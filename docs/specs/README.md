@@ -10,6 +10,12 @@
 | --- | --- | --- |
 | [M0 工程基线](./m0-engineering-baseline/spec.md) | M0 | Monorepo、十二包骨架、工具链、边界门禁和私有 tarball 验收 |
 
+## 设计中
+
+| Spec | 阶段 | 说明 |
+| --- | --- | --- |
+| [Contracts Foundation](./contracts-foundation/spec.md) | P0 | Canonical Document、JSON boundary、parser、诊断、序列化和 JSON Schema |
+
 ## 使用规则
 
 - Spec 必须引用已接受 ADR，并提供 Requirements、验收场景和完成定义。
