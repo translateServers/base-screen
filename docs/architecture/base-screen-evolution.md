@@ -1029,6 +1029,8 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 实施依据：[M0 工程基线 Spec](../specs/m0-engineering-baseline/spec.md)
 
+实施状态（2026-08-03）：本地 Node 22 已完成十二包工程初始化并通过 `pnpm verify:m0`；Node 24 由 CI matrix 验证。
+
 交付：
 
 - 本总纲评审通过。

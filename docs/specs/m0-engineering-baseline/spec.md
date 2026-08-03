@@ -18,6 +18,10 @@ M0 只建立可重复、可检查、可打包的工程底座，不实现 Screen 
 - Changesets 私有阶段版本记录。
 - License、provenance 和默认无副作用基线。
 
+## 实施状态
+
+2026-08-03 本地在 Node 22.20.0、pnpm 11.18.0 完成 M0 初始化，并通过 `pnpm verify:m0`。Node 24.18.1 验证由新增 CI matrix 执行；首次 CI 结果是 M0 的远程环境验证记录。
+
 ## 2. 非目标
 
 M0 不包含：
@@ -179,7 +183,7 @@ M0 可以尚未创建 `examples/`。不存在的 glob 不构成错误。
 - `build` 依赖 `^build`，输出 `dist/**`。
 - `typecheck` 依赖 `^build`，无输出。
 - `lint` 依赖 `^build`，无输出。
-- `test` 依赖当前 package `build`，输出 `coverage/**`。
+- `test` 依赖当前 package `build`；测试开始产出 coverage 后再将其声明为 Turbo output。
 - `clean` 不缓存。
 
 Turbo 只编排 package scripts，不复制边界、tarball 或发布逻辑。
@@ -192,6 +196,7 @@ Turbo 只编排 package scripts，不复制边界、tarball 或发布逻辑。
 {
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "files": ["dist"],
   "sideEffects": false,
