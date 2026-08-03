@@ -186,7 +186,7 @@ packages/
 └── testing/          # 契约夹具、Fake Adapter 和一致性测试工具
 ```
 
-建议发布名统一使用 `@base-screen/*` scope。最终 npm scope、仓库工具链和发布平台需要在工程初始化 ADR 中冻结。
+M0 内部逻辑包名统一使用 `@base-screen/*`，十二包保持 private。公开 npm scope 不在 M0 范围内；工具链和私有阶段规则由已接受的 [ADR-0001](../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md) 冻结。
 
 ### 4.2 `@base-screen/contracts`
 
@@ -379,7 +379,7 @@ testing       (+ public packages under test; production packages never point bac
 - `material`、`react`、`vue` 不依赖 engine、renderer 或 sdk。
 - workspace 内部包不得通过 `sdk` 反向获取底层类型。
 - `sdk` 是依赖图顶层之一，不作为内部共享包。
-- `testing` 只能出现在测试、示例和开发依赖中。
+- `testing` 只允许被 examples、外部 consumer 和独立测试工程依赖；十二个正式生产包的任何 dependency 类型都不得指向 testing。
 - 所有包禁止 import 应用目录或 Nebula 源码。
 
 这些规则必须由依赖图检查、声明文件检查和发布 tarball 验证共同守护。
@@ -638,12 +638,13 @@ Custom Element 只能观察 `disconnectedCallback()`，无法知道一次移除�
 
 ### 8.5 宿主框架接入
 
-React 19、Vue 3 和其他现代框架直接消费标准 `<base-screen-designer>` 与 `<base-screen-viewer>`。SDK 应提供：
+React 19、Vue 3 和其他现代框架直接消费标准 `<base-screen-designer>` 与 `<base-screen-viewer>`。SDK 保持框架无关，并提供：
 
 - 完整 Custom Element TypeScript 类型。
-- React JSX 和 Vue template 类型增强方案。
 - property 设置、事件订阅和生命周期示例。
 - 对框架更新时序的适配说明。
+
+SDK 不发布引用 React/Vue module 的声明。React JSX 和 Vue template/GlobalComponents 的增强以 consumer-local module augmentation 配方和可编译示例提供，由宿主项目显式采用；框架 bridge 仍只服务物料作者。
 
 首期不维护重型宿主包装组件。若标准 Custom Element 在某框架中存在无法通过薄 helper 解决的高频问题，再通过独立 ADR 评估 host bridge。
 
@@ -1026,6 +1027,8 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 目标：让仓库具备可以安全开始实现的边界。
 
+实施依据：[M0 工程基线 Spec](../specs/m0-engineering-baseline/spec.md)
+
 交付：
 
 - 本总纲评审通过。
@@ -1106,7 +1109,8 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 - `@base-screen/react` 与真实 React 物料。
 - `@base-screen/vue` 与真实 Vue SFC 物料。
-- SDK 正式子路径、类型增强和注册契约稳定化。
+- SDK 正式子路径、框架无关 DOM 类型和注册契约稳定化。
+- React/Vue consumer-local 类型增强示例和类型检查 fixture。
 - Vanilla、React、Vue tarball consumers。
 - 框架物料作者指南。
 
@@ -1182,16 +1186,16 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 ## 18. 初始 ADR 清单
 
-| ADR | 主题 | 优先级 |
-| --- | --- | --- |
-| ADR-0001 | Monorepo、工具链、包发布与依赖方向 | M0 |
-| ADR-0002 | Canonical Screen Document 与迁移策略 | M1 |
-| ADR-0003 | Web Component 物料 ABI 与注册规则 | M1 |
-| ADR-0004 | 插件生命周期、贡献点和信任边界 | M1/M6 |
-| ADR-0005 | Renderer DOM、样式和 Shadow DOM 策略 | M2 |
-| ADR-0006 | Designer Engine 内部 UI 与交互技术选型 | M3 |
-| ADR-0007 | Host Resource 安全与执行模型 | M5 |
-| ADR-0008 | Nebula importer 与集成边界 | M7 |
+| ADR | 主题 | 状态 | 优先级 |
+| --- | --- | --- | --- |
+| [ADR-0001](../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md) | Monorepo、工具链、私有阶段版本与依赖方向 | 已接受 | M0 |
+| ADR-0002 | Canonical Screen Document 与迁移策略 | 待起草 | M1 |
+| ADR-0003 | Web Component 物料 ABI 与注册规则 | 待起草 | M1 |
+| ADR-0004 | 插件生命周期、贡献点和信任边界 | 待起草 | M1/M6 |
+| ADR-0005 | Renderer DOM、样式和 Shadow DOM 策略 | 待起草 | M2 |
+| ADR-0006 | Designer Engine 内部 UI 与交互技术选型 | 待起草 | M3 |
+| ADR-0007 | Host Resource 安全与执行模型 | 待起草 | M5 |
+| ADR-0008 | Nebula importer 与集成边界 | 待起草 | M7 |
 
 ## 19. 已确认决策
 
@@ -1209,6 +1213,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | 插件边界 | 物料与插件分离；插件可以贡献已定义物料和受控能力 |
 | 包结构 | contracts、core、renderer、engine、material、plugin-core、plugin-manager、plugin-sdk、react、vue、sdk、testing |
 | Testing | 独立发布包，生产包不得依赖 |
+| M0 发布边界 | 十二包使用 `@base-screen/*` 内部逻辑名并保持 private；公开 npm scope 延后决策 |
 | 数据边界 | static + host-resource；宿主执行副作用 |
 | 安全模型 | 首期只支持宿主显式导入的受信代码 |
 
@@ -1259,3 +1264,8 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | --- | --- |
 | 2026-08-03 | 创建长期演进总纲，冻结独立开源定位、十二包结构、Web Component 物料注册、框架桥接、插件边界和阶段路线 |
 | 2026-08-03 | 架构复核：明确 Core/Engine 状态所有权、插件命令端口、产品元素归属、bridge 断连协议、注册边界、来源审查和 importer 语义 |
+| 2026-08-03 | 新增 ADR-0001 回链，开始评审 Monorepo、工具链、发布和依赖门禁提案 |
+| 2026-08-03 | 按评审收紧 testing 依赖语义，并将 ADR-0001 Node 基线调整为 Node.js 22+ |
+| 2026-08-03 | 将 React JSX 与 Vue template 类型增强调整为 consumer-local 配方，保持 SDK 和 bridge 依赖方向不变 |
+| 2026-08-03 | 接受 ADR-0001；M0 十二包保持 private，公开 npm scope 延后到首次公开发布前决策 |
+| 2026-08-03 | 新增生效中的 M0 工程基线 Spec，冻结工具链、十二包骨架、边界门禁和私有 tarball 验收 |

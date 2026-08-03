@@ -1,0 +1,31 @@
+# Base Screen 架构决策记录
+
+> 状态：生效中
+> 最近更新：2026-08-03
+> 定位：索引 Base Screen 的架构决策、状态及其影响范围
+
+## 使用规则
+
+- ADR 记录影响公共契约、依赖方向、安全边界、兼容策略或工程基线的重要决策。
+- 状态流转为：设计中 -> 评审中 -> 已接受 -> 已取代或已废弃。
+- 已接受 ADR 不修改历史结论；方向变化时新增 ADR，并在新旧文档中互相标注。
+- 评审中 ADR 不能作为实施授权。进入代码实现前还需要 acceptance-oriented Spec。
+- ADR 中的示例配置用于冻结语义；精确实现文件由对应 Spec 验收。
+
+## 决策索引
+
+| ADR | 状态 | 日期 | 主题 |
+| --- | --- | --- | --- |
+| [ADR-0001](./ADR-0001-monorepo-toolchain-and-package-boundaries.md) | 已接受 | 2026-08-03 | Monorepo、工具链、私有阶段版本与十二包依赖边界 |
+
+## 计划决策
+
+| ADR | 优先级 | 主题 |
+| --- | --- | --- |
+| ADR-0002 | M1 | Canonical Screen Document 与迁移策略 |
+| ADR-0003 | M1 | Web Component 物料 ABI 与注册规则 |
+| ADR-0004 | M1/M6 | 插件生命周期、贡献点和信任边界 |
+| ADR-0005 | M2 | Renderer DOM、样式和 Shadow DOM 策略 |
+| ADR-0006 | M3 | Designer Engine 内部 UI 与交互技术选型 |
+| ADR-0007 | M5 | Host Resource 安全与执行模型 |
+| ADR-0008 | M7 | Nebula importer 与集成边界 |
