@@ -49,5 +49,11 @@ describe('project lifecycle contracts', () => {
     expectTypeOf<ScreenProjectAdapter['load']>().returns.toEqualTypeOf<
       Promise<import('../index.js').ScreenParseResult<ScreenProjectEnvelope>>
     >();
+    expectTypeOf<ScreenProjectAdapter['save']>().returns.toEqualTypeOf<
+      Promise<import('../index.js').ScreenParseResult<ScreenProjectEnvelope>>
+    >();
+    expectTypeOf<NonNullable<ScreenProjectAdapter['publish']>>().returns.toEqualTypeOf<
+      Promise<import('../index.js').ScreenParseResult<ScreenProjectEnvelope>>
+    >();
   });
 });

@@ -9,6 +9,10 @@ import { MAX_ARRAY_ITEMS, MAX_JSON_DEPTH, MAX_OBJECT_KEYS, MAX_STRING_BYTES } fr
 
 export type PreflightContext = {
   readonly maxBytes: number;
+  readonly maxDepth?: number;
+  readonly maxStringBytes?: number;
+  readonly maxObjectKeys?: number;
+  readonly maxArrayItems?: number;
   readonly limitCode: ScreenDiagnosticCode;
   readonly totalOverrunPath?: readonly DiagnosticSegment[];
 };
@@ -68,12 +72,12 @@ function walkJson(
       status = 'violated';
     }
     const bytes = escapedJsonStringByteLength(value);
-    if (bytes > MAX_STRING_BYTES) {
+    if (bytes > (context.maxStringBytes ?? MAX_STRING_BYTES)) {
       collector.add(
         context.limitCode,
         path,
         phase,
-        `String exceeds the maximum size of ${MAX_STRING_BYTES} UTF-8 bytes.`,
+        `String exceeds the maximum size of ${context.maxStringBytes ?? MAX_STRING_BYTES} UTF-8 bytes.`,
       );
       return 'aborted';
     }
@@ -98,12 +102,12 @@ function walkJson(
     collector.add('JSON_CYCLE', path, phase, 'JSON value contains a reference cycle.');
     return 'violated';
   }
-  if (depth + 1 > MAX_JSON_DEPTH) {
+  if (depth + 1 > (context.maxDepth ?? MAX_JSON_DEPTH)) {
     collector.add(
       context.limitCode,
       path,
       phase,
-      `JSON nesting exceeds the maximum depth of ${MAX_JSON_DEPTH}.`,
+      `JSON nesting exceeds the maximum depth of ${context.maxDepth ?? MAX_JSON_DEPTH}.`,
     );
     return 'aborted';
   }
@@ -142,12 +146,12 @@ function walkObject(
   }
   const descriptors = Object.getOwnPropertyDescriptors(value);
   const keys = Object.keys(descriptors);
-  if (keys.length > MAX_OBJECT_KEYS) {
+  if (keys.length > (context.maxObjectKeys ?? MAX_OBJECT_KEYS)) {
     collector.add(
       context.limitCode,
       path,
       phase,
-      `Object has more than ${MAX_OBJECT_KEYS} own keys.`,
+      `Object has more than ${context.maxObjectKeys ?? MAX_OBJECT_KEYS} own keys.`,
     );
     return 'aborted';
   }
@@ -194,12 +198,12 @@ function walkObject(
       continue;
     }
     const keyBytes = escapedJsonStringByteLength(key);
-    if (keyBytes > MAX_STRING_BYTES) {
+    if (keyBytes > (context.maxStringBytes ?? MAX_STRING_BYTES)) {
       collector.add(
         context.limitCode,
         childPath,
         phase,
-        `Property name exceeds the maximum size of ${MAX_STRING_BYTES} UTF-8 bytes.`,
+        `Property name exceeds the maximum size of ${context.maxStringBytes ?? MAX_STRING_BYTES} UTF-8 bytes.`,
       );
       return 'aborted';
     }
@@ -262,8 +266,13 @@ function walkArray(
     return 'violated';
   }
   const length = lengthDescriptor.value;
-  if (length > MAX_ARRAY_ITEMS) {
-    collector.add(context.limitCode, path, phase, `Array has more than ${MAX_ARRAY_ITEMS} items.`);
+  if (length > (context.maxArrayItems ?? MAX_ARRAY_ITEMS)) {
+    collector.add(
+      context.limitCode,
+      path,
+      phase,
+      `Array has more than ${context.maxArrayItems ?? MAX_ARRAY_ITEMS} items.`,
+    );
     return 'aborted';
   }
   let indexCount = 0;

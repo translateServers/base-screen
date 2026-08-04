@@ -51,6 +51,15 @@ describe('parseScreenJsonValue', () => {
     }
   });
 
+  it('enforces caller-selected JSON budgets without allowing global limits to increase', () => {
+    expect(parse({ value: { nested: true } }, { maxDepth: 1 })).toMatchObject({ ok: false });
+    expect(parse({ first: 1, second: 2 }, { maxObjectKeys: 1 })).toMatchObject({ ok: false });
+    expect(parse([1, 2], { maxArrayItems: 1 })).toMatchObject({ ok: false });
+    expect(parse('four', { maxStringBytes: 3 })).toMatchObject({ ok: false });
+    expect(parse({ value: 'four' }, { maxBytes: 4 })).toMatchObject({ ok: false });
+    expect(() => parse(null, { maxDepth: 65 })).toThrow(RangeError);
+  });
+
   it('accepts Object.create(null) input and outputs plain objects', () => {
     const input = Object.create(null) as Record<string, unknown>;
     input.value = 1;
