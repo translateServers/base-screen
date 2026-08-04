@@ -8,3 +8,4 @@ test-results/
 tarballs/
 packages/*/LICENSE
 *.tsbuildinfo
+.workbuddy
