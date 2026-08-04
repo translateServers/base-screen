@@ -18,6 +18,7 @@ import {
   type BaseScreenMaterialMode,
   type BaseScreenMaterialModel,
   type BaseScreenMaterialObjectSchema,
+  type BaseScreenRuntimeContributionIndex,
   parseBaseScreenMaterialEventDetail,
   validateBaseScreenMaterialProps,
 } from '@base-screen/plugin-core';
@@ -37,10 +38,7 @@ export interface CreateBaseScreenRendererOptions {
   readonly onMaterialEvent: ((event: BaseScreenMaterialEvent) => void) | undefined;
   readonly resourcePort: ScreenHostResourcePort | undefined;
   readonly resourceTimeoutMs?: number;
-  readonly resourceTypes?: ReadonlyMap<
-    string,
-    { readonly configSchema: BaseScreenMaterialObjectSchema }
-  >;
+  readonly contributionIndex?: BaseScreenRuntimeContributionIndex;
 }
 
 export interface BaseScreenRenderer {
@@ -93,7 +91,7 @@ class Renderer implements BaseScreenRenderer {
       this.options.catalog,
       this.options.mode,
       this.options.interactive,
-      this.options.resourceTypes,
+      this.options.contributionIndex,
     );
     if (!prepared.ok) {
       return prepared;
@@ -297,9 +295,7 @@ function prepareCandidates(
   catalog: BaseScreenMaterialCatalog,
   mode: BaseScreenMaterialMode,
   interactive: boolean,
-  resourceTypes:
-    | ReadonlyMap<string, { readonly configSchema: BaseScreenMaterialObjectSchema }>
-    | undefined,
+  contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
 ): ScreenParseResult<readonly RenderCandidate[]> {
   const candidates: RenderCandidate[] = [];
   const diagnostics: ScreenDiagnostic[] = [];
@@ -337,7 +333,7 @@ function prepareCandidates(
       );
       continue;
     }
-    const dataState = getDataState(component, entry, index, diagnostics, resourceTypes);
+    const dataState = getDataState(component, entry, index, diagnostics, contributionIndex);
     if (dataState === undefined) {
       continue;
     }
@@ -365,9 +361,7 @@ function getDataState(
   entry: BaseScreenMaterialCatalogEntry,
   index: number,
   diagnostics: ScreenDiagnostic[],
-  resourceTypes:
-    | ReadonlyMap<string, { readonly configSchema: BaseScreenMaterialObjectSchema }>
-    | undefined,
+  contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
 ): BaseScreenMaterialDataState | undefined {
   if (component.dataSource === null) {
     return { status: 'idle' };
@@ -387,8 +381,8 @@ function getDataState(
     return undefined;
   }
   if (component.dataSource.type === 'host-resource') {
-    const schema = resourceTypes?.get(component.dataSource.resourceType);
-    if (resourceTypes !== undefined && schema === undefined) {
+    const resourceType = contributionIndex?.getResourceType(component.dataSource.resourceType);
+    if (contributionIndex !== undefined && resourceType === undefined) {
       diagnostics.push(
         diagnostic(
           'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
@@ -398,10 +392,10 @@ function getDataState(
       );
       return undefined;
     }
-    if (schema !== undefined) {
+    if (resourceType !== undefined) {
       const params = validateBaseScreenMaterialProps(
         component.dataSource.params,
-        schema.configSchema,
+        resourceType.configSchema,
       );
       if (!params.ok) {
         diagnostics.push(
