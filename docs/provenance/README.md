@@ -12,6 +12,7 @@ M0 不引入 Nebula 源码、应用配置或资产。本目录当前仅建立记
 
 - [Nebula Importer](./nebula-importer.md)：legacy export shape 与离线迁移研究。
 - [Nebula Designer Parity](./nebula-designer-parity.md)：Designer 可观察样式/行为兼容研究与 no-copy 边界。
+- [Lucide Designer Icons](./lucide-designer-icons.md)：Engine 私有 SVG 图标的 ISC 许可来源与修改记录。
 
 ## 单文件记录模板
 

@@ -23,6 +23,7 @@
 
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
+| [Designer Workbench Control Styles](./designer-workbench-control-styles/spec.md) | M3 增量 | Engine 私有设计 token、语义控件、Shadow DOM 样式隔离与视觉验收 |
 | [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/spec.md) | P6-P7/M7-M8 增量 | Sandbox/Host Resource/Blueprint/plugin contribution、tarball bridge consumer 与 importer 生产级验收 |
 
 ## 已归档
