@@ -3,7 +3,7 @@
 > Status: Active
 > Date: 2026-08-04
 > Governing spec: [Runtime And Ecosystem Hardening](../../specs/runtime-ecosystem-hardening/spec.md)
-> Decisions: [ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md), [ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-v2.md), [ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md)
+> Decisions: [ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md), [ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md), [ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md)
 
 ## Guardrails
 
@@ -13,8 +13,8 @@
 
 ## Delivery sequence
 
-1. **Contracts V2 (R3-R4):** introduce strict V1/V2 Blueprint types, schemas, diagnostics, reference validation, serializer stability, and regenerate `screen-document.schema.json`.
-2. **Core V2 evaluator (R3-R4):** compile/evaluate expressions and conditions against readonly capability index; retain V1 deep equality fixtures.
+1. **Contracts Blueprint shape (R3-R4):** define the current Blueprint types, schemas, diagnostics, reference validation, serializer behavior, and regenerate `screen-document.schema.json`.
+2. **Core Blueprint evaluator (R3-R4):** compile/evaluate expressions and conditions against readonly capability index.
 3. **Contribution projection (R5):** create immutable per-Manager runtime index from active catalog; pass read-only resource/capability validation data to Renderer/Core without runtime handlers or ports.
 4. **Renderer deadline (R2):** validate `resourceTimeoutMs`, add request timers/abort classification, preserve generation guard, and add external testing conformance helper.
 5. **Remote transport (R1):** migrate sandbox option to `entryUrl`, implement ADR-0009 preflight/state machine and add isolated Chromium harness.

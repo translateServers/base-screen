@@ -7,7 +7,7 @@
   "components": [
     {
       "id": "headline",
-      "type": "base.text/v1",
+      "type": "base.text",
       "name": "Headline",
       "position": { "x": 16, "y": 16 },
       "size": { "width": 280, "height": 48 },

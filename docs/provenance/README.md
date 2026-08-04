@@ -1,12 +1,17 @@
 # Base Screen 来源记录
 
 > 状态：生效中
-> 最近更新：2026-08-03
+> 最近更新：2026-08-04
 > 定位：记录进入 Base Screen 的外部或 Nebula 衍生源码来源、授权和 attribution 决策
 
 ## M0 基线
 
 M0 不引入 Nebula 源码、应用配置或资产。本目录当前仅建立记录格式。
+
+## 记录索引
+
+- [Nebula Importer](./nebula-importer.md)：legacy export shape 与离线迁移研究。
+- [Nebula Designer Parity](./nebula-designer-parity.md)：Designer 可观察样式/行为兼容研究与 no-copy 边界。
 
 ## 单文件记录模板
 

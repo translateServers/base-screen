@@ -2,8 +2,9 @@
 
 > 状态：设计中
 > 最近更新：2026-08-04
-> 定位：增量冻结 Designer 完整编辑交互与 load/save/publish 项目生命周期，不扩展 runtime/plugin 语义
+> 定位：以 Nebula Designer 的可观察样式与功能为兼容基准，增量冻结 Base Screen Designer 与项目生命周期
 > 依据：[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[Designer Engine Spec](../designer-engine/spec.md)、[Core Domain Spec](../core-domain/spec.md)、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)
+> 来源：[Nebula Designer Parity Provenance](../../provenance/nebula-designer-parity.md)
 > 实施：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 
@@ -18,6 +19,10 @@ Engine 还没有把这些能力组装为可用设计器，项目会话也没有 
 该 document 是否 dirty。将它们放在同一增量 Spec 可以避免 UI 手势、历史和异步 save 各自维护
 不同基线。
 
+本增量同时把 Nebula Designer 作为产品兼容目标：尽可能复现其紧凑工作台结构、画布交互、工具、
+图层、属性、数据、事件、历史、快捷键、预览和项目流程。兼容目标是可观察行为与视觉测量值，
+不是源码同构；Base Screen 必须独立实现并继续遵守十二包边界。
+
 ## 2. 生效前置
 
 - 新增 Project Lifecycle ADR，冻结 `ScreenProjectAdapter` 的 publish、AbortSignal、冲突和 retry
@@ -27,6 +32,8 @@ Engine 还没有把这些能力组装为可用设计器，项目会话也没有 
 - grouping 若需要自动创建容器，宿主必须显式配置已启用且 `designCapabilities.children=true` 的
   `groupMaterialType`；不得向 canonical document 偷渡 synthetic node。
 - 本 Spec 评审生效后才能实施；现有 load/save 行为在此之前保持原样。
+- Nebula 参考 commit、路径、许可状态和 no-copy 结论必须记录在 provenance；当前参考仓库没有可
+  确认的 LICENSE，因此不得复制其 TypeScript、JSX、CSS、配置、SVG、字体或测试资产。
 
 ## 3. 目标
 
@@ -36,6 +43,8 @@ Engine 还没有把这些能力组装为可用设计器，项目会话也没有 
 - 建立可取消、generation-safe 的 load/save/publish controller。
 - 用 canonical baseline 精确跟踪 dirty，使 undo 回到保存点时重新 clean。
 - 显式处理 conflict 和 retry，不自动覆盖远端或自动重放 mutation。
+- 在 Base Screen 能力边界内达到 Nebula 工作台的视觉密度、布局、画布工具和作者工作流 parity。
+- 以分层 screenshot/geometry/workflow 门禁量化 parity，而不是依赖主观“看起来相似”。
 
 ## 4. 非目标
 
@@ -46,6 +55,9 @@ Engine 还没有把这些能力组装为可用设计器，项目会话也没有 
 - 不引入 React/Vue、第三方画布框架、全局 Store 或模块级 current session。
 - 不实现多人实时协作、merge editor、force overwrite、系统剪贴板或移动端编辑承诺。
 - 不修改 Renderer 的 Material DOM/model/event/resource 生命周期。
+- 不复制 Nebula 源码、样式表、主题配置、组件资产、图标、字体文件或截图到 MIT 发布产物。
+- 不复现 Nebula 的鉴权、TanStack Router/Query、项目列表、后端 DTO、API/dataset/requestApi、
+  Monaco loader、动态全局变量或 localStorage snapshot 策略。
 
 ## 5. 所有权与并行边界
 
@@ -53,7 +65,7 @@ Engine 还没有把这些能力组装为可用设计器，项目会话也没有 
 | --- | --- | --- |
 | Contracts | Project Adapter request/result/capability 与 project diagnostic | Host Resource/Blueprint ports |
 | Core | 编辑 transaction、selection/geometry 的缺口增量 | Canonical parser 与 runtime capability index |
-| Engine | Designer session、UI、history、clipboard、project controller | Material Catalog/Manifest、Renderer |
+| Engine | Designer session、parity shell/UI、history、clipboard、project controller、Blueprint authoring UI | Material Catalog/Manifest、Renderer、Blueprint runtime contract |
 | Testing | Designer Core/DOM/Playwright harness | Runtime conformance harness |
 
 配套的
@@ -231,7 +243,7 @@ operation。Publish 要求 adapter capability、phase=ready 且 dirty=false，�
 ### 8.6 Clipboard
 
 - Ctrl/Cmd+C 把 selection 的 detached canonical component subtree 写入 Designer 实例内存。
-- Ctrl/Cmd+V 为所有 node 生成新 id，重写内部 parent 引用并偏移 10 x 10。
+- Ctrl/Cmd+V 为所有 node 生成新 id，重写内部 parent 引用并偏移 20 x 20，与 Nebula 画布语义对齐。
 - 连续 paste 累加偏移；project replace/unload/dispose 清空 clipboard。
 - 不复制 selection、history、runtime data state、pending operation、project revision 或 baseline。
 - 首期不使用系统 Clipboard API，不跨 Designer 实例或浏览器 tab。
@@ -268,7 +280,117 @@ operation。Publish 要求 adapter capability、phase=ready 且 dirty=false，�
 - persistence response 不写入用户 history；服务端若返回不同 canonical document，只有在 current
   document 仍等于 submitted snapshot 时才能 replace present 并重建 baseline。
 
-## 11. ADDED Requirements
+Designer session 的 history limit 固定为 50，与 Nebula 可观察行为一致；Core 的通用默认值不因此
+改变。Viewport、guides、panel layout、clipboard、preview state 和 runtime overrides 不进入 history。
+
+## 11. Nebula Designer Parity Baseline
+
+### 11.1 兼容原则与层级
+
+- **P0 Structure**：工作台区域、稳定尺寸、主题变量、面板折叠/缩放和窄屏降级。
+- **P1 Authoring**：画布视口、七工具、选择/变换、图层、属性、历史、剪贴板和快捷键。
+- **P2 Integration**：static/host-resource 配置、Blueprint 作者界面、交互模式、预览、导入导出和
+  Project Adapter 状态。
+- **P3 Host-specific**：鉴权路由、API/dataset、动态变量、requestApi、Monaco 和 snapshot policy
+  明确不进入 Base Screen parity；宿主可通过既有端口另行组装。
+
+P0-P2 都属于本 Spec 的目标，但 P2 中 Blueprint authoring 必须等待 Runtime And Ecosystem
+Hardening Spec 冻结当前 Blueprint shape。等待上游期间可以完成 shell 和 fake-contract UI，不得复制或
+猜测 runtime schema。
+
+### 11.2 工作台几何
+
+| 区域 | Base Screen parity 目标 |
+| --- | --- |
+| Top toolbar | 48px 高，紧凑命令分组，常用 icon button 28px |
+| Bottom status | 28px 高，显示坐标/尺寸/旋转、缩放、模式、dirty/operation 状态 |
+| Left panel | 默认 240px，范围 200..400px，折叠后 48px |
+| Right panel | 默认 288px，范围 240..480px，折叠后 48px |
+| Panel resize handle | 4px，不因 hover 改变布局尺寸 |
+| Rulers | 顶部和左侧各 20px |
+| Workspace grid | 默认 24px，可关闭，不进入 document/history |
+| Panel section header | 32px 高，紧凑但可访问 |
+
+- 面板宽度、折叠和 UI hidden 状态属于每实例 preference，不进入 canonical document/history。
+- 默认不隐式访问 localStorage；宿主可监听 layout event 并在下次创建时显式回填 preference。
+- 工作台完整支持的最小 viewport 为 1024 x 640；更小时显示不可编辑警告，仍保证 dialog 不溢出、
+  element 不抛错且 Viewer preview 可正常工作。
+
+### 11.3 主题与视觉语言
+
+- 提供 light/dark 两组 Base Screen CSS custom properties：近中性背景/表面、清晰边框、高对比文字和
+  紫色强调色，视觉方向接近 Nebula，但 token 名称和值由 Base Screen 独立设计。
+- 默认字体栈允许宿主已有 Geist，回退 `ui-sans-serif, system-ui, sans-serif`；package 不分发字体。
+- 控件和容器圆角不超过 8px；toolbar/panel 使用平面分区，不嵌套装饰卡片。
+- 不增加 React/Radix/Lucide dependency。图标使用 Base Screen 独立实现的最小 SVG/symbol 集；熟悉
+  命令优先 icon，所有不熟悉 icon 有 tooltip 和可访问名称。
+- hover/focus/active/disabled/busy/conflict 状态使用同一语义 token，文本和图标在 light/dark 下均满足
+  WCAG AA；动画遵守 `prefers-reduced-motion`。
+
+### 11.4 Canvas、Viewport 与工具
+
+- Designer zoom UI 固定 10%..500%，支持 cursor-anchored wheel zoom、fit screen 30px margin、
+  zoom in/out、100% reset 和 Space 临时 Hand。
+- 支持 pan、20px rulers、draggable guides、24px grid、grid snap、5px smart-guide threshold；guide、
+  grid 和 smart-guide state 不进入 document/history。
+- 工具 registry 提供 Select(V)、Hand(H)、Text(T)、Rectangle(R)、Ellipse(E)、Image(I)、Zoom(Z)。
+- create tool 通过显式 `toolMaterialTypes` 映射到已启用 Material；缺失或 capability 不兼容时工具
+  disabled，不创建隐式内置 type。
+- Text 点击创建；shape/image 支持点击或拖拽创建；小于 4px 的拖拽取消，不产生 history。
+- 支持 select-all（排除 hidden/locked）、Alt-drag duplicate、双击进入 group 和分层 Escape。
+
+### 11.5 Layers、Properties 与数据
+
+- 左面板提供 Materials/Layers tabs；Layers 显示 component count、group tree、collapse、rename、
+  multi-select、visibility、lock、top/bottom/step ordering、group/ungroup 和 context commands。
+- 组件数不超过 50 时允许直接 drag sort；更大集合可 virtualize，但所有排序命令仍可用。
+- 右面板提供 Appearance/Data/Interaction/Events tabs。Appearance 包含 geometry、rotation、z-index、
+  lock/hide 和 Manifest property fields；没有选中时显示 Canvas settings。
+- Data tab 只编辑 canonical static/host-resource source。API、dataset、header、URL 测试和自动 refresh
+  不进入 Base Screen package。
+- Interaction tab 控制 design/interaction mode 和 Material 可交互状态；Events tab 提供“Open
+  Blueprint”以及当前 component 相关 rule 的只读摘要，不复制 Nebula QuickEvent 模板逻辑。
+- JSON property editor 仅使用 Base Screen 自有 textarea/JSON boundary；Monaco 属宿主可选增强。
+
+### 11.6 Blueprint authoring parity
+
+- Engine 提供 full-workspace Blueprint authoring surface，视觉上复用同一 toolbar/panel/status 语言。
+- 首版基于 canonical rule/condition 构建 trigger、condition、action 和 comment-like annotation
+  视图；节点/连线只是 authoring projection，不成为第二份 runtime truth。
+- 必须提供 selection、search insertion、connection validation、zoom 25%..200%、fit、minimap、
+  align/distribute、node config、diagnostics、simulation log、context menu 和 component locate/filter。
+- 若 canonical contract 不持久化节点 layout，使用确定性 auto-layout；不得把私有 layout 字段写进
+  document。未来持久化 layout 需要独立 ADR/Spec。
+- Blueprint UI 只调用 Runtime Spec 的 parser/compiler/fake runtime；Engine 不复制 evaluator 或执行
+  host action。
+
+### 11.7 Preview、文件与快捷键
+
+- Project mode Preview 只针对最近成功 save 的 projectId/revision 发出 host preview request，不把
+  unsaved in-memory document 伪装成已保存预览。
+- Direct document mode 可在 Designer 内切到同实例 Viewer preview；退出后恢复 viewport/selection。
+- 提供 canonical JSON import/export。Import 在 preview/confirm 后以一个 transaction 替换 document；
+  不承担 Nebula migration，legacy 文件继续走独立 importer。
+- 所有命令来自单一 shortcut registry，按 global/canvas/blueprint scope 仲裁；输入控件保留浏览器
+  undo、selection 和文本快捷键。
+- 目标是覆盖 Nebula 可对应的 file/edit/view/component/align/help/tool/ui 命令，而不是机械追求固定
+  数量；未实现能力不注册误导性快捷键。
+
+### 11.8 Visual 与 workflow 门禁
+
+- 在 1024x640、1440x900、1920x1080 验证 toolbar/status/ruler/panel/handle 尺寸，误差不超过 1px，
+  无 body scroll 或不一致 overlap。
+- 1440x900 light/dark shell 使用 Base Screen 自有 screenshot golden，`maxDiffPixelRatio <= 0.005`。
+- Materials、Layers、selected transform、四 Property tabs、Canvas settings、context menu、conflict 和
+  preview workflow screenshot 几何误差不超过 2px，diff ratio 不超过 0.01。
+- Blueprint empty/populated/config/diagnostics/log/search/context menu 在 1440x900 的 diff ratio 不超过
+  0.01。
+- 390x844 与 768x1024 只验收窄屏 warning、dialog containment 和无 runtime failure；Viewer preview
+  另在 390x844、412x915 验证居中缩放和无 body overflow。
+- Nebula 对比截图仅可作为本地、非提交审计输入；仓库只提交 Base Screen 独立生成的 goldens 和
+  数值结果。视觉 diff 不是复制未授权资产的许可。
+
+## 12. ADDED Requirements
 
 ### R1：Dirty baseline
 
@@ -310,7 +432,23 @@ operation。Publish 要求 adapter capability、phase=ready 且 dirty=false，�
 当用户编辑 Manifest 声明字段时，Designer SHALL 在 command 前验证完整 props；非法输入不得改变
 document/history/Renderer。
 
-## 12. Test Matrix
+### R9：Nebula-compatible shell
+
+Designer SHALL 以 §11 的区域、尺寸、主题、密度、状态和窄屏规则实现独立工作台，并通过 geometry
+与 screenshot 门禁；不得复制 Nebula CSS/asset/config。
+
+### R10：Nebula-compatible authoring workflow
+
+当对应 Material capability 可用时，Designer SHALL 提供七工具、ruler/guide/grid/smart-guide、
+select/create/duplicate/group、Layers、Properties、history、clipboard 和 scoped shortcuts 工作流。
+
+### R11：Nebula-compatible integration surfaces
+
+当 Runtime Spec 和 host capability 可用时，Designer SHALL 提供 static/host-resource 配置、
+Blueprint authoring projection、interaction mode、preview request 和 canonical import/export；缺失
+capability 时界面必须明确 disabled 或 absent，不得用宿主专有 fallback。
+
+## 13. Test Matrix
 
 | 领域 | 必测行为 |
 | --- | --- |
@@ -324,11 +462,14 @@ document/history/Renderer。
 | Layout | 六种 alignment、两种 distribution、locked reference、原子 transaction |
 | Layers/Clipboard | tree/reorder/status、双向 selection、id/reference rewrite、project 清理 |
 | Property | control/schema 映射、enum、非法 draft、完整 props validation、单历史 |
+| Parity shell | 三种 desktop viewport 几何、light/dark screenshot、panel resize/collapse、窄屏 warning |
+| Viewport/tools | 10%-500%、fit、ruler/guides/grid/smart guides、七工具、临时 Hand、4px create threshold |
+| Integration UI | Data/Interaction/Events tabs、Blueprint workspace、preview request、canonical import/export、scope shortcuts |
 
 Core 纯函数和 Engine controller 使用 Vitest；真实 Pointer Events、Shadow DOM、keyboard、project races
 使用独立 Designer Playwright harness。该 harness 不承担 sandbox/resource/framework/importer 测试。
 
-## 13. 完成定义
+## 14. 完成定义
 
 - Project Lifecycle ADR 已接受，Contracts adapter/result/diagnostic 与本 Spec 一致。
 - load/save/publish、cancel、conflict、dirty baseline 和 retry 均有单元与浏览器 race 测试。
@@ -337,6 +478,8 @@ Core 纯函数和 Engine controller 使用 Vitest；真实 Pointer Events、Shad
 - 所有 persistent high-level action 通过 Core command/transaction，只产生一个 history entry。
 - pointer/project cancellation 和迟到结果不会污染新 document、revision、baseline 或 DOM。
 - 两个 Designer 实例的 selection、history、clipboard、project operation 和 UI 状态完全隔离。
-- 本 Spec 未修改 Remote Sandbox、Host Resource、Blueprint、plugin contribution、framework bridge
-  或 importer 契约。
+- P0-P2 parity matrix 已完成，截图/geometry/workflow evidence 满足 §11.8；所有已知有意差异有记录。
+- Nebula 样式与功能只作为可观察兼容基准，发布产物不包含其源码、CSS、配置、资产或截图。
+- 本 Spec 未修改 Remote Sandbox、Host Resource、Blueprint schema/compiler/runtime、plugin
+  contribution、framework bridge 或 importer 契约。
 - 定向检查及 `pnpm verify:m0` 全部通过，且不存在未记录的公共 API 偏离。

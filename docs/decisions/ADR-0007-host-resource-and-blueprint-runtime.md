@@ -1,13 +1,13 @@
 # ADR-0007: Host Resource And Blueprint Runtime
 
-> Status: Superseded by [ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-v2.md)
+> Status: Superseded by [ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-runtime.md)
 > Date: 2026-08-04
 > Scope: host-resource intent, restricted Blueprint rules, and runtime host ports
 > Implements: [Host Resource And Blueprint Spec](../specs/host-resource-blueprint/spec.md)
 
 ## Decision
 
-1. `blueprint: { apiVersion: 1, rules: [] }` is a required field of the canonical
+1. `blueprint: { rules: [] }` is a required field of the canonical
    Screen Document. It is a bounded data-only rule set, not executable code.
 2. A `host-resource` source declares only `resourceType`, `resourceId`, and JSON `params`.
    It cannot persist URLs, methods, headers, tokens, cookies, or functions.

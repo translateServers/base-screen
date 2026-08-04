@@ -11,8 +11,8 @@ Base Screen must render first-party and third-party material consistently withou
 
 ## Decision
 
-1. A document persists a namespaced, versioned material `type`, never a tag name, constructor, package name, module URL, or framework component.
-2. Every material exposes an explicit, versioned Custom Element `tagName` in a strict serializable manifest. `type`, material ABI version, implementation SemVer, tag name, and package SemVer are distinct compatibility axes.
+1. A document persists a namespaced material `type`, never a tag name, constructor, package name, module URL, or framework component.
+2. Every material exposes an explicit Custom Element `tagName` in a strict serializable manifest. `type` and tag name are stable identities; package SemVer remains a distribution concern outside the document contract.
 3. The stable runtime ABI is a `BaseScreenMaterialElement` with a complete `model` JavaScript property and a `BaseScreenMaterialConstructor` with a static `manifest` property. Complex state does not cross the ABI through attributes.
 4. Renderer writes a full detached model atomically, reuses an existing element for ordinary model changes, and obtains component identity, mode, and interactivity from its own trusted context.
 5. Materials issue only `base-screen-material-event` events with a declared event name and JSON-bounded payload. Renderer accepts only bubbling, composed events whose name is in the enabled manifest allowlist; event detail never establishes component identity or permissions.
@@ -48,7 +48,7 @@ Rejected because JSON attributes lose type and identity fidelity, create size an
 
 ## Verification
 
-- Plugin Core parsers validate strict manifests, versioned identities, declared events, and detached JSON data.
+- Plugin Core parsers validate strict manifests, stable identities, declared events, and detached JSON data.
 - Plugin SDK registration tests cover same-constructor idempotence and different-constructor rejection against a real Custom Element registry.
 - Plugin Manager tests prove that catalog snapshots are instance-local and no package defines or enumerates browser-global elements during import or candidate resolution.
 - Renderer tests prove model property updates preserve the material instance and gate untrusted event data.

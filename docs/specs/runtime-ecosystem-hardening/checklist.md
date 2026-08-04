@@ -3,14 +3,14 @@
 ## 文档与决策
 
 - [x] Remote Sandbox successor ADR 已接受，并消除 opaque origin/exact-origin 矛盾（ADR-0009）。
-- [x] Host Resource deadline/Blueprint V2 successor ADR 已接受，ADR-0007 的旧所有权已由 ADR-0010 取代。
+- [x] Host Resource deadline/Blueprint runtime successor ADR 已接受，ADR-0007 的旧所有权已由 ADR-0010 取代。
 - [x] Nebula importer ADR 使用唯一新编号，决策索引不再重复 `ADR-0008`（ADR-0011）。
 - [x] Contracts Foundation、Host Resource、Sandbox、Plugin Manager 和 Importer 现行 Spec 已同步。
 - [x] 本 Spec 状态为“生效中”，R1-R7 均有 Task 与自动化测试映射。
 
 ## 所有权边界
 
-- [ ] Contracts 变更只涉及 Blueprint V2、runtime port 和对应 diagnostics，不改 Project Adapter。
+- [ ] Contracts 变更只涉及 Blueprint、runtime port 和对应 diagnostics，不改 Project Adapter。
 - [ ] Core 只增加 Blueprint compile/evaluate，不拥有 DOM、Renderer 或 Engine session。
 - [ ] Renderer 不复制 contribution parser，不访问 Plugin runtime 或 project persistence。
 - [ ] Plugin Manager index 是实例级 readonly snapshot，不含 handler、resolver、credential 或 host object。
@@ -40,10 +40,9 @@
 - [ ] `@base-screen/testing` conformance 覆盖 success/reject/throw/malformed/never-settling 和所有取消路径。
 - [ ] production package 不反向依赖 `@base-screen/testing`。
 
-## Blueprint V2
+## Blueprint
 
-- [ ] V1 文档、parser、serializer、compiler 和 runtime fixture 行为保持不变。
-- [ ] V2 是 strict 判别分支，V1/V2 不 strip、不猜测、不隐式迁移。
+- [ ] Blueprint 使用一个 strict canonical shape，不 strip、不猜测、不隐式迁移。
 - [ ] value expression 支持 literal/event/variable/array/object 且输出 detached JSON。
 - [ ] path 拒绝危险键并遵守 segment、depth、container 和 byte 上限。
 - [ ] condition 对 `exists` 和其他 operator 执行正确的 right 条件必填验证。
@@ -58,7 +57,7 @@
 - [ ] `dataResourceType.id` 与 Document `resourceType` 建立唯一、大小写敏感映射。
 - [ ] source params 在 Host port 调用前通过 contribution config schema。
 - [ ] Blueprint capability 只接受稳定、宿主支持、已声明且获授权的 id。
-- [ ] V2 plan 缺少 required capability 时 fail closed，不执行部分 rule。
+- [ ] Blueprint plan 缺少 required capability 时 fail closed，不执行部分 rule。
 - [ ] contribution 不包含或取得 resolver、handler、URL、credential 或 runtime port。
 - [ ] deactivate/dispose 撤销 current index，旧 snapshot 无 runtime authority。
 - [ ] 双实例不同 contribution/authorization 不互相污染。
@@ -91,4 +90,4 @@
 - [ ] diagnostics/captured output 不包含 canary secret、完整 URL/payload/Error/stack。
 - [ ] 受影响 package format/lint/typecheck/test/build 全部通过。
 - [ ] boundary、API report、publint、ATTW、tarball、browser 和 importer verification 全部通过。
-- [ ] `pnpm verify:m0` 通过，既有 V1、Viewer、Plugin Manager 和 framework bridge 无回归。
+- [ ] `pnpm verify:m0` 通过，Viewer、Plugin Manager 和 framework bridge 无回归。

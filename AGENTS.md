@@ -21,6 +21,7 @@
 
 - `@base-screen/contracts` is the sole owner of canonical document types, parsing, diagnostics, serialization, and JSON Schema. Do not duplicate or bypass its parser in another package.
 - Its canonical parser is fail-closed: do not add unknown-field stripping, defaulting, coercion, or implicit future-version fallback. Public document-contract changes require an accepted ADR and an active Spec first.
+- Exploratory-stage naming rule: do not introduce or retain `V1`/`V2`/`V3`, `v1`/`v2`/`v3`, `/vN`, `-vN`, version marker fields such as `apiVersion`/`schemaVersion`/`implementationVersion`, version-discriminated branches, or version-suffixed public names in documents, material identities, tag names, manifests, fixtures, ADRs, Specs, plans, or public APIs. Use one current shape and one stable name. Any compatibility or versioning design requires explicit user approval after the project leaves this stage.
 - `packages/contracts/src/screen-document.schema.json` is a committed golden artifact generated from the built schema with `pnpm --filter @base-screen/contracts build` followed by `node scripts/emit-schema-golden.mjs`. Commit a deliberate golden update with its schema change; the build only copies it into `dist`.
 
 ## Documentation And Provenance

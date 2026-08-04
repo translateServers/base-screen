@@ -9,10 +9,8 @@ import { createBaseScreenPluginManager } from './manager.js';
 
 function materialManifest(overrides: Record<string, unknown> = {}) {
   return {
-    apiVersion: 1 as const,
-    type: 'acme.kpi-card/v1',
-    implementationVersion: '1.0.0',
-    tagName: 'acme-kpi-card-v1',
+    type: 'acme.kpi-card',
+    tagName: 'acme-kpi-card',
     name: 'KPI Card',
     category: 'Charts',
     keywords: ['kpi'],
@@ -36,7 +34,6 @@ function pluginManifest(
   overrides: Partial<BaseScreenPluginManifest> = {},
 ): BaseScreenPluginManifest {
   return {
-    apiVersion: 1,
     id: 'acme.plugin',
     version: '1.0.0',
     dependencies: [],

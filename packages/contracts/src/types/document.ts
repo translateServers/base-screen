@@ -85,7 +85,6 @@ export interface ScreenBlueprintRule {
 }
 
 export interface ScreenBlueprint {
-  readonly apiVersion: 1;
   readonly rules: readonly ScreenBlueprintRule[];
 }
 

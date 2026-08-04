@@ -8,7 +8,6 @@ describe('Blueprint runtime', () => {
       components: [makeComponent({ id: 'button' })],
       variables: [makeVariable({ name: 'count', value: 0 })],
       blueprint: {
-        apiVersion: 1,
         rules: [
           {
             id: 'increment',

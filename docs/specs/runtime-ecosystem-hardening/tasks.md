@@ -2,7 +2,7 @@
 
 - [x] Task 1：完成生效前 ADR 与上游契约冻结（R1-R7）。
   - [x] 新增并接受 Remote Sandbox successor ADR，解决 opaque origin 与 exact-origin 的冲突（ADR-0009）。
-  - [x] 新增并接受 Host Resource deadline/Blueprint V2 successor ADR（ADR-0010）。
+  - [x] 新增并接受 Host Resource deadline/Blueprint runtime successor ADR（ADR-0010）。
   - [x] 使用唯一新编号新增 Nebula importer ADR，并修正决策索引中的重复编号（ADR-0011）。
   - [x] 同步 Contracts Foundation、Host Resource And Blueprint、Remote Plugin Sandbox、Plugin Manager Runtime 与 Nebula Importer Spec。
   - [x] 将本 Spec 状态改为“生效中”，并建立实施计划。
@@ -23,16 +23,16 @@
   - [ ] 在 `@base-screen/testing` 增加只消费公共 API 的 conformance helper。
   - [ ] 保持 production package 不依赖 Testing，Renderer 不自动 retry/cache/deduplicate。
 
-- [ ] Task 4：冻结并实现 Blueprint V2 Contracts（R3、R4）。
-  - [ ] 把 Blueprint 定义为 V1/V2 判别联合，保持 V1 strict shape 和序列化不变。
+- [ ] Task 4：冻结并实现当前 Blueprint Contracts（R3、R4）。
+  - [ ] 定义一个严格的 Blueprint shape，不引入判别联合或兼容分支。
   - [ ] 实现 literal/event-payload/variable/array/object value expression schema。
   - [ ] 实现 path 危险键、深度、container 和 byte 预算。
   - [ ] 实现 condition operator 的条件必填和类型兼容校验。
   - [ ] 增加 `requiredCapabilities` 与稳定 capability id grammar。
   - [ ] 更新 canonical parser、serializer、reference validation 和 JSON Schema golden。
 
-- [ ] Task 5：实现 Blueprint V2 compile/evaluate（R3、R4）。
-  - [ ] 保持 V1 compile/dispatch 结果与既有 fixture 深相等。
+- [ ] Task 5：实现 Blueprint compile/evaluate（R3、R4）。
+  - [ ] 更新 fixture 以匹配当前 strict shape。
   - [ ] 实现 event payload/variable value resolution 和 detached JSON result。
   - [ ] 实现 condition 单分支、rule/action 文档顺序与失败原子性。
   - [ ] 缺失 path/variable、危险 path、类型不兼容和超限输入返回固定 diagnostics。
@@ -42,7 +42,7 @@
 - [ ] Task 6：接通 Plugin contribution runtime projection（R5）。
   - [ ] 从 active Plugin Catalog 构建实例级 immutable runtime contribution index。
   - [ ] 以 `dataResourceType.id` 校验 Document resourceType 和 source params schema。
-  - [ ] 以已声明、宿主支持且获授权的 `blueprintCapability.id` 校验 V2 plan。
+  - [ ] 以已声明、宿主支持且获授权的 `blueprintCapability.id` 校验 Blueprint plan。
   - [ ] 未启用、冲突、未知和未授权 contribution 全部 fail closed。
   - [ ] deactivate/dispose 后撤销当前 index，旧 snapshot 不保留 runtime authority。
   - [ ] 验证双 Manager 实例使用不同 contribution 集合且互不污染。
@@ -67,7 +67,7 @@
   - [ ] 建立 R1-R7 -> Task -> test file/case 和 test -> Requirement 双向映射。
   - [ ] 建立独立 Runtime Playwright harness，不向 Designer harness 混入场景。
   - [ ] 覆盖 sandbox、resource、Blueprint、contribution、tarball 和 importer Test Matrix。
-  - [ ] 保留既有 V1、Renderer/Viewer、Plugin Manager、bridge 与 importer success 回归。
+  - [ ] 保留 Renderer/Viewer、Plugin Manager、bridge 与 importer success 回归。
   - [ ] 验证 diagnostics 不泄漏 URL、payload、Error、stack、业务数据或凭证。
 
 - [ ] Task 10：运行完整质量门禁并收敛文档（R1-R7）。

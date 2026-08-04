@@ -24,9 +24,7 @@ const catalog = createBaseScreenMaterialCatalog([
 ]);
 
 const bridgeManifest = (type: string, tagName: string, name: string) => ({
-  apiVersion: 1 as const,
   type,
-  implementationVersion: '1.0.0',
   tagName,
   name,
   category: 'Bridge',
@@ -46,7 +44,7 @@ const bridgeManifest = (type: string, tagName: string, name: string) => ({
 });
 
 const reactBridge = createReactMaterialDefinition({
-  manifest: bridgeManifest('harness.react-button/v1', 'harness-react-button-v1', 'React bridge'),
+  manifest: bridgeManifest('harness.react-button', 'harness-react-button', 'React bridge'),
   component: ({
     label,
     onValueClick,
@@ -62,7 +60,7 @@ const reactBridge = createReactMaterialDefinition({
   eventProps: { valueClick: 'onValueClick' },
 });
 const vueBridge = createVueMaterialDefinition({
-  manifest: bridgeManifest('harness.vue-button/v1', 'harness-vue-button-v1', 'Vue bridge'),
+  manifest: bridgeManifest('harness.vue-button', 'harness-vue-button', 'Vue bridge'),
   component: {
     props: ['label', 'onValueClick'],
     setup(props) {
@@ -92,7 +90,7 @@ const screenDocument = {
   components: [
     {
       id: 'title',
-      type: 'base.text/v1',
+      type: 'base.text',
       name: 'Title',
       parentId: null,
       position: { x: 80, y: 80 },
@@ -106,7 +104,7 @@ const screenDocument = {
     },
     {
       id: 'subtitle',
-      type: 'base.text/v1',
+      type: 'base.text',
       name: 'Subtitle',
       parentId: null,
       position: { x: 84, y: 172 },
@@ -120,7 +118,7 @@ const screenDocument = {
     },
     {
       id: 'host-data',
-      type: 'base.text/v1',
+      type: 'base.text',
       name: 'Host Data',
       parentId: null,
       position: { x: 84, y: 236 },
@@ -168,7 +166,6 @@ const screenDocument = {
   ],
   variables: [],
   blueprint: {
-    apiVersion: 1 as const,
     rules: [
       {
         id: 'title-click',

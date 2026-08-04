@@ -16,7 +16,7 @@
   - [ ] 将 Spec 状态改为“生效中”，并将规格索引中的条目从“设计中”移动到“生效中”。
 
 - [ ] Task 4：实现 Material 基础协议（R1-R5、R10-R12）。
-  - [ ] 实现物料协议版本、readonly Material Manifest、完整 Element Model 与 dataState 判别联合。
+  - [ ] 实现 readonly Material Manifest、完整 Element Model 与 dataState 判别联合。
   - [ ] 实现显式 type/tagName 绑定校验、有限 props schema 与 Material Manifest parser。
   - [ ] 实现直接扩展 `HTMLElement` / `CustomElementConstructor` 的公共结构类型和 strict 两字段标准事件 detail。
   - [ ] 确保 parser detached、strict、fail closed，且不执行输入函数或访问 DOM global。

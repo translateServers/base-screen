@@ -36,7 +36,7 @@
           },
           "type": {
             "type": "string",
-            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\/v[1-9][0-9]*$"
+            "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*\\.[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
           },
           "name": {
             "type": "string",
@@ -212,10 +212,6 @@
     "blueprint": {
       "type": "object",
       "properties": {
-        "apiVersion": {
-          "type": "number",
-          "const": 1
-        },
         "rules": {
           "maxItems": 1000,
           "type": "array",
@@ -291,7 +287,7 @@
           }
         }
       },
-      "required": ["apiVersion", "rules"],
+      "required": ["rules"],
       "additionalProperties": false
     }
   },

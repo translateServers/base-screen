@@ -124,7 +124,7 @@ Web Component 是 Base Screen 的宿主集成 ABI，也是物料渲染和注册 
 - 相同文档、物料目录和运行时输入必须产生可重复结果。
 - 编辑写入统一经过命令边界，支持诊断、历史和测试。
 - 当前文档 shape 不使用版本标记、兼容转换或字段猜测。
-- npm 包版本、组件协议版本和物料实现版本彼此独立。
+- npm 包发布版本不参与文档或物料身份判断。
 
 ### 2.6 最小公共面
 
@@ -423,9 +423,9 @@ interface ScreenProjectEnvelope {
 
 ### 6.2 物料身份
 
-文档保存稳定的物料 `type`，例如 `acme.kpi-card/v1`，不直接保存 JavaScript 模块地址或 constructor。
+文档保存稳定的物料 `type`，例如 `acme.kpi-card`，不直接保存 JavaScript 模块地址或 constructor。
 
-Manifest 保存对应的 Custom Element `tagName`，例如 `acme-kpi-card-v1`。实例物料目录负责：
+Manifest 保存对应的 Custom Element `tagName`，例如 `acme-kpi-card`。实例物料目录负责：
 
 ```text
 document type
@@ -434,13 +434,13 @@ document type
 Material Manifest
      │
      ▼
-versioned tagName
+Material tagName
      │
      ▼
 customElements.get(tagName)
 ```
 
-将持久化 type 与 DOM tagName 分开，可以在保持文档身份稳定的同时校验实现版本和浏览器全局注册冲突。
+将持久化 type 与 DOM tagName 分开，可以在保持文档身份稳定的同时校验浏览器全局注册冲突。
 
 ### 6.3 文档边界
 
@@ -475,7 +475,6 @@ Renderer 通过 JavaScript property 原子写入 detached model，不把复杂�
 
 ```ts
 interface BaseScreenMaterialModel {
-  readonly apiVersion: number;
   readonly componentId: string;
   readonly mode: 'design' | 'preview' | 'viewer';
   readonly interactive: boolean;
@@ -498,7 +497,7 @@ interface BaseScreenMaterialModel {
 
 Manifest 至少描述：
 
-- 协议版本、稳定 type、实现版本和 versioned tagName。
+- 稳定 type 和显式 tagName。
 - 名称、分类、关键词、默认尺寸、默认 props 和默认 style。
 - props schema 和声明式属性面板字段。
 - 标准事件和可接受的数据能力。
@@ -559,7 +558,7 @@ customElements.define(manifest.tagName, MaterialElement);
 defineKpiCard();
 
 const designer = document.querySelector('base-screen-designer');
-designer.materials = ['acme-kpi-card-v1'];
+designer.materials = ['acme-kpi-card'];
 await designer.load({ projectId: 'screen-1' });
 ```
 
@@ -937,15 +936,13 @@ Renderer 拥有未注册的 Viewer Element 实现类，Engine 拥有未注册的
 
 ## 15. 兼容与发布策略
 
-### 15.1 三类版本
+### 15.1 发布边界
 
-| 版本 | 用途 |
+| 边界 | 用途 |
 | --- | --- |
 | Package SemVer | npm 包 API 和行为兼容 |
-| Material API Version | Manifest、Element Model 和标准事件协议 |
-| Material implementationVersion | 某个物料包自身实现版本 |
 
-三者不得共用一个版本判断或通过包版本猜测文档形状。
+包发布版本不得用于猜测文档或物料形状。
 
 ### 15.2 发布阶段
 
@@ -1225,7 +1222,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 | 风险 | 当前控制方式 |
 | --- | --- |
-| Custom Element 全局不可撤销 | versioned tagName、同 constructor 幂等、不同 constructor 拒绝 |
+| Custom Element 全局不可撤销 | 显式 tagName、同 constructor 幂等、不同 constructor 拒绝 |
 | 全局定义破坏实例隔离 | 单独维护实例物料目录，文档只能使用启用项 |
 | 插件 API 过早膨胀 | 首期只开放必要声明式贡献点，任意 UI renderer 延后 |
 | 内部框架泄漏 | 声明检查、tarball consumer、依赖图门禁 |

@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createReactMaterialDefinition } from './index.js';
 
 const manifest = {
-  apiVersion: 1 as const,
-  type: 'acme.react-label/v1',
-  implementationVersion: '1.0.0',
-  tagName: 'acme-react-label-v1',
+  type: 'acme.react-label',
+  tagName: 'acme-react-label',
   name: 'React Label',
   category: 'Basic',
   keywords: ['react'],
@@ -33,7 +31,7 @@ describe('React material bridge', () => {
 
     expect(definition.ok).toBe(true);
     if (definition.ok) {
-      expect(definition.value.manifest.type).toBe('acme.react-label/v1');
+      expect(definition.value.manifest.type).toBe('acme.react-label');
     }
     expect('customElements' in globalThis).toBe(false);
   });

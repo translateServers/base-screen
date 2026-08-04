@@ -24,8 +24,8 @@ ADR 或 Contracts 前置改变公共边界时必须先同步本 Spec；实现不
 
 ## 3. What Changes
 
-- 增加物料协议版本、Manifest、Element Model、标准事件及 Custom Element 结构 ABI。
-- 增加稳定物料身份与显式 versioned `tagName` 的绑定校验规则。
+- 增加 Manifest、Element Model、标准事件及 Custom Element 结构 ABI。
+- 增加稳定物料身份与显式 `tagName` 的绑定校验规则。
 - 增加只读、实例级 Material Catalog 与 Plugin Catalog 接口。
 - 增加 Plugin Manifest、依赖、能力、贡献点和生命周期协议。
 - 增加仅允许白名单 Core 命令的 Plugin Command Port。
@@ -80,16 +80,14 @@ ADR 或 Contracts 前置改变公共边界时必须先同步本 Spec；实现不
 - public `.d.ts` 直接使用 `HTMLElement`、`CustomElementConstructor`、`CustomEvent` 等 `lib.dom` 类型；package 的构建配置必须包含 `DOM` lib，消费者若使用 Element/Event API 也必须启用 DOM lib。Node 运行时导入仍不得访问 DOM global。
 - 所有跨边界数据使用 readonly 类型和 Contracts 的 JSON value，不接受函数、类实例或可变宿主对象。
 
-## 8. 物料身份与版本
+## 8. 物料身份
 
 ### 8.1 身份层次
 
 物料协议必须区分：
 
-- `type`：写入 `ScreenDocument` 的稳定身份，例如 `acme.kpi-card/v1`。
-- `apiVersion`：Plugin Core 物料 ABI 版本。
-- `implementationVersion`：物料实现自身 SemVer。
-- `tagName`：浏览器注册使用的 versioned Custom Element 名称。
+- `type`：写入 `ScreenDocument` 的稳定身份，例如 `acme.kpi-card`。
+- `tagName`：浏览器注册使用的稳定 Custom Element 名称。
 - package version：分发包版本，不进入文档身份。
 
 `type` 的格式复用 Contracts Foundation Spec，不由 Plugin Core 放宽或复制第二套规则。
@@ -102,18 +100,15 @@ ADR 或 Contracts 前置改变公共边界时必须先同步本 Spec；实现不
 
 - 是 ASCII、全小写，长度为 `2..63` code units，并符合 autonomous custom element name 语法：以 `[a-z]` 开头、至少包含一个连字符、其余字符仅允许 `[a-z0-9._-]`。
 - 不以 `xml` 开头，不使用平台保留名 `annotation-xml`、`color-profile`、`font-face`、`font-face-src`、`font-face-uri`、`font-face-format`、`font-face-name` 或 `missing-glyph`。
-- 以 `-v<major>` 结尾，其中 `<major>` 与 `type` 的 `/v<major>` 完全一致；例如 `acme.kpi-card/v1` 可绑定 `acme-kpi-card-v1`。
 - 不读取 locale、环境、DOM 或全局 registry；失败返回结构化诊断，不 trim、改写大小写或自动修复输入。
 
 相同 type 在同一 Material Catalog snapshot 中只能绑定一个 tagName，相同 tagName 也只能绑定一个 type；冲突 fail closed，不做覆盖或 fallback。
 
 ## 9. Material Manifest
 
-根入口必须公开物料协议版本常量、Manifest readonly 类型和以下签名：
+根入口必须公开 Manifest readonly 类型和以下签名：
 
 ```ts
-export const BASE_SCREEN_MATERIAL_API_VERSION = 1 as const;
-
 export function parseBaseScreenMaterialManifest(
   input: unknown,
 ): ScreenParseResult<BaseScreenMaterialManifest>;
@@ -121,7 +116,7 @@ export function parseBaseScreenMaterialManifest(
 
 Manifest 是 strict、可序列化的纯数据对象，包含且仅包含：
 
-- `apiVersion`、`type`、`implementationVersion`、`tagName`。
+- `type`、`tagName`。
 - `name`、`category`、`keywords`。
 - `defaultSize`、`defaultProps`、`defaultStyle`。
 - 声明式 props schema 与属性面板字段。
@@ -138,13 +133,13 @@ Manifest 不得包含：
 
 props schema 使用 package 自有的有限 JSON 声明式判别联合，只允许 `string`、`number`、`boolean`、`enum`、`object`、`array` 七种 kind；object 通过 `properties` 与 `required` 描述，array 必须有 `items`，各 kind 仅允许对应约束字段。属性面板字段仅引用顶层 props schema 中已声明的 prop key，并描述 label、control 与只读展示元数据，不得另带 validator、default 或第二份约束。完整字段级结构由本 Spec 的公共 readonly 类型直接表达，不生成或公开通用 JSON Schema，也不得泄漏 Zod。
 
-`apiVersion` 必须精确等于 `BASE_SCREEN_MATERIAL_API_VERSION`；`implementationVersion` 使用严格 SemVer core `major.minor.patch`，首版不接受 prerelease、build metadata 或 range。`defaultProps` 必须逐字段满足 props schema，属性面板引用、事件名和 keywords 不得重复。
+`defaultProps` 必须逐字段满足 props schema，属性面板引用、事件名和 keywords 不得重复。
 
 解析成功必须返回 detached Manifest，不修改输入；失败不得返回部分 Manifest。
 
 ## 10. Element Model 与数据状态
 
-根入口必须公开封闭类型 `BaseScreenMaterialModel`，包含且仅包含 `apiVersion: 1`、`componentId: string`、`mode: 'design' | 'preview' | 'viewer'`、`interactive: boolean`、`props: ScreenJsonObject`、`style: ScreenJsonObject`、`size: { width: number; height: number }` 和 `dataState: BaseScreenMaterialDataState`；所有字段必填且 readonly。
+根入口必须公开封闭类型 `BaseScreenMaterialModel`，包含且仅包含 `componentId: string`、`mode: 'design' | 'preview' | 'viewer'`、`interactive: boolean`、`props: ScreenJsonObject`、`style: ScreenJsonObject`、`size: { width: number; height: number }` 和 `dataState: BaseScreenMaterialDataState`；所有字段必填且 readonly。
 
 `BaseScreenMaterialDataState` 是封闭判别联合：`{ status: 'idle' }`、`{ status: 'loading' }`、`{ status: 'ready'; value: ScreenJsonValue }`、`{ status: 'error'; code: string; message: string }`。各分支拒绝额外字段；code 为 `1..128` ASCII code units，message 为 `1..1024` Unicode code points。`ready.value` 与安全化 error 必须遵守 Contracts JSON boundary；不得包含 Error 实例、Promise、AbortSignal、Response、DOM node 或凭证。
 
@@ -193,9 +188,9 @@ Model 约束：
 
 ## 14. Plugin Manifest
 
-根入口必须公开 Plugin Manifest readonly 类型、`BASE_SCREEN_PLUGIN_API_VERSION = 1` 和 `parseBaseScreenPluginManifest(input: unknown): ScreenParseResult<BaseScreenPluginManifest>`。Manifest 是 strict 纯数据对象，包含且仅包含：
+根入口必须公开 Plugin Manifest readonly 类型和 `parseBaseScreenPluginManifest(input: unknown): ScreenParseResult<BaseScreenPluginManifest>`。Manifest 是 strict 纯数据对象，包含且仅包含：
 
-- `apiVersion: 1`、稳定 plugin id 和严格 SemVer core version。
+- 稳定 plugin id 和严格 SemVer core version。
 - 显式依赖列表；每项包含 plugin id 与首期 range `^major.minor.patch`。
 - 请求的 capability 列表。
 - contribution 列表。
@@ -340,7 +335,7 @@ canonical byte、depth、container 和 string 的计算语义完全复用 Contra
 
 ### R2：稳定物料身份
 
-系统 SHALL 确定性验证 type、ABI version、implementationVersion 与 tagName 的绑定。
+系统 SHALL 确定性验证 type 与 tagName 的绑定。
 
 #### Scenario：重复解析同一身份
 

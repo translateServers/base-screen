@@ -8,7 +8,7 @@ function document(overrides: Record<string, unknown> = {}): Record<string, unkno
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { apiVersion: 1, rules: [] },
+    blueprint: { rules: [] },
     ...overrides,
   };
 }
@@ -28,7 +28,7 @@ describe('serializeScreenDocument', () => {
         components: [
           {
             id: 'c1',
-            type: 'acme.kpi-card/v1',
+            type: 'acme.kpi-card',
             name: 'Card',
             parentId: null,
             position: { x: 1, y: 2 },
@@ -134,7 +134,7 @@ describe('serializeScreenDocument', () => {
 function emptyComponent(): Record<string, unknown> {
   return {
     id: 'c1',
-    type: 'acme.kpi-card/v1',
+    type: 'acme.kpi-card',
     name: 'Card',
     parentId: null,
     position: { x: 0, y: 0 },

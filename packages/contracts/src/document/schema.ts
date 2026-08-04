@@ -92,7 +92,6 @@ const blueprintRuleSchema = z.strictObject({
 });
 
 export const blueprintSchema = z.strictObject({
-  apiVersion: z.literal(1),
   rules: z.array(blueprintRuleSchema).max(MAX_BLUEPRINT_RULES),
 });
 

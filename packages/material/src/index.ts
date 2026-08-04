@@ -8,10 +8,8 @@ import type {
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 
 export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
-  apiVersion: 1,
-  type: 'base.text/v1',
-  implementationVersion: '1.0.0',
-  tagName: 'base-screen-text-v1',
+  type: 'base.text',
+  tagName: 'base-screen-text',
   name: 'Text',
   category: 'Basic',
   keywords: ['text', 'label'],

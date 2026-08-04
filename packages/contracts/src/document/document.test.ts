@@ -5,7 +5,7 @@ import { parseScreenDocument } from './parse.js';
 function component(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'c1',
-    type: 'acme.kpi-card/v1',
+    type: 'acme.kpi-card',
     name: 'KPI Card',
     parentId: null,
     position: { x: 0, y: 0 },
@@ -25,7 +25,7 @@ function document(overrides: Record<string, unknown> = {}): Record<string, unkno
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { apiVersion: 1, rules: [] },
+    blueprint: { rules: [] },
     ...overrides,
   };
 }
@@ -34,11 +34,11 @@ const parse = parseScreenDocument;
 
 describe('isScreenMaterialType', () => {
   it('uses the canonical namespaced material identity grammar', () => {
-    expect(isScreenMaterialType('acme.kpi-card/v1')).toBe(true);
-    expect(isScreenMaterialType('acme.kpi-card/v12')).toBe(true);
-    expect(isScreenMaterialType('acme.kpi-card')).toBe(false);
-    expect(isScreenMaterialType('acme.kpi-card/v0')).toBe(false);
-    expect(isScreenMaterialType('Acme.kpi-card/v1')).toBe(false);
+    expect(isScreenMaterialType('acme.kpi-card')).toBe(true);
+    expect(isScreenMaterialType('acme.kpi.card')).toBe(true);
+    expect(isScreenMaterialType('acme/kpi-card')).toBe(false);
+    expect(isScreenMaterialType('acme')).toBe(false);
+    expect(isScreenMaterialType('Acme.kpi-card')).toBe(false);
   });
 });
 
@@ -79,7 +79,6 @@ describe('parseScreenDocument', () => {
       ],
       variables: [{ type: 'static', name: 'count', value: 0 }],
       blueprint: {
-        apiVersion: 1,
         rules: [
           {
             id: 'refresh',
@@ -94,7 +93,6 @@ describe('parseScreenDocument', () => {
       parse(
         document({
           blueprint: {
-            apiVersion: 1,
             rules: [
               {
                 id: 'bad',
@@ -158,7 +156,7 @@ describe('parseScreenDocument', () => {
   it('rejects unknown fields on every strict object', () => {
     const cases: Array<{ input: Record<string, unknown>; path: (string | number)[] }> = [
       {
-        input: document({ blueprint: { apiVersion: 1, rules: [], extra: true } }),
+        input: document({ blueprint: { rules: [], extra: true } }),
         path: ['blueprint', 'extra'],
       },
       {
@@ -279,14 +277,7 @@ describe('parseScreenDocument', () => {
   });
 
   it('rejects invalid material types', () => {
-    for (const type of [
-      'kpi-card',
-      'acme./v1',
-      'acme.KPI/v1',
-      'acme.kpi/v0',
-      'acme.kpi/v',
-      'acme.kpi',
-    ]) {
+    for (const type of ['kpi-card', 'acme.', 'acme.KPI', 'acme/kpi-card', 'acme/kpi', 'acme']) {
       const result = parse(document({ components: [component({ type })] }));
       expect(result.ok).toBe(false);
       if (!result.ok) {

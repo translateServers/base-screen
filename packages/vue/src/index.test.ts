@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { createVueMaterialDefinition } from './index.js';
 
 const manifest = {
-  apiVersion: 1 as const,
-  type: 'acme.vue-label/v1',
-  implementationVersion: '1.0.0',
-  tagName: 'acme-vue-label-v1',
+  type: 'acme.vue-label',
+  tagName: 'acme-vue-label',
   name: 'Vue Label',
   category: 'Basic',
   keywords: ['vue'],
@@ -33,7 +31,7 @@ describe('Vue material bridge', () => {
 
     expect(definition.ok).toBe(true);
     if (definition.ok) {
-      expect(definition.value.manifest.type).toBe('acme.vue-label/v1');
+      expect(definition.value.manifest.type).toBe('acme.vue-label');
     }
     expect('customElements' in globalThis).toBe(false);
   });

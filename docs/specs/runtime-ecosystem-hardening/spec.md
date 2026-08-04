@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-04
 > 定位：增量冻结远程 sandbox、Host Resource、Blueprint、插件运行时贡献、框架 tarball consumer 与 Nebula importer 的生产级验收边界
-> 依据：[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)、[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-v2.md)、[ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md)、[Host Resource And Blueprint Spec](../host-resource-blueprint/spec.md)、[Remote Plugin Sandbox Spec](../remote-plugin-sandbox/spec.md)、[Nebula Importer Spec](../nebula-importer/spec.md)
+> 依据：[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)、[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)、[ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md)、[Host Resource And Blueprint Spec](../host-resource-blueprint/spec.md)、[Remote Plugin Sandbox Spec](../remote-plugin-sandbox/spec.md)、[Nebula Importer Spec](../nebula-importer/spec.md)
 > 实施：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 
@@ -31,12 +31,12 @@ bridge 和 Nebula importer 的第一条纵向切片，但当前验收仍以成�
 
 1. [ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md) 取代
    ADR-0008 的 opaque-origin/exact-origin 不可执行组合，冻结 strict cross-origin transport。
-2. [ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-v2.md) 明确
-   Renderer resource deadline 的边界，以及 Blueprint V2 兼容和 capability 求值方式。
+2. [ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md) 明确
+   Renderer resource deadline 的边界，以及 Blueprint expression、condition 和 capability 求值方式。
 3. [ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md) 为 importer 提供
    独立、唯一编号的离线迁移决策；决策索引不再重复使用 ADR-0008。
-4. Blueprint V2 实施必须同步 Contracts Foundation Spec 和 committed JSON Schema golden；V1
-   已持久化文档继续可解析。
+4. Blueprint 实施必须同步 Contracts Foundation Spec 和 committed JSON Schema golden；当前
+   canonical shape 不引入兼容分支。
 
 ## 3. 目标
 
@@ -61,7 +61,7 @@ bridge 和 Nebula importer 的第一条纵向切片，但当前验收仍以成�
 
 | 领域 | 本 Spec 拥有 | 不得修改 |
 | --- | --- | --- |
-| Contracts | Blueprint V2、Host Resource/Blueprint runtime port、对应诊断 | Project Adapter、project revision 与 dirty 状态 |
+| Contracts | Blueprint、Host Resource/Blueprint runtime port、对应诊断 | Project Adapter、project revision 与 dirty 状态 |
 | Core | Blueprint compile/evaluate 与 capability 校验 | Designer session、selection UI、project lifecycle |
 | Renderer | resource deadline/cancel 与 contribution 消费 | Designer overlay、history 和 persistence |
 | Plugin Core/Manager | contribution runtime projection、remote sandbox | Project Adapter 和 Engine command UI |
@@ -140,18 +140,17 @@ type RemoteSandboxMessage =
 Renderer factory、fake port 和 DOM root，不被生产包反向 import。helper 必须覆盖 success、reject、
 malformed、never-settling、timeout、replace、remove、clear 和 dispose。
 
-## 8. Blueprint V2 与 Plugin Contribution
+## 8. Blueprint And Plugin Contribution
 
-### 8.1 版本兼容
+### 8.1 当前 canonical shape
 
-- `ScreenBlueprint` 改为 `apiVersion: 1 | 2` 的判别联合。
-- V1 shape 和语义保持精确兼容，不默认升级、不 strip 字段。
-- V2 才允许 value expression、condition 和 `requiredCapabilities`。
-- parser/serializer 保留输入版本；Importer 若没有可证明的动态映射，继续输出显式空 V1。
+- `ScreenBlueprint` 使用一个严格 canonical shape。
+- value expression、condition 和 `requiredCapabilities` 直接进入当前 shape。
+- parser/serializer 不升级、strip 字段或推断结构；Importer 若没有可证明的动态映射，输出显式空 Blueprint。
 
 ### 8.2 Value expression
 
-V2 action value/payload 使用封闭、递归、纯数据表达式：
+Action value/payload 使用封闭、递归、纯数据表达式：
 
 ```ts
 type ScreenBlueprintValueExpression =
@@ -173,7 +172,7 @@ type ScreenBlueprintValueExpression =
 
 ### 8.3 Condition
 
-V2 rule 可选一个 condition：
+Rule 可选一个 condition：
 
 ```ts
 interface ScreenBlueprintCondition {
@@ -207,7 +206,7 @@ Plugin Manager 从 active Plugin Catalog 构建 immutable runtime contribution i
 - `blueprintCapability.id` 必须是宿主支持且已授权的稳定 capability id；未知 id 不进入 index。
 - Renderer 在调用 Host Resource port 前验证 resource type 已启用且 params 满足 contribution
   schema。
-- Blueprint compiler 接收 readonly capability index；V2 rule 的 `requiredCapabilities` 必须全部
+- Blueprint compiler 接收 readonly capability index；rule 的 `requiredCapabilities` 必须全部
   可用，否则该 plan fail closed。
 - contribution 只控制 allowlist/config validation，不携带 handler，不获得 runtime port。
 - 两个 Plugin Manager 实例的 index 相互隔离；deactivate/dispose 后旧 index 不再是当前能力源。
@@ -278,7 +277,7 @@ dispose 均产生确定结果，且 remote Material 能力仍不可达。
 
 ### R3：Blueprint 动态值
 
-当 V2 rule 引用 event payload 或 variable 时，系统 SHALL 在资源预算内得到 detached JSON 值；
+当 rule 引用 event payload 或 variable 时，系统 SHALL 在资源预算内得到 detached JSON 值；
 缺失或危险 path 不得产生 action 副作用。
 
 ### R4：Blueprint 条件
@@ -307,8 +306,7 @@ blocking 项时禁止写 canonical output。
 | --- | --- |
 | Sandbox | entry origin preflight、exact source/origin、ready 顺序、64 KiB、timeout、load error、dispose、无 remote Material |
 | Host Resource | success、reject、throw、malformed、never-settling、timeout、replace/remove/clear/dispose、late result |
-| Blueprint V1 | 既有 fixture/parser/compiler/serializer 行为不变 |
-| Blueprint V2 | expression 全分支、危险 path、预算、condition operator、原子失败、顺序 |
+| Blueprint | expression 全分支、危险 path、预算、condition operator、原子失败、顺序 |
 | Contribution | resource config、capability allowlist、授权、冲突、双实例、deactivate 后失效 |
 | Tarball | React/Vue 本地增强、peer 隔离、Vite build、model/event/disconnect 浏览器行为 |
 | Importer | 三类真实 variant、零/多匹配、字段 loss、decision、同路径、原子输出、round-trip |
@@ -321,7 +319,7 @@ Runtime browser tests 使用独立 harness，不向 Designer harness 追加场�
 - 所有生效前置 ADR/Spec 已接受并消除决策索引的 ADR 编号冲突。
 - Remote sandbox 在真实浏览器中满足 transport、timeout、malformed 和 dispose 约束。
 - Host Resource timeout/cancel conformance 覆盖 signal 和 DOM 生命周期，不只有 success smoke。
-- Blueprint V1 保持兼容，V2 expression/condition/capability 全部 fail closed 且有 golden 更新。
+- Blueprint expression/condition/capability 全部 fail closed 且有 golden 更新。
 - data-resource/Blueprint contribution 从 active catalog 投影到 runtime，不再只是 parsed metadata。
 - React/Vue installed-tarball consumer 通过类型、构建和 Chromium 门禁。
 - Importer 真实 variants、字段级 report、decision 和 provenance 全部可审计。

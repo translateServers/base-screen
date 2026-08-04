@@ -29,7 +29,7 @@
 
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
-| [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | P5-P6 增量 | Designer 完整编辑交互与 publish/conflict/cancel/dirty/retry 项目生命周期 |
+| [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | P5-P6 增量 | 以 Nebula 可观察样式/功能为 parity 基准的 Designer 与 publish/conflict/cancel/dirty/retry 生命周期 |
 
 ## 使用规则
 

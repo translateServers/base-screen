@@ -6,10 +6,8 @@ import {
 } from './index.js';
 
 const manifest = {
-  apiVersion: 1 as const,
-  type: 'acme.label/v1',
-  implementationVersion: '1.0.0',
-  tagName: 'acme-label-v1',
+  type: 'acme.label',
+  tagName: 'acme-label',
   name: 'Label',
   category: 'Basic',
   keywords: ['label'],
@@ -91,7 +89,6 @@ describe('definePlugin', () => {
   it('returns a runtime only after its manifest passes the Plugin Core parser', () => {
     const runtime = {
       manifest: {
-        apiVersion: 1 as const,
         id: 'acme.example',
         version: '1.0.0',
         dependencies: [],

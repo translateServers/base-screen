@@ -5,7 +5,7 @@ export function createMinimalScreenDocument(): ScreenDocument {
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
-    blueprint: { apiVersion: 1, rules: [] },
+    blueprint: { rules: [] },
   };
 }
 
@@ -17,7 +17,7 @@ export function createSingleComponentDocument(
     components: [
       {
         id: overrides.id ?? 'c1',
-        type: overrides.type ?? 'acme.kpi-card/v1',
+        type: overrides.type ?? 'acme.kpi-card',
         name: overrides.name ?? 'KPI Card',
         parentId: null,
         position: { x: 0, y: 0 },
@@ -31,6 +31,6 @@ export function createSingleComponentDocument(
       },
     ],
     variables: [],
-    blueprint: { apiVersion: 1, rules: [] },
+    blueprint: { rules: [] },
   };
 }

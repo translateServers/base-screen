@@ -1,9 +1,11 @@
 # Designer Authoring And Project Lifecycle Tasks
 
-- [ ] Task 1：完成 Project Lifecycle ADR 与实施授权（R1-R8）。
+- [ ] Task 1：完成 Project Lifecycle ADR、Nebula parity provenance 与实施授权（R1-R11）。
   - [ ] 新增并接受 Project Lifecycle ADR，冻结 publish/signal/conflict/retry/baseline 所有权。
   - [ ] 同步 Contracts Foundation、Core Domain 与 Designer Engine Spec。
   - [ ] 冻结 `groupMaterialType`、direct-document baseline 和 persistence response 竞态语义。
+  - [ ] 记录 Nebula 参考 commit/path、许可未知、behavior-only 和 no-copy 结论。
+  - [ ] 冻结 P0-P2 parity matrix、`toolMaterialTypes`、视觉 token 所有权和 intentional differences。
   - [ ] 将本 Spec 状态改为“生效中”，此前保持现有 load/save 公共行为。
 
 - [ ] Task 2：扩展 Project Adapter 公共契约（R1-R3）。
@@ -58,30 +60,55 @@
   - [ ] props command 前验证完整 next props，非法 draft 不改 document/history/Renderer。
   - [ ] 多选只编辑兼容通用字段，不猜测异构 Material props。
 
-- [ ] Task 9：整合 Designer UI、事务与键盘（R1-R8）。
+- [ ] Task 9：整合 Nebula-compatible shell、Designer UI、事务与键盘（R1-R10）。
   - [ ] 增加 `executeTransaction()`，Renderer 失败时保持 document/history/selection/DOM 原值。
-  - [ ] 装配 toolbar、Material/Layers tabs、canvas overlays、Property 与 project status panel。
+  - [ ] 按 Spec 尺寸装配 48px toolbar、28px status、20px rulers、可调/可折叠左右 panel。
+  - [ ] 装配 Material/Layers tabs、canvas overlays、四 Property tabs 与 project status panel。
+  - [ ] 实现独立 Base Screen light/dark tokens、focus/disabled/busy/conflict 状态和 reduced motion。
   - [ ] 对不可用 command 使用 disabled 状态，不在 handler 中静默失败。
   - [ ] 实现 copy/paste/group/align/save/publish 等快捷键，并排除文本输入。
   - [ ] undo/redo 后统一刷新 dirty、selection、Layers、Property 和 active gesture。
-  - [ ] 验证两个 Designer 实例无共享 selection/history/clipboard/project controller。
+  - [ ] 实现小于 1024x640 的不可编辑 warning 和 viewport-contained dialog。
+  - [ ] 验证两个 Designer 实例无共享 selection/history/clipboard/project controller/layout state。
 
-- [ ] Task 10：完成测试、质量门与三件套验收（R1-R8）。
-  - [ ] 建立 R1-R8 -> Task -> test file/case 和 test -> Requirement 双向映射。
+- [ ] Task 10：实现 Nebula-compatible viewport、工具与作者辅助（R9、R10）。
+  - [ ] 实现 Designer 10%-500% zoom、cursor anchor、fit 30px margin、pan 和 100% reset。
+  - [ ] 实现 20px rulers、draggable guides、24px grid、grid snap 和 5px smart guides。
+  - [ ] 建立 Select/Hand/Text/Rectangle/Ellipse/Image/Zoom 工具 registry 与 scope shortcuts。
+  - [ ] 通过显式 `toolMaterialTypes` 解析 create tool，缺失 Material 时 disabled。
+  - [ ] 实现 Text/shape/image click/drag create、4px threshold、Space Hand、Alt duplicate 和分层 Escape。
+  - [ ] 将 Designer history limit 固定为 50，并排除 viewport/guides/layout/clipboard/runtime state。
+
+- [ ] Task 11：实现 Nebula-compatible integration surfaces（R11）。
+  - [ ] Data tab 只装配 canonical static/host-resource editor，不增加 API/dataset/credential 字段。
+  - [ ] Interaction/Events tabs 提供 mode、rule 摘要和 Open Blueprint 入口。
+  - [ ] 在 Runtime Spec 的当前 Blueprint shape 生效后实现 Blueprint full-workspace authoring projection。
+  - [ ] Blueprint workspace 提供 search/connect/zoom/minimap/align/config/diagnostics/simulation log/context menu。
+  - [ ] layout 未进入 canonical contract 时使用 deterministic auto-layout，不私自持久化节点坐标。
+  - [ ] 实现 saved revision preview request、direct document Viewer preview 和 canonical import/export。
+  - [ ] 明确排除 Nebula auth/routes/API/dataset/requestApi/Monaco/dynamic variables/snapshot policy。
+
+- [ ] Task 12：完成 parity 测试、质量门与三件套验收（R1-R11）。
+  - [ ] 建立 R1-R11 -> Task -> test file/case 和 test -> Requirement 双向映射。
   - [ ] Core 纯函数/transaction 与 Engine project controller 使用 Vitest。
-  - [ ] Pointer、Shadow DOM、keyboard、history 和 project race 使用独立 Designer Playwright harness。
+  - [ ] Pointer、Shadow DOM、keyboard、history、project race 和 parity workflow 使用独立 Designer Playwright harness。
+  - [ ] 生成三种 desktop geometry、light/dark shell、authoring workflow 和 Blueprint screenshots。
+  - [ ] 验证 Spec 的 pixel ratio/geometry threshold 和窄屏 warning/preview 行为。
+  - [ ] 只提交 Base Screen 自有 goldens；Nebula reference screenshots 不进入仓库或 tarball。
   - [ ] 运行受影响 package format/lint/typecheck/test/build 和 API/tarball/browser 门禁。
   - [ ] 运行 `pnpm verify:m0` 并按 `checklist.md` 逐项验收。
 
 # Task Dependencies
 
-- Task 1 是 Task 2-9 的共同前置。
+- Task 1 是 Task 2-11 的共同前置。
 - Task 3 depends on Task 2。
 - Task 4 depends on Task 3。
 - Task 5、Task 6、Task 7 在 Task 1 后可分支推进；Task 6 依赖 Task 5 的 selection 语义。
 - Task 8 depends on Task 5 and Task 7。
 - Task 9 depends on Task 3-8。
-- Task 10 随 Task 2-9 分阶段推进，最终完成依赖 Task 9。
+- Task 10 depends on Task 5、Task 6 and Task 9。
+- Task 11 depends on Task 9；其中 Blueprint authoring 还 depends on Runtime Spec Blueprint shape。
+- Task 12 随 Task 2-11 分阶段推进，最终完成依赖 Task 10 and Task 11。
 
-该任务集不得修改 Remote Sandbox、Host Resource runtime、Blueprint、plugin contribution、framework
-bridge 或 Nebula importer；相关工作仅由配套 Runtime 三件套拥有。
+该任务集不得修改 Remote Sandbox、Host Resource runtime、Blueprint schema/compiler/runtime、plugin
+contribution、framework bridge 或 Nebula importer；相关工作仅由配套 Runtime 三件套拥有。

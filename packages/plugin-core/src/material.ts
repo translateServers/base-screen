@@ -7,7 +7,6 @@ import {
   type ScreenParseResult,
 } from '@base-screen/contracts';
 import {
-  BASE_SCREEN_MATERIAL_API_VERSION,
   type BaseScreenMaterialEventDetail,
   type BaseScreenMaterialManifest,
   type BaseScreenMaterialObjectSchema,
@@ -32,9 +31,7 @@ const RESERVED_TAG_NAMES = new Set([
 ]);
 
 const MANIFEST_FIELDS = new Set([
-  'apiVersion',
   'type',
-  'implementationVersion',
   'tagName',
   'name',
   'category',
@@ -163,25 +160,11 @@ function validateMaterialFields(
   manifest: Record<string, ScreenJsonValue>,
   collector: PluginDiagnosticCollector,
 ): void {
-  if (manifest.apiVersion !== BASE_SCREEN_MATERIAL_API_VERSION) {
-    collector.add(
-      'PLUGIN_CORE_API_VERSION_UNSUPPORTED',
-      ['apiVersion'],
-      'Material API version is unsupported.',
-    );
-  }
   const identity = validateBaseScreenMaterialIdentity(manifest.type, manifest.tagName);
   if (!identity.ok) {
     for (const diagnostic of identity.diagnostics) {
       collector.add(diagnostic.code, diagnostic.path, diagnostic.message);
     }
-  }
-  if (!isStrictSemver(manifest.implementationVersion)) {
-    collector.add(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['implementationVersion'],
-      'Implementation version must be SemVer core.',
-    );
   }
   for (const field of ['name', 'category'] as const) {
     if (!isDisplayString(manifest[field], 256)) {
@@ -712,13 +695,6 @@ function isRecord(value: ScreenJsonValue | undefined): value is ScreenJsonObject
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-function isStrictSemver(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(value)
-  );
-}
-
 function isValidTagName(tagName: unknown, type: unknown): boolean {
   if (!isScreenMaterialType(type)) {
     return false;
@@ -727,13 +703,13 @@ function isValidTagName(tagName: unknown, type: unknown): boolean {
     typeof tagName !== 'string' ||
     tagName.length < 2 ||
     tagName.length > 63 ||
-    !/^[a-z][a-z0-9._-]*-v[1-9][0-9]*$/.test(tagName) ||
+    !/^[a-z][a-z0-9._-]*-[a-z0-9._-]+$/.test(tagName) ||
     tagName.startsWith('xml') ||
     RESERVED_TAG_NAMES.has(tagName)
   ) {
     return false;
   }
-  return tagName.endsWith(`-v${type.slice(type.lastIndexOf('/v') + 2)}`);
+  return true;
 }
 
 function isIdentifier(value: unknown): value is string {

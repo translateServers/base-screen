@@ -4,16 +4,18 @@
 
 - [ ] Project Lifecycle ADR 已接受并冻结 publish、signal、conflict、retry 和 baseline。
 - [ ] Contracts Foundation、Core Domain 与 Designer Engine Spec 已同步公共契约变化。
-- [ ] 本 Spec 状态为“生效中”，R1-R8 均映射到 Task 与自动化测试。
+- [ ] 本 Spec 状态为“生效中”，R1-R11 均映射到 Task 与自动化测试。
 - [ ] `groupMaterialType`、direct-document baseline 和 save pending edit 语义无待定项。
+- [ ] Nebula Designer parity provenance 记录了参考 commit/path、许可未知和 no-copy 结论。
+- [ ] 实现没有复制 Nebula TypeScript/JSX/CSS/config/SVG/font/screenshot/test asset。
 
 ## 所有权边界
 
 - [ ] Contracts 变更只涉及 Project Adapter/result/diagnostics，不改 runtime ports 或 Blueprint。
 - [ ] Core 只提供纯 transaction/interaction/geometry/hierarchy，不访问 DOM 或 adapter。
-- [ ] Engine 独占 Designer session、history、clipboard、project controller 和 Shadow DOM authoring UI。
+- [ ] Engine 独占 Designer session、history、clipboard、project controller、parity shell 和 Blueprint authoring UI。
 - [ ] Engine 只消费 Material Catalog/Manifest 与 Renderer，不复制其 parser/runtime。
-- [ ] 本实施未修改 sandbox、Host Resource、Blueprint、plugin contribution、bridge 或 importer。
+- [ ] 本实施未修改 sandbox、Host Resource、Blueprint schema/compiler/runtime、plugin contribution、bridge 或 importer。
 
 ## Project Adapter
 
@@ -82,7 +84,7 @@
 - [ ] Layers 搜索只过滤视图，不改变 document order 或 selection。
 - [ ] clipboard 是 Designer 实例内存，不使用系统 Clipboard API 或跨实例共享。
 - [ ] copy detached clone 完整 selection subtree；paste 生成唯一 id 并重写 parent 引用。
-- [ ] 连续 paste 偏移稳定，project replace/unload/dispose 清空 clipboard。
+- [ ] 连续 paste 按 20 x 20 偏移，project replace/unload/dispose 清空 clipboard。
 - [ ] clipboard 不包含 history/selection/runtime/project revision/baseline/pending operation。
 
 ## Manifest Property Panel
@@ -105,11 +107,69 @@
 - [ ] conflict/error panel 不卸载 Designer，不清空 history/selection。
 - [ ] 两个 Designer 不共享 history、clipboard、adapter operation、revision、baseline 或 UI state。
 
+## Nebula-compatible Shell
+
+- [ ] Toolbar 48px、Status 28px、Rulers 20px、panel handle 4px，desktop geometry 误差不超过 1px。
+- [ ] Left panel 默认 240px、范围 200..400px、折叠 48px。
+- [ ] Right panel 默认 288px、范围 240..480px、折叠 48px。
+- [ ] panel/layout preference 是实例状态，不进入 document/history，也不隐式访问 localStorage。
+- [ ] light/dark 使用 Base Screen 自有 token，视觉方向接近 Nebula 且不是复制其 CSS/theme config。
+- [ ] 默认字体只引用 host/system stack，不把 Nebula 或第三方字体文件打入 package。
+- [ ] 圆角不超过 8px，页面分区不使用嵌套装饰卡片，文本/图标无重叠或截断。
+- [ ] icon/symbol 为 Base Screen 独立资产，命令有 tooltip、accessible name 和稳定 disabled/busy 状态。
+- [ ] 小于 1024x640 显示不可编辑 warning，dialog 不溢出且 element 不抛 runtime error。
+
+## Nebula-compatible Viewport 与 Tools
+
+- [ ] Designer zoom 限制为 10%..500%，支持 cursor anchor、fit 30px、100% reset 和 zoom tool。
+- [ ] pan、Space temporary Hand、window blur cleanup 与 tool restore 行为确定。
+- [ ] 20px rulers、draggable guides、24px grid、grid snap 和 5px smart guides 可独立开关。
+- [ ] viewport/guides/grid/smart-guide/layout 不进入 canonical document/history。
+- [ ] Select(V)、Hand(H)、Text(T)、Rectangle(R)、Ellipse(E)、Image(I)、Zoom(Z) 来自单一 registry。
+- [ ] create tool 只使用显式 `toolMaterialTypes` 和已启用 Material capability，无 fallback type。
+- [ ] 小于 4px create drag 取消；Text/shape/image 的 click/drag create 各只产生一个 history entry。
+- [ ] Alt-drag duplicate、select-all 排除 hidden/locked、group enter 和 layered Escape 符合 Spec。
+- [ ] Designer history limit 为 50，viewport/layout/clipboard/runtime override 不进入 history。
+
+## Nebula-compatible Panels 与 Integration
+
+- [ ] 左 panel 提供 Materials/Layers tabs、component count、tree collapse、rename/status/order/group context commands。
+- [ ] 50 个以内允许 Layers drag sort；更大集合仍可通过稳定命令完成排序。
+- [ ] 右 panel 提供 Appearance/Data/Interaction/Events tabs；无 selection 时显示 Canvas settings。
+- [ ] Data 只编辑 static/host-resource，不出现 API/dataset/header/credential/request-test 字段。
+- [ ] Interaction 控制 design/interaction mode；Events 显示 rule 摘要和 Open Blueprint 入口。
+- [ ] JSON 编辑使用 Base Screen 自有 JSON boundary，不把 Monaco 作为 package 依赖。
+- [ ] project preview request 只引用最近保存 projectId/revision，不把 unsaved document 当作 saved preview。
+- [ ] direct document Viewer preview 退出后恢复 authoring viewport/selection。
+- [ ] canonical JSON import 在确认后以一个 transaction 替换；legacy Nebula 文件不绕过 importer。
+- [ ] shortcut registry 按 global/canvas/blueprint scope 仲裁，输入控件保留原生文本快捷键。
+
+## Blueprint Authoring Parity
+
+- [ ] Blueprint UI 只消费 Runtime Spec parser/compiler/fake runtime，不复制 evaluator 或 host action。
+- [ ] authoring projection 支持 trigger/condition/action/annotation，不形成第二份 runtime truth。
+- [ ] 提供 search insertion、connection validation、25%..200% zoom、fit、minimap 和 selection。
+- [ ] 提供 align/distribute、node config、diagnostics、simulation log、context menu 和 component locate/filter。
+- [ ] canonical contract 不含 layout 时使用 deterministic auto-layout，不写私有 node position 字段。
+- [ ] Runtime capability 缺失时 Blueprint control disabled，不猜测 schema 或 fallback。
+- [ ] Nebula 的 API/dataset/requestApi/dynamic variables/template/route/auth 能力没有进入 Base Screen runtime。
+
+## Visual Parity Gates
+
+- [ ] 1024x640、1440x900、1920x1080 无 body scroll、异常 overlap 或父容器溢出。
+- [ ] 1440x900 light/dark shell 自有 golden 的 `maxDiffPixelRatio <= 0.005`。
+- [ ] Materials/Layers/transform/Property/Canvas/context/conflict/preview workflow 几何误差 <=2px、diff <=0.01。
+- [ ] Blueprint empty/populated/config/diagnostics/log/search/context screenshot diff <=0.01。
+- [ ] 390x844、768x1024 warning/dialog containment 通过；Viewer 390x844、412x915 无 body overflow。
+- [ ] 动画在 screenshot 时关闭，fixture/document/id/data 确定，时间字段被 mask。
+- [ ] Nebula 对比截图只用于本地审计且不提交；仓库只包含 Base Screen 自有 goldens/数值证据。
+
 ## 测试与质量门
 
 - [ ] Project controller 的 generation/abort/race/retry/conflict/baseline 有 Vitest 分支测试。
 - [ ] Core transaction/selection/geometry/hierarchy 的新增业务约束有纯函数测试。
 - [ ] 独立 Designer Playwright 覆盖 pointer、marquee、handles、Layers、keyboard 和 project races。
+- [ ] Designer Playwright 覆盖 P0-P2 parity shell、viewport/tools、panels、Blueprint 和 preview workflow。
 - [ ] Designer harness 不承担 sandbox/resource/framework/importer 测试。
 - [ ] diagnostics 与测试产物不包含 canary secret、Document、adapter Error 或 stack。
 - [ ] 受影响 package format/lint/typecheck/test/build 全部通过。

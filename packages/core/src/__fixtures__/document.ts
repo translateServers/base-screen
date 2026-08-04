@@ -17,7 +17,7 @@ export function makeComponent(
   const id = overrides.id ?? 'c1';
   return {
     id,
-    type: 'acme.kpi-card/v1',
+    type: 'acme.kpi-card',
     name: `Component ${id}`,
     parentId: null,
     position: { x: 0, y: 0 },
@@ -48,7 +48,7 @@ export function makeDocument(overrides: Partial<ScreenDocument> = {}): ScreenDoc
     canvas: DEFAULT_CANVAS,
     components: [],
     variables: [],
-    blueprint: { apiVersion: 1, rules: [] },
+    blueprint: { rules: [] },
     ...overrides,
   };
 }

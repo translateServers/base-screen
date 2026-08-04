@@ -160,7 +160,7 @@ const document = {
   canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
   components: [],
   variables: [],
-  blueprint: { apiVersion: 1, rules: [] },
+  blueprint: { rules: [] },
 };
 const parsed = parseScreenDocument(document);
 if (!parsed.ok || parsed.diagnostics.length !== 0) {

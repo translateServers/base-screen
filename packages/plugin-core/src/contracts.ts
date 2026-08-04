@@ -5,8 +5,6 @@ import type {
   ScreenSize,
 } from '@base-screen/contracts';
 
-export const BASE_SCREEN_MATERIAL_API_VERSION = 1 as const;
-export const BASE_SCREEN_PLUGIN_API_VERSION = 1 as const;
 export const BASE_SCREEN_MATERIAL_EVENT = 'base-screen-material-event' as const;
 
 export type BaseScreenMaterialMode = 'design' | 'preview' | 'viewer';
@@ -18,7 +16,6 @@ export type BaseScreenMaterialDataState =
   | { readonly status: 'error'; readonly code: string; readonly message: string };
 
 export interface BaseScreenMaterialModel {
-  readonly apiVersion: typeof BASE_SCREEN_MATERIAL_API_VERSION;
   readonly componentId: string;
   readonly mode: BaseScreenMaterialMode;
   readonly interactive: boolean;
@@ -84,9 +81,7 @@ export interface BaseScreenMaterialDesignCapabilities {
 }
 
 export interface BaseScreenMaterialManifest {
-  readonly apiVersion: typeof BASE_SCREEN_MATERIAL_API_VERSION;
   readonly type: string;
-  readonly implementationVersion: string;
   readonly tagName: string;
   readonly name: string;
   readonly category: string;
@@ -147,7 +142,6 @@ export type BaseScreenPluginContribution =
   | { readonly kind: 'blueprintCapability'; readonly id: string; readonly name: string };
 
 export interface BaseScreenPluginManifest {
-  readonly apiVersion: typeof BASE_SCREEN_PLUGIN_API_VERSION;
   readonly id: string;
   readonly version: string;
   readonly dependencies: readonly BaseScreenPluginDependency[];

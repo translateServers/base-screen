@@ -5,25 +5,14 @@ import {
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
-import {
-  BASE_SCREEN_PLUGIN_API_VERSION,
-  type BaseScreenPluginManifest,
-  type PluginCommandRequest,
-} from './contracts.js';
+import { type BaseScreenPluginManifest, type PluginCommandRequest } from './contracts.js';
 import { PluginDiagnosticCollector } from './diagnostics.js';
 import { validateBaseScreenMaterialIdentity, validatePropsSchema } from './material.js';
 
 const MAX_PLUGIN_MANIFEST_BYTES = 128 * 1024;
 const MAX_COMMAND_BYTES = 256 * 1024;
 const MAX_ITEMS = 128;
-const PLUGIN_FIELDS = new Set([
-  'apiVersion',
-  'id',
-  'version',
-  'dependencies',
-  'capabilities',
-  'contributions',
-]);
+const PLUGIN_FIELDS = new Set(['id', 'version', 'dependencies', 'capabilities', 'contributions']);
 
 export function parseBaseScreenPluginManifest(
   input: unknown,
@@ -38,13 +27,6 @@ export function parseBaseScreenPluginManifest(
   const manifest = parsed.value;
   const collector = new PluginDiagnosticCollector();
   validateExactObject(manifest, PLUGIN_FIELDS, [], collector);
-  if (manifest.apiVersion !== BASE_SCREEN_PLUGIN_API_VERSION) {
-    collector.add(
-      'PLUGIN_CORE_API_VERSION_UNSUPPORTED',
-      ['apiVersion'],
-      'Plugin API version is unsupported.',
-    );
-  }
   if (!isIdentifier(manifest.id)) {
     collector.add('PLUGIN_CORE_IDENTITY_INVALID', ['id'], 'Plugin id must be an ASCII identifier.');
   }

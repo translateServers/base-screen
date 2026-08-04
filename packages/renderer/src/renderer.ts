@@ -306,7 +306,6 @@ function prepareCandidates(
       component,
       entry,
       model: {
-        apiVersion: 1,
         componentId: component.id,
         mode,
         interactive,

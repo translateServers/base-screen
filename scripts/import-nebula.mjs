@@ -82,7 +82,7 @@ function mapNebulaExport(source) {
       canvas: record.canvas,
       components,
       variables: Array.isArray(record.variables) ? record.variables : [],
-      blueprint: { apiVersion: 1, rules: [] },
+      blueprint: { rules: [] },
     },
     mappedComponents: components.length,
     skippedComponents,

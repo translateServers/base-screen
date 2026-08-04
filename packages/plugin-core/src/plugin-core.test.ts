@@ -13,10 +13,8 @@ import {
 
 function materialManifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    apiVersion: 1,
-    type: 'acme.kpi-card/v1',
-    implementationVersion: '1.0.0',
-    tagName: 'acme-kpi-card-v1',
+    type: 'acme.kpi-card',
+    tagName: 'acme-kpi-card',
     name: 'KPI Card',
     category: 'Charts',
     keywords: ['kpi', 'metric'],
@@ -44,7 +42,6 @@ function materialManifest(overrides: Record<string, unknown> = {}): Record<strin
 
 function pluginManifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    apiVersion: 1,
     id: 'acme.analytics',
     version: '1.0.0',
     dependencies: [],
@@ -52,8 +49,8 @@ function pluginManifest(overrides: Record<string, unknown> = {}): Record<string,
     contributions: [
       {
         kind: 'material',
-        type: 'acme.kpi-card/v1',
-        tagName: 'acme-kpi-card-v1',
+        type: 'acme.kpi-card',
+        tagName: 'acme-kpi-card',
       },
       {
         kind: 'command',
@@ -80,7 +77,7 @@ describe('material identity and manifests', () => {
   });
 
   it('rejects malformed type/tag bindings and unknown fields', () => {
-    const identity = validateBaseScreenMaterialIdentity('acme.kpi-card/v2', 'acme-kpi-card-v1');
+    const identity = validateBaseScreenMaterialIdentity('acme.kpi-card', 'acme');
     const manifest = parseBaseScreenMaterialManifest(materialManifest({ unrecognized: true }));
 
     expect(identity.ok).toBe(false);
@@ -236,7 +233,7 @@ describe('plugin manifests and catalogs', () => {
       },
     ]);
 
-    expect(materials.get('acme.kpi-card/v1')?.constructor).toBe(constructor);
+    expect(materials.get('acme.kpi-card')?.constructor).toBe(constructor);
     expect(materials.has('missing')).toBe(false);
     expect(materials.list()).toHaveLength(1);
     expect(plugins.list()[0]?.manifest.id).toBe('acme.analytics');
