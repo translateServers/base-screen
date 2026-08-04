@@ -82,4 +82,45 @@ describe('Blueprint runtime', () => {
 
     expect(result).toMatchObject({ ok: true, value: { hostEvents: [{ name: 'matched' }] } });
   });
+
+  it('evaluates each rule action against the pending atomic variable state', () => {
+    const document = makeDocument({
+      components: [makeComponent({ id: 'button' })],
+      variables: [makeVariable({ name: 'count', value: 0 })],
+      blueprint: {
+        rules: [
+          {
+            id: 'chain',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'count',
+                value: { kind: 'literal', value: 2 },
+              },
+              {
+                type: 'emit-host-event',
+                eventName: 'count-updated',
+                payload: { kind: 'variable', name: 'count' },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const compiled = compileScreenBlueprint(document);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+
+    const result = dispatchScreenBlueprintEvent(compiled.value, compiled.value.initialVariables, {
+      componentId: 'button',
+      name: 'click',
+      payload: null,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: { variables: { count: 2 }, hostEvents: [{ name: 'count-updated', payload: 2 }] },
+    });
+  });
 });

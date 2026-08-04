@@ -17,7 +17,7 @@ export interface ScreenBlueprintEvent {
 }
 
 export interface ScreenBlueprintCapabilityIndex {
-  readonly has: (id: string) => boolean;
+  readonly hasBlueprintCapability: (id: string) => boolean;
 }
 
 export interface ScreenBlueprintPlan {
@@ -32,11 +32,11 @@ export interface ScreenBlueprintDispatchResult {
 
 export function compileScreenBlueprint(
   document: ScreenDocument,
-  capabilities: ScreenBlueprintCapabilityIndex = { has: () => true },
+  capabilities: ScreenBlueprintCapabilityIndex = { hasBlueprintCapability: () => true },
 ): ScreenParseResult<ScreenBlueprintPlan> {
   for (const rule of document.blueprint.rules) {
     for (const capability of rule.requiredCapabilities ?? []) {
-      if (!capabilities.has(capability)) {
+      if (!capabilities.hasBlueprintCapability(capability)) {
         return failure('BLUEPRINT_CAPABILITY_UNAVAILABLE', 'Blueprint capability is unavailable.');
       }
     }
@@ -86,7 +86,7 @@ export function dispatchScreenBlueprintEvent(
     const nextEvents = [...hostEvents];
     for (const action of rule.actions) {
       const expression = action.type === 'set-variable' ? action.value : action.payload;
-      const value = evaluateExpression(expression, parsedPayload.value, variables);
+      const value = evaluateExpression(expression, parsedPayload.value, nextVariables);
       if (!value.ok) return value;
       if (action.type === 'set-variable') nextVariables[action.variableName] = value.value;
       else nextEvents.push({ name: action.eventName, payload: value.value });
