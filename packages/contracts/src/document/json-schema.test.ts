@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import goldenSchema from '../screen-document.schema.json';
 import { generateScreenDocumentJsonSchema, SCREEN_DOCUMENT_JSON_SCHEMA } from './json-schema.js';
-import { MAX_BACKGROUND_COLOR_CODE_POINTS, MAX_NAME_CODE_POINTS } from './limits.js';
-import { COMPONENT_ID_PATTERN, MATERIAL_TYPE_PATTERN, VARIABLE_NAME_PATTERN } from './schema.js';
+import {
+  MAX_BACKGROUND_COLOR_CODE_POINTS,
+  MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
+  MAX_NAME_CODE_POINTS,
+} from './limits.js';
+import {
+  BLUEPRINT_PATH_SEGMENT_PATTERN,
+  COMPONENT_ID_PATTERN,
+  MATERIAL_TYPE_PATTERN,
+  VARIABLE_NAME_PATTERN,
+} from './schema.js';
 
 const schema = SCREEN_DOCUMENT_JSON_SCHEMA as unknown as Record<string, unknown>;
 
@@ -87,6 +96,29 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     const name = componentFields.name as { minLength: number; maxLength: number };
     expect(name.minLength).toBe(1);
     expect(name.maxLength).toBe(MAX_NAME_CODE_POINTS);
+  });
+
+  it('expresses Blueprint condition and expression limits', () => {
+    const blueprint = propertiesOf(schema).blueprint as Record<string, unknown>;
+    const rules = propertiesOf(blueprint).rules as { items: unknown };
+    const rule = propertiesOf(rules.items as Record<string, unknown>);
+    const condition = rule.condition as { allOf: unknown[] };
+    expect(condition.allOf).toEqual([
+      {
+        if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
+        then: { not: { required: ['right'] } },
+        else: { required: ['right'] },
+      },
+    ]);
+
+    const definitions = schema.$defs as Record<string, unknown>;
+    const expressions = definitions.__schema0 as { anyOf: Array<Record<string, unknown>> };
+    const eventPayload = expressions.anyOf[1]!;
+    const path = propertiesOf(eventPayload).path as { items: { pattern: string } };
+    expect(path.items.pattern).toBe(BLUEPRINT_PATH_SEGMENT_PATTERN);
+    const object = expressions.anyOf[4]!;
+    const expressionProperties = propertiesOf(object).properties as { maxProperties: number };
+    expect(expressionProperties.maxProperties).toBe(MAX_BLUEPRINT_EXPRESSION_CONTAINERS);
   });
 
   it('contains no zod-specific metadata', () => {

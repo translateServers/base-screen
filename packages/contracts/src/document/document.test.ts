@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { isScreenMaterialType } from './identity.js';
+import {
+  MAX_BLUEPRINT_EXPRESSION_BYTES,
+  MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
+  MAX_BLUEPRINT_EXPRESSION_DEPTH,
+} from './limits.js';
 import { parseScreenDocument } from './parse.js';
 
 function component(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -86,6 +91,182 @@ describe('parseScreenDocument', () => {
     });
     expect(parse(rawValue).ok).toBe(false);
     expect(parse(existsWithRight).ok).toBe(false);
+  });
+
+  it('accepts dotted Blueprint capability identities without coercing them', () => {
+    const input = document({
+      components: [component({ id: 'button' })],
+      blueprint: {
+        rules: [
+          {
+            id: 'capability',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            requiredCapabilities: ['blueprint.value.variable'],
+            actions: [],
+          },
+        ],
+      },
+    });
+
+    expect(parse(input)).toMatchObject({ ok: true });
+  });
+
+  it('rejects unknown expression fields and dangerous event paths', () => {
+    const expressionExtra = document({
+      components: [component({ id: 'button' })],
+      variables: [{ type: 'static', name: 'count', value: 0 }],
+      blueprint: {
+        rules: [
+          {
+            id: 'extra',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'count',
+                value: { kind: 'literal', value: 1, extra: true },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const dangerousPath = document({
+      components: [component({ id: 'button' })],
+      variables: [{ type: 'static', name: 'count', value: 0 }],
+      blueprint: {
+        rules: [
+          {
+            id: 'path',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'count',
+                value: { kind: 'event-payload', path: ['constructor'] },
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    expect(parse(expressionExtra).ok).toBe(false);
+    expect(parse(dangerousPath).ok).toBe(false);
+  });
+
+  it('rejects dangerous expression object keys', () => {
+    const properties = JSON.parse('{"__proto__":{"kind":"literal","value":1}}') as Record<
+      string,
+      unknown
+    >;
+    const result = parse(
+      document({
+        components: [component({ id: 'button' })],
+        variables: [{ type: 'static', name: 'count', value: 0 }],
+        blueprint: {
+          rules: [
+            {
+              id: 'key',
+              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+              actions: [
+                {
+                  type: 'set-variable',
+                  variableName: 'count',
+                  value: { kind: 'object', properties },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(result).toMatchObject({ ok: false });
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('JSON_DANGEROUS_KEY');
+      expect(result.diagnostics[0]?.path).toEqual([
+        'blueprint',
+        'rules',
+        0,
+        'actions',
+        0,
+        'value',
+        'properties',
+        '__proto__',
+      ]);
+    }
+  });
+
+  it('enforces Blueprint expression depth, container, and byte budgets', () => {
+    let deep: Record<string, unknown> = { kind: 'literal', value: 1 };
+    for (let index = 0; index < MAX_BLUEPRINT_EXPRESSION_DEPTH; index++) {
+      deep = { kind: 'array', items: [deep] };
+    }
+    const containers = {
+      kind: 'array',
+      items: Array.from({ length: MAX_BLUEPRINT_EXPRESSION_CONTAINERS }, () => ({
+        kind: 'array',
+        items: [],
+      })),
+    };
+    const cases = [
+      document({
+        components: [component({ id: 'button' })],
+        variables: [{ type: 'static', name: 'count', value: 0 }],
+        blueprint: {
+          rules: [
+            {
+              id: 'deep',
+              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+              actions: [{ type: 'set-variable', variableName: 'count', value: deep }],
+            },
+          ],
+        },
+      }),
+      document({
+        components: [component({ id: 'button' })],
+        variables: [{ type: 'static', name: 'count', value: 0 }],
+        blueprint: {
+          rules: [
+            {
+              id: 'containers',
+              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+              actions: [{ type: 'set-variable', variableName: 'count', value: containers }],
+            },
+          ],
+        },
+      }),
+      document({
+        components: [component({ id: 'button' })],
+        variables: [{ type: 'static', name: 'count', value: 0 }],
+        blueprint: {
+          rules: [
+            {
+              id: 'bytes',
+              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+              actions: [
+                {
+                  type: 'set-variable',
+                  variableName: 'count',
+                  value: { kind: 'literal', value: 'x'.repeat(MAX_BLUEPRINT_EXPRESSION_BYTES) },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    ];
+
+    for (const input of cases) {
+      const result = parse(input);
+      expect(result).toMatchObject({ ok: false });
+      if (!result.ok) {
+        expect(
+          result.diagnostics.some((diagnostic) => diagnostic.code === 'DOCUMENT_LIMIT_EXCEEDED'),
+        ).toBe(true);
+      }
+    }
   });
 
   it('parses multiple roots and parents declared after children', () => {

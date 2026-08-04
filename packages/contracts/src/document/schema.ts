@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SCREEN_MATERIAL_TYPE_PATTERN } from './identity.js';
 import {
   MAX_BLUEPRINT_ACTIONS_PER_RULE,
+  MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_BLUEPRINT_RULES,
   MAX_COMPONENTS,
   MAX_VARIABLES,
@@ -10,6 +11,8 @@ import {
 export const COMPONENT_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$';
 export const MATERIAL_TYPE_PATTERN = SCREEN_MATERIAL_TYPE_PATTERN;
 export const VARIABLE_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]{0,127}$';
+export const BLUEPRINT_PATH_SEGMENT_PATTERN =
+  '^(?!(?:__proto__|prototype|constructor)$)[A-Za-z_][A-Za-z0-9_]{0,127}$';
 
 export const canvasSchema = z.strictObject({
   width: z.number().int().min(1).max(100_000),
@@ -76,13 +79,16 @@ const blueprintValueExpressionSchema: z.ZodTypeAny = z.lazy(() =>
     z.strictObject({ kind: z.literal('literal'), value: z.any() }),
     z.strictObject({
       kind: z.literal('event-payload'),
-      path: z.array(z.string().regex(new RegExp(VARIABLE_NAME_PATTERN))).max(16),
+      path: z.array(z.string().regex(new RegExp(BLUEPRINT_PATH_SEGMENT_PATTERN))).max(16),
     }),
     z.strictObject({
       kind: z.literal('variable'),
       name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
     }),
-    z.strictObject({ kind: z.literal('array'), items: z.array(blueprintValueExpressionSchema) }),
+    z.strictObject({
+      kind: z.literal('array'),
+      items: z.array(blueprintValueExpressionSchema).max(MAX_BLUEPRINT_EXPRESSION_CONTAINERS),
+    }),
     z.strictObject({
       kind: z.literal('object'),
       properties: z.record(z.string(), blueprintValueExpressionSchema),
@@ -124,7 +130,7 @@ const emitHostEventActionSchema = z.strictObject({
 const blueprintRuleSchema = z.strictObject({
   id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   trigger: blueprintTriggerSchema,
-  requiredCapabilities: z.array(z.string().regex(new RegExp(VARIABLE_NAME_PATTERN))).optional(),
+  requiredCapabilities: z.array(z.string().regex(new RegExp(COMPONENT_ID_PATTERN))).optional(),
   condition: blueprintConditionSchema.optional(),
   actions: z
     .array(z.union([setVariableActionSchema, emitHostEventActionSchema]))

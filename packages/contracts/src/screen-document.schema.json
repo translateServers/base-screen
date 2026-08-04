@@ -245,7 +245,7 @@
                 "type": "array",
                 "items": {
                   "type": "string",
-                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
                 }
               },
               "condition": {
@@ -263,7 +263,27 @@
                   }
                 },
                 "required": ["left", "operator"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "operator": {
+                          "const": "exists"
+                        }
+                      },
+                      "required": ["operator"]
+                    },
+                    "then": {
+                      "not": {
+                        "required": ["right"]
+                      }
+                    },
+                    "else": {
+                      "required": ["right"]
+                    }
+                  }
+                ]
               },
               "actions": {
                 "maxItems": 128,
@@ -348,7 +368,7 @@
               "type": "array",
               "items": {
                 "type": "string",
-                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                "pattern": "^(?!(?:__proto__|prototype|constructor)$)[A-Za-z_][A-Za-z0-9_]{0,127}$"
               }
             }
           },
@@ -378,6 +398,7 @@
               "const": "array"
             },
             "items": {
+              "maxItems": 256,
               "type": "array",
               "items": {
                 "$ref": "#/$defs/__schema0"
@@ -401,7 +422,8 @@
               },
               "additionalProperties": {
                 "$ref": "#/$defs/__schema0"
-              }
+              },
+              "maxProperties": 256
             }
           },
           "required": ["kind", "properties"],

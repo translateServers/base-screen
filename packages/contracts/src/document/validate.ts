@@ -7,11 +7,14 @@ import { canonicalByteLength, codePointLength, hasControlCharacter } from '../js
 import { cloneJsonValue } from '../json/clone.js';
 import { preflightJsonValue } from '../json/preflight.js';
 import type { ScreenDiagnosticCode } from '../types/diagnostics.js';
-import type { ScreenDocument } from '../types/document.js';
+import type { ScreenBlueprintValueExpression, ScreenDocument } from '../types/document.js';
 import type { ScreenJsonValue } from '../types/json.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
   MAX_BLUEPRINT_ACTIONS_PER_RULE,
+  MAX_BLUEPRINT_EXPRESSION_BYTES,
+  MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
+  MAX_BLUEPRINT_EXPRESSION_DEPTH,
   MAX_BLUEPRINT_RULES,
   MAX_CANONICAL_DOCUMENT_BYTES,
   MAX_COMPONENTS,
@@ -447,7 +450,13 @@ function validateBlueprint(
     return false;
   }
   for (let index = 0; index < rules.length; index++) {
-    const rule = rules[index] as { readonly actions: readonly unknown[] };
+    const rule = rules[index] as {
+      readonly actions: readonly unknown[];
+      readonly condition?: {
+        readonly left: ScreenBlueprintValueExpression;
+        readonly right?: ScreenBlueprintValueExpression;
+      };
+    };
     if (rule.actions.length > MAX_BLUEPRINT_ACTIONS_PER_RULE) {
       collector.add(
         'DOCUMENT_LIMIT_EXCEEDED',
@@ -456,8 +465,137 @@ function validateBlueprint(
         'Blueprint rule has too many actions.',
       );
     }
+    if (rule.condition) {
+      validateBlueprintExpression(
+        rule.condition.left,
+        ['blueprint', 'rules', index, 'condition', 'left'],
+        at,
+        collector,
+        phase,
+      );
+      if (rule.condition.right !== undefined) {
+        validateBlueprintExpression(
+          rule.condition.right,
+          ['blueprint', 'rules', index, 'condition', 'right'],
+          at,
+          collector,
+          phase,
+        );
+      }
+    }
+    for (let actionIndex = 0; actionIndex < rule.actions.length; actionIndex++) {
+      const action = rule.actions[actionIndex] as Record<string, unknown>;
+      const field = action.type === 'set-variable' ? 'value' : 'payload';
+      validateBlueprintExpression(
+        action[field] as ScreenBlueprintValueExpression,
+        ['blueprint', 'rules', index, 'actions', actionIndex, field],
+        at,
+        collector,
+        phase,
+      );
+    }
   }
   return true;
+}
+
+function validateBlueprintExpression(
+  expression: ScreenBlueprintValueExpression,
+  base: DiagnosticSegment[],
+  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  let clean = true;
+  if (
+    canonicalByteLength(expression as unknown as ScreenJsonValue) > MAX_BLUEPRINT_EXPRESSION_BYTES
+  ) {
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at(base),
+      phase,
+      `Blueprint expression exceeds ${MAX_BLUEPRINT_EXPRESSION_BYTES} UTF-8 bytes.`,
+    );
+    clean = false;
+  }
+  const budget = { containers: 0 };
+  return walkBlueprintExpression(expression, base, 1, budget, at, collector, phase) && clean;
+}
+
+function walkBlueprintExpression(
+  expression: ScreenBlueprintValueExpression,
+  base: DiagnosticSegment[],
+  depth: number,
+  budget: { containers: number },
+  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  if (depth > MAX_BLUEPRINT_EXPRESSION_DEPTH) {
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at(base),
+      phase,
+      `Blueprint expression nesting exceeds ${MAX_BLUEPRINT_EXPRESSION_DEPTH}.`,
+    );
+    return false;
+  }
+  if (expression.kind !== 'array' && expression.kind !== 'object') {
+    return true;
+  }
+  budget.containers++;
+  if (budget.containers > MAX_BLUEPRINT_EXPRESSION_CONTAINERS) {
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at(base),
+      phase,
+      `Blueprint expression has more than ${MAX_BLUEPRINT_EXPRESSION_CONTAINERS} containers.`,
+    );
+    return false;
+  }
+  let clean = true;
+  if (expression.kind === 'array') {
+    for (let index = 0; index < expression.items.length; index++) {
+      if (
+        !walkBlueprintExpression(
+          expression.items[index]!,
+          [...base, 'items', index],
+          depth + 1,
+          budget,
+          at,
+          collector,
+          phase,
+        )
+      ) {
+        clean = false;
+      }
+    }
+    return clean;
+  }
+  if (Object.keys(expression.properties).length > MAX_BLUEPRINT_EXPRESSION_CONTAINERS) {
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at([...base, 'properties']),
+      phase,
+      `Blueprint expression object has more than ${MAX_BLUEPRINT_EXPRESSION_CONTAINERS} properties.`,
+    );
+    return false;
+  }
+  for (const [key, value] of Object.entries(expression.properties)) {
+    if (
+      !walkBlueprintExpression(
+        value,
+        [...base, 'properties', key],
+        depth + 1,
+        budget,
+        at,
+        collector,
+        phase,
+      )
+    ) {
+      clean = false;
+    }
+  }
+  return clean;
 }
 
 function validateVariable(
