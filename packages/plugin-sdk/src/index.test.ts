@@ -90,7 +90,6 @@ describe('definePlugin', () => {
     const runtime = {
       manifest: {
         id: 'acme.example',
-        version: '1.0.0',
         dependencies: [],
         capabilities: [],
         contributions: [],
