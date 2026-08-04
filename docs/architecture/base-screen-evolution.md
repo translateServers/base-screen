@@ -237,7 +237,7 @@ M0 内部逻辑包名统一使用 `@base-screen/*`，十二包保持 private。�
 
 拥有：
 
-- 运行中的设计会话和 Store 实例，并基于 Core 的纯转换规则实例化工具状态机与交互状态机。
+- 实例级 Designer session，并基于 Core 的纯转换规则实例化工具状态机与交互状态机。
 - DOM 事件到选择、框选、拖拽、缩放、旋转、分组和图层命令的协调。
 - 命令调度、历史实例、剪贴板、快捷键和脏状态。
 - 运行中的画布视口、标尺、网格、吸附线和设计态辅助层。
@@ -269,7 +269,7 @@ Engine 通过 renderer 展示真实物料，通过 plugin-manager 获取当前�
 
 拥有：
 
-- 插件预检、依赖图、版本约束和启用顺序。
+- 插件预检、依赖图和启用顺序。
 - 插件 activate/deactivate/dispose 生命周期。
 - Custom Element 已定义状态、constructor 身份和 Manifest 校验。
 - 设计器实例级不可变物料目录和贡献点快照。

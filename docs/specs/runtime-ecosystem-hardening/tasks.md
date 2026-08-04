@@ -98,5 +98,5 @@
 - Task 9 随 Task 2-8 分阶段推进，最终完成依赖 Task 2-8。
 - Task 10 depends on Task 9。
 
-该任务集不得修改 `ScreenProjectAdapter`、Engine project session、Designer Shadow DOM 或 dirty
-baseline；相关工作仅由配套 Designer 三件套拥有。
+该任务集不得修改 `ScreenProjectAdapter`、Engine project session、Designer Shadow DOM、中文界面或
+dirty baseline；相关工作仅由现行 Designer Engine 三件套拥有。

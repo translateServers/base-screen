@@ -28,6 +28,9 @@
 
 - Feature Specs live in `docs/specs/<kebab-case-feature>/`; plans live in `docs/plans/<kebab-case-feature>/`. Keep them versioned and do not leave workflow output in `.trae/`.
 - Follow `docs/specs/README.md`: implementations must not silently diverge from an active Spec; public-boundary changes need the relevant ADR/Spec updated first.
+- **Persistent Spec Execution.** When a user asks to implement, execute, complete, or remediate an active Spec, treat its `tasks.md` and `checklist.md` as the completion state machine. Do not send a final/completion response while any applicable item remains unchecked. A passing focused check, `pnpm verify:m0`, or completion of one Task is evidence only; it is not completion of the Spec.
+- Before ending persistent Spec work, verify that every applicable Task and checklist item is checked with current code and automated evidence, the requirement-to-test mapping is current when the Spec requires one, and all required quality gates pass. Update the Spec artifacts incrementally as evidence is obtained; never mark an item complete without it.
+- Continue directly to the next unchecked applicable item after each verified change. Stop only when the Spec completion conditions are met, the user explicitly pauses or redirects the work, or a genuine blocker requires a user decision. In the blocker case, state the exact unchecked items, governing contract/ADR constraint, attempted resolution, and the decision required.
 - This project may draw on `C:\worker\nebula`, but copy no Nebula source, app configuration, or assets into this MIT repository without a file-level record in `docs/provenance/` covering source commit/path, authorization, modifications, and attribution decision.
 
 ## Code And Tests

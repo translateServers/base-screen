@@ -2,13 +2,13 @@
 
 > 状态：已记录
 > 最近更新：2026-08-04
-> 定位：记录 Base Screen Designer 视觉与行为兼容规格所参考的 Nebula 版本、路径和 no-copy 边界
+> 定位：记录已归档 Designer parity 规格所参考的 Nebula 版本、路径和 no-copy 边界；不作为现行 Designer Engine 验收基线
 
 ## 目标文件
 
-- `docs/specs/designer-authoring-project-lifecycle/spec.md`
-- `docs/specs/designer-authoring-project-lifecycle/tasks.md`
-- `docs/specs/designer-authoring-project-lifecycle/checklist.md`
+- `docs/specs/archive/designer-authoring-project-lifecycle/spec.md`
+- `docs/specs/archive/designer-authoring-project-lifecycle/tasks.md`
+- `docs/specs/archive/designer-authoring-project-lifecycle/checklist.md`
 - 本 provenance 记录
 
 本记录当前只覆盖文档层的行为/视觉研究。未来实现文件若直接衍生外部代码、CSS、配置或资产，必须

@@ -1,9 +1,9 @@
 # Core Domain Spec
 
 > 状态：生效中
-> 最近更新：2026-08-03
+> 最近更新：2026-08-04
 > 定位：冻结 `@base-screen/core` 首个文档状态、命令、事务、历史、组件树语义和几何纯算法的可验收契约
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md)（已接受）
+> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)（已接受）、[ADR-0013](../../decisions/ADR-0013-core-canonical-blueprint-mutation.md)（已接受）
 
 ## 1. 生效条件
 
@@ -41,10 +41,12 @@
 - Runtime Overrides、数据加载结果、可见性覆盖或运行时错误状态。
 - canonical parser、serializer、JSON Schema 或 JSON boundary 的重复实现。
 - 剪贴板、快捷键、标尺、网格绘制、空间索引或可见区域裁剪。
-- Blueprint、DSL 编译、事件匹配或执行计划。
+- Blueprint 的 parser、serializer、schema、runtime side effect 或 host action。
 - 不可撤销的宿主副作用或插件命令。
 
-DSL 仍属于 Core 的目标职责，但 canonical Blueprint、Capabilities 和 Compiled Plan 尚未由 Contracts 冻结。本阶段不得用占位字段、`unknown` 扩展槽或空 facade 提前保留该 API；后续必须通过独立 Spec 增量进入 Core。
+Contracts 已按 ADR-0010 冻结 canonical Blueprint、host-resource data source、capability index 和
+diagnostics。Core 可在其纯 command 与 compile/evaluate 边界内消费这些类型；不得创建占位 API、
+`unknown` 扩展槽、兼容分支或 host runtime facade。
 
 ## 4. Package 边界
 
@@ -212,6 +214,10 @@ export type ScreenDocumentCommand =
       readonly parentId: string | null;
     }
   | {
+      readonly type: 'replace-blueprint';
+      readonly blueprint: ScreenBlueprint;
+    }
+  | {
       readonly type: 'replace-variables';
       readonly variables: readonly ScreenStaticVariable[];
     };
@@ -225,11 +231,14 @@ export interface ScreenComponentPatch {
   readonly status?: ScreenComponentStatus;
   readonly props?: ScreenJsonObject;
   readonly style?: ScreenJsonObject;
-  readonly dataSource?: ScreenStaticDataSource | null;
+  readonly dataSource?: ScreenComponentDataSource | null;
 }
 ```
 
 `ScreenComponentPatch` 不包含 `id`、`type` 或 `parentId`。身份创建只通过 `add-component`，父关系修改只通过 `reparent-components`；首期不支持修改既有组件的 material type。
+`replace-blueprint` 只接受 Contracts 已冻结的 canonical shape，并和其他命令一样在 candidate
+Document 通过后置校验前不提交。`host-resource` 仅是 data source 描述，不把 host transport、credential
+或 resource resolution 引入 Core。
 
 ### 7.2 Apply result
 
@@ -741,15 +750,17 @@ src/
 - THEN 类型检查和运行成功
 - AND 无 Custom Element 注册、global mutation、I/O 或 framework runtime
 
-### R13：DSL 延后
+### R13：Blueprint 纯边界
 
-系统 SHALL 不在本阶段公开未冻结的 Blueprint 或 DSL API。
+系统 SHALL 只公开由 ADR-0010 与 ADR-0013 冻结的 Blueprint command 和纯 compile/evaluate API，且不得
+暴露 runtime、host action、兼容 placeholder 或未冻结 DSL surface。
 
 场景：检查 public declaration
 
 - GIVEN `@base-screen/core` 的发布 tarball
 - WHEN 检查根入口声明
-- THEN 不存在 Blueprint、Compiled Plan、Capability 或 DSL placeholder export
+- THEN 仅存在当前 Spec 明确的 Blueprint command 与纯 compile/evaluate export
+- AND 不存在 runtime、host action 或 compatibility placeholder export
 
 ## 17. 实施顺序
 
@@ -781,4 +792,4 @@ Core Domain 阶段完成必须同时满足：
 - public declaration 不泄漏 DOM、framework、Store、Zod、Nebula 或宿主类型。
 - Node 单元测试、类型检查、边界检查、API report、package 检查和真实 tarball consumer 全部通过。
 - 每个 Requirement 都有自动化测试映射，且不存在仅靠文档声明通过的验收项。
-- DSL/Blueprint 没有以占位 API 进入发布面。
+- Blueprint 只以 ADR-0010 与 ADR-0013 冻结的纯 API 进入发布面。

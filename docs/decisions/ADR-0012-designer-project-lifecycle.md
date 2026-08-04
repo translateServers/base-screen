@@ -3,7 +3,8 @@
 > Status: Accepted
 > Date: 2026-08-04
 > Scope: Project Adapter public contract, Engine project-operation ownership, baseline and conflict semantics
-> Implements: [Designer Authoring And Project Lifecycle Spec](../specs/designer-authoring-project-lifecycle/spec.md)
+> Historical implementation: [Archived Designer Authoring And Project Lifecycle Spec](../specs/archive/designer-authoring-project-lifecycle/spec.md)
+> Current implementation: [Designer Engine Spec](../specs/designer-engine/spec.md)
 
 ## Context
 

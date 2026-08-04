@@ -69,7 +69,7 @@ bridge 和 Nebula importer 的第一条纵向切片，但当前验收仍以成�
 | Scripts | Nebula analyze/decision/convert | Engine load/save/publish |
 
 配套的
-[Designer Authoring And Project Lifecycle Spec](../designer-authoring-project-lifecycle/spec.md)
+[Designer Engine Spec](../designer-engine/spec.md)
 只读取 immutable Material Catalog 和 property/design declarations。两个 Spec 不共享状态机、adapter
 或 Playwright 项目；根级总门禁只在两条独立验证命令都稳定后做聚合。
 

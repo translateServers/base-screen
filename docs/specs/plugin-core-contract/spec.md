@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/plugin-core` 的物料 ABI、插件协议、只读目录、标准事件与限权命令端口
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[Contracts Foundation Spec](../contracts-foundation/spec.md)（生效中）、[Base Screen 长期演进总纲](../../architecture/base-screen-evolution.md)（生效中）
+> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[Contracts Foundation Spec](../contracts-foundation/spec.md)（生效中）、[Base Screen 长期演进总纲](../../architecture/base-screen-evolution.md)（生效中）
 
 ## 1. Why
 
@@ -182,7 +182,7 @@ Model 约束：
 语义要求：
 
 - Catalog 不等同于全局 `CustomElementRegistry`，不得通过枚举 global 自动构造。
-- 未启用或不存在的 type 返回 `undefined`，不得隐式 fallback 到同名或其他 major。
+- 未启用或不存在的 type 返回 `undefined`，不得隐式 fallback 到其他 identity。
 - 两个 Base Screen 实例可以消费不同 Catalog，互不污染。
 - `list()` 按 entry Manifest 的 `type` 使用 UTF-16 code unit 升序返回；不得依赖注册顺序、object insertion order 或 locale。同一 snapshot 重复读取必须深相等。
 
@@ -190,8 +190,8 @@ Model 约束：
 
 根入口必须公开 Plugin Manifest readonly 类型和 `parseBaseScreenPluginManifest(input: unknown): ScreenParseResult<BaseScreenPluginManifest>`。Manifest 是 strict 纯数据对象，包含且仅包含：
 
-- 稳定 plugin id 和严格 SemVer core version。
-- 显式依赖列表；每项包含 plugin id 与首期 range `^major.minor.patch`。
+- 稳定 plugin id。
+- 显式依赖列表；每项仅包含 plugin id。
 - 请求的 capability 列表。
 - contribution 列表。
 
@@ -202,7 +202,7 @@ Model 约束：
 - `dataResourceType`：只声明资源类型 id、展示元数据和配置 schema，不包含 endpoint、Header 或凭证。
 - `blueprintCapability`：只声明宿主白名单中的 trigger/action capability id，不携带执行函数。
 
-Plugin Core parser 只验证单份 Manifest 的 strict shape、版本/range、自重复和引用一致性。依赖缺失、依赖版本不兼容、依赖环，以及不同插件间 type/tagName/contribution 冲突只能在候选集合解析后确定，归 Plugin Manager resolver 负责；resolver 必须复用 §18 的 code 和确定性排序。
+Plugin Core parser 只验证单份 Manifest 的 strict shape、自重复和引用一致性。依赖缺失、依赖环，以及不同插件间 type/tagName/contribution 冲突只能在候选集合解析后确定，归 Plugin Manager resolver 负责；resolver 必须复用 §18 的 code 和确定性排序。
 
 Manifest 不得包含 activate function、handler、constructor、render function、宿主实例、远程代码地址或凭证。Manifest parser 必须拒绝未知 contribution kind、重复 dependency、重复 capability 和重复 contribution identity，并返回确定性诊断。
 
@@ -270,8 +270,8 @@ Plugin Core 必须复用 Contracts 所有的诊断 envelope、path、排序、�
 本 Spec 生效前，Contracts 的 `ScreenDiagnosticCode` 必须通过显式 union 扩展拥有以下稳定 code；Plugin Core 不定义第二个 diagnostic type：
 
 - `PLUGIN_CORE_MANIFEST_NOT_OBJECT`、`PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD`、`PLUGIN_CORE_MANIFEST_FIELD_INVALID`、`PLUGIN_CORE_LIMIT_EXCEEDED`。
-- `PLUGIN_CORE_API_VERSION_UNSUPPORTED`、`PLUGIN_CORE_IDENTITY_INVALID`、`PLUGIN_CORE_TAG_NAME_INVALID`、`PLUGIN_CORE_IDENTITY_CONFLICT`。
-- `PLUGIN_CORE_DEPENDENCY_MISSING`、`PLUGIN_CORE_DEPENDENCY_VERSION_INCOMPATIBLE`、`PLUGIN_CORE_DEPENDENCY_CYCLE`。
+- `PLUGIN_CORE_IDENTITY_INVALID`、`PLUGIN_CORE_TAG_NAME_INVALID`、`PLUGIN_CORE_IDENTITY_CONFLICT`。
+- `PLUGIN_CORE_DEPENDENCY_MISSING`、`PLUGIN_CORE_DEPENDENCY_CYCLE`。
 - `PLUGIN_CORE_CAPABILITY_UNDECLARED`、`PLUGIN_CORE_CAPABILITY_UNAUTHORIZED`、`PLUGIN_CORE_CAPABILITY_INCOMPATIBLE`。
 - `PLUGIN_CORE_CONTRIBUTION_DUPLICATE`、`PLUGIN_CORE_CONTRIBUTION_UNKNOWN`、`PLUGIN_CORE_CONTRIBUTION_CONFLICT`。
 - `PLUGIN_CORE_EVENT_INVALID`、`PLUGIN_CORE_EVENT_PAYLOAD_INVALID`。
@@ -480,12 +480,12 @@ canonical byte、depth、container 和 string 的计算语义完全复用 Contra
 | 领域 | 必测行为 |
 | --- | --- |
 | Package | Node ESM import、唯一 workspace dependency、默认无副作用、真实 tarball consumer |
-| Identity | type/tagName 合法与非法边界、碰撞、确定性、ABI/version 不兼容 |
+| Identity | type/tagName 合法与非法边界、碰撞和确定性 |
 | Material Manifest | strict shape、纯数据、重复字段语义、JSON/资源边界、detached output |
 | Model | dataState 判别、readonly JSON 数据、非 JSON error/data 拒绝 |
 | Event | allowlist、bubbles/composed、payload clone/limit、伪造可信字段不生效 |
 | Material Catalog | get/has/list、UTF-16 排序、缺失 fail closed、双向冲突、只读接口、双实例隔离 |
-| Plugin Manifest | 单份 shape/range/引用/重复检测、四类 contribution 判别、Manager 集合依赖与冲突 conformance |
+| Plugin Manifest | 单份 shape/依赖/引用/重复检测、四类 contribution 判别、Manager 集合依赖与冲突 conformance |
 | Lifecycle | context 最小权限、非法/并发 transition、activate 回滚、deactivate 失败、重复 dispose、session 失效 |
 | Command Port | command allowlist、args/result JSON、失效 session、诊断最小披露 |
 | Plugin Catalog | 只包含已启用 snapshot、不泄漏生命周期和 adapter |
@@ -498,7 +498,7 @@ canonical byte、depth、container 和 string 的计算语义完全复用 Contra
 
 实现应按责任分离 Material 类型与校验、identity、event、catalog、Plugin 类型与校验、lifecycle、command port 和 diagnostics。`index.ts` 只导出本 Spec 已验收 API。
 
-协议/声明文件以 400 行为 review threshold，超过 600 行必须按 contract 或版本拆分；纯逻辑模块目标不超过 300 行，超过 500 行必须按职责拆分。不得创建仅转发行为的空文件或尚未授权的 API facade。
+协议/声明文件以 400 行为 review threshold，超过 600 行必须按 contract 拆分；纯逻辑模块目标不超过 300 行，超过 500 行必须按职责拆分。不得创建仅转发行为的空文件或尚未授权的 API facade。
 
 ## 26. 实施顺序
 

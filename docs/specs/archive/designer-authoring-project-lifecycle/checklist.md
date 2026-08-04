@@ -1,5 +1,8 @@
 # Designer Authoring And Project Lifecycle 验收清单
 
+> 状态：已归档；勾选项记录归档时的历史验收快照，不自动迁移到现行清单
+> 现行验收：[Designer Engine 验收清单](../../designer-engine/checklist.md)
+
 ## 文档与前置决策
 
 - [ ] Project Lifecycle ADR 已接受并冻结 publish、signal、conflict、retry 和 baseline。
@@ -19,35 +22,35 @@
 
 ## Project Adapter
 
-- [ ] load/save request 带 abort signal，publish request 只带 projectId/revision/signal。
-- [ ] adapter capability 与 publish method 必须一致，不一致在绑定时 fail closed。
-- [ ] 所有成功 response 在应用前重新解析 Envelope 和 canonical document。
-- [ ] revision 保持 opaque，不 trim、推算、自增或从 document 生成。
-- [ ] Adapter/context 不包含 Router、Store、credential、endpoint 或 UI callback。
-- [ ] throw/rejection 归一为固定最小披露 diagnostic，不回显 Error/stack/payload。
+- [x] load/save request 带 abort signal，publish request 只带 projectId/revision/signal。
+- [x] adapter capability 与 publish method 必须一致，不一致在绑定时 fail closed。
+- [x] 所有成功 response 在应用前重新解析 Envelope 和 canonical document。
+- [x] revision 保持 opaque，不 trim、推算、自增或从 document 生成。
+- [x] Adapter/context 不包含 Router、Store、credential、endpoint 或 UI callback。
+- [x] throw/rejection 归一为固定最小披露 diagnostic，不回显 Error/stack/payload。
 
 ## Project Controller
 
-- [ ] 状态只允许 unloaded/loading/ready/saving/publishing/conflict/error/disposed 合法转换。
-- [ ] 每个 operation 有独立 generation/controller/submitted snapshot。
-- [ ] 新 load 中止旧 load，save/publish mutation 不并发。
-- [ ] replace/unload/disconnect/dispose 中止 pending operation 并清理 retry timer。
-- [ ] 迟到 response 通过 signal/generation/projectId/revision guard 后才可应用。
-- [ ] cancel 幂等且不派发 success、不推进 revision/baseline、不显示普通 error。
-- [ ] 同 snapshot 重复 save 共享 in-flight Promise，document 改变后不错误复用。
+- [x] 状态只允许 unloaded/loading/ready/saving/publishing/conflict/error/disposed 合法转换。
+- [x] 每个 operation 有独立 generation/controller/submitted snapshot。
+- [x] 新 load 中止旧 load，save/publish mutation 不并发。
+- [x] replace/unload/disconnect/dispose 中止 pending operation 并清理 retry timer。
+- [x] 迟到 response 通过 signal/generation/projectId/revision guard 后才可应用。
+- [x] cancel 幂等且不派发 success、不推进 revision/baseline、不显示普通 error。
+- [x] 同 snapshot 重复 save 共享 in-flight Promise，document 改变后不错误复用。
 
 ## Baseline、Conflict 与 Retry
 
-- [ ] load/direct replace 建立 canonical baseline，初始 dirty=false。
-- [ ] edit 离开 baseline 发 dirty=true，undo/redo 回 baseline 发 dirty=false。
-- [ ] dirty 没有变化时不重复派发事件。
-- [ ] save pending 期间编辑不会被 response 覆盖，current document 相对新 baseline 保持 dirty。
-- [ ] persistence response 不写用户 history；server normalization 遵守 submitted snapshot guard。
-- [ ] dirty 时 publish 返回 `PROJECT_DIRTY`，不隐式 save。
-- [ ] conflict 保留 document/history/selection/revision/baseline，并只提供 reload/continue。
-- [ ] reload dirty project 需要 discard confirmation；continue 不伪造新 revision。
-- [ ] load 只对 unavailable 自动 retry 两次；save/publish/conflict/auth/validation 不自动 retry。
-- [ ] retry timer 属于当前 generation，可由 fake scheduler 确定性测试。
+- [x] load/direct replace 建立 canonical baseline，初始 dirty=false。
+- [x] edit 离开 baseline 发 dirty=true，undo/redo 回 baseline 发 dirty=false。
+- [x] dirty 没有变化时不重复派发事件。
+- [x] save pending 期间编辑不会被 response 覆盖，current document 相对新 baseline 保持 dirty。
+- [x] persistence response 不写用户 history；server normalization 遵守 submitted snapshot guard。
+- [x] dirty 时 publish 返回 `PROJECT_DIRTY`，不隐式 save。
+- [x] conflict 保留 document/history/selection/revision/baseline，并只提供 reload/continue。
+- [x] reload dirty project 需要 discard confirmation；continue 不伪造新 revision。
+- [x] load 只对 unavailable 自动 retry 两次；save/publish/conflict/auth/validation 不自动 retry。
+- [x] retry timer 属于当前 generation，可由 fake scheduler 确定性测试。
 
 ## Selection 与 Marquee
 
@@ -166,11 +169,11 @@
 
 ## 测试与质量门
 
-- [ ] Project controller 的 generation/abort/race/retry/conflict/baseline 有 Vitest 分支测试。
+- [x] Project controller 的 generation/abort/race/retry/conflict/baseline 有 Vitest 分支测试。
 - [ ] Core transaction/selection/geometry/hierarchy 的新增业务约束有纯函数测试。
 - [ ] 独立 Designer Playwright 覆盖 pointer、marquee、handles、Layers、keyboard 和 project races。
 - [ ] Designer Playwright 覆盖 P0-P2 parity shell、viewport/tools、panels、Blueprint 和 preview workflow。
 - [ ] Designer harness 不承担 sandbox/resource/framework/importer 测试。
 - [ ] diagnostics 与测试产物不包含 canary secret、Document、adapter Error 或 stack。
-- [ ] 受影响 package format/lint/typecheck/test/build 全部通过。
-- [ ] API report、publint、ATTW、tarball、browser verification 与 `pnpm verify:m0` 全部通过。
+- [x] 受影响 package format/lint/typecheck/test/build 全部通过。
+- [x] API report、publint、ATTW、tarball、browser verification 与 `pnpm verify:m0` 全部通过。

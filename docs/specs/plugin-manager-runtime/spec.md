@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/plugin-manager` 在 P2 的候选预检、依赖解析、能力授权、插件生命周期和实例级只读目录事务
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)（设计中）、[包开发与文档优先级](../../architecture/package-development-order.md)（生效中）
+> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)（生效中）、[包开发与文档优先级](../../architecture/package-development-order.md)（生效中）
 
 ## 1. 生效条件
 
@@ -44,7 +44,7 @@ P2 退出条件保持仓库既有定义：
 - 对宿主显式提供的 standalone material tagName 和 plugin runtime 做完整候选预检。
 - 复用 Plugin Core parser 校验 constructor static Manifest 与 runtime Manifest。
 - 检测跨候选 plugin id、material type、tagName 和四类 contribution identity 冲突。
-- 检测缺失依赖、`^major.minor.patch` 不兼容和依赖环，并生成确定性启用顺序。
+- 检测缺失依赖和依赖环，并生成确定性启用顺序。
 - 将插件请求 capability 与宿主批准集合求交，拒绝未声明、未授权或不兼容能力。
 - 按 Plugin Core 固定状态机执行 activate、deactivate、dispose，并约束 session 端口失效时机。
 - 以一次性提交方式发布实例级不可变 Material Catalog 与 Plugin Catalog snapshot。
@@ -162,7 +162,7 @@ inactive -> activating -> active -> deactivating -> inactive
 2. **单份解析**：分别调用 Plugin Core Material/Plugin Manifest parser；Manager 不复制字段级 schema。
 3. **runtime 一致性**：runtime 的 `manifest` 必须与 parser 成功得到的 detached Manifest 内容深相等，不能在 activate 时追加 contribution。
 4. **集合 identity**：检测重复 plugin id、material type、tagName 和 contribution identity。
-5. **依赖解析**：检测依赖缺失、SemVer range 不兼容与依赖环，生成确定性拓扑顺序。
+5. **依赖解析**：检测依赖缺失与依赖环，生成确定性拓扑顺序。
 6. **能力授权**：验证 requested、declared、host-approved capability 关系，并形成每个插件的最终 granted capability snapshot。
 7. **Custom Element 预检**：按候选 tagName 查询显式 registry 端口并核对 constructor、static Manifest、type 与 tagName。
 8. **计划冻结**：形成仅供本次事务使用的 detached enable plan；此时仍不发布 Catalog。
@@ -173,9 +173,9 @@ inactive -> activating -> active -> deactivating -> inactive
 
 ## 9. 依赖与确定性启用顺序
 
-- Plugin Core parser 负责单份 Manifest 内 dependency shape、range 语法和自重复；Manager 只负责候选集合语义。
+- Plugin Core parser 负责单份 Manifest 内 dependency shape 和自重复；Manager 只负责候选集合语义。
 - plugin id 必须唯一；同 id 即使 Manifest 深相等也作为候选冲突拒绝，不做覆盖或隐式去重。
-- 每条依赖必须在候选 plugin 集合中存在，并满足声明的 `^major.minor.patch`；不选择其他 major，不访问包管理器解析版本。
+- 每条依赖必须在候选 plugin 集合中存在；不选择替代 candidate，不访问包管理器解析版本。
 - 依赖图存在任意环时整体失败；diagnostic 必须覆盖可确定的环成员，顺序稳定，不只依赖 DFS 起点或输入顺序。
 - 启用顺序使用拓扑序：依赖先于依赖者；多个同时可选节点按 plugin id 的 UTF-16 code unit 升序决定。
 - deactivate、回滚和 dispose 顺序是实际成功 activate 顺序的严格逆序。
@@ -237,7 +237,7 @@ inactive -> activating -> active -> deactivating -> inactive
 - Material Catalog entry 只包含 Plugin Core 冻结的 Manifest 与 Constructor 契约；list 按 material type 的 UTF-16 code unit 升序。
 - Plugin Catalog 只包含已启用插件的安全 Manifest 数据、granted capability 和 contribution 摘要；list 按 plugin id 的 UTF-16 code unit 升序。
 - Catalog 不暴露 runtime、activation context、session、adapter、registry、状态机或可变 Map/Set。
-- `get()` 缺失返回 `undefined`；不存在同名 fallback、其他 major fallback 或全局 registry fallback。
+- `get()` 缺失返回 `undefined`；不存在同名 fallback 或全局 registry fallback。
 - 同一 snapshot 重复 `get/has/list` 深相等；返回集合不可被消费者用于改变内部目录。
 - deactivate 开始或 dispose 开始后，旧 snapshot 立即不再作为会话当前目录；已持有对象仍只是一份不具备生命周期能力的只读快照。
 - 任一预检、resolve、授权或 activate 失败，结果中不得包含 Catalog value，Manager 查询也不得观察到部分 entry。
@@ -256,7 +256,7 @@ inactive -> activating -> active -> deactivating -> inactive
 Manager 必须复用 Contracts 的 `ScreenParseResult`、diagnostic envelope、path、排序、上限和数据最小化规则，并只使用 Plugin Core 已冻结的 `PLUGIN_CORE_*` code：
 
 - identity 与 registry 预检：`PLUGIN_CORE_IDENTITY_INVALID`、`PLUGIN_CORE_IDENTITY_CONFLICT`。
-- dependency：`PLUGIN_CORE_DEPENDENCY_MISSING`、`PLUGIN_CORE_DEPENDENCY_VERSION_INCOMPATIBLE`、`PLUGIN_CORE_DEPENDENCY_CYCLE`。
+- dependency：`PLUGIN_CORE_DEPENDENCY_MISSING`、`PLUGIN_CORE_DEPENDENCY_CYCLE`。
 - capability：`PLUGIN_CORE_CAPABILITY_UNDECLARED`、`PLUGIN_CORE_CAPABILITY_UNAUTHORIZED`、`PLUGIN_CORE_CAPABILITY_INCOMPATIBLE`。
 - contribution：`PLUGIN_CORE_CONTRIBUTION_DUPLICATE`、`PLUGIN_CORE_CONTRIBUTION_CONFLICT`。
 - lifecycle/session：`PLUGIN_CORE_LIFECYCLE_INVALID`、`PLUGIN_CORE_SESSION_INVALID`。
@@ -455,7 +455,7 @@ Plugin Manager Runtime 仅在以下条件全部满足后完成：
 
 - P1 Plugin Core 已完成，本 Spec 已生效，代码不存在未记录偏离。
 - Manager 只依赖 Contracts 与 Plugin Core，默认入口无 DOM/global/注册/执行副作用。
-- parser 与 resolver 责任清晰，Manager 未复制 Manifest、JSON、SemVer range 或 diagnostic envelope 契约。
+- parser 与 resolver 责任清晰，Manager 未复制 Manifest、JSON 或 diagnostic envelope 契约。
 - 候选预检、冲突、依赖环、稳定拓扑、能力授权和 registry 检查全部 fail closed。
 - activate、rollback、deactivate、dispose 与 session 失效严格符合 Plugin Core 生命周期。
 - 任一失败均不返回或保留部分 Material/Plugin Catalog。
