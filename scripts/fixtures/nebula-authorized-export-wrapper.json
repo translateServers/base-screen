@@ -1,0 +1,22 @@
+{
+  "nebulaVersion": 1,
+  "export": {
+    "exportVersion": 1,
+    "document": {
+      "canvas": { "width": 1320, "height": 680, "backgroundColor": "#f7f2df" },
+      "components": [
+        {
+          "id": "export_label",
+          "type": "base.text",
+          "name": "Export label",
+          "position": { "x": 48, "y": 48 },
+          "size": { "width": 300, "height": 56 },
+          "props": { "text": "Sanitized export" },
+          "style": {},
+          "dataSource": null
+        }
+      ],
+      "variables": []
+    }
+  }
+}

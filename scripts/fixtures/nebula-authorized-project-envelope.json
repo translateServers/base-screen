@@ -1,0 +1,22 @@
+{
+  "nebulaVersion": 1,
+  "project": {
+    "projectVersion": 1,
+    "document": {
+      "canvas": { "width": 1320, "height": 680, "backgroundColor": "#eef5f1" },
+      "components": [
+        {
+          "id": "project_label",
+          "type": "base.text",
+          "name": "Project label",
+          "position": { "x": 32, "y": 32 },
+          "size": { "width": 280, "height": 48 },
+          "props": { "text": "Sanitized project" },
+          "style": {},
+          "dataSource": null
+        }
+      ],
+      "variables": []
+    }
+  }
+}

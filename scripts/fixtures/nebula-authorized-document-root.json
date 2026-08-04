@@ -1,0 +1,17 @@
+{
+  "nebulaVersion": 1,
+  "canvas": { "width": 1920, "height": 1080, "backgroundColor": "#07141c" },
+  "components": [
+    {
+      "id": "metric_card",
+      "type": "base.text",
+      "name": "Metric card",
+      "position": { "x": 40, "y": 40 },
+      "size": { "width": 320, "height": 180 },
+      "props": { "title": "Sample metric", "decimals": 0 },
+      "style": {},
+      "dataSource": null
+    }
+  ],
+  "variables": []
+}
