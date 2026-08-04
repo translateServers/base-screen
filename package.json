@@ -24,6 +24,7 @@
     "sync:license": "node scripts/sync-package-license.mjs",
     "verify:tarball": "node scripts/verify-tarballs.mjs",
     "verify:browser": "node scripts/verify-browser-harness.mjs",
+    "verify:runtime": "node scripts/verify-runtime-harness.mjs",
     "verify:nebula-import": "node scripts/verify-nebula-import.mjs",
     "verify:m0": "pnpm format && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm check:api && pnpm check:engine-import && pnpm verify:tarball",
     "changeset": "changeset",

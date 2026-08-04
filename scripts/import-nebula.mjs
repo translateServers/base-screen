@@ -313,14 +313,15 @@ function analyzeComponent(component, index, findings) {
 }
 
 function resolveFindings(analysis, decisions) {
-  const findings = [...analysis.report.findings];
+  const sourceFindings = [...analysis.report.findings];
+  const findings = [...sourceFindings];
   if (analysis.document === undefined) {
     return { ok: false, findings };
   }
 
   const decisionById = new Map(decisions.map((decision) => [decision.id, decision]));
   const findingIds = new Set(
-    findings.flatMap((item) => (item.decisionId === undefined ? [] : [item.decisionId])),
+    sourceFindings.flatMap((item) => (item.decisionId === undefined ? [] : [item.decisionId])),
   );
   for (const decision of decisions) {
     if (!findingIds.has(decision.id)) {
@@ -338,7 +339,7 @@ function resolveFindings(analysis, decisions) {
   }
 
   const droppedComponents = new Set();
-  for (const item of findings) {
+  for (const item of sourceFindings) {
     if (item.severity !== 'blocking') continue;
     if (item.decisionId === undefined) continue;
     const decision = decisionById.get(item.decisionId);

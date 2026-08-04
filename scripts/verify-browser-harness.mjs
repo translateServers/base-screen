@@ -1,5 +1,9 @@
+import { mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
+
+const screenshotDirectory = 'test-results/designer-workbench';
+mkdirSync(screenshotDirectory, { recursive: true });
 
 const server = await createServer({
   root: 'examples/browser-harness',
@@ -49,7 +53,7 @@ try {
         const compact = await designer.evaluate((element) => {
           const warning = element.shadowRoot.querySelector('.small-screen-warning');
           return {
-            text: warning?.textContent,
+            text: warning?.textContent?.trim(),
             visible:
               warning !== null &&
               warning !== undefined &&
@@ -67,9 +71,13 @@ try {
         ) {
           throw new Error('BROWSER_HARNESS_COMPACT_WORKBENCH_FAILED');
         }
+        await page.screenshot({
+          path: `${screenshotDirectory}/${viewport.width}x${viewport.height}.png`,
+        });
       }
       if (viewport.width > 800) {
         await assertDesktopWorkbench(designer, viewport);
+        await assertDesignerControlStyles(designer);
         const geometry = await designer.evaluate((element) => {
           const root = element.shadowRoot;
           return {
@@ -89,6 +97,9 @@ try {
         ) {
           throw new Error(`BROWSER_HARNESS_GEOMETRY_FAILED: ${viewport.width}x${viewport.height}`);
         }
+        await page.screenshot({
+          path: `${screenshotDirectory}/${viewport.width}x${viewport.height}.png`,
+        });
         const isolation = await page.evaluate(() => {
           const { catalog, designer } = window.baseScreenHarness;
           const second = document.createElement('base-screen-designer');
@@ -429,6 +440,64 @@ try {
   }
 } finally {
   await server.close();
+}
+
+async function assertDesignerControlStyles(designer) {
+  const styles = await designer.evaluate((host) => {
+    const root = host.shadowRoot;
+    const canvas = root?.querySelector('[data-canvas]');
+    const workspace = root?.querySelector('.designer');
+    if (
+      root === null ||
+      canvas === null ||
+      canvas === undefined ||
+      workspace === null ||
+      workspace === undefined
+    ) {
+      return undefined;
+    }
+    const canary = document.createElement('div');
+    canary.dataset.baseScreenComponentId = 'style-canary';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'canary';
+    const input = document.createElement('input');
+    input.value = 'canary';
+    canary.append(button, input);
+    canvas.appendChild(canary);
+    const toolbar = root.querySelector('[data-action="undo"]');
+    const viewer = document.querySelector('base-screen-viewer');
+    const before = {
+      theme: getComputedStyle(host).getPropertyValue('--designer-surface-workspace').trim(),
+      toolbarHeight: toolbar?.getBoundingClientRect().height,
+      canaryFont: getComputedStyle(canary).font,
+      workspaceFont: getComputedStyle(workspace).font,
+      canaryInputHeight: input.getBoundingClientRect().height,
+      viewerFont: viewer === null ? undefined : getComputedStyle(viewer).font,
+    };
+    host.setAttribute('theme', 'light');
+    const lightTheme = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-workspace')
+      .trim();
+    const lightViewerFont = viewer === null ? undefined : getComputedStyle(viewer).font;
+    host.removeAttribute('theme');
+    const restoredTheme = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-workspace')
+      .trim();
+    canary.remove();
+    return { ...before, lightTheme, lightViewerFont, restoredTheme };
+  });
+  if (
+    styles === undefined ||
+    styles.toolbarHeight !== 30 ||
+    styles.theme === styles.lightTheme ||
+    styles.theme !== styles.restoredTheme ||
+    styles.canaryFont === styles.workspaceFont ||
+    styles.canaryInputHeight === 30 ||
+    styles.viewerFont !== styles.lightViewerFont
+  ) {
+    throw new Error(`BROWSER_HARNESS_CONTROL_STYLE_FAILED:${JSON.stringify(styles)}`);
+  }
 }
 
 async function assertDesktopWorkbench(designer, viewport) {
