@@ -5,7 +5,6 @@ import { ScreenSerializationError, serializeScreenDocument } from './serialize.j
 
 function document(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    schemaVersion: 2,
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],

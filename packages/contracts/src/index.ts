@@ -25,17 +25,15 @@ export type {
   ScreenBlueprintSetVariableAction,
   ScreenCanvas,
   ScreenComponentDataSource,
-  ScreenComponentNode,
-  ScreenComponentStatus,
-  ScreenDocument,
-  ScreenDocumentSchemaVersion,
-  ScreenHostResourceDataSource,
+    ScreenComponentNode,
+    ScreenComponentStatus,
+    ScreenDocument,
+    ScreenHostResourceDataSource,
   ScreenPosition,
   ScreenSize,
   ScreenStaticDataSource,
   ScreenStaticVariable,
 } from './types/document.js';
-export { SCREEN_DOCUMENT_SCHEMA_VERSION } from './types/document.js';
 export type { ScreenProjectEnvelope } from './types/envelope.js';
 export type {
   ScreenAbortSignal,

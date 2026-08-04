@@ -1,9 +1,5 @@
 import type { ScreenJsonObject, ScreenJsonValue } from './json.js';
 
-export const SCREEN_DOCUMENT_SCHEMA_VERSION = 2 as const;
-
-export type ScreenDocumentSchemaVersion = typeof SCREEN_DOCUMENT_SCHEMA_VERSION;
-
 export interface ScreenCanvas {
   readonly width: number;
   readonly height: number;
@@ -94,7 +90,6 @@ export interface ScreenBlueprint {
 }
 
 export interface ScreenDocument {
-  readonly schemaVersion: ScreenDocumentSchemaVersion;
   readonly canvas: ScreenCanvas;
   readonly components: readonly ScreenComponentNode[];
   readonly variables: readonly ScreenStaticVariable[];

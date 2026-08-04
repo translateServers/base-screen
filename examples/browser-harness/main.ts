@@ -88,7 +88,6 @@ const bridgeCatalog = createBaseScreenMaterialCatalog([
 ]);
 
 const screenDocument = {
-  schemaVersion: 2 as const,
   canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
   components: [
     {

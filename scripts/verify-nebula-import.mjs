@@ -24,7 +24,6 @@ try {
   const parsed = parseScreenDocument(document);
   if (
     !parsed.ok ||
-    parsed.value.schemaVersion !== 2 ||
     report.status !== 'success' ||
     report.mappedComponents !== 1 ||
     report.skippedComponents !== 0

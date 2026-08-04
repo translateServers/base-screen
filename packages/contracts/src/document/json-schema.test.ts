@@ -21,12 +21,16 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
 
   it('declares the draft and document id', () => {
     expect(schema.$schema).toBe('https://json-schema.org/draft/2020-12/schema');
-    expect(schema.$id).toBe('urn:base-screen:schema:screen-document:2');
+    expect(schema.$id).toBe('urn:base-screen:schema:screen-document');
   });
 
-  it('pins the current schemaVersion as a const', () => {
-    const schemaVersion = propertiesOf(schema).schemaVersion as { const: number };
-    expect(schemaVersion.const).toBe(2);
+  it('lists the current document fields', () => {
+    expect(Object.keys(propertiesOf(schema))).toEqual([
+      'canvas',
+      'components',
+      'variables',
+      'blueprint',
+    ]);
   });
 
   it('marks every canonical object as strict', () => {

@@ -6,10 +6,8 @@ import {
 import { canonicalByteLength, codePointLength, hasControlCharacter } from '../json/canonical.js';
 import { cloneJsonValue } from '../json/clone.js';
 import { preflightJsonValue } from '../json/preflight.js';
-import { runMigrationChain, SCHEMA_MIGRATION_STEPS } from '../migration/chain.js';
 import type { ScreenDiagnosticCode } from '../types/diagnostics.js';
 import type { ScreenDocument } from '../types/document.js';
-import { SCREEN_DOCUMENT_SCHEMA_VERSION } from '../types/document.js';
 import type { ScreenJsonValue } from '../types/json.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
@@ -25,7 +23,6 @@ import { validateReferences } from './references.js';
 import { blueprintSchema, canvasSchema, componentSchema, staticVariableSchema } from './schema.js';
 
 const DOCUMENT_ROOT_FIELDS = new Set([
-  'schemaVersion',
   'canvas',
   'components',
   'variables',
@@ -84,60 +81,6 @@ export function validateDocument(
       phase,
     )
   ) {
-    return undefined;
-  }
-
-  if (!Object.hasOwn(input, 'schemaVersion')) {
-    collector.add(
-      'DOCUMENT_VERSION_MISSING',
-      at(['schemaVersion']),
-      phase,
-      'Screen document is missing the schemaVersion field.',
-    );
-    return undefined;
-  }
-  const version = (input as Record<string, unknown>).schemaVersion;
-  if (typeof version === 'number' && Number.isInteger(version) && version > 0) {
-    if (version > SCREEN_DOCUMENT_SCHEMA_VERSION) {
-      collector.add(
-        'DOCUMENT_VERSION_FUTURE',
-        at(['schemaVersion']),
-        phase,
-        `Screen document schemaVersion ${version} is newer than the supported version ${SCREEN_DOCUMENT_SCHEMA_VERSION}.`,
-      );
-      return undefined;
-    }
-    if (version < SCREEN_DOCUMENT_SCHEMA_VERSION) {
-      if (SCHEMA_MIGRATION_STEPS.length > 0) {
-        const migrated = runMigrationChain(input, version, SCHEMA_MIGRATION_STEPS);
-        if (migrated.ok) {
-          return validateDocument(migrated.value, collector, phase);
-        }
-        for (const diagnostic of migrated.diagnostics) {
-          collector.add(
-            diagnostic.code,
-            at(diagnostic.path as DiagnosticSegment[]),
-            phase,
-            diagnostic.message,
-          );
-        }
-      } else {
-        collector.add(
-          'DOCUMENT_VERSION_UNSUPPORTED',
-          at(['schemaVersion']),
-          phase,
-          `Screen document schemaVersion ${version} is not supported.`,
-        );
-      }
-      return undefined;
-    }
-  } else {
-    collector.add(
-      'DOCUMENT_VERSION_UNSUPPORTED',
-      at(['schemaVersion']),
-      phase,
-      'Screen document schemaVersion must be a supported integer.',
-    );
     return undefined;
   }
 

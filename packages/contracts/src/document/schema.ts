@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { SCREEN_DOCUMENT_SCHEMA_VERSION } from '../types/document.js';
 import { SCREEN_MATERIAL_TYPE_PATTERN } from './identity.js';
 import {
   MAX_BLUEPRINT_ACTIONS_PER_RULE,
@@ -98,7 +97,6 @@ export const blueprintSchema = z.strictObject({
 });
 
 export const documentSchema = z.strictObject({
-  schemaVersion: z.literal(SCREEN_DOCUMENT_SCHEMA_VERSION),
   canvas: canvasSchema,
   components: z.array(componentSchema).max(MAX_COMPONENTS),
   variables: z.array(staticVariableSchema).max(MAX_VARIABLES),

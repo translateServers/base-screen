@@ -337,7 +337,7 @@ SDK 是对外统一入口和产品级装配层：
 
 拥有：
 
-- canonical document fixtures 和 schema migration fixtures。
+- canonical document fixtures 和 parser conformance fixtures。
 - Fake Host Adapter、Fake Host Resource 和可控时钟。
 - 物料协议一致性套件。
 - 插件生命周期与冲突测试工具。
@@ -395,7 +395,6 @@ testing       (+ public packages under test; production packages never point bac
 
 ```ts
 interface ScreenDocument {
-  readonly schemaVersion: number;
   readonly canvas: ScreenCanvas;
   readonly components: readonly ScreenComponentNode[];
   readonly variables: readonly ScreenVariable[];
@@ -418,7 +417,7 @@ interface ScreenProjectEnvelope {
 - 保存以完整 canonical document 原子替换为基线，不允许多个隐式字段写路径互相覆盖。
 - 文档对象使用 strict schema；未知字段不得被静默 strip。
 - 文档中的所有可变值必须是有限、无循环、无危险原型键的 JSON value。
-- Parser 必须拒绝未知和未来 `schemaVersion`，不能尝试按当前版本读取。
+- Parser 必须拒绝未知字段，不能尝试推断或填充未声明的文档 shape。
 - component id 必须唯一，parent、DSL 和其他跨节点引用必须存在且满足类型约束。
 - Contracts Spec 必须冻结文档深度、组件数量、字符串长度和单字段 payload 等资源上限。
 
@@ -445,12 +444,12 @@ customElements.get(tagName)
 
 ### 6.3 版本与迁移
 
-- 首个正式契约使用明确的 `schemaVersion`。
+- 首个正式契约使用唯一的严格 canonical shape。
 - Parser 只输出当前 canonical shape。
 - 旧版本输入先经过 `vN -> vN+1` 的显式纯函数迁移链，再进入当前 parser。
 - 每条迁移必须有输入 fixture、输出 fixture、幂等或单向性说明及失败诊断。
 - 相同输入和迁移版本必须产生字节可稳定规范化或语义完全相同的输出，迁移不得读取时间、随机数、网络或宿主状态。
-- 导入 Nebula 等外部格式属于 importer，不占用 Base Screen schemaVersion。
+- 导入 Nebula 等外部格式属于 importer，不进入 Base Screen canonical parser。
 - 发布稳定版后不得通过“重置数据”逃避已承诺的文档兼容。
 
 ## 7. Web Component 物料协议
@@ -913,7 +912,7 @@ Renderer 拥有未注册的 Viewer Element 实现类，Engine 拥有未注册的
 - 应用 Router、Query、认证、通知、Monaco、数据集 DTO 和后端模型。
 - 模块级可变组件注册表。
 - document 驱动的代码加载和任意 fetch callback。
-- V1/V2/V3 长期并存的文档和 runtime 分支。
+- 多套长期并存的文档和 runtime 分支。
 - ReactNode 属性面板和任意 renderer escape hatch。
 
 ### 13.4 延后
@@ -944,7 +943,7 @@ Renderer 拥有未注册的 Viewer Element 实现类，Engine 拥有未注册的
 | 版本 | 用途 |
 | --- | --- |
 | Package SemVer | npm 包 API 和行为兼容 |
-| Document schemaVersion | 持久化文档形状与迁移 |
+| Document | 持久化文档形状 |
 | Material API Version | Manifest、Element Model 和标准事件协议 |
 | Material implementationVersion | 某个物料包自身实现版本 |
 
@@ -1000,9 +999,9 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 - 跨 microtask 重连时旧 root 已释放，并从最后合法 model 创建新实例。
 - 清理检查后没有继续运行的 effect、事件或请求。
 - save 的旧 revision 冲突不会静默覆盖。
-- schema migration 和 Nebula importer 不修改原始输入。
-- 未知/未来 schemaVersion、重复 component id、悬空引用和超出资源上限的文档稳定拒绝。
-- 相同 migration 输入产生确定性输出；导入发生有损映射时必须返回结构化 diagnostics。
+- parser 和 Nebula importer 不修改原始输入。
+- 未知字段、重复 component id、悬空引用和超出资源上限的文档稳定拒绝。
+- 相同 parser 输入产生确定性输出；导入发生有损映射时必须返回结构化 diagnostics。
 - Viewer 与 Designer 对同一文档产生一致的物料 model。
 - `interactive=false` 时物料事件不进入 DSL runtime。
 - 生产依赖图不包含 testing，Vanilla consumer 不被迫安装 React 或 Vue。
@@ -1192,12 +1191,12 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | ADR | 主题 | 状态 | 优先级 |
 | --- | --- | --- | --- |
 | [ADR-0001](../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md) | Monorepo、工具链、私有阶段版本与依赖方向 | 已接受 | M0 |
-| ADR-0002 | Canonical Screen Document 与迁移策略 | 已接受 | M1 |
+| ADR-0002 | Canonical Screen Document 契约 | 已接受 | M1 |
 | ADR-0003 | Web Component 物料 ABI 与注册规则 | 已接受 | M1 |
 | ADR-0004 | 插件生命周期、贡献点和信任边界 | 已接受 | M1/M6 |
 | ADR-0005 | Renderer DOM、样式和 Shadow DOM 策略 | 已接受 | M2 |
 | ADR-0006 | Designer Engine 内部 UI 与交互技术选型 | 已接受 | M3 |
-| ADR-0007 | Host Resource intent、DSL/Blueprint 与 Document V2 迁移 | 已接受 | M5 |
+| ADR-0007 | Host Resource intent 与 DSL/Blueprint 运行时 | 已接受 | M5 |
 | ADR-0008 | 不可信远程插件 sandbox、协议与可用能力 | 已接受 | M8 |
 | ADR-0007 | Host Resource 安全与执行模型 | 待起草 | M5 |
 | ADR-0008 | Nebula importer 与集成边界 | 待起草 | M7 |

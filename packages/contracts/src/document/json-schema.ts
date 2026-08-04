@@ -3,7 +3,7 @@ import type { ScreenJsonObject } from '../types/json.js';
 import { MAX_BACKGROUND_COLOR_CODE_POINTS, MAX_NAME_CODE_POINTS } from './limits.js';
 import { documentSchema } from './schema.js';
 
-export const SCREEN_DOCUMENT_JSON_SCHEMA_ID = 'urn:base-screen:schema:screen-document:2';
+export const SCREEN_DOCUMENT_JSON_SCHEMA_ID = 'urn:base-screen:schema:screen-document';
 
 export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
   const generated = z.toJSONSchema(documentSchema) as Record<string, unknown>;

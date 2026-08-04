@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/core` 首个文档状态、命令、事务、历史、组件树语义和几何纯算法的可验收契约
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../decisions/ADR-0002-canonical-screen-document-and-migrations.md)（已接受）
+> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md)（已接受）
 
 ## 1. 生效条件
 
@@ -777,7 +777,7 @@ Core Domain 阶段完成必须同时满足：
 - command 和 transaction 对失败、no-op、锁定、目标缺失和资源上限具有稳定行为。
 - history 只恢复 Document State，并通过 undo、redo、branch 和 limit 测试。
 - hierarchy、geometry、hit test、alignment、distribution 和 snap 结果 deterministic 且 finite。
-- Core 不复制 canonical parser、schema、migration、serializer 或 diagnostic envelope。
+- Core 不复制 canonical parser、schema、serializer 或 diagnostic envelope。
 - public declaration 不泄漏 DOM、framework、Store、Zod、Nebula 或宿主类型。
 - Node 单元测试、类型检查、边界检查、API report、package 检查和真实 tarball consumer 全部通过。
 - 每个 Requirement 都有自动化测试映射，且不存在仅靠文档声明通过的验收项。

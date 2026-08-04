@@ -47,7 +47,6 @@ writeFileSync(absoluteOutput, serializeScreenDocument(parsed.value), 'utf8');
 writeReport(reportPath, {
   source: absoluteInput,
   status: 'success',
-  targetSchemaVersion: parsed.value.schemaVersion,
   mappedComponents: mapped.mappedComponents,
   skippedComponents: mapped.skippedComponents,
   diagnostics: [],
@@ -80,7 +79,6 @@ function mapNebulaExport(source) {
   }
   return {
     document: {
-      schemaVersion: 2,
       canvas: record.canvas,
       components,
       variables: Array.isArray(record.variables) ? record.variables : [],

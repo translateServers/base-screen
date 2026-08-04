@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 2
-    },
     "canvas": {
       "type": "object",
       "properties": {
@@ -299,7 +295,7 @@
       "additionalProperties": false
     }
   },
-  "required": ["schemaVersion", "canvas", "components", "variables", "blueprint"],
+  "required": ["canvas", "components", "variables", "blueprint"],
   "additionalProperties": false,
-  "$id": "urn:base-screen:schema:screen-document:2"
+  "$id": "urn:base-screen:schema:screen-document"
 }

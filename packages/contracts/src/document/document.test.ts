@@ -22,7 +22,6 @@ function component(overrides: Record<string, unknown> = {}): Record<string, unkn
 
 function document(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
-    schemaVersion: 2,
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
@@ -51,18 +50,6 @@ describe('parseScreenDocument', () => {
       expect(result.diagnostics).toEqual([]);
       expect(result.value).toEqual(document());
       expect(result.value).not.toBe(document());
-    }
-  });
-
-  it('migrates a version 1 document only through the explicit migration chain', () => {
-    const input = document({ schemaVersion: 1 });
-    delete input.blueprint;
-    const result = parse(input);
-
-    expect(result).toMatchObject({ ok: true });
-    if (result.ok) {
-      expect(result.value.schemaVersion).toBe(2);
-      expect(result.value.blueprint).toEqual({ apiVersion: 1, rules: [] });
     }
   });
 
@@ -166,39 +153,6 @@ describe('parseScreenDocument', () => {
         expect(result.diagnostics[0]?.path).toEqual([]);
       }
     }
-  });
-
-  it('rejects invalid schemaVersion markers', () => {
-    const missing = document();
-    delete missing.schemaVersion;
-    const missingResult = parse(missing);
-    expect(missingResult.ok).toBe(false);
-    if (!missingResult.ok) {
-      expect(missingResult.diagnostics[0]?.code).toBe('DOCUMENT_VERSION_MISSING');
-    }
-    for (const version of [0, -1, 1.5, '1', true]) {
-      const result = parse(document({ schemaVersion: version }));
-      expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.diagnostics[0]?.code).toBe('DOCUMENT_VERSION_UNSUPPORTED');
-      }
-    }
-  });
-
-  it('rejects future schemaVersion without shape checks', () => {
-    const input = document({
-      schemaVersion: 3,
-      unknownFutureField: { garbage: 1 },
-      canvas: 'not-an-object',
-    });
-    const result = parse(input);
-    expect(result.ok).toBe(false);
-    if (result.ok) {
-      return;
-    }
-    expect(result.diagnostics).toHaveLength(1);
-    expect(result.diagnostics[0]?.code).toBe('DOCUMENT_VERSION_FUTURE');
-    expect(result.diagnostics[0]?.path).toEqual(['schemaVersion']);
   });
 
   it('rejects unknown fields on every strict object', () => {

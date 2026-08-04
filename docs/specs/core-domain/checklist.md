@@ -17,7 +17,7 @@
 - [ ] 默认入口不注册元素、不创建 Store、不修改 global、不产生 I/O、不读取时间或随机数。
 - [ ] package 保持 ESM-only、`sideEffects: false`，发布 exports 与 tarball 内容正确。
 - [ ] public declaration 不泄漏 DOM、React、Vue、Zod、Router、Store、Nebula 或宿主 DTO。
-- [ ] Core 不复制 Contracts 的 canonical parser、schema、migration、serializer 或诊断 envelope。
+- [ ] Core 不复制 Contracts 的 canonical parser、schema、serializer 或诊断 envelope。
 
 ## 状态分层
 

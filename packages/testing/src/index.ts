@@ -2,7 +2,6 @@ import type { ScreenDocument } from '@base-screen/contracts';
 
 export function createMinimalScreenDocument(): ScreenDocument {
   return {
-    schemaVersion: 2,
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [],
     variables: [],
@@ -14,7 +13,6 @@ export function createSingleComponentDocument(
   overrides: { id?: string; type?: string; name?: string } = {},
 ): ScreenDocument {
   return {
-    schemaVersion: 2,
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components: [
       {

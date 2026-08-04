@@ -8,7 +8,6 @@ function envelope(overrides: Record<string, unknown> = {}): Record<string, unkno
     name: 'My Dashboard',
     description: null,
     document: {
-      schemaVersion: 2,
       canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
       components: [],
       variables: [],
@@ -102,7 +101,6 @@ describe('parseScreenProjectEnvelope', () => {
     const result = parse(
       envelope({
         document: {
-          schemaVersion: 2,
           canvas: { width: 1, height: 1, backgroundColor: '#000', extra: true },
           components: [],
           variables: [],
@@ -134,7 +132,6 @@ describe('parseScreenProjectEnvelope', () => {
     const result = parse(
       envelope({
         document: {
-          schemaVersion: 2,
           canvas: { width: 1, height: 1, backgroundColor: '#000' },
           components: [],
           variables: [],
@@ -154,7 +151,6 @@ describe('parseScreenProjectEnvelope', () => {
 
   it('prefixes the nested diagnostic limit sentinel', () => {
     const badDocument: Record<string, unknown> = {
-      schemaVersion: 2,
       canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
       components: [],
       variables: [],

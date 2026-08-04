@@ -208,7 +208,7 @@ testing       -> 只从外部消费公共包，横向覆盖每个波次
 
 | 波次 | Testing 交付 |
 | --- | --- |
-| P0 | Document fixtures、parser/migration conformance |
+| P0 | Document fixtures、parser conformance |
 | P1 | Core command/history fixtures、Material contract fixtures |
 | P2 | Registry/Plugin lifecycle conformance |
 | P3 | Native/React/Vue material conformance |
@@ -232,5 +232,5 @@ testing       -> 只从外部消费公共包，横向覆盖每个波次
 | P4 Renderer/Viewer | 已完成：catalog DOM diff、Shadow DOM Viewer、标准事件、资源 generation guard 与浏览器 harness |
 | P5 Designer Engine | 已完成：Core command/history、拖拽单次提交、属性编辑、项目 load/save revision Adapter 与浏览器 harness |
 | P6 SDK 与 Framework Bridge | 进行中：SDK 稳定子路径和 tarball 验证已完成；consumer-local 类型增强示例待补充 |
-| P7 动态数据与 DSL | 进行中：Document V2、Host Resource port、Blueprint compile/dispatch、Nebula importer 已完成；超时/取消和专业 conformance harness 待补充 |
+| P7 动态数据与 DSL | 进行中：当前 Document、Host Resource port、Blueprint compile/dispatch、Nebula importer 已完成；超时/取消和专业 conformance harness 待补充 |
 | M8 不可信插件/远程模块 | 已完成第一阶段：ADR-0008、sandbox iframe、bounded ready/event protocol、超时和处置边界；远程物料 ABI 仍明确不在该协议内 |

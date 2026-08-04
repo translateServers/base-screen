@@ -19,7 +19,7 @@
 
 ## Contracts And Artifacts
 
-- `@base-screen/contracts` is the sole owner of canonical document types, parsing, diagnostics, serialization, versions, migrations, and JSON Schema. Do not duplicate or bypass its parser in another package.
+- `@base-screen/contracts` is the sole owner of canonical document types, parsing, diagnostics, serialization, and JSON Schema. Do not duplicate or bypass its parser in another package.
 - Its canonical parser is fail-closed: do not add unknown-field stripping, defaulting, coercion, or implicit future-version fallback. Public document-contract changes require an accepted ADR and an active Spec first.
 - `packages/contracts/src/screen-document.schema.json` is a committed golden artifact generated from the built schema with `pnpm --filter @base-screen/contracts build` followed by `node scripts/emit-schema-golden.mjs`. Commit a deliberate golden update with its schema change; the build only copies it into `dist`.
 
@@ -33,4 +33,4 @@
 
 - Biome is the sole formatter/linter: 2 spaces, LF, single quotes, semicolons, and 100-column lines. Use `pnpm format` to apply formatting; do not add ESLint or Prettier for style.
 - Test custom validation, transforms, discriminated/conditional schemas, security helpers, service branches, and hook state transitions. Do not add tests that only duplicate built-in Zod validation or default unknown-key stripping behavior.
-- File-size thresholds are review signals: domain/runtime modules target 300 lines and split above 500; UI controllers target 250 and split above 400; contract/schema/migration files target 400 and split above 600; tests target 500 and split above 800. Generated/data-only artifacts are exempt but must name their generator or authority.
+- File-size thresholds are review signals: domain/runtime modules target 300 lines and split above 500; UI controllers target 250 and split above 400; contract/schema files target 400 and split above 600; tests target 500 and split above 800. Generated/data-only artifacts are exempt but must name their generator or authority.

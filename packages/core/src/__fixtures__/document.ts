@@ -45,7 +45,6 @@ export function makeVariable(
 
 export function makeDocument(overrides: Partial<ScreenDocument> = {}): ScreenDocument {
   return {
-    schemaVersion: 2,
     canvas: DEFAULT_CANVAS,
     components: [],
     variables: [],
