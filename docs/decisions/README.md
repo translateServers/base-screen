@@ -23,12 +23,12 @@
 | [ADR-0004](./ADR-0004-plugin-lifecycle-contributions-and-trust.md) | 已接受 | 2026-08-03 | 插件生命周期、贡献点和信任边界 |
 | [ADR-0005](./ADR-0005-renderer-dom-shadow-dom-and-product-elements.md) | 已接受 | 2026-08-04 | Renderer DOM、样式、Shadow DOM 与产品元素归属 |
 | [ADR-0006](./ADR-0006-designer-engine-dom-interactions-and-history.md) | 已接受 | 2026-08-04 | Designer Engine DOM、交互与历史策略 |
-| [ADR-0007](./ADR-0007-host-resource-and-blueprint-runtime.md) | 已接受 | 2026-08-04 | Host Resource 与受限 Blueprint 运行时 |
-| [ADR-0008](./ADR-0008-remote-plugin-sandbox-protocol.md) | 已接受 | 2026-08-04 | 远程插件 iframe sandbox 与消息协议 |
+| [ADR-0007](./ADR-0007-host-resource-and-blueprint-runtime.md) | 已取代 | 2026-08-04 | Host Resource 与受限 Blueprint 运行时 |
+| [ADR-0008](./ADR-0008-remote-plugin-sandbox-protocol.md) | 已取代 | 2026-08-04 | 远程插件 iframe sandbox 与消息协议 |
+| [ADR-0009](./ADR-0009-remote-plugin-sandbox-cross-origin-transport.md) | 已接受 | 2026-08-04 | 远程插件跨 origin iframe transport |
+| [ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-v2.md) | 已接受 | 2026-08-04 | Host Resource deadline 与 Blueprint V2 |
+| [ADR-0011](./ADR-0011-nebula-importer-auditable-migration.md) | 已接受 | 2026-08-04 | Nebula importer 可审计迁移 |
 
 ## 计划决策
 
-| ADR | 优先级 | 主题 |
-| --- | --- | --- |
-| ADR-0007 | M5 | Host Resource 安全与执行模型 |
-| ADR-0008 | M7 | Nebula importer 与集成边界 |
+当前没有待编号的计划决策。

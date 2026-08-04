@@ -22,12 +22,7 @@ import {
 import { validateReferences } from './references.js';
 import { blueprintSchema, canvasSchema, componentSchema, staticVariableSchema } from './schema.js';
 
-const DOCUMENT_ROOT_FIELDS = new Set([
-  'canvas',
-  'components',
-  'variables',
-  'blueprint',
-]);
+const DOCUMENT_ROOT_FIELDS = new Set(['canvas', 'components', 'variables', 'blueprint']);
 const CANVAS_FIELDS = new Set(['width', 'height', 'backgroundColor']);
 const COMPONENT_FIELDS = new Set([
   'id',

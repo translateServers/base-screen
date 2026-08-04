@@ -1,7 +1,7 @@
 # Base Screen 功能与工程规格
 
 > 状态：生效中
-> 最近更新：2026-08-03
+> 最近更新：2026-08-04
 > 定位：索引可直接验收和实施的 Base Screen Spec
 
 ## 生效中
@@ -23,6 +23,13 @@
 
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
+| [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/spec.md) | P6-P7/M7-M8 增量 | Sandbox/Host Resource/Blueprint/plugin contribution、tarball bridge consumer 与 importer 生产级验收 |
+
+## 设计中
+
+| Spec | 阶段 | 说明 |
+| --- | --- | --- |
+| [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | P5-P6 增量 | Designer 完整编辑交互与 publish/conflict/cancel/dirty/retry 项目生命周期 |
 
 ## 使用规则
 

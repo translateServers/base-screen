@@ -21,7 +21,10 @@ interface ScreenDocument {
 }
 ```
 
-`ScreenBlueprint` is required with `apiVersion: 1` and a bounded rules array. Components
+`ScreenBlueprint` is required as a strict `apiVersion: 1 | 2` discriminated union with a
+bounded rules array. V1 remains exact and is never defaulted or migrated; V2 adds only
+bounded data expressions, conditions, and explicit capability requirements under
+[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-v2.md). Components
 may have `null`, `static`, or `host-resource` data sources. Project identity, revision,
 metadata, credentials, transport details, and host-only policy are outside this shape.
 

@@ -1,6 +1,6 @@
 # ADR-0008: Remote Plugin Sandbox Protocol
 
-> Status: Accepted
+> Status: Superseded by [ADR-0009](./ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)
 > Date: 2026-08-04
 > Scope: untrusted remote plugin execution, iframe isolation, and message protocol
 

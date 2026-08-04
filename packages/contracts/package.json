@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node ../../scripts/write-schema-artifact.mjs",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && node ../../scripts/write-schema-artifact.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
     "lint": "biome check src",
     "test": "vitest run --passWithNoTests",

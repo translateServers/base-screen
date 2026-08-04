@@ -42,17 +42,17 @@ testing       -> 只从外部消费公共包，横向覆盖每个波次
 
 包：`@base-screen/contracts`
 
-目标：冻结所有后续包共同消费的 JSON、Document、版本、迁移和诊断边界。
+目标：冻结所有后续包共同消费的 JSON、Document 和诊断边界。
 
 文档前置：
 
-- ADR-0002：Canonical Screen Document 与迁移策略。
+- ADR-0002：Canonical Screen Document 契约。
 - Contracts Foundation Spec。
 
 退出条件：
 
 - 当前 Schema、parser、canonical serializer 和 JSON Schema 契约可独立实现。
-- 未知版本、未知字段、危险 JSON、资源上限和迁移失败都有稳定诊断。
+- 未知字段、危险 JSON 和资源上限都有稳定诊断。
 - 不依赖 DOM、插件、Core、Renderer 或 SDK。
 
 ### P1：Core 与 Plugin Core

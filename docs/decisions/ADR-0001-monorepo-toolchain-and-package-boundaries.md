@@ -416,7 +416,7 @@ pnpm verify:release
 - 破坏性公共 API 变化必须有 changeset。
 - 纯文档修改无需 package changeset，除非文档宣布公共行为变化。
 - pre-1.0 期间仍需明确 breaking change，不能以 `0.x` 为由静默破坏 consumer。
-- package SemVer 与 document schemaVersion、Material API Version 完全独立。
+- package SemVer 与 Material API Version 完全独立。
 - `.changeset/config.json`、pre mode、dist-tag、内部依赖更新和 base branch 属于 M0 Spec 的冻结内容。
 - alpha/beta 使用 Changesets pre mode 和非 `latest` dist-tag；只有 stable release 可以更新 `latest`。
 - SDK 子路径重导出的下层 API 发生 breaking change 时，SDK 也必须产生对应 breaking changeset；CI 比较 API report 与 changeset 集合，不能只依赖内部 range 自动更新。

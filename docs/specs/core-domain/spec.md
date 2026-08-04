@@ -39,7 +39,7 @@
 - React、Vue、Router、Query Client、宿主 Store 或应用 Context。
 - 项目 load、save、publish、资源执行、认证、权限或网络副作用。
 - Runtime Overrides、数据加载结果、可见性覆盖或运行时错误状态。
-- canonical parser、迁移、serializer、JSON Schema 或 JSON boundary 的重复实现。
+- canonical parser、serializer、JSON Schema 或 JSON boundary 的重复实现。
 - 剪贴板、快捷键、标尺、网格绘制、空间索引或可见区域裁剪。
 - Blueprint、DSL 编译、事件匹配或执行计划。
 - 不可撤销的宿主副作用或插件命令。

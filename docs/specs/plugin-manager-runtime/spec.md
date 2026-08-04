@@ -79,6 +79,7 @@ P2 退出条件保持仓库既有定义：
 - package 保持 ESM-only、`sideEffects: false`；公共声明不得泄漏 Zod、框架、Core、Engine 或宿主 DTO 类型。
 - Manager 实现不得 deep import Contracts 或 Plugin Core 源码；只能消费其公开根入口。
 - `@base-screen/testing` 只从外部消费 Manager 公共 API，生产包不得反向依赖测试包。
+- Manager may derive an immutable, per-instance runtime contribution index only from its active Plugin Catalog snapshot. The index contains data-resource configuration validators and host-supported, granted Blueprint capability ids; it contains no handler, resolver, URL, credential, host object, or session port. Deactivation and disposal revoke its status as current runtime authority.
 
 ## 6. 输入与公开运行时形状
 

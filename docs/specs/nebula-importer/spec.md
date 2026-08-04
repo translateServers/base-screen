@@ -7,8 +7,9 @@
 ## Requirements
 
 - Importer is an offline script, not a production package dependency.
-- It reads a supplied JSON export, maps explicit canvas/components/variables fields into the current Document shape, adds an empty Blueprint, then validates with `parseScreenDocument`.
-- It writes canonical output only after parser success and writes a report with source path, mapped count, skipped count, and diagnostic codes/paths only.
+- It analyzes an explicitly supplied JSON export as exactly one recognized document-root, project-envelope, or export-wrapper variant, then converts only with an explicit decision file.
+- It maps explicit canvas/components/variables fields into the current Document shape, adds an empty V1 Blueprint when no provable dynamic mapping exists, and validates with `parseScreenDocument`.
+- Analyze mode writes only a field-level report. Conversion writes canonical output only after every blocking finding is resolved and parser/serializer round-trip succeeds; report and output use atomic replacement.
 - It never copies source modules, sends input over network, reads Nebula configuration implicitly, or preserves credentials.
 
 ## Acceptance

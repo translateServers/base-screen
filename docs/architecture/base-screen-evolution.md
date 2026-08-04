@@ -48,7 +48,7 @@ Base Screen 是一个独立、可嵌入、跨框架的大屏设计器底座。�
 - 框架无关的设计器和查看器 SDK。
 - 受控、可验证的插件体系。
 - 面向 Vanilla、React 和 Vue 物料作者的开发桥接。
-- 可版本化、可迁移的项目文档契约。
+- 单一、严格的项目文档契约。
 
 Base Screen 不绑定具体后台、账号系统、数据平台或业务领域。宿主应用决定项目存储、认证、数据资源、发布流程和权限模型。
 
@@ -99,7 +99,7 @@ Web Component 是 Base Screen 的宿主集成 ABI，也是物料渲染和注册 
 
 ### 2.2 契约优先
 
-- `contracts` 是 wire schema、公共数据类型、版本和迁移的唯一来源。
+- `contracts` 是 wire schema、公共数据类型和 JSON 边界的唯一来源。
 - 其他包可以追加语义校验，但不得复制一套同名持久化 Schema。
 - 文档、Element Model、事件 payload 和 Adapter 结果都必须跨越明确的 JSON 边界。
 - 公共行为先由契约测试描述，再由实现包消费。
@@ -119,12 +119,12 @@ Web Component 是 Base Screen 的宿主集成 ABI，也是物料渲染和注册 
 - 项目文档不能决定加载哪些代码。
 - 未注册、未启用或能力不匹配时必须 fail closed。
 
-### 2.5 确定性与可迁移
+### 2.5 确定性与契约收敛
 
 - 相同文档、物料目录和运行时输入必须产生可重复结果。
 - 编辑写入统一经过命令边界，支持诊断、历史和测试。
-- 文档升级使用显式迁移链，不依赖启发式字段猜测。
-- npm 包版本、文档 Schema 版本、组件协议版本和物料实现版本彼此独立。
+- 当前文档 shape 不使用版本标记、兼容转换或字段猜测。
+- npm 包版本、组件协议版本和物料实现版本彼此独立。
 
 ### 2.6 最小公共面
 
@@ -172,7 +172,7 @@ Custom Elements       Storage / Data / Publish
 
 ```text
 packages/
-├── contracts/        # 持久化契约、公共类型、版本、迁移、诊断
+├── contracts/        # 持久化契约、公共类型、JSON 边界、诊断
 ├── core/             # 画布领域、状态、命令、DSL、事件
 ├── renderer/         # 运行时渲染与 viewer
 ├── engine/           # 设计器引擎
@@ -196,7 +196,7 @@ M0 内部逻辑包名统一使用 `@base-screen/*`，十二包保持 private。�
 - `ScreenProjectEnvelope`、opaque revision 和项目操作输入输出。
 - Host Adapter、Host Resource 和快照等公共端口。
 - 基础 JSON value、错误、诊断、能力和事件数据结构。
-- Schema 版本常量、迁移接口、迁移结果和兼容性诊断。
+- 严格解析、canonical serialization 和 JSON Schema artifact。
 - 公共 fixture 的类型，不包含具体测试数据。
 
 不拥有：
@@ -442,13 +442,12 @@ customElements.get(tagName)
 
 将持久化 type 与 DOM tagName 分开，可以在保持文档身份稳定的同时校验实现版本和浏览器全局注册冲突。
 
-### 6.3 版本与迁移
+### 6.3 文档边界
 
 - 首个正式契约使用唯一的严格 canonical shape。
 - Parser 只输出当前 canonical shape。
-- 旧版本输入先经过 `vN -> vN+1` 的显式纯函数迁移链，再进入当前 parser。
-- 每条迁移必须有输入 fixture、输出 fixture、幂等或单向性说明及失败诊断。
-- 相同输入和迁移版本必须产生字节可稳定规范化或语义完全相同的输出，迁移不得读取时间、随机数、网络或宿主状态。
+- Parser 不接受兼容转换、别名映射或字段默认值。
+- 相同输入必须产生字节可稳定规范化或语义完全相同的输出，解析不得读取时间、随机数、网络或宿主状态。
 - 导入 Nebula 等外部格式属于 importer，不进入 Base Screen canonical parser。
 - 发布稳定版后不得通过“重置数据”逃避已承诺的文档兼容。
 
@@ -685,7 +684,7 @@ Engine Adapter          执行实例权限、参数和会话检查
 Core Command Dispatcher 统一事务、诊断和历史
 ```
 
-Engine 实现 `PluginCommandPort` Adapter，因此可以同时依赖 plugin-core 与 core；plugin-core/plugin-sdk 不需要依赖 core。首期插件只能编排已注册 Core 命令。允许插件定义新的文档 mutation 之前，必须另立 ADR 说明 schema、历史和迁移语义。
+Engine 实现 `PluginCommandPort` Adapter，因此可以同时依赖 plugin-core 与 core；plugin-core/plugin-sdk 不需要依赖 core。首期插件只能编排已注册 Core 命令。允许插件定义新的文档 mutation 之前，必须另立 ADR 说明 schema 和历史语义。
 
 ### 9.3 生命周期
 
@@ -938,22 +937,21 @@ Renderer 拥有未注册的 Viewer Element 实现类，Engine 拥有未注册的
 
 ## 15. 兼容与发布策略
 
-### 15.1 四类版本
+### 15.1 三类版本
 
 | 版本 | 用途 |
 | --- | --- |
 | Package SemVer | npm 包 API 和行为兼容 |
-| Document | 持久化文档形状 |
 | Material API Version | Manifest、Element Model 和标准事件协议 |
 | Material implementationVersion | 某个物料包自身实现版本 |
 
-四者不得共用一个版本判断或通过包版本猜测文档形状。
+三者不得共用一个版本判断或通过包版本猜测文档形状。
 
 ### 15.2 发布阶段
 
 - `alpha`：允许快速收敛，但每次破坏性变化需要变更记录。
-- `beta`：公共 API 候选冻结，必须提供迁移说明和 consumer 验证。
-- `stable`：遵循 SemVer、弃用周期和文档迁移承诺。
+- `beta`：公共 API 候选冻结，必须提供变更记录和 consumer 验证。
+- `stable`：遵循 SemVer 和弃用周期。
 
 稳定版删除公共 API 前至少经过一个有文档记录的弃用周期。安全问题例外，但需要补充公告和替代方案。
 
@@ -978,7 +976,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 | 层次 | 重点 |
 | --- | --- |
-| Contract | Schema、迁移、JSON 边界、错误码和序列化 |
+| Contract | Schema、JSON 边界、错误码和序列化 |
 | Unit | 命令、几何、DSL 编译、依赖图和数据协调器 |
 | Conformance | 原生、React、Vue 物料的 model、事件和生命周期 |
 | Integration | Engine、Renderer、Plugin Manager 和 Adapter 协作 |
@@ -1165,7 +1163,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 - Nebula importer 或宿主侧转换层。
 - Nebula Host Adapter。
 - 真实项目兼容报告和性能基线。
-- beta 到 stable 的 API、Schema 和迁移审核。
+- beta 到 stable 的 API 和 Schema 审核。
 
 退出标准：
 
@@ -1231,7 +1229,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | 全局定义破坏实例隔离 | 单独维护实例物料目录，文档只能使用启用项 |
 | 插件 API 过早膨胀 | 首期只开放必要声明式贡献点，任意 UI renderer 延后 |
 | 内部框架泄漏 | 声明检查、tarball consumer、依赖图门禁 |
-| 文档版本再次分裂 | contracts 单一来源、显式迁移、禁止重复 parser |
+| 文档 shape 再次分裂 | contracts 单一来源、禁止重复 parser |
 | 动态数据泄漏凭证 | host-resource intent、Host Adapter、服务端 allowlist |
 | React/Vue 生命周期差异 | bridge conformance suite 和真实浏览器卸载测试 |
 | Custom Element 无法判断永久断开 | microtask 检查、同步 move 保持、延迟重连重建的确定性协议 |
