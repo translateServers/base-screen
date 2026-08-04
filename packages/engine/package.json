@@ -8,6 +8,12 @@
     "dist"
   ],
   "sideEffects": false,
+  "dependencies": {
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/core": "workspace:^",
+    "@base-screen/plugin-core": "workspace:^",
+    "@base-screen/renderer": "workspace:^"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

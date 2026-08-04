@@ -1,0 +1,605 @@
+import { describe, expect, it } from 'vitest';
+import { isScreenMaterialType } from './identity.js';
+import { parseScreenDocument } from './parse.js';
+
+function component(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: 'c1',
+    type: 'acme.kpi-card/v1',
+    name: 'KPI Card',
+    parentId: null,
+    position: { x: 0, y: 0 },
+    size: { width: 320, height: 160 },
+    rotation: 0,
+    zIndex: 1,
+    status: { locked: false, hidden: false },
+    props: {},
+    style: {},
+    dataSource: null,
+    ...overrides,
+  };
+}
+
+function document(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    schemaVersion: 2,
+    canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
+    components: [],
+    variables: [],
+    blueprint: { apiVersion: 1, rules: [] },
+    ...overrides,
+  };
+}
+
+const parse = parseScreenDocument;
+
+describe('isScreenMaterialType', () => {
+  it('uses the canonical namespaced material identity grammar', () => {
+    expect(isScreenMaterialType('acme.kpi-card/v1')).toBe(true);
+    expect(isScreenMaterialType('acme.kpi-card/v12')).toBe(true);
+    expect(isScreenMaterialType('acme.kpi-card')).toBe(false);
+    expect(isScreenMaterialType('acme.kpi-card/v0')).toBe(false);
+    expect(isScreenMaterialType('Acme.kpi-card/v1')).toBe(false);
+  });
+});
+
+describe('parseScreenDocument', () => {
+  it('parses a minimal document', () => {
+    const result = parse(document());
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.diagnostics).toEqual([]);
+      expect(result.value).toEqual(document());
+      expect(result.value).not.toBe(document());
+    }
+  });
+
+  it('migrates a version 1 document only through the explicit migration chain', () => {
+    const input = document({ schemaVersion: 1 });
+    delete input.blueprint;
+    const result = parse(input);
+
+    expect(result).toMatchObject({ ok: true });
+    if (result.ok) {
+      expect(result.value.schemaVersion).toBe(2);
+      expect(result.value.blueprint).toEqual({ apiVersion: 1, rules: [] });
+    }
+  });
+
+  it('parses multiple roots and parents declared after children', () => {
+    const input = document({
+      components: [
+        component({ id: 'child', parentId: 'parent' }),
+        component({ id: 'parent' }),
+        component({ id: 'sibling' }),
+      ],
+    });
+    expect(parse(input)).toMatchObject({ ok: true });
+  });
+
+  it('parses host resource intent and validates blueprint references', () => {
+    const input = document({
+      components: [
+        component({
+          id: 'button',
+          dataSource: {
+            type: 'host-resource',
+            resourceType: 'dataset',
+            resourceId: 'orders',
+            params: { limit: 5 },
+          },
+        }),
+      ],
+      variables: [{ type: 'static', name: 'count', value: 0 }],
+      blueprint: {
+        apiVersion: 1,
+        rules: [
+          {
+            id: 'refresh',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
+            actions: [{ type: 'set-variable', variableName: 'count', value: 1 }],
+          },
+        ],
+      },
+    });
+    expect(parse(input).ok).toBe(true);
+    expect(
+      parse(
+        document({
+          blueprint: {
+            apiVersion: 1,
+            rules: [
+              {
+                id: 'bad',
+                trigger: { type: 'material-event', componentId: 'missing', eventName: 'click' },
+                actions: [],
+              },
+            ],
+          },
+        }),
+      ).ok,
+    ).toBe(false);
+  });
+
+  it('parses deep JSON, unicode names and -0 values', () => {
+    const input = document({
+      canvas: { width: 1, height: 1, backgroundColor: '#fff' },
+      components: [
+        component({
+          name: 'emoji \u{1f600}',
+          props: { nested: { list: [1, 2, -0] }, 中文: '值' },
+        }),
+      ],
+      variables: [{ type: 'static', name: 'count', value: { deep: [true, null] } }],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const first = result.value.components[0];
+      expect(first?.name).toBe('emoji \u{1f600}');
+      const nested = first?.props.nested as { list: readonly (number | boolean | null)[] };
+      expect(Object.is(nested.list[2], -0)).toBe(true);
+    }
+  });
+
+  it('clones shared references and rejects nothing on valid input', () => {
+    const shared = { leaf: 1 };
+    const input = document({
+      components: [component({ id: 'a', props: shared }), component({ id: 'b', props: shared })],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const propsA = result.value.components[0]?.props;
+      const propsB = result.value.components[1]?.props;
+      expect(propsA).toEqual(propsB);
+      expect(propsA).not.toBe(propsB);
+    }
+  });
+
+  it('rejects non-object roots', () => {
+    for (const input of [null, 42, 'text', [], true, undefined]) {
+      const result = parse(input);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.diagnostics[0]?.code).toBe('DOCUMENT_NOT_OBJECT');
+        expect(result.diagnostics[0]?.path).toEqual([]);
+      }
+    }
+  });
+
+  it('rejects invalid schemaVersion markers', () => {
+    const missing = document();
+    delete missing.schemaVersion;
+    const missingResult = parse(missing);
+    expect(missingResult.ok).toBe(false);
+    if (!missingResult.ok) {
+      expect(missingResult.diagnostics[0]?.code).toBe('DOCUMENT_VERSION_MISSING');
+    }
+    for (const version of [0, -1, 1.5, '1', true]) {
+      const result = parse(document({ schemaVersion: version }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.diagnostics[0]?.code).toBe('DOCUMENT_VERSION_UNSUPPORTED');
+      }
+    }
+  });
+
+  it('rejects future schemaVersion without shape checks', () => {
+    const input = document({
+      schemaVersion: 3,
+      unknownFutureField: { garbage: 1 },
+      canvas: 'not-an-object',
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      return;
+    }
+    expect(result.diagnostics).toHaveLength(1);
+    expect(result.diagnostics[0]?.code).toBe('DOCUMENT_VERSION_FUTURE');
+    expect(result.diagnostics[0]?.path).toEqual(['schemaVersion']);
+  });
+
+  it('rejects unknown fields on every strict object', () => {
+    const cases: Array<{ input: Record<string, unknown>; path: (string | number)[] }> = [
+      {
+        input: document({ blueprint: { apiVersion: 1, rules: [], extra: true } }),
+        path: ['blueprint', 'extra'],
+      },
+      {
+        input: document({ canvas: { width: 1, height: 1, backgroundColor: '#000', extra: 1 } }),
+        path: ['canvas', 'extra'],
+      },
+      {
+        input: document({ components: [component({ position: { x: 0, y: 0, z: 0 } })] }),
+        path: ['components', 0, 'position', 'z'],
+      },
+      {
+        input: document({ components: [component({ size: { width: 1, height: 1, depth: 1 } })] }),
+        path: ['components', 0, 'size', 'depth'],
+      },
+      {
+        input: document({
+          components: [component({ status: { locked: false, hidden: false, active: true } })],
+        }),
+        path: ['components', 0, 'status', 'active'],
+      },
+      {
+        input: document({
+          components: [component({ dataSource: { type: 'static', value: 1, label: 'x' } })],
+        }),
+        path: ['components', 0, 'dataSource', 'label'],
+      },
+      {
+        input: document({ components: [component({ postion: { x: 0, y: 0 } })] }),
+        path: ['components', 0, 'postion'],
+      },
+      {
+        input: document({ variables: [{ type: 'static', name: 'a', value: 1, extra: true }] }),
+        path: ['variables', 0, 'extra'],
+      },
+    ];
+    for (const { input, path } of cases) {
+      const result = parse(input);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.diagnostics[0]?.code).toBe('DOCUMENT_UNKNOWN_FIELD');
+        expect(result.diagnostics[0]?.path).toEqual(path);
+      }
+    }
+  });
+
+  it('rejects missing required fields without defaults', () => {
+    const withMissingId = document({ components: [component()] });
+    delete (withMissingId.components as Array<Record<string, unknown>>)[0]?.id;
+    const withMissingPosition = document({ components: [component()] });
+    delete (withMissingPosition.components as Array<Record<string, unknown>>)[0]?.position;
+    const withMissingStatus = document({ components: [component()] });
+    delete (withMissingStatus.components as Array<Record<string, unknown>>)[0]?.status;
+    const withMissingVariable = document({ variables: [{ type: 'static', name: 'a', value: 1 }] });
+    delete (withMissingVariable.variables as Array<Record<string, unknown>>)[0]?.value;
+    const withMissingCanvas = document();
+    delete (withMissingCanvas.canvas as Record<string, unknown>).width;
+    const cases: Array<[Record<string, unknown>, (string | number)[], string]> = [
+      [withMissingCanvas, ['canvas', 'width'], 'DOCUMENT_FIELD_INVALID'],
+      [withMissingId, ['components', 0, 'id'], 'DOCUMENT_FIELD_INVALID'],
+      [withMissingPosition, ['components', 0, 'position'], 'COMPONENT_GEOMETRY_INVALID'],
+      [withMissingStatus, ['components', 0, 'status'], 'DOCUMENT_FIELD_INVALID'],
+      [withMissingVariable, ['variables', 0, 'value'], 'DOCUMENT_FIELD_INVALID'],
+    ];
+    for (const [input, path, code] of cases) {
+      const result = parse(input);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.diagnostics[0]?.path).toEqual(path);
+        expect(result.diagnostics[0]?.code).toBe(code);
+      }
+    }
+  });
+
+  it('rejects explicit undefined values at the JSON boundary', () => {
+    const input = document({ components: [component({ id: undefined as unknown as string })] });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('JSON_VALUE_INVALID');
+      expect(result.diagnostics[0]?.path).toEqual(['components', 0, 'id']);
+    }
+  });
+
+  it('reports geometry violations with the geometry code', () => {
+    const cases: Array<[Record<string, unknown>, (string | number)[]]> = [
+      [
+        document({ components: [component({ position: { x: 1_000_001, y: 0 } })] }),
+        ['components', 0, 'position', 'x'],
+      ],
+      [
+        document({ components: [component({ position: { x: -1_000_001, y: 0 } })] }),
+        ['components', 0, 'position', 'x'],
+      ],
+      [
+        document({ components: [component({ size: { width: 0, height: 1 } })] }),
+        ['components', 0, 'size', 'width'],
+      ],
+      [
+        document({ components: [component({ size: { width: 1, height: 1_000_001 } })] }),
+        ['components', 0, 'size', 'height'],
+      ],
+      [document({ components: [component({ rotation: 180 })] }), ['components', 0, 'rotation']],
+      [document({ components: [component({ rotation: -180.5 })] }), ['components', 0, 'rotation']],
+      [document({ components: [component({ zIndex: 1.5 })] }), ['components', 0, 'zIndex']],
+      [document({ components: [component({ zIndex: -1 })] }), ['components', 0, 'zIndex']],
+      [document({ canvas: { width: 0, height: 1, backgroundColor: '#000' } }), ['canvas', 'width']],
+    ];
+    for (const [input, path] of cases) {
+      const result = parse(input);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.diagnostics[0]?.code).toBe(
+          path[0] === 'canvas' ? 'DOCUMENT_FIELD_INVALID' : 'COMPONENT_GEOMETRY_INVALID',
+        );
+        expect(result.diagnostics[0]?.path).toEqual(path);
+      }
+    }
+  });
+
+  it('rejects invalid material types', () => {
+    for (const type of [
+      'kpi-card',
+      'acme./v1',
+      'acme.KPI/v1',
+      'acme.kpi/v0',
+      'acme.kpi/v',
+      'acme.kpi',
+    ]) {
+      const result = parse(document({ components: [component({ type })] }));
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.diagnostics[0]?.code).toBe('COMPONENT_TYPE_INVALID');
+      }
+    }
+  });
+
+  it('accepts names at the code point limit and rejects beyond', () => {
+    const atLimit = document({ components: [component({ name: '\u{1f600}'.repeat(256) })] });
+    expect(parse(atLimit)).toMatchObject({ ok: true });
+    const beyond = document({ components: [component({ name: '\u{1f600}'.repeat(257) })] });
+    const result = parse(beyond);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('DOCUMENT_FIELD_INVALID');
+      expect(result.diagnostics[0]?.path).toEqual(['components', 0, 'name']);
+    }
+  });
+
+  it('rejects blank or control-character names and background colors', () => {
+    const blank = parse(document({ components: [component({ name: '   ' })] }));
+    expect(blank.ok).toBe(false);
+    if (!blank.ok) {
+      expect(blank.diagnostics[0]?.code).toBe('DOCUMENT_FIELD_INVALID');
+    }
+    const control = parse(document({ components: [component({ name: 'a\u0007b' })] }));
+    expect(control.ok).toBe(false);
+    const color = parse(document({ canvas: { width: 1, height: 1, backgroundColor: '#0\u007f' } }));
+    expect(color.ok).toBe(false);
+  });
+
+  it('rejects invalid ids, parent ids and variable names', () => {
+    const badId = parse(document({ components: [component({ id: '-abc' })] }));
+    expect(badId.ok).toBe(false);
+    if (!badId.ok) {
+      expect(badId.diagnostics[0]?.code).toBe('DOCUMENT_FIELD_INVALID');
+    }
+    const badParent = parse(document({ components: [component({ parentId: 'has space' })] }));
+    expect(badParent.ok).toBe(false);
+    const badVariable = parse(
+      document({ variables: [{ type: 'static', name: '1abc', value: 0 }] }),
+    );
+    expect(badVariable.ok).toBe(false);
+    if (!badVariable.ok) {
+      expect(badVariable.diagnostics[0]?.code).toBe('VARIABLE_NAME_INVALID');
+    }
+  });
+
+  it('rejects wrong container shapes', () => {
+    const propsArray = parse(document({ components: [component({ props: [] })] }));
+    expect(propsArray.ok).toBe(false);
+    if (!propsArray.ok) {
+      expect(propsArray.diagnostics[0]?.code).toBe('DOCUMENT_FIELD_INVALID');
+      expect(propsArray.diagnostics[0]?.path).toEqual(['components', 0, 'props']);
+    }
+    const dataSourceType = parse(
+      document({ components: [component({ dataSource: { type: 'dynamic', value: 1 } })] }),
+    );
+    expect(dataSourceType.ok).toBe(false);
+  });
+
+  it('rejects duplicate component ids', () => {
+    const input = document({
+      components: [component({ id: 'a' }), component({ id: 'b' }), component({ id: 'a' })],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('COMPONENT_ID_DUPLICATE');
+      expect(result.diagnostics[0]?.path).toEqual(['components', 2, 'id']);
+    }
+  });
+
+  it('rejects missing and self parent references', () => {
+    const missing = parse(document({ components: [component({ parentId: 'ghost' })] }));
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.diagnostics[0]?.code).toBe('COMPONENT_PARENT_MISSING');
+      expect(missing.diagnostics[0]?.path).toEqual(['components', 0, 'parentId']);
+    }
+    const self = parse(document({ components: [component({ parentId: 'c1' })] }));
+    expect(self.ok).toBe(false);
+    if (!self.ok) {
+      expect(self.diagnostics[0]?.code).toBe('COMPONENT_PARENT_SELF');
+    }
+  });
+
+  it('reports one cycle diagnostic at the smallest member index', () => {
+    const input = document({
+      components: [
+        component({ id: 'a', parentId: 'c' }),
+        component({ id: 'b', parentId: 'a' }),
+        component({ id: 'c', parentId: 'b' }),
+      ],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const cycle = result.diagnostics.find(
+        (diagnostic) => diagnostic.code === 'COMPONENT_PARENT_CYCLE',
+      );
+      expect(cycle).toBeDefined();
+      expect(cycle?.path).toEqual(['components', 0, 'parentId']);
+    }
+  });
+
+  it('reports two independent cycles', () => {
+    const input = document({
+      components: [
+        component({ id: 'a', parentId: 'b' }),
+        component({ id: 'b', parentId: 'a' }),
+        component({ id: 'x', parentId: 'y' }),
+        component({ id: 'y', parentId: 'x' }),
+      ],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const cycles = result.diagnostics.filter(
+        (diagnostic) => diagnostic.code === 'COMPONENT_PARENT_CYCLE',
+      );
+      expect(cycles).toHaveLength(2);
+    }
+  });
+
+  it('accepts long acyclic parent chains', () => {
+    const components: Array<Record<string, unknown>> = [];
+    for (let index = 0; index < 10_000; index++) {
+      const parentId = index === 0 ? null : `c${index - 1}`;
+      components.push(component({ id: `c${index}`, parentId }));
+    }
+    const result = parse(document({ components }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects duplicate variable names', () => {
+    const input = document({
+      variables: [
+        { type: 'static', name: 'a', value: 1 },
+        { type: 'static', name: 'a', value: 2 },
+      ],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('VARIABLE_NAME_DUPLICATE');
+      expect(result.diagnostics[0]?.path).toEqual(['variables', 1, 'name']);
+    }
+  });
+
+  it('enforces component and variable count limits', () => {
+    const manyComponents = document({
+      components: Array.from({ length: 10_001 }, (_, index) => component({ id: `c${index}` })),
+    });
+    const componentsResult = parse(manyComponents);
+    expect(componentsResult.ok).toBe(false);
+    if (!componentsResult.ok) {
+      expect(componentsResult.diagnostics[0]?.code).toBe('DOCUMENT_LIMIT_EXCEEDED');
+      expect(componentsResult.diagnostics[0]?.path).toEqual(['components']);
+    }
+    const manyVariables = document({
+      variables: Array.from({ length: 1_001 }, (_, index) => ({
+        type: 'static' as const,
+        name: `v${index}`,
+        value: 0,
+      })),
+    });
+    const variablesResult = parse(manyVariables);
+    expect(variablesResult.ok).toBe(false);
+    if (!variablesResult.ok) {
+      expect(variablesResult.diagnostics[0]?.code).toBe('DOCUMENT_LIMIT_EXCEEDED');
+      expect(variablesResult.diagnostics[0]?.path).toEqual(['variables']);
+    }
+  });
+
+  it('enforces the single data source value budget', () => {
+    const payload: Record<string, string> = {};
+    for (let index = 0; index < 10_000; index++) {
+      payload[`key-${'x'.repeat(90)}${index}`] = 'value';
+    }
+    const input = document({
+      components: [component({ dataSource: { type: 'static', value: payload } })],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('DOCUMENT_LIMIT_EXCEEDED');
+      expect(result.diagnostics[0]?.path).toEqual(['components', 0, 'dataSource', 'value']);
+    }
+  });
+
+  it('enforces the total canonical byte budget', () => {
+    const components: Array<Record<string, unknown>> = [];
+    for (let index = 0; index < 10_000; index++) {
+      const props: Record<string, string> = {};
+      for (let key = 0; key < 60; key++) {
+        props[`k${key}`] = 'v'.repeat(90);
+      }
+      components.push(component({ id: `c${index}`, props }));
+    }
+    const result = parse(document({ components }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.diagnostics.some((diagnostic) => diagnostic.code === 'DOCUMENT_LIMIT_EXCEEDED'),
+      ).toBe(true);
+    }
+  });
+
+  it('orders diagnostics deterministically by path', () => {
+    const input = document({
+      components: [component({ position: { x: 1_000_001, y: 0 } })],
+      variables: [{ type: 'static', name: '1bad', value: 0 }],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.path).toEqual(['components', 0, 'position', 'x']);
+      expect(result.diagnostics[1]?.path).toEqual(['variables', 0, 'name']);
+    }
+  });
+
+  it('truncates diagnostics at the limit with a sentinel', () => {
+    const input: Record<string, unknown> = document();
+    for (let index = 0; index < 150; index++) {
+      input[`unknown${index}`] = 1;
+    }
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics).toHaveLength(100);
+      expect(result.diagnostics[99]?.code).toBe('DIAGNOSTIC_LIMIT_REACHED');
+      expect(result.diagnostics[99]?.path).toEqual([]);
+    }
+  });
+
+  it('never leaks input values into diagnostic messages', () => {
+    const secret = 'super-secret-canary-value-7f3a';
+    const input = document({
+      components: [
+        component({
+          name: 'bad\u0000name',
+          props: { token: secret },
+          dataSource: { type: 'static', value: secret },
+        }),
+      ],
+      variables: [{ type: 'static', name: 'a', value: secret }],
+    });
+    const result = parse(input);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.length).toBeGreaterThan(0);
+      for (const diagnostic of result.diagnostics) {
+        expect(diagnostic.message).not.toContain(secret);
+      }
+    }
+  });
+
+  it('does not mutate input and is deterministic', () => {
+    const input = document({
+      components: [component({ id: 'a' }), component({ id: 'b', parentId: 'a' })],
+    });
+    const snapshot = structuredClone(input);
+    const first = parse(input);
+    const second = parse(input);
+    expect(input).toEqual(snapshot);
+    expect(first).toEqual(second);
+  });
+});

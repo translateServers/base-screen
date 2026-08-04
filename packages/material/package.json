@@ -8,10 +8,19 @@
     "dist"
   ],
   "sideEffects": false,
+  "dependencies": {
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/plugin-core": "workspace:^",
+    "@base-screen/plugin-sdk": "workspace:^"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./auto-register": {
+      "types": "./dist/auto-register.d.ts",
+      "import": "./dist/auto-register.js"
     }
   },
   "scripts": {

@@ -18,14 +18,17 @@
 | --- | --- | --- | --- |
 | [ADR-0001](./ADR-0001-monorepo-toolchain-and-package-boundaries.md) | 已接受 | 2026-08-03 | Monorepo、工具链、私有阶段版本与十二包依赖边界 |
 
+| [ADR-0002](./ADR-0002-canonical-screen-document-and-migrations.md) | 已接受 | 2026-08-03 | Canonical Screen Document 与迁移策略 |
+| [ADR-0003](./ADR-0003-web-component-material-abi-and-registration.md) | 已接受 | 2026-08-03 | Web Component 物料 ABI 与注册规则 |
+| [ADR-0004](./ADR-0004-plugin-lifecycle-contributions-and-trust.md) | 已接受 | 2026-08-03 | 插件生命周期、贡献点和信任边界 |
+| [ADR-0005](./ADR-0005-renderer-dom-shadow-dom-and-product-elements.md) | 已接受 | 2026-08-04 | Renderer DOM、样式、Shadow DOM 与产品元素归属 |
+| [ADR-0006](./ADR-0006-designer-engine-dom-interactions-and-history.md) | 已接受 | 2026-08-04 | Designer Engine DOM、交互与历史策略 |
+| [ADR-0007](./ADR-0007-document-v2-host-resource-and-blueprint-runtime.md) | 已接受 | 2026-08-04 | Document V2、Host Resource 与受限 Blueprint 运行时 |
+| [ADR-0008](./ADR-0008-remote-plugin-sandbox-protocol.md) | 已接受 | 2026-08-04 | 远程插件 iframe sandbox 与消息协议 |
+
 ## 计划决策
 
 | ADR | 优先级 | 主题 |
 | --- | --- | --- |
-| ADR-0002 | M1 | Canonical Screen Document 与迁移策略 |
-| ADR-0003 | M1 | Web Component 物料 ABI 与注册规则 |
-| ADR-0004 | M1/M6 | 插件生命周期、贡献点和信任边界 |
-| ADR-0005 | M2 | Renderer DOM、样式和 Shadow DOM 策略 |
-| ADR-0006 | M3 | Designer Engine 内部 UI 与交互技术选型 |
 | ADR-0007 | M5 | Host Resource 安全与执行模型 |
 | ADR-0008 | M7 | Nebula importer 与集成边界 |

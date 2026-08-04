@@ -20,16 +20,19 @@ function collectExternalPackages(manifest: PackageManifest): readonly string[] {
   });
 }
 
-export function createViteLibraryConfig(packageRoot: string): UserConfig {
+export function createViteLibraryConfig(
+  packageRoot: string,
+  entries: string | Record<string, string> = join(packageRoot, 'src/index.ts'),
+): UserConfig {
   const externalPackages = collectExternalPackages(readManifest(packageRoot));
 
   return defineConfig({
     build: {
       emptyOutDir: false,
       lib: {
-        entry: join(packageRoot, 'src/index.ts'),
+        entry: entries,
         formats: ['es'],
-        fileName: () => 'index.js',
+        fileName: (_format, entryName) => (entryName === 'index' ? 'index.js' : `${entryName}.js`),
       },
       sourcemap: true,
       target: 'baseline-widely-available',

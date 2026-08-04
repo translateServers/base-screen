@@ -8,14 +8,21 @@
     "dist"
   ],
   "sideEffects": false,
+  "dependencies": {
+    "zod": "4.4.3"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./screen-document.schema.json": {
+      "import": "./dist/screen-document.schema.json",
+      "default": "./dist/screen-document.schema.json"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/write-schema-artifact.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
     "lint": "biome check src",
     "test": "vitest run --passWithNoTests",

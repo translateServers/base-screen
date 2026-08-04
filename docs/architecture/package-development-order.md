@@ -224,6 +224,13 @@ testing       -> 只从外部消费公共包，横向覆盖每个波次
 | 波次 | 状态 |
 | --- | --- |
 | M0 工程基线 | 已完成，本地 Node 22 通过 `pnpm verify:m0` |
-| P0 Contracts 文档 | 进行中 |
-| P0 Contracts 实现 | 未开始 |
-| P1 及后续 | 等待上游文档与退出条件 |
+| P0 Contracts 文档 | 已完成：ADR-0002 已接受，Contracts Foundation Spec 生效中 |
+| P0 Contracts 实现 | 已完成：schema、parser、serializer、diagnostics、JSON Schema artifact 与测试；`pnpm verify:m0` 通过 |
+| P1 Core 与 Plugin Core | 已完成：命令、history、层级/几何纯查询、Material/Plugin contract、catalog 与 parser 通过包内测试 |
+| P2 Plugin Manager 与 Authoring SDK | 已完成：候选预检、依赖拓扑、授权、生命周期回滚、会话端口和显式物料/插件定义 |
+| P3 Native/React/Vue Material | 已完成：官方文本物料、Custom Element registration、React/Vue bridge 与 Node 无副作用测试 |
+| P4 Renderer/Viewer | 已完成：catalog DOM diff、Shadow DOM Viewer、标准事件、资源 generation guard 与浏览器 harness |
+| P5 Designer Engine | 已完成：Core command/history、拖拽单次提交、属性编辑、项目 load/save revision Adapter 与浏览器 harness |
+| P6 SDK 与 Framework Bridge | 进行中：SDK 稳定子路径和 tarball 验证已完成；consumer-local 类型增强示例待补充 |
+| P7 动态数据与 DSL | 进行中：Document V2、Host Resource port、Blueprint compile/dispatch、Nebula importer 已完成；超时/取消和专业 conformance harness 待补充 |
+| M8 不可信插件/远程模块 | 已完成第一阶段：ADR-0008、sandbox iframe、bounded ready/event protocol、超时和处置边界；远程物料 ABI 仍明确不在该协议内 |

@@ -1,9 +1,11 @@
 # ADR-0002: Canonical Screen Document 与迁移策略
 
-> 状态：评审中
+> 状态：已接受
 > 日期：2026-08-03
 > 定位：确定 Base Screen 唯一持久化文档、JSON 边界、版本解析、迁移和外部导入边界
 > 关联：[Base Screen 长期演进总纲](../architecture/base-screen-evolution.md)
+> 验收：2026-08-03 接受，作为 [Contracts Foundation Spec](../specs/contracts-foundation/spec.md) 的实施依据
+> 演进：V1 是历史首版；当前 canonical 输出为 V2，V1 到 V2 的变更由 [ADR-0007](./ADR-0007-document-v2-host-resource-and-blueprint-runtime.md) 补充并优先。
 
 ## 1. 背景
 

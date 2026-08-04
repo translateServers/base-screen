@@ -21,7 +21,9 @@
     "check:api": "node scripts/check-api.mjs",
     "sync:license": "node scripts/sync-package-license.mjs",
     "verify:tarball": "node scripts/verify-tarballs.mjs",
-    "verify:m0": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm check:api && pnpm verify:tarball",
+    "verify:browser": "node scripts/verify-browser-harness.mjs",
+    "verify:nebula-import": "node scripts/verify-nebula-import.mjs",
+    "verify:m0": "pnpm format && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm check:api && pnpm verify:tarball",
     "changeset": "changeset",
     "version-packages": "changeset version"
   },
@@ -31,10 +33,15 @@
     "@changesets/cli": "2.31.1",
     "@microsoft/api-extractor": "7.58.12",
     "@playwright/test": "1.62.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
     "publint": "0.3.22",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
     "turbo": "2.10.8",
     "typescript": "7.0.2",
     "vite": "8.2.0",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "vue": "3.5.0"
   }
 }

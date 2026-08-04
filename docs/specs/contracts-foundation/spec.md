@@ -1,15 +1,19 @@
 # Contracts Foundation Spec
 
-> 状态：设计中
+> 状态：生效中
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/contracts` 首个 canonical document、JSON boundary、parser、诊断、序列化和 JSON Schema 的可验收契约
-> 依据：[ADR-0002](../../decisions/ADR-0002-canonical-screen-document-and-migrations.md)（评审中）
+> 依据：[ADR-0002](../../decisions/ADR-0002-canonical-screen-document-and-migrations.md)（已接受，2026-08-03）
 
-## 1. 生效条件
+## 1. 依据与授权
 
-本 Spec 是 P0 Contracts 的实施草案。ADR-0002 转为“已接受”且本 Spec 完成评审后，状态才可改为“生效中”，随后才允许修改 `@base-screen/contracts` 空入口或增加 Zod production dependency。
+本 Spec 由已接受的 ADR-0002 授权，自 2026-08-03 起生效，作为 P0 Contracts 实现和验收的唯一行为依据。
 
-ADR-0002 若在接受前改变 `schemaVersion`、文档范围、JSON boundary、迁移策略或序列化规则，本 Spec 必须先同步，不允许实现自行选择另一套行为。
+实现已开始后，任何改变 `schemaVersion`、文档范围、JSON boundary、迁移策略或序列化规则的修改，必须先更新 ADR 与本 Spec，不允许实现自行选择另一套行为。
+
+## 实施状态
+
+2026-08-03 在 Node 22.20.0 完成 P0 实现并通过 `pnpm verify:m0`（format、lint、typecheck、test、build、package/boundary/api check、tarball consumer 与 artifact subpath smoke）。Node 24 验证由 CI matrix 执行。实施中遇到的工具链与验证问题（vitest DOM lib、Zod toJSONSchema、tarball workspace 依赖解析等）见[门禁排障记录](../../troubleshooting/verify-m0-troubleshooting.md)。
 
 ## 2. 目标
 
@@ -224,11 +228,18 @@ export type ScreenParseResult<T> =
 ```ts
 export function parseScreenJsonValue(
   input: unknown,
+  options?: ScreenJsonParseOptions,
 ): ScreenParseResult<ScreenJsonValue>;
+
+export interface ScreenJsonParseOptions {
+  readonly maxBytes?: number;
+}
 
 export function parseScreenDocument(
   input: unknown,
 ): ScreenParseResult<ScreenDocument>;
+
+export function isScreenMaterialType(value: unknown): value is string;
 
 export function parseScreenProjectEnvelope(
   input: unknown,
@@ -245,6 +256,8 @@ export const SCREEN_DOCUMENT_JSON_SCHEMA: ScreenJsonObject;
 ```
 
 公共 API 不导出 Zod schema、preflight helper、clone helper、graph helper、migration step map 或可变 limits object。
+
+`parseScreenJsonValue()` 默认使用 §8 的 10 MiB 独立 JSON budget。跨包协议可传入 `maxBytes` 将预算收紧到 `1..10 MiB` 的整数；该选项只允许收紧，不能扩大 Contracts 的全局 JSON 限制。预算超限仍返回 `JSON_LIMIT_EXCEEDED`，上层协议可以在保留 path、顺序和其他 JSON diagnostics 的前提下映射到自身已冻结的 limit code。非法 option 是调用方错误，抛出 `RangeError`，不读取输入或执行 clone。
 
 ## 6. Canonical Shape
 

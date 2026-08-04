@@ -23,6 +23,10 @@ const FRAMEWORK_ROOTS = new Map([
   ['vue', 'vue'],
 ]);
 
+const ALLOWED_EXTERNAL_DEPENDENCIES = Object.freeze({
+  contracts: ['zod'],
+});
+
 function fail(code, detail) {
   throw new Error(`${code}: ${detail}`);
 }
@@ -134,7 +138,9 @@ function validateManifestDependencies(directory, manifest, graph) {
       continue;
     }
 
-    fail('FORBIDDEN_EXTERNAL_DEPENDENCY', `${directory} -> ${dependencyName}`);
+    if (!ALLOWED_EXTERNAL_DEPENDENCIES[directory]?.includes(dependencyName)) {
+      fail('FORBIDDEN_EXTERNAL_DEPENDENCY', `${directory} -> ${dependencyName}`);
+    }
   }
 
   graph.set(directory, dependencies);
@@ -157,7 +163,12 @@ function validateSourceImports(directory, manifest) {
       ) {
         fail('FORBIDDEN_SOURCE_ROOT', `${sourceFile} -> ${importName}`);
       }
-      if (buildWithTsc && importName.startsWith('.') && !importName.endsWith('.js')) {
+      if (
+        buildWithTsc &&
+        importName.startsWith('.') &&
+        !importName.endsWith('.js') &&
+        !importName.endsWith('.json')
+      ) {
         fail('EXTENSIONLESS_ESM_IMPORT', `${sourceFile} -> ${importName}`);
       }
       const dependencyDirectory = packageDirectoryByName(importName);

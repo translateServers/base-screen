@@ -243,6 +243,7 @@ M0 内部逻辑包名统一使用 `@base-screen/*`，十二包保持 private。�
 - 运行中的画布视口、标尺、网格、吸附线和设计态辅助层。
 - 属性编辑、组件库、图层树和 DSL 编辑入口的协调端口。
 - 未注册的 Designer Element 实现类和 `<base-screen-designer>` 的底层能力；稳定 tagName 只由 sdk 注册。
+- Vanilla开发模式
 
 Engine 通过 renderer 展示真实物料，通过 plugin-manager 获取当前实例能力，不直接识别 React/Vue 组件。
 
@@ -1191,11 +1192,13 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | ADR | 主题 | 状态 | 优先级 |
 | --- | --- | --- | --- |
 | [ADR-0001](../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md) | Monorepo、工具链、私有阶段版本与依赖方向 | 已接受 | M0 |
-| ADR-0002 | Canonical Screen Document 与迁移策略 | 待起草 | M1 |
-| ADR-0003 | Web Component 物料 ABI 与注册规则 | 待起草 | M1 |
-| ADR-0004 | 插件生命周期、贡献点和信任边界 | 待起草 | M1/M6 |
-| ADR-0005 | Renderer DOM、样式和 Shadow DOM 策略 | 待起草 | M2 |
-| ADR-0006 | Designer Engine 内部 UI 与交互技术选型 | 待起草 | M3 |
+| ADR-0002 | Canonical Screen Document 与迁移策略 | 已接受 | M1 |
+| ADR-0003 | Web Component 物料 ABI 与注册规则 | 已接受 | M1 |
+| ADR-0004 | 插件生命周期、贡献点和信任边界 | 已接受 | M1/M6 |
+| ADR-0005 | Renderer DOM、样式和 Shadow DOM 策略 | 已接受 | M2 |
+| ADR-0006 | Designer Engine 内部 UI 与交互技术选型 | 已接受 | M3 |
+| ADR-0007 | Host Resource intent、DSL/Blueprint 与 Document V2 迁移 | 已接受 | M5 |
+| ADR-0008 | 不可信远程插件 sandbox、协议与可用能力 | 已接受 | M8 |
 | ADR-0007 | Host Resource 安全与执行模型 | 待起草 | M5 |
 | ADR-0008 | Nebula importer 与集成边界 | 待起草 | M7 |
 

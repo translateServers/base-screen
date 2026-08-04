@@ -8,10 +8,63 @@
     "dist"
   ],
   "sideEffects": false,
+  "dependencies": {
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/core": "workspace:^",
+    "@base-screen/engine": "workspace:^",
+    "@base-screen/material": "workspace:^",
+    "@base-screen/plugin-manager": "workspace:^",
+    "@base-screen/plugin-sdk": "workspace:^",
+    "@base-screen/renderer": "workspace:^"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./auto-register": {
+      "types": "./dist/auto-register.d.ts",
+      "import": "./dist/auto-register.js"
+    },
+    "./viewer": {
+      "types": "./dist/viewer.d.ts",
+      "import": "./dist/viewer.js"
+    },
+    "./viewer/auto-register": {
+      "types": "./dist/viewer-auto-register.d.ts",
+      "import": "./dist/viewer-auto-register.js"
+    },
+    "./designer": {
+      "types": "./dist/designer.d.ts",
+      "import": "./dist/designer.js"
+    },
+    "./designer/auto-register": {
+      "types": "./dist/designer-auto-register.d.ts",
+      "import": "./dist/designer-auto-register.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
+    },
+    "./core": {
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js"
+    },
+    "./renderer": {
+      "types": "./dist/renderer.d.ts",
+      "import": "./dist/renderer.js"
+    },
+    "./engine": {
+      "types": "./dist/engine.d.ts",
+      "import": "./dist/engine.js"
+    },
+    "./plugins": {
+      "types": "./dist/plugins.d.ts",
+      "import": "./dist/plugins.js"
+    },
+    "./material": {
+      "types": "./dist/material.d.ts",
+      "import": "./dist/material.js"
     }
   },
   "scripts": {

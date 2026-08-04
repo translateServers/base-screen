@@ -22,6 +22,8 @@ M0 只建立可重复、可检查、可打包的工程底座，不实现 Screen 
 
 2026-08-03 本地在 Node 22.20.0、pnpm 11.18.0 完成 M0 初始化，并通过 `pnpm verify:m0`。Node 24.18.1 验证由新增 CI matrix 执行；首次 CI 结果是 M0 的远程环境验证记录。
 
+`verify:m0` 门禁运行中遇到的实际问题与修复方法见[门禁排障记录](../../troubleshooting/verify-m0-troubleshooting.md)。
+
 ## 2. 非目标
 
 M0 不包含：
@@ -250,6 +252,7 @@ M0 package manifest 应声明架构允许且当前源码真实使用的依赖，
 ### 8.3 外部依赖
 
 - M0 production dependencies 为空。
+- P0 起 `@base-screen/contracts` 增加 `zod` 作为唯一 production dependency（由已接受的 ADR-0002 和 [Contracts Foundation Spec](../contracts-foundation/spec.md) §4 授权）；zod 仅作为内部 runtime schema 实现，不进入 public `.d.ts`。
 - `react` 只声明 React/React DOM peer，不把它们加入 dependencies 或 optionalDependencies。
 - `vue` 只声明 Vue peer。
 - 其他十个包不得声明 React、React DOM 或 Vue peer。
