@@ -99,7 +99,9 @@ try {
         if (undone.x !== before.x || undone.y !== before.y) {
           throw new Error('BROWSER_HARNESS_UNDO_FAILED');
         }
-        await designer.getByTitle('Save project').click({ force: true });
+        await page.goto('http://127.0.0.1:4174/?designer', { waitUntil: 'networkidle' });
+        const authoringDesigner = page.locator('base-screen-designer');
+        await authoringDesigner.getByTitle('Save project').click();
         await page.waitForFunction(() => window.baseScreenHarness.getEnvelope().revision === '2');
         const saved = await page.evaluate(() => ({
           revision: window.baseScreenHarness.getEnvelope().revision,
