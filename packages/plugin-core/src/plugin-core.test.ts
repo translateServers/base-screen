@@ -43,7 +43,6 @@ function materialManifest(overrides: Record<string, unknown> = {}): Record<strin
 function pluginManifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     id: 'acme.analytics',
-    version: '1.0.0',
     dependencies: [],
     capabilities: ['command.execute'],
     contributions: [
@@ -113,6 +112,24 @@ describe('material identity and manifests', () => {
     }
   });
 
+  it('rejects executable, cyclic, and dangerous Manifest data without invoking it', () => {
+    let invoked = false;
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const dangerous = {} as Record<string, unknown>;
+    Object.defineProperty(dangerous, '__proto__', { enumerable: true, value: 'unsafe' });
+    const manifests = [
+      materialManifest({ defaultStyle: { render: () => (invoked = true) } }),
+      materialManifest({ defaultStyle: cyclic }),
+      materialManifest({ defaultStyle: dangerous }),
+    ];
+
+    for (const input of manifests) {
+      expect(parseBaseScreenMaterialManifest(input).ok).toBe(false);
+    }
+    expect(invoked).toBe(false);
+  });
+
   it('applies the material manifest resource budget before cloning', () => {
     const result = parseBaseScreenMaterialManifest(
       materialManifest({ defaultStyle: { value: 'a'.repeat(256 * 1024) } }),
@@ -170,6 +187,21 @@ describe('events and plugin command data', () => {
       expect(command.diagnostics[0]?.code).toBe('PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD');
     }
   });
+
+  it('rejects cyclic event payloads and keeps diagnostics deterministic and minimal', () => {
+    const payload: Record<string, unknown> = {};
+    payload.self = payload;
+    const input = { name: 'valueClick', payload };
+    const first = parseBaseScreenMaterialEventDetail(input);
+    const second = parseBaseScreenMaterialEventDetail(input);
+
+    expect(first).toEqual(second);
+    expect(first.ok).toBe(false);
+    if (!first.ok) {
+      expect(first.diagnostics[0]?.code).toBe('JSON_CYCLE');
+      expect(first.diagnostics[0]?.message).not.toContain('self');
+    }
+  });
 });
 
 describe('plugin manifests and catalogs', () => {
@@ -181,7 +213,7 @@ describe('plugin manifests and catalogs', () => {
     }
   });
 
-  it('rejects duplicate contribution identities and invalid dependency ranges', () => {
+  it('rejects duplicate contribution identities and malformed dependencies', () => {
     const duplicate = parseBaseScreenPluginManifest(
       pluginManifest({
         contributions: [
@@ -201,7 +233,7 @@ describe('plugin manifests and catalogs', () => {
       }),
     );
     const dependency = parseBaseScreenPluginManifest(
-      pluginManifest({ dependencies: [{ id: 'acme.base', range: '1.0.0' }] }),
+      pluginManifest({ dependencies: [{ id: 'acme.base', unexpected: true }] }),
     );
 
     expect(duplicate.ok).toBe(false);
@@ -239,5 +271,61 @@ describe('plugin manifests and catalogs', () => {
     expect(plugins.list()[0]?.manifest.id).toBe('acme.analytics');
     expect('register' in materials).toBe(false);
     expect('delete' in plugins).toBe(false);
+  });
+
+  it('detaches catalog snapshots and rejects duplicate identities', () => {
+    const parsedMaterial = parseBaseScreenMaterialManifest(materialManifest());
+    const parsedPlugin = parseBaseScreenPluginManifest(pluginManifest());
+    expect(parsedMaterial.ok).toBe(true);
+    expect(parsedPlugin.ok).toBe(true);
+    if (!parsedMaterial.ok || !parsedPlugin.ok) {
+      return;
+    }
+    const constructor = class {} as unknown as BaseScreenMaterialConstructor;
+    const catalog = createBaseScreenMaterialCatalog([
+      { manifest: parsedMaterial.value, constructor },
+    ]);
+    const entry = catalog.get('acme.kpi-card');
+
+    expect(entry?.manifest).not.toBe(parsedMaterial.value);
+    expect(Object.isFrozen(entry?.manifest)).toBe(true);
+    expect(() =>
+      createBaseScreenPluginCatalog([
+        {
+          manifest: parsedPlugin.value,
+          grantedCapabilities: [],
+          contributions: [],
+        },
+        {
+          manifest: parsedPlugin.value,
+          grantedCapabilities: [],
+          contributions: [],
+        },
+      ]),
+    ).toThrow(RangeError);
+  });
+
+  it('sorts Material Catalogs independently for separate instances', () => {
+    const first = parseBaseScreenMaterialManifest(materialManifest({ type: 'acme.zeta-card' }));
+    const second = parseBaseScreenMaterialManifest(
+      materialManifest({ type: 'acme.alpha-card', tagName: 'acme-alpha-card' }),
+    );
+    expect(first.ok).toBe(true);
+    expect(second.ok).toBe(true);
+    if (!first.ok || !second.ok) {
+      return;
+    }
+    const constructor = class {} as unknown as BaseScreenMaterialConstructor;
+    const enabled = createBaseScreenMaterialCatalog([
+      { manifest: first.value, constructor },
+      { manifest: second.value, constructor },
+    ]);
+    const excluded = createBaseScreenMaterialCatalog([]);
+
+    expect(enabled.list().map((entry) => entry.manifest.type)).toEqual([
+      'acme.alpha-card',
+      'acme.zeta-card',
+    ]);
+    expect(excluded.get('acme.alpha-card')).toBeUndefined();
   });
 });

@@ -12,7 +12,7 @@ import { validateBaseScreenMaterialIdentity, validatePropsSchema } from './mater
 const MAX_PLUGIN_MANIFEST_BYTES = 128 * 1024;
 const MAX_COMMAND_BYTES = 256 * 1024;
 const MAX_ITEMS = 128;
-const PLUGIN_FIELDS = new Set(['id', 'version', 'dependencies', 'capabilities', 'contributions']);
+const PLUGIN_FIELDS = new Set(['id', 'dependencies', 'capabilities', 'contributions']);
 
 export function parseBaseScreenPluginManifest(
   input: unknown,
@@ -29,13 +29,6 @@ export function parseBaseScreenPluginManifest(
   validateExactObject(manifest, PLUGIN_FIELDS, [], collector);
   if (!isIdentifier(manifest.id)) {
     collector.add('PLUGIN_CORE_IDENTITY_INVALID', ['id'], 'Plugin id must be an ASCII identifier.');
-  }
-  if (!isStrictSemver(manifest.version)) {
-    collector.add(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['version'],
-      'Plugin version must be SemVer core.',
-    );
   }
   validateDependencies(manifest.dependencies, collector);
   validateIdentifiers(manifest.capabilities, ['capabilities'], collector);
@@ -111,7 +104,7 @@ function validateDependencies(
       );
       continue;
     }
-    validateExactObject(dependency, new Set(['id', 'range']), ['dependencies', index], collector);
+    validateExactObject(dependency, new Set(['id']), ['dependencies', index], collector);
     if (!isIdentifier(dependency.id)) {
       collector.add(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
@@ -126,13 +119,6 @@ function validateDependencies(
       );
     } else {
       seen.add(dependency.id);
-    }
-    if (!isCaretSemver(dependency.range)) {
-      collector.add(
-        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['dependencies', index, 'range'],
-        'Dependency range must be a caret SemVer core range.',
-      );
     }
   }
 }
@@ -380,19 +366,5 @@ function isIdentifier(value: unknown): value is string {
     value.length > 0 &&
     value.length <= 128 &&
     /^[A-Za-z0-9][A-Za-z0-9._:-]*$/.test(value)
-  );
-}
-
-function isStrictSemver(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(value)
-  );
-}
-
-function isCaretSemver(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /^\^(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$/.test(value)
   );
 }

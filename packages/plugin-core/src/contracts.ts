@@ -122,7 +122,6 @@ export interface BaseScreenMaterialCatalog {
 
 export interface BaseScreenPluginDependency {
   readonly id: string;
-  readonly range: string;
 }
 
 export type BaseScreenPluginContribution =
@@ -143,7 +142,6 @@ export type BaseScreenPluginContribution =
 
 export interface BaseScreenPluginManifest {
   readonly id: string;
-  readonly version: string;
   readonly dependencies: readonly BaseScreenPluginDependency[];
   readonly capabilities: readonly string[];
   readonly contributions: readonly BaseScreenPluginContribution[];
