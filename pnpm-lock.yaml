@@ -176,6 +176,10 @@ importers:
       '@base-screen/contracts':
         specifier: workspace:^
         version: link:../contracts
+    devDependencies:
+      '@base-screen/plugin-manager':
+        specifier: workspace:^
+        version: link:../plugin-manager
 
   packages/vue:
     dependencies:

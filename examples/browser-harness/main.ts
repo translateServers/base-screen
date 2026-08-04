@@ -5,7 +5,11 @@ import {
   BaseScreenTextMaterialElement,
   defineBaseScreenTextMaterial,
 } from '../../packages/material/src/index.ts';
-import { createBaseScreenMaterialCatalog } from '../../packages/plugin-core/src/index.ts';
+import {
+  type BaseScreenMaterialConstructor,
+  createBaseScreenMaterialCatalog,
+} from '../../packages/plugin-core/src/index.ts';
+import { createBaseScreenPluginManager } from '../../packages/plugin-manager/src/index.ts';
 import { createReactMaterialDefinition } from '../../packages/react/src/index.ts';
 import { defineBaseScreenElements } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
@@ -20,6 +24,21 @@ if (!productElements.ok || !textMaterial.ok) {
   throw new Error('Base Screen browser harness failed to register its elements.');
 }
 
+const pluginManager = createBaseScreenPluginManager({
+  instanceId: 'browser-harness',
+  standaloneMaterialTagNames: [BASE_SCREEN_TEXT_MATERIAL_MANIFEST.tagName],
+  plugins: [],
+  grantedCapabilities: {},
+  registry: {
+    get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
+  },
+  createCommandPort: undefined,
+});
+const managerActivated = await pluginManager.activate();
+if (!managerActivated.ok || !pluginManager.snapshot?.materials.has('base.text')) {
+  throw new Error('Base Screen browser harness failed to inspect its material registry.');
+}
+
 const catalog = createBaseScreenMaterialCatalog([
   {
     manifest: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
@@ -31,8 +50,8 @@ const bridgeManifest = (type: string, tagName: string, name: string) => ({
   type,
   tagName,
   name,
-  category: 'Bridge',
-  keywords: ['bridge'],
+  category: '桥接',
+  keywords: ['桥接'],
   defaultSize: { width: 200, height: 36 },
   defaultProps: { label: name },
   defaultStyle: {},
@@ -41,14 +60,14 @@ const bridgeManifest = (type: string, tagName: string, name: string) => ({
     properties: { label: { kind: 'string' as const } },
     required: ['label'],
   },
-  propertyPanel: [{ prop: 'label', label: 'Label', control: 'text' as const }],
+  propertyPanel: [{ prop: 'label', label: '标签', control: 'text' as const }],
   events: ['valueClick'],
   dataCapabilities: ['static' as const],
   designCapabilities: { resize: true, rotate: false, children: false },
 });
 
 const reactBridge = createReactMaterialDefinition({
-  manifest: bridgeManifest('harness.react-button', 'harness-react-button', 'React bridge'),
+  manifest: bridgeManifest('harness.react-button', 'harness-react-button', 'React 桥接'),
   component: ({
     label,
     onValueClick,
@@ -64,7 +83,7 @@ const reactBridge = createReactMaterialDefinition({
   eventProps: { valueClick: 'onValueClick' },
 });
 const vueBridge = createVueMaterialDefinition({
-  manifest: bridgeManifest('harness.vue-button', 'harness-vue-button', 'Vue bridge'),
+  manifest: bridgeManifest('harness.vue-button', 'harness-vue-button', 'Vue 桥接'),
   component: {
     props: ['label', 'onValueClick'],
     setup(props) {
@@ -95,42 +114,42 @@ const screenDocument = {
     {
       id: 'title',
       type: 'base.text',
-      name: 'Title',
+      name: '标题',
       parentId: null,
       position: { x: 80, y: 80 },
       size: { width: 500, height: 72 },
       rotation: 0,
       zIndex: 1,
       status: { locked: false, hidden: false },
-      props: { text: 'Base Screen Designer' },
+      props: { text: 'Base Screen 设计器' },
       style: { color: '#e9f2ff', fontSize: 42, fontWeight: '700' },
       dataSource: null,
     },
     {
       id: 'subtitle',
       type: 'base.text',
-      name: 'Subtitle',
+      name: '副标题',
       parentId: null,
       position: { x: 84, y: 172 },
       size: { width: 430, height: 48 },
       rotation: 0,
       zIndex: 2,
       status: { locked: false, hidden: false },
-      props: { text: 'Drag text, edit properties, undo and redo.' },
+      props: { text: '拖动文本，编辑属性，撤销或重做。' },
       style: { color: '#9fb1c9', fontSize: 20, fontWeight: '400' },
       dataSource: null,
     },
     {
       id: 'host-data',
       type: 'base.text',
-      name: 'Host Data',
+      name: '宿主数据',
       parentId: null,
       position: { x: 84, y: 236 },
       size: { width: 430, height: 32 },
       rotation: 0,
       zIndex: 3,
       status: { locked: false, hidden: false },
-      props: { text: 'Host resource resolved' },
+      props: { text: '宿主资源已就绪' },
       style: { color: '#39c5bb', fontSize: 16, fontWeight: '400' },
       dataSource: {
         type: 'host-resource' as const,
@@ -142,28 +161,28 @@ const screenDocument = {
     {
       id: 'react-bridge',
       type: reactBridge.value.manifest.type,
-      name: 'React bridge',
+      name: 'React 桥接',
       parentId: null,
       position: { x: 84, y: 300 },
       size: { width: 200, height: 36 },
       rotation: 0,
       zIndex: 4,
       status: { locked: false, hidden: false },
-      props: { label: 'React bridge' },
+      props: { label: 'React 桥接' },
       style: {},
       dataSource: null,
     },
     {
       id: 'vue-bridge',
       type: vueBridge.value.manifest.type,
-      name: 'Vue bridge',
+      name: 'Vue 桥接',
       parentId: null,
       position: { x: 84, y: 348 },
       size: { width: 200, height: 36 },
       rotation: 0,
       zIndex: 5,
       status: { locked: false, hidden: false },
-      props: { label: 'Vue bridge' },
+      props: { label: 'Vue 桥接' },
       style: {},
       dataSource: null,
     },
@@ -200,15 +219,17 @@ viewer.blueprintRuntimePort = {
   },
 };
 designer.catalog = bridgeCatalog;
+designer.toolMaterialTypes = { text: 'base.text', rectangle: 'base.text' };
 viewer.catalog = bridgeCatalog;
 let envelope = {
   projectId: 'browser-harness',
   revision: '1',
-  name: 'Browser Harness',
+  name: '浏览器验证',
   description: null,
   document: screenDocument,
   metadata: {},
 };
+let nextSaveFailure: 'PROJECT_CONFLICT' | 'PROJECT_UNAVAILABLE' | undefined;
 designer.projectAdapter = {
   capabilities: { publish: false },
   async load({ projectId }) {
@@ -227,6 +248,16 @@ designer.projectAdapter = {
         };
   },
   async save(request) {
+    if (nextSaveFailure !== undefined) {
+      const code = nextSaveFailure;
+      nextSaveFailure = undefined;
+      return {
+        ok: false as const,
+        diagnostics: [
+          { severity: 'error' as const, code, path: [], message: 'Harness project failure.' },
+        ],
+      };
+    }
     envelope = {
       ...envelope,
       revision: String(Number(envelope.revision) + 1),
@@ -248,8 +279,12 @@ Object.assign(window, {
   baseScreenHarness: {
     catalog: bridgeCatalog,
     designer,
+    pluginManager,
     viewer,
     hostEvents,
     getEnvelope: () => envelope,
+    failNextSave: (code: 'PROJECT_CONFLICT' | 'PROJECT_UNAVAILABLE') => {
+      nextSaveFailure = code;
+    },
   },
 });

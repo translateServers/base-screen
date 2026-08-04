@@ -172,6 +172,99 @@ if (typeof serialized !== 'string' || serialized.length === 0) {
 }
 `;
     }
+    if (directory === 'core') {
+      smokeSource = `import {
+  applyScreenDocumentCommand,
+  canvasPointToViewport,
+  createScreenHistory,
+} from '${barePackage}';
+
+const document = {
+  canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
+  components: [],
+  variables: [],
+  blueprint: { rules: [] },
+};
+const command = applyScreenDocumentCommand(document, {
+  type: 'update-canvas',
+  patch: { width: 1280 },
+});
+if (!command.ok || command.document.canvas.width !== 1280) {
+  throw new Error('core: command failed');
+}
+if (createScreenHistory(document).present !== document) {
+  throw new Error('core: history failed');
+}
+if (canvasPointToViewport({ x: 1, y: 1 }, { zoom: 2, offset: { x: 0, y: 0 } }).x !== 2) {
+  throw new Error('core: geometry failed');
+}
+`;
+    }
+    if (directory === 'plugin-core') {
+      smokeSource = `import { parseBaseScreenMaterialManifest } from '${barePackage}';
+
+const result = parseBaseScreenMaterialManifest({
+  type: 'base.text',
+  tagName: 'base-text',
+  name: 'Text',
+  category: 'Basic',
+  keywords: [],
+  defaultSize: { width: 100, height: 50 },
+  defaultProps: {},
+  defaultStyle: {},
+  propsSchema: { kind: 'object', properties: {}, required: [] },
+  propertyPanel: [],
+  events: [],
+  dataCapabilities: ['static'],
+  designCapabilities: { resize: true, rotate: true, children: false },
+});
+if (!result.ok) {
+  throw new Error('plugin-core: manifest parse failed');
+}
+`;
+    }
+    if (directory === 'plugin-manager') {
+      smokeSource = `import { createBaseScreenPluginManager } from '${barePackage}';
+
+const manager = createBaseScreenPluginManager({
+  instanceId: 'tarball-consumer',
+  standaloneMaterialTagNames: [],
+  plugins: [],
+  grantedCapabilities: {},
+  registry: { get: () => undefined },
+  createCommandPort: undefined,
+});
+const result = await manager.activate();
+if (!result.ok || manager.snapshot === undefined) {
+  throw new Error('plugin-manager: activation failed');
+}
+await manager.dispose();
+`;
+    }
+    if (directory === 'engine') {
+      smokeSource = `import { ScreenProjectController } from '${barePackage}';
+
+let document = {
+  canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
+  components: [],
+  variables: [],
+  blueprint: { rules: [] },
+};
+const controller = new ScreenProjectController({
+  getDocument: () => document,
+  replaceDocument: (next) => {
+    document = next;
+    return { ok: true, value: next, diagnostics: [] };
+  },
+});
+if (!controller.establishDocumentBaseline(document).ok) {
+  throw new Error('engine: direct-document baseline failed');
+}
+if (controller.phase !== 'ready' || controller.dirty) {
+  throw new Error('engine: lifecycle controller failed');
+}
+`;
+    }
     await import(`node:fs/promises`).then(({ writeFile }) => writeFile(smoke, smokeSource, 'utf8'));
     run('node', [smoke], consumer);
   }
