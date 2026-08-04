@@ -4,6 +4,7 @@ import {
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
 } from '@base-screen/plugin-core';
+import { createRuntimeContributionIndex } from './contributions.js';
 import { failure, sortDiagnostics } from './diagnostics.js';
 import { type ActivationSession, createActivationPlan, type PlannedPlugin } from './preflight.js';
 import type {
@@ -111,10 +112,12 @@ class PluginManager implements BaseScreenPluginManager {
       grantedCapabilities: plugin.grantedCapabilities,
       contributions: plugin.manifest.contributions,
     }));
+    const plugins = createBaseScreenPluginCatalog(pluginEntries);
     this.#active = active;
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
-      plugins: createBaseScreenPluginCatalog(pluginEntries),
+      plugins,
+      contributions: createRuntimeContributionIndex(plugins),
     };
     this.#status = 'active';
     return { ok: true, value: this.#snapshot, diagnostics: [] };

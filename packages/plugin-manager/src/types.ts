@@ -4,6 +4,7 @@ import type {
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
   BaseScreenPluginRuntime,
+  BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
 } from '@base-screen/plugin-core';
 
@@ -19,6 +20,7 @@ export type BaseScreenPluginManagerStatus =
 export interface BaseScreenPluginManagerSnapshot {
   readonly materials: BaseScreenMaterialCatalog;
   readonly plugins: BaseScreenPluginCatalog;
+  readonly contributions: BaseScreenRuntimeContributionIndex;
 }
 
 export interface BaseScreenCustomElementRegistryPort {

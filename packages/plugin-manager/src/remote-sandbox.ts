@@ -21,7 +21,7 @@ export interface CreateBaseScreenRemotePluginSandboxOptions {
 }
 
 export interface BaseScreenRemotePluginSandbox {
-  readonly element: HTMLIFrameElement;
+  readonly element: HTMLIFrameElement | undefined;
   readonly status: 'loading' | 'ready' | 'failed' | 'disposed';
   ready(): Promise<ScreenParseResult<null>>;
   dispose(): void;
@@ -30,7 +30,10 @@ export interface BaseScreenRemotePluginSandbox {
 export function createBaseScreenRemotePluginSandbox(
   options: CreateBaseScreenRemotePluginSandboxOptions,
 ): BaseScreenRemotePluginSandbox {
-  return new RemotePluginSandbox(options);
+  const preflight = preflightSandbox(options);
+  return preflight.ok
+    ? new RemotePluginSandbox(options, preflight.value)
+    : new FailedRemotePluginSandbox(preflight);
 }
 
 class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
@@ -40,26 +43,23 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
   #resolveReady: ((result: ScreenParseResult<null>) => void) | undefined;
   #timeout: ReturnType<typeof setTimeout> | undefined;
 
-  constructor(private readonly options: CreateBaseScreenRemotePluginSandboxOptions) {
+  constructor(
+    private readonly options: CreateBaseScreenRemotePluginSandboxOptions,
+    preflight: { readonly entryUrl: string; readonly timeoutMs: number },
+  ) {
     this.element = options.target.ownerDocument.createElement('iframe');
     this.#ready = new Promise((resolve) => {
       this.#resolveReady = resolve;
     });
 
-    const preflight = preflightSandbox(options);
-    if (!preflight.ok) {
-      this.finish(preflight);
-      return;
-    }
-
     this.element.sandbox.add('allow-scripts', 'allow-same-origin');
     this.element.referrerPolicy = 'no-referrer';
-    this.element.src = preflight.value.entryUrl;
+    this.element.src = preflight.entryUrl;
     this.element.addEventListener('load', this.handleLoad);
     this.element.addEventListener('error', this.handleLoadError);
     this.#timeout = setTimeout(
       () => this.finish(failure('REMOTE_PLUGIN_TIMEOUT', 'Remote plugin timed out.')),
-      preflight.value.timeoutMs,
+      preflight.timeoutMs,
     );
     options.target.appendChild(this.element);
     options.target.ownerDocument.defaultView?.addEventListener('message', this.handleMessage);
@@ -159,6 +159,25 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
       clearTimeout(this.#timeout);
       this.#timeout = undefined;
     }
+  }
+}
+
+class FailedRemotePluginSandbox implements BaseScreenRemotePluginSandbox {
+  readonly element = undefined;
+  #status: BaseScreenRemotePluginSandbox['status'] = 'failed';
+
+  constructor(private readonly result: ScreenParseResult<null>) {}
+
+  get status(): BaseScreenRemotePluginSandbox['status'] {
+    return this.#status;
+  }
+
+  ready(): Promise<ScreenParseResult<null>> {
+    return Promise.resolve(this.result);
+  }
+
+  dispose(): void {
+    this.#status = 'disposed';
   }
 }
 

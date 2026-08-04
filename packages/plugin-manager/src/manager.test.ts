@@ -253,7 +253,7 @@ describe('BaseScreenPluginManager', () => {
     }
   });
 
-  it('publishes contribution summaries only through the plugin catalog', async () => {
+  it('publishes query-only runtime contribution authority with its catalogs', async () => {
     const plugin = runtime(
       pluginManifest({
         id: 'acme.runtime',
@@ -288,6 +288,13 @@ describe('BaseScreenPluginManager', () => {
     expect(activated.value.plugins.get('acme.runtime')?.contributions).toEqual(
       plugin.manifest.contributions,
     );
+    expect(activated.value.contributions.getResourceType('dataset')?.configSchema.required).toEqual(
+      ['limit'],
+    );
+    expect(activated.value.contributions.hasBlueprintCapability('blueprint.value.variable')).toBe(
+      true,
+    );
+    expect('resourceTypes' in activated.value.contributions).toBe(false);
     await manager.deactivate();
     expect(manager.snapshot).toBeUndefined();
   });
@@ -312,6 +319,36 @@ describe('BaseScreenPluginManager', () => {
     expect(second.snapshot?.materials.has(material.type)).toBe(false);
     await first.dispose();
     expect(second.status).toBe('active');
+  });
+
+  it('keeps contribution authorities isolated between manager sessions', async () => {
+    const firstPlugin = runtime(
+      pluginManifest({
+        id: 'acme.first-authority',
+        capabilities: ['blueprint.value.variable'],
+        contributions: [
+          {
+            kind: 'blueprintCapability',
+            id: 'blueprint.value.variable',
+            name: 'Variable',
+          },
+        ],
+      }),
+    );
+    const first = createBaseScreenPluginManager({
+      ...managerOptions([firstPlugin]),
+      grantedCapabilities: { 'acme.first-authority': ['blueprint.value.variable'] },
+    });
+    const second = createBaseScreenPluginManager(managerOptions([]));
+
+    expect((await first.activate()).ok).toBe(true);
+    expect((await second.activate()).ok).toBe(true);
+    expect(first.snapshot?.contributions.hasBlueprintCapability('blueprint.value.variable')).toBe(
+      true,
+    );
+    expect(second.snapshot?.contributions.hasBlueprintCapability('blueprint.value.variable')).toBe(
+      false,
+    );
   });
 
   it('does not query the registry when manifest parsing fails', async () => {
