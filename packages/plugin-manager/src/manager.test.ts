@@ -35,7 +35,6 @@ function pluginManifest(
 ): BaseScreenPluginManifest {
   return {
     id: 'acme.plugin',
-    version: '1.0.0',
     dependencies: [],
     capabilities: [],
     contributions: [],
@@ -78,6 +77,31 @@ function managerOptions(
 }
 
 describe('BaseScreenPluginManager', () => {
+  it('creates an inactive session without querying the registry or running lifecycle hooks', () => {
+    let queries = 0;
+    let hooks = 0;
+    const plugin = runtime(pluginManifest(), {
+      activate: () => {
+        hooks++;
+      },
+    });
+
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      registry: {
+        get: () => {
+          queries++;
+          return undefined;
+        },
+      },
+    });
+
+    expect(manager.status).toBe('inactive');
+    expect(manager.snapshot).toBeUndefined();
+    expect(queries).toBe(0);
+    expect(hooks).toBe(0);
+  });
+
   it('activates dependencies in deterministic order then atomically publishes catalogs', async () => {
     const log: string[] = [];
     const material = materialManifest();
@@ -99,7 +123,7 @@ describe('BaseScreenPluginManager', () => {
     const chart = runtime(
       pluginManifest({
         id: 'acme.chart',
-        dependencies: [{ id: 'acme.base', range: '^1.0.0' }],
+        dependencies: [{ id: 'acme.base' }],
       }),
       {
         activate: () => {
@@ -130,7 +154,7 @@ describe('BaseScreenPluginManager', () => {
     let hooksCalled = 0;
     let portsCreated = 0;
     const first = runtime(
-      pluginManifest({ id: 'acme.first', dependencies: [{ id: 'acme.second', range: '^1.0.0' }] }),
+      pluginManifest({ id: 'acme.first', dependencies: [{ id: 'acme.second' }] }),
       {
         activate: () => {
           hooksCalled++;
@@ -138,7 +162,7 @@ describe('BaseScreenPluginManager', () => {
       },
     );
     const second = runtime(
-      pluginManifest({ id: 'acme.second', dependencies: [{ id: 'acme.first', range: '^1.0.0' }] }),
+      pluginManifest({ id: 'acme.second', dependencies: [{ id: 'acme.first' }] }),
       {
         activate: () => {
           hooksCalled++;
@@ -155,6 +179,7 @@ describe('BaseScreenPluginManager', () => {
 
     const result = await manager.activate();
     expect(result.ok).toBe(false);
+    expect(JSON.stringify(result)).not.toContain('canary secret must not escape');
     if (!result.ok) {
       expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_DEPENDENCY_CYCLE')).toBe(
         true,
@@ -228,7 +253,7 @@ describe('BaseScreenPluginManager', () => {
     }
   });
 
-  it('publishes an instance-local immutable runtime contribution index', async () => {
+  it('publishes contribution summaries only through the plugin catalog', async () => {
     const plugin = runtime(
       pluginManifest({
         id: 'acme.runtime',
@@ -260,12 +285,9 @@ describe('BaseScreenPluginManager', () => {
     const activated = await manager.activate();
     expect(activated.ok).toBe(true);
     if (!activated.ok) return;
-    expect(
-      activated.value.contributions.resourceTypes.get('dataset')?.configSchema.required,
-    ).toEqual(['limit']);
-    expect(
-      activated.value.contributions.blueprintCapabilities.has('blueprint.value.variable'),
-    ).toBe(true);
+    expect(activated.value.plugins.get('acme.runtime')?.contributions).toEqual(
+      plugin.manifest.contributions,
+    );
     await manager.deactivate();
     expect(manager.snapshot).toBeUndefined();
   });
@@ -290,5 +312,220 @@ describe('BaseScreenPluginManager', () => {
     expect(second.snapshot?.materials.has(material.type)).toBe(false);
     await first.dispose();
     expect(second.status).toBe('active');
+  });
+
+  it('does not query the registry when manifest parsing fails', async () => {
+    let queries = 0;
+    let hooks = 0;
+    const invalid = {
+      manifest: {
+        id: 'acme.invalid',
+        dependencies: [],
+        capabilities: [],
+        contributions: [],
+        extra: true,
+      },
+      activate: () => {
+        hooks++;
+      },
+      deactivate: () => undefined,
+      dispose: () => undefined,
+    } as unknown as BaseScreenPluginRuntime;
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([invalid]),
+      standaloneMaterialTagNames: ['acme-kpi-card'],
+      registry: {
+        get: () => {
+          queries++;
+          return undefined;
+        },
+      },
+    });
+
+    const result = await manager.activate();
+
+    expect(result.ok).toBe(false);
+    expect(queries).toBe(0);
+    expect(hooks).toBe(0);
+  });
+
+  it('enforces the standalone material limit before registry queries', async () => {
+    let queries = 0;
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([]),
+      standaloneMaterialTagNames: Array.from({ length: 513 }, (_, index) => `acme-card-${index}`),
+      registry: {
+        get: () => {
+          queries++;
+          return undefined;
+        },
+      },
+    });
+
+    const result = await manager.activate();
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
+      'PLUGIN_CORE_LIMIT_EXCEEDED',
+    );
+    expect(queries).toBe(0);
+  });
+
+  it('rejects missing dependencies before creating a session', async () => {
+    let ports = 0;
+    let hooks = 0;
+    const plugin = runtime(
+      pluginManifest({
+        id: 'acme.needs-missing',
+        capabilities: ['command.execute'],
+        dependencies: [{ id: 'acme.missing' }],
+      }),
+      {
+        activate: () => {
+          hooks++;
+        },
+      },
+    );
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.needs-missing': ['command.execute'] },
+      createCommandPort: () => {
+        ports++;
+        return { execute: async () => ({ ok: true as const, value: null, diagnostics: [] }) };
+      },
+    });
+
+    const result = await manager.activate();
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
+      'PLUGIN_CORE_DEPENDENCY_MISSING',
+    );
+    expect(ports).toBe(0);
+    expect(hooks).toBe(0);
+  });
+
+  it('rejects a tag that resolves to different constructors', async () => {
+    const material = materialManifest();
+    const first = constructorFor(material);
+    const second = constructorFor(material);
+    let calls = 0;
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([]),
+      standaloneMaterialTagNames: [material.tagName, material.tagName],
+      registry: {
+        get: () => (calls++ === 0 ? first : second),
+      },
+    });
+
+    const result = await manager.activate();
+
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
+      'PLUGIN_CORE_IDENTITY_CONFLICT',
+    );
+  });
+
+  it('freezes the granted capability snapshot supplied to plugin activation', async () => {
+    let granted: readonly string[] | undefined;
+    const plugin = runtime(
+      pluginManifest({ id: 'acme.frozen', capabilities: ['command.execute'] }),
+      {
+        activate: (context) => {
+          granted = context.grantedCapabilities;
+        },
+      },
+    );
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.frozen': ['command.execute'] },
+      createCommandPort: () => ({
+        execute: async () => ({ ok: true as const, value: null, diagnostics: [] }),
+      }),
+    });
+
+    expect((await manager.activate()).ok).toBe(true);
+    expect(granted).toEqual(['command.execute']);
+    expect(Object.isFrozen(granted)).toBe(true);
+  });
+
+  it('shares the first dispose operation and releases a runtime once', async () => {
+    let disposed = 0;
+    const plugin = runtime(pluginManifest({ id: 'acme.dispose-once' }), {
+      dispose: async () => {
+        disposed++;
+      },
+    });
+    const manager = createBaseScreenPluginManager(managerOptions([plugin]));
+
+    expect((await manager.activate()).ok).toBe(true);
+    const first = manager.dispose();
+    const second = manager.dispose();
+
+    expect(first).toBe(second);
+    expect((await first).ok).toBe(true);
+    expect(disposed).toBe(1);
+    expect(manager.status).toBe('disposed');
+  });
+
+  it('enters failed after deactivate errors while allowing final disposal', async () => {
+    let disposed = 0;
+    const plugin = runtime(pluginManifest({ id: 'acme.deactivate-fails' }), {
+      deactivate: () => Promise.reject(new Error('canary secret must not escape')),
+      dispose: () => {
+        disposed++;
+      },
+    });
+    const manager = createBaseScreenPluginManager(managerOptions([plugin]));
+
+    expect((await manager.activate()).ok).toBe(true);
+    expect((await manager.deactivate()).ok).toBe(false);
+    expect(manager.status).toBe('failed');
+    expect((await manager.dispose()).ok).toBe(true);
+    expect(disposed).toBe(1);
+    expect(manager.status).toBe('disposed');
+  });
+
+  it('preserves stable ordering across equivalent candidate permutations', async () => {
+    const log: string[] = [];
+    const alpha = runtime(pluginManifest({ id: 'acme.alpha' }), {
+      activate: () => {
+        log.push('alpha');
+      },
+    });
+    const beta = runtime(pluginManifest({ id: 'acme.beta' }), {
+      activate: () => {
+        log.push('beta');
+      },
+    });
+    const first = createBaseScreenPluginManager(managerOptions([beta, alpha]));
+    const second = createBaseScreenPluginManager(managerOptions([alpha, beta]));
+
+    const firstResult = await first.activate();
+    const secondResult = await second.activate();
+
+    expect(
+      firstResult.ok && firstResult.value.plugins.list().map((entry) => entry.manifest.id),
+    ).toEqual(['acme.alpha', 'acme.beta']);
+    expect(
+      secondResult.ok && secondResult.value.plugins.list().map((entry) => entry.manifest.id),
+    ).toEqual(['acme.alpha', 'acme.beta']);
+    expect(log).toEqual(['alpha', 'beta', 'alpha', 'beta']);
+  });
+
+  it('disposes a reactivated runtime only once', async () => {
+    let disposed = 0;
+    const plugin = runtime(pluginManifest({ id: 'acme.reactivated' }), {
+      dispose: () => {
+        disposed++;
+      },
+    });
+    const manager = createBaseScreenPluginManager(managerOptions([plugin]));
+
+    expect((await manager.activate()).ok).toBe(true);
+    expect((await manager.deactivate()).ok).toBe(true);
+    expect((await manager.activate()).ok).toBe(true);
+    expect((await manager.dispose()).ok).toBe(true);
+    expect(disposed).toBe(1);
   });
 });

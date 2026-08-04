@@ -1,10 +1,10 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenPluginCatalogEntry,
-  type BaseScreenPluginContribution,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
 } from '@base-screen/plugin-core';
+import { failure, sortDiagnostics } from './diagnostics.js';
 import { type ActivationSession, createActivationPlan, type PlannedPlugin } from './preflight.js';
 import type {
   BaseScreenPluginManager,
@@ -23,7 +23,8 @@ class PluginManager implements BaseScreenPluginManager {
   #status: BaseScreenPluginManagerStatus = 'inactive';
   #snapshot: BaseScreenPluginManagerSnapshot | undefined;
   #active: Array<{ readonly plugin: PlannedPlugin; readonly session: ActivationSession }> = [];
-  #everActivated: PlannedPlugin[] = [];
+  #disposalOrder: PlannedPlugin[] = [];
+  #disposePromise: Promise<ScreenParseResult<null>> | undefined;
   #queue: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: BaseScreenPluginManagerOptions) {}
@@ -45,7 +46,10 @@ class PluginManager implements BaseScreenPluginManager {
   }
 
   dispose(): Promise<ScreenParseResult<null>> {
-    return this.enqueue(() => this.performDispose());
+    if (this.#disposePromise === undefined) {
+      this.#disposePromise = this.enqueue(() => this.performDispose());
+    }
+    return this.#disposePromise;
   }
 
   private enqueue<T>(
@@ -63,6 +67,7 @@ class PluginManager implements BaseScreenPluginManager {
     if (this.#status !== 'inactive') {
       return failure(
         'PLUGIN_CORE_LIFECYCLE_INVALID',
+        [],
         'Plugin manager cannot activate from its current state.',
       );
     }
@@ -79,11 +84,9 @@ class PluginManager implements BaseScreenPluginManager {
       let session: ActivationSession | undefined;
       try {
         session = plugin.createSession();
-        await plugin.runtime.activate(session.context);
+        await plugin.activate(session.context);
         active.push({ plugin, session });
-        if (!this.#everActivated.includes(plugin)) {
-          this.#everActivated.push(plugin);
-        }
+        this.recordActivated(plugin);
       } catch {
         session?.invalidate();
         diagnostics.push(
@@ -112,7 +115,6 @@ class PluginManager implements BaseScreenPluginManager {
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
       plugins: createBaseScreenPluginCatalog(pluginEntries),
-      contributions: createRuntimeContributionIndex(pluginEntries),
     };
     this.#status = 'active';
     return { ok: true, value: this.#snapshot, diagnostics: [] };
@@ -120,7 +122,7 @@ class PluginManager implements BaseScreenPluginManager {
 
   private async performDeactivate(): Promise<ScreenParseResult<null>> {
     if (this.#status !== 'active') {
-      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', 'Plugin manager is not active.');
+      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Plugin manager is not active.');
     }
     this.#status = 'deactivating';
     this.#snapshot = undefined;
@@ -140,9 +142,9 @@ class PluginManager implements BaseScreenPluginManager {
     this.#snapshot = undefined;
     const diagnostics = await deactivateEntries(this.#active);
     this.#active = [];
-    for (const plugin of [...this.#everActivated].reverse()) {
+    for (const plugin of [...this.#disposalOrder].reverse()) {
       try {
-        await plugin.runtime.dispose();
+        await plugin.dispose();
       } catch {
         diagnostics.push(
           diagnostic(
@@ -158,27 +160,12 @@ class PluginManager implements BaseScreenPluginManager {
       ? { ok: true, value: null, diagnostics: [] }
       : failureResult(diagnostics);
   }
-}
 
-function createRuntimeContributionIndex(entries: readonly BaseScreenPluginCatalogEntry[]) {
-  const resourceTypes = new Map<
-    string,
-    BaseScreenPluginContribution & { readonly kind: 'dataResourceType' }
-  >();
-  const blueprintCapabilities = new Set<string>();
-  for (const entry of entries) {
-    for (const contribution of entry.contributions) {
-      if (contribution.kind === 'dataResourceType') {
-        resourceTypes.set(contribution.id, contribution);
-      } else if (
-        contribution.kind === 'blueprintCapability' &&
-        entry.grantedCapabilities.includes(contribution.id)
-      ) {
-        blueprintCapabilities.add(contribution.id);
-      }
-    }
+  private recordActivated(plugin: PlannedPlugin): void {
+    const existing = this.#disposalOrder.findIndex((item) => item.runtime === plugin.runtime);
+    if (existing !== -1) this.#disposalOrder.splice(existing, 1);
+    this.#disposalOrder.push(plugin);
   }
-  return { resourceTypes, blueprintCapabilities };
 }
 
 async function deactivateEntries(
@@ -190,7 +177,7 @@ async function deactivateEntries(
   const diagnostics: ScreenDiagnostic[] = [];
   for (const entry of [...entries].reverse()) {
     try {
-      await entry.plugin.runtime.deactivate();
+      await entry.plugin.deactivate();
     } catch {
       diagnostics.push(
         diagnostic(
@@ -212,15 +199,9 @@ function diagnostic(
   return { severity: 'error', code, path, message };
 }
 
-function failure<T>(code: ScreenDiagnostic['code'], message: string): ScreenParseResult<T> {
-  return failureResult([diagnostic(code, [], message)]);
-}
-
 function failureResult<T>(diagnostics: readonly ScreenDiagnostic[]): ScreenParseResult<T> {
   return {
     ok: false,
-    diagnostics: [...diagnostics].sort((left, right) =>
-      left.code < right.code ? -1 : left.code > right.code ? 1 : 0,
-    ),
+    diagnostics: sortDiagnostics(diagnostics),
   };
 }
