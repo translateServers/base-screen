@@ -21,6 +21,12 @@ describe('geometry transforms and bounds', () => {
     expect(viewportPointToCanvas(viewportPoint, viewport)).toEqual({ x: 15, y: 25 });
   });
 
+  it('rejects coordinate transforms that overflow finite geometry', () => {
+    expect(() =>
+      canvasPointToViewport({ x: Number.MAX_VALUE, y: 0 }, { zoom: 64, offset: { x: 0, y: 0 } }),
+    ).toThrow(RangeError);
+  });
+
   it('calculates rotated component and selection bounds', () => {
     const first = makeComponent({ id: 'first', size: { width: 100, height: 100 }, rotation: 45 });
     const second = makeComponent({

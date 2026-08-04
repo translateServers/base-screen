@@ -1,5 +1,7 @@
 import type {
+  ScreenBlueprint,
   ScreenCanvas,
+  ScreenComponentDataSource,
   ScreenComponentNode,
   ScreenComponentStatus,
   ScreenDiagnostic,
@@ -7,7 +9,6 @@ import type {
   ScreenJsonObject,
   ScreenPosition,
   ScreenSize,
-  ScreenStaticDataSource,
   ScreenStaticVariable,
 } from '@base-screen/contracts';
 
@@ -25,6 +26,7 @@ export type ScreenDocumentCommand =
       readonly componentIds: readonly string[];
       readonly parentId: string | null;
     }
+  | { readonly type: 'replace-blueprint'; readonly blueprint: ScreenBlueprint }
   | { readonly type: 'replace-variables'; readonly variables: readonly ScreenStaticVariable[] };
 
 export interface ScreenComponentPatch {
@@ -36,7 +38,7 @@ export interface ScreenComponentPatch {
   readonly status?: ScreenComponentStatus;
   readonly props?: ScreenJsonObject;
   readonly style?: ScreenJsonObject;
-  readonly dataSource?: ScreenStaticDataSource | null;
+  readonly dataSource?: ScreenComponentDataSource | null;
 }
 
 export type ScreenCommandResult =

@@ -47,6 +47,8 @@ export function applyScreenDocumentCommand(
       return applyRemoveComponents(document, command.componentIds);
     case 'reparent-components':
       return applyReparentComponents(document, command.componentIds, command.parentId);
+    case 'replace-blueprint':
+      return applyBlueprint(document, command.blueprint);
     case 'replace-variables':
       return applyVariables(document, command.variables);
     default:
@@ -351,6 +353,14 @@ function applyVariables(document: ScreenDocument, variables: unknown): ScreenCom
     return success(document, []);
   }
   return finalize(document, { ...document, variables }, []);
+}
+
+function applyBlueprint(document: ScreenDocument, blueprint: unknown): ScreenCommandResult {
+  if (!isRecord(blueprint) || !Array.isArray(blueprint.rules)) {
+    return failure(document, invalid('Blueprint must be a canonical object.', ['blueprint']));
+  }
+  if (areEqual(document.blueprint, blueprint)) return success(document, []);
+  return finalize(document, { ...document, blueprint }, []);
 }
 
 function finalize(

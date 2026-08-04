@@ -45,4 +45,41 @@ describe('Blueprint runtime', () => {
     }
     expect(plan.initialVariables).toEqual({ count: 0 });
   });
+
+  it('compares JSON objects structurally regardless of property insertion order', () => {
+    const document = makeDocument({
+      components: [makeComponent({ id: 'button' })],
+      blueprint: {
+        rules: [
+          {
+            id: 'match',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            condition: {
+              left: { kind: 'event-payload', path: ['value'] },
+              operator: 'eq',
+              right: { kind: 'literal', value: { first: 1, second: 2 } },
+            },
+            actions: [
+              {
+                type: 'emit-host-event',
+                eventName: 'matched',
+                payload: { kind: 'literal', value: null },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const compiled = compileScreenBlueprint(document);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+
+    const result = dispatchScreenBlueprintEvent(compiled.value, compiled.value.initialVariables, {
+      componentId: 'button',
+      name: 'click',
+      payload: { value: { second: 2, first: 1 } },
+    });
+
+    expect(result).toMatchObject({ ok: true, value: { hostEvents: [{ name: 'matched' }] } });
+  });
 });

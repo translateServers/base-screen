@@ -22,6 +22,11 @@ describe('screen viewport state', () => {
     ).toBe(state);
     expect(reduceScreenViewport(state, { type: 'reset' })).toBe(state);
   });
+
+  it('keeps the viewport state when finite pan inputs overflow', () => {
+    const state = { zoom: 1, offset: { x: Number.MAX_VALUE, y: 0 } };
+    expect(reduceScreenViewport(state, { type: 'pan-by', delta: { x: 1, y: 0 } })).toBe(state);
+  });
 });
 
 describe('screen interaction state', () => {

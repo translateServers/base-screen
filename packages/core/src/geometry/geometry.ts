@@ -30,7 +30,7 @@ export function canvasPointToViewport(
 ): ScreenPoint {
   assertPoint(point, 'point');
   assertViewport(viewport);
-  return normalizePoint({
+  return normalizeFinitePoint({
     x: point.x * viewport.zoom + viewport.offset.x,
     y: point.y * viewport.zoom + viewport.offset.y,
   });
@@ -42,10 +42,16 @@ export function viewportPointToCanvas(
 ): ScreenPoint {
   assertPoint(point, 'point');
   assertViewport(viewport);
-  return normalizePoint({
+  return normalizeFinitePoint({
     x: (point.x - viewport.offset.x) / viewport.zoom,
     y: (point.y - viewport.offset.y) / viewport.zoom,
   });
+}
+
+function normalizeFinitePoint(point: ScreenPoint): ScreenPoint {
+  assertFinite(point.x, 'calculated point x');
+  assertFinite(point.y, 'calculated point y');
+  return normalizePoint(point);
 }
 
 export function getScreenComponentBounds(component: ScreenComponentNode): ScreenBounds {

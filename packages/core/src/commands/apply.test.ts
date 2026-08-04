@@ -101,6 +101,33 @@ describe('applyScreenDocumentCommand', () => {
     }
   });
 
+  it('permits reparenting hidden components without changing canvas coordinates', () => {
+    const document = makeDocument({
+      components: [
+        makeComponent({ id: 'visible' }),
+        makeComponent({ id: 'hidden-parent', status: { locked: false, hidden: true } }),
+        makeComponent({ id: 'hidden-child', parentId: 'hidden-parent' }),
+      ],
+    });
+    const target = applyScreenDocumentCommand(document, {
+      type: 'reparent-components',
+      componentIds: ['hidden-child'],
+      parentId: null,
+    });
+    const parent = applyScreenDocumentCommand(document, {
+      type: 'reparent-components',
+      componentIds: ['visible'],
+      parentId: 'hidden-parent',
+    });
+
+    expect(target.ok).toBe(true);
+    expect(parent.ok).toBe(true);
+    if (target.ok && parent.ok) {
+      expect(target.document.components[2]?.parentId).toBeNull();
+      expect(parent.document.components[0]?.parentId).toBe('hidden-parent');
+    }
+  });
+
   it('treats identical patches as a no-op', () => {
     const document = documentWithComponents();
     const result = applyScreenDocumentCommand(document, {
@@ -127,6 +154,25 @@ describe('applyScreenDocumentCommand', () => {
       expect(result.document).toBe(document);
       expect(result.diagnostics[0]?.code).toBe('VARIABLE_NAME_INVALID');
     }
+  });
+
+  it('replaces a canonical blueprint as one command', () => {
+    const document = documentWithComponents();
+    const result = applyScreenDocumentCommand(document, {
+      type: 'replace-blueprint',
+      blueprint: {
+        rules: [
+          {
+            id: 'rule-1',
+            trigger: { type: 'material-event', componentId: 'group', eventName: 'valueClick' },
+            actions: [],
+          },
+        ],
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.document.blueprint.rules[0]?.id).toBe('rule-1');
   });
 
   it('does not retain mutable command JSON references', () => {
@@ -179,6 +225,22 @@ describe('applyScreenDocumentTransaction', () => {
       expect(result.document.components).toEqual([]);
       expect(result.changedComponentIds).toEqual([]);
       expect(parseScreenDocument(result.document).ok).toBe(true);
+    }
+  });
+
+  it('omits components restored to their original value from net changes', () => {
+    const document = documentWithComponents();
+    const result = applyScreenDocumentTransaction(document, {
+      commands: [
+        { type: 'update-components', componentIds: ['group'], patch: { name: 'Changed' } },
+        { type: 'update-components', componentIds: ['group'], patch: { name: 'Component group' } },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.document).not.toBe(document);
+      expect(result.changedComponentIds).toEqual([]);
     }
   });
 

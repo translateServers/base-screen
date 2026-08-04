@@ -56,6 +56,9 @@ function withViewport(
   zoom: number,
   offset: ScreenPoint,
 ): ScreenViewportState {
+  if (!Number.isFinite(offset.x) || !Number.isFinite(offset.y)) {
+    return state;
+  }
   const next = { x: normalizeZero(offset.x), y: normalizeZero(offset.y) };
   if (state.zoom === zoom && state.offset.x === next.x && state.offset.y === next.y) {
     return state;

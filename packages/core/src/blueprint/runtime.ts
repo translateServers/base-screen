@@ -8,6 +8,7 @@ import {
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
+import { areEqualJson } from '../internal/equality.js';
 
 export interface ScreenBlueprintEvent {
   readonly componentId: string;
@@ -154,17 +155,14 @@ function evaluateCondition(
     return failure('BLUEPRINT_CONDITION_INVALID', 'Blueprint condition is invalid.');
   if (
     condition.operator === 'contains' &&
-    !(
-      (typeof a === 'string' && typeof b === 'string') ||
-      (Array.isArray(a) && a.every((item) => JSON.stringify(item) !== undefined))
-    )
+    !((typeof a === 'string' && typeof b === 'string') || Array.isArray(a))
   )
     return failure('BLUEPRINT_CONDITION_INVALID', 'Blueprint condition is invalid.');
   switch (condition.operator) {
     case 'eq':
-      return { ok: true, value: JSON.stringify(a) === JSON.stringify(b), diagnostics: [] };
+      return { ok: true, value: areEqualJson(a, b), diagnostics: [] };
     case 'neq':
-      return { ok: true, value: JSON.stringify(a) !== JSON.stringify(b), diagnostics: [] };
+      return { ok: true, value: !areEqualJson(a, b), diagnostics: [] };
     case 'gt':
       return { ok: true, value: (a as number) > (b as number), diagnostics: [] };
     case 'gte':
@@ -179,7 +177,7 @@ function evaluateCondition(
         value:
           typeof a === 'string'
             ? a.includes(b as string)
-            : (a as ScreenJsonValue[]).some((item) => JSON.stringify(item) === JSON.stringify(b)),
+            : (a as ScreenJsonValue[]).some((item) => areEqualJson(item, b)),
         diagnostics: [],
       };
     default:
@@ -233,10 +231,10 @@ function cloneResult(value: ScreenJsonValue): ScreenParseResult<ScreenJsonValue>
   }
 }
 function cloneExpression(value: ScreenBlueprintValueExpression): ScreenBlueprintValueExpression {
-  return JSON.parse(JSON.stringify(value)) as ScreenBlueprintValueExpression;
+  return cloneValue(value as unknown as ScreenJsonValue) as ScreenBlueprintValueExpression;
 }
 function cloneCondition(value: ScreenBlueprintCondition): ScreenBlueprintCondition {
-  return JSON.parse(JSON.stringify(value)) as ScreenBlueprintCondition;
+  return cloneValue(value as unknown as ScreenJsonValue) as unknown as ScreenBlueprintCondition;
 }
 function failure<T>(
   code:
