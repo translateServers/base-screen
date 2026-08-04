@@ -11,6 +11,9 @@
   "dependencies": {
     "@base-screen/contracts": "workspace:^"
   },
+  "devDependencies": {
+    "@base-screen/plugin-manager": "workspace:^"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

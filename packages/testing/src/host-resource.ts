@@ -1,4 +1,5 @@
 import type {
+  ScreenAbortSignal,
   ScreenComponentDataSource,
   ScreenDocument,
   ScreenHostResourcePort,
@@ -151,14 +152,14 @@ async function assertCancellation(
 function createPendingPort(): {
   readonly port: ScreenHostResourcePort;
   readonly resolve: (result: ScreenParseResult<ScreenJsonValue>) => void;
-  readonly signal: () => AbortSignal | undefined;
+  readonly signal: () => ScreenAbortSignal | undefined;
 } {
   let resolve: ((result: ScreenParseResult<ScreenJsonValue>) => void) | undefined;
-  let signal: AbortSignal | undefined;
+  let signal: ScreenAbortSignal | undefined;
   return {
     port: {
       resolve: (_request, options) => {
-        signal = options.signal as AbortSignal;
+        signal = options.signal;
         return new Promise<ScreenParseResult<ScreenJsonValue>>((complete) => {
           resolve = complete;
         });
@@ -170,7 +171,7 @@ function createPendingPort(): {
 }
 
 function assertAbort(
-  pending: { readonly signal: () => AbortSignal | undefined },
+  pending: { readonly signal: () => ScreenAbortSignal | undefined },
   scenario: string,
 ): void {
   if (pending.signal()?.aborted !== true) {

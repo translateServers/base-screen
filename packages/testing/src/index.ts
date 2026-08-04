@@ -5,6 +5,12 @@ export {
   type HostResourceConformanceResult,
   runHostResourceConformance,
 } from './host-resource.js';
+export {
+  type PluginManagerConformanceHarness,
+  type PluginManagerConformanceResult,
+  type PluginManagerConformanceSession,
+  runPluginManagerConformance,
+} from './plugin-manager.js';
 
 export function createMinimalScreenDocument(): ScreenDocument {
   return {
