@@ -105,6 +105,7 @@ class Renderer implements BaseScreenRenderer {
         applyMaterial(
           existing.element,
           candidate.component,
+          parsedDocument.value,
           candidate.model,
           isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
         );
@@ -117,6 +118,7 @@ class Renderer implements BaseScreenRenderer {
       applyMaterial(
         element,
         candidate.component,
+        parsedDocument.value,
         candidate.model,
         isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
       );
@@ -423,12 +425,14 @@ function getDataState(
 function applyMaterial(
   element: BaseScreenMaterialElement,
   component: ScreenComponentNode,
+  document: ScreenDocument,
   model: BaseScreenMaterialModel,
   effectivelyHidden: boolean,
 ): void {
+  const position = component.position;
   element.style.position = 'absolute';
-  element.style.left = `${component.position.x}px`;
-  element.style.top = `${component.position.y}px`;
+  element.style.left = `${position.x}px`;
+  element.style.top = `${position.y}px`;
   element.style.width = `${component.size.width}px`;
   element.style.height = `${component.size.height}px`;
   element.style.zIndex = String(component.zIndex);
