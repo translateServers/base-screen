@@ -54,21 +54,21 @@ export function renderDesignerLayers(
   layers.replaceChildren();
   const searchControl = layers.ownerDocument.createElement('label');
   searchControl.className = 'layer-search';
-  searchControl.textContent = 'Search layers';
+  searchControl.textContent = '搜索图层';
   const input = layers.ownerDocument.createElement('input');
   input.type = 'search';
   input.value = search;
-  input.placeholder = 'Search';
+  input.placeholder = '搜索';
   input.dataset.layerSearch = 'true';
   searchControl.appendChild(input);
   layers.appendChild(searchControl);
 
   const tree = layers.ownerDocument.createElement('div');
   tree.setAttribute('role', 'tree');
-  tree.ariaLabel = 'Layers';
-  const query = search.trim().toLocaleLowerCase();
+  tree.ariaLabel = '图层';
+  const query = search.trim().toLowerCase();
   for (const item of view.items) {
-    if (query !== '' && !`${item.name} ${item.type}`.toLocaleLowerCase().includes(query)) continue;
+    if (query !== '' && !`${item.name} ${item.type}`.toLowerCase().includes(query)) continue;
     tree.appendChild(
       createLayerNode(layers.ownerDocument, item, item.id === focusedComponentId, canMove),
     );
@@ -124,8 +124,9 @@ function createLayerNode(
   row.ariaLevel = String(item.depth + 1);
   row.ariaSelected = String(selected);
   row.dataset.layerId = item.id;
+  row.draggable = true;
 
-  const select = button(ownerDocument, item.name, 'Select layer');
+  const select = button(ownerDocument, item.name, '选择图层');
   select.dataset.layerSelect = item.id;
   select.className = 'layer-select';
   const type = ownerDocument.createElement('small');
@@ -137,17 +138,17 @@ function createLayerNode(
   rename.type = 'text';
   rename.value = item.name;
   rename.dataset.layerRename = item.id;
-  rename.ariaLabel = `Rename ${item.name}`;
+  rename.ariaLabel = `重命名 ${item.name}`;
   row.appendChild(rename);
-  row.appendChild(layerButton(ownerDocument, item, 'hidden', item.hidden ? 'Show' : 'Hide'));
-  row.appendChild(layerButton(ownerDocument, item, 'locked', item.locked ? 'Unlock' : 'Lock'));
+  row.appendChild(layerButton(ownerDocument, item, 'hidden', item.hidden ? '显示' : '隐藏'));
+  row.appendChild(layerButton(ownerDocument, item, 'locked', item.locked ? '解锁' : '锁定'));
   row.appendChild(moveButton(ownerDocument, item.id, 'up', canMove(item.id, 'up')));
   row.appendChild(moveButton(ownerDocument, item.id, 'down', canMove(item.id, 'down')));
   if (item.missingMaterial) {
     const diagnostic = ownerDocument.createElement('span');
     diagnostic.className = 'layer-diagnostic';
     diagnostic.setAttribute('role', 'status');
-    diagnostic.textContent = `Missing material: ${item.type}`;
+    diagnostic.textContent = `缺少物料：${item.type}`;
     row.appendChild(diagnostic);
   }
   return row;
@@ -172,8 +173,8 @@ function moveButton(
   direction: 'up' | 'down',
   enabled: boolean,
 ): HTMLButtonElement {
-  const label = direction === 'up' ? 'Move up' : 'Move down';
-  const control = button(ownerDocument, direction === 'up' ? 'Up' : 'Down', label);
+  const label = direction === 'up' ? '上移' : '下移';
+  const control = button(ownerDocument, label, label);
   control.dataset.layerMove = direction;
   control.dataset.layerId = id;
   control.disabled = !enabled;

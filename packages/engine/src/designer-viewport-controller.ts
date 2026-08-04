@@ -1,6 +1,6 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { reduceScreenViewport, type ScreenViewportState } from '@base-screen/core';
-import type { DesignerToolId } from './designer-tools.js';
+import { DESIGNER_TOOLS, type DesignerToolId } from './designer-tools.js';
 import {
   clampDesignerZoom,
   getFitDesignerZoom,
@@ -10,6 +10,7 @@ import {
 
 export interface DesignerViewportControllerCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
+  readonly onBlur: () => void;
   readonly onToolChange: (tool: DesignerToolId) => void;
 }
 
@@ -33,9 +34,10 @@ export class DesignerViewportController {
     this.#viewport = viewport;
     this.#canvas = canvas;
     viewport.addEventListener('wheel', (event) => this.onWheel(event), { passive: false });
-    viewport.addEventListener('keydown', (event) => this.onKeyDown(event));
-    viewport.addEventListener('keyup', (event) => this.onKeyUp(event));
-    viewport.addEventListener('blur', () => this.releaseSpace());
+    viewport.addEventListener('blur', () => {
+      this.releaseSpace();
+      this.callbacks.onBlur();
+    });
     viewport.tabIndex = 0;
   }
 
@@ -67,27 +69,6 @@ export class DesignerViewportController {
     );
   }
 
-  onClick(target: HTMLElement): boolean {
-    const tool = target.closest<HTMLButtonElement>('[data-tool]')?.dataset.tool as
-      | DesignerToolId
-      | undefined;
-    if (tool !== undefined) {
-      this.#activeTool = tool;
-      this.callbacks.onToolChange(tool);
-      return true;
-    }
-    switch (target.dataset.action) {
-      case 'zoom-reset':
-        this.reset();
-        return true;
-      case 'zoom-fit':
-        this.fit();
-        return true;
-      default:
-        return false;
-    }
-  }
-
   render(root: ParentNode | null = getParentNode(this.#canvas)): void {
     if (this.#canvas !== undefined) this.#canvas.style.transform = viewportTransform(this.#state);
     for (const output of root?.querySelectorAll<HTMLOutputElement>(
@@ -95,7 +76,9 @@ export class DesignerViewportController {
     ) ?? []) {
       output.value = `${Math.round(this.#state.zoom * 100)}%`;
     }
-    root?.querySelector<HTMLElement>('[data-status-tool]')?.replaceChildren(this.activeTool);
+    root
+      ?.querySelector<HTMLElement>('[data-status-tool]')
+      ?.replaceChildren(DESIGNER_TOOLS.find((tool) => tool.id === this.activeTool)?.label ?? '');
   }
 
   private onWheel(event: WheelEvent): void {
@@ -107,22 +90,33 @@ export class DesignerViewportController {
     );
   }
 
-  private onKeyDown(event: KeyboardEvent): void {
-    if (event.code !== 'Space' || event.repeat || isEditable(event.target)) return;
-    event.preventDefault();
-    this.#spacePressed = true;
-    this.render();
+  onKeyDown(event: KeyboardEvent): boolean {
+    if (event.repeat || isEditable(event.target)) return false;
+    if (event.code === 'Space') {
+      event.preventDefault();
+      this.#spacePressed = true;
+      this.render();
+      return true;
+    }
+    return false;
   }
 
-  private onKeyUp(event: KeyboardEvent): void {
-    if (event.code !== 'Space') return;
+  onKeyUp(event: KeyboardEvent): boolean {
+    if (event.code !== 'Space') return false;
     this.releaseSpace();
+    return true;
   }
 
   private releaseSpace(): void {
     if (!this.#spacePressed) return;
     this.#spacePressed = false;
     this.render();
+  }
+
+  setActiveTool(tool: DesignerToolId): void {
+    this.#activeTool = tool;
+    this.render();
+    this.callbacks.onToolChange(tool);
   }
 }
 

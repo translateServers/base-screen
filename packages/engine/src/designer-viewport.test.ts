@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   clampDesignerZoom,
   DESIGNER_FIT_MARGIN,
@@ -7,6 +7,7 @@ import {
   getFitDesignerZoom,
   viewportTransform,
 } from './designer-viewport.js';
+import { DesignerViewportController } from './designer-viewport-controller.js';
 
 const document = {
   canvas: { width: 1000, height: 500, backgroundColor: '#000000' },
@@ -30,5 +31,26 @@ describe('designer viewport helpers', () => {
     expect(viewportTransform({ zoom: 1.5, offset: { x: 10, y: -5 } })).toBe(
       'translate(10px, -5px) scale(1.5)',
     );
+  });
+
+  it('renders the active tool with its registered Chinese label', () => {
+    vi.stubGlobal('Document', class Document {});
+    vi.stubGlobal('DocumentFragment', class DocumentFragment {});
+    const status = { replaceChildren: (value: string) => (status.value = value), value: '' };
+    const root = {
+      querySelectorAll: () => [],
+      querySelector: () => status,
+    } as unknown as ParentNode;
+    const controller = new DesignerViewportController({
+      getDocument: () => undefined,
+      onBlur: () => undefined,
+      onToolChange: () => undefined,
+    });
+
+    controller.setActiveTool('rectangle');
+    controller.render(root);
+
+    expect(status.value).toBe('矩形');
+    vi.unstubAllGlobals();
   });
 });

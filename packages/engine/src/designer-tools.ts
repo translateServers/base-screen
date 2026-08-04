@@ -1,17 +1,39 @@
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 
 export const DESIGNER_TOOLS = [
-  { id: 'select', label: 'Select', materialKey: undefined },
-  { id: 'hand', label: 'Hand', materialKey: undefined },
-  { id: 'text', label: 'Text', materialKey: 'text' },
-  { id: 'rectangle', label: 'Rectangle', materialKey: 'rectangle' },
-  { id: 'ellipse', label: 'Ellipse', materialKey: 'ellipse' },
-  { id: 'image', label: 'Image', materialKey: 'image' },
-  { id: 'zoom', label: 'Zoom', materialKey: undefined },
+  { id: 'select', label: '选择', materialKey: undefined },
+  { id: 'hand', label: '抓手', materialKey: undefined },
+  { id: 'text', label: '文本', materialKey: 'text' },
+  { id: 'rectangle', label: '矩形', materialKey: 'rectangle' },
+  { id: 'ellipse', label: '椭圆', materialKey: 'ellipse' },
+  { id: 'image', label: '图片', materialKey: 'image' },
+  { id: 'zoom', label: '缩放', materialKey: undefined },
 ] as const;
 
 export type DesignerToolId = (typeof DESIGNER_TOOLS)[number]['id'];
 export type DesignerToolMaterialTypes = Partial<Record<DesignerToolId, string>>;
+
+const TOOL_SHORTCUTS: Readonly<Record<string, DesignerToolId>> = {
+  v: 'select',
+  h: 'hand',
+  t: 'text',
+  r: 'rectangle',
+  e: 'ellipse',
+  i: 'image',
+  z: 'zoom',
+};
+
+export function getDesignerToolForShortcut(key: string): DesignerToolId | undefined {
+  return TOOL_SHORTCUTS[key.toLowerCase()];
+}
+
+export function getDesignerToolShortcut(tool: DesignerToolId): string {
+  return (
+    Object.entries(TOOL_SHORTCUTS)
+      .find(([, value]) => value === tool)?.[0]
+      ?.toUpperCase() ?? ''
+  );
+}
 
 export function isDesignerToolConfigured(
   tool: (typeof DESIGNER_TOOLS)[number],
@@ -23,18 +45,4 @@ export function isDesignerToolConfigured(
     tool.materialKey === undefined ||
     (materialType !== undefined && catalog?.get(materialType) !== undefined)
   );
-}
-
-export function updateDesignerTools(
-  root: ParentNode,
-  toolMaterialTypes: DesignerToolMaterialTypes | undefined,
-  catalog: BaseScreenMaterialCatalog | undefined,
-  activeTool: DesignerToolId = 'select',
-): void {
-  for (const tool of DESIGNER_TOOLS) {
-    const control = root.querySelector<HTMLButtonElement>(`[data-tool="${tool.id}"]`);
-    if (control === null) continue;
-    control.disabled = !isDesignerToolConfigured(tool, toolMaterialTypes, catalog);
-    control.ariaPressed = String(tool.id === activeTool);
-  }
 }

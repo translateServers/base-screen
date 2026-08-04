@@ -2,6 +2,7 @@ import type {
   ScreenComponentNode,
   ScreenDiagnostic,
   ScreenDocument,
+  ScreenHostResourcePort,
   ScreenParseResult,
 } from '@base-screen/contracts';
 import type {
@@ -25,17 +26,20 @@ import {
   createGroupTransaction,
   createUngroupTransaction,
 } from './designer-layout-operations.js';
-import { createPropertyTransaction, renderDesignerProperties } from './designer-panel-dom.js';
+import {
+  createDataSourceTransaction,
+  createPropertyTransaction,
+  renderDesignerDataPanel,
+  renderDesignerProperties,
+} from './designer-panel-dom.js';
 import { selectedComponents } from './designer-selection.js';
-import { updateDesignerControls } from './designer-workspace.js';
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;
-  readonly canRedo: () => boolean;
-  readonly canUndo: () => boolean;
+  readonly getResourcePort: () => ScreenHostResourcePort | undefined;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
   readonly executeTransaction: (
     transaction: ScreenDocumentTransaction,
@@ -57,6 +61,26 @@ export class DesignerPanelController {
   clearClipboard(): void {
     this.#clipboard = undefined;
     this.#pasteCount = 0;
+  }
+
+  get hasClipboard(): boolean {
+    return this.#clipboard !== undefined;
+  }
+
+  get canGroup(): boolean {
+    return this.isGroupAvailable();
+  }
+
+  get canUngroup(): boolean {
+    return this.isUngroupAvailable();
+  }
+
+  get canAlign(): boolean {
+    return this.isAlignmentAvailable();
+  }
+
+  get canDistribute(): boolean {
+    return this.isDistributionAvailable();
   }
 
   copy(): void {
@@ -93,7 +117,7 @@ export class DesignerPanelController {
         ? []
         : selectedComponents(document, this.interaction.selectedComponentIds);
     const bounds = getScreenSelectionBounds(selected);
-    if (!this.canGroup() || document === undefined || entry === undefined || bounds === null) {
+    if (!this.canGroup || document === undefined || entry === undefined || bounds === null) {
       return failure('Grouping is unavailable.');
     }
     const group: ScreenComponentNode = {
@@ -111,7 +135,7 @@ export class DesignerPanelController {
       dataSource: null,
     };
     const result = this.callbacks.executeTransaction(
-      createGroupTransaction(group, this.interaction.selectedComponentIds),
+      createGroupTransaction(document, group, this.interaction.selectedComponentIds),
     );
     if (result.ok) this.select([group.id]);
     return result;
@@ -120,7 +144,7 @@ export class DesignerPanelController {
   ungroup(): ScreenParseResult<ScreenDocument> {
     const document = this.callbacks.getDocument();
     const groupId = this.interaction.focusedComponentId;
-    if (document === undefined || groupId === null || !this.canUngroup()) {
+    if (document === undefined || groupId === null || !this.canUngroup) {
       return failure('Ungrouping is unavailable.');
     }
     const childIds = document.components
@@ -133,7 +157,7 @@ export class DesignerPanelController {
 
   align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument> {
     const document = this.callbacks.getDocument();
-    if (document === undefined || !this.canAlign()) return failure('Alignment is unavailable.');
+    if (document === undefined || !this.canAlign) return failure('Alignment is unavailable.');
     return this.callbacks.executeTransaction(
       createAlignmentTransaction(document, this.interaction.selectedComponentIds, alignment),
     );
@@ -141,14 +165,14 @@ export class DesignerPanelController {
 
   distribute(distribution: BaseScreenDistribution): ScreenParseResult<ScreenDocument> {
     const document = this.callbacks.getDocument();
-    if (document === undefined || !this.canDistribute())
+    if (document === undefined || !this.canDistribute)
       return failure('Distribution is unavailable.');
     return this.callbacks.executeTransaction(
       createDistributionTransaction(document, this.interaction.selectedComponentIds, distribution),
     );
   }
 
-  render(properties: HTMLElement | undefined, root: ParentNode | null): void {
+  render(properties: HTMLElement | undefined, dataPanel?: HTMLElement): void {
     if (properties !== undefined) {
       renderDesignerProperties(
         properties,
@@ -157,18 +181,13 @@ export class DesignerPanelController {
         this.callbacks.getCatalog(),
       );
     }
-    if (root !== null) {
-      updateDesignerControls(root, {
-        canAlign: this.canAlign(),
-        canDistribute: this.canDistribute(),
-        canGroup: this.canGroup(),
-        canUngroup: this.canUngroup(),
-        canCopy: this.interaction.selectedComponentIds.length > 0,
-        canPaste: this.#clipboard !== undefined,
-        canUndo: this.callbacks.canUndo(),
-        canRedo: this.callbacks.canRedo(),
-      });
-    }
+    renderDesignerDataPanel(
+      dataPanel,
+      this.callbacks.getDocument(),
+      this.interaction,
+      this.callbacks.getCatalog(),
+      this.callbacks.getResourcePort() !== undefined,
+    );
   }
 
   onClick(event: Event): void {
@@ -229,6 +248,19 @@ export class DesignerPanelController {
   }
 
   onPropertyChange(event: Event): void {
+    const dataTransaction = createDataSourceTransaction(
+      event.target,
+      this.callbacks.getDocument(),
+      this.interaction,
+      this.callbacks.getCatalog(),
+      this.callbacks.getResourcePort() !== undefined,
+    );
+    if (dataTransaction !== undefined) {
+      dataTransaction.ok
+        ? this.report(this.callbacks.executeTransaction(dataTransaction.value))
+        : this.callbacks.emitDiagnostics(dataTransaction.diagnostics);
+      return;
+    }
     const transaction = createPropertyTransaction(
       event.target,
       this.callbacks.getDocument(),
@@ -239,6 +271,10 @@ export class DesignerPanelController {
       transaction.ok
         ? this.report(this.callbacks.executeTransaction(transaction.value))
         : this.callbacks.emitDiagnostics(transaction.diagnostics);
+      return;
+    }
+    if (isDesignerDraft(event.target)) {
+      this.callbacks.emitDiagnostics([invalidDraftDiagnostic()]);
     }
   }
 
@@ -273,7 +309,7 @@ export class DesignerPanelController {
     });
   }
 
-  private canGroup(): boolean {
+  private isGroupAvailable(): boolean {
     const document = this.callbacks.getDocument();
     const selected =
       document === undefined
@@ -288,7 +324,7 @@ export class DesignerPanelController {
     );
   }
 
-  private canUngroup(): boolean {
+  private isUngroupAvailable(): boolean {
     const document = this.callbacks.getDocument();
     const group = document?.components.find(
       (component) => component.id === this.interaction.focusedComponentId,
@@ -302,14 +338,14 @@ export class DesignerPanelController {
     );
   }
 
-  private canAlign(): boolean {
+  private isAlignmentAvailable(): boolean {
     return (
       this.callbacks.getDocument() !== undefined &&
       this.interaction.selectedComponentIds.length >= 2
     );
   }
 
-  private canDistribute(): boolean {
+  private isDistributionAvailable(): boolean {
     return (
       this.callbacks.getDocument() !== undefined &&
       this.interaction.selectedComponentIds.length >= 3
@@ -351,5 +387,27 @@ function failure(message: string): ScreenParseResult<ScreenDocument> {
   return {
     ok: false,
     diagnostics: [{ severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message }],
+  };
+}
+
+function isDesignerDraft(target: EventTarget | null): boolean {
+  return (
+    (target instanceof HTMLInputElement ||
+      target instanceof HTMLSelectElement ||
+      target instanceof HTMLTextAreaElement) &&
+    (target.dataset.property !== undefined ||
+      target.dataset.prop !== undefined ||
+      target.dataset.canvasProperty !== undefined ||
+      target.dataset.dataSourceType !== undefined ||
+      target.dataset.dataSourceField !== undefined)
+  );
+}
+
+function invalidDraftDiagnostic(): ScreenDiagnostic {
+  return {
+    severity: 'error',
+    code: 'CORE_COMMAND_INVALID',
+    path: [],
+    message: 'Designer property draft is invalid.',
   };
 }

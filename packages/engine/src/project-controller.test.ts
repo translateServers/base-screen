@@ -145,6 +145,42 @@ describe('ScreenProjectController', () => {
     await expect(second).resolves.toMatchObject({ ok: true, value: { revision: 'new' } });
   });
 
+  it('cancels a delayed load when rebinding a different adapter', async () => {
+    let resolveOld: ((result: ScreenParseResult<ScreenProjectEnvelope>) => void) | undefined;
+    let oldSignal: AbortSignal | undefined;
+    const oldAdapter = adapter({
+      load: vi.fn(
+        (request) =>
+          new Promise<ScreenParseResult<ScreenProjectEnvelope>>((resolve) => {
+            oldSignal = request.signal;
+            resolveOld = resolve;
+          }),
+      ),
+    });
+    const newAdapter = adapter({ load: vi.fn(async () => success(envelope('new'))) });
+    const session = controller(oldAdapter);
+    const pending = session.instance.load('project-1');
+    await vi.waitFor(() => expect(resolveOld).toBeTypeOf('function'));
+
+    expect(session.instance.bindAdapter(newAdapter)).toMatchObject({ ok: true });
+    expect(oldSignal?.aborted).toBe(true);
+    expect(session.instance.phase).toBe('unloaded');
+    resolveOld?.(success(envelope('old')));
+
+    await expect(pending).resolves.toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'PROJECT_ABORTED' }],
+    });
+    expect(session.present).toEqual(document());
+    expect(session.instance.project).toBeUndefined();
+    await expect(session.instance.load('project-1')).resolves.toMatchObject({
+      ok: true,
+      value: { revision: 'new' },
+    });
+    expect(oldAdapter.load).toHaveBeenCalledTimes(1);
+    expect(newAdapter.load).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects a load envelope for another project without replacing the document', async () => {
     const projectAdapter = adapter({ load: vi.fn(async () => success(envelope('rev-2'))) });
     const session = controller(projectAdapter);
@@ -186,6 +222,35 @@ describe('ScreenProjectController', () => {
     expect(projectAdapter.save).toHaveBeenCalledTimes(1);
   });
 
+  it('aborts persistence and clears project state for an external document baseline', async () => {
+    let resolveSave: ((result: ScreenParseResult<ScreenProjectEnvelope>) => void) | undefined;
+    const projectAdapter = adapter({
+      save: vi.fn(
+        () =>
+          new Promise<ScreenParseResult<ScreenProjectEnvelope>>((resolve) => {
+            resolveSave = resolve;
+          }),
+      ),
+    });
+    const session = controller(projectAdapter);
+    await session.instance.load('project-1');
+    const saving = session.instance.save();
+    await vi.waitFor(() => expect(resolveSave).toBeTypeOf('function'));
+    session.present = {
+      ...document(),
+      canvas: { width: 100, height: 100, backgroundColor: '#000000' },
+    };
+    expect(session.instance.establishDocumentBaseline(session.present)).toMatchObject({ ok: true });
+    resolveSave?.(success(envelope('rev-2')));
+    await expect(saving).resolves.toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'PROJECT_ABORTED' }],
+    });
+    expect(session.instance.project).toBeUndefined();
+    expect(session.instance.dirty).toBe(false);
+    expect(session.present.canvas.width).toBe(100);
+  });
+
   it('serializes save and publish, requires a clean project, and preserves conflict state', async () => {
     const published = vi.fn(async () => success(envelope('rev-3')));
     const projectAdapter = adapter({
@@ -213,6 +278,33 @@ describe('ScreenProjectController', () => {
     expect(session.instance.phase).toBe('conflict');
     expect(session.present).toBe(before);
     expect(session.instance.project?.revision).toBe('rev-3');
+  });
+
+  it('does not run a queued mutation after its submitted revision is superseded', async () => {
+    let resolvePublish: ((result: ScreenParseResult<ScreenProjectEnvelope>) => void) | undefined;
+    const projectAdapter = adapter({
+      capabilities: { publish: true },
+      publish: vi.fn(
+        () =>
+          new Promise<ScreenParseResult<ScreenProjectEnvelope>>((resolve) => {
+            resolvePublish = resolve;
+          }),
+      ),
+    });
+    const session = controller(projectAdapter);
+    await session.instance.load('project-1');
+    const publishing = session.instance.publish();
+    const saving = session.instance.save();
+    await vi.waitFor(() => expect(resolvePublish).toBeTypeOf('function'));
+    resolvePublish?.(success(envelope('rev-2')));
+
+    await expect(publishing).resolves.toMatchObject({ ok: true, value: { revision: 'rev-2' } });
+    await expect(saving).resolves.toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'PROJECT_ABORTED' }],
+    });
+    expect(projectAdapter.save).not.toHaveBeenCalled();
+    expect(session.instance.project?.revision).toBe('rev-2');
   });
 
   it('allows an explicit publish retry after an unavailable failure', async () => {

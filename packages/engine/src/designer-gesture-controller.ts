@@ -1,6 +1,7 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import {
   getScreenSelectionBounds,
+  isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
   queryScreenComponentsInRect,
   type ScreenDocumentTransaction,
@@ -9,6 +10,7 @@ import {
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { selectedComponents } from './designer-selection.js';
+import type { DesignerToolId, DesignerToolMaterialTypes } from './designer-tools.js';
 import {
   type BaseScreenTransformHandle,
   createTransformTransaction,
@@ -47,6 +49,13 @@ interface Pan {
   readonly startClientY: number;
 }
 
+interface Create {
+  readonly pointerId: number;
+  readonly start: Point;
+  readonly tool: DesignerToolId;
+  readonly materialType: string;
+}
+
 interface Point {
   readonly x: number;
   readonly y: number;
@@ -61,7 +70,14 @@ export interface DesignerGestureCallbacks {
   };
   readonly getViewport: () => ScreenViewportState;
   readonly panBy: (delta: Point) => void;
+  readonly zoomBy: (factor: number) => void;
   readonly isHandActive: () => boolean;
+  readonly getActiveTool: () => DesignerToolId;
+  readonly getToolMaterialTypes: () => DesignerToolMaterialTypes | undefined;
+  readonly snapCanvasPoint: (point: { readonly x: number; readonly y: number }) => {
+    readonly x: number;
+    readonly y: number;
+  };
   readonly reduceSelection: (action: ScreenInteractionAction) => void;
   readonly reportTransaction: (transaction: ScreenDocumentTransaction) => void;
   readonly renderSelection: () => void;
@@ -73,6 +89,7 @@ export class DesignerGestureController {
   #transform: Transform | undefined;
   #marquee: Marquee | undefined;
   #pan: Pan | undefined;
+  #create: Create | undefined;
 
   constructor(private readonly callbacks: DesignerGestureCallbacks) {}
 
@@ -90,6 +107,7 @@ export class DesignerGestureController {
     this.cancelTransform();
     this.cancelMarquee();
     this.cancelPan();
+    this.cancelCreate();
   }
 
   private onPointerDown(event: PointerEvent): void {
@@ -105,6 +123,20 @@ export class DesignerGestureController {
         pointerId: event.pointerId,
         startClientX: event.clientX,
         startClientY: event.clientY,
+      };
+      return;
+    }
+    if (this.callbacks.getActiveTool() === 'zoom') {
+      this.callbacks.zoomBy(event.shiftKey ? 1 / 1.2 : 1.2);
+      return;
+    }
+    const create = this.getCreateTool();
+    if (create !== undefined && target.closest('[data-base-screen-component-id]') === null) {
+      canvas.setPointerCapture(event.pointerId);
+      this.#create = {
+        pointerId: event.pointerId,
+        start: this.snapCanvasPoint(event),
+        ...create,
       };
       return;
     }
@@ -126,7 +158,7 @@ export class DesignerGestureController {
       canvas.setPointerCapture(event.pointerId);
       this.#marquee = {
         pointerId: event.pointerId,
-        start: this.canvasPointFromPointer(event),
+        start: this.snapCanvasPoint(event),
         union: event.shiftKey,
         contain: event.altKey,
       };
@@ -135,6 +167,9 @@ export class DesignerGestureController {
     }
     const component = document.components.find((item) => item.id === componentId);
     if (component === undefined) {
+      return;
+    }
+    if (isScreenComponentEffectivelyHidden(document, componentId)) {
       return;
     }
     if (event.shiftKey || event.ctrlKey || event.metaKey) {
@@ -170,8 +205,12 @@ export class DesignerGestureController {
       this.#pan = { ...this.#pan, startClientX: event.clientX, startClientY: event.clientY };
       return;
     }
+    if (this.#create !== undefined && event.pointerId === this.#create.pointerId) {
+      this.renderCreatePreview(this.#create, this.snapCanvasPoint(event));
+      return;
+    }
     if (this.#marquee !== undefined && event.pointerId === this.#marquee.pointerId) {
-      this.renderMarquee(this.#marquee.start, this.canvasPointFromPointer(event));
+      this.renderMarquee(this.#marquee.start, this.snapCanvasPoint(event));
       return;
     }
     if (this.#transform !== undefined && event.pointerId === this.#transform.pointerId) {
@@ -191,9 +230,13 @@ export class DesignerGestureController {
       this.cancelPan();
       return;
     }
+    if (this.#create !== undefined && event.pointerId === this.#create.pointerId) {
+      this.commitCreate(event);
+      return;
+    }
     if (this.#marquee !== undefined && event.pointerId === this.#marquee.pointerId) {
       const marquee = this.#marquee;
-      const end = this.canvasPointFromPointer(event);
+      const end = this.snapCanvasPoint(event);
       this.cancelMarquee();
       const rect = normalizedRect(marquee.start, end);
       if (rect.width < 1 || rect.height < 1) {
@@ -231,17 +274,41 @@ export class DesignerGestureController {
     const zoom = this.callbacks.getViewport().zoom;
     const x = (event.clientX - drag.startClientX) / zoom;
     const y = (event.clientY - drag.startClientY) / zoom;
+    const position = this.callbacks.snapCanvasPoint({
+      x: clampCoordinate(drag.startX + x),
+      y: clampCoordinate(drag.startY + y),
+    });
     this.cancelDrag();
+    const document = this.callbacks.getDocument();
+    const source = document?.components.find((component) => component.id === drag.componentId);
+    if (event.altKey && document !== undefined && source !== undefined) {
+      this.callbacks.reportTransaction({
+        commands: [
+          {
+            type: 'add-component',
+            component: {
+              ...source,
+              id: nextComponentId(document, source.type),
+              name: `${source.name} copy`,
+              position,
+              zIndex:
+                document.components.reduce(
+                  (maximum, component) => Math.max(maximum, component.zIndex),
+                  -1,
+                ) + 1,
+            },
+          },
+        ],
+      });
+      return;
+    }
     this.callbacks.reportTransaction({
       commands: [
         {
           type: 'update-components',
           componentIds: [drag.componentId],
           patch: {
-            position: {
-              x: clampCoordinate(drag.startX + x),
-              y: clampCoordinate(drag.startY + y),
-            },
+            position,
           },
         },
       ],
@@ -287,7 +354,7 @@ export class DesignerGestureController {
     transform: Transform,
     event: PointerEvent,
   ): readonly ScreenComponentNode[] {
-    const pointer = this.canvasPointFromPointer(event);
+    const pointer = this.snapCanvasPoint(event);
     return transform.kind === 'resize'
       ? resizeScreenComponents(transform.components, transform.handle!, pointer, {
           shift: event.shiftKey,
@@ -346,10 +413,22 @@ export class DesignerGestureController {
     }
   }
 
+  private cancelCreate(): void {
+    if (this.#create !== undefined) {
+      this.releasePointerCapture(this.#create.pointerId);
+      this.#create = undefined;
+    }
+    this.#canvas?.querySelector<HTMLElement>('[data-create-preview]')?.remove();
+  }
+
   private canvasPointFromPointer(event: PointerEvent): Point {
     const bounds = this.#canvas!.getBoundingClientRect();
     const zoom = this.callbacks.getViewport().zoom;
     return { x: (event.clientX - bounds.left) / zoom, y: (event.clientY - bounds.top) / zoom };
+  }
+
+  private snapCanvasPoint(event: PointerEvent): Point {
+    return this.callbacks.snapCanvasPoint(this.canvasPointFromPointer(event));
   }
 
   private renderMarquee(start: Point, end: Point): void {
@@ -365,11 +444,91 @@ export class DesignerGestureController {
     marquee.style.height = `${rect.height}px`;
   }
 
+  private renderCreatePreview(create: Create, end: Point): void {
+    const canvas = this.#canvas;
+    if (canvas === undefined) return;
+    const preview =
+      canvas.querySelector<HTMLElement>('[data-create-preview]') ??
+      canvas.ownerDocument.createElement('div');
+    preview.className = 'create-preview';
+    preview.dataset.createPreview = 'true';
+    const rect = normalizedRect(create.start, end);
+    preview.style.left = `${rect.x}px`;
+    preview.style.top = `${rect.y}px`;
+    preview.style.width = `${Math.max(1, rect.width)}px`;
+    preview.style.height = `${Math.max(1, rect.height)}px`;
+    if (!preview.isConnected) canvas.appendChild(preview);
+  }
+
   private releasePointerCapture(pointerId: number): void {
     if (this.#canvas?.hasPointerCapture(pointerId)) {
       this.#canvas.releasePointerCapture(pointerId);
     }
   }
+
+  private getCreateTool():
+    | { readonly tool: DesignerToolId; readonly materialType: string }
+    | undefined {
+    const tool = this.callbacks.getActiveTool();
+    if (!['text', 'rectangle', 'ellipse', 'image'].includes(tool)) return undefined;
+    const materialType = this.callbacks.getToolMaterialTypes()?.[tool];
+    if (
+      materialType === undefined ||
+      this.callbacks.getCatalog()?.get(materialType) === undefined
+    ) {
+      return undefined;
+    }
+    return { tool, materialType };
+  }
+
+  private commitCreate(event: PointerEvent): void {
+    const create = this.#create;
+    const document = this.callbacks.getDocument();
+    this.cancelCreate();
+    if (create === undefined || document === undefined) return;
+    const entry = this.callbacks.getCatalog()?.get(create.materialType);
+    if (entry === undefined) return;
+    const end = this.snapCanvasPoint(event);
+    const width = Math.abs(end.x - create.start.x);
+    const height = Math.abs(end.y - create.start.y);
+    if (create.tool !== 'text' && (width > 0 || height > 0) && Math.max(width, height) < 4) return;
+    const dragged = create.tool !== 'text' && (width >= 4 || height >= 4);
+    this.callbacks.reportTransaction({
+      commands: [
+        {
+          type: 'add-component',
+          component: {
+            id: nextComponentId(document, entry.manifest.type),
+            type: entry.manifest.type,
+            name: entry.manifest.name,
+            parentId: null,
+            position: dragged
+              ? { x: Math.min(create.start.x, end.x), y: Math.min(create.start.y, end.y) }
+              : create.start,
+            size: dragged ? { width, height } : entry.manifest.defaultSize,
+            rotation: 0,
+            zIndex:
+              document.components.reduce(
+                (maximum, component) => Math.max(maximum, component.zIndex),
+                -1,
+              ) + 1,
+            status: { locked: false, hidden: false },
+            props: entry.manifest.defaultProps,
+            style: entry.manifest.defaultStyle,
+            dataSource: null,
+          },
+        },
+      ],
+    });
+  }
+}
+
+function nextComponentId(document: ScreenDocument, type: string): string {
+  const base = type.replace(/[^A-Za-z0-9]+/g, '-');
+  let index = document.components.length + 1;
+  const ids = new Set(document.components.map((component) => component.id));
+  while (ids.has(`${base}-${index}`)) index++;
+  return `${base}-${index}`;
 }
 
 function normalizedRect(

@@ -212,7 +212,8 @@ export class DesignerSession {
     }
     this.#document = parsed.value;
     this.#history = createScreenHistory(parsed.value);
-    this.reconcileInteraction(false);
+    this.#interaction = { selectedComponentIds: [], focusedComponentId: null };
+    this.renderInteraction(true);
     if (establishBaseline) {
       const baseline = this.#projectController.establishDocumentBaseline(parsed.value);
       if (!baseline.ok) {

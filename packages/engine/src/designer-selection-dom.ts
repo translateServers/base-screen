@@ -2,6 +2,7 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import { getScreenSelectionBounds, isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { selectedComponents } from './designer-selection.js';
+import type { BaseScreenTransformHandle } from './designer-transform.js';
 
 export function renderDesignerSelection(
   selection: HTMLDivElement | undefined,
@@ -10,7 +11,12 @@ export function renderDesignerSelection(
   componentIds: readonly string[],
   catalog: BaseScreenMaterialCatalog | undefined,
 ): void {
-  if (selection === undefined || document === undefined) return;
+  if (selection === undefined) return;
+  if (document === undefined) {
+    selection.style.display = 'none';
+    selection.replaceChildren();
+    return;
+  }
   const selected = selectedComponents(document, componentIds);
   const bounds = getScreenSelectionBounds(selected);
   if (bounds === null) {
@@ -48,7 +54,7 @@ function appendTransformControls(
       control.type = 'button';
       control.className = `transform-handle handle-${handle}`;
       control.dataset.transformHandle = handle;
-      control.ariaLabel = `Resize ${handle}`;
+      control.ariaLabel = `调整大小：${handleLabel(handle)}`;
       selection.appendChild(control);
     }
   }
@@ -57,8 +63,29 @@ function appendTransformControls(
     rotate.type = 'button';
     rotate.className = 'transform-rotate';
     rotate.dataset.transformRotate = 'true';
-    rotate.ariaLabel = 'Rotate selection';
+    rotate.ariaLabel = '旋转选中组件';
     selection.appendChild(rotate);
+  }
+}
+
+function handleLabel(handle: BaseScreenTransformHandle): string {
+  switch (handle) {
+    case 'north-west':
+      return '左上';
+    case 'north':
+      return '上方';
+    case 'north-east':
+      return '右上';
+    case 'east':
+      return '右侧';
+    case 'south-east':
+      return '右下';
+    case 'south':
+      return '下方';
+    case 'south-west':
+      return '左下';
+    case 'west':
+      return '左侧';
   }
 }
 

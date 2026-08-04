@@ -68,10 +68,7 @@ export function createPasteTransaction(
             component.parentId === null || !copiedIds.has(component.parentId)
               ? null
               : idMap.get(component.parentId)!,
-          position: {
-            x: clampCoordinate(component.position.x + offset.x),
-            y: clampCoordinate(component.position.y + offset.y),
-          },
+          position: offsetPosition(component, copiedIds, offset),
         },
       });
       pending.delete(id);
@@ -82,6 +79,18 @@ export function createPasteTransaction(
     }
   }
   return { commands };
+}
+
+function offsetPosition(
+  component: ScreenComponentNode,
+  copiedIds: ReadonlySet<string>,
+  offset: { readonly x: number; readonly y: number },
+): { readonly x: number; readonly y: number } {
+  const isCopiedRoot = component.parentId === null || !copiedIds.has(component.parentId);
+  return {
+    x: clampCoordinate(component.position.x + (isCopiedRoot ? offset.x : 0)),
+    y: clampCoordinate(component.position.y + (isCopiedRoot ? offset.y : 0)),
+  };
 }
 
 function hasSelectedAncestor(

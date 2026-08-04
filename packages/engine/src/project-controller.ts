@@ -42,6 +42,7 @@ type Operation = 'load' | 'save' | 'publish';
 interface PendingOperation {
   readonly generation: number;
   readonly controller: AbortController;
+  readonly adapter: ScreenProjectAdapter | undefined;
   readonly projectId: string | undefined;
   readonly revision: string | undefined;
 }
@@ -89,6 +90,13 @@ export class ScreenProjectController {
     }
     if (!isConsistentAdapter(adapter)) {
       return fail('PROJECT_ADAPTER_INVALID', 'Project adapter publish capability is inconsistent.');
+    }
+    if (adapter !== this.#adapter) {
+      this.abortAll();
+      if (this.#phase === 'loading') {
+        this.#phase = 'unloaded';
+        this.notify();
+      }
     }
     this.#adapter = adapter;
     return { ok: true, value: undefined, diagnostics: [] };
@@ -326,7 +334,7 @@ export class ScreenProjectController {
     type: Extract<Operation, 'save' | 'publish'>,
     operation: (pending: PendingOperation) => Promise<ScreenParseResult<ScreenProjectEnvelope>>,
   ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    const pending = this.createPending(this.#project?.projectId, undefined);
+    const pending = this.createPending(this.#project?.projectId, this.#project?.revision);
     const run: Promise<ScreenParseResult<ScreenProjectEnvelope>> = this.#mutationTail.then(
       async (): Promise<ScreenParseResult<ScreenProjectEnvelope>> => {
         if (pending.controller.signal.aborted || !this.isCurrent(pending)) {
@@ -353,7 +361,10 @@ export class ScreenProjectController {
     pending: PendingOperation,
   ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
     try {
-      return await this.#adapter!.load({ projectId, signal: pending.controller.signal });
+      if (pending.adapter === undefined) {
+        return fail('PROJECT_ADAPTER_INVALID', 'Project adapter is unavailable.');
+      }
+      return await pending.adapter.load({ projectId, signal: pending.controller.signal });
     } catch {
       return fail('PROJECT_UNAVAILABLE', 'Project load is unavailable.');
     }
@@ -365,7 +376,10 @@ export class ScreenProjectController {
     pending: PendingOperation,
   ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
     try {
-      return await this.#adapter!.save({
+      if (pending.adapter === undefined) {
+        return fail('PROJECT_ADAPTER_INVALID', 'Project adapter is unavailable.');
+      }
+      return await pending.adapter.save({
         projectId: project.projectId,
         revision: project.revision,
         document,
@@ -381,7 +395,10 @@ export class ScreenProjectController {
     pending: PendingOperation,
   ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
     try {
-      return await this.#adapter!.publish!({
+      if (pending.adapter?.publish === undefined) {
+        return fail('PROJECT_PUBLISH_UNAVAILABLE', 'Project publishing is unavailable.');
+      }
+      return await pending.adapter.publish({
         projectId: project.projectId,
         revision: project.revision,
         signal: pending.controller.signal,
@@ -464,6 +481,7 @@ export class ScreenProjectController {
     const pending = {
       generation: this.#generation,
       controller: new AbortController(),
+      adapter: this.#adapter,
       projectId,
       revision,
     };
@@ -472,7 +490,14 @@ export class ScreenProjectController {
   }
 
   private isCurrent(pending: PendingOperation): boolean {
-    return !this.#disposed && pending.generation === this.#generation;
+    const project = this.#project;
+    return (
+      !this.#disposed &&
+      pending.generation === this.#generation &&
+      pending.adapter === this.#adapter &&
+      (pending.revision === undefined ||
+        (project?.projectId === pending.projectId && project?.revision === pending.revision))
+    );
   }
 
   private abortAll(): void {

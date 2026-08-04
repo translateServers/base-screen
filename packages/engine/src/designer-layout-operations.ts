@@ -21,6 +21,7 @@ export type BaseScreenAlignment = 'left' | 'center' | 'right' | 'top' | 'middle'
 export type BaseScreenDistribution = 'horizontal' | 'vertical';
 
 export function createGroupTransaction(
+  document: ScreenDocument,
   group: ScreenComponentNode,
   componentIds: readonly string[],
 ): ScreenDocumentTransaction {
@@ -57,10 +58,13 @@ export function createUngroupTransaction(
 }
 
 export function createReparentTransaction(
+  document: ScreenDocument,
   componentIds: readonly string[],
   parentId: string | null,
 ): ScreenDocumentTransaction {
-  return { commands: [{ type: 'reparent-components', componentIds, parentId }] };
+  return {
+    commands: [{ type: 'reparent-components', componentIds, parentId }],
+  };
 }
 
 export function createAlignmentTransaction(

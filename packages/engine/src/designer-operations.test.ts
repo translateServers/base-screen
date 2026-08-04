@@ -1,6 +1,7 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
 import { createClipboard, createPasteTransaction } from './designer-clipboard.js';
+import { createReparentTransaction } from './designer-layout-operations.js';
 import { resizeScreenComponents, rotateScreenComponents } from './designer-transform.js';
 
 function component(id: string, x: number, y: number): ScreenComponentNode {
@@ -72,7 +73,17 @@ describe('designer operations', () => {
     });
     expect(transaction.commands[1]).toMatchObject({
       type: 'add-component',
-      component: { id: 'child-copy-1', parentId: 'root-copy-1', position: { x: 30, y: 30 } },
+      component: { id: 'child-copy-1', parentId: 'root-copy-1', position: { x: 10, y: 10 } },
     });
+  });
+
+  it('reparents without changing the canonical canvas position', () => {
+    const parent = component('parent', 100, 200);
+    const child = component('child', 320, 450);
+    const transaction = createReparentTransaction(document([parent, child]), ['child'], 'parent');
+
+    expect(transaction.commands).toEqual([
+      { type: 'reparent-components', componentIds: ['child'], parentId: 'parent' },
+    ]);
   });
 });

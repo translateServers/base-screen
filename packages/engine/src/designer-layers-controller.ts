@@ -1,5 +1,6 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import {
+  applyScreenDocumentTransaction,
   isScreenComponentEffectivelyLocked,
   type ScreenComponentPatch,
   type ScreenDocumentTransaction,
@@ -8,6 +9,7 @@ import {
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { createDesignerLayerView, renderDesignerLayers } from './designer-layers-dom.js';
+import { createReparentTransaction } from './designer-layout-operations.js';
 
 export interface DesignerLayersControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -22,6 +24,7 @@ export interface DesignerLayersControllerCallbacks {
 
 export class DesignerLayersController {
   #search = '';
+  #draggedLayerId: string | undefined;
 
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {}
 
@@ -71,6 +74,55 @@ export class DesignerLayersController {
     if (id === undefined) return false;
     this.update(id, { name: target.value });
     return true;
+  }
+
+  onDragStart(event: DragEvent): boolean {
+    const row = getLayerRow(event.target);
+    const document = this.callbacks.getDocument();
+    if (row === undefined || document === undefined || document.components.length > 50)
+      return false;
+    this.#draggedLayerId = row;
+    event.dataTransfer?.setData('text/plain', row);
+    if (event.dataTransfer !== null) event.dataTransfer.effectAllowed = 'move';
+    return true;
+  }
+
+  onDragOver(event: DragEvent): boolean {
+    const parentId = getLayerRow(event.target);
+    if (
+      this.#draggedLayerId === undefined ||
+      parentId === undefined ||
+      parentId === this.#draggedLayerId
+    )
+      return false;
+    if (!this.canReparent(this.draggedSelection(), parentId)) return false;
+    event.preventDefault();
+    if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'move';
+    return true;
+  }
+
+  onDrop(event: DragEvent): boolean {
+    const parentId = getLayerRow(event.target);
+    const componentIds = this.draggedSelection();
+    this.#draggedLayerId = undefined;
+    if (
+      parentId === undefined ||
+      componentIds.length === 0 ||
+      !this.canReparent(componentIds, parentId)
+    ) {
+      return false;
+    }
+    event.preventDefault();
+    this.report(
+      this.callbacks.executeTransaction(
+        createReparentTransaction(this.callbacks.getDocument()!, componentIds, parentId),
+      ),
+    );
+    return true;
+  }
+
+  clearDrag(): void {
+    this.#draggedLayerId = undefined;
   }
 
   private select(componentId: string): void {
@@ -141,9 +193,37 @@ export class DesignerLayersController {
     return neighborId !== undefined && !isScreenComponentEffectivelyLocked(document, neighborId);
   }
 
+  private draggedSelection(): readonly string[] {
+    if (this.#draggedLayerId === undefined) return [];
+    const selected = this.callbacks.getInteraction().selectedComponentIds;
+    return selected.includes(this.#draggedLayerId) ? selected : [this.#draggedLayerId];
+  }
+
+  private canReparent(componentIds: readonly string[], parentId: string): boolean {
+    const document = this.callbacks.getDocument();
+    const parent = document?.components.find((component) => component.id === parentId);
+    return (
+      document !== undefined &&
+      parent !== undefined &&
+      document.components.length <= 50 &&
+      this.callbacks.getCatalog()?.get(parent.type)?.manifest.designCapabilities.children ===
+        true &&
+      applyScreenDocumentTransaction(
+        document,
+        createReparentTransaction(document, componentIds, parentId),
+      ).ok
+    );
+  }
+
   private report(result: ScreenParseResult<ScreenDocument>): void {
     if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
   }
+}
+
+function getLayerRow(target: EventTarget | null): string | undefined {
+  return target instanceof HTMLElement
+    ? target.closest<HTMLElement>('[data-layer-id]')?.dataset.layerId
+    : undefined;
 }
 
 function getSiblingIds(document: ScreenDocument, parentId: string | null): readonly string[] {
