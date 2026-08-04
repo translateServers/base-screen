@@ -61,8 +61,8 @@ export async function runHostResourceConformance(
 function createHostResourceSource(): ScreenComponentDataSource {
   return {
     type: 'host-resource',
-    resourceType: 'test-resource',
-    resourceId: 'test-request',
+    resourceType: 'test_resource',
+    resourceId: 'test_request',
     params: {},
   };
 }
