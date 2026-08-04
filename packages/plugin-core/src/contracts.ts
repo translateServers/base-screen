@@ -140,6 +140,13 @@ export type BaseScreenPluginContribution =
     }
   | { readonly kind: 'blueprintCapability'; readonly id: string; readonly name: string };
 
+export interface BaseScreenRuntimeContributionIndex {
+  getResourceType(
+    resourceType: string,
+  ): (BaseScreenPluginContribution & { readonly kind: 'dataResourceType' }) | undefined;
+  hasBlueprintCapability(capability: string): boolean;
+}
+
 export interface BaseScreenPluginManifest {
   readonly id: string;
   readonly dependencies: readonly BaseScreenPluginDependency[];

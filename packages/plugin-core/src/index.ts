@@ -28,6 +28,7 @@ export type {
   BaseScreenPluginDependency,
   BaseScreenPluginManifest,
   BaseScreenPluginRuntime,
+  BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
   PluginCommandRequest,
 } from './contracts.js';
