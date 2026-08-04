@@ -53,10 +53,11 @@ export function renderDesignerLayers(
 ): void {
   layers.replaceChildren();
   const searchControl = layers.ownerDocument.createElement('label');
-  searchControl.className = 'layer-search';
+  searchControl.className = 'designer-field designer-field-label layer-search';
   searchControl.textContent = '搜索图层';
   const input = layers.ownerDocument.createElement('input');
   input.type = 'search';
+  input.className = 'designer-control designer-input';
   input.value = search;
   input.placeholder = '搜索';
   input.dataset.layerSearch = 'true';
@@ -136,6 +137,7 @@ function createLayerNode(
 
   const rename = ownerDocument.createElement('input');
   rename.type = 'text';
+  rename.className = 'designer-control designer-input';
   rename.value = item.name;
   rename.dataset.layerRename = item.id;
   rename.ariaLabel = `重命名 ${item.name}`;
@@ -184,6 +186,7 @@ function moveButton(
 function button(ownerDocument: Document, text: string, label: string): HTMLButtonElement {
   const control = ownerDocument.createElement('button');
   control.type = 'button';
+  control.className = 'designer-control designer-button';
   control.textContent = text;
   control.ariaLabel = label;
   return control;

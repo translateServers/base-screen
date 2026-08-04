@@ -24,7 +24,7 @@ export class DesignerProjectFeedbackController {
     if (phase !== 'conflict' || !this.#reloadConfirmationPending) this.resetConfirmation();
   }
 
-  onClick(target: HTMLElement): boolean {
+  onClick(target: Element): boolean {
     const action = target.closest<HTMLButtonElement>('[data-action]')?.dataset.action;
     if (action === 'continue-editing') {
       this.callbacks.report(this.callbacks.continueEditing());

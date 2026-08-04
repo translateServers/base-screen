@@ -1,0 +1,75 @@
+:host {
+  --designer-surface-workspace: #0b0d12;
+  --designer-surface-panel: #11131a;
+  --designer-surface-raised: #161922;
+  --designer-surface-control: #1c1f29;
+  --designer-surface-control-hover: #252936;
+  --designer-surface-overlay: #161922;
+  --designer-surface-canvas: #0a0b10;
+  --designer-text-primary: #e8eaf0;
+  --designer-text-secondary: #aeb5c5;
+  --designer-text-muted: #8b93a6;
+  --designer-text-disabled: #6f7788;
+  --designer-border-subtle: #1d202b;
+  --designer-border-default: #343948;
+  --designer-border-strong: #596174;
+  --designer-focus-ring: #54ddff;
+  --designer-accent: #16c8ee;
+  --designer-accent-surface: #123d4b;
+  --designer-success: #54d39a;
+  --designer-success-surface: #173e32;
+  --designer-warning: #f5c156;
+  --designer-warning-surface: #493b1c;
+  --designer-danger: #ff758f;
+  --designer-danger-surface: #4b2330;
+  --designer-space-1: 2px;
+  --designer-space-2: 4px;
+  --designer-space-3: 6px;
+  --designer-space-4: 8px;
+  --designer-space-5: 12px;
+  --designer-space-6: 16px;
+  --designer-space-7: 24px;
+  --designer-control-height: 30px;
+  --designer-control-height-compact: 28px;
+  --designer-icon-size: 16px;
+  --designer-radius-control: 5px;
+  --designer-radius-overlay: 8px;
+  --designer-font:
+    12px / 1.5 "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --designer-font-small:
+    11px / 1.4 "SF Pro Display", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --designer-font-numeric: 600 11px / 1 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --designer-shadow-overlay: 0 18px 48px rgb(0 0 0 / 38%);
+  --designer-shadow-canvas: 0 18px 48px rgb(0 0 0 / 36%);
+  --designer-motion: 120ms ease;
+  color-scheme: dark;
+}
+
+:host([theme="light"]) {
+  --designer-surface-workspace: #f3f5f8;
+  --designer-surface-panel: #ffffff;
+  --designer-surface-raised: #f8f9fb;
+  --designer-surface-control: #eef1f5;
+  --designer-surface-control-hover: #e2e7ee;
+  --designer-surface-overlay: #ffffff;
+  --designer-surface-canvas: #e9edf3;
+  --designer-text-primary: #171922;
+  --designer-text-secondary: #454c5c;
+  --designer-text-muted: #626b7c;
+  --designer-text-disabled: #8b92a0;
+  --designer-border-subtle: #e5e8ee;
+  --designer-border-default: #d4d9e2;
+  --designer-border-strong: #9ba4b4;
+  --designer-focus-ring: #006dd8;
+  --designer-accent: #006edc;
+  --designer-accent-surface: #dceeff;
+  --designer-success: #087b4a;
+  --designer-success-surface: #d9f3e6;
+  --designer-warning: #8b5900;
+  --designer-warning-surface: #fff0ca;
+  --designer-danger: #bd2247;
+  --designer-danger-surface: #ffe1e8;
+  --designer-shadow-overlay: 0 16px 40px rgb(24 34 54 / 18%);
+  --designer-shadow-canvas: 0 16px 40px rgb(24 34 54 / 20%);
+  color-scheme: light;
+}

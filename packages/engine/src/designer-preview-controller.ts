@@ -20,6 +20,7 @@ export class DesignerPreviewController {
     const header = shadow.ownerDocument.createElement('header');
     const close = shadow.ownerDocument.createElement('button');
     close.type = 'button';
+    close.className = 'designer-control designer-button';
     close.dataset.action = 'preview';
     close.textContent = '关闭预览';
     header.appendChild(close);

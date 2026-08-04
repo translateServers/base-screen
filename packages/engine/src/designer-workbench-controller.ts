@@ -48,7 +48,7 @@ export class DesignerWorkbenchController {
     this.renderCanvasAids();
   }
 
-  onClick(target: HTMLElement): boolean {
+  onClick(target: Element): boolean {
     const collapse =
       target.closest<HTMLButtonElement>('[data-panel-collapse]')?.dataset.panelCollapse;
     if (collapse === 'left' || collapse === 'right') {

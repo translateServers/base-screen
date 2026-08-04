@@ -42,7 +42,7 @@ export class DesignerImportController {
       });
   }
 
-  onClick(target: HTMLElement): boolean {
+  onClick(target: Element): boolean {
     const action = target.closest<HTMLButtonElement>('[data-action]')?.dataset.action;
     if (action === 'import-cancel') {
       this.clear();

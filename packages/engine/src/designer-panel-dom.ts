@@ -81,8 +81,10 @@ export function renderDesignerDataPanel(
   const source = component.dataSource;
   const type = source?.type ?? 'none';
   const label = panel.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
   label.textContent = '数据源';
   const select = panel.ownerDocument.createElement('select');
+  select.className = 'designer-control designer-select';
   select.dataset.dataSourceType = component.id;
   for (const value of ['none', ...capabilities]) {
     const option = panel.ownerDocument.createElement('option');
@@ -227,9 +229,11 @@ function appendInput(
   min?: string,
 ): void {
   const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
   const input = parent.ownerDocument.createElement('input');
   input.type = type;
+  input.className = `designer-control designer-input${type === 'number' ? ' designer-number' : ''}`;
   input.value = String(value);
   input.dataset.property = property;
   if (min !== undefined) input.min = min;
@@ -244,9 +248,11 @@ function appendCheckbox(
   value: boolean,
 ): void {
   const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
   const input = parent.ownerDocument.createElement('input');
   input.type = 'checkbox';
+  input.className = 'designer-checkbox';
   input.checked = value;
   input.value = String(input.checked);
   input.dataset.property = property;
@@ -260,7 +266,13 @@ function appendCheckbox(
 function appendCanvasControls(parent: HTMLElement, document: ScreenDocument): void {
   appendCanvasInput(parent, '画布宽度', 'width', document.canvas.width, 'number');
   appendCanvasInput(parent, '画布高度', 'height', document.canvas.height, 'number');
-  appendCanvasInput(parent, '背景颜色', 'backgroundColor', document.canvas.backgroundColor);
+  appendCanvasInput(
+    parent,
+    '背景颜色',
+    'backgroundColor',
+    document.canvas.backgroundColor,
+    'color',
+  );
 }
 
 function appendCanvasInput(
@@ -271,9 +283,14 @@ function appendCanvasInput(
   type = 'text',
 ): void {
   const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
   const input = parent.ownerDocument.createElement('input');
   input.type = type;
+  input.className =
+    type === 'color'
+      ? 'designer-control designer-color'
+      : `designer-control designer-input${type === 'number' ? ' designer-number' : ''}`;
   input.value = String(value);
   input.dataset.canvasProperty = property;
   label.appendChild(input);
@@ -287,12 +304,17 @@ function appendDataInput(
   value: string,
 ): void {
   const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
   const input =
     field === 'static' || field === 'params'
       ? parent.ownerDocument.createElement('textarea')
       : parent.ownerDocument.createElement('input');
   input.value = value;
+  input.className =
+    field === 'static' || field === 'params'
+      ? 'designer-control designer-textarea'
+      : 'designer-control designer-input';
   input.dataset.dataSourceField = field;
   label.appendChild(input);
   parent.appendChild(label);
@@ -367,6 +389,7 @@ function appendPropControl(
   control: string,
 ): void {
   const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
   const input = createControl(parent.ownerDocument, value, schema, control);
   input.dataset.prop = prop;
@@ -383,11 +406,13 @@ function createControl(
   if (control === 'boolean') {
     const input = ownerDocument.createElement('input');
     input.type = 'checkbox';
+    input.className = 'designer-checkbox';
     input.checked = value === true;
     return input;
   }
   if (control === 'select' && schema.kind === 'enum') {
     const select = ownerDocument.createElement('select');
+    select.className = 'designer-control designer-select';
     for (const optionValue of schema.values) {
       const option = ownerDocument.createElement('option');
       option.value = String(optionValue);
@@ -399,11 +424,13 @@ function createControl(
   }
   if (control === 'json') {
     const input = ownerDocument.createElement('textarea');
+    input.className = 'designer-control designer-textarea';
     input.value = JSON.stringify(value);
     return input;
   }
   const input = ownerDocument.createElement('input');
   input.type = control === 'number' ? 'number' : 'text';
+  input.className = `designer-control designer-input${control === 'number' ? ' designer-number' : ''}`;
   input.value = String(value ?? '');
   return input;
 }

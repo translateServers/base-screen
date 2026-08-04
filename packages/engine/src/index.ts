@@ -624,12 +624,13 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#viewportController.connect(this.#viewportElement, this.#canvas);
     shadow.addEventListener('click', (event) => {
       const target = event.target;
-      if (target instanceof HTMLElement && this.executeToolFromTarget(target)) return;
-      if (target instanceof HTMLElement && this.executeOperationFromTarget(target)) return;
-      if (target instanceof HTMLElement && this.#importController.onClick(target)) return;
-      if (target instanceof HTMLElement && this.#projectFeedbackController.onClick(target)) return;
-      if (target instanceof HTMLElement && this.#integrationController.onClick(target)) return;
-      if (target instanceof HTMLElement && this.#workbenchController.onClick(target)) return;
+      if (!(target instanceof Element)) return;
+      if (this.executeToolFromTarget(target)) return;
+      if (this.executeOperationFromTarget(target)) return;
+      if (this.#importController.onClick(target)) return;
+      if (this.#projectFeedbackController.onClick(target)) return;
+      if (this.#integrationController.onClick(target)) return;
+      if (this.#workbenchController.onClick(target)) return;
       if (this.#layersController.onClick(event)) return;
       this.#panelController.onClick(event);
     });
@@ -710,7 +711,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#panelController.render(this.#properties, this.#dataPanel);
   }
 
-  private executeOperationFromTarget(target: HTMLElement): boolean {
+  private executeOperationFromTarget(target: Element): boolean {
     const id = target.closest<HTMLButtonElement>('[data-action]')?.dataset.action;
     if (id === undefined || this.#operations.get(id) === undefined) return false;
     this.#operations.execute(id, undefined);
@@ -755,7 +756,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     );
   }
 
-  private executeToolFromTarget(target: HTMLElement): boolean {
+  private executeToolFromTarget(target: Element): boolean {
     const tool = target.closest<HTMLButtonElement>('[data-tool]')?.dataset.tool as
       | DesignerToolId
       | undefined;

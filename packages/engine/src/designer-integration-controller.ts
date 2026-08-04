@@ -56,7 +56,7 @@ export class DesignerIntegrationController {
     }
   }
 
-  onClick(target: HTMLElement): boolean {
+  onClick(target: Element): boolean {
     const action = target.closest<HTMLButtonElement>('[data-action]')?.dataset.action;
     if (action === 'open-blueprint') {
       this.#blueprintOpen = true;

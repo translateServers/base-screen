@@ -19,6 +19,7 @@ export function renderDesignerEventsPanel(
   panel.appendChild(summary);
   const open = panel.ownerDocument.createElement('button');
   open.type = 'button';
+  open.className = 'designer-control designer-button';
   open.dataset.action = 'open-blueprint';
   open.disabled = getFocusedEventName(document, interaction, catalog) === undefined;
   open.textContent = '打开蓝图';
@@ -37,11 +38,13 @@ export function renderDesignerBlueprintWorkspace(
   heading.textContent = '蓝图';
   const add = workspace.ownerDocument.createElement('button');
   add.type = 'button';
+  add.className = 'designer-control designer-button';
   add.dataset.action = 'blueprint-add-rule';
   add.disabled = getFocusedEventName(document, interaction, catalog) === undefined;
   add.textContent = '添加规则';
   const close = workspace.ownerDocument.createElement('button');
   close.type = 'button';
+  close.className = 'designer-control designer-button';
   close.dataset.action = 'close-blueprint';
   close.textContent = '关闭';
   heading.append(add, close);
@@ -52,6 +55,7 @@ export function renderDesignerBlueprintWorkspace(
     item.textContent = `${rule.trigger.componentId}.${rule.trigger.eventName}，${rule.actions.length} 个动作`;
     const remove = workspace.ownerDocument.createElement('button');
     remove.type = 'button';
+    remove.className = 'designer-control designer-button';
     remove.dataset.blueprintRemoveRule = rule.id;
     remove.textContent = '移除';
     item.appendChild(remove);
