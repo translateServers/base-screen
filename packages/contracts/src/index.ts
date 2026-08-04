@@ -19,10 +19,12 @@ export type {
 export type {
   ScreenBlueprint,
   ScreenBlueprintAction,
+  ScreenBlueprintCondition,
   ScreenBlueprintEmitHostEventAction,
   ScreenBlueprintMaterialEventTrigger,
   ScreenBlueprintRule,
   ScreenBlueprintSetVariableAction,
+  ScreenBlueprintValueExpression,
   ScreenCanvas,
   ScreenComponentDataSource,
   ScreenComponentNode,
@@ -44,6 +46,7 @@ export type {
   ScreenHostResourceResolveOptions,
   ScreenProjectAdapter,
   ScreenProjectLoadRequest,
+  ScreenProjectPublishRequest,
   ScreenProjectSaveRequest,
 } from './types/host.js';
 export type { ScreenJsonObject, ScreenJsonValue } from './types/json.js';

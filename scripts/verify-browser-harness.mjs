@@ -99,11 +99,15 @@ try {
         if (undone.x !== before.x || undone.y !== before.y) {
           throw new Error('BROWSER_HARNESS_UNDO_FAILED');
         }
-        const saved = await page.evaluate(async () => ({
-          result: await window.baseScreenHarness.designer.save(),
+        await designer.getByTitle('Save project').click({ force: true });
+        await page.waitForFunction(() => window.baseScreenHarness.getEnvelope().revision === '2');
+        const saved = await page.evaluate(() => ({
           revision: window.baseScreenHarness.getEnvelope().revision,
+          status:
+            window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
+              ?.textContent,
         }));
-        if (!saved.result.ok || saved.revision !== '2') {
+        if (saved.revision !== '2' || saved.status !== 'ready') {
           throw new Error('BROWSER_HARNESS_SAVE_FAILED');
         }
       }

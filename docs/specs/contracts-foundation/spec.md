@@ -8,7 +8,10 @@
 
 `@base-screen/contracts` owns one current `ScreenDocument` contract plus its parser,
 diagnostics, canonical serializer, JSON Schema artifact, host ports, and project envelope.
-It has no workspace dependencies, DOM dependencies, registration side effects, or host I/O.
+It has no workspace dependencies, DOM dependencies, registration side effects, or host I/O. The
+Project Adapter requests, publish capability, opaque revision envelope, abort signal, and stable
+`PROJECT_*` diagnostics are public host-port contracts defined by
+[ADR-0012](../../decisions/ADR-0012-designer-project-lifecycle.md).
 
 The canonical root is strictly:
 

@@ -11,6 +11,15 @@ import {
 } from '@base-screen/plugin-core';
 import type { BaseScreenPluginManagerOptions, BaseScreenPluginManagerSnapshot } from './types.js';
 
+const SUPPORTED_BLUEPRINT_CAPABILITIES = new Set([
+  'blueprint.trigger.material-event',
+  'blueprint.value.event-payload',
+  'blueprint.value.variable',
+  'blueprint.condition.compare',
+  'blueprint.action.set-variable',
+  'blueprint.action.emit-host-event',
+]);
+
 export interface ActivationSession {
   readonly context: BaseScreenPluginActivationContext;
   invalidate(): void;
@@ -356,6 +365,26 @@ function validateContributions(
           ),
         );
       }
+      if (contribution.kind === 'blueprintCapability') {
+        if (!SUPPORTED_BLUEPRINT_CAPABILITIES.has(contribution.id)) {
+          diagnostics.push(
+            diagnostic(
+              'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+              ['plugins', candidate.index, 'manifest', 'contributions', index],
+              'Blueprint contribution is not supported by this host.',
+            ),
+          );
+        }
+        if (!candidate.manifest.capabilities.includes(contribution.id)) {
+          diagnostics.push(
+            diagnostic(
+              'PLUGIN_CORE_CAPABILITY_UNDECLARED',
+              ['plugins', candidate.index, 'manifest', 'contributions', index],
+              'Blueprint contribution requires a declared capability.',
+            ),
+          );
+        }
+      }
     }
   }
 }
@@ -377,12 +406,23 @@ function validateCapabilities(
             'Plugin capability is not approved by the host.',
           ),
         );
-      } else if (capability !== 'command.execute' || createCommandPort === undefined) {
+      } else if (capability === 'command.execute' && createCommandPort === undefined) {
         diagnostics.push(
           diagnostic(
             'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
             ['plugins', candidate.index, 'manifest', 'capabilities'],
-            'Plugin capability has no compatible port factory.',
+            'Plugin command capability has no compatible port factory.',
+          ),
+        );
+      } else if (
+        capability !== 'command.execute' &&
+        !SUPPORTED_BLUEPRINT_CAPABILITIES.has(capability)
+      ) {
+        diagnostics.push(
+          diagnostic(
+            'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
+            ['plugins', candidate.index, 'manifest', 'capabilities'],
+            'Plugin capability is not supported by this host.',
           ),
         );
       }

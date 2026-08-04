@@ -17,6 +17,7 @@ import {
   type BaseScreenMaterialElement,
   type BaseScreenMaterialMode,
   type BaseScreenMaterialModel,
+  type BaseScreenMaterialObjectSchema,
   parseBaseScreenMaterialEventDetail,
   validateBaseScreenMaterialProps,
 } from '@base-screen/plugin-core';
@@ -35,6 +36,11 @@ export interface CreateBaseScreenRendererOptions {
   readonly interactive: boolean;
   readonly onMaterialEvent: ((event: BaseScreenMaterialEvent) => void) | undefined;
   readonly resourcePort: ScreenHostResourcePort | undefined;
+  readonly resourceTimeoutMs?: number;
+  readonly resourceTypes?: ReadonlyMap<
+    string,
+    { readonly configSchema: BaseScreenMaterialObjectSchema }
+  >;
 }
 
 export interface BaseScreenRenderer {
@@ -61,13 +67,18 @@ type MountedMaterial = {
   readonly onEvent: (event: Event) => void;
   resourceGeneration: number;
   resourceController: AbortController | undefined;
+  resourceTimer: ReturnType<typeof setTimeout> | undefined;
 };
 
 class Renderer implements BaseScreenRenderer {
   #mounted = new Map<string, MountedMaterial>();
   #disposed = false;
 
-  constructor(private readonly options: CreateBaseScreenRendererOptions) {}
+  constructor(private readonly options: CreateBaseScreenRendererOptions) {
+    if (!isResourceTimeoutValid(options.resourceTimeoutMs ?? 15_000)) {
+      throw new RangeError('resourceTimeoutMs must be an integer between 100 and 60000.');
+    }
+  }
 
   render(document: ScreenDocument): ScreenParseResult<null> {
     if (this.#disposed) {
@@ -82,6 +93,7 @@ class Renderer implements BaseScreenRenderer {
       this.options.catalog,
       this.options.mode,
       this.options.interactive,
+      this.options.resourceTypes,
     );
     if (!prepared.ok) {
       return prepared;
@@ -115,6 +127,7 @@ class Renderer implements BaseScreenRenderer {
         onEvent,
         resourceGeneration: 0,
         resourceController: undefined,
+        resourceTimer: undefined,
       });
     }
     for (const [componentId, mounted] of this.#mounted) {
@@ -186,10 +199,18 @@ class Renderer implements BaseScreenRenderer {
     if (source === null || source.type !== 'host-resource') {
       return;
     }
+    cancelResource(mounted);
     const generation = ++mounted.resourceGeneration;
-    mounted.resourceController?.abort();
     const controller = new AbortController();
     mounted.resourceController = controller;
+    mounted.resourceTimer = setTimeout(() => {
+      controller.abort();
+      this.applyResourceResult(candidate, mounted, generation, {
+        status: 'error',
+        code: 'HOST_RESOURCE_TIMEOUT',
+        message: 'Host resource request timed out.',
+      });
+    }, this.options.resourceTimeoutMs ?? 15_000);
     if (this.options.resourcePort === undefined) {
       this.applyResourceResult(candidate, mounted, generation, {
         status: 'error',
@@ -246,14 +267,27 @@ class Renderer implements BaseScreenRenderer {
     ) {
       return;
     }
+    if (mounted.resourceTimer !== undefined) {
+      clearTimeout(mounted.resourceTimer);
+      mounted.resourceTimer = undefined;
+    }
+    mounted.resourceController = undefined;
     mounted.element.model = { ...candidate.model, dataState };
   }
 }
 
 function cancelResource(mounted: MountedMaterial): void {
   mounted.resourceGeneration++;
+  if (mounted.resourceTimer !== undefined) {
+    clearTimeout(mounted.resourceTimer);
+    mounted.resourceTimer = undefined;
+  }
   mounted.resourceController?.abort();
   mounted.resourceController = undefined;
+}
+
+function isResourceTimeoutValid(value: number): boolean {
+  return Number.isInteger(value) && value >= 100 && value <= 60_000;
 }
 
 function prepareCandidates(
@@ -261,6 +295,9 @@ function prepareCandidates(
   catalog: BaseScreenMaterialCatalog,
   mode: BaseScreenMaterialMode,
   interactive: boolean,
+  resourceTypes:
+    | ReadonlyMap<string, { readonly configSchema: BaseScreenMaterialObjectSchema }>
+    | undefined,
 ): ScreenParseResult<readonly RenderCandidate[]> {
   const candidates: RenderCandidate[] = [];
   const diagnostics: ScreenDiagnostic[] = [];
@@ -298,7 +335,7 @@ function prepareCandidates(
       );
       continue;
     }
-    const dataState = getDataState(component, entry, index, diagnostics);
+    const dataState = getDataState(component, entry, index, diagnostics, resourceTypes);
     if (dataState === undefined) {
       continue;
     }
@@ -326,6 +363,9 @@ function getDataState(
   entry: BaseScreenMaterialCatalogEntry,
   index: number,
   diagnostics: ScreenDiagnostic[],
+  resourceTypes:
+    | ReadonlyMap<string, { readonly configSchema: BaseScreenMaterialObjectSchema }>
+    | undefined,
 ): BaseScreenMaterialDataState | undefined {
   if (component.dataSource === null) {
     return { status: 'idle' };
@@ -345,6 +385,29 @@ function getDataState(
     return undefined;
   }
   if (component.dataSource.type === 'host-resource') {
+    const schema = resourceTypes?.get(component.dataSource.resourceType);
+    if (resourceTypes !== undefined && schema === undefined) {
+      diagnostics.push(
+        diagnostic(
+          'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+          ['components', index, 'dataSource', 'resourceType'],
+          'Host resource type is not enabled by an active plugin contribution.',
+        ),
+      );
+      return undefined;
+    }
+    if (schema !== undefined) {
+      const params = validateBaseScreenMaterialProps(
+        component.dataSource.params,
+        schema.configSchema,
+      );
+      if (!params.ok) {
+        diagnostics.push(
+          ...prefixDiagnostics(params.diagnostics, ['components', index, 'dataSource', 'params']),
+        );
+        return undefined;
+      }
+    }
     return { status: 'loading' };
   }
   const parsed = parseScreenJsonValue(component.dataSource.value, { maxBytes: 1024 * 1024 });

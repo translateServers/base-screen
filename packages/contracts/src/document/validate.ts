@@ -45,10 +45,17 @@ const STATIC_DATA_SOURCE_FIELDS = new Set(['type', 'value']);
 const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set(['type', 'resourceType', 'resourceId', 'params']);
 const VARIABLE_FIELDS = new Set(['type', 'name', 'value']);
 const BLUEPRINT_FIELDS = new Set(['rules']);
-const BLUEPRINT_RULE_FIELDS = new Set(['id', 'trigger', 'actions']);
+const BLUEPRINT_RULE_FIELDS = new Set([
+  'id',
+  'trigger',
+  'requiredCapabilities',
+  'condition',
+  'actions',
+]);
 const BLUEPRINT_TRIGGER_FIELDS = new Set(['type', 'componentId', 'eventName']);
 const SET_VARIABLE_ACTION_FIELDS = new Set(['type', 'variableName', 'value']);
 const EMIT_HOST_EVENT_ACTION_FIELDS = new Set(['type', 'eventName', 'payload']);
+const BLUEPRINT_CONDITION_FIELDS = new Set(['left', 'operator', 'right']);
 
 type ZodIssueLike = {
   readonly path: readonly PropertyKey[];
@@ -377,6 +384,18 @@ function validateBlueprint(
           rule.trigger,
           BLUEPRINT_TRIGGER_FIELDS,
           at([...base, 'trigger']),
+          collector,
+          phase,
+        )
+      ) {
+        continue;
+      }
+      if (
+        isJsonObject(rule.condition) &&
+        !checkStrictObjectKeys(
+          rule.condition,
+          BLUEPRINT_CONDITION_FIELDS,
+          at([...base, 'condition']),
           collector,
           phase,
         )

@@ -53,6 +53,41 @@ describe('parseScreenDocument', () => {
     }
   });
 
+  it('rejects legacy raw blueprint action values and invalid condition right placement', () => {
+    const rawValue = document({
+      components: [component({ id: 'button' })],
+      variables: [{ type: 'static', name: 'count', value: 0 }],
+      blueprint: {
+        rules: [
+          {
+            id: 'raw',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            actions: [{ type: 'set-variable', variableName: 'count', value: 1 }],
+          },
+        ],
+      },
+    });
+    const existsWithRight = document({
+      components: [component({ id: 'button' })],
+      blueprint: {
+        rules: [
+          {
+            id: 'exists',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            condition: {
+              left: { kind: 'literal', value: true },
+              operator: 'exists',
+              right: { kind: 'literal', value: true },
+            },
+            actions: [],
+          },
+        ],
+      },
+    });
+    expect(parse(rawValue).ok).toBe(false);
+    expect(parse(existsWithRight).ok).toBe(false);
+  });
+
   it('parses multiple roots and parents declared after children', () => {
     const input = document({
       components: [
@@ -83,7 +118,13 @@ describe('parseScreenDocument', () => {
           {
             id: 'refresh',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
-            actions: [{ type: 'set-variable', variableName: 'count', value: 1 }],
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'count',
+                value: { kind: 'literal', value: 1 },
+              },
+            ],
           },
         ],
       },

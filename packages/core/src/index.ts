@@ -47,6 +47,10 @@ export type {
   ScreenVector,
 } from './geometry/types.js';
 export {
+  buildComponentIndex,
+  getPainterOrder,
+} from './hierarchy/hierarchy.js';
+export {
   isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
 } from './hierarchy/query.js';

@@ -1,6 +1,7 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenPluginCatalogEntry,
+  type BaseScreenPluginContribution,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
 } from '@base-screen/plugin-core';
@@ -111,6 +112,7 @@ class PluginManager implements BaseScreenPluginManager {
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
       plugins: createBaseScreenPluginCatalog(pluginEntries),
+      contributions: createRuntimeContributionIndex(pluginEntries),
     };
     this.#status = 'active';
     return { ok: true, value: this.#snapshot, diagnostics: [] };
@@ -156,6 +158,27 @@ class PluginManager implements BaseScreenPluginManager {
       ? { ok: true, value: null, diagnostics: [] }
       : failureResult(diagnostics);
   }
+}
+
+function createRuntimeContributionIndex(entries: readonly BaseScreenPluginCatalogEntry[]) {
+  const resourceTypes = new Map<
+    string,
+    BaseScreenPluginContribution & { readonly kind: 'dataResourceType' }
+  >();
+  const blueprintCapabilities = new Set<string>();
+  for (const entry of entries) {
+    for (const contribution of entry.contributions) {
+      if (contribution.kind === 'dataResourceType') {
+        resourceTypes.set(contribution.id, contribution);
+      } else if (
+        contribution.kind === 'blueprintCapability' &&
+        entry.grantedCapabilities.includes(contribution.id)
+      ) {
+        blueprintCapabilities.add(contribution.id);
+      }
+    }
+  }
+  return { resourceTypes, blueprintCapabilities };
 }
 
 async function deactivateEntries(

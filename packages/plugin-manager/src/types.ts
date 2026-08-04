@@ -3,6 +3,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
+  BaseScreenPluginContribution,
   BaseScreenPluginRuntime,
   PluginCommandPort,
 } from '@base-screen/plugin-core';
@@ -16,9 +17,18 @@ export type BaseScreenPluginManagerStatus =
   | 'disposing'
   | 'disposed';
 
+export interface BaseScreenRuntimeContributionIndex {
+  readonly resourceTypes: ReadonlyMap<
+    string,
+    BaseScreenPluginContribution & { readonly kind: 'dataResourceType' }
+  >;
+  readonly blueprintCapabilities: ReadonlySet<string>;
+}
+
 export interface BaseScreenPluginManagerSnapshot {
   readonly materials: BaseScreenMaterialCatalog;
   readonly plugins: BaseScreenPluginCatalog;
+  readonly contributions: BaseScreenRuntimeContributionIndex;
 }
 
 export interface BaseScreenCustomElementRegistryPort {

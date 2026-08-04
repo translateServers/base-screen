@@ -1,9 +1,9 @@
 # Designer Authoring And Project Lifecycle Spec
 
-> 状态：设计中
+> 状态：生效中
 > 最近更新：2026-08-04
 > 定位：以 Nebula Designer 的可观察样式与功能为兼容基准，增量冻结 Base Screen Designer 与项目生命周期
-> 依据：[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[Designer Engine Spec](../designer-engine/spec.md)、[Core Domain Spec](../core-domain/spec.md)、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)
+> 依据：[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0012](../../decisions/ADR-0012-designer-project-lifecycle.md)、[Designer Engine Spec](../designer-engine/spec.md)、[Core Domain Spec](../core-domain/spec.md)、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)
 > 来源：[Nebula Designer Parity Provenance](../../provenance/nebula-designer-parity.md)
 > 实施：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
@@ -25,15 +25,18 @@ Engine 还没有把这些能力组装为可用设计器，项目会话也没有 
 
 ## 2. 生效前置
 
-- 新增 Project Lifecycle ADR，冻结 `ScreenProjectAdapter` 的 publish、AbortSignal、冲突和 retry
-  所有权；ADR-0006 只确认 adapter 显式存在，没有定义这些公共语义。
-- Public adapter/result/diagnostic 变更同步 Contracts Foundation Spec；不得只在 Engine 私有类型中
-  增加兼容分支。
-- grouping 若需要自动创建容器，宿主必须显式配置已启用且 `designCapabilities.children=true` 的
+- [ADR-0012](../../decisions/ADR-0012-designer-project-lifecycle.md) 已接受，冻结
+  `ScreenProjectAdapter` 的 publish、AbortSignal、冲突、retry 和 baseline 所有权；ADR-0006 继续只
+  定义 Engine DOM 与手势边界。
+- Public adapter/result/diagnostic 变更同步 Contracts Foundation、Core Domain 和 Designer Engine
+  Spec；不得只在 Engine 私有类型中增加兼容分支。
+- grouping 自动创建容器时，宿主必须显式配置已启用且 `designCapabilities.children=true` 的
   `groupMaterialType`；不得向 canonical document 偷渡 synthetic node。
-- 本 Spec 评审生效后才能实施；现有 load/save 行为在此之前保持原样。
-- Nebula 参考 commit、路径、许可状态和 no-copy 结论必须记录在 provenance；当前参考仓库没有可
-  确认的 LICENSE，因此不得复制其 TypeScript、JSX、CSS、配置、SVG、字体或测试资产。
+- `toolMaterialTypes` 是 Engine 配置的显式映射；缺失、未启用或能力不兼容的工具必须 disabled。
+- direct-document baseline 是 document-only canonical baseline；save pending 的响应只在 current
+  document 仍等于 submitted snapshot 时替换 present，否则仅推进 submitted baseline。
+- Nebula 参考 commit、路径、许可状态和 no-copy 结论已记录在 provenance；当前参考仓库没有可确认的
+  LICENSE，因此不得复制其 TypeScript、JSX、CSS、配置、SVG、字体或测试资产。
 
 ## 3. 目标
 

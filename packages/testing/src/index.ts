@@ -1,5 +1,11 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 
+export {
+  type HostResourceConformanceHarness,
+  type HostResourceConformanceResult,
+  runHostResourceConformance,
+} from './host-resource.js';
+
 export function createMinimalScreenDocument(): ScreenDocument {
   return {
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },

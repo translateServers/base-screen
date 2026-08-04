@@ -62,16 +62,32 @@ export interface ScreenBlueprintMaterialEventTrigger {
   readonly eventName: string;
 }
 
+export type ScreenBlueprintValueExpression =
+  | { readonly kind: 'literal'; readonly value: ScreenJsonValue }
+  | { readonly kind: 'event-payload'; readonly path: readonly string[] }
+  | { readonly kind: 'variable'; readonly name: string }
+  | { readonly kind: 'array'; readonly items: readonly ScreenBlueprintValueExpression[] }
+  | {
+      readonly kind: 'object';
+      readonly properties: Readonly<Record<string, ScreenBlueprintValueExpression>>;
+    };
+
+export interface ScreenBlueprintCondition {
+  readonly left: ScreenBlueprintValueExpression;
+  readonly operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
+  readonly right?: ScreenBlueprintValueExpression;
+}
+
 export interface ScreenBlueprintSetVariableAction {
   readonly type: 'set-variable';
   readonly variableName: string;
-  readonly value: ScreenJsonValue;
+  readonly value: ScreenBlueprintValueExpression;
 }
 
 export interface ScreenBlueprintEmitHostEventAction {
   readonly type: 'emit-host-event';
   readonly eventName: string;
-  readonly payload: ScreenJsonValue;
+  readonly payload: ScreenBlueprintValueExpression;
 }
 
 export type ScreenBlueprintAction =
@@ -81,6 +97,8 @@ export type ScreenBlueprintAction =
 export interface ScreenBlueprintRule {
   readonly id: string;
   readonly trigger: ScreenBlueprintMaterialEventTrigger;
+  readonly requiredCapabilities?: readonly string[];
+  readonly condition?: ScreenBlueprintCondition;
   readonly actions: readonly ScreenBlueprintAction[];
 }
 

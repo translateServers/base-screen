@@ -1,31 +1,45 @@
-import {
-  parseScreenDocument,
-  type ScreenDiagnostic,
-  type ScreenDocument,
-  type ScreenHostResourcePort,
-  type ScreenParseResult,
-  type ScreenProjectAdapter,
-  type ScreenProjectEnvelope,
+export {
+  ScreenProjectController,
+  type ScreenProjectControllerChange,
+  type ScreenProjectControllerOptions,
+  type ScreenProjectPhase,
+  type ScreenProjectScheduler,
+} from './project-controller.js';
+
+import type {
+  ScreenDiagnostic,
+  ScreenDocument,
+  ScreenHostResourcePort,
+  ScreenParseResult,
+  ScreenProjectAdapter,
+  ScreenProjectEnvelope,
 } from '@base-screen/contracts';
 import {
-  applyScreenDocumentCommand,
-  commitScreenHistory,
-  createScreenHistory,
-  getScreenComponentBounds,
-  redoScreenHistory,
-  reduceScreenInteraction,
-  reduceScreenViewport,
   type ScreenDocumentCommand,
-  type ScreenHistoryState,
-  type ScreenInteractionState,
-  type ScreenViewportState,
-  undoScreenHistory,
+  type ScreenDocumentTransaction,
+  type ScreenInteractionAction,
 } from '@base-screen/core';
-import type {
-  BaseScreenMaterialCatalog,
-  BaseScreenMaterialCatalogEntry,
-} from '@base-screen/plugin-core';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '@base-screen/renderer';
+import { DesignerGestureController } from './designer-gesture-controller.js';
+import { DesignerLayersController } from './designer-layers-controller.js';
+import {
+  type BaseScreenAlignment,
+  type BaseScreenDistribution,
+  createReparentTransaction,
+} from './designer-layout-operations.js';
+import { DesignerPanelController } from './designer-panel-controller.js';
+import { selectedComponents } from './designer-selection.js';
+import { renderDesignerSelection } from './designer-selection-dom.js';
+import { DesignerSession } from './designer-session.js';
+import { createDesignerStyle } from './designer-style.js';
+import {
+  type DesignerToolId,
+  type DesignerToolMaterialTypes,
+  updateDesignerTools,
+} from './designer-tools.js';
+import { DesignerViewportController } from './designer-viewport-controller.js';
+import { createDesignerWorkspace } from './designer-workspace.js';
 
 const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
@@ -34,59 +48,120 @@ const ElementBase =
 export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
-  #projectAdapter: ScreenProjectAdapter | undefined;
-  #project: ScreenProjectEnvelope | undefined;
-  #document: ScreenDocument | undefined;
-  #history: ScreenHistoryState | undefined;
-  #interaction: ScreenInteractionState = { selectedComponentIds: [], focusedComponentId: null };
-  #viewport: ScreenViewportState = { zoom: 1, offset: { x: 0, y: 0 } };
+  #groupMaterialType: string | undefined;
+  #toolMaterialTypes: DesignerToolMaterialTypes | undefined;
+  #activeTool: DesignerToolId = 'select';
   #renderer: BaseScreenRenderer | undefined;
   #canvas: HTMLDivElement | undefined;
+  #viewportElement: HTMLDivElement | undefined;
   #selection: HTMLDivElement | undefined;
   #properties: HTMLDivElement | undefined;
-  #drag:
-    | {
-        readonly componentId: string;
-        readonly pointerId: number;
-        readonly startClientX: number;
-        readonly startClientY: number;
-        readonly startX: number;
-        readonly startY: number;
-        readonly element: HTMLElement;
-      }
-    | undefined;
+  #layers: HTMLDivElement | undefined;
+  #projectConflict: HTMLElement | undefined;
+  #reloadConfirmationPending = false;
+  readonly #session = new DesignerSession({
+    renderDocument: (document) => this.renderDocument(document),
+    renderInteraction: () => this.renderInteraction(),
+    emitChange: (document) => this.emitChange(document),
+    emitSelectionChange: (interaction) =>
+      this.dispatchEvent(new CustomEvent('base-screen-selection-change', { detail: interaction })),
+    onProjectChange: (_project, phase) => {
+      this.toggleAttribute('data-project-busy', phase === 'saving' || phase === 'publishing');
+      if (this.#projectConflict !== undefined) this.#projectConflict.hidden = phase !== 'conflict';
+      if (phase !== 'conflict') this.#reloadConfirmationPending = false;
+      this.renderProjectStatus();
+    },
+    onDirtyChange: (dirty, revision) =>
+      this.dispatchEvent(
+        new CustomEvent('base-screen-dirty-change', { detail: { dirty, revision } }),
+      ),
+    onConflict: () => this.dispatchEvent(new CustomEvent('base-screen-project-conflict')),
+    onReady: ({ projectId, revision }) =>
+      this.dispatchEvent(new CustomEvent('base-screen-ready', { detail: { projectId, revision } })),
+  });
+  readonly #gestureController = new DesignerGestureController({
+    getCatalog: () => this.#catalog,
+    getDocument: () => this.#session.document,
+    getInteraction: () => this.#session.interaction,
+    getViewport: () => this.#viewportController.state,
+    panBy: (delta) => this.#viewportController.panBy(delta),
+    isHandActive: () => this.#viewportController.activeTool === 'hand',
+    reduceSelection: (action) => this.#session.reduceSelection(action),
+    reportTransaction: (transaction) => this.report(this.#session.executeTransaction(transaction)),
+    renderSelection: () => this.renderSelection(),
+  });
+  readonly #layersController = new DesignerLayersController({
+    getCatalog: () => this.#catalog,
+    getDocument: () => this.#session.document,
+    getInteraction: () => this.#session.interaction,
+    executeTransaction: (transaction) => this.#session.executeTransaction(transaction),
+    reduceSelection: (action) => this.#session.reduceSelection(action),
+    emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
+  });
+  readonly #panelController = new DesignerPanelController({
+    getCatalog: () => this.#catalog,
+    getDocument: () => this.#session.document,
+    getGroupMaterialType: () => this.#groupMaterialType,
+    getInteraction: () => this.#session.interaction,
+    canRedo: () => this.#session.canRedo,
+    canUndo: () => this.#session.canUndo,
+    executeCommand: (command) => this.#session.executeCommand(command),
+    executeTransaction: (transaction) => this.#session.executeTransaction(transaction),
+    reduceSelection: (action) => this.#session.reduceSelection(action),
+    redo: () => this.#session.redo(),
+    setZoom: (zoom) => this.#viewportController.setZoom(zoom),
+    undo: () => this.#session.undo(),
+    getZoom: () => this.#viewportController.state.zoom,
+    emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
+  });
+  readonly #viewportController = new DesignerViewportController({
+    getDocument: () => this.#session.document,
+    onToolChange: (tool) => {
+      this.#activeTool = tool;
+      this.renderControls();
+    },
+  });
 
   get catalog(): BaseScreenMaterialCatalog | undefined {
     return this.#catalog;
   }
 
-  get projectAdapter(): ScreenProjectAdapter | undefined {
-    return this.#projectAdapter;
-  }
-
-  set projectAdapter(value: ScreenProjectAdapter | undefined) {
-    if (this.#project !== undefined && value !== this.#projectAdapter) {
-      this.emitDiagnostics([
-        diagnostic(
-          'PLUGIN_CORE_LIFECYCLE_INVALID',
-          [],
-          'Project adapter cannot change while loaded.',
-        ),
-      ]);
-      return;
-    }
-    this.#projectAdapter = value;
-  }
-
   set catalog(value: BaseScreenMaterialCatalog | undefined) {
-    if (this.#document !== undefined && value !== this.#catalog) {
-      this.emitDiagnostics([
-        diagnostic('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Catalog cannot change while loaded.'),
-      ]);
+    if (this.#session.document !== undefined && value !== this.#catalog) {
+      this.emitDiagnostics([lifecycleDiagnostic('Catalog cannot change while loaded.')]);
       return;
     }
     this.#catalog = value;
     this.initialize();
+  }
+
+  get projectAdapter(): ScreenProjectAdapter | undefined {
+    return this.#session.adapter;
+  }
+
+  set projectAdapter(value: ScreenProjectAdapter | undefined) {
+    const bound = this.#session.bindProjectAdapter(value);
+    if (!bound.ok) {
+      this.emitDiagnostics(bound.diagnostics);
+    }
+  }
+
+  get toolMaterialTypes(): DesignerToolMaterialTypes | undefined {
+    return this.#toolMaterialTypes;
+  }
+
+  set toolMaterialTypes(value: DesignerToolMaterialTypes | undefined) {
+    this.#toolMaterialTypes = value;
+    this.renderControls();
+  }
+
+  get groupMaterialType(): string | undefined {
+    return this.#groupMaterialType;
+  }
+
+  set groupMaterialType(value: string | undefined) {
+    this.#groupMaterialType = value;
+    this.renderControls();
   }
 
   get resourcePort(): ScreenHostResourcePort | undefined {
@@ -94,21 +169,15 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   set resourcePort(value: ScreenHostResourcePort | undefined) {
-    if (this.#document !== undefined && value !== this.#resourcePort) {
-      this.emitDiagnostics([
-        diagnostic(
-          'PLUGIN_CORE_LIFECYCLE_INVALID',
-          [],
-          'Resource port cannot change while loaded.',
-        ),
-      ]);
+    if (this.#session.document !== undefined && value !== this.#resourcePort) {
+      this.emitDiagnostics([lifecycleDiagnostic('Resource port cannot change while loaded.')]);
       return;
     }
     this.#resourcePort = value;
   }
 
   get document(): ScreenDocument | undefined {
-    return this.#document;
+    return this.#session.document;
   }
 
   set document(value: ScreenDocument | undefined) {
@@ -116,195 +185,110 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.unload();
       return;
     }
-    const result = this.replaceDocument(value);
-    if (!result.ok) {
-      this.emitDiagnostics(result.diagnostics);
-    }
+    this.cancelGesture();
+    this.report(this.#session.replaceDocument(value));
   }
 
   connectedCallback(): void {
     this.initialize();
   }
 
+  disconnectedCallback(): void {
+    this.cancelGesture();
+    this.#session.cancelProjectOperation();
+  }
+
   getDocument(): ScreenDocument | undefined {
-    return this.#document;
+    return this.#session.document;
   }
 
   replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument> {
-    const parsed = parseScreenDocument(document);
-    if (!parsed.ok) {
-      return parsed;
-    }
-    this.initialize();
-    if (this.#renderer !== undefined) {
-      const rendered = this.#renderer.render(parsed.value);
-      if (!rendered.ok) {
-        return { ok: false, diagnostics: rendered.diagnostics };
-      }
-    }
-    this.#document = parsed.value;
-    this.#history = createScreenHistory(parsed.value);
-    this.#interaction = reduceScreenInteraction(
-      this.#interaction,
-      { type: 'reconcile-document' },
-      parsed.value,
-    );
-    this.renderSelection();
-    this.renderProperties();
-    this.emitChange();
-    return { ok: true, value: parsed.value, diagnostics: [] };
+    this.cancelGesture();
+    return this.#session.replaceDocument(document);
   }
 
   executeCommand(command: ScreenDocumentCommand): ScreenParseResult<ScreenDocument> {
-    if (
-      this.#document === undefined ||
-      this.#history === undefined ||
-      this.#renderer === undefined
-    ) {
-      return failure(
-        'PLUGIN_CORE_LIFECYCLE_INVALID',
-        [],
-        'Designer must be connected with a catalog and document.',
-      );
-    }
-    const result = applyScreenDocumentCommand(this.#document, command);
-    if (!result.ok) {
-      return { ok: false, diagnostics: result.diagnostics };
-    }
-    const rendered = this.#renderer.render(result.document);
-    if (!rendered.ok) {
-      return { ok: false, diagnostics: rendered.diagnostics };
-    }
-    this.#document = result.document;
-    this.#history = commitScreenHistory(this.#history, result.document);
-    this.#interaction = reduceScreenInteraction(
-      this.#interaction,
-      { type: 'reconcile-document' },
-      result.document,
-    );
-    this.renderSelection();
-    this.renderProperties();
-    this.emitChange();
-    return { ok: true, value: result.document, diagnostics: [] };
+    return this.#session.executeCommand(command);
+  }
+
+  executeTransaction(transaction: ScreenDocumentTransaction): ScreenParseResult<ScreenDocument> {
+    return this.#session.executeTransaction(transaction);
+  }
+
+  group(): ScreenParseResult<ScreenDocument> {
+    return this.#panelController.group();
+  }
+
+  ungroup(): ScreenParseResult<ScreenDocument> {
+    return this.#panelController.ungroup();
+  }
+
+  reparent(
+    componentIds: readonly string[],
+    parentId: string | null,
+  ): ScreenParseResult<ScreenDocument> {
+    return this.#session.executeTransaction(createReparentTransaction(componentIds, parentId));
+  }
+
+  align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument> {
+    return this.#panelController.align(alignment);
+  }
+
+  distribute(distribution: BaseScreenDistribution): ScreenParseResult<ScreenDocument> {
+    return this.#panelController.distribute(distribution);
+  }
+
+  copy(): void {
+    this.#panelController.copy();
+    this.renderControls();
+  }
+
+  paste(): ScreenParseResult<ScreenDocument> {
+    return this.#panelController.paste();
   }
 
   undo(): ScreenParseResult<ScreenDocument> {
-    if (this.#history === undefined || this.#renderer === undefined) {
-      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Designer has no loaded history.');
-    }
-    const next = undoScreenHistory(this.#history);
-    const rendered = this.#renderer.render(next.present);
-    if (!rendered.ok) {
-      return { ok: false, diagnostics: rendered.diagnostics };
-    }
-    this.#history = next;
-    this.#document = next.present;
-    this.#interaction = reduceScreenInteraction(
-      this.#interaction,
-      { type: 'reconcile-document' },
-      next.present,
-    );
-    this.renderSelection();
-    this.renderProperties();
-    this.emitChange();
-    return { ok: true, value: next.present, diagnostics: [] };
+    return this.#session.undo();
   }
 
   redo(): ScreenParseResult<ScreenDocument> {
-    if (this.#history === undefined || this.#renderer === undefined) {
-      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Designer has no loaded history.');
-    }
-    const next = redoScreenHistory(this.#history);
-    const rendered = this.#renderer.render(next.present);
-    if (!rendered.ok) {
-      return { ok: false, diagnostics: rendered.diagnostics };
-    }
-    this.#history = next;
-    this.#document = next.present;
-    this.#interaction = reduceScreenInteraction(
-      this.#interaction,
-      { type: 'reconcile-document' },
-      next.present,
-    );
-    this.renderSelection();
-    this.renderProperties();
-    this.emitChange();
-    return { ok: true, value: next.present, diagnostics: [] };
+    return this.#session.redo();
   }
 
-  async load(projectId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    if (this.#projectAdapter === undefined) {
-      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Designer has no project adapter.');
-    }
-    let loaded: ScreenParseResult<ScreenProjectEnvelope>;
-    try {
-      loaded = await this.#projectAdapter.load({ projectId });
-    } catch {
-      return failure('ENVELOPE_INVALID', [], 'Project adapter load failed.');
-    }
-    if (!loaded.ok) {
-      return loaded;
-    }
-    const replacement = this.replaceDocument(loaded.value.document);
-    if (!replacement.ok) {
-      return { ok: false, diagnostics: replacement.diagnostics };
-    }
-    this.#project = loaded.value;
-    this.dispatchEvent(
-      new CustomEvent('base-screen-ready', {
-        detail: { projectId, revision: loaded.value.revision },
-      }),
-    );
-    return loaded;
+  load(projectId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
+    return this.#session.load(projectId);
   }
 
-  async save(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    if (
-      this.#projectAdapter === undefined ||
-      this.#project === undefined ||
-      this.#document === undefined
-    ) {
-      return failure(
-        'PLUGIN_CORE_LIFECYCLE_INVALID',
-        [],
-        'Designer has no loaded project to save.',
-      );
-    }
-    let saved: ScreenParseResult<ScreenProjectEnvelope>;
-    try {
-      saved = await this.#projectAdapter.save({
-        projectId: this.#project.projectId,
-        revision: this.#project.revision,
-        document: this.#document,
-      });
-    } catch {
-      return failure('ENVELOPE_INVALID', [], 'Project adapter save failed.');
-    }
-    if (!saved.ok) {
-      return saved;
-    }
-    const replacement = this.replaceDocument(saved.value.document);
-    if (!replacement.ok) {
-      return { ok: false, diagnostics: replacement.diagnostics };
-    }
-    this.#project = saved.value;
-    this.dispatchEvent(
-      new CustomEvent('base-screen-dirty-change', {
-        detail: { dirty: false, revision: saved.value.revision },
-      }),
-    );
-    return saved;
+  save(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
+    return this.#session.save();
+  }
+
+  publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
+    return this.#session.publish();
+  }
+
+  retryLastProjectOperation(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
+    return this.#session.retryLastProjectOperation();
+  }
+
+  reloadRemote(discardChanges = false): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
+    return this.#session.reloadRemote(discardChanges);
+  }
+
+  continueEditing(): ScreenParseResult<void> {
+    return this.#session.continueEditing();
+  }
+
+  cancelProjectOperation(): void {
+    this.#session.cancelProjectOperation();
   }
 
   unload(): void {
-    this.cancelDrag();
+    this.cancelGesture();
+    this.#session.unload();
+    this.#panelController.clearClipboard();
     this.#renderer?.clear();
-    this.#document = undefined;
-    this.#history = undefined;
-    this.#project = undefined;
-    this.#interaction = { selectedComponentIds: [], focusedComponentId: null };
-    this.renderSelection();
-    this.renderProperties();
+    this.renderInteraction();
   }
 
   private initialize(): void {
@@ -312,10 +296,16 @@ export class BaseScreenDesignerElement extends ElementBase {
       return;
     }
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
-    shadow.replaceChildren(createDesignerStyle(), this.createLayout());
+    shadow.replaceChildren(
+      createDesignerStyle(this.ownerDocument),
+      createDesignerWorkspace(this.ownerDocument, this.#catalog.list(), this.#toolMaterialTypes),
+    );
+    this.#viewportElement = shadow.querySelector<HTMLDivElement>('[data-viewport]')!;
     this.#canvas = shadow.querySelector<HTMLDivElement>('[data-canvas]')!;
     this.#selection = shadow.querySelector<HTMLDivElement>('[data-selection]')!;
     this.#properties = shadow.querySelector<HTMLDivElement>('[data-properties]')!;
+    this.#layers = shadow.querySelector<HTMLDivElement>('[data-layers]')!;
+    this.#projectConflict = shadow.querySelector<HTMLElement>('[data-project-conflict]')!;
     this.#renderer = createBaseScreenRenderer({
       root: this.#canvas,
       catalog: this.#catalog,
@@ -324,305 +314,164 @@ export class BaseScreenDesignerElement extends ElementBase {
       onMaterialEvent: () => undefined,
       resourcePort: this.#resourcePort,
     });
-    this.#canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
-    this.#canvas.addEventListener('pointermove', (event) => this.onPointerMove(event));
-    this.#canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
-    this.#canvas.addEventListener('pointercancel', () => this.cancelDrag());
-    this.#canvas.addEventListener('lostpointercapture', () => this.cancelDrag());
-    shadow.addEventListener('click', (event) => this.onControlClick(event));
-    shadow.addEventListener('change', (event) => this.onPropertyChange(event));
-    if (this.#document !== undefined) {
-      this.#renderer.render(this.#document);
-      this.renderSelection();
-      this.renderProperties();
-    }
-  }
-
-  private createLayout(): HTMLElement {
-    const layout = this.ownerDocument.createElement('section');
-    layout.className = 'designer';
-    layout.innerHTML = `
-      <aside class="rail" data-materials></aside>
-      <main class="workspace">
-        <header class="toolbar">
-          <button type="button" data-action="undo" title="Undo">Undo</button>
-          <button type="button" data-action="redo" title="Redo">Redo</button>
-          <button type="button" data-action="zoom-out" title="Zoom out">-</button>
-          <output data-zoom>100%</output>
-          <button type="button" data-action="zoom-in" title="Zoom in">+</button>
-        </header>
-        <div class="viewport"><div class="canvas" data-canvas><div class="selection" data-selection></div></div></div>
-      </main>
-      <aside class="properties" data-properties></aside>`;
-    const materials = layout.querySelector<HTMLElement>('[data-materials]')!;
-    for (const entry of this.#catalog?.list() ?? []) {
-      materials.appendChild(this.createMaterialButton(entry));
-    }
-    return layout;
-  }
-
-  private createMaterialButton(entry: BaseScreenMaterialCatalogEntry): HTMLButtonElement {
-    const button = this.ownerDocument.createElement('button');
-    button.type = 'button';
-    button.dataset.materialType = entry.manifest.type;
-    button.textContent = entry.manifest.name;
-    return button;
-  }
-
-  private onControlClick(event: Event): void {
-    const target = event.target;
-    if (!(target instanceof HTMLElement)) {
-      return;
-    }
-    if (target.dataset.materialType !== undefined) {
-      this.addMaterial(target.dataset.materialType);
-      return;
-    }
-    switch (target.dataset.action) {
-      case 'undo':
-        this.report(this.undo());
-        return;
-      case 'redo':
-        this.report(this.redo());
-        return;
-      case 'zoom-in':
-        this.setZoom(this.#viewport.zoom * 1.2);
-        return;
-      case 'zoom-out':
-        this.setZoom(this.#viewport.zoom / 1.2);
-    }
-  }
-
-  private addMaterial(type: string): void {
-    if (this.#document === undefined || this.#catalog === undefined) {
-      return;
-    }
-    const entry = this.#catalog.get(type);
-    if (entry === undefined) {
-      return;
-    }
-    const index = this.#document.components.length;
-    const component = {
-      id: nextComponentId(this.#document, entry.manifest.type),
-      type: entry.manifest.type,
-      name: entry.manifest.name,
-      parentId: null,
-      position: { x: 64 + index * 16, y: 64 + index * 16 },
-      size: entry.manifest.defaultSize,
-      rotation: 0,
-      zIndex: index,
-      status: { locked: false, hidden: false },
-      props: entry.manifest.defaultProps,
-      style: entry.manifest.defaultStyle,
-      dataSource: null,
-    } as const;
-    const result = this.executeCommand({ type: 'add-component', component });
-    if (result.ok) {
-      this.select(component.id);
-    } else {
-      this.emitDiagnostics(result.diagnostics);
-    }
-  }
-
-  private onPointerDown(event: PointerEvent): void {
-    const target = event.target;
-    if (
-      !(target instanceof HTMLElement) ||
-      this.#document === undefined ||
-      this.#canvas === undefined
-    ) {
-      return;
-    }
-    const material = target.closest<HTMLElement>('[data-base-screen-component-id]');
-    const componentId = material?.dataset.baseScreenComponentId;
-    if (componentId === undefined || material === null) {
-      this.select(null);
-      return;
-    }
-    const component = this.#document.components.find((item) => item.id === componentId);
-    if (component === undefined || component.status.locked) {
-      return;
-    }
-    this.select(componentId);
-    this.#canvas.setPointerCapture(event.pointerId);
-    this.#drag = {
-      componentId,
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startClientY: event.clientY,
-      startX: component.position.x,
-      startY: component.position.y,
-      element: material,
-    };
-  }
-
-  private onPointerMove(event: PointerEvent): void {
-    if (this.#drag === undefined || event.pointerId !== this.#drag.pointerId) {
-      return;
-    }
-    const x = (event.clientX - this.#drag.startClientX) / this.#viewport.zoom;
-    const y = (event.clientY - this.#drag.startClientY) / this.#viewport.zoom;
-    this.#drag.element.style.translate = `${x}px ${y}px`;
-  }
-
-  private onPointerUp(event: PointerEvent): void {
-    if (this.#drag === undefined || event.pointerId !== this.#drag.pointerId) {
-      return;
-    }
-    const drag = this.#drag;
-    const x = (event.clientX - drag.startClientX) / this.#viewport.zoom;
-    const y = (event.clientY - drag.startClientY) / this.#viewport.zoom;
-    this.cancelDrag();
-    this.report(
-      this.executeCommand({
-        type: 'update-components',
-        componentIds: [drag.componentId],
-        patch: {
-          position: {
-            x: clampCoordinate(drag.startX + x),
-            y: clampCoordinate(drag.startY + y),
-          },
-        },
-      }),
+    this.#gestureController.connect(this.#canvas);
+    this.#viewportController.connect(this.#viewportElement, this.#canvas);
+    shadow.addEventListener('click', (event) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && this.#viewportController.onClick(target)) return;
+      if (target instanceof HTMLElement && this.onProjectConflictClick(target)) return;
+      if (target instanceof HTMLElement && this.onProjectActionClick(target)) return;
+      if (this.onTabClick(event)) return;
+      if (this.#layersController.onClick(event)) return;
+      this.#panelController.onClick(event);
+    });
+    shadow.addEventListener('change', (event) => {
+      if (this.#layersController.onChange(event)) return;
+      this.#panelController.onPropertyChange(event);
+    });
+    shadow.addEventListener('input', (event) => this.#layersController.onChange(event));
+    shadow.addEventListener('keydown', (event) =>
+      this.#panelController.onKeyDown(event as KeyboardEvent),
     );
-  }
-
-  private cancelDrag(): void {
-    if (this.#drag !== undefined) {
-      this.#drag.element.style.translate = '';
-      if (this.#canvas?.hasPointerCapture(this.#drag.pointerId)) {
-        this.#canvas.releasePointerCapture(this.#drag.pointerId);
-      }
-      this.#drag = undefined;
+    if (this.#session.document !== undefined) {
+      this.renderDocument(this.#session.document);
+      this.renderInteraction();
     }
   }
 
-  private select(componentId: string | null): void {
-    if (this.#document === undefined) {
-      return;
+  private renderDocument(document: ScreenDocument): ScreenParseResult<void> {
+    this.initialize();
+    if (this.#renderer === undefined) {
+      return { ok: true, value: undefined, diagnostics: [] };
     }
-    this.#interaction = reduceScreenInteraction(
-      this.#interaction,
-      {
-        type: 'replace-selection',
-        componentIds: componentId === null ? [] : [componentId],
-        focusedComponentId: componentId,
-      },
-      this.#document,
-    );
+    const rendered = this.#renderer.render(document);
+    return rendered.ok
+      ? { ok: true, value: undefined, diagnostics: [] }
+      : { ok: false, diagnostics: rendered.diagnostics };
+  }
+
+  private renderInteraction(): void {
     this.renderSelection();
     this.renderProperties();
-    this.dispatchEvent(
-      new CustomEvent('base-screen-selection-change', { detail: this.#interaction }),
-    );
+    this.renderLayers();
+    this.renderControls();
   }
 
   private renderSelection(): void {
-    if (this.#selection === undefined) {
-      return;
-    }
-    const selected = this.#document?.components.find(
-      (component) => component.id === this.#interaction.focusedComponentId,
+    renderDesignerSelection(
+      this.#selection,
+      this.ownerDocument,
+      this.#session.document,
+      this.#session.interaction.selectedComponentIds,
+      this.#catalog,
     );
-    if (selected === undefined) {
-      this.#selection.style.display = 'none';
-      return;
-    }
-    const bounds = getScreenComponentBounds(selected);
-    this.#selection.style.display = 'block';
-    this.#selection.style.left = `${bounds.left}px`;
-    this.#selection.style.top = `${bounds.top}px`;
-    this.#selection.style.width = `${bounds.right - bounds.left}px`;
-    this.#selection.style.height = `${bounds.bottom - bounds.top}px`;
+  }
+
+  private renderControls(): void {
+    this.#panelController.render(undefined, this.shadowRoot);
+    this.renderProjectStatus();
+  }
+
+  private renderLayers(): void {
+    this.#layersController.render(this.#layers);
   }
 
   private renderProperties(): void {
-    if (this.#properties === undefined) {
-      return;
-    }
-    const selected = this.#document?.components.find(
-      (component) => component.id === this.#interaction.focusedComponentId,
-    );
-    if (selected === undefined) {
-      this.#properties.replaceChildren();
-      return;
-    }
-    this.#properties.innerHTML = `
-      <label>Name<input data-property="name" value="${escapeAttribute(selected.name)}"></label>
-      <label>X<input data-property="x" type="number" value="${selected.position.x}"></label>
-      <label>Y<input data-property="y" type="number" value="${selected.position.y}"></label>
-      <label>Width<input data-property="width" type="number" min="1" value="${selected.size.width}"></label>
-      <label>Height<input data-property="height" type="number" min="1" value="${selected.size.height}"></label>`;
+    this.#panelController.render(this.#properties, null);
   }
 
-  private onPropertyChange(event: Event): void {
+  private onTabClick(event: Event): boolean {
     const target = event.target;
-    const selectedId = this.#interaction.focusedComponentId;
-    const selected = this.#document?.components.find((component) => component.id === selectedId);
-    if (!(target instanceof HTMLInputElement) || selected === undefined) {
-      return;
+    if (!(target instanceof HTMLElement)) return false;
+    const tab = target.closest<HTMLButtonElement>('[data-panel-tab]');
+    if (tab === null || this.shadowRoot === null) return false;
+    const panel = tab.dataset.panelTab;
+    const materials = this.shadowRoot.querySelector<HTMLElement>('[data-materials]');
+    const layers = this.shadowRoot.querySelector<HTMLElement>('[data-layers]');
+    if (panel === undefined || materials === null || layers === null) return false;
+    for (const control of this.shadowRoot.querySelectorAll<HTMLButtonElement>('[data-panel-tab]')) {
+      control.ariaSelected = String(control === tab);
     }
-    switch (target.dataset.property) {
-      case 'name':
-        this.report(
-          this.executeCommand({
-            type: 'update-components',
-            componentIds: [selected.id],
-            patch: { name: target.value },
-          }),
+    materials.hidden = panel !== 'materials';
+    layers.hidden = panel !== 'layers';
+    return true;
+  }
+
+  private onProjectConflictClick(target: HTMLElement): boolean {
+    const action = target.closest<HTMLButtonElement>('[data-action]')?.dataset.action;
+    if (action === 'continue-editing') {
+      this.reportProject(this.continueEditing());
+      return true;
+    }
+    if (action === 'reload-remote') {
+      if (this.#session.dirty && !this.#reloadConfirmationPending) {
+        this.#reloadConfirmationPending = true;
+        const message = this.#projectConflict?.querySelector('p');
+        const control = this.#projectConflict?.querySelector<HTMLButtonElement>(
+          '[data-action="reload-remote"]',
         );
-        return;
-      case 'x':
-      case 'y': {
-        const value = Number(target.value);
-        if (Number.isFinite(value)) {
-          this.report(
-            this.executeCommand({
-              type: 'update-components',
-              componentIds: [selected.id],
-              patch: {
-                position: {
-                  ...selected.position,
-                  [target.dataset.property]: clampCoordinate(value),
-                },
-              },
-            }),
-          );
+        if (message !== null && message !== undefined) {
+          message.textContent = 'Reloading will discard local edits.';
         }
-        return;
+        if (control !== null && control !== undefined) control.textContent = 'Discard and reload';
+        return true;
       }
-      case 'width':
-      case 'height': {
-        const value = Number(target.value);
-        if (Number.isFinite(value) && value > 0) {
-          this.report(
-            this.executeCommand({
-              type: 'update-components',
-              componentIds: [selected.id],
-              patch: {
-                size: { ...selected.size, [target.dataset.property]: Math.min(value, 1_000_000) },
-              },
-            }),
-          );
-        }
-      }
+      void this.reloadRemote(this.#reloadConfirmationPending).then((result) =>
+        this.reportProject(result),
+      );
+      return true;
+    }
+    return false;
+  }
+
+  private onProjectActionClick(target: HTMLElement): boolean {
+    switch (target.closest<HTMLButtonElement>('[data-action]')?.dataset.action) {
+      case 'project-save':
+        void this.save().then((result) => this.reportProject(result));
+        return true;
+      case 'project-publish':
+        void this.publish().then((result) => this.reportProject(result));
+        return true;
+      case 'project-retry':
+        void this.retryLastProjectOperation().then((result) => this.reportProject(result));
+        return true;
+      case 'project-cancel':
+        this.cancelProjectOperation();
+        return true;
+      default:
+        return false;
     }
   }
 
-  private setZoom(zoom: number): void {
-    this.#viewport = reduceScreenViewport(this.#viewport, {
-      type: 'set-zoom',
-      zoom,
-      anchor: { x: 0, y: 0 },
-    });
-    if (this.#canvas !== undefined) {
-      this.#canvas.style.transformOrigin = 'top left';
-      this.#canvas.style.transform = `translate(${this.#viewport.offset.x}px, ${this.#viewport.offset.y}px) scale(${this.#viewport.zoom})`;
-      const output = this.shadowRoot?.querySelector<HTMLOutputElement>('[data-zoom]');
-      if (output !== null && output !== undefined) {
-        output.value = `${Math.round(this.#viewport.zoom * 100)}%`;
-      }
+  private renderProjectStatus(): void {
+    const root = this.shadowRoot;
+    if (root === null) return;
+    const phase = this.#session.projectPhase;
+    const project = this.#session.project;
+    const busy = phase === 'saving' || phase === 'publishing';
+    const status = root.querySelector<HTMLElement>('[data-project-status]');
+    if (status !== null) {
+      status.textContent =
+        project === undefined ? 'Direct document' : `${phase}${this.#session.dirty ? ' *' : ''}`;
     }
+    const revision = root.querySelector<HTMLElement>('[data-project-revision]');
+    if (revision !== null) revision.textContent = project?.revision ?? '';
+    setDisabled(root, 'project-save', project === undefined || busy || phase === 'conflict');
+    setDisabled(
+      root,
+      'project-publish',
+      project === undefined ||
+        busy ||
+        phase !== 'ready' ||
+        this.#session.dirty ||
+        this.#session.adapter?.capabilities.publish !== true,
+    );
+    setDisabled(root, 'project-retry', phase !== 'error');
+    setDisabled(root, 'project-cancel', !busy);
+  }
+
+  private cancelGesture(): void {
+    this.#gestureController.cancel();
   }
 
   private report(result: ScreenParseResult<ScreenDocument>): void {
@@ -631,70 +480,24 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
   }
 
+  private reportProject(result: ScreenParseResult<unknown>): void {
+    if (!result.ok) this.emitDiagnostics(result.diagnostics);
+  }
+
   private emitDiagnostics(diagnostics: readonly ScreenDiagnostic[]): void {
     this.dispatchEvent(new CustomEvent('base-screen-diagnostic', { detail: { diagnostics } }));
   }
 
-  private emitChange(): void {
-    this.dispatchEvent(
-      new CustomEvent('base-screen-change', { detail: { document: this.#document } }),
-    );
+  private emitChange(document: ScreenDocument | undefined): void {
+    this.dispatchEvent(new CustomEvent('base-screen-change', { detail: { document } }));
   }
 }
 
-function nextComponentId(document: ScreenDocument, type: string): string {
-  const base = type.replace(/[^A-Za-z0-9]+/g, '-');
-  let index = document.components.length + 1;
-  const ids = new Set(document.components.map((component) => component.id));
-  while (ids.has(`${base}-${index}`)) {
-    index++;
-  }
-  return `${base}-${index}`;
+function lifecycleDiagnostic(message: string): ScreenDiagnostic {
+  return { severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message };
 }
 
-function clampCoordinate(value: number): number {
-  return Math.max(-1_000_000, Math.min(1_000_000, value));
-}
-
-function escapeAttribute(value: string): string {
-  return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;');
-}
-
-function diagnostic(
-  code: ScreenDiagnostic['code'],
-  path: readonly (string | number)[],
-  message: string,
-): ScreenDiagnostic {
-  return { severity: 'error', code, path, message };
-}
-
-function failure<T>(
-  code: ScreenDiagnostic['code'],
-  path: readonly (string | number)[],
-  message: string,
-): ScreenParseResult<T> {
-  return { ok: false, diagnostics: [diagnostic(code, path, message)] };
-}
-
-function createDesignerStyle(): HTMLStyleElement {
-  const style = document.createElement('style');
-  style.textContent = `
-    :host { display: block; min-width: 720px; min-height: 480px; color: #d8dee9; font: 13px/1.4 Arial, sans-serif; }
-    .designer { display: grid; grid-template-columns: 168px minmax(0, 1fr) 204px; height: 100%; background: #161b22; border: 1px solid #364152; }
-    .rail, .properties { overflow: auto; padding: 10px; background: #202833; }
-    .rail { border-right: 1px solid #364152; }
-    .properties { border-left: 1px solid #364152; }
-    .rail button, .toolbar button { display: block; width: 100%; margin: 0 0 6px; border: 1px solid #46566c; border-radius: 4px; background: #2d3948; color: inherit; padding: 7px 8px; text-align: left; cursor: pointer; }
-    .toolbar { display: flex; align-items: center; gap: 6px; padding: 8px; border-bottom: 1px solid #364152; background: #202833; }
-    .toolbar button { width: auto; margin: 0; text-align: center; }
-    .toolbar output { min-width: 48px; text-align: center; color: #9fb1c9; }
-    .workspace { min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
-    .viewport { overflow: auto; padding: 36px; background: #0f141a; }
-    .canvas { min-width: 1px; min-height: 1px; box-shadow: 0 16px 48px rgb(0 0 0 / 35%); }
-    .selection { position: absolute; pointer-events: none; outline: 1px solid #39c5bb; outline-offset: 2px; z-index: 1000001; }
-    .properties label { display: grid; gap: 4px; margin-bottom: 10px; color: #9fb1c9; }
-    .properties input { min-width: 0; border: 1px solid #46566c; border-radius: 3px; background: #151b23; color: #edf2f7; padding: 6px; }
-    @media (max-width: 760px) { :host { min-width: 0; } .designer { grid-template-columns: 128px minmax(0, 1fr); } .properties { display: none; } }
-  `;
-  return style;
+function setDisabled(root: ParentNode, action: string, disabled: boolean): void {
+  const control = root.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
+  if (control !== null) control.disabled = disabled;
 }

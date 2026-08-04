@@ -19,17 +19,12 @@
 | [Nebula Importer](./nebula-importer/spec.md) | M7 | 离线 legacy export 转换、报告和 provenance |
 | [Remote Plugin Sandbox](./remote-plugin-sandbox/spec.md) | M8 | 不可信 iframe 插件协议、来源校验和能力缩减 |
 
-## 设计中
-
-| Spec | 阶段 | 说明 |
-| --- | --- | --- |
-| [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/spec.md) | P6-P7/M7-M8 增量 | Sandbox/Host Resource/Blueprint/plugin contribution、tarball bridge consumer 与 importer 生产级验收 |
-
-## 设计中
+## 生效中（增量）
 
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
 | [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | P5-P6 增量 | 以 Nebula 可观察样式/功能为 parity 基准的 Designer 与 publish/conflict/cancel/dirty/retry 生命周期 |
+| [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/spec.md) | P6-P7/M7-M8 增量 | Sandbox/Host Resource/Blueprint/plugin contribution、tarball bridge consumer 与 importer 生产级验收 |
 
 ## 使用规则
 

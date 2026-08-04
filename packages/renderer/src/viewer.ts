@@ -10,7 +10,10 @@ import {
   dispatchScreenBlueprintEvent,
   type ScreenBlueprintPlan,
 } from '@base-screen/core';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenMaterialObjectSchema,
+} from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from './renderer.js';
 
 const ElementBase =
@@ -20,6 +23,10 @@ const ElementBase =
 export class BaseScreenViewerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
+  #resourceTypes:
+    | ReadonlyMap<string, { readonly configSchema: BaseScreenMaterialObjectSchema }>
+    | undefined;
+  #blueprintCapabilities: ReadonlySet<string> | undefined;
   #blueprintRuntimePort: ScreenBlueprintRuntimePort | undefined;
   #document: ScreenDocument | undefined;
   #blueprintPlan: ScreenBlueprintPlan | undefined;
@@ -38,6 +45,25 @@ export class BaseScreenViewerElement extends ElementBase {
 
   get resourcePort(): ScreenHostResourcePort | undefined {
     return this.#resourcePort;
+  }
+
+  set runtimeContributions(value:
+    | {
+        readonly resourceTypes: ReadonlyMap<
+          string,
+          { readonly configSchema: BaseScreenMaterialObjectSchema }
+        >;
+        readonly blueprintCapabilities: ReadonlySet<string>;
+      }
+    | undefined,) {
+    this.#resourceTypes = value?.resourceTypes;
+    this.#blueprintCapabilities = value?.blueprintCapabilities;
+    this.#renderer?.dispose();
+    this.#renderer = undefined;
+    this.#mount?.replaceChildren();
+    this.compileBlueprint();
+    this.initialize();
+    this.renderDocument();
   }
 
   set resourcePort(value: ScreenHostResourcePort | undefined) {
@@ -62,13 +88,7 @@ export class BaseScreenViewerElement extends ElementBase {
 
   set document(value: ScreenDocument | undefined) {
     this.#document = value;
-    if (value !== undefined) {
-      this.#blueprintPlan = compileScreenBlueprint(value);
-      this.#blueprintVariables = this.#blueprintPlan.initialVariables;
-    } else {
-      this.#blueprintPlan = undefined;
-      this.#blueprintVariables = undefined;
-    }
+    this.compileBlueprint();
     this.renderDocument();
   }
 
@@ -104,12 +124,47 @@ export class BaseScreenViewerElement extends ElementBase {
         );
       },
       resourcePort: this.#resourcePort,
+      ...(this.#resourceTypes === undefined ? {} : { resourceTypes: this.#resourceTypes }),
     });
     this.renderDocument();
   }
 
+  private compileBlueprint(): void {
+    if (this.#document === undefined) {
+      this.#blueprintPlan = undefined;
+      this.#blueprintVariables = undefined;
+      return;
+    }
+    const required = this.#document.blueprint.rules.flatMap(
+      (rule) => rule.requiredCapabilities ?? [],
+    );
+    if (required.some((capability) => this.#blueprintCapabilities?.has(capability) !== true)) {
+      this.#blueprintPlan = undefined;
+      this.#blueprintVariables = undefined;
+      this.emitDiagnostics('Blueprint capability is unavailable.');
+      return;
+    }
+    const compiled = compileScreenBlueprint(this.#document);
+    if (!compiled.ok) {
+      this.#blueprintPlan = undefined;
+      this.#blueprintVariables = undefined;
+      this.dispatchEvent(
+        new CustomEvent('base-screen-diagnostic', {
+          detail: { diagnostics: compiled.diagnostics },
+        }),
+      );
+      return;
+    }
+    this.#blueprintPlan = compiled.value;
+    this.#blueprintVariables = compiled.value.initialVariables;
+  }
+
   private renderDocument(): void {
-    if (this.#renderer === undefined || this.#document === undefined) {
+    if (
+      this.#renderer === undefined ||
+      this.#document === undefined ||
+      this.#blueprintPlan === undefined
+    ) {
       return;
     }
     const result = this.#renderer.render(this.#document);

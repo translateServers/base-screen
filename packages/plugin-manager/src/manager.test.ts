@@ -200,6 +200,76 @@ describe('BaseScreenPluginManager', () => {
     }
   });
 
+  it('fails closed for unknown Blueprint capability contributions', async () => {
+    const plugin = runtime(
+      pluginManifest({
+        id: 'acme.unknown-capability',
+        capabilities: ['blueprint.unknown'],
+        contributions: [
+          {
+            kind: 'blueprintCapability',
+            id: 'blueprint.unknown',
+            name: 'Unknown capability',
+          },
+        ],
+      }),
+    );
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.unknown-capability': ['blueprint.unknown'] },
+    });
+
+    const activated = await manager.activate();
+    expect(activated.ok).toBe(false);
+    if (!activated.ok) {
+      expect(
+        activated.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN'),
+      ).toBe(true);
+    }
+  });
+
+  it('publishes an instance-local immutable runtime contribution index', async () => {
+    const plugin = runtime(
+      pluginManifest({
+        id: 'acme.runtime',
+        capabilities: ['blueprint.value.variable'],
+        contributions: [
+          {
+            kind: 'dataResourceType',
+            id: 'dataset',
+            name: 'Dataset',
+            configSchema: {
+              kind: 'object',
+              properties: { limit: { kind: 'number' } },
+              required: ['limit'],
+            },
+          },
+          {
+            kind: 'blueprintCapability',
+            id: 'blueprint.value.variable',
+            name: 'Blueprint variable',
+          },
+        ],
+      }),
+    );
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.runtime': ['blueprint.value.variable'] },
+    });
+
+    const activated = await manager.activate();
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(
+      activated.value.contributions.resourceTypes.get('dataset')?.configSchema.required,
+    ).toEqual(['limit']);
+    expect(
+      activated.value.contributions.blueprintCapabilities.has('blueprint.value.variable'),
+    ).toBe(true);
+    await manager.deactivate();
+    expect(manager.snapshot).toBeUndefined();
+  });
+
   it('keeps manager sessions and catalogs isolated', async () => {
     const material = materialManifest();
     const constructor = constructorFor(material);

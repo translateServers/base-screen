@@ -13,14 +13,25 @@ describe('Blueprint runtime', () => {
             id: 'increment',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
             actions: [
-              { type: 'set-variable', variableName: 'count', value: 1 },
-              { type: 'emit-host-event', eventName: 'refresh', payload: { source: 'button' } },
+              {
+                type: 'set-variable',
+                variableName: 'count',
+                value: { kind: 'literal', value: 1 },
+              },
+              {
+                type: 'emit-host-event',
+                eventName: 'refresh',
+                payload: { kind: 'literal', value: { source: 'button' } },
+              },
             ],
           },
         ],
       },
     });
-    const plan = compileScreenBlueprint(document);
+    const compiled = compileScreenBlueprint(document);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+    const plan = compiled.value;
     const result = dispatchScreenBlueprintEvent(plan, plan.initialVariables, {
       componentId: 'button',
       name: 'click',

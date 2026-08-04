@@ -141,7 +141,7 @@ export function reduceScreenInteraction(
 
 selection 按传入 document 的 component 顺序 canonicalize，去重并移除不存在或 hidden 的 component id。focused component 必须属于 selection，否则为 `null`。锁定组件可以被选中，但不能被 mutation command 直接或通过祖先间接修改。
 
-Interaction State 只描述稳定选择结果。pointer、drag、resize、rotate、marquee 和 editing session 的运行状态由 Engine 拥有，并在其 Spec 中基于 Core 几何与命令 API 定义。
+Interaction State 只描述稳定选择结果。pointer、drag、resize、rotate、marquee 和 editing session 的运行状态由 Engine 拥有，并在其 Spec 中基于 Core 几何与命令 API 定义。项目 operation、dirty baseline、adapter revision、conflict 和 retry 也属于 Engine 项目控制器，详见 [ADR-0012](../../decisions/ADR-0012-designer-project-lifecycle.md)；它们不得进入 Core。
 
 ### 5.4 Runtime Overrides
 

@@ -28,6 +28,19 @@
         height: calc(100vh - 32px);
       }
 
+      body[data-layout='designer'] {
+        display: block;
+      }
+
+      body[data-layout='designer'] base-screen-designer {
+        display: block;
+        width: 100%;
+      }
+
+      body[data-layout='designer'] base-screen-viewer {
+        display: none;
+      }
+
       @media (max-width: 800px) {
         body {
           display: block;

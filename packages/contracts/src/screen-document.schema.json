@@ -241,6 +241,30 @@
                 "required": ["type", "componentId", "eventName"],
                 "additionalProperties": false
               },
+              "requiredCapabilities": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                }
+              },
+              "condition": {
+                "type": "object",
+                "properties": {
+                  "left": {
+                    "$ref": "#/$defs/__schema0"
+                  },
+                  "operator": {
+                    "type": "string",
+                    "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
+                  },
+                  "right": {
+                    "$ref": "#/$defs/__schema0"
+                  }
+                },
+                "required": ["left", "operator"],
+                "additionalProperties": false
+              },
               "actions": {
                 "maxItems": 128,
                 "type": "array",
@@ -257,7 +281,9 @@
                           "type": "string",
                           "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
                         },
-                        "value": {}
+                        "value": {
+                          "$ref": "#/$defs/__schema0"
+                        }
                       },
                       "required": ["type", "variableName", "value"],
                       "additionalProperties": false
@@ -273,7 +299,9 @@
                           "type": "string",
                           "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
                         },
-                        "payload": {}
+                        "payload": {
+                          "$ref": "#/$defs/__schema0"
+                        }
                       },
                       "required": ["type", "eventName", "payload"],
                       "additionalProperties": false
@@ -293,5 +321,94 @@
   },
   "required": ["canvas", "components", "variables", "blueprint"],
   "additionalProperties": false,
+  "$defs": {
+    "__schema0": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "literal"
+            },
+            "value": {}
+          },
+          "required": ["kind", "value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "event-payload"
+            },
+            "path": {
+              "maxItems": 16,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+              }
+            }
+          },
+          "required": ["kind", "path"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "variable"
+            },
+            "name": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+            }
+          },
+          "required": ["kind", "name"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "array"
+            },
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": ["kind", "items"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "object"
+            },
+            "properties": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/__schema0"
+              }
+            }
+          },
+          "required": ["kind", "properties"],
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
   "$id": "urn:base-screen:schema:screen-document"
 }

@@ -5,17 +5,27 @@ import type { ScreenJsonValue } from './json.js';
 
 export interface ScreenProjectLoadRequest {
   readonly projectId: string;
+  readonly signal: ScreenAbortSignal;
 }
 
 export interface ScreenProjectSaveRequest {
   readonly projectId: string;
   readonly revision: string;
   readonly document: ScreenDocument;
+  readonly signal: ScreenAbortSignal;
+}
+
+export interface ScreenProjectPublishRequest {
+  readonly projectId: string;
+  readonly revision: string;
+  readonly signal: ScreenAbortSignal;
 }
 
 export interface ScreenProjectAdapter {
+  readonly capabilities: { readonly publish: boolean };
   load(request: ScreenProjectLoadRequest): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   save(request: ScreenProjectSaveRequest): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
+  publish?(request: ScreenProjectPublishRequest): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
 }
 
 export interface ScreenHostResourceRequest {

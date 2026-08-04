@@ -71,21 +71,61 @@ const blueprintTriggerSchema = z.strictObject({
   eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
 });
 
+const blueprintValueExpressionSchema: z.ZodTypeAny = z.lazy(() =>
+  z.union([
+    z.strictObject({ kind: z.literal('literal'), value: z.any() }),
+    z.strictObject({
+      kind: z.literal('event-payload'),
+      path: z.array(z.string().regex(new RegExp(VARIABLE_NAME_PATTERN))).max(16),
+    }),
+    z.strictObject({
+      kind: z.literal('variable'),
+      name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+    }),
+    z.strictObject({ kind: z.literal('array'), items: z.array(blueprintValueExpressionSchema) }),
+    z.strictObject({
+      kind: z.literal('object'),
+      properties: z.record(z.string(), blueprintValueExpressionSchema),
+    }),
+  ]),
+);
+
+const blueprintConditionSchema = z
+  .strictObject({
+    left: blueprintValueExpressionSchema,
+    operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists']),
+    right: blueprintValueExpressionSchema.optional(),
+  })
+  .superRefine((condition, context) => {
+    if (condition.operator === 'exists' && condition.right !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'exists condition must not define right.',
+        path: ['right'],
+      });
+    }
+    if (condition.operator !== 'exists' && condition.right === undefined) {
+      context.addIssue({ code: 'custom', message: 'condition requires right.', path: ['right'] });
+    }
+  });
+
 const setVariableActionSchema = z.strictObject({
   type: z.literal('set-variable'),
   variableName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
-  value: z.any(),
+  value: blueprintValueExpressionSchema,
 });
 
 const emitHostEventActionSchema = z.strictObject({
   type: z.literal('emit-host-event'),
   eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
-  payload: z.any(),
+  payload: blueprintValueExpressionSchema,
 });
 
 const blueprintRuleSchema = z.strictObject({
   id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   trigger: blueprintTriggerSchema,
+  requiredCapabilities: z.array(z.string().regex(new RegExp(VARIABLE_NAME_PATTERN))).optional(),
+  condition: blueprintConditionSchema.optional(),
   actions: z
     .array(z.union([setVariableActionSchema, emitHostEventActionSchema]))
     .max(MAX_BLUEPRINT_ACTIONS_PER_RULE),

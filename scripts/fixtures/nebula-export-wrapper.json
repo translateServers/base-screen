@@ -1,0 +1,26 @@
+{
+  "nebulaVersion": 1,
+  "export": {
+    "exportVersion": 1,
+    "document": {
+      "canvas": {
+        "width": 800,
+        "height": 450,
+        "backgroundColor": "#1a1a1a"
+      },
+      "components": [
+        {
+          "id": "status",
+          "type": "base.status",
+          "name": "Status",
+          "position": { "x": 32, "y": 32 },
+          "size": { "width": 240, "height": 80 },
+          "props": { "label": "Demo" },
+          "style": {},
+          "dataSource": null
+        }
+      ],
+      "variables": []
+    }
+  }
+}

@@ -8,43 +8,43 @@
   - [x] 将本 Spec 状态改为“生效中”，并建立实施计划。
 
 - [ ] Task 2：实现 Remote Sandbox transport 与浏览器协议（R1）。
-  - [ ] 将 `moduleUrl` 语义替换为明确的 remote HTML `entryUrl`。
-  - [ ] 实现 entry/expected/host origin 预检，拒绝 same-origin entry 和非法 timeout。
-  - [ ] 按 successor ADR 设置最小 sandbox token、referrer policy 和 exact `targetOrigin`。
-  - [ ] 实现 strict init/ready/emit-event 顺序、消息预算和固定 diagnostics。
-  - [ ] 实现 iframe load error、timeout、重复 ready、畸形消息和幂等 dispose。
+  - [x] 将 `moduleUrl` 语义替换为明确的 remote HTML `entryUrl`。
+  - [x] 实现 entry/expected/host origin 预检，拒绝 same-origin entry 和非法 timeout。
+  - [x] 按 successor ADR 设置最小 sandbox token、referrer policy 和 exact `targetOrigin`。
+  - [x] 实现 strict init/ready/emit-event 顺序、消息预算和固定 diagnostics。
+  - [x] 实现 iframe load error、timeout、重复 ready、畸形消息和幂等 dispose。
   - [ ] 验证 sandbox 不获得 Material、Catalog、Document、command/resource port 或凭证。
 
 - [ ] Task 3：实现 Host Resource deadline 与 conformance（R2）。
-  - [ ] 为 Renderer options 增加并校验 `resourceTimeoutMs`。
-  - [ ] 为每个 resolve 维护 controller、deadline timer 和 generation。
-  - [ ] 区分 timeout、host failure、invalid result 与 silent lifecycle cancellation。
-  - [ ] 覆盖 Host 忽略 signal 时的迟到结果抑制。
-  - [ ] 在 `@base-screen/testing` 增加只消费公共 API 的 conformance helper。
-  - [ ] 保持 production package 不依赖 Testing，Renderer 不自动 retry/cache/deduplicate。
+  - [x] 为 Renderer options 增加并校验 `resourceTimeoutMs`。
+  - [x] 为每个 resolve 维护 controller、deadline timer 和 generation。
+  - [x] 区分 timeout、host failure、invalid result 与 silent lifecycle cancellation。
+  - [x] 覆盖 Host 忽略 signal 时的迟到结果抑制。
+  - [x] 在 `@base-screen/testing` 增加只消费公共 API 的 conformance helper。
+  - [x] 保持 production package 不依赖 Testing，Renderer 不自动 retry/cache/deduplicate。
 
 - [ ] Task 4：冻结并实现当前 Blueprint Contracts（R3、R4）。
-  - [ ] 定义一个严格的 Blueprint shape，不引入判别联合或兼容分支。
-  - [ ] 实现 literal/event-payload/variable/array/object value expression schema。
-  - [ ] 实现 path 危险键、深度、container 和 byte 预算。
-  - [ ] 实现 condition operator 的条件必填和类型兼容校验。
-  - [ ] 增加 `requiredCapabilities` 与稳定 capability id grammar。
-  - [ ] 更新 canonical parser、serializer、reference validation 和 JSON Schema golden。
+  - [x] 定义一个严格的 Blueprint shape，不引入判别联合或兼容分支。
+  - [x] 实现 literal/event-payload/variable/array/object value expression schema。
+  - [x] 实现 path 危险键、深度、container 和 byte 预算。
+  - [x] 实现 condition operator 的条件必填和类型兼容校验。
+  - [x] 增加 `requiredCapabilities` 与稳定 capability id grammar。
+  - [x] 更新 canonical parser、serializer、reference validation 和 JSON Schema golden。
 
 - [ ] Task 5：实现 Blueprint compile/evaluate（R3、R4）。
-  - [ ] 更新 fixture 以匹配当前 strict shape。
-  - [ ] 实现 event payload/variable value resolution 和 detached JSON result。
-  - [ ] 实现 condition 单分支、rule/action 文档顺序与失败原子性。
-  - [ ] 缺失 path/variable、危险 path、类型不兼容和超限输入返回固定 diagnostics。
-  - [ ] 确保 evaluator 不调用 getter、函数、`eval` 或脚本解释器。
+  - [x] 更新 fixture 以匹配当前 strict shape。
+  - [x] 实现 event payload/variable value resolution 和 detached JSON result。
+  - [x] 实现 condition 单分支、rule/action 文档顺序与失败原子性。
+  - [x] 缺失 path/variable、危险 path、类型不兼容和超限输入返回固定 diagnostics。
+  - [x] 确保 evaluator 不调用 getter、函数、`eval` 或脚本解释器。
   - [ ] 覆盖 host event port rejection，避免 rejected Promise 形成浮动异常。
 
 - [ ] Task 6：接通 Plugin contribution runtime projection（R5）。
-  - [ ] 从 active Plugin Catalog 构建实例级 immutable runtime contribution index。
-  - [ ] 以 `dataResourceType.id` 校验 Document resourceType 和 source params schema。
-  - [ ] 以已声明、宿主支持且获授权的 `blueprintCapability.id` 校验 Blueprint plan。
-  - [ ] 未启用、冲突、未知和未授权 contribution 全部 fail closed。
-  - [ ] deactivate/dispose 后撤销当前 index，旧 snapshot 不保留 runtime authority。
+  - [x] 从 active Plugin Catalog 构建实例级 immutable runtime contribution index。
+  - [x] 以 `dataResourceType.id` 校验 Document resourceType 和 source params schema。
+  - [x] 以已声明、宿主支持且获授权的 `blueprintCapability.id` 校验 Blueprint plan。
+  - [x] 未启用、冲突、未知和未授权 contribution 全部 fail closed。
+  - [x] deactivate/dispose 后撤销当前 index，旧 snapshot 不保留 runtime authority。
   - [ ] 验证双 Manager 实例使用不同 contribution 集合且互不污染。
 
 - [ ] Task 7：增加 React/Vue installed-tarball consumer（R6）。
@@ -56,12 +56,12 @@
   - [ ] 检查 lockfile/resolve graph 无 workspace link、源码 alias 和额外 framework peer。
 
 - [ ] Task 8：实现 Nebula importer 两阶段迁移（R7）。
-  - [ ] 收集、脱敏并记录至少三类真实 export fixture 的 provenance。
-  - [ ] 实现唯一 variant detector，拒绝零匹配和多匹配。
-  - [ ] 实现 `--analyze` 字段级 finding report，不写 canonical output。
-  - [ ] 实现 map/drop/cancel decision 文件解析和 blocking resolution。
-  - [ ] 拒绝 input/output/report/decision 同路径并使用临时文件原子写入。
-  - [ ] 成功输出重新 parse/serialize；失败移除 stale success output。
+  - [x] 收集、脱敏并记录至少三类真实 export fixture 的 provenance。
+  - [x] 实现唯一 variant detector，拒绝零匹配和多匹配。
+  - [x] 实现 `--analyze` 字段级 finding report，不写 canonical output。
+  - [x] 实现 map/drop/cancel decision 文件解析和 blocking resolution。
+  - [x] 拒绝 input/output/report/decision 同路径并使用临时文件原子写入。
+  - [x] 成功输出重新 parse/serialize；失败移除 stale success output。
 
 - [ ] Task 9：完成测试映射与独立 harness（R1-R7）。
   - [ ] 建立 R1-R7 -> Task -> test file/case 和 test -> Requirement 双向映射。
@@ -73,9 +73,21 @@
 - [ ] Task 10：运行完整质量门禁并收敛文档（R1-R7）。
   - [ ] 运行受影响 package 的 format、lint、typecheck、test 和 build。
   - [ ] 运行 boundary、API report、publint、ATTW、tarball 和 browser verification。
-  - [ ] 运行 `pnpm verify:nebula-import` 与新增 importer variant/decision 验证。
+  - [x] 运行 `pnpm verify:nebula-import` 等效 Node verifier 与新增 importer variant/decision 验证。
   - [ ] 运行 `pnpm verify:m0`，修复所有由本任务引入的问题。
   - [ ] 按 `checklist.md` 逐项验收并同步现行 Spec/架构状态。
+
+# 执行进度（2026-08-04）
+
+> 本节记录当前工作区的实现快照，不替代下列未勾选任务的验收标准。只有实现、测试和质量门禁均完成后，才可勾选对应 Task。
+
+- **Task 2 / R1：部分实现。** `packages/plugin-manager/src/remote-sandbox.ts` 已切换为 `entryUrl`，并已加入 entry/expected/host origin 预检、same-origin 拒绝、`allow-scripts allow-same-origin`、`no-referrer`、精确 `targetOrigin`、strict message shape/64 KiB、ready 顺序、timeout、load error 与幂等 dispose 的基础逻辑。尚缺独立 Chromium harness、完整畸形输入与能力不可达测试。
+- **Task 3 / R2：部分实现。** `packages/renderer/src/renderer.ts` 已新增 `resourceTimeoutMs`（默认 15,000ms，100..60,000ms）、每请求 controller/timer/generation、timeout diagnostic 和静默 lifecycle cancellation 的基础处理。尚缺 `@base-screen/testing` 公共 API conformance helper 及覆盖所有 cancellation/late-result 路径的 DOM 测试。
+- **Task 4–5 / R3–R4：部分实现。** Contracts 已引入 value expression、condition、`requiredCapabilities` 和 Blueprint diagnostics；Core evaluator 已有 expression/condition/capability 的基础求值逻辑。当前仍保留旧 JSON literal action 值的临时兼容，尚未完成 strict canonical shape、预算/危险键/类型边界、原子性和 host-port rejection 的完整测试，也未更新 schema golden。
+- **Task 6 / R5：部分实现。** Plugin Manager snapshot 已创建实例级 contribution index（resource types 与已授权 Blueprint capabilities）。尚未将 index 完整接入 Renderer 的 params schema 校验和 Core/Viewer Blueprint capability 执行链路；冲突、撤销和双实例隔离测试未完成。
+- **Task 7 / R6：未开始。** 尚未扩展 installed-tarball React/Vue Vite consumer 与 Chromium lifecycle gate。
+- **Task 8 / R7：主体实现，未验收。** `scripts/import-nebula.mjs` 已改造为 analyze/decision/convert、唯一 variant detection、字段级 findings、严格 decision、路径隔离、原子写入和 round-trip 的主体流程。尚缺三类脱敏真实 fixture、file-level provenance 和 verifier 覆盖。
+- **Task 9–10：未完成。** R1-R7 双向测试映射、Runtime 独立 Playwright harness 和完整质量门禁均未完成。定向 TypeScript 检查通过 Contracts/Core/Plugin Manager；标准 pnpm 命令当前受 Corepack 解析路径故障影响，全量构建还遇到 `packages/core/dist` Windows access-denied，Biome 对部分 Contracts 文件报读取权限错误。因此尚未运行或通过 `pnpm verify:m0`。
 
 # Task Dependencies
 

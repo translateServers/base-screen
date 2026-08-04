@@ -10,6 +10,10 @@ import { createReactMaterialDefinition } from '../../packages/react/src/index.ts
 import { defineBaseScreenElements } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
 
+if (new URLSearchParams(window.location.search).has('designer')) {
+  document.body.dataset.layout = 'designer';
+}
+
 const productElements = defineBaseScreenElements();
 const textMaterial = defineBaseScreenTextMaterial();
 if (!productElements.ok || !textMaterial.ok) {
@@ -174,7 +178,7 @@ const screenDocument = {
           {
             type: 'emit-host-event' as const,
             eventName: 'titleClick',
-            payload: { source: 'harness' },
+            payload: { kind: 'literal' as const, value: { source: 'harness' } },
           },
         ],
       },
@@ -206,6 +210,7 @@ let envelope = {
   metadata: {},
 };
 designer.projectAdapter = {
+  capabilities: { publish: false },
   async load({ projectId }) {
     return projectId === envelope.projectId
       ? { ok: true as const, value: envelope, diagnostics: [] }

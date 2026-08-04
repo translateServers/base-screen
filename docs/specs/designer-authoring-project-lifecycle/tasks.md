@@ -1,83 +1,83 @@
 # Designer Authoring And Project Lifecycle Tasks
 
-- [ ] Task 1：完成 Project Lifecycle ADR、Nebula parity provenance 与实施授权（R1-R11）。
-  - [ ] 新增并接受 Project Lifecycle ADR，冻结 publish/signal/conflict/retry/baseline 所有权。
-  - [ ] 同步 Contracts Foundation、Core Domain 与 Designer Engine Spec。
-  - [ ] 冻结 `groupMaterialType`、direct-document baseline 和 persistence response 竞态语义。
-  - [ ] 记录 Nebula 参考 commit/path、许可未知、behavior-only 和 no-copy 结论。
-  - [ ] 冻结 P0-P2 parity matrix、`toolMaterialTypes`、视觉 token 所有权和 intentional differences。
-  - [ ] 将本 Spec 状态改为“生效中”，此前保持现有 load/save 公共行为。
+- [x] Task 1：完成 Project Lifecycle ADR、Nebula parity provenance 与实施授权（R1-R11）。
+  - [x] 新增并接受 Project Lifecycle ADR，冻结 publish/signal/conflict/retry/baseline 所有权。
+  - [x] 同步 Contracts Foundation、Core Domain 与 Designer Engine Spec。
+  - [x] 冻结 `groupMaterialType`、direct-document baseline 和 persistence response 竞态语义。
+  - [x] 记录 Nebula 参考 commit/path、许可未知、behavior-only 和 no-copy 结论。
+  - [x] 冻结 P0-P2 parity matrix、`toolMaterialTypes`、视觉 token 所有权和 intentional differences。
+  - [x] 将本 Spec 状态改为“生效中”，此前保持现有 load/save 公共行为。
 
 - [ ] Task 2：扩展 Project Adapter 公共契约（R1-R3）。
-  - [ ] 为 load/save 增加 `ScreenAbortSignal`，增加 publish request 和 adapter capability。
-  - [ ] 增加 project-specific diagnostics，并纳入 Contracts 显式 union。
-  - [ ] 实现 adapter capability/method 一致性和 response envelope canonical parse。
-  - [ ] 保持 revision opaque，不暴露 Router、Store、credential 或 callback。
+  - [x] 为 load/save 增加 `ScreenAbortSignal`，增加 publish request 和 adapter capability。
+  - [x] 增加 project-specific diagnostics，并纳入 Contracts 显式 union。
+  - [x] 实现 adapter capability/method 一致性和 response envelope canonical parse。
+  - [x] 保持 revision opaque，不暴露 Router、Store、credential 或 callback。
   - [ ] 更新 public declarations、API report、tarball consumer 和契约测试。
 
 - [ ] Task 3：实现 Engine Project Controller（R1-R3）。
-  - [ ] 实现 unloaded/loading/ready/saving/publishing/conflict/error/disposed 状态机。
-  - [ ] 为每个 operation 创建 generation、AbortController 和 submitted snapshot。
-  - [ ] 新 load 中止旧 load，save/publish mutation 串行化。
-  - [ ] 在 replace/unload/disconnect/dispose 时中止并清理全部 operation/timer。
-  - [ ] 以 signal/generation/projectId/revision guard 抑制迟到 response。
-  - [ ] 实现 cancel 和同 snapshot save single-flight。
+  - [x] 实现 unloaded/loading/ready/saving/publishing/conflict/error/disposed 状态机。
+  - [x] 为每个 operation 创建 generation、AbortController 和 submitted snapshot。
+  - [x] 新 load 中止旧 load，save/publish mutation 串行化。
+  - [x] 在 replace/unload/disconnect/dispose 时中止并清理全部 operation/timer。
+  - [x] 以 signal/generation/projectId/revision guard 抑制迟到 response。
+  - [x] 实现 cancel 和同 snapshot save single-flight。
 
 - [ ] Task 4：实现 baseline、conflict 与 retry（R1-R3）。
-  - [ ] 为 load/direct replace 建立 canonical baseline，并在每次 document change 后比较 dirty。
-  - [ ] dirty 布尔值变化时只派发一次事件，undo/redo 回 baseline 时重新 clean。
-  - [ ] save pending 期间继续编辑时保留 current document，并推进 submitted baseline。
-  - [ ] publish 只接受 clean revision，不隐式 save、不清理未保存编辑。
+  - [x] 为 load/direct replace 建立 canonical baseline，并在每次 document change 后比较 dirty。
+  - [x] dirty 布尔值变化时只派发一次事件，undo/redo 回 baseline 时重新 clean。
+  - [x] save pending 期间继续编辑时保留 current document，并推进 submitted baseline。
+  - [x] publish 只接受 clean revision，不隐式 save、不清理未保存编辑。
   - [ ] conflict 保留 document/history/selection/revision/baseline，提供 reload/continue。
-  - [ ] 实现 load unavailable 两次自动 retry 和 mutation 显式 retry；scheduler 可测试。
+  - [x] 实现 load unavailable 两次自动 retry 和 mutation 显式 retry；scheduler 可测试。
 
-- [ ] Task 5：接通多选与 marquee（R4、R5）。
-  - [ ] Engine 所有 selection 只通过 Core interaction reducer。
-  - [ ] 实现 click、modifier toggle、blank clear 和 focused reconciliation。
-  - [ ] 实现 intersect/contain marquee 和 selection merge/replace。
-  - [ ] locked component 只允许 Layers 查看，hidden component 不可选。
-  - [ ] gesture cancel/document replace 后清理 marquee overlay 和 transient state。
+- [x] Task 5：接通多选与 marquee（R4、R5）。
+  - [x] Engine 所有 selection 只通过 Core interaction reducer。
+  - [x] 实现 click、modifier toggle、blank clear 和 focused reconciliation。
+  - [x] 实现 intersect/contain marquee 和 selection merge/replace。
+  - [x] locked component 只允许 Layers 查看，hidden component 不可选。
+  - [x] gesture cancel/document replace 后清理 marquee overlay 和 transient state.
 
-- [ ] Task 6：实现 resize/rotate 与多选 transform（R4）。
-  - [ ] 实现单选 8 resize handles、rotate handle 与多选 bounds handles。
-  - [ ] 统一检查 Material resize/rotate capability 和 effective locked。
-  - [ ] 实现 Shift/Alt resize 与 15 度 rotate snap。
-  - [ ] 保持多选相对几何，并将 pointer preview 与 persistent transaction 分离。
-  - [ ] pointerup 只提交一个 history entry；所有 cancel path 恢复 baseline。
+- [x] Task 6：实现 resize/rotate 与多选 transform（R4）。
+  - [x] 实现单选 8 resize handles、rotate handle 与多选 bounds handles。
+  - [x] 统一检查 Material resize/rotate capability 和 effective locked。
+  - [x] 实现 Shift/Alt resize 与 15 度 rotate snap。
+  - [x] 保持多选相对几何，并将 pointer preview 与 persistent transaction 分离。
+  - [x] pointerup 只提交一个 history entry；所有 cancel path 恢复 baseline。
 
 - [ ] Task 7：实现 group/reparent 与布局命令（R6）。
-  - [ ] 校验显式 `groupMaterialType` 已启用且 children=true。
-  - [ ] 用一个 transaction 完成 group add + reparent，ungroup 保持画布位置并删除空 group。
+  - [x] 校验显式 `groupMaterialType` 已启用且 children=true。
+  - [x] 用一个 transaction 完成 group add + reparent，ungroup 保持画布位置并删除空 group。
   - [ ] Layers drag reparent 执行 local/canvas 坐标转换并复用 Core cycle/lock 校验。
-  - [ ] 接通六种 alignment 与两种 distribution，复用 Core geometry delta。
-  - [ ] 为不同 component position 生成独立 command，整个高层操作只提交一次 history。
+  - [x] 接通六种 alignment 与两种 distribution，复用 Core geometry delta。
+  - [x] 为不同 component position 生成独立 command，整个高层操作只提交一次 history。
 
 - [ ] Task 8：实现 Layers、Clipboard 与 Property Panel（R5、R7、R8）。
-  - [ ] Layers 使用 Core hierarchy/painter order 展示树、selection、rename、hide/lock 和 reorder。
-  - [ ] 实现实例内 clipboard、subtree detached clone、id/parent rewrite 和连续 paste offset。
-  - [ ] project replace/unload/dispose 清空 clipboard。
-  - [ ] 从 focused Manifest propertyPanel/propsSchema 生成白名单控件。
-  - [ ] props command 前验证完整 next props，非法 draft 不改 document/history/Renderer。
-  - [ ] 多选只编辑兼容通用字段，不猜测异构 Material props。
+  - [x] Layers 使用 canonical tree/painter-order 规则展示树、selection、rename、hide/lock 和同级 reorder。
+  - [x] 实现实例内 clipboard、subtree detached clone、id/parent rewrite 和连续 paste offset。
+  - [x] project replace/unload/dispose 清空 clipboard。
+  - [x] 从 focused Manifest propertyPanel/propsSchema 生成白名单控件。
+  - [x] props command 前验证完整 next props，非法 draft 不改 document/history/Renderer。
+  - [x] 多选只编辑兼容通用字段，不猜测异构 Material props。
 
 - [ ] Task 9：整合 Nebula-compatible shell、Designer UI、事务与键盘（R1-R10）。
-  - [ ] 增加 `executeTransaction()`，Renderer 失败时保持 document/history/selection/DOM 原值。
+  - [x] 增加 `executeTransaction()`，Renderer 失败时保持 document/history/selection/DOM 原值。
   - [ ] 按 Spec 尺寸装配 48px toolbar、28px status、20px rulers、可调/可折叠左右 panel。
   - [ ] 装配 Material/Layers tabs、canvas overlays、四 Property tabs 与 project status panel。
-  - [ ] 实现独立 Base Screen light/dark tokens、focus/disabled/busy/conflict 状态和 reduced motion。
-  - [ ] 对不可用 command 使用 disabled 状态，不在 handler 中静默失败。
-  - [ ] 实现 copy/paste/group/align/save/publish 等快捷键，并排除文本输入。
-  - [ ] undo/redo 后统一刷新 dirty、selection、Layers、Property 和 active gesture。
-  - [ ] 实现小于 1024x640 的不可编辑 warning 和 viewport-contained dialog。
+  - [x] 实现独立 Base Screen dark token、focus/disabled/busy/conflict 状态；light/reduced-motion 仍待完成。
+  - [x] 对不可用 command 使用 disabled 状态，不在 handler 中静默失败。
+  - [x] 实现 copy/paste 快捷键并排除文本输入；group/align/save/publish 快捷键仍待完成。
+  - [x] undo/redo 后统一刷新 dirty、selection、Layers、Property 和 active gesture。
+  - [x] 实现小于 1024x640 的不可编辑 warning；dialog containment 仍待浏览器验证。
   - [ ] 验证两个 Designer 实例无共享 selection/history/clipboard/project controller/layout state。
 
 - [ ] Task 10：实现 Nebula-compatible viewport、工具与作者辅助（R9、R10）。
-  - [ ] 实现 Designer 10%-500% zoom、cursor anchor、fit 30px margin、pan 和 100% reset。
+  - [x] 实现 Designer 10%-500% zoom、cursor anchor、fit 30px margin、pan 和 100% reset。
   - [ ] 实现 20px rulers、draggable guides、24px grid、grid snap 和 5px smart guides。
-  - [ ] 建立 Select/Hand/Text/Rectangle/Ellipse/Image/Zoom 工具 registry 与 scope shortcuts。
-  - [ ] 通过显式 `toolMaterialTypes` 解析 create tool，缺失 Material 时 disabled。
+  - [x] 建立 Select/Hand/Text/Rectangle/Ellipse/Image/Zoom 工具 registry 与 scope shortcuts。
+  - [x] 通过显式 `toolMaterialTypes` 解析 create tool，缺失 Material 时 disabled。
   - [ ] 实现 Text/shape/image click/drag create、4px threshold、Space Hand、Alt duplicate 和分层 Escape。
-  - [ ] 将 Designer history limit 固定为 50，并排除 viewport/guides/layout/clipboard/runtime state。
+  - [x] 将 Designer history limit 固定为 50，并排除 viewport/guides/layout/clipboard/runtime state。
 
 - [ ] Task 11：实现 Nebula-compatible integration surfaces（R11）。
   - [ ] Data tab 只装配 canonical static/host-resource editor，不增加 API/dataset/credential 字段。

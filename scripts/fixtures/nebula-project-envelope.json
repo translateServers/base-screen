@@ -1,0 +1,26 @@
+{
+  "nebulaVersion": 1,
+  "project": {
+    "projectVersion": 1,
+    "document": {
+      "canvas": {
+        "width": 640,
+        "height": 360,
+        "backgroundColor": "#102030"
+      },
+      "components": [
+        {
+          "id": "metric",
+          "type": "base.metric",
+          "name": "Metric",
+          "position": { "x": 24, "y": 24 },
+          "size": { "width": 220, "height": 96 },
+          "props": { "label": "Example" },
+          "style": {},
+          "dataSource": null
+        }
+      ],
+      "variables": []
+    }
+  }
+}
