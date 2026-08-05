@@ -1,4 +1,5 @@
 import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import type { ScreenInteractionState } from '@base-screen/core';
 import {
   isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
@@ -7,9 +8,11 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 
 export interface DesignerLayerItem {
   readonly id: string;
+  readonly parentId: string | null;
   readonly name: string;
   readonly type: string;
   readonly depth: number;
+  readonly hasChildren: boolean;
   readonly hidden: boolean;
   readonly locked: boolean;
   readonly missingMaterial: boolean;
@@ -19,6 +22,18 @@ export interface DesignerLayerView {
   readonly items: readonly DesignerLayerItem[];
   readonly diagnostics: readonly ScreenDiagnostic[];
 }
+
+export interface DesignerLayersRenderOptions {
+  readonly interaction: ScreenInteractionState;
+  readonly search: string;
+  readonly collapsed: ReadonlySet<string>;
+  readonly dropTargetId: string | null | undefined;
+  readonly renameDrafts: ReadonlyMap<string, string>;
+  readonly renderLimit: number;
+  readonly canMove: (componentId: string, direction: 'up' | 'down') => boolean;
+}
+
+export const DESIGNER_LAYER_PAGE_SIZE = 100;
 
 export function createDesignerLayerView(
   document: ScreenDocument | undefined,
@@ -47,9 +62,7 @@ export function createDesignerLayerView(
 export function renderDesignerLayers(
   layers: HTMLElement,
   view: DesignerLayerView,
-  focusedComponentId: string | null,
-  search: string,
-  canMove: (componentId: string, direction: 'up' | 'down') => boolean,
+  options: DesignerLayersRenderOptions,
 ): void {
   layers.replaceChildren();
   const searchControl = layers.ownerDocument.createElement('label');
@@ -58,7 +71,7 @@ export function renderDesignerLayers(
   const input = layers.ownerDocument.createElement('input');
   input.type = 'search';
   input.className = 'designer-control designer-input';
-  input.value = search;
+  input.value = options.search;
   input.placeholder = '搜索';
   input.dataset.layerSearch = 'true';
   searchControl.appendChild(input);
@@ -66,15 +79,87 @@ export function renderDesignerLayers(
 
   const tree = layers.ownerDocument.createElement('div');
   tree.setAttribute('role', 'tree');
-  tree.ariaLabel = '图层';
-  const query = search.trim().toLowerCase();
-  for (const item of view.items) {
-    if (query !== '' && !`${item.name} ${item.type}`.toLowerCase().includes(query)) continue;
+  tree.ariaLabel = options.dropTargetId === null ? '图层，根图层是当前放置目标' : '图层';
+  tree.dataset.layerRoot = 'true';
+  if (options.dropTargetId === null) tree.dataset.dropTarget = 'true';
+  const query = options.search.trim().toLowerCase();
+  const visible = filterDesignerLayerItems(view.items, options.search, options.collapsed);
+  for (const item of visible.slice(0, options.renderLimit)) {
     tree.appendChild(
-      createLayerNode(layers.ownerDocument, item, item.id === focusedComponentId, canMove),
+      createLayerNode(
+        layers.ownerDocument,
+        item,
+        options.interaction.selectedComponentIds.includes(item.id),
+        item.id === options.interaction.focusedComponentId,
+        query === '' && options.collapsed.has(item.id),
+        item.id === options.dropTargetId,
+        options.renameDrafts.get(item.id),
+        options.canMove,
+      ),
     );
   }
+  if (visible.length === 0) {
+    const empty = layers.ownerDocument.createElement('p');
+    empty.className = 'designer-empty-state';
+    empty.setAttribute('role', 'status');
+    empty.textContent = '未找到图层。';
+    tree.appendChild(empty);
+  } else if (visible.length > options.renderLimit) {
+    const more = button(layers.ownerDocument, '显示更多图层', '显示更多图层');
+    more.dataset.layerShowMore = 'true';
+    tree.appendChild(more);
+  }
   layers.appendChild(tree);
+}
+
+export function filterDesignerLayerItems(
+  items: readonly DesignerLayerItem[],
+  search: string,
+  collapsed: ReadonlySet<string>,
+): readonly DesignerLayerItem[] {
+  const query = search.trim().toLowerCase();
+  if (query !== '') {
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const children = new Map<string, string[]>();
+    for (const item of items) {
+      if (item.parentId === null) continue;
+      const siblings = children.get(item.parentId) ?? [];
+      siblings.push(item.id);
+      children.set(item.parentId, siblings);
+    }
+    const visible = new Set<string>();
+    for (const item of items) {
+      if (!matchesLayerQuery(item, query)) continue;
+      let current: DesignerLayerItem | undefined = item;
+      while (current !== undefined && !visible.has(current.id)) {
+        visible.add(current.id);
+        current = current.parentId === null ? undefined : byId.get(current.parentId);
+      }
+      addLayerDescendants(item.id, children, visible);
+    }
+    return items.filter((item) => visible.has(item.id));
+  }
+
+  const hidden = new Set<string>();
+  return items.filter((item) => {
+    if (item.parentId !== null && hidden.has(item.parentId)) {
+      hidden.add(item.id);
+      return false;
+    }
+    if (collapsed.has(item.id)) hidden.add(item.id);
+    return true;
+  });
+}
+
+function addLayerDescendants(
+  componentId: string,
+  children: ReadonlyMap<string, readonly string[]>,
+  visible: Set<string>,
+): void {
+  for (const childId of children.get(componentId) ?? []) {
+    visible.add(childId);
+    addLayerDescendants(childId, children, visible);
+  }
 }
 
 function visitLayer(
@@ -90,9 +175,11 @@ function visitLayer(
     const component = byId.get(id)!;
     items.push({
       id: component.id,
+      parentId,
       name: component.name,
       type: component.type,
       depth,
+      hasChildren: (children.get(component.id)?.length ?? 0) > 0,
       hidden: isScreenComponentEffectivelyHidden(document, component.id),
       locked: isScreenComponentEffectivelyLocked(document, component.id),
       missingMaterial: catalog?.get(component.type) === undefined,
@@ -116,6 +203,10 @@ function createLayerNode(
   ownerDocument: Document,
   item: DesignerLayerItem,
   selected: boolean,
+  focused: boolean,
+  collapsed: boolean,
+  dropTarget: boolean,
+  renameDraft: string | undefined,
   canMove: (componentId: string, direction: 'up' | 'down') => boolean,
 ): HTMLElement {
   const row = ownerDocument.createElement('div');
@@ -125,11 +216,33 @@ function createLayerNode(
   row.ariaLevel = String(item.depth + 1);
   row.ariaSelected = String(selected);
   row.dataset.layerId = item.id;
-  row.draggable = true;
+  row.draggable = !item.hidden && !item.locked;
+  if (focused) row.ariaCurrent = 'true';
+  if (dropTarget) row.dataset.dropTarget = 'true';
+
+  const states = layerStateLabels(item, selected, focused, dropTarget);
+  if (states.length > 0) row.setAttribute('aria-description', states.join('，'));
+
+  if (item.hasChildren) {
+    const collapse = button(
+      ownerDocument,
+      collapsed ? '展开' : '收起',
+      collapsed ? '展开子图层' : '收起子图层',
+    );
+    collapse.dataset.layerCollapse = item.id;
+    collapse.ariaExpanded = String(!collapsed);
+    row.appendChild(collapse);
+  } else {
+    const spacer = ownerDocument.createElement('span');
+    spacer.className = 'layer-collapse-spacer';
+    spacer.setAttribute('aria-hidden', 'true');
+    row.appendChild(spacer);
+  }
 
   const select = button(ownerDocument, item.name, '选择图层');
   select.dataset.layerSelect = item.id;
   select.className = 'layer-select';
+  select.disabled = item.hidden;
   const type = ownerDocument.createElement('small');
   type.textContent = item.type;
   select.appendChild(type);
@@ -138,9 +251,10 @@ function createLayerNode(
   const rename = ownerDocument.createElement('input');
   rename.type = 'text';
   rename.className = 'designer-control designer-input';
-  rename.value = item.name;
+  rename.value = renameDraft ?? item.name;
   rename.dataset.layerRename = item.id;
   rename.ariaLabel = `重命名 ${item.name}`;
+  rename.disabled = item.locked;
   row.appendChild(rename);
   row.appendChild(layerButton(ownerDocument, item, 'hidden', item.hidden ? '显示' : '隐藏'));
   row.appendChild(layerButton(ownerDocument, item, 'locked', item.locked ? '解锁' : '锁定'));
@@ -153,7 +267,32 @@ function createLayerNode(
     diagnostic.textContent = `缺少物料：${item.type}`;
     row.appendChild(diagnostic);
   }
+  if (states.length > 0) {
+    const state = ownerDocument.createElement('small');
+    state.className = 'layer-state';
+    state.textContent = states.join('，');
+    row.appendChild(state);
+  }
   return row;
+}
+
+function matchesLayerQuery(item: DesignerLayerItem, query: string): boolean {
+  return `${item.name} ${item.type}`.toLowerCase().includes(query);
+}
+
+function layerStateLabels(
+  item: DesignerLayerItem,
+  selected: boolean,
+  focused: boolean,
+  dropTarget: boolean,
+): readonly string[] {
+  return [
+    ...(item.hidden ? ['已隐藏'] : []),
+    ...(item.locked ? ['已锁定'] : []),
+    ...(selected ? ['已选中'] : []),
+    ...(focused ? ['当前焦点'] : []),
+    ...(dropTarget ? ['放置目标'] : []),
+  ];
 }
 
 function layerButton(

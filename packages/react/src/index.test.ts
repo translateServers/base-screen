@@ -10,6 +10,8 @@ const manifest = {
   defaultSize: { width: 100, height: 20 },
   defaultProps: { text: 'Label' },
   defaultStyle: {},
+  styleSchema: { kind: 'object' as const, properties: {}, required: [] },
+  stylePanel: [],
   propsSchema: {
     kind: 'object' as const,
     properties: { text: { kind: 'string' as const } },

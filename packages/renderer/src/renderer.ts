@@ -21,6 +21,7 @@ import {
   type BaseScreenRuntimeContributionIndex,
   parseBaseScreenMaterialEventDetail,
   validateBaseScreenMaterialProps,
+  validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
 
 export interface BaseScreenMaterialEvent {
@@ -338,20 +339,9 @@ function prepareCandidates(
       diagnostics.push(...prefixDiagnostics(props.diagnostics, ['components', index, 'props']));
       continue;
     }
-    const style = parseScreenJsonValue(component.style, { maxBytes: 2 * 1024 * 1024 });
-    if (
-      !style.ok ||
-      style.value === null ||
-      typeof style.value !== 'object' ||
-      Array.isArray(style.value)
-    ) {
-      diagnostics.push(
-        diagnostic(
-          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-          ['components', index, 'style'],
-          'Component style is invalid.',
-        ),
-      );
+    const style = validateBaseScreenMaterialStyle(component.style, entry.manifest.styleSchema);
+    if (!style.ok) {
+      diagnostics.push(...prefixDiagnostics(style.diagnostics, ['components', index, 'style']));
       continue;
     }
     const dataState = getDataState(component, entry, index, diagnostics, contributionIndex);
@@ -366,7 +356,7 @@ function prepareCandidates(
         mode,
         interactive,
         props: props.value,
-        style: style.value as ScreenJsonObject,
+        style: style.value,
         size: { width: component.size.width, height: component.size.height },
         dataState,
       },

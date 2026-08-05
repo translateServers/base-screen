@@ -18,9 +18,11 @@ export type {
   BaseScreenMaterialModel,
   BaseScreenMaterialNumberSchema,
   BaseScreenMaterialObjectSchema,
+  BaseScreenMaterialPanelControl,
   BaseScreenMaterialPropertyPanelField,
   BaseScreenMaterialPropSchema,
   BaseScreenMaterialStringSchema,
+  BaseScreenMaterialStylePanelField,
   BaseScreenPluginActivationContext,
   BaseScreenPluginCatalog,
   BaseScreenPluginCatalogEntry,
@@ -38,5 +40,6 @@ export {
   parseBaseScreenMaterialManifest,
   validateBaseScreenMaterialIdentity,
   validateBaseScreenMaterialProps,
+  validateBaseScreenMaterialStyle,
 } from './material.js';
 export { parseBaseScreenPluginManifest, parsePluginCommandRequest } from './plugin.js';

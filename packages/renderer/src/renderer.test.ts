@@ -42,6 +42,8 @@ function createCatalog(): BaseScreenMaterialCatalog {
     defaultSize: { width: 100, height: 40 },
     defaultProps: {},
     defaultStyle: {},
+    styleSchema: { kind: 'object', properties: {}, required: [] },
+    stylePanel: [],
     propsSchema: { kind: 'object', properties: {}, required: [] },
     propertyPanel: [],
     events: [],
@@ -152,5 +154,43 @@ describe('BaseScreenRenderer', () => {
     expect(renderer.render(edited).ok).toBe(true);
     expect(resolveCalls).toBe(1);
     expect(root.children[0]?.model?.dataState.status).toBe('ready');
+  });
+
+  it('R4 rejects a component style that does not satisfy its Material schema', () => {
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const invalid = { ...component('invalid-style', 0), style: { color: 42 } };
+
+    const result = renderer.render(document([invalid]));
+
+    expect(result.ok).toBe(false);
+    expect(root.children).toEqual([]);
+  });
+
+  it('R3 updates a mounted Material model without replacing its element', () => {
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const initial = document([component('material', 0)]);
+
+    expect(renderer.render(initial).ok).toBe(true);
+    const mounted = root.children[0];
+    expect(renderer.render(document([{ ...initial.components[0]!, style: {} }])).ok).toBe(true);
+
+    expect(root.children).toHaveLength(1);
+    expect(root.children[0]).toBe(mounted);
   });
 });

@@ -17,6 +17,8 @@ function materialManifest(overrides: Record<string, unknown> = {}) {
     defaultSize: { width: 320, height: 160 },
     defaultProps: { title: 'Revenue' },
     defaultStyle: {},
+    styleSchema: { kind: 'object' as const, properties: {}, required: [] },
+    stylePanel: [],
     propsSchema: {
       kind: 'object' as const,
       properties: { title: { kind: 'string' as const } },

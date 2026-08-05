@@ -1,5 +1,8 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenRuntimeContributionIndex,
+} from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { renderDesignerDataPanel, renderDesignerProperties } from '../dom/designer-panel-dom.js';
 import { DesignerPanelController } from './designer-panel-controller.js';
@@ -25,6 +28,8 @@ class FakeElement {
   }
 
   addEventListener(): void {}
+
+  setAttribute(): void {}
 
   replaceChildren(...children: FakeElement[]): void {
     this.children.splice(0, this.children.length, ...children);
@@ -70,7 +75,7 @@ function document(
         zIndex: 0,
         status: { locked: false, hidden: false },
         props: { title: 'Status' },
-        style: {},
+        style: { color: '#ffffff' },
         dataSource,
       },
     ],
@@ -91,9 +96,30 @@ function catalog(): BaseScreenMaterialCatalog {
             properties: { title: { kind: 'string' } },
             required: ['title'],
           },
+          stylePanel: [{ style: 'color', label: 'Color', control: 'color' }],
+          styleSchema: {
+            kind: 'object',
+            properties: { color: { kind: 'string' } },
+            required: ['color'],
+          },
         },
       }) as unknown,
   } as unknown as BaseScreenMaterialCatalog;
+}
+
+function resourceAuthority(): BaseScreenRuntimeContributionIndex {
+  return {
+    getResourceType: (resourceType) =>
+      resourceType === 'asset'
+        ? {
+            kind: 'dataResourceType',
+            id: 'asset',
+            name: '资源',
+            configSchema: { kind: 'object', properties: {}, required: [] },
+          }
+        : undefined,
+    hasBlueprintCapability: () => false,
+  };
 }
 
 function descendants(element: FakeElement): FakeElement[] {
@@ -136,7 +162,24 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'input')
         .map((element) => element.dataset.property),
-    ).toEqual(['name', 'x', 'y', 'width', 'height', 'locked', 'hidden', undefined]);
+    ).toEqual([
+      'name',
+      'x',
+      'y',
+      'width',
+      'height',
+      'rotation',
+      'zIndex',
+      'locked',
+      'hidden',
+      undefined,
+      undefined,
+    ]);
+    expect(
+      descendants(properties)
+        .filter((element) => element.tagName === 'h3')
+        .map((element) => element.textContent),
+    ).toEqual(['几何', '状态', '内容', '样式']);
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
       'Status',
     );
@@ -159,7 +202,7 @@ describe('designer panel rendering', () => {
     expect(properties.children[0]?.textContent).toBe('已选择 2 个组件。');
   });
 
-  it('keeps static sources available while gating host-resource sources by host support', () => {
+  it('R9 keeps static sources available and requires host support plus contribution authority', () => {
     const ownerDocument = new FakeDocument();
     const withoutHost = ownerDocument.createElement('div');
     const withHost = ownerDocument.createElement('div');
@@ -171,6 +214,7 @@ describe('designer panel rendering', () => {
       { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
       catalog(),
       false,
+      undefined,
     );
     renderDesignerDataPanel(
       withHost as unknown as HTMLElement,
@@ -178,6 +222,7 @@ describe('designer panel rendering', () => {
       { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
       catalog(),
       true,
+      resourceAuthority(),
     );
 
     expect(
@@ -213,6 +258,7 @@ describe('DesignerPanelController property drafts', () => {
       getGroupMaterialType: () => undefined,
       getInteraction: () => ({ selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' }),
       getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
       getZoom: () => 1,
       redo: () => ({ ok: true, value: document(), diagnostics: [] }),
       reduceSelection: () => undefined,
@@ -231,7 +277,7 @@ describe('DesignerPanelController property drafts', () => {
           severity: 'error',
           code: 'CORE_COMMAND_INVALID',
           path: [],
-          message: 'Designer property draft is invalid.',
+          message: '字段值无效，未保存修改。',
         },
       ],
     ]);

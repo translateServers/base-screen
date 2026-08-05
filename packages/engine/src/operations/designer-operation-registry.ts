@@ -54,6 +54,13 @@ export class DesignerOperationRegistry<Context> {
 export const DESIGNER_OPERATION_TEXT = {
   undo: { label: '撤销', tooltip: '撤销上一步操作' },
   redo: { label: '重做', tooltip: '重做上一步操作' },
+  'select-all': { label: '全选', tooltip: '选择全部组件' },
+  delete: { label: '删除', tooltip: '删除选中组件' },
+  escape: { label: '取消', tooltip: '取消当前操作' },
+  'nudge-left': { label: '左移', tooltip: '向左微调' },
+  'nudge-right': { label: '右移', tooltip: '向右微调' },
+  'nudge-up': { label: '上移', tooltip: '向上微调' },
+  'nudge-down': { label: '下移', tooltip: '向下微调' },
   copy: { label: '复制', tooltip: '复制选中组件' },
   paste: { label: '粘贴', tooltip: '粘贴组件' },
   group: { label: '编组', tooltip: '将选中组件编组' },

@@ -28,6 +28,8 @@ const resourceManifest = {
   defaultSize: { width: 100, height: 40 },
   defaultProps: {},
   defaultStyle: {},
+  styleSchema: { kind: 'object' as const, properties: {}, required: [] },
+  stylePanel: [],
   propsSchema: { kind: 'object' as const, properties: {}, required: [] },
   propertyPanel: [],
   events: ['fire'],

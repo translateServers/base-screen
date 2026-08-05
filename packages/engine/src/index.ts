@@ -16,11 +16,15 @@ import type {
 } from '@base-screen/contracts';
 import { parseScreenDocument, serializeScreenDocument } from '@base-screen/contracts';
 import {
+  isScreenComponentEffectivelyLocked,
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
   type ScreenInteractionAction,
 } from '@base-screen/core';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenRuntimeContributionIndex,
+} from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerGestureController } from './controllers/designer-gesture-controller.js';
 import { DesignerImportController } from './controllers/designer-import-controller.js';
@@ -32,6 +36,7 @@ import { DesignerProjectFeedbackController } from './controllers/designer-projec
 import { DesignerViewportController } from './controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from './controllers/designer-workbench-controller.js';
 import type { ScreenProjectPhase } from './controllers/project-controller.js';
+import { renderDesignerInteractionPanel } from './dom/designer-interaction-dom.js';
 import { renderDesignerSelection } from './dom/designer-selection-dom.js';
 import { createDesignerWorkspace } from './dom/designer-workspace.js';
 import {
@@ -69,6 +74,7 @@ interface DesignerOperationContext {
 
 export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
+  #runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
   #groupMaterialType: string | undefined;
   #toolMaterialTypes: DesignerToolMaterialTypes | undefined;
@@ -78,6 +84,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   #selection: HTMLDivElement | undefined;
   #properties: HTMLDivElement | undefined;
   #dataPanel: HTMLDivElement | undefined;
+  #interactionPanel: HTMLDivElement | undefined;
   #statusFeedback: HTMLElement | undefined;
   #layers: HTMLDivElement | undefined;
   readonly #session = new DesignerSession({
@@ -114,7 +121,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     isHandActive: () => this.#viewportController.activeTool === 'hand',
     getActiveTool: () => this.#viewportController.activeTool,
     getToolMaterialTypes: () => this.#toolMaterialTypes,
-    snapCanvasPoint: (point) => this.#workbenchController.snapPoint(point),
+    snapCanvasPoint: (point, excludedComponentIds) =>
+      this.#workbenchController.snapPoint(point, excludedComponentIds),
+    renderSnapPreview: (point) => this.#workbenchController.renderSnapPreview(point),
     reduceSelection: (action) => this.#session.reduceSelection(action),
     reportTransaction: (transaction) => this.executeDesignerTransaction(transaction),
     renderSelection: () => this.renderSelection(),
@@ -131,6 +140,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     getCatalog: () => this.#catalog,
     getDocument: () => this.#session.document,
     getInteraction: () => this.#session.interaction,
+    getRuntimeContributions: () => this.#runtimeContributions,
     executeCommand: (command) => this.executeDesignerCommand(command),
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
   });
@@ -157,6 +167,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     getGroupMaterialType: () => this.#groupMaterialType,
     getInteraction: () => this.#session.interaction,
     getResourcePort: () => this.#resourcePort,
+    getRuntimeContributions: () => this.#runtimeContributions,
     executeCommand: (command) => this.executeDesignerCommand(command),
     executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
     reduceSelection: (action) => this.#session.reduceSelection(action),
@@ -168,11 +179,19 @@ export class BaseScreenDesignerElement extends ElementBase {
   });
   readonly #viewportController = new DesignerViewportController({
     getDocument: () => this.#session.document,
-    onBlur: () => this.cancelGesture(),
-    onToolChange: () => this.renderControls(),
+    onBlur: () => {
+      this.cancelGesture();
+      this.#workbenchController.cancelTransientState();
+    },
+    onToolChange: () => {
+      this.#workbenchController.cancelTransientState();
+      this.renderControls();
+    },
+    onViewportChange: () => this.#workbenchController.renderCanvasPrecision(),
   });
   readonly #workbenchController = new DesignerWorkbenchController({
     getCanvas: () => this.#canvas,
+    getDocument: () => this.#session.document,
     getRoot: () => this.shadowRoot,
     getZoom: () => this.#viewportController.state.zoom,
   });
@@ -201,6 +220,56 @@ export class BaseScreenDesignerElement extends ElementBase {
       'redo',
       () => this.#session.canRedo,
       () => this.report(this.redo()),
+    ),
+    this.operation(
+      'select-all',
+      () => (this.#session.document?.components.length ?? 0) > 0,
+      () => {
+        const document = this.#session.document;
+        if (document === undefined) return;
+        const componentIds = document.components.map((component) => component.id);
+        this.#session.reduceSelection({
+          type: 'replace-selection',
+          componentIds,
+          focusedComponentId: componentIds.at(-1) ?? null,
+        });
+      },
+      'canvas',
+    ),
+    this.operation(
+      'delete',
+      () => this.canMutateSelection(),
+      () => this.deleteSelection(),
+      'canvas',
+    ),
+    this.operation(
+      'escape',
+      () => this.#session.interaction.selectedComponentIds.length > 0,
+      () => {
+        this.cancelGesture();
+        this.#session.reduceSelection({ type: 'clear-selection' });
+      },
+      'canvas',
+    ),
+    this.operation(
+      'nudge-left',
+      () => this.canMutateSelection(),
+      () => this.nudgeSelection(-1, 0),
+    ),
+    this.operation(
+      'nudge-right',
+      () => this.canMutateSelection(),
+      () => this.nudgeSelection(1, 0),
+    ),
+    this.operation(
+      'nudge-up',
+      () => this.canMutateSelection(),
+      () => this.nudgeSelection(0, -1),
+    ),
+    this.operation(
+      'nudge-down',
+      () => this.canMutateSelection(),
+      () => this.nudgeSelection(0, 1),
     ),
     this.operation(
       'copy',
@@ -369,6 +438,21 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     this.#catalog = value;
     this.initialize();
+  }
+
+  get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
+    return this.#runtimeContributions;
+  }
+
+  set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
+    this.#runtimeContributions = value;
+    if (this.#renderer !== undefined) {
+      this.#renderer.dispose();
+      this.#renderer = undefined;
+      this.createRenderer();
+      if (this.#session.document !== undefined) this.renderDocument(this.#session.document);
+    }
+    this.renderInteraction();
   }
 
   get projectAdapter(): ScreenProjectAdapter | undefined {
@@ -612,6 +696,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#selection = shadow.querySelector<HTMLDivElement>('[data-selection]')!;
     this.#properties = shadow.querySelector<HTMLDivElement>('[data-properties]')!;
     this.#dataPanel = shadow.querySelector<HTMLDivElement>('[data-inspector-pane="data"]')!;
+    this.#interactionPanel = shadow.querySelector<HTMLDivElement>(
+      '[data-inspector-pane="interaction"]',
+    )!;
     this.#statusFeedback = shadow.querySelector<HTMLElement>('[data-status-feedback]')!;
     this.#integrationController.connect(
       shadow.querySelector<HTMLDivElement>('[data-events-panel]')!,
@@ -626,14 +713,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       shadow.querySelector<HTMLElement>('[data-project-conflict]')!,
     );
     this.#workbenchController.initialize();
-    this.#renderer = createBaseScreenRenderer({
-      root: this.#canvas,
-      catalog: this.#catalog,
-      mode: 'design',
-      interactive: false,
-      onMaterialEvent: () => undefined,
-      resourcePort: this.#resourcePort,
-    });
+    this.createRenderer();
     this.#gestureController.connect(this.#canvas);
     this.#viewportController.connect(this.#viewportElement, this.#canvas);
     shadow.addEventListener('click', (event) => {
@@ -650,10 +730,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     });
     shadow.addEventListener('change', (event) => {
       if (this.onImportChange(event)) return;
+      if (this.#integrationController.onChange(event)) return;
       if (this.#layersController.onChange(event)) return;
       this.#panelController.onPropertyChange(event);
     });
-    shadow.addEventListener('input', (event) => this.#layersController.onChange(event));
+    shadow.addEventListener('input', (event) => this.#layersController.onInput(event));
     shadow.addEventListener('dragstart', (event) =>
       this.#layersController.onDragStart(event as DragEvent),
     );
@@ -671,7 +752,34 @@ export class BaseScreenDesignerElement extends ElementBase {
     shadow.addEventListener('pointerup', (event) =>
       this.#workbenchController.onPointerUp(event as PointerEvent),
     );
-    shadow.addEventListener('keydown', (event) => this.onKeyDown(event as KeyboardEvent));
+    shadow.addEventListener('dblclick', (event) =>
+      this.#workbenchController.onDoubleClick(event as MouseEvent),
+    );
+    shadow.addEventListener('pointercancel', () =>
+      this.#workbenchController.cancelTransientState(),
+    );
+    shadow.addEventListener('lostpointercapture', () =>
+      this.#workbenchController.cancelTransientState(),
+    );
+    shadow.addEventListener('keydown', (event) => {
+      const keyboardEvent = event as KeyboardEvent;
+      const inspectorDraft = getInspectorDraftTarget(keyboardEvent);
+      if (
+        keyboardEvent.key === 'Enter' &&
+        !keyboardEvent.isComposing &&
+        inspectorDraft !== undefined &&
+        !isTextAreaDraft(inspectorDraft)
+      ) {
+        keyboardEvent.preventDefault();
+        this.#panelController.onPropertyChange({ target: inspectorDraft } as Event);
+        return;
+      }
+      if (this.#layersController.onKeyDown(keyboardEvent)) return;
+      if (this.#integrationController.onKeyDown(keyboardEvent)) return;
+      if (!this.#panelController.onKeyDown(keyboardEvent)) {
+        this.onKeyDown(keyboardEvent);
+      }
+    });
     shadow.addEventListener('keyup', (event) =>
       this.#viewportController.onKeyUp(event as KeyboardEvent),
     );
@@ -695,6 +803,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   private renderInteraction(): void {
     this.renderSelection();
     this.renderProperties();
+    this.renderInspectorInteraction();
     this.renderLayers();
     this.renderControls();
     this.#integrationController.render();
@@ -723,6 +832,34 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   private renderProperties(): void {
     this.#panelController.render(this.#properties, this.#dataPanel);
+  }
+
+  private renderInspectorInteraction(): void {
+    const available = renderDesignerInteractionPanel(
+      this.#interactionPanel,
+      this.#session.document,
+      this.#session.interaction,
+      this.#catalog,
+      this.#runtimeContributions,
+    );
+    this.shadowRoot
+      ?.querySelector<HTMLButtonElement>('[data-inspector-tab="interaction"]')
+      ?.toggleAttribute('disabled', !available);
+  }
+
+  private createRenderer(): void {
+    if (this.#canvas === undefined || this.#catalog === undefined) return;
+    this.#renderer = createBaseScreenRenderer({
+      root: this.#canvas,
+      catalog: this.#catalog,
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: () => undefined,
+      resourcePort: this.#resourcePort,
+      ...(this.#runtimeContributions === undefined
+        ? {}
+        : { contributionIndex: this.#runtimeContributions }),
+    });
   }
 
   private executeOperationFromTarget(target: Element): boolean {
@@ -794,17 +931,43 @@ export class BaseScreenDesignerElement extends ElementBase {
     if (this.#workbenchController.onKeyDown(event)) return;
     if (!isEditable(event.target) && (event.ctrlKey || event.metaKey) && !event.altKey) {
       const id =
-        event.key.toLowerCase() === 'c'
-          ? 'copy'
-          : event.key.toLowerCase() === 'v'
-            ? 'paste'
-            : undefined;
+        event.key.toLowerCase() === 'a'
+          ? 'select-all'
+          : event.key.toLowerCase() === 'c'
+            ? 'copy'
+            : event.key.toLowerCase() === 'v'
+              ? 'paste'
+              : event.key.toLowerCase() === 'z'
+                ? event.shiftKey
+                  ? 'redo'
+                  : 'undo'
+                : event.key.toLowerCase() === 'y'
+                  ? 'redo'
+                  : undefined;
       if (id !== undefined && this.#operations.execute(id, undefined)) {
         event.preventDefault();
         return;
       }
     }
     if (!isEditable(event.target) && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      const id =
+        event.key === 'Escape'
+          ? 'escape'
+          : event.key === 'Delete' || event.key === 'Backspace'
+            ? 'delete'
+            : event.key === 'ArrowLeft'
+              ? 'nudge-left'
+              : event.key === 'ArrowRight'
+                ? 'nudge-right'
+                : event.key === 'ArrowUp'
+                  ? 'nudge-up'
+                  : event.key === 'ArrowDown'
+                    ? 'nudge-down'
+                    : undefined;
+      if (id !== undefined && this.#operations.execute(id, undefined)) {
+        event.preventDefault();
+        return;
+      }
       const tool = getDesignerToolForShortcut(event.key);
       if (tool !== undefined && this.#operations.execute(`tool.${tool}`, undefined)) {
         event.preventDefault();
@@ -812,6 +975,42 @@ export class BaseScreenDesignerElement extends ElementBase {
       }
     }
     if (!event.defaultPrevented) this.#viewportController.onKeyDown(event);
+  }
+
+  private canMutateSelection(): boolean {
+    const document = this.#session.document;
+    if (document === undefined) return false;
+    const selected = selectedComponents(document, this.#session.interaction.selectedComponentIds);
+    return (
+      selected.length > 0 &&
+      new Set(selected.map((component) => component.parentId)).size === 1 &&
+      selected.every((component) => !isScreenComponentEffectivelyLocked(document, component.id))
+    );
+  }
+
+  private deleteSelection(): void {
+    if (!this.canMutateSelection()) return;
+    const componentIds = this.#session.interaction.selectedComponentIds;
+    const result = this.executeDesignerCommand({ type: 'remove-components', componentIds });
+    if (result.ok) this.#session.reduceSelection({ type: 'clear-selection' });
+    else this.report(result);
+  }
+
+  private nudgeSelection(x: number, y: number): void {
+    const document = this.#session.document;
+    if (document === undefined || !this.canMutateSelection()) return;
+    const selected = selectedComponents(document, this.#session.interaction.selectedComponentIds);
+    this.report(
+      this.executeDesignerTransaction({
+        commands: selected.map((component) => ({
+          type: 'update-components' as const,
+          componentIds: [component.id],
+          patch: {
+            position: { x: component.position.x + x, y: component.position.y + y },
+          },
+        })),
+      }),
+    );
   }
 
   private renderProjectStatus(): void {
@@ -919,7 +1118,8 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   private resetSessionSurfaces(): void {
     this.cancelGesture();
-    this.#workbenchController.cancelTransientState();
+    this.#workbenchController.clearGuides();
+    this.#layersController.clearSessionState();
     this.#panelController.clearClipboard();
     this.#integrationController.clear();
     this.#projectFeedbackController.clear();
@@ -998,4 +1198,24 @@ function isEditable(target: EventTarget | null): boolean {
     target instanceof HTMLTextAreaElement ||
     (target instanceof HTMLElement && target.isContentEditable)
   );
+}
+
+function isInspectorDraft(target: EventTarget | null): boolean {
+  const dataset = (target as { readonly dataset?: DOMStringMap } | null)?.dataset;
+  return (
+    dataset !== undefined &&
+    (dataset.property !== undefined ||
+      dataset.prop !== undefined ||
+      dataset.canvasProperty !== undefined ||
+      dataset.dataSourceType !== undefined ||
+      dataset.dataSourceField !== undefined)
+  );
+}
+
+function getInspectorDraftTarget(event: KeyboardEvent): EventTarget | undefined {
+  return event.composedPath().find((target) => isInspectorDraft(target));
+}
+
+function isTextAreaDraft(target: EventTarget | null): boolean {
+  return (target as { readonly tagName?: string } | null)?.tagName === 'TEXTAREA';
 }

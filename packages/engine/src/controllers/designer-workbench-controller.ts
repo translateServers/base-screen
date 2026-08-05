@@ -1,11 +1,16 @@
+import type { ScreenDocument } from '@base-screen/contracts';
 import {
+  collectDesignerSnapCandidates,
   DEFAULT_DESIGNER_CANVAS_AIDS,
   type DesignerCanvasAidsState,
+  type DesignerSnapPoint,
+  getDesignerRulerMarks,
   snapDesignerCanvasPoint,
 } from '../viewport/designer-canvas-aids.js';
 
 interface DesignerWorkbenchCallbacks {
   readonly getCanvas: () => HTMLDivElement | undefined;
+  readonly getDocument: () => ScreenDocument | undefined;
   readonly getRoot: () => ShadowRoot | null;
   readonly getZoom: () => number;
 }
@@ -22,25 +27,65 @@ export class DesignerWorkbenchController {
   #rightTab: RightTab = 'appearance';
   #canvasAids: DesignerCanvasAidsState = DEFAULT_DESIGNER_CANVAS_AIDS;
   #guides: { x: number[]; y: number[] } = { x: [], y: [] };
-  #guideDrag: { readonly axis: GuideAxis; readonly pointerId: number } | undefined;
+  #guideDrag:
+    | {
+        readonly axis: GuideAxis;
+        readonly guideIndex: number | undefined;
+        readonly pointerId: number;
+      }
+    | undefined;
+  #guidePreview: { readonly axis: GuideAxis; readonly value: number } | undefined;
+  #snapPreview: { readonly x: number | undefined; readonly y: number | undefined } | undefined;
   #panelResize: { readonly side: PanelSide; readonly pointerId: number } | undefined;
   #panelResizeCaptureTarget: HTMLElement | undefined;
   #guideCaptureTarget: HTMLDivElement | undefined;
+  #connectedCanvas: HTMLDivElement | undefined;
 
   constructor(private readonly callbacks: DesignerWorkbenchCallbacks) {}
 
   initialize(): void {
+    this.connect(this.callbacks.getCanvas());
     this.renderLayout();
     this.renderTabs();
     this.renderCanvasAids();
-    this.renderGuides(this.#guides);
+    this.renderGuides();
+    this.renderRulers();
   }
 
-  snapPoint(point: { readonly x: number; readonly y: number }): {
-    readonly x: number;
-    readonly y: number;
-  } {
-    return snapDesignerCanvasPoint(point, this.#canvasAids, this.#guides);
+  connect(canvas: HTMLDivElement | undefined): void {
+    if (canvas === undefined || this.#connectedCanvas === canvas) return;
+    this.disconnect();
+    this.#connectedCanvas = canvas;
+    canvas.addEventListener('pointerdown', (event) => this.onCanvasPointerDown(event));
+    canvas.addEventListener('dblclick', (event) => this.onDoubleClick(event));
+    canvas.addEventListener('lostpointercapture', () => this.cancelTransientState());
+  }
+
+  disconnect(): void {
+    this.cancelTransientState();
+    this.#connectedCanvas = undefined;
+  }
+
+  snapPoint(
+    point: { readonly x: number; readonly y: number },
+    excludedComponentIds: readonly string[] = [],
+  ): DesignerSnapPoint {
+    const document = this.callbacks.getDocument();
+    const candidates =
+      document === undefined
+        ? this.#guides
+        : collectDesignerSnapCandidates(document, this.#guides, excludedComponentIds);
+    return snapDesignerCanvasPoint(point, this.#canvasAids, candidates, this.callbacks.getZoom());
+  }
+
+  renderSnapPreview(point: DesignerSnapPoint | undefined): void {
+    this.#snapPreview = point === undefined ? undefined : { x: point.snappedX, y: point.snappedY };
+    this.renderGuides();
+  }
+
+  renderCanvasPrecision(): void {
+    this.renderGuides();
+    this.renderRulers();
   }
 
   toggleCanvasAid(aid: 'gridEnabled' | 'gridSnapEnabled'): void {
@@ -119,10 +164,7 @@ export class DesignerWorkbenchController {
         : undefined;
     const canvas = this.callbacks.getCanvas();
     if (axis === undefined || canvas === undefined) return;
-    canvas.setPointerCapture(event.pointerId);
-    this.#guideCaptureTarget = canvas;
-    this.#guideDrag = { axis, pointerId: event.pointerId };
-    this.moveGuide(event);
+    this.startGuideDrag(axis, undefined, event, canvas);
   }
 
   onPointerMove(event: PointerEvent): void {
@@ -135,9 +177,23 @@ export class DesignerWorkbenchController {
     this.commitGuide(event);
   }
 
+  onDoubleClick(event: MouseEvent): void {
+    const target = event.composedPath?.()[0] ?? event.target;
+    this.onCanvasDoubleClick(target, event);
+  }
+
   cancelTransientState(): void {
     this.releaseGuideDrag();
     this.releasePanelResize();
+    this.#guidePreview = undefined;
+    this.#snapPreview = undefined;
+    this.renderGuides();
+  }
+
+  clearGuides(): void {
+    this.cancelTransientState();
+    this.#guides = { x: [], y: [] };
+    this.renderGuides();
   }
 
   private renderLayout(): void {
@@ -188,7 +244,8 @@ export class DesignerWorkbenchController {
     const value =
       (drag.axis === 'x' ? event.clientX - bounds.left : event.clientY - bounds.top) /
       this.callbacks.getZoom();
-    this.renderGuides({ ...this.#guides, [drag.axis]: [value] });
+    this.#guidePreview = { axis: drag.axis, value };
+    this.renderGuides();
   }
 
   private commitGuide(event: PointerEvent): void {
@@ -199,9 +256,16 @@ export class DesignerWorkbenchController {
     const value =
       (drag.axis === 'x' ? event.clientX - bounds.left : event.clientY - bounds.top) /
       this.callbacks.getZoom();
-    this.#guides[drag.axis].push(value);
+    if (drag.guideIndex !== undefined) {
+      if (this.isGuideWithinCanvas(drag.axis, value))
+        this.#guides[drag.axis][drag.guideIndex] = value;
+      else this.#guides[drag.axis].splice(drag.guideIndex, 1);
+    } else if (this.isGuideWithinCanvas(drag.axis, value)) {
+      this.#guides[drag.axis].push(value);
+    }
     this.releaseGuideDrag();
-    this.renderGuides(this.#guides);
+    this.#guidePreview = undefined;
+    this.renderGuides();
   }
 
   private releasePanelResize(pointerId?: number): void {
@@ -224,15 +288,103 @@ export class DesignerWorkbenchController {
     this.#guideCaptureTarget = undefined;
   }
 
-  private renderGuides(guides: {
-    readonly x: readonly number[];
-    readonly y: readonly number[];
-  }): void {
+  private startGuideDrag(
+    axis: GuideAxis,
+    guideIndex: number | undefined,
+    event: PointerEvent,
+    canvas: HTMLDivElement,
+  ): void {
+    canvas.setPointerCapture(event.pointerId);
+    this.#guideCaptureTarget = canvas;
+    this.#guideDrag = { axis, guideIndex, pointerId: event.pointerId };
+    this.moveGuide(event);
+  }
+
+  private onCanvasPointerDown(event: PointerEvent): void {
+    const target = event.target as HTMLElement | null;
+    const guide = target?.closest<HTMLElement>('[data-canvas-guide]');
+    const axis = guide?.dataset.axis;
+    const index = Number(guide?.dataset.guideIndex);
+    const canvas = this.callbacks.getCanvas();
+    if ((axis !== 'x' && axis !== 'y') || !Number.isInteger(index) || canvas === undefined) return;
+    event.stopImmediatePropagation();
+    this.startGuideDrag(axis, index, event, canvas);
+  }
+
+  private onCanvasDoubleClick(target: EventTarget | null, event: MouseEvent): void {
+    const element = target as { closest?: (selector: string) => HTMLElement | null } | null;
+    const guide = element?.closest?.('[data-canvas-guide]');
+    const axis = guide?.dataset.axis;
+    const index = Number(guide?.dataset.guideIndex);
+    if ((axis !== 'x' && axis !== 'y') || !Number.isInteger(index)) return;
+    this.#guides[axis].splice(index, 1);
+    event.stopImmediatePropagation();
+    this.renderGuides();
+  }
+
+  private isGuideWithinCanvas(axis: GuideAxis, value: number): boolean {
+    const document = this.callbacks.getDocument();
+    const limit = axis === 'x' ? document?.canvas.width : document?.canvas.height;
+    return limit !== undefined && Number.isFinite(value) && value >= 0 && value <= limit;
+  }
+
+  private renderGuides(): void {
     const container = this.callbacks.getRoot()?.querySelector<HTMLElement>('[data-canvas-guides]');
     if (container === null || container === undefined) return;
     container.replaceChildren();
-    for (const x of guides.x) container.appendChild(this.createGuide('x', x));
-    for (const y of guides.y) container.appendChild(this.createGuide('y', y));
+    for (const axis of ['x', 'y'] as const) {
+      for (const [index, value] of this.#guides[axis].entries()) {
+        const preview = this.#guidePreview;
+        if (preview?.axis === axis && this.#guideDrag?.guideIndex === index) {
+          if (this.isGuideWithinCanvas(axis, preview.value)) {
+            container.appendChild(this.createGuide(axis, preview.value, 'preview'));
+          }
+          continue;
+        }
+        container.appendChild(this.createGuide(axis, value, 'persistent', index));
+      }
+      if (
+        this.#guidePreview?.axis === axis &&
+        this.#guideDrag?.guideIndex === undefined &&
+        this.isGuideWithinCanvas(axis, this.#guidePreview.value)
+      ) {
+        container.appendChild(this.createGuide(axis, this.#guidePreview.value, 'preview'));
+      }
+      const snapValue = this.#snapPreview?.[axis];
+      if (snapValue !== undefined) container.appendChild(this.createGuide(axis, snapValue, 'snap'));
+    }
+  }
+
+  private renderRulers(): void {
+    const root = this.callbacks.getRoot();
+    const canvas = this.callbacks.getCanvas();
+    if (root === null || canvas === undefined) return;
+    const canvasBounds = canvas.getBoundingClientRect();
+    this.renderRuler(root.querySelector<HTMLElement>('.ruler-horizontal'), 'x', canvasBounds);
+    this.renderRuler(root.querySelector<HTMLElement>('.ruler-vertical'), 'y', canvasBounds);
+  }
+
+  private renderRuler(ruler: HTMLElement | null, axis: GuideAxis, canvasBounds: DOMRect): void {
+    if (ruler === null) return;
+    const bounds = ruler.getBoundingClientRect();
+    const length = axis === 'x' ? bounds.width : bounds.height;
+    const origin = axis === 'x' ? canvasBounds.left - bounds.left : canvasBounds.top - bounds.top;
+    const marks = getDesignerRulerMarks({
+      devicePixelRatio: globalThis.devicePixelRatio,
+      length,
+      origin,
+      zoom: this.callbacks.getZoom(),
+    });
+    ruler.replaceChildren(
+      ...marks.map((mark) => {
+        const tick = ruler.ownerDocument.createElement('span');
+        tick.className = 'ruler-mark';
+        tick.dataset.rulerMark = String(mark.value);
+        tick.style[axis === 'x' ? 'left' : 'top'] = `${mark.position}px`;
+        tick.textContent = mark.label;
+        return tick;
+      }),
+    );
   }
 
   private renderCanvasAids(): void {
@@ -248,10 +400,19 @@ export class DesignerWorkbenchController {
       ?.setAttribute('aria-pressed', String(this.#canvasAids.gridSnapEnabled));
   }
 
-  private createGuide(axis: GuideAxis, value: number): HTMLElement {
+  private createGuide(
+    axis: GuideAxis,
+    value: number,
+    kind: 'persistent' | 'preview' | 'snap',
+    index?: number,
+  ): HTMLElement {
     const guide = this.callbacks.getCanvas()!.ownerDocument.createElement('div');
-    guide.className = 'canvas-guide';
+    guide.className = `canvas-guide canvas-guide-${kind}`;
     guide.dataset.axis = axis;
+    if (kind === 'persistent' && index !== undefined) {
+      guide.dataset.canvasGuide = 'true';
+      guide.dataset.guideIndex = String(index);
+    }
     guide.style[axis === 'x' ? 'left' : 'top'] = `${value}px`;
     return guide;
   }

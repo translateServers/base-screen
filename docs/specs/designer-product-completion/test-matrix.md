@@ -1,6 +1,6 @@
 # Designer Product Completion 测试矩阵
 
-> 状态：规划中
+> 状态：已验证
 > 最近更新：2026-08-05
 > 依据：[spec.md](./spec.md)
 
@@ -29,18 +29,18 @@ subtree painter order；每次 render 都会重启全部 host-resource resolve�
 
 | Requirement | Task | 目标测试与证据 | 状态 |
 | --- | --- | --- | --- |
-| R1 来源与范围 | 1、12 | provenance verifier：冻结 commit、允许/排除路径、逐文件映射、bundle/声明/tarball 私有路径扫描 | Planned |
+| R1 来源与范围 | 1、12 | provenance verifier、`scripts/verify-tarballs.mjs` 和 `pnpm verify:m0` | Implemented |
 | R2 可信基线 | 1、2 | `packages/renderer/src/renderer.test.ts`: `R2 keeps every root subtree within its Core painter-order span`, `R2 does not restart an unchanged host-resource resolve for unrelated edits`; `packages/renderer/src/viewer.test.ts`: `R2 rejects renderer configuration drift until unload releases the renderer`; `scripts/verify-browser-harness.mjs`: material child click and direct preview flow | Implemented |
-| R3 真实官方物料 | 3、4 | Plugin Core manifest parser；Material DOM/conformance；Designer create/transform/save/preview；Viewer model reuse | Planned |
-| R4 声明式内容样式 | 3、5 | Plugin Core style schema/panel parser；Plugin SDK builder；Engine inspector valid/invalid/draft/multi-select cases | Planned |
-| R5 统一作者操作 | 2、5、6、7、8 | operation registry；multi-selection drag；shortcut scopes；single-history pointer/keyboard/layers/property cases | Planned |
-| R6 图层完整性 | 7 | Layers DOM：modifier selection、collapse、rename；Core/Engine：reorder/reparent/root drop/invalid hierarchy | Planned |
-| R7 精确画布 | 8 | viewport/ruler pure tests；gesture guide lifecycle；browser pan/zoom/guide/snap matrix at 10%-500% | Planned |
-| R8 工作台视觉质量 | 5、7、8、9 | style static verifier；control DOM states；Chromium contrast/geometry/overflow/isolation/current screenshots | Planned |
-| R9 数据与交互渐进集成 | 4、10 | Material data-state DOM；Renderer resource generation stability；Engine capability-gated Data/Interaction DOM | Planned |
-| R10 Canonical Blueprint 作者能力 | 11 | Contracts/Core existing regression；Engine events/condition/expression/action/history/capability/keyboard cases | Planned |
-| R11 隔离与可访问性 | 2-11 | dual Designer DOM/browser; Material/host style canary; keyboard/focus/ARIA/forced-colors/reduced-motion | Planned |
-| R12 发布级证据 | 1、12 | focused package gates、Designer Chromium、API/boundary/no-side-effect/tarball、`pnpm verify:m0` | Planned |
+| R3 真实官方物料 | 3、4 | `packages/material/src/index.test.ts`: `R3 publishes valid Chinese manifests and matching constructors without registration`, `R3 auto-registers exactly the official Material tags`; `packages/renderer/src/renderer.test.ts`: `R3 updates a mounted Material model without replacing its element`; `scripts/verify-browser-harness.mjs`: official registry, rectangle, ellipse, image, container, palette, design/preview/viewer and Material event assertions | Implemented |
+| R4 声明式内容样式 | 3、5 | `packages/plugin-core/src/plugin-core.test.ts`: style schema/panel and `color` parser cases; `packages/renderer/src/renderer.test.ts`: invalid style fail closed; `packages/engine/src/controllers/designer-panel-controller.test.ts`: section and Manifest control projection; `scripts/verify-browser-harness.mjs`: Enter commit, invalid draft ARIA/message and editable shortcut assertions | Implemented |
+| R5 统一作者操作 | 2、5、6、7、8 | `designer-operation-registry.test.ts`、`designer-gesture-controller.test.ts`、`verify-browser-harness.mjs` | Implemented |
+| R6 图层完整性 | 7 | `designer-layers-controller.test.ts`、`designer-layers-dom.test.ts` | Implemented |
+| R7 精确画布 | 8 | `designer-canvas-aids.test.ts`、`designer-workbench-controller.test.ts`、browser harness | Implemented |
+| R8 工作台视觉质量 | 5、7、8、9 | `designer-style.test.ts`、`check-designer-styles.mjs`、browser screenshots | Implemented |
+| R9 数据与交互渐进集成 | 4、10 | `designer-panel-dom.test.ts`、`designer-interaction-dom.test.ts`、Material/Renderer regressions | Implemented |
+| R10 Canonical Blueprint 作者能力 | 11 | `designer-integration-controller.test.ts`、`designer-blueprint-dom.test.ts`、browser harness | Implemented |
+| R11 隔离与可访问性 | 2-11 | dual Designer browser workflow、DOM/controller tests、style verifier | Implemented |
+| R12 发布级证据 | 1、12 | `pnpm verify:browser`、`pnpm verify:m0`、tarball consumers | Implemented |
 
 ## 计划文件
 

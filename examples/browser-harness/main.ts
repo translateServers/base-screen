@@ -1,12 +1,25 @@
 import { createElement } from 'react';
 import { h } from 'vue';
 import {
+  BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
+  BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
+  BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
+  BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BaseScreenContainerMaterialElement,
+  BaseScreenEllipseMaterialElement,
+  BaseScreenImageMaterialElement,
+  BaseScreenRectangleMaterialElement,
   BaseScreenTextMaterialElement,
+  defineBaseScreenContainerMaterial,
+  defineBaseScreenEllipseMaterial,
+  defineBaseScreenImageMaterial,
+  defineBaseScreenRectangleMaterial,
   defineBaseScreenTextMaterial,
 } from '../../packages/material/src/index.ts';
 import {
   type BaseScreenMaterialConstructor,
+  type BaseScreenPluginRuntime,
   createBaseScreenMaterialCatalog,
 } from '../../packages/plugin-core/src/index.ts';
 import { createBaseScreenPluginManager } from '../../packages/plugin-manager/src/index.ts';
@@ -19,23 +32,77 @@ if (new URLSearchParams(window.location.search).has('designer')) {
 }
 
 const productElements = defineBaseScreenElements();
-const textMaterial = defineBaseScreenTextMaterial();
-if (!productElements.ok || !textMaterial.ok) {
+const officialMaterials = [
+  defineBaseScreenTextMaterial(),
+  defineBaseScreenRectangleMaterial(),
+  defineBaseScreenEllipseMaterial(),
+  defineBaseScreenImageMaterial(),
+  defineBaseScreenContainerMaterial(),
+];
+if (!productElements.ok || officialMaterials.some((definition) => !definition.ok)) {
   throw new Error('Base Screen browser harness failed to register its elements.');
 }
 
+const designerAuthoringCapabilities = [
+  'blueprint.trigger.material-event',
+  'blueprint.value.event-payload',
+  'blueprint.value.variable',
+  'blueprint.condition.compare',
+  'blueprint.action.set-variable',
+  'blueprint.action.emit-host-event',
+] as const;
+const designerAuthoringPlugin: BaseScreenPluginRuntime = {
+  manifest: {
+    id: 'browser-harness-authoring',
+    dependencies: [],
+    capabilities: designerAuthoringCapabilities,
+    contributions: [
+      {
+        kind: 'dataResourceType',
+        id: 'dataset',
+        name: '数据集',
+        configSchema: {
+          kind: 'object',
+          properties: { limit: { kind: 'number' } },
+          required: ['limit'],
+        },
+      },
+      ...designerAuthoringCapabilities.map((id) => ({
+        kind: 'blueprintCapability' as const,
+        id,
+        name: id,
+      })),
+    ],
+  },
+  activate() {},
+  deactivate() {},
+  dispose() {},
+};
+
 const pluginManager = createBaseScreenPluginManager({
   instanceId: 'browser-harness',
-  standaloneMaterialTagNames: [BASE_SCREEN_TEXT_MATERIAL_MANIFEST.tagName],
-  plugins: [],
-  grantedCapabilities: {},
+  standaloneMaterialTagNames: officialMaterials
+    .filter((definition) => definition.ok)
+    .map((definition) => definition.value.manifest.tagName),
+  plugins: [designerAuthoringPlugin],
+  grantedCapabilities: { 'browser-harness-authoring': designerAuthoringCapabilities },
   registry: {
     get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
   },
   createCommandPort: undefined,
 });
 const managerActivated = await pluginManager.activate();
-if (!managerActivated.ok || !pluginManager.snapshot?.materials.has('base.text')) {
+if (
+  !managerActivated.ok ||
+  pluginManager.snapshot === undefined ||
+  !['base.text', 'base.rectangle', 'base.ellipse', 'base.image', 'base.container'].every((type) =>
+    pluginManager.snapshot?.materials.has(type),
+  ) ||
+  pluginManager.snapshot.contributions.getResourceType('dataset') === undefined ||
+  !designerAuthoringCapabilities.every((capability) =>
+    pluginManager.snapshot?.contributions.hasBlueprintCapability(capability),
+  )
+) {
   throw new Error('Base Screen browser harness failed to inspect its material registry.');
 }
 
@@ -44,7 +111,40 @@ const catalog = createBaseScreenMaterialCatalog([
     manifest: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
     constructor: BaseScreenTextMaterialElement,
   },
+  {
+    manifest: BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
+    constructor: BaseScreenRectangleMaterialElement,
+  },
+  {
+    manifest: BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
+    constructor: BaseScreenEllipseMaterialElement,
+  },
+  {
+    manifest: BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
+    constructor: BaseScreenImageMaterialElement,
+  },
+  {
+    manifest: BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
+    constructor: BaseScreenContainerMaterialElement,
+  },
 ]);
+
+const runtimeContributions = {
+  getResourceType: (resourceType: string) =>
+    resourceType === 'dataset'
+      ? {
+          kind: 'dataResourceType' as const,
+          id: 'dataset',
+          name: '数据集',
+          configSchema: {
+            kind: 'object' as const,
+            properties: { limit: { kind: 'number' as const, minimum: 1, maximum: 100 } },
+            required: ['limit'],
+          },
+        }
+      : undefined,
+  hasBlueprintCapability: () => true,
+};
 
 const bridgeManifest = (type: string, tagName: string, name: string) => ({
   type,
@@ -55,6 +155,8 @@ const bridgeManifest = (type: string, tagName: string, name: string) => ({
   defaultSize: { width: 200, height: 36 },
   defaultProps: { label: name },
   defaultStyle: {},
+  styleSchema: { kind: 'object' as const, properties: {}, required: [] },
+  stylePanel: [],
   propsSchema: {
     kind: 'object' as const,
     properties: { label: { kind: 'string' as const } },
@@ -122,7 +224,7 @@ const screenDocument = {
       zIndex: 1,
       status: { locked: false, hidden: false },
       props: { text: 'Base Screen 设计器' },
-      style: { color: '#e9f2ff', fontSize: 42, fontWeight: '700' },
+      style: { color: '#e9f2ff', fontSize: 42, fontWeight: '700', textAlign: 'left' },
       dataSource: null,
     },
     {
@@ -136,7 +238,7 @@ const screenDocument = {
       zIndex: 2,
       status: { locked: false, hidden: false },
       props: { text: '拖动文本，编辑属性，撤销或重做。' },
-      style: { color: '#9fb1c9', fontSize: 20, fontWeight: '400' },
+      style: { color: '#9fb1c9', fontSize: 20, fontWeight: '400', textAlign: 'left' },
       dataSource: null,
     },
     {
@@ -150,7 +252,7 @@ const screenDocument = {
       zIndex: 3,
       status: { locked: false, hidden: false },
       props: { text: '宿主资源已就绪' },
-      style: { color: '#39c5bb', fontSize: 16, fontWeight: '400' },
+      style: { color: '#39c5bb', fontSize: 16, fontWeight: '400', textAlign: 'left' },
       dataSource: {
         type: 'host-resource' as const,
         resourceType: 'dataset',
@@ -187,7 +289,7 @@ const screenDocument = {
       dataSource: null,
     },
   ],
-  variables: [],
+  variables: [{ type: 'static' as const, name: 'count', value: 0 }],
   blueprint: {
     rules: [
       {
@@ -208,18 +310,28 @@ const screenDocument = {
 const designer = document.querySelector('base-screen-designer')!;
 const viewer = document.querySelector('base-screen-viewer')!;
 const hostEvents: unknown[] = [];
-viewer.resourcePort = {
+const resourcePort = {
   async resolve() {
     return { ok: true as const, value: { records: 5 }, diagnostics: [] };
   },
 };
+designer.resourcePort = resourcePort;
+designer.runtimeContributions = pluginManager.snapshot.contributions;
+viewer.resourcePort = resourcePort;
+viewer.runtimeContributions = pluginManager.snapshot.contributions;
 viewer.blueprintRuntimePort = {
   emit(event) {
     hostEvents.push(event);
   },
 };
 designer.catalog = bridgeCatalog;
-designer.toolMaterialTypes = { text: 'base.text', rectangle: 'base.text' };
+designer.runtimeContributions = runtimeContributions;
+designer.toolMaterialTypes = {
+  text: 'base.text',
+  rectangle: 'base.rectangle',
+  ellipse: 'base.ellipse',
+  image: 'base.image',
+};
 viewer.catalog = bridgeCatalog;
 let envelope = {
   projectId: 'browser-harness',
@@ -271,8 +383,13 @@ designer.addEventListener('base-screen-change', (event) => {
 });
 const loaded = await designer.load('browser-harness');
 if (!loaded.ok) {
-  throw new Error('Base Screen browser harness failed to load its project.');
+  throw new Error(
+    `Base Screen browser harness failed to load its project: ${loaded.diagnostics
+      .map((diagnostic) => `${diagnostic.code}@${diagnostic.path.join('.')}`)
+      .join(',')}`,
+  );
 }
+designer.runtimeContributions = runtimeContributions;
 viewer.document = designer.document;
 
 Object.assign(window, {

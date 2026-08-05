@@ -279,8 +279,8 @@ M0 package manifest 应声明架构允许且当前源码真实使用的依赖，
 
 包配置：
 
-- `tsconfig.json` 用于 `tsc --noEmit`，显式 `rootDir: src`。
-- `tsconfig.build.json` 输出 `dist`，生成 declaration、declarationMap 和 sourceMap。
+- `tsconfig.json` 用于 `tsc --noEmit`。测试位于 `src/` 时使用 `rootDir: src`；测试外置到同包 `tests/` 时使用 `rootDir: .` 并同时 include `src` 与 `tests`。
+- `tsconfig.build.json` 输出 `dist`，生成 declaration、declarationMap 和 sourceMap；它必须显式设置 `rootDir: src` 且只 include `src`，不从 typecheck 配置继承测试输入范围。
 - tsc build 包输出 JS + declaration。
 - Vite build 包的 build tsconfig 使用 `emitDeclarationOnly: true`，Vite 输出 JS/CSS/source map。
 - `contracts`、`core` 默认只使用 `ES2022` lib。

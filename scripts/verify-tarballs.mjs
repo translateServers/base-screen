@@ -243,6 +243,8 @@ const manifest: BaseScreenMaterialManifest = {
   defaultSize: { width: 200, height: 40 },
   defaultProps: { label: 'Initial' },
   defaultStyle: {},
+  styleSchema: { kind: 'object', properties: {}, required: [] },
+  stylePanel: [],
   propsSchema: {
     kind: 'object',
     properties: { label: { kind: 'string' } },
@@ -402,6 +404,8 @@ const manifest: BaseScreenMaterialManifest = {
   defaultSize: { width: 200, height: 40 },
   defaultProps: { label: 'Initial' },
   defaultStyle: {},
+  styleSchema: { kind: 'object', properties: {}, required: [] },
+  stylePanel: [],
   propsSchema: {
     kind: 'object',
     properties: { label: { kind: 'string' } },
@@ -787,6 +791,8 @@ const result = parseBaseScreenMaterialManifest({
   defaultStyle: {},
   propsSchema: { kind: 'object', properties: {}, required: [] },
   propertyPanel: [],
+  styleSchema: { kind: 'object', properties: {}, required: [] },
+  stylePanel: [],
   events: [],
   dataCapabilities: ['static'],
   designCapabilities: { resize: true, rotate: true, children: false },

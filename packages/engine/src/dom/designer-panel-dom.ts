@@ -1,17 +1,24 @@
 import type {
   ScreenComponentDataSource,
   ScreenComponentNode,
+  ScreenDiagnostic,
   ScreenDocument,
   ScreenJsonObject,
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
+import { parseScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialPropSchema,
+  BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import { createValidatedPropsTransaction } from '../operations/designer-layout-operations.js';
+import { validateBaseScreenMaterialProps } from '@base-screen/plugin-core';
+import {
+  createValidatedPropsTransaction,
+  createValidatedStyleTransaction,
+} from '../operations/designer-layout-operations.js';
 
 export interface DesignerPanelInput {
   readonly value: string;
@@ -37,23 +44,44 @@ export function renderDesignerProperties(
     properties.appendChild(summary);
     return;
   }
-  appendInput(properties, '名称', 'name', component.name);
-  appendInput(properties, 'X', 'x', component.position.x, 'number');
-  appendInput(properties, 'Y', 'y', component.position.y, 'number');
-  appendInput(properties, '宽度', 'width', component.size.width, 'number', '1');
-  appendInput(properties, '高度', 'height', component.size.height, 'number', '1');
-  appendCheckbox(properties, '锁定', 'locked', component.status.locked);
-  appendCheckbox(properties, '隐藏', 'hidden', component.status.hidden);
+  const geometry = appendSection(properties, '几何');
+  appendInput(geometry, '名称', 'name', component.name);
+  appendInput(geometry, 'X', 'x', component.position.x, 'number');
+  appendInput(geometry, 'Y', 'y', component.position.y, 'number');
+  appendInput(geometry, '宽度', 'width', component.size.width, 'number', '1');
+  appendInput(geometry, '高度', 'height', component.size.height, 'number', '1');
+  appendInput(geometry, '旋转', 'rotation', component.rotation, 'number', '-180');
+  appendInput(geometry, '层级', 'zIndex', component.zIndex, 'number', '0');
+  const status = appendSection(properties, '状态');
+  appendCheckbox(status, '锁定', 'locked', component.status.locked);
+  appendCheckbox(status, '隐藏', 'hidden', component.status.hidden);
   const manifest = catalog?.get(component.type)?.manifest;
   if (manifest === undefined) return;
+  const content =
+    manifest.propertyPanel.length === 0 ? undefined : appendSection(properties, '内容');
   for (const field of manifest.propertyPanel) {
     const schema = manifest.propsSchema.properties[field.prop];
-    if (schema !== undefined) {
+    if (schema !== undefined && content !== undefined) {
       appendPropControl(
-        properties,
+        content,
         field.label,
         field.prop,
         component.props[field.prop],
+        schema,
+        field.control,
+      );
+    }
+  }
+  const stylePanel = manifest.stylePanel ?? [];
+  const style = stylePanel.length === 0 ? undefined : appendSection(properties, '样式');
+  for (const field of stylePanel) {
+    const schema = manifest.styleSchema.properties[field.style];
+    if (schema !== undefined && style !== undefined) {
+      appendStyleControl(
+        style,
+        field.label,
+        field.style,
+        component.style[field.style],
         schema,
         field.control,
       );
@@ -67,13 +95,17 @@ export function renderDesignerDataPanel(
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
   hostResourceAvailable: boolean,
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): void {
   if (panel === undefined) return;
   panel.replaceChildren();
   const component = document?.components.find((item) => item.id === interaction.focusedComponentId);
-  const capabilities = (
-    component === undefined ? undefined : catalog?.get(component.type)?.manifest.dataCapabilities
-  )?.filter((capability) => capability !== 'host-resource' || hostResourceAvailable);
+  const capabilities = dataCapabilities(
+    component,
+    catalog,
+    hostResourceAvailable,
+    runtimeContributions,
+  );
   if (component === undefined || capabilities === undefined || capabilities.length === 0) {
     panel.textContent = '未选择数据源。';
     return;
@@ -85,7 +117,7 @@ export function renderDesignerDataPanel(
   label.textContent = '数据源';
   const select = panel.ownerDocument.createElement('select');
   select.className = 'designer-control designer-select';
-  select.dataset.dataSourceType = component.id;
+  select.dataset.dataSourceType = 'true';
   for (const value of ['none', ...capabilities]) {
     const option = panel.ownerDocument.createElement('option');
     option.value = value;
@@ -95,13 +127,33 @@ export function renderDesignerDataPanel(
   }
   label.appendChild(select);
   panel.appendChild(label);
-  if (source?.type === 'static') {
-    appendDataInput(panel, '值', 'static', JSON.stringify(source.value));
+  if (capabilities.includes('static')) {
+    appendDataInput(
+      panel,
+      '值',
+      'static',
+      source?.type === 'static' ? JSON.stringify(source.value) : 'null',
+    );
   }
-  if (source?.type === 'host-resource') {
-    appendDataInput(panel, '资源类型', 'resourceType', source.resourceType);
-    appendDataInput(panel, '资源 ID', 'resourceId', source.resourceId);
-    appendDataInput(panel, '参数', 'params', JSON.stringify(source.params));
+  if (capabilities.includes('host-resource')) {
+    appendDataInput(
+      panel,
+      '资源类型',
+      'resourceType',
+      source?.type === 'host-resource' ? source.resourceType : '',
+    );
+    appendDataInput(
+      panel,
+      '资源 ID',
+      'resourceId',
+      source?.type === 'host-resource' ? source.resourceId : '',
+    );
+    appendDataInput(
+      panel,
+      '参数',
+      'params',
+      source?.type === 'host-resource' ? JSON.stringify(source.params) : '{}',
+    );
   }
 }
 
@@ -117,7 +169,23 @@ export function createPropertyTransaction(
   const property = target.dataset.property;
   if (property !== undefined) return createGeometryTransaction(component, property, target.value);
   const prop = target.dataset.prop;
+  const style = target.dataset.style;
   const manifest = catalog?.get(component.type)?.manifest;
+  if (
+    manifest !== undefined &&
+    style !== undefined &&
+    manifest.styleSchema.properties[style] !== undefined &&
+    manifest.stylePanel.some((field) => field.style === style)
+  ) {
+    const value = parsePropertyControlValue(target, manifest.styleSchema.properties[style]);
+    return value === undefined
+      ? undefined
+      : createValidatedStyleTransaction(
+          component.id,
+          { ...component.style, [style]: value },
+          manifest.styleSchema,
+        );
+  }
   const schema = prop === undefined ? undefined : manifest?.propsSchema.properties[prop];
   if (
     manifest === undefined ||
@@ -142,18 +210,42 @@ export function createDataSourceTransaction(
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
   hostResourceAvailable: boolean,
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   if (!isControl(target)) return undefined;
   const component = document?.components.find((item) => item.id === interaction.focusedComponentId);
-  const capabilities = (
-    component === undefined ? undefined : catalog?.get(component.type)?.manifest.dataCapabilities
-  )?.filter((capability) => capability !== 'host-resource' || hostResourceAvailable);
+  const capabilities = dataCapabilities(
+    component,
+    catalog,
+    hostResourceAvailable,
+    runtimeContributions,
+  );
   if (component === undefined || capabilities === undefined) return undefined;
   const fields = readDataSourceFields(target, component);
   if (fields === undefined) return undefined;
-  const source = createDataSource(target.dataset.dataSourceType ?? fields.type, fields);
-  if (source === undefined || (source !== null && !capabilities.includes(source.type)))
-    return undefined;
+  const source = createDataSource(fields.type, fields);
+  if (source === undefined) return dataSourceFailure('CORE_COMMAND_INVALID');
+  if (source !== null && !capabilities.includes(source.type)) {
+    return dataSourceFailure('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
+  }
+  if (source?.type === 'static') {
+    const value = parseScreenJsonValue(source.value);
+    if (!value.ok) return dataSourceFailure(value.diagnostics[0]?.code ?? 'JSON_VALUE_INVALID');
+    return success(update(component.id, { dataSource: { type: source.type, value: value.value } }));
+  }
+  if (source?.type === 'host-resource') {
+    const resourceType = getResourceType(runtimeContributions, source.resourceType);
+    if (resourceType === undefined) return dataSourceFailure('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
+    const params = validateBaseScreenMaterialProps(source.params, resourceType.configSchema);
+    if (!params.ok) {
+      return dataSourceFailure(params.diagnostics[0]?.code ?? 'PLUGIN_CORE_MANIFEST_FIELD_INVALID');
+    }
+    return success(
+      update(component.id, {
+        dataSource: { ...source, params: params.value },
+      }),
+    );
+  }
   return success(update(component.id, { dataSource: source }));
 }
 
@@ -199,6 +291,12 @@ function createGeometryTransaction(
       update(component.id, { size: { ...component.size, [property]: Math.min(value, 1_000_000) } }),
     );
   }
+  if (property === 'rotation' && value >= -180 && value < 180) {
+    return success(update(component.id, { rotation: value }));
+  }
+  if (property === 'zIndex' && Number.isInteger(value) && value >= 0 && value <= 1_000_000) {
+    return success(update(component.id, { zIndex: value }));
+  }
   return undefined;
 }
 
@@ -238,6 +336,7 @@ function appendInput(
   input.dataset.property = property;
   if (min !== undefined) input.min = min;
   label.appendChild(input);
+  appendFieldMessage(label, input, `property-${property}`);
   parent.appendChild(label);
 }
 
@@ -260,14 +359,16 @@ function appendCheckbox(
     input.value = String(input.checked);
   });
   label.appendChild(input);
+  appendFieldMessage(label, input, `property-${property}`);
   parent.appendChild(label);
 }
 
 function appendCanvasControls(parent: HTMLElement, document: ScreenDocument): void {
-  appendCanvasInput(parent, '画布宽度', 'width', document.canvas.width, 'number');
-  appendCanvasInput(parent, '画布高度', 'height', document.canvas.height, 'number');
+  const section = appendSection(parent, '画布');
+  appendCanvasInput(section, '画布宽度', 'width', document.canvas.width, 'number');
+  appendCanvasInput(section, '画布高度', 'height', document.canvas.height, 'number');
   appendCanvasInput(
-    parent,
+    section,
     '背景颜色',
     'backgroundColor',
     document.canvas.backgroundColor,
@@ -294,6 +395,7 @@ function appendCanvasInput(
   input.value = String(value);
   input.dataset.canvasProperty = property;
   label.appendChild(input);
+  appendFieldMessage(label, input, `canvas-${property}`);
   parent.appendChild(label);
 }
 
@@ -317,6 +419,7 @@ function appendDataInput(
       : 'designer-control designer-input';
   input.dataset.dataSourceField = field;
   label.appendChild(input);
+  appendFieldMessage(label, input, `data-${field}`);
   parent.appendChild(label);
 }
 
@@ -350,6 +453,32 @@ function readDataSourceFields(
     params:
       value('params') || (source?.type === 'host-resource' ? JSON.stringify(source.params) : '{}'),
   };
+}
+
+function dataCapabilities(
+  component: ScreenComponentNode | undefined,
+  catalog: BaseScreenMaterialCatalog | undefined,
+  hostResourceAvailable: boolean,
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+): readonly ('static' | 'host-resource')[] | undefined {
+  return catalog
+    ?.get(component?.type ?? '')
+    ?.manifest.dataCapabilities.filter(
+      (capability) =>
+        capability !== 'host-resource' ||
+        (hostResourceAvailable && runtimeContributions !== undefined),
+    );
+}
+
+function getResourceType(
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+  resourceType: string,
+) {
+  try {
+    return runtimeContributions?.getResourceType(resourceType);
+  } catch {
+    return undefined;
+  }
 }
 
 function createDataSource(
@@ -394,7 +523,55 @@ function appendPropControl(
   const input = createControl(parent.ownerDocument, value, schema, control);
   input.dataset.prop = prop;
   label.appendChild(input);
+  appendFieldMessage(label, input, `prop-${prop}`);
   parent.appendChild(label);
+}
+
+function appendStyleControl(
+  parent: HTMLElement,
+  labelText: string,
+  style: string,
+  value: ScreenJsonValue | undefined,
+  schema: BaseScreenMaterialPropSchema,
+  control: string,
+): void {
+  const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
+  label.textContent = labelText;
+  const input = createControl(parent.ownerDocument, value, schema, control);
+  input.dataset.style = style;
+  label.appendChild(input);
+  appendFieldMessage(label, input, `style-${style}`);
+  parent.appendChild(label);
+}
+
+function appendSection(parent: HTMLElement, title: string): HTMLElement {
+  const section = parent.ownerDocument.createElement('section');
+  section.className = 'designer-inspector-section';
+  const heading = parent.ownerDocument.createElement('h3');
+  heading.className = 'designer-inspector-section-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+  parent.appendChild(section);
+  return section;
+}
+
+function appendFieldMessage(
+  label: HTMLLabelElement,
+  input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  key: string,
+): void {
+  const id = `designer-field-${key}`;
+  const messageId = `${id}-message`;
+  input.id = id;
+  input.setAttribute('aria-describedby', messageId);
+  label.htmlFor = id;
+  const message = label.ownerDocument.createElement('span');
+  message.id = messageId;
+  message.className = 'designer-field-message';
+  message.dataset.fieldMessage = 'true';
+  message.ariaLive = 'polite';
+  label.appendChild(message);
 }
 
 function createControl(
@@ -429,8 +606,11 @@ function createControl(
     return input;
   }
   const input = ownerDocument.createElement('input');
-  input.type = control === 'number' ? 'number' : 'text';
-  input.className = `designer-control designer-input${control === 'number' ? ' designer-number' : ''}`;
+  input.type = control === 'number' || control === 'color' ? control : 'text';
+  input.className =
+    control === 'color'
+      ? 'designer-control designer-color'
+      : `designer-control designer-input${control === 'number' ? ' designer-number' : ''}`;
   input.value = String(value ?? '');
   return input;
 }
@@ -438,11 +618,10 @@ function createControl(
 function isControl(
   target: EventTarget | null,
 ): target is HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLSelectElement ||
-    target instanceof HTMLTextAreaElement
-  );
+  const candidate = target as
+    | (Partial<HTMLInputElement> & { readonly dataset?: DOMStringMap })
+    | null;
+  return candidate?.dataset !== undefined && typeof candidate.value === 'string';
 }
 
 function update(componentId: string, patch: Record<string, unknown>): ScreenDocumentTransaction {
@@ -453,6 +632,19 @@ function update(componentId: string, patch: Record<string, unknown>): ScreenDocu
 
 function success(value: ScreenDocumentTransaction): ScreenParseResult<ScreenDocumentTransaction> {
   return { ok: true, value, diagnostics: [] };
+}
+
+function dataSourceFailure(
+  code: ScreenDiagnostic['code'],
+): ScreenParseResult<ScreenDocumentTransaction> {
+  const message =
+    code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN'
+      ? '资源类型不可用，未保存修改。'
+      : '数据源配置无效，未保存修改。';
+  return {
+    ok: false,
+    diagnostics: [{ severity: 'error', code, path: [], message }],
+  };
 }
 
 function clamp(value: number): number {

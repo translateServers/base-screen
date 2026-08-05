@@ -12,7 +12,10 @@ import type {
   ScreenInteractionState,
 } from '@base-screen/core';
 import { getScreenSelectionBounds, isScreenComponentEffectivelyLocked } from '@base-screen/core';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenRuntimeContributionIndex,
+} from '@base-screen/plugin-core';
 import {
   createDataSourceTransaction,
   createPropertyTransaction,
@@ -40,6 +43,7 @@ export interface DesignerPanelControllerCallbacks {
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
+  readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
   readonly executeTransaction: (
     transaction: ScreenDocumentTransaction,
@@ -187,6 +191,7 @@ export class DesignerPanelController {
       this.interaction,
       this.callbacks.getCatalog(),
       this.callbacks.getResourcePort() !== undefined,
+      this.callbacks.getRuntimeContributions(),
     );
   }
 
@@ -232,23 +237,6 @@ export class DesignerPanelController {
     }
   }
 
-  onKeyDown(event: KeyboardEvent): void {
-    if (
-      event.altKey ||
-      event.isComposing ||
-      !(event.ctrlKey || event.metaKey) ||
-      isEditable(event.target)
-    )
-      return;
-    if (event.key.toLowerCase() === 'c') {
-      event.preventDefault();
-      this.copy();
-    } else if (event.key.toLowerCase() === 'v') {
-      event.preventDefault();
-      this.report(this.paste());
-    }
-  }
-
   onPropertyChange(event: Event): void {
     const dataTransaction = createDataSourceTransaction(
       event.target,
@@ -256,11 +244,16 @@ export class DesignerPanelController {
       this.interaction,
       this.callbacks.getCatalog(),
       this.callbacks.getResourcePort() !== undefined,
+      this.callbacks.getRuntimeContributions(),
     );
     if (dataTransaction !== undefined) {
-      dataTransaction.ok
-        ? this.report(this.callbacks.executeTransaction(dataTransaction.value))
-        : this.callbacks.emitDiagnostics(dataTransaction.diagnostics);
+      if (dataTransaction.ok) {
+        setDraftValidity(event.target, true);
+        this.report(this.callbacks.executeTransaction(dataTransaction.value));
+      } else {
+        setDraftValidity(event.target, false);
+        this.callbacks.emitDiagnostics(dataTransaction.diagnostics);
+      }
       return;
     }
     const transaction = createPropertyTransaction(
@@ -270,14 +263,51 @@ export class DesignerPanelController {
       this.callbacks.getCatalog(),
     );
     if (transaction !== undefined) {
-      transaction.ok
-        ? this.report(this.callbacks.executeTransaction(transaction.value))
-        : this.callbacks.emitDiagnostics(transaction.diagnostics);
+      if (transaction.ok) {
+        setDraftValidity(event.target, true);
+        this.report(this.callbacks.executeTransaction(transaction.value));
+      } else {
+        setDraftValidity(event.target, false);
+        this.callbacks.emitDiagnostics(transaction.diagnostics);
+      }
       return;
     }
     if (isDesignerDraft(event.target)) {
+      setDraftValidity(event.target, false);
       this.callbacks.emitDiagnostics([invalidDraftDiagnostic()]);
     }
+  }
+
+  onKeyDown(event: KeyboardEvent): boolean {
+    if (
+      event.key === 'Enter' &&
+      !event.isComposing &&
+      !isTextArea(event.target) &&
+      isDesignerDraft(event.target)
+    ) {
+      event.preventDefault();
+      this.onPropertyChange(event);
+      return true;
+    }
+    if (
+      event.altKey ||
+      event.isComposing ||
+      !(event.ctrlKey || event.metaKey) ||
+      isEditable(event.target)
+    ) {
+      return false;
+    }
+    if (event.key.toLowerCase() === 'c') {
+      event.preventDefault();
+      this.copy();
+      return true;
+    }
+    if (event.key.toLowerCase() === 'v') {
+      event.preventDefault();
+      this.report(this.paste());
+      return true;
+    }
+    return false;
   }
 
   private addMaterial(type: string): void {
@@ -393,16 +423,19 @@ function failure(message: string): ScreenParseResult<ScreenDocument> {
 }
 
 function isDesignerDraft(target: EventTarget | null): boolean {
+  const dataset = (target as { readonly dataset?: DOMStringMap } | null)?.dataset;
   return (
-    (target instanceof HTMLInputElement ||
-      target instanceof HTMLSelectElement ||
-      target instanceof HTMLTextAreaElement) &&
-    (target.dataset.property !== undefined ||
-      target.dataset.prop !== undefined ||
-      target.dataset.canvasProperty !== undefined ||
-      target.dataset.dataSourceType !== undefined ||
-      target.dataset.dataSourceField !== undefined)
+    dataset !== undefined &&
+    (dataset.property !== undefined ||
+      dataset.prop !== undefined ||
+      dataset.canvasProperty !== undefined ||
+      dataset.dataSourceType !== undefined ||
+      dataset.dataSourceField !== undefined)
   );
+}
+
+function isTextArea(target: EventTarget | null): boolean {
+  return (target as { readonly tagName?: string } | null)?.tagName === 'TEXTAREA';
 }
 
 function invalidDraftDiagnostic(): ScreenDiagnostic {
@@ -410,6 +443,21 @@ function invalidDraftDiagnostic(): ScreenDiagnostic {
     severity: 'error',
     code: 'CORE_COMMAND_INVALID',
     path: [],
-    message: 'Designer property draft is invalid.',
+    message: '字段值无效，未保存修改。',
   };
+}
+
+function setDraftValidity(target: EventTarget | null, valid: boolean): void {
+  if (
+    !(target instanceof HTMLInputElement) &&
+    !(target instanceof HTMLSelectElement) &&
+    !(target instanceof HTMLTextAreaElement)
+  ) {
+    return;
+  }
+  target.ariaInvalid = String(!valid);
+  const message = target.parentElement?.querySelector<HTMLElement>('[data-field-message]');
+  if (message !== null && message !== undefined) {
+    message.textContent = valid ? '' : '请输入有效值。';
+  }
 }

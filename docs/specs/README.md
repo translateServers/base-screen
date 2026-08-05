@@ -18,6 +18,7 @@
 | [Host Resource And Blueprint](./host-resource-blueprint/spec.md) | M5 | 当前 Document、opaque 资源意图和受限运行时 |
 | [Nebula Importer](./nebula-importer/spec.md) | M7 | 离线 legacy export 转换、报告和 provenance |
 | [Remote Plugin Sandbox](./remote-plugin-sandbox/spec.md) | M8 | 不可信 iframe 插件协议、来源校验和能力缩减 |
+| [Directory Structure Rules](./directory-structure-rules/spec.md) | M0 增量 | 包内目录结构、engine common/browser 分层、测试外置与构建产物卫生 |
 
 ## 生效中（增量）
 

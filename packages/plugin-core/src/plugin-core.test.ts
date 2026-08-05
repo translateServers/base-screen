@@ -9,6 +9,7 @@ import {
   parsePluginCommandRequest,
   validateBaseScreenMaterialIdentity,
   validateBaseScreenMaterialProps,
+  validateBaseScreenMaterialStyle,
 } from './index.js';
 
 function materialManifest(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -21,6 +22,12 @@ function materialManifest(overrides: Record<string, unknown> = {}): Record<strin
     defaultSize: { width: 320, height: 160 },
     defaultProps: { title: 'Revenue', threshold: 80 },
     defaultStyle: { color: '#00ff00' },
+    styleSchema: {
+      kind: 'object',
+      properties: { color: { kind: 'string' } },
+      required: ['color'],
+    },
+    stylePanel: [{ style: 'color', label: 'Color', control: 'color' }],
     propsSchema: {
       kind: 'object',
       properties: {
@@ -158,6 +165,22 @@ describe('material identity and manifests', () => {
     expect(validateBaseScreenMaterialProps({ title: '' }, manifest.value.propsSchema).ok).toBe(
       false,
     );
+    expect(
+      validateBaseScreenMaterialStyle({ color: '#ff0000' }, manifest.value.styleSchema).ok,
+    ).toBe(true);
+  });
+
+  it('rejects style panels that do not declare an editable style key', () => {
+    const result = parseBaseScreenMaterialManifest(
+      materialManifest({ stylePanel: [{ style: 'missing', label: 'Missing', control: 'color' }] }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.path.join('.') === 'stylePanel.0.style')).toBe(
+        true,
+      );
+    }
   });
 });
 

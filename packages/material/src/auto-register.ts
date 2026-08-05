@@ -1,8 +1,28 @@
-import { defineBaseScreenTextMaterial } from './index.js';
+import {
+  defineBaseScreenContainerMaterial,
+  defineBaseScreenEllipseMaterial,
+  defineBaseScreenImageMaterial,
+  defineBaseScreenRectangleMaterial,
+  defineBaseScreenTextMaterial,
+} from './index.js';
 
-const definition = defineBaseScreenTextMaterial();
-if (!definition.ok) {
-  throw new Error('Base Screen text material registration failed.');
+for (const define of [
+  defineBaseScreenTextMaterial,
+  defineBaseScreenRectangleMaterial,
+  defineBaseScreenEllipseMaterial,
+  defineBaseScreenImageMaterial,
+  defineBaseScreenContainerMaterial,
+]) {
+  const definition = define();
+  if (!definition.ok) {
+    throw new Error('Base Screen official material registration failed.');
+  }
 }
 
-export { defineBaseScreenTextMaterial } from './index.js';
+export {
+  defineBaseScreenContainerMaterial,
+  defineBaseScreenEllipseMaterial,
+  defineBaseScreenImageMaterial,
+  defineBaseScreenRectangleMaterial,
+  defineBaseScreenTextMaterial,
+} from './index.js';

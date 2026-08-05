@@ -24,6 +24,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     } as unknown as ShadowRoot;
     const controller = new DesignerWorkbenchController({
       getCanvas: () => canvas,
+      getDocument: () => undefined,
       getRoot: () => root,
       getZoom: () => 1,
     });
@@ -61,6 +62,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     } as unknown as ShadowRoot;
     const controller = new DesignerWorkbenchController({
       getCanvas: () => canvas,
+      getDocument: () => undefined,
       getRoot: () => root,
       getZoom: () => 1,
     });
@@ -91,6 +93,7 @@ class WorkbenchElement {
   readonly children: WorkbenchElement[] = [];
   readonly dataset: Record<string, string> = {};
   readonly style = { setProperty: () => undefined };
+  className = '';
   ariaPressed = '';
   ariaSelected = '';
   hidden = false;
@@ -106,6 +109,12 @@ class WorkbenchElement {
 
   setAttribute(name: string, value: string): void {
     if (name === 'aria-pressed') this.ariaPressed = value;
+  }
+
+  closest<T extends Element>(selector: string): T | null {
+    return (
+      selector === '[data-canvas-guide]' && this.dataset.canvasGuide === 'true' ? this : null
+    ) as T | null;
   }
 }
 
@@ -132,11 +141,24 @@ function createWorkbench() {
   });
   const grid = new WorkbenchElement();
   const snap = new WorkbenchElement();
+  const canvasListeners = new Map<string, (event: PointerEvent | MouseEvent) => void>();
   const canvas = {
     ...captureTarget(),
+    addEventListener: (type: string, listener: (event: PointerEvent | MouseEvent) => void) =>
+      canvasListeners.set(type, listener),
+    dispatch: (type: string, event: PointerEvent | MouseEvent) =>
+      canvasListeners.get(type)?.(event),
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
     ownerDocument: { createElement: () => new WorkbenchElement() },
-  } as unknown as HTMLDivElement;
+  } as unknown as HTMLDivElement & {
+    dispatch: (type: string, event: PointerEvent | MouseEvent) => void;
+  };
+  const document = {
+    canvas: { width: 960, height: 540, backgroundColor: '#000000' },
+    components: [],
+    variables: [],
+    blueprint: { rules: [] },
+  } as const;
   const elements = new Map<string, WorkbenchElement>([
     ['.designer', layout],
     ['[data-viewport]', viewport],
@@ -159,9 +181,11 @@ function createWorkbench() {
     canvas,
     controller: new DesignerWorkbenchController({
       getCanvas: () => canvas,
+      getDocument: () => document,
       getRoot: () => root,
       getZoom: () => 1,
     }),
+    document,
     grid,
     guides,
     layers,
@@ -223,8 +247,80 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(first.rightTabs[1]?.ariaSelected).toBe('true');
     expect(second.rightTabs[0]?.ariaSelected).toBe('true');
     expect(first.guides.children).toHaveLength(1);
-    expect(first.controller.snapPoint({ x: 47, y: 47 })).toEqual({ x: 50, y: 47 });
-    expect(second.controller.snapPoint({ x: 47, y: 47 })).toEqual({ x: 48, y: 48 });
+    expect(first.controller.snapPoint({ x: 47, y: 47 })).toEqual({
+      x: 50,
+      y: 47,
+      snappedX: 50,
+    });
+    expect(second.controller.snapPoint({ x: 47, y: 47 })).toEqual({
+      x: 48,
+      y: 48,
+      snappedX: 48,
+      snappedY: 48,
+    });
+  });
+
+  it('R7 moves, double-click deletes, and discards out-of-bounds guides without touching the document', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    const originalDocument = structuredClone(workbench.document);
+    const ruler = {
+      classList: { contains: (name: string) => name === 'ruler-vertical' },
+      closest: (selector: string) => (selector === '.ruler' ? ruler : null),
+    } as unknown as HTMLElement;
+
+    workbench.controller.onPointerDown({
+      target: ruler,
+      pointerId: 1,
+      clientX: 50,
+      clientY: 0,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 1, clientX: 50, clientY: 0 } as PointerEvent);
+    const guide = workbench.guides.children[0]!;
+    workbench.canvas.dispatch('pointerdown', {
+      target: guide,
+      pointerId: 2,
+      clientX: 50,
+      clientY: 0,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerMove({ pointerId: 2, clientX: 100, clientY: 0 } as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 2, clientX: 100, clientY: 0 } as PointerEvent);
+
+    expect(workbench.guides.children).toHaveLength(1);
+    expect((workbench.guides.children[0]!.style as unknown as Record<string, string>).left).toBe(
+      '100px',
+    );
+    workbench.canvas.dispatch('dblclick', {
+      target: workbench.guides.children[0],
+      stopImmediatePropagation: () => undefined,
+    } as unknown as MouseEvent);
+    expect(workbench.guides.children).toHaveLength(0);
+
+    workbench.controller.onPointerDown({
+      target: ruler,
+      pointerId: 3,
+      clientX: 50,
+      clientY: 0,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 3, clientX: -1, clientY: 0 } as PointerEvent);
+
+    expect(workbench.guides.children).toHaveLength(0);
+    expect(workbench.document).toEqual(originalDocument);
+  });
+
+  it('R7 renders snap previews as transient overlays without touching the document', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    const originalDocument = structuredClone(workbench.document);
+
+    workbench.controller.renderSnapPreview({ x: 50, y: 40, snappedX: 50 });
+
+    expect(workbench.guides.children).toHaveLength(1);
+    expect(workbench.guides.children[0]!.className).toBe('canvas-guide canvas-guide-snap');
+    workbench.controller.renderSnapPreview(undefined);
+    expect(workbench.guides.children).toHaveLength(0);
+    expect(workbench.document).toEqual(originalDocument);
   });
 
   it('keeps the viewport active tool and zoom local to each controller', () => {

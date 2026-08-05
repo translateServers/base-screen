@@ -42,6 +42,13 @@ C:\worker\nebula\packages\screen-editor-core
 | `docs/specs/designer-product-completion/checklist.md` | 同上 | 将可观察行为转写为独立验收项 | 同上 |
 | `docs/specs/designer-product-completion/test-matrix.md` | 同上 | 建立 Base Screen 自有测试映射 | 同上 |
 | `docs/provenance/nebula-designer-core.md` | 来源仓库和用户授权声明 | 记录来源、范围、授权和后续逐文件门禁 | 不包含来源源码或资产 |
+| `packages/material/src/base-material.ts` | 无 | 使用既有 Material ABI 独立实现共享 model/data-state 更新基类 | 未改编 Nebula 源码；不含第三方内容或 attribution |
+| `packages/material/src/text.ts` | 无 | 使用既有 Material ABI 独立实现文本 Manifest、DOM 和事件 | 未改编 Nebula 源码；不含第三方内容或 attribution |
+| `packages/material/src/shapes.ts` | 无 | 使用既有 Material ABI 独立实现矩形和椭圆 Manifest、DOM | 未改编 Nebula 源码；不含第三方内容或 attribution |
+| `packages/material/src/image.ts` | 无 | 使用既有 Material ABI 独立实现图片 Manifest、DOM 和 data-state | 未改编 Nebula 源码；不含第三方内容或 attribution |
+| `packages/material/src/container.ts` | 无 | 使用既有 Material ABI 独立实现容器 Manifest、DOM | 未改编 Nebula 源码；不含第三方内容或 attribution |
+| `packages/material/src/index.ts`、`auto-register.ts`、`index.test.ts` | 无 | 按物料职责拆分公共入口、精确聚合注册和 Base Screen 测试 | 未改编 Nebula 源码；不含第三方内容或 attribution |
+| `examples/browser-harness/main.ts`、`scripts/verify-browser-harness.mjs` | 无 | 将官方物料注册、工具和 DOM 验证接入现有 Base Screen harness | 未改编 Nebula 源码；不含第三方内容或 attribution |
 
 ## 后续实现门禁
 

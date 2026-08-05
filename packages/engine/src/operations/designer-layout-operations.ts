@@ -14,6 +14,7 @@ import {
 import {
   type BaseScreenMaterialObjectSchema,
   validateBaseScreenMaterialProps,
+  validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
 import { selectedComponents } from './designer-selection.js';
 
@@ -67,6 +68,42 @@ export function createReparentTransaction(
   };
 }
 
+export function createSiblingReorderTransaction(
+  document: ScreenDocument,
+  componentId: string,
+  direction: 'up' | 'down',
+): ScreenDocumentTransaction | undefined {
+  const component = document.components.find((item) => item.id === componentId);
+  if (component === undefined) return undefined;
+  const siblings = document.components
+    .filter((item) => item.parentId === component.parentId)
+    .sort(
+      (left, right) =>
+        left.zIndex - right.zIndex ||
+        document.components.indexOf(left) - document.components.indexOf(right),
+    );
+  const index = siblings.findIndex((item) => item.id === componentId);
+  const targetIndex = index + (direction === 'up' ? -1 : 1);
+  if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return undefined;
+
+  const reordered = [...siblings];
+  const [moved] = reordered.splice(index, 1);
+  reordered.splice(targetIndex, 0, moved!);
+  const zIndexes = siblings.map((item) => item.zIndex);
+  const orderedIndexes = zIndexes.every(
+    (value, position) => position === 0 || zIndexes[position - 1]! < value,
+  )
+    ? zIndexes
+    : siblings.map((_, position) => position);
+  const commands = reordered.flatMap((item, position) => {
+    const zIndex = orderedIndexes[position]!;
+    return item.zIndex === zIndex
+      ? []
+      : [{ type: 'update-components' as const, componentIds: [item.id], patch: { zIndex } }];
+  });
+  return commands.length === 0 ? undefined : { commands };
+}
+
 export function createAlignmentTransaction(
   document: ScreenDocument,
   componentIds: readonly string[],
@@ -105,6 +142,30 @@ export function createValidatedPropsTransaction(
           type: 'update-components',
           componentIds: [componentId],
           patch: { props: validated.value },
+        },
+      ],
+    },
+    diagnostics: [],
+  };
+}
+
+export function createValidatedStyleTransaction(
+  componentId: string,
+  style: ScreenJsonObject,
+  schema: BaseScreenMaterialObjectSchema,
+): ScreenParseResult<ScreenDocumentTransaction> {
+  const validated = validateBaseScreenMaterialStyle(style, schema);
+  if (!validated.ok) {
+    return validated;
+  }
+  return {
+    ok: true,
+    value: {
+      commands: [
+        {
+          type: 'update-components',
+          componentIds: [componentId],
+          patch: { style: validated.value },
         },
       ],
     },

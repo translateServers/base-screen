@@ -71,7 +71,21 @@ export interface BaseScreenMaterialArraySchema {
 export interface BaseScreenMaterialPropertyPanelField {
   readonly prop: string;
   readonly label: string;
-  readonly control: 'text' | 'number' | 'boolean' | 'select' | 'json';
+  readonly control: BaseScreenMaterialPanelControl;
+}
+
+export type BaseScreenMaterialPanelControl =
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'select'
+  | 'color'
+  | 'json';
+
+export interface BaseScreenMaterialStylePanelField {
+  readonly style: string;
+  readonly label: string;
+  readonly control: BaseScreenMaterialPanelControl;
 }
 
 export interface BaseScreenMaterialDesignCapabilities {
@@ -91,6 +105,8 @@ export interface BaseScreenMaterialManifest {
   readonly defaultStyle: ScreenJsonObject;
   readonly propsSchema: BaseScreenMaterialObjectSchema;
   readonly propertyPanel: readonly BaseScreenMaterialPropertyPanelField[];
+  readonly styleSchema: BaseScreenMaterialObjectSchema;
+  readonly stylePanel: readonly BaseScreenMaterialStylePanelField[];
   readonly events: readonly string[];
   readonly dataCapabilities: readonly ('static' | 'host-resource')[];
   readonly designCapabilities: BaseScreenMaterialDesignCapabilities;

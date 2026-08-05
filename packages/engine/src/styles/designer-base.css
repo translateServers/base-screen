@@ -73,12 +73,24 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  :host,
+  .designer {
+    scroll-behavior: auto !important;
+  }
+
   .designer-control,
   .designer-tab,
   .layer-row,
   .panel-handle,
-  .material-card {
-    scroll-behavior: auto !important;
+  .material-card,
+  .canvas-guide-preview,
+  .selection,
+  .marquee,
+  .create-preview,
+  .project-conflict,
+  .import-confirmation,
+  .blueprint-workspace,
+  .direct-preview {
     transition-duration: 0s !important;
     animation-duration: 0s !important;
   }
@@ -86,8 +98,20 @@
 
 @media (forced-colors: active) {
   .designer-control:focus-visible,
-  .designer-tab:focus-visible {
+  .designer-tab:focus-visible,
+  .designer-checkbox:focus-visible {
     outline: 2px solid Highlight;
     outline-offset: 2px;
+  }
+
+  .designer-control[aria-invalid="true"] {
+    outline: 2px solid Mark;
+    outline-offset: 2px;
+  }
+
+  .designer-button[aria-pressed="true"],
+  .designer-tab[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
   }
 }

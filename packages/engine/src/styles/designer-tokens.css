@@ -6,6 +6,8 @@
   --designer-surface-control-hover: #252936;
   --designer-surface-overlay: #161922;
   --designer-surface-canvas: #0a0b10;
+  --designer-surface-scrim: rgb(0 0 0 / 55%);
+  --designer-canvas-grid-line: rgb(255 255 255 / 5%);
   --designer-text-primary: #e8eaf0;
   --designer-text-secondary: #aeb5c5;
   --designer-text-muted: #8b93a6;
@@ -42,6 +44,12 @@
   --designer-shadow-overlay: 0 18px 48px rgb(0 0 0 / 38%);
   --designer-shadow-canvas: 0 18px 48px rgb(0 0 0 / 36%);
   --designer-motion: 120ms ease;
+  --designer-z-canvas: 0;
+  --designer-z-canvas-guide: 1;
+  --designer-z-canvas-selection: 2;
+  --designer-z-workspace-overlay: 10;
+  --designer-z-dialog: 20;
+  --designer-z-modal: 30;
   color-scheme: dark;
 }
 
@@ -53,6 +61,8 @@
   --designer-surface-control-hover: #e2e7ee;
   --designer-surface-overlay: #ffffff;
   --designer-surface-canvas: #e9edf3;
+  --designer-surface-scrim: rgb(24 34 54 / 38%);
+  --designer-canvas-grid-line: rgb(24 34 54 / 10%);
   --designer-text-primary: #171922;
   --designer-text-secondary: #454c5c;
   --designer-text-muted: #626b7c;

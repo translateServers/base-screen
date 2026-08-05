@@ -12,6 +12,7 @@ export interface DesignerViewportControllerCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly onBlur: () => void;
   readonly onToolChange: (tool: DesignerToolId) => void;
+  readonly onViewportChange?: () => void;
 }
 
 export class DesignerViewportController {
@@ -79,6 +80,7 @@ export class DesignerViewportController {
     root
       ?.querySelector<HTMLElement>('[data-status-tool]')
       ?.replaceChildren(DESIGNER_TOOLS.find((tool) => tool.id === this.activeTool)?.label ?? '');
+    this.callbacks.onViewportChange?.();
   }
 
   private onWheel(event: WheelEvent): void {

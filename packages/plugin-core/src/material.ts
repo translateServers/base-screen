@@ -41,6 +41,8 @@ const MANIFEST_FIELDS = new Set([
   'defaultStyle',
   'propsSchema',
   'propertyPanel',
+  'styleSchema',
+  'stylePanel',
   'events',
   'dataCapabilities',
   'designCapabilities',
@@ -97,8 +99,24 @@ export function parseBaseScreenMaterialManifest(
       'Material props schema must be an object schema.',
     );
   }
-  validateDefaultValues(manifest, propsSchema, collector);
+  const parsedStyleSchema = validatePropsSchema(
+    manifest.styleSchema,
+    ['styleSchema'],
+    collector,
+    1,
+  );
+  const styleSchema = parsedStyleSchema?.kind === 'object' ? parsedStyleSchema : undefined;
+  if (parsedStyleSchema !== undefined && styleSchema === undefined) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['styleSchema'],
+      'Material style schema must be an object schema.',
+    );
+  }
+  validateDefaultValues(manifest.defaultProps, propsSchema, ['defaultProps'], collector);
+  validateDefaultValues(manifest.defaultStyle, styleSchema, ['defaultStyle'], collector);
   validatePropertyPanel(manifest.propertyPanel, propsSchema, collector);
+  validateStylePanel(manifest.stylePanel, styleSchema, collector);
   if (collector.hasErrors) {
     return collector.failure();
   }
@@ -154,6 +172,13 @@ export function validateBaseScreenMaterialProps(
     );
   }
   return { ok: true, value: parsed.value, diagnostics: [] };
+}
+
+export function validateBaseScreenMaterialStyle(
+  input: unknown,
+  schema: BaseScreenMaterialObjectSchema,
+): ScreenParseResult<ScreenJsonObject> {
+  return validateBaseScreenMaterialProps(input, schema);
 }
 
 function validateMaterialFields(
@@ -273,18 +298,19 @@ function validateDesignCapabilities(
 }
 
 function validateDefaultValues(
-  manifest: Record<string, ScreenJsonValue>,
+  value: ScreenJsonValue | undefined,
   schema: BaseScreenMaterialObjectSchema | undefined,
+  path: readonly (string | number)[],
   collector: PluginDiagnosticCollector,
 ): void {
-  if (schema === undefined || !isRecord(manifest.defaultProps)) {
+  if (schema === undefined || !isRecord(value)) {
     return;
   }
-  if (!matchesSchema(manifest.defaultProps, schema)) {
+  if (!matchesSchema(value, schema)) {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['defaultProps'],
-      'Default props do not satisfy the declared props schema.',
+      path,
+      'Default values do not satisfy the declared schema.',
     );
   }
 }
@@ -294,65 +320,78 @@ function validatePropertyPanel(
   schema: BaseScreenMaterialObjectSchema | undefined,
   collector: PluginDiagnosticCollector,
 ): void {
+  validatePanel(value, schema, 'propertyPanel', 'prop', collector);
+}
+
+function validateStylePanel(
+  value: ScreenJsonValue | undefined,
+  schema: BaseScreenMaterialObjectSchema | undefined,
+  collector: PluginDiagnosticCollector,
+): void {
+  validatePanel(value, schema, 'stylePanel', 'style', collector);
+}
+
+function validatePanel(
+  value: ScreenJsonValue | undefined,
+  schema: BaseScreenMaterialObjectSchema | undefined,
+  panelName: 'propertyPanel' | 'stylePanel',
+  fieldName: 'prop' | 'style',
+  collector: PluginDiagnosticCollector,
+): void {
   if (!Array.isArray(value)) {
-    collector.add(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['propertyPanel'],
-      'Property panel must be an array.',
-    );
+    collector.add('PLUGIN_CORE_MANIFEST_FIELD_INVALID', [panelName], 'Panel must be an array.');
     return;
   }
   if (value.length > MAX_PROPERTY_PANEL_FIELDS) {
-    collector.add(
-      'PLUGIN_CORE_LIMIT_EXCEEDED',
-      ['propertyPanel'],
-      'Property panel has too many fields.',
-    );
+    collector.add('PLUGIN_CORE_LIMIT_EXCEEDED', [panelName], 'Panel has too many fields.');
     return;
   }
   const seen = new Set<string>();
   for (let index = 0; index < value.length; index++) {
-    const field = value[index];
+    const field: ScreenJsonValue | undefined = value[index];
     if (!isRecord(field)) {
       collector.add(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['propertyPanel', index],
+        [panelName, index],
         'Panel field must be an object.',
       );
       continue;
     }
     validateExactObject(
       field,
-      new Set(['prop', 'label', 'control']),
-      ['propertyPanel', index],
+      new Set([fieldName, 'label', 'control']),
+      [panelName, index],
       collector,
     );
-    if (typeof field.prop !== 'string' || schema?.properties[field.prop] === undefined) {
+    const key = field[fieldName];
+    if (typeof key !== 'string' || schema?.properties[key] === undefined) {
       collector.add(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['propertyPanel', index, 'prop'],
-        'Panel field must reference a top-level prop.',
+        [panelName, index, fieldName],
+        'Panel field must reference a top-level schema key.',
       );
-    } else if (seen.has(field.prop)) {
+    } else if (seen.has(key)) {
       collector.add(
         'PLUGIN_CORE_CONTRIBUTION_DUPLICATE',
-        ['propertyPanel', index, 'prop'],
+        [panelName, index, fieldName],
         'Property panel field is duplicated.',
       );
     } else {
-      seen.add(field.prop);
+      seen.add(key);
     }
     if (!isDisplayString(field.label, 256)) {
       collector.add(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['propertyPanel', index, 'label'],
+        [panelName, index, 'label'],
         'Panel label must be a display string.',
       );
     }
-    if (!['text', 'number', 'boolean', 'select', 'json'].includes(field.control as string)) {
+    if (
+      !['text', 'number', 'boolean', 'select', 'color', 'json'].includes(field.control as string)
+    ) {
       collector.add(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['propertyPanel', index, 'control'],
+        [panelName, index, 'control'],
         'Panel control is unsupported.',
       );
     }

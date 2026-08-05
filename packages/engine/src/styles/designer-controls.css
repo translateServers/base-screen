@@ -12,7 +12,25 @@
   white-space: nowrap;
 }
 
+.designer-inspector-section {
+  margin-bottom: var(--designer-space-6);
+}
+
+.designer-inspector-section-title {
+  margin: 0 0 var(--designer-space-4);
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 700;
+}
+
+.designer-field-message {
+  min-height: 16px;
+  color: var(--designer-danger);
+  white-space: normal;
+}
+
 .designer-control {
+  box-sizing: border-box;
   min-width: 0;
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-control);
@@ -27,11 +45,13 @@
 
 .designer-input,
 .designer-select {
+  width: 100%;
   height: var(--designer-control-height);
   padding: 0 var(--designer-space-3);
 }
 
 .designer-textarea {
+  width: 100%;
   min-height: 72px;
   padding: var(--designer-space-3);
   resize: vertical;
@@ -53,7 +73,8 @@
 }
 
 .designer-control:focus-visible,
-.designer-tab:focus-visible {
+.designer-tab:focus-visible,
+.designer-checkbox:focus-visible {
   outline: 2px solid var(--designer-focus-ring);
   outline-offset: 2px;
 }
@@ -74,10 +95,16 @@
 }
 
 .designer-checkbox {
+  box-sizing: border-box;
   width: 16px;
   height: 16px;
   margin: 0;
   accent-color: var(--designer-accent);
+}
+
+.designer-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .designer-color {
@@ -97,6 +124,10 @@
   font: var(--designer-font-small);
   font-weight: 600;
   white-space: nowrap;
+}
+
+.designer-button[aria-busy="true"] {
+  cursor: progress;
 }
 
 .designer-icon-button {
@@ -167,8 +198,11 @@
 }
 
 .designer-status,
-.designer-badge {
+.designer-badge,
+.status-pill {
+  box-sizing: border-box;
   display: inline-flex;
+  max-width: 100%;
   align-items: center;
   min-height: 20px;
   padding: 0 var(--designer-space-2);
@@ -179,6 +213,9 @@
   font: var(--designer-font-small);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .designer-empty-state {
@@ -188,15 +225,19 @@
   border-radius: var(--designer-radius-control);
   color: var(--designer-text-muted);
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .designer-dialog-surface {
+  box-sizing: border-box;
+  width: min(340px, 100%);
   max-width: 340px;
   padding: var(--designer-space-6);
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-overlay);
   background: var(--designer-surface-overlay);
   box-shadow: var(--designer-shadow-overlay);
+  overflow-wrap: anywhere;
 }
 
 .designer-dialog-actions {
