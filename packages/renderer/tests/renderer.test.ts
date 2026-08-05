@@ -61,6 +61,42 @@ function createCatalog(): BaseScreenMaterialCatalog {
   };
 }
 
+function createImageCatalog(): BaseScreenMaterialCatalog {
+  const manifest: BaseScreenMaterialManifest = {
+    type: 'base.image',
+    tagName: 'base-screen-image',
+    name: '图片',
+    category: '基础',
+    keywords: ['图片'],
+    defaultSize: { width: 100, height: 40 },
+    defaultProps: { source: '', alt: '' },
+    defaultStyle: {},
+    styleSchema: { kind: 'object', properties: {}, required: [] },
+    stylePanel: [],
+    propsSchema: {
+      kind: 'object',
+      properties: { source: { kind: 'string' }, alt: { kind: 'string' } },
+      required: ['source', 'alt'],
+    },
+    propertyPanel: [
+      { prop: 'source', label: '图片来源', control: 'text' },
+      { prop: 'alt', label: '替代文本', control: 'text' },
+    ],
+    events: [],
+    dataCapabilities: [],
+    designCapabilities: { resize: true, rotate: true, children: false },
+  };
+  const entry = {
+    manifest,
+    constructor: FakeMaterialElement as unknown as BaseScreenMaterialConstructor,
+  };
+  return {
+    get: (type) => (type === manifest.type ? entry : undefined),
+    has: (type) => type === manifest.type,
+    list: () => [entry],
+  };
+}
+
 function component(
   id: string,
   zIndex: number,
@@ -93,6 +129,26 @@ function document(components: readonly ScreenComponentNode[]): ScreenDocument {
 }
 
 describe('BaseScreenRenderer', () => {
+  it('R5 validates and forwards declared image alternative text to its Material model', () => {
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createImageCatalog(),
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const image = {
+      ...component('image', 0),
+      type: 'base.image',
+      props: { source: '', alt: '趋势图' },
+    };
+
+    expect(renderer.render(document([image])).ok).toBe(true);
+    expect(root.children[0]?.model?.props).toEqual({ source: '', alt: '趋势图' });
+  });
+
   it('R2 keeps every root subtree within its Core painter-order span', () => {
     const root = new FakeRoot();
     const renderer = createBaseScreenRenderer({
@@ -154,6 +210,48 @@ describe('BaseScreenRenderer', () => {
     expect(renderer.render(edited).ok).toBe(true);
     expect(resolveCalls).toBe(1);
     expect(root.children[0]?.model?.dataState.status).toBe('ready');
+  });
+
+  it('R1 resolves again when only a host-resource id changes', async () => {
+    const root = new FakeRoot();
+    let resolveCalls = 0;
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: {
+        resolve: async () => {
+          resolveCalls++;
+          return { ok: true, value: { resolveCalls }, diagnostics: [] };
+        },
+      },
+    });
+    const source: ScreenComponentNode['dataSource'] = {
+      type: 'host-resource',
+      resourceId: 'resource-1',
+      resourceType: 'resource',
+      params: { region: 'north' },
+    };
+    const initial = document([component('resource', 0, null, source)]);
+
+    expect(renderer.render(initial).ok).toBe(true);
+    await Promise.resolve();
+    expect(resolveCalls).toBe(1);
+
+    expect(
+      renderer.render(
+        document([
+          {
+            ...initial.components[0]!,
+            dataSource: { ...source, resourceId: 'resource-2' },
+          },
+        ]),
+      ).ok,
+    ).toBe(true);
+    await Promise.resolve();
+    expect(resolveCalls).toBe(2);
   });
 
   it('R4 rejects a component style that does not satisfy its Material schema', () => {

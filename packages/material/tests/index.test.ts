@@ -32,6 +32,19 @@ describe('official materials', () => {
     }
   });
 
+  it('R5 declares image alternative text as an editable canonical prop', () => {
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.defaultProps).toEqual({ source: '', alt: '' });
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.propsSchema.properties.alt).toEqual({
+      kind: 'string',
+      maxLength: 1024,
+    });
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.propertyPanel).toContainEqual({
+      prop: 'alt',
+      label: '替代文本',
+      control: 'text',
+    });
+  });
+
   it('does not access or register custom elements at module import time', () => {
     expect('customElements' in globalThis).toBe(false);
   });

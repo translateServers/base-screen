@@ -1,4 +1,5 @@
 import type {
+  ScreenBlueprintHostActionPort,
   ScreenBlueprintRuntimePort,
   ScreenDocument,
   ScreenHostResourcePort,
@@ -25,6 +26,7 @@ export class BaseScreenViewerElement extends ElementBase {
   #resourcePort: ScreenHostResourcePort | undefined;
   #contributionIndex: BaseScreenRuntimeContributionIndex | undefined;
   #blueprintRuntimePort: ScreenBlueprintRuntimePort | undefined;
+  #blueprintHostActionPort: ScreenBlueprintHostActionPort | undefined;
   #document: ScreenDocument | undefined;
   #blueprintPlan: ScreenBlueprintPlan | undefined;
   #blueprintVariables: ScreenJsonObject | undefined;
@@ -70,6 +72,14 @@ export class BaseScreenViewerElement extends ElementBase {
 
   set blueprintRuntimePort(value: ScreenBlueprintRuntimePort | undefined) {
     this.#blueprintRuntimePort = value;
+  }
+
+  get blueprintHostActionPort(): ScreenBlueprintHostActionPort | undefined {
+    return this.#blueprintHostActionPort;
+  }
+
+  set blueprintHostActionPort(value: ScreenBlueprintHostActionPort | undefined) {
+    this.#blueprintHostActionPort = value;
   }
 
   get document(): ScreenDocument | undefined {
@@ -196,6 +206,15 @@ export class BaseScreenViewerElement extends ElementBase {
       } else {
         void Promise.resolve(this.#blueprintRuntimePort.emit(hostEvent)).catch(() => {
           this.emitDiagnostics('Blueprint host event failed.');
+        });
+      }
+    }
+    for (const hostAction of result.value.hostActions) {
+      if (this.#blueprintHostActionPort === undefined) {
+        this.emitDiagnostics('Blueprint host action is unavailable.');
+      } else {
+        void Promise.resolve(this.#blueprintHostActionPort.execute(hostAction)).catch(() => {
+          this.emitDiagnostics('Blueprint host action failed.');
         });
       }
     }

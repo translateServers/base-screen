@@ -14,7 +14,7 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   category: '基础',
   keywords: ['图片', '图像'],
   defaultSize: { width: 240, height: 160 },
-  defaultProps: { source: '' },
+  defaultProps: { source: '', alt: '' },
   defaultStyle: { objectFit: 'contain', opacity: 1 },
   styleSchema: {
     kind: 'object',
@@ -30,10 +30,16 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   ],
   propsSchema: {
     kind: 'object',
-    properties: { source: { kind: 'string', maxLength: 4096 } },
-    required: ['source'],
+    properties: {
+      source: { kind: 'string', maxLength: 4096 },
+      alt: { kind: 'string', maxLength: 1024 },
+    },
+    required: ['source', 'alt'],
   },
-  propertyPanel: [{ prop: 'source', label: '图片来源', control: 'text' }],
+  propertyPanel: [
+    { prop: 'source', label: '图片来源', control: 'text' },
+    { prop: 'alt', label: '替代文本', control: 'text' },
+  ],
   events: [],
   dataCapabilities: ['static', 'host-resource'],
   designCapabilities: { resize: true, rotate: true, children: false },
@@ -71,7 +77,7 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
     }
     const image = this.ownerDocument.createElement('img');
     image.src = source;
-    image.alt = '';
+    image.alt = typeof model.props.alt === 'string' ? model.props.alt : '';
     image.style.width = '100%';
     image.style.height = '100%';
     image.style.objectFit =

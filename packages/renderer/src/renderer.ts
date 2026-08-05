@@ -456,7 +456,7 @@ function getHostResourceKey(component: ScreenComponentNode): string | undefined 
   if (source === null || source.type !== 'host-resource') {
     return undefined;
   }
-  return `${source.resourceType}\u0000${JSON.stringify(source.params)}`;
+  return `${source.resourceType}\u0000${source.resourceId}\u0000${JSON.stringify(source.params)}`;
 }
 
 function prefixDiagnostics(
