@@ -10,6 +10,14 @@ if (target === null) throw new Error('Runtime harness target is missing.');
 
 const remoteOrigin = 'http://127.0.0.1:4176';
 const events: unknown[] = [];
+const remoteCapabilityCanaries = {
+  baseScreenMaterial: { name: 'material' },
+  baseScreenCatalog: { name: 'catalog' },
+  baseScreenDocument: { name: 'document' },
+  baseScreenCommandPort: { name: 'command' },
+  baseScreenResource: { name: 'resource' },
+  baseScreenCredential: { name: 'credential' },
+} as const;
 
 const resourceManifest = {
   type: 'harness.resource',
@@ -86,6 +94,130 @@ Object.assign(window, {
         sandboxed: sandbox.element?.getAttribute('sandbox'),
         referrerPolicy: sandbox.element?.referrerPolicy,
       };
+    },
+    async runSandboxFailureMatrix() {
+      const hostOrigin = window.location.origin;
+      const hostWindow = window as unknown as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+
+      const sameOrigin = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: `${hostOrigin}/ready.html`,
+        expectedOrigin: hostOrigin,
+        timeoutMs: 500,
+        onEvent: undefined,
+      });
+      out.sameOrigin = {
+        code: (await sameOrigin.ready()).diagnostics[0]?.code,
+        message: (await sameOrigin.ready()).diagnostics[0]?.message,
+        element: sameOrigin.element,
+      };
+
+      const invalidUrl = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: 'not a valid URL',
+        expectedOrigin: remoteOrigin,
+        timeoutMs: 500,
+        onEvent: undefined,
+      });
+      out.invalidUrl = {
+        code: (await invalidUrl.ready()).diagnostics[0]?.code,
+        message: (await invalidUrl.ready()).diagnostics[0]?.message,
+        element: invalidUrl.element,
+      };
+
+      const mismatched = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: `${remoteOrigin}/ready.html`,
+        expectedOrigin: 'http://127.0.0.1:4177',
+        timeoutMs: 500,
+        onEvent: undefined,
+      });
+      out.mismatchedOrigin = {
+        code: (await mismatched.ready()).diagnostics[0]?.code,
+        message: (await mismatched.ready()).diagnostics[0]?.message,
+        element: mismatched.element,
+      };
+
+      const malformed = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: `${remoteOrigin}/malformed.html`,
+        expectedOrigin: remoteOrigin,
+        timeoutMs: 500,
+        onEvent: undefined,
+      });
+      out.malformed = {
+        code: (await malformed.ready()).diagnostics[0]?.code,
+        message: (await malformed.ready()).diagnostics[0]?.message,
+        status: malformed.status,
+      };
+
+      const repeated = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: `${remoteOrigin}/repeat-ready.html`,
+        expectedOrigin: remoteOrigin,
+        timeoutMs: 500,
+        onEvent: undefined,
+      });
+      const repeatedReadyResult = await repeated.ready();
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      out.repeatedReady = { ok: repeatedReadyResult.ok, status: repeated.status };
+
+      const loadError = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: 'http://127.0.0.1:4177/load.html',
+        expectedOrigin: 'http://127.0.0.1:4177',
+        timeoutMs: 500,
+        onEvent: undefined,
+      });
+      // Chromium does not fire the `error` event for iframe load failures, so dispatch
+      // it manually to exercise the sandbox's load-error handling deterministically.
+      loadError.element?.dispatchEvent(new Event('error'));
+      const loadErrorResult = await loadError.ready();
+      out.loadError = {
+        code: loadErrorResult.diagnostics[0]?.code,
+        status: loadError.status,
+        message: loadErrorResult.diagnostics[0]?.message,
+      };
+
+      const disposed = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: `${remoteOrigin}/never-ready.html`,
+        expectedOrigin: remoteOrigin,
+        timeoutMs: 1000,
+        onEvent: undefined,
+      });
+      disposed.dispose();
+      out.dispose = {
+        code: (await disposed.ready()).diagnostics[0]?.code,
+        status: disposed.status,
+        message: (await disposed.ready()).diagnostics[0]?.message,
+      };
+
+      Object.assign(hostWindow, remoteCapabilityCanaries);
+      let capabilityProbe: unknown;
+      const surveyed = createBaseScreenRemotePluginSandbox({
+        target,
+        entryUrl: `${remoteOrigin}/capability-probe.html`,
+        expectedOrigin: remoteOrigin,
+        timeoutMs: 500,
+        onEvent: (event) => {
+          if (event.name === 'capability_probe') {
+            capabilityProbe = event.payload;
+          }
+        },
+      });
+      try {
+        await surveyed.ready();
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        out.remoteCapabilityProbe = capabilityProbe;
+      } finally {
+        surveyed.dispose();
+        for (const key of Object.keys(remoteCapabilityCanaries)) {
+          delete hostWindow[key];
+        }
+      }
+      return out;
     },
     events,
     async runHostResourceConformance() {

@@ -357,6 +357,13 @@ try {
         await page.waitForFunction(
           () => window.baseScreenHarness.designer.document.components.length === 7,
         );
+        await authoringDesigner.locator('[data-material-type="base.text"] .material-name').click();
+        const materialPaletteCount = await page.evaluate(
+          () => window.baseScreenHarness.designer.document.components.length,
+        );
+        if (materialPaletteCount !== 8) {
+          throw new Error(`BROWSER_HARNESS_MATERIAL_PALETTE_DELEGATION_FAILED: ${materialPaletteCount}`);
+        }
         if ((await authoringDesigner.locator('[data-create-preview]').count()) !== 0) {
           throw new Error('BROWSER_HARNESS_CREATE_PREVIEW_STALE');
         }
@@ -429,7 +436,12 @@ try {
         const previewCount = await authoringDesigner
           .locator('.direct-preview base-screen-viewer [data-base-screen-component-id]')
           .count();
-        if (previewCount !== 7) throw new Error('BROWSER_HARNESS_DIRECT_PREVIEW_FAILED');
+        const expectedPreviewCount = await page.evaluate(
+          () => window.baseScreenHarness.designer.document.components.length,
+        );
+        if (previewCount !== expectedPreviewCount) {
+          throw new Error('BROWSER_HARNESS_DIRECT_PREVIEW_FAILED');
+        }
         await assertOverlayContained(authoringDesigner, '.direct-preview');
         await authoringDesigner.locator('.direct-preview [data-action="preview"]').click();
       }

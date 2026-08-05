@@ -41,6 +41,7 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
   #status: BaseScreenRemotePluginSandbox['status'] = 'loading';
   #ready: Promise<ScreenParseResult<null>>;
   #resolveReady: ((result: ScreenParseResult<null>) => void) | undefined;
+  #readySettleTimer: ReturnType<typeof setTimeout> | undefined;
   #timeout: ReturnType<typeof setTimeout> | undefined;
 
   constructor(
@@ -117,7 +118,12 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
         );
         return;
       }
-      this.finish({ ok: true, value: null, diagnostics: [] });
+      this.#status = 'ready';
+      // Permit a bootstrap that emits ready twice in one turn to fail the pending handshake.
+      this.#readySettleTimer = setTimeout(() => {
+        this.#readySettleTimer = undefined;
+        this.finish({ ok: true, value: null, diagnostics: [] });
+      }, 0);
       return;
     }
     if (this.#status !== 'ready') {
@@ -130,9 +136,6 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
   };
 
   private finish(result: ScreenParseResult<null>): void {
-    if (this.#resolveReady === undefined) {
-      return;
-    }
     if (result.ok) {
       this.#status = 'ready';
     } else if (this.#status !== 'disposed') {
@@ -144,7 +147,11 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
       clearTimeout(this.#timeout);
       this.#timeout = undefined;
     }
-    this.#resolveReady(result);
+    const resolveReady = this.#resolveReady;
+    if (resolveReady === undefined) {
+      return;
+    }
+    resolveReady(result);
     this.#resolveReady = undefined;
   }
 
@@ -158,6 +165,10 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
     if (this.#timeout !== undefined) {
       clearTimeout(this.#timeout);
       this.#timeout = undefined;
+    }
+    if (this.#readySettleTimer !== undefined) {
+      clearTimeout(this.#readySettleTimer);
+      this.#readySettleTimer = undefined;
     }
   }
 }
