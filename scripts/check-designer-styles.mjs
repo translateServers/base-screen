@@ -5,12 +5,12 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = (file) => readFileSync(resolve(root, file), 'utf8');
 const layers = [
-  'packages/engine/src/designer-tokens.css',
-  'packages/engine/src/designer-base.css',
-  'packages/engine/src/designer-controls.css',
-  'packages/engine/src/designer-workbench.css',
+  'packages/engine/src/styles/designer-tokens.css',
+  'packages/engine/src/styles/designer-base.css',
+  'packages/engine/src/styles/designer-controls.css',
+  'packages/engine/src/styles/designer-workbench.css',
 ];
-const style = source('packages/engine/src/designer-style.ts');
+const style = source('packages/engine/src/styles/designer-style.ts');
 
 for (const file of layers) source(file);
 if (!/\[tokensCss, baseCss, controlsCss, workbenchCss\]/.test(style)) {

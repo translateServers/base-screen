@@ -14,7 +14,7 @@ import {
   createDesignerBlueprintRule,
   renderDesignerBlueprintWorkspace,
   renderDesignerEventsPanel,
-} from './designer-blueprint-dom.js';
+} from '../dom/designer-blueprint-dom.js';
 
 export interface DesignerIntegrationCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;

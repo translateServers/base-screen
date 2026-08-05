@@ -8,8 +8,8 @@ import {
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { createDesignerLayerView, renderDesignerLayers } from './designer-layers-dom.js';
-import { createReparentTransaction } from './designer-layout-operations.js';
+import { createDesignerLayerView, renderDesignerLayers } from '../dom/designer-layers-dom.js';
+import { createReparentTransaction } from '../operations/designer-layout-operations.js';
 
 export interface DesignerLayersControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;

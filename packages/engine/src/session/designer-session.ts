@@ -19,7 +19,10 @@ import {
   type ScreenInteractionState,
   undoScreenHistory,
 } from '@base-screen/core';
-import { ScreenProjectController, type ScreenProjectPhase } from './project-controller.js';
+import {
+  ScreenProjectController,
+  type ScreenProjectPhase,
+} from '../controllers/project-controller.js';
 
 export interface DesignerSessionCallbacks {
   readonly renderDocument: (document: ScreenDocument) => ScreenParseResult<void>;

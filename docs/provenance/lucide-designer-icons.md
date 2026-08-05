@@ -6,7 +6,7 @@
 
 ## 目标文件
 
-- `packages/engine/src/designer-icons.ts`
+- `packages/engine/src/ui/designer-icons.ts`
 
 ## 来源仓库与 Commit
 

@@ -1,12 +1,12 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { reduceScreenViewport, type ScreenViewportState } from '@base-screen/core';
-import { DESIGNER_TOOLS, type DesignerToolId } from './designer-tools.js';
+import { DESIGNER_TOOLS, type DesignerToolId } from '../tools/designer-tools.js';
 import {
   clampDesignerZoom,
   getFitDesignerZoom,
   getViewportAnchor,
   viewportTransform,
-} from './designer-viewport.js';
+} from '../viewport/designer-viewport.js';
 
 export interface DesignerViewportControllerCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;

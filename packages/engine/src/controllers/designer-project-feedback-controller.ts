@@ -1,5 +1,5 @@
 import type { ScreenParseResult } from '@base-screen/contracts';
-import { DESIGNER_UI_TEXT } from './designer-ui-text.js';
+import { DESIGNER_UI_TEXT } from '../ui/designer-ui-text.js';
 import type { ScreenProjectPhase } from './project-controller.js';
 
 export interface DesignerProjectFeedbackCallbacks {

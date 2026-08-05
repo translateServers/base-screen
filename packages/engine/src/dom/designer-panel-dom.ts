@@ -11,7 +11,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialPropSchema,
 } from '@base-screen/plugin-core';
-import { createValidatedPropsTransaction } from './designer-layout-operations.js';
+import { createValidatedPropsTransaction } from '../operations/designer-layout-operations.js';
 
 export interface DesignerPanelInput {
   readonly value: string;

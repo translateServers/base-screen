@@ -1,8 +1,8 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
-import { designerIcon } from './designer-icons.js';
-import { DESIGNER_OPERATION_TEXT } from './designer-operation-registry.js';
-import { DESIGNER_TOOLS, type DesignerToolMaterialTypes } from './designer-tools.js';
-import { DESIGNER_UI_TEXT } from './designer-ui-text.js';
+import { DESIGNER_OPERATION_TEXT } from '../operations/designer-operation-registry.js';
+import { DESIGNER_TOOLS, type DesignerToolMaterialTypes } from '../tools/designer-tools.js';
+import { designerIcon } from '../ui/designer-icons.js';
+import { DESIGNER_UI_TEXT } from '../ui/designer-ui-text.js';
 
 export function createDesignerWorkspace(
   ownerDocument: Document,

@@ -1,8 +1,8 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { getScreenSelectionBounds, isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { selectedComponents } from './designer-selection.js';
-import type { BaseScreenTransformHandle } from './designer-transform.js';
+import { selectedComponents } from '../operations/designer-selection.js';
+import type { BaseScreenTransformHandle } from '../operations/designer-transform.js';
 
 export function renderDesignerSelection(
   selection: HTMLDivElement | undefined,

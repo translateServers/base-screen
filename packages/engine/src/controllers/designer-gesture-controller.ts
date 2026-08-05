@@ -9,14 +9,14 @@ import {
   type ScreenViewportState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { selectedComponents } from './designer-selection.js';
-import type { DesignerToolId, DesignerToolMaterialTypes } from './designer-tools.js';
+import { selectedComponents } from '../operations/designer-selection.js';
 import {
   type BaseScreenTransformHandle,
   createTransformTransaction,
   resizeScreenComponents,
   rotateScreenComponents,
-} from './designer-transform.js';
+} from '../operations/designer-transform.js';
+import type { DesignerToolId, DesignerToolMaterialTypes } from '../tools/designer-tools.js';
 
 interface Drag {
   readonly componentId: string;

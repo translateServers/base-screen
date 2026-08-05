@@ -1,8 +1,8 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { renderDesignerDataPanel, renderDesignerProperties } from '../dom/designer-panel-dom.js';
 import { DesignerPanelController } from './designer-panel-controller.js';
-import { renderDesignerDataPanel, renderDesignerProperties } from './designer-panel-dom.js';
 
 class FakeElement {
   readonly children: FakeElement[] = [];

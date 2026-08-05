@@ -2,7 +2,7 @@ import {
   DEFAULT_DESIGNER_CANVAS_AIDS,
   type DesignerCanvasAidsState,
   snapDesignerCanvasPoint,
-} from './designer-canvas-aids.js';
+} from '../viewport/designer-canvas-aids.js';
 
 interface DesignerWorkbenchCallbacks {
   readonly getCanvas: () => HTMLDivElement | undefined;

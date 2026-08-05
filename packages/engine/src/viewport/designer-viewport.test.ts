@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DesignerViewportController } from '../controllers/designer-viewport-controller.js';
 import {
   clampDesignerZoom,
   DESIGNER_FIT_MARGIN,
@@ -7,7 +8,6 @@ import {
   getFitDesignerZoom,
   viewportTransform,
 } from './designer-viewport.js';
-import { DesignerViewportController } from './designer-viewport-controller.js';
 
 const document = {
   canvas: { width: 1000, height: 500, backgroundColor: '#000000' },
