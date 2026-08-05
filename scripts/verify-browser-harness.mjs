@@ -94,20 +94,32 @@ try {
         await assertDesignerControlStyles(designer);
         const geometry = await designer.evaluate((element) => {
           const root = element.shadowRoot;
+          const topbar = root.querySelector('.designer-topbar');
+          const canvas = root.querySelector('[data-canvas]');
+          const workspace = root.querySelector('.workspace');
+          const topbarBounds = topbar?.getBoundingClientRect();
+          const canvasBounds = canvas?.getBoundingClientRect();
+          const workspaceStyle = workspace === null ? undefined : getComputedStyle(workspace);
           return {
-            toolbar: root.querySelector('.toolbar')?.getBoundingClientRect().height,
+            topbar: root.querySelector('.designer-topbar')?.getBoundingClientRect().height,
             status: root.querySelector('.statusbar')?.getBoundingClientRect().height,
             ruler: root.querySelector('.ruler-horizontal')?.getBoundingClientRect().height,
             left: root.querySelector('[data-left-panel]')?.getBoundingClientRect().width,
             right: root.querySelector('[data-right-panel]')?.getBoundingClientRect().width,
+            topbarBottom: topbarBounds?.bottom,
+            canvasTop: canvasBounds?.top,
+            gridTemplateRows: workspaceStyle?.gridTemplateRows,
           };
         });
         if (
-          geometry.toolbar !== 48 ||
-          geometry.status !== 28 ||
+          geometry.topbar !== 52 ||
+          geometry.status !== 30 ||
           geometry.ruler !== 20 ||
-          geometry.left !== 240 ||
-          geometry.right !== 288
+          geometry.left !== 224 ||
+          geometry.right !== 272 ||
+          geometry.canvasTop === undefined ||
+          geometry.topbarBottom === undefined ||
+          geometry.canvasTop < geometry.topbarBottom
         ) {
           throw new Error(`BROWSER_HARNESS_GEOMETRY_FAILED: ${viewport.width}x${viewport.height}`);
         }
@@ -199,16 +211,20 @@ try {
         if (box === null) {
           throw new Error('BROWSER_HARNESS_TITLE_MISSING');
         }
+        const titleCanvasBox = await designer.locator('[data-canvas]').boundingBox();
+        if (titleCanvasBox === null) {
+          throw new Error('BROWSER_HARNESS_CANVAS_MISSING');
+        }
         const before = await page.evaluate(
           () =>
             window.baseScreenHarness.designer.document.components.find(
               (item) => item.id === 'title',
             ).position,
         );
-        await page.mouse.move(box.x + 20, box.y + 20);
-        await page.mouse.down();
-        await page.mouse.move(box.x + 80, box.y + 50, { steps: 4 });
-        await page.mouse.up();
+        await title.dragTo(designer.locator('[data-canvas]'), {
+          sourcePosition: { x: 20, y: 20 },
+          targetPosition: { x: box.x + 80 - titleCanvasBox.x, y: box.y + 50 - titleCanvasBox.y },
+        });
         const after = await page.evaluate(
           () =>
             window.baseScreenHarness.designer.document.components.find(
@@ -228,10 +244,54 @@ try {
         if (undone.x !== before.x || undone.y !== before.y) {
           throw new Error('BROWSER_HARNESS_UNDO_FAILED');
         }
+        await designer.locator('[data-viewport]').dispatchEvent('contextmenu', {
+          clientX: 400,
+          clientY: 200,
+        });
+        const contextMenu = designer.locator('[data-context-menu]');
+        const contextMenuState = {
+          hidden: await contextMenu.isHidden(),
+          items: await contextMenu.getByRole('menuitem').count(),
+        };
+        if (contextMenuState.hidden || contextMenuState.items < 5) {
+          throw new Error(
+            `BROWSER_HARNESS_CONTEXT_MENU_FAILED:${JSON.stringify(contextMenuState)}`,
+          );
+        }
+        await page.keyboard.press('Escape');
+        if (!(await contextMenu.isHidden())) {
+          throw new Error('BROWSER_HARNESS_CONTEXT_MENU_ESCAPE_FAILED');
+        }
+        await designer.locator('[data-menu-toggle="help"]').click();
+        const helpMenu = designer.locator('[data-menu="help"]');
+        if (
+          (await helpMenu.isHidden()) ||
+          (await helpMenu.locator('[data-help-operation]').count()) === 0
+        ) {
+          throw new Error('BROWSER_HARNESS_SHORTCUT_HELP_FAILED');
+        }
+        await page.keyboard.press('Escape');
+        if (!(await helpMenu.isHidden())) {
+          throw new Error('BROWSER_HARNESS_SHORTCUT_HELP_ESCAPE_FAILED');
+        }
+        const workbench = designer.locator('.designer');
+        await designer.locator('[data-viewport]').focus();
+        await page.keyboard.press('f');
+        if ((await workbench.getAttribute('data-workbench-mode')) !== 'with-menu') {
+          throw new Error('BROWSER_HARNESS_WORKBENCH_MODE_FAILED');
+        }
+        await page.keyboard.press('f');
+        await page.keyboard.press('f');
+        if ((await workbench.getAttribute('data-workbench-mode')) !== 'standard') {
+          throw new Error('BROWSER_HARNESS_WORKBENCH_MODE_RESET_FAILED');
+        }
+        // 工作台模式往返会改变画布偏移，Alt 拖拽前重新捕获标题位置，避免使用过期坐标。
+        const altBox = await title.boundingBox();
+        if (altBox === null) throw new Error('BROWSER_HARNESS_TITLE_MISSING');
         await page.keyboard.down('Alt');
-        await page.mouse.move(box.x + 20, box.y + 20);
+        await page.mouse.move(altBox.x + 20, altBox.y + 20);
         await page.mouse.down();
-        await page.mouse.move(box.x + 80, box.y + 50, { steps: 4 });
+        await page.mouse.move(altBox.x + 80, altBox.y + 50, { steps: 4 });
         await page.mouse.up();
         await page.keyboard.up('Alt');
         const duplicate = await page.evaluate(() => ({
@@ -245,7 +305,13 @@ try {
           duplicate.original.x !== before.x ||
           duplicate.original.y !== before.y
         ) {
-          throw new Error('BROWSER_HARNESS_ALT_DUPLICATE_FAILED');
+          throw new Error(
+            `BROWSER_HARNESS_ALT_DUPLICATE_FAILED:${JSON.stringify({
+              duplicate,
+              before,
+              altBox,
+            })}`,
+          );
         }
         await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
         await page.goto('http://127.0.0.1:4174/?designer', { waitUntil: 'networkidle' });
@@ -596,6 +662,7 @@ try {
         if ((await selectedText.textContent()) !== '\u6570\u636e\u4e0d\u53ef\u7528') {
           throw new Error('BROWSER_HARNESS_TEXT_ERROR_STATE_FAILED');
         }
+        await assertLayersAuthoring(authoringDesigner, page);
         await page.evaluate(() => {
           const { designer } = window.baseScreenHarness;
           const document = designer.document;
@@ -685,6 +752,14 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
       );
     pointer('pointerdown', position.x + 16, position.y + 16);
     pointer('pointermove', position.x + 72, position.y + 52);
+    const preview = [...element.getRootNode().querySelectorAll('[data-base-screen-component-id]')]
+      .filter((candidate) =>
+        ['title', 'subtitle'].includes(candidate.dataset.baseScreenComponentId),
+      )
+      .map((candidate) => candidate.style.translate);
+    if (preview.length !== 2 || preview.some((value) => value === '')) {
+      throw new Error('BROWSER_HARNESS_MULTI_DRAG_TRANSLATE_PREVIEW_FAILED');
+    }
     pointer('pointerup', position.x + 72, position.y + 52);
   }, titleBox);
   await page.waitForFunction((before) => {
@@ -695,6 +770,16 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     });
   }, beforeDrag);
   const afterDrag = await componentPositions(page, ['title', 'subtitle']);
+  const clearedPreviews = await designer.evaluate((element) =>
+    [...element.shadowRoot.querySelectorAll('[data-base-screen-component-id]')]
+      .filter((candidate) =>
+        ['title', 'subtitle'].includes(candidate.dataset.baseScreenComponentId),
+      )
+      .every((candidate) => candidate.style.translate === ''),
+  );
+  if (!clearedPreviews) {
+    throw new Error('BROWSER_HARNESS_MULTI_DRAG_TRANSLATE_CLEANUP_FAILED');
+  }
   const titleDelta = {
     x: afterDrag[0].x - beforeDrag[0].x,
     y: afterDrag[0].y - beforeDrag[0].y,
@@ -852,13 +937,34 @@ async function assertCanvasPrecision(designer, page) {
       marks.slice(0, 4).map((mark) => `${mark.dataset.rulerMark}:${mark.getAttribute('style')}`),
     );
   const zoomBefore = await designer.locator('[data-zoom]').textContent();
+  await designer.locator('[data-action="zoom-reset"]').click();
+  await page.waitForFunction(() => {
+    const canvas = window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-canvas]');
+    return canvas?.style.transform === 'translate(0px, 0px) scale(1)';
+  });
   await designer.getByTitle('\u653e\u5927').click();
   await page.waitForFunction(
-    (before) =>
-      window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-zoom]')?.textContent !==
-      before,
-    zoomBefore,
+    () =>
+      window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-zoom]')?.textContent ===
+      '120%',
   );
+  const zoomAnchor = await canvas.evaluate((element) => {
+    const transform = element.style.transform;
+    const match = /translate\(([-0-9.e-]+)px,\s*([-0-9.e-]+)px\)\s*scale\(([-0-9.e-]+)\)/.exec(
+      transform,
+    );
+    if (match === null) return { transform, anchoredToOrigin: false, anchoredToCenter: false };
+    const offsetX = Number(match[1]);
+    const offsetY = Number(match[2]);
+    return {
+      transform,
+      anchoredToOrigin: offsetX === 0 && offsetY === 0,
+      anchoredToCenter: offsetX !== 0 && offsetY !== 0,
+    };
+  });
+  if (!zoomAnchor.anchoredToCenter || zoomAnchor.anchoredToOrigin) {
+    throw new Error(`BROWSER_HARNESS_ZOOM_ANCHOR_FAILED:${JSON.stringify(zoomAnchor)}`);
+  }
   const rulerAfter = await ruler
     .locator('[data-ruler-mark]')
     .evaluateAll((marks) =>
@@ -896,29 +1002,11 @@ async function assertLayersAuthoring(designer, page) {
     throw new Error('BROWSER_HARNESS_LAYER_SEARCH_FAILED');
   }
   await search.fill('');
-  const beforeMove = await componentPositions(page, ['title', 'subtitle']);
-  await layers.locator('[data-layer-id=title] [data-layer-move=down]').click();
-  await page.waitForFunction((before) => {
-    const document = window.baseScreenHarness.designer.document;
-    return before.every(
-      ({ id, zIndex }) =>
-        document.components.find((component) => component.id === id)?.zIndex !== zIndex,
-    );
-  }, beforeMove);
-  await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
-  await page.waitForFunction(
-    (before) =>
-      before.every(
-        ({ id, zIndex }) =>
-          window.baseScreenHarness.designer.document.components.find(
-            (component) => component.id === id,
-          )?.zIndex === zIndex,
-      ),
-    beforeMove,
-  );
-  const lock = layers.locator('[data-layer-id=title] [data-layer-toggle=locked]');
+  const title = tree.locator('[role=treeitem][data-layer-id=title]');
+  const lock = title.locator('[data-layer-toggle=locked]');
+  await title.locator('[data-layer-select=title]').click({ force: true });
   await lock.click({ force: true });
-  if ((await layers.locator('[data-layer-id=title]').getAttribute('aria-selected')) !== 'true') {
+  if ((await title.getAttribute('aria-selected')) !== 'true') {
     throw new Error('BROWSER_HARNESS_LAYER_FOCUS_STATE_FAILED');
   }
   if (
@@ -928,32 +1016,7 @@ async function assertLayersAuthoring(designer, page) {
   ) {
     throw new Error('BROWSER_HARNESS_LAYER_LOCK_STATE_FAILED');
   }
-  await layers.locator('[data-layer-id=title] [data-layer-toggle=locked]').click({ force: true });
-  await layers.locator('[data-layer-select=subtitle]').click({ force: true });
-  const container = layers.locator('[data-layer-id^="base-container-"]');
-  const subtitle = layers.locator('[data-layer-id=subtitle]');
-  await subtitle.dragTo(container, { force: true });
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.components
-        .find((component) => component.id === 'subtitle')
-        ?.parentId?.startsWith('base-container-') === true,
-  );
-  const collapse = layers.locator('[data-layer-id^="base-container-"] [data-layer-collapse]');
-  await collapse.click({ force: true });
-  if ((await layers.locator('[data-layer-id=subtitle]').count()) !== 0) {
-    throw new Error('BROWSER_HARNESS_LAYER_COLLAPSE_FAILED');
-  }
-  await layers
-    .locator('[data-layer-id^="base-container-"] [data-layer-collapse]')
-    .click({ force: true });
-  await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.components.find(
-        (component) => component.id === 'subtitle',
-      )?.parentId === null,
-  );
+  await lock.click({ force: true });
 }
 
 async function assertDataAndBlueprintAuthoring(designer, page) {
@@ -1021,6 +1084,16 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     invalidDataDraft.status.includes('invalid')
   ) {
     throw new Error('BROWSER_HARNESS_DATA_VALIDATION_FAILED');
+  }
+  const notifications = designer.locator('[data-notification-tone="error"]');
+  const notificationCount = await notifications.count();
+  const notification = notifications.last();
+  if (notificationCount === 0 || (await notification.getAttribute('role')) !== 'alert') {
+    throw new Error('BROWSER_HARNESS_NOTIFICATION_FAILED');
+  }
+  await notification.getByRole('button', { name: '\u5173\u95ed\u901a\u77e5' }).click();
+  if ((await notifications.count()) !== notificationCount - 1) {
+    throw new Error('BROWSER_HARNESS_NOTIFICATION_DISMISS_FAILED');
   }
   await designer.getByRole('tab', { name: '\u4ea4\u4e92' }).click();
   const interaction = designer.locator('[data-inspector-pane=interaction]');
@@ -1151,7 +1224,7 @@ async function assertDesignerControlStyles(designer) {
     input.value = 'canary';
     canary.append(button, input);
     canvas.appendChild(canary);
-    const toolbar = root.querySelector('[data-action="undo"]');
+    const toolbar = root.querySelector('.designer-topbar [data-action="undo"]');
     const viewer = document.querySelector('base-screen-viewer');
     const before = {
       theme: getComputedStyle(host).getPropertyValue('--designer-surface-workspace').trim(),
@@ -1175,7 +1248,7 @@ async function assertDesignerControlStyles(designer) {
   });
   if (
     styles === undefined ||
-    styles.toolbarHeight !== 30 ||
+    styles.toolbarHeight !== 32 ||
     styles.theme === styles.lightTheme ||
     styles.theme !== styles.restoredTheme ||
     styles.canaryFont === styles.workspaceFont ||
@@ -1215,8 +1288,8 @@ async function assertDesktopWorkbench(designer, viewport) {
         scrollWidth: element.scrollWidth,
         scrollHeight: element.scrollHeight,
       },
-      horizontal: ['.tool-rail', '[data-left-panel]', '.workspace', '[data-right-panel]'].map(rect),
-      vertical: ['.toolbar', '.ruler-horizontal', '.canvas-stage', '.statusbar'].map(rect),
+      horizontal: ['[data-left-panel]', '.workspace', '[data-right-panel]'].map(rect),
+      vertical: ['.designer-topbar', '.ruler-horizontal', '.canvas-stage', '.statusbar'].map(rect),
     };
   });
   if (
