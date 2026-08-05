@@ -51,7 +51,11 @@ class FakeTarget {
       (selector === '[data-blueprint-add-action]' &&
         this.dataset.blueprintAddAction !== undefined) ||
       (selector === '[data-blueprint-remove-action]' &&
-        this.dataset.blueprintRemoveAction !== undefined);
+        this.dataset.blueprintRemoveAction !== undefined) ||
+      (selector === '[data-blueprint-graph-node]' &&
+        this.dataset.blueprintGraphNode !== undefined) ||
+      (selector === '[data-blueprint-graph-action]' &&
+        this.dataset.blueprintGraphAction !== undefined);
     return (matches ? this : null) as T | null;
   }
 }
@@ -102,6 +106,18 @@ function createController(
 }
 
 describe('DesignerIntegrationController', () => {
+  it('R7 updates graph-only selection without writing a canonical command', () => {
+    const state = createController(authority('blueprint.trigger.material-event'));
+
+    const handled = state.controller.onClick(
+      new FakeTarget({ blueprintGraphNode: 'rule-1:trigger' }) as unknown as Element,
+    );
+
+    expect(handled).toBe(true);
+    expect(state.commands).toEqual([]);
+    expect(state.document).toEqual(document);
+  });
+
   it('R10 fails closed with a fixed Chinese diagnostic when no authority grants a material event', () => {
     const state = createController(undefined);
 
@@ -286,5 +302,119 @@ describe('DesignerIntegrationController', () => {
       type: 'set-variable',
       value: { kind: 'literal', value: 2 },
     });
+  });
+
+  it('R7 simulates the selected event without writing a canonical command', () => {
+    const state = createController(
+      authority('blueprint.trigger.material-event', 'blueprint.action.set-variable'),
+      {
+        ...document,
+        blueprint: {
+          rules: [
+            {
+              id: 'rule-1',
+              trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
+              requiredCapabilities: [
+                'blueprint.trigger.material-event',
+                'blueprint.action.set-variable',
+              ],
+              actions: [
+                {
+                  type: 'set-variable',
+                  variableName: 'count',
+                  value: { kind: 'literal', value: 2 },
+                },
+              ],
+            },
+          ],
+        },
+      },
+    );
+
+    const handled = state.controller.onClick(
+      new FakeTarget({ blueprintGraphAction: 'simulate' }) as unknown as Element,
+    );
+
+    expect(handled).toBe(true);
+    expect(state.commands).toEqual([]);
+    expect(state.diagnostics).toEqual([]);
+  });
+
+  it('R7 applies the minimal event template through the canonical authoring path', () => {
+    const state = createController(authority('blueprint.trigger.material-event'));
+
+    const handled = state.controller.onClick(
+      new FakeTarget({ blueprintGraphAction: 'apply-template' }) as unknown as Element,
+    );
+
+    expect(handled).toBe(true);
+    expect(state.commands).toHaveLength(1);
+    expect(state.document.blueprint.rules).toMatchObject([
+      {
+        id: 'rule-1',
+        trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
+      },
+    ]);
+  });
+
+  it('R7 filters graph nodes and navigates them with arrow keys without canonical writes', () => {
+    const state = createController(authority('blueprint.trigger.material-event'), {
+      ...document,
+      blueprint: {
+        rules: [
+          {
+            id: 'rule-1',
+            trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
+            requiredCapabilities: ['blueprint.trigger.material-event'],
+            actions: [],
+          },
+        ],
+      },
+    });
+    state.controller.onClick(new FakeTarget({ action: 'open-blueprint' }) as unknown as Element);
+    state.controller.onChange({
+      target: new FakeTarget({ blueprintGraphSearch: 'true' }, 'button-1.click'),
+    } as unknown as Event);
+    const preventDefault = vi.fn();
+
+    const handled = state.controller.onKeyDown({
+      key: 'ArrowDown',
+      preventDefault,
+    } as unknown as KeyboardEvent);
+
+    expect(handled).toBe(true);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(state.commands).toEqual([]);
+  });
+
+  it('R7 clears graph selection before closing the Blueprint workspace with Escape', () => {
+    const state = createController(authority('blueprint.trigger.material-event'), {
+      ...document,
+      blueprint: {
+        rules: [
+          {
+            id: 'rule-1',
+            trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
+            requiredCapabilities: ['blueprint.trigger.material-event'],
+            actions: [],
+          },
+        ],
+      },
+    });
+    const preventDefault = vi.fn();
+    state.controller.onClick(new FakeTarget({ action: 'open-blueprint' }) as unknown as Element);
+    state.controller.onClick(
+      new FakeTarget({ blueprintGraphNode: 'rule-1:trigger' }) as unknown as Element,
+    );
+
+    expect(
+      state.controller.onKeyDown({ key: 'Escape', preventDefault } as unknown as KeyboardEvent),
+    ).toBe(true);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(state.commands).toEqual([]);
+
+    expect(
+      state.controller.onKeyDown({ key: 'Escape', preventDefault } as unknown as KeyboardEvent),
+    ).toBe(true);
   });
 });

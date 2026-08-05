@@ -13,6 +13,26 @@ function captureTarget() {
 }
 
 describe('DesignerWorkbenchController pointer capture', () => {
+  it('R3 cycles private workbench modes without document state', () => {
+    const layout = { dataset: {} as DOMStringMap };
+    const root = {
+      querySelector: (selector: string) => (selector === '.designer' ? layout : undefined),
+    } as unknown as ShadowRoot;
+    const controller = new DesignerWorkbenchController({
+      getCanvas: () => undefined,
+      getDocument: () => undefined,
+      getRoot: () => root,
+      getZoom: () => 1,
+    });
+
+    controller.cycleMode();
+    expect(layout.dataset.workbenchMode).toBe('with-menu');
+    controller.cycleMode();
+    expect(layout.dataset.workbenchMode).toBe('fullscreen');
+    controller.cycleMode();
+    expect(layout.dataset.workbenchMode).toBe('standard');
+  });
+
   it('releases panel-resize and guide-drag captures on pointer up', () => {
     const layout = captureTarget();
     const canvas = {

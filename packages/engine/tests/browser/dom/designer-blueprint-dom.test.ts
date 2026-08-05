@@ -4,7 +4,11 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
-import { renderDesignerEventsPanel } from '../../../src/browser/dom/designer-blueprint-dom.js';
+import type { DesignerBlueprintGraphProjection } from '../../../src/browser/controllers/designer-blueprint-graph-session.js';
+import {
+  renderDesignerBlueprintWorkspace,
+  renderDesignerEventsPanel,
+} from '../../../src/browser/dom/designer-blueprint-dom.js';
 
 class FakeElement {
   readonly children: FakeElement[] = [];
@@ -80,6 +84,16 @@ function capabilityIndex(...capabilities: string[]): BaseScreenRuntimeContributi
   };
 }
 
+const emptyGraph: DesignerBlueprintGraphProjection = {
+  nodes: [],
+  edges: [],
+  selectedNodeId: undefined,
+  searchQuery: '',
+  diagnostics: [],
+  simulationLog: [],
+  zoom: 1,
+};
+
 describe('renderDesignerEventsPanel', () => {
   it('R10 disables Blueprint entry when the focused material has no declared event', () => {
     const ownerDocument = new FakeDocument();
@@ -138,5 +152,91 @@ describe('renderDesignerEventsPanel', () => {
         .filter((element) => element.tagName === 'li')
         .map((element) => element.textContent),
     ).toEqual(['click：1 条规则', 'change：0 条规则']);
+  });
+
+  it('R1 enables expression fields when their Blueprint capability is available', () => {
+    const ownerDocument = new FakeDocument();
+    const workspace = new FakeElement('div', ownerDocument);
+    const populated: ScreenDocument = {
+      ...document,
+      blueprint: {
+        rules: [
+          {
+            id: 'rule-1',
+            trigger: { type: 'material-event', componentId: 'component-1', eventName: 'click' },
+            condition: {
+              left: { kind: 'literal', value: true },
+              operator: 'exists',
+            },
+            actions: [],
+          },
+        ],
+      },
+    };
+
+    renderDesignerBlueprintWorkspace(
+      workspace as unknown as HTMLElement,
+      populated,
+      { selectedComponentIds: ['component-1'], focusedComponentId: 'component-1' },
+      { get: () => ({ manifest: { events: ['click'] } }) } as unknown as BaseScreenMaterialCatalog,
+      'click',
+      capabilityIndex('blueprint.trigger.material-event', 'blueprint.condition.compare'),
+      emptyGraph,
+    );
+
+    expect(
+      descendants(workspace).find(
+        (element) => element.dataset.blueprintExpression === 'condition-left',
+      ),
+    ).toMatchObject({ disabled: false });
+  });
+
+  it('R7 renders the graph as a projection of canonical nodes and edges', () => {
+    const ownerDocument = new FakeDocument();
+    const workspace = new FakeElement('div', ownerDocument);
+
+    renderDesignerBlueprintWorkspace(
+      workspace as unknown as HTMLElement,
+      document,
+      { selectedComponentIds: ['component-1'], focusedComponentId: 'component-1' },
+      { get: () => ({ manifest: { events: ['click'] } }) } as unknown as BaseScreenMaterialCatalog,
+      'click',
+      capabilityIndex('blueprint.trigger.material-event'),
+      {
+        nodes: [
+          { id: 'rule-1:trigger', ruleId: 'rule-1', kind: 'trigger', label: 'component-1.click' },
+        ],
+        edges: [{ from: 'rule-1:trigger', to: 'rule-1:action:0' }],
+        selectedNodeId: 'rule-1:trigger',
+        searchQuery: '',
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'BLUEPRINT_EXPRESSION_INVALID',
+            path: [],
+            message: '表达式无效。',
+          },
+        ],
+        simulationLog: ['模拟 component-1.click：变量 0 项，事件 0 项，动作 0 项。'],
+        zoom: 1,
+      },
+    );
+
+    expect(
+      descendants(workspace).find(
+        (element) => element.dataset.blueprintGraphNode === 'rule-1:trigger',
+      ),
+    ).toMatchObject({ textContent: 'component-1.click' });
+    expect(
+      descendants(workspace).find(
+        (element) => element.dataset.blueprintGraphEdge === 'rule-1:trigger:rule-1:action:0',
+      ),
+    ).toBeDefined();
+    expect(
+      descendants(workspace).find((element) => element.dataset.blueprintGraphSearch === 'true'),
+    ).toMatchObject({ value: '' });
+    expect(descendants(workspace).some((element) => element.textContent === '表达式无效。')).toBe(
+      true,
+    );
   });
 });

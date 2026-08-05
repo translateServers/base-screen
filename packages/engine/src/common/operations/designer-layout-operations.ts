@@ -68,6 +68,51 @@ export function createReparentTransaction(
   };
 }
 
+export function createZOrderTransaction(
+  document: ScreenDocument,
+  componentIds: readonly string[],
+  edge: 'front' | 'back',
+): ScreenDocumentTransaction | undefined {
+  const selected = new Set(componentIds);
+  const targets = selectedComponents(document, componentIds);
+  if (targets.length === 0) return undefined;
+  if (targets.some((component) => isScreenComponentEffectivelyLocked(document, component.id)))
+    return undefined;
+  const parentIds = new Set(targets.map((component) => component.parentId));
+  if (parentIds.size !== 1) return undefined;
+  const parentId = targets[0]!.parentId;
+  const siblings = document.components
+    .filter((component) => component.parentId === parentId)
+    .sort(
+      (left, right) =>
+        left.zIndex - right.zIndex ||
+        document.components.indexOf(left) - document.components.indexOf(right),
+    );
+  const ordered =
+    edge === 'front'
+      ? [
+          ...siblings.filter((item) => !selected.has(item.id)),
+          ...siblings.filter((item) => selected.has(item.id)),
+        ]
+      : [
+          ...siblings.filter((item) => selected.has(item.id)),
+          ...siblings.filter((item) => !selected.has(item.id)),
+        ];
+  const zIndexes = siblings.map((item) => item.zIndex);
+  const orderedIndexes = zIndexes.every(
+    (value, position) => position === 0 || zIndexes[position - 1]! < value,
+  )
+    ? zIndexes
+    : siblings.map((_, position) => position);
+  const commands = ordered.flatMap((item, position) => {
+    const zIndex = orderedIndexes[position]!;
+    return item.zIndex === zIndex
+      ? []
+      : [{ type: 'update-components' as const, componentIds: [item.id], patch: { zIndex } }];
+  });
+  return commands.length === 0 ? undefined : { commands };
+}
+
 export function createSiblingReorderTransaction(
   document: ScreenDocument,
   componentId: string,

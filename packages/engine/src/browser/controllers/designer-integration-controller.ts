@@ -7,8 +7,10 @@ import type {
   ScreenDocument,
   ScreenParseResult,
 } from '@base-screen/contracts';
+import { parseScreenJsonValue } from '@base-screen/contracts';
 import {
   compileScreenBlueprint,
+  dispatchScreenBlueprintEvent,
   type ScreenDocumentCommand,
   type ScreenInteractionState,
 } from '@base-screen/core';
@@ -37,6 +39,7 @@ import {
   renderDesignerBlueprintWorkspace,
   renderDesignerEventsPanel,
 } from '../dom/designer-blueprint-dom.js';
+import { DesignerBlueprintGraphSession } from './designer-blueprint-graph-session.js';
 
 export interface DesignerIntegrationCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -52,6 +55,7 @@ export class DesignerIntegrationController {
   #workspace: HTMLElement | undefined;
   #blueprintOpen = false;
   #selectedEventName: string | undefined;
+  readonly #graph = new DesignerBlueprintGraphSession();
 
   constructor(private readonly callbacks: DesignerIntegrationCallbacks) {}
 
@@ -85,11 +89,58 @@ export class DesignerIntegrationController {
         catalog,
         selectedEventName,
         runtimeContributions,
+        this.#graph.project(document?.blueprint),
       );
     }
   }
 
   onClick(target: Element): boolean {
+    const graphNode = target.closest<HTMLElement>('[data-blueprint-graph-node]')?.dataset
+      .blueprintGraphNode;
+    if (graphNode !== undefined) {
+      this.#graph.selectNode(graphNode);
+      this.render();
+      return true;
+    }
+    const graphAction = target.closest<HTMLButtonElement>('[data-blueprint-graph-action]')?.dataset
+      .blueprintGraphAction;
+    if (graphAction === 'apply-template') {
+      const document = this.callbacks.getDocument();
+      if (document === undefined) return false;
+      const blueprint = createDesignerBlueprintRule(
+        document,
+        this.callbacks.getInteraction(),
+        this.callbacks.getCatalog(),
+        this.selectedEventName(),
+      );
+      if (
+        blueprint !== undefined &&
+        this.ensureCapabilities([DESIGNER_BLUEPRINT_CAPABILITIES.materialEvent])
+      ) {
+        this.commitBlueprint(document, blueprint);
+      }
+      return true;
+    }
+    if (graphAction === 'simulate') {
+      this.simulate();
+      this.render();
+      return true;
+    }
+    if (graphAction === 'zoom-in') {
+      this.#graph.zoomIn();
+      this.render();
+      return true;
+    }
+    if (graphAction === 'zoom-out') {
+      this.#graph.zoomOut();
+      this.render();
+      return true;
+    }
+    if (graphAction === 'fit') {
+      this.#graph.fit();
+      this.render();
+      return true;
+    }
     const action = target.closest<HTMLButtonElement>('[data-action]')?.dataset.action;
     if (action === 'open-blueprint') {
       this.#blueprintOpen = true;
@@ -175,6 +226,11 @@ export class DesignerIntegrationController {
       }
       return true;
     }
+    if (target.dataset.blueprintGraphSearch !== undefined) {
+      this.#graph.setSearchQuery(target.value ?? '');
+      this.render();
+      return true;
+    }
     const rule = getRule(document, target.dataset.blueprintRule);
     if (rule === undefined) return false;
     if (target.dataset.blueprintTriggerEvent !== undefined) {
@@ -199,14 +255,30 @@ export class DesignerIntegrationController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
-    const target = event.target as BlueprintControl | null;
-    if (target?.dataset === undefined || !isBlueprintControl(target)) return false;
-    if (event.key === 'Escape' && this.#blueprintOpen) {
+    if (this.#blueprintOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+      event.preventDefault();
+      this.#graph.selectAdjacent(
+        this.callbacks.getDocument()?.blueprint,
+        event.key === 'ArrowDown' ? 1 : -1,
+      );
+      this.render();
+      return true;
+    }
+    if (this.#blueprintOpen && event.key === 'Escape') {
+      const projection = this.#graph.project(this.callbacks.getDocument()?.blueprint);
+      if (projection.selectedNodeId !== undefined) {
+        event.preventDefault();
+        this.#graph.selectNode(undefined);
+        this.render();
+        return true;
+      }
       event.preventDefault();
       this.#blueprintOpen = false;
       this.render();
       return true;
     }
+    const target = event.target as BlueprintControl | null;
+    if (target?.dataset === undefined || !isBlueprintControl(target)) return false;
     const submit =
       event.key === 'Enter' &&
       !event.isComposing &&
@@ -219,6 +291,7 @@ export class DesignerIntegrationController {
   clear(): void {
     this.#blueprintOpen = false;
     this.#selectedEventName = undefined;
+    this.#graph.clear();
     if (this.#workspace !== undefined) this.#workspace.hidden = true;
   }
 
@@ -403,11 +476,17 @@ export class DesignerIntegrationController {
       this.callbacks.getRuntimeContributions() ?? unavailableCapabilities,
     );
     if (!compiled.ok) {
-      this.callbacks.emitDiagnostics(compiled.diagnostics.map(blueprintDiagnostic));
+      const diagnostics = compiled.diagnostics.map(blueprintDiagnostic);
+      this.#graph.setDiagnostics(diagnostics);
+      this.callbacks.emitDiagnostics(diagnostics);
       return;
     }
     const result = this.callbacks.executeCommand({ type: 'replace-blueprint', blueprint });
-    if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics.map(blueprintDiagnostic));
+    if (!result.ok) {
+      const diagnostics = result.diagnostics.map(blueprintDiagnostic);
+      this.#graph.setDiagnostics(diagnostics);
+      this.callbacks.emitDiagnostics(diagnostics);
+    } else this.#graph.setDiagnostics([]);
   }
 
   private ensureCapabilities(capabilities: readonly string[]): boolean {
@@ -427,9 +506,41 @@ export class DesignerIntegrationController {
   }
 
   private emitBlueprintDiagnostic(code: ScreenDiagnostic['code']): void {
-    this.callbacks.emitDiagnostics([
-      blueprintDiagnostic({ severity: 'error', code, path: [], message: '' }),
-    ]);
+    const diagnostics = [blueprintDiagnostic({ severity: 'error', code, path: [], message: '' })];
+    this.#graph.setDiagnostics(diagnostics);
+    this.callbacks.emitDiagnostics(diagnostics);
+  }
+
+  private simulate(): void {
+    const document = this.callbacks.getDocument();
+    const componentId = this.callbacks.getInteraction().focusedComponentId;
+    const eventName = this.selectedEventName();
+    if (document === undefined || componentId === null || eventName === undefined) return;
+    const compiled = compileScreenBlueprint(
+      document,
+      this.callbacks.getRuntimeContributions() ?? unavailableCapabilities,
+    );
+    if (!compiled.ok) {
+      const diagnostics = compiled.diagnostics.map(blueprintDiagnostic);
+      this.#graph.setDiagnostics(diagnostics);
+      this.callbacks.emitDiagnostics(diagnostics);
+      return;
+    }
+    const result = dispatchScreenBlueprintEvent(compiled.value, compiled.value.initialVariables, {
+      componentId,
+      name: eventName,
+      payload: null,
+    });
+    if (!result.ok) {
+      const diagnostics = result.diagnostics.map(blueprintDiagnostic);
+      this.#graph.setDiagnostics(diagnostics);
+      this.callbacks.emitDiagnostics(diagnostics);
+      return;
+    }
+    this.#graph.setDiagnostics([]);
+    this.#graph.appendSimulationLog(
+      `模拟 ${componentId}.${eventName}：变量 ${Object.keys(result.value.variables).length} 项，事件 ${result.value.hostEvents.length} 项，动作 ${result.value.hostActions.length} 项。`,
+    );
   }
 }
 
@@ -465,7 +576,8 @@ function isBlueprintControl(target: BlueprintControl): boolean {
 function parseExpression(value: string | undefined): ScreenBlueprintValueExpression | undefined {
   if (value === undefined) return undefined;
   try {
-    return JSON.parse(value) as ScreenBlueprintValueExpression;
+    const parsed = parseScreenJsonValue(JSON.parse(value));
+    return parsed.ok ? (parsed.value as ScreenBlueprintValueExpression) : undefined;
   } catch {
     return undefined;
   }

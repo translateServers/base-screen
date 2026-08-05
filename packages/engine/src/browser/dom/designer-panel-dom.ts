@@ -261,11 +261,7 @@ export function parsePropertyControlValue(
   if (schema.kind === 'boolean') return input.value === 'true';
   if (schema.kind === 'enum') return schema.values.find((value) => String(value) === input.value);
   if (schema.kind === 'string') return input.value;
-  try {
-    return JSON.parse(input.value) as ScreenJsonValue;
-  } catch {
-    return undefined;
-  }
+  return parseJsonDraft(input.value);
 }
 
 function createGeometryTransaction(
@@ -491,22 +487,34 @@ function createDataSource(
   },
 ): ScreenComponentDataSource | null | undefined {
   if (type === 'none') return null;
+  if (type === 'static') {
+    const value = parseJsonDraft(fields.static);
+    return value === undefined ? undefined : { type, value };
+  }
+  if (type === 'host-resource') {
+    const params = parseJsonDraft(fields.params);
+    if (!isScreenJsonObject(params)) return undefined;
+    return {
+      type,
+      resourceType: fields.resourceType,
+      resourceId: fields.resourceId,
+      params,
+    };
+  }
+  return undefined;
+}
+
+function parseJsonDraft(value: string): ScreenJsonValue | undefined {
   try {
-    if (type === 'static') return { type, value: JSON.parse(fields.static) as ScreenJsonValue };
-    if (type === 'host-resource') {
-      const params = JSON.parse(fields.params) as ScreenJsonValue;
-      if (typeof params !== 'object' || params === null || Array.isArray(params)) return undefined;
-      return {
-        type,
-        resourceType: fields.resourceType,
-        resourceId: fields.resourceId,
-        params: params as ScreenJsonObject,
-      };
-    }
+    const parsed = parseScreenJsonValue(JSON.parse(value));
+    return parsed.ok ? parsed.value : undefined;
   } catch {
     return undefined;
   }
-  return undefined;
+}
+
+function isScreenJsonObject(value: ScreenJsonValue | undefined): value is ScreenJsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function appendPropControl(

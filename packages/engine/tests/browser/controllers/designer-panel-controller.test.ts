@@ -4,7 +4,10 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DesignerPanelController } from '../../../src/browser/controllers/designer-panel-controller.js';
+import {
+  DesignerPanelController,
+  MATERIAL_DRAG_TYPE,
+} from '../../../src/browser/controllers/designer-panel-controller.js';
 import {
   renderDesignerDataPanel,
   renderDesignerProperties,
@@ -19,11 +22,16 @@ class FakeElement {
   textContent = '';
   type = '';
   value = '';
+  closestResult: FakeElement | null = null;
 
   constructor(
     readonly tagName: string,
     readonly ownerDocument: FakeDocument,
   ) {}
+
+  closest<T extends Element>(selector: string): T | null {
+    return this.closestResult as T | null;
+  }
 
   appendChild(child: FakeElement): FakeElement {
     this.children.push(child);
@@ -110,6 +118,28 @@ function catalog(): BaseScreenMaterialCatalog {
   } as unknown as BaseScreenMaterialCatalog;
 }
 
+function imageCatalog(): BaseScreenMaterialCatalog {
+  return {
+    get: () =>
+      ({
+        manifest: {
+          dataCapabilities: [],
+          propertyPanel: [
+            { prop: 'source', label: '图片来源', control: 'text' },
+            { prop: 'alt', label: '替代文本', control: 'text' },
+          ],
+          propsSchema: {
+            kind: 'object',
+            properties: { source: { kind: 'string' }, alt: { kind: 'string' } },
+            required: ['source', 'alt'],
+          },
+          stylePanel: [],
+          styleSchema: { kind: 'object', properties: {}, required: [] },
+        },
+      }) as unknown,
+  } as unknown as BaseScreenMaterialCatalog;
+}
+
 function resourceAuthority(): BaseScreenRuntimeContributionIndex {
   return {
     getResourceType: (resourceType) =>
@@ -185,6 +215,35 @@ describe('designer panel rendering', () => {
     ).toEqual(['几何', '状态', '内容', '样式']);
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
       'Status',
+    );
+  });
+
+  it('R5 renders the image alternative-text control declared by its manifest', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const imageDocument = {
+      ...document(),
+      components: [
+        {
+          ...document().components[0]!,
+          type: 'base.image',
+          props: { source: 'asset-image', alt: '销售趋势图' },
+          style: {},
+        },
+      ],
+    };
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      imageDocument,
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      imageCatalog(),
+    );
+
+    expect(descendants(properties).find((element) => element.dataset.prop === 'alt')).toMatchObject(
+      {
+        value: '销售趋势图',
+      },
     );
   });
 
@@ -284,5 +343,50 @@ describe('DesignerPanelController property drafts', () => {
         },
       ],
     ]);
+  });
+});
+
+describe('DesignerPanelController material drag', () => {
+  function createController(): DesignerPanelController {
+    return new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: () => ({ ok: true, value: document(), diagnostics: [] }),
+      executeTransaction: () => ({ ok: true, value: document(), diagnostics: [] }),
+      getCatalog: catalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+  }
+
+  it('writes the material type to the dataTransfer on drag start from a material card', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const controller = createController();
+    const card = new FakeElement('button', new FakeDocument());
+    card.dataset.materialType = 'base.label';
+    const target = new FakeElement('button', new FakeDocument());
+    target.closestResult = card;
+    const dataTransfer = { setData: vi.fn(), effectAllowed: '' };
+    const handled = controller.onDragStart({ target, dataTransfer } as unknown as DragEvent);
+
+    expect(handled).toBe(true);
+    expect(dataTransfer.setData).toHaveBeenCalledWith(MATERIAL_DRAG_TYPE, 'base.label');
+    expect(dataTransfer.effectAllowed).toBe('copy');
+  });
+
+  it('does not handle drag start outside a material card', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const controller = createController();
+    const target = new FakeElement('button', new FakeDocument());
+    const handled = controller.onDragStart({ target, dataTransfer: null } as unknown as DragEvent);
+
+    expect(handled).toBe(false);
   });
 });

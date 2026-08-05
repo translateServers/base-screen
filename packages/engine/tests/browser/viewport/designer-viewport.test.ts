@@ -27,6 +27,30 @@ describe('designer viewport helpers', () => {
     expect(DESIGNER_FIT_MARGIN).toBe(30);
   });
 
+  it('fits a selected region through the same bounded viewport calculation', () => {
+    vi.stubGlobal('Document', class Document {});
+    vi.stubGlobal('DocumentFragment', class DocumentFragment {});
+    const controller = new DesignerViewportController({
+      getDocument: () => document,
+      onBlur: () => undefined,
+      onToolChange: () => undefined,
+    });
+    const viewport = {
+      clientWidth: 1060,
+      clientHeight: 560,
+      addEventListener: () => undefined,
+    } as unknown as HTMLDivElement;
+    controller.connect(viewport, {
+      style: {},
+      getRootNode: () => null,
+    } as unknown as HTMLDivElement);
+
+    controller.fitSelection({ width: 1000, height: 500 });
+
+    expect(controller.state.zoom).toBe(1);
+    vi.unstubAllGlobals();
+  });
+
   it('formats the canvas viewport transform deterministically', () => {
     expect(viewportTransform({ zoom: 1.5, offset: { x: 10, y: -5 } })).toBe(
       'translate(10px, -5px) scale(1.5)',

@@ -4,9 +4,12 @@ import {
   DEFAULT_DESIGNER_CANVAS_AIDS,
   type DesignerCanvasAidsState,
   type DesignerSnapPoint,
+  type DesignerSnapTranslation,
   getDesignerRulerMarks,
   snapDesignerCanvasPoint,
+  snapDesignerSelectionTranslation,
 } from '../viewport/designer-canvas-aids.js';
+import { clientPointToDesignerCanvasPoint } from '../viewport/designer-canvas-coordinates.js';
 
 interface DesignerWorkbenchCallbacks {
   readonly getCanvas: () => HTMLDivElement | undefined;
@@ -19,14 +22,17 @@ type PanelSide = 'left' | 'right';
 type GuideAxis = 'x' | 'y';
 type LeftTab = 'materials' | 'layers';
 type RightTab = 'appearance' | 'data' | 'interaction' | 'events';
+type WorkbenchMode = 'standard' | 'with-menu' | 'fullscreen';
 
 export class DesignerWorkbenchController {
   #leftCollapsed = false;
   #rightCollapsed = false;
   #leftTab: LeftTab = 'materials';
   #rightTab: RightTab = 'appearance';
+  #mode: WorkbenchMode = 'standard';
   #canvasAids: DesignerCanvasAidsState = DEFAULT_DESIGNER_CANVAS_AIDS;
   #guides: { x: number[]; y: number[] } = { x: [], y: [] };
+  #guidesVisible = true;
   #guideDrag:
     | {
         readonly axis: GuideAxis;
@@ -78,6 +84,30 @@ export class DesignerWorkbenchController {
     return snapDesignerCanvasPoint(point, this.#canvasAids, candidates, this.callbacks.getZoom());
   }
 
+  snapSelectionOffset(
+    bounds: {
+      readonly bottom: number;
+      readonly left: number;
+      readonly right: number;
+      readonly top: number;
+    },
+    offset: { readonly x: number; readonly y: number },
+    excludedComponentIds: readonly string[] = [],
+  ): DesignerSnapTranslation {
+    const document = this.callbacks.getDocument();
+    const candidates =
+      document === undefined
+        ? this.#guides
+        : collectDesignerSnapCandidates(document, this.#guides, excludedComponentIds);
+    return snapDesignerSelectionTranslation(
+      bounds,
+      offset,
+      this.#canvasAids,
+      candidates,
+      this.callbacks.getZoom(),
+    );
+  }
+
   renderSnapPreview(point: DesignerSnapPoint | undefined): void {
     this.#snapPreview = point === undefined ? undefined : { x: point.snappedX, y: point.snappedY };
     this.renderGuides();
@@ -91,6 +121,29 @@ export class DesignerWorkbenchController {
   toggleCanvasAid(aid: 'gridEnabled' | 'gridSnapEnabled'): void {
     this.#canvasAids = { ...this.#canvasAids, [aid]: !this.#canvasAids[aid] };
     this.renderCanvasAids();
+  }
+
+  toggleGuides(): void {
+    this.#guidesVisible = !this.#guidesVisible;
+    this.renderGuides();
+  }
+
+  toggleBorderGuides(): void {
+    this.#canvasAids = {
+      ...this.#canvasAids,
+      smartGuidesEnabled: !this.#canvasAids.smartGuidesEnabled,
+    };
+    this.renderCanvasAids();
+  }
+
+  cycleMode(): void {
+    this.#mode =
+      this.#mode === 'standard'
+        ? 'with-menu'
+        : this.#mode === 'with-menu'
+          ? 'fullscreen'
+          : 'standard';
+    this.renderLayout();
   }
 
   onClick(target: Element): boolean {
@@ -201,6 +254,7 @@ export class DesignerWorkbenchController {
     if (layout === null || layout === undefined) return;
     layout.dataset.leftCollapsed = String(this.#leftCollapsed);
     layout.dataset.rightCollapsed = String(this.#rightCollapsed);
+    layout.dataset.workbenchMode = this.#mode;
   }
 
   private renderTabs(): void {
@@ -229,10 +283,10 @@ export class DesignerWorkbenchController {
     if (layout === null) return;
     const bounds = layout.getBoundingClientRect();
     const width =
-      resize.side === 'left' ? event.clientX - bounds.left - 56 : bounds.right - event.clientX;
+      resize.side === 'left' ? event.clientX - bounds.left - 48 : bounds.right - event.clientX;
     layout.style.setProperty(
       resize.side === 'left' ? '--left-panel-width' : '--right-panel-width',
-      `${Math.max(resize.side === 'left' ? 200 : 240, Math.min(resize.side === 'left' ? 400 : 480, width))}px`,
+      `${Math.max(resize.side === 'left' ? 160 : 200, Math.min(resize.side === 'left' ? 400 : 480, width))}px`,
     );
   }
 
@@ -240,10 +294,12 @@ export class DesignerWorkbenchController {
     const drag = this.#guideDrag;
     const canvas = this.callbacks.getCanvas();
     if (drag?.pointerId !== event.pointerId || canvas === undefined) return;
-    const bounds = canvas.getBoundingClientRect();
-    const value =
-      (drag.axis === 'x' ? event.clientX - bounds.left : event.clientY - bounds.top) /
-      this.callbacks.getZoom();
+    const point = clientPointToDesignerCanvasPoint(
+      event,
+      canvas.getBoundingClientRect(),
+      this.callbacks.getZoom(),
+    );
+    const value = drag.axis === 'x' ? point.x : point.y;
     this.#guidePreview = { axis: drag.axis, value };
     this.renderGuides();
   }
@@ -252,10 +308,12 @@ export class DesignerWorkbenchController {
     const drag = this.#guideDrag;
     const canvas = this.callbacks.getCanvas();
     if (drag?.pointerId !== event.pointerId || canvas === undefined) return;
-    const bounds = canvas.getBoundingClientRect();
-    const value =
-      (drag.axis === 'x' ? event.clientX - bounds.left : event.clientY - bounds.top) /
-      this.callbacks.getZoom();
+    const point = clientPointToDesignerCanvasPoint(
+      event,
+      canvas.getBoundingClientRect(),
+      this.callbacks.getZoom(),
+    );
+    const value = drag.axis === 'x' ? point.x : point.y;
     if (drag.guideIndex !== undefined) {
       if (this.isGuideWithinCanvas(drag.axis, value))
         this.#guides[drag.axis][drag.guideIndex] = value;
@@ -341,7 +399,9 @@ export class DesignerWorkbenchController {
           }
           continue;
         }
-        container.appendChild(this.createGuide(axis, value, 'persistent', index));
+        if (this.#guidesVisible) {
+          container.appendChild(this.createGuide(axis, value, 'persistent', index));
+        }
       }
       if (
         this.#guidePreview?.axis === axis &&

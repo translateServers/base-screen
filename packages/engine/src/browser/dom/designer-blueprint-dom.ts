@@ -11,6 +11,7 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { DESIGNER_BLUEPRINT_CAPABILITIES } from '../../common/operations/designer-blueprint-authoring.js';
+import type { DesignerBlueprintGraphProjection } from '../controllers/designer-blueprint-graph-session.js';
 
 export function getDesignerFocusedMaterialEvents(
   document: ScreenDocument | undefined,
@@ -95,6 +96,7 @@ export function renderDesignerBlueprintWorkspace(
   catalog: BaseScreenMaterialCatalog | undefined,
   selectedEventName: string | undefined,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+  graph: DesignerBlueprintGraphProjection,
 ): void {
   if (workspace === undefined) return;
   workspace.replaceChildren();
@@ -111,6 +113,7 @@ export function renderDesignerBlueprintWorkspace(
   close.dataset.action = 'close-blueprint';
   heading.append(add, close);
   workspace.appendChild(heading);
+  workspace.appendChild(createGraphProjection(workspace.ownerDocument, graph));
 
   const list = workspace.ownerDocument.createElement('ol');
   for (const [index, rule] of document.blueprint.rules.entries()) {
@@ -141,6 +144,82 @@ export function renderDesignerBlueprintWorkspace(
     list.appendChild(item);
   }
   workspace.appendChild(list);
+}
+
+function createGraphProjection(
+  ownerDocument: Document,
+  graph: DesignerBlueprintGraphProjection,
+): HTMLElement {
+  const projection = ownerDocument.createElement('section');
+  projection.className = 'blueprint-graph';
+  projection.dataset.blueprintGraph = 'true';
+  projection.setAttribute('aria-label', '蓝图图形投影');
+  const controls = ownerDocument.createElement('div');
+  controls.className = 'blueprint-graph-controls';
+  const search = ownerDocument.createElement('input');
+  search.type = 'search';
+  search.className = 'designer-control designer-input';
+  search.dataset.blueprintGraphSearch = 'true';
+  search.value = graph.searchQuery;
+  search.setAttribute('aria-label', '搜索蓝图节点');
+  controls.appendChild(search);
+  for (const [action, label] of [
+    ['apply-template', '添加事件模板'],
+    ['simulate', '模拟事件'],
+    ['zoom-out', '缩小图形'],
+    ['zoom-in', '放大图形'],
+    ['fit', '适应图形'],
+  ] as const) {
+    const control = createButton(ownerDocument, label);
+    control.dataset.blueprintGraphAction = action;
+    controls.appendChild(control);
+  }
+  const zoom = ownerDocument.createElement('output');
+  zoom.textContent = `${Math.round(graph.zoom * 100)}%`;
+  controls.appendChild(zoom);
+  projection.appendChild(controls);
+  const canvas = ownerDocument.createElement('div');
+  canvas.className = 'blueprint-graph-canvas';
+  canvas.setAttribute('data-blueprint-graph-zoom', String(Math.round(graph.zoom * 100)));
+  for (const node of graph.nodes) {
+    const element = createButton(ownerDocument, node.label);
+    element.className = 'designer-control designer-button blueprint-graph-node';
+    element.dataset.blueprintGraphNode = node.id;
+    element.dataset.blueprintGraphKind = node.kind;
+    element.dataset.blueprintRule = node.ruleId;
+    element.setAttribute('aria-pressed', String(graph.selectedNodeId === node.id));
+    canvas.appendChild(element);
+  }
+  for (const edge of graph.edges) {
+    const element = ownerDocument.createElement('span');
+    element.dataset.blueprintGraphEdge = `${edge.from}:${edge.to}`;
+    element.hidden = true;
+    canvas.appendChild(element);
+  }
+  projection.appendChild(canvas);
+  if (graph.diagnostics.length > 0) {
+    const diagnostics = ownerDocument.createElement('ul');
+    diagnostics.className = 'blueprint-graph-diagnostics';
+    diagnostics.setAttribute('role', 'alert');
+    for (const diagnostic of graph.diagnostics) {
+      const item = ownerDocument.createElement('li');
+      item.textContent = diagnostic.message;
+      diagnostics.appendChild(item);
+    }
+    projection.appendChild(diagnostics);
+  }
+  if (graph.simulationLog.length > 0) {
+    const log = ownerDocument.createElement('ol');
+    log.className = 'blueprint-graph-log';
+    log.setAttribute('aria-label', '模拟日志');
+    for (const entry of graph.simulationLog) {
+      const item = ownerDocument.createElement('li');
+      item.textContent = entry;
+      log.appendChild(item);
+    }
+    projection.appendChild(log);
+  }
+  return projection;
 }
 
 export function createDesignerBlueprintRule(
@@ -268,13 +347,20 @@ function createActionsField(
   for (const [index, action] of rule.actions.entries()) {
     const actionField = ownerDocument.createElement('fieldset');
     const legend = ownerDocument.createElement('legend');
-    legend.textContent = action.type === 'set-variable' ? '设置变量' : '发送宿主事件';
+    legend.textContent =
+      action.type === 'set-variable'
+        ? '设置变量'
+        : action.type === 'emit-host-event'
+          ? '发送宿主事件'
+          : '调用宿主动作';
     actionField.appendChild(legend);
     const editable = hasCapability(
       runtimeContributions,
       action.type === 'set-variable'
         ? DESIGNER_BLUEPRINT_CAPABILITIES.setVariable
-        : DESIGNER_BLUEPRINT_CAPABILITIES.emitHostEvent,
+        : action.type === 'emit-host-event'
+          ? DESIGNER_BLUEPRINT_CAPABILITIES.emitHostEvent
+          : action.actionId,
     );
     if (action.type === 'set-variable') {
       const variable = ownerDocument.createElement('select');
@@ -308,9 +394,12 @@ function createActionsField(
       eventName.dataset.blueprintRule = rule.id;
       eventName.dataset.blueprintActionIndex = String(index);
       eventName.dataset.blueprintHostEventName = 'true';
-      eventName.value = action.eventName;
+      eventName.value = action.type === 'emit-host-event' ? action.eventName : action.actionId;
       eventName.disabled = !editable;
-      eventName.setAttribute('aria-label', '宿主事件名称');
+      eventName.setAttribute(
+        'aria-label',
+        action.type === 'emit-host-event' ? '宿主事件名称' : '宿主动作名称',
+      );
       actionField.appendChild(eventName);
       appendExpressionInput(
         ownerDocument,
@@ -353,7 +442,7 @@ function appendExpressionInput(
   ruleId: string,
   field: 'condition-left' | 'condition-right' | 'action',
   expression: ScreenBlueprintValueExpression,
-  disabled: boolean,
+  editable: boolean,
   actionIndex?: number,
 ): void {
   const expressionField = createField(ownerDocument, label);
@@ -363,7 +452,7 @@ function appendExpressionInput(
   input.dataset.blueprintExpression = field;
   if (actionIndex !== undefined) input.dataset.blueprintActionIndex = String(actionIndex);
   input.value = JSON.stringify(expression);
-  input.disabled = disabled;
+  input.disabled = !editable;
   expressionField.appendChild(input);
   parent.appendChild(expressionField);
 }

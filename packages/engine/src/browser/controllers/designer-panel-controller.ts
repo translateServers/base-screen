@@ -59,6 +59,10 @@ export interface DesignerPanelControllerCallbacks {
 export class DesignerPanelController {
   #clipboard: BaseScreenClipboard | undefined;
   #pasteCount = 0;
+  #materialFilter: 'all' | 'favorite' | 'recent' = 'all';
+  #materialSearch = '';
+  readonly #favoriteMaterials = new Set<string>();
+  readonly #recentMaterials: string[] = [];
 
   constructor(private readonly callbacks: DesignerPanelControllerCallbacks) {}
 
@@ -103,6 +107,23 @@ export class DesignerPanelController {
       x: this.#pasteCount * 20,
       y: this.#pasteCount * 20,
     });
+    const result = this.callbacks.executeTransaction(transaction);
+    if (result.ok) {
+      const componentIds = transaction.commands.flatMap((command) =>
+        command.type === 'add-component' ? [command.component.id] : [],
+      );
+      this.select(componentIds);
+    }
+    return result;
+  }
+
+  duplicate(): ScreenParseResult<ScreenDocument> {
+    const document = this.callbacks.getDocument();
+    if (document === undefined || this.interaction.selectedComponentIds.length === 0)
+      return failure('Nothing to duplicate.');
+    this.copy();
+    if (this.#clipboard === undefined) return failure('Nothing to duplicate.');
+    const transaction = createPasteTransaction(document, this.#clipboard, { x: 0, y: 0 });
     const result = this.callbacks.executeTransaction(transaction);
     if (result.ok) {
       const componentIds = transaction.commands.flatMap((command) =>
@@ -198,9 +219,24 @@ export class DesignerPanelController {
   onClick(event: Event): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    const favorite = target.closest<HTMLButtonElement>('[data-material-favorite]');
+    if (favorite?.dataset.materialFavorite !== undefined) {
+      this.toggleMaterialFavorite(favorite.dataset.materialFavorite);
+      this.renderMaterials(favorite.closest<HTMLElement>('.designer'));
+      return;
+    }
+    const filter =
+      target.closest<HTMLButtonElement>('[data-material-filter]')?.dataset.materialFilter;
+    if (filter === 'all' || filter === 'favorite' || filter === 'recent') {
+      this.#materialFilter = filter;
+      this.renderMaterials(target.closest<HTMLElement>('.designer'));
+      return;
+    }
     const materialCard = target.closest<HTMLElement>('[data-material-type]');
     if (materialCard?.dataset.materialType !== undefined) {
       this.addMaterial(materialCard.dataset.materialType);
+      this.recordRecentMaterial(materialCard.dataset.materialType);
+      this.renderMaterials(materialCard.closest<HTMLElement>('.designer'));
       return;
     }
     if (!(target instanceof HTMLElement)) return;
@@ -235,6 +271,18 @@ export class DesignerPanelController {
       case 'zoom-out':
         this.callbacks.setZoom(this.callbacks.getZoom() / 1.2);
     }
+  }
+
+  onDragStart(event: DragEvent): boolean {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return false;
+    const materialType = target.closest<HTMLElement>('[data-material-type]')?.dataset.materialType;
+    if (materialType === undefined) return false;
+    if (event.dataTransfer !== null && event.dataTransfer !== undefined) {
+      event.dataTransfer.setData(MATERIAL_DRAG_TYPE, materialType);
+      event.dataTransfer.effectAllowed = 'copy';
+    }
+    return true;
   }
 
   onPropertyChange(event: Event): void {
@@ -276,6 +324,16 @@ export class DesignerPanelController {
       setDraftValidity(event.target, false);
       this.callbacks.emitDiagnostics([invalidDraftDiagnostic()]);
     }
+  }
+
+  onInput(event: Event): boolean {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.dataset.materialSearch === undefined) {
+      return false;
+    }
+    this.#materialSearch = target.value.trim().toLocaleLowerCase();
+    this.renderMaterials(target.closest<HTMLElement>('.designer'));
+    return true;
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
@@ -331,6 +389,43 @@ export class DesignerPanelController {
     };
     const result = this.callbacks.executeCommand({ type: 'add-component', component });
     result.ok ? this.select([component.id]) : this.callbacks.emitDiagnostics(result.diagnostics);
+  }
+
+  private toggleMaterialFavorite(type: string): void {
+    if (this.#favoriteMaterials.has(type)) this.#favoriteMaterials.delete(type);
+    else this.#favoriteMaterials.add(type);
+  }
+
+  private recordRecentMaterial(type: string): void {
+    const index = this.#recentMaterials.indexOf(type);
+    if (index >= 0) this.#recentMaterials.splice(index, 1);
+    this.#recentMaterials.unshift(type);
+    this.#recentMaterials.splice(12);
+  }
+
+  private renderMaterials(layout: HTMLElement | null): void {
+    if (layout === null) return;
+    for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
+      const type = card.dataset.materialCard;
+      const entry = type === undefined ? undefined : this.callbacks.getCatalog()?.get(type);
+      const searchable = `${entry?.manifest.name ?? ''} ${type ?? ''}`.toLocaleLowerCase();
+      const included =
+        type !== undefined &&
+        (this.#materialFilter === 'all' ||
+          (this.#materialFilter === 'favorite' && this.#favoriteMaterials.has(type)) ||
+          (this.#materialFilter === 'recent' && this.#recentMaterials.includes(type))) &&
+        searchable.includes(this.#materialSearch);
+      card.hidden = !included;
+      const favorite = card.querySelector<HTMLButtonElement>('[data-material-favorite]');
+      if (favorite !== null && type !== undefined) {
+        const active = this.#favoriteMaterials.has(type);
+        favorite.ariaPressed = String(active);
+        favorite.textContent = active ? '★' : '☆';
+      }
+    }
+    for (const control of layout.querySelectorAll<HTMLButtonElement>('[data-material-filter]')) {
+      control.ariaPressed = String(control.dataset.materialFilter === this.#materialFilter);
+    }
   }
 
   private select(componentIds: readonly string[]): void {
@@ -397,6 +492,8 @@ export class DesignerPanelController {
     return type === undefined ? undefined : this.callbacks.getCatalog()?.get(type);
   }
 }
+
+export const MATERIAL_DRAG_TYPE = 'application/x-base-screen-material';
 
 function isEditable(target: EventTarget | null): boolean {
   return (

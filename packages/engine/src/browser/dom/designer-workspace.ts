@@ -3,6 +3,7 @@ import { DESIGNER_OPERATION_TEXT } from '../../common/operations/designer-operat
 import {
   DESIGNER_TOOLS,
   type DesignerToolMaterialTypes,
+  getDesignerToolShortcut,
 } from '../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
@@ -19,11 +20,6 @@ export function createDesignerWorkspace(
       <span>编辑需要至少 1024 × 640 的可用空间。</span>
     </div>
 
-    <aside class="tool-rail" aria-label="设计工具">
-      <div class="tool-rail-brand" aria-hidden="true">Bs</div>
-      ${DESIGNER_TOOLS.map((tool) => `<button type="button" class="designer-control designer-button designer-icon-button designer-tool-button tool-btn" data-variant="ghost" data-tool="${tool.id}" data-material-key="${tool.materialKey ?? ''}" title="${tool.label} (${toolShortcut(tool.id)})" aria-label="${tool.label}">${toolGlyph(tool.id)}<kbd>${toolShortcut(tool.id)}</kbd></button>`).join('')}
-    </aside>
-
     <aside class="rail" data-left-panel>
       <header class="panel-heading">
         <span class="panel-title">${DESIGNER_UI_TEXT.materials}</span>
@@ -32,6 +28,15 @@ export function createDesignerWorkspace(
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
         </button>
       </header>
+      <label class="designer-field material-search">
+        <span class="sr-only">搜索物料</span>
+        <input type="search" class="designer-control designer-input" data-material-search placeholder="搜索物料">
+      </label>
+      <div class="material-filters" role="group" aria-label="物料筛选">
+        <button type="button" class="designer-control designer-button" data-material-filter="all" aria-pressed="true">全部</button>
+        <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">收藏</button>
+        <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">最近</button>
+      </div>
       <div class="designer-tablist rail-tabs" role="tablist" aria-label="左侧面板">
         <button type="button" class="designer-tab" id="designer-materials-tab" role="tab" aria-controls="designer-materials-panel" aria-selected="true" data-panel-tab="materials">${DESIGNER_UI_TEXT.materials}</button>
         <button type="button" class="designer-tab" id="designer-layers-tab" role="tab" aria-controls="designer-layers-panel" aria-selected="false" data-panel-tab="layers">${DESIGNER_UI_TEXT.layers}</button>
@@ -43,16 +48,26 @@ export function createDesignerWorkspace(
     <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical"></div>
 
     <main class="workspace">
-      <header class="toolbar">
-        <div class="toolbar-group" aria-label="历史记录">
+      <header class="designer-topbar" aria-label="设计器顶栏">
+        <div class="topbar-brand" aria-label="Base Screen 设计器">
+          <span class="designer-brand-mark" aria-hidden="true">Bs</span>
+          <span class="designer-brand-name">Base Screen</span>
+          <span class="designer-brand-separator" aria-hidden="true"></span>
+          <span class="designer-project-name">未命名大屏</span>
+          <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
+        </div>
+        <div class="topbar-group designer-tool-cluster" role="group" aria-label="工具">
+          ${DESIGNER_TOOLS.map((tool) => `<button type="button" class="designer-control designer-button designer-icon-button designer-tool-button tool-btn" data-variant="ghost" data-tool="${tool.id}" data-material-key="${tool.materialKey ?? ''}" title="${tool.label} (${getDesignerToolShortcut(tool.id)})" aria-label="${tool.label}">${toolGlyph(tool.id)}<kbd>${getDesignerToolShortcut(tool.id)}</kbd></button>`).join('')}
+        </div>
+        <div class="topbar-group" aria-label="历史记录">
           ${actionButton('undo', designerIcon('undo'))}
           ${actionButton('redo', redoGlyph())}
         </div>
-        <div class="toolbar-group" aria-label="剪贴板">
+        <div class="topbar-group" aria-label="剪贴板">
           ${actionButton('copy', copyGlyph())}
           ${actionButton('paste', pasteGlyph())}
         </div>
-        <div class="toolbar-group" aria-label="排列">
+        <div class="topbar-group" aria-label="排列">
           ${actionButton('group', groupGlyph())}
           ${actionButton('ungroup', ungroupGlyph())}
           <span class="toolbar-divider"></span>
@@ -66,8 +81,9 @@ export function createDesignerWorkspace(
           ${actionButton('distribute-horizontal', distributeHorizontalGlyph())}
           ${actionButton('distribute-vertical', distributeVerticalGlyph())}
         </div>
-        <div class="toolbar-spacer"></div>
-        <div class="toolbar-group" aria-label="项目">
+        <div class="topbar-spacer"></div>
+        <div class="topbar-group" aria-label="项目">
+          ${actionButton('project-workspace', projectGlyph())}
           ${actionButton('preview', previewGlyph())}
           ${actionButton('import', importGlyph())}
           ${actionButton('export', exportGlyph())}
@@ -76,17 +92,48 @@ export function createDesignerWorkspace(
           ${actionButton('project-retry', retryGlyph())}
           ${actionButton('project-cancel', cancelGlyph())}
         </div>
-        <div class="toolbar-group toolbar-zoom" aria-label="缩放">
+        <div class="topbar-group topbar-zoom" aria-label="缩放">
           ${actionButton('zoom-out', zoomOutGlyph())}
           <output class="zoom-value" data-zoom>100%</output>
           ${actionButton('zoom-in', zoomInGlyph())}
           ${actionButton('zoom-reset', resetZoomGlyph())}
           ${actionButton('zoom-fit', fitZoomGlyph())}
         </div>
-        <div class="toolbar-group" aria-label="画布辅助">
+        <div class="topbar-group" aria-label="画布辅助">
           ${actionButton('toggle-grid', gridGlyph())}
           ${actionButton('toggle-snap', snapGlyph())}
         </div>
+        <div class="designer-menu-triggers" role="menubar" aria-label="设计器菜单">
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="file" aria-expanded="false" role="menuitem">文件</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="edit" aria-expanded="false" role="menuitem">编辑</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="view" aria-expanded="false" role="menuitem">视图</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="tools" aria-expanded="false" role="menuitem">工具</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="help" aria-expanded="false" role="menuitem">帮助</button>
+        </div>
+        <div class="designer-menu" data-menu="file" hidden role="menu">
+          ${menuButton('project-workspace')}${menuButton('import')}${menuButton('export')}${menuButton('project-save')}${menuButton('project-publish')}${menuButton('project-retry')}${menuButton('project-cancel')}
+        </div>
+        <div class="designer-menu" data-menu="edit" hidden role="menu">
+          ${menuButton('undo')}${menuButton('redo')}${menuButton('copy')}${menuButton('paste')}${menuButton('delete')}${menuButton('duplicate')}${menuButton('group')}${menuButton('ungroup')}${menuButton('lock')}${menuButton('unlock')}${menuButton('hide')}${menuButton('bring-to-front')}${menuButton('send-to-back')}
+        </div>
+        <div class="designer-menu" data-menu="view" hidden role="menu">
+          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-fit')}${menuButton('toggle-grid')}${menuButton('toggle-snap')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}
+        </div>
+        <div class="designer-menu" data-menu="tools" hidden role="menu">
+          ${menuButton('toggle-grid')}${menuButton('toggle-snap')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}${menuButton('toggle-workbench')}
+        </div>
+        <section class="designer-help" data-menu="help" hidden aria-label="快捷键帮助">
+          <h2>快捷键</h2>
+          ${Object.entries(DESIGNER_OPERATION_TEXT)
+            .flatMap(([id, operation]) =>
+              'shortcut' in operation
+                ? [
+                    `<p data-help-operation="${id}">${operation.label}<kbd>${operation.shortcut}</kbd></p>`,
+                  ]
+                : [],
+            )
+            .join('')}
+        </section>
       </header>
 
       <input type="file" accept="application/json" data-import-document hidden>
@@ -102,15 +149,21 @@ export function createDesignerWorkspace(
           </div>
         </div>
       </div>
+      <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="画布操作" tabindex="-1"></div>
 
       <footer class="statusbar">
         <span class="status-pill" data-status-tool>选择</span>
         <span class="status-divider"></span>
+        <span class="status-item">吸附</span>
+        <span class="status-item">参考线</span>
+        <span class="status-item">设计模式</span>
+        <span class="status-divider"></span>
         <span data-project-status>${DESIGNER_UI_TEXT.directDocument}</span>
         <span data-project-revision></span>
         <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
-        <output class="status-zoom" data-status-zoom>100%</output>
+        <output class="status-zoom" data-status-zoom aria-label="缩放比例">100%</output>
       </footer>
+      <div class="designer-notifications" data-notifications aria-label="操作通知"></div>
     </main>
 
     <div class="panel-handle" data-panel-handle="right" role="separator" aria-orientation="vertical"></div>
@@ -154,6 +207,19 @@ export function createDesignerWorkspace(
       </div>
     </section>`;
 
+  // Nebula 布局：单条顶栏（品牌+保存状态｜工具簇+撤销重做｜动作组+缩放+菜单），顶栏与状态栏全宽，画布与左右面板并排。
+  // 顶栏与状态栏从 workspace 内移动到 grid 顶层，使其各自占据整行。
+  const topbar = layout.querySelector<HTMLElement>('.designer-topbar')!;
+  const statusbar = layout.querySelector<HTMLElement>('.statusbar')!;
+  layout.prepend(topbar);
+  layout.appendChild(statusbar);
+
+  const projectWorkspace = ownerDocument.createElement('section');
+  projectWorkspace.className = 'project-workspace';
+  projectWorkspace.dataset.projectWorkspace = 'true';
+  projectWorkspace.hidden = true;
+  layout.appendChild(projectWorkspace);
+
   const importConfirmation = ownerDocument.createElement('section');
   importConfirmation.className = 'import-confirmation';
   importConfirmation.dataset.importConfirmation = 'true';
@@ -180,9 +246,9 @@ export function createDesignerWorkspace(
   blueprint.hidden = true;
   layout.appendChild(blueprint);
 
-  const rail = layout.querySelector<HTMLElement>('[data-materials]')!;
+  const materialsRail = layout.querySelector<HTMLElement>('[data-materials]')!;
   for (const entry of materials) {
-    rail.appendChild(createMaterialButton(ownerDocument, entry));
+    materialsRail.appendChild(createMaterialCard(ownerDocument, entry));
   }
   for (const tool of DESIGNER_TOOLS) {
     const control = layout.querySelector<HTMLButtonElement>(`[data-tool="${tool.id}"]`)!;
@@ -193,7 +259,27 @@ export function createDesignerWorkspace(
 
 function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: string): string {
   const operation = DESIGNER_OPERATION_TEXT[action];
-  return `<button type="button" class="designer-control designer-button designer-icon-button toolbar-btn" data-variant="neutral" data-action="${action}" title="${operation.tooltip}" aria-label="${operation.label}">${glyph}</button>`;
+  const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
+  return `<button type="button" class="designer-control designer-button designer-icon-button toolbar-btn" data-variant="neutral" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}">${glyph}</button>`;
+}
+
+function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {
+  const operation = DESIGNER_OPERATION_TEXT[action];
+  const shortcut = 'shortcut' in operation ? `<kbd>${operation.shortcut}</kbd>` : '';
+  return `<button type="button" class="designer-control designer-button designer-menu-item" data-menu-action="${action}" role="menuitem"><span>${operation.label}</span>${shortcut}</button>`;
+}
+
+export type DesignerContextMenuAction = keyof typeof DESIGNER_OPERATION_TEXT | 'separator';
+
+// 画布右键菜单按右键目标动态组合：'separator' 渲染分组分隔线。
+export function contextMenuHtml(actions: readonly DesignerContextMenuAction[]): string {
+  return actions
+    .map((action) =>
+      action === 'separator'
+        ? '<div class="designer-menu-separator" data-menu-separator role="separator"></div>'
+        : menuButton(action),
+    )
+    .join('');
 }
 
 function toolGlyph(id: string): string {
@@ -216,40 +302,33 @@ function toolGlyph(id: string): string {
   return '';
 }
 
-function toolShortcut(id: string): string {
-  switch (id) {
-    case 'select':
-      return 'V';
-    case 'hand':
-      return 'H';
-    case 'text':
-      return 'T';
-    case 'rectangle':
-      return 'R';
-    case 'ellipse':
-      return 'E';
-    case 'image':
-      return 'I';
-    case 'zoom':
-      return 'Z';
-  }
-  return '';
-}
-
 function toolIcon(path: string): string {
   return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${path}"/></svg>`;
 }
 
-function createMaterialButton(
+function createMaterialCard(
   ownerDocument: Document,
   entry: BaseScreenMaterialCatalogEntry,
-): HTMLButtonElement {
+): HTMLElement {
+  const card = ownerDocument.createElement('div');
+  card.className = 'material-card-wrap';
+  card.dataset.materialCard = entry.manifest.type;
   const button = ownerDocument.createElement('button');
   button.type = 'button';
   button.className = 'designer-control designer-button material-card';
   button.dataset.materialType = entry.manifest.type;
+  // 物料卡片可拖拽到画布新增组件：dragstart 由 DesignerPanelController 写入物料类型到 dataTransfer。
+  button.draggable = true;
   button.innerHTML = `<span class="material-thumb" aria-hidden="true"></span><span class="material-name">${entry.manifest.name}</span><span class="material-type">${entry.manifest.type}</span>`;
-  return button;
+  const favorite = ownerDocument.createElement('button');
+  favorite.type = 'button';
+  favorite.className = 'designer-control designer-button material-favorite';
+  favorite.dataset.materialFavorite = entry.manifest.type;
+  favorite.ariaLabel = `收藏 ${entry.manifest.name}`;
+  favorite.ariaPressed = 'false';
+  favorite.textContent = '☆';
+  card.append(button, favorite);
+  return card;
 }
 
 function redoGlyph(): string {
@@ -312,6 +391,10 @@ function previewGlyph(): string {
   return toolbarIcon(
     'M8 5a4 4 0 0 0-5 3 4 4 0 0 0 5 3 4 4 0 0 0 5-3 4 4 0 0 0-5-3zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2z',
   );
+}
+
+function projectGlyph(): string {
+  return toolbarIcon('M3 5h10v8H3zM3 5l2-2h3l2 2M5 8h6M5 10h4');
 }
 
 function importGlyph(): string {

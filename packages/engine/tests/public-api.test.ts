@@ -1,4 +1,9 @@
-import type { ScreenParseResult, ScreenProjectEnvelope } from '@base-screen/contracts';
+import type {
+  ScreenDesignerHostAdapter,
+  ScreenParseResult,
+  ScreenProjectEnvelope,
+  ScreenProjectSummary,
+} from '@base-screen/contracts';
 import { describe, expectTypeOf, it } from 'vitest';
 import {
   BaseScreenDesignerElement,
@@ -31,5 +36,24 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<InstanceType<typeof BaseScreenDesignerElement>['publish']>().returns.toEqualTypeOf<
       Promise<ScreenParseResult<ScreenProjectEnvelope>>
     >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['listProjects']
+    >().returns.toEqualTypeOf<Promise<ScreenParseResult<readonly ScreenProjectSummary[]>>>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['previewProject']
+    >().returns.toEqualTypeOf<
+      Promise<ScreenParseResult<import('@base-screen/contracts').ScreenDocument>>
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['restoreSnapshot']
+    >().returns.toEqualTypeOf<Promise<ScreenParseResult<ScreenProjectEnvelope>>>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['exportProject']
+    >().returns.toEqualTypeOf<
+      Promise<ScreenParseResult<import('@base-screen/contracts').ScreenDocument>>
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['designerHostAdapter']
+    >().toEqualTypeOf<ScreenDesignerHostAdapter | undefined>();
   });
 });

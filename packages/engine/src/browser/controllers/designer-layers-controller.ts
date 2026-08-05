@@ -119,9 +119,11 @@ export class DesignerLayersController {
 
   onKeyDown(event: KeyboardEvent): boolean {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement) || target.dataset.layerRename === undefined) {
-      return false;
+    if (isLayerSelectButton(target)) {
+      return this.navigateTree(target, event);
     }
+    if (!(target instanceof HTMLInputElement) || target.dataset.layerRename === undefined)
+      return false;
     const component = this.callbacks
       .getDocument()
       ?.components.find((item) => item.id === target.dataset.layerRename);
@@ -135,6 +137,32 @@ export class DesignerLayersController {
     if (event.key !== 'Enter' || event.isComposing) return false;
     event.preventDefault();
     this.commitRename(component.id, target.value);
+    return true;
+  }
+
+  private navigateTree(target: HTMLButtonElement, event: KeyboardEvent): boolean {
+    const root = target.closest<HTMLElement>('[data-layer-root]');
+    if (root === null) return false;
+    const controls = [...root.querySelectorAll<HTMLButtonElement>('[data-layer-select]')].filter(
+      (control) => !control.disabled,
+    );
+    const index = controls.indexOf(target);
+    const nextIndex =
+      event.key === 'ArrowDown'
+        ? index + 1
+        : event.key === 'ArrowUp'
+          ? index - 1
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? controls.length - 1
+              : undefined;
+    if (nextIndex === undefined) return false;
+    const next = controls[nextIndex];
+    if (next === undefined) return true;
+    event.preventDefault();
+    next.focus();
+    this.select(next.dataset.layerSelect!, event);
     return true;
   }
 
@@ -333,6 +361,11 @@ export class DesignerLayersController {
     this.#dropTargetId = parentId;
     this.render(this.#layers);
   }
+}
+
+function isLayerSelectButton(target: EventTarget | null): target is HTMLButtonElement {
+  const candidate = target as { readonly dataset?: DOMStringMap; readonly tagName?: string } | null;
+  return candidate?.tagName === 'BUTTON' && candidate.dataset?.layerSelect !== undefined;
 }
 
 function getLayerRow(target: EventTarget | null): string | undefined {

@@ -8,8 +8,23 @@ class FakeElement {
   readonly dataset: Record<string, string> = {};
   readonly matches: Record<string, FakeElement> = {};
 
+  querySelectorAll(): FakeElement[] {
+    return [];
+  }
+
   closest<T extends Element>(selector: string): T | null {
     return (this.matches[selector] ?? null) as T | null;
+  }
+}
+
+class FakeButton extends FakeElement {
+  disabled = false;
+  focused = false;
+
+  readonly tagName = 'BUTTON';
+
+  focus(): void {
+    this.focused = true;
   }
 }
 
@@ -131,6 +146,38 @@ describe('DesignerLayersController', () => {
       { type: 'toggle-selection', componentId: 'layer-1' },
       { type: 'toggle-selection', componentId: 'layer-1' },
       { type: 'toggle-selection', componentId: 'layer-1' },
+    ]);
+  });
+
+  it('R4 keeps keyboard tree movement on the shared selection path', () => {
+    vi.stubGlobal('HTMLButtonElement', FakeButton);
+    const actions: unknown[] = [];
+    const controller = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: document, diagnostics: [] }),
+      getCatalog: () => undefined,
+      getDocument: () => document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      reduceSelection: (action) => actions.push(action),
+    });
+    const root = new FakeElement();
+    const first = new FakeButton();
+    const second = new FakeButton();
+    first.dataset.layerSelect = 'first';
+    second.dataset.layerSelect = 'second';
+    first.matches['[data-layer-root]'] = root;
+    root.querySelectorAll = () => [first, second];
+
+    expect(
+      controller.onKeyDown({
+        target: first,
+        key: 'ArrowDown',
+        preventDefault: () => undefined,
+      } as unknown as KeyboardEvent),
+    ).toBe(true);
+    expect(second.focused).toBe(true);
+    expect(actions).toEqual([
+      { type: 'replace-selection', componentIds: ['second'], focusedComponentId: 'second' },
     ]);
   });
 

@@ -21,15 +21,31 @@ import type {
   DesignerToolMaterialTypes,
 } from '../../common/tools/designer-tools.js';
 import type { DesignerSnapPoint } from '../viewport/designer-canvas-aids.js';
+import {
+  clientPointToDesignerCanvasPoint,
+  type DesignerClientPoint,
+} from '../viewport/designer-canvas-coordinates.js';
+import { MATERIAL_DRAG_TYPE } from './designer-panel-controller.js';
+
+// Movement below this screen-pixel distance is treated as a selection click, not a drag.
+// Otherwise a click would snap the component to the grid / smart guides and move it.
+const DESIGNER_DRAG_CLICK_THRESHOLD = 3;
 
 interface Drag {
   readonly components: readonly ScreenComponentNode[];
   readonly pointerId: number;
   readonly startClientX: number;
   readonly startClientY: number;
-  readonly startX: number;
-  readonly startY: number;
-  readonly element: HTMLElement;
+  readonly bounds: {
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
+    readonly top: number;
+  };
+  /** 拖拽的目标是 selection（控制器）；组件内容作为被选实体的内容一起跟随移动。 */
+  readonly selection: HTMLElement | undefined;
+  readonly elements: readonly HTMLElement[];
+  readonly moved: boolean;
 }
 
 interface Transform {
@@ -82,10 +98,27 @@ export interface DesignerGestureCallbacks {
     point: { readonly x: number; readonly y: number },
     excludedComponentIds?: readonly string[],
   ) => DesignerSnapPoint;
+  readonly snapCanvasSelection: (
+    bounds: {
+      readonly bottom: number;
+      readonly left: number;
+      readonly right: number;
+      readonly top: number;
+    },
+    offset: Point,
+    excludedComponentIds?: readonly string[],
+  ) => {
+    readonly x: number;
+    readonly y: number;
+    readonly snappedX?: number | undefined;
+    readonly snappedY?: number | undefined;
+  };
   readonly renderSnapPreview?: (point: DesignerSnapPoint | undefined) => void;
   readonly reduceSelection: (action: ScreenInteractionAction) => void;
   readonly reportTransaction: (transaction: ScreenDocumentTransaction) => void;
   readonly renderSelection: () => void;
+  /** 系统级焦点约束：画布点击时把键盘焦点收敛到 viewport 容器。 */
+  readonly focusViewport?: () => void;
 }
 
 export class DesignerGestureController {
@@ -95,6 +128,7 @@ export class DesignerGestureController {
   #marquee: Marquee | undefined;
   #pan: Pan | undefined;
   #create: Create | undefined;
+  #selectSuppression: string | null = null;
 
   constructor(private readonly callbacks: DesignerGestureCallbacks) {}
 
@@ -105,6 +139,12 @@ export class DesignerGestureController {
     canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
     canvas.addEventListener('pointercancel', () => this.cancel());
     canvas.addEventListener('lostpointercapture', () => this.cancel());
+    // 画布是可拖拽交互表面：系统性禁止原生文本选择（selectstart 是浏览器启动文本选择的
+    // 事件通道，即使 CSS user-select 未级联到某些内容也能拦截，参考 Nebula/Moveable）。
+    canvas.addEventListener('selectstart', (event) => event.preventDefault());
+    // 从物料面板拖拽物料到画布：dragover 需要 preventDefault 才能触发 drop。
+    canvas.addEventListener('dragover', (event) => this.onDragOverCanvas(event));
+    canvas.addEventListener('drop', (event) => this.onDropOnCanvas(event));
   }
 
   cancel(): void {
@@ -123,7 +163,13 @@ export class DesignerGestureController {
     if (!(target instanceof HTMLElement) || document === undefined || canvas === undefined) {
       return;
     }
+    // 系统级焦点约束：画布是键盘交互表面。阻止浏览器默认把焦点分配给被点击的子元素，
+    // 并把焦点收敛到 viewport 容器，保证后续快捷键（空格平移、删除等）始终命中画布上下文，
+    // 不会残留到某个已聚焦控件（否则空格/回车会触发该控件的默认激活，干扰快捷键）。
+    event.preventDefault();
+    this.callbacks.focusViewport?.();
     if (this.callbacks.isHandActive()) {
+      event.preventDefault();
       this.capturePointer(event.pointerId);
       this.#pan = {
         pointerId: event.pointerId,
@@ -138,6 +184,7 @@ export class DesignerGestureController {
     }
     const create = this.getCreateTool();
     if (create !== undefined && target.closest('[data-base-screen-component-id]') === null) {
+      event.preventDefault();
       this.capturePointer(event.pointerId);
       this.#create = {
         pointerId: event.pointerId,
@@ -161,10 +208,11 @@ export class DesignerGestureController {
     const material = target.closest<HTMLElement>('[data-base-screen-component-id]');
     const componentId = material?.dataset.baseScreenComponentId;
     if (componentId === undefined || material === null) {
+      event.preventDefault();
       this.capturePointer(event.pointerId);
       this.#marquee = {
         pointerId: event.pointerId,
-        start: this.snapCanvasPoint(event),
+        start: this.canvasPointFromPointer(event),
         union: event.shiftKey,
         contain: event.altKey,
       };
@@ -201,15 +249,27 @@ export class DesignerGestureController {
         focusedComponentId: componentId,
       });
     }
+    event.preventDefault();
     this.capturePointer(event.pointerId);
+    const bounds = getScreenSelectionBounds(components);
+    if (bounds === null) return;
     this.#drag = {
       components,
       pointerId: event.pointerId,
       startClientX: event.clientX,
       startClientY: event.clientY,
-      startX: component.position.x,
-      startY: component.position.y,
-      element: material,
+      bounds,
+      selection: canvas.querySelector<HTMLElement>('[data-selection]') ?? undefined,
+      elements: [
+        material,
+        ...components.flatMap((selected) => {
+          const element = canvas.querySelector<HTMLElement>(
+            `[data-base-screen-component-id="${selected.id}"]`,
+          );
+          return element === null || element === material ? [] : [element];
+        }),
+      ],
+      moved: false,
     };
   }
 
@@ -227,7 +287,7 @@ export class DesignerGestureController {
       return;
     }
     if (this.#marquee !== undefined && event.pointerId === this.#marquee.pointerId) {
-      this.renderMarquee(this.#marquee.start, this.snapCanvasPoint(event));
+      this.renderMarquee(this.#marquee.start, this.canvasPointFromPointer(event));
       return;
     }
     if (this.#transform !== undefined && event.pointerId === this.#transform.pointerId) {
@@ -237,13 +297,26 @@ export class DesignerGestureController {
     if (this.#drag === undefined || event.pointerId !== this.#drag.pointerId) {
       return;
     }
-    const x = (event.clientX - this.#drag.startClientX) / this.callbacks.getViewport().zoom;
-    const y = (event.clientY - this.#drag.startClientY) / this.callbacks.getViewport().zoom;
-    const position = this.snapPoint(
-      { x: clampCoordinate(this.#drag.startX + x), y: clampCoordinate(this.#drag.startY + y) },
-      this.#drag.components.map((component) => component.id),
+    const drag = this.#drag;
+    const distance = Math.hypot(
+      event.clientX - drag.startClientX,
+      event.clientY - drag.startClientY,
     );
-    this.#drag.element.style.translate = `${position.x - this.#drag.startX}px ${position.y - this.#drag.startY}px`;
+    if (distance < DESIGNER_DRAG_CLICK_THRESHOLD) {
+      return;
+    }
+    if (!drag.moved) {
+      this.#drag = { ...drag, moved: true };
+    }
+    const translation = this.dragTranslation(this.#drag, event);
+    // 拖拽以 selection（控制器）为目标，组件内容作为被选实体一起跟随移动，二者保持同步。
+    const selection = this.#drag.selection;
+    for (const element of this.#drag.elements) {
+      element.style.translate = `${translation.x}px ${translation.y}px`;
+    }
+    if (selection !== undefined) {
+      selection.style.translate = `${translation.x}px ${translation.y}px`;
+    }
   }
 
   private onPointerUp(event: PointerEvent): void {
@@ -257,7 +330,7 @@ export class DesignerGestureController {
     }
     if (this.#marquee !== undefined && event.pointerId === this.#marquee.pointerId) {
       const marquee = this.#marquee;
-      const end = this.snapCanvasPoint(event);
+      const end = this.canvasPointFromPointer(event);
       this.cancelMarquee();
       const rect = normalizedRect(marquee.start, end);
       if (rect.width < 1 || rect.height < 1) {
@@ -292,13 +365,11 @@ export class DesignerGestureController {
       return;
     }
     const drag = this.#drag;
-    const zoom = this.callbacks.getViewport().zoom;
-    const x = (event.clientX - drag.startClientX) / zoom;
-    const y = (event.clientY - drag.startClientY) / zoom;
-    const position = this.snapPoint(
-      { x: clampCoordinate(drag.startX + x), y: clampCoordinate(drag.startY + y) },
-      drag.components.map((component) => component.id),
-    );
+    if (!drag.moved) {
+      this.cancelDrag();
+      return;
+    }
+    const translation = this.dragTranslation(drag, event);
     this.cancelDrag();
     const document = this.callbacks.getDocument();
     if (event.altKey && document !== undefined) {
@@ -310,8 +381,8 @@ export class DesignerGestureController {
             id: nextComponentId(document, `${source.type}-${index}`),
             name: `${source.name} copy`,
             position: {
-              x: clampCoordinate(source.position.x + position.x - drag.startX),
-              y: clampCoordinate(source.position.y + position.y - drag.startY),
+              x: clampCoordinate(source.position.x + translation.x),
+              y: clampCoordinate(source.position.y + translation.y),
             },
             zIndex:
               document.components.reduce(
@@ -331,8 +402,8 @@ export class DesignerGestureController {
         componentIds: [component.id],
         patch: {
           position: {
-            x: clampCoordinate(component.position.x + position.x - drag.startX),
-            y: clampCoordinate(component.position.y + position.y - drag.startY),
+            x: clampCoordinate(component.position.x + translation.x),
+            y: clampCoordinate(component.position.y + translation.y),
           },
         },
       })),
@@ -419,7 +490,13 @@ export class DesignerGestureController {
     if (this.#drag === undefined) {
       return;
     }
-    this.#drag.element.style.translate = '';
+    for (const element of this.#drag.elements) {
+      element.style.translate = '';
+    }
+    const selection = this.#drag.selection;
+    if (selection !== undefined) {
+      selection.style.translate = '';
+    }
     this.releasePointerCapture(this.#drag.pointerId);
     this.#drag = undefined;
     this.clearSnapPreview();
@@ -453,10 +530,24 @@ export class DesignerGestureController {
     this.clearSnapPreview();
   }
 
-  private canvasPointFromPointer(event: PointerEvent): Point {
+  private canvasPointFromPointer(point: DesignerClientPoint): Point {
     const bounds = this.#canvas!.getBoundingClientRect();
+    return clientPointToDesignerCanvasPoint(point, bounds, this.callbacks.getViewport().zoom);
+  }
+
+  private dragTranslation(drag: Drag, event: PointerEvent): Point {
     const zoom = this.callbacks.getViewport().zoom;
-    return { x: (event.clientX - bounds.left) / zoom, y: (event.clientY - bounds.top) / zoom };
+    const translation = {
+      x: clampCoordinate((event.clientX - drag.startClientX) / zoom),
+      y: clampCoordinate((event.clientY - drag.startClientY) / zoom),
+    };
+    const snapped = this.callbacks.snapCanvasSelection(
+      drag.bounds,
+      translation,
+      drag.components.map((component) => component.id),
+    );
+    this.callbacks.renderSnapPreview?.(snapped);
+    return snapped;
   }
 
   private snapCanvasPoint(
@@ -474,6 +565,57 @@ export class DesignerGestureController {
 
   private clearSnapPreview(): void {
     this.callbacks.renderSnapPreview?.(undefined);
+  }
+
+  // 从物料面板拖拽物料到画布：dragover 只有 preventDefault 才会放行 drop。
+  private onDragOverCanvas(event: DragEvent): void {
+    if (!event.dataTransfer?.types.includes(MATERIAL_DRAG_TYPE)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+  }
+
+  // 在画布上释放物料：以释放位置为左上角新增组件（吸附后），复用创建工具的默认尺寸与属性。
+  private onDropOnCanvas(event: DragEvent): boolean {
+    const type = event.dataTransfer?.getData(MATERIAL_DRAG_TYPE);
+    if (type === undefined || type === '') return false;
+    const document = this.callbacks.getDocument();
+    const entry = this.callbacks.getCatalog()?.get(type);
+    if (document === undefined || entry === undefined) return false;
+    // snapPoint 返回的吸附点带 snappedX/snappedY 辅助字段，不能直接写入组件 position
+    // （fail-closed 校验会拒绝未知字段），这里只取规范化后的 x/y。
+    const snapped = this.snapPoint(this.canvasPointFromPointer(event));
+    const position = { x: snapped.x, y: snapped.y };
+    this.callbacks.reportTransaction({
+      commands: [
+        {
+          type: 'add-component',
+          component: {
+            id: nextComponentId(document, entry.manifest.type),
+            type: entry.manifest.type,
+            name: entry.manifest.name,
+            parentId: null,
+            position,
+            size: entry.manifest.defaultSize,
+            rotation: 0,
+            zIndex:
+              document.components.reduce(
+                (maximum, component) => Math.max(maximum, component.zIndex),
+                -1,
+              ) + 1,
+            status: { locked: false, hidden: false },
+            props: entry.manifest.defaultProps,
+            style: entry.manifest.defaultStyle,
+            dataSource: null,
+          },
+        },
+      ],
+    });
+    this.clearSnapPreview();
+    event.preventDefault();
+    event.stopPropagation();
+    return true;
   }
 
   private renderMarquee(start: Point, end: Point): void {
@@ -509,6 +651,7 @@ export class DesignerGestureController {
     if (this.#canvas?.hasPointerCapture(pointerId)) {
       this.#canvas.releasePointerCapture(pointerId);
     }
+    this.restoreSelection();
   }
 
   private capturePointer(pointerId: number): void {
@@ -517,6 +660,25 @@ export class DesignerGestureController {
     } catch {
       // Synthetic or detached pointers cannot capture; the gesture remains valid while events arrive.
     }
+    this.suppressSelection();
+  }
+
+  // 手势激活期间，把画布自身的 user-select 临时置为 none，阻止拖拽选中组件内的文本。
+  // 画布在设计器 shadow root 内，body 的 user-select 不会跨 shadow 边界继承到组件，
+  // 因此必须直接作用于 canvas 元素（连同其子树一起继承）。参考 Nebula/Moveable 的
+  // dragStart/dragEnd 阶段处理。
+  private suppressSelection(): void {
+    const canvas = this.#canvas;
+    if (canvas === undefined || this.#selectSuppression !== null) return;
+    this.#selectSuppression = canvas.style.userSelect;
+    canvas.style.userSelect = 'none';
+  }
+
+  private restoreSelection(): void {
+    const canvas = this.#canvas;
+    if (canvas === undefined || this.#selectSuppression === null) return;
+    canvas.style.userSelect = this.#selectSuppression;
+    this.#selectSuppression = null;
   }
 
   private getCreateTool():

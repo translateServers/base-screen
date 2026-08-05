@@ -46,6 +46,18 @@ describe('designer panel property parsing', () => {
     expect(parsePropertyControlValue({ value: '{' }, object)).toBeUndefined();
   });
 
+  it('R3 rejects unsafe JSON property drafts before mutations', () => {
+    const object: BaseScreenMaterialPropSchema = {
+      kind: 'object',
+      properties: {},
+      required: [],
+    };
+
+    expect(
+      parsePropertyControlValue({ value: '{"__proto__":{"polluted":true}}' }, object),
+    ).toBeUndefined();
+  });
+
   it('accepts only schema props that are exposed by the manifest property panel', () => {
     class FakeInput {
       readonly dataset: { prop?: string };
@@ -313,5 +325,30 @@ describe('designer data source authoring', () => {
     });
     expect(JSON.stringify(result)).not.toContain('secret');
     expect(JSON.stringify(result)).not.toContain('example.test');
+  });
+
+  it('R3 rejects unsafe JSON data drafts without creating a transaction', () => {
+    const result = createDataSourceTransaction(
+      dataTarget('static', {
+        static: '{"__proto__":{"polluted":true}}',
+      }) as unknown as HTMLTextAreaElement,
+      dataDocument(),
+      { focusedComponentId: 'text-1', selectedComponentIds: ['text-1'] },
+      dataCatalog(),
+      false,
+      undefined,
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      diagnostics: [
+        {
+          severity: 'error',
+          code: 'CORE_COMMAND_INVALID',
+          path: [],
+          message: '数据源配置无效，未保存修改。',
+        },
+      ],
+    });
   });
 });

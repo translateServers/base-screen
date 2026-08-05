@@ -5,6 +5,7 @@ import {
   DEFAULT_DESIGNER_CANVAS_AIDS,
   getDesignerRulerMarks,
   snapDesignerCanvasPoint,
+  snapDesignerSelectionTranslation,
 } from '../../../src/browser/viewport/designer-canvas-aids.js';
 
 describe('snapDesignerCanvasPoint', () => {
@@ -91,6 +92,19 @@ describe('snapDesignerCanvasPoint', () => {
       x: [0, 80, 100, 120, 200],
       y: [0, 50, 100],
     });
+  });
+
+  it('R2 snaps selection edge and center anchors with one shared translation', () => {
+    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+
+    expect(
+      snapDesignerSelectionTranslation(
+        { left: 10, right: 110, top: 20, bottom: 60 },
+        { x: 37, y: 31 },
+        state,
+        { x: [150], y: [70] },
+      ),
+    ).toEqual({ x: 40, y: 30, snappedX: 150, snappedY: 70 });
   });
 });
 

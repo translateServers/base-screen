@@ -22,13 +22,34 @@ const workbenchCss = readCss('../../../src/browser/styles/designer-workbench.css
 
 describe('designer workbench visual convergence', () => {
   it('R8 reserves stable tracks for workbench geometry and dynamic status content', () => {
-    expect(workbenchCss).toContain('grid-template-rows: 48px 20px minmax(0, 1fr) 28px;');
-    expect(workbenchCss).toContain('min-height: 52px;');
+    expect(baseCss).toContain('grid-template-rows: 52px minmax(0, 1fr) 30px;');
+    expect(baseCss).toContain('grid-column: 1 / -1;');
+    expect(workbenchCss).toContain('grid-template-rows: 20px minmax(0, 1fr);');
+    expect(workbenchCss).toContain('grid-row: 1 / 2 !important;');
+    expect(workbenchCss).toContain('padding: 0 var(--designer-space-6);');
+    expect(workbenchCss).toContain('.ruler-horizontal {');
+    expect(workbenchCss).toContain('grid-row: 2 / 3 !important;');
+    expect(baseCss).toContain('.designer > .designer-topbar {');
+    expect(workbenchCss).toContain('overflow: hidden;');
+    expect(baseCss).toContain('grid-row: 1 / 2;');
+    expect(workbenchCss).toContain('min-height: 56px;');
     expect(workbenchCss).toContain('.statusbar > [data-project-status]');
     expect(workbenchCss).toContain('flex: 0 1 12ch;');
     expect(workbenchCss).toContain('.statusbar > [data-project-revision]');
     expect(workbenchCss).toContain('flex: 0 1 18ch;');
     expect(workbenchCss).toContain('overflow-wrap: anywhere;');
+  });
+
+  it('R3 gives the designer a single top bar integrating the tool cluster and project menubar', () => {
+    expect(baseCss).toContain('.designer > .designer-topbar {');
+    expect(baseCss).toContain('.designer > .rail {');
+    expect(baseCss).toContain('grid-column: 1 / 2;');
+    expect(workbenchCss).toContain('.topbar-brand {');
+    expect(workbenchCss).toContain('.designer-menu-triggers {');
+    expect(workbenchCss).toContain('.designer-tool-cluster {');
+    expect(workbenchCss).toContain('.designer-tool-cluster .designer-tool-button {');
+    expect(workbenchCss).toContain('border-right: 1px solid var(--designer-border-default);');
+    expect(workbenchCss).toContain('.status-item {');
   });
 
   it('R8 keeps canvas grid and overlay layers driven by theme tokens', () => {

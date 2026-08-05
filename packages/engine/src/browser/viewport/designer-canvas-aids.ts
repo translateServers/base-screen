@@ -28,6 +28,20 @@ export interface DesignerSnapPoint {
   readonly snappedY?: number | undefined;
 }
 
+export interface DesignerSnapTranslation {
+  readonly x: number;
+  readonly y: number;
+  readonly snappedX?: number | undefined;
+  readonly snappedY?: number | undefined;
+}
+
+export interface DesignerSelectionSnapBounds {
+  readonly bottom: number;
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+}
+
 export interface DesignerRulerMark {
   readonly label: string;
   readonly position: number;
@@ -65,6 +79,35 @@ export function snapDesignerCanvasPoint(
     y: smartY ?? gridY ?? point.y,
     ...((smartX ?? gridX) === undefined ? {} : { snappedX: smartX ?? gridX }),
     ...((smartY ?? gridY) === undefined ? {} : { snappedY: smartY ?? gridY }),
+  };
+}
+
+export function snapDesignerSelectionTranslation(
+  bounds: DesignerSelectionSnapBounds,
+  translation: { readonly x: number; readonly y: number },
+  state: DesignerCanvasAidsState,
+  candidates: DesignerSnapCandidates = { x: [], y: [] },
+  zoom = 1,
+): DesignerSnapTranslation {
+  const horizontal = snapSelectionAxis(
+    [bounds.left, (bounds.left + bounds.right) / 2, bounds.right],
+    translation.x,
+    state,
+    candidates.x,
+    zoom,
+  );
+  const vertical = snapSelectionAxis(
+    [bounds.top, (bounds.top + bounds.bottom) / 2, bounds.bottom],
+    translation.y,
+    state,
+    candidates.y,
+    zoom,
+  );
+  return {
+    x: horizontal.value,
+    y: vertical.value,
+    ...(horizontal.snapped === undefined ? {} : { snappedX: horizontal.snapped }),
+    ...(vertical.snapped === undefined ? {} : { snappedY: vertical.snapped }),
   };
 }
 
@@ -121,6 +164,50 @@ function nearestSnapCandidate(
       (Math.abs(candidate - value) === Math.abs(nearest - value) && candidate < nearest)
     ) {
       nearest = candidate;
+    }
+  }
+  return nearest;
+}
+
+function snapSelectionAxis(
+  anchors: readonly number[],
+  translation: number,
+  state: DesignerCanvasAidsState,
+  candidates: readonly number[],
+  zoom: number,
+): { readonly value: number; readonly snapped: number | undefined } {
+  const threshold = DESIGNER_SMART_GUIDE_THRESHOLD / Math.max(zoom, Number.EPSILON);
+  const smart = state.smartGuidesEnabled
+    ? nearestSelectionCandidate(anchors, translation, candidates, threshold)
+    : undefined;
+  if (smart !== undefined) {
+    return { value: smart.value - smart.anchor, snapped: smart.value };
+  }
+  if (!state.gridSnapEnabled) return { value: translation, snapped: undefined };
+  const anchor = anchors[0]!;
+  const snapped = Math.round((anchor + translation) / DESIGNER_GRID_SIZE) * DESIGNER_GRID_SIZE;
+  return { value: snapped - anchor, snapped };
+}
+
+function nearestSelectionCandidate(
+  anchors: readonly number[],
+  translation: number,
+  candidates: readonly number[],
+  threshold: number,
+): { readonly anchor: number; readonly value: number } | undefined {
+  let nearest: { readonly anchor: number; readonly value: number } | undefined;
+  for (const anchor of anchors) {
+    const value = nearestSnapCandidate(anchor + translation, candidates, threshold);
+    if (value === undefined) continue;
+    if (
+      nearest === undefined ||
+      Math.abs(value - (anchor + translation)) <
+        Math.abs(nearest.value - (nearest.anchor + translation)) ||
+      (Math.abs(value - (anchor + translation)) ===
+        Math.abs(nearest.value - (nearest.anchor + translation)) &&
+        value < nearest.value)
+    ) {
+      nearest = { anchor, value };
     }
   }
   return nearest;

@@ -42,6 +42,11 @@ export class DesignerViewportController {
     viewport.tabIndex = 0;
   }
 
+  /** 把键盘焦点收敛到 viewport 焦点容器，作为画布交互的统一快捷键命中目标。 */
+  focus(preventScroll = true): void {
+    this.#viewport?.focus({ preventScroll });
+  }
+
   setZoom(zoom: number, anchor = { x: 0, y: 0 }): void {
     this.#state = reduceScreenViewport(this.#state, {
       type: 'set-zoom',
@@ -49,6 +54,15 @@ export class DesignerViewportController {
       anchor,
     });
     this.render();
+  }
+
+  setZoomCentered(zoom: number): void {
+    const viewport = this.#viewport;
+    if (viewport === undefined) {
+      this.setZoom(zoom);
+      return;
+    }
+    this.setZoom(zoom, { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 });
   }
 
   panBy(delta: { readonly x: number; readonly y: number }): void {
@@ -67,6 +81,22 @@ export class DesignerViewportController {
     if (document === undefined || viewport === undefined) return;
     this.setZoom(
       getFitDesignerZoom(document, { width: viewport.clientWidth, height: viewport.clientHeight }),
+    );
+  }
+
+  fitSelection(size: { readonly width: number; readonly height: number }): void {
+    const viewport = this.#viewport;
+    if (viewport === undefined) return;
+    this.setZoom(
+      getFitDesignerZoom(
+        {
+          canvas: { width: size.width, height: size.height, backgroundColor: '#000000' },
+          components: [],
+          variables: [],
+          blueprint: { rules: [] },
+        },
+        { width: viewport.clientWidth, height: viewport.clientHeight },
+      ),
     );
   }
 
@@ -93,8 +123,10 @@ export class DesignerViewportController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
-    if (event.repeat || isEditable(event.target)) return false;
+    if (isEditable(event.target)) return false;
     if (event.code === 'Space') {
+      // 即使是按住空格重复触发（连续平移），也必须阻止浏览器默认滚动，
+      // 否则焦点容器上的空格会滚动页面，干扰快捷键平移。
       event.preventDefault();
       this.#spacePressed = true;
       this.render();
