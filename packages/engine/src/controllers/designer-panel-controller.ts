@@ -14,10 +14,16 @@ import type {
 import { getScreenSelectionBounds, isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
+  createDataSourceTransaction,
+  createPropertyTransaction,
+  renderDesignerDataPanel,
+  renderDesignerProperties,
+} from '../dom/designer-panel-dom.js';
+import {
   type BaseScreenClipboard,
   createClipboard,
   createPasteTransaction,
-} from './designer-clipboard.js';
+} from '../operations/designer-clipboard.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -25,14 +31,8 @@ import {
   createDistributionTransaction,
   createGroupTransaction,
   createUngroupTransaction,
-} from './designer-layout-operations.js';
-import {
-  createDataSourceTransaction,
-  createPropertyTransaction,
-  renderDesignerDataPanel,
-  renderDesignerProperties,
-} from './designer-panel-dom.js';
-import { selectedComponents } from './designer-selection.js';
+} from '../operations/designer-layout-operations.js';
+import { selectedComponents } from '../operations/designer-selection.js';
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -192,11 +192,13 @@ export class DesignerPanelController {
 
   onClick(event: Event): void {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return;
-    if (target.dataset.materialType !== undefined) {
-      this.addMaterial(target.dataset.materialType);
+    if (!(target instanceof Element)) return;
+    const materialCard = target.closest<HTMLElement>('[data-material-type]');
+    if (materialCard?.dataset.materialType !== undefined) {
+      this.addMaterial(materialCard.dataset.materialType);
       return;
     }
+    if (!(target instanceof HTMLElement)) return;
     switch (target.dataset.action) {
       case 'undo':
         return this.report(this.callbacks.undo());

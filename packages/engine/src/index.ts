@@ -4,7 +4,7 @@ export {
   type ScreenProjectControllerOptions,
   type ScreenProjectPhase,
   type ScreenProjectScheduler,
-} from './project-controller.js';
+} from './controllers/project-controller.js';
 
 import type {
   ScreenDiagnostic,
@@ -22,26 +22,30 @@ import {
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '@base-screen/renderer';
-import { DesignerGestureController } from './designer-gesture-controller.js';
-import { DesignerImportController } from './designer-import-controller.js';
-import { DesignerIntegrationController } from './designer-integration-controller.js';
-import { DesignerLayersController } from './designer-layers-controller.js';
+import { DesignerGestureController } from './controllers/designer-gesture-controller.js';
+import { DesignerImportController } from './controllers/designer-import-controller.js';
+import { DesignerIntegrationController } from './controllers/designer-integration-controller.js';
+import { DesignerLayersController } from './controllers/designer-layers-controller.js';
+import { DesignerPanelController } from './controllers/designer-panel-controller.js';
+import { DesignerPreviewController } from './controllers/designer-preview-controller.js';
+import { DesignerProjectFeedbackController } from './controllers/designer-project-feedback-controller.js';
+import { DesignerViewportController } from './controllers/designer-viewport-controller.js';
+import { DesignerWorkbenchController } from './controllers/designer-workbench-controller.js';
+import type { ScreenProjectPhase } from './controllers/project-controller.js';
+import { renderDesignerSelection } from './dom/designer-selection-dom.js';
+import { createDesignerWorkspace } from './dom/designer-workspace.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
   createReparentTransaction,
-} from './designer-layout-operations.js';
+} from './operations/designer-layout-operations.js';
 import {
   DESIGNER_OPERATION_TEXT,
   DesignerOperationRegistry,
-} from './designer-operation-registry.js';
-import { DesignerPanelController } from './designer-panel-controller.js';
-import { DesignerPreviewController } from './designer-preview-controller.js';
-import { DesignerProjectFeedbackController } from './designer-project-feedback-controller.js';
-import { selectedComponents } from './designer-selection.js';
-import { renderDesignerSelection } from './designer-selection-dom.js';
-import { DesignerSession } from './designer-session.js';
-import { createDesignerStyle } from './designer-style.js';
+} from './operations/designer-operation-registry.js';
+import { selectedComponents } from './operations/designer-selection.js';
+import { DesignerSession } from './session/designer-session.js';
+import { createDesignerStyle } from './styles/designer-style.js';
 import {
   DESIGNER_TOOLS,
   type DesignerToolId,
@@ -49,12 +53,8 @@ import {
   getDesignerToolForShortcut,
   getDesignerToolShortcut,
   isDesignerToolConfigured,
-} from './designer-tools.js';
-import { DESIGNER_UI_TEXT } from './designer-ui-text.js';
-import { DesignerViewportController } from './designer-viewport-controller.js';
-import { DesignerWorkbenchController } from './designer-workbench-controller.js';
-import { createDesignerWorkspace } from './designer-workspace.js';
-import type { ScreenProjectPhase } from './project-controller.js';
+} from './tools/designer-tools.js';
+import { DESIGNER_UI_TEXT } from './ui/designer-ui-text.js';
 
 const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
@@ -144,6 +144,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     getCatalog: () => this.#catalog,
     getDocument: () => this.#session.document,
     getResourcePort: () => this.#resourcePort,
+    isViewerRegistered: () =>
+      this.ownerDocument.defaultView?.customElements.get('base-screen-viewer') !== undefined,
   });
   readonly #importController = new DesignerImportController({
     replaceDocument: (document) => this.replaceDocument(document),
@@ -359,8 +361,10 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   set catalog(value: BaseScreenMaterialCatalog | undefined) {
-    if (this.#session.document !== undefined && value !== this.#catalog) {
-      this.emitDiagnostics([lifecycleDiagnostic('Catalog cannot change while loaded.')]);
+    if (this.#renderer !== undefined && value !== this.#catalog) {
+      this.emitDiagnostics([
+        lifecycleDiagnostic('Catalog cannot change after initialization. Call unload first.'),
+      ]);
       return;
     }
     this.#catalog = value;
@@ -401,11 +405,14 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   set resourcePort(value: ScreenHostResourcePort | undefined) {
-    if (this.#session.document !== undefined && value !== this.#resourcePort) {
-      this.emitDiagnostics([lifecycleDiagnostic('Resource port cannot change while loaded.')]);
+    if (this.#renderer !== undefined && value !== this.#resourcePort) {
+      this.emitDiagnostics([
+        lifecycleDiagnostic('Resource port cannot change after initialization. Call unload first.'),
+      ]);
       return;
     }
     this.#resourcePort = value;
+    this.initialize();
   }
 
   get document(): ScreenDocument | undefined {
@@ -545,8 +552,14 @@ export class BaseScreenDesignerElement extends ElementBase {
         diagnostics: [lifecycleDiagnostic('Project preview requires a host preview capability.')],
       };
     }
-    this.#previewController.toggle();
-    return { ok: true, value: undefined, diagnostics: [] };
+    return this.#previewController.toggle()
+      ? { ok: true, value: undefined, diagnostics: [] }
+      : {
+          ok: false,
+          diagnostics: [
+            lifecycleDiagnostic('Direct preview requires base-screen-viewer to be registered.'),
+          ],
+        };
   }
 
   load(projectId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
@@ -580,7 +593,8 @@ export class BaseScreenDesignerElement extends ElementBase {
   unload(): void {
     this.#session.unload();
     this.resetSessionSurfaces();
-    this.#renderer?.clear();
+    this.#renderer?.dispose();
+    this.#renderer = undefined;
     this.renderInteraction();
   }
 

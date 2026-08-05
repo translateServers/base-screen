@@ -5,6 +5,7 @@ export interface DesignerPreviewCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
+  readonly isViewerRegistered: () => boolean;
 }
 
 export class DesignerPreviewController {
@@ -30,10 +31,13 @@ export class DesignerPreviewController {
     this.render();
   }
 
-  toggle(): void {
-    if (this.#preview === undefined) return;
+  toggle(): boolean {
+    if (this.#preview === undefined || (!this.#open && !this.callbacks.isViewerRegistered())) {
+      return false;
+    }
     this.#open = !this.#open;
     this.render();
+    return true;
   }
 
   clear(): void {

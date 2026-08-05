@@ -36,6 +36,10 @@ export class BaseScreenViewerElement extends ElementBase {
   }
 
   set catalog(value: BaseScreenMaterialCatalog | undefined) {
+    if (this.#renderer !== undefined && value !== this.#catalog) {
+      this.emitDiagnostics('Catalog cannot change after initialization. Call unload first.');
+      return;
+    }
     this.#catalog = value;
     this.initialize();
   }
@@ -46,17 +50,15 @@ export class BaseScreenViewerElement extends ElementBase {
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
     this.#contributionIndex = value;
-    this.#renderer?.dispose();
-    this.#renderer = undefined;
-    this.#mount?.replaceChildren();
+    this.disposeRenderer();
     this.compileBlueprint();
     this.initialize();
     this.renderDocument();
   }
 
   set resourcePort(value: ScreenHostResourcePort | undefined) {
-    if (this.#document !== undefined && value !== this.#resourcePort) {
-      this.emitDiagnostics('Resource port cannot change while a document is loaded.');
+    if (this.#renderer !== undefined && value !== this.#resourcePort) {
+      this.emitDiagnostics('Resource port cannot change after initialization. Call unload first.');
       return;
     }
     this.#resourcePort = value;
@@ -77,6 +79,7 @@ export class BaseScreenViewerElement extends ElementBase {
   set document(value: ScreenDocument | undefined) {
     this.#document = value;
     this.compileBlueprint();
+    this.initialize();
     this.renderDocument();
   }
 
@@ -85,8 +88,9 @@ export class BaseScreenViewerElement extends ElementBase {
   }
 
   unload(): void {
-    this.#renderer?.clear();
+    this.disposeRenderer();
     this.#document = undefined;
+    this.compileBlueprint();
   }
 
   private initialize(): void {
@@ -117,6 +121,13 @@ export class BaseScreenViewerElement extends ElementBase {
         : { contributionIndex: this.#contributionIndex }),
     });
     this.renderDocument();
+  }
+
+  private disposeRenderer(): void {
+    this.#renderer?.dispose();
+    this.#renderer = undefined;
+    this.#mount?.remove();
+    this.#mount = undefined;
   }
 
   private compileBlueprint(): void {

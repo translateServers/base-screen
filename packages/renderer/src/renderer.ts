@@ -9,7 +9,7 @@ import {
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
-import { isScreenComponentEffectivelyHidden } from '@base-screen/core';
+import { getPainterOrder, isScreenComponentEffectivelyHidden } from '@base-screen/core';
 import {
   type BaseScreenMaterialCatalog,
   type BaseScreenMaterialCatalogEntry,
@@ -66,6 +66,7 @@ type MountedMaterial = {
   resourceGeneration: number;
   resourceController: AbortController | undefined;
   resourceTimer: ReturnType<typeof setTimeout> | undefined;
+  resourceKey: string | undefined;
 };
 
 class Renderer implements BaseScreenRenderer {
@@ -96,16 +97,27 @@ class Renderer implements BaseScreenRenderer {
     if (!prepared.ok) {
       return prepared;
     }
+    const painterIndex = new Map(
+      getPainterOrder(parsedDocument.value).map((componentId, index) => [componentId, index]),
+    );
+    const candidates = [...prepared.value].sort(
+      (left, right) => painterIndex.get(left.component.id)! - painterIndex.get(right.component.id)!,
+    );
     const next = new Map<string, MountedMaterial>();
-    for (const candidate of prepared.value) {
+    for (const candidate of candidates) {
+      const stackOrder = painterIndex.get(candidate.component.id)!;
       const existing = this.#mounted.get(candidate.component.id);
       if (existing !== undefined && existing.type === candidate.component.type) {
+        const resourceKey = getHostResourceKey(candidate.component);
         applyMaterial(
           existing.element,
           candidate.component,
           parsedDocument.value,
-          candidate.model,
+          resourceKey !== undefined && resourceKey === existing.resourceKey
+            ? { ...candidate.model, dataState: existing.element.model.dataState }
+            : candidate.model,
           isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
+          stackOrder,
         );
         next.set(candidate.component.id, existing);
         continue;
@@ -119,6 +131,7 @@ class Renderer implements BaseScreenRenderer {
         parsedDocument.value,
         candidate.model,
         isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
+        stackOrder,
       );
       this.options.root.appendChild(element);
       next.set(candidate.component.id, {
@@ -128,6 +141,7 @@ class Renderer implements BaseScreenRenderer {
         resourceGeneration: 0,
         resourceController: undefined,
         resourceTimer: undefined,
+        resourceKey: undefined,
       });
     }
     for (const [componentId, mounted] of this.#mounted) {
@@ -142,12 +156,19 @@ class Renderer implements BaseScreenRenderer {
     this.options.root.style.height = `${parsedDocument.value.canvas.height}px`;
     this.options.root.style.backgroundColor = parsedDocument.value.canvas.backgroundColor;
     this.#mounted = next;
-    for (const candidate of prepared.value) {
+    for (const candidate of candidates) {
       const mounted = next.get(candidate.component.id);
-      if (mounted !== undefined && candidate.component.dataSource?.type === 'host-resource') {
+      const resourceKey = getHostResourceKey(candidate.component);
+      if (
+        mounted !== undefined &&
+        resourceKey !== undefined &&
+        mounted.resourceKey !== resourceKey
+      ) {
+        mounted.resourceKey = resourceKey;
         void this.resolveHostResource(candidate, mounted);
       } else if (mounted !== undefined) {
         cancelResource(mounted);
+        mounted.resourceKey = undefined;
       }
     }
     return { ok: true, value: null, diagnostics: [] };
@@ -422,6 +443,7 @@ function applyMaterial(
   document: ScreenDocument,
   model: BaseScreenMaterialModel,
   effectivelyHidden: boolean,
+  stackOrder: number,
 ): void {
   const position = component.position;
   element.style.position = 'absolute';
@@ -429,12 +451,22 @@ function applyMaterial(
   element.style.top = `${position.y}px`;
   element.style.width = `${component.size.width}px`;
   element.style.height = `${component.size.height}px`;
-  element.style.zIndex = String(component.zIndex);
+  // Core painter order makes root subtrees indivisible spans. A unique order avoids child zIndex
+  // values escaping their root subtree while Material elements remain mounted on the canvas root.
+  element.style.zIndex = String(stackOrder);
   element.dataset.baseScreenComponentId = component.id;
   element.style.transformOrigin = 'center';
   element.style.transform = `rotate(${component.rotation}deg)`;
   element.style.display = effectivelyHidden ? 'none' : 'block';
   element.model = model;
+}
+
+function getHostResourceKey(component: ScreenComponentNode): string | undefined {
+  const source = component.dataSource;
+  if (source === null || source.type !== 'host-resource') {
+    return undefined;
+  }
+  return `${source.resourceType}\u0000${JSON.stringify(source.params)}`;
 }
 
 function prefixDiagnostics(
