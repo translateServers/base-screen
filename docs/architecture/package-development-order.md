@@ -221,6 +221,9 @@ testing       -> 只从外部消费公共包，横向覆盖每个波次
 
 ## 5. 当前状态
 
+当前推进方针：以 `@base-screen/engine` 的大屏设计器样式和作者功能为主线。其他包只在直接支撑设计器
+能力、解除其质量瓶颈或守护既有公共契约时继续扩展；该优先级不放宽既有依赖边界和质量门。
+
 | 波次 | 状态 |
 | --- | --- |
 | M0 工程基线 | 已完成，本地 Node 22 通过 `pnpm verify:m0` |
@@ -231,6 +234,6 @@ testing       -> 只从外部消费公共包，横向覆盖每个波次
 | P3 Native/React/Vue Material | 已完成：官方文本物料、Custom Element registration、React/Vue bridge 与 Node 无副作用测试 |
 | P4 Renderer/Viewer | 已完成：catalog DOM diff、Shadow DOM Viewer、标准事件、资源 generation guard 与浏览器 harness |
 | P5 Designer Engine | 已完成：Core command/history、拖拽单次提交、属性编辑、项目 load/save revision Adapter 与浏览器 harness |
-| P6 SDK 与 Framework Bridge | 进行中：SDK 稳定子路径和 tarball 验证已完成；consumer-local 类型增强示例待补充 |
-| P7 动态数据与 DSL | 进行中：当前 Document、Host Resource port、Blueprint compile/dispatch、Nebula importer 已完成；超时/取消和专业 conformance harness 待补充 |
+| P6 SDK 与 Framework Bridge | 已完成：SDK 稳定子路径、React/Vue 物料桥接公共 API、consumer-local 类型增强（React `JSX.IntrinsicElements` / Vue `GlobalComponents`）与 Vanilla/React/Vue tarball consumers 均已由 `pnpm verify:tarball` 与 `pnpm verify:m0` 验证 |
+| P7 动态数据与 DSL | 已完成：当前 Document、Host Resource port、Blueprint compile/dispatch、Nebula importer 与超时/取消/conformance harness 均已由 `pnpm verify:runtime`、`pnpm verify:nebula-import` 和 `pnpm verify:m0` 验证 |
 | M8 不可信插件/远程模块 | 已完成第一阶段：ADR-0008、sandbox iframe、bounded ready/event protocol、超时和处置边界；远程物料 ABI 仍明确不在该协议内 |

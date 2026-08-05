@@ -1,7 +1,7 @@
 # Base Screen 长期演进总纲
 
 > 状态：设计中
-> 最近更新：2026-08-03
+> 最近更新：2026-08-05
 > 定位：定义 Base Screen 的长期产品边界、目标架构、公共契约、包职责、演进路线和质量基线
 
 ## 0. 文档职责
@@ -84,6 +84,18 @@ Base Screen 是从 Nebula 大屏能力中提炼出的独立开源底座，不是
 - 任意脚本、`eval`、SQL 或通用 HTTP 请求描述进入项目文档。
 - 为所有前端框架维护重型设计器包装组件。
 - 兼容旧浏览器的 Custom Element polyfill。
+
+### 1.5 当前推进方针
+
+当前实现以大屏设计器的样式和作者功能为产品主线。设计器体验的完整性、可用性和质量优先于为底层包
+单独扩展能力。
+
+- 优先推进 `@base-screen/engine` 的工作台视觉、交互、编辑闭环和对应浏览器验收。
+- `contracts`、`core`、`renderer`、物料、插件、SDK、framework bridge 与 `testing` 的后续工作，必须直接
+  服务于设计器需求、解除设计器质量瓶颈，或守护其既有公共契约。
+- 不因独立的底层探索扩大公共 API、包图或持久化契约；确有设计器需求时，仍按 ADR、Spec、测试和质量门
+  的顺序推进。
+- 本方针不改变宿主拥有副作用、契约优先、实例隔离和生产包不依赖 `testing` 等既有边界。
 
 ## 2. 长期架构原则
 
@@ -1024,7 +1036,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 实施依据：[M0 工程基线 Spec](../specs/m0-engineering-baseline/spec.md)
 
-实施状态（2026-08-03）：本地 Node 22 已完成十二包工程初始化并通过 `pnpm verify:m0`；Node 24 由 CI matrix 验证。
+实施状态（2026-08-05）：本地 Node 22 已完成十二包工程初始化并通过 `pnpm verify:m0`；Node 24 由 CI matrix 验证。P6 SDK 与 Framework Bridge、P7 动态数据与 DSL 已收敛，runtime/ecosystem hardening 的 sandbox、Host Resource、Blueprint、contribution、tarball bridge consumer 与 importer 均通过 `pnpm verify:runtime`、`pnpm verify:tarball`、`pnpm verify:nebula-import` 与 `pnpm verify:m0`。
 
 交付：
 
@@ -1186,15 +1198,22 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | ADR | 主题 | 状态 | 优先级 |
 | --- | --- | --- | --- |
 | [ADR-0001](../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md) | Monorepo、工具链、私有阶段版本与依赖方向 | 已接受 | M0 |
-| ADR-0002 | Canonical Screen Document 契约 | 已接受 | M1 |
-| ADR-0003 | Web Component 物料 ABI 与注册规则 | 已接受 | M1 |
-| ADR-0004 | 插件生命周期、贡献点和信任边界 | 已接受 | M1/M6 |
-| ADR-0005 | Renderer DOM、样式和 Shadow DOM 策略 | 已接受 | M2 |
-| ADR-0006 | Designer Engine 内部 UI 与交互技术选型 | 已接受 | M3 |
-| ADR-0007 | Host Resource intent 与 DSL/Blueprint 运行时 | 已接受 | M5 |
-| ADR-0008 | 不可信远程插件 sandbox、协议与可用能力 | 已接受 | M8 |
-| ADR-0007 | Host Resource 安全与执行模型 | 待起草 | M5 |
-| ADR-0008 | Nebula importer 与集成边界 | 待起草 | M7 |
+| [ADR-0002](../decisions/ADR-0002-canonical-screen-document.md) | Canonical Screen Document 契约 | 已接受 | M1 |
+| [ADR-0003](../decisions/ADR-0003-web-component-material-abi-and-registration.md) | Web Component 物料 ABI 与注册规则 | 已接受 | M1 |
+| [ADR-0004](../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) | 插件生命周期、贡献点和信任边界 | 已接受 | M1/M6 |
+| [ADR-0005](../decisions/ADR-0005-renderer-dom-shadow-dom-and-product-elements.md) | Renderer DOM、样式和 Shadow DOM 策略 | 已接受 | M2 |
+| [ADR-0006](../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md) | Designer Engine 内部 UI 与交互技术选型 | 已接受 | M3 |
+| [ADR-0007](../decisions/ADR-0007-host-resource-and-blueprint-runtime.md) | Host Resource intent 与 DSL/Blueprint 运行时 | 已取代 | M5 |
+| [ADR-0008](../decisions/ADR-0008-remote-plugin-sandbox-protocol.md) | 不可信远程插件 sandbox、协议与可用能力 | 已取代 | M8 |
+| [ADR-0009](../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md) | 远程插件跨 origin iframe transport | 已接受 | M8 |
+| [ADR-0010](../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md) | Host Resource deadline 与 Blueprint 运行时 | 已接受 | M5 |
+| [ADR-0011](../decisions/ADR-0011-nebula-importer-auditable-migration.md) | Nebula importer 可审计迁移 | 已接受 | M7 |
+| [ADR-0012](../decisions/ADR-0012-designer-project-lifecycle.md) | Designer 项目生命周期 | 已接受 | M3 |
+| [ADR-0013](../decisions/ADR-0013-core-canonical-blueprint-mutation.md) | Core canonical Blueprint mutation | 已接受 | M5 |
+| [ADR-0014](../decisions/ADR-0014-plugin-manifest-identity-only.md) | Plugin Manifest identity-only 依赖 | 已接受 | M6 |
+| [ADR-0015](../decisions/ADR-0015-runtime-contribution-authority.md) | 实例级 runtime contribution authority | 已接受 | M6 |
+
+ADR 完整索引与状态流转以 [docs/decisions/README.md](../decisions/README.md) 为准。
 
 ## 19. 已确认决策
 
@@ -1209,6 +1228,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | 注册方式 | 标准 `customElements.define()`，默认显式 define，提供 `/auto-register` |
 | 实例隔离 | 全局 Custom Element 定义 + 实例级不可变物料目录 |
 | 框架桥接 | React/Vue 包只桥接物料组件，不提供重型宿主包装器 |
+| 当前推进方针 | 以设计器样式与作者功能为主线；其他包仅为设计器能力、质量或既有契约提供支撑 |
 | 插件边界 | 物料与插件分离；插件可以贡献已定义物料和受控能力 |
 | 包结构 | contracts、core、renderer、engine、material、plugin-core、plugin-manager、plugin-sdk、react、vue、sdk、testing |
 | Testing | 独立发布包，生产包不得依赖 |
@@ -1268,3 +1288,4 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 | 2026-08-03 | 将 React JSX 与 Vue template 类型增强调整为 consumer-local 配方，保持 SDK 和 bridge 依赖方向不变 |
 | 2026-08-03 | 接受 ADR-0001；M0 十二包保持 private，公开 npm scope 延后到首次公开发布前决策 |
 | 2026-08-03 | 新增生效中的 M0 工程基线 Spec，冻结工具链、十二包骨架、边界门禁和私有 tarball 验收 |
+| 2026-08-05 | 明确当前以大屏设计器的样式与作者功能为主线；其他包后续工作以服务设计器能力、质量或既有契约为准 |

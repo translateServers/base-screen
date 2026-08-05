@@ -1,7 +1,7 @@
 # Base Screen 功能与工程规格
 
 > 状态：生效中
-> 最近更新：2026-08-04
+> 最近更新：2026-08-05
 > 定位：索引可直接验收和实施的 Base Screen Spec
 
 ## 生效中
@@ -23,6 +23,7 @@
 
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
+| [Designer Product Completion](./designer-product-completion/spec.md) | Designer 产品主线增量 | 仅参考 Nebula `screen-editor-core`，补齐真实物料、内容样式、作者操作、图层、画布、数据与蓝图 |
 | [Designer Workbench Control Styles](./designer-workbench-control-styles/spec.md) | M3 增量 | Engine 私有设计 token、语义控件、Shadow DOM 样式隔离与视觉验收 |
 | [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/spec.md) | P6-P7/M7-M8 增量 | Sandbox/Host Resource/Blueprint/plugin contribution、tarball bridge consumer 与 importer 生产级验收 |
 

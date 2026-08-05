@@ -32,6 +32,7 @@
 | [ADR-0013](./ADR-0013-core-canonical-blueprint-mutation.md) | 已接受 | 2026-08-04 | Core canonical Blueprint mutation |
 | [ADR-0014](./ADR-0014-plugin-manifest-identity-only.md) | 已接受 | 2026-08-04 | Plugin Manifest identity-only 依赖 |
 | [ADR-0015](./ADR-0015-runtime-contribution-authority.md) | 已接受 | 2026-08-04 | 实例级 runtime contribution authority |
+| [ADR-0016](./ADR-0016-material-appearance-authoring-contract.md) | 已接受 | 2026-08-05 | Material 声明式外观作者契约 |
 
 ## 计划决策
 

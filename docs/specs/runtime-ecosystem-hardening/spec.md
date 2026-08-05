@@ -1,7 +1,7 @@
 # Runtime And Ecosystem Hardening Spec
 
 > 状态：生效中
-> 最近更新：2026-08-04
+> 最近更新：2026-08-05
 > 定位：增量冻结远程 sandbox、Host Resource、Blueprint、插件运行时贡献、框架 tarball consumer 与 Nebula importer 的生产级验收边界
 > 依据：[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)、[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)、[ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md)、[Host Resource And Blueprint Spec](../host-resource-blueprint/spec.md)、[Remote Plugin Sandbox Spec](../remote-plugin-sandbox/spec.md)、[Nebula Importer Spec](../nebula-importer/spec.md)
 > 实施：[tasks.md](./tasks.md)

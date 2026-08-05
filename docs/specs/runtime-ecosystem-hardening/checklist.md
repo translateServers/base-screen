@@ -27,7 +27,7 @@
 - [x] ready 前 emit、重复 ready、未知 type、未知字段和非法 payload 均确定性失败。
 - [x] timeout、load error、invalid URL/origin、malformed 和 dispose 使用固定最小披露 diagnostics。
 - [x] dispose 幂等并清理 iframe、listener、timer 和 pending ready。
-- [ ] Runtime Chromium harness 证明跨 origin remote 无法访问 parent document；仍未逐项证明 Material/Catalog/Document/command/resource/credential 全部不可达。
+- [x] Runtime Chromium harness 证明跨 origin remote 无法读取 parent document，并将 Material/Catalog/Document/command/resource/credential canary 放入 host window 后由 remote document 逐项探测为不可达；remote 同时回传 strict init 的精确字段。`runSandboxFailureMatrix` 独立覆盖 invalid origin/URL、malformed、repeated ready、load error 和 dispose。Chromium 不会为 iframe 导航失败派发 `error`，故以真实 iframe 上手动派发的 `error` 事件确定性验证本地 load-error handler。
 
 ## Host Resource
 
@@ -83,18 +83,18 @@
 - [x] 成功 output 通过 canonical parse/serialize round-trip。
 - [x] 工具全程离线，不读取 Nebula config、credential、asset 或业务数据。
 
-## 当前验收状态（2026-08-04）
+## 当前验收状态（2026-08-05）
 
 - 已按当前代码实现勾选可确认的子项；未勾选项仍代表缺失实现、测试、集成或质量门禁，不应视为通过。
-- 当前自动化证据及 exact case 已记录在 [test-matrix.md](./test-matrix.md)。2026-08-04 已通过 `pnpm verify:runtime` 和 `pnpm verify:nebula-import`；Runtime Chromium harness 和 Host Resource conformance DOM invocation 已实现，其未覆盖的 R1 cases 与 diagnostics disclosure 仍未验收。
-- 尚未完成的验证：完整 R1 browser failure matrix、diagnostics disclosure、API/boundary/browser 门禁与 `pnpm verify:m0`。React/Vue installed-tarball consumer 已通过 `pnpm verify:tarball`；Nebula structural verifier 已通过 `pnpm verify:nebula-import`，但三类经授权脱敏真实 export fixture 及 file-level provenance 仍缺失。
-- 环境阻塞：标准 `pnpm` 命令解析到失效的 Corepack 路径；全量构建曾遇 `packages/core/dist` Windows access-denied；Biome 对部分 Contracts 文件报告读取权限错误。阻塞消除前，不得将实现项或质量门标为通过。
+- 当前自动化证据及 exact case 已记录在 [test-matrix.md](./test-matrix.md)。2026-08-05 已通过 `pnpm verify:runtime`；此前 `pnpm verify:nebula-import` 和 `pnpm verify:m0` 已通过。Runtime Chromium harness 的 `runSandboxFailureMatrix` 已覆盖 invalid origin/URL、malformed、repeated ready、load error、dispose、strict init 和 remote 对 host capability canary 的不可达探测。
+- 尚未完成的验证：无。R1 浏览器失败路径、diagnostics disclosure、R7 三类经授权脱敏真实 export fixture 及 file-level provenance 均已由 automation 与 `docs/provenance/nebula-importer.md` 覆盖。
+- 环境阻塞已消除：Node 22.20.0 / pnpm 11.18.0 可用，`packages/core/dist` 可写入，Biome 可正常读取所有文件；`pnpm verify:m0` 已完整通过。
 
 ## 质量门
 
-- [ ] Runtime 独立 Playwright harness 覆盖 R1-R5，不依赖 Designer harness。
-- [ ] R6 tarball consumer 已由 `pnpm verify:tarball` 验证；R7 importer structural verifier 已通过，但经授权脱敏真实 export fixture 与 file-level provenance 仍缺失。
-- [ ] diagnostics/captured output 不包含 canary secret、完整 URL/payload/Error/stack。
-- [ ] 受影响 package format/lint/typecheck/test/build 全部通过。
-- [ ] boundary、API report、publint、ATTW、tarball、browser 和 importer verification 全部通过。
-- [ ] `pnpm verify:m0` 通过，Viewer、Plugin Manager 和 framework bridge 无回归。
+- [x] Runtime 独立 Playwright harness 覆盖 R1-R5，不依赖 Designer harness。
+- [x] R6 tarball consumer 已由 `pnpm verify:tarball` 验证；R7 importer structural verifier 已通过，三种经授权脱敏真实 export fixture 与 file-level provenance 已记录在 `docs/provenance/nebula-importer.md`。
+- [x] diagnostics/captured output 不包含 canary secret、完整 URL/payload/Error/stack、业务数据或凭证。`runSandboxFailureMatrix` 在 malformed message 中发送 URL/Error/credential canary，并断言所有 R1 failure diagnostic 的固定完整消息。
+- [x] 受影响 package format/lint/typecheck/test/build 全部通过。
+- [x] boundary、API report、publint、ATTW、tarball、browser 和 importer verification 全部通过。
+- [x] `pnpm verify:m0` 通过，Viewer、Plugin Manager 和 framework bridge 无回归。

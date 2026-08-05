@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/plugin-core` 的物料 ABI、插件协议、只读目录、标准事件与限权命令端口
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[Contracts Foundation Spec](../contracts-foundation/spec.md)（生效中）、[Base Screen 长期演进总纲](../../architecture/base-screen-evolution.md)（生效中）
+> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[ADR-0016](../../decisions/ADR-0016-material-appearance-authoring-contract.md)（已接受）、[Contracts Foundation Spec](../contracts-foundation/spec.md)（生效中）、[Base Screen 长期演进总纲](../../architecture/base-screen-evolution.md)（生效中）
 
 ## 1. Why
 
@@ -25,6 +25,7 @@ ADR 或 Contracts 前置改变公共边界时必须先同步本 Spec；实现不
 ## 3. What Changes
 
 - 增加 Manifest、Element Model、标准事件及 Custom Element 结构 ABI。
+- 增加 Material `styleSchema`、`stylePanel` 与严格声明式外观控件语义。
 - 增加稳定物料身份与显式 `tagName` 的绑定校验规则。
 - 增加只读、实例级 Material Catalog 与 Plugin Catalog 接口。
 - 增加 Plugin Manifest、依赖、能力、贡献点和生命周期协议。
@@ -118,8 +119,8 @@ Manifest 是 strict、可序列化的纯数据对象，包含且仅包含：
 
 - `type`、`tagName`。
 - `name`、`category`、`keywords`。
-- `defaultSize`、`defaultProps`、`defaultStyle`。
-- 声明式 props schema 与属性面板字段。
+ - `defaultSize`、`defaultProps`、`defaultStyle`。
+ - 声明式 props/style schema 与各自属性面板字段。
 - 标准事件 allowlist。
 - 可接受的数据能力。
 - 设计能力：resize、rotate、children 等明确布尔声明。
@@ -133,7 +134,11 @@ Manifest 不得包含：
 
 props schema 使用 package 自有的有限 JSON 声明式判别联合，只允许 `string`、`number`、`boolean`、`enum`、`object`、`array` 七种 kind；object 通过 `properties` 与 `required` 描述，array 必须有 `items`，各 kind 仅允许对应约束字段。属性面板字段仅引用顶层 props schema 中已声明的 prop key，并描述 label、control 与只读展示元数据，不得另带 validator、default 或第二份约束。完整字段级结构由本 Spec 的公共 readonly 类型直接表达，不生成或公开通用 JSON Schema，也不得泄漏 Zod。
 
-`defaultProps` 必须逐字段满足 props schema，属性面板引用、事件名和 keywords 不得重复。
+`defaultProps` 与 `defaultStyle` 必须分别逐字段满足 props/style schema。属性面板字段是
+`{ prop, label, control }`，stylePanel 字段是 `{ style, label, control }`；两者都只引用对应顶层
+schema 中已声明的 key，字段重复、未知字段、未知 control 或额外字段均 fail closed。两类面板允许的
+control 是 `text`、`number`、`boolean`、`select`、`color`、`json`；`color` 不规范化字符串，完整值仍由
+对应 schema 校验。Manifest 不得以 callback、DOM、framework component 或 host object 取代这些声明。
 
 解析成功必须返回 detached Manifest，不修改输入；失败不得返回部分 Manifest。
 
