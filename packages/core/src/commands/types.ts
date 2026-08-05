@@ -9,7 +9,7 @@ import type {
   ScreenJsonObject,
   ScreenPosition,
   ScreenSize,
-  ScreenStaticVariable,
+  ScreenVariable,
 } from '@base-screen/contracts';
 
 export type ScreenDocumentCommand =
@@ -27,7 +27,7 @@ export type ScreenDocumentCommand =
       readonly parentId: string | null;
     }
   | { readonly type: 'replace-blueprint'; readonly blueprint: ScreenBlueprint }
-  | { readonly type: 'replace-variables'; readonly variables: readonly ScreenStaticVariable[] };
+  | { readonly type: 'replace-variables'; readonly variables: readonly ScreenVariable[] };
 
 export interface ScreenComponentPatch {
   readonly name?: string;

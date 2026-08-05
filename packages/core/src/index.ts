@@ -9,6 +9,7 @@ export type {
   ScreenSize,
   ScreenStaticDataSource,
   ScreenStaticVariable,
+  ScreenVariable,
 } from '@base-screen/contracts';
 export {
   compileScreenBlueprint,

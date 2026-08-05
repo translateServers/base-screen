@@ -28,6 +28,7 @@ export interface ScreenBlueprintPlan {
 export interface ScreenBlueprintDispatchResult {
   readonly variables: ScreenJsonObject;
   readonly hostEvents: readonly ScreenBlueprintHostEvent[];
+  readonly hostActions: readonly ScreenBlueprintHostEvent[];
 }
 
 export function compileScreenBlueprint(
@@ -43,7 +44,7 @@ export function compileScreenBlueprint(
   }
   const initialVariables: Record<string, ScreenJsonValue> = {};
   for (const variable of document.variables) {
-    initialVariables[variable.name] = cloneValue(variable.value);
+    if (variable.type === 'static') initialVariables[variable.name] = cloneValue(variable.value);
   }
   return {
     ok: true,
@@ -56,7 +57,9 @@ export function compileScreenBlueprint(
           ...action,
           ...(action.type === 'set-variable'
             ? { value: cloneExpression(action.value) }
-            : { payload: cloneExpression(action.payload) }),
+            : action.type === 'emit-host-event'
+              ? { payload: cloneExpression(action.payload) }
+              : { payload: cloneExpression(action.payload) }),
         })),
       })),
       initialVariables,
@@ -74,6 +77,7 @@ export function dispatchScreenBlueprintEvent(
   if (!parsedPayload.ok) return parsedPayload;
   const variables = cloneObject(state);
   const hostEvents: ScreenBlueprintHostEvent[] = [];
+  const hostActions: ScreenBlueprintHostEvent[] = [];
   for (const rule of plan.rules) {
     if (rule.trigger.componentId !== event.componentId || rule.trigger.eventName !== event.name)
       continue;
@@ -84,17 +88,21 @@ export function dispatchScreenBlueprintEvent(
     }
     const nextVariables = { ...variables };
     const nextEvents = [...hostEvents];
+    const nextActions = [...hostActions];
     for (const action of rule.actions) {
       const expression = action.type === 'set-variable' ? action.value : action.payload;
       const value = evaluateExpression(expression, parsedPayload.value, nextVariables);
       if (!value.ok) return value;
       if (action.type === 'set-variable') nextVariables[action.variableName] = value.value;
-      else nextEvents.push({ name: action.eventName, payload: value.value });
+      else if (action.type === 'emit-host-event')
+        nextEvents.push({ name: action.eventName, payload: value.value });
+      else nextActions.push({ name: action.actionId, payload: value.value });
     }
     Object.assign(variables, nextVariables);
     hostEvents.push(...nextEvents.slice(hostEvents.length));
+    hostActions.push(...nextActions.slice(hostActions.length));
   }
-  return { ok: true, value: { variables, hostEvents }, diagnostics: [] };
+  return { ok: true, value: { variables, hostEvents, hostActions }, diagnostics: [] };
 }
 
 function evaluateExpression(

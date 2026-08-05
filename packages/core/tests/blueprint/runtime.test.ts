@@ -126,4 +126,43 @@ describe('Blueprint runtime', () => {
       value: { variables: { count: 2 }, hostEvents: [{ name: 'count-updated', payload: 2 }] },
     });
   });
+
+  it('R6 keeps authorized host actions separate from events and variable state', () => {
+    const document = makeDocument({
+      components: [makeComponent({ id: 'button' })],
+      blueprint: {
+        rules: [
+          {
+            id: 'notify',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            actions: [
+              {
+                type: 'host-action',
+                actionId: 'project.notify',
+                payload: { kind: 'literal', value: { source: 'button' } },
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const compiled = compileScreenBlueprint(document);
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+
+    const result = dispatchScreenBlueprintEvent(compiled.value, compiled.value.initialVariables, {
+      componentId: 'button',
+      name: 'click',
+      payload: null,
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        variables: {},
+        hostEvents: [],
+        hostActions: [{ name: 'project.notify', payload: { source: 'button' } }],
+      },
+    });
+  });
 });
