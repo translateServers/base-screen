@@ -23,7 +23,13 @@ import {
   MAX_VARIABLES,
 } from './limits.js';
 import { validateReferences } from './references.js';
-import { blueprintSchema, canvasSchema, componentSchema, staticVariableSchema } from './schema.js';
+import {
+  blueprintSchema,
+  canvasSchema,
+  componentSchema,
+  hostVariableSchema,
+  staticVariableSchema,
+} from './schema.js';
 
 const DOCUMENT_ROOT_FIELDS = new Set(['canvas', 'components', 'variables', 'blueprint']);
 const CANVAS_FIELDS = new Set(['width', 'height', 'backgroundColor']);
@@ -47,6 +53,7 @@ const STATUS_FIELDS = new Set(['locked', 'hidden']);
 const STATIC_DATA_SOURCE_FIELDS = new Set(['type', 'value']);
 const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set(['type', 'resourceType', 'resourceId', 'params']);
 const VARIABLE_FIELDS = new Set(['type', 'name', 'value']);
+const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'variableId']);
 const BLUEPRINT_FIELDS = new Set(['rules']);
 const BLUEPRINT_RULE_FIELDS = new Set([
   'id',
@@ -58,6 +65,7 @@ const BLUEPRINT_RULE_FIELDS = new Set([
 const BLUEPRINT_TRIGGER_FIELDS = new Set(['type', 'componentId', 'eventName']);
 const SET_VARIABLE_ACTION_FIELDS = new Set(['type', 'variableName', 'value']);
 const EMIT_HOST_EVENT_ACTION_FIELDS = new Set(['type', 'eventName', 'payload']);
+const HOST_ACTION_FIELDS = new Set(['type', 'actionId', 'payload']);
 const BLUEPRINT_CONDITION_FIELDS = new Set(['left', 'operator', 'right']);
 
 type ZodIssueLike = {
@@ -416,7 +424,9 @@ function validateBlueprint(
         const fields =
           action.type === 'set-variable'
             ? SET_VARIABLE_ACTION_FIELDS
-            : EMIT_HOST_EVENT_ACTION_FIELDS;
+            : action.type === 'emit-host-event'
+              ? EMIT_HOST_EVENT_ACTION_FIELDS
+              : HOST_ACTION_FIELDS;
         checkStrictObjectKeys(
           action,
           fields,
@@ -613,7 +623,7 @@ function validateVariable(
   if (
     !checkStrictObjectKeys(
       variable,
-      VARIABLE_FIELDS,
+      variable.type === 'host' ? HOST_VARIABLE_FIELDS : VARIABLE_FIELDS,
       base,
       collector,
       phase,
@@ -622,7 +632,10 @@ function validateVariable(
   ) {
     return false;
   }
-  const result = staticVariableSchema.safeParse(variable);
+  const result =
+    variable.type === 'host'
+      ? hostVariableSchema.safeParse(variable)
+      : staticVariableSchema.safeParse(variable);
   if (!result.success) {
     addZodIssues(
       result.error.issues,

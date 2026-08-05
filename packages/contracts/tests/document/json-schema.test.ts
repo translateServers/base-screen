@@ -57,7 +57,7 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
       (entry) => (entry as { type?: string }).type === 'object',
     );
     const variables = propertiesOf(schema).variables as { items: unknown };
-    const variable = variables.items as Record<string, unknown>;
+    const variableSchemas = (variables.items as { anyOf: Record<string, unknown>[] }).anyOf;
     expect(schema.additionalProperties).toBe(false);
     expect(canvas.additionalProperties).toBe(false);
     expect(component.additionalProperties).toBe(false);
@@ -65,7 +65,7 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     expect(size.additionalProperties).toBe(false);
     expect(status.additionalProperties).toBe(false);
     expect((dataSource as Record<string, unknown>).additionalProperties).toBe(false);
-    expect(variable.additionalProperties).toBe(false);
+    for (const variable of variableSchemas) expect(variable.additionalProperties).toBe(false);
   });
 
   it('expresses patterns and geometry bounds', () => {
@@ -82,7 +82,9 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     expect(zIndex.minimum).toBe(0);
     expect(zIndex.maximum).toBe(1_000_000);
     const variables = propertiesOf(schema).variables as { items: unknown };
-    const variable = propertiesOf(variables.items as Record<string, unknown>);
+    const variable = propertiesOf(
+      (variables.items as { anyOf: Record<string, unknown>[] }).anyOf[0]!,
+    );
     expect((variable.name as { pattern: string }).pattern).toBe(VARIABLE_NAME_PATTERN);
   });
 

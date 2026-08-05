@@ -58,6 +58,41 @@ describe('parseScreenDocument', () => {
     }
   });
 
+  it('R6 accepts host variables and authorized host actions without transport details', () => {
+    const result = parse(
+      document({
+        components: [component({ id: 'button' })],
+        variables: [{ type: 'host', name: 'tenant', variableId: 'tenant-context' }],
+        blueprint: {
+          rules: [
+            {
+              id: 'notify',
+              trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+              actions: [
+                {
+                  type: 'host-action',
+                  actionId: 'project.notify',
+                  payload: { kind: 'variable', name: 'tenant' },
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('R6 rejects transport details on host variables and actions', () => {
+    const result = parse(
+      document({
+        variables: [{ type: 'host', name: 'tenant', variableId: 'tenant-context', url: '/secret' }],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.diagnostics[0]?.path).toEqual(['variables', 0, 'url']);
+  });
+
   it('rejects legacy raw blueprint action values and invalid condition right placement', () => {
     const rawValue = document({
       components: [component({ id: 'button' })],

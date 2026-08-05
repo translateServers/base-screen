@@ -21,7 +21,11 @@
           "maxLength": 128
         }
       },
-      "required": ["width", "height", "backgroundColor"],
+      "required": [
+        "width",
+        "height",
+        "backgroundColor"
+      ],
       "additionalProperties": false
     },
     "components": {
@@ -68,7 +72,10 @@
                 "maximum": 1000000
               }
             },
-            "required": ["x", "y"],
+            "required": [
+              "x",
+              "y"
+            ],
             "additionalProperties": false
           },
           "size": {
@@ -85,7 +92,10 @@
                 "maximum": 1000000
               }
             },
-            "required": ["width", "height"],
+            "required": [
+              "width",
+              "height"
+            ],
             "additionalProperties": false
           },
           "rotation": {
@@ -108,7 +118,10 @@
                 "type": "boolean"
               }
             },
-            "required": ["locked", "hidden"],
+            "required": [
+              "locked",
+              "hidden"
+            ],
             "additionalProperties": false
           },
           "props": {
@@ -136,7 +149,10 @@
                   },
                   "value": {}
                 },
-                "required": ["type", "value"],
+                "required": [
+                  "type",
+                  "value"
+                ],
                 "additionalProperties": false
               },
               {
@@ -163,7 +179,12 @@
                     "additionalProperties": {}
                   }
                 },
-                "required": ["type", "resourceType", "resourceId", "params"],
+                "required": [
+                  "type",
+                  "resourceType",
+                  "resourceId",
+                  "params"
+                ],
                 "additionalProperties": false
               },
               {
@@ -193,20 +214,52 @@
       "maxItems": 1000,
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "const": "static"
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "static"
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+              },
+              "value": {}
+            },
+            "required": [
+              "type",
+              "name",
+              "value"
+            ],
+            "additionalProperties": false
           },
-          "name": {
-            "type": "string",
-            "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
-          },
-          "value": {}
-        },
-        "required": ["type", "name", "value"],
-        "additionalProperties": false
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "host"
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+              },
+              "variableId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              }
+            },
+            "required": [
+              "type",
+              "name",
+              "variableId"
+            ],
+            "additionalProperties": false
+          }
+        ]
       }
     },
     "blueprint": {
@@ -238,7 +291,11 @@
                     "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
                   }
                 },
-                "required": ["type", "componentId", "eventName"],
+                "required": [
+                  "type",
+                  "componentId",
+                  "eventName"
+                ],
                 "additionalProperties": false
               },
               "requiredCapabilities": {
@@ -256,13 +313,25 @@
                   },
                   "operator": {
                     "type": "string",
-                    "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
+                    "enum": [
+                      "eq",
+                      "neq",
+                      "gt",
+                      "gte",
+                      "lt",
+                      "lte",
+                      "contains",
+                      "exists"
+                    ]
                   },
                   "right": {
                     "$ref": "#/$defs/__schema0"
                   }
                 },
-                "required": ["left", "operator"],
+                "required": [
+                  "left",
+                  "operator"
+                ],
                 "additionalProperties": false,
                 "allOf": [
                   {
@@ -272,15 +341,21 @@
                           "const": "exists"
                         }
                       },
-                      "required": ["operator"]
+                      "required": [
+                        "operator"
+                      ]
                     },
                     "then": {
                       "not": {
-                        "required": ["right"]
+                        "required": [
+                          "right"
+                        ]
                       }
                     },
                     "else": {
-                      "required": ["right"]
+                      "required": [
+                        "right"
+                      ]
                     }
                   }
                 ]
@@ -305,7 +380,11 @@
                           "$ref": "#/$defs/__schema0"
                         }
                       },
-                      "required": ["type", "variableName", "value"],
+                      "required": [
+                        "type",
+                        "variableName",
+                        "value"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -323,23 +402,60 @@
                           "$ref": "#/$defs/__schema0"
                         }
                       },
-                      "required": ["type", "eventName", "payload"],
+                      "required": [
+                        "type",
+                        "eventName",
+                        "payload"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "host-action"
+                        },
+                        "actionId": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                        },
+                        "payload": {
+                          "$ref": "#/$defs/__schema0"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "actionId",
+                        "payload"
+                      ],
                       "additionalProperties": false
                     }
                   ]
                 }
               }
             },
-            "required": ["id", "trigger", "actions"],
+            "required": [
+              "id",
+              "trigger",
+              "actions"
+            ],
             "additionalProperties": false
           }
         }
       },
-      "required": ["rules"],
+      "required": [
+        "rules"
+      ],
       "additionalProperties": false
     }
   },
-  "required": ["canvas", "components", "variables", "blueprint"],
+  "required": [
+    "canvas",
+    "components",
+    "variables",
+    "blueprint"
+  ],
   "additionalProperties": false,
   "$defs": {
     "__schema0": {
@@ -353,7 +469,10 @@
             },
             "value": {}
           },
-          "required": ["kind", "value"],
+          "required": [
+            "kind",
+            "value"
+          ],
           "additionalProperties": false
         },
         {
@@ -372,7 +491,10 @@
               }
             }
           },
-          "required": ["kind", "path"],
+          "required": [
+            "kind",
+            "path"
+          ],
           "additionalProperties": false
         },
         {
@@ -387,7 +509,10 @@
               "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
             }
           },
-          "required": ["kind", "name"],
+          "required": [
+            "kind",
+            "name"
+          ],
           "additionalProperties": false
         },
         {
@@ -405,7 +530,10 @@
               }
             }
           },
-          "required": ["kind", "items"],
+          "required": [
+            "kind",
+            "items"
+          ],
           "additionalProperties": false
         },
         {
@@ -426,7 +554,10 @@
               "maxProperties": 256
             }
           },
-          "required": ["kind", "properties"],
+          "required": [
+            "kind",
+            "properties"
+          ],
           "additionalProperties": false
         }
       ]

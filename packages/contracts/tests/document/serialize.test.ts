@@ -82,7 +82,10 @@ describe('serializeScreenDocument', () => {
             props: { nested: [1, 2, 3], flag: true, nothing: null },
           },
         ],
-        variables: [{ type: 'static', name: 'count', value: 42 }],
+        variables: [
+          { type: 'static', name: 'count', value: 42 },
+          { type: 'host', name: 'tenant', variableId: 'tenant-context' },
+        ],
       }),
     );
     const output = serializeScreenDocument(input);

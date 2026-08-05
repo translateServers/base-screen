@@ -68,6 +68,12 @@ export const staticVariableSchema = z.strictObject({
   value: z.any(),
 });
 
+export const hostVariableSchema = z.strictObject({
+  type: z.literal('host'),
+  name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+  variableId: z.string().min(1).max(256),
+});
+
 const blueprintTriggerSchema = z.strictObject({
   type: z.literal('material-event'),
   componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
@@ -127,13 +133,19 @@ const emitHostEventActionSchema = z.strictObject({
   payload: blueprintValueExpressionSchema,
 });
 
+const hostActionSchema = z.strictObject({
+  type: z.literal('host-action'),
+  actionId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  payload: blueprintValueExpressionSchema,
+});
+
 const blueprintRuleSchema = z.strictObject({
   id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   trigger: blueprintTriggerSchema,
   requiredCapabilities: z.array(z.string().regex(new RegExp(COMPONENT_ID_PATTERN))).optional(),
   condition: blueprintConditionSchema.optional(),
   actions: z
-    .array(z.union([setVariableActionSchema, emitHostEventActionSchema]))
+    .array(z.union([setVariableActionSchema, emitHostEventActionSchema, hostActionSchema]))
     .max(MAX_BLUEPRINT_ACTIONS_PER_RULE),
 });
 
@@ -144,6 +156,6 @@ export const blueprintSchema = z.strictObject({
 export const documentSchema = z.strictObject({
   canvas: canvasSchema,
   components: z.array(componentSchema).max(MAX_COMPONENTS),
-  variables: z.array(staticVariableSchema).max(MAX_VARIABLES),
+  variables: z.array(z.union([staticVariableSchema, hostVariableSchema])).max(MAX_VARIABLES),
   blueprint: blueprintSchema,
 });

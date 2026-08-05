@@ -56,6 +56,14 @@ export interface ScreenStaticVariable {
   readonly value: ScreenJsonValue;
 }
 
+export interface ScreenHostVariable {
+  readonly type: 'host';
+  readonly name: string;
+  readonly variableId: string;
+}
+
+export type ScreenVariable = ScreenStaticVariable | ScreenHostVariable;
+
 export interface ScreenBlueprintMaterialEventTrigger {
   readonly type: 'material-event';
   readonly componentId: string;
@@ -90,9 +98,16 @@ export interface ScreenBlueprintEmitHostEventAction {
   readonly payload: ScreenBlueprintValueExpression;
 }
 
+export interface ScreenBlueprintHostAction {
+  readonly type: 'host-action';
+  readonly actionId: string;
+  readonly payload: ScreenBlueprintValueExpression;
+}
+
 export type ScreenBlueprintAction =
   | ScreenBlueprintSetVariableAction
-  | ScreenBlueprintEmitHostEventAction;
+  | ScreenBlueprintEmitHostEventAction
+  | ScreenBlueprintHostAction;
 
 export interface ScreenBlueprintRule {
   readonly id: string;
@@ -109,6 +124,6 @@ export interface ScreenBlueprint {
 export interface ScreenDocument {
   readonly canvas: ScreenCanvas;
   readonly components: readonly ScreenComponentNode[];
-  readonly variables: readonly ScreenStaticVariable[];
+  readonly variables: readonly ScreenVariable[];
   readonly blueprint: ScreenBlueprint;
 }
