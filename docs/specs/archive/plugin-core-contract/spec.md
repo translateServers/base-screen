@@ -15,7 +15,7 @@
 
 - ADR-0003 已接受，冻结 Web Component ABI、DOM 类型策略、显式 type/tagName 绑定与注册所有权。
 - ADR-0004 已接受，冻结同 realm 信任模型、插件生命周期、贡献点、能力授权与命令权限边界。
-- [Contracts Foundation Spec](../contracts-foundation/spec.md) 保持“生效中”，且发布包提供稳定的 JSON value、可配置专用资源预算的安全 parser/preflight 与诊断契约。
+- [Contracts Foundation Spec](../../contracts-foundation/spec.md) 保持“生效中”，且发布包提供稳定的 JSON value、可配置专用资源预算的安全 parser/preflight 与诊断契约。
 - Contracts 诊断契约已通过受控扩展纳入 §18 的 `PLUGIN_CORE_*` code；不得把 Plugin Core code 混入 Document 专用语义。
 - 本 Spec 已根据 ADR 完整回填所有公共 strict object、discriminated union、函数签名、注册责任、资源限制、诊断责任和生命周期状态，不存在待定项。
 - 本 Spec 完成评审，每项 Requirement 均可映射到自动化测试。
@@ -206,6 +206,11 @@ Model 约束：
 - `command`：声明 command contribution id、展示元数据和所需 capability；handler 不进入 Manifest，由宿主显式导入的运行对象提供。
 - `dataResourceType`：只声明资源类型 id、展示元数据和配置 schema，不包含 endpoint、Header 或凭证。
 - `blueprintCapability`：只声明宿主白名单中的 trigger/action capability id，不携带执行函数。
+
+物料 action、资源与资产的宿主执行权不属于 Manifest runtime。Manifest 只能以 `blueprintCapability` 声明
+稳定 capability identity；具体 action intent、资源目录和资产引用由 Contracts 的 strict shape 与宿主的
+capability-gated adapter 管理。贡献不得包含 URL、header、token、cookie、SQL、脚本、handler 或任何 transport
+配置。
 
 Plugin Core parser 只验证单份 Manifest 的 strict shape、自重复和引用一致性。依赖缺失、依赖环，以及不同插件间 type/tagName/contribution 冲突只能在候选集合解析后确定，归 Plugin Manager resolver 负责；resolver 必须复用 §18 的 code 和确定性排序。
 

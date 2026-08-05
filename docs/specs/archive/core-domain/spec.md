@@ -10,7 +10,7 @@
 本 Spec 是 P1 Core 的实施草案。只有同时满足以下条件，状态才可改为“生效中”，随后才允许修改 `@base-screen/core` 空入口：
 
 - ADR-0002 保持“已接受”。
-- [Contracts Foundation Spec](../contracts-foundation/spec.md) 保持“生效中”，且其公共声明和真实 tarball 已通过验收。
+- [Contracts Foundation Spec](../../contracts-foundation/spec.md) 保持“生效中”，且其公共声明和真实 tarball 已通过验收。
 - Contracts 公共诊断契约已包含本 Spec 所需的 Core diagnostic code，或提供由 Contracts 所有的等价可扩展机制。
 - 本 Spec 完成评审，所有 Requirement 均可映射到自动化测试。
 
@@ -47,6 +47,10 @@
 Contracts 已按 ADR-0010 冻结 canonical Blueprint、host-resource data source、capability index 和
 diagnostics。Core 可在其纯 command 与 compile/evaluate 边界内消费这些类型；不得创建占位 API、
 `unknown` 扩展槽、兼容分支或 host runtime facade。
+
+Designer Full Product 新增的项目目录、预览、快照、资产、资源和授权 action port 仍全部归宿主 adapter
+与 Engine controller。Core 只可消费 Contracts 已解析的 canonical document mutation；不得调用 port、持有
+取消信号、缓存资源结果，或将宿主 action、变量解析值和运行时结果写入 history。
 
 ## 4. Package 边界
 
