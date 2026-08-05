@@ -4,7 +4,7 @@
 
 - 使用 Node `22.23.2`（见 `.node-version`）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
 - CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`。它会依次运行 `format`（会写入文件）、`format:check`、`lint`、`typecheck`、`test`、`build`、`check:packages`、`check:api` 和 `verify:tarball`。
-- 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/src/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
+- 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/tests/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
 - `pnpm lint` 还会运行 `scripts/check-boundaries.mjs`；`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级测试。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
 - `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中；对于空的 ESM 包，ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。
 
@@ -16,6 +16,14 @@
 - 依赖白名单编码在 `scripts/check-boundaries.mjs` 中；只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖。新增依赖时，必须同时更新该白名单和包清单。
 - `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。
 - `@base-screen/testing` 消费公共包 API 来提供 fixture 和一致性辅助工具。生产包绝不能导入它。
+
+## 目录结构与命名
+
+- 每个包 `src/` 只放发布物。所有 `*.test.ts` 与 `__fixtures__/` 放在同包 `tests/`，并镜像 `src/` 子目录；测试用相对路径导入被测模块（如 `../src/index.js`）。`scripts/check-packages.mjs` 会拒绝 `src/` 内的测试/fixture，以及 `dist/` 内的测试/fixture 产物。
+- 每个包 `tsconfig.json` 用 `rootDir: "."` 且 include `src` 与 `tests`，供无 emit 的类型检查；`tsconfig.build.json` 必须覆写 `rootDir: "src"` 且只 include `src`，并排除测试与 fixture，避免测试进入 `dist`。
+- `engine/src` 按环境分层：`common/`（`operations`、`session`、`project`、`tools`、`ui-text`）是环境无关纯逻辑，`browser/`（`controllers`、`dom`、`viewport`、`styles`、`ui`）承载 DOM。依赖方向单向：`browser/` 可依赖 `common/`，反向禁止，`common/` 也不得引用浏览器全局。`scripts/check-engine-import.mjs` 强制这两条。
+- 纯逻辑需要环境能力时通过构造 options 注入回调（如 `ScreenProjectController` 的 `scheduler`），不要直接访问 DOM/global。
+- 命名前缀承载层级语义，不要删除：`Screen*` 表示 canonical document、事务、项目等领域概念；`Designer*` 表示设计器编排层；`BaseScreen*` 表示 Base Screen 平台命名空间中的跨层契约与公共 API。新增类型按此选择前缀。
 
 ## 契约与产物
 

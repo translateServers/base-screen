@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 
 export const PACKAGE_DEFINITIONS = Object.freeze({
   contracts: { build: 'tsc', name: '@base-screen/contracts' },
@@ -23,6 +23,58 @@ function fail(code, detail) {
 function readPackage(directory) {
   const packagePath = join('packages', directory, 'package.json');
   return JSON.parse(readFileSync(packagePath, 'utf8'));
+}
+
+function collectFiles(directory) {
+  const files = [];
+  const visit = (current) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const target = join(current, entry.name);
+      if (entry.isDirectory()) visit(target);
+      else files.push(target);
+    }
+  };
+  if (existsSync(directory)) visit(directory);
+  return files;
+}
+
+function assertSourceIsPublishableOnly(directory) {
+  const source = join('packages', directory, 'src');
+  for (const file of collectFiles(source)) {
+    if (/\.test\.[cm]?tsx?$/.test(file)) {
+      fail('SOURCE_TEST_FILE_FORBIDDEN', file);
+    }
+    if (file.split(/[\\/]/).includes('__fixtures__')) {
+      fail('SOURCE_FIXTURE_FORBIDDEN', file);
+    }
+  }
+}
+
+function assertBuildConfigIsSourceOnly(directory) {
+  const configPath = join('packages', directory, 'tsconfig.build.json');
+  const config = JSON.parse(readFileSync(configPath, 'utf8'));
+
+  if (config.compilerOptions?.rootDir !== 'src') {
+    fail('BUILD_TSCONFIG_ROOT_DIR_INVALID', directory);
+  }
+  if (JSON.stringify(config.include) !== JSON.stringify(['src/**/*.ts'])) {
+    fail('BUILD_TSCONFIG_INCLUDE_INVALID', directory);
+  }
+  const exclude = config.exclude ?? [];
+  for (const required of ['src/**/*.test.ts', 'src/**/__fixtures__/**']) {
+    if (!exclude.includes(required)) {
+      fail('BUILD_TSCONFIG_EXCLUDE_INVALID', `${directory} -> ${required}`);
+    }
+  }
+}
+
+function assertDistIsClean(directory) {
+  const dist = join('packages', directory, 'dist');
+  for (const file of collectFiles(dist)) {
+    if (/\.test\./.test(basename(file)) || file.split(/[\\/]/).includes('__fixtures__')) {
+      fail('DIST_TEST_ARTIFACT_FORBIDDEN', file);
+    }
+  }
 }
 
 function assertM0Package(directory, definition) {
@@ -61,6 +113,10 @@ function assertM0Package(directory, definition) {
   if (definition.build === 'vite' && !existsSync(join('packages', directory, 'vite.config.ts'))) {
     fail('PACKAGE_VITE_CONFIG_MISSING', directory);
   }
+
+  assertSourceIsPublishableOnly(directory);
+  assertBuildConfigIsSourceOnly(directory);
+  assertDistIsClean(directory);
 }
 
 export function validatePackages() {

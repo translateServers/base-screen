@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PACKAGE_DEFINITIONS } from './check-packages.mjs';
 
@@ -85,7 +85,7 @@ export function detectCycle(graph) {
 }
 
 function collectSourceFiles(directory) {
-  const root = join('packages', directory, 'src');
+  const roots = [join('packages', directory, 'src'), join('packages', directory, 'tests')];
   const files = [];
   const visit = (current) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -97,7 +97,9 @@ function collectSourceFiles(directory) {
       }
     }
   };
-  visit(root);
+  for (const root of roots) {
+    if (existsSync(root)) visit(root);
+  }
   return files;
 }
 

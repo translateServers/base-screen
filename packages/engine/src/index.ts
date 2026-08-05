@@ -4,7 +4,7 @@ export {
   type ScreenProjectControllerOptions,
   type ScreenProjectPhase,
   type ScreenProjectScheduler,
-} from './controllers/project-controller.js';
+} from './common/project/project-controller.js';
 
 import type {
   ScreenDiagnostic,
@@ -26,31 +26,31 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '@base-screen/renderer';
-import { DesignerGestureController } from './controllers/designer-gesture-controller.js';
-import { DesignerImportController } from './controllers/designer-import-controller.js';
-import { DesignerIntegrationController } from './controllers/designer-integration-controller.js';
-import { DesignerLayersController } from './controllers/designer-layers-controller.js';
-import { DesignerPanelController } from './controllers/designer-panel-controller.js';
-import { DesignerPreviewController } from './controllers/designer-preview-controller.js';
-import { DesignerProjectFeedbackController } from './controllers/designer-project-feedback-controller.js';
-import { DesignerViewportController } from './controllers/designer-viewport-controller.js';
-import { DesignerWorkbenchController } from './controllers/designer-workbench-controller.js';
-import type { ScreenProjectPhase } from './controllers/project-controller.js';
-import { renderDesignerInteractionPanel } from './dom/designer-interaction-dom.js';
-import { renderDesignerSelection } from './dom/designer-selection-dom.js';
-import { createDesignerWorkspace } from './dom/designer-workspace.js';
+import { DesignerGestureController } from './browser/controllers/designer-gesture-controller.js';
+import { DesignerImportController } from './browser/controllers/designer-import-controller.js';
+import { DesignerIntegrationController } from './browser/controllers/designer-integration-controller.js';
+import { DesignerLayersController } from './browser/controllers/designer-layers-controller.js';
+import { DesignerPanelController } from './browser/controllers/designer-panel-controller.js';
+import { DesignerPreviewController } from './browser/controllers/designer-preview-controller.js';
+import { DesignerProjectFeedbackController } from './browser/controllers/designer-project-feedback-controller.js';
+import { DesignerViewportController } from './browser/controllers/designer-viewport-controller.js';
+import { DesignerWorkbenchController } from './browser/controllers/designer-workbench-controller.js';
+import { renderDesignerInteractionPanel } from './browser/dom/designer-interaction-dom.js';
+import { renderDesignerSelection } from './browser/dom/designer-selection-dom.js';
+import { createDesignerWorkspace } from './browser/dom/designer-workspace.js';
+import { createDesignerStyle } from './browser/styles/designer-style.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
   createReparentTransaction,
-} from './operations/designer-layout-operations.js';
+} from './common/operations/designer-layout-operations.js';
 import {
   DESIGNER_OPERATION_TEXT,
   DesignerOperationRegistry,
-} from './operations/designer-operation-registry.js';
-import { selectedComponents } from './operations/designer-selection.js';
-import { DesignerSession } from './session/designer-session.js';
-import { createDesignerStyle } from './styles/designer-style.js';
+} from './common/operations/designer-operation-registry.js';
+import { selectedComponents } from './common/operations/designer-selection.js';
+import type { ScreenProjectPhase } from './common/project/project-controller.js';
+import { DesignerSession } from './common/session/designer-session.js';
 import {
   DESIGNER_TOOLS,
   type DesignerToolId,
@@ -58,8 +58,8 @@ import {
   getDesignerToolForShortcut,
   getDesignerToolShortcut,
   isDesignerToolConfigured,
-} from './tools/designer-tools.js';
-import { DESIGNER_UI_TEXT } from './ui/designer-ui-text.js';
+} from './common/tools/designer-tools.js';
+import { DESIGNER_UI_TEXT } from './common/ui-text/designer-ui-text.js';
 
 const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??

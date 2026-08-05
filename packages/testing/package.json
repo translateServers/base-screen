@@ -21,9 +21,9 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
-    "lint": "biome check src",
+    "lint": "biome check src tests",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }

@@ -175,8 +175,8 @@ Designer Product Completion 主线采用以下预算：
 
 ```text
 packages/engine/src/integrations/<capability>-adapter.ts
-packages/engine/src/controllers/<feature>-controller.ts
-packages/engine/src/operations/<feature>-operations.ts
+packages/engine/src/browser/controllers/<feature>-controller.ts
+packages/engine/src/common/operations/<feature>-operations.ts
 ```
 
 约束如下：

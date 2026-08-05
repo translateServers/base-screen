@@ -13,9 +13,9 @@
 | R5 标准事件 | `plugin-core.test.ts` 的 event parser，`packages/renderer` event gate tests | `pnpm test`、`pnpm verify:browser` |
 | R6 Material Catalog | `plugin-core.test.ts` 的 ordered, detached, duplicate, double-instance cases | `pnpm --filter @base-screen/plugin-core test` |
 | R7 Plugin Manifest | `plugin-core.test.ts` 的 strict manifest, duplicate contribution, dependency cases | 同上 |
-| R8 生命周期限权 | `packages/plugin-manager/src/manager.test.ts` 的 activation rollback/session invalidation | `pnpm --filter @base-screen/plugin-manager test` |
-| R9 Command Port | `packages/plugin-manager/src/manager.test.ts` 的 session port invalidation | 同上 |
-| R10 JSON/resource boundary | `packages/contracts/src/json/json.test.ts` 与 Plugin Core event/manifest limits | `pnpm --filter @base-screen/contracts test` |
+| R8 生命周期限权 | `packages/plugin-manager/tests/manager.test.ts` 的 activation rollback/session invalidation | `pnpm --filter @base-screen/plugin-manager test` |
+| R9 Command Port | `packages/plugin-manager/tests/manager.test.ts` 的 session port invalidation | 同上 |
+| R10 JSON/resource boundary | `packages/contracts/tests/json/json.test.ts` 与 Plugin Core event/manifest limits | `pnpm --filter @base-screen/contracts test` |
 | R11 诊断确定性 | `plugin-core.test.ts` 的 deterministic cyclic event diagnostics | `pnpm --filter @base-screen/plugin-core test` |
 | R12 框架中立声明 | package manifests、`scripts/check-boundaries.mjs`、tarball ATTW/publint | `pnpm verify:m0` |
 | R13 Plugin Catalog | `plugin-core.test.ts` 的 ordered readonly plugin catalog snapshot | `pnpm --filter @base-screen/plugin-core test` |

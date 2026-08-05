@@ -20,9 +20,9 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && vite build",
+    "build": "pnpm run clean && tsc -p tsconfig.build.json && vite build",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
-    "lint": "biome check src",
+    "lint": "biome check src tests",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }

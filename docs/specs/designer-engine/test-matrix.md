@@ -21,20 +21,20 @@
 
 | 自动化证据 | Requirements |
 | --- | --- |
-| `packages/engine/src/designer-operation-registry.test.ts` | R2、R8 |
-| `packages/engine/src/designer-session.test.ts` | R1、R4、R5、R8 |
-| `packages/engine/src/designer-tools.test.ts` | R2、R3、R6 |
-| `packages/engine/src/designer-operations.test.ts` | R4、R5、R8 |
-| `packages/engine/src/designer-panel-dom.test.ts` | R4、R6 |
-| `packages/engine/src/designer-panel-controller.test.ts` | R4、R6、R9 |
-| `packages/engine/src/designer-blueprint-dom.test.ts` | R6、R9 |
-| `packages/engine/src/designer-layers-dom.test.ts` | R5、R6 |
-| `packages/engine/src/designer-gesture-controller.test.ts` | R4、R5、R8 |
-| `packages/engine/src/designer-selection-dom.test.ts` | R4、R5、R8 |
-| `packages/engine/src/designer-viewport.test.ts` | R3、R8 |
-| `packages/engine/src/designer-workbench-controller.test.ts` | R4、R8 |
-| `packages/engine/src/project-controller.test.ts` | R1、R7、R8 |
-| `packages/engine/src/designer-ui-text.test.ts` | R3 |
+| `packages/engine/tests/common/operations/designer-operation-registry.test.ts` | R2、R8 |
+| `packages/engine/tests/common/session/designer-session.test.ts` | R1、R4、R5、R8 |
+| `packages/engine/tests/common/tools/designer-tools.test.ts` | R2、R3、R6 |
+| `packages/engine/tests/common/operations/designer-operations.test.ts` | R4、R5、R8 |
+| `packages/engine/tests/browser/dom/designer-panel-dom.test.ts` | R4、R6 |
+| `packages/engine/tests/browser/controllers/designer-panel-controller.test.ts` | R4、R6、R9 |
+| `packages/engine/tests/browser/dom/designer-blueprint-dom.test.ts` | R6、R9 |
+| `packages/engine/tests/browser/dom/designer-layers-dom.test.ts` | R5、R6 |
+| `packages/engine/tests/browser/controllers/designer-gesture-controller.test.ts` | R4、R5、R8 |
+| `packages/engine/tests/browser/dom/designer-selection-dom.test.ts` | R4、R5、R8 |
+| `packages/engine/tests/browser/viewport/designer-viewport.test.ts` | R3、R8 |
+| `packages/engine/tests/browser/controllers/designer-workbench-controller.test.ts` | R4、R8 |
+| `packages/engine/tests/common/project/project-controller.test.ts` | R1、R7、R8 |
+| `packages/engine/tests/common/ui-text/designer-ui-text.test.ts` | R3 |
 | `scripts/check-designer-ui.mjs` | R3、R10 |
 | `scripts/verify-browser-harness.mjs` | R2、R3、R4、R5、R6、R7、R9、R10 |
 | `pnpm verify:m0` | R1-R10 的 package/build/API/tarball 质量门 |
