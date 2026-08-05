@@ -49,6 +49,8 @@ C:\worker\nebula\packages\screen-editor-core
 | `packages/material/src/container.ts` | 无 | 使用既有 Material ABI 独立实现容器 Manifest、DOM | 未改编 Nebula 源码；不含第三方内容或 attribution |
 | `packages/material/src/index.ts`、`auto-register.ts`、`index.test.ts` | 无 | 按物料职责拆分公共入口、精确聚合注册和 Base Screen 测试 | 未改编 Nebula 源码；不含第三方内容或 attribution |
 | `examples/browser-harness/main.ts`、`scripts/verify-browser-harness.mjs` | 无 | 将官方物料注册、工具和 DOM 验证接入现有 Base Screen harness | 未改编 Nebula 源码；不含第三方内容或 attribution |
+| `docs/specs/designer-canvas-precision/` | `packages/screen-editor-core/src/components/moveable-container.tsx`、`src/components/screen-canvas.tsx`、`src/components/canvas-guides.tsx` | 将实时 transform 预览、组件/guide 吸附与坐标边界转写为 Base Screen requirements、任务、验收与测试映射；不复制实现文本 | 用户授权范围内的行为研究；不引入 React、Moveable 或第三方内容 |
+| `packages/engine/src/browser/controllers/designer-gesture-controller.ts`、`viewport/designer-canvas-aids.ts`、`viewport/designer-canvas-coordinates.ts`、对应测试 | `packages/screen-editor-core/src/components/moveable-container.tsx`、`src/components/screen-canvas.tsx`、`src/components/canvas-guides.tsx` | 使用现有 Engine DOM、Core history 与 Renderer 边界独立实现全选区 translate 预览、anchor 吸附和坐标 helper | 未复制来源源码；不含来源 CSS、React、Moveable 或第三方内容，用户授权下的行为研究无需额外 attribution |
 
 ## 后续实现门禁
 

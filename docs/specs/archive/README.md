@@ -14,4 +14,12 @@
 
 | 归档规格 | 后继规格 | 归档日期 |
 | --- | --- | --- |
-| [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | [Designer Engine](../designer-engine/spec.md) | 2026-08-04 |
+| [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | [Designer Engine](./designer-engine/spec.md) | 2026-08-04 |
+| [Designer Engine](./designer-engine/spec.md) | 已完成（无后继） | 2026-08-05 |
+| [Core Domain](./core-domain/spec.md) | 已完成（无后继） | 2026-08-05 |
+| [Plugin Core Contract](./plugin-core-contract/spec.md) | 已完成（无后继） | 2026-08-05 |
+| [Plugin Manager Runtime](./plugin-manager-runtime/spec.md) | 已完成（无后继） | 2026-08-05 |
+| [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/spec.md) | 已完成（无后继） | 2026-08-05 |
+| [Designer Product Completion](./designer-product-completion/spec.md) | 已完成（无后继） | 2026-08-05 |
+| [Designer Workbench Control Styles](./designer-workbench-control-styles/spec.md) | 已完成（无后继） | 2026-08-05 |
+| [Directory Structure Rules](./directory-structure-rules/spec.md) | 已完成（无后继） | 2026-08-05 |
