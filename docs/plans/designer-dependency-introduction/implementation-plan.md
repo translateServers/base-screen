@@ -270,10 +270,14 @@ pnpm verify:m0
 在 Designer Product Completion 的当前范围内：
 
 - React、React DOM、Vue 和其他 UI framework：禁止。
-- Moveable、Selecto、dnd-kit、React Flow、Zustand、快捷键库和标尺库：不引入。
-- 新增外部生产依赖预算：目标为零，唯一例外槽位暂不分配。
+- Selecto、dnd-kit、React Flow、Zustand、快捷键库和标尺库：不引入。
+- Moveable（npm 包）：不引入。2026-08-06 决策改为逻辑层源码 vendor（[ADR-0020](../../decisions/ADR-0020-designer-canvas-interaction-pilot.md)），
+  吸附数学（snappable）+ 手势状态机（gesto）+ 裁剪工具迁入 `engine/src/common/vendor/`，渲染层自研；
+  不写入 manifest、lockfile 或 boundary 白名单。
+- 新增外部生产依赖预算：目标为零，唯一例外槽位暂不分配；交互品质缺口由 vendor 解决，不占用该槽位。
 - 新增开发依赖：当前没有已识别需求。
 - `@floating-ui/dom`、`@tanstack/virtual-core` 和 `@dagrejs/dagre` 只进入条件候选池，不写入 manifest；
   每次仍需单独通过 Gate A-E，且不能同时占用唯一例外槽位。
 - 当前 Spec 已有功能继续使用现有原生实现；只有新的生效中 Requirement、自动化或性能数据证明具体缺口后
-  才启动 Gate A。
+  才启动 Gate A。2026-08-06 交互品质缺口证据已通过 vendor 路径解决（评估记录见
+  [依赖候选评估](./dependency-evaluation.md)），不构成 Gate A 依赖申请。

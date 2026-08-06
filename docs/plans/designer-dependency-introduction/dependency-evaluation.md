@@ -1,14 +1,16 @@
 # Designer 依赖候选评估
 
-> 状态：待评审
-> 日期：2026-08-05
+> 状态：已评审（2026-08-06 决策落地：vendor 合入，interactjs 未采纳）
+> 日期：2026-08-05（2026-08-06 更新）
 > 计划：[Designer 依赖引入计划](./implementation-plan.md)
 > 评估基线：当前 Designer Product Completion tasks、checklist 和代码
 
 ## 1. 结论
 
 当前 Designer Product Completion 的 Task 6-12 和 checklist 已完成，现有功能没有必须补装的外部生产依赖。
-本次评估结论不是立即修改 manifest，而是建立后续准入候选池。
+2026-08-06 重审：Designer Canvas Precision 多轮调整后交互品质仍不满足产品基准，构成新的需求证据。因
+Moveable 上游停止演进，最终决策为**逻辑层源码 vendor**（见 [ADR-0020](../../decisions/ADR-0020-designer-canvas-interaction-pilot.md)），
+不引入 npm 依赖。vendor 前在仓库外临时目录做移植验证。
 
 | 结论 | 依赖 | 当前动作 |
 | --- | --- | --- |
@@ -16,11 +18,13 @@
 | 条件候选 | `@tanstack/virtual-core` | 仅在连续滚动大图层树出现可复现性能缺口时进入试点 |
 | 条件候选 | `@dagrejs/dagre` | 仅在 Blueprint 图形投影成为生效中 Requirement 时进入试点 |
 | 观察候选 | `@atlaskit/pragmatic-drag-and-drop` | 仅在图层需要复杂插入落点和自动滚动时重新评估 |
-| 观察候选 | `interactjs` | 仅在新增多点触控或复杂手势、现有控制器无法合理扩展时重新评估 |
+| 观察候选 | `interactjs` | 手势内核观察候选；逻辑层移植（Moveable/gesto vendor）后不再需要 |
 | 观察候选 | `rbush` | 仅在大画布 profiling 证明候选查询是瓶颈时重新评估 |
-| 当前拒绝 | Moveable、Selecto、Scena Ruler、hotkeys-js、SortableJS、XYFlow System、ELK、CodeMirror | 不进入当前依赖预算 |
+| 已决策 | Moveable（npm 包） | 2026-08-06 决策：不引入依赖；其逻辑层以 MIT vendor 迁入 engine（见 [ADR-0020](../../decisions/ADR-0020-designer-canvas-interaction-pilot.md) 与 [移植验证计划](../designer-moveable-pilot/pilot-plan.md)） |
+| 当前拒绝 | Selecto、Scena Ruler、hotkeys-js、SortableJS、XYFlow System、ELK、CodeMirror | 不进入当前依赖预算 |
 
-因此，当前建议仍是零新增生产依赖。条件候选表示“架构上允许进入 Gate A”，不表示允许直接安装。
+因此，当前建议仍是不修改 manifest。条件候选表示"架构上允许进入 Gate A"，不表示允许直接安装；Moveable
+相关的交互品质缺口通过代码 vendor 解决，不占用依赖预算与唯一例外槽位。
 
 ## 2. 评估依据
 
@@ -133,6 +137,12 @@ selection、capability、snap、transient preview、Core transaction 深度集�
 回归矩阵，不能缩短已经完成的周期。
 
 只有后续明确需要多点触控、惯性、复杂手势 modifier，并且原生控制器评估超过 10 个工程日时才重新进入 Gate A。
+
+**2026-08-06 终审（未采纳）**：吸附品质缺口的根因在吸附语义本身；interactjs 的 snap modifier 只有
+range/offset/anchors/grid 距离竞争，**没有释放带滞后与同锚点跟随**——与生效 Spec（designer-canvas-precision
+R1/R2）冻结的行为契约不符，替换需要改 Spec 或在其上层补写（回到自研）。吸附数学最终以 Moveable snappable
+MIT vendor 迁入 `common/vendor`（[ADR-0020](../../decisions/ADR-0020-designer-canvas-interaction-pilot.md)），
+无需引入 npm 依赖。该结论仅在产品明确要求多点触控/惯性且原生评估超限时重审。
 
 ### 4.3 `rbush`
 
