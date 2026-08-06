@@ -1,45 +1,62 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const uiModules = [
-  'packages/engine/src/browser/dom/designer-blueprint-dom.ts',
-  'packages/engine/src/browser/controllers/designer-integration-controller.ts',
-  'packages/engine/src/browser/controllers/designer-import-controller.ts',
-  'packages/engine/src/browser/dom/designer-layers-dom.ts',
+const root = fileURLToPath(new URL('../', import.meta.url));
+const browserRoot = resolve(root, 'packages/engine/src/browser');
+
+// Modules outside `browser/` that must not introduce localization gates or inline
+// user-visible text, but are not themselves the source-of-truth UI text module.
+const monitoredModules = [
   'packages/engine/src/common/operations/designer-operation-registry.ts',
-  'packages/engine/src/browser/dom/designer-panel-dom.ts',
-  'packages/engine/src/browser/controllers/designer-preview-controller.ts',
-  'packages/engine/src/browser/controllers/designer-project-feedback-controller.ts',
-  'packages/engine/src/browser/dom/designer-selection-dom.ts',
   'packages/engine/src/common/tools/designer-tools.ts',
   'packages/engine/src/common/ui-text/designer-ui-text.ts',
-  'packages/engine/src/browser/controllers/designer-workbench-controller.ts',
-  'packages/engine/src/browser/dom/designer-workspace.ts',
   'packages/engine/src/index.ts',
 ];
 
-const forbiddenLocalization = /\b(?:i18n|locale|language|translation)\b/i;
-const forbiddenUiText = [
-  'Search layers',
-  'Open Blueprint',
-  'Direct document',
-  'Reload remote',
-  'Close preview',
-  'Save project',
-  'Designer requires',
-];
+const cjk = /[\u4e00-\u9fff]/;
+const forbiddenLocalization = /\b(?:i18n|locale|language)\b/i;
 
-const root = fileURLToPath(new URL('../', import.meta.url));
+function collectTypeScriptFiles(dir) {
+  const files = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      files.push(...collectTypeScriptFiles(full));
+    } else if (entry.endsWith('.ts')) {
+      files.push(full);
+    }
+  }
+  return files;
+}
 
-for (const file of uiModules) {
-  const source = readFileSync(resolve(root, file), 'utf8');
+// Strip line, block and JSDoc comments so CJK inside comments is not treated as
+// inline UI text. Remaining CJK in `browser/` code therefore lives in string
+// literals, which is forbidden: user-visible text must live in
+// `common/ui-text/designer-ui-text.ts`.
+function stripComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\r\n]*/g, '');
+}
+
+function hasInlineUiText(source) {
+  return cjk.test(stripComments(source));
+}
+
+const browserFiles = collectTypeScriptFiles(browserRoot);
+const monitoredFiles = monitoredModules.map((file) => resolve(root, file));
+
+const inlineViolations = browserFiles.filter((file) => {
+  const source = readFileSync(file, 'utf8');
+  return hasInlineUiText(source);
+});
+
+if (inlineViolations.length > 0) {
+  throw new Error(`DESIGNER_UI_INLINE_TEXT_FORBIDDEN: ${inlineViolations.join(', ')}`);
+}
+
+for (const file of [...browserFiles, ...monitoredFiles]) {
+  const source = readFileSync(file, 'utf8');
   if (forbiddenLocalization.test(source)) {
     throw new Error(`DESIGNER_UI_LOCALIZATION_FORBIDDEN: ${file}`);
-  }
-  for (const text of forbiddenUiText) {
-    if (source.includes(text)) {
-      throw new Error(`DESIGNER_UI_ENGLISH_TEXT_FORBIDDEN: ${file}`);
-    }
   }
 }

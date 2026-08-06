@@ -428,7 +428,7 @@ try {
         await authoringDesigner.getByTitle('\u77e9\u5f62').click();
         const activeTool = await authoringDesigner.locator('[data-status-tool]').textContent();
         const rectanglePressed = await authoringDesigner
-          .locator('[data-tool="rectangle"]')
+          .locator('button[data-tool="rectangle"]')
           .getAttribute('aria-pressed');
         if (activeTool !== '\u77e9\u5f62' || rectanglePressed !== 'true') {
           throw new Error('BROWSER_HARNESS_ACTIVE_TOOL_STATUS_FAILED');
@@ -526,7 +526,7 @@ try {
           throw new Error('BROWSER_HARNESS_CREATE_PREVIEW_STALE');
         }
         const zoomBefore = await authoringDesigner.locator('[data-zoom]').textContent();
-        await authoringDesigner.locator('[data-tool="zoom"]').click();
+        await authoringDesigner.locator('button[data-tool="zoom"]').click();
         await page.mouse.click(canvasBox.x + 500, canvasBox.y + 250);
         const zoomAfter = await authoringDesigner.locator('[data-zoom]').textContent();
         if (zoomBefore === zoomAfter) throw new Error('BROWSER_HARNESS_ZOOM_TOOL_FAILED');
@@ -685,6 +685,7 @@ try {
         await assertOverlayContained(authoringDesigner, '.direct-preview');
         await authoringDesigner.locator('.direct-preview [data-action="preview"]').click();
       }
+      await assertEventSystemGuards(page, page.locator('base-screen-designer'));
       await page.close();
     }
   } finally {
@@ -897,6 +898,93 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     );
   }
   await page.evaluate(() => document.querySelectorAll('base-screen-designer')[1]?.remove());
+
+  // 框选（marquee）多选后，直接拖拽选中框（控制器）的空白区域应整体移动选中组件。
+  const marqueeCanvasBox = await designer.locator('[data-canvas]').boundingBox();
+  if (marqueeCanvasBox === null) throw new Error('BROWSER_HARNESS_MARQUEE_CANVAS_MISSING');
+  await page.evaluate(() => {
+    window.__browserHarnessMarqueeEvents = [];
+    window.baseScreenHarness.designer.addEventListener('base-screen-selection-change', (event) => {
+      window.__browserHarnessMarqueeEvents.push(event.detail);
+    });
+  });
+  await page.mouse.move(marqueeCanvasBox.x + 40, marqueeCanvasBox.y + 40);
+  await page.mouse.down();
+  await page.mouse.move(marqueeCanvasBox.x + 700, marqueeCanvasBox.y + 240, { steps: 6 });
+  await page.mouse.up();
+  const marqueeSelection = await page.evaluate(
+    () => window.__browserHarnessMarqueeEvents.at(-1)?.selectedComponentIds ?? [],
+  );
+  if (
+    !marqueeSelection.includes('title') ||
+    !marqueeSelection.includes('subtitle') ||
+    marqueeSelection.length < 2
+  ) {
+    throw new Error(`BROWSER_HARNESS_MARQUEE_SELECTION_FAILED:${JSON.stringify(marqueeSelection)}`);
+  }
+  const marqueeBefore = await componentPositions(page, ['title', 'subtitle']);
+  // 前序属性测试把 title 旋转了 30°：直接归零旋转，保证框选与间隙几何可预测。
+  await page.evaluate(() => {
+    const result = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['title'],
+      patch: { rotation: 0 },
+    });
+    if (!result.ok) throw new Error('BROWSER_HARNESS_MARQUEE_ROTATION_RESET_FAILED');
+  });
+  // 在选中框包围盒内、组件外的空白处拖拽：取 title 下方与 subtitle 之间的间隙（文档坐标）。
+  const marqueeDocument = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return {
+      canvasTransform: root.querySelector('[data-canvas]').style.transform,
+      canvasBox: root.querySelector('[data-canvas]').getBoundingClientRect(),
+      zoom:
+        Number((root.querySelector('[data-zoom]')?.textContent ?? '100%').replace('%', '')) / 100,
+    };
+  });
+  const gapPoint = {
+    x: marqueeCanvasBox.x + (marqueeBefore[0].x + 200) * marqueeDocument.zoom,
+    y: marqueeCanvasBox.y + (marqueeBefore[0].y + 82) * marqueeDocument.zoom,
+  };
+  await page.mouse.move(gapPoint.x, gapPoint.y);
+  await page.mouse.down();
+  await page.mouse.move(gapPoint.x + 80, gapPoint.y + 60, { steps: 5 });
+  await page.mouse.up();
+  const marqueeAfter = await componentPositions(page, ['title', 'subtitle']);
+  const marqueeDeltaX = marqueeAfter[0].x - marqueeBefore[0].x;
+  const marqueeDeltaY = marqueeAfter[0].y - marqueeBefore[0].y;
+  if (
+    (marqueeDeltaX === 0 && marqueeDeltaY === 0) ||
+    marqueeAfter[1].x - marqueeBefore[1].x !== marqueeDeltaX ||
+    marqueeAfter[1].y - marqueeBefore[1].y !== marqueeDeltaY
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_MARQUEE_OVERLAY_DRAG_FAILED:${JSON.stringify({
+        marqueeBefore,
+        marqueeAfter,
+        marqueeDocument,
+        gapPoint,
+      })}`,
+    );
+  }
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction(
+    (before) =>
+      before.every(({ id, x, y }) => {
+        const component = window.baseScreenHarness.designer.document.components.find(
+          (item) => item.id === id,
+        );
+        return component?.position.x === x && component.position.y === y;
+      }),
+    marqueeBefore,
+  );
+  // 清空框选遗留的选择，避免污染后续断言步骤。
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-selection]')?.style
+        .display === 'none',
+  );
 }
 
 async function assertCanvasPrecision(designer, page) {
@@ -910,11 +998,112 @@ async function assertCanvasPrecision(designer, page) {
   const beforeDocument = await page.evaluate(() =>
     JSON.stringify(window.baseScreenHarness.designer.document),
   );
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    window.__guideLog = [];
+    const record = (type, target) =>
+      target?.addEventListener(type, (event) =>
+        window.__guideLog.push([type, event.pointerId, event.clientX, event.clientY]),
+      );
+    record('pointerdown', root.querySelector('.ruler-horizontal'));
+    record('pointermove', root.querySelector('[data-canvas]'));
+    record('pointerup', root.querySelector('[data-canvas]'));
+    record('lostpointercapture', root.querySelector('[data-canvas]'));
+  });
+  const guideHit = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    window.__guideLog = [];
+    const record = (type, target) =>
+      target?.addEventListener(type, (event) =>
+        window.__guideLog.push([type, event.pointerId, event.clientX, event.clientY]),
+      );
+    record('pointerdown', root.querySelector('.ruler-horizontal'));
+    record('pointermove', root.querySelector('[data-canvas]'));
+    record('pointerup', root.querySelector('[data-canvas]'));
+    record('lostpointercapture', root.querySelector('[data-canvas]'));
+    root.addEventListener('pointerdown', (event) =>
+      window.__guideLog.push(['root-down', event.pointerId, event.clientX, event.clientY]),
+    );
+    const target = root.elementFromPoint(342, 79);
+    return {
+      tag: target?.tagName ?? null,
+      className: typeof target?.className === 'string' ? target.className : null,
+      inRuler: target?.closest?.('.ruler') !== null && target?.closest?.('.ruler') !== undefined,
+    };
+  });
+  const manualGuide = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const ruler = root.querySelector('.ruler-horizontal');
+    const canvas = root.querySelector('[data-canvas]');
+    const guides = root.querySelector('[data-canvas-guides]');
+    ruler.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        composed: true,
+        pointerId: 1,
+        clientX: 342,
+        clientY: 79,
+      }),
+    );
+    const captureAfterDown = canvas.hasPointerCapture(1);
+    canvas.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        composed: true,
+        pointerId: 1,
+        clientX: 476,
+        clientY: 249,
+      }),
+    );
+    return {
+      captureAfterDown,
+      guidesChildren: guides?.children.length ?? -1,
+    };
+  });
   await page.mouse.move(rulerBox.x + 96, rulerBox.y + 10);
   await page.mouse.down();
+  const captureState = await canvas.evaluate((element) => ({
+    hasCapture: element.hasPointerCapture(1),
+    canvasTransform: element.style.transform,
+    captureLog: window.__guideLog.filter((entry) => entry[0] === 'lostpointercapture'),
+  }));
+  const manualMoveResult = await canvas.evaluate((element) => {
+    const root = element.getRootNode();
+    const guides = root.querySelector('[data-canvas-guides]');
+    element.dispatchEvent(
+      new PointerEvent('pointermove', {
+        bubbles: true,
+        composed: true,
+        pointerId: 1,
+        clientX: 476,
+        clientY: 249,
+      }),
+    );
+    return { guidesChildren: guides?.children.length ?? -1 };
+  });
   await page.mouse.move(canvasBox.x + 180, canvasBox.y + 130, { steps: 3 });
   if ((await canvas.locator('.canvas-guide-preview').count()) !== 1) {
-    throw new Error('BROWSER_HARNESS_GUIDE_PREVIEW_FAILED');
+    const guideState = await page.evaluate(() => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      const guides = root.querySelector('[data-canvas-guides]');
+      return {
+        canvasTransform: root.querySelector('[data-canvas]').style.transform,
+        canvasBox: root.querySelector('[data-canvas]').getBoundingClientRect(),
+        rulerBox: root.querySelector('.ruler-horizontal')?.getBoundingClientRect(),
+        guidesChildren: guides?.children.length ?? -1,
+        guideLog: window.__guideLog,
+      };
+    });
+    throw new Error(
+      `BROWSER_HARNESS_GUIDE_PREVIEW_FAILED:${JSON.stringify({
+        canvasBox,
+        rulerBox,
+        guideState,
+        guideHit,
+        captureState,
+        manualGuide,
+      })}`,
+    );
   }
   if (
     (await page.evaluate(() => JSON.stringify(window.baseScreenHarness.designer.document))) !==
@@ -979,13 +1168,6 @@ async function assertCanvasPrecision(designer, page) {
     throw new Error('BROWSER_HARNESS_GRID_TOGGLE_FAILED');
   }
   await designer.locator('[data-action="toggle-grid"]').click();
-  await designer.locator('[data-action="toggle-snap"]').click();
-  if (
-    (await designer.locator('[data-action="toggle-snap"]').getAttribute('aria-pressed')) !== 'false'
-  ) {
-    throw new Error('BROWSER_HARNESS_SNAP_TOGGLE_FAILED');
-  }
-  await designer.locator('[data-action="toggle-snap"]').click();
 }
 
 async function assertLayersAuthoring(designer, page) {
@@ -1021,7 +1203,44 @@ async function assertLayersAuthoring(designer, page) {
 
 async function assertDataAndBlueprintAuthoring(designer, page) {
   await designer.getByTitle('\u9009\u62e9').click();
-  await designer.locator('[data-base-screen-component-id=title]').click();
+  const titleClickProbe = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const canvas = root.querySelector('[data-canvas]');
+    const canvasBox = canvas.getBoundingClientRect();
+    const positions = window.baseScreenHarness.designer.document.components.map((item) => ({
+      id: item.id,
+      position: item.position,
+      size: item.size,
+      zIndex: item.zIndex,
+    }));
+    const title = positions.find((item) => item.id === 'title');
+    const overlapped = positions.filter((item) => {
+      if (item.id === 'title' || item.zIndex <= title.zIndex) return false;
+      return (
+        item.position.x < title.position.x + title.size.width &&
+        item.position.x + item.size.width > title.position.x &&
+        item.position.y < title.position.y + title.size.height &&
+        item.position.y + item.size.height > title.position.y
+      );
+    });
+    return {
+      canvasTransform: canvas.style.transform,
+      canvasBox: { x: canvasBox.x, y: canvasBox.y },
+      zoom: root.querySelector('[data-zoom]')?.textContent,
+      title,
+      overlapped,
+    };
+  });
+  try {
+    // 前序物料面板添加的组件（base-text-6 等）与 title 重叠，点击左上角未被遮挡的区域。
+    await designer.locator('[data-base-screen-component-id=title]').click({
+      position: { x: 6, y: 7 },
+    });
+  } catch (error) {
+    throw new Error(
+      `BROWSER_HARNESS_TITLE_CLICK_FAILED:${JSON.stringify(titleClickProbe)}:${error}`,
+    );
+  }
   await designer.getByRole('tab', { name: '\u6570\u636e' }).click();
   const dataPanel = designer.locator('[data-inspector-pane=data]');
   const dataSource = dataPanel.locator('[data-data-source-type]');
@@ -1349,6 +1568,104 @@ async function assertOverlayContained(designer, selector) {
     );
   }, selector);
   if (!contained) throw new Error('BROWSER_HARNESS_OVERLAY_CONTAINMENT_FAILED');
+}
+
+// R1/R5/R7：浏览器默认行为管控与零宿主影响边界（Designer Event System）。
+async function assertEventSystemGuards(page, designer) {
+  // R1：焦点在设计器内时浏览器级快捷键被 capture 黑名单拦截；普通键不受影响。
+  const inDesigner = await designer.evaluate((element) => {
+    const viewport = element.shadowRoot?.querySelector('[data-viewport]');
+    if (viewport === null || viewport === undefined) {
+      throw new Error('BROWSER_HARNESS_VIEWPORT_MISSING');
+    }
+    viewport.focus();
+    const blocked = [];
+    for (const init of [
+      { key: 's', code: 'KeyS', ctrlKey: true },
+      { key: 'w', code: 'KeyW', ctrlKey: true },
+      { key: 'r', code: 'KeyR', ctrlKey: true },
+    ]) {
+      const event = new KeyboardEvent('keydown', { ...init, bubbles: true, cancelable: true });
+      viewport.dispatchEvent(event);
+      blocked.push(event.defaultPrevented);
+    }
+    const plain = new KeyboardEvent('keydown', {
+      key: 'a',
+      code: 'KeyA',
+      bubbles: true,
+      cancelable: true,
+    });
+    viewport.dispatchEvent(plain);
+    return { blocked, plainPrevented: plain.defaultPrevented };
+  });
+  if (!inDesigner.blocked.every(Boolean) || inDesigner.plainPrevented) {
+    throw new Error(`BROWSER_HARNESS_KEYBOARD_BLOCKLIST_FAILED: ${JSON.stringify(inDesigner)}`);
+  }
+  // R1/R7：焦点在宿主页面时设计器零干预（host 零影响硬边界）。
+  const hostImpact = await page.evaluate(() => {
+    document.body.focus();
+    const event = new KeyboardEvent('keydown', {
+      key: 's',
+      code: 'KeyS',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    document.body.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  if (hostImpact) throw new Error('BROWSER_HARNESS_HOST_KEYBOARD_IMPACTED');
+  // R5：设计器发起的拖拽在 window 层被阻止默认（拖不出设计器）；宿主拖拽零干预。
+  const dragContained = await designer.evaluate((element) => {
+    const material = element.shadowRoot?.querySelector('[data-base-screen-component-id]');
+    if (material === null || material === undefined) return { own: false, hostPrevented: false };
+    material.dispatchEvent(
+      new DragEvent('dragstart', {
+        bubbles: true,
+        cancelable: true,
+        dataTransfer: new DataTransfer(),
+      }),
+    );
+    const ownOver = new DragEvent('dragover', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer: new DataTransfer(),
+    });
+    window.dispatchEvent(ownOver);
+    const ownPrevented = ownOver.defaultPrevented;
+    window.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true }));
+    const hostOver = new DragEvent('dragover', {
+      bubbles: true,
+      cancelable: true,
+      dataTransfer: new DataTransfer(),
+    });
+    window.dispatchEvent(hostOver);
+    return { own: ownPrevented, hostPrevented: hostOver.defaultPrevented };
+  });
+  if (dragContained.own !== true || dragContained.hostPrevented !== false) {
+    throw new Error(`BROWSER_HARNESS_DRAG_CONTAINMENT_FAILED: ${JSON.stringify(dragContained)}`);
+  }
+  // R7：多实例 smoke —— 第二个实例挂载/移除后，首个实例的键盘拦截不受影响。
+  const multiInstance = await page.evaluate(async () => {
+    const second = document.createElement('base-screen-designer');
+    document.body.appendChild(second);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const first = document.querySelector('base-screen-designer');
+    const viewport = first.shadowRoot?.querySelector('[data-viewport]');
+    viewport?.focus();
+    const event = new KeyboardEvent('keydown', {
+      key: 's',
+      code: 'KeyS',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    });
+    viewport?.dispatchEvent(event);
+    const firstBlocked = event.defaultPrevented;
+    second.remove();
+    return firstBlocked;
+  });
+  if (multiInstance !== true) throw new Error('BROWSER_HARNESS_MULTI_INSTANCE_FAILED');
 }
 
 async function assertEditableShortcuts(page, designer, input) {

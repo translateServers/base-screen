@@ -195,6 +195,84 @@ async function assertEntryHasNoSideEffects() {
   }
 }
 
+// Gate 4: engine sub-layer direction within browser/ and common/.
+// Each sub-layer may only depend on itself and the explicitly allowed sibling sub-layers.
+const BROWSER_SUBLAYERS = [
+  ['ui', []],
+  ['styles', []],
+  ['viewport', []],
+  ['dom', ['ui']],
+  ['controllers', ['dom', 'viewport']],
+];
+
+const COMMON_SUBLAYERS = [
+  ['ui-text', []],
+  ['tools', []],
+  ['project', []],
+  ['events', []],
+  ['operations', ['project', 'tools']],
+  ['session', ['project', 'operations']],
+];
+
+function subLayerOf(file, rootDir, subLayers) {
+  const segment = relative(rootDir, file).split(/[\\/]/)[0] ?? '';
+  return subLayers.find(([name]) => name === segment);
+}
+
+// Pure sub-layer direction check over pre-resolved (from, to) file pairs.
+function subLayerDirectionViolations(pairs, rootDir, subLayers) {
+  const layerMap = new Map(subLayers);
+  const violations = [];
+  for (const { from, to } of pairs) {
+    const fromLayer = subLayerOf(from, rootDir, subLayers);
+    const toLayer = subLayerOf(to, rootDir, subLayers);
+    if (fromLayer === undefined || toLayer === undefined) continue;
+    const allowed = new Set(layerMap.get(fromLayer[0]));
+    allowed.add(fromLayer[0]);
+    if (!allowed.has(toLayer[0])) {
+      violations.push(`${relative(engineSource, from)} -> ${relative(engineSource, to)}`);
+    }
+  }
+  return violations;
+}
+
+function assertSubLayerDirection() {
+  const pairs = [];
+  for (const rootDir of [browserRoot, commonRoot]) {
+    for (const file of collectTypeScriptFiles(rootDir)) {
+      for (const specifier of relativeImports(file)) {
+        const target = resolveSpecifier(file, specifier);
+        if (target !== undefined) pairs.push({ from: file, to: target });
+      }
+    }
+  }
+  const violations = subLayerDirectionViolations(pairs, browserRoot, BROWSER_SUBLAYERS).concat(
+    subLayerDirectionViolations(pairs, commonRoot, COMMON_SUBLAYERS),
+  );
+  if (violations.length > 0) {
+    fail('ENGINE_SUBLAYER_DIRECTION_FORBIDDEN', violations.join(', '));
+  }
+}
+
+// Regression: the gate must positively reject a dom -> controllers import.
+function assertSubLayerDirectionRegression() {
+  const violations = subLayerDirectionViolations(
+    [
+      {
+        from: join(browserRoot, 'dom', 'sample.ts'),
+        to: join(browserRoot, 'controllers', 'sample.ts'),
+      },
+    ],
+    browserRoot,
+    BROWSER_SUBLAYERS,
+  );
+  if (violations.length === 0) {
+    fail('ENGINE_SUBLAYER_REGRESSION', 'dom -> controllers was not rejected');
+  }
+}
+
 assertCommonIsEnvironmentAgnostic();
 assertCommonNeverReachesBrowser();
 await assertEntryHasNoSideEffects();
+assertSubLayerDirection();
+assertSubLayerDirectionRegression();
