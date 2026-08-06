@@ -29,10 +29,8 @@ import {
 } from '@base-screen/contracts';
 import {
   getScreenSelectionBounds,
-  isScreenComponentEffectivelyLocked,
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
-  type ScreenInteractionAction,
 } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
@@ -51,77 +49,45 @@ import { DesignerProjectFeedbackController } from './browser/controllers/designe
 import { DesignerProjectWorkspaceController } from './browser/controllers/designer-project-workspace-controller.js';
 import { DesignerViewportController } from './browser/controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from './browser/controllers/designer-workbench-controller.js';
+import { DesignerEventSystem } from './browser/dom/designer-event-system.js';
 import { renderDesignerInteractionPanel } from './browser/dom/designer-interaction-dom.js';
+import { DesignerMenuController } from './browser/dom/designer-menu.js';
 import { renderDesignerSelection } from './browser/dom/designer-selection-dom.js';
 import {
-  contextMenuHtml,
-  createDesignerWorkspace,
-  type DesignerContextMenuAction,
-} from './browser/dom/designer-workspace.js';
+  type DesignerSurfaceBindings,
+  DesignerSurfaceRouter,
+  getInspectorDraftTarget,
+  isEditableTarget,
+  isTextAreaDraft,
+} from './browser/dom/designer-surface-router.js';
+import { createDesignerWorkspace } from './browser/dom/designer-workspace.js';
 import { createDesignerStyle } from './browser/styles/designer-style.js';
+import {
+  createDesignerElementOperations,
+  type DesignerElementOperationsHost,
+  type DesignerOperationContext,
+} from './common/operations/designer-element-operations.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
   createReparentTransaction,
-  createZOrderTransaction,
 } from './common/operations/designer-layout-operations.js';
-import {
-  DESIGNER_OPERATION_TEXT,
-  DesignerOperationRegistry,
-  shortcutFromKeyboardEvent,
-} from './common/operations/designer-operation-registry.js';
+import { DesignerOperationRegistry } from './common/operations/designer-operation-registry.js';
 import { selectedComponents } from './common/operations/designer-selection.js';
+import { DesignerSelectionActions } from './common/operations/designer-selection-actions.js';
+import { DesignerProjectGateway } from './common/project/designer-project-gateway.js';
 import type { ScreenProjectPhase } from './common/project/project-controller.js';
 import { DesignerSession } from './common/session/designer-session.js';
 import {
   DESIGNER_TOOLS,
   type DesignerToolId,
   type DesignerToolMaterialTypes,
-  getDesignerToolShortcut,
-  isDesignerToolConfigured,
 } from './common/tools/designer-tools.js';
-import { DESIGNER_UI_TEXT } from './common/ui-text/designer-ui-text.js';
+import { DESIGNER_UI_TEXT, designerDiagnosticSummary } from './common/ui-text/designer-ui-text.js';
 
 const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
   (class {} as unknown as typeof HTMLElement);
-
-interface DesignerOperationContext {
-  readonly command?: ScreenDocumentCommand;
-  readonly transaction?: ScreenDocumentTransaction;
-  readonly runCommand?: () => ScreenParseResult<ScreenDocument>;
-  readonly runTransaction?: () => ScreenParseResult<ScreenDocument>;
-}
-
-// 画布右键菜单按右键目标动态组合：空白画布与组件上显示不同菜单。
-const DESIGNER_CONTEXT_MENU = {
-  canvas: [
-    'undo',
-    'redo',
-    'separator',
-    'select-all',
-    'paste',
-    'separator',
-    'zoom-in',
-    'zoom-out',
-    'zoom-reset',
-    'zoom-fit',
-    'separator',
-    'toggle-grid',
-    'toggle-snap',
-  ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
-  component: [
-    'undo',
-    'redo',
-    'separator',
-    'copy',
-    'paste',
-    'delete',
-    'separator',
-    'group',
-    'ungroup',
-  ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
-};
 
 export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
@@ -168,6 +134,16 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.dispatchEvent(new CustomEvent('base-screen-ready', { detail: { projectId, revision } }));
     },
   });
+  readonly #projectGateway = new DesignerProjectGateway({
+    getAssetCatalogPort: () => this.#assetCatalogPort,
+    getProjectCatalogPort: () => this.#projectCatalogPort,
+    getProjectPreviewPort: () => this.#projectPreviewPort,
+    getProjectSnapshotPort: () => this.#projectSnapshotPort,
+    getDocument: () => this.#session.document,
+    getProject: () => this.#session.project,
+    replaceDocument: (document) => this.replaceDocument(document),
+    loadProject: (projectId) => this.#session.load(projectId),
+  });
   readonly #gestureController = new DesignerGestureController({
     getCatalog: () => this.#catalog,
     getDocument: () => this.#session.document,
@@ -181,13 +157,14 @@ export class BaseScreenDesignerElement extends ElementBase {
     getToolMaterialTypes: () => this.#toolMaterialTypes,
     snapCanvasPoint: (point, excludedComponentIds) =>
       this.#workbenchController.snapPoint(point, excludedComponentIds),
-    snapCanvasSelection: (bounds, offset, excludedComponentIds) =>
-      this.#workbenchController.snapSelectionOffset(bounds, offset, excludedComponentIds),
+    snapCanvasSelection: (bounds, offset, excludedComponentIds, options) =>
+      this.#workbenchController.snapSelectionOffset(bounds, offset, excludedComponentIds, options),
     renderSnapPreview: (point) => this.#workbenchController.renderSnapPreview(point),
     reduceSelection: (action) => this.#session.reduceSelection(action),
     reportTransaction: (transaction) => this.executeDesignerTransaction(transaction),
     renderSelection: () => this.renderSelection(),
     focusViewport: () => this.#viewportController.focus(),
+    setPanning: (panning) => this.#viewportController.setPanning(panning),
   });
   readonly #layersController = new DesignerLayersController({
     getCatalog: () => this.#catalog,
@@ -221,11 +198,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #projectWorkspaceController = new DesignerProjectWorkspaceController({
     createProject: (name) => this.createProject(name),
     deleteProject: (projectId, revision) => this.deleteProject(projectId, revision),
-    getCapabilities: () => ({
-      directory: this.#projectCatalogPort !== undefined,
-      preview: this.#projectPreviewPort !== undefined,
-      snapshots: this.#projectSnapshotPort !== undefined,
-    }),
+    getCapabilities: () => this.#projectGateway.capabilities,
     getProject: () => this.#session.project,
     listProjects: () => this.listProjects(),
     listSnapshots: () => this.listSnapshots(),
@@ -277,329 +250,267 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #workbenchController = new DesignerWorkbenchController({
     getCanvas: () => this.#canvas,
     getDocument: () => this.#session.document,
+    getInteraction: () => this.#session.interaction,
     getRoot: () => this.shadowRoot,
     getZoom: () => this.#viewportController.state.zoom,
   });
-  readonly #operations = new DesignerOperationRegistry<DesignerOperationContext | undefined>([
-    ...DESIGNER_TOOLS.map((tool) => this.toolOperation(tool.id)),
-    {
-      id: 'document.commit',
-      scope: 'canvas',
-      label: '提交编辑',
-      tooltip: '提交编辑',
-      isAvailable: () => true,
-      isEnabled: (context) =>
-        ((context?.transaction !== undefined && context.runTransaction !== undefined) ||
-          (context?.command !== undefined && context.runCommand !== undefined)) &&
-        this.#session.document !== undefined,
-      execute: (context) => {
-        context?.runTransaction?.() ?? context?.runCommand?.();
-      },
+  readonly #operationHost: DesignerElementOperationsHost = {
+    getDocument: () => this.#session.document,
+    canUndo: () => this.#session.canUndo,
+    canRedo: () => this.#session.canRedo,
+    getSelection: () => this.#session.interaction,
+    getProject: () => this.#session.project,
+    getProjectPhase: () => this.#session.projectPhase,
+    isDirty: () => this.#session.dirty,
+    canPublish: () => this.#session.adapter?.capabilities.publish === true,
+    hasProjectWorkspace: () =>
+      this.#projectCatalogPort !== undefined ||
+      this.#projectPreviewPort !== undefined ||
+      this.#projectSnapshotPort !== undefined,
+    hasClipboard: () => this.#panelController.hasClipboard,
+    canGroup: () => this.#panelController.canGroup,
+    canUngroup: () => this.#panelController.canUngroup,
+    canAlign: () => this.#panelController.canAlign,
+    canDistribute: () => this.#panelController.canDistribute,
+    getToolMaterialTypes: () => this.#toolMaterialTypes,
+    getCatalog: () => this.#catalog,
+    getZoom: () => this.#viewportController.state.zoom,
+    undo: () => this.undo(),
+    redo: () => this.redo(),
+    reduceSelection: (action) => this.#session.reduceSelection(action),
+    executeCommand: (command) => this.executeDesignerCommand(command),
+    executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
+    copy: () => this.copy(),
+    paste: () => this.paste(),
+    group: () => this.group(),
+    ungroup: () => this.ungroup(),
+    align: (alignment) => this.align(alignment),
+    distribute: (distribution) => this.distribute(distribution),
+    duplicate: () => this.#panelController.duplicate(),
+    setZoomCentered: (zoom) => this.#viewportController.setZoomCentered(zoom),
+    resetViewport: () => this.#viewportController.reset(),
+    toggleCanvasAid: (aid) => this.#workbenchController.toggleCanvasAid(aid),
+    toggleGuides: () => this.#workbenchController.toggleGuides(),
+    toggleBorderGuides: () => this.#workbenchController.toggleBorderGuides(),
+    cycleWorkbenchMode: () => this.#workbenchController.cycleMode(),
+    openProjectWorkspace: () => this.#projectWorkspaceController.open(),
+    save: () => this.save(),
+    publish: () => this.publish(),
+    retryLastProjectOperation: () => this.retryLastProjectOperation(),
+    cancelProjectOperation: () => this.cancelProjectOperation(),
+    setActiveTool: (tool) => this.#viewportController.setActiveTool(tool),
+    cancelGesture: () => this.cancelGesture(),
+    canMutateSelection: () => this.#selectionActions.canMutate(),
+    canSetSelectionStatus: () => this.#selectionActions.canSetStatus(),
+    deleteSelection: () => this.#selectionActions.delete(),
+    nudgeSelection: (x, y) => this.#selectionActions.nudge(x, y),
+    toggleSelectionStatus: (property, value) =>
+      this.#selectionActions.toggleStatus(property, value),
+    reorderSelection: (edge) => this.#selectionActions.reorder(edge),
+    toggleHelpPanel: () => this.#menuController.toggleHelpPanel(),
+    fitViewportToSelectionOrCanvas: () => this.fitViewportToSelectionOrCanvas(),
+    exportFromOperation: () => this.exportFromOperation(),
+    openImportPicker: () => this.openImportPicker(),
+    togglePreview: () => this.togglePreview(),
+    isProjectBusy: () => this.isProjectBusy(),
+    report: (result) => this.report(result),
+    reportProject: (result) => this.reportProject(result),
+    reportPreview: (result) => this.reportPreview(result),
+  };
+  readonly #operations = new DesignerOperationRegistry<DesignerOperationContext | undefined>(
+    createDesignerElementOperations(this.#operationHost),
+  );
+  readonly #eventSystem = new DesignerEventSystem({
+    isGestureActive: () => this.#gestureController.active,
+    findOperation: (chord) => this.#operations.findByShortcut(chord),
+    onWindowBlur: () => {
+      // 窗口失焦统一复位设计器内部状态（不触达宿主）。
+      this.cancelGesture();
+      this.#workbenchController.cancelTransientState();
+      this.#menuController.closeMenus();
+      this.#menuController.closeContextMenu();
     },
-    this.operation(
-      'undo',
-      () => this.#session.canUndo,
-      () => this.report(this.undo()),
-    ),
-    this.operation(
-      'redo',
-      () => this.#session.canRedo,
-      () => this.report(this.redo()),
-    ),
-    this.operation(
-      'select-all',
-      () => (this.#session.document?.components.length ?? 0) > 0,
+  });
+  readonly #selectionActions = new DesignerSelectionActions({
+    getDocument: () => this.#session.document,
+    getSelectedComponentIds: () => this.#session.interaction.selectedComponentIds,
+    executeCommand: (command) => this.executeDesignerCommand(command),
+    executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
+    reduceSelection: (action) => this.#session.reduceSelection(action),
+    report: (result) => this.report(result),
+  });
+  readonly #menuController = new DesignerMenuController({
+    getRoot: () => this.shadowRoot,
+    getContextMenu: () => this.#contextMenu,
+    getOperationState: (id) => this.#operations.getState(id, undefined),
+  });
+  readonly #surfaceRouter = new DesignerSurfaceRouter();
+  readonly #surfaceBindings: DesignerSurfaceBindings = {
+    click: [
+      (target) => this.#notificationController.dismiss(target as Element),
+      (target) => this.#menuController.toggleMenuFromTarget(target as Element),
       () => {
-        const document = this.#session.document;
-        if (document === undefined) return;
-        const componentIds = document.components.map((component) => component.id);
-        this.#session.reduceSelection({
-          type: 'replace-selection',
-          componentIds,
-          focusedComponentId: componentIds.at(-1) ?? null,
-        });
+        this.#menuController.closeMenus();
+        this.#menuController.closeContextMenu();
+        return false;
       },
-      'canvas',
-    ),
-    this.operation(
-      'delete',
-      () => this.canMutateSelection(),
-      () => this.deleteSelection(),
-      'canvas',
-    ),
-    this.operation(
-      'escape',
-      () => this.#session.interaction.selectedComponentIds.length > 0,
-      () => {
-        this.cancelGesture();
-        this.#session.reduceSelection({ type: 'clear-selection' });
+      (target) => this.executeToolFromTarget(target as Element),
+      (target) => this.executeOperationFromTarget(target as Element),
+      (target) => this.#importController.onClick(target as Element),
+      (target) => this.#projectFeedbackController.onClick(target as Element),
+      (target) => this.#projectWorkspaceController.onClick(target as Element),
+      (target) => this.#assetController.onClick(target as Element),
+      (target) => this.#integrationController.onClick(target as Element),
+      (target) => this.#workbenchController.onClick(target as Element),
+      (target, event) => this.#layersController.onClick(event as MouseEvent),
+      (target, event) => {
+        this.#panelController.onClick(event as MouseEvent);
+        return true;
       },
-      'canvas',
-    ),
-    this.operation(
-      'nudge-left',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(-1, 0),
-    ),
-    this.operation(
-      'nudge-right',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(1, 0),
-    ),
-    this.operation(
-      'nudge-up',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(0, -1),
-    ),
-    this.operation(
-      'nudge-down',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(0, 1),
-    ),
-    this.operation(
-      'copy',
-      () => this.#session.interaction.selectedComponentIds.length > 0,
-      () => this.copy(),
-      'canvas',
-    ),
-    this.operation(
-      'paste',
-      () => this.#panelController.hasClipboard,
-      () => this.report(this.paste()),
-      'canvas',
-    ),
-    this.operation(
-      'group',
-      () => this.#panelController.canGroup,
-      () => this.report(this.group()),
-      'canvas',
-    ),
-    this.operation(
-      'ungroup',
-      () => this.#panelController.canUngroup,
-      () => this.report(this.ungroup()),
-      'canvas',
-    ),
-    this.operation(
-      'align-left',
-      () => this.#panelController.canAlign,
-      () => this.report(this.align('left')),
-      'canvas',
-    ),
-    this.operation(
-      'align-center',
-      () => this.#panelController.canAlign,
-      () => this.report(this.align('center')),
-      'canvas',
-    ),
-    this.operation(
-      'align-right',
-      () => this.#panelController.canAlign,
-      () => this.report(this.align('right')),
-      'canvas',
-    ),
-    this.operation(
-      'align-top',
-      () => this.#panelController.canAlign,
-      () => this.report(this.align('top')),
-      'canvas',
-    ),
-    this.operation(
-      'align-middle',
-      () => this.#panelController.canAlign,
-      () => this.report(this.align('middle')),
-      'canvas',
-    ),
-    this.operation(
-      'align-bottom',
-      () => this.#panelController.canAlign,
-      () => this.report(this.align('bottom')),
-      'canvas',
-    ),
-    this.operation(
-      'distribute-horizontal',
-      () => this.#panelController.canDistribute,
-      () => this.report(this.distribute('horizontal')),
-      'canvas',
-    ),
-    this.operation(
-      'distribute-vertical',
-      () => this.#panelController.canDistribute,
-      () => this.report(this.distribute('vertical')),
-      'canvas',
-    ),
-    this.operation(
-      'zoom-in',
-      () => true,
-      () => this.#viewportController.setZoomCentered(this.#viewportController.state.zoom * 1.2),
-      'canvas',
-    ),
-    this.operation(
-      'zoom-out',
-      () => true,
-      () => this.#viewportController.setZoomCentered(this.#viewportController.state.zoom / 1.2),
-      'canvas',
-    ),
-    this.operation(
-      'zoom-reset',
-      () => true,
-      () => this.#viewportController.reset(),
-      'canvas',
-    ),
-    this.operation(
-      'zoom-fit',
-      () => this.#session.document !== undefined,
-      () => this.fitViewportToSelectionOrCanvas(),
-      'canvas',
-    ),
-    this.operation(
-      'preview',
-      () => this.#session.document !== undefined && this.#session.project === undefined,
-      () => this.reportPreview(this.togglePreview()),
-    ),
-    this.operation(
-      'project-workspace',
-      () =>
-        this.#projectCatalogPort !== undefined ||
-        this.#projectPreviewPort !== undefined ||
-        this.#projectSnapshotPort !== undefined,
-      () => this.#projectWorkspaceController.open(),
-      'global',
-      () =>
-        this.#projectCatalogPort !== undefined ||
-        this.#projectPreviewPort !== undefined ||
-        this.#projectSnapshotPort !== undefined,
-    ),
-    this.operation(
-      'export',
-      () => this.#session.document !== undefined,
-      () => this.exportFromOperation(),
-    ),
-    this.operation(
-      'import',
-      () => true,
-      () => this.openImportPicker(),
-    ),
-    this.operation(
-      'project-save',
-      () =>
-        this.#session.project !== undefined &&
-        !this.isProjectBusy() &&
-        this.#session.projectPhase !== 'conflict',
-      () => void this.save().then((result) => this.reportProject(result)),
-    ),
-    this.operation(
-      'project-publish',
-      () =>
-        this.#session.project !== undefined &&
-        !this.isProjectBusy() &&
-        this.#session.projectPhase === 'ready' &&
-        !this.#session.dirty,
-      () => void this.publish().then((result) => this.reportProject(result)),
-      'global',
-      () => this.#session.adapter?.capabilities.publish === true,
-    ),
-    this.operation(
-      'project-retry',
-      () => this.#session.projectPhase === 'error',
-      () => void this.retryLastProjectOperation().then((result) => this.reportProject(result)),
-    ),
-    this.operation(
-      'project-cancel',
-      () => this.isProjectBusy(),
-      () => this.cancelProjectOperation(),
-    ),
-    this.operation(
-      'toggle-grid',
-      () => true,
-      () => this.#workbenchController.toggleCanvasAid('gridEnabled'),
-      'canvas',
-    ),
-    this.operation(
-      'toggle-snap',
-      () => true,
-      () => this.#workbenchController.toggleCanvasAid('gridSnapEnabled'),
-      'canvas',
-    ),
-    this.operation(
-      'toggle-workbench',
-      () => true,
-      () => this.#workbenchController.cycleMode(),
-    ),
-    this.operation(
-      'duplicate',
-      () => this.canMutateSelection(),
-      () => this.report(this.#panelController.duplicate()),
-      'canvas',
-    ),
-    this.operation(
-      'lock',
-      () => this.canSetSelectionStatus(),
-      () => this.toggleSelectionStatus('locked', true),
-      'canvas',
-    ),
-    this.operation(
-      'unlock',
-      () => this.canSetSelectionStatus(),
-      () => this.toggleSelectionStatus('locked', false),
-      'canvas',
-    ),
-    this.operation(
-      'hide',
-      () => this.canSetSelectionStatus(),
-      () => this.toggleSelectionStatus('hidden', true),
-      'canvas',
-    ),
-    this.operation(
-      'bring-to-front',
-      () => this.canMutateSelection(),
-      () => this.reorderSelection('front'),
-      'canvas',
-    ),
-    this.operation(
-      'send-to-back',
-      () => this.canMutateSelection(),
-      () => this.reorderSelection('back'),
-      'canvas',
-    ),
-    this.operation(
-      'toggle-guides',
-      () => true,
-      () => this.#workbenchController.toggleGuides(),
-      'canvas',
-    ),
-    this.operation(
-      'toggle-border-guides',
-      () => true,
-      () => this.#workbenchController.toggleBorderGuides(),
-      'canvas',
-    ),
-    this.operation(
-      'show-help',
-      () => true,
-      () => this.toggleHelpPanel(),
-    ),
-    this.operation(
-      'nudge-10-left',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(-10, 0),
-    ),
-    this.operation(
-      'nudge-10-right',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(10, 0),
-    ),
-    this.operation(
-      'nudge-10-up',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(0, -10),
-    ),
-    this.operation(
-      'nudge-10-down',
-      () => this.canMutateSelection(),
-      () => this.nudgeSelection(0, 10),
-    ),
-  ]);
+    ],
+    contextMenu: (target, event) => {
+      // 手势激活期间阻止浏览器右键菜单（R3）。
+      if (this.#gestureController.active) {
+        event.preventDefault();
+        return true;
+      }
+      const targetElement = target as Element;
+      if (targetElement.closest('[data-viewport]')) {
+        event.preventDefault();
+        this.#menuController.openContextMenu(event as MouseEvent);
+        return true;
+      }
+      // 全 shadow 表面阻止浏览器默认菜单；面板不新增菜单（R4）。
+      event.preventDefault();
+      return true;
+    },
+    selectStart: (target, event) => {
+      // 手势激活期全 shadow 禁选；可编辑目标放行（画布表面常禁选由手势控制器负责）。
+      if (!isEditableTarget(target) && this.#gestureController.active) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    },
+    copy: (target, event) => {
+      // 剪贴板事件旁路（右键/系统组合）：非可编辑目标路由到应用剪贴板操作。
+      if (isEditableTarget(target)) return false;
+      event.preventDefault();
+      this.#operations.execute('copy', undefined);
+      return true;
+    },
+    cut: (target, event) => {
+      // 未注册 cut 操作：仅阻止默认，防止设计器内容进入系统剪贴板。
+      if (isEditableTarget(target)) return false;
+      event.preventDefault();
+      return true;
+    },
+    paste: (target, event) => {
+      if (isEditableTarget(target)) return false;
+      event.preventDefault();
+      this.#operations.execute('paste', undefined);
+      return true;
+    },
+    gesture: (target, event) => {
+      // Safari 触控板双指手势（与 ctrl+wheel 等价）：非可编辑目标阻止默认。
+      if (!isEditableTarget(target)) {
+        event.preventDefault();
+        return true;
+      }
+      return false;
+    },
+    change: [
+      (target, event) => this.onImportChange(event),
+      (target, event) => this.#integrationController.onChange(event),
+      (target, event) => this.#layersController.onChange(event),
+      (target, event) => {
+        this.#panelController.onPropertyChange(event);
+        return true;
+      },
+    ],
+    input: [
+      (target) => this.#assetController.onInput(target),
+      (target, event) => this.#panelController.onInput(event),
+      (target, event) => {
+        this.#layersController.onInput(event);
+        return true;
+      },
+    ],
+    dragStart: [
+      (target, event) => {
+        // 标记本设计器发起的拖拽，供 window DnD 防线识别（零宿主干预）。
+        this.#eventSystem.markDragStart();
+        return false;
+      },
+      (target, event) => this.#panelController.onDragStart(event as DragEvent),
+      (target, event) => this.#layersController.onDragStart(event as DragEvent),
+    ],
+    dragOver: (target, event) => this.#layersController.onDragOver(event as DragEvent),
+    drop: (target, event) => this.#layersController.onDrop(event as DragEvent),
+    dragEnd: () => {
+      this.#layersController.clearDrag();
+      return true;
+    },
+    pointerDown: (target, event) => {
+      this.#workbenchController.onPointerDown(event as PointerEvent);
+      return true;
+    },
+    pointerMove: (target, event) => {
+      this.#workbenchController.onPointerMove(event as PointerEvent);
+      return true;
+    },
+    pointerUp: (target, event) => {
+      this.#workbenchController.onPointerUp(event as PointerEvent);
+      return true;
+    },
+    pointerCancel: () => {
+      this.#workbenchController.cancelTransientState();
+      return true;
+    },
+    doubleClick: (target, event) => {
+      this.#workbenchController.onDoubleClick(event as MouseEvent);
+      return true;
+    },
+    keyDownCapture: (target, event) => this.#eventSystem.swallow(event as KeyboardEvent),
+    keyUpCapture: (target, event) => {
+      // 手势激活期间 keyup 同样全吞；但 Space 必须放行到 viewport 的 keyup，
+      // 否则抓手状态（spacePressed）无法在拖拽中松开复位。
+      const keyboardEvent = event as KeyboardEvent;
+      if (this.#gestureController.active && keyboardEvent.code !== 'Space') {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        return true;
+      }
+      return false;
+    },
+    keyDown: [
+      (target, event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        const inspectorDraft = getInspectorDraftTarget(keyboardEvent);
+        if (
+          keyboardEvent.key !== 'Enter' ||
+          keyboardEvent.isComposing ||
+          inspectorDraft === undefined ||
+          isTextAreaDraft(inspectorDraft)
+        ) {
+          return false;
+        }
+        keyboardEvent.preventDefault();
+        this.#panelController.onPropertyChange({ target: inspectorDraft } as Event);
+        return true;
+      },
+      (target, event) => this.#layersController.onKeyDown(event as KeyboardEvent),
+      (target, event) => this.#integrationController.onKeyDown(event as KeyboardEvent),
+      (target, event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        if (!this.#panelController.onKeyDown(keyboardEvent)) {
+          this.onKeyDown(keyboardEvent);
+        }
+        return true;
+      },
+    ],
+    keyUp: (target, event) => this.#viewportController.onKeyUp(event as KeyboardEvent),
+  };
 
   get catalog(): BaseScreenMaterialCatalog | undefined {
     return this.#catalog;
@@ -759,14 +670,27 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.renderDocument(this.#session.document);
       this.renderInteraction();
     }
+    this.connectWindowGuards();
   }
 
   disconnectedCallback(): void {
+    this.#eventSystem.disconnectWindowGuards();
     this.cancelGesture();
     this.#assetController.clear();
     this.resetSessionSurfaces();
     this.#session.cancelProjectOperation();
     this.#renderer?.clear();
+  }
+
+  // window 级守卫随 shadow 表面就绪而注册：upgrade 时 initialize 可能因 catalog 未注入而
+  // 早退（shadowRoot 尚未创建），catalog 注入后 initialize 再次进入并注册；重连场景由
+  // connectedCallback 兜底。connectWindowGuards 本身按实例幂等。
+  private connectWindowGuards(): void {
+    const ownerWindow = this.ownerDocument.defaultView;
+    const root = this.shadowRoot;
+    if (ownerWindow !== null && root !== null) {
+      this.#eventSystem.connectWindowGuards(ownerWindow, root);
+    }
   }
 
   getDocument(): ScreenDocument | undefined {
@@ -897,141 +821,50 @@ export class BaseScreenDesignerElement extends ElementBase {
     query = '',
     published: boolean | undefined = undefined,
   ): Promise<ScreenParseResult<readonly ScreenProjectSummary[]>> {
-    if (this.#projectCatalogPort === undefined) {
-      return Promise.resolve({
-        ok: false,
-        diagnostics: [lifecycleDiagnostic('Project catalog capability is unavailable.')],
-      });
-    }
-    return this.#projectCatalogPort.list({
-      query,
-      published,
-      signal: new AbortController().signal,
-    });
+    return this.#projectGateway.listProjects(query, published);
   }
 
   createProject(name: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    if (this.#projectCatalogPort === undefined) return Promise.resolve(projectPortUnavailable());
-    return this.#projectCatalogPort.create({ name, signal: new AbortController().signal });
+    return this.#projectGateway.createProject(name);
   }
 
   cloneProject(projectId: string, name: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    if (this.#projectCatalogPort === undefined) return Promise.resolve(projectPortUnavailable());
-    return this.#projectCatalogPort.clone({
-      projectId,
-      name,
-      signal: new AbortController().signal,
-    });
+    return this.#projectGateway.cloneProject(projectId, name);
   }
 
   deleteProject(projectId: string, revision: string): Promise<ScreenParseResult<void>> {
-    if (this.#projectCatalogPort === undefined) return Promise.resolve(projectPortUnavailable());
-    return this.#projectCatalogPort.delete({
-      projectId,
-      revision,
-      signal: new AbortController().signal,
-    });
+    return this.#projectGateway.deleteProject(projectId, revision);
   }
 
   importProject(
     name: string,
     document: ScreenDocument,
   ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    if (this.#projectCatalogPort === undefined) return Promise.resolve(projectPortUnavailable());
-    return this.#projectCatalogPort.import({
-      name,
-      document,
-      signal: new AbortController().signal,
-    });
+    return this.#projectGateway.importProject(name, document);
   }
 
   exportProject(projectId: string, revision: string): Promise<ScreenParseResult<ScreenDocument>> {
-    if (this.#projectCatalogPort === undefined) {
-      return Promise.resolve({
-        ok: false,
-        diagnostics: [projectPortUnavailable().diagnostics[0]!],
-      });
-    }
-    return this.#projectCatalogPort.export({
-      projectId,
-      revision,
-      signal: new AbortController().signal,
-    });
+    return this.#projectGateway.exportProject(projectId, revision);
   }
 
   previewProject(published: boolean): Promise<ScreenParseResult<ScreenDocument>> {
-    const project = this.#session.project;
-    if (project === undefined || this.#projectPreviewPort === undefined) {
-      return Promise.resolve({
-        ok: false,
-        diagnostics: [lifecycleDiagnostic('Project preview capability is unavailable.')],
-      });
-    }
-    return this.#projectPreviewPort
-      .load({
-        projectId: project.projectId,
-        revision: project.revision,
-        published,
-        signal: new AbortController().signal,
-      })
-      .then((result) =>
-        result.ok
-          ? { ok: true, value: result.value.document, diagnostics: [] }
-          : { ok: false, diagnostics: result.diagnostics },
-      );
+    return this.#projectGateway.previewProject(published);
   }
 
   listSnapshots(): Promise<ScreenParseResult<readonly ScreenProjectSnapshot[]>> {
-    const project = this.#session.project;
-    if (project === undefined || this.#projectSnapshotPort === undefined) {
-      return Promise.resolve(snapshotPortUnavailable());
-    }
-    return this.#projectSnapshotPort.list(project.projectId, new AbortController().signal);
+    return this.#projectGateway.listSnapshots();
   }
 
   createSnapshot(name: string): Promise<ScreenParseResult<ScreenProjectSnapshot>> {
-    const project = this.#session.project;
-    const document = this.#session.document;
-    if (
-      project === undefined ||
-      document === undefined ||
-      this.#projectSnapshotPort === undefined
-    ) {
-      return Promise.resolve(snapshotPortUnavailable());
-    }
-    return this.#projectSnapshotPort.create({
-      projectId: project.projectId,
-      revision: project.revision,
-      name,
-      document,
-      signal: new AbortController().signal,
-    });
+    return this.#projectGateway.createSnapshot(name);
   }
 
   restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    const project = this.#session.project;
-    if (project === undefined || this.#projectSnapshotPort === undefined) {
-      return Promise.resolve(snapshotPortUnavailable());
-    }
-    return this.#projectSnapshotPort
-      .restore(project.projectId, snapshotId, new AbortController().signal)
-      .then((result) => {
-        if (!result.ok) return result;
-        const replaced = this.replaceDocument(result.value.document);
-        return replaced.ok
-          ? this.#session.load(result.value.projectId)
-          : { ok: false, diagnostics: replaced.diagnostics };
-      });
+    return this.#projectGateway.restoreSnapshot(snapshotId);
   }
 
   listAssets(query = ''): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>> {
-    if (this.#assetCatalogPort === undefined) {
-      return Promise.resolve({
-        ok: false,
-        diagnostics: [lifecycleDiagnostic('Asset catalog capability is unavailable.')],
-      });
-    }
-    return this.#assetCatalogPort.list({ query, signal: new AbortController().signal });
+    return this.#projectGateway.listAssets(query);
   }
 
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
@@ -1107,91 +940,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.createRenderer();
     this.#gestureController.connect(this.#canvas);
     this.#viewportController.connect(this.#viewportElement, this.#canvas);
-    shadow.addEventListener('click', (event) => {
-      const target = event.target;
-      if (!(target instanceof Element)) return;
-      if (this.#notificationController.dismiss(target)) return;
-      if (this.toggleMenuFromTarget(target)) return;
-      this.closeMenus();
-      this.closeContextMenu();
-      if (this.executeToolFromTarget(target)) return;
-      if (this.executeOperationFromTarget(target)) return;
-      if (this.#importController.onClick(target)) return;
-      if (this.#projectFeedbackController.onClick(target)) return;
-      if (this.#projectWorkspaceController.onClick(target)) return;
-      if (this.#assetController.onClick(target)) return;
-      if (this.#integrationController.onClick(target)) return;
-      if (this.#workbenchController.onClick(target)) return;
-      if (this.#layersController.onClick(event)) return;
-      this.#panelController.onClick(event);
-    });
-    shadow.addEventListener('contextmenu', (event) => {
-      const target = event.target;
-      if (!(target instanceof Element) || !target.closest('[data-viewport]')) return;
-      event.preventDefault();
-      this.openContextMenu(event as MouseEvent);
-    });
-    shadow.addEventListener('change', (event) => {
-      if (this.onImportChange(event)) return;
-      if (this.#integrationController.onChange(event)) return;
-      if (this.#layersController.onChange(event)) return;
-      this.#panelController.onPropertyChange(event);
-    });
-    shadow.addEventListener('input', (event) => {
-      if (this.#assetController.onInput(event.target)) return;
-      if (this.#panelController.onInput(event)) return;
-      this.#layersController.onInput(event);
-    });
-    shadow.addEventListener('dragstart', (event) => {
-      const dragEvent = event as DragEvent;
-      if (this.#panelController.onDragStart(dragEvent)) return;
-      this.#layersController.onDragStart(dragEvent);
-    });
-    shadow.addEventListener('dragover', (event) =>
-      this.#layersController.onDragOver(event as DragEvent),
-    );
-    shadow.addEventListener('drop', (event) => this.#layersController.onDrop(event as DragEvent));
-    shadow.addEventListener('dragend', () => this.#layersController.clearDrag());
-    shadow.addEventListener('pointerdown', (event) =>
-      this.#workbenchController.onPointerDown(event as PointerEvent),
-    );
-    shadow.addEventListener('pointermove', (event) =>
-      this.#workbenchController.onPointerMove(event as PointerEvent),
-    );
-    shadow.addEventListener('pointerup', (event) =>
-      this.#workbenchController.onPointerUp(event as PointerEvent),
-    );
-    shadow.addEventListener('dblclick', (event) =>
-      this.#workbenchController.onDoubleClick(event as MouseEvent),
-    );
-    shadow.addEventListener('pointercancel', () =>
-      this.#workbenchController.cancelTransientState(),
-    );
-    shadow.addEventListener('lostpointercapture', () =>
-      this.#workbenchController.cancelTransientState(),
-    );
-    shadow.addEventListener('keydown', (event) => {
-      const keyboardEvent = event as KeyboardEvent;
-      const inspectorDraft = getInspectorDraftTarget(keyboardEvent);
-      if (
-        keyboardEvent.key === 'Enter' &&
-        !keyboardEvent.isComposing &&
-        inspectorDraft !== undefined &&
-        !isTextAreaDraft(inspectorDraft)
-      ) {
-        keyboardEvent.preventDefault();
-        this.#panelController.onPropertyChange({ target: inspectorDraft } as Event);
-        return;
-      }
-      if (this.#layersController.onKeyDown(keyboardEvent)) return;
-      if (this.#integrationController.onKeyDown(keyboardEvent)) return;
-      if (!this.#panelController.onKeyDown(keyboardEvent)) {
-        this.onKeyDown(keyboardEvent);
-      }
-    });
-    shadow.addEventListener('keyup', (event) =>
-      this.#viewportController.onKeyUp(event as KeyboardEvent),
-    );
+    this.#surfaceRouter.connect(shadow, this.#surfaceBindings);
+    this.connectWindowGuards();
     if (this.#session.document !== undefined) {
       this.renderDocument(this.#session.document);
       this.renderInteraction();
@@ -1205,7 +955,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     const rendered = this.#renderer.render(document);
     return rendered.ok
-      ? { ok: true, value: undefined, diagnostics: [] }
+      ? { ok: true, value: undefined, diagnostics: rendered.diagnostics }
       : { ok: false, diagnostics: rendered.diagnostics };
   }
 
@@ -1216,6 +966,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.renderLayers();
     this.renderControls();
     this.#integrationController.render();
+    this.#workbenchController.renderInspectorTabs();
   }
 
   private renderSelection(): void {
@@ -1276,44 +1027,58 @@ export class BaseScreenDesignerElement extends ElementBase {
     const control = target.closest<HTMLButtonElement>('[data-action], [data-menu-action]');
     const id = control?.dataset.action ?? control?.dataset.menuAction;
     if (id === undefined || this.#operations.get(id) === undefined) return false;
-    this.closeContextMenu();
+    this.#menuController.closeContextMenu();
     return this.#operations.execute(id, undefined);
   }
 
   private executeDesignerTransaction(
     transaction: ScreenDocumentTransaction,
   ): ScreenParseResult<ScreenDocument> {
-    let result: ScreenParseResult<ScreenDocument> | undefined;
-    const executed = this.#operations.execute('document.commit', {
-      transaction,
-      runTransaction: () => {
-        result = this.#session.executeTransaction(transaction);
-        return result;
-      },
-    });
-    return (
-      result ?? {
-        ok: false,
-        diagnostics: [lifecycleDiagnostic(executed ? '编辑操作未完成。' : '编辑操作不可用。')],
-      }
-    );
+    return this.executeDesignerCommit({ transaction });
   }
 
   private executeDesignerCommand(
     command: ScreenDocumentCommand,
   ): ScreenParseResult<ScreenDocument> {
+    return this.executeDesignerCommit({ command });
+  }
+
+  private executeDesignerCommit(
+    commit:
+      | { readonly transaction: ScreenDocumentTransaction }
+      | { readonly command: ScreenDocumentCommand },
+  ): ScreenParseResult<ScreenDocument> {
     let result: ScreenParseResult<ScreenDocument> | undefined;
     const executed = this.#operations.execute('document.commit', {
-      command,
-      runCommand: () => {
-        result = this.#session.executeCommand(command);
-        return result;
-      },
+      ...('transaction' in commit ? { transaction: commit.transaction } : {}),
+      ...('command' in commit ? { command: commit.command } : {}),
+      ...('transaction' in commit
+        ? {
+            runTransaction: () => {
+              result = this.#session.executeTransaction(commit.transaction);
+              return result;
+            },
+          }
+        : {}),
+      ...('command' in commit
+        ? {
+            runCommand: () => {
+              result = this.#session.executeCommand(commit.command);
+              return result;
+            },
+          }
+        : {}),
     });
     return (
       result ?? {
         ok: false,
-        diagnostics: [lifecycleDiagnostic(executed ? '编辑操作未完成。' : '编辑操作不可用。')],
+        diagnostics: [
+          lifecycleDiagnostic(
+            executed
+              ? DESIGNER_UI_TEXT.lifecycle.commitIncomplete
+              : DESIGNER_UI_TEXT.lifecycle.commitUnavailable,
+          ),
+        ],
       }
     );
   }
@@ -1343,26 +1108,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     });
   }
 
-  private toggleMenuFromTarget(target: Element): boolean {
-    const toggle = target.closest<HTMLButtonElement>('[data-menu-toggle]');
-    if (toggle === null) return false;
-    const menuId = toggle.dataset.menuToggle;
-    if (menuId === undefined || this.shadowRoot === null) return true;
-    for (const menu of this.shadowRoot.querySelectorAll<HTMLElement>('[data-menu]')) {
-      const open = menu.dataset.menu === menuId && menu.hidden;
-      menu.hidden = !open;
-    }
-    for (const control of this.shadowRoot.querySelectorAll<HTMLButtonElement>(
-      '[data-menu-toggle]',
-    )) {
-      control.ariaExpanded = String(
-        control === toggle &&
-          !this.shadowRoot.querySelector<HTMLElement>(`[data-menu="${menuId}"]`)?.hidden,
-      );
-    }
-    return true;
-  }
-
   private onImportChange(event: Event): boolean {
     const input = event.target;
     if (!(input instanceof HTMLInputElement) || input.dataset.importDocument === undefined)
@@ -1376,157 +1121,24 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   private onKeyDown(event: KeyboardEvent): void {
     if (this.#workbenchController.onKeyDown(event)) return;
-    if (event.key === 'Escape' && (this.closeContextMenu() || this.closeMenus())) {
+    if (
+      event.key === 'Escape' &&
+      (this.#menuController.closeContextMenu() || this.#menuController.closeMenus())
+    ) {
       event.preventDefault();
       return;
     }
-    if (!isEditable(event.target) && (!event.altKey || event.ctrlKey || event.metaKey)) {
-      const operation = this.#operations.findByShortcut(shortcutFromKeyboardEvent(event) ?? '');
-      if (operation !== undefined && this.#operations.execute(operation.id, undefined)) {
-        event.preventDefault();
-        return;
-      }
+    // 统一命令通道：capture 阶段的策略裁决已排除黑名单与手势激活期。
+    // 命中设计器命令 chord 即阻止浏览器默认（命令未启用/不可用时不弹浏览器默认行为），
+    // 控件级键优先，命令未命中时回落到 viewport 状态通道。
+    const policy = this.#eventSystem.resolve(event);
+    if (policy.kind === 'command') {
+      event.preventDefault();
+      const operation = this.#operations.findByShortcut(policy.chord);
+      if (operation !== undefined) this.#operations.execute(operation.id, undefined);
+      return;
     }
     if (!event.defaultPrevented) this.#viewportController.onKeyDown(event);
-  }
-
-  private closeMenus(): boolean {
-    if (this.shadowRoot === null) return false;
-    let closed = false;
-    for (const menu of this.shadowRoot.querySelectorAll<HTMLElement>('[data-menu]')) {
-      if (!menu.hidden) {
-        menu.hidden = true;
-        closed = true;
-      }
-    }
-    for (const control of this.shadowRoot.querySelectorAll<HTMLButtonElement>(
-      '[data-menu-toggle]',
-    )) {
-      control.ariaExpanded = 'false';
-    }
-    return closed;
-  }
-
-  private openContextMenu(event: MouseEvent): void {
-    const menu = this.#contextMenu;
-    if (menu === undefined) return;
-    const workspace = this.shadowRoot?.querySelector<HTMLElement>('.workspace');
-    if (workspace === null || workspace === undefined) return;
-    const target = event.target;
-    const onComponent =
-      target instanceof Element && target.closest('[data-base-screen-component-id]') !== null;
-    menu.innerHTML = contextMenuHtml(
-      onComponent ? DESIGNER_CONTEXT_MENU.component : DESIGNER_CONTEXT_MENU.canvas,
-    );
-    this.renderContextMenuState();
-    menu.hidden = false;
-    const bounds = workspace.getBoundingClientRect();
-    const left = event.clientX - bounds.left;
-    const top = event.clientY - bounds.top;
-    menu.style.left = `${Math.max(0, Math.min(left, bounds.width - menu.offsetWidth))}px`;
-    menu.style.top = `${Math.max(0, Math.min(top, bounds.height - menu.offsetHeight))}px`;
-    menu.focus();
-  }
-
-  private renderContextMenuState(): void {
-    const menu = this.#contextMenu;
-    if (menu === undefined) return;
-    for (const control of menu.querySelectorAll<HTMLButtonElement>('[data-menu-action]')) {
-      const id = control.dataset.menuAction;
-      if (id === undefined) continue;
-      const state = this.#operations.getState(id, undefined);
-      if (state !== undefined) {
-        control.hidden = !state.available;
-        control.disabled = !state.enabled;
-      }
-    }
-  }
-
-  private closeContextMenu(): boolean {
-    const menu = this.#contextMenu;
-    if (menu === undefined || menu.hidden) return false;
-    menu.hidden = true;
-    return true;
-  }
-
-  private canMutateSelection(): boolean {
-    const document = this.#session.document;
-    if (document === undefined) return false;
-    const selected = selectedComponents(document, this.#session.interaction.selectedComponentIds);
-    return (
-      selected.length > 0 &&
-      new Set(selected.map((component) => component.parentId)).size === 1 &&
-      selected.every((component) => !isScreenComponentEffectivelyLocked(document, component.id))
-    );
-  }
-
-  private deleteSelection(): void {
-    if (!this.canMutateSelection()) return;
-    const componentIds = this.#session.interaction.selectedComponentIds;
-    const result = this.executeDesignerCommand({ type: 'remove-components', componentIds });
-    if (result.ok) this.#session.reduceSelection({ type: 'clear-selection' });
-    else this.report(result);
-  }
-
-  private nudgeSelection(x: number, y: number): void {
-    const document = this.#session.document;
-    if (document === undefined || !this.canMutateSelection()) return;
-    const selected = selectedComponents(document, this.#session.interaction.selectedComponentIds);
-    this.report(
-      this.executeDesignerTransaction({
-        commands: selected.map((component) => ({
-          type: 'update-components' as const,
-          componentIds: [component.id],
-          patch: {
-            position: { x: component.position.x + x, y: component.position.y + y },
-          },
-        })),
-      }),
-    );
-  }
-
-  private canSetSelectionStatus(): boolean {
-    const document = this.#session.document;
-    if (document === undefined) return false;
-    return document.components.length > 0;
-  }
-
-  private toggleSelectionStatus(property: 'locked' | 'hidden', value: boolean): void {
-    const document = this.#session.document;
-    if (document === undefined) return;
-    const selected = selectedComponents(document, this.#session.interaction.selectedComponentIds);
-    if (selected.length === 0) return;
-    this.report(
-      this.executeDesignerTransaction({
-        commands: selected.map((component) => ({
-          type: 'update-components' as const,
-          componentIds: [component.id],
-          patch: { status: { ...component.status, [property]: value } },
-        })),
-      }),
-    );
-  }
-
-  private reorderSelection(edge: 'front' | 'back'): void {
-    const document = this.#session.document;
-    if (document === undefined || !this.canMutateSelection()) return;
-    const transaction = createZOrderTransaction(
-      document,
-      this.#session.interaction.selectedComponentIds,
-      edge,
-    );
-    if (transaction !== undefined) this.report(this.executeDesignerTransaction(transaction));
-  }
-
-  private toggleHelpPanel(): void {
-    if (this.shadowRoot === null) return;
-    const help = this.shadowRoot.querySelector<HTMLElement>('[data-menu="help"]');
-    if (help === null || help === undefined) return;
-    const open = help.hidden;
-    this.closeMenus();
-    help.hidden = !open;
-    const toggle = this.shadowRoot.querySelector<HTMLElement>('[data-menu-toggle="help"]');
-    if (toggle !== null) toggle.ariaExpanded = String(open);
   }
 
   private renderProjectStatus(): void {
@@ -1572,46 +1184,6 @@ export class BaseScreenDesignerElement extends ElementBase {
       control.disabled = state?.enabled !== true;
       control.ariaPressed = String(this.#viewportController.activeTool === tool.id);
     }
-  }
-
-  private operation(
-    id: keyof typeof DESIGNER_OPERATION_TEXT,
-    isEnabled: () => boolean,
-    execute: () => void,
-    scope: 'global' | 'canvas' = 'global',
-    isAvailable: () => boolean = () => true,
-  ) {
-    const text = DESIGNER_OPERATION_TEXT[id];
-    return {
-      id,
-      scope,
-      label: text.label,
-      tooltip: text.tooltip,
-      ...('shortcut' in text ? { shortcut: text.shortcut } : {}),
-      ...(id === 'redo' ? { aliases: ['Ctrl+Y'] } : {}),
-      ...(id === 'zoom-in' ? { aliases: ['Ctrl+Shift+='] } : {}),
-      isAvailable: () => isAvailable(),
-      isEnabled: () => isEnabled(),
-      execute: () => execute(),
-    };
-  }
-
-  private toolOperation(tool: DesignerToolId) {
-    const definition = DESIGNER_TOOLS.find((candidate) => candidate.id === tool)!;
-    return {
-      id: `tool.${tool}`,
-      scope: 'canvas' as const,
-      label: definition.label,
-      tooltip: definition.label,
-      shortcut: getDesignerToolShortcut(tool),
-      isAvailable: () =>
-        isDesignerToolConfigured(definition, this.#toolMaterialTypes, this.#catalog),
-      isEnabled: () => isDesignerToolConfigured(definition, this.#toolMaterialTypes, this.#catalog),
-      execute: () => {
-        this.cancelGesture();
-        this.#viewportController.setActiveTool(tool);
-      },
-    };
   }
 
   private isProjectBusy(): boolean {
@@ -1667,8 +1239,8 @@ export class BaseScreenDesignerElement extends ElementBase {
   private emitDiagnostics(diagnostics: readonly ScreenDiagnostic[]): void {
     const diagnostic = diagnostics[0];
     if (diagnostic !== undefined && this.#statusFeedback !== undefined) {
-      this.#statusFeedback.textContent = diagnosticSummary(diagnostic.code);
-      this.#notificationController.notify(diagnosticSummary(diagnostic.code), 'error');
+      this.#statusFeedback.textContent = designerDiagnosticSummary(diagnostic.code);
+      this.#notificationController.notify(designerDiagnosticSummary(diagnostic.code), 'error');
     }
     this.dispatchEvent(new CustomEvent('base-screen-diagnostic', { detail: { diagnostics } }));
   }
@@ -1684,76 +1256,4 @@ function lifecycleDiagnostic(message: string): ScreenDiagnostic {
 
 function projectPhaseLabel(phase: ScreenProjectPhase): string {
   return DESIGNER_UI_TEXT.projectPhases[phase];
-}
-
-function diagnosticSummary(code: ScreenDiagnostic['code']): string {
-  switch (code) {
-    case 'PROJECT_CONFLICT':
-      return '项目存在远端冲突。';
-    case 'PROJECT_UNAVAILABLE':
-      return '项目服务暂时不可用。';
-    case 'PROJECT_ABORTED':
-      return '项目操作已取消。';
-    case 'PROJECT_DIRTY':
-      return '请先保存项目。';
-    case 'PROJECT_PUBLISH_UNAVAILABLE':
-      return '当前项目不能发布。';
-    case 'BLUEPRINT_CAPABILITY_UNAVAILABLE':
-      return '当前物料不支持蓝图。';
-    case 'HOST_RESOURCE_TIMEOUT':
-    case 'HOST_RESOURCE_FAILED':
-    case 'HOST_RESOURCE_INVALID':
-      return '资源数据不可用。';
-    case 'CORE_COMMAND_TARGET_LOCKED':
-      return '选中组件已锁定。';
-    case 'CORE_COMMAND_TARGET_HIDDEN':
-      return '选中组件已隐藏。';
-    case 'PLUGIN_CORE_LIFECYCLE_INVALID':
-      return '当前操作无法执行。';
-    default:
-      return '操作未完成，请检查输入后重试。';
-  }
-}
-
-function isEditable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLSelectElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
-}
-
-function isInspectorDraft(target: EventTarget | null): boolean {
-  const dataset = (target as { readonly dataset?: DOMStringMap } | null)?.dataset;
-  return (
-    dataset !== undefined &&
-    (dataset.property !== undefined ||
-      dataset.prop !== undefined ||
-      dataset.canvasProperty !== undefined ||
-      dataset.dataSourceType !== undefined ||
-      dataset.dataSourceField !== undefined)
-  );
-}
-
-function getInspectorDraftTarget(event: KeyboardEvent): EventTarget | undefined {
-  return event.composedPath().find((target) => isInspectorDraft(target));
-}
-
-function isTextAreaDraft(target: EventTarget | null): boolean {
-  return (target as { readonly tagName?: string } | null)?.tagName === 'TEXTAREA';
-}
-
-function projectPortUnavailable<T>(): ScreenParseResult<T> {
-  return {
-    ok: false,
-    diagnostics: [lifecycleDiagnostic('Project catalog capability is unavailable.')],
-  };
-}
-
-function snapshotPortUnavailable<T>(): ScreenParseResult<T> {
-  return {
-    ok: false,
-    diagnostics: [lifecycleDiagnostic('Project snapshot capability is unavailable.')],
-  };
 }
