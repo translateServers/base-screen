@@ -14,7 +14,10 @@ export interface DesignerKeyboardEventShape {
 // - Backspace 归一为 Delete（与注册表语义一致）；
 // - Cmd 归一为 Ctrl（macOS 与 Windows 共用同一命令元数据）；
 // - IME 组合期（isComposing / Process 键）与 AltGr 布局不产生命令 chord，
-//   由上层裁决为"放行"，避免中文输入法与欧式键盘布局误触发快捷键。
+//   由上层裁决为"放行"，避免中文输入法与欧式键盘布局误触发快捷键；
+// - 修饰键自身（Alt/Ctrl/Meta/Shift）不携带自身修饰前缀：Chromium 对 Alt 键自身的
+//   keydown 上报 altKey=true，若不剥离会产生 'Alt+Alt' 伪 chord，使黑名单（'ALT'）失配，
+//   Edge/Chrome 的 Alt 访问键聚焦将无法被拦截。
 export function designerChordFromKeyboardEvent(
   event: DesignerKeyboardEventShape,
 ): string | undefined {
@@ -22,6 +25,8 @@ export function designerChordFromKeyboardEvent(
     return undefined;
   }
   if (event.key === 'Backspace') return 'Delete';
+  if (event.key === 'Control') return 'Ctrl';
+  if (event.key === 'Alt' || event.key === 'Meta' || event.key === 'Shift') return event.key;
   const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
   const modifiers = [
     event.ctrlKey || event.metaKey ? 'Ctrl' : '',

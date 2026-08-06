@@ -48,6 +48,8 @@ describe('resolveDesignerKeyboardPolicy', () => {
     expect(key({ event: { key: 'Alt' }, context: { editable: true } })).toEqual({
       kind: 'block',
     });
+    // Chromium 真实形态：Alt 自身 keydown 报 altKey=true（Edge/Chrome 访问键聚焦必须被拦）。
+    expect(key({ event: { key: 'Alt', altKey: true } })).toEqual({ kind: 'block' });
   });
 
   it('R2 routes matching operations to commands and classifies repeats', () => {

@@ -32,6 +32,15 @@ describe('designerChordFromKeyboardEvent', () => {
     expect(chord({ key: 'Backspace' })).toBe('Delete');
   });
 
+  it('R1 normalizes modifier keys themselves without a self-modifier prefix', () => {
+    // Chromium 对 Alt 自身的 keydown 上报 altKey=true；若不剥离会产生 'Alt+Alt' 伪 chord。
+    expect(chord({ key: 'Alt', altKey: true })).toBe('Alt');
+    expect(chord({ key: 'Alt' })).toBe('Alt');
+    expect(chord({ key: 'Control', ctrlKey: true })).toBe('Ctrl');
+    expect(chord({ key: 'Shift', shiftKey: true })).toBe('Shift');
+    expect(chord({ key: 'Meta', metaKey: true })).toBe('Meta');
+  });
+
   it('R2 guards IME composition from command chords', () => {
     expect(chord({ key: 'e', ctrlKey: true, isComposing: true })).toBeUndefined();
     expect(chord({ key: 'Process', ctrlKey: true })).toBeUndefined();
