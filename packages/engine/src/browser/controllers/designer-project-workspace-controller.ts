@@ -5,6 +5,7 @@ import type {
   ScreenProjectSnapshot,
   ScreenProjectSummary,
 } from '@base-screen/contracts';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerProjectWorkspaceCapabilities {
   readonly directory: boolean;
@@ -67,12 +68,12 @@ export class DesignerProjectWorkspaceController {
         ?.querySelector<HTMLInputElement>('[data-project-name]')
         ?.value.trim();
       if (name === undefined || name.length === 0) {
-        this.setFeedback('请输入项目名称。');
+        this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.enterProjectName);
         return true;
       }
       void this.callbacks.createProject(name).then((result) => {
         if (result.ok) {
-          this.setFeedback('项目已创建。');
+          this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.created);
           void this.callbacks
             .loadProject(result.value.projectId)
             .then((loaded) => this.report(loaded));
@@ -86,7 +87,7 @@ export class DesignerProjectWorkspaceController {
       void this.callbacks.previewProject(action === 'preview-published').then((result) => {
         if (result.ok)
           this.setFeedback(
-            action === 'preview-published' ? '已获取已发布预览。' : '已获取草稿预览。',
+            DESIGNER_UI_TEXT.projectWorkspace.previewFetched(action === 'preview-published'),
           );
         else this.report(result);
       });
@@ -96,7 +97,7 @@ export class DesignerProjectWorkspaceController {
     if (action === 'load' && projectId !== undefined) {
       void this.callbacks.loadProject(projectId).then((result) => {
         if (result.ok) {
-          this.setFeedback('项目已加载。');
+          this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.loaded);
           this.render();
         } else {
           this.report(result);
@@ -110,7 +111,7 @@ export class DesignerProjectWorkspaceController {
       if (revision === undefined) return true;
       void this.callbacks.deleteProject(projectId, revision).then((result) => {
         if (result.ok) {
-          this.setFeedback('项目已删除。');
+          this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.deleted);
           void this.listProjects();
         } else {
           this.report(result);
@@ -122,7 +123,7 @@ export class DesignerProjectWorkspaceController {
     if (action === 'restore' && snapshotId !== undefined) {
       void this.callbacks.restoreSnapshot(snapshotId).then((result) => {
         if (result.ok) {
-          this.setFeedback('快照已恢复。');
+          this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.snapshotRestored);
           this.render();
         } else {
           this.report(result);
@@ -148,8 +149,8 @@ export class DesignerProjectWorkspaceController {
     workspace.replaceChildren();
     const header = workspace.ownerDocument.createElement('header');
     const title = workspace.ownerDocument.createElement('h2');
-    title.textContent = '项目';
-    const close = this.button('关闭项目面板', 'close');
+    title.textContent = DESIGNER_UI_TEXT.project;
+    const close = this.button(DESIGNER_UI_TEXT.projectWorkspace.closePanel, 'close');
     header.append(title, close);
     workspace.appendChild(header);
     this.#feedback = workspace.ownerDocument.createElement('p');
@@ -158,39 +159,45 @@ export class DesignerProjectWorkspaceController {
     this.#feedback.setAttribute('role', 'status');
     this.#feedback.setAttribute('aria-live', 'polite');
     this.#feedback.textContent =
-      project === undefined ? '请选择或创建项目。' : `当前项目：${project.name}`;
+      project === undefined
+        ? DESIGNER_UI_TEXT.projectWorkspace.selectOrCreate
+        : DESIGNER_UI_TEXT.projectWorkspace.current(project.name);
     workspace.appendChild(this.#feedback);
     if (capabilities.directory) this.renderDirectory(workspace);
     if (project !== undefined && capabilities.preview) this.renderPreview(workspace);
     if (project !== undefined && capabilities.snapshots) this.renderSnapshots(workspace);
     if (!capabilities.directory && !capabilities.preview && !capabilities.snapshots) {
-      this.setFeedback('宿主未提供项目目录、预览或快照能力。');
+      this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.hostMissingCapabilities);
     }
   }
 
   private renderDirectory(workspace: HTMLElement): void {
-    const section = this.section('项目目录');
+    const section = this.section(DESIGNER_UI_TEXT.projectWorkspace.directory);
     const name = workspace.ownerDocument.createElement('input');
     name.className = 'designer-control designer-input';
     name.dataset.projectName = 'true';
-    name.placeholder = '项目名称';
-    name.setAttribute('aria-label', '新项目名称');
-    section.append(name, this.button('创建项目', 'create'), this.button('刷新目录', 'directory'));
+    name.placeholder = DESIGNER_UI_TEXT.projectWorkspace.name;
+    name.setAttribute('aria-label', DESIGNER_UI_TEXT.projectWorkspace.newName);
+    section.append(
+      name,
+      this.button(DESIGNER_UI_TEXT.projectWorkspace.create, 'create'),
+      this.button(DESIGNER_UI_TEXT.projectWorkspace.refreshDirectory, 'directory'),
+    );
     workspace.appendChild(section);
   }
 
   private renderPreview(workspace: HTMLElement): void {
-    const section = this.section('项目预览');
+    const section = this.section(DESIGNER_UI_TEXT.projectWorkspace.preview);
     section.append(
-      this.button('预览草稿', 'preview-draft'),
-      this.button('预览已发布版本', 'preview-published'),
+      this.button(DESIGNER_UI_TEXT.projectWorkspace.previewDraft, 'preview-draft'),
+      this.button(DESIGNER_UI_TEXT.projectWorkspace.previewPublished, 'preview-published'),
     );
     workspace.appendChild(section);
   }
 
   private renderSnapshots(workspace: HTMLElement): void {
-    const section = this.section('项目快照');
-    section.appendChild(this.button('查看快照', 'snapshots'));
+    const section = this.section(DESIGNER_UI_TEXT.projectWorkspace.snapshot);
+    section.appendChild(this.button(DESIGNER_UI_TEXT.projectWorkspace.viewSnapshots, 'snapshots'));
     workspace.appendChild(section);
   }
 
@@ -203,7 +210,7 @@ export class DesignerProjectWorkspaceController {
     const workspace = this.#workspace;
     if (workspace === undefined) return;
     workspace.querySelector<HTMLElement>('[data-project-results]')?.remove();
-    const results = this.section('目录结果');
+    const results = this.section(DESIGNER_UI_TEXT.projectWorkspace.directoryResults);
     results.dataset.projectResults = 'true';
     for (const project of result.value) {
       const item = workspace.ownerDocument.createElement('div');
@@ -211,12 +218,16 @@ export class DesignerProjectWorkspaceController {
       item.dataset.projectId = project.projectId;
       item.dataset.projectRevision = project.revision;
       item.textContent = project.name;
-      item.append(this.button('加载', 'load'), this.button('删除', 'delete'));
+      item.append(
+        this.button(DESIGNER_UI_TEXT.projectWorkspace.load, 'load'),
+        this.button(DESIGNER_UI_TEXT.projectWorkspace.delete, 'delete'),
+      );
       results.appendChild(item);
     }
-    if (result.value.length === 0) results.appendChild(this.empty('没有可用项目。'));
+    if (result.value.length === 0)
+      results.appendChild(this.empty(DESIGNER_UI_TEXT.projectWorkspace.noProjects));
     workspace.appendChild(results);
-    this.setFeedback(`已显示 ${result.value.length} 个项目。`);
+    this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.projectsShown(result.value.length));
   }
 
   private async listSnapshots(): Promise<void> {
@@ -228,19 +239,20 @@ export class DesignerProjectWorkspaceController {
     const workspace = this.#workspace;
     if (workspace === undefined) return;
     workspace.querySelector<HTMLElement>('[data-snapshot-results]')?.remove();
-    const results = this.section('快照结果');
+    const results = this.section(DESIGNER_UI_TEXT.projectWorkspace.snapshotResults);
     results.dataset.snapshotResults = 'true';
     for (const snapshot of result.value) {
       const item = workspace.ownerDocument.createElement('div');
       item.className = 'designer-project-item';
       item.dataset.snapshotId = snapshot.id;
       item.textContent = snapshot.name;
-      item.appendChild(this.button('恢复', 'restore'));
+      item.appendChild(this.button(DESIGNER_UI_TEXT.projectWorkspace.restore, 'restore'));
       results.appendChild(item);
     }
-    if (result.value.length === 0) results.appendChild(this.empty('没有可用快照。'));
+    if (result.value.length === 0)
+      results.appendChild(this.empty(DESIGNER_UI_TEXT.projectWorkspace.noSnapshots));
     workspace.appendChild(results);
-    this.setFeedback(`已显示 ${result.value.length} 个快照。`);
+    this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.snapshotsShown(result.value.length));
   }
 
   private button(label: string, action: string): HTMLButtonElement {
@@ -271,7 +283,7 @@ export class DesignerProjectWorkspaceController {
 
   private report(result: ScreenParseResult<unknown>): void {
     this.callbacks.report(result.diagnostics);
-    this.setFeedback('操作未完成，请重试。');
+    this.setFeedback(DESIGNER_UI_TEXT.projectWorkspace.operationFailed);
   }
 
   private setFeedback(message: string): void {

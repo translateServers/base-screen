@@ -17,27 +17,27 @@ export function createDesignerWorkspace(
   layout.className = 'designer';
   layout.innerHTML = `
     <div class="small-screen-warning" role="alert">
-      <span>编辑需要至少 1024 × 640 的可用空间。</span>
+      <span>${DESIGNER_UI_TEXT.smallScreenWarning}</span>
     </div>
 
     <aside class="rail" data-left-panel>
       <header class="panel-heading">
         <span class="panel-title">${DESIGNER_UI_TEXT.materials}</span>
         <span class="panel-count">${materials.length}</span>
-        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" title="收起物料面板" aria-label="收起物料面板">
+        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" title="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
         </button>
       </header>
       <label class="designer-field material-search">
-        <span class="sr-only">搜索物料</span>
-        <input type="search" class="designer-control designer-input" data-material-search placeholder="搜索物料">
+        <span class="sr-only">${DESIGNER_UI_TEXT.materialsSearch}</span>
+        <input type="search" class="designer-control designer-input" data-material-search placeholder="${DESIGNER_UI_TEXT.materialsSearch}">
       </label>
-      <div class="material-filters" role="group" aria-label="物料筛选">
-        <button type="button" class="designer-control designer-button" data-material-filter="all" aria-pressed="true">全部</button>
-        <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">收藏</button>
-        <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">最近</button>
+      <div class="material-filters" role="group" aria-label="${DESIGNER_UI_TEXT.materialFilters}">
+        <button type="button" class="designer-control designer-button" data-material-filter="all" aria-pressed="true">${DESIGNER_UI_TEXT.allMaterials}</button>
+        <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">${DESIGNER_UI_TEXT.favoriteMaterials}</button>
+        <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">${DESIGNER_UI_TEXT.recentMaterials}</button>
       </div>
-      <div class="designer-tablist rail-tabs" role="tablist" aria-label="左侧面板">
+      <div class="designer-tablist rail-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.leftPanel}">
         <button type="button" class="designer-tab" id="designer-materials-tab" role="tab" aria-controls="designer-materials-panel" aria-selected="true" data-panel-tab="materials">${DESIGNER_UI_TEXT.materials}</button>
         <button type="button" class="designer-tab" id="designer-layers-tab" role="tab" aria-controls="designer-layers-panel" aria-selected="false" data-panel-tab="layers">${DESIGNER_UI_TEXT.layers}</button>
       </div>
@@ -48,26 +48,26 @@ export function createDesignerWorkspace(
     <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical"></div>
 
     <main class="workspace">
-      <header class="designer-topbar" aria-label="设计器顶栏">
-        <div class="topbar-brand" aria-label="Base Screen 设计器">
+      <header class="designer-topbar" aria-label="${DESIGNER_UI_TEXT.topbar}">
+        <div class="topbar-brand" aria-label="${DESIGNER_UI_TEXT.brand}">
           <span class="designer-brand-mark" aria-hidden="true">Bs</span>
           <span class="designer-brand-name">Base Screen</span>
           <span class="designer-brand-separator" aria-hidden="true"></span>
-          <span class="designer-project-name">未命名大屏</span>
+          <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>
           <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
         </div>
-        <div class="topbar-group designer-tool-cluster" role="group" aria-label="工具">
+        <div class="topbar-group designer-tool-cluster" role="group" aria-label="${DESIGNER_UI_TEXT.tools}">
           ${DESIGNER_TOOLS.map((tool) => `<button type="button" class="designer-control designer-button designer-icon-button designer-tool-button tool-btn" data-variant="ghost" data-tool="${tool.id}" data-material-key="${tool.materialKey ?? ''}" title="${tool.label} (${getDesignerToolShortcut(tool.id)})" aria-label="${tool.label}">${toolGlyph(tool.id)}<kbd>${getDesignerToolShortcut(tool.id)}</kbd></button>`).join('')}
         </div>
-        <div class="topbar-group" aria-label="历史记录">
+        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.history}">
           ${actionButton('undo', designerIcon('undo'))}
           ${actionButton('redo', redoGlyph())}
         </div>
-        <div class="topbar-group" aria-label="剪贴板">
+        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.clipboard}">
           ${actionButton('copy', copyGlyph())}
           ${actionButton('paste', pasteGlyph())}
         </div>
-        <div class="topbar-group" aria-label="排列">
+        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.arrange}">
           ${actionButton('group', groupGlyph())}
           ${actionButton('ungroup', ungroupGlyph())}
           <span class="toolbar-divider"></span>
@@ -82,7 +82,7 @@ export function createDesignerWorkspace(
           ${actionButton('distribute-vertical', distributeVerticalGlyph())}
         </div>
         <div class="topbar-spacer"></div>
-        <div class="topbar-group" aria-label="项目">
+        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.project}">
           ${actionButton('project-workspace', projectGlyph())}
           ${actionButton('preview', previewGlyph())}
           ${actionButton('import', importGlyph())}
@@ -92,23 +92,22 @@ export function createDesignerWorkspace(
           ${actionButton('project-retry', retryGlyph())}
           ${actionButton('project-cancel', cancelGlyph())}
         </div>
-        <div class="topbar-group topbar-zoom" aria-label="缩放">
+        <div class="topbar-group topbar-zoom" aria-label="${DESIGNER_UI_TEXT.zoom}">
           ${actionButton('zoom-out', zoomOutGlyph())}
           <output class="zoom-value" data-zoom>100%</output>
           ${actionButton('zoom-in', zoomInGlyph())}
           ${actionButton('zoom-reset', resetZoomGlyph())}
           ${actionButton('zoom-fit', fitZoomGlyph())}
         </div>
-        <div class="topbar-group" aria-label="画布辅助">
+        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.canvasAids}">
           ${actionButton('toggle-grid', gridGlyph())}
-          ${actionButton('toggle-snap', snapGlyph())}
         </div>
-        <div class="designer-menu-triggers" role="menubar" aria-label="设计器菜单">
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="file" aria-expanded="false" role="menuitem">文件</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="edit" aria-expanded="false" role="menuitem">编辑</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="view" aria-expanded="false" role="menuitem">视图</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="tools" aria-expanded="false" role="menuitem">工具</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="help" aria-expanded="false" role="menuitem">帮助</button>
+        <div class="designer-menu-triggers" role="menubar" aria-label="${DESIGNER_UI_TEXT.designerMenu}">
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="file" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.file}</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="edit" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.edit}</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="view" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.view}</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="tools" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.tools}</button>
+          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="help" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.help}</button>
         </div>
         <div class="designer-menu" data-menu="file" hidden role="menu">
           ${menuButton('project-workspace')}${menuButton('import')}${menuButton('export')}${menuButton('project-save')}${menuButton('project-publish')}${menuButton('project-retry')}${menuButton('project-cancel')}
@@ -117,13 +116,13 @@ export function createDesignerWorkspace(
           ${menuButton('undo')}${menuButton('redo')}${menuButton('copy')}${menuButton('paste')}${menuButton('delete')}${menuButton('duplicate')}${menuButton('group')}${menuButton('ungroup')}${menuButton('lock')}${menuButton('unlock')}${menuButton('hide')}${menuButton('bring-to-front')}${menuButton('send-to-back')}
         </div>
         <div class="designer-menu" data-menu="view" hidden role="menu">
-          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-fit')}${menuButton('toggle-grid')}${menuButton('toggle-snap')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}
+          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-fit')}${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}
         </div>
         <div class="designer-menu" data-menu="tools" hidden role="menu">
-          ${menuButton('toggle-grid')}${menuButton('toggle-snap')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}${menuButton('toggle-workbench')}
+          ${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}${menuButton('toggle-workbench')}
         </div>
-        <section class="designer-help" data-menu="help" hidden aria-label="快捷键帮助">
-          <h2>快捷键</h2>
+        <section class="designer-help" data-menu="help" hidden aria-label="${DESIGNER_UI_TEXT.shortcutHelp}">
+          <h2>${DESIGNER_UI_TEXT.shortcuts}</h2>
           ${Object.entries(DESIGNER_OPERATION_TEXT)
             .flatMap(([id, operation]) =>
               'shortcut' in operation
@@ -149,21 +148,21 @@ export function createDesignerWorkspace(
           </div>
         </div>
       </div>
-      <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="画布操作" tabindex="-1"></div>
+      <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="${DESIGNER_UI_TEXT.contextMenu}" tabindex="-1"></div>
 
       <footer class="statusbar">
-        <span class="status-pill" data-status-tool>选择</span>
+        <span class="status-pill" data-status-tool>${DESIGNER_UI_TEXT.statusTool}</span>
         <span class="status-divider"></span>
-        <span class="status-item">吸附</span>
-        <span class="status-item">参考线</span>
-        <span class="status-item">设计模式</span>
+        <span class="status-item">${DESIGNER_UI_TEXT.snap}</span>
+        <span class="status-item">${DESIGNER_UI_TEXT.guides}</span>
+        <span class="status-item">${DESIGNER_UI_TEXT.designerMode}</span>
         <span class="status-divider"></span>
         <span data-project-status>${DESIGNER_UI_TEXT.directDocument}</span>
         <span data-project-revision></span>
         <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
-        <output class="status-zoom" data-status-zoom aria-label="缩放比例">100%</output>
+        <output class="status-zoom" data-status-zoom aria-label="${DESIGNER_UI_TEXT.zoomRatio}">100%</output>
       </footer>
-      <div class="designer-notifications" data-notifications aria-label="操作通知"></div>
+      <div class="designer-notifications" data-notifications aria-label="${DESIGNER_UI_TEXT.notifications}"></div>
     </main>
 
     <div class="panel-handle" data-panel-handle="right" role="separator" aria-orientation="vertical"></div>
@@ -171,11 +170,11 @@ export function createDesignerWorkspace(
     <aside class="properties" data-right-panel>
       <header class="panel-heading">
         <span class="panel-title">${DESIGNER_UI_TEXT.inspector}</span>
-        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="right" title="收起检查器" aria-label="收起检查器">
+        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="right" title="${DESIGNER_UI_TEXT.collapseInspector}" aria-label="${DESIGNER_UI_TEXT.collapseInspector}">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
         </button>
       </header>
-      <div class="inspector-tabs" role="tablist" aria-label="检查器">
+      <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
         <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance">${DESIGNER_UI_TEXT.appearance}</button>
         <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data">${DESIGNER_UI_TEXT.data}</button>
         <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction">${DESIGNER_UI_TEXT.interaction}</button>
@@ -185,25 +184,25 @@ export function createDesignerWorkspace(
         <div data-properties></div>
       </div>
       <div class="inspector-pane" id="designer-data-panel" role="tabpanel" aria-labelledby="designer-data-tab" data-inspector-pane="data" hidden>
-        <p class="designer-empty-state" data-data-panel>未选择数据源。</p>
+        <p class="designer-empty-state" data-data-panel>${DESIGNER_UI_TEXT.dataPanelEmpty}</p>
       </div>
       <div class="inspector-pane" id="designer-interaction-panel" role="tabpanel" aria-labelledby="designer-interaction-tab" data-inspector-pane="interaction" hidden>
-        <p class="designer-empty-state">交互设置将在预览中生效。</p>
+        <p class="designer-empty-state">${DESIGNER_UI_TEXT.interactionPanelEmpty}</p>
       </div>
       <div class="inspector-pane" id="designer-events-panel" role="tabpanel" aria-labelledby="designer-events-tab" data-inspector-pane="events" hidden>
         <div data-events-panel></div>
       </div>
     </aside>
 
-    <section class="designer-dialog-surface project-conflict" data-project-conflict hidden role="alertdialog" aria-label="项目冲突">
+    <section class="designer-dialog-surface project-conflict" data-project-conflict hidden role="alertdialog" aria-label="${DESIGNER_UI_TEXT.projectConflict}">
       <header>
         <span class="conflict-icon" aria-hidden="true">!</span>
-        <span>远端变更与本地编辑冲突。</span>
+        <span>${DESIGNER_UI_TEXT.conflict}</span>
       </header>
-      <p>继续编辑将保留本地版本；重新加载将丢弃本地修改。</p>
+      <p>${DESIGNER_UI_TEXT.conflictDetail}</p>
       <div class="designer-dialog-actions">
-        <button type="button" class="designer-control designer-button" data-variant="neutral" data-action="continue-editing">继续编辑</button>
-        <button type="button" class="designer-control designer-button" data-variant="danger" data-action="reload-remote">重新加载远端</button>
+        <button type="button" class="designer-control designer-button" data-variant="neutral" data-action="continue-editing">${DESIGNER_UI_TEXT.continueEditing}</button>
+        <button type="button" class="designer-control designer-button" data-variant="danger" data-action="reload-remote">${DESIGNER_UI_TEXT.reloadRemote}</button>
       </div>
     </section>`;
 
@@ -213,6 +212,12 @@ export function createDesignerWorkspace(
   const statusbar = layout.querySelector<HTMLElement>('.statusbar')!;
   layout.prepend(topbar);
   layout.appendChild(statusbar);
+
+  // 下拉菜单（含帮助面板）从顶栏移出到布局根，避免被顶栏的 overflow-x: auto
+  // 裁剪上下文遮断；绝对定位相对 .designer 顶部定位，不受栅格排版影响。
+  for (const menu of layout.querySelectorAll<HTMLElement>('[data-menu]')) {
+    layout.appendChild(menu);
+  }
 
   const projectWorkspace = ownerDocument.createElement('section');
   projectWorkspace.className = 'project-workspace';
@@ -225,17 +230,17 @@ export function createDesignerWorkspace(
   importConfirmation.dataset.importConfirmation = 'true';
   importConfirmation.hidden = true;
   importConfirmation.setAttribute('role', 'alertdialog');
-  importConfirmation.ariaLabel = '确认导入';
+  importConfirmation.ariaLabel = DESIGNER_UI_TEXT.importConfirm;
   importConfirmation.innerHTML = `
     <div class="designer-dialog-surface import-confirmation-card">
       <header>
         <span class="import-icon" aria-hidden="true">?</span>
-        <span>导入将替换当前文档。</span>
+        <span>${DESIGNER_UI_TEXT.importReplace}</span>
       </header>
-      <p>当前未保存的修改将会丢失，是否继续？</p>
+      <p>${DESIGNER_UI_TEXT.importWarning}</p>
       <div class="designer-dialog-actions">
-        <button type="button" class="designer-control designer-button" data-variant="neutral" data-action="import-cancel">取消</button>
-        <button type="button" class="designer-control designer-button" data-variant="danger" data-action="import-confirm">确认导入</button>
+        <button type="button" class="designer-control designer-button" data-variant="neutral" data-action="import-cancel">${DESIGNER_UI_TEXT.cancel}</button>
+        <button type="button" class="designer-control designer-button" data-variant="danger" data-action="import-confirm">${DESIGNER_UI_TEXT.importConfirm}</button>
       </div>
     </div>`;
   layout.appendChild(importConfirmation);
@@ -324,7 +329,7 @@ function createMaterialCard(
   favorite.type = 'button';
   favorite.className = 'designer-control designer-button material-favorite';
   favorite.dataset.materialFavorite = entry.manifest.type;
-  favorite.ariaLabel = `收藏 ${entry.manifest.name}`;
+  favorite.ariaLabel = DESIGNER_UI_TEXT.favoriteMaterial(entry.manifest.name);
   favorite.ariaPressed = 'false';
   favorite.textContent = '☆';
   card.append(button, favorite);
@@ -435,10 +440,6 @@ function fitZoomGlyph(): string {
 
 function gridGlyph(): string {
   return toolbarIcon('M3 4h10v8H3zM7 4v8M11 4v8M3 6h10M3 10h10');
-}
-
-function snapGlyph(): string {
-  return toolbarIcon('M3 8h4l2-3 2 6M3 12h10');
 }
 
 function toolbarIcon(path: string): string {

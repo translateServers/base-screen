@@ -30,6 +30,7 @@ import {
   createUngroupTransaction,
 } from '../../common/operations/designer-layout-operations.js';
 import { selectedComponents } from '../../common/operations/designer-selection.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   createDataSourceTransaction,
   createPropertyTransaction,
@@ -540,7 +541,7 @@ function invalidDraftDiagnostic(): ScreenDiagnostic {
     severity: 'error',
     code: 'CORE_COMMAND_INVALID',
     path: [],
-    message: '字段值无效，未保存修改。',
+    message: DESIGNER_UI_TEXT.panel.fieldValueInvalid,
   };
 }
 
@@ -555,6 +556,6 @@ function setDraftValidity(target: EventTarget | null, valid: boolean): void {
   target.ariaInvalid = String(!valid);
   const message = target.parentElement?.querySelector<HTMLElement>('[data-field-message]');
   if (message !== null && message !== undefined) {
-    message.textContent = valid ? '' : '请输入有效值。';
+    message.textContent = valid ? '' : DESIGNER_UI_TEXT.panel.enterValidValue;
   }
 }

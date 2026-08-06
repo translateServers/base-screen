@@ -5,6 +5,7 @@ import {
   isScreenComponentEffectivelyLocked,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerLayerItem {
   readonly id: string;
@@ -67,19 +68,22 @@ export function renderDesignerLayers(
   layers.replaceChildren();
   const searchControl = layers.ownerDocument.createElement('label');
   searchControl.className = 'designer-field designer-field-label layer-search';
-  searchControl.textContent = '搜索图层';
+  searchControl.textContent = DESIGNER_UI_TEXT.layersPanel.searchLabel;
   const input = layers.ownerDocument.createElement('input');
   input.type = 'search';
   input.className = 'designer-control designer-input';
   input.value = options.search;
-  input.placeholder = '搜索';
+  input.placeholder = DESIGNER_UI_TEXT.layersPanel.searchPlaceholder;
   input.dataset.layerSearch = 'true';
   searchControl.appendChild(input);
   layers.appendChild(searchControl);
 
   const tree = layers.ownerDocument.createElement('div');
   tree.setAttribute('role', 'tree');
-  tree.ariaLabel = options.dropTargetId === null ? '图层，根图层是当前放置目标' : '图层';
+  tree.ariaLabel =
+    options.dropTargetId === null
+      ? DESIGNER_UI_TEXT.layersPanel.dropTargetAria
+      : DESIGNER_UI_TEXT.layersPanel.aria;
   tree.dataset.layerRoot = 'true';
   if (options.dropTargetId === null) tree.dataset.dropTarget = 'true';
   const query = options.search.trim().toLowerCase();
@@ -102,10 +106,14 @@ export function renderDesignerLayers(
     const empty = layers.ownerDocument.createElement('p');
     empty.className = 'designer-empty-state';
     empty.setAttribute('role', 'status');
-    empty.textContent = '未找到图层。';
+    empty.textContent = DESIGNER_UI_TEXT.layersPanel.empty;
     tree.appendChild(empty);
   } else if (visible.length > options.renderLimit) {
-    const more = button(layers.ownerDocument, '显示更多图层', '显示更多图层');
+    const more = button(
+      layers.ownerDocument,
+      DESIGNER_UI_TEXT.layersPanel.showMore,
+      DESIGNER_UI_TEXT.layersPanel.showMore,
+    );
     more.dataset.layerShowMore = 'true';
     tree.appendChild(more);
   }
@@ -226,8 +234,10 @@ function createLayerNode(
   if (item.hasChildren) {
     const collapse = button(
       ownerDocument,
-      collapsed ? '展开' : '收起',
-      collapsed ? '展开子图层' : '收起子图层',
+      collapsed ? DESIGNER_UI_TEXT.layersPanel.expand : DESIGNER_UI_TEXT.layersPanel.collapse,
+      collapsed
+        ? DESIGNER_UI_TEXT.layersPanel.expandChildren
+        : DESIGNER_UI_TEXT.layersPanel.collapseChildren,
     );
     collapse.dataset.layerCollapse = item.id;
     collapse.ariaExpanded = String(!collapsed);
@@ -239,7 +249,7 @@ function createLayerNode(
     row.appendChild(spacer);
   }
 
-  const select = button(ownerDocument, item.name, '选择图层');
+  const select = button(ownerDocument, item.name, DESIGNER_UI_TEXT.layersPanel.select);
   select.dataset.layerSelect = item.id;
   select.className = 'layer-select';
   select.disabled = item.hidden;
@@ -253,18 +263,32 @@ function createLayerNode(
   rename.className = 'designer-control designer-input';
   rename.value = renameDraft ?? item.name;
   rename.dataset.layerRename = item.id;
-  rename.ariaLabel = `重命名 ${item.name}`;
+  rename.ariaLabel = DESIGNER_UI_TEXT.layersPanel.rename(item.name);
   rename.disabled = item.locked;
   row.appendChild(rename);
-  row.appendChild(layerButton(ownerDocument, item, 'hidden', item.hidden ? '显示' : '隐藏'));
-  row.appendChild(layerButton(ownerDocument, item, 'locked', item.locked ? '解锁' : '锁定'));
+  row.appendChild(
+    layerButton(
+      ownerDocument,
+      item,
+      'hidden',
+      item.hidden ? DESIGNER_UI_TEXT.layersPanel.show : DESIGNER_UI_TEXT.layersPanel.hide,
+    ),
+  );
+  row.appendChild(
+    layerButton(
+      ownerDocument,
+      item,
+      'locked',
+      item.locked ? DESIGNER_UI_TEXT.layersPanel.unlock : DESIGNER_UI_TEXT.layersPanel.lock,
+    ),
+  );
   row.appendChild(moveButton(ownerDocument, item.id, 'up', canMove(item.id, 'up')));
   row.appendChild(moveButton(ownerDocument, item.id, 'down', canMove(item.id, 'down')));
   if (item.missingMaterial) {
     const diagnostic = ownerDocument.createElement('span');
     diagnostic.className = 'layer-diagnostic';
     diagnostic.setAttribute('role', 'status');
-    diagnostic.textContent = `缺少物料：${item.type}`;
+    diagnostic.textContent = DESIGNER_UI_TEXT.layersPanel.missingMaterial(item.type);
     row.appendChild(diagnostic);
   }
   if (states.length > 0) {
@@ -287,11 +311,11 @@ function layerStateLabels(
   dropTarget: boolean,
 ): readonly string[] {
   return [
-    ...(item.hidden ? ['已隐藏'] : []),
-    ...(item.locked ? ['已锁定'] : []),
-    ...(selected ? ['已选中'] : []),
-    ...(focused ? ['当前焦点'] : []),
-    ...(dropTarget ? ['放置目标'] : []),
+    ...(item.hidden ? [DESIGNER_UI_TEXT.layersPanel.hidden] : []),
+    ...(item.locked ? [DESIGNER_UI_TEXT.layersPanel.locked] : []),
+    ...(selected ? [DESIGNER_UI_TEXT.layersPanel.selected] : []),
+    ...(focused ? [DESIGNER_UI_TEXT.layersPanel.focused] : []),
+    ...(dropTarget ? [DESIGNER_UI_TEXT.layersPanel.dropTarget] : []),
   ];
 }
 
@@ -314,7 +338,10 @@ function moveButton(
   direction: 'up' | 'down',
   enabled: boolean,
 ): HTMLButtonElement {
-  const label = direction === 'up' ? '上移' : '下移';
+  const label =
+    direction === 'up'
+      ? DESIGNER_UI_TEXT.layersPanel.moveUp
+      : DESIGNER_UI_TEXT.layersPanel.moveDown;
   const control = button(ownerDocument, label, label);
   control.dataset.layerMove = direction;
   control.dataset.layerId = id;

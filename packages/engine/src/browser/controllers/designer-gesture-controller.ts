@@ -1,6 +1,7 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import {
   getScreenSelectionBounds,
+  hitTestScreenComponents,
   isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
   queryScreenComponentsInRect,
@@ -107,6 +108,7 @@ export interface DesignerGestureCallbacks {
     },
     offset: Point,
     excludedComponentIds?: readonly string[],
+    options?: { readonly gridSnapEnabled?: boolean },
   ) => {
     readonly x: number;
     readonly y: number;
@@ -119,6 +121,8 @@ export interface DesignerGestureCallbacks {
   readonly renderSelection: () => void;
   /** 系统级焦点约束：画布点击时把键盘焦点收敛到 viewport 容器。 */
   readonly focusViewport?: () => void;
+  /** 平移拖拽期间同步抓握光标（grabbing）状态。 */
+  readonly setPanning?: (panning: boolean) => void;
 }
 
 export class DesignerGestureController {
@@ -132,6 +136,17 @@ export class DesignerGestureController {
 
   constructor(private readonly callbacks: DesignerGestureCallbacks) {}
 
+  /** 任一画布手势激活中（拖拽/变换/框选/平移/创建）。事件系统据此抑制快捷键与默认行为。 */
+  get active(): boolean {
+    return (
+      this.#drag !== undefined ||
+      this.#transform !== undefined ||
+      this.#marquee !== undefined ||
+      this.#pan !== undefined ||
+      this.#create !== undefined
+    );
+  }
+
   connect(canvas: HTMLDivElement): void {
     this.#canvas = canvas;
     canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
@@ -142,6 +157,11 @@ export class DesignerGestureController {
     // 画布是可拖拽交互表面：系统性禁止原生文本选择（selectstart 是浏览器启动文本选择的
     // 事件通道，即使 CSS user-select 未级联到某些内容也能拦截，参考 Nebula/Moveable）。
     canvas.addEventListener('selectstart', (event) => event.preventDefault());
+    // 中键（button 1）在画布上不触发浏览器自动滚动：自动滚动由 mousedown 默认动作启动，
+    // 必须在 mousedown 阶段阻止（auxclick 阶段阻止无效）。
+    canvas.addEventListener('mousedown', (event) => {
+      if (event.button === 1) event.preventDefault();
+    });
     // 从物料面板拖拽物料到画布：dragover 需要 preventDefault 才能触发 drop。
     canvas.addEventListener('dragover', (event) => this.onDragOverCanvas(event));
     canvas.addEventListener('drop', (event) => this.onDropOnCanvas(event));
@@ -169,6 +189,9 @@ export class DesignerGestureController {
     event.preventDefault();
     this.callbacks.focusViewport?.();
     if (this.callbacks.isHandActive()) {
+      // 仅主键（左键）用于平移；非主键（右键/中键）在抓手工具下不触发框选等其他手势，
+      // 对齐 Nebula handlePanStart 的 `e.button !== 0` 守卫。
+      if (event.button !== 0) return;
       event.preventDefault();
       this.capturePointer(event.pointerId);
       this.#pan = {
@@ -176,6 +199,7 @@ export class DesignerGestureController {
         startClientX: event.clientX,
         startClientY: event.clientY,
       };
+      this.callbacks.setPanning?.(true);
       return;
     }
     if (this.callbacks.getActiveTool() === 'zoom') {
@@ -203,6 +227,11 @@ export class DesignerGestureController {
     }
     if (target.closest<HTMLElement>('[data-transform-rotate]') !== null) {
       this.startTransform(event, undefined);
+      return;
+    }
+    // 选中框（控制器）的空白区域可拖拽：普通按下启动多选移动，修饰键按下时按命中测试切换单个组件。
+    if (target.closest<HTMLElement>('[data-selection-grab]') !== null) {
+      this.onSelectionPointerDown(event);
       return;
     }
     const material = target.closest<HTMLElement>('[data-base-screen-component-id]');
@@ -269,6 +298,51 @@ export class DesignerGestureController {
           return element === null || element === material ? [] : [element];
         }),
       ],
+      moved: false,
+    };
+  }
+
+  private onSelectionPointerDown(event: PointerEvent): void {
+    const document = this.callbacks.getDocument();
+    const canvas = this.#canvas;
+    if (document === undefined || canvas === undefined) return;
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      // 选中框覆盖组件区域，修饰键点击按文档命中测试切换单个组件选择。
+      const point = this.canvasPointFromPointer(event);
+      const componentId = hitTestScreenComponents(document, point)[0];
+      if (componentId !== undefined) {
+        this.callbacks.reduceSelection({ type: 'toggle-selection', componentId });
+      }
+      return;
+    }
+    const components = selectedComponents(
+      document,
+      this.callbacks.getInteraction().selectedComponentIds,
+    );
+    if (
+      components.length === 0 ||
+      new Set(components.map((item) => item.parentId)).size !== 1 ||
+      components.some((item) => isScreenComponentEffectivelyLocked(document, item.id))
+    ) {
+      return;
+    }
+    event.preventDefault();
+    this.capturePointer(event.pointerId);
+    const bounds = getScreenSelectionBounds(components);
+    if (bounds === null) return;
+    this.#drag = {
+      components,
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      bounds,
+      selection: canvas.querySelector<HTMLElement>('[data-selection]') ?? undefined,
+      elements: components.flatMap((component) => {
+        const element = canvas.querySelector<HTMLElement>(
+          `[data-base-screen-component-id="${component.id}"]`,
+        );
+        return element === null ? [] : [element];
+      }),
       moved: false,
     };
   }
@@ -381,8 +455,8 @@ export class DesignerGestureController {
             id: nextComponentId(document, `${source.type}-${index}`),
             name: `${source.name} copy`,
             position: {
-              x: clampCoordinate(source.position.x + translation.x),
-              y: clampCoordinate(source.position.y + translation.y),
+              x: roundCoordinate(clampCoordinate(source.position.x + translation.x)),
+              y: roundCoordinate(clampCoordinate(source.position.y + translation.y)),
             },
             zIndex:
               document.components.reduce(
@@ -402,8 +476,8 @@ export class DesignerGestureController {
         componentIds: [component.id],
         patch: {
           position: {
-            x: clampCoordinate(component.position.x + translation.x),
-            y: clampCoordinate(component.position.y + translation.y),
+            x: roundCoordinate(clampCoordinate(component.position.x + translation.x)),
+            y: roundCoordinate(clampCoordinate(component.position.y + translation.y)),
           },
         },
       })),
@@ -506,6 +580,8 @@ export class DesignerGestureController {
     if (this.#pan === undefined) return;
     this.releasePointerCapture(this.#pan.pointerId);
     this.#pan = undefined;
+    // 平移结束须复位抓握光标（grabbing），否则 data-panning 残留 true，光标一直卡在实心抓握。
+    this.callbacks.setPanning?.(false);
     this.clearSnapPreview();
   }
 
@@ -541,10 +617,12 @@ export class DesignerGestureController {
       x: clampCoordinate((event.clientX - drag.startClientX) / zoom),
       y: clampCoordinate((event.clientY - drag.startClientY) / zoom),
     };
+    // 拖拽移动只保留智能参考线吸附，不吸附到 24px 像素网格，允许亚像素自由定位。
     const snapped = this.callbacks.snapCanvasSelection(
       drag.bounds,
       translation,
       drag.components.map((component) => component.id),
+      { gridSnapEnabled: false },
     );
     this.callbacks.renderSnapPreview?.(snapped);
     return snapped;
@@ -766,4 +844,8 @@ function normalizedRect(
 
 function clampCoordinate(value: number): number {
   return Math.max(-1_000_000, Math.min(1_000_000, value));
+}
+
+function roundCoordinate(value: number): number {
+  return Math.round(value * 100) / 100;
 }

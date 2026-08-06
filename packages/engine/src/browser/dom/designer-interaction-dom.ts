@@ -4,6 +4,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 const MATERIAL_EVENT_CAPABILITY = 'blueprint.trigger.material-event';
 
@@ -28,17 +29,21 @@ export function renderDesignerInteractionPanel(
     runtimeContributions,
   );
   if (capabilities === undefined) {
-    panel.textContent = '选择组件以查看交互能力。';
+    panel.textContent = DESIGNER_UI_TEXT.interactionPanel.noComponent;
     return false;
   }
   if (capabilities.design.length > 0) {
-    appendCapabilitySection(panel, '设计', capabilities.design);
+    appendCapabilitySection(panel, DESIGNER_UI_TEXT.interactionPanel.design, capabilities.design);
   }
   if (capabilities.previewEvents.length > 0) {
-    appendCapabilitySection(panel, '预览', capabilities.previewEvents);
+    appendCapabilitySection(
+      panel,
+      DESIGNER_UI_TEXT.interactionPanel.preview,
+      capabilities.previewEvents,
+    );
   }
   if (capabilities.design.length === 0 && capabilities.previewEvents.length === 0) {
-    panel.textContent = '当前组件没有公开交互能力。';
+    panel.textContent = DESIGNER_UI_TEXT.interactionPanel.noCapabilities;
     return false;
   }
   return true;
@@ -53,11 +58,16 @@ export function getDesignerInteractionCapabilities(
   const component = document?.components.find((item) => item.id === interaction.focusedComponentId);
   const manifest = component === undefined ? undefined : catalog?.get(component.type)?.manifest;
   if (manifest === undefined) return undefined;
-  const design = [
-    manifest.designCapabilities.resize ? '调整大小' : undefined,
-    manifest.designCapabilities.rotate ? '旋转' : undefined,
-    manifest.designCapabilities.children ? '包含子组件' : undefined,
-  ].filter((capability): capability is string => capability !== undefined);
+  const capabilities: readonly (string | undefined)[] = [
+    manifest.designCapabilities.resize ? DESIGNER_UI_TEXT.interactionPanel.resize : undefined,
+    manifest.designCapabilities.rotate ? DESIGNER_UI_TEXT.interactionPanel.rotate : undefined,
+    manifest.designCapabilities.children
+      ? DESIGNER_UI_TEXT.interactionPanel.hasChildren
+      : undefined,
+  ];
+  const design = capabilities.filter(
+    (capability): capability is string => capability !== undefined,
+  );
   const previewEvents = hasMaterialEventCapability(runtimeContributions) ? manifest.events : [];
   return { design, previewEvents };
 }

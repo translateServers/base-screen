@@ -325,6 +325,7 @@
 }
 
 .rail-content[hidden],
+.inspector-tabs[hidden],
 .inspector-pane[hidden],
 .blueprint-workspace[hidden],
 .direct-preview[hidden],
@@ -571,6 +572,8 @@
   min-height: 0;
   overflow: hidden;
   padding: 30px;
+  /* 画布表面不交给浏览器手势：平移/缩放由 wheel 通道接管（触控板双指对应 ctrl+wheel）。 */
+  touch-action: none;
   background-color: var(--designer-surface-canvas);
   background-image:
     radial-gradient(circle, var(--designer-canvas-grid-line) 1px, transparent 1px),
@@ -600,6 +603,26 @@
   background-size: 100% 100%;
 }
 
+/* 抓手工具或按住空格临时平移时，画布表面切换为抓握光标；拖拽中为实心抓握。 */
+.viewport[data-tool="hand"] {
+  cursor: grab;
+}
+.viewport[data-tool="hand"][data-panning="true"] {
+  cursor: grabbing;
+}
+/* 抓手工具激活时，选中框拖拽层/变换控件等交互覆盖层不覆盖抓握光标，
+   与 Nebula 一致：hand 工具下整个画布表面（含选中组件上）统一为 grab/grabbing。 */
+.viewport[data-tool="hand"] .selection-grab,
+.viewport[data-tool="hand"] .transform-handle,
+.viewport[data-tool="hand"] .transform-rotate {
+  cursor: grab;
+}
+.viewport[data-tool="hand"][data-panning="true"] .selection-grab,
+.viewport[data-tool="hand"][data-panning="true"] .transform-handle,
+.viewport[data-tool="hand"][data-panning="true"] .transform-rotate {
+  cursor: grabbing;
+}
+
 .canvas {
   position: relative;
   z-index: var(--designer-z-canvas);
@@ -614,6 +637,8 @@
   /* 画布是可拖拽交互表面：禁用文本选择，避免拖拽组件时选中组件内的文本（参考 Nebula）。 */
   user-select: none;
   -webkit-user-select: none;
+  /* 画布表面不交给浏览器手势：平移/缩放由 wheel 通道接管。 */
+  touch-action: none;
   transition: box-shadow var(--designer-motion-emphasis);
 }
 
@@ -629,6 +654,14 @@
   position: absolute;
   z-index: var(--designer-z-canvas-selection);
   pointer-events: none;
+}
+
+/* 选中框空白区域可拖拽移动组件：grab 层覆盖包围盒但用 clip-path 挖掉组件区域，
+   组件区域保持可点击（事件穿透到组件），handles/rotate 按 DOM 顺序优先命中。 */
+.selection-grab {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
 }
 
 .canvas-guides {

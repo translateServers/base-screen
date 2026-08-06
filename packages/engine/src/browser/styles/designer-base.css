@@ -11,7 +11,7 @@
 .designer-menu,
 .designer-help {
   position: absolute;
-  top: calc(100% + var(--designer-space-2));
+  top: calc(var(--designer-topbar-height) + var(--designer-space-2));
   z-index: 5;
   min-width: 196px;
   padding: var(--designer-space-2);
@@ -102,6 +102,7 @@
 .designer {
   --left-panel-width: 224px;
   --right-panel-width: 272px;
+  --designer-topbar-height: 52px;
   position: relative;
   display: grid;
   grid-template-columns: var(--left-panel-width) 5px minmax(360px, 1fr) 5px var(--right-panel-width);

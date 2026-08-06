@@ -1,3 +1,5 @@
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+
 export type DesignerNotificationTone = 'error' | 'success';
 
 export class DesignerNotificationController {
@@ -20,8 +22,8 @@ export class DesignerNotificationController {
     close.type = 'button';
     close.className = 'designer-control designer-button designer-notification-close';
     close.dataset.notificationDismiss = 'true';
-    close.setAttribute('aria-label', '关闭通知');
-    close.textContent = '关闭';
+    close.setAttribute('aria-label', DESIGNER_UI_TEXT.notification.closeAria);
+    close.textContent = DESIGNER_UI_TEXT.notification.close;
     notification.append(text, close);
     container.appendChild(notification);
   }

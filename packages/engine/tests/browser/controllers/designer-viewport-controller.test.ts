@@ -24,6 +24,7 @@ function createController() {
 }
 
 function connectCanvas(controller: DesignerViewportController, width: number, height: number) {
+  const listeners = new Map<string, (event: Event) => void>();
   const canvas = {
     style: {},
     getRootNode: () => null,
@@ -31,10 +32,16 @@ function connectCanvas(controller: DesignerViewportController, width: number, he
   const viewport = {
     clientWidth: width,
     clientHeight: height,
-    addEventListener: vi.fn(),
+    getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    addEventListener: (type: string, listener: (event: Event) => void) =>
+      listeners.set(type, listener),
   } as unknown as HTMLDivElement;
   controller.connect(viewport, canvas);
-  return { canvas, viewport };
+  return {
+    canvas,
+    dispatch: (type: string, event: Event) => listeners.get(type)?.(event),
+    viewport,
+  };
 }
 
 describe('DesignerViewportController zoom anchor', () => {
@@ -51,6 +58,61 @@ describe('DesignerViewportController zoom anchor', () => {
     controller.setZoomCentered(1.2);
     controller.setZoomCentered(1.5);
     expect(canvas.style.transform).toBe('translate(-200px, -150px) scale(1.5)');
+  });
+});
+
+describe('DesignerViewportController wheel', () => {
+  function wheel(partial: Record<string, unknown>): WheelEvent {
+    return {
+      clientX: 400,
+      clientY: 300,
+      ctrlKey: false,
+      deltaMode: 0,
+      deltaX: 0,
+      deltaY: 0,
+      metaKey: false,
+      preventDefault: () => {},
+      shiftKey: false,
+      ...partial,
+    } as unknown as WheelEvent;
+  }
+
+  it('R4 pans the canvas vertically with a plain wheel and blocks page scroll', () => {
+    const { controller } = createController();
+    const { canvas, dispatch } = connectCanvas(controller, 800, 600);
+    const preventDefault = vi.fn();
+    dispatch('wheel', wheel({ deltaY: 120, preventDefault }));
+
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(canvas.style.transform).toBe('translate(0px, -120px) scale(1)');
+  });
+
+  it('R4 pans horizontally with shift+wheel', () => {
+    const { controller } = createController();
+    const { canvas, dispatch } = connectCanvas(controller, 800, 600);
+    dispatch('wheel', wheel({ shiftKey: true, deltaY: 120 }));
+
+    expect(canvas.style.transform).toBe('translate(-120px, 0px) scale(1)');
+  });
+
+  it('R4 scales line-mode deltas like Firefox reports them', () => {
+    const { controller } = createController();
+    const { canvas, dispatch } = connectCanvas(controller, 800, 600);
+    dispatch('wheel', wheel({ deltaMode: 1, deltaY: 3 }));
+
+    expect(canvas.style.transform).toBe('translate(0px, -48px) scale(1)');
+  });
+
+  it('R4 zooms with ctrl+wheel and keeps the browser zoom blocked', () => {
+    const { controller } = createController();
+    const { canvas, dispatch } = connectCanvas(controller, 800, 600);
+    const preventDefault = vi.fn();
+    dispatch('wheel', wheel({ ctrlKey: true, deltaY: -100, preventDefault }));
+
+    expect(preventDefault).toHaveBeenCalledOnce();
+    // 光标锚点（400, 300）在缩放后保持不动：offset 相应回退（浮点误差容忍）。
+    expect(canvas.style.transform).toMatch(/^translate\(-40/);
+    expect(canvas.style.transform).toContain('scale(1.1)');
   });
 });
 
@@ -100,5 +162,21 @@ describe('DesignerViewportController space key', () => {
     } as unknown as KeyboardEvent;
     expect(controller.onKeyDown(event)).toBe(false);
     expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('releases a held Space hand when a persistent tool is selected', () => {
+    const { controller } = createController();
+    connectCanvas(controller, 800, 600);
+    controller.onKeyDown({
+      code: 'Space',
+      repeat: false,
+      target: null,
+      preventDefault: () => {},
+    } as KeyboardEvent);
+    expect(controller.activeTool).toBe('hand');
+
+    // 按住空格时选择主工具：临时抓手随主工具切换而清空（对标 Nebula setTool 清空临时栈）。
+    controller.setActiveTool('rectangle');
+    expect(controller.activeTool).toBe('rectangle');
   });
 });

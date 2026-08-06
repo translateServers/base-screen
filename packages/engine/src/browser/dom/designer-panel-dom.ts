@@ -19,6 +19,7 @@ import {
   createValidatedPropsTransaction,
   createValidatedStyleTransaction,
 } from '../../common/operations/designer-layout-operations.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerPanelInput {
   readonly value: string;
@@ -40,25 +41,67 @@ export function renderDesignerProperties(
   }
   if (interaction.selectedComponentIds.length > 1) {
     const summary = properties.ownerDocument.createElement('p');
-    summary.textContent = `已选择 ${interaction.selectedComponentIds.length} 个组件。`;
+    summary.textContent = DESIGNER_UI_TEXT.propertiesPanel.multiSelect(
+      interaction.selectedComponentIds.length,
+    );
     properties.appendChild(summary);
     return;
   }
-  const geometry = appendSection(properties, '几何');
-  appendInput(geometry, '名称', 'name', component.name);
-  appendInput(geometry, 'X', 'x', component.position.x, 'number');
-  appendInput(geometry, 'Y', 'y', component.position.y, 'number');
-  appendInput(geometry, '宽度', 'width', component.size.width, 'number', '1');
-  appendInput(geometry, '高度', 'height', component.size.height, 'number', '1');
-  appendInput(geometry, '旋转', 'rotation', component.rotation, 'number', '-180');
-  appendInput(geometry, '层级', 'zIndex', component.zIndex, 'number', '0');
-  const status = appendSection(properties, '状态');
-  appendCheckbox(status, '锁定', 'locked', component.status.locked);
-  appendCheckbox(status, '隐藏', 'hidden', component.status.hidden);
+  const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
+  appendInput(properties, DESIGNER_UI_TEXT.propertiesPanel.name, 'name', component.name);
+  appendInput(properties, DESIGNER_UI_TEXT.propertiesPanel.x, 'x', component.position.x, 'number');
+  appendInput(properties, DESIGNER_UI_TEXT.propertiesPanel.y, 'y', component.position.y, 'number');
+  appendInput(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.width,
+    'width',
+    component.size.width,
+    'number',
+    '1',
+  );
+  appendInput(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.height,
+    'height',
+    component.size.height,
+    'number',
+    '1',
+  );
+  appendInput(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.rotation,
+    'rotation',
+    component.rotation,
+    'number',
+    '-180',
+  );
+  appendInput(
+    properties,
+    DESIGNER_UI_TEXT.propertiesPanel.zIndex,
+    'zIndex',
+    component.zIndex,
+    'number',
+    '0',
+  );
+  const status = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.status);
+  appendCheckbox(
+    status,
+    DESIGNER_UI_TEXT.propertiesPanel.locked,
+    'locked',
+    component.status.locked,
+  );
+  appendCheckbox(
+    status,
+    DESIGNER_UI_TEXT.propertiesPanel.hidden,
+    'hidden',
+    component.status.hidden,
+  );
   const manifest = catalog?.get(component.type)?.manifest;
   if (manifest === undefined) return;
   const content =
-    manifest.propertyPanel.length === 0 ? undefined : appendSection(properties, '内容');
+    manifest.propertyPanel.length === 0
+      ? undefined
+      : appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.content);
   for (const field of manifest.propertyPanel) {
     const schema = manifest.propsSchema.properties[field.prop];
     if (schema !== undefined && content !== undefined) {
@@ -73,7 +116,10 @@ export function renderDesignerProperties(
     }
   }
   const stylePanel = manifest.stylePanel ?? [];
-  const style = stylePanel.length === 0 ? undefined : appendSection(properties, '样式');
+  const style =
+    stylePanel.length === 0
+      ? undefined
+      : appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.style);
   for (const field of stylePanel) {
     const schema = manifest.styleSchema.properties[field.style];
     if (schema !== undefined && style !== undefined) {
@@ -107,21 +153,21 @@ export function renderDesignerDataPanel(
     runtimeContributions,
   );
   if (component === undefined || capabilities === undefined || capabilities.length === 0) {
-    panel.textContent = '未选择数据源。';
+    panel.textContent = DESIGNER_UI_TEXT.dataPanelEmpty;
     return;
   }
   const source = component.dataSource;
   const type = source?.type ?? 'none';
   const label = panel.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label';
-  label.textContent = '数据源';
+  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.dataSource;
   const select = panel.ownerDocument.createElement('select');
   select.className = 'designer-control designer-select';
   select.dataset.dataSourceType = 'true';
   for (const value of ['none', ...capabilities]) {
     const option = panel.ownerDocument.createElement('option');
     option.value = value;
-    option.textContent = value === 'none' ? '无' : value;
+    option.textContent = value === 'none' ? DESIGNER_UI_TEXT.propertiesPanel.none : value;
     option.selected = value === type;
     select.appendChild(option);
   }
@@ -130,7 +176,7 @@ export function renderDesignerDataPanel(
   if (capabilities.includes('static')) {
     appendDataInput(
       panel,
-      '值',
+      DESIGNER_UI_TEXT.propertiesPanel.value,
       'static',
       source?.type === 'static' ? JSON.stringify(source.value) : 'null',
     );
@@ -138,19 +184,19 @@ export function renderDesignerDataPanel(
   if (capabilities.includes('host-resource')) {
     appendDataInput(
       panel,
-      '资源类型',
+      DESIGNER_UI_TEXT.propertiesPanel.resourceType,
       'resourceType',
       source?.type === 'host-resource' ? source.resourceType : '',
     );
     appendDataInput(
       panel,
-      '资源 ID',
+      DESIGNER_UI_TEXT.propertiesPanel.resourceId,
       'resourceId',
       source?.type === 'host-resource' ? source.resourceId : '',
     );
     appendDataInput(
       panel,
-      '参数',
+      DESIGNER_UI_TEXT.propertiesPanel.params,
       'params',
       source?.type === 'host-resource' ? JSON.stringify(source.params) : '{}',
     );
@@ -360,12 +406,24 @@ function appendCheckbox(
 }
 
 function appendCanvasControls(parent: HTMLElement, document: ScreenDocument): void {
-  const section = appendSection(parent, '画布');
-  appendCanvasInput(section, '画布宽度', 'width', document.canvas.width, 'number');
-  appendCanvasInput(section, '画布高度', 'height', document.canvas.height, 'number');
+  const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvas);
   appendCanvasInput(
     section,
-    '背景颜色',
+    DESIGNER_UI_TEXT.propertiesPanel.canvasWidth,
+    'width',
+    document.canvas.width,
+    'number',
+  );
+  appendCanvasInput(
+    section,
+    DESIGNER_UI_TEXT.propertiesPanel.canvasHeight,
+    'height',
+    document.canvas.height,
+    'number',
+  );
+  appendCanvasInput(
+    section,
+    DESIGNER_UI_TEXT.propertiesPanel.backgroundColor,
     'backgroundColor',
     document.canvas.backgroundColor,
     'color',
@@ -647,8 +705,8 @@ function dataSourceFailure(
 ): ScreenParseResult<ScreenDocumentTransaction> {
   const message =
     code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN'
-      ? '资源类型不可用，未保存修改。'
-      : '数据源配置无效，未保存修改。';
+      ? DESIGNER_UI_TEXT.propertiesPanel.resourceTypeUnavailable
+      : DESIGNER_UI_TEXT.propertiesPanel.dataSourceInvalid;
   return {
     ok: false,
     diagnostics: [{ severity: 'error', code, path: [], message }],

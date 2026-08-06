@@ -3,28 +3,12 @@ import type {
   ScreenBlueprintRule,
   ScreenDiagnostic,
 } from '@base-screen/contracts';
-
-export interface DesignerBlueprintGraphNode {
-  readonly id: string;
-  readonly ruleId: string;
-  readonly kind: 'trigger' | 'condition' | 'action';
-  readonly label: string;
-}
-
-export interface DesignerBlueprintGraphEdge {
-  readonly from: string;
-  readonly to: string;
-}
-
-export interface DesignerBlueprintGraphProjection {
-  readonly nodes: readonly DesignerBlueprintGraphNode[];
-  readonly edges: readonly DesignerBlueprintGraphEdge[];
-  readonly selectedNodeId: string | undefined;
-  readonly searchQuery: string;
-  readonly diagnostics: readonly ScreenDiagnostic[];
-  readonly simulationLog: readonly string[];
-  readonly zoom: number;
-}
+import type {
+  DesignerBlueprintGraphEdge,
+  DesignerBlueprintGraphNode,
+  DesignerBlueprintGraphProjection,
+} from '../../common/operations/designer-blueprint-authoring.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export class DesignerBlueprintGraphSession {
   #selectedNodeId: string | undefined;
@@ -118,7 +102,12 @@ function projectRule(rule: ScreenBlueprintRule): readonly DesignerBlueprintGraph
     },
   ];
   if (rule.condition !== undefined) {
-    nodes.push({ id: `${rule.id}:condition`, ruleId: rule.id, kind: 'condition', label: '条件' });
+    nodes.push({
+      id: `${rule.id}:condition`,
+      ruleId: rule.id,
+      kind: 'condition',
+      label: DESIGNER_UI_TEXT.blueprint.condition,
+    });
   }
   for (const [index, action] of rule.actions.entries()) {
     nodes.push({
@@ -127,10 +116,10 @@ function projectRule(rule: ScreenBlueprintRule): readonly DesignerBlueprintGraph
       kind: 'action',
       label:
         action.type === 'set-variable'
-          ? `设置 ${action.variableName}`
+          ? DESIGNER_UI_TEXT.blueprint.graphSetVariable(action.variableName)
           : action.type === 'emit-host-event'
-            ? `发送 ${action.eventName}`
-            : `调用 ${action.actionId}`,
+            ? DESIGNER_UI_TEXT.blueprint.graphEmitHostEvent(action.eventName)
+            : DESIGNER_UI_TEXT.blueprint.graphCallHostAction(action.actionId),
     });
   }
   return nodes;

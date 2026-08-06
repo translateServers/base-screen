@@ -3,8 +3,31 @@ import type {
   ScreenBlueprintCondition,
   ScreenBlueprintRule,
   ScreenBlueprintValueExpression,
+  ScreenDiagnostic,
   ScreenDocument,
 } from '@base-screen/contracts';
+
+export interface DesignerBlueprintGraphNode {
+  readonly id: string;
+  readonly ruleId: string;
+  readonly kind: 'trigger' | 'condition' | 'action';
+  readonly label: string;
+}
+
+export interface DesignerBlueprintGraphEdge {
+  readonly from: string;
+  readonly to: string;
+}
+
+export interface DesignerBlueprintGraphProjection {
+  readonly nodes: readonly DesignerBlueprintGraphNode[];
+  readonly edges: readonly DesignerBlueprintGraphEdge[];
+  readonly selectedNodeId: string | undefined;
+  readonly searchQuery: string;
+  readonly diagnostics: readonly ScreenDiagnostic[];
+  readonly simulationLog: readonly string[];
+  readonly zoom: number;
+}
 
 export const DESIGNER_BLUEPRINT_CAPABILITIES = {
   materialEvent: 'blueprint.trigger.material-event',

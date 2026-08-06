@@ -21,6 +21,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     const controller = new DesignerWorkbenchController({
       getCanvas: () => undefined,
       getDocument: () => undefined,
+      getInteraction: () => ({ focusedComponentId: null, selectedComponentIds: [] }),
       getRoot: () => root,
       getZoom: () => 1,
     });
@@ -45,6 +46,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     const controller = new DesignerWorkbenchController({
       getCanvas: () => canvas,
       getDocument: () => undefined,
+      getInteraction: () => ({ focusedComponentId: null, selectedComponentIds: [] }),
       getRoot: () => root,
       getZoom: () => 1,
     });
@@ -57,12 +59,17 @@ describe('DesignerWorkbenchController pointer capture', () => {
       closest: (selector: string) => (selector === '.ruler' ? ruler : null),
     } as unknown as HTMLElement;
 
-    controller.onPointerDown({ target: panelHandle, pointerId: 1 } as unknown as PointerEvent);
+    controller.onPointerDown({
+      target: panelHandle,
+      pointerId: 1,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
     controller.onPointerDown({
       target: ruler,
       pointerId: 2,
       clientX: 10,
       clientY: 20,
+      preventDefault: () => undefined,
     } as unknown as PointerEvent);
     controller.onPointerUp({ pointerId: 1 } as unknown as PointerEvent);
     controller.onPointerUp({ pointerId: 2, clientX: 10, clientY: 20 } as unknown as PointerEvent);
@@ -83,6 +90,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     const controller = new DesignerWorkbenchController({
       getCanvas: () => canvas,
       getDocument: () => undefined,
+      getInteraction: () => ({ focusedComponentId: null, selectedComponentIds: [] }),
       getRoot: () => root,
       getZoom: () => 1,
     });
@@ -95,12 +103,17 @@ describe('DesignerWorkbenchController pointer capture', () => {
       closest: (selector: string) => (selector === '.ruler' ? ruler : null),
     } as unknown as HTMLElement;
 
-    controller.onPointerDown({ target: panelHandle, pointerId: 3 } as unknown as PointerEvent);
+    controller.onPointerDown({
+      target: panelHandle,
+      pointerId: 3,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
     controller.onPointerDown({
       target: ruler,
       pointerId: 4,
       clientX: 10,
       clientY: 20,
+      preventDefault: () => undefined,
     } as unknown as PointerEvent);
     controller.cancelTransientState();
 
@@ -142,6 +155,7 @@ function createWorkbench() {
   const layout = new WorkbenchElement();
   const viewport = new WorkbenchElement();
   const guides = new WorkbenchElement();
+  const inspectorTabs = new WorkbenchElement();
   const materials = new WorkbenchElement();
   const layers = new WorkbenchElement();
   const leftTabs = ['materials', 'layers'].map((tab) => {
@@ -160,7 +174,6 @@ function createWorkbench() {
     return pane;
   });
   const grid = new WorkbenchElement();
-  const snap = new WorkbenchElement();
   const canvasListeners = new Map<string, (event: PointerEvent | MouseEvent) => void>();
   const canvas = {
     ...captureTarget(),
@@ -179,14 +192,18 @@ function createWorkbench() {
     variables: [],
     blueprint: { rules: [] },
   } as const;
+  const interaction: {
+    focusedComponentId: string | null;
+    selectedComponentIds: string[];
+  } = { focusedComponentId: 'c1', selectedComponentIds: ['c1'] };
   const elements = new Map<string, WorkbenchElement>([
     ['.designer', layout],
     ['[data-viewport]', viewport],
     ['[data-canvas-guides]', guides],
     ['[data-materials]', materials],
     ['[data-layers]', layers],
+    ['.inspector-tabs', inspectorTabs],
     ['[data-action="toggle-grid"]', grid],
-    ['[data-action="toggle-snap"]', snap],
   ]);
   const root = {
     querySelector: (selector: string) => elements.get(selector) ?? null,
@@ -202,18 +219,21 @@ function createWorkbench() {
     controller: new DesignerWorkbenchController({
       getCanvas: () => canvas,
       getDocument: () => document,
+      getInteraction: () => interaction,
       getRoot: () => root,
       getZoom: () => 1,
     }),
     document,
     grid,
     guides,
+    inspectorTabs,
+    interaction,
     layers,
     layout,
     leftTabs,
     materials,
+    panes,
     rightTabs,
-    snap,
   };
 }
 
@@ -240,7 +260,6 @@ describe('DesignerWorkbenchController instance state', () => {
     second.controller.initialize();
 
     first.controller.toggleCanvasAid('gridEnabled');
-    first.controller.toggleCanvasAid('gridSnapEnabled');
     first.controller.onClick(clickTarget({ panelCollapse: 'left' }));
     first.controller.onClick(clickTarget({ panelTab: 'layers' }));
     first.controller.onClick(clickTarget({ inspectorTab: 'data' }));
@@ -253,13 +272,12 @@ describe('DesignerWorkbenchController instance state', () => {
       pointerId: 1,
       clientX: 50,
       clientY: 0,
+      preventDefault: () => undefined,
     } as unknown as PointerEvent);
     first.controller.onPointerUp({ pointerId: 1, clientX: 50, clientY: 0 } as PointerEvent);
 
     expect(first.grid.ariaPressed).toBe('false');
     expect(second.grid.ariaPressed).toBe('true');
-    expect(first.snap.ariaPressed).toBe('false');
-    expect(second.snap.ariaPressed).toBe('true');
     expect(first.layout.dataset.leftCollapsed).toBe('true');
     expect(second.layout.dataset.leftCollapsed).toBe('false');
     expect(first.leftTabs[1]?.ariaSelected).toBe('true');
@@ -269,8 +287,9 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(first.guides.children).toHaveLength(1);
     expect(first.controller.snapPoint({ x: 47, y: 47 })).toEqual({
       x: 50,
-      y: 47,
+      y: 48,
       snappedX: 50,
+      snappedY: 48,
     });
     expect(second.controller.snapPoint({ x: 47, y: 47 })).toEqual({
       x: 48,
@@ -294,6 +313,7 @@ describe('DesignerWorkbenchController instance state', () => {
       pointerId: 1,
       clientX: 50,
       clientY: 0,
+      preventDefault: () => undefined,
     } as unknown as PointerEvent);
     workbench.controller.onPointerUp({ pointerId: 1, clientX: 50, clientY: 0 } as PointerEvent);
     const guide = workbench.guides.children[0]!;
@@ -322,11 +342,38 @@ describe('DesignerWorkbenchController instance state', () => {
       pointerId: 3,
       clientX: 50,
       clientY: 0,
+      preventDefault: () => undefined,
     } as unknown as PointerEvent);
     workbench.controller.onPointerUp({ pointerId: 3, clientX: -1, clientY: 0 } as PointerEvent);
 
     expect(workbench.guides.children).toHaveLength(0);
     expect(workbench.document).toEqual(originalDocument);
+  });
+
+  it('hides inspector tabs and falls back to appearance when no component is focused', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    expect(workbench.inspectorTabs.hidden).toBe(false);
+
+    workbench.controller.onClick(clickTarget({ inspectorTab: 'data' }));
+    expect(workbench.rightTabs[1]?.ariaSelected).toBe('true');
+    expect(workbench.panes[1]?.hidden).toBe(false);
+
+    workbench.interaction.focusedComponentId = null;
+    workbench.interaction.selectedComponentIds = [];
+    workbench.controller.renderInspectorTabs();
+    expect(workbench.inspectorTabs.hidden).toBe(true);
+    expect(workbench.rightTabs[0]?.ariaSelected).toBe('true');
+    expect(workbench.panes[0]?.hidden).toBe(false);
+    expect(workbench.panes[1]?.hidden).toBe(true);
+    expect(workbench.panes[2]?.hidden).toBe(true);
+    expect(workbench.panes[3]?.hidden).toBe(true);
+
+    workbench.interaction.focusedComponentId = 'c1';
+    workbench.interaction.selectedComponentIds = ['c1'];
+    workbench.controller.renderInspectorTabs();
+    expect(workbench.inspectorTabs.hidden).toBe(false);
+    expect(workbench.rightTabs[0]?.ariaSelected).toBe('true');
   });
 
   it('R7 renders snap previews as transient overlays without touching the document', () => {

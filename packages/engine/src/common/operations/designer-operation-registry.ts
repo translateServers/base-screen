@@ -7,6 +7,8 @@ export interface DesignerOperationDefinition<Context> {
   readonly tooltip: string;
   readonly shortcut?: string;
   readonly aliases?: readonly string[];
+  /** 按键按住重复（event.repeat）时是否允许连续执行；Delete、nudge 等连续型为 true。 */
+  readonly repeatable?: boolean;
   readonly isAvailable: (context: Context) => boolean;
   readonly isEnabled: (context: Context) => boolean;
   readonly execute: (context: Context) => void | Promise<void>;
@@ -62,28 +64,9 @@ export class DesignerOperationRegistry<Context> {
   }
 }
 
-// Structural keyboard-shape so common/ stays environment-agnostic (no DOM KeyboardEvent).
-export interface DesignerKeyboardEventShape {
-  readonly altKey: boolean;
-  readonly ctrlKey: boolean;
-  readonly key: string;
-  readonly metaKey: boolean;
-  readonly shiftKey: boolean;
-}
-
-export function shortcutFromKeyboardEvent(event: DesignerKeyboardEventShape): string | undefined {
-  if (event.key === 'Backspace') return 'Delete';
-  const key = event.key.length === 1 ? event.key.toUpperCase() : event.key;
-  const modifiers = [
-    event.ctrlKey || event.metaKey ? 'Ctrl' : '',
-    event.altKey ? 'Alt' : '',
-    event.shiftKey ? 'Shift' : '',
-  ]
-    .filter(Boolean)
-    .join('+');
-  return `${modifiers}${modifiers === '' ? '' : '+'}${key}`;
-}
-
+// Structural keyboard-shape is owned by common/events (designer-key-chords.ts).
+// Matching-side normalization: registry metadata (shortcut/alias) is compared in a
+// canonical uppercase form so keyboard chords resolve against the same metadata.
 function normalizeDesignerShortcut(shortcut: string): string {
   return shortcut.replace('Cmd', 'Ctrl').toUpperCase();
 }
@@ -137,7 +120,6 @@ export const DESIGNER_OPERATION_TEXT = {
   'project-retry': { label: '重试', tooltip: '重试项目操作' },
   'project-cancel': { label: '取消', tooltip: '取消项目操作' },
   'toggle-grid': { label: '网格', tooltip: '切换网格' },
-  'toggle-snap': { label: '对齐', tooltip: '切换网格对齐' },
   'toggle-guides': { label: '参考线', tooltip: '切换参考线显示', shortcut: 'Ctrl+;' },
   'toggle-border-guides': { label: '边框参考线', tooltip: '切换边框参考线', shortcut: 'Ctrl+K' },
   'toggle-workbench': { label: '切换工作台模式', tooltip: '切换工作台模式', shortcut: 'F' },

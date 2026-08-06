@@ -1,5 +1,6 @@
 import type { ScreenDocument, ScreenHostResourcePort } from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerPreviewCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -23,7 +24,7 @@ export class DesignerPreviewController {
     close.type = 'button';
     close.className = 'designer-control designer-button';
     close.dataset.action = 'preview';
-    close.textContent = '关闭预览';
+    close.textContent = DESIGNER_UI_TEXT.closePreview;
     header.appendChild(close);
     preview.append(header, shadow.ownerDocument.createElement('base-screen-viewer'));
     shadow.querySelector<HTMLElement>('.designer')?.appendChild(preview);

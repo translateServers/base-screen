@@ -1,4 +1,5 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenInteractionState } from '@base-screen/core';
 import {
   collectDesignerSnapCandidates,
   DEFAULT_DESIGNER_CANVAS_AIDS,
@@ -14,6 +15,7 @@ import { clientPointToDesignerCanvasPoint } from '../viewport/designer-canvas-co
 interface DesignerWorkbenchCallbacks {
   readonly getCanvas: () => HTMLDivElement | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
+  readonly getInteraction: () => ScreenInteractionState;
   readonly getRoot: () => ShadowRoot | null;
   readonly getZoom: () => number;
 }
@@ -93,16 +95,21 @@ export class DesignerWorkbenchController {
     },
     offset: { readonly x: number; readonly y: number },
     excludedComponentIds: readonly string[] = [],
+    options: { readonly gridSnapEnabled?: boolean } = {},
   ): DesignerSnapTranslation {
     const document = this.callbacks.getDocument();
     const candidates =
       document === undefined
         ? this.#guides
         : collectDesignerSnapCandidates(document, this.#guides, excludedComponentIds);
+    const state =
+      options.gridSnapEnabled === undefined
+        ? this.#canvasAids
+        : { ...this.#canvasAids, gridSnapEnabled: options.gridSnapEnabled };
     return snapDesignerSelectionTranslation(
       bounds,
       offset,
-      this.#canvasAids,
+      state,
       candidates,
       this.callbacks.getZoom(),
     );
@@ -118,7 +125,7 @@ export class DesignerWorkbenchController {
     this.renderRulers();
   }
 
-  toggleCanvasAid(aid: 'gridEnabled' | 'gridSnapEnabled'): void {
+  toggleCanvasAid(aid: 'gridEnabled'): void {
     this.#canvasAids = { ...this.#canvasAids, [aid]: !this.#canvasAids[aid] };
     this.renderCanvasAids();
   }
@@ -203,6 +210,8 @@ export class DesignerWorkbenchController {
     const target = event.target as HTMLElement | null;
     const side = target?.closest<HTMLElement>('[data-panel-handle]')?.dataset.panelHandle;
     if (side === 'left' || side === 'right') {
+      // 阻止 pointerdown 默认聚焦行为把焦点从 viewport 移走，避免 blur 取消本次手势。
+      event.preventDefault();
       const layout = this.callbacks.getRoot()?.querySelector<HTMLElement>('.designer');
       layout?.setPointerCapture(event.pointerId);
       this.#panelResizeCaptureTarget = layout ?? undefined;
@@ -217,6 +226,8 @@ export class DesignerWorkbenchController {
         : undefined;
     const canvas = this.callbacks.getCanvas();
     if (axis === undefined || canvas === undefined) return;
+    // 阻止 pointerdown 默认聚焦行为把焦点从 viewport 移走，避免 blur 取消参考线拖拽。
+    event.preventDefault();
     this.startGuideDrag(axis, undefined, event, canvas);
   }
 
@@ -243,6 +254,11 @@ export class DesignerWorkbenchController {
     this.renderGuides();
   }
 
+  // 选中变化时刷新右侧检查器：无焦点组件时隐藏"外观/数据/交互/事件"tab 栏，只保留画布属性。
+  renderInspectorTabs(): void {
+    this.renderTabs();
+  }
+
   clearGuides(): void {
     this.cancelTransientState();
     this.#guides = { x: [], y: [] };
@@ -260,6 +276,8 @@ export class DesignerWorkbenchController {
   private renderTabs(): void {
     const root = this.callbacks.getRoot();
     if (root === null) return;
+    const focused = this.callbacks.getInteraction().focusedComponentId !== null;
+    if (!focused) this.#rightTab = 'appearance';
     for (const control of root.querySelectorAll<HTMLButtonElement>('[data-panel-tab]')) {
       control.ariaSelected = String(control.dataset.panelTab === this.#leftTab);
     }
@@ -267,6 +285,8 @@ export class DesignerWorkbenchController {
     const layers = root.querySelector<HTMLElement>('[data-layers]');
     if (materials !== null) materials.hidden = this.#leftTab !== 'materials';
     if (layers !== null) layers.hidden = this.#leftTab !== 'layers';
+    const inspectorTabs = root.querySelector<HTMLElement>('.inspector-tabs');
+    if (inspectorTabs !== null) inspectorTabs.hidden = !focused;
     for (const control of root.querySelectorAll<HTMLButtonElement>('[data-inspector-tab]')) {
       control.ariaSelected = String(control.dataset.inspectorTab === this.#rightTab);
     }
@@ -455,9 +475,6 @@ export class DesignerWorkbenchController {
     root
       .querySelector<HTMLButtonElement>('[data-action="toggle-grid"]')
       ?.setAttribute('aria-pressed', String(this.#canvasAids.gridEnabled));
-    root
-      .querySelector<HTMLButtonElement>('[data-action="toggle-snap"]')
-      ?.setAttribute('aria-pressed', String(this.#canvasAids.gridSnapEnabled));
   }
 
   private createGuide(

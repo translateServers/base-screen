@@ -33,6 +33,7 @@ import {
   updateDesignerBlueprintTrigger,
   updateDesignerBlueprintVariableName,
 } from '../../common/operations/designer-blueprint-authoring.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   createDesignerBlueprintRule,
   getDesignerFocusedMaterialEvents,
@@ -539,7 +540,13 @@ export class DesignerIntegrationController {
     }
     this.#graph.setDiagnostics([]);
     this.#graph.appendSimulationLog(
-      `模拟 ${componentId}.${eventName}：变量 ${Object.keys(result.value.variables).length} 项，事件 ${result.value.hostEvents.length} 项，动作 ${result.value.hostActions.length} 项。`,
+      DESIGNER_UI_TEXT.feedback.simulate(
+        componentId,
+        eventName,
+        Object.keys(result.value.variables).length,
+        result.value.hostEvents.length,
+        result.value.hostActions.length,
+      ),
     );
   }
 }
@@ -592,11 +599,11 @@ function isConditionOperator(
 function blueprintDiagnostic(diagnostic: ScreenDiagnostic): ScreenDiagnostic {
   const message =
     diagnostic.code === 'BLUEPRINT_CAPABILITY_UNAVAILABLE'
-      ? '蓝图能力不可用，未保存修改。'
+      ? DESIGNER_UI_TEXT.feedback.blueprintUnavailable
       : diagnostic.code === 'BLUEPRINT_CONDITION_INVALID'
-        ? '蓝图条件无效，未保存修改。'
+        ? DESIGNER_UI_TEXT.feedback.blueprintConditionInvalid
         : diagnostic.code === 'BLUEPRINT_EXPRESSION_INVALID'
-          ? '蓝图表达式无效，未保存修改。'
-          : '蓝图配置无效，未保存修改。';
+          ? DESIGNER_UI_TEXT.feedback.blueprintExpressionInvalid
+          : DESIGNER_UI_TEXT.feedback.blueprintConfigInvalid;
   return { ...diagnostic, message };
 }

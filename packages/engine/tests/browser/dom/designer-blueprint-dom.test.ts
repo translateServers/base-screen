@@ -4,11 +4,11 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
-import type { DesignerBlueprintGraphProjection } from '../../../src/browser/controllers/designer-blueprint-graph-session.js';
 import {
   renderDesignerBlueprintWorkspace,
   renderDesignerEventsPanel,
 } from '../../../src/browser/dom/designer-blueprint-dom.js';
+import type { DesignerBlueprintGraphProjection } from '../../../src/common/operations/designer-blueprint-authoring.js';
 
 class FakeElement {
   readonly children: FakeElement[] = [];

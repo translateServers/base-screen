@@ -10,8 +10,11 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import { DESIGNER_BLUEPRINT_CAPABILITIES } from '../../common/operations/designer-blueprint-authoring.js';
-import type { DesignerBlueprintGraphProjection } from '../controllers/designer-blueprint-graph-session.js';
+import {
+  DESIGNER_BLUEPRINT_CAPABILITIES,
+  type DesignerBlueprintGraphProjection,
+} from '../../common/operations/designer-blueprint-authoring.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export function getDesignerFocusedMaterialEvents(
   document: ScreenDocument | undefined,
@@ -37,12 +40,14 @@ export function renderDesignerEventsPanel(
     document?.blueprint.rules.filter((rule) => rule.trigger.componentId === focused) ?? [];
   const summary = panel.ownerDocument.createElement('p');
   summary.textContent =
-    focused === null ? '选择组件以查看事件规则。' : `当前组件有 ${rules.length} 条事件规则。`;
+    focused === null
+      ? DESIGNER_UI_TEXT.blueprint.noComponent
+      : DESIGNER_UI_TEXT.blueprint.ruleCount(rules.length);
   panel.appendChild(summary);
 
   const events = getDesignerFocusedMaterialEvents(document, interaction, catalog);
   if (events.length > 0) {
-    const eventField = createField(panel.ownerDocument, '触发事件');
+    const eventField = createField(panel.ownerDocument, DESIGNER_UI_TEXT.blueprint.triggerEvent);
     const select = panel.ownerDocument.createElement('select');
     select.className = 'designer-control designer-select';
     select.dataset.blueprintEvent = 'true';
@@ -66,13 +71,13 @@ export function renderDesignerEventsPanel(
     for (const eventName of events) {
       const item = panel.ownerDocument.createElement('li');
       const count = rules.filter((rule) => rule.trigger.eventName === eventName).length;
-      item.textContent = `${eventName}：${count} 条规则`;
+      item.textContent = DESIGNER_UI_TEXT.blueprint.ruleListItem(eventName, count);
       eventList.appendChild(item);
     }
     panel.appendChild(eventList);
   }
 
-  const open = createButton(panel.ownerDocument, '打开蓝图');
+  const open = createButton(panel.ownerDocument, DESIGNER_UI_TEXT.blueprint.openBlueprint);
   open.dataset.action = 'open-blueprint';
   open.disabled =
     events.length === 0 ||
@@ -84,7 +89,7 @@ export function renderDesignerEventsPanel(
   ) {
     const unavailable = panel.ownerDocument.createElement('p');
     unavailable.setAttribute('role', 'status');
-    unavailable.textContent = '当前蓝图能力不可用。';
+    unavailable.textContent = DESIGNER_UI_TEXT.blueprint.unavailable;
     panel.appendChild(unavailable);
   }
 }
@@ -102,14 +107,14 @@ export function renderDesignerBlueprintWorkspace(
   workspace.replaceChildren();
   if (document === undefined) return;
   const heading = workspace.ownerDocument.createElement('header');
-  heading.textContent = '蓝图';
-  const add = createButton(workspace.ownerDocument, '添加规则');
+  heading.textContent = DESIGNER_UI_TEXT.blueprint.title;
+  const add = createButton(workspace.ownerDocument, DESIGNER_UI_TEXT.blueprint.addRule);
   add.dataset.action = 'blueprint-add-rule';
   add.disabled =
     !getDesignerFocusedMaterialEvents(document, interaction, catalog).includes(
       selectedEventName ?? '',
     ) || !hasCapability(runtimeContributions, DESIGNER_BLUEPRINT_CAPABILITIES.materialEvent);
-  const close = createButton(workspace.ownerDocument, '关闭');
+  const close = createButton(workspace.ownerDocument, DESIGNER_UI_TEXT.blueprint.close);
   close.dataset.action = 'close-blueprint';
   heading.append(add, close);
   workspace.appendChild(heading);
@@ -130,15 +135,15 @@ export function renderDesignerBlueprintWorkspace(
     item.appendChild(
       createActionsField(workspace.ownerDocument, document, rule, runtimeContributions),
     );
-    const moveUp = createButton(workspace.ownerDocument, '上移规则');
+    const moveUp = createButton(workspace.ownerDocument, DESIGNER_UI_TEXT.blueprint.moveUp);
     moveUp.dataset.blueprintMoveRule = rule.id;
     moveUp.dataset.blueprintMoveDirection = 'up';
     moveUp.disabled = index === 0;
-    const moveDown = createButton(workspace.ownerDocument, '下移规则');
+    const moveDown = createButton(workspace.ownerDocument, DESIGNER_UI_TEXT.blueprint.moveDown);
     moveDown.dataset.blueprintMoveRule = rule.id;
     moveDown.dataset.blueprintMoveDirection = 'down';
     moveDown.disabled = index === document.blueprint.rules.length - 1;
-    const remove = createButton(workspace.ownerDocument, '移除规则');
+    const remove = createButton(workspace.ownerDocument, DESIGNER_UI_TEXT.blueprint.removeRule);
     remove.dataset.blueprintRemoveRule = rule.id;
     item.append(moveUp, moveDown, remove);
     list.appendChild(item);
@@ -153,7 +158,7 @@ function createGraphProjection(
   const projection = ownerDocument.createElement('section');
   projection.className = 'blueprint-graph';
   projection.dataset.blueprintGraph = 'true';
-  projection.setAttribute('aria-label', '蓝图图形投影');
+  projection.setAttribute('aria-label', DESIGNER_UI_TEXT.blueprint.graphAria);
   const controls = ownerDocument.createElement('div');
   controls.className = 'blueprint-graph-controls';
   const search = ownerDocument.createElement('input');
@@ -161,14 +166,14 @@ function createGraphProjection(
   search.className = 'designer-control designer-input';
   search.dataset.blueprintGraphSearch = 'true';
   search.value = graph.searchQuery;
-  search.setAttribute('aria-label', '搜索蓝图节点');
+  search.setAttribute('aria-label', DESIGNER_UI_TEXT.blueprint.searchAria);
   controls.appendChild(search);
   for (const [action, label] of [
-    ['apply-template', '添加事件模板'],
-    ['simulate', '模拟事件'],
-    ['zoom-out', '缩小图形'],
-    ['zoom-in', '放大图形'],
-    ['fit', '适应图形'],
+    ['apply-template', DESIGNER_UI_TEXT.blueprint.addTemplate],
+    ['simulate', DESIGNER_UI_TEXT.blueprint.simulate],
+    ['zoom-out', DESIGNER_UI_TEXT.blueprint.zoomOut],
+    ['zoom-in', DESIGNER_UI_TEXT.blueprint.zoomIn],
+    ['fit', DESIGNER_UI_TEXT.blueprint.fit],
   ] as const) {
     const control = createButton(ownerDocument, label);
     control.dataset.blueprintGraphAction = action;
@@ -211,7 +216,7 @@ function createGraphProjection(
   if (graph.simulationLog.length > 0) {
     const log = ownerDocument.createElement('ol');
     log.className = 'blueprint-graph-log';
-    log.setAttribute('aria-label', '模拟日志');
+    log.setAttribute('aria-label', DESIGNER_UI_TEXT.blueprint.logAria);
     for (const entry of graph.simulationLog) {
       const item = ownerDocument.createElement('li');
       item.textContent = entry;
@@ -258,7 +263,7 @@ function createRuleEventField(
   catalog: BaseScreenMaterialCatalog | undefined,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): HTMLElement {
-  const field = createField(ownerDocument, '触发事件');
+  const field = createField(ownerDocument, DESIGNER_UI_TEXT.blueprint.triggerEvent);
   const select = ownerDocument.createElement('select');
   select.className = 'designer-control designer-select';
   select.dataset.blueprintRule = rule.id;
@@ -288,7 +293,7 @@ function createConditionField(
   rule: ScreenBlueprintRule,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): HTMLElement {
-  const field = createField(ownerDocument, '条件');
+  const field = createField(ownerDocument, DESIGNER_UI_TEXT.blueprint.condition);
   const toggle = ownerDocument.createElement('input');
   toggle.type = 'checkbox';
   toggle.className = 'designer-checkbox';
@@ -317,7 +322,7 @@ function createConditionField(
   appendExpressionInput(
     ownerDocument,
     field,
-    '左值（JSON）',
+    DESIGNER_UI_TEXT.blueprint.leftValue,
     rule.id,
     'condition-left',
     rule.condition.left,
@@ -327,7 +332,7 @@ function createConditionField(
     appendExpressionInput(
       ownerDocument,
       field,
-      '右值（JSON）',
+      DESIGNER_UI_TEXT.blueprint.rightValue,
       rule.id,
       'condition-right',
       rule.condition.right,
@@ -343,16 +348,16 @@ function createActionsField(
   rule: ScreenBlueprintRule,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): HTMLElement {
-  const field = createField(ownerDocument, '动作');
+  const field = createField(ownerDocument, DESIGNER_UI_TEXT.blueprint.actions);
   for (const [index, action] of rule.actions.entries()) {
     const actionField = ownerDocument.createElement('fieldset');
     const legend = ownerDocument.createElement('legend');
     legend.textContent =
       action.type === 'set-variable'
-        ? '设置变量'
+        ? DESIGNER_UI_TEXT.blueprint.setVariable
         : action.type === 'emit-host-event'
-          ? '发送宿主事件'
-          : '调用宿主动作';
+          ? DESIGNER_UI_TEXT.blueprint.emitHostEvent
+          : DESIGNER_UI_TEXT.blueprint.callHostAction;
     actionField.appendChild(legend);
     const editable = hasCapability(
       runtimeContributions,
@@ -380,7 +385,7 @@ function createActionsField(
       appendExpressionInput(
         ownerDocument,
         actionField,
-        '值（JSON）',
+        DESIGNER_UI_TEXT.blueprint.value,
         rule.id,
         'action',
         action.value,
@@ -398,13 +403,15 @@ function createActionsField(
       eventName.disabled = !editable;
       eventName.setAttribute(
         'aria-label',
-        action.type === 'emit-host-event' ? '宿主事件名称' : '宿主动作名称',
+        action.type === 'emit-host-event'
+          ? DESIGNER_UI_TEXT.blueprint.hostEventName
+          : DESIGNER_UI_TEXT.blueprint.hostActionName,
       );
       actionField.appendChild(eventName);
       appendExpressionInput(
         ownerDocument,
         actionField,
-        '载荷（JSON）',
+        DESIGNER_UI_TEXT.blueprint.payload,
         rule.id,
         'action',
         action.payload,
@@ -412,19 +419,19 @@ function createActionsField(
         index,
       );
     }
-    const remove = createButton(ownerDocument, '移除动作');
+    const remove = createButton(ownerDocument, DESIGNER_UI_TEXT.blueprint.removeAction);
     remove.dataset.blueprintRule = rule.id;
     remove.dataset.blueprintRemoveAction = String(index);
     actionField.appendChild(remove);
     field.appendChild(actionField);
   }
-  const addVariable = createButton(ownerDocument, '添加变量动作');
+  const addVariable = createButton(ownerDocument, DESIGNER_UI_TEXT.blueprint.addVariableAction);
   addVariable.dataset.blueprintRule = rule.id;
   addVariable.dataset.blueprintAddAction = 'set-variable';
   addVariable.disabled =
     document.variables.length === 0 ||
     !hasCapability(runtimeContributions, DESIGNER_BLUEPRINT_CAPABILITIES.setVariable);
-  const addHostEvent = createButton(ownerDocument, '添加宿主事件动作');
+  const addHostEvent = createButton(ownerDocument, DESIGNER_UI_TEXT.blueprint.addHostEventAction);
   addHostEvent.dataset.blueprintRule = rule.id;
   addHostEvent.dataset.blueprintAddAction = 'emit-host-event';
   addHostEvent.disabled = !hasCapability(
@@ -487,20 +494,20 @@ function hasCapability(
 function conditionLabel(value: ScreenBlueprintCondition['operator']): string {
   switch (value) {
     case 'eq':
-      return '等于';
+      return DESIGNER_UI_TEXT.blueprint.conditionEq;
     case 'neq':
-      return '不等于';
+      return DESIGNER_UI_TEXT.blueprint.conditionNeq;
     case 'gt':
-      return '大于';
+      return DESIGNER_UI_TEXT.blueprint.conditionGt;
     case 'gte':
-      return '大于或等于';
+      return DESIGNER_UI_TEXT.blueprint.conditionGte;
     case 'lt':
-      return '小于';
+      return DESIGNER_UI_TEXT.blueprint.conditionLt;
     case 'lte':
-      return '小于或等于';
+      return DESIGNER_UI_TEXT.blueprint.conditionLte;
     case 'contains':
-      return '包含';
+      return DESIGNER_UI_TEXT.blueprint.conditionContains;
     case 'exists':
-      return '存在';
+      return DESIGNER_UI_TEXT.blueprint.conditionExists;
   }
 }

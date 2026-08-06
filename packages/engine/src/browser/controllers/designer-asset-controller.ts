@@ -7,6 +7,7 @@ import type {
 } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { createPropertyTransaction } from '../dom/designer-panel-dom.js';
 
 export interface DesignerAssetControllerCallbacks {
@@ -39,13 +40,13 @@ export class DesignerAssetController {
     section.className = 'designer-asset-section';
     section.dataset.assetSection = 'true';
     const heading = panel.ownerDocument.createElement('h3');
-    heading.textContent = '资产';
+    heading.textContent = DESIGNER_UI_TEXT.asset.title;
     const search = panel.ownerDocument.createElement('input');
     search.className = 'designer-control designer-input';
     search.dataset.assetQuery = 'true';
-    search.placeholder = '搜索资产';
+    search.placeholder = DESIGNER_UI_TEXT.asset.search;
     search.value = this.#query;
-    search.setAttribute('aria-label', '搜索资产');
+    search.setAttribute('aria-label', DESIGNER_UI_TEXT.asset.search);
     const results = panel.ownerDocument.createElement('div');
     results.dataset.assetResults = 'true';
     const feedback = panel.ownerDocument.createElement('p');
@@ -79,13 +80,13 @@ export class DesignerAssetController {
     if (assetId === undefined) return true;
     if (action === 'select') {
       this.#selectedAssetId = assetId;
-      this.setFeedback('已选择资产，请确认替换。');
+      this.setFeedback(DESIGNER_UI_TEXT.asset.selectedConfirm);
       this.renderResults();
       return true;
     }
     if (action === 'replace') {
       if (this.#selectedAssetId !== assetId) {
-        this.setFeedback('请先选择要替换的资产。');
+        this.setFeedback(DESIGNER_UI_TEXT.asset.selectFirst);
         return true;
       }
       this.replace(assetId);
@@ -127,12 +128,12 @@ export class DesignerAssetController {
     const controller = new AbortController();
     this.#listAbort = controller;
     const requestId = ++this.#requestId;
-    this.setFeedback('正在加载资产。');
+    this.setFeedback(DESIGNER_UI_TEXT.asset.loading);
     const result = await port.list({ query, signal: controller.signal });
     if (controller.signal.aborted || requestId !== this.#requestId) return;
     if (!result.ok) {
       this.callbacks.report(result.diagnostics);
-      this.setFeedback('资产加载失败，请重试。');
+      this.setFeedback(DESIGNER_UI_TEXT.asset.loadFailed);
       return;
     }
     this.#results = result.value;
@@ -140,7 +141,7 @@ export class DesignerAssetController {
       this.#selectedAssetId = undefined;
     }
     this.renderResults();
-    this.setFeedback(`已显示 ${result.value.length} 个资产。`);
+    this.setFeedback(DESIGNER_UI_TEXT.asset.shown(result.value.length));
   }
 
   private replace(assetId: string): void {
@@ -152,14 +153,14 @@ export class DesignerAssetController {
     );
     if (transaction === undefined || !transaction.ok) {
       if (transaction !== undefined) this.callbacks.report(transaction.diagnostics);
-      this.setFeedback('资产替换不可用，未保存修改。');
+      this.setFeedback(DESIGNER_UI_TEXT.asset.replaceUnavailable);
       return;
     }
     const result = this.callbacks.executeTransaction(transaction.value);
-    if (result.ok) this.setFeedback('资产已替换。');
+    if (result.ok) this.setFeedback(DESIGNER_UI_TEXT.asset.replaced);
     else {
       this.callbacks.report(result.diagnostics);
-      this.setFeedback('资产替换失败，未保存修改。');
+      this.setFeedback(DESIGNER_UI_TEXT.asset.replaceFailed);
     }
   }
 
@@ -170,16 +171,16 @@ export class DesignerAssetController {
     const controller = new AbortController();
     this.#deleteAbort = controller;
     const requestId = ++this.#deleteRequestId;
-    this.setFeedback('正在检查删除保护。');
+    this.setFeedback(DESIGNER_UI_TEXT.asset.checkingDelete);
     const result = await port.canDelete(assetId, controller.signal);
     if (controller.signal.aborted || requestId !== this.#deleteRequestId) return;
     if (!result.ok) {
       this.callbacks.report(result.diagnostics);
-      this.setFeedback('无法确认删除保护，请重试。');
+      this.setFeedback(DESIGNER_UI_TEXT.asset.deleteCheckFailed);
       return;
     }
     this.setFeedback(
-      result.value ? '该资产当前可由宿主删除。' : '该资产仍被引用，宿主将阻止删除。',
+      result.value ? DESIGNER_UI_TEXT.asset.deletable : DESIGNER_UI_TEXT.asset.referenced,
     );
   }
 
@@ -190,7 +191,7 @@ export class DesignerAssetController {
     if (this.#results.length === 0) {
       const empty = results.ownerDocument.createElement('p');
       empty.className = 'designer-empty-state';
-      empty.textContent = '没有可用资产。';
+      empty.textContent = DESIGNER_UI_TEXT.asset.empty;
       results.appendChild(empty);
       return;
     }
@@ -199,11 +200,16 @@ export class DesignerAssetController {
       item.className = 'designer-asset-item';
       item.dataset.assetId = asset.assetId;
       const name = results.ownerDocument.createElement('span');
-      name.textContent = `${asset.name}（${asset.mediaType}）`;
-      const select = this.button(results, '选择', 'select');
-      const replace = this.button(results, '替换', 'replace');
+      name.textContent = DESIGNER_UI_TEXT.asset.nameWithType(asset.name, asset.mediaType);
+      const select = this.button(results, DESIGNER_UI_TEXT.asset.select, 'select');
+      const replace = this.button(results, DESIGNER_UI_TEXT.asset.replace, 'replace');
       replace.disabled = this.#selectedAssetId !== asset.assetId;
-      item.append(name, select, replace, this.button(results, '检查删除保护', 'check-delete'));
+      item.append(
+        name,
+        select,
+        replace,
+        this.button(results, DESIGNER_UI_TEXT.asset.checkDelete, 'check-delete'),
+      );
       results.appendChild(item);
     }
   }

@@ -40,6 +40,7 @@ export class DesignerViewportController {
       this.callbacks.onBlur();
     });
     viewport.tabIndex = 0;
+    this.render();
   }
 
   /** 把键盘焦点收敛到 viewport 焦点容器，作为画布交互的统一快捷键命中目标。 */
@@ -100,8 +101,16 @@ export class DesignerViewportController {
     );
   }
 
+  /** 同步手型/平移状态到 viewport 表面，供 CSS 切换抓手工标（空格临时或抓手工具）。 */
+  setPanning(panning: boolean): void {
+    const dataset = (this.#viewport as { readonly dataset?: DOMStringMap } | undefined)?.dataset;
+    if (dataset !== undefined) dataset.panning = String(panning);
+  }
+
   render(root: ParentNode | null = getParentNode(this.#canvas)): void {
     if (this.#canvas !== undefined) this.#canvas.style.transform = viewportTransform(this.#state);
+    const dataset = (this.#viewport as { readonly dataset?: DOMStringMap } | undefined)?.dataset;
+    if (dataset !== undefined) dataset.tool = this.activeTool;
     for (const output of root?.querySelectorAll<HTMLOutputElement>(
       '[data-zoom], [data-status-zoom]',
     ) ?? []) {
@@ -114,12 +123,21 @@ export class DesignerViewportController {
   }
 
   private onWheel(event: WheelEvent): void {
-    if (!event.ctrlKey && !event.metaKey) return;
+    if (event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      this.setZoom(
+        this.#state.zoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1),
+        getViewportAnchor(event, this.#viewport!),
+      );
+      return;
+    }
+    // 画布内普通滚轮 = 平移画布（shift+wheel = 水平平移），阻断宿主页面滚动。
+    // 方向约定与直接拖拽相反：滚轮向下滚动等价于"视图内容上移"，即画布 offset 减少。
     event.preventDefault();
-    this.setZoom(
-      this.#state.zoom * (event.deltaY < 0 ? 1.1 : 1 / 1.1),
-      getViewportAnchor(event, this.#viewport!),
-    );
+    const scale = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? 512 : 1;
+    const dx = (event.shiftKey ? event.deltaY : event.deltaX) * scale;
+    const dy = (event.shiftKey ? event.deltaX : event.deltaY) * scale;
+    this.panBy({ x: -dx, y: -dy });
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
@@ -148,6 +166,9 @@ export class DesignerViewportController {
   }
 
   setActiveTool(tool: DesignerToolId): void {
+    // 选择主工具时清空临时空格抓手（对标 Nebula 的 setTool 会清空临时工具栈），
+    // 避免前一次按住空格的状态残留到新选中的工具上（例如按住空格后点选矩形，仍被当作抓手）。
+    this.#spacePressed = false;
     this.#activeTool = tool;
     this.render();
     this.callbacks.onToolChange(tool);
