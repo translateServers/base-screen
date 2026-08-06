@@ -55,6 +55,8 @@ interface Transform {
   readonly handle: BaseScreenTransformHandle | undefined;
   readonly start: Point;
   readonly components: readonly ScreenComponentNode[];
+  /** 变换预览覆盖的 Material 根元素内联样式（结束/取消手势时恢复，与拖拽 translate 清理对称）。 */
+  readonly previewStyles: ReadonlyMap<string, TransformPreviewStyle>;
 }
 
 interface Marquee {
@@ -116,6 +118,8 @@ export interface DesignerGestureCallbacks {
     readonly snappedY?: number | undefined;
   };
   readonly renderSnapPreview?: (point: DesignerSnapPoint | undefined) => void;
+  /** 吸附会话生命周期：拖拽/变换/创建手势开始与结束时切换候选缓存与滞后状态。 */
+  readonly setSnapSessionActive?: (active: boolean) => void;
   readonly reduceSelection: (action: ScreenInteractionAction) => void;
   readonly reportTransaction: (transaction: ScreenDocumentTransaction) => void;
   readonly renderSelection: () => void;
@@ -210,6 +214,7 @@ export class DesignerGestureController {
     if (create !== undefined && target.closest('[data-base-screen-component-id]') === null) {
       event.preventDefault();
       this.capturePointer(event.pointerId);
+      this.callbacks.setSnapSessionActive?.(true);
       this.#create = {
         pointerId: event.pointerId,
         start: this.snapCanvasPoint(event),
@@ -282,6 +287,7 @@ export class DesignerGestureController {
     this.capturePointer(event.pointerId);
     const bounds = getScreenSelectionBounds(components);
     if (bounds === null) return;
+    this.callbacks.setSnapSessionActive?.(true);
     this.#drag = {
       components,
       pointerId: event.pointerId,
@@ -330,6 +336,7 @@ export class DesignerGestureController {
     this.capturePointer(event.pointerId);
     const bounds = getScreenSelectionBounds(components);
     if (bounds === null) return;
+    this.callbacks.setSnapSessionActive?.(true);
     this.#drag = {
       components,
       pointerId: event.pointerId,
@@ -510,12 +517,14 @@ export class DesignerGestureController {
     event.preventDefault();
     event.stopPropagation();
     this.capturePointer(event.pointerId);
+    this.callbacks.setSnapSessionActive?.(true);
     this.#transform = {
       pointerId: event.pointerId,
       kind: handle === undefined ? 'rotate' : 'resize',
       handle,
       start: this.canvasPointFromPointer(event),
       components,
+      previewStyles: captureTransformPreviewStyles(canvas, components),
     };
   }
 
@@ -536,11 +545,19 @@ export class DesignerGestureController {
   }
 
   private renderTransformPreview(event: PointerEvent): void {
-    const selection = this.#canvas?.querySelector<HTMLElement>('[data-selection]');
-    if (this.#transform === undefined || selection === null || selection === undefined) {
+    const transform = this.#transform;
+    const canvas = this.#canvas;
+    const selection = canvas?.querySelector<HTMLElement>('[data-selection]');
+    if (
+      transform === undefined ||
+      canvas === undefined ||
+      selection === null ||
+      selection === undefined
+    ) {
       return;
     }
-    const bounds = getScreenSelectionBounds(this.transformComponents(this.#transform, event));
+    const after = this.transformComponents(transform, event);
+    const bounds = getScreenSelectionBounds(after);
     if (bounds === null) {
       return;
     }
@@ -548,13 +565,38 @@ export class DesignerGestureController {
     selection.style.top = `${bounds.top}px`;
     selection.style.width = `${bounds.right - bounds.left}px`;
     selection.style.height = `${bounds.bottom - bounds.top}px`;
+    // Material 根元素实时变换（V10）：resize/rotate 直接作用于组件元素，与 renderer 的
+    // left/top/width/height + rotate() 定位一致；手势结束/取消时按捕获样式恢复。
+    for (const component of after) {
+      const element = canvas.querySelector<HTMLElement>(
+        `[data-base-screen-component-id="${component.id}"]`,
+      );
+      if (element === null || element === undefined) continue;
+      element.style.left = `${component.position.x}px`;
+      element.style.top = `${component.position.y}px`;
+      element.style.width = `${component.size.width}px`;
+      element.style.height = `${component.size.height}px`;
+      element.style.transform = `rotate(${component.rotation}deg)`;
+    }
   }
 
   private cancelTransform(): void {
     if (this.#transform === undefined) {
       return;
     }
+    this.callbacks.setSnapSessionActive?.(false);
     this.releasePointerCapture(this.#transform.pointerId);
+    for (const [componentId, styles] of this.#transform.previewStyles) {
+      const element = this.#canvas?.querySelector<HTMLElement>(
+        `[data-base-screen-component-id="${componentId}"]`,
+      );
+      if (element === null || element === undefined) continue;
+      element.style.left = styles.left;
+      element.style.top = styles.top;
+      element.style.width = styles.width;
+      element.style.height = styles.height;
+      element.style.transform = styles.transform;
+    }
     this.#transform = undefined;
     this.clearSnapPreview();
     this.callbacks.renderSelection();
@@ -564,6 +606,7 @@ export class DesignerGestureController {
     if (this.#drag === undefined) {
       return;
     }
+    this.callbacks.setSnapSessionActive?.(false);
     for (const element of this.#drag.elements) {
       element.style.translate = '';
     }
@@ -599,6 +642,7 @@ export class DesignerGestureController {
 
   private cancelCreate(): void {
     if (this.#create !== undefined) {
+      this.callbacks.setSnapSessionActive?.(false);
       this.releasePointerCapture(this.#create.pointerId);
       this.#create = undefined;
     }
@@ -617,7 +661,8 @@ export class DesignerGestureController {
       x: clampCoordinate((event.clientX - drag.startClientX) / zoom),
       y: clampCoordinate((event.clientY - drag.startClientY) / zoom),
     };
-    // 拖拽移动只保留智能参考线吸附，不吸附到 24px 像素网格，允许亚像素自由定位。
+    // 拖拽移动关闭无阈值网格取整：网格线以 5px 阈值并入智能候选（参考 Moveable/Nebula 语义），
+    // 与组件/画布/参考线统一按距离竞争，网格线之间允许亚像素自由定位。
     const snapped = this.callbacks.snapCanvasSelection(
       drag.bounds,
       translation,
@@ -815,6 +860,37 @@ export class DesignerGestureController {
       ],
     });
   }
+}
+
+interface TransformPreviewStyle {
+  readonly height: string;
+  readonly left: string;
+  readonly top: string;
+  readonly transform: string;
+  readonly width: string;
+}
+
+// 变换手势开始前捕获 Material 根元素内联几何样式（renderer 以 left/top/width/height + rotate()
+// 定位组件），供预览结束/取消时恢复，与拖拽 preview 的 translate 清理语义对称。
+function captureTransformPreviewStyles(
+  canvas: HTMLElement,
+  components: readonly ScreenComponentNode[],
+): ReadonlyMap<string, TransformPreviewStyle> {
+  const styles = new Map<string, TransformPreviewStyle>();
+  for (const component of components) {
+    const element = canvas.querySelector<HTMLElement>(
+      `[data-base-screen-component-id="${component.id}"]`,
+    );
+    if (element === null || element === undefined) continue;
+    styles.set(component.id, {
+      left: element.style.left,
+      top: element.style.top,
+      width: element.style.width,
+      height: element.style.height,
+      transform: element.style.transform,
+    });
+  }
+  return styles;
 }
 
 function nextComponentId(document: ScreenDocument, type: string): string {

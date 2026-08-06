@@ -57,13 +57,15 @@ describe('designer viewport helpers', () => {
     );
   });
 
-  it('renders the active tool with its registered Chinese label', () => {
+  it('renders the active tool glyph+label and the zoom trigger text', () => {
     vi.stubGlobal('Document', class Document {});
     vi.stubGlobal('DocumentFragment', class DocumentFragment {});
-    const status = { replaceChildren: (value: string) => (status.value = value), value: '' };
+    const statusTool = { innerHTML: '' };
+    const zoomTrigger = { textContent: '' };
     const root = {
       querySelectorAll: () => [],
-      querySelector: () => status,
+      querySelector: (selector: string) =>
+        selector === '[data-status-zoom]' ? zoomTrigger : statusTool,
     } as unknown as ParentNode;
     const controller = new DesignerViewportController({
       getDocument: () => undefined,
@@ -74,7 +76,9 @@ describe('designer viewport helpers', () => {
     controller.setActiveTool('rectangle');
     controller.render(root);
 
-    expect(status.value).toBe('矩形');
+    expect(statusTool.innerHTML).toContain('矩形');
+    expect(statusTool.innerHTML).toContain('<span class="status-tool-name">');
+    expect(zoomTrigger.textContent).toBe('100%');
     vi.unstubAllGlobals();
   });
 });

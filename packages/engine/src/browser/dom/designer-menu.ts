@@ -131,6 +131,7 @@ export class DesignerMenuController {
     const open = help.hidden;
     this.closeMenus();
     help.hidden = !open;
+    if (open) help.focus();
     const toggle = root.querySelector<HTMLElement>('[data-menu-toggle="help"]');
     if (toggle !== null) toggle.ariaExpanded = String(open);
   }

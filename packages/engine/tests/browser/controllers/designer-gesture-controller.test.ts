@@ -625,6 +625,130 @@ describe('DesignerGestureController cancellation', () => {
     expect(transactions).toEqual([]);
   });
 
+  it('R2 previews resize/rotate on the material root and restores its styles on cancel', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: unknown[] = [];
+    const handle = new FakeElement();
+    handle.dataset.transformHandle = 'east';
+    handle.matches['[data-transform-handle]'] = handle;
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    material.style.left = '10px';
+    material.style.top = '20px';
+    material.style.width = '100px';
+    material.style.height = '80px';
+    material.style.transform = 'rotate(0deg)';
+    canvas.registerMaterial('rectangle-1', material);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({
+        selectedComponentIds: ['rectangle-1'],
+        focusedComponentId: 'rectangle-1',
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 5,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      stopPropagation: () => undefined,
+      target: handle,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 5, clientX: 60, clientY: 20 } as PointerEvent);
+
+    // V10：resize 预览直接作用于 Material 根元素（left/top/width/height + rotate()，与 renderer 一致）。
+    expect(material.style.width).toBe('50px');
+    expect(material.style.left).toBe('10px');
+    expect(canvas.selection.style.width).toBe('50px');
+
+    canvas.dispatch('lostpointercapture', {} as PointerEvent);
+
+    // 取消恢复手势开始前捕获的样式，不残留脏预览。
+    expect(material.style.left).toBe('10px');
+    expect(material.style.top).toBe('20px');
+    expect(material.style.width).toBe('100px');
+    expect(material.style.height).toBe('80px');
+    expect(material.style.transform).toBe('rotate(0deg)');
+    expect(transactions).toEqual([]);
+  });
+
+  it('R2 commits a resize transaction from the previewed geometry', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: unknown[] = [];
+    const handle = new FakeElement();
+    handle.dataset.transformHandle = 'east';
+    handle.matches['[data-transform-handle]'] = handle;
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    material.style.left = '10px';
+    material.style.top = '20px';
+    material.style.width = '100px';
+    material.style.height = '80px';
+    material.style.transform = 'rotate(0deg)';
+    canvas.registerMaterial('rectangle-1', material);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({
+        selectedComponentIds: ['rectangle-1'],
+        focusedComponentId: 'rectangle-1',
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 6,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      stopPropagation: () => undefined,
+      target: handle,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 6, clientX: 60, clientY: 20 } as PointerEvent);
+    canvas.dispatch('pointerup', { pointerId: 6, clientX: 60, clientY: 20 } as PointerEvent);
+
+    expect(transactions).toHaveLength(1);
+    const transaction = transactions[0] as {
+      commands: readonly { type: string; componentIds: readonly string[]; patch: object }[];
+    };
+    expect(transaction.commands[0]).toMatchObject({
+      type: 'update-components',
+      componentIds: ['rectangle-1'],
+      patch: { size: { width: 50, height: 80 } },
+    });
+    expect(material.style.width).toBe('100px');
+    expect(material.style.height).toBe('80px');
+  });
+
   it('prevents native text selection on the canvas via selectstart', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
@@ -963,5 +1087,85 @@ describe('DesignerGestureController material drop', () => {
 
     canvas.dispatch('pointermove', { pointerId: 7, clientX: 40, clientY: 50 } as PointerEvent);
     expect(panBy).not.toHaveBeenCalled();
+  });
+});
+
+describe('DesignerGestureController snap session', () => {
+  it('activates the snap session on drag start and releases it on completion', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const setSnapSessionActive = vi.fn();
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    canvas.registerMaterial('rectangle-1', material);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({
+        selectedComponentIds: ['rectangle-1'],
+        focusedComponentId: 'rectangle-1',
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: vi.fn(),
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      setSnapSessionActive,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      target: createGrabTarget(),
+    } as unknown as PointerEvent);
+    expect(setSnapSessionActive).toHaveBeenLastCalledWith(true);
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+    canvas.dispatch('pointerup', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+    expect(setSnapSessionActive).toHaveBeenLastCalledWith(false);
+  });
+
+  it('activates the snap session on create start and releases it on cancel', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const setSnapSessionActive = vi.fn();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'rectangle',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => ({ rectangle: 'base.rectangle' }),
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: vi.fn(),
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      setSnapSessionActive,
+      snapCanvasPoint: (point) => point,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      target: new FakeElement(),
+    } as unknown as PointerEvent);
+    expect(setSnapSessionActive).toHaveBeenLastCalledWith(true);
+    canvas.dispatch('pointercancel', {} as PointerEvent);
+    expect(setSnapSessionActive).toHaveBeenLastCalledWith(false);
   });
 });

@@ -1,6 +1,7 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { reduceScreenViewport, type ScreenViewportState } from '@base-screen/core';
 import { DESIGNER_TOOLS, type DesignerToolId } from '../../common/tools/designer-tools.js';
+import { designerToolGlyph } from '../dom/designer-workspace.js';
 import {
   clampDesignerZoom,
   getFitDesignerZoom,
@@ -21,6 +22,7 @@ export class DesignerViewportController {
   #canvas: HTMLDivElement | undefined;
   #spacePressed = false;
   #activeTool: DesignerToolId = 'select';
+  #hovered = false;
 
   constructor(private readonly callbacks: DesignerViewportControllerCallbacks) {}
 
@@ -30,6 +32,10 @@ export class DesignerViewportController {
   get activeTool(): DesignerToolId {
     return this.#spacePressed ? 'hand' : this.#activeTool;
   }
+  /** 指针当前悬停在视窗表面（window 级空格抓手的前置条件，与键盘焦点解耦）。 */
+  get hovered(): boolean {
+    return this.#hovered;
+  }
 
   connect(viewport: HTMLDivElement, canvas: HTMLDivElement): void {
     this.#viewport = viewport;
@@ -38,6 +44,14 @@ export class DesignerViewportController {
     viewport.addEventListener('blur', () => {
       this.releaseSpace();
       this.callbacks.onBlur();
+    });
+    // hover 状态：空格抓手不依赖键盘焦点，鼠标移入视窗即可激活（PS 语义）。
+    // pointerenter/leave 不冒泡，且 pointer capture 期间不会误触发（enter/leave 派发到 capture 元素）。
+    viewport.addEventListener('pointerenter', () => {
+      this.#hovered = true;
+    });
+    viewport.addEventListener('pointerleave', () => {
+      this.#hovered = false;
     });
     viewport.tabIndex = 0;
     this.render();
@@ -110,15 +124,22 @@ export class DesignerViewportController {
   render(root: ParentNode | null = getParentNode(this.#canvas)): void {
     if (this.#canvas !== undefined) this.#canvas.style.transform = viewportTransform(this.#state);
     const dataset = (this.#viewport as { readonly dataset?: DOMStringMap } | undefined)?.dataset;
-    if (dataset !== undefined) dataset.tool = this.activeTool;
-    for (const output of root?.querySelectorAll<HTMLOutputElement>(
-      '[data-zoom], [data-status-zoom]',
-    ) ?? []) {
+    // 用 data-active-tool 而非 data-tool 存储当前工具：data-tool 是工具栏按钮的
+    // 命中选择器（executeToolFromTarget 的 closest('[data-tool]')），同名会被误命中。
+    if (dataset !== undefined) dataset.activeTool = this.activeTool;
+    for (const output of root?.querySelectorAll<HTMLOutputElement>('[data-zoom]') ?? []) {
       output.value = `${Math.round(this.#state.zoom * 100)}%`;
     }
-    root
-      ?.querySelector<HTMLElement>('[data-status-tool]')
-      ?.replaceChildren(DESIGNER_TOOLS.find((tool) => tool.id === this.activeTool)?.label ?? '');
+    const zoomTrigger = root?.querySelector<HTMLElement>('[data-status-zoom]');
+    if (zoomTrigger !== null && zoomTrigger !== undefined) {
+      zoomTrigger.textContent = `${Math.round(this.#state.zoom * 100)}%`;
+    }
+    const tool = DESIGNER_TOOLS.find((entry) => entry.id === this.activeTool);
+    const statusTool = root?.querySelector<HTMLElement>('[data-status-tool]');
+    if (statusTool !== null && statusTool !== undefined && tool !== undefined) {
+      // 图标+名称均由静态常量派生（designerToolGlyph / DESIGNER_TOOLS），无用户输入。
+      statusTool.innerHTML = `${designerToolGlyph(tool.id)}<span class="status-tool-name">${tool.label}</span>`;
+    }
     this.callbacks.onViewportChange?.();
   }
 
@@ -154,6 +175,26 @@ export class DesignerViewportController {
   }
 
   onKeyUp(event: KeyboardEvent): boolean {
+    if (event.code !== 'Space') return false;
+    this.releaseSpace();
+    return true;
+  }
+
+  /**
+   * window 级空格抓手（与键盘焦点解耦）：鼠标悬停在视窗内即可激活临时抓手，
+   * 无需先点击聚焦视窗。由事件系统的 window capture 通道在"事件落点不在本设计器
+   * shadow 内"时调用（焦点在 shadow 内时走既有 onKeyDown/onKeyUp 链路）。
+   * 可编辑目标（输入框/内容可编辑）保留原生空格输入。
+   */
+  onWindowKeyDown(event: KeyboardEvent): boolean {
+    if (event.code !== 'Space' || !this.#hovered || isEditable(event.target)) return false;
+    event.preventDefault();
+    this.#spacePressed = true;
+    this.render();
+    return true;
+  }
+
+  onWindowKeyUp(event: KeyboardEvent): boolean {
     if (event.code !== 'Space') return false;
     this.releaseSpace();
     return true;

@@ -10,6 +10,12 @@ export interface DesignerEventSystemCallbacks {
   readonly findOperation: (chord: string) => DesignerOperationChordInfo | undefined;
   /** window blur 时的统一状态复位（手势/空格/菜单/面板 resize/参考线拖拽）。 */
   readonly onWindowBlur?: () => void;
+  /**
+   * window 级 keydown 旁路：事件落点不在本设计器 shadow 内时调用（如鼠标悬停视窗但
+   * 焦点在宿主页面），用于与键盘焦点解耦的空格抓手等。落点在本 shadow 内时由既有链路处理。
+   */
+  readonly onWindowKeyDown?: (event: KeyboardEvent) => boolean;
+  readonly onWindowKeyUp?: (event: KeyboardEvent) => boolean;
 }
 
 // 键盘通道与 window 守卫的浏览器侧封装：把 common/events 的三态裁决适配到真实事件，
@@ -80,6 +86,16 @@ export class DesignerEventSystem {
       this.#ownDragInFlight = false;
     });
     this.#windowListeners.set('blur', () => this.callbacks.onWindowBlur?.());
+    // window 级空格抓手旁路：事件落点在本设计器 shadow 内时跳过（既有链路处理），
+    // 否则交给 hover 判定（与键盘焦点解耦）；对宿主页面其他区域零干预。
+    this.#windowListeners.set('keydown', (event) => {
+      if (event.composedPath().includes(root)) return;
+      this.callbacks.onWindowKeyDown?.(event as KeyboardEvent);
+    });
+    this.#windowListeners.set('keyup', (event) => {
+      if (event.composedPath().includes(root)) return;
+      this.callbacks.onWindowKeyUp?.(event as KeyboardEvent);
+    });
     for (const [type, listener] of this.#windowListeners) {
       ownerWindow.addEventListener(type, listener);
     }

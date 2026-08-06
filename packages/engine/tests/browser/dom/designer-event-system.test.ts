@@ -43,12 +43,21 @@ function keyEvent(partial: Record<string, unknown>): KeyboardEvent {
 }
 
 function system(
-  overrides: { readonly gestureActive?: boolean; readonly onWindowBlur?: () => void } = {},
+  overrides: {
+    readonly gestureActive?: boolean;
+    readonly onWindowBlur?: () => void;
+    readonly onWindowKeyDown?: (event: KeyboardEvent) => boolean;
+    readonly onWindowKeyUp?: (event: KeyboardEvent) => boolean;
+  } = {},
 ): DesignerEventSystem {
   return new DesignerEventSystem({
     isGestureActive: () => overrides.gestureActive === true,
     findOperation: (chord) => (chord === 'Ctrl+Z' ? { repeatable: false } : undefined),
     ...(overrides.onWindowBlur === undefined ? {} : { onWindowBlur: overrides.onWindowBlur }),
+    ...(overrides.onWindowKeyDown === undefined
+      ? {}
+      : { onWindowKeyDown: overrides.onWindowKeyDown }),
+    ...(overrides.onWindowKeyUp === undefined ? {} : { onWindowKeyUp: overrides.onWindowKeyUp }),
   });
 }
 
@@ -184,5 +193,40 @@ describe('DesignerEventSystem', () => {
     expect(view.listeners.size).toBe(0);
     view.dispatch('blur', new Event('blur'));
     expect(onWindowBlur).toHaveBeenCalledOnce();
+  });
+
+  it('R4 routes window keydown only for events outside the designer shadow', () => {
+    const onWindowKeyDown = vi.fn(() => false);
+    const onWindowKeyUp = vi.fn(() => false);
+    const systemInstance = system({ onWindowKeyDown, onWindowKeyUp });
+    const view = new FakeWindow();
+    const root = new FakeElement();
+    systemInstance.connectWindowGuards(view as unknown as Window, root as unknown as ShadowRoot);
+
+    // 事件落点在本设计器 shadow 内（焦点在设计器）：跳过 window 旁路，既有链路处理。
+    const inside = {
+      key: ' ',
+      type: 'keydown',
+      composedPath: () => [root],
+    } as unknown as KeyboardEvent;
+    view.dispatch('keydown', inside);
+    expect(onWindowKeyDown).not.toHaveBeenCalled();
+
+    // 事件落点在宿主页面（焦点在 body，鼠标悬停视窗）：交给 hover 判定。
+    const outside = {
+      key: ' ',
+      type: 'keydown',
+      composedPath: () => [],
+    } as unknown as KeyboardEvent;
+    view.dispatch('keydown', outside);
+    expect(onWindowKeyDown).toHaveBeenCalledOnce();
+
+    const outsideUp = {
+      key: ' ',
+      type: 'keyup',
+      composedPath: () => [],
+    } as unknown as KeyboardEvent;
+    view.dispatch('keyup', outsideUp);
+    expect(onWindowKeyUp).toHaveBeenCalledOnce();
   });
 });

@@ -112,7 +112,7 @@ try {
           };
         });
         if (
-          geometry.topbar !== 52 ||
+          geometry.topbar !== 48 ||
           geometry.status !== 30 ||
           geometry.ruler !== 20 ||
           geometry.left !== 224 ||
@@ -262,7 +262,10 @@ try {
         if (!(await contextMenu.isHidden())) {
           throw new Error('BROWSER_HARNESS_CONTEXT_MENU_ESCAPE_FAILED');
         }
-        await designer.locator('[data-menu-toggle="help"]').click();
+        await designer.locator('[data-menu-toggle="tools"]').click();
+        await designer
+          .locator('.designer-menu[data-menu="tools"] [data-menu-action="show-help"]')
+          .click();
         const helpMenu = designer.locator('[data-menu="help"]');
         if (
           (await helpMenu.isHidden()) ||
@@ -326,8 +329,15 @@ try {
           status:
             window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
               ?.textContent,
+          saveStatus: window.baseScreenHarness.designer.shadowRoot.querySelector(
+            '[data-topbar-save-status]',
+          )?.textContent,
         }));
-        if (saved.revision !== '2' || saved.status !== '\u5c31\u7eea') {
+        if (
+          saved.revision !== '2' ||
+          saved.status !== '\u5c31\u7eea' ||
+          !saved.saveStatus.startsWith('\u5df2\u4fdd\u5b58')
+        ) {
           throw new Error('BROWSER_HARNESS_SAVE_FAILED');
         }
         await page.evaluate(() => {
@@ -351,12 +361,16 @@ try {
           status:
             window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
               ?.textContent,
+          saveStatus: window.baseScreenHarness.designer.shadowRoot.querySelector(
+            '[data-topbar-save-status]',
+          )?.textContent,
           title: window.baseScreenHarness.designer.document.components.find(
             (component) => component.id === 'title',
           )?.name,
         }));
         if (
           continued.status !== '\u5c31\u7eea *' ||
+          continued.saveStatus !== '\u672a\u4fdd\u5b58\u66f4\u6539' ||
           continued.title !== '\u672c\u5730\u6807\u9898'
         ) {
           throw new Error('BROWSER_HARNESS_CONFLICT_CONTINUE_FAILED');
@@ -404,12 +418,17 @@ try {
             window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
               ?.textContent === '\u64cd\u4f5c\u5931\u8d25 *',
         );
+        await authoringDesigner.locator('[data-menu-toggle="file"]').click();
         if (
-          await authoringDesigner.getByTitle('\u91cd\u8bd5\u9879\u76ee\u64cd\u4f5c').isDisabled()
+          await authoringDesigner
+            .locator('.designer-menu[data-menu="file"] [data-menu-action="project-retry"]')
+            .isDisabled()
         ) {
           throw new Error('BROWSER_HARNESS_RETRY_DISABLED');
         }
-        await authoringDesigner.getByTitle('\u91cd\u8bd5\u9879\u76ee\u64cd\u4f5c').click();
+        await authoringDesigner
+          .locator('.designer-menu[data-menu="file"] [data-menu-action="project-retry"]')
+          .click();
         await page.waitForFunction(() => window.baseScreenHarness.getEnvelope().revision === '3');
         const retried = await page.evaluate(
           () =>
@@ -534,7 +553,10 @@ try {
           () => window.baseScreenHarness.designer.document.components.length,
         );
         const chooserPromise = page.waitForEvent('filechooser');
-        await authoringDesigner.getByTitle('\u5bfc\u5165\u89c4\u8303\u6587\u6863').click();
+        await authoringDesigner.locator('[data-menu-toggle="file"]').click();
+        await authoringDesigner
+          .locator('.designer-menu[data-menu="file"] [data-menu-action="import"]')
+          .click();
         const chooser = await chooserPromise;
         const importDocument = await page.evaluate(
           () => window.baseScreenHarness.designer.document,
@@ -646,6 +668,8 @@ try {
         await assertAuthoringShortcutsAndIsolation(page, authoringDesigner);
         await assertCanvasPrecision(authoringDesigner, page);
         await assertDataAndBlueprintAuthoring(authoringDesigner, page);
+        await assertSnapWorkflow(authoringDesigner, page);
+        await assertTransformPreviewWorkflow(authoringDesigner, page);
         const selectedText = authoringDesigner.locator('[data-base-screen-component-id=title]');
         await selectedText.evaluate((element) => {
           element.model = { ...element.model, dataState: { status: 'loading' } };
@@ -684,8 +708,10 @@ try {
         }
         await assertOverlayContained(authoringDesigner, '.direct-preview');
         await authoringDesigner.locator('.direct-preview [data-action="preview"]').click();
+        // 事件系统断言只在完整桌面流程（1440 视口）执行：窄屏视口命中
+        // @media (max-width: 1023px) 会隐藏 .workspace（显示可用空间警告），画布不可交互。
+        await assertEventSystemGuards(page, page.locator('base-screen-designer'));
       }
-      await assertEventSystemGuards(page, page.locator('base-screen-designer'));
       await page.close();
     }
   } finally {
@@ -1121,12 +1147,10 @@ async function assertCanvasPrecision(designer, page) {
     throw new Error('BROWSER_HARNESS_GUIDE_COMMIT_MUTATED_DOCUMENT');
   }
   const rulerBefore = await ruler
-    .locator('[data-ruler-mark]')
-    .evaluateAll((marks) =>
-      marks.slice(0, 4).map((mark) => `${mark.dataset.rulerMark}:${mark.getAttribute('style')}`),
-    );
+    .locator('[data-ruler-canvas]')
+    .evaluateAll((canvases) => canvases.map((canvas) => canvas.dataset.rulerVersion ?? ''));
   const zoomBefore = await designer.locator('[data-zoom]').textContent();
-  await designer.locator('[data-action="zoom-reset"]').click();
+  await zoomResetViaMenu(designer);
   await page.waitForFunction(() => {
     const canvas = window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-canvas]');
     return canvas?.style.transform === 'translate(0px, 0px) scale(1)';
@@ -1155,19 +1179,585 @@ async function assertCanvasPrecision(designer, page) {
     throw new Error(`BROWSER_HARNESS_ZOOM_ANCHOR_FAILED:${JSON.stringify(zoomAnchor)}`);
   }
   const rulerAfter = await ruler
-    .locator('[data-ruler-mark]')
-    .evaluateAll((marks) =>
-      marks.slice(0, 4).map((mark) => `${mark.dataset.rulerMark}:${mark.getAttribute('style')}`),
-    );
+    .locator('[data-ruler-canvas]')
+    .evaluateAll((canvases) => canvases.map((canvas) => canvas.dataset.rulerVersion ?? ''));
   if (rulerBefore.length === 0 || JSON.stringify(rulerBefore) === JSON.stringify(rulerAfter)) {
     throw new Error('BROWSER_HARNESS_RULER_ZOOM_UPDATE_FAILED');
   }
   const viewport = designer.locator('[data-viewport]');
-  await designer.locator('[data-action="toggle-grid"]').click();
+  await toggleGridViaMenu(designer);
   if ((await viewport.getAttribute('data-grid')) !== 'false') {
     throw new Error('BROWSER_HARNESS_GRID_TOGGLE_FAILED');
   }
-  await designer.locator('[data-action="toggle-grid"]').click();
+  await toggleGridViaMenu(designer);
+
+  // 视窗 resize 后标尺必须重绘（canvas 缓冲尺寸与新容器一致、版本号递增）。
+  const readRulerVersion = () =>
+    ruler
+      .locator('[data-ruler-canvas]')
+      .evaluateAll((canvases) => canvases.map((canvas) => canvas.dataset.rulerVersion ?? ''));
+  const resizeBefore = await readRulerVersion();
+  await page.setViewportSize({ width: 1100, height: 720 });
+  await page.waitForFunction((previous) => {
+    const ruler = window.baseScreenHarness.designer.shadowRoot?.querySelector(
+      '.ruler-horizontal canvas[data-ruler-canvas]',
+    );
+    const version = ruler === null || ruler === undefined ? '' : (ruler.dataset.rulerVersion ?? '');
+    return version !== previous;
+  }, resizeBefore[0]);
+  const resizeAfter = await readRulerVersion();
+  const bufferMatches = await ruler.locator('[data-ruler-canvas]').evaluateAll((canvases) =>
+    canvases.map((canvas) => {
+      const rect = canvas.getBoundingClientRect();
+      return canvas.width === Math.round(rect.width) && canvas.height === Math.round(rect.height);
+    }),
+  );
+  if (
+    resizeBefore.length === 0 ||
+    JSON.stringify(resizeBefore) === JSON.stringify(resizeAfter) ||
+    bufferMatches.includes(false)
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_RULER_RESIZE_UPDATE_FAILED:${JSON.stringify({
+        before: resizeBefore,
+        after: resizeAfter,
+        bufferMatches,
+      })}`,
+    );
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+}
+
+// 浏览器级吸附工作流（R2/R4）：真实指针拖拽验证按距离吸附、释放带保持与旋转候选；
+// 结束前把文档恢复到调用前状态，避免污染后续断言。
+async function assertSnapWorkflow(designer, page) {
+  const before = await page.evaluate(() =>
+    JSON.stringify(window.baseScreenHarness.designer.document),
+  );
+  const beforeComponents = await page.evaluate(() => {
+    const read = (id) => {
+      const component = window.baseScreenHarness.designer.document.components.find(
+        (item) => item.id === id,
+      );
+      if (component === undefined) throw new Error(`Missing component: ${id}`);
+      return {
+        position: { ...component.position },
+        rotation: component.rotation,
+      };
+    };
+    return { title: read('title'), subtitle: read('subtitle') };
+  });
+  await zoomResetViaMenu(designer);
+  await page.waitForFunction(() => {
+    const canvas = window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-canvas]');
+    return canvas?.style.transform === 'translate(0px, 0px) scale(1)';
+  });
+  // 固定两组件几何，隔离前置断言的移动/旋转影响。
+  await designer.evaluate(() => {
+    const titleResult = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['title'],
+      patch: { position: { x: 100, y: 100 }, rotation: 0 },
+    });
+    const subtitleResult = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['subtitle'],
+      patch: { position: { x: 320, y: 100 }, rotation: 0 },
+    });
+    if (!titleResult.ok || !subtitleResult.ok) {
+      throw new Error('BROWSER_HARNESS_SNAP_BASELINE_FAILED');
+    }
+  });
+  const baselineSettled = await page
+    .waitForFunction(
+      () => {
+        const { document: doc } = window.baseScreenHarness.designer;
+        const read = (id) => doc.components.find((item) => item.id === id);
+        const title = read('title');
+        const subtitle = read('subtitle');
+        return (
+          title?.position.x === 100 &&
+          title?.position.y === 100 &&
+          title?.rotation === 0 &&
+          subtitle?.position.x === 320 &&
+          subtitle?.position.y === 100 &&
+          subtitle?.rotation === 0
+        );
+      },
+      undefined,
+      { timeout: 3_000 },
+    )
+    .catch(() => false);
+  if (!baselineSettled) {
+    const state = await page.evaluate(() =>
+      JSON.stringify(
+        window.baseScreenHarness.designer.document.components.map((component) => ({
+          id: component.id,
+          position: component.position,
+          rotation: component.rotation,
+        })),
+      ),
+    );
+    throw new Error(`BROWSER_HARNESS_SNAP_BASELINE_TIMEOUT:${state}`);
+  }
+  const baseline = await page.evaluate(() => {
+    const { document: doc } = window.baseScreenHarness.designer;
+    const read = (id) => {
+      const component = doc.components.find((item) => item.id === id);
+      if (component === undefined) throw new Error(`Missing component: ${id}`);
+      return { position: { ...component.position }, size: { ...component.size } };
+    };
+    return { title: read('title'), subtitle: read('subtitle') };
+  });
+  // 网格线候选（5px 阈值）会干扰释放带断言，断言期间关闭网格（结束前恢复）。
+  const gridWasEnabled =
+    (await designer.locator('[data-viewport]').getAttribute('data-grid')) !== 'false';
+  if (gridWasEnabled) {
+    await toggleGridViaMenu(designer);
+    await page.waitForFunction(() => {
+      const viewport =
+        window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-viewport]');
+      return viewport?.dataset.grid === 'false';
+    });
+  }
+  const titleBox = await designer.locator('[data-base-screen-component-id=title]').boundingBox();
+  if (titleBox === null) throw new Error('BROWSER_HARNESS_SNAP_TITLE_MISSING');
+  // 起点取 title 左上（文档 x=130 处）：subtitle 覆盖 title 右半部分，中心点会命中 subtitle。
+  const startX = titleBox.x + (130 - baseline.title.position.x);
+  const startY = titleBox.y + (136 - baseline.title.position.y);
+  const hitProbe = await designer.evaluate(
+    (element, probe) => {
+      const root = element.shadowRoot;
+      const hit = root?.elementFromPoint(probe.x, probe.y);
+      const rect = (selector) => {
+        const node = root?.querySelector(selector);
+        const box = node?.getBoundingClientRect();
+        return box === undefined
+          ? null
+          : { x: box.x, y: box.y, width: box.width, height: box.height };
+      };
+      return {
+        hit:
+          hit === null || hit === undefined
+            ? null
+            : {
+                dataset: Object.fromEntries(
+                  [...hit.attributes].map((attribute) => [attribute.name, attribute.value]),
+                ),
+                className: typeof hit.className === 'string' ? hit.className : null,
+              },
+        title: rect('[data-base-screen-component-id="title"]'),
+        subtitle: rect('[data-base-screen-component-id="subtitle"]'),
+      };
+    },
+    { x: startX, y: startY },
+  );
+  if (
+    hitProbe.hit === null ||
+    hitProbe.hit.dataset?.['data-base-screen-component-id'] !== 'title'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_SNAP_HIT_PROBE_FAILED:${JSON.stringify({ probe: { x: startX, y: startY }, ...hitProbe })}`,
+    );
+  }
+  const readTranslate = (id) =>
+    page.evaluate((componentId) => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      const element = root?.querySelector(`[data-base-screen-component-id="${componentId}"]`);
+      const translate = element?.style.translate ?? '';
+      const match = /^(-?[\d.]+)px(?: (-?[\d.]+)px)?$/.exec(translate);
+      if (match === null) return null;
+      return { x: Number(match[1]), y: match[2] === undefined ? 0 : Number(match[2]) };
+    }, id);
+  const expectAxis = async (actual, axis, expected, label) => {
+    const value = actual === null ? Number.NaN : actual[axis];
+    if (!Number.isFinite(value) || Math.abs(value - expected) > 0.5) {
+      const debug = await page.evaluate(() => ({
+        guides: [
+          ...(window.baseScreenHarness.designer.shadowRoot?.querySelectorAll(
+            '[data-canvas-guides] > *',
+          ) ?? []),
+        ].map((element) => ({
+          className: element.className,
+          left: element.style?.left,
+          top: element.style?.top,
+        })),
+        titleTranslate:
+          window.baseScreenHarness.designer.shadowRoot?.querySelector(
+            '[data-base-screen-component-id="title"]',
+          )?.style.translate ?? null,
+      }));
+      throw new Error(
+        `BROWSER_HARNESS_SNAP_${label}_FAILED:${JSON.stringify({ startX, startY, axis, translate: actual, expected, ...debug })}`,
+      );
+    }
+  };
+  // y 轴验证：title top 对齐画布 top=0（差 2px 进入捕获阈值）→ 吸附 -100。
+  // 渲染阈值 1px：吸附（5px）与渲染分离，ALIGN 阶段（dist 2）无线（Moveable snapRenderThreshold 语义）。
+  const targetDeltaY = 0 - baseline.title.position.y;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  await page.mouse.move(startX, startY + targetDeltaY - 2, { steps: 5 });
+  let translate = await readTranslate('title');
+  await expectAxis(translate, 'y', targetDeltaY, 'ALIGN');
+  // 无命中（锚点距候选 6px > 5px 阈值）但仍在释放带（8px）内：保持吸附目标。
+  await page.mouse.move(startX, startY + targetDeltaY + 6, { steps: 2 });
+  translate = await readTranslate('title');
+  await expectAxis(translate, 'y', targetDeltaY, 'HOLD');
+  // 网格线候选（5px 阈值，参考 Moveable/Nebula）：center 锚点距 48 网格线 5px → 吸附 -88。
+  await page.mouse.move(startX, startY + targetDeltaY + 7, { steps: 2 });
+  translate = await readTranslate('title');
+  await expectAxis(translate, 'y', targetDeltaY + 12, 'GRID_LINE');
+  // 超过释放带后不再保持 -88：bottom 锚点距 subtitle top（100）2px → 按距离重新吸附 -72。
+  const releaseDelta =
+    baseline.subtitle.position.y - (baseline.title.position.y + baseline.title.size.height);
+  await page.mouse.move(startX, startY + targetDeltaY + 30, { steps: 2 });
+  translate = await readTranslate('title');
+  await expectAxis(translate, 'y', releaseDelta, 'RELEASE');
+  // 视觉重合：完全重合（dist 0）的 x 轴参考线（600 网格线 = title 右边缘）中心与选中框边缘对齐。
+  const overlay = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const snap = root?.querySelector('.canvas-guide-snap[data-axis="x"]');
+    const selection = root?.querySelector('[data-selection]');
+    if (snap === null || snap === undefined || selection === null || selection === undefined) {
+      return null;
+    }
+    const snapRect = snap.getBoundingClientRect();
+    const selectionRect = selection.getBoundingClientRect();
+    return {
+      snapCenter: snapRect.x + snapRect.width / 2,
+      selectionLeft: selectionRect.left,
+      selectionRight: selectionRect.right,
+    };
+  });
+  if (
+    overlay === null ||
+    (Math.abs(overlay.snapCenter - overlay.selectionLeft) > 1.5 &&
+      Math.abs(overlay.snapCenter - overlay.selectionRight) > 1.5)
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_SNAP_GUIDE_ALIGNMENT_FAILED:${JSON.stringify({ overlay, targetDeltaY, translate })}`,
+    );
+  }
+  await page.mouse.up();
+  const commitTargetY = baseline.title.position.y + releaseDelta;
+  const committedOk = await page
+    .waitForFunction(
+      (expected) => {
+        const title = window.baseScreenHarness.designer.document.components.find(
+          (item) => item.id === 'title',
+        );
+        return title !== undefined && Math.abs(title.position.y - expected) < 0.01;
+      },
+      commitTargetY,
+      { timeout: 3_000 },
+    )
+    .catch(() => false);
+  if (!committedOk) {
+    const committed = await componentPositions(page, ['title']);
+    throw new Error(
+      `BROWSER_HARNESS_SNAP_COMMIT_FAILED:${JSON.stringify({ committed, targetDeltaY, commitTargetY, baseline: baseline.title.position })}`,
+    );
+  }
+  // 旋转候选：subtitle 移到 title 右侧并转 90°，按 visual bounds 左边缘吸附。
+  // x=800 使旋转后的 visual left（991）远离 24px 网格线（984/1008），避免被网格线竞争。
+  await designer.evaluate(() => {
+    const result = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['subtitle'],
+      patch: { position: { x: 800, y: 100 }, rotation: 90 },
+    });
+    if (!result.ok) throw new Error('BROWSER_HARNESS_SNAP_ROTATION_FAILED');
+  });
+  await page.waitForFunction(() => {
+    const subtitle = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'subtitle',
+    );
+    return subtitle?.position.x === 800 && subtitle?.rotation === 90;
+  });
+  const rotated = await page.evaluate(() => {
+    const subtitle = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'subtitle',
+    );
+    if (subtitle === undefined) throw new Error('Missing subtitle');
+    const centerX = subtitle.position.x + subtitle.size.width / 2;
+    return { centerX, height: subtitle.size.height };
+  });
+  const rotatedLeft = rotated.centerX - rotated.height / 2;
+  const rotatedDelta = rotatedLeft - (baseline.title.position.x + baseline.title.size.width);
+  const settledAfterCommit = await page
+    .waitForFunction(
+      (expected) => {
+        const root = window.baseScreenHarness.designer.shadowRoot;
+        const element = root?.querySelector('[data-base-screen-component-id="title"]');
+        const canvas = root?.querySelector('[data-canvas]');
+        const box = element?.getBoundingClientRect();
+        const canvasBox = canvas?.getBoundingClientRect();
+        if (box === undefined || canvasBox === undefined || canvas === undefined) return false;
+        return Math.abs(box.x - (canvasBox.x + canvas.clientLeft) - expected) < 1;
+      },
+      baseline.title.position.x,
+      { timeout: 3_000 },
+    )
+    .catch(() => false);
+  if (!settledAfterCommit) {
+    const state = await page.evaluate(() => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      const canvas = root?.querySelector('[data-canvas]');
+      const title = root?.querySelector('[data-base-screen-component-id="title"]');
+      const component = window.baseScreenHarness.designer.document.components.find(
+        (item) => item.id === 'title',
+      );
+      return {
+        box: title?.getBoundingClientRect(),
+        canvasBox: canvas?.getBoundingClientRect(),
+        position: component?.position,
+        translate: title?.style.translate ?? null,
+        transform: canvas?.style.transform ?? null,
+      };
+    });
+    throw new Error(`BROWSER_HARNESS_SNAP_SETTLE_FAILED:${JSON.stringify(state)}`);
+  }
+  const movedBox = await designer.locator('[data-base-screen-component-id=title]').boundingBox();
+  if (movedBox === null) throw new Error('BROWSER_HARNESS_SNAP_TITLE_MOVED_MISSING');
+  await page.mouse.move(movedBox.x + 250, movedBox.y + 36);
+  await page.mouse.down();
+  await page.mouse.move(movedBox.x + 250 + rotatedDelta - 2, movedBox.y + 36, { steps: 5 });
+  translate = await readTranslate('title');
+  await expectAxis(translate, 'x', rotatedDelta, 'ROTATED_CANDIDATE');
+  await page.mouse.up();
+  // 恢复文档与选择，避免污染后续断言。
+  await page.evaluate((restore) => {
+    const result = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['title', 'subtitle'],
+      patch: {
+        position: {
+          x: restore.subtitle.position.x,
+          y: restore.subtitle.position.y,
+        },
+        rotation: restore.subtitle.rotation,
+      },
+    });
+    const titleResult = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['title'],
+      patch: {
+        position: restore.title.position,
+        rotation: restore.title.rotation,
+      },
+    });
+    if (!result.ok || !titleResult.ok) throw new Error('BROWSER_HARNESS_SNAP_RESTORE_FAILED');
+  }, beforeComponents);
+  await page.waitForFunction((expected) => {
+    const { document: doc } = window.baseScreenHarness.designer;
+    const read = (id) => {
+      const component = doc.components.find((item) => item.id === id);
+      return component === undefined
+        ? undefined
+        : {
+            position: {
+              x: component.position.x,
+              y: component.position.y,
+            },
+            rotation: component.rotation,
+          };
+    };
+    const title = read('title');
+    const subtitle = read('subtitle');
+    return (
+      title !== undefined &&
+      subtitle !== undefined &&
+      title.position.x === expected.title.position.x &&
+      title.position.y === expected.title.position.y &&
+      title.rotation === expected.title.rotation &&
+      subtitle.position.x === expected.subtitle.position.x &&
+      subtitle.position.y === expected.subtitle.position.y &&
+      subtitle.rotation === expected.subtitle.rotation
+    );
+  }, beforeComponents);
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const canvas = root?.querySelector('[data-canvas]');
+    const box = canvas?.getBoundingClientRect();
+    if (canvas === undefined || box === undefined) return;
+    const tool = root?.querySelector('button[data-tool="select"]');
+    tool?.dispatchEvent(new PointerEvent('click', { bubbles: true, composed: true, pointerId: 1 }));
+    canvas.dispatchEvent(
+      new PointerEvent('pointerdown', {
+        bubbles: true,
+        composed: true,
+        clientX: box.left + 10,
+        clientY: box.top + 10,
+        pointerId: 1,
+      }),
+    );
+    canvas.dispatchEvent(
+      new PointerEvent('pointerup', {
+        bubbles: true,
+        composed: true,
+        clientX: box.left + 10,
+        clientY: box.top + 10,
+        pointerId: 1,
+      }),
+    );
+  });
+  const after = await page.evaluate(() =>
+    JSON.stringify(window.baseScreenHarness.designer.document),
+  );
+  if (after !== before) {
+    throw new Error('BROWSER_HARNESS_SNAP_RESTORE_MISMATCH');
+  }
+  // 恢复网格开关状态。
+  if (gridWasEnabled) {
+    await toggleGridViaMenu(designer);
+    await page.waitForFunction(() => {
+      const viewport =
+        window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-viewport]');
+      return viewport?.dataset.grid === 'true';
+    });
+  }
+}
+
+// 浏览器级变换实时预览（V10）：真实指针拖拽 east 手柄，断言 Material 根元素在预览期间
+// 实时更新几何（renderer 的 left/top/width/height + rotate() 定位），提交后文档与渲染一致。
+async function assertTransformPreviewWorkflow(designer, page) {
+  await zoomResetViaMenu(designer);
+  await page.waitForFunction(() => {
+    const canvas = window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-canvas]');
+    return canvas?.style.transform === 'translate(0px, 0px) scale(1)';
+  });
+  const before = await page.evaluate(() => {
+    const title = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    if (title === undefined) throw new Error('Missing title');
+    return {
+      position: { ...title.position },
+      rotation: title.rotation,
+      size: { ...title.size },
+    };
+  });
+  await designer.locator('[data-base-screen-component-id=title]').evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const pointer = (type, clientX, clientY) =>
+      element.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          composed: true,
+          clientX,
+          clientY,
+          pointerId: 77,
+        }),
+      );
+    pointer('pointerdown', rect.x + 10, rect.y + 10);
+    pointer('pointerup', rect.x + 10, rect.y + 10);
+  });
+  const handle = designer.locator('[data-transform-handle="east"]');
+  await handle.waitFor();
+  const handleBox = await handle.boundingBox();
+  if (handleBox === null) throw new Error('BROWSER_HARNESS_TRANSFORM_HANDLE_MISSING');
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  const readProbe = () =>
+    designer.evaluate((element) => {
+      const root = element.shadowRoot;
+      const title = root?.querySelector('[data-base-screen-component-id="title"]');
+      const selection = root?.querySelector('[data-selection]');
+      const handle = root?.querySelector('[data-transform-handle="east"]');
+      const rect = (node) => {
+        const r = node?.getBoundingClientRect();
+        return r === undefined ? null : { x: r.x, y: r.y, width: r.width, height: r.height };
+      };
+      return {
+        selectionStyle: {
+          height: selection?.style?.height ?? null,
+          left: selection?.style?.left ?? null,
+          translate: selection?.style?.translate ?? null,
+          width: selection?.style?.width ?? null,
+        },
+        titleStyle: {
+          height: title?.style?.height ?? null,
+          left: title?.style?.left ?? null,
+          top: title?.style?.top ?? null,
+          transform: title?.style?.transform ?? null,
+          translate: title?.style?.translate ?? null,
+          width: title?.style?.width ?? null,
+        },
+        handle: rect(handle),
+      };
+    });
+  const probeAfterDown = await readProbe();
+  await page.mouse.move(handleBox.x + handleBox.width / 2 + 8, handleBox.y + handleBox.height / 2, {
+    steps: 3,
+  });
+  const probeAfterSmallMove = await readProbe();
+  await page.mouse.move(
+    handleBox.x + handleBox.width / 2 + 60,
+    handleBox.y + handleBox.height / 2,
+    { steps: 3 },
+  );
+  const probeAfterDrag = await readProbe();
+  const preview = await designer
+    .locator('[data-base-screen-component-id=title]')
+    .evaluate((element) => ({
+      height: element.style.height,
+      width: element.style.width,
+    }));
+  const previewWidth = Number.parseFloat(preview.width);
+  if (
+    !Number.isFinite(previewWidth) ||
+    previewWidth <= before.size.width + 0.5 ||
+    preview.height !== `${before.size.height}px`
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_TRANSFORM_PREVIEW_FAILED:${JSON.stringify({
+        before,
+        preview,
+        handleBox,
+        probeAfterDown,
+        probeAfterSmallMove,
+        probeAfterDrag,
+      })}`,
+    );
+  }
+  await page.mouse.up();
+  const committed = await page.evaluate(() => {
+    const title = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    if (title === undefined) throw new Error('Missing title');
+    return { height: title.size.height, width: title.size.width };
+  });
+  if (committed.width <= before.size.width + 0.5 || committed.height !== before.size.height) {
+    throw new Error(
+      `BROWSER_HARNESS_TRANSFORM_COMMIT_FAILED:${JSON.stringify({ before, committed })}`,
+    );
+  }
+  const rendered = await designer
+    .locator('[data-base-screen-component-id=title]')
+    .evaluate((element) => ({
+      height: element.style.height,
+      width: element.style.width,
+    }));
+  if (rendered.width !== `${committed.width}px` || rendered.height !== `${committed.height}px`) {
+    throw new Error(
+      `BROWSER_HARNESS_TRANSFORM_RENDER_FAILED:${JSON.stringify({ committed, rendered })}`,
+    );
+  }
+  await page.evaluate((restore) => {
+    const result = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['title'],
+      patch: {
+        position: restore.position,
+        rotation: restore.rotation,
+        size: restore.size,
+      },
+    });
+    if (!result.ok) throw new Error('BROWSER_HARNESS_TRANSFORM_RESTORE_FAILED');
+  }, before);
+  await page.keyboard.press('Escape');
 }
 
 async function assertLayersAuthoring(designer, page) {
@@ -1406,6 +1996,21 @@ async function componentCount(page) {
   return page.evaluate(() => window.baseScreenHarness.designer.document.components.length);
 }
 
+// 顶栏改版后网格/缩放复位按钮移入视图菜单，通过菜单路径触发。
+async function toggleGridViaMenu(designer) {
+  await designer.locator('[data-menu-toggle="view"]').click();
+  await designer
+    .locator('.designer-menu[data-menu="view"] [data-menu-action="toggle-grid"]')
+    .click();
+}
+
+async function zoomResetViaMenu(designer) {
+  await designer.locator('[data-menu-toggle="view"]').click();
+  await designer
+    .locator('.designer-menu[data-menu="view"] [data-menu-action="zoom-reset"]')
+    .click();
+}
+
 async function componentPositions(page, ids) {
   return page.evaluate(
     (componentIds) =>
@@ -1467,7 +2072,7 @@ async function assertDesignerControlStyles(designer) {
   });
   if (
     styles === undefined ||
-    styles.toolbarHeight !== 32 ||
+    styles.toolbarHeight !== 28 ||
     styles.theme === styles.lightTheme ||
     styles.theme !== styles.restoredTheme ||
     styles.canaryFont === styles.workspaceFont ||
@@ -1571,7 +2176,72 @@ async function assertOverlayContained(designer, selector) {
 }
 
 // R1/R5/R7：浏览器默认行为管控与零宿主影响边界（Designer Event System）。
+// 仅在完整桌面流程视口调用：画布可见且可交互。
 async function assertEventSystemGuards(page, designer) {
+  // R1：真实可信的 Alt 按键不得触发 Edge/Chrome 的访问键聚焦（"设置及其他"按钮）。
+  // Chromium 对 Alt 自身 keydown 上报 altKey=true，chord 必须剥离修饰键自身前缀，
+  // 否则 'Alt+Alt' 伪 chord 使黑名单失配。焦点保持在设计器即证明浏览器默认被阻止。
+  // 聚焦走真实点击路径（画布 pointerdown 的系统级焦点收敛）：Chromium 在复杂流程后
+  // 对 shadow 内元素的编程 focus() 存在静默失效的怪癖。
+  const viewportRect = await page.evaluate(() => {
+    const element = document.querySelector('base-screen-designer');
+    const viewport = element.shadowRoot?.querySelector('[data-viewport]');
+    const rect = viewport?.getBoundingClientRect();
+    return rect === undefined
+      ? null
+      : { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+  });
+  if (viewportRect === null || viewportRect.width <= 0 || viewportRect.height <= 0) {
+    throw new Error('BROWSER_HARNESS_VIEWPORT_MISSING');
+  }
+  await page.mouse.click(
+    viewportRect.x + viewportRect.width / 2,
+    viewportRect.y + viewportRect.height / 2,
+  );
+  await page.keyboard.press('Alt');
+  const altFocusKept = await page.evaluate(
+    () => document.activeElement?.tagName === 'BASE-SCREEN-DESIGNER',
+  );
+  if (!altFocusKept) {
+    throw new Error('BROWSER_HARNESS_ALT_ACCESS_KEY_FOCUS_FAILED');
+  }
+  // R4：空格抓手与键盘焦点解耦——焦点在宿主页面时，鼠标悬停视窗即可空格拖拽平移画布。
+  const panState = await page.evaluate(() => {
+    const element = document.querySelector('base-screen-designer');
+    const viewport = element.shadowRoot?.querySelector('[data-viewport]');
+    const canvas = element.shadowRoot?.querySelector('[data-canvas]');
+    const rect = viewport?.getBoundingClientRect();
+    return {
+      rect:
+        rect === undefined
+          ? null
+          : { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      transform: canvas?.style.transform ?? null,
+    };
+  });
+  if (panState.rect === null) throw new Error('BROWSER_HARNESS_VIEWPORT_MISSING');
+  await page.evaluate(() => document.body.focus());
+  const centerX = panState.rect.x + panState.rect.width / 2;
+  const centerY = panState.rect.y + panState.rect.height / 2;
+  await page.mouse.move(centerX, centerY);
+  await page.keyboard.down('Space');
+  await page.mouse.down();
+  await page.mouse.move(centerX + 80, centerY + 60, { steps: 3 });
+  await page.mouse.up();
+  await page.keyboard.up('Space');
+  const panResult = await page.evaluate(() => {
+    const element = document.querySelector('base-screen-designer');
+    return {
+      transform: element.shadowRoot?.querySelector('[data-canvas]')?.style.transform ?? null,
+      scrollY: window.scrollY,
+    };
+  });
+  if (panResult.transform === panState.transform) {
+    throw new Error('BROWSER_HARNESS_SPACE_PAN_DECOUPLED_FAILED');
+  }
+  if (panResult.scrollY !== 0) {
+    throw new Error('BROWSER_HARNESS_SPACE_PAN_SCROLLED_HOST');
+  }
   // R1：焦点在设计器内时浏览器级快捷键被 capture 黑名单拦截；普通键不受影响。
   const inDesigner = await designer.evaluate((element) => {
     const viewport = element.shadowRoot?.querySelector('[data-viewport]');

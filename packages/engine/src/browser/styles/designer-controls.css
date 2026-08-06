@@ -220,8 +220,7 @@
 }
 
 .designer-status,
-.designer-badge,
-.status-pill {
+.designer-badge {
   box-sizing: border-box;
   display: inline-flex;
   max-width: 100%;

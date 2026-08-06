@@ -109,6 +109,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   #interactionPanel: HTMLDivElement | undefined;
   #statusFeedback: HTMLElement | undefined;
   #contextMenu: HTMLElement | undefined;
+  #lastSavedAt: number | undefined;
   readonly #notificationController = new DesignerNotificationController();
   #layers: HTMLDivElement | undefined;
   readonly #session = new DesignerSession({
@@ -131,6 +132,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     onConflict: () => this.dispatchEvent(new CustomEvent('base-screen-project-conflict')),
     onReady: ({ projectId, revision }) => {
       this.resetSessionSurfaces();
+      this.#lastSavedAt = Date.now();
+      this.renderTopbarSaveStatus();
       this.dispatchEvent(new CustomEvent('base-screen-ready', { detail: { projectId, revision } }));
     },
   });
@@ -160,6 +163,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     snapCanvasSelection: (bounds, offset, excludedComponentIds, options) =>
       this.#workbenchController.snapSelectionOffset(bounds, offset, excludedComponentIds, options),
     renderSnapPreview: (point) => this.#workbenchController.renderSnapPreview(point),
+    setSnapSessionActive: (active) => this.#workbenchController.setSnapSessionActive(active),
     reduceSelection: (action) => this.#session.reduceSelection(action),
     reportTransaction: (transaction) => this.executeDesignerTransaction(transaction),
     renderSelection: () => this.renderSelection(),
@@ -330,6 +334,9 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#menuController.closeMenus();
       this.#menuController.closeContextMenu();
     },
+    // 空格抓手与键盘焦点解耦：鼠标悬停视窗即可激活临时抓手（无需先点击聚焦）。
+    onWindowKeyDown: (event) => this.#viewportController.onWindowKeyDown(event),
+    onWindowKeyUp: (event) => this.#viewportController.onWindowKeyUp(event),
   });
   readonly #selectionActions = new DesignerSelectionActions({
     getDocument: () => this.#session.document,
@@ -356,6 +363,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       },
       (target) => this.executeToolFromTarget(target as Element),
       (target) => this.executeOperationFromTarget(target as Element),
+      (target) => this.onStatusZoomPreset(target as Element),
       (target) => this.#importController.onClick(target as Element),
       (target) => this.#projectFeedbackController.onClick(target as Element),
       (target) => this.#projectWorkspaceController.onClick(target as Element),
@@ -868,7 +876,13 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    return this.#session.save();
+    return this.#session.save().then((result) => {
+      if (result.ok) {
+        this.#lastSavedAt = Date.now();
+        this.renderTopbarSaveStatus();
+      }
+      return result;
+    });
   }
 
   publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
@@ -893,6 +907,7 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   unload(): void {
     this.#session.unload();
+    this.#lastSavedAt = undefined;
     this.resetSessionSurfaces();
     this.#renderer?.dispose();
     this.#renderer = undefined;
@@ -1031,6 +1046,15 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#operations.execute(id, undefined);
   }
 
+  // 状态栏缩放下拉预设（Nebula 语义：25%–200% 预设，居中缩放）。
+  private onStatusZoomPreset(target: Element): boolean {
+    const preset = target.closest<HTMLButtonElement>('[data-status-zoom-preset]')?.dataset
+      .statusZoomPreset;
+    if (preset === undefined) return false;
+    this.#viewportController.setZoomCentered(Number(preset) / 100);
+    return true;
+  }
+
   private executeDesignerTransaction(
     transaction: ScreenDocumentTransaction,
   ): ScreenParseResult<ScreenDocument> {
@@ -1084,7 +1108,9 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private executeToolFromTarget(target: Element): boolean {
-    const tool = target.closest<HTMLButtonElement>('[data-tool]')?.dataset.tool as
+    // 限定按钮元素：data-tool 是工具栏按钮的命中选择器，非按钮元素（如 viewport 容器）
+    // 上的同名属性不得被当作工具切换（否则画布拖拽产生的 click 会误切换工具）。
+    const tool = target.closest<HTMLButtonElement>('button[data-tool]')?.dataset.tool as
       | DesignerToolId
       | undefined;
     if (tool === undefined || this.#operations.get(`tool.${tool}`) === undefined) return false;
@@ -1155,6 +1181,65 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     const revision = root.querySelector<HTMLElement>('[data-project-revision]');
     if (revision !== null) revision.textContent = project?.revision ?? '';
+    this.renderTopbarSaveStatus();
+    this.renderStatusBar();
+  }
+
+  // Nebula 状态栏左/中段：左侧选中信息（未选中/单个名称/数量），中间画布静态尺寸。
+  private renderStatusBar(): void {
+    const root = this.shadowRoot;
+    if (root === null) return;
+    const document = this.#session.document;
+    const componentIds = this.#session.interaction.selectedComponentIds;
+    const count = componentIds.length;
+    const selectionText =
+      count === 0
+        ? DESIGNER_UI_TEXT.nothingSelected
+        : count === 1
+          ? document === undefined
+            ? DESIGNER_UI_TEXT.selectedSingle
+            : (selectedComponents(document, componentIds)[0]?.name ??
+              DESIGNER_UI_TEXT.selectedSingle)
+          : DESIGNER_UI_TEXT.selectedCount(count);
+    const selection = root.querySelector<HTMLElement>('[data-status-selection]');
+    if (selection !== null) selection.textContent = selectionText;
+    const canvas = root.querySelector<HTMLElement>('[data-status-canvas]');
+    if (canvas !== null && document !== undefined) {
+      canvas.textContent = `${document.canvas.width} × ${document.canvas.height}`;
+    }
+  }
+
+  // Nebula 保存状态徽标：保存中... / 未保存更改 / 已保存 HH:mm。
+  // 无项目（直接文档）时保持静态占位文案，与状态栏的「直接文档」一致。
+  private renderTopbarSaveStatus(): void {
+    const root = this.shadowRoot;
+    if (root === null) return;
+    const badge = root.querySelector<HTMLElement>('[data-topbar-save-status]');
+    if (badge === null) return;
+    if (this.#session.project === undefined) {
+      badge.dataset.state = 'direct';
+      badge.textContent = DESIGNER_UI_TEXT.directDocument;
+      return;
+    }
+    if (this.#session.projectPhase === 'saving') {
+      badge.dataset.state = 'saving';
+      badge.innerHTML = `${saveStatusSpinnerGlyph()}<span>${DESIGNER_UI_TEXT.saveStatus.saving}</span>`;
+      return;
+    }
+    if (this.#session.dirty) {
+      badge.dataset.state = 'dirty';
+      badge.innerHTML = `<span class="topbar-save-status-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.saveStatus.unsaved}</span>`;
+      return;
+    }
+    if (this.#lastSavedAt !== undefined) {
+      badge.dataset.state = 'saved';
+      badge.innerHTML = `${saveStatusCheckGlyph()}<span>${DESIGNER_UI_TEXT.saveStatus.saved(
+        formatSavedTime(this.#lastSavedAt),
+      )}</span>`;
+      return;
+    }
+    badge.dataset.state = 'clean';
+    badge.textContent = '';
   }
 
   private renderOperationControls(): void {
@@ -1256,4 +1341,19 @@ function lifecycleDiagnostic(message: string): ScreenDiagnostic {
 
 function projectPhaseLabel(phase: ScreenProjectPhase): string {
   return DESIGNER_UI_TEXT.projectPhases[phase];
+}
+
+function saveStatusSpinnerGlyph(): string {
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 2a6 6 0 1 1-6 6"/></svg>';
+}
+
+function saveStatusCheckGlyph(): string {
+  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 8.5 6.5 12 13 4.5"/></svg>';
+}
+
+function formatSavedTime(timestamp: number): string {
+  const date = new Date(timestamp);
+  const hh = String(date.getHours()).padStart(2, '0');
+  const mm = String(date.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
 }

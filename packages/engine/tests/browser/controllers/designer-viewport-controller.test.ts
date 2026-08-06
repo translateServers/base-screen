@@ -179,4 +179,53 @@ describe('DesignerViewportController space key', () => {
     controller.setActiveTool('rectangle');
     expect(controller.activeTool).toBe('rectangle');
   });
+
+  it('R4 activates the space hand from hover without keyboard focus and releases on key up', () => {
+    const { controller } = createController();
+    const { dispatch } = connectCanvas(controller, 800, 600);
+    expect(controller.hovered).toBe(false);
+
+    // 鼠标移入视窗：hover 状态就绪（与键盘焦点解耦）。
+    dispatch('pointerenter', new Event('pointerenter'));
+    expect(controller.hovered).toBe(true);
+
+    const preventDefault = vi.fn();
+    const windowDown = {
+      code: 'Space',
+      target: null,
+      preventDefault,
+    } as unknown as KeyboardEvent;
+    expect(controller.onWindowKeyDown(windowDown)).toBe(true);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(controller.activeTool).toBe('hand');
+
+    expect(controller.onWindowKeyUp({ code: 'Space' } as KeyboardEvent)).toBe(true);
+    expect(controller.activeTool).toBe('select');
+
+    // 鼠标移出视窗：hover 解除，空格不再激活抓手（宿主页面空格滚动不受影响）。
+    dispatch('pointerleave', new Event('pointerleave'));
+    expect(controller.hovered).toBe(false);
+    expect(
+      controller.onWindowKeyDown({
+        code: 'Space',
+        target: null,
+        preventDefault: vi.fn(),
+      } as unknown as KeyboardEvent),
+    ).toBe(false);
+  });
+
+  it('R2 keeps native space input on editable targets even when hovering', () => {
+    const { controller } = createController();
+    const { dispatch } = connectCanvas(controller, 800, 600);
+    dispatch('pointerenter', new Event('pointerenter'));
+    const target = new MockHTMLElement();
+    target.isContentEditable = true;
+    expect(
+      controller.onWindowKeyDown({
+        code: 'Space',
+        target,
+        preventDefault: vi.fn(),
+      } as unknown as KeyboardEvent),
+    ).toBe(false);
+  });
 });

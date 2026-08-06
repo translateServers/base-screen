@@ -67,48 +67,187 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: var(--designer-space-5);
-  overflow-x: auto;
-  padding: 0 var(--designer-space-6);
+  gap: var(--designer-space-4);
+  padding: 0 var(--designer-space-5);
   border-bottom: 1px solid var(--designer-border-default);
   background: var(--designer-surface-panel);
 }
 
 .topbar-brand,
-.designer-menu-triggers {
+.topbar-center,
+.topbar-actions {
   display: flex;
   align-items: center;
 }
 
 .topbar-brand {
+  flex: 1 1 0;
   min-width: 0;
+  gap: var(--designer-space-3);
+}
+
+.topbar-center {
   flex: none;
   gap: var(--designer-space-3);
 }
 
-.topbar-save-status {
-  flex: 0 0 auto;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-weight: 600;
+.topbar-actions {
+  flex: 1 1 0;
+  justify-content: flex-end;
+  gap: var(--designer-space-3);
+}
+
+/* Nebula 三段式顶栏的圆角分组：工具选择器 / 撤销重做 / 缩放。 */
+.topbar-segment {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-workspace);
+}
+
+.topbar-segment .designer-icon-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+}
+
+.topbar-segment kbd {
+  display: none;
+}
+
+.designer-tool-cluster .designer-tool-button[aria-pressed="true"] {
+  background: var(--designer-accent);
+  color: var(--designer-surface-workspace);
+  box-shadow: none;
 }
 
 .designer-tool-cluster {
   flex: none;
 }
 
-.designer-tool-cluster .designer-tool-button {
-  width: 30px;
-  height: 30px;
-  min-height: 30px;
+.topbar-zoom .designer-icon-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
 }
 
-.designer-tool-cluster .designer-tool-button[aria-pressed="true"] {
-  box-shadow: inset 2px 0 0 var(--designer-accent);
+.zoom-value {
+  box-sizing: border-box;
+  width: 56px;
+  height: 24px;
+  flex: 0 0 56px;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  text-align: center;
 }
 
-.designer-tool-cluster kbd {
-  display: none;
+.topbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--designer-border-default);
+}
+
+.designer-project-name {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-save-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  color: var(--designer-text-muted);
+  font-size: 11px;
+}
+
+.topbar-save-status svg {
+  width: 12px;
+  height: 12px;
+}
+
+.topbar-save-status[data-state="saving"] svg {
+  animation: designer-save-status-spin 1s linear infinite;
+}
+
+.topbar-save-status[data-state="dirty"] {
+  color: var(--designer-warning);
+}
+
+.topbar-save-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--designer-warning);
+}
+
+.topbar-save-status[data-state="saved"] svg {
+  color: var(--designer-success);
+}
+
+@keyframes designer-save-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.designer-menu-triggers {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-1);
+}
+
+.designer-menu-trigger {
+  min-height: 28px;
+  padding: 0 var(--designer-space-3);
+  border-radius: var(--designer-radius-control);
+}
+
+/* 右段带文案操作按钮：预览 / 保存 / 发布。 */
+.topbar-text-button {
+  min-height: 28px;
+  gap: 6px;
+  padding: 0 var(--designer-space-3);
+  font-size: 13px;
+}
+
+.topbar-text-button .topbar-text-button-glyph {
+  display: inline-flex;
+}
+
+.topbar-publish {
+  border-color: var(--designer-success);
+  background: var(--designer-success);
+  color: var(--designer-surface-workspace);
+}
+
+/* 菜单触发位于单条顶栏右段，下拉菜单按右边缘锚定在各自触发项下方。 */
+.designer-menu[data-menu="file"] {
+  right: 407px;
+}
+
+.designer-menu[data-menu="edit"] {
+  right: 369px;
+}
+
+.designer-menu[data-menu="view"] {
+  right: 331px;
+}
+
+.designer-menu[data-menu="tools"] {
+  right: 293px;
+}
+
+.designer-help {
+  right: 293px;
+  left: auto;
 }
 
 .workspace {
@@ -121,89 +260,6 @@
   background: var(--designer-surface-workspace);
 }
 
-.designer-brand-mark {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--designer-accent) 65%, var(--designer-border-default));
-  border-radius: 9px;
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--designer-text-primary) 8%, transparent);
-  transition:
-    box-shadow var(--designer-motion-emphasis),
-    transform var(--designer-motion-emphasis);
-}
-
-.designer-brand:hover .designer-brand-mark {
-  box-shadow: 0 0 0 4px var(--designer-accent-surface);
-  transform: rotate(-4deg) scale(1.04);
-}
-
-.designer-brand-name {
-  color: var(--designer-text-primary);
-  font-size: 13px;
-  font-weight: 760;
-  letter-spacing: -0.01em;
-}
-
-.designer-brand-separator {
-  width: 1px;
-  height: 16px;
-  background: var(--designer-border-default);
-}
-
-.designer-project-name {
-  overflow: hidden;
-  color: var(--designer-text-secondary);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.designer-menu-triggers {
-  display: flex;
-  align-items: center;
-  align-self: center;
-  gap: var(--designer-space-1);
-  padding: var(--designer-space-1);
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: 999px;
-  background: var(--designer-surface-workspace);
-}
-
-.designer-menu-trigger {
-  min-height: 28px;
-  padding: 0 var(--designer-space-4);
-  border-radius: 999px;
-}
-
-/* 菜单触发触发位于单条顶栏右侧，下拉菜单按右边缘锚定在各自触发项下方。 */
-.designer-menu[data-menu="file"] {
-  right: 176px;
-}
-
-.designer-menu[data-menu="edit"] {
-  right: 144px;
-}
-
-.designer-menu[data-menu="view"] {
-  right: 112px;
-}
-
-.designer-menu[data-menu="tools"] {
-  right: 80px;
-}
-
-.designer-help {
-  right: 48px;
-  left: auto;
-}
-
 .canvas-stage {
   position: relative;
   display: grid;
@@ -212,15 +268,104 @@
   grid-template-columns: 20px minmax(0, 1fr);
 }
 
+/* Nebula 底部状态栏：左（工具+选中信息+项目状态）｜中（画布尺寸）｜右（开关+模式+缩放）。 */
 .statusbar {
   display: flex;
   min-width: 0;
   align-items: center;
+  justify-content: space-between;
   gap: var(--designer-space-4);
-  padding: 0 var(--designer-space-6);
+  padding: 0 var(--designer-space-4);
   border-top: 1px solid var(--designer-border-default);
   font: var(--designer-font-small);
   background: var(--designer-surface-panel);
+}
+
+.statusbar-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-3);
+}
+
+.statusbar-center {
+  flex: 0 0 auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+}
+
+.statusbar-end {
+  flex: 0 0 auto;
+}
+
+.status-tool {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-tool svg {
+  width: 12px;
+  height: 12px;
+}
+
+.status-selection {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-toggle {
+  display: inline-flex;
+  cursor: pointer;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 1px var(--designer-space-2);
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  transition:
+    color var(--designer-motion),
+    background var(--designer-motion);
+}
+
+.status-toggle:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-accent);
+}
+
+.status-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--designer-text-muted);
+  opacity: 0.4;
+}
+
+.status-toggle[aria-checked="true"] .status-toggle-dot {
+  background: var(--designer-success);
+  opacity: 1;
+}
+
+.status-zoom-trigger {
+  min-width: 48px;
+  font: var(--designer-font-numeric);
+}
+
+.status-zoom-menu {
+  top: auto;
+  right: var(--designer-space-3);
+  bottom: calc(30px + var(--designer-space-2));
+  min-width: 72px;
 }
 
 .status-item {
@@ -475,26 +620,6 @@
   min-height: var(--designer-control-height);
 }
 
-.toolbar-group {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--designer-space-1);
-  padding: var(--designer-space-1);
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: calc(var(--designer-radius-control) + 1px);
-  background: var(--designer-surface-workspace);
-}
-
-.toolbar-group:last-child {
-  margin-right: 0;
-}
-
-.toolbar-spacer {
-  flex: 1 0 var(--designer-space-4);
-}
-
-.toolbar-divider,
 .status-divider {
   flex: 0 0 auto;
   width: 1px;
@@ -502,26 +627,12 @@
   background: var(--designer-border-default);
 }
 
-.toolbar-btn[data-action^="project-"] {
-  width: auto;
-  padding: 0 var(--designer-space-3);
-}
-
-.zoom-value,
-.status-zoom {
-  box-sizing: border-box;
-  flex: 0 0 48px;
-  min-width: 48px;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
-  text-align: center;
-}
-
 .ruler-horizontal {
   grid-row: 1 / 2 !important;
   position: relative;
   overflow: hidden;
-  border-bottom: 1px solid var(--designer-border-default);
+  /* 分隔线用 inset shadow 画：border 会在 border-box 下吃掉 canvas 1px 尺寸。 */
+  box-shadow: inset 0 -1px 0 var(--designer-border-default);
   background: var(--designer-surface-panel);
 }
 
@@ -531,39 +642,31 @@
   background: var(--designer-surface-panel);
 }
 
-.ruler-mark {
+.ruler-corner {
   position: absolute;
-  display: block;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border-right: 1px solid var(--designer-border-default);
+  border-bottom: 1px solid var(--designer-border-default);
+  background: var(--designer-surface-panel);
   color: var(--designer-text-muted);
-  font:
-    9px / 20px ui-monospace,
-    monospace;
-  pointer-events: none;
-  white-space: nowrap;
+  font-size: 9px;
 }
 
-.ruler-horizontal .ruler-mark {
-  top: 0;
-  height: 8px;
-  padding: 8px 0 0 2px;
-  border-left: 1px solid var(--designer-border-default);
+.ruler-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .canvas-stage > .ruler-vertical {
-  border-right: 1px solid var(--designer-border-default);
-  border-bottom: 0;
-  background:
-    repeating-linear-gradient(180deg, transparent 0 9px, var(--designer-border-default) 9px 10px),
-    var(--designer-surface-panel);
-}
-
-.ruler-vertical .ruler-mark {
-  right: 0;
-  width: 8px;
-  padding: 2px 0 0 8px;
-  border-top: 1px solid var(--designer-border-default);
-  line-height: 9px;
-  writing-mode: vertical-rl;
+  /* 同 .ruler-horizontal：inset shadow 分隔线，避免 border 吃掉 canvas 1px。 */
+  box-shadow: inset -1px 0 0 var(--designer-border-default);
 }
 
 .viewport {
@@ -604,22 +707,22 @@
 }
 
 /* 抓手工具或按住空格临时平移时，画布表面切换为抓握光标；拖拽中为实心抓握。 */
-.viewport[data-tool="hand"] {
+.viewport[data-active-tool="hand"] {
   cursor: grab;
 }
-.viewport[data-tool="hand"][data-panning="true"] {
+.viewport[data-active-tool="hand"][data-panning="true"] {
   cursor: grabbing;
 }
 /* 抓手工具激活时，选中框拖拽层/变换控件等交互覆盖层不覆盖抓握光标，
    与 Nebula 一致：hand 工具下整个画布表面（含选中组件上）统一为 grab/grabbing。 */
-.viewport[data-tool="hand"] .selection-grab,
-.viewport[data-tool="hand"] .transform-handle,
-.viewport[data-tool="hand"] .transform-rotate {
+.viewport[data-active-tool="hand"] .selection-grab,
+.viewport[data-active-tool="hand"] .transform-handle,
+.viewport[data-active-tool="hand"] .transform-rotate {
   cursor: grab;
 }
-.viewport[data-tool="hand"][data-panning="true"] .selection-grab,
-.viewport[data-tool="hand"][data-panning="true"] .transform-handle,
-.viewport[data-tool="hand"][data-panning="true"] .transform-rotate {
+.viewport[data-active-tool="hand"][data-panning="true"] .selection-grab,
+.viewport[data-active-tool="hand"][data-panning="true"] .transform-handle,
+.viewport[data-active-tool="hand"][data-panning="true"] .transform-rotate {
   cursor: grabbing;
 }
 
@@ -692,23 +795,76 @@
   opacity: 0.65;
 }
 
+/* 智能对齐线（参考 Moveable/Nebula）：蓝色系，参考线 1px，
+   吸附目标线（active）2px 更醒目 + 柔和发光，距离标签显示间距；
+   仅渲染阈值（1px）内的命中才显示，吸附与渲染分离。 */
 .canvas-guide-snap {
-  background: var(--designer-accent);
+  background: var(--designer-snap-guide);
+}
+
+.canvas-guide-snap-active {
+  background: var(--designer-snap-guide);
+  box-shadow:
+    0 0 2px var(--designer-snap-guide),
+    0 0 6px color-mix(in srgb, var(--designer-snap-guide) 45%, transparent);
+}
+
+.canvas-guide[data-axis="x"].canvas-guide-snap {
+  width: 1px;
+}
+
+.canvas-guide[data-axis="x"].canvas-guide-snap-active {
+  width: 2px;
+}
+
+.canvas-guide[data-axis="y"].canvas-guide-snap {
+  height: 1px;
+}
+
+.canvas-guide[data-axis="y"].canvas-guide-snap-active {
+  height: 2px;
+}
+
+.canvas-guide-snap-label {
+  position: absolute;
+  padding: 1px 4px;
+  font-size: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  line-height: 1.4;
+  color: var(--designer-surface-workspace);
+  background: var(--designer-snap-guide);
+  border-radius: 2px;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.canvas-guide[data-axis="x"] .canvas-guide-snap-label {
+  top: 8px;
+  left: 4px;
+}
+
+.canvas-guide[data-axis="y"] .canvas-guide-snap-label {
+  top: 4px;
+  left: 8px;
 }
 
 .canvas-guide[data-axis="x"] {
   top: 0;
   bottom: 0;
   width: 1px;
+  transform: translateX(-50%);
 }
 .canvas-guide[data-axis="y"] {
   right: 0;
   left: 0;
   height: 1px;
+  transform: translateY(-50%);
 }
+/* 选中框视觉轮廓与吸附锚点使用同一选区几何（组件包围盒）：
+   outline-offset 取 -1px 使 2px 轮廓以边缘为中线，与 1px 吸附预览线重合。 */
 .selection {
   outline: 2px solid var(--designer-accent);
-  outline-offset: 2px;
+  outline-offset: -1px;
 }
 .marquee {
   display: none;
@@ -796,7 +952,7 @@
 }
 
 .status-feedback {
-  flex: 1 1 0;
+  max-width: 28ch;
   min-width: 0;
   overflow: hidden;
   color: var(--designer-warning);
@@ -804,24 +960,16 @@
   white-space: nowrap;
 }
 
-.status-zoom {
-  margin-left: auto;
-}
-
-.status-pill {
-  flex: 0 0 48px;
-}
-
-.statusbar > [data-project-status] {
-  flex: 0 1 12ch;
+.statusbar [data-project-status] {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.statusbar > [data-project-revision] {
-  flex: 0 1 18ch;
+.statusbar [data-project-revision] {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--designer-text-muted);

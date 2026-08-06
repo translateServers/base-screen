@@ -6,7 +6,13 @@ import {
   getDesignerToolShortcut,
 } from '../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { designerIcon } from '../ui/designer-icons.js';
+import { designerIcon, designerToolGlyph } from '../ui/designer-icons.js';
+
+// 工具图标供 controllers 层消费（controllers 可依赖 dom，但不得直接依赖 ui 叶子层）。
+export { designerToolGlyph };
+
+// Nebula 缩放下拉预设（状态栏缩放百分比菜单）。
+const DESIGNER_ZOOM_PRESETS = [25, 50, 75, 100, 125, 150, 200] as const;
 
 export function createDesignerWorkspace(
   ownerDocument: Document,
@@ -49,79 +55,54 @@ export function createDesignerWorkspace(
 
     <main class="workspace">
       <header class="designer-topbar" aria-label="${DESIGNER_UI_TEXT.topbar}">
-        <div class="topbar-brand" aria-label="${DESIGNER_UI_TEXT.brand}">
-          <span class="designer-brand-mark" aria-hidden="true">Bs</span>
-          <span class="designer-brand-name">Base Screen</span>
-          <span class="designer-brand-separator" aria-hidden="true"></span>
+        <div class="topbar-brand">
           <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>
           <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
         </div>
-        <div class="topbar-group designer-tool-cluster" role="group" aria-label="${DESIGNER_UI_TEXT.tools}">
-          ${DESIGNER_TOOLS.map((tool) => `<button type="button" class="designer-control designer-button designer-icon-button designer-tool-button tool-btn" data-variant="ghost" data-tool="${tool.id}" data-material-key="${tool.materialKey ?? ''}" title="${tool.label} (${getDesignerToolShortcut(tool.id)})" aria-label="${tool.label}">${toolGlyph(tool.id)}<kbd>${getDesignerToolShortcut(tool.id)}</kbd></button>`).join('')}
+        <div class="topbar-center">
+          <div class="topbar-segment designer-tool-cluster" role="group" aria-label="${DESIGNER_UI_TEXT.tools}">
+            ${DESIGNER_TOOLS.map((tool) => `<button type="button" class="designer-control designer-button designer-icon-button designer-tool-button tool-btn" data-variant="ghost" data-tool="${tool.id}" data-material-key="${tool.materialKey ?? ''}" title="${tool.label} (${getDesignerToolShortcut(tool.id)})" aria-label="${tool.label}">${designerToolGlyph(tool.id)}<kbd>${getDesignerToolShortcut(tool.id)}</kbd></button>`).join('')}
+          </div>
+          <div class="topbar-segment" role="group" aria-label="${DESIGNER_UI_TEXT.history}">
+            ${actionButton('undo', designerIcon('undo'))}
+            ${actionButton('redo', redoGlyph())}
+          </div>
         </div>
-        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.history}">
-          ${actionButton('undo', designerIcon('undo'))}
-          ${actionButton('redo', redoGlyph())}
-        </div>
-        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.clipboard}">
-          ${actionButton('copy', copyGlyph())}
-          ${actionButton('paste', pasteGlyph())}
-        </div>
-        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.arrange}">
-          ${actionButton('group', groupGlyph())}
-          ${actionButton('ungroup', ungroupGlyph())}
-          <span class="toolbar-divider"></span>
-          ${actionButton('align-left', alignLeftGlyph())}
-          ${actionButton('align-center', alignCenterGlyph())}
-          ${actionButton('align-right', alignRightGlyph())}
-          ${actionButton('align-top', alignTopGlyph())}
-          ${actionButton('align-middle', alignMiddleGlyph())}
-          ${actionButton('align-bottom', alignBottomGlyph())}
-          <span class="toolbar-divider"></span>
-          ${actionButton('distribute-horizontal', distributeHorizontalGlyph())}
-          ${actionButton('distribute-vertical', distributeVerticalGlyph())}
-        </div>
-        <div class="topbar-spacer"></div>
-        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.project}">
-          ${actionButton('project-workspace', projectGlyph())}
-          ${actionButton('preview', previewGlyph())}
-          ${actionButton('import', importGlyph())}
-          ${actionButton('export', exportGlyph())}
-          ${actionButton('project-save', designerIcon('save'))}
-          ${actionButton('project-publish', publishGlyph())}
-          ${actionButton('project-retry', retryGlyph())}
-          ${actionButton('project-cancel', cancelGlyph())}
-        </div>
-        <div class="topbar-group topbar-zoom" aria-label="${DESIGNER_UI_TEXT.zoom}">
-          ${actionButton('zoom-out', zoomOutGlyph())}
-          <output class="zoom-value" data-zoom>100%</output>
-          ${actionButton('zoom-in', zoomInGlyph())}
-          ${actionButton('zoom-reset', resetZoomGlyph())}
-          ${actionButton('zoom-fit', fitZoomGlyph())}
-        </div>
-        <div class="topbar-group" aria-label="${DESIGNER_UI_TEXT.canvasAids}">
-          ${actionButton('toggle-grid', gridGlyph())}
-        </div>
-        <div class="designer-menu-triggers" role="menubar" aria-label="${DESIGNER_UI_TEXT.designerMenu}">
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="file" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.file}</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="edit" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.edit}</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="view" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.view}</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="tools" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.tools}</button>
-          <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="help" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.help}</button>
+        <div class="topbar-actions">
+          <div class="topbar-segment topbar-zoom" role="group" aria-label="${DESIGNER_UI_TEXT.zoom}">
+            ${actionButton('zoom-out', zoomOutGlyph())}
+            <output class="zoom-value" data-zoom>100%</output>
+            ${actionButton('zoom-in', zoomInGlyph())}
+          </div>
+          <span class="topbar-divider" aria-hidden="true"></span>
+          <div class="designer-menu-triggers" role="menubar" aria-label="${DESIGNER_UI_TEXT.designerMenu}">
+            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="file" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.file}</button>
+            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="edit" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.edit}</button>
+            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="view" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.view}</button>
+            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="tools" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.tools}</button>
+          </div>
+          <span class="topbar-divider" aria-hidden="true"></span>
+          ${labeledActionButton('preview', previewGlyph())}
+          ${labeledActionButton('project-save', designerIcon('save'))}
+          ${labeledActionButton('project-publish', publishGlyph(), 'topbar-publish')}
         </div>
         <div class="designer-menu" data-menu="file" hidden role="menu">
           ${menuButton('project-workspace')}${menuButton('import')}${menuButton('export')}${menuButton('project-save')}${menuButton('project-publish')}${menuButton('project-retry')}${menuButton('project-cancel')}
         </div>
         <div class="designer-menu" data-menu="edit" hidden role="menu">
-          ${menuButton('undo')}${menuButton('redo')}${menuButton('copy')}${menuButton('paste')}${menuButton('delete')}${menuButton('duplicate')}${menuButton('group')}${menuButton('ungroup')}${menuButton('lock')}${menuButton('unlock')}${menuButton('hide')}${menuButton('bring-to-front')}${menuButton('send-to-back')}
+          ${menuButton('undo')}${menuButton('redo')}${menuButton('copy')}${menuButton('paste')}${menuButton('delete')}${menuButton('duplicate')}${menuButton('group')}${menuButton('ungroup')}
+          <div class="designer-menu-separator" role="separator"></div>
+          ${menuButton('align-left')}${menuButton('align-center')}${menuButton('align-right')}${menuButton('align-top')}${menuButton('align-middle')}${menuButton('align-bottom')}${menuButton('distribute-horizontal')}${menuButton('distribute-vertical')}
+          <div class="designer-menu-separator" role="separator"></div>
+          ${menuButton('lock')}${menuButton('unlock')}${menuButton('hide')}${menuButton('bring-to-front')}${menuButton('send-to-back')}
         </div>
         <div class="designer-menu" data-menu="view" hidden role="menu">
-          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-fit')}${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}
+          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-reset')}${menuButton('zoom-fit')}${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}
         </div>
         <div class="designer-menu" data-menu="tools" hidden role="menu">
-          ${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}${menuButton('toggle-workbench')}
+          ${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}${menuButton('toggle-workbench')}${menuButton('show-help')}
         </div>
-        <section class="designer-help" data-menu="help" hidden aria-label="${DESIGNER_UI_TEXT.shortcutHelp}">
+        <section class="designer-help" data-menu="help" hidden aria-label="${DESIGNER_UI_TEXT.shortcutHelp}" tabindex="-1">
           <h2>${DESIGNER_UI_TEXT.shortcuts}</h2>
           ${Object.entries(DESIGNER_OPERATION_TEXT)
             .flatMap(([id, operation]) =>
@@ -137,9 +118,10 @@ export function createDesignerWorkspace(
 
       <input type="file" accept="application/json" data-import-document hidden>
 
-      <div class="ruler ruler-horizontal" aria-hidden="true"></div>
+      <div class="ruler-corner" aria-hidden="true">${DESIGNER_UI_TEXT.rulerCornerUnit}</div>
+      <div class="ruler ruler-horizontal" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
       <div class="canvas-stage">
-        <div class="ruler ruler-vertical" aria-hidden="true"></div>
+        <div class="ruler ruler-vertical" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
         <div class="viewport" data-viewport>
           <div class="canvas" data-canvas>
             <div class="selection" data-selection></div>
@@ -150,17 +132,35 @@ export function createDesignerWorkspace(
       </div>
       <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="${DESIGNER_UI_TEXT.contextMenu}" tabindex="-1"></div>
 
+      <!-- Nebula-style status bar: left (tool + selection + project state) | center (canvas size) | right (Snap/Guide toggles + design mode + zoom menu). -->
       <footer class="statusbar">
-        <span class="status-pill" data-status-tool>${DESIGNER_UI_TEXT.statusTool}</span>
-        <span class="status-divider"></span>
-        <span class="status-item">${DESIGNER_UI_TEXT.snap}</span>
-        <span class="status-item">${DESIGNER_UI_TEXT.guides}</span>
-        <span class="status-item">${DESIGNER_UI_TEXT.designerMode}</span>
-        <span class="status-divider"></span>
-        <span data-project-status>${DESIGNER_UI_TEXT.directDocument}</span>
-        <span data-project-revision></span>
-        <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
-        <output class="status-zoom" data-status-zoom aria-label="${DESIGNER_UI_TEXT.zoomRatio}">100%</output>
+        <div class="statusbar-group statusbar-start">
+          <span class="status-tool" data-status-tool>${designerToolGlyph('select')}<span class="status-tool-name">${DESIGNER_TOOLS.find((tool) => tool.id === 'select')?.label ?? ''}</span></span>
+          <span class="status-divider" aria-hidden="true"></span>
+          <span class="status-selection" data-status-selection>${DESIGNER_UI_TEXT.nothingSelected}</span>
+          <span class="status-divider" aria-hidden="true"></span>
+          <span class="status-project" data-project-status>${DESIGNER_UI_TEXT.directDocument}</span>
+          <span class="status-revision" data-project-revision></span>
+          <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
+        </div>
+        <div class="statusbar-group statusbar-center">
+          <span class="status-canvas" data-status-canvas aria-label="${DESIGNER_UI_TEXT.canvasSize}"></span>
+        </div>
+        <div class="statusbar-group statusbar-end">
+          <button type="button" class="status-toggle" data-status-toggle="snap" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.snap}">
+            <span class="status-toggle-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.snap}</span>
+          </button>
+          <button type="button" class="status-toggle" data-status-toggle="guides" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.guides}">
+            <span class="status-toggle-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.guides}</span>
+          </button>
+          <span class="status-divider" aria-hidden="true"></span>
+          <span class="status-item">${DESIGNER_UI_TEXT.designerMode}</span>
+          <span class="status-divider" aria-hidden="true"></span>
+          <button type="button" class="designer-control designer-button status-zoom-trigger" data-menu-toggle="status-zoom" data-status-zoom aria-haspopup="menu" aria-expanded="false" aria-label="${DESIGNER_UI_TEXT.zoomRatio}">100%</button>
+          <div class="designer-menu status-zoom-menu" data-menu="status-zoom" hidden role="menu" aria-label="${DESIGNER_UI_TEXT.zoomRatio}">
+            ${DESIGNER_ZOOM_PRESETS.map((percent) => `<button type="button" class="designer-control designer-button designer-menu-item" data-status-zoom-preset="${percent}" role="menuitem"><span>${percent}%</span></button>`).join('')}
+          </div>
+        </div>
       </footer>
       <div class="designer-notifications" data-notifications aria-label="${DESIGNER_UI_TEXT.notifications}"></div>
     </main>
@@ -268,6 +268,17 @@ function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: strin
   return `<button type="button" class="designer-control designer-button designer-icon-button toolbar-btn" data-variant="neutral" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}">${glyph}</button>`;
 }
 
+// Nebula 顶栏右段的带文案操作按钮（预览/保存/发布）：图标 + 标签。
+function labeledActionButton(
+  action: keyof typeof DESIGNER_OPERATION_TEXT,
+  glyph: string,
+  extraClass = '',
+): string {
+  const operation = DESIGNER_OPERATION_TEXT[action];
+  const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
+  return `<button type="button" class="designer-control designer-button topbar-text-button ${extraClass}" data-variant="neutral" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}</span><span>${operation.label}</span></button>`;
+}
+
 function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {
   const operation = DESIGNER_OPERATION_TEXT[action];
   const shortcut = 'shortcut' in operation ? `<kbd>${operation.shortcut}</kbd>` : '';
@@ -285,30 +296,6 @@ export function contextMenuHtml(actions: readonly DesignerContextMenuAction[]): 
         : menuButton(action),
     )
     .join('');
-}
-
-function toolGlyph(id: string): string {
-  switch (id) {
-    case 'select':
-      return designerIcon('pointer');
-    case 'hand':
-      return toolIcon('M5 6.5a1.5 1.5 0 0 1 3 0V8h1V5a1.5 1.5 0 0 1 3 0v6.5a3.5 3.5 0 1 1-7 0z');
-    case 'text':
-      return toolIcon('M5 4h6M8 4v8M6 12h4');
-    case 'rectangle':
-      return toolIcon('M3 4h10v8H3z');
-    case 'ellipse':
-      return toolIcon('M8 3.5a4.5 3 0 1 0 0 6 4.5 3 0 0 0 0-6z');
-    case 'image':
-      return toolIcon('M3 5h10v6H3zm0 4 3-2 2 2 3-3 2 2');
-    case 'zoom':
-      return toolIcon('M6.5 6.5a3 3 0 1 0 0 0M10 10l3 3');
-  }
-  return '';
-}
-
-function toolIcon(path: string): string {
-  return `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${path}"/></svg>`;
 }
 
 function createMaterialCard(
@@ -340,86 +327,14 @@ function redoGlyph(): string {
   return toolbarIcon('M12 6H7a3 3 0 0 0-3 3v0M11 5l2 2-2 2');
 }
 
-function copyGlyph(): string {
-  return toolbarIcon(
-    'M5 4h5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm0 0V3a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-1',
-  );
-}
-
-function pasteGlyph(): string {
-  return toolbarIcon(
-    'M5 4h6a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zm1-1h4M8 2v2',
-  );
-}
-
-function groupGlyph(): string {
-  return toolbarIcon('M4 5h8v6H4z');
-}
-
-function ungroupGlyph(): string {
-  return toolbarIcon('M3 4h4v4H3zm6 4h4v4H9z');
-}
-
-function alignLeftGlyph(): string {
-  return toolbarIcon('M3 3v10M5 5h6M5 9h4');
-}
-
-function alignCenterGlyph(): string {
-  return toolbarIcon('M8 3v10M5 5h6M4 9h8');
-}
-
-function alignRightGlyph(): string {
-  return toolbarIcon('M13 3v10M11 5H5M11 9H7');
-}
-
-function alignTopGlyph(): string {
-  return toolbarIcon('M3 3h10M5 5v6M9 5v4');
-}
-
-function alignMiddleGlyph(): string {
-  return toolbarIcon('M3 8h10M5 5v6M9 4v8');
-}
-
-function alignBottomGlyph(): string {
-  return toolbarIcon('M3 13h10M5 5v6M9 7v4');
-}
-
-function distributeHorizontalGlyph(): string {
-  return toolbarIcon('M3 4v8M13 4v8M7 7h2M7 9h2');
-}
-
-function distributeVerticalGlyph(): string {
-  return toolbarIcon('M4 3h8M4 13h8M7 7v2M9 7v2');
-}
-
 function previewGlyph(): string {
   return toolbarIcon(
     'M8 5a4 4 0 0 0-5 3 4 4 0 0 0 5 3 4 4 0 0 0 5-3 4 4 0 0 0-5-3zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2z',
   );
 }
 
-function projectGlyph(): string {
-  return toolbarIcon('M3 5h10v8H3zM3 5l2-2h3l2 2M5 8h6M5 10h4');
-}
-
-function importGlyph(): string {
-  return toolbarIcon('M8 3v8M5 7l3 3 3-3M4 12h8');
-}
-
-function exportGlyph(): string {
-  return toolbarIcon('M8 5v8M5 9l3-3 3 3M4 12h8');
-}
-
 function publishGlyph(): string {
   return toolbarIcon('M8 3l4 7H4zM4 12h8');
-}
-
-function retryGlyph(): string {
-  return toolbarIcon('M13 8a5 5 0 1 1-2-4M13 4v4H9');
-}
-
-function cancelGlyph(): string {
-  return toolbarIcon('M4 4l8 8M12 4l-8 8');
 }
 
 function zoomOutGlyph(): string {
@@ -428,18 +343,6 @@ function zoomOutGlyph(): string {
 
 function zoomInGlyph(): string {
   return toolbarIcon('M6 8h4M8 6v4M4 4h8v8H4z');
-}
-
-function resetZoomGlyph(): string {
-  return toolbarIcon('M4 4h8v8H4zM6 8h4');
-}
-
-function fitZoomGlyph(): string {
-  return toolbarIcon('M3 6h3V3M10 3v3h3M3 10h3v3M13 10h-3v3');
-}
-
-function gridGlyph(): string {
-  return toolbarIcon('M3 4h10v8H3zM7 4v8M11 4v8M3 6h10M3 10h10');
 }
 
 function toolbarIcon(path: string): string {
