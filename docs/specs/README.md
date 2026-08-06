@@ -21,6 +21,8 @@
 | --- | --- | --- |
 | [Designer Full Product](./designer-full-product/spec.md) | Designer 产品后继增量 | 完整作者、图形 Blueprint、宿主解耦资源/资产和项目产品能力 |
 | [Designer Canvas Precision](./designer-canvas-precision/spec.md) | Designer 画布增量 | 以瞬态 `translate` 预览强化单/多选移动、选区吸附与坐标换算 |
+| [Designer Event System](./designer-event-system/spec.md) | Designer 事件增量 | 浏览器默认键盘/鼠标行为管控、统一命令通道、手势抑制与零宿主影响 window 守卫 |
+| [Boundary Hygiene](./boundary-hygiene/spec.md) | 工程增量 | 将 AGENTS.md 分层与边界约定落地：消除 `dom→controllers` 反向依赖、子层方向门禁、UI 文案收敛 |
 
 ## 已归档
 

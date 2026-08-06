@@ -9,7 +9,7 @@
 | R2 宿主产品 | 2、6 | Contracts adapter binding、project controller race、adapter integration、`designer-project-workspace-controller.test.ts` 的目录/预览/快照 capability UI 状态 |
 | R3 作者效率 | 3 | operation/shortcut registry、DOM menus/panels、keyboard browser workflows |
 | R4 画布图层 | 3 | geometry/controller unit、Layers DOM、pointer/keyboard/performance browser cases |
-| R5 物料资产 | 2、4 | Contracts port binding、Material conformance（图片替代文本）、Renderer asset lifecycle/prop 投影、Inspector DOM |
+| R5 物料资产 | 2、4 | Contracts port binding、Material conformance（图片替代文本）、Renderer asset lifecycle/prop、runtime isolation 投影、Inspector DOM |
 | R6 资源数据 | 2、4 | Contracts canonical parser、Core action isolation、Renderer races、host adapter integration |
 | R7 图形 Blueprint | 5 | Core compiler/runtime、`designer-blueprint-graph-session.test.ts` 的 canonical rule 投影、搜索、键盘导航与无写入、`designer-integration-controller.test.ts` 的模板/模拟/键盘路径、Blueprint graph adapter DOM、keyboard and pointer browser workflows |
 | R8 依赖准入 | 5 | registry/license/security record、Vite gzip、Shadow DOM、`designer-blueprint-graph-session.test.ts` 的双实例/cleanup、browser tests |

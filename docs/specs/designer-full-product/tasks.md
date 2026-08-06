@@ -24,6 +24,7 @@
 - [ ] Task 4：完成物料、资产和数据作者能力（R5、R6、R9）。
   - [ ] 增加经 Manifest/Renderer conformance 验收的基础物料。
   - [ ] 实现变量、资源、资产和数据状态的宿主解耦闭环。
+  - [ ] Renderer 渲染时异常隔离：创建、模型赋值、事件回调等首次渲染失败时隔离到该组件，其余组件渲染成功，并上报 `PLUGIN_CORE_RENDER_FAILED` 诊断（对应 Renderer Viewer Spec 增量）。
   - [ ] 覆盖取消、去重、超时、资源替换、删除保护和敏感信息隔离。
 
 - [ ] Task 5：完成图形 Blueprint spike 与实现（R7、R8、R9）。

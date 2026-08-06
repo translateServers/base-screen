@@ -25,6 +25,18 @@
 - 纯逻辑需要环境能力时通过构造 options 注入回调（如 `ScreenProjectController` 的 `scheduler`），不要直接访问 DOM/global。
 - 命名前缀承载层级语义，不要删除：`Screen*` 表示 canonical document、事务、项目等领域概念；`Designer*` 表示设计器编排层；`BaseScreen*` 表示 Base Screen 平台命名空间中的跨层契约与公共 API。新增类型按此选择前缀。
 
+## 分层与边界
+
+除已定义的包边界与 `engine` 的 `common/`↔`browser/` 单向分层外，各层内部再分子层。子层依赖必须遵循下列允许方向；未明确允许的跨子层依赖默认禁止，避免环与聚合体。
+
+- **`engine/browser/` 子层依赖方向（自叶到编排）：** `ui`（图标等纯资源）、`styles`（CSS 层）、`viewport`（画布坐标/辅助线）为叶子，不依赖兄弟子层；`dom`（DOM 节点/自定义元素封装）可依赖 `common/` 与 `ui`，但不得依赖 `controllers`。跨层共享类型应下沉至 `common/` 或由消费方定义最小接口，不得反向导入控制器；`controllers`（编排）为顶层，可依赖 `dom`、`viewport` 与 `common/`。
+- **`engine/common/` 子层依赖方向（自叶到会话）：** `ui-text`、`tools`、`project` 与 `events`（键盘 chord 规范化与默认行为策略）是彼此独立的基础子层，不得互相依赖；`operations`（元素/布局/选区/剪贴板/变换/操作注册/蓝图编排）可依赖 `project`、`tools` 及同层 `operations`；`session`（`DesignerSession`）为编排顶层，可依赖 `project` 与 `operations`。
+- **UI 文案边界：** 用户可见字符串应集中到 `common/ui-text/designer-ui-text.ts`，由 `dom`/`controllers` 消费。新增用户可见文案一律不得内联硬编码，必须收敛到 `designer-ui-text.ts`；现有内联文案应逐步迁移，不得继续扩散。`check-designer-ui.mjs` 已兜底部分文件，约定以全量为准。
+- **renderer 与 designer 职责边界：** `@base-screen/renderer` 只做纯展示（viewer），不含任何编辑/设计逻辑；designer（`engine/browser`）构建在 renderer 之上，renderer 不得依赖或感知 designer。`sdk` 的 `viewer` 与 `designer` 入口分别对应这两条职责线。
+- **plugin 三层边界：** `plugin-core`（契约与共享类型）是唯一契约层；`plugin-manager`（运行时加载/管理）与 `plugin-sdk`（插件作者面）可依赖 `contracts` 与 `plugin-core`，二者不得互相依赖；`plugin-sdk` 是对 `plugin-core` 的作者友好门面，不承载运行时管理逻辑。
+- **material 与 renderer 边界：** 物料契约、manifest 类型与校验由 `plugin-core` 拥有；`@base-screen/material` 提供官方物料实现及其 manifest/注册；`@base-screen/renderer` 只通过 `plugin-core` 的 catalog 与 material element 契约执行渲染，不依赖具体官方物料。
+- **sdk 聚合层边界：** `@base-screen/sdk` 是产品级入口与组合层，可负责公共 API 转发、Custom Element 注册及自动注册编排（auto-register、designer、viewer、material、plugins）；不得实现 contracts、core、renderer、engine、material 或 plugin-manager 所属的领域与运行时逻辑。包内实现仍直接通过各自声明的 `@base-screen/*` 公共导出交互，不得经 sdk 反向耦合。
+
 ## 契约与产物
 
 - `@base-screen/contracts` 是规范文档类型、解析、诊断、序列化和 JSON Schema 的唯一所有者。不要在其他包中复制或绕过其解析器。
@@ -44,6 +56,7 @@
 
 ## 代码与测试
 
+- **高内聚、低耦合。** 相关逻辑应聚合在同一模块/包内，跨模块只通过明确、最小化的公共接口交互；模块不得依赖其内部实现细节或兄弟模块的实现。职责单一，避免聚合体（god object）与循环依赖。上述分层（`common`/`browser`）、跨包公共导出以及依赖边界检查，都是本约定的具体落地。
 - Biome 是唯一的格式化/检查工具：2 个空格、LF、单引号、分号、100 列行宽。使用 `pnpm format` 应用格式化；不要为样式添加 ESLint 或 Prettier。
 - 测试自定义校验、转换、区分/条件 schema、安全辅助函数、服务分支和 hook 状态转换。不要添加只重复内置 Zod 校验或默认未知键剥离行为的测试。
 - 文件大小阈值是审查信号：领域/运行时模块以 300 行为目标，超过 500 行拆分；UI 控制器以 250 行为目标，超过 400 行拆分；契约/schema 文件以 400 行为目标，超过 600 行拆分；测试以 500 行为目标，超过 800 行拆分。生成/纯数据产物可豁免，但必须注明其生成器或权威来源。
