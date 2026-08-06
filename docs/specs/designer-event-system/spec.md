@@ -86,6 +86,9 @@ chord 规范化 v2 SHALL 增加：
 - **wheel**：画布内普通 wheel = 垂直平移画布（`panBy({x: 0, y: deltaY})`）、`shift+wheel` = 水平平移、
   `ctrl/meta+wheel` = 缩放（现状保留）；全部 preventDefault（passive:false），阻断宿主页面滚动。
   画布外表面（面板、工具栏、图层列表等可滚动区域）保持宿主/面板滚动，不拦截。
+- **空格抓手与键盘焦点解耦**：窗口级 keydown/keyup 旁路（落点在本设计器 shadow 内的事件由既有
+  链路处理），鼠标悬停视窗（pointerenter/leave 维护 hover 状态）即激活临时抓手，无需先点击聚焦
+  视窗；可编辑目标保留原生空格输入；鼠标不在视窗内时宿主页面空格滚动不受影响。
 - **selectstart**：画布表面始终禁选；手势激活期全 shadow 禁选；可编辑目标放行（系统化现有
   canvas 级 selectstart prevent + user-select 切换）。
 - **auxclick**：画布表面中键 preventDefault（禁浏览器自动滚动）。

@@ -27,6 +27,7 @@
 ## 指针管控
 
 - [x] 画布 wheel=垂直平移、shift+wheel=水平平移、ctrl/meta+wheel=缩放，宿主页面不滚动。
+- [x] 空格抓手与键盘焦点解耦：鼠标悬停视窗即可激活（无需先聚焦），可编辑目标保留原生空格，视窗外空格不干预宿主滚动；松开空格后工具/光标完整恢复（data-active-tool 与工具栏 data-tool 命中选择器解耦）。
 - [x] 面板等可滚动表面 wheel 保持原生滚动（监听绑定在 viewport 内）。
 - [x] selectstart 系统化（画布禁选、手势期全 shadow 禁选、可编辑放行）；中键 mousedown 阻止自动滚动；
       Safari gesturestart/gesturechange 阻止；画布与 viewport `touch-action: none`。

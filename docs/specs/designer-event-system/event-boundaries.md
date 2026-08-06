@@ -22,7 +22,7 @@ SHALL 被拦截，见 spec R1。
 
 | 行为 | Chrome | Firefox | Safari | Edge |
 | --- | --- | --- | --- | --- |
-| `Alt` 单按弹菜单栏 | 无 | 有（已被黑名单拦截） | 无 | 无 |
+| `Alt` 单按聚焦浏览器按钮 | 有（访问键，已被拦截） | 有（菜单栏，已被拦截） | 无 | 有（"设置及其他"，已被拦截） |
 | `/`、`'` 快速查找 | 无 | 有（非可编辑目标已被拦截） | 无 | 无 |
 | `wheel` deltaMode | 像素（0） | 行（1），需要换算 | 像素（0） | 像素（0） |
 | 触控板双指缩放事件 | `ctrlKey+wheel` | `ctrlKey+wheel` | `gesturestart/gesturechange`（已被阻止） | `ctrlKey+wheel` |
@@ -30,8 +30,15 @@ SHALL 被拦截，见 spec R1。
 | 中键自动滚动 | mousedown button 1 触发（已被阻止） | 同左 | 同左 | 同左 |
 | macOS Cocoa 文本编辑组合（`Ctrl+W/T/N/D/K` 等） | 可编辑目标保留原生（黑名单不触碰 editable） | 同左 | 同左 | 同左 |
 
-拦截可靠性结论：`Ctrl+0/=/-`、`Ctrl+W/T/N`、`Ctrl+S`、`F5`、`Ctrl+R`、`Alt+←/→` 在焦点位于
-页面（含 shadow 内）时均可通过 keydown preventDefault 阻止；DevTools/隐身组合除外（见第 1 节）。
+**Chromium 键盘怪癖（已处理）：** Chromium 对修饰键自身的 keydown 上报自身修饰位
+（如 Alt 的 keydown `altKey=true`），若不剥离会产生 `Alt+Alt` 伪 chord 使黑名单失配。
+chord 规范化对 Alt/Ctrl/Meta/Shift 自身返回裸键名（`designer-key-chords.ts`），
+Edge/Chrome 的 Alt 访问键聚焦因此可被拦截（browser harness `assertEventSystemGuards` 用
+真实可信 Alt 按键验证焦点保持）。
+
+拦截可靠性结论：`Ctrl+0/=/-`、`Ctrl+W/T/N`、`Ctrl+S`、`F5`、`Ctrl+R`、`Alt+←/→`、
+`Alt` 单按在焦点位于页面（含 shadow 内）时均可通过 keydown preventDefault 阻止；
+DevTools/隐身组合除外（见第 1 节）。
 
 ## 3. iframe 嵌入
 
