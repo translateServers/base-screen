@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import {
-  DesignerOperationRegistry,
-  shortcutFromKeyboardEvent,
-} from '../../../src/common/operations/designer-operation-registry.js';
+import { designerChordFromKeyboardEvent } from '../../../src/common/events/designer-key-chords.js';
+import { DesignerOperationRegistry } from '../../../src/common/operations/designer-operation-registry.js';
 
 describe('DesignerOperationRegistry', () => {
   it('uses one available and enabled state for every execution entry', () => {
@@ -87,23 +85,23 @@ describe('DesignerOperationRegistry', () => {
         execute: vi.fn(),
       },
     ]);
-    const shortcut = shortcutFromKeyboardEvent({
+    const shortcut = designerChordFromKeyboardEvent({
       key: 'z',
       ctrlKey: true,
       metaKey: false,
       shiftKey: false,
       altKey: false,
-    } as KeyboardEvent);
+    });
     expect(registry.findByShortcut(shortcut ?? '')?.id).toBe('undo');
     // Alt modifier is now expressed in the shortcut string (e.g. Ctrl+Alt+L alignment).
     expect(
-      shortcutFromKeyboardEvent({
+      designerChordFromKeyboardEvent({
         key: 'z',
         ctrlKey: true,
         metaKey: false,
         shiftKey: false,
         altKey: true,
-      } as KeyboardEvent),
+      }),
     ).toBe('Ctrl+Alt+Z');
   });
 
@@ -123,13 +121,13 @@ describe('DesignerOperationRegistry', () => {
     ]);
     expect(registry.findByShortcut('Ctrl+Y')?.id).toBe('redo');
     expect(
-      shortcutFromKeyboardEvent({
+      designerChordFromKeyboardEvent({
         key: 'Backspace',
         ctrlKey: false,
         metaKey: false,
         shiftKey: false,
         altKey: false,
-      } as KeyboardEvent),
+      }),
     ).toBe('Delete');
   });
 });
