@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,8 @@ function collectTypeScriptFiles(directory) {
 // Gate 1: compile common/ with the DOM lib withheld. TypeScript resolves every identifier
 // through real lexical scope, so domain names such as `document: ScreenDocument` parameters
 // stay legal while any genuine browser global surfaces as an unresolved name.
+// vendor/ is excluded here and instead validated by tsconfig.vendor.json (ES2022 lib, no DOM)
+// plus the static scan in assertVendorIsEnvironmentAgnostic.
 function assertCommonIsEnvironmentAgnostic() {
   const workspace = mkdtempSync(join(tmpdir(), 'base-screen-engine-common-'));
   const configPath = join(workspace, 'tsconfig.json');
@@ -62,6 +64,7 @@ function assertCommonIsEnvironmentAgnostic() {
             types: [],
           },
           include: [`${commonRoot.split('\\').join('/')}/**/*.ts`],
+          exclude: [`${join(commonRoot, 'vendor').split('\\').join('/')}/**/*.ts`],
         },
         null,
         2,
@@ -105,6 +108,31 @@ function assertCommonIsEnvironmentAgnostic() {
     }
   } finally {
     rmSync(workspace, { force: true, recursive: true });
+  }
+}
+
+// Gate 1b: vendored code must stay environment-agnostic. tsconfig.vendor.json compiles it with
+// an ES2022-only lib; the static scan below rejects direct DOM global usage that a lax
+// upstream tsconfig could otherwise hide.
+const DOM_GLOBAL_PATTERNS = [
+  /\bwindow\./,
+  /\bdocument\./,
+  /\baddEventListener\b/,
+  /\brequestAnimationFrame\b/,
+  /\bgetBoundingClientRect\b/,
+  /\blocalStorage\b/,
+  /\bHTMLElement\b/,
+];
+function assertVendorIsEnvironmentAgnostic() {
+  const vendorRoot = join(commonRoot, 'vendor');
+  if (!existsSync(vendorRoot)) return;
+  for (const file of collectTypeScriptFiles(vendorRoot)) {
+    const source = readFileSync(file, 'utf8');
+    for (const pattern of DOM_GLOBAL_PATTERNS) {
+      if (pattern.test(source)) {
+        fail('ENGINE_VENDOR_DOM_GLOBAL_FORBIDDEN', `${relative(engineSource, file)} -> ${pattern}`);
+      }
+    }
   }
 }
 
@@ -272,6 +300,7 @@ function assertSubLayerDirectionRegression() {
 }
 
 assertCommonIsEnvironmentAgnostic();
+assertVendorIsEnvironmentAgnostic();
 assertCommonNeverReachesBrowser();
 await assertEntryHasNoSideEffects();
 assertSubLayerDirection();

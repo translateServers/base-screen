@@ -12,6 +12,7 @@
       "!**/test-results",
       "!**/tarballs",
       "!**/*.tsbuildinfo",
+      "!packages/engine/src/common/vendor",
       "!pnpm-lock.yaml"
     ]
   },
