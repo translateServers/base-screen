@@ -6,6 +6,7 @@ import type {
 } from '@base-screen/core';
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import { createZOrderTransaction } from './designer-layout-operations.js';
+import { removeComponentCommands } from './designer-remove-operations.js';
 import { selectedComponents } from './designer-selection.js';
 
 // 元素面向"选择动作"暴露的门面契约，本控制器只依赖此契约，不直接耦合元素或会话。
@@ -43,8 +44,13 @@ export class DesignerSelectionActions {
 
   delete(): void {
     if (!this.canMutate()) return;
-    const componentIds = this.callbacks.getSelectedComponentIds();
-    const result = this.callbacks.executeCommand({ type: 'remove-components', componentIds });
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return;
+    const commands = removeComponentCommands(document, this.callbacks.getSelectedComponentIds());
+    const result =
+      commands.length === 1
+        ? this.callbacks.executeCommand(commands[0]!)
+        : this.callbacks.executeTransaction({ commands });
     if (result.ok) this.callbacks.reduceSelection({ type: 'clear-selection' });
     else this.callbacks.report(result);
   }

@@ -16,6 +16,7 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
+import { removeComponentCommands } from './designer-remove-operations.js';
 import { selectedComponents } from './designer-selection.js';
 
 export type BaseScreenAlignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
@@ -42,20 +43,17 @@ export function createUngroupTransaction(
   const childIds = document.components
     .filter((component) => component.parentId === groupId)
     .map((component) => component.id);
-  return {
-    commands: [
-      ...(childIds.length === 0
-        ? []
-        : [
-            {
-              type: 'reparent-components' as const,
-              componentIds: childIds,
-              parentId: group?.parentId ?? null,
-            },
-          ]),
-      { type: 'remove-components', componentIds: [groupId] },
-    ],
-  };
+  const reparent =
+    childIds.length === 0
+      ? []
+      : [
+          {
+            type: 'reparent-components' as const,
+            componentIds: childIds,
+            parentId: group?.parentId ?? null,
+          },
+        ];
+  return { commands: [...reparent, ...removeComponentCommands(document, [groupId])] };
 }
 
 export function createReparentTransaction(
