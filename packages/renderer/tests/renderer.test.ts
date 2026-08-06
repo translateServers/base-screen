@@ -61,6 +61,91 @@ function createCatalog(): BaseScreenMaterialCatalog {
   };
 }
 
+function createEventCatalog(): BaseScreenMaterialCatalog {
+  const manifest: BaseScreenMaterialManifest = {
+    type: 'base.test',
+    tagName: 'base-screen-test',
+    name: 'Test',
+    category: 'Test',
+    keywords: [],
+    defaultSize: { width: 100, height: 40 },
+    defaultProps: {},
+    defaultStyle: {},
+    styleSchema: { kind: 'object', properties: {}, required: [] },
+    stylePanel: [],
+    propsSchema: { kind: 'object', properties: {}, required: [] },
+    propertyPanel: [],
+    events: ['valueClick'],
+    dataCapabilities: [],
+    designCapabilities: { resize: true, rotate: true, children: true },
+  };
+  const entry = {
+    manifest,
+    constructor: EventfulMaterialElement as unknown as BaseScreenMaterialConstructor,
+  };
+  return {
+    get: (type) => (type === manifest.type ? entry : undefined),
+    has: (type) => type === manifest.type,
+    list: () => [entry],
+  };
+}
+
+class ExplodingConstructorElement {
+  constructor() {
+    throw new Error('constructor boom');
+  }
+}
+
+let modelExplodes = false;
+
+class ExplodingModelMaterialElement {
+  readonly dataset: Record<string, string> = {};
+  readonly style = {} as CSSStyleDeclaration;
+  #model: BaseScreenMaterialModel | undefined;
+
+  get model(): BaseScreenMaterialModel | undefined {
+    return this.#model;
+  }
+
+  set model(value: BaseScreenMaterialModel) {
+    if (modelExplodes) {
+      throw new Error('model boom');
+    }
+    this.#model = value;
+  }
+
+  addEventListener(): void {}
+  remove(): void {}
+  removeEventListener(): void {}
+}
+
+class EventfulMaterialElement {
+  readonly dataset: Record<string, string> = {};
+  readonly style = {} as CSSStyleDeclaration;
+  model: BaseScreenMaterialModel | undefined;
+  readonly handlers: Record<string, ((event: unknown) => void) | undefined> = {};
+
+  addEventListener(type: string, handler: (event: unknown) => void): void {
+    this.handlers[type] = handler;
+  }
+
+  removeEventListener(type: string): void {
+    this.handlers[type] = undefined;
+  }
+
+  remove(): void {}
+
+  fire(detail: unknown): void {
+    this.handlers['base-screen-material-event']?.({
+      bubbles: true,
+      composed: true,
+      type: 'base-screen-material-event',
+      detail,
+      stopPropagation() {},
+    });
+  }
+}
+
 function createImageCatalog(): BaseScreenMaterialCatalog {
   const manifest: BaseScreenMaterialManifest = {
     type: 'base.image',
@@ -290,5 +375,175 @@ describe('BaseScreenRenderer', () => {
 
     expect(root.children).toHaveLength(1);
     expect(root.children[0]).toBe(mounted);
+  });
+
+  it('R5 isolates a throwing material constructor and keeps rendering other components', () => {
+    const root = new FakeRoot();
+    const healthy: BaseScreenMaterialManifest = {
+      type: 'base.healthy',
+      tagName: 'base-screen-healthy',
+      name: 'Healthy',
+      category: 'Test',
+      keywords: [],
+      defaultSize: { width: 100, height: 40 },
+      defaultProps: {},
+      defaultStyle: {},
+      styleSchema: { kind: 'object', properties: {}, required: [] },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: [],
+      designCapabilities: { resize: true, rotate: true, children: true },
+    };
+    const broken: BaseScreenMaterialManifest = {
+      type: 'base.broken',
+      tagName: 'base-screen-broken',
+      name: 'Broken',
+      category: 'Test',
+      keywords: [],
+      defaultSize: { width: 100, height: 40 },
+      defaultProps: {},
+      defaultStyle: {},
+      styleSchema: { kind: 'object', properties: {}, required: [] },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: [],
+      designCapabilities: { resize: true, rotate: true, children: true },
+    };
+    const catalog: BaseScreenMaterialCatalog = {
+      get: (type) =>
+        type === 'base.healthy'
+          ? {
+              manifest: healthy,
+              constructor: FakeMaterialElement as unknown as BaseScreenMaterialConstructor,
+            }
+          : type === 'base.broken'
+            ? {
+                manifest: broken,
+                constructor:
+                  ExplodingConstructorElement as unknown as BaseScreenMaterialConstructor,
+              }
+            : undefined,
+      has: (type) => type === 'base.healthy' || type === 'base.broken',
+      list: () => [],
+    };
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog,
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+
+    const result = renderer.render(
+      document([
+        { ...component('healthy', 0), type: 'base.healthy' },
+        { ...component('broken', 0), type: 'base.broken' },
+      ]),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(root.children.map((element) => element.dataset.baseScreenComponentId)).toEqual([
+      'healthy',
+    ]);
+    expect(result.diagnostics).toEqual([
+      {
+        severity: 'error',
+        code: 'PLUGIN_CORE_RENDER_FAILED',
+        path: ['components', 'broken'],
+        message: 'Material constructor raised an exception.',
+      },
+    ]);
+  });
+
+  it('R5 keeps the previous mounted element when a material model update throws', () => {
+    const root = new FakeRoot();
+    const manifest: BaseScreenMaterialManifest = {
+      type: 'base.test',
+      tagName: 'base-screen-test',
+      name: 'Test',
+      category: 'Test',
+      keywords: [],
+      defaultSize: { width: 100, height: 40 },
+      defaultProps: {},
+      defaultStyle: {},
+      styleSchema: { kind: 'object', properties: {}, required: [] },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: [],
+      designCapabilities: { resize: true, rotate: true, children: true },
+    };
+    const entry = {
+      manifest,
+      constructor: ExplodingModelMaterialElement as unknown as BaseScreenMaterialConstructor,
+    };
+    const catalog: BaseScreenMaterialCatalog = {
+      get: (type) => (type === manifest.type ? entry : undefined),
+      has: (type) => type === manifest.type,
+      list: () => [entry],
+    };
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog,
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const initial = document([component('volatile', 0)]);
+
+    expect(renderer.render(initial).ok).toBe(true);
+    expect(root.children).toHaveLength(1);
+    const mounted = root.children[0];
+
+    modelExplodes = true;
+    const result = renderer.render(initial);
+    modelExplodes = false;
+
+    expect(result.ok).toBe(true);
+    expect(root.children).toHaveLength(1);
+    expect(root.children[0]).toBe(mounted);
+    expect(result.diagnostics).toEqual([
+      {
+        severity: 'error',
+        code: 'PLUGIN_CORE_RENDER_FAILED',
+        path: ['components', 'volatile'],
+        message: 'Material model update raised an exception.',
+      },
+    ]);
+  });
+
+  it('R5 contains a throwing host material event callback without breaking the render pipeline', () => {
+    const root = new FakeRoot();
+    const diagnostics: unknown[] = [];
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createEventCatalog(),
+      mode: 'viewer',
+      interactive: true,
+      onMaterialEvent: () => {
+        throw new Error('host boom');
+      },
+      onDiagnostic: (diagnostic) => diagnostics.push(diagnostic),
+      resourcePort: undefined,
+    });
+
+    expect(renderer.render(document([component('interactive', 0)])).ok).toBe(true);
+    const element = root.children[0] as unknown as EventfulMaterialElement;
+    expect(() => element.fire({ name: 'valueClick', payload: {} })).not.toThrow();
+    expect(diagnostics).toEqual([
+      {
+        severity: 'error',
+        code: 'PLUGIN_CORE_RENDER_FAILED',
+        path: ['components', 'interactive'],
+        message: 'Host material event callback raised an exception.',
+      },
+    ]);
   });
 });

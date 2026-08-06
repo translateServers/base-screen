@@ -37,6 +37,7 @@ export interface CreateBaseScreenRendererOptions {
   readonly mode: BaseScreenMaterialMode;
   readonly interactive: boolean;
   readonly onMaterialEvent: ((event: BaseScreenMaterialEvent) => void) | undefined;
+  readonly onDiagnostic?: (diagnostic: ScreenDiagnostic) => void;
   readonly resourcePort: ScreenHostResourcePort | undefined;
   readonly resourceTimeoutMs?: number;
   readonly contributionIndex?: BaseScreenRuntimeContributionIndex;
@@ -105,35 +106,55 @@ class Renderer implements BaseScreenRenderer {
       (left, right) => painterIndex.get(left.component.id)! - painterIndex.get(right.component.id)!,
     );
     const next = new Map<string, MountedMaterial>();
+    const runtimeDiagnostics: ScreenDiagnostic[] = [];
     for (const candidate of candidates) {
       const stackOrder = painterIndex.get(candidate.component.id)!;
       const existing = this.#mounted.get(candidate.component.id);
       if (existing !== undefined && existing.type === candidate.component.type) {
         const resourceKey = getHostResourceKey(candidate.component);
-        applyMaterial(
-          existing.element,
-          candidate.component,
-          parsedDocument.value,
-          resourceKey !== undefined && resourceKey === existing.resourceKey
-            ? { ...candidate.model, dataState: existing.element.model.dataState }
-            : candidate.model,
-          isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
-          stackOrder,
-        );
+        try {
+          applyMaterial(
+            existing.element,
+            candidate.component,
+            parsedDocument.value,
+            resourceKey !== undefined && resourceKey === existing.resourceKey
+              ? { ...candidate.model, dataState: existing.element.model.dataState }
+              : candidate.model,
+            isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
+            stackOrder,
+          );
+        } catch {
+          runtimeDiagnostics.push(
+            renderFailure(candidate, 'Material model update raised an exception.'),
+          );
+        }
         next.set(candidate.component.id, existing);
         continue;
       }
-      const element = new candidate.entry.constructor() as BaseScreenMaterialElement;
+      let element: BaseScreenMaterialElement;
+      try {
+        element = new candidate.entry.constructor() as BaseScreenMaterialElement;
+      } catch {
+        runtimeDiagnostics.push(
+          renderFailure(candidate, 'Material constructor raised an exception.'),
+        );
+        continue;
+      }
       const onEvent = (event: Event): void => this.handleMaterialEvent(candidate, event);
       element.addEventListener('base-screen-material-event', onEvent);
-      applyMaterial(
-        element,
-        candidate.component,
-        parsedDocument.value,
-        candidate.model,
-        isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
-        stackOrder,
-      );
+      try {
+        applyMaterial(
+          element,
+          candidate.component,
+          parsedDocument.value,
+          candidate.model,
+          isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
+          stackOrder,
+        );
+      } catch {
+        runtimeDiagnostics.push(renderFailure(candidate, 'Material render raised an exception.'));
+        continue;
+      }
       this.options.root.appendChild(element);
       next.set(candidate.component.id, {
         type: candidate.component.type,
@@ -172,7 +193,12 @@ class Renderer implements BaseScreenRenderer {
         mounted.resourceKey = undefined;
       }
     }
-    return { ok: true, value: null, diagnostics: [] };
+    if (runtimeDiagnostics.length > 0) {
+      for (const diagnostic of runtimeDiagnostics) {
+        this.options.onDiagnostic?.(diagnostic);
+      }
+    }
+    return { ok: true, value: null, diagnostics: runtimeDiagnostics };
   }
 
   clear(): void {
@@ -205,12 +231,21 @@ class Renderer implements BaseScreenRenderer {
       return;
     }
     event.stopPropagation();
-    this.options.onMaterialEvent?.({
-      componentId: candidate.component.id,
-      type: candidate.component.type,
-      name: parsed.value.name,
-      payload: parsed.value.payload,
-    });
+    try {
+      this.options.onMaterialEvent?.({
+        componentId: candidate.component.id,
+        type: candidate.component.type,
+        name: parsed.value.name,
+        payload: parsed.value.payload,
+      });
+    } catch {
+      this.options.onDiagnostic?.({
+        severity: 'error',
+        code: 'PLUGIN_CORE_RENDER_FAILED',
+        path: ['components', candidate.component.id],
+        message: 'Host material event callback raised an exception.',
+      });
+    }
   }
 
   private async resolveHostResource(
@@ -480,6 +515,15 @@ function failure<T>(
   message: string,
 ): ScreenParseResult<T> {
   return { ok: false, diagnostics: [diagnostic(code, path, message)] };
+}
+
+function renderFailure(candidate: RenderCandidate, message: string): ScreenDiagnostic {
+  return {
+    severity: 'error',
+    code: 'PLUGIN_CORE_RENDER_FAILED',
+    path: ['components', candidate.component.id],
+    message,
+  };
 }
 
 function sortDiagnostics(diagnostics: readonly ScreenDiagnostic[]): readonly ScreenDiagnostic[] {

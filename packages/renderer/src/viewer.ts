@@ -173,7 +173,7 @@ export class BaseScreenViewerElement extends ElementBase {
       return;
     }
     const result = this.#renderer.render(this.#document);
-    if (!result.ok) {
+    if (!result.ok || result.diagnostics.length > 0) {
       this.dispatchEvent(
         new CustomEvent('base-screen-diagnostic', {
           detail: { diagnostics: result.diagnostics },
