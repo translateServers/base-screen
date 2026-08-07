@@ -470,12 +470,34 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#workbenchController.onPointerMove(event as PointerEvent);
       return true;
     },
+    mouseOver: (target, event) => {
+      const element = target as Element | null;
+      const wrapper = element?.closest<HTMLElement>('.designer-menu-submenu-wrap');
+      if (wrapper !== null && wrapper !== undefined) {
+        const toggle = wrapper.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
+        if (toggle !== null && toggle !== undefined) this.#menuController.onSubmenuEnter(toggle);
+        return true;
+      }
+      return false;
+    },
+    mouseOut: (target, event) => {
+      const element = target as Element | null;
+      const wrapper = element?.closest<HTMLElement>('.designer-menu-submenu-wrap');
+      if (wrapper !== null && wrapper !== undefined) {
+        const toggle = wrapper.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
+        if (toggle !== null && toggle !== undefined) {
+          this.#menuController.onSubmenuPointerOut(toggle, (event as MouseEvent).relatedTarget);
+        }
+        return true;
+      }
+      return false;
+    },
     pointerUp: (target, event) => {
       this.#workbenchController.onPointerUp(event as PointerEvent);
       return true;
     },
-    pointerCancel: () => {
-      this.#workbenchController.cancelTransientState();
+    pointerCancel: (target, event) => {
+      this.#workbenchController.onPointerCancel(event as PointerEvent);
       return true;
     },
     doubleClick: (target, event) => {

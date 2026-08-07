@@ -167,7 +167,11 @@ class WorkbenchElement {
   readonly children: WorkbenchElement[] = [];
   replaceChildrenCalls = 0;
   readonly dataset: Record<string, string> = {};
-  readonly style = { setProperty: () => undefined };
+  readonly style = {
+    setProperty: (property: string, value: string) => {
+      (this.style as unknown as Record<string, string>)[property] = value;
+    },
+  };
   className = '';
   ariaPressed = '';
   ariaSelected = '';
@@ -232,7 +236,9 @@ function createWorkbench() {
     addEventListener: (type: string, listener: (event: PointerEvent | MouseEvent) => void) =>
       canvasListeners.set(type, listener),
     dispatch: (type: string, event: PointerEvent | MouseEvent) =>
-      canvasListeners.get(type)?.(event),
+      canvasListeners.get(type)?.(
+        Object.assign({ preventDefault: () => undefined }, event) as PointerEvent | MouseEvent,
+      ),
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
     ownerDocument: { createElement: () => new WorkbenchElement() },
   } as unknown as HTMLDivElement & {
@@ -248,6 +254,7 @@ function createWorkbench() {
     focusedComponentId: string | null;
     selectedComponentIds: string[];
   } = { focusedComponentId: 'c1', selectedComponentIds: ['c1'] };
+  const zoom = { value: 1 };
   const elements = new Map<string, WorkbenchElement>([
     ['.designer', layout],
     ['[data-viewport]', viewport],
@@ -276,7 +283,7 @@ function createWorkbench() {
       getDocument: () => document,
       getInteraction: () => interaction,
       getRoot: () => root,
-      getZoom: () => 1,
+      getZoom: () => zoom.value,
     }),
     document,
     grid,
@@ -289,6 +296,7 @@ function createWorkbench() {
     materials,
     panes,
     rightTabs,
+    zoom,
   };
 }
 
@@ -462,22 +470,30 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(workbench.guides.children).toHaveLength(1);
 
     // 第一次 pointerdown 落在参考线上，进入拖拽并原地 commit（无位移，双击判定保持武装）。
+    const preventDefault = vi.fn();
     workbench.canvas.dispatch('pointerdown', {
       target: workbench.guides.children[0],
       pointerId: 2,
       clientX: 50,
       clientY: 0,
       timeStamp: 1000,
+      preventDefault,
       stopImmediatePropagation: () => undefined,
     } as unknown as PointerEvent);
-    workbench.controller.onPointerUp({ pointerId: 2, clientX: 50, clientY: 0 } as PointerEvent);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    workbench.controller.onPointerMove({ pointerId: 2, clientX: 51, clientY: 0 } as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 2, clientX: 51, clientY: 0 } as PointerEvent);
+    workbench.canvas.dispatch('lostpointercapture', {
+      type: 'lostpointercapture',
+      pointerId: 2,
+    } as PointerEvent);
     expect(workbench.guides.children).toHaveLength(1);
 
     // 500ms 窗口内同一参考线的第二次 pointerdown = 双击：直接移除，不再进入拖拽。
     workbench.canvas.dispatch('pointerdown', {
       target: workbench.guides.children[0],
       pointerId: 3,
-      clientX: 50,
+      clientX: 51,
       clientY: 0,
       timeStamp: 1400,
       stopImmediatePropagation: () => undefined,
@@ -540,6 +556,48 @@ describe('DesignerWorkbenchController instance state', () => {
     workbench.controller.onPointerUp({ pointerId: 4, clientX: 120, clientY: 0 } as PointerEvent);
     expect(workbench.guides.children).toHaveLength(1);
     expect(workbench.document).toEqual(originalDocument);
+  });
+
+  it('R7 does not treat a click after cancelled guide capture as a double click', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    const ruler = {
+      classList: { contains: (name: string) => name === 'ruler-vertical' },
+      closest: (selector: string) => (selector === '.ruler' ? ruler : null),
+    } as unknown as HTMLElement;
+    workbench.controller.onPointerDown({
+      target: ruler,
+      pointerId: 1,
+      clientX: 50,
+      clientY: 0,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 1, clientX: 50, clientY: 0 } as PointerEvent);
+
+    workbench.canvas.dispatch('pointerdown', {
+      target: workbench.guides.children[0],
+      pointerId: 2,
+      clientX: 50,
+      clientY: 0,
+      timeStamp: 1000,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.canvas.dispatch('lostpointercapture', {
+      type: 'lostpointercapture',
+      pointerId: 2,
+    } as PointerEvent);
+    workbench.canvas.dispatch('pointerdown', {
+      target: workbench.guides.children[0],
+      pointerId: 3,
+      clientX: 50,
+      clientY: 0,
+      timeStamp: 1200,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+
+    expect(workbench.guides.children).toHaveLength(1);
+    expect(workbench.canvas.hasPointerCapture(3)).toBe(true);
+    workbench.controller.onPointerUp({ pointerId: 3, clientX: 50, clientY: 0 } as PointerEvent);
   });
 
   it('hides inspector tabs and falls back to appearance when no component is focused', () => {
@@ -732,6 +790,20 @@ describe('DesignerWorkbenchController instance state', () => {
     });
 
     expect(workbench.guides.replaceChildrenCalls).toBe(callsAfterFirstPreview);
+  });
+
+  it('R4 inversely scales guide and measurement chrome with canvas zoom', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+
+    workbench.zoom.value = 5;
+    workbench.controller.renderCanvasPrecision();
+    const styles = workbench.guides.style as unknown as Record<string, string>;
+
+    expect(styles['--designer-overlay-pixel']).toBe('0.2px');
+    expect(styles['--designer-overlay-active']).toBe('0.4px');
+    expect(styles['--designer-overlay-hit-size']).toBe('1.8px');
+    expect(styles['--designer-overlay-font-size']).toBe('2px');
   });
 
   it('keeps the viewport active tool and zoom local to each controller', () => {

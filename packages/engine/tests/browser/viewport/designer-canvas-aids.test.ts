@@ -46,6 +46,30 @@ describe('snapDesignerCanvasPoint', () => {
     ).toEqual({ x: 52, y: 84, snappedX: 52, snappedY: 84 });
   });
 
+  it('R2 applies the 1px render threshold and preserves local geometry for point snaps', () => {
+    const local: DesignerSnapCandidates = {
+      x: [{ value: 50, start: 120, size: 40 }],
+      y: [],
+    };
+
+    expect(snapDesignerCanvasPoint({ x: 47, y: 0 }, DEFAULT_DESIGNER_CANVAS_AIDS, local)).toEqual({
+      x: 50,
+      y: 0,
+      snappedX: 50,
+    });
+    expect(snapDesignerCanvasPoint({ x: 49.5, y: 0 }, DEFAULT_DESIGNER_CANVAS_AIDS, local)).toEqual(
+      {
+        x: 50,
+        y: 0,
+        snappedX: 50,
+        guides: { x: [{ value: 50, start: 120, size: 40 }] },
+      },
+    );
+    expect(
+      snapDesignerCanvasPoint({ x: 50, y: 0 }, DEFAULT_DESIGNER_CANVAS_AIDS, local),
+    ).toMatchObject({ guides: { x: [{ value: 50, start: 120, size: 40 }] } });
+  });
+
   it('R7 chooses the nearest sorted candidate within a screen-pixel threshold at every zoom', () => {
     const state = DEFAULT_DESIGNER_CANVAS_AIDS;
 

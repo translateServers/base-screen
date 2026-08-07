@@ -36,3 +36,10 @@
 
 - [x] R1–R4 有当前 unit/DOM/browser 测试映射和反向标注。
 - [x] provenance、Engine format、lint、typecheck、test、build 与 `pnpm verify:m0` 通过。
+
+## 研究报告整改
+
+- [x] R3 坐标换算以 canvas content edge 为原点，canvas border、zoom、pan 下的 pointer、guide、ruler 结果一致。
+- [x] R2 point/create/resize/rotate 路径按同一 snapRenderThreshold 输出最近局部参考线，接近阶段不显示贯穿画布的线。
+- [x] R4 候选与测量路径复用组件索引；锁定后代不发生 translate 预览或 mutation，且 Alt 复制保留内部 parentId 映射。
+- [x] R2/R4 辅助线、测量标注和持久参考线命中区随 zoom 保持屏幕像素尺寸，取消参考线手势不污染后续双击判定。

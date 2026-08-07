@@ -33,6 +33,7 @@ import type {
 import {
   clientPointToDesignerCanvasPoint,
   type DesignerClientPoint,
+  getDesignerCanvasBounds,
 } from '../viewport/designer-canvas-coordinates.js';
 import { MATERIAL_DRAG_TYPE } from './designer-panel-controller.js';
 
@@ -328,7 +329,7 @@ export class DesignerGestureController {
     }
     event.preventDefault();
     // 移动按子树生效：编组/容器连同其子组件一起拖动，保持相对位置。
-    const moved = selectionSubtree(
+    const moved = mutableSelectionSubtree(
       document,
       components.map((component) => component.id),
     );
@@ -344,15 +345,12 @@ export class DesignerGestureController {
       startClientY: event.clientY,
       bounds,
       selection: canvas.querySelector<HTMLElement>('[data-selection]') ?? undefined,
-      elements: [
-        material,
-        ...moved.flatMap((item) => {
-          const element = canvas.querySelector<HTMLElement>(
-            `[data-base-screen-component-id="${item.id}"]`,
-          );
-          return element === null || element === material ? [] : [element];
-        }),
-      ],
+      elements: moved.flatMap((item) => {
+        const element = canvas.querySelector<HTMLElement>(
+          `[data-base-screen-component-id="${item.id}"]`,
+        );
+        return element === null ? [] : [element];
+      }),
       moved: false,
     };
   }
@@ -382,7 +380,7 @@ export class DesignerGestureController {
       return;
     }
     event.preventDefault();
-    const moved = selectionSubtree(
+    const moved = mutableSelectionSubtree(
       document,
       components.map((component) => component.id),
     );
@@ -525,13 +523,21 @@ export class DesignerGestureController {
     this.cancelDrag();
     const document = this.callbacks.getDocument();
     if (event.altKey && document !== undefined) {
+      const copiedIds = new Map(
+        drag.components.map((source, index) => [
+          source.id,
+          nextComponentId(document, `${source.type}-${index}`),
+        ]),
+      );
       this.callbacks.reportTransaction({
         commands: drag.components.map((source, index) => ({
           type: 'add-component' as const,
           component: {
             ...source,
-            id: nextComponentId(document, `${source.type}-${index}`),
+            id: copiedIds.get(source.id)!,
             name: `${source.name} copy`,
+            parentId:
+              source.parentId === null ? null : (copiedIds.get(source.parentId) ?? source.parentId),
             position: {
               x: roundCoordinate(clampCoordinate(source.position.x + translation.x)),
               y: roundCoordinate(clampCoordinate(source.position.y + translation.y)),
@@ -590,7 +596,7 @@ export class DesignerGestureController {
     this.capturePointer(event.pointerId);
     this.callbacks.setSnapSessionActive?.(true);
     // 变换按子树生效：能力门禁只看选中根组件，子组件随组一起缩放/旋转。
-    const components = selectionSubtree(
+    const components = mutableSelectionSubtree(
       document,
       roots.map((component) => component.id),
     );
@@ -727,7 +733,7 @@ export class DesignerGestureController {
   }
 
   private canvasPointFromPointer(point: DesignerClientPoint): Point {
-    const bounds = this.#canvas!.getBoundingClientRect();
+    const bounds = getDesignerCanvasBounds(this.#canvas!);
     return clientPointToDesignerCanvasPoint(point, bounds, this.callbacks.getViewport().zoom);
   }
 
@@ -965,6 +971,15 @@ function captureTransformPreviewStyles(
     });
   }
   return styles;
+}
+
+function mutableSelectionSubtree(
+  document: ScreenDocument,
+  componentIds: readonly string[],
+): readonly ScreenComponentNode[] {
+  return selectionSubtree(document, componentIds).filter(
+    (component) => !isScreenComponentEffectivelyLocked(document, component.id),
+  );
 }
 
 function nextComponentId(document: ScreenDocument, type: string): string {

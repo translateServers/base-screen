@@ -10,6 +10,8 @@
 | R3 统一坐标换算 | 1、3 | `designer-canvas-coordinates.test.ts` 的 zoom/pan case；guide DOM/browser workflow（`assertCanvasPrecision`：ruler 拖拽创建、双击移除与 out-of-bounds 丢弃） |
 | R4 可靠性与性能 | 1–7 | pointer cancellation、secondary-pointer 不捕获、deferred capture 的 viewport fallback、snap toggle 后续帧不再吸附/渲染、无命中预览不重建 guide layer、拖拽测量覆盖层出现/清理、边界重合无 overlay、non-zero pan/zoom、rotated candidate、`designer-workbench-controller.test.ts` 的手势会话候选缓存/稳定排除集合/开关清理 case、`designer-gesture-controller.test.ts` 的会话生命周期 case、focused Engine package checks |
 
+研究报告整改（Task 8）证据：`designer-canvas-coordinates.test.ts` 的 border/content-origin case；`designer-canvas-aids.test.ts` 的 point render-threshold/local-geometry case；`designer-workbench-controller.test.ts` 的 zoom overlay scale、正常/取消 capture 与 guide double-click case；`designer-gesture-controller.test.ts` 的 locked descendant drag 与 Alt subtree parent remap case；`verify-browser-harness.mjs` 的缩放复位框选与真实参考线双击流程；候选/测量路径通过共享 `ComponentIndex`，由 Engine typecheck/build 与 focused tests 覆盖。
+
 R2/R4 附带的变换实时预览（V10）：`designer-gesture-controller.test.ts` 的 preview/cancel-restore/commit case +
 `verify-browser-harness.mjs` 的 `assertTransformPreviewWorkflow`（真实指针拖拽手柄，Material 根元素预览与提交一致）。
 

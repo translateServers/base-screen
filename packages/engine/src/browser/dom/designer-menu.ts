@@ -1,3 +1,4 @@
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { contextMenuHtml, type DesignerContextMenuAction } from './designer-workspace.js';
 
 export interface DesignerMenuControllerCallbacks {
@@ -36,7 +37,10 @@ const DESIGNER_CONTEXT_MENU = {
     'zoom-reset',
     'zoom-fit',
     'separator',
-    'toggle-grid',
+    {
+      label: DESIGNER_UI_TEXT.canvasAids,
+      entries: ['toggle-grid', 'toggle-guides', 'toggle-border-guides'],
+    },
   ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
   component: [
     'undo',
@@ -48,6 +52,10 @@ const DESIGNER_CONTEXT_MENU = {
     'separator',
     'group',
     'ungroup',
+    {
+      label: DESIGNER_UI_TEXT.layer,
+      entries: ['bring-to-front', 'send-to-back', 'lock', 'unlock', 'hide'],
+    },
   ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
   multi: [
     'undo',
@@ -59,19 +67,24 @@ const DESIGNER_CONTEXT_MENU = {
     'separator',
     'group',
     'ungroup',
-    'separator',
-    'align-left',
-    'align-center',
-    'align-right',
-    'align-top',
-    'align-middle',
-    'align-bottom',
-    'separator',
-    'distribute-horizontal',
-    'distribute-vertical',
-    'separator',
-    'bring-to-front',
-    'send-to-back',
+    {
+      label: DESIGNER_UI_TEXT.arrange,
+      entries: [
+        'align-left',
+        'align-center',
+        'align-right',
+        'align-top',
+        'align-middle',
+        'align-bottom',
+        'separator',
+        'distribute-horizontal',
+        'distribute-vertical',
+      ],
+    },
+    {
+      label: DESIGNER_UI_TEXT.layer,
+      entries: ['bring-to-front', 'send-to-back', 'lock', 'unlock', 'hide'],
+    },
   ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
 };
 
@@ -83,6 +96,8 @@ export class DesignerMenuController {
   constructor(private readonly callbacks: DesignerMenuControllerCallbacks) {}
 
   toggleMenuFromTarget(target: Element): boolean {
+    const submenuToggle = target.closest<HTMLButtonElement>('[data-submenu-toggle]');
+    if (submenuToggle !== null) return this.toggleSubmenu(submenuToggle);
     const toggle = target.closest<HTMLButtonElement>('[data-menu-toggle]');
     if (toggle === null) return false;
     const menuId = toggle.dataset.menuToggle;
@@ -98,6 +113,7 @@ export class DesignerMenuController {
     for (const menu of root.querySelectorAll<HTMLElement>('[data-menu]')) {
       menu.hidden = true;
     }
+    this.closeSubmenus(root);
 
     if (isOpening) {
       const menu = root.querySelector<HTMLElement>(`[data-menu="${menuId}"]`);
@@ -185,6 +201,146 @@ export class DesignerMenuController {
         }
       }
     }
+    this.renderSubmenuVisibility(menu);
+  }
+
+  private renderSubmenuVisibility(menu: HTMLElement): void {
+    for (const wrapper of menu.querySelectorAll<HTMLElement>('.designer-menu-submenu-wrap')) {
+      const submenu = wrapper.querySelector<HTMLElement>('[data-submenu]');
+      const trigger = wrapper.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
+      if (submenu === null || trigger === null) continue;
+      const hasAvailableItem = Array.from(
+        submenu.querySelectorAll<HTMLButtonElement>('[data-menu-action]'),
+      ).some((item) => !item.hidden);
+      wrapper.hidden = !hasAvailableItem;
+      if (!hasAvailableItem) {
+        submenu.hidden = true;
+        trigger.ariaExpanded = 'false';
+      }
+    }
+  }
+
+  private toggleSubmenu(toggle: HTMLButtonElement): boolean {
+    const wrapper = toggle.closest<HTMLElement>('.designer-menu-submenu-wrap');
+    const submenu = wrapper?.querySelector<HTMLElement>('[data-submenu]');
+    const root = this.callbacks.getRoot();
+    if (wrapper === null || submenu === null || submenu === undefined || root === null) return true;
+    this.closeSiblingSubmenus(wrapper, submenu);
+    const opening = submenu.hidden;
+    if (!opening && submenu.dataset.submenuOpenSource === 'hover') {
+      submenu.dataset.submenuOpenSource = 'click';
+      toggle.ariaExpanded = 'true';
+      return true;
+    }
+    submenu.hidden = !opening;
+    toggle.ariaExpanded = String(opening);
+    if (opening) {
+      submenu.dataset.submenuOpenSource = 'click';
+      this.renderMenuState(submenu);
+      this.positionSubmenu(submenu, wrapper, root);
+      submenu
+        .querySelector<HTMLButtonElement>('.designer-menu-item:not(:disabled):not([hidden])')
+        ?.focus();
+    } else {
+      delete submenu.dataset.submenuOpenSource;
+    }
+    return true;
+  }
+
+  onSubmenuEnter(toggle: HTMLButtonElement): void {
+    const wrapper = toggle.closest<HTMLElement>('.designer-menu-submenu-wrap');
+    const submenu = wrapper?.querySelector<HTMLElement>('[data-submenu]');
+    if (wrapper === null || submenu === null || submenu === undefined) return;
+    if (submenu.hidden) {
+      this.closeSiblingSubmenus(wrapper, submenu);
+      submenu.hidden = false;
+      submenu.dataset.submenuOpenSource = 'hover';
+      toggle.ariaExpanded = 'true';
+      this.renderMenuState(submenu);
+      const root = this.callbacks.getRoot();
+      if (root !== null) this.positionSubmenu(submenu, wrapper, root);
+    }
+  }
+
+  onSubmenuLeave(toggle: HTMLButtonElement): void {
+    const wrapper = toggle.closest<HTMLElement>('.designer-menu-submenu-wrap');
+    const submenu = wrapper?.querySelector<HTMLElement>('[data-submenu]');
+    if (wrapper === null || submenu === null || submenu === undefined) return;
+    if (!submenu.hidden) {
+      submenu.hidden = true;
+      delete submenu.dataset.submenuOpenSource;
+      toggle.ariaExpanded = 'false';
+    }
+  }
+
+  /** 鼠标离开触发按钮或其子菜单项时收起；relatedTarget 仍在同一子菜单内时保持展开。 */
+  onSubmenuPointerOut(toggle: HTMLButtonElement, relatedTarget: EventTarget | null): void {
+    const wrapper = toggle.closest<HTMLElement>('.designer-menu-submenu-wrap');
+    if (wrapper === null) return;
+    const stillInside =
+      relatedTarget instanceof Element &&
+      relatedTarget.closest('.designer-menu-submenu-wrap') === wrapper;
+    if (!stillInside) this.onSubmenuLeave(toggle);
+  }
+
+  private closeSiblingSubmenus(wrapper: HTMLElement, keep: HTMLElement): void {
+    for (const sibling of wrapper.parentElement?.querySelectorAll<HTMLElement>('[data-submenu]') ??
+      []) {
+      if (sibling === keep) continue;
+      sibling.hidden = true;
+      delete sibling.dataset.submenuOpenSource;
+      const siblingToggle =
+        sibling.parentElement?.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
+      if (siblingToggle !== null && siblingToggle !== undefined) {
+        siblingToggle.ariaExpanded = 'false';
+      }
+    }
+  }
+
+  private positionSubmenu(submenu: HTMLElement, wrapper: HTMLElement, root: ShadowRoot): void {
+    const layout = root.host as HTMLElement | null;
+    if (
+      layout === null ||
+      layout === undefined ||
+      typeof layout.getBoundingClientRect !== 'function' ||
+      typeof wrapper.getBoundingClientRect !== 'function'
+    ) {
+      return;
+    }
+    const layoutRect = layout.getBoundingClientRect();
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const submenuWidth = submenu.offsetWidth;
+    const submenuHeight = submenu.offsetHeight;
+    const edgeGap = 8;
+    const overlap = 1;
+    const layoutRight = layoutRect.left + layoutRect.width;
+    const layoutBottom = layoutRect.top + layoutRect.height;
+    const wrapperRight = wrapperRect.left + wrapperRect.width;
+    const wrapperBottom = wrapperRect.top + wrapperRect.height;
+    const rightSpace = layoutRight - wrapperRight;
+    const leftSpace = wrapperRect.left - layoutRect.left;
+    const opensLeft = rightSpace < submenuWidth + edgeGap && leftSpace >= submenuWidth + edgeGap;
+    submenu.dataset.submenuSide = opensLeft ? 'left' : 'right';
+    submenu.style.left = opensLeft ? '' : 'calc(100% - 4px)';
+    submenu.style.right = opensLeft ? 'calc(100% - 4px)' : '';
+
+    const spaceBelow = layoutBottom - wrapperRect.top - edgeGap;
+    const spaceAbove = wrapperBottom - layoutRect.top - edgeGap;
+    const opensUp = spaceBelow < submenuHeight && spaceAbove >= spaceBelow;
+    const availableHeight = Math.max(0, opensUp ? spaceAbove : spaceBelow);
+    submenu.style.top = opensUp ? 'auto' : `-${overlap}px`;
+    submenu.style.bottom = opensUp ? `-${overlap}px` : 'auto';
+    submenu.style.maxHeight = submenuHeight > availableHeight ? `${availableHeight}px` : '';
+  }
+
+  private closeSubmenus(root: ShadowRoot): void {
+    for (const submenu of root.querySelectorAll<HTMLElement>('[data-submenu]')) {
+      submenu.hidden = true;
+      delete submenu.dataset.submenuOpenSource;
+    }
+    for (const toggle of root.querySelectorAll<HTMLButtonElement>('[data-submenu-toggle]')) {
+      toggle.ariaExpanded = 'false';
+    }
   }
 
   /** Handle keyboard navigation within open menus. */
@@ -192,15 +348,19 @@ export class DesignerMenuController {
     const root = this.callbacks.getRoot();
     if (root === null) return false;
 
-    const openMenu = Array.from(root.querySelectorAll<HTMLElement>('[data-menu]')).find(
-      (m) => !m.hidden,
-    );
+    const target = event.target;
+    const currentMenu =
+      target instanceof HTMLElement
+        ? target.closest<HTMLElement>('[data-menu], [data-submenu]')
+        : null;
+    const openMenu =
+      currentMenu ??
+      Array.from(root.querySelectorAll<HTMLElement>('[data-menu]')).find((m) => !m.hidden);
     if (openMenu === undefined) return false;
 
-    const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
 
-    const inMenu = target.closest('[data-menu]') !== null;
+    const inMenu = target.closest('[data-menu], [data-submenu]') !== null;
     const onToggle = target.closest('[data-menu-toggle]') !== null;
     if (!inMenu && !onToggle) return false;
 
@@ -210,8 +370,40 @@ export class DesignerMenuController {
     const currentIndex = triggers.indexOf(currentTrigger);
 
     switch (event.key) {
+      case 'Escape': {
+        if (inMenu) {
+          event.preventDefault();
+          const submenu = target.closest<HTMLElement>('[data-submenu]');
+          const openSubmenu = submenu !== null && submenu !== undefined ? submenu : null;
+          if (openSubmenu !== null) {
+            const trigger =
+              openSubmenu.parentElement?.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
+            openSubmenu.hidden = true;
+            if (trigger !== null && trigger !== undefined) {
+              trigger.ariaExpanded = 'false';
+              trigger.focus();
+            }
+            return true;
+          }
+        }
+        return false;
+      }
       case 'ArrowLeft': {
         event.preventDefault();
+        if (inMenu) {
+          const submenu = target.closest<HTMLElement>('[data-submenu]');
+          const openSubmenu = submenu !== null && submenu !== undefined ? submenu : null;
+          if (openSubmenu !== null) {
+            const trigger =
+              openSubmenu.parentElement?.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
+            openSubmenu.hidden = true;
+            if (trigger !== null && trigger !== undefined) {
+              trigger.ariaExpanded = 'false';
+              trigger.focus();
+            }
+            return true;
+          }
+        }
         const prevIndex = (currentIndex - 1 + triggers.length) % triggers.length;
         const prevTrigger = triggers[prevIndex];
         if (prevTrigger !== undefined) this.switchToMenu(prevTrigger, root);
@@ -219,6 +411,12 @@ export class DesignerMenuController {
       }
       case 'ArrowRight': {
         event.preventDefault();
+        const submenuToggle = target.closest<HTMLButtonElement>('[data-submenu-toggle]');
+        if (submenuToggle !== null && submenuToggle !== undefined) {
+          this.toggleSubmenu(submenuToggle);
+          return true;
+        }
+        if (openMenu.dataset.submenu !== undefined) return true;
         const nextIndex = (currentIndex + 1) % triggers.length;
         const nextTrigger = triggers[nextIndex];
         if (nextTrigger !== undefined) this.switchToMenu(nextTrigger, root);
@@ -284,6 +482,7 @@ export class DesignerMenuController {
     for (const t of root.querySelectorAll<HTMLButtonElement>('[data-menu-toggle]')) {
       t.ariaExpanded = 'false';
     }
+    this.closeSubmenus(root);
     const menu = root.querySelector<HTMLElement>(`[data-menu="${menuId}"]`);
     if (menu !== null) {
       menu.hidden = false;
@@ -324,6 +523,7 @@ export class DesignerMenuController {
     for (const control of root.querySelectorAll<HTMLButtonElement>('[data-menu-toggle]')) {
       control.ariaExpanded = 'false';
     }
+    this.closeSubmenus(root);
     return closed;
   }
 
@@ -399,6 +599,7 @@ export class DesignerMenuController {
         }
       }
     }
+    this.renderSubmenuVisibility(menu);
   }
 
   /** Refresh menu item states (enabled/disabled/checked) for any currently open menu. */
@@ -415,6 +616,8 @@ export class DesignerMenuController {
     const menu = this.callbacks.getContextMenu();
     if (menu === undefined || menu.hidden) return false;
     menu.hidden = true;
+    const root = this.callbacks.getRoot();
+    if (root !== null) this.closeSubmenus(root);
     return true;
   }
 

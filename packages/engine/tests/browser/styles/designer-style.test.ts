@@ -65,6 +65,13 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('.status-item {');
   });
 
+  it('R3 renders nested menus as side flyouts instead of inline rows', () => {
+    expect(baseCss).toContain('.designer-menu .designer-submenu {');
+    expect(baseCss).toContain('position: absolute;');
+    expect(baseCss).toContain('left: calc(100% - 4px);');
+    expect(workbenchCss).toContain('.designer-context-menu .designer-submenu {');
+  });
+
   it('R8 keeps canvas grid and overlay layers driven by theme tokens', () => {
     expect(tokensCss).toContain('--designer-canvas-grid-line:');
     expect(tokensCss).toContain('--designer-surface-scrim:');
@@ -115,7 +122,9 @@ describe('designer workbench visual convergence', () => {
   it('R2 styles Moveable-like transient distance measurements with tokens', () => {
     expect(tokensCss).toContain('--designer-measurement-label:');
     expect(workbenchCss).toContain('.canvas-measurement {');
-    expect(workbenchCss).toContain('border-left: 1px dashed var(--designer-snap-guide);');
+    expect(workbenchCss).toContain(
+      'border-left: var(--designer-overlay-pixel, 1px) dashed var(--designer-snap-guide);',
+    );
     expect(workbenchCss).toContain('.canvas-measurement-label {');
     expect(workbenchCss).toContain('color: var(--designer-measurement-label);');
   });

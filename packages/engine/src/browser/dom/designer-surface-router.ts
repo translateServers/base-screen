@@ -17,6 +17,8 @@ export interface DesignerSurfaceBindings {
   readonly pointerMove: DesignerSurfaceHandler;
   readonly pointerUp: DesignerSurfaceHandler;
   readonly pointerCancel: DesignerSurfaceHandler;
+  readonly mouseOver: DesignerSurfaceHandler;
+  readonly mouseOut: DesignerSurfaceHandler;
   readonly doubleClick: DesignerSurfaceHandler;
   // 剪贴板事件通道：非可编辑目标路由到应用剪贴板操作（右键/上下文菜单/系统组合的旁路）。
   readonly copy: DesignerSurfaceHandler;
@@ -74,6 +76,8 @@ export class DesignerSurfaceRouter {
     this.#root.addEventListener('pointercancel', (event) =>
       bindings.pointerCancel(event.target, event),
     );
+    this.#root.addEventListener('mouseover', (event) => bindings.mouseOver(event.target, event));
+    this.#root.addEventListener('mouseout', (event) => bindings.mouseOut(event.target, event));
     this.#root.addEventListener('lostpointercapture', (event) =>
       bindings.pointerCancel(event.target, event),
     );

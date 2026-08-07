@@ -15,7 +15,12 @@ import {
   snapDesignerCanvasPoint,
   snapDesignerSelectionTranslation,
 } from '../viewport/designer-canvas-aids.js';
-import { clientPointToDesignerCanvasPoint } from '../viewport/designer-canvas-coordinates.js';
+import {
+  clientPointToDesignerCanvasPoint,
+  type DesignerCanvasBounds,
+  getDesignerCanvasBounds,
+  getDesignerCanvasClientOrigin,
+} from '../viewport/designer-canvas-coordinates.js';
 import { collectDesignerCanvasMeasurements } from '../viewport/designer-canvas-measurements.js';
 
 interface DesignerWorkbenchCallbacks {
@@ -36,6 +41,7 @@ type WorkbenchMode = 'standard' | 'with-menu' | 'fullscreen';
 // 不能在浏览器 dblclick 事件上实现：guide 拖拽在 pointerdown 时 setPointerCapture 接管指针，
 // Chromium 此后不再合成 click/dblclick（仅派发 pointerdown/up），dblclick 处理器只作兜底。
 const DESIGNER_GUIDE_DOUBLE_CLICK_MS = 500;
+const DESIGNER_GUIDE_DRAG_THRESHOLD = 3;
 
 interface SnapPreviewState {
   readonly x: readonly DesignerSnapGuideLine[] | undefined;
@@ -103,7 +109,7 @@ export class DesignerWorkbenchController {
     this.#connectedCanvas = canvas;
     canvas.addEventListener('pointerdown', (event) => this.onCanvasPointerDown(event));
     canvas.addEventListener('dblclick', (event) => this.onDoubleClick(event));
-    canvas.addEventListener('lostpointercapture', () => this.cancelTransientState());
+    canvas.addEventListener('lostpointercapture', (event) => this.onPointerCancel(event));
   }
 
   disconnect(): void {
@@ -396,6 +402,17 @@ export class DesignerWorkbenchController {
     this.commitGuide(event);
   }
 
+  onPointerCancel(event: PointerEvent): void {
+    if (
+      event.type === 'lostpointercapture' &&
+      this.#panelResize?.pointerId !== event.pointerId &&
+      this.#guideDrag?.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+    this.cancelTransientState();
+  }
+
   onDoubleClick(event: MouseEvent): void {
     this.onCanvasDoubleClick(event);
   }
@@ -403,6 +420,7 @@ export class DesignerWorkbenchController {
   cancelTransientState(): void {
     this.releaseGuideDrag();
     this.releasePanelResize();
+    this.#lastGuidePointerDown = undefined;
     this.#guidePreview = undefined;
     this.#snapPreview = undefined;
     this.renderGuides();
@@ -474,7 +492,7 @@ export class DesignerWorkbenchController {
     if (drag?.pointerId !== event.pointerId || canvas === undefined) return;
     const point = clientPointToDesignerCanvasPoint(
       event,
-      canvas.getBoundingClientRect(),
+      getDesignerCanvasBounds(canvas),
       this.callbacks.getZoom(),
     );
     const value = drag.axis === 'x' ? point.x : point.y;
@@ -483,7 +501,8 @@ export class DesignerWorkbenchController {
       this.#lastGuidePointerDown !== undefined &&
       this.#lastGuidePointerDown.axis === drag.axis &&
       this.#lastGuidePointerDown.index === drag.guideIndex &&
-      value !== drag.value
+      Math.abs(value - drag.value) * Math.max(this.callbacks.getZoom(), Number.EPSILON) >=
+        DESIGNER_GUIDE_DRAG_THRESHOLD
     ) {
       this.#lastGuidePointerDown = undefined;
     }
@@ -497,7 +516,7 @@ export class DesignerWorkbenchController {
     if (drag?.pointerId !== event.pointerId || canvas === undefined) return;
     const point = clientPointToDesignerCanvasPoint(
       event,
-      canvas.getBoundingClientRect(),
+      getDesignerCanvasBounds(canvas),
       this.callbacks.getZoom(),
     );
     const value = drag.axis === 'x' ? point.x : point.y;
@@ -518,21 +537,23 @@ export class DesignerWorkbenchController {
   private releasePanelResize(pointerId?: number): void {
     const resize = this.#panelResize;
     if (resize === undefined || (pointerId !== undefined && resize.pointerId !== pointerId)) return;
-    if (this.#panelResizeCaptureTarget?.hasPointerCapture(resize.pointerId)) {
-      this.#panelResizeCaptureTarget.releasePointerCapture(resize.pointerId);
-    }
+    const captureTarget = this.#panelResizeCaptureTarget;
     this.#panelResize = undefined;
     this.#panelResizeCaptureTarget = undefined;
+    if (captureTarget?.hasPointerCapture(resize.pointerId)) {
+      captureTarget.releasePointerCapture(resize.pointerId);
+    }
   }
 
   private releaseGuideDrag(pointerId?: number): void {
     const drag = this.#guideDrag;
     if (drag === undefined || (pointerId !== undefined && drag.pointerId !== pointerId)) return;
-    if (this.#guideCaptureTarget?.hasPointerCapture(drag.pointerId)) {
-      this.#guideCaptureTarget.releasePointerCapture(drag.pointerId);
-    }
+    const captureTarget = this.#guideCaptureTarget;
     this.#guideDrag = undefined;
     this.#guideCaptureTarget = undefined;
+    if (captureTarget?.hasPointerCapture(drag.pointerId)) {
+      captureTarget.releasePointerCapture(drag.pointerId);
+    }
   }
 
   private startGuideDrag(
@@ -543,19 +564,21 @@ export class DesignerWorkbenchController {
   ): void {
     canvas.setPointerCapture(event.pointerId);
     this.#guideCaptureTarget = canvas;
+    const value = this.guideDragValue(event, axis, canvas);
     this.#guideDrag = {
       axis,
       guideIndex,
       pointerId: event.pointerId,
-      value: this.guideDragValue(event, axis, canvas),
+      value,
     };
-    this.moveGuide(event);
+    this.#guidePreview = { axis, value };
+    this.renderGuides();
   }
 
   private guideDragValue(event: PointerEvent, axis: GuideAxis, canvas: HTMLDivElement): number {
     const point = clientPointToDesignerCanvasPoint(
       event,
-      canvas.getBoundingClientRect(),
+      getDesignerCanvasBounds(canvas),
       this.callbacks.getZoom(),
     );
     return axis === 'x' ? point.x : point.y;
@@ -569,6 +592,8 @@ export class DesignerWorkbenchController {
     const index = Number(guide?.dataset.guideIndex);
     const canvas = this.callbacks.getCanvas();
     if ((axis !== 'x' && axis !== 'y') || !Number.isInteger(index) || canvas === undefined) return;
+    // 保持键盘焦点停留在 viewport；否则首次点击参考线会触发 blur 并清空双击状态。
+    event.preventDefault();
     event.stopImmediatePropagation();
     const previous = this.#lastGuidePointerDown;
     this.#lastGuidePointerDown = { axis, index, time: event.timeStamp };
@@ -620,6 +645,7 @@ export class DesignerWorkbenchController {
   private renderGuides(): void {
     const container = this.callbacks.getRoot()?.querySelector<HTMLElement>('[data-canvas-guides]');
     if (container === null || container === undefined) return;
+    setCanvasOverlayScale(container, this.callbacks.getZoom());
     container.replaceChildren();
     for (const axis of ['x', 'y'] as const) {
       for (const [index, value] of this.#guides[axis].entries()) {
@@ -697,12 +723,16 @@ export class DesignerWorkbenchController {
     const root = this.callbacks.getRoot();
     const canvas = this.callbacks.getCanvas();
     if (root === null || canvas === undefined) return;
-    const canvasBounds = canvas.getBoundingClientRect();
+    const canvasBounds = getDesignerCanvasBounds(canvas);
     this.renderRuler(root.querySelector<HTMLElement>('.ruler-horizontal'), 'x', canvasBounds);
     this.renderRuler(root.querySelector<HTMLElement>('.ruler-vertical'), 'y', canvasBounds);
   }
 
-  private renderRuler(ruler: HTMLElement | null, axis: GuideAxis, canvasBounds: DOMRect): void {
+  private renderRuler(
+    ruler: HTMLElement | null,
+    axis: GuideAxis,
+    canvasBounds: DesignerCanvasBounds,
+  ): void {
     if (ruler === null) return;
     const canvas = ruler.querySelector<HTMLCanvasElement>('canvas[data-ruler-canvas]');
     if (canvas === null) return;
@@ -711,8 +741,9 @@ export class DesignerWorkbenchController {
     const canvasRect = canvas.getBoundingClientRect();
     const length = axis === 'x' ? canvasRect.width : canvasRect.height;
     if (length <= 0) return;
+    const canvasOrigin = getDesignerCanvasClientOrigin(canvasBounds, this.callbacks.getZoom());
     const origin =
-      axis === 'x' ? canvasBounds.left - canvasRect.left : canvasBounds.top - canvasRect.top;
+      axis === 'x' ? canvasOrigin.left - canvasRect.left : canvasOrigin.top - canvasRect.top;
     const devicePixelRatio = Math.max(1, globalThis.devicePixelRatio || 1);
     const widthPixels = Math.round(canvasRect.width * devicePixelRatio);
     const heightPixels = Math.round(canvasRect.height * devicePixelRatio);
@@ -880,6 +911,25 @@ function translateSelectionBounds(
 function formatMeasurement(distance: number): string {
   // Match Moveable's default `snapDigit: 0`: visual measurements are whole, unitless pixels.
   return String(Math.round(distance));
+}
+
+function setCanvasOverlayScale(container: HTMLElement, zoom: number): void {
+  const unit = 1 / Math.max(zoom, Number.EPSILON);
+  const sizes = {
+    '--designer-overlay-active': 2,
+    '--designer-overlay-cap-offset': 4,
+    '--designer-overlay-cap-size': 7,
+    '--designer-overlay-font-size': 10,
+    '--designer-overlay-glow-large': 6,
+    '--designer-overlay-glow-small': 2,
+    '--designer-overlay-hit-size': 9,
+    '--designer-overlay-label-offset': 5,
+    '--designer-overlay-line-height': 14,
+    '--designer-overlay-pixel': 1,
+  } as const;
+  for (const [property, multiplier] of Object.entries(sizes)) {
+    container.style.setProperty(property, `${unit * multiplier}px`);
+  }
 }
 
 function tabDirection(key: string): -1 | 1 | 'first' | 'last' | undefined {

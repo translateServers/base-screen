@@ -136,20 +136,35 @@ export function createDesignerWorkspace(
           ${labeledActionButton('project-publish', publishGlyph(), 'topbar-publish')}
         </div>
         <div class="designer-menu" data-menu="file" hidden role="menu">
-          ${menuButton('project-workspace')}${menuButton('import')}${menuButton('export')}${menuButton('project-save')}${menuButton('project-publish')}${menuButton('project-retry')}${menuButton('project-cancel')}
+          ${menuButton('project-workspace')}${menuButton('import')}${menuButton('export')}
+          <div class="designer-menu-separator" role="separator"></div>
+          ${menuButton('project-save')}${menuButton('project-publish')}${menuButton('project-retry')}${menuButton('project-cancel')}
         </div>
         <div class="designer-menu" data-menu="edit" hidden role="menu">
-          ${menuButton('undo')}${menuButton('redo')}${menuButton('copy')}${menuButton('paste')}${menuButton('delete')}${menuButton('duplicate')}${menuButton('group')}${menuButton('ungroup')}
+          ${menuButton('undo')}${menuButton('redo')}
           <div class="designer-menu-separator" role="separator"></div>
-          ${menuButton('align-left')}${menuButton('align-center')}${menuButton('align-right')}${menuButton('align-top')}${menuButton('align-middle')}${menuButton('align-bottom')}${menuButton('distribute-horizontal')}${menuButton('distribute-vertical')}
+          ${menuButton('copy')}${menuButton('paste')}${menuButton('duplicate')}${menuButton('delete')}
           <div class="designer-menu-separator" role="separator"></div>
-          ${menuButton('lock')}${menuButton('unlock')}${menuButton('hide')}${menuButton('bring-to-front')}${menuButton('send-to-back')}
+          ${menuButton('group')}${menuButton('ungroup')}
+          ${submenuButton(DESIGNER_UI_TEXT.arrange, [
+            'align-left',
+            'align-center',
+            'align-right',
+            'align-top',
+            'align-middle',
+            'align-bottom',
+            'separator',
+            'distribute-horizontal',
+            'distribute-vertical',
+          ])}
+          ${submenuButton(DESIGNER_UI_TEXT.layer, ['bring-to-front', 'send-to-back', 'lock', 'unlock', 'hide'])}
         </div>
         <div class="designer-menu" data-menu="view" hidden role="menu">
-          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-reset')}${menuButton('zoom-fit')}${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}
+          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-reset')}${menuButton('zoom-fit')}
+          ${submenuButton(DESIGNER_UI_TEXT.canvasAids, ['toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
         </div>
         <div class="designer-menu" data-menu="tools" hidden role="menu">
-          ${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}${menuButton('toggle-workbench')}${menuButton('show-help')}
+          ${menuButton('toggle-workbench')}${menuButton('show-help')}
         </div>
       </header>
 
@@ -363,17 +378,35 @@ function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {
   return `<button type="button" class="designer-control designer-button designer-menu-item" data-menu-action="${action}" role="menuitem"><span>${operation.label}</span>${shortcut}</button>`;
 }
 
-export type DesignerContextMenuAction = keyof typeof DESIGNER_OPERATION_TEXT | 'separator';
+export type DesignerMenuEntry =
+  | keyof typeof DESIGNER_OPERATION_TEXT
+  | 'separator'
+  | { readonly label: string; readonly entries: readonly DesignerMenuEntry[] };
+
+export type DesignerContextMenuAction = DesignerMenuEntry;
+
+function submenuButton(label: string, entries: readonly DesignerMenuEntry[]): string {
+  return `<div class="designer-menu-submenu-wrap">
+    <button type="button" class="designer-control designer-button designer-menu-item designer-menu-submenu-trigger" data-submenu-toggle aria-haspopup="menu" aria-expanded="false" role="menuitem"><span>${label}</span><span class="designer-menu-submenu-arrow" aria-hidden="true">&gt;</span></button>
+    <div class="designer-menu designer-submenu" data-submenu hidden role="menu">${menuEntriesHtml(entries)}</div>
+  </div>`;
+}
+
+function menuEntriesHtml(entries: readonly DesignerMenuEntry[]): string {
+  return entries
+    .map((entry) =>
+      entry === 'separator'
+        ? '<div class="designer-menu-separator" data-menu-separator role="separator"></div>'
+        : typeof entry === 'string'
+          ? menuButton(entry)
+          : submenuButton(entry.label, entry.entries),
+    )
+    .join('');
+}
 
 // 画布右键菜单按右键目标动态组合：'separator' 渲染分组分隔线。
 export function contextMenuHtml(actions: readonly DesignerContextMenuAction[]): string {
-  return actions
-    .map((action) =>
-      action === 'separator'
-        ? '<div class="designer-menu-separator" data-menu-separator role="separator"></div>'
-        : menuButton(action),
-    )
-    .join('');
+  return menuEntriesHtml(actions);
 }
 
 function createMaterialCard(

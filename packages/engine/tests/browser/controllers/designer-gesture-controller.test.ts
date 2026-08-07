@@ -485,6 +485,140 @@ describe('DesignerGestureController cancellation', () => {
     ]);
   });
 
+  it('R2 excludes locked descendants from group drag preview and mutation', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const group = {
+      ...document().components[0]!,
+      id: 'group',
+      type: 'base.container',
+      size: { width: 300, height: 200 },
+    };
+    const child = {
+      ...document().components[0]!,
+      id: 'child',
+      parentId: 'group',
+      position: { x: 20, y: 30 },
+      status: { locked: true, hidden: false },
+      zIndex: 1,
+    };
+    const current = { ...document(), components: [group, child] };
+    const groupMaterial = new FakeElement();
+    groupMaterial.dataset.baseScreenComponentId = 'group';
+    groupMaterial.matches['[data-base-screen-component-id]'] = groupMaterial;
+    canvas.registerMaterial('group', groupMaterial);
+    const childMaterial = new FakeElement();
+    childMaterial.dataset.baseScreenComponentId = 'child';
+    canvas.registerMaterial('child', childMaterial);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: () => current,
+      getInteraction: () => ({ selectedComponentIds: ['group'], focusedComponentId: 'group' }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      target: groupMaterial,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+
+    expect(groupMaterial.style.translate).toBe('30px 30px');
+    expect(childMaterial.style.translate).toBeUndefined();
+    canvas.dispatch('pointerup', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+    expect(transactions).toEqual([
+      {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['group'],
+            patch: { position: { x: 40, y: 50 } },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('R2 rewrites copied group child parents during Alt drag duplication', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const group = {
+      ...document().components[0]!,
+      id: 'group',
+      type: 'base.container',
+      size: { width: 300, height: 200 },
+    };
+    const child = {
+      ...document().components[0]!,
+      id: 'child',
+      parentId: 'group',
+      position: { x: 20, y: 30 },
+      zIndex: 1,
+    };
+    const current = { ...document(), components: [group, child] };
+    const groupMaterial = new FakeElement();
+    groupMaterial.dataset.baseScreenComponentId = 'group';
+    groupMaterial.matches['[data-base-screen-component-id]'] = groupMaterial;
+    canvas.registerMaterial('group', groupMaterial);
+    const childMaterial = new FakeElement();
+    childMaterial.dataset.baseScreenComponentId = 'child';
+    canvas.registerMaterial('child', childMaterial);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: () => current,
+      getInteraction: () => ({ selectedComponentIds: ['group'], focusedComponentId: 'group' }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      target: groupMaterial,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+    canvas.dispatch('pointerup', {
+      pointerId: 1,
+      clientX: 40,
+      clientY: 50,
+      altKey: true,
+    } as unknown as PointerEvent);
+
+    const commands = transactions[0]?.commands as readonly {
+      readonly component: { readonly id: string; readonly parentId: string | null };
+    }[];
+    expect(commands).toHaveLength(2);
+    expect(commands[1]?.component.parentId).toBe(commands[0]?.component.id);
+  });
+
   it('prunes marquee selection to subtree roots so group children are not double-selected', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();

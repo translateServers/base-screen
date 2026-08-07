@@ -1114,15 +1114,63 @@
 }
 
 .canvas-guide-persistent {
+  background: transparent;
   pointer-events: auto;
 }
 
+.canvas-guide-persistent::before {
+  position: absolute;
+  background: var(--designer-warning);
+  content: "";
+}
+
 .canvas-guide-persistent[data-axis="x"] {
+  width: var(--designer-overlay-hit-size, 9px);
   cursor: ew-resize;
 }
 
+.canvas-guide-persistent[data-axis="x"]::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--designer-overlay-pixel, 1px);
+  translate: -50% 0;
+}
+
 .canvas-guide-persistent[data-axis="y"] {
+  height: var(--designer-overlay-hit-size, 9px);
   cursor: ns-resize;
+}
+
+.canvas-guide-persistent[data-axis="y"]::before {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: var(--designer-overlay-pixel, 1px);
+  translate: 0 -50%;
+}
+
+/* 参考线视觉保持 1px，拖拽命中范围通过伪元素扩展为 9px 的不可见命中条
+   （各边 4.5px，命中条中心与参考线坐标重合）；伪元素继承 pointer-events: auto。 */
+.canvas-guide-persistent::after {
+  position: absolute;
+  content: "";
+}
+
+.canvas-guide-persistent[data-axis="x"]::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--designer-overlay-hit-size, 9px);
+  transform: translateX(-50%);
+}
+
+.canvas-guide-persistent[data-axis="y"]::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--designer-overlay-hit-size, 9px);
+  transform: translateY(-50%);
 }
 
 .canvas-guide-preview {
@@ -1139,24 +1187,25 @@
 .canvas-guide-snap-active {
   background: var(--designer-snap-guide);
   box-shadow:
-    0 0 2px var(--designer-snap-guide),
-    0 0 6px color-mix(in srgb, var(--designer-snap-guide) 45%, transparent);
+    0 0 var(--designer-overlay-glow-small, 2px) var(--designer-snap-guide),
+    0 0 var(--designer-overlay-glow-large, 6px)
+    color-mix(in srgb, var(--designer-snap-guide) 45%, transparent);
 }
 
 .canvas-guide[data-axis="x"].canvas-guide-snap {
-  width: 1px;
+  width: var(--designer-overlay-pixel, 1px);
 }
 
 .canvas-guide[data-axis="x"].canvas-guide-snap-active {
-  width: 2px;
+  width: var(--designer-overlay-active, 2px);
 }
 
 .canvas-guide[data-axis="y"].canvas-guide-snap {
-  height: 1px;
+  height: var(--designer-overlay-pixel, 1px);
 }
 
 .canvas-guide[data-axis="y"].canvas-guide-snap-active {
-  height: 2px;
+  height: var(--designer-overlay-active, 2px);
 }
 
 /* 选区对齐轨道上的布局间距：蓝色虚线段 + 红色数字，和吸附线解耦，不会参与命中。 */
@@ -1167,13 +1216,13 @@
 }
 
 .canvas-measurement[data-axis="x"] {
-  height: 1px;
-  border-top: 1px dashed var(--designer-snap-guide);
+  height: var(--designer-overlay-pixel, 1px);
+  border-top: var(--designer-overlay-pixel, 1px) dashed var(--designer-snap-guide);
 }
 
 .canvas-measurement[data-axis="y"] {
-  width: 1px;
-  border-left: 1px dashed var(--designer-snap-guide);
+  width: var(--designer-overlay-pixel, 1px);
+  border-left: var(--designer-overlay-pixel, 1px) dashed var(--designer-snap-guide);
 }
 
 .canvas-measurement::before,
@@ -1185,9 +1234,9 @@
 
 .canvas-measurement[data-axis="x"]::before,
 .canvas-measurement[data-axis="x"]::after {
-  top: -4px;
-  width: 1px;
-  height: 7px;
+  top: calc(0px - var(--designer-overlay-cap-offset, 4px));
+  width: var(--designer-overlay-pixel, 1px);
+  height: var(--designer-overlay-cap-size, 7px);
 }
 
 .canvas-measurement[data-axis="x"]::before {
@@ -1200,9 +1249,9 @@
 
 .canvas-measurement[data-axis="y"]::before,
 .canvas-measurement[data-axis="y"]::after {
-  left: -4px;
-  width: 7px;
-  height: 1px;
+  left: calc(0px - var(--designer-overlay-cap-offset, 4px));
+  width: var(--designer-overlay-cap-size, 7px);
+  height: var(--designer-overlay-pixel, 1px);
 }
 
 .canvas-measurement[data-axis="y"]::before {
@@ -1217,32 +1266,35 @@
   position: absolute;
   color: var(--designer-measurement-label);
   font: var(--designer-font-numeric);
-  text-shadow: 0 1px 2px color-mix(in srgb, var(--designer-surface-workspace) 70%, transparent);
+  font-size: var(--designer-overlay-font-size, 10px);
+  line-height: var(--designer-overlay-line-height, 14px);
+  text-shadow: 0 var(--designer-overlay-pixel, 1px) var(--designer-overlay-glow-small, 2px)
+    color-mix(in srgb, var(--designer-surface-workspace) 70%, transparent);
   white-space: nowrap;
 }
 
 .canvas-measurement[data-axis="x"] .canvas-measurement-label {
-  top: 5px;
+  top: var(--designer-overlay-label-offset, 5px);
   left: 50%;
   translate: -50% 0;
 }
 
 .canvas-measurement[data-axis="y"] .canvas-measurement-label {
   top: 50%;
-  left: 5px;
+  left: var(--designer-overlay-label-offset, 5px);
   translate: 0 -50%;
 }
 
 .canvas-guide[data-axis="x"] {
   top: 0;
   bottom: 0;
-  width: 1px;
+  width: var(--designer-overlay-pixel, 1px);
   transform: translateX(-50%);
 }
 .canvas-guide[data-axis="y"] {
   right: 0;
   left: 0;
-  height: 1px;
+  height: var(--designer-overlay-pixel, 1px);
   transform: translateY(-50%);
 }
 /* 选中框视觉轮廓与吸附锚点使用同一选区几何（组件包围盒）：
@@ -1402,9 +1454,9 @@
   position: absolute;
   z-index: var(--designer-z-dialog);
   min-width: 200px;
-  /* 多选等长菜单超出工作区时内部滚动，配合 openContextMenu 的光标锚定避免被裁剪或压回 (0,0)。 */
-  max-height: 100%;
-  overflow-y: auto;
+  /* 子菜单需要溢出到右侧；当前菜单已按上下文裁剪为短菜单。 */
+  max-height: none;
+  overflow: visible;
   padding: var(--designer-space-2);
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-overlay);
@@ -1467,6 +1519,30 @@
   font: var(--designer-font-numeric);
   font-size: 10px;
   opacity: 0.8;
+}
+
+.designer-context-menu .designer-submenu {
+  position: absolute;
+  top: -1px;
+  left: calc(100% - 4px);
+  min-width: 200px;
+  padding: var(--designer-space-2);
+  overflow: auto;
+  overflow-x: hidden;
+  background: var(--designer-surface-overlay);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-overlay);
+  box-shadow: var(--designer-shadow-overlay);
+  z-index: calc(var(--designer-z-dialog) + 1);
+}
+
+.designer-context-menu .designer-submenu[data-submenu-side="left"] {
+  left: auto;
+  right: calc(100% - 4px);
+}
+
+.designer-context-menu .designer-submenu .designer-menu-item {
+  padding-left: var(--designer-space-5);
 }
 
 .project-conflict {
@@ -1670,6 +1746,14 @@
   }
 
   .canvas-guide {
+    background: CanvasText;
+  }
+
+  .canvas-guide-persistent {
+    background: transparent;
+  }
+
+  .canvas-guide-persistent::before {
     background: CanvasText;
   }
 

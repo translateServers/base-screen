@@ -258,6 +258,11 @@ try {
             `BROWSER_HARNESS_CONTEXT_MENU_FAILED:${JSON.stringify(contextMenuState)}`,
           );
         }
+        const canvasAidsToggle = contextMenu.locator('[data-submenu-toggle]').first();
+        await canvasAidsToggle.click();
+        await contextMenu
+          .locator('[data-submenu][data-submenu-side] [data-menu-action="toggle-grid"]')
+          .click();
         await page.keyboard.press('Escape');
         if (!(await contextMenu.isHidden())) {
           throw new Error('BROWSER_HARNESS_CONTEXT_MENU_ESCAPE_FAILED');
@@ -960,6 +965,12 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   await page.evaluate(() => document.querySelectorAll('base-screen-designer')[1]?.remove());
 
   // 框选（marquee）多选后，直接拖拽选中框（控制器）的空白区域应整体移动选中组件。
+  await zoomResetViaMenu(designer);
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-zoom]')?.textContent ===
+      '100%',
+  );
   const marqueeCanvasBox = await designer.locator('[data-canvas]').boundingBox();
   if (marqueeCanvasBox === null) throw new Error('BROWSER_HARNESS_MARQUEE_CANVAS_MISSING');
   await page.evaluate(() => {
@@ -2184,12 +2195,12 @@ async function componentCount(page) {
   return page.evaluate(() => window.baseScreenHarness.designer.document.components.length);
 }
 
-// 顶栏改版后网格/缩放复位按钮移入视图菜单，通过菜单路径触发。
+// 顶栏改版后网格移入“视图 > 画布辅助”子菜单，按真实菜单路径触发。
 async function toggleGridViaMenu(designer) {
   await designer.locator('[data-menu-toggle="view"]').click();
-  await designer
-    .locator('.designer-menu[data-menu="view"] [data-menu-action="toggle-grid"]')
-    .click();
+  const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
+  await viewMenu.locator('[data-submenu-toggle]').click();
+  await viewMenu.locator('[data-submenu] [data-menu-action="toggle-grid"]').click();
 }
 
 async function zoomResetViaMenu(designer) {

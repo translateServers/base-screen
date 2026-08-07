@@ -43,6 +43,7 @@ export interface DesignerSnapCandidates {
 }
 
 export interface DesignerSnapPoint {
+  readonly guides?: DesignerSnapGuides | undefined;
   readonly x: number;
   readonly y: number;
   readonly snappedX?: number | undefined;
@@ -133,6 +134,7 @@ export function snapDesignerCanvasPoint(
 ): DesignerSnapPoint {
   const threshold = DESIGNER_SMART_GUIDE_THRESHOLD / Math.max(zoom, Number.EPSILON);
   const releaseThreshold = DESIGNER_SNAP_RELEASE_MULTIPLIER * threshold;
+  const renderThreshold = DESIGNER_SNAP_RENDER_THRESHOLD / Math.max(zoom, Number.EPSILON);
   const guidelines = state.smartGuidesEnabled ? toSnapGuidelines(candidates) : [];
   const result = checkSnapPoses(
     guidelines,
@@ -148,6 +150,7 @@ export function snapDesignerCanvasPoint(
     point.x,
     result.vertical,
     releaseThreshold,
+    renderThreshold,
     session?.x,
     'vertical',
   );
@@ -155,6 +158,7 @@ export function snapDesignerCanvasPoint(
     point.y,
     result.horizontal,
     releaseThreshold,
+    renderThreshold,
     session?.y,
     'horizontal',
   );
@@ -167,6 +171,14 @@ export function snapDesignerCanvasPoint(
     y: vertical.value,
     ...(horizontal.snapped === undefined ? {} : { snappedX: horizontal.snapped }),
     ...(vertical.snapped === undefined ? {} : { snappedY: vertical.snapped }),
+    ...(horizontal.guides.length === 0 && vertical.guides.length === 0
+      ? {}
+      : {
+          guides: {
+            ...(horizontal.guides.length === 0 ? {} : { x: horizontal.guides }),
+            ...(vertical.guides.length === 0 ? {} : { y: vertical.guides }),
+          },
+        }),
   };
 }
 
@@ -333,6 +345,7 @@ function resolvePointAxis(
   raw: number,
   snap: SnapInfo,
   releaseThreshold: number,
+  renderThreshold: number,
   previous: DesignerSnapSessionAxis | undefined,
   axis: 'vertical' | 'horizontal',
 ): AxisResolution {
@@ -343,7 +356,7 @@ function resolvePointAxis(
       value,
       snapped: value,
       next: { value },
-      guides: [],
+      guides: collectPointGuideLines(smart, renderThreshold, axis),
     };
   }
   if (previous !== undefined && Math.abs(previous.value - raw) <= releaseThreshold) {
@@ -360,6 +373,26 @@ function resolvePointAxis(
     next: undefined,
     guides: [],
   };
+}
+
+// 创建、缩放和旋转等单点路径与选区移动共用渲染阈值，并保留组件参考线的局部几何。
+// 单点精确落在目标上仍显示参考线，用于确认当前变换锚点；选区零校正则由 collectGuideLines 抑制。
+function collectPointGuideLines(
+  snap: ReturnType<typeof getNearestSnapGuidelineInfo>,
+  threshold: number,
+  axis: 'vertical' | 'horizontal',
+): readonly DesignerSnapGuideLine[] {
+  if (!snap.isSnap || snap.dist > threshold) return [];
+  const guideline = snap.guideline!;
+  const startType = axis === 'vertical' ? 1 : 0;
+  const valueType = axis === 'vertical' ? 0 : 1;
+  return [
+    {
+      size: guideline.size,
+      start: guideline.pos[startType]!,
+      value: guideline.pos[valueType]!,
+    },
+  ];
 }
 
 // 选区平移吸附解析：6 个锚点匹配候选；同锚点继续跟随，未命中时在捕获阈值内保持上次吸附目标。

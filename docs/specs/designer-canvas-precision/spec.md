@@ -61,6 +61,7 @@ SHALL NOT 在参考线上叠加距离标签——接近阶段无线，几乎贴�
 或 cancellation SHALL 不显示或立即清理。它们只用于视觉反馈，绝不加入吸附候选、缓存或坐标调整。
 参考线 SHALL 以对齐坐标定位并居中（CSS translate(-50%)），使任意线宽的中心与对齐坐标精确重合。
 参考线层 SHALL 渲染在所有组件之上（组件 z-index 取 Core painter order 索引 0..N-1，覆盖层 z-index 由文档组件数派生，始终高于 N-1），不得被组件遮挡。
+point、create、resize、rotate 路径 SHALL 复用吸附渲染阈值，并携带命中组件参考线的局部起点与长度；接近阶段不得回退为贯穿画布的辅助线。
 背景网格 SHALL 仅作视觉辅助；任何 pointer、移动、缩放、旋转或创建手势均不得将网格线加入候选或执行网格坐标取整。组件、画布与用户
 参考线仍按距离竞争。吸附参考线
 以蓝色系（Moveable #4af 语义）渲染，吸附目标线以更粗高亮样式指示。
@@ -68,14 +69,14 @@ SHALL NOT 在参考线上叠加距离标签——接近阶段无线，几乎贴�
 ### R3：统一坐标换算
 
 pointer、guide、ruler 和后续画布交互 SHALL 通过同一个 browser viewport 坐标换算边界处理 client point、
-canvas bounds 与 zoom。当前 viewport 平移由 canvas rect 表达的行为必须保持，且抽象为后续 ruler inset、
+canvas content bounds、border inset 与 zoom。当前 viewport 平移由 canvas rect 表达的行为必须保持，且抽象为后续 ruler inset、
 滚动容器或嵌套 transform 的单一扩展点。
 
 ### R4：可靠性与性能
 
 在 10%–500% zoom、非零 viewport 平移、单选与多选、组件旋转候选、guide/component 冲突及 pointer cancellation
 场景中，预览和提交 SHALL 可预测。每个 pointer move 仅修改必要的 preview style/overlay，不执行 document
-transaction 或全量 Renderer reconciliation。吸附候选集合 SHALL 在每个手势会话内只收集一次（会话内文档与
+transaction 或全量 Renderer reconciliation。候选与测量的可见性判断 SHALL 复用单次组件索引；吸附候选集合 SHALL 在每个手势会话内只收集一次（会话内文档与
 参考线不变），按排除集合区分缓存；会话结束或候选集合变化时失效，避免会话间残留。
 
 ## 4. 完成定义
