@@ -262,20 +262,46 @@ try {
         if (!(await contextMenu.isHidden())) {
           throw new Error('BROWSER_HARNESS_CONTEXT_MENU_ESCAPE_FAILED');
         }
+        await designer
+          .locator('[data-viewport]')
+          .click({ button: 'right', position: { x: 12, y: 12 } });
+        if (await contextMenu.isHidden()) {
+          throw new Error('BROWSER_HARNESS_SECONDARY_POINTER_CAPTURE_FAILED');
+        }
+        await page.keyboard.press('Escape');
+        if (!(await contextMenu.isHidden())) {
+          throw new Error('BROWSER_HARNESS_SECONDARY_CONTEXT_MENU_ESCAPE_FAILED');
+        }
+        const snapToggle = designer.locator('[data-status-toggle="snap"]');
+        if ((await snapToggle.getAttribute('aria-checked')) !== 'true') {
+          throw new Error('BROWSER_HARNESS_SNAP_TOGGLE_INITIAL_STATE_FAILED');
+        }
+        await snapToggle.click();
+        if ((await snapToggle.getAttribute('aria-checked')) !== 'false') {
+          throw new Error('BROWSER_HARNESS_SNAP_TOGGLE_OFF_FAILED');
+        }
+        if ((await designer.locator('.canvas-guide-snap').count()) !== 0) {
+          throw new Error('BROWSER_HARNESS_SNAP_GUIDE_NOT_CLEARED_FAILED');
+        }
+        await snapToggle.click();
+        if ((await snapToggle.getAttribute('aria-checked')) !== 'true') {
+          throw new Error('BROWSER_HARNESS_SNAP_TOGGLE_ON_FAILED');
+        }
         await designer.locator('[data-menu-toggle="tools"]').click();
         await designer
           .locator('.designer-menu[data-menu="tools"] [data-menu-action="show-help"]')
           .click();
-        const helpMenu = designer.locator('[data-menu="help"]');
+        const helpMenu = designer.locator('[data-help-dialog]');
         if (
           (await helpMenu.isHidden()) ||
           (await helpMenu.locator('[data-help-operation]').count()) === 0
         ) {
           throw new Error('BROWSER_HARNESS_SHORTCUT_HELP_FAILED');
         }
-        await page.keyboard.press('Escape');
+        // 帮助对话框：点击 close 按钮关闭（对话框覆盖顶栏，直接派发 click 事件）。
+        await helpMenu.locator('[data-help-close]').evaluate((button) => button.click());
         if (!(await helpMenu.isHidden())) {
-          throw new Error('BROWSER_HARNESS_SHORTCUT_HELP_ESCAPE_FAILED');
+          throw new Error('BROWSER_HARNESS_SHORTCUT_HELP_CLOSE_FAILED');
         }
         const workbench = designer.locator('.designer');
         await designer.locator('[data-viewport]').focus();
@@ -319,6 +345,14 @@ try {
         await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
         await page.goto('http://127.0.0.1:4174/?designer', { waitUntil: 'networkidle' });
         const authoringDesigner = page.locator('base-screen-designer');
+        // ?designer 页面的 designer 初始化是异步的（custom element upgrade + load）：
+        // 等待 publish 按钮的操作渲染完成（hidden 由 renderOperationControls 设置），
+        // 避免 networkidle 后立即断言踩到初始化竞态。
+        await page.waitForFunction(() => {
+          const designer = document.querySelector('base-screen-designer');
+          const publish = designer?.shadowRoot?.querySelector('[data-action="project-publish"]');
+          return publish !== null && publish !== undefined && publish.hidden === true;
+        });
         if (!(await authoringDesigner.locator('[data-action="project-publish"]').isHidden())) {
           throw new Error('BROWSER_HARNESS_PUBLISH_CAPABILITY_FAILED');
         }
@@ -1146,6 +1180,109 @@ async function assertCanvasPrecision(designer, page) {
   ) {
     throw new Error('BROWSER_HARNESS_GUIDE_COMMIT_MUTATED_DOCUMENT');
   }
+  // 追加一条跨越更高 painter order 组件的参考线（canvas y=260 穿过 host-data 236..268，
+  // 其组件 z-index = painter order ≥ 2，修复前会盖住 z-index 1 的参考线层）。
+  await page.mouse.move(rulerBox.x + 400, rulerBox.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(canvasBox.x + 400, canvasBox.y + 260, { steps: 3 });
+  await page.mouse.up();
+  await page.waitForFunction(
+    (count) =>
+      window.baseScreenHarness.designer.shadowRoot?.querySelectorAll(
+        '[data-canvas-guides] > .canvas-guide-persistent',
+      ).length === count,
+    2,
+  );
+  // 参考线层级：组件 z-index 取 Core painter order 索引（0..N-1），覆盖层 z-index 由组件数派生，
+  // 参考线必须绘制在所有组件之上。探测参考线穿过的最上层组件（按 z-index 取最大）中心点，
+  // elementFromPoint 必须命中参考线本身（或 canvas-guides 层内元素），而非组件。
+  const guideLayer = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const guides = root.querySelectorAll('.canvas-guide-persistent');
+    const guide = guides[guides.length - 1];
+    if (guide === undefined || guide === null) return null;
+    const axis = guide.dataset.axis;
+    const guideRect = guide.getBoundingClientRect();
+    const guidePos =
+      axis === 'x' ? guideRect.x + guideRect.width / 2 : guideRect.y + guideRect.height / 2;
+    const inSpan = (rect) =>
+      axis === 'x'
+        ? rect.width > 0 && rect.height > 0 && guidePos >= rect.x && guidePos <= rect.x + rect.width
+        : rect.width > 0 &&
+          rect.height > 0 &&
+          guidePos >= rect.y &&
+          guidePos <= rect.y + rect.height;
+    const crossed = [...root.querySelectorAll('[data-base-screen-component-id]')]
+      .map((material) => {
+        const rect = material.getBoundingClientRect();
+        return { material, rect, z: Number(material.style.zIndex ?? 0) };
+      })
+      .filter(({ rect }) => inSpan(rect))
+      .sort((left, right) => right.z - left.z);
+    const target = crossed[0];
+    if (target === undefined) {
+      return { crossed: 0, axis, guidePos };
+    }
+    const probe =
+      axis === 'x'
+        ? { x: guidePos, y: target.rect.y + target.rect.height / 2 }
+        : { x: target.rect.x + target.rect.width / 2, y: guidePos };
+    const hit = root.elementFromPoint(probe.x, probe.y);
+    return {
+      crossed: crossed.length,
+      axis,
+      targetZ: target.z,
+      targetId: target.material.dataset.baseScreenComponentId ?? null,
+      probe,
+      guidePos,
+      hitTag: hit?.tagName ?? null,
+      hitClass: typeof hit?.className === 'string' ? hit.className : null,
+      hitDataset: hit instanceof HTMLElement ? { ...hit.dataset } : null,
+      inGuides:
+        hit?.closest?.('[data-canvas-guides]') !== null &&
+        hit?.closest?.('[data-canvas-guides]') !== undefined,
+    };
+  });
+  if (guideLayer === null || guideLayer.crossed === 0) {
+    throw new Error(`BROWSER_HARNESS_GUIDE_LAYER_PROBE_FAILED:${JSON.stringify(guideLayer)}`);
+  }
+  if (guideLayer.targetZ < 2) {
+    throw new Error(`BROWSER_HARNESS_GUIDE_LAYER_TARGET_WEAK:${JSON.stringify(guideLayer)}`);
+  }
+  if (!guideLayer.inGuides) {
+    throw new Error(
+      `BROWSER_HARNESS_GUIDE_COVERED_BY_COMPONENT_FAILED:${JSON.stringify(guideLayer)}`,
+    );
+  }
+  // 双击移除参考线：真实鼠标双击第二条参考线（canvas y=260），持久参考线数量必须减少。
+  // guide 拖拽以 setPointerCapture 接管指针后浏览器不再合成 click/dblclick，
+  // 移除由 pointerdown 双击窗口判定实现，这里验证真实指针流程。
+  const dblGuidePoint = await designer.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const guides = root.querySelectorAll('.canvas-guide-persistent');
+    const guide = guides[guides.length - 1];
+    if (guide === undefined || guide === null) return null;
+    const rect = guide.getBoundingClientRect();
+    const canvasBox = root.querySelector('[data-canvas]').getBoundingClientRect();
+    return { x: canvasBox.x + 200, y: rect.y + rect.height / 2 };
+  });
+  if (dblGuidePoint === null) {
+    throw new Error('BROWSER_HARNESS_GUIDE_DBLCLICK_PROBE_FAILED:null');
+  }
+  await page.mouse.dblclick(dblGuidePoint.x, dblGuidePoint.y, { delay: 60 });
+  await page.waitForFunction(
+    (count) =>
+      window.baseScreenHarness.designer.shadowRoot?.querySelectorAll(
+        '[data-canvas-guides] > .canvas-guide-persistent',
+      ).length === count,
+    1,
+  );
+  if (
+    (await page.evaluate(() => JSON.stringify(window.baseScreenHarness.designer.document))) !==
+    beforeDocument
+  ) {
+    throw new Error('BROWSER_HARNESS_GUIDE_DBLCLICK_MUTATED_DOCUMENT');
+  }
   const rulerBefore = await ruler
     .locator('[data-ruler-canvas]')
     .evaluateAll((canvases) => canvases.map((canvas) => canvas.dataset.rulerVersion ?? ''));
@@ -1228,7 +1365,7 @@ async function assertCanvasPrecision(designer, page) {
   await page.setViewportSize({ width: 1440, height: 900 });
 }
 
-// 浏览器级吸附工作流（R2/R4）：真实指针拖拽验证按距离吸附、释放带保持与旋转候选；
+// 浏览器级吸附工作流（R2/R4）：真实指针拖拽验证按距离吸附、阈值内保持与旋转候选；
 // 结束前把文档恢复到调用前状态，避免污染后续断言。
 async function assertSnapWorkflow(designer, page) {
   const before = await page.evaluate(() =>
@@ -1245,14 +1382,14 @@ async function assertSnapWorkflow(designer, page) {
         rotation: component.rotation,
       };
     };
-    return { title: read('title'), subtitle: read('subtitle') };
+    return { hostData: read('host-data'), title: read('title'), subtitle: read('subtitle') };
   });
   await zoomResetViaMenu(designer);
   await page.waitForFunction(() => {
     const canvas = window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-canvas]');
     return canvas?.style.transform === 'translate(0px, 0px) scale(1)';
   });
-  // 固定两组件几何，隔离前置断言的移动/旋转影响。
+  // 固定三组件几何，隔离前置断言的移动/旋转影响。
   await designer.evaluate(() => {
     const titleResult = window.baseScreenHarness.designer.executeCommand({
       type: 'update-components',
@@ -1264,7 +1401,13 @@ async function assertSnapWorkflow(designer, page) {
       componentIds: ['subtitle'],
       patch: { position: { x: 320, y: 100 }, rotation: 0 },
     });
-    if (!titleResult.ok || !subtitleResult.ok) {
+    const hostDataResult = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['host-data'],
+      // 保留 title 左侧对齐轨道，专供验证拖拽时的 Moveable 式间距标注。
+      patch: { position: { x: 100, y: 300 }, rotation: 0 },
+    });
+    if (!titleResult.ok || !subtitleResult.ok || !hostDataResult.ok) {
       throw new Error('BROWSER_HARNESS_SNAP_BASELINE_FAILED');
     }
   });
@@ -1275,13 +1418,17 @@ async function assertSnapWorkflow(designer, page) {
         const read = (id) => doc.components.find((item) => item.id === id);
         const title = read('title');
         const subtitle = read('subtitle');
+        const hostData = read('host-data');
         return (
           title?.position.x === 100 &&
           title?.position.y === 100 &&
           title?.rotation === 0 &&
           subtitle?.position.x === 320 &&
           subtitle?.position.y === 100 &&
-          subtitle?.rotation === 0
+          subtitle?.rotation === 0 &&
+          hostData?.position.x === 100 &&
+          hostData?.position.y === 300 &&
+          hostData?.rotation === 0
         );
       },
       undefined,
@@ -1309,18 +1456,39 @@ async function assertSnapWorkflow(designer, page) {
     };
     return { title: read('title'), subtitle: read('subtitle') };
   });
-  // 网格线候选（5px 阈值）会干扰释放带断言，断言期间关闭网格（结束前恢复）。
-  const gridWasEnabled =
-    (await designer.locator('[data-viewport]').getAttribute('data-grid')) !== 'false';
-  if (gridWasEnabled) {
-    await toggleGridViaMenu(designer);
-    await page.waitForFunction(() => {
-      const viewport =
-        window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-viewport]');
-      return viewport?.dataset.grid === 'false';
-    });
+  const title = designer.locator('[data-base-screen-component-id=title]');
+  await title.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const pointer = (type) =>
+      element.dispatchEvent(
+        new PointerEvent(type, {
+          bubbles: true,
+          composed: true,
+          clientX: rect.x + 20,
+          clientY: rect.y + 20,
+          pointerId: 93,
+        }),
+      );
+    pointer('pointerdown');
+    pointer('pointerup');
+  });
+  const titleSelected = await page
+    .waitForFunction(
+      () => {
+        const interaction = window.__browserHarnessSelectionEvents.at(-1);
+        return (
+          interaction?.selectedComponentIds?.length === 1 &&
+          interaction.selectedComponentIds[0] === 'title'
+        );
+      },
+      undefined,
+      { timeout: 1_000 },
+    )
+    .catch(() => false);
+  if (!titleSelected) {
+    throw new Error('BROWSER_HARNESS_SNAP_TITLE_SELECTION_FAILED');
   }
-  const titleBox = await designer.locator('[data-base-screen-component-id=title]').boundingBox();
+  const titleBox = await title.boundingBox();
   if (titleBox === null) throw new Error('BROWSER_HARNESS_SNAP_TITLE_MISSING');
   // 起点取 title 左上（文档 x=130 处）：subtitle 覆盖 title 右半部分，中心点会命中 subtitle。
   const startX = titleBox.x + (130 - baseline.title.position.x);
@@ -1397,49 +1565,63 @@ async function assertSnapWorkflow(designer, page) {
   const targetDeltaY = 0 - baseline.title.position.y;
   await page.mouse.move(startX, startY);
   await page.mouse.down();
+  if ((await designer.locator('.canvas-measurement').count()) !== 0) {
+    throw new Error('BROWSER_HARNESS_SNAP_MEASUREMENT_BEFORE_DRAG_FAILED');
+  }
   await page.mouse.move(startX, startY + targetDeltaY - 2, { steps: 5 });
   let translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY, 'ALIGN');
-  // 无命中（锚点距候选 6px > 5px 阈值）但仍在释放带（8px）内：保持吸附目标。
-  await page.mouse.move(startX, startY + targetDeltaY + 6, { steps: 2 });
+  const dragMeasurements = await designer.locator('.canvas-measurement').evaluateAll((elements) =>
+    elements.map((element) => ({
+      axis: element.dataset.axis,
+      label: element.querySelector('.canvas-measurement-label')?.textContent ?? '',
+    })),
+  );
+  if (
+    dragMeasurements.length === 0 ||
+    dragMeasurements.some(
+      (measurement) =>
+        (measurement.axis !== 'x' && measurement.axis !== 'y') || !/^\d+$/.test(measurement.label),
+    )
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_SNAP_MEASUREMENT_DURING_DRAG_FAILED:${JSON.stringify(dragMeasurements)}`,
+    );
+  }
+  // 捕获阈值内（4px ≤ 5px）每帧重新吸附：保持吸附目标（×1.0，无额外释放带，Nebula/Moveable 语义）。
+  await page.mouse.move(startX, startY + targetDeltaY + 4, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY, 'HOLD');
-  // 网格线候选（5px 阈值，参考 Moveable/Nebula）：center 锚点距 48 网格线 5px → 吸附 -88。
+  // 超出捕获阈值（6px > 5px）立即释放：translate 恢复原始位移。
+  await page.mouse.move(startX, startY + targetDeltaY + 6, { steps: 2 });
+  translate = await readTranslate('title');
+  await expectAxis(translate, 'y', targetDeltaY + 6, 'RELEASE_BEYOND');
+  // 没有组件、画布或用户参考线命中时，移动保持原始位移。
   await page.mouse.move(startX, startY + targetDeltaY + 7, { steps: 2 });
   translate = await readTranslate('title');
-  await expectAxis(translate, 'y', targetDeltaY + 12, 'GRID_LINE');
-  // 超过释放带后不再保持 -88：bottom 锚点距 subtitle top（100）2px → 按距离重新吸附 -72。
+  await expectAxis(translate, 'y', targetDeltaY + 7, 'RAW_MOVE');
+  // 超出画布边界吸附阈值后，bottom 锚点距 subtitle top（100）2px → 按距离重新吸附。
   const releaseDelta =
     baseline.subtitle.position.y - (baseline.title.position.y + baseline.title.size.height);
   await page.mouse.move(startX, startY + targetDeltaY + 30, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', releaseDelta, 'RELEASE');
-  // 视觉重合：完全重合（dist 0）的 x 轴参考线（600 网格线 = title 右边缘）中心与选中框边缘对齐。
-  const overlay = await page.evaluate(() => {
-    const root = window.baseScreenHarness.designer.shadowRoot;
-    const snap = root?.querySelector('.canvas-guide-snap[data-axis="x"]');
-    const selection = root?.querySelector('[data-selection]');
-    if (snap === null || snap === undefined || selection === null || selection === undefined) {
-      return null;
-    }
-    const snapRect = snap.getBoundingClientRect();
-    const selectionRect = selection.getBoundingClientRect();
-    return {
-      snapCenter: snapRect.x + snapRect.width / 2,
-      selectionLeft: selectionRect.left,
-      selectionRight: selectionRect.right,
-    };
-  });
-  if (
-    overlay === null ||
-    (Math.abs(overlay.snapCenter - overlay.selectionLeft) > 1.5 &&
-      Math.abs(overlay.snapCenter - overlay.selectionRight) > 1.5)
-  ) {
-    throw new Error(
-      `BROWSER_HARNESS_SNAP_GUIDE_ALIGNMENT_FAILED:${JSON.stringify({ overlay, targetDeltaY, translate })}`,
-    );
+  // title 与 host-data 的 left=100 已精确重合；即使 y 轴仍在 2px 捕获范围内，
+  // x 轴也不得因零校正而出现贯穿画布的辅助线。
+  if ((await designer.locator('.canvas-guide-snap[data-axis="x"]').count()) !== 0) {
+    throw new Error('BROWSER_HARNESS_SNAP_EXACT_X_GUIDE_FAILED');
+  }
+  // 指针也精确落在重合边界时，两轴均无需校正，因此不应保留任何 snap overlay。
+  await page.mouse.move(startX, startY + releaseDelta, { steps: 2 });
+  translate = await readTranslate('title');
+  await expectAxis(translate, 'y', releaseDelta, 'EXACT_BOUNDARY');
+  if ((await designer.locator('.canvas-guide-snap').count()) !== 0) {
+    throw new Error('BROWSER_HARNESS_SNAP_EXACT_BOUNDARY_GUIDE_FAILED');
   }
   await page.mouse.up();
+  if ((await designer.locator('.canvas-measurement').count()) !== 0) {
+    throw new Error('BROWSER_HARNESS_SNAP_MEASUREMENT_RELEASE_FAILED');
+  }
   const commitTargetY = baseline.title.position.y + releaseDelta;
   const committedOk = await page
     .waitForFunction(
@@ -1460,7 +1642,7 @@ async function assertSnapWorkflow(designer, page) {
     );
   }
   // 旋转候选：subtitle 移到 title 右侧并转 90°，按 visual bounds 左边缘吸附。
-  // x=800 使旋转后的 visual left（991）远离 24px 网格线（984/1008），避免被网格线竞争。
+  // x=800 使旋转后的 visual left（991）远离 title，隔离旋转候选断言。
   await designer.evaluate(() => {
     const result = window.baseScreenHarness.designer.executeCommand({
       type: 'update-components',
@@ -1547,7 +1729,17 @@ async function assertSnapWorkflow(designer, page) {
         rotation: restore.title.rotation,
       },
     });
-    if (!result.ok || !titleResult.ok) throw new Error('BROWSER_HARNESS_SNAP_RESTORE_FAILED');
+    const hostDataResult = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: ['host-data'],
+      patch: {
+        position: restore.hostData.position,
+        rotation: restore.hostData.rotation,
+      },
+    });
+    if (!result.ok || !titleResult.ok || !hostDataResult.ok) {
+      throw new Error('BROWSER_HARNESS_SNAP_RESTORE_FAILED');
+    }
   }, beforeComponents);
   await page.waitForFunction((expected) => {
     const { document: doc } = window.baseScreenHarness.designer;
@@ -1565,15 +1757,20 @@ async function assertSnapWorkflow(designer, page) {
     };
     const title = read('title');
     const subtitle = read('subtitle');
+    const hostData = read('host-data');
     return (
       title !== undefined &&
       subtitle !== undefined &&
+      hostData !== undefined &&
       title.position.x === expected.title.position.x &&
       title.position.y === expected.title.position.y &&
       title.rotation === expected.title.rotation &&
       subtitle.position.x === expected.subtitle.position.x &&
       subtitle.position.y === expected.subtitle.position.y &&
-      subtitle.rotation === expected.subtitle.rotation
+      subtitle.rotation === expected.subtitle.rotation &&
+      hostData.position.x === expected.hostData.position.x &&
+      hostData.position.y === expected.hostData.position.y &&
+      hostData.rotation === expected.hostData.rotation
     );
   }, beforeComponents);
   await page.evaluate(() => {
@@ -1607,15 +1804,6 @@ async function assertSnapWorkflow(designer, page) {
   );
   if (after !== before) {
     throw new Error('BROWSER_HARNESS_SNAP_RESTORE_MISMATCH');
-  }
-  // 恢复网格开关状态。
-  if (gridWasEnabled) {
-    await toggleGridViaMenu(designer);
-    await page.waitForFunction(() => {
-      const viewport =
-        window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-viewport]');
-      return viewport?.dataset.grid === 'true';
-    });
   }
 }
 
@@ -2133,14 +2321,14 @@ async function assertDesktopWorkbench(designer, viewport) {
 function assertPositiveNonOverlappingRects(rects, axis, viewport) {
   if (rects.some((rect) => rect === undefined || rect.width <= 0 || rect.height <= 0)) {
     throw new Error(
-      `BROWSER_HARNESS_${axis}_REGION_SIZE_FAILED: ${viewport.width}x${viewport.height}`,
+      `BROWSER_HARNESS_${axis}_REGION_SIZE_FAILED: ${viewport.width}x${viewport.height} ${JSON.stringify(rects)}`,
     );
   }
   for (let index = 0; index < rects.length; index++) {
     for (let other = index + 1; other < rects.length; other++) {
       if (rectanglesOverlap(rects[index], rects[other])) {
         throw new Error(
-          `BROWSER_HARNESS_${axis}_REGION_OVERLAP_FAILED: ${viewport.width}x${viewport.height}`,
+          `BROWSER_HARNESS_${axis}_REGION_OVERLAP_FAILED: ${viewport.width}x${viewport.height} ${JSON.stringify({ first: rects[index], second: rects[other] })}`,
         );
       }
     }

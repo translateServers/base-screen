@@ -332,6 +332,8 @@ designer.toolMaterialTypes = {
   ellipse: 'base.ellipse',
   image: 'base.image',
 };
+// 编组使用显式配置的容器物料（children=true），缺失时 Group 命令按 ADR-0012 保持禁用。
+designer.groupMaterialType = 'base.container';
 viewer.catalog = bridgeCatalog;
 let envelope = {
   projectId: 'browser-harness',
