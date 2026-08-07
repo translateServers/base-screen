@@ -8,38 +8,99 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-.designer-menu,
-.designer-help {
+.designer-menu {
   position: absolute;
-  top: calc(var(--designer-topbar-height) + var(--designer-space-2));
-  z-index: 5;
-  min-width: 196px;
+  z-index: var(--designer-z-dialog);
+  min-width: 208px;
   padding: var(--designer-space-2);
   background: var(--designer-surface-overlay);
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-overlay);
   box-shadow: var(--designer-shadow-overlay);
+  transform-origin: top center;
+  animation: designer-menu-in var(--designer-motion) cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.designer-menu-item,
-.designer-help p {
+.designer-menu[hidden] {
+  display: none;
+}
+
+.designer-menu {
+  top: calc(var(--designer-topbar-height) - 1px);
+}
+
+.designer-menu .designer-menu-item {
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: var(--designer-space-6);
   width: 100%;
-  gap: 24px;
+  min-height: var(--designer-control-height-compact);
+  padding: 0 var(--designer-space-5);
+  border: none;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background var(--designer-motion),
+    color var(--designer-motion);
 }
 
-.designer-help h2 {
-  font-size: 14px;
-  margin: 4px 0 8px;
-}
-
-.designer-help:focus {
+.designer-menu .designer-menu-item:hover:not(:disabled),
+.designer-menu .designer-menu-item:focus-visible:not(:disabled) {
+  background: var(--designer-accent-surface);
+  color: var(--designer-text-primary);
   outline: none;
 }
 
-.designer-help p {
-  margin: 4px 0;
+.designer-menu .designer-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-menu .designer-menu-item:disabled {
+  color: var(--designer-text-disabled);
+  cursor: default;
+}
+
+.designer-menu .designer-menu-item kbd {
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.designer-menu .designer-menu-item .menu-item-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--designer-accent);
+  opacity: 0;
+}
+
+.designer-menu .designer-menu-item[aria-checked="true"] .menu-item-check {
+  opacity: 1;
+}
+
+.designer-menu .designer-menu-item .menu-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.designer-menu .designer-menu-separator {
+  height: 1px;
+  margin: var(--designer-space-2) var(--designer-space-3);
+  background: var(--designer-border-subtle);
 }
 
 .material-search {
@@ -200,6 +261,17 @@
   }
 }
 
+@keyframes designer-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   :host,
   .designer {
@@ -218,7 +290,11 @@
   .project-conflict,
   .import-confirmation,
   .blueprint-workspace,
-  .direct-preview {
+  .direct-preview,
+  .designer-menu,
+  .designer-help-dialog,
+  .designer-context-menu,
+  .topbar-text-button {
     transition-duration: 0s !important;
     animation-duration: 0s !important;
   }

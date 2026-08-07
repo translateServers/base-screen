@@ -3,13 +3,12 @@ import type { ScreenInteractionState } from '@base-screen/core';
 import {
   collectDesignerSnapCandidates,
   DEFAULT_DESIGNER_CANVAS_AIDS,
-  DESIGNER_GRID_SIZE,
   type DesignerCanvasAidsState,
-  type DesignerSnapCandidate,
+  type DesignerCanvasMeasurement,
   type DesignerSnapCandidates,
   type DesignerSnapGuideLine,
-  type DesignerSnapGuides,
   type DesignerSnapPoint,
+  type DesignerSnapPreview,
   type DesignerSnapSession,
   type DesignerSnapTranslation,
   getDesignerRulerMarks,
@@ -17,6 +16,7 @@ import {
   snapDesignerSelectionTranslation,
 } from '../viewport/designer-canvas-aids.js';
 import { clientPointToDesignerCanvasPoint } from '../viewport/designer-canvas-coordinates.js';
+import { collectDesignerCanvasMeasurements } from '../viewport/designer-canvas-measurements.js';
 
 interface DesignerWorkbenchCallbacks {
   readonly getCanvas: () => HTMLDivElement | undefined;
@@ -31,6 +31,19 @@ type GuideAxis = 'x' | 'y';
 type LeftTab = 'materials' | 'layers';
 type RightTab = 'appearance' | 'data' | 'interaction' | 'events';
 type WorkbenchMode = 'standard' | 'with-menu' | 'fullscreen';
+
+// 双击移除参考线的判定窗口：同一参考线（轴 + 索引）的两次 pointerdown 间隔不超过该值。
+// 不能在浏览器 dblclick 事件上实现：guide 拖拽在 pointerdown 时 setPointerCapture 接管指针，
+// Chromium 此后不再合成 click/dblclick（仅派发 pointerdown/up），dblclick 处理器只作兜底。
+const DESIGNER_GUIDE_DOUBLE_CLICK_MS = 500;
+
+interface SnapPreviewState {
+  readonly x: readonly DesignerSnapGuideLine[] | undefined;
+  readonly y: readonly DesignerSnapGuideLine[] | undefined;
+  readonly activeX: number | undefined;
+  readonly activeY: number | undefined;
+  readonly measurements: readonly DesignerCanvasMeasurement[] | undefined;
+}
 
 export class DesignerWorkbenchController {
   #leftCollapsed = false;
@@ -47,17 +60,16 @@ export class DesignerWorkbenchController {
         readonly axis: GuideAxis;
         readonly guideIndex: number | undefined;
         readonly pointerId: number;
+        /** 拖拽起始的参考线坐标：指针移动偏离时视为拖拽而非双击点击。 */
+        readonly value: number;
       }
+    | undefined;
+  /** 上一次落在参考线上的 pointerdown（轴 + 索引 + 时间戳），用于双击移除判定。 */
+  #lastGuidePointerDown:
+    | { readonly axis: GuideAxis; readonly index: number; readonly time: number }
     | undefined;
   #guidePreview: { readonly axis: GuideAxis; readonly value: number } | undefined;
-  #snapPreview:
-    | {
-        readonly x: readonly DesignerSnapGuideLine[] | undefined;
-        readonly y: readonly DesignerSnapGuideLine[] | undefined;
-        readonly activeX: number | undefined;
-        readonly activeY: number | undefined;
-      }
-    | undefined;
+  #snapPreview: SnapPreviewState | undefined;
   #panelResize: { readonly side: PanelSide; readonly pointerId: number } | undefined;
   #panelResizeCaptureTarget: HTMLElement | undefined;
   #guideCaptureTarget: HTMLDivElement | undefined;
@@ -150,7 +162,6 @@ export class DesignerWorkbenchController {
     },
     offset: { readonly x: number; readonly y: number },
     excludedComponentIds: readonly string[] = [],
-    options: { readonly gridSnapEnabled?: boolean } = {},
   ): DesignerSnapTranslation {
     if (!this.#snapEnabled) return { x: offset.x, y: offset.y };
     const document = this.callbacks.getDocument();
@@ -158,18 +169,29 @@ export class DesignerWorkbenchController {
       document === undefined
         ? this.#guidesCandidates()
         : this.resolveSnapCandidates(document, excludedComponentIds);
-    const state =
-      options.gridSnapEnabled === undefined
-        ? this.#canvasAids
-        : { ...this.#canvasAids, gridSnapEnabled: options.gridSnapEnabled };
-    return snapDesignerSelectionTranslation(
+    const snapped = snapDesignerSelectionTranslation(
       bounds,
       offset,
-      state,
+      this.#canvasAids,
       candidates,
       this.callbacks.getZoom(),
       this.#snapSessionActive ? this.#snapSession : undefined,
     );
+    return {
+      ...snapped,
+      // 选区路径显式传入空 guides，避免已精确重合（零校正）时被单点/变换路径的回退线误渲染。
+      guides: snapped.guides ?? {},
+      ...(document === undefined || !this.#canvasAids.smartGuidesEnabled
+        ? {}
+        : {
+            measurements: collectDesignerCanvasMeasurements(
+              document,
+              translateSelectionBounds(bounds, snapped),
+              excludedComponentIds,
+              this.callbacks.getZoom(),
+            ),
+          }),
+    };
   }
 
   // 无文档时（罕见）仅用户参考线作为候选；size 0 表示渲染层按全画布线处理。
@@ -187,51 +209,38 @@ export class DesignerWorkbenchController {
     if (this.#snapSessionActive) {
       // 手势会话内文档与参考线不变（预览只写 CSS translate），候选集合只需收集一次；
       // 排除集合变化（候选语义变化）或会话结束时失效。
-      const excludedKey = excludedComponentIds.join('\u0000');
+      const excludedKey = JSON.stringify([...new Set(excludedComponentIds)].sort());
       if (this.#snapCache !== undefined && this.#snapCache.excludedKey === excludedKey) {
         return this.#snapCache.candidates;
       }
       // 候选集合变化时旧吸附目标失效，重置滞后状态。
       this.#snapSession = {};
-      const candidates = withGridLines(
-        collectDesignerSnapCandidates(document, this.#guides, excludedComponentIds),
-        this.#canvasAids,
+      const candidates = collectDesignerSnapCandidates(
         document,
+        this.#guides,
+        excludedComponentIds,
       );
       this.#snapCache = { candidates, excludedKey };
       return candidates;
     }
-    return withGridLines(
-      collectDesignerSnapCandidates(document, this.#guides, excludedComponentIds),
-      this.#canvasAids,
-      document,
-    );
+    return collectDesignerSnapCandidates(document, this.#guides, excludedComponentIds);
   }
 
-  // 吸附预览：选区平移传入 guides（显示阈值内的全部智能对齐线）与吸附目标值，
-  // 单点/变换路径无 guides 时回退到 snappedX/snappedY 单线（既有行为）。
-  renderSnapPreview(
-    point: (DesignerSnapPoint & { readonly guides?: DesignerSnapGuides | undefined }) | undefined,
-  ): void {
-    if (point === undefined) {
+  // 吸附预览：选区平移始终传入 guides（可能为空），单点/变换路径无 guides 时才回退到
+  // snappedX/snappedY 单线，避免已重合的选区边界被回退路径画成贯穿画布的辅助线。
+  renderSnapPreview(point: DesignerSnapPreview | undefined): void {
+    if (!this.#snapEnabled) {
+      if (this.#snapPreview === undefined) return;
       this.#snapPreview = undefined;
-    } else if (point.guides !== undefined) {
-      this.#snapPreview = {
-        x: point.guides.x,
-        y: point.guides.y,
-        activeX: point.snappedX,
-        activeY: point.snappedY,
-      };
-    } else {
-      const activeLine = (value: number | undefined) =>
-        value === undefined ? undefined : [{ value, distance: 0 }];
-      this.#snapPreview = {
-        x: activeLine(point.snappedX),
-        y: activeLine(point.snappedY),
-        activeX: point.snappedX,
-        activeY: point.snappedY,
-      };
+      this.renderGuides();
+      return;
     }
+    const nextPreview = toSnapPreviewState(point);
+    if (snapPreviewRenderKey(this.#snapPreview) === snapPreviewRenderKey(nextPreview)) {
+      this.#snapPreview = nextPreview;
+      return;
+    }
+    this.#snapPreview = nextPreview;
     this.renderGuides();
   }
 
@@ -252,6 +261,10 @@ export class DesignerWorkbenchController {
 
   toggleSnap(): void {
     this.#snapEnabled = !this.#snapEnabled;
+    this.#snapCache = undefined;
+    this.#snapSession = {};
+    this.#snapPreview = undefined;
+    this.renderGuides();
     this.renderStatusToggles();
   }
 
@@ -266,7 +279,11 @@ export class DesignerWorkbenchController {
       ...this.#canvasAids,
       smartGuidesEnabled: !this.#canvasAids.smartGuidesEnabled,
     };
+    this.#snapCache = undefined;
+    this.#snapSession = {};
+    this.#snapPreview = undefined;
     this.renderCanvasAids();
+    this.renderGuides();
   }
 
   cycleMode(): void {
@@ -328,8 +345,8 @@ export class DesignerWorkbenchController {
     if (direction === undefined) return false;
     const tabList = target.closest<HTMLElement>('[role="tablist"]');
     if (tabList === null) return false;
-    const controls = [...tabList.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
-    const current = controls.indexOf(target);
+    const controls = Array.from(tabList.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const current = controls.findIndex((tab) => tab === target);
     const next =
       direction === 'first'
         ? 0
@@ -344,6 +361,7 @@ export class DesignerWorkbenchController {
   }
 
   onPointerDown(event: PointerEvent): void {
+    if (!isPrimaryPointer(event)) return;
     const target = event.target as HTMLElement | null;
     const side = target?.closest<HTMLElement>('[data-panel-handle]')?.dataset.panelHandle;
     if (side === 'left' || side === 'right') {
@@ -379,8 +397,7 @@ export class DesignerWorkbenchController {
   }
 
   onDoubleClick(event: MouseEvent): void {
-    const target = event.composedPath?.()[0] ?? event.target;
-    this.onCanvasDoubleClick(target, event);
+    this.onCanvasDoubleClick(event);
   }
 
   cancelTransientState(): void {
@@ -399,6 +416,10 @@ export class DesignerWorkbenchController {
   clearGuides(): void {
     this.cancelTransientState();
     this.#guides = { x: [], y: [] };
+    // 参考线集合整体替换后，旧的轴+索引命中可能落到新参考线上：清除双击判定状态。
+    this.#lastGuidePointerDown = undefined;
+    this.#snapCache = undefined;
+    this.#snapSession = {};
     this.renderGuides();
   }
 
@@ -457,6 +478,15 @@ export class DesignerWorkbenchController {
       this.callbacks.getZoom(),
     );
     const value = drag.axis === 'x' ? point.x : point.y;
+    // 拖拽实际发生位移时，本次 pointerdown 不算双击点击：清除双击判定状态。
+    if (
+      this.#lastGuidePointerDown !== undefined &&
+      this.#lastGuidePointerDown.axis === drag.axis &&
+      this.#lastGuidePointerDown.index === drag.guideIndex &&
+      value !== drag.value
+    ) {
+      this.#lastGuidePointerDown = undefined;
+    }
     this.#guidePreview = { axis: drag.axis, value };
     this.renderGuides();
   }
@@ -478,6 +508,8 @@ export class DesignerWorkbenchController {
     } else if (this.isGuideWithinCanvas(drag.axis, value)) {
       this.#guides[drag.axis].push(value);
     }
+    this.#snapCache = undefined;
+    this.#snapSession = {};
     this.releaseGuideDrag();
     this.#guidePreview = undefined;
     this.renderGuides();
@@ -511,11 +543,26 @@ export class DesignerWorkbenchController {
   ): void {
     canvas.setPointerCapture(event.pointerId);
     this.#guideCaptureTarget = canvas;
-    this.#guideDrag = { axis, guideIndex, pointerId: event.pointerId };
+    this.#guideDrag = {
+      axis,
+      guideIndex,
+      pointerId: event.pointerId,
+      value: this.guideDragValue(event, axis, canvas),
+    };
     this.moveGuide(event);
   }
 
+  private guideDragValue(event: PointerEvent, axis: GuideAxis, canvas: HTMLDivElement): number {
+    const point = clientPointToDesignerCanvasPoint(
+      event,
+      canvas.getBoundingClientRect(),
+      this.callbacks.getZoom(),
+    );
+    return axis === 'x' ? point.x : point.y;
+  }
+
   private onCanvasPointerDown(event: PointerEvent): void {
+    if (!isPrimaryPointer(event)) return;
     const target = event.target as HTMLElement | null;
     const guide = target?.closest<HTMLElement>('[data-canvas-guide]');
     const axis = guide?.dataset.axis;
@@ -523,18 +570,45 @@ export class DesignerWorkbenchController {
     const canvas = this.callbacks.getCanvas();
     if ((axis !== 'x' && axis !== 'y') || !Number.isInteger(index) || canvas === undefined) return;
     event.stopImmediatePropagation();
+    const previous = this.#lastGuidePointerDown;
+    this.#lastGuidePointerDown = { axis, index, time: event.timeStamp };
+    if (
+      previous !== undefined &&
+      previous.axis === axis &&
+      previous.index === index &&
+      event.timeStamp - previous.time <= DESIGNER_GUIDE_DOUBLE_CLICK_MS
+    ) {
+      // 同一参考线上 500ms 内的第二次 pointerdown = 双击：移除参考线（不再进入拖拽）。
+      this.#lastGuidePointerDown = undefined;
+      this.#guides[axis].splice(index, 1);
+      this.renderGuides();
+      return;
+    }
     this.startGuideDrag(axis, index, event, canvas);
   }
 
-  private onCanvasDoubleClick(target: EventTarget | null, event: MouseEvent): void {
-    const element = target as { closest?: (selector: string) => HTMLElement | null } | null;
-    const guide = element?.closest?.('[data-canvas-guide]');
-    const axis = guide?.dataset.axis;
-    const index = Number(guide?.dataset.guideIndex);
-    if ((axis !== 'x' && axis !== 'y') || !Number.isInteger(index)) return;
-    this.#guides[axis].splice(index, 1);
-    event.stopImmediatePropagation();
-    this.renderGuides();
+  // 双击移除参考线。注意不能用 dblclick 的 event target 定位：guide 拖拽通过
+  // setPointerCapture 接管指针，pointerdown/up 被重定向到画布，浏览器合成的 click/dblclick
+  // 会派发到捕获元素（画布）而非参考线。因此按 clientX/Y 做位置命中（elementsFromPoint），
+  // 按绘制顺序取第一个落在参考线上的元素；无命中时回退 composed path target（合成事件/边界）。
+  private onCanvasDoubleClick(event: MouseEvent): void {
+    const root = this.callbacks.getRoot();
+    const target = event.composedPath?.()[0] ?? event.target;
+    const candidates: readonly (Element | EventTarget)[] =
+      root !== null && typeof root.elementsFromPoint === 'function'
+        ? root.elementsFromPoint(event.clientX, event.clientY)
+        : [];
+    for (const hit of [...candidates, target]) {
+      const element = hit as { closest?: (selector: string) => HTMLElement | null } | null;
+      const guide = element?.closest?.('[data-canvas-guide]');
+      const axis = guide?.dataset.axis;
+      const index = Number(guide?.dataset.guideIndex);
+      if ((axis !== 'x' && axis !== 'y') || !Number.isInteger(index)) continue;
+      this.#guides[axis].splice(index, 1);
+      event.stopImmediatePropagation();
+      this.renderGuides();
+      return;
+    }
   }
 
   private isGuideWithinCanvas(axis: GuideAxis, value: number): boolean {
@@ -575,6 +649,12 @@ export class DesignerWorkbenchController {
         }
       }
     }
+    if (this.#snapEnabled && this.#canvasAids.smartGuidesEnabled) {
+      const measurements = this.#snapPreview?.measurements ?? [];
+      for (const measurement of measurements) {
+        container.appendChild(this.createMeasurement(measurement));
+      }
+    }
   }
 
   private createSnapGuide(
@@ -584,19 +664,33 @@ export class DesignerWorkbenchController {
   ): HTMLElement {
     const guide = this.createGuide(axis, line.value, 'snap');
     // 组件参考线只覆盖参考组件的正交范围（局部线，参考 Moveable element guidelines）；
-    // 画布/guide/网格线（全画布尺寸）与单点回退线保持 CSS 全画布默认（size 0 或未定义）。
+    // 画布/guide（全画布尺寸）与单点回退线保持 CSS 全画布默认（size 0 或未定义）。
     if (line.start !== undefined && line.size !== undefined && line.size > 0) {
       guide.style[axis === 'x' ? 'top' : 'left'] = `${line.start}px`;
       guide.style[axis === 'x' ? 'height' : 'width'] = `${line.size}px`;
     }
     if (active) guide.classList.add('canvas-guide-snap-active');
-    if (line.distance > 0) {
-      const label = guide.ownerDocument.createElement('span');
-      label.className = 'canvas-guide-snap-label';
-      label.textContent = `${Math.round(line.distance * 10) / 10}px`;
-      guide.appendChild(label);
-    }
     return guide;
+  }
+
+  private createMeasurement(measurement: DesignerCanvasMeasurement): HTMLElement {
+    const marker = this.callbacks.getCanvas()!.ownerDocument.createElement('div');
+    marker.className = 'canvas-measurement';
+    marker.dataset.axis = measurement.axis;
+    if (measurement.axis === 'x') {
+      marker.style.left = `${measurement.from}px`;
+      marker.style.top = `${measurement.position}px`;
+      marker.style.width = `${measurement.to - measurement.from}px`;
+    } else {
+      marker.style.left = `${measurement.position}px`;
+      marker.style.top = `${measurement.from}px`;
+      marker.style.height = `${measurement.to - measurement.from}px`;
+    }
+    const label = marker.ownerDocument.createElement('span');
+    label.className = 'canvas-measurement-label';
+    label.textContent = formatMeasurement(measurement.distance);
+    marker.appendChild(label);
+    return marker;
   }
 
   private renderRulers(): void {
@@ -726,46 +820,66 @@ export class DesignerWorkbenchController {
   }
 }
 
-// 网格开启时把 24px 网格线并入智能候选（5px 阈值内吸附，参考 Moveable 的网格线 guidelines 语义）。
-// 网格线为全画布参考（start 0，长度 = 画布正交尺寸）；选区平移关闭无阈值取整，
-// 网格线作为普通候选与组件/画布/参考线统一按距离竞争。
-function withGridLines(
-  candidates: DesignerSnapCandidates,
-  state: DesignerCanvasAidsState,
-  document: ScreenDocument,
-): DesignerSnapCandidates {
-  if (!state.gridSnapEnabled) return candidates;
-  const axis = (limit: number, orthogonalSize: number) => {
-    const lines: DesignerSnapCandidate[] = [];
-    for (let value = DESIGNER_GRID_SIZE; value < limit; value += DESIGNER_GRID_SIZE) {
-      lines.push({ value, start: 0, size: orthogonalSize });
-    }
-    return lines;
-  };
+function toSnapPreviewState(point: DesignerSnapPreview | undefined): SnapPreviewState | undefined {
+  if (point === undefined) return undefined;
+  if (point.guides !== undefined) {
+    const x = point.guides.x?.length === 0 ? undefined : point.guides.x;
+    const y = point.guides.y?.length === 0 ? undefined : point.guides.y;
+    return {
+      x,
+      y,
+      activeX: x === undefined ? undefined : point.snappedX,
+      activeY: y === undefined ? undefined : point.snappedY,
+      measurements: point.measurements,
+    };
+  }
+  const activeLine = (value: number | undefined): readonly DesignerSnapGuideLine[] | undefined =>
+    value === undefined ? undefined : [{ value }];
   return {
-    x: sortedUniqueCandidates([
-      ...candidates.x,
-      ...axis(document.canvas.width, document.canvas.height),
-    ]),
-    y: sortedUniqueCandidates([
-      ...candidates.y,
-      ...axis(document.canvas.height, document.canvas.width),
-    ]),
+    x: activeLine(point.snappedX),
+    y: activeLine(point.snappedY),
+    activeX: point.snappedX,
+    activeY: point.snappedY,
+    measurements: point.measurements,
   };
 }
 
-// 同值候选合并（长度取更长者，全画布尺寸 > 组件局部尺寸），按 value 升序。
-function sortedUniqueCandidates(
-  candidates: readonly DesignerSnapCandidate[],
-): readonly DesignerSnapCandidate[] {
-  const byValue = new Map<number, DesignerSnapCandidate>();
-  for (const candidate of candidates) {
-    const existing = byValue.get(candidate.value);
-    if (existing === undefined || candidate.size > existing.size) {
-      byValue.set(candidate.value, candidate);
-    }
-  }
-  return [...byValue.values()].sort((left, right) => left.value - right.value);
+function snapPreviewRenderKey(preview: SnapPreviewState | undefined): string {
+  if (preview === undefined) return '';
+  return JSON.stringify({
+    x: preview.x,
+    y: preview.y,
+    activeX: preview.activeX,
+    activeY: preview.activeY,
+    measurements: preview.measurements,
+  });
+}
+
+function translateSelectionBounds(
+  bounds: {
+    readonly bottom: number;
+    readonly left: number;
+    readonly right: number;
+    readonly top: number;
+  },
+  translation: { readonly x: number; readonly y: number },
+): {
+  readonly bottom: number;
+  readonly left: number;
+  readonly right: number;
+  readonly top: number;
+} {
+  return {
+    bottom: bounds.bottom + translation.y,
+    left: bounds.left + translation.x,
+    right: bounds.right + translation.x,
+    top: bounds.top + translation.y,
+  };
+}
+
+function formatMeasurement(distance: number): string {
+  // Match Moveable's default `snapDigit: 0`: visual measurements are whole, unitless pixels.
+  return String(Math.round(distance));
 }
 
 function tabDirection(key: string): -1 | 1 | 'first' | 'last' | undefined {
@@ -774,4 +888,8 @@ function tabDirection(key: string): -1 | 1 | 'first' | 'last' | undefined {
   if (key === 'Home') return 'first';
   if (key === 'End') return 'last';
   return undefined;
+}
+
+function isPrimaryPointer(event: PointerEvent): boolean {
+  return event.button === undefined || event.button === 0;
 }

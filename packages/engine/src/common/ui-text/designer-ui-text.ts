@@ -154,6 +154,13 @@ export const DESIGNER_UI_TEXT = {
     dataSourceInvalid: '数据源配置无效，未保存修改。',
   },
   shortcutHelp: '快捷键帮助',
+  helpClose: '关闭',
+  shortcutHelpIntro: '常用操作一览，按 Esc 或点击空白处关闭。',
+  shortcutHelpSections: {
+    edit: '编辑',
+    arrange: '排列',
+    canvas: '画布与视图',
+  },
   rulerCornerUnit: 'px',
   selection: {
     resizeHandle: (dir: string) => `调整大小：${dir}`,

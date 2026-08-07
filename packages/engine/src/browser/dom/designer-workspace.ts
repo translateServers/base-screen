@@ -14,6 +14,55 @@ export { designerToolGlyph };
 // Nebula 缩放下拉预设（状态栏缩放百分比菜单）。
 const DESIGNER_ZOOM_PRESETS = [25, 50, 75, 100, 125, 150, 200] as const;
 
+const SHORTCUT_HELP_SECTIONS = [
+  {
+    title: DESIGNER_UI_TEXT.shortcutHelpSections.edit,
+    operationIds: [
+      'undo',
+      'redo',
+      'copy',
+      'paste',
+      'duplicate',
+      'delete',
+      'select-all',
+      'group',
+      'ungroup',
+      'lock',
+      'unlock',
+      'hide',
+    ],
+  },
+  {
+    title: DESIGNER_UI_TEXT.shortcutHelpSections.arrange,
+    operationIds: [
+      'nudge-left',
+      'nudge-right',
+      'nudge-up',
+      'nudge-down',
+      'align-left',
+      'align-center',
+      'align-right',
+      'align-top',
+      'align-middle',
+      'align-bottom',
+      'bring-to-front',
+      'send-to-back',
+    ],
+  },
+  {
+    title: DESIGNER_UI_TEXT.shortcutHelpSections.canvas,
+    operationIds: [
+      'zoom-in',
+      'zoom-out',
+      'zoom-fit',
+      'toggle-guides',
+      'toggle-border-guides',
+      'toggle-workbench',
+      'show-help',
+    ],
+  },
+] as const;
+
 export function createDesignerWorkspace(
   ownerDocument: Document,
   materials: readonly BaseScreenMaterialCatalogEntry[],
@@ -102,18 +151,6 @@ export function createDesignerWorkspace(
         <div class="designer-menu" data-menu="tools" hidden role="menu">
           ${menuButton('toggle-grid')}${menuButton('toggle-guides')}${menuButton('toggle-border-guides')}${menuButton('toggle-workbench')}${menuButton('show-help')}
         </div>
-        <section class="designer-help" data-menu="help" hidden aria-label="${DESIGNER_UI_TEXT.shortcutHelp}" tabindex="-1">
-          <h2>${DESIGNER_UI_TEXT.shortcuts}</h2>
-          ${Object.entries(DESIGNER_OPERATION_TEXT)
-            .flatMap(([id, operation]) =>
-              'shortcut' in operation
-                ? [
-                    `<p data-help-operation="${id}">${operation.label}<kbd>${operation.shortcut}</kbd></p>`,
-                  ]
-                : [],
-            )
-            .join('')}
-        </section>
       </header>
 
       <input type="file" accept="application/json" data-import-document hidden>
@@ -251,6 +288,46 @@ export function createDesignerWorkspace(
   blueprint.hidden = true;
   layout.appendChild(blueprint);
 
+  const helpDialog = ownerDocument.createElement('section');
+  helpDialog.className = 'designer-help-dialog';
+  helpDialog.dataset.helpDialog = 'true';
+  helpDialog.hidden = true;
+  helpDialog.setAttribute('role', 'dialog');
+  helpDialog.setAttribute('aria-modal', 'true');
+  helpDialog.ariaLabel = DESIGNER_UI_TEXT.shortcutHelp;
+  helpDialog.innerHTML = `
+    <div class="designer-dialog-surface help-card">
+      <header>
+        <div class="help-heading">
+          <span>${DESIGNER_UI_TEXT.shortcuts}</span>
+          <p>${DESIGNER_UI_TEXT.shortcutHelpIntro}</p>
+        </div>
+        <button type="button" class="designer-control designer-button designer-icon-button help-close" data-variant="ghost" data-help-close aria-label="${DESIGNER_UI_TEXT.helpClose}">
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+        </button>
+      </header>
+      <div class="help-content">
+        ${SHORTCUT_HELP_SECTIONS.map(
+          ({ title, operationIds }) => `<section class="help-section">
+            <h3>${title}</h3>
+            <div class="help-shortcuts">
+              ${operationIds
+                .flatMap((id) => {
+                  const operation = DESIGNER_OPERATION_TEXT[id];
+                  return 'shortcut' in operation
+                    ? [
+                        `<p data-help-operation="${id}"><span>${operation.label}</span><kbd>${operation.shortcut}</kbd></p>`,
+                      ]
+                    : [];
+                })
+                .join('')}
+            </div>
+          </section>`,
+        ).join('')}
+      </div>
+    </div>`;
+  layout.appendChild(helpDialog);
+
   const materialsRail = layout.querySelector<HTMLElement>('[data-materials]')!;
   for (const entry of materials) {
     materialsRail.appendChild(createMaterialCard(ownerDocument, entry));
@@ -269,6 +346,7 @@ function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: strin
 }
 
 // Nebula 顶栏右段的带文案操作按钮（预览/保存/发布）：图标 + 标签。
+// 不使用 .designer-button（inline-grid 会导致图标/文字垂直堆叠），用 .topbar-text-button 独立控制布局。
 function labeledActionButton(
   action: keyof typeof DESIGNER_OPERATION_TEXT,
   glyph: string,
@@ -276,7 +354,7 @@ function labeledActionButton(
 ): string {
   const operation = DESIGNER_OPERATION_TEXT[action];
   const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
-  return `<button type="button" class="designer-control designer-button topbar-text-button ${extraClass}" data-variant="neutral" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}</span><span>${operation.label}</span></button>`;
+  return `<button type="button" class="topbar-text-button ${extraClass}" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}</span><span>${operation.label}</span></button>`;
 }
 
 function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {

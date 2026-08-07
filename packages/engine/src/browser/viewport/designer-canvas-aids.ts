@@ -1,5 +1,5 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import { isScreenComponentEffectivelyHidden } from '@base-screen/core';
+import { getScreenComponentBounds, isScreenComponentEffectivelyHidden } from '@base-screen/core';
 // 吸附竞争数学来自 vendored Moveable snappable（见 ADR-0020 与 common/vendor 的 MIT notice）：
 // 每锚点 × 每候选 offset/dist + 阈值过滤 + 最近排序全部由上游 checkSnap 语义保证。
 import {
@@ -8,11 +8,10 @@ import {
 } from '../../common/vendor/moveable/snappable/snap.js';
 import type { SnapGuideline, SnapInfo } from '../../common/vendor/moveable/types.js';
 
-export const DESIGNER_GRID_SIZE = 24;
 export const DESIGNER_SMART_GUIDE_THRESHOLD = 5;
-// 吸附释放带倍率：吸附激活后偏离超过捕获阈值 × 此倍率才释放。
-// 阈值边界（如 4.9↔5.1px）的微小移动不会反复吸附/脱离，参考 Moveable 的贴线保持语义。
-export const DESIGNER_SNAP_RELEASE_MULTIPLIER = 1.6;
+// 吸附保持范围倍率：1.0 = 捕获阈值本身（超出阈值立即释放），
+// 对齐 Nebula/Moveable 的每帧重新判定语义（Moveable snapThreshold=5，无额外滞后带）。
+export const DESIGNER_SNAP_RELEASE_MULTIPLIER = 1;
 // 对齐线渲染阈值（px，文档坐标）：仅距离 ≤ 该值的命中才绘制参考线，
 // 对应 Moveable 的 snapRenderThreshold（默认 1）——吸附（5px）与渲染（1px）分离，
 // 接近阶段无线，几乎贴合时才出现线。
@@ -20,13 +19,11 @@ export const DESIGNER_SNAP_RENDER_THRESHOLD = 1;
 
 export interface DesignerCanvasAidsState {
   readonly gridEnabled: boolean;
-  readonly gridSnapEnabled: boolean;
   readonly smartGuidesEnabled: boolean;
 }
 
 export const DEFAULT_DESIGNER_CANVAS_AIDS: DesignerCanvasAidsState = {
   gridEnabled: true,
-  gridSnapEnabled: true,
   smartGuidesEnabled: true,
 };
 
@@ -34,9 +31,9 @@ export const DEFAULT_DESIGNER_CANVAS_AIDS: DesignerCanvasAidsState = {
 export interface DesignerSnapCandidate {
   /** 对齐坐标（x 轴为 value，y 轴为 value）。 */
   readonly value: number;
-  /** 参考线起点（正交方向，画布坐标）：组件边为其 top/left，画布/guide/网格线为 0。 */
+  /** 参考线起点（正交方向，画布坐标）：组件边为其 top/left，画布/guide 为 0。 */
   readonly start: number;
-  /** 参考线长度：组件边为其正交尺寸（height/width），画布/guide/网格线为画布正交尺寸。 */
+  /** 参考线长度：组件边为其正交尺寸（height/width），画布/guide 为画布正交尺寸。 */
   readonly size: number;
 }
 
@@ -52,7 +49,22 @@ export interface DesignerSnapPoint {
   readonly snappedY?: number | undefined;
 }
 
-/** 单条智能对齐线（画布坐标）：供预览层绘制参考线、距离标签与吸附目标指示。 */
+/**
+ * 选区对齐轨道上的可视间距：`axis` 表示长度方向，`position` 表示正交坐标。
+ * 例如 `axis: 'y'` 从 `from` 到 `to` 的竖线位于 `position` 的 x 坐标。
+ */
+export interface DesignerCanvasMeasurement {
+  readonly axis: 'x' | 'y';
+  readonly distance: number;
+  readonly from: number;
+  readonly position: number;
+  readonly to: number;
+}
+
+export type DesignerSnapPreview = DesignerSnapPoint &
+  Pick<DesignerSnapTranslation, 'guides' | 'measurements'>;
+
+/** 单条智能对齐线（画布坐标）：供预览层绘制参考线与吸附目标指示。 */
 export interface DesignerSnapGuideLine {
   /** 对齐线坐标（x 轴为 value，y 轴为 value）。 */
   readonly value: number;
@@ -60,8 +72,6 @@ export interface DesignerSnapGuideLine {
   readonly start?: number | undefined;
   /** 参考线长度（可选）：undefined 表示全画布线。 */
   readonly size?: number | undefined;
-  /** 被移动选区锚点与参考边的距离（绝对值，px）。 */
-  readonly distance: number;
 }
 
 export interface DesignerSnapGuides {
@@ -74,11 +84,13 @@ export interface DesignerSnapTranslation {
   readonly y: number;
   readonly snappedX?: number | undefined;
   readonly snappedY?: number | undefined;
-  /** 显示阈值内的全部智能对齐线（不含网格，网格吸附不绘制参考线）。 */
+  /** 显示阈值内的最近一条智能对齐线。 */
   readonly guides?: DesignerSnapGuides | undefined;
+  /** 选区对齐轨道上的相邻组件间距，仅作为覆盖层视觉反馈。 */
+  readonly measurements?: readonly DesignerCanvasMeasurement[] | undefined;
 }
 
-/** 单个轴向的吸附会话状态：记录当前吸附的目标与选区锚点，供后续帧做释放带保持与同锚点跟随。 */
+/** 单个轴向的吸附会话状态：记录当前吸附的目标与选区锚点，供后续帧做阈值内保持与同锚点跟随。 */
 export interface DesignerSnapSessionAxis {
   readonly anchor?: number | undefined;
   readonly value: number;
@@ -135,7 +147,6 @@ export function snapDesignerCanvasPoint(
   const horizontal = resolvePointAxis(
     point.x,
     result.vertical,
-    state,
     releaseThreshold,
     session?.x,
     'vertical',
@@ -143,7 +154,6 @@ export function snapDesignerCanvasPoint(
   const vertical = resolvePointAxis(
     point.y,
     result.horizontal,
-    state,
     releaseThreshold,
     session?.y,
     'horizontal',
@@ -230,16 +240,14 @@ export function collectDesignerSnapCandidates(
   excludedComponentIds: readonly string[] = [],
 ): DesignerSnapCandidates {
   const excluded = new Set(excludedComponentIds);
-  // x 轴候选：x 坐标 + 正交方向的起点/长度（垂直线沿 y 延伸）。
+  // x 轴候选：画布边（0/宽）+ 用户 guide + 组件边（不含画布中心点候选）。
   const x: DesignerSnapCandidate[] = [
     { value: 0, start: 0, size: document.canvas.height },
-    { value: document.canvas.width / 2, start: 0, size: document.canvas.height },
     { value: document.canvas.width, start: 0, size: document.canvas.height },
     ...guides.x.map((value) => ({ value, start: 0, size: document.canvas.height })),
   ];
   const y: DesignerSnapCandidate[] = [
     { value: 0, start: 0, size: document.canvas.width },
-    { value: document.canvas.height / 2, start: 0, size: document.canvas.width },
     { value: document.canvas.height, start: 0, size: document.canvas.width },
     ...guides.y.map((value) => ({ value, start: 0, size: document.canvas.width })),
   ];
@@ -289,6 +297,13 @@ interface AxisResolution {
   readonly value: number;
 }
 
+interface SelectionSnapHit {
+  readonly anchor: number;
+  readonly distance: number;
+  readonly guideline: SnapGuideline;
+  readonly value: number;
+}
+
 // 候选 → 上游 SnapGuideline：垂直线的 pos=[对齐坐标, 正交起点]、水平线相反，size 为参考线长度。
 // 数组顺序保留调用方顺序（上游 checkSnap 对同距离命中按数组序取首个，生产路径候选已按值升序）。
 function toSnapGuidelines(candidates: DesignerSnapCandidates): SnapGuideline[] {
@@ -312,38 +327,44 @@ function toSnapGuidelines(candidates: DesignerSnapCandidates): SnapGuideline[] {
   return guidelines;
 }
 
-// 单点（指针位置）吸附解析：智能参考线与网格按绝对距离统一竞争；
-// 智能线未命中但仍在释放带内时保持上次吸附目标，避免阈值边界反复吸附/脱离。
+// 单点（指针位置）吸附解析：智能参考线未命中但仍在捕获阈值内时保持上次吸附目标
+// （×1.0，超出阈值即释放，对齐 Nebula 每帧判定）。
 function resolvePointAxis(
   raw: number,
   snap: SnapInfo,
-  state: DesignerCanvasAidsState,
   releaseThreshold: number,
   previous: DesignerSnapSessionAxis | undefined,
   axis: 'vertical' | 'horizontal',
 ): AxisResolution {
   const smart = getNearestSnapGuidelineInfo(snap);
-  const grid = state.gridSnapEnabled
-    ? Math.round(raw / DESIGNER_GRID_SIZE) * DESIGNER_GRID_SIZE
-    : undefined;
   if (smart.isSnap) {
-    const smartDistance = smart.dist;
-    if (grid !== undefined && Math.abs(grid - raw) < smartDistance) {
-      return { value: grid, snapped: grid, next: undefined, guides: [] };
-    }
     const value = smart.guideline!.pos[axis === 'vertical' ? 0 : 1]!;
-    return { value, snapped: value, next: { value }, guides: [] };
+    return {
+      value,
+      snapped: value,
+      next: { value },
+      guides: [],
+    };
   }
   if (previous !== undefined && Math.abs(previous.value - raw) <= releaseThreshold) {
-    return { value: previous.value, snapped: previous.value, next: previous, guides: [] };
+    return {
+      value: previous.value,
+      snapped: previous.value,
+      next: previous,
+      guides: [],
+    };
   }
-  return { value: grid ?? raw, snapped: grid, next: undefined, guides: [] };
+  return {
+    value: raw,
+    snapped: undefined,
+    next: undefined,
+    guides: [],
+  };
 }
 
-// 选区平移吸附解析：6 个锚点匹配候选；同锚点继续跟随（吸附目标未变时不切换到其他线/网格），
-// 新锚点或首次命中与网格按绝对距离统一竞争，未命中时在释放带内保持上次吸附目标。
-// 同时收集渲染阈值内的全部智能对齐线（每锚点 × 每候选，同值取最近；渲染阈值 1px，
-// 对应 Moveable snapRenderThreshold——吸附 5px 与渲染分离，接近阶段无线）。
+// 选区平移吸附解析：6 个锚点匹配候选；同锚点继续跟随，未命中时在捕获阈值内保持上次吸附目标。
+// 仅在本帧确实修正位置时绘制渲染阈值内的最近智能对齐线；已精确重合的边界会保留吸附，
+// 但不再以贯穿画布的蓝线重复提示（吸附 5px 与渲染 1px 仍分离）。
 function resolveSelectionAxis(
   anchors: readonly number[],
   translation: number,
@@ -354,29 +375,27 @@ function resolveSelectionAxis(
   previous: DesignerSnapSessionAxis | undefined,
   axis: 'vertical' | 'horizontal',
 ): AxisResolution {
-  const guides = state.smartGuidesEnabled ? collectGuideLines(snap, renderThreshold, axis) : [];
   const smart = nearestSnapHit(snap, anchors, axis);
-  const gridAnchor = anchors[0]!;
-  const grid = state.gridSnapEnabled
-    ? Math.round((gridAnchor + translation) / DESIGNER_GRID_SIZE) * DESIGNER_GRID_SIZE
-    : undefined;
+  const guides = state.smartGuidesEnabled ? collectGuideLines(smart, renderThreshold, axis) : [];
   if (smart !== undefined) {
     if (previous?.anchor !== undefined && previous.anchor === smart.anchor) {
       return {
         value: smart.value - smart.anchor,
         snapped: smart.value,
-        next: { anchor: smart.anchor, value: smart.value },
+        next: {
+          anchor: smart.anchor,
+          value: smart.value,
+        },
         guides,
       };
-    }
-    const smartDistance = smart.dist;
-    if (grid !== undefined && Math.abs(grid - (gridAnchor + translation)) < smartDistance) {
-      return { value: grid - gridAnchor, snapped: grid, next: undefined, guides };
     }
     return {
       value: smart.value - smart.anchor,
       snapped: smart.value,
-      next: { anchor: smart.anchor, value: smart.value },
+      next: {
+        anchor: smart.anchor,
+        value: smart.value,
+      },
       guides,
     };
   }
@@ -392,8 +411,8 @@ function resolveSelectionAxis(
     };
   }
   return {
-    value: grid === undefined ? translation : grid - gridAnchor,
-    snapped: grid,
+    value: translation,
+    snapped: undefined,
     next: undefined,
     guides,
   };
@@ -404,55 +423,35 @@ function nearestSnapHit(
   snap: SnapInfo,
   anchors: readonly number[],
   axis: 'vertical' | 'horizontal',
-): { readonly anchor: number; readonly value: number; readonly dist: number } | undefined {
+): SelectionSnapHit | undefined {
   const posInfo = snap.posInfos[0];
   const info = posInfo?.guidelineInfos[0];
   if (posInfo === undefined || info === undefined) return undefined;
   const posType = axis === 'vertical' ? 0 : 1;
   return {
     anchor: anchors[posInfo.index] ?? posInfo.pos,
+    distance: info.dist,
+    guideline: info.guideline,
     value: info.guideline.pos[posType]!,
-    dist: info.dist,
   };
 }
 
-// 渲染阈值内的全部智能对齐线（来自上游 guidelineInfos，同值多条候选合并取最近距离、长度取更长者，
-// 画布/网格线为全画布尺寸，视觉上覆盖组件局部线），按 value 升序。
+// 渲染阈值内的吸附线：每轴只输出实际赢得本次吸附的最近一条，避免其他巧合重合线混入。
+// 零距离代表选区原本就与候选边界/中心重合，并未发生位置修正，因此不输出视觉辅助线。
 function collectGuideLines(
-  snap: SnapInfo,
+  hit: SelectionSnapHit | undefined,
   threshold: number,
   axis: 'vertical' | 'horizontal',
 ): readonly DesignerSnapGuideLine[] {
-  const posType = axis === 'vertical' ? 0 : 1;
+  if (hit === undefined || hit.distance <= Number.EPSILON || hit.distance > threshold) return [];
   const startType = axis === 'vertical' ? 1 : 0;
-  const byValue = new Map<number, { distance: number; start: number; size: number }>();
-  for (const posInfo of snap.posInfos) {
-    for (const info of posInfo.guidelineInfos) {
-      if (info.dist > threshold) continue;
-      const guideline = info.guideline;
-      const value = guideline.pos[posType]!;
-      const nearest = byValue.get(value);
-      if (
-        nearest === undefined ||
-        info.dist < nearest.distance ||
-        (info.dist === nearest.distance && guideline.size > nearest.size)
-      ) {
-        byValue.set(value, {
-          distance: info.dist,
-          start: guideline.pos[startType]!,
-          size: guideline.size,
-        });
-      }
-    }
-  }
-  return [...byValue.entries()]
-    .map(([value, info]) => ({
-      value,
-      start: info.start,
-      size: info.size,
-      distance: info.distance,
-    }))
-    .sort((left, right) => left.value - right.value);
+  return [
+    {
+      size: hit.guideline.size,
+      start: hit.guideline.pos[startType]!,
+      value: hit.value,
+    },
+  ];
 }
 
 function rulerIncrement(zoom: number): number {
@@ -471,31 +470,25 @@ function componentSnapBounds(component: ScreenDocument['components'][number]): {
   readonly top: number;
   readonly width: number;
 } {
+  // Selection rendering and snapping must use the same Core geometry. Keeping a second
+  // rotation formula here caused sub-pixel drift between the outline and the snap anchors.
+  const visual = getScreenComponentBounds(component);
   const centerX = component.position.x + component.size.width / 2;
   const centerY = component.position.y + component.size.height / 2;
-  const radians = (component.rotation * Math.PI) / 180;
-  const cosine = Math.abs(Math.cos(radians));
-  const sine = Math.abs(Math.sin(radians));
-  const halfWidth = (component.size.width * cosine + component.size.height * sine) / 2;
-  const halfHeight = (component.size.width * sine + component.size.height * cosine) / 2;
-  const left = normalizeCoordinate(centerX - halfWidth);
-  const right = normalizeCoordinate(centerX + halfWidth);
-  const top = normalizeCoordinate(centerY - halfHeight);
-  const bottom = normalizeCoordinate(centerY + halfHeight);
+  const left = visual.left;
+  const right = visual.right;
+  const top = visual.top;
+  const bottom = visual.bottom;
   return {
     bottom,
-    centerX: normalizeCoordinate(centerX),
-    centerY: normalizeCoordinate(centerY),
-    height: normalizeCoordinate(bottom - top),
+    centerX,
+    centerY,
+    height: bottom - top,
     left,
     right,
     top,
-    width: normalizeCoordinate(right - left),
+    width: right - left,
   };
-}
-
-function normalizeCoordinate(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 // 同值候选合并（长度取更长者），按 value 升序；过滤非有限值。

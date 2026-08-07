@@ -68,12 +68,28 @@ describe('designer workbench visual convergence', () => {
   it('R8 keeps canvas grid and overlay layers driven by theme tokens', () => {
     expect(tokensCss).toContain('--designer-canvas-grid-line:');
     expect(tokensCss).toContain('--designer-surface-scrim:');
-    expect(tokensCss).toContain('--designer-z-canvas-selection: 2;');
+    expect(tokensCss).toContain(
+      '--designer-z-canvas-guide: calc(var(--designer-canvas-component-count, 0) + 1);',
+    );
+    expect(tokensCss).toContain(
+      '--designer-z-canvas-selection: calc(var(--designer-canvas-component-count, 0) + 2);',
+    );
     expect(tokensCss).toContain('--designer-z-modal: 30;');
     expect(workbenchCss).toContain('var(--designer-canvas-grid-line)');
     expect(workbenchCss).toContain('background: var(--designer-surface-scrim);');
     expect(workbenchCss).toContain('z-index: var(--designer-z-modal);');
     expect(workbenchCss).not.toMatch(/(?:#|rgb\()/);
+  });
+
+  it('R3 presents shortcut help as a scannable, responsive modal', () => {
+    expect(workbenchCss).toContain('.designer-help-dialog .help-card {');
+    expect(workbenchCss).toContain('width: min(480px, 100%);');
+    expect(workbenchCss).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(workbenchCss).toContain('.designer-help-dialog .help-section h3 {');
+    expect(workbenchCss).toContain('.designer-help-dialog .help-shortcuts {');
+    expect(workbenchCss).toContain('.designer-help-dialog .help-content p kbd {');
+    expect(workbenchCss).toContain('@keyframes designer-help-card-in');
+    expect(workbenchCss).toContain('@media (max-height: 760px)');
   });
 
   it('R11 preserves visible forced-color states and removes editor motion', () => {
@@ -94,5 +110,13 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('outline-offset: -1px;');
     expect(workbenchCss).toContain('.selection-grab {');
     expect(workbenchCss).toContain('pointer-events: auto;');
+  });
+
+  it('R2 styles Moveable-like transient distance measurements with tokens', () => {
+    expect(tokensCss).toContain('--designer-measurement-label:');
+    expect(workbenchCss).toContain('.canvas-measurement {');
+    expect(workbenchCss).toContain('border-left: 1px dashed var(--designer-snap-guide);');
+    expect(workbenchCss).toContain('.canvas-measurement-label {');
+    expect(workbenchCss).toContain('color: var(--designer-measurement-label);');
   });
 });

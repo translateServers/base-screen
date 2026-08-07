@@ -1,4 +1,5 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import { getScreenComponentBounds } from '@base-screen/core';
 import { describe, expect, it } from 'vitest';
 import {
   collectDesignerSnapCandidates,
@@ -21,33 +22,32 @@ function candidates(x: readonly number[] = [], y: readonly number[] = []): Desig
 }
 
 describe('snapDesignerCanvasPoint', () => {
-  it('snaps to the instance-local 24px grid only when enabled', () => {
+  it('R2 does not derive snap targets from the grid', () => {
     expect(snapDesignerCanvasPoint({ x: 35, y: 61 }, DEFAULT_DESIGNER_CANVAS_AIDS)).toEqual({
-      x: 24,
-      y: 72,
-      snappedX: 24,
-      snappedY: 72,
+      x: 35,
+      y: 61,
     });
     expect(
-      snapDesignerCanvasPoint(
-        { x: 35, y: 61 },
-        { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false },
+      snapDesignerSelectionTranslation(
+        { left: 100, right: 200, top: 100, bottom: 140 },
+        { x: 21, y: 21 },
+        DEFAULT_DESIGNER_CANVAS_AIDS,
       ),
-    ).toEqual({ x: 35, y: 61 });
+    ).toEqual({ x: 21, y: 21 });
   });
 
   it('uses guides within the 5px smart-guide threshold', () => {
     expect(
       snapDesignerCanvasPoint(
         { x: 49, y: 89 },
-        { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false },
+        DEFAULT_DESIGNER_CANVAS_AIDS,
         candidates([52], [84]),
       ),
     ).toEqual({ x: 52, y: 84, snappedX: 52, snappedY: 84 });
   });
 
   it('R7 chooses the nearest sorted candidate within a screen-pixel threshold at every zoom', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
 
     expect(
       snapDesignerCanvasPoint({ x: 40, y: 0 }, state, candidates([42, 38], []), 1),
@@ -83,15 +83,15 @@ describe('snapDesignerCanvasPoint', () => {
       x: collected.x.map((candidate) => candidate.value),
       y: collected.y.map((candidate) => candidate.value),
     }).toEqual({
-      x: [0, 15, 80, 100, 130, 180, 200],
+      x: [0, 15, 80, 130, 180, 200],
       y: [0, 10, 25, 30, 50, 100],
     });
-    // 组件参考线携带局部几何（起点/长度），画布与用户参考线为全画布尺寸（y 向线长 = 画布宽）。
+    // 组件参考线携带局部几何（起点/长度），画布与用户参考线为全画布尺寸（y 向线长 = 画布宽）；
+    // 画布中心点（100/50）不作为候选。
     expect(collected.x).toEqual([
       { value: 0, start: 0, size: 100 },
       { value: 15, start: 0, size: 100 },
       { value: 80, start: 10, size: 40 },
-      { value: 100, start: 0, size: 100 },
       { value: 130, start: 10, size: 40 },
       { value: 180, start: 10, size: 40 },
       { value: 200, start: 0, size: 100 },
@@ -101,7 +101,7 @@ describe('snapDesignerCanvasPoint', () => {
       { value: 10, start: 80, size: 100 },
       { value: 25, start: 0, size: 200 },
       { value: 30, start: 80, size: 100 },
-      { value: 50, start: 0, size: 200 },
+      { value: 50, start: 80, size: 100 },
       { value: 100, start: 0, size: 200 },
     ]);
   });
@@ -135,7 +135,7 @@ describe('snapDesignerCanvasPoint', () => {
   });
 
   it('R2 snaps selection edge and center anchors with one shared translation', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
 
     expect(
       snapDesignerSelectionTranslation(
@@ -147,29 +147,12 @@ describe('snapDesignerCanvasPoint', () => {
     ).toMatchObject({ x: 40, y: 30, snappedX: 150, snappedY: 70 });
   });
 
-  it('R2 competes smart guides against the grid by absolute distance at a single point', () => {
+  it('R2 keeps a single-point snap inside the capture threshold and releases beyond it (×1.0, Nebula 语义)', () => {
     const state = DEFAULT_DESIGNER_CANVAS_AIDS;
-
-    expect(snapDesignerCanvasPoint({ x: 98, y: 0 }, state, candidates([99], []))).toEqual({
-      x: 99,
-      y: 0,
-      snappedX: 99,
-      snappedY: 0,
-    });
-    expect(snapDesignerCanvasPoint({ x: 95, y: 0 }, state, candidates([99], []))).toEqual({
-      x: 96,
-      y: 0,
-      snappedX: 96,
-      snappedY: 0,
-    });
-  });
-
-  it('R2 holds an active single-point snap inside the release band, then releases to the grid', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
     const session: DesignerSnapSession = { x: { value: 100 } };
 
     expect(
-      snapDesignerCanvasPoint({ x: 106, y: 0 }, state, candidates([], []), 1, session),
+      snapDesignerCanvasPoint({ x: 104, y: 0 }, state, candidates([], []), 1, session),
     ).toEqual({
       x: 100,
       y: 0,
@@ -177,16 +160,16 @@ describe('snapDesignerCanvasPoint', () => {
     });
     expect(session.x).toEqual({ value: 100 });
     expect(
-      snapDesignerCanvasPoint({ x: 109, y: 0 }, state, candidates([], []), 1, session),
+      snapDesignerCanvasPoint({ x: 106, y: 0 }, state, candidates([], []), 1, session),
     ).toEqual({
-      x: 109,
+      x: 106,
       y: 0,
     });
     expect(session.x).toBeUndefined();
   });
 
   it('R2 prefers a fresh smart hit over holding the previous single-point target', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
     const session: DesignerSnapSession = { x: { value: 100 } };
 
     expect(
@@ -195,8 +178,8 @@ describe('snapDesignerCanvasPoint', () => {
     expect(session.x).toEqual({ value: 105 });
   });
 
-  it('R2 scales the release band with zoom so it stays a screen-pixel semantic', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+  it('R2 scales the capture threshold with zoom so it stays a screen-pixel semantic', () => {
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
     const session: DesignerSnapSession = { x: { value: 100 } };
 
     expect(
@@ -215,7 +198,7 @@ describe('snapDesignerCanvasPoint', () => {
   });
 
   it('R2 follows the same selection anchor while dragging near its guide', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
     const session: DesignerSnapSession = { x: { anchor: 110, value: 150 } };
     const bounds = { left: 10, right: 110, top: 20, bottom: 60 };
 
@@ -232,15 +215,15 @@ describe('snapDesignerCanvasPoint', () => {
     expect(session.x).toEqual({ anchor: 110, value: 150 });
   });
 
-  it('R2 keeps the snapped selection inside the release band and releases beyond it', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+  it('R2 keeps the snapped selection inside the capture threshold and releases beyond it (×1.0)', () => {
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
     const session: DesignerSnapSession = { x: { anchor: 110, value: 150 } };
     const bounds = { left: 10, right: 110, top: 20, bottom: 60 };
 
     expect(
       snapDesignerSelectionTranslation(
         bounds,
-        { x: 48, y: 31 },
+        { x: 45, y: 31 },
         state,
         candidates([150], [70]),
         1,
@@ -251,17 +234,17 @@ describe('snapDesignerCanvasPoint', () => {
     expect(
       snapDesignerSelectionTranslation(
         bounds,
-        { x: 53, y: 31 },
+        { x: 47, y: 31 },
         state,
         candidates([150], [70]),
         1,
         session,
       ),
-    ).toMatchObject({ x: 53, y: 30, snappedY: 70 });
+    ).toMatchObject({ x: 47, y: 30, snappedY: 70 });
     expect(session.x).toBeUndefined();
   });
 
-  it('R2 keeps an already-tracked anchor over a nearer grid line', () => {
+  it('R2 keeps an already-tracked anchor inside the capture threshold', () => {
     const session: DesignerSnapSession = { x: { anchor: 110, value: 150 } };
     const bounds = { left: 10, right: 110, top: 20, bottom: 60 };
 
@@ -278,7 +261,7 @@ describe('snapDesignerCanvasPoint', () => {
   });
 
   it('R2 competes anchors by distance when the tracked anchor is no longer the best hit', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
     const session: DesignerSnapSession = { x: { anchor: 50, value: 96 } };
     const bounds = { left: 0, right: 100, top: 20, bottom: 60 };
 
@@ -295,24 +278,8 @@ describe('snapDesignerCanvasPoint', () => {
     expect(session.x).toEqual({ anchor: 100, value: 150 });
   });
 
-  it('R2 falls back to the grid after the release band when grid snap is enabled', () => {
-    const session: DesignerSnapSession = { x: { anchor: 110, value: 150 } };
-    const bounds = { left: 10, right: 110, top: 20, bottom: 60 };
-
-    expect(
-      snapDesignerSelectionTranslation(
-        bounds,
-        { x: 53, y: 31 },
-        DEFAULT_DESIGNER_CANVAS_AIDS,
-        candidates([150], [70]),
-        1,
-        session,
-      ),
-    ).toMatchObject({ x: 62, y: 30, snappedX: 72, snappedY: 70 });
-  });
-
-  it('R2 emits only render-threshold (1px) guide lines with geometry and sorting', () => {
-    const state = { ...DEFAULT_DESIGNER_CANVAS_AIDS, gridSnapEnabled: false };
+  it('R2 emits only the nearest render-threshold (1px) guide line per axis', () => {
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
 
     const result = snapDesignerSelectionTranslation(
       { left: 0, right: 100, top: 20, bottom: 60 },
@@ -323,21 +290,81 @@ describe('snapDesignerCanvasPoint', () => {
     // 吸附（5px 阈值）命中 150（dist 1）；渲染阈值 1px：96（dist 5）不显示。
     expect(result.snappedX).toBe(150);
     expect(result.guides).toEqual({
-      x: [{ value: 150, start: 0, size: 100, distance: 1 }],
-      y: [{ value: 70, start: 0, size: 100, distance: 1 }],
+      x: [{ value: 150, start: 0, size: 100 }],
+      y: [{ value: 70, start: 0, size: 100 }],
     });
   });
 
-  it('R2 emits no guide lines for grid-only snapping', () => {
+  it('R2 renders only the nearest line when several candidates are within the render threshold', () => {
+    const state = DEFAULT_DESIGNER_CANVAS_AIDS;
+
     const result = snapDesignerSelectionTranslation(
-      { left: 10, right: 110, top: 20, bottom: 60 },
-      { x: 53, y: 31 },
-      DEFAULT_DESIGNER_CANVAS_AIDS,
-      candidates([], [70]),
+      { left: 0, right: 100, top: 20, bottom: 60 },
+      { x: 51, y: 31 },
+      state,
+      // anchor 50 → 101 距 102（dist 1）、anchor 100 → 151 距 150（dist 1）：两条线都在渲染阈值内，
+      // 每轴只输出最近一条（同距离取候选序首个 = 102）。
+      candidates([102, 150], [70]),
     );
-    expect(result.x).toBe(62);
+    expect(result.snappedX).toBe(102);
     expect(result.guides).toEqual({
-      y: [{ value: 70, start: 0, size: 100, distance: 1 }],
+      x: [{ value: 102, start: 0, size: 100 }],
+      y: [{ value: 70, start: 0, size: 100 }],
+    });
+  });
+
+  it('R2 keeps exact component-boundary snaps without rendering canvas-spanning guides', () => {
+    const document: ScreenDocument = {
+      canvas: { width: 960, height: 540, backgroundColor: '#000000' },
+      components: [component('above', 130, 126, false, false)],
+      variables: [],
+      blueprint: { rules: [] },
+    };
+
+    expect(
+      snapDesignerSelectionTranslation(
+        { left: 130, right: 230, top: 166, bottom: 206 },
+        { x: 0, y: 0 },
+        DEFAULT_DESIGNER_CANVAS_AIDS,
+        collectDesignerSnapCandidates(document, { x: [], y: [] }, ['selected']),
+      ),
+    ).toEqual({
+      x: 0,
+      y: 0,
+      snappedX: 130,
+      snappedY: 166,
+    });
+  });
+
+  it('R2 keeps rotated candidate anchors identical to Core visual bounds', () => {
+    const document: ScreenDocument = {
+      canvas: { width: 400, height: 300, backgroundColor: '#000000' },
+      components: [component('rotated', 80, 60, false, false, 37)],
+      variables: [],
+      blueprint: { rules: [] },
+    };
+    const bounds = getScreenComponentBounds(document.components[0]!);
+    const collected = collectDesignerSnapCandidates(document, { x: [], y: [] });
+
+    expect(collected.x).toContainEqual({
+      value: bounds.left,
+      start: bounds.top,
+      size: bounds.bottom - bounds.top,
+    });
+    expect(collected.x).toContainEqual({
+      value: bounds.right,
+      start: bounds.top,
+      size: bounds.bottom - bounds.top,
+    });
+    expect(collected.y).toContainEqual({
+      value: bounds.top,
+      start: bounds.left,
+      size: bounds.right - bounds.left,
+    });
+    expect(collected.y).toContainEqual({
+      value: bounds.bottom,
+      start: bounds.left,
+      size: bounds.right - bounds.left,
     });
   });
 });

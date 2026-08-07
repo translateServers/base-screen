@@ -160,8 +160,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     getToolMaterialTypes: () => this.#toolMaterialTypes,
     snapCanvasPoint: (point, excludedComponentIds) =>
       this.#workbenchController.snapPoint(point, excludedComponentIds),
-    snapCanvasSelection: (bounds, offset, excludedComponentIds, options) =>
-      this.#workbenchController.snapSelectionOffset(bounds, offset, excludedComponentIds, options),
+    snapCanvasSelection: (bounds, offset, excludedComponentIds) =>
+      this.#workbenchController.snapSelectionOffset(bounds, offset, excludedComponentIds),
     renderSnapPreview: (point) => this.#workbenchController.renderSnapPreview(point),
     setSnapSessionActive: (active) => this.#workbenchController.setSnapSessionActive(active),
     reduceSelection: (action) => this.#session.reduceSelection(action),
@@ -333,6 +333,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#workbenchController.cancelTransientState();
       this.#menuController.closeMenus();
       this.#menuController.closeContextMenu();
+      this.#menuController.closeHelpPanel();
     },
     // 空格抓手与键盘焦点解耦：鼠标悬停视窗即可激活临时抓手（无需先点击聚焦）。
     onWindowKeyDown: (event) => this.#viewportController.onWindowKeyDown(event),
@@ -349,12 +350,14 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #menuController = new DesignerMenuController({
     getRoot: () => this.shadowRoot,
     getContextMenu: () => this.#contextMenu,
+    getSelectedComponentIds: () => this.#session.interaction.selectedComponentIds,
     getOperationState: (id) => this.#operations.getState(id, undefined),
   });
   readonly #surfaceRouter = new DesignerSurfaceRouter();
   readonly #surfaceBindings: DesignerSurfaceBindings = {
     click: [
       (target) => this.#notificationController.dismiss(target as Element),
+      (target) => this.#menuController.onHelpClick(target as Element),
       (target) => this.#menuController.toggleMenuFromTarget(target as Element),
       () => {
         this.#menuController.closeMenus();
@@ -492,6 +495,12 @@ export class BaseScreenDesignerElement extends ElementBase {
       return false;
     },
     keyDown: [
+      (target, event) => {
+        const keyboardEvent = event as KeyboardEvent;
+        if (keyboardEvent.key !== 'Escape' || !this.#menuController.closeHelpPanel()) return false;
+        keyboardEvent.preventDefault();
+        return true;
+      },
       (target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         const inspectorDraft = getInspectorDraftTarget(keyboardEvent);
@@ -954,6 +963,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#workbenchController.initialize();
     this.createRenderer();
     this.#gestureController.connect(this.#canvas);
+    this.#gestureController.connectViewport(this.#viewportElement);
     this.#viewportController.connect(this.#viewportElement, this.#canvas);
     this.#surfaceRouter.connect(shadow, this.#surfaceBindings);
     this.connectWindowGuards();
@@ -965,6 +975,9 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   private renderDocument(document: ScreenDocument): ScreenParseResult<void> {
     this.initialize();
+    // 画布覆盖层（参考线/选区）的 z-index 由组件数派生（token 中 calc），
+    // 保证始终高于组件的 painter order z-index（0..N-1）。
+    this.style.setProperty('--designer-canvas-component-count', String(document.components.length));
     if (this.#renderer === undefined) {
       return { ok: true, value: undefined, diagnostics: [] };
     }
@@ -1043,6 +1056,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     const id = control?.dataset.action ?? control?.dataset.menuAction;
     if (id === undefined || this.#operations.get(id) === undefined) return false;
     this.#menuController.closeContextMenu();
+    this.#menuController.closeMenus();
     return this.#operations.execute(id, undefined);
   }
 
@@ -1146,6 +1160,11 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private onKeyDown(event: KeyboardEvent): void {
+    if (event.key === 'Escape' && this.#menuController.closeHelpPanel()) {
+      event.preventDefault();
+      return;
+    }
+    if (this.#menuController.onKeyDown(event)) return;
     if (this.#workbenchController.onKeyDown(event)) return;
     if (
       event.key === 'Escape' &&
@@ -1256,6 +1275,7 @@ export class BaseScreenDesignerElement extends ElementBase {
         control.disabled = !state.enabled;
       }
     }
+    this.#menuController.renderMenuStates();
   }
 
   private renderToolControls(): void {

@@ -79,6 +79,46 @@ describe('DesignerWorkbenchController pointer capture', () => {
     expect(canvas.hasPointerCapture(2)).toBe(false);
   });
 
+  it('does not capture panel or ruler interactions from a secondary button', () => {
+    const layout = captureTarget();
+    const canvas = {
+      ...captureTarget(),
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+    } as unknown as HTMLDivElement;
+    const root = {
+      querySelector: (selector: string) => (selector === '.designer' ? layout : undefined),
+    } as unknown as ShadowRoot;
+    const controller = new DesignerWorkbenchController({
+      getCanvas: () => canvas,
+      getDocument: () => undefined,
+      getInteraction: () => ({ focusedComponentId: null, selectedComponentIds: [] }),
+      getRoot: () => root,
+      getZoom: () => 1,
+    });
+    const panelHandle = {
+      closest: (selector: string) =>
+        selector === '[data-panel-handle]' ? { dataset: { panelHandle: 'left' } } : null,
+    } as unknown as HTMLElement;
+    const ruler = {
+      classList: { contains: (name: string) => name === 'ruler-horizontal' },
+      closest: (selector: string) => (selector === '.ruler' ? ruler : null),
+    } as unknown as HTMLElement;
+
+    controller.onPointerDown({
+      target: panelHandle,
+      pointerId: 9,
+      button: 2,
+    } as unknown as PointerEvent);
+    controller.onPointerDown({
+      target: ruler,
+      pointerId: 10,
+      button: 2,
+    } as unknown as PointerEvent);
+
+    expect(layout.captures.has(9)).toBe(false);
+    expect(canvas.hasPointerCapture(10)).toBe(false);
+  });
+
   it('releases all transient captures when cancelled', () => {
     const layout = captureTarget();
     const canvas = {
@@ -125,6 +165,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
 
 class WorkbenchElement {
   readonly children: WorkbenchElement[] = [];
+  replaceChildrenCalls = 0;
   readonly dataset: Record<string, string> = {};
   readonly style = { setProperty: () => undefined };
   className = '';
@@ -147,6 +188,7 @@ class WorkbenchElement {
   }
 
   replaceChildren(...children: WorkbenchElement[]): void {
+    this.replaceChildrenCalls += 1;
     this.children.splice(0, this.children.length, ...children);
   }
 
@@ -223,6 +265,9 @@ function createWorkbench() {
       if (selector === '[data-inspector-pane]') return panes;
       return [];
     },
+    // 浏览器中 dblclick 因指针捕获被重定向到画布，真实路径按坐标命中参考线
+    // （elementFromPoint/elementsFromPoint 由真实 ShadowRoot 提供）。
+    elementsFromPoint: () => [...guides.children],
   } as unknown as ShadowRoot;
   return {
     canvas,
@@ -247,6 +292,23 @@ function createWorkbench() {
   };
 }
 
+function measurementComponent(id: string, x: number, y: number, width: number, height: number) {
+  return {
+    id,
+    type: 'base.rectangle',
+    name: id,
+    parentId: null,
+    position: { x, y },
+    size: { width, height },
+    rotation: 0,
+    zIndex: 0,
+    status: { locked: false, hidden: false },
+    props: {},
+    style: {},
+    dataSource: null,
+  } as const;
+}
+
 function clickTarget(dataset: Record<string, string>) {
   return {
     closest: (selector: string) => {
@@ -254,6 +316,8 @@ function clickTarget(dataset: Record<string, string>) {
         return { dataset };
       if (selector === '[data-panel-tab]' && dataset.panelTab !== undefined) return { dataset };
       if (selector === '[data-inspector-tab]' && dataset.inspectorTab !== undefined)
+        return { dataset };
+      if (selector === '[data-status-toggle]' && dataset.statusToggle !== undefined)
         return { dataset };
       return null;
     },
@@ -295,33 +359,33 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(first.rightTabs[1]?.ariaSelected).toBe('true');
     expect(second.rightTabs[0]?.ariaSelected).toBe('true');
     expect(first.guides.children).toHaveLength(1);
-    // 智能参考线（50）与 24px 网格（48）按绝对距离统一竞争：47 距网格更近，吸附到 48。
     expect(first.controller.snapPoint({ x: 47, y: 47 })).toEqual({
-      x: 48,
-      y: 48,
-      snappedX: 48,
-      snappedY: 48,
+      x: 50,
+      y: 47,
+      snappedX: 50,
     });
-    expect(second.controller.snapPoint({ x: 47, y: 47 })).toEqual({
-      x: 48,
-      y: 48,
-      snappedX: 48,
-      snappedY: 48,
-    });
+    expect(second.controller.snapPoint({ x: 47, y: 47 })).toEqual({ x: 47, y: 47 });
   });
 
   it('R4 snap toggle gates snapping while keeping raw coordinates', () => {
     const { controller } = createWorkbench();
     expect(controller.snapEnabled).toBe(true);
-    expect(controller.snapPoint({ x: 47, y: 47 }).snappedX).toBe(48);
+    expect(controller.snapPoint({ x: 3, y: 3 }).snappedX).toBe(0);
     controller.toggleSnap();
     expect(controller.snapEnabled).toBe(false);
-    expect(controller.snapPoint({ x: 47, y: 47 })).toEqual({ x: 47, y: 47 });
+    expect(controller.snapPoint({ x: 3, y: 3 })).toEqual({ x: 3, y: 3 });
     expect(
       controller.snapSelectionOffset({ left: 0, right: 50, top: 0, bottom: 40 }, { x: 3, y: 3 }),
     ).toEqual({ x: 3, y: 3 });
     controller.toggleSnap();
     expect(controller.snapEnabled).toBe(true);
+  });
+
+  it('routes the bottom status snap switch through the workbench click handler', () => {
+    const { controller } = createWorkbench();
+
+    expect(controller.onClick(clickTarget({ statusToggle: 'snap' }))).toBe(true);
+    expect(controller.snapEnabled).toBe(false);
   });
 
   it('R7 moves, double-click deletes, and discards out-of-bounds guides without touching the document', () => {
@@ -357,8 +421,11 @@ describe('DesignerWorkbenchController instance state', () => {
     expect((workbench.guides.children[0]!.style as unknown as Record<string, string>).left).toBe(
       '100px',
     );
+    // 真实浏览器中 dblclick 的 target 是捕获元素（画布）而非参考线：以坐标命中参考线。
     workbench.canvas.dispatch('dblclick', {
-      target: workbench.guides.children[0],
+      target: workbench.canvas,
+      clientX: 100,
+      clientY: 0,
       stopImmediatePropagation: () => undefined,
     } as unknown as MouseEvent);
     expect(workbench.guides.children).toHaveLength(0);
@@ -373,6 +440,105 @@ describe('DesignerWorkbenchController instance state', () => {
     workbench.controller.onPointerUp({ pointerId: 3, clientX: -1, clientY: 0 } as PointerEvent);
 
     expect(workbench.guides.children).toHaveLength(0);
+    expect(workbench.document).toEqual(originalDocument);
+  });
+
+  it('R7 removes a guide on a second pointerdown within the double-click window', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    const originalDocument = structuredClone(workbench.document);
+    const ruler = {
+      classList: { contains: (name: string) => name === 'ruler-vertical' },
+      closest: (selector: string) => (selector === '.ruler' ? ruler : null),
+    } as unknown as HTMLElement;
+    workbench.controller.onPointerDown({
+      target: ruler,
+      pointerId: 1,
+      clientX: 50,
+      clientY: 0,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 1, clientX: 50, clientY: 0 } as PointerEvent);
+    expect(workbench.guides.children).toHaveLength(1);
+
+    // 第一次 pointerdown 落在参考线上，进入拖拽并原地 commit（无位移，双击判定保持武装）。
+    workbench.canvas.dispatch('pointerdown', {
+      target: workbench.guides.children[0],
+      pointerId: 2,
+      clientX: 50,
+      clientY: 0,
+      timeStamp: 1000,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 2, clientX: 50, clientY: 0 } as PointerEvent);
+    expect(workbench.guides.children).toHaveLength(1);
+
+    // 500ms 窗口内同一参考线的第二次 pointerdown = 双击：直接移除，不再进入拖拽。
+    workbench.canvas.dispatch('pointerdown', {
+      target: workbench.guides.children[0],
+      pointerId: 3,
+      clientX: 50,
+      clientY: 0,
+      timeStamp: 1400,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+    expect(workbench.guides.children).toHaveLength(0);
+    expect(workbench.document).toEqual(originalDocument);
+  });
+
+  it('R7 keeps a guide when the second pointerdown is a drag or falls outside the double-click window', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    const originalDocument = structuredClone(workbench.document);
+    const ruler = {
+      classList: { contains: (name: string) => name === 'ruler-vertical' },
+      closest: (selector: string) => (selector === '.ruler' ? ruler : null),
+    } as unknown as HTMLElement;
+    workbench.controller.onPointerDown({
+      target: ruler,
+      pointerId: 1,
+      clientX: 50,
+      clientY: 0,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 1, clientX: 50, clientY: 0 } as PointerEvent);
+
+    // 第一次点击后拖拽位移：判定失效（拖拽不等于双击点击），参考线移动而不是被移除。
+    workbench.canvas.dispatch('pointerdown', {
+      target: workbench.guides.children[0],
+      pointerId: 2,
+      clientX: 50,
+      clientY: 0,
+      timeStamp: 1000,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerMove({ pointerId: 2, clientX: 120, clientY: 0 } as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 2, clientX: 120, clientY: 0 } as PointerEvent);
+    expect(workbench.guides.children).toHaveLength(1);
+
+    // 窗口内（500ms 内）的第二次 pointerdown 不触发移除（拖拽已使判定失效），照常进入拖拽。
+    workbench.canvas.dispatch('pointerdown', {
+      target: workbench.guides.children[0],
+      pointerId: 3,
+      clientX: 120,
+      clientY: 0,
+      timeStamp: 1300,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 3, clientX: 120, clientY: 0 } as PointerEvent);
+    expect(workbench.guides.children).toHaveLength(1);
+
+    // 窗口外（>500ms）的第二次 pointerdown 同样不触发移除。
+    workbench.canvas.dispatch('pointerdown', {
+      target: workbench.guides.children[0],
+      pointerId: 4,
+      clientX: 120,
+      clientY: 0,
+      timeStamp: 2500,
+      stopImmediatePropagation: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerUp({ pointerId: 4, clientX: 120, clientY: 0 } as PointerEvent);
+    expect(workbench.guides.children).toHaveLength(1);
     expect(workbench.document).toEqual(originalDocument);
   });
 
@@ -418,7 +584,7 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(workbench.document).toEqual(originalDocument);
   });
 
-  it('R7 renders render-threshold snap guide lines with distance labels and active highlight', () => {
+  it('R7 renders render-threshold snap guide lines without distance labels and with active highlight', () => {
     const workbench = createWorkbench();
     workbench.controller.initialize();
 
@@ -428,19 +594,144 @@ describe('DesignerWorkbenchController instance state', () => {
       snappedX: 150,
       snappedY: 70,
       guides: {
-        x: [{ value: 150, start: 0, size: 100, distance: 1 }],
-        y: [{ value: 70, start: 0, size: 100, distance: 1 }],
+        x: [{ value: 150, start: 0, size: 100 }],
+        y: [{ value: 70, start: 0, size: 100 }],
       },
     });
 
     expect(workbench.guides.children).toHaveLength(2);
     const xGuide = workbench.guides.children.find((child) => child.dataset.axis === 'x');
-    // 吸附目标线（snappedX=150）以 active 高亮。
+    // 吸附目标线（snappedX=150）以 active 高亮；渲染阈值内残余间距恒 ≤1px，不再叠加距离标签。
     expect(xGuide?.className).toBe('canvas-guide canvas-guide-snap canvas-guide-snap-active');
-    expect(xGuide?.children[0]?.className).toBe('canvas-guide-snap-label');
-    expect(xGuide?.children[0]?.textContent).toBe('1px');
+    expect(xGuide?.children).toHaveLength(0);
     workbench.controller.renderSnapPreview(undefined);
     expect(workbench.guides.children).toHaveLength(0);
+  });
+
+  it('R2 does not render snap overlays when stacked component boundaries already coincide', () => {
+    const workbench = createWorkbench();
+    const components = workbench.document.components as unknown as Array<
+      ScreenDocument['components'][number]
+    >;
+    components.push(measurementComponent('above', 130, 126, 100, 40));
+    workbench.controller.initialize();
+
+    const preview = workbench.controller.snapSelectionOffset(
+      { left: 130, right: 230, top: 166, bottom: 206 },
+      { x: 0, y: 0 },
+      ['c1'],
+    );
+    expect(preview).toMatchObject({
+      x: 0,
+      y: 0,
+      snappedX: 130,
+      snappedY: 166,
+      guides: {},
+    });
+
+    workbench.controller.renderSnapPreview(preview);
+    expect(workbench.guides.children).toHaveLength(0);
+  });
+
+  it('R2 renders alignment-rail measurements only for a moving preview without changing snap candidates', () => {
+    const workbench = createWorkbench();
+    const components = workbench.document.components as unknown as Array<
+      ScreenDocument['components'][number]
+    >;
+    components.push(
+      measurementComponent('top', 0, 0, 260, 100),
+      measurementComponent('c1', 0, 146, 200, 34),
+      measurementComponent('upper-left', 0, 228, 100, 120),
+      measurementComponent('upper-right', 100, 228, 100, 120),
+      measurementComponent('lower-left', 0, 407, 100, 120),
+      measurementComponent('lower-right', 100, 407, 100, 120),
+    );
+    workbench.controller.initialize();
+
+    expect(
+      workbench.guides.children.filter((child) => child.className === 'canvas-measurement'),
+    ).toHaveLength(0);
+
+    const preview = workbench.controller.snapSelectionOffset(
+      { left: 0, right: 200, top: 146, bottom: 180 },
+      { x: 0, y: 0 },
+      ['c1'],
+    );
+    expect(preview.measurements?.[0]).toMatchObject({ axis: 'y', distance: 46 });
+    workbench.controller.renderSnapPreview(preview);
+    let measurements = workbench.guides.children.filter(
+      (child) => child.className === 'canvas-measurement',
+    );
+    expect(measurements).toHaveLength(7);
+    expect(measurements[0]?.dataset.axis).toBe('y');
+    expect(measurements[0]?.children[0]?.textContent).toBe('46');
+    expect((measurements[0]?.style as unknown as CSSStyleDeclaration).height).toBe('46px');
+
+    const movedPreview = workbench.controller.snapSelectionOffset(
+      { left: 0, right: 200, top: 146, bottom: 180 },
+      { x: 0, y: 4 },
+      ['c1'],
+    );
+    expect(movedPreview.measurements?.[0]).toMatchObject({ axis: 'y', distance: 50 });
+    workbench.controller.renderSnapPreview(movedPreview);
+    measurements = workbench.guides.children.filter(
+      (child) => child.className === 'canvas-measurement',
+    );
+    expect(measurements[0]?.children[0]?.textContent).toBe('50');
+
+    workbench.controller.renderSnapPreview(undefined);
+    expect(
+      workbench.guides.children.filter((child) => child.className === 'canvas-measurement'),
+    ).toHaveLength(0);
+  });
+
+  it('R2 clears transient snap overlays when snapping or border guides are toggled', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+
+    workbench.controller.renderSnapPreview({ x: 50, y: 40, snappedX: 50 });
+    expect(workbench.guides.children).toHaveLength(1);
+    workbench.controller.toggleSnap();
+    expect(workbench.guides.children).toHaveLength(0);
+
+    workbench.controller.toggleSnap();
+    workbench.controller.renderSnapPreview({ x: 50, y: 40, snappedX: 50 });
+    expect(workbench.guides.children).toHaveLength(1);
+    workbench.controller.toggleBorderGuides();
+    expect(workbench.guides.children).toHaveLength(0);
+  });
+
+  it('R4 keeps snap overlays disabled for previews arriving after the snap toggle is off', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+
+    workbench.controller.toggleSnap();
+    workbench.controller.renderSnapPreview({
+      x: 50,
+      y: 40,
+      snappedX: 50,
+      guides: { x: [{ value: 50 }], y: [] },
+    });
+
+    expect(workbench.guides.children).toHaveLength(0);
+    expect(workbench.controller.snapPoint({ x: 47, y: 47 })).toEqual({ x: 47, y: 47 });
+  });
+
+  it('R4 does not rebuild the guide layer for raw preview changes with no snap', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+
+    workbench.controller.renderSnapPreview({
+      x: 48,
+      y: 48,
+    });
+    const callsAfterFirstPreview = workbench.guides.replaceChildrenCalls;
+    workbench.controller.renderSnapPreview({
+      x: 72,
+      y: 72,
+    });
+
+    expect(workbench.guides.replaceChildrenCalls).toBe(callsAfterFirstPreview);
   });
 
   it('keeps the viewport active tool and zoom local to each controller', () => {
@@ -507,13 +798,13 @@ describe('DesignerWorkbenchController snap session', () => {
 
     expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(100);
     document = snapDocument(200);
-    expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(96);
+    expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(101);
 
     controller.setSnapSessionActive(true);
-    expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(96);
+    expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(101);
     document = snapDocument(100);
     // 会话内文档引用替换：候选仍来自会话起始文档（a@200），未重新收集。
-    expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(96);
+    expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(101);
     controller.setSnapSessionActive(false);
     expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(100);
   });
@@ -522,27 +813,24 @@ describe('DesignerWorkbenchController snap session', () => {
     const controller = createController(() => snapDocument(100));
 
     controller.setSnapSessionActive(true);
-    expect(controller.snapPoint({ x: 101, y: 0 }, ['a']).x).toBe(96);
+    expect(controller.snapPoint({ x: 101, y: 0 }, ['a']).x).toBe(101);
     expect(controller.snapPoint({ x: 101, y: 0 }).x).toBe(100);
-    expect(controller.snapPoint({ x: 101, y: 0 }, ['a']).x).toBe(96);
+    expect(controller.snapPoint({ x: 101, y: 0 }, ['a']).x).toBe(101);
   });
 
-  it('R4 merges 24px grid lines into smart candidates with a 5px threshold', () => {
-    const controller = createController(() => snapDocument(100));
+  it('R4 treats excluded component ids as an order-independent cache key', () => {
+    let document = snapDocument(100);
+    const controller = createController(() => document);
 
-    // 选区锚点 0/25/50 + 20 = 20/45/70：分别距网格线 24/48/72 为 4/3/2px，
-    // 均在 5px 吸附阈值内；最近的是 bottom→72（dist 2）→ delta 22。
-    // 渲染阈值 1px：x 轴命中（dist 2–4）不显示参考线；y 轴画布 top 完全重合（dist 0）显示。
-    const result = controller.snapSelectionOffset(
-      { left: 0, right: 50, top: 0, bottom: 40 },
-      { x: 20, y: 0 },
-      [],
-      { gridSnapEnabled: false },
-    );
-    expect(result.x).toBe(22);
-    expect(result.snappedX).toBe(72);
-    expect(result.guides?.x).toBeUndefined();
-    expect(result.guides?.y?.map((line) => line.value)).toEqual([0]);
+    controller.setSnapSessionActive(true);
+    expect(controller.snapPoint({ x: 197, y: 0 }, ['a', 'b']).x).toBe(197);
+    document = snapDocument(200);
+
+    // The reversed exclusion order describes the same candidate set, so the session keeps
+    // the original cache instead of collecting the replacement document mid-gesture.
+    expect(controller.snapPoint({ x: 197, y: 0 }, ['b', 'a']).x).toBe(197);
+    controller.setSnapSessionActive(false);
+    expect(controller.snapPoint({ x: 197, y: 0 }).x).toBe(200);
   });
 });
 

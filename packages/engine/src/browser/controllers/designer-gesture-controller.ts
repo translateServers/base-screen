@@ -10,7 +10,11 @@ import {
   type ScreenViewportState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { selectedComponents } from '../../common/operations/designer-selection.js';
+import {
+  selectedComponents,
+  selectedRootIds,
+  selectionSubtree,
+} from '../../common/operations/designer-selection.js';
 import {
   type BaseScreenTransformHandle,
   createTransformTransaction,
@@ -21,7 +25,11 @@ import type {
   DesignerToolId,
   DesignerToolMaterialTypes,
 } from '../../common/tools/designer-tools.js';
-import type { DesignerSnapPoint } from '../viewport/designer-canvas-aids.js';
+import type {
+  DesignerSnapPoint,
+  DesignerSnapPreview,
+  DesignerSnapTranslation,
+} from '../viewport/designer-canvas-aids.js';
 import {
   clientPointToDesignerCanvasPoint,
   type DesignerClientPoint,
@@ -29,7 +37,7 @@ import {
 import { MATERIAL_DRAG_TYPE } from './designer-panel-controller.js';
 
 // Movement below this screen-pixel distance is treated as a selection click, not a drag.
-// Otherwise a click would snap the component to the grid / smart guides and move it.
+// Otherwise a click could snap the component to a smart guide and move it.
 const DESIGNER_DRAG_CLICK_THRESHOLD = 3;
 
 interface Drag {
@@ -62,8 +70,11 @@ interface Transform {
 interface Marquee {
   readonly pointerId: number;
   readonly start: Point;
+  readonly startClientX: number;
+  readonly startClientY: number;
   readonly union: boolean;
   readonly contain: boolean;
+  readonly moved: boolean;
 }
 
 interface Pan {
@@ -110,14 +121,8 @@ export interface DesignerGestureCallbacks {
     },
     offset: Point,
     excludedComponentIds?: readonly string[],
-    options?: { readonly gridSnapEnabled?: boolean },
-  ) => {
-    readonly x: number;
-    readonly y: number;
-    readonly snappedX?: number | undefined;
-    readonly snappedY?: number | undefined;
-  };
-  readonly renderSnapPreview?: (point: DesignerSnapPoint | undefined) => void;
+  ) => DesignerSnapTranslation;
+  readonly renderSnapPreview?: (point: DesignerSnapPreview | undefined) => void;
   /** 吸附会话生命周期：拖拽/变换/创建手势开始与结束时切换候选缓存与滞后状态。 */
   readonly setSnapSessionActive?: (active: boolean) => void;
   readonly reduceSelection: (action: ScreenInteractionAction) => void;
@@ -161,14 +166,51 @@ export class DesignerGestureController {
     // 画布是可拖拽交互表面：系统性禁止原生文本选择（selectstart 是浏览器启动文本选择的
     // 事件通道，即使 CSS user-select 未级联到某些内容也能拦截，参考 Nebula/Moveable）。
     canvas.addEventListener('selectstart', (event) => event.preventDefault());
-    // 中键（button 1）在画布上不触发浏览器自动滚动：自动滚动由 mousedown 默认动作启动，
-    // 必须在 mousedown 阶段阻止（auxclick 阶段阻止无效）。
-    canvas.addEventListener('mousedown', (event) => {
-      if (event.button === 1) event.preventDefault();
-    });
     // 从物料面板拖拽物料到画布：dragover 需要 preventDefault 才能触发 drop。
     canvas.addEventListener('dragover', (event) => this.onDragOverCanvas(event));
     canvas.addEventListener('drop', (event) => this.onDropOnCanvas(event));
+  }
+
+  /**
+   * 视窗背景（画布外）点击：退出选中状态。画布区域内的指针事件由 {@link connect}
+   * 的手势处理，这里只兜底落在视窗背景（点阵网格 / padding 区域）的点击，
+   * 与画布空白点击的取消选中语义一致。
+   */
+  connectViewport(viewport: HTMLDivElement): void {
+    viewport.addEventListener('pointerdown', (event) =>
+      this.onViewportBackgroundPointerDown(event),
+    );
+    viewport.addEventListener('pointermove', (event) => {
+      if (!this.isCanvasEvent(event)) this.onPointerMove(event);
+    });
+    viewport.addEventListener('pointerup', (event) => {
+      if (!this.isCanvasEvent(event)) this.onPointerUp(event);
+    });
+    viewport.addEventListener('pointercancel', (event) => {
+      if (!this.isCanvasEvent(event)) this.cancel();
+    });
+  }
+
+  private isCanvasEvent(event: Event): boolean {
+    const canvas = this.#canvas;
+    return canvas !== undefined && event.target !== null && canvas.contains(event.target as Node);
+  }
+
+  private onViewportBackgroundPointerDown(event: PointerEvent): void {
+    const target = event.target;
+    const canvas = this.#canvas;
+    if (
+      !isPrimaryPointer(event) ||
+      !(target instanceof HTMLElement) ||
+      canvas === undefined ||
+      canvas.contains(target)
+    ) {
+      return;
+    }
+    if (this.callbacks.getInteraction().selectedComponentIds.length === 0) {
+      return;
+    }
+    this.callbacks.reduceSelection({ type: 'clear-selection' });
   }
 
   cancel(): void {
@@ -187,6 +229,7 @@ export class DesignerGestureController {
     if (!(target instanceof HTMLElement) || document === undefined || canvas === undefined) {
       return;
     }
+    if (!isPrimaryPointer(event)) return;
     // 系统级焦点约束：画布是键盘交互表面。阻止浏览器默认把焦点分配给被点击的子元素，
     // 并把焦点收敛到 viewport 容器，保证后续快捷键（空格平移、删除等）始终命中画布上下文，
     // 不会残留到某个已聚焦控件（否则空格/回车会触发该控件的默认激活，干扰快捷键）。
@@ -195,7 +238,6 @@ export class DesignerGestureController {
     if (this.callbacks.isHandActive()) {
       // 仅主键（左键）用于平移；非主键（右键/中键）在抓手工具下不触发框选等其他手势，
       // 对齐 Nebula handlePanStart 的 `e.button !== 0` 守卫。
-      if (event.button !== 0) return;
       event.preventDefault();
       this.capturePointer(event.pointerId);
       this.#pan = {
@@ -234,7 +276,7 @@ export class DesignerGestureController {
       this.startTransform(event, undefined);
       return;
     }
-    // 选中框（控制器）的空白区域可拖拽：普通按下启动多选移动，修饰键按下时按命中测试切换单个组件。
+    // 选中框（控制器）的空白区域可拖拽：普通按下建立待确认移动，修饰键按下时按命中测试切换单个组件。
     if (target.closest<HTMLElement>('[data-selection-grab]') !== null) {
       this.onSelectionPointerDown(event);
       return;
@@ -243,14 +285,15 @@ export class DesignerGestureController {
     const componentId = material?.dataset.baseScreenComponentId;
     if (componentId === undefined || material === null) {
       event.preventDefault();
-      this.capturePointer(event.pointerId);
       this.#marquee = {
         pointerId: event.pointerId,
         start: this.canvasPointFromPointer(event),
+        startClientX: event.clientX,
+        startClientY: event.clientY,
         union: event.shiftKey,
         contain: event.altKey,
+        moved: false,
       };
-      this.renderMarquee(this.#marquee.start, this.#marquee.start);
       return;
     }
     const component = document.components.find((item) => item.id === componentId);
@@ -284,12 +327,18 @@ export class DesignerGestureController {
       });
     }
     event.preventDefault();
-    this.capturePointer(event.pointerId);
-    const bounds = getScreenSelectionBounds(components);
-    if (bounds === null) return;
-    this.callbacks.setSnapSessionActive?.(true);
+    // 移动按子树生效：编组/容器连同其子组件一起拖动，保持相对位置。
+    const moved = selectionSubtree(
+      document,
+      components.map((component) => component.id),
+    );
+    const bounds = getScreenSelectionBounds(moved);
+    if (bounds === null) {
+      this.releasePointerCapture(event.pointerId);
+      return;
+    }
     this.#drag = {
-      components,
+      components: moved,
       pointerId: event.pointerId,
       startClientX: event.clientX,
       startClientY: event.clientY,
@@ -297,9 +346,9 @@ export class DesignerGestureController {
       selection: canvas.querySelector<HTMLElement>('[data-selection]') ?? undefined,
       elements: [
         material,
-        ...components.flatMap((selected) => {
+        ...moved.flatMap((item) => {
           const element = canvas.querySelector<HTMLElement>(
-            `[data-base-screen-component-id="${selected.id}"]`,
+            `[data-base-screen-component-id="${item.id}"]`,
           );
           return element === null || element === material ? [] : [element];
         }),
@@ -333,18 +382,23 @@ export class DesignerGestureController {
       return;
     }
     event.preventDefault();
-    this.capturePointer(event.pointerId);
-    const bounds = getScreenSelectionBounds(components);
-    if (bounds === null) return;
-    this.callbacks.setSnapSessionActive?.(true);
+    const moved = selectionSubtree(
+      document,
+      components.map((component) => component.id),
+    );
+    const bounds = getScreenSelectionBounds(moved);
+    if (bounds === null) {
+      this.releasePointerCapture(event.pointerId);
+      return;
+    }
     this.#drag = {
-      components,
+      components: moved,
       pointerId: event.pointerId,
       startClientX: event.clientX,
       startClientY: event.clientY,
       bounds,
       selection: canvas.querySelector<HTMLElement>('[data-selection]') ?? undefined,
-      elements: components.flatMap((component) => {
+      elements: moved.flatMap((component) => {
         const element = canvas.querySelector<HTMLElement>(
           `[data-base-screen-component-id="${component.id}"]`,
         );
@@ -368,7 +422,17 @@ export class DesignerGestureController {
       return;
     }
     if (this.#marquee !== undefined && event.pointerId === this.#marquee.pointerId) {
-      this.renderMarquee(this.#marquee.start, this.canvasPointFromPointer(event));
+      const marquee = this.#marquee;
+      const distance = Math.hypot(
+        event.clientX - marquee.startClientX,
+        event.clientY - marquee.startClientY,
+      );
+      if (distance < DESIGNER_DRAG_CLICK_THRESHOLD) return;
+      if (!marquee.moved) {
+        this.capturePointer(event.pointerId);
+        this.#marquee = { ...marquee, moved: true };
+      }
+      this.renderMarquee(marquee.start, this.canvasPointFromPointer(event));
       return;
     }
     if (this.#transform !== undefined && event.pointerId === this.#transform.pointerId) {
@@ -387,6 +451,8 @@ export class DesignerGestureController {
       return;
     }
     if (!drag.moved) {
+      this.capturePointer(event.pointerId);
+      this.callbacks.setSnapSessionActive?.(true);
       this.#drag = { ...drag, moved: true };
     }
     const translation = this.dragTranslation(this.#drag, event);
@@ -428,10 +494,15 @@ export class DesignerGestureController {
         marquee.contain ? 'contain' : 'intersect',
       );
       const interaction = this.callbacks.getInteraction();
+      const componentIds = selectedRootIds(
+        document,
+        marquee.union ? [...interaction.selectedComponentIds, ...ids] : ids,
+      );
       this.callbacks.reduceSelection({
         type: 'replace-selection',
-        componentIds: marquee.union ? [...interaction.selectedComponentIds, ...ids] : ids,
-        focusedComponentId: ids.at(-1) ?? (marquee.union ? interaction.focusedComponentId : null),
+        componentIds,
+        focusedComponentId:
+          componentIds.at(-1) ?? (marquee.union ? interaction.focusedComponentId : null),
       });
       return;
     }
@@ -497,14 +568,14 @@ export class DesignerGestureController {
     if (document === undefined || canvas === undefined) {
       return;
     }
-    const components = selectedComponents(
+    const roots = selectedComponents(
       document,
       this.callbacks.getInteraction().selectedComponentIds,
     );
     const capability = handle === undefined ? 'rotate' : 'resize';
     if (
-      components.length === 0 ||
-      !components.every((component) => {
+      roots.length === 0 ||
+      !roots.every((component) => {
         const entry = this.callbacks.getCatalog()?.get(component.type);
         return (
           entry?.manifest.designCapabilities[capability] === true &&
@@ -518,6 +589,11 @@ export class DesignerGestureController {
     event.stopPropagation();
     this.capturePointer(event.pointerId);
     this.callbacks.setSnapSessionActive?.(true);
+    // 变换按子树生效：能力门禁只看选中根组件，子组件随组一起缩放/旋转。
+    const components = selectionSubtree(
+      document,
+      roots.map((component) => component.id),
+    );
     this.#transform = {
       pointerId: event.pointerId,
       kind: handle === undefined ? 'rotate' : 'resize',
@@ -655,19 +731,17 @@ export class DesignerGestureController {
     return clientPointToDesignerCanvasPoint(point, bounds, this.callbacks.getViewport().zoom);
   }
 
-  private dragTranslation(drag: Drag, event: PointerEvent): Point {
+  private dragTranslation(drag: Drag, event: PointerEvent): DesignerSnapTranslation {
     const zoom = this.callbacks.getViewport().zoom;
     const translation = {
       x: clampCoordinate((event.clientX - drag.startClientX) / zoom),
       y: clampCoordinate((event.clientY - drag.startClientY) / zoom),
     };
-    // 拖拽移动关闭无阈值网格取整：网格线以 5px 阈值并入智能候选（参考 Moveable/Nebula 语义），
-    // 与组件/画布/参考线统一按距离竞争，网格线之间允许亚像素自由定位。
+    // 移动以选区锚点匹配组件、画布和用户参考线；网格不参与吸附。
     const snapped = this.callbacks.snapCanvasSelection(
       drag.bounds,
       translation,
       drag.components.map((component) => component.id),
-      { gridSnapEnabled: false },
     );
     this.callbacks.renderSnapPreview?.(snapped);
     return snapped;
@@ -924,4 +998,10 @@ function clampCoordinate(value: number): number {
 
 function roundCoordinate(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+function isPrimaryPointer(event: PointerEvent): boolean {
+  // Synthetic test events may omit button; real PointerEvent always exposes 0 for the
+  // primary pointer. Treat the omitted value as primary without allowing secondary buttons.
+  return event.button === undefined || event.button === 0;
 }

@@ -19,6 +19,7 @@
   --designer-accent: #ff7a59;
   --designer-accent-surface: #47271f;
   --designer-snap-guide: #4af;
+  --designer-measurement-label: #ff6b6b;
   --designer-success: #86c99a;
   --designer-success-surface: #20372a;
   --designer-warning: #e6b86d;
@@ -48,8 +49,10 @@
   --designer-motion: 160ms cubic-bezier(0.25, 1, 0.5, 1);
   --designer-motion-emphasis: 240ms cubic-bezier(0.16, 1, 0.3, 1);
   --designer-z-canvas: 0;
-  --designer-z-canvas-guide: 1;
-  --designer-z-canvas-selection: 2;
+  /* 画布覆盖层必须高于全部组件：组件 z-index 取 Core painter order 索引（0..N-1），
+     由 engine 按文档组件数维护 --designer-canvas-component-count（未设置时回退 0）。 */
+  --designer-z-canvas-guide: calc(var(--designer-canvas-component-count, 0) + 1);
+  --designer-z-canvas-selection: calc(var(--designer-canvas-component-count, 0) + 2);
   --designer-z-workspace-overlay: 10;
   --designer-z-dialog: 20;
   --designer-z-modal: 30;
@@ -77,6 +80,7 @@
   --designer-accent: #d95235;
   --designer-accent-surface: #f7dcd3;
   --designer-snap-guide: #4af;
+  --designer-measurement-label: #d93838;
   --designer-success: #397a4b;
   --designer-success-surface: #dcebdd;
   --designer-warning: #8a5a16;
