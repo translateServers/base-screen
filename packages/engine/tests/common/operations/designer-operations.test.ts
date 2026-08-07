@@ -4,7 +4,11 @@ import {
   createClipboard,
   createPasteTransaction,
 } from '../../../src/common/operations/designer-clipboard.js';
-import { createReparentTransaction } from '../../../src/common/operations/designer-layout-operations.js';
+import {
+  createAlignmentTransaction,
+  createDistributionTransaction,
+  createReparentTransaction,
+} from '../../../src/common/operations/designer-layout-operations.js';
 import {
   resizeScreenComponents,
   rotateScreenComponents,
@@ -91,5 +95,75 @@ describe('designer operations', () => {
     expect(transaction.commands).toEqual([
       { type: 'reparent-components', componentIds: ['child'], parentId: 'parent' },
     ]);
+  });
+
+  it('applies alignment deltas to the whole group subtree', () => {
+    const group = { ...component('group', 0, 100) };
+    const child = { ...component('child', 20, 130), parentId: 'group' };
+    const sibling = component('sibling', 300, 0);
+    const source = document([group, child, sibling]);
+
+    const transaction = createAlignmentTransaction(source, ['group', 'sibling'], 'top');
+
+    const positions = new Map(
+      transaction.commands.map((command) => {
+        const { componentIds, patch } = command as {
+          readonly componentIds: readonly string[];
+          readonly patch: { readonly position: { readonly x: number; readonly y: number } };
+        };
+        return [componentIds[0]!, patch.position];
+      }),
+    );
+    // 组对齐到 sibling 顶部（y=0），子组件保持相对位置跟随。
+    expect(positions.get('group')).toEqual({ x: 0, y: 0 });
+    expect(positions.get('child')).toEqual({ x: 20, y: 30 });
+    expect(transaction.commands).toHaveLength(2);
+  });
+
+  it('applies distribution deltas to the whole group subtree', () => {
+    const group = { ...component('group', 400, 0) };
+    const child = { ...component('child', 420, 30), parentId: 'group' };
+    const middle = component('middle', 250, 0);
+    const end = component('end', 800, 0);
+    const source = document([group, child, middle, end]);
+
+    const transaction = createDistributionTransaction(
+      source,
+      ['group', 'middle', 'end'],
+      'horizontal',
+    );
+
+    const moved = new Map(
+      transaction.commands.map((command) => {
+        const { componentIds, patch } = command as {
+          readonly componentIds: readonly string[];
+          readonly patch: { readonly position: { readonly x: number; readonly y: number } };
+        };
+        return [componentIds[0]!, patch.position];
+      }),
+    );
+    const groupDelta = moved.get('group')!.x - group.position.x;
+    expect(groupDelta).toBe(125);
+    // 组内子组件与组保持相同位移。
+    expect(moved.get('child')).toEqual({ x: 420 + groupDelta, y: 30 });
+  });
+
+  it('skips directly locked descendants inside a moving group', () => {
+    const group = { ...component('group', 0, 100) };
+    const child = {
+      ...component('child', 20, 130),
+      parentId: 'group',
+      status: { locked: true, hidden: false },
+    };
+    const sibling = component('sibling', 300, 0);
+    const source = document([group, child, sibling]);
+
+    const transaction = createAlignmentTransaction(source, ['group', 'sibling'], 'top');
+    const movedIds = transaction.commands.map(
+      (command) => (command as { readonly componentIds: readonly string[] }).componentIds[0],
+    );
+
+    expect(movedIds).toEqual(['group']);
+    expect(movedIds).not.toContain('child');
   });
 });

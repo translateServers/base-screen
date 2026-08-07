@@ -7,7 +7,7 @@ import type {
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import { createZOrderTransaction } from './designer-layout-operations.js';
 import { removeComponentCommands } from './designer-remove-operations.js';
-import { selectedComponents } from './designer-selection.js';
+import { selectedComponents, selectionSubtree } from './designer-selection.js';
 
 // 元素面向"选择动作"暴露的门面契约，本控制器只依赖此契约，不直接耦合元素或会话。
 export interface DesignerSelectionActionsHost {
@@ -58,7 +58,8 @@ export class DesignerSelectionActions {
   nudge(x: number, y: number): void {
     const document = this.callbacks.getDocument();
     if (document === undefined || !this.canMutate()) return;
-    const selected = selectedComponents(document, this.callbacks.getSelectedComponentIds());
+    // 微调按子树应用：编组/容器连同其子组件一起移动，保持相对位置。
+    const selected = selectionSubtree(document, this.callbacks.getSelectedComponentIds());
     this.callbacks.report(
       this.callbacks.executeTransaction({
         commands: selected.map((component) => ({

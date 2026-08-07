@@ -155,7 +155,7 @@ export function createAlignmentTransaction(
   const components = withEffectiveLockedStatus(document, componentIds);
   const [axis, mode] = alignmentAxisMode(alignment);
   const deltas = calculateScreenAlignment(components, axis, mode);
-  return { commands: positionCommands(components, deltas) };
+  return { commands: subtreePositionCommands(document, deltas) };
 }
 
 export function createDistributionTransaction(
@@ -165,7 +165,7 @@ export function createDistributionTransaction(
 ): ScreenDocumentTransaction {
   const components = withEffectiveLockedStatus(document, componentIds);
   const deltas = calculateScreenDistribution(components, distribution === 'horizontal' ? 'x' : 'y');
-  return { commands: positionCommands(components, deltas) };
+  return { commands: subtreePositionCommands(document, deltas) };
 }
 
 export function createValidatedPropsTransaction(
@@ -248,29 +248,46 @@ function alignmentAxisMode(
   }
 }
 
-function positionCommands(
-  components: readonly ScreenComponentNode[],
+// 对齐/分布的位移按子树应用：每个被计算的根组件连同其全部后代一起移动，
+// 编组内的子组件保持相对位置，直接 locked 的后代不参与。
+function subtreePositionCommands(
+  document: ScreenDocument,
   deltas: readonly {
     readonly componentId: string;
     readonly delta: { readonly x: number; readonly y: number };
   }[],
 ): readonly ScreenDocumentCommand[] {
-  const byId = new Map(components.map((component) => [component.id, component]));
-  return deltas.flatMap(({ componentId, delta }) => {
-    const component = byId.get(componentId);
-    return component === undefined
-      ? []
-      : [
-          {
-            type: 'update-components' as const,
-            componentIds: [componentId],
-            patch: {
-              position: {
-                x: component.position.x + delta.x,
-                y: component.position.y + delta.y,
-              },
-            },
+  const index = new Map(document.components.map((component) => [component.id, component]));
+  const childrenByParent = new Map<string | null, readonly string[]>();
+  for (const component of document.components) {
+    const children = childrenByParent.get(component.parentId);
+    childrenByParent.set(
+      component.parentId,
+      children === undefined ? [component.id] : [...children, component.id],
+    );
+  }
+  const commands: ScreenDocumentCommand[] = [];
+  for (const { componentId, delta } of deltas) {
+    if (delta.x === 0 && delta.y === 0) continue;
+    const pending = [componentId];
+    while (pending.length > 0) {
+      const id = pending.pop()!;
+      const component = index.get(id);
+      if (component === undefined || component.status.locked) {
+        continue;
+      }
+      commands.push({
+        type: 'update-components' as const,
+        componentIds: [id],
+        patch: {
+          position: {
+            x: component.position.x + delta.x,
+            y: component.position.y + delta.y,
           },
-        ];
-  });
+        },
+      });
+      pending.push(...(childrenByParent.get(id) ?? []));
+    }
+  }
+  return commands;
 }

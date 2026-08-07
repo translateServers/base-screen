@@ -5,7 +5,10 @@ import {
   isScreenComponentEffectivelyLocked,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { selectedComponents } from '../../common/operations/designer-selection.js';
+import {
+  selectedComponents,
+  selectionSubtree,
+} from '../../common/operations/designer-selection.js';
 import type { BaseScreenTransformHandle } from '../../common/operations/designer-transform.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
@@ -23,7 +26,12 @@ export function renderDesignerSelection(
     return;
   }
   const selected = selectedComponents(document, componentIds);
-  const bounds = getScreenSelectionBounds(selected);
+  // 选中框覆盖完整子树（编组/容器连同子组件），手柄作用于整个子树。
+  const covered = selectionSubtree(
+    document,
+    selected.map((component) => component.id),
+  );
+  const bounds = getScreenSelectionBounds(covered);
   if (bounds === null) {
     selection.style.display = 'none';
     return;
@@ -34,7 +42,7 @@ export function renderDesignerSelection(
   selection.style.width = `${bounds.right - bounds.left}px`;
   selection.style.height = `${bounds.bottom - bounds.top}px`;
   selection.replaceChildren();
-  appendSelectionGrab(selection, ownerDocument, selected, bounds);
+  appendSelectionGrab(selection, ownerDocument, covered, bounds);
   appendTransformControls(selection, ownerDocument, document, selected, catalog);
 }
 

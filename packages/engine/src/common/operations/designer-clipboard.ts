@@ -1,5 +1,6 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import type { ScreenDocumentCommand, ScreenDocumentTransaction } from '@base-screen/core';
+import { hasSelectedAncestor } from './designer-selection.js';
 
 export interface BaseScreenClipboard {
   readonly components: readonly ScreenComponentNode[];
@@ -12,7 +13,7 @@ export function createClipboard(
   const selected = new Set(componentIds);
   const copiedRoots = document.components.filter(
     (component) =>
-      selected.has(component.id) && !hasSelectedAncestor(document, selected, component),
+      selected.has(component.id) && !hasSelectedAncestor(document, selected, component.id),
   );
   if (copiedRoots.length === 0) {
     return null;
@@ -91,22 +92,6 @@ function offsetPosition(
     x: clampCoordinate(component.position.x + (isCopiedRoot ? offset.x : 0)),
     y: clampCoordinate(component.position.y + (isCopiedRoot ? offset.y : 0)),
   };
-}
-
-function hasSelectedAncestor(
-  document: ScreenDocument,
-  selected: ReadonlySet<string>,
-  component: ScreenComponentNode,
-): boolean {
-  let parentId = component.parentId;
-  const byId = new Map(document.components.map((candidate) => [candidate.id, candidate]));
-  while (parentId !== null) {
-    if (selected.has(parentId)) {
-      return true;
-    }
-    parentId = byId.get(parentId)?.parentId ?? null;
-  }
-  return false;
 }
 
 function nextCopiedId(existingIds: ReadonlySet<string>, sourceId: string): string {
