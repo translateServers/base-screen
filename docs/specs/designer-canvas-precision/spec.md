@@ -1,7 +1,7 @@
 # Designer Canvas Precision 规格
 
 > 状态：生效中
-> 最近更新：2026-08-06
+> 最近更新：2026-08-07
 > 定位：以瞬态 `translate` 预览夯实大屏设计器的移动、吸附与坐标精度
 > 前置：[Designer Full Product](../designer-full-product/spec.md)、[Designer Engine](../designer-engine/spec.md)、[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)
 > 任务：[tasks.md](./tasks.md)
@@ -39,19 +39,30 @@ absolute position transaction。
 ### R2：选区几何吸附
 
 移动多选集合时，Designer SHALL 使用整个选区的 visual axis-aligned bounds 的左/中/右及上/中/下 anchor
-匹配画布、网格、参考线和其他可见组件候选。吸附 SHALL 输出统一 delta 与命中 guide metadata，使预览和最终
+匹配画布、参考线和其他可见组件候选。吸附 SHALL 输出统一 delta 与命中 guide metadata，使预览和最终
 提交一致；被移动组件 SHALL 排除出候选集合。
 
-智能参考线与网格候选 SHALL 按绝对距离统一竞争（同轴取最近命中，网格仍无阈值保底），不再固定优先于
-网格。已吸附目标 SHALL 在释放带（捕获阈值 × 固定倍率，随 zoom 保持 screen-pixel 语义）内保持吸附；
-同锚点继续跟随，避免阈值边界反复吸附/脱离与多锚点切换抖动。吸附会话状态按轴独立，仅存在于单个手势
+智能参考线候选 SHALL 按绝对距离统一竞争（同轴取最近命中）。已吸附目标 SHALL 在捕获阈值（5px screen-pixel 语义，随 zoom 缩放）内保持吸附、超出即释放
+（×1.0，对齐 Nebula/Moveable 的每帧重新判定语义，无额外释放带）；同锚点继续跟随，避免多锚点切换
+抖动。吸附会话状态按轴独立，仅存在于单个手势
 会话内，手势结束或吸附开关切换时 SHALL 清除。吸附锚点与选中框视觉轮廓 SHALL 基于同一选区几何（组件
 视觉包围盒），吸附预览线中心与选中框边缘重合，不与控制器视觉产生偏移。移动预览 SHALL 按渲染阈值（1px，
-对应 Moveable snapRenderThreshold）输出全部对齐线（每锚点 × 每候选，同值取最近），预览层 SHALL 绘制
-参考线、以距离标签显示与参考边的间距；吸附（5px）与渲染（1px）分离——接近阶段无线，几乎贴合时才出现
-线。参考线 SHALL 以对齐坐标定位并居中（CSS translate(-50%)），使任意线宽的中心与对齐坐标精确重合。
-移动拖拽 SHALL 关闭无阈值网格取整，改为把 24px 网格线按 5px 阈值并入智能候选，与组件/画布/参考线统一
-按距离竞争（参考 Moveable/Nebula 的网格线 guidelines 语义），网格线之间允许亚像素自由定位；吸附参考线
+对应 Moveable snapRenderThreshold）每轴输出**最近一条**对齐线（对齐 Moveable snapRenderInfo 单方向
+语义，避免多组件画布拖拽时辅助线杂乱）。预览层 SHALL 只绘制参考线本身；
+吸附（5px）与渲染（1px）分离使线只出现在渲染阈值内，锚点与参考边的残余间距恒 ≤1px，不构成有效读数，
+SHALL NOT 在参考线上叠加距离标签——接近阶段无线，几乎贴合时才出现线。
+若选区 anchor 与候选边或中心已精确重合（零校正），Designer 可保留吸附状态，但 SHALL 不输出该轴的
+蓝色参考线；参考线只反馈渲染阈值内、确实需要非零位置修正的吸附，避免已拼接组件的边界贯穿画布。
+当组件移动越过拖拽确认阈值时，Designer SHALL 以拖动选区的左/中/右与上/中/下 anchor 为测量轨道：在与可见
+组件边缘或中心落入渲染阈值的轨道上，按 visual bounds 排序相邻区间，并将每个非重叠间隙绘制为蓝色虚线测量段和
+红色整数数值标签（无单位）。该规则对齐 Moveable `renderDashedGuidelines`：沿同一对齐轨道从移动选区向两侧依次
+标注正间距，并不把重叠区域或网格纳入测量。候选与选区在测量方向的正交投影必须存在超过渲染阈值的正重叠；
+仅共享边或角的对角关系不得生成间距标注。标注只在实际移动预览期间重算；未越过点击阈值、pointer completion
+或 cancellation SHALL 不显示或立即清理。它们只用于视觉反馈，绝不加入吸附候选、缓存或坐标调整。
+参考线 SHALL 以对齐坐标定位并居中（CSS translate(-50%)），使任意线宽的中心与对齐坐标精确重合。
+参考线层 SHALL 渲染在所有组件之上（组件 z-index 取 Core painter order 索引 0..N-1，覆盖层 z-index 由文档组件数派生，始终高于 N-1），不得被组件遮挡。
+背景网格 SHALL 仅作视觉辅助；任何 pointer、移动、缩放、旋转或创建手势均不得将网格线加入候选或执行网格坐标取整。组件、画布与用户
+参考线仍按距离竞争。吸附参考线
 以蓝色系（Moveable #4af 语义）渲染，吸附目标线以更粗高亮样式指示。
 
 ### R3：统一坐标换算
@@ -62,7 +73,7 @@ canvas bounds 与 zoom。当前 viewport 平移由 canvas rect 表达的行为�
 
 ### R4：可靠性与性能
 
-在 10%–500% zoom、非零 viewport 平移、单选与多选、组件旋转候选、guide/grid 冲突及 pointer cancellation
+在 10%–500% zoom、非零 viewport 平移、单选与多选、组件旋转候选、guide/component 冲突及 pointer cancellation
 场景中，预览和提交 SHALL 可预测。每个 pointer move 仅修改必要的 preview style/overlay，不执行 document
 transaction 或全量 Renderer reconciliation。吸附候选集合 SHALL 在每个手势会话内只收集一次（会话内文档与
 参考线不变），按排除集合区分缓存；会话结束或候选集合变化时失效，避免会话间残留。
