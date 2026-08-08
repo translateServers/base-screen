@@ -8,6 +8,75 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+.designer-menu .designer-submenu,
+.designer-context-menu .designer-submenu,
+.designer-help-dialog .help-content,
+.rail,
+.properties,
+.blueprint-workspace,
+.direct-preview,
+.project-workspace {
+  scrollbar-color: var(--designer-scrollbar-thumb) var(--designer-scrollbar-track);
+  scrollbar-width: thin;
+}
+
+.designer-menu .designer-submenu::-webkit-scrollbar,
+.designer-context-menu .designer-submenu::-webkit-scrollbar,
+.designer-help-dialog .help-content::-webkit-scrollbar,
+.rail::-webkit-scrollbar,
+.properties::-webkit-scrollbar,
+.blueprint-workspace::-webkit-scrollbar,
+.direct-preview::-webkit-scrollbar,
+.project-workspace::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.designer-menu .designer-submenu::-webkit-scrollbar-thumb,
+.designer-context-menu .designer-submenu::-webkit-scrollbar-thumb,
+.designer-help-dialog .help-content::-webkit-scrollbar-thumb,
+.rail::-webkit-scrollbar-thumb,
+.properties::-webkit-scrollbar-thumb,
+.blueprint-workspace::-webkit-scrollbar-thumb,
+.direct-preview::-webkit-scrollbar-thumb,
+.project-workspace::-webkit-scrollbar-thumb {
+  background: var(--designer-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.designer-menu .designer-submenu::-webkit-scrollbar-thumb:hover,
+.designer-context-menu .designer-submenu::-webkit-scrollbar-thumb:hover,
+.designer-help-dialog .help-content::-webkit-scrollbar-thumb:hover,
+.rail::-webkit-scrollbar-thumb:hover,
+.properties::-webkit-scrollbar-thumb:hover,
+.blueprint-workspace::-webkit-scrollbar-thumb:hover,
+.direct-preview::-webkit-scrollbar-thumb:hover,
+.project-workspace::-webkit-scrollbar-thumb:hover {
+  background: var(--designer-scrollbar-thumb-hover);
+}
+
+.designer-menu .designer-submenu::-webkit-scrollbar-track,
+.designer-context-menu .designer-submenu::-webkit-scrollbar-track,
+.designer-help-dialog .help-content::-webkit-scrollbar-track,
+.rail::-webkit-scrollbar-track,
+.properties::-webkit-scrollbar-track,
+.blueprint-workspace::-webkit-scrollbar-track,
+.direct-preview::-webkit-scrollbar-track,
+.project-workspace::-webkit-scrollbar-track {
+  background: var(--designer-scrollbar-track);
+}
+
+.designer-menu .designer-submenu::-webkit-scrollbar-corner,
+.designer-context-menu .designer-submenu::-webkit-scrollbar-corner,
+.designer-help-dialog .help-content::-webkit-scrollbar-corner,
+.rail::-webkit-scrollbar-corner,
+.properties::-webkit-scrollbar-corner,
+.blueprint-workspace::-webkit-scrollbar-corner,
+.direct-preview::-webkit-scrollbar-corner,
+.project-workspace::-webkit-scrollbar-corner {
+  background: var(--designer-scrollbar-corner);
+}
+
 .designer-menu {
   position: absolute;
   z-index: var(--designer-z-dialog);
@@ -344,6 +413,17 @@
 }
 
 @media (forced-colors: active) {
+  .designer-menu .designer-submenu,
+  .designer-context-menu .designer-submenu,
+  .designer-help-dialog .help-content,
+  .rail,
+  .properties,
+  .blueprint-workspace,
+  .direct-preview,
+  .project-workspace {
+    scrollbar-color: auto;
+  }
+
   .designer-control:focus-visible,
   .designer-tab:focus-visible,
   .designer-checkbox:focus-visible {

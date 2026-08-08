@@ -1,31 +1,31 @@
 :host {
-  --designer-surface-workspace: #11100f;
-  --designer-surface-panel: #181715;
-  --designer-surface-raised: #201e1b;
-  --designer-surface-control: #24221f;
-  --designer-surface-control-hover: #302d29;
-  --designer-surface-overlay: #201e1b;
-  --designer-surface-canvas: #0d0d0c;
-  --designer-surface-scrim: rgb(8 7 6 / 68%);
-  --designer-canvas-grid-line: rgb(231 222 207 / 5%);
-  --designer-text-primary: #f1ece3;
-  --designer-text-secondary: #bcb3a6;
-  --designer-text-muted: #8d857a;
-  --designer-text-disabled: #686159;
-  --designer-border-subtle: #292621;
-  --designer-border-default: #39352f;
-  --designer-border-strong: #5d574e;
-  --designer-focus-ring: #ff9c7a;
-  --designer-accent: #ff7a59;
-  --designer-accent-surface: #47271f;
+  --designer-surface-workspace: var(--base-screen-designer-surface-workspace, #11100f);
+  --designer-surface-panel: var(--base-screen-designer-surface-panel, #181715);
+  --designer-surface-raised: var(--base-screen-designer-surface-raised, #201e1b);
+  --designer-surface-control: var(--base-screen-designer-surface-control, #24221f);
+  --designer-surface-control-hover: var(--base-screen-designer-surface-control-hover, #302d29);
+  --designer-surface-overlay: var(--base-screen-designer-surface-overlay, #201e1b);
+  --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #0d0d0c);
+  --designer-surface-scrim: var(--base-screen-designer-surface-scrim, rgb(8 7 6 / 68%));
+  --designer-canvas-grid-line: var(--base-screen-designer-canvas-grid-line, rgb(231 222 207 / 5%));
+  --designer-text-primary: var(--base-screen-designer-text-primary, #f1ece3);
+  --designer-text-secondary: var(--base-screen-designer-text-secondary, #bcb3a6);
+  --designer-text-muted: var(--base-screen-designer-text-muted, #8d857a);
+  --designer-text-disabled: var(--base-screen-designer-text-disabled, #686159);
+  --designer-border-subtle: var(--base-screen-designer-border-subtle, #292621);
+  --designer-border-default: var(--base-screen-designer-border-default, #39352f);
+  --designer-border-strong: var(--base-screen-designer-border-strong, #5d574e);
+  --designer-focus-ring: var(--base-screen-designer-focus-ring, #ff9c7a);
+  --designer-accent: var(--base-screen-designer-accent, #ff7a59);
+  --designer-accent-surface: var(--base-screen-designer-accent-surface, #47271f);
   --designer-snap-guide: #4af;
   --designer-measurement-label: #ff6b6b;
-  --designer-success: #86c99a;
-  --designer-success-surface: #20372a;
-  --designer-warning: #e6b86d;
-  --designer-warning-surface: #44351e;
-  --designer-danger: #ff8197;
-  --designer-danger-surface: #48242d;
+  --designer-success: var(--base-screen-designer-success, #86c99a);
+  --designer-success-surface: var(--base-screen-designer-success-surface, #20372a);
+  --designer-warning: var(--base-screen-designer-warning, #e6b86d);
+  --designer-warning-surface: var(--base-screen-designer-warning-surface, #44351e);
+  --designer-danger: var(--base-screen-designer-danger, #ff8197);
+  --designer-danger-surface: var(--base-screen-designer-danger-surface, #48242d);
   --designer-space-1: 2px;
   --designer-space-2: 4px;
   --designer-space-3: 6px;
@@ -43,11 +43,27 @@
   --designer-font-small:
     11px / 1.4 Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
   --designer-font-numeric: 600 11px / 1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
-  --designer-shadow-overlay: 0 24px 64px rgb(0 0 0 / 48%);
-  --designer-shadow-canvas: 0 28px 80px rgb(0 0 0 / 44%);
-  --designer-shadow-float: 0 12px 32px rgb(0 0 0 / 34%);
-  --designer-motion: 160ms cubic-bezier(0.25, 1, 0.5, 1);
-  --designer-motion-emphasis: 240ms cubic-bezier(0.16, 1, 0.3, 1);
+  --designer-shadow-overlay: var(
+    --base-screen-designer-shadow-overlay,
+    0 24px 64px rgb(0 0 0 / 48%)
+  );
+  --designer-shadow-canvas: var(--base-screen-designer-shadow-canvas, 0 28px 80px rgb(0 0 0 / 44%));
+  --designer-shadow-float: var(--base-screen-designer-shadow-float, 0 12px 32px rgb(0 0 0 / 34%));
+  --designer-motion: var(--base-screen-designer-motion, 160ms cubic-bezier(0.25, 1, 0.5, 1));
+  --designer-motion-emphasis: var(
+    --base-screen-designer-motion-emphasis,
+    240ms cubic-bezier(0.16, 1, 0.3, 1)
+  );
+  --designer-scrollbar-thumb: var(
+    --base-screen-designer-scrollbar-thumb,
+    var(--designer-border-strong)
+  );
+  --designer-scrollbar-thumb-hover: var(
+    --base-screen-designer-scrollbar-thumb-hover,
+    var(--designer-text-muted)
+  );
+  --designer-scrollbar-track: var(--base-screen-designer-scrollbar-track, transparent);
+  --designer-scrollbar-corner: var(--base-screen-designer-scrollbar-corner, transparent);
   --designer-z-canvas: 0;
   /* 画布覆盖层必须高于全部组件：组件 z-index 取 Core painter order 索引（0..N-1），
      由 engine 按文档组件数维护 --designer-canvas-component-count（未设置时回退 0）。 */
@@ -60,35 +76,59 @@
 }
 
 :host([theme="light"]) {
-  --designer-surface-workspace: #ebe7df;
-  --designer-surface-panel: #f8f5ef;
-  --designer-surface-raised: #f1ede5;
-  --designer-surface-control: #e9e3d9;
-  --designer-surface-control-hover: #ddd5c9;
-  --designer-surface-overlay: #fffdf9;
-  --designer-surface-canvas: #d9d4ca;
-  --designer-surface-scrim: rgb(41 34 28 / 42%);
-  --designer-canvas-grid-line: rgb(62 52 43 / 10%);
-  --designer-text-primary: #24201c;
-  --designer-text-secondary: #514a43;
-  --designer-text-muted: #766d63;
-  --designer-text-disabled: #9b938a;
-  --designer-border-subtle: #e4ded4;
-  --designer-border-default: #d2c9bc;
-  --designer-border-strong: #9e9385;
-  --designer-focus-ring: #d64d2f;
-  --designer-accent: #d95235;
-  --designer-accent-surface: #f7dcd3;
+  --designer-surface-workspace: var(--base-screen-designer-surface-workspace, #ebe7df);
+  --designer-surface-panel: var(--base-screen-designer-surface-panel, #f8f5ef);
+  --designer-surface-raised: var(--base-screen-designer-surface-raised, #f1ede5);
+  --designer-surface-control: var(--base-screen-designer-surface-control, #e9e3d9);
+  --designer-surface-control-hover: var(--base-screen-designer-surface-control-hover, #ddd5c9);
+  --designer-surface-overlay: var(--base-screen-designer-surface-overlay, #fffdf9);
+  --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #d9d4ca);
+  --designer-surface-scrim: var(--base-screen-designer-surface-scrim, rgb(41 34 28 / 42%));
+  --designer-canvas-grid-line: var(--base-screen-designer-canvas-grid-line, rgb(62 52 43 / 10%));
+  --designer-text-primary: var(--base-screen-designer-text-primary, #24201c);
+  --designer-text-secondary: var(--base-screen-designer-text-secondary, #514a43);
+  --designer-text-muted: var(--base-screen-designer-text-muted, #766d63);
+  --designer-text-disabled: var(--base-screen-designer-text-disabled, #9b938a);
+  --designer-border-subtle: var(--base-screen-designer-border-subtle, #e4ded4);
+  --designer-border-default: var(--base-screen-designer-border-default, #d2c9bc);
+  --designer-border-strong: var(--base-screen-designer-border-strong, #9e9385);
+  --designer-focus-ring: var(--base-screen-designer-focus-ring, #d64d2f);
+  --designer-accent: var(--base-screen-designer-accent, #d95235);
+  --designer-accent-surface: var(--base-screen-designer-accent-surface, #f7dcd3);
   --designer-snap-guide: #4af;
   --designer-measurement-label: #d93838;
-  --designer-success: #397a4b;
-  --designer-success-surface: #dcebdd;
-  --designer-warning: #8a5a16;
-  --designer-warning-surface: #f8e8c8;
-  --designer-danger: #b93650;
-  --designer-danger-surface: #f8dce2;
-  --designer-shadow-overlay: 0 20px 56px rgb(62 52 43 / 20%);
-  --designer-shadow-canvas: 0 24px 64px rgb(62 52 43 / 24%);
-  --designer-shadow-float: 0 12px 28px rgb(62 52 43 / 14%);
+  --designer-success: var(--base-screen-designer-success, #397a4b);
+  --designer-success-surface: var(--base-screen-designer-success-surface, #dcebdd);
+  --designer-warning: var(--base-screen-designer-warning, #8a5a16);
+  --designer-warning-surface: var(--base-screen-designer-warning-surface, #f8e8c8);
+  --designer-danger: var(--base-screen-designer-danger, #b93650);
+  --designer-danger-surface: var(--base-screen-designer-danger-surface, #f8dce2);
+  --designer-shadow-overlay: var(
+    --base-screen-designer-shadow-overlay,
+    0 20px 56px rgb(62 52 43 / 20%)
+  );
+  --designer-shadow-canvas: var(
+    --base-screen-designer-shadow-canvas,
+    0 24px 64px rgb(62 52 43 / 24%)
+  );
+  --designer-shadow-float: var(
+    --base-screen-designer-shadow-float,
+    0 12px 28px rgb(62 52 43 / 14%)
+  );
+  --designer-motion: var(--base-screen-designer-motion, 160ms cubic-bezier(0.25, 1, 0.5, 1));
+  --designer-motion-emphasis: var(
+    --base-screen-designer-motion-emphasis,
+    240ms cubic-bezier(0.16, 1, 0.3, 1)
+  );
+  --designer-scrollbar-thumb: var(
+    --base-screen-designer-scrollbar-thumb,
+    var(--designer-border-strong)
+  );
+  --designer-scrollbar-thumb-hover: var(
+    --base-screen-designer-scrollbar-thumb-hover,
+    var(--designer-text-muted)
+  );
+  --designer-scrollbar-track: var(--base-screen-designer-scrollbar-track, transparent);
+  --designer-scrollbar-corner: var(--base-screen-designer-scrollbar-corner, transparent);
   color-scheme: light;
 }

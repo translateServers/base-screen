@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { collectGlobalRules } from '../src/global-styles.js';
 import { createVueMaterialDefinition } from '../src/index.js';
 
 const manifest = {
@@ -36,5 +37,37 @@ describe('Vue material bridge', () => {
       expect(definition.value.manifest.type).toBe('acme.vue-label');
     }
     expect('customElements' in globalThis).toBe(false);
+  });
+
+  it('collects all readable rules across sheets', () => {
+    const rules = collectGlobalRules([
+      {
+        cssRules: [
+          { cssText: 'x-vue-echarts{display:block}' },
+          { cssText: '.unrelated{color:red}' },
+          { cssText: 'x-vue-echarts > .echarts-host{width:100%}' },
+        ],
+      },
+    ]);
+
+    expect(rules).toEqual([
+      'x-vue-echarts{display:block}',
+      '.unrelated{color:red}',
+      'x-vue-echarts > .echarts-host{width:100%}',
+    ]);
+  });
+
+  it('recurse into grouping rules and deduplicate rules and sheets', () => {
+    const media = {
+      cssText: '@media (min-width: 0px){x-vue-echarts{display:block}}',
+      cssRules: [{ cssText: 'x-vue-echarts{display:block}' }],
+    };
+    const sheet = { cssRules: [media, media] };
+    const rules = collectGlobalRules([sheet, sheet]);
+
+    expect(rules).toEqual([
+      '@media (min-width: 0px){x-vue-echarts{display:block}}',
+      'x-vue-echarts{display:block}',
+    ]);
   });
 });

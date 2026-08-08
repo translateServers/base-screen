@@ -88,6 +88,44 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).not.toMatch(/(?:#|rgb\()/);
   });
 
+  it('R1 exposes only the documented public theme inputs through private token fallbacks', () => {
+    const publicTokens = [
+      'surface-workspace',
+      'text-primary',
+      'border-default',
+      'accent',
+      'success',
+      'warning',
+      'danger',
+      'shadow-overlay',
+      'motion',
+      'scrollbar-thumb',
+    ];
+
+    for (const token of publicTokens) {
+      expect(tokensCss).toMatch(
+        new RegExp(`--designer-${token}:\\s*var\\(\\s*--base-screen-designer-${token},`),
+      );
+    }
+    expect(tokensCss).not.toContain('--base-screen-designer-z-modal');
+    expect(tokensCss).not.toContain('--base-screen-designer-space-1');
+    expect(tokensCss).not.toContain('--base-screen-designer-control-height');
+  });
+
+  it('R4 scopes scrollbar token consumption to owned Designer scroll containers', () => {
+    expect(baseCss).toContain(
+      'scrollbar-color: var(--designer-scrollbar-thumb) var(--designer-scrollbar-track);',
+    );
+    expect(baseCss).toContain('.designer-menu .designer-submenu::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.designer-context-menu .designer-submenu::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.designer-help-dialog .help-content::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.rail::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.properties::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('.project-workspace::-webkit-scrollbar-thumb');
+    expect(baseCss).toContain('scrollbar-color: auto;');
+    expect(baseCss).not.toContain('body::-webkit-scrollbar');
+  });
+
   it('R3 presents shortcut help as a scannable, responsive modal', () => {
     expect(workbenchCss).toContain('.designer-help-dialog .help-card {');
     expect(workbenchCss).toContain('width: min(480px, 100%);');

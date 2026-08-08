@@ -8,10 +8,14 @@
 ## 1. 目标
 
 为 `<base-screen-designer>` 建立一个稳定、可从宿主页面覆盖、且不把 Engine 私有实现泄漏为公共
-CSS 结构的样式 Token 契约。
+CSS 结构的主题 Token 契约。
 
-交付后，宿主可以通过 CSS 选择器或标准 `element.style.setProperty()` 修改 Designer 的颜色、字体、
-间距、形状、阴影和动效；未提供覆盖时，现有 dark/light 视觉基线保持不变。
+交付后，宿主可以通过 CSS 选择器或标准 `element.style.setProperty()` 修改 Designer 支持的颜色、字体、
+间距、形状、阴影、动效和内部滚动条视觉；未提供覆盖时，现有 dark/light 视觉基线保持不变。
+
+本计划实现的是“主题化视觉外观”，不是任意整体换肤。宿主可以控制 Designer 元素在页面中的宽高、位置
+和外部布局；Designer 内部的 DOM、布局结构、断点、z-index、图标形状、交互状态和 Material 内容仍由
+对应所有者控制。
 
 本计划首版只增加 CSS Custom Properties 公共契约，不增加 `setThemeTokens()`、`themeTokens` 对象、
 全局 stylesheet、CSS-in-JS runtime 或新的 workspace package。
@@ -24,6 +28,18 @@ CSS 结构的样式 Token 契约。
 - `base-screen-designer` 的稳定注册入口由 `@base-screen/sdk` 拥有，Engine 不负责注册标签。
 - `check-designer-styles.mjs`、Engine 样式单测和 browser harness 已提供现成质量入口。
 - 归档样式 Spec 曾将宿主 theme API 列为非目标，因此本计划必须先经过新的 ADR 和生效中的 Spec 授权。
+
+### 2.1 样式所有权边界
+
+| 所有者 | 可修改范围 | 不可修改范围 |
+| --- | --- | --- |
+| 宿主页面 | Designer 元素的外部尺寸、位置、页面布局；文档化公共 Token | Engine Shadow DOM 内部 selector、任意 CSS 注入 |
+| Designer 公共 Token | 主题颜色、文字、边框、语义状态、受限几何、阴影、动效、Owned scrollbar 视觉 | DOM 结构、布局 track、断点、z-index、工具图标和交互语义 |
+| Material | Material 自身 appearance contract、Material Shadow DOM | Designer chrome 的公共 Token |
+| Viewer/Renderer | Viewer 内容和 document canvas appearance | Designer 工作台 chrome |
+
+宿主页面滚动条、`body` 滚动条以及 Material 自己 Shadow DOM 内的滚动条不属于 Designer Scrollbar Token
+范围。首版不开放 `::part`、公共 CSS class、stylesheet URL 或 Shadow DOM 样式注入。
 
 ## 3. 建议决策（待 ADR 冻结）
 
@@ -88,16 +104,32 @@ CSS 结构的样式 Token 契约。
 | Typography | `font`、`font-small`、`font-numeric` | 有效 CSS `font` shorthand；字号不随 viewport 缩放 |
 | Elevation | `shadow-overlay`、`shadow-canvas`、`shadow-float` | 有效 `box-shadow`；不用于普通 section/panel |
 | Motion | `motion`、`motion-emphasis` | 有效 transition shorthand；reduced-motion 时由内部规则关闭 |
+| Scrollbar | `scrollbar-thumb`、`scrollbar-thumb-hover`、`scrollbar-track`、`scrollbar-corner` | 只控制 Designer 自有滚动区域的颜色；宽度保持内部固定 |
 
 所有公共名称在 CSS 中写成完整形式，例如 `--base-screen-designer-surface-panel`。`z-index` 标尺、
 面板宽度、顶部栏/状态栏高度、断点、网格 track、内部选择器和 DOM class 不进入公共目录。
+
+### 4.1 Token 分级
+
+- **主题级**：Surface、Text、Border、Focus、Semantic、Elevation、Motion 和 Scrollbar。必须支持 dark/light
+  fallback 和宿主覆盖。
+- **受限几何级**：Spacing、Control、Shape、Typography。首版无法以纯 CSS 覆盖保证 geometry，全部保持私有；
+  未来必须定义推荐值、允许范围和各 viewport 证据后才能公开。
+- **私有结构级**：Panel width、topbar/statusbar height、grid track、breakpoint、z-index、selector、DOM
+  class、icon geometry 和 canvas coordinate。不得通过公共 Token 暴露。
+
+公共 Token 的实现必须保持“公共输入 -> 私有消费”两层结构。公共目录冻结前，必须为每个名称记录消费者、
+CSS grammar、dark/light fallback、可接受范围和 geometry 风险；`text-inverse` 与各 `*-on` 只有在实现和
+contrast 审计完成后才能进入正式目录。
 
 ## 5. 代码边界和预计改动
 
 ### 必改文件
 
 - `packages/engine/src/browser/styles/designer-tokens.css`：增加公共输入到私有 Token 的映射、缺失的
-  semantic foreground Token，以及 light/dark 成对 fallback。
+  semantic foreground Token、Scrollbar Token，以及 light/dark 成对 fallback。
+- `packages/engine/src/browser/styles/designer-base.css`、`designer-workbench.css`：为 Designer 自有滚动容器
+  接入 scrollbar 规则；不得让 scrollbar 规则扩散到 Material、Viewer 或宿主节点。
 - `scripts/check-designer-styles.mjs`：增加公共 Token allowlist、映射完整性、主题成对覆盖、私有布局
   Token 不外泄，以及源码不引入任意 stylesheet/runtime 注入路径的静态门禁。
 - `packages/engine/tests/browser/styles/designer-style.test.ts`：增加目录、映射、主题 fallback 和
@@ -109,7 +141,7 @@ CSS 结构的样式 Token 契约。
 
 ### 必建文档
 
-- `docs/decisions/ADR-0020-designer-public-style-tokens.md`：记录命名空间、所有权、覆盖优先级、兼容策略、
+- `docs/decisions/ADR-0024-designer-public-style-tokens.md`：记录命名空间、所有权、覆盖优先级、兼容策略、
   安全边界和拒绝的 JS/runtime 方案。
 - `docs/specs/designer-theme-tokens/spec.md`：Requirements、场景、非目标和完成定义。
 - `docs/specs/designer-theme-tokens/tasks.md`：按实现和证据拆分任务。
@@ -131,11 +163,15 @@ exports、package manifest、lockfile 或 Custom Element 注册逻辑。CSS-only
 
 1. 从四层 CSS 提取实际 Token 使用矩阵，确认每个候选 Token 的消费者、默认值和 light 值。
 2. 计算内建 dark/light 的文本、图标、边界和 focus contrast；确定 `text-inverse` 与各 `*-on` 的最终值。
-3. 完成 ADR-0020 草案，明确 CSS-only 首版、不支持 JS theme object、无效值责任和不持久化边界。
-4. 完成 Spec 三件套和测试矩阵，并在索引中标为“评审中”而非直接授权实施。
-5. 评审通过后将 ADR 置为“已接受”、Spec 置为“生效中”；未通过前不得改运行时代码。
+3. 为 Spacing、Control、Shape、Typography 定义范围和 geometry 失败处理；确认哪些 Token 需要保持私有。
+4. 确认 Scrollbar 的 owned container 清单、Firefox `scrollbar-color`、Chromium/Safari pseudo-element
+   fallback 和 forced-colors 行为。
+5. 完成 ADR-0024 草案，明确 CSS-only 首版、不支持 JS theme object、无效值责任和不持久化边界。
+6. 完成 Spec 三件套和测试矩阵，并在索引中标为“评审中”而非直接授权实施。
+7. 评审通过后将 ADR 置为“已接受”、Spec 置为“生效中”；未通过前不得改运行时代码。
 
-阶段门：公共前缀、Token 全集、主题语义、无效值策略和 JS API 是否延期必须全部有明确结论。
+阶段门：公共前缀、Token 分级、主题语义、Scrollbar 边界、geometry 范围、无效值策略和 JS API 是否延期
+必须全部有明确结论。
 
 ### 阶段 1：Token 映射实现
 
@@ -143,8 +179,10 @@ exports、package manifest、lockfile 或 Custom Element 注册逻辑。CSS-only
 2. 对按钮前景、状态徽标和危险操作补齐 `accent-on`、`success-on`、`warning-on`、`danger-on` 私有映射，
    只有通过 contrast 验收后才纳入公共目录。
 3. 保持 Tokens、Base、Controls、Workbench 装配顺序和单 `<style>` 结构不变。
-4. 不把公共变量名拼接进 class、data attribute、document 数据或 DOM helper 参数。
-5. 让 reduced-motion、forced-colors 继续由内部媒体规则掌控，外部 motion Token 不能绕过可访问性策略。
+4. 为 Designer 自有滚动容器接入 `scrollbar-color` 和 WebKit scrollbar fallback；Scrollbar Token 不控制
+   scrollbar width/height，避免跨浏览器差异改变布局。
+5. 不把公共变量名拼接进 class、data attribute、document 数据或 DOM helper 参数。
+6. 让 reduced-motion、forced-colors 继续由内部媒体规则掌控，外部 motion Token 不能绕过可访问性策略。
 
 阶段门：无覆盖时所有现有样式测试和默认截图保持等价；公共变量只影响 Designer chrome。
 
@@ -153,7 +191,9 @@ exports、package manifest、lockfile 或 Custom Element 注册逻辑。CSS-only
 1. 让 `check-designer-styles.mjs` 解析并校验公共 Token allowlist，而不是只检查字符串存在。
 2. 验证每个公开 Token 都有 dark fallback；颜色角色在 light 下有对应 fallback；没有意外公开 z-index 或布局变量。
 3. 验证 Controls/Workbench 不新增可由 Token 表达的颜色字面量，也没有第二套 theme branch。
-4. 增加覆盖、删除覆盖、主题切换、未知变量和单 style node 的测试；测试名称标注对应 Requirement。
+4. 验证 Scrollbar Token 只出现在 Designer owned scroll container 规则中，且没有裸 `body`/宿主 scrollbar
+   选择器。
+5. 增加覆盖、删除覆盖、主题切换、未知变量和单 style node 的测试；测试名称标注对应 Requirement。
 
 阶段门：Engine focused lint、typecheck、test、build 全通过，且静态检查能阻止未来遗漏映射。
 
@@ -165,7 +205,9 @@ exports、package manifest、lockfile 或 Custom Element 注册逻辑。CSS-only
 4. 使用 Material button/input/style canary、Viewer 和宿主控件验证 computed style 不受污染。
 5. 覆盖 dark、light、自定义品牌主题和 reduced-motion/forced-colors；检查 contrast、overflow、layout shift、
    固定控件几何和 screenshot 非空。
-6. 覆盖连接、断开、重连和 catalog 延迟初始化，确认不重复注入 style 或遗留跨实例状态。
+6. 在可用的 Chromium/Safari WebKit 环境检查 scrollbar pseudo-element，在 Firefox 环境检查 `scrollbar-color`；
+   验收语义状态和可读性等价，不要求原生 scrollbar 像素完全一致；forced-colors 下确认恢复系统 scrollbar。
+7. 覆盖连接、断开、重连和 catalog 延迟初始化，确认不重复注入 style 或遗留跨实例状态。
 
 阶段门：1024x640、1440x900、1920x1080 和窄屏路径均通过；自定义主题不能遮挡文本、焦点或相邻控件。
 
@@ -199,7 +241,7 @@ exports、package manifest、lockfile 或 Custom Element 注册逻辑。CSS-only
 | R3 外部覆盖 | ancestor/host/inline、删除恢复、未知变量无效 | Chromium browser harness |
 | R4 主题隔离 | 两个 Designer 使用不同 Token，动态修改互不影响 | 双实例 browser case |
 | R5 Shadow 隔离 | Material、Viewer、body、宿主控件 computed style 不变 | canary browser case |
-| R6 可访问性 | contrast、focus、invalid、disabled、forced-colors、reduced-motion | browser assertions + screenshot |
+| R6 可访问性 | contrast、focus、invalid、disabled、forced-colors、reduced-motion、system scrollbar fallback | browser assertions + screenshot |
 | R7 生命周期 | disconnect/reconnect、延迟初始化、style node 唯一 | DOM/browser tests |
 | R8 产物边界 | 无新 package/export/CSS 文件依赖，tarball 可消费 | build、API、boundary、tarball |
 
@@ -237,6 +279,8 @@ rg -n "^- \[ \]" docs/specs/designer-theme-tokens/{tasks,checklist}.md
 
 - CSS cascade 在目标浏览器不一致：保留公共输入/私有消费的两层映射，以 browser case 作为合入门槛；失败时暂缓祖先继承，只保留元素级覆盖。
 - 外部值导致 contrast 或几何破坏：内建主题必须始终合格；公共目录首版不包含布局 track、z-index 和 panel width；发现破坏时收缩 Token 集，不增加运行时修复逻辑。
+- Scrollbar pseudo-element 与标准 `scrollbar-color` 能力不一致：颜色视觉作为增强能力，forced-colors 和不支持
+  pseudo-element 的浏览器必须保持可用系统 scrollbar；不为统一厚度引入运行时 polyfill。
 - 无效或不受支持的 CSS grammar：文档只承诺标准 CSS 值；`@property` 仅在单独浏览器评估通过后考虑。
 - 宿主误把主题值写入持久化文档：公共 Token 不进入任何 contracts/Core 接口，browser 和 serialization case 证明其为元素瞬态样式。
 - 需求转为数据驱动 JS 主题对象：停止当前扩展，先完成阶段 5 的新 ADR，不在 CSS 计划中混入公共 TypeScript API。
@@ -246,9 +290,11 @@ document、history、package graph 和 SDK 注册行为不需要迁移。
 
 ## 10. 完成定义
 
-- ADR-0020 已接受，Designer Theme Tokens Spec 已生效并完成三件套及测试矩阵。
+- ADR-0024 已接受，Designer Theme Tokens Spec 已生效并完成三件套及测试矩阵。
 - 公共 Token 目录、值语法、覆盖优先级和不变边界均有文档和静态门禁。
 - 无覆盖时 dark/light 的既有行为和几何无回归；有效外部覆盖在 Shadow DOM 内可见。
+- Designer 自有滚动区域在 dark/light 和自定义主题下具有可读的 thumb/track/corner 视觉；宿主和 Material
+  scrollbar 未被修改。
 - 多实例、Material、Viewer、宿主隔离、生命周期、可访问性和截图证据全部通过。
 - Engine focused gates、browser、API、boundary、tarball 和 `pnpm verify:m0` 全部通过。
 - `tasks.md`、`checklist.md` 不存在适用未勾选项，且 test matrix 与当前 case 一致。
