@@ -97,6 +97,32 @@ describe('serializeScreenDocument', () => {
     }
   });
 
+  it('round-trips strict host dataset parameter and binding intent', () => {
+    const input = parsed(
+      document({
+        components: [
+          {
+            ...emptyComponent(),
+            dataSource: {
+              type: 'host-resource',
+              resourceType: 'dataset',
+              resourceId: 'orders',
+              params: {
+                limit: { kind: 'literal', value: 5 },
+                tenant: { kind: 'variable', name: 'tenant' },
+              },
+              binding: { fields: { columns: ['name', 'amount'] } },
+            },
+          },
+        ],
+        variables: [{ type: 'host', name: 'tenant', variableId: 'tenant-context' }],
+      }),
+    );
+    const reparsed = parseScreenDocument(JSON.parse(serializeScreenDocument(input)));
+    expect(reparsed.ok).toBe(true);
+    if (reparsed.ok) expect(reparsed.value).toEqual(input);
+  });
+
   it('throws ScreenSerializationError for invalid runtime input', () => {
     const cases: Array<Record<string, unknown>> = [
       document({ canvas: { width: 0, height: 1, backgroundColor: '#000' } }),

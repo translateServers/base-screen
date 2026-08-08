@@ -1,5 +1,6 @@
+import type { ScreenDatasetDescriptor, ScreenDatasetPage } from './dataset.js';
 import type { ScreenParseResult } from './diagnostics.js';
-import type { ScreenDocument, ScreenHostResourceDataSource } from './document.js';
+import type { ScreenDocument } from './document.js';
 import type { ScreenProjectEnvelope } from './envelope.js';
 import type { ScreenJsonValue } from './json.js';
 
@@ -34,6 +35,7 @@ export interface ScreenDesignerHostCapabilities {
   readonly projectSnapshots: boolean;
   readonly assets: boolean;
   readonly resources: boolean;
+  readonly datasetCatalog: boolean;
   readonly variables: boolean;
   readonly actions: boolean;
 }
@@ -45,6 +47,7 @@ export interface ScreenDesignerHostAdapter {
   readonly projectSnapshots?: ScreenProjectSnapshotPort;
   readonly assets?: ScreenAssetCatalogPort;
   readonly resources?: ScreenHostResourcePort;
+  readonly datasetCatalog?: ScreenHostDatasetCatalogPort;
   readonly variables?: ScreenHostVariablePort;
   readonly actions?: ScreenBlueprintHostActionPort;
 }
@@ -173,7 +176,9 @@ export interface ScreenAssetCatalogPort {
 
 export interface ScreenHostResourceRequest {
   readonly componentId: string;
-  readonly source: ScreenHostResourceDataSource;
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly params: Readonly<Record<string, import('./json.js').ScreenJsonValue>>;
 }
 
 export interface ScreenAbortSignal {
@@ -194,6 +199,26 @@ export interface ScreenHostResourcePort {
     request: ScreenHostResourceRequest,
     options: ScreenHostResourceResolveOptions,
   ): Promise<ScreenParseResult<ScreenJsonValue>>;
+}
+
+export interface ScreenHostDatasetCatalogListRequest {
+  readonly query: string;
+  readonly cursor?: string;
+  readonly limit: number;
+  readonly signal: ScreenAbortSignal;
+}
+
+export interface ScreenHostDatasetDescribeRequest {
+  readonly resourceType: string;
+  readonly resourceId: string;
+  readonly signal: ScreenAbortSignal;
+}
+
+export interface ScreenHostDatasetCatalogPort {
+  list(request: ScreenHostDatasetCatalogListRequest): Promise<ScreenParseResult<ScreenDatasetPage>>;
+  describe(
+    request: ScreenHostDatasetDescribeRequest,
+  ): Promise<ScreenParseResult<ScreenDatasetDescriptor>>;
 }
 
 export interface ScreenHostVariableRequest {
@@ -236,6 +261,7 @@ export function validateScreenDesignerHostAdapter(
     ['projectSnapshots', 'projectSnapshots', ['list', 'create', 'restore', 'delete']],
     ['assets', 'assets', ['list', 'canDelete']],
     ['resources', 'resources', ['resolve']],
+    ['datasetCatalog', 'datasetCatalog', ['list', 'describe']],
     ['variables', 'variables', ['resolve']],
     ['actions', 'actions', ['execute']],
   ] as const;

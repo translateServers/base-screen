@@ -1,3 +1,12 @@
+export {
+  MAX_DATASET_BYTES,
+  MAX_DATASET_FIELDS,
+  MAX_DATASET_PAGE_ITEMS,
+  MAX_DATASET_ROWS,
+  parseScreenDatasetDescriptor,
+  parseScreenDatasetPage,
+  parseScreenTabularDataset,
+} from './dataset/parse.js';
 export { isScreenMaterialType } from './document/identity.js';
 export { SCREEN_DOCUMENT_JSON_SCHEMA } from './document/json-schema.js';
 export {
@@ -9,6 +18,16 @@ export {
   serializeScreenDocument,
 } from './document/serialize.js';
 export { parseScreenJsonValue, type ScreenJsonParseOptions } from './json/parse.js';
+export type {
+  ScreenDatasetDescriptor,
+  ScreenDatasetField,
+  ScreenDatasetPage,
+  ScreenDatasetParameter,
+  ScreenDatasetParameterEditor,
+  ScreenDatasetSummary,
+  ScreenDatasetValueType,
+  ScreenTabularDataset,
+} from './types/dataset.js';
 export type {
   ScreenDiagnostic,
   ScreenDiagnosticCode,
@@ -31,7 +50,9 @@ export type {
   ScreenComponentNode,
   ScreenComponentStatus,
   ScreenDocument,
+  ScreenHostResourceBinding,
   ScreenHostResourceDataSource,
+  ScreenHostResourceParameter,
   ScreenHostVariable,
   ScreenPosition,
   ScreenSize,
@@ -50,6 +71,9 @@ export type {
   ScreenBlueprintRuntimePort,
   ScreenDesignerHostAdapter,
   ScreenDesignerHostCapabilities,
+  ScreenHostDatasetCatalogListRequest,
+  ScreenHostDatasetCatalogPort,
+  ScreenHostDatasetDescribeRequest,
   ScreenHostResourcePort,
   ScreenHostResourceRequest,
   ScreenHostResourceResolveOptions,

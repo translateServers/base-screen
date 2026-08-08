@@ -26,11 +26,20 @@ export interface ScreenStaticDataSource {
   readonly value: ScreenJsonValue;
 }
 
+export type ScreenHostResourceParameter =
+  | { readonly kind: 'literal'; readonly value: ScreenJsonValue }
+  | { readonly kind: 'variable'; readonly name: string };
+
+export interface ScreenHostResourceBinding {
+  readonly fields: Readonly<Record<string, readonly string[]>>;
+}
+
 export interface ScreenHostResourceDataSource {
   readonly type: 'host-resource';
   readonly resourceType: string;
   readonly resourceId: string;
-  readonly params: ScreenJsonObject;
+  readonly params: Readonly<Record<string, ScreenHostResourceParameter>>;
+  readonly binding: ScreenHostResourceBinding | null;
 }
 
 export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenHostResourceDataSource;

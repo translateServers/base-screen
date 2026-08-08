@@ -51,7 +51,15 @@ const POSITION_FIELDS = new Set(['x', 'y']);
 const SIZE_FIELDS = new Set(['width', 'height']);
 const STATUS_FIELDS = new Set(['locked', 'hidden']);
 const STATIC_DATA_SOURCE_FIELDS = new Set(['type', 'value']);
-const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set(['type', 'resourceType', 'resourceId', 'params']);
+const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set([
+  'type',
+  'resourceType',
+  'resourceId',
+  'params',
+  'binding',
+]);
+const HOST_RESOURCE_PARAMETER_FIELDS = new Set(['kind', 'value', 'name']);
+const HOST_RESOURCE_BINDING_FIELDS = new Set(['fields']);
 const VARIABLE_FIELDS = new Set(['type', 'name', 'value']);
 const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'variableId']);
 const BLUEPRINT_FIELDS = new Set(['rules']);
@@ -305,6 +313,43 @@ function validateComponent(
       )
     ) {
       return false;
+    }
+    if (dataSource.type === 'host-resource') {
+      const params = dataSource.params;
+      if (isJsonObject(params)) {
+        for (const [key, parameter] of Object.entries(params)) {
+          if (
+            isJsonObject(parameter) &&
+            !checkStrictObjectKeys(
+              parameter,
+              parameter.kind === 'variable'
+                ? new Set(['kind', 'name'])
+                : parameter.kind === 'literal'
+                  ? new Set(['kind', 'value'])
+                  : HOST_RESOURCE_PARAMETER_FIELDS,
+              at([...baseSegments, 'dataSource', 'params', key]),
+              collector,
+              phase,
+            )
+          ) {
+            return false;
+          }
+        }
+      }
+      const binding = dataSource.binding;
+      if (isJsonObject(binding)) {
+        if (
+          !checkStrictObjectKeys(
+            binding,
+            HOST_RESOURCE_BINDING_FIELDS,
+            at([...baseSegments, 'dataSource', 'binding']),
+            collector,
+            phase,
+          )
+        ) {
+          return false;
+        }
+      }
     }
   }
   const result = componentSchema.safeParse(component);

@@ -190,7 +190,7 @@ function applyUpdateComponents(
   }
   const index = buildComponentIndex(document);
   const locked = targets.find((id) => isEffectiveLocked(index, id));
-  if (locked !== undefined) {
+  if (locked !== undefined && !isStatusOnlyPatch(patch)) {
     return failure(
       document,
       diagnostic(
@@ -411,6 +411,10 @@ function isExactPatch(
   allowed: ReadonlySet<string>,
 ): value is Record<string, unknown> {
   return isRecord(value) && Object.keys(value).every((key) => allowed.has(key));
+}
+
+function isStatusOnlyPatch(value: unknown): boolean {
+  return isRecord(value) && Object.keys(value).length === 1 && value.status !== undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

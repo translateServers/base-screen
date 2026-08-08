@@ -73,6 +73,59 @@ describe('applyScreenDocumentCommand', () => {
     }
   });
 
+  it('permits status-only patches on effectively locked targets', () => {
+    const document = makeDocument({
+      components: [
+        makeComponent({ id: 'group', status: { locked: true, hidden: false } }),
+        makeComponent({ id: 'child', parentId: 'group' }),
+      ],
+    });
+    const unlock = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['group'],
+      patch: { status: { locked: false, hidden: false } },
+    });
+    const hide = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['child'],
+      patch: { status: { locked: false, hidden: true } },
+    });
+
+    expect(unlock.ok).toBe(true);
+    if (unlock.ok) {
+      expect(unlock.document.components[0]?.status.locked).toBe(false);
+      expect(unlock.changedComponentIds).toEqual(['group']);
+    }
+    expect(hide.ok).toBe(true);
+    if (hide.ok) {
+      expect(hide.document.components[1]?.status.hidden).toBe(true);
+    }
+  });
+
+  it('still blocks geometry or name patches on effectively locked targets', () => {
+    const document = makeDocument({
+      components: [
+        makeComponent({ id: 'group', status: { locked: true, hidden: false } }),
+        makeComponent({ id: 'child', parentId: 'group' }),
+      ],
+    });
+    const move = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['child'],
+      patch: { position: { x: 10, y: 10 } },
+    });
+    const rename = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['group'],
+      patch: { name: 'Changed' },
+    });
+
+    expect(move.ok).toBe(false);
+    if (!move.ok) expect(move.diagnostics[0]?.code).toBe('CORE_COMMAND_TARGET_LOCKED');
+    expect(rename.ok).toBe(false);
+    if (!rename.ok) expect(rename.diagnostics[0]?.code).toBe('CORE_COMMAND_TARGET_LOCKED');
+  });
+
   it('removes descendants and reports them in source order', () => {
     const document = documentWithComponents();
     const result = applyScreenDocumentCommand(document, {

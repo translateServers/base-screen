@@ -44,7 +44,25 @@ export const hostResourceDataSourceSchema = z.strictObject({
   type: z.literal('host-resource'),
   resourceType: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
   resourceId: z.string().min(1).max(256),
-  params: z.record(z.string(), z.any()),
+  params: z.record(
+    z.string().min(1).max(128),
+    z.union([
+      z.strictObject({ kind: z.literal('literal'), value: z.any() }),
+      z.strictObject({
+        kind: z.literal('variable'),
+        name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+      }),
+    ]),
+  ),
+  binding: z.union([
+    z.strictObject({
+      fields: z.record(
+        z.string().min(1).max(128),
+        z.array(z.string().min(1).max(256)).min(1).max(256),
+      ),
+    }),
+    z.null(),
+  ]),
 });
 
 export const componentSchema = z.strictObject({

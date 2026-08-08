@@ -28,6 +28,16 @@ export type {
   ScreenTransactionResult,
   ScreenTransactionSuccess,
 } from './commands/types.js';
+export type {
+  ScreenDataBindingRole,
+  ScreenHostResourceBindingValidation,
+  ScreenHostResourceParameterEvaluation,
+} from './data/host-dataset.js';
+export {
+  evaluateScreenHostResourceParameters,
+  extractScreenHostResourceVariableDependencies,
+  validateScreenHostResourceBinding,
+} from './data/host-dataset.js';
 export type { ScreenAlignmentDelta, ScreenSnapCandidate } from './geometry/geometry.js';
 export {
   calculateScreenAlignment,

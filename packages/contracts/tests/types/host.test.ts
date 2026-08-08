@@ -6,6 +6,7 @@ import type {
   ScreenDesignerHostAdapter,
   ScreenDiagnosticCode,
   ScreenDocument,
+  ScreenHostDatasetCatalogPort,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
   ScreenProjectEnvelope,
@@ -99,6 +100,7 @@ describe('project lifecycle contracts', () => {
         readonly projectSnapshots: boolean;
         readonly assets: boolean;
         readonly resources: boolean;
+        readonly datasetCatalog: boolean;
         readonly variables: boolean;
         readonly actions: boolean;
       };
@@ -120,6 +122,7 @@ describe('project lifecycle contracts', () => {
         projectSnapshots: false,
         assets: false,
         resources: false,
+        datasetCatalog: false,
         variables: false,
         actions: false,
       },
@@ -141,6 +144,7 @@ describe('project lifecycle contracts', () => {
         projectSnapshots: false,
         assets: false,
         resources: false,
+        datasetCatalog: false,
         variables: false,
         actions: false,
       },
