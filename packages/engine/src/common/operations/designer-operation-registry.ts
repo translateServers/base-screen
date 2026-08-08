@@ -86,6 +86,12 @@ export const DESIGNER_OPERATION_TEXT = {
   duplicate: { label: '原地复制', tooltip: '原地复制选中组件', shortcut: 'Ctrl+D' },
   group: { label: '编组', tooltip: '将选中组件编组', shortcut: 'Ctrl+G' },
   ungroup: { label: '取消编组', tooltip: '取消选中组件的编组', shortcut: 'Ctrl+Shift+G' },
+  'group-enter': { label: '进入组内', tooltip: '进入选中组的组内编辑', shortcut: 'Enter' },
+  'group-exit': {
+    label: '退出组内',
+    tooltip: '退出当前组内编辑并选中父级',
+    shortcut: 'Shift+Enter',
+  },
   lock: { label: '锁定', tooltip: '锁定选中组件', shortcut: 'Ctrl+L' },
   unlock: { label: '解锁', tooltip: '解锁选中组件', shortcut: 'Ctrl+Shift+L' },
   hide: { label: '隐藏', tooltip: '隐藏选中组件', shortcut: 'Ctrl+H' },

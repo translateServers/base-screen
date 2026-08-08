@@ -68,6 +68,7 @@ export function createDesignerWorkspace(
   materials: readonly BaseScreenMaterialCatalogEntry[],
   toolMaterialTypes: DesignerToolMaterialTypes | undefined,
 ): HTMLElement {
+  const visibleMaterials = visibleLibraryMaterials(materials);
   const layout = ownerDocument.createElement('section');
   layout.className = 'designer';
   layout.innerHTML = `
@@ -78,7 +79,7 @@ export function createDesignerWorkspace(
     <aside class="rail" data-left-panel>
       <header class="panel-heading">
         <span class="panel-title">${DESIGNER_UI_TEXT.materials}</span>
-        <span class="panel-count">${materials.length}</span>
+        <span class="panel-count">${visibleMaterials.length}</span>
         <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" title="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
         </button>
@@ -344,7 +345,7 @@ export function createDesignerWorkspace(
   layout.appendChild(helpDialog);
 
   const materialsRail = layout.querySelector<HTMLElement>('[data-materials]')!;
-  for (const entry of materials) {
+  for (const entry of visibleMaterials) {
     materialsRail.appendChild(createMaterialCard(ownerDocument, entry));
   }
   for (const tool of DESIGNER_TOOLS) {
@@ -407,6 +408,12 @@ function menuEntriesHtml(entries: readonly DesignerMenuEntry[]): string {
 // 画布右键菜单按右键目标动态组合：'separator' 渲染分组分隔线。
 export function contextMenuHtml(actions: readonly DesignerContextMenuAction[]): string {
   return menuEntriesHtml(actions);
+}
+
+export function visibleLibraryMaterials(
+  materials: readonly BaseScreenMaterialCatalogEntry[],
+): readonly BaseScreenMaterialCatalogEntry[] {
+  return materials.filter((entry) => entry.manifest.libraryVisible !== false);
 }
 
 function createMaterialCard(

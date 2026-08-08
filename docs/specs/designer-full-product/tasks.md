@@ -24,6 +24,7 @@
 - [ ] Task 4：完成物料、资产和数据作者能力（R5、R6、R9）。
   - [ ] 增加经 Manifest/Renderer conformance 验收的基础物料。
   - [ ] 实现变量、资源、资产和数据状态的宿主解耦闭环。
+  - [x] 完成宿主数据集目录、参数 union、字段绑定、表格/图表预览与 Viewer 刷新闭环（[Host Dataset Integration](../host-dataset-integration/spec.md)）。
   - [ ] Renderer 渲染时异常隔离：创建、模型赋值、事件回调等首次渲染失败时隔离到该组件，其余组件渲染成功，并上报 `PLUGIN_CORE_RENDER_FAILED` 诊断（对应 Renderer Viewer Spec 增量）。
   - [ ] 覆盖取消、去重、超时、资源替换、删除保护和敏感信息隔离。
 

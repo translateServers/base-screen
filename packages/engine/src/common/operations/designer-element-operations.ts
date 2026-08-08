@@ -50,6 +50,8 @@ export interface DesignerElementOperationsHost {
   readonly hasClipboard: () => boolean;
   readonly canGroup: () => boolean;
   readonly canUngroup: () => boolean;
+  readonly canEnterGroupEditing: () => boolean;
+  readonly canExitGroupEditing: () => boolean;
   readonly canAlign: () => boolean;
   readonly canDistribute: () => boolean;
   readonly getToolMaterialTypes: () => DesignerToolMaterialTypes | undefined;
@@ -66,6 +68,8 @@ export interface DesignerElementOperationsHost {
   readonly paste: () => ScreenParseResult<ScreenDocument>;
   readonly group: () => ScreenParseResult<ScreenDocument>;
   readonly ungroup: () => ScreenParseResult<ScreenDocument>;
+  readonly enterGroupEditing: () => boolean;
+  readonly exitGroupEditing: () => boolean;
   readonly align: (alignment: BaseScreenAlignment) => ScreenParseResult<ScreenDocument>;
   readonly distribute: (distribution: BaseScreenDistribution) => ScreenParseResult<ScreenDocument>;
   readonly duplicate: () => ScreenParseResult<ScreenDocument>;
@@ -200,6 +204,22 @@ export function createDesignerElementOperations(
       'ungroup',
       () => host.canUngroup(),
       () => host.report(host.ungroup()),
+      'canvas',
+    ),
+    simpleOperation(
+      'group-enter',
+      () => host.canEnterGroupEditing(),
+      () => {
+        host.enterGroupEditing();
+      },
+      'canvas',
+    ),
+    simpleOperation(
+      'group-exit',
+      () => host.canExitGroupEditing(),
+      () => {
+        host.exitGroupEditing();
+      },
       'canvas',
     ),
     simpleOperation(

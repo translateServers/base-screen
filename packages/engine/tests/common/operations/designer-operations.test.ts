@@ -10,6 +10,10 @@ import {
   createReparentTransaction,
 } from '../../../src/common/operations/designer-layout-operations.js';
 import {
+  selectionTargetInContext,
+  selectionTargetsInContext,
+} from '../../../src/common/operations/designer-selection.js';
+import {
   resizeScreenComponents,
   rotateScreenComponents,
 } from '../../../src/common/operations/designer-transform.js';
@@ -165,5 +169,23 @@ describe('designer operations', () => {
 
     expect(movedIds).toEqual(['group']);
     expect(movedIds).not.toContain('child');
+  });
+
+  it('R3 resolves canvas hits to the current group-editing context', () => {
+    const group = { ...component('group', 0, 0), type: 'base.group' };
+    const childGroup = {
+      ...component('child-group', 20, 20),
+      type: 'base.group',
+      parentId: 'group',
+    };
+    const leaf = { ...component('leaf', 30, 30), parentId: 'child-group' };
+    const source = document([group, childGroup, leaf]);
+
+    expect(selectionTargetInContext(source, 'leaf', null)).toBe('group');
+    expect(selectionTargetInContext(source, 'leaf', 'group')).toBe('child-group');
+    expect(selectionTargetInContext(source, 'leaf', 'child-group')).toBe('leaf');
+    expect(selectionTargetsInContext(source, ['group', 'child-group', 'leaf'], 'group')).toEqual([
+      'child-group',
+    ]);
   });
 });

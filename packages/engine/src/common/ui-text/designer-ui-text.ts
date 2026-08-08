@@ -7,7 +7,7 @@ export const DESIGNER_UI_TEXT = {
   data: '数据',
   interaction: '交互',
   events: '事件',
-  inspector: '检查器',
+  inspector: '属性',
   directDocument: '直接文档',
   continueEditing: '继续编辑',
   reloadRemote: '重新加载远端',
@@ -32,7 +32,7 @@ export const DESIGNER_UI_TEXT = {
   },
   smallScreenWarning: '编辑需要至少 1024 × 640 的可用空间。',
   collapseMaterials: '收起物料面板',
-  collapseInspector: '收起检查器',
+  collapseInspector: '收起属性',
   materialsSearch: '搜索物料',
   materialFilters: '物料筛选',
   allMaterials: '全部',
@@ -62,6 +62,7 @@ export const DESIGNER_UI_TEXT = {
   nothingSelected: '未选中',
   selectedSingle: '已选中 1 个',
   selectedCount: (count: number) => `已选中 ${count} 个组件`,
+  groupEditingPath: (path: string) => `组内：${path}`,
   notifications: '操作通知',
   projectConflict: '项目冲突',
   conflictDetail: '继续编辑将保留本地版本；重新加载将丢弃本地修改。',
@@ -70,6 +71,23 @@ export const DESIGNER_UI_TEXT = {
   importWarning: '当前未保存的修改将会丢失，是否继续？',
   cancel: '取消',
   dataPanelEmpty: '未选择数据源。',
+  dataSource: {
+    title: '数据来源',
+    mode: (mode: string) =>
+      ({ none: '无数据', static: '静态数据', dataset: '宿主数据集' })[mode] ?? mode,
+    noneSelected: '当前组件不使用数据。',
+    staticTitle: '静态数据',
+    staticValue: 'JSON 数据',
+    staticInvalid: '静态数据不是有效的 JSON，未保存修改。',
+    hostConnection: '宿主连接',
+    datasetCatalog: '数据集目录',
+    dataQuery: '数据查询',
+    connected: '已连接',
+    disconnected: '未连接',
+    apply: (mode: string) =>
+      ({ none: '移除数据', static: '应用静态数据', dataset: '应用数据集' })[mode] ?? '应用',
+    applied: '数据来源已应用。',
+  },
   interactionPanelEmpty: '交互设置将在预览中生效。',
   favoriteMaterial: (name: string) => `收藏 ${name}`,
   interactionPanel: {
@@ -130,6 +148,38 @@ export const DESIGNER_UI_TEXT = {
   },
   propertiesPanel: {
     multiSelect: (count: number) => `已选择 ${count} 个组件。`,
+    selectionSummary: '选择概览',
+    groupSummary: '组概览',
+    groupActions: '组操作',
+    group: '组',
+    childCount: (count: number) => `直接子项 ${count} 个`,
+    descendantCount: (count: number) => `全部子项 ${count} 个`,
+    containsLockedDescendant: '包含锁定子项',
+    containsHiddenDescendant: '包含隐藏子项',
+    sameParentSelection: '选中项位于同一父级',
+    mixedParentSelection: '选中项跨父级',
+    containsLockedSelection: '包含锁定组件',
+    containsHiddenSelection: '包含隐藏组件',
+    groupUnavailableDifferentParents: '跨父级选择不能编组。',
+    groupUnavailableLocked: '包含锁定组件，不能编组。',
+    groupUnavailableCount: '至少选择 2 个组件才能编组。',
+    alignAvailable: '可对齐',
+    distributeAvailable: '可分布',
+    arrangeActions: '排列操作',
+    alignLeft: '左对齐',
+    alignCenter: '水平居中',
+    alignRight: '右对齐',
+    alignTop: '顶端对齐',
+    alignMiddle: '垂直居中',
+    alignBottom: '底端对齐',
+    distributeHorizontal: '水平分布',
+    distributeVertical: '垂直分布',
+    alignUnavailableCount: '至少选择 2 个组件才能对齐。',
+    distributeUnavailableCount: '至少选择 3 个组件才能分布。',
+    actionGroup: '编组',
+    actionUngroup: '解组',
+    actionUnavailableLocked: '当前组已锁定。',
+    actionUnavailableEmptyGroup: '当前组没有可解组的子项。',
     geometry: '几何',
     name: '名称',
     x: 'X',
@@ -215,6 +265,42 @@ export const DESIGNER_UI_TEXT = {
   panel: {
     fieldValueInvalid: '字段值无效，未保存修改。',
     enterValidValue: '请输入有效值。',
+  },
+  dataset: {
+    title: '数据集',
+    select: '选择数据集',
+    search: '搜索数据集',
+    loading: '正在加载数据集。',
+    loadFailed: '数据集目录加载失败，请重试。',
+    empty: '没有可用数据集。',
+    shown: (count: number) => `已显示 ${count} 个数据集。`,
+    loadMore: '加载更多',
+    describeLoading: '正在读取数据集描述。',
+    describeFailed: '数据集描述读取失败，请重试。',
+    fields: '可用字段',
+    parameters: '参数',
+    binding: '字段绑定',
+    literal: '固定值',
+    variable: '变量',
+    selectVariable: '选择变量',
+    noBinding: '当前物料不支持字段绑定。',
+    noCompatibleFields: '没有符合当前角色类型要求的字段。',
+    selectedFields: (count: number) => `已选 ${count} 个字段`,
+    bindingHint: (min: number, max: number) =>
+      min === max ? `请选择 ${min} 个字段` : `请选择 ${min}–${max} 个字段`,
+    bindingRole: (role: string) =>
+      ({ columns: '表格列', dimension: '维度', measures: '指标' })[role] ?? role,
+    currentDataset: '当前数据集',
+    change: '更换',
+    use: '使用',
+    apply: '应用数据源',
+    refresh: '刷新数据',
+    unavailable: '宿主未提供数据集目录。',
+    resourceUnavailable: '宿主未提供资源查询能力。',
+    incomplete: '请完成数据集参数和字段绑定。',
+    noParameters: '此数据集不需要参数。',
+    noFields: '此数据集没有可绑定字段。',
+    selected: (name: string) => `已选择：${name}`,
   },
   projectWorkspace: {
     enterProjectName: '请输入项目名称。',
@@ -316,6 +402,14 @@ export function designerDiagnosticSummary(code: ScreenDiagnostic['code']): strin
     case 'HOST_RESOURCE_FAILED':
     case 'HOST_RESOURCE_INVALID':
       return DESIGNER_UI_TEXT.diagnostics.hostResourceUnavailable;
+    case 'HOST_DATASET_CATALOG_FAILED':
+    case 'HOST_DATASET_DESCRIPTOR_INVALID':
+    case 'HOST_DATASET_INVALID':
+    case 'HOST_DATASET_PARAMETER_INVALID':
+    case 'HOST_DATASET_BINDING_INVALID':
+    case 'HOST_DATASET_UNAVAILABLE':
+    case 'HOST_DATASET_VARIABLE_INVALID':
+      return DESIGNER_UI_TEXT.dataset.incomplete;
     case 'CORE_COMMAND_TARGET_LOCKED':
       return DESIGNER_UI_TEXT.diagnostics.commandTargetLocked;
     case 'CORE_COMMAND_TARGET_HIDDEN':

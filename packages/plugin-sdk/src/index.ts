@@ -3,6 +3,7 @@ import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
   type BaseScreenMaterialManifest,
+  type BaseScreenMaterialTabularDataAdapter,
   type BaseScreenPluginRuntime,
   parseBaseScreenMaterialManifest,
   parseBaseScreenPluginManifest,
@@ -37,7 +38,13 @@ export function createMaterialDefinition(
       'Element static manifest does not match the definition manifest.',
     );
   }
-  const entry = { manifest: parsedManifest.value, constructor: options.element };
+  const adapter = readStaticTabularDataAdapter(options.element);
+  if (!adapter.ok) return adapter;
+  const entry = {
+    manifest: parsedManifest.value,
+    constructor: options.element,
+    ...(adapter.value === undefined ? {} : { tabularDataAdapter: adapter.value }),
+  };
   return {
     ok: true,
     value: {
@@ -45,6 +52,38 @@ export function createMaterialDefinition(
       element: options.element,
       define: () => defineMaterial(entry),
     },
+    diagnostics: [],
+  };
+}
+
+function readStaticTabularDataAdapter(
+  element: BaseScreenMaterialConstructor,
+): ScreenParseResult<BaseScreenMaterialTabularDataAdapter | undefined> {
+  const descriptor = Object.getOwnPropertyDescriptor(element, 'tabularDataAdapter');
+  if (descriptor === undefined) return { ok: true, value: undefined, diagnostics: [] };
+  if (!Object.hasOwn(descriptor, 'value')) {
+    return failure(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['element', 'tabularDataAdapter'],
+      'Material dataset adapter must be a static data property.',
+    );
+  }
+  const value = descriptor.value;
+  if (value === undefined) return { ok: true, value: undefined, diagnostics: [] };
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    typeof (value as { readonly adapt?: unknown }).adapt !== 'function'
+  ) {
+    return failure(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['element', 'tabularDataAdapter'],
+      'Material dataset adapter is invalid.',
+    );
+  }
+  return {
+    ok: true,
+    value: value as BaseScreenMaterialTabularDataAdapter,
     diagnostics: [],
   };
 }

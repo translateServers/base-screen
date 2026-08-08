@@ -1,4 +1,5 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DesignerViewportController } from '../../../src/browser/controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from '../../../src/browser/controllers/designer-workbench-controller.js';
@@ -166,6 +167,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
 class WorkbenchElement {
   readonly children: WorkbenchElement[] = [];
   replaceChildrenCalls = 0;
+  readonly attributes: Record<string, string> = {};
   readonly dataset: Record<string, string> = {};
   readonly style = {
     setProperty: (property: string, value: string) => {
@@ -197,7 +199,12 @@ class WorkbenchElement {
   }
 
   setAttribute(name: string, value: string): void {
+    this.attributes[name] = value;
     if (name === 'aria-pressed') this.ariaPressed = value;
+  }
+
+  removeAttribute(name: string): void {
+    delete this.attributes[name];
   }
 
   closest<T extends Element>(selector: string): T | null {
@@ -207,7 +214,9 @@ class WorkbenchElement {
   }
 }
 
-function createWorkbench() {
+function createWorkbench(
+  options: { readonly dataCapabilities?: readonly ('static' | 'host-resource')[] } = {},
+) {
   const layout = new WorkbenchElement();
   const viewport = new WorkbenchElement();
   const guides = new WorkbenchElement();
@@ -244,12 +253,30 @@ function createWorkbench() {
   } as unknown as HTMLDivElement & {
     dispatch: (type: string, event: PointerEvent | MouseEvent) => void;
   };
-  const document = {
+  const document: ScreenDocument = {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
-    components: [],
+    components:
+      options.dataCapabilities === undefined
+        ? []
+        : [
+            {
+              id: 'c1',
+              type: 'base.rectangle',
+              name: '矩形',
+              parentId: null,
+              position: { x: 0, y: 0 },
+              size: { width: 100, height: 100 },
+              rotation: 0,
+              zIndex: 0,
+              status: { locked: false, hidden: false },
+              props: {},
+              style: {},
+              dataSource: null,
+            },
+          ],
     variables: [],
     blueprint: { rules: [] },
-  } as const;
+  };
   const interaction: {
     focusedComponentId: string | null;
     selectedComponentIds: string[];
@@ -282,6 +309,14 @@ function createWorkbench() {
       getCanvas: () => canvas,
       getDocument: () => document,
       getInteraction: () => interaction,
+      ...(options.dataCapabilities === undefined
+        ? {}
+        : {
+            getCatalog: () =>
+              ({
+                get: () => ({ manifest: { dataCapabilities: options.dataCapabilities } }),
+              }) as unknown as BaseScreenMaterialCatalog,
+          }),
       getRoot: () => root,
       getZoom: () => zoom.value,
     }),
@@ -604,6 +639,8 @@ describe('DesignerWorkbenchController instance state', () => {
     const workbench = createWorkbench();
     workbench.controller.initialize();
     expect(workbench.inspectorTabs.hidden).toBe(false);
+    expect(workbench.panes[0]?.attributes.role).toBe('tabpanel');
+    expect(workbench.panes[0]?.attributes['aria-labelledby']).toBe('designer-appearance-tab');
 
     workbench.controller.onClick(clickTarget({ inspectorTab: 'data' }));
     expect(workbench.rightTabs[1]?.ariaSelected).toBe('true');
@@ -618,12 +655,54 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(workbench.panes[1]?.hidden).toBe(true);
     expect(workbench.panes[2]?.hidden).toBe(true);
     expect(workbench.panes[3]?.hidden).toBe(true);
+    expect(workbench.panes[0]?.attributes.role).toBe('region');
+    expect(workbench.panes[0]?.attributes['aria-label']).toBe('画布');
+    expect(workbench.panes[0]?.attributes['aria-labelledby']).toBeUndefined();
 
     workbench.interaction.focusedComponentId = 'c1';
     workbench.interaction.selectedComponentIds = ['c1'];
     workbench.controller.renderInspectorTabs();
     expect(workbench.inspectorTabs.hidden).toBe(false);
     expect(workbench.rightTabs[0]?.ariaSelected).toBe('true');
+    expect(workbench.panes[0]?.attributes.role).toBe('tabpanel');
+    expect(workbench.panes[0]?.attributes['aria-labelledby']).toBe('designer-appearance-tab');
+    expect(workbench.panes[0]?.attributes['aria-label']).toBeUndefined();
+  });
+
+  it('hides inspector tabs and falls back to appearance for multi-selection', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    workbench.controller.onClick(clickTarget({ inspectorTab: 'data' }));
+    expect(workbench.inspectorTabs.hidden).toBe(false);
+    expect(workbench.panes[1]?.hidden).toBe(false);
+
+    workbench.interaction.focusedComponentId = 'c2';
+    workbench.interaction.selectedComponentIds = ['c1', 'c2'];
+    workbench.controller.renderInspectorTabs();
+
+    expect(workbench.inspectorTabs.hidden).toBe(true);
+    expect(workbench.rightTabs[0]?.ariaSelected).toBe('true');
+    expect(workbench.panes[0]?.hidden).toBe(false);
+    expect(workbench.panes[1]?.hidden).toBe(true);
+    expect(workbench.panes[2]?.hidden).toBe(true);
+    expect(workbench.panes[3]?.hidden).toBe(true);
+    expect(workbench.panes[0]?.attributes.role).toBe('region');
+    expect(workbench.panes[0]?.attributes['aria-label']).toBe('选择概览');
+    expect(workbench.panes[0]?.attributes['aria-labelledby']).toBeUndefined();
+  });
+
+  it('hides the data tab when the focused material declares no data capability', () => {
+    const withoutData = createWorkbench({ dataCapabilities: [] });
+    withoutData.controller.initialize();
+
+    expect(withoutData.rightTabs[1]?.hidden).toBe(true);
+    withoutData.controller.onClick(clickTarget({ inspectorTab: 'data' }));
+    expect(withoutData.rightTabs[0]?.ariaSelected).toBe('true');
+    expect(withoutData.panes[0]?.hidden).toBe(false);
+
+    const withData = createWorkbench({ dataCapabilities: ['static'] });
+    withData.controller.initialize();
+    expect(withData.rightTabs[1]?.hidden).toBe(false);
   });
 
   it('R7 renders snap previews as transient overlays without touching the document', () => {

@@ -22,6 +22,7 @@
 - [ ] 编辑器、图层、画布、物料、检查器、资产、数据、变量、Blueprint 和项目产品闭环可用。
 - [ ] 图形 Blueprint 与键盘表单路径编辑同一 canonical rule。
 - [ ] 保存、发布、预览、资源和恢复的竞态、取消、失败和权限反馈具有中文可访问状态。
+- [x] 宿主数据集目录选择、参数求值、字段绑定、表格/图表预览、变量定向重取和手动刷新满足 [Host Dataset Integration](../host-dataset-integration/checklist.md)。
 
 ## 质量
 

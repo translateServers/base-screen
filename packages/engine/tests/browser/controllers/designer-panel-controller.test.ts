@@ -17,11 +17,14 @@ class FakeElement {
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
   checked = false;
+  disabled = false;
   hidden = false;
   selected = false;
+  title = '';
   textContent = '';
   type = '';
   value = '';
+  ariaLabel: string | null = null;
   closestResult: FakeElement | null = null;
 
   constructor(
@@ -113,6 +116,27 @@ function catalog(): BaseScreenMaterialCatalog {
             properties: { color: { kind: 'string' } },
             required: ['color'],
           },
+        },
+      }) as unknown,
+  } as unknown as BaseScreenMaterialCatalog;
+}
+
+function groupCatalog(): BaseScreenMaterialCatalog {
+  return {
+    get: (type: string) =>
+      ({
+        manifest: {
+          type,
+          designCapabilities: {
+            resize: true,
+            rotate: true,
+            children: type === 'base.group',
+          },
+          dataCapabilities: [],
+          propertyPanel: [],
+          propsSchema: { kind: 'object', properties: {}, required: [] },
+          stylePanel: [],
+          styleSchema: { kind: 'object', properties: {}, required: [] },
         },
       }) as unknown,
   } as unknown as BaseScreenMaterialCatalog;
@@ -250,10 +274,17 @@ describe('designer panel rendering', () => {
   it('renders no material properties for a multi-selection', () => {
     const ownerDocument = new FakeDocument();
     const properties = ownerDocument.createElement('div');
+    const multiDocument = {
+      ...document(),
+      components: [
+        document().components[0]!,
+        { ...document().components[0]!, id: 'label-2', name: 'Label 2' },
+      ],
+    };
 
     renderDesignerProperties(
       properties as unknown as HTMLElement,
-      document(),
+      multiDocument,
       { selectedComponentIds: ['label-1', 'label-2'], focusedComponentId: 'label-1' },
       catalog(),
     );
@@ -261,7 +292,70 @@ describe('designer panel rendering', () => {
     expect(descendants(properties).some((element) => element.dataset.prop !== undefined)).toBe(
       false,
     );
-    expect(properties.children[0]?.textContent).toBe('已选择 2 个组件。');
+    expect(
+      descendants(properties).some((element) => element.textContent === '已选择 2 个组件。'),
+    ).toBe(true);
+    expect(
+      descendants(properties).find((element) => element.dataset.action === 'group'),
+    ).toMatchObject({ disabled: false, textContent: '编组' });
+    expect(
+      descendants(properties)
+        .filter((element) => element.dataset.action?.startsWith('align-'))
+        .map((element) => element.dataset.action),
+    ).toEqual([
+      'align-left',
+      'align-center',
+      'align-right',
+      'align-top',
+      'align-middle',
+      'align-bottom',
+    ]);
+  });
+
+  it('renders group-specific summary and actions for a selected group', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const groupDocument = {
+      ...document(),
+      components: [
+        {
+          ...document().components[0]!,
+          id: 'group',
+          type: 'base.group',
+          name: '组合',
+        },
+        {
+          ...document().components[0]!,
+          id: 'child',
+          parentId: 'group',
+          name: '子项',
+        },
+      ],
+    };
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      groupDocument,
+      { selectedComponentIds: ['group'], focusedComponentId: 'group' },
+      groupCatalog(),
+    );
+
+    expect(
+      descendants(properties)
+        .filter((element) => element.tagName === 'h3')
+        .map((element) => element.textContent),
+    ).toContain('组概览');
+    expect(descendants(properties).some((element) => element.textContent === '直接子项 1 个')).toBe(
+      true,
+    );
+    expect(
+      descendants(properties).find((element) => element.dataset.action === 'ungroup'),
+    ).toMatchObject({ disabled: false, textContent: '解组' });
+    expect(
+      descendants(properties)
+        .filter((element) => element.dataset.property === 'width')
+        .map((element) => element.disabled),
+    ).toEqual([false]);
   });
 
   it('R9 keeps static sources available and requires host support plus contribution authority', () => {

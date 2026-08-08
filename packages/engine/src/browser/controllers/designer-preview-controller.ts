@@ -1,11 +1,20 @@
-import type { ScreenDocument, ScreenHostResourcePort } from '@base-screen/contracts';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type {
+  ScreenDocument,
+  ScreenHostResourcePort,
+  ScreenHostVariablePort,
+} from '@base-screen/contracts';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenRuntimeContributionIndex,
+} from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerPreviewCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
+  readonly getVariablePort: () => ScreenHostVariablePort | undefined;
+  readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly isViewerRegistered: () => boolean;
 }
 
@@ -41,22 +50,39 @@ export class DesignerPreviewController {
     return true;
   }
 
+  refreshData(componentId?: string): void {
+    const viewer = this.viewer();
+    viewer?.refreshData?.(componentId);
+  }
+
+  sync(document?: ScreenDocument): void {
+    this.render(document);
+  }
+
   clear(): void {
     this.#open = false;
     this.render();
   }
 
-  private render(): void {
+  private render(documentOverride?: ScreenDocument): void {
     if (this.#preview !== undefined) this.#preview.hidden = !this.#open;
-    const viewer = this.#preview?.querySelector<HTMLElement>('base-screen-viewer') as {
+    const viewer = this.viewer() as {
       catalog: BaseScreenMaterialCatalog | undefined;
       resourcePort: ScreenHostResourcePort | undefined;
+      variablePort: ScreenHostVariablePort | undefined;
+      runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
       document: ScreenDocument | undefined;
     } | null;
-    const document = this.callbacks.getDocument();
+    const document = documentOverride ?? this.callbacks.getDocument();
     if (!this.#open || viewer === null || viewer === undefined || document === undefined) return;
-    viewer.catalog = this.callbacks.getCatalog();
     viewer.resourcePort = this.callbacks.getResourcePort();
+    viewer.variablePort = this.callbacks.getVariablePort();
+    viewer.runtimeContributions = this.callbacks.getRuntimeContributions();
+    viewer.catalog = this.callbacks.getCatalog();
     viewer.document = document;
+  }
+
+  private viewer(): (HTMLElement & { refreshData?: (componentId?: string) => void }) | null {
+    return this.#preview?.querySelector<HTMLElement>('base-screen-viewer') ?? null;
   }
 }

@@ -3,6 +3,7 @@ import type {
   ScreenComponentNode,
   ScreenDiagnostic,
   ScreenDocument,
+  ScreenHostResourceParameter,
   ScreenJsonObject,
   ScreenJsonValue,
   ScreenParseResult,
@@ -15,6 +16,15 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { validateBaseScreenMaterialProps } from '@base-screen/plugin-core';
+import {
+  createGroupRotationTransaction,
+  createGroupSizeTransaction,
+} from '../../common/operations/designer-group.js';
+import {
+  createGroupPositionTransaction,
+  type DesignerInspectorContext,
+  getDesignerInspectorContext,
+} from '../../common/operations/designer-inspector.js';
 import {
   createValidatedPropsTransaction,
   createValidatedStyleTransaction,
@@ -34,25 +44,32 @@ export function renderDesignerProperties(
   catalog: BaseScreenMaterialCatalog | undefined,
 ): void {
   properties.replaceChildren();
-  const component = document?.components.find((item) => item.id === interaction.focusedComponentId);
-  if (component === undefined) {
+  const context = getDesignerInspectorContext(document, interaction, catalog);
+  if (context.kind === 'canvas') {
     if (document !== undefined) appendCanvasControls(properties, document);
     return;
   }
-  if (interaction.selectedComponentIds.length > 1) {
-    const summary = properties.ownerDocument.createElement('p');
-    summary.textContent = DESIGNER_UI_TEXT.propertiesPanel.multiSelect(
-      interaction.selectedComponentIds.length,
-    );
-    properties.appendChild(summary);
+  if (context.kind === 'multi-selection') {
+    appendMultiSelectionControls(properties, context);
     return;
   }
+  if (context.kind === 'single-group') {
+    appendGroupOverview(properties, context);
+  }
+  appendComponentControls(properties, context);
+}
+
+function appendComponentControls(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'single-material' | 'single-group' }>,
+): void {
+  const { component, manifest } = context;
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
-  appendInput(properties, DESIGNER_UI_TEXT.propertiesPanel.name, 'name', component.name);
-  appendInput(properties, DESIGNER_UI_TEXT.propertiesPanel.x, 'x', component.position.x, 'number');
-  appendInput(properties, DESIGNER_UI_TEXT.propertiesPanel.y, 'y', component.position.y, 'number');
+  appendInput(geometry, DESIGNER_UI_TEXT.propertiesPanel.name, 'name', component.name);
+  appendInput(geometry, DESIGNER_UI_TEXT.propertiesPanel.x, 'x', component.position.x, 'number');
+  appendInput(geometry, DESIGNER_UI_TEXT.propertiesPanel.y, 'y', component.position.y, 'number');
   appendInput(
-    properties,
+    geometry,
     DESIGNER_UI_TEXT.propertiesPanel.width,
     'width',
     component.size.width,
@@ -60,7 +77,7 @@ export function renderDesignerProperties(
     '1',
   );
   appendInput(
-    properties,
+    geometry,
     DESIGNER_UI_TEXT.propertiesPanel.height,
     'height',
     component.size.height,
@@ -68,7 +85,7 @@ export function renderDesignerProperties(
     '1',
   );
   appendInput(
-    properties,
+    geometry,
     DESIGNER_UI_TEXT.propertiesPanel.rotation,
     'rotation',
     component.rotation,
@@ -76,7 +93,7 @@ export function renderDesignerProperties(
     '-180',
   );
   appendInput(
-    properties,
+    geometry,
     DESIGNER_UI_TEXT.propertiesPanel.zIndex,
     'zIndex',
     component.zIndex,
@@ -96,7 +113,9 @@ export function renderDesignerProperties(
     'hidden',
     component.status.hidden,
   );
-  const manifest = catalog?.get(component.type)?.manifest;
+  if (context.kind === 'single-group') {
+    appendGroupActions(properties, context);
+  }
   if (manifest === undefined) return;
   const content =
     manifest.propertyPanel.length === 0
@@ -133,6 +152,112 @@ export function renderDesignerProperties(
       );
     }
   }
+}
+
+function appendGroupOverview(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'single-group' }>,
+): void {
+  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupSummary);
+  const list = properties.ownerDocument.createElement('ul');
+  appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.group);
+  appendListItem(
+    list,
+    DESIGNER_UI_TEXT.propertiesPanel.childCount(context.summary.directChildCount),
+  );
+  appendListItem(
+    list,
+    DESIGNER_UI_TEXT.propertiesPanel.descendantCount(context.summary.descendantCount),
+  );
+  if (context.summary.hasLockedDescendant) {
+    appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.containsLockedDescendant);
+  }
+  if (context.summary.hasHiddenDescendant) {
+    appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.containsHiddenDescendant);
+  }
+  section.appendChild(list);
+}
+
+function appendGroupActions(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'single-group' }>,
+): void {
+  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupActions);
+  appendActionButton(
+    section,
+    DESIGNER_UI_TEXT.propertiesPanel.actionUngroup,
+    'ungroup',
+    !context.summary.canUngroup,
+    context.component.status.locked
+      ? DESIGNER_UI_TEXT.propertiesPanel.actionUnavailableLocked
+      : DESIGNER_UI_TEXT.propertiesPanel.actionUnavailableEmptyGroup,
+  );
+}
+
+function appendMultiSelectionControls(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
+): void {
+  const summary = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionSummary);
+  const list = properties.ownerDocument.createElement('ul');
+  appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.multiSelect(context.summary.count));
+  appendListItem(
+    list,
+    context.summary.sameParent
+      ? DESIGNER_UI_TEXT.propertiesPanel.sameParentSelection
+      : DESIGNER_UI_TEXT.propertiesPanel.mixedParentSelection,
+  );
+  if (context.summary.hasLocked) {
+    appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.containsLockedSelection);
+  }
+  if (context.summary.hasHidden) {
+    appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.containsHiddenSelection);
+  }
+  if (context.summary.canAlign)
+    appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.alignAvailable);
+  if (context.summary.canDistribute) {
+    appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.distributeAvailable);
+  }
+  summary.appendChild(list);
+  const arrange = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.arrangeActions);
+  for (const [action, label] of [
+    ['align-left', DESIGNER_UI_TEXT.propertiesPanel.alignLeft],
+    ['align-center', DESIGNER_UI_TEXT.propertiesPanel.alignCenter],
+    ['align-right', DESIGNER_UI_TEXT.propertiesPanel.alignRight],
+    ['align-top', DESIGNER_UI_TEXT.propertiesPanel.alignTop],
+    ['align-middle', DESIGNER_UI_TEXT.propertiesPanel.alignMiddle],
+    ['align-bottom', DESIGNER_UI_TEXT.propertiesPanel.alignBottom],
+  ] as const) {
+    appendActionButton(
+      arrange,
+      label,
+      action,
+      !context.summary.canAlign,
+      DESIGNER_UI_TEXT.propertiesPanel.alignUnavailableCount,
+    );
+  }
+  appendActionButton(
+    arrange,
+    DESIGNER_UI_TEXT.propertiesPanel.distributeHorizontal,
+    'distribute-horizontal',
+    !context.summary.canDistribute,
+    DESIGNER_UI_TEXT.propertiesPanel.distributeUnavailableCount,
+  );
+  appendActionButton(
+    arrange,
+    DESIGNER_UI_TEXT.propertiesPanel.distributeVertical,
+    'distribute-vertical',
+    !context.summary.canDistribute,
+    DESIGNER_UI_TEXT.propertiesPanel.distributeUnavailableCount,
+  );
+  const actions = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupActions);
+  appendActionButton(
+    actions,
+    DESIGNER_UI_TEXT.propertiesPanel.actionGroup,
+    'group',
+    !context.summary.canGroup,
+    multiSelectionGroupUnavailableReason(context.summary),
+  );
 }
 
 export function renderDesignerDataPanel(
@@ -210,13 +335,18 @@ export function createPropertyTransaction(
   catalog: BaseScreenMaterialCatalog | undefined,
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   if (!isControl(target)) return undefined;
-  const component = document?.components.find((item) => item.id === interaction.focusedComponentId);
-  if (component === undefined) return createCanvasTransaction(document, target);
+  const context = getDesignerInspectorContext(document, interaction, catalog);
+  if (context.kind !== 'single-material' && context.kind !== 'single-group') {
+    return createCanvasTransaction(document, target);
+  }
+  const component = context.component;
   const property = target.dataset.property;
-  if (property !== undefined) return createGeometryTransaction(component, property, target.value);
+  if (property !== undefined) {
+    return createGeometryTransaction(document, context, component, property, target.value);
+  }
   const prop = target.dataset.prop;
   const style = target.dataset.style;
-  const manifest = catalog?.get(component.type)?.manifest;
+  const manifest = context.manifest;
   if (
     manifest !== undefined &&
     style !== undefined &&
@@ -282,13 +412,16 @@ export function createDataSourceTransaction(
   if (source?.type === 'host-resource') {
     const resourceType = getResourceType(runtimeContributions, source.resourceType);
     if (resourceType === undefined) return dataSourceFailure('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
-    const params = validateBaseScreenMaterialProps(source.params, resourceType.configSchema);
+    const params = validateBaseScreenMaterialProps(
+      literalParameterValues(source.params),
+      resourceType.configSchema,
+    );
     if (!params.ok) {
       return dataSourceFailure(params.diagnostics[0]?.code ?? 'PLUGIN_CORE_MANIFEST_FIELD_INVALID');
     }
     return success(
       update(component.id, {
-        dataSource: { ...source, params: params.value },
+        dataSource: { ...source, params: literalParameters(params.value), binding: null },
       }),
     );
   }
@@ -311,6 +444,8 @@ export function parsePropertyControlValue(
 }
 
 function createGeometryTransaction(
+  document: ScreenDocument | undefined,
+  context: DesignerInspectorContext,
   component: ScreenComponentNode,
   property: string,
   input: string,
@@ -324,9 +459,30 @@ function createGeometryTransaction(
   const value = Number(input);
   if (!Number.isFinite(value)) return undefined;
   if (property === 'x' || property === 'y') {
+    if (document !== undefined && context.kind === 'single-group') {
+      const transaction = createGroupPositionTransaction(document, component.id, {
+        ...component.position,
+        [property]: clamp(value),
+      });
+      return transaction === undefined ? undefined : success(transaction);
+    }
     return success(
       update(component.id, { position: { ...component.position, [property]: clamp(value) } }),
     );
+  }
+  if (context.kind === 'single-group' && document !== undefined) {
+    if (property === 'width' || property === 'height') {
+      const size = {
+        ...component.size,
+        [property]: Math.min(value, 1_000_000),
+      };
+      const transaction = createGroupSizeTransaction(document, component.id, size);
+      return transaction === undefined ? undefined : success(transaction);
+    }
+    if (property === 'rotation' && value >= -180 && value < 180) {
+      const transaction = createGroupRotationTransaction(document, component.id, value);
+      return transaction === undefined ? undefined : success(transaction);
+    }
   }
   if ((property === 'width' || property === 'height') && value > 0) {
     return success(
@@ -556,7 +712,8 @@ function createDataSource(
       type,
       resourceType: fields.resourceType,
       resourceId: fields.resourceId,
-      params,
+      params: literalParameters(params),
+      binding: null,
     };
   }
   return undefined;
@@ -573,6 +730,24 @@ function parseJsonDraft(value: string): ScreenJsonValue | undefined {
 
 function isScreenJsonObject(value: ScreenJsonValue | undefined): value is ScreenJsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function literalParameters(
+  values: ScreenJsonObject,
+): Readonly<Record<string, ScreenHostResourceParameter>> {
+  return Object.fromEntries(
+    Object.entries(values).map(([name, value]) => [name, { kind: 'literal', value }]),
+  );
+}
+
+function literalParameterValues(
+  values: Readonly<Record<string, ScreenHostResourceParameter>>,
+): ScreenJsonObject {
+  return Object.fromEntries(
+    Object.entries(values).flatMap(([name, parameter]) =>
+      parameter.kind === 'literal' ? [[name, parameter.value]] : [],
+    ),
+  );
 }
 
 function appendPropControl(
@@ -620,6 +795,41 @@ function appendSection(parent: HTMLElement, title: string): HTMLElement {
   section.appendChild(heading);
   parent.appendChild(section);
   return section;
+}
+
+function appendListItem(parent: HTMLElement, text: string): void {
+  const item = parent.ownerDocument.createElement('li');
+  item.textContent = text;
+  parent.appendChild(item);
+}
+
+function appendActionButton(
+  parent: HTMLElement,
+  label: string,
+  action: string,
+  disabled: boolean,
+  unavailableReason: string,
+): void {
+  const button = parent.ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-button';
+  button.dataset.action = action;
+  button.textContent = label;
+  button.disabled = disabled;
+  if (disabled) {
+    button.title = unavailableReason;
+    button.ariaLabel = `${label}：${unavailableReason}`;
+  }
+  parent.appendChild(button);
+}
+
+function multiSelectionGroupUnavailableReason(
+  summary: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>['summary'],
+): string {
+  if (summary.count < 2) return DESIGNER_UI_TEXT.propertiesPanel.groupUnavailableCount;
+  if (!summary.sameParent) return DESIGNER_UI_TEXT.propertiesPanel.groupUnavailableDifferentParents;
+  if (summary.hasLocked) return DESIGNER_UI_TEXT.propertiesPanel.groupUnavailableLocked;
+  return '';
 }
 
 function appendFieldMessage(

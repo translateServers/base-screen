@@ -64,3 +64,47 @@ export function selectedRootIds(
     (componentId) => !hasSelectedAncestor(document, selected, componentId),
   );
 }
+
+// Resolve a hit component to the object selectable in the current group-editing context.
+// At the canvas root this collapses any descendant hit to its root group/container; inside
+// a group it collapses deep hits to that group's direct child.
+export function selectionTargetInContext(
+  document: ScreenDocument,
+  componentId: string,
+  editingParentId: string | null,
+): string | null {
+  const byId = new Map(document.components.map((component) => [component.id, component]));
+  let current = byId.get(componentId);
+  while (current !== undefined) {
+    if (current.parentId === editingParentId) {
+      return current.id;
+    }
+    current = current.parentId === null ? undefined : byId.get(current.parentId);
+  }
+  return null;
+}
+
+export function selectionTargetsInContext(
+  document: ScreenDocument,
+  componentIds: readonly string[],
+  editingParentId: string | null,
+): readonly string[] {
+  const targets: string[] = [];
+  const seen = new Set<string>();
+  for (const componentId of componentIds) {
+    const target = selectionTargetInContext(document, componentId, editingParentId);
+    if (target !== null && !seen.has(target)) {
+      seen.add(target);
+      targets.push(target);
+    }
+  }
+  return targets;
+}
+
+export function parentIdOf(document: ScreenDocument, componentId: string): string | null {
+  return document.components.find((component) => component.id === componentId)?.parentId ?? null;
+}
+
+export function hasDirectChildren(document: ScreenDocument, componentId: string): boolean {
+  return document.components.some((component) => component.parentId === componentId);
+}

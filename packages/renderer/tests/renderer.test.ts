@@ -2,14 +2,18 @@ import type {
   ScreenComponentNode,
   ScreenDocument,
   ScreenHostResourcePort,
+  ScreenJsonValue,
+  ScreenParseResult,
 } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
+  BaseScreenMaterialDataBindingRole,
   BaseScreenMaterialManifest,
   BaseScreenMaterialModel,
+  BaseScreenMaterialTabularDataAdapter,
 } from '@base-screen/plugin-core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createBaseScreenRenderer } from '../src/renderer.js';
 
 class FakeMaterialElement {
@@ -53,6 +57,42 @@ function createCatalog(): BaseScreenMaterialCatalog {
   const entry = {
     manifest,
     constructor: FakeMaterialElement as unknown as BaseScreenMaterialConstructor,
+  };
+  return {
+    get: (type) => (type === manifest.type ? entry : undefined),
+    has: (type) => type === manifest.type,
+    list: () => [entry],
+  };
+}
+
+function createDatasetCatalog(
+  adapter: BaseScreenMaterialTabularDataAdapter,
+  roles: readonly BaseScreenMaterialDataBindingRole[] = [
+    { id: 'columns', minFields: 1, maxFields: 256, valueTypes: ['string', 'number'] },
+  ],
+): BaseScreenMaterialCatalog {
+  const manifest: BaseScreenMaterialManifest = {
+    type: 'base.test',
+    tagName: 'base-screen-test',
+    name: 'Test',
+    category: 'Test',
+    keywords: [],
+    defaultSize: { width: 100, height: 40 },
+    defaultProps: {},
+    defaultStyle: {},
+    styleSchema: { kind: 'object', properties: {}, required: [] },
+    stylePanel: [],
+    propsSchema: { kind: 'object', properties: {}, required: [] },
+    propertyPanel: [],
+    events: [],
+    dataCapabilities: ['host-resource'],
+    dataBinding: { roles },
+    designCapabilities: { resize: true, rotate: true, children: true },
+  };
+  const entry = {
+    manifest,
+    constructor: FakeMaterialElement as unknown as BaseScreenMaterialConstructor,
+    tabularDataAdapter: adapter,
   };
   return {
     get: (type) => (type === manifest.type ? entry : undefined),
@@ -144,6 +184,19 @@ class EventfulMaterialElement {
       stopPropagation() {},
     });
   }
+}
+
+class DisplayManagingMaterialElement {
+  readonly dataset: Record<string, string> = {};
+  readonly style = {} as CSSStyleDeclaration;
+
+  set model(_value: BaseScreenMaterialModel) {
+    this.style.display = 'block';
+  }
+
+  addEventListener(): void {}
+  remove(): void {}
+  removeEventListener(): void {}
 }
 
 function createImageCatalog(): BaseScreenMaterialCatalog {
@@ -283,7 +336,8 @@ describe('BaseScreenRenderer', () => {
       type: 'host-resource',
       resourceId: 'resource-1',
       resourceType: 'resource',
-      params: { region: 'north' },
+      params: { region: { kind: 'literal', value: 'north' } },
+      binding: null,
     };
     const initial = document([component('resource', 0, null, source)]);
 
@@ -317,7 +371,8 @@ describe('BaseScreenRenderer', () => {
       type: 'host-resource',
       resourceId: 'resource-1',
       resourceType: 'resource',
-      params: { region: 'north' },
+      params: { region: { kind: 'literal', value: 'north' } },
+      binding: null,
     };
     const initial = document([component('resource', 0, null, source)]);
 
@@ -337,6 +392,177 @@ describe('BaseScreenRenderer', () => {
     ).toBe(true);
     await Promise.resolve();
     expect(resolveCalls).toBe(2);
+  });
+
+  it('R4 projects a validated dataset and forwards only evaluated request parameters', async () => {
+    const root = new FakeRoot();
+    const requests: unknown[] = [];
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createDatasetCatalog({
+        adapt: ({ dataset, fields }) => ({
+          ok: true,
+          value: {
+            columns: fields.columns?.map((field) => field.id) ?? [],
+            rows: dataset.rows,
+          },
+          diagnostics: [],
+        }),
+      }),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: {
+        resolve: async (request) => {
+          requests.push(request);
+          return {
+            ok: true as const,
+            value: {
+              fields: [
+                { id: 'name', label: '名称', valueType: 'string' },
+                { id: 'amount', label: '金额', valueType: 'number' },
+              ],
+              rows: [{ name: 'A', amount: 2 }],
+            },
+            diagnostics: [],
+          };
+        },
+      },
+    });
+    const source: ScreenComponentNode['dataSource'] = {
+      type: 'host-resource',
+      resourceId: 'orders',
+      resourceType: 'dataset',
+      params: { limit: { kind: 'literal', value: 5 } },
+      binding: { fields: { columns: ['name'] } },
+    };
+
+    expect(renderer.render(document([component('dataset', 0, null, source)])).ok).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(requests).toEqual([
+      {
+        componentId: 'dataset',
+        resourceType: 'dataset',
+        resourceId: 'orders',
+        params: { limit: 5 },
+      },
+    ]);
+    expect(root.children[0]?.model?.dataState).toEqual({
+      status: 'ready',
+      value: { columns: ['name'], rows: [{ name: 'A', amount: 2 }] },
+    });
+  });
+
+  it('R4 blocks a variable-dependent resource until variables are supplied', async () => {
+    const root = new FakeRoot();
+    let resolveCalls = 0;
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: {
+        resolve: async () => {
+          resolveCalls++;
+          return { ok: true as const, value: { ready: true }, diagnostics: [] };
+        },
+      },
+    });
+    const source: ScreenComponentNode['dataSource'] = {
+      type: 'host-resource',
+      resourceId: 'orders',
+      resourceType: 'dataset',
+      params: { region: { kind: 'variable', name: 'region' } },
+      binding: null,
+    };
+    const screen = document([component('dependent', 0, null, source)]);
+
+    expect(renderer.render(screen).ok).toBe(true);
+    expect(resolveCalls).toBe(0);
+    expect(root.children[0]?.model?.dataState.status).toBe('error');
+
+    expect(renderer.setVariables({ region: 'north' }).ok).toBe(true);
+    expect(renderer.render(screen).ok).toBe(true);
+    await Promise.resolve();
+    expect(resolveCalls).toBe(1);
+  });
+
+  it('R4 coalesces repeated refreshes while a component request is pending', async () => {
+    const root = new FakeRoot();
+    let resolveRequest: (() => void) | undefined;
+    let resolveCalls = 0;
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: {
+        resolve: async () => {
+          resolveCalls++;
+          await new Promise<void>((resolve) => {
+            resolveRequest = resolve;
+          });
+          return { ok: true as const, value: { ready: true }, diagnostics: [] };
+        },
+      },
+    });
+    const source: ScreenComponentNode['dataSource'] = {
+      type: 'host-resource',
+      resourceId: 'orders',
+      resourceType: 'dataset',
+      params: { limit: { kind: 'literal', value: 5 } },
+      binding: null,
+    };
+    expect(renderer.render(document([component('refreshable', 0, null, source)])).ok).toBe(true);
+    renderer.refreshData('refreshable');
+    renderer.refreshData('refreshable');
+    expect(resolveCalls).toBe(1);
+    resolveRequest?.();
+    await Promise.resolve();
+    await Promise.resolve();
+    renderer.refreshData('refreshable');
+    expect(resolveCalls).toBe(2);
+  });
+
+  it('R4 suppresses a late result after timeout', async () => {
+    vi.useFakeTimers();
+    try {
+      const root = new FakeRoot();
+      let resolveRequest: ((value: ScreenParseResult<ScreenJsonValue>) => void) | undefined;
+      const renderer = createBaseScreenRenderer({
+        root: root as unknown as HTMLElement,
+        catalog: createCatalog(),
+        mode: 'viewer',
+        interactive: false,
+        onMaterialEvent: undefined,
+        resourceTimeoutMs: 100,
+        resourcePort: {
+          resolve: () =>
+            new Promise<ScreenParseResult<ScreenJsonValue>>((resolve) => {
+              resolveRequest = resolve;
+            }),
+        },
+      });
+      const source: ScreenComponentNode['dataSource'] = {
+        type: 'host-resource',
+        resourceId: 'orders',
+        resourceType: 'dataset',
+        params: { limit: { kind: 'literal', value: 5 } },
+        binding: null,
+      };
+      expect(renderer.render(document([component('timeout', 0, null, source)])).ok).toBe(true);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(root.children[0]?.model?.dataState.status).toBe('error');
+      resolveRequest?.({ ok: true, value: { late: true }, diagnostics: [] });
+      await Promise.resolve();
+      expect(root.children[0]?.model?.dataState).toMatchObject({ code: 'HOST_RESOURCE_TIMEOUT' });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('R4 rejects a component style that does not satisfy its Material schema', () => {
@@ -375,6 +601,69 @@ describe('BaseScreenRenderer', () => {
 
     expect(root.children).toHaveLength(1);
     expect(root.children[0]).toBe(mounted);
+  });
+
+  it('keeps effectively hidden components and subtrees display none despite Material display overrides', () => {
+    const root = new FakeRoot();
+    const manifest: BaseScreenMaterialManifest = {
+      type: 'base.test',
+      tagName: 'base-screen-test',
+      name: 'Test',
+      category: 'Test',
+      keywords: [],
+      defaultSize: { width: 100, height: 40 },
+      defaultProps: {},
+      defaultStyle: {},
+      styleSchema: { kind: 'object', properties: {}, required: [] },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: [],
+      designCapabilities: { resize: true, rotate: true, children: true },
+    };
+    const catalog: BaseScreenMaterialCatalog = {
+      get: (type) =>
+        type === manifest.type
+          ? {
+              manifest,
+              constructor:
+                DisplayManagingMaterialElement as unknown as BaseScreenMaterialConstructor,
+            }
+          : undefined,
+      has: (type) => type === manifest.type,
+      list: () => [
+        {
+          manifest,
+          constructor: DisplayManagingMaterialElement as unknown as BaseScreenMaterialConstructor,
+        },
+      ],
+    };
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog,
+      mode: 'design',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const visible = component('visible', 0);
+    const hidden = { ...component('hidden', 1), status: { locked: false, hidden: true } };
+    const child = { ...component('child', 2, 'hidden'), status: { locked: false, hidden: false } };
+    const initial = document([visible, hidden, child]);
+
+    expect(renderer.render(initial).ok).toBe(true);
+    expect(root.children).toHaveLength(3);
+    expect(root.children[0]!.style.display).toBe('block');
+    expect(root.children[1]!.style.display).toBe('none');
+    expect(root.children[2]!.style.display).toBe('none');
+
+    const unhidden = { ...hidden, status: { locked: false, hidden: false } };
+    expect(renderer.render(document([visible, unhidden, child])).ok).toBe(true);
+    expect(root.children[1]!.style.display).toBe('block');
+
+    expect(renderer.render(initial).ok).toBe(true);
+    expect(root.children[1]!.style.display).toBe('none');
   });
 
   it('R5 isolates a throwing material constructor and keeps rendering other components', () => {

@@ -124,6 +124,101 @@ describe('designer panel property parsing', () => {
     ).toMatchObject({ ok: true });
     vi.unstubAllGlobals();
   });
+
+  it('creates a subtree position transaction when editing a selected group position', () => {
+    class FakeInput {
+      readonly dataset: { property: string };
+
+      constructor(
+        property: string,
+        readonly value: string,
+      ) {
+        this.dataset = { property };
+      }
+    }
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const document = {
+      canvas: { width: 100, height: 100, backgroundColor: '#000000' },
+      components: [
+        {
+          id: 'group',
+          type: 'base.group',
+          name: '组合',
+          parentId: null,
+          position: { x: 10, y: 20 },
+          size: { width: 100, height: 100 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+        },
+        {
+          id: 'child',
+          type: 'base.text',
+          name: '子项',
+          parentId: 'group',
+          position: { x: 30, y: 50 },
+          size: { width: 10, height: 10 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+        },
+      ],
+      variables: [],
+      blueprint: { rules: [] },
+    } as ScreenDocument;
+    const catalog = {
+      get: (type: string) => ({
+        manifest: {
+          type,
+          designCapabilities: { resize: true, rotate: true, children: type === 'base.group' },
+          propertyPanel: [],
+          propsSchema: { kind: 'object', properties: {}, required: [] },
+          stylePanel: [],
+          styleSchema: { kind: 'object', properties: {}, required: [] },
+        },
+      }),
+    } as unknown as BaseScreenMaterialCatalog;
+
+    expect(
+      createPropertyTransaction(
+        new FakeInput('x', '40') as unknown as HTMLInputElement,
+        document,
+        { focusedComponentId: 'group', selectedComponentIds: ['group'] },
+        catalog,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        commands: [
+          { componentIds: ['group'], patch: { position: { x: 40, y: 20 } } },
+          { componentIds: ['child'], patch: { position: { x: 60, y: 50 } } },
+        ],
+      },
+    });
+    expect(
+      createPropertyTransaction(
+        new FakeInput('width', '200') as unknown as HTMLInputElement,
+        document,
+        { focusedComponentId: 'group', selectedComponentIds: ['group'] },
+        catalog,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        commands: [
+          { componentIds: ['group'], patch: { size: { width: 200, height: 100 } } },
+          { componentIds: ['child'], patch: { size: { width: 20, height: 10 } } },
+        ],
+      },
+    });
+    vi.unstubAllGlobals();
+  });
 });
 
 class DataPanel {
@@ -278,7 +373,8 @@ describe('designer data source authoring', () => {
                 type: 'host-resource',
                 resourceType: 'asset',
                 resourceId: 'product-42',
-                params: { locale: 'zh-CN' },
+                params: { locale: { kind: 'literal', value: 'zh-CN' } },
+                binding: null,
               },
             },
           },

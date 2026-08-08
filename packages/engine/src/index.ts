@@ -12,7 +12,9 @@ import type {
   ScreenDesignerHostAdapter,
   ScreenDiagnostic,
   ScreenDocument,
+  ScreenHostDatasetCatalogPort,
   ScreenHostResourcePort,
+  ScreenHostVariablePort,
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
@@ -38,6 +40,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerAssetController } from './browser/controllers/designer-asset-controller.js';
+import { DesignerDatasetController } from './browser/controllers/designer-dataset-controller.js';
 import { DesignerGestureController } from './browser/controllers/designer-gesture-controller.js';
 import { DesignerImportController } from './browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from './browser/controllers/designer-integration-controller.js';
@@ -67,6 +70,7 @@ import {
   type DesignerElementOperationsHost,
   type DesignerOperationContext,
 } from './common/operations/designer-element-operations.js';
+import { withDerivedDesignerGroupBounds } from './common/operations/designer-group.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -93,6 +97,8 @@ export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
+  #variablePort: ScreenHostVariablePort | undefined;
+  #datasetCatalogPort: ScreenHostDatasetCatalogPort | undefined;
   #designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   #assetCatalogPort: ScreenAssetCatalogPort | undefined;
   #projectCatalogPort: ScreenProjectCatalogPort | undefined;
@@ -196,6 +202,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     getCatalog: () => this.#catalog,
     getDocument: () => this.#session.document,
     getResourcePort: () => this.#resourcePort,
+    getVariablePort: () => this.#variablePort,
+    getRuntimeContributions: () => this.#runtimeContributions,
     isViewerRegistered: () =>
       this.ownerDocument.defaultView?.customElements.get('base-screen-viewer') !== undefined,
   });
@@ -218,6 +226,17 @@ export class BaseScreenDesignerElement extends ElementBase {
     getInteraction: () => this.#session.interaction,
     getPort: () => this.#assetCatalogPort,
     report: (diagnostics) => this.emitDiagnostics(diagnostics),
+  });
+  readonly #datasetController = new DesignerDatasetController({
+    getCatalogPort: () => this.#datasetCatalogPort,
+    getDocument: () => this.#session.document,
+    getInteraction: () => this.#session.interaction,
+    getCatalog: () => this.#catalog,
+    getResourcePort: () => this.#resourcePort,
+    getRuntimeContributions: () => this.#runtimeContributions,
+    executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
+    report: (diagnostics) => this.emitDiagnostics(diagnostics),
+    refresh: (componentId) => this.refreshData(componentId),
   });
   readonly #importController = new DesignerImportController({
     replaceDocument: (document) => this.replaceDocument(document),
@@ -255,6 +274,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     getCanvas: () => this.#canvas,
     getDocument: () => this.#session.document,
     getInteraction: () => this.#session.interaction,
+    getCatalog: () => this.#catalog,
     getRoot: () => this.shadowRoot,
     getZoom: () => this.#viewportController.state.zoom,
   });
@@ -276,6 +296,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     canUngroup: () => this.#panelController.canUngroup,
     canAlign: () => this.#panelController.canAlign,
     canDistribute: () => this.#panelController.canDistribute,
+    canEnterGroupEditing: () => this.#gestureController.canEnterGroupEditingContext(),
+    canExitGroupEditing: () => this.#gestureController.canExitGroupEditingContext(),
     getToolMaterialTypes: () => this.#toolMaterialTypes,
     getCatalog: () => this.#catalog,
     getZoom: () => this.#viewportController.state.zoom,
@@ -288,6 +310,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     paste: () => this.paste(),
     group: () => this.group(),
     ungroup: () => this.ungroup(),
+    enterGroupEditing: () => this.#gestureController.enterGroupEditingContext(),
+    exitGroupEditing: () => this.#gestureController.exitGroupEditingContext(),
     align: (alignment) => this.align(alignment),
     distribute: (distribution) => this.distribute(distribution),
     duplicate: () => this.#panelController.duplicate(),
@@ -371,6 +395,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       (target) => this.#projectFeedbackController.onClick(target as Element),
       (target) => this.#projectWorkspaceController.onClick(target as Element),
       (target) => this.#assetController.onClick(target as Element),
+      (target) => this.#datasetController.onClick(target as Element),
       (target) => this.#integrationController.onClick(target as Element),
       (target) => this.#workbenchController.onClick(target as Element),
       (target, event) => this.#layersController.onClick(event as MouseEvent),
@@ -434,6 +459,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       (target, event) => this.onImportChange(event),
       (target, event) => this.#integrationController.onChange(event),
       (target, event) => this.#layersController.onChange(event),
+      (target) => this.#datasetController.onChange(target),
       (target, event) => {
         this.#panelController.onPropertyChange(event);
         return true;
@@ -441,6 +467,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     ],
     input: [
       (target) => this.#assetController.onInput(target),
+      (target) => this.#datasetController.onInput(target),
       (target, event) => this.#panelController.onInput(event),
       (target, event) => {
         this.#layersController.onInput(event);
@@ -539,6 +566,7 @@ export class BaseScreenDesignerElement extends ElementBase {
         return true;
       },
       (target, event) => this.#layersController.onKeyDown(event as KeyboardEvent),
+      (target, event) => this.#datasetController.onKeyDown(event as KeyboardEvent),
       (target, event) => this.#integrationController.onKeyDown(event as KeyboardEvent),
       (target, event) => {
         const keyboardEvent = event as KeyboardEvent;
@@ -626,6 +654,8 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.projectPreviewPort = undefined;
       this.projectSnapshotPort = undefined;
       this.resourcePort = undefined;
+      this.variablePort = undefined;
+      this.datasetCatalogPort = undefined;
       return;
     }
     const parsed = validateScreenDesignerHostAdapter(value);
@@ -645,6 +675,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.projectPreviewPort = parsed.value.projectPreview;
     this.projectSnapshotPort = parsed.value.projectSnapshots;
     this.resourcePort = parsed.value.resources;
+    this.variablePort = parsed.value.variables;
+    this.datasetCatalogPort = parsed.value.datasetCatalog;
   }
 
   set resourcePort(value: ScreenHostResourcePort | undefined) {
@@ -656,6 +688,29 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     this.#resourcePort = value;
     this.initialize();
+  }
+
+  get variablePort(): ScreenHostVariablePort | undefined {
+    return this.#variablePort;
+  }
+
+  set variablePort(value: ScreenHostVariablePort | undefined) {
+    if (this.#renderer !== undefined && value !== this.#variablePort) {
+      this.emitDiagnostics([
+        lifecycleDiagnostic('Variable port cannot change after initialization. Call unload first.'),
+      ]);
+      return;
+    }
+    this.#variablePort = value;
+  }
+
+  get datasetCatalogPort(): ScreenHostDatasetCatalogPort | undefined {
+    return this.#datasetCatalogPort;
+  }
+
+  set datasetCatalogPort(value: ScreenHostDatasetCatalogPort | undefined) {
+    this.#datasetCatalogPort = value;
+    this.renderInteraction();
   }
 
   get assetCatalogPort(): ScreenAssetCatalogPort | undefined {
@@ -716,6 +771,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#eventSystem.disconnectWindowGuards();
     this.cancelGesture();
     this.#assetController.clear();
+    this.#datasetController.clear();
     this.resetSessionSurfaces();
     this.#session.cancelProjectOperation();
     this.#renderer?.clear();
@@ -744,11 +800,16 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   executeCommand(command: ScreenDocumentCommand): ScreenParseResult<ScreenDocument> {
-    return this.#session.executeCommand(command);
+    return this.executeTransaction({ commands: [command] });
   }
 
   executeTransaction(transaction: ScreenDocumentTransaction): ScreenParseResult<ScreenDocument> {
-    return this.#session.executeTransaction(transaction);
+    const document = this.#session.document;
+    return this.#session.executeTransaction(
+      document === undefined
+        ? transaction
+        : withDerivedDesignerGroupBounds(document, transaction, this.#groupMaterialType),
+    );
   }
 
   group(): ScreenParseResult<ScreenDocument> {
@@ -781,9 +842,7 @@ export class BaseScreenDesignerElement extends ElementBase {
         diagnostics: [lifecycleDiagnostic('The selected parent does not accept children.')],
       };
     }
-    return this.#session.executeTransaction(
-      createReparentTransaction(document, componentIds, parentId),
-    );
+    return this.executeTransaction(createReparentTransaction(document, componentIds, parentId));
   }
 
   align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument> {
@@ -906,6 +965,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#projectGateway.listAssets(query);
   }
 
+  refreshData(componentId?: string): void {
+    this.#renderer?.refreshData(componentId);
+    this.#previewController.refreshData(componentId);
+  }
+
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
     return this.#session.save().then((result) => {
       if (result.ok) {
@@ -1004,6 +1068,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       return { ok: true, value: undefined, diagnostics: [] };
     }
     const rendered = this.#renderer.render(document);
+    if (rendered.ok) this.#previewController.sync(document);
     return rendered.ok
       ? { ok: true, value: undefined, diagnostics: rendered.diagnostics }
       : { ok: false, diagnostics: rendered.diagnostics };
@@ -1030,7 +1095,11 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private renderControls(): void {
-    this.#panelController.render(undefined, this.#dataPanel);
+    this.#panelController.render(
+      undefined,
+      this.#datasetCatalogPort === undefined ? this.#dataPanel : undefined,
+    );
+    if (this.#datasetCatalogPort !== undefined) this.#datasetController.render(this.#dataPanel);
     this.renderToolControls();
     this.renderOperationControls();
     this.renderProjectStatus();
@@ -1041,7 +1110,11 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private renderProperties(): void {
-    this.#panelController.render(this.#properties, this.#dataPanel);
+    this.#panelController.render(
+      this.#properties,
+      this.#datasetCatalogPort === undefined ? this.#dataPanel : undefined,
+    );
+    if (this.#datasetCatalogPort !== undefined) this.#datasetController.render(this.#dataPanel);
     this.#assetController.render(this.#properties);
   }
 
@@ -1115,7 +1188,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       ...('transaction' in commit
         ? {
             runTransaction: () => {
-              result = this.#session.executeTransaction(commit.transaction);
+              result = this.executeTransaction(commit.transaction);
               return result;
             },
           }
@@ -1123,7 +1196,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       ...('command' in commit
         ? {
             runCommand: () => {
-              result = this.#session.executeCommand(commit.command);
+              result = this.executeCommand(commit.command);
               return result;
             },
           }
@@ -1195,6 +1268,10 @@ export class BaseScreenDesignerElement extends ElementBase {
       event.preventDefault();
       return;
     }
+    if (event.key === 'Escape' && this.#gestureController.exitGroupEditingContext()) {
+      event.preventDefault();
+      return;
+    }
     // 统一命令通道：capture 阶段的策略裁决已排除黑名单与手势激活期。
     // 命中设计器命令 chord 即阻止浏览器默认（命令未启用/不可用时不弹浏览器默认行为），
     // 控件级键优先，命令未命中时回落到 viewport 状态通道。
@@ -1233,7 +1310,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     const document = this.#session.document;
     const componentIds = this.#session.interaction.selectedComponentIds;
     const count = componentIds.length;
-    const selectionText =
+    const baseSelectionText =
       count === 0
         ? DESIGNER_UI_TEXT.nothingSelected
         : count === 1
@@ -1242,6 +1319,14 @@ export class BaseScreenDesignerElement extends ElementBase {
             : (selectedComponents(document, componentIds)[0]?.name ??
               DESIGNER_UI_TEXT.selectedSingle)
           : DESIGNER_UI_TEXT.selectedCount(count);
+    const groupPath =
+      document === undefined
+        ? null
+        : groupEditingPath(document, this.#gestureController.groupEditingParentId);
+    const selectionText =
+      groupPath === null
+        ? baseSelectionText
+        : `${DESIGNER_UI_TEXT.groupEditingPath(groupPath)} · ${baseSelectionText}`;
     const selection = root.querySelector<HTMLElement>('[data-status-selection]');
     if (selection !== null) selection.textContent = selectionText;
     const canvas = root.querySelector<HTMLElement>('[data-status-canvas]');
@@ -1341,6 +1426,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#workbenchController.clearGuides();
     this.#layersController.clearSessionState();
     this.#panelController.clearClipboard();
+    this.#datasetController.clear();
+    this.#datasetController.clear();
     this.#integrationController.clear();
     this.#projectFeedbackController.clear();
     this.#previewController.clear();
@@ -1383,6 +1470,18 @@ function lifecycleDiagnostic(message: string): ScreenDiagnostic {
 
 function projectPhaseLabel(phase: ScreenProjectPhase): string {
   return DESIGNER_UI_TEXT.projectPhases[phase];
+}
+
+function groupEditingPath(document: ScreenDocument, groupId: string | null): string | null {
+  if (groupId === null) return null;
+  const byId = new Map(document.components.map((component) => [component.id, component]));
+  const names: string[] = [];
+  let current = byId.get(groupId);
+  while (current !== undefined) {
+    names.unshift(current.name);
+    current = current.parentId === null ? undefined : byId.get(current.parentId);
+  }
+  return names.length === 0 ? null : names.join(' / ');
 }
 
 function saveStatusSpinnerGlyph(): string {

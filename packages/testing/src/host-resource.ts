@@ -64,6 +64,7 @@ function createHostResourceSource(): ScreenComponentDataSource {
     resourceType: 'test_resource',
     resourceId: 'test_request',
     params: {},
+    binding: null,
   };
 }
 

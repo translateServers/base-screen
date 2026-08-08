@@ -1,5 +1,7 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   collectDesignerSnapCandidates,
   DEFAULT_DESIGNER_CANVAS_AIDS,
@@ -27,6 +29,7 @@ interface DesignerWorkbenchCallbacks {
   readonly getCanvas: () => HTMLDivElement | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getInteraction: () => ScreenInteractionState;
+  readonly getCatalog?: () => BaseScreenMaterialCatalog | undefined;
   readonly getRoot: () => ShadowRoot | null;
   readonly getZoom: () => number;
 }
@@ -325,6 +328,7 @@ export class DesignerWorkbenchController {
       rightTab === 'interaction' ||
       rightTab === 'events'
     ) {
+      if (!this.rightTabAvailable(rightTab)) return true;
       this.#rightTab = rightTab;
       this.renderTabs();
       return true;
@@ -426,7 +430,8 @@ export class DesignerWorkbenchController {
     this.renderGuides();
   }
 
-  // 选中变化时刷新右侧检查器：无焦点组件时隐藏"外观/数据/交互/事件"tab 栏，只保留画布属性。
+  // 选中变化时刷新右侧检查器：只有单选显示"外观/数据/交互/事件"tab 栏。
+  // 画布和多选只保留外观 pane，避免暴露单组件才有意义的检查器页签。
   renderInspectorTabs(): void {
     this.renderTabs();
   }
@@ -452,8 +457,13 @@ export class DesignerWorkbenchController {
   private renderTabs(): void {
     const root = this.callbacks.getRoot();
     if (root === null) return;
-    const focused = this.callbacks.getInteraction().focusedComponentId !== null;
-    if (!focused) this.#rightTab = 'appearance';
+    const selection = this.callbacks.getInteraction();
+    const singleComponentSelected =
+      selection.focusedComponentId !== null && selection.selectedComponentIds.length === 1;
+    const dataTabAvailable = singleComponentSelected && this.rightTabAvailable('data');
+    if (!singleComponentSelected || (this.#rightTab === 'data' && !dataTabAvailable)) {
+      this.#rightTab = 'appearance';
+    }
     for (const control of root.querySelectorAll<HTMLButtonElement>('[data-panel-tab]')) {
       control.ariaSelected = String(control.dataset.panelTab === this.#leftTab);
     }
@@ -462,13 +472,39 @@ export class DesignerWorkbenchController {
     if (materials !== null) materials.hidden = this.#leftTab !== 'materials';
     if (layers !== null) layers.hidden = this.#leftTab !== 'layers';
     const inspectorTabs = root.querySelector<HTMLElement>('.inspector-tabs');
-    if (inspectorTabs !== null) inspectorTabs.hidden = !focused;
+    if (inspectorTabs !== null) inspectorTabs.hidden = !singleComponentSelected;
     for (const control of root.querySelectorAll<HTMLButtonElement>('[data-inspector-tab]')) {
+      control.hidden = control.dataset.inspectorTab === 'data' && !dataTabAvailable;
       control.ariaSelected = String(control.dataset.inspectorTab === this.#rightTab);
     }
     for (const pane of root.querySelectorAll<HTMLElement>('[data-inspector-pane]')) {
-      pane.hidden = pane.dataset.inspectorPane !== this.#rightTab;
+      const active = pane.dataset.inspectorPane === this.#rightTab;
+      pane.hidden = !active;
+      if (singleComponentSelected) {
+        pane.setAttribute('role', 'tabpanel');
+        pane.setAttribute('aria-labelledby', `designer-${pane.dataset.inspectorPane}-tab`);
+        pane.removeAttribute('aria-label');
+      } else if (active) {
+        pane.setAttribute('role', 'region');
+        pane.removeAttribute('aria-labelledby');
+        pane.setAttribute('aria-label', nonTabbedInspectorLabel(selection.selectedComponentIds));
+      } else {
+        pane.removeAttribute('role');
+        pane.removeAttribute('aria-labelledby');
+        pane.removeAttribute('aria-label');
+      }
     }
+  }
+
+  private rightTabAvailable(tab: RightTab): boolean {
+    if (tab !== 'data' || this.callbacks.getCatalog === undefined) return true;
+    const catalog = this.callbacks.getCatalog();
+    const focusedId = this.callbacks.getInteraction().focusedComponentId;
+    const component = this.callbacks
+      .getDocument()
+      ?.components.find((item) => item.id === focusedId);
+    if (catalog === undefined || component === undefined) return false;
+    return (catalog.get(component.type)?.manifest.dataCapabilities.length ?? 0) > 0;
   }
 
   private resizePanel(event: PointerEvent): void {
@@ -938,6 +974,12 @@ function tabDirection(key: string): -1 | 1 | 'first' | 'last' | undefined {
   if (key === 'Home') return 'first';
   if (key === 'End') return 'last';
   return undefined;
+}
+
+function nonTabbedInspectorLabel(selectedComponentIds: readonly string[]): string {
+  return selectedComponentIds.length > 1
+    ? DESIGNER_UI_TEXT.propertiesPanel.selectionSummary
+    : DESIGNER_UI_TEXT.propertiesPanel.canvas;
 }
 
 function isPrimaryPointer(event: PointerEvent): boolean {

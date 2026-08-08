@@ -1,6 +1,7 @@
 import {
   parseScreenDocument,
   parseScreenJsonValue,
+  parseScreenTabularDataset,
   type ScreenComponentNode,
   type ScreenDiagnostic,
   type ScreenDocument,
@@ -9,7 +10,12 @@ import {
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
-import { getPainterOrder, isScreenComponentEffectivelyHidden } from '@base-screen/core';
+import {
+  evaluateScreenHostResourceParameters,
+  getPainterOrder,
+  isScreenComponentEffectivelyHidden,
+  validateScreenHostResourceBinding,
+} from '@base-screen/core';
 import {
   type BaseScreenMaterialCatalog,
   type BaseScreenMaterialCatalogEntry,
@@ -45,6 +51,9 @@ export interface CreateBaseScreenRendererOptions {
 
 export interface BaseScreenRenderer {
   render(document: ScreenDocument): ScreenParseResult<null>;
+  suspendData(): void;
+  setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
+  refreshData(componentId?: string): void;
   clear(): void;
   dispose(): void;
 }
@@ -59,6 +68,12 @@ type RenderCandidate = {
   readonly component: ScreenComponentNode;
   readonly entry: BaseScreenMaterialCatalogEntry;
   readonly model: BaseScreenMaterialModel;
+  readonly resource: ResolvedHostResource | undefined;
+};
+
+type ResolvedHostResource = {
+  readonly key: string;
+  readonly params: ScreenJsonObject;
 };
 
 type MountedMaterial = {
@@ -73,6 +88,10 @@ type MountedMaterial = {
 
 class Renderer implements BaseScreenRenderer {
   #mounted = new Map<string, MountedMaterial>();
+  #candidates = new Map<string, RenderCandidate>();
+  #document: ScreenDocument | undefined;
+  #variables: ScreenJsonObject = {};
+  #dataSuspended = false;
   #disposed = false;
 
   constructor(private readonly options: CreateBaseScreenRendererOptions) {
@@ -95,6 +114,8 @@ class Renderer implements BaseScreenRenderer {
       this.options.mode,
       this.options.interactive,
       this.options.contributionIndex,
+      this.#variables,
+      this.#dataSuspended,
     );
     if (!prepared.ok) {
       return prepared;
@@ -111,7 +132,7 @@ class Renderer implements BaseScreenRenderer {
       const stackOrder = painterIndex.get(candidate.component.id)!;
       const existing = this.#mounted.get(candidate.component.id);
       if (existing !== undefined && existing.type === candidate.component.type) {
-        const resourceKey = getHostResourceKey(candidate.component);
+        const resourceKey = candidate.resource?.key;
         try {
           applyMaterial(
             existing.element,
@@ -156,6 +177,12 @@ class Renderer implements BaseScreenRenderer {
         continue;
       }
       this.options.root.appendChild(element);
+      element.style.display = isScreenComponentEffectivelyHidden(
+        parsedDocument.value,
+        candidate.component.id,
+      )
+        ? 'none'
+        : 'block';
       next.set(candidate.component.id, {
         type: candidate.component.type,
         element,
@@ -178,9 +205,11 @@ class Renderer implements BaseScreenRenderer {
     this.options.root.style.height = `${parsedDocument.value.canvas.height}px`;
     this.options.root.style.backgroundColor = parsedDocument.value.canvas.backgroundColor;
     this.#mounted = next;
+    this.#candidates = new Map(candidates.map((candidate) => [candidate.component.id, candidate]));
+    this.#document = parsedDocument.value;
     for (const candidate of candidates) {
       const mounted = next.get(candidate.component.id);
-      const resourceKey = getHostResourceKey(candidate.component);
+      const resourceKey = candidate.resource?.key;
       if (
         mounted !== undefined &&
         resourceKey !== undefined &&
@@ -201,6 +230,43 @@ class Renderer implements BaseScreenRenderer {
     return { ok: true, value: null, diagnostics: runtimeDiagnostics };
   }
 
+  setVariables(variables: ScreenJsonObject): ScreenParseResult<null> {
+    const parsed = parseScreenJsonValue(variables, { maxBytes: 2 * 1024 * 1024 });
+    if (
+      !parsed.ok ||
+      parsed.value === null ||
+      Array.isArray(parsed.value) ||
+      typeof parsed.value !== 'object'
+    ) {
+      return failure('HOST_DATASET_VARIABLE_INVALID', [], 'Runtime variables are invalid.');
+    }
+    this.#variables = parsed.value as ScreenJsonObject;
+    this.#dataSuspended = false;
+    return { ok: true, value: null, diagnostics: [] };
+  }
+
+  suspendData(): void {
+    this.#dataSuspended = true;
+    for (const [componentId, mounted] of this.#mounted) {
+      cancelResource(mounted);
+      mounted.resourceKey = undefined;
+      const candidate = this.#candidates.get(componentId);
+      if (candidate !== undefined && candidate.resource !== undefined) {
+        mounted.element.model = { ...candidate.model, dataState: { status: 'loading' } };
+      }
+    }
+  }
+
+  refreshData(componentId?: string): void {
+    for (const [id, candidate] of this.#candidates) {
+      if (componentId !== undefined && componentId !== id) continue;
+      const mounted = this.#mounted.get(id);
+      if (mounted !== undefined && candidate.resource !== undefined) {
+        void this.resolveHostResource(candidate, mounted, true);
+      }
+    }
+  }
+
   clear(): void {
     for (const mounted of this.#mounted.values()) {
       cancelResource(mounted);
@@ -208,6 +274,8 @@ class Renderer implements BaseScreenRenderer {
       mounted.element.remove();
     }
     this.#mounted.clear();
+    this.#candidates.clear();
+    this.#document = undefined;
   }
 
   dispose(): void {
@@ -251,9 +319,18 @@ class Renderer implements BaseScreenRenderer {
   private async resolveHostResource(
     candidate: RenderCandidate,
     mounted: MountedMaterial,
+    refresh = false,
   ): Promise<void> {
     const source = candidate.component.dataSource;
-    if (source === null || source.type !== 'host-resource') {
+    const resource = candidate.resource;
+    if (source === null || source.type !== 'host-resource' || resource === undefined) {
+      return;
+    }
+    if (
+      refresh &&
+      mounted.resourceController !== undefined &&
+      mounted.resourceKey === resource.key
+    ) {
       return;
     }
     cancelResource(mounted);
@@ -267,6 +344,8 @@ class Renderer implements BaseScreenRenderer {
         code: 'HOST_RESOURCE_TIMEOUT',
         message: 'Host resource request timed out.',
       });
+      // A settled timeout is terminal for this generation; suppress a host promise that resolves later.
+      if (mounted.resourceGeneration === generation) mounted.resourceGeneration++;
     }, this.options.resourceTimeoutMs ?? 15_000);
     if (this.options.resourcePort === undefined) {
       this.applyResourceResult(candidate, mounted, generation, {
@@ -278,7 +357,12 @@ class Renderer implements BaseScreenRenderer {
     }
     try {
       const result = await this.options.resourcePort.resolve(
-        { componentId: candidate.component.id, source },
+        {
+          componentId: candidate.component.id,
+          resourceType: source.resourceType,
+          resourceId: source.resourceId,
+          params: resource.params,
+        },
         { signal: controller.signal },
       );
       if (!result.ok) {
@@ -298,16 +382,85 @@ class Renderer implements BaseScreenRenderer {
         });
         return;
       }
-      this.applyResourceResult(candidate, mounted, generation, {
-        status: 'ready',
-        value: value.value,
-      });
+      const adapted = this.adaptResourceResult(candidate, value.value);
+      this.applyResourceResult(candidate, mounted, generation, adapted);
     } catch {
       this.applyResourceResult(candidate, mounted, generation, {
         status: 'error',
         code: 'HOST_RESOURCE_FAILED',
         message: 'Host resource request failed.',
       });
+    }
+  }
+
+  private adaptResourceResult(
+    candidate: RenderCandidate,
+    value: ScreenJsonValue,
+  ): BaseScreenMaterialDataState {
+    const source = candidate.component.dataSource;
+    if (source === null || source.type !== 'host-resource' || source.binding === null) {
+      return { status: 'ready', value };
+    }
+    const dataset = parseScreenTabularDataset(value);
+    if (!dataset.ok) {
+      return {
+        status: 'error',
+        code: 'HOST_DATASET_INVALID',
+        message: 'Host dataset is invalid.',
+      };
+    }
+    const declaration = candidate.entry.manifest.dataBinding;
+    const adapter = candidate.entry.tabularDataAdapter;
+    if (declaration === undefined || adapter === undefined) {
+      return {
+        status: 'error',
+        code: 'HOST_DATASET_BINDING_INVALID',
+        message: 'Host dataset binding is invalid.',
+      };
+    }
+    const binding = validateScreenHostResourceBinding(
+      source.binding,
+      dataset.value.fields,
+      declaration.roles,
+    );
+    if (!binding.ok) {
+      return {
+        status: 'error',
+        code: 'HOST_DATASET_BINDING_INVALID',
+        message: 'Host dataset binding is invalid.',
+      };
+    }
+    try {
+      const adapted = adapter.adapt({ dataset: dataset.value, fields: binding.value.fields });
+      if (!adapted.ok) {
+        return {
+          status: 'error',
+          code: 'HOST_DATASET_BINDING_INVALID',
+          message: 'Host dataset binding is invalid.',
+        };
+      }
+      const parsed = parseScreenJsonValue(adapted.value, { maxBytes: 1024 * 1024 });
+      if (!parsed.ok) {
+        return {
+          status: 'error',
+          code: 'HOST_DATASET_BINDING_INVALID',
+          message: 'Host dataset binding is invalid.',
+        };
+      }
+      return { status: 'ready', value: parsed.value };
+    } catch {
+      this.options.onDiagnostic?.(
+        diagnostic(
+          'PLUGIN_CORE_RENDER_FAILED',
+          ['components', candidate.component.id, 'dataSource', 'binding'],
+          'Material dataset adapter raised an exception.',
+        ),
+      );
+      return {
+        status: 'error',
+        code: 'HOST_DATASET_BINDING_INVALID',
+        message: 'Host dataset binding is invalid.',
+      };
     }
   }
 
@@ -353,6 +506,8 @@ function prepareCandidates(
   mode: BaseScreenMaterialMode,
   interactive: boolean,
   contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
+  variables: ScreenJsonObject,
+  dataSuspended: boolean,
 ): ScreenParseResult<readonly RenderCandidate[]> {
   const candidates: RenderCandidate[] = [];
   const diagnostics: ScreenDiagnostic[] = [];
@@ -379,8 +534,16 @@ function prepareCandidates(
       diagnostics.push(...prefixDiagnostics(style.diagnostics, ['components', index, 'style']));
       continue;
     }
-    const dataState = getDataState(component, entry, index, diagnostics, contributionIndex);
-    if (dataState === undefined) {
+    const data = getDataState(
+      component,
+      entry,
+      index,
+      diagnostics,
+      contributionIndex,
+      variables,
+      dataSuspended,
+    );
+    if (data === undefined) {
       continue;
     }
     candidates.push({
@@ -393,8 +556,9 @@ function prepareCandidates(
         props: props.value,
         style: style.value,
         size: { width: component.size.width, height: component.size.height },
-        dataState,
+        dataState: data.dataState,
       },
+      resource: data.resource,
     });
   }
   return diagnostics.length === 0
@@ -408,9 +572,16 @@ function getDataState(
   index: number,
   diagnostics: ScreenDiagnostic[],
   contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
-): BaseScreenMaterialDataState | undefined {
+  variables: ScreenJsonObject,
+  dataSuspended: boolean,
+):
+  | {
+      readonly dataState: BaseScreenMaterialDataState;
+      readonly resource: ResolvedHostResource | undefined;
+    }
+  | undefined {
   if (component.dataSource === null) {
-    return { status: 'idle' };
+    return { dataState: { status: 'idle' }, resource: undefined };
   }
   if (
     !entry.manifest.dataCapabilities.includes(
@@ -427,6 +598,20 @@ function getDataState(
     return undefined;
   }
   if (component.dataSource.type === 'host-resource') {
+    if (dataSuspended) {
+      return { dataState: { status: 'loading' }, resource: undefined };
+    }
+    const evaluated = evaluateScreenHostResourceParameters(component.dataSource.params, variables);
+    if (!evaluated.ok) {
+      return {
+        dataState: {
+          status: 'error',
+          code: 'HOST_DATASET_PARAMETER_INVALID',
+          message: 'Host dataset parameters are invalid.',
+        },
+        resource: undefined,
+      };
+    }
     const resourceType = contributionIndex?.getResourceType(component.dataSource.resourceType);
     if (contributionIndex !== undefined && resourceType === undefined) {
       diagnostics.push(
@@ -440,17 +625,40 @@ function getDataState(
     }
     if (resourceType !== undefined) {
       const params = validateBaseScreenMaterialProps(
-        component.dataSource.params,
+        evaluated.value.params,
         resourceType.configSchema,
       );
       if (!params.ok) {
-        diagnostics.push(
-          ...prefixDiagnostics(params.diagnostics, ['components', index, 'dataSource', 'params']),
-        );
-        return undefined;
+        return {
+          dataState: {
+            status: 'error',
+            code: 'HOST_DATASET_PARAMETER_INVALID',
+            message: 'Host dataset parameters are invalid.',
+          },
+          resource: undefined,
+        };
       }
     }
-    return { status: 'loading' };
+    if (
+      component.dataSource.binding !== null &&
+      (entry.manifest.dataBinding === undefined || entry.tabularDataAdapter === undefined)
+    ) {
+      return {
+        dataState: {
+          status: 'error',
+          code: 'HOST_DATASET_BINDING_INVALID',
+          message: 'Host dataset binding is invalid.',
+        },
+        resource: undefined,
+      };
+    }
+    return {
+      dataState: { status: 'loading' },
+      resource: {
+        params: evaluated.value.params,
+        key: getHostResourceKey(component, evaluated.value.params),
+      },
+    };
   }
   const parsed = parseScreenJsonValue(component.dataSource.value, { maxBytes: 1024 * 1024 });
   if (!parsed.ok) {
@@ -459,7 +667,7 @@ function getDataState(
     );
     return undefined;
   }
-  return { status: 'ready', value: parsed.value };
+  return { dataState: { status: 'ready', value: parsed.value }, resource: undefined };
 }
 
 function applyMaterial(
@@ -482,16 +690,16 @@ function applyMaterial(
   element.dataset.baseScreenComponentId = component.id;
   element.style.transformOrigin = 'center';
   element.style.transform = `rotate(${component.rotation}deg)`;
-  element.style.display = effectivelyHidden ? 'none' : 'block';
   element.model = model;
+  element.style.display = effectivelyHidden ? 'none' : 'block';
 }
 
-function getHostResourceKey(component: ScreenComponentNode): string | undefined {
+function getHostResourceKey(component: ScreenComponentNode, params: ScreenJsonObject): string {
   const source = component.dataSource;
   if (source === null || source.type !== 'host-resource') {
-    return undefined;
+    throw new Error('Host resource key requires a host-resource source.');
   }
-  return `${source.resourceType}\u0000${source.resourceId}\u0000${JSON.stringify(source.params)}`;
+  return `${source.resourceType}\u0000${source.resourceId}\u0000${JSON.stringify(params)}\u0000${JSON.stringify(source.binding)}`;
 }
 
 function prefixDiagnostics(

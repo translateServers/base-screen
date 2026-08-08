@@ -1,13 +1,16 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import type { ScreenDocumentTransaction } from '@base-screen/core';
+import type { ScreenDocumentTransaction, ScreenInteractionAction } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DesignerGestureController } from '../../../src/browser/controllers/designer-gesture-controller.js';
 import { MATERIAL_DRAG_TYPE } from '../../../src/browser/controllers/designer-panel-controller.js';
 
-class FakeElement {
+// 元素类层次：FakeElementBase 对应 Element（所有元素），FakeElement 对应 HTMLElement。
+// 测试里 Element stub 为基类、HTMLElement stub 为子类，从而可以构造"是 Element 但
+// 不是 HTMLElement"的 SVG 场景。
+class FakeElementBase {
   readonly dataset: Record<string, string> = {};
-  readonly matches: Record<string, FakeElement> = {};
+  readonly matches: Record<string, FakeElementBase> = {};
   readonly style: Record<string, string> = {};
   className = '';
   isConnected = false;
@@ -21,6 +24,8 @@ class FakeElement {
     this.onRemove?.();
   }
 }
+
+class FakeElement extends FakeElementBase {}
 
 function document(): ScreenDocument {
   return {
@@ -57,6 +62,22 @@ function catalog(): BaseScreenMaterialCatalog {
           defaultProps: {},
           defaultStyle: {},
           designCapabilities: { resize: true, rotate: true, children: false },
+        },
+      }) as unknown,
+  } as unknown as BaseScreenMaterialCatalog;
+}
+
+function groupCatalog(): BaseScreenMaterialCatalog {
+  return {
+    get: (type: string) =>
+      ({
+        manifest: {
+          type,
+          name: type,
+          defaultSize: { width: 100, height: 80 },
+          defaultProps: {},
+          defaultStyle: {},
+          designCapabilities: { resize: true, rotate: true, children: type === 'base.group' },
         },
       }) as unknown,
   } as unknown as BaseScreenMaterialCatalog;
@@ -141,7 +162,160 @@ function createGrabTarget() {
 }
 
 describe('DesignerGestureController cancellation', () => {
+  it('R3 selects the outer group when clicking a nested child from the canvas root', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const group = {
+      ...document().components[0]!,
+      id: 'group',
+      type: 'base.group',
+      size: { width: 300, height: 200 },
+    };
+    const child = {
+      ...document().components[0]!,
+      id: 'child',
+      parentId: 'group',
+      position: { x: 20, y: 30 },
+      zIndex: 1,
+    };
+    const current = { ...document(), components: [group, child] };
+    const childMaterial = new FakeElement();
+    childMaterial.dataset.baseScreenComponentId = 'child';
+    childMaterial.matches['[data-base-screen-component-id]'] = childMaterial;
+    canvas.registerMaterial('child', childMaterial);
+    const interaction = {
+      selectedComponentIds: [] as string[],
+      focusedComponentId: null as string | null,
+    };
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: groupCatalog,
+      getDocument: () => current,
+      getInteraction: () => interaction,
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: (action) => {
+        if (action.type === 'replace-selection') {
+          interaction.selectedComponentIds = [...action.componentIds];
+          interaction.focusedComponentId = action.focusedComponentId;
+        }
+      },
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 25,
+      clientY: 35,
+      preventDefault: () => undefined,
+      target: childMaterial,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointerup', { pointerId: 1, clientX: 25, clientY: 35 } as PointerEvent);
+
+    expect(interaction).toEqual({ selectedComponentIds: ['group'], focusedComponentId: 'group' });
+  });
+
+  it('R3 drills into nested groups with double click and backs out one level with Escape', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const root = {
+      ...document().components[0]!,
+      id: 'root-group',
+      type: 'base.group',
+      size: { width: 300, height: 200 },
+    };
+    const childGroup = {
+      ...document().components[0]!,
+      id: 'child-group',
+      type: 'base.group',
+      parentId: 'root-group',
+      position: { x: 20, y: 30 },
+      zIndex: 1,
+    };
+    const leaf = {
+      ...document().components[0]!,
+      id: 'leaf',
+      parentId: 'child-group',
+      position: { x: 40, y: 50 },
+      zIndex: 2,
+    };
+    const current = { ...document(), components: [root, childGroup, leaf] };
+    const leafMaterial = new FakeElement();
+    leafMaterial.dataset.baseScreenComponentId = 'leaf';
+    leafMaterial.matches['[data-base-screen-component-id]'] = leafMaterial;
+    canvas.registerMaterial('leaf', leafMaterial);
+    const interaction = {
+      selectedComponentIds: [] as string[],
+      focusedComponentId: null as string | null,
+    };
+    const reduceSelection = (action: ScreenInteractionAction) => {
+      if (action.type === 'replace-selection') {
+        interaction.selectedComponentIds = [...action.componentIds];
+        interaction.focusedComponentId = action.focusedComponentId;
+      }
+    };
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: groupCatalog,
+      getDocument: () => current,
+      getInteraction: () => interaction,
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('dblclick', {
+      preventDefault: () => undefined,
+      target: leafMaterial,
+    } as unknown as PointerEvent);
+    expect(interaction).toEqual({
+      selectedComponentIds: ['child-group'],
+      focusedComponentId: 'child-group',
+    });
+
+    canvas.dispatch('dblclick', {
+      preventDefault: () => undefined,
+      target: leafMaterial,
+    } as unknown as PointerEvent);
+    expect(interaction).toEqual({ selectedComponentIds: ['leaf'], focusedComponentId: 'leaf' });
+
+    expect(controller.exitGroupEditingContext()).toBe(true);
+    expect(interaction).toEqual({
+      selectedComponentIds: ['child-group'],
+      focusedComponentId: 'child-group',
+    });
+    expect(controller.exitGroupEditingContext()).toBe(true);
+    expect(interaction).toEqual({
+      selectedComponentIds: ['root-group'],
+      focusedComponentId: 'root-group',
+    });
+    expect(controller.canEnterGroupEditingContext()).toBe(true);
+    expect(controller.enterGroupEditingContext()).toBe(true);
+    expect(interaction).toEqual({
+      selectedComponentIds: ['child-group'],
+      focusedComponentId: 'child-group',
+    });
+  });
+
   it('R5 moves an existing same-parent selection in one transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -219,7 +393,68 @@ describe('DesignerGestureController cancellation', () => {
     ]);
   });
 
+  // SVG 元素（如物料内部的图表/图标）不是 HTMLElement 实例，但仍是 Element。
+  // 拖拽手势的目标判定必须兼容 Element，否则点击物料内 SVG 时手势被跳过。
+  it('starts a drag when the pointer target is an SVG element inside a material', () => {
+    vi.stubGlobal('Element', FakeElementBase);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const first = document().components[0]!;
+    const current = { ...document(), components: [first] };
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    canvas.registerMaterial('rectangle-1', material);
+    const svg = new FakeElementBase();
+    svg.matches['[data-base-screen-component-id]'] = material;
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: () => current,
+      getInteraction: () => ({
+        selectedComponentIds: [] as string[],
+        focusedComponentId: null as string | null,
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      target: svg,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+
+    expect(material.style.translate).toBe('30px 30px');
+    canvas.dispatch('pointerup', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+    expect(transactions).toEqual([
+      {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['rectangle-1'],
+            patch: { position: { x: 40, y: 50 } },
+          },
+        ],
+      },
+    ]);
+  });
+
   it('moves a multi-selection by dragging the selection overlay itself', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -294,6 +529,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('R2 routes drag snapping through selection candidates and only renders after the drag threshold', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const material = new FakeElement();
@@ -347,6 +583,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('rounds the committed drag position to two decimal places', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -408,6 +645,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('moves a group and its children in one drag transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -486,6 +724,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('R2 excludes locked descendants from group drag preview and mutation', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -555,6 +794,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('R2 rewrites copied group child parents during Alt drag duplication', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -620,6 +860,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('prunes marquee selection to subtree roots so group children are not double-selected', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const first = document().components[0]!;
@@ -684,7 +925,8 @@ describe('DesignerGestureController cancellation', () => {
     });
   });
 
-  it('toggles the component under the selection overlay on a modifier click', () => {
+  it('toggles the component under the selection overlay on a Ctrl/Cmd modifier click', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const material = new FakeElement();
@@ -718,7 +960,7 @@ describe('DesignerGestureController cancellation', () => {
       pointerId: 2,
       clientX: 20,
       clientY: 30,
-      shiftKey: true,
+      ctrlKey: true,
       preventDefault: () => undefined,
       target: grab,
     } as unknown as PointerEvent);
@@ -729,7 +971,112 @@ describe('DesignerGestureController cancellation', () => {
     });
   });
 
+  it('R3 does not use Shift as a multi-select modifier', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    canvas.registerMaterial('rectangle-1', material);
+    const reduceSelection = vi.fn();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({
+        selectedComponentIds: ['rectangle-1'],
+        focusedComponentId: 'rectangle-1',
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 4,
+      clientX: 20,
+      clientY: 30,
+      shiftKey: true,
+      preventDefault: () => undefined,
+      target: material,
+    } as unknown as PointerEvent);
+
+    expect(reduceSelection).not.toHaveBeenCalledWith({
+      type: 'toggle-selection',
+      componentId: 'rectangle-1',
+    });
+  });
+
+  it('R3 keeps Ctrl/Cmd multi-select while resolving hits to the current group context', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const group = {
+      ...document().components[0]!,
+      id: 'group',
+      type: 'base.group',
+      size: { width: 300, height: 200 },
+    };
+    const child = {
+      ...document().components[0]!,
+      id: 'child',
+      parentId: 'group',
+      position: { x: 20, y: 30 },
+      zIndex: 1,
+    };
+    const current = { ...document(), components: [group, child] };
+    const childMaterial = new FakeElement();
+    childMaterial.dataset.baseScreenComponentId = 'child';
+    childMaterial.matches['[data-base-screen-component-id]'] = childMaterial;
+    canvas.registerMaterial('child', childMaterial);
+    const reduceSelection = vi.fn();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: groupCatalog,
+      getDocument: () => current,
+      getInteraction: () => ({
+        selectedComponentIds: [],
+        focusedComponentId: null,
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 3,
+      clientX: 25,
+      clientY: 35,
+      ctrlKey: true,
+      preventDefault: () => undefined,
+      target: childMaterial,
+    } as unknown as PointerEvent);
+
+    expect(reduceSelection).toHaveBeenCalledWith({
+      type: 'toggle-selection',
+      componentId: 'group',
+    });
+  });
+
   it('removes a create preview on pointer cancel without reporting a transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: unknown[] = [];
@@ -769,6 +1116,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('hides a marquee projection on lost pointer capture without reporting a transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: unknown[] = [];
@@ -804,7 +1152,8 @@ describe('DesignerGestureController cancellation', () => {
     expect(transactions).toEqual([]);
   });
 
-  it('keeps a marquee start at the raw pointer point without invoking snap or snap preview', () => {
+  it('captures at marquee start so a release outside the viewport cannot strand the gesture', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const snapCanvasPoint = vi.fn((point) => ({ x: point.x + 5, y: point.y + 5 }));
@@ -839,7 +1188,9 @@ describe('DesignerGestureController cancellation', () => {
     expect(snapCanvasPoint).not.toHaveBeenCalled();
     expect(renderSnapPreview).not.toHaveBeenCalled();
     expect(canvas.marquee.style.display).toBeUndefined();
-    expect(canvas.canvas.hasPointerCapture(3)).toBe(false);
+    // 按下即捕获：即使未越过点击阈值就释放，pointerup 也会被重定向到画布，
+    // 状态栏/面板等视窗之外的释放不会把 #marquee 悬挂成 active 常驻。
+    expect(canvas.canvas.hasPointerCapture(3)).toBe(true);
 
     canvas.dispatch('pointermove', { pointerId: 3, clientX: 16, clientY: 28 } as PointerEvent);
 
@@ -851,7 +1202,66 @@ describe('DesignerGestureController cancellation', () => {
     expect(canvas.marquee.style.top).toBe('24px');
   });
 
+  it('keeps repeated box selects from stranding the gesture with or without movement', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    for (let round = 0; round < 3; round++) {
+      canvas.dispatch('pointerdown', {
+        pointerId: 20 + round,
+        clientX: 10,
+        clientY: 20,
+        preventDefault: () => undefined,
+        target: new FakeElement(),
+      } as unknown as PointerEvent);
+      expect(controller.active).toBe(true);
+      expect(canvas.canvas.hasPointerCapture(20 + round)).toBe(true);
+
+      canvas.dispatch('pointerup', {
+        pointerId: 20 + round,
+        clientX: 10,
+        clientY: 20,
+      } as unknown as PointerEvent);
+
+      expect(controller.active).toBe(false);
+      expect(canvas.canvas.hasPointerCapture(20 + round)).toBe(false);
+      expect(canvas.marquee.style.display).toBe('none');
+    }
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 0,
+      clientY: 0,
+      preventDefault: () => undefined,
+      target: new FakeElement(),
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 200, clientY: 150 } as PointerEvent);
+    expect(controller.active).toBe(true);
+    canvas.dispatch('pointerup', { pointerId: 1, clientX: 200, clientY: 150 } as PointerEvent);
+    expect(controller.active).toBe(false);
+    expect(canvas.marquee.style.display).toBe('none');
+  });
+
   it('clears a drag translation on pointer cancel without reporting a transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: unknown[] = [];
@@ -896,6 +1306,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('restores a transform overlay on lost pointer capture without reporting a transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: unknown[] = [];
@@ -941,6 +1352,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('R2 previews resize/rotate on the material root and restores its styles on cancel', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: unknown[] = [];
@@ -1004,6 +1416,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('R2 commits a resize transaction from the previewed geometry', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: unknown[] = [];
@@ -1065,6 +1478,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('prevents native text selection on the canvas via selectstart', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const preventDefault = vi.fn();
@@ -1092,6 +1506,7 @@ describe('DesignerGestureController cancellation', () => {
   });
 
   it('suppresses canvas text selection during a drag and restores it on release', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     canvas.canvas.style.userSelect = 'auto';
@@ -1139,6 +1554,7 @@ describe('DesignerGestureController cancellation', () => {
 
 describe('DesignerGestureController viewport background click', () => {
   it('clears the selection when clicking the viewport background outside the canvas', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const viewport = createViewport();
@@ -1171,6 +1587,7 @@ describe('DesignerGestureController viewport background click', () => {
   });
 
   it('keeps the selection when clicking inside the canvas', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const viewport = createViewport();
@@ -1210,6 +1627,7 @@ describe('DesignerGestureController viewport background click', () => {
   });
 
   it('does not clear the selection from a secondary click on the viewport background', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const viewport = createViewport();
@@ -1245,6 +1663,7 @@ describe('DesignerGestureController viewport background click', () => {
   });
 
   it('R4 cancels a pending drag when the pointer leaves the canvas before capture', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const viewport = createViewport();
@@ -1292,6 +1711,7 @@ describe('DesignerGestureController viewport background click', () => {
   });
 
   it('does not clear when nothing is selected', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const viewport = createViewport();
@@ -1323,6 +1743,7 @@ describe('DesignerGestureController viewport background click', () => {
 
 describe('DesignerGestureController gesture-active state', () => {
   it('R3 reports active during a drag and restores on every exit path', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const material = new FakeElement();
@@ -1376,6 +1797,7 @@ describe('DesignerGestureController gesture-active state', () => {
 
 describe('DesignerGestureController material drop', () => {
   it('adds a component at the drop point when a material is dropped on the canvas', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -1435,6 +1857,7 @@ describe('DesignerGestureController material drop', () => {
   });
 
   it('strips snappedX/snappedY from the drop position so the transaction passes fail-closed validation', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const transactions: ScreenDocumentTransaction[] = [];
@@ -1478,6 +1901,7 @@ describe('DesignerGestureController material drop', () => {
   });
 
   it('routes focus to the viewport and prevents the browser default focus on canvas pointerdown', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const focusViewport = vi.fn();
@@ -1514,6 +1938,7 @@ describe('DesignerGestureController material drop', () => {
   });
 
   it('pans with the primary button when the hand tool is active', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const panBy = vi.fn();
@@ -1555,6 +1980,7 @@ describe('DesignerGestureController material drop', () => {
   });
 
   it('ignores a non-primary (right/middle) button press under the hand tool', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const panBy = vi.fn();
@@ -1593,6 +2019,7 @@ describe('DesignerGestureController material drop', () => {
   });
 
   it('does not capture or suppress a secondary button under the select tool', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const material = new FakeElement();
@@ -1636,6 +2063,7 @@ describe('DesignerGestureController material drop', () => {
   });
 
   it('leaves the browser middle-button behavior untouched', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const controller = new DesignerGestureController({
@@ -1665,6 +2093,7 @@ describe('DesignerGestureController material drop', () => {
 
 describe('DesignerGestureController snap session', () => {
   it('activates the snap session on drag start and releases it on completion', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const setSnapSessionActive = vi.fn();
@@ -1709,6 +2138,7 @@ describe('DesignerGestureController snap session', () => {
   });
 
   it('activates the snap session on create start and releases it on cancel', () => {
+    vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
     const setSnapSessionActive = vi.fn();

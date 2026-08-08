@@ -46,7 +46,13 @@ export function inspectMaterialRegistry(
       );
       continue;
     }
-    const entry = { manifest, constructor };
+    const adapter = readTabularDataAdapter(constructor, requirement, diagnostics);
+    if (adapter === null) continue;
+    const entry = {
+      manifest,
+      constructor,
+      ...(adapter === undefined ? {} : { tabularDataAdapter: adapter }),
+    };
     const priorEntry = byType.get(manifest.type);
     if (
       priorEntry !== undefined &&
@@ -62,6 +68,38 @@ export function inspectMaterialRegistry(
     byType.set(manifest.type, entry);
   }
   return [...byType.values()];
+}
+
+function readTabularDataAdapter(
+  constructor: BaseScreenMaterialConstructor,
+  requirement: Requirement,
+  diagnostics: DiagnosticCollector,
+): NonNullable<BaseScreenMaterialConstructor['tabularDataAdapter']> | undefined | null {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(constructor, 'tabularDataAdapter');
+    if (descriptor === undefined) return undefined;
+    if (
+      !Object.hasOwn(descriptor, 'value') ||
+      descriptor.value === null ||
+      typeof descriptor.value !== 'object' ||
+      typeof (descriptor.value as { readonly adapt?: unknown }).adapt !== 'function'
+    ) {
+      diagnostics.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        requirement.path,
+        'Material dataset adapter is invalid.',
+      );
+      return null;
+    }
+    return descriptor.value as NonNullable<BaseScreenMaterialConstructor['tabularDataAdapter']>;
+  } catch {
+    diagnostics.add(
+      'PLUGIN_CORE_IDENTITY_INVALID',
+      requirement.path,
+      'Material dataset adapter cannot be safely read.',
+    );
+    return null;
+  }
 }
 
 function createRequirements(

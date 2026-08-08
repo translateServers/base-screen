@@ -11,9 +11,13 @@ import {
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
+  hasDirectChildren,
+  parentIdOf,
   selectedComponents,
   selectedRootIds,
   selectionSubtree,
+  selectionTargetInContext,
+  selectionTargetsInContext,
 } from '../../common/operations/designer-selection.js';
 import {
   type BaseScreenTransformHandle,
@@ -143,8 +147,13 @@ export class DesignerGestureController {
   #pan: Pan | undefined;
   #create: Create | undefined;
   #selectSuppression: string | null = null;
+  #editingParentId: string | null = null;
 
   constructor(private readonly callbacks: DesignerGestureCallbacks) {}
+
+  get groupEditingParentId(): string | null {
+    return this.#editingParentId;
+  }
 
   /** 任一画布手势激活中（拖拽/变换/框选/平移/创建）。事件系统据此抑制快捷键与默认行为。 */
   get active(): boolean {
@@ -164,6 +173,7 @@ export class DesignerGestureController {
     canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
     canvas.addEventListener('pointercancel', () => this.cancel());
     canvas.addEventListener('lostpointercapture', () => this.cancel());
+    canvas.addEventListener('dblclick', (event) => this.onDoubleClick(event));
     // 画布是可拖拽交互表面：系统性禁止原生文本选择（selectstart 是浏览器启动文本选择的
     // 事件通道，即使 CSS user-select 未级联到某些内容也能拦截，参考 Nebula/Moveable）。
     canvas.addEventListener('selectstart', (event) => event.preventDefault());
@@ -202,7 +212,7 @@ export class DesignerGestureController {
     const canvas = this.#canvas;
     if (
       !isPrimaryPointer(event) ||
-      !(target instanceof HTMLElement) ||
+      !(target instanceof Element) ||
       canvas === undefined ||
       canvas.contains(target)
     ) {
@@ -211,6 +221,7 @@ export class DesignerGestureController {
     if (this.callbacks.getInteraction().selectedComponentIds.length === 0) {
       return;
     }
+    this.#editingParentId = null;
     this.callbacks.reduceSelection({ type: 'clear-selection' });
   }
 
@@ -223,11 +234,66 @@ export class DesignerGestureController {
     this.clearSnapPreview();
   }
 
+  exitGroupEditingContext(): boolean {
+    const document = this.callbacks.getDocument();
+    const editingParentId = this.validEditingParentId(document);
+    if (document === undefined || editingParentId === null) return false;
+    this.#editingParentId = parentIdOf(document, editingParentId);
+    this.callbacks.reduceSelection({
+      type: 'replace-selection',
+      componentIds: [editingParentId],
+      focusedComponentId: editingParentId,
+    });
+    return true;
+  }
+
+  canEnterGroupEditingContext(): boolean {
+    const document = this.callbacks.getDocument();
+    const interaction = this.callbacks.getInteraction();
+    if (document === undefined || interaction.selectedComponentIds.length !== 1) return false;
+    const componentId = interaction.selectedComponentIds[0];
+    return componentId !== undefined && this.canEditChildren(document, componentId);
+  }
+
+  canExitGroupEditingContext(): boolean {
+    return this.validEditingParentId(this.callbacks.getDocument()) !== null;
+  }
+
+  enterGroupEditingContext(): boolean {
+    const document = this.callbacks.getDocument();
+    const interaction = this.callbacks.getInteraction();
+    const groupId = interaction.selectedComponentIds[0];
+    if (
+      document === undefined ||
+      interaction.selectedComponentIds.length !== 1 ||
+      groupId === undefined ||
+      !this.canEditChildren(document, groupId)
+    ) {
+      return false;
+    }
+    const child = document.components.find(
+      (component) =>
+        component.parentId === groupId &&
+        !isScreenComponentEffectivelyLocked(document, component.id) &&
+        !isScreenComponentEffectivelyHidden(document, component.id),
+    );
+    if (child === undefined) return false;
+    this.#editingParentId = groupId;
+    this.callbacks.reduceSelection({
+      type: 'replace-selection',
+      componentIds: [child.id],
+      focusedComponentId: child.id,
+    });
+    return true;
+  }
+
   private onPointerDown(event: PointerEvent): void {
     const target = event.target;
     const document = this.callbacks.getDocument();
     const canvas = this.#canvas;
-    if (!(target instanceof HTMLElement) || document === undefined || canvas === undefined) {
+    // 注意：物料内部可能包含 SVG（图表/图标），SVG 元素不是 HTMLElement，
+    // 用 Element 判定 + closest 命中测试，避免点击 SVG 时手势被跳过导致拖拽失败。
+    if (!(target instanceof Element) || document === undefined || canvas === undefined) {
       return;
     }
     if (!isPrimaryPointer(event)) return;
@@ -285,32 +351,40 @@ export class DesignerGestureController {
     const material = target.closest<HTMLElement>('[data-base-screen-component-id]');
     const componentId = material?.dataset.baseScreenComponentId;
     if (componentId === undefined || material === null) {
+      this.#editingParentId = null;
       event.preventDefault();
+      // 框选从按下即捕获指针：pointerup 被重定向到画布，释放落在状态栏/面板等视窗之外
+      // 的表面也不会漏掉手势，避免 #marquee 悬挂导致 active 常驻、快捷键与右键菜单被吞。
+      this.capturePointer(event.pointerId);
       this.#marquee = {
         pointerId: event.pointerId,
         start: this.canvasPointFromPointer(event),
         startClientX: event.clientX,
         startClientY: event.clientY,
-        union: event.shiftKey,
+        union: event.ctrlKey || event.metaKey,
         contain: event.altKey,
         moved: false,
       };
       return;
     }
-    const component = document.components.find((item) => item.id === componentId);
+    const selectableComponentId = this.selectableComponentId(document, componentId);
+    const component =
+      selectableComponentId === null
+        ? undefined
+        : document.components.find((item) => item.id === selectableComponentId);
     if (component === undefined) {
       return;
     }
-    if (isScreenComponentEffectivelyHidden(document, componentId)) {
+    if (isScreenComponentEffectivelyHidden(document, component.id)) {
       return;
     }
-    if (event.shiftKey || event.ctrlKey || event.metaKey) {
-      this.callbacks.reduceSelection({ type: 'toggle-selection', componentId });
+    if (event.ctrlKey || event.metaKey) {
+      this.callbacks.reduceSelection({ type: 'toggle-selection', componentId: component.id });
       return;
     }
     const interaction = this.callbacks.getInteraction();
     const selected = selectedComponents(document, interaction.selectedComponentIds);
-    const components = interaction.selectedComponentIds.includes(componentId)
+    const components = interaction.selectedComponentIds.includes(component.id)
       ? selected
       : [component];
     if (
@@ -320,11 +394,11 @@ export class DesignerGestureController {
     ) {
       return;
     }
-    if (!interaction.selectedComponentIds.includes(componentId)) {
+    if (!interaction.selectedComponentIds.includes(component.id)) {
       this.callbacks.reduceSelection({
         type: 'replace-selection',
-        componentIds: [componentId],
-        focusedComponentId: componentId,
+        componentIds: [component.id],
+        focusedComponentId: component.id,
       });
     }
     event.preventDefault();
@@ -359,12 +433,17 @@ export class DesignerGestureController {
     const document = this.callbacks.getDocument();
     const canvas = this.#canvas;
     if (document === undefined || canvas === undefined) return;
-    if (event.shiftKey || event.ctrlKey || event.metaKey) {
-      // 选中框覆盖组件区域，修饰键点击按文档命中测试切换单个组件选择。
+    if (event.ctrlKey || event.metaKey) {
+      // 选中框覆盖组件区域，修饰键点击按当前组内编辑上下文切换同层组件选择。
       const point = this.canvasPointFromPointer(event);
       const componentId = hitTestScreenComponents(document, point)[0];
-      if (componentId !== undefined) {
-        this.callbacks.reduceSelection({ type: 'toggle-selection', componentId });
+      const selectableComponentId =
+        componentId === undefined ? null : this.selectableComponentId(document, componentId);
+      if (selectableComponentId !== null) {
+        this.callbacks.reduceSelection({
+          type: 'toggle-selection',
+          componentId: selectableComponentId,
+        });
       }
       return;
     }
@@ -380,6 +459,8 @@ export class DesignerGestureController {
       return;
     }
     event.preventDefault();
+    // 选中框拖拽与框选同理：按下即捕获，释放落在视窗之外也不会悬挂拖拽手势。
+    this.capturePointer(event.pointerId);
     const moved = mutableSelectionSubtree(
       document,
       components.map((component) => component.id),
@@ -492,9 +573,15 @@ export class DesignerGestureController {
         marquee.contain ? 'contain' : 'intersect',
       );
       const interaction = this.callbacks.getInteraction();
+      const editingParentId = this.validEditingParentId(document);
       const componentIds = selectedRootIds(
         document,
-        marquee.union ? [...interaction.selectedComponentIds, ...ids] : ids,
+        marquee.union
+          ? [
+              ...interaction.selectedComponentIds,
+              ...selectionTargetsInContext(document, ids, editingParentId),
+            ]
+          : selectionTargetsInContext(document, ids, editingParentId),
       );
       this.callbacks.reduceSelection({
         type: 'replace-selection',
@@ -566,6 +653,60 @@ export class DesignerGestureController {
         },
       })),
     });
+  }
+
+  private onDoubleClick(event: MouseEvent): void {
+    const target = event.target;
+    const document = this.callbacks.getDocument();
+    if (!(target instanceof Element) || document === undefined) return;
+    const material = target.closest<HTMLElement>('[data-base-screen-component-id]');
+    const hitId = material?.dataset.baseScreenComponentId;
+    if (hitId === undefined) return;
+    const groupId = this.selectableComponentId(document, hitId);
+    if (groupId === null || !this.canEditChildren(document, groupId)) return;
+    const childId = selectionTargetInContext(document, hitId, groupId);
+    this.#editingParentId = groupId;
+    this.callbacks.reduceSelection({
+      type: 'replace-selection',
+      componentIds: [childId ?? groupId],
+      focusedComponentId: childId ?? groupId,
+    });
+    event.preventDefault();
+  }
+
+  private selectableComponentId(document: ScreenDocument, hitComponentId: string): string | null {
+    const editingParentId = this.validEditingParentId(document);
+    const target = selectionTargetInContext(document, hitComponentId, editingParentId);
+    if (target !== null) return target;
+    this.#editingParentId = null;
+    return selectionTargetInContext(document, hitComponentId, null);
+  }
+
+  private validEditingParentId(document: ScreenDocument | undefined): string | null {
+    if (
+      document === undefined ||
+      this.#editingParentId === null ||
+      !document.components.some((component) => component.id === this.#editingParentId)
+    ) {
+      this.#editingParentId = null;
+      return null;
+    }
+    return this.#editingParentId;
+  }
+
+  private canEditChildren(document: ScreenDocument, componentId: string): boolean {
+    const component = document.components.find((item) => item.id === componentId);
+    if (
+      component === undefined ||
+      !hasDirectChildren(document, componentId) ||
+      isScreenComponentEffectivelyLocked(document, componentId)
+    ) {
+      return false;
+    }
+    return (
+      this.callbacks.getCatalog()?.get(component.type)?.manifest.designCapabilities.children ===
+      true
+    );
   }
 
   private startTransform(event: PointerEvent, handle: BaseScreenTransformHandle | undefined): void {
