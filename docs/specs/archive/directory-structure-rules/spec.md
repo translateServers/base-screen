@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-05
 > 定位：定义 Base Screen 包内目录结构、分层边界、测试外置与构建产物卫生的工程规则
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)
+> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)
 
 ## 1. 目标
 
@@ -34,7 +34,7 @@
 
 ## 3. 依据与所有权
 
-- [ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)：包边界、依赖白名单、ESM/build 契约的唯一权威。
+- [ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)：包边界、依赖白名单、ESM/build 契约的唯一权威。
 - 本 Spec 只整改**包内目录结构与工程约定**，不改变任何包的公共边界；因此不要求新增 ADR。若后续实现发现会触及公共边界，必须先提交并接受对应 ADR。
 - `engine` 的 `common/browser` 是新的**内部结构约定**，由本 Spec 与 `check-engine-import.mjs` 作为唯一权威实现。
 

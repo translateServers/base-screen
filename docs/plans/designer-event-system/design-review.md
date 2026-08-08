@@ -119,4 +119,4 @@
 | 6 | beforeunload | 宿主契约，designer 不接管（写入 Spec 边界） |
 | 7 | 宿主影响 | **零宿主影响硬边界**：window 级监听仅处理落点在本设计器 shadow 内的事件（composedPath 归属过滤），其余一律零副作用；DnD 仅拦本设计器发起的拖拽；不注册 beforeunload/visibilitychange；disconnectedCallback 注销全部监听 |
 
-Spec：[designer-event-system](../specs/designer-event-system/spec.md)
+Spec：[designer-event-system](../../specs/designer-event-system/spec.md)

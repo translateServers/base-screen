@@ -2,7 +2,7 @@
 
 > Status: Active
 > Date: 2026-08-04
-> Governing spec: [Runtime And Ecosystem Hardening](../../specs/runtime-ecosystem-hardening/spec.md)
+> Governing spec: [Runtime And Ecosystem Hardening](../../specs/archive/runtime-ecosystem-hardening/spec.md)
 > Decisions: [ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md), [ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md), [ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md)
 
 ## Guardrails

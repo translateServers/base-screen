@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-03
 > Scope: The framework-neutral material ABI, material identity, Custom Element registration ownership, and instance catalog boundary
-> Implements: [Plugin Core Contract Spec](../specs/plugin-core-contract/spec.md)
+> Implements: [Plugin Core Contract Spec](../specs/archive/plugin-core-contract/spec.md)
 
 ## Context
 

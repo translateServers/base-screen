@@ -1,7 +1,7 @@
 # Designer Authoring And Project Lifecycle Tasks
 
 > 状态：已归档；勾选项记录归档时的历史实施进度，不作为现行 Designer Engine 验收结论
-> 现行任务：[Designer Engine Tasks](../../designer-engine/tasks.md)
+> 现行任务：[Designer Engine Tasks](../designer-engine/tasks.md)
 
 - [x] Task 1：完成 Project Lifecycle ADR、Nebula parity provenance 与实施授权（R1-R11）。
   - [x] 新增并接受 Project Lifecycle ADR，冻结 publish/signal/conflict/retry/baseline 所有权。

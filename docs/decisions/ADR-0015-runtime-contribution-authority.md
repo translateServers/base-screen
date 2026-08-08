@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-04
 > Scope: Instance-scoped plugin contribution authority
-> Implements: [Plugin Manager Runtime Spec](../specs/plugin-manager-runtime/spec.md), [Runtime And Ecosystem Hardening Spec](../specs/runtime-ecosystem-hardening/spec.md)
+> Implements: [Plugin Manager Runtime Spec](../specs/archive/plugin-manager-runtime/spec.md), [Runtime And Ecosystem Hardening Spec](../specs/archive/runtime-ecosystem-hardening/spec.md)
 
 ## Context
 

@@ -4,7 +4,7 @@
 > Date: 2026-08-04
 > Scope: Plugin Manifest identity and dependency declarations
 > Supersedes: The plugin API/core version and dependency range portions of ADR-0004
-> Implements: [Plugin Core Contract Spec](../specs/plugin-core-contract/spec.md), [Plugin Manager Runtime Spec](../specs/plugin-manager-runtime/spec.md)
+> Implements: [Plugin Core Contract Spec](../specs/archive/plugin-core-contract/spec.md), [Plugin Manager Runtime Spec](../specs/archive/plugin-manager-runtime/spec.md)
 
 ## Context
 

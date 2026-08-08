@@ -2,7 +2,7 @@
 
 > Status: Active
 > Updated: 2026-08-04
-> Authority: [ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md)
+> Authority: [ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md), [ADR-0023](../../decisions/ADR-0023-host-dataset-resource-integration.md)
 
 ## Scope
 
@@ -27,7 +27,9 @@ interface ScreenDocument {
 `ScreenBlueprint` is required as one strict shape with a bounded rules array, bounded data
 expressions, optional conditions, and explicit capability requirements under
 [ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md).
-Components may have `null`, `static`, or `host-resource` data sources. Project identity,
+Components may have `null`, `static`, or `host-resource` data sources. A host-resource source has an
+opaque resource identity, literal/variable parameter bindings, and an optional material field
+binding. Project identity,
 revision, metadata, credentials, transport details, and host-only policy are outside this
 shape.
 
@@ -44,6 +46,9 @@ shape.
 - `parseScreenProjectEnvelope()` validates its own metadata boundary and prefixes nested
   document diagnostic paths with `document`.
 - `serializeScreenDocument()` revalidates input and emits deterministic canonical JSON.
+- `ScreenHostResourceDataSource` is exactly `{ type, resourceType, resourceId, params, binding }`, where each parameter is a literal JSON value or a document-variable reference; no legacy arbitrary JSON parameter form is accepted.
+- `ScreenTabularDataset` validates at most 256 fields, 10,000 rows, and 1 MiB, with unique declared fields, declared row keys, matching scalar/null cells, finite numbers, and ISO date strings.
+- `ScreenHostDatasetCatalogPort` exposes abort-aware bounded listing and safe descriptor lookup. The Designer adapter validates the capability/port relationship before use.
 - `SCREEN_DOCUMENT_JSON_SCHEMA` and the published `screen-document.schema.json` artifact
   derive from the same schema source and are deeply equal.
 - Public declarations expose TypeScript data types and parser APIs, not Zod implementation

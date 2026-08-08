@@ -4,11 +4,11 @@
 > 最近更新：2026-08-05
 > 阶段：Designer 产品主线增量
 > 定位：补齐大屏设计器底座的作者功能、内容样式、画布精度和工作台质量
-> 依据：[ADR-0003](../../decisions/ADR-0003-web-component-material-abi-and-registration.md)、[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0012](../../decisions/ADR-0012-designer-project-lifecycle.md)、[Designer Engine Spec](../designer-engine/spec.md)、[Designer Workbench Control Styles Spec](../designer-workbench-control-styles/spec.md)
+> 依据：[ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md)、[ADR-0006](../../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0012](../../../decisions/ADR-0012-designer-project-lifecycle.md)、[Designer Engine Spec](../designer-engine/spec.md)、[Designer Workbench Control Styles Spec](../designer-workbench-control-styles/spec.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
-> 来源：[Nebula Designer Core](../../provenance/nebula-designer-core.md)
+> 来源：[Nebula Designer Core](../../../provenance/nebula-designer-core.md)
 
 ## 1. 背景
 

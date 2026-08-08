@@ -8,7 +8,7 @@
 复用，但只有满足当前边界、中文界面和自动化证据后才勾选。
 
 执行记录：Task 8 所依赖的 canonical Blueprint 与 host-resource Core command 边界由
-[ADR-0013](../../decisions/ADR-0013-core-canonical-blueprint-mutation.md) 和 Core Domain Spec 管理；
+[ADR-0013](../../../decisions/ADR-0013-core-canonical-blueprint-mutation.md) 和 Core Domain Spec 管理；
 其余 Task 8 验收仍需逐项以自动化证据完成。
 
 - [x] Task 1：冻结 Engine 主导的现行规格与归档边界（R1-R10）。

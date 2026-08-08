@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-08-04
+> 最近更新：2026-08-07
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -36,7 +36,14 @@
 | [ADR-0017](./ADR-0017-designer-product-host-boundaries.md) | 已接受 | 2026-08-05 | 完整 Designer 产品的宿主边界 |
 | [ADR-0018](./ADR-0018-host-intents-assets-and-graph-blueprint.md) | 已接受 | 2026-08-05 | 宿主意图、资产与图形 Blueprint |
 | [ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md) | 已接受 | 2026-08-05 | Designer 专项编辑依赖准入 |
+| [ADR-0020](./ADR-0020-designer-canvas-interaction-pilot.md) | 已采纳 | 2026-08-06 | Designer 画布交互逻辑层移植（Moveable/Gesto 源码 vendor） |
+| [ADR-0021](./ADR-0021-material-library-visibility.md) | 已接受 | 2026-08-07 | Material Manifest 可见性与 Designer 物料库过滤 |
+| [ADR-0022](./ADR-0022-official-data-material-contracts.md) | 已接受 | 2026-08-07 | 官方图表与表格数据语义契约 |
+| [ADR-0023](./ADR-0023-host-dataset-resource-integration.md) | 已接受 | 2026-08-07 | 宿主数据集目录、绑定与运行时取数 |
+| [ADR-0024](./ADR-0024-designer-public-style-tokens.md) | 已接受 | 2026-08-07 | Designer 宿主可配置主题 Token |
 
 ## 计划决策
 
 当前没有待编号的计划决策。
+
+相关背景、实施计划和规格入口见 [文档索引](../README.md)。

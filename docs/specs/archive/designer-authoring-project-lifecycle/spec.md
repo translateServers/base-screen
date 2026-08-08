@@ -3,9 +3,9 @@
 > 状态：已归档
 > 最近更新：2026-08-04
 > 归档于：2026-08-04
-> 归档原因：由现行 [Designer Engine 规格](../../designer-engine/spec.md) 统一承接 Engine 产品规划；本文只保留历史需求与实施语境
+> 归档原因：由现行 [Designer Engine 规格](../designer-engine/spec.md) 统一承接 Engine 产品规划；本文只保留历史需求与实施语境
 > 定位：以 Nebula Designer 的可观察样式与功能为兼容基准，增量冻结 Base Screen Designer 与项目生命周期
-> 依据：[ADR-0006](../../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0012](../../../decisions/ADR-0012-designer-project-lifecycle.md)、[Designer Engine Spec](../../designer-engine/spec.md)、[Core Domain Spec](../../core-domain/spec.md)、[Plugin Core Contract Spec](../../plugin-core-contract/spec.md)
+> 依据：[ADR-0006](../../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0012](../../../decisions/ADR-0012-designer-project-lifecycle.md)、[Designer Engine Spec](../designer-engine/spec.md)、[Core Domain Spec](../core-domain/spec.md)、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)
 > 来源：[Nebula Designer Parity Provenance](../../../provenance/nebula-designer-parity.md)
 > 实施：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
@@ -74,7 +74,7 @@ Engine 还没有把这些能力组装为可用设计器，项目会话也没有 
 | Testing | Designer Core/DOM/Playwright harness | Runtime conformance harness |
 
 配套的
-[Runtime And Ecosystem Hardening Spec](../../runtime-ecosystem-hardening/spec.md)
+[Runtime And Ecosystem Hardening Spec](../runtime-ecosystem-hardening/spec.md)
 不得修改 `ScreenProjectAdapter`、Engine session、dirty baseline 或 Designer Shadow DOM。Importer 输出只
 能由宿主作为普通 canonical document 交给 Designer，不共享 migration state。
 

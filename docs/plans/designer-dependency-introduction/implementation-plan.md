@@ -3,7 +3,7 @@
 > 状态：待评审
 > 日期：2026-08-05
 > 适用范围：Designer Product Completion 及其后续 Designer 增量
-> 依据：[Designer Product Completion Spec](../../specs/designer-product-completion/spec.md)、[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[仓库指南](../../../AGENTS.md)
+> 依据：[Designer Product Completion Spec](../../specs/archive/designer-product-completion/spec.md)、[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[仓库指南](../../../AGENTS.md)
 > 候选评估：[Designer 依赖候选评估](./dependency-evaluation.md)
 
 ## 1. 目标

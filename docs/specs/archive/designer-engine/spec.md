@@ -4,7 +4,7 @@
 > 最近更新：2026-08-04
 > 阶段：M3 后续增量
 > 定位：由 `@base-screen/engine` 主导设计器产品闭环、中文工作台与项目生命周期
-> 依据：[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0012](../../decisions/ADR-0012-designer-project-lifecycle.md)、[Core Domain Spec](../core-domain/spec.md)、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)
+> 依据：[ADR-0006](../../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0012](../../../decisions/ADR-0012-designer-project-lifecycle.md)、[Core Domain Spec](../core-domain/spec.md)、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)
 > 实施：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)

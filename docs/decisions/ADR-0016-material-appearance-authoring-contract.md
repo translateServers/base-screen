@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-05
 > Scope: Declarative Material style schema and Designer appearance panel ownership
-> Implements: [Plugin Core Contract Spec](../specs/plugin-core-contract/spec.md), [Designer Product Completion](../specs/designer-product-completion/spec.md)
+> Implements: [Plugin Core Contract Spec](../specs/archive/plugin-core-contract/spec.md), [Designer Product Completion](../specs/archive/designer-product-completion/spec.md)
 
 ## Context
 

@@ -4,7 +4,7 @@
 > 最近更新：2026-08-04
 > 阶段：M3 增量
 > 定位：冻结 `@base-screen/engine` 私有工作台的设计 token、基础样式、语义控件和视觉验收边界
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)（已接受）、[Designer Engine Spec](../designer-engine/spec.md)（生效中）
+> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0006](../../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)（已接受）、[Designer Engine Spec](../designer-engine/spec.md)（生效中）
 > 实施：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 

@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-07
 > 定位：以瞬态 `translate` 预览夯实大屏设计器的移动、吸附与坐标精度
-> 前置：[Designer Full Product](../designer-full-product/spec.md)、[Designer Engine](../designer-engine/spec.md)、[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)
+> 前置：[Designer Full Product](../designer-full-product/spec.md)、[Designer Engine](../archive/designer-engine/spec.md)、[ADR-0006](../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)

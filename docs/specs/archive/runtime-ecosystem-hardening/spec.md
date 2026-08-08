@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-05
 > 定位：增量冻结远程 sandbox、Host Resource、Blueprint、插件运行时贡献、框架 tarball consumer 与 Nebula importer 的生产级验收边界
-> 依据：[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)、[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)、[ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md)、[Host Resource And Blueprint Spec](../host-resource-blueprint/spec.md)、[Remote Plugin Sandbox Spec](../remote-plugin-sandbox/spec.md)、[Nebula Importer Spec](../nebula-importer/spec.md)
+> 依据：[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0009](../../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)、[ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)、[ADR-0011](../../../decisions/ADR-0011-nebula-importer-auditable-migration.md)、[Host Resource And Blueprint Spec](../../host-resource-blueprint/spec.md)、[Remote Plugin Sandbox Spec](../../remote-plugin-sandbox/spec.md)、[Nebula Importer Spec](../../nebula-importer/spec.md)
 > 实施：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 
@@ -29,11 +29,11 @@ bridge 和 Nebula importer 的第一条纵向切片，但当前验收仍以成�
 
 以下决策已经完成并构成本 Spec 的实施授权：
 
-1. [ADR-0009](../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md) 取代
+1. [ADR-0009](../../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md) 取代
    ADR-0008 的 opaque-origin/exact-origin 不可执行组合，冻结 strict cross-origin transport。
-2. [ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md) 明确
+2. [ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md) 明确
    Renderer resource deadline 的边界，以及 Blueprint expression、condition 和 capability 求值方式。
-3. [ADR-0011](../../decisions/ADR-0011-nebula-importer-auditable-migration.md) 为 importer 提供
+3. [ADR-0011](../../../decisions/ADR-0011-nebula-importer-auditable-migration.md) 为 importer 提供
    独立、唯一编号的离线迁移决策；决策索引不再重复使用 ADR-0008。
 4. Blueprint 实施必须同步 Contracts Foundation Spec 和 committed JSON Schema golden；当前
    canonical shape 不引入兼容分支。

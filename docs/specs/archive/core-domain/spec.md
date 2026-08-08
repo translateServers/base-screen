@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-04
 > 定位：冻结 `@base-screen/core` 首个文档状态、命令、事务、历史、组件树语义和几何纯算法的可验收契约
-> 依据：[ADR-0001](../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)（已接受）、[ADR-0013](../../decisions/ADR-0013-core-canonical-blueprint-mutation.md)（已接受）
+> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、[ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)（已接受）、[ADR-0013](../../../decisions/ADR-0013-core-canonical-blueprint-mutation.md)（已接受）
 
 ## 1. 生效条件
 
@@ -147,7 +147,7 @@ export function reduceScreenInteraction(
 
 selection 按传入 document 的 component 顺序 canonicalize，去重并移除不存在或 hidden 的 component id。focused component 必须属于 selection，否则为 `null`。锁定组件可以被选中，但不能被 mutation command 直接或通过祖先间接修改。
 
-Interaction State 只描述稳定选择结果。pointer、drag、resize、rotate、marquee 和 editing session 的运行状态由 Engine 拥有，并在其 Spec 中基于 Core 几何与命令 API 定义。项目 operation、dirty baseline、adapter revision、conflict 和 retry 也属于 Engine 项目控制器，详见 [ADR-0012](../../decisions/ADR-0012-designer-project-lifecycle.md)；它们不得进入 Core。
+Interaction State 只描述稳定选择结果。pointer、drag、resize、rotate、marquee 和 editing session 的运行状态由 Engine 拥有，并在其 Spec 中基于 Core 几何与命令 API 定义。项目 operation、dirty baseline、adapter revision、conflict 和 retry 也属于 Engine 项目控制器，详见 [ADR-0012](../../../decisions/ADR-0012-designer-project-lifecycle.md)；它们不得进入 Core。
 
 ### 5.4 Runtime Overrides
 

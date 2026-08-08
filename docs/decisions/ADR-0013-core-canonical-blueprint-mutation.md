@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-04
 > Scope: Core command support for already-frozen canonical Blueprint and host-resource data
-> Implements: [Host Resource And Blueprint Spec](../specs/host-resource-blueprint/spec.md), [Core Domain Spec](../specs/core-domain/spec.md)
+> Implements: [Host Resource And Blueprint Spec](../specs/host-resource-blueprint/spec.md), [Core Domain Spec](../specs/archive/core-domain/spec.md)
 
 ## Context
 

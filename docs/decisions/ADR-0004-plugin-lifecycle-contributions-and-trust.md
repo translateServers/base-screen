@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-03
 > Scope: Trusted plugin inputs, manifest contributions, capability authorization, lifecycle state, session ports, and catalog publication
-> Implements: [Plugin Core Contract Spec](../specs/plugin-core-contract/spec.md), [Plugin Manager Runtime Spec](../specs/plugin-manager-runtime/spec.md)
+> Implements: [Plugin Core Contract Spec](../specs/archive/plugin-core-contract/spec.md), [Plugin Manager Runtime Spec](../specs/archive/plugin-manager-runtime/spec.md)
 
 ## Context
 

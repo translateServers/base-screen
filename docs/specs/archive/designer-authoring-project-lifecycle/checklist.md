@@ -1,7 +1,7 @@
 # Designer Authoring And Project Lifecycle 验收清单
 
 > 状态：已归档；勾选项记录归档时的历史验收快照，不自动迁移到现行清单
-> 现行验收：[Designer Engine 验收清单](../../designer-engine/checklist.md)
+> 现行验收：[Designer Engine 验收清单](../designer-engine/checklist.md)
 
 ## 文档与前置决策
 
