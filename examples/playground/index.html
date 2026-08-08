@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Base Screen Playground</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: #0b1016;
+        color: #e8eef7;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-width: 320px;
+        min-height: 100vh;
+        background: #0b1016;
+      }
+
+      .designer-fullscreen {
+        width: 100vw;
+        height: 100vh;
+        min-height: 100vh;
+        overflow: hidden;
+        background: #11100f;
+      }
+
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 250px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        display: flex;
+        flex-direction: column;
+        gap: 28px;
+        padding: 28px 20px;
+        border-right: 1px solid rgba(159, 177, 201, 0.16);
+        background: rgba(10, 15, 22, 0.82);
+      }
+
+      .brand {
+        display: grid;
+        gap: 6px;
+      }
+
+      .brand strong {
+        color: #f5f8fc;
+        font-size: 18px;
+      }
+
+      .brand span {
+        color: #8da1bb;
+        font-size: 12px;
+      }
+
+      .nav {
+        display: grid;
+        gap: 8px;
+      }
+
+      .nav a {
+        padding: 11px 12px;
+        border: 1px solid transparent;
+        border-radius: 6px;
+        color: #9fb1c9;
+        font-size: 14px;
+        transition: 160ms ease;
+      }
+
+      .nav a:hover,
+      .nav a[aria-current="page"] {
+        border-color: rgba(57, 197, 187, 0.35);
+        background: rgba(57, 197, 187, 0.1);
+        color: #e8ffff;
+      }
+
+      .sidebar-note {
+        margin-top: auto;
+        color: #63758d;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+
+      .main {
+        display: grid;
+        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+        padding: 42px clamp(24px, 5vw, 76px) 56px;
+      }
+
+      .intro {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        padding-bottom: 28px;
+      }
+
+      .intro-copy {
+        max-width: 720px;
+      }
+
+      .eyebrow {
+        margin: 0 0 12px;
+        color: #39c5bb;
+        font-size: 12px;
+        font-weight: 700;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        color: #f5f8fc;
+        font-size: clamp(34px, 5vw, 68px);
+        line-height: 0.98;
+      }
+
+      .intro-copy p:last-child {
+        max-width: 620px;
+        margin: 18px 0 0;
+        color: #9fb1c9;
+        font-size: 16px;
+        line-height: 1.7;
+      }
+
+      .path {
+        flex: 0 0 auto;
+        padding: 9px 12px;
+        border: 1px solid rgba(159, 177, 201, 0.18);
+        border-radius: 6px;
+        color: #8da1bb;
+        font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+
+      .stage {
+        display: grid;
+        min-height: 480px;
+        overflow: hidden;
+        border: 1px solid rgba(159, 177, 201, 0.16);
+        border-radius: 8px;
+        background: #111923;
+        box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+      }
+
+      .runtime-toolbar {
+        display: flex;
+        align-items: end;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 14px 0 18px;
+      }
+
+      .runtime-toolbar__title {
+        display: grid;
+        gap: 3px;
+        min-width: 170px;
+        margin-right: auto;
+      }
+
+      .runtime-toolbar__title strong {
+        color: #e8ffff;
+        font-size: 13px;
+      }
+
+      .runtime-toolbar__title span,
+      .field span {
+        color: #7387a1;
+        font-size: 11px;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+      }
+
+      .field select,
+      .toolbar-button {
+        min-height: 32px;
+        border: 1px solid rgba(159, 177, 201, 0.24);
+        border-radius: 5px;
+        background: #182433;
+        color: #e8eef7;
+        font: inherit;
+        font-size: 12px;
+      }
+
+      .field select {
+        min-width: 120px;
+        padding: 0 8px;
+      }
+
+      .toolbar-button {
+        padding: 0 10px;
+        cursor: pointer;
+      }
+
+      .toolbar-button:hover,
+      .toolbar-button.is-active {
+        border-color: rgba(57, 197, 187, 0.65);
+        background: rgba(57, 197, 187, 0.14);
+      }
+
+      .toolbar-button.is-danger {
+        border-color: rgba(255, 107, 107, 0.72);
+        color: #ffb0b0;
+      }
+
+      .playground-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 220px;
+        gap: 14px;
+        min-height: 480px;
+      }
+
+      .runtime-inspector {
+        min-width: 0;
+        padding: 14px;
+        border: 1px solid rgba(159, 177, 201, 0.16);
+        border-radius: 8px;
+        background: #101923;
+        overflow: auto;
+      }
+
+      .inspector-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 8px;
+        color: #8da1bb;
+        font-size: 11px;
+        text-transform: uppercase;
+      }
+
+      .inspector-heading strong {
+        color: #e8ffff;
+        font-size: 12px;
+        text-transform: none;
+      }
+
+      .inspector-copy {
+        margin: 0 0 22px;
+        color: #9fb1c9;
+        font-size: 12px;
+        line-height: 1.55;
+      }
+
+      .request-list {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .request-list li {
+        display: grid;
+        gap: 3px;
+        padding: 7px 0;
+        border-top: 1px dashed rgba(159, 177, 201, 0.16);
+        color: #9fb1c9;
+        font-size: 11px;
+      }
+
+      .request-list code {
+        color: #39c5bb;
+        font-size: 10px;
+      }
+
+      .vue-status-card {
+        color: #39c5bb;
+      }
+
+      .vue-status-card--amber {
+        color: #f2c14e;
+      }
+
+      .vue-status-card--red {
+        color: #ff7c7c;
+      }
+
+      .vue-status-card__label,
+      .vue-status-card__meta {
+        color: currentColor;
+        opacity: 0.75;
+      }
+
+      .vue-status-card__label {
+        font-size: 12px;
+      }
+
+      .vue-status-card__value {
+        color: #f5f8fc;
+        font-size: 20px;
+      }
+
+      .vue-status-card__meta {
+        font-size: 10px;
+      }
+
+      base-screen-viewer {
+        display: block;
+        width: 100%;
+        min-height: 480px;
+      }
+
+      base-screen-designer {
+        display: block;
+        width: 100%;
+        min-height: 480px;
+        height: 100%;
+      }
+
+      .designer-fullscreen base-screen-designer {
+        min-height: 0;
+        height: 100%;
+      }
+
+      .empty {
+        display: grid;
+        place-items: center;
+        min-height: 480px;
+        padding: 32px;
+        color: #8da1bb;
+        text-align: center;
+      }
+
+      @media (max-width: 760px) {
+        .shell {
+          display: block;
+        }
+
+        .sidebar {
+          gap: 16px;
+          padding: 18px;
+          border-right: 0;
+          border-bottom: 1px solid rgba(159, 177, 201, 0.16);
+        }
+
+        .nav {
+          display: flex;
+          gap: 6px;
+          overflow-x: auto;
+          padding-bottom: 2px;
+        }
+
+        .nav a {
+          flex: 0 0 auto;
+        }
+
+        .sidebar-note {
+          display: none;
+        }
+
+        .main {
+          padding: 30px 16px 32px;
+        }
+
+        .intro {
+          display: block;
+        }
+
+        .path {
+          display: inline-block;
+          margin-top: 22px;
+        }
+
+        .playground-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .runtime-inspector {
+          min-height: 160px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

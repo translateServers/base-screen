@@ -357,7 +357,8 @@ Object.assign(window, {
           type: 'host-resource',
           resourceType: 'dataset',
           resourceId: 'orders',
-          params: { limit: 'invalid' },
+          params: { limit: { kind: 'literal', value: 'invalid' } },
+          binding: null,
         }),
         blueprint: {
           rules: [

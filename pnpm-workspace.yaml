@@ -1,3 +1,5 @@
 packages:
   - packages/*
   - examples/*
+minimumReleaseAgeExclude:
+  - vue-echarts@8.1.0

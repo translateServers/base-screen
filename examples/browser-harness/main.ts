@@ -1,20 +1,28 @@
 import { createElement } from 'react';
 import { h } from 'vue';
 import {
+  BASE_SCREEN_CHART_MATERIAL_MANIFEST,
+  BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BaseScreenChartMaterialElement,
   BaseScreenContainerMaterialElement,
   BaseScreenEllipseMaterialElement,
   BaseScreenImageMaterialElement,
   BaseScreenRectangleMaterialElement,
+  BaseScreenTableMaterialElement,
   BaseScreenTextMaterialElement,
+  defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from '../../packages/material/src/index.ts';
 import {
@@ -38,6 +46,8 @@ const officialMaterials = [
   defineBaseScreenEllipseMaterial(),
   defineBaseScreenImageMaterial(),
   defineBaseScreenContainerMaterial(),
+  defineBaseScreenChartMaterial(),
+  defineBaseScreenTableMaterial(),
 ];
 if (!productElements.ok || officialMaterials.some((definition) => !definition.ok)) {
   throw new Error('Base Screen browser harness failed to register its elements.');
@@ -63,7 +73,7 @@ const designerAuthoringPlugin: BaseScreenPluginRuntime = {
         name: '数据集',
         configSchema: {
           kind: 'object',
-          properties: { limit: { kind: 'number' } },
+          properties: { limit: { kind: 'number' }, region: { kind: 'string' } },
           required: ['limit'],
         },
       },
@@ -127,6 +137,16 @@ const catalog = createBaseScreenMaterialCatalog([
     manifest: BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
     constructor: BaseScreenContainerMaterialElement,
   },
+  {
+    manifest: BASE_SCREEN_CHART_MATERIAL_MANIFEST,
+    constructor: BaseScreenChartMaterialElement,
+    tabularDataAdapter: BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
+  },
+  {
+    manifest: BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
+    constructor: BaseScreenTableMaterialElement,
+    tabularDataAdapter: BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
+  },
 ]);
 
 const runtimeContributions = {
@@ -138,7 +158,10 @@ const runtimeContributions = {
           name: '数据集',
           configSchema: {
             kind: 'object' as const,
-            properties: { limit: { kind: 'number' as const, minimum: 1, maximum: 100 } },
+            properties: {
+              limit: { kind: 'number' as const, minimum: 1, maximum: 100 },
+              region: { kind: 'string' as const },
+            },
             required: ['limit'],
           },
         }
@@ -257,7 +280,8 @@ const screenDocument = {
         type: 'host-resource' as const,
         resourceType: 'dataset',
         resourceId: 'orders',
-        params: { limit: 5 },
+        params: { limit: { kind: 'literal' as const, value: 5 } },
+        binding: null,
       },
     },
     {
@@ -310,14 +334,111 @@ const screenDocument = {
 const designer = document.querySelector('base-screen-designer')!;
 const viewer = document.querySelector('base-screen-viewer')!;
 const hostEvents: unknown[] = [];
+let datasetVersion = 0;
+let datasetRegion = 'north';
+let datasetDelay = false;
+const datasetRequests: unknown[] = [];
 const resourcePort = {
-  async resolve() {
+  async resolve(request: {
+    readonly resourceId: string;
+    readonly params: Readonly<Record<string, unknown>>;
+  }) {
+    datasetRequests.push(request);
+    if (request.resourceId === 'tabular-orders') {
+      if (datasetDelay) await new Promise((resolve) => setTimeout(resolve, 500));
+      if (request.params.region === 'error') {
+        return {
+          ok: false as const,
+          diagnostics: [
+            {
+              severity: 'error' as const,
+              code: 'HOST_RESOURCE_FAILED' as const,
+              path: [],
+              message: 'Harness dataset failure.',
+            },
+          ],
+        };
+      }
+      return {
+        ok: true as const,
+        value: {
+          fields: [
+            { id: 'category', label: '分类', valueType: 'string' as const },
+            { id: 'amount', label: '金额', valueType: 'number' as const },
+          ],
+          rows: [
+            { category: 'A', amount: datasetVersion + 2 },
+            { category: 'B', amount: datasetVersion + 4 },
+          ],
+        },
+        diagnostics: [],
+      };
+    }
     return { ok: true as const, value: { records: 5 }, diagnostics: [] };
   },
 };
+const variablePort = {
+  async resolve() {
+    return { ok: true as const, value: datasetRegion, diagnostics: [] };
+  },
+};
+const datasetCatalog = {
+  async list() {
+    return {
+      ok: true as const,
+      value: {
+        items: [
+          {
+            resourceType: 'dataset',
+            resourceId: 'tabular-orders',
+            name: '订单数据集',
+            description: '用于浏览器验证的表格与图表数据。',
+          },
+        ],
+      },
+      diagnostics: [],
+    };
+  },
+  async describe() {
+    return {
+      ok: true as const,
+      value: {
+        resourceType: 'dataset',
+        resourceId: 'tabular-orders',
+        name: '订单数据集',
+        description: '用于浏览器验证的表格与图表数据。',
+        fields: [
+          { id: 'category', label: '分类', valueType: 'string' as const },
+          { id: 'amount', label: '金额', valueType: 'number' as const },
+        ],
+        parameters: [
+          {
+            name: 'limit',
+            label: '行数',
+            valueType: 'number' as const,
+            editor: 'number' as const,
+            required: true,
+            defaultValue: 2,
+          },
+          {
+            name: 'region',
+            label: '区域',
+            valueType: 'string' as const,
+            editor: 'text' as const,
+            required: true,
+          },
+        ],
+      },
+      diagnostics: [],
+    };
+  },
+};
 designer.resourcePort = resourcePort;
+designer.variablePort = variablePort;
+designer.datasetCatalogPort = datasetCatalog;
 designer.runtimeContributions = pluginManager.snapshot.contributions;
 viewer.resourcePort = resourcePort;
+viewer.variablePort = variablePort;
 viewer.runtimeContributions = pluginManager.snapshot.contributions;
 viewer.blueprintRuntimePort = {
   emit(event) {
@@ -401,6 +522,81 @@ Object.assign(window, {
     pluginManager,
     viewer,
     hostEvents,
+    datasetCatalog,
+    datasetRequests,
+    setDatasetRegion: (value: string) => {
+      datasetRegion = value;
+    },
+    setDatasetDelay: (value: boolean) => {
+      datasetDelay = value;
+    },
+    bumpDatasetVersion: () => {
+      datasetVersion++;
+    },
+    createDatasetDemo: () => {
+      const demo = document.createElement('base-screen-viewer') as typeof viewer;
+      demo.dataset.datasetDemo = 'true';
+      demo.catalog = bridgeCatalog;
+      demo.resourcePort = resourcePort;
+      demo.variablePort = variablePort;
+      demo.resourceTimeoutMs = 100;
+      demo.runtimeContributions = runtimeContributions;
+      demo.document = {
+        canvas: { width: 960, height: 540, backgroundColor: '#111827' },
+        components: [
+          {
+            id: 'table-demo',
+            type: 'base.table',
+            name: '数据表',
+            parentId: null,
+            position: { x: 20, y: 20 },
+            size: { width: 420, height: 260 },
+            rotation: 0,
+            zIndex: 0,
+            status: { locked: false, hidden: false },
+            props: BASE_SCREEN_TABLE_MATERIAL_MANIFEST.defaultProps,
+            style: BASE_SCREEN_TABLE_MATERIAL_MANIFEST.defaultStyle,
+            dataSource: {
+              type: 'host-resource' as const,
+              resourceType: 'dataset',
+              resourceId: 'tabular-orders',
+              params: {
+                limit: { kind: 'literal' as const, value: 2 },
+                region: { kind: 'variable' as const, name: 'region' },
+              },
+              binding: { fields: { columns: ['category', 'amount'] } },
+            },
+          },
+          {
+            id: 'chart-demo',
+            type: 'base.chart',
+            name: '数据图表',
+            parentId: null,
+            position: { x: 460, y: 20 },
+            size: { width: 420, height: 260 },
+            rotation: 0,
+            zIndex: 1,
+            status: { locked: false, hidden: false },
+            props: BASE_SCREEN_CHART_MATERIAL_MANIFEST.defaultProps,
+            style: BASE_SCREEN_CHART_MATERIAL_MANIFEST.defaultStyle,
+            dataSource: {
+              type: 'host-resource' as const,
+              resourceType: 'dataset',
+              resourceId: 'tabular-orders',
+              params: {
+                limit: { kind: 'literal' as const, value: 2 },
+                region: { kind: 'variable' as const, name: 'region' },
+              },
+              binding: { fields: { dimension: ['category'], measures: ['amount'] } },
+            },
+          },
+        ],
+        variables: [{ type: 'host' as const, name: 'region', variableId: 'region' }],
+        blueprint: { rules: [] },
+      };
+      document.body.appendChild(demo);
+      return demo;
+    },
     getEnvelope: () => envelope,
     failNextSave: (code: 'PROJECT_CONFLICT' | 'PROJECT_UNAVAILABLE') => {
       nextSaveFailure = code;

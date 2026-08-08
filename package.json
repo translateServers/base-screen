@@ -17,6 +17,8 @@
     "build": "pnpm sync:license && turbo run build",
     "clean": "turbo run clean && node scripts/clean.mjs",
     "dev:browser-harness": "vite examples/browser-harness",
+    "dev:playground": "vite examples/playground",
+    "dev:vue-harness": "vite examples/vue-harness",
     "check:packages": "node scripts/check-packages.mjs",
     "check:boundaries": "node scripts/check-boundaries.mjs",
     "check:api": "node scripts/check-api.mjs",
@@ -24,6 +26,8 @@
     "sync:license": "node scripts/sync-package-license.mjs",
     "verify:tarball": "node scripts/verify-tarballs.mjs",
     "verify:browser": "node scripts/verify-browser-harness.mjs",
+    "verify:playground": "node scripts/verify-playground.mjs",
+    "verify:vue-harness": "node scripts/verify-vue-harness.mjs",
     "verify:runtime": "node scripts/verify-runtime-harness.mjs",
     "verify:nebula-import": "node scripts/verify-nebula-import.mjs",
     "verify:m0": "pnpm format && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm check:api && pnpm check:engine-import && pnpm verify:tarball",
@@ -38,6 +42,7 @@
     "@playwright/test": "1.62.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
+    "echarts": "6.1.0",
     "publint": "0.3.22",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -45,6 +50,7 @@
     "typescript": "7.0.2",
     "vite": "8.2.0",
     "vitest": "4.1.10",
-    "vue": "3.5.0"
+    "vue": "3.5.0",
+    "vue-echarts": "8.1.0"
   }
 }

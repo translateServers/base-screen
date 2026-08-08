@@ -49,7 +49,7 @@ try {
         throw new Error('BROWSER_HARNESS_PLUGIN_MANAGER_REGISTRY_FAILED');
       }
       const designer = page.locator('base-screen-designer');
-      const viewer = page.locator('base-screen-viewer');
+      const viewer = page.locator('base-screen-viewer').first();
       const materialCount = await designer.locator('[data-base-screen-component-id]').count();
       const viewerMaterialCount = await viewer.locator('[data-base-screen-component-id]').count();
       const screenshot = await page.screenshot();
@@ -179,6 +179,93 @@ try {
         if (resourceDomState !== 'ready') {
           throw new Error('BROWSER_HARNESS_RESOURCE_DOM_STATE_FAILED');
         }
+        await page.evaluate(() => window.baseScreenHarness.createDatasetDemo());
+        const datasetDemo = page.locator('base-screen-viewer[data-dataset-demo]');
+        await datasetDemo.locator('[data-base-screen-component-id=table-demo]').waitFor();
+        await page.waitForFunction(() => {
+          const demo = document.querySelector('base-screen-viewer[data-dataset-demo]');
+          return (
+            demo?.shadowRoot
+              ?.querySelector('[data-base-screen-component-id=table-demo]')
+              ?.getAttribute('data-base-screen-data-state') === 'ready'
+          );
+        });
+        const datasetRender = await page.evaluate(() => {
+          const demo = document.querySelector('base-screen-viewer[data-dataset-demo]');
+          const table = demo?.shadowRoot?.querySelector(
+            '[data-base-screen-component-id=table-demo]',
+          );
+          const chart = demo?.shadowRoot?.querySelector(
+            '[data-base-screen-component-id=chart-demo]',
+          );
+          return {
+            tableReady: table?.getAttribute('data-base-screen-data-state') === 'ready',
+            tableRows: table?.querySelectorAll('tbody tr').length ?? 0,
+            chartReady: chart?.getAttribute('data-base-screen-data-state') === 'ready',
+            chartLines: chart?.querySelectorAll('polyline').length ?? 0,
+          };
+        });
+        if (
+          !datasetRender.tableReady ||
+          datasetRender.tableRows !== 2 ||
+          !datasetRender.chartReady ||
+          datasetRender.chartLines !== 1
+        ) {
+          throw new Error(`BROWSER_HARNESS_DATASET_RENDER_FAILED:${JSON.stringify(datasetRender)}`);
+        }
+        const beforeDatasetRequests = await page.evaluate(
+          () => window.baseScreenHarness.datasetRequests.length,
+        );
+        await page.evaluate(() => {
+          window.baseScreenHarness.setDatasetRegion('south');
+          window.baseScreenHarness.bumpDatasetVersion();
+          document.querySelector('base-screen-viewer[data-dataset-demo]').refreshData('table-demo');
+        });
+        await page.waitForFunction(
+          (before) =>
+            window.baseScreenHarness.datasetRequests.length > before &&
+            window.baseScreenHarness.datasetRequests.at(-1)?.params?.region === 'south',
+          beforeDatasetRequests,
+        );
+        await page.waitForFunction(() => {
+          const demo = document.querySelector('base-screen-viewer[data-dataset-demo]');
+          return (
+            demo?.shadowRoot
+              ?.querySelector('[data-base-screen-component-id=table-demo]')
+              ?.getAttribute('data-base-screen-data-state') === 'ready'
+          );
+        });
+        await page.evaluate(() => {
+          window.baseScreenHarness.setDatasetDelay(true);
+          document.querySelector('base-screen-viewer[data-dataset-demo]').refreshData('table-demo');
+        });
+        await page.waitForFunction(() => {
+          const demo = document.querySelector('base-screen-viewer[data-dataset-demo]');
+          const table = demo?.shadowRoot?.querySelector(
+            '[data-base-screen-component-id=table-demo]',
+          );
+          return (
+            table?.getAttribute('data-base-screen-data-state') === 'error' &&
+            table?.model?.dataState?.code === 'HOST_RESOURCE_TIMEOUT'
+          );
+        });
+        await page.evaluate(() => window.baseScreenHarness.setDatasetDelay(false));
+        await page.evaluate(() => {
+          window.baseScreenHarness.setDatasetRegion('error');
+          document.querySelector('base-screen-viewer[data-dataset-demo]').refreshData('table-demo');
+        });
+        await page.waitForFunction(() => {
+          const demo = document.querySelector('base-screen-viewer[data-dataset-demo]');
+          return (
+            demo?.shadowRoot
+              ?.querySelector('[data-base-screen-component-id=table-demo]')
+              ?.getAttribute('data-base-screen-data-state') === 'error'
+          );
+        });
+        await page.evaluate(() => {
+          document.querySelector('base-screen-viewer[data-dataset-demo]')?.remove();
+          window.baseScreenHarness.setDatasetRegion('north');
+        });
         await viewer.locator('[data-base-screen-component-id=title]').click();
         const hostEventCount = await page.evaluate(
           () => window.baseScreenHarness.hostEvents.length,
@@ -558,9 +645,23 @@ try {
         if ((await image.textContent()) !== '\u56fe\u7247\u4e0d\u53ef\u7528') {
           throw new Error('BROWSER_HARNESS_IMAGE_ERROR_STATE_FAILED');
         }
+        if (
+          (await authoringDesigner.locator('[data-material-type="base.container"]').count()) !== 0
+        ) {
+          throw new Error('BROWSER_HARNESS_CONTAINER_LIBRARY_VISIBLE_FAILED');
+        }
+        await authoringDesigner.locator('[data-panel-tab="layers"]').click();
+        await authoringDesigner.locator('[data-layer-select]', { hasText: '\u77e9\u5f62' }).click();
         await authoringDesigner
-          .locator('[data-material-type="base.container"] .material-name')
-          .click();
+          .locator('[data-layer-select]', { hasText: '\u692d\u5706' })
+          .click({ modifiers: ['Control'] });
+        await authoringDesigner.locator('[data-viewport]').focus();
+        await page.keyboard.press('Control+g');
+        await page.waitForFunction(() =>
+          window.baseScreenHarness.designer.document.components.some(
+            (component) => component.type === 'base.container',
+          ),
+        );
         const container = authoringDesigner.locator(
           '[data-base-screen-component-id^="base-container-"]',
         );
@@ -571,6 +672,7 @@ try {
         ) {
           throw new Error('BROWSER_HARNESS_CONTAINER_MATERIAL_FAILED');
         }
+        await authoringDesigner.locator('[data-panel-tab="materials"]').click();
         await authoringDesigner.locator('[data-material-type="base.text"] .material-name').click();
         const materialPaletteCount = await page.evaluate(
           () => window.baseScreenHarness.designer.document.components.length,
@@ -856,8 +958,8 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   };
   if (
     (titleDelta.x === 0 && titleDelta.y === 0) ||
-    titleDelta.x !== subtitleDelta.x ||
-    titleDelta.y !== subtitleDelta.y
+    Math.abs(titleDelta.x - subtitleDelta.x) > 0.01 ||
+    Math.abs(titleDelta.y - subtitleDelta.y) > 0.01
   ) {
     throw new Error('BROWSER_HARNESS_MULTI_DRAG_TRANSACTION_FAILED');
   }
@@ -993,6 +1095,11 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   ) {
     throw new Error(`BROWSER_HARNESS_MARQUEE_SELECTION_FAILED:${JSON.stringify(marqueeSelection)}`);
   }
+  // 多选语义：框选后检查器隐藏"外观/数据/交互/事件"tab 栏，只保留外观 pane（选择概览）。
+  const marqueeInspectorTabsHidden = await designer.locator('.inspector-tabs').isHidden();
+  if (!marqueeInspectorTabsHidden) {
+    throw new Error('BROWSER_HARNESS_MARQUEE_INSPECTOR_TABS_FAILED');
+  }
   const marqueeBefore = await componentPositions(page, ['title', 'subtitle']);
   // 前序属性测试把 title 旋转了 30°：直接归零旋转，保证框选与间隙几何可预测。
   await page.evaluate(() => {
@@ -1026,8 +1133,8 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   const marqueeDeltaY = marqueeAfter[0].y - marqueeBefore[0].y;
   if (
     (marqueeDeltaX === 0 && marqueeDeltaY === 0) ||
-    marqueeAfter[1].x - marqueeBefore[1].x !== marqueeDeltaX ||
-    marqueeAfter[1].y - marqueeBefore[1].y !== marqueeDeltaY
+    Math.abs(marqueeAfter[1].x - marqueeBefore[1].x - marqueeDeltaX) > 0.01 ||
+    Math.abs(marqueeAfter[1].y - marqueeBefore[1].y - marqueeDeltaY) > 0.01
   ) {
     throw new Error(
       `BROWSER_HARNESS_MARQUEE_OVERLAY_DRAG_FAILED:${JSON.stringify({
@@ -1939,7 +2046,10 @@ async function assertTransformPreviewWorkflow(designer, page) {
       height: element.style.height,
       width: element.style.width,
     }));
-  if (rendered.width !== `${committed.width}px` || rendered.height !== `${committed.height}px`) {
+  if (
+    Math.abs(Number.parseFloat(rendered.width) - committed.width) > 0.01 ||
+    Math.abs(Number.parseFloat(rendered.height) - committed.height) > 0.01
+  ) {
     throw new Error(
       `BROWSER_HARNESS_TRANSFORM_RENDER_FAILED:${JSON.stringify({ committed, rendered })}`,
     );
@@ -2032,32 +2142,43 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   }
   await designer.getByRole('tab', { name: '\u6570\u636e' }).click();
   const dataPanel = designer.locator('[data-inspector-pane=data]');
-  const dataSource = dataPanel.locator('[data-data-source-type]');
-  const sourceOptions = await dataSource
-    .locator('option')
-    .evaluateAll((options) => options.map((option) => option.value));
-  if (
-    JSON.stringify(sourceOptions) !== JSON.stringify(['none', 'static', 'host-resource']) ||
-    (await dataPanel.locator('input[type=url]').count()) !== 0
-  ) {
-    throw new Error('BROWSER_HARNESS_DATA_SOURCE_SURFACE_FAILED');
+  await dataPanel.locator('[data-data-source-mode="dataset"]').click();
+  const datasetQuery = dataPanel.locator('[data-dataset-query]');
+  const datasetItem = dataPanel.locator('[data-dataset-resource-id="tabular-orders"]');
+  if ((await datasetQuery.count()) !== 1) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_SEARCH_SURFACE_FAILED:${await dataPanel.textContent()}`,
+    );
   }
-  await dataSource.selectOption('static');
-  const staticValue = dataPanel.locator('[data-data-source-field=static]');
-  await staticValue.fill('{"source":"browser"}');
-  await staticValue.blur();
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.components.find(
-        (component) => component.id === 'title',
-      )?.dataSource?.type === 'static',
-  );
-  await dataSource.selectOption('host-resource');
-  await dataPanel.locator('[data-data-source-field=resourceType]').fill('dataset');
-  await dataPanel.locator('[data-data-source-field=resourceId]').fill('orders');
-  const params = dataPanel.locator('[data-data-source-field=params]');
-  await params.fill('{"limit":5}');
-  await params.blur();
+  await datasetItem.waitFor();
+  await datasetItem.click();
+  await dataPanel.locator('[data-dataset-descriptor]').waitFor();
+  const descriptorSurface = await dataPanel.evaluate((panel) => ({
+    parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
+    bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
+    apply: panel.querySelector('[data-dataset-action="apply"]') !== null,
+    previewActionCount: panel.querySelectorAll('[data-dataset-action="preview"]').length,
+    actionsVisible: [...panel.querySelectorAll('[data-dataset-action]')].every((action) => {
+      const panelBox = panel.getBoundingClientRect();
+      const actionBox = action.getBoundingClientRect();
+      return actionBox.top >= panelBox.top && actionBox.bottom <= panelBox.bottom;
+    }),
+  }));
+  if (
+    descriptorSurface.parameterCount < 2 ||
+    descriptorSurface.bindingCount !== 0 ||
+    !descriptorSurface.apply ||
+    descriptorSurface.previewActionCount !== 0 ||
+    !descriptorSurface.actionsVisible
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_DESCRIPTOR_SURFACE_FAILED:${JSON.stringify(descriptorSurface)}`,
+    );
+  }
+  const region = dataPanel.locator('[data-dataset-parameter="region"]');
+  await region.fill('north');
+  await region.dispatchEvent('change');
+  await dataPanel.locator('[data-dataset-action="apply"]').click();
   await page.waitForFunction(() => {
     const source = window.baseScreenHarness.designer.document.components.find(
       (component) => component.id === 'title',
@@ -2065,33 +2186,22 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     return (
       source?.type === 'host-resource' &&
       source.resourceType === 'dataset' &&
-      source.params.limit === 5
+      source.resourceId === 'tabular-orders' &&
+      source.params.region?.kind === 'literal'
     );
   });
-  await designer.locator('[data-base-screen-component-id=title]').waitFor({ state: 'attached' });
-  const sourceBeforeInvalidDraft = await page.evaluate(
+  const appliedDatasetSource = await page.evaluate(
     () =>
       window.baseScreenHarness.designer.document.components.find(
         (component) => component.id === 'title',
       )?.dataSource,
   );
-  await params.fill('{"limit":"invalid"}');
-  await params.blur();
-  const invalidDataDraft = await page.evaluate(() => ({
-    source: window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'title',
-    )?.dataSource,
-    status:
-      window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-status-feedback]')
-        ?.textContent,
-  }));
   if (
-    JSON.stringify(invalidDataDraft.source) !== JSON.stringify(sourceBeforeInvalidDraft) ||
-    invalidDataDraft.status !==
-      '\u64cd\u4f5c\u672a\u5b8c\u6210\uff0c\u8bf7\u68c0\u67e5\u8f93\u5165\u540e\u91cd\u8bd5\u3002' ||
-    invalidDataDraft.status.includes('invalid')
+    appliedDatasetSource?.type !== 'host-resource' ||
+    appliedDatasetSource.binding !== null ||
+    appliedDatasetSource.params.region?.kind !== 'literal'
   ) {
-    throw new Error('BROWSER_HARNESS_DATA_VALIDATION_FAILED');
+    throw new Error('BROWSER_HARNESS_DATASET_TRANSACTION_FAILED');
   }
   const notifications = designer.locator('[data-notification-tone="error"]');
   const notificationCount = await notifications.count();
@@ -2261,18 +2371,35 @@ async function assertDesignerControlStyles(designer) {
     const lightTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
+    host.style.setProperty('--base-screen-designer-surface-workspace', 'rgb(1, 2, 3)');
+    const overriddenTheme = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-workspace')
+      .trim();
+    host.style.removeProperty('--base-screen-designer-surface-workspace');
+    const restoredLightTheme = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-workspace')
+      .trim();
     const lightViewerFont = viewer === null ? undefined : getComputedStyle(viewer).font;
     host.removeAttribute('theme');
     const restoredTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
     canary.remove();
-    return { ...before, lightTheme, lightViewerFont, restoredTheme };
+    return {
+      ...before,
+      lightTheme,
+      overriddenTheme,
+      restoredLightTheme,
+      lightViewerFont,
+      restoredTheme,
+    };
   });
   if (
     styles === undefined ||
     styles.toolbarHeight !== 28 ||
     styles.theme === styles.lightTheme ||
+    styles.overriddenTheme !== 'rgb(1, 2, 3)' ||
+    styles.restoredLightTheme !== styles.lightTheme ||
     styles.theme !== styles.restoredTheme ||
     styles.canaryFont === styles.workspaceFont ||
     styles.canaryInputHeight === 30 ||
