@@ -11,7 +11,15 @@ export function createBaseScreenMaterialCatalog(
 ): BaseScreenMaterialCatalog {
   assertUnique(entries, (entry) => entry.manifest.type, 'material type');
   const sorted = entries
-    .map((entry) => freeze({ manifest: cloneJson(entry.manifest), constructor: entry.constructor }))
+    .map((entry) =>
+      freeze({
+        manifest: cloneJson(entry.manifest),
+        constructor: entry.constructor,
+        ...(entry.tabularDataAdapter === undefined
+          ? {}
+          : { tabularDataAdapter: entry.tabularDataAdapter }),
+      }),
+    )
     .sort((left, right) => compareStrings(left.manifest.type, right.manifest.type));
   const byType = new Map(sorted.map((entry) => [entry.manifest.type, entry]));
   return {

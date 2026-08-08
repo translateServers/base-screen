@@ -15,7 +15,7 @@ export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest
   keywords: ['容器', '分组'],
   defaultSize: { width: 320, height: 180 },
   defaultProps: {},
-  defaultStyle: { fill: '#111827', borderColor: '#334155', borderWidth: 1, opacity: 1 },
+  defaultStyle: { fill: 'transparent', borderColor: 'transparent', borderWidth: 1, opacity: 1 },
   styleSchema: {
     kind: 'object',
     properties: {
@@ -37,6 +37,7 @@ export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest
   events: [],
   dataCapabilities: [],
   designCapabilities: { resize: true, rotate: true, children: true },
+  libraryVisible: false,
 };
 
 export class BaseScreenContainerMaterialElement extends BaseScreenOfficialMaterialElement {
@@ -51,7 +52,6 @@ export class BaseScreenContainerMaterialElement extends BaseScreenOfficialMateri
     this.style.borderStyle = 'solid';
     this.style.borderWidth = typeof style.borderWidth === 'number' ? `${style.borderWidth}px` : '';
     this.style.opacity = typeof style.opacity === 'number' ? String(style.opacity) : '';
-    this.style.display = 'block';
   }
 }
 

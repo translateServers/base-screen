@@ -8,6 +8,7 @@ export type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
+  BaseScreenMaterialDataBindingRole,
   BaseScreenMaterialDataState,
   BaseScreenMaterialDesignCapabilities,
   BaseScreenMaterialElement,
@@ -23,6 +24,7 @@ export type {
   BaseScreenMaterialPropSchema,
   BaseScreenMaterialStringSchema,
   BaseScreenMaterialStylePanelField,
+  BaseScreenMaterialTabularDataAdapter,
   BaseScreenPluginActivationContext,
   BaseScreenPluginCatalog,
   BaseScreenPluginCatalogEntry,
@@ -35,6 +37,19 @@ export type {
   PluginCommandRequest,
 } from './contracts.js';
 export { BASE_SCREEN_MATERIAL_EVENT } from './contracts.js';
+export type {
+  BaseScreenChartData,
+  BaseScreenChartPoint,
+  BaseScreenChartSeries,
+  BaseScreenDataField,
+  BaseScreenDataValueType,
+  BaseScreenTableColumn,
+  BaseScreenTableData,
+} from './data-contracts.js';
+export {
+  parseBaseScreenChartData,
+  parseBaseScreenTableData,
+} from './data-contracts.js';
 export {
   parseBaseScreenMaterialEventDetail,
   parseBaseScreenMaterialManifest,

@@ -96,6 +96,63 @@ describe('material identity and manifests', () => {
     }
   });
 
+  it('R1 treats libraryVisible as optional and defaults to visible', () => {
+    const result = parseBaseScreenMaterialManifest(materialManifest());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.libraryVisible).toBeUndefined();
+  });
+
+  it('allows a manifest without the optional dataBinding declaration', () => {
+    const result = parseBaseScreenMaterialManifest(materialManifest());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.dataBinding).toBeUndefined();
+  });
+
+  it('R3 accepts strict data binding roles and rejects invalid role declarations', () => {
+    const valid = parseBaseScreenMaterialManifest(
+      materialManifest({
+        dataBinding: {
+          roles: [
+            { id: 'columns', minFields: 1, maxFields: 256, valueTypes: ['string', 'number'] },
+          ],
+        },
+      }),
+    );
+    const invalid = parseBaseScreenMaterialManifest(
+      materialManifest({
+        dataBinding: {
+          roles: [{ id: 'columns', minFields: 2, maxFields: 1, valueTypes: ['unknown'] }],
+        },
+      }),
+    );
+    expect(valid).toMatchObject({ ok: true });
+    expect(invalid).toMatchObject({ ok: false });
+    if (!invalid.ok) {
+      expect(
+        invalid.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID'),
+      ).toBe(true);
+    }
+  });
+
+  it('R1 accepts an explicit boolean libraryVisible', () => {
+    const result = parseBaseScreenMaterialManifest(materialManifest({ libraryVisible: false }));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.libraryVisible).toBe(false);
+  });
+
+  it('R1 rejects a non-boolean libraryVisible', () => {
+    const result = parseBaseScreenMaterialManifest(materialManifest({ libraryVisible: 'no' }));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.path[0] === 'libraryVisible')).toBe(true);
+      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_MANIFEST_FIELD_INVALID');
+    }
+  });
+
   it('rejects unsafe data and default props that do not match the schema', () => {
     let invoked = false;
     const unsafe = materialManifest({

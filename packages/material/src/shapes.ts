@@ -61,7 +61,6 @@ class BaseScreenShapeMaterialElement extends BaseScreenOfficialMaterialElement {
     this.style.borderStyle = 'solid';
     this.style.borderWidth = typeof style.borderWidth === 'number' ? `${style.borderWidth}px` : '';
     this.style.opacity = typeof style.opacity === 'number' ? String(style.opacity) : '';
-    this.style.display = 'block';
   }
 }
 

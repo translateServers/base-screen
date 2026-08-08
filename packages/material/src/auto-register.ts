@@ -1,8 +1,10 @@
 import {
+  defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from './index.js';
 
@@ -12,6 +14,8 @@ for (const define of [
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenContainerMaterial,
+  defineBaseScreenChartMaterial,
+  defineBaseScreenTableMaterial,
 ]) {
   const definition = define();
   if (!definition.ok) {
@@ -20,9 +24,11 @@ for (const define of [
 }
 
 export {
+  defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from './index.js';

@@ -1,4 +1,5 @@
 import type {
+  ScreenDatasetValueType,
   ScreenJsonObject,
   ScreenJsonValue,
   ScreenParseResult,
@@ -94,6 +95,22 @@ export interface BaseScreenMaterialDesignCapabilities {
   readonly children: boolean;
 }
 
+export interface BaseScreenMaterialDataBindingRole {
+  readonly id: string;
+  readonly minFields: number;
+  readonly maxFields: number;
+  readonly valueTypes: readonly ScreenDatasetValueType[];
+}
+
+export interface BaseScreenMaterialTabularDataAdapter {
+  adapt(request: {
+    readonly dataset: import('@base-screen/contracts').ScreenTabularDataset;
+    readonly fields: Readonly<
+      Record<string, readonly import('@base-screen/contracts').ScreenDatasetField[]>
+    >;
+  }): ScreenParseResult<ScreenJsonValue>;
+}
+
 export interface BaseScreenMaterialManifest {
   readonly type: string;
   readonly tagName: string;
@@ -109,7 +126,9 @@ export interface BaseScreenMaterialManifest {
   readonly stylePanel: readonly BaseScreenMaterialStylePanelField[];
   readonly events: readonly string[];
   readonly dataCapabilities: readonly ('static' | 'host-resource')[];
+  readonly dataBinding?: { readonly roles: readonly BaseScreenMaterialDataBindingRole[] };
   readonly designCapabilities: BaseScreenMaterialDesignCapabilities;
+  readonly libraryVisible?: boolean;
 }
 
 export interface BaseScreenMaterialElement extends HTMLElement {
@@ -118,6 +137,7 @@ export interface BaseScreenMaterialElement extends HTMLElement {
 
 export interface BaseScreenMaterialConstructor extends CustomElementConstructor {
   readonly manifest: BaseScreenMaterialManifest;
+  readonly tabularDataAdapter?: BaseScreenMaterialTabularDataAdapter;
 }
 
 export interface BaseScreenMaterialEventDetail {
@@ -128,6 +148,7 @@ export interface BaseScreenMaterialEventDetail {
 export interface BaseScreenMaterialCatalogEntry {
   readonly manifest: BaseScreenMaterialManifest;
   readonly constructor: BaseScreenMaterialConstructor;
+  readonly tabularDataAdapter?: BaseScreenMaterialTabularDataAdapter;
 }
 
 export interface BaseScreenMaterialCatalog {

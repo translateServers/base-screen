@@ -45,7 +45,9 @@ const MANIFEST_FIELDS = new Set([
   'stylePanel',
   'events',
   'dataCapabilities',
+  'dataBinding',
   'designCapabilities',
+  'libraryVisible',
 ]);
 
 export function validateBaseScreenMaterialIdentity(
@@ -83,7 +85,12 @@ export function parseBaseScreenMaterialManifest(
 
   const manifest = parsed.value;
   const collector = new PluginDiagnosticCollector();
-  validateExactObject(manifest, MANIFEST_FIELDS, [], collector);
+  validateKnownObject(manifest, MANIFEST_FIELDS, [], collector);
+  for (const field of MANIFEST_FIELDS) {
+    if (field !== 'dataBinding' && field !== 'libraryVisible' && !Object.hasOwn(manifest, field)) {
+      collector.add('PLUGIN_CORE_MANIFEST_FIELD_INVALID', [field], 'Manifest field is required.');
+    }
+  }
   validateMaterialFields(manifest, collector);
   const parsedPropsSchema = validatePropsSchema(
     manifest.propsSchema,
@@ -236,6 +243,97 @@ function validateMaterialFields(
     );
   }
   validateDesignCapabilities(manifest.designCapabilities, collector);
+  validateDataBinding(manifest.dataBinding, collector);
+  if (manifest.libraryVisible !== undefined && typeof manifest.libraryVisible !== 'boolean') {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['libraryVisible'],
+      'Library visibility must be a boolean.',
+    );
+  }
+}
+
+function validateDataBinding(
+  value: ScreenJsonValue | undefined,
+  collector: PluginDiagnosticCollector,
+): void {
+  if (value === undefined) return;
+  if (!isRecord(value)) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['dataBinding'],
+      'Data binding must be an object.',
+    );
+    return;
+  }
+  validateExactObject(value, new Set(['roles']), ['dataBinding'], collector);
+  if (!Array.isArray(value.roles) || value.roles.length === 0 || value.roles.length > 16) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['dataBinding', 'roles'],
+      'Data binding roles are invalid.',
+    );
+    return;
+  }
+  const ids = new Set<string>();
+  value.roles.forEach((role, index) => {
+    const path = ['dataBinding', 'roles', index] as const;
+    if (!isRecord(role)) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        path,
+        'Data binding role must be an object.',
+      );
+      return;
+    }
+    validateExactObject(
+      role,
+      new Set(['id', 'minFields', 'maxFields', 'valueTypes']),
+      path,
+      collector,
+    );
+    if (!isIdentifier(role.id)) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [...path, 'id'],
+        'Data binding role id is invalid.',
+      );
+    } else if (ids.has(role.id)) {
+      collector.add(
+        'PLUGIN_CORE_CONTRIBUTION_DUPLICATE',
+        [...path, 'id'],
+        'Data binding role is duplicated.',
+      );
+    } else {
+      ids.add(role.id);
+    }
+    if (
+      !isNonNegativeInteger(role.minFields) ||
+      !isNonNegativeInteger(role.maxFields) ||
+      role.minFields > role.maxFields ||
+      role.maxFields > 256
+    ) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        path,
+        'Data binding role field range is invalid.',
+      );
+    }
+    if (
+      !Array.isArray(role.valueTypes) ||
+      role.valueTypes.length === 0 ||
+      new Set(role.valueTypes).size !== role.valueTypes.length ||
+      role.valueTypes.some(
+        (type) => !['string', 'number', 'boolean', 'date'].includes(type as string),
+      )
+    ) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [...path, 'valueTypes'],
+        'Data binding role value types are invalid.',
+      );
+    }
+  });
 }
 
 function validateDefaultSize(
