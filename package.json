@@ -25,6 +25,7 @@
     "check:engine-import": "node scripts/check-engine-import.mjs",
     "sync:license": "node scripts/sync-package-license.mjs",
     "verify:tarball": "node scripts/verify-tarballs.mjs",
+    "verify:fast": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm check:api && pnpm check:engine-import",
     "verify:browser": "node scripts/verify-browser-harness.mjs",
     "verify:playground": "node scripts/verify-playground.mjs",
     "verify:vue-harness": "node scripts/verify-vue-harness.mjs",

@@ -2161,7 +2161,12 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     actionsVisible: [...panel.querySelectorAll('[data-dataset-action]')].every((action) => {
       const panelBox = panel.getBoundingClientRect();
       const actionBox = action.getBoundingClientRect();
-      return actionBox.top >= panelBox.top && actionBox.bottom <= panelBox.bottom;
+      return (
+        actionBox.left >= panelBox.left &&
+        actionBox.right <= panelBox.right &&
+        actionBox.top >= panelBox.top &&
+        actionBox.bottom <= panelBox.bottom
+      );
     }),
   }));
   if (

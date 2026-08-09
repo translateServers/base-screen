@@ -2,6 +2,7 @@ import type { ScreenDatasetDescriptor, ScreenDatasetPage } from './dataset.js';
 import type { ScreenParseResult } from './diagnostics.js';
 import type { ScreenDocument } from './document.js';
 import type { ScreenProjectEnvelope } from './envelope.js';
+import type { ScreenResourceExecutionContext } from './execution.js';
 import type { ScreenJsonValue } from './json.js';
 
 export interface ScreenProjectLoadRequest {
@@ -192,6 +193,8 @@ export interface ScreenAbortSignal {
 
 export interface ScreenHostResourceResolveOptions {
   readonly signal: ScreenAbortSignal;
+  /** 非持久化执行上下文（DRH-R8）：按次解析提供，不写入 ScreenDocument。 */
+  readonly context?: ScreenResourceExecutionContext;
 }
 
 export interface ScreenHostResourcePort {

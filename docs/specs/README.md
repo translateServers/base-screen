@@ -27,6 +27,7 @@
 | [Material Library Visibility](./material-library-visibility/spec.md) | 契约增量 | Manifest 可选 `libraryVisible` 声明与 Designer 物料库过滤，容器移出物料库 |
 | [Official Data Material Contracts](./data-material-contracts/spec.md) | 契约增量 | 官方图表与表格物料的最小数据语义契约 |
 | [Host Dataset Integration](./host-dataset-integration/spec.md) | 契约与产品增量 | 宿主数据集目录、参数绑定、字段映射、预览与 Viewer 取数闭环 |
+| [Data Runtime Hardening](./data-runtime-hardening/spec.md) | 契约与运行时增量 | 宿主数据集边界、请求身份与共享、元数据/错误协议、初始化/参数/变量/执行上下文、一次性迁移与两仓验收；覆盖 [ADR-0025](../decisions/ADR-0025-data-runtime-hardening.md)（已接受）九项决策；2026-08-09 生效 |
 
 相关计划和架构背景见 [计划与评审](../plans/README.md) 与 [架构文档](../architecture/README.md)。
 

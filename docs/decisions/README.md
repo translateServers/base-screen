@@ -41,9 +41,12 @@
 | [ADR-0022](./ADR-0022-official-data-material-contracts.md) | 已接受 | 2026-08-07 | 官方图表与表格数据语义契约 |
 | [ADR-0023](./ADR-0023-host-dataset-resource-integration.md) | 已接受 | 2026-08-07 | 宿主数据集目录、绑定与运行时取数 |
 | [ADR-0024](./ADR-0024-designer-public-style-tokens.md) | 已接受 | 2026-08-07 | Designer 宿主可配置主题 Token |
+| [ADR-0025](./ADR-0025-data-runtime-hardening.md) | 已接受 | 2026-08-09 | Data Runtime Hardening：宿主数据集边界、请求身份与共享、元数据/错误协议、初始化/变量/上下文、一次性迁移（部分取代 ADR-0010/0023 的跨组件去重归属） |
 
 ## 计划决策
 
-当前没有待编号的计划决策。
+ADR-0025 已于 2026-08-09 接受，治理已接受、实施进行中；相关任务与验收见
+[Data Runtime Hardening Spec](../specs/data-runtime-hardening/spec.md)，XJ 侧见
+XJ Data Hub 仓库 `.agent/specs/data-runtime-hardening/spec.md`。
 
 相关背景、实施计划和规格入口见 [文档索引](../README.md)。

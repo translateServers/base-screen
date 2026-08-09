@@ -129,6 +129,8 @@ try {
                 const actionBounds = action.getBoundingClientRect();
                 return (
                   bounds !== undefined &&
+                  actionBounds.left >= bounds.left &&
+                  actionBounds.right <= bounds.right &&
                   actionBounds.top >= bounds.top &&
                   actionBounds.bottom <= bounds.bottom
                 );

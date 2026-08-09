@@ -126,6 +126,14 @@ describe('designer workbench visual convergence', () => {
     expect(baseCss).not.toContain('body::-webkit-scrollbar');
   });
 
+  it('R5 keeps sticky dataset actions inside the inspector content width', () => {
+    expect(workbenchCss).toContain('.designer-dataset-actions {');
+    expect(workbenchCss).toContain('position: sticky;');
+    expect(workbenchCss).toContain('bottom: 0;');
+    expect(workbenchCss).toContain('max-width: 100%;');
+    expect(workbenchCss).not.toContain('margin: 0 calc(var(--designer-space-5) * -1);');
+  });
+
   it('R3 presents shortcut help as a scannable, responsive modal', () => {
     expect(workbenchCss).toContain('.designer-help-dialog .help-card {');
     expect(workbenchCss).toContain('width: min(480px, 100%);');

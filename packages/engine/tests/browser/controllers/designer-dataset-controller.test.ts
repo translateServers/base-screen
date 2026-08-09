@@ -49,17 +49,13 @@ const descriptor: ScreenDatasetDescriptor = {
     {
       name: 'limit',
       label: '行数',
-      valueType: 'number',
       editor: 'number',
-      required: true,
       defaultValue: 2,
     },
     {
       name: 'region',
       label: '区域',
-      valueType: 'string',
       editor: 'text',
-      required: true,
     },
   ],
 };

@@ -4,6 +4,7 @@ import type {
   ScreenDocument,
   ScreenHostResourcePort,
   ScreenJsonValue,
+  ScreenMaterialErrorCode,
   ScreenParseResult,
 } from '@base-screen/contracts';
 
@@ -11,7 +12,11 @@ export type HostResourceDataState =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
   | { readonly status: 'ready'; readonly value: ScreenJsonValue }
-  | { readonly status: 'error'; readonly code: string; readonly message: string };
+  | {
+      readonly status: 'error';
+      readonly code: ScreenMaterialErrorCode;
+      readonly message: string;
+    };
 
 export interface HostResourceConformanceRenderer {
   render(document: ScreenDocument): ScreenParseResult<null>;
@@ -183,7 +188,7 @@ function assertAbort(
 function assertState(
   harness: HostResourceConformanceHarness,
   status: HostResourceDataState['status'],
-  code?: string,
+  code?: ScreenMaterialErrorCode,
 ): void {
   const actual = harness.readDataState();
   if (

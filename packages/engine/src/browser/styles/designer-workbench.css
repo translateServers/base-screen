@@ -1200,12 +1200,17 @@
   position: sticky;
   bottom: 0;
   display: flex;
+  min-width: 0;
+  max-width: 100%;
   gap: var(--designer-space-2);
-  margin: 0 calc(var(--designer-space-5) * -1);
-  padding: var(--designer-space-4) var(--designer-space-5);
+  padding: var(--designer-space-4) 0;
   border-top: 1px solid var(--designer-border-default);
   background: var(--designer-surface-panel);
   box-shadow: 0 -10px 24px color-mix(in srgb, var(--designer-surface-workspace) 72%, transparent);
+}
+
+.designer-dataset-actions .designer-button {
+  min-width: 0;
 }
 
 .designer-dataset-actions .designer-button[data-variant="primary"] {

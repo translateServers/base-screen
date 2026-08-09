@@ -325,6 +325,46 @@ describe('plugin manifests and catalogs', () => {
     expect(dependency.ok).toBe(false);
   });
 
+  it('accepts an explicit queryScope resource declaration and rejects any other value', () => {
+    const shareable = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'dataResourceType',
+            id: 'acme.metric',
+            name: '指标',
+            configSchema: { kind: 'object', properties: {}, required: [] },
+            queryScope: 'resource',
+          },
+        ],
+      }),
+    );
+    const invalid = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'dataResourceType',
+            id: 'acme.metric',
+            name: '指标',
+            configSchema: { kind: 'object', properties: {}, required: [] },
+            queryScope: 'component',
+          },
+        ],
+      }),
+    );
+
+    expect(shareable.ok).toBe(true);
+    if (shareable.ok) {
+      expect(shareable.value.contributions[0]).toMatchObject({ queryScope: 'resource' });
+    }
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) {
+      expect(
+        invalid.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID'),
+      ).toBe(true);
+    }
+  });
+
   it('creates ordered read-only catalog snapshots without mutable entry APIs', () => {
     const parsedMaterial = parseBaseScreenMaterialManifest(materialManifest());
     const parsedPlugin = parseBaseScreenPluginManifest(pluginManifest());

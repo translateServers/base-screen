@@ -93,6 +93,22 @@ const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
   (class {} as unknown as typeof HTMLElement);
 
+export interface BaseScreenDesignerConfiguration {
+  readonly catalog: BaseScreenMaterialCatalog;
+  readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
+  readonly projectAdapter?: ScreenProjectAdapter;
+  readonly toolMaterialTypes?: DesignerToolMaterialTypes;
+  readonly groupMaterialType?: string;
+  readonly designerHostAdapter?: ScreenDesignerHostAdapter;
+  readonly resourcePort?: ScreenHostResourcePort;
+  readonly variablePort?: ScreenHostVariablePort;
+  readonly datasetCatalogPort?: ScreenHostDatasetCatalogPort;
+  readonly assetCatalogPort?: ScreenAssetCatalogPort;
+  readonly projectCatalogPort?: ScreenProjectCatalogPort;
+  readonly projectPreviewPort?: ScreenProjectPreviewPort;
+  readonly projectSnapshotPort?: ScreenProjectSnapshotPort;
+}
+
 export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
@@ -581,6 +597,55 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get catalog(): BaseScreenMaterialCatalog | undefined {
     return this.#catalog;
+  }
+
+  /**
+   * 权威原子配置入口（DRH-R8）：一次提交并校验全部运行时依赖（catalog、
+   * runtime contributions、resource/variable/dataset 端口、timeout、host
+   * adapter）后再创建 Renderer；配置后运行时依赖 setter 不再独立初始化。
+   */
+  configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null> {
+    if (this.#renderer !== undefined) {
+      return {
+        ok: false as const,
+        diagnostics: [lifecycleDiagnostic('Designer 已初始化，请先 unload 再重新配置。')],
+      };
+    }
+    if (configuration.designerHostAdapter !== undefined) {
+      const parsed = validateScreenDesignerHostAdapter(configuration.designerHostAdapter);
+      if (!parsed.ok) {
+        return { ok: false, diagnostics: parsed.diagnostics };
+      }
+      this.#designerHostAdapter = parsed.value;
+      this.#assetCatalogPort = parsed.value.assets;
+      this.#projectCatalogPort = parsed.value.projectCatalog;
+      this.#projectPreviewPort = parsed.value.projectPreview;
+      this.#projectSnapshotPort = parsed.value.projectSnapshots;
+      this.#resourcePort = parsed.value.resources;
+      this.#variablePort = parsed.value.variables;
+      this.#datasetCatalogPort = parsed.value.datasetCatalog;
+    } else {
+      this.#designerHostAdapter = undefined;
+      this.#assetCatalogPort = configuration.assetCatalogPort;
+      this.#projectCatalogPort = configuration.projectCatalogPort;
+      this.#projectPreviewPort = configuration.projectPreviewPort;
+      this.#projectSnapshotPort = configuration.projectSnapshotPort;
+      this.#resourcePort = configuration.resourcePort;
+      this.#variablePort = configuration.variablePort;
+      this.#datasetCatalogPort = configuration.datasetCatalogPort;
+    }
+    this.#catalog = configuration.catalog;
+    this.#runtimeContributions = configuration.runtimeContributions;
+    this.#toolMaterialTypes = configuration.toolMaterialTypes;
+    this.#groupMaterialType = configuration.groupMaterialType;
+    if (configuration.projectAdapter !== undefined) {
+      const bound = this.#session.bindProjectAdapter(configuration.projectAdapter);
+      if (!bound.ok) {
+        return { ok: false, diagnostics: bound.diagnostics };
+      }
+    }
+    this.initialize();
+    return { ok: true, value: null, diagnostics: [] };
   }
 
   set catalog(value: BaseScreenMaterialCatalog | undefined) {

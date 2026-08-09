@@ -32,6 +32,19 @@ function assertTarballContents(tarball) {
   }
 }
 
+function assertContractsSchemaSingularity(tarball) {
+  const entries = execFileSync('tar', ['-tf', tarball], { encoding: 'utf8' }).trim().split(/\r?\n/);
+  const schemaEntries = entries.filter((entry) => entry.endsWith('screen-document.schema.json'));
+  if (schemaEntries.length !== 1) {
+    throw new Error(
+      `CONTRACTS_SCHEMA_COUNT_INVALID: expected exactly one screen-document.schema.json in the tarball, found ${schemaEntries.length}`,
+    );
+  }
+  if (schemaEntries[0] !== 'package/dist/screen-document.schema.json') {
+    throw new Error(`CONTRACTS_SCHEMA_LOCATION_INVALID: ${schemaEntries[0]}`);
+  }
+}
+
 function packageDirectoryByName(name) {
   return Object.entries(PACKAGE_DEFINITIONS).find(
     ([, definition]) => definition.name === name,
@@ -700,6 +713,9 @@ try {
     const tarball = join(packageTarballs, tarballName);
     packedTarballs.set(directory, tarball);
     assertTarballContents(tarball);
+    if (directory === 'contracts') {
+      assertContractsSchemaSingularity(tarball);
+    }
     run('pnpm', ['exec', 'publint', tarball], root);
     run('pnpm', ['exec', 'attw', '--profile', 'esm-only', tarball], root);
 
@@ -733,17 +749,67 @@ import {
 } from '${barePackage}';
 
 deepStrictEqual(artifact, SCREEN_DOCUMENT_JSON_SCHEMA);
-const document = {
+
+const component = (dataSource) => ({
+  id: 'c1',
+  type: 'acme.kpi-card',
+  name: 'Card',
+  parentId: null,
+  position: { x: 0, y: 0 },
+  size: { width: 320, height: 160 },
+  rotation: 0,
+  zIndex: 1,
+  status: { locked: false, hidden: false },
+  props: {},
+  style: {},
+  dataSource,
+});
+const document = (components) => ({
   canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
-  components: [],
+  components,
   variables: [],
   blueprint: { rules: [] },
-};
-const parsed = parseScreenDocument(document);
-if (!parsed.ok || parsed.diagnostics.length !== 0) {
-  throw new Error('contracts: document parse failed');
+});
+const hostResource = (binding, includeBinding) => ({
+  type: 'host-resource',
+  resourceType: 'xj_metric',
+  resourceId: 'demo_cpu_usage',
+  params: { limit: { kind: 'literal', value: 5 } },
+  ...(includeBinding ? { binding } : {}),
+});
+const nullBindingDocument = document([component(hostResource(null, true))]);
+const fullBindingDocument = document([
+  component(
+    hostResource(
+      {
+        fields: {
+          dimension: ['host_name'],
+          measures: ['avg_cpu_usage_percent'],
+        },
+      },
+      true,
+    ),
+  ),
+]);
+const missingBindingDocument = document([component(hostResource(null, false))]);
+
+const nullParsed = parseScreenDocument(nullBindingDocument);
+if (!nullParsed.ok) {
+  throw new Error('contracts: binding null document rejected');
 }
-const serialized = serializeScreenDocument(parsed.value);
+const fullParsed = parseScreenDocument(fullBindingDocument);
+if (!fullParsed.ok) {
+  throw new Error('contracts: full binding document rejected');
+}
+const missingParsed = parseScreenDocument(missingBindingDocument);
+if (missingParsed.ok) {
+  throw new Error('contracts: missing binding document accepted');
+}
+const roundTripped = parseScreenDocument(JSON.parse(serializeScreenDocument(fullParsed.value)));
+if (!roundTripped.ok) {
+  throw new Error('contracts: full binding round trip failed');
+}
+const serialized = serializeScreenDocument(nullParsed.value);
 if (typeof serialized !== 'string' || serialized.length === 0) {
   throw new Error('contracts: serialization failed');
 }

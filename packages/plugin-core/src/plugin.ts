@@ -243,6 +243,7 @@ function validateContribution(
         new Set(['kind', 'id', 'name', 'configSchema']),
         path,
         collector,
+        new Set(['queryScope']),
       );
       validateContributionIdentityFields(contribution, path, collector, ['id']);
       validateDisplayName(contribution.name, [...path, 'name'], collector);
@@ -257,6 +258,13 @@ function validateContribution(
           'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
           [...path, 'configSchema'],
           'Resource config schema must be an object schema.',
+        );
+      }
+      if (contribution.queryScope !== undefined && contribution.queryScope !== 'resource') {
+        collector.add(
+          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          [...path, 'queryScope'],
+          'Resource queryScope must be the literal "resource" when declared.',
         );
       }
       return typeof contribution.id === 'string'
@@ -312,9 +320,11 @@ function validateExactObject(
   fields: ReadonlySet<string>,
   path: readonly (string | number)[],
   collector: PluginDiagnosticCollector,
+  optional?: ReadonlySet<string>,
 ): void {
+  const allowed = optional === undefined ? fields : new Set<string>([...fields, ...optional]);
   for (const key of Object.keys(value)) {
-    if (!fields.has(key)) {
+    if (!allowed.has(key)) {
       collector.add(
         'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD',
         [...path, key],

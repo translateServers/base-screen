@@ -127,7 +127,14 @@ function isValueType(value: string): value is ScreenDatasetValueType {
 }
 
 function cloneField(field: ScreenDatasetField): ScreenDatasetField {
-  return { id: field.id, label: field.label, valueType: field.valueType };
+  return {
+    id: field.id,
+    label: field.label,
+    valueType: field.valueType,
+    ...(field.nullable === undefined ? {} : { nullable: field.nullable }),
+    ...(field.unit === undefined ? {} : { unit: field.unit }),
+    ...(field.format === undefined ? {} : { format: field.format }),
+  };
 }
 
 function isObject(value: ScreenJsonValue): value is ScreenJsonObject {

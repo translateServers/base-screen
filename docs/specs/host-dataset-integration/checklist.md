@@ -16,4 +16,4 @@
 - [x] Materials without declared data capabilities do not expose a Data inspector tab.
 - [x] The data pane exposes apply/refresh actions without a dedicated preview action.
 - [x] The right inspector reserves scrollbar space and does not change width when switching data-source views.
-- [ ] Dataset apply and refresh actions remain fully visible when the inspector scrolls.
+- [x] Dataset apply and refresh actions remain fully visible when the inspector scrolls.

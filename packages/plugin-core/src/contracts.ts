@@ -2,6 +2,7 @@ import type {
   ScreenDatasetValueType,
   ScreenJsonObject,
   ScreenJsonValue,
+  ScreenMaterialErrorCode,
   ScreenParseResult,
   ScreenSize,
 } from '@base-screen/contracts';
@@ -14,7 +15,11 @@ export type BaseScreenMaterialDataState =
   | { readonly status: 'idle' }
   | { readonly status: 'loading' }
   | { readonly status: 'ready'; readonly value: ScreenJsonValue }
-  | { readonly status: 'error'; readonly code: string; readonly message: string };
+  | {
+      readonly status: 'error';
+      readonly code: ScreenMaterialErrorCode;
+      readonly message: string;
+    };
 
 export interface BaseScreenMaterialModel {
   readonly componentId: string;
@@ -174,6 +179,9 @@ export type BaseScreenPluginContribution =
       readonly id: string;
       readonly name: string;
       readonly configSchema: BaseScreenMaterialObjectSchema;
+      /** 显式共享声明（Data Runtime Hardening / DRH-R2）：仅 'resource' 开启同实例
+       *  in-flight 共享；缺省为组件域，不共享。仅作声明，不含其它运行时语义。 */
+      readonly queryScope?: 'resource';
     }
   | { readonly kind: 'blueprintCapability'; readonly id: string; readonly name: string };
 

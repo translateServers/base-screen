@@ -1,8 +1,9 @@
-import type {
-  BaseScreenMaterialConstructor,
-  BaseScreenPluginManifest,
-  BaseScreenPluginRuntime,
-  PluginCommandPort,
+import {
+  type BaseScreenMaterialConstructor,
+  type BaseScreenPluginManifest,
+  type BaseScreenPluginRuntime,
+  createBaseScreenMaterialCatalog,
+  type PluginCommandPort,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { createBaseScreenPluginManager } from '../src/manager.js';
@@ -149,6 +150,38 @@ describe('BaseScreenPluginManager', () => {
 
     expect((await manager.deactivate()).ok).toBe(true);
     expect(log).toEqual(['activate:base', 'activate:chart', 'deactivate:chart', 'deactivate:base']);
+    expect(manager.snapshot).toBeUndefined();
+  });
+
+  it('carries a catalog dataset adapter across the registry boundary into the activated snapshot', async () => {
+    const material = materialManifest();
+    const datasetAdapter = {
+      adapt: () => ({ ok: true as const, value: null, diagnostics: [] }),
+    };
+    const constructor = constructorFor(material);
+    const catalog = createBaseScreenMaterialCatalog([
+      { manifest: material, constructor, tabularDataAdapter: datasetAdapter },
+    ]);
+    expect(catalog.get(material.type)?.tabularDataAdapter).toBe(datasetAdapter);
+
+    const plugin = runtime(
+      pluginManifest({
+        id: 'acme.material',
+        contributions: [{ kind: 'material', type: material.type, tagName: material.tagName }],
+      }),
+    );
+    const manager = createBaseScreenPluginManager(
+      managerOptions([plugin], new Map([[material.tagName, constructor]])),
+    );
+
+    const activated = await manager.activate();
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) {
+      return;
+    }
+    expect(activated.value.materials.get(material.type)?.tabularDataAdapter).toBe(datasetAdapter);
+    expect(manager.snapshot?.materials.get(material.type)?.tabularDataAdapter).toBe(datasetAdapter);
+    await manager.deactivate();
     expect(manager.snapshot).toBeUndefined();
   });
 

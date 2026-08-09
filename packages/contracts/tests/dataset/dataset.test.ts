@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MAX_DATASET_FIELD_FORMAT_LENGTH,
+  MAX_DATASET_FIELD_UNIT_LENGTH,
   MAX_DATASET_FIELDS,
   MAX_DATASET_ROWS,
   parseScreenDatasetDescriptor,
@@ -89,9 +91,8 @@ describe('host tabular dataset contracts', () => {
         {
           name: 'region',
           label: '区域',
-          valueType: 'string',
           editor: 'text',
-          required: true,
+          defaultValue: '华东',
         },
       ],
     });
@@ -114,5 +115,229 @@ describe('host tabular dataset contracts', () => {
         token: 'secret',
       }),
     ).toMatchObject({ ok: false, diagnostics: [{ code: 'HOST_DATASET_DESCRIPTOR_INVALID' }] });
+  });
+});
+
+describe('DRH-R6 public dataset field metadata', () => {
+  it('R6 preserves nullable/unit/format as detached parsed field metadata', () => {
+    const input = {
+      fields: [
+        {
+          id: 'amount',
+          label: '金额',
+          valueType: 'number',
+          nullable: true,
+          unit: '元',
+          format: '#,##0.00',
+        },
+      ],
+      rows: [{ amount: null }],
+    };
+    const result = parseScreenTabularDataset(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.fields).toEqual(input.fields);
+      expect(result.value.fields[0]).not.toBe(input.fields[0]);
+      expect(result.value.fields[0]).toEqual({
+        id: 'amount',
+        label: '金额',
+        valueType: 'number',
+        nullable: true,
+        unit: '元',
+        format: '#,##0.00',
+      });
+      input.fields[0]!.unit = '已修改';
+      expect(result.value.fields[0]!.unit).toBe('元');
+    }
+    const descriptor = parseScreenDatasetDescriptor({
+      resourceType: 'dataset',
+      resourceId: 'orders',
+      name: '订单数据',
+      description: null,
+      fields: [
+        {
+          id: 'amount',
+          label: '金额',
+          valueType: 'number',
+          nullable: false,
+          unit: '元',
+          format: '#,##0.00"元"',
+        },
+      ],
+      parameters: [],
+    });
+    expect(descriptor.ok).toBe(true);
+    if (descriptor.ok) {
+      expect(descriptor.value.fields[0]).toEqual({
+        id: 'amount',
+        label: '金额',
+        valueType: 'number',
+        nullable: false,
+        unit: '元',
+        format: '#,##0.00"元"',
+      });
+    }
+  });
+
+  it('R6 rejects semanticType and any other unknown field metadata keys', () => {
+    const rejectField = (field: Record<string, unknown>) =>
+      expect(
+        parseScreenTabularDataset({
+          fields: [{ id: 'amount', label: '金额', ...field }],
+          rows: [],
+        }),
+      ).toMatchObject({ ok: false, diagnostics: [{ code: 'HOST_DATASET_INVALID' }] });
+    rejectField({ valueType: 'number', semanticType: 'currency' });
+    rejectField({ valueType: 'number', color: '#fff' });
+    expect(
+      parseScreenDatasetDescriptor({
+        resourceType: 'dataset',
+        resourceId: 'orders',
+        name: '订单数据',
+        description: null,
+        fields: [{ id: 'amount', label: '金额', valueType: 'number', semanticType: 'currency' }],
+        parameters: [],
+      }),
+    ).toMatchObject({ ok: false, diagnostics: [{ code: 'HOST_DATASET_DESCRIPTOR_INVALID' }] });
+  });
+
+  it('R6 accepts omitted and explicit true nullable with null and missing cells', () => {
+    const omitted = parseScreenTabularDataset({
+      fields: [{ id: 'amount', label: '金额', valueType: 'number' }],
+      rows: [{ amount: null }, {}],
+    });
+    expect(omitted).toMatchObject({ ok: true });
+    const explicitTrue = parseScreenTabularDataset({
+      fields: [{ id: 'amount', label: '金额', valueType: 'number', nullable: true }],
+      rows: [{ amount: null }, {}],
+    });
+    expect(explicitTrue).toMatchObject({ ok: true });
+  });
+
+  it('R6 rejects null and missing cells for nullable:false fields', () => {
+    const nullCell = parseScreenTabularDataset({
+      fields: [{ id: 'amount', label: '金额', valueType: 'number', nullable: false }],
+      rows: [{ amount: null }],
+    });
+    expect(nullCell).toMatchObject({ ok: false, diagnostics: [{ code: 'HOST_DATASET_INVALID' }] });
+    const missingCell = parseScreenTabularDataset({
+      fields: [{ id: 'amount', label: '金额', valueType: 'number', nullable: false }],
+      rows: [{}],
+    });
+    expect(missingCell).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'HOST_DATASET_INVALID' }],
+    });
+    const present = parseScreenTabularDataset({
+      fields: [{ id: 'amount', label: '金额', valueType: 'number', nullable: false }],
+      rows: [{ amount: 1 }],
+    });
+    expect(present).toMatchObject({ ok: true });
+  });
+
+  it('R6 enforces unit and format bounds, emptiness, C0/C1 controls, and types', () => {
+    const rejectField = (field: Record<string, unknown>) =>
+      expect(
+        parseScreenTabularDataset({
+          fields: [{ id: 'amount', label: '金额', ...field }],
+          rows: [],
+        }),
+      ).toMatchObject({ ok: false, diagnostics: [{ code: 'HOST_DATASET_INVALID' }] });
+    rejectField({ valueType: 'number', unit: '' });
+    rejectField({ valueType: 'number', unit: 'x'.repeat(MAX_DATASET_FIELD_UNIT_LENGTH + 1) });
+    rejectField({ valueType: 'number', unit: '\u0000' });
+    rejectField({ valueType: 'number', unit: '\u001f' });
+    rejectField({ valueType: 'number', unit: '\u007f' });
+    rejectField({ valueType: 'number', unit: '\u0080' });
+    rejectField({ valueType: 'number', unit: '\u009f' });
+    rejectField({ valueType: 'number', unit: 42 });
+    rejectField({ valueType: 'number', format: '' });
+    rejectField({ valueType: 'number', format: 'x'.repeat(MAX_DATASET_FIELD_FORMAT_LENGTH + 1) });
+    rejectField({ valueType: 'number', format: '\u0001' });
+    rejectField({ valueType: 'number', format: '\u009f' });
+    rejectField({ valueType: 'number', format: false });
+    rejectField({ valueType: 'number', nullable: 'yes' });
+    const atLimit = parseScreenTabularDataset({
+      fields: [
+        {
+          id: 'amount',
+          label: '金额',
+          valueType: 'number',
+          unit: 'x'.repeat(MAX_DATASET_FIELD_UNIT_LENGTH),
+          format: 'x'.repeat(MAX_DATASET_FIELD_FORMAT_LENGTH),
+        },
+      ],
+      rows: [],
+    });
+    expect(atLimit).toMatchObject({ ok: true });
+    expect(
+      parseScreenDatasetDescriptor({
+        resourceType: 'dataset',
+        resourceId: 'orders',
+        name: '订单数据',
+        description: null,
+        fields: [{ id: 'amount', label: '金额', valueType: 'number', unit: '\u0007' }],
+        parameters: [],
+      }),
+    ).toMatchObject({ ok: false, diagnostics: [{ code: 'HOST_DATASET_DESCRIPTOR_INVALID' }] });
+  });
+
+  it('R6 counts unit and format length in UTF-16 code units, not code points', () => {
+    // '🚀' is one code point but two UTF-16 code units.
+    const atLimit = parseScreenTabularDataset({
+      fields: [
+        {
+          id: 'amount',
+          label: '金额',
+          valueType: 'number',
+          unit: '🚀'.repeat(MAX_DATASET_FIELD_UNIT_LENGTH / 2),
+        },
+      ],
+      rows: [],
+    });
+    expect(atLimit).toMatchObject({ ok: true });
+    const overLimit = parseScreenTabularDataset({
+      fields: [
+        {
+          id: 'amount',
+          label: '金额',
+          valueType: 'number',
+          unit: '🚀'.repeat(MAX_DATASET_FIELD_UNIT_LENGTH / 2 + 1),
+        },
+      ],
+      rows: [],
+    });
+    expect(overLimit).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'HOST_DATASET_INVALID' }],
+    });
+  });
+
+  it('R6 preserves format verbatim as opaque non-executable display text', () => {
+    const input = {
+      fields: [
+        {
+          id: 'amount',
+          label: '金额',
+          valueType: 'number',
+          format: '#,##0.00;"负";"零"',
+        },
+      ],
+      rows: [{ amount: -12.5 }],
+    };
+    const result = parseScreenTabularDataset(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.fields[0]!.format).toBe('#,##0.00;"负";"零"');
+    }
+    const payload = '${globalThis}["process"]';
+    const opaque = parseScreenTabularDataset({
+      fields: [{ id: 'amount', label: '金额', valueType: 'number', format: payload }],
+      rows: [],
+    });
+    expect(opaque).toMatchObject({ ok: true });
+    if (opaque.ok) {
+      expect(opaque.value.fields[0]!.format).toBe(payload);
+    }
   });
 });

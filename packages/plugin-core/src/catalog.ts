@@ -2,6 +2,7 @@ import { parseScreenJsonValue } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogEntry,
+  BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
   BaseScreenPluginCatalogEntry,
 } from './contracts.js';
@@ -11,15 +12,19 @@ export function createBaseScreenMaterialCatalog(
 ): BaseScreenMaterialCatalog {
   assertUnique(entries, (entry) => entry.manifest.type, 'material type');
   const sorted = entries
-    .map((entry) =>
-      freeze({
+    .map((entry) => {
+      // The Plugin Manager reconstructs catalog entries from the registered
+      // custom-element constructor. Keep trusted runtime adapters discoverable
+      // across that boundary while leaving the serialized manifest unchanged.
+      attachTabularDataAdapter(entry);
+      return freeze({
         manifest: cloneJson(entry.manifest),
         constructor: entry.constructor,
         ...(entry.tabularDataAdapter === undefined
           ? {}
           : { tabularDataAdapter: entry.tabularDataAdapter }),
-      }),
-    )
+      });
+    })
     .sort((left, right) => compareStrings(left.manifest.type, right.manifest.type));
   const byType = new Map(sorted.map((entry) => [entry.manifest.type, entry]));
   return {
@@ -33,6 +38,29 @@ export function createBaseScreenMaterialCatalog(
       return [...sorted];
     },
   };
+}
+
+function attachTabularDataAdapter(entry: BaseScreenMaterialCatalogEntry): void {
+  const adapter = entry.tabularDataAdapter;
+  if (adapter === undefined) return;
+  const constructor = entry.constructor as BaseScreenMaterialConstructor;
+  const existing = Object.getOwnPropertyDescriptor(constructor, 'tabularDataAdapter');
+  if (existing !== undefined) {
+    if (existing.value !== adapter) {
+      throw new RangeError('Material constructor contains a different dataset adapter.');
+    }
+    return;
+  }
+  try {
+    Object.defineProperty(constructor, 'tabularDataAdapter', {
+      configurable: false,
+      enumerable: false,
+      writable: false,
+      value: adapter,
+    });
+  } catch {
+    throw new RangeError('Material constructor cannot host a dataset adapter.');
+  }
 }
 
 export function createBaseScreenPluginCatalog(

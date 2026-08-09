@@ -11,4 +11,4 @@
 - [x] Complete focused tests, browser workflow, API/boundary/tarball checks, and `pnpm verify:m0`.
 - [x] Redesign the Designer data pane around source selection, host connection state, and automatic binding restoration.
 - [x] Remove the data-pane preview action and keep the right inspector width stable while its scrollbar state changes.
-- [ ] Keep dataset actions fully visible at the bottom of a scrollable inspector.
+- [x] Keep dataset actions fully visible at the bottom of a scrollable inspector.

@@ -14,6 +14,8 @@ export const MAX_DATASET_FIELDS = 256;
 export const MAX_DATASET_ROWS = 10_000;
 export const MAX_DATASET_BYTES = 1024 * 1024;
 export const MAX_DATASET_PAGE_ITEMS = 50;
+export const MAX_DATASET_FIELD_UNIT_LENGTH = 64;
+export const MAX_DATASET_FIELD_FORMAT_LENGTH = 128;
 
 export function parseScreenTabularDataset(input: unknown): ScreenParseResult<ScreenTabularDataset> {
   const parsed = parseScreenJsonValue(input, { maxBytes: MAX_DATASET_BYTES });
@@ -183,12 +185,43 @@ function parseFields(
       diagnostics.push(diagnostic(code, itemPath, 'Dataset field is invalid.'));
       return;
     }
-    checkExact(item, new Set(['id', 'label', 'valueType']), itemPath, diagnostics, code);
+    checkExact(
+      item,
+      new Set(['id', 'label', 'valueType', 'nullable', 'unit', 'format']),
+      itemPath,
+      diagnostics,
+      code,
+    );
     validateFieldId(item.id, [...itemPath, 'id'], diagnostics, code);
     validateDisplayString(item.label, [...itemPath, 'label'], diagnostics, false, code);
     if (!isDatasetValueType(item.valueType)) {
       diagnostics.push(
         diagnostic(code, [...itemPath, 'valueType'], 'Dataset field valueType is invalid.'),
+      );
+    }
+    if (item.nullable !== undefined && typeof item.nullable !== 'boolean') {
+      diagnostics.push(
+        diagnostic(code, [...itemPath, 'nullable'], 'Dataset field nullable is invalid.'),
+      );
+    }
+    if (item.unit !== undefined) {
+      validateDisplayHint(
+        item.unit,
+        [...itemPath, 'unit'],
+        diagnostics,
+        code,
+        'unit',
+        MAX_DATASET_FIELD_UNIT_LENGTH,
+      );
+    }
+    if (item.format !== undefined) {
+      validateDisplayHint(
+        item.format,
+        [...itemPath, 'format'],
+        diagnostics,
+        code,
+        'format',
+        MAX_DATASET_FIELD_FORMAT_LENGTH,
       );
     }
     if (typeof item.id === 'string') {
@@ -234,6 +267,12 @@ function parseRows(
         );
         continue;
       }
+      if (field.nullable === false && cell === null) {
+        diagnostics.push(
+          diagnostic('HOST_DATASET_INVALID', [...rowPath, key], 'Dataset cell is not nullable.'),
+        );
+        continue;
+      }
       if (!validCell(cell, field.valueType)) {
         diagnostics.push(
           diagnostic('HOST_DATASET_INVALID', [...rowPath, key], 'Dataset cell type is invalid.'),
@@ -241,6 +280,17 @@ function parseRows(
         continue;
       }
       row[key] = cell;
+    }
+    for (const field of fields ?? []) {
+      if (field.nullable === false && !Object.prototype.hasOwnProperty.call(item, field.id)) {
+        diagnostics.push(
+          diagnostic(
+            'HOST_DATASET_INVALID',
+            [...rowPath, field.id],
+            'Dataset cell is missing for a non-nullable field.',
+          ),
+        );
+      }
     }
     rows.push(row);
   });
@@ -270,7 +320,7 @@ function parseParameters(
     }
     checkExact(
       item,
-      new Set(['name', 'label', 'valueType', 'editor', 'required', 'defaultValue']),
+      new Set(['name', 'label', 'editor', 'defaultValue']),
       itemPath,
       diagnostics,
       'HOST_DATASET_DESCRIPTOR_INVALID',
@@ -288,23 +338,16 @@ function parseParameters(
       false,
       'HOST_DATASET_DESCRIPTOR_INVALID',
     );
-    if (
-      !isDatasetValueType(item.valueType) ||
-      !isDatasetEditor(item.editor) ||
-      typeof item.required !== 'boolean'
-    ) {
+    if (item.editor !== undefined && !isDatasetEditor(item.editor)) {
       diagnostics.push(
         diagnostic(
           'HOST_DATASET_DESCRIPTOR_INVALID',
-          itemPath,
-          'Dataset parameter metadata is invalid.',
+          [...itemPath, 'editor'],
+          'Dataset parameter editor is invalid.',
         ),
       );
     }
-    if (
-      item.defaultValue !== undefined &&
-      !validCell(item.defaultValue, item.valueType as string)
-    ) {
+    if (item.defaultValue !== undefined && !isPlainJsonValue(item.defaultValue)) {
       diagnostics.push(
         diagnostic(
           'HOST_DATASET_DESCRIPTOR_INVALID',
@@ -355,6 +398,13 @@ function isIsoDate(value: string): boolean {
     return false;
   const time = Date.parse(value);
   return Number.isFinite(time);
+}
+
+/** 参数默认值必须是普通 JSON 值（parseScreenJsonValue 已整体保证，此处显式兜底）。 */
+function isPlainJsonValue(value: unknown): boolean {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
+  if (typeof value === 'number') return Number.isFinite(value);
+  return typeof value === 'object';
 }
 
 function isDatasetValueType(value: unknown): boolean {
@@ -434,6 +484,24 @@ function validateNullableDisplayString(
   diagnostics: ScreenDiagnostic[],
 ): void {
   if (value !== null) validateDisplayString(value, path, diagnostics, true);
+}
+
+function validateDisplayHint(
+  value: unknown,
+  path: readonly (string | number)[],
+  diagnostics: ScreenDiagnostic[],
+  code: 'HOST_DATASET_INVALID' | 'HOST_DATASET_DESCRIPTOR_INVALID',
+  hint: 'unit' | 'format',
+  maxCodeUnits: number,
+): void {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length > maxCodeUnits ||
+    /[\u0000-\u001f\u007f-\u009f]/.test(value)
+  ) {
+    diagnostics.push(diagnostic(code, path, `Dataset field ${hint} is invalid.`));
+  }
 }
 
 function isCursor(value: unknown): value is string {

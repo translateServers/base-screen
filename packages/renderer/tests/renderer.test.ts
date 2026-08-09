@@ -343,6 +343,8 @@ describe('BaseScreenRenderer', () => {
 
     expect(renderer.render(initial).ok).toBe(true);
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(resolveCalls).toBe(1);
 
     const edited = document([{ ...initial.components[0]!, name: 'Edited resource' }]);
@@ -378,6 +380,8 @@ describe('BaseScreenRenderer', () => {
 
     expect(renderer.render(initial).ok).toBe(true);
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(resolveCalls).toBe(1);
 
     expect(
@@ -390,6 +394,8 @@ describe('BaseScreenRenderer', () => {
         ]),
       ).ok,
     ).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
     await Promise.resolve();
     expect(resolveCalls).toBe(2);
   });
@@ -440,7 +446,10 @@ describe('BaseScreenRenderer', () => {
     expect(renderer.render(document([component('dataset', 0, null, source)])).ok).toBe(true);
     await Promise.resolve();
     await Promise.resolve();
-
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(requests).toEqual([
       {
         componentId: 'dataset',
@@ -487,6 +496,8 @@ describe('BaseScreenRenderer', () => {
     expect(renderer.setVariables({ region: 'north' }).ok).toBe(true);
     expect(renderer.render(screen).ok).toBe(true);
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     expect(resolveCalls).toBe(1);
   });
 
@@ -524,6 +535,10 @@ describe('BaseScreenRenderer', () => {
     resolveRequest?.();
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     renderer.refreshData('refreshable');
     expect(resolveCalls).toBe(2);
   });
@@ -558,6 +573,7 @@ describe('BaseScreenRenderer', () => {
       await vi.advanceTimersByTimeAsync(100);
       expect(root.children[0]?.model?.dataState.status).toBe('error');
       resolveRequest?.({ ok: true, value: { late: true }, diagnostics: [] });
+      await Promise.resolve();
       await Promise.resolve();
       expect(root.children[0]?.model?.dataState).toMatchObject({ code: 'HOST_RESOURCE_TIMEOUT' });
     } finally {

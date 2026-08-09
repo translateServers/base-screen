@@ -1,4 +1,5 @@
 import {
+  normalizeScreenMaterialError,
   parseScreenDocument,
   parseScreenJsonValue,
   parseScreenTabularDataset,
@@ -9,6 +10,10 @@ import {
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
+  type ScreenResourceExecutionContext,
+  type ScreenResourceExecutionMode,
+  type ScreenResourceExecutionTrigger,
+  type ScreenResourceObserver,
 } from '@base-screen/contracts';
 import {
   evaluateScreenHostResourceParameters,
@@ -23,12 +28,19 @@ import {
   type BaseScreenMaterialElement,
   type BaseScreenMaterialMode,
   type BaseScreenMaterialModel,
-  type BaseScreenMaterialObjectSchema,
   type BaseScreenRuntimeContributionIndex,
   parseBaseScreenMaterialEventDetail,
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
+import { ResourceRequestCoordinator } from './request-coordinator.js';
+import {
+  cancelResourceState,
+  createMountedResourceState,
+  getHostResourceKey,
+  getProjectionKey,
+  type MountedResourceState,
+} from './resource-state.js';
 
 export interface BaseScreenMaterialEvent {
   readonly componentId: string;
@@ -47,13 +59,16 @@ export interface CreateBaseScreenRendererOptions {
   readonly resourcePort: ScreenHostResourcePort | undefined;
   readonly resourceTimeoutMs?: number;
   readonly contributionIndex?: BaseScreenRuntimeContributionIndex;
+  readonly observer?: ScreenResourceObserver;
+  readonly instanceId?: string;
+  readonly executionMode?: ScreenResourceExecutionMode;
 }
 
 export interface BaseScreenRenderer {
   render(document: ScreenDocument): ScreenParseResult<null>;
   suspendData(): void;
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
-  refreshData(componentId?: string): void;
+  refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
   clear(): void;
   dispose(): void;
 }
@@ -73,6 +88,7 @@ type RenderCandidate = {
 
 type ResolvedHostResource = {
   readonly key: string;
+  readonly projectionKey: string;
   readonly params: ScreenJsonObject;
 };
 
@@ -80,10 +96,7 @@ type MountedMaterial = {
   readonly type: string;
   readonly element: BaseScreenMaterialElement;
   readonly onEvent: (event: Event) => void;
-  resourceGeneration: number;
-  resourceController: AbortController | undefined;
-  resourceTimer: ReturnType<typeof setTimeout> | undefined;
-  resourceKey: string | undefined;
+  readonly resource: MountedResourceState;
 };
 
 class Renderer implements BaseScreenRenderer {
@@ -93,10 +106,27 @@ class Renderer implements BaseScreenRenderer {
   #variables: ScreenJsonObject = {};
   #dataSuspended = false;
   #disposed = false;
+  #coordinator: ResourceRequestCoordinator | undefined;
+  #nextTrigger: ScreenResourceExecutionTrigger = 'manual';
+  #nextTraceId: string | undefined;
 
   constructor(private readonly options: CreateBaseScreenRendererOptions) {
     if (!isResourceTimeoutValid(options.resourceTimeoutMs ?? 15_000)) {
       throw new RangeError('resourceTimeoutMs must be an integer between 100 and 60000.');
+    }
+    if (options.resourcePort !== undefined) {
+      this.#coordinator = new ResourceRequestCoordinator(
+        options.resourcePort,
+        (resourceType) =>
+          options.contributionIndex?.getResourceType(resourceType)?.queryScope === 'resource',
+        options.resourceTimeoutMs ?? 15_000,
+        (key, componentId) =>
+          this.emitObserver('shared', key, componentId, undefined, {
+            startedAt: undefined,
+            trigger: 'manual',
+            traceId: undefined,
+          }),
+      );
     }
   }
 
@@ -128,22 +158,30 @@ class Renderer implements BaseScreenRenderer {
     );
     const next = new Map<string, MountedMaterial>();
     const runtimeDiagnostics: ScreenDiagnostic[] = [];
+    // First resolves for newly mounted components (and for existing mounts that
+    // change raw identity) are deferred until #mounted/#candidates/#document are
+    // committed below. Starting them earlier would let a synchronous terminal
+    // path (missing resource port or a synchronously throwing resolve) be
+    // rejected by applyResourceResult's mount-identity guard, leaving the
+    // material stuck in loading with a live timer until timeout.
+    const pendingResolves: {
+      readonly candidate: RenderCandidate;
+      readonly mounted: MountedMaterial;
+    }[] = [];
     for (const candidate of candidates) {
       const stackOrder = painterIndex.get(candidate.component.id)!;
       const existing = this.#mounted.get(candidate.component.id);
       if (existing !== undefined && existing.type === candidate.component.type) {
-        const resourceKey = candidate.resource?.key;
         try {
-          applyMaterial(
-            existing.element,
-            candidate.component,
+          const toResolve = this.reconcileMountedMaterial(
+            candidate,
+            existing,
             parsedDocument.value,
-            resourceKey !== undefined && resourceKey === existing.resourceKey
-              ? { ...candidate.model, dataState: existing.element.model.dataState }
-              : candidate.model,
-            isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
             stackOrder,
           );
+          if (toResolve !== undefined) {
+            pendingResolves.push({ candidate: toResolve, mounted: existing });
+          }
         } catch {
           runtimeDiagnostics.push(
             renderFailure(candidate, 'Material model update raised an exception.'),
@@ -151,6 +189,14 @@ class Renderer implements BaseScreenRenderer {
         }
         next.set(candidate.component.id, existing);
         continue;
+      }
+      if (existing !== undefined) {
+        // Material type replacement on the same component id: tear down the
+        // previous mount exactly once (cancel, detach listener, remove element)
+        // so no resource or DOM for the old type leaks behind the new one.
+        this.cancelHostResource(existing, candidate.component.id);
+        existing.element.removeEventListener('base-screen-material-event', existing.onEvent);
+        existing.element.remove();
       }
       let element: BaseScreenMaterialElement;
       try {
@@ -183,19 +229,21 @@ class Renderer implements BaseScreenRenderer {
       )
         ? 'none'
         : 'block';
-      next.set(candidate.component.id, {
+      const mounted: MountedMaterial = {
         type: candidate.component.type,
         element,
         onEvent,
-        resourceGeneration: 0,
-        resourceController: undefined,
-        resourceTimer: undefined,
-        resourceKey: undefined,
-      });
+        resource: createMountedResourceState(),
+      };
+      mounted.resource.dataState = candidate.model.dataState;
+      next.set(candidate.component.id, mounted);
+      if (candidate.resource !== undefined) {
+        pendingResolves.push({ candidate, mounted });
+      }
     }
     for (const [componentId, mounted] of this.#mounted) {
       if (!next.has(componentId)) {
-        cancelResource(mounted);
+        this.cancelHostResource(mounted, componentId);
         mounted.element.removeEventListener('base-screen-material-event', mounted.onEvent);
         mounted.element.remove();
       }
@@ -207,20 +255,8 @@ class Renderer implements BaseScreenRenderer {
     this.#mounted = next;
     this.#candidates = new Map(candidates.map((candidate) => [candidate.component.id, candidate]));
     this.#document = parsedDocument.value;
-    for (const candidate of candidates) {
-      const mounted = next.get(candidate.component.id);
-      const resourceKey = candidate.resource?.key;
-      if (
-        mounted !== undefined &&
-        resourceKey !== undefined &&
-        mounted.resourceKey !== resourceKey
-      ) {
-        mounted.resourceKey = resourceKey;
-        void this.resolveHostResource(candidate, mounted);
-      } else if (mounted !== undefined) {
-        cancelResource(mounted);
-        mounted.resourceKey = undefined;
-      }
+    for (const { candidate, mounted } of pendingResolves) {
+      void this.resolveHostResource(candidate, mounted);
     }
     if (runtimeDiagnostics.length > 0) {
       for (const diagnostic of runtimeDiagnostics) {
@@ -245,11 +281,76 @@ class Renderer implements BaseScreenRenderer {
     return { ok: true, value: null, diagnostics: [] };
   }
 
+  /**
+   * Tears down a mounted component's host request: bumps its generation, removes
+   * the shared-coordinator subscription (last consumer leaving aborts the host
+   * request) and clears any in-flight marker.
+   */
+  private cancelHostResource(mounted: MountedMaterial, componentId: string): void {
+    const key = mounted.resource.resourceKey;
+    cancelResourceState(mounted.resource);
+    if (key !== undefined) {
+      this.#coordinator?.release(key, componentId);
+      this.emitObserver('aborted', key, componentId, undefined, {
+        startedAt: undefined,
+        trigger: 'manual',
+        traceId: undefined,
+      });
+    }
+  }
+
+  /** 观察事件只携带身份/上下文/耗时/可选计数与稳定码；观察者异常被隔离。 */
+  private emitObserver(
+    type: 'started' | 'shared' | 'succeeded' | 'failed' | 'aborted' | 'timed-out' | 'adapted',
+    key: string,
+    componentId: string,
+    requestId: string | undefined,
+    meta: {
+      readonly startedAt: number | undefined;
+      readonly trigger: ScreenResourceExecutionTrigger;
+      readonly traceId: string | undefined;
+      readonly fieldCount?: number | undefined;
+      readonly rowCount?: number | undefined;
+      readonly code?: string | undefined;
+    },
+  ): void {
+    const observer = this.options.observer;
+    if (observer === undefined) return;
+    const [resourceType, resourceId] = key.split('\u0000');
+    const context: ScreenResourceExecutionContext = {
+      instanceId: this.options.instanceId ?? 'renderer',
+      mode: this.options.executionMode ?? 'viewer',
+      trigger: meta.trigger,
+      traceId: meta.traceId ?? '',
+    };
+    try {
+      observer({
+        type,
+        requestId: requestId ?? `${componentId}:${key}:cancel`,
+        componentId,
+        resourceType: resourceType ?? key,
+        resourceId: resourceId ?? '',
+        context,
+        durationMs: meta.startedAt === undefined ? 0 : Date.now() - meta.startedAt,
+        ...(meta.fieldCount === undefined ? {} : { fieldCount: meta.fieldCount }),
+        ...(meta.rowCount === undefined ? {} : { rowCount: meta.rowCount }),
+        ...(meta.code === undefined ? {} : { code: meta.code }),
+      });
+    } catch {
+      // 观察者异常被隔离，不得中断解析。
+    }
+  }
+
   suspendData(): void {
     this.#dataSuspended = true;
+    this.#coordinator?.abortAll();
     for (const [componentId, mounted] of this.#mounted) {
-      cancelResource(mounted);
-      mounted.resourceKey = undefined;
+      const resource = mounted.resource;
+      cancelResourceState(resource);
+      resource.resourceKey = undefined;
+      resource.projectionKey = undefined;
+      resource.rawValue = undefined;
+      resource.dataState = { status: 'loading' };
       const candidate = this.#candidates.get(componentId);
       if (candidate !== undefined && candidate.resource !== undefined) {
         mounted.element.model = { ...candidate.model, dataState: { status: 'loading' } };
@@ -257,7 +358,9 @@ class Renderer implements BaseScreenRenderer {
     }
   }
 
-  refreshData(componentId?: string): void {
+  refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void {
+    this.#nextTrigger = trigger === 'polling' ? 'polling' : 'manual';
+    if (traceId !== undefined) this.#nextTraceId = traceId;
     for (const [id, candidate] of this.#candidates) {
       if (componentId !== undefined && componentId !== id) continue;
       const mounted = this.#mounted.get(id);
@@ -268,8 +371,9 @@ class Renderer implements BaseScreenRenderer {
   }
 
   clear(): void {
+    this.#coordinator?.abortAll();
     for (const mounted of this.#mounted.values()) {
-      cancelResource(mounted);
+      cancelResourceState(mounted.resource);
       mounted.element.removeEventListener('base-screen-material-event', mounted.onEvent);
       mounted.element.remove();
     }
@@ -283,6 +387,70 @@ class Renderer implements BaseScreenRenderer {
       this.clear();
       this.#disposed = true;
     }
+  }
+
+  /**
+   * Reconciles an already-mounted material. Returns the candidate whose first
+   * resolve must be started after the render commit (new raw identity), or
+   * undefined when no resolve should start. Starting the resolve here would run
+   * before `#mounted`/`#candidates` are committed, so a synchronous terminal
+   * path could never apply to the current mount.
+   */
+  private reconcileMountedMaterial(
+    candidate: RenderCandidate,
+    mounted: MountedMaterial,
+    document: ScreenDocument,
+    stackOrder: number,
+  ): RenderCandidate | undefined {
+    const resource = candidate.resource;
+    const resourceState = mounted.resource;
+    if (resource === undefined) {
+      // Data source removed (or parameters became unevaluable): cancel the old
+      // generation exactly once, clear the raw/projection keys and retained raw
+      // value, and let the candidate dataState (idle/static/error) win.
+      this.cancelHostResource(mounted, candidate.component.id);
+      resourceState.resourceKey = undefined;
+      resourceState.projectionKey = undefined;
+      resourceState.rawValue = undefined;
+      resourceState.dataState = candidate.model.dataState;
+      this.applyMountedModel(candidate, mounted, document, stackOrder);
+      return undefined;
+    }
+    if (resourceState.resourceKey !== resource.key) {
+      // New raw identity: the render loop starts the resolve after the commit.
+      resourceState.rawValue = undefined;
+      resourceState.dataState = { status: 'loading' };
+      this.applyMountedModel(candidate, mounted, document, stackOrder);
+      return candidate;
+    }
+    // Same raw identity: preserve the in-flight request, controller, timer,
+    // generation, retained raw value and current dataState. Unrelated edits must
+    // neither abort nor re-fetch. A projection/binding-only change re-validates
+    // and re-adapts locally from the retained raw value with zero host resolves.
+    if (resourceState.projectionKey !== resource.projectionKey) {
+      if (resourceState.rawValue !== undefined) {
+        resourceState.dataState = this.adaptResourceResult(candidate, resourceState.rawValue);
+      }
+      resourceState.projectionKey = resource.projectionKey;
+    }
+    this.applyMountedModel(candidate, mounted, document, stackOrder);
+    return undefined;
+  }
+
+  private applyMountedModel(
+    candidate: RenderCandidate,
+    mounted: MountedMaterial,
+    document: ScreenDocument,
+    stackOrder: number,
+  ): void {
+    applyMaterial(
+      mounted.element,
+      candidate.component,
+      document,
+      { ...candidate.model, dataState: mounted.resource.dataState },
+      isScreenComponentEffectivelyHidden(document, candidate.component.id),
+      stackOrder,
+    );
   }
 
   private handleMaterialEvent(candidate: RenderCandidate, event: Event): void {
@@ -326,69 +494,178 @@ class Renderer implements BaseScreenRenderer {
     if (source === null || source.type !== 'host-resource' || resource === undefined) {
       return;
     }
-    if (
-      refresh &&
-      mounted.resourceController !== undefined &&
-      mounted.resourceKey === resource.key
-    ) {
+    const resourceState = mounted.resource;
+    if (refresh && this.#coordinator !== undefined && this.#coordinator.isPending(resource.key)) {
+      // Same raw identity is already in flight through the coordinator: coalesce
+      // instead of cancel/restart.
       return;
     }
-    cancelResource(mounted);
-    const generation = ++mounted.resourceGeneration;
-    const controller = new AbortController();
-    mounted.resourceController = controller;
-    mounted.resourceTimer = setTimeout(() => {
-      controller.abort();
-      this.applyResourceResult(candidate, mounted, generation, {
-        status: 'error',
-        code: 'HOST_RESOURCE_TIMEOUT',
-        message: 'Host resource request timed out.',
-      });
-      // A settled timeout is terminal for this generation; suppress a host promise that resolves later.
-      if (mounted.resourceGeneration === generation) mounted.resourceGeneration++;
-    }, this.options.resourceTimeoutMs ?? 15_000);
+    const previousKey = resourceState.resourceKey;
+    if (previousKey !== undefined && previousKey !== resource.key) {
+      // Raw identity changed: leave the old shared subscription before starting
+      // the new one (last consumer leaving aborts the old host request).
+      this.#coordinator?.release(previousKey, candidate.component.id);
+    }
+    cancelResourceState(resourceState);
+    const generation = resourceState.resourceGeneration;
+    resourceState.resourceKey = resource.key;
+    resourceState.projectionKey = resource.projectionKey;
+    const requestId = `${candidate.component.id}:${resource.key}:${generation}`;
+    const startedAt = Date.now();
+    const trigger = this.#nextTrigger;
+    const traceId = this.#nextTraceId;
+    this.#nextTrigger = 'manual';
+    this.#nextTraceId = undefined;
     if (this.options.resourcePort === undefined) {
-      this.applyResourceResult(candidate, mounted, generation, {
+      this.emitObserver('started', resource.key, candidate.component.id, requestId, {
+        startedAt,
+        trigger,
+        traceId,
+      });
+      resourceState.rawValue = undefined;
+      this.applyResourceResult(candidate.component.id, mounted, generation, {
         status: 'error',
         code: 'HOST_RESOURCE_UNAVAILABLE',
         message: 'Host resource port is unavailable.',
       });
+      this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
+        startedAt,
+        trigger,
+        traceId,
+        code: 'HOST_RESOURCE_UNAVAILABLE',
+      });
       return;
     }
     try {
-      const result = await this.options.resourcePort.resolve(
+      const { resolution, shared } = this.#coordinator!.request(
+        resource.key,
+        source.resourceType,
+        candidate.component.id,
         {
           componentId: candidate.component.id,
           resourceType: source.resourceType,
           resourceId: source.resourceId,
           params: resource.params,
         },
-        { signal: controller.signal },
+        {
+          instanceId: this.options.instanceId ?? 'renderer',
+          mode: this.options.executionMode ?? 'viewer',
+          trigger,
+          traceId: traceId ?? '',
+        },
       );
-      if (!result.ok) {
-        this.applyResourceResult(candidate, mounted, generation, {
+      if (!shared) {
+        // 共享请求在首个消费者处发 started；后续消费者只发 shared（coordinator 回调）。
+        this.emitObserver('started', resource.key, candidate.component.id, requestId, {
+          startedAt,
+          trigger,
+          traceId,
+        });
+      }
+      const resolutionValue = await resolution;
+      if (resolutionValue.kind === 'timeout') {
+        resourceState.rawValue = undefined;
+        this.applyResourceResult(candidate.component.id, mounted, generation, {
           status: 'error',
-          code: 'HOST_RESOURCE_FAILED',
-          message: 'Host resource request failed.',
+          code: 'HOST_RESOURCE_TIMEOUT',
+          message: 'Host resource request timed out.',
+        });
+        this.emitObserver('timed-out', resource.key, candidate.component.id, requestId, {
+          startedAt,
+          trigger,
+          traceId,
+          code: 'HOST_RESOURCE_TIMEOUT',
         });
         return;
       }
-      const value = parseScreenJsonValue(result.value, { maxBytes: 1024 * 1024 });
+      if (resolutionValue.kind === 'failure') {
+        resourceState.rawValue = undefined;
+        // The host safe-failure diagnostic is normalized at the material state
+        // boundary: frozen codes (access-denied/unavailable/valid dataset codes)
+        // survive, unknown or internal codes collapse to HOST_RESOURCE_FAILED,
+        // and the host path or raw message never reaches the material - for a
+        // non-frozen code its message is discarded along with the code.
+        const hostError = normalizeScreenMaterialError(resolutionValue.diagnostics.diagnostics[0]);
+        this.applyResourceResult(candidate.component.id, mounted, generation, {
+          status: 'error',
+          code: hostError.code,
+          message: hostError.message,
+        });
+        this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
+          startedAt,
+          trigger,
+          traceId,
+          code: hostError.code,
+        });
+        return;
+      }
+      const value = parseScreenJsonValue(resolutionValue.value, { maxBytes: 1024 * 1024 });
       if (!value.ok) {
-        this.applyResourceResult(candidate, mounted, generation, {
+        resourceState.rawValue = undefined;
+        this.applyResourceResult(candidate.component.id, mounted, generation, {
           status: 'error',
           code: 'HOST_RESOURCE_INVALID',
           message: 'Host resource returned invalid JSON.',
         });
+        this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
+          startedAt,
+          trigger,
+          traceId,
+          code: 'HOST_RESOURCE_INVALID',
+        });
         return;
       }
-      const adapted = this.adaptResourceResult(candidate, value.value);
-      this.applyResourceResult(candidate, mounted, generation, adapted);
+      if (
+        this.#disposed ||
+        this.#mounted.get(candidate.component.id) !== mounted ||
+        resourceState.resourceGeneration !== generation
+      ) {
+        return;
+      }
+      resourceState.rawValue = value.value;
+      const current = this.#candidates.get(candidate.component.id) ?? candidate;
+      const adapted = this.adaptResourceResult(current, value.value);
+      this.applyResourceResult(candidate.component.id, mounted, generation, adapted);
+      if (adapted.status === 'ready') {
+        const tabular = isTabularValue(adapted.value)
+          ? (adapted.value as {
+              readonly fields: readonly unknown[];
+              readonly rows: readonly unknown[];
+            })
+          : undefined;
+        this.emitObserver('succeeded', resource.key, candidate.component.id, requestId, {
+          startedAt,
+          trigger,
+          traceId,
+          fieldCount: tabular?.fields.length,
+          rowCount: tabular?.rows.length,
+        });
+        this.emitObserver('adapted', resource.key, candidate.component.id, requestId, {
+          startedAt,
+          trigger,
+          traceId,
+          fieldCount: tabular?.fields.length,
+          rowCount: tabular?.rows.length,
+        });
+      } else {
+        this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
+          startedAt,
+          trigger,
+          traceId,
+          ...('code' in adapted ? { code: adapted.code } : {}),
+        });
+      }
     } catch {
-      this.applyResourceResult(candidate, mounted, generation, {
+      this.applyResourceResult(candidate.component.id, mounted, generation, {
         status: 'error',
         code: 'HOST_RESOURCE_FAILED',
         message: 'Host resource request failed.',
+      });
+      this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
+        startedAt,
+        trigger,
+        traceId,
+        code: 'HOST_RESOURCE_FAILED',
       });
     }
   }
@@ -435,16 +712,16 @@ class Renderer implements BaseScreenRenderer {
       if (!adapted.ok) {
         return {
           status: 'error',
-          code: 'HOST_DATASET_BINDING_INVALID',
-          message: 'Host dataset binding is invalid.',
+          code: 'HOST_DATASET_ADAPTER_FAILED',
+          message: 'Host dataset adapter failed.',
         };
       }
       const parsed = parseScreenJsonValue(adapted.value, { maxBytes: 1024 * 1024 });
       if (!parsed.ok) {
         return {
           status: 'error',
-          code: 'HOST_DATASET_BINDING_INVALID',
-          message: 'Host dataset binding is invalid.',
+          code: 'HOST_DATASET_ADAPTER_FAILED',
+          message: 'Host dataset adapter failed.',
         };
       }
       return { status: 'ready', value: parsed.value };
@@ -458,46 +735,48 @@ class Renderer implements BaseScreenRenderer {
       );
       return {
         status: 'error',
-        code: 'HOST_DATASET_BINDING_INVALID',
-        message: 'Host dataset binding is invalid.',
+        code: 'HOST_DATASET_ADAPTER_FAILED',
+        message: 'Host dataset adapter failed.',
       };
     }
   }
 
   private applyResourceResult(
-    candidate: RenderCandidate,
+    componentId: string,
     mounted: MountedMaterial,
     generation: number,
     dataState: BaseScreenMaterialDataState,
   ): void {
+    const resourceState = mounted.resource;
     if (
       this.#disposed ||
-      this.#mounted.get(candidate.component.id) !== mounted ||
-      mounted.resourceGeneration !== generation
+      this.#mounted.get(componentId) !== mounted ||
+      resourceState.resourceGeneration !== generation
     ) {
       return;
     }
-    if (mounted.resourceTimer !== undefined) {
-      clearTimeout(mounted.resourceTimer);
-      mounted.resourceTimer = undefined;
+    resourceState.dataState = dataState;
+    const current = this.#candidates.get(componentId);
+    if (current !== undefined) {
+      mounted.element.model = { ...current.model, dataState };
     }
-    mounted.resourceController = undefined;
-    mounted.element.model = { ...candidate.model, dataState };
   }
-}
-
-function cancelResource(mounted: MountedMaterial): void {
-  mounted.resourceGeneration++;
-  if (mounted.resourceTimer !== undefined) {
-    clearTimeout(mounted.resourceTimer);
-    mounted.resourceTimer = undefined;
-  }
-  mounted.resourceController?.abort();
-  mounted.resourceController = undefined;
 }
 
 function isResourceTimeoutValid(value: number): boolean {
   return Number.isInteger(value) && value >= 100 && value <= 60_000;
+}
+
+function isTabularValue(value: ScreenJsonValue): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    'fields' in value &&
+    Array.isArray((value as { readonly fields: unknown }).fields) &&
+    'rows' in value &&
+    Array.isArray((value as { readonly rows: unknown }).rows)
+  );
 }
 
 function prepareCandidates(
@@ -606,8 +885,8 @@ function getDataState(
       return {
         dataState: {
           status: 'error',
-          code: 'HOST_DATASET_PARAMETER_INVALID',
-          message: 'Host dataset parameters are invalid.',
+          code: 'HOST_RESOURCE_FAILED',
+          message: 'Host resource request failed.',
         },
         resource: undefined,
       };
@@ -632,8 +911,8 @@ function getDataState(
         return {
           dataState: {
             status: 'error',
-            code: 'HOST_DATASET_PARAMETER_INVALID',
-            message: 'Host dataset parameters are invalid.',
+            code: 'HOST_RESOURCE_FAILED',
+            message: 'Host resource request failed.',
           },
           resource: undefined,
         };
@@ -657,6 +936,7 @@ function getDataState(
       resource: {
         params: evaluated.value.params,
         key: getHostResourceKey(component, evaluated.value.params),
+        projectionKey: getProjectionKey(component.dataSource),
       },
     };
   }
@@ -692,14 +972,6 @@ function applyMaterial(
   element.style.transform = `rotate(${component.rotation}deg)`;
   element.model = model;
   element.style.display = effectivelyHidden ? 'none' : 'block';
-}
-
-function getHostResourceKey(component: ScreenComponentNode, params: ScreenJsonObject): string {
-  const source = component.dataSource;
-  if (source === null || source.type !== 'host-resource') {
-    throw new Error('Host resource key requires a host-resource source.');
-  }
-  return `${source.resourceType}\u0000${source.resourceId}\u0000${JSON.stringify(params)}\u0000${JSON.stringify(source.binding)}`;
 }
 
 function prefixDiagnostics(

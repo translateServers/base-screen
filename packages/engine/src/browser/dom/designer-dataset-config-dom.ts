@@ -74,7 +74,7 @@ function renderParameters(
     label.className = 'designer-field designer-dataset-parameter';
     const labelText = ownerDocument.createElement('span');
     labelText.className = 'designer-field-label';
-    labelText.textContent = `${parameter.label}${parameter.required ? ' *' : ''}`;
+    labelText.textContent = parameter.label;
     const controls = ownerDocument.createElement('span');
     controls.className = 'designer-dataset-parameter-controls';
     const mode = ownerDocument.createElement('select');

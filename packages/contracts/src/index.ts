@@ -1,5 +1,7 @@
 export {
   MAX_DATASET_BYTES,
+  MAX_DATASET_FIELD_FORMAT_LENGTH,
+  MAX_DATASET_FIELD_UNIT_LENGTH,
   MAX_DATASET_FIELDS,
   MAX_DATASET_PAGE_ITEMS,
   MAX_DATASET_ROWS,
@@ -7,6 +9,16 @@ export {
   parseScreenDatasetPage,
   parseScreenTabularDataset,
 } from './dataset/parse.js';
+export type {
+  NormalizedScreenMaterialError,
+  ScreenMaterialErrorCode,
+} from './diagnostics/material-error.js';
+export {
+  isScreenMaterialErrorCode,
+  MAX_SCREEN_MATERIAL_ERROR_MESSAGE_LENGTH,
+  normalizeScreenMaterialError,
+  SCREEN_MATERIAL_ERROR_CODES,
+} from './diagnostics/material-error.js';
 export { isScreenMaterialType } from './document/identity.js';
 export { SCREEN_DOCUMENT_JSON_SCHEMA } from './document/json-schema.js';
 export {
@@ -61,6 +73,14 @@ export type {
   ScreenVariable,
 } from './types/document.js';
 export type { ScreenProjectEnvelope } from './types/envelope.js';
+export type {
+  ScreenResourceExecutionContext,
+  ScreenResourceExecutionMode,
+  ScreenResourceExecutionTrigger,
+  ScreenResourceObserver,
+  ScreenResourceObserverEvent,
+  ScreenResourceObserverEventType,
+} from './types/execution.js';
 export type {
   ScreenAbortSignal,
   ScreenAssetCatalogPort,
