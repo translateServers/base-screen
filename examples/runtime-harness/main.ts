@@ -374,8 +374,22 @@ Object.assign(window, {
       document.body.appendChild(viewer);
       try {
         await new Promise((resolve) => setTimeout(resolve));
+        const resource = viewer.shadowRoot?.querySelector(
+          '[data-base-screen-component-id="resource"]',
+        ) as
+          | {
+              readonly model?: {
+                readonly dataState?: { readonly status?: string; readonly code?: string };
+              };
+            }
+          | null
+          | undefined;
+        // 非法参数按 configSchema fail-closed：组件进入稳定错误终态（不触发宿主
+        // 查询），且不产生任何诊断（error data state 是面向 material 的契约面）。
         return (
-          diagnostics === 1 &&
+          diagnostics === 0 &&
+          resource?.model?.dataState?.status === 'error' &&
+          resource?.model?.dataState?.code === 'HOST_RESOURCE_FAILED' &&
           activated.value.contributions.hasBlueprintCapability('blueprint.value.variable') &&
           activated.value.contributions.getResourceType('dataset') !== undefined
         );

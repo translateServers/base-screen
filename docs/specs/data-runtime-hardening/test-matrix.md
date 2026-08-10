@@ -1,10 +1,9 @@
 # 测试矩阵
 
-> 状态：生效中（Active，2026-08-09）；DRH-R1-R9 全部行已由本实施批次产出真实测试并标记
-> Verified，并链接回对应任务与清单项。
+> 状态：生效中（Active，2026-08-09）。Review Remediation Batch (2026-08-09) 已全部完成并取证：
+> 本批次新增行均为 Verified（见文末「Review Remediation Batch (2026-08-09)」小节）；
+> XJ RB9 远程/临时环境 E2E 与查询次数演练已于 2026-08-10 真实执行通过（见 XJ 仓库对应任务与清单）。
 > 约定：每个条目写明期望行为证据、命名测试目标与质量门；生产专属验证不在本执行范围内。
-> 目标声明：除标注“已存在”的既有测试文件外，所有命名测试目标均为本实施批次计划新增的意图目标，
-> 不声称已存在或已通过；落地后必须在矩阵中把状态改为 Verified 并链接回对应任务与清单项。
 
 ## DRH-R1 宿主管理数据集边界与唯一文档形态
 
@@ -95,7 +94,7 @@
 | --- | --- | --- | --- |
 | 多组件同指标的可共享查询只调用一次宿主 resolve | Base Screen `packages/renderer/tests/request-coordinator.test.ts`（`shares one in-flight host resolve for identical shareable raw keys` 请求数=1）+ `scripts/verify-browser-harness.mjs`（verify:m0 内执行） | Verified | renderer test + browser harness（verify:m0 exit=0） |
 | 不同 params/不可共享类型的查询保持隔离且计数独立 | `packages/renderer/tests/request-coordinator.test.ts`（`never merges different params or resource ids` / `keeps same-key requests isolated when queryScope is not declared`，独立请求计数） | Verified | renderer test 72/72 |
-| 真实浏览器覆盖选择数据集、绑定字段、保存、重载、Viewer、刷新、错误与恢复 | Base Screen `scripts/verify-browser-harness.mjs`（verify:m0 内真实浏览器 harness：catalog 选择/绑定/预览/刷新/安全失败/超时/取消/实例隔离）；XJ Playwright 演练列为远程/临时环境门禁 | Verified | browser harness（verify:m0 exit=0） |
+| 真实浏览器覆盖选择数据集、绑定字段、保存、重载、Viewer、刷新、错误与恢复 | Base Screen `scripts/verify-browser-harness.mjs`（verify:m0 内真实浏览器 harness：catalog 选择/绑定/预览/刷新/安全失败/超时/取消/实例隔离）；XJ Playwright 已于 2026-08-10 在远程/临时环境真实执行通过（`pnpm test:e2e` `3 passed`） | Verified | browser harness（verify:m0 exit=0） |
 | 无关 render 的 deferred resolve 期间请求不被 abort | `packages/renderer/tests/resource-state-machine.test.ts`（deferred retention 用例，deferred resolve + 无关编辑不 abort、ready 保持、相同 key 单次 resolve） | Verified | renderer test、typecheck |
 | 定向刷新只刷新目标组件；未知 ID 产生零调用 | `packages/renderer/tests/viewer-refresh.test.ts`（`refreshData(componentId) only refreshes the target and leaves others ready` 与 `a targeted refresh with an unknown component id produces zero calls` 用例） | Verified | renderer test、typecheck |
 | 初始/文档变更路径在解析宿主变量前暂停（suspend）旧资源：初始文档加载变量就绪前零资源查询、就绪后所有资源恰好启动一次；文档替换时旧资源被 abort、迟到结果被拒绝，新变量就绪后只解析新文档资源（保留未提交的初始显式 refreshData） | `packages/renderer/tests/viewer-refresh.test.ts`（`starts every current resource exactly once after host variables resolve` 与 `a pending document change suspends the old resources and rejects late results` 用例，观察实际 resolve 调用与 abort 信号） | Verified | renderer test、typecheck |
@@ -103,6 +102,22 @@
 | 同一目标同一 key 的进行中刷新合并，不取消后重启；参数或资源身份变化取消旧请求并立即使用新 key | `packages/renderer/tests/viewer-refresh.test.ts`（`repeated refreshes of the same target while pending coalesce without cancelling` 与 `a changed evaluated param cancels the old request and re-fetches the new identity` 用例，观察实际 resolve 调用与 abort 信号） | Verified | renderer test、typecheck |
 | 变量失败/缺失不触发任何资源查询；变量变化只重查依赖该变量的组件 | `packages/renderer/tests/viewer-refresh.test.ts`（`a failing or missing host variable blocks every resource query` 与 `a variable change only re-queries the components whose params depend on it` 用例） | Verified | renderer test、typecheck |
 | 两个 Viewer 实例的资源与变量端口相互隔离 | `packages/renderer/tests/viewer-refresh.test.ts`（`two viewer instances keep their resource and variable ports isolated` 用例，各自端口请求互不串扰） | Verified | renderer test、typecheck |
+
+## Review Remediation Batch (2026-08-09)
+
+> 本批次为代码评审发现的正确性缺陷修复（ADR-0025 既有要求下的收敛，非新公共契约/ADR）。已取证行
+> 为 Verified；仅 XJ 远程/临时环境 E2E 与查询次数演练保持 Planned。
+
+| 期望行为证据 | 命名测试目标 | 状态 | 门禁 |
+| --- | --- | --- | --- |
+| 未声明 `queryScope`（缺省组件域）的相同 raw key 请求使用独立槽位并各自 settle，互不合并、互不阻塞 | `packages/renderer/tests/request-coordinator.test.ts`（非共享同 key 独立 settle、slot timeout、释放后迟到结果丢弃；显式共享只在同实例内合并） | Verified | renderer test 86/86、typecheck |
+| 同一组件同一 key 的进行中刷新合并，不取消后重启、无重复宿主请求 | `packages/renderer/tests/request-coordinator.test.ts`（`coalesces only the same-component pending refresh, never a non-shareable same-key sibling`）+ `packages/renderer/tests/viewer-refresh.test.ts`（pending refresh） | Verified | renderer test 86/86、typecheck |
+| 每次 resolve 的 trigger/trace 上下文正确独立；initial/document-change/variable/manual/polling 可区分；projectId/documentRevision 流动；observer 事件使用同一正确上下文 | `packages/renderer/tests/observer-events.test.ts`（6/6）+ `packages/renderer/tests/viewer-refresh.test.ts`（17/17：触发区分、手动/轮询 trace、排队刷新上下文、projectId/documentRevision） | Verified | renderer test 88/88、typecheck |
+| Viewer/Designer `configure()` 先校验后变异/初始化；运行时 setter 不独立初始化；仓内消费方使用 `configure()` | `packages/renderer/tests/viewer-configure.test.ts`（10/10：零副作用、可选端口、timeout setter）+ `packages/engine/tests/browser/controllers/designer-runtime-config.test.ts`（7/7）+ `designer-preview-controller.test.ts`（6/6） | Verified | renderer test 93/93、engine test 333/333、typecheck |
+| RB1-RB3 聚焦回归测试与 `pnpm verify:m0` 全量门禁通过 | Base `pnpm verify:m0` + `pnpm verify:browser` | Verified | `VERIFY_M0_EXIT=0`、`VERIFY_TARBALL_EXIT=0`、`VERIFY_BROWSER_EXIT=0` |
+| XJ 告警时间戳含秒、目录 final-page 分页且不超过 50 项 | XJ `DashboardAlertDatasetServiceTest` 19/19 + `DashboardDataServiceTest` 22/22 | Verified | XJ Collect `194/194` |
+| XJ resolve 转发 mode/projectId/documentRevision，Viewer 与并发组件上下文不串值 | XJ `xjViewerConfig.test.ts` 7/7 + `dashboardData.test.ts` 11/11 | Verified | XJ frontend `88/88`、`vue-tsc -b`、build；Collect `194/194` |
+| XJ 真实浏览器 E2E 与查询次数证明 | `frontend/e2e/dashboard-editor.spec.ts` 需配置的真实后端演练 | Planned | `XJ_E2E_BASE_URL`、`XJ_E2E_USERNAME`、`XJ_E2E_PASSWORD` 均 unset；当前执行 `2 skipped` |
 
 ## 生产专属验证（本执行 N/A）
 

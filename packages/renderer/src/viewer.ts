@@ -40,6 +40,9 @@ export interface BaseScreenViewerConfiguration {
   readonly instanceId?: string;
   readonly mode?: ScreenResourceExecutionMode;
   readonly observer?: ScreenResourceObserver;
+  /** 非持久化执行上下文附加信息（RB2）：提供时流入每次 resolve 与 observer 事件。 */
+  readonly projectId?: string;
+  readonly documentRevision?: string;
 }
 
 export type BaseScreenViewerRefreshOptions = {
@@ -71,39 +74,56 @@ export class BaseScreenViewerElement extends ElementBase {
   readonly #pendingRefreshComponents = new Set<string>();
   #nextTrigger: ScreenResourceExecutionTrigger = 'manual';
   #nextTraceId: string | undefined;
+  #hasRenderedDocument = false;
+  #projectId: string | undefined;
+  #documentRevision: string | undefined;
 
   /**
-   * 权威原子配置入口（DRH-R8）：一次提交并校验全部运行时依赖后再创建
-   * Renderer；运行时依赖 setter 不再独立初始化。配置后文档更新仍是显式操作
-   * （设置 document）。
+   * 权威原子配置入口（DRH-R8）：先校验全部运行时依赖（catalog、resource/variable
+   * 端口、runtime contributions、blueprint 端口、timeout），任何一项无效都不做
+   * 任何字段变更、不创建 Renderer（validate before mutate）。配置后文档更新仍是
+   * 显式操作（设置 document）。
    */
   configure(configuration: BaseScreenViewerConfiguration): ScreenParseResult<null> {
     if (this.#renderer !== undefined) {
-      return {
-        ok: false as const,
-        diagnostics: [
-          {
-            severity: 'error',
-            code: 'PLUGIN_CORE_LIFECYCLE_INVALID',
-            path: [],
-            message: 'Viewer 已初始化，请先 unload 再重新配置。',
-          },
-        ],
-      };
+      return lifecycleFailure('Viewer 已初始化，请先 unload 再重新配置。');
+    }
+    if (!isBaseScreenMaterialCatalog(configuration.catalog)) {
+      return lifecycleFailure('Viewer catalog 必须是合法的物料目录。');
     }
     const timeout = configuration.resourceTimeoutMs ?? 15_000;
     if (!Number.isInteger(timeout) || timeout < 100 || timeout > 60_000) {
-      return {
-        ok: false as const,
-        diagnostics: [
-          {
-            severity: 'error',
-            code: 'PLUGIN_CORE_LIFECYCLE_INVALID',
-            path: [],
-            message: 'resourceTimeoutMs 必须是 100..60000 的整数。',
-          },
-        ],
-      };
+      return lifecycleFailure('resourceTimeoutMs 必须是 100..60000 的整数。');
+    }
+    if (
+      configuration.resourcePort !== undefined &&
+      !isScreenHostResourcePort(configuration.resourcePort)
+    ) {
+      return lifecycleFailure('Viewer resource port 必须是含 resolve 的对象。');
+    }
+    if (
+      configuration.variablePort !== undefined &&
+      !isScreenHostVariablePort(configuration.variablePort)
+    ) {
+      return lifecycleFailure('Viewer variable port 必须是含 resolve 的对象。');
+    }
+    if (
+      configuration.runtimeContributions !== undefined &&
+      !isBaseScreenRuntimeContributionIndex(configuration.runtimeContributions)
+    ) {
+      return lifecycleFailure('Viewer runtime contributions 必须是含 getResourceType 的对象。');
+    }
+    if (
+      configuration.blueprintRuntimePort !== undefined &&
+      !isScreenBlueprintRuntimePort(configuration.blueprintRuntimePort)
+    ) {
+      return lifecycleFailure('Viewer blueprint runtime port 必须是含 emit 的对象。');
+    }
+    if (
+      configuration.blueprintHostActionPort !== undefined &&
+      !isScreenBlueprintHostActionPort(configuration.blueprintHostActionPort)
+    ) {
+      return lifecycleFailure('Viewer blueprint host action port 必须是含 execute 的对象。');
     }
     this.#catalog = configuration.catalog;
     this.#resourcePort = configuration.resourcePort;
@@ -115,6 +135,8 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#instanceId = configuration.instanceId ?? 'viewer';
     this.#mode = configuration.mode ?? 'viewer';
     this.#observer = configuration.observer;
+    this.#projectId = configuration.projectId;
+    this.#documentRevision = configuration.documentRevision;
     this.initialize();
     this.startVariableRender(undefined, false, true);
     return { ok: true, value: null, diagnostics: [] };
@@ -124,6 +146,10 @@ export class BaseScreenViewerElement extends ElementBase {
     return this.#catalog;
   }
 
+  /**
+   * 运行时依赖 setter 只保留值、不再独立初始化（RB3）：初始化由 configure /
+   * document 赋值 / connect 控制。
+   */
   set catalog(value: BaseScreenMaterialCatalog | undefined) {
     if (this.#renderer !== undefined && value !== this.#catalog) {
       this.emitLifecycleDiagnostic(
@@ -132,8 +158,6 @@ export class BaseScreenViewerElement extends ElementBase {
       return;
     }
     this.#catalog = value;
-    this.initialize();
-    this.startVariableRender();
   }
 
   get resourcePort(): ScreenHostResourcePort | undefined {
@@ -155,8 +179,8 @@ export class BaseScreenViewerElement extends ElementBase {
       );
       return;
     }
-    if (!Number.isFinite(value) || value <= 0) {
-      this.emitLifecycleDiagnostic('Resource timeout must be a positive finite number.');
+    if (!Number.isInteger(value) || value < 100 || value > 60_000) {
+      this.emitLifecycleDiagnostic('Resource timeout must be an integer between 100 and 60000.');
       return;
     }
     this.#resourceTimeoutMs = value;
@@ -173,13 +197,13 @@ export class BaseScreenViewerElement extends ElementBase {
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
-    if (value === this.#contributionIndex) return;
+    if (this.#renderer !== undefined && value !== this.#contributionIndex) {
+      this.emitLifecycleDiagnostic(
+        'Runtime contributions cannot change after initialization. Call unload first.',
+      );
+      return;
+    }
     this.#contributionIndex = value;
-    this.cancelVariableResolution();
-    this.disposeRenderer();
-    this.compileBlueprint();
-    this.initialize();
-    this.startVariableRender(undefined, false, true);
   }
 
   set resourcePort(value: ScreenHostResourcePort | undefined) {
@@ -234,6 +258,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.cancelVariableResolution();
     this.disposeRenderer();
     this.#document = undefined;
+    this.#hasRenderedDocument = false;
     this.compileBlueprint();
   }
 
@@ -295,8 +320,9 @@ export class BaseScreenViewerElement extends ElementBase {
       ...(this.#observer === undefined ? {} : { observer: this.#observer }),
       ...(this.#instanceId === undefined ? {} : { instanceId: this.#instanceId }),
       ...(this.#mode === undefined ? {} : { executionMode: this.#mode }),
+      ...(this.#projectId === undefined ? {} : { projectId: this.#projectId }),
+      ...(this.#documentRevision === undefined ? {} : { documentRevision: this.#documentRevision }),
     });
-    this.startVariableRender();
   }
 
   private disposeRenderer(): void {
@@ -343,12 +369,24 @@ export class BaseScreenViewerElement extends ElementBase {
       if (!ready) {
         this.#pendingRefreshAll = false;
         this.#pendingRefreshComponents.clear();
+        this.#nextTrigger = 'manual';
+        this.#nextTraceId = undefined;
         return;
       }
-      if (this.#pendingRefreshAll) this.#renderer?.refreshData();
+      // 进行中 refresh 队列完成后补发刷新：携带排队期间记录的 trigger/trace
+      // intent（RB2），避免 polling/trace 在全量刷新中被吞掉。排队意图必须
+      // 在此处消费后才复位，否则 resolveVariablesAndRender 的完成路径会先
+      // 重置它们，导致队列中的 trigger/trace 丢失。
+      const trigger = this.#nextTrigger === 'polling' ? 'polling' : 'manual';
+      const traceId = this.#nextTraceId;
+      if (this.#pendingRefreshAll) this.#renderer?.refreshData(undefined, trigger, traceId);
       else {
-        for (const id of this.#pendingRefreshComponents) this.#renderer?.refreshData(id);
+        for (const id of this.#pendingRefreshComponents) {
+          this.#renderer?.refreshData(id, trigger, traceId);
+        }
       }
+      this.#nextTrigger = 'manual';
+      this.#nextTraceId = undefined;
       this.#pendingRefreshAll = false;
       this.#pendingRefreshComponents.clear();
     });
@@ -362,6 +400,15 @@ export class BaseScreenViewerElement extends ElementBase {
     const document = this.#document;
     const plan = this.#blueprintPlan;
     if (renderer === undefined || document === undefined || plan === undefined) return false;
+    // 按本次操作派生执行上下文（RB2）：显式刷新使用 manual/polling 与提供的
+    // traceId；初始加载使用 initial；文档替换使用 document-change。每次派生
+    // 独立传入，任何组件都不会消费/重置其他组件的 trigger/trace。
+    const trigger: ScreenResourceExecutionTrigger = forceRefresh
+      ? this.#nextTrigger
+      : this.#hasRenderedDocument
+        ? 'document-change'
+        : 'initial';
+    const traceId = forceRefresh ? this.#nextTraceId : undefined;
     const generation = ++this.#variableGeneration;
     const controller = new AbortController();
     this.#variableController = controller;
@@ -423,24 +470,31 @@ export class BaseScreenViewerElement extends ElementBase {
       this.emitDiagnostics(applied.diagnostics);
       return false;
     }
-    const rendered = renderer.render(document);
+    const rendered = renderer.render(document, { trigger, traceId: traceId ?? '' });
     if (!rendered.ok || rendered.diagnostics.length > 0) {
       this.emitDiagnostics(rendered.diagnostics);
       return false;
+    }
+    if (!forceRefresh) {
+      // 首次成功渲染标记完成，后续文档替换使用 document-change 触发。
+      this.#hasRenderedDocument = true;
     }
     // `render()` already starts the first resolve for every newly mounted or
     // identity-changed resource once variables are ready, so a variable change
     // only re-queries the components whose evaluated params depend on it. The
     // explicit refresh below guarantees that all current resources start
     // exactly once on the initial/document load (it coalesces with those first
-    // resolves) and drives the manual full or targeted refresh.
+    // resolves) and drives the manual full or targeted refresh. The derived
+    // traceId is forwarded for both polling and manual refreshes so a manual
+    // refresh with a trace never loses it. `#nextTrigger`/`#nextTraceId` are
+    // intentionally NOT reset here: a refresh queued while this run was
+    // in-flight already stored its own intent, and the completion callback
+    // consumes (and then resets) it after this run settles.
     renderer.refreshData(
       forceRefresh ? componentId : undefined,
-      this.#nextTrigger === 'polling' ? 'polling' : 'manual',
-      this.#nextTraceId,
+      trigger === 'polling' ? 'polling' : 'manual',
+      traceId,
     );
-    this.#nextTrigger = 'manual';
-    this.#nextTraceId = undefined;
     return true;
   }
 
@@ -467,7 +521,7 @@ export class BaseScreenViewerElement extends ElementBase {
     if (renderer !== undefined && document !== undefined) {
       const variables = renderer.setVariables(result.value.variables);
       if (variables.ok) {
-        const rendered = renderer.render(document);
+        const rendered = renderer.render(document, { trigger: 'variable' });
         if (!rendered.ok || rendered.diagnostics.length > 0)
           this.emitDiagnostics(rendered.diagnostics);
       } else {
@@ -540,4 +594,67 @@ async function resolveHostVariable(
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+// ---------------------------------------------------------------------------
+// RB3 原子配置：配置对象形状校验（validate before mutate）。这些校验只做
+// 足够避免坏配置提交/运行时崩溃的形状检查，不发明兼容解析器。
+// ---------------------------------------------------------------------------
+
+function isBaseScreenMaterialCatalog(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).get === 'function' &&
+    typeof (value as Record<string, unknown>).has === 'function' &&
+    typeof (value as Record<string, unknown>).list === 'function'
+  );
+}
+
+function isScreenHostResourcePort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).resolve === 'function'
+  );
+}
+
+function isScreenHostVariablePort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).resolve === 'function'
+  );
+}
+
+function isBaseScreenRuntimeContributionIndex(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).getResourceType === 'function' &&
+    typeof (value as Record<string, unknown>).hasBlueprintCapability === 'function'
+  );
+}
+
+function isScreenBlueprintRuntimePort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).emit === 'function'
+  );
+}
+
+function isScreenBlueprintHostActionPort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).execute === 'function'
+  );
+}
+
+function lifecycleFailure(message: string): ScreenParseResult<null> {
+  return {
+    ok: false as const,
+    diagnostics: [{ severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message }],
+  };
 }

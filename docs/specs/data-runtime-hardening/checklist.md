@@ -1,9 +1,40 @@
 # 验收清单
 
-> 状态：生效中（Active，2026-08-09）。治理已接受，实施进行中；工程适用项仍为待办。
+> 状态：生效中（Active，2026-08-09）。治理已接受；Review Remediation Batch (2026-08-09) 已全部
+> 完成并取证：Base RB1-RB3 与本仓 RB9 自动化门禁已完成，XJ RB9 远程/临时环境演练已于 2026-08-10
+> 真实执行通过（见 XJ 仓库对应任务与清单）；生产专属项 N/A 表述不变。
 > 约定：`[ ]` 表示待办，`[x]` 表示完成或本执行范围消解；生产专属项显式标记
 > `N/A for this execution: not performed, separately authorized production phase required`，
 > 勾选仅表示“本执行不适用/不执行”，不代表生产动作发生，也不作为完成证明。
+
+## Review Remediation Batch (2026-08-09)
+
+> 代码评审整改批次：以下条目是评审发现的正确性缺陷修复；未取证项保持待办（`[ ]`），在聚焦回归测试与
+> 质量门证据落地前不得勾选。本批次属于 ADR-0025 既有要求下的正确性收敛，不新增公共契约、不
+> 引入新 ADR；生产专属 N/A 表述保持不变。
+
+### RB1 请求协调
+
+- [x] 未声明共享（缺省组件域）的相同 raw key 请求使用独立槽位并各自 settle；共享仍仅限显式
+      `queryScope: 'resource'`。（renderer test 86/86，含非共享 slot settle/timeout/late result 与跨实例隔离）
+- [x] 同一组件同一 key 的进行中刷新合并，不取消后重启、不产生重复宿主请求。（`request-coordinator.test.ts`，renderer test 86/86）
+
+### RB2 执行上下文
+
+- [x] 每次 resolve 的 trigger/trace 上下文正确且独立；initial/document-change/variable/
+      manual/polling 触发可区分。（renderer test 88/88，含手动/轮询 trace 与排队刷新回归）
+- [x] projectId/documentRevision 在提供时流动到每次 resolve；observer 事件使用同一正确上下文。（`observer-events.test.ts`
+      6/6；renderer test 88/88）
+
+### RB3 原子配置
+
+- [x] Viewer/Designer `configure()` 先校验后变异/初始化；运行时 setter 不独立初始化；仓内
+      消费方（含 Designer preview）使用 `configure()`。（renderer 93/93、engine 333/333；XJ editor 验收见 XJ RB3）
+
+### RB9 测试与门禁
+
+- [x] RB1-RB3 聚焦回归测试通过；Base Screen `pnpm verify:m0` 全量门禁通过；browser harness
+      通过。（renderer `93/93`、engine `333/333`、`VERIFY_M0_EXIT=0`、`VERIFY_BROWSER_EXIT=0`；生产专属 N/A 表述不变）
 
 ## 文档契约一致性
 
@@ -100,7 +131,7 @@
 ## 证据门禁
 
 - [x] DRH-R1-R9 的每条 test-matrix 证据均指向具体测试名与断言行为并执行通过。（test-matrix 全部行 Verified；`pnpm verify:m0` exit=0）
-- [x] 真实浏览器 E2E 覆盖选择数据集、绑定字段、保存、重载、Viewer、刷新、错误与恢复。（Base browser harness（`verify-browser-harness.mjs`）在 verify:m0 内执行通过，覆盖 catalog 选择/绑定/预览/刷新/安全失败/超时/取消/实例隔离与查询计数；XJ Playwright 演练列为远程/临时环境门禁）
+- [x] 真实浏览器 E2E 覆盖选择数据集、绑定字段、保存、重载、Viewer、刷新、错误与恢复。（Base browser harness（`verify-browser-harness.mjs`）在 verify:m0 内执行通过，覆盖 catalog 选择/绑定/预览/刷新/安全失败/超时/取消/实例隔离与查询计数；XJ Playwright 演练已于 2026-08-10 在远程/临时环境真实执行通过（`pnpm test:e2e` `3 passed`））
 - [x] 查询次数证明覆盖多组件同指标的可共享合并与不可共享隔离。（Base browser harness query-count 断言 + `request-coordinator.test.ts` 请求数断言（合并=1、隔离=独立计数））
 - [x] Base Screen `pnpm verify:m0` 通过；XJ 前端 build 与后端目标模块测试通过。（verify:m0 exit=0；XJ 远程 Collect 170/170 + frontend build 全绿）
 

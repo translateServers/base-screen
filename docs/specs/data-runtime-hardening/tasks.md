@@ -1,9 +1,56 @@
 # 任务清单
 
-> 状态：生效中（Active，2026-08-09）。治理已接受，实施进行中；工程适用项仍为待办。
+> 状态：生效中（Active，2026-08-09）。治理已接受；Review Remediation Batch (2026-08-09) 已全部
+> 完成并取证：Base RB1-RB3 与本仓 RB9 自动化门禁已完成，XJ RB9 远程/临时环境演练已于 2026-08-10
+> 真实执行通过（见 XJ 仓库对应任务与清单）；生产专属项 N/A 表述不变。
 > 约定：`[ ]` 表示待办，`[x]` 表示完成或本执行范围消解；生产专属项显式标记
 > `N/A for this execution: not performed, separately authorized production phase required`，
 > 勾选仅表示“本执行不适用/不执行”，不代表生产动作发生，也不作为完成证明。
+
+## Review Remediation Batch (2026-08-09)
+
+> 代码评审整改批次：以下条目是评审发现的正确性缺陷修复；未取证项保持待办（`[ ]`），在聚焦回归测试与
+> 质量门证据落地前不得勾选。本批次属于 ADR-0025 既有要求（DRH-R2/R3/R7/R8）下的正确性收敛，
+> 不新增公共契约、不引入新 ADR；生产专属 N/A 表述保持不变。
+
+### RB1 请求协调（Base Screen，DRH-R2/R3）
+
+- [x] Renderer：未声明 `queryScope`（缺省组件域）的相同 raw key 请求使用独立槽位并各自
+      settle，互不合并、互不阻塞，均到达正确终态。（`request-coordinator.test.ts`：非共享同 key
+      独立 settle、slot 超时隔离、释放后迟到结果丢弃）
+- [x] Renderer：同一组件同一 key 的进行中刷新合并（coalesce），不取消后重启、不产生重复宿主
+      请求。（`request-coordinator.test.ts`：same-component pending refresh；renderer test 86/86）
+- [x] Renderer：共享仍只对显式 `queryScope: 'resource'` 声明的资源类型开放；缺省不共享的
+      隔离行为有回归测试证明。（`request-coordinator.test.ts`：显式共享、缺省隔离、跨 Renderer
+      实例隔离；renderer test 86/86）
+
+### RB2 执行上下文（Base Screen，DRH-R8）
+
+- [x] Engine/Renderer：每次 resolve 获得正确且独立的 trigger/trace 上下文；
+      initial/document-change/variable/manual/polling 触发可区分且各带正确 traceId。（`viewer-refresh.test.ts`
+      17/17，覆盖触发区分、手动/轮询 trace 与排队刷新意图）
+- [x] Engine/Renderer：提供 projectId/documentRevision 时，两者在每次 resolve 上下文中流动。（`viewer-refresh.test.ts`
+      `forwards projectId and documentRevision into every resolve context when configured`）
+- [x] Renderer：observer 事件（started/shared/succeeded/failed/aborted/timed-out/adapted）
+      携带与对应 resolve 相同的正确执行上下文。（`observer-events.test.ts` 6/6；renderer test 88/88）
+
+### RB3 原子配置（Base Screen，DRH-R8）
+
+- [x] Engine：Viewer/Designer `configure()` 在任何变异/初始化之前完成全部校验（validate
+      before mutate），校验失败不创建 Renderer、零副作用。（renderer `viewer-configure` 10/10；engine
+      `designer-runtime-config` 7/7）
+- [x] Engine：运行时依赖 setter（catalog、runtime contributions、resource/variable 端口、
+      timeout、host adapter）不得独立初始化。（timeout setter 与 configure 同为整数 100..60000；renderer
+      test 93/93、engine test 333/333）
+- [x] 仓内消费方：Designer preview 等仓内消费方迁移到 `configure()`，不再依赖 setter 顺序。
+      （`designer-preview-controller.test.ts` 6/6，含静态 preview 可选端口与配置漂移；XJ editor 侧见 XJ 仓库 RB3）
+
+### RB9 测试与门禁（两仓共同）
+
+- [x] 为 RB1-RB3 添加聚焦回归测试（renderer `request-coordinator`/`viewer-refresh`/
+      `observer-events`、engine 执行上下文与原子配置），相关包 test/typecheck 通过。（renderer `93/93`、engine `333/333`、typecheck 通过）
+- [x] Base Screen `pnpm verify:m0` 全量门禁通过（format/check/lint/typecheck/test/build/
+      check:packages/check:api/verify:tarball）且 browser harness 通过。（`VERIFY_M0_EXIT=0`、`VERIFY_TARBALL_EXIT=0`、`VERIFY_BROWSER_EXIT=0`；生产专属 N/A 项表述不变）
 
 ## 阶段一：文档契约一致性（两仓共同）
 
@@ -162,7 +209,7 @@
 ## 证据与门禁（两仓共同）
 
 - [x] Base Screen：DRH-R1-R9 全部映射到 test-matrix 的具体测试目标并执行通过。（test-matrix 全部行 Verified；`pnpm verify:m0` 全绿 exit=0：format/check/lint/typecheck/test/build/check:packages/check:api/verify:tarball/browser harness）
-- [x] XJ：前端 build、后端目标模块测试、真实浏览器 E2E 与查询次数证明通过。（XJ 远程 Java 25 Collect 170/170 + frontend frozen install/test:unit/check:screen-schema/build 全绿；Base browser harness 覆盖查询次数与浏览器行为，XJ Playwright 演练列为远程/临时环境门禁）
+- [x] XJ：前端 build、后端目标模块测试、真实浏览器 E2E 与查询次数证明通过。（XJ 远程 Java 25 Collect 170/170 + frontend frozen install/test:unit/check:screen-schema/build 全绿；Base browser harness 覆盖查询次数与浏览器行为；XJ Playwright 演练已于 2026-08-10 在远程/临时环境真实执行通过（`pnpm test:e2e` `3 passed`，含 Viewer query-count：同一 `xj_metric` identity 两个组件初始加载只发 1 个真实 resolve POST 并 CAS 恢复文档））
 - [x] 两仓：文档、日志、Schema、fixture 与公共 API 中不存在凭据或连接信息泄露。（远程 bundle 与两仓扫描：无密钥/私钥/生产配置泄露；`git diff --check` 两仓干净；诊断消息与日志只含稳定标识）
 
 ## 生产专属（本执行 N/A：勾选仅表示范围消解，不代表生产动作发生）

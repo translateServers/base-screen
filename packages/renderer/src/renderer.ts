@@ -62,10 +62,22 @@ export interface CreateBaseScreenRendererOptions {
   readonly observer?: ScreenResourceObserver;
   readonly instanceId?: string;
   readonly executionMode?: ScreenResourceExecutionMode;
+  /** 非持久化执行上下文附加信息（RB2）：提供时流入每次 resolve 与 observer 事件。 */
+  readonly projectId?: string;
+  readonly documentRevision?: string;
 }
 
+/** 单次解析的执行上下文（trigger/traceId 由调用方按操作派生，不复用可变全局状态）。 */
+export type ResolveContext = {
+  readonly trigger: ScreenResourceExecutionTrigger;
+  readonly traceId: string;
+};
+
 export interface BaseScreenRenderer {
-  render(document: ScreenDocument): ScreenParseResult<null>;
+  render(
+    document: ScreenDocument,
+    context?: { readonly trigger?: ScreenResourceExecutionTrigger; readonly traceId?: string },
+  ): ScreenParseResult<null>;
   suspendData(): void;
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
@@ -107,8 +119,6 @@ class Renderer implements BaseScreenRenderer {
   #dataSuspended = false;
   #disposed = false;
   #coordinator: ResourceRequestCoordinator | undefined;
-  #nextTrigger: ScreenResourceExecutionTrigger = 'manual';
-  #nextTraceId: string | undefined;
 
   constructor(private readonly options: CreateBaseScreenRendererOptions) {
     if (!isResourceTimeoutValid(options.resourceTimeoutMs ?? 15_000)) {
@@ -120,17 +130,23 @@ class Renderer implements BaseScreenRenderer {
         (resourceType) =>
           options.contributionIndex?.getResourceType(resourceType)?.queryScope === 'resource',
         options.resourceTimeoutMs ?? 15_000,
-        (key, componentId) =>
-          this.emitObserver('shared', key, componentId, undefined, {
-            startedAt: undefined,
-            trigger: 'manual',
-            traceId: undefined,
-          }),
+        (key, componentId, context) =>
+          this.emitObserver(
+            'shared',
+            key,
+            componentId,
+            undefined,
+            context ?? this.defaultExecutionContext(),
+            { startedAt: undefined },
+          ),
       );
     }
   }
 
-  render(document: ScreenDocument): ScreenParseResult<null> {
+  render(
+    document: ScreenDocument,
+    context?: { readonly trigger?: ScreenResourceExecutionTrigger; readonly traceId?: string },
+  ): ScreenParseResult<null> {
     if (this.#disposed) {
       return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Renderer has been disposed.');
     }
@@ -255,8 +271,14 @@ class Renderer implements BaseScreenRenderer {
     this.#mounted = next;
     this.#candidates = new Map(candidates.map((candidate) => [candidate.component.id, candidate]));
     this.#document = parsedDocument.value;
+    // 整次 render 共享同一份按操作派生的上下文（RB2）：resolve 与它的全部
+    // observer 事件使用同一 context 对象数据，且不被其他组件消费/重置。
+    const renderContext: ResolveContext = {
+      trigger: context?.trigger ?? 'manual',
+      traceId: context?.traceId ?? '',
+    };
     for (const { candidate, mounted } of pendingResolves) {
-      void this.resolveHostResource(candidate, mounted);
+      void this.resolveHostResource(candidate, mounted, renderContext);
     }
     if (runtimeDiagnostics.length > 0) {
       for (const diagnostic of runtimeDiagnostics) {
@@ -283,18 +305,18 @@ class Renderer implements BaseScreenRenderer {
 
   /**
    * Tears down a mounted component's host request: bumps its generation, removes
-   * the shared-coordinator subscription (last consumer leaving aborts the host
-   * request) and clears any in-flight marker.
+   * the shared-coordinator subscription by its opaque slot id (last consumer
+   * leaving aborts the host request) and clears any in-flight marker.
    */
   private cancelHostResource(mounted: MountedMaterial, componentId: string): void {
     const key = mounted.resource.resourceKey;
+    const slotId = mounted.resource.requestSlotId;
+    const context = mounted.resource.executionContext ?? this.defaultExecutionContext();
     cancelResourceState(mounted.resource);
     if (key !== undefined) {
-      this.#coordinator?.release(key, componentId);
-      this.emitObserver('aborted', key, componentId, undefined, {
+      if (slotId !== undefined) this.#coordinator?.release(slotId, componentId);
+      this.emitObserver('aborted', key, componentId, undefined, context, {
         startedAt: undefined,
-        trigger: 'manual',
-        traceId: undefined,
       });
     }
   }
@@ -305,10 +327,9 @@ class Renderer implements BaseScreenRenderer {
     key: string,
     componentId: string,
     requestId: string | undefined,
+    context: ScreenResourceExecutionContext,
     meta: {
       readonly startedAt: number | undefined;
-      readonly trigger: ScreenResourceExecutionTrigger;
-      readonly traceId: string | undefined;
       readonly fieldCount?: number | undefined;
       readonly rowCount?: number | undefined;
       readonly code?: string | undefined;
@@ -317,12 +338,6 @@ class Renderer implements BaseScreenRenderer {
     const observer = this.options.observer;
     if (observer === undefined) return;
     const [resourceType, resourceId] = key.split('\u0000');
-    const context: ScreenResourceExecutionContext = {
-      instanceId: this.options.instanceId ?? 'renderer',
-      mode: this.options.executionMode ?? 'viewer',
-      trigger: meta.trigger,
-      traceId: meta.traceId ?? '',
-    };
     try {
       observer({
         type,
@@ -341,6 +356,16 @@ class Renderer implements BaseScreenRenderer {
     }
   }
 
+  /** 无上下文可追溯时的稳定默认执行上下文。 */
+  private defaultExecutionContext(): ScreenResourceExecutionContext {
+    return {
+      instanceId: this.options.instanceId ?? 'renderer',
+      mode: this.options.executionMode ?? 'viewer',
+      trigger: 'manual',
+      traceId: '',
+    };
+  }
+
   suspendData(): void {
     this.#dataSuspended = true;
     this.#coordinator?.abortAll();
@@ -350,6 +375,7 @@ class Renderer implements BaseScreenRenderer {
       resource.resourceKey = undefined;
       resource.projectionKey = undefined;
       resource.rawValue = undefined;
+      resource.requestSlotId = undefined;
       resource.dataState = { status: 'loading' };
       const candidate = this.#candidates.get(componentId);
       if (candidate !== undefined && candidate.resource !== undefined) {
@@ -359,13 +385,17 @@ class Renderer implements BaseScreenRenderer {
   }
 
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void {
-    this.#nextTrigger = trigger === 'polling' ? 'polling' : 'manual';
-    if (traceId !== undefined) this.#nextTraceId = traceId;
+    // 每次 refresh 操作派生一份上下文，逐组件传给 resolve（RB2）：全量刷新中
+    // 任一组件都不会消费/重置其他组件的 trigger 或 trace。
+    const refreshContext: ResolveContext = {
+      trigger: trigger === 'polling' ? 'polling' : 'manual',
+      traceId: traceId ?? '',
+    };
     for (const [id, candidate] of this.#candidates) {
       if (componentId !== undefined && componentId !== id) continue;
       const mounted = this.#mounted.get(id);
       if (mounted !== undefined && candidate.resource !== undefined) {
-        void this.resolveHostResource(candidate, mounted, true);
+        void this.resolveHostResource(candidate, mounted, refreshContext, true);
       }
     }
   }
@@ -412,6 +442,7 @@ class Renderer implements BaseScreenRenderer {
       resourceState.resourceKey = undefined;
       resourceState.projectionKey = undefined;
       resourceState.rawValue = undefined;
+      resourceState.requestSlotId = undefined;
       resourceState.dataState = candidate.model.dataState;
       this.applyMountedModel(candidate, mounted, document, stackOrder);
       return undefined;
@@ -487,6 +518,7 @@ class Renderer implements BaseScreenRenderer {
   private async resolveHostResource(
     candidate: RenderCandidate,
     mounted: MountedMaterial,
+    context: ResolveContext,
     refresh = false,
   ): Promise<void> {
     const source = candidate.component.dataSource;
@@ -495,49 +527,73 @@ class Renderer implements BaseScreenRenderer {
       return;
     }
     const resourceState = mounted.resource;
-    if (refresh && this.#coordinator !== undefined && this.#coordinator.isPending(resource.key)) {
-      // Same raw identity is already in flight through the coordinator: coalesce
-      // instead of cancel/restart.
+    if (
+      refresh &&
+      this.#coordinator !== undefined &&
+      resourceState.requestSlotId !== undefined &&
+      this.#coordinator.isPending(resourceState.requestSlotId)
+    ) {
+      // 同一组件同一 raw identity 已在该组件的槽位上 in-flight：合并，不取消后
+      // 重启。槽位按组件独立（未声明共享时），因此不会把不同组件的相同 raw
+      // key 请求错误合并。
       return;
     }
-    const previousKey = resourceState.resourceKey;
-    if (previousKey !== undefined && previousKey !== resource.key) {
-      // Raw identity changed: leave the old shared subscription before starting
-      // the new one (last consumer leaving aborts the old host request).
-      this.#coordinator?.release(previousKey, candidate.component.id);
+    // Raw identity 变化（或上次请求已结束）时离开旧槽位：按不透明槽位 ID 释放，
+    // 最后一个消费者离开会 abort 旧宿主请求。
+    if (resourceState.requestSlotId !== undefined) {
+      this.#coordinator?.release(resourceState.requestSlotId, candidate.component.id);
     }
     cancelResourceState(resourceState);
     const generation = resourceState.resourceGeneration;
     resourceState.resourceKey = resource.key;
     resourceState.projectionKey = resource.projectionKey;
+    // 按次解析的执行上下文：resolve、宿主端口与它的全部 observer 事件共享同一
+    // 对象数据，且为本次操作独立派生（RB2）。
+    const executionContext: ScreenResourceExecutionContext = {
+      instanceId: this.options.instanceId ?? 'renderer',
+      mode: this.options.executionMode ?? 'viewer',
+      trigger: context.trigger,
+      traceId: context.traceId,
+      ...(this.options.projectId === undefined ? {} : { projectId: this.options.projectId }),
+      ...(this.options.documentRevision === undefined
+        ? {}
+        : { documentRevision: this.options.documentRevision }),
+    };
+    resourceState.executionContext = executionContext;
     const requestId = `${candidate.component.id}:${resource.key}:${generation}`;
     const startedAt = Date.now();
-    const trigger = this.#nextTrigger;
-    const traceId = this.#nextTraceId;
-    this.#nextTrigger = 'manual';
-    this.#nextTraceId = undefined;
     if (this.options.resourcePort === undefined) {
-      this.emitObserver('started', resource.key, candidate.component.id, requestId, {
-        startedAt,
-        trigger,
-        traceId,
-      });
+      this.emitObserver(
+        'started',
+        resource.key,
+        candidate.component.id,
+        requestId,
+        executionContext,
+        {
+          startedAt,
+        },
+      );
       resourceState.rawValue = undefined;
       this.applyResourceResult(candidate.component.id, mounted, generation, {
         status: 'error',
         code: 'HOST_RESOURCE_UNAVAILABLE',
         message: 'Host resource port is unavailable.',
       });
-      this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
-        startedAt,
-        trigger,
-        traceId,
-        code: 'HOST_RESOURCE_UNAVAILABLE',
-      });
+      this.emitObserver(
+        'failed',
+        resource.key,
+        candidate.component.id,
+        requestId,
+        executionContext,
+        {
+          startedAt,
+          code: 'HOST_RESOURCE_UNAVAILABLE',
+        },
+      );
       return;
     }
     try {
-      const { resolution, shared } = this.#coordinator!.request(
+      const { resolution, shared, slotId } = this.#coordinator!.request(
         resource.key,
         source.resourceType,
         candidate.component.id,
@@ -547,20 +603,21 @@ class Renderer implements BaseScreenRenderer {
           resourceId: source.resourceId,
           params: resource.params,
         },
-        {
-          instanceId: this.options.instanceId ?? 'renderer',
-          mode: this.options.executionMode ?? 'viewer',
-          trigger,
-          traceId: traceId ?? '',
-        },
+        executionContext,
       );
+      resourceState.requestSlotId = slotId;
       if (!shared) {
         // 共享请求在首个消费者处发 started；后续消费者只发 shared（coordinator 回调）。
-        this.emitObserver('started', resource.key, candidate.component.id, requestId, {
-          startedAt,
-          trigger,
-          traceId,
-        });
+        this.emitObserver(
+          'started',
+          resource.key,
+          candidate.component.id,
+          requestId,
+          executionContext,
+          {
+            startedAt,
+          },
+        );
       }
       const resolutionValue = await resolution;
       if (resolutionValue.kind === 'timeout') {
@@ -570,12 +627,17 @@ class Renderer implements BaseScreenRenderer {
           code: 'HOST_RESOURCE_TIMEOUT',
           message: 'Host resource request timed out.',
         });
-        this.emitObserver('timed-out', resource.key, candidate.component.id, requestId, {
-          startedAt,
-          trigger,
-          traceId,
-          code: 'HOST_RESOURCE_TIMEOUT',
-        });
+        this.emitObserver(
+          'timed-out',
+          resource.key,
+          candidate.component.id,
+          requestId,
+          executionContext,
+          {
+            startedAt,
+            code: 'HOST_RESOURCE_TIMEOUT',
+          },
+        );
         return;
       }
       if (resolutionValue.kind === 'failure') {
@@ -591,12 +653,17 @@ class Renderer implements BaseScreenRenderer {
           code: hostError.code,
           message: hostError.message,
         });
-        this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
-          startedAt,
-          trigger,
-          traceId,
-          code: hostError.code,
-        });
+        this.emitObserver(
+          'failed',
+          resource.key,
+          candidate.component.id,
+          requestId,
+          executionContext,
+          {
+            startedAt,
+            code: hostError.code,
+          },
+        );
         return;
       }
       const value = parseScreenJsonValue(resolutionValue.value, { maxBytes: 1024 * 1024 });
@@ -607,12 +674,17 @@ class Renderer implements BaseScreenRenderer {
           code: 'HOST_RESOURCE_INVALID',
           message: 'Host resource returned invalid JSON.',
         });
-        this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
-          startedAt,
-          trigger,
-          traceId,
-          code: 'HOST_RESOURCE_INVALID',
-        });
+        this.emitObserver(
+          'failed',
+          resource.key,
+          candidate.component.id,
+          requestId,
+          executionContext,
+          {
+            startedAt,
+            code: 'HOST_RESOURCE_INVALID',
+          },
+        );
         return;
       }
       if (
@@ -633,27 +705,42 @@ class Renderer implements BaseScreenRenderer {
               readonly rows: readonly unknown[];
             })
           : undefined;
-        this.emitObserver('succeeded', resource.key, candidate.component.id, requestId, {
-          startedAt,
-          trigger,
-          traceId,
-          fieldCount: tabular?.fields.length,
-          rowCount: tabular?.rows.length,
-        });
-        this.emitObserver('adapted', resource.key, candidate.component.id, requestId, {
-          startedAt,
-          trigger,
-          traceId,
-          fieldCount: tabular?.fields.length,
-          rowCount: tabular?.rows.length,
-        });
+        this.emitObserver(
+          'succeeded',
+          resource.key,
+          candidate.component.id,
+          requestId,
+          executionContext,
+          {
+            startedAt,
+            fieldCount: tabular?.fields.length,
+            rowCount: tabular?.rows.length,
+          },
+        );
+        this.emitObserver(
+          'adapted',
+          resource.key,
+          candidate.component.id,
+          requestId,
+          executionContext,
+          {
+            startedAt,
+            fieldCount: tabular?.fields.length,
+            rowCount: tabular?.rows.length,
+          },
+        );
       } else {
-        this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
-          startedAt,
-          trigger,
-          traceId,
-          ...('code' in adapted ? { code: adapted.code } : {}),
-        });
+        this.emitObserver(
+          'failed',
+          resource.key,
+          candidate.component.id,
+          requestId,
+          executionContext,
+          {
+            startedAt,
+            ...('code' in adapted ? { code: adapted.code } : {}),
+          },
+        );
       }
     } catch {
       this.applyResourceResult(candidate.component.id, mounted, generation, {
@@ -661,12 +748,17 @@ class Renderer implements BaseScreenRenderer {
         code: 'HOST_RESOURCE_FAILED',
         message: 'Host resource request failed.',
       });
-      this.emitObserver('failed', resource.key, candidate.component.id, requestId, {
-        startedAt,
-        trigger,
-        traceId,
-        code: 'HOST_RESOURCE_FAILED',
-      });
+      this.emitObserver(
+        'failed',
+        resource.key,
+        candidate.component.id,
+        requestId,
+        executionContext,
+        {
+          startedAt,
+          code: 'HOST_RESOURCE_FAILED',
+        },
+      );
     }
   }
 

@@ -1,7 +1,9 @@
 # Data Runtime Hardening 规格
 
-> 状态：生效中（Active）
-> 最近更新：2026-08-09
+> 状态：生效中（Active）。Review Remediation Batch (2026-08-09) 已全部完成并取证（Base
+> RB1-RB3、本仓 RB9 自动化门禁，以及 XJ RB9 远程/临时环境演练，见第 7 节与 XJ 仓库对应产物）；
+> 生产专属项 N/A 表述不变。
+> 最近更新：2026-08-10
 > 依据：[ADR-0025](../../decisions/ADR-0025-data-runtime-hardening.md)（已接受）、[ADR-0023](../../decisions/ADR-0023-host-dataset-resource-integration.md)、[ADR-0010](../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)
 > 计划：[实施计划](../../plans/data-runtime-hardening/implementation-plan.md)
 > 任务：[tasks.md](./tasks.md)
@@ -191,3 +193,35 @@ SHALL NOT 呈现为 material 错误，且 abort 没有面向 material 的码。
 - Material 可区分 loading、empty、ready、error；诊断与事件不含敏感载荷。
 - 设计态、预览态与 Viewer 对同一文档、变量与数据返回一致结果。
 - 两仓必需质量门、真实浏览器 E2E 与查询次数证明全部通过；生产 smoke 不在本执行范围内。
+- Review Remediation Batch (2026-08-09) 的全部适用修复项具备自动化证据并勾选（见第 7 节）。
+
+## 7. Review Remediation Batch（2026-08-09）
+
+> 评审整改批次：以下修复是代码评审发现的正确性缺陷，属于 ADR-0025 既有要求（DRH-R2/R3/R7/R8）
+> 下的正确性收敛，不是新公共契约，也不引入新 ADR；版本化/兼容形态要求保持不变。对应
+> `tasks.md`/`checklist.md` 中「Review Remediation Batch (2026-08-09)」小节全部为已勾选
+> （`[x]`）状态，本规格已声明完成。生产专属 N/A 表述保持不变。
+
+1. **请求协调（RB1）**：未声明 `queryScope`（缺省组件域）的相同 raw key 请求必须使用独立槽位
+   并各自 settle；同一组件同一 key 的进行中刷新合并（coalesce）；共享仍仅限显式
+   `queryScope: 'resource'` 声明的资源类型。
+2. **执行上下文（RB2）**：每次 resolve 获得正确且独立的 trigger/trace 上下文；
+   initial/document-change/variable/manual/polling 触发必须可区分；提供
+   projectId/documentRevision 时两者必须流动；observer 事件使用同一正确上下文。
+3. **原子配置（RB3）**：Viewer/Designer `configure()` 在任何变异/初始化前校验全部运行时依赖；
+   运行时 setter 不得独立初始化；仓内消费方（含 Designer preview）与 XJ editor 使用
+   `configure()`。
+4. **XJ ScreenDocument 持久化语义拒绝（RB4，XJ 仓库跟踪）**：XJ 保存与 stored-read 边界拒绝
+   Base contracts parser 拒绝的语义用例（至少：重复 component ID、缺失/自引用/循环 parent、
+   重复 variables/rules、未知 blueprint trigger/action 引用）。
+5. **XJ 数据集呈现（RB5，XJ 仓库跟踪）**：material-facing 错误态与 empty/loading 严格区分，
+   只携带安全 code/message；HTTP 处理归一化前不得 toast 后端不安全诊断文本。
+6. **XJ 身份失效（RB6，XJ 仓库跟踪）**：数据失效响应真实响应式 auth 身份变化（登出、token
+   替换、租户/身份键），不依赖 localStorage 读取。
+7. **XJ 告警数据集（RB7，XJ 仓库跟踪）**：时间戳输出含秒的 parser-valid ISO；目录分页完整且
+   不超过 Base Screen 最大 50 项；final-page 告警用例有测试。
+8. **XJ resolve 上下文转发（RB8，XJ 仓库跟踪）**：按适用转发 mode/projectId/documentRevision；
+   全量轮询/手动刷新不丢失 per-component 上下文。
+9. **测试与门禁（RB9）** `[x]`：两仓为上述修复添加聚焦回归测试并运行相关包 test/typecheck 与全量
+   必需门禁（Base `pnpm verify:m0` 全绿；XJ 前端 build/unit 与后端 Collect 测试通过，Viewer
+   query-count E2E 已于 2026-08-10 在远程/临时环境真实执行通过）；生产专属动作保持 N/A 表述不变。

@@ -3,6 +3,7 @@ import {
   component,
   createDeferredResourcePort,
   createHostResourceCatalog,
+  createImmediateResourcePort,
   createVariablePort,
   createViewerHarness,
   diagnosticCodes,
@@ -531,5 +532,258 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     expect(resourcesB.requests).toHaveLength(1);
     expect(variablesA.requests).toHaveLength(2);
     expect(variablesB.requests).toHaveLength(1);
+  });
+
+  it('a full polling refresh keeps polling and the same traceId for every component (RB2)', async () => {
+    const variables = createVariablePort({ region: 'north' });
+    const resources = createDeferredResourcePort();
+    const catalog = createHostResourceCatalog();
+    const screen = document([
+      component('a', hostSource('orders')),
+      component('b', hostSource('products')),
+    ]);
+    const { viewer } = await createViewerHarness({
+      catalog,
+      document: screen,
+      resourcePort: resources.port,
+      variablePort: variables.port,
+    });
+    await flush();
+    expect(resources.requests).toHaveLength(2);
+    resolveAll(resources.requests);
+    await flush();
+
+    viewer.refreshData({ trigger: 'polling', traceId: 'poll-trace-1' });
+    await flush();
+
+    // 全量轮询刷新：每个组件的 resolve 上下文都是 polling 且共享同一 traceId，
+    // 任一组件都不消费/重置其他组件的 trigger/trace。
+    const after = resources.requests.slice(2);
+    expect(after.map((request) => request.request.componentId).sort()).toEqual(['a', 'b']);
+    for (const request of after) {
+      expect(request.context?.trigger).toBe('polling');
+      expect(request.context?.traceId).toBe('poll-trace-1');
+    }
+    viewer.unload();
+  });
+
+  it('a manual refresh with a traceId keeps manual trigger and the traceId (RB2)', async () => {
+    const variables = createVariablePort({ region: 'north' });
+    const resources = createDeferredResourcePort();
+    const catalog = createHostResourceCatalog();
+    const screen = document([
+      component('a', hostSource('orders')),
+      component('b', hostSource('products')),
+    ]);
+    const { viewer } = await createViewerHarness({
+      catalog,
+      document: screen,
+      resourcePort: resources.port,
+      variablePort: variables.port,
+    });
+    await flush();
+    expect(resources.requests).toHaveLength(2);
+    resolveAll(resources.requests);
+    await flush();
+
+    viewer.refreshData({ trigger: 'manual', traceId: 'manual-trace-1' });
+    await flush();
+
+    // 手动刷新同样携带 traceId（RB2）：manual trigger 下的 trace 不得被吞掉。
+    const after = resources.requests.slice(2);
+    expect(after.map((request) => request.request.componentId).sort()).toEqual(['a', 'b']);
+    for (const request of after) {
+      expect(request.context?.trigger).toBe('manual');
+      expect(request.context?.traceId).toBe('manual-trace-1');
+    }
+    viewer.unload();
+  });
+
+  it('a refresh queued during an in-flight refresh keeps its own trigger and traceId (RB2)', async () => {
+    const variables = createVariablePort({ region: 'north' }, true);
+    const resources = createImmediateResourcePort();
+    const catalog = createHostResourceCatalog();
+    const screen = document(
+      [component('a', hostSource('orders')), component('b', hostSource('products'))],
+      [hostVariable('region', 'region')],
+    );
+    const { viewer } = await createViewerHarness({
+      catalog,
+      document: screen,
+      resourcePort: resources.port,
+      variablePort: variables.port,
+    });
+
+    // Initial load: the deferred variable resolves and both resources start.
+    expect(variables.requests).toHaveLength(1);
+    variables.requests[0]!.resolveRequest({
+      ok: true,
+      value: 'north',
+      diagnostics: [],
+    });
+    await flush();
+    expect(resources.requests).toHaveLength(2);
+    expect(resources.requests.every((request) => request.context?.trigger === 'initial')).toBe(
+      true,
+    );
+
+    // A manual refresh starts a fresh variable resolution; while that variable
+    // is pending a polling refresh is queued with its own traceId. The queued
+    // intent must survive the completing manual refresh instead of being reset
+    // before the completion callback consumes it.
+    viewer.refreshData({ trigger: 'manual', traceId: 'manual-trace-1' });
+    expect(variables.requests).toHaveLength(2);
+    viewer.refreshData({ trigger: 'polling', traceId: 'poll-trace-2' });
+    expect(variables.requests).toHaveLength(2);
+    expect(resources.requests).toHaveLength(2);
+
+    variables.requests[1]!.resolveRequest({
+      ok: true,
+      value: 'north',
+      diagnostics: [],
+    });
+    await flush();
+
+    // The manual refresh re-issues every component with its own context; the
+    // queued polling refresh is then replayed with the queued trigger/trace.
+    const after = resources.requests.slice(2);
+    expect(after.map((request) => request.request.componentId)).toEqual(['a', 'b', 'a', 'b']);
+    const manual = after.slice(0, 2);
+    const queued = after.slice(2);
+    for (const request of manual) {
+      expect(request.context?.trigger).toBe('manual');
+      expect(request.context?.traceId).toBe('manual-trace-1');
+    }
+    for (const request of queued) {
+      expect(request.context?.trigger).toBe('polling');
+      expect(request.context?.traceId).toBe('poll-trace-2');
+    }
+    expect(resources.requests.filter((request) => request.aborted)).toHaveLength(0);
+    viewer.unload();
+  });
+
+  it('derives initial / document-change / variable triggers for the matching operations (RB2)', async () => {
+    const variables = createVariablePort({ region: 'north' });
+    const resources = createDeferredResourcePort();
+    const catalog = createHostResourceCatalog(['change']);
+    const initial = document(
+      [
+        component('a', hostSource('orders', { region: { kind: 'variable', name: 'region' } })),
+        component('trigger'),
+      ],
+      [hostVariable('region', 'region')],
+      {
+        rules: [
+          {
+            id: 'set-region',
+            trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'region',
+                value: { kind: 'literal', value: 'south' },
+              },
+            ],
+          },
+        ],
+      },
+    );
+    const { viewer, mount } = await createViewerHarness({
+      catalog,
+      document: initial,
+      resourcePort: resources.port,
+      variablePort: variables.port,
+    });
+    await flush();
+
+    // initial：首载解析。
+    expect(resources.requests[0]?.context?.trigger).toBe('initial');
+    expect(resources.requests[0]?.context?.traceId).toBe('');
+    resolveAll(resources.requests);
+    await flush();
+
+    // document-change：替换文档（保留 blueprint 规则以便继续触发 variable）。
+    const replacement = document(
+      [
+        component('a', hostSource('orders', { region: { kind: 'variable', name: 'region' } })),
+        component('trigger'),
+      ],
+      [hostVariable('region', 'region')],
+      {
+        rules: [
+          {
+            id: 'set-region',
+            trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'region',
+                value: { kind: 'literal', value: 'south' },
+              },
+            ],
+          },
+        ],
+      },
+    );
+    viewer.document = replacement;
+    await flush();
+    const documentChange = resources.requests.filter(
+      (request) => request.context?.trigger === 'document-change',
+    );
+    expect(documentChange).toHaveLength(1);
+    resolveAll(resources.requests);
+    await flush();
+
+    // variable：blueprint 物料事件驱动重渲染。
+    const trigger = mount.children.find(
+      (element) => element.dataset.baseScreenComponentId === 'trigger',
+    )!;
+    trigger.fire({ name: 'change', payload: {} });
+    await flush();
+    const variableResolves = resources.requests.filter(
+      (request) => request.context?.trigger === 'variable',
+    );
+    expect(variableResolves.length).toBeGreaterThanOrEqual(1);
+    // 参数变化后同一组件仍带正确上下文（variable）。
+    expect(variableResolves[variableResolves.length - 1]!.request.params).toEqual({
+      region: 'south',
+    });
+    viewer.unload();
+  });
+
+  it('forwards projectId and documentRevision into every resolve context when configured (RB2)', async () => {
+    const variables = createVariablePort({ region: 'north' });
+    const resources = createDeferredResourcePort();
+    const catalog = createHostResourceCatalog();
+    const screen = document([
+      component('a', hostSource('orders')),
+      component('b', hostSource('products')),
+    ]);
+    const { viewer } = await createViewerHarness({
+      catalog,
+      document: screen,
+      resourcePort: resources.port,
+      variablePort: variables.port,
+      projectId: 'proj-1',
+      documentRevision: 'rev-7',
+    });
+    await flush();
+
+    expect(resources.requests).toHaveLength(2);
+    for (const request of resources.requests) {
+      expect(request.context?.projectId).toBe('proj-1');
+      expect(request.context?.documentRevision).toBe('rev-7');
+    }
+    resolveAll(resources.requests);
+    await flush();
+
+    // 手动刷新后的新 resolve 同样携带配置的 projectId/documentRevision。
+    viewer.refreshData('a');
+    await flush();
+    const refreshed = resources.requests[2]!;
+    expect(refreshed.context?.projectId).toBe('proj-1');
+    expect(refreshed.context?.documentRevision).toBe('rev-7');
+    expect(refreshed.context?.trigger).toBe('manual');
+    viewer.unload();
   });
 });

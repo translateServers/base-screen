@@ -415,17 +415,13 @@ const datasetCatalog = {
           {
             name: 'limit',
             label: '行数',
-            valueType: 'number' as const,
             editor: 'number' as const,
-            required: true,
             defaultValue: 2,
           },
           {
             name: 'region',
             label: '区域',
-            valueType: 'string' as const,
             editor: 'text' as const,
-            required: true,
           },
         ],
       },

@@ -49,4 +49,10 @@ ADR-0025 已于 2026-08-09 接受，治理已接受、实施进行中；相关�
 [Data Runtime Hardening Spec](../specs/data-runtime-hardening/spec.md)，XJ 侧见
 XJ Data Hub 仓库 `.agent/specs/data-runtime-hardening/spec.md`。
 
+| [ADR-0026](./ADR-0026-designer-event-blueprint-authoring.md) | 设计中，待人工确认 | 2026-08-10 | Designer 事件 Blueprint 图形/表单作者闭环与候选准入门 |
+
+ADR-0026 在人工确认前不作为实现授权；评估报告与实施计划见
+[Designer Event Blueprint](../specs/designer-event-blueprint/spec.md) 和
+[候选评估报告](../plans/designer-event-blueprint/dependency-evaluation.md)。
+
 相关背景、实施计划和规格入口见 [文档索引](../README.md)。

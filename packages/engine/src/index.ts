@@ -600,30 +600,78 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   /**
-   * 权威原子配置入口（DRH-R8）：一次提交并校验全部运行时依赖（catalog、
-   * runtime contributions、resource/variable/dataset 端口、timeout、host
-   * adapter）后再创建 Renderer；配置后运行时依赖 setter 不再独立初始化。
+   * 权威原子配置入口（DRH-R8）：先校验全部运行时依赖（catalog、resource/variable
+   * 端口、runtime contributions、host adapter）后再做任何字段变更、再创建
+   * Renderer（validate before mutate）。校验失败零副作用：既有字段与 session
+   * 保持原样。配置后运行时依赖 setter 不再独立初始化。
    */
   configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null> {
     if (this.#renderer !== undefined) {
       return {
-        ok: false as const,
+        ok: false,
         diagnostics: [lifecycleDiagnostic('Designer 已初始化，请先 unload 再重新配置。')],
       };
     }
+    if (!isBaseScreenMaterialCatalog(configuration.catalog)) {
+      return {
+        ok: false,
+        diagnostics: [lifecycleDiagnostic('Designer catalog 必须是合法的物料目录。')],
+      };
+    }
+    if (
+      configuration.resourcePort !== undefined &&
+      !isScreenHostResourcePort(configuration.resourcePort)
+    ) {
+      return {
+        ok: false,
+        diagnostics: [lifecycleDiagnostic('Designer resource port 必须是含 resolve 的对象。')],
+      };
+    }
+    if (
+      configuration.variablePort !== undefined &&
+      !isScreenHostVariablePort(configuration.variablePort)
+    ) {
+      return {
+        ok: false,
+        diagnostics: [lifecycleDiagnostic('Designer variable port 必须是含 resolve 的对象。')],
+      };
+    }
+    if (
+      configuration.runtimeContributions !== undefined &&
+      !isBaseScreenRuntimeContributionIndex(configuration.runtimeContributions)
+    ) {
+      return {
+        ok: false,
+        diagnostics: [
+          lifecycleDiagnostic('Designer runtime contributions 必须是含 getResourceType 的对象。'),
+        ],
+      };
+    }
+    let adapter: ScreenDesignerHostAdapter | undefined;
     if (configuration.designerHostAdapter !== undefined) {
       const parsed = validateScreenDesignerHostAdapter(configuration.designerHostAdapter);
       if (!parsed.ok) {
         return { ok: false, diagnostics: parsed.diagnostics };
       }
-      this.#designerHostAdapter = parsed.value;
-      this.#assetCatalogPort = parsed.value.assets;
-      this.#projectCatalogPort = parsed.value.projectCatalog;
-      this.#projectPreviewPort = parsed.value.projectPreview;
-      this.#projectSnapshotPort = parsed.value.projectSnapshots;
-      this.#resourcePort = parsed.value.resources;
-      this.#variablePort = parsed.value.variables;
-      this.#datasetCatalogPort = parsed.value.datasetCatalog;
+      adapter = parsed.value;
+    }
+    // 在提交任何字段之前绑定 project adapter：绑定失败时既有字段与 session
+    // 保持原样（failed configure leaves prior fields/session untouched）。
+    if (configuration.projectAdapter !== undefined) {
+      const bound = this.#session.bindProjectAdapter(configuration.projectAdapter);
+      if (!bound.ok) {
+        return { ok: false, diagnostics: bound.diagnostics };
+      }
+    }
+    if (adapter !== undefined) {
+      this.#designerHostAdapter = adapter;
+      this.#assetCatalogPort = adapter.assets;
+      this.#projectCatalogPort = adapter.projectCatalog;
+      this.#projectPreviewPort = adapter.projectPreview;
+      this.#projectSnapshotPort = adapter.projectSnapshots;
+      this.#resourcePort = adapter.resources;
+      this.#variablePort = adapter.variables;
+      this.#datasetCatalogPort = adapter.datasetCatalog;
     } else {
       this.#designerHostAdapter = undefined;
       this.#assetCatalogPort = configuration.assetCatalogPort;
@@ -638,16 +686,14 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#runtimeContributions = configuration.runtimeContributions;
     this.#toolMaterialTypes = configuration.toolMaterialTypes;
     this.#groupMaterialType = configuration.groupMaterialType;
-    if (configuration.projectAdapter !== undefined) {
-      const bound = this.#session.bindProjectAdapter(configuration.projectAdapter);
-      if (!bound.ok) {
-        return { ok: false, diagnostics: bound.diagnostics };
-      }
-    }
     this.initialize();
     return { ok: true, value: null, diagnostics: [] };
   }
 
+  /**
+   * 运行时依赖 setter 只保留值、不独立初始化（RB3）：初始化由 configure /
+   * document 赋值 / connect 控制。
+   */
   set catalog(value: BaseScreenMaterialCatalog | undefined) {
     if (this.#renderer !== undefined && value !== this.#catalog) {
       this.emitDiagnostics([
@@ -656,7 +702,6 @@ export class BaseScreenDesignerElement extends ElementBase {
       return;
     }
     this.#catalog = value;
-    this.initialize();
   }
 
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
@@ -664,14 +709,15 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
-    this.#runtimeContributions = value;
-    if (this.#renderer !== undefined) {
-      this.#renderer.dispose();
-      this.#renderer = undefined;
-      this.createRenderer();
-      if (this.#session.document !== undefined) this.renderDocument(this.#session.document);
+    if (this.#renderer !== undefined && value !== this.#runtimeContributions) {
+      this.emitDiagnostics([
+        lifecycleDiagnostic(
+          'Runtime contributions cannot change after initialization. Call unload first.',
+        ),
+      ]);
+      return;
     }
-    this.renderInteraction();
+    this.#runtimeContributions = value;
   }
 
   get projectAdapter(): ScreenProjectAdapter | undefined {
@@ -752,7 +798,6 @@ export class BaseScreenDesignerElement extends ElementBase {
       return;
     }
     this.#resourcePort = value;
-    this.initialize();
   }
 
   get variablePort(): ScreenHostVariablePort | undefined {
@@ -1205,6 +1250,8 @@ export class BaseScreenDesignerElement extends ElementBase {
       interactive: false,
       onMaterialEvent: () => undefined,
       resourcePort: this.#resourcePort,
+      // 设计态渲染器获得设计执行上下文（RB2）：design mode，不绑定项目。
+      executionMode: 'design',
       ...(this.#runtimeContributions === undefined
         ? {}
         : { contributionIndex: this.#runtimeContributions }),
@@ -1531,6 +1578,46 @@ export class BaseScreenDesignerElement extends ElementBase {
 
 function lifecycleDiagnostic(message: string): ScreenDiagnostic {
   return { severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message };
+}
+
+// ---------------------------------------------------------------------------
+// RB3 原子配置：配置对象形状校验（validate before mutate）。这些校验只做
+// 足够避免坏配置提交/运行时崩溃的形状检查，不发明兼容解析器。
+// ---------------------------------------------------------------------------
+
+function isBaseScreenMaterialCatalog(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).get === 'function' &&
+    typeof (value as Record<string, unknown>).has === 'function' &&
+    typeof (value as Record<string, unknown>).list === 'function'
+  );
+}
+
+function isScreenHostResourcePort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).resolve === 'function'
+  );
+}
+
+function isScreenHostVariablePort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).resolve === 'function'
+  );
+}
+
+function isBaseScreenRuntimeContributionIndex(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).getResourceType === 'function' &&
+    typeof (value as Record<string, unknown>).hasBlueprintCapability === 'function'
+  );
 }
 
 function projectPhaseLabel(phase: ScreenProjectPhase): string {

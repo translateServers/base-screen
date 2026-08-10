@@ -3,10 +3,11 @@
 ## 环境搭建与验证
 
 - 使用 Node `22.23.2`（见 `.node-version`）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
-- CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`。它会依次运行 `format`（会写入文件）、`format:check`、`lint`、`typecheck`、`test`、`build`、`check:packages`、`check:api` 和 `verify:tarball`。
+- CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`。它依次运行 `format`（会写入文件）、`format:check`、`lint`、`typecheck`、`test`、`build`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
 - 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/tests/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
-- `pnpm lint` 还会运行 `scripts/check-boundaries.mjs`；`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级测试。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
-- `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中；对于空的 ESM 包，ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。
+- `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行 `scripts/check-boundaries.mjs`；`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
+- `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。门禁失败排查见 `docs/troubleshooting/verify-m0-troubleshooting.md`。
+- 手动验证用示例（workspace 成员）：`pnpm dev:browser-harness`、`pnpm dev:playground`、`pnpm dev:vue-harness` 起 Vite dev server；`verify:browser`、`verify:playground`、`verify:vue-harness`、`verify:runtime` 是对应的 Playwright 验证脚本。
 
 ## 包边界
 
@@ -21,7 +22,8 @@
 
 - 每个包 `src/` 只放发布物。所有 `*.test.ts` 与 `__fixtures__/` 放在同包 `tests/`，并镜像 `src/` 子目录；测试用相对路径导入被测模块（如 `../src/index.js`）。`scripts/check-packages.mjs` 会拒绝 `src/` 内的测试/fixture，以及 `dist/` 内的测试/fixture 产物。
 - 每个包 `tsconfig.json` 用 `rootDir: "."` 且 include `src` 与 `tests`，供无 emit 的类型检查；`tsconfig.build.json` 必须覆写 `rootDir: "src"` 且只 include `src`，并排除测试与 fixture，避免测试进入 `dist`。
-- `engine/src` 按环境分层：`common/`（`operations`、`session`、`project`、`tools`、`ui-text`）是环境无关纯逻辑，`browser/`（`controllers`、`dom`、`viewport`、`styles`、`ui`）承载 DOM。依赖方向单向：`browser/` 可依赖 `common/`，反向禁止，`common/` 也不得引用浏览器全局。`scripts/check-engine-import.mjs` 强制这两条。
+- `engine/src` 按环境分层：`common/`（`operations`、`session`、`project`、`tools`、`ui-text`、`events`、`vendor`）是环境无关纯逻辑，`browser/`（`controllers`、`dom`、`viewport`、`styles`、`ui`）承载 DOM。依赖方向单向：`browser/` 可依赖 `common/`，反向禁止，`common/` 也不得引用浏览器全局（以无 DOM lib 编译验证）。`scripts/check-engine-import.mjs` 强制这些约束及下述子层方向。
+- engine 的发布入口必须无副作用：导入 `@base-screen/engine` 不得注册 `base-screen-designer` Custom Element 或触碰 localStorage/sessionStorage（`check:engine-import` 会真实 import `dist/index.js` 验证）。`common/vendor/`（moveable 源码）被静态扫描禁止 DOM 全局，且有独立的 `tsconfig.vendor.json`。
 - 纯逻辑需要环境能力时通过构造 options 注入回调（如 `ScreenProjectController` 的 `scheduler`），不要直接访问 DOM/global。
 - 命名前缀承载层级语义，不要删除：`Screen*` 表示 canonical document、事务、项目等领域概念；`Designer*` 表示设计器编排层；`BaseScreen*` 表示 Base Screen 平台命名空间中的跨层契约与公共 API。新增类型按此选择前缀。
 

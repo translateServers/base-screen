@@ -3,6 +3,7 @@ import type {
   ScreenHostResourceDataSource,
   ScreenJsonObject,
   ScreenJsonValue,
+  ScreenResourceExecutionContext,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import { canonicalJsonString } from './canonical-json.js';
@@ -26,6 +27,13 @@ export type MountedResourceState = {
   rawValue: ScreenJsonValue | undefined;
   /** Generation guard; every cancel bumps it so late results are suppressed. */
   resourceGeneration: number;
+  /**
+   * 不透明请求槽位 ID（RB1）：由协调器按次请求签发，释放/超时/进行中合并按它
+   * 定位，绝不与 raw key 混用。未声明共享的相同 raw key 因此获得独立槽位。
+   */
+  requestSlotId: string | undefined;
+  /** 最近一次 resolve 的执行上下文（RB2）：abort 等生命周期事件复用同一上下文。 */
+  executionContext: ScreenResourceExecutionContext | undefined;
 };
 
 export function createMountedResourceState(): MountedResourceState {
@@ -35,6 +43,8 @@ export function createMountedResourceState(): MountedResourceState {
     dataState: { status: 'idle' },
     rawValue: undefined,
     resourceGeneration: 0,
+    requestSlotId: undefined,
+    executionContext: undefined,
   };
 }
 

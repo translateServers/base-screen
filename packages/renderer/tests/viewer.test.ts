@@ -23,13 +23,21 @@ class FakeDocument {
   }
 }
 
+function catalog(): BaseScreenMaterialCatalog {
+  return {
+    get: () => undefined,
+    has: () => false,
+    list: () => [],
+  };
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.resetModules();
 });
 
 describe('BaseScreenViewerElement lifecycle', () => {
-  it('R2 rejects renderer configuration drift until unload releases the renderer', async () => {
+  it('R2/RB3 keeps configuration drift rejected after configure until unload releases the renderer', async () => {
     const ownerDocument = new FakeDocument();
     class FakeHTMLElement extends FakeNode {
       isConnected = true;
@@ -54,17 +62,25 @@ describe('BaseScreenViewerElement lifecycle', () => {
     vi.stubGlobal('HTMLElement', FakeHTMLElement);
     vi.stubGlobal('CustomEvent', FakeCustomEvent);
     const { BaseScreenViewerElement } = await import('../src/viewer.js');
-    const firstCatalog = {} as BaseScreenMaterialCatalog;
-    const secondCatalog = {} as BaseScreenMaterialCatalog;
-    const firstPort = {} as ScreenHostResourcePort;
+    const firstCatalog = catalog();
+    const secondCatalog = catalog();
+    const firstPort = {
+      resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }),
+    } as ScreenHostResourcePort;
     const secondPort = {} as ScreenHostResourcePort;
     const viewer = new BaseScreenViewerElement();
 
+    // 运行时依赖 setter 只保留值，不创建 Renderer（RB3）。
     viewer.resourcePort = firstPort;
     viewer.catalog = firstCatalog;
+    expect(viewer.catalog).toBe(firstCatalog);
+    expect(viewer.resourcePort).toBe(firstPort);
+
+    // configure 原子提交后，变更已提交的运行时依赖被拒绝（需先 unload）。
+    const configured = viewer.configure({ catalog: firstCatalog, resourcePort: firstPort });
+    expect(configured).toEqual({ ok: true, value: null, diagnostics: [] });
     viewer.catalog = secondCatalog;
     viewer.resourcePort = secondPort;
-
     expect(viewer.catalog).toBe(firstCatalog);
     expect(viewer.resourcePort).toBe(firstPort);
 

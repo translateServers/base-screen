@@ -7,6 +7,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import type { BaseScreenViewerConfiguration } from '@base-screen/renderer';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerPreviewCallbacks {
@@ -18,10 +19,20 @@ export interface DesignerPreviewCallbacks {
   readonly isViewerRegistered: () => boolean;
 }
 
+type PreviewViewer = HTMLElement & {
+  configure?: (configuration: BaseScreenViewerConfiguration) => {
+    ok: boolean;
+    diagnostics?: readonly { code: string }[];
+  };
+  unload?: () => void;
+  refreshData?: (componentId?: string) => void;
+  document?: ScreenDocument;
+};
+
 export class DesignerPreviewController {
   #preview: HTMLElement | undefined;
   #open = false;
-
+  #lastConfiguration: BaseScreenViewerConfiguration | undefined;
   constructor(private readonly callbacks: DesignerPreviewCallbacks) {}
 
   connect(shadow: ShadowRoot): void {
@@ -66,23 +77,48 @@ export class DesignerPreviewController {
 
   private render(documentOverride?: ScreenDocument): void {
     if (this.#preview !== undefined) this.#preview.hidden = !this.#open;
-    const viewer = this.viewer() as {
-      catalog: BaseScreenMaterialCatalog | undefined;
-      resourcePort: ScreenHostResourcePort | undefined;
-      variablePort: ScreenHostVariablePort | undefined;
-      runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
-      document: ScreenDocument | undefined;
-    } | null;
     const document = documentOverride ?? this.callbacks.getDocument();
-    if (!this.#open || viewer === null || viewer === undefined || document === undefined) return;
-    viewer.resourcePort = this.callbacks.getResourcePort();
-    viewer.variablePort = this.callbacks.getVariablePort();
-    viewer.runtimeContributions = this.callbacks.getRuntimeContributions();
-    viewer.catalog = this.callbacks.getCatalog();
+    if (!this.#open || document === undefined) return;
+    const viewer = this.viewer();
+    if (viewer === null || viewer === undefined) return;
+    // BaseScreenViewerConfiguration 只要求 catalog：resource/variable 端口是可选
+    // 运行时依赖。静态预览（无宿主资源/变量端口）也必须能 configure 并渲染，
+    // 不能因为迁移到 configure() 而把可选端口变成必填。
+    const catalog = this.callbacks.getCatalog();
+    if (catalog === undefined) return;
+    const resourcePort = this.callbacks.getResourcePort();
+    const variablePort = this.callbacks.getVariablePort();
+    const runtimeContributions = this.callbacks.getRuntimeContributions();
+    const configuration: BaseScreenViewerConfiguration = {
+      catalog,
+      ...(resourcePort === undefined ? {} : { resourcePort }),
+      ...(variablePort === undefined ? {} : { variablePort }),
+      ...(runtimeContributions === undefined ? {} : { runtimeContributions }),
+    };
+    const configChanged =
+      this.#lastConfiguration === undefined ||
+      this.#lastConfiguration.catalog !== configuration.catalog ||
+      this.#lastConfiguration.resourcePort !== configuration.resourcePort ||
+      this.#lastConfiguration.variablePort !== configuration.variablePort ||
+      this.#lastConfiguration.runtimeContributions !== configuration.runtimeContributions;
+    if (configChanged) {
+      // 重新配置前先 unload（configure 拒绝在已初始化实例上二次调用），
+      // 避免重复 configure 或残留陈旧渲染器；首次配置无需 unload。
+      if (this.#lastConfiguration !== undefined) {
+        viewer.unload?.();
+      }
+      const configured = viewer.configure?.(configuration);
+      if (configured === undefined || !configured.ok) {
+        this.#lastConfiguration = undefined;
+        return;
+      }
+      this.#lastConfiguration = configuration;
+    }
+    // 配置未变化时（普通同步）只更新文档，由 document 赋值驱动渲染。
     viewer.document = document;
   }
 
-  private viewer(): (HTMLElement & { refreshData?: (componentId?: string) => void }) | null {
+  private viewer(): PreviewViewer | null {
     return this.#preview?.querySelector<HTMLElement>('base-screen-viewer') ?? null;
   }
 }

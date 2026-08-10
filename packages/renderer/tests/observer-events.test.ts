@@ -5,6 +5,7 @@ import type {
   ScreenHostResourcePort,
   ScreenJsonValue,
   ScreenParseResult,
+  ScreenResourceExecutionContext,
   ScreenResourceObserverEvent,
 } from '@base-screen/contracts';
 import type {
@@ -308,5 +309,57 @@ describe('Renderer observer events (DRH-R8)', () => {
     await flush();
     expect(root.children[0]?.model?.dataState).toMatchObject({ status: 'ready' });
     renderer.dispose();
+  });
+
+  it('observer events carry the same execution context as the host resolve (RB2)', async () => {
+    const events: ScreenResourceObserverEvent[] = [];
+    const seenContexts: ScreenResourceExecutionContext[] = [];
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      contributionIndex: shareableIndex(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      observer: (event) => events.push(event),
+      instanceId: 'instance-1',
+      executionMode: 'viewer',
+      projectId: 'proj-9',
+      documentRevision: 'rev-3',
+      resourcePort: {
+        resolve: (_request, options) => {
+          seenContexts.push(options.context!);
+          return Promise.resolve({
+            ok: true as const,
+            value: { fields: [{ id: 'a', label: 'A', valueType: 'string' }], rows: [{ a: 'x' }] },
+            diagnostics: [],
+          });
+        },
+      },
+    });
+
+    expect(
+      renderer.render(document([component('c1')]), { trigger: 'polling', traceId: 'trace-abc' }).ok,
+    ).toBe(true);
+    await flush();
+    renderer.dispose();
+
+    expect(seenContexts).toHaveLength(1);
+    for (const event of events) {
+      expect(event.context).toEqual(seenContexts[0]);
+      expect(event.context).toMatchObject({
+        instanceId: 'instance-1',
+        mode: 'viewer',
+        trigger: 'polling',
+        traceId: 'trace-abc',
+        projectId: 'proj-9',
+        documentRevision: 'rev-3',
+      });
+    }
+    // 同一 resolve 的所有事件都指向同一上下文数据（trigger/trace 不被其他组件消费）。
+    expect(events.filter((event) => event.type === 'started')[0]?.context).toEqual(
+      events.filter((event) => event.type === 'succeeded')[0]?.context,
+    );
   });
 });

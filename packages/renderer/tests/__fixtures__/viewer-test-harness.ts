@@ -205,6 +205,8 @@ export function document(
 export type PendingResourceRequest = {
   readonly request: ScreenHostResourceRequest;
   readonly signal: ScreenAbortSignal;
+  /** 该次解析的执行上下文（RB2）：与 observer 事件、宿主端口使用同一数据。 */
+  readonly context: import('@base-screen/contracts').ScreenResourceExecutionContext | undefined;
   aborted: boolean;
   resolveRequest: (value: ScreenParseResult<ScreenJsonValue>) => void;
 };
@@ -219,6 +221,7 @@ export function createDeferredResourcePort(): {
       const pending: PendingResourceRequest = {
         request,
         signal: options.signal,
+        context: options.context,
         aborted: false,
         resolveRequest: () => {},
       };
@@ -229,6 +232,35 @@ export function createDeferredResourcePort(): {
       return new Promise<ScreenParseResult<ScreenJsonValue>>((resolve) => {
         pending.resolveRequest = resolve;
       });
+    },
+  };
+  return { port, requests };
+}
+
+/**
+ * 即时结算的资源端口：每个请求立即返回 ready。用于验证排队 refresh 的
+ * trigger/trace intent 在完成回调补发时真实生效（补发时旧槽位必须已结算，
+ * 否则会被进行中合并静默跳过，观察不到排队 intent）。
+ */
+export function createImmediateResourcePort(): {
+  port: ScreenHostResourcePort;
+  requests: PendingResourceRequest[];
+} {
+  const requests: PendingResourceRequest[] = [];
+  const port: ScreenHostResourcePort = {
+    resolve: (request, options) => {
+      const pending: PendingResourceRequest = {
+        request,
+        signal: options.signal,
+        context: options.context,
+        aborted: false,
+        resolveRequest: () => {},
+      };
+      requests.push(pending);
+      options.signal.addEventListener('abort', () => {
+        pending.aborted = true;
+      });
+      return Promise.resolve({ ok: true as const, value: { ready: true }, diagnostics: [] });
     },
   };
   return { port, requests };
@@ -292,6 +324,9 @@ export async function createViewerHarness(options: {
   resourcePort: ScreenHostResourcePort;
   variablePort: ScreenHostVariablePort;
   resourceTimeoutMs?: number;
+  projectId?: string;
+  documentRevision?: string;
+  observer?: import('@base-screen/contracts').ScreenResourceObserver;
 }): Promise<{
   viewer: InstanceType<typeof import('../../src/viewer.js')['BaseScreenViewerElement']>;
   mount: FakeMount;
@@ -301,12 +336,35 @@ export async function createViewerHarness(options: {
   vi.stubGlobal('CustomEvent', FakeCustomEvent);
   const { BaseScreenViewerElement } = await import('../../src/viewer.js');
   const viewer = new BaseScreenViewerElement();
-  viewer.resourcePort = options.resourcePort;
-  viewer.variablePort = options.variablePort;
-  if (options.resourceTimeoutMs !== undefined) {
-    viewer.resourceTimeoutMs = options.resourceTimeoutMs;
+  if (
+    options.projectId !== undefined ||
+    options.documentRevision !== undefined ||
+    options.observer !== undefined
+  ) {
+    const configured = viewer.configure({
+      catalog: options.catalog,
+      resourcePort: options.resourcePort,
+      variablePort: options.variablePort,
+      ...(options.resourceTimeoutMs === undefined
+        ? {}
+        : { resourceTimeoutMs: options.resourceTimeoutMs }),
+      ...(options.projectId === undefined ? {} : { projectId: options.projectId }),
+      ...(options.documentRevision === undefined
+        ? {}
+        : { documentRevision: options.documentRevision }),
+      ...(options.observer === undefined ? {} : { observer: options.observer }),
+    });
+    if (!configured.ok) {
+      throw new Error('Viewer harness configure failed.');
+    }
+  } else {
+    viewer.resourcePort = options.resourcePort;
+    viewer.variablePort = options.variablePort;
+    if (options.resourceTimeoutMs !== undefined) {
+      viewer.resourceTimeoutMs = options.resourceTimeoutMs;
+    }
+    viewer.catalog = options.catalog;
   }
-  viewer.catalog = options.catalog;
   viewer.document = options.document;
   const host = viewer as unknown as {
     shadowRoot: FakeShadowDom | null;

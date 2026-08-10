@@ -1,6 +1,7 @@
 # Data Runtime Hardening 实施计划
 
-> 状态：治理已接受，实施进行中（本计划不视为已实现）
+> 状态：治理已接受，实施进行中（本计划不视为已实现）。Review Remediation Batch (2026-08-09)
+> 进行中：代码评审发现正确性缺陷，整改项见第 18 节。
 > 研究输入：[数据模块设计原则深度研究](../../研究报告.md)
 > 现有决策：[ADR-0023 Host Dataset Resource Integration](../../decisions/ADR-0023-host-dataset-resource-integration.md)
 > 新增决策：[ADR-0025 Data Runtime Hardening](../../decisions/ADR-0025-data-runtime-hardening.md)（已接受，2026-08-09）
@@ -506,3 +507,24 @@ pnpm verify:m0
 10. 两个仓库的必需质量门、browser E2E 和迁移演练全部通过。
 11. 生产 smoke 未发现无效文档、静默空数据或重复查询风暴。
 12. 文档、日志、Schema、fixture 和公共 API 中不存在凭证或连接信息泄露。
+13. Review Remediation Batch (2026-08-09) 的全部适用修复项具备证据并勾选（见第 18 节）。
+
+## 18. Review Remediation Batch（2026-08-09）
+
+> 代码评审整改批次：在首批实施证据之外补充评审发现的正确性修复。以下修复属于 ADR-0025 既有
+> 要求（DRH-R2/R3/R7/R8）下的正确性收敛，不是新公共契约，也不引入新 ADR；版本化/兼容形态
+> 要求保持不变。对应待办项见 Spec 第 7 节与 `tasks.md`/`checklist.md` 的「Review Remediation
+> Batch (2026-08-09)」小节，全部为未勾选状态；生产专属动作保持 N/A 表述不变。
+
+1. **请求协调（RB1）**：未声明共享的相同 raw key 请求使用独立槽位并各自 settle；同一组件同一
+   key 的进行中刷新合并；共享仅限显式 `queryScope: 'resource'`。
+2. **执行上下文（RB2）**：每次 resolve 的 trigger/trace 上下文正确独立且可区分
+   （initial/document-change/variable/manual/polling）；projectId/documentRevision 在提供时
+   流动；observer 事件使用同一正确上下文。
+3. **原子配置（RB3）**：Viewer/Designer `configure()` 先校验后生效，运行时 setter 不独立
+   初始化；仓内消费方（含 Designer preview）与 XJ editor 迁移到 `configure()`。
+4. **测试与门禁（RB9）**：为 RB1-RB3 添加聚焦回归测试并运行相关包 test/typecheck 与
+   `pnpm verify:m0` 全量门禁；XJ 侧修复（RB4-RB8）见 XJ 仓库批次小节，XJ 前端/后端测试与
+   远程/临时环境 E2E 门禁由 XJ 仓库跟踪。
+
+本批次完成条件：全部待办项具备自动化证据并勾选，`pnpm verify:m0` 与 XJ 对应门禁通过。
