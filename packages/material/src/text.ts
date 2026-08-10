@@ -14,7 +14,8 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   category: '基础',
   keywords: ['文本', '标签'],
   defaultSize: { width: 320, height: 72 },
-  defaultProps: { text: '文本' },
+  defaultProps: {},
+  defaultData: '文本',
   defaultStyle: { color: '#ffffff', fontSize: 32, fontWeight: '400', textAlign: 'left' },
   styleSchema: {
     kind: 'object',
@@ -32,12 +33,8 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'fontWeight', label: '字重', control: 'select' },
     { style: 'textAlign', label: '对齐', control: 'select' },
   ],
-  propsSchema: {
-    kind: 'object',
-    properties: { text: { kind: 'string', minLength: 0, maxLength: 4096 } },
-    required: ['text'],
-  },
-  propertyPanel: [{ prop: 'text', label: '文本', control: 'text' }],
+  propsSchema: { kind: 'object', properties: {}, required: [] },
+  propertyPanel: [],
   events: ['valueClick'],
   dataCapabilities: ['static', 'host-resource'],
   designCapabilities: { resize: true, rotate: true, children: false },
@@ -58,7 +55,7 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
   protected renderMaterial(): void {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
-    const { props, style } = model;
+    const { style } = model;
     this.textContent =
       model.dataState.status === 'loading'
         ? '加载中'
@@ -66,9 +63,7 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
           ? '数据不可用'
           : model.dataState.status === 'ready' && typeof model.dataState.value === 'string'
             ? model.dataState.value
-            : typeof props.text === 'string'
-              ? props.text
-              : '';
+            : '';
     this.style.color = typeof style.color === 'string' ? style.color : '';
     this.style.fontSize = typeof style.fontSize === 'number' ? `${style.fontSize}px` : '';
     this.style.fontWeight = typeof style.fontWeight === 'string' ? style.fontWeight : '';

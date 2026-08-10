@@ -33,6 +33,7 @@ import type {
   DesignerToolId,
   DesignerToolMaterialTypes,
 } from '../../common/tools/designer-tools.js';
+import { createInitialDataSource } from '../dom/designer-panel-dom.js';
 import type {
   DesignerSnapPoint,
   DesignerSnapPreview,
@@ -959,7 +960,7 @@ export class DesignerGestureController {
             status: { locked: false, hidden: false },
             props: entry.manifest.defaultProps,
             style: entry.manifest.defaultStyle,
-            dataSource: null,
+            dataSource: createInitialDataSource(entry.manifest),
           },
         },
       ],
@@ -1089,7 +1090,7 @@ export class DesignerGestureController {
             status: { locked: false, hidden: false },
             props: entry.manifest.defaultProps,
             style: entry.manifest.defaultStyle,
-            dataSource: null,
+            dataSource: createInitialDataSource(entry.manifest),
           },
         },
       ],

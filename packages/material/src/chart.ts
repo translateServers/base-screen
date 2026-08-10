@@ -21,7 +21,22 @@ export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   category: '数据',
   keywords: ['图表', '趋势', '数据'],
   defaultSize: { width: 480, height: 280 },
-  defaultProps: { title: '图表' },
+  defaultProps: {},
+  defaultData: {
+    series: [
+      {
+        id: 'amount',
+        label: '订单金额',
+        points: [
+          { x: 'north', y: 42 },
+          { x: 'south', y: 36 },
+          { x: 'east', y: 28 },
+          { x: 'west', y: 24 },
+          { x: 'central', y: 19 },
+        ],
+      },
+    ],
+  },
   defaultStyle: {
     backgroundColor: '#111827',
     color: '#f9fafb',
@@ -44,12 +59,8 @@ export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'gridColor', label: '网格色', control: 'color' },
     { style: 'lineWidth', label: '线宽', control: 'number' },
   ],
-  propsSchema: {
-    kind: 'object',
-    properties: { title: { kind: 'string', maxLength: 256 } },
-    required: ['title'],
-  },
-  propertyPanel: [{ prop: 'title', label: '标题', control: 'text' }],
+  propsSchema: { kind: 'object', properties: {}, required: [] },
+  propertyPanel: [],
   events: ['pointClick'],
   dataCapabilities: ['static', 'host-resource'],
   dataBinding: {
@@ -80,12 +91,7 @@ export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialEl
     this.style.backgroundColor = stringValue(model.style.backgroundColor);
     this.style.color = stringValue(model.style.color);
     this.setAttribute('role', 'img');
-    this.setAttribute('aria-label', stringValue(model.props.title) || '图表');
-
-    const title = this.ownerDocument.createElement('div');
-    title.textContent = stringValue(model.props.title);
-    title.style.cssText = 'font: 600 14px sans-serif; padding: 10px 12px 2px;';
-    this.appendChild(title);
+    this.setAttribute('aria-label', '图表');
 
     if (model.dataState.status !== 'ready') {
       const state = this.ownerDocument.createElement('div');
@@ -96,7 +102,7 @@ export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialEl
             ? '数据不可用'
             : '暂无数据';
       state.style.cssText =
-        'display: grid; place-items: center; height: calc(100% - 38px); color: currentColor; opacity: .72; font: 13px sans-serif;';
+        'display: grid; place-items: center; height: 100%; color: currentColor; opacity: .72; font: 13px sans-serif;';
       this.appendChild(state);
       return;
     }
@@ -117,7 +123,7 @@ export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialEl
     svg.setAttribute('preserveAspectRatio', 'none');
     svg.setAttribute('aria-hidden', 'true');
     svg.style.cssText =
-      'display: block; width: 100%; height: calc(100% - 38px); padding: 4px 12px 10px; box-sizing: border-box;';
+      'display: block; width: 100%; height: 100%; padding: 4px 12px 10px; box-sizing: border-box;';
     const gridColor = stringValue(model.style.gridColor);
     for (const y of [12, 24, 36, 48]) {
       const line = this.svgElement('line', {
@@ -168,7 +174,7 @@ export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialEl
     const element = this.ownerDocument.createElement('div');
     element.textContent = message;
     element.style.cssText =
-      'display: grid; place-items: center; height: calc(100% - 38px); opacity: .72; font: 13px sans-serif;';
+      'display: grid; place-items: center; height: 100%; opacity: .72; font: 13px sans-serif;';
     this.appendChild(element);
   }
 

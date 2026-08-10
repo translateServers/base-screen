@@ -484,3 +484,75 @@ describe('DesignerPanelController material drag', () => {
     expect(handled).toBe(false);
   });
 });
+
+describe('DesignerPanelController material add', () => {
+  function createController(commands: unknown[], defaultData?: unknown): DesignerPanelController {
+    return new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: (command) => {
+        commands.push(command);
+        return { ok: true, value: document(), diagnostics: [] };
+      },
+      executeTransaction: () => ({ ok: true, value: document(), diagnostics: [] }),
+      getCatalog: () =>
+        ({
+          get: () => ({
+            manifest: {
+              type: 'base.text',
+              name: '文本',
+              defaultSize: { width: 100, height: 40 },
+              defaultProps: {},
+              defaultStyle: {},
+              ...(defaultData === undefined ? {} : { defaultData }),
+            },
+          }),
+          has: () => true,
+          list: () => [],
+        }) as unknown as BaseScreenMaterialCatalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+  }
+
+  function clickMaterialCard(controller: DesignerPanelController, type: string): void {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const layout = { querySelectorAll: () => [] } as unknown as FakeElement;
+    const card = new FakeElement('button', new FakeDocument());
+    card.dataset.materialType = type;
+    card.closestResult = layout;
+    const target = new FakeElement('button', new FakeDocument());
+    target.closestResult = card;
+    controller.onClick({ target } as unknown as Event);
+  }
+
+  it('initializes a static dataSource from the manifest defaultData', () => {
+    const commands: unknown[] = [];
+    const controller = createController(commands, '文本');
+
+    clickMaterialCard(controller, 'base.text');
+
+    expect(commands).toHaveLength(1);
+    const component = (commands[0] as { component: { dataSource: unknown } }).component;
+    expect(component.dataSource).toEqual({ type: 'static', value: '文本' });
+  });
+
+  it('keeps dataSource null when the manifest declares no defaultData', () => {
+    const commands: unknown[] = [];
+    const controller = createController(commands);
+
+    clickMaterialCard(controller, 'base.text');
+
+    expect(commands).toHaveLength(1);
+    const component = (commands[0] as { component: { dataSource: unknown } }).component;
+    expect(component.dataSource).toBeNull();
+  });
+});

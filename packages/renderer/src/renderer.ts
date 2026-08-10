@@ -952,7 +952,9 @@ function getDataState(
     }
   | undefined {
   if (component.dataSource === null) {
-    return { dataState: { status: 'idle' }, resource: undefined };
+    return entry.manifest.defaultData === undefined
+      ? { dataState: { status: 'idle' }, resource: undefined }
+      : { dataState: { status: 'ready', value: entry.manifest.defaultData }, resource: undefined };
   }
   if (
     !entry.manifest.dataCapabilities.includes(

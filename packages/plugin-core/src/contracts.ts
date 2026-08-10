@@ -125,6 +125,7 @@ export interface BaseScreenMaterialManifest {
   readonly defaultSize: ScreenSize;
   readonly defaultProps: ScreenJsonObject;
   readonly defaultStyle: ScreenJsonObject;
+  readonly defaultData?: ScreenJsonValue;
   readonly propsSchema: BaseScreenMaterialObjectSchema;
   readonly propertyPanel: readonly BaseScreenMaterialPropertyPanelField[];
   readonly styleSchema: BaseScreenMaterialObjectSchema;

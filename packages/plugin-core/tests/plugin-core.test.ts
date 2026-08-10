@@ -153,6 +153,36 @@ describe('material identity and manifests', () => {
     }
   });
 
+  it('R7 accepts an optional detached defaultData sample', () => {
+    const result = parseBaseScreenMaterialManifest(
+      materialManifest({ defaultData: { columns: [], rows: [{ sample: true }] } }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.defaultData).toEqual({ columns: [], rows: [{ sample: true }] });
+    }
+    const without = parseBaseScreenMaterialManifest(materialManifest());
+    expect(without.ok).toBe(true);
+    if (without.ok) expect(without.value.defaultData).toBeUndefined();
+  });
+
+  it('R7 rejects unsafe defaultData without invoking it', () => {
+    let invoked = false;
+    const unsafe = materialManifest({
+      defaultData: Object.defineProperty({}, 'rows', {
+        enumerable: true,
+        get() {
+          invoked = true;
+          return [];
+        },
+      }),
+    });
+
+    expect(parseBaseScreenMaterialManifest(unsafe).ok).toBe(false);
+    expect(invoked).toBe(false);
+  });
+
   it('rejects unsafe data and default props that do not match the schema', () => {
     let invoked = false;
     const unsafe = materialManifest({

@@ -815,16 +815,25 @@ try {
         }
         await authoringDesigner.getByTitle('\u9009\u62e9').click();
         await authoringDesigner.locator('[data-base-screen-component-id=title]').click();
-        await authoringDesigner.getByRole('tab', { name: '\u5916\u89c2' }).click();
-        const textInput = authoringDesigner.locator('[data-properties] input[data-prop="text"]');
-        await textInput.waitFor();
-        await assertEditableShortcuts(page, authoringDesigner, textInput);
-        await textInput.blur();
+        await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).click();
+        const staticInput = authoringDesigner.locator(
+          '[data-inspector-pane=data] [data-data-source-static]',
+        );
+        await staticInput.waitFor();
+        await assertEditableShortcuts(page, authoringDesigner, staticInput);
+        await staticInput.fill('"Base Screen 设计器r"');
+        await authoringDesigner
+          .locator('[data-inspector-pane=data] [data-dataset-action="apply"]')
+          .click();
         await page.waitForFunction(() =>
           window.baseScreenHarness.designer.document.components.some(
-            (component) => component.props.text === 'Base Screen 设计器r',
+            (component) =>
+              component.id === 'title' &&
+              component.dataSource?.type === 'static' &&
+              component.dataSource.value === 'Base Screen 设计器r',
           ),
         );
+        await authoringDesigner.getByRole('tab', { name: '\u5916\u89c2' }).click();
         const rotation = authoringDesigner.locator(
           '[data-properties] input[data-property="rotation"]',
         );
@@ -1515,7 +1524,7 @@ async function assertCanvasPrecision(designer, page) {
     throw new Error('BROWSER_HARNESS_RULER_ZOOM_UPDATE_FAILED');
   }
   const viewport = designer.locator('[data-viewport]');
-  await toggleGridViaMenu(designer);
+  await toggleGridViaMenu(designer, page);
   if ((await viewport.getAttribute('data-grid')) !== 'false') {
     // eslint-disable-next-line no-console
     console.log(
@@ -1546,28 +1555,34 @@ async function assertCanvasPrecision(designer, page) {
     );
     throw new Error('BROWSER_HARNESS_GRID_TOGGLE_FAILED');
   }
-  await assertCanvasAidChecked(designer, 'toggle-grid', 'false');
-  await toggleGridViaMenu(designer);
+  await assertCanvasAidChecked(designer, page, 'toggle-grid', 'false');
+  await toggleGridViaMenu(designer, page);
   if ((await viewport.getAttribute('data-grid')) !== 'true') {
     throw new Error('BROWSER_HARNESS_GRID_TOGGLE_BACK_FAILED');
   }
-  await assertCanvasAidChecked(designer, 'toggle-grid', 'true');
+  await assertCanvasAidChecked(designer, page, 'toggle-grid', 'true');
   // 参考线开关（菜单与状态栏共用状态源）：菜单关闭后状态栏开关同步为 false。
-  await toggleCanvasAidViaMenu(designer, 'toggle-guides');
-  if ((await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !== 'false') {
+  await toggleCanvasAidViaMenu(designer, page, 'toggle-guides');
+  if (
+    (await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !==
+    'false'
+  ) {
     throw new Error('BROWSER_HARNESS_GUIDES_TOGGLE_FAILED');
   }
-  await assertCanvasAidChecked(designer, 'toggle-guides', 'false');
-  await toggleCanvasAidViaMenu(designer, 'toggle-guides');
-  if ((await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !== 'true') {
+  await assertCanvasAidChecked(designer, page, 'toggle-guides', 'false');
+  await toggleCanvasAidViaMenu(designer, page, 'toggle-guides');
+  if (
+    (await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !==
+    'true'
+  ) {
     throw new Error('BROWSER_HARNESS_GUIDES_TOGGLE_BACK_FAILED');
   }
-  await assertCanvasAidChecked(designer, 'toggle-guides', 'true');
+  await assertCanvasAidChecked(designer, page, 'toggle-guides', 'true');
   // 边框参考线开关往返：菜单勾选状态随开关翻转。
-  await toggleCanvasAidViaMenu(designer, 'toggle-border-guides');
-  await assertCanvasAidChecked(designer, 'toggle-border-guides', 'false');
-  await toggleCanvasAidViaMenu(designer, 'toggle-border-guides');
-  await assertCanvasAidChecked(designer, 'toggle-border-guides', 'true');
+  await toggleCanvasAidViaMenu(designer, page, 'toggle-border-guides');
+  await assertCanvasAidChecked(designer, page, 'toggle-border-guides', 'false');
+  await toggleCanvasAidViaMenu(designer, page, 'toggle-border-guides');
+  await assertCanvasAidChecked(designer, page, 'toggle-border-guides', 'true');
 
   // 视窗 resize 后标尺必须重绘（canvas 缓冲尺寸与新容器一致、版本号递增）。
   const readRulerVersion = () =>
@@ -2434,25 +2449,29 @@ async function componentCount(page) {
 }
 
 // 顶栏改版后网格移入“视图 > 画布辅助”子菜单，按真实菜单路径触发。
-async function toggleGridViaMenu(designer) {
+// 打开 视图 > 画布辅助 子菜单。先 Escape 收起可能已展开的菜单，保证 helper 可重入。
+async function openCanvasAidsMenu(designer, page) {
+  await page.keyboard.press('Escape');
   await designer.locator('[data-menu-toggle="view"]').click();
   const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
   await viewMenu.locator('[data-submenu-toggle]').click();
+  return viewMenu;
+}
+
+async function toggleGridViaMenu(designer, page) {
+  const viewMenu = await openCanvasAidsMenu(designer, page);
+  await viewMenu.locator('[data-submenu] [data-menu-action="toggle-grid"]').click();
 }
 
 // 视图 > 画布辅助子菜单内按操作 id 触发开关。
-async function toggleCanvasAidViaMenu(designer, actionId) {
-  await designer.locator('[data-menu-toggle="view"]').click();
-  const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
-  await viewMenu.locator('[data-submenu-toggle]').click();
+async function toggleCanvasAidViaMenu(designer, page, actionId) {
+  const viewMenu = await openCanvasAidsMenu(designer, page);
   await viewMenu.locator(`[data-submenu] [data-menu-action="${actionId}"]`).click();
 }
 
 // 打开视图 > 画布辅助子菜单，断言指定开关项勾选状态与真实开关状态一致。
-async function assertCanvasAidChecked(designer, actionId, expected) {
-  await designer.locator('[data-menu-toggle="view"]').click();
-  const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
-  await viewMenu.locator('[data-submenu-toggle]').click();
+async function assertCanvasAidChecked(designer, page, actionId, expected) {
+  const viewMenu = await openCanvasAidsMenu(designer, page);
   const item = viewMenu.locator(`[data-submenu] [data-menu-action="${actionId}"]`);
   const checked = await item.getAttribute('aria-checked');
   if (checked !== expected) {

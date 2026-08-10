@@ -14,7 +14,7 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   category: '基础',
   keywords: ['图片', '图像'],
   defaultSize: { width: 240, height: 160 },
-  defaultProps: { source: '', alt: '' },
+  defaultProps: {},
   defaultStyle: { objectFit: 'contain', opacity: 1 },
   styleSchema: {
     kind: 'object',
@@ -28,18 +28,8 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'objectFit', label: '适应方式', control: 'select' },
     { style: 'opacity', label: '不透明度', control: 'number' },
   ],
-  propsSchema: {
-    kind: 'object',
-    properties: {
-      source: { kind: 'string', maxLength: 4096 },
-      alt: { kind: 'string', maxLength: 1024 },
-    },
-    required: ['source', 'alt'],
-  },
-  propertyPanel: [
-    { prop: 'source', label: '图片来源', control: 'text' },
-    { prop: 'alt', label: '替代文本', control: 'text' },
-  ],
+  propsSchema: { kind: 'object', properties: {}, required: [] },
+  propertyPanel: [],
   events: [],
   dataCapabilities: ['static', 'host-resource'],
   designCapabilities: { resize: true, rotate: true, children: false },
@@ -64,20 +54,16 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
       return;
     }
     const source =
-      model.dataState.status === 'ready'
-        ? typeof model.dataState.value === 'string'
-          ? model.dataState.value
-          : ''
-        : typeof model.props.source === 'string'
-          ? model.props.source
-          : '';
+      model.dataState.status === 'ready' && typeof model.dataState.value === 'string'
+        ? model.dataState.value
+        : '';
     if (source.length === 0) {
       this.textContent = model.dataState.status === 'ready' ? '图片不可用' : '未设置图片';
       return;
     }
     const image = this.ownerDocument.createElement('img');
     image.src = source;
-    image.alt = typeof model.props.alt === 'string' ? model.props.alt : '';
+    image.alt = '';
     image.style.width = '100%';
     image.style.height = '100%';
     image.style.objectFit =

@@ -39,6 +39,7 @@ const MANIFEST_FIELDS = new Set([
   'defaultSize',
   'defaultProps',
   'defaultStyle',
+  'defaultData',
   'propsSchema',
   'propertyPanel',
   'styleSchema',
@@ -87,7 +88,12 @@ export function parseBaseScreenMaterialManifest(
   const collector = new PluginDiagnosticCollector();
   validateKnownObject(manifest, MANIFEST_FIELDS, [], collector);
   for (const field of MANIFEST_FIELDS) {
-    if (field !== 'dataBinding' && field !== 'libraryVisible' && !Object.hasOwn(manifest, field)) {
+    if (
+      field !== 'dataBinding' &&
+      field !== 'libraryVisible' &&
+      field !== 'defaultData' &&
+      !Object.hasOwn(manifest, field)
+    ) {
       collector.add('PLUGIN_CORE_MANIFEST_FIELD_INVALID', [field], 'Manifest field is required.');
     }
   }

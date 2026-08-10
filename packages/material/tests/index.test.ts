@@ -1,4 +1,8 @@
-import { parseBaseScreenMaterialManifest } from '@base-screen/plugin-core';
+import {
+  parseBaseScreenChartData,
+  parseBaseScreenMaterialManifest,
+  parseBaseScreenTableData,
+} from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -40,17 +44,23 @@ describe('official materials', () => {
     }
   });
 
-  it('R5 declares image alternative text as an editable canonical prop', () => {
-    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.defaultProps).toEqual({ source: '', alt: '' });
-    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.propsSchema.properties.alt).toEqual({
-      kind: 'string',
-      maxLength: 1024,
-    });
-    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.propertyPanel).toContainEqual({
-      prop: 'alt',
-      label: '替代文本',
-      control: 'text',
-    });
+  it('R5 drives official material content through data, not prop forms', () => {
+    for (const manifest of [
+      BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+      BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
+      BASE_SCREEN_CHART_MATERIAL_MANIFEST,
+      BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
+    ]) {
+      expect(manifest.propertyPanel).toEqual([]);
+      expect(manifest.propsSchema).toEqual({ kind: 'object', properties: {}, required: [] });
+      expect(manifest.defaultProps).toEqual({});
+    }
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultData).toBe('文本');
+  });
+
+  it('R7 declares default sample data that satisfies the official data contracts', () => {
+    expect(parseBaseScreenTableData(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.defaultData).ok).toBe(true);
+    expect(parseBaseScreenChartData(BASE_SCREEN_CHART_MATERIAL_MANIFEST.defaultData).ok).toBe(true);
   });
 
   it('R3 declares the container as hidden from the material library', () => {

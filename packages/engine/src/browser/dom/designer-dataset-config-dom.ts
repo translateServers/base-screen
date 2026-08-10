@@ -50,7 +50,7 @@ function renderDatasetSummary(
   schema.className = 'designer-dataset-schema';
   for (const field of descriptor.fields) {
     const item = ownerDocument.createElement('li');
-    item.textContent = `${field.label} · ${field.valueType}`;
+    item.textContent = field.label;
     schema.appendChild(item);
   }
   summary.appendChild(schema);
@@ -181,9 +181,7 @@ function bindingField(
   button.setAttribute('aria-pressed', String(selected.includes(field.id)));
   const label = ownerDocument.createElement('span');
   label.textContent = field.label;
-  const type = ownerDocument.createElement('small');
-  type.textContent = field.valueType;
-  button.append(label, type);
+  button.appendChild(label);
   return button;
 }
 

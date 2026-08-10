@@ -21,7 +21,21 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   category: '数据',
   keywords: ['表格', '数据', '明细'],
   defaultSize: { width: 560, height: 320 },
-  defaultProps: { title: '数据表' },
+  defaultProps: {},
+  defaultData: {
+    columns: [
+      { id: 'category', label: '区域', valueType: 'string', sortable: false, filterable: false },
+      { id: 'amount', label: '金额', valueType: 'number', sortable: true, filterable: false },
+      { id: 'orders', label: '订单数', valueType: 'number', sortable: true, filterable: false },
+    ],
+    rows: [
+      { category: 'north', amount: 42, orders: 18 },
+      { category: 'south', amount: 36, orders: 15 },
+      { category: 'east', amount: 28, orders: 11 },
+      { category: 'west', amount: 24, orders: 9 },
+      { category: 'central', amount: 19, orders: 7 },
+    ],
+  },
   defaultStyle: {
     backgroundColor: '#111827',
     color: '#f9fafb',
@@ -57,12 +71,8 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'fontSize', label: '字号', control: 'number' },
     { style: 'rowHeight', label: '行高', control: 'number' },
   ],
-  propsSchema: {
-    kind: 'object',
-    properties: { title: { kind: 'string', maxLength: 256 } },
-    required: ['title'],
-  },
-  propertyPanel: [{ prop: 'title', label: '标题', control: 'text' }],
+  propsSchema: { kind: 'object', properties: {}, required: [] },
+  propertyPanel: [],
   events: ['rowClick', 'cellClick'],
   dataCapabilities: ['static', 'host-resource'],
   dataBinding: {
@@ -90,7 +100,7 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
     this.style.backgroundColor = stringValue(model.style.backgroundColor);
     this.style.color = stringValue(model.style.color);
     this.setAttribute('role', 'region');
-    this.setAttribute('aria-label', stringValue(model.props.title) || '数据表');
+    this.setAttribute('aria-label', '数据表');
     if (model.dataState.status !== 'ready') {
       this.renderMessage(
         model.dataState.status === 'loading'

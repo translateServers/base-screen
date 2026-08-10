@@ -9,3 +9,8 @@
 - [x] 官方图表物料使用 SVG 展示且不引入图表库依赖。
 - [x] 官方表格物料使用语义化 `table`、`thead`、`tbody`、`th` 和 `td`。
 - [x] 官方图表和表格物料均通过统一 Material Manifest 校验。
+- [x] `defaultData` 为可选字段且随 manifest 一起 detached。
+- [x] 无 `dataSource` 时 Renderer 用 `defaultData` 呈现 `ready`，未声明时保持 `idle`。
+- [x] 官方表格/图表 `defaultData` 满足各自数据契约。
+- [x] 官方物料无 `propertyPanel` 内容表单，内容由静态数据/host-resource 驱动。
+- [x] Designer 创建组件时 `defaultData` 初始化为静态数据源。

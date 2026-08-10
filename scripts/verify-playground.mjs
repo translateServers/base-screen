@@ -13,7 +13,7 @@ try {
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     const cases = [
-      { path: '/', title: 'Vue 应用中的 Base Screen', state: 'idle', materials: 4 },
+      { path: '/', title: 'Vue 应用中的 Base Screen', state: 'ready', materials: 4 },
       {
         path: '/designer',
         title: '大屏设计器',

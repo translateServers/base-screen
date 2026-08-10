@@ -34,6 +34,7 @@ import { selectedComponents } from '../../common/operations/designer-selection.j
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   createDataSourceTransaction,
+  createInitialDataSource,
   createPropertyTransaction,
   renderDesignerDataPanel,
   renderDesignerProperties,
@@ -165,7 +166,7 @@ export class DesignerPanelController {
       status: { locked: false, hidden: false },
       props: entry.manifest.defaultProps,
       style: entry.manifest.defaultStyle,
-      dataSource: null,
+      dataSource: createInitialDataSource(entry.manifest),
     };
     const result = this.callbacks.executeTransaction(
       createGroupTransaction(document, group, this.interaction.selectedComponentIds),
@@ -393,7 +394,7 @@ export class DesignerPanelController {
       status: { locked: false, hidden: false },
       props: entry.manifest.defaultProps,
       style: entry.manifest.defaultStyle,
-      dataSource: null,
+      dataSource: createInitialDataSource(entry.manifest),
     };
     const result = this.callbacks.executeCommand({ type: 'add-component', component });
     result.ok ? this.select([component.id]) : this.callbacks.emitDiagnostics(result.diagnostics);

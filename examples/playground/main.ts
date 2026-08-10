@@ -640,7 +640,7 @@ function createErrorDocument(): ScreenDocument {
         rotation: 0,
         zIndex: 1,
         status: { locked: false, hidden: false },
-        props: { text: '资源失败时，Base Screen 只展示安全错误状态。' },
+        props: {},
         style: { color: '#ff9c9c', fontSize: 18, fontWeight: '400', textAlign: 'left' },
         dataSource: {
           type: 'host-resource',
@@ -676,9 +676,9 @@ function text(
     rotation: 0,
     zIndex: 0,
     status: { locked: false, hidden: false },
-    props: { text: value },
+    props: {},
     style: { color, fontSize, fontWeight: '700', textAlign: 'left' },
-    dataSource: null,
+    dataSource: { type: 'static', value },
   };
 }
 

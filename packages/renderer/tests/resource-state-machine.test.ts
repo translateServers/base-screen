@@ -52,7 +52,10 @@ class FakeRoot {
   }
 }
 
-function createCatalog(type = 'base.test'): BaseScreenMaterialCatalog {
+function createCatalog(
+  type = 'base.test',
+  defaultData?: ScreenJsonValue,
+): BaseScreenMaterialCatalog {
   const manifest: BaseScreenMaterialManifest = {
     type,
     tagName: 'base-screen-test',
@@ -62,6 +65,7 @@ function createCatalog(type = 'base.test'): BaseScreenMaterialCatalog {
     defaultSize: { width: 100, height: 40 },
     defaultProps: {},
     defaultStyle: {},
+    ...(defaultData === undefined ? {} : { defaultData }),
     styleSchema: { kind: 'object', properties: {}, required: [] },
     stylePanel: [],
     propsSchema: { kind: 'object', properties: {}, required: [] },
@@ -648,6 +652,31 @@ describe('Renderer resource state machine', () => {
       status: 'ready',
       value: { fresh: true },
     });
+  });
+
+  it('R7 renders manifest defaultData as ready data when no source is bound', async () => {
+    const root = new FakeRoot();
+    const { port, requests } = createDeferredPort();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog('base.test', { sample: true }),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: port,
+    });
+
+    expect(renderer.render(document([component('sample', 0)])).ok).toBe(true);
+    expect(root.children[0]?.model?.dataState).toEqual({
+      status: 'ready',
+      value: { sample: true },
+    });
+
+    expect(renderer.render(document([component('sample', 0, null, hostSource('orders'))])).ok).toBe(
+      true,
+    );
+    expect(requests).toHaveLength(1);
+    expect(root.children[0]?.model?.dataState.status).toBe('loading');
   });
 
   it('data-source removal clears the resource and a restored source resolves again', async () => {

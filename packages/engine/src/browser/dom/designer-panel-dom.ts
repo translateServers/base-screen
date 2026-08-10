@@ -12,6 +12,7 @@ import { parseScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
+  BaseScreenMaterialManifest,
   BaseScreenMaterialPropSchema,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
@@ -39,6 +40,14 @@ export interface DesignerPanelInput {
   readonly value: string;
   readonly checked?: boolean;
   readonly type?: string;
+}
+
+export function createInitialDataSource(
+  manifest: BaseScreenMaterialManifest | undefined,
+): ScreenComponentDataSource | null {
+  return manifest?.defaultData === undefined
+    ? null
+    : { type: 'static', value: manifest.defaultData };
 }
 
 export function renderDesignerProperties(
