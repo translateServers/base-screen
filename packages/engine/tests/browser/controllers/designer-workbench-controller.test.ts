@@ -424,6 +424,28 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(controller.snapEnabled).toBe(true);
   });
 
+  it('exposes canvas aid toggle states for menu checkmarks', () => {
+    const { controller } = createWorkbench();
+    expect(controller.isCanvasAidEnabled('gridEnabled')).toBe(true);
+    expect(controller.guidesVisible).toBe(true);
+    expect(controller.borderGuidesEnabled).toBe(true);
+
+    controller.toggleCanvasAid('gridEnabled');
+    expect(controller.isCanvasAidEnabled('gridEnabled')).toBe(false);
+    controller.toggleCanvasAid('gridEnabled');
+    expect(controller.isCanvasAidEnabled('gridEnabled')).toBe(true);
+
+    controller.toggleGuides();
+    expect(controller.guidesVisible).toBe(false);
+    controller.toggleGuides();
+    expect(controller.guidesVisible).toBe(true);
+
+    controller.toggleBorderGuides();
+    expect(controller.borderGuidesEnabled).toBe(false);
+    controller.toggleBorderGuides();
+    expect(controller.borderGuidesEnabled).toBe(true);
+  });
+
   it('routes the bottom status snap switch through the workbench click handler', () => {
     const { controller } = createWorkbench();
 

@@ -75,8 +75,11 @@ export interface DesignerElementOperationsHost {
   readonly duplicate: () => ScreenParseResult<ScreenDocument>;
   readonly setZoomCentered: (zoom: number) => void;
   readonly resetViewport: () => void;
+  readonly isCanvasAidEnabled: (aid: 'gridEnabled') => boolean;
   readonly toggleCanvasAid: (aid: 'gridEnabled') => void;
+  readonly isGuidesVisible: () => boolean;
   readonly toggleGuides: () => void;
+  readonly isBorderGuidesEnabled: () => boolean;
   readonly toggleBorderGuides: () => void;
   readonly cycleWorkbenchMode: () => void;
   readonly openProjectWorkspace: () => void;
@@ -350,6 +353,8 @@ export function createDesignerElementOperations(
       () => true,
       () => host.toggleCanvasAid('gridEnabled'),
       'canvas',
+      () => true,
+      () => host.isCanvasAidEnabled('gridEnabled'),
     ),
     simpleOperation(
       'toggle-workbench',
@@ -397,12 +402,16 @@ export function createDesignerElementOperations(
       () => true,
       () => host.toggleGuides(),
       'canvas',
+      () => true,
+      () => host.isGuidesVisible(),
     ),
     simpleOperation(
       'toggle-border-guides',
       () => true,
       () => host.toggleBorderGuides(),
       'canvas',
+      () => true,
+      () => host.isBorderGuidesEnabled(),
     ),
     simpleOperation(
       'show-help',
@@ -451,6 +460,7 @@ function simpleOperation(
   execute: () => void,
   scope: 'global' | 'canvas' = 'global',
   isAvailable: () => boolean = () => true,
+  isChecked?: () => boolean,
 ): DesignerOperationDefinition<DesignerOperationContext | undefined> {
   const text = DESIGNER_OPERATION_TEXT[id];
   return {
@@ -464,6 +474,7 @@ function simpleOperation(
     ...(REPEATABLE_OPERATION_IDS.has(id) ? { repeatable: true } : {}),
     isAvailable: () => isAvailable(),
     isEnabled: () => isEnabled(),
+    ...(isChecked === undefined ? {} : { isChecked: () => isChecked() }),
     execute: () => execute(),
   };
 }

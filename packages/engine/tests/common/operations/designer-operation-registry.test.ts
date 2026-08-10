@@ -72,6 +72,39 @@ describe('DesignerOperationRegistry', () => {
     ).toThrow('Designer operation ids must be unique.');
   });
 
+  it('exposes a separate checked state decoupled from availability and enablement', () => {
+    const registry = new DesignerOperationRegistry([
+      {
+        id: 'toggle-grid',
+        scope: 'canvas',
+        label: '网格',
+        tooltip: '切换网格',
+        isAvailable: () => true,
+        isEnabled: () => false,
+        isChecked: () => true,
+        execute: vi.fn(),
+      },
+      {
+        id: 'toggle-guides',
+        scope: 'canvas',
+        label: '参考线',
+        tooltip: '切换参考线显示',
+        isAvailable: () => true,
+        isEnabled: () => true,
+        execute: vi.fn(),
+      },
+    ]);
+
+    expect(registry.getState('toggle-grid', undefined)).toMatchObject({
+      enabled: false,
+      checked: true,
+    });
+    expect(registry.getState('toggle-guides', undefined)).toMatchObject({
+      enabled: true,
+      checked: true,
+    });
+  });
+
   it('R3 resolves keyboard shortcuts from the same operation metadata', () => {
     const registry = new DesignerOperationRegistry([
       {

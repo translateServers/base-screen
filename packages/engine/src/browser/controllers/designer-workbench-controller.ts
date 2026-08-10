@@ -268,6 +268,21 @@ export class DesignerWorkbenchController {
     return this.#snapEnabled;
   }
 
+  /** 画布辅助开关当前值：菜单勾选状态与状态栏开关共用同一状态源。 */
+  isCanvasAidEnabled(aid: 'gridEnabled'): boolean {
+    return this.#canvasAids[aid];
+  }
+
+  /** 用户参考线显示开关（视图 > 画布辅助 > 参考线，与状态栏 Guide 开关共用）。 */
+  get guidesVisible(): boolean {
+    return this.#guidesVisible;
+  }
+
+  /** 边框参考线（智能吸附参考线/测量标注）开关当前值。 */
+  get borderGuidesEnabled(): boolean {
+    return this.#canvasAids.smartGuidesEnabled;
+  }
+
   toggleSnap(): void {
     this.#snapEnabled = !this.#snapEnabled;
     this.#snapCache = undefined;

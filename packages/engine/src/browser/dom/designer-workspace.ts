@@ -288,13 +288,9 @@ export function createDesignerWorkspace(
     <div class="designer-dialog-surface import-confirmation-card">
       <header>
         <span class="import-icon" aria-hidden="true">?</span>
-        <span>${DESIGNER_UI_TEXT.importReplace}</span>
+        <span data-import-title>${DESIGNER_UI_TEXT.importReplace}</span>
       </header>
-      <p>${DESIGNER_UI_TEXT.importWarning}</p>
-      <div class="designer-dialog-actions">
-        <button type="button" class="designer-control designer-button" data-variant="neutral" data-action="import-cancel">${DESIGNER_UI_TEXT.cancel}</button>
-        <button type="button" class="designer-control designer-button" data-variant="danger" data-action="import-confirm">${DESIGNER_UI_TEXT.importConfirm}</button>
-      </div>
+      <div data-import-body></div>
     </div>`;
   layout.appendChild(importConfirmation);
 
@@ -363,6 +359,7 @@ function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: strin
 
 // Nebula 顶栏右段的带文案操作按钮（预览/保存/发布）：图标 + 标签。
 // 不使用 .designer-button（inline-grid 会导致图标/文字垂直堆叠），用 .topbar-text-button 独立控制布局。
+// glyph 容器内同时包含原图标和 spinner，固定 13×13 尺寸，切换 loading 状态时宽度稳定无抖动。
 function labeledActionButton(
   action: keyof typeof DESIGNER_OPERATION_TEXT,
   glyph: string,
@@ -370,7 +367,7 @@ function labeledActionButton(
 ): string {
   const operation = DESIGNER_OPERATION_TEXT[action];
   const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
-  return `<button type="button" class="topbar-text-button ${extraClass}" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}</span><span>${operation.label}</span></button>`;
+  return `<button type="button" class="topbar-text-button ${extraClass}" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}${spinnerGlyph()}</span><span>${operation.label}</span></button>`;
 }
 
 function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {
@@ -414,6 +411,23 @@ export function visibleLibraryMaterials(
   materials: readonly BaseScreenMaterialCatalogEntry[],
 ): readonly BaseScreenMaterialCatalogEntry[] {
   return materials.filter((entry) => entry.manifest.libraryVisible !== false);
+}
+
+// 浏览器原生下载：以 application/json Blob 生成 .json 文件（导入使用文件选择器，导出使用下载锚点）。
+export function downloadDesignerDocument(
+  ownerDocument: Document,
+  filename: string,
+  contents: string,
+): void {
+  const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
+  const anchor = ownerDocument.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.hidden = true;
+  ownerDocument.body.append(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function createMaterialCard(
@@ -465,4 +479,8 @@ function zoomInGlyph(): string {
 
 function toolbarIcon(path: string): string {
   return `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
+}
+
+function spinnerGlyph(): string {
+  return '<svg class="topbar-button-spinner" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 2a6 6 0 1 1-6 6"/></svg>';
 }

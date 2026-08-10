@@ -11,6 +11,8 @@ export interface DesignerOperationDefinition<Context> {
   readonly repeatable?: boolean;
   readonly isAvailable: (context: Context) => boolean;
   readonly isEnabled: (context: Context) => boolean;
+  /** 开关型操作的当前激活状态（菜单勾选显示用），与可执行性（isEnabled）解耦。 */
+  readonly isChecked?: (context: Context) => boolean;
   readonly execute: (context: Context) => void | Promise<void>;
 }
 
@@ -18,6 +20,8 @@ export interface DesignerOperationState<Context> {
   readonly definition: DesignerOperationDefinition<Context>;
   readonly available: boolean;
   readonly enabled: boolean;
+  /** 开关型操作的当前激活状态（菜单勾选显示用）；未声明 isChecked 的操作按未激活处理。 */
+  readonly checked: boolean;
 }
 
 export class DesignerOperationRegistry<Context> {
@@ -39,10 +43,14 @@ export class DesignerOperationRegistry<Context> {
     const definition = this.#definitions.get(id);
     if (definition === undefined) return undefined;
     const available = definition.isAvailable(context);
+    const enabled = available && definition.isEnabled(context);
     return {
       definition,
       available,
-      enabled: available && definition.isEnabled(context),
+      enabled,
+      // checked 与可执行性解耦：声明 isChecked 的操作以 isChecked 为准，否则回退为 enabled。
+      checked:
+        available && (definition.isChecked === undefined ? enabled : definition.isChecked(context)),
     };
   }
 

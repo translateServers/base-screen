@@ -1,6 +1,9 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
-import { describe, expect, it } from 'vitest';
-import { visibleLibraryMaterials } from '../../../src/browser/dom/designer-workspace.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  downloadDesignerDocument,
+  visibleLibraryMaterials,
+} from '../../../src/browser/dom/designer-workspace.js';
 
 function entry(type: string, libraryVisible: boolean | undefined): BaseScreenMaterialCatalogEntry {
   return {
@@ -43,5 +46,58 @@ describe('visibleLibraryMaterials', () => {
       'base.text',
       'base.rectangle',
     ]);
+  });
+});
+
+describe('downloadDesignerDocument', () => {
+  afterEach(() => {
+    delete (URL as unknown as Record<string, unknown>).createObjectURL;
+    delete (URL as unknown as Record<string, unknown>).revokeObjectURL;
+  });
+
+  it('R2 以 application/json Blob 触发浏览器下载并回收对象 URL', async () => {
+    const anchor = {
+      href: '',
+      download: '',
+      hidden: false,
+      clicked: false,
+      removed: false,
+      click: () => {
+        anchor.clicked = true;
+      },
+      remove: () => {
+        anchor.removed = true;
+      },
+    };
+    const ownerDocument = {
+      body: {
+        append: () => undefined,
+        remove: () => undefined,
+      },
+      createElement: (tagName: string) => {
+        expect(tagName).toBe('a');
+        return anchor;
+      },
+    };
+    const createObjectURL = vi.fn((blob: Blob) => {
+      expect(blob.type).toBe('application/json');
+      return 'blob:designer-export';
+    });
+    const revokeObjectURL = vi.fn();
+    Object.assign(URL, { createObjectURL, revokeObjectURL });
+
+    downloadDesignerDocument(
+      ownerDocument as unknown as Document,
+      'screen-document.json',
+      '{"canvas":{"width":960}}',
+    );
+
+    const blob = createObjectURL.mock.calls[0]![0]!;
+    await expect(blob.text()).resolves.toBe('{"canvas":{"width":960}}');
+    expect(anchor.download).toBe('screen-document.json');
+    expect(anchor.href).toBe('blob:designer-export');
+    expect(anchor.clicked).toBe(true);
+    expect(anchor.removed).toBe(true);
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:designer-export');
   });
 });

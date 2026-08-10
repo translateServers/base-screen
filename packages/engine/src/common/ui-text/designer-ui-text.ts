@@ -69,6 +69,12 @@ export const DESIGNER_UI_TEXT = {
   importConfirm: '确认导入',
   importReplace: '导入将替换当前文档。',
   importWarning: '当前未保存的修改将会丢失，是否继续？',
+  importFailed: '导入失败',
+  importParseFailed: '导入文件无法解析。',
+  importClose: '关闭',
+  imported: '文档已导入。',
+  exported: '文档已导出。',
+  defaultExportFileName: 'screen-document.json',
   cancel: '取消',
   dataPanelEmpty: '未选择数据源。',
   dataSource: {

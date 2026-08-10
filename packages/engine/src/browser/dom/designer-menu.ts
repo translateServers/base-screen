@@ -5,14 +5,13 @@ export interface DesignerMenuControllerCallbacks {
   readonly getRoot: () => ShadowRoot | null;
   readonly getContextMenu: () => HTMLElement | undefined;
   readonly getSelectedComponentIds: () => readonly string[];
-  readonly getOperationState: (
-    id: string,
-  ) => { readonly available: boolean; readonly enabled: boolean } | undefined;
+  readonly getOperationState: (id: string) => DesignerOperationStateShape | undefined;
 }
 
 export interface DesignerOperationStateShape {
   readonly available: boolean;
   readonly enabled: boolean;
+  readonly checked: boolean;
 }
 
 // Actions that act as toggles (show checkmark when enabled/active).
@@ -173,7 +172,7 @@ export class DesignerMenuController {
         control.disabled = !state.enabled;
         // Set aria-checked for toggle actions
         if (TOGGLE_MENU_ACTIONS.has(id)) {
-          control.setAttribute('aria-checked', String(state.enabled));
+          control.setAttribute('aria-checked', String(state.checked));
           // Ensure checkmark element exists
           if (!control.querySelector('.menu-item-check')) {
             const check = document.createElement('span');
@@ -574,7 +573,7 @@ export class DesignerMenuController {
         control.hidden = !state.available;
         control.disabled = !state.enabled;
         if (TOGGLE_MENU_ACTIONS.has(id)) {
-          control.setAttribute('aria-checked', String(state.enabled));
+          control.setAttribute('aria-checked', String(state.checked));
           if (!control.querySelector('.menu-item-check')) {
             const check = document.createElement('span');
             check.className = 'menu-item-check';

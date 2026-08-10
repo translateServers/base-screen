@@ -63,7 +63,10 @@ import {
   isEditableTarget,
   isTextAreaDraft,
 } from './browser/dom/designer-surface-router.js';
-import { createDesignerWorkspace } from './browser/dom/designer-workspace.js';
+import {
+  createDesignerWorkspace,
+  downloadDesignerDocument,
+} from './browser/dom/designer-workspace.js';
 import { createDesignerStyle } from './browser/styles/designer-style.js';
 import {
   createDesignerElementOperations,
@@ -257,6 +260,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #importController = new DesignerImportController({
     replaceDocument: (document) => this.replaceDocument(document),
     report: (diagnostics) => this.emitDiagnostics(diagnostics),
+    notify: (message) => this.#notificationController.notify(message, 'success'),
   });
   readonly #panelController = new DesignerPanelController({
     getCatalog: () => this.#catalog,
@@ -334,8 +338,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     setZoomCentered: (zoom) => this.#viewportController.setZoomCentered(zoom),
     resetViewport: () => this.#viewportController.reset(),
     toggleCanvasAid: (aid) => this.#workbenchController.toggleCanvasAid(aid),
+    isCanvasAidEnabled: (aid) => this.#workbenchController.isCanvasAidEnabled(aid),
     toggleGuides: () => this.#workbenchController.toggleGuides(),
+    isGuidesVisible: () => this.#workbenchController.guidesVisible,
     toggleBorderGuides: () => this.#workbenchController.toggleBorderGuides(),
+    isBorderGuidesEnabled: () => this.#workbenchController.borderGuidesEnabled,
     cycleWorkbenchMode: () => this.#workbenchController.cycleMode(),
     openProjectWorkspace: () => this.#projectWorkspaceController.open(),
     save: () => this.save(),
@@ -1483,6 +1490,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   private renderOperationControls(): void {
     const root = this.shadowRoot;
     if (root === null) return;
+    const phase = this.#session.projectPhase;
     for (const control of root.querySelectorAll<HTMLButtonElement>(
       '[data-action], [data-menu-action]',
     )) {
@@ -1493,6 +1501,10 @@ export class BaseScreenDesignerElement extends ElementBase {
         control.hidden = !state.available;
         control.disabled = !state.enabled;
       }
+      const isBusy =
+        (id === 'project-save' && phase === 'saving') ||
+        (id === 'project-publish' && phase === 'publishing');
+      control.ariaBusy = String(isBusy);
     }
     this.#menuController.renderMenuStates();
   }
@@ -1517,12 +1529,22 @@ export class BaseScreenDesignerElement extends ElementBase {
   private exportFromOperation(): void {
     const exported = this.exportDocument();
     if (exported.ok) {
+      downloadDesignerDocument(this.ownerDocument, this.exportFileName(), exported.value);
+      this.#notificationController.notify(DESIGNER_UI_TEXT.exported, 'success');
       this.dispatchEvent(
         new CustomEvent('base-screen-export', { detail: { document: exported.value } }),
       );
     } else {
       this.emitDiagnostics(exported.diagnostics);
     }
+  }
+
+  private exportFileName(): string {
+    const projectName = this.#session.project?.name;
+    if (projectName === undefined || projectName.trim() === '') {
+      return DESIGNER_UI_TEXT.defaultExportFileName;
+    }
+    return `${projectName.replace(/[\\/:*?"<>|\u0000-\u001f]/g, '-')}.json`;
   }
 
   private openImportPicker(): void {
