@@ -1,7 +1,7 @@
 # Base Screen 长期演进总纲
 
 > 状态：设计中
-> 最近更新：2026-08-05
+> 最近更新：2026-08-10
 > 定位：定义 Base Screen 的长期产品边界、目标架构、公共契约、包职责、演进路线和质量基线
 
 ## 0. 文档职责
@@ -40,7 +40,7 @@
 
 ### 1.1 产品定义
 
-Base Screen 是一个独立、可嵌入、跨框架的大屏设计器底座。它提供：
+Base Screen 是一个轻量、独立、可嵌入、跨框架的大屏设计器基座。它提供：
 
 - 可视化设计引擎。
 - 独立运行时渲染器。
@@ -51,6 +51,16 @@ Base Screen 是一个独立、可嵌入、跨框架的大屏设计器底座。�
 - 单一、严格的项目文档契约。
 
 Base Screen 不绑定具体后台、账号系统、数据平台或业务领域。宿主应用决定项目存储、认证、数据资源、发布流程和权限模型。
+
+### 1.1.1 轻量基座边界
+
+轻量是职责边界，不是功能质量降级。Base Screen 拥有当前文档内的确定性编辑、画布交互、历史、渲染、物料协议、
+诊断和有界请求协调；它不是项目管理应用、资产后台、数据平台、发布系统或通用任务运行时。
+
+实际存储与检索、认证与权限、数据查询与聚合、资产上传与转码、部署与公开 URL、截图/视频/批量导出以及其他长任务
+由宿主执行。Base Screen 只通过 JSON-safe intent、capability-gated port、Custom Element method 与 CustomEvent
+表达请求和消费有界结果。详细判定规则见
+[ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)。
 
 ### 1.2 与 Nebula 的关系
 
@@ -83,19 +93,22 @@ Base Screen 是从 Nebula 大屏能力中提炼出的独立开源底座，不是
 - 服务端渲染设计器。
 - 任意脚本、`eval`、SQL 或通用 HTTP 请求描述进入项目文档。
 - 为所有前端框架维护重型设计器包装组件。
+- 内建项目中心、资产后台、数据工作台、发布部署中心或任务队列。
+- 在 Base Screen 内执行大文件处理、数据 ETL/聚合、截图/视频/批量渲染或其他长任务。
 - 兼容旧浏览器的 Custom Element polyfill。
 
 ### 1.5 当前推进方针
 
-当前实现以大屏设计器的样式和作者功能为产品主线。设计器体验的完整性、可用性和质量优先于为底层包
-单独扩展能力。
+当前实现以轻量设计器基座的本地作者体验和渲染质量为主线。作者体验的完整性、可用性和质量优先，但完整业务产品
+不进入 Base Screen。
 
-- 优先推进 `@base-screen/engine` 的工作台视觉、交互、编辑闭环和对应浏览器验收。
-- `contracts`、`core`、`renderer`、物料、插件、SDK、framework bridge 与 `testing` 的后续工作，必须直接
-  服务于设计器需求、解除设计器质量瓶颈，或守护其既有公共契约。
-- 不因独立的底层探索扩大公共 API、包图或持久化契约；确有设计器需求时，仍按 ADR、Spec、测试和质量门
-  的顺序推进。
-- 本方针不改变宿主拥有副作用、契约优先、实例隔离和生产包不依赖 `testing` 等既有边界。
+- 优先推进 `@base-screen/engine` 的画布交互、编辑闭环、可访问性和对应浏览器验收。
+- `contracts`、`core`、`renderer`、物料、插件、SDK、framework bridge 与 `testing` 的后续工作，必须直接服务于
+  可移植作者内核、渲染内核、必要宿主边界，或守护既有公共契约。
+- 项目目录、业务导航、数据执行、资产处理、发布部署和长任务只定义最小 intent/port，不在 Engine 中建设完整产品
+  工作流或宿主能力的替代实现。
+- 不因独立探索扩大公共 API、包图或持久化契约；确有基座需求时，仍按 ADR、Spec、测试和质量门的顺序推进。
+- 本方针不改变契约优先、实例隔离、fail-closed 和生产包不依赖 `testing` 等既有边界。
 
 ## 2. 长期架构原则
 
@@ -116,12 +129,14 @@ Web Component 是 Base Screen 的宿主集成 ABI，也是物料渲染和注册 
 - 文档、Element Model、事件 payload 和 Adapter 结果都必须跨越明确的 JSON 边界。
 - 公共行为先由契约测试描述，再由实现包消费。
 
-### 2.3 宿主拥有副作用
+### 2.3 宿主拥有副作用与重型处理
 
 - 项目加载、保存、发布、资源执行和权限校验由宿主 Adapter 实现。
 - Base Screen 不读取宿主 Token、Cookie、Router、Query Client 或业务 Store。
 - 项目文档只保存业务意图和稳定资源标识，不保存 URL、Header、Token、SQL 或连接信息。
 - Core 和 DSL 编译器保持纯粹；副作用通过端口注入。
+- 需要租户/凭证、跨项目状态、无明确容量上限、后台队列、持久缓存或领域基础设施的处理一律归宿主。
+- Base Screen 可以协调当前实例的一次有界请求，但不拥有实际 I/O、长任务、业务重试或跨实例共享执行。
 
 ### 2.4 显式注册与实例隔离
 
@@ -822,13 +837,19 @@ Adapter 能力按端口组合，不要求所有宿主实现全部能力：
 
 Renderer 内的数据协调器负责请求去重、取消、超时、刷新、迟到结果保护和 context 生命周期；宿主负责真实执行、认证、权限、缓存策略和服务端审计。
 
+### 11.4 重型处理
+
+Base Screen 的运行时协调只覆盖当前实例、当前文档和既有容量预算内的请求。跨项目查询、跨实例缓存、分页/轮询、
+ETL、资产处理、批量导出、后台队列和长任务恢复均由宿主拥有。需要这些能力时，Base Screen 发出稳定 intent 或调用
+有界 port，并消费经过校验的结果；它不感知宿主采用浏览器 Worker、服务端任务还是外部平台实现。
+
 ## 12. SDK 公共形态
 
 ### 12.1 Custom Elements
 
 首个正式 SDK 只提供两个产品级元素：
 
-- `<base-screen-designer>`：设计、保存、预览和发布入口。
+- `<base-screen-designer>`：设计、局部预览和当前会话宿主命令入口。
 - `<base-screen-viewer>`：预览、发布态和只读查看入口。
 
 Renderer 拥有未注册的 Viewer Element 实现类，Engine 拥有未注册的 Designer Element 实现类；SDK 负责装配、公开类型和注册稳定 tagName。下层包不得自行定义这两个产品 tagName。
@@ -1220,6 +1241,7 @@ ADR 完整索引与状态流转以 [docs/decisions/README.md](../decisions/READM
 | 决策项 | 结论 |
 | --- | --- |
 | 项目关系 | Base Screen 是独立 MIT 开源底座，Nebula 是宿主和参考来源 |
+| 产品定位 | 轻量、可嵌入的大屏设计器基座，不建设完整业务应用或后端平台 |
 | 文档策略 | 先维护一份总纲型活文档，再按实施拆分 ADR 与 Spec |
 | 文档兼容 | 定义新的 canonical schema，Nebula 通过 importer 接入 |
 | 首期框架 | Vanilla、React 19、Vue 3 |
@@ -1228,7 +1250,7 @@ ADR 完整索引与状态流转以 [docs/decisions/README.md](../decisions/READM
 | 注册方式 | 标准 `customElements.define()`，默认显式 define，提供 `/auto-register` |
 | 实例隔离 | 全局 Custom Element 定义 + 实例级不可变物料目录 |
 | 框架桥接 | React/Vue 包只桥接物料组件，不提供重型宿主包装器 |
-| 当前推进方针 | 以设计器样式与作者功能为主线；其他包仅为设计器能力、质量或既有契约提供支撑 |
+| 当前推进方针 | 聚焦可移植作者/渲染内核与必要宿主端口；重型处理和完整业务工作流归宿主 |
 | 插件边界 | 物料与插件分离；插件可以贡献已定义物料和受控能力 |
 | 包结构 | contracts、core、renderer、engine、material、plugin-core、plugin-manager、plugin-sdk、react、vue、sdk、testing |
 | Testing | 独立发布包，生产包不得依赖 |
@@ -1248,6 +1270,7 @@ ADR 完整索引与状态流转以 [docs/decisions/README.md](../decisions/READM
 | 内部框架泄漏 | 声明检查、tarball consumer、依赖图门禁 |
 | 文档 shape 再次分裂 | contracts 单一来源、禁止重复 parser |
 | 动态数据泄漏凭证 | host-resource intent、Host Adapter、服务端 allowlist |
+| 基座膨胀为宿主产品 | ADR-0027 范围判定、最小 intent/port 与 Spec 准入 |
 | React/Vue 生命周期差异 | bridge conformance suite 和真实浏览器卸载测试 |
 | Custom Element 无法判断永久断开 | microtask 检查、同步 move 保持、延迟重连重建的确定性协议 |
 | 大画布性能退化 | transient transform、rAF、稳定 diff、性能基线和后续虚拟化 |
@@ -1289,3 +1312,4 @@ ADR 完整索引与状态流转以 [docs/decisions/README.md](../decisions/READM
 | 2026-08-03 | 接受 ADR-0001；M0 十二包保持 private，公开 npm scope 延后到首次公开发布前决策 |
 | 2026-08-03 | 新增生效中的 M0 工程基线 Spec，冻结工具链、十二包骨架、边界门禁和私有 tarball 验收 |
 | 2026-08-05 | 明确当前以大屏设计器的样式与作者功能为主线；其他包后续工作以服务设计器能力、质量或既有契约为准 |
+| 2026-08-10 | 接受 ADR-0027，将项目定调为轻量大屏设计器基座；重型处理与完整业务工作流由宿主负责 |

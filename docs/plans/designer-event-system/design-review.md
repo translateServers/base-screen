@@ -91,7 +91,7 @@
 | 手势中 `setPointerCapture` 后键盘仍可达 | capture keydown 无条件吞（3.3） |
 | window 级 DnD 全局劫持宿主 | 仅拦截"本 shadow 发起的拖拽"（dragstart 时打类型前缀标记），其余放行 |
 | 与现有仲裁顺序冲突 | 保持超集顺序（3.1），回归现有 gesture/workbench 测试 |
-| 与活动 Spec 重叠 | designer-full-product tasks.md:20「统一所有快捷键、菜单和帮助元数据」未勾选，新 Spec 建立链接归并 |
+| 与活动 Spec 重叠 | 相关快捷键与菜单能力由本 Spec 独立收敛；范围受 [ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) 约束 |
 
 ## 5. 备选方案
 
@@ -114,7 +114,7 @@
 | 1 | wheel 语义 | 画布普通滚轮 = 平移画布（shift+wheel=水平平移，ctrl/meta+wheel=缩放保留） |
 | 2 | 归属 | `common/events/` 新叶子子层 |
 | 3 | 范围 | P1+P2 合并为一个 Spec |
-| 4 | Spec 归并 | 新建 `docs/specs/designer-event-system/`，链接 designer-full-product tasks.md:20 |
+| 4 | Spec 归并 | 新建 `docs/specs/designer-event-system/`，作为轻量作者内核的独立 Spec |
 | 5 | 右键菜单 | 全 shadow 表面阻止默认菜单；仅画布多态菜单，面板不新增菜单（写入 Spec 边界） |
 | 6 | beforeunload | 宿主契约，designer 不接管（写入 Spec 边界） |
 | 7 | 宿主影响 | **零宿主影响硬边界**：window 级监听仅处理落点在本设计器 shadow 内的事件（composedPath 归属过滤），其余一律零副作用；DnD 仅拦本设计器发起的拖拽；不注册 beforeunload/visibilitychange；disconnectedCallback 注销全部监听 |

@@ -5,7 +5,7 @@
 > Authority: [ADR-0023](../../decisions/ADR-0023-host-dataset-resource-integration.md)
 > Related: [Contracts Foundation](../contracts-foundation/spec.md),
 > [Host Resource And Blueprint](../host-resource-blueprint/spec.md),
-> [Designer Full Product](../designer-full-product/spec.md)
+> [ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)
 > Tasks: [tasks.md](./tasks.md)
 > Acceptance: [checklist.md](./checklist.md)
 > Matrix: [test-matrix.md](./test-matrix.md)

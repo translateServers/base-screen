@@ -3,7 +3,7 @@
 > 状态：已决策（图形延后）；表单与 Core trace 实施待启动
 > 日期：2026-08-10
 > 依据：[ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md)（已接受）、[专项 Spec](../../specs/designer-event-blueprint/spec.md)（生效中）、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
-> 回链：[Designer Full Product Task 5](../../specs/designer-full-product/tasks.md)
+> 范围依据：[ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)；本计划只覆盖轻量作者内核
 
 ## 1. 执行原则
 
@@ -18,7 +18,7 @@
 ### Batch A：规范与决策门（已完成）
 
 - 建立 ADR-0026、专项 Spec、tasks、checklist 和 test matrix；定义 Core trace 契约、表单/draft/模拟/诊断边界。
-- 2026-08-10 接受 ADR-0026（图形延后、零依赖），专项 Spec 生效；更新文档索引与 Full Product 回链。
+- 2026-08-10 接受 ADR-0026（图形延后、零依赖），专项 Spec 生效；范围由 ADR-0027 收敛为轻量作者内核。
 
 ### Batch B：候选评估（已完成，归档）
 
@@ -38,10 +38,10 @@ fixture/Chromium 对比；证据与结论见 [候选评估报告](./dependency-e
 
 ### Batch D：质量与交付
 
-- 覆盖专项矩阵全部 unit/DOM/browser/visual/a11y/scale cases，维护 Full Product R7（表单部分）/R9 反向映射。
+- 覆盖专项矩阵全部 unit/DOM/browser/visual/a11y/scale cases，维护本 Spec R7（表单部分）/R9 反向映射。
 - 运行 Engine/Core focused lint、typecheck、test、build，browser、API、boundary、license、consumer bundle、
   tarball 与 `pnpm verify:m0`。
-- 证据齐全后增量勾选专项 tasks/checklist，再勾选 Full Product Task 5；未通过项进入 fix loop，不以单次 focused
+- 证据齐全后增量勾选专项 tasks/checklist；未通过项进入 fix loop，不以单次 focused
   test 替代完成定义。
 
 ## 3. 预算与终止条件

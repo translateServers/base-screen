@@ -3,7 +3,8 @@
 > 状态：已接受
 > 日期：2026-08-05
 > 扩展：[ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-runtime.md)、[ADR-0013](./ADR-0013-core-canonical-blueprint-mutation.md)、[ADR-0015](./ADR-0015-runtime-contribution-authority.md)
-> 适用：[Designer Full Product](../specs/designer-full-product/spec.md)
+> 历史适用：[已归档 Designer Full Product](../specs/archive/designer-full-product/spec.md)
+> 后续边界：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)
 
 ## 决策
 

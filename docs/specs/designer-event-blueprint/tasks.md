@@ -27,7 +27,7 @@
   - [ ] 问题面板定位、能力撤销、组件/事件失效、无效 payload、host-action 限制与中文可访问反馈。
   - [ ] 搜索高亮与定位、模拟预算与逐规则 trace、内存日志隔离。
 
-- [ ] Task 5：完成质量门与 Full Product 回链（R7、R8、R9）。
+- [ ] Task 5：完成质量门与轻量基座范围回链（R7、R8、R9）。
   - [ ] 完成 unit、DOM、完整 pointer/keyboard Chromium、视觉与可访问性、容量、双实例和清理矩阵。
   - [ ] 完成 Engine/Core focused lint、typecheck、test、build，browser、API、boundary、license、consumer bundle、tarball 与 `pnpm verify:m0`。
-  - [ ] 以当前自动化证据更新本 Spec 三件套、Full Product Task 5、R7/R9 矩阵和依赖记录，再勾选所有适用项。
+  - [ ] 以当前自动化证据更新本 Spec 三件套、R7/R9 矩阵和依赖记录，再勾选所有适用项。

@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-06
 > 定位：浏览器默认键盘/鼠标事件行为管控与统一事件通道，零宿主影响
-> 前置：[Designer Engine](../archive/designer-engine/spec.md)、[Designer Full Product](../designer-full-product/spec.md)（R3 快捷键元数据任务链接）
+> 前置：[Designer Engine](../archive/designer-engine/spec.md)、[ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)（本地作者内核范围）
 > 评审：[设计评审](../../plans/designer-event-system/design-review.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)

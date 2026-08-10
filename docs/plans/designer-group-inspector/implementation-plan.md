@@ -3,7 +3,7 @@
 > 状态：第二轮已实现
 > 日期：2026-08-07
 > 范围：`@base-screen/engine` 的编组语义、选中态判定和右侧检查器面板
-> 关联规格：[Designer Full Product](../../specs/designer-full-product/spec.md) R3/R5/R9
+> 关联边界：[ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)；本计划覆盖轻量作者内核 R3/R5/R9
 > 不进入范围：画布吸附、图层树完整改造、Blueprint 图形编辑、物料公共契约扩展
 
 ## 1. 目标
@@ -179,7 +179,7 @@ DOM 渲染只消费一个面板 view model，不直接重复业务判断。建�
 1. DOM 测试：单组选中显示组概览/解组；多选显示可用动作和不可用原因；普通单选不回退。
 2. Controller 测试：组位置编辑更新子树；锁定组禁用解组；解组后选择子项。
 3. Operation 测试：组位置 delta 跳过有效锁定后代；非法组操作 fail closed。
-4. 更新 `designer-full-product/test-matrix.md` 的 R3/R5 证据。
+4. 将 R3/R5 证据归入对应的聚焦 Designer Spec 与测试矩阵。
 5. 聚焦运行 engine tests/typecheck；合入前按影响范围补跑更高质量门。
 
 ## 9. 验收标准

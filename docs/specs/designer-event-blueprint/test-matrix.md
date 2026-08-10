@@ -15,7 +15,7 @@
 | EB-R9-C02 | visual/a11y | Chromium | 空态、复杂规则、配置、问题、模拟、搜索；light/dark、forced-colors、reduced-motion |
 | EB-R9-C03 | scale/release | Package/release | 表单分页、规则/动作过滤、合法极限 document、API、boundary、tarball、`pnpm verify:m0` |
 
-每个新增或变更的测试名称必须保留 `EB-R7`、`EB-R8` 或 `EB-R9` 标记，并同步回链 Designer Full Product 矩阵。
+每个新增或变更的测试名称必须保留 `EB-R7`、`EB-R8` 或 `EB-R9` 标记，并同步回链本 Spec。
 
 ## 候选评估归档（2026-08-10）
 

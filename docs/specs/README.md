@@ -1,7 +1,7 @@
 # Base Screen 功能与工程规格
 
 > 状态：生效中
-> 最近更新：2026-08-07
+> 最近更新：2026-08-10
 > 定位：索引可直接验收和实施的 Base Screen Spec
 
 ## 生效中
@@ -19,7 +19,6 @@
 
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
-| [Designer Full Product](./designer-full-product/spec.md) | Designer 产品后继增量 | 完整作者、图形 Blueprint、宿主解耦资源/资产和项目产品能力 |
 | [Designer Canvas Precision](./designer-canvas-precision/spec.md) | Designer 画布增量 | 以瞬态 `translate` 预览强化单/多选移动、选区吸附与坐标换算 |
 | [Designer Event System](./designer-event-system/spec.md) | Designer 事件增量 | 浏览器默认键盘/鼠标行为管控、统一命令通道、手势抑制与零宿主影响 window 守卫 |
 | [Boundary Hygiene](./boundary-hygiene/spec.md) | 工程增量 | 将 AGENTS.md 分层与边界约定落地：消除 `dom→controllers` 反向依赖、子层方向门禁、UI 文案收敛 |
@@ -34,7 +33,7 @@
 
 ## 已归档
 
-| Spec | 归档日期 | 后继规格 | 说明 |
+| Spec | 归档日期 | 后继依据 | 说明 |
 | --- | --- | --- | --- |
 | [Designer Authoring And Project Lifecycle](./archive/designer-authoring-project-lifecycle/spec.md) | 2026-08-04 | [Designer Engine](./archive/designer-engine/spec.md) | 保留 Nebula parity 与旧项目生命周期任务进度，不再作为现行实施或验收依据 |
 | [Designer Engine](./archive/designer-engine/spec.md) | 2026-08-05 | 已完成 | 三件套已全部勾选，作为历史行为依据保留 |
@@ -45,6 +44,7 @@
 | [Designer Product Completion](./archive/designer-product-completion/spec.md) | 2026-08-05 | 已完成 | Designer 产品主线增量已落地 |
 | [Designer Workbench Control Styles](./archive/designer-workbench-control-styles/spec.md) | 2026-08-05 | 已完成 | Engine token、控件、Shadow DOM 样式隔离与视觉验收已落地 |
 | [Directory Structure Rules](./archive/directory-structure-rules/spec.md) | 2026-08-05 | 已完成 | 目录结构、engine 分层、测试外置与构建产物卫生已落地 |
+| [Designer Full Product](./archive/designer-full-product/spec.md) | 2026-08-10 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) | 未完成的完整产品范围被轻量基座定位取代；原勾选状态保留 |
 
 ## 使用规则
 

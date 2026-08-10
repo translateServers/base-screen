@@ -1,13 +1,17 @@
 # Designer Full Product 规格
 
-> 状态：生效中
-> 最近更新：2026-08-05
-> 定位：完整大屏设计器及宿主解耦产品能力的后继增量
-> 前置：[Designer Product Completion](../archive/designer-product-completion/spec.md)、[Designer Engine](../archive/designer-engine/spec.md)、[ADR-0017](../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0018](../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0023](../../decisions/ADR-0023-host-dataset-resource-integration.md)、[ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
+> 状态：已归档（未完成范围被 ADR-0027 取代）
+> 最近更新：2026-08-10
+> 定位：完整大屏设计器产品范围的历史实施快照，不再授权新实现
+> 前置：[Designer Product Completion](../designer-product-completion/spec.md)、[Designer Engine](../designer-engine/spec.md)、[ADR-0017](../../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0018](../../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md)、[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
+> 后继：[ADR-0027：轻量设计器基座与宿主重型处理边界](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
-> 研究来源：[Nebula Designer Core](../../provenance/nebula-designer-core.md)
+> 研究来源：[Nebula Designer Core](../../../provenance/nebula-designer-core.md)
+
+本目录按 2026-08-10 的任务勾选状态归档。未完成项不得继续实施；仍符合轻量基座边界的独立 Spec 继续以各自
+三件套为唯一实施和验收依据。
 
 ## 1. 目标
 
@@ -63,9 +67,9 @@ Designer SHALL 支持 static 与 host-backed 变量、授权资源目录、参�
 ### R7：Blueprint 表单作者闭环
 
 Blueprint SHALL 提供完整键盘表单路径：trigger、condition、action 与递归 value expression 编辑，以及配置、
-模板、编译诊断、问题面板和受限模拟日志，并支持 Core 只读 trace（[Designer Event Blueprint](../designer-event-blueprint/spec.md)）。
-图形路径按 [ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md) 整体延后，表单为唯一作者
-路径。未来恢复图形路径时须重新执行 [ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
+模板、编译诊断、问题面板和受限模拟日志，并支持 Core 只读 trace（[Designer Event Blueprint](../../designer-event-blueprint/spec.md)）。
+图形路径按 [ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md) 整体延后，表单为唯一作者
+路径。未来恢复图形路径时须重新执行 [ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
 依赖评估；图形路径 SHALL 投影 canonical rule/condition/action，不能创建私有执行模型。
 
 ### R8：依赖准入

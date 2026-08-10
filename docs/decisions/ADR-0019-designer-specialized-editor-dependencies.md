@@ -3,7 +3,8 @@
 > 状态：已接受
 > 日期：2026-08-05
 > 扩展：[Designer 依赖引入计划](../plans/designer-dependency-introduction/implementation-plan.md)
-> 适用：[Designer Full Product](../specs/designer-full-product/spec.md)
+> 历史适用：[已归档 Designer Full Product](../specs/archive/designer-full-product/spec.md)
+> 后续边界：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)
 
 ## 决策
 

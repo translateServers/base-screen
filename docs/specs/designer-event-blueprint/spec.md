@@ -2,8 +2,8 @@
 
 > 状态：生效中
 > 最近更新：2026-08-10
-> 归属：Designer Full Product Task 5（R7 表单部分、R9）
-> 前置：[Designer Full Product](../designer-full-product/spec.md)、[ADR-0018](../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
+> 定位：轻量设计器基座内的纯规则作者能力（R7 表单部分、R9）
+> 前置：[ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0018](../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
@@ -135,6 +135,6 @@ host event/action，不写日志或遥测。
 
 - ADR-0026 已接受（2026-08-10）。
 - 本目录 `tasks.md`、`checklist.md` 的所有适用项与测试矩阵证据全部完成。
-- Designer Full Product Task 5 回链、R7（表单部分）/R9 双向映射、focused quality gates、browser、API、boundary、
+- 本 Spec 的 R7（表单部分）/R9 双向映射、focused quality gates、browser、API、boundary、
   license、consumer bundle、tarball 与 `pnpm verify:m0` 均通过。
 - 图形路径不属于本规格验收范围（ADR-0026 延后）。

@@ -3,7 +3,8 @@
 > 状态：已接受
 > 日期：2026-08-05
 > 扩展：[ADR-0012](./ADR-0012-designer-project-lifecycle.md)
-> 适用：[Designer Full Product](../specs/designer-full-product/spec.md)
+> 历史适用：[已归档 Designer Full Product](../specs/archive/designer-full-product/spec.md)
+> 部分取代：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)（完整产品建设范围被取代；端口安全与竞态规则保留）
 
 ## 决策
 

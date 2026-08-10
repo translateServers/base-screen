@@ -30,4 +30,4 @@
 - [ ] 1024x640、1440x900、1920x1080、窄屏提示、light/dark、forced-colors、reduced-motion 视觉与可访问性通过。
 - [ ] 完整 pointer、keyboard-only、undo/redo、项目替换、容量上限、表单分页通过。
 - [ ] Engine/Core focused gates、browser、API、boundary、license、consumer bundle、tarball 与 `pnpm verify:m0` 通过。
-- [ ] 本 Spec 与 Designer Full Product Task 5 的任务、checklist、test matrix 和报告证据双向同步。
+- [ ] 本 Spec 的任务、checklist、test matrix 和报告证据与当前实现双向同步。

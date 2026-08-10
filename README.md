@@ -1,6 +1,8 @@
 # Base Screen
 
-Base Screen 是一个基于 Screen Document、Web Components 和物料目录的可视化屏幕运行时，提供 Viewer、Designer、官方基础物料以及 React/Vue 物料桥接能力。
+Base Screen 是一个轻量、可嵌入、跨框架的大屏设计器基座。它基于 Screen Document、Web Components 和物料
+目录提供 Viewer、Designer、官方基础物料以及 React/Vue 物料桥接能力；项目、数据、资产、发布和长任务的
+真实处理由宿主负责，Base Screen 只保留本地作者内核、渲染内核与有界宿主端口。
 
 ## 集成入口
 
