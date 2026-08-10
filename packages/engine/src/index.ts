@@ -9,12 +9,18 @@ export {
 import type {
   ScreenAssetCatalogPort,
   ScreenAssetSummary,
+  ScreenAuthoringEditorContext,
+  ScreenBlueprint,
+  ScreenBlueprintCommitRequest,
+  ScreenComponentTextCommitRequest,
+  ScreenComponentTextTarget,
   ScreenDesignerHostAdapter,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenHostDatasetCatalogPort,
   ScreenHostResourcePort,
   ScreenHostVariablePort,
+  ScreenJsonObject,
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
@@ -25,11 +31,15 @@ import type {
   ScreenProjectSummary,
 } from '@base-screen/contracts';
 import {
+  MAX_AUTHORING_SOURCE_BYTES,
   parseScreenDocument,
+  parseScreenJsonValue,
+  SCREEN_AUTHORING_REQUEST_EVENT,
   serializeScreenDocument,
   validateScreenDesignerHostAdapter,
 } from '@base-screen/contracts';
 import {
+  compileScreenBlueprint,
   getScreenSelectionBounds,
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
@@ -37,6 +47,10 @@ import {
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
+} from '@base-screen/plugin-core';
+import {
+  validateBaseScreenMaterialProps,
+  validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerAssetController } from './browser/controllers/designer-asset-controller.js';
@@ -68,6 +82,14 @@ import {
   downloadDesignerDocument,
 } from './browser/dom/designer-workspace.js';
 import { createDesignerStyle } from './browser/styles/designer-style.js';
+import {
+  buildScreenAuthoringEditorContext,
+  createScreenAuthoringInstanceId,
+  createScreenAuthoringRequestId,
+  parseScreenAuthoringBlueprintCandidate,
+  parseScreenComponentTextSource,
+  validateScreenAuthoringCommitGuards,
+} from './common/operations/designer-authoring-bridge.js';
 import {
   createDesignerElementOperations,
   type DesignerElementOperationsHost,
@@ -135,6 +157,9 @@ export class BaseScreenDesignerElement extends ElementBase {
   #statusFeedback: HTMLElement | undefined;
   #contextMenu: HTMLElement | undefined;
   #lastSavedAt: number | undefined;
+  readonly #instanceId = createScreenAuthoringInstanceId();
+  readonly #pendingAuthoringRequests = new Map<string, { readonly kind: string }>();
+  #authoringGeneration = 0;
   readonly #notificationController = new DesignerNotificationController();
   #layers: HTMLDivElement | undefined;
   readonly #session = new DesignerSession({
@@ -208,7 +233,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     getDocument: () => this.#session.document,
     getInteraction: () => this.#session.interaction,
     getRuntimeContributions: () => this.#runtimeContributions,
-    executeCommand: (command) => this.executeDesignerCommand(command),
+    requestBlueprintEdit: () => this.requestBlueprintEdit(),
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
   });
   readonly #projectFeedbackController = new DesignerProjectFeedbackController({
@@ -265,6 +290,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #panelController = new DesignerPanelController({
     getCatalog: () => this.#catalog,
     getDocument: () => this.#session.document,
+    getDatasetFields: () => this.#datasetController.getFocusedDatasetFields(),
     getGroupMaterialType: () => this.#groupMaterialType,
     getInteraction: () => this.#session.interaction,
     getResourcePort: () => this.#resourcePort,
@@ -480,7 +506,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     },
     change: [
       (target, event) => this.onImportChange(event),
-      (target, event) => this.#integrationController.onChange(event),
       (target, event) => this.#layersController.onChange(event),
       (target) => this.#datasetController.onChange(target),
       (target, event) => {
@@ -590,7 +615,6 @@ export class BaseScreenDesignerElement extends ElementBase {
       },
       (target, event) => this.#layersController.onKeyDown(event as KeyboardEvent),
       (target, event) => this.#datasetController.onKeyDown(event as KeyboardEvent),
-      (target, event) => this.#integrationController.onKeyDown(event as KeyboardEvent),
       (target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         if (!this.#panelController.onKeyDown(keyboardEvent)) {
@@ -887,6 +911,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   disconnectedCallback(): void {
     this.#eventSystem.disconnectWindowGuards();
     this.cancelGesture();
+    this.invalidateAuthoringRequests();
     this.#assetController.clear();
     this.#datasetController.clear();
     this.resetSessionSurfaces();
@@ -911,6 +936,7 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument> {
     this.cancelGesture();
+    this.invalidateAuthoringRequests();
     const result = this.#session.replaceDocument(document);
     if (result.ok) this.resetSessionSurfaces();
     return result;
@@ -927,6 +953,199 @@ export class BaseScreenDesignerElement extends ElementBase {
         ? transaction
         : withDerivedDesignerGroupBounds(document, transaction, this.#groupMaterialType),
     );
+  }
+
+  get instanceId(): string {
+    return this.#instanceId;
+  }
+
+  getAuthoringEditorContext(): ScreenAuthoringEditorContext {
+    const manifest = this.#catalog?.get(this.focusedComponentType())?.manifest;
+    return buildScreenAuthoringEditorContext({
+      instanceId: this.#instanceId,
+      requestId: undefined,
+      document: this.#session.document,
+      documentRevision: this.#session.project?.revision,
+      focusedComponentId: this.#session.interaction.focusedComponentId,
+      manifest,
+    });
+  }
+
+  requestComponentTextEdit(target: ScreenComponentTextTarget): string | null {
+    const document = this.#session.document;
+    const componentId = this.#session.interaction.focusedComponentId;
+    if (document === undefined || componentId === null) return null;
+    const requestId = createScreenAuthoringRequestId();
+    const component = document.components.find((item) => item.id === componentId);
+    if (component === undefined) return null;
+    this.#pendingAuthoringRequests.set(requestId, { kind: 'component-text' });
+    this.dispatchEvent(
+      new CustomEvent(SCREEN_AUTHORING_REQUEST_EVENT, {
+        detail: {
+          request: {
+            kind: 'component-text',
+            requestId,
+            componentId,
+            documentRevision: this.#session.project?.revision ?? null,
+            target,
+            source: JSON.stringify(component[target === 'style' ? 'style' : 'props']),
+            format: 'json',
+            maxBytes: MAX_AUTHORING_SOURCE_BYTES,
+          },
+        },
+      }),
+    );
+    return requestId;
+  }
+
+  requestBlueprintEdit(): boolean {
+    const document = this.#session.document;
+    const componentId = this.#session.interaction.focusedComponentId;
+    if (document === undefined || componentId === null) return false;
+    const requestId = createScreenAuthoringRequestId();
+    this.#pendingAuthoringRequests.set(requestId, { kind: 'blueprint' });
+    this.dispatchEvent(
+      new CustomEvent(SCREEN_AUTHORING_REQUEST_EVENT, {
+        detail: {
+          request: {
+            kind: 'blueprint',
+            requestId,
+            componentId,
+            documentRevision: this.#session.project?.revision ?? null,
+            blueprint: document.blueprint as unknown as ScreenJsonObject,
+            maxBytes: MAX_AUTHORING_SOURCE_BYTES,
+          },
+        },
+      }),
+    );
+    return true;
+  }
+
+  commitComponentTextEdit(
+    request: ScreenComponentTextCommitRequest,
+  ): ScreenParseResult<ScreenDocument> {
+    const document = this.#session.document;
+    if (document === undefined) return this.commitGuardFailure('AUTHORING_EXPIRED');
+    const pending = this.#pendingAuthoringRequests.get(request.requestId);
+    if (pending?.kind !== 'component-text') {
+      return this.commitGuardFailure('AUTHORING_REQUEST_INVALID');
+    }
+    const guards = validateScreenAuthoringCommitGuards({
+      requestId: request.requestId,
+      expectedRevision: request.expectedRevision ?? null,
+      currentRevision: this.#session.project?.revision ?? null,
+      componentId: request.componentId,
+      componentExists: document.components.some((item) => item.id === request.componentId),
+      disposed: this.#authoringGeneration > 0,
+    });
+    if (!guards.ok) {
+      this.#pendingAuthoringRequests.delete(request.requestId);
+      return { ok: false, diagnostics: guards.diagnostics };
+    }
+    const component = document.components.find((item) => item.id === request.componentId);
+    const manifest = this.#catalog?.get(component?.type ?? '')?.manifest;
+    if (component === undefined || manifest === undefined) {
+      return this.commitGuardFailure('AUTHORING_COMPONENT_MISSING');
+    }
+    const source = parseScreenComponentTextSource(request.source, MAX_AUTHORING_SOURCE_BYTES);
+    if (!source.ok) return { ok: false, diagnostics: source.diagnostics };
+    if (source.value === null || typeof source.value !== 'object' || Array.isArray(source.value)) {
+      return this.commitGuardFailure('AUTHORING_SOURCE_INVALID');
+    }
+    if (request.target === 'props' || request.target === 'style') {
+      const schema = request.target === 'props' ? manifest.propsSchema : manifest.styleSchema;
+      const candidate = source.value as ScreenJsonObject;
+      const validator =
+        request.target === 'props'
+          ? validateBaseScreenMaterialProps
+          : validateBaseScreenMaterialStyle;
+      const validated = validator(candidate, schema);
+      if (!validated.ok) return { ok: false, diagnostics: validated.diagnostics };
+      const result = this.executeCommand({
+        type: 'update-components',
+        componentIds: [request.componentId],
+        patch: { [request.target]: validated.value },
+      });
+      if (result.ok) this.#pendingAuthoringRequests.delete(request.requestId);
+      return result;
+    }
+    const currentSource = component.dataSource;
+    if (currentSource?.type !== 'host-resource') {
+      return this.commitGuardFailure('AUTHORING_PAYLOAD_INVALID');
+    }
+    const params = source.value as ScreenJsonObject;
+    const parameters = Object.fromEntries(
+      Object.entries(params).map(([name, value]) => [name, { kind: 'literal' as const, value }]),
+    );
+    const result = this.executeCommand({
+      type: 'update-components',
+      componentIds: [request.componentId],
+      patch: { dataSource: { ...currentSource, params: parameters } },
+    });
+    if (result.ok) this.#pendingAuthoringRequests.delete(request.requestId);
+    return result;
+  }
+
+  commitBlueprintEdit(request: ScreenBlueprintCommitRequest): ScreenParseResult<ScreenDocument> {
+    const document = this.#session.document;
+    if (document === undefined) return this.commitGuardFailure('AUTHORING_EXPIRED');
+    const pending = this.#pendingAuthoringRequests.get(request.requestId);
+    if (pending?.kind !== 'blueprint') {
+      return this.commitGuardFailure('AUTHORING_REQUEST_INVALID');
+    }
+    const guards = validateScreenAuthoringCommitGuards({
+      requestId: request.requestId,
+      expectedRevision: request.expectedRevision ?? null,
+      currentRevision: this.#session.project?.revision ?? null,
+      componentId: request.componentId ?? undefined,
+      componentExists:
+        request.componentId === null ||
+        document.components.some((item) => item.id === request.componentId),
+      disposed: this.#authoringGeneration > 0,
+    });
+    if (!guards.ok) {
+      this.#pendingAuthoringRequests.delete(request.requestId);
+      return { ok: false, diagnostics: guards.diagnostics };
+    }
+    const candidate = parseScreenAuthoringBlueprintCandidate(
+      request.blueprint,
+      MAX_AUTHORING_SOURCE_BYTES,
+    );
+    if (!candidate.ok) return { ok: false, diagnostics: candidate.diagnostics };
+    if (candidate.value === null || typeof candidate.value !== 'object') {
+      return this.commitGuardFailure('AUTHORING_PAYLOAD_INVALID');
+    }
+    const blueprint = candidate.value as unknown as ScreenBlueprint;
+    const compiled = compileScreenBlueprint(
+      { ...document, blueprint },
+      this.#runtimeContributions ?? { hasBlueprintCapability: () => false },
+    );
+    if (!compiled.ok) {
+      return { ok: false, diagnostics: compiled.diagnostics };
+    }
+    const result = this.executeCommand({ type: 'replace-blueprint', blueprint });
+    if (result.ok) this.#pendingAuthoringRequests.delete(request.requestId);
+    return result;
+  }
+
+  private commitGuardFailure(code: ScreenDiagnostic['code']): ScreenParseResult<ScreenDocument> {
+    const message =
+      code === 'AUTHORING_EXPIRED'
+        ? DESIGNER_UI_TEXT.lifecycle.unloaded
+        : code === 'AUTHORING_REQUEST_INVALID'
+          ? DESIGNER_UI_TEXT.lifecycle.commitUnavailable
+          : DESIGNER_UI_TEXT.propertiesPanel.dataSourceInvalid;
+    return { ok: false, diagnostics: [{ severity: 'error', code, path: [], message }] };
+  }
+
+  private focusedComponentType(): string {
+    const componentId = this.#session.interaction.focusedComponentId;
+    return this.#session.document?.components.find((item) => item.id === componentId)?.type ?? '';
+  }
+
+  private invalidateAuthoringRequests(): void {
+    this.#authoringGeneration++;
+    this.#pendingAuthoringRequests.clear();
   }
 
   group(): ScreenParseResult<ScreenDocument> {
@@ -1118,6 +1337,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   unload(): void {
+    this.invalidateAuthoringRequests();
     this.#session.unload();
     this.#lastSavedAt = undefined;
     this.resetSessionSurfaces();
@@ -1150,7 +1370,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     );
     this.#integrationController.connect(
       shadow.querySelector<HTMLDivElement>('[data-events-panel]')!,
-      shadow.querySelector<HTMLElement>('[data-blueprint-workspace]')!,
     );
     this.#importController.connect(
       shadow.querySelector<HTMLElement>('[data-import-confirmation]')!,

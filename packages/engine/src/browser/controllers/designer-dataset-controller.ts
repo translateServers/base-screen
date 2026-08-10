@@ -18,6 +18,7 @@ import {
   type DesignerDatasetDraftView,
   renderDesignerDataSourcePanel,
 } from '../dom/designer-dataset-dom.js';
+import { renderDesignerDescriptorZone } from '../dom/designer-descriptor-dom.js';
 import {
   createDatasetDataSourceTransaction,
   createDesignerDatasetDraft,
@@ -83,6 +84,11 @@ export class DesignerDatasetController {
     if (describeTarget !== undefined) {
       void this.describe(describeTarget.resourceType, describeTarget.resourceId);
     }
+  }
+
+  getFocusedDatasetFields(): readonly { readonly id: string; readonly label: string }[] {
+    if (this.#descriptor === undefined) return [];
+    return this.#descriptor.fields.map((field) => ({ id: field.id, label: field.label }));
   }
 
   clear(): void {
@@ -360,6 +366,13 @@ export class DesignerDatasetController {
       feedback: this.#feedbackText,
     });
     this.#feedback = surface.feedback;
+    const manifest = this.currentEntry()?.manifest;
+    renderDesignerDescriptorZone(panel, manifest?.editorDescriptor?.data, {
+      document: this.callbacks.getDocument(),
+      interaction: this.callbacks.getInteraction(),
+      catalog: this.callbacks.getCatalog(),
+      getDatasetFields: () => this.getFocusedDatasetFields(),
+    });
   }
 
   private availableModes(): readonly DesignerDataSourceMode[] {

@@ -32,6 +32,11 @@ import {
 } from '../../common/operations/designer-layout-operations.js';
 import { selectedComponents } from '../../common/operations/designer-selection.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import type { DesignerDescriptorDatasetFields } from '../dom/designer-descriptor-dom.js';
+import {
+  createDescriptorArrayTransaction,
+  createDescriptorFieldTransaction,
+} from '../dom/designer-descriptor-operations.js';
 import {
   createDataSourceTransaction,
   createInitialDataSource,
@@ -43,6 +48,7 @@ import {
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
+  readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
@@ -213,6 +219,7 @@ export class DesignerPanelController {
         this.callbacks.getDocument(),
         this.interaction,
         this.callbacks.getCatalog(),
+        this.callbacks.getDatasetFields,
       );
     }
     renderDesignerDataPanel(
@@ -222,6 +229,7 @@ export class DesignerPanelController {
       this.callbacks.getCatalog(),
       this.callbacks.getResourcePort() !== undefined,
       this.callbacks.getRuntimeContributions(),
+      this.callbacks.getDatasetFields,
     );
   }
 
@@ -246,6 +254,23 @@ export class DesignerPanelController {
       this.addMaterial(materialCard.dataset.materialType);
       this.recordRecentMaterial(materialCard.dataset.materialType);
       this.renderMaterials(materialCard.closest<HTMLElement>('.designer'));
+      return;
+    }
+    const arrayButton = target.closest<HTMLButtonElement>('[data-descriptor-array-action]');
+    if (arrayButton !== null && arrayButton.dataset.descriptorArrayAction !== undefined) {
+      const transaction = createDescriptorArrayTransaction(
+        arrayButton,
+        this.callbacks.getDocument(),
+        this.interaction,
+        this.callbacks.getCatalog(),
+      );
+      if (transaction !== undefined) {
+        if (transaction.ok) {
+          this.report(this.callbacks.executeTransaction(transaction.value));
+        } else {
+          this.callbacks.emitDiagnostics(transaction.diagnostics);
+        }
+      }
       return;
     }
     if (!(target instanceof HTMLElement)) return;
@@ -295,6 +320,36 @@ export class DesignerPanelController {
   }
 
   onPropertyChange(event: Event): void {
+    const arrayTransaction = createDescriptorArrayTransaction(
+      event.target,
+      this.callbacks.getDocument(),
+      this.interaction,
+      this.callbacks.getCatalog(),
+    );
+    if (arrayTransaction !== undefined) {
+      if (arrayTransaction.ok) {
+        this.report(this.callbacks.executeTransaction(arrayTransaction.value));
+      } else {
+        this.callbacks.emitDiagnostics(arrayTransaction.diagnostics);
+      }
+      return;
+    }
+    const descriptorTransaction = createDescriptorFieldTransaction(
+      event.target,
+      this.callbacks.getDocument(),
+      this.interaction,
+      this.callbacks.getCatalog(),
+    );
+    if (descriptorTransaction !== undefined) {
+      if (descriptorTransaction.ok) {
+        setDraftValidity(event.target, true);
+        this.report(this.callbacks.executeTransaction(descriptorTransaction.value));
+      } else {
+        setDraftValidity(event.target, false);
+        this.callbacks.emitDiagnostics(descriptorTransaction.diagnostics);
+      }
+      return;
+    }
     const dataTransaction = createDataSourceTransaction(
       event.target,
       this.callbacks.getDocument(),

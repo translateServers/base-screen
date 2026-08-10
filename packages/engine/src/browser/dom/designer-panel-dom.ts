@@ -35,6 +35,10 @@ import {
   createValidatedStyleTransaction,
 } from '../../common/operations/designer-layout-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import {
+  type DesignerDescriptorDatasetFields,
+  renderDesignerDescriptorZone,
+} from './designer-descriptor-dom.js';
 
 export interface DesignerPanelInput {
   readonly value: string;
@@ -55,6 +59,7 @@ export function renderDesignerProperties(
   document: ScreenDocument | undefined,
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
+  getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
 ): void {
   properties.replaceChildren();
   const context = getDesignerInspectorContext(document, interaction, catalog);
@@ -69,12 +74,16 @@ export function renderDesignerProperties(
   if (context.kind === 'single-group') {
     appendGroupOverview(properties, context);
   }
-  appendComponentControls(properties, context);
+  appendComponentControls(properties, context, document, interaction, catalog, getDatasetFields);
 }
 
 function appendComponentControls(
   properties: HTMLElement,
   context: Extract<DesignerInspectorContext, { readonly kind: 'single-material' | 'single-group' }>,
+  document: ScreenDocument | undefined,
+  interaction: ScreenInteractionState,
+  catalog: BaseScreenMaterialCatalog | undefined,
+  getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
 ): void {
   const { component, manifest } = context;
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
@@ -130,6 +139,16 @@ function appendComponentControls(
     appendGroupActions(properties, context);
   }
   if (manifest === undefined) return;
+  const descriptorAppearance = manifest.editorDescriptor?.appearance;
+  if (descriptorAppearance !== undefined && descriptorAppearance.length > 0) {
+    renderDesignerDescriptorZone(properties, descriptorAppearance, {
+      document,
+      interaction,
+      catalog,
+      getDatasetFields,
+    });
+    return;
+  }
   const content =
     manifest.propertyPanel.length === 0
       ? undefined
@@ -280,6 +299,7 @@ export function renderDesignerDataPanel(
   catalog: BaseScreenMaterialCatalog | undefined,
   hostResourceAvailable: boolean,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+  getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
 ): void {
   if (panel === undefined) return;
   panel.replaceChildren();
@@ -339,6 +359,13 @@ export function renderDesignerDataPanel(
       source?.type === 'host-resource' ? JSON.stringify(source.params) : '{}',
     );
   }
+  const manifest = component === undefined ? undefined : catalog?.get(component.type)?.manifest;
+  renderDesignerDescriptorZone(panel, manifest?.editorDescriptor?.data, {
+    document,
+    interaction,
+    catalog,
+    getDatasetFields,
+  });
 }
 
 export function createPropertyTransaction(

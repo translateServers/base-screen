@@ -5,62 +5,6 @@
   background: var(--designer-surface-panel);
 }
 
-.blueprint-graph {
-  display: grid;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-4);
-  border: 1px solid var(--designer-border-default);
-}
-
-.blueprint-graph-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--designer-space-2);
-}
-
-.blueprint-graph-canvas {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--designer-space-3);
-  transform-origin: top left;
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="25"] {
-  transform: scale(0.25);
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="50"] {
-  transform: scale(0.5);
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="75"] {
-  transform: scale(0.75);
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="100"] {
-  transform: scale(1);
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="125"] {
-  transform: scale(1.25);
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="150"] {
-  transform: scale(1.5);
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="175"] {
-  transform: scale(1.75);
-}
-
-.blueprint-graph-canvas[data-blueprint-graph-zoom="200"] {
-  transform: scale(2);
-}
-
-.blueprint-graph-node[data-blueprint-graph-kind="trigger"] {
-  border-color: var(--designer-accent);
-}
-
 .designer-topbar {
   position: relative;
   z-index: var(--designer-z-workspace-overlay);
@@ -845,7 +789,6 @@
 .rail-content[hidden],
 .inspector-tabs[hidden],
 .inspector-pane[hidden],
-.blueprint-workspace[hidden],
 .direct-preview[hidden],
 .project-workspace[hidden],
 .project-conflict[hidden] {
@@ -1962,7 +1905,6 @@
   color: var(--designer-text-muted);
 }
 
-.blueprint-workspace,
 .direct-preview,
 .project-workspace {
   position: absolute;
@@ -1974,7 +1916,6 @@
   background: var(--designer-surface-workspace);
 }
 
-.blueprint-workspace header,
 .direct-preview header,
 .project-workspace header {
   display: flex;
@@ -1982,87 +1923,9 @@
   gap: var(--designer-space-3);
 }
 
-.blueprint-workspace header,
 .direct-preview header,
 .project-workspace header {
   margin-bottom: var(--designer-space-5);
-}
-
-.blueprint-workspace header .designer-button:last-child {
-  margin-left: auto;
-}
-
-.blueprint-workspace ol {
-  display: grid;
-  gap: var(--designer-space-4);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.blueprint-graph {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--designer-space-2);
-  margin-bottom: var(--designer-space-5);
-  padding: var(--designer-space-3);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-panel);
-}
-
-.blueprint-graph-node {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.blueprint-rule {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: start;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-4);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-panel);
-}
-
-.blueprint-rule > h2 {
-  grid-column: 1 / -1;
-  margin: 0;
-  font: var(--designer-font-small);
-  font-weight: 700;
-  overflow-wrap: anywhere;
-}
-
-.blueprint-rule > .designer-field,
-.blueprint-rule fieldset .designer-field {
-  min-width: 0;
-  margin: 0;
-}
-
-.blueprint-rule .designer-field-label {
-  white-space: normal;
-}
-
-.blueprint-rule fieldset {
-  display: grid;
-  min-width: 0;
-  gap: var(--designer-space-3);
-  margin: 0;
-  padding: var(--designer-space-3);
-  border: 1px solid var(--designer-border-default);
-}
-
-.blueprint-rule legend {
-  padding: 0 var(--designer-space-1);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-}
-
-.blueprint-rule > .designer-button:last-child {
-  margin-left: auto;
 }
 
 .direct-preview base-screen-viewer {

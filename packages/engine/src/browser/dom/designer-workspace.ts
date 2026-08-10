@@ -294,12 +294,6 @@ export function createDesignerWorkspace(
     </div>`;
   layout.appendChild(importConfirmation);
 
-  const blueprint = ownerDocument.createElement('section');
-  blueprint.className = 'blueprint-workspace';
-  blueprint.dataset.blueprintWorkspace = 'true';
-  blueprint.hidden = true;
-  layout.appendChild(blueprint);
-
   const helpDialog = ownerDocument.createElement('section');
   helpDialog.className = 'designer-help-dialog';
   helpDialog.dataset.helpDialog = 'true';

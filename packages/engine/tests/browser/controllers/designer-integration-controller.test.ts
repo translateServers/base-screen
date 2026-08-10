@@ -1,5 +1,4 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import { applyScreenDocumentCommand } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -29,37 +28,6 @@ const document: ScreenDocument = {
   blueprint: { rules: [] },
 };
 
-class FakeTarget {
-  readonly dataset: Record<string, string>;
-
-  constructor(
-    dataset: Record<string, string>,
-    readonly value?: string,
-    readonly checked?: boolean,
-    readonly tagName = 'INPUT',
-  ) {
-    this.dataset = dataset;
-  }
-
-  closest<T extends Element>(selector: string): T | null {
-    const matches =
-      (selector === '[data-action]' && this.dataset.action !== undefined) ||
-      (selector === '[data-blueprint-remove-rule]' &&
-        this.dataset.blueprintRemoveRule !== undefined) ||
-      (selector === '[data-blueprint-move-rule]' && this.dataset.blueprintMoveRule !== undefined) ||
-      (selector === '[data-blueprint-rule]' && this.dataset.blueprintRule !== undefined) ||
-      (selector === '[data-blueprint-add-action]' &&
-        this.dataset.blueprintAddAction !== undefined) ||
-      (selector === '[data-blueprint-remove-action]' &&
-        this.dataset.blueprintRemoveAction !== undefined) ||
-      (selector === '[data-blueprint-graph-node]' &&
-        this.dataset.blueprintGraphNode !== undefined) ||
-      (selector === '[data-blueprint-graph-action]' &&
-        this.dataset.blueprintGraphAction !== undefined);
-    return (matches ? this : null) as T | null;
-  }
-}
-
 function authority(...capabilities: string[]): BaseScreenRuntimeContributionIndex {
   const granted = new Set(capabilities);
   return {
@@ -68,353 +36,197 @@ function authority(...capabilities: string[]): BaseScreenRuntimeContributionInde
   };
 }
 
-function catalog(): BaseScreenMaterialCatalog {
-  return {
-    get: () => ({ manifest: { events: ['click', 'change'] } }),
-  } as unknown as BaseScreenMaterialCatalog;
+class FakeElement {
+  readonly children: FakeElement[] = [];
+  readonly dataset: Record<string, string> = {};
+  checked = false;
+  className = '';
+  disabled = false;
+  selected = false;
+  textContent = '';
+  title = '';
+  type = '';
+  value = '';
+
+  constructor(
+    readonly tagName: string,
+    readonly ownerDocument: FakeDocument,
+  ) {}
+
+  append(...children: FakeElement[]): void {
+    this.children.push(...children);
+  }
+
+  appendChild(child: FakeElement): FakeElement {
+    this.children.push(child);
+    return child;
+  }
+
+  replaceChildren(...children: FakeElement[]): void {
+    this.children.splice(0, this.children.length, ...children);
+    this.textContent = '';
+  }
+
+  setAttribute(): void {}
+
+  closest<T>(selector: string): T | null {
+    const matches = selector === '[data-action]' && this.dataset.action !== undefined;
+    return (matches ? this : null) as T | null;
+  }
+
+  querySelector<T>(selector: string): T | null {
+    const match = /^\[data-([a-z-]+)="([^"]*)"\]$/.exec(selector);
+    if (match === null) return null;
+    const [, key, expected] = match;
+    const keyName = (key ?? '').replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+    const found = descendants(this).find((item) => item.dataset[keyName] === expected);
+    return (found ?? null) as T | null;
+  }
+}
+
+class FakeDocument {
+  createElement(tagName: string): FakeElement {
+    return new FakeElement(tagName, this);
+  }
+}
+
+function panelElement(): FakeElement {
+  return new FakeDocument().createElement('div');
+}
+
+function descendants(element: FakeElement): FakeElement[] {
+  return element.children.flatMap((child) => [child, ...descendants(child)]);
+}
+
+function queryText(element: FakeElement): string {
+  return [element, ...descendants(element)]
+    .map((item) => item.textContent)
+    .join(' ')
+    .replace(/\s+/g, ' ');
 }
 
 function createController(
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
   initial = document,
 ) {
-  let current = initial;
-  const commands: unknown[] = [];
+  const requestBlueprintEdit = vi.fn(() => true);
   const diagnostics: unknown[] = [];
   const controller = new DesignerIntegrationController({
     emitDiagnostics: (value) => diagnostics.push(value),
-    executeCommand: (command) => {
-      commands.push(command);
-      const result = applyScreenDocumentCommand(current, command);
-      if (!result.ok) return { ok: false, diagnostics: result.diagnostics };
-      current = result.document;
-      return { ok: true, value: current, diagnostics: result.diagnostics };
-    },
-    getCatalog: catalog,
-    getDocument: () => current,
-    getInteraction: () => ({ selectedComponentIds: ['button-1'], focusedComponentId: 'button-1' }),
+    getCatalog: () => undefined,
+    getDocument: () => initial,
+    getInteraction: () => ({
+      selectedComponentIds: ['button-1'],
+      focusedComponentId: 'button-1',
+    }),
     getRuntimeContributions: () => runtimeContributions,
+    requestBlueprintEdit,
   });
-  return {
-    commands,
-    controller,
-    diagnostics,
-    get document() {
-      return current;
-    },
-  };
+  return { controller, diagnostics, requestBlueprintEdit };
 }
 
-describe('DesignerIntegrationController', () => {
-  it('R7 updates graph-only selection without writing a canonical command', () => {
-    const state = createController(authority('blueprint.trigger.material-event'));
+class FakeTarget {
+  constructor(readonly dataset: Record<string, string>) {}
 
-    const handled = state.controller.onClick(
-      new FakeTarget({ blueprintGraphNode: 'rule-1:trigger' }) as unknown as Element,
-    );
+  closest<T extends Element>(selector: string): T | null {
+    const matches = selector === '[data-action]' && this.dataset.action !== undefined;
+    return (matches ? this : null) as T | null;
+  }
+}
 
-    expect(handled).toBe(true);
-    expect(state.commands).toEqual([]);
-    expect(state.document).toEqual(document);
+describe('EB-R7-C03 Designer events panel host boundary', () => {
+  it('renders the rule summary and a host request entry with capability gating', () => {
+    const panel = panelElement();
+    const { controller } = createController(authority('blueprint.trigger.material-event'));
+    controller.connect(panel as unknown as HTMLElement);
+    expect(queryText(panel)).toContain('0');
+    const button = panel.querySelector<HTMLButtonElement>('[data-action="open-blueprint"]');
+    expect(button).not.toBeNull();
+    expect(button?.disabled).toBe(false);
   });
 
-  it('R10 fails closed with a fixed Chinese diagnostic when no authority grants a material event', () => {
-    const state = createController(undefined);
-
-    state.controller.onClick(
-      new FakeTarget({ action: 'blueprint-add-rule' }) as unknown as Element,
-    );
-
-    expect(state.commands).toEqual([]);
-    expect(state.diagnostics).toEqual([
-      [
-        {
-          severity: 'error',
-          code: 'BLUEPRINT_CAPABILITY_UNAVAILABLE',
-          path: [],
-          message: '蓝图能力不可用，未保存修改。',
-        },
-      ],
-    ]);
+  it('disables the host request entry when the capability is missing', () => {
+    const panel = panelElement();
+    const { controller } = createController(authority('other.capability'));
+    controller.connect(panel as unknown as HTMLElement);
+    const button = panel.querySelector<HTMLButtonElement>('[data-action="open-blueprint"]');
+    expect(button?.disabled).toBe(true);
+    expect(queryText(panel)).toContain('能力不可用');
   });
 
-  it('R10 commits each canonical authoring edit through one replace-blueprint command', () => {
-    const state = createController(
-      authority(
-        'blueprint.trigger.material-event',
-        'blueprint.condition.compare',
-        'blueprint.action.set-variable',
-        'blueprint.action.emit-host-event',
-        'blueprint.value.event-payload',
-      ),
-    );
+  it('AE-ED-C06 keeps the panel free of internal form or graph authoring controls', () => {
+    const panel = panelElement();
+    const { controller } = createController(authority('blueprint.trigger.material-event'));
+    controller.connect(panel as unknown as HTMLElement);
+    expect(panel.querySelector('[data-blueprint-rule]')).toBeNull();
+    expect(panel.querySelector('[data-blueprint-graph]')).toBeNull();
+    expect(panel.querySelector('[data-blueprint-add-action]')).toBeNull();
+  });
 
-    state.controller.onClick(
-      new FakeTarget({ action: 'blueprint-add-rule' }) as unknown as Element,
+  it('forwards the host edit request and reports failures', () => {
+    const panel = panelElement();
+    const { controller, requestBlueprintEdit, diagnostics } = createController(
+      authority('blueprint.trigger.material-event'),
     );
-    state.controller.onChange({
-      target: new FakeTarget({ blueprintRule: 'rule-1', blueprintTriggerEvent: 'true' }, 'change'),
-    } as unknown as Event);
-    state.controller.onChange({
-      target: new FakeTarget(
-        { blueprintRule: 'rule-1', blueprintCondition: 'true' },
-        undefined,
-        true,
-      ),
-    } as unknown as Event);
-    state.controller.onClick(
-      new FakeTarget({
-        blueprintRule: 'rule-1',
-        blueprintAddAction: 'set-variable',
-      }) as unknown as Element,
-    );
-    state.controller.onClick(
-      new FakeTarget({
-        blueprintRule: 'rule-1',
-        blueprintAddAction: 'emit-host-event',
-      }) as unknown as Element,
-    );
-    state.controller.onChange({
-      target: new FakeTarget(
-        {
-          blueprintRule: 'rule-1',
-          blueprintActionIndex: '1',
-          blueprintExpression: 'action',
-        },
-        '{"kind":"event-payload","path":["id"]}',
-      ),
-    } as unknown as Event);
-
-    expect(state.commands).toHaveLength(6);
+    controller.connect(panel as unknown as HTMLElement);
+    const button = panel.querySelector<HTMLButtonElement>('[data-action="open-blueprint"]');
     expect(
-      state.commands.every((command) => (command as { type: string }).type === 'replace-blueprint'),
+      controller.onClick(
+        (button ?? new FakeTarget({ action: 'open-blueprint' })) as unknown as Element,
+      ),
     ).toBe(true);
-    expect(state.document.blueprint.rules[0]).toMatchObject({
-      trigger: { type: 'material-event', componentId: 'button-1', eventName: 'change' },
-      condition: {
-        left: { kind: 'literal', value: true },
-        operator: 'eq',
-        right: { kind: 'literal', value: true },
-      },
-      actions: [
-        { type: 'set-variable', variableName: 'count', value: { kind: 'literal', value: null } },
-        {
-          type: 'emit-host-event',
-          eventName: 'host_event',
-          payload: { kind: 'event-payload', path: ['id'] },
-        },
-      ],
-      requiredCapabilities: [
-        'blueprint.trigger.material-event',
-        'blueprint.condition.compare',
-        'blueprint.action.set-variable',
-        'blueprint.action.emit-host-event',
-        'blueprint.value.event-payload',
-      ],
-    });
+    expect(requestBlueprintEdit).toHaveBeenCalledTimes(1);
+
+    requestBlueprintEdit.mockReturnValue(false);
+    expect(
+      controller.onClick(
+        (button ?? new FakeTarget({ action: 'open-blueprint' })) as unknown as Element,
+      ),
+    ).toBe(true);
+    expect(diagnostics.length).toBeGreaterThan(0);
   });
 
-  it('R10 refuses a reorder after a required capability is revoked', () => {
-    const state = createController(authority('blueprint.trigger.material-event'), {
+  it('clears the panel without side effects', () => {
+    const panel = panelElement();
+    const { controller } = createController(authority('blueprint.trigger.material-event'));
+    controller.connect(panel as unknown as HTMLElement);
+    controller.clear();
+    expect(panel.children.length).toBe(0);
+  });
+});
+
+describe('catalog-driven summary', () => {
+  it('shows per-event rule counts from the document blueprint', () => {
+    const panel = panelElement();
+    const withRules: ScreenDocument = {
       ...document,
       blueprint: {
         rules: [
           {
-            id: 'rule-1',
+            id: 'r1',
             trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
-            requiredCapabilities: ['blueprint.trigger.material-event'],
-            actions: [],
-          },
-          {
-            id: 'rule-2',
-            trigger: { type: 'material-event', componentId: 'button-1', eventName: 'change' },
-            requiredCapabilities: ['blueprint.action.emit-host-event'],
             actions: [],
           },
         ],
       },
+    };
+    const catalog = {
+      get: () => ({ manifest: { events: ['click'] } }),
+    } as unknown as BaseScreenMaterialCatalog;
+    const diagnostics: unknown[] = [];
+    const controller = new DesignerIntegrationController({
+      emitDiagnostics: (value) => diagnostics.push(value),
+      getCatalog: () => catalog,
+      getDocument: () => withRules,
+      getInteraction: () => ({
+        selectedComponentIds: ['button-1'],
+        focusedComponentId: 'button-1',
+      }),
+      getRuntimeContributions: () => authority('blueprint.trigger.material-event'),
+      requestBlueprintEdit: () => true,
     });
-
-    state.controller.onClick(
-      new FakeTarget({
-        blueprintMoveRule: 'rule-2',
-        blueprintMoveDirection: 'up',
-      }) as unknown as Element,
-    );
-
-    expect(state.commands).toEqual([]);
-    expect(state.diagnostics).toEqual([
-      [
-        {
-          severity: 'error',
-          code: 'BLUEPRINT_CAPABILITY_UNAVAILABLE',
-          path: [],
-          message: '蓝图能力不可用，未保存修改。',
-        },
-      ],
-    ]);
-  });
-
-  it('R11 submits an expression with the keyboard without requiring a pointer path', () => {
-    const state = createController(
-      authority('blueprint.trigger.material-event', 'blueprint.action.set-variable'),
-      {
-        ...document,
-        blueprint: {
-          rules: [
-            {
-              id: 'rule-1',
-              trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
-              actions: [
-                {
-                  type: 'set-variable',
-                  variableName: 'count',
-                  value: { kind: 'literal', value: 0 },
-                },
-              ],
-            },
-          ],
-        },
-      },
-    );
-    const preventDefault = vi.fn();
-
-    const handled = state.controller.onKeyDown({
-      key: 'Enter',
-      isComposing: false,
-      ctrlKey: false,
-      metaKey: false,
-      preventDefault,
-      target: new FakeTarget(
-        {
-          blueprintRule: 'rule-1',
-          blueprintActionIndex: '0',
-          blueprintExpression: 'action',
-        },
-        '{"kind":"literal","value":2}',
-      ),
-    } as unknown as KeyboardEvent);
-
-    expect(handled).toBe(true);
-    expect(preventDefault).toHaveBeenCalledOnce();
-    expect(state.commands).toHaveLength(1);
-    expect(state.document.blueprint.rules[0]?.actions[0]).toMatchObject({
-      type: 'set-variable',
-      value: { kind: 'literal', value: 2 },
-    });
-  });
-
-  it('R7 simulates the selected event without writing a canonical command', () => {
-    const state = createController(
-      authority('blueprint.trigger.material-event', 'blueprint.action.set-variable'),
-      {
-        ...document,
-        blueprint: {
-          rules: [
-            {
-              id: 'rule-1',
-              trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
-              requiredCapabilities: [
-                'blueprint.trigger.material-event',
-                'blueprint.action.set-variable',
-              ],
-              actions: [
-                {
-                  type: 'set-variable',
-                  variableName: 'count',
-                  value: { kind: 'literal', value: 2 },
-                },
-              ],
-            },
-          ],
-        },
-      },
-    );
-
-    const handled = state.controller.onClick(
-      new FakeTarget({ blueprintGraphAction: 'simulate' }) as unknown as Element,
-    );
-
-    expect(handled).toBe(true);
-    expect(state.commands).toEqual([]);
-    expect(state.diagnostics).toEqual([]);
-  });
-
-  it('R7 applies the minimal event template through the canonical authoring path', () => {
-    const state = createController(authority('blueprint.trigger.material-event'));
-
-    const handled = state.controller.onClick(
-      new FakeTarget({ blueprintGraphAction: 'apply-template' }) as unknown as Element,
-    );
-
-    expect(handled).toBe(true);
-    expect(state.commands).toHaveLength(1);
-    expect(state.document.blueprint.rules).toMatchObject([
-      {
-        id: 'rule-1',
-        trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
-      },
-    ]);
-  });
-
-  it('R7 filters graph nodes and navigates them with arrow keys without canonical writes', () => {
-    const state = createController(authority('blueprint.trigger.material-event'), {
-      ...document,
-      blueprint: {
-        rules: [
-          {
-            id: 'rule-1',
-            trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
-            requiredCapabilities: ['blueprint.trigger.material-event'],
-            actions: [],
-          },
-        ],
-      },
-    });
-    state.controller.onClick(new FakeTarget({ action: 'open-blueprint' }) as unknown as Element);
-    state.controller.onChange({
-      target: new FakeTarget({ blueprintGraphSearch: 'true' }, 'button-1.click'),
-    } as unknown as Event);
-    const preventDefault = vi.fn();
-
-    const handled = state.controller.onKeyDown({
-      key: 'ArrowDown',
-      preventDefault,
-    } as unknown as KeyboardEvent);
-
-    expect(handled).toBe(true);
-    expect(preventDefault).toHaveBeenCalledOnce();
-    expect(state.commands).toEqual([]);
-  });
-
-  it('R7 clears graph selection before closing the Blueprint workspace with Escape', () => {
-    const state = createController(authority('blueprint.trigger.material-event'), {
-      ...document,
-      blueprint: {
-        rules: [
-          {
-            id: 'rule-1',
-            trigger: { type: 'material-event', componentId: 'button-1', eventName: 'click' },
-            requiredCapabilities: ['blueprint.trigger.material-event'],
-            actions: [],
-          },
-        ],
-      },
-    });
-    const preventDefault = vi.fn();
-    state.controller.onClick(new FakeTarget({ action: 'open-blueprint' }) as unknown as Element);
-    state.controller.onClick(
-      new FakeTarget({ blueprintGraphNode: 'rule-1:trigger' }) as unknown as Element,
-    );
-
-    expect(
-      state.controller.onKeyDown({ key: 'Escape', preventDefault } as unknown as KeyboardEvent),
-    ).toBe(true);
-    expect(preventDefault).toHaveBeenCalledOnce();
-    expect(state.commands).toEqual([]);
-
-    expect(
-      state.controller.onKeyDown({ key: 'Escape', preventDefault } as unknown as KeyboardEvent),
-    ).toBe(true);
+    controller.connect(panel as unknown as HTMLElement);
+    expect(queryText(panel)).toContain('click');
+    expect(queryText(panel)).toContain('1');
   });
 });

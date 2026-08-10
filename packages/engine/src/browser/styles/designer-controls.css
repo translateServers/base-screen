@@ -382,3 +382,100 @@
 .designer-empty-state[hidden] {
   display: none;
 }
+
+.designer-descriptor-group {
+  display: grid;
+  gap: var(--designer-space-3);
+  margin: 0 0 var(--designer-space-4);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+}
+
+.designer-descriptor-group-summary {
+  cursor: pointer;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 700;
+  list-style: none;
+}
+
+.designer-descriptor-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.designer-descriptor-group-summary::before {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-right: var(--designer-space-2);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid var(--designer-text-muted);
+  transition: transform var(--designer-motion);
+}
+
+.designer-descriptor-group[open] > .designer-descriptor-group-summary::before {
+  transform: rotate(90deg);
+}
+
+.designer-descriptor-fields {
+  display: grid;
+  gap: 0;
+}
+
+.designer-descriptor-help {
+  display: block;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.designer-descriptor-array {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin-bottom: var(--designer-space-4);
+}
+
+.designer-descriptor-array-list {
+  display: grid;
+  gap: var(--designer-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.designer-descriptor-array-item {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+}
+
+.designer-descriptor-array-item > .designer-field {
+  margin-bottom: var(--designer-space-2);
+}
+
+.designer-descriptor-array-actions {
+  display: flex;
+  align-items: start;
+  gap: var(--designer-space-1);
+}
+
+.designer-descriptor-array-actions .designer-button {
+  min-width: 0;
+  padding: var(--designer-space-1) var(--designer-space-2);
+}
+
+.designer-capability-ok {
+  color: var(--designer-success);
+}
+
+.designer-capability-missing {
+  color: var(--designer-danger);
+}

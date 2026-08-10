@@ -148,7 +148,8 @@ export function isInspectorDraftTarget(target: EventTarget | null): boolean {
       dataset.prop !== undefined ||
       dataset.canvasProperty !== undefined ||
       dataset.dataSourceType !== undefined ||
-      dataset.dataSourceField !== undefined)
+      dataset.dataSourceField !== undefined ||
+      dataset.descriptorFieldId !== undefined)
   );
 }
 

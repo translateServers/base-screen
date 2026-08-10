@@ -55,5 +55,22 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['designerHostAdapter']
     >().toEqualTypeOf<ScreenDesignerHostAdapter | undefined>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['commitComponentTextEdit']
+    >().parameters.toEqualTypeOf<
+      [import('@base-screen/contracts').ScreenComponentTextCommitRequest]
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['commitBlueprintEdit']
+    >().parameters.toEqualTypeOf<[import('@base-screen/contracts').ScreenBlueprintCommitRequest]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['requestComponentTextEdit']
+    >().parameters.toEqualTypeOf<[import('@base-screen/contracts').ScreenComponentTextTarget]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['instanceId']
+    >().toEqualTypeOf<string>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['getAuthoringEditorContext']
+    >().returns.toEqualTypeOf<import('@base-screen/contracts').ScreenAuthoringEditorContext>();
   });
 });

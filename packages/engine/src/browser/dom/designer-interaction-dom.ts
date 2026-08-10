@@ -5,6 +5,10 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import {
+  type DesignerDescriptorDatasetFields,
+  renderDesignerDescriptorZone,
+} from './designer-descriptor-dom.js';
 
 const MATERIAL_EVENT_CAPABILITY = 'blueprint.trigger.material-event';
 
@@ -19,6 +23,7 @@ export function renderDesignerInteractionPanel(
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+  getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
 ): boolean {
   if (panel === undefined) return false;
   panel.replaceChildren();
@@ -42,7 +47,19 @@ export function renderDesignerInteractionPanel(
       capabilities.previewEvents,
     );
   }
-  if (capabilities.design.length === 0 && capabilities.previewEvents.length === 0) {
+  const component = document?.components.find((item) => item.id === interaction.focusedComponentId);
+  const manifest = component === undefined ? undefined : catalog?.get(component.type)?.manifest;
+  renderDesignerDescriptorZone(panel, manifest?.editorDescriptor?.interaction, {
+    document,
+    interaction,
+    catalog,
+    getDatasetFields,
+  });
+  if (
+    capabilities.design.length === 0 &&
+    capabilities.previewEvents.length === 0 &&
+    (manifest?.editorDescriptor?.interaction?.length ?? 0) === 0
+  ) {
     panel.textContent = DESIGNER_UI_TEXT.interactionPanel.noCapabilities;
     return false;
   }

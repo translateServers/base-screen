@@ -5,10 +5,10 @@ import type {
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
-  renderDesignerBlueprintWorkspace,
+  getDesignerFocusedEventDescriptors,
+  getDesignerFocusedMaterialEvents,
   renderDesignerEventsPanel,
 } from '../../../src/browser/dom/designer-blueprint-dom.js';
-import type { DesignerBlueprintGraphProjection } from '../../../src/common/operations/designer-blueprint-authoring.js';
 
 class FakeElement {
   readonly children: FakeElement[] = [];
@@ -42,6 +42,15 @@ class FakeElement {
   }
 
   setAttribute(): void {}
+
+  querySelector<T>(selector: string): T | null {
+    const match = /^\[data-([a-z-]+)="([^"]*)"\]$/.exec(selector);
+    if (match === null) return null;
+    const [, key, expected] = match;
+    const keyName = (key ?? '').replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+    const found = descendants(this).find((item) => item.dataset[keyName] === expected);
+    return (found ?? null) as T | null;
+  }
 }
 
 class FakeDocument {
@@ -50,13 +59,28 @@ class FakeDocument {
   }
 }
 
+function panelElement(): FakeElement {
+  return new FakeDocument().createElement('div');
+}
+
+function descendants(element: FakeElement): FakeElement[] {
+  return element.children.flatMap((child) => [child, ...descendants(child)]);
+}
+
+function queryText(element: FakeElement): string {
+  return [element, ...descendants(element)]
+    .map((item) => item.textContent)
+    .join(' ')
+    .replace(/\s+/g, ' ');
+}
+
 const document: ScreenDocument = {
   canvas: { width: 100, height: 100, backgroundColor: '#000000' },
   components: [
     {
-      id: 'component-1',
-      type: 'base.text',
-      name: '文本',
+      id: 'chart-1',
+      type: 'base.chart',
+      name: '图表',
       parentId: null,
       position: { x: 0, y: 0 },
       size: { width: 10, height: 10 },
@@ -69,174 +93,92 @@ const document: ScreenDocument = {
     },
   ],
   variables: [],
-  blueprint: { rules: [] },
+  blueprint: {
+    rules: [
+      {
+        id: 'r1',
+        trigger: { type: 'material-event', componentId: 'chart-1', eventName: 'seriesClick' },
+        actions: [],
+      },
+    ],
+  },
 };
 
-function descendants(element: FakeElement): FakeElement[] {
-  return element.children.flatMap((child) => [child, ...descendants(child)]);
-}
-
-function capabilityIndex(...capabilities: string[]): BaseScreenRuntimeContributionIndex {
-  const available = new Set(capabilities);
+function authority(...capabilities: string[]): BaseScreenRuntimeContributionIndex {
+  const granted = new Set(capabilities);
   return {
     getResourceType: () => undefined,
-    hasBlueprintCapability: (capability) => available.has(capability),
+    hasBlueprintCapability: (capability) => granted.has(capability),
   };
 }
 
-const emptyGraph: DesignerBlueprintGraphProjection = {
-  nodes: [],
-  edges: [],
-  selectedNodeId: undefined,
-  searchQuery: '',
-  diagnostics: [],
-  simulationLog: [],
-  zoom: 1,
-};
-
-describe('renderDesignerEventsPanel', () => {
-  it('R10 disables Blueprint entry when the focused material has no declared event', () => {
-    const ownerDocument = new FakeDocument();
-    const panel = new FakeElement('div', ownerDocument);
-    const catalog = {
-      get: () => ({ manifest: { events: [] } }),
-    } as unknown as BaseScreenMaterialCatalog;
-
-    renderDesignerEventsPanel(
-      panel as unknown as HTMLElement,
-      document,
-      { selectedComponentIds: ['component-1'], focusedComponentId: 'component-1' },
-      catalog,
-      undefined,
-      undefined,
-    );
-
-    expect(panel.children[1]).toMatchObject({ disabled: true, textContent: '打开蓝图' });
-  });
-
-  it('R10 lists focused manifest events and their related canonical rules', () => {
-    const ownerDocument = new FakeDocument();
-    const panel = new FakeElement('div', ownerDocument);
-    const catalog = {
-      get: () => ({ manifest: { events: ['click', 'change'] } }),
-    } as unknown as BaseScreenMaterialCatalog;
-    const populated: ScreenDocument = {
-      ...document,
-      blueprint: {
-        rules: [
-          {
-            id: 'rule-1',
-            trigger: { type: 'material-event', componentId: 'component-1', eventName: 'click' },
-            actions: [],
-          },
-        ],
-      },
-    };
-
-    renderDesignerEventsPanel(
-      panel as unknown as HTMLElement,
-      populated,
-      { selectedComponentIds: ['component-1'], focusedComponentId: 'component-1' },
-      catalog,
-      'change',
-      capabilityIndex('blueprint.trigger.material-event'),
-    );
-
-    expect(
-      descendants(panel).find((element) => element.dataset.blueprintEvent === 'true'),
-    ).toMatchObject({
-      disabled: false,
-    });
-    expect(
-      descendants(panel)
-        .filter((element) => element.tagName === 'li')
-        .map((element) => element.textContent),
-    ).toEqual(['click：1 条规则', 'change：0 条规则']);
-  });
-
-  it('R1 enables expression fields when their Blueprint capability is available', () => {
-    const ownerDocument = new FakeDocument();
-    const workspace = new FakeElement('div', ownerDocument);
-    const populated: ScreenDocument = {
-      ...document,
-      blueprint: {
-        rules: [
-          {
-            id: 'rule-1',
-            trigger: { type: 'material-event', componentId: 'component-1', eventName: 'click' },
-            condition: {
-              left: { kind: 'literal', value: true },
-              operator: 'exists',
+function catalog(): BaseScreenMaterialCatalog {
+  return {
+    get: () => ({
+      manifest: {
+        events: ['seriesClick'],
+        editorDescriptor: {
+          events: [
+            {
+              name: 'seriesClick',
+              label: '系列点击',
+              hint: '点击数据点',
+              requiredCapability: 'blueprint.trigger.material-event',
             },
-            actions: [],
-          },
-        ],
+          ],
+        },
       },
-    };
+    }),
+  } as unknown as BaseScreenMaterialCatalog;
+}
 
-    renderDesignerBlueprintWorkspace(
-      workspace as unknown as HTMLElement,
-      populated,
-      { selectedComponentIds: ['component-1'], focusedComponentId: 'component-1' },
-      { get: () => ({ manifest: { events: ['click'] } }) } as unknown as BaseScreenMaterialCatalog,
-      'click',
-      capabilityIndex('blueprint.trigger.material-event', 'blueprint.condition.compare'),
-      emptyGraph,
+describe('EB-R7-C03 events panel summary and capability state', () => {
+  it('renders event summaries with descriptor labels and hints', () => {
+    const panel = panelElement();
+    renderDesignerEventsPanel(
+      panel as unknown as HTMLElement,
+      document,
+      { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' },
+      catalog(),
+      authority('blueprint.trigger.material-event'),
     );
-
-    expect(
-      descendants(workspace).find(
-        (element) => element.dataset.blueprintExpression === 'condition-left',
-      ),
-    ).toMatchObject({ disabled: false });
+    expect(queryText(panel)).toContain('系列点击');
+    expect(queryText(panel)).toContain('点击数据点');
+    expect(queryText(panel)).toContain('1');
   });
 
-  it('R7 renders the graph as a projection of canonical nodes and edges', () => {
-    const ownerDocument = new FakeDocument();
-    const workspace = new FakeElement('div', ownerDocument);
-
-    renderDesignerBlueprintWorkspace(
-      workspace as unknown as HTMLElement,
+  it('marks required capability state fail closed', () => {
+    const panel = panelElement();
+    renderDesignerEventsPanel(
+      panel as unknown as HTMLElement,
       document,
-      { selectedComponentIds: ['component-1'], focusedComponentId: 'component-1' },
-      { get: () => ({ manifest: { events: ['click'] } }) } as unknown as BaseScreenMaterialCatalog,
-      'click',
-      capabilityIndex('blueprint.trigger.material-event'),
-      {
-        nodes: [
-          { id: 'rule-1:trigger', ruleId: 'rule-1', kind: 'trigger', label: 'component-1.click' },
-        ],
-        edges: [{ from: 'rule-1:trigger', to: 'rule-1:action:0' }],
-        selectedNodeId: 'rule-1:trigger',
-        searchQuery: '',
-        diagnostics: [
-          {
-            severity: 'error',
-            code: 'BLUEPRINT_EXPRESSION_INVALID',
-            path: [],
-            message: '表达式无效。',
-          },
-        ],
-        simulationLog: ['模拟 component-1.click：变量 0 项，事件 0 项，动作 0 项。'],
-        zoom: 1,
-      },
+      { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' },
+      catalog(),
+      authority('unrelated'),
     );
+    expect(queryText(panel)).toContain('能力不可用');
+  });
 
-    expect(
-      descendants(workspace).find(
-        (element) => element.dataset.blueprintGraphNode === 'rule-1:trigger',
-      ),
-    ).toMatchObject({ textContent: 'component-1.click' });
-    expect(
-      descendants(workspace).find(
-        (element) => element.dataset.blueprintGraphEdge === 'rule-1:trigger:rule-1:action:0',
-      ),
-    ).toBeDefined();
-    expect(
-      descendants(workspace).find((element) => element.dataset.blueprintGraphSearch === 'true'),
-    ).toMatchObject({ value: '' });
-    expect(descendants(workspace).some((element) => element.textContent === '表达式无效。')).toBe(
-      true,
+  it('exposes structured event declarations and the raw event list', () => {
+    const interaction = { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' };
+    expect(getDesignerFocusedMaterialEvents(document, interaction, catalog())).toEqual([
+      'seriesClick',
+    ]);
+    expect(getDesignerFocusedEventDescriptors(document, interaction, catalog())).toHaveLength(1);
+  });
+
+  it('keeps the internal surface to summary, capability and request entry', () => {
+    const panel = panelElement();
+    renderDesignerEventsPanel(
+      panel as unknown as HTMLElement,
+      document,
+      { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' },
+      catalog(),
+      authority('blueprint.trigger.material-event'),
     );
+    expect(panel.querySelector('[data-action="open-blueprint"]')).not.toBeNull();
+    expect(panel.querySelector('[data-blueprint-graph="true"]')).toBeNull();
+    expect(panel.querySelector('[data-blueprint-expression="action"]')).toBeNull();
+    expect(panel.querySelector('[data-blueprint-add-action="set-variable"]')).toBeNull();
   });
 });
