@@ -18,6 +18,14 @@
 - `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。
 - `@base-screen/testing` 消费公共包 API 来提供 fixture 和一致性辅助工具。生产包绝不能导入它。
 
+## 产品定位与宿主边界
+
+- Base Screen 是轻量、可嵌入的大屏设计器基座，不是完整业务应用、项目管理产品、数据平台或后端平台。权威决策见 [ADR-0027](docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)。
+- Base Screen 负责 canonical document、严格契约、当前实例内的命令/事务/历史/画布/检查器、Viewer/Designer 渲染、物料 ABI，以及有界请求的取消、deadline、generation guard 和安全结果投影。
+- 宿主负责实际存储与检索、认证授权、业务路由与 Store、数据查询/聚合/缓存/ETL、资产存储与转码、发布部署、公开 URL、截图/视频/批量导出和长任务。Base Screen 只通过 JSON-safe intent、port、method 或 event 请求这些能力。
+- 需要凭证或租户状态、跨项目/跨实例共享、无明确容量上限、后台队列/持久缓存/长任务，或依赖特定业务基础设施的处理默认归宿主；不得在 Engine 中补建后端、通用网络客户端、任务队列或业务降级实现。
+- 新增功能若能通过既有宿主边界完成，不得新增 Base Screen 内部工作流、package 或传输配置；范围扩展必须先更新 ADR 和生效中的 Spec。
+
 ## 目录结构与命名
 
 - 每个包 `src/` 只放发布物。所有 `*.test.ts` 与 `__fixtures__/` 放在同包 `tests/`，并镜像 `src/` 子目录；测试用相对路径导入被测模块（如 `../src/index.js`）。`scripts/check-packages.mjs` 会拒绝 `src/` 内的测试/fixture，以及 `dist/` 内的测试/fixture 产物。
