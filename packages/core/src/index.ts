@@ -14,9 +14,17 @@ export type {
 export {
   compileScreenBlueprint,
   dispatchScreenBlueprintEvent,
+  type ScreenBlueprintActionTrace,
+  type ScreenBlueprintConditionTraceState,
   type ScreenBlueprintDispatchResult,
+  type ScreenBlueprintEmitHostEventActionTrace,
   type ScreenBlueprintEvent,
+  type ScreenBlueprintHostActionTrace,
   type ScreenBlueprintPlan,
+  type ScreenBlueprintRuleTrace,
+  type ScreenBlueprintSetVariableActionTrace,
+  type ScreenBlueprintTraceResult,
+  traceScreenBlueprintEvent,
 } from './blueprint/runtime.js';
 export { applyScreenDocumentCommand, applyScreenDocumentTransaction } from './commands/apply.js';
 export type {
@@ -72,6 +80,15 @@ export {
   redoScreenHistory,
   undoScreenHistory,
 } from './history/history.js';
+export {
+  deleteScreenJsonPath,
+  getScreenJsonPath,
+  insertScreenJsonArrayItem,
+  moveScreenJsonArrayItem,
+  removeScreenJsonArrayItem,
+  setScreenJsonArrayItem,
+  setScreenJsonPath,
+} from './json/path-update.js';
 export type { ScreenInteractionAction, ScreenInteractionState } from './state/interaction.js';
 export { reduceScreenInteraction } from './state/interaction.js';
 export type { ScreenViewportAction, ScreenViewportState } from './state/viewport.js';

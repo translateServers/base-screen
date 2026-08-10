@@ -31,6 +31,27 @@ export {
 } from './document/serialize.js';
 export { parseScreenJsonValue, type ScreenJsonParseOptions } from './json/parse.js';
 export type {
+  ScreenAuthoringEditorContext,
+  ScreenAuthoringEditorLimits,
+  ScreenAuthoringRequest,
+  ScreenAuthoringRequestEventDetail,
+  ScreenBlueprintCommitRequest,
+  ScreenComponentTextCommitRequest,
+  ScreenComponentTextTarget,
+} from './types/authoring.js';
+export {
+  isScreenAuthoringRequest,
+  jsonDepth,
+  MAX_AUTHORING_CANDIDATE_BYTES,
+  MAX_AUTHORING_COMPONENT_SNAPSHOT_BYTES,
+  MAX_AUTHORING_JSON_DEPTH,
+  MAX_AUTHORING_REQUEST_ID_LENGTH,
+  MAX_AUTHORING_SOURCE_BYTES,
+  parseScreenAuthoringEditorContext,
+  parseScreenAuthoringRequest,
+  SCREEN_AUTHORING_REQUEST_EVENT,
+} from './types/authoring.js';
+export type {
   ScreenDatasetDescriptor,
   ScreenDatasetField,
   ScreenDatasetPage,
