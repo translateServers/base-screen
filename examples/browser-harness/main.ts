@@ -4,6 +4,8 @@ import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
+  BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
+  BASE_SCREEN_ECHARTS_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
@@ -12,6 +14,7 @@ import {
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
   BaseScreenChartMaterialElement,
   BaseScreenContainerMaterialElement,
+  BaseScreenEChartsMaterialElement,
   BaseScreenEllipseMaterialElement,
   BaseScreenImageMaterialElement,
   BaseScreenRectangleMaterialElement,
@@ -19,6 +22,7 @@ import {
   BaseScreenTextMaterialElement,
   defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
+  defineBaseScreenEChartsMaterial,
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
@@ -32,7 +36,10 @@ import {
 } from '../../packages/plugin-core/src/index.ts';
 import { createBaseScreenPluginManager } from '../../packages/plugin-manager/src/index.ts';
 import { createReactMaterialDefinition } from '../../packages/react/src/index.ts';
-import { defineBaseScreenElements } from '../../packages/sdk/src/index.ts';
+import {
+  defineBaseScreenElements,
+  SCREEN_AUTHORING_REQUEST_EVENT,
+} from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
 
 if (new URLSearchParams(window.location.search).has('designer')) {
@@ -47,6 +54,7 @@ const officialMaterials = [
   defineBaseScreenImageMaterial(),
   defineBaseScreenContainerMaterial(),
   defineBaseScreenChartMaterial(),
+  defineBaseScreenEChartsMaterial(),
   defineBaseScreenTableMaterial(),
 ];
 if (!productElements.ok || officialMaterials.some((definition) => !definition.ok)) {
@@ -141,6 +149,11 @@ const catalog = createBaseScreenMaterialCatalog([
     manifest: BASE_SCREEN_CHART_MATERIAL_MANIFEST,
     constructor: BaseScreenChartMaterialElement,
     tabularDataAdapter: BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
+  },
+  {
+    manifest: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
+    constructor: BaseScreenEChartsMaterialElement,
+    tabularDataAdapter: BASE_SCREEN_ECHARTS_TABULAR_DATA_ADAPTER,
   },
   {
     manifest: BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
@@ -305,6 +318,29 @@ const screenDocument = {
       props: { label: 'Vue 桥接' },
       style: {},
       dataSource: null,
+    },
+    {
+      id: 'echarts-demo',
+      type: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.type,
+      name: 'ECharts 语义图',
+      parentId: null,
+      position: { x: 560, y: 80 },
+      size: { width: 340, height: 220 },
+      rotation: 0,
+      zIndex: 6,
+      status: { locked: false, hidden: false },
+      props: structuredClone(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.defaultProps),
+      style: structuredClone(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.defaultStyle),
+      dataSource: {
+        type: 'host-resource' as const,
+        resourceType: 'dataset',
+        resourceId: 'tabular-orders',
+        params: {
+          limit: { kind: 'literal' as const, value: 2 },
+          region: { kind: 'variable' as const, name: 'region' },
+        },
+        binding: { fields: { dimension: ['category'], measures: ['amount'] } },
+      },
     },
   ],
   variables: [{ type: 'static' as const, name: 'count', value: 0 }],
@@ -508,6 +544,144 @@ if (!loaded.ok) {
 designer.runtimeContributions = runtimeContributions;
 viewer.document = designer.document;
 
+// --- 宿主作者 shell（Shadow DOM 外） ---
+const hostShell = document.querySelector<HTMLElement>('[data-host-shell]')!;
+const hostSelection = hostShell.querySelector<HTMLElement>('[data-host-selection]')!;
+const hostEditor = hostShell.querySelector<HTMLTextAreaElement>('[data-host-editor]')!;
+const hostStatus = hostShell.querySelector<HTMLOutputElement>('[data-host-status]')!;
+let pendingAuthoringRequest:
+  | {
+      readonly kind: 'component-text';
+      readonly requestId: string;
+      readonly componentId: string;
+      readonly documentRevision: string | null;
+      readonly target: string;
+    }
+  | {
+      readonly kind: 'blueprint';
+      readonly requestId: string;
+      readonly componentId: string | null;
+      readonly documentRevision: string | null;
+    }
+  | undefined;
+let pendingHostRevision: string | null = null;
+
+function setHostStatus(message: string, tone: 'ok' | 'error' = 'ok'): void {
+  hostStatus.textContent = message;
+  hostStatus.dataset.tone = tone;
+}
+
+function hostRequestForAction(action: string): boolean {
+  if (action === 'blueprint') return designer.requestBlueprintEdit();
+  if (action === 'component-text' || action === 'component-data') {
+    const target = action === 'component-text' ? 'props' : 'data';
+    return designer.requestComponentTextEdit(target) !== null;
+  }
+  return false;
+}
+
+designer.addEventListener(SCREEN_AUTHORING_REQUEST_EVENT, (event) => {
+  const request = (event as CustomEvent<{ readonly request: unknown }>).detail.request as
+    | {
+        readonly kind: 'component-text';
+        readonly requestId: string;
+        readonly componentId: string;
+        readonly documentRevision: string | null;
+        readonly target: string;
+        readonly source: string;
+      }
+    | {
+        readonly kind: 'blueprint';
+        readonly requestId: string;
+        readonly componentId: string | null;
+        readonly documentRevision: string | null;
+        readonly blueprint: unknown;
+      };
+  pendingAuthoringRequest = request;
+  pendingHostRevision = request.documentRevision;
+  hostEditor.value =
+    request.kind === 'component-text' ? request.source : JSON.stringify(request.blueprint, null, 2);
+  setHostStatus(
+    request.kind === 'component-text'
+      ? `宿主编辑请求：${request.componentId} 的 ${request.target}`
+      : `宿主编辑请求：${request.componentId ?? '全局'} 的事件蓝图`,
+  );
+});
+
+designer.addEventListener('base-screen-selection-change', (event) => {
+  const interaction = (event as CustomEvent<{ focusedComponentId: string | null }>).detail;
+  const component = designer.document?.components.find(
+    (item) => item.id === interaction.focusedComponentId,
+  );
+  hostSelection.textContent = component === undefined ? '未选择组件' : `已选择：${component.name}`;
+});
+
+hostShell.addEventListener('click', (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-host-action]');
+  if (button === null) return;
+  const action = button.dataset.hostAction;
+  if (action === 'commit') {
+    if (pendingAuthoringRequest === undefined) {
+      setHostStatus('没有进行中的宿主编辑请求。', 'error');
+      return;
+    }
+    const request = pendingAuthoringRequest;
+    if (request.kind === 'component-text') {
+      const result = designer.commitComponentTextEdit({
+        requestId: request.requestId,
+        expectedRevision: pendingHostRevision,
+        componentId: request.componentId,
+        target: request.target as 'props' | 'style' | 'data',
+        source: hostEditor.value,
+      });
+      if (result.ok) {
+        pendingAuthoringRequest = undefined;
+        setHostStatus('组件文本编辑已提交，产生一条历史记录。');
+      } else {
+        setHostStatus(
+          `提交被拒绝：${result.diagnostics.map((item) => item.code).join(',')}`,
+          'error',
+        );
+      }
+      return;
+    }
+    let blueprint: unknown;
+    try {
+      blueprint = JSON.parse(hostEditor.value);
+    } catch {
+      setHostStatus('蓝图候选不是合法 JSON。', 'error');
+      return;
+    }
+    const result = designer.commitBlueprintEdit({
+      requestId: request.requestId,
+      expectedRevision: pendingHostRevision,
+      componentId: request.componentId,
+      blueprint: blueprint as never,
+    });
+    if (result.ok) {
+      pendingAuthoringRequest = undefined;
+      setHostStatus('蓝图编辑已提交，产生一条历史记录。');
+    } else {
+      setHostStatus(
+        `提交被拒绝：${result.diagnostics.map((item) => item.code).join(',')}`,
+        'error',
+      );
+    }
+    return;
+  }
+  if (action === 'cancel') {
+    pendingAuthoringRequest = undefined;
+    hostEditor.value = '';
+    setHostStatus('宿主编辑已取消。');
+    return;
+  }
+  if (hostRequestForAction(action ?? '')) {
+    setHostStatus('已发起宿主编辑请求，等待编辑器返回。');
+  } else {
+    setHostStatus('无法发起宿主编辑请求。', 'error');
+  }
+});
+
 Object.assign(window, {
   baseScreenHarness: {
     catalog: bridgeCatalog,
@@ -517,6 +691,8 @@ Object.assign(window, {
     hostEvents,
     datasetCatalog,
     datasetRequests,
+    hostShell,
+    pendingAuthoringRequest: () => pendingAuthoringRequest,
     setDatasetRegion: (value: string) => {
       datasetRegion = value;
     },

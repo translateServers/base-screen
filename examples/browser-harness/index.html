@@ -28,6 +28,70 @@
         height: calc(100vh - 32px);
       }
 
+      #host-shell {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        z-index: 10;
+        display: grid;
+        align-content: start;
+        gap: 10px;
+        width: 380px;
+        max-width: calc(100vw - 24px);
+        max-height: 45vh;
+        overflow: auto;
+        padding: 12px;
+        border: 1px solid #2b3a4e;
+        border-radius: 8px;
+        background: #0e1620;
+        color: #d7e2f0;
+        font: 13px/1.5 system-ui, sans-serif;
+        box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+      }
+
+      body[data-layout='designer'] #host-shell {
+        display: none;
+      }
+
+      #host-shell header {
+        font-weight: 700;
+      }
+
+      #host-shell textarea {
+        box-sizing: border-box;
+        width: 100%;
+        background: #0b1016;
+        border: 1px solid #2b3a4e;
+        border-radius: 6px;
+        color: #d7e2f0;
+        font: 12px/1.4 ui-monospace, monospace;
+      }
+
+      #host-shell output {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        color: #86c99a;
+      }
+
+      #host-shell output[data-tone='error'] {
+        color: #ff8197;
+      }
+
+      .host-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      #host-shell button {
+        padding: 4px 10px;
+        border: 1px solid #2b3a4e;
+        border-radius: 6px;
+        background: #17212b;
+        color: #d7e2f0;
+        cursor: pointer;
+      }
+
       body[data-layout='designer'] {
         display: block;
       }
@@ -61,6 +125,24 @@
   <body>
     <base-screen-designer></base-screen-designer>
     <base-screen-viewer></base-screen-viewer>
+    <section id="host-shell" data-host-shell aria-label="宿主作者面板">
+      <header>宿主作者面板</header>
+      <p data-host-selection>未选择组件</p>
+      <div class="host-actions">
+        <button type="button" data-host-action="component-text">编辑组件 props</button>
+        <button type="button" data-host-action="component-data">编辑数据参数</button>
+        <button type="button" data-host-action="blueprint">编辑事件蓝图</button>
+      </div>
+      <label>
+        编辑器候选（JSON）
+        <textarea data-host-editor rows="8" spellcheck="false"></textarea>
+      </label>
+      <div class="host-actions">
+        <button type="button" data-host-action="commit">提交到设计器</button>
+        <button type="button" data-host-action="cancel">取消</button>
+      </div>
+      <output data-host-status aria-live="polite"></output>
+    </section>
     <script type="module" src="/main.ts"></script>
   </body>
 </html>

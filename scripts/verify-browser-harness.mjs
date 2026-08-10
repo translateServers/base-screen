@@ -53,7 +53,7 @@ try {
       const materialCount = await designer.locator('[data-base-screen-component-id]').count();
       const viewerMaterialCount = await viewer.locator('[data-base-screen-component-id]').count();
       const screenshot = await page.screenshot();
-      if (materialCount !== 5 || viewerMaterialCount !== 5 || screenshot.byteLength < 10_000) {
+      if (materialCount !== 6 || viewerMaterialCount !== 6 || screenshot.byteLength < 10_000) {
         throw new Error(`BROWSER_HARNESS_RENDER_FAILED: ${viewport.width}x${viewport.height}`);
       }
       if (viewport.width > 800) {
@@ -422,7 +422,7 @@ try {
           ).position,
         }));
         if (
-          duplicate.count !== 6 ||
+          duplicate.count !== 7 ||
           duplicate.original.x !== before.x ||
           duplicate.original.y !== before.y
         ) {
@@ -568,7 +568,7 @@ try {
         if (canvasBox === null) throw new Error('BROWSER_HARNESS_CANVAS_MISSING');
         await authoringDesigner.locator('[data-material-type="base.text"] .material-name').click();
         await page.waitForFunction(
-          () => window.baseScreenHarness.designer.document.components.length === 6,
+          () => window.baseScreenHarness.designer.document.components.length === 7,
         );
         await authoringDesigner.getByTitle('\u77e9\u5f62').click();
         const activeTool = await authoringDesigner.locator('[data-status-tool]').textContent();
@@ -582,7 +582,7 @@ try {
           .locator('[data-material-type="base.rectangle"] .material-name')
           .click();
         await page.waitForFunction(
-          () => window.baseScreenHarness.designer.document.components.length === 7,
+          () => window.baseScreenHarness.designer.document.components.length === 8,
         );
         const rectangle = authoringDesigner.locator(
           '[data-base-screen-component-id^="base-rectangle-"]',
@@ -677,7 +677,7 @@ try {
         const materialPaletteCount = await page.evaluate(
           () => window.baseScreenHarness.designer.document.components.length,
         );
-        if (materialPaletteCount !== 11) {
+        if (materialPaletteCount !== 12) {
           throw new Error(
             `BROWSER_HARNESS_MATERIAL_PALETTE_DELEGATION_FAILED: ${materialPaletteCount}`,
           );
@@ -2369,79 +2369,226 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   }
   await designer.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
   const events = designer.locator('[data-events-panel]');
-  const eventSelect = events.locator('[data-blueprint-event]');
+  const requestButton = events.locator('[data-action="open-blueprint"]');
   if (
-    (await eventSelect.isDisabled()) ||
+    (await requestButton.isDisabled()) ||
     (await events.textContent())?.includes('\u4e0d\u53ef\u7528')
   ) {
     throw new Error('BROWSER_HARNESS_BLUEPRINT_CAPABILITY_FAILED');
   }
   const hostEventCount = await page.evaluate(() => window.baseScreenHarness.hostEvents.length);
-  await events.getByTitle('\u6253\u5f00\u84dd\u56fe').click();
-  const blueprint = designer.locator('[data-blueprint-workspace]');
-  await blueprint.waitFor();
-  await blueprint.getByTitle('\u6dfb\u52a0\u89c4\u5219').click();
+  // 宿主蓝图编辑闭环：请求（requestId/revision/快照）→ 宿主修改 canonical 快照 → 专用提交。
+  const blueprintCommit = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    const requests = [];
+    const listener = (event) => requests.push(event.detail.request);
+    designer.addEventListener('base-screen-authoring-request', listener);
+    if (!designer.requestBlueprintEdit()) return { step: 'request', ok: false };
+    const request = requests.at(-1);
+    if (request?.kind !== 'blueprint') return { step: 'kind', ok: false };
+    const rules = [...request.blueprint.rules];
+    rules.push({
+      id: 'rule-2',
+      trigger: {
+        type: 'material-event',
+        componentId: request.componentId,
+        eventName: 'valueClick',
+      },
+      actions: [],
+    });
+    const result = designer.commitBlueprintEdit({
+      requestId: request.requestId,
+      expectedRevision: request.documentRevision,
+      componentId: request.componentId,
+      blueprint: { rules },
+    });
+    return { step: 'commit', ok: result.ok, code: result.diagnostics?.[0]?.code };
+  });
+  if (!blueprintCommit.ok) {
+    throw new Error(
+      `BROWSER_HARNESS_BLUEPRINT_HOST_COMMIT_FAILED:${JSON.stringify(blueprintCommit)}`,
+    );
+  }
   await page.waitForFunction(
     () => window.baseScreenHarness.designer.document.blueprint.rules.length === 2,
   );
-  const rule = blueprint.locator('[data-blueprint-rule=rule-2]');
-  await rule.locator('[data-blueprint-condition]').check();
-  await rule.getByTitle('\u6dfb\u52a0\u53d8\u91cf\u52a8\u4f5c').click();
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.blueprint.rules.find(
-        (item) => item.id === 'rule-2',
-      )?.actions[0]?.type === 'set-variable',
-  );
-  const variableExpression = rule.locator('[data-blueprint-expression=action]');
-  const blueprintAuthority = await page.evaluate(() => ({
-    eventPayload: window.baseScreenHarness.designer.runtimeContributions?.hasBlueprintCapability(
-      'blueprint.value.event-payload',
-    ),
-    setVariable: window.baseScreenHarness.designer.runtimeContributions?.hasBlueprintCapability(
-      'blueprint.action.set-variable',
-    ),
-  }));
-  if (!blueprintAuthority.eventPayload || !blueprintAuthority.setVariable) {
-    throw new Error(
-      `BROWSER_HARNESS_BLUEPRINT_AUTHORITY_FAILED:${JSON.stringify(blueprintAuthority)}`,
-    );
-  }
-  await variableExpression.evaluate((element) => {
-    element.value = '{"kind":"event-payload","path":["framework"]}';
-    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  // 陈旧 revision 提交被拒绝，document 保持不变。
+  const staleCommit = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    const requests = [];
+    const listener = (event) => requests.push(event.detail.request);
+    designer.addEventListener('base-screen-authoring-request', listener);
+    designer.requestBlueprintEdit();
+    const request = requests.at(-1);
+    const rules = [...window.baseScreenHarness.designer.document.blueprint.rules];
+    rules.push({
+      id: 'rule-3',
+      trigger: {
+        type: 'material-event',
+        componentId: request.componentId,
+        eventName: 'valueClick',
+      },
+      actions: [],
+    });
+    const result = designer.commitBlueprintEdit({
+      requestId: request.requestId,
+      expectedRevision: 'stale-revision',
+      componentId: request.componentId,
+      blueprint: { rules },
+    });
+    return {
+      ok: result.ok,
+      code: result.diagnostics?.[0]?.code,
+      rules: window.baseScreenHarness.designer.document.blueprint.rules.length,
+    };
   });
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.blueprint.rules.find(
-        (item) => item.id === 'rule-2',
-      )?.actions[0]?.value?.kind === 'event-payload',
-  );
-  await rule.getByTitle('\u6dfb\u52a0\u5bbf\u4e3b\u4e8b\u4ef6\u52a8\u4f5c').click();
-  const hostEventName = rule.locator('[data-blueprint-host-event-name]');
-  await hostEventName.fill('authoringEvent');
-  await hostEventName.press('Enter');
-  await page.waitForFunction(
-    () =>
-      window.baseScreenHarness.designer.document.blueprint.rules.find(
-        (item) => item.id === 'rule-2',
-      )?.actions[1]?.eventName === 'authoringEvent',
-  );
-  await rule.getByTitle('\u4e0a\u79fb\u89c4\u5219').click();
-  await page.waitForFunction(
-    () => window.baseScreenHarness.designer.document.blueprint.rules[0]?.id === 'rule-2',
-  );
-  await blueprint
-    .locator('[data-blueprint-rule=rule-2]')
-    .getByTitle('\u79fb\u9664\u89c4\u5219')
-    .click();
-  await page.waitForFunction(
-    () => window.baseScreenHarness.designer.document.blueprint.rules.length === 1,
-  );
+  if (
+    staleCommit.ok ||
+    staleCommit.code !== 'AUTHORING_STALE_REVISION' ||
+    staleCommit.rules !== 2
+  ) {
+    throw new Error(`BROWSER_HARNESS_BLUEPRINT_STALE_COMMIT_FAILED:${JSON.stringify(staleCommit)}`);
+  }
+  // 宿主组件文本编辑闭环（data target：写入既有 host-resource 参数，单 history entry）。
+  const textCommit = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    const requests = [];
+    const listener = (event) => requests.push(event.detail.request);
+    designer.addEventListener('base-screen-authoring-request', listener);
+    const requestId = designer.requestComponentTextEdit('data');
+    if (requestId === null) return { step: 'request', ok: false };
+    const request = requests.at(-1);
+    const result = designer.commitComponentTextEdit({
+      requestId,
+      expectedRevision: request?.documentRevision ?? null,
+      componentId: 'title',
+      target: 'data',
+      source: '{"region":"south"}',
+    });
+    return { step: 'commit', ok: result.ok, code: result.diagnostics?.[0]?.code };
+  });
+  if (!textCommit.ok) {
+    throw new Error(`BROWSER_HARNESS_TEXT_HOST_COMMIT_FAILED:${JSON.stringify(textCommit)}`);
+  }
+  await page.waitForFunction(() => {
+    const source = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'title',
+    )?.dataSource;
+    return source?.type === 'host-resource' && source.params.region?.value === 'south';
+  });
+  // 无效 JSON 文本提交被拒绝，document 与 history 不变。
+  const invalidText = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    const requests = [];
+    const listener = (event) => requests.push(event.detail.request);
+    designer.addEventListener('base-screen-authoring-request', listener);
+    const requestId = designer.requestComponentTextEdit('data');
+    const request = requests.at(-1);
+    const result = designer.commitComponentTextEdit({
+      requestId,
+      expectedRevision: request?.documentRevision ?? null,
+      componentId: 'title',
+      target: 'data',
+      source: '{broken',
+    });
+    return { ok: result.ok, code: result.diagnostics?.[0]?.code };
+  });
+  if (invalidText.ok || invalidText.code !== 'AUTHORING_SOURCE_INVALID') {
+    throw new Error(`BROWSER_HARNESS_TEXT_INVALID_COMMIT_FAILED:${JSON.stringify(invalidText)}`);
+  }
   if ((await page.evaluate(() => window.baseScreenHarness.hostEvents.length)) !== hostEventCount) {
     throw new Error('BROWSER_HARNESS_BLUEPRINT_AUTHORING_EXECUTED_HOST_ACTION');
   }
-  await blueprint.getByTitle('\u5173\u95ed').click();
+  // 内部事件面板只呈现摘要、能力状态与宿主请求入口，无内部表单/图形控件。
+  const internalSurface = await events.evaluate((panel) => ({
+    hasRuleForm: panel.querySelector('[data-blueprint-rule]') !== null,
+    hasGraph: panel.querySelector('[data-blueprint-graph]') !== null,
+    hasExpression: panel.querySelector('[data-blueprint-expression]') !== null,
+    hasRequestEntry: panel.querySelector('[data-action="open-blueprint"]') !== null,
+  }));
+  if (
+    internalSurface.hasRuleForm ||
+    internalSurface.hasGraph ||
+    internalSurface.hasExpression ||
+    !internalSurface.hasRequestEntry
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_BLUEPRINT_INTERNAL_SURFACE_FAILED:${JSON.stringify(internalSurface)}`,
+    );
+  }
+  // ECharts 语义面板：受限 Descriptor 完成常见配置，无需 raw option。
+  await designer.getByRole('tab', { name: '\u5916\u89c2' }).click();
+  await designer.locator('[data-base-screen-component-id=echarts-demo]').click();
+  const appearance = designer.locator('[data-properties]');
+  const sectionNames = await appearance
+    .locator('.designer-descriptor-group-summary')
+    .allTextContents();
+  if (
+    ![
+      '\u6807\u9898',
+      '\u56fe\u4f8b',
+      '\u7f51\u683c',
+      '\u5750\u6807\u8f74',
+      '\u7cfb\u5217',
+      '\u9ad8\u7ea7',
+    ].every((name) => sectionNames.includes(name))
+  ) {
+    throw new Error(`BROWSER_HARNESS_ECHARTS_SECTIONS_FAILED:${sectionNames.join(',')}`);
+  }
+  const advancedDetails = appearance
+    .locator('details.designer-descriptor-group')
+    .filter({ hasText: '\u9ad8\u7ea7' });
+  if (await advancedDetails.getAttribute('open')) {
+    throw new Error('BROWSER_HARNESS_ECHARTS_ADVANCED_COLLAPSED_FAILED');
+  }
+  const titleText = appearance.locator('[data-descriptor-field-id="titleText"]');
+  await titleText.fill('\u9500\u552e\u8d8b\u52bf');
+  await titleText.press('Enter');
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'echarts-demo',
+      )?.props?.title?.text === '\u9500\u552e\u8d8b\u52bf',
+  );
+  // 条件字段：次 Y 轴名称仅在“显示次 Y 轴”为 true 时渲染。
+  const yAxis2Name = appearance.locator('[data-descriptor-field-id="yAxis2Name"]');
+  if ((await yAxis2Name.count()) !== 0) {
+    throw new Error('BROWSER_HARNESS_ECHARTS_CONDITION_HIDDEN_FAILED');
+  }
+  await appearance.locator('[data-descriptor-field-id="yAxis2Show"]').click();
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'echarts-demo',
+      )?.props?.yAxis2?.show === true,
+  );
+  await appearance.locator('[data-descriptor-field-id="yAxis2Name"]').waitFor();
+  // 重复系列数组：添加一个 series（reorderable-array primitive）。
+  await appearance.locator('[data-descriptor-array-action="add"]').click();
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'echarts-demo',
+      )?.props?.series?.length === 2,
+  );
+  // 数据 tab：字段选择器投影到宿主数据集字段。
+  await designer.getByRole('tab', { name: '\u6570\u636e' }).click();
+  const fieldSelector = designer.locator(
+    '[data-inspector-pane=data] [data-descriptor-field-id="dimensionField"]',
+  );
+  if ((await fieldSelector.locator('option').count()) < 2) {
+    throw new Error('BROWSER_HARNESS_ECHARTS_FIELD_SELECTOR_FAILED');
+  }
+  // 事件 tab：结构化事件声明 label 与能力提示。
+  await designer.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
+  const eventText = await events.textContent();
+  if (
+    eventText === null ||
+    !eventText.includes('\u7cfb\u5217\u70b9\u51fb') ||
+    !eventText.includes('\u80fd\u529b\u53ef\u7528')
+  ) {
+    throw new Error(`BROWSER_HARNESS_ECHARTS_EVENT_DECLARATION_FAILED:${eventText}`);
+  }
 }
 
 async function componentCount(page) {
