@@ -116,6 +116,7 @@ describe('official materials', () => {
     expect([...registrations.keys()].sort()).toEqual([
       'base-screen-chart',
       'base-screen-container',
+      'base-screen-echarts',
       'base-screen-ellipse',
       'base-screen-image',
       'base-screen-rectangle',

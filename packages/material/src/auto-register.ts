@@ -1,6 +1,7 @@
 import {
   defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
+  defineBaseScreenEChartsMaterial,
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
@@ -15,6 +16,7 @@ for (const define of [
   defineBaseScreenImageMaterial,
   defineBaseScreenContainerMaterial,
   defineBaseScreenChartMaterial,
+  defineBaseScreenEChartsMaterial,
   defineBaseScreenTableMaterial,
 ]) {
   const definition = define();
@@ -26,6 +28,7 @@ for (const define of [
 export {
   defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
+  defineBaseScreenEChartsMaterial,
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
