@@ -100,7 +100,7 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
     this.style.backgroundColor = stringValue(model.style.backgroundColor);
     this.style.color = stringValue(model.style.color);
     this.setAttribute('role', 'region');
-    this.setAttribute('aria-label', '数据表');
+    this.setAttribute('aria-label', '表格');
     if (model.dataState.status !== 'ready') {
       this.renderMessage(
         model.dataState.status === 'loading'

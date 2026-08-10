@@ -350,7 +350,7 @@ describe('designer panel rendering', () => {
     );
     expect(
       descendants(properties).find((element) => element.dataset.action === 'ungroup'),
-    ).toMatchObject({ disabled: false, textContent: '解组' });
+    ).toMatchObject({ disabled: false, textContent: '取消编组' });
     expect(
       descendants(properties)
         .filter((element) => element.dataset.property === 'width')

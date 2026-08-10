@@ -10,7 +10,7 @@ describe('designer fixed Chinese terminology', () => {
       data: '数据',
       interaction: '交互',
       events: '事件',
-      directDocument: '直接文档',
+      directDocument: '未关联项目',
       reloadRemote: '重新加载远端',
     });
   });

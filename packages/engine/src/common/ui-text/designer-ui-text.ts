@@ -8,7 +8,7 @@ export const DESIGNER_UI_TEXT = {
   interaction: '交互',
   events: '事件',
   inspector: '属性',
-  directDocument: '直接文档',
+  directDocument: '未关联项目',
   continueEditing: '继续编辑',
   reloadRemote: '重新加载远端',
   discardAndReload: '丢弃并重新加载',
@@ -26,13 +26,13 @@ export const DESIGNER_UI_TEXT = {
     disposed: '已释放',
   },
   saveStatus: {
-    saving: '保存中...',
+    saving: '保存中…',
     unsaved: '未保存更改',
     saved: (time: string) => `已保存 ${time}`,
   },
-  smallScreenWarning: '编辑需要至少 1024 × 640 的可用空间。',
+  smallScreenWarning: '编辑大屏需要至少 1024 × 640 的可用空间。',
   collapseMaterials: '收起物料面板',
-  collapseInspector: '收起属性',
+  collapseInspector: '收起属性面板',
   materialsSearch: '搜索物料',
   materialFilters: '物料筛选',
   allMaterials: '全部',
@@ -59,8 +59,8 @@ export const DESIGNER_UI_TEXT = {
   designerMode: '设计模式',
   zoomRatio: '缩放比例',
   canvasSize: '画布尺寸',
-  nothingSelected: '未选中',
-  selectedSingle: '已选中 1 个',
+  nothingSelected: '未选中组件',
+  selectedSingle: '已选中 1 个组件',
   selectedCount: (count: number) => `已选中 ${count} 个组件`,
   groupEditingPath: (path: string) => `组内：${path}`,
   notifications: '操作通知',
@@ -78,7 +78,7 @@ export const DESIGNER_UI_TEXT = {
   cancel: '取消',
   dataPanelEmpty: '未选择数据源。',
   dataSource: {
-    title: '数据来源',
+    title: '数据源',
     mode: (mode: string) =>
       ({ none: '无数据', static: '静态数据', dataset: '宿主数据集' })[mode] ?? mode,
     noneSelected: '当前组件不使用数据。',
@@ -92,7 +92,7 @@ export const DESIGNER_UI_TEXT = {
     disconnected: '未连接',
     apply: (mode: string) =>
       ({ none: '移除数据', static: '应用静态数据', dataset: '应用数据集' })[mode] ?? '应用',
-    applied: '数据来源已应用。',
+    applied: '数据源已应用。',
   },
   interactionPanelEmpty: '交互设置将在预览中生效。',
   favoriteMaterial: (name: string) => `收藏 ${name}`,
@@ -128,8 +128,8 @@ export const DESIGNER_UI_TEXT = {
   },
   layersPanel: {
     searchLabel: '搜索图层',
-    searchPlaceholder: '搜索',
-    dropTargetAria: '图层，根图层是当前放置目标',
+    searchPlaceholder: '搜索图层',
+    dropTargetAria: '图层，当前放置目标为根图层',
     aria: '图层',
     empty: '未找到图层。',
     showMore: '显示更多图层',
@@ -183,9 +183,9 @@ export const DESIGNER_UI_TEXT = {
     alignUnavailableCount: '至少选择 2 个组件才能对齐。',
     distributeUnavailableCount: '至少选择 3 个组件才能分布。',
     actionGroup: '编组',
-    actionUngroup: '解组',
+    actionUngroup: '取消编组',
     actionUnavailableLocked: '当前组已锁定。',
-    actionUnavailableEmptyGroup: '当前组没有可解组的子项。',
+    actionUnavailableEmptyGroup: '当前组没有子项，无法取消编组。',
     geometry: '几何',
     name: '名称',
     x: 'X',
@@ -266,6 +266,7 @@ export const DESIGNER_UI_TEXT = {
     hostResourceUnavailable: '资源数据不可用。',
     commandTargetLocked: '选中组件已锁定。',
     commandTargetHidden: '选中组件已隐藏。',
+    datasetUnavailable: '数据集暂不可用，请稍后重试。',
     lifecycleInvalid: '当前操作无法执行。',
     genericFailure: '操作未完成，请检查输入后重试。',
   },
@@ -354,7 +355,7 @@ export const DESIGNER_UI_TEXT = {
     capabilityUnavailable: '能力不可用',
   },
   descriptor: {
-    noField: '未选择字段',
+    noField: '未选择字段。',
     moveUp: '上移',
     moveDown: '下移',
     removeItem: '移除',
@@ -383,11 +384,15 @@ export function designerDiagnosticSummary(code: ScreenDiagnostic['code']): strin
     case 'HOST_RESOURCE_INVALID':
       return DESIGNER_UI_TEXT.diagnostics.hostResourceUnavailable;
     case 'HOST_DATASET_CATALOG_FAILED':
+      return DESIGNER_UI_TEXT.dataset.loadFailed;
     case 'HOST_DATASET_DESCRIPTOR_INVALID':
+      return DESIGNER_UI_TEXT.dataset.describeFailed;
     case 'HOST_DATASET_INVALID':
+    case 'HOST_DATASET_ADAPTER_FAILED':
+    case 'HOST_DATASET_UNAVAILABLE':
+      return DESIGNER_UI_TEXT.diagnostics.datasetUnavailable;
     case 'HOST_DATASET_PARAMETER_INVALID':
     case 'HOST_DATASET_BINDING_INVALID':
-    case 'HOST_DATASET_UNAVAILABLE':
     case 'HOST_DATASET_VARIABLE_INVALID':
       return DESIGNER_UI_TEXT.dataset.incomplete;
     case 'CORE_COMMAND_TARGET_LOCKED':

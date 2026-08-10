@@ -497,10 +497,10 @@ const PlaygroundApp = defineComponent({
                 'p',
                 { class: 'inspector-copy' },
                 isDesignerRoute
-                  ? 'Designer 已接入数据集目录，可在 Data 面板选择数据集并配置字段角色。'
+                  ? 'Designer 已接入数据集目录，可在数据面板选择数据集并配置字段角色。'
                   : isDataRoute
                     ? datasetDescription(runtimeState.datasetId)
-                    : '进入 Designer、Dataset 或 Binding 查看真实宿主数据流.',
+                    : '进入 Designer、Dataset 或 Binding 查看真实宿主数据流。',
               ),
               isDesignerRoute
                 ? h('div', { class: 'inspector-heading' }, [

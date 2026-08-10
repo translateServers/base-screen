@@ -1673,8 +1673,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
   }
 
-  // Nebula 保存状态徽标：保存中... / 未保存更改 / 已保存 HH:mm。
-  // 无项目（直接文档）时保持静态占位文案，与状态栏的「直接文档」一致。
+  // Nebula 保存状态徽标：保存中… / 未保存更改 / 已保存 HH:mm。
+  // 无项目（未关联项目）时保持静态占位文案，与状态栏的「未关联项目」一致。
   private renderTopbarSaveStatus(): void {
     const root = this.shadowRoot;
     if (root === null) return;

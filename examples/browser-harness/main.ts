@@ -324,7 +324,7 @@ const screenDocument = {
       type: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.type,
       name: 'ECharts 语义图',
       parentId: null,
-      position: { x: 560, y: 80 },
+      position: { x: 560, y: 320 },
       size: { width: 340, height: 220 },
       rotation: 0,
       zIndex: 6,
@@ -716,7 +716,7 @@ Object.assign(window, {
           {
             id: 'table-demo',
             type: 'base.table',
-            name: '数据表',
+            name: '表格',
             parentId: null,
             position: { x: 20, y: 20 },
             size: { width: 420, height: 260 },
@@ -739,7 +739,7 @@ Object.assign(window, {
           {
             id: 'chart-demo',
             type: 'base.chart',
-            name: '数据图表',
+            name: '图表',
             parentId: null,
             position: { x: 460, y: 20 },
             size: { width: 420, height: 260 },
