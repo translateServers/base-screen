@@ -24,6 +24,9 @@
 - Base Screen 负责 canonical document、严格契约、当前实例内的命令/事务/历史/画布/检查器、Viewer/Designer 渲染、物料 ABI，以及有界请求的取消、deadline、generation guard 和安全结果投影。
 - 宿主负责实际存储与检索、认证授权、业务路由与 Store、数据查询/聚合/缓存/ETL、资产存储与转码、发布部署、公开 URL、截图/视频/批量导出和长任务。Base Screen 只通过 JSON-safe intent、port、method 或 event 请求这些能力。
 - 需要凭证或租户状态、跨项目/跨实例共享、无明确容量上限、后台队列/持久缓存/长任务，或依赖特定业务基础设施的处理默认归宿主；不得在 Engine 中补建后端、通用网络客户端、任务队列或业务降级实现。
+- 物料自定义属性面板默认使用 JSON-safe、声明式的 Manifest Editor Descriptor 和 Base Screen 内建控件；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。
+- 事件 Blueprint 编辑器、代码编辑器和复杂 ECharts/领域配置编辑器由宿主拥有；Base Screen 只提供 detached 编辑上下文、canonical 校验、Core transaction、history/revision guard 和有界结果提交。源码、图形布局和编辑器 session 不进入 Screen Document。
+- 宿主作者扩展通过公开 Custom Element method/event 和 JSON-safe authoring bridge 集成；宿主不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的通用 UI 注入逃生口。
 - 新增功能若能通过既有宿主边界完成，不得新增 Base Screen 内部工作流、package 或传输配置；范围扩展必须先更新 ADR 和生效中的 Spec。
 
 ## 目录结构与命名

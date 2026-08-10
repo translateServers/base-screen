@@ -4,7 +4,7 @@
 > 最近更新：2026-08-10
 > 定位：完整大屏设计器产品范围的历史实施快照，不再授权新实现
 > 前置：[Designer Product Completion](../designer-product-completion/spec.md)、[Designer Engine](../designer-engine/spec.md)、[ADR-0017](../../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0018](../../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md)、[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
-> 后继：[ADR-0027：轻量设计器基座与宿主重型处理边界](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)
+> 后继：[ADR-0027：轻量设计器基座与宿主重型处理边界](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0028：宿主作者桥与 Material Editor Descriptor](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
@@ -12,6 +12,15 @@
 
 本目录按 2026-08-10 的任务勾选状态归档。未完成项不得继续实施；仍符合轻量基座边界的独立 Spec 继续以各自
 三件套为唯一实施和验收依据。
+
+## 宿主归属范围说明（2026-08-10，ADR-0028）
+
+- **ECharts（及其它复杂图表）的完整 option 编辑器、代码编辑器（Monaco/CodeMirror 类）、Blueprint 图形编辑器
+  与领域专用配置编辑器均属宿主集成能力**，由宿主通过公开作者桥（Custom Element method/event + `@base-screen/*`
+  exports）实现，只提交 canonical candidate；Base Screen 默认 bundle 不包含这些编辑器及其依赖。
+- 官方 ECharts 物料的受限语义面板试点（标题/图例/网格/坐标轴/series/字段绑定/颜色/基础交互）由
+  [Designer Authoring Extension](../../designer-authoring-extension/spec.md) 授权实施。
+- 本目录中关于 Engine 内部表单/图形 Blueprint 作者工作流的未完成项不再授权实施。
 
 ## 1. 目标
 
@@ -26,8 +35,8 @@
 - URL、header、token、cookie、SQL、脚本、任意 fetch 配置和业务凭证不得进入 canonical document、日志、fixture 或
   Engine UI。资源和外部动作只保存由宿主目录授权的 opaque intent。
 - 宿主拥有认证、路由、数据库、文件存储、真实资源执行、公开预览 URL 和部署；Base Screen 不复制其实现。
-- Blueprint 的节点位置、边路由、视口、选区、折叠、MiniMap 与搜索状态只属于 Engine session，不进入 document、
-  history、export 或 host payload。
+- Blueprint 的节点位置、边路由、视口、选区、折叠、MiniMap 与搜索状态只属于编辑器 session（Engine 内部实现
+  时归 Engine session；ADR-0028 起归宿主编辑器 session），不进入 document、history、export 或 host payload。
 - 来源清单中的 bug、不一致和死代码必须作为负向回归，不构成兼容目标。
 
 ## 3. Requirements

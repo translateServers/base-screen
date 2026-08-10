@@ -13,5 +13,6 @@
 | [Designer 编组与右侧面板整改](./designer-group-inspector/implementation-plan.md) | 第二轮已实现 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) |
 | [Data Runtime Hardening](./data-runtime-hardening/implementation-plan.md) | 治理已接受，实施进行中 | [Data Runtime Hardening Spec](../specs/data-runtime-hardening/spec.md)（生效中）、[ADR-0025](../decisions/ADR-0025-data-runtime-hardening.md)（已接受） |
 | [Designer Event Blueprint](./designer-event-blueprint/implementation-plan.md) | 已决策（图形延后）；表单实施待启动 | [Designer Event Blueprint Spec](../specs/designer-event-blueprint/spec.md)（生效中）、[ADR-0026](../decisions/ADR-0026-designer-event-blueprint-authoring.md)（已接受） |
+| [轻量 Designer 作者扩展](./designer-authoring-extension/implementation-plan.md) | 草案，不授权实现 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、Material/Blueprint/Host authoring bridge 范围 |
 
 实现和验收时，请以 [功能与工程规格](../specs/README.md) 的生效中条目为准。

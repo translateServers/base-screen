@@ -42,8 +42,9 @@
 | [ADR-0023](./ADR-0023-host-dataset-resource-integration.md) | 已接受 | 2026-08-07 | 宿主数据集目录、绑定与运行时取数 |
 | [ADR-0024](./ADR-0024-designer-public-style-tokens.md) | 已接受 | 2026-08-07 | Designer 宿主可配置主题 Token |
 | [ADR-0025](./ADR-0025-data-runtime-hardening.md) | 已接受 | 2026-08-09 | Data Runtime Hardening：宿主数据集边界、请求身份与共享、元数据/错误协议、初始化/变量/上下文、一次性迁移（部分取代 ADR-0010/0023 的跨组件去重归属） |
-| [ADR-0026](./ADR-0026-designer-event-blueprint-authoring.md) | 已接受 | 2026-08-10 | Designer 事件 Blueprint 表单作者闭环与 Core trace；图形路径整体延后、零新增依赖 |
+| [ADR-0026](./ADR-0026-designer-event-blueprint-authoring.md) | 已接受 | 2026-08-10 | Designer 事件 Blueprint 表单作者闭环与 Core trace；图形路径整体延后、零新增依赖（Engine 内部表单 UI 范围由 ADR-0028 移交宿主） |
 | [ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md) | 已接受 | 2026-08-10 | 轻量设计器基座定位与宿主重型处理边界；部分取代 ADR-0017 的完整产品范围 |
+| [ADR-0028](./ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md) | 已接受 | 2026-08-10 | 宿主作者桥与 Material Editor Descriptor：JSON-safe 声明式面板、结构化事件声明、专用提交入口；部分取代 ADR-0026 的 Engine 内部表单作者 UI 范围 |
 
 ## 计划决策
 
@@ -53,9 +54,15 @@ XJ Data Hub 仓库 `.agent/specs/data-runtime-hardening/spec.md`。
 
 ADR-0026 已于 2026-08-10 接受：事件 Blueprint 以键盘表单为唯一作者路径并新增 Core trace；图形路径整体延后，
 本期不引入图库。评估证据与实施计划见 [Designer Event Blueprint Spec](../specs/designer-event-blueprint/spec.md)
-与 [候选评估报告](../plans/designer-event-blueprint/dependency-evaluation.md)。
+与 [候选评估报告](../plans/designer-event-blueprint/dependency-evaluation.md)。2026-08-10 起，Engine 内部表单
+作者 UI 范围由 ADR-0028 移交宿主作者桥。
 
 ADR-0027 已于 2026-08-10 接受：Base Screen 定位为轻量、可嵌入的大屏设计器基座；项目、数据、资产、发布和
 长任务的真实处理由宿主负责，Base Screen 只拥有本地作者内核、渲染内核与有界宿主端口。
+
+ADR-0028 已于 2026-08-10 接受：物料 Manifest 可通过 JSON-safe 声明式 Editor Descriptor 描述外观/数据/交互/
+事件作者字段；Engine 提供有限内建面板 primitives 与宿主作者桥（requestId/revision/身份/实例守护 + 专用提交
+入口）；Blueprint 图形布局、代码编辑器、完整 ECharts option 与领域编辑器归宿主。规格见
+[Designer Authoring Extension Spec](../specs/designer-authoring-extension/spec.md)。
 
 相关背景、实施计划和规格入口见 [文档索引](../README.md)。
