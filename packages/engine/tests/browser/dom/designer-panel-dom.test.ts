@@ -219,6 +219,95 @@ describe('designer panel property parsing', () => {
     });
     vi.unstubAllGlobals();
   });
+
+  it('rounds geometry panel x/y/w/h input to two decimal places', () => {
+    class FakeInput {
+      readonly dataset: { property: string };
+      readonly value: string;
+
+      constructor(property: string, value: string) {
+        this.dataset = { property };
+        this.value = value;
+      }
+    }
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const document = {
+      canvas: { width: 100, height: 100, backgroundColor: '#000000' },
+      components: [
+        {
+          id: 'text-1',
+          type: 'base.text',
+          name: '文本',
+          parentId: null,
+          position: { x: 10.004, y: 20.006 },
+          size: { width: 10, height: 10 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+        },
+      ],
+      variables: [],
+      blueprint: { rules: [] },
+    } as ScreenDocument;
+    const interaction = { focusedComponentId: 'text-1', selectedComponentIds: ['text-1'] };
+
+    expect(
+      createPropertyTransaction(
+        new FakeInput('x', '10.006') as unknown as HTMLInputElement,
+        document,
+        interaction,
+        undefined,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        commands: [{ componentIds: ['text-1'], patch: { position: { x: 10.01, y: 20.006 } } }],
+      },
+    });
+    expect(
+      createPropertyTransaction(
+        new FakeInput('y', '20.004') as unknown as HTMLInputElement,
+        document,
+        interaction,
+        undefined,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        commands: [{ componentIds: ['text-1'], patch: { position: { x: 10.004, y: 20 } } }],
+      },
+    });
+    expect(
+      createPropertyTransaction(
+        new FakeInput('width', '12.345') as unknown as HTMLInputElement,
+        document,
+        interaction,
+        undefined,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        commands: [{ componentIds: ['text-1'], patch: { size: { width: 12.35, height: 10 } } }],
+      },
+    });
+    expect(
+      createPropertyTransaction(
+        new FakeInput('height', '34.567') as unknown as HTMLInputElement,
+        document,
+        interaction,
+        undefined,
+      ),
+    ).toMatchObject({
+      ok: true,
+      value: {
+        commands: [{ componentIds: ['text-1'], patch: { size: { width: 10, height: 34.57 } } }],
+      },
+    });
+    vi.unstubAllGlobals();
+  });
 });
 
 class DataPanel {

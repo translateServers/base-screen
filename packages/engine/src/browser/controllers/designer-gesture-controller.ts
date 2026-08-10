@@ -11,6 +11,10 @@ import {
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
+  clampScreenCoordinate,
+  roundScreenGeometry,
+} from '../../common/operations/designer-geometry.js';
+import {
   hasDirectChildren,
   parentIdOf,
   selectedComponents,
@@ -626,8 +630,8 @@ export class DesignerGestureController {
             parentId:
               source.parentId === null ? null : (copiedIds.get(source.parentId) ?? source.parentId),
             position: {
-              x: roundCoordinate(clampCoordinate(source.position.x + translation.x)),
-              y: roundCoordinate(clampCoordinate(source.position.y + translation.y)),
+              x: roundScreenGeometry(clampScreenCoordinate(source.position.x + translation.x)),
+              y: roundScreenGeometry(clampScreenCoordinate(source.position.y + translation.y)),
             },
             zIndex:
               document.components.reduce(
@@ -647,8 +651,8 @@ export class DesignerGestureController {
         componentIds: [component.id],
         patch: {
           position: {
-            x: roundCoordinate(clampCoordinate(component.position.x + translation.x)),
-            y: roundCoordinate(clampCoordinate(component.position.y + translation.y)),
+            x: roundScreenGeometry(clampScreenCoordinate(component.position.x + translation.x)),
+            y: roundScreenGeometry(clampScreenCoordinate(component.position.y + translation.y)),
           },
         },
       })),
@@ -881,8 +885,8 @@ export class DesignerGestureController {
   private dragTranslation(drag: Drag, event: PointerEvent): DesignerSnapTranslation {
     const zoom = this.callbacks.getViewport().zoom;
     const translation = {
-      x: clampCoordinate((event.clientX - drag.startClientX) / zoom),
-      y: clampCoordinate((event.clientY - drag.startClientY) / zoom),
+      x: clampScreenCoordinate((event.clientX - drag.startClientX) / zoom),
+      y: clampScreenCoordinate((event.clientY - drag.startClientY) / zoom),
     };
     // 移动以选区锚点匹配组件、画布和用户参考线；网格不参与吸附。
     const snapped = this.callbacks.snapCanvasSelection(
@@ -929,8 +933,12 @@ export class DesignerGestureController {
     if (document === undefined || entry === undefined) return false;
     // snapPoint 返回的吸附点带 snappedX/snappedY 辅助字段，不能直接写入组件 position
     // （fail-closed 校验会拒绝未知字段），这里只取规范化后的 x/y。
+    // 与画布内拖拽一致：坐标只保留小数点后两位，并夹取到合法范围。
     const snapped = this.snapPoint(this.canvasPointFromPointer(event));
-    const position = { x: snapped.x, y: snapped.y };
+    const position = {
+      x: roundScreenGeometry(clampScreenCoordinate(snapped.x)),
+      y: roundScreenGeometry(clampScreenCoordinate(snapped.y)),
+    };
     this.callbacks.reportTransaction({
       commands: [
         {
@@ -1049,8 +1057,8 @@ export class DesignerGestureController {
     const entry = this.callbacks.getCatalog()?.get(create.materialType);
     if (entry === undefined) return;
     if (end === undefined) return;
-    const width = Math.abs(end.x - create.start.x);
-    const height = Math.abs(end.y - create.start.y);
+    const width = roundScreenGeometry(Math.abs(end.x - create.start.x));
+    const height = roundScreenGeometry(Math.abs(end.y - create.start.y));
     if (create.tool !== 'text' && (width > 0 || height > 0) && Math.max(width, height) < 4) return;
     const dragged = create.tool !== 'text' && (width >= 4 || height >= 4);
     this.callbacks.reportTransaction({
@@ -1063,8 +1071,14 @@ export class DesignerGestureController {
             name: entry.manifest.name,
             parentId: null,
             position: dragged
-              ? { x: Math.min(create.start.x, end.x), y: Math.min(create.start.y, end.y) }
-              : create.start,
+              ? {
+                  x: roundScreenGeometry(Math.min(create.start.x, end.x)),
+                  y: roundScreenGeometry(Math.min(create.start.y, end.y)),
+                }
+              : {
+                  x: roundScreenGeometry(create.start.x),
+                  y: roundScreenGeometry(create.start.y),
+                },
             size: dragged ? { width, height } : entry.manifest.defaultSize,
             rotation: 0,
             zIndex:
@@ -1146,14 +1160,6 @@ function normalizedRect(
     width: Math.abs(end.x - start.x),
     height: Math.abs(end.y - start.y),
   };
-}
-
-function clampCoordinate(value: number): number {
-  return Math.max(-1_000_000, Math.min(1_000_000, value));
-}
-
-function roundCoordinate(value: number): number {
-  return Math.round(value * 100) / 100;
 }
 
 function isPrimaryPointer(event: PointerEvent): boolean {

@@ -70,6 +70,37 @@ describe('designer operations', () => {
     expect(after[0]?.rotation).toBe(75);
   });
 
+  it('rounds resize positions and sizes to two decimal places', () => {
+    const before = [component('first', 0, 0), component('second', 120.5, 0)];
+    const after = resizeScreenComponents(
+      before,
+      'south-east',
+      { x: 335.333, y: 200.444 },
+      {
+        shift: false,
+        alt: false,
+      },
+    );
+
+    expect(after[0]).toMatchObject({
+      position: { x: 0, y: 0 },
+      size: { width: 152.08, height: 200.44 },
+    });
+    expect(after[1]).toMatchObject({
+      position: { x: 183.25, y: 0 },
+      size: { width: 152.08, height: 200.44 },
+    });
+  });
+
+  it('rounds rotate positions to two decimal places', () => {
+    const before = [component('first', 0, 0)];
+    const after = rotateScreenComponents(before, { x: 100, y: 50 }, { x: 75, y: 100 }, false);
+
+    expect(after[0]?.rotation).not.toBe(75);
+    expect(Number.isInteger(after[0]!.position.x * 100)).toBe(true);
+    expect(Number.isInteger(after[0]!.position.y * 100)).toBe(true);
+  });
+
   it('copies detached subtrees and rewrites ids and internal parents on paste', () => {
     const root = component('root', 0, 0);
     const child = { ...component('child', 10, 10), parentId: 'root' };

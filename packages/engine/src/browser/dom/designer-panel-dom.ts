@@ -17,6 +17,10 @@ import type {
 } from '@base-screen/plugin-core';
 import { validateBaseScreenMaterialProps } from '@base-screen/plugin-core';
 import {
+  clampScreenCoordinate,
+  roundScreenGeometry,
+} from '../../common/operations/designer-geometry.js';
+import {
   createGroupRotationTransaction,
   createGroupSizeTransaction,
 } from '../../common/operations/designer-group.js';
@@ -459,22 +463,21 @@ function createGeometryTransaction(
   const value = Number(input);
   if (!Number.isFinite(value)) return undefined;
   if (property === 'x' || property === 'y') {
+    const position = {
+      ...component.position,
+      [property]: roundScreenGeometry(clampScreenCoordinate(value)),
+    };
     if (document !== undefined && context.kind === 'single-group') {
-      const transaction = createGroupPositionTransaction(document, component.id, {
-        ...component.position,
-        [property]: clamp(value),
-      });
+      const transaction = createGroupPositionTransaction(document, component.id, position);
       return transaction === undefined ? undefined : success(transaction);
     }
-    return success(
-      update(component.id, { position: { ...component.position, [property]: clamp(value) } }),
-    );
+    return success(update(component.id, { position }));
   }
   if (context.kind === 'single-group' && document !== undefined) {
     if (property === 'width' || property === 'height') {
       const size = {
         ...component.size,
-        [property]: Math.min(value, 1_000_000),
+        [property]: roundScreenGeometry(Math.min(value, 1_000_000)),
       };
       const transaction = createGroupSizeTransaction(document, component.id, size);
       return transaction === undefined ? undefined : success(transaction);
@@ -486,7 +489,9 @@ function createGeometryTransaction(
   }
   if ((property === 'width' || property === 'height') && value > 0) {
     return success(
-      update(component.id, { size: { ...component.size, [property]: Math.min(value, 1_000_000) } }),
+      update(component.id, {
+        size: { ...component.size, [property]: roundScreenGeometry(Math.min(value, 1_000_000)) },
+      }),
     );
   }
   if (property === 'rotation' && value >= -180 && value < 180) {
@@ -513,7 +518,9 @@ function createCanvasTransaction(
   if (!Number.isFinite(value) || value <= 0 || (property !== 'width' && property !== 'height')) {
     return undefined;
   }
-  return success({ commands: [{ type: 'update-canvas', patch: { [property]: value } }] });
+  return success({
+    commands: [{ type: 'update-canvas', patch: { [property]: roundScreenGeometry(value) } }],
+  });
 }
 
 function appendInput(
@@ -921,8 +928,4 @@ function dataSourceFailure(
     ok: false,
     diagnostics: [{ severity: 'error', code, path: [], message }],
   };
-}
-
-function clamp(value: number): number {
-  return Math.max(-1_000_000, Math.min(1_000_000, value));
 }

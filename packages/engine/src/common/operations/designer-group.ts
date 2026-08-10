@@ -7,6 +7,11 @@ import {
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
 } from '@base-screen/core';
+import {
+  clampScreenCoordinate,
+  clampScreenSize,
+  roundScreenGeometry,
+} from './designer-geometry.js';
 
 export function createGroupSizeTransaction(
   document: ScreenDocument,
@@ -35,12 +40,16 @@ export function createGroupSizeTransaction(
     componentIds: [component.id],
     patch: {
       position: {
-        x: clampCoordinate(anchor.x + (component.position.x - anchor.x) * scaleX),
-        y: clampCoordinate(anchor.y + (component.position.y - anchor.y) * scaleY),
+        x: roundScreenGeometry(
+          clampScreenCoordinate(anchor.x + (component.position.x - anchor.x) * scaleX),
+        ),
+        y: roundScreenGeometry(
+          clampScreenCoordinate(anchor.y + (component.position.y - anchor.y) * scaleY),
+        ),
       },
       size: {
-        width: clampSize(component.size.width * scaleX),
-        height: clampSize(component.size.height * scaleY),
+        width: roundScreenGeometry(clampScreenSize(component.size.width * scaleX)),
+        height: roundScreenGeometry(clampScreenSize(component.size.height * scaleY)),
       },
     },
   }));
@@ -90,8 +99,8 @@ export function createGroupRotationTransaction(
         componentIds: [component.id],
         patch: {
           position: {
-            x: clampCoordinate(nextCenter.x - component.size.width / 2),
-            y: clampCoordinate(nextCenter.y - component.size.height / 2),
+            x: roundScreenGeometry(clampScreenCoordinate(nextCenter.x - component.size.width / 2)),
+            y: roundScreenGeometry(clampScreenCoordinate(nextCenter.y - component.size.height / 2)),
           },
           rotation:
             component.id === groupId ? rotation : normalizeRotation(component.rotation + delta),
@@ -217,10 +226,6 @@ function sameSize(left: ScreenSize, right: ScreenSize): boolean {
 function normalizeRotation(rotation: number): number {
   const normalized = ((((rotation + 180) % 360) + 360) % 360) - 180;
   return Object.is(normalized, -0) ? 0 : normalized;
-}
-
-function clampCoordinate(value: number): number {
-  return Math.max(-1_000_000, Math.min(1_000_000, value));
 }
 
 function clampSize(value: number): number {

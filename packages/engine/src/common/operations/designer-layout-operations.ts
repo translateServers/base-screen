@@ -16,6 +16,7 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
+import { roundScreenGeometry } from './designer-geometry.js';
 import { removeComponentCommands } from './designer-remove-operations.js';
 import { selectedComponents } from './designer-selection.js';
 
@@ -281,8 +282,8 @@ function subtreePositionCommands(
         componentIds: [id],
         patch: {
           position: {
-            x: component.position.x + delta.x,
-            y: component.position.y + delta.y,
+            x: roundScreenGeometry(component.position.x + delta.x),
+            y: roundScreenGeometry(component.position.y + delta.y),
           },
         },
       });

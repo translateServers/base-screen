@@ -1856,6 +1856,93 @@ describe('DesignerGestureController material drop', () => {
     ]);
   });
 
+  it('rounds fractional drop coordinates to two decimals like canvas drags', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    const dataTransfer = {
+      types: [MATERIAL_DRAG_TYPE],
+      getData: () => 'base.rectangle',
+    };
+    canvas.dispatch('drop', {
+      clientX: 30.123,
+      clientY: 40.567,
+      dataTransfer,
+      preventDefault: () => undefined,
+      stopPropagation: () => undefined,
+    } as unknown as PointerEvent);
+
+    const component = transactions[0]?.commands[0] as Extract<
+      ScreenDocumentTransaction['commands'][number],
+      { type: 'add-component' }
+    >;
+    expect(component.component.position).toEqual({ x: 30.12, y: 40.57 });
+  });
+
+  it('rounds created component position and size to two decimal places', () => {
+    vi.stubGlobal('Element', FakeElementBase);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'rectangle',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => ({ rectangle: 'base.rectangle' }),
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 10,
+      preventDefault: () => undefined,
+      target: new FakeElement(),
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 20, clientY: 30 } as PointerEvent);
+    canvas.dispatch('pointerup', {
+      pointerId: 1,
+      clientX: 123.456,
+      clientY: 78.901,
+    } as unknown as PointerEvent);
+
+    const component = transactions[0]?.commands[0] as Extract<
+      ScreenDocumentTransaction['commands'][number],
+      { type: 'add-component' }
+    >;
+    expect(component.component.position).toEqual({ x: 10, y: 10 });
+    expect(component.component.size).toEqual({ width: 113.46, height: 68.9 });
+  });
+
   it('strips snappedX/snappedY from the drop position so the transaction passes fail-closed validation', () => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);

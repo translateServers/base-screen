@@ -21,6 +21,7 @@ import {
   createClipboard,
   createPasteTransaction,
 } from '../../common/operations/designer-clipboard.js';
+import { roundScreenGeometry } from '../../common/operations/designer-geometry.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -151,8 +152,14 @@ export class DesignerPanelController {
       type: entry.manifest.type,
       name: entry.manifest.name,
       parentId: selected[0]?.parentId ?? null,
-      position: { x: bounds.left, y: bounds.top },
-      size: { width: bounds.right - bounds.left, height: bounds.bottom - bounds.top },
+      position: {
+        x: roundScreenGeometry(bounds.left),
+        y: roundScreenGeometry(bounds.top),
+      },
+      size: {
+        width: roundScreenGeometry(bounds.right - bounds.left),
+        height: roundScreenGeometry(bounds.bottom - bounds.top),
+      },
       rotation: 0,
       zIndex: Math.max(...selected.map((component) => component.zIndex)) + 1,
       status: { locked: false, hidden: false },
