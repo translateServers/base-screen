@@ -2,9 +2,11 @@ import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
+  type BaseScreenMaterialEditorDescriptor,
   type BaseScreenMaterialManifest,
   type BaseScreenMaterialTabularDataAdapter,
   type BaseScreenPluginRuntime,
+  parseBaseScreenMaterialEditorDescriptor,
   parseBaseScreenMaterialManifest,
   parseBaseScreenPluginManifest,
 } from '@base-screen/plugin-core';
@@ -18,6 +20,25 @@ export interface BaseScreenMaterialDefinition {
 export interface CreateMaterialDefinitionOptions {
   readonly manifest: BaseScreenMaterialManifest;
   readonly element: BaseScreenMaterialConstructor;
+}
+
+/** 纯数据 builder：把 JSON-safe 的 Descriptor 输入解析为规范形态，不渲染任何 UI。 */
+export function createBaseScreenMaterialEditorDescriptor(
+  input: unknown,
+  options: {
+    readonly propsSchema?: BaseScreenMaterialManifest['propsSchema'];
+    readonly styleSchema?: BaseScreenMaterialManifest['styleSchema'];
+    readonly manifestEvents?: readonly string[];
+    readonly dataBindingRoles?: readonly { readonly id: string }[];
+  } = {},
+): ScreenParseResult<BaseScreenMaterialEditorDescriptor> {
+  return parseBaseScreenMaterialEditorDescriptor(
+    input,
+    options.propsSchema,
+    options.styleSchema,
+    options.manifestEvents,
+    options.dataBindingRoles,
+  );
 }
 
 export function createMaterialDefinition(

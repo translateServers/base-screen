@@ -6,6 +6,7 @@ import type {
   ScreenParseResult,
   ScreenSize,
 } from '@base-screen/contracts';
+import type { BaseScreenMaterialEditorDescriptor } from './editor-descriptor.js';
 
 export const BASE_SCREEN_MATERIAL_EVENT = 'base-screen-material-event' as const;
 
@@ -135,6 +136,8 @@ export interface BaseScreenMaterialManifest {
   readonly dataBinding?: { readonly roles: readonly BaseScreenMaterialDataBindingRole[] };
   readonly designCapabilities: BaseScreenMaterialDesignCapabilities;
   readonly libraryVisible?: boolean;
+  /** 可选：JSON-safe 声明式作者描述（appearance/data/interaction/events）。 */
+  readonly editorDescriptor?: BaseScreenMaterialEditorDescriptor;
 }
 
 export interface BaseScreenMaterialElement extends HTMLElement {

@@ -2,6 +2,16 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import { defineBaseScreenDesigner } from './designer.js';
 import { defineBaseScreenViewer } from './viewer.js';
 
+export type {
+  ScreenAuthoringEditorContext,
+  ScreenAuthoringEditorLimits,
+  ScreenAuthoringRequest,
+  ScreenAuthoringRequestEventDetail,
+  ScreenBlueprintCommitRequest,
+  ScreenComponentTextCommitRequest,
+  ScreenComponentTextTarget,
+} from '@base-screen/contracts';
+export { SCREEN_AUTHORING_REQUEST_EVENT } from '@base-screen/contracts';
 export {
   BASE_SCREEN_DESIGNER_TAG_NAME,
   BaseScreenDesignerElement,

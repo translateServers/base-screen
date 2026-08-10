@@ -13,6 +13,7 @@ import {
   type BaseScreenMaterialPropSchema,
 } from './contracts.js';
 import { PluginDiagnosticCollector } from './diagnostics.js';
+import { parseBaseScreenMaterialEditorDescriptor } from './editor-descriptor.js';
 
 const MAX_MATERIAL_MANIFEST_BYTES = 256 * 1024;
 const MAX_SCHEMA_DEPTH = 16;
@@ -49,6 +50,7 @@ const MANIFEST_FIELDS = new Set([
   'dataBinding',
   'designCapabilities',
   'libraryVisible',
+  'editorDescriptor',
 ]);
 
 export function validateBaseScreenMaterialIdentity(
@@ -92,6 +94,7 @@ export function parseBaseScreenMaterialManifest(
       field !== 'dataBinding' &&
       field !== 'libraryVisible' &&
       field !== 'defaultData' &&
+      field !== 'editorDescriptor' &&
       !Object.hasOwn(manifest, field)
     ) {
       collector.add('PLUGIN_CORE_MANIFEST_FIELD_INVALID', [field], 'Manifest field is required.');
@@ -130,6 +133,21 @@ export function parseBaseScreenMaterialManifest(
   validateDefaultValues(manifest.defaultStyle, styleSchema, ['defaultStyle'], collector);
   validatePropertyPanel(manifest.propertyPanel, propsSchema, collector);
   validateStylePanel(manifest.stylePanel, styleSchema, collector);
+  if (manifest.editorDescriptor !== undefined) {
+    const descriptor = parseBaseScreenMaterialEditorDescriptor(
+      manifest.editorDescriptor,
+      propsSchema,
+      styleSchema,
+      Array.isArray(manifest.events) ? (manifest.events as readonly string[]) : undefined,
+      (manifest.dataBinding as { readonly roles?: readonly { readonly id: string }[] } | undefined)
+        ?.roles,
+    );
+    if (!descriptor.ok) {
+      for (const diagnostic of descriptor.diagnostics) {
+        collector.add(diagnostic.code, diagnostic.path, diagnostic.message);
+      }
+    }
+  }
   if (collector.hasErrors) {
     return collector.failure();
   }

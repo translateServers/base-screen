@@ -50,6 +50,30 @@ export {
   parseBaseScreenChartData,
   parseBaseScreenTableData,
 } from './data-contracts.js';
+export type {
+  BaseScreenMaterialEditorCondition,
+  BaseScreenMaterialEditorConditionOperator,
+  BaseScreenMaterialEditorControl,
+  BaseScreenMaterialEditorDescriptor,
+  BaseScreenMaterialEditorField,
+  BaseScreenMaterialEditorProjection,
+  BaseScreenMaterialEditorSection,
+  BaseScreenMaterialEditorTarget,
+  BaseScreenMaterialEventDescriptor,
+} from './editor-descriptor.js';
+export {
+  MAX_EDITOR_CONDITION_VALUES,
+  MAX_EDITOR_CONDITIONS,
+  MAX_EDITOR_EVENTS,
+  MAX_EDITOR_FIELDS_PER_SECTION,
+  MAX_EDITOR_HELP_LENGTH,
+  MAX_EDITOR_ITEM_FIELDS,
+  MAX_EDITOR_ITEM_PATH_DEPTH,
+  MAX_EDITOR_PATH_DEPTH,
+  MAX_EDITOR_SECTIONS_PER_ZONE,
+  parseBaseScreenMaterialEditorDescriptor,
+  resolveSchema,
+} from './editor-descriptor.js';
 export {
   parseBaseScreenMaterialEventDetail,
   parseBaseScreenMaterialManifest,
