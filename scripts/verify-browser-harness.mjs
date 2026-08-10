@@ -1,4 +1,4 @@
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
 import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 
@@ -717,6 +717,81 @@ try {
           () => window.baseScreenHarness.designer.document.components.length,
         );
         if (beforeImport !== afterImport) throw new Error('BROWSER_HARNESS_IMPORT_CANCEL_FAILED');
+        // 导入错误反馈：无效 JSON 展示诊断明细弹窗，文档保持不变。
+        const beforeInvalidImport = await page.evaluate(
+          () => window.baseScreenHarness.designer.document.components.length,
+        );
+        const invalidChooserPromise = page.waitForEvent('filechooser');
+        await authoringDesigner.locator('[data-menu-toggle="file"]').click();
+        await authoringDesigner
+          .locator('.designer-menu[data-menu="file"] [data-menu-action="import"]')
+          .click();
+        const invalidChooser = await invalidChooserPromise;
+        await invalidChooser.setFiles({
+          name: 'broken.json',
+          mimeType: 'application/json',
+          buffer: Buffer.from('{not json'),
+        });
+        const importErrorDialog = authoringDesigner.getByRole('alertdialog', {
+          name: '\u5bfc\u5165\u5931\u8d25',
+        });
+        await importErrorDialog.waitFor();
+        await assertOverlayContained(authoringDesigner, '[data-import-confirmation]');
+        const importDiagnosticCount = await importErrorDialog.locator('.import-diagnostic').count();
+        const importDiagnosticText = await importErrorDialog
+          .locator('.import-diagnostic')
+          .first()
+          .textContent();
+        const afterInvalidImport = await page.evaluate(
+          () => window.baseScreenHarness.designer.document.components.length,
+        );
+        if (
+          importDiagnosticCount < 1 ||
+          !importDiagnosticText.includes(
+            '\u5bfc\u5165\u6587\u4ef6\u65e0\u6cd5\u89e3\u6790\u3002',
+          ) ||
+          beforeInvalidImport !== afterInvalidImport
+        ) {
+          throw new Error(
+            `BROWSER_HARNESS_IMPORT_ERROR_FEEDBACK_FAILED:${JSON.stringify({
+              importDiagnosticCount,
+              importDiagnosticText,
+              beforeInvalidImport,
+              afterInvalidImport,
+            })}`,
+          );
+        }
+        await importErrorDialog.getByRole('button', { name: '\u5173\u95ed' }).click();
+        if (!(await importErrorDialog.isHidden())) {
+          throw new Error('BROWSER_HARNESS_IMPORT_ERROR_CLOSE_FAILED');
+        }
+        // 导出：文件菜单导出触发浏览器下载 .json，内容与当前文档一致并展示成功通知。
+        const exportDownloadPromise = page.waitForEvent('download');
+        await authoringDesigner.locator('[data-menu-toggle="file"]').click();
+        await authoringDesigner
+          .locator('.designer-menu[data-menu="file"] [data-menu-action="export"]')
+          .click();
+        const exportDownload = await exportDownloadPromise;
+        const exportPath = await exportDownload.path();
+        if (exportPath === null) throw new Error('BROWSER_HARNESS_EXPORT_PATH_MISSING');
+        const exportContents = readFileSync(exportPath, 'utf8');
+        const exportDocumentJson = await page.evaluate(() =>
+          JSON.stringify(window.baseScreenHarness.designer.document),
+        );
+        const exportMatches =
+          stableJson(JSON.parse(exportContents)) === stableJson(JSON.parse(exportDocumentJson));
+        if (!exportDownload.suggestedFilename().endsWith('.json') || !exportMatches) {
+          throw new Error(
+            `BROWSER_HARNESS_EXPORT_DOWNLOAD_FAILED:${JSON.stringify({
+              suggestedFilename: exportDownload.suggestedFilename(),
+              exportMatches,
+            })}`,
+          );
+        }
+        await authoringDesigner
+          .locator('[data-notification-tone="success"]')
+          .filter({ hasText: '\u6587\u6863\u5df2\u5bfc\u51fa\u3002' })
+          .waitFor();
         await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).click();
         await authoringDesigner.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
         await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).focus();
@@ -1442,9 +1517,57 @@ async function assertCanvasPrecision(designer, page) {
   const viewport = designer.locator('[data-viewport]');
   await toggleGridViaMenu(designer);
   if ((await viewport.getAttribute('data-grid')) !== 'false') {
+    // eslint-disable-next-line no-console
+    console.log(
+      'GRID_TOGGLE_FAILED_DIAG',
+      JSON.stringify(
+        await designer.evaluate((host) => {
+          const root = host.shadowRoot;
+          const viewport = root.querySelector('[data-viewport]');
+          const trigger = root.querySelector('[data-menu-toggle="view"]');
+          const menus = [...root.querySelectorAll('[data-menu]')].map((menu) => ({
+            id: menu.dataset.menu,
+            hidden: menu.hidden,
+            items: [...menu.querySelectorAll('[data-menu-action]')].map((item) => ({
+              id: item.dataset.menuAction,
+              hidden: item.hidden,
+              disabled: item.disabled,
+            })),
+          }));
+          return {
+            dataGrid: viewport?.getAttribute('data-grid'),
+            triggerExpanded: trigger?.getAttribute('aria-expanded'),
+            zoom: root.querySelector('[data-zoom]')?.textContent,
+            guides: root.querySelectorAll('.canvas-guide-persistent').length,
+            menus,
+          };
+        }),
+      ),
+    );
     throw new Error('BROWSER_HARNESS_GRID_TOGGLE_FAILED');
   }
+  await assertCanvasAidChecked(designer, 'toggle-grid', 'false');
   await toggleGridViaMenu(designer);
+  if ((await viewport.getAttribute('data-grid')) !== 'true') {
+    throw new Error('BROWSER_HARNESS_GRID_TOGGLE_BACK_FAILED');
+  }
+  await assertCanvasAidChecked(designer, 'toggle-grid', 'true');
+  // 参考线开关（菜单与状态栏共用状态源）：菜单关闭后状态栏开关同步为 false。
+  await toggleCanvasAidViaMenu(designer, 'toggle-guides');
+  if ((await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !== 'false') {
+    throw new Error('BROWSER_HARNESS_GUIDES_TOGGLE_FAILED');
+  }
+  await assertCanvasAidChecked(designer, 'toggle-guides', 'false');
+  await toggleCanvasAidViaMenu(designer, 'toggle-guides');
+  if ((await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !== 'true') {
+    throw new Error('BROWSER_HARNESS_GUIDES_TOGGLE_BACK_FAILED');
+  }
+  await assertCanvasAidChecked(designer, 'toggle-guides', 'true');
+  // 边框参考线开关往返：菜单勾选状态随开关翻转。
+  await toggleCanvasAidViaMenu(designer, 'toggle-border-guides');
+  await assertCanvasAidChecked(designer, 'toggle-border-guides', 'false');
+  await toggleCanvasAidViaMenu(designer, 'toggle-border-guides');
+  await assertCanvasAidChecked(designer, 'toggle-border-guides', 'true');
 
   // 视窗 resize 后标尺必须重绘（canvas 缓冲尺寸与新容器一致、版本号递增）。
   const readRulerVersion = () =>
@@ -2315,7 +2438,32 @@ async function toggleGridViaMenu(designer) {
   await designer.locator('[data-menu-toggle="view"]').click();
   const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
   await viewMenu.locator('[data-submenu-toggle]').click();
-  await viewMenu.locator('[data-submenu] [data-menu-action="toggle-grid"]').click();
+}
+
+// 视图 > 画布辅助子菜单内按操作 id 触发开关。
+async function toggleCanvasAidViaMenu(designer, actionId) {
+  await designer.locator('[data-menu-toggle="view"]').click();
+  const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
+  await viewMenu.locator('[data-submenu-toggle]').click();
+  await viewMenu.locator(`[data-submenu] [data-menu-action="${actionId}"]`).click();
+}
+
+// 打开视图 > 画布辅助子菜单，断言指定开关项勾选状态与真实开关状态一致。
+async function assertCanvasAidChecked(designer, actionId, expected) {
+  await designer.locator('[data-menu-toggle="view"]').click();
+  const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
+  await viewMenu.locator('[data-submenu-toggle]').click();
+  const item = viewMenu.locator(`[data-submenu] [data-menu-action="${actionId}"]`);
+  const checked = await item.getAttribute('aria-checked');
+  if (checked !== expected) {
+    throw new Error(
+      `BROWSER_HARNESS_CANVAS_AID_CHECKED_FAILED:${JSON.stringify({
+        actionId,
+        checked,
+        expected,
+      })}`,
+    );
+  }
 }
 
 async function zoomResetViaMenu(designer) {
@@ -2707,4 +2855,16 @@ async function assertEditableShortcuts(page, designer, input) {
   ) {
     throw new Error(`BROWSER_HARNESS_EDITABLE_SHORTCUT_FAILED: ${JSON.stringify(shortcuts)}`);
   }
+}
+
+// Canonical JSON 比较：键排序后序列化，忽略对象键顺序差异（导出经 serializeCanonicalJson 排序）。
+function stableJson(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableJson).join(',')}]`;
+  }
+  if (value !== null && typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
 }

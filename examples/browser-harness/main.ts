@@ -461,6 +461,8 @@ let envelope = {
   metadata: {},
 };
 let nextSaveFailure: 'PROJECT_CONFLICT' | 'PROJECT_UNAVAILABLE' | undefined;
+// 模拟保存 loading：>0 时让 save 挂起对应毫秒，用于在浏览器里观察保存按钮的 loading（spinner）状态。
+let saveDelayMs = 0;
 designer.projectAdapter = {
   capabilities: { publish: false },
   async load({ projectId }) {
@@ -479,6 +481,7 @@ designer.projectAdapter = {
         };
   },
   async save(request) {
+    if (saveDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, saveDelayMs));
     if (nextSaveFailure !== undefined) {
       const code = nextSaveFailure;
       nextSaveFailure = undefined;
@@ -594,6 +597,9 @@ Object.assign(window, {
       return demo;
     },
     getEnvelope: () => envelope,
+    setSaveDelay: (ms: number) => {
+      saveDelayMs = ms;
+    },
     failNextSave: (code: 'PROJECT_CONFLICT' | 'PROJECT_UNAVAILABLE') => {
       nextSaveFailure = code;
     },
