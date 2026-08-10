@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-05
 > 定位：完整大屏设计器及宿主解耦产品能力的后继增量
-> 前置：[Designer Product Completion](../archive/designer-product-completion/spec.md)、[Designer Engine](../archive/designer-engine/spec.md)、[ADR-0017](../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0018](../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0023](../../decisions/ADR-0023-host-dataset-resource-integration.md)
+> 前置：[Designer Product Completion](../archive/designer-product-completion/spec.md)、[Designer Engine](../archive/designer-engine/spec.md)、[ADR-0017](../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0018](../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0023](../../decisions/ADR-0023-host-dataset-resource-integration.md)、[ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
@@ -60,17 +60,20 @@ SHALL 使用宿主资产引用，不持久化传输细节。
 Designer SHALL 支持 static 与 host-backed 变量、授权资源目录、参数绑定、预览、刷新、取消、去重、超时和迟到
 结果保护。Designer 同时支持宿主数据集目录、字段映射和统一行列数据预览；查询仅发生在初载、依赖变量变化和手动刷新，不支持轮询、分页、运行时排序或筛选。数据集、API、导航和请求类工作流 SHALL 映射为宿主资源或授权动作 intent，不引入可执行网络配置。
 
-### R7：图形 Blueprint
+### R7：Blueprint 表单作者闭环
 
-Blueprint SHALL 同时提供完整键盘表单路径和图形路径：节点/边、合法连线、框选、移动、缩放、MiniMap、搜索、
-配置、模板、编译诊断、问题面板和受限模拟日志。图形路径 SHALL 投影 canonical rule/condition/action，不能创建
-私有执行模型。
+Blueprint SHALL 提供完整键盘表单路径：trigger、condition、action 与递归 value expression 编辑，以及配置、
+模板、编译诊断、问题面板和受限模拟日志，并支持 Core 只读 trace（[Designer Event Blueprint](../designer-event-blueprint/spec.md)）。
+图形路径按 [ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md) 整体延后，表单为唯一作者
+路径。未来恢复图形路径时须重新执行 [ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
+依赖评估；图形路径 SHALL 投影 canonical rule/condition/action，不能创建私有执行模型。
 
 ### R8：依赖准入
 
-图形 Blueprint 和结构化 JSON 编辑各自最多使用一个经过 spike 验证的 specialized dependency。依赖 SHALL 位于
-私有 adapter 后，不泄漏类型，不成为 canonical state，并通过 bundle、license、安全、Shadow DOM、双实例、
-keyboard、cleanup 与移除验证。
+结构化 JSON 编辑槽位维持现状；图形 Blueprint 槽位随 R7 图形路径延后，本期不引入任何 specialized dependency。
+未来图形路径恢复时，最多使用一个经过 spike 验证的 specialized dependency；依赖 SHALL 位于私有 adapter 后，
+不泄漏类型，不成为 canonical state，并通过 bundle、license、安全、Shadow DOM、双实例、keyboard、cleanup 与
+移除验证。
 
 ### R9：产品级质量
 

@@ -33,7 +33,7 @@
 
 - **`engine/browser/` 子层依赖方向（自叶到编排）：** `ui`（图标等纯资源）、`styles`（CSS 层）、`viewport`（画布坐标/辅助线）为叶子，不依赖兄弟子层；`dom`（DOM 节点/自定义元素封装）可依赖 `common/` 与 `ui`，但不得依赖 `controllers`。跨层共享类型应下沉至 `common/` 或由消费方定义最小接口，不得反向导入控制器；`controllers`（编排）为顶层，可依赖 `dom`、`viewport` 与 `common/`。
 - **`engine/common/` 子层依赖方向（自叶到会话）：** `ui-text`、`tools`、`project` 与 `events`（键盘 chord 规范化与默认行为策略）是彼此独立的基础子层，不得互相依赖；`operations`（元素/布局/选区/剪贴板/变换/操作注册/蓝图编排）可依赖 `project`、`tools` 及同层 `operations`；`session`（`DesignerSession`）为编排顶层，可依赖 `project` 与 `operations`。
-- **UI 文案边界：** 用户可见字符串应集中到 `common/ui-text/designer-ui-text.ts`，由 `dom`/`controllers` 消费。新增用户可见文案一律不得内联硬编码，必须收敛到 `designer-ui-text.ts`；现有内联文案应逐步迁移，不得继续扩散。`check-designer-ui.mjs` 已兜底部分文件，约定以全量为准。
+- **UI 文案边界：** 用户可见字符串集中到 `common/ui-text/designer-ui-text.ts`，由 `dom`/`controllers` 消费，不得内联硬编码。`check-designer-ui.mjs`（随 engine lint 运行）会扫描整个 `browser/` 树：字符串字面量中出现 CJK 即失败，且禁止引入 `i18n`/`locale`/`language` 等本地化机制。
 - **renderer 与 designer 职责边界：** `@base-screen/renderer` 只做纯展示（viewer），不含任何编辑/设计逻辑；designer（`engine/browser`）构建在 renderer 之上，renderer 不得依赖或感知 designer。`sdk` 的 `viewer` 与 `designer` 入口分别对应这两条职责线。
 - **plugin 三层边界：** `plugin-core`（契约与共享类型）是唯一契约层；`plugin-manager`（运行时加载/管理）与 `plugin-sdk`（插件作者面）可依赖 `contracts` 与 `plugin-core`，二者不得互相依赖；`plugin-sdk` 是对 `plugin-core` 的作者友好门面，不承载运行时管理逻辑。
 - **material 与 renderer 边界：** 物料契约、manifest 类型与校验由 `plugin-core` 拥有；`@base-screen/material` 提供官方物料实现及其 manifest/注册；`@base-screen/renderer` 只通过 `plugin-core` 的 catalog 与 material element 契约执行渲染，不依赖具体官方物料。
@@ -48,8 +48,8 @@
 
 ## 文档与出处
 
-- 功能 Spec 存放在 `docs/specs/<kebab-case-feature>/`；计划存放在 `docs/plans/<kebab-case-feature>/`。保持它们有版本管理，不要把工作流输出留在 `.trae/` 中。
-- 遵循 `docs/specs/README.md`：实现不得悄悄偏离活动的 Spec；公共边界变更需要先更新相关的 ADR/Spec。
+- 功能 Spec 存放在 `docs/specs/<kebab-case-feature>/`（`spec.md`、`tasks.md`、`checklist.md`、`test-matrix.md` 一套）；计划存放在 `docs/plans/<kebab-case-feature>/`；ADR 存放在 `docs/decisions/`。保持它们有版本管理，不要把工作流输出留在 `.trae/` 中。
+- 遵循 `docs/specs/README.md`：只有“生效中”的 Spec 可授权实现；实现不得悄悄偏离活动的 Spec；公共边界变更需要先更新相关的 ADR/Spec。
 - **持久化 Spec 执行。** 当用户要求实现、执行、完成或整改某个活动的 Spec 时，把它的 `tasks.md` 和 `checklist.md` 当作完成状态机。只要还有任何适用项未勾选，就不要发送最终/完成回复。某个聚焦检查通过、`pnpm verify:m0` 通过或完成一个 Task 只是证据，并不代表 Spec 已完成。
 - **硬性 final 门槛。** 活动 Spec 存在时，`final` 只能在以下条件全部满足后发送：所有适用的顶层 Task 和子项、所有适用 checklist 项均为 `[x]`；测试矩阵已反映当前 case；必需质量门已通过。发送前必须执行 `rg -n "^- \[ \]" docs/specs/<feature>/{tasks,checklist}.md` 或等效逐文件检查。命令找到任何未勾选项时，禁止发送 `final`，即使用户只询问阶段性结果或某个 Task 已完成。
 - **恢复与继续门槛。** 任何继续、恢复、上下文压缩后的后续回合，先读取活动 Spec 的 `tasks.md`、`checklist.md` 和测试矩阵，确认第一个未勾选的适用项；将其标记为唯一进行中事项后立即继续执行。阶段性更新只能使用 `commentary`，不得以完成语气替代执行。除非用户明确暂停、转向其他工作或出现需要用户决策的阻塞，否则不得在一个已开始的活动 Spec 中止于状态报告或单个 Task。
@@ -60,5 +60,6 @@
 
 - **高内聚、低耦合。** 相关逻辑应聚合在同一模块/包内，跨模块只通过明确、最小化的公共接口交互；模块不得依赖其内部实现细节或兄弟模块的实现。职责单一，避免聚合体（god object）与循环依赖。上述分层（`common`/`browser`）、跨包公共导出以及依赖边界检查，都是本约定的具体落地。
 - Biome 是唯一的格式化/检查工具：2 个空格、LF、单引号、分号、100 列行宽。使用 `pnpm format` 应用格式化；不要为样式添加 ESLint 或 Prettier。
+- **样式稳定性：不得出现抖动。** Designer/Viewer 样式改动不得引入视觉抖动（jitter/flicker），包括但不限于：布局在初次渲染或数据/状态变化时发生位移、滚动条出现/消失导致内容跳动、hover/active 状态改变几何或边框宽度、字体加载后文本换行重排、主题切换时出现闪烁或回退。判定与做法：几何变化只允许由状态切换或过渡动画驱动；避免在布局/绘制路径上依赖异步加载资源（字体、图片、字体测量）；`overflow: auto/scroll` 容器应预留稳定轨道；不使用会改变元素尺寸的 hover 样式（改用 `outline`/`box-shadow`/`transform` 等不触发 reflow 的方式）；主题/Token 变化走单一 style node 原子更新，不逐属性打补丁。
 - 测试自定义校验、转换、区分/条件 schema、安全辅助函数、服务分支和 hook 状态转换。不要添加只重复内置 Zod 校验或默认未知键剥离行为的测试。
 - 文件大小阈值是审查信号：领域/运行时模块以 300 行为目标，超过 500 行拆分；UI 控制器以 250 行为目标，超过 400 行拆分；契约/schema 文件以 400 行为目标，超过 600 行拆分；测试以 500 行为目标，超过 800 行拆分。生成/纯数据产物可豁免，但必须注明其生成器或权威来源。
