@@ -40,12 +40,15 @@ export function renderDesignerEventsPanel(
   const focused = interaction.focusedComponentId;
   const rules =
     document?.blueprint.rules.filter((rule) => rule.trigger.componentId === focused) ?? [];
+
+  const summarySection = appendSection(panel, DESIGNER_UI_TEXT.blueprint.summaryTitle);
   const summary = panel.ownerDocument.createElement('p');
+  summary.className = 'designer-blueprint-summary';
   summary.textContent =
     focused === null
       ? DESIGNER_UI_TEXT.blueprint.noComponent
       : DESIGNER_UI_TEXT.blueprint.ruleCount(rules.length);
-  panel.appendChild(summary);
+  summarySection.appendChild(summary);
 
   const events = getDesignerFocusedMaterialEvents(document, interaction, catalog);
   const descriptors = getDesignerFocusedEventDescriptors(document, interaction, catalog);
@@ -55,6 +58,7 @@ export function renderDesignerEventsPanel(
   );
   if (events.length > 0) {
     const eventList = panel.ownerDocument.createElement('ul');
+    eventList.className = 'designer-inspector-summary';
     for (const eventName of events) {
       const item = panel.ownerDocument.createElement('li');
       const descriptor = descriptors.find((candidate) => candidate.name === eventName);
@@ -80,20 +84,33 @@ export function renderDesignerEventsPanel(
       }
       eventList.appendChild(item);
     }
-    panel.appendChild(eventList);
+    summarySection.appendChild(eventList);
   }
 
+  const editorSection = appendSection(panel, DESIGNER_UI_TEXT.blueprint.editorTitle);
   const open = createButton(panel.ownerDocument, DESIGNER_UI_TEXT.blueprint.editInHost);
   open.dataset.action = 'open-blueprint';
   open.disabled = !capabilityAvailable;
   open.title = DESIGNER_UI_TEXT.blueprint.hostEditorHint;
-  panel.appendChild(open);
+  editorSection.appendChild(open);
   if (!capabilityAvailable) {
     const unavailable = panel.ownerDocument.createElement('p');
+    unavailable.className = 'designer-field-message';
     unavailable.setAttribute('role', 'status');
     unavailable.textContent = DESIGNER_UI_TEXT.blueprint.unavailable;
-    panel.appendChild(unavailable);
+    editorSection.appendChild(unavailable);
   }
+}
+
+function appendSection(parent: HTMLElement, title: string): HTMLElement {
+  const section = parent.ownerDocument.createElement('section');
+  section.className = 'designer-inspector-section';
+  const heading = parent.ownerDocument.createElement('h3');
+  heading.className = 'designer-inspector-section-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+  parent.appendChild(section);
+  return section;
 }
 
 export function renderDesignerBlueprintSnapshot(

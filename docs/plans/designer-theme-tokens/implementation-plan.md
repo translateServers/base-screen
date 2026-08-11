@@ -1,9 +1,9 @@
 # Designer 外部样式 Token 实施计划
 
-> 状态：待评审
+> 状态：已实现
 > 日期：2026-08-06
 > 适用范围：`@base-screen/engine` 的 Designer Shadow DOM chrome
-> 前置依据：[Designer Workbench Control Styles](../../specs/archive/designer-workbench-control-styles/spec.md)、[ADR-0017](../../decisions/ADR-0017-designer-product-host-boundaries.md)、[仓库指南](../../../AGENTS.md)
+> 前置依据：[Designer Workbench Control Styles](../../specs/archive/designer-workbench-control-styles/spec.md)、[ADR-0017](../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0024](../../decisions/ADR-0024-designer-public-style-tokens.md)（已接受）、[Designer Theme Tokens](../../specs/designer-theme-tokens/spec.md)（生效中）、[仓库指南](../../../AGENTS.md)
 
 ## 1. 目标
 

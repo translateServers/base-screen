@@ -88,10 +88,23 @@ function appendComponentControls(
   const { component, manifest } = context;
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
   appendInput(geometry, DESIGNER_UI_TEXT.propertiesPanel.name, 'name', component.name);
-  appendInput(geometry, DESIGNER_UI_TEXT.propertiesPanel.x, 'x', component.position.x, 'number');
-  appendInput(geometry, DESIGNER_UI_TEXT.propertiesPanel.y, 'y', component.position.y, 'number');
+  const geometryGrid = appendFieldGrid(geometry);
   appendInput(
-    geometry,
+    geometryGrid,
+    DESIGNER_UI_TEXT.propertiesPanel.x,
+    'x',
+    component.position.x,
+    'number',
+  );
+  appendInput(
+    geometryGrid,
+    DESIGNER_UI_TEXT.propertiesPanel.y,
+    'y',
+    component.position.y,
+    'number',
+  );
+  appendInput(
+    geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.width,
     'width',
     component.size.width,
@@ -99,7 +112,7 @@ function appendComponentControls(
     '1',
   );
   appendInput(
-    geometry,
+    geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.height,
     'height',
     component.size.height,
@@ -107,7 +120,7 @@ function appendComponentControls(
     '1',
   );
   appendInput(
-    geometry,
+    geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.rotation,
     'rotation',
     component.rotation,
@@ -115,7 +128,7 @@ function appendComponentControls(
     '-180',
   );
   appendInput(
-    geometry,
+    geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.zIndex,
     'zIndex',
     component.zIndex,
@@ -123,14 +136,15 @@ function appendComponentControls(
     '0',
   );
   const status = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.status);
+  const statusGrid = appendFieldGrid(status);
   appendCheckbox(
-    status,
+    statusGrid,
     DESIGNER_UI_TEXT.propertiesPanel.locked,
     'locked',
     component.status.locked,
   );
   appendCheckbox(
-    status,
+    statusGrid,
     DESIGNER_UI_TEXT.propertiesPanel.hidden,
     'hidden',
     component.status.hidden,
@@ -192,6 +206,7 @@ function appendGroupOverview(
 ): void {
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupSummary);
   const list = properties.ownerDocument.createElement('ul');
+  list.className = 'designer-inspector-summary';
   appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.group);
   appendListItem(
     list,
@@ -232,6 +247,7 @@ function appendMultiSelectionControls(
 ): void {
   const summary = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionSummary);
   const list = properties.ownerDocument.createElement('ul');
+  list.className = 'designer-inspector-summary';
   appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.multiSelect(context.summary.count));
   appendListItem(
     list,
@@ -838,6 +854,13 @@ function appendSection(parent: HTMLElement, title: string): HTMLElement {
   section.appendChild(heading);
   parent.appendChild(section);
   return section;
+}
+
+function appendFieldGrid(parent: HTMLElement): HTMLElement {
+  const grid = parent.ownerDocument.createElement('div');
+  grid.className = 'designer-field-grid';
+  parent.appendChild(grid);
+  return grid;
 }
 
 function appendListItem(parent: HTMLElement, text: string): void {

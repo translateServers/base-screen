@@ -1,8 +1,8 @@
 .designer-field {
   display: grid;
   gap: var(--designer-space-2);
-  margin-bottom: var(--designer-space-5);
-  color: var(--designer-text-secondary);
+  margin-bottom: var(--designer-space-4);
+  color: var(--designer-text-muted);
   font: var(--designer-font-small);
 }
 
@@ -12,15 +12,58 @@
   white-space: nowrap;
 }
 
+.designer-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-3);
+  margin-bottom: var(--designer-space-4);
+}
+
+.designer-field-grid .designer-field {
+  margin-bottom: 0;
+}
+
+.designer-field:has(> .designer-checkbox) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--designer-space-1) var(--designer-space-3);
+  min-height: var(--designer-control-height-compact);
+  cursor: pointer;
+}
+
+.designer-field:has(> .designer-checkbox) .designer-field-message {
+  flex-basis: 100%;
+}
+
 .designer-inspector-section {
-  margin-bottom: var(--designer-space-6);
+  padding: var(--designer-space-4) 0;
+}
+
+.designer-inspector-section + .designer-inspector-section {
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
+.designer-inspector-section:first-child {
+  padding-top: 0;
 }
 
 .designer-inspector-section-title {
-  margin: 0 0 var(--designer-space-4);
-  color: var(--designer-text-primary);
+  margin: 0 0 var(--designer-space-3);
+  color: var(--designer-text-secondary);
   font: var(--designer-font-small);
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.designer-inspector-summary {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin: 0;
+  padding: 0;
+  color: var(--designer-text-muted);
+  list-style: none;
 }
 
 .designer-field-message {
@@ -29,15 +72,19 @@
   white-space: normal;
 }
 
+.designer-field-message:empty {
+  display: none;
+}
+
 .designer-control {
   box-sizing: border-box;
   min-width: 0;
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-control);
   background-color: var(--designer-surface-control);
-  box-shadow: inset 0 1px 2px rgb(0 0 0 / 12%);
   color: var(--designer-text-primary);
   font: inherit;
+  caret-color: var(--designer-accent);
   transition:
     border-color var(--designer-motion),
     background-color var(--designer-motion),
@@ -110,9 +157,17 @@
 .designer-textarea:focus,
 .designer-color:focus {
   border-color: var(--designer-accent);
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 12%),
-    0 0 0 3px color-mix(in srgb, var(--designer-accent) 24%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--designer-accent) 35%, transparent);
+  outline: none;
+  background-color: var(--designer-surface-control);
+}
+
+.designer-input:focus:hover,
+.designer-select:focus:hover,
+.designer-textarea:focus:hover,
+.designer-color:focus:hover {
+  border-color: var(--designer-accent);
+  background-color: var(--designer-surface-control);
 }
 
 .designer-control:focus-visible,
@@ -120,6 +175,13 @@
 .designer-checkbox:focus-visible {
   outline: 2px solid var(--designer-focus-ring);
   outline-offset: 2px;
+}
+
+.designer-input:focus-visible,
+.designer-select:focus-visible,
+.designer-textarea:focus-visible,
+.designer-color:focus-visible {
+  outline: none;
 }
 
 .designer-control:disabled {
@@ -142,11 +204,28 @@
   );
 }
 
+.designer-control[aria-invalid="true"]:hover:not(:disabled) {
+  border-color: var(--designer-danger);
+}
+
 .designer-control[aria-invalid="true"]:focus {
   border-color: var(--designer-danger);
-  box-shadow:
-    inset 0 1px 2px rgb(0 0 0 / 12%),
-    0 0 0 3px color-mix(in srgb, var(--designer-danger) 24%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--designer-danger) 35%, transparent);
+  outline: none;
+  background-color: color-mix(
+    in srgb,
+    var(--designer-danger-surface) 35%,
+    var(--designer-surface-control)
+  );
+}
+
+.designer-control[aria-invalid="true"]:focus:hover {
+  border-color: var(--designer-danger);
+  background-color: color-mix(
+    in srgb,
+    var(--designer-danger-surface) 35%,
+    var(--designer-surface-control)
+  );
 }
 
 .designer-checkbox {

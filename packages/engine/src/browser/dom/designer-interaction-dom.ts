@@ -100,6 +100,7 @@ function appendCapabilitySection(
   heading.className = 'designer-inspector-section-title';
   heading.textContent = title;
   const list = panel.ownerDocument.createElement('ul');
+  list.className = 'designer-inspector-summary';
   for (const capability of capabilities) {
     const item = panel.ownerDocument.createElement('li');
     item.textContent = capability;

@@ -786,6 +786,33 @@
   padding: var(--designer-space-5);
 }
 
+.inspector-pane > p,
+.inspector-pane .designer-blueprint-summary {
+  margin: 0 0 var(--designer-space-3);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 1.55;
+}
+
+.inspector-pane ul:not([class]),
+.inspector-pane ol:not([class]) {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin: 0 0 var(--designer-space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.inspector-pane ul:not([class]) li,
+.inspector-pane ol:not([class]) li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--designer-space-2);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
 .rail-content[hidden],
 .inspector-tabs[hidden],
 .inspector-pane[hidden],
@@ -896,7 +923,20 @@
 .designer-data-source-panel h3,
 .designer-data-source-panel h4 {
   margin: 0;
+}
+
+.designer-data-source-panel h3 {
   color: var(--designer-text-primary);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.designer-data-source-panel h4 {
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .designer-data-source-segmented {

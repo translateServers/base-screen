@@ -343,6 +343,8 @@ export const DESIGNER_UI_TEXT = {
     operationFailed: '操作未完成，请重试。',
   },
   blueprint: {
+    summaryTitle: '事件概览',
+    editorTitle: '蓝图编辑',
     noComponent: '选择组件以查看事件规则。',
     ruleCount: (count: number) => `当前组件有 ${count} 条事件规则。`,
     ruleListItem: (eventName: string, count: number) => `${eventName}：${count} 条规则`,
