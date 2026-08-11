@@ -7,6 +7,7 @@
 - [x] Initial generation refuses overwrite and guarded update refuses unmarked directories.
 - [x] Generated Skill supports creation and targeted revision instructions, explicit registration, verification scripts, diff auditing, and catalog refresh handoff.
 - [x] Generated validator rejects invalid manifests and existing catalog type conflicts through public parsers.
+- [x] Generated validator resolves public parsers from installed host workspace packages through ESM `exports` entries, with a Base Screen checkout `dist` fallback.
 - [x] Native, React, and Vue route references state the current adapter and event boundaries.
 - [x] Test matrix maps every requirement to automated evidence.
 - [x] Relevant focused tests and quality checks pass: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` (821 tests), `pnpm build`, `pnpm check:packages`, `pnpm check:boundaries`, `pnpm check:api`, `pnpm check:engine-import`, and `pnpm verify:tarball`; no applicable task or checklist item remains unchecked.

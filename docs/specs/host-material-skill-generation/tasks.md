@@ -13,5 +13,6 @@
 - [x] Implement the generated public-ABI manifest validator and authoring workflow.
   - [x] Validate manifest/defaults and catalog type conflicts through public parsers.
   - [x] Document native, React, Vue, adapter, event, descriptor, and explicit registration routes.
-- [x] Add focused fixtures and automated tests for deterministic generation, invalid input, all framework routes, guarded updates, and generated manifest validation.
+  - [x] Resolve public parsers from installed host workspace `@base-screen/*` packages via ESM `exports` entries, falling back to a Base Screen checkout `dist` (R5).
+- [x] Add focused fixtures and automated tests for deterministic generation, invalid input, all framework routes, guarded updates, generated manifest validation, and host workspace package resolution.
 - [x] Run Skill validation, focused tests, and required repository quality gates; update the test matrix and checklist with evidence.

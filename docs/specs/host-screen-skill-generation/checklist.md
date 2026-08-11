@@ -8,5 +8,6 @@
 - [x] Generated Skill supports creation and targeted revision instructions with literal parameters and empty variables/Blueprint rules.
 - [x] Generated validator rejects unknown materials/resources/datasets/fields, bad schemas, unsupported capabilities, bad parents, variable parameters, and invalid bindings.
 - [x] Generated validator reports layout warnings without hiding structural errors.
+- [x] Generated validator resolves public parsers from installed host workspace packages through ESM `exports` entries, with a Base Screen checkout `dist` fallback.
 - [x] Test matrix maps every requirement to automated evidence.
 - [x] `pnpm verify:m0` passes, and no applicable task or checklist item remains unchecked.

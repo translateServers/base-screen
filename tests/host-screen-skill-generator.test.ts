@@ -109,6 +109,55 @@ describe('host screen Skill generator', () => {
     await rm(unmarked, { recursive: true, force: true });
   });
 
+  it('resolves ESM-only host packages from the workspace node_modules', async () => {
+    const workspace = await temporaryDirectory('base-screen-host-workspace');
+    const packageRoot = join(workspace, 'node_modules', '@base-screen', 'contracts');
+    await mkdir(join(packageRoot, 'dist'), { recursive: true });
+    await writeFile(
+      join(packageRoot, 'package.json'),
+      `${JSON.stringify(
+        {
+          name: '@base-screen/contracts',
+          version: '0.0.0',
+          type: 'module',
+          exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeFile(
+      join(packageRoot, 'dist', 'index.js'),
+      'export const parseScreenDocument = () => ({ ok: true, value: {}, diagnostics: [] });\n',
+    );
+    await writeFile(join(workspace, 'package.json'), '{}\n');
+
+    const validator = await import(
+      pathToFileURL(
+        join(
+          TEST_DIR,
+          '..',
+          'skills',
+          'create-base-screen-host-skill',
+          'assets',
+          'host-skill-template',
+          'scripts',
+          'validate-screen-document.mjs',
+        ),
+      ).href
+    );
+    const entry = await validator.resolveHostPackageEntry(
+      '@base-screen/contracts',
+      pathToFileURL(join(workspace, 'package.json')),
+    );
+    expect(
+      entry.endsWith(join('node_modules', '@base-screen', 'contracts', 'dist', 'index.js')),
+    ).toBe(true);
+    await expect(import(pathToFileURL(entry).href)).resolves.toHaveProperty('parseScreenDocument');
+
+    await rm(workspace, { recursive: true, force: true });
+  });
+
   it('validates a generated document against catalog, schema, and binding roles', async () => {
     const bundle = await copyBundle();
     const output = await temporaryDirectory('base-screen-host-validator');

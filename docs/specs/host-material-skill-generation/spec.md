@@ -52,8 +52,14 @@ defaults, props/style schemas, editor descriptors, data-binding roles, and catal
 The generated instructions SHALL describe native, React, and Vue bridge constraints, including the
 current adapter boundary and the standard material event.
 
+### R5: Host workspace package resolution
+
+The generated validator SHALL load the public parsers from the host workspace's installed `@base-screen/*`
+packages when present, resolving ESM-only `exports` entries from the workspace `package.json`; otherwise it
+SHALL fall back to a Base Screen checkout's built package `dist`.
+
 ## Completion definition
 
-R1–R4 have focused automated evidence, the meta and generated Skills pass Skill validation, all
+R1–R5 have focused automated evidence, the meta and generated Skills pass Skill validation, all
 generator and validator tests pass, relevant repository quality gates pass, and every applicable
 checklist item is checked.

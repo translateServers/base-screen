@@ -52,7 +52,13 @@ validation, parent-child capability checks, resource `configSchema` checks, data
 material binding-role validation. It SHALL return nonzero for errors and may report out-of-canvas layout
 as an advisory warning.
 
+### R6: Host workspace package resolution
+
+The generated validator SHALL load the public parsers from the host workspace's installed `@base-screen/*`
+packages when present, resolving ESM-only `exports` entries from the workspace `package.json`; otherwise it
+SHALL fall back to a Base Screen checkout's built package `dist`.
+
 ## Completion definition
 
-R1–R5 have focused automated evidence, the generated Skill passes `quick_validate.py`, the relevant
+R1–R6 have focused automated evidence, the generated Skill passes `quick_validate.py`, the relevant
 repository quality gates pass, and all applicable checklist items are checked.

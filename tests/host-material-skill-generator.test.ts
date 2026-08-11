@@ -119,6 +119,57 @@ describe('host material Skill generator', () => {
     await rm(bundle, { recursive: true, force: true });
   });
 
+  it('resolves ESM-only host packages from the workspace node_modules', async () => {
+    const workspace = await temporaryDirectory('base-screen-material-workspace');
+    const packageRoot = join(workspace, 'node_modules', '@base-screen', 'plugin-core');
+    await mkdir(join(packageRoot, 'dist'), { recursive: true });
+    await writeFile(
+      join(packageRoot, 'package.json'),
+      `${JSON.stringify(
+        {
+          name: '@base-screen/plugin-core',
+          version: '0.0.0',
+          type: 'module',
+          exports: { '.': { types: './dist/index.d.ts', import: './dist/index.js' } },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    await writeFile(
+      join(packageRoot, 'dist', 'index.js'),
+      'export const parseBaseScreenMaterialManifest = () => ({ ok: true, value: {}, diagnostics: [] });\n',
+    );
+    await writeFile(join(workspace, 'package.json'), '{}\n');
+
+    const validator = await import(
+      pathToFileURL(
+        join(
+          TEST_DIR,
+          '..',
+          'skills',
+          'create-base-screen-host-material-skill',
+          'assets',
+          'host-material-skill-template',
+          'scripts',
+          'validate-material-definition.mjs',
+        ),
+      ).href
+    );
+    const entry = await validator.resolveHostPackageEntry(
+      '@base-screen/plugin-core',
+      pathToFileURL(join(workspace, 'package.json')),
+    );
+    expect(
+      entry.endsWith(join('node_modules', '@base-screen', 'plugin-core', 'dist', 'index.js')),
+    ).toBe(true);
+    await expect(import(pathToFileURL(entry).href)).resolves.toHaveProperty(
+      'parseBaseScreenMaterialManifest',
+    );
+
+    await rm(workspace, { recursive: true, force: true });
+  });
+
   it('guards overwrite and validates a generated manifest through public parsers', async () => {
     const bundle = await copyBundle();
     const output = await temporaryDirectory('base-screen-material-output');

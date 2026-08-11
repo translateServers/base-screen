@@ -12,5 +12,6 @@
 - [x] Implement the generated Screen Document validator.
   - [x] Check canonical/core semantics, catalog identities, props/style, parent capabilities, data capabilities, parameters, and bindings.
   - [x] Add advisory out-of-canvas diagnostics.
-- [x] Add focused fixtures and automated tests for valid generation, invalid snapshots, deterministic output, update rollback, and document validation.
+  - [x] Resolve public parsers from installed host workspace `@base-screen/*` packages via ESM `exports` entries, falling back to a Base Screen checkout `dist` (R6).
+- [x] Add focused fixtures and automated tests for valid generation, invalid snapshots, deterministic output, update rollback, document validation, and host workspace package resolution.
 - [x] Run Skill validation, focused tests, forward tests, and required repository quality gates; update the test matrix and checklist with evidence.

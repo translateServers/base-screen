@@ -1,10 +1,23 @@
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { dirname, resolve } from 'node:path';
+import { findPackageJSON } from 'node:module';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = resolve(SCRIPT_DIR, '..');
+
+export async function resolveHostPackageEntry(packageName, basePackageJsonUrl) {
+  const packageJsonPath = findPackageJSON(packageName, basePackageJsonUrl);
+  const manifest = JSON.parse(await readFile(packageJsonPath, 'utf8'));
+  const target = manifest.exports?.['.'];
+  let entry;
+  if (typeof target === 'string') entry = target;
+  else if (target !== undefined && target !== null && typeof target === 'object')
+    entry = target.import ?? target.default;
+  if (typeof entry === 'string') return join(dirname(packageJsonPath), entry);
+  if (typeof manifest.main === 'string') return join(dirname(packageJsonPath), manifest.main);
+  return join(dirname(packageJsonPath), 'index.js');
+}
 
 const SECRET_PATTERN =
   /(-----BEGIN (?:PRIVATE KEY|OPENSSH PRIVATE KEY)-----|(?:password|secret|token|api[_-]?key|authorization)\s*[:=])/iu;
@@ -96,8 +109,9 @@ async function loadPublicApis() {
 
 async function loadModule(packageName, fallback) {
   try {
-    const require = createRequire(resolve(process.cwd(), 'package.json'));
-    return await import(pathToFileURL(require.resolve(packageName)).href);
+    const base = pathToFileURL(resolve(process.cwd(), 'package.json'));
+    const entry = await resolveHostPackageEntry(packageName, base);
+    return await import(pathToFileURL(entry).href);
   } catch {
     return import(pathToFileURL(resolve(fallback)).href);
   }
