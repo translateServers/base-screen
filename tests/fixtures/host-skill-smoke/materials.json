@@ -1,0 +1,51 @@
+[
+  {
+    "type": "acme.text",
+    "tagName": "acme-text",
+    "name": "Text",
+    "category": "content",
+    "keywords": ["text"],
+    "defaultSize": { "width": 240, "height": 48 },
+    "defaultProps": {},
+    "defaultData": "Text",
+    "defaultStyle": { "color": "#ffffff" },
+    "styleSchema": {
+      "kind": "object",
+      "properties": { "color": { "kind": "string" } },
+      "required": ["color"]
+    },
+    "stylePanel": [],
+    "propsSchema": { "kind": "object", "properties": {}, "required": [] },
+    "propertyPanel": [],
+    "events": [],
+    "dataCapabilities": ["static"],
+    "designCapabilities": { "resize": true, "rotate": false, "children": false }
+  },
+  {
+    "type": "acme.chart",
+    "tagName": "acme-chart",
+    "name": "Chart",
+    "category": "data",
+    "keywords": ["chart"],
+    "defaultSize": { "width": 480, "height": 280 },
+    "defaultProps": {},
+    "defaultStyle": { "color": "#ffffff" },
+    "styleSchema": {
+      "kind": "object",
+      "properties": { "color": { "kind": "string" } },
+      "required": ["color"]
+    },
+    "stylePanel": [],
+    "propsSchema": { "kind": "object", "properties": {}, "required": [] },
+    "propertyPanel": [],
+    "events": [],
+    "dataCapabilities": ["host-resource"],
+    "dataBinding": {
+      "roles": [
+        { "id": "dimension", "minFields": 1, "maxFields": 1, "valueTypes": ["date", "string"] },
+        { "id": "measures", "minFields": 1, "maxFields": 4, "valueTypes": ["number"] }
+      ]
+    },
+    "designCapabilities": { "resize": true, "rotate": true, "children": false }
+  }
+]

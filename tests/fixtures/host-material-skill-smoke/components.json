@@ -1,0 +1,11 @@
+[
+  {
+    "id": "status-card",
+    "name": "Status card",
+    "framework": "native",
+    "sourcePath": "src/components/status-card.ts",
+    "exportName": "StatusCard",
+    "role": "reference",
+    "notes": "Use for compact KPI cards."
+  }
+]

@@ -1,0 +1,10 @@
+{
+  "hostId": "acme",
+  "hostName": "Acme Operations",
+  "locale": "zh-CN",
+  "defaultCanvas": {
+    "width": 1920,
+    "height": 1080,
+    "backgroundColor": "#07111f"
+  }
+}

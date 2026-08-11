@@ -1,0 +1,19 @@
+{
+  "framework": "native",
+  "workspace": {
+    "rootMarker": "package.json",
+    "packageManager": "pnpm",
+    "verificationScripts": ["typecheck", "test"]
+  },
+  "roots": {
+    "source": "src/materials",
+    "tests": "tests/materials"
+  },
+  "registration": {
+    "mode": "standalone",
+    "file": "src/materials/register.ts",
+    "exportName": "registerAcmeMaterials"
+  },
+  "allowedFiles": ["src/materials/**", "tests/materials/**", "src/materials/register.ts"],
+  "referenceSourcePaths": ["src/materials/text.ts"]
+}

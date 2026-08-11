@@ -1,0 +1,4 @@
+interface:
+  display_name: "创建宿主物料 Skill"
+  short_description: "为宿主生成安全可注册的专属物料创建 Skill"
+  default_prompt: "使用 $create-base-screen-host-material-skill 从宿主快照生成物料创建 Skill。"

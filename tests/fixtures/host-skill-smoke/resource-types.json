@@ -1,0 +1,12 @@
+[
+  {
+    "kind": "dataResourceType",
+    "id": "metrics",
+    "name": "Metrics",
+    "configSchema": {
+      "kind": "object",
+      "properties": { "range": { "kind": "string", "minLength": 1, "maxLength": 16 } },
+      "required": ["range"]
+    }
+  }
+]

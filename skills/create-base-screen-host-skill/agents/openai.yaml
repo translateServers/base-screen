@@ -1,0 +1,4 @@
+interface:
+  display_name: "创建宿主大屏设计 Skill"
+  short_description: "从宿主目录和品牌规范生成专属大屏设计 Skill"
+  default_prompt: "使用 $create-base-screen-host-skill 从宿主物料、资源类型和数据集快照生成专属大屏设计 Skill。"

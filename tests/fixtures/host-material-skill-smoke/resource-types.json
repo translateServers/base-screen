@@ -1,0 +1,13 @@
+[
+  {
+    "kind": "dataResourceType",
+    "id": "metrics",
+    "name": "Metrics",
+    "configSchema": {
+      "kind": "object",
+      "properties": { "range": { "kind": "string" } },
+      "required": ["range"]
+    },
+    "queryScope": "resource"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "resourceType": "metrics",
+    "resourceId": "daily-sales",
+    "name": "Daily sales",
+    "description": "Daily sales metrics",
+    "fields": [
+      { "id": "day", "label": "Day", "valueType": "date" },
+      { "id": "sales", "label": "Sales", "valueType": "number" }
+    ],
+    "parameters": [{ "name": "range", "label": "Range", "editor": "text", "defaultValue": "7d" }]
+  }
+]

@@ -1,0 +1,14 @@
+[
+  {
+    "resourceType": "metrics",
+    "resourceId": "daily-sales",
+    "classification": "sanitized",
+    "dataset": {
+      "fields": [
+        { "id": "day", "label": "Day", "valueType": "date" },
+        { "id": "sales", "label": "Sales", "valueType": "number" }
+      ],
+      "rows": [{ "day": "2026-08-01", "sales": 42 }, { "day": "2026-08-02", "sales": 51 }]
+    }
+  }
+]
