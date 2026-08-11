@@ -493,8 +493,8 @@ async function loadPublicApis() {
 
 async function loadModule(packageName, fallback) {
   try {
-    const require = createRequire(join(process.cwd(), 'package.json'));
-    return await import(pathToFileURL(require.resolve(packageName)).href);
+    const entry = resolveHostPackage(packageName);
+    return await import(pathToFileURL(entry).href);
   } catch {
     try {
       return await import(pathToFileURL(fallback).href);
@@ -504,6 +504,27 @@ async function loadModule(packageName, fallback) {
       );
     }
   }
+}
+
+function resolveHostPackage(packageName) {
+  const roots = [
+    process.env.BASE_SCREEN_HOST_WORKSPACE_ROOT,
+    process.cwd(),
+    join(process.cwd(), 'frontend'),
+  ].filter((root) => typeof root === 'string' && root.length > 0);
+  const seen = new Set();
+  for (const root of roots) {
+    const workspaceRoot = resolve(root);
+    if (seen.has(workspaceRoot)) continue;
+    seen.add(workspaceRoot);
+    try {
+      const require = createRequire(join(workspaceRoot, 'package.json'));
+      return require.resolve(packageName, { conditions: new Set(['node', 'import']) });
+    } catch {
+      // Try the next workspace root, then use the checked-out package as a fallback.
+    }
+  }
+  throw new Error(`Cannot resolve ${packageName} from the host workspace.`);
 }
 
 async function findRepoRoot() {

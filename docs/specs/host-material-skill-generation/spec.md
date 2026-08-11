@@ -41,9 +41,12 @@ replacement with rollback on failure.
 
 The child Skill SHALL guide workspace verification, new material creation, targeted revision, public
 ABI selection, JSON-safe manifests/descriptors/events, focused tests, explicit standalone/plugin
-registration, named verification scripts, and allowlist diff auditing. It SHALL preserve the prior
-catalog when preflight or verification fails and SHALL tell the host to refresh its dashboard Skill
-snapshot after a successful catalog change.
+registration policy, named verification scripts, and allowlist diff auditing. The policy SHALL
+default to `propose`: source and tests may be created, but configured registration targets remain
+unchanged until an explicit apply request. `apply` SHALL update only the configured targets and
+restore them if verification fails. The child Skill SHALL preserve the prior catalog when preflight
+or verification fails and SHALL tell the host to refresh its dashboard Skill snapshot after a
+successful catalog change.
 
 ### R4: Public material contract
 

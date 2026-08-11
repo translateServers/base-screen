@@ -36,15 +36,22 @@ selected framework route.
 6. Add a focused test in the configured test root. Cover initial model rendering, prop/style defaults,
    data-ready and data-error states when applicable, declared event payloads, and adapter behavior.
    Do not test through private Shadow DOM or host services.
-7. Stage source and tests, then update exactly the configured registration file. For standalone mode,
-   call the definition's explicit `define()` result and export the named registration function. For
-   plugin mode, add only the material contribution to the named plugin manifest and keep activation in
-   the host Plugin Manager. Never enumerate `customElements` or load a module from document data.
-8. Run only the declared verification scripts through the configured package manager. If any command
-   fails, restore the registration file and leave the previous catalog state unchanged.
-9. Audit `git diff --name-only` against `allowedFiles` in `workspace.json`; stop if an unrelated file
-   changed. Report the material identity, framework, changed files, checks, and any remaining host
-   follow-up. The host must refresh its dashboard Skill snapshot after a catalog change.
+7. Follow the registration policy in `workspace.json`:
+   - `propose` (the safe default): stage source and tests, keep the configured registration file and
+     plugin manifest unchanged, and report the exact target files plus a unified diff. A later explicit
+     user request may apply that proposal only after rechecking the target contents.
+   - `apply`: after source and tests pass preflight, update exactly the configured registration target.
+     For standalone mode, call the definition's explicit `define()` result and export the named
+     registration function. For plugin mode, add only the material contribution to the named plugin
+     manifest and keep activation in the host Plugin Manager.
+   Never enumerate `customElements` or load a module from document data.
+8. Run only the declared verification scripts through the configured package manager. If an apply
+   operation fails, restore every registration target and leave the previous catalog state unchanged.
+9. Audit `git diff --name-only` against `allowedFiles` in `workspace.json`; in `propose` mode also
+   verify that registration targets are unchanged. Stop if an unrelated file changed. Report the
+   material identity, framework, changed files, checks, registration proposal or application result,
+   and remaining host follow-up. The host must refresh its dashboard Skill snapshot after a catalog
+   change.
 
 ## Data and security rules
 

@@ -5,7 +5,8 @@
 - [x] Resource type `configSchema` and Dataset Descriptor parameter names are checked one-to-one.
 - [x] Generated Skill output is deterministic and includes host rules, one framework route, workspace policy, catalog references, public contract, validator, and marker.
 - [x] Initial generation refuses overwrite and guarded update refuses unmarked directories.
-- [x] Generated Skill supports creation and targeted revision instructions, explicit registration, verification scripts, diff auditing, and catalog refresh handoff.
+- [x] Generated Skill supports creation and targeted revision instructions, explicit registration policy, verification scripts, diff auditing, and catalog refresh handoff.
+- [x] Registration policy defaults to `propose`, leaves configured targets unchanged until explicit apply, and rolls back failed applications.
 - [x] Generated validator rejects invalid manifests and existing catalog type conflicts through public parsers.
 - [x] Generated validator resolves public parsers from installed host workspace packages through ESM `exports` entries, with a Base Screen checkout `dist` fallback.
 - [x] Native, React, and Vue route references state the current adapter and event boundaries.

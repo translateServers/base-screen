@@ -322,6 +322,7 @@ function validateRegistration(input, errors) {
     mode: 'standalone',
     file: 'src/materials/register.ts',
     exportName: 'registerMaterials',
+    policy: 'propose',
   };
   if (!isObject(input)) {
     errors.push('material-authoring.json.registration must contain an object');
@@ -330,7 +331,7 @@ function validateRegistration(input, errors) {
   exactKeys(
     input,
     ['mode', 'file', 'exportName'],
-    ['pluginManifestFile'],
+    ['pluginManifestFile', 'policy'],
     'material-authoring.json.registration',
     errors,
   );
@@ -351,6 +352,9 @@ function validateRegistration(input, errors) {
     errors.push('registration.pluginManifestFile is required for plugin mode');
   if (input.mode === 'standalone' && input.pluginManifestFile !== undefined)
     errors.push('registration.pluginManifestFile is only allowed for plugin mode');
+  const policy = input.policy === undefined ? 'propose' : input.policy;
+  if (policy !== 'propose' && policy !== 'apply')
+    errors.push('registration.policy must be propose or apply');
   return {
     mode: input.mode === 'plugin' ? 'plugin' : 'standalone',
     file: file ?? fallback.file,
@@ -358,6 +362,7 @@ function validateRegistration(input, errors) {
       typeof input.exportName === 'string' && IDENTIFIER.test(input.exportName)
         ? input.exportName
         : fallback.exportName,
+    policy: policy === 'apply' ? 'apply' : 'propose',
     ...(pluginManifestFile === undefined ? {} : { pluginManifestFile }),
   };
 }
@@ -644,7 +649,7 @@ async function renderSkillFiles(bundle) {
 }
 
 function renderHostReference(bundle) {
-  return `# ${bundle.hostName} material rules\n\n- Host identity: \`${bundle.hostId}\`\n- Locale: \`${bundle.locale}\`\n- Authoring framework: \`${bundle.framework}\`\n- Source root: \`${bundle.roots.source}\`\n- Test root: \`${bundle.roots.tests}\`\n- Registration: \`${bundle.registration.mode}\` via \`${bundle.registration.file}\`\n\n## Guidelines\n\n${bundle.guidelines.trim()}\n`;
+  return `# ${bundle.hostName} material rules\n\n- Host identity: \`${bundle.hostId}\`\n- Locale: \`${bundle.locale}\`\n- Authoring framework: \`${bundle.framework}\`\n- Source root: \`${bundle.roots.source}\`\n- Test root: \`${bundle.roots.tests}\`\n- Registration: \`${bundle.registration.mode}\` via \`${bundle.registration.file}\`\n- Registration policy: \`${bundle.registration.policy}\` (missing policy defaults to \`propose\`)\n\n## Guidelines\n\n${bundle.guidelines.trim()}\n`;
 }
 
 async function installSkill(parent, skillName, files, update) {
@@ -724,8 +729,8 @@ async function loadPublicApis() {
 
 async function loadModule(packageName, fallback) {
   try {
-    const require = createRequire(join(process.cwd(), 'package.json'));
-    return await import(pathToFileURL(require.resolve(packageName)).href);
+    const entry = resolveHostPackage(packageName);
+    return await import(pathToFileURL(entry).href);
   } catch {
     try {
       return await import(pathToFileURL(fallback).href);
@@ -735,6 +740,27 @@ async function loadModule(packageName, fallback) {
       );
     }
   }
+}
+
+function resolveHostPackage(packageName) {
+  const roots = [
+    process.env.BASE_SCREEN_HOST_WORKSPACE_ROOT,
+    process.cwd(),
+    join(process.cwd(), 'frontend'),
+  ].filter((root) => typeof root === 'string' && root.length > 0);
+  const seen = new Set();
+  for (const root of roots) {
+    const workspaceRoot = resolve(root);
+    if (seen.has(workspaceRoot)) continue;
+    seen.add(workspaceRoot);
+    try {
+      const require = createRequire(join(workspaceRoot, 'package.json'));
+      return require.resolve(packageName, { conditions: new Set(['node', 'import']) });
+    } catch {
+      // Try the next workspace root, then use the checked-out package as a fallback.
+    }
+  }
+  throw new Error(`Cannot resolve ${packageName} from the host workspace.`);
 }
 
 async function findRepoRoot() {

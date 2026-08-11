@@ -34,10 +34,43 @@ describe('host material Skill generator', () => {
       'Confirm the current directory is the host Git workspace',
     );
     expect(first.files.get('references/framework.md')).toContain('Native Custom Element route');
+    expect(first.files.get('references/workspace.json')).toContain('"policy": "propose"');
+    expect(first.files.get('references/host.md')).toContain('Registration policy: `propose`');
     expect(first.files.get('generation-manifest.json')).toContain(
       'create-base-screen-host-material-skill',
     );
 
+    await rm(bundle, { recursive: true, force: true });
+  });
+
+  it('defaults omitted registration policy to propose and rejects invalid policy', async () => {
+    const bundle = await copyBundle();
+    const authoringFile = join(bundle, 'material-authoring.json');
+    const authoring = await readJson<Record<string, unknown>>(authoringFile);
+    const registration = authoring.registration as Record<string, unknown>;
+    delete registration.policy;
+    await writeFile(authoringFile, `${JSON.stringify(authoring, null, 2)}\n`);
+    const result = await createHostMaterialSkill({ inputDir: bundle, checkOnly: true });
+    expect(result.files.get('references/workspace.json')).toContain('"policy": "propose"');
+
+    registration.policy = 'always';
+    await writeFile(authoringFile, `${JSON.stringify(authoring, null, 2)}\n`);
+    await expect(createHostMaterialSkill({ inputDir: bundle, checkOnly: true })).rejects.toThrow(
+      'registration.policy must be propose or apply',
+    );
+    await rm(bundle, { recursive: true, force: true });
+  });
+
+  it('renders the explicit apply policy without weakening the workflow', async () => {
+    const bundle = await copyBundle();
+    const authoringFile = join(bundle, 'material-authoring.json');
+    const authoring = await readJson<Record<string, unknown>>(authoringFile);
+    (authoring.registration as Record<string, unknown>).policy = 'apply';
+    await writeFile(authoringFile, `${JSON.stringify(authoring, null, 2)}\n`);
+    const result = await createHostMaterialSkill({ inputDir: bundle, checkOnly: true });
+    expect(result.files.get('references/workspace.json')).toContain('"policy": "apply"');
+    expect(result.files.get('SKILL.md')).toContain('`apply`');
+    expect(result.files.get('SKILL.md')).toContain('restore every registration target');
     await rm(bundle, { recursive: true, force: true });
   });
 

@@ -41,7 +41,8 @@ This file is the only source of workspace write authority:
   "registration": {
     "mode": "standalone",
     "file": "src/materials/register.ts",
-    "exportName": "registerAcmeMaterials"
+    "exportName": "registerAcmeMaterials",
+    "policy": "propose"
   },
   "allowedFiles": [
     "src/materials/**",
@@ -53,8 +54,9 @@ This file is the only source of workspace write authority:
 ```
 
 `framework` is exactly one of `native`, `react`, or `vue`; the generated child Skill contains only
-that framework route. `registration.mode` is `standalone` or `plugin`. Plugin registration also
-requires `pluginManifestFile`, which must be listed in `allowedFiles`. `rootMarker` must be a file
+that framework route. `registration.mode` is `standalone` or `plugin`. `registration.policy` is
+`propose` or `apply` and defaults to `propose` when omitted. Plugin registration also requires
+`pluginManifestFile`, which must be listed in `allowedFiles`. `rootMarker` must be a file
 at the workspace root. Verification entries are script names, not shell commands; the child Skill
 invokes them through the declared package manager.
 

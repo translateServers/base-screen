@@ -1,6 +1,6 @@
 ---
 name: create-base-screen-host-material-skill
-description: Generate or refresh a host-specific Codex Skill that creates and registers Base Screen materials in a host workspace from sanitized catalogs, framework rules, component references, and data-resource descriptors. Use when a host needs a reusable Skill for authoring native, React, or Vue materials with guarded source paths, public ABI validation, tests, and explicit registration updates.
+description: Generate or refresh a host-specific Codex Skill that creates or proposes registration for Base Screen materials in a host workspace from sanitized catalogs, framework rules, component references, and data-resource descriptors. Use when a host needs a reusable Skill for authoring native, React, or Vue materials with guarded source paths, public ABI validation, tests, and explicit registration policy.
 ---
 
 # Create a host-specific material Skill
