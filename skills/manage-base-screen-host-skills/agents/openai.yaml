@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage host Base Screen Skills"
+  short_description: "Sync online host catalogs into dashboard and material Skills"
+  default_prompt: "Use $manage-base-screen-host-skills to check or synchronize the host catalog and generated Base Screen Skills."
