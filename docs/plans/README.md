@@ -9,10 +9,11 @@
 | [Designer 依赖候选评估](./designer-dependency-introduction/dependency-evaluation.md) | 调研记录 | Designer 依赖引入计划 |
 | [Moveable 逻辑层移植验证](./designer-moveable-pilot/pilot-plan.md) | 完成 | [Designer Canvas Precision](../specs/designer-canvas-precision/spec.md) |
 | [Designer 事件系统设计评审](./designer-event-system/design-review.md) | 已评审 | [Designer Event System](../specs/designer-event-system/spec.md) |
-| [Designer 外部样式 Token](./designer-theme-tokens/implementation-plan.md) | 待评审 | [Designer Theme Tokens](../specs/designer-theme-tokens/spec.md) |
+| [Designer 外部样式 Token](./designer-theme-tokens/implementation-plan.md) | 已实现 | [Designer Theme Tokens](../specs/designer-theme-tokens/spec.md)（生效中）、[ADR-0024](../decisions/ADR-0024-designer-public-style-tokens.md)（已接受） |
 | [Designer 编组与右侧面板整改](./designer-group-inspector/implementation-plan.md) | 第二轮已实现 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) |
 | [Data Runtime Hardening](./data-runtime-hardening/implementation-plan.md) | 治理已接受，实施进行中 | [Data Runtime Hardening Spec](../specs/data-runtime-hardening/spec.md)（生效中）、[ADR-0025](../decisions/ADR-0025-data-runtime-hardening.md)（已接受） |
 | [Designer Event Blueprint](./designer-event-blueprint/implementation-plan.md) | 已决策（图形延后）；表单实施待启动 | [Designer Event Blueprint Spec](../specs/designer-event-blueprint/spec.md)（生效中）、[ADR-0026](../decisions/ADR-0026-designer-event-blueprint-authoring.md)（已接受） |
 | [轻量 Designer 作者扩展](./designer-authoring-extension/implementation-plan.md) | 草案，不授权实现 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、Material/Blueprint/Host authoring bridge 范围 |
+| [宿主托管物料包](./host-material-package/implementation-plan.md) | 已实现 | [ADR-0029](../decisions/ADR-0029-host-managed-material-package-distribution.md)、[Host Material Package Spec](../specs/host-material-package/spec.md)；[概论评估](./host-material-package/assessment.md) |
 
 实现和验收时，请以 [功能与工程规格](../specs/README.md) 的生效中条目为准。

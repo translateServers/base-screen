@@ -239,3 +239,4 @@ testing       -> 只从外部消费公共包，横向覆盖每个波次
 | P6 SDK 与 Framework Bridge | 已完成：SDK 稳定子路径、React/Vue 物料桥接公共 API、consumer-local 类型增强（React `JSX.IntrinsicElements` / Vue `GlobalComponents`）与 Vanilla/React/Vue tarball consumers 均已由 `pnpm verify:tarball` 与 `pnpm verify:m0` 验证 |
 | P7 动态数据与 DSL | 已完成：当前 Document、Host Resource port、Blueprint compile/dispatch、Nebula importer 与超时/取消/conformance harness 均已由 `pnpm verify:runtime`、`pnpm verify:nebula-import` 和 `pnpm verify:m0` 验证 |
 | M8 不可信插件/远程模块 | 已完成第一阶段：ADR-0008、sandbox iframe、bounded ready/event protocol、超时和处置边界；远程物料 ABI 仍明确不在该协议内 |
+| M9 宿主托管物料包 | 已完成：ADR-0029 与 Host Material Package Spec 生效，plugin-sdk `createMaterialPackage` 注册辅助与 browser-harness 闭环验证；Base Screen 不加载远程代码，宿主交付可信模块 |

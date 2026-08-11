@@ -1,54 +1,89 @@
-# Base Screen 集成指南
+# Base Screen 宿主使用指南
 
-本文面向需要在自己的 Web 应用中使用 Base Screen 的项目开发者，不介绍 Base Screen 仓库本身的开发流程。
+本文面向把 Base Screen 嵌入现有 Web 应用的宿主开发者，说明宿主如何注册运行时、提供
+Screen Document、接入项目存储与数据服务、接收事件，以及托管高级编辑器和自定义物料。
+本文不介绍 Base Screen 仓库本身的开发流程。
 
-Base Screen 提供两类运行时：
+Base Screen 提供两个 Custom Element：
 
-- **Viewer**：把 Screen Document 渲染成只读的可视化页面。
-- **Designer**：在 Viewer 基础上提供拖拽、选中、属性编辑、撤销和重做。
+- `base-screen-viewer`：渲染只读大屏，适合预览页和发布页。
+- `base-screen-designer`：提供当前文档内的画布、选区、检查器、事务、历史和项目会话。
 
-组件和物料通过 Web Components 工作，React、Vue 项目不需要替换应用自身的根框架。
+它们通过公开属性、方法、端口和 Custom Event 与宿主交互，不要求宿主更换 React、Vue 或
+其他应用框架。
 
-## 1. 准备依赖
+## 1. 先明确宿主边界
 
-应用至少需要以下包：
+| Base Screen 负责 | 宿主负责 |
+| --- | --- |
+| Screen Document 的严格契约、解析、序列化和诊断 | 项目存储、目录、业务元数据、revision 和并发控制 |
+| 当前实例内的渲染、编辑事务、撤销和重做 | 认证、授权、租户、路由、业务 Store 和审计 |
+| Material ABI、物料目录和安全的数据结果投影 | 数据查询、聚合、缓存、轮询、ETL 和敏感参数 |
+| 有界请求的取消、deadline 和迟到结果保护 | 资产上传、存储、转码、发布、部署、截图和长任务 |
+| JSON-safe intent、port、method 和 event | 高级 Blueprint、代码和领域配置编辑器 |
+
+Screen Document 只保存可移植的 canonical 数据。URL、SQL、token、请求头、数据库连接、宿主
+服务对象、编辑器 session 和部署配置都不得写入文档。
+
+## 2. 选择接入模式
+
+宿主通常使用以下三种模式之一：
+
+| 场景 | 元素 | 文档来源 | 保存方式 |
+| --- | --- | --- | --- |
+| 发布或只读预览 | Viewer | 宿主加载后赋给 `document` | 不适用 |
+| 临时编辑或由宿主完全控制保存 | Designer | 宿主赋给 `document` | 监听 `base-screen-change` |
+| 有项目 revision 的编辑页 | Designer | `projectAdapter.load()` | `projectAdapter.save()` |
+
+Designer 的直接文档模式和项目模式是两种独立用法。项目模式绑定 `projectAdapter` 并调用
+`load(projectId)`；不要再直接给 `document` 赋值。
+
+## 3. 安装和注册
+
+宿主常用包如下：
 
 ```text
-@base-screen/contracts  文档类型、解析和诊断
-@base-screen/plugin-core 物料目录和物料契约
-@base-screen/sdk        Viewer、Designer 和组合入口
-@base-screen/material   官方基础物料
+@base-screen/sdk          Viewer、Designer 和组合入口
+@base-screen/contracts    文档、宿主端口和诊断类型
+@base-screen/plugin-core  物料目录和运行时 contribution 契约
+@base-screen/material     官方基础物料
 ```
 
-React 或 Vue 自定义物料再增加对应的桥接包：
+按需增加：
 
 ```text
-@base-screen/react
-@base-screen/vue
+@base-screen/plugin-manager  插件激活和 capability 授权
+@base-screen/plugin-sdk      宿主托管物料包
+@base-screen/react           React 物料桥接
+@base-screen/vue             Vue 物料桥接
 ```
 
-当前这些包在仓库中标记为私有包。接入方需要使用项目提供的内部 npm registry、workspace 依赖或构建产物；依赖的具体来源由发布方配置，本文不假设它们已经发布到公共 npm。
+当前包标记为私有包。宿主需要通过组织内部 registry、workspace 依赖或发布方提供的构建产物
+获取，不能假设它们已经发布到公共 npm。
 
-## 2. 初始化运行时
-
-在浏览器环境中，应用启动时注册 SDK 元素和官方物料：
+在浏览器启动代码中注册一次 Viewer、Designer 和官方物料：
 
 ```ts
 import '@base-screen/sdk/auto-register';
 import '@base-screen/material/auto-register';
 ```
 
-这两个入口分别注册：
+只使用 Viewer 时，可以缩小注册范围：
 
-- `base-screen-viewer`
-- `base-screen-designer`
-- 官方 `base.*` 物料 Custom Element
+```ts
+import '@base-screen/sdk/viewer/auto-register';
+import '@base-screen/material/auto-register';
+```
 
-如果应用需要处理注册失败、只注册部分物料，使用显式注册 API。自动注册入口应只在浏览器启动代码中执行一次。
+需要处理注册诊断或只注册部分物料时，改用 `defineBaseScreenViewer()`、
+`defineBaseScreenDesigner()` 和各物料的 `define*()` API。
 
-## 3. 创建物料目录
+## 4. 创建物料目录
 
-Viewer 和 Designer 通过物料目录查找文档中的 `type`。自动注册 Custom Element 不会自动创建目录，应用仍需要把要使用的物料加入目录：
+注册 Custom Element 不会自动创建物料目录。每个 Viewer/Designer 都必须获得一个目录，且
+目录要包含当前文档可能出现的全部物料 `type`。
+
+下面是只支持文本和矩形的最小目录：
 
 ```ts
 import {
@@ -71,300 +106,516 @@ const catalog = createBaseScreenMaterialCatalog([
 ]);
 ```
 
-目录应包含文档可能出现的所有物料类型。官方物料包括文本、矩形、椭圆、图片、容器、图表和表格；应用可以只加入实际需要的类型。
+官方物料还包括椭圆、图片、容器、图表、ECharts 和表格。图表、ECharts、表格使用宿主表格
+数据时，目录项还要分别携带包中导出的 `*_TABULAR_DATA_ADAPTER`。`examples/browser-harness`
+包含完整官方目录。
 
-## 4. 准备 Screen Document
+## 5. 加载和校验文档
 
-Screen Document 是渲染和编辑的唯一数据输入。它是 JSON 兼容数据，应用可以从接口、数据库或项目文件中获取。
+从 API、数据库、文件或 URL 得到的值都视为不可信输入，进入 Viewer/Designer 前使用
+`parseScreenDocument()`：
 
 ```ts
-import type { ScreenDocument } from '@base-screen/contracts';
+import { parseScreenDocument } from '@base-screen/contracts';
 
-const screenDocument: ScreenDocument = {
-  canvas: {
-    width: 960,
-    height: 540,
-    backgroundColor: '#17212b',
-  },
-  components: [
-    {
-      id: 'title',
-      type: 'base.text',
-      name: '标题',
-      parentId: null,
-      position: { x: 80, y: 80 },
-      size: { width: 500, height: 72 },
-      rotation: 0,
-      zIndex: 1,
-      status: { locked: false, hidden: false },
-      props: {},
-      style: {
-        color: '#ffffff',
-        fontSize: 42,
-        fontWeight: '700',
-        textAlign: 'left',
-      },
-      dataSource: { type: 'static', value: '销售看板' },
-    },
-  ],
+const response = await fetch('/api/screens/sales');
+const parsed = parseScreenDocument(await response.json());
+if (!parsed.ok) {
+  showDiagnostics(parsed.diagnostics);
+  throw new Error('Screen Document 无效');
+}
+
+const screenDocument = parsed.value;
+```
+
+解析器会拒绝未知字段和无效结构。宿主不要自行剥离未知字段、补默认值、转换类型或回退到
+猜测的文档形态。
+
+宿主自行构造文档时也建议在开发和导入边界执行同一解析器。最小文档包含 `canvas`、
+`components`、`variables` 和 `blueprint`：
+
+```ts
+const emptyDocument = {
+  canvas: { width: 1920, height: 1080, backgroundColor: '#111827' },
+  components: [],
   variables: [],
   blueprint: { rules: [] },
 };
 ```
 
-从不可信来源读取文档时，使用 `parseScreenDocument(value)` 校验：
+## 6. 嵌入 Viewer
 
-```ts
-import { parseScreenDocument } from '@base-screen/contracts';
-
-const parsed = parseScreenDocument(input);
-if (!parsed.ok) {
-  console.error(parsed.diagnostics);
-  return;
-}
-const validDocument = parsed.value;
-```
-
-解析器是严格校验器。应用不要自行删除未知字段、补默认值或强制转换类型。
-
-## 5. 嵌入 Viewer
-
-Viewer 适合大屏预览、发布页和只读用户界面：
-
-```ts
-import type { BaseScreenViewerElement } from '@base-screen/sdk';
-
-const viewer = document.querySelector('base-screen-viewer');
-if (!(viewer instanceof HTMLElement)) {
-  throw new Error('缺少 base-screen-viewer');
-}
-
-const viewerElement = viewer as BaseScreenViewerElement;
-viewerElement.catalog = catalog;
-viewerElement.document = validDocument;
-```
-
-设置 `catalog` 或 `document` 会触发初始化，之后不能再替换 `catalog` 和 `resourcePort`（会被拒绝并产生诊断）。需要用到宿主资源时，必须在初始化之前设置 `resourcePort`：
-
-```ts
-viewerElement.resourcePort = resourcePort; // 先设置端口
-viewerElement.catalog = catalog;
-viewerElement.document = validDocument;
-```
-
-运行中需要更换目录或资源端口时，先调用 `unload()`，再重新设置依赖和文档。
-
-HTML：
+HTML 和宿主容器必须有稳定尺寸：
 
 ```html
-<base-screen-viewer></base-screen-viewer>
+<div class="screen-stage">
+  <base-screen-viewer></base-screen-viewer>
+</div>
 ```
 
-建议监听诊断事件，至少记录无法渲染的物料和无效蓝图：
+```css
+.screen-stage,
+base-screen-viewer {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+```
+
+推荐使用 `configure()` 一次性提交运行时依赖，再单独设置文档：
 
 ```ts
-viewerElement.addEventListener('base-screen-diagnostic', (event) => {
-  console.error('Base Screen diagnostic', event);
+import type { ScreenDiagnostic } from '@base-screen/contracts';
+import type { BaseScreenViewerElement } from '@base-screen/sdk';
+
+const viewer = document.querySelector<BaseScreenViewerElement>('base-screen-viewer');
+if (viewer === null) throw new Error('缺少 base-screen-viewer');
+
+viewer.addEventListener('base-screen-diagnostic', (event) => {
+  const detail = (event as CustomEvent<{ diagnostics: readonly ScreenDiagnostic[] }>).detail;
+  reportBaseScreenDiagnostics(detail.diagnostics);
+});
+
+const configured = viewer.configure({
+  catalog,
+  instanceId: 'sales-published-viewer',
+  mode: 'viewer',
+  resourceTimeoutMs: 15_000,
+});
+if (!configured.ok) {
+  showDiagnostics(configured.diagnostics);
+  throw new Error('Viewer 配置失败');
+}
+
+viewer.document = screenDocument;
+```
+
+`configure()` 会在创建 Renderer 前原子校验整个配置。不要依赖多个 setter 的先后顺序完成
+初始化。运行中可以重新设置 `document`；`catalog`、资源端口、变量端口、contribution 和
+timeout 等运行时依赖需要先 `unload()`，再重新 `configure()`。诊断监听应在配置和文档赋值前
+注册，避免漏掉初始化阶段的错误。
+
+数据变化时可刷新全部资源或单个组件：
+
+```ts
+viewer.refreshData();
+viewer.refreshData('sales-chart');
+viewer.refreshData({
+  componentId: 'sales-chart',
+  trigger: 'polling',
+  traceId: crypto.randomUUID(),
 });
 ```
 
-Viewer 常用属性：
-
-- `catalog`：物料目录。初始化后不能直接替换；需要更换目录时先调用 `unload()`。
-- `document`：当前文档。重新赋值会重新渲染。
-- `resourcePort`：宿主资源解析端口，供 `host-resource` 数据源使用。初始化后不能直接替换。
-- `resourceTimeoutMs`：资源解析 deadline，必须在 Viewer 初始化前设置，默认 15,000 毫秒。
-- `runtimeContributions`：运行时能力索引，用于蓝图能力和资源类型校验。
-- `blueprintRuntimePort`：蓝图向宿主发送事件的端口。
-- `blueprintHostActionPort`：蓝图请求宿主执行动作的端口。
-- `variablePort`：解析文档中 `host` 变量的端口，必须在 `catalog` 初始化前设置。
-- `refreshData(componentId?)`：重新查询全部数据源，或只重新查询指定组件。
-
-## 6. 宿主数据集
-
-数据面板提供“无数据”“静态数据”和“宿主数据集”三个入口。API、数据库、全局状态或其他
-数据基础设施不直接成为 Designer 表单；宿主把它们注册成稳定的数据集，并继续负责鉴权、租户、
-查询、缓存和审计。
-
-宿主数据集使用两个独立端口：
-
-- `datasetCatalogPort`：让 Designer 发现数据集，并读取安全的名称、字段和参数编辑元数据。
-- `resourcePort`：接收组件 ID、资源标识和已经求值的普通 JSON 参数，返回数据结果。
-
-变量参数再通过可选的 `variablePort` 求值。字段绑定和变量引用只保存在 Screen Document 中，
-不会发送给宿主查询端口：
-
-```ts
-designerElement.datasetCatalogPort = datasetCatalogPort;
-designerElement.resourcePort = resourcePort;
-designerElement.variablePort = variablePort;
-```
-
-一个典型宿主可以把不同底层来源统一注册到自己的目录中：
-
-```ts
-const datasetCatalogPort = {
-  async list({ query, cursor, limit, signal }) {
-    return hostDatasets.list({ query, cursor, limit, signal });
-  },
-  async describe({ resourceType, resourceId, signal }) {
-    return hostDatasets.describe({ resourceType, resourceId, signal });
-  },
-};
-
-const resourcePort = {
-  async resolve({ componentId, resourceType, resourceId, params }, { signal }) {
-    return hostDatasets.resolve({
-      componentId,
-      resourceType,
-      resourceId,
-      params,
-      signal,
-    });
-  },
-};
-```
-
-这里的 `hostDatasets` 可以在宿主内部路由到 API、数据库查询、缓存或应用全局状态；Base Screen
-只识别目录中的稳定资源标识，不知道也不持久化底层连接方式。
-
-数据面板会先列出数据集，再读取描述，最后把 literal/variable 参数和物料字段角色作为一次
-Core transaction 应用。官方 `base.table` 使用 `columns` 角色，`base.chart` 使用 `dimension`
-和 `measures` 角色。数据集响应必须符合 `ScreenTabularDataset` 契约；无效响应会进入安全错误状态。
-
-Viewer 使用相同的端口：
-
-```ts
-viewerElement.variablePort = variablePort;
-viewerElement.resourcePort = resourcePort;
-viewerElement.catalog = catalog;
-viewerElement.document = validDocument;
-viewerElement.refreshData('sales-chart');
-```
-
-宿主负责鉴权、查询、缓存和权限校验；Base Screen 不持久化 transport 配置或敏感信息。
+轮询调度属于宿主。Base Screen 只执行本次有界刷新，不创建后台轮询器。
 
 ## 7. 嵌入 Designer
-
-Designer 适合后台配置页和大屏编排页：
 
 ```html
 <base-screen-designer></base-screen-designer>
 ```
 
-```ts
-import type { BaseScreenDesignerElement } from '@base-screen/sdk';
+### 7.1 直接文档模式
 
-const designer = document.querySelector('base-screen-designer');
-if (!(designer instanceof HTMLElement)) {
-  throw new Error('缺少 base-screen-designer');
-}
-
-const designerElement = designer as BaseScreenDesignerElement;
-designerElement.catalog = catalog;
-designerElement.toolMaterialTypes = {
-  text: 'base.text',
-  rectangle: 'base.rectangle',
-  ellipse: 'base.ellipse',
-  image: 'base.image',
-};
-designerElement.document = validDocument;
-```
-
-保存编辑结果时监听 `base-screen-change`：
+直接文档模式适合新建草稿、临时编辑，或保存按钮完全位于宿主外壳中的场景：
 
 ```ts
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { BaseScreenDesignerElement } from '@base-screen/sdk';
 
-designerElement.addEventListener('base-screen-change', (event) => {
-  const nextDocument = (event as CustomEvent<{ document: ScreenDocument }>).detail.document;
-  saveToApplication(nextDocument);
+const designer = document.querySelector<BaseScreenDesignerElement>('base-screen-designer');
+if (designer === null) throw new Error('缺少 base-screen-designer');
+
+const configured = designer.configure({
+  catalog,
+  toolMaterialTypes: {
+    text: 'base.text',
+    rectangle: 'base.rectangle',
+  },
+});
+if (!configured.ok) {
+  showDiagnostics(configured.diagnostics);
+  throw new Error('Designer 配置失败');
+}
+
+designer.document = screenDocument;
+
+designer.addEventListener('base-screen-change', (event) => {
+  const nextDocument = (event as CustomEvent<{ document: ScreenDocument | undefined }>).detail
+    .document;
+  if (nextDocument !== undefined) hostDraftStore.set(nextDocument);
 });
 ```
 
-`toolMaterialTypes` 中的每个类型都必须存在于目录。需要支持编组时，再配置 `groupMaterialType`，并确保该物料的 `designCapabilities.children` 为 `true`。
+`base-screen-change` 表示 canonical 文档发生了修改，不等同于服务端已经保存。宿主应按自己的
+节流、离开页面确认和错误处理策略保存。`toolMaterialTypes` 中的类型必须存在于目录；启用编组
+时再设置 `groupMaterialType`，对应 manifest 的 `designCapabilities.children` 必须为 `true`。
 
-## 8. 项目加载和保存
+### 7.2 项目模式
 
-Designer 的项目读写通过 `projectAdapter` 注入，应用负责连接自己的 API、鉴权和并发控制：
+有服务端项目和 revision 时，宿主实现 `ScreenProjectAdapter`：
 
 ```ts
-designerElement.projectAdapter = {
+import {
+  parseScreenProjectEnvelope,
+  type ScreenProjectAdapter,
+} from '@base-screen/contracts';
+
+const projectAdapter: ScreenProjectAdapter = {
   capabilities: { publish: false },
-  async load({ projectId }) {
-    const response = await api.getProject(projectId);
-    return parseProjectResponse(response);
+
+  async load({ projectId, signal }) {
+    const raw = await hostProjectApi.load({ projectId, signal });
+    return parseScreenProjectEnvelope(raw);
   },
-  async save({ projectId, revision, document: nextDocument }) {
-    const response = await api.saveProject(projectId, revision, nextDocument);
-    return parseProjectResponse(response);
+
+  async save({ projectId, revision, document, signal }) {
+    const raw = await hostProjectApi.save({
+      projectId,
+      expectedRevision: revision,
+      document,
+      signal,
+    });
+    return parseScreenProjectEnvelope(raw);
   },
 };
 ```
 
-`load` 和 `save` 必须返回 `ScreenParseResult<ScreenProjectEnvelope>`。保存请求中的 `revision` 用于并发控制；收到 `PROJECT_CONFLICT` 时不要静默覆盖服务端数据，应提示用户重新加载或处理冲突。
-
-绑定适配器后，通过 `load(projectId)` 加载项目：
+然后在初始化时绑定 adapter，并通过项目 ID 加载：
 
 ```ts
-const loaded = await designerElement.load('my-project');
-if (!loaded.ok) {
-  showProjectError(loaded.diagnostics);
-  return;
-}
-saveToApplication(loaded.value.document);
+const configured = designer.configure({
+  catalog,
+  projectAdapter,
+  toolMaterialTypes: {
+    text: 'base.text',
+    rectangle: 'base.rectangle',
+  },
+});
+if (!configured.ok) throw new Error('Designer 配置失败');
+
+const loaded = await designer.load('sales-screen');
+if (!loaded.ok) showDiagnostics(loaded.diagnostics);
 ```
 
-项目模式（绑定适配器 + `load(projectId)`）与直接文档模式（只设置 `document`，不绑定适配器）是两种独立用法；不要在项目模式下直接设置 `document`。
+Designer 内建保存操作和 `await designer.save()` 都会调用 adapter。保存成功必须返回新的
+`ScreenProjectEnvelope` 和 revision。服务端发现 revision 过期时返回 `PROJECT_CONFLICT`，宿主
+不能静默覆盖远端文档；应让用户继续编辑或明确执行 `reloadRemote(true)`。
 
-## 9. 宿主资源
+如果宿主支持发布，将 `capabilities.publish` 设为 `true`，实现 `publish()`，并让发布请求同样
+校验 `projectId + revision`。实际构建、部署和公开 URL 仍由宿主处理。
 
-文档只保存资源类型、资源 ID 和参数，不保存 token、请求头或数据库连接信息。应用通过 `resourcePort` 解析资源：
+项目模式常用事件：
+
+| 事件 | `detail` | 宿主用途 |
+| --- | --- | --- |
+| `base-screen-ready` | `{ projectId, revision }` | 项目加载完成 |
+| `base-screen-dirty-change` | `{ dirty, revision }` | 离开页面确认、外部保存状态 |
+| `base-screen-project-conflict` | 无 | 展示并发冲突处理入口 |
+| `base-screen-diagnostic` | `{ diagnostics }` | 日志、提示和可观测性 |
+
+### 7.3 配置 Designer 主题
+
+`base-screen-designer` 提供 CSS Custom Properties，用于让 Designer 的顶栏、工具栏、面板、
+菜单、对话框、控件和自有滚动条与宿主的视觉语义保持一致。主题只作用于 Designer chrome：
+Designer 画布中的 Material 与 Viewer 中的同一 Material 都继续使用 document-driven appearance，
+不会被这些 Token 重绘。
+
+缺失 `theme` 或未知值使用内建 dark fallback；设置 `theme="light"` 使用 light fallback。宿主可在
+元素、任意祖先或 author stylesheet 中设置 Token：
+
+```html
+<main class="host-shell">
+  <base-screen-designer theme="light"></base-screen-designer>
+</main>
+```
+
+```css
+.host-shell {
+  --base-screen-designer-surface-workspace: var(--host-surface-canvas);
+  --base-screen-designer-surface-panel: var(--host-surface-panel);
+  --base-screen-designer-surface-control: var(--host-surface-control);
+  --base-screen-designer-text-primary: var(--host-text-primary);
+  --base-screen-designer-text-secondary: var(--host-text-secondary);
+  --base-screen-designer-border-default: var(--host-border-default);
+  --base-screen-designer-focus-ring: var(--host-focus-ring);
+  --base-screen-designer-accent: var(--host-accent);
+  --base-screen-designer-accent-surface: var(--host-accent-subtle);
+  --base-screen-designer-shadow-overlay: var(--host-shadow-overlay);
+  --base-screen-designer-motion: 140ms ease-out;
+  --base-screen-designer-scrollbar-thumb: var(--host-scrollbar-thumb);
+  --base-screen-designer-scrollbar-track: var(--host-scrollbar-track);
+}
+```
+
+需要在运行时切换主题时，使用标准 CSS API；不需要 Base Screen 的 JavaScript theme setter：
+
+```ts
+const designer = document.querySelector<HTMLElement>('base-screen-designer');
+if (designer === null) throw new Error('缺少 base-screen-designer');
+
+designer.setAttribute('theme', 'light');
+designer.style.setProperty('--base-screen-designer-accent', '#1d4ed8');
+designer.style.removeProperty('--base-screen-designer-accent');
+```
+
+同一 Token 的优先级为：元素 inline style、宿主 author stylesheet、当前 `theme` fallback、dark
+fallback。删除覆盖会恢复下一层有效值。两个 Designer 可设置不同的 `theme` 和 Token，状态互不影响。
+
+正式公开的 Token 家族如下。每个名称均以 `--base-screen-designer-` 为前缀：
+
+| 家族 | 后缀 |
+| --- | --- |
+| Surface | `surface-workspace`、`surface-panel`、`surface-raised`、`surface-control`、`surface-control-hover`、`surface-overlay`、`surface-canvas`、`surface-scrim`、`canvas-grid-line` |
+| Text | `text-primary`、`text-secondary`、`text-muted`、`text-disabled` |
+| Border | `border-subtle`、`border-default`、`border-strong`、`focus-ring` |
+| Semantic | `accent`、`accent-surface`、`success`、`success-surface`、`warning`、`warning-surface`、`danger`、`danger-surface` |
+| Elevation | `shadow-overlay`、`shadow-canvas`、`shadow-float` |
+| Motion | `motion`、`motion-emphasis` |
+| Scrollbar | `scrollbar-thumb`、`scrollbar-thumb-hover`、`scrollbar-track`、`scrollbar-corner` |
+
+Surface、Text、Border、Semantic 和 Scrollbar 接受标准 CSS 颜色值；Elevation 接受 `box-shadow` 值；
+Motion 接受 transition duration/timing-function 序列。Scrollbar Token 只影响 Designer 明确拥有的
+滚动区域，不会影响 `body`、宿主元素、Viewer 或 Material。
+
+不要依赖或修改私有 `--designer-*` Token、Shadow DOM selector、class、`::part`、内部布局、面板尺寸、
+grid、breakpoint、z-index 或图标几何。不要通过 `cssText` 或注入 Shadow DOM stylesheet 重写工作台。
+
+## 8. 统一接入 Designer 宿主能力
+
+Designer 可以通过一个 `ScreenDesignerHostAdapter` 接入宿主能力。每个 capability 必须与同名
+端口严格匹配：`true` 时必须提供端口，`false` 时不得提供端口。
+
+```ts
+import type { ScreenDesignerHostAdapter } from '@base-screen/contracts';
+
+const designerHostAdapter: ScreenDesignerHostAdapter = {
+  capabilities: {
+    projectCatalog: false,
+    projectPreview: false,
+    projectSnapshots: false,
+    assets: false,
+    resources: true,
+    datasetCatalog: true,
+    variables: true,
+    actions: false,
+  },
+  resources: resourcePort,
+  datasetCatalog: datasetCatalogPort,
+  variables: variablePort,
+};
+
+const configured = designer.configure({
+  catalog,
+  designerHostAdapter,
+  runtimeContributions,
+  projectAdapter,
+});
+```
+
+可选端口及其宿主职责：
+
+| capability / 端口 | 用途 | 宿主仍负责 |
+| --- | --- | --- |
+| `projectCatalog` | 有界的项目列表、创建、克隆、删除、导入和导出调用 | 项目中心 UI、权限、分页和业务流程 |
+| `projectPreview` | 加载指定 revision 的预览文档 | 预览路由、发布状态和访问控制 |
+| `projectSnapshots` | 列出、创建、恢复和删除快照 | 快照存储、保留策略和审计 |
+| `assets` | 查询资产摘要和删除前检查 | 上传、转码、缩略图、存储和删除 |
+| `resources` | 根据稳定资源标识解析数据 | 查询、凭证、缓存和结果裁剪 |
+| `datasetCatalog` | 为 Designer 提供数据集名称、字段和参数元数据 | 数据目录、搜索和权限 |
+| `variables` | 解析文档中的宿主变量 | 全局状态、租户上下文和敏感值 |
+| `actions` | 声明 JSON-safe host action 端口 | 业务动作、授权、幂等和审计 |
+
+也可以在 `configure()` 中分别传入 `resourcePort`、`datasetCatalogPort` 等独立端口。不要同时
+使用两种方式表达同一能力；统一 adapter 更适合能力较多的宿主。Designer 设计画布本身不执行
+Blueprint host action，示例因此使用 `actions: false`；Viewer 和发布态按第 10 节设置
+`blueprintHostActionPort`。
+
+## 9. 接入宿主数据
+
+宿主数据由三部分组成：
+
+- `datasetCatalogPort`：Designer 发现数据集并读取字段、参数编辑元数据。
+- `resourcePort`：Viewer/Designer 按稳定 `resourceType + resourceId` 查询数据。
+- `variablePort`：把文档中的宿主变量 ID 解析为当前运行值。
+
+### 9.1 数据集目录
+
+```ts
+import type { ScreenHostDatasetCatalogPort } from '@base-screen/contracts';
+
+const datasetCatalogPort: ScreenHostDatasetCatalogPort = {
+  async list({ query, cursor, limit, signal }) {
+    return hostDatasetService.list({ query, cursor, limit, signal });
+  },
+
+  async describe({ resourceType, resourceId, signal }) {
+    return hostDatasetService.describe({ resourceType, resourceId, signal });
+  },
+};
+```
+
+`list()` 返回 `ScreenDatasetPage`，`describe()` 返回 `ScreenDatasetDescriptor`。描述只暴露安全的
+名称、字段和参数编辑元数据，不携带连接信息。参数的权威结构和约束来自对应 resource type 的
+`configSchema`。
+
+### 9.2 资源解析
 
 ```ts
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
 
 const resourcePort: ScreenHostResourcePort = {
-  async resolve({ source }, { signal }) {
-    const value = await api.resolveResource(source.resourceType, source.resourceId, source.params, signal);
-    return { ok: true, value, diagnostics: [] };
+  async resolve(
+    { componentId, resourceType, resourceId, params },
+    { signal, context },
+  ) {
+    return hostDatasetService.resolve({
+      componentId,
+      resourceType,
+      resourceId,
+      params,
+      signal,
+      context,
+    });
   },
 };
-
-viewerElement.resourcePort = resourcePort;
-designerElement.resourcePort = resourcePort;
 ```
 
-端口必须在 `catalog`/`document` 初始化之前设置（见第 5 节）；Designer 初始化后替换端口同样需要先 `unload()`。
+`params` 已经把 literal 和 variable 参数求值成普通 JSON。字段绑定不会发送给查询端口，而是由
+Base Screen 在安全结果投影阶段处理。表格数据应符合 `ScreenTabularDataset`；对后端返回值可
+使用 `parseScreenTabularDataset()` 再进入端口结果。
 
-资源解析失败或超时会进入物料的数据错误状态。资源端口应自行执行鉴权、参数白名单和返回值裁剪。
+宿主实现必须：
 
-## 10. 物料事件和蓝图事件
+- 只接受已授权的 `resourceType`、`resourceId` 和参数。
+- 响应 `signal.aborted`，把信号继续传给底层请求或主动停止工作。
+- 返回 `ScreenParseResult`，不抛出包含 token、SQL、内部 URL 或原始服务端消息的错误。
+- 对返回值执行容量限制和字段裁剪；Base Screen 不是无限数据传输通道。
+- 将 `context` 仅用于本次追踪、审计或模式判断，不把它写回 Screen Document。
 
-Viewer 会把物料事件冒泡为 `base-screen-material-event`：
+### 9.3 宿主变量
 
 ```ts
-viewerElement.addEventListener('base-screen-material-event', (event) => {
-  const detail = (event as CustomEvent).detail;
-  console.log(detail.componentId, detail.type, detail.name, detail.payload);
+import type { ScreenHostVariablePort } from '@base-screen/contracts';
+
+const variablePort: ScreenHostVariablePort = {
+  async resolve({ variableId, signal }) {
+    return hostVariableService.resolve({ variableId, signal });
+  },
+};
+```
+
+文档只保存类似 `{ type: 'host', name: 'region', variableId: 'current-region' }` 的引用。实际租户、
+用户和路由状态留在宿主。缺少变量端口、解析失败或结果不是 JSON-safe 值时，资源不会带着
+猜测值继续查询。
+
+### 9.4 Resource type 和 capability
+
+提供 `runtimeContributions` 后，Base Screen 会按 resource type 的 `configSchema` 校验参数，并
+按授权 capability 编译 Blueprint。权威索引通常由宿主已有的插件激活结果提供：
+
+```ts
+viewer.configure({
+  catalog,
+  resourcePort,
+  variablePort,
+  runtimeContributions: pluginManagerSnapshot.contributions,
 });
 ```
 
-文档中的蓝图可以把物料事件转换为宿主事件。应用可以通过 `blueprintRuntimePort` 接收这些事件：
+使用 `@base-screen/plugin-manager` 时应采用 `activate()` 成功返回的 snapshot；插件未激活、
+resource type 未贡献或 capability 未授权时保持失败关闭。
+
+## 10. 物料事件、宿主事件和宿主动作
+
+Viewer 把物料交互冒泡为 `base-screen-material-event`：
 
 ```ts
-viewerElement.blueprintRuntimePort = {
-  emit(event) {
-    applicationEventBus.publish(event);
-  },
-};
+viewer.addEventListener('base-screen-material-event', (event) => {
+  const detail = (
+    event as CustomEvent<{
+      componentId: string;
+      name: string;
+      payload: unknown;
+    }>
+  ).detail;
+
+  hostTelemetry.track('screen_material_event', detail);
+});
 ```
 
-蓝图只能使用应用通过 `runtimeContributions` 授权的 capability 和资源类型。不要把任意函数、凭据或宿主服务对象写入 Screen Document。
+Blueprint 的 `emit-host-event` 通过 `blueprintRuntimePort` 交给宿主事件总线：
 
-## 11. React 和 Vue
+```ts
+const configured = viewer.configure({
+  catalog,
+  runtimeContributions,
+  blueprintRuntimePort: {
+    emit(event) {
+      hostEventBus.publish(event.name, event.payload);
+    },
+  },
+  blueprintHostActionPort: {
+    async execute(action) {
+      await authorizedHostActions.execute(action.name, action.payload);
+    },
+  },
+});
+```
 
-React/Vue 应用可以把现有组件包装为 Base Screen 物料，不需要让 Screen Document 保存框架组件名。文档只引用稳定的物料 `type`。
+未提供 `blueprintRuntimePort` 时，宿主事件会以 `base-screen-blueprint-event` Custom Event 发出。
+`host-action` 没有端口时会失败并产生诊断，不会静默执行任意函数。宿主动作端口需要自行处理
+授权、幂等、审计和业务错误脱敏。
+
+## 11. 接入宿主高级编辑器
+
+复杂 Blueprint、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。
+Designer 通过 `base-screen-authoring-request` 发起 JSON-safe 请求，宿主完成编辑后调用专用提交
+方法。
+
+```ts
+import {
+  SCREEN_AUTHORING_REQUEST_EVENT,
+  type ScreenAuthoringRequestEventDetail,
+} from '@base-screen/sdk';
+
+designer.addEventListener(SCREEN_AUTHORING_REQUEST_EVENT, (event) => {
+  const { request } = (event as CustomEvent<ScreenAuthoringRequestEventDetail>).detail;
+  hostAuthoringEditor.open(request);
+});
+```
+
+宿主可以从自己的按钮或路由发起编辑请求：
+
+```ts
+designer.requestBlueprintEdit();
+designer.requestComponentTextEdit('props');
+designer.requestComponentTextEdit('style');
+designer.requestComponentTextEdit('data');
+```
+
+提交时必须原样带回请求身份和预期 revision：
+
+```ts
+const result = designer.commitBlueprintEdit({
+  requestId: request.requestId,
+  expectedRevision: request.documentRevision,
+  componentId: request.componentId,
+  blueprint: editedBlueprint,
+});
+
+if (!result.ok) showDiagnostics(result.diagnostics);
+```
+
+组件文本编辑使用 `commitComponentTextEdit()`。提交会校验 request ID、Designer 实例、revision、
+component identity、目标 schema、JSON 深度和容量；陈旧或无效候选不会修改文档和历史。宿主
+不要绕过这些入口操作 Designer 的 Shadow DOM 或内部 Store。
+
+## 12. React、Vue 和自定义物料
+
+React/Vue 应用可以把现有组件包装成 Base Screen 物料。Screen Document 仍只引用稳定的
+material `type`，不保存框架组件名。
 
 React：
 
@@ -373,7 +624,7 @@ import { createReactMaterialDefinition } from '@base-screen/react';
 
 const definition = createReactMaterialDefinition({
   manifest,
-  component: AppBadge,
+  component: HostKpiCard,
   eventProps: { valueClick: 'onValueClick' },
 });
 ```
@@ -385,24 +636,123 @@ import { createVueMaterialDefinition } from '@base-screen/vue';
 
 const definition = createVueMaterialDefinition({
   manifest,
-  component: AppBadge,
+  component: HostKpiCard,
   eventProps: { valueClick: 'onValueClick' },
 });
 ```
 
-定义返回成功后，把 `definition.value` 加入应用的物料目录。自定义物料的 `type` 和 `tagName` 必须稳定且唯一，manifest 与 Custom Element 上的静态 manifest 必须完全一致。
+结果成功后注册返回的 constructor，并把 definition 加入目录。`type` 和 `tagName` 必须稳定且
+唯一，definition manifest 与 Custom Element 的静态 manifest 必须一致。桥接组件根元素应填满
+物料几何区域，避免内容尺寸反向影响画布布局。
 
-## 12. 生命周期和清理
+## 13. 宿主托管外部物料包
 
-- 一个页面可以创建多个 Viewer 或 Designer 实例，每个实例独立设置 `catalog` 和 `document`。
-- 页面卸载前移除实例即可；长生命周期场景下，更换目录或资源端口前先调用 `unload()`。
-- 不要直接操作 Viewer/Designer 内部 Shadow DOM。通过公开属性、端口和 Custom Event 与组件交互。
-- 不要把 `@base-screen/*/src` 路径、仓库内部 fixture 或 harness 作为应用依赖。
+物料包不是普通的自定义物料集合，它有独立的注册契约。业务团队独立分发物料模块时，宿主负责
+下载、完整性校验、信任审核和加载；Base Screen 不 fetch、不 dynamic import、不发现远程代码。
+代码进入页面后，用 `createMaterialPackage()` 先完整校验再注册：
 
-## 13. 故障排查
+```ts
+import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { createMaterialPackage } from '@base-screen/plugin-sdk';
 
-- **没有内容**：确认自动注册已执行、目录包含文档中的 `type`，并检查 `base-screen-diagnostic`。
-- **尺寸为 0**：确保宿主容器有明确尺寸；第三方 React/Vue 组件根元素应设置 `width: 100%; height: 100%`。
-- **修改目录不生效**：调用 `unload()` 后重新设置目录和文档。
-- **事件没有触发**：确认物料 manifest 声明了事件，并且 Viewer 处于交互模式；蓝图还需要对应的 capability 授权。
-- **保存失败**：保留并展示 diagnostics；`PROJECT_CONFLICT` 需要重新加载最新 revision 后处理。
+const packageResult = createMaterialPackage({
+  id: 'acme.kpi',
+  materials: [
+    { manifest: acmeKpiManifest, element: AcmeKpiElement },
+    { manifest: acmeTrendManifest, element: AcmeTrendElement },
+  ],
+});
+if (!packageResult.ok) throw new Error('外部物料包无效');
+
+const defined = packageResult.value.define();
+if (!defined.ok) throw new Error('外部物料注册冲突');
+
+const hostedCatalog = createBaseScreenMaterialCatalog(defined.value);
+```
+
+契约要点：
+
+- `id` 必须是合法 ASCII identifier（1..128 个 code unit，`[A-Za-z0-9._:-]`，首字符为字母或
+  数字）。它只用于宿主侧诊断和配置，不进入 Screen Document、manifest 或运行时状态。
+- `materials` 为数组且最多 512 项；每一项都会复用 `createMaterialDefinition` 完成 manifest
+  解析、静态 manifest 一致性校验和数据集适配器校验，并拒绝包内重复 `type` / `tagName`。
+- 创建期 fail closed 返回 `ScreenParseResult`，不抛异常、不访问浏览器全局；诊断代码为
+  `PLUGIN_CORE_MANIFEST_*` / `PLUGIN_CORE_IDENTITY_*`，路径定位到 `['id']`、`['materials']`
+  或 `['materials', index, ...]`。
+- `define()` 注册前对全部 tagName 做冲突预检：任一冲突（同 tagName 绑定不同 constructor）
+  整体失败且不产生部分注册副作用；同 tagName 同 constructor 幂等。成功后返回
+  `BaseScreenMaterialCatalogEntry[]`，宿主用它一次性构建不可变 catalog。
+- 文档只持久化物料 `type`。模块 URL、包名、版本和完整性信息是宿主分发配置，不得写入
+  Screen Document 或 Material Manifest。
+- 更换物料包版本 = 宿主重新加载新模块并重建 catalog；先 `unload()` 或销毁旧实例，再以新
+  catalog 配置新实例。已初始化的实例不能原地替换 catalog。
+
+不可信代码需要由宿主使用独立隔离方案；Shadow DOM、manifest 校验和 catalog 不是安全沙箱，
+普通 Material ABI 不提供恶意代码隔离。
+
+### 13.1 外部物料包的标准出口
+
+可发布的外部物料包建议采用与官方物料一致的标准出口，便于宿主按同一路径接入：
+
+```text
+<package>                 根入口：manifest + constructor + define()，导入无副作用
+<package>/auto-register   可选副作用入口：导入即注册该包声明的全部物料
+```
+
+```ts
+// <package>/auto-register.ts —— 宿主选择“导入即注册”时使用
+import { autoRegisterHostedMaterialPackage } from './index.js';
+const registered = autoRegisterHostedMaterialPackage();
+if (!registered.ok) {
+  throw new Error(registered.diagnostics.map((item) => item.code).join(','));
+}
+```
+
+宿主动态加载示例（受控 `import()`，来源由宿主配置决定）：
+
+```ts
+const module = await import(/* 宿主审核过的模块地址 */);
+const defined = module.hostedMaterialPackage.define();
+if (!defined.ok) {
+  throw new Error(defined.diagnostics.map((item) => item.code).join(','));
+}
+const catalog = createBaseScreenMaterialCatalog(defined.value);
+```
+
+## 14. 生命周期和清理
+
+- 一个页面可以创建多个 Viewer/Designer；每个实例单独配置 catalog、端口和文档。
+- 运行时依赖发生变化时，先调用 `unload()`，再调用新的 `configure()`，最后设置或加载文档。
+- 移除实例会取消实例内工作；宿主自己的轮询、订阅、编辑器 session 和请求也要自行清理。
+- Plugin Manager 不再使用时调用 `dispose()`，不要继续使用旧 snapshot。
+- 不要访问 Shadow DOM、内部 controller、`@base-screen/*/src`、仓库 fixture 或 harness 内部状态。
+- 端口只能返回 JSON-safe 数据和公开契约对象，不能把函数、DOM、Promise、凭据或服务实例写入文档。
+
+## 15. 交付前检查
+
+- 文档进入运行时前通过 `parseScreenDocument()`，项目响应通过
+  `parseScreenProjectEnvelope()`。
+- catalog 覆盖全部 material type，Custom Element 已注册，表格物料带正确 adapter。
+- Viewer/Designer 使用 `configure()` 原子初始化，宿主容器具有明确且稳定的尺寸。
+- 所有宿主端口处理 abort、权限、容量限制、诊断脱敏和 revision 冲突。
+- 监听 `base-screen-diagnostic`，并为资源失败、超时、无 capability 和缺失物料建立监控。
+- Screen Document 中没有 URL、SQL、token、header、连接信息、宿主服务对象和业务私有状态。
+- 切换项目、租户、物料包或运行时能力时执行 `unload()`，不会复用旧端口或旧 snapshot。
+
+## 16. 常见问题
+
+- **页面没有内容**：确认元素和物料已注册、catalog 包含文档中的 `type`，并检查诊断事件。
+- **Viewer/Designer 尺寸为 0**：给宿主容器和 Custom Element 设置明确的宽高及 `min-height: 0`。
+- **更换 catalog 或端口不生效**：调用 `unload()`，重新 `configure()`，再设置或加载文档。
+- **宿主数据没有查询**：检查 resource type contribution、参数 schema、变量端口和 material 的
+  `dataCapabilities`。
+- **事件没有触发**：检查 material manifest 的事件声明、Blueprint capability 和对应宿主端口。
+- **保存冲突**：保留本地文档，展示 `PROJECT_CONFLICT`，由用户决定继续编辑或显式重载远端。
+- **高级编辑提交被拒绝**：检查 request ID、expected revision、component ID、schema 和容量限制，
+  不要复用旧请求。
+
+仓库中的可运行宿主示例：
+
+- `examples/playground`：Vue 宿主、Viewer/Designer、数据集和变量切换。
+- `examples/browser-harness`：项目 adapter、完整官方物料、宿主作者桥和外部物料包。
+- `examples/runtime-harness`：宿主资源、Blueprint 端口和远程插件隔离验证。

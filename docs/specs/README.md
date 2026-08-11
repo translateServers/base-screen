@@ -29,6 +29,9 @@
 | [Data Runtime Hardening](./data-runtime-hardening/spec.md) | 契约与运行时增量 | 宿主数据集边界、请求身份与共享、元数据/错误协议、初始化/参数/变量/执行上下文、一次性迁移与两仓验收；覆盖 [ADR-0025](../decisions/ADR-0025-data-runtime-hardening.md)（已接受）九项决策；2026-08-09 生效 |
 | [Designer Event Blueprint](./designer-event-blueprint/spec.md) | Designer 事件增量 | canonical Blueprint、Core compile/trace/replace/history/诊断与事件面板摘要/能力状态/宿主请求入口；Blueprint 图形布局与编辑器归宿主；依据 [ADR-0026](../decisions/ADR-0026-designer-event-blueprint-authoring.md) 与 [ADR-0028](../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)；2026-08-10 生效 |
 | [Designer Authoring Extension](./designer-authoring-extension/spec.md) | Design 作者增量 | 轻量作者扩展边界：JSON-safe 声明式面板 Descriptor、宿主作者桥与结构化事件声明；Blueprint 图形/代码/完整领域配置编辑器归宿主；依据 [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0028](../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md) 与 [实施计划](../plans/designer-authoring-extension/implementation-plan.md) |
+| [Host Screen Skill Generation](./host-screen-skill-generation/spec.md) | 宿主作者工具增量 | 从宿主安全快照生成专属大屏设计 Skill；不新增 Base Screen runtime/package |
+| [Host Material Skill Generation](./host-material-skill-generation/spec.md) | 宿主作者工具增量 | 从宿主安全作者快照生成专属物料创建 Skill；不新增 Base Screen runtime/package |
+| [Host Material Package](./host-material-package/spec.md) | 契约增量 | 宿主托管可信物料包：宿主负责加载与信任，plugin-sdk `createMaterialPackage` 注册辅助与目录集成；远程代码加载不进 Base Screen；依据 [ADR-0029](../decisions/ADR-0029-host-managed-material-package-distribution.md)；2026-08-11 生效 |
 
 相关计划和架构背景见 [计划与评审](../plans/README.md) 与 [架构文档](../architecture/README.md)。
 
