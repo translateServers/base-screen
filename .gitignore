@@ -12,3 +12,4 @@ packages/*/LICENSE
 *.tsbuildinfo
 .workbuddy
 .schema-build/
+.trae

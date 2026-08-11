@@ -79,7 +79,7 @@ try {
         });
         if (
           compact.text !==
-            '\u7f16\u8f91\u9700\u8981\u81f3\u5c11 1024 \u00d7 640 \u7684\u53ef\u7528\u7a7a\u95f4\u3002' ||
+            '\u7f16\u8f91\u5927\u5c4f\u9700\u8981\u81f3\u5c11 1024 \u00d7 640 \u7684\u53ef\u7528\u7a7a\u95f4\u3002' ||
           !compact.visible ||
           compact.overflows
         ) {
@@ -936,6 +936,37 @@ try {
         // 事件系统断言只在完整桌面流程（1440 视口）执行：窄屏视口命中
         // @media (max-width: 1023px) 会隐藏 .workspace（显示可用空间警告），画布不可交互。
         await assertEventSystemGuards(page, page.locator('base-screen-designer'));
+        // ADR-0029 宿主托管物料包：宿主加载 -> define -> 独立 catalog -> Viewer 渲染闭环。
+        const hosted = await page.evaluate(async () => {
+          const demo = window.baseScreenHarness.createHostedPackageDemo();
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+          const material = demo.shadowRoot?.querySelector('[data-base-screen-component-id]');
+          const count =
+            demo.shadowRoot?.querySelectorAll('[data-base-screen-component-id]').length ?? 0;
+          const text = material?.textContent?.trim() ?? '';
+          const badge = window.customElements.get('harness-hosted-badge') !== undefined;
+          const metric = window.customElements.get('harness-hosted-metric') !== undefined;
+          demo.remove();
+          return {
+            id: window.baseScreenHarness.hostedPackage.id,
+            count,
+            text,
+            badge,
+            metric,
+          };
+        });
+        if (
+          hosted.id !== 'harness.hosted' ||
+          hosted.count !== 1 ||
+          hosted.text !== '\u6258\u7ba1\u5fbd\u7ae0' ||
+          !hosted.badge ||
+          !hosted.metric
+        ) {
+          throw new Error(`BROWSER_HARNESS_HOSTED_PACKAGE_FAILED: ${JSON.stringify(hosted)}`);
+        }
+        await assertDesignerThemeIsolation(page);
       }
       await page.close();
     }
@@ -2377,7 +2408,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     throw new Error('BROWSER_HARNESS_BLUEPRINT_CAPABILITY_FAILED');
   }
   const hostEventCount = await page.evaluate(() => window.baseScreenHarness.hostEvents.length);
-  // 宿主蓝图编辑闭环：请求（requestId/revision/快照）→ 宿主修改 canonical 快照 → 专用提交。
+  // AE-HB-C01/AE-ED-C07 宿主蓝图编辑闭环：请求（requestId/revision/快照）→ 宿主修改 canonical 快照 → 专用提交。
   const blueprintCommit = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
     const requests = [];
@@ -2449,7 +2480,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   ) {
     throw new Error(`BROWSER_HARNESS_BLUEPRINT_STALE_COMMIT_FAILED:${JSON.stringify(staleCommit)}`);
   }
-  // 宿主组件文本编辑闭环（data target：写入既有 host-resource 参数，单 history entry）。
+  // AE-ED-C07 宿主组件文本编辑闭环（data target：写入既有 host-resource 参数，单 history entry）。
   const textCommit = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
     const requests = [];
@@ -2499,7 +2530,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   if ((await page.evaluate(() => window.baseScreenHarness.hostEvents.length)) !== hostEventCount) {
     throw new Error('BROWSER_HARNESS_BLUEPRINT_AUTHORING_EXECUTED_HOST_ACTION');
   }
-  // 内部事件面板只呈现摘要、能力状态与宿主请求入口，无内部表单/图形控件。
+  // AE-ED-C06 内部事件面板只呈现摘要、能力状态与宿主请求入口，无内部表单/图形控件。
   const internalSurface = await events.evaluate((panel) => ({
     hasRuleForm: panel.querySelector('[data-blueprint-rule]') !== null,
     hasGraph: panel.querySelector('[data-blueprint-graph]') !== null,
@@ -2516,7 +2547,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
       `BROWSER_HARNESS_BLUEPRINT_INTERNAL_SURFACE_FAILED:${JSON.stringify(internalSurface)}`,
     );
   }
-  // ECharts 语义面板：受限 Descriptor 完成常见配置，无需 raw option。
+  // AE-ED-C01/AE-EC-C01 ECharts 语义面板：受限 Descriptor 完成常见配置，无需 raw option。
   await designer.getByRole('tab', { name: '\u5916\u89c2' }).click();
   await designer.locator('[data-base-screen-component-id=echarts-demo]').click();
   const appearance = designer.locator('[data-properties]');
@@ -2571,7 +2602,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
         (component) => component.id === 'echarts-demo',
       )?.props?.series?.length === 2,
   );
-  // 数据 tab：字段选择器投影到宿主数据集字段。
+  // AE-ED-C04 数据 tab：字段选择器投影到宿主数据集字段。
   await designer.getByRole('tab', { name: '\u6570\u636e' }).click();
   const fieldSelector = designer.locator(
     '[data-inspector-pane=data] [data-descriptor-field-id="dimensionField"]',
@@ -2579,7 +2610,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   if ((await fieldSelector.locator('option').count()) < 2) {
     throw new Error('BROWSER_HARNESS_ECHARTS_FIELD_SELECTOR_FAILED');
   }
-  // 事件 tab：结构化事件声明 label 与能力提示。
+  // AE-ED-C05 事件 tab：结构化事件声明 label 与能力提示。
   await designer.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
   const eventText = await events.textContent();
   if (
@@ -2690,11 +2721,22 @@ async function assertDesignerControlStyles(designer) {
     const lightTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
+    const hostStyle = document.createElement('style');
+    hostStyle.textContent =
+      'base-screen-designer { --base-screen-designer-surface-workspace: rgb(10, 20, 30); }';
+    document.head.appendChild(hostStyle);
+    const hostStylesheetValue = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-workspace')
+      .trim();
     host.style.setProperty('--base-screen-designer-surface-workspace', 'rgb(1, 2, 3)');
     const overriddenTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
     host.style.removeProperty('--base-screen-designer-surface-workspace');
+    const restoredHostStylesheet = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-workspace')
+      .trim();
+    hostStyle.remove();
     const restoredLightTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
@@ -2703,12 +2745,23 @@ async function assertDesignerControlStyles(designer) {
     const restoredTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
+    const ancestor = document.createElement('div');
+    ancestor.style.setProperty('--base-screen-designer-surface-panel', 'rgb(70, 80, 90)');
+    host.before(ancestor);
+    ancestor.appendChild(host);
+    const inheritedPanel = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-panel')
+      .trim();
+    ancestor.replaceWith(host);
     canary.remove();
     return {
       ...before,
       lightTheme,
+      hostStylesheetValue,
       overriddenTheme,
+      restoredHostStylesheet,
       restoredLightTheme,
+      inheritedPanel,
       lightViewerFont,
       restoredTheme,
     };
@@ -2717,14 +2770,104 @@ async function assertDesignerControlStyles(designer) {
     styles === undefined ||
     styles.toolbarHeight !== 28 ||
     styles.theme === styles.lightTheme ||
+    styles.hostStylesheetValue !== 'rgb(10, 20, 30)' ||
     styles.overriddenTheme !== 'rgb(1, 2, 3)' ||
+    styles.restoredHostStylesheet !== 'rgb(10, 20, 30)' ||
     styles.restoredLightTheme !== styles.lightTheme ||
+    styles.inheritedPanel !== 'rgb(70, 80, 90)' ||
     styles.theme !== styles.restoredTheme ||
     styles.canaryFont === styles.workspaceFont ||
     styles.canaryInputHeight === 30 ||
     styles.viewerFont !== styles.lightViewerFont
   ) {
     throw new Error(`BROWSER_HARNESS_CONTROL_STYLE_FAILED:${JSON.stringify(styles)}`);
+  }
+}
+
+// R5：两个 Designer 的 theme/Token/style node 互不影响；disconnect/reconnect 和
+// 延迟初始化不累积 style node、不遗留跨实例状态。只依赖公开 `--base-screen-designer-*` 输入。
+async function assertDesignerThemeIsolation(page) {
+  const result = await page.evaluate(async () => {
+    const first = document.querySelector('base-screen-designer');
+    if (first === null) return { ok: false, reason: 'first-missing' };
+    const { catalog, designer } = window.baseScreenHarness;
+    const screenDocument = designer.document;
+    const firstStyleNodes = () => first.shadowRoot?.querySelectorAll('style').length ?? 0;
+    const firstWorkspace = () =>
+      getComputedStyle(first).getPropertyValue('--designer-surface-workspace').trim();
+
+    // 双实例：第二个实例使用不同 theme 与不同公共 Token 值。
+    const second = document.createElement('base-screen-designer');
+    second.catalog = catalog;
+    second.document = structuredClone(screenDocument);
+    second.setAttribute('theme', 'light');
+    second.style.setProperty('--base-screen-designer-surface-workspace', 'rgb(200, 210, 220)');
+    document.body.appendChild(second);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const secondWorkspace = () =>
+      getComputedStyle(second).getPropertyValue('--designer-surface-workspace').trim();
+    const secondStyleNodes = () => second.shadowRoot?.querySelectorAll('style').length ?? 0;
+
+    const before = {
+      firstWorkspace: firstWorkspace(),
+      secondWorkspace: secondWorkspace(),
+      firstStyleNodes: firstStyleNodes(),
+      secondStyleNodes: secondStyleNodes(),
+    };
+
+    // 切换第一个实例主题，验证第二个实例的 Token 不变。
+    first.setAttribute('theme', 'light');
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    const firstLight = firstWorkspace();
+    const secondAfterFirstSwitch = secondWorkspace();
+    first.removeAttribute('theme');
+
+    // disconnect/reconnect：style node 数量保持唯一，Token 不跨实例遗留。
+    second.remove();
+    const firstStyleAfterDetach = firstStyleNodes();
+    document.body.appendChild(second);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const secondStyleAfterReconnect = secondStyleNodes();
+    const secondWorkspaceAfterReconnect = secondWorkspace();
+
+    // 延迟初始化（无 catalog）：不创建 style node。
+    const third = document.createElement('base-screen-designer');
+    document.body.appendChild(third);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const thirdStyleBeforeCatalog = third.shadowRoot?.querySelectorAll('style').length ?? 0;
+    third.catalog = catalog;
+    third.document = structuredClone(screenDocument);
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const thirdStyleAfterCatalog = third.shadowRoot?.querySelectorAll('style').length ?? 0;
+
+    second.remove();
+    third.remove();
+    return {
+      ok: true,
+      before,
+      firstLight,
+      secondAfterFirstSwitch,
+      firstStyleAfterDetach,
+      secondStyleAfterReconnect,
+      secondWorkspaceAfterReconnect,
+      thirdStyleBeforeCatalog,
+      thirdStyleAfterCatalog,
+    };
+  });
+  if (
+    result.ok !== true ||
+    result.before.firstWorkspace === result.before.secondWorkspace ||
+    result.before.firstWorkspace === result.firstLight ||
+    result.before.secondWorkspace !== result.secondAfterFirstSwitch ||
+    result.before.firstStyleNodes < 1 ||
+    result.before.secondStyleNodes !== result.before.firstStyleNodes ||
+    result.firstStyleAfterDetach !== result.before.firstStyleNodes ||
+    result.secondStyleAfterReconnect !== result.before.secondStyleNodes ||
+    result.secondWorkspaceAfterReconnect !== result.before.secondWorkspace ||
+    result.thirdStyleBeforeCatalog !== 0 ||
+    result.thirdStyleAfterCatalog !== result.before.firstStyleNodes
+  ) {
+    throw new Error(`BROWSER_HARNESS_THEME_ISOLATION_FAILED:${JSON.stringify(result)}`);
   }
 }
 
@@ -2960,7 +3103,7 @@ async function assertEventSystemGuards(page, designer) {
   if (dragContained.own !== true || dragContained.hostPrevented !== false) {
     throw new Error(`BROWSER_HARNESS_DRAG_CONTAINMENT_FAILED: ${JSON.stringify(dragContained)}`);
   }
-  // R7：多实例 smoke —— 第二个实例挂载/移除后，首个实例的键盘拦截不受影响。
+  // AE-ED-C09 双实例 smoke：第二个实例挂载/移除后，首个实例的键盘拦截不受影响。
   const multiInstance = await page.evaluate(async () => {
     const second = document.createElement('base-screen-designer');
     document.body.appendChild(second);
