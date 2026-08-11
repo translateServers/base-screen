@@ -212,7 +212,7 @@ describe('applyScreenDocumentCommand', () => {
     }
   });
 
-  it('replaces a canonical blueprint as one command', () => {
+  it('AE-CR-C02 replaces a canonical blueprint as one command', () => {
     const document = documentWithComponents();
     const result = applyScreenDocumentCommand(document, {
       type: 'replace-blueprint',

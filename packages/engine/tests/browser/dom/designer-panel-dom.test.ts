@@ -32,7 +32,7 @@ describe('designer panel property parsing', () => {
     });
   });
 
-  it('rejects invalid number, enum, and json input before mutations', () => {
+  it('AE-ED-C02 rejects invalid number, enum, and json input before mutations', () => {
     const number: BaseScreenMaterialPropSchema = { kind: 'number' };
     const enumSchema: BaseScreenMaterialPropSchema = { kind: 'enum', values: ['left', 'right'] };
     const object: BaseScreenMaterialPropSchema = {
