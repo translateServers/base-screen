@@ -15,3 +15,4 @@
   - [x] Resolve public parsers from installed host workspace `@base-screen/*` packages via ESM `exports` entries, falling back to a Base Screen checkout `dist` (R6).
 - [x] Add focused fixtures and automated tests for valid generation, invalid snapshots, deterministic output, update rollback, document validation, and host workspace package resolution.
 - [x] Run Skill validation, focused tests, forward tests, and required repository quality gates; update the test matrix and checklist with evidence.
+- [x] Add explicit draft catalog overlay, material request helper, provenance routing, and published-only preflight.

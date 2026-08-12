@@ -121,6 +121,17 @@ class HostedMetricElement extends HostedMaterialElement {
   }
 }
 
+const draftBadgeManifest = {
+  ...hostedBadgeManifest,
+  type: 'harness.draft-badge',
+  tagName: 'harness-draft-badge',
+  name: '草稿徽章',
+};
+
+class DraftBadgeElement extends HostedBadgeElement {
+  static readonly manifest = draftBadgeManifest;
+}
+
 const packageResult = createMaterialPackage({
   id: 'harness.hosted',
   materials: [
@@ -140,6 +151,15 @@ if (!packageResult.ok) {
 }
 
 export const hostedMaterialPackage = packageResult.value;
+
+const draftPackageResult = createMaterialPackage({
+  id: 'harness.draft',
+  materials: [{ manifest: draftBadgeManifest, element: DraftBadgeElement as never }],
+});
+
+if (!draftPackageResult.ok) throw new Error('Draft material package fixture is invalid.');
+
+export const draftMaterialPackage = draftPackageResult.value;
 
 /** auto-register 风格入口（等价外部包 /auto-register 出口）：导入后调用即注册全部物料。 */
 export function autoRegisterHostedMaterialPackage(): ScreenParseResult<

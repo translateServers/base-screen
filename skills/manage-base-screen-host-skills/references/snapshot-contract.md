@@ -1,30 +1,49 @@
 # Host snapshot exporter contract
 
-The host package script named by `.base-screen/host-skills.json` receives the absolute output
-directory in `BASE_SCREEN_HOST_SKILL_CONTEXT_DIR`. It must write a single flat directory containing
-only the following files:
+The host package script named by `.base-screen/host-skills.json` receives the absolute path of a
+single temporary file in `BASE_SCREEN_HOST_SKILL_SNAPSHOT_FILE`. It must write one JSON object to
+that file with exactly these top-level fields:
 
-| File | Required | Purpose |
+```json
+{
+  "host": {},
+  "screenGuidelines": "...",
+  "materialGuidelines": "...",
+  "materialAuthoring": {},
+  "components": [],
+  "materials": [],
+  "resourceTypes": [],
+  "datasets": [],
+  "datasetSamples": [],
+  "materialProvenance": []
+}
+```
+
+| Field | Required | Purpose |
 | --- | --- | --- |
-| `host.json` | yes | Host identity, locale, and default canvas |
-| `design-guidelines.md` | yes | Dashboard visual and interaction rules |
-| `material-authoring.json` | yes | Framework, workspace, roots, registration policy, and write allowlist |
-| `material-guidelines.md` | yes | Material authoring rules |
-| `components.json` | yes | Sanitized reusable component metadata |
-| `materials.json` | yes | Existing public material manifests |
-| `resource-types.json` | yes | Host data-resource contributions |
-| `datasets.json` | yes | Host dataset descriptors and parameter schemas |
-| `dataset-samples.json` | no | Bounded samples classified as `sanitized` |
+| `host` | yes | Host identity, locale, and default canvas |
+| `screenGuidelines` | yes | Dashboard visual and interaction rules |
+| `materialGuidelines` | yes | Material authoring rules |
+| `materialAuthoring` | yes | Framework, workspace, roots, registration policy, and write allowlist |
+| `components` | yes | Sanitized reusable component metadata |
+| `materials` | yes | Existing public material manifests |
+| `resourceTypes` | yes | Host data-resource contributions |
+| `datasets` | yes | Host dataset descriptors and parameter schemas |
+| `datasetSamples` | no | Bounded samples classified as `sanitized` |
+| `materialProvenance` | no | Source classification for published materials (`code` or `online`) |
 
 The exporter should query the host's approved or enabled catalog through its existing authenticated
 client. It must filter draft/unpublished records before serialization. Approval state, tenant IDs,
-request IDs, timestamps, transport URLs, headers, credentials, private records, and executable
-source are not part of the output contract.
+request IDs, timestamps, transport URLs, headers, credentials, connection details, private records,
+executable source, and remote module addresses are not part of the output contract. Use stable IDs
+for ordering and omit request-dependent values.
 
-The output must be deterministic: use stable IDs for ordering and omit request-dependent values.
-The coordinator rejects unknown entries, directories, symbolic links, oversized files, missing
-required files, and malformed JSON. The two existing generators then apply the full Contracts and
-Plugin Core parsers, path checks, parameter authority checks, and credential-like value checks.
+The coordinator strictly rejects unknown fields, missing fields, credential-like values, executable
+content, remote URLs, and oversized data, then sorts every catalog array by stable identity and
+writes the canonical result as `.base-screen/host-snapshot.json`. The two generators then apply the
+full Contracts and Plugin Core parsers, path checks, parameter authority checks, and credential-like
+value checks.
 
 If authentication, authorization, network access, or catalog export fails, exit non-zero and write
-no partial context. The coordinator leaves the previously generated Skills untouched.
+no partial snapshot. The coordinator leaves the previously committed snapshot and generated Skills
+untouched.

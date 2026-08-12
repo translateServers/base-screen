@@ -7,7 +7,7 @@ description: {{DESCRIPTION_YAML}}
 
 Use this Skill to create or revise one Base Screen material in the host workspace. Read the host
 rules and workspace policy before editing; then load only the matching catalog entries and the
-selected framework route.
+selected framework route. This Skill never fetches or modifies online materials.
 
 ## Required workflow
 
@@ -24,7 +24,16 @@ selected framework route.
 4. Write a complete manifest and implementation in the configured source root. Keep all manifest,
    descriptor, event, and adapter values JSON-safe. Use only the selected public framework route;
    do not import Base Screen internals or access a private Engine store.
-5. Run the generated preflight validator before changing registration. For a new material, use the
+5. For design-time creation, use the `draft-only` workflow: create source, a focused test, the
+   complete manifest, and a `material-candidate.json` with `status: "pending-review"`,
+   `registration: "draft-only"`, stable host-namespaced `type`/`tagName`, and safe relative
+   `sourcePath`/`testPath`. Do not edit the configured registration file or plugin manifest in this
+   mode. The host must build, test, review, and accept the candidate before writing a
+   `draft-material-catalog.json` for one screen draft.
+6. If [material-provenance.json](references/material-provenance.json) exists, treat `online` entries
+   as read-only compatibility references. Only `code` entries marked editable and covered by the
+   workspace allowlist may be revised.
+7. Run the generated preflight validator before changing registration. For a new material, use the
    catalog duplicate check; for a targeted revision, pass the existing type explicitly:
 
    ```text
@@ -33,10 +42,10 @@ selected framework route.
    ```
 
    Stop on any diagnostic. Fix the manifest or source rather than weakening the validator.
-6. Add a focused test in the configured test root. Cover initial model rendering, prop/style defaults,
+8. Add a focused test in the configured test root. Cover initial model rendering, prop/style defaults,
    data-ready and data-error states when applicable, declared event payloads, and adapter behavior.
    Do not test through private Shadow DOM or host services.
-7. Follow the registration policy in `workspace.json`:
+9. Follow the registration policy in `workspace.json` for formal code materials:
    - `propose` (the safe default): stage source and tests, keep the configured registration file and
      plugin manifest unchanged, and report the exact target files plus a unified diff. A later explicit
      user request may apply that proposal only after rechecking the target contents.
@@ -45,9 +54,9 @@ selected framework route.
      registration function. For plugin mode, add only the material contribution to the named plugin
      manifest and keep activation in the host Plugin Manager.
    Never enumerate `customElements` or load a module from document data.
-8. Run only the declared verification scripts through the configured package manager. If an apply
+10. Run only the declared verification scripts through the configured package manager. If an apply
    operation fails, restore every registration target and leave the previous catalog state unchanged.
-9. Audit `git diff --name-only` against `allowedFiles` in `workspace.json`; in `propose` mode also
+11. Audit `git diff --name-only` against `allowedFiles` in `workspace.json`; in `propose` mode also
    verify that registration targets are unchanged. Stop if an unrelated file changed. Report the
    material identity, framework, changed files, checks, registration proposal or application result,
    and remaining host follow-up. The host must refresh its dashboard Skill snapshot after a catalog

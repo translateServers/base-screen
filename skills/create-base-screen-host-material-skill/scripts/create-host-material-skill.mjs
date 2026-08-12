@@ -1,37 +1,29 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { validateMaterialProvenance } from '../../shared/material-handoff.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = resolve(SCRIPT_DIR, '..');
 const TEMPLATE_ROOT = join(SKILL_ROOT, 'assets', 'host-material-skill-template');
 const GENERATOR = 'create-base-screen-host-material-skill';
-const ALLOWED_FILES = new Set([
-  'host.json',
-  'material-authoring.json',
-  'material-guidelines.md',
-  'components.json',
-  'materials.json',
-  'resource-types.json',
-  'datasets.json',
-  'dataset-samples.json',
-]);
-const REQUIRED_FILES = new Set([
-  'host.json',
-  'material-authoring.json',
-  'material-guidelines.md',
-  'components.json',
-  'materials.json',
-  'resource-types.json',
-  'datasets.json',
-]);
+const SNAPSHOT_TOP_LEVEL = {
+  host: 'object',
+  screenGuidelines: 'string',
+  materialGuidelines: 'string',
+  materialAuthoring: 'object',
+  components: 'array',
+  materials: 'array',
+  resourceTypes: 'array',
+  datasets: 'array',
+  datasetSamples: 'array',
+  materialProvenance: 'array',
+};
+const MAX_SNAPSHOT_BYTES = 12 * 1024 * 1024;
 const MAX_TEXT_BYTES = 64 * 1024;
-const MAX_CATALOG_BYTES = 4 * 1024 * 1024;
-const MAX_RESOURCE_BYTES = 2 * 1024 * 1024;
-const MAX_SAMPLE_FILE_BYTES = 1024 * 1024;
 const MAX_SAMPLE_BYTES = 64 * 1024;
 const MAX_SAMPLE_ROWS = 50;
 const MAX_SAMPLE_TOTAL_BYTES = 1024 * 1024;
@@ -41,107 +33,76 @@ const SAFE_GLOB = /^(?!\/)(?!.*\\)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._@+\-/]+\
 const IDENTIFIER = /^[A-Za-z][A-Za-z0-9._:-]{0,63}$/u;
 
 export async function createHostMaterialSkill({
-  inputDir,
+  snapshotFile,
   outputParent,
   checkOnly = false,
   update = false,
 }) {
-  if (typeof inputDir !== 'string' || inputDir.length === 0) {
-    throw new Error('An input bundle directory is required.');
+  if (typeof snapshotFile !== 'string' || snapshotFile.length === 0) {
+    throw new Error('A canonical host snapshot file is required.');
   }
   const apis = await loadPublicApis();
-  const bundle = await readAndValidateBundle(resolve(inputDir), apis);
+  const bundle = await readAndValidateSnapshot(resolve(snapshotFile), apis);
   const parent = resolve(outputParent ?? defaultSkillParent());
   const files = await renderSkillFiles(bundle);
   if (checkOnly) {
-    return { skillName: bundle.skillName, target: join(parent, bundle.skillName), files };
+    return {
+      skillName: bundle.skillName,
+      target: join(parent, bundle.skillName),
+      files,
+      snapshotDigest: bundle.snapshotDigest,
+    };
   }
   const target = await installSkill(parent, bundle.skillName, files, update);
-  return { skillName: bundle.skillName, target, files };
+  return {
+    skillName: bundle.skillName,
+    target,
+    files,
+    snapshotDigest: bundle.snapshotDigest,
+  };
 }
 
-export async function readAndValidateBundle(inputDir, apis) {
-  const entries = await readdir(inputDir, { withFileTypes: true });
-  const names = new Set(entries.map((entry) => entry.name));
+export async function readAndValidateSnapshot(snapshotFile, apis) {
+  const raw = await readBounded(snapshotFile, MAX_SNAPSHOT_BYTES);
   const errors = [];
-  for (const entry of entries) {
-    if (!entry.isFile() || !ALLOWED_FILES.has(entry.name)) {
-      errors.push(`input bundle contains unsupported entry "${entry.name}"`);
-    }
+  const snapshot = parseJson(raw, 'host-snapshot.json', errors);
+  if (snapshot === undefined) throw validationError(errors);
+  if (!isObject(snapshot)) {
+    throw validationError(['host snapshot must contain a JSON object']);
   }
-  for (const required of REQUIRED_FILES) {
-    if (!names.has(required)) errors.push(`input bundle is missing ${required}`);
+  const allowed = new Set(Object.keys(SNAPSHOT_TOP_LEVEL));
+  for (const key of Object.keys(snapshot)) {
+    if (!allowed.has(key)) errors.push(`host snapshot contains unknown field ${key}`);
+  }
+  for (const [name, kind] of Object.entries(SNAPSHOT_TOP_LEVEL)) {
+    if (!Object.hasOwn(snapshot, name)) {
+      if (name !== 'datasetSamples' && name !== 'materialProvenance')
+        errors.push(`host snapshot is missing ${name}`);
+      continue;
+    }
+    const value = snapshot[name];
+    if (kind === 'object' && !isObject(value))
+      errors.push(`host snapshot field ${name} must contain an object`);
+    if (kind === 'string' && (typeof value !== 'string' || value.length === 0))
+      errors.push(`host snapshot field ${name} must be a non-empty string`);
+    if (kind === 'array' && !Array.isArray(value))
+      errors.push(`host snapshot field ${name} must contain an array`);
   }
   if (errors.length > 0) throw validationError(errors);
 
-  const raw = new Map();
-  raw.set('host.json', await readBounded(join(inputDir, 'host.json'), MAX_TEXT_BYTES));
-  raw.set(
-    'material-authoring.json',
-    await readBounded(join(inputDir, 'material-authoring.json'), MAX_TEXT_BYTES),
-  );
-  raw.set(
-    'material-guidelines.md',
-    await readBounded(join(inputDir, 'material-guidelines.md'), MAX_TEXT_BYTES),
-  );
-  raw.set(
-    'components.json',
-    await readBounded(join(inputDir, 'components.json'), MAX_CATALOG_BYTES),
-  );
-  raw.set('materials.json', await readBounded(join(inputDir, 'materials.json'), MAX_CATALOG_BYTES));
-  raw.set(
-    'resource-types.json',
-    await readBounded(join(inputDir, 'resource-types.json'), MAX_RESOURCE_BYTES),
-  );
-  raw.set('datasets.json', await readBounded(join(inputDir, 'datasets.json'), MAX_CATALOG_BYTES));
-  if (names.has('dataset-samples.json')) {
-    raw.set(
-      'dataset-samples.json',
-      await readBounded(join(inputDir, 'dataset-samples.json'), MAX_SAMPLE_FILE_BYTES),
-    );
-  }
-
-  const host = parseJson(raw.get('host.json'), 'host.json', errors);
-  const authoring = parseJson(
-    raw.get('material-authoring.json'),
-    'material-authoring.json',
-    errors,
-  );
-  const guidelines = raw.get('material-guidelines.md').trim();
-  if (guidelines.length === 0) errors.push('material-guidelines.md must not be empty');
+  const normalizedHost = validateHost(snapshot.host, apis, errors);
+  const normalizedAuthoring = validateAuthoring(snapshot.materialAuthoring, errors);
+  const guidelines = snapshot.materialGuidelines.trim();
+  if (guidelines.length === 0) errors.push('materialGuidelines must not be empty');
   if (containsSecret(guidelines))
-    errors.push('material-guidelines.md contains a credential-like value');
-  const normalizedHost = validateHost(host, apis, errors);
-  const normalizedAuthoring = validateAuthoring(authoring, errors);
-  const components = parseComponents(
-    parseJson(raw.get('components.json'), 'components.json', errors),
-    normalizedAuthoring.framework,
-    errors,
-  );
-  const materials = parseMaterialArray(
-    parseJson(raw.get('materials.json'), 'materials.json', errors),
-    apis,
-    errors,
-  );
-  const resourceTypes = parseResourceTypes(
-    parseJson(raw.get('resource-types.json'), 'resource-types.json', errors),
-    apis,
-    errors,
-  );
-  const datasets = parseDatasetArray(
-    parseJson(raw.get('datasets.json'), 'datasets.json', errors),
-    apis,
-    errors,
-  );
+    errors.push('materialGuidelines contains a credential-like value');
+  const components = parseComponents(snapshot.components, normalizedAuthoring.framework, errors);
+  const materials = parseMaterialArray(snapshot.materials, apis, errors);
+  const resourceTypes = parseResourceTypes(snapshot.resourceTypes, apis, errors);
+  const datasets = parseDatasetArray(snapshot.datasets, apis, errors);
   validateDatasetParameterAuthority(datasets, resourceTypes, apis, errors);
-  const samples = parseSamples(
-    raw.has('dataset-samples.json')
-      ? parseJson(raw.get('dataset-samples.json'), 'dataset-samples.json', errors)
-      : [],
-    datasets,
-    apis,
-    errors,
-  );
+  const samples = parseSamples(snapshot.datasetSamples ?? [], datasets, apis, errors);
+  const provenance = parseMaterialProvenance(snapshot.materialProvenance, materials, errors);
   if (errors.length > 0) throw validationError(errors);
 
   return {
@@ -153,10 +114,21 @@ export async function readAndValidateBundle(inputDir, apis) {
     resourceTypes,
     datasets,
     samples,
-    inputDigests: Object.fromEntries(
-      [...raw.entries()].map(([name, value]) => [name, sha256(value)]),
-    ),
+    provenance,
+    snapshotDigest: sha256(raw),
   };
+}
+
+function parseMaterialProvenance(input, materials, errors) {
+  if (input === undefined) return [];
+  const result = validateMaterialProvenance(input, {
+    materialTypes: materials.map((material) => material.type),
+  });
+  if (!result.ok) {
+    for (const diagnostic of result.diagnostics) errors.push(diagnostic.message);
+    return [];
+  }
+  return [...input].sort((left, right) => left.type.localeCompare(right.type));
 }
 
 function validateHost(input, apis, errors) {
@@ -591,12 +563,22 @@ function parseSamples(input, datasets, apis, errors) {
 }
 
 async function renderSkillFiles(bundle) {
-  const [skillTemplate, interfaceTemplate, contract, framework, validator] = await Promise.all([
+  const [
+    skillTemplate,
+    interfaceTemplate,
+    contract,
+    framework,
+    validator,
+    handoff,
+    candidateScript,
+  ] = await Promise.all([
     readFile(join(TEMPLATE_ROOT, 'SKILL.md'), 'utf8'),
     readFile(join(TEMPLATE_ROOT, 'agents', 'openai.yaml'), 'utf8'),
     readFile(join(TEMPLATE_ROOT, 'references', 'material-contract.md'), 'utf8'),
     readFile(join(TEMPLATE_ROOT, 'references', `framework-${bundle.framework}.md`), 'utf8'),
     readFile(join(TEMPLATE_ROOT, 'scripts', 'validate-material-definition.mjs'), 'utf8'),
+    readFile(join(SKILL_ROOT, '..', 'shared', 'material-handoff.mjs'), 'utf8'),
+    readFile(join(TEMPLATE_ROOT, 'scripts', 'create-material-candidate.mjs'), 'utf8'),
   ]);
   const description = `Create or revise ${bundle.hostName} Base Screen materials in the host workspace.`;
   const displayName = `${bundle.hostName} 物料创建`;
@@ -634,7 +616,11 @@ async function renderSkillFiles(bundle) {
   files.set('references/resource-types.json', json(bundle.resourceTypes));
   files.set('references/datasets.json', json(bundle.datasets));
   if (bundle.samples.length > 0) files.set('references/dataset-samples.json', json(bundle.samples));
+  if (bundle.provenance.length > 0)
+    files.set('references/material-provenance.json', json(bundle.provenance));
   files.set('scripts/validate-material-definition.mjs', validator);
+  files.set('scripts/material-handoff.mjs', handoff);
+  files.set('scripts/create-material-candidate.mjs', candidateScript);
   files.set(
     'generation-manifest.json',
     json({
@@ -642,7 +628,7 @@ async function renderSkillFiles(bundle) {
       hostId: bundle.hostId,
       skillName: bundle.skillName,
       framework: bundle.framework,
-      inputs: bundle.inputDigests,
+      snapshotDigest: bundle.snapshotDigest,
     }),
   );
   return files;
@@ -947,14 +933,20 @@ function parseArgs(argv) {
       else options.outputParent = value;
     } else throw new Error(`Unknown argument ${argument}`);
   }
-  if (options.inputDir === undefined) throw new Error('--input is required');
+  if (options.inputDir === undefined)
+    throw new Error('--input <canonical snapshot file> is required');
   return options;
 }
 
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
-    const result = await createHostMaterialSkill(options);
+    const result = await createHostMaterialSkill({
+      snapshotFile: options.inputDir,
+      outputParent: options.outputParent,
+      checkOnly: options.checkOnly,
+      update: options.update,
+    });
     if (options.checkOnly) console.log(`Snapshot is valid for ${result.skillName}.`);
     else console.log(`Generated ${result.skillName} at ${result.target}.`);
   } catch (error) {

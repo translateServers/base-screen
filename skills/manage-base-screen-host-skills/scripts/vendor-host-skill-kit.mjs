@@ -3,28 +3,41 @@ import { createHash } from 'node:crypto';
 import { lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { initHostSkillConfig, refreshHostSkills } from './manage-host-skills.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SOURCE_SKILLS_ROOT = resolve(SCRIPT_DIR, '..', '..');
 const MANIFEST_RELATIVE = join('.base-screen', 'host-skill-tooling.json');
+const TOOLING_RELATIVE = join('.base-screen', 'tooling', 'base-screen-host-skills');
+const CONFIG_RELATIVE = join('.base-screen', 'host-skills.json');
 const MANIFEST_GENERATOR = 'base-screen-host-skill-kit';
+const LEGACY_MANIFEST_RELATIVE = join('.base-screen', 'host-skill-kit-manifest.json');
+const HOST_SCRIPT_NAME = 'base-screen:skills';
+const HOST_SCRIPT_VALUE =
+  'node .base-screen/tooling/base-screen-host-skills/manage-base-screen-host-skills/scripts/manage-host-skills.mjs';
 const MANAGED_SKILLS = [
   'create-base-screen-host-skill',
   'create-base-screen-host-material-skill',
   'manage-base-screen-host-skills',
 ];
+const MANAGED_AUXILIARY = ['shared/material-handoff.mjs'];
 
-export async function vendorHostSkillKit({ hostRoot, update = false } = {}) {
+export async function vendorHostSkillKit({ hostRoot, packageManager, snapshotScript } = {}) {
   if (typeof hostRoot !== 'string' || hostRoot.length === 0)
     throw new Error('--host must point to a host repository.');
   const targetRoot = resolve(hostRoot);
   if ((await pathState(join(targetRoot, 'package.json'))) !== 'file')
     throw new Error(`Host root must contain package.json: ${targetRoot}`);
-  const targetSkillsRoot = join(targetRoot, '.agents', 'skills');
+  const targetToolingRoot = join(targetRoot, TOOLING_RELATIVE);
   const targetManifestPath = join(targetRoot, MANIFEST_RELATIVE);
+  const legacyManifestPath = join(targetRoot, LEGACY_MANIFEST_RELATIVE);
+  const targetConfigPath = join(targetRoot, CONFIG_RELATIVE);
+  const packageFile = join(targetRoot, 'package.json');
+
   const sourceFiles = await collectManagedFiles(SOURCE_SKILLS_ROOT);
   const manifest = {
     generator: MANIFEST_GENERATOR,
+    layout: 'tooling',
     sourceRevision: await readGitRevision(SOURCE_SKILLS_ROOT),
     sourceDigest: digestFiles(sourceFiles),
     managedSkills: MANAGED_SKILLS.slice(),
@@ -32,62 +45,201 @@ export async function vendorHostSkillKit({ hostRoot, update = false } = {}) {
       [...sourceFiles.entries()].map(([name, content]) => [name, sha256(content)]),
     ),
   };
-  await assertSupplyState(targetSkillsRoot, targetManifestPath, update, manifest);
-  await installManagedFiles(targetSkillsRoot, targetManifestPath, sourceFiles, manifest, update);
-  return { targetRoot, targetSkillsRoot, targetManifestPath, manifest };
+
+  // Preflight (no mutation).
+  const manifestState = await pathState(targetManifestPath);
+  const legacyManifestState = await pathState(legacyManifestPath);
+  if (legacyManifestState === 'file' && manifestState === 'file')
+    throw new Error(
+      'Both host-skill-tooling.json and host-skill-kit-manifest.json exist; remove the obsolete legacy manifest, then re-run.',
+    );
+  const isUpdate = manifestState === 'file';
+  await assertSupplyState(targetToolingRoot, targetManifestPath, isUpdate, manifest);
+  const legacy =
+    legacyManifestState === 'file'
+      ? await prepareLegacyMigration(targetRoot, legacyManifestPath)
+      : await prepareLegacyCleanup(targetRoot, targetManifestPath, isUpdate);
+  const packageJson = await readJson(packageFile);
+  assertHostScriptCompatible(packageJson);
+
+  // Apply, with rollback of every artifact on any later failure.
+  const packageBackup = await readOptional(packageFile);
+  let configCreated = false;
+  let toolkit;
+  let generated;
+  try {
+    if ((await pathState(targetConfigPath)) === 'missing') {
+      await initHostSkillConfig({ root: targetRoot, packageManager, snapshotScript });
+      configCreated = true;
+    } else {
+      if ((await pathState(targetConfigPath)) !== 'file')
+        throw new Error(`Host Skill config must be a file: ${targetConfigPath}`);
+      if (packageManager !== undefined || snapshotScript !== undefined) {
+        throw new Error(
+          '--package-manager and --snapshot-script only apply when host-skills.json is absent.',
+        );
+      }
+    }
+    await refreshHostSkills({ root: targetRoot, dryRun: true });
+    toolkit = await installManagedFiles(
+      targetToolingRoot,
+      targetManifestPath,
+      sourceFiles,
+      manifest,
+      isUpdate,
+    );
+    generated = await refreshHostSkills({ root: targetRoot });
+    await registerHostScript(packageFile, packageJson);
+    await removeLegacyArtifacts(legacy);
+    await toolkit.commit();
+    return {
+      targetRoot,
+      targetToolingRoot,
+      targetManifestPath,
+      targetConfigPath,
+      configCreated,
+      manifest,
+      generated,
+    };
+  } catch (error) {
+    await toolkit?.restore().catch(() => {});
+    if (packageBackup !== undefined) await writeFile(packageFile, packageBackup).catch(() => {});
+    else await rm(packageFile, { force: true }).catch(() => {});
+    if (configCreated) await rm(targetConfigPath, { force: true }).catch(() => {});
+    throw error;
+  }
 }
 
-async function assertSupplyState(skillsRoot, manifestPath, update, nextManifest) {
+async function assertSupplyState(toolingRoot, manifestPath, update, nextManifest) {
   const existingManifestState = await pathState(manifestPath);
-  const existingManaged = await Promise.all(
+  const managedStates = await Promise.all(
     MANAGED_SKILLS.map(async (skillName) => ({
       skillName,
-      state: await pathState(join(skillsRoot, skillName)),
+      state: await pathState(join(toolingRoot, skillName)),
     })),
   );
   if (!update) {
     if (
       existingManifestState !== 'missing' ||
-      existingManaged.some((item) => item.state !== 'missing')
+      managedStates.some((item) => item.state !== 'missing')
     )
       throw new Error(
-        'Refusing to overwrite existing host Skill tooling; pass --update for a managed kit.',
+        'Refusing to overwrite existing host Skill tooling; re-run the same command for a managed update.',
       );
     return;
   }
-  if (
-    existingManifestState !== 'file' ||
-    existingManaged.some((item) => item.state !== 'directory')
-  )
-    throw new Error('Refusing to update an incomplete or unmarked host Skill tooling kit.');
   const existingManifest = await readJson(manifestPath);
   validateManifest(existingManifest);
-  const currentFiles = await collectManagedFiles(skillsRoot);
+  if (existingManifestState !== 'file' || managedStates.some((item) => item.state !== 'directory'))
+    throw new Error('Refusing to update an incomplete or unmarked host Skill tooling kit.');
+  const currentFiles = await collectManagedFiles(toolingRoot);
+  const managedCurrentFiles = new Map(
+    [...currentFiles.entries()].filter(([name]) => Object.hasOwn(existingManifest.files, name)),
+  );
   const expectedNames = Object.keys(existingManifest.files).sort();
-  const currentNames = [...currentFiles.keys()].sort();
+  const currentNames = [...managedCurrentFiles.keys()].sort();
   if (JSON.stringify(expectedNames) !== JSON.stringify(currentNames))
     throw new Error('Refusing to update host Skill tooling with missing or extra files.');
-  for (const [name, content] of currentFiles) {
+  for (const [name, content] of managedCurrentFiles) {
     if (sha256(content) !== existingManifest.files[name])
       throw new Error(`Refusing to update manually changed managed file: ${name}`);
   }
-  if (digestFiles(currentFiles) !== existingManifest.sourceDigest)
+  if (digestFiles(managedCurrentFiles) !== existingManifest.sourceDigest)
     throw new Error('Refusing to update a manually changed host Skill tooling manifest.');
   if (!MANAGED_SKILLS.every((skillName) => nextManifest.managedSkills.includes(skillName)))
     throw new Error('Next tooling manifest does not contain the complete managed Skill set.');
 }
 
+async function prepareLegacyMigration(targetRoot, legacyManifestPath) {
+  const legacyManifest = await readJson(legacyManifestPath);
+  if (
+    !isObject(legacyManifest) ||
+    legacyManifest.generator !== MANIFEST_GENERATOR ||
+    !isObject(legacyManifest.files) ||
+    typeof legacyManifest.sourceDigest !== 'string'
+  )
+    throw new Error('Legacy tooling manifest is invalid; migrate the old layout manually.');
+  const legacySkillsRoot = join(targetRoot, '.agents', 'skills');
+  const { mismatch } = await findLegacyMismatch(legacySkillsRoot, legacyManifest);
+  if (mismatch !== null)
+    throw new Error(
+      `Legacy layout is not fully managed (${mismatch}); fix or remove the manual change, then re-run.`,
+    );
+  return {
+    kind: 'migration',
+    legacyManifestPath,
+    legacySkillsRoot,
+    skills: MANAGED_SKILLS.slice(),
+  };
+}
+
+async function prepareLegacyCleanup(targetRoot, manifestPath, update) {
+  if (!update) return { kind: 'none', legacySkillsRoot: join(targetRoot, '.agents', 'skills') };
+  const manifest = await readJson(manifestPath);
+  const legacySkillsRoot = join(targetRoot, '.agents', 'skills');
+  const { mismatch, present } = await findLegacyMismatch(legacySkillsRoot, manifest);
+  if (!present) return { kind: 'none', legacySkillsRoot };
+  if (mismatch !== null) {
+    throw new Error(
+      `Legacy Skill copies under .agents/skills are not fully managed (${mismatch}); move them away, then re-run.`,
+    );
+  }
+  return {
+    kind: 'cleanup',
+    legacyManifestPath: undefined,
+    legacySkillsRoot,
+    skills: MANAGED_SKILLS.slice(),
+  };
+}
+
+async function findLegacyMismatch(legacySkillsRoot, manifest) {
+  const managedPrefixes = new Set(MANAGED_SKILLS);
+  let present = false;
+  for (const prefix of managedPrefixes) {
+    const state = await pathState(join(legacySkillsRoot, prefix));
+    if (state === 'directory' || state === 'file') present = true;
+  }
+  if (!present) return { mismatch: null, present: false };
+  const legacyFiles = await collectManagedFiles(legacySkillsRoot);
+  for (const [name, digest] of Object.entries(manifest.files)) {
+    const prefix = name.split('/')[0];
+    if (!managedPrefixes.has(prefix)) continue;
+    const content = legacyFiles.get(name);
+    if (content === undefined) return { mismatch: `missing managed file: ${name}`, present: true };
+    if (sha256(content) !== digest)
+      return { mismatch: `modified managed file: ${name}`, present: true };
+  }
+  const extra = [...legacyFiles.keys()].filter((name) => {
+    const prefix = name.split('/')[0];
+    return managedPrefixes.has(prefix) && !Object.hasOwn(manifest.files, name);
+  });
+  if (extra.length > 0)
+    return { mismatch: `extra file(s) not in the manifest: ${extra.join(', ')}`, present: true };
+  return { mismatch: null, present: true };
+}
+
+async function removeLegacyArtifacts(legacy) {
+  if (legacy.kind === 'none') return;
+  for (const skillName of legacy.skills) {
+    await rm(join(legacy.legacySkillsRoot, skillName), { recursive: true, force: true }).catch(
+      () => {},
+    );
+  }
+  if (legacy.legacyManifestPath !== undefined)
+    await rm(legacy.legacyManifestPath, { force: true }).catch(() => {});
+}
+
 async function installManagedFiles(
-  targetSkillsRoot,
+  targetToolingRoot,
   targetManifestPath,
   sourceFiles,
   manifest,
   update,
 ) {
-  await mkdir(targetSkillsRoot, { recursive: true });
+  await mkdir(targetToolingRoot, { recursive: true });
   await mkdir(dirname(targetManifestPath), { recursive: true });
-  const stage = await mkdtemp(join(targetSkillsRoot, '.base-screen-host-kit-stage-'));
-  const backup = await mkdtemp(join(targetSkillsRoot, '.base-screen-host-kit-backup-'));
+  const stage = await mkdtemp(join(targetToolingRoot, '.base-screen-host-kit-stage-'));
+  const backup = await mkdtemp(join(targetToolingRoot, '.base-screen-host-kit-backup-'));
   const moved = [];
   const placed = [];
   const oldManifest = await readOptional(targetManifestPath);
@@ -101,27 +253,78 @@ async function installManagedFiles(
     }
     if (update) {
       for (const skillName of MANAGED_SKILLS) {
-        await rename(join(targetSkillsRoot, skillName), join(backup, skillName));
+        await rename(join(targetToolingRoot, skillName), join(backup, skillName));
         moved.push(skillName);
+      }
+      for (const name of MANAGED_AUXILIARY) {
+        if ((await pathState(join(targetToolingRoot, name))) !== 'file') continue;
+        await mkdir(dirname(join(backup, name)), { recursive: true });
+        await rename(join(targetToolingRoot, name), join(backup, name));
+        moved.push(name);
       }
     }
     for (const skillName of MANAGED_SKILLS) {
-      await rename(join(stage, skillName), join(targetSkillsRoot, skillName));
+      await rename(join(stage, skillName), join(targetToolingRoot, skillName));
       placed.push(skillName);
+    }
+    for (const name of MANAGED_AUXILIARY) {
+      await mkdir(dirname(join(targetToolingRoot, name)), { recursive: true });
+      await rename(join(stage, name), join(targetToolingRoot, name));
+      placed.push(name);
     }
     await atomicWrite(targetManifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   } catch (error) {
     for (const skillName of placed)
-      await rm(join(targetSkillsRoot, skillName), { recursive: true, force: true }).catch(() => {});
-    for (const skillName of moved)
-      await rename(join(backup, skillName), join(targetSkillsRoot, skillName)).catch(() => {});
+      await rm(join(targetToolingRoot, skillName), { recursive: true, force: true }).catch(
+        () => {},
+      );
+    for (const skillName of moved) {
+      await mkdir(dirname(join(targetToolingRoot, skillName)), { recursive: true });
+      await rename(join(backup, skillName), join(targetToolingRoot, skillName)).catch(() => {});
+    }
     if (oldManifest === undefined) await rm(targetManifestPath, { force: true }).catch(() => {});
     else await atomicWrite(targetManifestPath, oldManifest).catch(() => {});
-    throw error;
-  } finally {
     await rm(stage, { recursive: true, force: true });
     await rm(backup, { recursive: true, force: true });
+    throw error;
   }
+  return {
+    async restore() {
+      for (const skillName of placed)
+        await rm(join(targetToolingRoot, skillName), { recursive: true, force: true }).catch(
+          () => {},
+        );
+      for (const skillName of moved) {
+        await mkdir(dirname(join(targetToolingRoot, skillName)), { recursive: true });
+        await rename(join(backup, skillName), join(targetToolingRoot, skillName)).catch(() => {});
+      }
+      if (oldManifest === undefined) await rm(targetManifestPath, { force: true }).catch(() => {});
+      else await atomicWrite(targetManifestPath, oldManifest).catch(() => {});
+      await rm(stage, { recursive: true, force: true });
+      await rm(backup, { recursive: true, force: true });
+    },
+    async commit() {
+      await rm(stage, { recursive: true, force: true });
+      await rm(backup, { recursive: true, force: true });
+    },
+  };
+}
+
+function assertHostScriptCompatible(packageJson) {
+  if (!isObject(packageJson.scripts)) return;
+  const existing = packageJson.scripts[HOST_SCRIPT_NAME];
+  if (existing !== undefined && existing !== HOST_SCRIPT_VALUE) {
+    throw new Error(
+      `package.json already defines "${HOST_SCRIPT_NAME}" as ${JSON.stringify(existing)}; the toolkit requires exactly ${JSON.stringify(HOST_SCRIPT_VALUE)}. Remove or adjust the conflicting script, then re-run.`,
+    );
+  }
+}
+
+async function registerHostScript(packageFile, packageJson) {
+  if (!isObject(packageJson.scripts)) packageJson.scripts = {};
+  if (packageJson.scripts[HOST_SCRIPT_NAME] !== undefined) return;
+  packageJson.scripts[HOST_SCRIPT_NAME] = HOST_SCRIPT_VALUE;
+  await writeFile(packageFile, `${JSON.stringify(packageJson, null, 2)}\n`, 'utf8');
 }
 
 async function collectManagedFiles(root) {
@@ -135,6 +338,14 @@ async function collectManagedFiles(root) {
     }
     if (state !== 'directory') throw new Error(`Managed Skill must be a directory: ${skillRoot}`);
     await collectDirectoryFiles(skillRoot, root, result);
+  }
+  for (const name of MANAGED_AUXILIARY) {
+    const auxiliaryPath = join(root, name);
+    if ((await pathState(auxiliaryPath)) === 'file') {
+      result.set(name, await readFile(auxiliaryPath));
+    } else if (root === SOURCE_SKILLS_ROOT) {
+      throw new Error(`Shared Skill helper is missing: ${auxiliaryPath}`);
+    }
   }
   return result;
 }
@@ -238,14 +449,22 @@ function isObject(value) {
 }
 
 function parseArgs(argv) {
-  const options = { hostRoot: undefined, update: false };
+  const options = {
+    hostRoot: undefined,
+    packageManager: undefined,
+    snapshotScript: undefined,
+  };
   for (let index = 0; index < argv.length; index++) {
     const argument = argv[index];
     if (argument === '--host') {
       options.hostRoot = argv[++index];
       if (options.hostRoot === undefined) throw new Error('--host requires a value.');
-    } else if (argument === '--update') options.update = true;
-    else if (argument !== '--help') throw new Error(`Unknown argument ${argument}.`);
+    } else if (argument === '--package-manager' || argument === '--snapshot-script') {
+      const value = argv[++index];
+      if (value === undefined) throw new Error(`${argument} requires a value.`);
+      if (argument === '--package-manager') options.packageManager = value;
+      else options.snapshotScript = value;
+    } else if (argument !== '--help') throw new Error(`Unknown argument ${argument}.`);
   }
   if (options.hostRoot === undefined) throw new Error('--host is required.');
   return options;
@@ -254,8 +473,20 @@ function parseArgs(argv) {
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
-    const result = await vendorHostSkillKit({ hostRoot: options.hostRoot, update: options.update });
-    console.log(`Supplied ${result.manifest.managedSkills.join(', ')} to ${result.targetRoot}.`);
+    if (options.hostRoot === undefined) {
+      console.log(
+        'Usage: node vendor-host-skill-kit.mjs --host <host-root> [--package-manager <pnpm|npm|yarn>] [--snapshot-script <name>]',
+      );
+      return;
+    }
+    const result = await vendorHostSkillKit({
+      hostRoot: options.hostRoot,
+      packageManager: options.packageManager,
+      snapshotScript: options.snapshotScript,
+    });
+    console.log(
+      `Installed the host toolkit at ${result.targetToolingRoot} and refreshed ${result.generated.screenTarget} and ${result.generated.materialTarget}.`,
+    );
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
     process.exitCode = 1;
@@ -268,4 +499,9 @@ if (
 )
   void main();
 
-export const vendorInternals = { collectManagedFiles, digestFiles, validateManifest };
+export const vendorInternals = {
+  collectManagedFiles,
+  digestFiles,
+  parseArgs,
+  validateManifest,
+};

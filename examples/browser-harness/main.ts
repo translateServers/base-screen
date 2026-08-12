@@ -46,6 +46,7 @@ import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
 // 由宿主审核模块来源并负责失败处理；Base Screen 只消费加载后的可信模块。
 const hostedModule = await import('./hosted-material-package.ts');
 const hostedMaterialPackage = hostedModule.hostedMaterialPackage;
+const draftMaterialPackage = hostedModule.draftMaterialPackage;
 
 if (new URLSearchParams(window.location.search).has('designer')) {
   document.body.dataset.layout = 'designer';
@@ -259,6 +260,13 @@ if (!hostedDefinitions.ok) {
 }
 const hostedEntries = hostedDefinitions.value;
 const hostedCatalog = createBaseScreenMaterialCatalog(hostedEntries);
+const draftDefinitions = draftMaterialPackage.define();
+if (!draftDefinitions.ok) {
+  throw new Error('Base Screen browser harness failed to register its draft material package.');
+}
+const draftEntries = draftDefinitions.value;
+const draftCatalog = createBaseScreenMaterialCatalog(draftEntries);
+const combinedDraftCatalog = createBaseScreenMaterialCatalog([...hostedEntries, ...draftEntries]);
 
 const screenDocument = {
   canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
@@ -783,6 +791,44 @@ Object.assign(window, {
     getEnvelope: () => envelope,
     hostedPackage: hostedMaterialPackage,
     hostedEntries,
+    draftPackage: draftMaterialPackage,
+    draftEntries,
+    draftCatalog,
+    combinedDraftCatalog,
+    createDraftDesignerDemo: () => {
+      const draftDesigner = document.createElement('base-screen-designer') as typeof designer;
+      draftDesigner.catalog = combinedDraftCatalog;
+      draftDesigner.document = {
+        canvas: { width: 960, height: 540, backgroundColor: '#111827' },
+        components: [
+          {
+            id: 'draft-badge',
+            type: draftEntries[0]!.manifest.type,
+            name: '草稿徽章',
+            parentId: null,
+            position: { x: 40, y: 40 },
+            size: { width: 260, height: 72 },
+            rotation: 0,
+            zIndex: 0,
+            status: { locked: false, hidden: false },
+            props: draftEntries[0]!.manifest.defaultProps,
+            style: draftEntries[0]!.manifest.defaultStyle,
+            dataSource: { type: 'static' as const, value: '草稿数据' },
+          },
+        ],
+        variables: [],
+        blueprint: { rules: [] },
+      };
+      document.body.appendChild(draftDesigner);
+      return draftDesigner;
+    },
+    publishDraftPreflight: (draftDocument: { components?: Array<{ type?: string }> }) => {
+      const draftTypes = new Set(draftEntries.map((entry) => entry.manifest.type));
+      const blocked = (draftDocument.components ?? []).some((component) =>
+        draftTypes.has(component.type ?? ''),
+      );
+      return blocked ? { ok: false, code: 'HOST_SKILL_DRAFT_MATERIAL_PUBLISHED' } : { ok: true };
+    },
     createHostedPackageDemo: () => {
       const demo = document.createElement('base-screen-viewer') as typeof viewer;
       demo.dataset.hostedPackageDemo = 'true';

@@ -1,132 +1,104 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { validateMaterialProvenance } from '../../shared/material-handoff.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = resolve(SCRIPT_DIR, '..');
 const TEMPLATE_ROOT = join(SKILL_ROOT, 'assets', 'host-skill-template');
-const ALLOWED_FILES = new Set([
-  'host.json',
-  'design-guidelines.md',
-  'materials.json',
-  'resource-types.json',
-  'datasets.json',
-  'dataset-samples.json',
-]);
-const REQUIRED_FILES = new Set([
-  'host.json',
-  'design-guidelines.md',
-  'materials.json',
-  'resource-types.json',
-  'datasets.json',
-]);
+const SNAPSHOT_TOP_LEVEL = {
+  host: 'object',
+  screenGuidelines: 'string',
+  materialGuidelines: 'string',
+  materialAuthoring: 'object',
+  components: 'array',
+  materials: 'array',
+  resourceTypes: 'array',
+  datasets: 'array',
+  datasetSamples: 'array',
+  materialProvenance: 'array',
+};
+const MAX_SNAPSHOT_BYTES = 12 * 1024 * 1024;
 const MAX_GUIDELINES_BYTES = 64 * 1024;
-const MAX_CATALOG_FILE_BYTES = 4 * 1024 * 1024;
-const MAX_RESOURCE_FILE_BYTES = 2 * 1024 * 1024;
-const MAX_SAMPLE_FILE_BYTES = 1024 * 1024;
 const MAX_SAMPLE_BYTES = 64 * 1024;
 const MAX_SAMPLE_ROWS = 50;
 const MAX_SAMPLE_TOTAL_BYTES = 1024 * 1024;
 
 export async function createHostSkill({
-  inputDir,
+  snapshotFile,
   outputParent,
   checkOnly = false,
   update = false,
 }) {
-  if (typeof inputDir !== 'string' || inputDir.length === 0) {
-    throw new Error('An input bundle directory is required.');
+  if (typeof snapshotFile !== 'string' || snapshotFile.length === 0) {
+    throw new Error('A canonical host snapshot file is required.');
   }
   const apis = await loadPublicApis();
-  const bundle = await readAndValidateBundle(resolve(inputDir), apis);
+  const bundle = await readAndValidateSnapshot(resolve(snapshotFile), apis);
   const targetParent = resolve(outputParent ?? defaultSkillParent());
   const files = await renderSkillFiles(bundle, apis);
   if (checkOnly) {
-    return { skillName: bundle.skillName, target: join(targetParent, bundle.skillName), files };
+    return {
+      skillName: bundle.skillName,
+      target: join(targetParent, bundle.skillName),
+      files,
+      snapshotDigest: bundle.snapshotDigest,
+    };
   }
   const target = await installSkill(targetParent, bundle.skillName, files, update);
-  return { skillName: bundle.skillName, target, files };
+  return {
+    skillName: bundle.skillName,
+    target,
+    files,
+    snapshotDigest: bundle.snapshotDigest,
+  };
 }
 
-export async function readAndValidateBundle(inputDir, apis) {
-  const entries = await readdir(inputDir, { withFileTypes: true });
-  const entryNames = new Set(entries.map((entry) => entry.name));
+export async function readAndValidateSnapshot(snapshotFile, apis) {
+  const raw = await readBounded(snapshotFile, MAX_SNAPSHOT_BYTES);
   const errors = [];
-  for (const entry of entries) {
-    if (!entry.isFile() || !ALLOWED_FILES.has(entry.name)) {
-      errors.push(`input bundle contains unsupported entry "${entry.name}"`);
+  const snapshot = parseJson(raw, 'host-snapshot.json', errors);
+  if (snapshot === undefined) throw validationError(errors);
+  if (!isObject(snapshot)) {
+    throw validationError(['host snapshot must contain a JSON object']);
+  }
+  const allowed = new Set(Object.keys(SNAPSHOT_TOP_LEVEL));
+  for (const key of Object.keys(snapshot)) {
+    if (!allowed.has(key)) errors.push(`host snapshot contains unknown field ${key}`);
+  }
+  for (const [name, kind] of Object.entries(SNAPSHOT_TOP_LEVEL)) {
+    if (!Object.hasOwn(snapshot, name)) {
+      if (name !== 'datasetSamples' && name !== 'materialProvenance')
+        errors.push(`host snapshot is missing ${name}`);
+      continue;
     }
-  }
-  for (const required of REQUIRED_FILES) {
-    if (!entryNames.has(required)) errors.push(`input bundle is missing ${required}`);
+    const value = snapshot[name];
+    if (kind === 'object' && !isObject(value))
+      errors.push(`host snapshot field ${name} must contain an object`);
+    if (kind === 'string' && (typeof value !== 'string' || value.length === 0))
+      errors.push(`host snapshot field ${name} must be a non-empty string`);
+    if (kind === 'array' && !Array.isArray(value))
+      errors.push(`host snapshot field ${name} must contain an array`);
   }
   if (errors.length > 0) throw validationError(errors);
 
-  const raw = new Map();
-  raw.set('host.json', await readBounded(join(inputDir, 'host.json'), 64 * 1024));
-  raw.set(
-    'design-guidelines.md',
-    await readBounded(join(inputDir, 'design-guidelines.md'), MAX_GUIDELINES_BYTES),
-  );
-  raw.set(
-    'materials.json',
-    await readBounded(join(inputDir, 'materials.json'), MAX_CATALOG_FILE_BYTES),
-  );
-  raw.set(
-    'resource-types.json',
-    await readBounded(join(inputDir, 'resource-types.json'), MAX_RESOURCE_FILE_BYTES),
-  );
-  raw.set(
-    'datasets.json',
-    await readBounded(join(inputDir, 'datasets.json'), MAX_CATALOG_FILE_BYTES),
-  );
-  if (entryNames.has('dataset-samples.json')) {
-    raw.set(
-      'dataset-samples.json',
-      await readBounded(join(inputDir, 'dataset-samples.json'), MAX_SAMPLE_FILE_BYTES),
-    );
-  }
-
-  const host = parseJson(raw.get('host.json'), 'host.json', errors);
-  const guidelines = raw.get('design-guidelines.md').trim();
-  if (guidelines.length === 0) errors.push('design-guidelines.md must not be empty');
+  const normalizedHost = validateHost(snapshot.host, apis, errors);
+  const guidelines = snapshot.screenGuidelines.trim();
+  if (guidelines.length === 0) errors.push('screenGuidelines must not be empty');
   if (/-----BEGIN (?:PRIVATE KEY|OPENSSH PRIVATE KEY)-----/u.test(guidelines)) {
-    errors.push('design-guidelines.md contains a private-key marker');
+    errors.push('screenGuidelines contains a private-key marker');
   }
-
-  const normalizedHost = validateHost(host, apis, errors);
-  const materials = parseManifestArray(
-    parseJson(raw.get('materials.json'), 'materials.json', errors),
-    apis,
-    errors,
-  );
-  const resourceTypes = parseResourceTypes(
-    parseJson(raw.get('resource-types.json'), 'resource-types.json', errors),
-    apis,
-    errors,
-  );
-  const datasets = parseDatasetArray(
-    parseJson(raw.get('datasets.json'), 'datasets.json', errors),
-    apis,
-    errors,
-  );
+  const materials = parseManifestArray(snapshot.materials, apis, errors);
+  const resourceTypes = parseResourceTypes(snapshot.resourceTypes, apis, errors);
+  const datasets = parseDatasetArray(snapshot.datasets, apis, errors);
   validateDatasetParameterAuthority(datasets, resourceTypes, apis, errors);
-  const samples = parseSamples(
-    raw.has('dataset-samples.json')
-      ? parseJson(raw.get('dataset-samples.json'), 'dataset-samples.json', errors)
-      : [],
-    datasets,
-    apis,
-    errors,
-  );
+  const samples = parseSamples(snapshot.datasetSamples ?? [], datasets, apis, errors);
+  const provenance = parseMaterialProvenance(snapshot.materialProvenance, materials, errors);
   if (errors.length > 0) throw validationError(errors);
 
-  const inputDigests = Object.fromEntries(
-    [...raw.entries()].map(([name, value]) => [name, sha256(value)]),
-  );
   return {
     ...normalizedHost,
     guidelines,
@@ -134,8 +106,21 @@ export async function readAndValidateBundle(inputDir, apis) {
     resourceTypes,
     datasets,
     samples,
-    inputDigests,
+    provenance,
+    snapshotDigest: sha256(raw),
   };
+}
+
+function parseMaterialProvenance(input, materials, errors) {
+  if (input === undefined) return [];
+  const result = validateMaterialProvenance(input, {
+    materialTypes: materials.map((material) => material.type),
+  });
+  if (!result.ok) {
+    for (const diagnostic of result.diagnostics) errors.push(diagnostic.message);
+    return [];
+  }
+  return [...input].sort((left, right) => left.type.localeCompare(right.type));
 }
 
 function validateHost(input, apis, errors) {
@@ -351,12 +336,15 @@ function parseSamples(input, datasets, apis, errors) {
 }
 
 async function renderSkillFiles(bundle, apis) {
-  const [skillTemplate, interfaceTemplate, contractTemplate, validator] = await Promise.all([
-    readFile(join(TEMPLATE_ROOT, 'SKILL.md'), 'utf8'),
-    readFile(join(TEMPLATE_ROOT, 'agents', 'openai.yaml'), 'utf8'),
-    readFile(join(TEMPLATE_ROOT, 'references', 'document-contract.md'), 'utf8'),
-    readFile(join(TEMPLATE_ROOT, 'scripts', 'validate-screen-document.mjs'), 'utf8'),
-  ]);
+  const [skillTemplate, interfaceTemplate, contractTemplate, validator, handoff, requestScript] =
+    await Promise.all([
+      readFile(join(TEMPLATE_ROOT, 'SKILL.md'), 'utf8'),
+      readFile(join(TEMPLATE_ROOT, 'agents', 'openai.yaml'), 'utf8'),
+      readFile(join(TEMPLATE_ROOT, 'references', 'document-contract.md'), 'utf8'),
+      readFile(join(TEMPLATE_ROOT, 'scripts', 'validate-screen-document.mjs'), 'utf8'),
+      readFile(join(SKILL_ROOT, '..', 'shared', 'material-handoff.mjs'), 'utf8'),
+      readFile(join(TEMPLATE_ROOT, 'scripts', 'create-material-request.mjs'), 'utf8'),
+    ]);
   const displayName = `${bundle.hostName} 大屏设计`;
   const shortDescription = fitDescription(`为${bundle.hostName}生成可导入的大屏设计文档`);
   const description = `Design or revise ${bundle.hostName} Base Screen dashboards from the host catalog and design guidelines.`;
@@ -377,11 +365,15 @@ async function renderSkillFiles(bundle, apis) {
   files.set('agents/openai.yaml', applyReplacements(interfaceTemplate, replacements));
   files.set('references/document-contract.md', applyReplacements(contractTemplate, replacements));
   files.set('scripts/validate-screen-document.mjs', validator);
+  files.set('scripts/material-handoff.mjs', handoff);
+  files.set('scripts/create-material-request.mjs', requestScript);
   files.set('references/host.md', renderHostReference(bundle));
   files.set('references/materials.json', json(bundle.materials));
   files.set('references/resource-types.json', json(bundle.resourceTypes));
   files.set('references/datasets.json', json(bundle.datasets));
   if (bundle.samples.length > 0) files.set('references/dataset-samples.json', json(bundle.samples));
+  if (bundle.provenance.length > 0)
+    files.set('references/material-provenance.json', json(bundle.provenance));
   files.set('references/screen-document.schema.json', json(apis.SCREEN_DOCUMENT_JSON_SCHEMA));
   files.set(
     'generation-manifest.json',
@@ -389,7 +381,7 @@ async function renderSkillFiles(bundle, apis) {
       generator: 'create-base-screen-host-skill',
       hostId: bundle.hostId,
       skillName: bundle.skillName,
-      inputs: bundle.inputDigests,
+      snapshotDigest: bundle.snapshotDigest,
     }),
   );
   return files;
@@ -656,14 +648,20 @@ function parseArgs(argv) {
       throw new Error(`Unknown argument ${argument}`);
     }
   }
-  if (options.inputDir === undefined) throw new Error('--input is required');
+  if (options.inputDir === undefined)
+    throw new Error('--input <canonical snapshot file> is required');
   return options;
 }
 
 async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
-    const result = await createHostSkill(options);
+    const result = await createHostSkill({
+      snapshotFile: options.inputDir,
+      outputParent: options.outputParent,
+      checkOnly: options.checkOnly,
+      update: options.update,
+    });
     if (options.checkOnly) {
       console.log(`Snapshot is valid for ${result.skillName}.`);
     } else {

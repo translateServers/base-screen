@@ -78,6 +78,34 @@ import '@base-screen/material/auto-register';
 需要处理注册诊断或只注册部分物料时，改用 `defineBaseScreenViewer()`、
 `defineBaseScreenDesigner()` 和各物料的 `define*()` API。
 
+### 3.1 为宿主生成项目级 Skill
+
+宿主若希望让 Codex 按自己的物料、数据集和设计规范创建大屏或物料，只需先在
+`package.json` 提供 `export:base-screen-skill-context` 脚本。该脚本负责复用宿主现有认证和目录
+接口，将脱敏的单一规范快照写入 `BASE_SCREEN_HOST_SKILL_SNAPSHOT_FILE` 指向的临时文件。
+
+然后在 Base Screen 仓库执行一次：
+
+```text
+node skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
+```
+
+这一个命令是幂等的：它会安装或安全更新 `.base-screen/tooling` 下的宿主工具包（不参与 Codex
+Skill 发现）、生成缺失配置、注册统一的 `base-screen:skills` 包脚本，并同步大屏设计与物料创建
+两个宿主 Skill。以后宿主目录变化，只需在宿主仓库执行：
+
+```text
+pnpm base-screen:skills
+```
+
+CI 使用 `pnpm base-screen:skills verify`（只依赖已提交的 `.base-screen/host-snapshot.json`，
+不联网、不需要 Token）。按需可用 `pnpm base-screen:skills check-remote` 检查线上目录是否变化
+（只报告、不写文件），用 `pnpm base-screen:skills doctor` 自检。快照单文件契约和安全边界见
+`skills/manage-base-screen-host-skills/references/snapshot-contract.md`。
+
+宿主侧手册见 `docs/host-skill-manuals/`：快速接入、日常同步、配置参考、故障排查与
+XJDataHub 落地方向。
+
 ## 4. 创建物料目录
 
 注册 Custom Element 不会自动创建物料目录。每个 Viewer/Designer 都必须获得一个目录，且

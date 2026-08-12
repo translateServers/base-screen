@@ -1,8 +1,9 @@
-# Host material authoring bundle
+# Host canonical snapshot
 
-The generator accepts one directory containing only these files:
+The generator accepts the single canonical snapshot file written by the coordinator as
+`.base-screen/host-snapshot.json`. It contains exactly these top-level fields.
 
-## `host.json`
+## `host`
 
 Use the same host identity shape as the dashboard Skill generator:
 
@@ -22,9 +23,9 @@ Use the same host identity shape as the dashboard Skill generator:
 The canvas is retained as host context for material preview examples and is checked by the Contracts
 parser. The child Skill name is `create-<hostId>-material`.
 
-## `material-authoring.json`
+## `materialAuthoring`
 
-This file is the only source of workspace write authority:
+This field is the only source of workspace write authority:
 
 ```json
 {
@@ -65,13 +66,13 @@ final `/**`, or control character. `allowedFiles` must cover both roots, the reg
 plugin manifest file when present. Reference paths are read-only and are never written by the child
 Skill.
 
-## `material-guidelines.md`
+## `materialGuidelines`
 
 Keep durable implementation rules here: naming, typography, colors, accessibility, CSS isolation,
 event conventions, preferred data adapters, and review expectations. Do not include credentials,
 connection details, source URLs, private records, tokens, or executable code.
 
-## `components.json`
+## `components`
 
 This is a sanitized index of reusable host components. It is metadata, not executable source:
 
@@ -92,22 +93,29 @@ This is a sanitized index of reusable host components. It is metadata, not execu
 `role` is `reference` or `wrapper`; each id and source path is unique, and the framework must match
 the selected authoring route.
 
-## Catalog and data files
+## Catalog and data fields
 
-- `materials.json` is an array of JSON-safe `BaseScreenMaterialManifest` values. Existing materials
-  are references for identity and compatibility; they are not copied or overwritten.
-- `resource-types.json` is an array of `dataResourceType` contributions and is validated by the
-  Plugin Core parser.
-- `datasets.json` is an array of `ScreenDatasetDescriptor` values. Parameter names must match the
-  selected resource type `configSchema` exactly.
-- `dataset-samples.json` is optional. Each item has `resourceType`, `resourceId`,
+- `materials` is an array of JSON-safe `BaseScreenMaterialManifest` values. Existing materials are
+  references for identity and compatibility; they are not copied or overwritten.
+- `resourceTypes` is an array of `dataResourceType` contributions and is validated by the Plugin
+  Core parser.
+- `datasets` is an array of `ScreenDatasetDescriptor` values. Parameter names must match the selected
+  resource type `configSchema` exactly.
+- `datasetSamples` is optional. Each item has `resourceType`, `resourceId`,
   `classification: "sanitized"`, and a bounded `dataset` parsed by Contracts. Samples never grant
   write or network authority.
+- `materialProvenance` is optional. It marks published materials as `code` or `online`; online
+  entries are read-only references.
+
+The remaining fields (`screenGuidelines`) are used by the dashboard Skill generator; this generator
+ignores them.
 
 ## Bounds and safety
 
-- `material-guidelines.md`: at most 64 KiB; catalog files: at most 4 MiB; resource types: at most
-  2 MiB; samples: at most 1 MiB total, 50 rows and 64 KiB per sample.
-- The bundle allowlist is strict and unknown fields fail closed.
-- The generator reads no files outside the bundle and never runs host verification scripts while
+- Snapshot file: at most 12 MiB total.
+- `materialGuidelines` and `materialAuthoring`: at most 64 KiB.
+- Catalog fields: at most 512 materials, 256 components, 128 resource types, 512 datasets.
+- Samples: at most 1 MiB total, 50 rows and 64 KiB per sample.
+- The snapshot allowlist is strict and unknown fields fail closed.
+- The generator reads no files outside the snapshot and never runs host verification scripts while
   validating a snapshot.

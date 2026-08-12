@@ -20,3 +20,4 @@
   - [x] Add focused policy evidence to the test matrix.
 - [x] Add focused fixtures and automated tests for deterministic generation, invalid input, all framework routes, guarded updates, generated manifest validation, and host workspace package resolution.
 - [x] Run Skill validation, focused tests, and required repository quality gates; update the test matrix and checklist with evidence.
+- [x] Add optional provenance routing and draft-only candidate helper without changing formal registration policy.

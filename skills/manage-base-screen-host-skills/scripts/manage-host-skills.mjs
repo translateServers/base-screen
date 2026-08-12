@@ -1,62 +1,26 @@
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
-  copyFile,
-  lstat,
-  mkdir,
-  mkdtemp,
-  readdir,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from 'node:fs/promises';
-import { homedir, tmpdir } from 'node:os';
+import { lstat, mkdir, mkdtemp, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHostMaterialSkill } from '../../create-base-screen-host-material-skill/scripts/create-host-material-skill.mjs';
 import { createHostSkill } from '../../create-base-screen-host-skill/scripts/create-host-screen-skill.mjs';
+import { readAndCanonicalizeSnapshot } from './snapshot-file.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const SKILLS_ROOT = resolve(SCRIPT_DIR, '..', '..');
 const CONFIG_RELATIVE = join('.base-screen', 'host-skills.json');
+const SNAPSHOT_RELATIVE = join('.base-screen', 'host-snapshot.json');
+const TOOLING_RELATIVE = join('.base-screen', 'tooling', 'base-screen-host-skills');
+const MANIFEST_RELATIVE = join('.base-screen', 'host-skill-tooling.json');
 const DEFAULT_SNAPSHOT_SCRIPT = 'export:base-screen-skill-context';
+const HOST_SCRIPT_NAME = 'base-screen:skills';
+const HOST_SCRIPT_VALUE =
+  'node .base-screen/tooling/base-screen-host-skills/manage-base-screen-host-skills/scripts/manage-host-skills.mjs';
 const SNAPSHOT_TIMEOUT_MS = 120_000;
-const MAX_CONTEXT_FILE_BYTES = 4 * 1024 * 1024;
-const MAX_CONTEXT_TOTAL_BYTES = 12 * 1024 * 1024;
 const SAFE_IDENTIFIER = /^[A-Za-z][A-Za-z0-9._:-]{0,63}$/u;
+const SAFE_ENV_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/u;
 const PACKAGE_MANAGERS = new Set(['pnpm', 'npm', 'yarn']);
-const CONTEXT_FILES = [
-  'host.json',
-  'design-guidelines.md',
-  'material-authoring.json',
-  'material-guidelines.md',
-  'components.json',
-  'materials.json',
-  'resource-types.json',
-  'datasets.json',
-  'dataset-samples.json',
-];
-const REQUIRED_CONTEXT_FILES = CONTEXT_FILES.slice(0, 8);
-const SCREEN_FILES = [
-  'host.json',
-  'design-guidelines.md',
-  'materials.json',
-  'resource-types.json',
-  'datasets.json',
-  'dataset-samples.json',
-];
-const MATERIAL_FILES = [
-  'host.json',
-  'material-authoring.json',
-  'material-guidelines.md',
-  'components.json',
-  'materials.json',
-  'resource-types.json',
-  'datasets.json',
-  'dataset-samples.json',
-];
 const GENERATORS = {
   screen: 'create-base-screen-host-skill',
   material: 'create-base-screen-host-material-skill',
@@ -66,6 +30,7 @@ export async function initHostSkillConfig({
   root = process.cwd(),
   packageManager,
   snapshotScript,
+  credentialEnvVars,
 } = {}) {
   const hostRoot = await assertHostRoot(root);
   const configPath = join(hostRoot, CONFIG_RELATIVE);
@@ -79,6 +44,7 @@ export async function initHostSkillConfig({
   validateConfig({
     packageManager: resolvedPackageManager,
     snapshotScript: resolvedSnapshotScript,
+    ...(credentialEnvVars === undefined ? {} : { credentialEnvVars }),
   });
   if (!isObject(scripts) || typeof scripts[resolvedSnapshotScript] !== 'string') {
     throw new Error(
@@ -92,51 +58,255 @@ export async function initHostSkillConfig({
     json({
       packageManager: resolvedPackageManager,
       snapshotScript: resolvedSnapshotScript,
+      ...(credentialEnvVars === undefined ? {} : { credentialEnvVars }),
     }),
   );
   return configPath;
 }
 
-export async function checkHostSkills({ root = process.cwd(), mode = 'check' } = {}) {
-  if (!['check', 'sync', 'verify'].includes(mode)) throw new Error(`Unsupported mode ${mode}`);
+export async function refreshHostSkills({ root = process.cwd(), dryRun = false } = {}) {
   const hostRoot = await assertHostRoot(root);
   const config = await readConfig(hostRoot);
   await assertSnapshotScript(hostRoot, config);
-  return withPreparedContext(hostRoot, config, async ({ results, skillsParent }) => {
-    if (mode === 'check') {
+  const workRoot = await mkdtemp(join(tmpdir(), 'base-screen-host-skill-refresh-'));
+  try {
+    const exportFile = join(workRoot, 'export.json');
+    await runSnapshotExporter(hostRoot, config, exportFile);
+    const { text, digest } = await readAndCanonicalizeSnapshot(exportFile);
+    const canonicalFile = join(workRoot, 'host-snapshot.json');
+    await writeFile(canonicalFile, text, 'utf8');
+    const skillsParent = join(hostRoot, '.agents', 'skills');
+    const results = {
+      screen: await createHostSkill({
+        snapshotFile: canonicalFile,
+        outputParent: skillsParent,
+        checkOnly: true,
+      }),
+      material: await createHostMaterialSkill({
+        snapshotFile: canonicalFile,
+        outputParent: skillsParent,
+        checkOnly: true,
+      }),
+    };
+    if (dryRun) {
       return {
-        mode,
+        mode: 'refresh-preflight',
+        snapshotDigest: digest,
         screenSkill: results.screen.skillName,
         materialSkill: results.material.skillName,
       };
     }
-    if (mode === 'verify') {
-      await verifyGeneratedTarget(skillsParent, results.screen);
-      await verifyGeneratedTarget(skillsParent, results.material);
-      return {
-        mode,
-        screenSkill: results.screen.skillName,
-        materialSkill: results.material.skillName,
-      };
+    const snapshotPath = join(hostRoot, SNAPSHOT_RELATIVE);
+    const previousSnapshot = await readOptionalText(snapshotPath);
+    await atomicWrite(snapshotPath, text);
+    try {
+      await syncGeneratedTargets(skillsParent, [results.screen, results.material]);
+    } catch (error) {
+      if (previousSnapshot === undefined) await rm(snapshotPath, { force: true }).catch(() => {});
+      else await atomicWrite(snapshotPath, previousSnapshot).catch(() => {});
+      throw error;
     }
-    await syncGeneratedTargets(skillsParent, [results.screen, results.material]);
     return {
-      mode,
+      mode: 'refresh',
+      snapshotPath,
+      snapshotDigest: digest,
       screenTarget: join(skillsParent, results.screen.skillName),
       materialTarget: join(skillsParent, results.material.skillName),
     };
+  } finally {
+    await rm(workRoot, { recursive: true, force: true });
+  }
+}
+
+export async function verifyHostSkills({ root = process.cwd() } = {}) {
+  const hostRoot = await assertHostRoot(root);
+  await readConfig(hostRoot);
+  const snapshotPath = join(hostRoot, SNAPSHOT_RELATIVE);
+  const state = await pathState(snapshotPath);
+  if (state !== 'file') throw new Error(`Committed snapshot is missing: ${snapshotPath}`);
+  const { digest } = await readAndCanonicalizeSnapshot(snapshotPath, { requireCanonical: true });
+  const skillsParent = join(hostRoot, '.agents', 'skills');
+  const results = {
+    screen: await createHostSkill({ snapshotFile: snapshotPath, checkOnly: true }),
+    material: await createHostMaterialSkill({ snapshotFile: snapshotPath, checkOnly: true }),
+  };
+  await verifyGeneratedTarget(skillsParent, results.screen, digest);
+  await verifyGeneratedTarget(skillsParent, results.material, digest);
+  return {
+    mode: 'verify',
+    snapshotDigest: digest,
+    screenSkill: results.screen.skillName,
+    materialSkill: results.material.skillName,
+  };
+}
+
+export async function checkRemoteHostSkills({ root = process.cwd() } = {}) {
+  const hostRoot = await assertHostRoot(root);
+  const config = await readConfig(hostRoot);
+  await assertSnapshotScript(hostRoot, config);
+  const workRoot = await mkdtemp(join(tmpdir(), 'base-screen-host-skill-check-remote-'));
+  try {
+    const snapshotFile = join(workRoot, 'host-snapshot.json');
+    await runSnapshotExporter(hostRoot, config, snapshotFile);
+    const { digest } = await readAndCanonicalizeSnapshot(snapshotFile);
+    const snapshotPath = join(hostRoot, SNAPSHOT_RELATIVE);
+    let previousDigest;
+    if ((await pathState(snapshotPath)) === 'file') {
+      try {
+        previousDigest = (
+          await readAndCanonicalizeSnapshot(snapshotPath, { requireCanonical: true })
+        ).digest;
+      } catch {
+        previousDigest = undefined;
+      }
+    }
+    return {
+      mode: 'check-remote',
+      changed: previousDigest === undefined || previousDigest !== digest,
+      snapshotDigest: digest,
+      previousDigest: previousDigest ?? null,
+    };
+  } finally {
+    await rm(workRoot, { recursive: true, force: true });
+  }
+}
+
+export async function doctorHostSkills({ root = process.cwd() } = {}) {
+  const hostRoot = await assertHostRoot(root);
+  const checks = [];
+  const nodeMajor = Number(process.versions.node.split('.')[0]);
+  checks.push({
+    name: 'node',
+    ok: Number.isFinite(nodeMajor) && nodeMajor >= 22,
+    detail: `Node ${process.version}`,
   });
+  let config;
+  try {
+    config = await readConfig(hostRoot);
+    checks.push({ name: 'config', ok: true, detail: join(hostRoot, CONFIG_RELATIVE) });
+  } catch (error) {
+    checks.push({
+      name: 'config',
+      ok: false,
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
+  if (config !== undefined) {
+    try {
+      await assertSnapshotScript(hostRoot, config);
+      checks.push({ name: 'snapshotScript', ok: true, detail: config.snapshotScript });
+    } catch (error) {
+      checks.push({
+        name: 'snapshotScript',
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+    try {
+      await resolvePackageManagerInvocation(config.packageManager, config.snapshotScript);
+      checks.push({ name: 'packageManager', ok: true, detail: config.packageManager });
+    } catch (error) {
+      checks.push({
+        name: 'packageManager',
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+    for (const name of config.credentialEnvVars ?? []) {
+      const value = process.env[name];
+      checks.push({
+        name: `credential:${name}`,
+        ok: typeof value === 'string' && value.length > 0,
+        detail:
+          typeof value === 'string' && value.length > 0
+            ? 'set'
+            : 'not set or empty in this environment',
+      });
+    }
+  }
+  const toolingRoot = join(hostRoot, TOOLING_RELATIVE);
+  const manifestPath = join(hostRoot, MANIFEST_RELATIVE);
+  if ((await pathState(manifestPath)) === 'file') {
+    try {
+      const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+      const actual = await collectToolingFiles(toolingRoot);
+      const expected = new Map(Object.entries(manifest.files ?? {}));
+      const missing = [...expected.keys()].filter((name) => !actual.has(name));
+      const changed = [...expected.entries()].filter(
+        ([name, digest]) => actual.get(name) !== digest,
+      );
+      checks.push({
+        name: 'toolkit',
+        ok: missing.length === 0 && changed.length === 0,
+        detail:
+          missing.length === 0 && changed.length === 0
+            ? `${expected.size} managed files match`
+            : `missing [${missing.join(', ')}], changed [${changed.map(([name]) => name).join(', ')}]`,
+      });
+    } catch (error) {
+      checks.push({
+        name: 'toolkit',
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else {
+    checks.push({ name: 'toolkit', ok: false, detail: 'Managed tooling manifest is missing' });
+  }
+  const snapshotPath = join(hostRoot, SNAPSHOT_RELATIVE);
+  if ((await pathState(snapshotPath)) === 'file') {
+    try {
+      const { digest } = await readAndCanonicalizeSnapshot(snapshotPath, {
+        requireCanonical: true,
+      });
+      checks.push({ name: 'snapshot', ok: true, detail: digest.slice(0, 12) });
+    } catch (error) {
+      checks.push({
+        name: 'snapshot',
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else {
+    checks.push({ name: 'snapshot', ok: false, detail: 'Committed snapshot is missing' });
+  }
+  const skillsParent = join(hostRoot, '.agents', 'skills');
+  if (config !== undefined && (await pathState(snapshotPath)) === 'file') {
+    try {
+      const results = {
+        screen: await createHostSkill({ snapshotFile: snapshotPath, checkOnly: true }),
+        material: await createHostMaterialSkill({ snapshotFile: snapshotPath, checkOnly: true }),
+      };
+      const { digest } = await readAndCanonicalizeSnapshot(snapshotPath);
+      await verifyGeneratedTarget(skillsParent, results.screen, digest);
+      await verifyGeneratedTarget(skillsParent, results.material, digest);
+      checks.push({
+        name: 'generatedSkills',
+        ok: true,
+        detail: `${results.screen.skillName}, ${results.material.skillName}`,
+      });
+    } catch (error) {
+      checks.push({
+        name: 'generatedSkills',
+        ok: false,
+        detail: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else {
+    checks.push({ name: 'generatedSkills', ok: false, detail: 'Not checked' });
+  }
+  return { mode: 'doctor', hostRoot, checks };
 }
 
 export async function runSnapshotExporter(
   root,
   config,
-  outputDirectory,
+  snapshotFile,
   timeoutMs = SNAPSHOT_TIMEOUT_MS,
 ) {
   validateConfig(config);
-  if (typeof outputDirectory !== 'string' || outputDirectory.length === 0)
-    throw new Error('Snapshot output directory is required.');
+  if (typeof snapshotFile !== 'string' || snapshotFile.length === 0)
+    throw new Error('Snapshot file path is required.');
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
     throw new Error('Snapshot exporter timeout must be a positive number.');
   let invocation;
@@ -146,20 +316,20 @@ export async function runSnapshotExporter(
       config.snapshotScript,
     );
   } catch (error) {
-    await clearSnapshotOutput(outputDirectory);
+    await clearSnapshotOutput(snapshotFile);
     throw new Error(`Unable to locate snapshot exporter command: ${error.message}`);
   }
   let child;
   try {
     child = spawn(invocation.command, invocation.args, {
       cwd: root,
-      env: { ...process.env, BASE_SCREEN_HOST_SKILL_CONTEXT_DIR: outputDirectory },
+      env: { ...process.env, BASE_SCREEN_HOST_SKILL_SNAPSHOT_FILE: snapshotFile },
       shell: false,
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (error) {
-    await clearSnapshotOutput(outputDirectory);
+    await clearSnapshotOutput(snapshotFile);
     throw new Error(`Unable to start snapshot exporter: ${error.message}`);
   }
   let stdout = '';
@@ -186,16 +356,16 @@ export async function runSnapshotExporter(
       resolveResult({ code, signal });
     });
   }).catch(async (error) => {
-    await clearSnapshotOutput(outputDirectory);
+    await clearSnapshotOutput(snapshotFile);
     throw new Error(`Unable to start snapshot exporter: ${error.message}`);
   });
   if (timedOut) {
-    await clearSnapshotOutput(outputDirectory);
+    await clearSnapshotOutput(snapshotFile);
     throw new Error(`Snapshot exporter timed out after ${timeoutMs}ms.`);
   }
   if (result.code !== 0) {
     const detail = redact(`${stdout}\n${stderr}`).trim();
-    await clearSnapshotOutput(outputDirectory);
+    await clearSnapshotOutput(snapshotFile);
     throw new Error(
       `Snapshot exporter failed with ${result.code === null ? result.signal : `exit code ${result.code}`}.${
         detail.length > 0 ? `\n${detail}` : ''
@@ -204,61 +374,45 @@ export async function runSnapshotExporter(
   }
 }
 
-async function resolvePackageManagerInvocation(packageManager, snapshotScript) {
-  if (process.platform !== 'win32')
-    return { command: packageManager, args: ['run', snapshotScript] };
-  const nodeDirectory = dirname(process.execPath);
-  const entryPoints = {
-    npm: join(nodeDirectory, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-    pnpm: join(nodeDirectory, 'node_modules', 'corepack', 'dist', 'pnpm.js'),
-    yarn: join(nodeDirectory, 'node_modules', 'corepack', 'dist', 'yarn.js'),
-  };
-  const command = entryPoints[packageManager];
-  if (command === undefined || (await pathState(command)) !== 'file')
-    throw new Error(`Unable to locate the ${packageManager} JavaScript entry point.`);
-  return { command: process.execPath, args: [command, 'run', snapshotScript] };
-}
-
-export async function validateContextDirectory(contextDirectory) {
-  const entries = await readdir(contextDirectory, { withFileTypes: true });
-  const names = new Set(entries.map((entry) => entry.name));
-  const unknown = entries.filter((entry) => !CONTEXT_FILES.includes(entry.name));
-  if (unknown.length > 0)
-    throw new Error(
-      `Snapshot contains unsupported entries: ${unknown.map((entry) => entry.name).join(', ')}`,
-    );
-  for (const entry of entries) {
-    if (!entry.isFile()) throw new Error(`Snapshot entry ${entry.name} must be a regular file.`);
-    const info = await stat(join(contextDirectory, entry.name));
-    if (info.size > MAX_CONTEXT_FILE_BYTES)
-      throw new Error(`Snapshot file ${entry.name} exceeds ${MAX_CONTEXT_FILE_BYTES} bytes.`);
-    const content = await readFile(join(contextDirectory, entry.name), 'utf8');
-    if (containsCredentialLikeValue(content))
-      throw new Error(`Snapshot file ${entry.name} contains a credential-like value.`);
+export function validateConfig(config) {
+  if (!isObject(config)) throw new Error('host-skills.json must contain an object.');
+  const allowed = new Set(['packageManager', 'snapshotScript', 'credentialEnvVars']);
+  for (const key of Object.keys(config))
+    if (!allowed.has(key)) throw new Error(`host-skills.json contains unknown field ${key}`);
+  if (!Object.hasOwn(config, 'packageManager') || !Object.hasOwn(config, 'snapshotScript'))
+    throw new Error('host-skills.json must contain packageManager and snapshotScript.');
+  if (!PACKAGE_MANAGERS.has(config.packageManager))
+    throw new Error('host-skills.json.packageManager must be pnpm, npm, or yarn.');
+  if (typeof config.snapshotScript !== 'string' || !SAFE_IDENTIFIER.test(config.snapshotScript))
+    throw new Error('host-skills.json.snapshotScript must be a safe script name.');
+  if (config.credentialEnvVars !== undefined) {
+    if (
+      !Array.isArray(config.credentialEnvVars) ||
+      config.credentialEnvVars.length === 0 ||
+      config.credentialEnvVars.length > 16 ||
+      config.credentialEnvVars.some((name) => typeof name !== 'string' || !SAFE_ENV_NAME.test(name))
+    ) {
+      throw new Error(
+        'host-skills.json.credentialEnvVars must contain 1 to 16 safe environment variable names.',
+      );
+    }
   }
-  for (const required of REQUIRED_CONTEXT_FILES) {
-    if (!names.has(required)) throw new Error(`Snapshot is missing ${required}.`);
-  }
-  const totalBytes = await sumFileBytes(contextDirectory, entries);
-  if (totalBytes > MAX_CONTEXT_TOTAL_BYTES)
-    throw new Error(`Snapshot exceeds ${MAX_CONTEXT_TOTAL_BYTES} bytes in total.`);
 }
 
-export async function routeContext(contextDirectory, bundleRoot) {
-  const screenDirectory = join(bundleRoot, 'screen');
-  const materialDirectory = join(bundleRoot, 'material');
-  await mkdir(screenDirectory, { recursive: true });
-  await mkdir(materialDirectory, { recursive: true });
-  await copyAllowlistedFiles(contextDirectory, screenDirectory, SCREEN_FILES);
-  await copyAllowlistedFiles(contextDirectory, materialDirectory, MATERIAL_FILES);
-  return { screenDirectory, materialDirectory };
+async function assertSnapshotScript(root, config) {
+  const packageJson = await readJsonFile(join(root, 'package.json'), 'package.json');
+  if (
+    !isObject(packageJson.scripts) ||
+    typeof packageJson.scripts[config.snapshotScript] !== 'string'
+  )
+    throw new Error(`package.json does not define ${config.snapshotScript}.`);
 }
 
-export async function verifyGeneratedTarget(parent, result) {
+async function verifyGeneratedTarget(parent, result, snapshotDigest) {
   const target = join(parent, result.skillName);
   const state = await pathState(target);
   if (state !== 'directory') throw new Error(`Generated Skill is missing: ${target}`);
-  await assertGeneratedMarker(target, result.skillName);
+  await assertGeneratedMarker(target, result.skillName, undefined, result, snapshotDigest);
   const actual = await collectFiles(target);
   const expected = new Set(result.files.keys());
   const extras = [...actual.keys()].filter((name) => !expected.has(name));
@@ -271,35 +425,6 @@ export async function verifyGeneratedTarget(parent, result) {
   for (const [name, expectedContent] of result.files) {
     if (actual.get(name) !== expectedContent)
       throw new Error(`Generated Skill drift at ${join(target, name)}.`);
-  }
-}
-
-async function withPreparedContext(root, config, callback) {
-  const workRoot = await mkdtemp(join(tmpdir(), 'base-screen-host-skill-adoption-'));
-  const contextDirectory = join(workRoot, 'context');
-  const bundlesRoot = join(workRoot, 'bundles');
-  const skillsParent = join(root, '.agents', 'skills');
-  await mkdir(contextDirectory, { recursive: true });
-  await mkdir(bundlesRoot, { recursive: true });
-  try {
-    await runSnapshotExporter(root, config, contextDirectory);
-    await validateContextDirectory(contextDirectory);
-    const bundles = await routeContext(contextDirectory, bundlesRoot);
-    const results = {
-      screen: await createHostSkill({
-        inputDir: bundles.screenDirectory,
-        outputParent: skillsParent,
-        checkOnly: true,
-      }),
-      material: await createHostMaterialSkill({
-        inputDir: bundles.materialDirectory,
-        outputParent: skillsParent,
-        checkOnly: true,
-      }),
-    };
-    return await callback({ results, skillsParent });
-  } finally {
-    await rm(workRoot, { recursive: true, force: true });
   }
 }
 
@@ -343,7 +468,7 @@ async function assertTargetCanUpdate(parent, result) {
     await assertGeneratedMarker(target, result.skillName, undefined, result);
 }
 
-async function assertGeneratedMarker(target, skillName, expectedManifest, result) {
+async function assertGeneratedMarker(target, skillName, expectedManifest, result, snapshotDigest) {
   let marker;
   let rawMarker;
   try {
@@ -365,6 +490,8 @@ async function assertGeneratedMarker(target, skillName, expectedManifest, result
     throw new Error(`Refusing to update unmarked Skill directory ${target}.`);
   if (expectedManifest !== undefined && rawMarker !== expectedManifest)
     throw new Error(`Generated Skill marker changed unexpectedly at ${target}.`);
+  if (snapshotDigest !== undefined && marker.snapshotDigest !== snapshotDigest)
+    throw new Error(`Generated Skill snapshot digest mismatch at ${target}.`);
 }
 
 async function writeFiles(root, files) {
@@ -393,57 +520,37 @@ async function collectFiles(root) {
   return result;
 }
 
-async function copyAllowlistedFiles(source, target, names) {
-  for (const name of names) {
-    const sourcePath = join(source, name);
-    if ((await pathState(sourcePath)) === 'file') {
-      await copyFile(sourcePath, join(target, name));
+async function collectToolingFiles(root) {
+  const result = new Map();
+  async function visit(directory) {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const absolute = join(directory, entry.name);
+      if (entry.isDirectory()) await visit(absolute);
+      else if (entry.isFile()) {
+        const content = await readFile(absolute);
+        result.set(relative(root, absolute).replaceAll('\\', '/'), sha256(content));
+      }
     }
   }
+  if ((await pathState(root)) === 'directory') await visit(root);
+  return result;
 }
 
-async function sumFileBytes(directory, entries) {
-  let total = 0;
-  for (const entry of entries) total += (await stat(join(directory, entry.name))).size;
-  return total;
-}
-
-async function clearSnapshotOutput(directory) {
-  const resolvedDirectory = resolve(directory);
+async function clearSnapshotOutput(snapshotFile) {
+  const resolvedFile = resolve(snapshotFile);
   const resolvedTempRoot = resolve(tmpdir());
   const tempPrefix =
     resolvedTempRoot.endsWith('/') || resolvedTempRoot.endsWith('\\')
       ? resolvedTempRoot
       : `${resolvedTempRoot}${process.platform === 'win32' ? '\\' : '/'}`;
-  if (!resolvedDirectory.startsWith(tempPrefix)) return;
-  await rm(resolvedDirectory, { recursive: true, force: true }).catch(() => {});
-  await mkdir(resolvedDirectory, { recursive: true }).catch(() => {});
+  if (!resolvedFile.startsWith(tempPrefix)) return;
+  await rm(resolvedFile, { force: true }).catch(() => {});
 }
 
 async function readConfig(root) {
   const config = await readJsonFile(join(root, CONFIG_RELATIVE), CONFIG_RELATIVE);
   validateConfig(config);
   return config;
-}
-
-export function validateConfig(config) {
-  if (!isObject(config)) throw new Error('host-skills.json must contain an object.');
-  const keys = Object.keys(config);
-  if (keys.length !== 2 || !keys.includes('packageManager') || !keys.includes('snapshotScript'))
-    throw new Error('host-skills.json must contain exactly packageManager and snapshotScript.');
-  if (!PACKAGE_MANAGERS.has(config.packageManager))
-    throw new Error('host-skills.json.packageManager must be pnpm, npm, or yarn.');
-  if (typeof config.snapshotScript !== 'string' || !SAFE_IDENTIFIER.test(config.snapshotScript))
-    throw new Error('host-skills.json.snapshotScript must be a safe script name.');
-}
-
-async function assertSnapshotScript(root, config) {
-  const packageJson = await readJsonFile(join(root, 'package.json'), 'package.json');
-  if (
-    !isObject(packageJson.scripts) ||
-    typeof packageJson.scripts[config.snapshotScript] !== 'string'
-  )
-    throw new Error(`package.json does not define ${config.snapshotScript}.`);
 }
 
 async function assertHostRoot(root) {
@@ -461,6 +568,21 @@ function inferPackageManager(value) {
   return 'pnpm';
 }
 
+async function resolvePackageManagerInvocation(packageManager, snapshotScript) {
+  if (process.platform !== 'win32')
+    return { command: packageManager, args: ['run', snapshotScript] };
+  const nodeDirectory = dirname(process.execPath);
+  const entryPoints = {
+    npm: join(nodeDirectory, 'node_modules', 'npm', 'bin', 'npm-cli.js'),
+    pnpm: join(nodeDirectory, 'node_modules', 'corepack', 'dist', 'pnpm.js'),
+    yarn: join(nodeDirectory, 'node_modules', 'corepack', 'dist', 'yarn.js'),
+  };
+  const command = entryPoints[packageManager];
+  if (command === undefined || (await pathState(command)) !== 'file')
+    throw new Error(`Unable to locate the ${packageManager} JavaScript entry point.`);
+  return { command: process.execPath, args: [command, 'run', snapshotScript] };
+}
+
 async function readJsonFile(file, label) {
   let raw;
   try {
@@ -472,6 +594,14 @@ async function readJsonFile(file, label) {
     return JSON.parse(raw.replace(/^\uFEFF/u, ''));
   } catch (error) {
     throw new Error(`${label} is not valid JSON: ${error.message}`);
+  }
+}
+
+async function readOptionalText(file) {
+  try {
+    return await readFile(file, 'utf8');
+  } catch {
+    return undefined;
   }
 }
 
@@ -490,12 +620,6 @@ function redact(value) {
   return value.replace(
     /(-----BEGIN [^-]+-----|["']?(?:password|secret|token|api[_-]?key|authorization)["']?\s*[:=]\s*)[^\s,;]+/giu,
     '$1[redacted]',
-  );
-}
-
-function containsCredentialLikeValue(value) {
-  return /-----BEGIN (?:PRIVATE KEY|OPENSSH PRIVATE KEY)-----|["']?(?:password|secret|token|api[_-]?key|authorization)["']?\s*[:=]/iu.test(
-    value,
   );
 }
 
@@ -521,31 +645,22 @@ function isObject(value) {
 }
 
 function parseArgs(argv) {
-  const options = {
-    command: argv[0] ?? 'help',
-    root: undefined,
-    packageManager: undefined,
-    snapshotScript: undefined,
-  };
-  let index = 1;
+  const options = { command: 'refresh', root: undefined };
+  let index = 0;
   while (index < argv.length) {
     const argument = argv[index++];
-    if (
-      argument === '--root' ||
-      argument === '--package-manager' ||
-      argument === '--snapshot-script'
-    ) {
+    if (argument === '--root') {
       const value = argv[index++];
-      if (value === undefined) throw new Error(`${argument} requires a value.`);
-      if (argument === '--root') options.root = value;
-      else if (argument === '--package-manager') options.packageManager = value;
-      else options.snapshotScript = value;
-    } else if (argument !== '--help') {
+      if (value === undefined) throw new Error('--root requires a value.');
+      options.root = value;
+    } else if (argument === '--help') {
+      options.command = 'help';
+    } else if (['refresh', 'verify', 'check-remote', 'doctor'].includes(argument)) {
+      options.command = argument;
+    } else {
       throw new Error(`Unknown argument ${argument}.`);
     }
   }
-  if (!['init', 'check', 'sync', 'verify', 'help'].includes(options.command))
-    throw new Error(`Unknown command ${options.command}.`);
   return options;
 }
 
@@ -553,20 +668,21 @@ async function main() {
   try {
     const options = parseArgs(process.argv.slice(2));
     if (options.command === 'help') {
-      console.log('Usage: node manage-host-skills.mjs <init|check|sync|verify> [--root <path>]');
+      console.log(
+        'Usage: node manage-host-skills.mjs [refresh|verify|check-remote|doctor] [--root <path>]\n' +
+          '  (no command)  Pull the latest snapshot and atomically refresh both host Skills.\n' +
+          '  verify        Offline check of the committed snapshot and both generated Skills.\n' +
+          '  check-remote  Export a temporary snapshot and report drift without writing.\n' +
+          '  doctor        Report Node, config, credentials, toolkit, snapshot, and Skill state.',
+      );
       return;
     }
-    const root = await assertHostRoot(options.root ?? process.cwd());
-    if (options.command === 'init') {
-      const configPath = await initHostSkillConfig({
-        root,
-        packageManager: options.packageManager,
-        snapshotScript: options.snapshotScript,
-      });
-      console.log(`Created ${configPath}.`);
-      return;
-    }
-    const result = await checkHostSkills({ root, mode: options.command });
+    const root = options.root ?? process.cwd();
+    let result;
+    if (options.command === 'refresh') result = await refreshHostSkills({ root });
+    else if (options.command === 'verify') result = await verifyHostSkills({ root });
+    else if (options.command === 'check-remote') result = await checkRemoteHostSkills({ root });
+    else result = await doctorHostSkills({ root });
     console.log(JSON.stringify(result, null, 2));
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error));
@@ -583,6 +699,7 @@ if (
 export const adoptionInternals = {
   assertHostRoot,
   collectFiles,
+  collectToolingFiles,
   inferPackageManager,
   pathState,
   redact,

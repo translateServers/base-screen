@@ -1,7 +1,7 @@
 # Host Material Skill Generation
 
 > Status: Active
-> Updated: 2026-08-11
+> Updated: 2026-08-12
 > Authority: [ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), [ADR-0003](../../decisions/ADR-0003-web-component-material-abi-and-registration.md), [ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md), [ADR-0028](../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
 
 ## Goal
@@ -19,13 +19,16 @@ material in an explicitly allowlisted workspace.
   commits changes, activates production code, or enumerates the global Custom Element registry.
 - Generated source uses only public `@base-screen/plugin-sdk`, `@base-screen/react`,
   `@base-screen/vue`, `@base-screen/plugin-core`, and host-owned APIs.
+- Online materials are read-only references. A draft-only workflow may emit a pending-review candidate
+  without changing formal registration targets.
 
 ## Requirements
 
-### R1: Authoring bundle and path authority
+### R1: Canonical snapshot input and path authority
 
-The generator SHALL accept only the documented allowlisted files, reject unknown fields and unsafe
-workspace paths, validate the selected framework, roots, registration mode, verification script names,
+The generator SHALL accept the documented canonical single-file host snapshot
+(`.base-screen/host-snapshot.json`), reject unknown top-level fields and unsafe workspace paths,
+validate the selected framework, roots, registration mode, verification script names,
 component metadata, material manifests, resource types, datasets, and optional samples, and fail closed
 on credential-like values or invalid/incomplete input.
 
@@ -61,8 +64,14 @@ The generated validator SHALL load the public parsers from the host workspace's 
 packages when present, resolving ESM-only `exports` entries from the workspace `package.json`; otherwise it
 SHALL fall back to a Base Screen checkout's built package `dist`.
 
+### R6: Draft-only candidate workflow
+
+The generated Skill SHALL support source, test, manifest, and `material-candidate.json` output with
+`status: pending-review` and `registration: draft-only`; it SHALL not modify registration files in
+that workflow and SHALL preserve the existing formal `propose/apply` policy for published code.
+
 ## Completion definition
 
-R1–R5 have focused automated evidence, the meta and generated Skills pass Skill validation, all
+R1–R6 have focused automated evidence, the meta and generated Skills pass Skill validation, all
 generator and validator tests pass, relevant repository quality gates pass, and every applicable
 checklist item is checked.

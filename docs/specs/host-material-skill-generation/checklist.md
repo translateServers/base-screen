@@ -10,5 +10,6 @@
 - [x] Generated validator rejects invalid manifests and existing catalog type conflicts through public parsers.
 - [x] Generated validator resolves public parsers from installed host workspace packages through ESM `exports` entries, with a Base Screen checkout `dist` fallback.
 - [x] Native, React, and Vue route references state the current adapter and event boundaries.
+- [x] Draft-only workflow emits pending-review candidate metadata and treats online materials as read-only references.
 - [x] Test matrix maps every requirement to automated evidence.
-- [x] Relevant focused tests and quality checks pass: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test` (821 tests), `pnpm build`, `pnpm check:packages`, `pnpm check:boundaries`, `pnpm check:api`, `pnpm check:engine-import`, and `pnpm verify:tarball`; no applicable task or checklist item remains unchecked.
+- [x] Relevant focused tests and quality checks pass: `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm check:packages`, `pnpm check:boundaries`, `pnpm check:api`, `pnpm check:engine-import`, and `pnpm verify:tarball`; no applicable task or checklist item remains unchecked.

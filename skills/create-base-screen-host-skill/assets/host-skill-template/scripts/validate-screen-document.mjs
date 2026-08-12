@@ -5,6 +5,48 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = resolve(SCRIPT_DIR, '..');
+let handoffValidators;
+
+async function getHandoffValidators() {
+  if (handoffValidators !== undefined) return handoffValidators;
+  try {
+    handoffValidators = await import('./material-handoff.mjs');
+  } catch {
+    handoffValidators = {
+      validateDraftMaterialCatalog: (value) => basicHandoffValidation(value, 'draft'),
+      validateMaterialProvenance: (value) => basicHandoffValidation(value, 'provenance'),
+    };
+  }
+  return handoffValidators;
+}
+
+function basicHandoffValidation(value, kind) {
+  const valid =
+    kind === 'draft'
+      ? value !== null &&
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Array.isArray(value.materials) &&
+        typeof value.hostId === 'string' &&
+        typeof value.screenDraftId === 'string' &&
+        typeof value.requestId === 'string'
+      : Array.isArray(value) &&
+        value.every(
+          (entry) =>
+            entry !== null &&
+            typeof entry === 'object' &&
+            typeof entry.type === 'string' &&
+            (entry.source === 'code' || entry.source === 'online') &&
+            (entry.authoring === 'workspace' || entry.authoring === 'host-platform') &&
+            typeof entry.editable === 'boolean',
+        );
+  return valid
+    ? { ok: true, value, diagnostics: [] }
+    : {
+        ok: false,
+        diagnostics: [{ code: 'MATERIAL_HANDOFF_INVALID', message: `${kind} handoff is invalid` }],
+      };
+}
 
 export async function resolveHostPackageEntry(packageName, basePackageJsonUrl) {
   const packageJsonPath = findPackageJSON(packageName, basePackageJsonUrl);
@@ -19,10 +61,10 @@ export async function resolveHostPackageEntry(packageName, basePackageJsonUrl) {
   return join(dirname(packageJsonPath), 'index.js');
 }
 
-export async function validateScreenDocumentFile(documentPath) {
+export async function validateScreenDocumentFile(documentPath, options = {}) {
   const apis = await loadPublicApis();
   const issues = [];
-  const refs = await loadReferences(apis, issues);
+  const refs = await loadReferences(apis, issues, options);
   let document;
   try {
     const source = await readFile(documentPath, 'utf8');
@@ -75,6 +117,14 @@ export async function validateScreenDocumentFile(documentPath) {
       });
       continue;
     }
+    if (options.publishedOnly === true && refs.draftTypes.has(component.type)) {
+      issues.push({
+        severity: 'error',
+        code: 'HOST_SKILL_DRAFT_MATERIAL_PUBLISHED',
+        path: [...path, 'type'],
+        message: `Material type ${component.type} is draft-only and cannot be published.`,
+      });
+    }
     checkSchema(
       issues,
       apis.validateBaseScreenMaterialProps(component.props, material.propsSchema),
@@ -115,13 +165,69 @@ export async function validateScreenDocumentFile(documentPath) {
   return issues;
 }
 
-async function loadReferences(apis, issues) {
+async function loadReferences(apis, issues, options = {}) {
+  const { validateDraftMaterialCatalog, validateMaterialProvenance } = await getHandoffValidators();
   const materials = new Map();
+  const draftTypes = new Set();
   const materialValues = await parseReferenceArray('materials.json', issues);
   for (const [index, item] of materialValues.entries()) {
     const parsed = apis.parseBaseScreenMaterialManifest(item);
     if (!parsed.ok) addDiagnostics(issues, parsed.diagnostics, ['references', 'materials', index]);
     else materials.set(parsed.value.type, parsed.value);
+  }
+  const formalMaterialTypes = new Set(materials.keys());
+  const draftPath = options.draftMaterialCatalogPath;
+  if (draftPath !== undefined) {
+    let catalog;
+    try {
+      catalog = JSON.parse((await readFile(resolve(draftPath), 'utf8')).replace(/^\uFEFF/u, ''));
+    } catch (error) {
+      issues.push({
+        severity: 'error',
+        code: 'HOST_DRAFT_MATERIAL_CATALOG_INVALID',
+        path: ['draft-material-catalog.json'],
+        message: error.message,
+      });
+    }
+    if (catalog !== undefined) {
+      const checked = validateDraftMaterialCatalog(catalog, {
+        parseManifest: apis.parseBaseScreenMaterialManifest,
+      });
+      if (!checked.ok) {
+        for (const diagnostic of checked.diagnostics) {
+          issues.push({
+            severity: 'error',
+            code: diagnostic.code,
+            path: ['draft-material-catalog.json'],
+            message: diagnostic.message,
+          });
+        }
+      } else {
+        for (const [index, item] of checked.value.materials.entries()) {
+          const parsed = apis.parseBaseScreenMaterialManifest(item);
+          if (!parsed.ok) {
+            addDiagnostics(issues, parsed.diagnostics, [
+              'draft-material-catalog.json',
+              'materials',
+              index,
+            ]);
+            continue;
+          }
+          const existing = materials.get(parsed.value.type);
+          if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(parsed.value)) {
+            issues.push({
+              severity: 'error',
+              code: 'HOST_DRAFT_MATERIAL_CONFLICT',
+              path: ['draft-material-catalog.json', 'materials', index, 'type'],
+              message: `Draft material ${parsed.value.type} conflicts with the formal catalog.`,
+            });
+            continue;
+          }
+          materials.set(parsed.value.type, parsed.value);
+          if (!formalMaterialTypes.has(parsed.value.type)) draftTypes.add(parsed.value.type);
+        }
+      }
+    }
   }
   const resourceTypes = new Map();
   const resourceValues = await parseReferenceArray('resource-types.json', issues);
@@ -146,7 +252,34 @@ async function loadReferences(apis, issues) {
     if (!parsed.ok) addDiagnostics(issues, parsed.diagnostics, ['references', 'datasets', index]);
     else datasets.set(datasetKey(parsed.value), parsed.value);
   }
-  return { materials, resourceTypes, datasets };
+  const provenancePath =
+    options.provenancePath ?? join(SKILL_ROOT, 'references', 'material-provenance.json');
+  try {
+    const provenance = JSON.parse((await readFile(provenancePath, 'utf8')).replace(/^\uFEFF/u, ''));
+    const checked = validateMaterialProvenance(provenance, {
+      materialTypes: [...formalMaterialTypes],
+    });
+    if (!checked.ok) {
+      for (const diagnostic of checked.diagnostics) {
+        issues.push({
+          severity: 'error',
+          code: diagnostic.code,
+          path: ['material-provenance.json'],
+          message: diagnostic.message,
+        });
+      }
+    }
+  } catch (error) {
+    if (options.provenancePath !== undefined || error.code !== 'ENOENT') {
+      issues.push({
+        severity: 'error',
+        code: 'HOST_MATERIAL_PROVENANCE_INVALID',
+        path: ['material-provenance.json'],
+        message: error.message,
+      });
+    }
+  }
+  return { materials, resourceTypes, datasets, draftTypes };
 }
 
 async function parseReferenceArray(fileName, issues) {
@@ -310,14 +443,38 @@ function formatIssue(issue) {
 async function main() {
   const args = process.argv.slice(2);
   const jsonOutput = args.includes('--json');
-  const documentPath = args.find((item) => item !== '--json');
+  const draftIndex = args.indexOf('--draft-material-catalog');
+  const provenanceIndex = args.indexOf('--provenance');
+  const draftMaterialCatalogPath = draftIndex === -1 ? undefined : args[draftIndex + 1];
+  const provenancePath = provenanceIndex === -1 ? undefined : args[provenanceIndex + 1];
+  if (draftIndex !== -1 && draftMaterialCatalogPath === undefined) {
+    console.error('--draft-material-catalog requires a file path');
+    process.exitCode = 1;
+    return;
+  }
+  if (provenanceIndex !== -1 && provenancePath === undefined) {
+    console.error('--provenance requires a file path');
+    process.exitCode = 1;
+    return;
+  }
+  const flags = new Set(['--json', '--published-only', '--draft-material-catalog', '--provenance']);
+  const values = new Set(
+    [draftMaterialCatalogPath, provenancePath].filter((value) => value !== undefined),
+  );
+  const documentPath = args.find((item) => !flags.has(item) && !values.has(item));
   if (documentPath === undefined) {
-    console.error('Usage: node scripts/validate-screen-document.mjs <document.json> [--json]');
+    console.error(
+      'Usage: node scripts/validate-screen-document.mjs <document.json> [--draft-material-catalog <file>] [--published-only] [--provenance <file>] [--json]',
+    );
     process.exitCode = 1;
     return;
   }
   try {
-    const issues = await validateScreenDocumentFile(resolve(documentPath));
+    const issues = await validateScreenDocumentFile(resolve(documentPath), {
+      draftMaterialCatalogPath,
+      provenancePath,
+      publishedOnly: args.includes('--published-only'),
+    });
     if (jsonOutput) console.log(JSON.stringify(issues, null, 2));
     else if (issues.length === 0) console.log('Screen Document is valid for this host Skill.');
     else issues.forEach((issue) => console.log(formatIssue(issue)));

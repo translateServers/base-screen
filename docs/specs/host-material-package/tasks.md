@@ -9,3 +9,4 @@
 - [x] verify-browser-harness 增加托管包注册与渲染闭环断言（`BROWSER_HARNESS_HOSTED_PACKAGE_FAILED` 分支）。
 - [x] 更新 ADR/Spec/计划索引、包开发顺序与 usage.md 集成说明。
 - [x] 运行聚焦检查与完整质量门，按证据更新 test-matrix 与 checklist。
+- [x] Browser harness adds a host-accepted draft package and unload/reconfigure/publish preflight demonstration without runtime API changes.

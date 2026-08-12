@@ -966,6 +966,35 @@ try {
         ) {
           throw new Error(`BROWSER_HARNESS_HOSTED_PACKAGE_FAILED: ${JSON.stringify(hosted)}`);
         }
+        const draft = await page.evaluate(async () => {
+          const demo = window.baseScreenHarness.createDraftDesignerDemo();
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+          const before = demo.document;
+          const draftType = before.components[0]?.type;
+          demo.unload();
+          const configured = demo.configure({
+            catalog: window.baseScreenHarness.combinedDraftCatalog,
+          });
+          demo.document = before;
+          await new Promise((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve)),
+          );
+          const restored = demo.document.components[0]?.type;
+          const published = window.baseScreenHarness.publishDraftPreflight(before);
+          demo.remove();
+          return { draftType, restored, configured: configured.ok, published };
+        });
+        if (
+          draft.draftType !== 'harness.draft-badge' ||
+          draft.restored !== draft.draftType ||
+          !draft.configured ||
+          draft.published.ok !== false ||
+          draft.published.code !== 'HOST_SKILL_DRAFT_MATERIAL_PUBLISHED'
+        ) {
+          throw new Error(`BROWSER_HARNESS_DRAFT_MATERIAL_FAILED: ${JSON.stringify(draft)}`);
+        }
         await assertDesignerThemeIsolation(page);
       }
       await page.close();
