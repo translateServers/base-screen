@@ -48,16 +48,37 @@ export async function vendorHostSkillKit({ hostRoot, packageManager, snapshotScr
 
   // Preflight (no mutation).
   const manifestState = await pathState(targetManifestPath);
+  const existingManifest =
+    manifestState === 'file' ? await readJson(targetManifestPath) : undefined;
+  // A real old host keeps its old kit manifest at .base-screen/host-skill-tooling.json without the
+  // `layout: "tooling"` field. Treat that file as the legacy manifest instead of the target one.
+  const isCurrentLayout = existingManifest !== undefined && existingManifest.layout === 'tooling';
   const legacyManifestState = await pathState(legacyManifestPath);
-  if (legacyManifestState === 'file' && manifestState === 'file')
+  if (legacyManifestState === 'file' && isCurrentLayout)
     throw new Error(
       'Both host-skill-tooling.json and host-skill-kit-manifest.json exist; remove the obsolete legacy manifest, then re-run.',
     );
-  const isUpdate = manifestState === 'file';
-  await assertSupplyState(targetToolingRoot, targetManifestPath, isUpdate, manifest);
+  const isUpdate = isCurrentLayout;
+  const legacySources = [];
+  if (legacyManifestState === 'file') legacySources.push(legacyManifestPath);
+  if (manifestState === 'file' && !isCurrentLayout) legacySources.push(targetManifestPath);
+  if (legacySources.length > 1)
+    throw new Error('Multiple legacy host Skill manifests exist; keep only one, then re-run.');
+  const replacingToolingManifest = legacySources.some((item) => item === targetManifestPath);
+  await assertSupplyState(
+    targetToolingRoot,
+    targetManifestPath,
+    isUpdate,
+    manifest,
+    replacingToolingManifest,
+  );
   const legacy =
-    legacyManifestState === 'file'
-      ? await prepareLegacyMigration(targetRoot, legacyManifestPath)
+    legacySources.length === 1
+      ? await prepareLegacyMigration(
+          targetRoot,
+          legacySources[0],
+          legacySources[0] === targetManifestPath,
+        )
       : await prepareLegacyCleanup(targetRoot, targetManifestPath, isUpdate);
   const packageJson = await readJson(packageFile);
   assertHostScriptCompatible(packageJson);
@@ -110,7 +131,13 @@ export async function vendorHostSkillKit({ hostRoot, packageManager, snapshotScr
   }
 }
 
-async function assertSupplyState(toolingRoot, manifestPath, update, nextManifest) {
+async function assertSupplyState(
+  toolingRoot,
+  manifestPath,
+  update,
+  nextManifest,
+  replacingLegacy = false,
+) {
   const existingManifestState = await pathState(manifestPath);
   const managedStates = await Promise.all(
     MANAGED_SKILLS.map(async (skillName) => ({
@@ -119,13 +146,20 @@ async function assertSupplyState(toolingRoot, manifestPath, update, nextManifest
     })),
   );
   if (!update) {
-    if (
+    if (replacingLegacy) {
+      if (
+        existingManifestState !== 'file' ||
+        managedStates.some((item) => item.state !== 'missing')
+      )
+        throw new Error('Refusing to migrate over an incomplete or unmarked legacy layout.');
+    } else if (
       existingManifestState !== 'missing' ||
       managedStates.some((item) => item.state !== 'missing')
-    )
+    ) {
       throw new Error(
         'Refusing to overwrite existing host Skill tooling; re-run the same command for a managed update.',
       );
+    }
     return;
   }
   const existingManifest = await readJson(manifestPath);
@@ -150,7 +184,11 @@ async function assertSupplyState(toolingRoot, manifestPath, update, nextManifest
     throw new Error('Next tooling manifest does not contain the complete managed Skill set.');
 }
 
-async function prepareLegacyMigration(targetRoot, legacyManifestPath) {
+async function prepareLegacyMigration(
+  targetRoot,
+  legacyManifestPath,
+  replacesToolingManifest = false,
+) {
   const legacyManifest = await readJson(legacyManifestPath);
   if (
     !isObject(legacyManifest) ||
@@ -167,7 +205,9 @@ async function prepareLegacyMigration(targetRoot, legacyManifestPath) {
     );
   return {
     kind: 'migration',
-    legacyManifestPath,
+    // When the legacy manifest lives at the target path, the install step replaces it with the
+    // new layout manifest, so there is no separate legacy manifest file to remove.
+    legacyManifestPath: replacesToolingManifest ? undefined : legacyManifestPath,
     legacySkillsRoot,
     skills: MANAGED_SKILLS.slice(),
   };
@@ -193,7 +233,10 @@ async function prepareLegacyCleanup(targetRoot, manifestPath, update) {
 }
 
 async function findLegacyMismatch(legacySkillsRoot, manifest) {
-  const managedPrefixes = new Set(MANAGED_SKILLS);
+  const managedPrefixes = new Set([
+    ...MANAGED_SKILLS,
+    ...MANAGED_AUXILIARY.map((name) => name.split('/')[0]),
+  ]);
   let present = false;
   for (const prefix of managedPrefixes) {
     const state = await pathState(join(legacySkillsRoot, prefix));
@@ -206,7 +249,7 @@ async function findLegacyMismatch(legacySkillsRoot, manifest) {
     if (!managedPrefixes.has(prefix)) continue;
     const content = legacyFiles.get(name);
     if (content === undefined) return { mismatch: `missing managed file: ${name}`, present: true };
-    if (sha256(content) !== digest)
+    if (!legacyDigestMatches(content, digest))
       return { mismatch: `modified managed file: ${name}`, present: true };
   }
   const extra = [...legacyFiles.keys()].filter((name) => {
@@ -218,6 +261,17 @@ async function findLegacyMismatch(legacySkillsRoot, manifest) {
   return { mismatch: null, present: true };
 }
 
+// Legacy manifests recorded LF-based digests, but a Windows host with core.autocrlf checked the
+// managed files out with CRLF. Treat a file as unmodified when either its raw or LF-normalized
+// digest matches, so checkout line-ending conversion is not mistaken for a manual edit.
+function legacyDigestMatches(content, digest) {
+  return sha256(content) === digest || sha256(normalizeLineEndings(content)) === digest;
+}
+
+function normalizeLineEndings(value) {
+  return Buffer.from(value.toString('utf8').replace(/\r\n/gu, '\n'), 'utf8');
+}
+
 async function removeLegacyArtifacts(legacy) {
   if (legacy.kind === 'none') return;
   for (const skillName of legacy.skills) {
@@ -225,8 +279,25 @@ async function removeLegacyArtifacts(legacy) {
       () => {},
     );
   }
+  for (const name of MANAGED_AUXILIARY) {
+    await rm(join(legacy.legacySkillsRoot, name), { force: true }).catch(() => {});
+  }
+  await rmEmptyDirectories(legacy.legacySkillsRoot, MANAGED_AUXILIARY);
   if (legacy.legacyManifestPath !== undefined)
     await rm(legacy.legacyManifestPath, { force: true }).catch(() => {});
+}
+
+async function rmEmptyDirectories(root, auxiliaryNames) {
+  for (const name of auxiliaryNames) {
+    const directory = dirname(join(root, name));
+    if (directory === root) continue;
+    try {
+      const entries = await readdir(directory);
+      if (entries.length === 0) await rm(directory, { recursive: true, force: true });
+    } catch {
+      // Directory is missing or not empty; nothing to remove.
+    }
+  }
 }
 
 async function installManagedFiles(

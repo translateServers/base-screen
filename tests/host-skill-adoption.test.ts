@@ -554,6 +554,94 @@ describe('host Skill adoption toolkit', () => {
     }
   }, 30_000);
 
+  it('migrates a real old host layout (host-skill-tooling.json without layout) and keeps the business Skills', async () => {
+    const host = await makeHost();
+    try {
+      // A real old host (e.g. XJ) keeps its old kit manifest at
+      // .base-screen/host-skill-tooling.json without a `layout` field, ships the three managed
+      // tool Skills and the shared helper under .agents/skills, and runs an old-style exporter
+      // that writes a multi-file context directory.
+      await writeLegacyLayout(host.root, { manifestName: 'host-skill-tooling.json' });
+      await writeLegacyBusinessSkills(host.root);
+      // Simulate the old exporter still present on disk; the configured snapshot script must
+      // already follow the new single-file contract for the vendor command to complete.
+      await writeFile(
+        join(host.root, 'scripts', 'export-context-legacy.mjs'),
+        `const output = process.env.BASE_SCREEN_HOST_SKILL_CONTEXT_DIR;\nif (!output) process.exit(1);\n`,
+        'utf8',
+      );
+
+      const result = await vendorHostSkillKit({ hostRoot: host.root });
+      expect(result.manifest.layout).toBe('tooling');
+      expect(
+        (
+          await readJson<{ layout?: string }>(
+            join(host.root, '.base-screen', 'host-skill-tooling.json'),
+          )
+        ).layout,
+      ).toBe('tooling');
+      for (const skillName of MANAGED_SKILLS) {
+        await expect(stat(join(host.root, '.agents', 'skills', skillName))).rejects.toThrow();
+      }
+      await expect(
+        stat(join(host.root, '.agents', 'skills', 'shared', 'material-handoff.mjs')),
+      ).rejects.toThrow();
+      expect(await stat(join(host.root, '.agents', 'skills', 'design-acme-screens'))).toBeTruthy();
+      expect(await stat(join(host.root, '.agents', 'skills', 'create-acme-material'))).toBeTruthy();
+      const skillsEntries = await readdir(join(host.root, '.agents', 'skills'));
+      expect(skillsEntries.sort()).toEqual(['create-acme-material', 'design-acme-screens']);
+      expect(
+        await stat(
+          join(
+            host.root,
+            '.base-screen',
+            'tooling',
+            'base-screen-host-skills',
+            'manage-base-screen-host-skills',
+            'SKILL.md',
+          ),
+        ),
+      ).toBeTruthy();
+      const verify = await verifyHostSkills({ root: host.root });
+      expect(verify.mode).toBe('verify');
+    } finally {
+      await rm(host.root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('refuses a real old host layout whose managed file was edited and writes nothing new', async () => {
+    const host = await makeHost();
+    try {
+      await writeLegacyLayout(host.root, { manifestName: 'host-skill-tooling.json' });
+      await writeLegacyBusinessSkills(host.root);
+      await writeFile(
+        join(host.root, '.agents', 'skills', 'manage-base-screen-host-skills', 'SKILL.md'),
+        `${await readFile(
+          join(host.root, '.agents', 'skills', 'manage-base-screen-host-skills', 'SKILL.md'),
+          'utf8',
+        )}\nmanual edit\n`,
+        'utf8',
+      );
+      await expect(vendorHostSkillKit({ hostRoot: host.root })).rejects.toThrow(
+        'Legacy layout is not fully managed',
+      );
+      await expect(stat(join(host.root, '.base-screen', 'host-skills.json'))).rejects.toThrow();
+      await expect(stat(join(host.root, '.base-screen', 'host-snapshot.json'))).rejects.toThrow();
+      await expect(
+        stat(join(host.root, '.base-screen', 'tooling', 'base-screen-host-skills')),
+      ).rejects.toThrow();
+      const packageJson = await readJson<{ scripts: Record<string, string> }>(
+        join(host.root, 'package.json'),
+      );
+      expect(packageJson.scripts['base-screen:skills']).toBeUndefined();
+      for (const skillName of MANAGED_SKILLS) {
+        expect(await stat(join(host.root, '.agents', 'skills', skillName))).toBeTruthy();
+      }
+    } finally {
+      await rm(host.root, { recursive: true, force: true });
+    }
+  }, 30_000);
+
   it('refuses managed updates with manual edits, an unmanaged legacy copy, or a script conflict', async () => {
     const host = await makeHost();
     try {
@@ -605,7 +693,10 @@ describe('host Skill adoption toolkit', () => {
   }, 60_000);
 });
 
-async function writeLegacyLayout(hostRoot: string): Promise<void> {
+async function writeLegacyLayout(
+  hostRoot: string,
+  { manifestName = 'host-skill-kit-manifest.json' }: { manifestName?: string } = {},
+): Promise<void> {
   const skillsRoot = join(hostRoot, '.agents', 'skills');
   for (const skillName of MANAGED_SKILLS) {
     await cp(join(REPO_SKILLS_ROOT, skillName), join(skillsRoot, skillName), {
@@ -624,7 +715,7 @@ async function writeLegacyLayout(hostRoot: string): Promise<void> {
     for (const [name, content] of collected) files.set(name, sha256(content));
   }
   const shared = await collectFiles(join(skillsRoot, 'shared'), skillsRoot);
-  for (const [name, content] of shared) files.set(`shared/${name}`, sha256(content));
+  for (const [name, content] of shared) files.set(name, sha256(content));
   files.set(
     'manage-base-screen-host-skills/scripts/snapshot-file.mjs',
     sha256(
@@ -642,11 +733,40 @@ async function writeLegacyLayout(hostRoot: string): Promise<void> {
   );
   await mkdir(join(hostRoot, '.base-screen'), { recursive: true });
   await writeFile(
-    join(hostRoot, '.base-screen', 'host-skill-kit-manifest.json'),
+    join(hostRoot, '.base-screen', manifestName),
     `${JSON.stringify(
+      // A real old host writes no `layout` field; only the new managed kit carries
+      // `layout: "tooling"`.
       { generator: 'base-screen-host-skill-kit', files: Object.fromEntries(files), sourceDigest },
       null,
       2,
     )}\n`,
   );
+}
+
+async function writeLegacyBusinessSkills(hostRoot: string): Promise<void> {
+  const skillsRoot = join(hostRoot, '.agents', 'skills');
+  for (const skill of [
+    {
+      name: 'design-acme-screens',
+      generator: 'create-base-screen-host-skill',
+      inputs: { 'host.json': sha256('host'), 'design-guidelines.md': sha256('guidelines') },
+    },
+    {
+      name: 'create-acme-material',
+      generator: 'create-base-screen-host-material-skill',
+      inputs: { 'material-authoring.json': sha256('authoring') },
+    },
+  ]) {
+    await mkdir(join(skillsRoot, skill.name), { recursive: true });
+    await writeFile(
+      join(skillsRoot, skill.name, 'generation-manifest.json'),
+      `${JSON.stringify(
+        { generator: skill.generator, hostId: 'acme', skillName: skill.name, inputs: skill.inputs },
+        null,
+        2,
+      )}\n`,
+      'utf8',
+    );
+  }
 }
