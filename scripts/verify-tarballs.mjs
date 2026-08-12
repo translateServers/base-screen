@@ -173,6 +173,7 @@ function writeConsumerFiles(consumer, framework) {
         name: `base-screen-${framework}-tarball-consumer`,
         private: true,
         type: 'module',
+        packageManager: 'pnpm@11.18.0',
         scripts: {
           typecheck: 'tsc --noEmit',
           build: 'vite build',
@@ -218,6 +219,86 @@ function writeConsumerFiles(consumer, framework) {
   } else {
     writeVueConsumerFiles(consumer, productTag);
   }
+}
+
+function writeVanillaConsumerFiles(consumer) {
+  const dependencies = Object.fromEntries(
+    ['contracts', 'material', 'plugin-core', 'sdk'].map((directory) => [
+      `@base-screen/${directory}`,
+      tarballSpec(directory),
+    ]),
+  );
+  writeFileSync(
+    join(consumer, 'package.json'),
+    `${JSON.stringify(
+      {
+        name: 'base-screen-vanilla-tarball-consumer',
+        private: true,
+        type: 'module',
+        packageManager: 'pnpm@11.18.0',
+        scripts: {
+          typecheck: 'tsc --noEmit',
+          build: 'vite build',
+          verify: 'node browser.mjs',
+        },
+        dependencies,
+        devDependencies: {
+          '@playwright/test': '1.62.1',
+          typescript: '7.0.2',
+          vite: '8.2.0',
+        },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  mkdirSync(join(consumer, 'src'));
+  writeFileSync(
+    join(consumer, 'tsconfig.json'),
+    `${JSON.stringify(
+      {
+        compilerOptions: {
+          target: 'ES2022',
+          module: 'Preserve',
+          moduleResolution: 'Bundler',
+          strict: true,
+          noUncheckedIndexedAccess: true,
+          exactOptionalPropertyTypes: true,
+          verbatimModuleSyntax: true,
+          isolatedModules: true,
+          skipLibCheck: false,
+        },
+        include: ['src'],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  const quickstart = join(root, 'examples', 'host-quickstart');
+  const quickstartSource = readFileSync(join(quickstart, 'src', 'main.ts'));
+  const quickstartText = quickstartSource.toString('utf8');
+  for (const forbiddenImport of [
+    '@base-screen/core',
+    '@base-screen/engine',
+    '@base-screen/plugin-manager',
+    '@base-screen/plugin-sdk',
+    '@base-screen/renderer',
+  ]) {
+    if (quickstartText.includes(forbiddenImport)) {
+      throw new Error(`VANILLA_TARBALL_UNDECLARED_IMPORT: ${forbiddenImport}`);
+    }
+  }
+  writeFileSync(join(consumer, 'index.html'), readFileSync(join(quickstart, 'index.html')));
+  writeFileSync(join(consumer, 'src', 'main.ts'), quickstartSource);
+  writeFileSync(
+    join(consumer, 'src', 'style.css'),
+    readFileSync(join(quickstart, 'src', 'style.css')),
+  );
+  writeFileSync(
+    join(consumer, 'src', 'vite-env.d.ts'),
+    readFileSync(join(quickstart, 'src', 'vite-env.d.ts')),
+  );
+  writeFileSync(join(consumer, 'browser.mjs'), vanillaBrowserVerifierSource());
 }
 
 function writeReactConsumerFiles(consumer, productTag) {
@@ -285,22 +366,30 @@ function Product({ label, onValueClick }: { label: string; onValueClick?: (paylo
 }
 
 export function registerProduct(): void {
-  const definition = createReactMaterialDefinition({
-    manifest,
-    component: Product,
-    eventProps: { valueClick: 'onValueClick' },
-  });
-  if (!definition.ok) throw new Error('REACT_TARBALL_PRODUCT_DEFINITION_FAILED');
-  customElements.define(definition.value.manifest.tagName, definition.value.constructor);
+  const existing = customElements.get(productEntry.manifest.tagName);
+  if (existing === undefined) {
+    customElements.define(productEntry.manifest.tagName, productEntry.constructor);
+  } else if (existing !== productEntry.constructor) {
+    throw new Error('REACT_TARBALL_PRODUCT_REGISTRATION_CONFLICT');
+  }
 }
+
+const definition = createReactMaterialDefinition({
+  manifest,
+  component: Product,
+  eventProps: { valueClick: 'onValueClick' },
+});
+if (!definition.ok) throw new Error('REACT_TARBALL_PRODUCT_DEFINITION_FAILED');
+const productEntry = definition.value;
 `,
   );
   writeFileSync(
     join(consumer, 'src', 'main.tsx'),
-    `import { useEffect, useRef, useState } from 'react';
+    `import '@base-screen/sdk/auto-register';
+import '@base-screen/material/auto-register';
+import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
-import { defineBaseScreenElements } from '@base-screen/sdk';
 import { registerProduct } from './bridge';
 
 declare global {
@@ -325,8 +414,6 @@ function model(label: string): BaseScreenMaterialModel {
   };
 }
 
-const elements = defineBaseScreenElements();
-if (!elements.ok) throw new Error('REACT_TARBALL_SDK_REGISTRATION_FAILED');
 registerProduct();
 
 function App({ unmount }: { unmount: () => void }) {
@@ -458,14 +545,21 @@ const Product = defineComponent({
 });
 
 export function registerProduct(): void {
-  const definition = createVueMaterialDefinition({
-    manifest,
-    component: Product,
-    eventProps: { valueClick: 'onValueClick' },
-  });
-  if (!definition.ok) throw new Error('VUE_TARBALL_PRODUCT_DEFINITION_FAILED');
-  customElements.define(definition.value.manifest.tagName, definition.value.constructor);
+  const existing = customElements.get(productEntry.manifest.tagName);
+  if (existing === undefined) {
+    customElements.define(productEntry.manifest.tagName, productEntry.constructor);
+  } else if (existing !== productEntry.constructor) {
+    throw new Error('VUE_TARBALL_PRODUCT_REGISTRATION_CONFLICT');
+  }
 }
+
+const definition = createVueMaterialDefinition({
+  manifest,
+  component: Product,
+  eventProps: { valueClick: 'onValueClick' },
+});
+if (!definition.ok) throw new Error('VUE_TARBALL_PRODUCT_DEFINITION_FAILED');
+const productEntry = definition.value;
 `,
   );
   writeFileSync(
@@ -526,8 +620,10 @@ onUnmounted(() => {
   );
   writeFileSync(
     join(consumer, 'src', 'main.ts'),
-    `import { createApp } from 'vue';
-import { defineBaseScreenElements } from '@base-screen/sdk';
+    `import '@base-screen/sdk/viewer/auto-register';
+import '@base-screen/sdk/designer/auto-register';
+import '@base-screen/material/auto-register';
+import { createApp } from 'vue';
 import App from './App.vue';
 import { registerProduct } from './bridge';
 
@@ -541,8 +637,6 @@ declare global {
   }
 }
 
-const elements = defineBaseScreenElements();
-if (!elements.ok) throw new Error('VUE_TARBALL_SDK_REGISTRATION_FAILED');
 registerProduct();
 
 const app = createApp(App);
@@ -605,16 +699,27 @@ export default defineConfig({
 
 function browserVerifierSource(framework, productTag) {
   return `import { chromium } from '@playwright/test';
-import { createServer } from 'vite';
+import { preview } from 'vite';
 
-const server = await createServer({ root: process.cwd(), server: { host: '127.0.0.1', port: 0 } });
-await server.listen();
+const server = await preview({ root: process.cwd(), preview: { host: '127.0.0.1', port: 0 } });
 const url = server.resolvedUrls?.local[0];
 if (url === undefined) throw new Error('${framework.toUpperCase()}_TARBALL_SERVER_URL_MISSING');
 const browser = await chromium.launch();
 try {
   const page = await browser.newPage();
   await page.goto(url, { waitUntil: 'networkidle' });
+  const automaticRegistrations = await page.evaluate(() => ({
+    designer: customElements.get('base-screen-designer') !== undefined,
+    rectangle: customElements.get('base-screen-rectangle') !== undefined,
+    text: customElements.get('base-screen-text') !== undefined,
+    viewer: customElements.get('base-screen-viewer') !== undefined,
+  }));
+  if (Object.values(automaticRegistrations).some((registered) => !registered)) {
+    throw new Error(
+      '${framework.toUpperCase()}_TARBALL_AUTO_REGISTRATION_FAILED: ' +
+        JSON.stringify(automaticRegistrations),
+    );
+  }
   await page.locator('#product-action').waitFor();
   await page.locator('#product-action').click();
   await page.waitForFunction(() => window.__tarballConsumer?.state().events === 1);
@@ -646,50 +751,123 @@ try {
 `;
 }
 
-function assertConsumerIsolation(consumer, framework) {
+function vanillaBrowserVerifierSource() {
+  return `import { chromium } from '@playwright/test';
+import { preview } from 'vite';
+
+const server = await preview({ root: process.cwd(), preview: { host: '127.0.0.1', port: 0 } });
+const url = server.resolvedUrls?.local[0];
+if (url === undefined) throw new Error('VANILLA_TARBALL_SERVER_URL_MISSING');
+const browser = await chromium.launch();
+try {
+  const page = await browser.newPage();
+  await page.goto(url, { waitUntil: 'networkidle' });
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('base-screen-viewer')
+        ?.shadowRoot?.querySelector('base-screen-text')?.textContent ===
+      'Base Screen Viewer 已就绪',
+  );
+  const state = await page.evaluate(() => {
+    const viewer = document.querySelector('base-screen-viewer');
+    const mount = viewer?.shadowRoot?.querySelector('div');
+    return {
+      rectangleRegistered: customElements.get('base-screen-rectangle') !== undefined,
+      textRegistered: customElements.get('base-screen-text') !== undefined,
+      viewerRegistered: customElements.get('base-screen-viewer') !== undefined,
+      canvasWidth: mount instanceof HTMLElement ? mount.style.width : undefined,
+      canvasHeight: mount instanceof HTMLElement ? mount.style.height : undefined,
+    };
+  });
+  if (
+    !state.rectangleRegistered ||
+    !state.textRegistered ||
+    !state.viewerRegistered ||
+    state.canvasWidth !== '640px' ||
+    state.canvasHeight !== '360px'
+  ) {
+    throw new Error('VANILLA_TARBALL_RENDER_FAILED: ' + JSON.stringify(state));
+  }
+} finally {
+  await browser.close();
+  await server.close();
+}
+`;
+}
+
+function assertConsumerIsolation(consumer, name, requiredPackages, forbiddenPackages) {
+  const code = name.toUpperCase();
   const lockfile = readFileSync(join(consumer, 'pnpm-lock.yaml'), 'utf8');
   if (lockfile.includes('workspace:') || lockfile.includes('link:')) {
-    throw new Error(`${framework.toUpperCase()}_TARBALL_WORKSPACE_LINK_FOUND`);
+    throw new Error(`${code}_TARBALL_WORKSPACE_LINK_FOUND`);
   }
   if (lockfile.includes(root.replace(/\\/g, '/'))) {
-    throw new Error(`${framework.toUpperCase()}_TARBALL_SOURCE_PATH_FOUND`);
+    throw new Error(`${code}_TARBALL_SOURCE_PATH_FOUND`);
   }
-  const requiredPackages = [
-    'contracts',
-    'core',
-    'engine',
-    'material',
-    'plugin-core',
-    'plugin-manager',
-    'plugin-sdk',
-    'renderer',
-    'sdk',
-    framework,
-  ];
   for (const directory of requiredPackages) {
     const packageName = `@base-screen/${directory}`;
     if (!lockfile.includes(packageName)) {
-      throw new Error(`${framework.toUpperCase()}_TARBALL_PACKAGE_MISSING: ${packageName}`);
+      throw new Error(`${code}_TARBALL_PACKAGE_MISSING: ${packageName}`);
     }
     const tarball = packedTarballs.get(directory);
     if (tarball === undefined || !lockfile.includes(basename(tarball))) {
-      throw new Error(`${framework.toUpperCase()}_TARBALL_PACKAGE_NOT_PACKED: ${packageName}`);
+      throw new Error(`${code}_TARBALL_PACKAGE_NOT_PACKED: ${packageName}`);
     }
   }
-  const forbiddenFramework = framework === 'react' ? 'vue' : 'react';
-  if (!existsSync(join(consumer, 'node_modules', forbiddenFramework))) {
-    return;
+  for (const forbiddenPackage of forbiddenPackages) {
+    if (existsSync(join(consumer, 'node_modules', forbiddenPackage))) {
+      throw new Error(`${code}_TARBALL_UNEXPECTED_PACKAGE: ${forbiddenPackage}`);
+    }
   }
-  throw new Error(
-    `${framework.toUpperCase()}_TARBALL_UNEXPECTED_FRAMEWORK_PEER: ${forbiddenFramework}`,
-  );
 }
 
 function verifyBridgeTarballConsumer(framework) {
   const consumer = mkdtempSync(join(temporaryRoot, `${framework}-vite-consumer-`));
   writeConsumerFiles(consumer, framework);
   run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
-  assertConsumerIsolation(consumer, framework);
+  assertConsumerIsolation(
+    consumer,
+    framework,
+    [
+      'contracts',
+      'core',
+      'engine',
+      'material',
+      'plugin-core',
+      'plugin-manager',
+      'plugin-sdk',
+      'renderer',
+      'sdk',
+      framework,
+    ],
+    [framework === 'react' ? 'vue' : 'react'],
+  );
+  run('pnpm', ['run', 'typecheck'], consumer);
+  run('pnpm', ['run', 'build'], consumer);
+  run('pnpm', ['run', 'verify'], consumer);
+}
+
+function verifyVanillaTarballConsumer() {
+  const consumer = mkdtempSync(join(temporaryRoot, 'vanilla-vite-consumer-'));
+  writeVanillaConsumerFiles(consumer);
+  run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
+  assertConsumerIsolation(
+    consumer,
+    'vanilla',
+    [
+      'contracts',
+      'core',
+      'engine',
+      'material',
+      'plugin-core',
+      'plugin-manager',
+      'plugin-sdk',
+      'renderer',
+      'sdk',
+    ],
+    ['react', 'react-dom', 'vue'],
+  );
   run('pnpm', ['run', 'typecheck'], consumer);
   run('pnpm', ['run', 'build'], consumer);
   run('pnpm', ['run', 'verify'], consumer);
@@ -729,6 +907,7 @@ try {
           name: `${directory}-consumer`,
           private: true,
           type: 'module',
+          packageManager: 'pnpm@11.18.0',
           dependencies: { [definition.name]: `file:${installTarball.replace(/\\/g, '/')}` },
         },
         null,
@@ -913,6 +1092,7 @@ if (controller.phase !== 'ready' || controller.dirty) {
     await import(`node:fs/promises`).then(({ writeFile }) => writeFile(smoke, smokeSource, 'utf8'));
     run('node', [smoke], consumer);
   }
+  verifyVanillaTarballConsumer();
   verifyBridgeTarballConsumer('react');
   verifyBridgeTarballConsumer('vue');
 } finally {

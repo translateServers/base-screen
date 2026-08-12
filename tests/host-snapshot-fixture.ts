@@ -18,6 +18,7 @@ export interface HostSnapshot {
   datasets: Array<Record<string, unknown>>;
   datasetSamples?: Array<Record<string, unknown>>;
   materialProvenance?: Array<Record<string, unknown>>;
+  materialTemplates?: Array<Record<string, unknown>>;
 }
 
 export async function makeSnapshot(): Promise<HostSnapshot> {

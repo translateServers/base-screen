@@ -33,6 +33,7 @@
 | [Host Material Skill Generation](./host-material-skill-generation/spec.md) | 宿主作者工具增量 | 从宿主安全作者快照生成专属物料创建 Skill；不新增 Base Screen runtime/package |
 | [Host Skill Adoption](./host-skill-adoption/spec.md) | 宿主作者工具增量 | 单一规范快照 + `.base-screen/tooling` 宿主工具包与 `base-screen:skills` 统一命令，维护两个宿主专属 Skill；不新增 Base Screen runtime/package |
 | [Host Material Package](./host-material-package/spec.md) | 契约增量 | 宿主托管可信物料包：宿主负责加载与信任，plugin-sdk `createMaterialPackage` 注册辅助与目录集成；远程代码加载不进 Base Screen；依据 [ADR-0029](../decisions/ADR-0029-host-managed-material-package-distribution.md)；2026-08-11 生效 |
+| [Host Material MCP Access](./host-material-mcp-access/spec.md) | 宿主作者工具增量 | 规范快照支持受控创作模板，提供在线物料查询/校验 MCP 契约、stdio 参考服务与两个业务 Skill 的在线优先/离线兜底规则；依据 [ADR-0030](../decisions/ADR-0030-host-material-mcp-access.md) |
 | [Host Draft Material Workflow](./host-draft-material-workflow/spec.md) | 宿主作者工具增量 | 设计期显式草稿物料交接、目录叠加与正式发布预检；不新增 Base Screen runtime/package |
 
 相关计划和架构背景见 [计划与评审](../plans/README.md) 与 [架构文档](../architecture/README.md)。

@@ -65,6 +65,9 @@ pnpm base-screen:skills verify
 - 自检：`pnpm base-screen:skills doctor` 会逐项报告配置、凭据环境变量、工具包、快照和
   Skill 状态。
 
+两个生成清单还记录 `catalogDigest`。在线 MCP 返回不同摘要时，表示本地目录已落后：先执行
+`check-remote`，人工审查后再同步；MCP 不自动修改快照或 Skill。
+
 注意：快照导出时不应写入时间戳、请求 ID 等瞬态字段，以保证重复导出结果稳定；快照本身不
 记录"导出时间"，更新时间以宿主仓库的提交历史为准。
 

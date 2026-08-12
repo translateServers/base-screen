@@ -7,7 +7,11 @@
   "files": [
     "dist"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/auto-register.js",
+    "./dist/designer-auto-register.js",
+    "./dist/viewer-auto-register.js"
+  ],
   "dependencies": {
     "@base-screen/contracts": "workspace:^",
     "@base-screen/core": "workspace:^",

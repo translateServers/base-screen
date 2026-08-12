@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
+import {
+  materialCatalogDigest,
+  validateMaterialTemplates,
+} from '../../shared/material-mcp-contract.mjs';
 
 export const SNAPSHOT_FIELDS = {
   host: { required: true, kind: 'object' },
@@ -12,6 +16,7 @@ export const SNAPSHOT_FIELDS = {
   datasets: { required: true, kind: 'array' },
   datasetSamples: { required: false, kind: 'array' },
   materialProvenance: { required: false, kind: 'array' },
+  materialTemplates: { required: false, kind: 'array' },
 };
 
 const MAX_SNAPSHOT_BYTES = 12 * 1024 * 1024;
@@ -23,6 +28,7 @@ const MAX_ARRAY_ITEMS = {
   datasets: 512,
   datasetSamples: 256,
   materialProvenance: 512,
+  materialTemplates: 32,
 };
 const ARRAY_SORT_KEY = {
   components: (item) => (isObject(item) && typeof item.id === 'string' ? item.id : ''),
@@ -37,6 +43,7 @@ const ARRAY_SORT_KEY = {
       ? `${item.resourceType}:${item.resourceId}`
       : '',
   materialProvenance: (item) => (isObject(item) && typeof item.type === 'string' ? item.type : ''),
+  materialTemplates: (item) => (isObject(item) && typeof item.id === 'string' ? item.id : ''),
 };
 
 const CREDENTIAL_KEY =
@@ -79,7 +86,12 @@ export function canonicalizeSnapshot(value, raw = undefined) {
   if (raw !== undefined && text !== raw.replace(/^\uFEFF/u, '')) {
     throw new Error('Committed snapshot is not canonical; run the default refresh command.');
   }
-  return { canonical: canonicalValue, text, digest: sha256(text) };
+  return {
+    canonical: canonicalValue,
+    text,
+    digest: sha256(text),
+    catalogDigest: materialCatalogDigest(canonicalValue),
+  };
 }
 
 export function validateSnapshotValue(value) {
@@ -107,6 +119,8 @@ export function validateSnapshotValue(value) {
       if (item.length > max) throw new Error(`Snapshot field ${name} exceeds ${max} items`);
     }
   }
+  const templates = validateMaterialTemplates(value.materialTemplates, value.materialAuthoring);
+  if (!templates.ok) throw new Error(templates.diagnostics.join('\n'));
   scanSnapshotSafety(value);
 }
 

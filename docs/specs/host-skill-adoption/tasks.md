@@ -59,3 +59,7 @@
   - [x] All managed and generated Skills pass structural validation.
   - [x] Focused tests pass, then the full `pnpm verify:m0` passes with every applicable task and
     checklist item checked.
+- [x] Extend the snapshot additively for online material MCP access.
+  - [x] Validate optional guarded material templates and keep old snapshots compatible.
+  - [x] Record identical material catalog digests in both generated Skills.
+  - [x] Keep default refresh atomic, verify offline, and check-remote write-free.

@@ -5,12 +5,12 @@ description: {{DESCRIPTION_YAML}}
 
 # {{HOST_NAME}} dashboard designer
 
-Design only with the host catalog and guidelines in this Skill. The output is a complete canonical Screen Document JSON file that the host can import into Base Screen. A generated Skill is a deterministic snapshot: it never fetches online materials.
+Design with the host catalog and guidelines in this Skill. The output is a complete canonical Screen Document JSON file that the host can import into Base Screen. Use the host material MCP when available; read [material-mcp.md](references/material-mcp.md) only for online discovery, drift, validation, or fallback behavior.
 
 ## Before designing
 
 1. Read [host.md](references/host.md) and follow its visual rules.
-2. Search [materials.json](references/materials.json) for the smallest set of suitable material types. Read a material's manifest before using it.
+2. Prefer the compatible host MCP for current material discovery, then search [materials.json](references/materials.json) as the offline fallback. Read a material's manifest before using it.
 3. Match each host-backed data component to one entry in [datasets.json](references/datasets.json) and one resource type in [resource-types.json](references/resource-types.json). Read the optional matching sample only when it helps choose a visual treatment.
 4. Read [document-contract.md](references/document-contract.md) for the output shape. Never add fields to the canonical document.
 5. If [material-provenance.json](references/material-provenance.json) exists, use it to distinguish `code` and `online` materials. Online materials are read-only references. A draft catalog is never implicit; use only the file explicitly supplied by the host.

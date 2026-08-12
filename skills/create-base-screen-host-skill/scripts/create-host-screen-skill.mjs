@@ -5,6 +5,10 @@ import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { validateMaterialProvenance } from '../../shared/material-handoff.mjs';
+import {
+  materialCatalogDigest,
+  validateMaterialTemplates,
+} from '../../shared/material-mcp-contract.mjs';
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const SKILL_ROOT = resolve(SCRIPT_DIR, '..');
@@ -20,6 +24,7 @@ const SNAPSHOT_TOP_LEVEL = {
   datasets: 'array',
   datasetSamples: 'array',
   materialProvenance: 'array',
+  materialTemplates: 'array',
 };
 const MAX_SNAPSHOT_BYTES = 12 * 1024 * 1024;
 const MAX_GUIDELINES_BYTES = 64 * 1024;
@@ -71,7 +76,11 @@ export async function readAndValidateSnapshot(snapshotFile, apis) {
   }
   for (const [name, kind] of Object.entries(SNAPSHOT_TOP_LEVEL)) {
     if (!Object.hasOwn(snapshot, name)) {
-      if (name !== 'datasetSamples' && name !== 'materialProvenance')
+      if (
+        name !== 'datasetSamples' &&
+        name !== 'materialProvenance' &&
+        name !== 'materialTemplates'
+      )
         errors.push(`host snapshot is missing ${name}`);
       continue;
     }
@@ -97,6 +106,11 @@ export async function readAndValidateSnapshot(snapshotFile, apis) {
   validateDatasetParameterAuthority(datasets, resourceTypes, apis, errors);
   const samples = parseSamples(snapshot.datasetSamples ?? [], datasets, apis, errors);
   const provenance = parseMaterialProvenance(snapshot.materialProvenance, materials, errors);
+  const templates = validateMaterialTemplates(
+    snapshot.materialTemplates,
+    snapshot.materialAuthoring,
+  );
+  if (!templates.ok) errors.push(...templates.diagnostics);
   if (errors.length > 0) throw validationError(errors);
 
   return {
@@ -107,7 +121,9 @@ export async function readAndValidateSnapshot(snapshotFile, apis) {
     datasets,
     samples,
     provenance,
+    templates: templates.value ?? [],
     snapshotDigest: sha256(raw),
+    catalogDigest: materialCatalogDigest(snapshot),
   };
 }
 
@@ -336,15 +352,23 @@ function parseSamples(input, datasets, apis, errors) {
 }
 
 async function renderSkillFiles(bundle, apis) {
-  const [skillTemplate, interfaceTemplate, contractTemplate, validator, handoff, requestScript] =
-    await Promise.all([
-      readFile(join(TEMPLATE_ROOT, 'SKILL.md'), 'utf8'),
-      readFile(join(TEMPLATE_ROOT, 'agents', 'openai.yaml'), 'utf8'),
-      readFile(join(TEMPLATE_ROOT, 'references', 'document-contract.md'), 'utf8'),
-      readFile(join(TEMPLATE_ROOT, 'scripts', 'validate-screen-document.mjs'), 'utf8'),
-      readFile(join(SKILL_ROOT, '..', 'shared', 'material-handoff.mjs'), 'utf8'),
-      readFile(join(TEMPLATE_ROOT, 'scripts', 'create-material-request.mjs'), 'utf8'),
-    ]);
+  const [
+    skillTemplate,
+    interfaceTemplate,
+    contractTemplate,
+    mcpReference,
+    validator,
+    handoff,
+    requestScript,
+  ] = await Promise.all([
+    readFile(join(TEMPLATE_ROOT, 'SKILL.md'), 'utf8'),
+    readFile(join(TEMPLATE_ROOT, 'agents', 'openai.yaml'), 'utf8'),
+    readFile(join(TEMPLATE_ROOT, 'references', 'document-contract.md'), 'utf8'),
+    readFile(join(TEMPLATE_ROOT, 'references', 'material-mcp.md'), 'utf8'),
+    readFile(join(TEMPLATE_ROOT, 'scripts', 'validate-screen-document.mjs'), 'utf8'),
+    readFile(join(SKILL_ROOT, '..', 'shared', 'material-handoff.mjs'), 'utf8'),
+    readFile(join(TEMPLATE_ROOT, 'scripts', 'create-material-request.mjs'), 'utf8'),
+  ]);
   const displayName = `${bundle.hostName} 大屏设计`;
   const shortDescription = fitDescription(`为${bundle.hostName}生成可导入的大屏设计文档`);
   const description = `Design or revise ${bundle.hostName} Base Screen dashboards from the host catalog and design guidelines.`;
@@ -359,11 +383,14 @@ async function renderSkillFiles(bundle, apis) {
     '{{CANVAS_WIDTH}}': String(bundle.defaultCanvas.width),
     '{{CANVAS_HEIGHT}}': String(bundle.defaultCanvas.height),
     '{{CANVAS_BACKGROUND}}': bundle.defaultCanvas.backgroundColor,
+    '{{HOST_ID}}': bundle.hostId,
+    '{{CATALOG_DIGEST}}': bundle.catalogDigest,
   };
   const files = new Map();
   files.set('SKILL.md', applyReplacements(skillTemplate, replacements));
   files.set('agents/openai.yaml', applyReplacements(interfaceTemplate, replacements));
   files.set('references/document-contract.md', applyReplacements(contractTemplate, replacements));
+  files.set('references/material-mcp.md', applyReplacements(mcpReference, replacements));
   files.set('scripts/validate-screen-document.mjs', validator);
   files.set('scripts/material-handoff.mjs', handoff);
   files.set('scripts/create-material-request.mjs', requestScript);
@@ -382,6 +409,7 @@ async function renderSkillFiles(bundle, apis) {
       hostId: bundle.hostId,
       skillName: bundle.skillName,
       snapshotDigest: bundle.snapshotDigest,
+      catalogDigest: bundle.catalogDigest,
     }),
   );
   return files;

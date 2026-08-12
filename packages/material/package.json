@@ -7,7 +7,9 @@
   "files": [
     "dist"
   ],
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/auto-register.js"
+  ],
   "dependencies": {
     "@base-screen/contracts": "workspace:^",
     "@base-screen/plugin-core": "workspace:^",

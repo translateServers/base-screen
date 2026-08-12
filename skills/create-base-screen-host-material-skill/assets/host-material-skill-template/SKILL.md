@@ -7,7 +7,8 @@ description: {{DESCRIPTION_YAML}}
 
 Use this Skill to create or revise one Base Screen material in the host workspace. Read the host
 rules and workspace policy before editing; then load only the matching catalog entries and the
-selected framework route. This Skill never fetches or modifies online materials.
+selected framework route. Use the host material MCP for discovery and early validation when
+available; read [material-mcp.md](references/material-mcp.md) only when that path is relevant.
 
 ## Required workflow
 
@@ -16,7 +17,8 @@ selected framework route. This Skill never fetches or modifies online materials.
 2. Read [host.md](references/host.md), [workspace.json](references/workspace.json),
    [material-contract.md](references/material-contract.md), [framework.md](references/framework.md),
    [materials.json](references/materials.json), [components.json](references/components.json), and
-   the matching resource/dataset references when the material consumes host data.
+   the matching resource/dataset references when the material consumes host data. Prefer the online
+   MCP authoring context and template when available; otherwise use the optional local template index.
 3. Clarify whether the request creates a new material or revises an existing one. For a revision,
    preserve its `type`, `tagName`, event names, public props, and document compatibility unless the
    user explicitly approves a breaking change. For a new material, use a unique host namespace such

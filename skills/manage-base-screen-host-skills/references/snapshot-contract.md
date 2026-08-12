@@ -15,7 +15,8 @@ that file with exactly these top-level fields:
   "resourceTypes": [],
   "datasets": [],
   "datasetSamples": [],
-  "materialProvenance": []
+  "materialProvenance": [],
+  "materialTemplates": []
 }
 ```
 
@@ -31,11 +32,12 @@ that file with exactly these top-level fields:
 | `datasets` | yes | Host dataset descriptors and parameter schemas |
 | `datasetSamples` | no | Bounded samples classified as `sanitized` |
 | `materialProvenance` | no | Source classification for published materials (`code` or `online`) |
+| `materialTemplates` | no | Bounded approved UTF-8 scaffolds covered by `materialAuthoring.allowedFiles` |
 
 The exporter should query the host's approved or enabled catalog through its existing authenticated
 client. It must filter draft/unpublished records before serialization. Approval state, tenant IDs,
 request IDs, timestamps, transport URLs, headers, credentials, connection details, private records,
-executable source, and remote module addresses are not part of the output contract. Use stable IDs
+unapproved executable source, runtime packages, and remote module addresses are not part of the output contract. Guarded `materialTemplates` may contain text scaffolds, but never lifecycle scripts, credentials, remote imports, or commands intended for execution. Use stable IDs
 for ordering and omit request-dependent values.
 
 The coordinator strictly rejects unknown fields, missing fields, credential-like values, executable

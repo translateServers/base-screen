@@ -1,6 +1,6 @@
 ---
 name: create-base-screen-host-skill
-description: Generate or refresh a host-specific Codex Skill for designing Base Screen dashboards from a canonical host snapshot of sanitized material manifests, data-resource schemas, dataset descriptors, optional samples, and brand guidelines. Use when a host needs a reusable Skill that produces or revises importable Screen Documents using only its own catalog.
+description: Generate or refresh a host-specific Codex Skill for designing Base Screen dashboards from a canonical host snapshot, with optional online material MCP discovery/validation and explicit offline fallback. Use when a host needs a reusable Skill that produces or revises importable Screen Documents using its own sanitized material, data, sample, and brand catalog.
 ---
 
 # Create a host-specific dashboard Skill

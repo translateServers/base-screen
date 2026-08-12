@@ -4,6 +4,10 @@
 Screen Document、接入项目存储与数据服务、接收事件，以及托管高级编辑器和自定义物料。
 本文不介绍 Base Screen 仓库本身的开发流程。
 
+当前接入状态：同一 pnpm workspace 内可以直接接入；独立仓库必须先由发布方提供组织 registry
+中的完整同批次包集，或等价的完整离线制品集。仅有本仓库地址或单个 SDK tarball，还不足以完成
+独立仓库安装。
+
 Base Screen 提供两个 Custom Element：
 
 - `base-screen-viewer`：渲染只读大屏，适合预览页和发布页。
@@ -40,7 +44,44 @@ Designer 的直接文档模式和项目模式是两种独立用法。项目模�
 
 ## 3. 安装和注册
 
-宿主常用包如下：
+### 3.1 先确认依赖来源
+
+Base Screen 当前十二个包均为 `private: true`、`0.0.0`，没有公共 npm 发布版本。因此：
+
+- 与 Base Screen 位于同一 pnpm workspace 的宿主现在可以使用 `workspace:^`。
+- 独立仓库只有在发布方提供了组织内部 registry 中的同批次完整包集后，才能按包名安装。
+- 不要把单个 `@base-screen/sdk` 的原始 `pnpm pack` tarball 当成可独立交付物。它仍引用其他
+  `@base-screen/*` 包，单独安装会尝试从 registry 解析这些依赖。
+- 不要复制 `dist`、从 `packages/*/src` 导入，或混用不同提交、不同批次的包产物。
+
+同一 workspace 中，宿主 `package.json` 至少声明其直接导入的包：
+
+```json
+{
+  "dependencies": {
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/material": "workspace:^",
+    "@base-screen/plugin-core": "workspace:^",
+    "@base-screen/sdk": "workspace:^"
+  }
+}
+```
+
+使用内部 registry 时，按发布方给出的 release manifest 锁定每个包的精确版本，并保证
+`@base-screen` scope 已指向组织 registry：
+
+```text
+pnpm add --save-exact @base-screen/contracts@<contracts-version> \
+  @base-screen/material@<material-version> \
+  @base-screen/plugin-core@<plugin-core-version> \
+  @base-screen/sdk@<sdk-version>
+```
+
+发布方如果交付离线制品，必须同时提供上述包及其全部内部依赖，并保证 tarball manifest 中的依赖
+可在离线制品集中解析。当前仓库的 `pnpm verify:tarball` 会在临时仓库外消费者中验证完整依赖链，
+但不会生成可长期分发的离线安装包。
+
+宿主常用包职责如下：
 
 ```text
 @base-screen/sdk          Viewer、Designer 和组合入口
@@ -58,10 +99,13 @@ Designer 的直接文档模式和项目模式是两种独立用法。项目模�
 @base-screen/vue             Vue 物料桥接
 ```
 
-当前包标记为私有包。宿主需要通过组织内部 registry、workspace 依赖或发布方提供的构建产物
-获取，不能假设它们已经发布到公共 npm。
+### 3.2 注册 Custom Element
 
-在浏览器启动代码中注册一次 Viewer、Designer 和官方物料：
+生产接入优先使用显式 `define*()` API：它能缩小注册范围，并允许宿主记录结构化诊断。最小 Viewer
+示例见第 4～6 节及 `examples/host-quickstart`。
+
+无需处理注册诊断时，也可以在浏览器启动入口使用副作用子路径一次性注册 Viewer、Designer 和
+全部官方物料：
 
 ```ts
 import '@base-screen/sdk/auto-register';
@@ -75,10 +119,18 @@ import '@base-screen/sdk/viewer/auto-register';
 import '@base-screen/material/auto-register';
 ```
 
-需要处理注册诊断或只注册部分物料时，改用 `defineBaseScreenViewer()`、
-`defineBaseScreenDesigner()` 和各物料的 `define*()` API。
+这些副作用入口已在 package manifest 中精确列入 `sideEffects`，并由仓库外 Vite 生产构建验证，
+不会被正常 tree-shaking 删除。应保持它们为顶层 import；默认包入口仍无注册副作用。SSR/SSG
+项目只能在浏览器客户端入口导入这些子路径，不能让服务端模块执行 Custom Element 注册。
 
-### 3.1 为宿主生成项目级 Skill
+### 3.3 可运行的最小宿主
+
+[`examples/host-quickstart`](../examples/host-quickstart/README.md) 是最小 Vanilla/Vite Viewer
+宿主，只导入公开包入口。`pnpm verify:tarball` 会把它复制到仓库外临时项目，安装真实 tarball，
+执行 TypeScript 检查、Vite 生产构建并用 Chromium 验证最终渲染。复制该示例前，先按 3.1 节
+接通宿主自己的依赖来源。
+
+### 3.4 为宿主生成项目级 Skill
 
 宿主若希望让 Codex 按自己的物料、数据集和设计规范创建大屏或物料，只需先在
 `package.json` 提供 `export:base-screen-skill-context` 脚本。该脚本负责复用宿主现有认证和目录
@@ -106,6 +158,10 @@ CI 使用 `pnpm base-screen:skills verify`（只依赖已提交的 `.base-screen
 宿主侧手册见 `docs/host-skill-manuals/`：快速接入、日常同步、配置参考、故障排查与
 XJDataHub 落地方向。
 
+宿主需要 AI 实时访问在线物料时，可按
+[`在线物料 MCP 接入指南`](./host-skill-manuals/06-online-material-mcp.md) 接入。Base Screen 提供
+stdio 参考服务和契约；生产 Streamable HTTP、OAuth、租户、审计及实际物料包加载均由宿主负责。
+
 ## 4. 创建物料目录
 
 注册 Custom Element 不会自动创建物料目录。每个 Viewer/Designer 都必须获得一个目录，且
@@ -115,24 +171,20 @@ XJDataHub 落地方向。
 
 ```ts
 import {
-  BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
-  BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
-  BaseScreenRectangleMaterialElement,
-  BaseScreenTextMaterialElement,
+  defineBaseScreenRectangleMaterial,
+  defineBaseScreenTextMaterial,
 } from '@base-screen/material';
 import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 
-const catalog = createBaseScreenMaterialCatalog([
-  {
-    manifest: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
-    constructor: BaseScreenTextMaterialElement,
-  },
-  {
-    manifest: BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
-    constructor: BaseScreenRectangleMaterialElement,
-  },
-]);
+const text = defineBaseScreenTextMaterial();
+const rectangle = defineBaseScreenRectangleMaterial();
+if (!text.ok || !rectangle.ok) throw new Error('官方物料注册失败');
+
+const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 ```
+
+`define*Material()` 成功值就是可放入 catalog 的 entry，并且重复调用同一 constructor 时幂等。
+不要在多个模块里无条件直接调用 `customElements.define()`。
 
 官方物料还包括椭圆、图片、容器、图表、ECharts 和表格。图表、ECharts、表格使用宿主表格
 数据时，目录项还要分别携带包中导出的 `*_TABULAR_DATA_ADAPTER`。`examples/browser-harness`
@@ -163,17 +215,22 @@ const screenDocument = parsed.value;
 `components`、`variables` 和 `blueprint`：
 
 ```ts
-const emptyDocument = {
+const parsed = parseScreenDocument({
   canvas: { width: 1920, height: 1080, backgroundColor: '#111827' },
   components: [],
   variables: [],
   blueprint: { rules: [] },
-};
+});
+if (!parsed.ok) throw new Error('Screen Document 无效');
+const emptyDocument = parsed.value;
 ```
 
 ## 6. 嵌入 Viewer
 
-HTML 和宿主容器必须有稳定尺寸：
+Viewer 按 Screen Document 的 `canvas.width` / `canvas.height` 渲染像素画布，不会自动缩放到宿主
+容器。宿主必须明确选择原始像素、`contain` 或 `cover` 策略。
+
+原始像素模式适合有滚动条的编辑预览或宿主本身已保证相同尺寸：
 
 ```html
 <div class="screen-stage">
@@ -185,9 +242,18 @@ HTML 和宿主容器必须有稳定尺寸：
 .screen-stage,
 base-screen-viewer {
   display: block;
+  min-height: 0;
+}
+
+.screen-stage {
   width: 100%;
   height: 100%;
-  min-height: 0;
+  overflow: auto;
+}
+
+base-screen-viewer {
+  width: 1920px;
+  height: 1080px;
 }
 ```
 
@@ -195,7 +261,10 @@ base-screen-viewer {
 
 ```ts
 import type { ScreenDiagnostic } from '@base-screen/contracts';
-import type { BaseScreenViewerElement } from '@base-screen/sdk';
+import { type BaseScreenViewerElement, defineBaseScreenViewer } from '@base-screen/sdk/viewer';
+
+const viewerDefinition = defineBaseScreenViewer();
+if (!viewerDefinition.ok) throw new Error('Viewer 注册失败');
 
 const viewer = document.querySelector<BaseScreenViewerElement>('base-screen-viewer');
 if (viewer === null) throw new Error('缺少 base-screen-viewer');
@@ -223,6 +292,80 @@ viewer.document = screenDocument;
 初始化。运行中可以重新设置 `document`；`catalog`、资源端口、变量端口、contribution 和
 timeout 等运行时依赖需要先 `unload()`，再重新 `configure()`。诊断监听应在配置和文档赋值前
 注册，避免漏掉初始化阶段的错误。
+
+### 6.1 `contain` / `cover` 自适应
+
+发布页需要等比自适应时，在 Viewer 外增加固定画布层，由宿主缩放该层。下面的实现同步完成首次
+计算，后续只更新 `transform`，不会改变文档坐标或向 Screen Document 写入视口状态：
+
+```html
+<div class="screen-viewport">
+  <div class="screen-canvas">
+    <base-screen-viewer></base-screen-viewer>
+  </div>
+</div>
+```
+
+```css
+.screen-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+.screen-canvas {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0);
+  transform-origin: center;
+}
+
+.screen-canvas > base-screen-viewer {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+```
+
+```ts
+function observeScreenFit(
+  viewport: HTMLElement,
+  canvas: HTMLElement,
+  size: { width: number; height: number },
+  mode: 'contain' | 'cover' = 'contain',
+): () => void {
+  if (size.width <= 0 || size.height <= 0) throw new RangeError('画布尺寸必须大于 0');
+
+  const update = () => {
+    const scaleX = viewport.clientWidth / size.width;
+    const scaleY = viewport.clientHeight / size.height;
+    const scale = mode === 'cover' ? Math.max(scaleX, scaleY) : Math.min(scaleX, scaleY);
+    canvas.style.transform = `translate(-50%, -50%) scale(${scale})`;
+  };
+
+  canvas.style.width = `${size.width}px`;
+  canvas.style.height = `${size.height}px`;
+  update();
+  const observer = new ResizeObserver(update);
+  observer.observe(viewport);
+  return () => observer.disconnect();
+}
+
+const viewport = document.querySelector<HTMLElement>('.screen-viewport');
+const canvas = document.querySelector<HTMLElement>('.screen-canvas');
+if (viewport === null || canvas === null) throw new Error('缺少 Viewer 自适应容器');
+
+const stopFit = observeScreenFit(viewport, canvas, screenDocument.canvas, 'contain');
+// 路由离开或销毁页面时调用 stopFit()。
+```
+
+`contain` 完整展示并可能留边；`cover` 填满容器并可能裁切。尺寸变化、全屏和横竖屏调度属于
+宿主。避免给 `base-screen-viewer` 自身设置百分比尺寸后期待它自动改变画布坐标系。
 
 数据变化时可刷新全部资源或单个组件：
 
@@ -643,18 +786,42 @@ component identity、目标 schema、JSON 深度和容量；陈旧或无效候�
 ## 12. React、Vue 和自定义物料
 
 React/Vue 应用可以把现有组件包装成 Base Screen 物料。Screen Document 仍只引用稳定的
-material `type`，不保存框架组件名。
+material `type`，不保存框架组件名。`@base-screen/react` 要求 `react`、`react-dom` `^19.1.0`；
+`@base-screen/vue` 要求 `vue` `^3.5.0`。框架依赖是 peer dependency，必须由宿主安装且全页只使用
+兼容版本。
+
+先提供一个冲突安全、可重复调用的注册函数：
+
+```ts
+import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
+
+function defineMaterialEntry(entry: BaseScreenMaterialCatalogEntry): void {
+  const existing = customElements.get(entry.manifest.tagName);
+  if (existing === undefined) {
+    customElements.define(entry.manifest.tagName, entry.constructor);
+    return;
+  }
+  if (existing !== entry.constructor) {
+    throw new Error(`物料标签冲突：${entry.manifest.tagName}`);
+  }
+}
+```
 
 React：
 
 ```ts
 import { createReactMaterialDefinition } from '@base-screen/react';
 
-const definition = createReactMaterialDefinition({
+const reactEntry = createReactMaterialDefinition({
   manifest,
   component: HostKpiCard,
   eventProps: { valueClick: 'onValueClick' },
 });
+if (!reactEntry.ok) {
+  showDiagnostics(reactEntry.diagnostics);
+  throw new Error('React 物料创建失败');
+}
+defineMaterialEntry(reactEntry.value);
 ```
 
 Vue：
@@ -662,16 +829,23 @@ Vue：
 ```ts
 import { createVueMaterialDefinition } from '@base-screen/vue';
 
-const definition = createVueMaterialDefinition({
+const vueEntry = createVueMaterialDefinition({
   manifest,
   component: HostKpiCard,
   eventProps: { valueClick: 'onValueClick' },
 });
+if (!vueEntry.ok) {
+  showDiagnostics(vueEntry.diagnostics);
+  throw new Error('Vue 物料创建失败');
+}
+defineMaterialEntry(vueEntry.value);
 ```
 
-结果成功后注册返回的 constructor，并把 definition 加入目录。`type` 和 `tagName` 必须稳定且
-唯一，definition manifest 与 Custom Element 的静态 manifest 必须一致。桥接组件根元素应填满
-物料几何区域，避免内容尺寸反向影响画布布局。
+成功值是 `BaseScreenMaterialCatalogEntry`，可与官方物料 entry 一起传给
+`createBaseScreenMaterialCatalog()`。`type` 和 `tagName` 必须稳定且唯一；不要每次组件渲染时创建
+新的 bridge constructor。桥接组件根元素应使用 `width: 100%; height: 100%` 填满物料几何区域，
+并在宿主卸载时清理自身订阅和定时器。仓库外 React/Vue tarball 消费者会验证类型增强、生产构建、
+事件、模型更新、断开重连和最终卸载。
 
 ## 13. 宿主托管外部物料包
 
@@ -736,16 +910,41 @@ if (!registered.ok) {
 }
 ```
 
-宿主动态加载示例（受控 `import()`，来源由宿主配置决定）：
+宿主动态加载应使用代码中固定的 loader allowlist。宿主业务配置只能选择 allowlist key，不能把
+Screen Document 中的字符串直接传给 `import()`：
 
 ```ts
-const module = await import(/* 宿主审核过的模块地址 */);
-const defined = module.hostedMaterialPackage.define();
-if (!defined.ok) {
-  throw new Error(defined.diagnostics.map((item) => item.code).join(','));
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialPackage } from '@base-screen/plugin-sdk';
+
+type HostedMaterialModule = {
+  readonly hostedMaterialPackage: BaseScreenMaterialPackage;
+};
+
+const approvedMaterialLoaders: Readonly<
+  Record<string, () => Promise<HostedMaterialModule>>
+> = {
+  'acme.kpi': () => import('@acme/base-screen-kpi-materials'),
+};
+
+export async function loadApprovedMaterialCatalog(
+  materialPackageId: string,
+): Promise<BaseScreenMaterialCatalog> {
+  const loader = approvedMaterialLoaders[materialPackageId];
+  if (loader === undefined) throw new Error('物料包未获宿主批准');
+
+  const loaded = await loader();
+  const defined = loaded.hostedMaterialPackage.define();
+  if (!defined.ok) {
+    throw new Error(defined.diagnostics.map((item) => item.code).join(','));
+  }
+  return createBaseScreenMaterialCatalog(defined.value);
 }
-const catalog = createBaseScreenMaterialCatalog(defined.value);
 ```
+
+若宿主确实需要 URL 运行时加载，URL allowlist、CSP、完整性校验、鉴权、缓存和 bundler 配置都由宿主
+实现；Base Screen 不提供通用网络加载器。
 
 ## 14. 生命周期和清理
 
@@ -760,8 +959,11 @@ const catalog = createBaseScreenMaterialCatalog(defined.value);
 
 - 文档进入运行时前通过 `parseScreenDocument()`，项目响应通过
   `parseScreenProjectEnvelope()`。
+- 依赖来自发布方批准的同一批次完整包集，锁文件中没有源码路径、workspace 泄漏或混合批次。
 - catalog 覆盖全部 material type，Custom Element 已注册，表格物料带正确 adapter。
-- Viewer/Designer 使用 `configure()` 原子初始化，宿主容器具有明确且稳定的尺寸。
+- Viewer/Designer 使用 `configure()` 原子初始化；Viewer 已明确选择原始像素、`contain` 或 `cover`
+  策略，宿主容器具有稳定尺寸。
+- SSR/SSG 不在服务端执行 `/auto-register`，宿主生产构建已验证所需 Custom Element 仍被注册。
 - 所有宿主端口处理 abort、权限、容量限制、诊断脱敏和 revision 冲突。
 - 监听 `base-screen-diagnostic`，并为资源失败、超时、无 capability 和缺失物料建立监控。
 - Screen Document 中没有 URL、SQL、token、header、连接信息、宿主服务对象和业务私有状态。
@@ -770,7 +972,11 @@ const catalog = createBaseScreenMaterialCatalog(defined.value);
 ## 16. 常见问题
 
 - **页面没有内容**：确认元素和物料已注册、catalog 包含文档中的 `type`，并检查诊断事件。
+- **独立项目安装 SDK 后提示其他 `@base-screen/*` 包 404**：当前拿到的是不完整制品。改用同一
+  workspace，或让发布方提供可解析全部内部依赖的同批次完整包集；不要只安装一个原始 SDK tarball。
 - **Viewer/Designer 尺寸为 0**：给宿主容器和 Custom Element 设置明确的宽高及 `min-height: 0`。
+- **Viewer 内容被裁切或没有随窗口变化**：Viewer 不自动适配容器；按 6.1 节选择 `contain` 或
+  `cover`，并由宿主在销毁时断开 `ResizeObserver`。
 - **更换 catalog 或端口不生效**：调用 `unload()`，重新 `configure()`，再设置或加载文档。
 - **宿主数据没有查询**：检查 resource type contribution、参数 schema、变量端口和 material 的
   `dataCapabilities`。
@@ -781,6 +987,9 @@ const catalog = createBaseScreenMaterialCatalog(defined.value);
 
 仓库中的可运行宿主示例：
 
+- `examples/host-quickstart`：只导入公开包入口的最小 Viewer；会被复制到仓库外并以 tarball 验证。
 - `examples/playground`：Vue 宿主、Viewer/Designer、数据集和变量切换。
 - `examples/browser-harness`：项目 adapter、完整官方物料、宿主作者桥和外部物料包。
 - `examples/runtime-harness`：宿主资源、Blueprint 端口和远程插件隔离验证。
+
+后三个是本仓库的开发/验收 harness，会直接引用 workspace 源码，不应当作独立项目的安装模板。

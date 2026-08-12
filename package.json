@@ -30,6 +30,8 @@
     "verify:playground": "node scripts/verify-playground.mjs",
     "verify:vue-harness": "node scripts/verify-vue-harness.mjs",
     "verify:runtime": "node scripts/verify-runtime-harness.mjs",
+    "dev:material-mcp": "node examples/material-mcp-server/server.mjs",
+    "verify:material-mcp": "node examples/material-mcp-server/smoke.mjs",
     "verify:nebula-import": "node scripts/verify-nebula-import.mjs",
     "verify:m0": "pnpm format && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && pnpm check:packages && pnpm check:api && pnpm check:engine-import && pnpm verify:tarball",
     "changeset": "changeset",
@@ -40,6 +42,7 @@
     "@biomejs/biome": "2.5.6",
     "@changesets/cli": "2.31.1",
     "@microsoft/api-extractor": "7.58.12",
+    "@modelcontextprotocol/sdk": "1.30.0",
     "@playwright/test": "1.62.1",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
@@ -52,6 +55,7 @@
     "vite": "8.2.0",
     "vitest": "4.1.10",
     "vue": "3.5.0",
-    "vue-echarts": "8.1.0"
+    "vue-echarts": "8.1.0",
+    "zod": "4.4.3"
   }
 }

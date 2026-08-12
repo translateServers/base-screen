@@ -6,13 +6,25 @@ export const PACKAGE_DEFINITIONS = Object.freeze({
   core: { build: 'tsc', name: '@base-screen/core' },
   renderer: { build: 'vite', name: '@base-screen/renderer' },
   engine: { build: 'vite', name: '@base-screen/engine' },
-  material: { build: 'vite', name: '@base-screen/material' },
+  material: {
+    build: 'vite',
+    name: '@base-screen/material',
+    sideEffects: ['./dist/auto-register.js'],
+  },
   'plugin-core': { build: 'tsc', name: '@base-screen/plugin-core' },
   'plugin-manager': { build: 'tsc', name: '@base-screen/plugin-manager' },
   'plugin-sdk': { build: 'tsc', name: '@base-screen/plugin-sdk' },
   react: { build: 'vite', name: '@base-screen/react' },
   vue: { build: 'vite', name: '@base-screen/vue' },
-  sdk: { build: 'vite', name: '@base-screen/sdk' },
+  sdk: {
+    build: 'vite',
+    name: '@base-screen/sdk',
+    sideEffects: [
+      './dist/auto-register.js',
+      './dist/designer-auto-register.js',
+      './dist/viewer-auto-register.js',
+    ],
+  },
   testing: { build: 'tsc', name: '@base-screen/testing' },
 });
 
@@ -79,6 +91,7 @@ function assertDistIsClean(directory) {
 
 function assertM0Package(directory, definition) {
   const manifest = readPackage(directory);
+  const expectedSideEffects = definition.sideEffects ?? false;
 
   if (manifest.name !== definition.name || manifest.version !== '0.0.0') {
     fail('PACKAGE_NAME_MISMATCH', directory);
@@ -95,7 +108,10 @@ function assertM0Package(directory, definition) {
   if (JSON.stringify(manifest.files) !== JSON.stringify(['dist'])) {
     fail('PACKAGE_FILES_MISMATCH', directory);
   }
-  if (manifest.sideEffects !== false || manifest.exports?.['.']?.types !== './dist/index.d.ts') {
+  if (
+    JSON.stringify(manifest.sideEffects) !== JSON.stringify(expectedSideEffects) ||
+    manifest.exports?.['.']?.types !== './dist/index.d.ts'
+  ) {
     fail('PACKAGE_EXPORT_MISMATCH', directory);
   }
   if (manifest.exports?.['.']?.import !== './dist/index.js') {

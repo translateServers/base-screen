@@ -28,6 +28,8 @@ describe('host screen Skill generator', () => {
       expect([...first.files.entries()]).toEqual([...second.files.entries()]);
       expect(first.snapshotDigest).toBe(second.snapshotDigest);
       expect(first.files.get('generation-manifest.json')).toContain('snapshotDigest');
+      expect(first.files.get('generation-manifest.json')).toContain('catalogDigest');
+      expect(first.files.get('references/material-mcp.md')).toContain('may be stale');
       expect(first.files.get('references/screen-document.schema.json')).toContain(
         'screen-document',
       );

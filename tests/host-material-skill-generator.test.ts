@@ -75,6 +75,31 @@ describe('host material Skill generator', () => {
     }
   });
 
+  it('renders guarded material templates as a progressive index and assets', async () => {
+    const { file } = await writeSnapshotFile({
+      materialTemplates: [
+        {
+          id: 'kpi-card',
+          name: 'KPI Card',
+          framework: 'native',
+          description: 'Approved KPI scaffold.',
+          files: [{ path: 'src/materials/kpi-card.ts', content: 'export const value = 1;' }],
+        },
+      ],
+    });
+    try {
+      const result = await createHostMaterialSkill({ snapshotFile: file, checkOnly: true });
+      expect(result.files.get('references/material-templates.json')).toContain('kpi-card');
+      expect(result.files.get('assets/material-templates/kpi-card/src/materials/kpi-card.ts')).toBe(
+        'export const value = 1;',
+      );
+      expect(result.files.get('references/material-mcp.md')).toContain('catalog digest');
+      expect(result.files.get('generation-manifest.json')).toContain('catalogDigest');
+    } finally {
+      await rm(dirname(file), { recursive: true, force: true });
+    }
+  });
+
   it('renders the explicit apply policy without weakening the workflow', async () => {
     const { snapshot, file } = await writeSnapshotFile();
     (snapshot.materialAuthoring.registration as Record<string, unknown>).policy = 'apply';

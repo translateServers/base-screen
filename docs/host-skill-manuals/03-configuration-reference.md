@@ -53,14 +53,15 @@ BASE_SCREEN_HOST_SKILL_SNAPSHOT_FILE=<临时文件绝对路径>
   "resourceTypes": [],
   "datasets": [],
   "datasetSamples": [],
-  "materialProvenance": []
+  "materialProvenance": [],
+  "materialTemplates": []
 }
 ```
 
 - 必填字段：`host`、`screenGuidelines`、`materialGuidelines`、`materialAuthoring`、
   `components`、`materials`、`resourceTypes`、`datasets`。
 - 可选字段：`datasetSamples`（每项必须 `classification: "sanitized"`）、
-  `materialProvenance`（`code` 或 `online`）。
+  `materialProvenance`（`code` 或 `online`）、`materialTemplates`（受控 UTF-8 创作模板）。
 - 导出脚本负责认证、租户/项目选择、线上查询、审批过滤、稳定排序与脱敏；失败时以非零退出码
   退出且不写部分快照。
 - 禁止出现在快照中：凭据、连接信息、请求/时间戳 ID、私有记录、可执行内容、远程模块地址、
@@ -83,11 +84,14 @@ BASE_SCREEN_HOST_SKILL_SNAPSHOT_FILE=<临时文件绝对路径>
 | `.agents/skills/design-<hostId>-screens` | 大屏设计 | 新建/修订 Screen Document、物料与数据集选择、草稿物料 overlay、canonical/语义/布局/published-only 校验 |
 | `.agents/skills/create-<hostId>-material` | 物料创建 | 新建/修订物料、`propose`/`apply` 注册策略、candidate 交接与失败回滚 |
 
-这两个目录由快照生成，`generation-manifest.json` 记录 `snapshotDigest`。`.agents/skills` 下
+这两个目录由快照生成，`generation-manifest.json` 记录 `snapshotDigest` 和物料相关字段的
+`catalogDigest`。`.agents/skills` 下
 不应出现工具 Skill；工具包在 `.base-screen/tooling/base-screen-host-skills/**`。
 
 ## 可选数据集样例、物料来源等扩展项
 
 - `datasetSamples`：给大屏设计提供布局/取值范围的脱敏提示，不是授权目录。
 - `materialProvenance`：区分 `code`（可修订）与 `online`（只读引用）物料。
+- `materialTemplates`：最多 32 个模板；每模板最多 16 个文本文件、单文件 64 KiB、合计
+  256 KiB。路径必须被 `allowedFiles` 覆盖，禁止越界、凭据、远程 import 和生命周期脚本。
 - 草稿物料 catalog 与 request/candidate 交接文件位于正式快照之外，只在显式提供时校验。

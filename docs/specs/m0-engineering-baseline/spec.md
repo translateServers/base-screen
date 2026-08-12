@@ -192,7 +192,7 @@ Turbo 只编排 package scripts，不复制边界、tarball 或发布逻辑。
 
 ## 8. 十二包 Manifest
 
-所有 package 使用：
+没有副作用入口的 package 使用：
 
 ```json
 {
@@ -212,6 +212,8 @@ Turbo 只编排 package scripts，不复制边界、tarball 或发布逻辑。
 ```
 
 M0 只导出根入口。`/auto-register`、`/contracts`、`/viewer` 等子路径在对应行为实现时加入，不能指向空占位文件。
+加入 `/auto-register` 后，package 必须把对应的构建后 JavaScript 文件逐项列入 `sideEffects`；不得继续
+使用 `false`，也不得用 `true` 或通配符扩大副作用范围。默认入口及其他子路径仍须无副作用。
 
 ### 8.1 包名与构建模式
 
@@ -395,6 +397,10 @@ M0 只验证 changeset 可以记录和更新 private package 版本。首次公�
 7. 对 tsc build 包执行多文件原生 Node ESM smoke。
 8. 确认默认 import 不新增 `customElements` 定义或其他全局副作用。
 9. 确认 private package 不可通过仓库脚本发布。
+10. 把 `examples/host-quickstart` 复制到仓库外临时 Vanilla/Vite consumer，从 tarball 安装后执行
+    typecheck、生产构建与 Chromium Viewer 渲染闭环。
+11. 在仓库外 React/Vue consumer 的生产构建中仅以副作用 import 使用 `/auto-register`，验证 Viewer、
+    Designer 和官方物料没有被 tree-shaking 删除，并验证桥接物料生命周期。
 
 临时文件只能写入仓库忽略目录或系统临时目录，成功和失败都应清理。
 

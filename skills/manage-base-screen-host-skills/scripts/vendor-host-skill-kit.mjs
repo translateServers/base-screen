@@ -20,7 +20,7 @@ const MANAGED_SKILLS = [
   'create-base-screen-host-material-skill',
   'manage-base-screen-host-skills',
 ];
-const MANAGED_AUXILIARY = ['shared/material-handoff.mjs'];
+const MANAGED_AUXILIARY = ['shared/material-handoff.mjs', 'shared/material-mcp-contract.mjs'];
 
 export async function vendorHostSkillKit({ hostRoot, packageManager, snapshotScript } = {}) {
   if (typeof hostRoot !== 'string' || hostRoot.length === 0)

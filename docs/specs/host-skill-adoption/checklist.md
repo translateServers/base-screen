@@ -15,6 +15,8 @@
   committed as `.base-screen/host-snapshot.json`.
 - [x] Both business Skills are generated from the same canonical snapshot and record the same
   `snapshotDigest` in their generation manifests.
+- [x] Optional `materialTemplates` are guarded and both business Skills record the same
+  `catalogDigest` without breaking old snapshots.
 - [x] `pnpm base-screen:skills` (no args) refreshes the canonical snapshot and both Skills
   atomically; `verify` is offline and detects missing/extra/changed files and digest mismatch;
   `check-remote` reports drift only and writes nothing; `doctor` reports actionable repair hints.

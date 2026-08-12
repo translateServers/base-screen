@@ -64,7 +64,8 @@ alignment rules, density preferences, allowed visual hierarchy, and language con
 credentials, connection details, transport configuration, or private records in this field.
 
 The remaining fields (`materialGuidelines`, `materialAuthoring`, `components`,
-`materialProvenance`) are used by the material Skill generator; this generator ignores them.
+`materialProvenance`, `materialTemplates`) are used by the material Skill generator. This generator
+validates templates for shared snapshot safety but does not copy their contents.
 
 ## Bounds and safety
 

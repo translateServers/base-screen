@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | R1 | Valid/invalid config incl. optional `credentialEnvVars`; unsupported package manager; named script discovery; snapshot object with unknown/missing fields; credential-like value; executable content; remote URL; oversized snapshot | `tests/host-skill-adoption.test.ts` (`validateConfig`, snapshot validation) |
 | R1 | Canonical sorting, repeated-sync stability, `.base-screen/host-snapshot.json` commit, identical `snapshotDigest` in both manifests | `tests/host-skill-adoption.test.ts` and generator tests |
+| R1 | Optional guarded material templates, old-snapshot compatibility, stable `catalogDigest` in both manifests | `tests/host-material-mcp.test.ts` and generator tests |
 | R2 | Mock exporter success; non-zero exit; timeout; malformed snapshot; no target mutation on failure | `tests/host-skill-adoption.test.ts` |
 | R3 | Default sync; offline `verify` detects missing/extra/changed files and digest mismatch; `check-remote` reports drift without writing; `doctor` reports each check | `tests/host-skill-adoption.test.ts` |
 | R4 | First install, repeated install, managed upgrade; digest manifest; manual-edit refusal; unmanaged target preservation; legacy migration with matching digests; manual-change migration refusal; package script registration and conflict | `tests/host-skill-adoption.test.ts` |

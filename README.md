@@ -6,7 +6,9 @@ Base Screen 是一个轻量、可嵌入、跨框架的大屏设计器基座。�
 
 ## 集成入口
 
-面向其他项目的安装、初始化、Viewer、Designer、宿主资源和自定义物料说明，参见[集成指南](./docs/usage.md)。当前包为私有包，需要从组织内部 registry、workspace 或发布方提供的构建产物获取。
+面向其他项目的安装、初始化、Viewer、Designer、宿主资源和自定义物料说明，参见[集成指南](./docs/usage.md)。
+当前包为私有包：同一 pnpm workspace 可直接接入；独立仓库必须使用发布方提供的完整同批次包集，
+单个 SDK tarball 不是可独立安装的交付物。
 
 ## 仓库开发
 

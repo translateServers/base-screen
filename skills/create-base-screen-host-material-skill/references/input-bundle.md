@@ -106,6 +106,9 @@ the selected authoring route.
   write or network authority.
 - `materialProvenance` is optional. It marks published materials as `code` or `online`; online
   entries are read-only references.
+- `materialTemplates` is optional. It contains approved UTF-8 scaffolds whose paths are covered by
+  `allowedFiles`; the generated Skill stores an index in `references/` and content under
+  `assets/material-templates/` for on-demand use.
 
 The remaining fields (`screenGuidelines`) are used by the dashboard Skill generator; this generator
 ignores them.

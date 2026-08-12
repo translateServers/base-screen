@@ -53,22 +53,28 @@ single temporary file and SHALL write one JSON object with exactly these top-lev
   "resourceTypes": [],
   "datasets": [],
   "datasetSamples": [],
-  "materialProvenance": []
+  "materialProvenance": [],
+  "materialTemplates": []
 }
 ```
 
-`datasetSamples` and `materialProvenance` are optional; the other eight fields are required. The
+`datasetSamples`, `materialProvenance`, and `materialTemplates` are optional; the other eight fields
+are required. The
 exporter SHALL use stable ordering, omit timestamps and request identifiers, and never emit
 credentials, connection information, private records, executable content, or remote module
 addresses. The old multi-file context-directory export form is removed; existing landed hosts
 migrate to the single-file form once during this change.
+
+When present, `materialTemplates` SHALL follow ADR-0030: bounded approved UTF-8 scaffolds covered by
+the authoring allowlist, never runtime packages or executable instructions.
 
 The coordinator SHALL strictly reject unknown fields, credential-like values, connection details,
 executable content, remote module/URL addresses, and oversized data. It SHALL validate host identity,
 materials, resource types, dataset parameters, workspace paths, and registration policy, sort every
 catalog array by stable identity, and serialize a canonical JSON snapshot. The canonical result
 SHALL be committed as `.base-screen/host-snapshot.json`. Both business Skills SHALL be generated from
-that same canonical snapshot and record the same `snapshotDigest` in their generation manifests.
+that same canonical snapshot and record the same `snapshotDigest` and material `catalogDigest` in
+their generation manifests.
 
 ### R2: Online boundary and strict routing
 
