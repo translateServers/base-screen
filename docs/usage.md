@@ -739,7 +739,39 @@ const configured = viewer.configure({
 `host-action` 没有端口时会失败并产生诊断，不会静默执行任意函数。宿主动作端口需要自行处理
 授权、幂等、审计和业务错误脱敏。
 
-## 11. 接入宿主高级编辑器
+## 11. 配置左侧物料库状态
+
+宿主从线上加载并校验可信物料包后，仍然以不可变 `catalog` 配置 Designer。若需要在左侧物料库展示加载、离线、
+部分失败、草稿或更新状态，可以同时传入只读状态投影：
+
+```ts
+import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/sdk';
+
+designer.configure({
+  catalog,
+  materialLibraryState: {
+    status: 'partial',
+    failedCount: 2,
+    draftTypes: ['xj.kpi-card'],
+    unavailableTypes: ['xj.legacy-chart'],
+  },
+});
+
+designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => {
+  const { action } = (event as CustomEvent<{ action: 'retry' | 'reload' | 'details' }>).detail;
+  hostMaterialLoader.handle(action);
+});
+```
+
+状态支持 `loading`、`ready`、`offline`、`partial`、`error` 和 `update-available`。面板使用 Manifest 已有的
+`category` 生成分类筛选；草稿和不可用标记不进入 Manifest 或 ScreenDocument。不可用物料仍可被解释和定位，
+但不能点击或拖拽创建。
+
+更新状态时可以直接设置 `designer.materialLibraryState`，只会重绘左侧状态投影，不会重建 Renderer。真正更换
+物料集合时仍须由宿主处理未保存内容，随后执行 `unload()` 并用新的不可变 catalog 重新配置。Base Screen 不会因
+重试或重新加载按钮自行联网。
+
+## 12. 接入宿主高级编辑器
 
 复杂 Blueprint、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。
 Designer 通过 `base-screen-authoring-request` 发起 JSON-safe 请求，宿主完成编辑后调用专用提交
@@ -783,7 +815,7 @@ if (!result.ok) showDiagnostics(result.diagnostics);
 component identity、目标 schema、JSON 深度和容量；陈旧或无效候选不会修改文档和历史。宿主
 不要绕过这些入口操作 Designer 的 Shadow DOM 或内部 Store。
 
-## 12. React、Vue 和自定义物料
+## 13. React、Vue 和自定义物料
 
 React/Vue 应用可以把现有组件包装成 Base Screen 物料。Screen Document 仍只引用稳定的
 material `type`，不保存框架组件名。`@base-screen/react` 要求 `react`、`react-dom` `^19.1.0`；
@@ -847,7 +879,7 @@ defineMaterialEntry(vueEntry.value);
 并在宿主卸载时清理自身订阅和定时器。仓库外 React/Vue tarball 消费者会验证类型增强、生产构建、
 事件、模型更新、断开重连和最终卸载。
 
-## 13. 宿主托管外部物料包
+## 14. 宿主托管外部物料包
 
 物料包不是普通的自定义物料集合，它有独立的注册契约。业务团队独立分发物料模块时，宿主负责
 下载、完整性校验、信任审核和加载；Base Screen 不 fetch、不 dynamic import、不发现远程代码。
@@ -946,7 +978,7 @@ export async function loadApprovedMaterialCatalog(
 若宿主确实需要 URL 运行时加载，URL allowlist、CSP、完整性校验、鉴权、缓存和 bundler 配置都由宿主
 实现；Base Screen 不提供通用网络加载器。
 
-## 14. 生命周期和清理
+## 15. 生命周期和清理
 
 - 一个页面可以创建多个 Viewer/Designer；每个实例单独配置 catalog、端口和文档。
 - 运行时依赖发生变化时，先调用 `unload()`，再调用新的 `configure()`，最后设置或加载文档。
@@ -955,7 +987,7 @@ export async function loadApprovedMaterialCatalog(
 - 不要访问 Shadow DOM、内部 controller、`@base-screen/*/src`、仓库 fixture 或 harness 内部状态。
 - 端口只能返回 JSON-safe 数据和公开契约对象，不能把函数、DOM、Promise、凭据或服务实例写入文档。
 
-## 15. 交付前检查
+## 16. 交付前检查
 
 - 文档进入运行时前通过 `parseScreenDocument()`，项目响应通过
   `parseScreenProjectEnvelope()`。
@@ -969,7 +1001,7 @@ export async function loadApprovedMaterialCatalog(
 - Screen Document 中没有 URL、SQL、token、header、连接信息、宿主服务对象和业务私有状态。
 - 切换项目、租户、物料包或运行时能力时执行 `unload()`，不会复用旧端口或旧 snapshot。
 
-## 16. 常见问题
+## 17. 常见问题
 
 - **页面没有内容**：确认元素和物料已注册、catalog 包含文档中的 `type`，并检查诊断事件。
 - **独立项目安装 SDK 后提示其他 `@base-screen/*` 包 404**：当前拿到的是不完整制品。改用同一

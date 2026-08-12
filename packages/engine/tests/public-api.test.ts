@@ -4,8 +4,9 @@ import type {
   ScreenProjectEnvelope,
   ScreenProjectSummary,
 } from '@base-screen/contracts';
-import { describe, expectTypeOf, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   BaseScreenDesignerElement,
   ScreenProjectController,
   type ScreenProjectControllerChange,
@@ -13,6 +14,13 @@ import {
 } from '../src/index.js';
 
 describe('engine public lifecycle API', () => {
+  it('exports the material library host projection contract', () => {
+    expect(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT).toBe('base-screen-material-library-action');
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['materialLibraryState']
+    >().toMatchTypeOf<{ readonly status: string } | undefined>();
+  });
+
   it('exports the controller phase and lifecycle methods from the package barrel', () => {
     expectTypeOf<ScreenProjectPhase>().toEqualTypeOf<
       'unloaded' | 'loading' | 'ready' | 'saving' | 'publishing' | 'conflict' | 'error' | 'disposed'

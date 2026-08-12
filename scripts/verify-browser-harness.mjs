@@ -91,6 +91,7 @@ try {
       }
       if (viewport.width > 800) {
         await assertDesktopWorkbench(designer, viewport);
+        await assertMaterialLibraryHostState(page, designer);
         await assertDesignerControlStyles(designer);
         const geometry = await designer.evaluate((element) => {
           const root = element.shadowRoot;
@@ -1004,6 +1005,110 @@ try {
   }
 } finally {
   await server.close();
+}
+
+async function assertMaterialLibraryHostState(page, designer) {
+  const state = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const status = root.querySelector('[data-material-library-status]');
+    const draft = root.querySelector('[data-material-card="base.echarts"]');
+    const unavailable = root.querySelector(
+      '[data-material-card="base.table"] [data-material-type]',
+    );
+    return {
+      status: status?.getAttribute('data-status'),
+      text: status?.textContent?.trim(),
+      categoryCount: root.querySelectorAll('[data-material-category-filter]').length,
+      draft: draft?.hasAttribute('data-material-draft'),
+      unavailable: unavailable?.disabled,
+      draggable: unavailable?.draggable,
+      height: status?.getBoundingClientRect().height,
+    };
+  });
+  if (
+    state.status !== 'partial' ||
+    !state.text?.includes('1 个物料加载失败') ||
+    state.categoryCount < 2 ||
+    state.draft !== true ||
+    state.unavailable !== true ||
+    state.draggable !== false ||
+    state.height < 60
+  ) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_STATE_FAILED:${JSON.stringify(state)}`);
+  }
+
+  await designer.locator('[data-material-library-action="retry"]').click();
+  await designer.locator('[data-material-library-action="details"]').click();
+  const actions = await page.evaluate(() => window.baseScreenHarness.materialLibraryActions);
+  if (actions.join(',') !== 'retry,details') {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_ACTION_FAILED:${actions.join(',')}`);
+  }
+
+  const category = designer.locator('[data-material-category-filter]').first();
+  const totalCards = await designer.locator('[data-material-card]').count();
+  await category.click();
+  const categoryFiltered = await designer.locator('[data-material-card]:not([hidden])').count();
+  if (
+    (await category.getAttribute('aria-pressed')) !== 'true' ||
+    categoryFiltered < 1 ||
+    categoryFiltered >= totalCards
+  ) {
+    throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_CATEGORY_FAILED');
+  }
+  await category.click();
+  const search = designer.locator('[data-material-search]');
+  await search.fill('no-such-material');
+  const searchState = await designer.evaluate((element) => ({
+    visible: element.shadowRoot.querySelectorAll('[data-material-card]:not([hidden])').length,
+    emptyHidden: element.shadowRoot.querySelector('[data-material-search-empty]')?.hidden,
+  }));
+  if (searchState.visible !== 0 || searchState.emptyHidden !== false) {
+    throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_SEARCH_EMPTY_FAILED');
+  }
+  await search.fill('');
+
+  const expectedStates = [
+    ['loading', '正在加载物料', 0],
+    ['ready', '物料目录已同步', 0],
+    ['offline', '正在使用离线目录', 1],
+    ['error', '物料目录加载失败', 1],
+    ['update-available', '物料目录有更新', 1],
+  ];
+  for (const [status, text, actionCount] of expectedStates) {
+    const rendered = await page.evaluate((nextStatus) => {
+      window.baseScreenHarness.designer.materialLibraryState = { status: nextStatus };
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      return {
+        status: root.querySelector('[data-material-library-status]')?.getAttribute('data-status'),
+        text: root.querySelector('[data-material-library-status]')?.textContent?.trim(),
+        actionCount: root.querySelectorAll('[data-material-library-action]').length,
+      };
+    }, status);
+    if (
+      rendered.status !== status ||
+      !rendered.text?.includes(text) ||
+      rendered.actionCount !== actionCount
+    ) {
+      throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_STATUS_FAILED:${JSON.stringify(rendered)}`);
+    }
+  }
+
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.materialLibraryState = { status: 'loading' };
+  });
+  const before = await designer.locator('[data-material-library-status]').boundingBox();
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.materialLibraryState = { status: 'update-available' };
+  });
+  const after = await designer.locator('[data-material-library-status]').boundingBox();
+  if (before === null || after === null || before.width !== after.width) {
+    throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_JITTER_FAILED');
+  }
+  await designer.locator('[data-material-library-action="reload"]').click();
+  const updatedActions = await page.evaluate(() => window.baseScreenHarness.materialLibraryActions);
+  if (updatedActions.at(-1) !== 'reload') {
+    throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_RELOAD_FAILED');
+  }
 }
 
 async function assertAuthoringShortcutsAndIsolation(page, designer) {

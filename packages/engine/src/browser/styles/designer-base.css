@@ -225,10 +225,73 @@
   width: 100%;
 }
 
+.material-library-status {
+  display: grid;
+  min-height: 66px;
+  gap: 6px;
+  margin: 0 8px 8px;
+  padding: 8px;
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+}
+
+.material-library-status[hidden] {
+  display: none;
+}
+
+.material-library-status-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.material-library-status-copy span {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.material-library-status-actions,
+.material-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.material-library-status-actions .designer-button,
+.material-categories .designer-button {
+  min-height: 24px;
+  padding: 2px 8px;
+  font: var(--designer-font-small);
+}
+
+.material-library-status[data-status="loading"] strong,
+.material-library-status[data-status="offline"] strong,
+.material-library-status[data-status="partial"] strong,
+.material-library-status[data-status="update-available"] strong {
+  color: var(--designer-warning);
+}
+
+.material-library-status[data-status="error"] strong {
+  color: var(--designer-danger);
+}
+
 .material-filters {
   display: flex;
   gap: 4px;
   padding: 0 8px 8px;
+}
+
+.material-categories {
+  padding: 0 8px 8px;
+}
+
+.material-categories[hidden] {
+  display: none;
+}
+
+.material-categories .designer-button[aria-pressed="true"] {
+  color: var(--designer-accent);
+  border-color: var(--designer-accent);
 }
 
 .material-card-wrap {
@@ -243,6 +306,39 @@
   position: absolute;
   top: 4px;
   right: 4px;
+}
+
+.material-badge {
+  position: absolute;
+  right: 30px;
+  bottom: 7px;
+  z-index: 1;
+  padding: 1px 5px;
+  color: var(--designer-warning);
+  font: var(--designer-font-small);
+  border: 1px solid var(--designer-warning);
+  border-radius: 999px;
+  background: var(--designer-warning-surface);
+  pointer-events: none;
+}
+
+.material-badge[data-material-badge="unavailable"] {
+  color: var(--designer-danger);
+  border-color: var(--designer-danger);
+  background: var(--designer-danger-surface);
+}
+
+.material-card-wrap[data-material-draft][data-material-unavailable]
+  .material-badge[data-material-badge="draft"] {
+  right: 78px;
+}
+
+.material-card-wrap[data-material-unavailable] .material-card {
+  opacity: 0.65;
+}
+
+.material-search-empty {
+  margin-top: 8px;
 }
 
 .designer {

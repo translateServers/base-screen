@@ -30,6 +30,27 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.catalog).toBeDefined();
   });
 
+  it('R1 accepts strict material library state and rejects invalid state atomically', () => {
+    const designer = new BaseScreenDesignerElement();
+    const firstCatalog = catalog();
+    expect(
+      designer.configure({
+        catalog: firstCatalog,
+        materialLibraryState: { status: 'offline', failedCount: 1 },
+      }).ok,
+    ).toBe(true);
+    expect(designer.materialLibraryState).toEqual({ status: 'offline', failedCount: 1 });
+
+    const invalid = new BaseScreenDesignerElement();
+    const result = invalid.configure({
+      catalog: firstCatalog,
+      materialLibraryState: { status: 'ready', extra: true } as never,
+    });
+    expect(result.ok).toBe(false);
+    expect(invalid.catalog).toBeUndefined();
+    expect(invalid.materialLibraryState).toBeUndefined();
+  });
+
   it('rejects a designer host adapter whose capabilities disagree with its ports', () => {
     const designer = new BaseScreenDesignerElement();
     const result = designer.configure({

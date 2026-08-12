@@ -6,6 +6,10 @@ import {
   getDesignerToolShortcut,
 } from '../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import type {
+  BaseScreenMaterialLibraryAction,
+  BaseScreenMaterialLibraryState,
+} from '../../material-library-state.js';
 import { designerIcon, designerToolGlyph } from '../ui/designer-icons.js';
 
 // 工具图标供 controllers 层消费（controllers 可依赖 dom，但不得直接依赖 ui 叶子层）。
@@ -67,6 +71,7 @@ export function createDesignerWorkspace(
   ownerDocument: Document,
   materials: readonly BaseScreenMaterialCatalogEntry[],
   toolMaterialTypes: DesignerToolMaterialTypes | undefined,
+  materialLibraryState?: BaseScreenMaterialLibraryState,
 ): HTMLElement {
   const visibleMaterials = visibleLibraryMaterials(materials);
   const layout = ownerDocument.createElement('section');
@@ -84,6 +89,7 @@ export function createDesignerWorkspace(
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
         </button>
       </header>
+      <section class="material-library-status" data-material-library-status aria-label="${DESIGNER_UI_TEXT.materialLibrary.label}" aria-live="polite" hidden></section>
       <label class="designer-field material-search">
         <span class="sr-only">${DESIGNER_UI_TEXT.materialsSearch}</span>
         <input type="search" class="designer-control designer-input" data-material-search placeholder="${DESIGNER_UI_TEXT.materialsSearch}">
@@ -93,11 +99,14 @@ export function createDesignerWorkspace(
         <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">${DESIGNER_UI_TEXT.favoriteMaterials}</button>
         <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">${DESIGNER_UI_TEXT.recentMaterials}</button>
       </div>
+      <div class="material-categories" data-material-categories role="group" aria-label="${DESIGNER_UI_TEXT.materialCategories}"></div>
       <div class="designer-tablist rail-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.leftPanel}">
         <button type="button" class="designer-tab" id="designer-materials-tab" role="tab" aria-controls="designer-materials-panel" aria-selected="true" data-panel-tab="materials">${DESIGNER_UI_TEXT.materials}</button>
         <button type="button" class="designer-tab" id="designer-layers-tab" role="tab" aria-controls="designer-layers-panel" aria-selected="false" data-panel-tab="layers">${DESIGNER_UI_TEXT.layers}</button>
       </div>
-      <div class="rail-content" id="designer-materials-panel" role="tabpanel" aria-labelledby="designer-materials-tab" data-materials></div>
+      <div class="rail-content" id="designer-materials-panel" role="tabpanel" aria-labelledby="designer-materials-tab" data-materials>
+        <p class="designer-empty-state material-search-empty" data-material-search-empty hidden>${DESIGNER_UI_TEXT.materialSearchEmpty}</p>
+      </div>
       <div class="rail-content" id="designer-layers-panel" role="tabpanel" aria-labelledby="designer-layers-tab" data-layers hidden></div>
     </aside>
 
@@ -338,6 +347,19 @@ export function createDesignerWorkspace(
   for (const entry of visibleMaterials) {
     materialsRail.appendChild(createMaterialCard(ownerDocument, entry));
   }
+  const categories = materialLibraryCategories(visibleMaterials);
+  const categoryRail = layout.querySelector<HTMLElement>('[data-material-categories]')!;
+  for (const category of categories) {
+    const button = ownerDocument.createElement('button');
+    button.type = 'button';
+    button.className = 'designer-control designer-button';
+    button.dataset.materialCategoryFilter = category;
+    button.ariaPressed = 'false';
+    button.textContent = category;
+    categoryRail.appendChild(button);
+  }
+  categoryRail.hidden = categories.length < 2;
+  renderMaterialLibraryState(layout, materialLibraryState);
   for (const tool of DESIGNER_TOOLS) {
     const control = layout.querySelector<HTMLButtonElement>(`[data-tool="${tool.id}"]`)!;
     control.disabled = tool.materialKey !== undefined && toolMaterialTypes?.[tool.id] === undefined;
@@ -407,6 +429,119 @@ export function visibleLibraryMaterials(
   return materials.filter((entry) => entry.manifest.libraryVisible !== false);
 }
 
+export function materialLibraryCategories(
+  materials: readonly BaseScreenMaterialCatalogEntry[],
+): readonly string[] {
+  return [...new Set(materials.map((entry) => entry.manifest.category))].sort((left, right) =>
+    left.localeCompare(right),
+  );
+}
+
+export function renderMaterialLibraryState(
+  layout: ParentNode,
+  state: BaseScreenMaterialLibraryState | undefined,
+): void {
+  const surface = layout.querySelector<HTMLElement>('[data-material-library-status]');
+  if (surface === null) return;
+  surface.replaceChildren();
+  surface.hidden = state === undefined;
+  surface.removeAttribute('data-status');
+  for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
+    card.removeAttribute('data-material-draft');
+    card.removeAttribute('data-material-unavailable');
+    const button = card.querySelector<HTMLButtonElement>('[data-material-type]');
+    if (button !== null) {
+      button.disabled = false;
+      button.draggable = true;
+    }
+    renderMaterialBadge(card, 'draft', false, DESIGNER_UI_TEXT.materialDraft);
+    renderMaterialBadge(card, 'unavailable', false, DESIGNER_UI_TEXT.materialUnavailable);
+  }
+  if (state === undefined) return;
+
+  surface.dataset.status = state.status;
+  const copy = surface.ownerDocument.createElement('div');
+  copy.className = 'material-library-status-copy';
+  const title = surface.ownerDocument.createElement('strong');
+  title.textContent = DESIGNER_UI_TEXT.materialLibrary.statuses[state.status];
+  const description = surface.ownerDocument.createElement('span');
+  description.textContent =
+    state.failedCount !== undefined && state.failedCount > 0
+      ? DESIGNER_UI_TEXT.materialLibrary.failedCount(state.failedCount)
+      : DESIGNER_UI_TEXT.materialLibrary.descriptions[state.status];
+  copy.append(title, description);
+  surface.appendChild(copy);
+
+  const actions = materialLibraryActions(state.status);
+  if (actions.length > 0) {
+    const controls = surface.ownerDocument.createElement('div');
+    controls.className = 'material-library-status-actions';
+    for (const action of actions) {
+      const button = surface.ownerDocument.createElement('button');
+      button.type = 'button';
+      button.className = 'designer-control designer-button';
+      button.dataset.materialLibraryAction = action;
+      button.textContent = DESIGNER_UI_TEXT.materialLibrary.actions[action];
+      controls.appendChild(button);
+    }
+    surface.appendChild(controls);
+  }
+
+  const draftTypes = new Set(state.draftTypes ?? []);
+  const unavailableTypes = new Set(state.unavailableTypes ?? []);
+  for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
+    const type = card.dataset.materialCard ?? '';
+    const draft = draftTypes.has(type);
+    const unavailable = unavailableTypes.has(type);
+    card.toggleAttribute('data-material-draft', draft);
+    card.toggleAttribute('data-material-unavailable', unavailable);
+    const button = card.querySelector<HTMLButtonElement>('[data-material-type]');
+    if (button !== null) {
+      button.disabled = unavailable;
+      button.draggable = !unavailable;
+    }
+    renderMaterialBadge(card, 'draft', draft, DESIGNER_UI_TEXT.materialDraft);
+    renderMaterialBadge(card, 'unavailable', unavailable, DESIGNER_UI_TEXT.materialUnavailable);
+  }
+}
+
+export function materialLibraryActions(
+  status: BaseScreenMaterialLibraryState['status'],
+): readonly BaseScreenMaterialLibraryAction[] {
+  switch (status) {
+    case 'loading':
+    case 'ready':
+      return [];
+    case 'offline':
+    case 'error':
+      return ['retry'];
+    case 'partial':
+      return ['retry', 'details'];
+    case 'update-available':
+      return ['reload'];
+  }
+}
+
+function renderMaterialBadge(
+  card: HTMLElement,
+  kind: 'draft' | 'unavailable',
+  visible: boolean,
+  label: string,
+): void {
+  const selector = `[data-material-badge="${kind}"]`;
+  const existing = card.querySelector<HTMLElement>(selector);
+  if (!visible) {
+    existing?.remove();
+    return;
+  }
+  if (existing !== null) return;
+  const badge = card.ownerDocument.createElement('span');
+  badge.className = 'material-badge';
+  badge.dataset.materialBadge = kind;
+  badge.textContent = label;
+  card.appendChild(badge);
+}
+
 // 浏览器原生下载：以 application/json Blob 生成 .json 文件（导入使用文件选择器，导出使用下载锚点）。
 export function downloadDesignerDocument(
   ownerDocument: Document,
@@ -431,6 +566,7 @@ function createMaterialCard(
   const card = ownerDocument.createElement('div');
   card.className = 'material-card-wrap';
   card.dataset.materialCard = entry.manifest.type;
+  card.dataset.materialCategory = entry.manifest.category;
   const button = ownerDocument.createElement('button');
   button.type = 'button';
   button.className = 'designer-control designer-button material-card';

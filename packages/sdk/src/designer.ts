@@ -4,7 +4,15 @@ import { defineBaseScreenElement } from './definition.js';
 
 export const BASE_SCREEN_DESIGNER_TAG_NAME = 'base-screen-designer' as const;
 
-export { BaseScreenDesignerElement } from '@base-screen/engine';
+export {
+  BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
+  BaseScreenDesignerElement,
+  type BaseScreenMaterialLibraryAction,
+  type BaseScreenMaterialLibraryActionEventDetail,
+  type BaseScreenMaterialLibraryState,
+  type BaseScreenMaterialLibraryStatus,
+  parseBaseScreenMaterialLibraryState,
+} from '@base-screen/engine';
 
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor> {
   return defineBaseScreenElement(BASE_SCREEN_DESIGNER_TAG_NAME, BaseScreenDesignerElement);

@@ -3,7 +3,7 @@
 > 状态：生效（维护期行为依据）
 > 最近更新：2026-08-12（阶段封版）
 
-本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状。它是维护期的行为依据：
+本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
 
 - 范围边界、宿主职责与安全约束以已接受的 [ADR](../decisions/README.md) 为准（尤其 ADR-0027/0028/0029/0030）。
@@ -56,6 +56,9 @@
 - **草稿物料流程**：设计期显式草稿交接、目录叠加与正式发布预检。依据：[Host Draft Material Workflow](../specs/archive/host-draft-material-workflow/spec.md)。
 - **在线物料 MCP**：规范快照 + 在线物料查询/校验 MCP 契约与 stdio 参考服务。依据：[Host Material MCP Access](../specs/archive/host-material-mcp-access/spec.md)、
   [ADR-0030](../decisions/ADR-0030-host-material-mcp-access.md)。
+- **左侧物料库宿主状态**（封版后增量，生效中）：左侧物料库的宿主状态投影——严格状态 schema（ready/loading/offline/partial/update）、
+  分类排序与搜索、草稿/不可用标记、composed 宿主动作事件（retry/reload/details）；保持不可变 catalog 与宿主加载边界。
+  依据：[Material Library Host State](../specs/material-library-host-state/spec.md)、[ADR-0031](../decisions/ADR-0031-material-library-host-state.md)。
 
 ## 宿主边界与数据运行时
 

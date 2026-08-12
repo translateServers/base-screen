@@ -63,6 +63,8 @@ export interface DesignerPanelControllerCallbacks {
   readonly undo: () => ScreenParseResult<ScreenDocument>;
   readonly getZoom: () => number;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  readonly isMaterialAvailable?: (type: string) => boolean;
+  readonly requestMaterialLibraryAction?: (action: 'retry' | 'reload' | 'details') => void;
 }
 
 export class DesignerPanelController {
@@ -70,6 +72,7 @@ export class DesignerPanelController {
   #pasteCount = 0;
   #materialFilter: 'all' | 'favorite' | 'recent' = 'all';
   #materialSearch = '';
+  #materialCategory: string | undefined;
   readonly #favoriteMaterials = new Set<string>();
   readonly #recentMaterials: string[] = [];
 
@@ -249,6 +252,19 @@ export class DesignerPanelController {
       this.renderMaterials(target.closest<HTMLElement>('.designer'));
       return;
     }
+    const category = target.closest<HTMLButtonElement>('[data-material-category-filter]')?.dataset
+      .materialCategoryFilter;
+    if (category !== undefined) {
+      this.#materialCategory = this.#materialCategory === category ? undefined : category;
+      this.renderMaterials(target.closest<HTMLElement>('.designer'));
+      return;
+    }
+    const libraryAction = target.closest<HTMLButtonElement>('[data-material-library-action]')
+      ?.dataset.materialLibraryAction;
+    if (libraryAction === 'retry' || libraryAction === 'reload' || libraryAction === 'details') {
+      this.callbacks.requestMaterialLibraryAction?.(libraryAction);
+      return;
+    }
     const materialCard = target.closest<HTMLElement>('[data-material-type]');
     if (materialCard?.dataset.materialType !== undefined) {
       this.addMaterial(materialCard.dataset.materialType);
@@ -311,7 +327,12 @@ export class DesignerPanelController {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
     const materialType = target.closest<HTMLElement>('[data-material-type]')?.dataset.materialType;
-    if (materialType === undefined) return false;
+    if (
+      materialType === undefined ||
+      this.callbacks.isMaterialAvailable?.(materialType) === false
+    ) {
+      return false;
+    }
     if (event.dataTransfer !== null && event.dataTransfer !== undefined) {
       event.dataTransfer.setData(MATERIAL_DRAG_TYPE, materialType);
       event.dataTransfer.effectAllowed = 'copy';
@@ -435,7 +456,13 @@ export class DesignerPanelController {
   private addMaterial(type: string): void {
     const document = this.callbacks.getDocument();
     const entry = this.callbacks.getCatalog()?.get(type);
-    if (document === undefined || entry === undefined) return;
+    if (
+      document === undefined ||
+      entry === undefined ||
+      this.callbacks.isMaterialAvailable?.(type) === false
+    ) {
+      return;
+    }
     const index = document.components.length;
     const component: ScreenComponentNode = {
       id: nextComponentId(document, entry.manifest.type),
@@ -472,13 +499,16 @@ export class DesignerPanelController {
     for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
       const type = card.dataset.materialCard;
       const entry = type === undefined ? undefined : this.callbacks.getCatalog()?.get(type);
-      const searchable = `${entry?.manifest.name ?? ''} ${type ?? ''}`.toLocaleLowerCase();
+      const category = entry?.manifest.category ?? card.dataset.materialCategory ?? '';
+      const searchable =
+        `${entry?.manifest.name ?? ''} ${type ?? ''} ${category}`.toLocaleLowerCase();
       const included =
         type !== undefined &&
         (this.#materialFilter === 'all' ||
           (this.#materialFilter === 'favorite' && this.#favoriteMaterials.has(type)) ||
           (this.#materialFilter === 'recent' && this.#recentMaterials.includes(type))) &&
-        searchable.includes(this.#materialSearch);
+        searchable.includes(this.#materialSearch) &&
+        (this.#materialCategory === undefined || category === this.#materialCategory);
       card.hidden = !included;
       const favorite = card.querySelector<HTMLButtonElement>('[data-material-favorite]');
       if (favorite !== null && type !== undefined) {
@@ -489,6 +519,19 @@ export class DesignerPanelController {
     }
     for (const control of layout.querySelectorAll<HTMLButtonElement>('[data-material-filter]')) {
       control.ariaPressed = String(control.dataset.materialFilter === this.#materialFilter);
+    }
+    for (const control of layout.querySelectorAll<HTMLButtonElement>(
+      '[data-material-category-filter]',
+    )) {
+      control.ariaPressed = String(
+        control.dataset.materialCategoryFilter === this.#materialCategory,
+      );
+    }
+    const empty = layout.querySelector<HTMLElement>('[data-material-search-empty]');
+    if (empty !== null) {
+      empty.hidden = [...layout.querySelectorAll<HTMLElement>('[data-material-card]')].some(
+        (card) => !card.hidden,
+      );
     }
   }
 

@@ -2,16 +2,22 @@ import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   downloadDesignerDocument,
+  materialLibraryActions,
+  materialLibraryCategories,
   visibleLibraryMaterials,
 } from '../../../src/browser/dom/designer-workspace.js';
 
-function entry(type: string, libraryVisible: boolean | undefined): BaseScreenMaterialCatalogEntry {
+function entry(
+  type: string,
+  libraryVisible: boolean | undefined,
+  category = 'Test',
+): BaseScreenMaterialCatalogEntry {
   return {
     manifest: {
       type,
       tagName: `${type.replaceAll('.', '-')}-element`,
       name: type,
-      category: 'Test',
+      category,
       keywords: [],
       defaultSize: { width: 100, height: 40 },
       defaultProps: {},
@@ -46,6 +52,24 @@ describe('visibleLibraryMaterials', () => {
       'base.text',
       'base.rectangle',
     ]);
+  });
+});
+
+describe('material library UI', () => {
+  it('R3 returns unique categories in stable order', () => {
+    expect(
+      materialLibraryCategories([
+        entry('xj.chart', true, '图表'),
+        entry('base.text', true, '基础'),
+        entry('xj.table', true, '图表'),
+      ]),
+    ).toEqual(['基础', '图表']);
+  });
+
+  it('R2 maps statuses to bounded host actions', () => {
+    expect(materialLibraryActions('ready')).toEqual([]);
+    expect(materialLibraryActions('partial')).toEqual(['retry', 'details']);
+    expect(materialLibraryActions('update-available')).toEqual(['reload']);
   });
 });
 

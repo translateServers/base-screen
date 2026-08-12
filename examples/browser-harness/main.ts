@@ -37,6 +37,7 @@ import {
 import { createBaseScreenPluginManager } from '../../packages/plugin-manager/src/index.ts';
 import { createReactMaterialDefinition } from '../../packages/react/src/index.ts';
 import {
+  BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   defineBaseScreenElements,
   SCREEN_AUTHORING_REQUEST_EVENT,
 } from '../../packages/sdk/src/index.ts';
@@ -494,6 +495,16 @@ viewer.blueprintRuntimePort = {
   },
 };
 designer.catalog = bridgeCatalog;
+designer.materialLibraryState = {
+  status: 'partial',
+  failedCount: 1,
+  draftTypes: ['base.echarts'],
+  unavailableTypes: ['base.table'],
+};
+const materialLibraryActions: string[] = [];
+designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => {
+  materialLibraryActions.push((event as CustomEvent<{ action: string }>).detail.action);
+});
 designer.runtimeContributions = runtimeContributions;
 designer.toolMaterialTypes = {
   text: 'base.text',
@@ -713,6 +724,7 @@ Object.assign(window, {
     hostEvents,
     datasetCatalog,
     datasetRequests,
+    materialLibraryActions,
     hostShell,
     pendingAuthoringRequest: () => pendingAuthoringRequest,
     setDatasetRegion: (value: string) => {

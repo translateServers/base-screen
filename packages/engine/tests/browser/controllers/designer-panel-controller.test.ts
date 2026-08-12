@@ -525,7 +525,10 @@ describe('DesignerPanelController material add', () => {
   function clickMaterialCard(controller: DesignerPanelController, type: string): void {
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('Element', FakeElement);
-    const layout = { querySelectorAll: () => [] } as unknown as FakeElement;
+    const layout = {
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    } as unknown as FakeElement;
     const card = new FakeElement('button', new FakeDocument());
     card.dataset.materialType = type;
     card.closestResult = layout;

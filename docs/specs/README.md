@@ -3,16 +3,17 @@
 > 状态：维护期（阶段封版）
 > 阶段封版：2026-08-12
 > 最近更新：2026-08-12
-> 定位：Base Screen 当前处于阶段成果维护期，没有正在实施的活动 Spec
+> 定位：Base Screen 处于阶段成果维护期；历史 Spec 全部归档，封版后的增量需求以新的 ADR/Spec 承载
 
 ## 当前状态
 
-- **没有正在实施的活动 Spec。** 截至 2026-08-12，所有历史 Spec 的 Tasks 与 Checklist 均已勾选完成，
-  其“需求 → 实现 → 测试 → 验收”生命周期已闭环，全部归档至 [archive/](./archive/README.md) 作为历史验收材料。
+- **历史 Spec 已全部归档。** 截至 2026-08-12，全部历史 Spec 的 Tasks 与 Checklist 均已勾选完成，
+  归档至 [archive/](./archive/README.md) 作为历史验收材料；维护期内的新需求不重新打开归档任务。
 - **当前处于阶段成果维护期。** 现有能力基线见 [当前能力基线](../baseline/README.md)，下一阶段方向见
   [后续路线图](../roadmap/README.md)。
-- **新功能必须重新建立 ADR/Spec。** 维护期内的任何新需求都不得重新打开归档任务；启动实施前先写
-  已接受的 ADR 与生效中的 Spec，并登记到本页“生效中”区域。
+- **新功能必须重新建立 ADR/Spec。** 启动实施前先写已接受的 ADR 与生效中的 Spec，并登记到本页
+  “生效中”区域。封版后的首个增量 Spec [Material Library Host State](./material-library-host-state/spec.md)
+  已于 2026-08-12 生效（依据 [ADR-0031](../decisions/ADR-0031-material-library-host-state.md)）。
 
 ## 使用规则
 
@@ -24,7 +25,9 @@
 
 ## 生效中
 
-当前为空。新 Spec 在通过评审后登记于此。
+| Spec | 阶段 | 说明 |
+| --- | --- | --- |
+| [Material Library Host State](./material-library-host-state/spec.md) | 契约与产品增量 | 左侧物料库宿主状态投影：严格状态 schema、分类/搜索/草稿/不可用标记与 composed 宿主动作事件；保持不可变 catalog；依据 [ADR-0031](../decisions/ADR-0031-material-library-host-state.md)；2026-08-12 生效 |
 
 ## 已归档
 

@@ -4,7 +4,8 @@
 > 最近更新：2026-08-12（阶段封版）
 
 本路线图列出下一阶段的候选方向与触发条件。**它不授权任何实现**：每一项启动前都必须先有已接受的 ADR
-与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域。当前无生效中 Spec。
+与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域。当前生效中 Spec 为
+[Material Library Host State](../specs/material-library-host-state/spec.md)（封版后首个增量）。
 
 ## 候选方向
 

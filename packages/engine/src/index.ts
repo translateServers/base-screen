@@ -80,7 +80,25 @@ import {
 import {
   createDesignerWorkspace,
   downloadDesignerDocument,
+  renderMaterialLibraryState,
 } from './browser/dom/designer-workspace.js';
+import {
+  BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
+  type BaseScreenMaterialLibraryAction,
+  type BaseScreenMaterialLibraryActionEventDetail,
+  type BaseScreenMaterialLibraryState,
+  parseBaseScreenMaterialLibraryState,
+} from './material-library-state.js';
+
+export {
+  BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
+  type BaseScreenMaterialLibraryAction,
+  type BaseScreenMaterialLibraryActionEventDetail,
+  type BaseScreenMaterialLibraryState,
+  type BaseScreenMaterialLibraryStatus,
+  parseBaseScreenMaterialLibraryState,
+} from './material-library-state.js';
+
 import { createDesignerStyle } from './browser/styles/designer-style.js';
 import {
   buildScreenAuthoringEditorContext,
@@ -120,6 +138,7 @@ const ElementBase =
 
 export interface BaseScreenDesignerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
+  readonly materialLibraryState?: BaseScreenMaterialLibraryState;
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly projectAdapter?: ScreenProjectAdapter;
   readonly toolMaterialTypes?: DesignerToolMaterialTypes;
@@ -136,6 +155,7 @@ export interface BaseScreenDesignerConfiguration {
 
 export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
+  #materialLibraryState: BaseScreenMaterialLibraryState | undefined;
   #runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
   #variablePort: ScreenHostVariablePort | undefined;
@@ -303,6 +323,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     undo: () => this.#session.undo(),
     getZoom: () => this.#viewportController.state.zoom,
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
+    isMaterialAvailable: (type) => !this.#materialLibraryState?.unavailableTypes?.includes(type),
+    requestMaterialLibraryAction: (action) => this.requestMaterialLibraryAction(action),
   });
   readonly #viewportController = new DesignerViewportController({
     getDocument: () => this.#session.document,
@@ -649,6 +671,12 @@ export class BaseScreenDesignerElement extends ElementBase {
         diagnostics: [lifecycleDiagnostic('Designer catalog 必须是合法的物料目录。')],
       };
     }
+    let materialLibraryState: BaseScreenMaterialLibraryState | undefined;
+    if (configuration.materialLibraryState !== undefined) {
+      const parsed = parseBaseScreenMaterialLibraryState(configuration.materialLibraryState);
+      if (!parsed.ok) return parsed;
+      materialLibraryState = parsed.value;
+    }
     if (
       configuration.resourcePort !== undefined &&
       !isScreenHostResourcePort(configuration.resourcePort)
@@ -714,6 +742,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#datasetCatalogPort = configuration.datasetCatalogPort;
     }
     this.#catalog = configuration.catalog;
+    this.#materialLibraryState = materialLibraryState;
     this.#runtimeContributions = configuration.runtimeContributions;
     this.#toolMaterialTypes = configuration.toolMaterialTypes;
     this.#groupMaterialType = configuration.groupMaterialType;
@@ -733,6 +762,25 @@ export class BaseScreenDesignerElement extends ElementBase {
       return;
     }
     this.#catalog = value;
+  }
+
+  get materialLibraryState(): BaseScreenMaterialLibraryState | undefined {
+    return this.#materialLibraryState;
+  }
+
+  set materialLibraryState(value: BaseScreenMaterialLibraryState | undefined) {
+    if (value === undefined) {
+      this.#materialLibraryState = undefined;
+      this.renderMaterialLibraryState();
+      return;
+    }
+    const parsed = parseBaseScreenMaterialLibraryState(value);
+    if (!parsed.ok) {
+      this.emitDiagnostics(parsed.diagnostics);
+      return;
+    }
+    this.#materialLibraryState = parsed.value;
+    this.renderMaterialLibraryState();
   }
 
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
@@ -1353,7 +1401,12 @@ export class BaseScreenDesignerElement extends ElementBase {
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
     shadow.replaceChildren(
       createDesignerStyle(this.ownerDocument),
-      createDesignerWorkspace(this.ownerDocument, this.#catalog.list(), this.#toolMaterialTypes),
+      createDesignerWorkspace(
+        this.ownerDocument,
+        this.#catalog.list(),
+        this.#toolMaterialTypes,
+        this.#materialLibraryState,
+      ),
     );
     this.#viewportElement = shadow.querySelector<HTMLDivElement>('[data-viewport]')!;
     this.#canvas = shadow.querySelector<HTMLDivElement>('[data-canvas]')!;
@@ -1418,6 +1471,20 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.renderControls();
     this.#integrationController.render();
     this.#workbenchController.renderInspectorTabs();
+  }
+
+  private renderMaterialLibraryState(): void {
+    if (this.shadowRoot === null) return;
+    renderMaterialLibraryState(this.shadowRoot, this.#materialLibraryState);
+  }
+
+  private requestMaterialLibraryAction(action: BaseScreenMaterialLibraryAction): void {
+    this.dispatchEvent(
+      new CustomEvent<BaseScreenMaterialLibraryActionEventDetail>(
+        BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
+        { detail: { action }, bubbles: true, composed: true },
+      ),
+    );
   }
 
   private renderSelection(): void {

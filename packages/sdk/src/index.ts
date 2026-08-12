@@ -14,8 +14,14 @@ export type {
 export { SCREEN_AUTHORING_REQUEST_EVENT } from '@base-screen/contracts';
 export {
   BASE_SCREEN_DESIGNER_TAG_NAME,
+  BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   BaseScreenDesignerElement,
+  type BaseScreenMaterialLibraryAction,
+  type BaseScreenMaterialLibraryActionEventDetail,
+  type BaseScreenMaterialLibraryState,
+  type BaseScreenMaterialLibraryStatus,
   defineBaseScreenDesigner,
+  parseBaseScreenMaterialLibraryState,
 } from './designer.js';
 export {
   BASE_SCREEN_VIEWER_TAG_NAME,
