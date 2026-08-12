@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-04
 > Scope: offline Nebula export variant detection, loss reporting, decision-controlled conversion, and atomic output
-> Implements: [Nebula Importer Spec](../specs/nebula-importer/spec.md)
+> Implements: [Nebula Importer Spec](../specs/archive/nebula-importer/spec.md)
 
 ## Context
 

@@ -4,7 +4,7 @@
 > 日期：2026-08-03
 > 定位：冻结 Base Screen 的工程基线、包发布形态、浏览器基线和十二包依赖门禁
 > 关联：[Base Screen 长期演进总纲](../architecture/base-screen-evolution.md)
-> 实施规格：[M0 工程基线 Spec](../specs/m0-engineering-baseline/spec.md)
+> 实施规格：[M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md)
 
 ## 1. 背景
 
@@ -545,7 +545,7 @@ pnpm verify:release
 
 ## 18. 实施与验收
 
-本 ADR 的实施由 [M0 工程基线 Spec](../specs/m0-engineering-baseline/spec.md) 约束。Spec 至少冻结：
+本 ADR 的实施由 [M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md) 约束。Spec 至少冻结：
 
 1. 根 manifest、workspace、Turbo、TypeScript 和 Biome 的精确文件内容。
 2. 十二个 package manifest、exports、sideEffects 和 allowed dependency matrix。

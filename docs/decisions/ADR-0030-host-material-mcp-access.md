@@ -3,7 +3,7 @@
 > 状态：已接受
 > 日期：2026-08-12
 > 依据：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](./ADR-0029-host-managed-material-package-distribution.md)
-> 规格：[Host Material MCP Access Spec](../specs/host-material-mcp-access/spec.md)
+> 规格：[Host Material MCP Access Spec](../specs/archive/host-material-mcp-access/spec.md)
 
 ## 决策
 

@@ -3,7 +3,7 @@
 > Status: Superseded by [ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-runtime.md)
 > Date: 2026-08-04
 > Scope: host-resource intent, restricted Blueprint rules, and runtime host ports
-> Implements: [Host Resource And Blueprint Spec](../specs/host-resource-blueprint/spec.md)
+> Implements: [Host Resource And Blueprint Spec](../specs/archive/host-resource-blueprint/spec.md)
 
 ## Decision
 

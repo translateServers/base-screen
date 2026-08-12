@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-04
 > Scope: the single persisted Screen Document contract, JSON boundary, parser, serialization, and JSON Schema
-> Implements: [Contracts Foundation Spec](../specs/contracts-foundation/spec.md)
+> Implements: [Contracts Foundation Spec](../specs/archive/contracts-foundation/spec.md)
 
 ## Decision
 

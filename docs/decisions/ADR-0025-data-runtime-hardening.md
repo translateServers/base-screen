@@ -5,7 +5,7 @@
 > Scope: Host dataset boundary, request identity and sharing, dataset metadata, data states and diagnostics, initialization/parameter/variable chain, execution context and observer events, one-time legacy migration
 > Extends: [ADR-0023](./ADR-0023-host-dataset-resource-integration.md), [ADR-0022](./ADR-0022-official-data-material-contracts.md), [ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-runtime.md)
 > Supersedes (in part): [ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-runtime.md), [ADR-0023](./ADR-0023-host-dataset-resource-integration.md) - only the in-flight cross-component dedup assignment
-> Implements: [Data Runtime Hardening Spec](../specs/data-runtime-hardening/spec.md)
+> Implements: [Data Runtime Hardening Spec](../specs/archive/data-runtime-hardening/spec.md)
 > XJ counterpart: the XJ Data Hub repository holds the active XJ Data Runtime Hardening Spec at
 > `.agent/specs/data-runtime-hardening/spec.md` (active since 2026-08-09); its acceptance and transfer
 > records live in the XJ Data Hub `.agent/specs/` tree

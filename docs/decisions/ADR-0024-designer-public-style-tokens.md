@@ -3,8 +3,8 @@
 > 状态：已接受
 > 日期：2026-08-07
 > 扩展：[ADR-0017](./ADR-0017-designer-product-host-boundaries.md)
-> 适用：[Designer Theme Tokens](../specs/designer-theme-tokens/spec.md)
-> 计划：[Designer 外部样式 Token 实施计划](../plans/designer-theme-tokens/implementation-plan.md)
+> 适用：[Designer Theme Tokens](../specs/archive/designer-theme-tokens/spec.md)
+> 计划：[Designer 外部样式 Token 实施计划](../plans/archive/designer-theme-tokens/implementation-plan.md)
 
 ## 决策
 

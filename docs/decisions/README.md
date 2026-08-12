@@ -47,16 +47,17 @@
 | [ADR-0028](./ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md) | 已接受 | 2026-08-10 | 宿主作者桥与 Material Editor Descriptor：JSON-safe 声明式面板、结构化事件声明、专用提交入口；部分取代 ADR-0026 的 Engine 内部表单作者 UI 范围 |
 | [ADR-0029](./ADR-0029-host-managed-material-package-distribution.md) | 已接受 | 2026-08-11 | 宿主托管可信物料包分发：宿主负责加载与信任，Base Screen 提供 `createMaterialPackage` 注册辅助；远程代码加载不进 Base Screen |
 | [ADR-0030](./ADR-0030-host-material-mcp-access.md) | 已接受 | 2026-08-12 | Skill 管流程、MCP 管在线物料查询与校验、规范快照管离线兜底；生产服务与运行包仍归宿主 |
+| [ADR-0031](./ADR-0031-material-library-host-state.md) | 已接受 | 2026-08-12 | 左侧物料库宿主状态投影、分类与动作事件；不改变不可变 catalog 和宿主加载边界 |
 
 ## 计划决策
 
 ADR-0025 已于 2026-08-09 接受，治理已接受、实施进行中；相关任务与验收见
-[Data Runtime Hardening Spec](../specs/data-runtime-hardening/spec.md)，XJ 侧见
+[Data Runtime Hardening Spec](../specs/archive/data-runtime-hardening/spec.md)，XJ 侧见
 XJ Data Hub 仓库 `.agent/specs/data-runtime-hardening/spec.md`。
 
 ADR-0026 已于 2026-08-10 接受：事件 Blueprint 以键盘表单为唯一作者路径并新增 Core trace；图形路径整体延后，
-本期不引入图库。评估证据与实施计划见 [Designer Event Blueprint Spec](../specs/designer-event-blueprint/spec.md)
-与 [候选评估报告](../plans/designer-event-blueprint/dependency-evaluation.md)。2026-08-10 起，Engine 内部表单
+本期不引入图库。评估证据与实施计划见 [Designer Event Blueprint Spec](../specs/archive/designer-event-blueprint/spec.md)
+与 [候选评估报告](../plans/archive/designer-event-blueprint/dependency-evaluation.md)。2026-08-10 起，Engine 内部表单
 作者 UI 范围由 ADR-0028 移交宿主作者桥。
 
 ADR-0027 已于 2026-08-10 接受：Base Screen 定位为轻量、可嵌入的大屏设计器基座；项目、数据、资产、发布和
@@ -65,11 +66,11 @@ ADR-0027 已于 2026-08-10 接受：Base Screen 定位为轻量、可嵌入的�
 ADR-0028 已于 2026-08-10 接受：物料 Manifest 可通过 JSON-safe 声明式 Editor Descriptor 描述外观/数据/交互/
 事件作者字段；Engine 提供有限内建面板 primitives 与宿主作者桥（requestId/revision/身份/实例守护 + 专用提交
 入口）；Blueprint 图形布局、代码编辑器、完整 ECharts option 与领域编辑器归宿主。规格见
-[Designer Authoring Extension Spec](../specs/designer-authoring-extension/spec.md)。
+[Designer Authoring Extension Spec](../specs/archive/designer-authoring-extension/spec.md)。
 
 ADR-0029 已于 2026-08-11 接受：宿主托管可信物料包。宿主负责加载、审核与信任远程物料代码，Base Screen 不
 fetch/dynamic import/发现远程代码；plugin-sdk 提供 `createMaterialPackage` 注册辅助，物料进入 Base Screen 后
 仍遵守 ADR-0003 同 realm ABI 与实例级不可变 catalog。规格见
-[Host Material Package Spec](../specs/host-material-package/spec.md)。
+[Host Material Package Spec](../specs/archive/host-material-package/spec.md)。
 
 相关背景、实施计划和规格入口见 [文档索引](../README.md)。

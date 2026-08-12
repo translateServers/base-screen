@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/plugin-core` 的物料 ABI、插件协议、只读目录、标准事件与限权命令端口
-> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[ADR-0016](../../../decisions/ADR-0016-material-appearance-authoring-contract.md)（已接受）、[Contracts Foundation Spec](../../contracts-foundation/spec.md)（生效中）、[Base Screen 长期演进总纲](../../../architecture/base-screen-evolution.md)（生效中）
+> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[ADR-0016](../../../decisions/ADR-0016-material-appearance-authoring-contract.md)（已接受）、[Contracts Foundation Spec](../contracts-foundation/spec.md)（生效中）、[Base Screen 长期演进总纲](../../../architecture/base-screen-evolution.md)（生效中）
 
 ## 1. Why
 
@@ -15,7 +15,7 @@
 
 - ADR-0003 已接受，冻结 Web Component ABI、DOM 类型策略、显式 type/tagName 绑定与注册所有权。
 - ADR-0004 已接受，冻结同 realm 信任模型、插件生命周期、贡献点、能力授权与命令权限边界。
-- [Contracts Foundation Spec](../../contracts-foundation/spec.md) 保持“生效中”，且发布包提供稳定的 JSON value、可配置专用资源预算的安全 parser/preflight 与诊断契约。
+- [Contracts Foundation Spec](../contracts-foundation/spec.md) 保持“生效中”，且发布包提供稳定的 JSON value、可配置专用资源预算的安全 parser/preflight 与诊断契约。
 - Contracts 诊断契约已通过受控扩展纳入 §18 的 `PLUGIN_CORE_*` code；不得把 Plugin Core code 混入 Document 专用语义。
 - 本 Spec 已根据 ADR 完整回填所有公共 strict object、discriminated union、函数签名、注册责任、资源限制、诊断责任和生命周期状态，不存在待定项。
 - 本 Spec 完成评审，每项 Requirement 均可映射到自动化测试。

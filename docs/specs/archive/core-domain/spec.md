@@ -10,7 +10,7 @@
 本 Spec 是 P1 Core 的实施草案。只有同时满足以下条件，状态才可改为“生效中”，随后才允许修改 `@base-screen/core` 空入口：
 
 - ADR-0002 保持“已接受”。
-- [Contracts Foundation Spec](../../contracts-foundation/spec.md) 保持“生效中”，且其公共声明和真实 tarball 已通过验收。
+- [Contracts Foundation Spec](../contracts-foundation/spec.md) 保持“生效中”，且其公共声明和真实 tarball 已通过验收。
 - Contracts 公共诊断契约已包含本 Spec 所需的 Core diagnostic code，或提供由 Contracts 所有的等价可扩展机制。
 - 本 Spec 完成评审，所有 Requirement 均可映射到自动化测试。
 

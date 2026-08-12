@@ -60,6 +60,7 @@
 ## 文档与出处
 
 - 功能 Spec 存放在 `docs/specs/<kebab-case-feature>/`（`spec.md`、`tasks.md`、`checklist.md`、`test-matrix.md` 一套）；计划存放在 `docs/plans/<kebab-case-feature>/`；ADR 存放在 `docs/decisions/`。保持它们有版本管理，不要把工作流输出留在 `.trae/` 中。
+- **维护期（阶段封版，2026-08-12 起）。** 全部历史 Spec 与计划已归档至 `docs/specs/archive/`、`docs/plans/archive/`；当前没有生效中的 Spec。当前能力基线见 `docs/baseline/README.md`，下一阶段方向见 `docs/roadmap/README.md`。新需求必须先新建已接受的 ADR 与生效中的 Spec，不得重新打开归档任务。
 - 遵循 `docs/specs/README.md`：只有“生效中”的 Spec 可授权实现；实现不得悄悄偏离活动的 Spec；公共边界变更需要先更新相关的 ADR/Spec。
 - **持久化 Spec 执行。** 当用户要求实现、执行、完成或整改某个活动的 Spec 时，把它的 `tasks.md` 和 `checklist.md` 当作完成状态机。只要还有任何适用项未勾选，就不要发送最终/完成回复。某个聚焦检查通过、`pnpm verify:m0` 通过或完成一个 Task 只是证据，并不代表 Spec 已完成。
 - **硬性 final 门槛。** 活动 Spec 存在时，`final` 只能在以下条件全部满足后发送：所有适用的顶层 Task 和子项、所有适用 checklist 项均为 `[x]`；测试矩阵已反映当前 case；必需质量门已通过。发送前必须执行 `rg -n "^- \[ \]" docs/specs/<feature>/{tasks,checklist}.md` 或等效逐文件检查。命令找到任何未勾选项时，禁止发送 `final`，即使用户只询问阶段性结果或某个 Task 已完成。

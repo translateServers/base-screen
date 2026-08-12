@@ -1,9 +1,9 @@
 # ADR-0020：Designer 画布交互逻辑层移植（Moveable/Gesto 源码 vendor）
 
-> 状态：已采纳（实施中，见[移植验证计划](../plans/designer-moveable-pilot/pilot-plan.md) §6/§6a 与测试矩阵）
+> 状态：已采纳（实施中，见[移植验证计划](../plans/archive/designer-moveable-pilot/pilot-plan.md) §6/§6a 与测试矩阵）
 > 日期：2026-08-06
 > 重审：[ADR-0006](./ADR-0006-designer-engine-dom-interactions-and-history.md) 第 1、4 条
-> 相关：[Moveable 逻辑层移植验证计划](../plans/designer-moveable-pilot/pilot-plan.md)、[Designer 依赖引入计划](../plans/designer-dependency-introduction/implementation-plan.md)
+> 相关：[Moveable 逻辑层移植验证计划](../plans/archive/designer-moveable-pilot/pilot-plan.md)、[Designer 依赖引入计划](../plans/archive/designer-dependency-introduction/implementation-plan.md)
 
 ## 决策
 
@@ -74,7 +74,7 @@
 - 已合入：snappable 吸附数学接入 `designer-canvas-aids.ts`（drag/point 吸附竞争与参考线收集以上游
   `checkSnapPoses` 为准，会话滞后层保留）；resize/rotate Material 实时预览（V10）。
 - 适配：vendor 接入后做运行时中立严格化（`!`/type-only import，行为不变）；build 后清理 `dist/common/vendor`
-  声明泄漏。详见[移植验证计划](../plans/designer-moveable-pilot/pilot-plan.md) §6a。
+  声明泄漏。详见[移植验证计划](../plans/archive/designer-moveable-pilot/pilot-plan.md) §6a。
 - 未接线：gesto 手势状态机（原生 Pointer Events 状态机继续承担手势编排，ADR-0006 契约未变，无需重审）；
   snapBounds/innerBounds（Base Screen 无 bounds 语义需求，保留 vendor 完整性测试于 Day 4）。
 - interactjs 未被采纳：其 snap 缺释放带/同锚点跟随语义，与生效 Spec 契约不符（见依赖评估 §4.2）。

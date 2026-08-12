@@ -1055,7 +1055,7 @@ Nebula importer 是外部格式转换工具，不属于 canonical parser。近�
 
 目标：让仓库具备可以安全开始实现的边界。
 
-实施依据：[M0 工程基线 Spec](../specs/m0-engineering-baseline/spec.md)
+实施依据：[M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md)
 
 实施状态（2026-08-05）：本地 Node 22 已完成十二包工程初始化并通过 `pnpm verify:m0`；Node 24 由 CI matrix 验证。P6 SDK 与 Framework Bridge、P7 动态数据与 DSL 已收敛，runtime/ecosystem hardening 的 sandbox、Host Resource、Blueprint、contribution、tarball bridge consumer 与 importer 均通过 `pnpm verify:runtime`、`pnpm verify:tarball`、`pnpm verify:nebula-import` 与 `pnpm verify:m0`。
 

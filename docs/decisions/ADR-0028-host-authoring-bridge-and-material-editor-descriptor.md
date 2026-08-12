@@ -5,8 +5,8 @@
 > 依据：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)
 > 部分取代：[ADR-0026](./ADR-0026-designer-event-blueprint-authoring.md)（仅 Engine 内部表单作者 UI 范围）、[ADR-0016](./ADR-0016-material-appearance-authoring-contract.md)（扩展，不删除）
 > 关联：[ADR-0018](./ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0013](./ADR-0013-core-canonical-blueprint-mutation.md)
-> 规格：[Designer Authoring Extension](../specs/designer-authoring-extension/spec.md)
-> 计划：[实施计划](../plans/designer-authoring-extension/implementation-plan.md)
+> 规格：[Designer Authoring Extension](../specs/archive/designer-authoring-extension/spec.md)
+> 计划：[实施计划](../plans/archive/designer-authoring-extension/implementation-plan.md)
 
 ## 1. 背景
 

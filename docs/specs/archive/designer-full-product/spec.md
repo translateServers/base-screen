@@ -19,7 +19,7 @@
   与领域专用配置编辑器均属宿主集成能力**，由宿主通过公开作者桥（Custom Element method/event + `@base-screen/*`
   exports）实现，只提交 canonical candidate；Base Screen 默认 bundle 不包含这些编辑器及其依赖。
 - 官方 ECharts 物料的受限语义面板试点（标题/图例/网格/坐标轴/series/字段绑定/颜色/基础交互）由
-  [Designer Authoring Extension](../../designer-authoring-extension/spec.md) 授权实施。
+  [Designer Authoring Extension](../designer-authoring-extension/spec.md) 授权实施。
 - 本目录中关于 Engine 内部表单/图形 Blueprint 作者工作流的未完成项不再授权实施。
 
 ## 1. 目标
@@ -76,7 +76,7 @@ Designer SHALL 支持 static 与 host-backed 变量、授权资源目录、参�
 ### R7：Blueprint 表单作者闭环
 
 Blueprint SHALL 提供完整键盘表单路径：trigger、condition、action 与递归 value expression 编辑，以及配置、
-模板、编译诊断、问题面板和受限模拟日志，并支持 Core 只读 trace（[Designer Event Blueprint](../../designer-event-blueprint/spec.md)）。
+模板、编译诊断、问题面板和受限模拟日志，并支持 Core 只读 trace（[Designer Event Blueprint](../designer-event-blueprint/spec.md)）。
 图形路径按 [ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md) 整体延后，表单为唯一作者
 路径。未来恢复图形路径时须重新执行 [ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
 依赖评估；图形路径 SHALL 投影 canonical rule/condition/action，不能创建私有执行模型。

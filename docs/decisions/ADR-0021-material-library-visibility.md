@@ -3,7 +3,7 @@
 > Status: Accepted
 > Date: 2026-08-07
 > Scope: Material Manifest authoring contract and Designer material library filtering
-> Implements: [Material Library Visibility Spec](../specs/material-library-visibility/spec.md)
+> Implements: [Material Library Visibility Spec](../specs/archive/material-library-visibility/spec.md)
 
 ## Context
 

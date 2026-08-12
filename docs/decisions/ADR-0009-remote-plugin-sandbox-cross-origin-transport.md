@@ -4,7 +4,7 @@
 > Date: 2026-08-04
 > Scope: cross-origin remote plugin iframe bootstrap, transport verification, lifecycle, and diagnostics
 > Supersedes: [ADR-0008](./ADR-0008-remote-plugin-sandbox-protocol.md)
-> Implements: [Remote Plugin Sandbox Spec](../specs/remote-plugin-sandbox/spec.md)
+> Implements: [Remote Plugin Sandbox Spec](../specs/archive/remote-plugin-sandbox/spec.md)
 
 ## Context
 

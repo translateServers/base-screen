@@ -3,9 +3,9 @@
 > 状态：已接受
 > 日期：2026-08-10
 > 关联：[ADR-0018](./ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0013](./ADR-0013-core-canonical-blueprint-mutation.md)
-> 规格：[Designer Event Blueprint](../specs/designer-event-blueprint/spec.md)
-> 计划：[实施计划](../plans/designer-event-blueprint/implementation-plan.md)
-> 评估：[候选评估报告](../plans/designer-event-blueprint/dependency-evaluation.md)
+> 规格：[Designer Event Blueprint](../specs/archive/designer-event-blueprint/spec.md)
+> 计划：[实施计划](../plans/archive/designer-event-blueprint/implementation-plan.md)
+> 评估：[候选评估报告](../plans/archive/designer-event-blueprint/dependency-evaluation.md)
 
 ## 1. 背景
 

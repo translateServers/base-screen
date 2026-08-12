@@ -4,7 +4,7 @@
 > Date: 2026-08-04
 > Scope: Renderer resource deadline ownership, Blueprint data evaluation, and capability gating
 > Supersedes: [ADR-0007](./ADR-0007-host-resource-and-blueprint-runtime.md)
-> Implements: [Host Resource And Blueprint Spec](../specs/host-resource-blueprint/spec.md), [Contracts Foundation Spec](../specs/contracts-foundation/spec.md)
+> Implements: [Host Resource And Blueprint Spec](../specs/archive/host-resource-blueprint/spec.md), [Contracts Foundation Spec](../specs/archive/contracts-foundation/spec.md)
 
 ## Decision
 

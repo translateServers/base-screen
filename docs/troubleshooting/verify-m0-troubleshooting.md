@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-03
 > 定位：记录 `pnpm verify:m0` 各门禁在 P0 实现中实际遇到的问题、根因与修复方法，避免重复排查
-> 关联：[M0 工程基线 Spec](../specs/m0-engineering-baseline/spec.md)、[Contracts Foundation Spec](../specs/contracts-foundation/spec.md)
+> 关联：[M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md)、[Contracts Foundation Spec](../specs/archive/contracts-foundation/spec.md)
 
 ## 1. 门禁执行顺序与定位方法
 
