@@ -13,3 +13,4 @@ packages/*/LICENSE
 .workbuddy
 .schema-build/
 .trae
+.zcode
