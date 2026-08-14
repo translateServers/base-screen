@@ -81,6 +81,11 @@ export interface BaseScreenRenderer {
   suspendData(): void;
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
+  /**
+   * 切换实例级 interactive 状态：已渲染过文档时原地重渲染（复用已挂载物料与资源请求状态），
+   * 未渲染时只记录状态供下一次 render 使用。Viewer 与 Designer 共用该入口。
+   */
+  setInteractive(enabled: boolean): ScreenParseResult<null>;
   clear(): void;
   dispose(): void;
 }
@@ -118,9 +123,11 @@ class Renderer implements BaseScreenRenderer {
   #variables: ScreenJsonObject = {};
   #dataSuspended = false;
   #disposed = false;
+  #interactive: boolean;
   #coordinator: ResourceRequestCoordinator | undefined;
 
   constructor(private readonly options: CreateBaseScreenRendererOptions) {
+    this.#interactive = options.interactive;
     if (!isResourceTimeoutValid(options.resourceTimeoutMs ?? 15_000)) {
       throw new RangeError('resourceTimeoutMs must be an integer between 100 and 60000.');
     }
@@ -158,7 +165,7 @@ class Renderer implements BaseScreenRenderer {
       parsedDocument.value,
       this.options.catalog,
       this.options.mode,
-      this.options.interactive,
+      this.#interactive,
       this.options.contributionIndex,
       this.#variables,
       this.#dataSuspended,
@@ -301,6 +308,22 @@ class Renderer implements BaseScreenRenderer {
     this.#variables = parsed.value as ScreenJsonObject;
     this.#dataSuspended = false;
     return { ok: true, value: null, diagnostics: [] };
+  }
+
+  setInteractive(enabled: boolean): ScreenParseResult<null> {
+    if (this.#disposed) {
+      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Renderer has been disposed.');
+    }
+    if (this.#interactive === enabled) {
+      return { ok: true, value: null, diagnostics: [] };
+    }
+    this.#interactive = enabled;
+    if (this.#document === undefined) {
+      return { ok: true, value: null, diagnostics: [] };
+    }
+    // 原地重渲染：同 type 同 id 的挂载按 reconcile 路径复用元素与资源请求状态，
+    // 仅更新模型（interactive 字段），不重挂载、不重取数、不闪烁。
+    return this.render(this.#document);
   }
 
   /**
@@ -486,22 +509,27 @@ class Renderer implements BaseScreenRenderer {
 
   private handleMaterialEvent(candidate: RenderCandidate, event: Event): void {
     if (
-      candidate.model.interactive !== true ||
       event.bubbles !== true ||
       event.composed !== true ||
       event.type !== 'base-screen-material-event'
     ) {
       return;
     }
+    // 闭包捕获的 candidate 只用于定位组件；interactive/manifest 校验必须读取最近一次
+    // render 的候选，否则 setInteractive 重渲染后事件仍按旧模型裁决（可能被错误门控）。
+    const current = this.#candidates.get(candidate.component.id) ?? candidate;
+    if (current.model.interactive !== true) {
+      return;
+    }
     const parsed = parseBaseScreenMaterialEventDetail((event as CustomEvent<unknown>).detail);
-    if (!parsed.ok || !candidate.entry.manifest.events.includes(parsed.value.name)) {
+    if (!parsed.ok || !current.entry.manifest.events.includes(parsed.value.name)) {
       return;
     }
     event.stopPropagation();
     try {
       this.options.onMaterialEvent?.({
-        componentId: candidate.component.id,
-        type: candidate.component.type,
+        componentId: current.component.id,
+        type: current.component.type,
         name: parsed.value.name,
         payload: parsed.value.payload,
       });
@@ -509,7 +537,7 @@ class Renderer implements BaseScreenRenderer {
       this.options.onDiagnostic?.({
         severity: 'error',
         code: 'PLUGIN_CORE_RENDER_FAILED',
-        path: ['components', candidate.component.id],
+        path: ['components', current.component.id],
         message: 'Host material event callback raised an exception.',
       });
     }

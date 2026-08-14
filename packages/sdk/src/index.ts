@@ -18,9 +18,12 @@ export {
   BaseScreenDesignerElement,
   type BaseScreenMaterialLibraryAction,
   type BaseScreenMaterialLibraryActionEventDetail,
+  type BaseScreenMaterialLibraryGroup,
+  type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryState,
   type BaseScreenMaterialLibraryStatus,
   defineBaseScreenDesigner,
+  parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryState,
 } from './designer.js';
 export {

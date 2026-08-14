@@ -5,11 +5,20 @@ import {
   defineBaseScreenDesigner,
   defineBaseScreenElements,
   defineBaseScreenViewer,
+  parseBaseScreenMaterialLibraryGrouping,
 } from '../src/index.js';
 
 describe('SDK product element registration', () => {
   it('does not register product elements from the default entry', () => {
     expect('customElements' in globalThis).toBe(false);
+  });
+
+  it('re-exports the host material grouping parser', () => {
+    expect(
+      parseBaseScreenMaterialLibraryGrouping({
+        groups: [{ id: 'content', label: 'Content', materialTypes: ['base.text'] }],
+      }).ok,
+    ).toBe(true);
   });
 
   it('defines Viewer and Designer idempotently through the explicit SDK API', () => {

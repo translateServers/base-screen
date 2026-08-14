@@ -2,7 +2,7 @@
 
 > 状态：维护期（阶段封版）
 > 阶段封版：2026-08-12
-> 最近更新：2026-08-12
+> 最近更新：2026-08-14
 > 定位：Base Screen 处于阶段成果维护期；历史 Spec 全部归档，封版后的增量需求以新的 ADR/Spec 承载
 
 ## 当前状态
@@ -28,6 +28,12 @@
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
 | [Material Library Host State](./material-library-host-state/spec.md) | 契约与产品增量 | 左侧物料库宿主状态投影：严格状态 schema、分类/搜索/草稿/不可用标记与 composed 宿主动作事件；保持不可变 catalog；依据 [ADR-0031](../decisions/ADR-0031-material-library-host-state.md)；2026-08-12 生效 |
+| [Designer Left Panel](./designer-left-panel/spec.md) | Designer 交互增量 | 左侧面板信息架构与交互重构：缩略图网格组件库、按 Tab 隔离工具栏、折叠图标轨、图层树增强与键盘可达性；依据 [ADR-0032](../decisions/ADR-0032-designer-left-panel-refactor.md)；2026-08-13 生效 |
+| [Host Material Library Grouping](./host-material-library-grouping/spec.md) | 宿主展示投影增量 | 宿主控制的多级物料分组树：严格 JSON-safe 解析、catalog 一致性、逐级导航和物料网格；依据 [ADR-0033](../decisions/ADR-0033-host-controlled-material-library-grouping.md)；2026-08-13 生效 |
+| [Designer Material Library Visual Refinement](./designer-material-library-visual-refinement/spec.md) | Designer 视觉增量 | 物料库目录路径、筛选、状态与卡片的紧凑视觉层级；保持主题 Token、可访问性、无抖动与既有分组契约；依据 [ADR-0034](../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)；2026-08-13 生效 |
+| [Material Library Error Console](./material-library-feedback-workspace-placement/spec.md) | Designer 错误展示增量 | 底部状态栏错误控制台追踪组件/物料加载失败，左栏不再承载错误提示；保持状态投影、宿主动作、卡片标记与无抖动；依据 [ADR-0035](../decisions/ADR-0035-material-library-feedback-workspace-placement.md)；2026-08-13 生效 |
+| [Designer Viewport Native Events](./designer-viewport-native-events/spec.md) | Designer 交互增量 | 状态栏「事件」改为与吸附/参考线同形态的开关，控制设计态画布交互模式：renderer 实例级 `setInteractive` 原地重渲染，宿主经 `base-screen-material-event` 验证组件原生事件；默认关闭、零重建零重取数；依据 [ADR-0036](../decisions/ADR-0036-designer-viewport-native-events-toggle.md)；2026-08-14 生效 |
+| [Designer Panel Collapse Fixes](./designer-panel-collapse-fixes/spec.md) | Designer 缺陷修复增量 | 左右面板折叠修复：宽度归控制器统一写回（折叠 48px、展开恢复拖拽宽度、未拖拽保留宿主默认）、折叠态拖拽自动展开、折叠轨箭头旋转与防压扁、tooltip 语义切换；公共契约零变化；依据 [ADR-0037](../decisions/ADR-0037-designer-panel-collapse-fixes.md)；2026-08-14 生效 |
 
 ## 已归档
 

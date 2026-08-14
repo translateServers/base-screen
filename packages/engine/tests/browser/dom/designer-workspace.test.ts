@@ -2,10 +2,14 @@ import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   downloadDesignerDocument,
+  materialCategoryHue,
+  materialCategoryIcon,
   materialLibraryActions,
   materialLibraryCategories,
+  orderedMaterialLibraryMaterials,
   visibleLibraryMaterials,
 } from '../../../src/browser/dom/designer-workspace.js';
+import { parseBaseScreenMaterialLibraryGrouping } from '../../../src/material-library-grouping.js';
 
 function entry(
   type: string,
@@ -66,10 +70,53 @@ describe('material library UI', () => {
     ).toEqual(['基础', '图表']);
   });
 
+  it('R3 follows host group and material order instead of catalog order', () => {
+    const parsed = parseBaseScreenMaterialLibraryGrouping({
+      groups: [
+        {
+          id: 'content',
+          label: 'Content',
+          materialTypes: ['base.text'],
+          children: [{ id: 'charts', label: 'Charts', materialTypes: ['base.line', 'base.bar'] }],
+        },
+      ],
+    });
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const ordered = orderedMaterialLibraryMaterials(
+      [entry('base.bar', true), entry('base.text', true), entry('base.line', true)],
+      parsed.value,
+    );
+
+    expect(ordered.map((item) => item.manifest.type)).toEqual([
+      'base.text',
+      'base.line',
+      'base.bar',
+    ]);
+  });
+
   it('R2 maps statuses to bounded host actions', () => {
     expect(materialLibraryActions('ready')).toEqual([]);
     expect(materialLibraryActions('partial')).toEqual(['retry', 'details']);
     expect(materialLibraryActions('update-available')).toEqual(['reload']);
+  });
+
+  it('R2 derives stable thumb icons from category keywords with a grid fallback', () => {
+    expect(materialCategoryIcon('图表')).toBe('chart');
+    expect(materialCategoryIcon('地图')).toBe('map');
+    expect(materialCategoryIcon('基础')).toBe('shapes');
+    expect(materialCategoryIcon('echarts')).toBe('chart');
+    // 组合串（分类 + type）让未命中分类关键词的物料也能按 type 派生图标。
+    expect(materialCategoryIcon('基础 base.text')).toBe('text');
+    expect(materialCategoryIcon('未知分类 unknown.thing')).toBe('grid');
+  });
+
+  it('R2 derives deterministic thumb hues bounded to the 0-359 range', () => {
+    expect(materialCategoryHue('图表')).toBe(materialCategoryHue('图表'));
+    expect(materialCategoryHue('图表')).toBeGreaterThanOrEqual(0);
+    expect(materialCategoryHue('图表')).toBeLessThan(360);
+    expect(materialCategoryHue('')).toBe(materialCategoryHue(''));
   });
 });
 

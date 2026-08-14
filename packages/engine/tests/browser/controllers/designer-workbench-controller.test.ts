@@ -3,6 +3,7 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DesignerViewportController } from '../../../src/browser/controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from '../../../src/browser/controllers/designer-workbench-controller.js';
+import { DESIGNER_UI_TEXT } from '../../../src/common/ui-text/designer-ui-text.js';
 
 function captureTarget() {
   const captures = new Set<number>();
@@ -16,7 +17,10 @@ function captureTarget() {
 
 describe('DesignerWorkbenchController pointer capture', () => {
   it('R3 cycles private workbench modes without document state', () => {
-    const layout = { dataset: {} as DOMStringMap };
+    const layout = {
+      dataset: {} as DOMStringMap,
+      style: { setProperty: () => undefined, removeProperty: () => undefined },
+    };
     const root = {
       querySelector: (selector: string) => (selector === '.designer' ? layout : undefined),
     } as unknown as ShadowRoot;
@@ -167,18 +171,44 @@ describe('DesignerWorkbenchController pointer capture', () => {
 class WorkbenchElement {
   readonly children: WorkbenchElement[] = [];
   replaceChildrenCalls = 0;
+  readonly captures = new Set<number>();
   readonly attributes: Record<string, string> = {};
   readonly dataset: Record<string, string> = {};
   readonly style = {
     setProperty: (property: string, value: string) => {
       (this.style as unknown as Record<string, string>)[property] = value;
     },
+    removeProperty: (property: string) => {
+      delete (this.style as unknown as Record<string, string>)[property];
+    },
   };
   className = '';
   ariaPressed = '';
   ariaSelected = '';
+  title = '';
   hidden = false;
   textContent = '';
+  clientLeft = 0;
+  getBoundingClientRect = () => ({
+    bottom: 0,
+    height: 0,
+    left: 0,
+    right: 0,
+    top: 0,
+    width: 0,
+  });
+
+  setPointerCapture(pointerId: number): void {
+    this.captures.add(pointerId);
+  }
+
+  hasPointerCapture(pointerId: number): boolean {
+    return this.captures.has(pointerId);
+  }
+
+  releasePointerCapture(pointerId: number): void {
+    this.captures.delete(pointerId);
+  }
 
   readonly classList = {
     add: (name: string) => {
@@ -215,7 +245,10 @@ class WorkbenchElement {
 }
 
 function createWorkbench(
-  options: { readonly dataCapabilities?: readonly ('static' | 'host-resource')[] } = {},
+  options: {
+    readonly dataCapabilities?: readonly ('static' | 'host-resource')[];
+    readonly onNativeEventsChange?: (enabled: boolean) => void;
+  } = {},
 ) {
   const layout = new WorkbenchElement();
   const viewport = new WorkbenchElement();
@@ -239,6 +272,15 @@ function createWorkbench(
     return pane;
   });
   const grid = new WorkbenchElement();
+  const nativeEventsToggle = new WorkbenchElement();
+  const leftCollapseControl = new WorkbenchElement();
+  const rightCollapseControl = new WorkbenchElement();
+  // 面板分隔列 5px（.panel-handle::before 的 1px 高亮线居中，列中线 = 高亮线位置）。
+  const handleRect = () => ({ bottom: 0, height: 0, left: 0, right: 5, top: 0, width: 5 });
+  const leftHandle = new WorkbenchElement();
+  const rightHandle = new WorkbenchElement();
+  leftHandle.getBoundingClientRect = handleRect;
+  rightHandle.getBoundingClientRect = handleRect;
   const canvasListeners = new Map<string, (event: PointerEvent | MouseEvent) => void>();
   const canvas = {
     ...captureTarget(),
@@ -290,6 +332,11 @@ function createWorkbench(
     ['[data-layers]', layers],
     ['.inspector-tabs', inspectorTabs],
     ['[data-action="toggle-grid"]', grid],
+    ['[data-status-toggle="native-events"]', nativeEventsToggle],
+    ['[data-panel-collapse="left"]', leftCollapseControl],
+    ['[data-panel-collapse="right"]', rightCollapseControl],
+    ['[data-panel-handle="left"]', leftHandle],
+    ['[data-panel-handle="right"]', rightHandle],
   ]);
   const root = {
     querySelector: (selector: string) => elements.get(selector) ?? null,
@@ -317,6 +364,9 @@ function createWorkbench(
                 get: () => ({ manifest: { dataCapabilities: options.dataCapabilities } }),
               }) as unknown as BaseScreenMaterialCatalog,
           }),
+      ...(options.onNativeEventsChange === undefined
+        ? {}
+        : { onNativeEventsChange: options.onNativeEventsChange }),
       getRoot: () => root,
       getZoom: () => zoom.value,
     }),
@@ -327,9 +377,12 @@ function createWorkbench(
     interaction,
     layers,
     layout,
+    leftCollapseControl,
     leftTabs,
     materials,
+    nativeEventsToggle,
     panes,
+    rightCollapseControl,
     rightTabs,
     zoom,
   };
@@ -377,8 +430,8 @@ describe('DesignerWorkbenchController instance state', () => {
     second.controller.initialize();
 
     first.controller.toggleCanvasAid('gridEnabled');
-    first.controller.onClick(clickTarget({ panelCollapse: 'left' }));
     first.controller.onClick(clickTarget({ panelTab: 'layers' }));
+    first.controller.onClick(clickTarget({ panelCollapse: 'left' }));
     first.controller.onClick(clickTarget({ inspectorTab: 'data' }));
     const ruler = {
       classList: { contains: (name: string) => name === 'ruler-vertical' },
@@ -408,6 +461,215 @@ describe('DesignerWorkbenchController instance state', () => {
       snappedX: 50,
     });
     expect(second.controller.snapPoint({ x: 47, y: 47 })).toEqual({ x: 47, y: 47 });
+  });
+
+  it('R4 expands the collapsed rail when an icon tab is clicked and switches the tab', () => {
+    const { controller, layout, leftTabs } = createWorkbench();
+    controller.initialize();
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(layout.dataset.leftCollapsed).toBe('true');
+
+    controller.onClick(clickTarget({ panelTab: 'layers' }));
+
+    expect(layout.dataset.leftCollapsed).toBe('false');
+    expect(leftTabs[1]?.ariaSelected).toBe('true');
+    expect(leftTabs[0]?.ariaSelected).toBe('false');
+  });
+
+  it('keeps the panel highlight line centered under the pointer while resizing', () => {
+    const workbench = createWorkbench();
+    // .designer 边框 1px + 分隔列 5px（1px 高亮线居中）：面板宽度 = 指针到内容原点距离 - 列中线，
+    // 使拖拽中高亮线始终与指针精确重合（历史 -48 偏移已移除）。
+    workbench.layout.clientLeft = 1;
+    workbench.layout.getBoundingClientRect = () => ({
+      bottom: 600,
+      height: 600,
+      left: 100,
+      right: 1300,
+      top: 0,
+      width: 1200,
+    });
+    const panelHandle = (side: string) =>
+      ({
+        closest: (selector: string) =>
+          selector === '[data-panel-handle]' ? { dataset: { panelHandle: side } } : null,
+      }) as unknown as HTMLElement;
+    const style = workbench.layout.style as unknown as Record<string, string>;
+
+    workbench.controller.onPointerDown({
+      target: panelHandle('left'),
+      pointerId: 1,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
+    // 指针位于高亮线（列中线 = 100 + 1 + 300 + 2.5）时，面板宽度恰好为 300px。
+    workbench.controller.onPointerMove({ pointerId: 1, clientX: 403.5 } as unknown as PointerEvent);
+    expect(style['--left-panel-width']).toBe('300px');
+    // 拖出上限后仍按列中线跟随指针，仅受钳制约束。
+    workbench.controller.onPointerMove({ pointerId: 1, clientX: 903.5 } as unknown as PointerEvent);
+    expect(style['--left-panel-width']).toBe('480px');
+    workbench.controller.onPointerUp({ pointerId: 1 } as unknown as PointerEvent);
+    expect(workbench.layout.captures.has(1)).toBe(false);
+
+    workbench.controller.onPointerDown({
+      target: panelHandle('right'),
+      pointerId: 2,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
+    workbench.controller.onPointerMove({ pointerId: 2, clientX: 996.5 } as unknown as PointerEvent);
+    expect(style['--right-panel-width']).toBe('300px');
+    workbench.controller.onPointerUp({ pointerId: 2 } as unknown as PointerEvent);
+    expect(workbench.layout.captures.has(2)).toBe(false);
+  });
+
+  it('R1 collapses to the 48px rail after a width drag and restores the dragged width', () => {
+    const workbench = createWorkbench();
+    const { controller, layout } = workbench;
+    layout.clientLeft = 1;
+    layout.getBoundingClientRect = () => ({
+      bottom: 600,
+      height: 600,
+      left: 100,
+      right: 1300,
+      top: 0,
+      width: 1200,
+    });
+    const style = layout.style as unknown as Record<string, string>;
+    const drag = (side: string, clientX: number, pointerId: number) => {
+      controller.onPointerDown({
+        target: {
+          closest: (selector: string) =>
+            selector === '[data-panel-handle]' ? { dataset: { panelHandle: side } } : null,
+        } as unknown as HTMLElement,
+        pointerId,
+        preventDefault: () => undefined,
+      } as unknown as PointerEvent);
+      controller.onPointerMove({ pointerId, clientX } as unknown as PointerEvent);
+      controller.onPointerUp({ pointerId } as unknown as PointerEvent);
+    };
+
+    // 左面板：拖到 380px 后折叠必须收敛到 48px，展开恢复拖拽宽度。
+    drag('left', 100 + 1 + 380 + 2.5, 1);
+    expect(style['--left-panel-width']).toBe('380px');
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(layout.dataset.leftCollapsed).toBe('true');
+    expect(style['--left-panel-width']).toBe('48px');
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(layout.dataset.leftCollapsed).toBe('false');
+    expect(style['--left-panel-width']).toBe('380px');
+
+    // 右面板：拖到 340px 后同样折叠收敛、展开恢复。
+    drag('right', 1300 - 340 - 1 - 2.5, 2);
+    expect(style['--right-panel-width']).toBe('340px');
+    controller.onClick(clickTarget({ panelCollapse: 'right' }));
+    expect(layout.dataset.rightCollapsed).toBe('true');
+    expect(style['--right-panel-width']).toBe('48px');
+    controller.onClick(clickTarget({ panelCollapse: 'right' }));
+    expect(style['--right-panel-width']).toBe('340px');
+  });
+
+  it('R1 keeps the host default width when collapsing without a prior drag', () => {
+    const workbench = createWorkbench();
+    const { controller, layout } = workbench;
+    const style = layout.style as unknown as Record<string, string>;
+    controller.initialize();
+
+    // 从未拖拽：不写内联宽度变量，宿主 CSS 默认生效。
+    expect(style['--left-panel-width']).toBeUndefined();
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(layout.dataset.leftCollapsed).toBe('true');
+    expect(style['--left-panel-width']).toBe('48px');
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(style['--left-panel-width']).toBeUndefined();
+  });
+
+  it('R2 expands a collapsed panel only after dragging past the expand threshold', () => {
+    const workbench = createWorkbench();
+    const { controller, layout } = workbench;
+    layout.clientLeft = 1;
+    layout.getBoundingClientRect = () => ({
+      bottom: 600,
+      height: 600,
+      left: 100,
+      right: 1300,
+      top: 0,
+      width: 1200,
+    });
+    controller.initialize();
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(layout.dataset.leftCollapsed).toBe('true');
+    const style = layout.style as unknown as Record<string, string>;
+    const handle = {
+      closest: (selector: string) =>
+        selector === '[data-panel-handle]' ? { dataset: { panelHandle: 'left' } } : null,
+    } as unknown as HTMLElement;
+
+    controller.onPointerDown({
+      target: handle,
+      pointerId: 1,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
+    // 阈值内拖拽（宽度 58 < 48+24）：保持折叠，宽度变量不变。
+    controller.onPointerMove({
+      pointerId: 1,
+      clientX: 100 + 1 + 58 + 2.5,
+    } as unknown as PointerEvent);
+    expect(layout.dataset.leftCollapsed).toBe('true');
+    expect(style['--left-panel-width']).toBe('48px');
+    // 越过阈值（宽度 300 ≥ 48+24）：展开并应用拖拽宽度。
+    controller.onPointerMove({
+      pointerId: 1,
+      clientX: 100 + 1 + 300 + 2.5,
+    } as unknown as PointerEvent);
+    expect(layout.dataset.leftCollapsed).toBe('false');
+    expect(style['--left-panel-width']).toBe('300px');
+    controller.onPointerUp({ pointerId: 1 } as unknown as PointerEvent);
+
+    // 右面板同阈值语义：先折叠，阈值内保持折叠，越过阈值展开。
+    controller.onClick(clickTarget({ panelCollapse: 'right' }));
+    expect(layout.dataset.rightCollapsed).toBe('true');
+    controller.onPointerDown({
+      target: {
+        closest: (selector: string) =>
+          selector === '[data-panel-handle]' ? { dataset: { panelHandle: 'right' } } : null,
+      } as unknown as HTMLElement,
+      pointerId: 2,
+      preventDefault: () => undefined,
+    } as unknown as PointerEvent);
+    controller.onPointerMove({
+      pointerId: 2,
+      clientX: 1300 - 58 - 1 - 2.5,
+    } as unknown as PointerEvent);
+    expect(layout.dataset.rightCollapsed).toBe('true');
+    expect(style['--right-panel-width']).toBe('48px');
+    controller.onPointerMove({
+      pointerId: 2,
+      clientX: 1300 - 300 - 1 - 2.5,
+    } as unknown as PointerEvent);
+    expect(layout.dataset.rightCollapsed).toBe('false');
+    expect(style['--right-panel-width']).toBe('300px');
+    controller.onPointerUp({ pointerId: 2 } as unknown as PointerEvent);
+  });
+
+  it('R3 switches collapse control labels between collapse and expand', () => {
+    const workbench = createWorkbench();
+    const { controller } = workbench;
+    controller.initialize();
+    expect(workbench.leftCollapseControl.title).toBe(DESIGNER_UI_TEXT.collapseMaterials);
+    expect(workbench.rightCollapseControl.title).toBe(DESIGNER_UI_TEXT.collapseInspector);
+
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(workbench.leftCollapseControl.title).toBe(DESIGNER_UI_TEXT.expandMaterials);
+    expect(workbench.leftCollapseControl.attributes['aria-label']).toBe(
+      DESIGNER_UI_TEXT.expandMaterials,
+    );
+    controller.onClick(clickTarget({ panelCollapse: 'left' }));
+    expect(workbench.leftCollapseControl.title).toBe(DESIGNER_UI_TEXT.collapseMaterials);
+
+    controller.onClick(clickTarget({ panelCollapse: 'right' }));
+    expect(workbench.rightCollapseControl.title).toBe(DESIGNER_UI_TEXT.expandInspector);
+    expect(workbench.rightCollapseControl.attributes['aria-label']).toBe(
+      DESIGNER_UI_TEXT.expandInspector,
+    );
   });
 
   it('R4 snap toggle gates snapping while keeping raw coordinates', () => {
@@ -451,6 +713,47 @@ describe('DesignerWorkbenchController instance state', () => {
 
     expect(controller.onClick(clickTarget({ statusToggle: 'snap' }))).toBe(true);
     expect(controller.snapEnabled).toBe(false);
+  });
+
+  it('routes the bottom status native events switch through the workbench click handler', () => {
+    const changed: boolean[] = [];
+    const { controller } = createWorkbench({
+      onNativeEventsChange: (enabled) => changed.push(enabled),
+    });
+
+    expect(controller.nativeEventsEnabled).toBe(false);
+    expect(controller.onClick(clickTarget({ statusToggle: 'native-events' }))).toBe(true);
+    expect(controller.nativeEventsEnabled).toBe(true);
+    expect(changed).toEqual([true]);
+
+    expect(controller.onClick(clickTarget({ statusToggle: 'native-events' }))).toBe(true);
+    expect(controller.nativeEventsEnabled).toBe(false);
+    expect(changed).toEqual([true, false]);
+  });
+
+  it('keeps the native events switch functional without a change callback', () => {
+    const { controller } = createWorkbench();
+    expect(() => controller.toggleNativeEvents()).not.toThrow();
+    expect(controller.nativeEventsEnabled).toBe(true);
+    expect(() => controller.toggleNativeEvents()).not.toThrow();
+    expect(controller.nativeEventsEnabled).toBe(false);
+  });
+
+  it('syncs the native events status toggle aria state with the controller state', () => {
+    const workbench = createWorkbench();
+    workbench.controller.initialize();
+    expect(workbench.nativeEventsToggle.attributes['aria-checked']).toBe('false');
+
+    workbench.controller.toggleNativeEvents();
+    expect(workbench.nativeEventsToggle.attributes['aria-checked']).toBe('true');
+  });
+
+  it('keeps native events state local to each workbench instance', () => {
+    const first = createWorkbench();
+    const second = createWorkbench();
+    first.controller.toggleNativeEvents();
+    expect(first.controller.nativeEventsEnabled).toBe(true);
+    expect(second.controller.nativeEventsEnabled).toBe(false);
   });
 
   it('R7 moves, double-click deletes, and discards out-of-bounds guides without touching the document', () => {

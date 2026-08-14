@@ -720,13 +720,17 @@ export class BaseScreenEChartsMaterialElement extends BaseScreenOfficialMaterial
           r: hover || select ? symbolSize / 3 : 1.2,
           fill: color,
         });
-        circle.style.cursor = 'pointer';
-        circle.addEventListener('mouseenter', () => {
-          circle.setAttribute('r', String(symbolSize / 2));
-        });
-        circle.addEventListener('mouseleave', () => {
-          circle.setAttribute('r', String(hover || select ? symbolSize / 3 : 1.2));
-        });
+        // 原生 CSS/悬停交互（光标与 hover 放大）与点击事件同受 interactive 门控：
+        // 设计态「事件」开关关闭时圆点保持静态，开启（或 Viewer）时才出现交互示意。
+        if (model.interactive) {
+          circle.style.cursor = 'pointer';
+          circle.addEventListener('mouseenter', () => {
+            circle.setAttribute('r', String(symbolSize / 2));
+          });
+          circle.addEventListener('mouseleave', () => {
+            circle.setAttribute('r', String(hover || select ? symbolSize / 3 : 1.2));
+          });
+        }
         circle.addEventListener('click', () =>
           this.emitSeriesClick(seriesIndex, series, point.point, point.pointIndex),
         );

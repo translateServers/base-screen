@@ -20,6 +20,14 @@ export interface CreateReactMaterialDefinitionOptions<Props extends object> {
   readonly eventProps?: Readonly<Record<string, string>>;
 }
 
+// 原生 CSS 交互门控（ADR-0036）：非交互模式下桥接渲染的原生控件（button 等）不再接收
+// 指针事件，hover/active/focus 原生样式静默；指针事件落到物料元素自身，设计器的选择/拖拽
+// 命中测试不受影响。规则注入到所在 shadow root（或 light DOM 的 document head），按属性
+// 作用域匹配、幂等注入。
+const BRIDGE_INTERACTIVE_STYLE_KEY = 'base-screen-bridge-interactive-styles';
+const BRIDGE_INTERACTIVE_STYLE_TEXT =
+  '[data-base-screen-interactive="false"] * { pointer-events: none; }';
+
 export function createReactMaterialDefinition<Props extends object>(
   options: CreateReactMaterialDefinitionOptions<Props>,
 ): ScreenParseResult<BaseScreenMaterialCatalogEntry> {
@@ -44,6 +52,7 @@ export function createReactMaterialDefinition<Props extends object>(
 
     set model(value: BaseScreenMaterialModel) {
       this.#model = value;
+      this.dataset.baseScreenInteractive = String(value.interactive);
       this.render();
     }
 
@@ -73,6 +82,7 @@ export function createReactMaterialDefinition<Props extends object>(
       if (this.#root === undefined || this.#model === undefined) {
         return;
       }
+      this.ensureInteractiveStyleSheet();
       const props = {
         ...(options.mapModel === undefined
           ? (this.#model.props as Props)
@@ -80,6 +90,29 @@ export function createReactMaterialDefinition<Props extends object>(
         ...this.createEventProps(),
       } as Props;
       this.#root.render(createElement(options.component, props));
+    }
+
+    private ensureInteractiveStyleSheet(): void {
+      const root = this.getRootNode();
+      if (root instanceof ShadowRoot) {
+        if (
+          root.querySelector(`style[data-bridge-style-key="${BRIDGE_INTERACTIVE_STYLE_KEY}"]`) !==
+          null
+        ) {
+          return;
+        }
+        const style = this.ownerDocument.createElement('style');
+        style.dataset.bridgeStyleKey = BRIDGE_INTERACTIVE_STYLE_KEY;
+        style.textContent = BRIDGE_INTERACTIVE_STYLE_TEXT;
+        root.appendChild(style);
+        return;
+      }
+      if (root instanceof Document && root.getElementById(BRIDGE_INTERACTIVE_STYLE_KEY) === null) {
+        const style = this.ownerDocument.createElement('style');
+        style.id = BRIDGE_INTERACTIVE_STYLE_KEY;
+        style.textContent = BRIDGE_INTERACTIVE_STYLE_TEXT;
+        root.head.appendChild(style);
+      }
     }
 
     private createEventProps(): Record<string, (payload: unknown) => void> {

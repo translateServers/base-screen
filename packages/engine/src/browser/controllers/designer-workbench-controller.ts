@@ -32,6 +32,8 @@ interface DesignerWorkbenchCallbacks {
   readonly getCatalog?: () => BaseScreenMaterialCatalog | undefined;
   readonly getRoot: () => ShadowRoot | null;
   readonly getZoom: () => number;
+  /** 状态栏「事件」开关切换回调：组合根据此切换渲染器 interactive 状态。 */
+  readonly onNativeEventsChange?: (enabled: boolean) => void;
 }
 
 type PanelSide = 'left' | 'right';
@@ -46,6 +48,13 @@ type WorkbenchMode = 'standard' | 'with-menu' | 'fullscreen';
 const DESIGNER_GUIDE_DOUBLE_CLICK_MS = 500;
 const DESIGNER_GUIDE_DRAG_THRESHOLD = 3;
 
+/** 折叠态面板宽度（px），与 designer-base.css 折叠变量保持一致（ADR-0037）。 */
+const DESIGNER_COLLAPSED_PANEL_WIDTH = 48;
+
+/** 折叠态拖拽展开阈值（px）：往外拖到超过 48+阈值 的宽度才展开（参考 VSCode），
+ *  阈值内保持折叠且不写宽度，避免微小移动误展开。 */
+const DESIGNER_COLLAPSED_EXPAND_THRESHOLD = 24;
+
 interface SnapPreviewState {
   readonly x: readonly DesignerSnapGuideLine[] | undefined;
   readonly y: readonly DesignerSnapGuideLine[] | undefined;
@@ -57,6 +66,9 @@ interface SnapPreviewState {
 export class DesignerWorkbenchController {
   #leftCollapsed = false;
   #rightCollapsed = false;
+  /** 用户拖拽后的面板宽度（undefined = 从未拖拽，使用宿主 CSS 默认）。 */
+  #leftPanelWidth: number | undefined;
+  #rightPanelWidth: number | undefined;
   #leftTab: LeftTab = 'materials';
   #rightTab: RightTab = 'appearance';
   #mode: WorkbenchMode = 'standard';
@@ -64,6 +76,7 @@ export class DesignerWorkbenchController {
   #guides: { x: number[]; y: number[] } = { x: [], y: [] };
   #guidesVisible = true;
   #snapEnabled = true;
+  #nativeEventsEnabled = false;
   #guideDrag:
     | {
         readonly axis: GuideAxis;
@@ -298,6 +311,18 @@ export class DesignerWorkbenchController {
     this.renderStatusToggles();
   }
 
+  /** 状态栏「事件」开关当前值（设计态画布 interactive 状态的唯一来源）。 */
+  get nativeEventsEnabled(): boolean {
+    return this.#nativeEventsEnabled;
+  }
+
+  /** 切换设计态画布原生事件（interactive）开关，并通知组合根应用新状态。 */
+  toggleNativeEvents(): void {
+    this.#nativeEventsEnabled = !this.#nativeEventsEnabled;
+    this.callbacks.onNativeEventsChange?.(this.#nativeEventsEnabled);
+    this.renderStatusToggles();
+  }
+
   toggleBorderGuides(): void {
     this.#canvasAids = {
       ...this.#canvasAids,
@@ -331,6 +356,11 @@ export class DesignerWorkbenchController {
     }
     const leftTab = target.closest<HTMLButtonElement>('[data-panel-tab]')?.dataset.panelTab;
     if (leftTab === 'materials' || leftTab === 'layers') {
+      // 折叠图标轨：点击图标 Tab 先展开面板再切换，保证折叠态也能完成导航。
+      if (this.#leftCollapsed) {
+        this.#leftCollapsed = false;
+        this.renderLayout();
+      }
       this.#leftTab = leftTab;
       this.renderTabs();
       return true;
@@ -357,6 +387,10 @@ export class DesignerWorkbenchController {
     }
     if (statusToggle === 'guides') {
       this.toggleGuides();
+      return true;
+    }
+    if (statusToggle === 'native-events') {
+      this.toggleNativeEvents();
       return true;
     }
     return false;
@@ -467,6 +501,52 @@ export class DesignerWorkbenchController {
     layout.dataset.leftCollapsed = String(this.#leftCollapsed);
     layout.dataset.rightCollapsed = String(this.#rightCollapsed);
     layout.dataset.workbenchMode = this.#mode;
+    this.applyPanelWidth(layout, 'left', this.#leftCollapsed, this.#leftPanelWidth);
+    this.applyPanelWidth(layout, 'right', this.#rightCollapsed, this.#rightPanelWidth);
+    this.renderCollapseControls();
+  }
+
+  /**
+   * 面板宽度唯一写回点（ADR-0037）：折叠写 48px（覆盖任何拖拽宽度）、展开恢复拖拽宽度、
+   * 从未拖拽时移除内联变量以保留宿主 CSS 默认。内联变量是折叠收敛的唯一权威来源，
+   * 否则拖拽后的内联宽度会压过 CSS 折叠规则导致折叠失效。
+   */
+  private applyPanelWidth(
+    layout: HTMLElement,
+    side: PanelSide,
+    collapsed: boolean,
+    width: number | undefined,
+  ): void {
+    const property = side === 'left' ? '--left-panel-width' : '--right-panel-width';
+    if (collapsed) {
+      layout.style.setProperty(property, `${DESIGNER_COLLAPSED_PANEL_WIDTH}px`);
+      return;
+    }
+    if (width === undefined) {
+      layout.style.removeProperty(property);
+      return;
+    }
+    layout.style.setProperty(property, `${width}px`);
+  }
+
+  /** 折叠按钮语义随状态切换：收起↔展开（title/aria-label，文案入 designer-ui-text）。 */
+  private renderCollapseControls(): void {
+    const root = this.callbacks.getRoot();
+    if (root === null) return;
+    const setControl = (side: PanelSide, label: string) => {
+      const control = root.querySelector<HTMLElement>(`[data-panel-collapse="${side}"]`);
+      if (control === null || control === undefined) return;
+      control.title = label;
+      control.setAttribute('aria-label', label);
+    };
+    setControl(
+      'left',
+      this.#leftCollapsed ? DESIGNER_UI_TEXT.expandMaterials : DESIGNER_UI_TEXT.collapseMaterials,
+    );
+    setControl(
+      'right',
+      this.#rightCollapsed ? DESIGNER_UI_TEXT.expandInspector : DESIGNER_UI_TEXT.collapseInspector,
+    );
   }
 
   private renderTabs(): void {
@@ -529,12 +609,38 @@ export class DesignerWorkbenchController {
     const layout = root.querySelector<HTMLElement>('.designer');
     if (layout === null) return;
     const bounds = layout.getBoundingClientRect();
+    // 高亮线是分隔列内居中的 1px 竖线（.panel-handle::before）：以分隔列中线为基准
+    // 计算面板宽度，让拖拽全程高亮线与指针精确重合（扣除 .designer 边框）。
+    // 历史实现硬编码 -48 偏移：早期布局在面板左侧有 56px 图标轨，布局重构后该常量
+    // 未同步更新，导致高亮线始终滞后指针约 45px。
+    const handle = root.querySelector<HTMLElement>(`[data-panel-handle="${resize.side}"]`);
+    const handleCenter = (handle?.getBoundingClientRect().width ?? 0) / 2;
     const width =
-      resize.side === 'left' ? event.clientX - bounds.left - 48 : bounds.right - event.clientX;
-    layout.style.setProperty(
-      resize.side === 'left' ? '--left-panel-width' : '--right-panel-width',
-      `${Math.max(resize.side === 'left' ? 160 : 200, Math.min(resize.side === 'left' ? 400 : 480, width))}px`,
+      resize.side === 'left'
+        ? event.clientX - bounds.left - layout.clientLeft - handleCenter
+        : bounds.right - event.clientX - layout.clientLeft - handleCenter;
+    const clamped = Math.max(
+      resize.side === 'left' ? 200 : 220,
+      Math.min(resize.side === 'left' ? 480 : 520, width),
     );
+    if (resize.side === 'left') {
+      // 折叠态拖拽展开阈值（ADR-0037，参考 VSCode）：以未钳制的目标宽度判定，
+      // 往外拖出超过 48+阈值 才展开并应用宽度；阈值内保持折叠（不写宽度）。
+      if (this.#leftCollapsed) {
+        if (width <= DESIGNER_COLLAPSED_PANEL_WIDTH + DESIGNER_COLLAPSED_EXPAND_THRESHOLD) return;
+        this.#leftCollapsed = false;
+      }
+      this.#leftPanelWidth = clamped;
+    } else {
+      if (this.#rightCollapsed) {
+        if (width <= DESIGNER_COLLAPSED_PANEL_WIDTH + DESIGNER_COLLAPSED_EXPAND_THRESHOLD) return;
+        this.#rightCollapsed = false;
+      }
+      this.#rightPanelWidth = clamped;
+    }
+    // 折叠态拖拽分隔条视为先展开再调整宽度（ADR-0037）：renderLayout 统一写回
+    // 折叠 48px / 展开拖拽宽度的内联变量。
+    this.renderLayout();
   }
 
   private moveGuide(event: PointerEvent): void {
@@ -869,17 +975,18 @@ export class DesignerWorkbenchController {
       ?.setAttribute('aria-pressed', String(this.#canvasAids.gridEnabled));
   }
 
-  // 状态栏 Snap/Guide 开关的开合态与 aria-checked 同步（开关与菜单/快捷键共用同一状态源）。
+  // 状态栏 Snap/Guide/Native Events 开关的开合态与 aria-checked 同步（开关与菜单/快捷键共用同一状态源）。
   private renderStatusToggles(): void {
     const root = this.callbacks.getRoot();
     if (root === null) return;
-    const setToggle = (name: 'snap' | 'guides', active: boolean) => {
+    const setToggle = (name: 'snap' | 'guides' | 'native-events', active: boolean) => {
       root
         .querySelector<HTMLButtonElement>(`[data-status-toggle="${name}"]`)
         ?.setAttribute('aria-checked', String(active));
     };
     setToggle('snap', this.#snapEnabled);
     setToggle('guides', this.#guidesVisible);
+    setToggle('native-events', this.#nativeEventsEnabled);
   }
 
   // 参考线以对齐坐标定位，由 CSS translate(-50%) 使任意线宽的中心与坐标精确重合，

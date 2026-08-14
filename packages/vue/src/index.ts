@@ -24,6 +24,13 @@ export interface CreateVueMaterialDefinitionOptions<Props extends object> {
   readonly eventProps?: Readonly<Record<string, string>>;
 }
 
+// 原生 CSS 交互门控（ADR-0036）：与 React 桥接一致，非交互模式下桥接渲染的原生控件
+// （button 等）不接收指针事件，hover/active/focus 原生样式静默；指针事件落到物料元素自身，
+// 设计器的选择/拖拽命中测试不受影响。规则按属性作用域匹配、按 shadow root（或 document）幂等注入。
+const BRIDGE_INTERACTIVE_STYLE_KEY = 'base-screen-bridge-interactive-styles';
+const BRIDGE_INTERACTIVE_STYLE_TEXT =
+  '[data-base-screen-interactive="false"] * { pointer-events: none; }';
+
 export function createVueMaterialDefinition<Props extends object>(
   options: CreateVueMaterialDefinitionOptions<Props>,
 ): ScreenParseResult<BaseScreenMaterialCatalogEntry> {
@@ -49,6 +56,7 @@ export function createVueMaterialDefinition<Props extends object>(
 
     set model(value: BaseScreenMaterialModel) {
       this.#model = value;
+      this.dataset.baseScreenInteractive = String(value.interactive);
       if (this.#modelRef !== undefined) {
         this.#modelRef.value = value;
       }
@@ -63,7 +71,31 @@ export function createVueMaterialDefinition<Props extends object>(
         // 组件之前把文档中的全部可读全局规则传播进宿主 shadow root，使组件库
         // 首次初始化就能拿到正确尺寸，嵌套组件树（含 scoped 样式）也能正常布局。
         this.#propagateGlobalStyles();
+        this.#ensureInteractiveStyleSheet();
         this.#mountApp();
+      }
+    }
+
+    #ensureInteractiveStyleSheet(): void {
+      const root = this.getRootNode();
+      if (root instanceof ShadowRoot) {
+        if (
+          root.querySelector(`style[data-bridge-style-key="${BRIDGE_INTERACTIVE_STYLE_KEY}"]`) !==
+          null
+        ) {
+          return;
+        }
+        const style = this.ownerDocument.createElement('style');
+        style.dataset.bridgeStyleKey = BRIDGE_INTERACTIVE_STYLE_KEY;
+        style.textContent = BRIDGE_INTERACTIVE_STYLE_TEXT;
+        root.appendChild(style);
+        return;
+      }
+      if (root instanceof Document && root.getElementById(BRIDGE_INTERACTIVE_STYLE_KEY) === null) {
+        const style = this.ownerDocument.createElement('style');
+        style.id = BRIDGE_INTERACTIVE_STYLE_KEY;
+        style.textContent = BRIDGE_INTERACTIVE_STYLE_TEXT;
+        root.head.appendChild(style);
       }
     }
 

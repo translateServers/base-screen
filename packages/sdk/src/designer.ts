@@ -9,8 +9,11 @@ export {
   BaseScreenDesignerElement,
   type BaseScreenMaterialLibraryAction,
   type BaseScreenMaterialLibraryActionEventDetail,
+  type BaseScreenMaterialLibraryGroup,
+  type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryState,
   type BaseScreenMaterialLibraryStatus,
+  parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryState,
 } from '@base-screen/engine';
 

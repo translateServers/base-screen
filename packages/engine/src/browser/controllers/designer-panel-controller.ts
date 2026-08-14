@@ -32,11 +32,17 @@ import {
 } from '../../common/operations/designer-layout-operations.js';
 import { selectedComponents } from '../../common/operations/designer-selection.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import {
+  type BaseScreenMaterialLibraryGrouping,
+  hasMaterialLibraryGroup,
+  materialLibraryGroupMaterialTypes,
+} from '../../material-library-grouping.js';
 import type { DesignerDescriptorDatasetFields } from '../dom/designer-descriptor-dom.js';
 import {
   createDescriptorArrayTransaction,
   createDescriptorFieldTransaction,
 } from '../dom/designer-descriptor-operations.js';
+import { renderMaterialLibraryGroupNavigation } from '../dom/designer-material-library-group-dom.js';
 import {
   createDataSourceTransaction,
   createInitialDataSource,
@@ -47,6 +53,7 @@ import {
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
+  readonly getMaterialLibraryGrouping?: () => BaseScreenMaterialLibraryGrouping | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
   readonly getGroupMaterialType: () => string | undefined;
@@ -73,6 +80,7 @@ export class DesignerPanelController {
   #materialFilter: 'all' | 'favorite' | 'recent' = 'all';
   #materialSearch = '';
   #materialCategory: string | undefined;
+  #materialGroupId: string | undefined;
   readonly #favoriteMaterials = new Set<string>();
   readonly #recentMaterials: string[] = [];
 
@@ -85,6 +93,19 @@ export class DesignerPanelController {
 
   get hasClipboard(): boolean {
     return this.#clipboard !== undefined;
+  }
+
+  refreshMaterialLibrary(layout: HTMLElement | null): void {
+    const grouping = this.materialLibraryGrouping;
+    if (
+      this.#materialGroupId !== undefined &&
+      (grouping === undefined || !hasMaterialLibraryGroup(grouping, this.#materialGroupId))
+    ) {
+      this.#materialGroupId = undefined;
+    }
+    if (layout === null) return;
+    renderMaterialLibraryGroupNavigation(layout, grouping, this.#materialGroupId);
+    this.renderMaterials(layout);
   }
 
   get canGroup(): boolean {
@@ -239,6 +260,24 @@ export class DesignerPanelController {
   onClick(event: Event): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    const clearSearch = target.closest<HTMLButtonElement>('[data-material-search-clear]');
+    if (clearSearch !== null) {
+      this.clearMaterialSearch(clearSearch.closest<HTMLElement>('.designer'));
+      return;
+    }
+    const allMaterialGroups = target.closest<HTMLButtonElement>('[data-material-group-all]');
+    if (allMaterialGroups !== null) {
+      this.selectMaterialGroup(undefined, allMaterialGroups.closest<HTMLElement>('.designer'));
+      return;
+    }
+    const materialGroup =
+      target.closest<HTMLButtonElement>('[data-material-group]')?.dataset.materialGroup ??
+      target.closest<HTMLButtonElement>('[data-material-group-breadcrumb]')?.dataset
+        .materialGroupBreadcrumb;
+    if (materialGroup !== undefined) {
+      this.selectMaterialGroup(materialGroup, target.closest<HTMLElement>('.designer'));
+      return;
+    }
     const favorite = target.closest<HTMLButtonElement>('[data-material-favorite]');
     if (favorite?.dataset.materialFavorite !== undefined) {
       this.toggleMaterialFavorite(favorite.dataset.materialFavorite);
@@ -422,6 +461,37 @@ export class DesignerPanelController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
+    if (event.key === 'Escape' && !event.isComposing) {
+      const search = event.target;
+      if (
+        search instanceof HTMLInputElement &&
+        search.dataset.materialSearch !== undefined &&
+        (this.#materialSearch !== '' || search.value !== '')
+      ) {
+        event.preventDefault();
+        this.clearMaterialSearch(search.closest<HTMLElement>('.designer'));
+        return true;
+      }
+    }
+    const materialCard =
+      event.target instanceof HTMLElement
+        ? event.target.closest<HTMLButtonElement>('[data-material-type]')
+        : undefined;
+    if (materialCard !== null && materialCard !== undefined) {
+      // 控件级键优先于命令通道：Enter 直接添加物料，不触发全局「进入组内」命令（ADR-0006）；
+      // Space 保持空格抓手语义，不在此劫持。方向键走卡片网格 roving focus。
+      if (event.key === 'Enter' && !event.isComposing) {
+        event.preventDefault();
+        const type = materialCard.dataset.materialType;
+        if (type !== undefined) {
+          this.addMaterial(type);
+          this.recordRecentMaterial(type);
+          this.renderMaterials(materialCard.closest<HTMLElement>('.designer'));
+        }
+        return true;
+      }
+      if (this.navigateMaterialGrid(materialCard, event)) return true;
+    }
     if (
       event.key === 'Enter' &&
       !event.isComposing &&
@@ -482,6 +552,54 @@ export class DesignerPanelController {
     result.ok ? this.select([component.id]) : this.callbacks.emitDiagnostics(result.diagnostics);
   }
 
+  private selectMaterialGroup(groupId: string | undefined, layout: HTMLElement | null): void {
+    const grouping = this.materialLibraryGrouping;
+    if (
+      grouping === undefined ||
+      (groupId !== undefined && !hasMaterialLibraryGroup(grouping, groupId))
+    ) {
+      return;
+    }
+    this.#materialGroupId = groupId;
+    if (layout === null) return;
+    renderMaterialLibraryGroupNavigation(layout, grouping, this.#materialGroupId);
+    this.renderMaterials(layout);
+  }
+
+  private clearMaterialSearch(layout: HTMLElement | null): void {
+    if (layout === null) return;
+    const input = layout.querySelector<HTMLInputElement>('[data-material-search]');
+    if (input !== null) input.value = '';
+    this.#materialSearch = '';
+    this.renderMaterials(layout);
+    input?.focus();
+  }
+
+  // 可见卡片间的方向键 roving focus：Arrow 线性移动，Home/End 到首尾；Enter/Space 走原生按钮语义。
+  private navigateMaterialGrid(current: HTMLButtonElement, event: KeyboardEvent): boolean {
+    const layout = current.closest<HTMLElement>('.designer');
+    if (layout === null) return false;
+    const cards = [...layout.querySelectorAll<HTMLButtonElement>('[data-material-type]')].filter(
+      (card) =>
+        !card.disabled && card.closest<HTMLElement>('[data-material-card]')?.hidden !== true,
+    );
+    const index = cards.indexOf(current);
+    const delta =
+      event.key === 'ArrowRight' || event.key === 'ArrowDown'
+        ? 1
+        : event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+          ? -1
+          : undefined;
+    let next: HTMLButtonElement | undefined;
+    if (delta !== undefined) next = cards[index + delta];
+    else if (event.key === 'Home') next = cards[0];
+    else if (event.key === 'End') next = cards.at(-1);
+    if (next === undefined) return false;
+    event.preventDefault();
+    next.focus();
+    return true;
+  }
+
   private toggleMaterialFavorite(type: string): void {
     if (this.#favoriteMaterials.has(type)) this.#favoriteMaterials.delete(type);
     else this.#favoriteMaterials.add(type);
@@ -496,6 +614,11 @@ export class DesignerPanelController {
 
   private renderMaterials(layout: HTMLElement | null): void {
     if (layout === null) return;
+    const grouping = this.materialLibraryGrouping;
+    const groupedTypes =
+      grouping === undefined || this.#materialGroupId === undefined
+        ? undefined
+        : new Set(materialLibraryGroupMaterialTypes(grouping, this.#materialGroupId));
     for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
       const type = card.dataset.materialCard;
       const entry = type === undefined ? undefined : this.callbacks.getCatalog()?.get(type);
@@ -508,15 +631,18 @@ export class DesignerPanelController {
           (this.#materialFilter === 'favorite' && this.#favoriteMaterials.has(type)) ||
           (this.#materialFilter === 'recent' && this.#recentMaterials.includes(type))) &&
         searchable.includes(this.#materialSearch) &&
-        (this.#materialCategory === undefined || category === this.#materialCategory);
+        (groupedTypes === undefined || groupedTypes.has(type)) &&
+        (grouping !== undefined ||
+          this.#materialCategory === undefined ||
+          category === this.#materialCategory);
       card.hidden = !included;
       const favorite = card.querySelector<HTMLButtonElement>('[data-material-favorite]');
       if (favorite !== null && type !== undefined) {
-        const active = this.#favoriteMaterials.has(type);
-        favorite.ariaPressed = String(active);
-        favorite.textContent = active ? '★' : '☆';
+        favorite.ariaPressed = String(this.#favoriteMaterials.has(type));
       }
     }
+    const clear = layout.querySelector<HTMLButtonElement>('[data-material-search-clear]');
+    if (clear !== null) clear.hidden = this.#materialSearch === '';
     for (const control of layout.querySelectorAll<HTMLButtonElement>('[data-material-filter]')) {
       control.ariaPressed = String(control.dataset.materialFilter === this.#materialFilter);
     }
@@ -592,6 +718,10 @@ export class DesignerPanelController {
 
   private get interaction(): ScreenInteractionState {
     return this.callbacks.getInteraction();
+  }
+
+  private get materialLibraryGrouping(): BaseScreenMaterialLibraryGrouping | undefined {
+    return this.callbacks.getMaterialLibraryGrouping?.();
   }
 
   private get groupEntry() {

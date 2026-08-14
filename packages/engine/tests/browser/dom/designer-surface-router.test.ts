@@ -49,6 +49,7 @@ function bindings(overrides: Partial<DesignerSurfaceBindings> = {}): DesignerSur
     mouseOver: vi.fn(() => false),
     mouseOut: vi.fn(() => false),
     doubleClick: vi.fn(() => false),
+    focusOut: vi.fn(() => false),
     copy: vi.fn(() => false),
     cut: vi.fn(() => false),
     paste: vi.fn(() => false),
@@ -178,6 +179,17 @@ describe('DesignerSurfaceRouter', () => {
 
     expect(selectStart).toHaveBeenCalledWith(target, expect.anything());
     expect(gesture).toHaveBeenCalledTimes(2);
+  });
+
+  it('routes focusout to the single-slot handler', () => {
+    const root = new FakeSurfaceRoot();
+    const focusOut = vi.fn(() => false);
+    const target = new FakeElement();
+    new DesignerSurfaceRouter().connect(root as unknown as ShadowRoot, bindings({ focusOut }));
+
+    root.dispatch('focusout', target);
+
+    expect(focusOut).toHaveBeenCalledWith(target, expect.anything());
   });
 
   it('routes clipboard events for Element targets', () => {

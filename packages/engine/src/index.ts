@@ -52,9 +52,14 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
-import { type BaseScreenRenderer, createBaseScreenRenderer } from '@base-screen/renderer';
+import {
+  type BaseScreenMaterialEvent,
+  type BaseScreenRenderer,
+  createBaseScreenRenderer,
+} from '@base-screen/renderer';
 import { DesignerAssetController } from './browser/controllers/designer-asset-controller.js';
 import { DesignerDatasetController } from './browser/controllers/designer-dataset-controller.js';
+import { DesignerErrorConsoleController } from './browser/controllers/designer-error-console-controller.js';
 import { DesignerGestureController } from './browser/controllers/designer-gesture-controller.js';
 import { DesignerImportController } from './browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from './browser/controllers/designer-integration-controller.js';
@@ -80,8 +85,14 @@ import {
 import {
   createDesignerWorkspace,
   downloadDesignerDocument,
+  populateMaterialLibrary,
   renderMaterialLibraryState,
 } from './browser/dom/designer-workspace.js';
+import {
+  type BaseScreenMaterialLibraryGrouping,
+  parseBaseScreenMaterialLibraryGrouping,
+  validateBaseScreenMaterialLibraryGroupingForCatalog,
+} from './material-library-grouping.js';
 import {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenMaterialLibraryAction,
@@ -89,6 +100,12 @@ import {
   type BaseScreenMaterialLibraryState,
   parseBaseScreenMaterialLibraryState,
 } from './material-library-state.js';
+
+export {
+  type BaseScreenMaterialLibraryGroup,
+  type BaseScreenMaterialLibraryGrouping,
+  parseBaseScreenMaterialLibraryGrouping,
+} from './material-library-grouping.js';
 
 export {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
@@ -139,6 +156,7 @@ const ElementBase =
 export interface BaseScreenDesignerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
   readonly materialLibraryState?: BaseScreenMaterialLibraryState;
+  readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly projectAdapter?: ScreenProjectAdapter;
   readonly toolMaterialTypes?: DesignerToolMaterialTypes;
@@ -156,6 +174,7 @@ export interface BaseScreenDesignerConfiguration {
 export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #materialLibraryState: BaseScreenMaterialLibraryState | undefined;
+  #materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   #runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
   #variablePort: ScreenHostVariablePort | undefined;
@@ -181,6 +200,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #pendingAuthoringRequests = new Map<string, { readonly kind: string }>();
   #authoringGeneration = 0;
   readonly #notificationController = new DesignerNotificationController();
+  readonly #errorConsoleController = new DesignerErrorConsoleController();
   #layers: HTMLDivElement | undefined;
   readonly #session = new DesignerSession({
     renderDocument: (document) => this.renderDocument(document),
@@ -309,6 +329,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   });
   readonly #panelController = new DesignerPanelController({
     getCatalog: () => this.#catalog,
+    getMaterialLibraryGrouping: () => this.#materialLibraryGrouping,
     getDocument: () => this.#session.document,
     getDatasetFields: () => this.#datasetController.getFocusedDatasetFields(),
     getGroupMaterialType: () => this.#groupMaterialType,
@@ -345,6 +366,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     getCatalog: () => this.#catalog,
     getRoot: () => this.shadowRoot,
     getZoom: () => this.#viewportController.state.zoom,
+    // 状态栏「事件」开关：把设计态画布交互模式应用到渲染器（原地重渲染，不重建）。
+    onNativeEventsChange: (enabled) => this.applyNativeEvents(enabled),
   });
   readonly #operationHost: DesignerElementOperationsHost = {
     getDocument: () => this.#session.document,
@@ -452,6 +475,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #surfaceBindings: DesignerSurfaceBindings = {
     click: [
       (target) => this.#notificationController.dismiss(target as Element),
+      (target) => this.#errorConsoleController.onClick(target as Element),
       (target) => this.#menuController.onHelpClick(target as Element),
       (target) => this.#menuController.toggleMenuFromTarget(target as Element),
       () => {
@@ -598,9 +622,12 @@ export class BaseScreenDesignerElement extends ElementBase {
       return true;
     },
     doubleClick: (target, event) => {
-      this.#workbenchController.onDoubleClick(event as MouseEvent);
+      const mouseEvent = event as MouseEvent;
+      if (this.#layersController.onDoubleClick(mouseEvent)) return true;
+      this.#workbenchController.onDoubleClick(mouseEvent);
       return true;
     },
+    focusOut: (target, event) => this.#layersController.onFocusOut(event as FocusEvent),
     keyDownCapture: (target, event) => this.#eventSystem.swallow(event as KeyboardEvent),
     keyUpCapture: (target, event) => {
       // 手势激活期间 keyup 同样全吞；但 Space 必须放行到 viewport 的 keyup，
@@ -614,6 +641,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       return false;
     },
     keyDown: [
+      (target, event) => this.#errorConsoleController.onKeyDown(event as KeyboardEvent),
       (target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         if (keyboardEvent.key !== 'Escape' || !this.#menuController.closeHelpPanel()) return false;
@@ -676,6 +704,17 @@ export class BaseScreenDesignerElement extends ElementBase {
       const parsed = parseBaseScreenMaterialLibraryState(configuration.materialLibraryState);
       if (!parsed.ok) return parsed;
       materialLibraryState = parsed.value;
+    }
+    let materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
+    if (configuration.materialLibraryGrouping !== undefined) {
+      const parsed = parseBaseScreenMaterialLibraryGrouping(configuration.materialLibraryGrouping);
+      if (!parsed.ok) return parsed;
+      const validated = validateBaseScreenMaterialLibraryGroupingForCatalog(
+        parsed.value,
+        configuration.catalog,
+      );
+      if (!validated.ok) return validated;
+      materialLibraryGrouping = validated.value;
     }
     if (
       configuration.resourcePort !== undefined &&
@@ -743,6 +782,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     this.#catalog = configuration.catalog;
     this.#materialLibraryState = materialLibraryState;
+    this.#materialLibraryGrouping = materialLibraryGrouping;
     this.#runtimeContributions = configuration.runtimeContributions;
     this.#toolMaterialTypes = configuration.toolMaterialTypes;
     this.#groupMaterialType = configuration.groupMaterialType;
@@ -760,6 +800,16 @@ export class BaseScreenDesignerElement extends ElementBase {
         lifecycleDiagnostic('Catalog cannot change after initialization. Call unload first.'),
       ]);
       return;
+    }
+    if (value !== undefined && this.#materialLibraryGrouping !== undefined) {
+      const validated = validateBaseScreenMaterialLibraryGroupingForCatalog(
+        this.#materialLibraryGrouping,
+        value,
+      );
+      if (!validated.ok) {
+        this.emitDiagnostics(validated.diagnostics);
+        return;
+      }
     }
     this.#catalog = value;
   }
@@ -781,6 +831,39 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     this.#materialLibraryState = parsed.value;
     this.renderMaterialLibraryState();
+  }
+
+  get materialLibraryGrouping(): BaseScreenMaterialLibraryGrouping | undefined {
+    return this.#materialLibraryGrouping;
+  }
+
+  set materialLibraryGrouping(value: BaseScreenMaterialLibraryGrouping | undefined) {
+    if (value === undefined) {
+      this.#materialLibraryGrouping = undefined;
+      this.renderMaterialLibraryGrouping();
+      return;
+    }
+    const parsed = parseBaseScreenMaterialLibraryGrouping(value);
+    if (!parsed.ok) {
+      this.emitDiagnostics(parsed.diagnostics);
+      return;
+    }
+    if (this.#catalog === undefined) {
+      this.emitDiagnostics([
+        lifecycleDiagnostic('Material library grouping requires a configured catalog.'),
+      ]);
+      return;
+    }
+    const validated = validateBaseScreenMaterialLibraryGroupingForCatalog(
+      parsed.value,
+      this.#catalog,
+    );
+    if (!validated.ok) {
+      this.emitDiagnostics(validated.diagnostics);
+      return;
+    }
+    this.#materialLibraryGrouping = validated.value;
+    this.renderMaterialLibraryGrouping();
   }
 
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
@@ -1406,8 +1489,10 @@ export class BaseScreenDesignerElement extends ElementBase {
         this.#catalog.list(),
         this.#toolMaterialTypes,
         this.#materialLibraryState,
+        this.#materialLibraryGrouping,
       ),
     );
+    this.#panelController.refreshMaterialLibrary(shadow.querySelector<HTMLElement>('.designer'));
     this.#viewportElement = shadow.querySelector<HTMLDivElement>('[data-viewport]')!;
     this.#canvas = shadow.querySelector<HTMLDivElement>('[data-canvas]')!;
     this.#selection = shadow.querySelector<HTMLDivElement>('[data-selection]')!;
@@ -1421,6 +1506,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#notificationController.connect(
       shadow.querySelector<HTMLElement>('[data-notifications]')!,
     );
+    this.#errorConsoleController.connect(
+      shadow.querySelector<HTMLElement>('[data-error-console]')!,
+      shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]')!,
+    );
+    this.renderMaterialLibraryState();
     this.#integrationController.connect(
       shadow.querySelector<HTMLDivElement>('[data-events-panel]')!,
     );
@@ -1474,8 +1564,24 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private renderMaterialLibraryState(): void {
-    if (this.shadowRoot === null) return;
-    renderMaterialLibraryState(this.shadowRoot, this.#materialLibraryState);
+    const shadow = this.shadowRoot;
+    if (shadow === null || shadow === undefined) return;
+    renderMaterialLibraryState(shadow, this.#materialLibraryState);
+    this.#errorConsoleController.recordMaterialLibraryState(this.#materialLibraryState);
+  }
+
+  private renderMaterialLibraryGrouping(): void {
+    const shadow = this.shadowRoot;
+    if (shadow === null || shadow === undefined || this.#catalog === undefined) return;
+    const layout = shadow.querySelector<HTMLElement>('.designer');
+    if (layout === null) return;
+    populateMaterialLibrary(
+      layout,
+      this.#catalog.list(),
+      this.#materialLibraryState,
+      this.#materialLibraryGrouping,
+    );
+    this.#panelController.refreshMaterialLibrary(layout);
   }
 
   private requestMaterialLibraryAction(action: BaseScreenMaterialLibraryAction): void {
@@ -1537,11 +1643,16 @@ export class BaseScreenDesignerElement extends ElementBase {
   private createRenderer(): void {
     if (this.#canvas === undefined || this.#catalog === undefined) return;
     this.#renderer = createBaseScreenRenderer({
+      // 设计态不裁剪画布边界：画布外的组件保持可见、可点击/拖拽（渲染器在 design
+      // 模式不设置 overflow；查看器/最终屏幕才按画布尺寸裁剪）。
       root: this.#canvas,
       catalog: this.#catalog,
       mode: 'design',
-      interactive: false,
-      onMaterialEvent: () => undefined,
+      // 状态栏「事件」开关是交互模式的唯一来源：渲染器重建后开关状态保持。
+      interactive: this.#workbenchController.nativeEventsEnabled,
+      // 设计态原生事件（interactive 开启时）转发给宿主，与 Viewer 的
+      // base-screen-material-event 同形同语义。
+      onMaterialEvent: (event) => this.forwardNativeMaterialEvent(event),
       resourcePort: this.#resourcePort,
       // 设计态渲染器获得设计执行上下文（RB2）：design mode，不绑定项目。
       executionMode: 'design',
@@ -1549,6 +1660,25 @@ export class BaseScreenDesignerElement extends ElementBase {
         ? {}
         : { contributionIndex: this.#runtimeContributions }),
     });
+  }
+
+  /** 应用「事件」开关：渲染器原地切换 interactive；失败（如已释放）经诊断通道上报。 */
+  private applyNativeEvents(enabled: boolean): void {
+    const renderer = this.#renderer;
+    if (renderer === undefined) return;
+    const result = renderer.setInteractive(enabled);
+    if (!result.ok) this.emitDiagnostics(result.diagnostics);
+  }
+
+  /** 把设计态画布物料事件转发为 designer 元素上的 composed 事件（与 Viewer 同形）。 */
+  private forwardNativeMaterialEvent(event: BaseScreenMaterialEvent): void {
+    this.dispatchEvent(
+      new CustomEvent<BaseScreenMaterialEvent>('base-screen-material-event', {
+        bubbles: true,
+        composed: true,
+        detail: event,
+      }),
+    );
   }
 
   private executeOperationFromTarget(target: Element): boolean {

@@ -1,11 +1,16 @@
 # Base Screen 后续路线图
 
 > 状态：方向候选，不授权实现
-> 最近更新：2026-08-12（阶段封版）
+> 最近更新：2026-08-14（封版后增量登记）
 
 本路线图列出下一阶段的候选方向与触发条件。**它不授权任何实现**：每一项启动前都必须先有已接受的 ADR
 与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域。当前生效中 Spec 为
-[Material Library Host State](../specs/material-library-host-state/spec.md)（封版后首个增量）。
+[Material Library Host State](../specs/material-library-host-state/spec.md)（封版后首个增量）、
+[Designer Left Panel](../specs/designer-left-panel/spec.md)（依据 ADR-0032，封版后第二个增量）、
+[Host Material Library Grouping](../specs/host-material-library-grouping/spec.md)（依据 ADR-0033）、
+[Designer Material Library Visual Refinement](../specs/designer-material-library-visual-refinement/spec.md)（依据 ADR-0034）、
+[Material Library Error Console](../specs/material-library-feedback-workspace-placement/spec.md)（依据 ADR-0035）和
+[Designer Viewport Native Events](../specs/designer-viewport-native-events/spec.md)（依据 ADR-0036）。
 
 ## 候选方向
 

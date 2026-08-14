@@ -29,8 +29,52 @@ class FakeButton extends FakeElement {
 }
 
 class FakeInput extends FakeElement {
+  isConnected = true;
+
   constructor(readonly value: string) {
     super();
+  }
+}
+
+// 极简面板骨架：满足 renderDesignerLayers 的属性写入面，用于观察重命名模式的 DOM 生命周期。
+class FakePanel {
+  readonly ownerDocument = { createElement: () => new FakePanel() };
+  readonly children: FakePanel[] = [];
+  readonly dataset: Record<string, string> = {};
+  readonly style = {
+    setProperty: () => undefined,
+  };
+  ariaCurrent = '';
+  ariaExpanded = '';
+  ariaLabel = '';
+  ariaLevel = '';
+  ariaPressed = '';
+  ariaSelected = '';
+  className = '';
+  disabled = false;
+  draggable = false;
+  innerHTML = '';
+  placeholder = '';
+  textContent = '';
+  title = '';
+  type = '';
+  value = '';
+
+  appendChild(child: FakePanel): FakePanel {
+    this.children.push(child);
+    return child;
+  }
+
+  replaceChildren(...children: FakePanel[]): void {
+    this.children.splice(0, this.children.length, ...children);
+  }
+
+  querySelector(): FakePanel | null {
+    return null;
+  }
+
+  setAttribute(name: string, value: string): void {
+    this.dataset[name] = value;
   }
 }
 
@@ -123,6 +167,7 @@ describe('DesignerLayersController', () => {
 
   it('R6 uses the Canvas selection reducer for plain and modifier layer clicks', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
     const actions: unknown[] = [];
     const controller = new DesignerLayersController({
       emitDiagnostics: () => undefined,
@@ -231,8 +276,96 @@ describe('DesignerLayersController', () => {
     expect(state.transactions).toEqual([]);
   });
 
+  it('R6 enters rename mode on double-click and exits after commit or cancel', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const state = createController(createDocument([component('layer-1', null, 0)]));
+    const panel = new FakePanel();
+    state.controller.render(panel as unknown as HTMLElement);
+    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+
+    const select = new FakeElement();
+    select.dataset.layerSelect = 'layer-1';
+    select.matches['[data-layer-select]'] = select;
+    expect(state.controller.onDoubleClick({ target: select } as unknown as MouseEvent)).toBe(true);
+    expect(panel.children[1]!.children[0]!.dataset.renaming).toBe('true');
+
+    const draft = new FakeInput('Renamed with double-click');
+    draft.dataset.layerRename = 'layer-1';
+    state.controller.onInput({ target: draft } as unknown as Event);
+    expect(
+      state.controller.onKeyDown({
+        target: draft,
+        key: 'Enter',
+        isComposing: false,
+        preventDefault: () => undefined,
+      } as unknown as KeyboardEvent),
+    ).toBe(true);
+
+    expect(state.transactions).toHaveLength(1);
+    expect(state.document().components[0]?.name).toBe('Renamed with double-click');
+    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+  });
+
+  it('R6 refuses rename mode for locked components and exits on unchanged focus-out', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const state = createController(
+      createDocument([
+        component('layer-1', null, 0),
+        component('locked', null, 1, { locked: true }),
+      ]),
+    );
+    const panel = new FakePanel();
+    state.controller.render(panel as unknown as HTMLElement);
+
+    const lockedSelect = new FakeElement();
+    lockedSelect.dataset.layerSelect = 'locked';
+    lockedSelect.matches['[data-layer-select]'] = lockedSelect;
+    expect(state.controller.onDoubleClick({ target: lockedSelect } as unknown as MouseEvent)).toBe(
+      false,
+    );
+    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+
+    const select = new FakeElement();
+    select.dataset.layerSelect = 'layer-1';
+    select.matches['[data-layer-select]'] = select;
+    state.controller.onDoubleClick({ target: select } as unknown as MouseEvent);
+    expect(panel.children[1]!.children[0]!.dataset.renaming).toBe('true');
+
+    const draft = new FakeInput('layer-1');
+    draft.dataset.layerRename = 'layer-1';
+    expect(state.controller.onFocusOut({ target: draft } as unknown as FocusEvent)).toBe(true);
+    expect(state.transactions).toEqual([]);
+    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+  });
+
+  it('R6 ignores focus-out of inputs removed by re-rendering', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const state = createController(createDocument([component('layer-1', null, 0)]));
+    const panel = new FakePanel();
+    state.controller.render(panel as unknown as HTMLElement);
+    const select = new FakeElement();
+    select.dataset.layerSelect = 'layer-1';
+    select.matches['[data-layer-select]'] = select;
+    state.controller.onDoubleClick({ target: select } as unknown as MouseEvent);
+
+    // 渲染重建移除聚焦输入框时，浏览器同步派发的 focusout 落在已脱离文档的节点上：
+    // 控制器必须忽略（状态由渲染方持有），不得重入 endRename 破坏正在进行的渲染。
+    const detached = new FakeInput('layer-1');
+    detached.dataset.layerRename = 'layer-1';
+    detached.isConnected = false;
+    expect(state.controller.onFocusOut({ target: detached } as unknown as FocusEvent)).toBe(true);
+    expect(panel.children[1]!.children[0]!.dataset.renaming).toBe('true');
+  });
+
   it('R6 normalizes duplicate sibling z-indexes when reordering in one transaction', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
     const state = createController(
       createDocument([component('first', null, 0), component('second', null, 0)]),
     );
@@ -252,6 +385,7 @@ describe('DesignerLayersController', () => {
 
   it('R6 allows root drops and rejects cycles, unavailable parents, hidden targets, and locked selections', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
     const rootState = createController(
       createDocument([
         component('container', null, 0, { type: 'base.container' }),

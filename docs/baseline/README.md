@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-12（阶段封版）
+> 最近更新：2026-08-14（左侧面板、宿主物料分组、物料库视觉层级、物料加载错误控制台、视窗原生事件开关与面板折叠修复增量）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -42,6 +42,18 @@
   [ADR-0028](../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)。
 - **事件 Blueprint**：canonical Blueprint、Core compile/trace/replace/history/诊断、事件面板摘要/能力状态/宿主请求入口。
   依据：[Designer Event Blueprint](../specs/archive/designer-event-blueprint/spec.md)、[ADR-0026](../decisions/ADR-0026-designer-event-blueprint-authoring.md)。
+- **左侧面板信息架构与交互**（封版后增量，生效中）：缩略图网格组件库、按 Tab 隔离的工具栏、折叠图标轨、
+  图层树引导线与图标操作、搜索清除与网格键盘可达性；既有 data-* 契约与宿主边界不变，零新依赖。
+  依据：[Designer Left Panel](../specs/designer-left-panel/spec.md)、[ADR-0032](../decisions/ADR-0032-designer-left-panel-refactor.md)。
+- **视窗原生事件开关**（封版后增量，生效中）：状态栏「事件」与吸附/参考线同形态的 switch 控制设计态画布交互
+  模式（默认关闭）；开启后组件原生事件经 `base-screen-material-event` 转发给宿主（与 Viewer 同形），renderer
+  以实例级 `setInteractive` 原地重渲染，不重挂载、不重取数。依据：
+  [Designer Viewport Native Events](../specs/designer-viewport-native-events/spec.md)、
+  [ADR-0036](../decisions/ADR-0036-designer-viewport-native-events-toggle.md)。
+- **面板折叠修复**（封版后缺陷修复增量，生效中）：左右面板折叠/拖宽往返收敛（折叠 48px 图标轨、展开恢复
+  拖拽宽度、未拖拽保留宿主默认宽度）、折叠态拖拽分隔条自动展开、折叠轨箭头旋转与按钮防压扁、收起/展开
+  tooltip 语义切换。依据：[Designer Panel Collapse Fixes](../specs/designer-panel-collapse-fixes/spec.md)、
+  [ADR-0037](../decisions/ADR-0037-designer-panel-collapse-fixes.md)。
 
 ## 物料体系
 
@@ -56,9 +68,18 @@
 - **草稿物料流程**：设计期显式草稿交接、目录叠加与正式发布预检。依据：[Host Draft Material Workflow](../specs/archive/host-draft-material-workflow/spec.md)。
 - **在线物料 MCP**：规范快照 + 在线物料查询/校验 MCP 契约与 stdio 参考服务。依据：[Host Material MCP Access](../specs/archive/host-material-mcp-access/spec.md)、
   [ADR-0030](../decisions/ADR-0030-host-material-mcp-access.md)。
-- **左侧物料库宿主状态**（封版后增量，生效中）：左侧物料库的宿主状态投影——严格状态 schema（ready/loading/offline/partial/update）、
-  分类排序与搜索、草稿/不可用标记、composed 宿主动作事件（retry/reload/details）；保持不可变 catalog 与宿主加载边界。
+- **物料库宿主状态**（封版后增量，生效中）：严格状态 schema（ready/loading/offline/partial/update）、分类排序与搜索、
+  草稿/不可用标记、composed 宿主动作事件（retry/reload/details）；保持不可变 catalog 与宿主加载边界。
   依据：[Material Library Host State](../specs/material-library-host-state/spec.md)、[ADR-0031](../decisions/ADR-0031-material-library-host-state.md)。
+- **宿主多级物料分组**（封版后增量，生效中）：宿主以 JSON-safe 树投影控制组层级、名称和卡片顺序；Designer 提供全部入口、
+  路径面包屑、当前层级子组与网格筛选，保持 Manifest、catalog、ScreenDocument 和 Renderer 不变。
+  依据：[Host Material Library Grouping](../specs/host-material-library-grouping/spec.md)、[ADR-0033](../decisions/ADR-0033-host-controlled-material-library-grouping.md)。
+- **物料库视觉层级**（封版后增量，生效中）：路径、当前层级、筛选、状态与缩略图网格采用紧凑的 data-dense/drill-down
+  层级；仅消费现有 Designer Token，保留深浅主题、键盘焦点、forced-colors、reduced-motion 与无抖动约束。
+  依据：[Designer Material Library Visual Refinement](../specs/designer-material-library-visual-refinement/spec.md)、[ADR-0034](../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)。
+- **物料加载错误控制台**（封版后增量，生效中）：失败记录、当前目录状态和恢复动作通过固定宽度的底部状态栏入口在工作区弹窗中显示；
+  左侧物料库专用于搜索、分组和网格，保留状态 data-*、宿主动作、草稿/不可用标记、可访问性和无抖动。
+  依据：[Material Library Error Console](../specs/material-library-feedback-workspace-placement/spec.md)、[ADR-0035](../decisions/ADR-0035-material-library-feedback-workspace-placement.md)。
 
 ## 宿主边界与数据运行时
 

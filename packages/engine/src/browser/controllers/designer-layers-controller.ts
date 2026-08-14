@@ -37,6 +37,7 @@ export class DesignerLayersController {
   #draggedLayerId: string | undefined;
   #layers: HTMLElement | undefined;
   #renameDrafts = new Map<string, string>();
+  #renamingId: string | undefined;
   #renderLimit = DESIGNER_LAYER_PAGE_SIZE;
 
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {}
@@ -51,6 +52,7 @@ export class DesignerLayersController {
       collapsed: this.#collapsed,
       dropTargetId: this.#dropTargetId,
       renameDrafts: this.#renameDrafts,
+      renamingId: this.#renamingId,
       renderLimit: this.#renderLimit,
       canMove: (id, direction) => this.canMove(id, direction),
     });
@@ -59,7 +61,7 @@ export class DesignerLayersController {
 
   onClick(event: Event): boolean {
     const target = event.target;
-    if (!(target instanceof HTMLElement)) return false;
+    if (!(target instanceof Element)) return false;
     const showMore = target.closest<HTMLElement>('[data-layer-show-more]');
     if (showMore !== null) {
       this.#renderLimit += DESIGNER_LAYER_PAGE_SIZE;
@@ -131,12 +133,49 @@ export class DesignerLayersController {
     if (event.key === 'Escape') {
       this.#renameDrafts.delete(component.id);
       target.value = component.name;
+      this.endRename();
       event.preventDefault();
       return true;
     }
     if (event.key !== 'Enter' || event.isComposing) return false;
     event.preventDefault();
     this.commitRename(component.id, target.value);
+    return true;
+  }
+
+  // 双击图层名称进入重命名：重命名输入框只在编辑期存在，名称行保持单行展示。
+  onDoubleClick(event: MouseEvent): boolean {
+    const target = event.target;
+    if (!(target instanceof Element)) return false;
+    const select = target.closest<HTMLElement>('[data-layer-select]');
+    const id = select?.dataset.layerSelect;
+    if (select === null || select === undefined || id === undefined) return false;
+    const component = this.callbacks.getDocument()?.components.find((item) => item.id === id);
+    if (component === undefined || component.status.locked) return false;
+    this.#renamingId = id;
+    this.render(this.#layers);
+    const rename = this.#layers?.querySelector<HTMLInputElement>('[data-layer-rename]');
+    rename?.focus();
+    rename?.select();
+    return true;
+  }
+
+  // 焦点离开重命名输入：值有变化时 change 事件随后接管提交；无变化时直接退出编辑态，
+  // 避免只读 Tab/点击空白后重命名输入残留。
+  // 渲染重建会移除聚焦中的输入框并同步派发 focusout：此时目标已脱离文档（isConnected
+  // false），状态由渲染方持有，必须忽略，否则会在外层渲染中途重入 endRename/render，
+  // 使陈旧的 renamingId 快照把面板渲染回重命名态。
+  onFocusOut(event: FocusEvent): boolean {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement) || target.dataset.layerRename === undefined)
+      return false;
+    if (!target.isConnected) return true;
+    const component = this.callbacks
+      .getDocument()
+      ?.components.find((item) => item.id === target.dataset.layerRename);
+    if (component === undefined || target.value !== component.name) return true;
+    this.#renameDrafts.delete(component.id);
+    this.endRename();
     return true;
   }
 
@@ -239,6 +278,7 @@ export class DesignerLayersController {
     this.#draggedLayerId = undefined;
     this.#dropTargetId = undefined;
     this.#renameDrafts.clear();
+    this.#renamingId = undefined;
     this.#renderLimit = DESIGNER_LAYER_PAGE_SIZE;
     this.render(this.#layers);
   }
@@ -287,13 +327,22 @@ export class DesignerLayersController {
       ?.components.find((item) => item.id === componentId);
     if (component === undefined || component.name === name) {
       this.#renameDrafts.delete(componentId);
+      this.endRename();
       return;
     }
     const result = this.callbacks.executeTransaction({
       commands: [{ type: 'update-components', componentIds: [componentId], patch: { name } }],
     });
-    if (result.ok) this.#renameDrafts.delete(componentId);
-    else this.callbacks.emitDiagnostics(result.diagnostics);
+    this.#renameDrafts.delete(componentId);
+    if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
+    this.endRename();
+  }
+
+  // 无条件退出并重绘：事务路径会同步触发一次携带旧 renamingId 快照的面板渲染，
+  // 若这里按标志提前返回，残留的重命名 DOM 将无法被修正。渲染幂等，代价可忽略。
+  private endRename(): void {
+    this.#renamingId = undefined;
+    this.render(this.#layers);
   }
 
   private canMove(componentId: string, direction: 'up' | 'down'): boolean {
@@ -369,13 +418,13 @@ function isLayerSelectButton(target: EventTarget | null): target is HTMLButtonEl
 }
 
 function getLayerRow(target: EventTarget | null): string | undefined {
-  return target instanceof HTMLElement
+  return target instanceof Element
     ? target.closest<HTMLElement>('[data-layer-id]')?.dataset.layerId
     : undefined;
 }
 
 function getDropParent(target: EventTarget | null): string | null | undefined {
-  if (!(target instanceof HTMLElement)) return undefined;
+  if (!(target instanceof Element)) return undefined;
   const row = target.closest<HTMLElement>('[data-layer-id]');
   if (row !== null) return row.dataset.layerId;
   return target.closest<HTMLElement>('[data-layer-root]') === null ? undefined : null;

@@ -542,6 +542,196 @@
   }
 }
 
+.designer-error-console {
+  position: absolute;
+  inset: 0;
+  z-index: var(--designer-z-modal);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  justify-items: center;
+  padding: var(--designer-space-7);
+  background: var(--designer-surface-scrim);
+}
+
+.workspace:has(.designer-error-console:not([hidden])) .designer-notifications {
+  visibility: hidden;
+}
+
+.designer-error-console[hidden] {
+  display: none;
+}
+
+.error-console-card {
+  width: min(520px, 100%);
+  max-height: min(620px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--designer-space-4);
+  padding: var(--designer-space-6);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-overlay);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-shadow-overlay);
+}
+
+.error-console-card > header,
+.error-console-heading,
+.error-console-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.error-console-card > header {
+  justify-content: space-between;
+  gap: var(--designer-space-4);
+  padding-bottom: var(--designer-space-4);
+  border-bottom: 1px solid var(--designer-border-subtle);
+}
+
+.error-console-heading {
+  min-width: 0;
+  gap: var(--designer-space-3);
+}
+
+.error-console-heading h2 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error-console-heading [data-error-console-summary] {
+  flex: 0 0 auto;
+  color: var(--designer-danger);
+  font: var(--designer-font-numeric);
+}
+
+.error-console-actions {
+  flex: 0 0 auto;
+  gap: var(--designer-space-2);
+}
+
+.error-console-clear {
+  min-height: 28px;
+  padding: 0 var(--designer-space-3);
+}
+
+.error-console-close {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.error-console-current {
+  --material-library-status-color: var(--designer-warning);
+  display: grid;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-4);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: color-mix(
+    in srgb,
+    var(--designer-surface-raised) 76%,
+    var(--designer-surface-control)
+  );
+  box-shadow: inset 2px 0 0 var(--material-library-status-color);
+}
+
+.error-console-current[hidden] {
+  display: none;
+}
+
+.error-console-current[data-status="partial"],
+.error-console-current[data-status="error"] {
+  --material-library-status-color: var(--designer-danger);
+}
+
+.material-library-status-copy {
+  display: grid;
+  gap: var(--designer-space-1);
+}
+
+.material-library-status-copy strong {
+  color: var(--material-library-status-color);
+  font: var(--designer-font-small);
+  font-weight: 700;
+}
+
+.material-library-status-copy span {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.material-library-status-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--designer-space-2);
+}
+
+.material-library-status-actions .designer-button {
+  min-height: 24px;
+  padding: 2px var(--designer-space-4);
+  border-color: color-mix(in srgb, var(--material-library-status-color) 34%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--material-library-status-color) 9%,
+    var(--designer-surface-control)
+  );
+  color: var(--material-library-status-color);
+  font: var(--designer-font-small);
+}
+
+.material-library-status-actions .designer-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--material-library-status-color) 56%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--material-library-status-color) 16%,
+    var(--designer-surface-control-hover)
+  );
+}
+
+.error-console-list {
+  display: grid;
+  min-height: 0;
+  gap: var(--designer-space-3);
+  overflow-y: auto;
+  scrollbar-color: var(--designer-scrollbar-thumb) var(--designer-scrollbar-track);
+}
+
+.error-console-entry,
+.error-console-empty {
+  margin: 0;
+  padding: var(--designer-space-3) var(--designer-space-4);
+}
+
+.error-console-entry {
+  border-bottom: 1px solid var(--designer-border-subtle);
+  box-shadow: inset 2px 0 0 var(--designer-danger);
+}
+
+.error-console-entry-copy {
+  display: grid;
+  gap: var(--designer-space-1);
+}
+
+.error-console-entry-copy strong {
+  color: var(--designer-danger);
+  font: var(--designer-font-small);
+  font-weight: 700;
+}
+
+.error-console-entry-copy span,
+.error-console-empty {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  overflow-wrap: anywhere;
+}
+
 .workspace {
   position: relative;
   display: grid;
@@ -660,21 +850,76 @@
   min-width: 72px;
 }
 
-.status-item {
-  flex: 0 0 auto;
+.status-console-trigger {
+  box-sizing: border-box;
+  width: 84px;
+  height: 24px;
+  min-height: 24px;
+  flex: 0 0 84px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-2);
+  border-color: transparent;
+  background: transparent;
   color: var(--designer-text-muted);
   font-weight: 600;
-  transition: color var(--designer-motion);
 }
 
-.status-item:hover {
-  color: var(--designer-accent);
+.status-console-trigger svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+}
+
+.status-console-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-console-count {
+  width: 20px;
+  height: 16px;
+  flex: 0 0 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  color: var(--designer-surface-workspace);
+  font: var(--designer-font-numeric);
+  font-size: 9px;
+  visibility: hidden;
+}
+
+.status-console-count[data-has-value] {
+  visibility: visible;
+  background: var(--designer-danger);
+}
+
+.status-console-trigger:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.status-console-trigger[data-has-errors] {
+  color: var(--designer-danger);
+}
+
+.status-console-trigger[data-has-warning] {
+  color: var(--designer-warning);
+}
+
+.status-console-trigger:not(:disabled):active {
+  transform: translateZ(0);
 }
 
 .rail,
 .properties {
   min-height: 0;
   overflow: hidden auto;
+  scrollbar-gutter: stable;
   background: var(--designer-surface-panel);
 }
 
@@ -709,13 +954,13 @@
 .panel-heading {
   position: sticky;
   top: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   height: 44px;
   align-items: center;
   gap: var(--designer-space-3);
   padding: 0 var(--designer-space-5);
-  border-bottom: 1px solid var(--designer-border-default);
+  border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
   transition: padding var(--designer-motion);
 }
@@ -736,37 +981,118 @@
   transition: margin var(--designer-motion);
 }
 
+.panel-collapse svg {
+  transition: transform var(--designer-motion);
+}
+
+/* 数量徽标：等宽数字药丸，安静呈现规模信息。 */
 .panel-count {
-  min-width: 18px;
+  display: inline-grid;
+  min-width: 20px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--designer-border-default) 34%, transparent);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
   transition: opacity var(--designer-motion);
 }
 
-/* 折叠状态下的面板样式 */
+/* 折叠状态下的面板样式（ADR-0037：折叠轨 UI 修复） */
+.designer[data-left-collapsed="true"] .rail,
+.designer[data-right-collapsed="true"] .properties {
+  /* 折叠轨内容很短（标题+图标 Tab），关闭 scrollbar-gutter 占用，把完整宽度还给内容，
+     否则折叠按钮被压缩到不可见（此前 48px 轨只剩约 25px 内容宽度）。 */
+  scrollbar-gutter: auto;
+}
+
 .designer[data-left-collapsed="true"] .rail .panel-heading,
 .designer[data-right-collapsed="true"] .properties .panel-heading {
   padding: 0 var(--designer-space-3);
   justify-content: center;
 }
 
+/* 折叠态标题/计数不占 flex 槽位：display:none 而非 width:0，避免间隙压扁折叠按钮。 */
 .designer[data-left-collapsed="true"] .rail .panel-title,
 .designer[data-left-collapsed="true"] .rail .panel-count,
 .designer[data-right-collapsed="true"] .properties .panel-title {
-  opacity: 0;
-  width: 0;
-  overflow: hidden;
+  display: none;
 }
 
 .designer[data-left-collapsed="true"] .rail .panel-collapse,
 .designer[data-right-collapsed="true"] .properties .panel-collapse {
+  flex: none;
   margin-left: 0;
 }
 
+/* 折叠态箭头反转：左面板 ‹→›、右面板 ›→‹，指示展开方向（过渡沿用 --designer-motion）。 */
+.designer[data-left-collapsed="true"] .rail .panel-collapse svg,
+.designer[data-right-collapsed="true"] .properties .panel-collapse svg {
+  transform: rotate(180deg);
+}
+
 .rail-tabs {
-  margin: var(--designer-space-4) var(--designer-space-5) 0;
+  position: sticky;
+  top: 44px;
+  z-index: 2;
+  display: flex;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-3) var(--designer-space-5);
+  border-bottom: 1px solid var(--designer-border-subtle);
+  background: var(--designer-surface-panel);
 }
 
 .rail-tabs .designer-tab {
+  display: inline-flex;
   flex: 1;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--designer-space-2);
+  border-radius: 7px;
+}
+
+/* 标签选中态：品牌色描边浅底 + 微投影；未选中 hover 仅换背景，不做位移（防抖）。 */
+.rail-tabs .designer-tab:not([aria-selected="true"]):hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-secondary);
+  transform: none;
+}
+
+.rail-tabs .designer-tab[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--designer-accent) 34%, transparent);
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 12%, transparent);
+}
+
+.rail-tab-glyph {
+  display: inline-flex;
+}
+
+.rail-tab-glyph svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+}
+
+/* 折叠图标轨：垂直图标 Tab，复用同一 Tab DOM 与状态，点击展开并切换（ADR-0032）。 */
+.designer[data-left-collapsed="true"] .rail-tabs {
+  flex-direction: column;
+  padding: var(--designer-space-3) var(--designer-space-2);
+}
+
+.designer[data-left-collapsed="true"] .rail-tabs .designer-tab {
+  flex: none;
+  min-height: 36px;
+}
+
+.designer[data-left-collapsed="true"] .rail-tab-label {
+  display: none;
 }
 
 .inspector-tabs {
@@ -781,9 +1107,15 @@
   background: var(--designer-surface-panel);
 }
 
-.rail-content,
+.rail-view,
 .inspector-pane {
   padding: var(--designer-space-5);
+}
+
+.rail-view {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
 }
 
 .inspector-pane > p,
@@ -813,7 +1145,7 @@
   font: var(--designer-font-small);
 }
 
-.rail-content[hidden],
+.rail-view[hidden],
 .inspector-tabs[hidden],
 .inspector-pane[hidden],
 .direct-preview[hidden],
@@ -822,63 +1154,188 @@
   display: none;
 }
 
-.material-card {
+.material-grid {
   display: grid;
+  /* 左侧面板可拖拽（160–400px，内容区 ≈ 面板宽 − 24px 内边距 − 滚动条轨）：卡片最小 128px
+     + 6px 列距 → 面板 ≥ 约 300px 时一行两列，窄面板自动回退单列；min(128px, 100%) 保证
+     最窄面板下卡片不超出轨宽，且 3 列需要 ≥ 420px 面板（超出上限），双列即最大密度。 */
+  grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr));
+  gap: var(--designer-space-3);
+  margin-top: var(--designer-space-4);
+}
+
+/* 物料卡片：大缩略图 + 名称行；交互只改边框/阴影/图标缩放等绘制属性，几何恒定。 */
+.material-card {
+  display: flex;
   width: 100%;
-  min-height: 56px;
-  grid-template-columns: 40px minmax(0, 1fr);
-  align-items: center;
-  gap: 0 var(--designer-space-4);
-  margin-bottom: var(--designer-space-3);
-  padding: var(--designer-space-4);
+  min-width: 0;
+  flex-direction: column;
+  /* 覆盖 .designer-button 基类的居中约束：列方向子元素必须横向拉伸，
+     否则名称/类型行收缩为内容宽并被居中截断。 */
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: var(--designer-space-3);
+  margin: 0;
+  padding: var(--designer-space-2);
   text-align: left;
   border-color: var(--designer-border-subtle);
-  background: color-mix(in srgb, var(--designer-surface-raised) 48%, transparent);
-  transition:
-    background var(--designer-motion),
-    border-color var(--designer-motion),
-    box-shadow var(--designer-motion),
-    transform var(--designer-motion);
-}
-
-.material-card:hover {
-  border-color: var(--designer-border-strong);
-  background: var(--designer-surface-control-hover);
-  box-shadow: inset 3px 0 0 var(--designer-accent);
-  transform: translateX(2px);
-}
-
-.material-thumb {
-  grid-row: 1 / 3;
-  width: 38px;
-  height: 38px;
-  border: 1px solid color-mix(in srgb, var(--designer-accent) 55%, var(--designer-border-default));
   border-radius: 10px;
+  background: color-mix(in srgb, var(--designer-surface-raised) 88%, var(--designer-surface-panel));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--designer-text-primary) 5%, transparent);
+  transition:
+    background-color var(--designer-motion),
+    border-color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+.material-card:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 42%, var(--designer-border-default));
+  background-color: color-mix(
+    in srgb,
+    var(--designer-surface-control-hover) 60%,
+    var(--designer-surface-raised)
+  );
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--designer-text-primary) 12%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--designer-accent) 18%, transparent);
+  transform: translateZ(0);
+}
+
+.material-card:not(:disabled):active {
+  transform: translateZ(0);
+}
+
+.material-card:focus-visible {
+  z-index: 1;
+}
+
+/* 缩略图：分类色相驱动（--material-hue 由 DOM 确定性写入）的双色渐变 + 网格纹理，
+   模拟数据大屏的深色画布质感；深浅主题共用同一色相。 */
+.material-thumb {
+  position: relative;
+  display: grid;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, hsl(var(--material-hue, 215) 45% 55%) 30%, transparent);
+  border-radius: 8px;
   background:
-    linear-gradient(135deg, var(--designer-accent-surface), transparent),
-    var(--designer-surface-control);
+    radial-gradient(
+      120% 90% at 18% 8%,
+      hsl(var(--material-hue, 215) 70% 62% / 38%),
+      transparent 56%
+    ),
+    linear-gradient(
+      158deg,
+      hsl(var(--material-hue, 215) 42% 30%),
+      hsl(var(--material-hue, 215) 48% 12%)
+    );
+  color: hsl(var(--material-hue, 215) 85% 86%);
+}
+
+.material-thumb::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      hsl(var(--material-hue, 215) 80% 85% / 8%) 0 1px,
+      transparent 1px 10px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      hsl(var(--material-hue, 215) 80% 85% / 8%) 0 1px,
+      transparent 1px 10px
+    );
+  content: "";
+  pointer-events: none;
+}
+
+.material-thumb svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  filter: drop-shadow(0 2px 8px hsl(var(--material-hue, 215) 90% 40% / 55%));
+  transition: transform var(--designer-motion);
+}
+
+.material-card:hover:not(:disabled) .material-thumb svg {
+  transform: scale(1.1);
+}
+
+:host([theme="light"]) .material-thumb {
+  border-color: color-mix(in srgb, hsl(var(--material-hue, 215) 45% 45%) 30%, transparent);
+  background:
+    radial-gradient(
+      120% 90% at 18% 8%,
+      hsl(var(--material-hue, 215) 85% 92% / 85%),
+      transparent 56%
+    ),
+    linear-gradient(
+      158deg,
+      hsl(var(--material-hue, 215) 62% 76%),
+      hsl(var(--material-hue, 215) 55% 62%)
+    );
+  color: hsl(var(--material-hue, 215) 50% 28%);
+}
+
+:host([theme="light"]) .material-thumb::before {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      hsl(var(--material-hue, 215) 45% 35% / 8%) 0 1px,
+      transparent 1px 10px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      hsl(var(--material-hue, 215) 45% 35% / 8%) 0 1px,
+      transparent 1px 10px
+    );
+}
+
+/* 名称与类型同一基线行：名称优先，类型以等宽微型字右对齐，信息保留但不喧哗。 */
+.material-card-meta {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-1);
 }
 
 .material-name {
+  flex: 1 1 auto;
+  min-width: 0;
   overflow: hidden;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.material-type,
+.material-type {
+  flex: 0 0 auto;
+  max-width: 62%;
+  overflow: hidden;
+  font: var(--designer-font-numeric);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  opacity: 0.72;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .layer-select small,
-.layer-state,
 .layer-diagnostic,
 .status-feedback {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-}
-
-.material-type {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .designer-asset-section {
@@ -1240,23 +1697,108 @@
 }
 
 .layer-search {
+  position: relative;
   margin-bottom: var(--designer-space-4);
 }
 
-.layer-row {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 0.7fr);
-  align-items: center;
-  gap: var(--designer-space-2);
-  margin-bottom: var(--designer-space-2);
-  padding: var(--designer-space-2) var(--designer-space-3);
-  border-radius: var(--designer-radius-control);
+/* 与物料搜索一致的视觉语言：内凹深底 + 大圆角，图标固定绝对定位在输入框内。 */
+.layer-search input {
+  padding-left: calc(var(--designer-space-3) + 20px);
+  border-color: var(--designer-border-subtle);
+  border-radius: 9px;
+  background: color-mix(
+    in srgb,
+    var(--designer-surface-workspace) 66%,
+    var(--designer-surface-panel)
+  );
 }
 
-.layer-row:hover,
-.layer-row[aria-selected="true"] {
+.layer-search input:hover:not(:disabled) {
+  border-color: var(--designer-border-default);
+  background: color-mix(
+    in srgb,
+    var(--designer-surface-workspace) 58%,
+    var(--designer-surface-panel)
+  );
+}
+
+.layer-search input:focus {
+  background: var(--designer-surface-control);
+}
+
+.layer-search-glyph {
+  position: absolute;
+  bottom: 0;
+  left: var(--designer-space-3);
+  z-index: 1;
+  display: grid;
+  width: var(--designer-control-height);
+  height: var(--designer-control-height);
+  place-items: center;
+  color: var(--designer-text-muted);
+  pointer-events: none;
+}
+
+.layer-search:focus-within .layer-search-glyph {
+  color: var(--designer-accent);
+}
+
+.layer-search-glyph svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+}
+
+/* 行几何常量：两列网格 + 恒定内边距/圆角，交互状态只改变背景/阴影/透明度。 */
+.layer-row {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-1);
+  margin-bottom: var(--designer-space-1);
+  padding: 4px var(--designer-space-2);
+  border-radius: var(--designer-radius-control);
+  transition:
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+/* 缩进引导线：--layer-depth × 20px 宽度的重复渐变，零逐级 DOM；仅在深层层级可见。
+   left 偏移 = 行左内边距（space-2），使竖线精确穿过父级折叠箭头中心（缩进 20px 的 10px 处）。 */
+.layer-row::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--designer-space-2);
+  width: calc(var(--layer-depth, 0) * 20px);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 9px,
+    var(--designer-border-subtle) 9px 10px
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.layer-row:hover {
   background: var(--designer-surface-control-hover);
+}
+
+/* 选中行用 accent-surface 染色，与普通悬停形成层级；仅改背景色，无几何变化。 */
+.layer-row[aria-selected="true"] {
+  background: color-mix(in srgb, var(--designer-accent-surface) 52%, var(--designer-surface-panel));
+}
+
+.layer-row[aria-selected="true"]:hover {
+  background: color-mix(
+    in srgb,
+    var(--designer-accent-surface) 78%,
+    var(--designer-surface-control-hover)
+  );
 }
 
 .layer-row[aria-current="true"] {
@@ -1270,23 +1812,283 @@
 }
 
 .layer-collapse-spacer {
-  width: 28px;
-  height: 28px;
+  width: 20px;
+  height: 20px;
 }
 
 .layer-select {
-  overflow: hidden;
+  display: flex;
+  min-width: 0;
+  min-height: 26px;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-2);
   text-align: left;
-  text-overflow: ellipsis;
+  border-color: transparent;
+  background: transparent;
+  transition:
+    border-color var(--designer-motion),
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    color var(--designer-motion),
+    padding-right var(--designer-motion);
 }
 
-.layer-diagnostic {
-  grid-column: 1 / -1;
+/* 悬停反馈由整行承载（行底色变化），名称按钮保持透明，覆盖 .designer-control 通用
+   hover 的边框/底色，避免"行圆角套按钮圆角"的双层盒。 */
+.layer-select:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* 行首类型图标：与物料库同一派生规则；选中行提亮为品牌色，默认保持安静。 */
+.layer-glyph {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  place-items: center;
+  color: var(--designer-text-muted);
+  transition: color var(--designer-motion);
+}
+
+.layer-select .layer-glyph svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+}
+
+.layer-row:hover .layer-glyph {
+  color: var(--designer-text-secondary);
+}
+
+.layer-row[aria-selected="true"] .layer-glyph {
+  color: var(--designer-accent);
+}
+
+.layer-row[aria-selected="true"] .layer-name {
+  color: var(--designer-text-primary);
+  font-weight: 600;
+}
+
+.layer-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--designer-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 类型标注：无背景等宽微型字，作为安静的下划线信息，不与名称争夺注意力；
+   opacity/max-width 过渡配合操作胶囊浮现时的让位（见 .layer-actions 可见性规则）。 */
+.layer-select small {
+  flex: 0 0 auto;
+  max-width: 42%;
+  min-height: 16px;
+  padding: 0;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 16px;
+  opacity: 0.75;
+  text-overflow: ellipsis;
+  transition:
+    opacity var(--designer-motion),
+    max-width var(--designer-motion);
+  white-space: nowrap;
+}
+
+.layer-count {
+  flex: 0 0 auto;
+  min-width: 16px;
+  min-height: 16px;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--designer-border-default) 32%, transparent);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* 行内紧凑控件：折叠/操作图标按钮与重命名输入，恒定尺寸避免几何抖动。 */
+.layer-row > .designer-button:not(.layer-select),
+.layer-actions .designer-button {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  min-width: 0;
+  min-height: 20px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--designer-text-muted);
+}
+
+.layer-row > .designer-button:not(.layer-select):hover:not(:disabled),
+.layer-actions .designer-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.layer-actions .designer-button[aria-pressed="true"] {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* 行内控件按压不缩放：小尺寸图标按钮的 scale 按压反馈会产生视觉抖动。 */
+.layer-row .designer-button:not(:disabled):active {
+  transform: translateZ(0);
+}
+
+.layer-row > .designer-button svg,
+.layer-actions .designer-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* 操作图标稍大，与 24px 按钮保持舒展比例。 */
+.layer-actions .designer-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 重命名模式：名称按钮隐藏、输入框同位同高替换，行几何不变。 */
+.layer-row[data-renaming="true"] .layer-select {
+  display: none;
+}
+
+.layer-row .designer-input {
+  grid-column: 2;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 var(--designer-space-2);
+  font: var(--designer-font-small);
+}
+
+/* 操作簇：行右端的绝对定位图标组，不占文档流；容器恒不拦截指针事件，
+   由每个按钮独立管理显隐（opacity 过渡）与可点性，几何恒定。
+   无容器底板：图标直接落在行背景上，与行状态色（中性 hover / accent 选中）自成一体，
+   避免"圆角行套圆角容器套圆角按钮"的多层嵌套感。 */
+.layer-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--designer-space-2);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.layer-actions .designer-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  border-radius: 6px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    border-color var(--designer-motion),
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    color var(--designer-motion),
+    opacity var(--designer-motion);
+}
+
+/* 操作图标 hover 用品牌色浅底，比通用灰底更能传达可点性。 */
+.layer-actions .designer-button:hover:not(:disabled) {
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+/* 分组间距：状态开关（隐藏/锁定）与排序（上移/下移）之间拉大空隙，无需分隔线。 */
+.layer-actions .designer-button[data-layer-move="up"] {
+  margin-left: 4px;
+}
+
+/* 逐图标浮现：hover/focus-within/选中行显示整组；已激活的隐藏/锁定开关常驻可见可点，
+   作为行级状态指示（替代文字芯片），其余时刻行右侧保持干净。 */
+.layer-row:hover .layer-actions .designer-button,
+.layer-row:focus-within .layer-actions .designer-button,
+.layer-row[aria-selected="true"] .layer-actions .designer-button,
+.layer-actions .designer-button[aria-pressed="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 排序按钮到达边界禁用：浮现时压暗（优先级高于浮现规则），常态随整组隐藏。 */
+.layer-row:hover .layer-actions .designer-button:disabled,
+.layer-row:focus-within .layer-actions .designer-button:disabled,
+.layer-row[aria-selected="true"] .layer-actions .designer-button:disabled {
+  opacity: 0.32;
+}
+
+/* 操作图标浮现时类型标注淡出并折叠（max-width 随 opacity 同步过渡），把宽度让给名称；
+   仅 opacity 归零时不可见的标注仍占据 flex 宽度，会挤占 layer-name。交互态行右侧只保留一组信息。 */
+.layer-row:hover .layer-select small,
+.layer-row:focus-within .layer-select small,
+.layer-row[aria-selected="true"] .layer-select small,
+.layer-row:has(.layer-actions .designer-button[aria-pressed="true"]) .layer-select small {
+  opacity: 0;
+  max-width: 0;
+}
+
+/* 操作图标无底板，名称按钮在交互态预留右侧空间（124px = 图标组 116px + 右偏移 4px +
+   呼吸 4px），padding 过渡平滑内收省略点，长名称不会钻到图标下面。 */
+.layer-row:hover .layer-select,
+.layer-row:focus-within .layer-select,
+.layer-row[aria-selected="true"] .layer-select,
+.layer-row:has(.layer-actions .designer-button[aria-pressed="true"]) .layer-select {
+  padding-right: 124px;
+}
+
+/* 选中行内操作图标提亮一档，与行首 accent 图标、加粗名称的强调层级一致。 */
+.layer-row[aria-selected="true"] .layer-actions .designer-button:not([aria-pressed="true"]) {
+  color: var(--designer-text-secondary);
+}
+
+/* 激活的隐藏/锁定开关以警示色常驻提示（hover 时保持警示色，不被品牌色覆盖）。 */
+.layer-actions .designer-button[aria-pressed="true"],
+.layer-actions .designer-button[aria-pressed="true"]:hover:not(:disabled) {
   color: var(--designer-warning);
 }
 
-.layer-state {
+/* 重命名模式：操作图标完全让位（输入框横跨整行；display 兜底压过常驻开关的显隐规则）。 */
+.layer-row[data-renaming="true"] .layer-actions {
+  display: none;
+}
+
+/* 诊断行：与名称文本左对齐（折叠列 20px + gap + 按钮边框 + 内边距）。 */
+.layer-diagnostic {
   grid-column: 1 / -1;
+  padding-inline-start: 27px;
+  color: var(--designer-warning);
+}
+
+/* 分页“显示更多”：整行幽灵按钮，恒定高度，悬停仅改背景色。 */
+.layer-show-more {
+  width: 100%;
+  min-height: 24px;
+  margin-top: var(--designer-space-1);
+  border-color: transparent;
+  background: transparent;
+  color: var(--designer-text-muted);
+}
+
+.layer-show-more:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-secondary);
 }
 
 .toolbar-btn {
@@ -2055,9 +2857,24 @@
   }
 
   .designer-dialog-surface,
-  .import-confirmation {
+  .import-confirmation,
+  .error-console-card {
     background: Canvas;
     border-color: CanvasText;
+    box-shadow: none;
+  }
+
+  .status-console-trigger[data-has-errors],
+  .status-console-trigger[data-has-warning] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .error-console-current,
+  .error-console-entry,
+  .error-console-empty {
+    border-color: CanvasText;
+    background: Canvas;
     box-shadow: none;
   }
 }

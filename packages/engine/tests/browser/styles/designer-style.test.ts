@@ -79,11 +79,35 @@ describe('designer workbench visual convergence', () => {
     expect(baseCss).toContain('.designer > .designer-topbar {');
     expect(workbenchCss).toContain('overflow: hidden;');
     expect(baseCss).toContain('grid-row: 1 / 2;');
-    expect(workbenchCss).toContain('min-height: 56px;');
+    expect(workbenchCss).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(workbenchCss).toContain('aspect-ratio: 16 / 10;');
+    expect(workbenchCss).toContain('scrollbar-gutter: stable;');
+    expect(workbenchCss).toContain('calc(var(--layer-depth, 0) * 20px);');
     expect(workbenchCss).toContain('.statusbar [data-project-status]');
     expect(workbenchCss).toContain('flex: 0 1 auto;');
     expect(workbenchCss).toContain('.statusbar [data-project-revision]');
     expect(workbenchCss).toContain('overflow-wrap: anywhere;');
+  });
+
+  it('R3 renders a usable collapsed rail with rotating collapse arrows (ADR-0037)', () => {
+    // 折叠轨：关闭 scrollbar-gutter 占用，标题/计数不占 flex 槽位。
+    expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail,');
+    expect(workbenchCss).toContain('.designer[data-right-collapsed="true"] .properties {');
+    expect(workbenchCss).toContain('scrollbar-gutter: auto;');
+    expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail .panel-title,');
+    expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail .panel-count,');
+    expect(workbenchCss).toContain('display: none;');
+    // 折叠按钮防压扁。
+    expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail .panel-collapse,');
+    expect(workbenchCss).toContain('flex: none;');
+    // 左右箭头折叠态旋转 180°。
+    expect(workbenchCss).toContain(
+      '.designer[data-left-collapsed="true"] .rail .panel-collapse svg,',
+    );
+    expect(workbenchCss).toContain(
+      '.designer[data-right-collapsed="true"] .properties .panel-collapse svg',
+    );
+    expect(workbenchCss).toContain('transform: rotate(180deg);');
   });
 
   it('R3 keeps a Nebula-style three-section status bar with toggles and zoom menu', () => {
@@ -109,7 +133,7 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('.topbar-save-status {');
     expect(workbenchCss).toContain('.topbar-save-status[data-state="dirty"] {');
     expect(workbenchCss).toContain('@keyframes designer-save-status-spin');
-    expect(workbenchCss).toContain('.status-item {');
+    expect(workbenchCss).not.toContain('.status-item');
   });
 
   it('R3 renders nested menus as side flyouts instead of inline rows', () => {
@@ -179,6 +203,26 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('bottom: 0;');
     expect(workbenchCss).toContain('max-width: 100%;');
     expect(workbenchCss).not.toContain('margin: 0 calc(var(--designer-space-5) * -1);');
+  });
+
+  it('collapses the layer type label in interactive rows instead of squeezing the name', () => {
+    // 交互态（hover/focus-within/选中/激活开关）类型标注 opacity 归零的同时折叠宽度，
+    // 释放给 layer-name；仅淡出会保留不可见宽度并挤占名称（历史缺陷）。
+    const interactiveRule = workbenchCss.slice(
+      workbenchCss.indexOf('.layer-row:hover .layer-select small,'),
+      workbenchCss.indexOf('/* 操作图标无底板'),
+    );
+    expect(interactiveRule).toContain('.layer-row[aria-selected="true"] .layer-select small,');
+    expect(interactiveRule).toContain(
+      '.layer-row:has(.layer-actions .designer-button[aria-pressed="true"]) .layer-select small {',
+    );
+    expect(interactiveRule).toContain('opacity: 0;');
+    expect(interactiveRule).toContain('max-width: 0;');
+    // 静息态保留类型标注（42% 上限），仅交互态折叠。
+    expect(workbenchCss).toContain('max-width: 42%;');
+    expect(workbenchCss).toContain(
+      'transition:\n    opacity var(--designer-motion),\n    max-width var(--designer-motion);',
+    );
   });
 
   it('R3 presents shortcut help as a scannable, responsive modal', () => {
@@ -274,9 +318,56 @@ describe('designer workbench visual convergence', () => {
     }
   });
 
+  it('R2 keeps the material library hierarchy token-driven and geometrically stable', () => {
+    const materialCardsCss = workbenchCss.slice(
+      workbenchCss.indexOf('.material-grid {'),
+      workbenchCss.indexOf('.designer-asset-section {'),
+    );
+
+    expect(baseCss).toContain('.material-group-navigation {');
+    expect(baseCss).toContain('grid-template-rows: 24px 28px;');
+    expect(baseCss).toContain('height: 56px;');
+    expect(baseCss).toContain('.material-group-navigation .material-group-button {');
+    expect(baseCss).toContain('display: inline-flex;');
+    expect(baseCss).toContain('.material-group-count {');
+    expect(baseCss).toContain('width: 16px;');
+    // 分组导航行高容不下原生滚动条轨道（会裁剪按钮）：两行隐藏滚动条，
+    // 可滚动性由 data-scroll-start/end 驱动的边缘渐隐表达，遮罩不含颜色以兼容主题切换。
+    expect(baseCss).not.toContain('scrollbar-gutter');
+    expect(baseCss).toContain('scrollbar-width: none;');
+    expect(baseCss).toContain('.material-group-children::-webkit-scrollbar {');
+    expect(baseCss).toContain('.material-group-children[data-scroll-start="true"],');
+    expect(baseCss).toContain('.material-group-children[data-scroll-end="true"],');
+    expect(baseCss).toContain('mask-image: linear-gradient(');
+    expect(baseCss).toContain('.material-filters .designer-button[aria-pressed="true"]');
+    expect(baseCss).toContain('.material-search-clear:not(:disabled):active');
+    expect(baseCss).toContain(
+      '.material-library-status-actions .designer-button:not(:disabled):active',
+    );
+    expect(workbenchCss).toContain('.status-console-trigger {');
+    expect(workbenchCss).toContain('width: 84px;');
+    expect(workbenchCss).toContain('.designer-error-console {');
+    expect(workbenchCss).toContain('.error-console-current {');
+    expect(materialCardsCss).toContain('aspect-ratio: 16 / 10;');
+    // 自适应列数：卡片最小 128px（+6px 列距），面板拖宽至约 300px 时一行两列，窄面板回退单列；
+    // min(128px, 100%) 保证最窄面板（160px）下卡片不超出轨宽。
+    expect(materialCardsCss).toContain(
+      'grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr));',
+    );
+    expect(materialCardsCss).toContain('hsl(var(--material-hue, 215)');
+    // 交互只做绘制反馈：图标缩放、边框与阴影变化，禁止位移类变换（防抖）。
+    expect(materialCardsCss).not.toContain('translateY(');
+  });
+
   it('R2 disables editor motion under reduced motion and keeps system scrollbar in forced colors', () => {
     expect(baseCss).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(baseCss).toContain('.designer-control,');
+    expect(baseCss).toContain('.material-card,');
+    expect(baseCss).toContain('.designer-error-console,');
     expect(baseCss).toMatch(/scrollbar-color:\s*auto;/);
     expect(baseCss).toMatch(/@media\s*\(forced-colors:\s*active\)/);
+    expect(baseCss).toContain(
+      '.material-group-navigation .material-group-button[aria-pressed="true"]',
+    );
   });
 });

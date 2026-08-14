@@ -18,6 +18,7 @@ class FakeElement {
   readonly dataset: Record<string, string> = {};
   checked = false;
   disabled = false;
+  focus: unknown = undefined;
   hidden = false;
   selected = false;
   title = '';
@@ -33,7 +34,22 @@ class FakeElement {
   ) {}
 
   closest<T extends Element>(selector: string): T | null {
-    return this.closestResult as T | null;
+    if (selector.startsWith('[data-')) {
+      const key = selector
+        .slice(6, -1)
+        .replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+      if ((this.dataset as Record<string, string>)[key] !== undefined) return this as unknown as T;
+      const result = this.closestResult;
+      if (
+        result !== null &&
+        (result.dataset as Record<string, string> | undefined)?.[key] !== undefined
+      ) {
+        return result as unknown as T;
+      }
+      return null;
+    }
+    if (selector === '.designer') return this.closestResult as unknown as T;
+    return null;
   }
 
   appendChild(child: FakeElement): FakeElement {
@@ -557,5 +573,164 @@ describe('DesignerPanelController material add', () => {
     expect(commands).toHaveLength(1);
     const component = (commands[0] as { component: { dataSource: unknown } }).component;
     expect(component.dataSource).toBeNull();
+  });
+});
+describe('DesignerPanelController material search and keyboard reachability', () => {
+  function createController(commands: unknown[]): DesignerPanelController {
+    return new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: (command) => {
+        commands.push(command);
+        return { ok: true, value: document(), diagnostics: [] };
+      },
+      executeTransaction: () => ({ ok: true, value: document(), diagnostics: [] }),
+      getCatalog: () =>
+        ({
+          get: (type: string) => ({
+            manifest: {
+              type,
+              name: '文本',
+              defaultSize: { width: 100, height: 40 },
+              defaultProps: {},
+              defaultStyle: {},
+            },
+          }),
+        }) as unknown as BaseScreenMaterialCatalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+  }
+
+  function searchLayout(
+    input: { value: string; focus: ReturnType<typeof vi.fn> },
+    clear: FakeElement,
+  ) {
+    return {
+      querySelector: (selector: string) =>
+        selector === '[data-material-search]'
+          ? input
+          : selector === '[data-material-search-clear]'
+            ? clear
+            : null,
+      querySelectorAll: () => [],
+    } as unknown as FakeElement;
+  }
+
+  it('R3 clears the search from the clear button and restores focus to the input', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const controller = createController([]);
+    const input = { value: '表格', focus: vi.fn() } as unknown as HTMLInputElement & {
+      focus: ReturnType<typeof vi.fn>;
+    };
+    const clear = new FakeElement('button', new FakeDocument());
+    clear.dataset.materialSearchClear = 'true';
+    const layout = searchLayout(input, clear);
+    clear.closestResult = layout;
+    const target = new FakeElement('span', new FakeDocument());
+    target.closestResult = clear;
+
+    controller.onClick({ target } as unknown as Event);
+
+    expect(input.value).toBe('');
+    expect(input.focus).toHaveBeenCalledTimes(1);
+    expect(clear.hidden).toBe(true);
+  });
+
+  it('R3 clears a non-empty search with Escape and consumes the key', () => {
+    vi.stubGlobal('HTMLInputElement', FakeElement);
+    const controller = createController([]);
+    const clear = new FakeElement('button', new FakeDocument());
+    clear.dataset.materialSearchClear = 'true';
+    const input = new FakeElement('input', new FakeDocument());
+    input.dataset.materialSearch = 'true';
+    input.value = '图表';
+    input.closestResult = searchLayout(
+      input as unknown as { value: string; focus: ReturnType<typeof vi.fn> },
+      clear,
+    );
+    input.focus = vi.fn();
+    const preventDefault = vi.fn();
+
+    const handled = controller.onKeyDown({
+      target: input as unknown as EventTarget,
+      key: 'Escape',
+      isComposing: false,
+      preventDefault,
+    } as unknown as KeyboardEvent);
+
+    expect(handled).toBe(true);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(input.value).toBe('');
+  });
+
+  it('R3 adds a material with Enter at the control level without the group-enter command', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const commands: unknown[] = [];
+    const controller = createController(commands);
+    const card = new FakeElement('button', new FakeDocument());
+    card.dataset.materialType = 'base.text';
+    card.closestResult = {
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    } as unknown as FakeElement;
+    const preventDefault = vi.fn();
+
+    const handled = controller.onKeyDown({
+      target: card as unknown as EventTarget,
+      key: 'Enter',
+      isComposing: false,
+      preventDefault,
+    } as unknown as KeyboardEvent);
+
+    expect(handled).toBe(true);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(commands).toHaveLength(1);
+    expect((commands[0] as { component: { type: string } }).component.type).toBe('base.text');
+  });
+
+  it('R3 moves focus across visible material cards with arrow keys and Home/End', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const controller = createController([]);
+    const first = new FakeElement('button', new FakeDocument());
+    first.dataset.materialType = 'base.text';
+    first.focus = vi.fn();
+    const second = new FakeElement('button', new FakeDocument());
+    second.dataset.materialType = 'base.table';
+    second.focus = vi.fn();
+    const layout = {
+      querySelectorAll: (selector: string) =>
+        selector === '[data-material-type]' ? [first, second] : [],
+    } as unknown as FakeElement;
+    first.closestResult = layout;
+    second.closestResult = layout;
+    const preventDefault = vi.fn();
+
+    const handled = controller.onKeyDown({
+      target: first as unknown as EventTarget,
+      key: 'ArrowDown',
+      preventDefault,
+    } as unknown as KeyboardEvent);
+
+    expect(handled).toBe(true);
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(second.focus).toHaveBeenCalledTimes(1);
+    const homeHandled = controller.onKeyDown({
+      target: second as unknown as EventTarget,
+      key: 'Home',
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent);
+    expect(homeHandled).toBe(true);
+    expect(first.focus).toHaveBeenCalledTimes(1);
   });
 });

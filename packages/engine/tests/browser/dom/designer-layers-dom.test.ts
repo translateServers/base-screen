@@ -11,7 +11,9 @@ class FakeElement {
   readonly attributes: Record<string, string> = {};
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
-  readonly style: Record<string, string> = {};
+  readonly style: Record<string, string> & {
+    setProperty?: (name: string, value: string) => void;
+  } = {};
   ariaCurrent = '';
   ariaLabel = '';
   ariaLevel = '';
@@ -25,7 +27,11 @@ class FakeElement {
   type = '';
   value = '';
 
-  constructor(readonly ownerDocument: FakeDocument) {}
+  constructor(readonly ownerDocument: FakeDocument) {
+    this.style.setProperty = (name: string, value: string) => {
+      this.style[name] = value;
+    };
+  }
 
   appendChild(child: FakeElement): FakeElement {
     this.children.push(child);
@@ -141,6 +147,7 @@ describe('designer layers view', () => {
       collapsed: new Set(),
       dropTargetId: 'container',
       renameDrafts: new Map([['container', '本地草稿']]),
+      renamingId: 'container',
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
       canMove: () => true,
     });
@@ -150,13 +157,63 @@ describe('designer layers view', () => {
     expect(row.ariaSelected).toBe('true');
     expect(row.ariaCurrent).toBe('true');
     expect(row.attributes['aria-description']).toBe('已隐藏，已锁定，已选中，当前焦点，放置目标');
+    expect(row.dataset.renaming).toBe('true');
     expect(row.draggable).toBe(false);
-    expect(row.children.find((child) => child.className === 'layer-state')?.textContent).toBe(
-      '已隐藏，已锁定，已选中，当前焦点，放置目标',
-    );
+    // 不渲染可见状态芯片：隐藏/锁定由常驻的警示色开关图标表达（aria-pressed），
+    // 完整状态在 aria-description 中（见上方断言）。
+    expect(row.children.find((child) => child.className === 'layer-state')).toBeUndefined();
+    const actions = row.children.find((child) => child.className === 'layer-actions');
+    expect(actions?.children.map((control) => control.ariaPressed)).toEqual([
+      'true',
+      'true',
+      '',
+      '',
+    ]);
     expect(row.children.find((child) => child.dataset.layerRename === 'container')?.value).toBe(
       '本地草稿',
     );
+  });
+
+  it('R8 renders the rename input only while renaming and hides the name button in that mode', () => {
+    const ownerDocument = new FakeDocument();
+    const layers = new FakeElement(ownerDocument);
+    const view = createDesignerLayerView(document([component('container', null, 0)]), undefined);
+
+    renderDesignerLayers(layers as unknown as HTMLElement, view, {
+      interaction: { selectedComponentIds: [], focusedComponentId: null },
+      search: '',
+      collapsed: new Set(),
+      dropTargetId: undefined,
+      renameDrafts: new Map(),
+      renamingId: undefined,
+      renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+      canMove: () => true,
+    });
+
+    const idleRow = layers.children[1]!.children[0]!;
+    expect(idleRow.dataset.renaming).toBeUndefined();
+    expect(idleRow.children.find((child) => child.dataset.layerRename)).toBeUndefined();
+    const idleSelect = idleRow.children.find((child) => child.dataset.layerSelect !== undefined);
+    expect(
+      idleSelect?.children.find((child) => child.className === 'layer-name')?.textContent,
+    ).toBe('container');
+
+    renderDesignerLayers(layers as unknown as HTMLElement, view, {
+      interaction: { selectedComponentIds: [], focusedComponentId: null },
+      search: '',
+      collapsed: new Set(),
+      dropTargetId: undefined,
+      renameDrafts: new Map(),
+      renamingId: 'container',
+      renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+      canMove: () => true,
+    });
+
+    const renamingRow = layers.children[1]!.children[0]!;
+    expect(renamingRow.dataset.renaming).toBe('true');
+    expect(
+      renamingRow.children.find((child) => child.dataset.layerRename === 'container')?.value,
+    ).toBe('container');
   });
 
   it('R6 renders large layer trees in stable pages with an explicit continuation control', () => {
@@ -177,6 +234,7 @@ describe('designer layers view', () => {
       collapsed: new Set(),
       dropTargetId: undefined,
       renameDrafts: new Map(),
+      renamingId: undefined,
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
       canMove: () => true,
     });

@@ -91,8 +91,11 @@ try {
       }
       if (viewport.width > 800) {
         await assertDesktopWorkbench(designer, viewport);
-        await assertMaterialLibraryHostState(page, designer);
+        await assertNativeEventsToggle(designer, page);
+        await assertMaterialLibraryGrouping(page, designer);
+        await assertMaterialLibraryHostState(page, designer, viewport);
         await assertDesignerControlStyles(designer);
+        await assertLeftPanelDesign(designer, page, viewport);
         const geometry = await designer.evaluate((element) => {
           const root = element.shadowRoot;
           const topbar = root.querySelector('.designer-topbar');
@@ -101,12 +104,23 @@ try {
           const topbarBounds = topbar?.getBoundingClientRect();
           const canvasBounds = canvas?.getBoundingClientRect();
           const workspaceStyle = workspace === null ? undefined : getComputedStyle(workspace);
+          const layout = root.querySelector('.designer');
+          const layoutStyle = layout === null ? undefined : getComputedStyle(layout);
           return {
             topbar: root.querySelector('.designer-topbar')?.getBoundingClientRect().height,
             status: root.querySelector('.statusbar')?.getBoundingClientRect().height,
             ruler: root.querySelector('.ruler-horizontal')?.getBoundingClientRect().height,
             left: root.querySelector('[data-left-panel]')?.getBoundingClientRect().width,
             right: root.querySelector('[data-right-panel]')?.getBoundingClientRect().width,
+            // 面板实际宽度必须与 CSS 默认变量一致（不硬编码具体默认值）。
+            defaultLeft:
+              layoutStyle === undefined
+                ? -1
+                : parseFloat(layoutStyle.getPropertyValue('--left-panel-width')),
+            defaultRight:
+              layoutStyle === undefined
+                ? -1
+                : parseFloat(layoutStyle.getPropertyValue('--right-panel-width')),
             topbarBottom: topbarBounds?.bottom,
             canvasTop: canvasBounds?.top,
             gridTemplateRows: workspaceStyle?.gridTemplateRows,
@@ -116,8 +130,8 @@ try {
           geometry.topbar !== 48 ||
           geometry.status !== 30 ||
           geometry.ruler !== 20 ||
-          geometry.left !== 224 ||
-          geometry.right !== 272 ||
+          Math.round(geometry.left) !== geometry.defaultLeft ||
+          Math.round(geometry.right) !== geometry.defaultRight ||
           geometry.canvasTop === undefined ||
           geometry.topbarBottom === undefined ||
           geometry.canvasTop < geometry.topbarBottom
@@ -652,9 +666,13 @@ try {
           throw new Error('BROWSER_HARNESS_CONTAINER_LIBRARY_VISIBLE_FAILED');
         }
         await authoringDesigner.locator('[data-panel-tab="layers"]').click();
-        await authoringDesigner.locator('[data-layer-select]', { hasText: '\u77e9\u5f62' }).click();
+        await authoringDesigner
+          .locator('[data-layer-select]', { hasText: '矩形' })
+          .locator('.layer-name')
+          .click();
         await authoringDesigner
           .locator('[data-layer-select]', { hasText: '\u692d\u5706' })
+          .locator('.layer-name')
           .click({ modifiers: ['Control'] });
         await authoringDesigner.locator('[data-viewport]').focus();
         await page.keyboard.press('Control+g');
@@ -1007,10 +1025,706 @@ try {
   await server.close();
 }
 
-async function assertMaterialLibraryHostState(page, designer) {
+// ADR-0032 左侧面板重构验证：信息架构、缩略图网格、键盘可达、折叠图标轨、图层树增强与无抖动。
+async function assertLeftPanelDesign(designer, page, viewport) {
+  const ia = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const rail = root.querySelector('[data-left-panel]');
+    const railChildren = [...rail.children].map((child) => child.className || '');
+    const grid = root.querySelector('[data-material-grid]');
+    const columns = grid === null ? '' : getComputedStyle(grid).gridTemplateColumns;
+    const cards = [...root.querySelectorAll('[data-material-card]:not([hidden])')];
+    const first = cards[0];
+    const second = cards[1];
+    const firstHue =
+      first?.querySelector('.material-thumb')?.style.getPropertyValue('--material-hue') ?? '';
+    const firstCategory = first?.dataset.materialCategory ?? '';
+    const sameCategoryHue = cards
+      .filter((card) => card.dataset.materialCategory === firstCategory)
+      .every(
+        (card) =>
+          card.querySelector('.material-thumb')?.style.getPropertyValue('--material-hue') ===
+          firstHue,
+      );
+    return {
+      railChildren,
+      railWidth: Math.round(rail.getBoundingClientRect().width),
+      tabIndex: railChildren.indexOf('rail-tabs'),
+      viewIndex: railChildren.indexOf('rail-view'),
+      viewCount: railChildren.filter((name) => name === 'rail-view').length,
+      materialsToolsInsideView:
+        root.querySelector('[data-materials] [data-material-search]') !== null,
+      gridDisplay: grid === null ? '' : getComputedStyle(grid).display,
+      // 列数随面板宽度变化（auto-fill，窄面板单列、宽面板两列）：只断言列宽一致与
+      // 卡片等宽，不硬编码列数/同列关系。
+      columnValues: columns.split(' '),
+      cardsEqualWidth:
+        first !== undefined &&
+        second !== undefined &&
+        Math.abs(first.getBoundingClientRect().width - second.getBoundingClientRect().width) < 1,
+      thumbsHaveIcons: cards
+        .slice(0, 4)
+        .every((card) => card.querySelector('.material-thumb svg') !== null),
+      hueSet: firstHue !== '',
+      sameCategoryHue,
+    };
+  });
+  if (
+    ia.tabIndex !== 1 ||
+    ia.viewIndex !== 2 ||
+    ia.viewCount !== 2 ||
+    !ia.materialsToolsInsideView ||
+    ia.gridDisplay !== 'grid' ||
+    new Set(ia.columnValues).size !== 1 ||
+    !ia.cardsEqualWidth ||
+    !ia.thumbsHaveIcons ||
+    !ia.hueSet ||
+    !ia.sameCategoryHue
+  ) {
+    throw new Error(`BROWSER_HARNESS_LEFT_PANEL_IA_FAILED:${JSON.stringify(ia)}`);
+  }
+
+  // R2：hover 仅改变阴影，不改变布局几何（offset 与兄弟元素矩形不变）。
+  const card = designer.locator('[data-material-card]:not([hidden]) .material-card').first();
+  const beforeHover = await card.evaluate((element) => ({
+    shadow: getComputedStyle(element).boxShadow,
+    offset: {
+      top: element.offsetTop,
+      left: element.offsetLeft,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+    },
+    sibling: element.nextElementSibling?.getBoundingClientRect().toJSON(),
+  }));
+  await card.hover();
+  await page.waitForTimeout(250);
+  const afterHover = await card.evaluate((element) => ({
+    shadow: getComputedStyle(element).boxShadow,
+    offset: {
+      top: element.offsetTop,
+      left: element.offsetLeft,
+      width: element.offsetWidth,
+      height: element.offsetHeight,
+    },
+    sibling: element.nextElementSibling?.getBoundingClientRect().toJSON(),
+  }));
+  if (
+    JSON.stringify(beforeHover.offset) !== JSON.stringify(afterHover.offset) ||
+    JSON.stringify(beforeHover.sibling) !== JSON.stringify(afterHover.sibling) ||
+    beforeHover.shadow === afterHover.shadow
+  ) {
+    throw new Error('BROWSER_HARNESS_LEFT_PANEL_HOVER_JITTER_FAILED');
+  }
+
+  // R3：搜索清除按钮与 Escape 清空（保持焦点）。
+  const search = designer.locator('[data-material-search]');
+  await search.fill('echarts');
+  const clear = designer.locator('[data-material-search-clear]');
+  if (!(await clear.isVisible())) {
+    throw new Error('BROWSER_HARNESS_LEFT_PANEL_CLEAR_HIDDEN');
+  }
+  await clear.click();
+  const cleared = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const input = root.querySelector('[data-material-search]');
+    return {
+      value: input?.value ?? 'x',
+      focused: root.activeElement === input,
+      clearHidden: root.querySelector('[data-material-search-clear]')?.hidden,
+      visible: root.querySelectorAll('[data-material-card]:not([hidden])').length,
+      total: root.querySelectorAll('[data-material-card]').length,
+    };
+  });
+  if (
+    cleared.value !== '' ||
+    !cleared.focused ||
+    cleared.clearHidden !== true ||
+    cleared.visible !== cleared.total
+  ) {
+    throw new Error(`BROWSER_HARNESS_LEFT_PANEL_CLEAR_FAILED:${JSON.stringify(cleared)}`);
+  }
+  await search.fill('\u56fe\u8868');
+  await page.keyboard.press('Escape');
+  const escaped = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const input = root.querySelector('[data-material-search]');
+    return {
+      value: input?.value ?? 'x',
+      focused: root.activeElement === input,
+      clearHidden: root.querySelector('[data-material-search-clear]')?.hidden,
+    };
+  });
+  if (escaped.value !== '' || !escaped.focused || escaped.clearHidden !== true) {
+    throw new Error(`BROWSER_HARNESS_LEFT_PANEL_ESCAPE_FAILED:${JSON.stringify(escaped)}`);
+  }
+
+  // R3：方向键 roving focus 与 Enter 添加、撤销恢复。
+  const visibleTypes = await designer.evaluate((element) =>
+    [
+      ...element.shadowRoot.querySelectorAll(
+        '[data-material-card]:not([hidden]) [data-material-type]',
+      ),
+    ]
+      .filter((button) => !button.disabled)
+      .map((button) => button.dataset.materialType),
+  );
+  const firstCard = designer
+    .locator('[data-material-card]:not([hidden]) [data-material-type]')
+    .first();
+  await firstCard.focus();
+  await page.keyboard.press('ArrowRight');
+  const secondType = await designer.evaluate(
+    (element) => element.shadowRoot.activeElement?.dataset?.materialType,
+  );
+  await page.keyboard.press('End');
+  const lastType = await designer.evaluate(
+    (element) => element.shadowRoot.activeElement?.dataset?.materialType,
+  );
+  await page.keyboard.press('Home');
+  const firstType = await designer.evaluate(
+    (element) => element.shadowRoot.activeElement?.dataset?.materialType,
+  );
+  if (
+    secondType !== visibleTypes[1] ||
+    lastType !== visibleTypes.at(-1) ||
+    firstType !== visibleTypes[0]
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LEFT_PANEL_KEYBOARD_FAILED:${JSON.stringify({
+        visibleTypes,
+        secondType,
+        lastType,
+        firstType,
+      })}`,
+    );
+  }
+  const countBeforeAdd = await componentCount(page);
+  await page.keyboard.press('Enter');
+  if ((await componentCount(page)) !== countBeforeAdd + 1) {
+    throw new Error('BROWSER_HARNESS_LEFT_PANEL_ENTER_ADD_FAILED');
+  }
+  await designer.locator('.designer-topbar [data-action="undo"]').first().click();
+  if ((await componentCount(page)) !== countBeforeAdd) {
+    throw new Error('BROWSER_HARNESS_LEFT_PANEL_UNDO_RESTORE_FAILED');
+  }
+
+  // R4：折叠为 48px 图标轨，点击图标 Tab 展开并切换；展开/折叠不引起工作区几何跳动。
+  const workspaceBefore = await designer.locator('.workspace').boundingBox();
+  await designer.locator('[data-panel-collapse="left"]').click();
+  const collapsed = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const rail = root.querySelector('[data-left-panel]');
+    const tabs = [...rail.querySelectorAll('[data-panel-tab]')];
+    return {
+      state: root.querySelector('.designer').dataset.leftCollapsed,
+      railWidth: rail.getBoundingClientRect().width,
+      tabsVisible: tabs.every((tab) => {
+        const rect = tab.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }),
+      labelsHidden: tabs.every(
+        (tab) => getComputedStyle(tab.querySelector('.rail-tab-label')).display === 'none',
+      ),
+      materialsHidden: getComputedStyle(root.querySelector('[data-materials]')).display === 'none',
+    };
+  });
+  if (
+    collapsed.state !== 'true' ||
+    collapsed.railWidth !== 48 ||
+    !collapsed.tabsVisible ||
+    !collapsed.labelsHidden ||
+    !collapsed.materialsHidden
+  ) {
+    throw new Error(`BROWSER_HARNESS_LEFT_PANEL_RAIL_FAILED:${JSON.stringify(collapsed)}`);
+  }
+  await designer.locator('[data-panel-tab="layers"]').click();
+  const expanded = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      state: root.querySelector('.designer').dataset.leftCollapsed,
+      layersSelected: root.querySelector('[data-panel-tab="layers"]').getAttribute('aria-selected'),
+      layersVisible: !root.querySelector('[data-layers]').hidden,
+      materialsHidden: root.querySelector('[data-materials]').hidden,
+    };
+  });
+  if (
+    expanded.state !== 'false' ||
+    expanded.layersSelected !== 'true' ||
+    !expanded.layersVisible ||
+    !expanded.materialsHidden
+  ) {
+    throw new Error(`BROWSER_HARNESS_LEFT_PANEL_RAIL_EXPAND_FAILED:${JSON.stringify(expanded)}`);
+  }
+  const workspaceAfter = await designer.locator('.workspace').boundingBox();
+  if (
+    workspaceBefore === null ||
+    workspaceAfter === null ||
+    Math.abs(workspaceBefore.x - workspaceAfter.x) > 1 ||
+    workspaceBefore.width !== workspaceAfter.width
+  ) {
+    throw new Error('BROWSER_HARNESS_LEFT_PANEL_RAIL_JITTER_FAILED');
+  }
+
+  // ADR-0037：真实鼠标拖宽后折叠必须收敛到 48px 图标轨，展开恢复拖拽宽度；折叠态箭头 180°
+  // 旋转、折叠按钮不被压扁（此前按钮被压缩到约 2px）；折叠态拖拽有展开阈值（48+24，参考
+  // VSCode）：阈值内保持折叠，越过阈值才展开。完成后把左右面板拖回默认宽度恢复现场。
+  const layoutBox = await designer.locator('.designer').boundingBox();
+  if (layoutBox === null) {
+    throw new Error('BROWSER_HARNESS_PANEL_HANDLE_MISSING');
+  }
+  const dragTo = async (side, targetX) => {
+    const box = await designer.locator(`[data-panel-handle="${side}"]`).boundingBox();
+    if (box === null) throw new Error('BROWSER_HARNESS_PANEL_HANDLE_MISSING');
+    const startY = box.y + box.height / 2;
+    const startX = box.x + box.width / 2;
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(targetX, startY, { steps: 4 });
+    await page.mouse.up();
+  };
+  // 宽度 = clientX - bounds.left - 边框1px - 列中线(2.5px)；右面板为 bounds.right 反向。
+  // 读取面板 CSS 默认宽度（不硬编码具体默认值），供最后拖回默认宽度恢复现场。
+  const defaultWidths = await page.evaluate(() => {
+    const style = getComputedStyle(
+      window.baseScreenHarness.designer.shadowRoot.querySelector('.designer'),
+    );
+    return {
+      left: parseFloat(style.getPropertyValue('--left-panel-width')),
+      right: parseFloat(style.getPropertyValue('--right-panel-width')),
+    };
+  });
+  await dragTo('left', layoutBox.x + 1 + 380 + 2.5);
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - 360 - 2.5);
+  const readPanel = () =>
+    page.evaluate(() => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      return {
+        left: Math.round(root.querySelector('[data-left-panel]').getBoundingClientRect().width),
+        right: Math.round(root.querySelector('.properties').getBoundingClientRect().width),
+        leftState: root.querySelector('.designer').dataset.leftCollapsed,
+        rightState: root.querySelector('.designer').dataset.rightCollapsed,
+      };
+    });
+  const collapseEvaluate = async (side) => {
+    await page.evaluate((panelSide) => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      root.querySelector(`[data-panel-collapse="${panelSide}"]`).click();
+    }, side);
+    // 等待折叠过渡（--designer-motion 0.16s）结束后再读箭头 transform。
+    await new Promise((resolve) => setTimeout(resolve, 220));
+    return page.evaluate((panelSide) => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      const button = root.querySelector(`[data-panel-collapse="${panelSide}"]`);
+      return {
+        arrow: getComputedStyle(button.querySelector('svg')).transform,
+        buttonWidth: Math.round(button.getBoundingClientRect().width),
+      };
+    }, side);
+  };
+
+  const dragged = await readPanel();
+  const collapsedLeft = { ...(await collapseEvaluate('left')), ...(await readPanel()) };
+  if (
+    dragged.left !== 380 ||
+    dragged.right !== 360 ||
+    collapsedLeft.leftState !== 'true' ||
+    collapsedLeft.left !== 48 ||
+    collapsedLeft.arrow !== 'matrix(-1, 0, 0, -1, 0, 0)' ||
+    collapsedLeft.buttonWidth < 28
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_PANEL_COLLAPSE_ROUNDTRIP_FAILED:${JSON.stringify({
+        dragged,
+        collapsedLeft,
+      })}`,
+    );
+  }
+  // 折叠态拖拽阈值：宽度 58 < 48+24 → 保持折叠；拖到 380 → 展开并应用宽度。
+  await dragTo('left', layoutBox.x + 1 + 58 + 2.5);
+  const underThreshold = await readPanel();
+  await dragTo('left', layoutBox.x + 1 + 380 + 2.5);
+  const expandedLeft = await readPanel();
+
+  const collapsedRight = { ...(await collapseEvaluate('right')), ...(await readPanel()) };
+  if (
+    collapsedRight.rightState !== 'true' ||
+    collapsedRight.right !== 48 ||
+    collapsedRight.arrow !== 'matrix(-1, 0, 0, -1, 0, 0)' ||
+    collapsedRight.buttonWidth < 28
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_PANEL_COLLAPSE_ROUNDTRIP_FAILED:${JSON.stringify({ collapsedRight })}`,
+    );
+  }
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - 58 - 2.5);
+  const underThresholdRight = await readPanel();
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - 360 - 2.5);
+  const expandedRight = await readPanel();
+  if (
+    underThreshold.leftState !== 'true' ||
+    underThreshold.left !== 48 ||
+    expandedLeft.leftState !== 'false' ||
+    expandedLeft.left !== 380 ||
+    underThresholdRight.rightState !== 'true' ||
+    underThresholdRight.right !== 48 ||
+    expandedRight.rightState !== 'false' ||
+    expandedRight.right !== 360
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_PANEL_COLLAPSE_THRESHOLD_FAILED:${JSON.stringify({
+        underThreshold,
+        expandedLeft,
+        underThresholdRight,
+        expandedRight,
+      })}`,
+    );
+  }
+  // 拖回默认宽度，恢复后续断言的现场。
+  await dragTo('left', layoutBox.x + 1 + defaultWidths.left + 2.5);
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - defaultWidths.right - 2.5);
+  const restored = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return {
+      left: Math.round(root.querySelector('[data-left-panel]').getBoundingClientRect().width),
+      right: Math.round(root.querySelector('.properties').getBoundingClientRect().width),
+    };
+  });
+  if (restored.left !== defaultWidths.left || restored.right !== defaultWidths.right) {
+    throw new Error(
+      `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, defaultWidths })}`,
+    );
+  }
+  await designer.locator('[data-panel-tab="materials"]').click();
+
+  // R5：图层树增强（嵌套文档独立实例验证：引导线变量、子项计数、hover 显示操作簇）。
+  await page.evaluate(() => {
+    const { catalog } = window.baseScreenHarness;
+    const probe = document.createElement('base-screen-designer');
+    probe.setAttribute('data-layer-probe', 'true');
+    probe.catalog = catalog;
+    probe.document = {
+      canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
+      components: [
+        {
+          id: 'probe-group',
+          type: 'base.container',
+          name: '\u5bb9\u5668',
+          parentId: null,
+          position: { x: 0, y: 0 },
+          size: { width: 200, height: 160 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+        },
+        {
+          id: 'probe-a',
+          type: 'base.text',
+          name: '\u5b50\u9879\u7532',
+          parentId: 'probe-group',
+          position: { x: 0, y: 0 },
+          size: { width: 80, height: 32 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+        },
+        {
+          id: 'probe-b',
+          type: 'base.text',
+          name: '\u5b50\u9879\u4e59',
+          parentId: 'probe-group',
+          position: { x: 0, y: 40 },
+          size: { width: 80, height: 32 },
+          rotation: 0,
+          zIndex: 1,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+        },
+      ],
+      variables: [],
+      blueprint: { rules: [] },
+    };
+    probe.style.cssText = 'position:fixed;inset:0;z-index:99;width:1024px;height:640px;';
+    document.body.appendChild(probe);
+  });
+  const probe = page.locator('base-screen-designer[data-layer-probe]');
+  await probe.locator('[data-panel-tab="layers"]').click();
+  const layerProbe = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    const groupRow = root.querySelector('[data-layer-id="probe-group"]');
+    const childRow = root.querySelector('[data-layer-id="probe-a"]');
+    const actions = childRow?.querySelector('.layer-actions');
+    // 显隐已下沉到按钮级（容器恒 opacity:1 + pointer-events:none），测量操作按钮本体。
+    const actionButton = childRow?.querySelector(
+      '.layer-actions [data-layer-toggle], .layer-actions [data-layer-move]',
+    );
+    return {
+      childDepth: childRow?.style.getPropertyValue('--layer-depth'),
+      childIndent: childRow?.style.paddingInlineStart,
+      count: groupRow?.querySelector('.layer-count')?.textContent,
+      actionButtons:
+        actions === null || actions === undefined
+          ? 0
+          : actions.querySelectorAll('[data-layer-toggle], [data-layer-move]').length,
+      actionButtonOpacity:
+        actionButton === null || actionButton === undefined
+          ? ''
+          : getComputedStyle(actionButton).opacity,
+      iconButtons: [
+        ...(groupRow?.querySelectorAll('[data-layer-toggle] svg, [data-layer-move] svg') ?? []),
+      ].length,
+    };
+  });
+  if (
+    layerProbe.childDepth !== '1' ||
+    layerProbe.childIndent !== '20px' ||
+    layerProbe.count !== '2' ||
+    layerProbe.actionButtons !== 4 ||
+    layerProbe.actionButtonOpacity !== '0' ||
+    layerProbe.iconButtons !== 4
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_TREE_DESIGN_FAILED:${JSON.stringify(layerProbe)}`);
+  }
+  const childRow = probe.locator('.layer-row[data-layer-id="probe-a"]');
+  const childHeightBefore = await childRow.evaluate((element) => element.offsetHeight);
+  await childRow.hover();
+  await page.waitForTimeout(250);
+  const childHeightAfter = await childRow.evaluate((element) => element.offsetHeight);
+  const actionsOpacity = await childRow
+    .locator('.layer-actions .designer-button')
+    .first()
+    .evaluate((element) => getComputedStyle(element).opacity);
+  if (actionsOpacity !== '1' || childHeightBefore !== childHeightAfter) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_ACTIONS_REVEAL_FAILED:${JSON.stringify({ actionsOpacity, childHeightBefore, childHeightAfter })}`,
+    );
+  }
+  await page.evaluate(() =>
+    document.querySelector('base-screen-designer[data-layer-probe]')?.remove(),
+  );
+
+  await designer.locator('[data-left-panel]').screenshot({
+    path: `${screenshotDirectory}/left-panel-${viewport.width}x${viewport.height}.png`,
+  });
+}
+
+async function assertMaterialLibraryGrouping(page, designer) {
+  const rootState = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      navigationHidden: root.querySelector('[data-material-groups]')?.hidden,
+      categoriesHidden: root.querySelector('[data-material-categories]')?.hidden,
+      groups: [...root.querySelectorAll('[data-material-group]')].map(
+        (group) => group.dataset.materialGroup,
+      ),
+      cards: [...root.querySelectorAll('[data-material-card]')].map(
+        (card) => card.dataset.materialCard,
+      ),
+      gridTop: root.querySelector('[data-material-grid]')?.getBoundingClientRect().top,
+      visual: (() => {
+        const navigation = root.querySelector('[data-material-groups]');
+        const breadcrumbs = navigation?.querySelector('.material-group-breadcrumbs');
+        const children = navigation?.querySelector('.material-group-children');
+        const group = navigation?.querySelector('[data-material-group]');
+        const count = group?.querySelector('.material-group-count');
+        const selectedFilter = root.querySelector('[data-material-filter="all"]');
+        const card = root.querySelector('[data-material-card] .material-card');
+        const thumb = card?.querySelector('.material-thumb');
+        return {
+          navigationHeight: navigation?.getBoundingClientRect().height,
+          breadcrumbsHeight: breadcrumbs?.getBoundingClientRect().height,
+          childrenHeight: children?.getBoundingClientRect().height,
+          groupDisplay:
+            group === null || group === undefined ? '' : getComputedStyle(group).display,
+          countDisplay:
+            count === null || count === undefined ? '' : getComputedStyle(count).display,
+          selectedFilterShadow:
+            selectedFilter === null || selectedFilter === undefined
+              ? ''
+              : getComputedStyle(selectedFilter).boxShadow,
+          cardMinHeight:
+            card === null || card === undefined ? '' : getComputedStyle(card).minHeight,
+          thumbAspectRatio:
+            thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).aspectRatio,
+          thumbBackgroundImage:
+            thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).backgroundImage,
+        };
+      })(),
+    };
+  });
+  const expectedCards = [
+    'base.text',
+    'base.rectangle',
+    'base.ellipse',
+    'base.image',
+    'base.chart',
+    'base.echarts',
+    'base.table',
+    'harness.react-button',
+    'harness.vue-button',
+  ];
+  if (
+    rootState.navigationHidden ||
+    !rootState.categoriesHidden ||
+    rootState.groups.join(',') !== 'foundation,data,bridges' ||
+    rootState.cards.join(',') !== expectedCards.join(',') ||
+    rootState.visual.navigationHeight !== 56 ||
+    rootState.visual.breadcrumbsHeight !== 24 ||
+    rootState.visual.childrenHeight !== 28 ||
+    rootState.visual.groupDisplay !== 'flex' ||
+    rootState.visual.countDisplay !== 'grid' ||
+    rootState.visual.selectedFilterShadow === 'none' ||
+    rootState.visual.cardMinHeight !== '32px' ||
+    rootState.visual.thumbAspectRatio !== '16 / 10' ||
+    !rootState.visual.thumbBackgroundImage.includes('radial-gradient')
+  ) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ROOT_FAILED:${JSON.stringify(rootState)}`);
+  }
+
+  const dataGroupButton = designer.locator('[data-material-group="data"]');
+  const groupBeforeHover = await dataGroupButton.boundingBox();
+  await dataGroupButton.hover();
+  await page.waitForTimeout(250);
+  const groupAfterHover = await dataGroupButton.boundingBox();
+  if (JSON.stringify(groupBeforeHover) !== JSON.stringify(groupAfterHover)) {
+    throw new Error(
+      `BROWSER_HARNESS_MATERIAL_GROUP_HOVER_JITTER_FAILED:${JSON.stringify({ groupBeforeHover, groupAfterHover })}`,
+    );
+  }
+
+  await dataGroupButton.click();
+  const dataGroup = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      selected: root.querySelector('[data-material-group-breadcrumb="data"]')?.ariaPressed,
+      children: [...root.querySelectorAll('[data-material-group]')].map(
+        (group) => group.dataset.materialGroup,
+      ),
+      visible: [...root.querySelectorAll('[data-material-card]:not([hidden])')].map(
+        (card) => card.dataset.materialCard,
+      ),
+      gridTop: root.querySelector('[data-material-grid]')?.getBoundingClientRect().top,
+    };
+  });
+  if (
+    dataGroup.selected !== 'true' ||
+    dataGroup.children.join(',') !== 'charts,tables' ||
+    dataGroup.visible.join(',') !== 'base.chart,base.echarts,base.table' ||
+    dataGroup.gridTop !== rootState.gridTop
+  ) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_DATA_FAILED:${JSON.stringify(dataGroup)}`);
+  }
+
+  const groupSearch = designer.locator('[data-material-search]');
+  await groupSearch.fill('echarts');
+  const searchScoped = await designer.evaluate((element) =>
+    [...element.shadowRoot.querySelectorAll('[data-material-card]:not([hidden])')].map(
+      (card) => card.dataset.materialCard,
+    ),
+  );
+  if (searchScoped.join(',') !== 'base.echarts') {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_SEARCH_FAILED:${searchScoped.join(',')}`);
+  }
+  await groupSearch.fill('');
+
+  const favorite = designer.locator('[data-material-card="base.chart"] [data-material-favorite]');
+  await favorite.click();
+  await designer.locator('[data-material-filter="favorite"]').click();
+  const favoriteScoped = await designer.evaluate((element) =>
+    [...element.shadowRoot.querySelectorAll('[data-material-card]:not([hidden])')].map(
+      (card) => card.dataset.materialCard,
+    ),
+  );
+  if (favoriteScoped.join(',') !== 'base.chart') {
+    throw new Error(
+      `BROWSER_HARNESS_MATERIAL_GROUPING_FAVORITE_FAILED:${favoriteScoped.join(',')}`,
+    );
+  }
+  await favorite.click();
+  await designer.locator('[data-material-filter="all"]').click();
+
+  await designer.locator('[data-material-group="charts"]').click();
+  const chartsGroup = await designer.evaluate((element) => ({
+    visible: [...element.shadowRoot.querySelectorAll('[data-material-card]:not([hidden])')].map(
+      (card) => card.dataset.materialCard,
+    ),
+    parent: element.shadowRoot.querySelector('[data-material-group-breadcrumb="data"]')
+      ?.ariaPressed,
+  }));
+  if (
+    chartsGroup.visible.join(',') !== 'base.chart,base.echarts' ||
+    chartsGroup.parent !== 'false'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_MATERIAL_GROUPING_CHILD_FAILED:${JSON.stringify(chartsGroup)}`,
+    );
+  }
+
+  await designer.locator('[data-material-group-breadcrumb="data"]').click();
+  await designer.locator('[data-material-group-all]').click();
+
+  const dynamic = await page.evaluate(() => {
+    const { designer, materialLibraryGrouping } = window.baseScreenHarness;
+    const root = designer.shadowRoot;
+    const canvas = root.querySelector('[data-canvas]');
+    designer.materialLibraryGrouping = {
+      groups: [
+        materialLibraryGrouping.groups[2],
+        materialLibraryGrouping.groups[0],
+        materialLibraryGrouping.groups[1],
+      ],
+    };
+    return {
+      sameCanvas: root.querySelector('[data-canvas]') === canvas,
+      groups: [...root.querySelectorAll('[data-material-group]')].map(
+        (group) => group.dataset.materialGroup,
+      ),
+      cards: [...root.querySelectorAll('[data-material-card]')].map(
+        (card) => card.dataset.materialCard,
+      ),
+    };
+  });
+  if (
+    !dynamic.sameCanvas ||
+    dynamic.groups.join(',') !== 'bridges,foundation,data' ||
+    dynamic.cards.join(',') !==
+      'harness.react-button,harness.vue-button,base.text,base.rectangle,base.ellipse,base.image,base.chart,base.echarts,base.table'
+  ) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_UPDATE_FAILED:${JSON.stringify(dynamic)}`);
+  }
+
+  const invalid = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    const before = designer.materialLibraryGrouping;
+    designer.materialLibraryGrouping = {
+      groups: [{ id: 'only', label: 'Only', materialTypes: ['base.text'] }],
+    };
+    return { unchanged: designer.materialLibraryGrouping === before };
+  });
+  if (!invalid.unchanged) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ATOMIC_FAILED:${JSON.stringify(invalid)}`);
+  }
+
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.materialLibraryGrouping =
+      window.baseScreenHarness.materialLibraryGrouping;
+  });
+}
+
+async function assertMaterialLibraryHostState(page, designer, viewport) {
   const state = await designer.evaluate((element) => {
     const root = element.shadowRoot;
     const status = root.querySelector('[data-material-library-status]');
+    const console = root.querySelector('[data-error-console]');
+    const materials = root.querySelector('[data-materials]');
+    const trigger = root.querySelector('[data-error-console-toggle]');
     const draft = root.querySelector('[data-material-card="base.echarts"]');
     const unavailable = root.querySelector(
       '[data-material-card="base.table"] [data-material-type]',
@@ -1018,30 +1732,104 @@ async function assertMaterialLibraryHostState(page, designer) {
     return {
       status: status?.getAttribute('data-status'),
       text: status?.textContent?.trim(),
+      statusHidden: status?.hidden,
+      statusRole: status?.getAttribute('role'),
+      statusInsideMaterials: materials?.contains(status) ?? false,
+      statusInsideConsole: console?.contains(status) ?? false,
+      consoleHidden: console?.hidden,
+      consoleCount: trigger?.querySelector('[data-error-console-count]')?.textContent,
+      consoleWidth: trigger?.getBoundingClientRect().width,
+      gridTop: root.querySelector('[data-material-grid]')?.getBoundingClientRect().top,
+      canvas: root.querySelector('[data-canvas]')?.getBoundingClientRect().toJSON(),
       categoryCount: root.querySelectorAll('[data-material-category-filter]').length,
+      groupCount: root.querySelectorAll('[data-material-group]').length,
       draft: draft?.hasAttribute('data-material-draft'),
       unavailable: unavailable?.disabled,
       draggable: unavailable?.draggable,
-      height: status?.getBoundingClientRect().height,
     };
   });
   if (
     state.status !== 'partial' ||
     !state.text?.includes('1 个物料加载失败') ||
-    state.categoryCount < 2 ||
+    state.statusHidden !== false ||
+    state.statusRole !== 'alert' ||
+    state.statusInsideMaterials ||
+    !state.statusInsideConsole ||
+    state.consoleHidden !== true ||
+    state.consoleCount !== '1' ||
+    state.consoleWidth !== 84 ||
+    state.categoryCount !== 0 ||
+    state.groupCount !== 3 ||
     state.draft !== true ||
     state.unavailable !== true ||
-    state.draggable !== false ||
-    state.height < 60
+    state.draggable !== false
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_STATE_FAILED:${JSON.stringify(state)}`);
   }
+
+  const consoleTrigger = designer.locator('[data-error-console-toggle]');
+  await designer.locator('.statusbar').screenshot({
+    path: `${screenshotDirectory}/error-console-trigger-${viewport.width}x${viewport.height}.png`,
+  });
+  await consoleTrigger.click();
+  const consoleOpen = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      hidden: root.querySelector('[data-error-console]')?.hidden,
+      expanded: root.querySelector('[data-error-console-toggle]')?.getAttribute('aria-expanded'),
+      focusedClose: root.activeElement?.hasAttribute('data-error-console-close'),
+      entryCount: root.querySelectorAll('[data-error-console-entry]').length,
+      gridTop: root.querySelector('[data-material-grid]')?.getBoundingClientRect().top,
+      canvas: root.querySelector('[data-canvas]')?.getBoundingClientRect().toJSON(),
+    };
+  });
+  if (
+    consoleOpen.hidden !== false ||
+    consoleOpen.expanded !== 'true' ||
+    !consoleOpen.focusedClose ||
+    consoleOpen.entryCount !== 1 ||
+    consoleOpen.gridTop !== state.gridTop ||
+    JSON.stringify(consoleOpen.canvas) !== JSON.stringify(state.canvas)
+  ) {
+    throw new Error(`BROWSER_HARNESS_ERROR_CONSOLE_OPEN_FAILED:${JSON.stringify(consoleOpen)}`);
+  }
+  await designer.locator('[data-error-console]').screenshot({
+    path: `${screenshotDirectory}/error-console-${viewport.width}x${viewport.height}.png`,
+  });
 
   await designer.locator('[data-material-library-action="retry"]').click();
   await designer.locator('[data-material-library-action="details"]').click();
   const actions = await page.evaluate(() => window.baseScreenHarness.materialLibraryActions);
   if (actions.join(',') !== 'retry,details') {
     throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_ACTION_FAILED:${actions.join(',')}`);
+  }
+  await page.keyboard.press('Escape');
+  const consoleClosed = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      hidden: root.querySelector('[data-error-console]')?.hidden,
+      expanded: root.querySelector('[data-error-console-toggle]')?.getAttribute('aria-expanded'),
+      focusedTrigger: root.activeElement?.hasAttribute('data-error-console-toggle'),
+    };
+  });
+  if (
+    consoleClosed.hidden !== true ||
+    consoleClosed.expanded !== 'false' ||
+    !consoleClosed.focusedTrigger
+  ) {
+    throw new Error(`BROWSER_HARNESS_ERROR_CONSOLE_CLOSE_FAILED:${JSON.stringify(consoleClosed)}`);
+  }
+
+  const fallback = await page.evaluate(() => {
+    window.baseScreenHarness.designer.materialLibraryGrouping = undefined;
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return {
+      categoryCount: root.querySelectorAll('[data-material-category-filter]').length,
+      navigationHidden: root.querySelector('[data-material-groups]')?.hidden,
+    };
+  });
+  if (fallback.categoryCount < 2 || fallback.navigationHidden !== true) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_FALLBACK_FAILED:${JSON.stringify(fallback)}`);
   }
 
   const category = designer.locator('[data-material-category-filter]').first();
@@ -1066,49 +1854,68 @@ async function assertMaterialLibraryHostState(page, designer) {
     throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_SEARCH_EMPTY_FAILED');
   }
   await search.fill('');
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.materialLibraryGrouping =
+      window.baseScreenHarness.materialLibraryGrouping;
+  });
 
   const expectedStates = [
-    ['loading', '正在加载物料', 0],
-    ['ready', '物料目录已同步', 0],
-    ['offline', '正在使用离线目录', 1],
-    ['error', '物料目录加载失败', 1],
-    ['update-available', '物料目录有更新', 1],
+    ['loading', undefined, null, true, null, 0],
+    ['ready', undefined, null, true, null, 0],
+    ['offline', '正在使用离线目录', 'status', false, 'offline', 1],
+    ['error', '物料目录加载失败', 'alert', false, 'error', 1],
+    ['update-available', '物料目录有更新', 'status', false, 'update-available', 1],
   ];
-  for (const [status, text, actionCount] of expectedStates) {
+  for (const [status, text, role, hidden, surfaceStatus, actionCount] of expectedStates) {
     const rendered = await page.evaluate((nextStatus) => {
       window.baseScreenHarness.designer.materialLibraryState = { status: nextStatus };
       const root = window.baseScreenHarness.designer.shadowRoot;
+      const surface = root.querySelector('[data-material-library-status]');
+      const trigger = root.querySelector('[data-error-console-toggle]');
       return {
-        status: root.querySelector('[data-material-library-status]')?.getAttribute('data-status'),
-        text: root.querySelector('[data-material-library-status]')?.textContent?.trim(),
-        actionCount: root.querySelectorAll('[data-material-library-action]').length,
+        status: surface?.getAttribute('data-status'),
+        text: surface?.textContent?.trim(),
+        role: surface?.getAttribute('role'),
+        hidden: surface?.hidden,
+        actionCount: surface?.querySelectorAll('[data-material-library-action]').length,
+        gridTop: root.querySelector('[data-material-grid]')?.getBoundingClientRect().top,
+        canvas: root.querySelector('[data-canvas]')?.getBoundingClientRect().toJSON(),
+        consoleWidth: trigger?.getBoundingClientRect().width,
       };
     }, status);
     if (
-      rendered.status !== status ||
-      !rendered.text?.includes(text) ||
-      rendered.actionCount !== actionCount
+      rendered.status !== surfaceStatus ||
+      rendered.role !== role ||
+      rendered.hidden !== hidden ||
+      (text !== undefined && !rendered.text?.includes(text)) ||
+      rendered.actionCount !== actionCount ||
+      rendered.gridTop !== state.gridTop ||
+      JSON.stringify(rendered.canvas) !== JSON.stringify(state.canvas) ||
+      rendered.consoleWidth !== state.consoleWidth
     ) {
       throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_STATUS_FAILED:${JSON.stringify(rendered)}`);
     }
   }
 
-  await page.evaluate(() => {
-    window.baseScreenHarness.designer.materialLibraryState = { status: 'loading' };
-  });
-  const before = await designer.locator('[data-material-library-status]').boundingBox();
-  await page.evaluate(() => {
-    window.baseScreenHarness.designer.materialLibraryState = { status: 'update-available' };
-  });
-  const after = await designer.locator('[data-material-library-status]').boundingBox();
-  if (before === null || after === null || before.width !== after.width) {
-    throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_JITTER_FAILED');
-  }
+  await consoleTrigger.click();
   await designer.locator('[data-material-library-action="reload"]').click();
   const updatedActions = await page.evaluate(() => window.baseScreenHarness.materialLibraryActions);
   if (updatedActions.at(-1) !== 'reload') {
     throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_RELOAD_FAILED');
   }
+  await designer.locator('[data-error-console-clear]').click();
+  const cleared = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      entryCount: root.querySelectorAll('[data-error-console-entry]').length,
+      count: root.querySelector('[data-error-console-count]')?.textContent,
+      status: root.querySelector('[data-material-library-status]')?.getAttribute('data-status'),
+    };
+  });
+  if (cleared.entryCount !== 0 || cleared.count !== '' || cleared.status !== 'update-available') {
+    throw new Error(`BROWSER_HARNESS_ERROR_CONSOLE_CLEAR_FAILED:${JSON.stringify(cleared)}`);
+  }
+  await designer.locator('[data-error-console-close]').click();
 }
 
 async function assertAuthoringShortcutsAndIsolation(page, designer) {
@@ -1123,8 +1930,8 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   const title = designer.locator('[data-base-screen-component-id=title]');
   await designer.getByRole('tab', { name: '\u56fe\u5c42' }).click();
   const layers = designer.locator('[data-layers]');
-  await layers.locator('[data-layer-select=title]').click();
-  await layers.locator('[data-layer-select=subtitle]').click({ modifiers: [modifier] });
+  await layers.locator('[data-layer-select=title] .layer-name').click();
+  await layers.locator('[data-layer-select=subtitle] .layer-name').click({ modifiers: [modifier] });
   const layersSelected = await page
     .waitForFunction(
       () => {
@@ -1275,7 +2082,7 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   await second.locator('[data-base-screen-component-id=title]').waitFor();
   const secondCount = await second.locator('[data-base-screen-component-id]').count();
   await second.getByRole('tab', { name: '\u56fe\u5c42' }).click();
-  await second.locator('[data-layer-select=title]').click();
+  await second.locator('[data-layer-select=title] .layer-name').click();
   await second.locator('[data-viewport]').focus();
   await page.keyboard.press(`${modifier}+v`);
   if ((await second.locator('[data-base-screen-component-id]').count()) !== secondCount) {
@@ -1911,13 +2718,12 @@ async function assertSnapWorkflow(designer, page) {
   }
   const titleBox = await title.boundingBox();
   if (titleBox === null) throw new Error('BROWSER_HARNESS_SNAP_TITLE_MISSING');
-  // 起点取 title 左上（文档 x=130 处）：subtitle 覆盖 title 右半部分，中心点会命中 subtitle。
-  const startX = titleBox.x + (130 - baseline.title.position.x);
   const startY = titleBox.y + (136 - baseline.title.position.y);
+  // 起点必须在 title 的可见区域：subtitle 覆盖 title 右半，左侧面板与标尺又会遮住画布左缘。
+  // 在 title 矩形内水平扫描，取第一个命中 title 自身的屏幕点，与面板/标尺宽度解耦。
   const hitProbe = await designer.evaluate(
     (element, probe) => {
       const root = element.shadowRoot;
-      const hit = root?.elementFromPoint(probe.x, probe.y);
       const rect = (selector) => {
         const node = root?.querySelector(selector);
         const box = node?.getBoundingClientRect();
@@ -1925,30 +2731,30 @@ async function assertSnapWorkflow(designer, page) {
           ? null
           : { x: box.x, y: box.y, width: box.width, height: box.height };
       };
-      return {
-        hit:
-          hit === null || hit === undefined
-            ? null
-            : {
-                dataset: Object.fromEntries(
-                  [...hit.attributes].map((attribute) => [attribute.name, attribute.value]),
-                ),
-                className: typeof hit.className === 'string' ? hit.className : null,
-              },
-        title: rect('[data-base-screen-component-id="title"]'),
-        subtitle: rect('[data-base-screen-component-id="subtitle"]'),
-      };
+      const titleRect = rect('[data-base-screen-component-id="title"]');
+      const subtitleRect = rect('[data-base-screen-component-id="subtitle"]');
+      if (titleRect === null || subtitleRect === null) {
+        return { startX: null, title: titleRect, subtitle: subtitleRect };
+      }
+      const right = Math.min(titleRect.x + titleRect.width, subtitleRect.x) - 4;
+      let startX = null;
+      for (let x = titleRect.x + 4; x <= right; x += 8) {
+        const hit = root?.elementFromPoint(x, probe.y);
+        if (hit?.closest?.('[data-base-screen-component-id="title"]') != null) {
+          startX = x;
+          break;
+        }
+      }
+      return { startX, title: titleRect, subtitle: subtitleRect };
     },
-    { x: startX, y: startY },
+    { y: startY },
   );
-  if (
-    hitProbe.hit === null ||
-    hitProbe.hit.dataset?.['data-base-screen-component-id'] !== 'title'
-  ) {
+  if (hitProbe.startX === null || hitProbe.startX === undefined) {
     throw new Error(
-      `BROWSER_HARNESS_SNAP_HIT_PROBE_FAILED:${JSON.stringify({ probe: { x: startX, y: startY }, ...hitProbe })}`,
+      `BROWSER_HARNESS_SNAP_HIT_PROBE_FAILED:${JSON.stringify({ probe: { y: startY }, ...hitProbe })}`,
     );
   }
+  const startX = hitProbe.startX;
   const readTranslate = (id) =>
     page.evaluate((componentId) => {
       const root = window.baseScreenHarness.designer.shadowRoot;
@@ -2843,6 +3649,7 @@ async function assertDesignerControlStyles(designer) {
     canvas.appendChild(canary);
     const toolbar = root.querySelector('.designer-topbar [data-action="undo"]');
     const viewer = document.querySelector('base-screen-viewer');
+    const materialThumb = root.querySelector('.material-thumb');
     const before = {
       theme: getComputedStyle(host).getPropertyValue('--designer-surface-workspace').trim(),
       toolbarHeight: toolbar?.getBoundingClientRect().height,
@@ -2850,11 +3657,15 @@ async function assertDesignerControlStyles(designer) {
       workspaceFont: getComputedStyle(workspace).font,
       canaryInputHeight: input.getBoundingClientRect().height,
       viewerFont: viewer === null ? undefined : getComputedStyle(viewer).font,
+      materialThumbBackground:
+        materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundImage,
     };
     host.setAttribute('theme', 'light');
     const lightTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
+    const lightMaterialThumbBackground =
+      materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundImage;
     const hostStyle = document.createElement('style');
     hostStyle.textContent =
       'base-screen-designer { --base-screen-designer-surface-workspace: rgb(10, 20, 30); }';
@@ -2891,6 +3702,7 @@ async function assertDesignerControlStyles(designer) {
     return {
       ...before,
       lightTheme,
+      lightMaterialThumbBackground,
       hostStylesheetValue,
       overriddenTheme,
       restoredHostStylesheet,
@@ -2904,6 +3716,8 @@ async function assertDesignerControlStyles(designer) {
     styles === undefined ||
     styles.toolbarHeight !== 28 ||
     styles.theme === styles.lightTheme ||
+    styles.materialThumbBackground === undefined ||
+    styles.materialThumbBackground === styles.lightMaterialThumbBackground ||
     styles.hostStylesheetValue !== 'rgb(10, 20, 30)' ||
     styles.overriddenTheme !== 'rgb(1, 2, 3)' ||
     styles.restoredHostStylesheet !== 'rgb(10, 20, 30)' ||
@@ -3002,6 +3816,305 @@ async function assertDesignerThemeIsolation(page) {
     result.thirdStyleAfterCatalog !== result.before.firstStyleNodes
   ) {
     throw new Error(`BROWSER_HARNESS_THEME_ISOLATION_FAILED:${JSON.stringify(result)}`);
+  }
+}
+
+async function assertNativeEventsToggle(designer, page) {
+  const toggle = designer.locator('[data-status-toggle="native-events"]');
+  if ((await toggle.getAttribute('aria-checked')) !== 'false') {
+    throw new Error('BROWSER_HARNESS_NATIVE_EVENTS_TOGGLE_INITIAL_STATE_FAILED');
+  }
+  const baseline = await page.evaluate(() => window.baseScreenHarness.designerNativeEvents.length);
+  // 关闭时点击画布文本组件：设计态只做编辑，不产生宿主事件。
+  await designer.evaluate(() => {
+    const canvas = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-canvas]');
+    canvas
+      ?.querySelector('[data-base-screen-component-id="title"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+  });
+  const countOff = await page.evaluate(() => window.baseScreenHarness.designerNativeEvents.length);
+  if (countOff !== baseline) {
+    throw new Error('BROWSER_HARNESS_NATIVE_EVENTS_OFF_LEAK_FAILED');
+  }
+
+  await toggle.click();
+  if ((await toggle.getAttribute('aria-checked')) !== 'true') {
+    throw new Error('BROWSER_HARNESS_NATIVE_EVENTS_TOGGLE_ON_FAILED');
+  }
+
+  // 开启后同一点击转发为宿主 base-screen-material-event（与 Viewer 同形）。
+  await designer.evaluate(() => {
+    const canvas = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-canvas]');
+    canvas
+      ?.querySelector('[data-base-screen-component-id="title"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+  });
+  const forwarded = await page.evaluate(() => window.baseScreenHarness.designerNativeEvents.at(-1));
+  if (
+    forwarded?.componentId !== 'title' ||
+    forwarded?.type !== 'base.text' ||
+    forwarded?.name !== 'valueClick'
+  ) {
+    throw new Error(`BROWSER_HARNESS_NATIVE_EVENTS_FORWARD_FAILED:${JSON.stringify(forwarded)}`);
+  }
+
+  // 关闭后事件再次被门控，状态恢复初始值。
+  await toggle.click();
+  if ((await toggle.getAttribute('aria-checked')) !== 'false') {
+    throw new Error('BROWSER_HARNESS_NATIVE_EVENTS_TOGGLE_OFF_AGAIN_FAILED');
+  }
+  const countAfterOff = await page.evaluate(
+    () => window.baseScreenHarness.designerNativeEvents.length,
+  );
+  await designer.evaluate(() => {
+    const canvas = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-canvas]');
+    canvas
+      ?.querySelector('[data-base-screen-component-id="title"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }));
+  });
+  const finalCount = await page.evaluate(
+    () => window.baseScreenHarness.designerNativeEvents.length,
+  );
+  if (finalCount !== countAfterOff) {
+    throw new Error('BROWSER_HARNESS_NATIVE_EVENTS_OFF_AFTER_TOGGLE_FAILED');
+  }
+
+  // 覆盖全部官方交互物料（text/chart/echarts/table）的探针设计器：同一「事件」开关在
+  // 真实浏览器里对全部 element（含 React/Vue 桥接）端到端生效；探针在单个异步 evaluate 内
+  // 创建、交互并移除，不污染主设计器的文档、历史与后续断言。
+  const probe = await page.evaluate(async () => {
+    const { catalog, materialManifests } = window.baseScreenHarness;
+    // React 桥接的初始提交与交互模式重渲染是异步的，交互前等待一个事件循环轮次。
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 20));
+    const probeElement = document.createElement('base-screen-designer');
+    const probeEvents = [];
+    probeElement.addEventListener('base-screen-material-event', (event) =>
+      probeEvents.push(event.detail),
+    );
+    const component = (id, manifestKey, position, dataSource) => ({
+      id,
+      type: materialManifests[manifestKey].type,
+      name: id,
+      parentId: null,
+      position,
+      size: { ...materialManifests[manifestKey].defaultSize },
+      rotation: 0,
+      zIndex: 0,
+      status: { locked: false, hidden: false },
+      props: structuredClone(materialManifests[manifestKey].defaultProps),
+      style: structuredClone(materialManifests[manifestKey].defaultStyle),
+      dataSource,
+    });
+    const chartValue = {
+      series: [{ id: 's1', label: '系列一', points: [{ x: 'north', y: 42 }] }],
+    };
+    const tableValue = {
+      columns: [
+        { id: 'amount', label: '金额', valueType: 'number', sortable: true, filterable: false },
+      ],
+      rows: [{ amount: 42 }],
+    };
+    probeElement.catalog = catalog;
+    probeElement.document = {
+      canvas: { width: 960, height: 540, backgroundColor: '#0b1220' },
+      components: [
+        component('probe-text', 'text', { x: 20, y: 20 }, { type: 'static', value: '探针文本' }),
+        component('probe-chart', 'chart', { x: 20, y: 100 }, { type: 'static', value: chartValue }),
+        component(
+          'probe-echarts',
+          'echarts',
+          { x: 340, y: 100 },
+          {
+            type: 'static',
+            value: chartValue,
+          },
+        ),
+        component(
+          'probe-table',
+          'table',
+          { x: 660, y: 100 },
+          {
+            type: 'static',
+            value: tableValue,
+          },
+        ),
+        component('probe-react', 'react', { x: 20, y: 300 }, null),
+        component('probe-vue', 'vue', { x: 240, y: 300 }, null),
+      ],
+      variables: [],
+      blueprint: { rules: [] },
+    };
+    document.body.appendChild(probeElement);
+    await tick();
+    const canvas = probeElement.shadowRoot.querySelector('[data-canvas]');
+    // React 桥接初始提交是异步的：轮询等待两个桥接按钮挂载完成（最多约 1s），
+    // 避免偶发慢提交导致关闭态断言在按钮就绪前执行。
+    const bridgeReady = async () => {
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const reactButton = canvas.querySelector(
+          '[data-base-screen-component-id="probe-react"] button',
+        );
+        const vueButton = canvas.querySelector(
+          '[data-base-screen-component-id="probe-vue"] button',
+        );
+        if (reactButton !== null && vueButton !== null) return true;
+        await tick();
+      }
+      return false;
+    };
+    if (!(await bridgeReady())) return { bridgeTimeout: true };
+    const dispatch = (componentId, selector) => {
+      const target = canvas.querySelector(
+        selector === null
+          ? `[data-base-screen-component-id="${componentId}"]`
+          : `[data-base-screen-component-id="${componentId}"] ${selector}`,
+      );
+      if (target === null || target === undefined) return false;
+      target.dispatchEvent(
+        new MouseEvent('click', { bubbles: true, composed: true, cancelable: true }),
+      );
+      return true;
+    };
+    const matches = (expected) => {
+      const actual = probeEvents.at(-1);
+      return (
+        actual !== undefined &&
+        actual.componentId === expected.componentId &&
+        actual.type === expected.type &&
+        actual.name === expected.name
+      );
+    };
+    // 原生 CSS 交互探针：echarts 圆点的 pointer 光标与 mouseenter 放大同样受开关门控。
+    const hoverCheck = () => {
+      const circle = canvas.querySelector('[data-base-screen-component-id="probe-echarts"] circle');
+      if (circle === null || circle === undefined) return null;
+      const before = circle.getAttribute('r');
+      const cursor = circle.style.cursor;
+      circle.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, composed: true }));
+      const after = circle.getAttribute('r');
+      return { before, after, cursor };
+    };
+    // 桥接原生 button 的 CSS 交互门控：关闭时 pointer-events 为 none（hover/active/focus 静默），
+    // 开启后恢复 auto。
+    const bridgeStyle = (componentId) => {
+      const button = canvas.querySelector(
+        `[data-base-screen-component-id="${componentId}"] button`,
+      );
+      return button === null || button === undefined
+        ? null
+        : getComputedStyle(button).pointerEvents;
+    };
+
+    // 初始（开关关闭）：各类 element 点击均零事件，hover 无效果，桥接按钮无指针交互。
+    const silentTargets = [
+      dispatch('probe-text', null),
+      dispatch('probe-chart', 'circle'),
+      dispatch('probe-echarts', 'circle'),
+      dispatch('probe-table', 'tbody tr'),
+      dispatch('probe-table', 'td'),
+    ];
+    const silentCount = probeEvents.length;
+    const hoverOff = hoverCheck();
+    const bridgeOff = { react: bridgeStyle('probe-react'), vue: bridgeStyle('probe-vue') };
+    const bridgeSilentTargets = [
+      dispatch('probe-react', 'button'),
+      dispatch('probe-vue', 'button'),
+    ];
+    const bridgeSilentCount = probeEvents.length;
+
+    // 开启：每类 element 的原生事件按 manifest 声明转发到宿主，hover 与桥接按钮交互恢复。
+    probeElement.shadowRoot.querySelector('[data-status-toggle="native-events"]').click();
+    await tick();
+    const results = {
+      text:
+        dispatch('probe-text', null) &&
+        matches({ componentId: 'probe-text', type: 'base.text', name: 'valueClick' }),
+      chart:
+        dispatch('probe-chart', 'circle') &&
+        matches({ componentId: 'probe-chart', type: 'base.chart', name: 'pointClick' }),
+      echarts:
+        dispatch('probe-echarts', 'circle') &&
+        matches({ componentId: 'probe-echarts', type: 'base.echarts', name: 'seriesClick' }),
+      row:
+        dispatch('probe-table', 'tbody tr') &&
+        matches({ componentId: 'probe-table', type: 'base.table', name: 'rowClick' }),
+      cell:
+        dispatch('probe-table', 'td') &&
+        matches({ componentId: 'probe-table', type: 'base.table', name: 'cellClick' }),
+      bridgeReact:
+        dispatch('probe-react', 'button') &&
+        matches({
+          componentId: 'probe-react',
+          type: 'harness.react-button',
+          name: 'valueClick',
+        }),
+      bridgeVue:
+        dispatch('probe-vue', 'button') &&
+        matches({ componentId: 'probe-vue', type: 'harness.vue-button', name: 'valueClick' }),
+    };
+    const hoverOn = hoverCheck();
+    const bridgeOn = { react: bridgeStyle('probe-react'), vue: bridgeStyle('probe-vue') };
+    const onCount = probeEvents.length;
+
+    // 关闭：各类 element 再次全部静默（含 hover 与桥接按钮指针交互），开关恢复初始值。
+    probeElement.shadowRoot.querySelector('[data-status-toggle="native-events"]').click();
+    await tick();
+    const again = dispatch('probe-text', null);
+    const bridgeAfterOff = { react: bridgeStyle('probe-react'), vue: bridgeStyle('probe-vue') };
+    const offCount = probeEvents.length;
+    const toggleOff = probeElement.shadowRoot
+      .querySelector('[data-status-toggle="native-events"]')
+      .getAttribute('aria-checked');
+    probeElement.remove();
+    return {
+      silentTargets,
+      silentCount,
+      hoverOff,
+      bridgeOff,
+      bridgeSilentTargets,
+      bridgeSilentCount,
+      results,
+      hoverOn,
+      bridgeOn,
+      onCount,
+      offCount,
+      bridgeAfterOff,
+      again,
+      toggleOff,
+    };
+  });
+  if (
+    probe.bridgeTimeout === true ||
+    probe.silentTargets.some((hit) => hit !== true) ||
+    probe.silentCount !== 0 ||
+    probe.hoverOff === null ||
+    probe.hoverOff.before !== probe.hoverOff.after ||
+    probe.hoverOff.cursor !== '' ||
+    probe.bridgeOff.react !== 'none' ||
+    probe.bridgeOff.vue !== 'none' ||
+    probe.bridgeSilentTargets.some((hit) => hit !== true) ||
+    probe.bridgeSilentCount !== 0 ||
+    probe.toggleOff !== 'false' ||
+    !probe.results.text ||
+    !probe.results.chart ||
+    !probe.results.echarts ||
+    !probe.results.row ||
+    !probe.results.cell ||
+    !probe.results.bridgeReact ||
+    !probe.results.bridgeVue ||
+    probe.hoverOn === null ||
+    probe.hoverOn.before === probe.hoverOn.after ||
+    probe.hoverOn.after !== '2' ||
+    probe.hoverOn.cursor !== 'pointer' ||
+    probe.bridgeOn.react !== 'auto' ||
+    probe.bridgeOn.vue !== 'auto' ||
+    probe.onCount !== 7 ||
+    probe.offCount !== probe.onCount ||
+    probe.bridgeAfterOff.react !== 'none' ||
+    probe.bridgeAfterOff.vue !== 'none' ||
+    probe.again !== true
+  ) {
+    throw new Error(`BROWSER_HARNESS_NATIVE_EVENTS_ELEMENTS_FAILED:${JSON.stringify(probe)}`);
   }
 }
 

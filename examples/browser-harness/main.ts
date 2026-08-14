@@ -252,6 +252,61 @@ const bridgeCatalog = createBaseScreenMaterialCatalog([
   reactBridge.value,
   vueBridge.value,
 ]);
+const materialLibraryGrouping = {
+  groups: [
+    {
+      id: 'foundation',
+      label: '基础',
+      materialTypes: ['base.text', 'base.rectangle', 'base.ellipse', 'base.image'],
+    },
+    {
+      id: 'data',
+      label: '数据',
+      children: [
+        { id: 'charts', label: '图表', materialTypes: ['base.chart', 'base.echarts'] },
+        { id: 'tables', label: '表格', materialTypes: ['base.table'] },
+      ],
+    },
+    {
+      id: 'bridges',
+      label: '桥接',
+      materialTypes: ['harness.react-button', 'harness.vue-button'],
+    },
+  ],
+} as const;
+
+// 变长标签压力演示分组：仅在 URL 携带 ?material-group-stress 时替换默认分组，
+// 用于人工验收分组按钮轨道的自适应宽度、168px 省略号截断与横向滚动，不影响默认验收数据。
+const materialLibraryStressGrouping = {
+  groups: [
+    { id: 'foundation', label: '基础', materialTypes: ['base.text'] },
+    { id: 'shapes', label: '图形', materialTypes: ['base.rectangle', 'base.ellipse'] },
+    { id: 'media', label: '媒体素材库', materialTypes: ['base.image'] },
+    {
+      id: 'data',
+      label: '数据可视化图表组件超长名称',
+      children: [
+        { id: 'charts', label: '图表', materialTypes: ['base.chart'] },
+        { id: 'echarts', label: 'ECharts 高级图表', materialTypes: ['base.echarts'] },
+        {
+          id: 'tables',
+          label: '一个超长的分组名称用来验证省略号截断效果',
+          materialTypes: ['base.table'],
+        },
+      ],
+    },
+    {
+      id: 'bridges',
+      label: '跨框架桥接物料',
+      materialTypes: ['harness.react-button', 'harness.vue-button'],
+    },
+  ],
+} as const;
+const activeMaterialLibraryGrouping = new URLSearchParams(window.location.search).has(
+  'material-group-stress',
+)
+  ? materialLibraryStressGrouping
+  : materialLibraryGrouping;
 
 // --- 宿主托管物料包（ADR-0029 演示）---
 // 宿主加载并审核独立物料模块后，显式 define() 并一次性构建只含该包的 catalog。
@@ -387,6 +442,11 @@ const screenDocument = {
 const designer = document.querySelector('base-screen-designer')!;
 const viewer = document.querySelector('base-screen-viewer')!;
 const hostEvents: unknown[] = [];
+// 设计态「事件」开关开启后，画布内组件原生事件转发到宿主的日志（与 Viewer 事件同形）。
+const designerNativeEvents: unknown[] = [];
+designer.addEventListener('base-screen-material-event', (event) => {
+  designerNativeEvents.push((event as CustomEvent).detail);
+});
 let datasetVersion = 0;
 let datasetRegion = 'north';
 let datasetDelay = false;
@@ -495,6 +555,7 @@ viewer.blueprintRuntimePort = {
   },
 };
 designer.catalog = bridgeCatalog;
+designer.materialLibraryGrouping = activeMaterialLibraryGrouping;
 designer.materialLibraryState = {
   status: 'partial',
   failedCount: 1,
@@ -722,9 +783,19 @@ Object.assign(window, {
     pluginManager,
     viewer,
     hostEvents,
+    designerNativeEvents,
+    materialManifests: {
+      text: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+      chart: BASE_SCREEN_CHART_MATERIAL_MANIFEST,
+      echarts: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
+      table: BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
+      react: reactBridge.value.manifest,
+      vue: vueBridge.value.manifest,
+    },
     datasetCatalog,
     datasetRequests,
     materialLibraryActions,
+    materialLibraryGrouping: activeMaterialLibraryGrouping,
     hostShell,
     pendingAuthoringRequest: () => pendingAuthoringRequest,
     setDatasetRegion: (value: string) => {

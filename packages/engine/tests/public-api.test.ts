@@ -8,6 +8,8 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   BaseScreenDesignerElement,
+  type BaseScreenMaterialLibraryGrouping,
+  parseBaseScreenMaterialLibraryGrouping,
   ScreenProjectController,
   type ScreenProjectControllerChange,
   type ScreenProjectPhase,
@@ -19,6 +21,12 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['materialLibraryState']
     >().toMatchTypeOf<{ readonly status: string } | undefined>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['materialLibraryGrouping']
+    >().toEqualTypeOf<BaseScreenMaterialLibraryGrouping | undefined>();
+    expectTypeOf<typeof parseBaseScreenMaterialLibraryGrouping>().returns.toMatchTypeOf<
+      ScreenParseResult<BaseScreenMaterialLibraryGrouping>
+    >();
   });
 
   it('exports the controller phase and lifecycle methods from the package barrel', () => {

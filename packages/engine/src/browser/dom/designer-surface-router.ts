@@ -20,6 +20,7 @@ export interface DesignerSurfaceBindings {
   readonly mouseOver: DesignerSurfaceHandler;
   readonly mouseOut: DesignerSurfaceHandler;
   readonly doubleClick: DesignerSurfaceHandler;
+  readonly focusOut: DesignerSurfaceHandler;
   // 剪贴板事件通道：非可编辑目标路由到应用剪贴板操作（右键/上下文菜单/系统组合的旁路）。
   readonly copy: DesignerSurfaceHandler;
   readonly cut: DesignerSurfaceHandler;
@@ -82,6 +83,7 @@ export class DesignerSurfaceRouter {
       bindings.pointerCancel(event.target, event),
     );
     this.#root.addEventListener('dblclick', (event) => bindings.doubleClick(event.target, event));
+    this.#root.addEventListener('focusout', (event) => bindings.focusOut(event.target, event));
     this.#root.addEventListener('copy', (event) => {
       if (event.target instanceof Element) bindings.copy(event.target, event);
     });

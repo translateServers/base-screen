@@ -377,11 +377,14 @@
   transform: translateY(-1px);
 }
 
-.designer-button svg {
+.designer-button svg,
+.designer-tab svg {
   width: var(--designer-icon-size);
   height: var(--designer-icon-size);
   fill: none;
   stroke: currentColor;
+  /* 装饰性图标不参与命中测试：点击图标落点应为按钮本身，避免 SVGElement 目标破坏控制器命中。 */
+  pointer-events: none;
 }
 
 .designer-tablist {

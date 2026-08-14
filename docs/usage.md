@@ -716,6 +716,24 @@ viewer.addEventListener('base-screen-material-event', (event) => {
 });
 ```
 
+Designer 默认关闭画布内组件原生事件。打开底部状态栏「事件」开关
+（`data-status-toggle="native-events"`）后，设计态画布切到交互模式：组件原生事件
+（如文本 `valueClick`、图表 `seriesClick`、表格行点击）以同样的 `base-screen-material-event`
+CustomEvent 从 designer 元素转发给宿主，`detail` 与 Viewer 完全同形
+（`{ componentId, type, name, payload }`）；原生 CSS/悬停交互也随开关一起生效：echarts 数据点的
+pointer 光标与悬停放大、React/Vue 桥接渲染的原生控件（button 等）的 hover/active/focus 样式，
+开关关闭时全部静默（桥接控件以 pointer-events 门控，不影响设计器选择/拖拽）：
+
+```ts
+designer.addEventListener('base-screen-material-event', (event) => {
+  const detail = (event as CustomEvent<{ componentId: string; name: string }>).detail;
+  hostDebugPanel.log(detail.componentId, detail.name);
+});
+```
+
+关闭开关后行为与现状一致（点击与悬停均静默、事件零外泄）；开关只影响当前实例的交互模式，
+不进文档、不持久化。切换在渲染器内原地生效，组件 DOM 与数据集请求不会重建。
+
 Blueprint 的 `emit-host-event` 通过 `blueprintRuntimePort` 交给宿主事件总线：
 
 ```ts
@@ -763,13 +781,55 @@ designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => 
 });
 ```
 
-状态支持 `loading`、`ready`、`offline`、`partial`、`error` 和 `update-available`。面板使用 Manifest 已有的
-`category` 生成分类筛选；草稿和不可用标记不进入 Manifest 或 ScreenDocument。不可用物料仍可被解释和定位，
-但不能点击或拖拽创建。
+状态支持 `loading`、`ready`、`offline`、`partial`、`error` 和 `update-available`。未配置宿主分组投影时，
+面板使用 Manifest 已有的 `category` 生成分类筛选；草稿和不可用标记不进入 Manifest 或 ScreenDocument。不可用
+物料仍可被解释和定位，但不能点击或拖拽创建。
 
 更新状态时可以直接设置 `designer.materialLibraryState`，只会重绘左侧状态投影，不会重建 Renderer。真正更换
 物料集合时仍须由宿主处理未保存内容，随后执行 `unload()` 并用新的不可变 catalog 重新配置。Base Screen 不会因
 重试或重新加载按钮自行联网。
+
+### 11.1 宿主控制多级物料分组
+
+当宿主需要按业务、租户或权限上下文组织同一份 catalog 时，可在 `configure()` 中传入
+`materialLibraryGrouping`，或在 catalog 已配置后更新同名 property：
+
+```ts
+import type { BaseScreenMaterialLibraryGrouping } from '@base-screen/sdk';
+
+const materialLibraryGrouping = {
+  groups: [
+    {
+      id: 'foundation',
+      label: '基础',
+      materialTypes: ['base.text', 'base.image'],
+    },
+    {
+      id: 'data',
+      label: '数据',
+      children: [
+        {
+          id: 'data.charts',
+          label: '图表',
+          materialTypes: ['base.chart', 'base.table'],
+        },
+      ],
+    },
+  ],
+} satisfies BaseScreenMaterialLibraryGrouping;
+
+designer.configure({ catalog, materialLibraryGrouping });
+
+// catalog 不变时，宿主可按自己的目录状态重新投影分组。
+designer.materialLibraryGrouping = materialLibraryGrouping;
+```
+
+节点只允许 `id`、`label`、`materialTypes` 与 `children`；顺序由宿主数组决定。传入投影时，当前 catalog 中每个
+`libraryVisible !== false` 的物料 type 都必须恰好出现一次，隐藏或不存在的 type 会使配置或更新被拒绝。Designer
+提供全部入口、路径面包屑、当前层级子组与缩略图网格；用户的路径选择只保留在当前实例内，不持久化。
+
+将 `designer.materialLibraryGrouping` 设为 `undefined` 会恢复既有 Manifest `category` 分类 UI。分组不会进入
+Manifest、catalog、ScreenDocument、历史、导出物、Renderer 或 Viewer，也不会触发联网或宿主存储。
 
 ## 12. 接入宿主高级编辑器
 

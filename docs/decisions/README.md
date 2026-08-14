@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-08-10
+> 最近更新：2026-08-14
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -48,6 +48,12 @@
 | [ADR-0029](./ADR-0029-host-managed-material-package-distribution.md) | 已接受 | 2026-08-11 | 宿主托管可信物料包分发：宿主负责加载与信任，Base Screen 提供 `createMaterialPackage` 注册辅助；远程代码加载不进 Base Screen |
 | [ADR-0030](./ADR-0030-host-material-mcp-access.md) | 已接受 | 2026-08-12 | Skill 管流程、MCP 管在线物料查询与校验、规范快照管离线兜底；生产服务与运行包仍归宿主 |
 | [ADR-0031](./ADR-0031-material-library-host-state.md) | 已接受 | 2026-08-12 | 左侧物料库宿主状态投影、分类与动作事件；不改变不可变 catalog 和宿主加载边界 |
+| [ADR-0032](./ADR-0032-designer-left-panel-refactor.md) | 已接受 | 2026-08-13 | 左侧面板信息架构与交互重构：缩略图网格组件库、按 Tab 隔离工具栏、折叠图标轨、图层树增强；零新依赖，既有 data-* 契约与宿主边界不变 |
+| [ADR-0033](./ADR-0033-host-controlled-material-library-grouping.md) | 已接受 | 2026-08-13 | 宿主控制的多级物料库分组：JSON-safe 树形展示投影、严格 catalog 一致性、逐级导航与卡片网格；不改变 Manifest、catalog 或 ScreenDocument |
+| [ADR-0034](./ADR-0034-designer-material-library-visual-hierarchy.md) | 已接受 | 2026-08-13 | Designer 物料库视觉层级：数据密集的目录路径、筛选、状态与卡片扫描体验；保持主题 Token、无抖动和既有物料分组契约 |
+| [ADR-0035](./ADR-0035-material-library-feedback-workspace-placement.md) | 已接受 | 2026-08-13 | 物料加载错误控制台：底部状态栏入口与弹窗追踪失败，左栏专注搜索/分组/网格，保留宿主状态投影、动作事件、卡片标记与无抖动约束 |
+| [ADR-0036](./ADR-0036-designer-viewport-native-events-toggle.md) | 已接受 | 2026-08-14 | Designer 视窗原生事件开关：状态栏「事件」与吸附/参考线同形态切换设计态交互模式；renderer 实例级 `setInteractive` 原地重渲染、宿主转发 `base-screen-material-event`，不重挂载不重取数 |
+| [ADR-0037](./ADR-0037-designer-panel-collapse-fixes.md) | 已接受 | 2026-08-14 | Designer 面板折叠修复：面板宽度归控制器统一写回（折叠 48px/展开拖拽宽度/未拖拽保留宿主默认）、折叠态拖拽自动展开、折叠轨 UI（箭头旋转、防压扁、tooltip 语义）；公共契约零变化 |
 
 ## 计划决策
 
