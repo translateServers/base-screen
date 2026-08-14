@@ -91,6 +91,7 @@ try {
       }
       if (viewport.width > 800) {
         await assertDesktopWorkbench(designer, viewport);
+        await assertTopbarProjectName(designer);
         await assertNativeEventsToggle(designer, page);
         await assertMaterialLibraryGrouping(page, designer);
         await assertMaterialLibraryHostState(page, designer, viewport);
@@ -4115,6 +4116,16 @@ async function assertNativeEventsToggle(designer, page) {
     probe.again !== true
   ) {
     throw new Error(`BROWSER_HARNESS_NATIVE_EVENTS_ELEMENTS_FAILED:${JSON.stringify(probe)}`);
+  }
+}
+
+async function assertTopbarProjectName(designer) {
+  const title = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return root?.querySelector('.designer-project-name')?.textContent ?? '';
+  });
+  if (title !== '浏览器验证') {
+    throw new Error(`BROWSER_HARNESS_TOPBAR_PROJECT_NAME_FAILED: ${JSON.stringify(title)}`);
   }
 }
 

@@ -222,4 +222,23 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     });
     expect(configured.ok).toBe(true);
   });
+
+  it('accepts a function preview handler and exposes it via getter', () => {
+    const designer = new BaseScreenDesignerElement();
+    const handler = () => true;
+    const configured = designer.configure({ catalog: catalog(), previewHandler: handler });
+    expect(configured.ok).toBe(true);
+    expect(designer.previewHandler).toBe(handler);
+  });
+
+  it('rejects a non-function preview handler before committing any field (RB3)', () => {
+    const designer = new BaseScreenDesignerElement();
+    const result = designer.configure({
+      catalog: catalog(),
+      previewHandler: 'not-a-function' as unknown as () => boolean,
+    });
+    expect(result.ok).toBe(false);
+    expect(designer.catalog).toBeUndefined();
+    expect(designer.previewHandler).toBeUndefined();
+  });
 });

@@ -169,6 +169,8 @@ export interface BaseScreenDesignerConfiguration {
   readonly projectCatalogPort?: ScreenProjectCatalogPort;
   readonly projectPreviewPort?: ScreenProjectPreviewPort;
   readonly projectSnapshotPort?: ScreenProjectSnapshotPort;
+  /** 宿主预览接管：返回 true 表示宿主已接管预览，引擎不再打开内置预览浮层。 */
+  readonly previewHandler?: (document: ScreenDocument) => boolean;
 }
 
 export class BaseScreenDesignerElement extends ElementBase {
@@ -186,6 +188,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   #projectSnapshotPort: ScreenProjectSnapshotPort | undefined;
   #groupMaterialType: string | undefined;
   #toolMaterialTypes: DesignerToolMaterialTypes | undefined;
+  #previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   #renderer: BaseScreenRenderer | undefined;
   #canvas: HTMLDivElement | undefined;
   #viewportElement: HTMLDivElement | undefined;
@@ -376,6 +379,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     getSelection: () => this.#session.interaction,
     getProject: () => this.#session.project,
     getProjectPhase: () => this.#session.projectPhase,
+    hasPreviewHandler: () => this.#previewHandler !== undefined,
     isDirty: () => this.#session.dirty,
     canPublish: () => this.#session.adapter?.capabilities.publish === true,
     hasProjectWorkspace: () =>
@@ -717,6 +721,15 @@ export class BaseScreenDesignerElement extends ElementBase {
       materialLibraryGrouping = validated.value;
     }
     if (
+      configuration.previewHandler !== undefined &&
+      typeof configuration.previewHandler !== 'function'
+    ) {
+      return {
+        ok: false,
+        diagnostics: [lifecycleDiagnostic('Designer previewHandler 必须是函数。')],
+      };
+    }
+    if (
       configuration.resourcePort !== undefined &&
       !isScreenHostResourcePort(configuration.resourcePort)
     ) {
@@ -786,6 +799,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#runtimeContributions = configuration.runtimeContributions;
     this.#toolMaterialTypes = configuration.toolMaterialTypes;
     this.#groupMaterialType = configuration.groupMaterialType;
+    this.#previewHandler = configuration.previewHandler;
     this.initialize();
     return { ok: true, value: null, diagnostics: [] };
   }
@@ -868,6 +882,10 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
     return this.#runtimeContributions;
+  }
+
+  get previewHandler(): ((document: ScreenDocument) => boolean) | undefined {
+    return this.#previewHandler;
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
@@ -1359,8 +1377,18 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   togglePreview(): ScreenParseResult<void> {
-    if (this.#session.document === undefined) {
+    const document = this.#session.document;
+    if (document === undefined) {
       return { ok: false, diagnostics: [lifecycleDiagnostic('No document to preview.')] };
+    }
+    if (this.#previewHandler !== undefined) {
+      let handled = false;
+      try {
+        handled = this.#previewHandler(document);
+      } catch {
+        handled = false;
+      }
+      if (handled) return { ok: true, value: undefined, diagnostics: [] };
     }
     if (this.#session.project !== undefined) {
       return {
@@ -1834,6 +1862,13 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     const revision = root.querySelector<HTMLElement>('[data-project-revision]');
     if (revision !== null) revision.textContent = project?.revision ?? '';
+    const projectName = root.querySelector<HTMLElement>('.designer-project-name');
+    if (projectName !== null) {
+      projectName.textContent =
+        project === undefined || project.name.trim() === ''
+          ? DESIGNER_UI_TEXT.unnamedProject
+          : project.name;
+    }
     this.renderTopbarSaveStatus();
     this.renderStatusBar();
   }

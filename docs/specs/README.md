@@ -34,6 +34,8 @@
 | [Material Library Error Console](./material-library-feedback-workspace-placement/spec.md) | Designer 错误展示增量 | 底部状态栏错误控制台追踪组件/物料加载失败，左栏不再承载错误提示；保持状态投影、宿主动作、卡片标记与无抖动；依据 [ADR-0035](../decisions/ADR-0035-material-library-feedback-workspace-placement.md)；2026-08-13 生效 |
 | [Designer Viewport Native Events](./designer-viewport-native-events/spec.md) | Designer 交互增量 | 状态栏「事件」改为与吸附/参考线同形态的开关，控制设计态画布交互模式：renderer 实例级 `setInteractive` 原地重渲染，宿主经 `base-screen-material-event` 验证组件原生事件；默认关闭、零重建零重取数；依据 [ADR-0036](../decisions/ADR-0036-designer-viewport-native-events-toggle.md)；2026-08-14 生效 |
 | [Designer Panel Collapse Fixes](./designer-panel-collapse-fixes/spec.md) | Designer 缺陷修复增量 | 左右面板折叠修复：宽度归控制器统一写回（折叠 48px、展开恢复拖拽宽度、未拖拽保留宿主默认）、折叠态拖拽自动展开、折叠轨箭头旋转与防压扁、tooltip 语义切换；公共契约零变化；依据 [ADR-0037](../decisions/ADR-0037-designer-panel-collapse-fixes.md)；2026-08-14 生效 |
+| [Designer Host Preview Handler](./designer-host-preview/spec.md) | Designer 交互增量 | 宿主经 `previewHandler` 配置接管项目模式预览：预览操作可用性放宽、`togglePreview` 接管与回退；上收宿主手工补丁，预览路由/鉴权/草稿存储仍归宿主；依据 [ADR-0038](../decisions/ADR-0038-designer-host-preview-handler.md)；2026-08-14 生效 |
+| [Designer Topbar Project Title](./designer-topbar-project-title/spec.md) | Designer 缺陷修复增量 | 顶栏项目标题修复：`renderProjectStatus` 回写加载项目名称，公共契约零变化；依据 [ADR-0039](../decisions/ADR-0039-designer-topbar-project-title.md)；2026-08-14 生效 |
 
 ## 已归档
 

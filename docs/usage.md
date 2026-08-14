@@ -486,6 +486,29 @@ Designer 内建保存操作和 `await designer.save()` 都会调用 adapter。�
 | `base-screen-project-conflict` | 无 | 展示并发冲突处理入口 |
 | `base-screen-diagnostic` | `{ diagnostics }` | 日志、提示和可观测性 |
 
+#### 宿主预览接管
+
+项目模式下，设计器内建预览默认禁用（发布路由、预览页与访问控制归宿主，见 ADR-0027）。宿主
+可在 `configure()` 中传入 `previewHandler` 接管预览按钮：
+
+```ts
+const configured = designer.configure({
+  catalog,
+  projectAdapter,
+  previewHandler: (document) => {
+    // 返回 true 表示宿主已接管：把当前编辑文档（含未保存修改）交给宿主预览流程。
+    sessionStorage.setItem('draft', JSON.stringify(document));
+    window.open('/preview?draft=1');
+    return true;
+  },
+});
+```
+
+处理器收到当前编辑中的 canonical `ScreenDocument`。返回 `true` 视为成功且不再打开引擎内置
+预览浮层；返回 `false` 或抛异常时回退到引擎内置预览。未配置 `previewHandler` 的项目模式
+保持既有失败语义；直接文档模式的内置浮层不受影响。预览路由、鉴权、草稿存储与窗口打开全部
+由宿主实现，Base Screen 不新增网络、存储或窗口管理职责。
+
 ### 7.3 配置 Designer 主题
 
 `base-screen-designer` 提供 CSS Custom Properties，用于让 Designer 的顶栏、工具栏、面板、

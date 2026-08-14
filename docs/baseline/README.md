@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-14（左侧面板、宿主物料分组、物料库视觉层级、物料加载错误控制台、视窗原生事件开关与面板折叠修复增量）
+> 最近更新：2026-08-14（左侧面板、宿主物料分组、物料库视觉层级、物料加载错误控制台、视窗原生事件开关、面板折叠修复、宿主预览处理器与顶栏项目标题修复增量）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -54,6 +54,13 @@
   拖拽宽度、未拖拽保留宿主默认宽度）、折叠态拖拽分隔条自动展开、折叠轨箭头旋转与按钮防压扁、收起/展开
   tooltip 语义切换。依据：[Designer Panel Collapse Fixes](../specs/designer-panel-collapse-fixes/spec.md)、
   [ADR-0037](../decisions/ADR-0037-designer-panel-collapse-fixes.md)。
+- **宿主预览处理器**（封版后增量，生效中）：`previewHandler` 配置接管项目模式预览，预览操作可用性放宽、
+  `togglePreview` 接管与回退；上收宿主手工补丁，预览路由/鉴权/草稿存储仍归宿主。依据：
+  [Designer Host Preview Handler](../specs/designer-host-preview/spec.md)、
+  [ADR-0038](../decisions/ADR-0038-designer-host-preview-handler.md)。
+- **顶栏项目标题修复**（封版后缺陷修复增量，生效中）：`renderProjectStatus` 回写加载项目名称，公共契约
+  零变化。依据：[Designer Topbar Project Title](../specs/designer-topbar-project-title/spec.md)、
+  [ADR-0039](../decisions/ADR-0039-designer-topbar-project-title.md)。
 
 ## 物料体系
 

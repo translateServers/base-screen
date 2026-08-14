@@ -44,6 +44,7 @@ export interface DesignerElementOperationsHost {
   readonly getSelection: () => ScreenInteractionState;
   readonly getProject: () => ScreenProjectEnvelope | undefined;
   readonly getProjectPhase: () => ScreenProjectPhase;
+  readonly hasPreviewHandler: () => boolean;
   readonly isDirty: () => boolean;
   readonly canPublish: () => boolean;
   readonly hasProjectWorkspace: () => boolean;
@@ -299,7 +300,9 @@ export function createDesignerElementOperations(
     ),
     simpleOperation(
       'preview',
-      () => host.getDocument() !== undefined && host.getProject() === undefined,
+      () =>
+        host.getDocument() !== undefined &&
+        (host.getProject() === undefined || host.hasPreviewHandler()),
       () => host.reportPreview(host.togglePreview()),
     ),
     simpleOperation(

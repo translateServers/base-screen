@@ -54,6 +54,8 @@
 | [ADR-0035](./ADR-0035-material-library-feedback-workspace-placement.md) | 已接受 | 2026-08-13 | 物料加载错误控制台：底部状态栏入口与弹窗追踪失败，左栏专注搜索/分组/网格，保留宿主状态投影、动作事件、卡片标记与无抖动约束 |
 | [ADR-0036](./ADR-0036-designer-viewport-native-events-toggle.md) | 已接受 | 2026-08-14 | Designer 视窗原生事件开关：状态栏「事件」与吸附/参考线同形态切换设计态交互模式；renderer 实例级 `setInteractive` 原地重渲染、宿主转发 `base-screen-material-event`，不重挂载不重取数 |
 | [ADR-0037](./ADR-0037-designer-panel-collapse-fixes.md) | 已接受 | 2026-08-14 | Designer 面板折叠修复：面板宽度归控制器统一写回（折叠 48px/展开拖拽宽度/未拖拽保留宿主默认）、折叠态拖拽自动展开、折叠轨 UI（箭头旋转、防压扁、tooltip 语义）；公共契约零变化 |
+| [ADR-0038](./ADR-0038-designer-host-preview-handler.md) | 已接受 | 2026-08-14 | Designer 宿主预览处理器：`previewHandler` 配置接管项目模式预览、预览操作可用性放宽、`togglePreview` 接管与回退；上收宿主手工补丁，宿主预览路由/鉴权/草稿存储仍归宿主 |
+| [ADR-0039](./ADR-0039-designer-topbar-project-title.md) | 已接受 | 2026-08-14 | Designer 顶栏项目标题修复：`renderProjectStatus` 回写加载项目名称，公共契约零变化 |
 
 ## 计划决策
 
