@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-08-14
+> 最近更新：2026-08-16
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -60,6 +60,7 @@
 | [ADR-0041](./ADR-0041-material-cover-adaptive-fit.md) | 已接受 | 2026-08-16 | 物料封面自适应适配：封面加载后按自然尺寸与容器决策——小图（放大 >1.5×）与异形图（宽高比偏差 >0.35）自动 `contain` 完整显示，照片类保持 `cover`；封面加载后占位彩色渐变/网格底色收为中性表面；纯展示启发式，`cover` 契约与宿主边界不变 |
 | [ADR-0042](./ADR-0042-material-library-render-scalability.md) | 已接受 | 2026-08-16 | 物料库渲染可扩展性：卡片网格项 `content-visibility: auto` + `contain-intrinsic-size: auto 140px` 跳过屏外渲染（实测首帧 500 张 ≈50ms / 2000 张 ≈160ms），搜索输入 120ms 防抖合并渲染；纯渐进增强（Safari < 18、Firefox < 125 退回全量渲染），无窗口化/分页，catalog 与宿主边界不变 |
 | [ADR-0043](./ADR-0043-canvas-background-image.md) | 已接受 | 2026-08-16 | ScreenCanvas 宿主背景图片：可选 `backgroundImage` URL 与 `backgroundImageFit`（cover/contain）进入 canonical 文档，失败关闭校验（ADR-0040 URL 规则同形）、`update-canvas` null 删除语义、Renderer/Designer 同路径渲染、`setCanvasBackgroundImage` 宿主公开 API；零 fetch/代理，资产归宿主 |
+| [ADR-0044](./ADR-0044-host-popup-anchored-overlay-no-integration.md) | 已接受 | 2026-08-16 | 宿主弹出框与贴组件锚定弹窗对接评估结论：不做修改——宿主弹窗走既有事件/端口/作者桥/`previewHandler` 机制，不新增坐标转换 API、不扩展 material-event detail、不新增 viewport 跟随事件、不引入锚定/碰撞依赖；公共边界零变化 |
 
 ## 计划决策
 
