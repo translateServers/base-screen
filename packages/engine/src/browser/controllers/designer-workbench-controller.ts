@@ -38,7 +38,7 @@ interface DesignerWorkbenchCallbacks {
 
 type PanelSide = 'left' | 'right';
 type GuideAxis = 'x' | 'y';
-type LeftTab = 'materials' | 'layers';
+type LeftTab = 'materials' | 'layers' | 'variables';
 type RightTab = 'appearance' | 'data' | 'interaction' | 'events';
 type WorkbenchMode = 'standard' | 'with-menu' | 'fullscreen';
 
@@ -355,7 +355,7 @@ export class DesignerWorkbenchController {
       return true;
     }
     const leftTab = target.closest<HTMLButtonElement>('[data-panel-tab]')?.dataset.panelTab;
-    if (leftTab === 'materials' || leftTab === 'layers') {
+    if (leftTab === 'materials' || leftTab === 'layers' || leftTab === 'variables') {
       // 折叠图标轨：点击图标 Tab 先展开面板再切换，保证折叠态也能完成导航。
       if (this.#leftCollapsed) {
         this.#leftCollapsed = false;
@@ -564,8 +564,10 @@ export class DesignerWorkbenchController {
     }
     const materials = root.querySelector<HTMLElement>('[data-materials]');
     const layers = root.querySelector<HTMLElement>('[data-layers]');
+    const variables = root.querySelector<HTMLElement>('[data-variables]');
     if (materials !== null) materials.hidden = this.#leftTab !== 'materials';
     if (layers !== null) layers.hidden = this.#leftTab !== 'layers';
+    if (variables !== null) variables.hidden = this.#leftTab !== 'variables';
     const inspectorTabs = root.querySelector<HTMLElement>('.inspector-tabs');
     if (inspectorTabs !== null) inspectorTabs.hidden = !singleComponentSelected;
     for (const control of root.querySelectorAll<HTMLButtonElement>('[data-inspector-tab]')) {

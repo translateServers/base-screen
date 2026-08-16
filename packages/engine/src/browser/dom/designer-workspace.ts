@@ -101,6 +101,10 @@ export function createDesignerWorkspace(
           <span class="rail-tab-glyph" aria-hidden="true">${designerIcon('layers')}</span>
           <span class="rail-tab-label">${DESIGNER_UI_TEXT.layers}</span>
         </button>
+        <button type="button" class="designer-tab" id="designer-variables-tab" role="tab" aria-controls="designer-variables-panel" aria-selected="false" data-panel-tab="variables" title="${DESIGNER_UI_TEXT.variables.title}">
+          <span class="rail-tab-glyph" aria-hidden="true">${designerIcon('variable')}</span>
+          <span class="rail-tab-label">${DESIGNER_UI_TEXT.variables.title}</span>
+        </button>
       </div>
       <div class="rail-view" id="designer-materials-panel" role="tabpanel" aria-labelledby="designer-materials-tab" data-materials>
         <div class="material-search">
@@ -121,6 +125,7 @@ export function createDesignerWorkspace(
         <p class="designer-empty-state material-search-empty" data-material-search-empty hidden>${DESIGNER_UI_TEXT.materialSearchEmpty}</p>
       </div>
       <div class="rail-view" id="designer-layers-panel" role="tabpanel" aria-labelledby="designer-layers-tab" data-layers hidden></div>
+      <div class="rail-view" id="designer-variables-panel" role="tabpanel" aria-labelledby="designer-variables-tab" data-variables hidden></div>
     </aside>
 
     <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical"></div>

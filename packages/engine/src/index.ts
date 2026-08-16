@@ -72,6 +72,7 @@ import { DesignerPreviewController } from './browser/controllers/designer-previe
 import { DesignerProjectFeedbackController } from './browser/controllers/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from './browser/controllers/designer-project-workspace-controller.js';
 import { DesignerTextEditController } from './browser/controllers/designer-text-edit-controller.js';
+import { DesignerVariablesController } from './browser/controllers/designer-variables-controller.js';
 import { DesignerViewportController } from './browser/controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from './browser/controllers/designer-workbench-controller.js';
 import { DesignerEventSystem } from './browser/dom/designer-event-system.js';
@@ -287,6 +288,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     executeCommand: (command) => this.executeCommand(command),
     report: (result) => this.report(result),
     onEditingChange: () => {},
+  });
+  readonly #variablesController = new DesignerVariablesController({
+    getDocument: () => this.#session.document,
+    executeCommand: (command) => this.executeCommand(command),
+    report: (result) => this.report(result),
   });
   readonly #layersController = new DesignerLayersController({
     getCatalog: () => this.#catalog,
@@ -523,6 +529,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       (target) => this.#assetController.onClick(target as Element),
       (target) => this.#datasetController.onClick(target as Element),
       (target) => this.#integrationController.onClick(target as Element),
+      (target) => this.#variablesController.onClick(target as Element),
       (target) => this.#workbenchController.onClick(target as Element),
       (target, event) => this.#layersController.onClick(event as MouseEvent),
       (target, event) => {
@@ -695,6 +702,7 @@ export class BaseScreenDesignerElement extends ElementBase {
         return true;
       },
       (target, event) => this.#layersController.onKeyDown(event as KeyboardEvent),
+      (target, event) => this.#variablesController.onKeyDown(event as KeyboardEvent),
       (target, event) => this.#datasetController.onKeyDown(event as KeyboardEvent),
       (target, event) => {
         const keyboardEvent = event as KeyboardEvent;
@@ -1682,6 +1690,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       shadow.querySelector<HTMLElement>('[data-project-workspace]')!,
     );
     this.#layers = shadow.querySelector<HTMLDivElement>('[data-layers]')!;
+    this.#variablesController.connect(shadow.querySelector<HTMLElement>('[data-variables]')!);
     this.#projectFeedbackController.connect(
       shadow.querySelector<HTMLElement>('[data-project-conflict]')!,
     );
@@ -1772,6 +1781,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.renderToolControls();
     this.renderOperationControls();
     this.renderProjectStatus();
+    this.#variablesController.render();
   }
 
   private renderLayers(): void {

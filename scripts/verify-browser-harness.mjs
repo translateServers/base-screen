@@ -1074,7 +1074,7 @@ async function assertLeftPanelDesign(designer, page, viewport) {
   if (
     ia.tabIndex !== 1 ||
     ia.viewIndex !== 2 ||
-    ia.viewCount !== 2 ||
+    ia.viewCount !== 3 ||
     !ia.materialsToolsInsideView ||
     ia.gridDisplay !== 'grid' ||
     new Set(ia.columnValues).size !== 1 ||
@@ -2564,6 +2564,92 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     );
     return component?.dataSource?.value === before;
   }, textEditValueBefore);
+
+  // 变量管理（ADR-0054）：左侧「变量」Tab 列表展示；新建静态变量生效且一条撤销恢复；
+  // 被文档引用的变量（region，被 echarts-demo 参数引用）删除被拒绝。
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.shadowRoot
+      .querySelector('[data-panel-tab="variables"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
+    return panel !== null && !panel.hidden && panel.innerText.includes('count');
+  });
+  const variableNamesBefore = await page.evaluate(() =>
+    window.baseScreenHarness.designer.document.variables.map((item) => item.name).join(','),
+  );
+  if (variableNamesBefore !== 'count') {
+    throw new Error(`BROWSER_HARNESS_VARIABLES_LIST_FAILED:${variableNamesBefore}`);
+  }
+  // 新建变量 region = "north"（与 echarts-demo 参数引用的变量同名，用于验证引用保护）
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
+    panel
+      .querySelector('[data-variable-action="add"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return root.querySelector('[data-variables] [data-variable-create-name]') !== null;
+  });
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
+    panel.querySelector('[data-variable-create-name]').value = 'region';
+    panel.querySelector('[data-variable-create-value]').value = '"north"';
+    panel
+      .querySelector('[data-variable-action="confirm-create"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const names = window.baseScreenHarness.designer.document.variables.map((item) => item.name);
+    return names.includes('region');
+  });
+  // 删除被引用的 region → 拒绝
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
+    const row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
+      entry.innerText.includes('region'),
+    );
+    row
+      .querySelector('[data-variable-action="delete"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForTimeout(200);
+  const regionStillPresent = await page.evaluate(() =>
+    window.baseScreenHarness.designer.document.variables.some((item) => item.name === 'region'),
+  );
+  if (!regionStillPresent) {
+    throw new Error('BROWSER_HARNESS_VARIABLES_REFERENCE_GUARD_FAILED');
+  }
+  // 删除未引用的 count → 生效且一条撤销恢复
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
+    const row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
+      entry.innerText.includes('count'),
+    );
+    row
+      .querySelector('[data-variable-action="delete"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const names = window.baseScreenHarness.designer.document.variables.map((item) => item.name);
+    return !names.includes('count') && names.includes('region');
+  });
+  // 撤销前把焦点移回画布视口（Ctrl+Z 需进入 designer 事件链）。
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.shadowRoot.querySelector('[data-viewport]').focus();
+  });
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction(() => {
+    const names = window.baseScreenHarness.designer.document.variables.map((item) => item.name);
+    return names.includes('count') && names.includes('region');
+  });
 
   // 清空框选遗留的选择，避免污染后续断言步骤。
   await page.keyboard.press('Escape');

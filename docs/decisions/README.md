@@ -70,6 +70,7 @@
 | [ADR-0051](./ADR-0051-unified-color-palette-replaces-color-input.md) | 已接受 | 2026-08-16 | 三段式调色板全面替换原生 color input：取消 ADR-0050 决策 2 的字段级门控，三种模式对所有颜色字段无条件可用；渐变渲染消费由物料渲染端负责，官方文本物料以 background-clip: text 支持渐变文字 |
 | [ADR-0052](./ADR-0052-designer-canvas-text-editing.md) | 已接受 | 2026-08-16 | Designer 画布内文本直接编辑：双击可编辑文本组件进入 contenteditable overlay 编辑会话（仅 `base.text` + static 字符串 dataSource，fail-closed），Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 经既有 `isEditableTarget` 通道放行 IME 与原生编辑键；不侵入物料/Renderer DOM，公共契约零变化 |
 | [ADR-0053](./ADR-0053-designer-multi-selection-editing.md) | 已接受 | 2026-08-16 | Designer 多选批量属性编辑：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑（复用 createControl / 三段式调色板），值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派，单选通道零改动，公共契约零变化 |
+| [ADR-0054](./ADR-0054-designer-variable-management.md) | 已接受 | 2026-08-16 | Designer 变量管理：左侧面板「变量」Tab 提供静态变量新建/重命名/编辑值/删除与 host 变量只读展示；提交复用 `replace-variables` 命令（恰一条历史）；删除/重命名引用保护（组件参数与蓝图引用，fail-closed 拒绝）与重名保护；数据绑定/蓝图引用自动联动，公共契约零变化 |
 
 ## 计划决策
 
