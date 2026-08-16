@@ -1,6 +1,6 @@
 # Canvas Background Image Tasks
 
-> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5/R6 增量）
+> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5/R6/按钮条件渲染增量）
 
 - [x] Task 1：冻结 ADR-0043 与 Spec 四件套；登记 Spec 索引（docs/specs/README.md「生效中」）、ADR 索引
       （docs/decisions/README.md）与基线 README 能力行。
@@ -58,3 +58,10 @@
       `requestCanvasBackgroundImage` 无文档分支与 commit 无会话拒绝；事件常量与类型导出断言（R6）。
 - [x] Task 16：质量门禁：engine lint/typecheck/test（457）通过；`pnpm verify:m0` 与
       `pnpm verify:browser` 全部通过；测试矩阵与实现一致（R1-R6）。
+- [x] Task 17：ADR-0049 已接受并互注 ADR-0046；Spec R6 修订（按钮默认隐藏 + 配置字段 +
+      对齐语义）、ADR 索引登记 ADR-0049；`BaseScreenDesignerConfiguration.canvasBackgroundImageButton?:
+      boolean`（RB3 校验）与 getter；面板按钮默认不渲染、配置后渲染；行容器承接间距、按钮与输入
+      同高居中对齐（R6/ADR-0049）。
+- [x] Task 18：测试与门禁：默认不渲染断言、配置后渲染断言、配置接受/拒绝（零副作用）、getter；
+      engine lint/typecheck/test（460）与 `pnpm verify:m0`、`pnpm verify:browser` 全部通过；
+      测试矩阵与实现一致（R1-R6）。

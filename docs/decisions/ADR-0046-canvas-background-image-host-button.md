@@ -4,7 +4,8 @@
 > 日期：2026-08-16
 > 关联：[ADR-0043](./ADR-0043-canvas-background-image.md)、[ADR-0045](./ADR-0045-canvas-background-panel-editing.md)
 > （面板编辑增量）、[ADR-0028](./ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
-> （requestId/身份守护与宿主提交语义同构）、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)
+> （requestId/身份守护与宿主提交语义同构）、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、
+> [ADR-0049](./ADR-0049-canvas-background-button-conditional-rendering.md)（部分取代本 ADR 决策 1 的「按钮始终渲染」：默认隐藏，宿主配置后显示）
 
 ## 1. 背景
 
@@ -17,8 +18,10 @@ ADR-0045 让属性面板「画布」区可以直接输入背景图 URL，但真�
 ## 2. 决策
 
 1. 属性面板「画布」区背景图片输入框旁新增宿主选择按钮（`designer-control designer-button`，
-   `data-canvas-background-image-action`，文案走 `designer-ui-text.ts`）。按钮始终渲染，点击派发
-   composed 宿主事件 `base-screen-canvas-background-image-request`（detail 形如
+   `data-canvas-background-image-action`，文案走 `designer-ui-text.ts`）。按钮默认隐藏，宿主配置
+   `canvasBackgroundImageButton: true` 后渲染（[ADR-0049](./ADR-0049-canvas-background-button-conditional-rendering.md)
+   部分取代「始终渲染」）；点击派发 composed 宿主事件
+   `base-screen-canvas-background-image-request`（detail 形如
    `{ request: BaseScreenCanvasBackgroundImageRequest }`），其中 request 含 `requestId`、
    `instanceId`、`documentRevision` 与 `current: { backgroundImage, backgroundImageFit }`。
    事件常量与类型从 `@base-screen/engine` 导出。

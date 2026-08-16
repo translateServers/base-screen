@@ -1,6 +1,6 @@
 # Canvas Background Image Checklist
 
-> 状态：已完成（2026-08-16，含 R5/R6 增量）
+> 状态：已完成（2026-08-16，含 R5/R6/按钮条件渲染增量）
 
 ## 契约与校验（R1）
 
@@ -69,10 +69,12 @@
 - [x] ADR-0046 已接受并登记 ADR 索引；事件常量与 `BaseScreenCanvasBackgroundImageRequest(EventDetail)`
       类型从 engine 导出。
 - [x] 「画布」区背景图片输入旁新增选择按钮（`data-canvas-background-image-action`、
-      `designer-button` 样式、ui-text 文案），始终渲染；点击派发 composed
+      `designer-button` 样式、ui-text 文案）；点击派发 composed
       `base-screen-canvas-background-image-request`（detail 含 requestId/instanceId/documentRevision/
       current）。
 - [x] `requestCanvasBackgroundImage()`：有文档登记会话并派发（true），无文档返回 false。
 - [x] `commitCanvasBackgroundImage`：设置/清除（null 并清 fit）/保留既有 fit 均经 `update-canvas`
       提交；成功消费会话；无效/过期 requestId 拒绝；非法 URL 失败零副作用。
-- [x] 未接入宿主：按钮点击仅派发事件、无副作用；事件 detail 仅 JSON-safe 值。
+- [x] ADR-0049 已接受并互注 ADR-0046；`canvasBackgroundImageButton?: boolean` 配置（RB3 校验）与
+      getter；按钮默认不渲染、配置 true 后渲染；未配置宿主零影响。
+- [x] 按钮与输入框垂直对齐：行容器承接字段间距、行内 field margin 归零、同高居中（无抖动）。

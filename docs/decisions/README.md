@@ -63,6 +63,7 @@
 | [ADR-0044](./ADR-0044-host-popup-anchored-overlay-no-integration.md) | 已接受 | 2026-08-16 | 宿主弹出框与贴组件锚定弹窗对接评估结论：不做修改——宿主弹窗走既有事件/端口/作者桥/`previewHandler` 机制，不新增坐标转换 API、不扩展 material-event detail、不新增 viewport 跟随事件、不引入锚定/碰撞依赖；公共边界零变化 |
 | [ADR-0045](./ADR-0045-canvas-background-panel-editing.md) | 已接受 | 2026-08-16 | 画布背景图属性面板编辑：右侧「画布」区新增 backgroundImage 文本输入与 backgroundImageFit 下拉（清空=删除并清 fit、无图禁用），经既有 `update-canvas` 事务与 canonical 校验，与 `setCanvasBackgroundImage`/文档入口语义一致；部分取代 ADR-0043 非目标 1；公共边界零变化 |
 | [ADR-0046](./ADR-0046-canvas-background-image-host-button.md) | 已接受 | 2026-08-16 | 画布背景图宿主选择按钮：「画布」区背景图片输入旁新增按钮，点击派发 `base-screen-canvas-background-image-request`（requestId/instanceId/revision/current）；`requestCanvasBackgroundImage` 登记会话、`commitCanvasBackgroundImage` 会话守护提交（复用 ADR-0028 作者桥语义）；宿主自开弹出框可视化选择；未接入宿主零副作用 |
+| [ADR-0049](./ADR-0049-canvas-background-button-conditional-rendering.md) | 已接受 | 2026-08-16 | 画布背景图宿主按钮条件渲染与对齐：按钮默认隐藏，`canvasBackgroundImageButton?: boolean` 配置（RB3 校验）后渲染并暴露 getter；行容器承接字段间距、行内 field margin 归零使按钮与输入框同高居中；部分取代 ADR-0046 决策 1「始终渲染」 |
 
 ## 计划决策
 

@@ -558,15 +558,18 @@ scheme、裸相对路径、含空白/控制字符/反斜杠的值。Base Screen 
 
 #### 宿主可视化选择背景图片
 
-属性面板背景图片输入框旁的「选择图片」按钮是宿主通道（ADR-0046）：点击后 Designer 派发
-composed 事件 `base-screen-canvas-background-image-request`，宿主监听后打开自己的图片选择
-弹出框（资产目录/缩略图/搜索/上传归宿主），确认后把选中的 URL 注入回画布：
+属性面板背景图片输入框旁的「选择图片」按钮是宿主通道（ADR-0046/0049）：**按钮默认隐藏**，宿主在
+`configure()` 中声明 `canvasBackgroundImageButton: true` 后渲染；点击后 Designer 派发 composed 事件
+`base-screen-canvas-background-image-request`，宿主监听后打开自己的图片选择弹出框（资产目录/缩略图/
+搜索/上传归宿主），确认后把选中的 URL 注入回画布：
 
 ```ts
 import {
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
   type BaseScreenCanvasBackgroundImageRequestEventDetail,
 } from '@base-screen/engine';
+
+const configured = designer.configure({ catalog, canvasBackgroundImageButton: true });
 
 designer.addEventListener(
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,

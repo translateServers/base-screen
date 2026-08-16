@@ -3,8 +3,9 @@
 > 状态：生效中（2026-08-16）
 > 依据：[ADR-0043](../../decisions/ADR-0043-canvas-background-image.md)、
 > [ADR-0045](../../decisions/ADR-0045-canvas-background-panel-editing.md)（面板编辑增量，部分取代 ADR-0043 非目标 1）、
-> [ADR-0046](../../decisions/ADR-0046-canvas-background-image-host-button.md)（宿主选择按钮增量）
-> 生效前置：ADR-0043/0045/0046 已接受；本 Spec 为维护期内允许变更 ScreenDocument `canvas` 字段的增量
+> [ADR-0046](../../decisions/ADR-0046-canvas-background-image-host-button.md)（宿主选择按钮增量）、
+> [ADR-0049](../../decisions/ADR-0049-canvas-background-button-conditional-rendering.md)（按钮条件渲染与对齐增量）
+> 生效前置：ADR-0043/0045/0046/0047 已接受；本 Spec 为维护期内允许变更 ScreenDocument `canvas` 字段的增量
 
 ## 1. 目标
 
@@ -75,11 +76,14 @@
 - 面板入口与宿主 API/文档入口语义完全一致（同一 canonical 校验、同一 null 删除、同一
   dirty/history/`base-screen-change` 通道）。
 
-### R6：宿主选择按钮与请求-提交通道（ADR-0046 增量）
+### R6：宿主选择按钮与请求-提交通道（ADR-0046/0049 增量）
 
 - 「画布」区背景图片输入框旁新增宿主选择按钮（`designer-control designer-button`，
-  `data-canvas-background-image-action`，文案走 `designer-ui-text.ts`），始终渲染；点击派发
-  composed 事件 `base-screen-canvas-background-image-request`，detail
+  `data-canvas-background-image-action`，文案走 `designer-ui-text.ts`）。按钮**默认不渲染**；
+  `BaseScreenDesignerConfiguration.canvasBackgroundImageButton?: boolean` 配置为 `true` 后才渲染
+  （RB3 校验布尔，非法值配置失败零副作用；`BaseScreenDesignerElement` 暴露同名 getter）。按钮与
+  输入框垂直对齐（行容器承接字段间距、行内 field margin 归零、同高居中，无抖动）。
+- 按钮点击派发 composed 事件 `base-screen-canvas-background-image-request`，detail
   `{ request: BaseScreenCanvasBackgroundImageRequest }`：`requestId`、`instanceId`、
   `documentRevision`、`current: { backgroundImage: string | null, backgroundImageFit: 'cover' |
   'contain' | null }`；常量与类型从 `@base-screen/engine` 导出。
@@ -92,7 +96,7 @@
   消费会话；无效/过期 requestId 以既有 authoring 守卫诊断拒绝。
 - 宿主提交路径二选一：`commitCanvasBackgroundImage`（会话守护）或既有 `setCanvasBackgroundImage`
   （无守护）；按钮事件只承载请求。宿主弹出框、资产目录、缩略图、搜索与上传归宿主。
-- 未接入宿主：按钮点击仅派发事件，无副作用；事件 detail 仅 JSON-safe 值。
+- 未配置 `canvasBackgroundImageButton` 的宿主：按钮不渲染、零影响；事件 detail 仅 JSON-safe 值。
 
 ## 3. 非目标
 
