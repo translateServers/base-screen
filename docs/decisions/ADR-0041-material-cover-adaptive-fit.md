@@ -2,7 +2,7 @@
 
 > 状态：已接受
 > 日期：2026-08-16
-> 关联：[ADR-0040](./ADR-0040-material-manifest-cover.md)、[ADR-0034](./ADR-0034-designer-material-library-visual-hierarchy.md)、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)
+> 关联：[ADR-0040](./ADR-0040-material-manifest-cover.md)、[ADR-0034](./ADR-0034-designer-material-library-visual-hierarchy.md)、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0042](./ADR-0042-material-library-render-scalability.md)（物料库渲染可扩展性：卡片屏外跳过渲染与搜索防抖）
 
 ## 1. 背景
 

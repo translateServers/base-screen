@@ -1574,6 +1574,9 @@ async function assertCoverThumbnail(page) {
       opacity: coverStyle?.opacity,
       objectFit: coverStyle?.objectFit,
       placeholderSvg: thumb?.querySelector('svg') !== null,
+      // ADR-0042：物料卡片网格项启用 content-visibility（屏外跳过渲染）。
+      cardContentVisibility:
+        card === null || card === undefined ? null : getComputedStyle(card).contentVisibility,
       thumbRect:
         thumb === null || thumb === undefined ? null : thumb.getBoundingClientRect().toJSON(),
       plainThumbRect:
@@ -1655,6 +1658,7 @@ async function assertCoverThumbnail(page) {
     !observed.loadedOnThumb ||
     observed.opacity !== '1' ||
     observed.objectFit !== 'cover' ||
+    observed.cardContentVisibility !== 'auto' ||
     !observed.placeholderSvg ||
     !geometryMatches
   ) {

@@ -58,6 +58,8 @@
 | [ADR-0039](./ADR-0039-designer-topbar-project-title.md) | 已接受 | 2026-08-14 | Designer 顶栏项目标题修复：`renderProjectStatus` 回写加载项目名称，公共契约零变化 |
 | [ADR-0040](./ADR-0040-material-manifest-cover.md) | 已接受 | 2026-08-16 | Material Manifest 宿主封面字段：可选 `cover` URL 进入 Manifest（失败关闭校验），物料库卡片真实封面 + 确定性占位/回退；部分取代 ADR-0032 的「不扩展 Manifest 缩略图字段」结论 |
 | [ADR-0041](./ADR-0041-material-cover-adaptive-fit.md) | 已接受 | 2026-08-16 | 物料封面自适应适配：封面加载后按自然尺寸与容器决策——小图（放大 >1.5×）与异形图（宽高比偏差 >0.35）自动 `contain` 完整显示，照片类保持 `cover`；封面加载后占位彩色渐变/网格底色收为中性表面；纯展示启发式，`cover` 契约与宿主边界不变 |
+| [ADR-0042](./ADR-0042-material-library-render-scalability.md) | 已接受 | 2026-08-16 | 物料库渲染可扩展性：卡片网格项 `content-visibility: auto` + `contain-intrinsic-size: auto 140px` 跳过屏外渲染（实测首帧 500 张 ≈50ms / 2000 张 ≈160ms），搜索输入 120ms 防抖合并渲染；纯渐进增强（Safari < 18、Firefox < 125 退回全量渲染），无窗口化/分页，catalog 与宿主边界不变 |
+| [ADR-0043](./ADR-0043-canvas-background-image.md) | 已接受 | 2026-08-16 | ScreenCanvas 宿主背景图片：可选 `backgroundImage` URL 与 `backgroundImageFit`（cover/contain）进入 canonical 文档，失败关闭校验（ADR-0040 URL 规则同形）、`update-canvas` null 删除语义、Renderer/Designer 同路径渲染、`setCanvasBackgroundImage` 宿主公开 API；零 fetch/代理，资产归宿主 |
 
 ## 计划决策
 

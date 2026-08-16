@@ -74,6 +74,9 @@ export interface DesignerPanelControllerCallbacks {
   readonly requestMaterialLibraryAction?: (action: 'retry' | 'reload' | 'details') => void;
 }
 
+// 搜索输入渲染防抖窗口（ADR-0042）：快速连续输入合并为一次渲染，避免每键一次布局失效。
+export const MATERIAL_SEARCH_DEBOUNCE_MS = 120;
+
 export class DesignerPanelController {
   #clipboard: BaseScreenClipboard | undefined;
   #pasteCount = 0;
@@ -81,6 +84,7 @@ export class DesignerPanelController {
   #materialSearch = '';
   #materialCategory: string | undefined;
   #materialGroupId: string | undefined;
+  #materialSearchTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #favoriteMaterials = new Set<string>();
   readonly #recentMaterials: string[] = [];
 
@@ -455,8 +459,16 @@ export class DesignerPanelController {
     if (!(target instanceof HTMLInputElement) || target.dataset.materialSearch === undefined) {
       return false;
     }
-    this.#materialSearch = target.value.trim().toLocaleLowerCase();
-    this.renderMaterials(target.closest<HTMLElement>('.designer'));
+    // 防抖（ADR-0042）：窗口内再次输入重置计时器，触发时统一更新搜索状态并渲染一次。
+    if (this.#materialSearchTimer !== undefined) {
+      clearTimeout(this.#materialSearchTimer);
+    }
+    const layout = target.closest<HTMLElement>('.designer');
+    this.#materialSearchTimer = setTimeout(() => {
+      this.#materialSearchTimer = undefined;
+      this.#materialSearch = target.value.trim().toLocaleLowerCase();
+      this.renderMaterials(layout);
+    }, MATERIAL_SEARCH_DEBOUNCE_MS);
     return true;
   }
 
@@ -567,6 +579,10 @@ export class DesignerPanelController {
   }
 
   private clearMaterialSearch(layout: HTMLElement | null): void {
+    if (this.#materialSearchTimer !== undefined) {
+      clearTimeout(this.#materialSearchTimer);
+      this.#materialSearchTimer = undefined;
+    }
     if (layout === null) return;
     const input = layout.querySelector<HTMLInputElement>('[data-material-search]');
     if (input !== null) input.value = '';

@@ -38,6 +38,8 @@
 | [Designer Topbar Project Title](./designer-topbar-project-title/spec.md) | Designer 缺陷修复增量 | 顶栏项目标题修复：`renderProjectStatus` 回写加载项目名称，公共契约零变化；依据 [ADR-0039](../decisions/ADR-0039-designer-topbar-project-title.md)；2026-08-14 生效 |
 | [Material Cover Thumbnail](./material-cover-thumbnail/spec.md) | 物料契约与展示增量 | Material Manifest 可选宿主封面字段 `cover`：失败关闭校验 + 物料库卡片真实封面渲染，确定性图标/色相保持占位与失败回退，缩略图区几何恒定；不进 ScreenDocument/Renderer/Viewer；依据 [ADR-0040](../decisions/ADR-0040-material-manifest-cover.md)；2026-08-16 生效 |
 | [Material Cover Adaptive Fit](./material-cover-adaptive-fit/spec.md) | 物料封面展示增量 | 封面加载后按自然尺寸与容器自适应适配：小图（放大 >1.5×）与异形图（宽高比偏差 >0.35）自动 `contain` 完整显示，照片类保持 `cover`；封面加载后占位彩色渐变/网格底色收为中性表面，透明素材不透底；纯展示启发式，`cover` 契约与宿主边界不变；依据 [ADR-0041](../decisions/ADR-0041-material-cover-adaptive-fit.md)；2026-08-16 生效 |
+| [Material Library Render Scalability](./material-library-render-scalability/spec.md) | 物料库渲染性能增量 | 物料卡片网格项 `content-visibility: auto` + `contain-intrinsic-size: auto 140px` 跳过屏外渲染（实测首帧 500 张 ≈50ms、2000 张 ≈160ms），搜索输入 120ms 防抖合并渲染；纯渐进增强（Safari < 18 / Firefox < 125 退回全量渲染），catalog 与宿主边界不变；依据 [ADR-0042](../decisions/ADR-0042-material-library-render-scalability.md)；2026-08-16 生效 |
+| [Canvas Background Image](./canvas-background-image/spec.md) | 文档契约与宿主能力增量 | ScreenCanvas 宿主背景图片：可选 `backgroundImage` URL（失败关闭校验，ADR-0040 URL 规则同形）与 `backgroundImageFit`（cover/contain，缺省 cover）进入 canonical 文档；`update-canvas` null 删除语义；Renderer/Designer 同路径渲染；`setCanvasBackgroundImage` 宿主公开 API；零 fetch/代理，资产归宿主；依据 [ADR-0043](../decisions/ADR-0043-canvas-background-image.md)；2026-08-16 生效 |
 
 ## 已归档
 

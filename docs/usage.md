@@ -880,6 +880,15 @@ const manifest = {
 其余照片类封面保持 `cover` 铺满裁切；封面加载成功后占位层的彩色渐变/网格底色收为中性表面，透明素材不再
 透底。该行为是纯展示启发式，宿主无需任何改造；需要统一裁切出图的宿主应在自己的资产链路上生成缩略图。
 
+### 11.3 物料库渲染可扩展性
+
+物料库卡片网格项默认启用 `content-visibility: auto` + `contain-intrinsic-size: auto 140px`
+（[ADR-0042](../docs/decisions/ADR-0042-material-library-render-scalability.md)）：屏外卡片跳过渲染，
+滚动条高度稳定（`auto` 关键字记住真实渲染尺寸），500~2000 张物料的首帧渲染下降约 40~57%（实测）。
+搜索输入经 120ms 防抖合并渲染。该优化是纯渐进增强：不支持 `content-visibility` 的浏览器
+（Safari < 18、Firefox < 125）静默退回全量渲染，功能与行为不变；宿主无需任何改造，也不应依赖
+卡片是否被跳过渲染（目录、DOM 结构、可访问性与拖拽语义均不变）。
+
 ## 12. 接入宿主高级编辑器
 
 复杂 Blueprint、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DesignerPanelController,
   MATERIAL_DRAG_TYPE,
+  MATERIAL_SEARCH_DEBOUNCE_MS,
 } from '../../../src/browser/controllers/designer-panel-controller.js';
 import {
   renderDesignerDataPanel,
@@ -732,5 +733,141 @@ describe('DesignerPanelController material search and keyboard reachability', ()
     } as unknown as KeyboardEvent);
     expect(homeHandled).toBe(true);
     expect(first.focus).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DesignerPanelController material search debounce (ADR-0042)', () => {
+  function createController(): DesignerPanelController {
+    return new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: () => ({ ok: true, value: document(), diagnostics: [] }),
+      executeTransaction: () => ({ ok: true, value: document(), diagnostics: [] }),
+      getCatalog: () =>
+        ({
+          get: (type: string) => ({
+            manifest: {
+              type,
+              name: '文本',
+              defaultSize: { width: 100, height: 40 },
+              defaultProps: {},
+              defaultStyle: {},
+            },
+          }),
+        }) as unknown as BaseScreenMaterialCatalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+  }
+
+  function debouncedLayout(input: FakeElement, clear: FakeElement) {
+    const cardsQuery = vi.fn(() => []);
+    const layout = {
+      querySelector: (selector: string) =>
+        selector === '[data-material-search]'
+          ? input
+          : selector === '[data-material-search-clear]'
+            ? clear
+            : null,
+      querySelectorAll: (selector: string) => {
+        // 只统计物料卡片查询（renderMaterials 内部对 filter/分组等选择器也有 querySelectorAll）。
+        if (selector === '[data-material-card]') cardsQuery(selector);
+        return [];
+      },
+    };
+    input.closestResult = layout as unknown as FakeElement;
+    return { layout: layout as unknown as FakeElement, cardsQuery };
+  }
+
+  it('R2 defers search rendering until the debounce window elapses', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeElement);
+    const controller = createController();
+    const input = new FakeElement('input', new FakeDocument());
+    input.dataset.materialSearch = 'true';
+    const clear = new FakeElement('button', new FakeDocument());
+    clear.dataset.materialSearchClear = 'true';
+    const { cardsQuery } = debouncedLayout(input, clear);
+    clear.hidden = true;
+
+    input.value = '表';
+    expect(controller.onInput({ target: input } as unknown as Event)).toBe(true);
+    vi.advanceTimersByTime(MATERIAL_SEARCH_DEBOUNCE_MS - 1);
+    expect(cardsQuery).not.toHaveBeenCalled();
+    expect(clear.hidden).toBe(true);
+
+    vi.advanceTimersByTime(1);
+    expect(cardsQuery).toHaveBeenCalledTimes(1);
+    // 搜索 '表' 非空 → clear 按钮显示（hidden=false）。
+    expect(clear.hidden).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('R2 coalesces rapid input into a single render with the latest value', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeElement);
+    const controller = createController();
+    const input = new FakeElement('input', new FakeDocument());
+    input.dataset.materialSearch = 'true';
+    const clear = new FakeElement('button', new FakeDocument());
+    clear.dataset.materialSearchClear = 'true';
+    const { cardsQuery } = debouncedLayout(input, clear);
+    clear.hidden = true;
+
+    input.value = '表';
+    controller.onInput({ target: input } as unknown as Event);
+    vi.advanceTimersByTime(MATERIAL_SEARCH_DEBOUNCE_MS / 2);
+    // 窗口内再次输入：重置计时器，不渲染中间值。
+    input.value = '表格';
+    controller.onInput({ target: input } as unknown as Event);
+    vi.advanceTimersByTime(MATERIAL_SEARCH_DEBOUNCE_MS / 2);
+    expect(cardsQuery).not.toHaveBeenCalled();
+    expect(clear.hidden).toBe(true);
+
+    vi.advanceTimersByTime(MATERIAL_SEARCH_DEBOUNCE_MS);
+    expect(cardsQuery).toHaveBeenCalledTimes(1);
+    expect(clear.hidden).toBe(false);
+    vi.useRealTimers();
+  });
+
+  it('R2 cancels the pending debounce when the search is cleared', () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeElement);
+    const controller = createController();
+    const input = new FakeElement('input', new FakeDocument());
+    input.dataset.materialSearch = 'true';
+    input.value = '表';
+    input.focus = vi.fn();
+    const clear = new FakeElement('button', new FakeDocument());
+    clear.dataset.materialSearchClear = 'true';
+    const { layout, cardsQuery } = debouncedLayout(input, clear);
+    clear.closestResult = layout;
+    clear.hidden = false;
+    const target = new FakeElement('span', new FakeDocument());
+    target.closestResult = clear;
+
+    controller.onInput({ target: input } as unknown as Event);
+    vi.advanceTimersByTime(MATERIAL_SEARCH_DEBOUNCE_MS / 2);
+    controller.onClick({ target } as unknown as Event);
+
+    // 清空立即渲染（搜索为空 → clear 隐藏），且未决计时器被取消。
+    expect(input.value).toBe('');
+    expect(cardsQuery).toHaveBeenCalledTimes(1);
+    expect(clear.hidden).toBe(true);
+    vi.advanceTimersByTime(MATERIAL_SEARCH_DEBOUNCE_MS * 2);
+    expect(cardsQuery).toHaveBeenCalledTimes(1);
+    expect(clear.hidden).toBe(true);
+    vi.useRealTimers();
   });
 });

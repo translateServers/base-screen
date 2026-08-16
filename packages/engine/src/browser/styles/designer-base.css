@@ -573,6 +573,10 @@
 .material-card-wrap {
   position: relative;
   min-width: 0;
+  /* 渲染可扩展性（ADR-0042）：屏外卡片跳过渲染（layout/paint），仅首次渲染前用估算高度占位；
+     auto 关键字记住最近一次真实渲染尺寸，滚动条高度稳定；不支持 CV 的浏览器静默退回全量渲染。 */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 140px;
 }
 
 .material-card-wrap[hidden] {

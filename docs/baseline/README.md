@@ -61,6 +61,12 @@
 - **顶栏项目标题修复**（封版后缺陷修复增量，生效中）：`renderProjectStatus` 回写加载项目名称，公共契约
   零变化。依据：[Designer Topbar Project Title](../specs/designer-topbar-project-title/spec.md)、
   [ADR-0039](../decisions/ADR-0039-designer-topbar-project-title.md)。
+- **画布宿主背景图片**（封版后增量，生效中）：`ScreenCanvas` 可选 `backgroundImage` URL 与
+  `backgroundImageFit`（cover/contain，缺省 cover）进入 canonical 文档并随文档持久化；失败关闭校验
+  （ADR-0040 URL 规则同形）、`update-canvas` null 删除语义、Renderer/Designer 同路径渲染；宿主经
+  `setCanvasBackgroundImage` 公开 API 设置/清除，零 fetch/代理，资产归宿主。依据：
+  [Canvas Background Image](../specs/canvas-background-image/spec.md)、
+  [ADR-0043](../decisions/ADR-0043-canvas-background-image.md)。
 
 ## 物料体系
 
@@ -94,6 +100,12 @@
   表面、透明素材不透底。依据：[Material Cover Thumbnail](../specs/material-cover-thumbnail/spec.md)、
   [Material Cover Adaptive Fit](../specs/material-cover-adaptive-fit/spec.md)、[ADR-0040](../decisions/ADR-0040-material-manifest-cover.md)、
   [ADR-0041](../decisions/ADR-0041-material-cover-adaptive-fit.md)。
+- **物料库渲染可扩展性**（封版后增量，生效中）：物料卡片网格项 `content-visibility: auto` +
+  `contain-intrinsic-size: auto 140px` 跳过屏外卡片渲染（实测首帧 500 张 ≈50ms、2000 张 ≈160ms），
+  搜索输入 120ms 防抖合并渲染；纯渐进增强——不支持 CV 的浏览器（Safari < 18、Firefox < 125）退回
+  全量渲染，功能零损失；无窗口化/分页，catalog 与宿主边界不变。依据：
+  [Material Library Render Scalability](../specs/material-library-render-scalability/spec.md)、
+  [ADR-0042](../decisions/ADR-0042-material-library-render-scalability.md)。
 
 ## 宿主边界与数据运行时
 
