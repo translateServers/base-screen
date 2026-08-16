@@ -1,6 +1,6 @@
 # Material Library Render Scalability Tasks
 
-> 状态：已完成（2026-08-16；verify:fast 待并行 ADR-0043 WIP 修复后补跑，见 Task 6 记录）
+> 状态：已完成（2026-08-16，`pnpm verify:fast` 全绿；ADR-0043 提交后补跑通过）
 
 - [x] Task 1：冻结 ADR-0042 与 Spec 四件套；登记 Spec 索引（docs/specs/README.md）、ADR 索引
       （docs/decisions/README.md）与基线 README 能力行；usage.md 11.3 节登记物料库渲染可扩展性
@@ -17,12 +17,8 @@
       既有搜索断言按防抖时序适配（clear 可见性、分组过滤、空态三处改为 waitFor 等待生效）；
       `pnpm verify:browser` 通过（R1、R3）。
 - [x] Task 6：质量门禁：engine 全量测试 442/442、engine 相关文件 biome check、干净提交（9704137）
-      全量构建（turbo 12 任务）与 `pnpm verify:browser` 全部通过。**例外记录**：`pnpm verify:fast`
-      当前被并行未提交的 ADR-0043 画布背景图 WIP 阻塞——其测试文件存在格式与类型错误
-      （`packages/core/tests/commands/apply.test.ts` 339/360/383/398 行：`null` 不匹配
-      `ScreenCanvasBackgroundImageFit`、`backgroundUrl` 未知属性；`packages/engine/tests/...`
-      `designer-session.test.ts:160` 同类错误；`designer-runtime-config.test.ts` 与 `public-api.test.ts`
-      未格式化）。ADR-0043 提交后需重跑 `pnpm verify:fast` 补完门禁（R1-R3）。
+      全量构建（turbo 12 任务）与 `pnpm verify:browser` 全部通过；ADR-0043 提交（45161dc）后补跑
+      `pnpm verify:fast` 全绿（12 任务 + check-packages/check-api/check-engine-import）（R1-R3）。
 - [x] Task 7：同步 xjdatahub：从干净提交 9704137 的临时 worktree 打包 engine（不含并行 WIP），
       覆盖 vendor、frontend 重装、验证安装后 bundle 含 CV 规则与 `contain-intrinsic-size: auto 140px`；
       vendor README 增加渲染可扩展性说明（宿主侧无改造要求）；xjdatahub dev `cf565e4..9dbd749`

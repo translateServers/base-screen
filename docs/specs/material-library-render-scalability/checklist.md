@@ -1,6 +1,6 @@
 # Material Library Render Scalability Checklist
 
-> 状态：已完成（2026-08-16；verify:fast 待 ADR-0043 WIP 修复后补跑，见「质量门禁」例外记录）
+> 状态：已完成（2026-08-16，`pnpm verify:fast` 全绿）
 
 ## 屏外跳过渲染（R1）
 
@@ -31,7 +31,5 @@
 - [x] `pnpm verify:browser` 通过（含 CV 生效断言与适配防抖时序后的搜索断言）。
 - [x] 基线 README、docs/specs/README.md、docs/decisions/README.md、usage.md 已登记；
       ADR-0041/0042 关联互注。
-- [ ] **例外（外部阻塞）**：`pnpm verify:fast` 全量需在并行未提交的 ADR-0043 WIP 修复后补跑——
-      `core/engine` 测试文件存在类型错误（`apply.test.ts` 339/360/383/398、`designer-session.test.ts:160`）
-      与未格式化文件（`designer-runtime-config.test.ts`、`public-api.test.ts`）；本 Spec 涉及的
-      全部改动已在干净提交上通过各自聚焦门禁。
+- [x] `pnpm verify:fast` 全量通过（2026-08-16 补跑：ADR-0043 提交后 12 任务 + check-packages /
+      check-api / check-engine-import 全绿）。

@@ -1,6 +1,6 @@
 # Material Library Render Scalability Test Matrix
 
-> 状态：已完成（2026-08-16；verify:fast 待 ADR-0043 WIP 修复后补跑）
+> 状态：已完成（2026-08-16，`pnpm verify:fast` 全绿）
 
 | Req | Case | 位置 | 状态 |
 | --- | --- | --- | --- |
@@ -15,4 +15,4 @@
 | R3 | catalog/`materialLibraryState`/宿主动作/分组断言回归不变 | 既有 engine 测试 + harness | ✅ |
 | 门禁 | engine lint/typecheck/test（442/442）；本变更相关文件 biome check 通过；干净提交 9704137 全量构建通过 | `pnpm --filter @base-screen/engine ...`、`pnpm build`（worktree） | ✅ |
 | 门禁 | `pnpm verify:browser`（含 CV 断言） | 仓库根 | ✅ |
-| 门禁 | `pnpm verify:fast` 全量（**例外**：被并行未提交 ADR-0043 WIP 测试错误阻塞，待其修复后补跑） | 仓库根 | ⬜（外部阻塞） |
+| 门禁 | `pnpm verify:fast` 全量（ADR-0043 提交 45161dc 后补跑通过，12 任务 + root 检查全绿） | 仓库根 | ✅ |
