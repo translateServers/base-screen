@@ -60,11 +60,14 @@ export function renderDesignerProperties(
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
   getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
+  canvasBackgroundImageButtonVisible = false,
 ): void {
   properties.replaceChildren();
   const context = getDesignerInspectorContext(document, interaction, catalog);
   if (context.kind === 'canvas') {
-    if (document !== undefined) appendCanvasControls(properties, document);
+    if (document !== undefined) {
+      appendCanvasControls(properties, document, canvasBackgroundImageButtonVisible);
+    }
     return;
   }
   if (context.kind === 'multi-selection') {
@@ -644,7 +647,11 @@ function appendCheckbox(
   parent.appendChild(label);
 }
 
-function appendCanvasControls(parent: HTMLElement, document: ScreenDocument): void {
+function appendCanvasControls(
+  parent: HTMLElement,
+  document: ScreenDocument,
+  canvasBackgroundImageButtonVisible: boolean,
+): void {
   const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvas);
   appendCanvasInput(
     section,
@@ -667,23 +674,34 @@ function appendCanvasControls(parent: HTMLElement, document: ScreenDocument): vo
     document.canvas.backgroundColor,
     'color',
   );
-  // 背景图片行：URL 输入 + 宿主选择按钮（ADR-0046，点击派发宿主请求事件，宿主自开弹出框可视化选择）。
-  const backgroundRow = parent.ownerDocument.createElement('div');
-  backgroundRow.className = 'designer-canvas-background-row';
-  appendCanvasInput(
-    backgroundRow,
-    DESIGNER_UI_TEXT.propertiesPanel.backgroundImage,
-    'backgroundImage',
-    document.canvas.backgroundImage ?? '',
-    'text',
-  );
-  const pickerButton = backgroundRow.ownerDocument.createElement('button');
-  pickerButton.type = 'button';
-  pickerButton.className = 'designer-control designer-button';
-  pickerButton.dataset.canvasBackgroundImageAction = '';
-  pickerButton.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundImageAction;
-  backgroundRow.appendChild(pickerButton);
-  section.appendChild(backgroundRow);
+  // 背景图片：URL 输入；宿主选择按钮（ADR-0046）默认隐藏，仅宿主配置
+  // canvasBackgroundImageButton 后渲染（点击派发请求事件，宿主自开弹出框可视化选择）。
+  if (canvasBackgroundImageButtonVisible) {
+    const backgroundRow = parent.ownerDocument.createElement('div');
+    backgroundRow.className = 'designer-canvas-background-row';
+    appendCanvasInput(
+      backgroundRow,
+      DESIGNER_UI_TEXT.propertiesPanel.backgroundImage,
+      'backgroundImage',
+      document.canvas.backgroundImage ?? '',
+      'text',
+    );
+    const pickerButton = backgroundRow.ownerDocument.createElement('button');
+    pickerButton.type = 'button';
+    pickerButton.className = 'designer-control designer-button';
+    pickerButton.dataset.canvasBackgroundImageAction = '';
+    pickerButton.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundImageAction;
+    backgroundRow.appendChild(pickerButton);
+    section.appendChild(backgroundRow);
+  } else {
+    appendCanvasInput(
+      section,
+      DESIGNER_UI_TEXT.propertiesPanel.backgroundImage,
+      'backgroundImage',
+      document.canvas.backgroundImage ?? '',
+      'text',
+    );
+  }
   appendCanvasSelect(
     section,
     DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFit,

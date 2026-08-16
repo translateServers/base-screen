@@ -74,6 +74,8 @@ export interface DesignerPanelControllerCallbacks {
   readonly requestMaterialLibraryAction?: (action: 'retry' | 'reload' | 'details') => void;
   /** 画布背景图宿主选择按钮点击（ADR-0046）：由宿主接管（打开图片选择弹出框），返回是否已有文档。 */
   readonly requestCanvasBackgroundImage?: () => boolean;
+  /** 画布背景图宿主选择按钮是否渲染（ADR-0049）：默认隐藏，仅宿主配置后显示。 */
+  readonly isCanvasBackgroundImageButtonVisible?: () => boolean;
 }
 
 // 搜索输入渲染防抖窗口（ADR-0042）：快速连续输入合并为一次渲染，避免每键一次布局失效。
@@ -250,6 +252,7 @@ export class DesignerPanelController {
         this.interaction,
         this.callbacks.getCatalog(),
         this.callbacks.getDatasetFields,
+        this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
       );
     }
     renderDesignerDataPanel(

@@ -231,6 +231,36 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.previewHandler).toBe(handler);
   });
 
+  it('accepts the canvas background image button flag and exposes it via getter (ADR-0049)', () => {
+    const designer = new BaseScreenDesignerElement();
+    expect(designer.canvasBackgroundImageButton).toBe(false); // 默认隐藏
+
+    const configured = designer.configure({
+      catalog: catalog(),
+      canvasBackgroundImageButton: true,
+    });
+    expect(configured.ok).toBe(true);
+    expect(designer.canvasBackgroundImageButton).toBe(true);
+  });
+
+  it('rejects a non-boolean canvas background image button flag before committing (RB3)', () => {
+    const designer = new BaseScreenDesignerElement();
+    const firstCatalog = catalog();
+    expect(designer.configure({ catalog: firstCatalog }).ok).toBe(true);
+
+    const result = designer.configure({
+      catalog: catalog(),
+      canvasBackgroundImageButton: 'yes' as unknown as boolean,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    }
+    // 失败配置零副作用：既有字段保持原样，按钮保持默认隐藏。
+    expect(designer.catalog).toBe(firstCatalog);
+    expect(designer.canvasBackgroundImageButton).toBe(false);
+  });
+
   it('rejects a non-function preview handler before committing any field (RB3)', () => {
     const designer = new BaseScreenDesignerElement();
     const result = designer.configure({

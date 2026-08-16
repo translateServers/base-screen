@@ -223,11 +223,12 @@ describe('designer panel rendering', () => {
         .filter((element) => element.tagName === 'input')
         .map((element) => element.dataset.canvasProperty),
     ).toEqual(['width', 'height', 'backgroundColor', 'backgroundImage']);
-    const action = descendants(properties).find(
-      (element) => element.dataset.canvasBackgroundImageAction !== undefined,
-    );
-    expect(action?.tagName).toBe('button');
-    expect(action?.textContent).toBe('选择图片');
+    // 宿主选择按钮默认隐藏（ADR-0047）：未配置 canvasBackgroundImageButton 时不渲染。
+    expect(
+      descendants(properties).some(
+        (element) => element.dataset.canvasBackgroundImageAction !== undefined,
+      ),
+    ).toBe(false);
     const fit = descendants(properties).find(
       (element) => element.dataset.canvasProperty === 'backgroundImageFit',
     );
@@ -238,6 +239,26 @@ describe('designer panel rendering', () => {
         .filter((element) => element.tagName === 'option')
         .map((element) => element.value),
     ).toEqual(['cover', 'contain']);
+  });
+
+  it('renders the host background image picker button only when configured', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      document(),
+      { selectedComponentIds: [], focusedComponentId: null },
+      catalog(),
+      undefined,
+      true,
+    );
+
+    const action = descendants(properties).find(
+      (element) => element.dataset.canvasBackgroundImageAction !== undefined,
+    );
+    expect(action?.tagName).toBe('button');
+    expect(action?.textContent).toBe('选择图片');
   });
 
   it('renders canvas background controls with an existing background image', () => {

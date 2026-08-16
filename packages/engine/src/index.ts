@@ -183,6 +183,8 @@ export interface BaseScreenDesignerConfiguration {
   readonly projectSnapshotPort?: ScreenProjectSnapshotPort;
   /** 宿主预览接管：返回 true 表示宿主已接管预览，引擎不再打开内置预览浮层。 */
   readonly previewHandler?: (document: ScreenDocument) => boolean;
+  /** 画布背景图宿主选择按钮（ADR-0046/0049）：默认隐藏；宿主配置 true 后属性面板渲染该按钮。 */
+  readonly canvasBackgroundImageButton?: boolean;
 }
 
 export class BaseScreenDesignerElement extends ElementBase {
@@ -201,6 +203,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   #groupMaterialType: string | undefined;
   #toolMaterialTypes: DesignerToolMaterialTypes | undefined;
   #previewHandler: ((document: ScreenDocument) => boolean) | undefined;
+  #canvasBackgroundImageButton = false;
   #renderer: BaseScreenRenderer | undefined;
   #canvas: HTMLDivElement | undefined;
   #viewportElement: HTMLDivElement | undefined;
@@ -362,6 +365,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     isMaterialAvailable: (type) => !this.#materialLibraryState?.unavailableTypes?.includes(type),
     requestMaterialLibraryAction: (action) => this.requestMaterialLibraryAction(action),
     requestCanvasBackgroundImage: () => this.requestCanvasBackgroundImage(),
+    isCanvasBackgroundImageButtonVisible: () => this.#canvasBackgroundImageButton,
   });
   readonly #viewportController = new DesignerViewportController({
     getDocument: () => this.#session.document,
@@ -743,6 +747,15 @@ export class BaseScreenDesignerElement extends ElementBase {
       };
     }
     if (
+      configuration.canvasBackgroundImageButton !== undefined &&
+      typeof configuration.canvasBackgroundImageButton !== 'boolean'
+    ) {
+      return {
+        ok: false,
+        diagnostics: [lifecycleDiagnostic('Designer canvasBackgroundImageButton 必须是布尔值。')],
+      };
+    }
+    if (
       configuration.resourcePort !== undefined &&
       !isScreenHostResourcePort(configuration.resourcePort)
     ) {
@@ -813,6 +826,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#toolMaterialTypes = configuration.toolMaterialTypes;
     this.#groupMaterialType = configuration.groupMaterialType;
     this.#previewHandler = configuration.previewHandler;
+    this.#canvasBackgroundImageButton = configuration.canvasBackgroundImageButton ?? false;
     this.initialize();
     return { ok: true, value: null, diagnostics: [] };
   }
@@ -899,6 +913,10 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get previewHandler(): ((document: ScreenDocument) => boolean) | undefined {
     return this.#previewHandler;
+  }
+
+  get canvasBackgroundImageButton(): boolean {
+    return this.#canvasBackgroundImageButton;
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
