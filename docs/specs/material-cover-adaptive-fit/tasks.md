@@ -1,6 +1,6 @@
 # Material Cover Adaptive Fit Tasks
 
-> 状态：进行中（2026-08-16，Task 7 待 xjdatahub 同步后勾选）
+> 状态：已完成（2026-08-16，`pnpm verify:fast` 与 `pnpm verify:browser` 全绿；xjdatahub 已同步）
 
 - [x] Task 1：冻结 ADR-0041 与 Spec 四件套；登记 Spec 索引（docs/specs/README.md）、ADR 索引
       （docs/decisions/README.md）与基线 README 能力行；usage.md 11.2 节登记自适应渲染行为
@@ -25,8 +25,9 @@
       contain`、完整可见（R1-R3）。
 - [x] Task 6：质量门禁：engine lint/typecheck/test（含 12 个物料库 DOM 测试）、`pnpm verify:fast` 与
       `pnpm verify:browser` 全部通过；测试矩阵与实现一致（R1-R3）。
-- [ ] Task 7：同步 xjdatahub：重新打包 engine tarball 覆盖 vendor、frontend 重装、验证 contain
-      渲染生效；更新 vendor README 渲染行为小节（宿主侧无改造要求）。
+- [x] Task 7：同步 xjdatahub：重新打包 engine tarball 覆盖 vendor、frontend 重装、验证 contain
+      渲染生效（安装后 bundle 含 `data-material-cover-fit=contain` 规则与自适应决策逻辑，vue-tsc 通过）；
+      更新 vendor README 渲染行为小节（宿主侧无改造要求）；xjdatahub dev `2dd3973..cf565e4` 已推送。
 
 ## 完成记录
 
