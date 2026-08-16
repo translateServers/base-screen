@@ -4,13 +4,27 @@
 > 最近更新：2026-08-16（封版后增量登记）
 
 本路线图列出下一阶段的候选方向与触发条件。**它不授权任何实现**：每一项启动前都必须先有已接受的 ADR
-与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域。当前生效中 Spec 为
-[Material Library Host State](../specs/material-library-host-state/spec.md)（封版后首个增量）、
-[Designer Left Panel](../specs/designer-left-panel/spec.md)（依据 ADR-0032，封版后第二个增量）、
-[Host Material Library Grouping](../specs/host-material-library-grouping/spec.md)（依据 ADR-0033）、
-[Designer Material Library Visual Refinement](../specs/designer-material-library-visual-refinement/spec.md)（依据 ADR-0034）、
-[Material Library Error Console](../specs/material-library-feedback-workspace-placement/spec.md)（依据 ADR-0035）和
-[Designer Viewport Native Events](../specs/designer-viewport-native-events/spec.md)（依据 ADR-0036）。
+与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域（当前共 19 份，完整清单以
+Spec 索引为准）：
+
+- 封版后首批增量：[Material Library Host State](../specs/material-library-host-state/spec.md)（ADR-0031）、
+  [Designer Left Panel](../specs/designer-left-panel/spec.md)（ADR-0032）、
+  [Host Material Library Grouping](../specs/host-material-library-grouping/spec.md)（ADR-0033）、
+  [Designer Material Library Visual Refinement](../specs/designer-material-library-visual-refinement/spec.md)（ADR-0034）、
+  [Material Library Error Console](../specs/material-library-feedback-workspace-placement/spec.md)（ADR-0035）、
+  [Designer Viewport Native Events](../specs/designer-viewport-native-events/spec.md)（ADR-0036）、
+  [Designer Panel Collapse Fixes](../specs/designer-panel-collapse-fixes/spec.md)（ADR-0037）、
+  [Designer Host Preview Handler](../specs/designer-host-preview/spec.md)（ADR-0038）、
+  [Designer Topbar Project Title](../specs/designer-topbar-project-title/spec.md)（ADR-0039）、
+  [Material Cover Thumbnail](../specs/material-cover-thumbnail/spec.md)（ADR-0040）、
+  [Material Cover Adaptive Fit](../specs/material-cover-adaptive-fit/spec.md)（ADR-0041）、
+  [Material Library Render Scalability](../specs/material-library-render-scalability/spec.md)（ADR-0042）、
+  [Canvas Background Image](../specs/canvas-background-image/spec.md)（ADR-0043/0045/0046/0049）、
+  [Text Material Typography](../specs/text-material-typography/spec.md)（ADR-0047）、
+  [Canvas Background Palette](../specs/canvas-background-palette/spec.md)（ADR-0048）、
+  [Unified Color Palette](../specs/unified-color-palette/spec.md)（ADR-0050/0051）、
+  [Designer Canvas Text Editing](../specs/designer-canvas-text-editing/spec.md)（ADR-0052）、
+  [Designer Multi Selection Editing](../specs/designer-multi-selection-editing/spec.md)（ADR-0053）。
 
 ## 候选方向
 

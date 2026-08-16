@@ -48,6 +48,7 @@ import {
   createDataSourceTransaction,
   createDesignerCanvasBackgroundDrafts,
   createInitialDataSource,
+  createMultiSelectionTransaction,
   createPropertyTransaction,
   type DesignerCanvasBackgroundDrafts,
   renderDesignerDataPanel,
@@ -419,6 +420,28 @@ export class DesignerPanelController {
   }
 
   onPropertyChange(event: Event): void {
+    const target = event.target;
+    const multiProperty = (target as { readonly dataset?: DOMStringMap } | null)?.dataset
+      ?.multiProperty;
+    if (multiProperty !== undefined && target !== null) {
+      // 多选批量编辑（ADR-0053）：data-multi-property 控件走独立事务通道。
+      const multiTransaction = createMultiSelectionTransaction(
+        target,
+        this.callbacks.getDocument(),
+        this.interaction,
+        this.callbacks.getCatalog(),
+      );
+      if (multiTransaction !== undefined) {
+        if (multiTransaction.ok) {
+          setDraftValidity(target, true);
+          this.report(this.callbacks.executeTransaction(multiTransaction.value));
+        } else {
+          setDraftValidity(target, false);
+          this.callbacks.emitDiagnostics(multiTransaction.diagnostics);
+        }
+        return;
+      }
+    }
     const arrayTransaction = createDescriptorArrayTransaction(
       event.target,
       this.callbacks.getDocument(),

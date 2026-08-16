@@ -142,6 +142,8 @@ export interface DesignerGestureCallbacks {
   readonly focusViewport?: () => void;
   /** 平移拖拽期间同步抓握光标（grabbing）状态。 */
   readonly setPanning?: (panning: boolean) => void;
+  /** 进入画布内文本编辑会话（ADR-0052）：返回是否已进入编辑。 */
+  readonly enterTextEdit?: (componentId: string) => boolean;
 }
 
 export class DesignerGestureController {
@@ -668,15 +670,23 @@ export class DesignerGestureController {
     const hitId = material?.dataset.baseScreenComponentId;
     if (hitId === undefined) return;
     const groupId = this.selectableComponentId(document, hitId);
-    if (groupId === null || !this.canEditChildren(document, groupId)) return;
-    const childId = selectionTargetInContext(document, hitId, groupId);
-    this.#editingParentId = groupId;
-    this.callbacks.reduceSelection({
-      type: 'replace-selection',
-      componentIds: [childId ?? groupId],
-      focusedComponentId: childId ?? groupId,
-    });
-    event.preventDefault();
+    if (groupId !== null && this.canEditChildren(document, groupId)) {
+      const childId = selectionTargetInContext(document, hitId, groupId);
+      this.#editingParentId = groupId;
+      this.callbacks.reduceSelection({
+        type: 'replace-selection',
+        componentIds: [childId ?? groupId],
+        focusedComponentId: childId ?? groupId,
+      });
+      event.preventDefault();
+      return;
+    }
+    // 组编辑不可用时，命中可编辑文本组件进入画布内文本编辑（ADR-0052 R1）。
+    // 注意：此处不重置 #editingParentId——组编辑上下文内双击不可编辑子组件
+    // 应保持组编辑状态（selectableComponentId 已处理非组目标的上下文退出）。
+    if (this.callbacks.enterTextEdit?.(hitId) === true) {
+      event.preventDefault();
+    }
   }
 
   private selectableComponentId(document: ScreenDocument, hitComponentId: string): string | null {

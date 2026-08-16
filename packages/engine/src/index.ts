@@ -71,6 +71,7 @@ import { DesignerPanelController } from './browser/controllers/designer-panel-co
 import { DesignerPreviewController } from './browser/controllers/designer-preview-controller.js';
 import { DesignerProjectFeedbackController } from './browser/controllers/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from './browser/controllers/designer-project-workspace-controller.js';
+import { DesignerTextEditController } from './browser/controllers/designer-text-edit-controller.js';
 import { DesignerViewportController } from './browser/controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from './browser/controllers/designer-workbench-controller.js';
 import { DesignerEventSystem } from './browser/dom/designer-event-system.js';
@@ -278,6 +279,14 @@ export class BaseScreenDesignerElement extends ElementBase {
     renderSelection: () => this.renderSelection(),
     focusViewport: () => this.#viewportController.focus(),
     setPanning: (panning) => this.#viewportController.setPanning(panning),
+    enterTextEdit: (componentId) => this.#textEditController.enter(componentId),
+  });
+  readonly #textEditController = new DesignerTextEditController({
+    getDocument: () => this.#session.document,
+    getCanvas: () => this.#canvas,
+    executeCommand: (command) => this.executeCommand(command),
+    report: (result) => this.report(result),
+    onEditingChange: () => {},
   });
   readonly #layersController = new DesignerLayersController({
     getCatalog: () => this.#catalog,

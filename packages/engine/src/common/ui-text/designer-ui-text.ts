@@ -235,6 +235,8 @@ export const DESIGNER_UI_TEXT = {
     actionUngroup: '取消编组',
     actionUnavailableLocked: '当前组已锁定。',
     actionUnavailableEmptyGroup: '当前组没有子项，无法取消编组。',
+    batchActionsHint: (count: number) => `应用到全部 ${count} 个组件。`,
+    batchAllLocked: '全部选中组件已锁定。',
     geometry: '几何',
     name: '名称',
     x: 'X',
@@ -426,6 +428,9 @@ export const DESIGNER_UI_TEXT = {
     removeItem: '移除',
     addItem: '添加',
     item: (index: number) => `第 ${index} 项`,
+  },
+  textEditing: {
+    hint: 'Enter 提交，Shift+Enter 换行，Esc 取消',
   },
 } as const;
 

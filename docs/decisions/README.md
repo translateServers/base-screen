@@ -64,10 +64,12 @@
 | [ADR-0045](./ADR-0045-canvas-background-panel-editing.md) | 已接受 | 2026-08-16 | 画布背景图属性面板编辑：右侧「画布」区新增 backgroundImage 文本输入与 backgroundImageFit 下拉（清空=删除并清 fit、无图禁用），经既有 `update-canvas` 事务与 canonical 校验，与 `setCanvasBackgroundImage`/文档入口语义一致；部分取代 ADR-0043 非目标 1；公共边界零变化 |
 | [ADR-0046](./ADR-0046-canvas-background-image-host-button.md) | 已接受 | 2026-08-16 | 画布背景图宿主选择按钮：「画布」区背景图片输入旁新增按钮，点击派发 `base-screen-canvas-background-image-request`（requestId/instanceId/revision/current）；`requestCanvasBackgroundImage` 登记会话、`commitCanvasBackgroundImage` 会话守护提交（复用 ADR-0028 作者桥语义）；宿主自开弹出框可视化选择；未接入宿主零副作用 |
 | [ADR-0047](./ADR-0047-text-material-typography.md) | 已接受 | 2026-08-16 | 文本物料排版能力：水平对齐（`textAlign`）与垂直对齐（`verticalAlign` top/middle/bottom）分离（flex 映射、缺失/top 保持 block 零回归），新增字间距 `letterSpacing`（px，0..100）与行间距 `lineSpacing`（px，0..512，增量语义：行高 = 字号 + 行间距）；新字段全部可选，旧文档零迁移，Manifest/面板经既有 schema 驱动通道自动生效，Engine 零改动 |
-| [ADR-0049](./ADR-0049-canvas-background-button-conditional-rendering.md) | 已接受 | 2026-08-16 | 画布背景图宿主按钮条件渲染与对齐：按钮默认隐藏，`canvasBackgroundImageButton?: boolean` 配置（RB3 校验）后渲染并暴露 getter；行容器承接字段间距、行内 field margin 归零使按钮与输入框同高居中；部分取代 ADR-0046 决策 1「始终渲染」 |
 | [ADR-0048](./ADR-0048-canvas-background-palette.md) | 已接受 | 2026-08-16 | Canvas 调色板：严格 JSON-safe 的单色、线性渐变与径向渐变背景对象；`update-canvas` null 删除、Renderer 与背景图分层、Designer 三模式编辑与宿主 `setCanvasBackground` API；旧 `backgroundColor` 文档保持单色回退 |
+| [ADR-0049](./ADR-0049-canvas-background-button-conditional-rendering.md) | 已接受 | 2026-08-16 | 画布背景图宿主按钮条件渲染与对齐：按钮默认隐藏，`canvasBackgroundImageButton?: boolean` 配置（RB3 校验）后渲染并暴露 getter；行容器承接字段间距、行内 field margin 归零使按钮与输入框同高居中；部分取代 ADR-0046 决策 1「始终渲染」 |
 | [ADR-0050](./ADR-0050-unified-color-palette-control.md) | 已接受 | 2026-08-16 | 统一三段式颜色调色板控件：属性面板与 Descriptor 全部 `color` 字段共享单色/线性渐变/径向渐变控件，多色标增删、按字段缓存三模式草稿；值保持字符串，Material/Manifest/ScreenDocument 契约零变化 |
 | [ADR-0051](./ADR-0051-unified-color-palette-replaces-color-input.md) | 已接受 | 2026-08-16 | 三段式调色板全面替换原生 color input：取消 ADR-0050 决策 2 的字段级门控，三种模式对所有颜色字段无条件可用；渐变渲染消费由物料渲染端负责，官方文本物料以 background-clip: text 支持渐变文字 |
+| [ADR-0052](./ADR-0052-designer-canvas-text-editing.md) | 已接受 | 2026-08-16 | Designer 画布内文本直接编辑：双击可编辑文本组件进入 contenteditable overlay 编辑会话（仅 `base.text` + static 字符串 dataSource，fail-closed），Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 经既有 `isEditableTarget` 通道放行 IME 与原生编辑键；不侵入物料/Renderer DOM，公共契约零变化 |
+| [ADR-0053](./ADR-0053-designer-multi-selection-editing.md) | 已接受 | 2026-08-16 | Designer 多选批量属性编辑：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑（复用 createControl / 三段式调色板），值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派，单选通道零改动，公共契约零变化 |
 
 ## 计划决策
 

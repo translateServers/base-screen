@@ -2394,6 +2394,177 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
       }),
     marqueeBefore,
   );
+  // 多选批量编辑（ADR-0053）：构造确定的多选（图层面板点选两个文本组件），
+  // 检查器提供批量几何与样式交集控件，编辑应用到全部选中组件且整批撤销恢复。
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const layers = root.querySelector('[data-layers]');
+    const titleRow = layers.querySelector('[data-layer-select="title"]');
+    titleRow.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return root.querySelector('[data-inspector-pane="appearance"]')?.innerText.includes('名称');
+  });
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const layers = root.querySelector('[data-layers]');
+    const subtitleRow = layers.querySelector('[data-layer-select="subtitle"]');
+    subtitleRow.dispatchEvent(
+      new MouseEvent('click', { bubbles: true, composed: true, shiftKey: true }),
+    );
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return root
+      .querySelector('[data-inspector-pane="appearance"]')
+      ?.innerText.includes('已选择 2 个组件');
+  });
+  const batchWidthControl = designer.locator('[data-multi-property="width"]');
+  const batchWidthCount = await batchWidthControl.count();
+  if (batchWidthCount !== 1) {
+    throw new Error(`BROWSER_HARNESS_BATCH_WIDTH_CONTROL_FAILED:${batchWidthCount}`);
+  }
+  const batchStyleControls = await designer.locator('[data-multi-property^="style:"]').count();
+  if (batchStyleControls < 2) {
+    throw new Error(`BROWSER_HARNESS_BATCH_STYLE_CONTROLS_FAILED:${batchStyleControls}`);
+  }
+  const batchBefore = await page.evaluate(() =>
+    ['title', 'subtitle'].map((id) => {
+      const component = window.baseScreenHarness.designer.document.components.find(
+        (item) => item.id === id,
+      );
+      return { id, width: component.size.width, fontSize: component.style.fontSize };
+    }),
+  );
+  await batchWidthControl.fill('601');
+  await batchWidthControl.dispatchEvent('change');
+  await page.waitForFunction(() =>
+    ['title', 'subtitle'].every((id) => {
+      const component = window.baseScreenHarness.designer.document.components.find(
+        (item) => item.id === id,
+      );
+      return component.size.width === 601;
+    }),
+  );
+  const batchFontSizeControl = designer.locator('[data-multi-property="style:fontSize"]');
+  await batchFontSizeControl.fill('26');
+  await batchFontSizeControl.dispatchEvent('change');
+  await page.waitForFunction(() =>
+    ['title', 'subtitle'].every((id) => {
+      const component = window.baseScreenHarness.designer.document.components.find(
+        (item) => item.id === id,
+      );
+      return component.style.fontSize === 26;
+    }),
+  );
+  // 批量宽度与批量字号各是一条历史：先把焦点从属性面板输入框移出（可编辑目标下
+  // Ctrl+Z 走原生撤销、不路由设计器命令），再两次撤销逐级恢复。
+  await page.mouse.click(marqueeCanvasBox.x + 20, marqueeCanvasBox.y + 20);
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction(
+    (before) =>
+      before.every(({ id, fontSize }) => {
+        const component = window.baseScreenHarness.designer.document.components.find(
+          (item) => item.id === id,
+        );
+        return component.style.fontSize === fontSize;
+      }),
+    batchBefore,
+  );
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction(
+    (before) =>
+      before.every(({ id, width }) => {
+        const component = window.baseScreenHarness.designer.document.components.find(
+          (item) => item.id === id,
+        );
+        return component.size.width === width;
+      }),
+    batchBefore,
+  );
+
+  // 画布内文本编辑（ADR-0052）：双击文本组件进入 overlay 编辑，Enter 提交产生一条
+  // 历史（撤销恢复原文），Esc 取消零副作用。
+  // 说明：page.mouse.dblclick 在 harness 页面布局（designer 与底部 viewer 并列）下可能
+  // 命中 viewer 渲染的物料，故在 designer 画布内以 composed dblclick 派发验证完整链路。
+  // 注意：前序作者桥断言（line ~845）把 title 静态数据设为 'Base Screen 设计器r'。
+  const textEditValueBefore = await page.evaluate(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.dataSource?.value;
+  });
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const canvas = root.querySelector('[data-canvas]');
+    const element = [...canvas.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.getAttribute('data-base-screen-component-id') === 'title',
+    );
+    if (element === undefined) throw new Error('BROWSER_HARNESS_TEXT_EDIT_TITLE_MISSING');
+    element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, composed: true }));
+  });
+  const textEditOverlay = designer.locator('[data-text-edit-overlay]');
+  await textEditOverlay.waitFor({ state: 'attached', timeout: 2_000 });
+  const overlayInitialText = await textEditOverlay.textContent();
+  if (overlayInitialText !== textEditValueBefore) {
+    throw new Error(
+      `BROWSER_HARNESS_TEXT_EDIT_OVERLAY_FAILED:${overlayInitialText}:before=${textEditValueBefore}`,
+    );
+  }
+  // 编辑期间物料本体隐藏：透明 overlay 下旧文本不得与编辑内容重叠（缺陷修复回归防线）。
+  const materialHiddenDuringEdit = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const canvas = root.querySelector('[data-canvas]');
+    const element = [...canvas.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.getAttribute('data-base-screen-component-id') === 'title',
+    );
+    return element?.style.visibility === 'hidden';
+  });
+  if (!materialHiddenDuringEdit) {
+    throw new Error('BROWSER_HARNESS_TEXT_EDIT_MATERIAL_VISIBILITY_FAILED');
+  }
+  await page.keyboard.press('Control+a');
+  await page.keyboard.type('新标题');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.dataSource?.value === '新标题';
+  });
+  const overlayGone = await textEditOverlay.count();
+  if (overlayGone !== 0) throw new Error('BROWSER_HARNESS_TEXT_EDIT_OVERLAY_LEFTOVER');
+  // overlay 移除后焦点回落 body，Ctrl+Z 不会进入 designer：先聚焦画布视口。
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.shadowRoot.querySelector('[data-viewport]').focus();
+  });
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction((before) => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.dataSource?.value === before;
+  }, textEditValueBefore);
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const canvas = root.querySelector('[data-canvas]');
+    const element = [...canvas.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.getAttribute('data-base-screen-component-id') === 'title',
+    );
+    element.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, composed: true }));
+  });
+  const cancelOverlay = designer.locator('[data-text-edit-overlay]');
+  await cancelOverlay.waitFor({ state: 'attached', timeout: 2_000 });
+  await page.keyboard.press('Escape');
+  await cancelOverlay.waitFor({ state: 'detached', timeout: 2_000 });
+  await page.waitForFunction((before) => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.dataSource?.value === before;
+  }, textEditValueBefore);
+
   // 清空框选遗留的选择，避免污染后续断言步骤。
   await page.keyboard.press('Escape');
   await page.waitForFunction(

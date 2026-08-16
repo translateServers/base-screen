@@ -2259,4 +2259,49 @@ describe('DesignerGestureController snap session', () => {
     canvas.dispatch('pointercancel', {} as PointerEvent);
     expect(setSnapSessionActive).toHaveBeenLastCalledWith(false);
   });
+
+  it('enters text editing on double click of an editable text component outside group editing', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const text = {
+      ...document().components[0]!,
+      id: 'text-1',
+      type: 'base.text',
+      dataSource: { type: 'static' as const, value: '标题' },
+    };
+    const current = { ...document(), components: [text] };
+    const textMaterial = new FakeElement();
+    textMaterial.dataset.baseScreenComponentId = 'text-1';
+    textMaterial.matches['[data-base-screen-component-id]'] = textMaterial;
+    canvas.registerMaterial('text-1', textMaterial);
+    const enterTextEdit = vi.fn(() => true);
+    const reduceSelection = vi.fn();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: () => current,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasPoint: (point) => point,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      zoomBy: () => undefined,
+      enterTextEdit,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('dblclick', {
+      target: textMaterial,
+      preventDefault: vi.fn(),
+    } as unknown as PointerEvent);
+
+    expect(enterTextEdit).toHaveBeenCalledWith('text-1');
+    expect(reduceSelection).not.toHaveBeenCalled();
+  });
 });

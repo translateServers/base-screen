@@ -36,6 +36,11 @@ import {
   createValidatedPropsTransaction,
   createValidatedStyleTransaction,
 } from '../../common/operations/designer-layout-operations.js';
+import {
+  commonStyleFields,
+  createMultiSelectionGeometryTransaction,
+  createMultiSelectionStyleTransaction,
+} from '../../common/operations/designer-multi-selection-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   createDesignerColorPalette,
@@ -111,7 +116,7 @@ export function renderDesignerProperties(
     return;
   }
   if (context.kind === 'multi-selection') {
-    appendMultiSelectionControls(properties, context);
+    appendMultiSelectionControls(properties, context, document, interaction, catalog);
     return;
   }
   if (context.kind === 'single-group') {
@@ -289,6 +294,9 @@ function appendGroupActions(
 function appendMultiSelectionControls(
   properties: HTMLElement,
   context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
+  document: ScreenDocument | undefined,
+  interaction: ScreenInteractionState,
+  catalog: BaseScreenMaterialCatalog | undefined,
 ): void {
   const summary = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionSummary);
   const list = properties.ownerDocument.createElement('ul');
@@ -351,6 +359,97 @@ function appendMultiSelectionControls(
     !context.summary.canGroup,
     multiSelectionGroupUnavailableReason(context.summary),
   );
+  appendBatchGeometryControls(properties, context, interaction);
+  appendBatchStyleControls(properties, context, document, interaction, catalog);
+}
+
+/**
+ * 批量几何编辑区（ADR-0053 R1）：宽度/高度/旋转，值显示焦点组件当前值，
+ * 编辑后应用到全部选中组件。全部锁定或无选中时禁用。
+ */
+function appendBatchGeometryControls(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
+  interaction: ScreenInteractionState,
+): void {
+  const focused =
+    context.components.find((item) => item.id === interaction.focusedComponentId) ??
+    context.components[0];
+  if (focused === undefined) return;
+  const disabled =
+    context.summary.hasLocked && context.components.every((item) => item.status.locked);
+  const hint = disabled
+    ? DESIGNER_UI_TEXT.propertiesPanel.batchAllLocked
+    : DESIGNER_UI_TEXT.propertiesPanel.batchActionsHint(context.summary.count);
+  const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
+  const grid = appendFieldGrid(geometry);
+  appendBatchNumberInput(
+    grid,
+    DESIGNER_UI_TEXT.propertiesPanel.width,
+    'width',
+    focused.size.width,
+    disabled,
+    hint,
+  );
+  appendBatchNumberInput(
+    grid,
+    DESIGNER_UI_TEXT.propertiesPanel.height,
+    'height',
+    focused.size.height,
+    disabled,
+    hint,
+  );
+  appendBatchNumberInput(
+    grid,
+    DESIGNER_UI_TEXT.propertiesPanel.rotation,
+    'rotation',
+    focused.rotation,
+    disabled,
+    hint,
+  );
+}
+
+/**
+ * 批量样式编辑区（ADR-0053 R2）：所有选中组件 stylePanel 字段的交集；
+ * 交集为空（混合类型）时只显示几何区。控件复用单选渲染（三段式调色板等）。
+ */
+function appendBatchStyleControls(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
+  document: ScreenDocument | undefined,
+  interaction: ScreenInteractionState,
+  catalog: BaseScreenMaterialCatalog | undefined,
+): void {
+  if (document === undefined) return;
+  const componentIds = context.components.map((item) => item.id);
+  const fields = commonStyleFields(document, componentIds, catalog);
+  if (fields.length === 0) return;
+  const focused =
+    context.components.find((item) => item.id === interaction.focusedComponentId) ??
+    context.components[0];
+  const manifest = focused === undefined ? undefined : catalog?.get(focused.type)?.manifest;
+  if (manifest === undefined || focused === undefined) return;
+  const disabled =
+    context.summary.hasLocked && context.components.every((item) => item.status.locked);
+  const hint = disabled
+    ? DESIGNER_UI_TEXT.propertiesPanel.batchAllLocked
+    : DESIGNER_UI_TEXT.propertiesPanel.batchActionsHint(context.summary.count);
+  const style = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.style);
+  for (const field of fields) {
+    const schema = manifest.styleSchema?.properties?.[field];
+    const panelField = (manifest.stylePanel ?? []).find((item) => item.style === field);
+    if (schema === undefined || panelField === undefined) continue;
+    appendBatchStyleControl(
+      style,
+      panelField.label,
+      field,
+      focused.style[field],
+      schema,
+      panelField.control,
+      disabled,
+      hint,
+    );
+  }
 }
 
 export function renderDesignerDataPanel(
@@ -480,6 +579,42 @@ export function createPropertyTransaction(
     { ...component.props, [prop]: value },
     manifest.propsSchema,
   );
+}
+
+/**
+ * 多选批量编辑事务分派（ADR-0053）：`data-multi-property` 控件（批量几何宽/高/旋转、
+ * 批量样式 `style:<field>`）的独立事务通道；单选事务通道（createPropertyTransaction）
+ * 零改动。值显示焦点组件，编辑后应用到全部选中组件（跳过锁定成员）。
+ */
+export function createMultiSelectionTransaction(
+  target: EventTarget | null,
+  document: ScreenDocument | undefined,
+  interaction: ScreenInteractionState,
+  catalog: BaseScreenMaterialCatalog | undefined,
+): ScreenParseResult<ScreenDocumentTransaction> | undefined {
+  if (!isControl(target) || document === undefined) return undefined;
+  const multiProperty = target.dataset.multiProperty;
+  if (multiProperty === undefined) return undefined;
+  const componentIds = interaction.selectedComponentIds;
+  if (multiProperty === 'width' || multiProperty === 'height' || multiProperty === 'rotation') {
+    return createMultiSelectionGeometryTransaction(
+      document,
+      componentIds,
+      multiProperty,
+      Number(target.value),
+    );
+  }
+  if (multiProperty.startsWith('style:')) {
+    const style = multiProperty.slice('style:'.length);
+    const focused = document.components.find((item) => item.id === interaction.focusedComponentId);
+    const manifest = focused === undefined ? undefined : catalog?.get(focused.type)?.manifest;
+    const schema = manifest?.styleSchema?.properties?.[style];
+    if (schema === undefined) return undefined;
+    const value = parsePropertyControlValue(target, schema);
+    if (value === undefined) return undefined;
+    return createMultiSelectionStyleTransaction(document, componentIds, style, value, catalog);
+  }
+  return undefined;
 }
 
 export function createDataSourceTransaction(
@@ -746,6 +881,68 @@ function appendInput(
   if (min !== undefined) input.min = min;
   label.appendChild(input);
   appendFieldMessage(label, input, `property-${property}`);
+  parent.appendChild(label);
+}
+
+/** 批量数值输入（ADR-0053）：带 `data-multi-property` 标记，经独立事务分派。 */
+function appendBatchNumberInput(
+  parent: HTMLElement,
+  labelText: string,
+  multiProperty: string,
+  value: number,
+  disabled: boolean,
+  hint: string,
+): void {
+  const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
+  label.textContent = labelText;
+  const input = parent.ownerDocument.createElement('input');
+  input.type = 'number';
+  input.className = 'designer-control designer-input designer-number';
+  input.value = String(value);
+  input.dataset.multiProperty = multiProperty;
+  input.disabled = disabled;
+  input.title = hint;
+  label.appendChild(input);
+  appendFieldMessage(label, input, `multi-property-${multiProperty}`);
+  parent.appendChild(label);
+}
+
+/** 批量样式控件（ADR-0053）：复用单选控件渲染，color 字段走统一三段式调色板。 */
+function appendBatchStyleControl(
+  parent: HTMLElement,
+  labelText: string,
+  style: string,
+  value: ScreenJsonValue | undefined,
+  schema: BaseScreenMaterialPropSchema,
+  control: string,
+  disabled: boolean,
+  hint: string,
+): void {
+  const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
+  label.className = 'designer-field designer-field-label';
+  label.textContent = labelText;
+  if (control === 'color') {
+    const palette = createDesignerColorPalette(
+      parent.ownerDocument,
+      typeof value === 'string' ? value : undefined,
+      `multi:style:${style}`,
+    );
+    for (const input of palette.controls) {
+      input.dataset.multiProperty = `style:${style}`;
+      input.disabled = disabled;
+      input.title = hint;
+    }
+    label.appendChild(palette.element);
+    appendFieldMessage(label, palette.controls[0]!, `multi-style-${style}`);
+  } else {
+    const input = createControl(parent.ownerDocument, value, schema, control);
+    input.dataset.multiProperty = `style:${style}`;
+    input.disabled = disabled;
+    input.title = hint;
+    label.appendChild(input);
+    appendFieldMessage(label, input, `multi-style-${style}`);
+  }
   parent.appendChild(label);
 }
 
