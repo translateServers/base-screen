@@ -509,6 +509,51 @@ const configured = designer.configure({
 保持既有失败语义；直接文档模式的内置浮层不受影响。预览路由、鉴权、草稿存储与窗口打开全部
 由宿主实现，Base Screen 不新增网络、存储或窗口管理职责。
 
+#### 画布背景图片
+
+宿主可以给画布设置/清除背景图片（ADR-0043）。图片 URL 进入 canonical 文档的
+`canvas.backgroundImage`（可选）与 `canvas.backgroundImageFit`（`cover`/`contain`，缺省按
+`cover` 渲染），随文档持久化，Designer 画布与 Viewer 同一渲染路径一致呈现：
+
+```ts
+// 设置背景图（可选指定适配方式；未传 fit 保留既有 fit，无则按 cover）
+const set = designer.setCanvasBackgroundImage(
+  'https://cdn.example.com/screens/bg.png',
+  'contain',
+);
+if (!set.ok) {
+  showDiagnostics(set.diagnostics); // 非法 URL/fit 失败关闭、零副作用
+  return;
+}
+
+// 清除背景图（同时清除 fit）
+designer.setCanvasBackgroundImage(null);
+```
+
+宿主也可以直接在加载的文档中携带背景字段（`replaceDocument`/`importDocument`/项目加载走同一
+失败关闭校验）：
+
+```ts
+const document = {
+  canvas: {
+    width: 1920,
+    height: 1080,
+    backgroundColor: '#000000',
+    backgroundImage: '/assets/screen-bg.png',
+    backgroundImageFit: 'cover',
+  },
+  components: [],
+  variables: [],
+  blueprint: { rules: [] },
+};
+```
+
+校验边界：`backgroundImage` 必须是非空、1..2048 码点的有界 URL——`http(s)://`、协议相对
+`//`、根相对 `/` 或点相对 `./`、`../` 开头；拒绝 `data:`/`javascript:`/`blob:`/`file:` 等
+scheme、裸相对路径、含空白/控制字符/反斜杠的值。Base Screen 只把校验后的 URL 写入 CSS
+`url()`（转义），不 fetch、不预取、不重试、不代理；图片加载失败只影响画布背景呈现，图片
+资产的上传、存储与鉴权归宿主（ADR-0027）。
+
 ### 7.3 配置 Designer 主题
 
 `base-screen-designer` 提供 CSS Custom Properties，用于让 Designer 的顶栏、工具栏、面板、

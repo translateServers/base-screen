@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { ScreenJsonObject } from '../types/json.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
+  MAX_BACKGROUND_IMAGE_CODE_POINTS,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_NAME_CODE_POINTS,
 } from './limits.js';
@@ -15,6 +16,7 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
   const properties = getObject(generated.properties);
   const canvas = getObject(getObject(properties.canvas).properties);
   getObject(canvas.backgroundColor).maxLength = MAX_BACKGROUND_COLOR_CODE_POINTS;
+  getObject(canvas.backgroundImage).maxLength = MAX_BACKGROUND_IMAGE_CODE_POINTS;
   const components = getObject(properties.components);
   const component = getObject(components.items);
   const componentProperties = getObject(component.properties);

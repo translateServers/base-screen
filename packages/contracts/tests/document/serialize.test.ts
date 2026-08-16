@@ -123,6 +123,30 @@ describe('serializeScreenDocument', () => {
     if (reparsed.ok) expect(reparsed.value).toEqual(input);
   });
 
+  it('round-trips canvas background image fields', () => {
+    const input = parsed(
+      document({
+        canvas: {
+          width: 1920,
+          height: 1080,
+          backgroundColor: '#000000',
+          backgroundImage: 'https://cdn.x/screens/bg.png',
+          backgroundImageFit: 'contain',
+        },
+      }),
+    );
+    const output = serializeScreenDocument(input);
+    expect(output).toContain('"backgroundImage":"https://cdn.x/screens/bg.png"');
+    expect(output).toContain('"backgroundImageFit":"contain"');
+    const reparsed = parseScreenDocument(JSON.parse(output));
+    expect(reparsed.ok).toBe(true);
+    if (reparsed.ok) {
+      expect(reparsed.value).toEqual(input);
+      expect(reparsed.value.canvas.backgroundImage).toBe('https://cdn.x/screens/bg.png');
+      expect(reparsed.value.canvas.backgroundImageFit).toBe('contain');
+    }
+  });
+
   it('throws ScreenSerializationError for invalid runtime input', () => {
     const cases: Array<Record<string, unknown>> = [
       document({ canvas: { width: 0, height: 1, backgroundColor: '#000' } }),

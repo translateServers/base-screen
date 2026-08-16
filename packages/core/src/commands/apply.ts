@@ -25,7 +25,15 @@ const PATCH_FIELDS = new Set([
   'style',
   'dataSource',
 ]);
-const CANVAS_FIELDS = new Set(['width', 'height', 'backgroundColor']);
+// canvas patch 字段白名单（ADR-0043：backgroundImage/backgroundImageFit 为可选字段，
+// patch 中值为 null 表示删除该字段——canvas 全部字段均不可空，null 无歧义）。
+const CANVAS_FIELDS = new Set([
+  'width',
+  'height',
+  'backgroundColor',
+  'backgroundImage',
+  'backgroundImageFit',
+]);
 
 export function applyScreenDocumentCommand(
   document: ScreenDocument,
@@ -115,13 +123,22 @@ function applyCanvas(document: ScreenDocument, patch: unknown): ScreenCommandRes
       invalid('Canvas patch contains an unknown or invalid field.', ['patch']),
     );
   }
-  if (
-    Object.keys(patch).length === 0 ||
-    areEqual(document.canvas, patchDocument(document.canvas, patch))
-  ) {
+  if (Object.keys(patch).length === 0) {
     return success(document, []);
   }
-  return finalize(document, { ...document, canvas: patchDocument(document.canvas, patch) }, []);
+  // null 值表示删除字段（canvas 字段均不可空，无歧义）；其余值合并。
+  const canvas = { ...document.canvas } as Record<string, unknown>;
+  for (const [key, value] of Object.entries(patch)) {
+    if (value === null) {
+      delete canvas[key];
+    } else {
+      canvas[key] = value;
+    }
+  }
+  if (areEqual(document.canvas, canvas)) {
+    return success(document, []);
+  }
+  return finalize(document, { ...document, canvas }, []);
 }
 
 function applyAddComponent(document: ScreenDocument, component: unknown): ScreenCommandResult {

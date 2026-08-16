@@ -19,6 +19,15 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 128
+        },
+        "backgroundImage": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "backgroundImageFit": {
+          "type": "string",
+          "enum": ["cover", "contain"]
         }
       },
       "required": ["width", "height", "backgroundColor"],

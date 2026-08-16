@@ -29,17 +29,18 @@ function document(name = '文本'): ScreenDocument {
 
 function createSession(renderDocument: (document: ScreenDocument) => ScreenParseResult<void>) {
   const selections: ScreenInteractionState[] = [];
+  const changes: (ScreenDocument | undefined)[] = [];
   const session = new DesignerSession({
     renderDocument,
     renderInteraction: () => undefined,
-    emitChange: () => undefined,
+    emitChange: (document) => changes.push(document),
     emitSelectionChange: (interaction) => selections.push(interaction),
     onProjectChange: () => undefined,
     onDirtyChange: () => undefined,
     onConflict: () => undefined,
     onReady: () => undefined,
   });
-  return { session, selections };
+  return { session, selections, changes };
 }
 
 describe('DesignerSession', () => {
@@ -96,5 +97,72 @@ describe('DesignerSession', () => {
     expect(session.document?.components[0]?.name).toBe('文本');
     expect(session.canUndo).toBe(false);
     expect(session.interaction.focusedComponentId).toBe('text-1');
+  });
+
+  it('commits a canvas background image transaction with history and change events', () => {
+    const { session, changes } = createSession(() => ({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    }));
+    session.replaceDocument(document());
+
+    const result = session.executeCommand({
+      type: 'update-canvas',
+      patch: { backgroundImage: 'https://cdn.x/screens/bg.png', backgroundImageFit: 'contain' },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(session.document?.canvas.backgroundImage).toBe('https://cdn.x/screens/bg.png');
+    expect(session.document?.canvas.backgroundImageFit).toBe('contain');
+    expect(session.canUndo).toBe(true);
+    expect(changes.at(-1)?.canvas.backgroundImage).toBe('https://cdn.x/screens/bg.png');
+  });
+
+  it('rejects an invalid canvas background image with zero side effects', () => {
+    const { session, changes } = createSession(() => ({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    }));
+    session.replaceDocument(document());
+
+    const result = session.executeCommand({
+      type: 'update-canvas',
+      patch: { backgroundImage: 'javascript:alert(1)' },
+    });
+
+    expect(result.ok).toBe(false);
+    expect(session.document?.canvas.backgroundImage).toBeUndefined();
+    expect(session.canUndo).toBe(false);
+    expect(changes).toHaveLength(1); // 只有 replaceDocument 的一次变更
+  });
+
+  it('clears the canvas background image via null patch values', () => {
+    const { session } = createSession(() => ({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    }));
+    session.replaceDocument({
+      ...document(),
+      canvas: {
+        width: 960,
+        height: 540,
+        backgroundColor: '#000000',
+        backgroundImage: 'https://cdn.x/bg.png',
+        backgroundImageFit: 'cover',
+      },
+    });
+
+    const result = session.executeCommand({
+      type: 'update-canvas',
+      patch: { backgroundImage: null, backgroundImageFit: null },
+    });
+
+    expect(result.ok).toBe(true);
+    expect(session.document?.canvas.backgroundImage).toBeUndefined();
+    expect(session.document?.canvas.backgroundImageFit).toBeUndefined();
+    expect(session.canUndo).toBe(true);
   });
 });

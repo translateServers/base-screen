@@ -18,6 +18,8 @@ export const canvasSchema = z.strictObject({
   width: z.number().int().min(1).max(100_000),
   height: z.number().int().min(1).max(100_000),
   backgroundColor: z.string().min(1),
+  backgroundImage: z.string().min(1).optional(),
+  backgroundImageFit: z.enum(['cover', 'contain']).optional(),
 });
 
 export const positionSchema = z.strictObject({

@@ -88,5 +88,16 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['getAuthoringEditorContext']
     >().returns.toEqualTypeOf<import('@base-screen/contracts').ScreenAuthoringEditorContext>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['setCanvasBackgroundImage']
+    >().parameters.toEqualTypeOf<
+      [
+        string | null,
+        (import('@base-screen/contracts').ScreenCanvasBackgroundImageFit | undefined)?,
+      ]
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['setCanvasBackgroundImage']
+    >().returns.toEqualTypeOf<ScreenParseResult<import('@base-screen/contracts').ScreenDocument>>();
   });
 });

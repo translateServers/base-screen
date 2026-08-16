@@ -1,6 +1,6 @@
 import type {
   ScreenBlueprint,
-  ScreenCanvas,
+  ScreenCanvasBackgroundImageFit,
   ScreenComponentDataSource,
   ScreenComponentNode,
   ScreenComponentStatus,
@@ -12,8 +12,20 @@ import type {
   ScreenVariable,
 } from '@base-screen/contracts';
 
+/**
+ * `update-canvas` patch：可选字段 `backgroundImage`/`backgroundImageFit` 允许 `null`，
+ * 表示删除该字段（ADR-0043；canvas 字段均不可空，null 无歧义）。
+ */
+export type ScreenCanvasPatch = {
+  readonly width?: number;
+  readonly height?: number;
+  readonly backgroundColor?: string;
+  readonly backgroundImage?: string | null;
+  readonly backgroundImageFit?: ScreenCanvasBackgroundImageFit | null;
+};
+
 export type ScreenDocumentCommand =
-  | { readonly type: 'update-canvas'; readonly patch: Partial<ScreenCanvas> }
+  | { readonly type: 'update-canvas'; readonly patch: ScreenCanvasPatch }
   | { readonly type: 'add-component'; readonly component: ScreenComponentNode }
   | {
       readonly type: 'update-components';

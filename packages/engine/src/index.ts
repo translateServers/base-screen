@@ -12,6 +12,7 @@ import type {
   ScreenAuthoringEditorContext,
   ScreenBlueprint,
   ScreenBlueprintCommitRequest,
+  ScreenCanvasBackgroundImageFit,
   ScreenComponentTextCommitRequest,
   ScreenComponentTextTarget,
   ScreenDesignerHostAdapter,
@@ -1102,6 +1103,25 @@ export class BaseScreenDesignerElement extends ElementBase {
         ? transaction
         : withDerivedDesignerGroupBounds(document, transaction, this.#groupMaterialType),
     );
+  }
+
+  /**
+   * 宿主设置/清除画布背景图片（ADR-0043）：经 session 事务（update-canvas）提交，失败关闭零副作用；
+   * `backgroundImage` 为 `null` 时清除背景并同时清除 fit；设置时未传 `fit` 保留既有 fit（无则按 cover 渲染）。
+   */
+  setCanvasBackgroundImage(
+    backgroundImage: string | null,
+    fit?: ScreenCanvasBackgroundImageFit,
+  ): ScreenParseResult<ScreenDocument> {
+    const patch: Record<string, unknown> = {};
+    if (backgroundImage === null) {
+      patch.backgroundImage = null;
+      patch.backgroundImageFit = null;
+    } else {
+      patch.backgroundImage = backgroundImage;
+      if (fit !== undefined) patch.backgroundImageFit = fit;
+    }
+    return this.executeTransaction({ commands: [{ type: 'update-canvas', patch }] });
   }
 
   get instanceId(): string {

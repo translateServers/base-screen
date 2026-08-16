@@ -20,6 +20,7 @@ export {
   SCREEN_MATERIAL_ERROR_CODES,
 } from './diagnostics/material-error.js';
 export { isScreenMaterialType } from './document/identity.js';
+export { isBoundedScreenImageUrl } from './document/image-url.js';
 export { SCREEN_DOCUMENT_JSON_SCHEMA } from './document/json-schema.js';
 export {
   parseScreenDocument,
@@ -79,6 +80,7 @@ export type {
   ScreenBlueprintSetVariableAction,
   ScreenBlueprintValueExpression,
   ScreenCanvas,
+  ScreenCanvasBackgroundImageFit,
   ScreenComponentDataSource,
   ScreenComponentNode,
   ScreenComponentStatus,

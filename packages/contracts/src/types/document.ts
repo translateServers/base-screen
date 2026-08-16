@@ -1,9 +1,13 @@
 import type { ScreenJsonObject, ScreenJsonValue } from './json.js';
 
+export type ScreenCanvasBackgroundImageFit = 'cover' | 'contain';
+
 export interface ScreenCanvas {
   readonly width: number;
   readonly height: number;
   readonly backgroundColor: string;
+  readonly backgroundImage?: string;
+  readonly backgroundImageFit?: ScreenCanvasBackgroundImageFit;
 }
 
 export interface ScreenPosition {

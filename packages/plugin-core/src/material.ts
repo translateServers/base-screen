@@ -1,4 +1,5 @@
 import {
+  isBoundedScreenImageUrl,
   isScreenMaterialType,
   parseScreenJsonValue,
   type ScreenDiagnostic,
@@ -281,21 +282,15 @@ function validateMaterialFields(
   }
 }
 
-// 封面 URL 校验（ADR-0040）：缺省即未声明；存在时必须是有界 http(s)/协议相对/根相对/点相对 URL，
-// 前缀 + 首字符分类，拒绝其他 scheme（data:/javascript:/blob:/file: 等）、裸相对路径与边界形式
-// （裸 /、裸 //、https:///x、http://?x、含反斜杠等），失败关闭不静默修复。
-const COVER_URL_PATTERN = /^(?:https?:\/\/|\/\/)[^\s/?#\\]|^(?:\/|\.{1,2}\/)[^\s/\\]/;
-
+// 封面 URL 校验（ADR-0040，规则同形收敛至 contracts 的 isBoundedScreenImageUrl）：缺省即未声明；
+// 存在时必须是有界 http(s)/协议相对/根相对/点相对 URL，拒绝其他 scheme、裸相对路径与边界形式，
+// 失败关闭不静默修复。
 function validateCover(
   value: ScreenJsonValue | undefined,
   collector: PluginDiagnosticCollector,
 ): void {
   if (value === undefined) return;
-  const valid =
-    isDisplayString(value, MAX_COVER_LENGTH) &&
-    !/[\s\\\u0080-\u009f]/.test(value) &&
-    COVER_URL_PATTERN.test(value);
-  if (!valid) {
+  if (!isBoundedScreenImageUrl(value, MAX_COVER_LENGTH)) {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
       ['cover'],

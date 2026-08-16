@@ -768,7 +768,7 @@ describe('DesignerPanelController material search debounce (ADR-0042)', () => {
   }
 
   function debouncedLayout(input: FakeElement, clear: FakeElement) {
-    const cardsQuery = vi.fn(() => []);
+    const cardsQuery = vi.fn((_selector: string) => []);
     const layout = {
       querySelector: (selector: string) =>
         selector === '[data-material-search]'

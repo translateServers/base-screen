@@ -5,6 +5,7 @@ import {
 } from '../../src/document/json-schema.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
+  MAX_BACKGROUND_IMAGE_CODE_POINTS,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_NAME_CODE_POINTS,
 } from '../../src/document/limits.js';
@@ -101,6 +102,27 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     const name = componentFields.name as { minLength: number; maxLength: number };
     expect(name.minLength).toBe(1);
     expect(name.maxLength).toBe(MAX_NAME_CODE_POINTS);
+  });
+
+  it('declares optional canvas background image fields', () => {
+    const canvas = propertiesOf(schema).canvas as Record<string, unknown>;
+    const canvasFields = propertiesOf(canvas);
+    const backgroundImage = canvasFields.backgroundImage as {
+      type: string;
+      minLength: number;
+      maxLength: number;
+    };
+    expect(backgroundImage).toEqual({
+      type: 'string',
+      minLength: 1,
+      maxLength: MAX_BACKGROUND_IMAGE_CODE_POINTS,
+    });
+    const backgroundImageFit = canvasFields.backgroundImageFit as {
+      type: string;
+      enum: string[];
+    };
+    expect(backgroundImageFit).toEqual({ type: 'string', enum: ['cover', 'contain'] });
+    expect(canvas.required).toEqual(['width', 'height', 'backgroundColor']);
   });
 
   it('expresses Blueprint condition and expression limits', () => {

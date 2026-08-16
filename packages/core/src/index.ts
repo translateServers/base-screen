@@ -28,6 +28,7 @@ export {
 } from './blueprint/runtime.js';
 export { applyScreenDocumentCommand, applyScreenDocumentTransaction } from './commands/apply.js';
 export type {
+  ScreenCanvasPatch,
   ScreenCommandResult,
   ScreenComponentPatch,
   ScreenDocumentCommand,

@@ -4,6 +4,7 @@ import {
   applyScreenDocumentCommand,
   applyScreenDocumentTransaction,
 } from '../../src/commands/apply.js';
+import type { ScreenCanvasPatch } from '../../src/commands/types.js';
 import { makeComponent, makeDocument, makeVariable } from '../__fixtures__/document.js';
 
 function documentWithComponents() {
@@ -308,6 +309,101 @@ describe('applyScreenDocumentTransaction', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.diagnostics[0]?.code).toBe('CORE_COMMAND_LIMIT_EXCEEDED');
+    }
+  });
+});
+
+describe('applyScreenDocumentCommand update-canvas background image', () => {
+  const canvas = { width: 1920, height: 1080, backgroundColor: '#000000' };
+
+  it('sets the background image and fit via an exact patch', () => {
+    const document = makeDocument({ canvas: { ...canvas } });
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-canvas',
+      patch: { backgroundImage: 'https://cdn.x/screens/bg.png', backgroundImageFit: 'contain' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.document.canvas.backgroundImage).toBe('https://cdn.x/screens/bg.png');
+      expect(result.document.canvas.backgroundImageFit).toBe('contain');
+      expect(document.canvas.backgroundImage).toBeUndefined();
+    }
+  });
+
+  it('removes the background image when the patch value is null', () => {
+    const document = makeDocument({
+      canvas: { ...canvas, backgroundImage: 'https://cdn.x/bg.png', backgroundImageFit: 'cover' },
+    });
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-canvas',
+      patch: { backgroundImage: null, backgroundImageFit: null },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.document.canvas.backgroundImage).toBeUndefined();
+      expect(result.document.canvas.backgroundImageFit).toBeUndefined();
+      expect(parseScreenDocument(result.document).ok).toBe(true);
+    }
+  });
+
+  it('fails atomically on an invalid background image or fit', () => {
+    const patches: ScreenCanvasPatch[] = [
+      { backgroundImage: 'javascript:alert(1)' },
+      { backgroundImage: 'a.png' },
+      { backgroundImage: `https://x/${'a'.repeat(2049)}` },
+      { backgroundImageFit: 'fill' } as unknown as ScreenCanvasPatch,
+    ];
+    for (const patch of patches) {
+      const document = makeDocument({ canvas: { ...canvas } });
+      const result = applyScreenDocumentCommand(document, {
+        type: 'update-canvas',
+        patch,
+      });
+      expect(result.ok).toBe(false);
+      expect(result.document).toBe(document);
+      if (!result.ok) {
+        expect(result.diagnostics[0]?.code).toBe('DOCUMENT_FIELD_INVALID');
+      }
+    }
+  });
+
+  it('treats empty and equal patches as no-op successes', () => {
+    const document = makeDocument({
+      canvas: { ...canvas, backgroundImage: 'https://cdn.x/bg.png' },
+    });
+    const empty = applyScreenDocumentCommand(document, { type: 'update-canvas', patch: {} });
+    const equal = applyScreenDocumentCommand(document, {
+      type: 'update-canvas',
+      patch: { backgroundImage: 'https://cdn.x/bg.png' },
+    });
+    // 文档本就未声明背景时，删除 patch 也是 no-op。
+    const plain = makeDocument({ canvas: { ...canvas } });
+    const removeAbsent = applyScreenDocumentCommand(plain, {
+      type: 'update-canvas',
+      patch: { backgroundImage: null, backgroundImageFit: null },
+    });
+
+    expect(empty.ok).toBe(true);
+    expect(equal.ok).toBe(true);
+    expect(removeAbsent.ok).toBe(true);
+    if (empty.ok) expect(empty.document).toBe(document);
+    if (equal.ok) expect(equal.document).toBe(document);
+    if (removeAbsent.ok) expect(removeAbsent.document).toBe(plain);
+  });
+
+  it('rejects unknown canvas patch fields', () => {
+    const document = makeDocument({ canvas: { ...canvas } });
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-canvas',
+      patch: { backgroundUrl: 'https://x/bg.png' } as unknown as ScreenCanvasPatch,
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.document).toBe(document);
+      expect(result.diagnostics[0]?.code).toBe('CORE_COMMAND_INVALID');
     }
   });
 });

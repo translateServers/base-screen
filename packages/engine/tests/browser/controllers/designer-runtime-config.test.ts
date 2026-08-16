@@ -7,7 +7,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { BaseScreenDesignerElement } from '../../../src/index.js';
 
 function catalog(): BaseScreenMaterialCatalog {
@@ -240,5 +240,72 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(result.ok).toBe(false);
     expect(designer.catalog).toBeUndefined();
     expect(designer.previewHandler).toBeUndefined();
+  });
+});
+
+describe('BaseScreenDesignerElement setCanvasBackgroundImage (ADR-0043)', () => {
+  it('submits an update-canvas transaction when setting the background image', () => {
+    const designer = new BaseScreenDesignerElement();
+    const transaction = vi.spyOn(designer, 'executeTransaction').mockReturnValue({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    } as never);
+
+    const result = designer.setCanvasBackgroundImage('https://cdn.x/screens/bg.png', 'contain');
+
+    expect(result.ok).toBe(true);
+    expect(transaction).toHaveBeenCalledWith({
+      commands: [
+        {
+          type: 'update-canvas',
+          patch: { backgroundImage: 'https://cdn.x/screens/bg.png', backgroundImageFit: 'contain' },
+        },
+      ],
+    });
+  });
+
+  it('keeps the existing fit when setting an image without one', () => {
+    const designer = new BaseScreenDesignerElement();
+    const transaction = vi.spyOn(designer, 'executeTransaction').mockReturnValue({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    } as never);
+
+    designer.setCanvasBackgroundImage('https://cdn.x/screens/bg.png');
+
+    expect(transaction).toHaveBeenCalledWith({
+      commands: [
+        { type: 'update-canvas', patch: { backgroundImage: 'https://cdn.x/screens/bg.png' } },
+      ],
+    });
+  });
+
+  it('clears the background image and its fit with null', () => {
+    const designer = new BaseScreenDesignerElement();
+    const transaction = vi.spyOn(designer, 'executeTransaction').mockReturnValue({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    } as never);
+
+    designer.setCanvasBackgroundImage(null);
+
+    expect(transaction).toHaveBeenCalledWith({
+      commands: [
+        { type: 'update-canvas', patch: { backgroundImage: null, backgroundImageFit: null } },
+      ],
+    });
+  });
+
+  it('fails with lifecycle semantics before a document exists', () => {
+    const designer = new BaseScreenDesignerElement();
+    const result = designer.setCanvasBackgroundImage('https://cdn.x/screens/bg.png');
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    }
   });
 });

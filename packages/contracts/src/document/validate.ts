@@ -9,8 +9,10 @@ import { preflightJsonValue } from '../json/preflight.js';
 import type { ScreenDiagnosticCode } from '../types/diagnostics.js';
 import type { ScreenBlueprintValueExpression, ScreenDocument } from '../types/document.js';
 import type { ScreenJsonValue } from '../types/json.js';
+import { isBoundedScreenImageUrl } from './image-url.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
+  MAX_BACKGROUND_IMAGE_CODE_POINTS,
   MAX_BLUEPRINT_ACTIONS_PER_RULE,
   MAX_BLUEPRINT_EXPRESSION_BYTES,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
@@ -32,7 +34,13 @@ import {
 } from './schema.js';
 
 const DOCUMENT_ROOT_FIELDS = new Set(['canvas', 'components', 'variables', 'blueprint']);
-const CANVAS_FIELDS = new Set(['width', 'height', 'backgroundColor']);
+const CANVAS_FIELDS = new Set([
+  'width',
+  'height',
+  'backgroundColor',
+  'backgroundImage',
+  'backgroundImageFit',
+]);
 const COMPONENT_FIELDS = new Set([
   'id',
   'type',
@@ -220,6 +228,19 @@ function validateCanvas(
       at(['canvas', 'backgroundColor']),
       phase,
       'Canvas backgroundColor must not contain control characters.',
+    );
+    clean = false;
+  }
+  const backgroundImage = canvas.backgroundImage;
+  if (
+    backgroundImage !== undefined &&
+    !isBoundedScreenImageUrl(backgroundImage, MAX_BACKGROUND_IMAGE_CODE_POINTS)
+  ) {
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at(['canvas', 'backgroundImage']),
+      phase,
+      'Canvas backgroundImage must be a bounded HTTP(S) or relative URL string.',
     );
     clean = false;
   }

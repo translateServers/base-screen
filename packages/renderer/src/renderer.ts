@@ -275,6 +275,21 @@ class Renderer implements BaseScreenRenderer {
     this.options.root.style.width = `${parsedDocument.value.canvas.width}px`;
     this.options.root.style.height = `${parsedDocument.value.canvas.height}px`;
     this.options.root.style.backgroundColor = parsedDocument.value.canvas.backgroundColor;
+    // 画布宿主背景图片（ADR-0043）：只把校验后的 URL 写入 CSS url()（转义，禁止 innerHTML/任意注入），
+    // 不 fetch/预取/重试/代理；缺省 fit 按 cover；无图时清除，backgroundColor 语义不变。
+    const backgroundImage = parsedDocument.value.canvas.backgroundImage;
+    if (backgroundImage !== undefined) {
+      this.options.root.style.backgroundImage = `url("${escapeCssString(backgroundImage)}")`;
+      this.options.root.style.backgroundSize =
+        parsedDocument.value.canvas.backgroundImageFit === 'contain' ? 'contain' : 'cover';
+      this.options.root.style.backgroundPosition = 'center';
+      this.options.root.style.backgroundRepeat = 'no-repeat';
+    } else {
+      this.options.root.style.backgroundImage = '';
+      this.options.root.style.backgroundSize = '';
+      this.options.root.style.backgroundPosition = '';
+      this.options.root.style.backgroundRepeat = '';
+    }
     this.#mounted = next;
     this.#candidates = new Map(candidates.map((candidate) => [candidate.component.id, candidate]));
     this.#document = parsedDocument.value;
@@ -1134,4 +1149,9 @@ function sortDiagnostics(diagnostics: readonly ScreenDiagnostic[]): readonly Scr
     const rightPath = right.path.join('/');
     return leftPath < rightPath ? -1 : leftPath > rightPath ? 1 : left.code < right.code ? -1 : 1;
   });
+}
+
+/** CSS 字符串转义（用于 url("...") 值；校验已拒绝空白/控制字符/反斜杠，此处防御性转义 `\` 与 `"`）。 */
+function escapeCssString(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
