@@ -7,7 +7,11 @@ import { canonicalByteLength, codePointLength, hasControlCharacter } from '../js
 import { cloneJsonValue } from '../json/clone.js';
 import { preflightJsonValue } from '../json/preflight.js';
 import type { ScreenDiagnosticCode } from '../types/diagnostics.js';
-import type { ScreenBlueprintValueExpression, ScreenDocument } from '../types/document.js';
+import type {
+  ScreenBlueprintValueExpression,
+  ScreenCanvasBackground,
+  ScreenDocument,
+} from '../types/document.js';
 import type { ScreenJsonValue } from '../types/json.js';
 import { isBoundedScreenImageUrl } from './image-url.js';
 import {
@@ -38,6 +42,7 @@ const CANVAS_FIELDS = new Set([
   'width',
   'height',
   'backgroundColor',
+  'background',
   'backgroundImage',
   'backgroundImageFit',
 ]);
@@ -83,6 +88,8 @@ const SET_VARIABLE_ACTION_FIELDS = new Set(['type', 'variableName', 'value']);
 const EMIT_HOST_EVENT_ACTION_FIELDS = new Set(['type', 'eventName', 'payload']);
 const HOST_ACTION_FIELDS = new Set(['type', 'actionId', 'payload']);
 const BLUEPRINT_CONDITION_FIELDS = new Set(['left', 'operator', 'right']);
+const CANVAS_PALETTE_COLOR_PATTERN =
+  /^(?:transparent|#[0-9A-Fa-f]{3,4}|#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)$/;
 
 type ZodIssueLike = {
   readonly path: readonly PropertyKey[];
@@ -231,6 +238,13 @@ function validateCanvas(
     );
     clean = false;
   }
+  const background = canvas.background as ScreenCanvasBackground | undefined;
+  if (
+    background !== undefined &&
+    !validateCanvasBackgroundColors(background, at, collector, phase)
+  ) {
+    clean = false;
+  }
   const backgroundImage = canvas.backgroundImage;
   if (
     backgroundImage !== undefined &&
@@ -241,6 +255,39 @@ function validateCanvas(
       at(['canvas', 'backgroundImage']),
       phase,
       'Canvas backgroundImage must be a bounded HTTP(S) or relative URL string.',
+    );
+    clean = false;
+  }
+  return clean;
+}
+
+function validateCanvasBackgroundColors(
+  background: ScreenCanvasBackground,
+  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  const colors =
+    background.type === 'solid'
+      ? [{ color: background.color, path: ['background', 'color'] as DiagnosticSegment[] }]
+      : background.stops.map((stop, index) => ({
+          color: stop.color,
+          path: ['background', 'stops', index, 'color'] as DiagnosticSegment[],
+        }));
+  let clean = true;
+  for (const { color, path } of colors) {
+    if (
+      codePointLength(color) <= MAX_BACKGROUND_COLOR_CODE_POINTS &&
+      !hasControlCharacter(color) &&
+      CANVAS_PALETTE_COLOR_PATTERN.test(color)
+    ) {
+      continue;
+    }
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at(['canvas', ...path]),
+      phase,
+      `Canvas palette colors must be hex colors or transparent and must be at most ${MAX_BACKGROUND_COLOR_CODE_POINTS} code points.`,
     );
     clean = false;
   }

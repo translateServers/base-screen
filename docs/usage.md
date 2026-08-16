@@ -509,6 +509,32 @@ const configured = designer.configure({
 保持既有失败语义；直接文档模式的内置浮层不受影响。预览路由、鉴权、草稿存储与窗口打开全部
 由宿主实现，Base Screen 不新增网络、存储或窗口管理职责。
 
+#### 画布调色板
+
+画布背景支持单色、线性渐变和径向渐变（ADR-0048）。`canvas.background` 是严格的 JSON-safe 判别对象；未声明时，既有 `backgroundColor` 继续表示单色。结构化调色板颜色仅接受十六进制色值或 `transparent`，渐变有 2..8 个位置严格递增的色标。Designer 的「画布」面板提供三种模式，宿主可使用同一事务语义设置或清除：
+
+```ts
+const result = designer.setCanvasBackground({
+  type: 'linear-gradient',
+  angle: 135,
+  stops: [
+    { color: '#0f172a', position: 0 },
+    { color: '#2563eb', position: 100 },
+  ],
+});
+
+// 删除结构化调色板并回退到 canvas.backgroundColor。
+designer.setCanvasBackground(null);
+```
+
+径向渐变使用 `{ type: 'radial-gradient', position: { x, y }, stops }`，其中中心位置为 0..100 的百分比。若同时设置背景图片，图片位于调色板渐变之上，二者均在基础背景色之上；Base Screen 不接受任意 CSS 字符串、不会发起图片网络请求。
+
+#### 物料颜色字段的三段式调色板
+
+属性面板与 Manifest Editor Descriptor 中所有 `control: 'color'` 字段共享同一个三段式调色板（ADR-0050/0051），已全面替换原生单色 input：单色、线性渐变、径向渐变三种模式无条件可用。渐变模式支持添加/删除 2..8 个色标、编辑每个色标的颜色与位置，并设置线性角度或径向中心。字段值仍是普通字符串：单色为色值，渐变保存为规范化 CSS 渐变字符串，物料渲染与既有文档无需改动。切换模式不会丢失各模式的编辑草稿；撤销/重做或替换文档会按文档值重新解析。
+
+渐变字符串是否真正生效取决于物料渲染端的消费方式：写 CSS `background` 类属性的字段（如 `backgroundColor`、`fill`）天然生效；官方文本物料（`base.text`）的 `color` 字段经 `background-clip: text` 渲染渐变文字（文字透明、渐变按字形显示）；`border-color`、SVG 图表与 ECharts option 内部色等不接受 CSS 渐变字符串的属性不会渲染渐变，这类字段请使用单色。
+
 #### 画布背景图片
 
 宿主可以给画布设置/清除背景图片（ADR-0043）。图片 URL 进入 canonical 文档的

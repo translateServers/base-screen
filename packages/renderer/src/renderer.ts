@@ -3,6 +3,8 @@ import {
   parseScreenDocument,
   parseScreenJsonValue,
   parseScreenTabularDataset,
+  type ScreenCanvas,
+  type ScreenCanvasBackground,
   type ScreenComponentNode,
   type ScreenDiagnostic,
   type ScreenDocument,
@@ -274,22 +276,7 @@ class Renderer implements BaseScreenRenderer {
     this.options.root.style.position = 'relative';
     this.options.root.style.width = `${parsedDocument.value.canvas.width}px`;
     this.options.root.style.height = `${parsedDocument.value.canvas.height}px`;
-    this.options.root.style.backgroundColor = parsedDocument.value.canvas.backgroundColor;
-    // 画布宿主背景图片（ADR-0043）：只把校验后的 URL 写入 CSS url()（转义，禁止 innerHTML/任意注入），
-    // 不 fetch/预取/重试/代理；缺省 fit 按 cover；无图时清除，backgroundColor 语义不变。
-    const backgroundImage = parsedDocument.value.canvas.backgroundImage;
-    if (backgroundImage !== undefined) {
-      this.options.root.style.backgroundImage = `url("${escapeCssString(backgroundImage)}")`;
-      this.options.root.style.backgroundSize =
-        parsedDocument.value.canvas.backgroundImageFit === 'contain' ? 'contain' : 'cover';
-      this.options.root.style.backgroundPosition = 'center';
-      this.options.root.style.backgroundRepeat = 'no-repeat';
-    } else {
-      this.options.root.style.backgroundImage = '';
-      this.options.root.style.backgroundSize = '';
-      this.options.root.style.backgroundPosition = '';
-      this.options.root.style.backgroundRepeat = '';
-    }
+    applyCanvasBackground(this.options.root, parsedDocument.value.canvas);
     this.#mounted = next;
     this.#candidates = new Map(candidates.map((candidate) => [candidate.component.id, candidate]));
     this.#document = parsedDocument.value;
@@ -1149,6 +1136,45 @@ function sortDiagnostics(diagnostics: readonly ScreenDiagnostic[]): readonly Scr
     const rightPath = right.path.join('/');
     return leftPath < rightPath ? -1 : leftPath > rightPath ? 1 : left.code < right.code ? -1 : 1;
   });
+}
+
+function applyCanvasBackground(root: HTMLElement, canvas: ScreenCanvas): void {
+  const background = canvas.background;
+  root.style.backgroundColor =
+    background?.type === 'solid' ? background.color : canvas.backgroundColor;
+
+  const imageLayers: string[] = [];
+  const sizes: string[] = [];
+  if (canvas.backgroundImage !== undefined) {
+    imageLayers.push(`url("${escapeCssString(canvas.backgroundImage)}")`);
+    sizes.push(canvas.backgroundImageFit === 'contain' ? 'contain' : 'cover');
+  }
+  const gradient = background === undefined ? undefined : canvasGradient(background);
+  if (gradient !== undefined) {
+    imageLayers.push(gradient);
+    sizes.push('100% 100%');
+  }
+
+  if (imageLayers.length === 0) {
+    root.style.backgroundImage = '';
+    root.style.backgroundSize = '';
+    root.style.backgroundPosition = '';
+    root.style.backgroundRepeat = '';
+    return;
+  }
+  root.style.backgroundImage = imageLayers.join(', ');
+  root.style.backgroundSize = sizes.join(', ');
+  root.style.backgroundPosition = imageLayers.map(() => 'center').join(', ');
+  root.style.backgroundRepeat = imageLayers.map(() => 'no-repeat').join(', ');
+}
+
+function canvasGradient(background: ScreenCanvasBackground): string | undefined {
+  if (background.type === 'solid') return undefined;
+  const stops = background.stops.map((stop) => `${stop.color} ${stop.position}%`).join(', ');
+  if (background.type === 'linear-gradient') {
+    return `linear-gradient(${background.angle}deg, ${stops})`;
+  }
+  return `radial-gradient(circle at ${background.position.x}% ${background.position.y}%, ${stops})`;
 }
 
 /** CSS 字符串转义（用于 url("...") 值；校验已拒绝空白/控制字符/反斜杠，此处防御性转义 `\` 与 `"`）。 */

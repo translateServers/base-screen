@@ -12,6 +12,7 @@ import type {
   ScreenAuthoringEditorContext,
   ScreenBlueprint,
   ScreenBlueprintCommitRequest,
+  ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
   ScreenComponentTextCommitRequest,
   ScreenComponentTextTarget,
@@ -1133,6 +1134,19 @@ export class BaseScreenDesignerElement extends ElementBase {
         ? transaction
         : withDerivedDesignerGroupBounds(document, transaction, this.#groupMaterialType),
     );
+  }
+
+  /**
+   * 宿主设置/清除画布调色板（ADR-0048）：经 session 事务（update-canvas）提交，失败关闭零副作用。
+   */
+  setCanvasBackground(
+    background: ScreenCanvasBackground | null,
+  ): ScreenParseResult<ScreenDocument> {
+    const patch =
+      background?.type === 'solid'
+        ? { background, backgroundColor: background.color }
+        : { background };
+    return this.executeTransaction({ commands: [{ type: 'update-canvas', patch }] });
   }
 
   /**

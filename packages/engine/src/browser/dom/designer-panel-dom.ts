@@ -1,4 +1,6 @@
 import type {
+  ScreenCanvasBackground,
+  ScreenCanvasColorStop,
   ScreenComponentDataSource,
   ScreenComponentNode,
   ScreenDiagnostic,
@@ -36,6 +38,10 @@ import {
 } from '../../common/operations/designer-layout-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
+  createDesignerColorPalette,
+  readDesignerColorPaletteValue,
+} from './designer-color-palette-dom.js';
+import {
   type DesignerDescriptorDatasetFields,
   renderDesignerDescriptorZone,
 } from './designer-descriptor-dom.js';
@@ -44,6 +50,33 @@ export interface DesignerPanelInput {
   readonly value: string;
   readonly checked?: boolean;
   readonly type?: string;
+}
+
+export interface DesignerCanvasBackgroundDrafts {
+  activeType: ScreenCanvasBackground['type'];
+  solid: Extract<ScreenCanvasBackground, { readonly type: 'solid' }>;
+  linear: Extract<ScreenCanvasBackground, { readonly type: 'linear-gradient' }>;
+  radial: Extract<ScreenCanvasBackground, { readonly type: 'radial-gradient' }>;
+  committedSignature: string;
+}
+
+export function createDesignerCanvasBackgroundDrafts(
+  document?: ScreenDocument,
+): DesignerCanvasBackgroundDrafts {
+  const background = document?.canvas.background;
+  const solid =
+    background?.type === 'solid'
+      ? background
+      : { type: 'solid' as const, color: document?.canvas.backgroundColor ?? '#000000' };
+  const linear = background?.type === 'linear-gradient' ? background : defaultLinearBackground();
+  const radial = background?.type === 'radial-gradient' ? background : defaultRadialBackground();
+  return {
+    activeType: background?.type ?? 'solid',
+    solid,
+    linear,
+    radial,
+    committedSignature: backgroundSignature(document?.canvas.background),
+  };
 }
 
 export function createInitialDataSource(
@@ -61,12 +94,19 @@ export function renderDesignerProperties(
   catalog: BaseScreenMaterialCatalog | undefined,
   getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
   canvasBackgroundImageButtonVisible = false,
+  canvasBackgroundDrafts = createDesignerCanvasBackgroundDrafts(document),
 ): void {
   properties.replaceChildren();
   const context = getDesignerInspectorContext(document, interaction, catalog);
   if (context.kind === 'canvas') {
     if (document !== undefined) {
-      appendCanvasControls(properties, document, canvasBackgroundImageButtonVisible);
+      syncCanvasBackgroundDrafts(canvasBackgroundDrafts, document);
+      appendCanvasControls(
+        properties,
+        document,
+        canvasBackgroundImageButtonVisible,
+        canvasBackgroundDrafts,
+      );
     }
     return;
   }
@@ -180,6 +220,7 @@ function appendComponentControls(
         component.props[field.prop],
         schema,
         field.control,
+        `${component.id}:prop:${field.prop}`,
       );
     }
   }
@@ -198,6 +239,7 @@ function appendComponentControls(
         component.style[field.style],
         schema,
         field.control,
+        `${component.id}:style:${field.style}`,
       );
     }
   }
@@ -392,11 +434,12 @@ export function createPropertyTransaction(
   document: ScreenDocument | undefined,
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
+  canvasBackgroundDrafts?: DesignerCanvasBackgroundDrafts,
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   if (!isControl(target)) return undefined;
   const context = getDesignerInspectorContext(document, interaction, catalog);
   if (context.kind !== 'single-material' && context.kind !== 'single-group') {
-    return createCanvasTransaction(document, target);
+    return createCanvasTransaction(document, target, canvasBackgroundDrafts);
   }
   const component = context.component;
   const property = target.dataset.property;
@@ -491,6 +534,8 @@ export function parsePropertyControlValue(
   input: DesignerPanelInput,
   schema: BaseScreenMaterialPropSchema,
 ): ScreenJsonValue | undefined {
+  const paletteValue = readDesignerColorPaletteValue(input as unknown as EventTarget);
+  if (paletteValue !== undefined) return paletteValue;
   if (input.type === 'checkbox') return input.checked === true;
   if (schema.kind === 'number') {
     const value = Number(input.value);
@@ -561,9 +606,55 @@ function createGeometryTransaction(
 function createCanvasTransaction(
   document: ScreenDocument | undefined,
   target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  drafts = createDesignerCanvasBackgroundDrafts(document),
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   if (document === undefined || target.dataset.canvasProperty === undefined) return undefined;
   const property = target.dataset.canvasProperty;
+  if (property === 'backgroundType') {
+    if (!isCanvasBackgroundType(target.value)) return undefined;
+    drafts.activeType = target.value;
+    return canvasBackgroundTransaction(drafts, activeCanvasBackground(drafts));
+  }
+  if (property === 'backgroundSolidColor') {
+    drafts.solid = { type: 'solid', color: target.value };
+    return canvasBackgroundTransaction(drafts, drafts.solid);
+  }
+  if (property === 'backgroundLinearAngle') {
+    const angle = Number(target.value);
+    if (!Number.isFinite(angle) || angle < 0 || angle > 360) return undefined;
+    drafts.linear = { ...drafts.linear, angle };
+    return canvasBackgroundTransaction(drafts, drafts.linear);
+  }
+  if (property === 'backgroundRadialX' || property === 'backgroundRadialY') {
+    const coordinate = Number(target.value);
+    if (!Number.isFinite(coordinate) || coordinate < 0 || coordinate > 100) return undefined;
+    drafts.radial = {
+      ...drafts.radial,
+      position: {
+        ...drafts.radial.position,
+        [property === 'backgroundRadialX' ? 'x' : 'y']: coordinate,
+      },
+    };
+    return canvasBackgroundTransaction(drafts, drafts.radial);
+  }
+  if (property === 'backgroundStopColor' || property === 'backgroundStopPosition') {
+    const index = Number(target.dataset.canvasBackgroundStopIndex);
+    if (!Number.isInteger(index)) return undefined;
+    const background = activeCanvasBackground(drafts);
+    if (background.type === 'solid' || background.stops[index] === undefined) return undefined;
+    const value = property === 'backgroundStopColor' ? target.value : Number(target.value);
+    if (typeof value === 'number' && (!Number.isFinite(value) || value < 0 || value > 100)) {
+      return undefined;
+    }
+    const stops = background.stops.map((stop, stopIndex) =>
+      stopIndex === index
+        ? { ...stop, [property === 'backgroundStopColor' ? 'color' : 'position']: value }
+        : stop,
+    );
+    if (!areAscendingStops(stops)) return undefined;
+    setActiveCanvasBackground(drafts, { ...background, stops });
+    return canvasBackgroundTransaction(drafts, activeCanvasBackground(drafts));
+  }
   if (property === 'backgroundColor') {
     return success({
       commands: [{ type: 'update-canvas', patch: { backgroundColor: target.value } }],
@@ -600,6 +691,40 @@ function createCanvasTransaction(
   return success({
     commands: [{ type: 'update-canvas', patch: { [property]: roundScreenGeometry(value) } }],
   });
+}
+
+export function createCanvasBackgroundStopTransaction(
+  document: ScreenDocument | undefined,
+  drafts: DesignerCanvasBackgroundDrafts,
+  action: 'add' | 'remove',
+  index?: number,
+): ScreenParseResult<ScreenDocumentTransaction> | undefined {
+  if (document === undefined) return undefined;
+  const background = activeCanvasBackground(drafts);
+  if (background.type === 'solid') return undefined;
+  if (action === 'add') {
+    if (background.stops.length >= 8) return undefined;
+    const last = background.stops[background.stops.length - 1]!;
+    const previous = background.stops[background.stops.length - 2]!;
+    const position = previous.position + (last.position - previous.position) / 2;
+    setActiveCanvasBackground(drafts, {
+      ...background,
+      stops: [...background.stops.slice(0, -1), { color: previous.color, position }, last],
+    });
+  } else {
+    if (
+      index === undefined ||
+      background.stops.length <= 2 ||
+      background.stops[index] === undefined
+    ) {
+      return undefined;
+    }
+    setActiveCanvasBackground(drafts, {
+      ...background,
+      stops: background.stops.filter((_, stopIndex) => stopIndex !== index),
+    });
+  }
+  return canvasBackgroundTransaction(drafts, activeCanvasBackground(drafts));
 }
 
 function appendInput(
@@ -651,6 +776,7 @@ function appendCanvasControls(
   parent: HTMLElement,
   document: ScreenDocument,
   canvasBackgroundImageButtonVisible: boolean,
+  drafts: DesignerCanvasBackgroundDrafts,
 ): void {
   const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvas);
   appendCanvasInput(
@@ -667,13 +793,7 @@ function appendCanvasControls(
     document.canvas.height,
     'number',
   );
-  appendCanvasInput(
-    section,
-    DESIGNER_UI_TEXT.propertiesPanel.backgroundColor,
-    'backgroundColor',
-    document.canvas.backgroundColor,
-    'color',
-  );
+  appendCanvasBackgroundControls(section, drafts);
   // 背景图片：URL 输入；宿主选择按钮（ADR-0046）默认隐藏，仅宿主配置
   // canvasBackgroundImageButton 后渲染（点击派发请求事件，宿主自开弹出框可视化选择）。
   if (canvasBackgroundImageButtonVisible) {
@@ -711,6 +831,112 @@ function appendCanvasControls(
   );
 }
 
+function appendCanvasBackgroundControls(
+  parent: HTMLElement,
+  drafts: DesignerCanvasBackgroundDrafts,
+): void {
+  const type = parent.ownerDocument.createElement('label');
+  type.className = 'designer-field designer-field-label';
+  type.textContent = DESIGNER_UI_TEXT.propertiesPanel.backgroundType;
+  const select = type.ownerDocument.createElement('select');
+  select.className = 'designer-control designer-select';
+  select.dataset.canvasProperty = 'backgroundType';
+  for (const [value, label] of [
+    ['solid', DESIGNER_UI_TEXT.propertiesPanel.backgroundSolid],
+    ['linear-gradient', DESIGNER_UI_TEXT.propertiesPanel.backgroundLinear],
+    ['radial-gradient', DESIGNER_UI_TEXT.propertiesPanel.backgroundRadial],
+  ] as const) {
+    const option = select.ownerDocument.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    select.appendChild(option);
+  }
+  select.value = drafts.activeType;
+  type.appendChild(select);
+  appendFieldMessage(type, select, 'canvas-backgroundType');
+  parent.appendChild(type);
+
+  if (drafts.activeType === 'solid') {
+    appendCanvasInput(
+      parent,
+      DESIGNER_UI_TEXT.propertiesPanel.backgroundColor,
+      'backgroundSolidColor',
+      drafts.solid.color,
+      'color',
+    );
+    return;
+  }
+  if (drafts.activeType === 'linear-gradient') {
+    appendCanvasInput(
+      parent,
+      DESIGNER_UI_TEXT.propertiesPanel.gradientAngle,
+      'backgroundLinearAngle',
+      drafts.linear.angle,
+      'number',
+    );
+    appendCanvasGradientStops(parent, drafts.linear.stops);
+    return;
+  }
+  appendCanvasInput(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.gradientCenterX,
+    'backgroundRadialX',
+    drafts.radial.position.x,
+    'number',
+  );
+  appendCanvasInput(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.gradientCenterY,
+    'backgroundRadialY',
+    drafts.radial.position.y,
+    'number',
+  );
+  appendCanvasGradientStops(parent, drafts.radial.stops);
+}
+
+function appendCanvasGradientStops(
+  parent: HTMLElement,
+  stops: readonly ScreenCanvasColorStop[],
+): void {
+  const section = parent.ownerDocument.createElement('div');
+  section.className = 'designer-field-grid';
+  for (let index = 0; index < stops.length; index++) {
+    const stop = stops[index]!;
+    const color = createCanvasInput(
+      section,
+      DESIGNER_UI_TEXT.propertiesPanel.gradientStopColor,
+      'backgroundStopColor',
+      stop.color,
+      'color',
+    );
+    color.dataset.canvasBackgroundStopIndex = String(index);
+    const position = createCanvasInput(
+      section,
+      DESIGNER_UI_TEXT.propertiesPanel.gradientStopPosition,
+      'backgroundStopPosition',
+      stop.position,
+      'number',
+    );
+    position.dataset.canvasBackgroundStopIndex = String(index);
+    const remove = section.ownerDocument.createElement('button');
+    remove.type = 'button';
+    remove.className = 'designer-control designer-button';
+    remove.disabled = stops.length <= 2;
+    remove.dataset.canvasBackgroundStopAction = 'remove';
+    remove.dataset.canvasBackgroundStopIndex = String(index);
+    remove.textContent = DESIGNER_UI_TEXT.propertiesPanel.gradientRemoveStop;
+    section.appendChild(remove);
+  }
+  const add = section.ownerDocument.createElement('button');
+  add.type = 'button';
+  add.className = 'designer-control designer-button';
+  add.disabled = stops.length >= 8;
+  add.dataset.canvasBackgroundStopAction = 'add';
+  add.textContent = DESIGNER_UI_TEXT.propertiesPanel.gradientAddStop;
+  section.appendChild(add);
+  parent.appendChild(section);
+}
+
 function appendCanvasSelect(
   parent: HTMLElement,
   labelText: string,
@@ -737,14 +963,15 @@ function appendCanvasSelect(
   parent.appendChild(label);
 }
 
-function appendCanvasInput(
+function createCanvasInput(
   parent: HTMLElement,
   labelText: string,
   property: string,
   value: string | number,
   type = 'text',
-): void {
-  const label = parent.ownerDocument.createElement('label');
+): HTMLInputElement {
+  // color 输入用 span 容器：label 点击会激活 color input 弹出原生取色器。
+  const label = parent.ownerDocument.createElement(type === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
   const input = parent.ownerDocument.createElement('input');
@@ -758,6 +985,32 @@ function appendCanvasInput(
   label.appendChild(input);
   appendFieldMessage(label, input, `canvas-${property}`);
   parent.appendChild(label);
+  return input;
+}
+
+function appendCanvasInput(
+  parent: HTMLElement,
+  labelText: string,
+  property: string,
+  value: string | number,
+  type = 'text',
+): HTMLInputElement {
+  // color 输入用 span 容器：label 点击会激活 color input 弹出原生取色器。
+  const label = parent.ownerDocument.createElement(type === 'color' ? 'span' : 'label');
+  label.className = 'designer-field designer-field-label';
+  label.textContent = labelText;
+  const input = parent.ownerDocument.createElement('input');
+  input.type = type;
+  input.className =
+    type === 'color'
+      ? 'designer-control designer-color'
+      : `designer-control designer-input${type === 'number' ? ' designer-number' : ''}`;
+  input.value = String(value);
+  input.dataset.canvasProperty = property;
+  label.appendChild(input);
+  appendFieldMessage(label, input, `canvas-${property}`);
+  parent.appendChild(label);
+  return input;
 }
 
 function appendDataInput(
@@ -908,14 +1161,26 @@ function appendPropControl(
   value: ScreenJsonValue | undefined,
   schema: BaseScreenMaterialPropSchema,
   control: string,
+  paletteKey: string,
 ): void {
-  const label = parent.ownerDocument.createElement('label');
+  const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
-  const input = createControl(parent.ownerDocument, value, schema, control);
-  input.dataset.prop = prop;
-  label.appendChild(input);
-  appendFieldMessage(label, input, `prop-${prop}`);
+  if (control === 'color') {
+    const palette = createDesignerColorPalette(
+      parent.ownerDocument,
+      typeof value === 'string' ? value : undefined,
+      paletteKey,
+    );
+    for (const input of palette.controls) input.dataset.prop = prop;
+    label.appendChild(palette.element);
+    appendFieldMessage(label, palette.controls[0]!, `prop-${prop}`);
+  } else {
+    const input = createControl(parent.ownerDocument, value, schema, control);
+    input.dataset.prop = prop;
+    label.appendChild(input);
+    appendFieldMessage(label, input, `prop-${prop}`);
+  }
   parent.appendChild(label);
 }
 
@@ -926,14 +1191,26 @@ function appendStyleControl(
   value: ScreenJsonValue | undefined,
   schema: BaseScreenMaterialPropSchema,
   control: string,
+  paletteKey: string,
 ): void {
-  const label = parent.ownerDocument.createElement('label');
+  const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
-  const input = createControl(parent.ownerDocument, value, schema, control);
-  input.dataset.style = style;
-  label.appendChild(input);
-  appendFieldMessage(label, input, `style-${style}`);
+  if (control === 'color') {
+    const palette = createDesignerColorPalette(
+      parent.ownerDocument,
+      typeof value === 'string' ? value : undefined,
+      paletteKey,
+    );
+    for (const input of palette.controls) input.dataset.style = style;
+    label.appendChild(palette.element);
+    appendFieldMessage(label, palette.controls[0]!, `style-${style}`);
+  } else {
+    const input = createControl(parent.ownerDocument, value, schema, control);
+    input.dataset.style = style;
+    label.appendChild(input);
+    appendFieldMessage(label, input, `style-${style}`);
+  }
   parent.appendChild(label);
 }
 
@@ -991,7 +1268,7 @@ function multiSelectionGroupUnavailableReason(
 }
 
 function appendFieldMessage(
-  label: HTMLLabelElement,
+  container: HTMLElement,
   input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
   key: string,
 ): void {
@@ -999,13 +1276,17 @@ function appendFieldMessage(
   const messageId = `${id}-message`;
   input.id = id;
   input.setAttribute('aria-describedby', messageId);
-  label.htmlFor = id;
-  const message = label.ownerDocument.createElement('span');
+  // 只有 label 容器才建立 for 关联：color 控件用 span 容器，点击字段文字不得激活
+  // color input（否则会弹出浏览器原生取色器）。
+  if (container.tagName.toLowerCase() === 'label') {
+    (container as HTMLLabelElement).htmlFor = id;
+  }
+  const message = container.ownerDocument.createElement('span');
   message.id = messageId;
   message.className = 'designer-field-message';
   message.dataset.fieldMessage = 'true';
   message.ariaLive = 'polite';
-  label.appendChild(message);
+  container.appendChild(message);
 }
 
 function createControl(
@@ -1047,6 +1328,94 @@ function createControl(
       : `designer-control designer-input${control === 'number' ? ' designer-number' : ''}`;
   input.value = String(value ?? '');
   return input;
+}
+
+function defaultLinearBackground(): Extract<
+  ScreenCanvasBackground,
+  { readonly type: 'linear-gradient' }
+> {
+  return {
+    type: 'linear-gradient',
+    angle: 90,
+    stops: [
+      { color: '#000000', position: 0 },
+      { color: '#ffffff', position: 100 },
+    ],
+  };
+}
+
+function defaultRadialBackground(): Extract<
+  ScreenCanvasBackground,
+  { readonly type: 'radial-gradient' }
+> {
+  return {
+    type: 'radial-gradient',
+    position: { x: 50, y: 50 },
+    stops: [
+      { color: '#000000', position: 0 },
+      { color: '#ffffff', position: 100 },
+    ],
+  };
+}
+
+function syncCanvasBackgroundDrafts(
+  drafts: DesignerCanvasBackgroundDrafts,
+  document: ScreenDocument,
+): void {
+  const signature = backgroundSignature(document.canvas.background);
+  if (signature === drafts.committedSignature) return;
+  const background = document.canvas.background;
+  drafts.activeType = background?.type ?? 'solid';
+  if (background?.type === 'solid') drafts.solid = background;
+  if (background?.type === 'linear-gradient') drafts.linear = background;
+  if (background?.type === 'radial-gradient') drafts.radial = background;
+  if (background === undefined) {
+    drafts.solid = { type: 'solid', color: document.canvas.backgroundColor };
+  }
+  drafts.committedSignature = signature;
+}
+
+function activeCanvasBackground(drafts: DesignerCanvasBackgroundDrafts): ScreenCanvasBackground {
+  if (drafts.activeType === 'solid') return drafts.solid;
+  return drafts.activeType === 'linear-gradient' ? drafts.linear : drafts.radial;
+}
+
+function setActiveCanvasBackground(
+  drafts: DesignerCanvasBackgroundDrafts,
+  background: Exclude<ScreenCanvasBackground, { readonly type: 'solid' }>,
+): void {
+  if (background.type === 'linear-gradient') drafts.linear = background;
+  else drafts.radial = background;
+}
+
+function canvasBackgroundTransaction(
+  drafts: DesignerCanvasBackgroundDrafts,
+  background: ScreenCanvasBackground,
+): ScreenParseResult<ScreenDocumentTransaction> {
+  drafts.committedSignature = backgroundSignature(background);
+  return success({
+    commands: [
+      {
+        type: 'update-canvas',
+        patch:
+          background.type === 'solid'
+            ? { background, backgroundColor: background.color }
+            : { background },
+      },
+    ],
+  });
+}
+
+function backgroundSignature(background: ScreenCanvasBackground | undefined): string {
+  return background === undefined ? '' : JSON.stringify(background);
+}
+
+function areAscendingStops(stops: readonly ScreenCanvasColorStop[]): boolean {
+  return stops.every((stop, index) => index === 0 || stops[index - 1]!.position < stop.position);
+}
+
+function isCanvasBackgroundType(value: string): value is ScreenCanvasBackground['type'] {
+  return value === 'solid' || value === 'linear-gradient' || value === 'radial-gradient';
 }
 
 function isControl(

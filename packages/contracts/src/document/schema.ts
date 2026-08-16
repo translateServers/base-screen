@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { SCREEN_MATERIAL_TYPE_PATTERN } from './identity.js';
 import {
+  MAX_BACKGROUND_COLOR_CODE_POINTS,
+  MAX_BACKGROUND_GRADIENT_STOPS,
   MAX_BLUEPRINT_ACTIONS_PER_RULE,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_BLUEPRINT_RULES,
@@ -14,10 +16,49 @@ export const VARIABLE_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]{0,127}$';
 export const BLUEPRINT_PATH_SEGMENT_PATTERN =
   '^(?!(?:__proto__|prototype|constructor)$)[A-Za-z_][A-Za-z0-9_]{0,127}$';
 
+const canvasBackgroundColorSchema = z.string().min(1).max(MAX_BACKGROUND_COLOR_CODE_POINTS);
+const canvasColorStopSchema = z.strictObject({
+  color: canvasBackgroundColorSchema,
+  position: z.number().finite().min(0).max(100),
+});
+const canvasGradientStopsSchema = z
+  .array(canvasColorStopSchema)
+  .min(2)
+  .max(MAX_BACKGROUND_GRADIENT_STOPS)
+  .superRefine((stops, context) => {
+    for (let index = 1; index < stops.length; index++) {
+      if (stops[index - 1]!.position >= stops[index]!.position) {
+        context.addIssue({
+          code: 'custom',
+          path: [index, 'position'],
+          message: 'Gradient stop positions must be strictly ascending.',
+        });
+      }
+    }
+  });
+
+const canvasBackgroundSchema = z.union([
+  z.strictObject({ type: z.literal('solid'), color: canvasBackgroundColorSchema }),
+  z.strictObject({
+    type: z.literal('linear-gradient'),
+    angle: z.number().finite().min(0).max(360),
+    stops: canvasGradientStopsSchema,
+  }),
+  z.strictObject({
+    type: z.literal('radial-gradient'),
+    position: z.strictObject({
+      x: z.number().finite().min(0).max(100),
+      y: z.number().finite().min(0).max(100),
+    }),
+    stops: canvasGradientStopsSchema,
+  }),
+]);
+
 export const canvasSchema = z.strictObject({
   width: z.number().int().min(1).max(100_000),
   height: z.number().int().min(1).max(100_000),
-  backgroundColor: z.string().min(1),
+  backgroundColor: canvasBackgroundColorSchema,
+  background: canvasBackgroundSchema.optional(),
   backgroundImage: z.string().min(1).optional(),
   backgroundImageFit: z.enum(['cover', 'contain']).optional(),
 });

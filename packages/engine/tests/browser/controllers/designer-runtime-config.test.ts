@@ -231,7 +231,7 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.previewHandler).toBe(handler);
   });
 
-  it('accepts the canvas background image button flag and exposes it via getter (ADR-0049)', () => {
+  it('accepts the canvas background image button flag and exposes it via getter (ADR-0047)', () => {
     const designer = new BaseScreenDesignerElement();
     expect(designer.canvasBackgroundImageButton).toBe(false); // 默认隐藏
 
@@ -273,7 +273,33 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
   });
 });
 
-describe('BaseScreenDesignerElement setCanvasBackgroundImage (ADR-0043)', () => {
+describe('BaseScreenDesignerElement canvas background setters', () => {
+  it('submits an update-canvas transaction when setting the palette', () => {
+    const designer = new BaseScreenDesignerElement();
+    const transaction = vi.spyOn(designer, 'executeTransaction').mockReturnValue({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    } as never);
+    const background = {
+      type: 'radial-gradient' as const,
+      position: { x: 50, y: 50 },
+      stops: [
+        { color: '#000000', position: 0 },
+        { color: '#ffffff', position: 100 },
+      ],
+    };
+
+    expect(designer.setCanvasBackground(background).ok).toBe(true);
+    expect(transaction).toHaveBeenCalledWith({
+      commands: [{ type: 'update-canvas', patch: { background } }],
+    });
+    designer.setCanvasBackground(null);
+    expect(transaction).toHaveBeenLastCalledWith({
+      commands: [{ type: 'update-canvas', patch: { background: null } }],
+    });
+  });
+
   it('submits an update-canvas transaction when setting the background image', () => {
     const designer = new BaseScreenDesignerElement();
     const transaction = vi.spyOn(designer, 'executeTransaction').mockReturnValue({

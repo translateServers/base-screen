@@ -14,6 +14,7 @@ import {
   resolveSchema,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { createDesignerColorPalette } from './designer-color-palette-dom.js';
 
 export interface DesignerDescriptorDatasetFields {
   readonly id: string;
@@ -200,18 +201,29 @@ function appendDescriptorField(
   const schema = descriptorFieldSchema(field, context);
   const value = readFieldTargetValue(field, field.path, context);
   const ownerDocument = parent.ownerDocument;
-  const label = ownerDocument.createElement('label');
+  const palette =
+    field.control === 'color'
+      ? createDesignerColorPalette(
+          ownerDocument,
+          typeof value === 'string' ? value : undefined,
+          `${context.component.id}:descriptor:${field.id}`,
+        )
+      : undefined;
+  // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
+  const label = ownerDocument.createElement(palette === undefined ? 'label' : 'span');
   label.className = 'designer-field designer-field-label';
   label.textContent = field.label;
-  const control = createDescriptorControl(
-    ownerDocument,
-    field,
-    schema,
-    value,
-    context.datasetFields,
-  );
-  applyFieldDataset(control, field);
-  label.appendChild(control);
+  const control =
+    palette === undefined
+      ? createDescriptorControl(ownerDocument, field, schema, value, context.datasetFields)
+      : palette.controls[0]!;
+  if (palette === undefined) {
+    applyFieldDataset(control, field);
+    label.appendChild(control);
+  } else {
+    for (const paletteControl of palette.controls) applyFieldDataset(paletteControl, field);
+    label.appendChild(palette.element);
+  }
   if (field.help !== undefined) {
     const help = ownerDocument.createElement('span');
     help.className = 'designer-descriptor-help';
@@ -490,7 +502,8 @@ function appendDescriptorItemField(
   context: DesignerDescriptorContext,
 ): void {
   const ownerDocument = parent.ownerDocument;
-  const label = ownerDocument.createElement('label');
+  // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
+  const label = ownerDocument.createElement(itemField.control === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
   label.textContent = itemField.label;
   const itemValue = readArrayItemValue(context, arrayField, index, itemField.path);
@@ -557,7 +570,7 @@ function arrayActionButton(
 }
 
 function appendFieldMessage(
-  label: HTMLLabelElement,
+  container: HTMLElement,
   input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
   key: string,
 ): void {
@@ -565,11 +578,15 @@ function appendFieldMessage(
   const messageId = `${id}-message`;
   input.id = id;
   input.setAttribute('aria-describedby', messageId);
-  label.htmlFor = id;
-  const message = label.ownerDocument.createElement('span');
+  // 只有 label 容器才建立 for 关联：color 控件用 span 容器，点击字段文字不得激活
+  // color input（否则会弹出浏览器原生取色器）。
+  if (container.tagName.toLowerCase() === 'label') {
+    (container as HTMLLabelElement).htmlFor = id;
+  }
+  const message = container.ownerDocument.createElement('span');
   message.id = messageId;
   message.className = 'designer-field-message';
   message.dataset.fieldMessage = 'true';
   message.ariaLive = 'polite';
-  label.appendChild(message);
+  container.appendChild(message);
 }

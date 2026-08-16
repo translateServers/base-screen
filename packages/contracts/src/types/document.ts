@@ -2,10 +2,31 @@ import type { ScreenJsonObject, ScreenJsonValue } from './json.js';
 
 export type ScreenCanvasBackgroundImageFit = 'cover' | 'contain';
 
+export type ScreenCanvasBackgroundType = 'solid' | 'linear-gradient' | 'radial-gradient';
+
+export interface ScreenCanvasColorStop {
+  readonly color: string;
+  readonly position: number;
+}
+
+export type ScreenCanvasBackground =
+  | { readonly type: 'solid'; readonly color: string }
+  | {
+      readonly type: 'linear-gradient';
+      readonly angle: number;
+      readonly stops: readonly ScreenCanvasColorStop[];
+    }
+  | {
+      readonly type: 'radial-gradient';
+      readonly position: { readonly x: number; readonly y: number };
+      readonly stops: readonly ScreenCanvasColorStop[];
+    };
+
 export interface ScreenCanvas {
   readonly width: number;
   readonly height: number;
   readonly backgroundColor: string;
+  readonly background?: ScreenCanvasBackground;
   readonly backgroundImage?: string;
   readonly backgroundImageFit?: ScreenCanvasBackgroundImageFit;
 }

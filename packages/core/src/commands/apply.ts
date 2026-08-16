@@ -31,6 +31,7 @@ const CANVAS_FIELDS = new Set([
   'width',
   'height',
   'backgroundColor',
+  'background',
   'backgroundImage',
   'backgroundImageFit',
 ]);

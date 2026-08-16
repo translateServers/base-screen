@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-14（左侧面板、宿主物料分组、物料库视觉层级、物料加载错误控制台、视窗原生事件开关、面板折叠修复、宿主预览处理器与顶栏项目标题修复增量）
+> 最近更新：2026-08-16（文本物料排版能力增量：水平/垂直对齐分离、字间距、行间距）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -74,6 +74,9 @@
   [ADR-0046](../decisions/ADR-0046-canvas-background-image-host-button.md)、
   [ADR-0049](../decisions/ADR-0049-canvas-background-button-conditional-rendering.md)。
 
+- **画布调色板**（封版后增量，生效中）：`ScreenCanvas.background` 以严格 JSON-safe 对象表达单色、线性渐变或径向渐变；未声明时保留既有 `backgroundColor` 单色语义。Renderer 以基础色、渐变、背景图片的层序一致渲染；Designer 画布区提供三模式和受限色标编辑，宿主可经 `setCanvasBackground` 提交。依据：[Canvas Background Palette](../specs/canvas-background-palette/spec.md)、[ADR-0048](../decisions/ADR-0048-canvas-background-palette.md)。
+- **统一三段式颜色调色板**（封版后增量，生效中）：自定义三段式调色板全面替换原生 color input——属性面板与 Manifest Editor Descriptor 的全部 `color` 字段无条件支持单色/线性渐变/径向渐变，渐变模式支持 2..8 个色标的增删与位置编辑，按字段缓存三种模式草稿；字段值仍为字符串（色值或规范化 CSS 渐变），Material/Manifest/ScreenDocument 契约零变化；渐变渲染消费由物料渲染端负责，官方文本物料以 `background-clip: text` 支持渐变文字；画布背景保持结构化契约。依据：[Unified Color Palette](../specs/unified-color-palette/spec.md)、[ADR-0050](../decisions/ADR-0050-unified-color-palette-control.md)、[ADR-0051](../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)。
+
 ## 物料体系
 
 - **物料契约与 ABI**：manifest 类型、校验、只读 catalog 与同 realm Web Component ABI。
@@ -112,6 +115,13 @@
   全量渲染，功能零损失；无窗口化/分页，catalog 与宿主边界不变。依据：
   [Material Library Render Scalability](../specs/material-library-render-scalability/spec.md)、
   [ADR-0042](../decisions/ADR-0042-material-library-render-scalability.md)。
+- **文本物料排版能力**（封版后增量，生效中）：文本物料水平对齐（`textAlign`）与垂直对齐
+  （`verticalAlign` top/middle/bottom）独立设置（flex 映射，缺失/top 保持 block 零回归），
+  新增字间距 `letterSpacing`（px，0..100）与行间距 `lineSpacing`（px，0..512，增量语义：
+  行高 = 字号 + 行间距）；新字段全部可选、旧文档零迁移、默认值同步（top/0/0），Manifest 与
+  属性面板经既有 schema 驱动通道自动生效，Engine 与文档契约零改动。依据：
+  [Text Material Typography](../specs/text-material-typography/spec.md)、
+  [ADR-0047](../decisions/ADR-0047-text-material-typography.md)。
 
 ## 宿主边界与数据运行时
 

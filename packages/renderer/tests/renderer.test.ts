@@ -305,6 +305,56 @@ describe('BaseScreenRenderer canvas background image', () => {
     expect(root.style.backgroundColor).toBe('#000000');
   });
 
+  it('renders linear and radial palettes below an optional background image', () => {
+    const { root, renderer } = rendererWithRoot();
+    expect(
+      renderer.render({
+        ...document([]),
+        canvas: {
+          width: 960,
+          height: 540,
+          backgroundColor: '#000000',
+          backgroundImage: 'https://cdn.x/screens/bg.png',
+          background: {
+            type: 'linear-gradient',
+            angle: 45,
+            stops: [
+              { color: '#112233', position: 0 },
+              { color: '#abcdef', position: 100 },
+            ],
+          },
+        },
+      }).ok,
+    ).toBe(true);
+    expect(root.style.backgroundImage).toBe(
+      'url("https://cdn.x/screens/bg.png"), linear-gradient(45deg, #112233 0%, #abcdef 100%)',
+    );
+    expect(root.style.backgroundSize).toBe('cover, 100% 100%');
+
+    expect(
+      renderer.render({
+        ...document([]),
+        canvas: {
+          width: 960,
+          height: 540,
+          backgroundColor: '#000000',
+          background: {
+            type: 'radial-gradient',
+            position: { x: 25, y: 75 },
+            stops: [
+              { color: '#112233', position: 0 },
+              { color: 'transparent', position: 100 },
+            ],
+          },
+        },
+      }).ok,
+    ).toBe(true);
+    expect(root.style.backgroundImage).toBe(
+      'radial-gradient(circle at 25% 75%, #112233 0%, transparent 100%)',
+    );
+    expect(root.style.backgroundSize).toBe('100% 100%');
+  });
+
   it('maps contain fit and escapes quotes in the CSS url value', () => {
     const { root, renderer } = rendererWithRoot();
     const result = renderer.render({

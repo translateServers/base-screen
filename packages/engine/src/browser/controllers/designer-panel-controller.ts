@@ -44,9 +44,12 @@ import {
 } from '../dom/designer-descriptor-operations.js';
 import { renderMaterialLibraryGroupNavigation } from '../dom/designer-material-library-group-dom.js';
 import {
+  createCanvasBackgroundStopTransaction,
   createDataSourceTransaction,
+  createDesignerCanvasBackgroundDrafts,
   createInitialDataSource,
   createPropertyTransaction,
+  type DesignerCanvasBackgroundDrafts,
   renderDesignerDataPanel,
   renderDesignerProperties,
 } from '../dom/designer-panel-dom.js';
@@ -91,6 +94,8 @@ export class DesignerPanelController {
   #materialSearchTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #favoriteMaterials = new Set<string>();
   readonly #recentMaterials: string[] = [];
+  readonly #canvasBackgroundDrafts: DesignerCanvasBackgroundDrafts =
+    createDesignerCanvasBackgroundDrafts();
 
   constructor(private readonly callbacks: DesignerPanelControllerCallbacks) {}
 
@@ -253,6 +258,7 @@ export class DesignerPanelController {
         this.callbacks.getCatalog(),
         this.callbacks.getDatasetFields,
         this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
+        this.#canvasBackgroundDrafts,
       );
     }
     renderDesignerDataPanel(
@@ -311,6 +317,23 @@ export class DesignerPanelController {
       ?.dataset.materialLibraryAction;
     if (libraryAction === 'retry' || libraryAction === 'reload' || libraryAction === 'details') {
       this.callbacks.requestMaterialLibraryAction?.(libraryAction);
+      return;
+    }
+    const paletteStopAction = target.closest<HTMLButtonElement>(
+      '[data-canvas-background-stop-action]',
+    );
+    if (paletteStopAction !== null) {
+      const action = paletteStopAction.dataset.canvasBackgroundStopAction;
+      if (action === 'add' || action === 'remove') {
+        const transaction = createCanvasBackgroundStopTransaction(
+          this.callbacks.getDocument(),
+          this.#canvasBackgroundDrafts,
+          action,
+          Number(paletteStopAction.dataset.canvasBackgroundStopIndex),
+        );
+        if (transaction?.ok) this.report(this.callbacks.executeTransaction(transaction.value));
+        else if (transaction !== undefined) this.callbacks.emitDiagnostics(transaction.diagnostics);
+      }
       return;
     }
     const backgroundImageAction = target.closest<HTMLButtonElement>(
@@ -449,6 +472,7 @@ export class DesignerPanelController {
       this.callbacks.getDocument(),
       this.interaction,
       this.callbacks.getCatalog(),
+      this.#canvasBackgroundDrafts,
     );
     if (transaction !== undefined) {
       if (transaction.ok) {

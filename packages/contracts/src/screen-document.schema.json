@@ -20,6 +20,114 @@
           "minLength": 1,
           "maxLength": 128
         },
+        "background": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "solid"
+                },
+                "color": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              },
+              "required": ["type", "color"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "linear-gradient"
+                },
+                "angle": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 360
+                },
+                "stops": {
+                  "minItems": 2,
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "color": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "position": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      }
+                    },
+                    "required": ["color", "position"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["type", "angle", "stops"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "radial-gradient"
+                },
+                "position": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "y": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "required": ["x", "y"],
+                  "additionalProperties": false
+                },
+                "stops": {
+                  "minItems": 2,
+                  "maxItems": 8,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "color": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128
+                      },
+                      "position": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 100
+                      }
+                    },
+                    "required": ["color", "position"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["type", "position", "stops"],
+              "additionalProperties": false
+            }
+          ]
+        },
         "backgroundImage": {
           "type": "string",
           "minLength": 1,

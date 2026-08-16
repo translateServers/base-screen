@@ -1,5 +1,6 @@
 import type {
   ScreenBlueprint,
+  ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
   ScreenComponentDataSource,
   ScreenComponentNode,
@@ -20,6 +21,7 @@ export type ScreenCanvasPatch = {
   readonly width?: number;
   readonly height?: number;
   readonly backgroundColor?: string;
+  readonly background?: ScreenCanvasBackground | null;
   readonly backgroundImage?: string | null;
   readonly backgroundImageFit?: ScreenCanvasBackgroundImageFit | null;
 };

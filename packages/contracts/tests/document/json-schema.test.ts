@@ -104,6 +104,24 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     expect(name.maxLength).toBe(MAX_NAME_CODE_POINTS);
   });
 
+  it('declares the optional structured canvas background palette', () => {
+    const canvas = propertiesOf(schema).canvas as Record<string, unknown>;
+    const background = propertiesOf(canvas).background as { anyOf: Array<Record<string, unknown>> };
+    expect(
+      background.anyOf.map((branch) => (branch.properties as Record<string, unknown>).type),
+    ).toEqual([
+      { type: 'string', const: 'solid' },
+      { type: 'string', const: 'linear-gradient' },
+      { type: 'string', const: 'radial-gradient' },
+    ]);
+    expect((background.anyOf[1]!.properties as Record<string, unknown>).angle).toEqual({
+      type: 'number',
+      minimum: 0,
+      maximum: 360,
+    });
+    expect(canvas.required).toEqual(['width', 'height', 'backgroundColor']);
+  });
+
   it('declares optional canvas background image fields', () => {
     const canvas = propertiesOf(schema).canvas as Record<string, unknown>;
     const canvasFields = propertiesOf(canvas);

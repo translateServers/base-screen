@@ -331,6 +331,52 @@ describe('applyScreenDocumentCommand update-canvas background image', () => {
     }
   });
 
+  it('sets and clears structured canvas backgrounds through the same patch', () => {
+    const document = makeDocument({ canvas: { ...canvas } });
+    const set = applyScreenDocumentCommand(document, {
+      type: 'update-canvas',
+      patch: {
+        background: {
+          type: 'linear-gradient',
+          angle: 90,
+          stops: [
+            { color: '#000000', position: 0 },
+            { color: '#ffffff', position: 100 },
+          ],
+        },
+      },
+    });
+    expect(set.ok).toBe(true);
+    if (!set.ok) return;
+    expect(set.document.canvas.background?.type).toBe('linear-gradient');
+
+    const clear = applyScreenDocumentCommand(set.document, {
+      type: 'update-canvas',
+      patch: { background: null },
+    });
+    expect(clear.ok).toBe(true);
+    if (clear.ok) {
+      expect(clear.document.canvas.background).toBeUndefined();
+      expect(clear.document.canvas.backgroundColor).toBe('#000000');
+    }
+  });
+
+  it('rejects malformed structured backgrounds without changing the document', () => {
+    const document = makeDocument({ canvas: { ...canvas } });
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-canvas',
+      patch: {
+        background: {
+          type: 'radial-gradient',
+          position: { x: 50, y: 50 },
+          stops: [{ color: '#000000', position: 0 }],
+        },
+      } as unknown as ScreenCanvasPatch,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.document).toBe(document);
+  });
+
   it('removes the background image when the patch value is null', () => {
     const document = makeDocument({
       canvas: { ...canvas, backgroundImage: 'https://cdn.x/bg.png', backgroundImageFit: 'cover' },

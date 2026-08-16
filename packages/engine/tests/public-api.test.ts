@@ -131,5 +131,10 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['setCanvasBackgroundImage']
     >().returns.toEqualTypeOf<ScreenParseResult<import('@base-screen/contracts').ScreenDocument>>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['setCanvasBackground']
+    >().parameters.toEqualTypeOf<
+      [import('@base-screen/contracts').ScreenCanvasBackground | null]
+    >();
   });
 });

@@ -24,6 +24,7 @@ import {
 } from '@base-screen/plugin-core';
 import { createValidatedPropsTransaction } from '../../common/operations/designer-layout-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { readDesignerColorPaletteValue } from './designer-color-palette-dom.js';
 
 interface DescriptorFieldDataset {
   readonly fieldId: string | undefined;
@@ -265,6 +266,9 @@ function parseControlValue(
   path: readonly (string | number)[],
 ): ScreenJsonValue | undefined {
   const resolved = schema === undefined ? undefined : resolveSchemaAt(path, schema);
+  if (control.control === 'color') {
+    return readDesignerColorPaletteValue(target) ?? target.value;
+  }
   if (control.control === 'boolean') {
     return (target as HTMLInputElement).checked === true;
   }

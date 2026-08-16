@@ -25,6 +25,7 @@ class FakeElement {
   selected = false;
   title = '';
   textContent = '';
+  className = '';
   type = '';
   value = '';
   ariaLabel: string | null = null;
@@ -222,7 +223,7 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'input')
         .map((element) => element.dataset.canvasProperty),
-    ).toEqual(['width', 'height', 'backgroundColor', 'backgroundImage']);
+    ).toEqual(['width', 'height', 'backgroundSolidColor', 'backgroundImage']);
     // 宿主选择按钮默认隐藏（ADR-0047）：未配置 canvasBackgroundImageButton 时不渲染。
     expect(
       descendants(properties).some(
@@ -238,7 +239,52 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'option')
         .map((element) => element.value),
-    ).toEqual(['cover', 'contain']);
+    ).toEqual(['solid', 'linear-gradient', 'radial-gradient', 'cover', 'contain']);
+  });
+
+  it('renders linear and radial palette controls from the active canvas background', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const linearDocument: ScreenDocument = {
+      ...document(),
+      canvas: {
+        width: 960,
+        height: 540,
+        backgroundColor: '#000000',
+        background: {
+          type: 'linear-gradient',
+          angle: 45,
+          stops: [
+            { color: '#112233', position: 0 },
+            { color: '#abcdef', position: 100 },
+          ],
+        },
+      },
+    };
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      linearDocument,
+      { selectedComponentIds: [], focusedComponentId: null },
+      catalog(),
+    );
+    expect(
+      descendants(properties)
+        .filter((element) => element.tagName === 'input')
+        .map((element) => element.dataset.canvasProperty),
+    ).toEqual([
+      'width',
+      'height',
+      'backgroundLinearAngle',
+      'backgroundStopColor',
+      'backgroundStopPosition',
+      'backgroundStopColor',
+      'backgroundStopPosition',
+      'backgroundImage',
+    ]);
+    const type = descendants(properties).find(
+      (element) => element.dataset.canvasProperty === 'backgroundType',
+    );
+    expect(type?.value).toBe('linear-gradient');
   });
 
   it('renders the host background image picker button only when configured', () => {
@@ -304,11 +350,10 @@ describe('designer panel rendering', () => {
       catalog(),
     );
 
-    expect(
-      descendants(properties)
-        .filter((element) => element.tagName === 'input')
-        .map((element) => element.dataset.property),
-    ).toEqual([
+    const propertyInputs = descendants(properties)
+      .filter((element) => element.tagName === 'input')
+      .map((element) => element.dataset.property);
+    expect(propertyInputs.slice(0, 9)).toEqual([
       'name',
       'x',
       'y',
@@ -318,9 +363,25 @@ describe('designer panel rendering', () => {
       'zIndex',
       'locked',
       'hidden',
-      undefined,
-      undefined,
     ]);
+    expect(propertyInputs.slice(9)).toHaveLength(10);
+    // style.color 字段同样使用完整三段式调色板：渐变模式全部可用。
+    const gradientModes = descendants(properties).filter(
+      (element) => element.tagName === 'input' && element.dataset.colorPaletteField === 'mode',
+    );
+    expect(gradientModes.map((element) => element.disabled)).toEqual([false, false, false]);
+    expect(
+      descendants(properties).find((element) => element.dataset.colorPaletteField === 'solid')
+        ?.value,
+    ).toBe('#ffffff');
+    // color 字段外层容器是 span 而非 label：点击字段文字不得激活 color input
+    // （否则会弹出浏览器原生取色器）。
+    const colorFieldContainer = descendants(properties).find(
+      (element) =>
+        element.className === 'designer-field designer-field-label' &&
+        element.textContent === '颜色',
+    );
+    expect(colorFieldContainer?.tagName).toBe('span');
     expect(
       descendants(properties)
         .filter((element) => element.tagName === 'h3')
@@ -579,6 +640,48 @@ describe('DesignerPanelController canvas background drafts', () => {
     controller.onClick({ target: button } as unknown as Event);
 
     expect(request).toHaveBeenCalledOnce();
+  });
+
+  it('switches palette modes with retained per-mode drafts', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    const { controller, transactions } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundType', 'linear-gradient', 'canvasProperty'),
+    } as unknown as Event);
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundLinearAngle', '135', 'canvasProperty'),
+    } as unknown as Event);
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundType', 'radial-gradient', 'canvasProperty'),
+    } as unknown as Event);
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundType', 'linear-gradient', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toHaveLength(4);
+    expect(transactions[3]).toEqual({
+      commands: [
+        {
+          type: 'update-canvas',
+          patch: {
+            background: {
+              type: 'linear-gradient',
+              angle: 135,
+              stops: [
+                { color: '#000000', position: 0 },
+                { color: '#ffffff', position: 100 },
+              ],
+            },
+          },
+        },
+      ],
+    });
   });
 
   it('commits a background image URL draft as an update-canvas patch', () => {

@@ -2,7 +2,7 @@
 
 > 状态：维护期（阶段封版）
 > 阶段封版：2026-08-12
-> 最近更新：2026-08-14
+> 最近更新：2026-08-16
 > 定位：Base Screen 处于阶段成果维护期；历史 Spec 全部归档，封版后的增量需求以新的 ADR/Spec 承载
 
 ## 当前状态
@@ -40,6 +40,9 @@
 | [Material Cover Adaptive Fit](./material-cover-adaptive-fit/spec.md) | 物料封面展示增量 | 封面加载后按自然尺寸与容器自适应适配：小图（放大 >1.5×）与异形图（宽高比偏差 >0.35）自动 `contain` 完整显示，照片类保持 `cover`；封面加载后占位彩色渐变/网格底色收为中性表面，透明素材不透底；纯展示启发式，`cover` 契约与宿主边界不变；依据 [ADR-0041](../decisions/ADR-0041-material-cover-adaptive-fit.md)；2026-08-16 生效 |
 | [Material Library Render Scalability](./material-library-render-scalability/spec.md) | 物料库渲染性能增量 | 物料卡片网格项 `content-visibility: auto` + `contain-intrinsic-size: auto 140px` 跳过屏外渲染（实测首帧 500 张 ≈50ms、2000 张 ≈160ms），搜索输入 120ms 防抖合并渲染；纯渐进增强（Safari < 18 / Firefox < 125 退回全量渲染），catalog 与宿主边界不变；依据 [ADR-0042](../decisions/ADR-0042-material-library-render-scalability.md)；2026-08-16 生效 |
 | [Canvas Background Image](./canvas-background-image/spec.md) | 文档契约与宿主能力增量 | ScreenCanvas 宿主背景图片：可选 `backgroundImage` URL（失败关闭校验，ADR-0040 URL 规则同形）与 `backgroundImageFit`（cover/contain，缺省 cover）进入 canonical 文档；`update-canvas` null 删除语义；Renderer/Designer 同路径渲染；`setCanvasBackgroundImage` 宿主公开 API、属性面板「画布」区编辑（URL 输入 + 适配下拉）与「选择图片」宿主按钮（请求事件 + requestId 会话守护提交）入口语义一致；零 fetch/代理，资产归宿主；依据 [ADR-0043](../decisions/ADR-0043-canvas-background-image.md)、[ADR-0045](../decisions/ADR-0045-canvas-background-panel-editing.md)、[ADR-0046](../decisions/ADR-0046-canvas-background-image-host-button.md)；2026-08-16 生效 |
+| [Text Material Typography](./text-material-typography/spec.md) | 物料能力增量 | 官方文本物料排版能力：水平对齐（`textAlign`）与垂直对齐（`verticalAlign` top/middle/bottom）独立设置（flex 映射，缺失/top 保持 block）、字间距 `letterSpacing`（px，0..100）、行间距 `lineSpacing`（px，0..512，增量语义：行高 = 字号 + 行间距）；新字段全部可选、旧文档零迁移、默认值同步（top/0/0），Manifest/面板经既有 schema 驱动通道自动生效，Engine 与文档契约零改动；依据 [ADR-0047](../decisions/ADR-0047-text-material-typography.md)；2026-08-16 生效 |
+| [Canvas Background Palette](./canvas-background-palette/spec.md) | 文档契约与 Designer 增量 | ScreenCanvas 的单色、线性渐变、径向渐变调色板：严格 JSON-safe 判别联合、Core null 删除、Renderer 与背景图分层、三模式面板草稿与 `setCanvasBackground` API；旧 `backgroundColor` 保持兼容回退；依据 [ADR-0048](../decisions/ADR-0048-canvas-background-palette.md)；2026-08-16 生效 |
+| [Unified Color Palette](./unified-color-palette/spec.md) | Designer 控件增量 | 自定义三段式调色板全面替换原生 color input：属性面板与 Manifest Editor Descriptor 全部 `color` 字段无条件支持单色/线性渐变/径向渐变，多色标增删、按字段缓存三模式草稿；值保持字符串、公共契约零变化；渐变渲染消费由物料负责，官方文本物料以 background-clip: text 支持渐变文字；画布背景保持结构化契约；依据 [ADR-0050](../decisions/ADR-0050-unified-color-palette-control.md)、[ADR-0051](../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)；2026-08-16 生效 |
 
 ## 已归档
 

@@ -58,6 +58,55 @@ describe('parseScreenDocument', () => {
     }
   });
 
+  it('accepts solid, linear, and radial canvas backgrounds', () => {
+    for (const background of [
+      { type: 'solid', color: '#123456' },
+      {
+        type: 'linear-gradient',
+        angle: 45,
+        stops: [
+          { color: '#123456', position: 0 },
+          { color: '#abcdef', position: 100 },
+        ],
+      },
+      {
+        type: 'radial-gradient',
+        position: { x: 25, y: 75 },
+        stops: [
+          { color: '#123456', position: 0 },
+          { color: 'transparent', position: 100 },
+        ],
+      },
+    ]) {
+      expect(
+        parse(document({ canvas: { width: 1, height: 1, backgroundColor: '#000', background } })),
+      ).toMatchObject({ ok: true });
+    }
+  });
+
+  it('rejects malformed canvas gradients fail-closed', () => {
+    const result = parse(
+      document({
+        canvas: {
+          width: 1,
+          height: 1,
+          backgroundColor: '#000',
+          background: {
+            type: 'linear-gradient',
+            angle: 45,
+            stops: [
+              { color: '#123456', position: 60 },
+              { color: '#abcdef', position: 40 },
+            ],
+          },
+        },
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok)
+      expect(result.diagnostics[0]?.path).toEqual(['canvas', 'background', 'stops', 1, 'position']);
+  });
+
   it('R6 accepts host variables and authorized host actions without transport details', () => {
     const result = parse(
       document({
