@@ -232,6 +232,40 @@ function createMaterialCard(
 // load 后由 CSS 以 opacity 过渡显现，error 时移除图片、恢复确定性占位图标。
 // 加载标记同时写到图片自身与缩略图容器：前者驱动封面显现，后者驱动占位图标淡出
 // （后代选择器，与 DOM 顺序无关）。
+//
+// 自适应适配（ADR-0041）：load 后按「容器 vs 图片自然尺寸」做一次性决策。小图（放大 >1.5×）与
+// 异形图（宽高比偏差 >0.35）改 contain，避免模糊铺满或只剩局部；照片类保持 cover。决策通过缩略图
+// 容器的 data-material-cover-fit="contain" 标记 + CSS 后代选择器生效，不写内联样式；cover 是缺省。
+const COVER_MAX_UPSCALE = 1.5;
+const COVER_MAX_ASPECT_MISMATCH = 0.35;
+
+export function materialCoverFit(
+  naturalWidth: number,
+  naturalHeight: number,
+  boxWidth: number,
+  boxHeight: number,
+): 'cover' | 'contain' {
+  if (
+    !Number.isFinite(naturalWidth) ||
+    !Number.isFinite(naturalHeight) ||
+    !Number.isFinite(boxWidth) ||
+    !Number.isFinite(boxHeight) ||
+    naturalWidth <= 0 ||
+    naturalHeight <= 0 ||
+    boxWidth <= 0 ||
+    boxHeight <= 0
+  ) {
+    return 'cover';
+  }
+  const upscale = Math.max(boxWidth / naturalWidth, boxHeight / naturalHeight);
+  if (upscale > COVER_MAX_UPSCALE) {
+    return 'contain';
+  }
+  const aspectMismatch =
+    Math.abs(naturalWidth / naturalHeight - boxWidth / boxHeight) / (boxWidth / boxHeight);
+  return aspectMismatch > COVER_MAX_ASPECT_MISMATCH ? 'contain' : 'cover';
+}
+
 function createMaterialCoverImage(
   ownerDocument: Document,
   src: string,
@@ -247,6 +281,16 @@ function createMaterialCoverImage(
   image.addEventListener('load', () => {
     image.dataset.materialCoverLoaded = 'true';
     thumb.dataset.materialCoverLoaded = 'true';
+    if (
+      materialCoverFit(
+        image.naturalWidth,
+        image.naturalHeight,
+        image.clientWidth,
+        image.clientHeight,
+      ) === 'contain'
+    ) {
+      thumb.dataset.materialCoverFit = 'contain';
+    }
   });
   image.addEventListener('error', () => {
     image.remove();

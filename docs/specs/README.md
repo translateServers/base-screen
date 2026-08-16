@@ -37,6 +37,7 @@
 | [Designer Host Preview Handler](./designer-host-preview/spec.md) | Designer 交互增量 | 宿主经 `previewHandler` 配置接管项目模式预览：预览操作可用性放宽、`togglePreview` 接管与回退；上收宿主手工补丁，预览路由/鉴权/草稿存储仍归宿主；依据 [ADR-0038](../decisions/ADR-0038-designer-host-preview-handler.md)；2026-08-14 生效 |
 | [Designer Topbar Project Title](./designer-topbar-project-title/spec.md) | Designer 缺陷修复增量 | 顶栏项目标题修复：`renderProjectStatus` 回写加载项目名称，公共契约零变化；依据 [ADR-0039](../decisions/ADR-0039-designer-topbar-project-title.md)；2026-08-14 生效 |
 | [Material Cover Thumbnail](./material-cover-thumbnail/spec.md) | 物料契约与展示增量 | Material Manifest 可选宿主封面字段 `cover`：失败关闭校验 + 物料库卡片真实封面渲染，确定性图标/色相保持占位与失败回退，缩略图区几何恒定；不进 ScreenDocument/Renderer/Viewer；依据 [ADR-0040](../decisions/ADR-0040-material-manifest-cover.md)；2026-08-16 生效 |
+| [Material Cover Adaptive Fit](./material-cover-adaptive-fit/spec.md) | 物料封面展示增量 | 封面加载后按自然尺寸与容器自适应适配：小图（放大 >1.5×）与异形图（宽高比偏差 >0.35）自动 `contain` 完整显示，照片类保持 `cover`；封面加载后占位彩色渐变/网格底色收为中性表面，透明素材不透底；纯展示启发式，`cover` 契约与宿主边界不变；依据 [ADR-0041](../decisions/ADR-0041-material-cover-adaptive-fit.md)；2026-08-16 生效 |
 
 ## 已归档
 

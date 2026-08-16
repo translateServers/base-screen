@@ -1,6 +1,9 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
-import { populateMaterialLibrary } from '../../../src/browser/dom/designer-material-library-dom.js';
+import {
+  materialCoverFit,
+  populateMaterialLibrary,
+} from '../../../src/browser/dom/designer-material-library-dom.js';
 
 // 假 DOM：与 designer-material-library-group-dom.test.ts 同款风格，覆盖
 // createMaterialCard 所需节点 API，不引入 jsdom。
@@ -22,6 +25,10 @@ class FakeElement {
   type = '';
   src = '';
   loading = '';
+  naturalWidth = 0;
+  naturalHeight = 0;
+  clientWidth = 0;
+  clientHeight = 0;
   parent: FakeElement | undefined;
   readonly style = {
     setProperty(_name: string, _value: string): void {},
@@ -215,5 +222,84 @@ describe('material library card cover rendering', () => {
     expect(covered.children.map((child) => child.tagName)).toEqual(['svg', 'img']);
     expect(covered.children[1]?.src).toBe('https://cdn.example.com/chart.png');
     expect(covered.innerHTML).toContain('svg');
+  });
+});
+
+// 缩略图区为 16:10（宽高比 1.625），以下用例沿用真实宿主的封面素材尺寸（ADR-0041）。
+describe('materialCoverFit adaptive decision', () => {
+  it('keeps cover for photos with a matching aspect ratio', () => {
+    expect(materialCoverFit(320, 200, 117, 72)).toBe('cover');
+    expect(materialCoverFit(1920, 1080, 117, 72)).toBe('cover');
+    // 605x534：宽高比偏差 30%，未超 0.35 阈值 → cover（裁切可接受）。
+    expect(materialCoverFit(605, 534, 117, 72)).toBe('cover');
+  });
+
+  it('switches to contain when the image would be upscaled beyond the threshold', () => {
+    expect(materialCoverFit(50, 50, 117, 72)).toBe('contain');
+    expect(materialCoverFit(71, 17, 117, 72)).toBe('contain');
+    expect(materialCoverFit(32, 32, 117, 72)).toBe('contain');
+    expect(materialCoverFit(1, 1, 117, 72)).toBe('contain');
+  });
+
+  it('switches to contain for extreme aspect mismatches', () => {
+    expect(materialCoverFit(1080, 1080, 117, 72)).toBe('contain');
+    expect(materialCoverFit(1920, 120, 117, 72)).toBe('contain');
+    expect(materialCoverFit(460, 34, 117, 72)).toBe('contain');
+  });
+
+  it('falls back to cover for degenerate or non-finite sizes', () => {
+    expect(materialCoverFit(0, 0, 117, 72)).toBe('cover');
+    expect(materialCoverFit(320, 200, 0, 0)).toBe('cover');
+    expect(materialCoverFit(Number.NaN, 200, 117, 72)).toBe('cover');
+    expect(materialCoverFit(320, Number.POSITIVE_INFINITY, 117, 72)).toBe('cover');
+    expect(materialCoverFit(-1, 200, 117, 72)).toBe('cover');
+  });
+});
+
+describe('material cover adaptive fit on load', () => {
+  it('marks the thumb for contain when the loaded image is tiny', () => {
+    const { grid, layout } = createLayout();
+    populateMaterialLibrary(layout, [entry('base.text', 'https://cdn.example.com/tiny.png')]);
+
+    const thumb = thumbOf(grid, 0);
+    const image = thumb.children[1]!;
+    image.naturalWidth = 50;
+    image.naturalHeight = 50;
+    image.clientWidth = 117;
+    image.clientHeight = 72;
+    image.emit('load');
+    expect(image.dataset.materialCoverLoaded).toBe('true');
+    expect(thumb.dataset.materialCoverLoaded).toBe('true');
+    expect(thumb.dataset.materialCoverFit).toBe('contain');
+  });
+
+  it('leaves the fit unmarked when cover stays the default fit', () => {
+    const { grid, layout } = createLayout();
+    populateMaterialLibrary(layout, [entry('base.text', 'https://cdn.example.com/photo.png')]);
+
+    const thumb = thumbOf(grid, 0);
+    const image = thumb.children[1]!;
+    image.naturalWidth = 320;
+    image.naturalHeight = 200;
+    image.clientWidth = 117;
+    image.clientHeight = 72;
+    image.emit('load');
+    expect(thumb.dataset.materialCoverFit).toBeUndefined();
+    expect(thumb.dataset.materialCoverLoaded).toBe('true');
+  });
+
+  it('skips the fit decision when layout is not ready', () => {
+    const { grid, layout } = createLayout();
+    populateMaterialLibrary(layout, [entry('base.text', 'https://cdn.example.com/tiny.png')]);
+
+    const thumb = thumbOf(grid, 0);
+    const image = thumb.children[1]!;
+    image.naturalWidth = 50;
+    image.naturalHeight = 50;
+    image.clientWidth = 0;
+    image.clientHeight = 0;
+    image.emit('load');
+    expect(thumb.dataset.materialCoverLoaded).toBe('true');
+    expect(thumb.dataset.materialCoverFit).toBeUndefined();
   });
 });

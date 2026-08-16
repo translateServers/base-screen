@@ -123,6 +123,45 @@ class HostedMetricElement extends HostedMaterialElement {
   }
 }
 
+const hostedTinyManifest = {
+  type: 'harness.hosted-tiny',
+  tagName: 'harness-hosted-tiny',
+  name: '托管窄条',
+  category: '托管',
+  keywords: ['hosted'],
+  // 自适应封面（ADR-0041）：200x24 窄条与 16:10 缩略图区宽高比偏差极大，
+  // 引擎应以 contain 完整显示，不放大、不裁切。
+  cover: '/tiny-cover.svg',
+  defaultSize: { width: 260, height: 96 },
+  defaultProps: {},
+  defaultStyle: {},
+  styleSchema: { kind: 'object' as const, properties: {}, required: [] },
+  stylePanel: [],
+  propsSchema: { kind: 'object' as const, properties: {}, required: [] },
+  propertyPanel: [],
+  events: [],
+  dataCapabilities: ['static' as const],
+  designCapabilities: { resize: true, rotate: false, children: false },
+};
+
+class HostedTinyElement extends HostedMaterialElement {
+  static readonly manifest = hostedTinyManifest;
+
+  protected renderMaterial(): void {
+    const model = this.materialModel;
+    if (model === undefined || !this.isConnected) return;
+    this.replaceChildren();
+    const strip = this.ownerDocument.createElement('span');
+    strip.textContent = String(model.props.label ?? '');
+    strip.style.display = 'inline-block';
+    strip.style.padding = '4px 10px';
+    strip.style.background = '#f59e0b';
+    strip.style.color = '#1c1917';
+    strip.style.font = '12px/1 system-ui, sans-serif';
+    this.appendChild(strip);
+  }
+}
+
 const draftBadgeManifest = {
   ...hostedBadgeManifest,
   type: 'harness.draft-badge',
@@ -144,6 +183,10 @@ const packageResult = createMaterialPackage({
     {
       manifest: hostedMetricManifest,
       element: HostedMetricElement as never,
+    },
+    {
+      manifest: hostedTinyManifest,
+      element: HostedTinyElement as never,
     },
   ],
 });

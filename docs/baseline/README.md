@@ -89,8 +89,11 @@
   依据：[Material Library Error Console](../specs/material-library-feedback-workspace-placement/spec.md)、[ADR-0035](../decisions/ADR-0035-material-library-feedback-workspace-placement.md)。
 - **物料宿主封面**（封版后增量，生效中）：Manifest 可选 `cover` URL 字段（失败关闭校验，http(s)/根相对/
   点相对/协议相对），物料库卡片在固定缩略图区内渲染真实封面，确定性分类图标/色相保持占位与失败回退，
-  纯展示投影不进 ScreenDocument/Renderer/Viewer。依据：[Material Cover Thumbnail](../specs/material-cover-thumbnail/spec.md)、
-  [ADR-0040](../decisions/ADR-0040-material-manifest-cover.md)。
+  纯展示投影不进 ScreenDocument/Renderer/Viewer。封面加载后按自然尺寸自适应适配：小图（放大 >1.5×）与
+  异形图（宽高比偏差 >0.35）自动 `contain` 完整显示、照片类保持 `cover`，占位彩色渐变/网格底色收为中性
+  表面、透明素材不透底。依据：[Material Cover Thumbnail](../specs/material-cover-thumbnail/spec.md)、
+  [Material Cover Adaptive Fit](../specs/material-cover-adaptive-fit/spec.md)、[ADR-0040](../decisions/ADR-0040-material-manifest-cover.md)、
+  [ADR-0041](../decisions/ADR-0041-material-cover-adaptive-fit.md)。
 
 ## 宿主边界与数据运行时
 

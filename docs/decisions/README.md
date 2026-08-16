@@ -57,6 +57,7 @@
 | [ADR-0038](./ADR-0038-designer-host-preview-handler.md) | 已接受 | 2026-08-14 | Designer 宿主预览处理器：`previewHandler` 配置接管项目模式预览、预览操作可用性放宽、`togglePreview` 接管与回退；上收宿主手工补丁，宿主预览路由/鉴权/草稿存储仍归宿主 |
 | [ADR-0039](./ADR-0039-designer-topbar-project-title.md) | 已接受 | 2026-08-14 | Designer 顶栏项目标题修复：`renderProjectStatus` 回写加载项目名称，公共契约零变化 |
 | [ADR-0040](./ADR-0040-material-manifest-cover.md) | 已接受 | 2026-08-16 | Material Manifest 宿主封面字段：可选 `cover` URL 进入 Manifest（失败关闭校验），物料库卡片真实封面 + 确定性占位/回退；部分取代 ADR-0032 的「不扩展 Manifest 缩略图字段」结论 |
+| [ADR-0041](./ADR-0041-material-cover-adaptive-fit.md) | 已接受 | 2026-08-16 | 物料封面自适应适配：封面加载后按自然尺寸与容器决策——小图（放大 >1.5×）与异形图（宽高比偏差 >0.35）自动 `contain` 完整显示，照片类保持 `cover`；封面加载后占位彩色渐变/网格底色收为中性表面；纯展示启发式，`cover` 契约与宿主边界不变 |
 
 ## 计划决策
 

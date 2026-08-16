@@ -1322,6 +1322,21 @@
     );
 }
 
+/* 封面加载后占位层收起（ADR-0041）：底色切换为中性表面 Token——半透明素材不再透出彩色渐变/网格；
+   网格纹理直接隐藏（状态切换，无过渡）。contain 模式由缩略图容器标记驱动（不写内联样式），
+   cover 为缺省不写标记。规则置于浅色主题块之后，避免被主题背景覆盖。 */
+.material-thumb[data-material-cover-loaded] {
+  background: var(--designer-surface-canvas);
+}
+
+.material-thumb[data-material-cover-loaded]::before {
+  display: none;
+}
+
+.material-thumb[data-material-cover-fit="contain"] .material-cover {
+  object-fit: contain;
+}
+
 /* 名称与类型同一基线行：名称优先，类型以等宽微型字右对齐，信息保留但不喧哗。 */
 .material-card-meta {
   display: flex;

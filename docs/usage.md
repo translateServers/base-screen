@@ -875,6 +875,11 @@ const manifest = {
 展示：缩略图区几何恒定，加载完成淡入、加载失败自动回退确定性占位图标，Base Screen 不重试、不代理、不缓存；
 封面不进入 ScreenDocument、历史、导出物、Renderer 或 Viewer。未声明 `cover` 的物料与既有行为完全一致。
 
+封面加载完成后，Engine 会按「图片自然尺寸 vs 缩略图容器」做一次自适应适配（[ADR-0041](../docs/decisions/ADR-0041-material-cover-adaptive-fit.md)）：
+放大倍数超过 1.5×（小图）或宽高比偏差超过 0.35（异形图）时自动切换为 `contain` 完整显示、不放大不裁切，
+其余照片类封面保持 `cover` 铺满裁切；封面加载成功后占位层的彩色渐变/网格底色收为中性表面，透明素材不再
+透底。该行为是纯展示启发式，宿主无需任何改造；需要统一裁切出图的宿主应在自己的资产链路上生成缩略图。
+
 ## 12. 接入宿主高级编辑器
 
 复杂 Blueprint、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。

@@ -2,7 +2,7 @@
 
 > 状态：已接受
 > 日期：2026-08-16
-> 关联：[ADR-0021](./ADR-0021-material-library-visibility.md)、[ADR-0031](./ADR-0031-material-library-host-state.md)、[ADR-0032](./ADR-0032-designer-left-panel-refactor.md)、[ADR-0034](./ADR-0034-designer-material-library-visual-hierarchy.md)
+> 关联：[ADR-0021](./ADR-0021-material-library-visibility.md)、[ADR-0031](./ADR-0031-material-library-host-state.md)、[ADR-0032](./ADR-0032-designer-left-panel-refactor.md)、[ADR-0034](./ADR-0034-designer-material-library-visual-hierarchy.md)、[ADR-0041](./ADR-0041-material-cover-adaptive-fit.md)（封面渲染自适应适配增量，部分细化本 ADR 决策 3 的 `object-fit: cover` 呈现）
 
 ## 1. 背景
 
