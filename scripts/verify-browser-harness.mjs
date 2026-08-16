@@ -1122,9 +1122,8 @@ async function assertLeftPanelDesign(designer, page, viewport) {
   const search = designer.locator('[data-material-search]');
   await search.fill('echarts');
   const clear = designer.locator('[data-material-search-clear]');
-  if (!(await clear.isVisible())) {
-    throw new Error('BROWSER_HARNESS_LEFT_PANEL_CLEAR_HIDDEN');
-  }
+  // ADR-0042：搜索渲染经 120ms 防抖，等待 clear 按钮随过滤渲染出现。
+  await clear.waitFor({ state: 'visible', timeout: 5000 });
   await clear.click();
   const cleared = await designer.evaluate((element) => {
     const root = element.shadowRoot;
@@ -1784,6 +1783,18 @@ async function assertMaterialLibraryGrouping(page, designer) {
 
   const groupSearch = designer.locator('[data-material-search]');
   await groupSearch.fill('echarts');
+  // ADR-0042：搜索渲染经 120ms 防抖，等待过滤结果生效后再断言。
+  await page.waitForFunction(
+    () => {
+      const designer = document.querySelector('base-screen-designer');
+      const visible = [
+        ...(designer?.shadowRoot?.querySelectorAll('[data-material-card]:not([hidden])') ?? []),
+      ].map((card) => card.dataset.materialCard);
+      return visible.join(',') === 'base.echarts';
+    },
+    undefined,
+    { timeout: 5000 },
+  );
   const searchScoped = await designer.evaluate((element) =>
     [...element.shadowRoot.querySelectorAll('[data-material-card]:not([hidden])')].map(
       (card) => card.dataset.materialCard,
@@ -2006,6 +2017,17 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
   await category.click();
   const search = designer.locator('[data-material-search]');
   await search.fill('no-such-material');
+  // ADR-0042：搜索渲染经 120ms 防抖，等待空态出现后再断言。
+  await page.waitForFunction(
+    () => {
+      const designer = document.querySelector('base-screen-designer');
+      const root = designer?.shadowRoot;
+      const visible = root?.querySelectorAll('[data-material-card]:not([hidden])').length ?? -1;
+      return visible === 0;
+    },
+    undefined,
+    { timeout: 5000 },
+  );
   const searchState = await designer.evaluate((element) => ({
     visible: element.shadowRoot.querySelectorAll('[data-material-card]:not([hidden])').length,
     emptyHidden: element.shadowRoot.querySelector('[data-material-search-empty]')?.hidden,
