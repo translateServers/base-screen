@@ -1,6 +1,6 @@
 # Canvas Background Image Tasks
 
-> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5 面板编辑增量）
+> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5/R6 增量）
 
 - [x] Task 1：冻结 ADR-0043 与 Spec 四件套；登记 Spec 索引（docs/specs/README.md「生效中」）、ADR 索引
       （docs/decisions/README.md）与基线 README 能力行。
@@ -45,3 +45,16 @@
       零副作用）；既有 canvas 输入断言更新为含 backgroundImage（R5）。
 - [x] Task 12：质量门禁：engine lint/typecheck/test（448）通过；`pnpm verify:m0` 与
       `pnpm verify:browser` 全部通过；测试矩阵与实现一致（R1-R5）。
+- [x] Task 13：ADR-0046 已接受；Spec 增补 R6（宿主选择按钮与请求-提交通道）、ADR 索引登记
+      ADR-0046（R6 文档门禁）。
+- [x] Task 14：engine 宿主通道实现：`base-screen-canvas-background-image-request` 事件常量与
+      `BaseScreenCanvasBackgroundImageRequest(EventDetail)` 类型从 engine 导出；面板「画布」区
+      backgroundImage 输入旁新增选择按钮（`data-canvas-background-image-action`，`designer-button`
+      样式，ui-text 文案）；`requestCanvasBackgroundImage()` 登记会话并派发事件；
+      `commitCanvasBackgroundImage(requestId, backgroundImage, fit?)` 会话守卫 + `update-canvas`
+      提交（R6）。
+- [x] Task 15：engine 测试：按钮渲染（位置/类/文案）；点击派发回调（面板 wiring）；守卫矩阵
+      （ok/过期/缺失/他类会话）；patch/请求体构建（设置/清除/保留 fit/current null 语义）；
+      `requestCanvasBackgroundImage` 无文档分支与 commit 无会话拒绝；事件常量与类型导出断言（R6）。
+- [x] Task 16：质量门禁：engine lint/typecheck/test（457）通过；`pnpm verify:m0` 与
+      `pnpm verify:browser` 全部通过；测试矩阵与实现一致（R1-R6）。

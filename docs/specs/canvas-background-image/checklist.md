@@ -1,6 +1,6 @@
 # Canvas Background Image Checklist
 
-> 状态：已完成（2026-08-16，含 R5 面板编辑增量）
+> 状态：已完成（2026-08-16，含 R5/R6 增量）
 
 ## 契约与校验（R1）
 
@@ -63,3 +63,16 @@
 - [x] 控件仅用既有 `designer-control` 样式与 `designer-ui-text.ts` 集中文案；无新增依赖、无抖动。
 - [x] 面板入口与 `setCanvasBackgroundImage`/文档入口语义一致（dirty/history/变更事件回归通过；
       engine 448 测试全绿）。
+
+## 宿主选择按钮（R6）
+
+- [x] ADR-0046 已接受并登记 ADR 索引；事件常量与 `BaseScreenCanvasBackgroundImageRequest(EventDetail)`
+      类型从 engine 导出。
+- [x] 「画布」区背景图片输入旁新增选择按钮（`data-canvas-background-image-action`、
+      `designer-button` 样式、ui-text 文案），始终渲染；点击派发 composed
+      `base-screen-canvas-background-image-request`（detail 含 requestId/instanceId/documentRevision/
+      current）。
+- [x] `requestCanvasBackgroundImage()`：有文档登记会话并派发（true），无文档返回 false。
+- [x] `commitCanvasBackgroundImage`：设置/清除（null 并清 fit）/保留既有 fit 均经 `update-canvas`
+      提交；成功消费会话；无效/过期 requestId 拒绝；非法 URL 失败零副作用。
+- [x] 未接入宿主：按钮点击仅派发事件、无副作用；事件 detail 仅 JSON-safe 值。

@@ -667,13 +667,23 @@ function appendCanvasControls(parent: HTMLElement, document: ScreenDocument): vo
     document.canvas.backgroundColor,
     'color',
   );
+  // 背景图片行：URL 输入 + 宿主选择按钮（ADR-0046，点击派发宿主请求事件，宿主自开弹出框可视化选择）。
+  const backgroundRow = parent.ownerDocument.createElement('div');
+  backgroundRow.className = 'designer-canvas-background-row';
   appendCanvasInput(
-    section,
+    backgroundRow,
     DESIGNER_UI_TEXT.propertiesPanel.backgroundImage,
     'backgroundImage',
     document.canvas.backgroundImage ?? '',
     'text',
   );
+  const pickerButton = backgroundRow.ownerDocument.createElement('button');
+  pickerButton.type = 'button';
+  pickerButton.className = 'designer-control designer-button';
+  pickerButton.dataset.canvasBackgroundImageAction = '';
+  pickerButton.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundImageAction;
+  backgroundRow.appendChild(pickerButton);
+  section.appendChild(backgroundRow);
   appendCanvasSelect(
     section,
     DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFit,

@@ -556,6 +556,43 @@ scheme、裸相对路径、含空白/控制字符/反斜杠的值。Base Screen 
 `url()`（转义），不 fetch、不预取、不重试、不代理；图片加载失败只影响画布背景呈现，图片
 资产的上传、存储与鉴权归宿主（ADR-0027）。
 
+#### 宿主可视化选择背景图片
+
+属性面板背景图片输入框旁的「选择图片」按钮是宿主通道（ADR-0046）：点击后 Designer 派发
+composed 事件 `base-screen-canvas-background-image-request`，宿主监听后打开自己的图片选择
+弹出框（资产目录/缩略图/搜索/上传归宿主），确认后把选中的 URL 注入回画布：
+
+```ts
+import {
+  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+  type BaseScreenCanvasBackgroundImageRequestEventDetail,
+} from '@base-screen/engine';
+
+designer.addEventListener(
+  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+  async (event) => {
+    const { request } = (event as CustomEvent<BaseScreenCanvasBackgroundImageRequestEventDetail>)
+      .detail;
+    // 打开宿主自己的图片选择弹出框（可视化选择），例如 assetPicker.open(request.current)。
+    const picked = await hostAssetPicker.pick({ current: request.current });
+    if (picked === null) return; // 用户取消：不提交
+    // 会话守护提交（requestId 匹配且未过期；null 清除背景并清 fit）
+    const result = designer.commitCanvasBackgroundImage(
+      request.requestId,
+      picked.url,
+      picked.fit,
+    );
+    if (!result.ok) showDiagnostics(result.diagnostics);
+  },
+);
+```
+
+宿主也可不依赖按钮，直接调用 `designer.requestCanvasBackgroundImage()` 发起请求（有文档返回
+`true` 并派发事件，无文档返回 `false`）；提交也可以改用无会话语义的
+`setCanvasBackgroundImage(url, fit)`。请求事件 detail 只含 JSON-safe 值（requestId、
+instanceId、documentRevision 与当前背景值）；宿主弹出框、资产目录与上传全部归宿主，Base
+Screen 不内嵌选择器。
+
 ### 7.3 配置 Designer 主题
 
 `base-screen-designer` 提供 CSS Custom Properties，用于让 Designer 的顶栏、工具栏、面板、

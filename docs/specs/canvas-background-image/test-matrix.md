@@ -1,6 +1,6 @@
 # Canvas Background Image Test Matrix
 
-> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5 面板编辑增量）
+> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5/R6 增量）
 
 | Req | Case | 位置 | 状态 |
 | --- | --- | --- | --- |
@@ -29,3 +29,9 @@
 | R5 | 非法 URL 经事务失败关闭：诊断走既有面板通道、零副作用；非法 fit 值构建层拒绝（不执行事务） | 同上 | ✅ |
 | R5 | 面板入口与 API 语义一致：session 集成（dirty/history/变更事件）回归 | `packages/engine/tests/common/session/designer-session.test.ts` 回归 | ✅ |
 | 门禁 | engine lint/typecheck/test（448）+ `pnpm verify:m0` + `pnpm verify:browser` | 仓库根 | ✅ |
+| R6 | 选择按钮渲染：背景图片输入旁存在 `data-canvas-background-image-action` 按钮（tagName/文案） | `packages/engine/tests/browser/controllers/designer-panel-controller.test.ts` | ✅ |
+| R6 | 点击调用宿主回调（面板 wiring）；`requestCanvasBackgroundImage` 无文档 false、commit 无会话 `AUTHORING_REQUEST_INVALID` | 同上 + `designer-runtime-config.test.ts` | ✅ |
+| R6 | 守卫矩阵（ok/过期 EXPIRED/缺失与他类会话 REQUEST_INVALID）；patch（带 fit/无 fit/null 清 fit）；请求体 current null 语义 | `packages/engine/tests/canvas-background-image.test.ts` | ✅ |
+| R6 | 事件常量与 `BaseScreenCanvasBackgroundImageRequest` 类型、request/commit 方法签名导出断言 | `packages/engine/tests/public-api.test.ts` | ✅ |
+| R6 | 未接入宿主零副作用（按钮仅派发事件） | panel 测试回归 | ✅ |
+| 门禁 | engine lint/typecheck/test（457）+ `pnpm verify:m0` + `pnpm verify:browser`（R1-R6） | 仓库根 | ✅ |

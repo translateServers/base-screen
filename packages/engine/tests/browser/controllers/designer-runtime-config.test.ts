@@ -308,4 +308,22 @@ describe('BaseScreenDesignerElement setCanvasBackgroundImage (ADR-0043)', () => 
       expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
     }
   });
+
+  it('does not dispatch a background image request without a document (ADR-0046)', () => {
+    const designer = new BaseScreenDesignerElement();
+    expect(designer.requestCanvasBackgroundImage()).toBe(false);
+  });
+
+  it('rejects a background image commit without a current session (ADR-0046)', () => {
+    const designer = new BaseScreenDesignerElement();
+    const result = designer.commitCanvasBackgroundImage(
+      'authoring-unknown',
+      'https://cdn.x/bg.png',
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('AUTHORING_REQUEST_INVALID');
+    }
+  });
 });

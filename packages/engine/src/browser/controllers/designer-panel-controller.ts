@@ -72,6 +72,8 @@ export interface DesignerPanelControllerCallbacks {
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly isMaterialAvailable?: (type: string) => boolean;
   readonly requestMaterialLibraryAction?: (action: 'retry' | 'reload' | 'details') => void;
+  /** 画布背景图宿主选择按钮点击（ADR-0046）：由宿主接管（打开图片选择弹出框），返回是否已有文档。 */
+  readonly requestCanvasBackgroundImage?: () => boolean;
 }
 
 // 搜索输入渲染防抖窗口（ADR-0042）：快速连续输入合并为一次渲染，避免每键一次布局失效。
@@ -306,6 +308,13 @@ export class DesignerPanelController {
       ?.dataset.materialLibraryAction;
     if (libraryAction === 'retry' || libraryAction === 'reload' || libraryAction === 'details') {
       this.callbacks.requestMaterialLibraryAction?.(libraryAction);
+      return;
+    }
+    const backgroundImageAction = target.closest<HTMLButtonElement>(
+      '[data-canvas-background-image-action]',
+    );
+    if (backgroundImageAction !== null) {
+      this.callbacks.requestCanvasBackgroundImage?.();
       return;
     }
     const materialCard = target.closest<HTMLElement>('[data-material-type]');

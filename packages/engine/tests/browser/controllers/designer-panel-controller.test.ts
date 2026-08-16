@@ -223,6 +223,11 @@ describe('designer panel rendering', () => {
         .filter((element) => element.tagName === 'input')
         .map((element) => element.dataset.canvasProperty),
     ).toEqual(['width', 'height', 'backgroundColor', 'backgroundImage']);
+    const action = descendants(properties).find(
+      (element) => element.dataset.canvasBackgroundImageAction !== undefined,
+    );
+    expect(action?.tagName).toBe('button');
+    expect(action?.textContent).toBe('选择图片');
     const fit = descendants(properties).find(
       (element) => element.dataset.canvasProperty === 'backgroundImageFit',
     );
@@ -508,6 +513,7 @@ describe('DesignerPanelController canvas background drafts', () => {
     executeTransaction: (
       transaction: ScreenDocumentTransaction,
     ) => ScreenParseResult<ScreenDocument>,
+    requestCanvasBackgroundImage?: () => boolean,
   ): {
     controller: DesignerPanelController;
     diagnostics: unknown[];
@@ -533,9 +539,26 @@ describe('DesignerPanelController canvas background drafts', () => {
       reduceSelection: () => undefined,
       setZoom: () => undefined,
       undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      ...(requestCanvasBackgroundImage === undefined ? {} : { requestCanvasBackgroundImage }),
     });
     return { controller, diagnostics, transactions };
   }
+
+  it('requests the host background image picker on the action button click', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const request = vi.fn(() => true);
+    const { controller } = createCanvasController(
+      () => ({ ok: true, value: document(), diagnostics: [] }),
+      request,
+    );
+
+    const button = new FakeElement('button', new FakeDocument());
+    button.dataset.canvasBackgroundImageAction = '';
+    controller.onClick({ target: button } as unknown as Event);
+
+    expect(request).toHaveBeenCalledOnce();
+  });
 
   it('commits a background image URL draft as an update-canvas patch', () => {
     vi.stubGlobal('HTMLInputElement', FakeInput);

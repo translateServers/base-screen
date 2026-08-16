@@ -90,6 +90,13 @@ import {
   renderMaterialLibraryState,
 } from './browser/dom/designer-workspace.js';
 import {
+  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+  type BaseScreenCanvasBackgroundImageRequestEventDetail,
+  buildCanvasBackgroundImagePatch,
+  buildCanvasBackgroundImageRequest,
+  validateCanvasBackgroundImageCommitGuards,
+} from './canvas-background-image.js';
+import {
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
   validateBaseScreenMaterialLibraryGroupingForCatalog,
@@ -103,11 +110,15 @@ import {
 } from './material-library-state.js';
 
 export {
+  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+  type BaseScreenCanvasBackgroundImageRequest,
+  type BaseScreenCanvasBackgroundImageRequestEventDetail,
+} from './canvas-background-image.js';
+export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
 } from './material-library-grouping.js';
-
 export {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenMaterialLibraryAction,
@@ -350,6 +361,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
     isMaterialAvailable: (type) => !this.#materialLibraryState?.unavailableTypes?.includes(type),
     requestMaterialLibraryAction: (action) => this.requestMaterialLibraryAction(action),
+    requestCanvasBackgroundImage: () => this.requestCanvasBackgroundImage(),
   });
   readonly #viewportController = new DesignerViewportController({
     getDocument: () => this.#session.document,
@@ -1122,6 +1134,65 @@ export class BaseScreenDesignerElement extends ElementBase {
       if (fit !== undefined) patch.backgroundImageFit = fit;
     }
     return this.executeTransaction({ commands: [{ type: 'update-canvas', patch }] });
+  }
+
+  /**
+   * 宿主背景图选择请求（ADR-0046）：登记宿主会话并派发
+   * `base-screen-canvas-background-image-request`（composed）。宿主监听后打开自己的图片选择
+   * 弹出框，经 `commitCanvasBackgroundImage` 注入；无文档时返回 false 且不派发。
+   */
+  requestCanvasBackgroundImage(): boolean {
+    const document = this.#session.document;
+    if (document === undefined) return false;
+    const requestId = createScreenAuthoringRequestId();
+    this.#pendingAuthoringRequests.set(requestId, { kind: 'canvas-background-image' });
+    this.dispatchEvent(
+      new CustomEvent<BaseScreenCanvasBackgroundImageRequestEventDetail>(
+        BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+        {
+          detail: {
+            request: buildCanvasBackgroundImageRequest(
+              document.canvas,
+              this.#instanceId,
+              requestId,
+              this.#session.project?.revision ?? null,
+            ),
+          },
+          bubbles: true,
+          composed: true,
+        },
+      ),
+    );
+    return true;
+  }
+
+  /**
+   * 宿主背景图选择提交（ADR-0046）：会话守护（requestId 匹配且未过期）后经 `update-canvas`
+   * 注入；`null` 清除背景并同时清除 fit；成功消费会话，失败关闭零副作用。
+   */
+  commitCanvasBackgroundImage(
+    requestId: string,
+    backgroundImage: string | null,
+    fit?: ScreenCanvasBackgroundImageFit,
+  ): ScreenParseResult<ScreenDocument> {
+    const guards = validateCanvasBackgroundImageCommitGuards({
+      pendingKind: this.#pendingAuthoringRequests.get(requestId)?.kind,
+      disposed: this.#authoringGeneration > 0,
+    });
+    if (!guards.ok) {
+      this.#pendingAuthoringRequests.delete(requestId);
+      return this.commitGuardFailure(guards.diagnostics[0]?.code ?? 'AUTHORING_REQUEST_INVALID');
+    }
+    const result = this.executeTransaction({
+      commands: [
+        {
+          type: 'update-canvas',
+          patch: buildCanvasBackgroundImagePatch(backgroundImage, fit),
+        },
+      ],
+    });
+    if (result.ok) this.#pendingAuthoringRequests.delete(requestId);
+    return result;
   }
 
   get instanceId(): string {

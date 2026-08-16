@@ -254,6 +254,7 @@ export const DESIGNER_UI_TEXT = {
     backgroundColor: '背景颜色',
     backgroundImage: '背景图片',
     backgroundImageFit: '适配方式',
+    canvasBackgroundImageAction: '选择图片',
     dataSource: '数据源',
     none: '无',
     value: '值',

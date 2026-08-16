@@ -6,7 +6,9 @@ import type {
 } from '@base-screen/contracts';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
+  type BaseScreenCanvasBackgroundImageRequest,
   BaseScreenDesignerElement,
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
@@ -27,6 +29,36 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<typeof parseBaseScreenMaterialLibraryGrouping>().returns.toMatchTypeOf<
       ScreenParseResult<BaseScreenMaterialLibraryGrouping>
     >();
+  });
+
+  it('exports the canvas background image host request contract (ADR-0046)', () => {
+    expect(BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT).toBe(
+      'base-screen-canvas-background-image-request',
+    );
+    expectTypeOf<BaseScreenCanvasBackgroundImageRequest>().toMatchTypeOf<{
+      readonly requestId: string;
+      readonly instanceId: string;
+      readonly documentRevision: string | null;
+      readonly current: {
+        readonly backgroundImage: string | null;
+        readonly backgroundImageFit: 'cover' | 'contain' | null;
+      };
+    }>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['requestCanvasBackgroundImage']
+    >().returns.toEqualTypeOf<boolean>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['commitCanvasBackgroundImage']
+    >().parameters.toEqualTypeOf<
+      [
+        string,
+        string | null,
+        (import('@base-screen/contracts').ScreenCanvasBackgroundImageFit | undefined)?,
+      ]
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['commitCanvasBackgroundImage']
+    >().returns.toEqualTypeOf<ScreenParseResult<import('@base-screen/contracts').ScreenDocument>>();
   });
 
   it('exports the controller phase and lifecycle methods from the package barrel', () => {
