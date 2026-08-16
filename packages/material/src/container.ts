@@ -5,7 +5,10 @@ import type {
   BaseScreenMaterialManifest,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
-import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import {
+  applyBackgroundColorOrGradient,
+  BaseScreenOfficialMaterialElement,
+} from './base-material.js';
 
 export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   type: 'base.container',
@@ -47,7 +50,7 @@ export class BaseScreenContainerMaterialElement extends BaseScreenOfficialMateri
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
     const { style } = model;
-    this.style.backgroundColor = typeof style.fill === 'string' ? style.fill : '';
+    applyBackgroundColorOrGradient(this, typeof style.fill === 'string' ? style.fill : '');
     this.style.borderColor = typeof style.borderColor === 'string' ? style.borderColor : '';
     this.style.borderStyle = 'solid';
     this.style.borderWidth = typeof style.borderWidth === 'number' ? `${style.borderWidth}px` : '';

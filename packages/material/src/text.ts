@@ -5,7 +5,7 @@ import type {
   BaseScreenMaterialManifest,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
-import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import { BaseScreenOfficialMaterialElement, isGradientColorValue } from './base-material.js';
 
 export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   type: 'base.text',
@@ -155,10 +155,6 @@ function applyTextColorStyle(element: HTMLElement, color: string): void {
     element.style.backgroundClip = '';
     element.style.webkitBackgroundClip = '';
   }
-}
-
-function isGradientColorValue(value: string): boolean {
-  return /^(?:linear|radial)-gradient\(/i.test(value);
 }
 
 export function defineBaseScreenTextMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry> {

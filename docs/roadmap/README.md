@@ -25,7 +25,9 @@ Spec 索引为准）：
   [Unified Color Palette](../specs/unified-color-palette/spec.md)（ADR-0050/0051）、
   [Designer Canvas Text Editing](../specs/designer-canvas-text-editing/spec.md)（ADR-0052）、
   [Designer Multi Selection Editing](../specs/designer-multi-selection-editing/spec.md)（ADR-0053）、
-  [Designer Variable Management](../specs/designer-variable-management/spec.md)（ADR-0054）。
+  [Designer Variable Management](../specs/designer-variable-management/spec.md)（ADR-0054）、
+  [Official Material Visual Capabilities](../specs/official-material-visual-capabilities/spec.md)（ADR-0055）、
+  [Image Material URL Validation](../specs/image-material-url-validation/spec.md)（ADR-0056）。
 
 ## 候选方向
 

@@ -31,3 +31,28 @@ export abstract class BaseScreenOfficialMaterialElement extends ElementBase {
 
   protected abstract renderMaterial(): void;
 }
+
+/**
+ * 统一调色板（ADR-0050/0051）color 字段值是否为规范化 CSS 渐变字符串。
+ * 渐变渲染消费由物料渲染端负责：文本（background-clip: text）、形状/容器（background-image）。
+ */
+export function isGradientColorValue(value: string): boolean {
+  return /^(?:linear|radial)-gradient\(/i.test(value);
+}
+
+/**
+ * 把颜色字段应用到背景：渐变字符串渲染为 background-image（背景色清除），
+ * 普通色值保持 background-color（ADR-0055 R2/R3）。
+ */
+export function applyBackgroundColorOrGradient(
+  element: { readonly style: CSSStyleDeclaration },
+  value: string,
+): void {
+  if (isGradientColorValue(value)) {
+    element.style.backgroundColor = 'transparent';
+    element.style.backgroundImage = value;
+  } else {
+    element.style.backgroundColor = value;
+    element.style.backgroundImage = '';
+  }
+}

@@ -2651,6 +2651,114 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     return names.includes('count') && names.includes('region');
   });
 
+  // 官方物料视觉能力（ADR-0055）：矩形面板出现圆角/阴影字段，设置后画布样式生效
+  // （圆角/阴影/渐变 fill 渲染为 background-image）。
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const card = [...root.querySelectorAll('button')].find(
+      (button) => button.dataset.materialType === 'base.rectangle',
+    );
+    card.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-inspector-pane="appearance"]');
+    return panel?.innerText.includes('圆角') && panel.innerText.includes('阴影模糊');
+  });
+  const visualResult = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.tagName.toLowerCase() === 'base-screen-rectangle',
+    );
+    const id = element.getAttribute('data-base-screen-component-id');
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === id,
+    );
+    const result = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: [id],
+      patch: {
+        style: {
+          ...component.style,
+          borderRadius: 16,
+          shadowColor: '#000000',
+          shadowBlur: 10,
+          shadowOffsetX: 4,
+          shadowOffsetY: 6,
+          fill: 'linear-gradient(90deg, #ff0000, #0000ff)',
+        },
+      },
+    });
+    return { ok: result.ok };
+  });
+  if (!visualResult.ok) throw new Error('BROWSER_HARNESS_SHAPE_VISUAL_COMMAND_FAILED');
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.tagName.toLowerCase() === 'base-screen-rectangle',
+    );
+    return (
+      element?.style.borderRadius === '16px' &&
+      element?.style.boxShadow !== '' &&
+      element?.style.backgroundImage.startsWith('linear-gradient(')
+    );
+  });
+
+  // 图片物料 URL 校验（ADR-0056）：非法 URL 显示占位且不创建 img。
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const card = [...root.querySelectorAll('button')].find(
+      (button) => button.dataset.materialType === 'base.image',
+    );
+    card.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return [...root.querySelectorAll('[data-base-screen-component-id]')].some(
+      (entry) => entry.tagName.toLowerCase() === 'base-screen-image',
+    );
+  });
+  const imageUrlResult = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.tagName.toLowerCase() === 'base-screen-image',
+    );
+    const id = element.getAttribute('data-base-screen-component-id');
+    return window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: [id],
+      patch: { dataSource: { type: 'static', value: 'javascript:alert(1)' } },
+    });
+  });
+  if (!imageUrlResult.ok) throw new Error('BROWSER_HARNESS_IMAGE_URL_COMMAND_FAILED');
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.tagName.toLowerCase() === 'base-screen-image',
+    );
+    return element?.textContent === '图片地址无效' && element.querySelector('img') === null;
+  });
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.tagName.toLowerCase() === 'base-screen-image',
+    );
+    const id = element.getAttribute('data-base-screen-component-id');
+    const result = window.baseScreenHarness.designer.executeCommand({
+      type: 'update-components',
+      componentIds: [id],
+      patch: { dataSource: { type: 'static', value: 'https://example.com/a.png' } },
+    });
+    if (!result.ok) throw new Error('BROWSER_HARNESS_IMAGE_URL_RESTORE_FAILED');
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].find(
+      (entry) => entry.tagName.toLowerCase() === 'base-screen-image',
+    );
+    return element?.querySelector('img')?.src === 'https://example.com/a.png';
+  });
+
   // 清空框选遗留的选择，避免污染后续断言步骤。
   await page.keyboard.press('Escape');
   await page.waitForFunction(

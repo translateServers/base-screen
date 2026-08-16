@@ -1,4 +1,4 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import { isBoundedScreenImageUrl, type ScreenParseResult } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
@@ -61,6 +61,12 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
       this.textContent = model.dataState.status === 'ready' ? '图片不可用' : '未设置图片';
       return;
     }
+    // 有界 URL 校验（ADR-0056 R1，与画布背景/封面同规则）：非法 URL fail-closed，
+    // 不设置 img.src（杜绝 data:/javascript: 等注入面）。
+    if (!isBoundedScreenImageUrl(source)) {
+      this.textContent = '图片地址无效';
+      return;
+    }
     const image = this.ownerDocument.createElement('img');
     image.src = source;
     image.alt = '';
@@ -68,6 +74,13 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
     image.style.height = '100%';
     image.style.objectFit =
       typeof model.style.objectFit === 'string' ? model.style.objectFit : 'contain';
+    // 加载失败回退（ADR-0056 R2）：移除失效图片并显示占位，重建不残留旧图片。
+    image.addEventListener('error', () => {
+      if (image.isConnected) {
+        image.remove();
+        this.textContent = '图片加载失败';
+      }
+    });
     this.appendChild(image);
   }
 }

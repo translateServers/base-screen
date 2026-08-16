@@ -71,6 +71,8 @@
 | [ADR-0052](./ADR-0052-designer-canvas-text-editing.md) | 已接受 | 2026-08-16 | Designer 画布内文本直接编辑：双击可编辑文本组件进入 contenteditable overlay 编辑会话（仅 `base.text` + static 字符串 dataSource，fail-closed），Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 经既有 `isEditableTarget` 通道放行 IME 与原生编辑键；不侵入物料/Renderer DOM，公共契约零变化 |
 | [ADR-0053](./ADR-0053-designer-multi-selection-editing.md) | 已接受 | 2026-08-16 | Designer 多选批量属性编辑：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑（复用 createControl / 三段式调色板），值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派，单选通道零改动，公共契约零变化 |
 | [ADR-0054](./ADR-0054-designer-variable-management.md) | 已接受 | 2026-08-16 | Designer 变量管理：左侧面板「变量」Tab 提供静态变量新建/重命名/编辑值/删除与 host 变量只读展示；提交复用 `replace-variables` 命令（恰一条历史）；删除/重命名引用保护（组件参数与蓝图引用，fail-closed 拒绝）与重名保护；数据绑定/蓝图引用自动联动，公共契约零变化 |
+| [ADR-0055](./ADR-0055-official-material-visual-capabilities.md) | 已接受 | 2026-08-16 | 官方物料视觉能力：形状（矩形/椭圆）新增圆角与阴影字段（borderRadius/shadowColor/shadowBlur/shadowOffsetX/Y，椭圆固定 50% 圆角），fill 渐变渲染为 background-image（容器同规则）——补齐 ADR-0051 渐变渲染责任到形状/容器；shadowColor 渐变跳过阴影（box-shadow 不接受 <image>）；Manifest 能力扩展，公共契约零变化 |
+| [ADR-0056](./ADR-0056-image-material-url-validation.md) | 已接受 | 2026-08-16 | 图片物料 URL 校验与失败回退：静态数据源复用 `isBoundedScreenImageUrl`（与画布背景/封面同规则），非法 URL fail-closed 显示「图片地址无效」占位且不创建 img；img error 移除失效图片显示「图片加载失败」占位；公共契约零变化 |
 
 ## 计划决策
 
