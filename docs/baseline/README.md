@@ -64,9 +64,11 @@
 - **画布宿主背景图片**（封版后增量，生效中）：`ScreenCanvas` 可选 `backgroundImage` URL 与
   `backgroundImageFit`（cover/contain，缺省 cover）进入 canonical 文档并随文档持久化；失败关闭校验
   （ADR-0040 URL 规则同形）、`update-canvas` null 删除语义、Renderer/Designer 同路径渲染；宿主经
-  `setCanvasBackgroundImage` 公开 API 设置/清除，零 fetch/代理，资产归宿主。依据：
+  `setCanvasBackgroundImage` 公开 API 设置/清除，属性面板「画布」区提供背景图 URL 输入与适配方式
+  下拉（清空=删除并清 fit），三条入口语义一致；零 fetch/代理，资产归宿主。依据：
   [Canvas Background Image](../specs/canvas-background-image/spec.md)、
-  [ADR-0043](../decisions/ADR-0043-canvas-background-image.md)。
+  [ADR-0043](../decisions/ADR-0043-canvas-background-image.md)、
+  [ADR-0045](../decisions/ADR-0045-canvas-background-panel-editing.md)。
 
 ## 物料体系
 

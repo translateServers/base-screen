@@ -513,7 +513,9 @@ const configured = designer.configure({
 
 宿主可以给画布设置/清除背景图片（ADR-0043）。图片 URL 进入 canonical 文档的
 `canvas.backgroundImage`（可选）与 `canvas.backgroundImageFit`（`cover`/`contain`，缺省按
-`cover` 渲染），随文档持久化，Designer 画布与 Viewer 同一渲染路径一致呈现：
+`cover` 渲染），随文档持久化，Designer 画布与 Viewer 同一渲染路径一致呈现。Designer 右侧属性
+面板的「画布」区也提供背景图 URL 输入与适配方式下拉（清空输入即清除背景，与 API 语义一致；
+ADR-0045）：
 
 ```ts
 // 设置背景图（可选指定适配方式；未传 fit 保留既有 fit，无则按 cover）

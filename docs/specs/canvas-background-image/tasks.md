@@ -1,6 +1,6 @@
 # Canvas Background Image Tasks
 
-> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿）
+> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5 面板编辑增量）
 
 - [x] Task 1：冻结 ADR-0043 与 Spec 四件套；登记 Spec 索引（docs/specs/README.md「生效中」）、ADR 索引
       （docs/decisions/README.md）与基线 README 能力行。
@@ -34,3 +34,14 @@
       engine lint/typecheck/test 通过（含预先存在的 panel 测试 `vi.fn` 类型错误修复——
       9704137 引入，与 ADR-0042 并行会话环境相关）；`pnpm verify:m0` 与 `pnpm verify:browser`
       全部通过；测试矩阵与实现一致（R1-R4）。
+- [x] Task 9：ADR-0045 已接受并互注 ADR-0043；Spec 增补 R5（属性面板画布背景图控件）、非目标修订
+      与完成定义更新；ADR 索引登记 ADR-0045（R5 文档门禁）。
+- [x] Task 10：属性面板实现：`designer-ui-text.ts` 增加「背景图片」「适配方式」文案；`appendCanvasControls`
+      增加 backgroundImage 文本输入与 backgroundImageFit 下拉（无背景图禁用、未声明显示 cover）；
+      `createCanvasTransaction` 支持 backgroundImage（非空提交、清空提交 null 删除并清 fit）与
+      backgroundImageFit（枚举提交）；仅用既有 designer-control 样式（R5）。
+- [x] Task 11：属性面板测试：画布区控件渲染（输入/下拉/禁用态/顺序/有图状态）；URL 设置、清空删除
+      （同时清 fit）、fit 变更的事务形状；非法 fit 构建层拒绝；非法 URL 经事务失败关闭（诊断通道、
+      零副作用）；既有 canvas 输入断言更新为含 backgroundImage（R5）。
+- [x] Task 12：质量门禁：engine lint/typecheck/test（448）通过；`pnpm verify:m0` 与
+      `pnpm verify:browser` 全部通过；测试矩阵与实现一致（R1-R5）。

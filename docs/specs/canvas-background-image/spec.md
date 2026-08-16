@@ -1,8 +1,9 @@
 # Canvas Background Image Spec
 
 > 状态：生效中（2026-08-16）
-> 依据：[ADR-0043](../../decisions/ADR-0043-canvas-background-image.md)
-> 生效前置：ADR-0043 已接受；本 Spec 为维护期内允许变更 ScreenDocument `canvas` 字段的增量
+> 依据：[ADR-0043](../../decisions/ADR-0043-canvas-background-image.md)、
+> [ADR-0045](../../decisions/ADR-0045-canvas-background-panel-editing.md)（面板编辑增量，部分取代 ADR-0043 非目标 1）
+> 生效前置：ADR-0043/0045 已接受；本 Spec 为维护期内允许变更 ScreenDocument `canvas` 字段的增量
 
 ## 1. 目标
 
@@ -59,9 +60,24 @@
 - 宿主也可在加载的文档中携带 `canvas.backgroundImage`：`replaceDocument`/`importDocument`/项目加载
   走同一 canonical 校验，非法值失败关闭。
 
+### R5：属性面板画布背景图编辑（ADR-0045 增量）
+
+- 右侧属性面板「画布」区（与 `backgroundColor` 同一 section）新增：
+  - `backgroundImage` 文本输入框：值为当前 `canvas.backgroundImage`（无则空）；非空输入经
+    `update-canvas` 提交（URL 校验失败关闭：事务失败走既有面板诊断通道、零副作用）；清空输入提交
+    删除语义（`backgroundImage: null` 与 `backgroundImageFit: null`，与 `setCanvasBackgroundImage(null)`
+    一致）。
+  - `backgroundImageFit` 下拉：选项 `cover`/`contain`，值为当前 `canvas.backgroundImageFit`
+    （未声明显示 `cover`）；无背景图时禁用；变更提交 `backgroundImageFit` patch。
+- 控件只消费既有 `designer-control designer-input/designer-select` 样式与
+  `designer-ui-text.ts` 集中文案；不新增依赖、不改主题 Token、无抖动。
+- 面板入口与宿主 API/文档入口语义完全一致（同一 canonical 校验、同一 null 删除、同一
+  dirty/history/`base-screen-change` 通道）。
+
 ## 3. 非目标
 
-- Designer 属性面板为画布背景图增加编辑控件（本期宿主经公开 API 或文档驱动）。
+- 面板内图片上传、资产选择器、预览缩略图、代理或缓存（宿主职责，ADR-0027；宿主可经资产目录端口
+  自行实现选择器后调用公开 API）。
 - 图片上传、转码、缩略图生成、代理、缓存或失败重试（宿主职责，ADR-0027）。
 - 支持 data URI、任意 HTML/SVG/组件/函数/Promise 或宿主服务对象作为背景。
 - 改变 `backgroundColor` 语义、`update-canvas` 其他字段语义或组件/Manifest/catalog 契约。
@@ -70,6 +86,6 @@
 ## 4. 完成定义
 
 - `tasks.md` 与 `checklist.md` 全部勾选；测试矩阵与当前实现一致。
-- 聚焦测试（contracts 解析/序列化/golden schema、core 命令、renderer 样式、engine 宿主 API）、
-  engine lint/typecheck/test 与 `pnpm verify:m0` 全部通过；基线 README、Spec/ADR 索引与 usage.md
-  已登记。
+- 聚焦测试（contracts 解析/序列化/golden schema、core 命令、renderer 样式、engine 宿主 API、
+  属性面板画布控件）、engine lint/typecheck/test 与 `pnpm verify:m0` 全部通过；基线 README、
+  Spec/ADR 索引与 usage.md 已登记。

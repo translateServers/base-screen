@@ -252,6 +252,8 @@ export const DESIGNER_UI_TEXT = {
     canvasWidth: '画布宽度',
     canvasHeight: '画布高度',
     backgroundColor: '背景颜色',
+    backgroundImage: '背景图片',
+    backgroundImageFit: '适配方式',
     dataSource: '数据源',
     none: '无',
     value: '值',

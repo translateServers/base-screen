@@ -1,4 +1,5 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenDocumentTransaction } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -76,12 +77,15 @@ class FakeDocument {
 
 class FakeInput {
   readonly dataset: Record<string, string>;
+  ariaInvalid = '';
+  parentElement: null = null;
 
   constructor(
     property: string,
     readonly value: string,
+    datasetKey = 'property',
   ) {
-    this.dataset = { property };
+    this.dataset = { [datasetKey]: property };
   }
 
   closest(): null {
@@ -218,7 +222,49 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'input')
         .map((element) => element.dataset.canvasProperty),
-    ).toEqual(['width', 'height', 'backgroundColor']);
+    ).toEqual(['width', 'height', 'backgroundColor', 'backgroundImage']);
+    const fit = descendants(properties).find(
+      (element) => element.dataset.canvasProperty === 'backgroundImageFit',
+    );
+    expect(fit?.tagName).toBe('select');
+    expect(fit?.disabled).toBe(true); // 无背景图时禁用
+    expect(
+      descendants(properties)
+        .filter((element) => element.tagName === 'option')
+        .map((element) => element.value),
+    ).toEqual(['cover', 'contain']);
+  });
+
+  it('renders canvas background controls with an existing background image', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const withBackground: ScreenDocument = {
+      ...document(),
+      canvas: {
+        width: 960,
+        height: 540,
+        backgroundColor: '#000000',
+        backgroundImage: 'https://cdn.x/screens/bg.png',
+        backgroundImageFit: 'contain',
+      },
+    };
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      withBackground,
+      { selectedComponentIds: [], focusedComponentId: null },
+      catalog(),
+    );
+
+    const url = descendants(properties).find(
+      (element) => element.dataset.canvasProperty === 'backgroundImage',
+    );
+    expect(url?.value).toBe('https://cdn.x/screens/bg.png');
+    const fit = descendants(properties).find(
+      (element) => element.dataset.canvasProperty === 'backgroundImageFit',
+    );
+    expect(fit?.disabled).toBe(false);
+    expect(fit?.value).toBe('contain');
   });
 
   it('renders focused geometry and status controls', () => {
@@ -454,6 +500,151 @@ describe('DesignerPanelController property drafts', () => {
         },
       ],
     ]);
+  });
+});
+
+describe('DesignerPanelController canvas background drafts', () => {
+  function createCanvasController(
+    executeTransaction: (
+      transaction: ScreenDocumentTransaction,
+    ) => ScreenParseResult<ScreenDocument>,
+  ): {
+    controller: DesignerPanelController;
+    diagnostics: unknown[];
+    transactions: unknown[];
+  } {
+    const transactions: unknown[] = [];
+    const diagnostics: unknown[] = [];
+    const controller = new DesignerPanelController({
+      emitDiagnostics: (value) => diagnostics.push(value),
+      executeCommand: () => ({ ok: true, value: document(), diagnostics: [] }),
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return executeTransaction(transaction);
+      },
+      getCatalog: catalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+    return { controller, diagnostics, transactions };
+  }
+
+  it('commits a background image URL draft as an update-canvas patch', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const { controller, transactions } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundImage', 'https://cdn.x/screens/bg.png', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toEqual([
+      {
+        commands: [
+          { type: 'update-canvas', patch: { backgroundImage: 'https://cdn.x/screens/bg.png' } },
+        ],
+      },
+    ]);
+  });
+
+  it('clears the background image and its fit when the URL draft is empty', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const { controller, transactions } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundImage', '   ', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toEqual([
+      {
+        commands: [
+          { type: 'update-canvas', patch: { backgroundImage: null, backgroundImageFit: null } },
+        ],
+      },
+    ]);
+  });
+
+  it('commits a fit draft as an enum patch', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    const { controller, transactions } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundImageFit', 'contain', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toEqual([
+      { commands: [{ type: 'update-canvas', patch: { backgroundImageFit: 'contain' } }] },
+    ]);
+  });
+
+  it('rejects an invalid fit draft without executing a transaction', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    const { controller, transactions, diagnostics } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundImageFit', 'fill', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toEqual([]);
+    expect(diagnostics).toEqual([
+      [
+        {
+          severity: 'error',
+          code: 'CORE_COMMAND_INVALID',
+          path: [],
+          message: '字段值无效，未保存修改。',
+        },
+      ],
+    ]);
+  });
+
+  it('surfaces a failed background image transaction through the diagnostic channel', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const failure = {
+      ok: false as const,
+      document: document(),
+      diagnostics: [
+        {
+          severity: 'error' as const,
+          code: 'DOCUMENT_FIELD_INVALID' as const,
+          path: ['canvas', 'backgroundImage'],
+          message: 'Canvas backgroundImage must be a bounded HTTP(S) or relative URL string.',
+        },
+      ],
+    };
+    const { controller, transactions, diagnostics } = createCanvasController(() => failure);
+
+    controller.onPropertyChange({
+      target: new FakeInput('backgroundImage', 'javascript:alert(1)', 'canvasProperty'),
+    } as unknown as Event);
+
+    expect(transactions).toHaveLength(1);
+    expect(diagnostics).toEqual([failure.diagnostics]);
   });
 });
 

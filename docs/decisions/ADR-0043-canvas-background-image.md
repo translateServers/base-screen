@@ -3,7 +3,8 @@
 > 状态：已接受
 > 日期：2026-08-16
 > 关联：[ADR-0002](./ADR-0002-canonical-screen-document.md)、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、
-> [ADR-0040](./ADR-0040-material-manifest-cover.md)（URL 校验规则同形复用）、[ADR-0041](./ADR-0041-material-cover-adaptive-fit.md)
+> [ADR-0040](./ADR-0040-material-manifest-cover.md)（URL 校验规则同形复用）、[ADR-0041](./ADR-0041-material-cover-adaptive-fit.md)、
+> [ADR-0045](./ADR-0045-canvas-background-panel-editing.md)（部分取代本 ADR 非目标 1：属性面板背景图编辑）
 
 ## 1. 背景
 
@@ -43,7 +44,8 @@ ScreenDocument 的 `canvas` 目前只有 `width`、`height`、`backgroundColor`�
 
 ## 3. 非目标
 
-- 在 Designer 属性面板为画布背景图增加编辑控件（本期宿主经公开 API 或文档驱动；面板编辑留待后续增量）。
+- Designer 属性面板为画布背景图增加编辑控件（已由 [ADR-0045](./ADR-0045-canvas-background-panel-editing.md)
+  部分取代：面板编辑经同一事务/校验通道落地）。
 - Engine 提供图片上传、转码、缩略图、代理、缓存或失败重试（ADR-0027：归宿主）。
 - 支持 data URI、任意 HTML/SVG/组件/函数/Promise 或宿主服务对象作为背景。
 - 改变 `backgroundColor` 语义、`update-canvas` 其他字段语义或组件契约。

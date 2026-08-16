@@ -566,6 +566,30 @@ function createCanvasTransaction(
       commands: [{ type: 'update-canvas', patch: { backgroundColor: target.value } }],
     });
   }
+  if (property === 'backgroundImage') {
+    // 非空输入提交 URL（失败关闭校验在 canonical 解析处拒绝）；清空输入提交删除语义，
+    // 与 setCanvasBackgroundImage(null) 一致（同时清除 fit）。
+    const value = target.value.trim();
+    return success({
+      commands: [
+        {
+          type: 'update-canvas',
+          patch:
+            value === ''
+              ? { backgroundImage: null, backgroundImageFit: null }
+              : { backgroundImage: value },
+        },
+      ],
+    });
+  }
+  if (property === 'backgroundImageFit') {
+    if (target.value !== 'cover' && target.value !== 'contain') {
+      return undefined;
+    }
+    return success({
+      commands: [{ type: 'update-canvas', patch: { backgroundImageFit: target.value } }],
+    });
+  }
   const value = Number(target.value);
   if (!Number.isFinite(value) || value <= 0 || (property !== 'width' && property !== 'height')) {
     return undefined;
@@ -643,6 +667,46 @@ function appendCanvasControls(parent: HTMLElement, document: ScreenDocument): vo
     document.canvas.backgroundColor,
     'color',
   );
+  appendCanvasInput(
+    section,
+    DESIGNER_UI_TEXT.propertiesPanel.backgroundImage,
+    'backgroundImage',
+    document.canvas.backgroundImage ?? '',
+    'text',
+  );
+  appendCanvasSelect(
+    section,
+    DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFit,
+    'backgroundImageFit',
+    document.canvas.backgroundImageFit ?? 'cover',
+    document.canvas.backgroundImage === undefined,
+  );
+}
+
+function appendCanvasSelect(
+  parent: HTMLElement,
+  labelText: string,
+  property: string,
+  value: string,
+  disabled: boolean,
+): void {
+  const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
+  label.textContent = labelText;
+  const select = parent.ownerDocument.createElement('select');
+  select.className = 'designer-control designer-select';
+  select.disabled = disabled;
+  select.dataset.canvasProperty = property;
+  for (const option of ['cover', 'contain'] as const) {
+    const element = select.ownerDocument.createElement('option');
+    element.value = option;
+    element.textContent = option;
+    select.appendChild(element);
+  }
+  select.value = value;
+  label.appendChild(select);
+  appendFieldMessage(label, select, `canvas-${property}`);
+  parent.appendChild(label);
 }
 
 function appendCanvasInput(

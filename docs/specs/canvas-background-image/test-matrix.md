@@ -1,6 +1,6 @@
 # Canvas Background Image Test Matrix
 
-> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿）
+> 状态：已完成（2026-08-16，`pnpm verify:m0` 与 `pnpm verify:browser` 全绿，含 R5 面板编辑增量）
 
 | Req | Case | 位置 | 状态 |
 | --- | --- | --- | --- |
@@ -24,3 +24,8 @@
 | 门禁 | contracts（141）/core（121）/renderer（23）/engine（442）聚焦测试 + engine lint/typecheck/test（含预先存在的 panel 测试 `vi.fn` 类型错误修复） | `pnpm --filter @base-screen/engine lint` 等 | ✅ |
 | 门禁 | `pnpm verify:m0` 全量 | 仓库根 | ✅ |
 | 门禁 | `pnpm verify:browser`（回归） | 仓库根 | ✅ |
+| R5 | 画布区渲染：canvas 输入列表含 `backgroundImage`；`backgroundImageFit` 下拉存在且无图禁用、未声明显示 cover；有图时 URL 值与 fit 值正确 | `packages/engine/tests/browser/controllers/designer-panel-controller.test.ts` | ✅ |
+| R5 | URL 输入提交 `update-canvas` patch；清空输入提交 null 删除（同时清 fit）；fit 变更提交枚举 | 同上 | ✅ |
+| R5 | 非法 URL 经事务失败关闭：诊断走既有面板通道、零副作用；非法 fit 值构建层拒绝（不执行事务） | 同上 | ✅ |
+| R5 | 面板入口与 API 语义一致：session 集成（dirty/history/变更事件）回归 | `packages/engine/tests/common/session/designer-session.test.ts` 回归 | ✅ |
+| 门禁 | engine lint/typecheck/test（448）+ `pnpm verify:m0` + `pnpm verify:browser` | 仓库根 | ✅ |

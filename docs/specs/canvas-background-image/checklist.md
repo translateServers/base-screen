@@ -1,6 +1,6 @@
 # Canvas Background Image Checklist
 
-> 状态：已完成（2026-08-16）
+> 状态：已完成（2026-08-16，含 R5 面板编辑增量）
 
 ## 契约与校验（R1）
 
@@ -51,3 +51,15 @@
 - [x] `pnpm verify:browser` 通过（回归；本增量不新增探针——harness 脚本由并行 ADR-0042 会话占用，
       背景渲染由聚焦测试覆盖）。
 - [x] 基线 README、docs/specs/README.md、docs/decisions/README.md 与 usage.md 均已登记。
+
+## 属性面板编辑（R5）
+
+- [x] ADR-0045 已接受、ADR-0043 非目标 1 已互注部分取代；ADR 索引已登记 ADR-0045。
+- [x] 「画布」区新增 `backgroundImage` 文本输入（值为当前 URL，无则空）与 `backgroundImageFit`
+      下拉（cover/contain，未声明显示 cover，无背景图禁用）。
+- [x] 非空 URL 输入提交 `update-canvas`；清空输入提交 null 删除并同时清除 fit；fit 变更提交枚举 patch。
+- [x] 非法 URL 失败关闭：事务失败走既有面板诊断通道、零副作用（与既有面板编辑语义一致）；
+      非法 fit 值构建层拒绝（`CORE_COMMAND_INVALID`，不执行事务）。
+- [x] 控件仅用既有 `designer-control` 样式与 `designer-ui-text.ts` 集中文案；无新增依赖、无抖动。
+- [x] 面板入口与 `setCanvasBackgroundImage`/文档入口语义一致（dirty/history/变更事件回归通过；
+      engine 448 测试全绿）。
