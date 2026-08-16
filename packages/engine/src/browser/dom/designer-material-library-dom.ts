@@ -202,6 +202,10 @@ function createMaterialCard(
   thumb.innerHTML = designerIcon(
     materialCategoryIcon(`${entry.manifest.category} ${entry.manifest.type}`),
   );
+  const cover = entry.manifest.cover;
+  if (cover !== undefined) {
+    thumb.appendChild(createMaterialCoverImage(thumb.ownerDocument, cover, thumb));
+  }
   // 名称与类型同一基线行：名称优先，类型作等宽微型标注。
   const meta = ownerDocument.createElement('span');
   meta.className = 'material-card-meta';
@@ -222,6 +226,32 @@ function createMaterialCard(
   favorite.innerHTML = designerIcon('star');
   wrap.append(card, favorite);
   return wrap;
+}
+
+// 宿主封面（ADR-0040）：校验后的 URL 以属性赋值写入 img.src，不 fetch、不预取、不代理；
+// load 后由 CSS 以 opacity 过渡显现，error 时移除图片、恢复确定性占位图标。
+// 加载标记同时写到图片自身与缩略图容器：前者驱动封面显现，后者驱动占位图标淡出
+// （后代选择器，与 DOM 顺序无关）。
+function createMaterialCoverImage(
+  ownerDocument: Document,
+  src: string,
+  thumb: HTMLElement,
+): HTMLImageElement {
+  const image = ownerDocument.createElement('img');
+  image.className = 'material-cover';
+  image.src = src;
+  image.alt = '';
+  image.draggable = false;
+  image.loading = 'lazy';
+  image.decoding = 'async';
+  image.addEventListener('load', () => {
+    image.dataset.materialCoverLoaded = 'true';
+    thumb.dataset.materialCoverLoaded = 'true';
+  });
+  image.addEventListener('error', () => {
+    image.remove();
+  });
+  return image;
 }
 
 function renderMaterialBadge(

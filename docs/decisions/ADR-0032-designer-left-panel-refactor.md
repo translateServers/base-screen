@@ -2,6 +2,8 @@
 
 > 状态：已接受
 > 日期：2026-08-13
+> 互注：决策 2 的「Manifest 没有缩略图字段且不为此扩展」结论已于 2026-08-16 被
+> [ADR-0040](./ADR-0040-material-manifest-cover.md) 部分取代（范围仅限可选 `cover` URL 字段），其余决策不变。
 > 关联：[ADR-0031](./ADR-0031-material-library-host-state.md)、[ADR-0024](./ADR-0024-designer-public-style-tokens.md)、
 > [ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0021](./ADR-0021-material-library-visibility.md)
 

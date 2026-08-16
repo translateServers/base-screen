@@ -36,6 +36,7 @@
 | [Designer Panel Collapse Fixes](./designer-panel-collapse-fixes/spec.md) | Designer 缺陷修复增量 | 左右面板折叠修复：宽度归控制器统一写回（折叠 48px、展开恢复拖拽宽度、未拖拽保留宿主默认）、折叠态拖拽自动展开、折叠轨箭头旋转与防压扁、tooltip 语义切换；公共契约零变化；依据 [ADR-0037](../decisions/ADR-0037-designer-panel-collapse-fixes.md)；2026-08-14 生效 |
 | [Designer Host Preview Handler](./designer-host-preview/spec.md) | Designer 交互增量 | 宿主经 `previewHandler` 配置接管项目模式预览：预览操作可用性放宽、`togglePreview` 接管与回退；上收宿主手工补丁，预览路由/鉴权/草稿存储仍归宿主；依据 [ADR-0038](../decisions/ADR-0038-designer-host-preview-handler.md)；2026-08-14 生效 |
 | [Designer Topbar Project Title](./designer-topbar-project-title/spec.md) | Designer 缺陷修复增量 | 顶栏项目标题修复：`renderProjectStatus` 回写加载项目名称，公共契约零变化；依据 [ADR-0039](../decisions/ADR-0039-designer-topbar-project-title.md)；2026-08-14 生效 |
+| [Material Cover Thumbnail](./material-cover-thumbnail/spec.md) | 物料契约与展示增量 | Material Manifest 可选宿主封面字段 `cover`：失败关闭校验 + 物料库卡片真实封面渲染，确定性图标/色相保持占位与失败回退，缩略图区几何恒定；不进 ScreenDocument/Renderer/Viewer；依据 [ADR-0040](../decisions/ADR-0040-material-manifest-cover.md)；2026-08-16 生效 |
 
 ## 已归档
 

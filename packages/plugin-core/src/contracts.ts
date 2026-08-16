@@ -136,6 +136,8 @@ export interface BaseScreenMaterialManifest {
   readonly dataBinding?: { readonly roles: readonly BaseScreenMaterialDataBindingRole[] };
   readonly designCapabilities: BaseScreenMaterialDesignCapabilities;
   readonly libraryVisible?: boolean;
+  /** 可选：宿主提供的封面图 URL，仅用于 Designer 物料库卡片展示。 */
+  readonly cover?: string;
   /** 可选：JSON-safe 声明式作者描述（appearance/data/interaction/events）。 */
   readonly editorDescriptor?: BaseScreenMaterialEditorDescriptor;
 }

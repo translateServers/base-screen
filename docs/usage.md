@@ -854,6 +854,27 @@ designer.materialLibraryGrouping = materialLibraryGrouping;
 将 `designer.materialLibraryGrouping` 设为 `undefined` 会恢复既有 Manifest `category` 分类 UI。分组不会进入
 Manifest、catalog、ScreenDocument、历史、导出物、Renderer 或 Viewer，也不会触发联网或宿主存储。
 
+### 11.2 物料封面
+
+物料作者或宿主可在 Material Manifest 中声明可选 `cover` 字段，为物料库卡片提供真实封面图（替代默认的
+确定性分类图标/色相占位）：
+
+```ts
+const manifest = {
+  type: 'acme.kpi-card',
+  tagName: 'acme-kpi-card',
+  // ...
+  cover: '/assets/materials/acme-kpi-card.png', // 或 https://cdn.example.com/x.png
+};
+```
+
+`cover` 必须是 1..2048 字符的 URL 字符串，不含空白、控制字符（含 C1）与反斜杠；仅允许 `http(s)://`、
+协议相对 `//`、根相对 `/`、点相对 `./`/`../` 开头，且开头后必须紧跟有效字符（裸 `/`、裸 `//`、
+`https:///x`、`http://?x` 等边界形式拒绝）；其他 scheme（`data:`、`javascript:`、`blob:`、`file:` 等）与
+裸相对路径（如 `a.png`）同样拒绝，非法值会使 manifest 解析失败（失败关闭）。封面只用于 Designer 物料库卡片
+展示：缩略图区几何恒定，加载完成淡入、加载失败自动回退确定性占位图标，Base Screen 不重试、不代理、不缓存；
+封面不进入 ScreenDocument、历史、导出物、Renderer 或 Viewer。未声明 `cover` 的物料与既有行为完全一致。
+
 ## 12. 接入宿主高级编辑器
 
 复杂 Blueprint、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。

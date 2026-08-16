@@ -912,6 +912,36 @@ Object.assign(window, {
       );
       return blocked ? { ok: false, code: 'HOST_SKILL_DRAFT_MATERIAL_PUBLISHED' } : { ok: true };
     },
+    // ADR-0040 封面验证探针：独立 designer 实例，只含托管包目录（hosted-metric 声明 /cover.svg），
+    // 不进入主 designer 的物料库与分组，避免影响既有断言与截图。
+    createCoverProbeDemo: () => {
+      const probe = document.createElement('base-screen-designer') as typeof designer;
+      probe.dataset.coverProbe = 'true';
+      probe.catalog = hostedCatalog;
+      probe.document = {
+        canvas: { width: 960, height: 540, backgroundColor: '#111827' },
+        components: [
+          {
+            id: 'probe',
+            type: hostedEntries[1]!.manifest.type,
+            name: '封面探针',
+            parentId: null,
+            position: { x: 40, y: 40 },
+            size: { width: 260, height: 96 },
+            rotation: 0,
+            zIndex: 0,
+            status: { locked: false, hidden: false },
+            props: hostedEntries[1]!.manifest.defaultProps,
+            style: hostedEntries[1]!.manifest.defaultStyle,
+            dataSource: { type: 'static' as const, value: '探针数据' },
+          },
+        ],
+        variables: [],
+        blueprint: { rules: [] },
+      };
+      document.body.appendChild(probe);
+      return probe;
+    },
     createHostedPackageDemo: () => {
       const demo = document.createElement('base-screen-viewer') as typeof viewer;
       demo.dataset.hostedPackageDemo = 'true';

@@ -3,6 +3,9 @@
 > 状态：生效中
 > 日期：2026-08-13
 > 依据：[ADR-0032](../../decisions/ADR-0032-designer-left-panel-refactor.md)
+> 修订：2026-08-16 —— 非目标第 4 条「Manifest 缩略图字段」项被 [Material Cover Thumbnail](../material-cover-thumbnail/spec.md)
+> （依据 ADR-0040）取代：Manifest 现允许可选 `cover` URL 字段，仅用于物料库卡片封面展示；R2 缩略图由
+> 分类图标/色相确定性派生与可选封面叠加组成，占位与失败回退语义见新 Spec。
 
 ## 1. 目标
 
@@ -64,7 +67,8 @@ SHALL 集中于 `designer-ui-text.ts`，browser 树不得内联 CJK 字面量（
 - 右侧检查器与画布工作区重构。
 - 物料市场、远程分页、下载、审核与版本 UI。
 - 面板宽度/收藏/最近使用的持久化（宿主存储边界）。
-- 新增依赖（virtual-core/floating-ui）、package 或 Manifest 缩略图字段。
+- 新增依赖（virtual-core/floating-ui）、package 或 Manifest 缩略图字段（Manifest 可选 `cover` 除外，
+  见 [Material Cover Thumbnail](../material-cover-thumbnail/spec.md)）。
 
 ## 4. 完成定义
 

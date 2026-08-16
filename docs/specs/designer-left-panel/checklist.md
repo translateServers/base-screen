@@ -38,7 +38,8 @@
 ## 契约与边界（R6）
 
 - [x] 既有全部 data-* 契约语义不变；verify-browser-harness 原断言通过。
-- [x] ScreenDocument/Manifest/catalog/SDK 公共 API 零变更；无新增依赖与 package。
+- [x] ScreenDocument/Manifest/catalog/SDK 公共 API 零变更；无新增依赖与 package。（修订注：2026-08-16
+      起 Manifest 允许可选 `cover` 字段，仅物料库封面展示，见 [Material Cover Thumbnail](../material-cover-thumbnail/spec.md)）
 - [x] 新增文案全部集中 designer-ui-text.ts；check-designer-ui.mjs 通过。
 
 ## 质量与无抖动（R7）

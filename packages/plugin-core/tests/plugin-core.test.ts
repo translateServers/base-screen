@@ -271,6 +271,102 @@ describe('material identity and manifests', () => {
   });
 });
 
+describe('material manifest cover', () => {
+  const validCovers = [
+    'https://cdn.example.com/a.png',
+    'http://x/y.png',
+    'https://x/y.png?v=1#frag',
+    '/assets/x.png',
+    './x.png',
+    '../x.png',
+    '//cdn.example.com/x.png',
+    `https://x/${'a'.repeat(2038)}`, // 恰好 2048 码点（上限边界）
+  ];
+  const invalidCovers: unknown[] = [
+    'data:image/png;base64,AAAA',
+    'javascript:alert(1)',
+    'blob:https://x/id',
+    'file:///etc/passwd',
+    'ftp://x/y.png',
+    'a.png', // 裸相对路径
+    '', // 空串
+    'x'.repeat(2049), // 超上限
+    'https://a b.com/x.png', // 含空白
+    'https://x/\u0000.png', // C0 控制字符
+    'https://x/\u009f.png', // C1 控制字符
+    '/', // 裸根相对
+    './', // 裸点相对
+    '//', // 裸协议相对
+    '///x', // 三斜杠
+    'https://', // 空 authority
+    'https:///x', // authority 首字符为 /
+    'http://?x', // authority 首字符为 ?
+    '/\\x', // 反斜杠
+    'https://x\\y.png', // 路径含反斜杠
+    null,
+    42,
+    true,
+    { src: 'https://x/y.png' },
+    ['https://x/y.png'],
+  ];
+
+  it('accepts bounded HTTP(S) and relative cover URLs', () => {
+    for (const cover of validCovers) {
+      const result = parseBaseScreenMaterialManifest(materialManifest({ cover }));
+
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.cover).toBe(cover);
+    }
+  });
+
+  it('rejects unsafe, unbounded, or malformed cover values', () => {
+    for (const cover of invalidCovers) {
+      const result = parseBaseScreenMaterialManifest(materialManifest({ cover }));
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(
+          result.diagnostics.some(
+            (item) =>
+              item.path[0] === 'cover' && item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          ),
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('keeps cover optional and still rejects unknown lookalike fields', () => {
+    const missing = parseBaseScreenMaterialManifest(materialManifest());
+    expect(missing.ok).toBe(true);
+    if (missing.ok) expect(missing.value.cover).toBeUndefined();
+
+    const unknown = parseBaseScreenMaterialManifest(
+      materialManifest({ coverUrl: 'https://x/y.png' }),
+    );
+    expect(unknown.ok).toBe(false);
+    if (!unknown.ok) {
+      expect(unknown.diagnostics[0]?.code).toBe('PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD');
+    }
+  });
+
+  it('catalog cloning preserves cover and keeps the manifest deeply frozen', () => {
+    const parsed = parseBaseScreenMaterialManifest(
+      materialManifest({ cover: 'https://cdn.example.com/a.png' }),
+    );
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+
+    const catalog = createBaseScreenMaterialCatalog([
+      { manifest: parsed.value, constructor: class {} as never },
+    ]);
+    const entry = catalog.get('acme.kpi-card');
+    expect(entry?.manifest.cover).toBe('https://cdn.example.com/a.png');
+    expect(entry?.manifest).not.toBe(parsed.value);
+    expect(Object.isFrozen(entry?.manifest)).toBe(true);
+    expect(Object.isFrozen(entry?.manifest.defaultProps)).toBe(true);
+  });
+});
+
 describe('events and plugin command data', () => {
   it('validates detached standard event details', () => {
     const result = parseBaseScreenMaterialEventDetail({

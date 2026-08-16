@@ -2,6 +2,10 @@
 
 > 状态：已接受
 > 日期：2026-08-13
+> 互注：决策 3 的「不得新增图片请求」约束已于 2026-08-16 被
+> [ADR-0040](./ADR-0040-material-manifest-cover.md) 部分取代（范围仅限物料库卡片封面图：宿主声明的校验后
+> URL 经 `img.src` 加载，无预取/重试/代理），其余决策不变；决策 4 的 `prefers-reduced-motion` 移除新增过渡
+> 要求对封面过渡同样适用。
 > 关联：[ADR-0024](./ADR-0024-designer-public-style-tokens.md)、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0031](./ADR-0031-material-library-host-state.md)、[ADR-0032](./ADR-0032-designer-left-panel-refactor.md)、[ADR-0033](./ADR-0033-host-controlled-material-library-grouping.md)
 > 设计依据：项目本地 `ui-ux-pro-max` 检索的 Data-Dense Dashboard、Drill-Down Analytics、可见焦点、稳定几何与减少动态效果准则
 

@@ -88,6 +88,8 @@ const hostedMetricManifest = {
   name: '托管指标',
   category: '托管',
   keywords: ['hosted'],
+  // 宿主封面（ADR-0040）：根相对 URL，Designer 物料库卡片在缩略图区渲染该图。
+  cover: '/cover.svg',
   defaultSize: { width: 260, height: 96 },
   defaultProps: {},
   defaultStyle: {},

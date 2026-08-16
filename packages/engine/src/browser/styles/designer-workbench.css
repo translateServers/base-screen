@@ -1265,6 +1265,33 @@
   transform: scale(1.1);
 }
 
+/* 宿主封面：绝对铺满缩略图区（几何恒定），加载前透明露出占位图标，load 后 opacity 过渡显现；
+   error 由 DOM 移除图片，恢复占位图标与色相背景。 */
+.material-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 7px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--designer-motion);
+}
+
+.material-cover[data-material-cover-loaded] {
+  opacity: 1;
+}
+
+/* 封面加载完成后占位图标淡出（opacity 过渡，无几何变化）。
+   标记写在与图片同级的缩略图容器上，用后代选择器匹配，与 DOM 顺序无关。 */
+.material-thumb[data-material-cover-loaded] svg {
+  opacity: 0;
+  transition:
+    opacity var(--designer-motion),
+    transform var(--designer-motion);
+}
+
 :host([theme="light"]) .material-thumb {
   border-color: color-mix(in srgb, hsl(var(--material-hue, 215) 45% 45%) 30%, transparent);
   background:

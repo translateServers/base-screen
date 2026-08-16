@@ -87,6 +87,10 @@
 - **物料加载错误控制台**（封版后增量，生效中）：失败记录、当前目录状态和恢复动作通过固定宽度的底部状态栏入口在工作区弹窗中显示；
   左侧物料库专用于搜索、分组和网格，保留状态 data-*、宿主动作、草稿/不可用标记、可访问性和无抖动。
   依据：[Material Library Error Console](../specs/material-library-feedback-workspace-placement/spec.md)、[ADR-0035](../decisions/ADR-0035-material-library-feedback-workspace-placement.md)。
+- **物料宿主封面**（封版后增量，生效中）：Manifest 可选 `cover` URL 字段（失败关闭校验，http(s)/根相对/
+  点相对/协议相对），物料库卡片在固定缩略图区内渲染真实封面，确定性分类图标/色相保持占位与失败回退，
+  纯展示投影不进 ScreenDocument/Renderer/Viewer。依据：[Material Cover Thumbnail](../specs/material-cover-thumbnail/spec.md)、
+  [ADR-0040](../decisions/ADR-0040-material-manifest-cover.md)。
 
 ## 宿主边界与数据运行时
 
