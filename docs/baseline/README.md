@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-16（文本物料排版能力增量：水平/垂直对齐分离、字间距、行间距）
+> 最近更新：2026-08-18（调色板紧凑布局、模式间状态共享与无边框手动 hex 输入）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -75,7 +75,7 @@
   [ADR-0049](../decisions/ADR-0049-canvas-background-button-conditional-rendering.md)。
 
 - **画布调色板**（封版后增量，生效中）：`ScreenCanvas.background` 以严格 JSON-safe 对象表达单色、线性渐变或径向渐变；未声明时保留既有 `backgroundColor` 单色语义。Renderer 以基础色、渐变、背景图片的层序一致渲染；Designer 画布区提供三模式和受限色标编辑，宿主可经 `setCanvasBackground` 提交。依据：[Canvas Background Palette](../specs/canvas-background-palette/spec.md)、[ADR-0048](../decisions/ADR-0048-canvas-background-palette.md)。
-- **统一三段式颜色调色板**（封版后增量，生效中）：自定义三段式调色板全面替换原生 color input——属性面板与 Manifest Editor Descriptor 的全部 `color` 字段无条件支持单色/线性渐变/径向渐变，渐变模式支持 2..8 个色标的增删与位置编辑，按字段缓存三种模式草稿；字段值仍为字符串（色值或规范化 CSS 渐变），Material/Manifest/ScreenDocument 契约零变化；渐变渲染消费由物料渲染端负责，官方文本物料以 `background-clip: text` 支持渐变文字；画布背景保持结构化契约。依据：[Unified Color Palette](../specs/unified-color-palette/spec.md)、[ADR-0050](../decisions/ADR-0050-unified-color-palette-control.md)、[ADR-0051](../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)。
+- **统一三段式颜色调色板**（封版后增量，生效中）：自定义三段式调色板全面替换原生 color input——属性面板与 Manifest Editor Descriptor 的全部 `color` 字段无条件支持单色/线性渐变/径向渐变，渐变模式支持 2..8 个色标的增删与位置编辑，单色与色标均带「透明度」滑杆（透明通道写入色值 `#rrggbbaa`，不透明保持 6 位，值仍为字符串），按字段缓存三种模式草稿；内部字段行内紧凑排布（单色 = 颜色 + 透明度一行、色标 = 颜色 + 位置一行、色标透明度与增删按钮同行、渐变参数行内）；模式间状态双向共享（渐变 -> 单色把选中色标完整色值含 alpha 同步为单色，transparent/非法跳过；单色 -> 渐变维持 ADR-0057 派生）；颜色控件使用无边框 hex 输入（支持 `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA`，提交时同步 swatch/alpha，无效草稿不写文档且无焦点 outline），颜色控件/数字输入/透明度滑杆带 aria-label；字段值仍为字符串（色值或规范化 CSS 渐变），Material/Manifest/ScreenDocument 契约零变化；渐变渲染消费由物料渲染端负责，官方文本物料以 `background-clip: text` 支持渐变文字；画布背景保持结构化契约。依据：[Unified Color Palette](../specs/unified-color-palette/spec.md)、[ADR-0050](../decisions/ADR-0050-unified-color-palette-control.md)、[ADR-0051](../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)。
 - **画布内文本直接编辑**（封版后增量，生效中）：双击可编辑文本组件进入 contenteditable overlay 编辑会话——仅官方文本物料且 dataSource 为 static 字符串（fail-closed，host-resource 数据归宿主）；Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 视觉复制物料样式（WYSIWYG），经既有 `isEditableTarget` 通道放行 IME 与原生编辑键，不侵入物料/Renderer DOM；公共契约零变化。依据：[Designer Canvas Text Editing](../specs/designer-canvas-text-editing/spec.md)、[ADR-0052](../decisions/ADR-0052-designer-canvas-text-editing.md)。
 - **多选批量属性编辑**（封版后增量，生效中）：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑——样式字段取所有选中组件 stylePanel 交集（空交集只显几何），控件复用既有渲染与统一三段式调色板；值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派、单选通道零改动；公共契约零变化。依据：[Designer Multi Selection Editing](../specs/designer-multi-selection-editing/spec.md)、[ADR-0053](../decisions/ADR-0053-designer-multi-selection-editing.md)。
 - **变量管理**（封版后增量，生效中）：左侧面板「变量」Tab 提供静态变量的新建/重命名/编辑值/删除与 host 变量只读展示（`variableId`）；提交复用 `replace-variables` 命令（恰一条历史，undo/redo 免费）；删除/重命名前引用保护（组件数据源参数与 Blueprint 引用，fail-closed 拒绝）与重名保护；数据绑定下拉与蓝图引用自动联动；公共契约零变化。依据：[Designer Variable Management](../specs/designer-variable-management/spec.md)、[ADR-0054](../decisions/ADR-0054-designer-variable-management.md)。

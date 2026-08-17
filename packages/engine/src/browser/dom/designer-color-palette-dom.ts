@@ -6,6 +6,8 @@ export const MAX_COLOR_PALETTE_STOPS = 8;
 
 export type ColorPaletteMode = 'solid' | 'linear-gradient' | 'radial-gradient';
 
+type ColorPaletteManualValueField = 'solid-value' | 'stop-value';
+
 export interface ColorPaletteStop {
   readonly color: string;
   readonly position: number;
@@ -27,7 +29,7 @@ export interface DesignerColorPalette {
 
 const DEFAULT_COLOR = '#000000';
 const DEFAULT_END_COLOR = '#ffffff';
-const COLOR_PATTERN = /^(?:#[0-9a-f]{3,8}|transparent)$/i;
+const COLOR_PATTERN = /^(?:#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$/i;
 const paletteDraftCache = new Map<string, ColorPaletteState>();
 const paletteSelectionCache = new Map<string, number>();
 
@@ -114,21 +116,46 @@ export function updateColorPaletteStop(
 }
 
 /**
- * 切换调色板模式；从单色切到渐变且色标还是未定制的内置默认时，按单色色系派生色标，
- * 保证渐变首帧与单色同色系（ADR-0057）。已定制色标（非默认）原样保留。
+ * 切换调色板模式并共享状态（双向：ADR-0057 派生 + 反向共享）：
+ * - 单色 -> 渐变且色标还是未定制的内置默认时，按单色色系派生色标（ADR-0057）；
+ *   已定制色标（非默认）原样保留。
+ * - 渐变 -> 单色时，把选中色标的完整色值（含 alpha）同步为单色（反向
+ *   共享，见 unified-color-palette spec 第 6 节）；选中色标为 transparent/非法色值时保持原单色。
  * `previousMode` 是切换前的面板模式（mode radio 的 change 触发时其 checked 已是新值，
- * 需从记录面板模式的 dataset 读取上一次模式）。
+ * 需从记录面板模式的 dataset 读取上一次模式）；`selectedStopIndex` 为渐变侧选中
+ * 色标索引（越界由 `solidFromColorPaletteStops` 回夹）。
  */
 export function switchColorPaletteMode(
   state: ColorPaletteState,
   nextMode: ColorPaletteMode,
   previousMode: ColorPaletteMode,
+  selectedStopIndex = 0,
 ): ColorPaletteState {
   if (nextMode !== 'solid' && previousMode === 'solid' && isDefaultColorPaletteStops(state.stops)) {
     const stops = deriveColorPaletteStopsFromSolid(state.solid);
     if (stops !== undefined) return { ...state, mode: nextMode, stops };
   }
+  if (nextMode === 'solid' && previousMode !== 'solid') {
+    const solid = solidFromColorPaletteStops(state, selectedStopIndex);
+    if (solid !== undefined) return { ...state, mode: 'solid', solid };
+  }
   return { ...state, mode: nextMode };
+}
+
+/**
+ * 渐变 -> 单色的共享色值：选中色标（索引回夹到有效范围）的完整色值（含 alpha）。
+ * `transparent` 或非法色值返回 undefined（调用方按既有规则保持原单色草稿）。
+ */
+function solidFromColorPaletteStops(state: ColorPaletteState, index: number): string | undefined {
+  if (state.stops.length === 0) return undefined;
+  const clamped = Math.min(
+    Math.max(Number.isInteger(index) ? index : 0, 0),
+    state.stops.length - 1,
+  );
+  const color = state.stops[clamped]?.color;
+  return color !== undefined && color.toLowerCase() !== 'transparent' && isValidColor(color)
+    ? color
+    : undefined;
 }
 
 /**
@@ -199,7 +226,11 @@ export function createDesignerColorPalette(
 
   const body = ownerDocument.createElement('div');
   body.className = 'designer-color-palette-fields';
-  const { solid, stops, gradientInputs } = renderPaletteBody(body, state, selectedStop);
+  const { solid, solidValue, solidAlpha, stops, gradientInputs } = renderPaletteBody(
+    body,
+    state,
+    selectedStop,
+  );
   element.appendChild(body);
 
   element.addEventListener('click', (event) => {
@@ -222,9 +253,12 @@ export function createDesignerColorPalette(
   });
   element.addEventListener('change', (event) => {
     const target = event.target as Partial<HTMLInputElement> | null;
-    if (target?.dataset?.colorPaletteField !== 'mode' || !isColorPaletteMode(target.value)) {
+    const field = target?.dataset?.colorPaletteField;
+    if (isColorPaletteManualValueField(field)) {
+      syncColorPaletteManualValue(element, target as HTMLInputElement, field);
       return;
     }
+    if (field !== 'mode' || !isColorPaletteMode(target?.value)) return;
     const current = readPaletteState(element);
     if (current === undefined) return;
     const metadata = readColorPaletteControlMetadata(element);
@@ -232,7 +266,7 @@ export function createDesignerColorPalette(
     const previousMode = isColorPaletteMode(element.dataset.colorPaletteMode)
       ? element.dataset.colorPaletteMode
       : current.mode;
-    const next = switchColorPaletteMode(current, target.value, previousMode);
+    const next = switchColorPaletteMode(current, target.value, previousMode, selected);
     element.dataset.colorPaletteMode = next.mode;
     renderPaletteBody(body, next, selected);
     applyColorPaletteControlMetadata(element, metadata);
@@ -243,6 +277,14 @@ export function createDesignerColorPalette(
       | null;
     if (target?.dataset === undefined || target.value === undefined) return;
     const field = target.dataset.colorPaletteField;
+    if (isColorPaletteManualValueField(field)) {
+      updateColorPaletteManualValueValidity(target as HTMLInputElement);
+      return;
+    }
+    if (field === 'solid-alpha' || field === 'stop-alpha') {
+      syncColorPaletteAlpha(element, target as HTMLInputElement, field);
+      return;
+    }
     if (
       field !== 'stop-position' &&
       field !== 'stop-color' &&
@@ -258,7 +300,10 @@ export function createDesignerColorPalette(
     updateColorPalettePreview(element);
   });
 
-  return { element, controls: [solid, ...stops, ...gradientInputs, ...modeControls] };
+  return {
+    element,
+    controls: [solid, solidValue, solidAlpha, ...stops, ...gradientInputs, ...modeControls],
+  };
 }
 
 export function readDesignerColorPaletteValue(target: EventTarget | null): string | undefined {
@@ -353,22 +398,26 @@ function renderPaletteBody(
   selectedStopIndex: number,
 ): {
   readonly solid: HTMLInputElement;
+  readonly solidValue: HTMLInputElement;
+  readonly solidAlpha: HTMLInputElement;
   readonly stops: readonly HTMLInputElement[];
   readonly gradientInputs: readonly HTMLInputElement[];
 } {
   body.replaceChildren();
   const ownerDocument = body.ownerDocument;
   const selected = Math.min(Math.max(selectedStopIndex, 0), state.stops.length - 1);
-  const solidField = labeledColorControl(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.gradientStopColor,
-    state.solid,
-    'solid',
-  );
+  // 单色组 = 颜色控件 + 透明度滑杆同一行（紧凑布局增量）：渐变模式下整组
+  // 隐藏（hide 规则 display: none），透明度滑杆不会脱离单色字段单独露出。
+  const solidField = paletteColorControl(ownerDocument, state.solid, 'solid');
   const solid = solidField.input;
+  const solidValue = solidField.value;
   solid.className += ' designer-color-palette-solid';
-  solidField.element.className += ' designer-color-palette-solid-field';
-  body.appendChild(solidField.element);
+  const solidAlpha = colorAlphaControl(ownerDocument, state.solid, 'solid-alpha');
+  const solidGroup = ownerDocument.createElement('div');
+  solidGroup.className = 'designer-color-palette-solid-field';
+  solidGroup.appendChild(solidField.element);
+  solidGroup.appendChild(solidAlpha.element);
+  body.appendChild(solidGroup);
 
   const gradient = ownerDocument.createElement('div');
   gradient.className = 'designer-color-palette-gradient';
@@ -381,43 +430,9 @@ function renderPaletteBody(
   const editor = createColorPaletteStopEditor(ownerDocument, state, selected);
   gradient.appendChild(editor.element);
 
-  const parameters = ownerDocument.createElement('div');
-  parameters.className = 'designer-color-palette-parameters';
-  const angle = labeledNumberInput(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.gradientAngle,
-    state.angle,
-    'angle',
-    0,
-    360,
-  );
-  angle.input.className += ' designer-color-palette-linear';
-  angle.element.className += ' designer-color-palette-linear';
-  parameters.appendChild(angle.element);
-  const x = labeledNumberInput(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.gradientCenterX,
-    state.x,
-    'x',
-    0,
-    100,
-  );
-  x.input.className += ' designer-color-palette-radial';
-  x.element.className += ' designer-color-palette-radial';
-  parameters.appendChild(x.element);
-  const y = labeledNumberInput(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.gradientCenterY,
-    state.y,
-    'y',
-    0,
-    100,
-  );
-  y.input.className += ' designer-color-palette-radial';
-  y.element.className += ' designer-color-palette-radial';
-  parameters.appendChild(y.element);
-  gradient.appendChild(parameters);
-
+  // 色标透明度与增删色标按钮同行（紧凑布局增量）。
+  const stopAlpha = colorAlphaControl(ownerDocument, state.stops[selected]!.color, 'stop-alpha');
+  stopAlpha.input.dataset.colorPaletteStopIndex = String(selected);
   const tools = ownerDocument.createElement('div');
   tools.className = 'designer-color-palette-tools';
   const add = colorPaletteActionButton(
@@ -437,12 +452,56 @@ function renderPaletteBody(
   remove.disabled = state.stops.length <= MIN_COLOR_PALETTE_STOPS;
   remove.dataset.colorPaletteStopIndex = String(selected);
   tools.appendChild(remove);
-  gradient.appendChild(tools);
+  const stopFooter = ownerDocument.createElement('div');
+  stopFooter.className = 'designer-color-palette-stop-footer';
+  stopFooter.appendChild(stopAlpha.element);
+  stopFooter.appendChild(tools);
+  gradient.appendChild(stopFooter);
+
+  // 渐变参数（角度或中心 X/Y）行内一行（紧凑布局增量）。
+  const parameters = ownerDocument.createElement('div');
+  parameters.className = 'designer-color-palette-parameters';
+  const angle = inlineNumberField(
+    ownerDocument,
+    DESIGNER_UI_TEXT.propertiesPanel.gradientAngle,
+    state.angle,
+    'angle',
+    0,
+    360,
+  );
+  angle.input.className += ' designer-color-palette-linear';
+  angle.element.className += ' designer-color-palette-linear';
+  parameters.appendChild(angle.element);
+  const x = inlineNumberField(
+    ownerDocument,
+    DESIGNER_UI_TEXT.propertiesPanel.gradientCenterX,
+    state.x,
+    'x',
+    0,
+    100,
+  );
+  x.input.className += ' designer-color-palette-radial';
+  x.element.className += ' designer-color-palette-radial';
+  parameters.appendChild(x.element);
+  const y = inlineNumberField(
+    ownerDocument,
+    DESIGNER_UI_TEXT.propertiesPanel.gradientCenterY,
+    state.y,
+    'y',
+    0,
+    100,
+  );
+  y.input.className += ' designer-color-palette-radial';
+  y.element.className += ' designer-color-palette-radial';
+  parameters.appendChild(y.element);
+  gradient.appendChild(parameters);
 
   body.appendChild(gradient);
   return {
     solid,
-    stops: editor.inputs,
+    solidValue,
+    solidAlpha: solidAlpha.input,
+    stops: [editor.color, editor.value, stopAlpha.input, editor.position],
     gradientInputs: [angle.input, x.input, y.input],
   };
 }
@@ -479,37 +538,41 @@ function createColorPaletteStopSlider(
   return slider;
 }
 
+/**
+ * 色标编辑行（紧凑布局增量）：颜色控件 + 行内「位置」数字输入同一行；
+ * 透明度滑杆由 `renderPaletteBody` 的 footer 行承载。
+ */
 function createColorPaletteStopEditor(
   ownerDocument: Document,
   state: ColorPaletteState,
   index: number,
-): { readonly element: HTMLElement; readonly inputs: readonly HTMLInputElement[] } {
+): {
+  readonly element: HTMLElement;
+  readonly color: HTMLInputElement;
+  readonly value: HTMLInputElement;
+  readonly position: HTMLInputElement;
+} {
   const stop = state.stops[index]!;
   const editor = ownerDocument.createElement('div');
   editor.className = 'designer-color-palette-stop-editor';
   editor.dataset.colorPaletteStopEditor = String(index);
-  const colorField = labeledColorControl(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.gradientStopColor,
-    stop.color,
-    'stop-color',
-  );
+  const colorField = paletteColorControl(ownerDocument, stop.color, 'stop-color');
   const color = colorField.input;
+  const value = colorField.value;
   color.dataset.colorPaletteStopIndex = String(index);
+  value.dataset.colorPaletteStopIndex = String(index);
   editor.appendChild(colorField.element);
-  const position = numberInput(
+  const position = inlineNumberField(
     ownerDocument,
+    DESIGNER_UI_TEXT.propertiesPanel.gradientStopPosition,
     stop.position,
     'stop-position',
     index === 0 ? 0 : state.stops[index - 1]!.position + 1,
     index === state.stops.length - 1 ? 100 : state.stops[index + 1]!.position - 1,
   );
-  position.dataset.colorPaletteStopIndex = String(index);
-  editor.appendChild(
-    labeledControl(ownerDocument, DESIGNER_UI_TEXT.propertiesPanel.gradientStopPosition, position)
-      .element,
-  );
-  return { element: editor, inputs: [color, position] };
+  position.input.dataset.colorPaletteStopIndex = String(index);
+  editor.appendChild(position.element);
+  return { element: editor, color, value, position: position.input };
 }
 
 function colorPaletteActionButton(
@@ -529,37 +592,157 @@ function colorPaletteActionButton(
   return button;
 }
 
-function colorInput(ownerDocument: Document, value: string, field: string): HTMLInputElement {
+function colorInput(
+  ownerDocument: Document,
+  value: string,
+  field: 'solid' | 'stop-color',
+): HTMLInputElement {
   const input = ownerDocument.createElement('input');
   input.type = 'color';
   input.className = 'designer-control designer-color';
-  input.value = value === 'transparent' ? DEFAULT_COLOR : value;
+  // 原生 color input 只接受 #rrggbb；完整色值（alpha/transparent）由 dataset 保留。
+  applyColorPaletteColorInputValue(input, value);
   input.dataset.colorPaletteField = field;
   return input;
 }
 
-function labeledColorControl(
+function applyColorPaletteColorInputValue(input: HTMLInputElement, value: string): void {
+  if (value.toLowerCase() === 'transparent') {
+    input.value = DEFAULT_COLOR;
+    delete input.dataset.colorPaletteAlpha;
+    input.dataset.colorPaletteTransparent = 'true';
+    return;
+  }
+  const rgb = hexToRgb(value);
+  input.value = rgb === undefined ? DEFAULT_COLOR : rgbToHex(rgb.r, rgb.g, rgb.b);
+  if (rgb?.alpha !== undefined) input.dataset.colorPaletteAlpha = rgb.alpha;
+  else delete input.dataset.colorPaletteAlpha;
+  delete input.dataset.colorPaletteTransparent;
+}
+
+/** 完整色值 = RGB（input.value）+ 透明通道（dataset）；transparent 单独保留。 */
+function composedColorValue(input: {
+  readonly value: string;
+  readonly dataset?: DOMStringMap;
+}): string {
+  if (input.dataset?.colorPaletteTransparent === 'true') return 'transparent';
+  const alpha = input.dataset?.colorPaletteAlpha;
+  return alpha === undefined || alpha === 'ff' ? input.value : `${input.value}${alpha}`;
+}
+
+/** 标准 hex/transparent token 规范化为控件内部小写 CSS 色值。 */
+function normalizeColorPaletteManualValue(value: string): string | undefined {
+  const candidate = value.trim();
+  if (candidate.toLowerCase() === 'transparent') return 'transparent';
+  const rgb = hexToRgb(candidate);
+  return rgb === undefined ? undefined : `${rgbToHex(rgb.r, rgb.g, rgb.b)}${rgb.alpha ?? ''}`;
+}
+
+function isColorPaletteManualValueField(
+  value: string | undefined,
+): value is ColorPaletteManualValueField {
+  return value === 'solid-value' || value === 'stop-value';
+}
+
+function updateColorPaletteManualValueValidity(input: HTMLInputElement): void {
+  input.setAttribute(
+    'aria-invalid',
+    String(normalizeColorPaletteManualValue(input.value) === undefined),
+  );
+}
+
+function isValidColorPaletteManualValue(input: HTMLInputElement | null): boolean {
+  return input !== null && normalizeColorPaletteManualValue(input.value) !== undefined;
+}
+
+/** 色值 → 透明度百分比（0..100）：不可解析或已不透明 = 100。 */
+function colorAlphaPercent(value: string | undefined): number {
+  const rgb = hexToRgb(value);
+  if (rgb?.alpha === undefined) return 100;
+  return Math.round((Number.parseInt(rgb.alpha, 16) * 100) / 255);
+}
+
+/** 透明度百分比（0..100）→ 2 位 hex 透明通道。 */
+function colorAlphaFromPercent(percent: number): string {
+  const clamped = Math.min(100, Math.max(0, percent));
+  return Math.round((clamped * 255) / 100)
+    .toString(16)
+    .padStart(2, '0');
+}
+
+function updateColorControlValueText(valueInput: HTMLInputElement, input: HTMLInputElement): void {
+  valueInput.value = composedColorValue(input).toUpperCase();
+  valueInput.setAttribute('aria-invalid', 'false');
+}
+
+/**
+ * 颜色控件（紧凑布局增量）：swatch + 可手动编辑的 hex 输入。输入失焦/提交时同步
+ * 原生取色器、透明度与色标句柄；屏幕阅读器经 aria-label 获得字段语义。
+ */
+function paletteColorControl(
   ownerDocument: Document,
-  labelText: string,
   value: string,
-  field: string,
-): { readonly element: HTMLElement; readonly input: HTMLInputElement } {
+  field: 'solid' | 'stop-color',
+): {
+  readonly element: HTMLElement;
+  readonly input: HTMLInputElement;
+  readonly value: HTMLInputElement;
+} {
   const input = colorInput(ownerDocument, value, field);
+  input.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.gradientStopColor);
   const control = ownerDocument.createElement('span');
   control.className = 'designer-color-palette-color-control';
-  const valueText = ownerDocument.createElement('span');
-  valueText.className = 'designer-color-palette-color-value';
-  valueText.textContent = input.value.toUpperCase();
+  const valueInput = ownerDocument.createElement('input');
+  valueInput.type = 'text';
+  valueInput.className = 'designer-color-palette-color-value';
+  valueInput.dataset.colorPaletteField = field === 'solid' ? 'solid-value' : 'stop-value';
+  valueInput.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.gradientStopHexValue);
+  valueInput.setAttribute('autocomplete', 'off');
+  valueInput.setAttribute('spellcheck', 'false');
+  updateColorControlValueText(valueInput, input);
   input.addEventListener('input', () => {
-    valueText.textContent = input.value.toUpperCase();
+    delete input.dataset.colorPaletteTransparent;
+    updateColorControlValueText(valueInput, input);
   });
   control.appendChild(input);
-  control.appendChild(valueText);
+  control.appendChild(valueInput);
+  return { element: control, input, value: valueInput };
+}
+
+/**
+ * 透明度（alpha）滑杆：0..100%。滑杆本身不保存色值，只把透明通道写入关联
+ * 颜色控件（input.dataset.colorPaletteAlpha，经面板 input 通道同步），完整色值由
+ * composedColorValue 组装，值格式仍是 CSS 颜色字符串（#rrggbbaa），公共契约零变化。
+ */
+function colorAlphaControl(
+  ownerDocument: Document,
+  value: string,
+  field: 'solid-alpha' | 'stop-alpha',
+): { readonly element: HTMLElement; readonly input: HTMLInputElement } {
+  const row = ownerDocument.createElement('span');
+  row.className = 'designer-color-palette-alpha';
   const label = ownerDocument.createElement('span');
-  label.className = 'designer-field designer-field-label';
-  label.textContent = labelText;
-  label.appendChild(control);
-  return { element: label, input };
+  label.className = 'designer-color-palette-alpha-label';
+  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.gradientStopOpacity;
+  const input = ownerDocument.createElement('input');
+  input.type = 'range';
+  input.className = 'designer-control designer-range designer-color-palette-alpha-input';
+  input.min = '0';
+  input.max = '100';
+  input.step = '1';
+  input.value = String(colorAlphaPercent(value));
+  input.dataset.colorPaletteField = field;
+  input.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.gradientStopOpacity);
+  const valueText = ownerDocument.createElement('span');
+  valueText.className = 'designer-color-palette-alpha-value';
+  valueText.textContent = `${input.value}%`;
+  input.addEventListener('input', () => {
+    valueText.textContent = `${input.value}%`;
+  });
+  row.appendChild(label);
+  row.appendChild(input);
+  row.appendChild(valueText);
+  return { element: row, input };
 }
 
 function numberInput(
@@ -580,7 +763,13 @@ function numberInput(
   return input;
 }
 
-function labeledNumberInput(
+/**
+ * 行内数字字段（紧凑布局增量）：可见文字标签与数字输入同一行，压缩纵向占用；
+ * 输入补充 aria-label（span 文字与输入无程序关联）。不用 <label> 包裹：label
+ * 点击会聚焦/激活关联控件（number input 聚焦跳动、color input 弹出原生取色器），
+ * 标签只是说明文字，不应产生输入副作用。
+ */
+function inlineNumberField(
   ownerDocument: Document,
   labelText: string,
   value: number,
@@ -588,28 +777,16 @@ function labeledNumberInput(
   min: number,
   max: number,
 ): { readonly element: HTMLElement; readonly input: HTMLInputElement } {
-  return labeledControl(
-    ownerDocument,
-    labelText,
-    numberInput(ownerDocument, value, field, min, max),
-  );
-}
-
-/**
- * 把控件包进带字段标签的 span（复用 designer-field 字段结构）。
- * 不用 <label> 包裹：label 点击会激活关联控件——对 color input 会弹出原生取色器，
- * 对 number input 会聚焦跳动；标签只是说明文字，不应产生输入副作用。
- */
-function labeledControl(
-  ownerDocument: Document,
-  labelText: string,
-  input: HTMLInputElement,
-): { readonly element: HTMLElement; readonly input: HTMLInputElement } {
+  const input = numberInput(ownerDocument, value, field, min, max);
+  input.setAttribute('aria-label', labelText);
+  const wrap = ownerDocument.createElement('span');
+  wrap.className = 'designer-color-palette-field-inline';
   const label = ownerDocument.createElement('span');
-  label.className = 'designer-field designer-field-label';
+  label.className = 'designer-color-palette-field-inline-label';
   label.textContent = labelText;
-  label.appendChild(input);
-  return { element: label, input };
+  wrap.appendChild(label);
+  wrap.appendChild(input);
+  return { element: wrap, input };
 }
 
 function selectColorPaletteStop(palette: HTMLElement, index: number): void {
@@ -634,12 +811,26 @@ function selectColorPaletteStop(palette: HTMLElement, index: number): void {
   if (editor !== null) editor.dataset.colorPaletteStopEditor = String(index);
   if (color !== null) {
     color.dataset.colorPaletteStopIndex = String(index);
-    color.value = stops[index]!.color === 'transparent' ? DEFAULT_COLOR : stops[index]!.color;
-    const valueText = color
+    applyColorPaletteColorInputValue(color, stops[index]!.color);
+    const valueInput = color
       .closest<HTMLElement>('.designer-color-palette-color-control')
-      ?.querySelector<HTMLElement>('.designer-color-palette-color-value');
-    if (valueText !== null && valueText !== undefined) {
-      valueText.textContent = color.value.toUpperCase();
+      ?.querySelector<HTMLInputElement>('.designer-color-palette-color-value');
+    if (valueInput !== null && valueInput !== undefined) {
+      valueInput.dataset.colorPaletteStopIndex = String(index);
+      updateColorControlValueText(valueInput, color);
+    }
+    const alpha = palette.querySelector<HTMLInputElement>(
+      '[data-color-palette-field="stop-alpha"]',
+    );
+    if (alpha !== null) {
+      alpha.dataset.colorPaletteStopIndex = String(index);
+      alpha.value = String(colorAlphaPercent(stops[index]!.color));
+      const alphaValue = alpha
+        .closest<HTMLElement>('.designer-color-palette-alpha')
+        ?.querySelector<HTMLElement>('.designer-color-palette-alpha-value');
+      if (alphaValue !== null && alphaValue !== undefined) {
+        alphaValue.textContent = `${alpha.value}%`;
+      }
     }
   }
   if (position !== null) {
@@ -649,6 +840,83 @@ function selectColorPaletteStop(palette: HTMLElement, index: number): void {
     position.max = String(index === stops.length - 1 ? 100 : stops[index + 1]!.position - 1);
   }
   if (remove !== null) remove.dataset.colorPaletteStopIndex = String(index);
+}
+
+/**
+ * 透明度滑杆 → 颜色控件透明通道：RGB 不变（input.value），透明通道写入
+ * dataset.colorPaletteAlpha，完整色值随后由 composedColorValue 组装、落到色标句柄。
+ */
+function syncColorPaletteAlpha(
+  palette: HTMLElement,
+  source: HTMLInputElement,
+  field: 'solid-alpha' | 'stop-alpha',
+): void {
+  const colorInput =
+    field === 'solid-alpha'
+      ? palette.querySelector<HTMLInputElement>('[data-color-palette-field="solid"]')
+      : palette.querySelector<HTMLInputElement>('[data-color-palette-field="stop-color"]');
+  if (colorInput === null || colorInput === undefined) return;
+  delete colorInput.dataset.colorPaletteTransparent;
+  colorInput.dataset.colorPaletteAlpha = colorAlphaFromPercent(Number(source.value));
+  const valueInput = colorInput
+    .closest<HTMLElement>('.designer-color-palette-color-control')
+    ?.querySelector<HTMLInputElement>('.designer-color-palette-color-value');
+  if (valueInput !== null && valueInput !== undefined) {
+    updateColorControlValueText(valueInput, colorInput);
+  }
+  if (field === 'stop-alpha') {
+    syncColorPaletteStopColorToHandle(palette, colorInput);
+  }
+  updateColorPalettePreview(palette);
+}
+
+/** 手动 hex 输入提交：同步原生取色器、透明度滑杆与（色标时）滑轨句柄。 */
+function syncColorPaletteManualValue(
+  palette: HTMLElement,
+  source: HTMLInputElement,
+  field: ColorPaletteManualValueField,
+): void {
+  const color = normalizeColorPaletteManualValue(source.value);
+  if (color === undefined) {
+    updateColorPaletteManualValueValidity(source);
+    return;
+  }
+  const colorInput =
+    field === 'solid-value'
+      ? palette.querySelector<HTMLInputElement>('[data-color-palette-field="solid"]')
+      : palette.querySelector<HTMLInputElement>('[data-color-palette-field="stop-color"]');
+  if (colorInput === null || colorInput === undefined) return;
+  applyColorPaletteColorInputValue(colorInput, color);
+  updateColorControlValueText(source, colorInput);
+  const alphaField = field === 'solid-value' ? 'solid-alpha' : 'stop-alpha';
+  const alpha = palette.querySelector<HTMLInputElement>(
+    `[data-color-palette-field="${alphaField}"]`,
+  );
+  if (alpha !== null) {
+    alpha.value = String(colorAlphaPercent(color));
+    const alphaValue = alpha
+      .closest<HTMLElement>('.designer-color-palette-alpha')
+      ?.querySelector<HTMLElement>('.designer-color-palette-alpha-value');
+    if (alphaValue !== null && alphaValue !== undefined) {
+      alphaValue.textContent = `${alpha.value}%`;
+    }
+  }
+  if (field === 'stop-value') syncColorPaletteStopColorToHandle(palette, colorInput);
+  updateColorPalettePreview(palette);
+}
+
+/** 把颜色控件的完整色值（RGB + 透明通道）同步到对应色标句柄。 */
+function syncColorPaletteStopColorToHandle(
+  palette: HTMLElement,
+  colorInput: HTMLInputElement,
+): void {
+  const index = Number(colorInput.dataset.colorPaletteStopIndex);
+  const handle = colorPaletteHandles(palette)[index];
+  if (!Number.isInteger(index) || handle === undefined) return;
+  const color = composedColorValue(colorInput);
+  if (!isValidColor(color)) return;
+  handle.dataset.colorPaletteStopColor = color;
+  setColorPaletteStopHandleColor(handle, color);
 }
 
 function syncColorPaletteStopEditor(
@@ -661,10 +929,7 @@ function syncColorPaletteStopEditor(
   const handle = handles[index];
   if (!Number.isInteger(index) || handle === undefined) return;
   if (field === 'stop-color') {
-    if (isValidColor(source.value)) {
-      handle.dataset.colorPaletteStopColor = source.value;
-      setColorPaletteStopHandleColor(handle, source.value);
-    }
+    syncColorPaletteStopColorToHandle(palette, source);
     return;
   }
   const position = Number(source.value);
@@ -896,13 +1161,21 @@ function addedColorPaletteStopIndex(
 function readPaletteState(palette: HTMLElement): ColorPaletteState | undefined {
   const mode = palette.querySelector<HTMLInputElement>('[data-color-palette-field="mode"]:checked')
     ?.value as ColorPaletteMode | undefined;
-  const solid = palette.querySelector<HTMLInputElement>(
-    '[data-color-palette-field="solid"]',
-  )?.value;
+  const solidInput = palette.querySelector<HTMLInputElement>('[data-color-palette-field="solid"]');
+  const solid = solidInput === null ? undefined : composedColorValue(solidInput);
+  const solidValue = palette.querySelector<HTMLInputElement>(
+    '[data-color-palette-field="solid-value"]',
+  );
+  const stopValue = palette.querySelector<HTMLInputElement>(
+    '[data-color-palette-field="stop-value"]',
+  );
   const stops = readColorPaletteStops(colorPaletteHandles(palette));
   if (
     mode === undefined ||
+    solid === undefined ||
     !isValidColor(solid) ||
+    !isValidColorPaletteManualValue(solidValue) ||
+    !isValidColorPaletteManualValue(stopValue) ||
     stops === undefined ||
     stops.length < MIN_COLOR_PALETTE_STOPS ||
     stops.length > MAX_COLOR_PALETTE_STOPS
@@ -913,7 +1186,7 @@ function readPaletteState(palette: HTMLElement): ColorPaletteState | undefined {
   const x = paletteNumber(palette, 'x');
   const y = paletteNumber(palette, 'y');
   if (angle === undefined || x === undefined || y === undefined) return undefined;
-  return { mode, solid: solid!, stops, angle, x, y };
+  return { mode, solid, stops, angle, x, y };
 }
 
 function paletteNumber(palette: HTMLElement, field: string): number | undefined {
@@ -967,7 +1240,9 @@ function parseStops(part: string): readonly ColorPaletteStop[] | undefined {
   }
   const stops: ColorPaletteStop[] = [];
   for (const token of tokens) {
-    const match = token.match(/^(#[0-9a-f]{3,8}|transparent)\s+(\d+(?:\.\d+)?)%$/i);
+    const match = token.match(
+      /^(#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)\s+(\d+(?:\.\d+)?)%$/i,
+    );
     if (match === null) return undefined;
     const position = Number(match[2]);
     if (!Number.isInteger(position) || position < 0 || position > 100) return undefined;

@@ -33,6 +33,7 @@ class FakeElement {
   textContent = '';
   dispatched: string[] = [];
   readonly listeners = new Map<string, EventListenerOrEventListenerObject[]>();
+  readonly attributes = new Map<string, string>();
 
   constructor(
     readonly tagName: string,
@@ -66,7 +67,9 @@ class FakeElement {
     );
   }
 
-  setAttribute(): void {}
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
 
   dispatchEvent(event: Event): boolean {
     this.dispatched.push(event.type);
@@ -353,7 +356,8 @@ describe('createDesignerColorPalette', () => {
       ),
     ).toHaveLength(1);
     expect(byDataset(element, 'colorPaletteAction')?.disabled).toBe(false);
-    expect(palette.controls).toHaveLength(3 + 1 + 2 + 3);
+    // modes(3) + solid(color/hex/alpha) + 色标编辑器(color/hex/alpha/position) + params(3)。
+    expect(palette.controls).toHaveLength(3 + 3 + 4 + 3);
     expect(
       descendants(element).some((candidate) =>
         candidate.className.split(/\s+/).includes('designer-color-palette-tools'),
@@ -390,17 +394,29 @@ describe('createDesignerColorPalette', () => {
     const labels = descendants(linearElement)
       .filter((candidate) => candidate.tagName === 'span')
       .map((candidate) => candidate.textContent);
+    // 行内字段（紧凑布局增量）：参数与位置保留可见文字标签。
     expect(labels).toContain('角度');
     expect(labels).toContain('中心 X');
     expect(labels).toContain('中心 Y');
-    expect(labels).toContain('颜色');
     expect(labels).toContain('位置');
-    // 字段标签是 span 而非 label：点击标签不得激活 color input（避免弹出原生取色器）。
-    expect(
-      descendants(linearElement).some(
-        (candidate) => candidate.tagName === 'label' && candidate.textContent === '颜色',
-      ),
-    ).toBe(false);
+    expect(labels).toContain('透明度');
+    // 颜色控件不再渲染可见「颜色」文字标签（hex 自明），改由 aria-label 提供语义。
+    expect(labels).not.toContain('颜色');
+    for (const field of ['solid', 'stop-color']) {
+      const input = byField(linearElement, field)!;
+      expect(input.attributes.get('aria-label')).toBe('颜色');
+    }
+    for (const field of ['solid-value', 'stop-value']) {
+      const input = byField(linearElement, field)!;
+      expect(input.type).toBe('text');
+      expect(input.attributes.get('aria-label')).toBe('十六进制颜色');
+    }
+    expect(byField(linearElement, 'solid-alpha')?.attributes.get('aria-label')).toBe('透明度');
+    expect(byField(linearElement, 'stop-alpha')?.attributes.get('aria-label')).toBe('透明度');
+    expect(byField(linearElement, 'stop-position')?.attributes.get('aria-label')).toBe('位置');
+    expect(byField(linearElement, 'angle')?.attributes.get('aria-label')).toBe('角度');
+    expect(byField(linearElement, 'x')?.attributes.get('aria-label')).toBe('中心 X');
+    expect(byField(linearElement, 'y')?.attributes.get('aria-label')).toBe('中心 Y');
 
     const radial = createDesignerColorPalette(
       ownerDocument as unknown as Document,
@@ -422,7 +438,7 @@ describe('createDesignerColorPalette', () => {
     expect(byField(element, 'angle')).toBeDefined();
     expect(stopRows(element)).toHaveLength(2);
     expect(stopRows(element)).toHaveLength(2);
-    expect(palette.controls).toHaveLength(3 + 1 + 2 + 3);
+    expect(palette.controls).toHaveLength(3 + 3 + 4 + 3);
   });
 
   it('keeps the remove button disabled with the minimum stop count', () => {
@@ -537,6 +553,53 @@ describe('switchColorPaletteMode', () => {
   it('does not derive when re-selecting the active mode', () => {
     expect(switchColorPaletteMode(solidState, 'solid', 'solid')).toEqual(solidState);
   });
+
+  it('shares the selected stop color (with alpha) back to solid on gradient -> solid', () => {
+    const gradient: ColorPaletteState = {
+      ...solidState,
+      mode: 'linear-gradient',
+      stops: [
+        { color: '#ff0000', position: 0 },
+        { color: '#0000ff66', position: 100 },
+      ],
+    };
+    const shared = switchColorPaletteMode(gradient, 'solid', 'linear-gradient', 1);
+    expect(shared.mode).toBe('solid');
+    expect(shared.solid).toBe('#0000ff66');
+    // 共享只改单色值，色标草稿原样保留（再切回渐变不丢配置）。
+    expect(shared.stops).toEqual(gradient.stops);
+    expect(shared.angle).toBe(90);
+    // 未传索引默认选中第 0 个；越界索引回夹到有效范围。
+    expect(switchColorPaletteMode(gradient, 'solid', 'radial-gradient').solid).toBe('#ff0000');
+    expect(switchColorPaletteMode(gradient, 'solid', 'linear-gradient', 9).solid).toBe('#0000ff66');
+  });
+
+  it('keeps the solid draft when the selected stop is transparent', () => {
+    const transparent: ColorPaletteState = {
+      ...solidState,
+      mode: 'radial-gradient',
+      solid: '#123456',
+      stops: [
+        { color: '#ff0000', position: 0 },
+        { color: 'transparent', position: 100 },
+      ],
+    };
+    expect(switchColorPaletteMode(transparent, 'solid', 'radial-gradient', 1).solid).toBe(
+      '#123456',
+    );
+    // 未选中 transparent 色标时照常共享。
+    expect(switchColorPaletteMode(transparent, 'solid', 'radial-gradient', 0).solid).toBe(
+      '#ff0000',
+    );
+    const invalid: ColorPaletteState = {
+      ...transparent,
+      stops: [
+        { color: '#ff0000', position: 0 },
+        { color: 'not-a-color', position: 100 },
+      ],
+    };
+    expect(switchColorPaletteMode(invalid, 'solid', 'radial-gradient', 1).solid).toBe('#123456');
+  });
 });
 
 describe('mode switch derives solid family in the DOM', () => {
@@ -586,6 +649,138 @@ describe('mode switch derives solid family in the DOM', () => {
     expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe(
       'radial-gradient(circle at 50% 50%, #112233 0%, #ffffff 100%)',
     );
+  });
+});
+
+describe('mode switch shares gradient state back to solid', () => {
+  it('syncs the edited stop color into the solid field on gradient -> solid', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #000000 0%, #ffffff 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    const stopColor = byField(element, 'stop-color')!;
+    stopColor.value = '#123456';
+    stopColor.dispatchEvent(new Event('input', { bubbles: true }));
+    checkMode(element, 'solid');
+    modeRadio(element, 'solid').dispatchEvent(new Event('change', { bubbles: true }));
+    expect(element.dataset.colorPaletteMode).toBe('solid');
+    expect(byField(element, 'solid')?.value).toBe('#123456');
+    expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe('#123456');
+  });
+
+  it('carries the selected stop alpha into the solid field and its alpha slider', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #000000 0%, #ffffff 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    stopRows(element)[1]!.dispatchEvent(new Event('click', { bubbles: true }));
+    const alpha = byField(element, 'stop-alpha')!;
+    alpha.value = '40';
+    alpha.dispatchEvent(new Event('input', { bubbles: true }));
+    checkMode(element, 'solid');
+    modeRadio(element, 'solid').dispatchEvent(new Event('change', { bubbles: true }));
+    const solid = byField(element, 'solid')!;
+    expect(solid.value).toBe('#ffffff');
+    expect(solid.dataset.colorPaletteAlpha).toBe('66');
+    expect(byField(element, 'solid-alpha')?.value).toBe('40');
+    expect(readDesignerColorPaletteValue(solid)).toBe('#ffffff66');
+  });
+
+  it('keeps the solid draft when the selected stop is transparent', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'radial-gradient(circle at 50% 50%, #112233 0%, transparent 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    stopRows(element)[1]!.dispatchEvent(new Event('click', { bubbles: true }));
+    checkMode(element, 'solid');
+    modeRadio(element, 'solid').dispatchEvent(new Event('change', { bubbles: true }));
+    // 选中 transparent 色标不同步：保持解析回退的单色（文档渐变 -> DEFAULT_COLOR）。
+    expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe('#000000');
+  });
+});
+
+describe('compact palette layout', () => {
+  it('puts the stop color and position in one editor row and alpha with tools in one footer row', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #000000 0%, #ffffff 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    const stopColor = byField(element, 'stop-color')!;
+    const stopPosition = byField(element, 'stop-position')!;
+    expect(stopPosition.closest('.designer-color-palette-stop-editor')).toBe(
+      stopColor.closest('.designer-color-palette-stop-editor'),
+    );
+    const stopAlpha = byField(element, 'stop-alpha')!;
+    const footer = stopAlpha.closest('.designer-color-palette-stop-footer');
+    expect(footer).not.toBeNull();
+    expect(
+      byDataset(element, 'colorPaletteAction')?.closest('.designer-color-palette-stop-footer'),
+    ).toBe(footer);
+    // 渐变参数（角度/中心）同行内排列。
+    expect(byField(element, 'angle')?.closest('.designer-color-palette-parameters')).toBe(
+      byField(element, 'x')?.closest('.designer-color-palette-parameters'),
+    );
+    expect(byField(element, 'y')?.closest('.designer-color-palette-parameters')).toBe(
+      byField(element, 'angle')?.closest('.designer-color-palette-parameters'),
+    );
+  });
+});
+
+describe('manual hex color input', () => {
+  it('keeps a shorthand draft while typing, then syncs solid rgb and alpha on change', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#112233');
+    const element = palette.element as unknown as FakeElement;
+    const value = byField(element, 'solid-value')!;
+    value.value = '#fff';
+    value.dispatchEvent(new Event('input', { bubbles: true }));
+    // #fff 是有效完整短写，但输入期间不重写，作者可以继续输入 #ffffff。
+    expect(value.value).toBe('#fff');
+    expect(value.attributes.get('aria-invalid')).toBe('false');
+    expect(byField(element, 'solid')?.value).toBe('#112233');
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(value.value).toBe('#FFFFFF');
+    expect(byField(element, 'solid')?.value).toBe('#ffffff');
+
+    value.value = '#12345680';
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(byField(element, 'solid')?.value).toBe('#123456');
+    expect(byField(element, 'solid')?.dataset.colorPaletteAlpha).toBe('80');
+    expect(byField(element, 'solid-alpha')?.value).toBe('50');
+    expect(readDesignerColorPaletteValue(value)).toBe('#12345680');
+  });
+
+  it('syncs a selected stop into its handle and rejects an invalid hex draft', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #000000 0%, #ffffff 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    const value = byField(element, 'stop-value')!;
+    value.value = '#0EA5E9';
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(value.value).toBe('#0EA5E9');
+    expect(byField(element, 'stop-color')?.value).toBe('#0ea5e9');
+    expect(stopRows(element)[0]?.dataset.colorPaletteStopColor).toBe('#0ea5e9');
+    expect(readDesignerColorPaletteValue(value)).toBe(
+      'linear-gradient(90deg, #0ea5e9 0%, #ffffff 100%)',
+    );
+
+    value.value = '#12';
+    value.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(value.attributes.get('aria-invalid')).toBe('true');
+    value.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(value)).toBeUndefined();
+    expect(stopRows(element)[0]?.dataset.colorPaletteStopColor).toBe('#0ea5e9');
   });
 });
 
@@ -660,6 +855,95 @@ describe('readDesignerColorPaletteValue', () => {
     const secondElement = second.element as unknown as FakeElement;
     expect(secondElement.dataset.colorPaletteSelectedStop).toBe('1');
     expect(byField(secondElement, 'stop-position')?.value).toBe('100');
+  });
+});
+
+describe('color palette alpha transparency', () => {
+  it('splits alpha-hex colors into rgb value and alpha dataset on render', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#ff000080');
+    const element = palette.element as unknown as FakeElement;
+    const solid = byField(element, 'solid')!;
+    expect(solid.value).toBe('#ff0000');
+    expect(solid.dataset.colorPaletteAlpha).toBe('80');
+    expect(byField(element, 'solid-alpha')?.value).toBe('50');
+  });
+
+  it('composes the alpha slider into the solid value on input', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#112233');
+    const element = palette.element as unknown as FakeElement;
+    const alpha = byField(element, 'solid-alpha')!;
+    alpha.value = '50';
+    alpha.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('#11223380');
+    alpha.value = '0';
+    alpha.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('#11223300');
+    alpha.value = '100';
+    alpha.dispatchEvent(new Event('input', { bubbles: true }));
+    // 不透明：不带透明通道后缀，保持既有 6 位值格式（旧文档零迁移）。
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('#112233');
+  });
+
+  it('applies stop alpha to the selected gradient stop and keeps other stops intact', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #000000 0%, #ffffff 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    const alpha = byField(element, 'stop-alpha')!;
+    alpha.value = '40';
+    alpha.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe(
+      'linear-gradient(90deg, #00000066 0%, #ffffff 100%)',
+    );
+  });
+
+  it('switching stops refreshes the alpha slider from the stop color', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #00000080 0%, #ffffff 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    expect(byField(element, 'stop-alpha')?.value).toBe('50');
+    stopRows(element)[1]!.dispatchEvent(new Event('click', { bubbles: true }));
+    expect(byField(element, 'stop-alpha')?.value).toBe('100');
+    expect(byField(element, 'stop-color')?.value).toBe('#ffffff');
+  });
+
+  it('groups the solid alpha slider with the solid field so gradient modes hide them together', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#112233');
+    const element = palette.element as unknown as FakeElement;
+    const solid = byField(element, 'solid')!;
+    const alpha = byField(element, 'solid-alpha')!;
+    const solidGroup = solid.closest('.designer-color-palette-solid-field');
+    expect(solidGroup).not.toBeNull();
+    // 单色透明度行与单色字段同一组：渐变模式的 hide 规则（display: none 锚定
+    // .designer-color-palette-solid-field）会把两者一起隐藏，滑杆不会单独露出。
+    expect(alpha.closest('.designer-color-palette-solid-field')).toBe(solidGroup);
+    expect(
+      descendants(element).filter((candidate) =>
+        candidate.className.split(/\s+/).includes('designer-color-palette-solid-field'),
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('keeps transparent gradient stops serialized as transparent when untouched', () => {
+    const ownerDocument = new FakeDocument();
+    const value = 'radial-gradient(circle at 50% 50%, #112233 0%, transparent 100%)';
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, value);
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe(value);
+  });
+
+  it('round-trips alpha solid and alpha gradient values through parse/serialize', () => {
+    expect(parseColorPaletteValue('#aabbcc40').solid).toBe('#aabbcc40');
+    expect(serializeColorPaletteValue(parseColorPaletteValue('#aabbcc40'))).toBe('#aabbcc40');
+    const gradient = 'linear-gradient(90deg, #ff000080 0%, #0000ff20 100%)';
+    expect(serializeColorPaletteValue(parseColorPaletteValue(gradient))).toBe(gradient);
   });
 });
 

@@ -1,6 +1,7 @@
 # Unified Color Palette Control Spec
 
-> 状态：生效中（2026-08-16）
+> 状态：生效中（2026-08-16；2026-08-17 增量补充：颜色透明度滑杆 `透明度`；
+> 2026-08-18 增量补充：紧凑布局与模式间状态共享，见第 6 节）
 > 依据：[ADR-0050](../../decisions/ADR-0050-unified-color-palette-control.md)、
 > [ADR-0051](../../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)（全面替换 color input，取消字段级门控）
 
@@ -41,7 +42,7 @@
 
 ## 3. 非目标
 
-- 在渐变预览条上直接拖拽色标、取色器、预设、透明度、HSV/HSL 进阶面板；本 Spec 的位置滑块属于附加的独立编辑控件。
+- 在渐变预览条上直接拖拽色标、取色器、预设、透明度、HSV/HSL 进阶面板；本 Spec 的位置滑块属于附加的独立编辑控件。（2026-08-17 增量：单色与色标增加「透明度」alpha 滑杆，见第 5 节；取色器/预设/HSV/HSL 仍不在范围。）
 - 为不支持 `<image>` 的 CSS 属性（`border-color`、SVG fill、ECharts option）批量适配渐变渲染。
 - 改变 Material/Manifest/ScreenDocument 公共契约。
 - 新增依赖或 package。
@@ -50,3 +51,47 @@
 
 - `tasks.md`/`checklist.md` 全勾选；测试矩阵反映当前用例。
 - palette 单元测试（解析/序列化/色标增删/草稿/读值）、面板渲染测试、文本物料渐变渲染测试与 `pnpm verify:fast` 通过；baseline、usage、ADR/Spec 索引已登记。
+
+## 5. 增量补充（2026-08-17）：颜色透明度滑杆
+
+产品反馈驱动的轻量增量（属性面板颜色缺少透明度选择），不新增 ADR/Spec：
+
+- 调色板每个颜色控件（单色 `solid` 与色标 `stop`）新增「透明度」滑杆（range 0..100%）。
+- 值表示零变化：原生 color input 仍只承载 RGB（`#rrggbb`），透明通道以 2 位 hex 存于
+  `dataset.colorPaletteAlpha`，完整色值由 `composedColorValue` 组装为 `#rrggbbaa`
+  （不透明不带后缀）；序列化/解析/草稿缓存/画布与文档契约全部不变（R3 本就允许
+  `#RRGGBBAA`）。单色/色标编辑、渐变预览、切换模式与派生单色色系（透明度保留）均生效。
+  单色字段与单色透明度行共用 `.designer-color-palette-solid-field` 组容器，渐变模式下
+  整组随既有模式隐藏规则一起隐藏（透明度滑杆不脱离单色字段单独露出），色标透明度始终可用。
+- 验收：palette 单元测试新增 alpha 用例（渲染拆分、滑杆合成、色标透明度、透明 token
+  保留、alpha 往返）、面板渲染计数更新，文本/形状物料颜色字段实测透明度生效；
+  engine lint/typecheck/test 与 `pnpm verify:m0` 通过（2026-08-17）。
+
+## 6. 增量补充（2026-08-18）：紧凑布局与模式间状态共享
+
+用户反馈驱动的轻量增量（调色板纵向占用过大、渐变编辑后切回单色看到旧值），
+不新增 ADR/Spec（公共契约零变化，纯 Engine 内部控件布局与交互行为）：
+
+- **紧凑布局（行内字段）**：颜色控件由原生 swatch + 无边框 hex 输入组成；单色模式
+  一行（颜色控件 + 透明度滑杆，仍共用 `.designer-color-palette-solid-field` 隐藏锚点）；
+  色标编辑一行（颜色 + 行内「位置」）；色标透明度与增删按钮合并一行
+  （`.designer-color-palette-stop-footer`）；
+  渐变参数（角度/中心 X/Y）行内一行；移除色标编辑器卡片框。288px 右栏下渐变模式
+  约 290px -> 约 200px、单色约 107px -> 约 73px。布局只消费既有 Designer Token，
+  模式切换仍为 display 切换，hover 不改几何（R5 无抖动约束不变）。
+- **模式间状态共享（双向）**：渐变 -> 单色切换把选中色标完整色值（含 alpha）同步
+  为单色，选中索引越界回夹，`transparent`/非法色值跳过（保持原单色）；单色 ->
+  渐变维持 ADR-0057 派生语义；线性 <-> 径向互切不变。同步只发生在交互切换路径，
+  经既有 change 通道提交一次（恰一条历史、可 undo）；文档解析路径与 R4 草稿缓存
+  不受影响。
+- **可访问性与手动 hex**：颜色控件不再渲染可见「颜色」文字标签（hex 输入自明），
+  改以 `aria-label` 提供语义；输入支持 `#RGB`、`#RGBA`、`#RRGGBB`、`#RRGGBBAA`
+  与既有 `transparent` token，失焦/提交时同步 swatch、透明度和色标句柄并规范化为
+  既有 CSS 色值；无效/未完成草稿标为 invalid 且不提交。hex 输入本身无边框、透明背景、
+  无焦点 outline；「位置/透明度/角度/中心 X/Y」保留可见行内标签，数字输入与透明度
+  滑杆补 `aria-label`；键盘输入能力不变。
+- 验收：palette 单元测试新增反向共享（选中色标同步、alpha 保留、transparent
+  跳过、索引回夹）、紧凑结构、aria-label 与手动 hex（alpha 同步/无效草稿）用例；
+  browser harness 断言渐变编辑选中色标后切回单色的端到端共享、单色行同行几何、手动
+  hex 同步及无边框/无焦点 outline；engine lint/typecheck/test 与 `pnpm verify:fast`
+  通过（2026-08-18）。

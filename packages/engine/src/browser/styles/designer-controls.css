@@ -51,9 +51,21 @@
   background: var(--designer-surface-raised);
 }
 
-/* 调色板内部字段行统一由容器 gap 承担间距，去掉 designer-field 默认外边距。 */
-.designer-color-palette .designer-field {
-  margin-bottom: 0;
+/* 单色行（紧凑布局增量）：颜色控件与透明度滑杆同行，均分剩余宽度；
+   颜色控件 hex 文本可省略号收缩，透明度滑杆保持稳定轨道。 */
+.designer-color-palette-solid-field {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+}
+
+.designer-color-palette-solid-field .designer-color-palette-color-control {
+  flex: 1 1 96px;
+  min-width: 0;
+}
+
+.designer-color-palette-solid-field .designer-color-palette-alpha {
+  flex: 1 1 96px;
 }
 
 .designer-color-palette-modes {
@@ -112,14 +124,6 @@
   padding: var(--designer-space-3);
 }
 
-.designer-color-palette-solid-field {
-  gap: var(--designer-space-2);
-}
-
-.designer-color-palette-solid-field .designer-color-palette-color-control {
-  width: 100%;
-}
-
 .designer-color-palette-gradient {
   display: grid;
   gap: var(--designer-space-3);
@@ -154,12 +158,55 @@
   background: transparent;
 }
 
+/* 可编辑 hex 值：不额外加边框，颜色 swatch 与文本保持同一稳定控制行。 */
 .designer-color-palette-color-value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  caret-color: var(--designer-accent);
   font: var(--designer-font-numeric);
   letter-spacing: 0;
+}
+
+.designer-color-palette-color-value:focus {
+  outline: 0;
+}
+
+.designer-color-palette-color-value[aria-invalid="true"] {
+  color: var(--designer-danger);
+}
+
+/* 透明度滑杆：标签 + range + 百分比，随颜色控件同行排布（范围输入保持稳定轨道，不抖动）。 */
+.designer-color-palette-alpha {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-3);
+  min-height: var(--designer-control-height-compact);
+}
+
+.designer-color-palette-alpha-label {
+  color: var(--designer-text-muted);
+  font: var(--designer-font);
+}
+
+.designer-color-palette-alpha-input {
+  min-width: 0;
+  width: 100%;
+  accent-color: var(--designer-accent);
+}
+
+.designer-color-palette-alpha-value {
+  min-width: 2.6em;
+  text-align: right;
+  font: var(--designer-font-numeric);
+  color: var(--designer-text-secondary);
 }
 
 .designer-color-palette-stop-slider {
@@ -215,29 +262,59 @@
   outline-offset: 2px;
 }
 
+/* 色标编辑行（紧凑布局增量）：颜色控件 + 行内位置输入同一行，无卡片框。 */
 .designer-color-palette-stop-editor {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(72px, 0.7fr);
+  display: flex;
+  align-items: center;
   gap: var(--designer-space-3);
-  padding: var(--designer-space-3);
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-panel);
 }
 
-.designer-color-palette-stop-editor .designer-field-label {
+.designer-color-palette-stop-editor .designer-color-palette-color-control {
+  flex: 1 1 96px;
   min-width: 0;
 }
 
-.designer-color-palette-stop-editor .designer-number {
+.designer-color-palette-stop-editor .designer-color-palette-field-inline {
+  flex: 0 1 116px;
+}
+
+/* 行内字段（位置/角度/中心）：可见文字标签与数字输入同一行。 */
+.designer-color-palette-field-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  min-width: 0;
+  flex: 1 1 0;
+}
+
+.designer-color-palette-field-inline-label {
+  flex: none;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+}
+
+.designer-color-palette-field-inline .designer-number {
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
+}
+
+/* 色标透明度滑杆与增删色标按钮同行（紧凑布局增量）。 */
+.designer-color-palette-stop-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+}
+
+.designer-color-palette-stop-footer .designer-color-palette-alpha {
+  flex: 1 1 auto;
 }
 
 .designer-color-palette-tools {
   display: flex;
+  flex: none;
   gap: var(--designer-space-2);
-  padding-top: var(--designer-space-1);
-  border-top: 1px solid var(--designer-border-subtle);
 }
 
 .designer-color-palette-action {
@@ -256,10 +333,11 @@
   opacity: 0.45;
 }
 
+/* 渐变参数（角度或中心 X/Y）行内一行：线性只显角度、径向只显中心。 */
 .designer-color-palette-parameters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--designer-space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
 }
 
 .designer-color-palette[data-color-palette-mode="solid"] .designer-color-palette-gradient,
@@ -270,11 +348,6 @@
   .designer-color-palette-solid-field,
 .designer-color-palette[data-color-palette-mode="radial-gradient"] .designer-color-palette-linear {
   display: none;
-}
-
-.designer-color-palette[data-color-palette-mode="linear-gradient"]
-  .designer-color-palette-parameters {
-  grid-template-columns: minmax(0, 1fr);
 }
 
 .designer-field:has(> .designer-checkbox) {

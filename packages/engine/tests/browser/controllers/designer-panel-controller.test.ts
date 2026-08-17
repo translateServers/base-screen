@@ -364,7 +364,7 @@ describe('designer panel rendering', () => {
       'locked',
       'hidden',
     ]);
-    expect(propertyInputs.slice(9)).toHaveLength(10);
+    expect(propertyInputs.slice(9)).toHaveLength(14);
     // style.color 字段同样使用完整三段式调色板：渐变模式全部可用。
     const gradientModes = descendants(properties).filter(
       (element) => element.tagName === 'input' && element.dataset.colorPaletteField === 'mode',
@@ -379,7 +379,7 @@ describe('designer panel rendering', () => {
     const colorFieldContainer = descendants(properties).find(
       (element) =>
         element.className === 'designer-field designer-field-label' &&
-        element.textContent === '颜色',
+        descendants(element).some((candidate) => candidate.dataset.colorPaletteField === 'solid'),
     );
     expect(colorFieldContainer?.tagName).toBe('span');
     expect(
