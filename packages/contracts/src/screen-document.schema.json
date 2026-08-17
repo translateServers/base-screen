@@ -35,10 +35,7 @@
                   "maxLength": 128
                 }
               },
-              "required": [
-                "type",
-                "color"
-              ],
+              "required": ["type", "color"],
               "additionalProperties": false
             },
             {
@@ -71,19 +68,12 @@
                         "maximum": 100
                       }
                     },
-                    "required": [
-                      "color",
-                      "position"
-                    ],
+                    "required": ["color", "position"],
                     "additionalProperties": false
                   }
                 }
               },
-              "required": [
-                "type",
-                "angle",
-                "stops"
-              ],
+              "required": ["type", "angle", "stops"],
               "additionalProperties": false
             },
             {
@@ -107,10 +97,7 @@
                       "maximum": 100
                     }
                   },
-                  "required": [
-                    "x",
-                    "y"
-                  ],
+                  "required": ["x", "y"],
                   "additionalProperties": false
                 },
                 "stops": {
@@ -131,19 +118,12 @@
                         "maximum": 100
                       }
                     },
-                    "required": [
-                      "color",
-                      "position"
-                    ],
+                    "required": ["color", "position"],
                     "additionalProperties": false
                   }
                 }
               },
-              "required": [
-                "type",
-                "position",
-                "stops"
-              ],
+              "required": ["type", "position", "stops"],
               "additionalProperties": false
             }
           ]
@@ -155,17 +135,10 @@
         },
         "backgroundImageFit": {
           "type": "string",
-          "enum": [
-            "cover",
-            "contain"
-          ]
+          "enum": ["cover", "contain"]
         }
       },
-      "required": [
-        "width",
-        "height",
-        "backgroundColor"
-      ],
+      "required": ["width", "height", "backgroundColor"],
       "additionalProperties": false
     },
     "components": {
@@ -212,10 +185,7 @@
                 "maximum": 1000000
               }
             },
-            "required": [
-              "x",
-              "y"
-            ],
+            "required": ["x", "y"],
             "additionalProperties": false
           },
           "size": {
@@ -232,10 +202,7 @@
                 "maximum": 1000000
               }
             },
-            "required": [
-              "width",
-              "height"
-            ],
+            "required": ["width", "height"],
             "additionalProperties": false
           },
           "rotation": {
@@ -258,10 +225,7 @@
                 "type": "boolean"
               }
             },
-            "required": [
-              "locked",
-              "hidden"
-            ],
+            "required": ["locked", "hidden"],
             "additionalProperties": false
           },
           "props": {
@@ -303,23 +267,11 @@
                     },
                     "operator": {
                       "type": "string",
-                      "enum": [
-                        "eq",
-                        "neq",
-                        "gt",
-                        "gte",
-                        "lt",
-                        "lte",
-                        "contains",
-                        "exists"
-                      ]
+                      "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
                     },
                     "value": {}
                   },
-                  "required": [
-                    "path",
-                    "operator"
-                  ],
+                  "required": ["path", "operator"],
                   "additionalProperties": false,
                   "allOf": [
                     {
@@ -329,21 +281,15 @@
                             "const": "exists"
                           }
                         },
-                        "required": [
-                          "operator"
-                        ]
+                        "required": ["operator"]
                       },
                       "then": {
                         "not": {
-                          "required": [
-                            "value"
-                          ]
+                          "required": ["value"]
                         }
                       },
                       "else": {
-                        "required": [
-                          "value"
-                        ]
+                        "required": ["value"]
                       }
                     }
                   ]
@@ -356,11 +302,7 @@
                   "additionalProperties": {}
                 }
               },
-              "required": [
-                "id",
-                "when",
-                "style"
-              ],
+              "required": ["id", "when", "style"],
               "additionalProperties": false
             }
           },
@@ -375,10 +317,7 @@
                   },
                   "value": {}
                 },
-                "required": [
-                  "type",
-                  "value"
-                ],
+                "required": ["type", "value"],
                 "additionalProperties": false
               },
               {
@@ -415,10 +354,7 @@
                             },
                             "value": {}
                           },
-                          "required": [
-                            "kind",
-                            "value"
-                          ],
+                          "required": ["kind", "value"],
                           "additionalProperties": false
                         },
                         {
@@ -433,10 +369,7 @@
                               "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
                             }
                           },
-                          "required": [
-                            "kind",
-                            "name"
-                          ],
+                          "required": ["kind", "name"],
                           "additionalProperties": false
                         }
                       ]
@@ -466,9 +399,7 @@
                             }
                           }
                         },
-                        "required": [
-                          "fields"
-                        ],
+                        "required": ["fields"],
                         "additionalProperties": false
                       },
                       {
@@ -477,13 +408,7 @@
                     ]
                   }
                 },
-                "required": [
-                  "type",
-                  "resourceType",
-                  "resourceId",
-                  "params",
-                  "binding"
-                ],
+                "required": ["type", "resourceType", "resourceId", "params", "binding"],
                 "additionalProperties": false
               },
               {
@@ -527,11 +452,7 @@
               },
               "value": {}
             },
-            "required": [
-              "type",
-              "name",
-              "value"
-            ],
+            "required": ["type", "name", "value"],
             "additionalProperties": false
           },
           {
@@ -551,11 +472,7 @@
                 "maxLength": 256
               }
             },
-            "required": [
-              "type",
-              "name",
-              "variableId"
-            ],
+            "required": ["type", "name", "variableId"],
             "additionalProperties": false
           }
         ]
@@ -590,11 +507,7 @@
                     "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
                   }
                 },
-                "required": [
-                  "type",
-                  "componentId",
-                  "eventName"
-                ],
+                "required": ["type", "componentId", "eventName"],
                 "additionalProperties": false
               },
               "requiredCapabilities": {
@@ -612,25 +525,13 @@
                   },
                   "operator": {
                     "type": "string",
-                    "enum": [
-                      "eq",
-                      "neq",
-                      "gt",
-                      "gte",
-                      "lt",
-                      "lte",
-                      "contains",
-                      "exists"
-                    ]
+                    "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
                   },
                   "right": {
                     "$ref": "#/$defs/__schema0"
                   }
                 },
-                "required": [
-                  "left",
-                  "operator"
-                ],
+                "required": ["left", "operator"],
                 "additionalProperties": false,
                 "allOf": [
                   {
@@ -640,21 +541,15 @@
                           "const": "exists"
                         }
                       },
-                      "required": [
-                        "operator"
-                      ]
+                      "required": ["operator"]
                     },
                     "then": {
                       "not": {
-                        "required": [
-                          "right"
-                        ]
+                        "required": ["right"]
                       }
                     },
                     "else": {
-                      "required": [
-                        "right"
-                      ]
+                      "required": ["right"]
                     }
                   }
                 ]
@@ -679,11 +574,7 @@
                           "$ref": "#/$defs/__schema0"
                         }
                       },
-                      "required": [
-                        "type",
-                        "variableName",
-                        "value"
-                      ],
+                      "required": ["type", "variableName", "value"],
                       "additionalProperties": false
                     },
                     {
@@ -701,11 +592,7 @@
                           "$ref": "#/$defs/__schema0"
                         }
                       },
-                      "required": [
-                        "type",
-                        "eventName",
-                        "payload"
-                      ],
+                      "required": ["type", "eventName", "payload"],
                       "additionalProperties": false
                     },
                     {
@@ -723,38 +610,23 @@
                           "$ref": "#/$defs/__schema0"
                         }
                       },
-                      "required": [
-                        "type",
-                        "actionId",
-                        "payload"
-                      ],
+                      "required": ["type", "actionId", "payload"],
                       "additionalProperties": false
                     }
                   ]
                 }
               }
             },
-            "required": [
-              "id",
-              "trigger",
-              "actions"
-            ],
+            "required": ["id", "trigger", "actions"],
             "additionalProperties": false
           }
         }
       },
-      "required": [
-        "rules"
-      ],
+      "required": ["rules"],
       "additionalProperties": false
     }
   },
-  "required": [
-    "canvas",
-    "components",
-    "variables",
-    "blueprint"
-  ],
+  "required": ["canvas", "components", "variables", "blueprint"],
   "additionalProperties": false,
   "$defs": {
     "__schema0": {
@@ -768,10 +640,7 @@
             },
             "value": {}
           },
-          "required": [
-            "kind",
-            "value"
-          ],
+          "required": ["kind", "value"],
           "additionalProperties": false
         },
         {
@@ -790,10 +659,7 @@
               }
             }
           },
-          "required": [
-            "kind",
-            "path"
-          ],
+          "required": ["kind", "path"],
           "additionalProperties": false
         },
         {
@@ -808,10 +674,7 @@
               "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
             }
           },
-          "required": [
-            "kind",
-            "name"
-          ],
+          "required": ["kind", "name"],
           "additionalProperties": false
         },
         {
@@ -829,10 +692,7 @@
               }
             }
           },
-          "required": [
-            "kind",
-            "items"
-          ],
+          "required": ["kind", "items"],
           "additionalProperties": false
         },
         {
@@ -853,10 +713,7 @@
               "maxProperties": 256
             }
           },
-          "required": [
-            "kind",
-            "properties"
-          ],
+          "required": ["kind", "properties"],
           "additionalProperties": false
         }
       ]
