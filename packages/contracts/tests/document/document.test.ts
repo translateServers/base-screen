@@ -985,3 +985,190 @@ describe('parseScreenDocument canvas background image', () => {
     }
   });
 });
+
+describe('parseScreenDocument component style rules', () => {
+  function styleRule(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+    return {
+      id: 'warn',
+      when: { path: [], operator: 'gt', value: 100 },
+      style: { color: '#ff0000' },
+      ...overrides,
+    };
+  }
+
+  it('R1 accepts bounded style rules and returns them detached', () => {
+    const source = document({
+      components: [
+        component({
+          styleRules: [
+            styleRule(),
+            {
+              id: 'critical',
+              when: { path: ['amount'], operator: 'gte', value: 500 },
+              style: { color: '#ff0000', fontWeight: '700' },
+            },
+          ],
+        }),
+      ],
+    });
+    const result = parse(source);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.components[0]?.styleRules).toEqual([
+      { id: 'warn', when: { path: [], operator: 'gt', value: 100 }, style: { color: '#ff0000' } },
+      {
+        id: 'critical',
+        when: { path: ['amount'], operator: 'gte', value: 500 },
+        style: { color: '#ff0000', fontWeight: '700' },
+      },
+    ]);
+    (source.components as Record<string, unknown>[])[0]!.styleRules = [];
+    expect(result.value.components[0]?.styleRules).toHaveLength(2);
+  });
+
+  it('R1 accepts exists without a value literal', () => {
+    const result = parse(
+      document({
+        components: [
+          component({
+            styleRules: [styleRule({ when: { path: ['status'], operator: 'exists' } })],
+          }),
+        ],
+      }),
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('R1 rejects unknown rule and condition fields fail-closed', () => {
+    const extraRuleField = parse(
+      document({ components: [component({ styleRules: [styleRule({ note: 'x' })] })] }),
+    );
+    expect(extraRuleField.ok).toBe(false);
+    if (!extraRuleField.ok) {
+      expect(extraRuleField.diagnostics[0]?.code).toBe('DOCUMENT_UNKNOWN_FIELD');
+      expect(extraRuleField.diagnostics[0]?.path).toEqual([
+        'components',
+        0,
+        'styleRules',
+        0,
+        'note',
+      ]);
+    }
+    const extraWhenField = parse(
+      document({
+        components: [
+          component({
+            styleRules: [styleRule({ when: { path: [], operator: 'gt', value: 1, comment: 'x' } })],
+          }),
+        ],
+      }),
+    );
+    expect(extraWhenField.ok).toBe(false);
+    if (!extraWhenField.ok) {
+      expect(extraWhenField.diagnostics[0]?.code).toBe('DOCUMENT_UNKNOWN_FIELD');
+    }
+  });
+
+  it('R1 rejects more than 8 rules and duplicate rule ids', () => {
+    const tooMany = parse(
+      document({
+        components: [
+          component({
+            styleRules: Array.from({ length: 9 }, (_, index) => styleRule({ id: `r${index}` })),
+          }),
+        ],
+      }),
+    );
+    expect(tooMany.ok).toBe(false);
+    const duplicate = parse(
+      document({
+        components: [component({ styleRules: [styleRule(), styleRule()] })],
+      }),
+    );
+    expect(duplicate.ok).toBe(false);
+    if (!duplicate.ok) {
+      expect(duplicate.diagnostics[0]?.path).toEqual(['components', 0, 'styleRules', 1, 'id']);
+    }
+  });
+
+  it('R1 enforces the value literal presence rules per operator', () => {
+    const missingValue = parse(
+      document({
+        components: [
+          component({ styleRules: [styleRule({ when: { path: [], operator: 'gt' } })] }),
+        ],
+      }),
+    );
+    expect(missingValue.ok).toBe(false);
+    if (!missingValue.ok) {
+      expect(missingValue.diagnostics[0]?.path).toEqual([
+        'components',
+        0,
+        'styleRules',
+        0,
+        'when',
+        'value',
+      ]);
+    }
+    const existsWithValue = parse(
+      document({
+        components: [
+          component({
+            styleRules: [styleRule({ when: { path: [], operator: 'exists', value: 1 } })],
+          }),
+        ],
+      }),
+    );
+    expect(existsWithValue.ok).toBe(false);
+  });
+
+  it('R1 rejects over-long ids, path segments, deep paths, and oversized values', () => {
+    const longId = parse(
+      document({ components: [component({ styleRules: [styleRule({ id: 'a'.repeat(65) })] })] }),
+    );
+    expect(longId.ok).toBe(false);
+    const longSegment = parse(
+      document({
+        components: [
+          component({
+            styleRules: [styleRule({ when: { path: ['a'.repeat(65)], operator: 'eq', value: 1 } })],
+          }),
+        ],
+      }),
+    );
+    expect(longSegment.ok).toBe(false);
+    const deepPath = parse(
+      document({
+        components: [
+          component({
+            styleRules: [
+              styleRule({
+                when: {
+                  path: Array.from({ length: 9 }, (_, i) => `k${i}`),
+                  operator: 'eq',
+                  value: 1,
+                },
+              }),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(deepPath.ok).toBe(false);
+    const bigValue = parse(
+      document({
+        components: [
+          component({
+            styleRules: [
+              styleRule({ when: { path: [], operator: 'eq', value: 'a'.repeat(64 * 1024) } }),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(bigValue.ok).toBe(false);
+    if (!bigValue.ok) {
+      expect(bigValue.diagnostics[0]?.code).toBe('DOCUMENT_LIMIT_EXCEEDED');
+    }
+  });
+});

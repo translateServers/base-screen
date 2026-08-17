@@ -74,6 +74,7 @@
 | [ADR-0055](./ADR-0055-official-material-visual-capabilities.md) | 已接受 | 2026-08-16 | 官方物料视觉能力：形状（矩形/椭圆）新增圆角与阴影字段（borderRadius/shadowColor/shadowBlur/shadowOffsetX/Y，椭圆固定 50% 圆角），fill 渐变渲染为 background-image（容器同规则）——补齐 ADR-0051 渐变渲染责任到形状/容器；shadowColor 渐变跳过阴影（box-shadow 不接受 <image>）；Manifest 能力扩展，公共契约零变化 |
 | [ADR-0056](./ADR-0056-image-material-url-validation.md) | 已接受 | 2026-08-16 | 图片物料 URL 校验与失败回退：静态数据源复用 `isBoundedScreenImageUrl`（与画布背景/封面同规则），非法 URL fail-closed 显示「图片地址无效」占位且不创建 img；img error 移除失效图片显示「图片加载失败」占位；公共契约零变化 |
 | [ADR-0057](./ADR-0057-color-palette-gradient-from-solid.md) | 已接受 | 2026-08-16 | 调色板切换模式继承单色色系：单色 → 线性/径向渐变切换时，未定制（默认黑→白）色标按单色派生同色系渐变（起点=单色、终点=提亮，纯白加深回退）；已定制色标模式往返原样保留；派生仅发生在交互切换路径，值格式与序列化不变，公共契约零变化 |
+| [ADR-0058](./ADR-0058-component-conditional-style-rules.md) | 已接受 | 2026-08-17 | 组件条件样式规则：`ScreenComponentNode` 新增 JSON-safe `styleRules`（锚定组件 `dataState.value` 的有界路径条件 + Manifest `styleSchema` 内样式合并），Renderer 在 model 构造前求值派生 effective style、数据刷新自动重评估；`update-components` patch 扩展与 Designer 条件样式编辑区；Blueprint 与宿主边界不变 |
 
 ## 计划决策
 

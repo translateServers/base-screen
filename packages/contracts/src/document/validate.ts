@@ -26,6 +26,9 @@ import {
   MAX_COMPONENTS,
   MAX_DATA_SOURCE_VALUE_BYTES,
   MAX_NAME_CODE_POINTS,
+  MAX_STYLE_RULE_ID_CODE_POINTS,
+  MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
+  MAX_STYLE_RULE_VALUE_BYTES,
   MAX_VARIABLES,
 } from './limits.js';
 import { validateReferences } from './references.js';
@@ -58,6 +61,7 @@ const COMPONENT_FIELDS = new Set([
   'status',
   'props',
   'style',
+  'styleRules',
   'dataSource',
 ]);
 const POSITION_FIELDS = new Set(['x', 'y']);
@@ -73,6 +77,8 @@ const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set([
 ]);
 const HOST_RESOURCE_PARAMETER_FIELDS = new Set(['kind', 'value', 'name']);
 const HOST_RESOURCE_BINDING_FIELDS = new Set(['fields']);
+const STYLE_RULE_FIELDS = new Set(['id', 'when', 'style']);
+const STYLE_RULE_WHEN_FIELDS = new Set(['path', 'operator', 'value']);
 const VARIABLE_FIELDS = new Set(['type', 'name', 'value']);
 const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'variableId']);
 const BLUEPRINT_FIELDS = new Set(['rules']);
@@ -364,6 +370,31 @@ function validateComponent(
   ) {
     return false;
   }
+  const styleRules = component.styleRules;
+  if (Array.isArray(styleRules)) {
+    for (let ruleIndex = 0; ruleIndex < styleRules.length; ruleIndex++) {
+      const rule = styleRules[ruleIndex];
+      const ruleBase = [...baseSegments, 'styleRules', ruleIndex] as DiagnosticSegment[];
+      if (
+        !isJsonObject(rule) ||
+        !checkStrictObjectKeys(rule, STYLE_RULE_FIELDS, at(ruleBase), collector, phase)
+      ) {
+        return false;
+      }
+      if (
+        isJsonObject(rule.when) &&
+        !checkStrictObjectKeys(
+          rule.when,
+          STYLE_RULE_WHEN_FIELDS,
+          at([...ruleBase, 'when']),
+          collector,
+          phase,
+        )
+      ) {
+        return false;
+      }
+    }
+  }
   const dataSource = component.dataSource;
   if (isJsonObject(dataSource)) {
     const fields =
@@ -454,6 +485,9 @@ function validateComponent(
     );
     clean = false;
   }
+  if (!validateComponentStyleRules(component.styleRules, baseSegments, at, collector, phase)) {
+    clean = false;
+  }
   if (
     dataSource !== null &&
     typeof dataSource === 'object' &&
@@ -469,6 +503,84 @@ function validateComponent(
         `Static data source value exceeds ${MAX_DATA_SOURCE_VALUE_BYTES} UTF-8 bytes.`,
       );
       clean = false;
+    }
+  }
+  return clean;
+}
+
+function validateComponentStyleRules(
+  styleRules: unknown,
+  baseSegments: DiagnosticSegment[],
+  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  if (!Array.isArray(styleRules)) {
+    return true;
+  }
+  let clean = true;
+  const seenIds = new Set<string>();
+  for (let index = 0; index < styleRules.length; index++) {
+    const rule = styleRules[index];
+    if (!isJsonObject(rule)) {
+      continue;
+    }
+    const base = [...baseSegments, 'styleRules', index] as DiagnosticSegment[];
+    const id = rule.id;
+    if (typeof id === 'string') {
+      if (codePointLength(id) > MAX_STYLE_RULE_ID_CODE_POINTS) {
+        collector.add(
+          'DOCUMENT_FIELD_INVALID',
+          at([...base, 'id']),
+          phase,
+          `Style rule id exceeds ${MAX_STYLE_RULE_ID_CODE_POINTS} code points.`,
+        );
+        clean = false;
+      }
+      if (seenIds.has(id)) {
+        collector.add(
+          'DOCUMENT_FIELD_INVALID',
+          at([...base, 'id']),
+          phase,
+          'Style rule ids must be unique within a component.',
+        );
+        clean = false;
+      }
+      seenIds.add(id);
+    }
+    const when = rule.when;
+    if (!isJsonObject(when)) {
+      continue;
+    }
+    const path = when.path;
+    if (Array.isArray(path)) {
+      for (let segmentIndex = 0; segmentIndex < path.length; segmentIndex++) {
+        const segment = path[segmentIndex];
+        if (
+          typeof segment === 'string' &&
+          codePointLength(segment) > MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS
+        ) {
+          collector.add(
+            'DOCUMENT_FIELD_INVALID',
+            at([...base, 'when', 'path', segmentIndex]),
+            phase,
+            `Style rule path segment exceeds ${MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS} code points.`,
+          );
+          clean = false;
+        }
+      }
+    }
+    if (when.value !== undefined) {
+      const valueBytes = canonicalByteLength(when.value as ScreenJsonValue);
+      if (valueBytes > MAX_STYLE_RULE_VALUE_BYTES) {
+        collector.add(
+          'DOCUMENT_LIMIT_EXCEEDED',
+          at([...base, 'when', 'value']),
+          phase,
+          `Style rule value exceeds ${MAX_STYLE_RULE_VALUE_BYTES} UTF-8 bytes.`,
+        );
+        clean = false;
+      }
     }
   }
   return clean;

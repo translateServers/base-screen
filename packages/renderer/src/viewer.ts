@@ -19,6 +19,7 @@ import {
   type ScreenBlueprintPlan,
 } from '@base-screen/core';
 import type {
+  BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
@@ -33,6 +34,8 @@ export interface BaseScreenViewerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
   readonly resourcePort?: ScreenHostResourcePort;
   readonly variablePort?: ScreenHostVariablePort;
+  /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，无独立 setter）。 */
+  readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly blueprintRuntimePort?: ScreenBlueprintRuntimePort;
   readonly blueprintHostActionPort?: ScreenBlueprintHostActionPort;
@@ -55,6 +58,7 @@ export class BaseScreenViewerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
   #variablePort: ScreenHostVariablePort | undefined;
+  #conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   #contributionIndex: BaseScreenRuntimeContributionIndex | undefined;
   #blueprintRuntimePort: ScreenBlueprintRuntimePort | undefined;
   #blueprintHostActionPort: ScreenBlueprintHostActionPort | undefined;
@@ -108,6 +112,12 @@ export class BaseScreenViewerElement extends ElementBase {
       return lifecycleFailure('Viewer variable port 必须是含 resolve 的对象。');
     }
     if (
+      configuration.conditionalStylePort !== undefined &&
+      !isBaseScreenConditionalStylePort(configuration.conditionalStylePort)
+    ) {
+      return lifecycleFailure('Viewer conditional style port 必须是含 resolve 的对象。');
+    }
+    if (
       configuration.runtimeContributions !== undefined &&
       !isBaseScreenRuntimeContributionIndex(configuration.runtimeContributions)
     ) {
@@ -128,6 +138,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#catalog = configuration.catalog;
     this.#resourcePort = configuration.resourcePort;
     this.#variablePort = configuration.variablePort;
+    this.#conditionalStylePort = configuration.conditionalStylePort;
     this.#contributionIndex = configuration.runtimeContributions;
     this.#blueprintRuntimePort = configuration.blueprintRuntimePort;
     this.#blueprintHostActionPort = configuration.blueprintHostActionPort;
@@ -166,6 +177,21 @@ export class BaseScreenViewerElement extends ElementBase {
 
   get variablePort(): ScreenHostVariablePort | undefined {
     return this.#variablePort;
+  }
+
+  /** ADR-0059：只读回读；配置入口是 configure 或初始化前的守卫 setter。 */
+  get conditionalStylePort(): BaseScreenConditionalStylePort | undefined {
+    return this.#conditionalStylePort;
+  }
+
+  set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined) {
+    if (this.#renderer !== undefined && value !== this.#conditionalStylePort) {
+      this.emitLifecycleDiagnostic(
+        'Conditional style port cannot change after initialization. Call unload first.',
+      );
+      return;
+    }
+    this.#conditionalStylePort = value;
   }
 
   get resourceTimeoutMs(): number {
@@ -313,6 +339,9 @@ export class BaseScreenViewerElement extends ElementBase {
         );
       },
       resourcePort: this.#resourcePort,
+      ...(this.#conditionalStylePort === undefined
+        ? {}
+        : { conditionalStylePort: this.#conditionalStylePort }),
       resourceTimeoutMs: this.#resourceTimeoutMs,
       ...(this.#contributionIndex === undefined
         ? {}
@@ -641,6 +670,14 @@ function isScreenBlueprintRuntimePort(value: unknown): boolean {
     value !== null &&
     typeof value === 'object' &&
     typeof (value as Record<string, unknown>).emit === 'function'
+  );
+}
+
+function isBaseScreenConditionalStylePort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).resolve === 'function'
   );
 }
 

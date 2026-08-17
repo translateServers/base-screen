@@ -24,6 +24,7 @@ import {
   validateScreenHostResourceBinding,
 } from '@base-screen/core';
 import {
+  type BaseScreenConditionalStylePort,
   type BaseScreenMaterialCatalog,
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialDataState,
@@ -43,6 +44,7 @@ import {
   getProjectionKey,
   type MountedResourceState,
 } from './resource-state.js';
+import { evaluateScreenComponentStyleRules } from './style-rules.js';
 
 export interface BaseScreenMaterialEvent {
   readonly componentId: string;
@@ -59,6 +61,8 @@ export interface CreateBaseScreenRendererOptions {
   readonly onMaterialEvent: ((event: BaseScreenMaterialEvent) => void) | undefined;
   readonly onDiagnostic?: (diagnostic: ScreenDiagnostic) => void;
   readonly resourcePort: ScreenHostResourcePort | undefined;
+  /** ADR-0059 宿主条件样式端口：缺省时与既有渲染路径逐字节一致。 */
+  readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly resourceTimeoutMs?: number;
   readonly contributionIndex?: BaseScreenRuntimeContributionIndex;
   readonly observer?: ScreenResourceObserver;
@@ -239,7 +243,7 @@ class Renderer implements BaseScreenRenderer {
           element,
           candidate.component,
           parsedDocument.value,
-          candidate.model,
+          this.#resolveEffectiveModel(candidate, candidate.model.dataState),
           isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
           stackOrder,
         );
@@ -503,7 +507,7 @@ class Renderer implements BaseScreenRenderer {
       mounted.element,
       candidate.component,
       document,
-      { ...candidate.model, dataState: mounted.resource.dataState },
+      this.#resolveEffectiveModel(candidate, mounted.resource.dataState),
       isScreenComponentEffectivelyHidden(document, candidate.component.id),
       stackOrder,
     );
@@ -880,7 +884,69 @@ class Renderer implements BaseScreenRenderer {
     resourceState.dataState = dataState;
     const current = this.#candidates.get(componentId);
     if (current !== undefined) {
-      mounted.element.model = { ...current.model, dataState };
+      mounted.element.model = this.#resolveEffectiveModel(current, dataState);
+    }
+  }
+
+  /**
+   * ADR-0058/0059：candidate.model.style 始终为 canonical 基础样式；effective style 按当前
+   * dataState 求值派生，合并顺序固定 base → 命中 styleRules → conditionalStylePort 覆盖
+   * （同键后写覆盖先写），不回写文档。端口覆盖 fail-closed：非法覆盖（styleSchema 校验
+   * 不过）与 resolve 抛异常都忽略端口覆盖、保留 base+规则结果并上报诊断，不中断渲染。
+   */
+  #resolveEffectiveModel(
+    candidate: RenderCandidate,
+    dataState: BaseScreenMaterialDataState,
+  ): BaseScreenMaterialModel {
+    const ruleOverrides = evaluateScreenComponentStyleRules(
+      candidate.component.styleRules,
+      dataState,
+    );
+    let style =
+      ruleOverrides === undefined
+        ? candidate.model.style
+        : { ...candidate.model.style, ...ruleOverrides };
+    const port = this.options.conditionalStylePort;
+    if (port !== undefined) {
+      const overrides = this.#callConditionalStylePort(port, candidate.component.id, dataState);
+      if (overrides !== undefined) {
+        const validated = validateBaseScreenMaterialStyle(
+          { ...style, ...overrides },
+          candidate.entry.manifest.styleSchema,
+        );
+        if (validated.ok) {
+          style = validated.value;
+        } else {
+          for (const item of prefixDiagnostics(validated.diagnostics, [
+            'components',
+            candidate.component.id,
+            'conditionalStyle',
+          ])) {
+            this.options.onDiagnostic?.(item);
+          }
+        }
+      }
+    }
+    return { ...candidate.model, dataState, style };
+  }
+
+  /** 端口异常隔离（ADR-0059）：忽略本次覆盖并上报诊断，不影响其他组件与整次渲染。 */
+  #callConditionalStylePort(
+    port: BaseScreenConditionalStylePort,
+    componentId: string,
+    dataState: BaseScreenMaterialDataState,
+  ): ScreenJsonObject | undefined {
+    try {
+      return port.resolve({ componentId, dataState });
+    } catch {
+      this.options.onDiagnostic?.(
+        diagnostic(
+          'PLUGIN_CORE_RENDER_FAILED',
+          ['components', componentId, 'conditionalStyle'],
+          'Conditional style port resolve raised an exception.',
+        ),
+      );
+      return undefined;
     }
   }
 }
@@ -933,6 +999,32 @@ function prepareCandidates(
     const style = validateBaseScreenMaterialStyle(component.style, entry.manifest.styleSchema);
     if (!style.ok) {
       diagnostics.push(...prefixDiagnostics(style.diagnostics, ['components', index, 'style']));
+      continue;
+    }
+    // 条件样式规则（ADR-0058）：每条规则的 style 与基础样式合并后必须满足该物料
+    // styleSchema（静态、与数据无关），非法规则样式与非法 style 同路径失败关闭。
+    const styleRules = component.styleRules ?? [];
+    let styleRulesValid = true;
+    for (let ruleIndex = 0; ruleIndex < styleRules.length; ruleIndex++) {
+      const ruleStyle = validateBaseScreenMaterialStyle(
+        { ...style.value, ...styleRules[ruleIndex]!.style },
+        entry.manifest.styleSchema,
+      );
+      if (!ruleStyle.ok) {
+        diagnostics.push(
+          ...prefixDiagnostics(ruleStyle.diagnostics, [
+            'components',
+            index,
+            'styleRules',
+            ruleIndex,
+            'style',
+          ]),
+        );
+        styleRulesValid = false;
+        break;
+      }
+    }
+    if (!styleRulesValid) {
       continue;
     }
     const data = getDataState(

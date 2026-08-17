@@ -7,10 +7,11 @@ import { BASE_SCREEN_TEXT_MATERIAL_MANIFEST, BaseScreenTextMaterialElement } fro
 /**
  * 文本物料排版能力（ADR-0047）：
  * - Manifest：水平/垂直对齐分离、字间距、行间距为可选 styleSchema 字段，defaultStyle 同步，
- *   stylePanel 顺序与标签正确，manifest 校验通过；
+ *   stylePanel 顺序与标签正确，manifest 校验通过；增量补充：绝对行高 `lineHeight`
+ *   与行间距并存（行高 = 绝对基准，行间距 = 叠加增量，缺省退回 字号 + 行间距 零回归）；
  * - 渲染：垂直对齐经内层 flex wrapper 实现（元素自身保持 display: block，与 renderer
- *   可见性契约兼容），letterSpacing、lineSpacing（增量：行高 = 字号 + 行间距）与缺失字段
- *   回退；textAlign 与数据状态文本回归。
+ *   可见性契约兼容），letterSpacing、lineSpacing（增量：行高 = 字号 + 行间距）、
+ *   lineHeight（绝对基准，与 lineSpacing 合成）与缺失字段回退；textAlign 与数据状态文本回归。
  */
 
 type StubNode = {
@@ -94,7 +95,7 @@ function modelWithStyle(style: BaseScreenMaterialModel['style']): BaseScreenMate
 }
 
 describe('text material typography (ADR-0047)', () => {
-  it('declares optional verticalAlign/letterSpacing/lineSpacing with defaults and passes validation', () => {
+  it('declares optional verticalAlign/letterSpacing/lineHeight/lineSpacing with defaults and passes validation', () => {
     expect(parseBaseScreenMaterialManifest(BASE_SCREEN_TEXT_MATERIAL_MANIFEST).ok).toBe(true);
     expect(
       createMaterialDefinition({
@@ -106,6 +107,7 @@ describe('text material typography (ADR-0047)', () => {
       textAlign: { kind: 'enum', values: ['left', 'center', 'right'] },
       verticalAlign: { kind: 'enum', values: ['top', 'middle', 'bottom'] },
       letterSpacing: { kind: 'number', minimum: 0, maximum: 100 },
+      lineHeight: { kind: 'number', minimum: 1, maximum: 512 },
       lineSpacing: { kind: 'number', minimum: 0, maximum: 512 },
     });
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.styleSchema.required).toEqual([
@@ -133,6 +135,7 @@ describe('text material typography (ADR-0047)', () => {
       'textAlign',
       'verticalAlign',
       'letterSpacing',
+      'lineHeight',
       'lineSpacing',
     ]);
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.stylePanel.map((field) => field.label)).toEqual([
@@ -142,6 +145,7 @@ describe('text material typography (ADR-0047)', () => {
       '水平对齐',
       '垂直对齐',
       '字间距',
+      '行高',
       '行间距',
     ]);
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.stylePanel.map((field) => field.control)).toEqual([
@@ -150,6 +154,7 @@ describe('text material typography (ADR-0047)', () => {
       'select',
       'select',
       'select',
+      'number',
       'number',
       'number',
     ]);
@@ -189,7 +194,24 @@ describe('text material typography (ADR-0047)', () => {
     expect(element.style.textAlign).toBe('center');
     expect(element.style.letterSpacing).toBe('4px');
     expect(element.style.lineHeight).toBe('32px');
+    // 水平对齐经 flex 主轴映射到 wrapper（否则单行文本在 flex 容器内贴左）。
+    expect(element.children[0]!.style.justifyContent).toBe('center');
     expect(element.children[0]!.textContent).toBe('你好');
+  });
+
+  it('maps textAlign to the wrapper justify-content so horizontal alignment survives vertical centering', () => {
+    const center = mountText({ textAlign: 'center', verticalAlign: 'middle' });
+    expect(center.children[0]!.style.justifyContent).toBe('center');
+    const right = mountText({ textAlign: 'right', verticalAlign: 'bottom' });
+    expect(right.children[0]!.style.justifyContent).toBe('flex-end');
+    const left = mountText({ textAlign: 'left', verticalAlign: 'middle' });
+    expect(left.children[0]!.style.justifyContent).toBe('flex-start');
+    const missing = mountText({ verticalAlign: 'middle' });
+    expect(missing.children[0]!.style.justifyContent).toBe('flex-start');
+    // top 路径不创建 wrapper：水平对齐仍走块级 text-align，行为不变。
+    const top = mountText({ textAlign: 'right', verticalAlign: 'top' });
+    expect(top.children).toHaveLength(0);
+    expect(top.style.textAlign).toBe('right');
   });
 
   it('switches between wrapper and direct text when verticalAlign changes', () => {
@@ -227,6 +249,18 @@ describe('text material typography (ADR-0047)', () => {
     expect(mountText({ lineSpacing: 16 }).style.lineHeight).toBe('');
     expect(mountText({ fontSize: 32 }).style.lineHeight).toBe('');
     expect(mountText({}).style.lineHeight).toBe('');
+  });
+
+  it('renders lineHeight as an absolute px baseline independent of fontSize', () => {
+    expect(mountText({ lineHeight: 40 }).style.lineHeight).toBe('40px');
+    expect(mountText({ fontSize: 20, lineHeight: 40 }).style.lineHeight).toBe('40px');
+  });
+
+  it('composes lineSpacing incrementally on top of the lineHeight baseline', () => {
+    expect(mountText({ lineHeight: 40, lineSpacing: 16 }).style.lineHeight).toBe('56px');
+    expect(mountText({ fontSize: 20, lineHeight: 40, lineSpacing: 8 }).style.lineHeight).toBe(
+      '48px',
+    );
   });
 
   it('renders gradient color strings through background-clip: text', () => {

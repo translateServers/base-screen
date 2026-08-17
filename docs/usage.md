@@ -893,6 +893,46 @@ const configured = viewer.configure({
 `host-action` 没有端口时会失败并产生诊断，不会静默执行任意函数。宿主动作端口需要自行处理
 授权、幂等、审计和业务错误脱敏。
 
+### 条件样式：文档规则与宿主端口
+
+数据驱动的预警样式有两条互补通道（合并顺序固定：基础 `style` → 命中的文档 `styleRules` →
+端口覆盖，同键后写覆盖先写；effective style 只存在于运行时，不回写文档、不产生历史）。
+
+**通道一：文档 `styleRules`**（ADR-0058）适合随屏幕版本化的轻量视觉映射。宿主把判定结果
+投影进数据（如 `{ value: 85, level: 'warn' }`），文档只保留纯视觉规则：
+
+```json
+{
+  "styleRules": [
+    { "id": "warn", "when": { "path": ["level"], "operator": "eq", "value": "warn" },
+      "style": { "color": "#ff4d4f", "fontWeight": "700" } }
+  ]
+}
+```
+
+**通道二：`conditionalStylePort`**（ADR-0059）适合判定与视觉映射都归宿主告警体系维护的场景：
+阈值调整零文档变更、多租户同屏不同视觉策略。`resolve` 必须是同步纯函数（相同输入返回相同
+结果；异步数据走 `resourcePort`/`refreshData` 产生新 `dataState` 后自然重求值）：
+
+```ts
+const configured = viewer.configure({
+  catalog,
+  conditionalStylePort: {
+    resolve({ componentId, dataState }) {
+      if (componentId !== 'kpi-1' || dataState.status !== 'ready') return undefined;
+      const level = alarmRegistry.levelFor(componentId, dataState.value);
+      return level === 'warn' ? { color: '#ff4d4f', fontWeight: '700' } : undefined;
+    },
+  },
+});
+```
+
+端口对每个组件的每次求值都会收到完整 `dataState`（含 `idle`/`loading`/`error`），可自行决定
+降灰等状态样式。端口返回的覆盖必须满足物料 `styleSchema`：非法覆盖与 `resolve` 抛异常都会被
+fail-closed 隔离——忽略本次覆盖、保留基础+规则样式并上报一条诊断，渲染不中断。Designer 支持
+同一配置（`configure` 或初始化前的守卫 setter），设计态画布与 Viewer 走同一渲染路径预览告警
+效果；未配置端口的实例行为与现状完全一致。
+
 ## 11. 配置左侧物料库状态
 
 宿主从线上加载并校验可信物料包后，仍然以不可变 `catalog` 配置 Designer。若需要在左侧物料库展示加载、离线、

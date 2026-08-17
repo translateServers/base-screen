@@ -1,6 +1,6 @@
 # Text Material Typography Spec
 
-> 状态：生效中（2026-08-16）
+> 状态：生效中（2026-08-16；2026-08-17 增量补充：绝对行高 `lineHeight`）
 > 依据：[ADR-0047](../../decisions/ADR-0047-text-material-typography.md)
 > 生效前置：ADR-0047 已接受；本 Spec 为维护期内允许变更官方文本物料 Manifest 与渲染的增量
 
@@ -73,3 +73,25 @@
 - `tasks.md` 与 `checklist.md` 全部勾选；测试矩阵与当前实现一致。
 - material 聚焦测试、material lint/typecheck/test 与 `pnpm verify:m0` 全部通过；基线 README、
   Spec/ADR 索引已登记。
+
+## 5. 增量补充（2026-08-17）：绝对行高 `lineHeight`
+
+维护期产品反馈驱动的轻量增量（属性面板缺少「行高」表单字段），不新增 ADR/Spec：
+
+- `styleSchema` 新增可选 `lineHeight`：`{ kind: 'number', minimum: 1, maximum: 512 }`；
+  `required` 与 `defaultStyle` 不变（行高缺省 = 随字号自适应，新拖入文本与改动前一致）。
+- `stylePanel` 在「行间距」前插入 `{ style: 'lineHeight', label: '行高', control: 'number' }`，
+  样式区顺序变为 颜色 → 字号 → 字重 → 水平对齐 → 垂直对齐 → 字间距 → 行高 → 行间距。
+- 渲染公式扩展为「行高与行间距并存、互不冲突」：
+  - `lineHeight` 为 number → `line-height: <lineHeight + (lineSpacing ?? 0)>px`
+    （行高为行盒绝对基准，行间距在其上叠加增量）；
+  - 否则 `lineSpacing` 与 `fontSize` 均为 number → `line-height: <fontSize + lineSpacing>px`
+    （本节既有增量语义，原样保留，旧文档零回归）；
+  - 否则不设置 `line-height`。
+- 验收：`packages/material/tests/text.test.ts` 新增 lineHeight 渲染矩阵与 Manifest/面板断言，
+  既有 lineSpacing 断言（48px/20px/''）全部保留；material lint/typecheck/test 与
+  `pnpm verify:m0` 通过（2026-08-17）。
+- **补充修复（2026-08-17）**：`middle`/`bottom` wrapper 路径补 `justify-content` 映射
+  （`textAlign` left/center/right → `flex-start`/`center`/`flex-end`）——flex 容器内文本节点
+  是收缩到内容的匿名 flex item，继承的 `text-align` 只作用于 item 内多行，单行文本会贴左，
+  水平对齐因此失效；映射后与块级 `text-align` 等价（多行逐像素一致）。`top` 路径不变。

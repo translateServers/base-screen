@@ -370,6 +370,56 @@ const screenDocument = {
       dataSource: { type: 'static' as const, value: '宿主资源已就绪' },
     },
     {
+      // 条件样式预警演示（ADR-0058）：宿主指标 >100 时变红加粗，回落自动恢复基础样式。
+      id: 'metric-warning',
+      type: 'base.text',
+      name: '指标预警',
+      parentId: null,
+      position: { x: 560, y: 236 },
+      size: { width: 340, height: 48 },
+      rotation: 0,
+      zIndex: 7,
+      status: { locked: false, hidden: false },
+      props: {},
+      style: { color: '#9fb1c9', fontSize: 28, fontWeight: '400', textAlign: 'left' },
+      styleRules: [
+        {
+          id: 'over-100',
+          when: { path: [], operator: 'gt' as const, value: 100 },
+          style: { color: '#ff4d4f', fontWeight: '700' },
+        },
+      ],
+      dataSource: {
+        type: 'host-resource' as const,
+        resourceType: 'dataset',
+        resourceId: 'metric-value',
+        params: { limit: { kind: 'literal' as const, value: 1 } },
+        binding: null,
+      },
+    },
+    {
+      // 条件样式端口演示（ADR-0059）：文档零告警知识（无 styleRules），阈值与视觉映射
+      // 全部归宿主端口；宿主指标 >100 时变橙加粗，回落自动恢复基础样式。
+      id: 'port-warning',
+      type: 'base.text',
+      name: '宿主端口预警',
+      parentId: null,
+      position: { x: 560, y: 288 },
+      size: { width: 340, height: 32 },
+      rotation: 0,
+      zIndex: 8,
+      status: { locked: false, hidden: false },
+      props: {},
+      style: { color: '#9fb1c9', fontSize: 16, fontWeight: '400', textAlign: 'left' },
+      dataSource: {
+        type: 'host-resource' as const,
+        resourceType: 'dataset',
+        resourceId: 'metric-value',
+        params: { limit: { kind: 'literal' as const, value: 1 } },
+        binding: null,
+      },
+    },
+    {
       id: 'react-bridge',
       type: reactBridge.value.manifest.type,
       name: 'React 桥接',
@@ -450,6 +500,7 @@ designer.addEventListener('base-screen-material-event', (event) => {
 let datasetVersion = 0;
 let datasetRegion = 'north';
 let datasetDelay = false;
+let metricValue = 42;
 const datasetRequests: unknown[] = [];
 const resourcePort = {
   async resolve(request: {
@@ -457,6 +508,9 @@ const resourcePort = {
     readonly params: Readonly<Record<string, unknown>>;
   }) {
     datasetRequests.push(request);
+    if (request.resourceId === 'metric-value') {
+      return { ok: true as const, value: metricValue, diagnostics: [] };
+    }
     if (request.resourceId === 'tabular-orders') {
       if (datasetDelay) await new Promise((resolve) => setTimeout(resolve, 500));
       if (request.params.region === 'error') {
@@ -546,6 +600,24 @@ designer.resourcePort = resourcePort;
 designer.variablePort = variablePort;
 designer.datasetCatalogPort = datasetCatalog;
 designer.runtimeContributions = pluginManager.snapshot.contributions;
+// ADR-0059 宿主条件样式端口：阈值与视觉映射归宿主告警体系，屏幕只消费结果。
+// 初始化前经守卫 setter 提交（与 resourcePort 同形）；两个元素共用同一宿主实现。
+const conditionalStylePort = {
+  resolve({
+    componentId,
+    dataState,
+  }: {
+    readonly componentId: string;
+    readonly dataState: { readonly status: string; readonly value?: unknown };
+  }) {
+    if (componentId !== 'port-warning' || dataState.status !== 'ready') return undefined;
+    return typeof dataState.value === 'number' && dataState.value > 100
+      ? { color: '#ffa940', fontWeight: '700' }
+      : undefined;
+  },
+};
+designer.conditionalStylePort = conditionalStylePort;
+viewer.conditionalStylePort = conditionalStylePort;
 viewer.resourcePort = resourcePort;
 viewer.variablePort = variablePort;
 viewer.runtimeContributions = pluginManager.snapshot.contributions;
@@ -806,6 +878,11 @@ Object.assign(window, {
     },
     bumpDatasetVersion: () => {
       datasetVersion++;
+    },
+    setMetricValue: (value: number) => {
+      metricValue = value;
+      viewer.refreshData('metric-warning');
+      viewer.refreshData('port-warning');
     },
     createDatasetDemo: () => {
       const demo = document.createElement('base-screen-viewer') as typeof viewer;

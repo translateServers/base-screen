@@ -106,7 +106,7 @@ function document(): ScreenDocument {
   };
 }
 
-function harness() {
+function harness(zoom = 1) {
   const commands: unknown[] = [];
   const reports: unknown[] = [];
   const editingChanges: boolean[] = [];
@@ -114,19 +114,20 @@ function harness() {
   const canvas = new FakeElement('div', ownerDocument, {
     left: 0,
     top: 0,
-    width: 960,
-    height: 540,
+    width: 960 * zoom,
+    height: 540 * zoom,
   });
   const material = new FakeElement('base-screen-text', ownerDocument, {
-    left: 80,
-    top: 80,
-    width: 320,
-    height: 72,
+    left: 80 * zoom,
+    top: 80 * zoom,
+    width: 320 * zoom,
+    height: 72 * zoom,
   });
   canvas.querySelectorResult = material;
   const controller = new DesignerTextEditController({
     getDocument: () => document(),
     getCanvas: () => canvas as unknown as HTMLElement,
+    getZoom: () => zoom,
     executeCommand: (command) => {
       commands.push(command);
       return { ok: true, value: document(), diagnostics: [] };
@@ -161,6 +162,20 @@ describe('designer text edit controller', () => {
     expect(material.style.visibility).toBe('hidden');
   });
 
+  it('places the overlay at canvas-local geometry for any zoom, above all layers', () => {
+    const { controller, canvas } = harness(2);
+    expect(controller.enter('title')).toBe(true);
+    const css = canvas.children[0]!.style.cssText ?? '';
+    // getBoundingClientRect 返回缩放后的视口坐标（zoom=2 时 rect 为 160/160/640/144），
+    // overlay 以画布本地坐标定位，必须除缩放还原为 80/80/320/72，否则出现平方级偏移。
+    expect(css).toContain('left: 80px');
+    expect(css).toContain('top: 80px');
+    expect(css).toContain('width: 320px');
+    expect(css).toContain('height: 72px');
+    // 编辑层 z-index 高于全部组件与画布选择层（选择的组件越多层级越靠上，不能被其他图层覆盖）。
+    expect(css).toContain('z-index: calc(var(--designer-z-canvas-selection, 0) + 1)');
+  });
+
   it('restores the material visibility when the session finishes', () => {
     const { controller, canvas, material } = harness();
     controller.enter('title');
@@ -193,6 +208,7 @@ describe('designer text edit controller', () => {
     const controller = new DesignerTextEditController({
       getDocument: () => document(),
       getCanvas: () => undefined,
+      getZoom: () => 1,
       executeCommand: (command) => {
         commands.push(command);
         return { ok: true, value: document(), diagnostics: [] };

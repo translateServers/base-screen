@@ -23,6 +23,7 @@ const PATCH_FIELDS = new Set([
   'status',
   'props',
   'style',
+  'styleRules',
   'dataSource',
 ]);
 // canvas patch 字段白名单（ADR-0043：backgroundImage/backgroundImageFit 为可选字段，

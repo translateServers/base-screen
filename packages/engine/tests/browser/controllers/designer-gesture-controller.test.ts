@@ -582,7 +582,117 @@ describe('DesignerGestureController cancellation', () => {
     expect(renderSnapPreview).toHaveBeenLastCalledWith(undefined);
   });
 
-  it('rounds the committed drag position to two decimal places', () => {
+  it('keeps dragged positions on whole pixels when zoom produces fractional deltas', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    canvas.registerMaterial('rectangle-1', material);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({
+        selectedComponentIds: ['rectangle-1'],
+        focusedComponentId: 'rectangle-1',
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 2, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      target: material,
+    } as unknown as PointerEvent);
+    // zoom 2：7 个 client px = 3.5 个画布 px，按 1px 最小步长取整为 4px。
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 17, clientY: 27 } as PointerEvent);
+    expect(material.style.translate).toBe('4px 4px');
+
+    canvas.dispatch('pointerup', { pointerId: 1, clientX: 17, clientY: 27 } as PointerEvent);
+    expect(transactions).toEqual([
+      {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['rectangle-1'],
+            patch: { position: { x: 14, y: 24 } },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('quantizes fractional snap adjustments to whole-pixel drag steps', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    canvas.registerMaterial('rectangle-1', material);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({
+        selectedComponentIds: ['rectangle-1'],
+        focusedComponentId: 'rectangle-1',
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => ({ ...translation, x: 31.6, y: 29.4 }),
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 1,
+      clientX: 10,
+      clientY: 20,
+      preventDefault: () => undefined,
+      target: material,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+    // 吸附给出的 31.6/29.4 被取整为 32/29，预览与提交保持一致。
+    expect(material.style.translate).toBe('32px 29px');
+
+    canvas.dispatch('pointerup', { pointerId: 1, clientX: 40, clientY: 50 } as PointerEvent);
+    expect(transactions).toEqual([
+      {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['rectangle-1'],
+            patch: { position: { x: 42, y: 49 } },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('commits dragged positions on a 1px grid, correcting fractional starts', () => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
     const canvas = createCanvas();
@@ -637,7 +747,7 @@ describe('DesignerGestureController cancellation', () => {
           {
             type: 'update-components',
             componentIds: ['rectangle-1'],
-            patch: { position: { x: 40.01, y: 50 } },
+            patch: { position: { x: 40, y: 50 } },
           },
         ],
       },
@@ -1475,6 +1585,69 @@ describe('DesignerGestureController cancellation', () => {
     });
     expect(material.style.width).toBe('100px');
     expect(material.style.height).toBe('80px');
+  });
+
+  it('keeps resize preview and commit on whole pixels when zoom produces fractional pointers', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: unknown[] = [];
+    const handle = new FakeElement();
+    handle.dataset.transformHandle = 'east';
+    handle.matches['[data-transform-handle]'] = handle;
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = 'rectangle-1';
+    material.matches['[data-base-screen-component-id]'] = material;
+    material.style.left = '10px';
+    material.style.top = '20px';
+    material.style.width = '100px';
+    material.style.height = '80px';
+    material.style.transform = 'rotate(0deg)';
+    canvas.registerMaterial('rectangle-1', material);
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({
+        selectedComponentIds: ['rectangle-1'],
+        focusedComponentId: 'rectangle-1',
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 2, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 7,
+      clientX: 200,
+      clientY: 20,
+      preventDefault: () => undefined,
+      stopPropagation: () => undefined,
+      target: handle,
+    } as unknown as PointerEvent);
+    // zoom 2：3 个 client px = 1.5 个画布 px，右边缘 101.5 → 宽度取整为 92px。
+    canvas.dispatch('pointermove', { pointerId: 7, clientX: 203, clientY: 20 } as PointerEvent);
+    expect(material.style.width).toBe('92px');
+    expect(canvas.selection.style.width).toBe('92px');
+
+    canvas.dispatch('pointerup', { pointerId: 7, clientX: 203, clientY: 20 } as PointerEvent);
+    expect(transactions).toHaveLength(1);
+    const transaction = transactions[0] as {
+      commands: readonly { type: string; componentIds: readonly string[]; patch: object }[];
+    };
+    expect(transaction.commands[0]).toMatchObject({
+      type: 'update-components',
+      componentIds: ['rectangle-1'],
+      patch: { size: { width: 92, height: 80 } },
+    });
   });
 
   it('prevents native text selection on the canvas via selectstart', () => {

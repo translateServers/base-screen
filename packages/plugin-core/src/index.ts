@@ -3,6 +3,8 @@ export {
   createBaseScreenPluginCatalog,
 } from './catalog.js';
 export type {
+  BaseScreenConditionalStylePort,
+  BaseScreenConditionalStyleRequest,
   BaseScreenMaterialArraySchema,
   BaseScreenMaterialBooleanSchema,
   BaseScreenMaterialCatalog,

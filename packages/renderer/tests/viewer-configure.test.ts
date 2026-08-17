@@ -160,6 +160,30 @@ describe('BaseScreenViewerElement configure validation (RB3)', () => {
     expect(viewer.shadowRoot).toBeNull();
   });
 
+  it('CSP-P3-C01 accepts a valid conditional style port and rejects an invalid one atomically', async () => {
+    const port = { resolve: () => undefined };
+    const viewer = await createViewer();
+    const valid = viewer.configure({ catalog: catalog(), conditionalStylePort: port });
+    expect(valid.ok).toBe(true);
+    expect(viewer.conditionalStylePort).toBe(port);
+
+    const invalid = await createViewer();
+    const firstCatalog = catalog();
+    invalid.catalog = firstCatalog;
+    const result = invalid.configure({
+      catalog: catalog(),
+      conditionalStylePort: { nope: 1 } as unknown as never,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    }
+    // 失败配置零副作用：既有 catalog 保持原样、未创建 Renderer、端口未提交。
+    expect(invalid.catalog).toBe(firstCatalog);
+    expect(invalid.conditionalStylePort).toBeUndefined();
+    expect(invalid.shadowRoot).toBeNull();
+  });
+
   it('a failed configure leaves the viewer usable for a later valid configure', async () => {
     const viewer = await createViewer();
     const failed = viewer.configure({

@@ -13,6 +13,7 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
   clampScreenCoordinate,
   roundScreenGeometry,
+  roundScreenStep,
 } from '../../common/operations/designer-geometry.js';
 import {
   hasDirectChildren,
@@ -633,8 +634,8 @@ export class DesignerGestureController {
             parentId:
               source.parentId === null ? null : (copiedIds.get(source.parentId) ?? source.parentId),
             position: {
-              x: roundScreenGeometry(clampScreenCoordinate(source.position.x + translation.x)),
-              y: roundScreenGeometry(clampScreenCoordinate(source.position.y + translation.y)),
+              x: roundScreenStep(clampScreenCoordinate(source.position.x + translation.x)),
+              y: roundScreenStep(clampScreenCoordinate(source.position.y + translation.y)),
             },
             zIndex:
               document.components.reduce(
@@ -654,8 +655,8 @@ export class DesignerGestureController {
         componentIds: [component.id],
         patch: {
           position: {
-            x: roundScreenGeometry(clampScreenCoordinate(component.position.x + translation.x)),
-            y: roundScreenGeometry(clampScreenCoordinate(component.position.y + translation.y)),
+            x: roundScreenStep(clampScreenCoordinate(component.position.x + translation.x)),
+            y: roundScreenStep(clampScreenCoordinate(component.position.y + translation.y)),
           },
         },
       })),
@@ -906,7 +907,14 @@ export class DesignerGestureController {
       drag.components.map((component) => component.id),
     );
     this.callbacks.renderSnapPreview?.(snapped);
-    return snapped;
+    // 拖拽最小步长 1px：吸附结果按整数像素取整，预览 translate 与提交坐标共用同一
+    // 量化值，保证整数坐标拖拽后仍是整数（缩放或吸附到小数参考线都不会产生小数坐标）。
+    // 吸附预览仍按精确吸附值渲染，蓝色参考线贴合实际候选，与取整后的位置最多差 0.5px。
+    return {
+      ...snapped,
+      x: clampScreenCoordinate(roundScreenStep(snapped.x)),
+      y: clampScreenCoordinate(roundScreenStep(snapped.y)),
+    };
   }
 
   private snapCanvasPoint(

@@ -34,6 +34,7 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
       textAlign: { kind: 'enum', values: ['left', 'center', 'right'] },
       verticalAlign: { kind: 'enum', values: ['top', 'middle', 'bottom'] },
       letterSpacing: { kind: 'number', minimum: 0, maximum: 100 },
+      lineHeight: { kind: 'number', minimum: 1, maximum: 512 },
       lineSpacing: { kind: 'number', minimum: 0, maximum: 512 },
     },
     required: ['color', 'fontSize', 'fontWeight', 'textAlign'],
@@ -45,6 +46,7 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'textAlign', label: '水平对齐', control: 'select' },
     { style: 'verticalAlign', label: '垂直对齐', control: 'select' },
     { style: 'letterSpacing', label: '字间距', control: 'number' },
+    { style: 'lineHeight', label: '行高', control: 'number' },
     { style: 'lineSpacing', label: '行间距', control: 'number' },
   ],
   propsSchema: { kind: 'object', properties: {}, required: [] },
@@ -91,6 +93,12 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
     if (verticalAlign === 'middle' || verticalAlign === 'bottom') {
       const wrapper = this.ensureTextWrapper();
       wrapper.style.alignItems = verticalAlign === 'middle' ? 'center' : 'flex-end';
+      // 水平对齐经 flex 主轴映射：wrapper 内文本节点是收缩到内容的匿名 flex item，
+      // 继承的 text-align 只作用于 item 内部的多行，单行文本会始终贴左；
+      // justify-content 负责把整块文本按 textAlign 水平定位（与块级 text-align 等价）。
+      const textAlign = typeof style.textAlign === 'string' ? style.textAlign : 'left';
+      wrapper.style.justifyContent =
+        textAlign === 'center' ? 'center' : textAlign === 'right' ? 'flex-end' : 'flex-start';
       wrapper.textContent = text;
     } else {
       this.removeTextWrapper();
@@ -99,9 +107,17 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
     this.style.letterSpacing =
       typeof style.letterSpacing === 'number' ? `${style.letterSpacing}px` : '';
     const fontSize = typeof style.fontSize === 'number' ? style.fontSize : undefined;
+    const lineHeight = typeof style.lineHeight === 'number' ? style.lineHeight : undefined;
     const lineSpacing = typeof style.lineSpacing === 'number' ? style.lineSpacing : undefined;
-    this.style.lineHeight =
-      fontSize !== undefined && lineSpacing !== undefined ? `${fontSize + lineSpacing}px` : '';
+    // 行高与行间距并存、互不冲突：行高为绝对行盒基准（px），行间距在其上叠加增量；
+    // 行高缺省时退回既有增量语义（基准 = 字号，旧文档逐像素零回归）。
+    let lineHeightCss = '';
+    if (lineHeight !== undefined) {
+      lineHeightCss = `${lineHeight + (lineSpacing ?? 0)}px`;
+    } else if (fontSize !== undefined && lineSpacing !== undefined) {
+      lineHeightCss = `${fontSize + lineSpacing}px`;
+    }
+    this.style.lineHeight = lineHeightCss;
     this.style.display = 'block';
     this.style.overflow = 'hidden';
     this.style.whiteSpace = 'pre-wrap';

@@ -69,6 +69,28 @@ export interface ScreenHostResourceDataSource {
 
 export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenHostResourceDataSource;
 
+export type ScreenComponentStyleRuleOperator =
+  | 'eq'
+  | 'neq'
+  | 'gt'
+  | 'gte'
+  | 'lt'
+  | 'lte'
+  | 'contains'
+  | 'exists';
+
+export interface ScreenComponentStyleRuleCondition {
+  readonly path: readonly string[];
+  readonly operator: ScreenComponentStyleRuleOperator;
+  readonly value?: ScreenJsonValue;
+}
+
+export interface ScreenComponentStyleRule {
+  readonly id: string;
+  readonly when: ScreenComponentStyleRuleCondition;
+  readonly style: ScreenJsonObject;
+}
+
 export interface ScreenComponentNode {
   readonly id: string;
   readonly type: string;
@@ -81,6 +103,7 @@ export interface ScreenComponentNode {
   readonly status: ScreenComponentStatus;
   readonly props: ScreenJsonObject;
   readonly style: ScreenJsonObject;
+  readonly styleRules?: readonly ScreenComponentStyleRule[];
   readonly dataSource: ScreenComponentDataSource | null;
 }
 

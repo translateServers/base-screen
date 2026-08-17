@@ -21,6 +21,16 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
   const component = getObject(components.items);
   const componentProperties = getObject(component.properties);
   getObject(componentProperties.name).maxLength = MAX_NAME_CODE_POINTS;
+  const styleRuleWhen = getObject(
+    getObject(getObject(getObject(componentProperties.styleRules).items).properties).when,
+  );
+  styleRuleWhen.allOf = [
+    {
+      if: { properties: { operator: { const: 'exists' } }, required: ['operator'] },
+      then: { not: { required: ['value'] } },
+      else: { required: ['value'] },
+    },
+  ];
   const blueprint = getObject(properties.blueprint);
   const rules = getObject(getObject(blueprint.properties).rules);
   const rule = getObject(rules.items);

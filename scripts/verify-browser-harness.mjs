@@ -53,7 +53,7 @@ try {
       const materialCount = await designer.locator('[data-base-screen-component-id]').count();
       const viewerMaterialCount = await viewer.locator('[data-base-screen-component-id]').count();
       const screenshot = await page.screenshot();
-      if (materialCount !== 6 || viewerMaterialCount !== 6 || screenshot.byteLength < 10_000) {
+      if (materialCount !== 8 || viewerMaterialCount !== 8 || screenshot.byteLength < 10_000) {
         throw new Error(`BROWSER_HARNESS_RENDER_FAILED: ${viewport.width}x${viewport.height}`);
       }
       if (viewport.width > 800) {
@@ -195,6 +195,88 @@ try {
           .getAttribute('data-base-screen-data-state');
         if (resourceDomState !== 'ready') {
           throw new Error('BROWSER_HARNESS_RESOURCE_DOM_STATE_FAILED');
+        }
+        // 条件样式规则（ADR-0058）：阈值双向穿越——命中变红加粗、回落恢复基础样式。
+        await viewer.locator('[data-base-screen-component-id=metric-warning]').waitFor();
+        const metricStyle = () =>
+          page.evaluate(
+            () =>
+              window.baseScreenHarness.viewer.shadowRoot.querySelector(
+                '[data-base-screen-component-id=metric-warning]',
+              ).model.style,
+          );
+        await page.waitForFunction(
+          () =>
+            window.baseScreenHarness.viewer.shadowRoot.querySelector(
+              '[data-base-screen-component-id=metric-warning]',
+            )?.model.dataState.status === 'ready',
+        );
+        const baseStyle = await metricStyle();
+        if (baseStyle.color !== '#9fb1c9' || baseStyle.fontWeight !== '400') {
+          throw new Error('BROWSER_HARNESS_STYLE_RULE_BASE_FAILED');
+        }
+        await page.evaluate(() => window.baseScreenHarness.setMetricValue(160));
+        await page.waitForFunction(
+          () =>
+            window.baseScreenHarness.viewer.shadowRoot.querySelector(
+              '[data-base-screen-component-id=metric-warning]',
+            )?.model.style.color === '#ff4d4f',
+        );
+        const warnedStyle = await metricStyle();
+        if (warnedStyle.color !== '#ff4d4f' || warnedStyle.fontWeight !== '700') {
+          throw new Error('BROWSER_HARNESS_STYLE_RULE_TRIGGER_FAILED');
+        }
+        await page.evaluate(() => window.baseScreenHarness.setMetricValue(20));
+        await page.waitForFunction(
+          () =>
+            window.baseScreenHarness.viewer.shadowRoot.querySelector(
+              '[data-base-screen-component-id=metric-warning]',
+            )?.model.style.color === '#9fb1c9',
+        );
+        const restoredStyle = await metricStyle();
+        if (restoredStyle.color !== '#9fb1c9' || restoredStyle.fontWeight !== '400') {
+          throw new Error('BROWSER_HARNESS_STYLE_RULE_RESTORE_FAILED');
+        }
+        // 条件样式端口（ADR-0059）：同一指标驱动宿主端口映射——命中变橙加粗、回落恢复，
+        // 文档对 port-warning 零告警知识（无 styleRules）。
+        const portStyle = () =>
+          page.evaluate(
+            () =>
+              window.baseScreenHarness.viewer.shadowRoot.querySelector(
+                '[data-base-screen-component-id=port-warning]',
+              ).model.style,
+          );
+        await page.waitForFunction(
+          () =>
+            window.baseScreenHarness.viewer.shadowRoot.querySelector(
+              '[data-base-screen-component-id=port-warning]',
+            )?.model.dataState.status === 'ready',
+        );
+        const portBase = await portStyle();
+        if (portBase.color !== '#9fb1c9' || portBase.fontWeight !== '400') {
+          throw new Error('BROWSER_HARNESS_STYLE_PORT_BASE_FAILED');
+        }
+        await page.evaluate(() => window.baseScreenHarness.setMetricValue(160));
+        await page.waitForFunction(
+          () =>
+            window.baseScreenHarness.viewer.shadowRoot.querySelector(
+              '[data-base-screen-component-id=port-warning]',
+            )?.model.style.color === '#ffa940',
+        );
+        const portWarned = await portStyle();
+        if (portWarned.color !== '#ffa940' || portWarned.fontWeight !== '700') {
+          throw new Error('BROWSER_HARNESS_STYLE_PORT_TRIGGER_FAILED');
+        }
+        await page.evaluate(() => window.baseScreenHarness.setMetricValue(20));
+        await page.waitForFunction(
+          () =>
+            window.baseScreenHarness.viewer.shadowRoot.querySelector(
+              '[data-base-screen-component-id=port-warning]',
+            )?.model.style.color === '#9fb1c9',
+        );
+        const portRestored = await portStyle();
+        if (portRestored.color !== '#9fb1c9' || portRestored.fontWeight !== '400') {
+          throw new Error('BROWSER_HARNESS_STYLE_PORT_RESTORE_FAILED');
         }
         await page.evaluate(() => window.baseScreenHarness.createDatasetDemo());
         const datasetDemo = page.locator('base-screen-viewer[data-dataset-demo]');
@@ -439,7 +521,7 @@ try {
           ).position,
         }));
         if (
-          duplicate.count !== 7 ||
+          duplicate.count !== 9 ||
           duplicate.original.x !== before.x ||
           duplicate.original.y !== before.y
         ) {
@@ -585,7 +667,7 @@ try {
         if (canvasBox === null) throw new Error('BROWSER_HARNESS_CANVAS_MISSING');
         await authoringDesigner.locator('[data-material-type="base.text"] .material-name').click();
         await page.waitForFunction(
-          () => window.baseScreenHarness.designer.document.components.length === 7,
+          () => window.baseScreenHarness.designer.document.components.length === 9,
         );
         await authoringDesigner.getByTitle('\u77e9\u5f62').click();
         const activeTool = await authoringDesigner.locator('[data-status-tool]').textContent();
@@ -599,7 +681,7 @@ try {
           .locator('[data-material-type="base.rectangle"] .material-name')
           .click();
         await page.waitForFunction(
-          () => window.baseScreenHarness.designer.document.components.length === 8,
+          () => window.baseScreenHarness.designer.document.components.length === 10,
         );
         const rectangle = authoringDesigner.locator(
           '[data-base-screen-component-id^="base-rectangle-"]',
@@ -698,7 +780,7 @@ try {
         const materialPaletteCount = await page.evaluate(
           () => window.baseScreenHarness.designer.document.components.length,
         );
-        if (materialPaletteCount !== 12) {
+        if (materialPaletteCount !== 14) {
           throw new Error(
             `BROWSER_HARNESS_MATERIAL_PALETTE_DELEGATION_FAILED: ${materialPaletteCount}`,
           );

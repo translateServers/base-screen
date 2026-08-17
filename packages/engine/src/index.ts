@@ -47,6 +47,7 @@ import {
   type ScreenDocumentTransaction,
 } from '@base-screen/core';
 import type {
+  BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
@@ -179,6 +180,8 @@ export interface BaseScreenDesignerConfiguration {
   readonly designerHostAdapter?: ScreenDesignerHostAdapter;
   readonly resourcePort?: ScreenHostResourcePort;
   readonly variablePort?: ScreenHostVariablePort;
+  /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，设计态画布同路径预览）。 */
+  readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly datasetCatalogPort?: ScreenHostDatasetCatalogPort;
   readonly assetCatalogPort?: ScreenAssetCatalogPort;
   readonly projectCatalogPort?: ScreenProjectCatalogPort;
@@ -197,6 +200,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   #runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
   #variablePort: ScreenHostVariablePort | undefined;
+  #conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   #datasetCatalogPort: ScreenHostDatasetCatalogPort | undefined;
   #designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   #assetCatalogPort: ScreenAssetCatalogPort | undefined;
@@ -285,6 +289,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #textEditController = new DesignerTextEditController({
     getDocument: () => this.#session.document,
     getCanvas: () => this.#canvas,
+    getZoom: () => this.#viewportController.state.zoom,
     executeCommand: (command) => this.executeCommand(command),
     report: (result) => this.report(result),
     onEditingChange: () => {},
@@ -792,6 +797,17 @@ export class BaseScreenDesignerElement extends ElementBase {
       };
     }
     if (
+      configuration.conditionalStylePort !== undefined &&
+      !isBaseScreenConditionalStylePort(configuration.conditionalStylePort)
+    ) {
+      return {
+        ok: false,
+        diagnostics: [
+          lifecycleDiagnostic('Designer conditional style port 必须是含 resolve 的对象。'),
+        ],
+      };
+    }
+    if (
       configuration.runtimeContributions !== undefined &&
       !isBaseScreenRuntimeContributionIndex(configuration.runtimeContributions)
     ) {
@@ -837,6 +853,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#variablePort = configuration.variablePort;
       this.#datasetCatalogPort = configuration.datasetCatalogPort;
     }
+    this.#conditionalStylePort = configuration.conditionalStylePort;
     this.#catalog = configuration.catalog;
     this.#materialLibraryState = materialLibraryState;
     this.#materialLibraryGrouping = materialLibraryGrouping;
@@ -1041,6 +1058,22 @@ export class BaseScreenDesignerElement extends ElementBase {
       return;
     }
     this.#variablePort = value;
+  }
+
+  get conditionalStylePort(): BaseScreenConditionalStylePort | undefined {
+    return this.#conditionalStylePort;
+  }
+
+  set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined) {
+    if (this.#renderer !== undefined && value !== this.#conditionalStylePort) {
+      this.emitDiagnostics([
+        lifecycleDiagnostic(
+          'Conditional style port cannot change after initialization. Call unload first.',
+        ),
+      ]);
+      return;
+    }
+    this.#conditionalStylePort = value;
   }
 
   get datasetCatalogPort(): ScreenHostDatasetCatalogPort | undefined {
@@ -2219,6 +2252,14 @@ function isScreenHostResourcePort(value: unknown): boolean {
 }
 
 function isScreenHostVariablePort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).resolve === 'function'
+  );
+}
+
+function isBaseScreenConditionalStylePort(value: unknown): boolean {
   return (
     value !== null &&
     typeof value === 'object' &&

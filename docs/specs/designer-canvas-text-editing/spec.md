@@ -1,6 +1,6 @@
 # Designer Canvas Text Editing Spec
 
-> 状态：生效中
+> 状态：生效中（2026-08-16；2026-08-17 缺陷修复增量：overlay 缩放偏移与层级）
 > 日期：2026-08-16
 > 依据：[ADR-0052](../../decisions/ADR-0052-designer-canvas-text-editing.md)
 
@@ -61,3 +61,25 @@ Ctrl+Z/C/V 不路由设计器命令；事件策略零改动。
 - `tasks.md` 与 `checklist.md` 的所有适用项完成，测试矩阵反映当前 case。
 - 聚焦测试、真实 browser harness 与 `pnpm verify:m0` 通过。
 - ADR/Spec 索引与能力基线反映当前状态。
+
+## 5. 缺陷修复增量（2026-08-17）：overlay 缩放偏移与层级
+
+产品反馈驱动的实现缺陷修复，不新增 ADR/Spec，公共契约零变化：
+
+- **缩放偏移**：overlay 以画布本地坐标定位（画布自身带 `scale(zoom)` 变换），原实现直接用
+  `getBoundingClientRect()` 视口差值与尺寸，缩放 ≠ 100% 时产生平方级偏移与放大。修复：
+  `createTextEditOverlay` 接收当前 `zoom`（`DesignerTextEditCallbacks.getZoom`，接 viewport
+  state），扣除画布 border 缩放后除以 zoom 还原本地几何（左/上/宽/高）。
+- **层级**：overlay 原 `z-index: 1` 低于部分组件（组件 z-index 取 Core painter order 0..N-1）
+  与画布选择层，编辑层会被其他图层覆盖。修复：`z-index: calc(var(--designer-z-canvas-selection) + 1)`，
+  恒高于全部组件、吸附/参考线与选择层。
+- 验收：text-edit-controller 测试新增 zoom 几何与层级断言；真实浏览器（200% 缩放 + 上层
+  组件覆盖）实测 overlay 与物料逐像素对齐、重叠区域命中编辑层；
+  engine lint/typecheck/test 与 `pnpm verify:m0` 通过（2026-08-17）。
+- **补充修复（2026-08-17）**：overlay 文本对齐映射修正——overlay 为 flex column，
+  交叉轴（`align-items`）决定水平位置、主轴（`justify-content`）决定垂直位置；原实现把
+  物料元素的 computed `align-items`（恒为 `normal`，实际对齐在物料内层 wrapper 上）映射到
+  `align-items`，导致编辑态文本永远贴左上。修正：`align-items` ← `textAlign` 映射
+  （left/center/right → flex-start/center/flex-end），`justify-content` ← 物料 wrapper 的
+  `align-items`（middle/bottom → center/flex-end，top/无 wrapper → flex-start），
+  编辑态与物料逐像素一致（WYSIWYG）。

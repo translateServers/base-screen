@@ -23,6 +23,13 @@ export { isScreenMaterialType } from './document/identity.js';
 export { isBoundedScreenImageUrl } from './document/image-url.js';
 export { SCREEN_DOCUMENT_JSON_SCHEMA } from './document/json-schema.js';
 export {
+  MAX_STYLE_RULE_ID_CODE_POINTS,
+  MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
+  MAX_STYLE_RULE_PATH_SEGMENTS,
+  MAX_STYLE_RULE_VALUE_BYTES,
+  MAX_STYLE_RULES_PER_COMPONENT,
+} from './document/limits.js';
+export {
   parseScreenDocument,
   parseScreenProjectEnvelope,
 } from './document/parse.js';
@@ -87,6 +94,9 @@ export type {
   ScreenComponentDataSource,
   ScreenComponentNode,
   ScreenComponentStatus,
+  ScreenComponentStyleRule,
+  ScreenComponentStyleRuleCondition,
+  ScreenComponentStyleRuleOperator,
   ScreenDocument,
   ScreenHostResourceBinding,
   ScreenHostResourceDataSource,

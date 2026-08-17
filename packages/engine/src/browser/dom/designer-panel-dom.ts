@@ -3,6 +3,8 @@ import type {
   ScreenCanvasColorStop,
   ScreenComponentDataSource,
   ScreenComponentNode,
+  ScreenComponentStyleRule,
+  ScreenComponentStyleRuleOperator,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenHostResourceParameter,
@@ -10,8 +12,9 @@ import type {
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
-import { parseScreenJsonValue } from '@base-screen/contracts';
+import { MAX_STYLE_RULES_PER_COMPONENT, parseScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
+import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
@@ -41,6 +44,11 @@ import {
   createMultiSelectionGeometryTransaction,
   createMultiSelectionStyleTransaction,
 } from '../../common/operations/designer-multi-selection-operations.js';
+import {
+  createStyleRuleDraft,
+  createStyleRulesTransaction,
+  STYLE_RULE_OPERATORS,
+} from '../../common/operations/designer-style-rule-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   createDesignerColorPalette,
@@ -248,6 +256,7 @@ function appendComponentControls(
       );
     }
   }
+  appendStyleRulesSection(properties, component, manifest, document);
 }
 
 function appendGroupOverview(
@@ -615,6 +624,122 @@ export function createMultiSelectionTransaction(
     return createMultiSelectionStyleTransaction(document, componentIds, style, value, catalog);
   }
   return undefined;
+}
+
+/**
+ * 条件样式字段编辑事务（ADR-0058）：`data-style-rule-path/operator/value/style` 控件
+ * 的变更在当前规则数组上做单项替换，整份数组经校验后恰一条事务提交。
+ */
+export function createStyleRuleEditTransaction(
+  target: EventTarget | null,
+  document: ScreenDocument | undefined,
+  interaction: ScreenInteractionState,
+  catalog: BaseScreenMaterialCatalog | undefined,
+): ScreenParseResult<ScreenDocumentTransaction> | undefined {
+  if (!isControl(target) || document === undefined) return undefined;
+  const dataset = target.dataset;
+  const pathMarker = dataset.styleRulePath;
+  const operatorMarker = dataset.styleRuleOperator;
+  const valueMarker = dataset.styleRuleValue;
+  const styleMarker = dataset.styleRuleStyle;
+  if (
+    pathMarker === undefined &&
+    operatorMarker === undefined &&
+    valueMarker === undefined &&
+    styleMarker === undefined
+  ) {
+    return undefined;
+  }
+  const context = getDesignerInspectorContext(document, interaction, catalog);
+  if (context.kind !== 'single-material' || context.manifest === undefined) return undefined;
+  const component = context.component;
+  const rules = component.styleRules ?? [];
+  const replaceAt = (
+    index: number,
+    next: ScreenComponentStyleRule,
+  ): ScreenParseResult<ScreenDocumentTransaction> | undefined =>
+    createStyleRulesTransaction(
+      document,
+      component.id,
+      rules.map((rule, position) => (position === index ? next : rule)),
+      catalog,
+    );
+
+  if (pathMarker !== undefined) {
+    const index = Number(pathMarker);
+    const rule = rules[index];
+    if (rule === undefined) return undefined;
+    const path =
+      target.value.trim() === '' ? [] : target.value.split('.').map((segment) => segment.trim());
+    if (path.some((segment) => segment === '')) return undefined;
+    return replaceAt(index, { ...rule, when: { ...rule.when, path } });
+  }
+  if (operatorMarker !== undefined) {
+    const index = Number(operatorMarker);
+    const rule = rules[index];
+    const operator = target.value as ScreenComponentStyleRuleOperator;
+    if (rule === undefined || !STYLE_RULE_OPERATORS.includes(operator)) return undefined;
+    const when =
+      operator === 'exists'
+        ? { path: rule.when.path, operator }
+        : {
+            path: rule.when.path,
+            operator,
+            ...(rule.when.value === undefined ? {} : { value: rule.when.value }),
+          };
+    return replaceAt(index, { ...rule, when });
+  }
+  if (valueMarker !== undefined) {
+    const index = Number(valueMarker);
+    const rule = rules[index];
+    if (rule === undefined) return undefined;
+    const parsed = parseJsonDraft(target.value);
+    if (parsed === undefined) return undefined;
+    return replaceAt(index, { ...rule, when: { ...rule.when, value: parsed } });
+  }
+  if (styleMarker === undefined) return undefined;
+  const separator = styleMarker.indexOf(':');
+  const index = Number(styleMarker.slice(0, separator));
+  const key = styleMarker.slice(separator + 1);
+  const rule = rules[index];
+  const schema = context.manifest.styleSchema.properties[key];
+  if (
+    rule === undefined ||
+    schema === undefined ||
+    !context.manifest.stylePanel.some((field) => field.style === key)
+  ) {
+    return undefined;
+  }
+  const parsed = parsePropertyControlValue(target, schema);
+  if (parsed === undefined) return undefined;
+  return replaceAt(index, { ...rule, style: { ...rule.style, [key]: parsed } });
+}
+
+/**
+ * 条件样式添加/删除按钮事务（ADR-0058）：追加默认草稿或按索引移除，
+ * 同样整份数组校验后恰一条事务提交。
+ */
+export function createStyleRuleClickTransaction(
+  target: EventTarget | null,
+  document: ScreenDocument | undefined,
+  interaction: ScreenInteractionState,
+  catalog: BaseScreenMaterialCatalog | undefined,
+): ScreenParseResult<ScreenDocumentTransaction> | undefined {
+  if (document === undefined) return undefined;
+  const dataset = (target as { readonly dataset?: DOMStringMap } | null)?.dataset;
+  if (dataset === undefined) return undefined;
+  const add = dataset.styleRuleAdd;
+  const remove = dataset.styleRuleRemove;
+  if (add === undefined && remove === undefined) return undefined;
+  const context = getDesignerInspectorContext(document, interaction, catalog);
+  if (context.kind !== 'single-material') return undefined;
+  const component = context.component;
+  const rules = component.styleRules ?? [];
+  const next =
+    add !== undefined
+      ? [...rules, createStyleRuleDraft(rules)]
+      : rules.filter((_, position) => position !== Number(remove));
+  return createStyleRulesTransaction(document, component.id, next, catalog);
 }
 
 export function createDataSourceTransaction(
@@ -1407,6 +1532,165 @@ function appendStyleControl(
     input.dataset.style = style;
     label.appendChild(input);
     appendFieldMessage(label, input, `style-${style}`);
+  }
+  parent.appendChild(label);
+}
+
+/**
+ * 条件样式编辑区（ADR-0058）：规则列表 + 添加/删除；每条规则编辑数据路径、
+ * 操作符、比较值与 stylePanel 声明的样式覆盖。锁定组件只读；多选不渲染本区。
+ */
+function appendStyleRulesSection(
+  parent: HTMLElement,
+  component: ScreenComponentNode,
+  manifest: BaseScreenMaterialManifest,
+  document: ScreenDocument | undefined,
+): void {
+  // 无可编辑样式键的物料（如组）不提供条件样式：规则样式覆盖需要 stylePanel 控件。
+  if ((manifest.stylePanel ?? []).length === 0) return;
+  const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.conditionalStyles);
+  const locked =
+    document !== undefined && isScreenComponentEffectivelyLocked(document, component.id);
+  const rules = component.styleRules ?? [];
+  if (rules.length === 0) {
+    const empty = parent.ownerDocument.createElement('p');
+    empty.className = 'designer-empty-state';
+    empty.textContent = DESIGNER_UI_TEXT.propertiesPanel.styleRuleEmpty;
+    section.appendChild(empty);
+  }
+  for (let index = 0; index < rules.length; index++) {
+    appendStyleRuleBlock(section, component, manifest, rules[index]!, index, locked);
+  }
+  const add = parent.ownerDocument.createElement('button');
+  add.type = 'button';
+  add.className = 'designer-button';
+  add.dataset.styleRuleAdd = '';
+  add.textContent = DESIGNER_UI_TEXT.propertiesPanel.styleRuleAdd;
+  add.disabled = locked || rules.length >= MAX_STYLE_RULES_PER_COMPONENT;
+  section.appendChild(add);
+}
+
+function appendStyleRuleBlock(
+  section: HTMLElement,
+  component: ScreenComponentNode,
+  manifest: BaseScreenMaterialManifest,
+  rule: ScreenComponentStyleRule,
+  index: number,
+  locked: boolean,
+): void {
+  const ownerDocument = section.ownerDocument;
+  const block = ownerDocument.createElement('div');
+  block.className = 'designer-style-rule';
+  const header = ownerDocument.createElement('div');
+  header.className = 'designer-style-rule-header';
+  const title = ownerDocument.createElement('span');
+  title.textContent = DESIGNER_UI_TEXT.propertiesPanel.styleRule(index);
+  const remove = ownerDocument.createElement('button');
+  remove.type = 'button';
+  remove.className = 'designer-button';
+  remove.dataset.styleRuleRemove = String(index);
+  remove.textContent = DESIGNER_UI_TEXT.propertiesPanel.styleRuleRemove;
+  remove.disabled = locked;
+  header.appendChild(title);
+  header.appendChild(remove);
+  block.appendChild(header);
+
+  const condition = ownerDocument.createElement('div');
+  condition.className = 'designer-field-grid';
+  const pathLabel = ownerDocument.createElement('label');
+  pathLabel.className = 'designer-field designer-field-label';
+  pathLabel.textContent = DESIGNER_UI_TEXT.propertiesPanel.styleRulePath;
+  const pathInput = ownerDocument.createElement('input');
+  pathInput.type = 'text';
+  pathInput.className = 'designer-control designer-input';
+  pathInput.value = rule.when.path.join('.');
+  pathInput.title = DESIGNER_UI_TEXT.propertiesPanel.styleRulePathHint;
+  pathInput.dataset.styleRulePath = String(index);
+  pathInput.disabled = locked;
+  pathLabel.appendChild(pathInput);
+  condition.appendChild(pathLabel);
+
+  const operatorLabel = ownerDocument.createElement('label');
+  operatorLabel.className = 'designer-field designer-field-label';
+  operatorLabel.textContent = DESIGNER_UI_TEXT.propertiesPanel.styleRuleOperator;
+  const operatorSelect = ownerDocument.createElement('select');
+  operatorSelect.className = 'designer-control designer-select';
+  operatorSelect.dataset.styleRuleOperator = String(index);
+  operatorSelect.disabled = locked;
+  for (const operator of STYLE_RULE_OPERATORS) {
+    const option = ownerDocument.createElement('option');
+    option.value = operator;
+    option.textContent = operator;
+    option.selected = rule.when.operator === operator;
+    operatorSelect.appendChild(option);
+  }
+  operatorLabel.appendChild(operatorSelect);
+  condition.appendChild(operatorLabel);
+
+  const valueLabel = ownerDocument.createElement('label');
+  valueLabel.className = 'designer-field designer-field-label';
+  valueLabel.textContent = DESIGNER_UI_TEXT.propertiesPanel.styleRuleValue;
+  const valueInput = ownerDocument.createElement('input');
+  valueInput.type = 'text';
+  valueInput.className = 'designer-control designer-input';
+  valueInput.value = rule.when.value === undefined ? '' : JSON.stringify(rule.when.value);
+  valueInput.dataset.styleRuleValue = String(index);
+  valueInput.disabled = locked || rule.when.operator === 'exists';
+  valueLabel.appendChild(valueInput);
+  condition.appendChild(valueLabel);
+  block.appendChild(condition);
+
+  for (const field of manifest.stylePanel ?? []) {
+    const schema = manifest.styleSchema.properties[field.style];
+    if (schema === undefined) continue;
+    appendStyleRuleControl(
+      block,
+      field.label,
+      index,
+      field.style,
+      rule.style[field.style] ?? component.style[field.style],
+      schema,
+      field.control,
+      `${component.id}:style-rule:${index}:${field.style}`,
+      locked,
+    );
+  }
+  section.appendChild(block);
+}
+
+function appendStyleRuleControl(
+  parent: HTMLElement,
+  labelText: string,
+  index: number,
+  style: string,
+  value: ScreenJsonValue | undefined,
+  schema: BaseScreenMaterialPropSchema,
+  control: string,
+  paletteKey: string,
+  locked: boolean,
+): void {
+  const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
+  label.className = 'designer-field designer-field-label';
+  label.textContent = labelText;
+  const marker = `${index}:${style}`;
+  if (control === 'color') {
+    const palette = createDesignerColorPalette(
+      parent.ownerDocument,
+      typeof value === 'string' ? value : undefined,
+      paletteKey,
+    );
+    for (const input of palette.controls) {
+      input.dataset.styleRuleStyle = marker;
+      (input as HTMLInputElement).disabled = locked;
+    }
+    label.appendChild(palette.element);
+    appendFieldMessage(label, palette.controls[0]!, `style-rule-${index}-${style}`);
+  } else {
+    const input = createControl(parent.ownerDocument, value, schema, control);
+    input.dataset.styleRuleStyle = marker;
+    input.disabled = locked;
+    label.appendChild(input);
+    appendFieldMessage(label, input, `style-rule-${index}-${style}`);
   }
   parent.appendChild(label);
 }

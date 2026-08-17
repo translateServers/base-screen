@@ -50,6 +50,8 @@ import {
   createInitialDataSource,
   createMultiSelectionTransaction,
   createPropertyTransaction,
+  createStyleRuleClickTransaction,
+  createStyleRuleEditTransaction,
   type DesignerCanvasBackgroundDrafts,
   renderDesignerDataPanel,
   renderDesignerProperties,
@@ -368,6 +370,26 @@ export class DesignerPanelController {
       }
       return;
     }
+    // 条件样式规则增删（ADR-0058）：按钮事务与字段编辑共用同一校验与提交通道。
+    const styleRuleAction =
+      target.closest<HTMLElement>('[data-style-rule-add]') ??
+      target.closest<HTMLElement>('[data-style-rule-remove]');
+    if (styleRuleAction !== null) {
+      const transaction = createStyleRuleClickTransaction(
+        styleRuleAction,
+        this.callbacks.getDocument(),
+        this.interaction,
+        this.callbacks.getCatalog(),
+      );
+      if (transaction !== undefined) {
+        if (transaction.ok) {
+          this.report(this.callbacks.executeTransaction(transaction.value));
+        } else {
+          this.callbacks.emitDiagnostics(transaction.diagnostics);
+        }
+      }
+      return;
+    }
     if (!(target instanceof HTMLElement)) return;
     switch (target.dataset.action) {
       case 'undo':
@@ -487,6 +509,23 @@ export class DesignerPanelController {
       } else {
         setDraftValidity(event.target, false);
         this.callbacks.emitDiagnostics(dataTransaction.diagnostics);
+      }
+      return;
+    }
+    // 条件样式字段编辑（ADR-0058）：data-style-rule-* 控件走独立事务通道。
+    const styleRuleTransaction = createStyleRuleEditTransaction(
+      event.target,
+      this.callbacks.getDocument(),
+      this.interaction,
+      this.callbacks.getCatalog(),
+    );
+    if (styleRuleTransaction !== undefined) {
+      if (styleRuleTransaction.ok) {
+        setDraftValidity(event.target, true);
+        this.report(this.callbacks.executeTransaction(styleRuleTransaction.value));
+      } else {
+        setDraftValidity(event.target, false);
+        this.callbacks.emitDiagnostics(styleRuleTransaction.diagnostics);
       }
       return;
     }
@@ -839,7 +878,11 @@ function isDesignerDraft(target: EventTarget | null): boolean {
       dataset.prop !== undefined ||
       dataset.canvasProperty !== undefined ||
       dataset.dataSourceType !== undefined ||
-      dataset.dataSourceField !== undefined)
+      dataset.dataSourceField !== undefined ||
+      dataset.styleRulePath !== undefined ||
+      dataset.styleRuleOperator !== undefined ||
+      dataset.styleRuleValue !== undefined ||
+      dataset.styleRuleStyle !== undefined)
   );
 }
 

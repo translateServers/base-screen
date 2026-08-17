@@ -14,6 +14,8 @@ import {
 export interface DesignerTextEditCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getCanvas: () => HTMLElement | undefined;
+  /** 画布当前缩放（overlay 以画布本地坐标定位，需除以缩放还原几何）。 */
+  readonly getZoom: () => number;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
   readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
   /** 编辑会话启停通知（供手势抑制等消费，ADR-0052 R2）。 */
@@ -64,7 +66,7 @@ export class DesignerTextEditController {
     // 编辑期间隐藏物料元素本体：overlay 为透明层（视觉复制物料样式），旧文本透出会与
     // 编辑内容重叠（用户可见"新旧文本重叠"）。隐藏后露出的是画布背景，与正常视觉一致。
     material.style.visibility = 'hidden';
-    this.#overlay = createTextEditOverlay(canvas, material, text);
+    this.#overlay = createTextEditOverlay(canvas, material, text, this.callbacks.getZoom());
     this.#overlay.addEventListener('keydown', this.onKeyDown);
     this.#overlay.addEventListener('blur', this.onBlur);
     selectAllTextInOverlay(this.#overlay);

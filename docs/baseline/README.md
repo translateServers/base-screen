@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-18（调色板紧凑布局、模式间状态共享与无边框手动 hex 输入）
+> 最近更新：2026-08-18（调色板紧凑布局与 alpha、组件条件样式规则与宿主条件样式端口、画布拖拽/形变 1px 网格）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -75,13 +75,15 @@
   [ADR-0049](../decisions/ADR-0049-canvas-background-button-conditional-rendering.md)。
 
 - **画布调色板**（封版后增量，生效中）：`ScreenCanvas.background` 以严格 JSON-safe 对象表达单色、线性渐变或径向渐变；未声明时保留既有 `backgroundColor` 单色语义。Renderer 以基础色、渐变、背景图片的层序一致渲染；Designer 画布区提供三模式和受限色标编辑，宿主可经 `setCanvasBackground` 提交。依据：[Canvas Background Palette](../specs/canvas-background-palette/spec.md)、[ADR-0048](../decisions/ADR-0048-canvas-background-palette.md)。
-- **统一三段式颜色调色板**（封版后增量，生效中）：自定义三段式调色板全面替换原生 color input——属性面板与 Manifest Editor Descriptor 的全部 `color` 字段无条件支持单色/线性渐变/径向渐变，渐变模式支持 2..8 个色标的增删与位置编辑，单色与色标均带「透明度」滑杆（透明通道写入色值 `#rrggbbaa`，不透明保持 6 位，值仍为字符串），按字段缓存三种模式草稿；内部字段行内紧凑排布（单色 = 颜色 + 透明度一行、色标 = 颜色 + 位置一行、色标透明度与增删按钮同行、渐变参数行内）；模式间状态双向共享（渐变 -> 单色把选中色标完整色值含 alpha 同步为单色，transparent/非法跳过；单色 -> 渐变维持 ADR-0057 派生）；颜色控件使用无边框 hex 输入（支持 `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA`，提交时同步 swatch/alpha，无效草稿不写文档且无焦点 outline），颜色控件/数字输入/透明度滑杆带 aria-label；字段值仍为字符串（色值或规范化 CSS 渐变），Material/Manifest/ScreenDocument 契约零变化；渐变渲染消费由物料渲染端负责，官方文本物料以 `background-clip: text` 支持渐变文字；画布背景保持结构化契约。依据：[Unified Color Palette](../specs/unified-color-palette/spec.md)、[ADR-0050](../decisions/ADR-0050-unified-color-palette-control.md)、[ADR-0051](../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)。
+- **统一三段式颜色调色板**（封版后增量，生效中）：自定义三段式调色板全面替换原生 color input——属性面板与 Manifest Editor Descriptor 的全部 `color` 字段无条件支持单色/线性渐变/径向渐变，渐变模式支持 2..8 个色标的增删与位置编辑，单色与色标均带「透明度」滑杆（透明通道写入色值 `#rrggbbaa`，不透明保持 6 位，值仍为字符串），按字段缓存三种模式草稿；内部字段行内紧凑排布（单色 = 颜色 + 透明度一行、色标 = 颜色 + 位置一行、色标透明度与增删按钮同行、渐变参数行内，渐变模式约 290px -> 约 200px、单色约 107px -> 约 73px），模式间状态双向共享（渐变 -> 单色把选中色标完整色值含 alpha 同步为单色，transparent/非法跳过；单色 -> 渐变维持 ADR-0057 派生），颜色控件使用无边框 hex 输入（支持 `#RGB`/`#RGBA`/`#RRGGBB`/`#RRGGBBAA`，提交时同步 swatch/alpha，无效草稿不写文档且无焦点 outline），颜色控件/数字输入/透明度滑杆带 aria-label；字段值仍为字符串（色值或规范化 CSS 渐变），Material/Manifest/ScreenDocument 契约零变化；渐变渲染消费由物料渲染端负责，官方文本物料以 `background-clip: text` 支持渐变文字；画布背景保持结构化契约。依据：[Unified Color Palette](../specs/unified-color-palette/spec.md)、[ADR-0050](../decisions/ADR-0050-unified-color-palette-control.md)、[ADR-0051](../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)。
 - **画布内文本直接编辑**（封版后增量，生效中）：双击可编辑文本组件进入 contenteditable overlay 编辑会话——仅官方文本物料且 dataSource 为 static 字符串（fail-closed，host-resource 数据归宿主）；Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 视觉复制物料样式（WYSIWYG），经既有 `isEditableTarget` 通道放行 IME 与原生编辑键，不侵入物料/Renderer DOM；公共契约零变化。依据：[Designer Canvas Text Editing](../specs/designer-canvas-text-editing/spec.md)、[ADR-0052](../decisions/ADR-0052-designer-canvas-text-editing.md)。
 - **多选批量属性编辑**（封版后增量，生效中）：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑——样式字段取所有选中组件 stylePanel 交集（空交集只显几何），控件复用既有渲染与统一三段式调色板；值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派、单选通道零改动；公共契约零变化。依据：[Designer Multi Selection Editing](../specs/designer-multi-selection-editing/spec.md)、[ADR-0053](../decisions/ADR-0053-designer-multi-selection-editing.md)。
 - **变量管理**（封版后增量，生效中）：左侧面板「变量」Tab 提供静态变量的新建/重命名/编辑值/删除与 host 变量只读展示（`variableId`）；提交复用 `replace-variables` 命令（恰一条历史，undo/redo 免费）；删除/重命名前引用保护（组件数据源参数与 Blueprint 引用，fail-closed 拒绝）与重名保护；数据绑定下拉与蓝图引用自动联动；公共契约零变化。依据：[Designer Variable Management](../specs/designer-variable-management/spec.md)、[ADR-0054](../decisions/ADR-0054-designer-variable-management.md)。
 - **官方物料视觉能力**（封版后增量，生效中）：形状物料（矩形/椭圆）新增圆角 `borderRadius`（0..512）与阴影 `shadowColor`/`shadowBlur`/`shadowOffsetX`/`shadowOffsetY`（阴影默认关闭，椭圆固定 50% 圆角且面板不暴露 borderRadius）；`fill` 渐变字符串渲染为 background-image（普通色值保持 background-color），容器 `backgroundColor` 同规则——补齐统一调色板渐变渲染责任到形状/容器；`shadowColor` 渐变时跳过阴影（box-shadow 不接受 `<image>`）；Manifest 能力扩展、旧文档零迁移，公共契约零变化。依据：[Official Material Visual Capabilities](../specs/official-material-visual-capabilities/spec.md)、[ADR-0055](../decisions/ADR-0055-official-material-visual-capabilities.md)。
 - **图片物料 URL 校验与失败回退**（封版后增量，生效中）：图片物料静态数据源复用 `isBoundedScreenImageUrl` fail-closed 校验（与画布背景/封面同规则，拒绝 data:/javascript:/blob:/file:/裸相对/控制字符）——非法 URL 不创建 img、显示「图片地址无效」占位；`img` 加载失败移除失效图片并显示「图片加载失败」占位，渲染重建不残留；公共契约零变化。依据：[Image Material URL Validation](../specs/image-material-url-validation/spec.md)、[ADR-0056](../decisions/ADR-0056-image-material-url-validation.md)。
 - **调色板切换模式继承单色色系**（封版后增量，生效中）：三段式调色板从单色切换到线性/径向渐变时，若色标为未定制的内置默认（黑→白），按单色色系派生——起点 = 单色、终点 = 同色系提亮（向白混合 45%，纯白等无区分度时向黑加深 35% 回退），渐变首帧即与单色同色系；已定制的渐变色标在模式往返中原样保留、线性 ↔ 径向互切保留色标与几何；派生仅发生在交互切换路径（文档解析路径不受影响），字段值格式与序列化契约不变、一条历史可 undo，公共契约零变化。依据：[Color Palette Gradient From Solid](../specs/color-palette-gradient-from-solid/spec.md)、[ADR-0057](../decisions/ADR-0057-color-palette-gradient-from-solid.md)。
+- **组件条件样式规则**（封版后增量，生效中）：`ScreenComponentNode` 可选 `styleRules`（≤8 条，严格 JSON-safe、fail-closed 解析）以组件自身 `dataState.value` 为唯一条件源（有界路径 + 与 Blueprint 同集的 8 个操作符，类型不匹配/非 ready 视为不命中），命中规则按数组顺序逐键合并出 effective style；Renderer 在模型应用前求值并逐规则过物料 `styleSchema`（非法规则样式与非法 style 同路径 fail-closed），数据刷新自动重评估且不发新请求，effective style 只存在于运行时、不回写文档/历史；Core `update-components` patch 整体替换（空数组清除，锁定组件既有拦截）；Designer 单选检查器「条件样式」区提供规则增删与路径/操作符/比较值/样式覆盖编辑（复用 stylePanel 控件与三段式调色板，8 条上限、锁定只读、多选不渲染、恰一条事务）；宿主可经文档或既有公开事务通道配置，零新增宿主 API。依据：[Component Conditional Style Rules](../specs/component-conditional-style-rules/spec.md)、[ADR-0058](../decisions/ADR-0058-component-conditional-style-rules.md)。
+- **宿主条件样式端口**（封版后增量，生效中）：判定与视觉映射都归宿主的告警视觉通道——Viewer/Designer `configure` 可选 `conditionalStylePort`（同步纯函数 `(componentId, dataState) => style overrides | undefined`，并提供与 `resourcePort` 同形的守卫 setter 与只读 getter）；Renderer 在同一 effective style 求值点按 base → 文档 `styleRules` → 端口覆盖的固定顺序合并，端口收到完整 `dataState`（含 idle/loading/error）可自行决定降灰等状态样式；端口覆盖过物料 `styleSchema`（非法覆盖与抛异常均忽略覆盖、保留 base+规则结果并上报诊断，不中断渲染）；effective style 仍只在运行时、不回写文档；无端口实例与现状逐字节一致，文档/Blueprint 契约零变化；设计态画布经同一 Renderer 路径预览宿主告警样式。依据：[Conditional Style Port](../specs/conditional-style-port/spec.md)、[ADR-0059](../decisions/ADR-0059-conditional-style-port.md)。
 
 ## 物料体系
 
@@ -124,8 +126,10 @@
 - **文本物料排版能力**（封版后增量，生效中）：文本物料水平对齐（`textAlign`）与垂直对齐
   （`verticalAlign` top/middle/bottom）独立设置（flex 映射，缺失/top 保持 block 零回归），
   新增字间距 `letterSpacing`（px，0..100）与行间距 `lineSpacing`（px，0..512，增量语义：
-  行高 = 字号 + 行间距）；新字段全部可选、旧文档零迁移、默认值同步（top/0/0），Manifest 与
-  属性面板经既有 schema 驱动通道自动生效，Engine 与文档契约零改动。依据：
+  行高 = 字号 + 行间距），并补绝对行高 `lineHeight`（px，1..512）：行高为行盒绝对基准、
+  行间距在其上叠加增量（`line-height = (lineHeight ?? 字号) + 行间距`），两者并存互不冲突，
+  行高缺省时保持「随字号自适应」默认；新字段全部可选、旧文档零迁移、默认值同步（top/0/0），
+  Manifest 与属性面板经既有 schema 驱动通道自动生效，Engine 与文档契约零改动。依据：
   [Text Material Typography](../specs/text-material-typography/spec.md)、
   [ADR-0047](../decisions/ADR-0047-text-material-typography.md)。
 

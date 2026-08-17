@@ -12,7 +12,7 @@
 ## 包边界
 
 - 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `scripts/check-packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`react`、`vue`、`sdk` 和 `testing`。
-- 不要在不更新包及边界检查、以及对应的 Spec/ADR 的情况下新增包或放宽包清单/导出。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API。
+- 新增包、放宽包清单或改变跨包导出时，必须更新包及边界检查。仅当该变更改变长期架构决策、包依赖/所有权或公共兼容策略时，才新增或更新 ADR；只有跨多个独立交付阶段、需要迁移或回滚方案，或用户明确要求时，才创建 Spec。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API。
 - 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`scripts/check-boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`scripts` 或 Nebula 的导入、被禁止的依赖图边，以及对 `testing` 的生产依赖。
 - 依赖白名单编码在 `scripts/check-boundaries.mjs` 中；只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖。新增依赖时，必须同时更新该白名单和包清单。
 - `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。
@@ -27,7 +27,7 @@
 - 物料自定义属性面板默认使用 JSON-safe、声明式的 Manifest Editor Descriptor 和 Base Screen 内建控件；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。
 - 事件 Blueprint 编辑器、代码编辑器和复杂 ECharts/领域配置编辑器由宿主拥有；Base Screen 只提供 detached 编辑上下文、canonical 校验、Core transaction、history/revision guard 和有界结果提交。源码、图形布局和编辑器 session 不进入 Screen Document。
 - 宿主作者扩展通过公开 Custom Element method/event 和 JSON-safe authoring bridge 集成；宿主不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的通用 UI 注入逃生口。
-- 新增功能若能通过既有宿主边界完成，不得新增 Base Screen 内部工作流、package 或传输配置；范围扩展必须先更新 ADR 和生效中的 Spec。
+- 新增功能若能通过既有宿主边界完成，不得新增 Base Screen 内部工作流、package 或传输配置。只有改变产品定位、宿主/Engine 职责划分，或引入长期维护承诺的范围扩展才需要 ADR；此类改动仅在实施跨多个阶段、涉及迁移或用户明确要求时再创建 Spec。
 
 ## 目录结构与命名
 
@@ -53,15 +53,15 @@
 ## 契约与产物
 
 - `@base-screen/contracts` 是规范文档类型、解析、诊断、序列化和 JSON Schema 的唯一所有者。不要在其他包中复制或绕过其解析器。
-- 其规范解析器是失败关闭（fail-closed）的：不要添加未知字段剥离、默认值、强制转换或隐式未来版本回退。公共文档契约变更需要先有已接受的 ADR 和活动的 Spec。
+- 其规范解析器是失败关闭（fail-closed）的：不要添加未知字段剥离、默认值、强制转换或隐式未来版本回退。变更公共文档契约时，必须同步更新解析、schema、测试以及适用的迁移/兼容处理；只有改变兼容性政策、领域边界或长期演进方向时才需要 ADR，复杂或高风险的多阶段变更才需要 Spec。
 - 探索阶段命名规则：不要在文档、物料标识、标签名、清单、fixture、ADR、Spec、计划或公共 API 中引入或保留 `V1`/`V2`/`V3`、`v1`/`v2`/`v3`、`/vN`、`-vN`、诸如 `apiVersion`/`schemaVersion`/`implementationVersion` 的版本标记字段、按版本区分的分支或带版本后缀的公共名称。只使用一个当前形态和一个稳定名称。任何兼容性或版本化设计都必须在项目离开此阶段后，获得用户的明确批准。
 - `packages/contracts/src/screen-document.schema.json` 是一个已提交的黄金产物，由构建后的 schema 通过 `pnpm --filter @base-screen/contracts build` 以及随后的 `node scripts/emit-schema-golden.mjs` 生成。黄金产物更新要与其 schema 变更一起有意识地提交；构建只会把该文件复制进 `dist`。
 
 ## 文档与出处
 
 - 功能 Spec 存放在 `docs/specs/<kebab-case-feature>/`（`spec.md`、`tasks.md`、`checklist.md`、`test-matrix.md` 一套）；计划存放在 `docs/plans/<kebab-case-feature>/`；ADR 存放在 `docs/decisions/`。保持它们有版本管理，不要把工作流输出留在 `.trae/` 中。
-- **维护期（阶段封版，2026-08-12 起）。** 全部历史 Spec 与计划已归档至 `docs/specs/archive/`、`docs/plans/archive/`；当前没有生效中的 Spec。当前能力基线见 `docs/baseline/README.md`，下一阶段方向见 `docs/roadmap/README.md`。新需求必须先新建已接受的 ADR 与生效中的 Spec，不得重新打开归档任务。
-- 遵循 `docs/specs/README.md`：只有“生效中”的 Spec 可授权实现；实现不得悄悄偏离活动的 Spec；公共边界变更需要先更新相关的 ADR/Spec。
+- **维护期（阶段封版，2026-08-12 起）。** 全部历史 Spec 与计划已归档至 `docs/specs/archive/`、`docs/plans/archive/`；当前没有生效中的 Spec。当前能力基线见 `docs/baseline/README.md`，下一阶段方向见 `docs/roadmap/README.md`。新需求默认通过代码、测试和必要的基线/使用文档更新直接实现，不自动创建 ADR 或 Spec。只有改变架构、产品与宿主边界、包依赖模型、公共兼容或迁移策略的长期决策需要 ADR；只有范围较大且可分阶段交付、存在迁移/回滚风险，或用户明确要求的工作需要生效中的 Spec。不得为单个常规功能、修复、UI 调整、内部重构或局部 API 增补新建 ADR/Spec，也不得重新打开归档任务。
+- ADR 和 Spec 是有意维护的设计记录，不是每项工作的前置条件。活动的 Spec 授权其已定义范围，实施不得悄悄偏离；已触发文档门槛的公共边界变更必须在实现前或同一变更中更新相关 ADR/Spec。
 - **持久化 Spec 执行。** 当用户要求实现、执行、完成或整改某个活动的 Spec 时，把它的 `tasks.md` 和 `checklist.md` 当作完成状态机。只要还有任何适用项未勾选，就不要发送最终/完成回复。某个聚焦检查通过、`pnpm verify:m0` 通过或完成一个 Task 只是证据，并不代表 Spec 已完成。
 - **硬性 final 门槛。** 活动 Spec 存在时，`final` 只能在以下条件全部满足后发送：所有适用的顶层 Task 和子项、所有适用 checklist 项均为 `[x]`；测试矩阵已反映当前 case；必需质量门已通过。发送前必须执行 `rg -n "^- \[ \]" docs/specs/<feature>/{tasks,checklist}.md` 或等效逐文件检查。命令找到任何未勾选项时，禁止发送 `final`，即使用户只询问阶段性结果或某个 Task 已完成。
 - **恢复与继续门槛。** 任何继续、恢复、上下文压缩后的后续回合，先读取活动 Spec 的 `tasks.md`、`checklist.md` 和测试矩阵，确认第一个未勾选的适用项；将其标记为唯一进行中事项后立即继续执行。阶段性更新只能使用 `commentary`，不得以完成语气替代执行。除非用户明确暂停、转向其他工作或出现需要用户决策的阻塞，否则不得在一个已开始的活动 Spec 中止于状态报告或单个 Task。

@@ -242,6 +242,70 @@
             },
             "additionalProperties": {}
           },
+          "styleRules": {
+            "maxItems": 8,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "when": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "maxItems": 8,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    },
+                    "operator": {
+                      "type": "string",
+                      "enum": ["eq", "neq", "gt", "gte", "lt", "lte", "contains", "exists"]
+                    },
+                    "value": {}
+                  },
+                  "required": ["path", "operator"],
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "if": {
+                        "properties": {
+                          "operator": {
+                            "const": "exists"
+                          }
+                        },
+                        "required": ["operator"]
+                      },
+                      "then": {
+                        "not": {
+                          "required": ["value"]
+                        }
+                      },
+                      "else": {
+                        "required": ["value"]
+                      }
+                    }
+                  ]
+                },
+                "style": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {}
+                }
+              },
+              "required": ["id", "when", "style"],
+              "additionalProperties": false
+            }
+          },
           "dataSource": {
             "anyOf": [
               {

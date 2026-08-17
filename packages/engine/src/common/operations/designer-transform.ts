@@ -4,11 +4,7 @@ import {
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
 } from '@base-screen/core';
-import {
-  clampScreenCoordinate,
-  clampScreenSize,
-  roundScreenGeometry,
-} from './designer-geometry.js';
+import { clampScreenCoordinate, clampScreenSize, roundScreenStep } from './designer-geometry.js';
 
 export type BaseScreenTransformHandle =
   | 'north-west'
@@ -43,16 +39,16 @@ export function resizeScreenComponents(
   return components.map((component) => ({
     ...component,
     position: {
-      x: roundScreenGeometry(
+      x: roundScreenStep(
         clampScreenCoordinate(next.left + (component.position.x - bounds.left) * scaleX),
       ),
-      y: roundScreenGeometry(
+      y: roundScreenStep(
         clampScreenCoordinate(next.top + (component.position.y - bounds.top) * scaleY),
       ),
     },
     size: {
-      width: roundScreenGeometry(clampScreenSize(component.size.width * scaleX)),
-      height: roundScreenGeometry(clampScreenSize(component.size.height * scaleY)),
+      width: roundScreenStep(clampScreenSize(component.size.width * scaleX)),
+      height: roundScreenStep(clampScreenSize(component.size.height * scaleY)),
     },
   }));
 }
@@ -88,8 +84,8 @@ export function rotateScreenComponents(
     return {
       ...component,
       position: {
-        x: roundScreenGeometry(clampScreenCoordinate(nextCenter.x - component.size.width / 2)),
-        y: roundScreenGeometry(clampScreenCoordinate(nextCenter.y - component.size.height / 2)),
+        x: roundScreenStep(clampScreenCoordinate(nextCenter.x - component.size.width / 2)),
+        y: roundScreenStep(clampScreenCoordinate(nextCenter.y - component.size.height / 2)),
       },
       rotation: normalizeRotation(component.rotation + delta),
     };

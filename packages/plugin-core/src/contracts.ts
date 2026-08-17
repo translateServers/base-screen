@@ -32,6 +32,21 @@ export interface BaseScreenMaterialModel {
   readonly dataState: BaseScreenMaterialDataState;
 }
 
+/** ADR-0059 宿主条件样式端口请求：组件身份与其当前完整数据状态（含 idle/loading/error）。 */
+export interface BaseScreenConditionalStyleRequest {
+  readonly componentId: string;
+  readonly dataState: BaseScreenMaterialDataState;
+}
+
+/**
+ * ADR-0059 宿主条件样式端口：渲染期同步纯函数，相同 (componentId, dataState) 返回相同结果。
+ * 返回样式覆盖键值（merge 语义，同 styleRules 的 style），undefined 表示无覆盖；
+ * 非法覆盖与抛异常由 Renderer 同路径 fail-closed 隔离。
+ */
+export interface BaseScreenConditionalStylePort {
+  resolve(request: BaseScreenConditionalStyleRequest): ScreenJsonObject | undefined;
+}
+
 export type BaseScreenMaterialPropSchema =
   | BaseScreenMaterialStringSchema
   | BaseScreenMaterialNumberSchema

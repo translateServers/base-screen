@@ -5,6 +5,7 @@ import type {
   ScreenComponentDataSource,
   ScreenComponentNode,
   ScreenComponentStatus,
+  ScreenComponentStyleRule,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenJsonObject,
@@ -52,6 +53,8 @@ export interface ScreenComponentPatch {
   readonly status?: ScreenComponentStatus;
   readonly props?: ScreenJsonObject;
   readonly style?: ScreenJsonObject;
+  /** 条件样式规则整体替换（ADR-0058）：传完整新数组，空数组清除全部规则。 */
+  readonly styleRules?: readonly ScreenComponentStyleRule[];
   readonly dataSource?: ScreenComponentDataSource | null;
 }
 

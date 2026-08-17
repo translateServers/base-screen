@@ -231,6 +231,29 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.previewHandler).toBe(handler);
   });
 
+  it('CSP-P3-C02 accepts a valid conditional style port and rejects an invalid one atomically', () => {
+    const port = { resolve: () => undefined };
+    const designer = new BaseScreenDesignerElement();
+    const valid = designer.configure({ catalog: catalog(), conditionalStylePort: port });
+    expect(valid.ok).toBe(true);
+    expect(designer.conditionalStylePort).toBe(port);
+
+    const invalid = new BaseScreenDesignerElement();
+    const firstCatalog = catalog();
+    invalid.catalog = firstCatalog;
+    const result = invalid.configure({
+      catalog: catalog(),
+      conditionalStylePort: { nope: 1 } as unknown as never,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    }
+    // 失败配置零副作用：既有 catalog 保持原样、端口未提交。
+    expect(invalid.catalog).toBe(firstCatalog);
+    expect(invalid.conditionalStylePort).toBeUndefined();
+  });
+
   it('accepts the canvas background image button flag and exposes it via getter (ADR-0047)', () => {
     const designer = new BaseScreenDesignerElement();
     expect(designer.canvasBackgroundImageButton).toBe(false); // 默认隐藏

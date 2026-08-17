@@ -453,3 +453,84 @@ describe('applyScreenDocumentCommand update-canvas background image', () => {
     }
   });
 });
+
+describe('applyScreenDocumentCommand styleRules patch', () => {
+  const warnRule = {
+    id: 'warn',
+    when: { path: [], operator: 'gt', value: 100 },
+    style: { color: '#ff0000' },
+  } as const;
+
+  it('R2 replaces styleRules wholesale and clears them with an empty array', () => {
+    const document = makeDocument({ components: [makeComponent({ id: 'metric' })] });
+    const applied = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['metric'],
+      patch: { styleRules: [warnRule] },
+    });
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(applied.document.components[0]?.styleRules).toEqual([warnRule]);
+    expect(applied.changedComponentIds).toEqual(['metric']);
+    expect(document.components[0]?.styleRules).toBeUndefined();
+
+    const cleared = applyScreenDocumentCommand(applied.document, {
+      type: 'update-components',
+      componentIds: ['metric'],
+      patch: { styleRules: [] },
+    });
+    expect(cleared.ok).toBe(true);
+    if (cleared.ok) {
+      expect(cleared.document.components[0]?.styleRules).toEqual([]);
+      expect(cleared.changedComponentIds).toEqual(['metric']);
+    }
+  });
+
+  it('R2 keeps no-op semantics for an equal rules array', () => {
+    const document = makeDocument({
+      components: [makeComponent({ id: 'metric', styleRules: [warnRule] })],
+    });
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['metric'],
+      patch: { styleRules: [{ ...warnRule }] },
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.document).toBe(document);
+      expect(result.changedComponentIds).toEqual([]);
+    }
+  });
+
+  it('R2 fails closed on contract-invalid rules and leaves the document unchanged', () => {
+    const document = makeDocument({ components: [makeComponent({ id: 'metric' })] });
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['metric'],
+      patch: { styleRules: [warnRule, warnRule] },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.document).toBe(document);
+    }
+  });
+
+  it('R2 rejects styleRules patches on effectively locked targets', () => {
+    const document = makeDocument({
+      components: [
+        makeComponent({ id: 'group', status: { locked: true, hidden: false } }),
+        makeComponent({ id: 'child', parentId: 'group' }),
+      ],
+    });
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['child'],
+      patch: { styleRules: [warnRule] },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.document).toBe(document);
+      expect(result.diagnostics[0]?.code).toBe('CORE_COMMAND_TARGET_LOCKED');
+    }
+  });
+});

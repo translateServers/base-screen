@@ -70,7 +70,7 @@ describe('designer operations', () => {
     expect(after[0]?.rotation).toBe(75);
   });
 
-  it('rounds resize positions and sizes to two decimal places', () => {
+  it('rounds resize positions and sizes to whole pixels', () => {
     const before = [component('first', 0, 0), component('second', 120.5, 0)];
     const after = resizeScreenComponents(
       before,
@@ -84,21 +84,23 @@ describe('designer operations', () => {
 
     expect(after[0]).toMatchObject({
       position: { x: 0, y: 0 },
-      size: { width: 152.08, height: 200.44 },
+      size: { width: 152, height: 200 },
     });
     expect(after[1]).toMatchObject({
-      position: { x: 183.25, y: 0 },
-      size: { width: 152.08, height: 200.44 },
+      position: { x: 183, y: 0 },
+      size: { width: 152, height: 200 },
     });
   });
 
-  it('rounds rotate positions to two decimal places', () => {
-    const before = [component('first', 0, 0)];
-    const after = rotateScreenComponents(before, { x: 100, y: 50 }, { x: 75, y: 100 }, false);
+  it('keeps rotated positions on whole pixels', () => {
+    const before = [component('first', 0, 0), component('second', 120, 0)];
+    const after = rotateScreenComponents(before, { x: 110, y: 75 }, { x: 160, y: 75 }, false);
 
-    expect(after[0]?.rotation).not.toBe(75);
-    expect(Number.isInteger(after[0]!.position.x * 100)).toBe(true);
-    expect(Number.isInteger(after[0]!.position.y * 100)).toBe(true);
+    // 选中框中心 (110, 25)，start 指向 90°、pointer 指向 45°，delta = -45°；
+    // 三角函数会产生小数位置，取整后两个组件都落在 1px 网格上。
+    expect(after[0]?.rotation).toBe(-45);
+    expect(after[0]).toMatchObject({ position: { x: 18, y: 42 } });
+    expect(after[1]).toMatchObject({ position: { x: 102, y: -42 } });
   });
 
   it('copies detached subtrees and rewrites ids and internal parents on paste', () => {

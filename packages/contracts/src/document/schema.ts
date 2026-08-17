@@ -7,6 +7,10 @@ import {
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
   MAX_BLUEPRINT_RULES,
   MAX_COMPONENTS,
+  MAX_STYLE_RULE_ID_CODE_POINTS,
+  MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
+  MAX_STYLE_RULE_PATH_SEGMENTS,
+  MAX_STYLE_RULES_PER_COMPONENT,
   MAX_VARIABLES,
 } from './limits.js';
 
@@ -78,6 +82,37 @@ export const componentStatusSchema = z.strictObject({
   hidden: z.boolean(),
 });
 
+const styleRuleConditionSchema = z
+  .strictObject({
+    path: z
+      .array(z.string().min(1).max(MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS))
+      .max(MAX_STYLE_RULE_PATH_SEGMENTS),
+    operator: z.enum(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'contains', 'exists']),
+    value: z.any().optional(),
+  })
+  .superRefine((condition, context) => {
+    if (condition.operator === 'exists' && condition.value !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'exists style rule condition must not define value.',
+        path: ['value'],
+      });
+    }
+    if (condition.operator !== 'exists' && condition.value === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'style rule condition requires value.',
+        path: ['value'],
+      });
+    }
+  });
+
+const styleRuleSchema = z.strictObject({
+  id: z.string().min(1).max(MAX_STYLE_RULE_ID_CODE_POINTS),
+  when: styleRuleConditionSchema,
+  style: z.record(z.string(), z.any()),
+});
+
 export const staticDataSourceSchema = z.strictObject({
   type: z.literal('static'),
   value: z.any(),
@@ -120,6 +155,7 @@ export const componentSchema = z.strictObject({
   status: componentStatusSchema,
   props: z.record(z.string(), z.any()),
   style: z.record(z.string(), z.any()),
+  styleRules: z.array(styleRuleSchema).max(MAX_STYLE_RULES_PER_COMPONENT).optional(),
   dataSource: z.union([staticDataSourceSchema, hostResourceDataSourceSchema, z.null()]),
 });
 
