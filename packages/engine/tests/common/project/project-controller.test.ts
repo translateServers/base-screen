@@ -225,6 +225,21 @@ describe('ScreenProjectController', () => {
     expect(projectAdapter.save).toHaveBeenCalledTimes(1);
   });
 
+  it('marks the project clean again when the baseline document reference is restored', async () => {
+    const session = controller(adapter());
+    await session.instance.load('project-1');
+    const baseline = session.present;
+    session.present = {
+      ...document(),
+      canvas: { width: 100, height: 100, backgroundColor: '#000000' },
+    };
+    session.instance.notifyDocumentChanged();
+    expect(session.instance.dirty).toBe(true);
+    session.present = baseline;
+    session.instance.notifyDocumentChanged();
+    expect(session.instance.dirty).toBe(false);
+  });
+
   it('aborts persistence and clears project state for an external document baseline', async () => {
     let resolveSave: ((result: ScreenParseResult<ScreenProjectEnvelope>) => void) | undefined;
     const projectAdapter = adapter({

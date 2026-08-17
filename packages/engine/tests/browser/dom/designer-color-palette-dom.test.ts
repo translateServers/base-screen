@@ -4,8 +4,10 @@ import {
   applyDesignerColorPaletteStopAction,
   type ColorPaletteState,
   clearColorPaletteDraftCache,
+  colorPaletteDraftCacheSizes,
   createDesignerColorPalette,
   deriveColorPaletteStopsFromSolid,
+  MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES,
   MAX_COLOR_PALETTE_STOPS,
   MIN_COLOR_PALETTE_STOPS,
   parseColorPaletteValue,
@@ -1020,5 +1022,58 @@ describe('per-mode draft retention', () => {
     expect((drifted.element as unknown as FakeElement).dataset.colorPaletteMode).toBe(
       'radial-gradient',
     );
+  });
+
+  it('evicts the oldest field draft beyond the FIFO cap', () => {
+    const linearValue = 'linear-gradient(90deg, #000000 0%, #ffffff 100%)';
+    const ownerDocument = new FakeDocument();
+    const first = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      linearValue,
+      'field-1',
+    );
+    (first.element as unknown as FakeElement).dataset.colorPaletteSelectedStop = '1';
+    expect(readDesignerColorPaletteValue(first.controls[0]!)).toBe(linearValue);
+    expect(colorPaletteDraftCacheSizes()).toEqual({ drafts: 1, selections: 1 });
+
+    // 未超限时同 key 复用选中草稿。
+    const reused = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      linearValue,
+      'field-1',
+    );
+    expect((reused.element as unknown as FakeElement).dataset.colorPaletteSelectedStop).toBe('1');
+
+    // 逐个写入直到上限：缓存条目数封顶。
+    for (let index = 2; index <= MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES; index++) {
+      const palette = createDesignerColorPalette(
+        ownerDocument as unknown as Document,
+        '#123456',
+        `field-${index}`,
+      );
+      expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('#123456');
+    }
+    expect(colorPaletteDraftCacheSizes()).toEqual({
+      drafts: MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES,
+      selections: MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES,
+    });
+
+    // 超限写入：最早字段（field-1）被 FIFO 淘汰，条目数保持封顶。
+    const overflow = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#123456',
+      `field-${MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES + 1}`,
+    );
+    readDesignerColorPaletteValue(overflow.controls[0]!);
+    expect(colorPaletteDraftCacheSizes()).toEqual({
+      drafts: MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES,
+      selections: MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES,
+    });
+    const evicted = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      linearValue,
+      'field-1',
+    );
+    expect((evicted.element as unknown as FakeElement).dataset.colorPaletteSelectedStop).toBe('0');
   });
 });

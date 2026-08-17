@@ -30,12 +30,42 @@ export interface DesignerColorPalette {
 const DEFAULT_COLOR = '#000000';
 const DEFAULT_END_COLOR = '#ffffff';
 const COLOR_PATTERN = /^(?:#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$/i;
+// 草稿缓存为模块级（多设计器实例共享）：以 FIFO 上限约束长会话内存增长，
+// 超限时淘汰最早写入的字段草稿（被淘汰字段回退为从文档值重新解析）。
+export const MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES = 32;
 const paletteDraftCache = new Map<string, ColorPaletteState>();
 const paletteSelectionCache = new Map<string, number>();
+
+function cacheColorPaletteDraft(fieldKey: string, state: ColorPaletteState): void {
+  if (paletteDraftCache.size >= MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES) {
+    const oldest = paletteDraftCache.keys().next().value;
+    if (oldest !== undefined) {
+      paletteDraftCache.delete(oldest);
+      paletteSelectionCache.delete(oldest);
+    }
+  }
+  paletteDraftCache.set(fieldKey, state);
+}
+
+function cacheColorPaletteSelection(fieldKey: string, index: number): void {
+  if (paletteSelectionCache.size >= MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES) {
+    const oldest = paletteSelectionCache.keys().next().value;
+    if (oldest !== undefined) paletteSelectionCache.delete(oldest);
+  }
+  paletteSelectionCache.set(fieldKey, index);
+}
 
 export function clearColorPaletteDraftCache(): void {
   paletteDraftCache.clear();
   paletteSelectionCache.clear();
+}
+
+/** 测试支撑面：草稿/选中缓存当前条目数（与 clearColorPaletteDraftCache 配套）。 */
+export function colorPaletteDraftCacheSizes(): {
+  readonly drafts: number;
+  readonly selections: number;
+} {
+  return { drafts: paletteDraftCache.size, selections: paletteSelectionCache.size };
 }
 
 export function parseColorPaletteValue(value: string | undefined): ColorPaletteState {
@@ -314,8 +344,8 @@ export function readDesignerColorPaletteValue(target: EventTarget | null): strin
   if (state === undefined) return undefined;
   const fieldKey = palette.dataset.colorPaletteKey;
   if (fieldKey !== undefined) {
-    paletteDraftCache.set(fieldKey, state);
-    paletteSelectionCache.set(fieldKey, selectedColorPaletteStop(palette, state.stops.length));
+    cacheColorPaletteDraft(fieldKey, state);
+    cacheColorPaletteSelection(fieldKey, selectedColorPaletteStop(palette, state.stops.length));
   }
   return serializeColorPaletteValue(state);
 }
@@ -796,7 +826,7 @@ function selectColorPaletteStop(palette: HTMLElement, index: number): void {
   if (stops === undefined) return;
   palette.dataset.colorPaletteSelectedStop = String(index);
   const fieldKey = palette.dataset.colorPaletteKey;
-  if (fieldKey !== undefined) paletteSelectionCache.set(fieldKey, index);
+  if (fieldKey !== undefined) cacheColorPaletteSelection(fieldKey, index);
   for (let stopIndex = 0; stopIndex < handles.length; stopIndex++) {
     updateColorPaletteHandleAccessibility(handles[stopIndex]!, stops, stopIndex, index);
   }

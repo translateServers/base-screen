@@ -51,7 +51,7 @@ export class ScreenProjectController {
   #adapter: ScreenProjectAdapter | undefined;
   #project: ScreenProjectEnvelope | undefined;
   #phase: ScreenProjectPhase = 'unloaded';
-  #baseline: string | undefined;
+  #baselineDocument: ScreenDocument | undefined;
   #dirty = false;
   #generation = 0;
   #disposed = false;
@@ -110,7 +110,7 @@ export class ScreenProjectController {
     this.abortAll();
     this.#project = undefined;
     this.#lastOperation = undefined;
-    this.#baseline = serialized.value;
+    this.#baselineDocument = document;
     this.#phase = 'ready';
     this.updateDirty();
     this.notify();
@@ -161,7 +161,7 @@ export class ScreenProjectController {
             return this.finishError(pending, replacement);
           }
           this.#project = parsed.value;
-          this.#baseline = serializeScreenDocument(parsed.value.document);
+          this.#baselineDocument = this.#options.getDocument() ?? parsed.value.document;
           this.#phase = 'ready';
           this.updateDirty();
           this.notify();
@@ -314,7 +314,7 @@ export class ScreenProjectController {
   unload(): void {
     this.cancelProjectOperation();
     this.#project = undefined;
-    this.#baseline = undefined;
+    this.#baselineDocument = undefined;
     this.#phase = 'unloaded';
     this.updateDirty();
     this.notify();
@@ -433,14 +433,16 @@ export class ScreenProjectController {
       return fail('PROJECT_ABORTED', 'Project operation was superseded.');
     }
     this.#project = parsed.value;
-    this.#baseline = serializeScreenDocument(parsed.value.document);
     const current = this.#options.getDocument();
+    let baselineDocument = parsed.value.document;
     if (current !== undefined && serializeScreenDocument(current) === snapshot) {
       const replacement = this.#options.replaceDocument(parsed.value.document);
       if (!replacement.ok) {
         return this.finishError(pending, replacement);
       }
+      baselineDocument = this.#options.getDocument() ?? parsed.value.document;
     }
+    this.#baselineDocument = baselineDocument;
     this.#phase = 'ready';
     this.updateDirty();
     this.notify();
@@ -519,9 +521,9 @@ export class ScreenProjectController {
   private updateDirty(): void {
     const document = this.#options.getDocument();
     const dirty =
-      document !== undefined && this.#baseline !== undefined
-        ? serializeScreenDocument(document) !== this.#baseline
-        : false;
+      document !== undefined &&
+      this.#baselineDocument !== undefined &&
+      document !== this.#baselineDocument;
     if (dirty !== this.#dirty) {
       this.#dirty = dirty;
       this.#options.onDirtyChange?.(dirty);
