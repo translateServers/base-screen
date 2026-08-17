@@ -356,8 +356,18 @@ export class DesignerLayersController {
       return false;
     }
     const siblings = getSiblingIds(document, component.parentId);
-    const neighborId = siblings[siblings.indexOf(componentId) + (direction === 'up' ? -1 : 1)];
-    return neighborId !== undefined && !isScreenComponentEffectivelyLocked(document, neighborId);
+    const index = siblings.indexOf(componentId);
+    if (index < 0) return false;
+    // 上移 = 减小 zIndex（向顶层），下移 = 增大 zIndex（向底层）。
+    // 被移动组件与目标位置之间的全部兄弟都不得锁定：任何锁定兄弟都会迫使
+    // 本组件（或与它交换 zIndex 的中间组件）跨越锁定边界，破坏锁定约束。
+    const targetIndex = index + (direction === 'up' ? -1 : 1);
+    if (targetIndex < 0 || targetIndex >= siblings.length) return false;
+    const span =
+      direction === 'up'
+        ? siblings.slice(targetIndex, index)
+        : siblings.slice(index + 1, targetIndex + 1);
+    return span.every((id) => !isScreenComponentEffectivelyLocked(document, id));
   }
 
   private draggedSelection(): readonly string[] {

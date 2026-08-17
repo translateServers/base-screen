@@ -1,5 +1,9 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import { applyScreenDocumentTransaction, type ScreenDocumentTransaction } from '@base-screen/core';
+import {
+  applyScreenDocumentTransaction,
+  isScreenComponentEffectivelyLocked,
+  type ScreenDocumentTransaction,
+} from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DesignerLayersController } from '../../../src/browser/controllers/designer-layers-controller.js';
@@ -381,6 +385,99 @@ describe('DesignerLayersController', () => {
         .sort((left, right) => left.zIndex - right.zIndex)
         .map((item) => item.id),
     ).toEqual(['second', 'first']);
+  });
+
+  // 每次移动操作都会重排文档 zIndex（mutate 当前文档），因此每个场景用独立
+  // controller 验证一次，避免前序事务污染兄弟顺序。onClick 匹配到
+  // [data-layer-move] 即返回 true（按钮存在感），不反映 canMove 的决策；
+  // 因此通过 transactions 是否追加来判断移动是否实际执行。
+  function clickMove(
+    state: {
+      controller: DesignerLayersController;
+      transactions: ScreenDocumentTransaction[];
+      document: () => ScreenDocument;
+    },
+    id: string,
+    direction: 'up' | 'down',
+  ): void {
+    const move = new FakeElement();
+    move.dataset.layerId = id;
+    move.dataset.layerMove = direction;
+    move.matches['[data-layer-move]'] = move;
+    state.controller.onClick({ target: move } as unknown as Event);
+  }
+
+  it('allows a move past unlocked siblings and blocks a move crossing a locked sibling', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    // 兄弟按 zIndex 升序 [locked(0), first(1), second(2)]：上移 = 减小 zIndex。
+    const state = createController(
+      createDocument([
+        component('locked', null, 0, { locked: true }),
+        component('first', null, 1),
+        component('second', null, 2),
+      ]),
+    );
+
+    // second 上移（targetIndex=1，路径上是 first，未锁定）→ 执行移动。
+    clickMove(state, 'second', 'up');
+    expect(state.transactions).toHaveLength(1);
+
+    // first 上移（targetIndex=0，路径上是 locked，锁定）→ 不执行移动。
+    const blocked = createController(
+      createDocument([
+        component('locked', null, 0, { locked: true }),
+        component('first', null, 1),
+        component('second', null, 2),
+      ]),
+    );
+    clickMove(blocked, 'first', 'up');
+    expect(blocked.transactions).toEqual([]);
+  });
+
+  it('blocks a move whose only crossing target is a locked sibling', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    // zIndex 升序 [first(0), locked(1), second(2)]：锁定组件夹在中间。
+    // second 上移会直接交换 locked → 禁；first 下移也会交换 locked → 禁。
+    const secondUp = createController(
+      createDocument([
+        component('first', null, 0),
+        component('locked', null, 1, { locked: true }),
+        component('second', null, 2),
+      ]),
+    );
+    // 前置探针：确认锁定语义在测试文档上按预期生效。
+    expect(isScreenComponentEffectivelyLocked(secondUp.document(), 'locked')).toBe(true);
+    expect(isScreenComponentEffectivelyLocked(secondUp.document(), 'second')).toBe(false);
+    clickMove(secondUp, 'second', 'up');
+    expect(secondUp.transactions).toEqual([]);
+
+    const firstDown = createController(
+      createDocument([
+        component('first', null, 0),
+        component('locked', null, 1, { locked: true }),
+        component('second', null, 2),
+      ]),
+    );
+    clickMove(firstDown, 'first', 'down');
+    expect(firstDown.transactions).toEqual([]);
+  });
+
+  it('blocks moves of the locked component itself and out-of-range moves', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const lockedSelf = createController(
+      createDocument([component('locked', null, 0, { locked: true }), component('other', null, 1)]),
+    );
+    clickMove(lockedSelf, 'locked', 'up');
+    clickMove(lockedSelf, 'locked', 'down');
+    expect(lockedSelf.transactions).toEqual([]);
+
+    const outOfRange = createController(createDocument([component('only', null, 0)]));
+    clickMove(outOfRange, 'only', 'up');
+    clickMove(outOfRange, 'only', 'down');
+    expect(outOfRange.transactions).toEqual([]);
   });
 
   it('R6 allows root drops and rejects cycles, unavailable parents, hidden targets, and locked selections', () => {
