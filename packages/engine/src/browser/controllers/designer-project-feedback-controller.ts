@@ -56,6 +56,11 @@ export class DesignerProjectFeedbackController {
     this.resetConfirmation();
   }
 
+  /** 释放冲突面板引用（元素 disconnect 时由宿主调用；重连时 connect 重新注入）。 */
+  release(): void {
+    this.#conflict = undefined;
+  }
+
   private resetConfirmation(): void {
     const message = this.#conflict?.querySelector('p');
     const control = this.#conflict?.querySelector<HTMLButtonElement>(

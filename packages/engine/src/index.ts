@@ -1131,8 +1131,11 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   connectedCallback(): void {
+    // 首连由 initialize 完成全部接线；重连（initialize 因 renderer 已存在早退）时
+    // 由 reconnectSurfaces 幂等重挂并重新注入面板引用（disconnect 时已被 release 释放）。
+    const reconnected = this.#renderer !== undefined;
     this.initialize();
-    this.reconnectSurfaces();
+    if (reconnected) this.reconnectSurfaces();
     if (this.#renderer !== undefined && this.#session.document !== undefined) {
       this.renderDocument(this.#session.document);
       this.renderInteraction();
@@ -1148,6 +1151,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#datasetController.clear();
     this.resetSessionSurfaces();
     this.disconnectSurfaces();
+    this.releaseSurfaces();
     this.#session.cancelProjectOperation();
     this.#renderer?.clear();
   }
@@ -1160,21 +1164,76 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#viewportController.disconnect();
     this.#surfaceRouter.disconnect();
     this.#panelController.dispose();
+    // 结束进行中的画布文本编辑：避免拆卸后物料 visibility 残留与 overlay 监听滞留。
+    this.#textEditController.disconnect();
+    // 关闭菜单/上下文菜单/帮助面板：帮助面板的返回焦点引用随之释放。
+    this.#menuController.closeContextMenu();
+    this.#menuController.closeMenus();
+    this.#menuController.closeHelpPanel();
+  }
+
+  // 释放对各表面 DOM 的引用：元素被宿主缓存（detached 但未 GC）时不再牵住面板节点；
+  // 重连时由 reconnectSurfaces 重新查询注入。preview 控制器的 connect 会重复创建 DOM，
+  // 其引用在 shadow 树内且随元素存续，不参与释放/重挂。
+  private releaseSurfaces(): void {
+    this.#canvas = undefined;
+    this.#viewportElement = undefined;
+    this.#selection = undefined;
+    this.#properties = undefined;
+    this.#dataPanel = undefined;
+    this.#interactionPanel = undefined;
+    this.#statusFeedback = undefined;
+    this.#contextMenu = undefined;
+    this.#layers = undefined;
+    this.#notificationController.release();
+    this.#errorConsoleController.release();
+    this.#integrationController.release();
+    this.#importController.release();
+    this.#projectWorkspaceController.release();
+    this.#projectFeedbackController.release();
+    this.#variablesController.release();
   }
 
   private reconnectSurfaces(): void {
-    const canvas = this.#canvas;
-    const viewport = this.#viewportElement;
-    if (canvas !== undefined && viewport !== undefined) {
+    const shadow = this.shadowRoot;
+    if (shadow === null || shadow === undefined) return;
+    const canvas = shadow.querySelector<HTMLDivElement>('[data-canvas]');
+    const viewport = shadow.querySelector<HTMLDivElement>('[data-viewport]');
+    if (canvas !== null && viewport !== null) {
+      this.#canvas = canvas;
+      this.#viewportElement = viewport;
       this.#workbenchController.connect(canvas);
       this.#gestureController.connect(canvas);
       this.#gestureController.connectViewport(viewport);
       this.#viewportController.connect(viewport, canvas);
     }
-    const shadow = this.shadowRoot;
-    if (shadow !== null && shadow !== undefined) {
-      this.#surfaceRouter.connect(shadow, this.#surfaceBindings);
+    this.#surfaceRouter.connect(shadow, this.#surfaceBindings);
+    this.#selection = shadow.querySelector<HTMLDivElement>('[data-selection]') ?? undefined;
+    this.#properties = shadow.querySelector<HTMLDivElement>('[data-properties]') ?? undefined;
+    this.#dataPanel =
+      shadow.querySelector<HTMLDivElement>('[data-inspector-pane="data"]') ?? undefined;
+    this.#interactionPanel =
+      shadow.querySelector<HTMLDivElement>('[data-inspector-pane="interaction"]') ?? undefined;
+    this.#statusFeedback = shadow.querySelector<HTMLElement>('[data-status-feedback]') ?? undefined;
+    this.#contextMenu = shadow.querySelector<HTMLElement>('[data-context-menu]') ?? undefined;
+    this.#layers = shadow.querySelector<HTMLDivElement>('[data-layers]') ?? undefined;
+    const notifications = shadow.querySelector<HTMLElement>('[data-notifications]');
+    if (notifications !== null) this.#notificationController.connect(notifications);
+    const consoleDialog = shadow.querySelector<HTMLElement>('[data-error-console]');
+    const consoleTrigger = shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]');
+    if (consoleDialog !== null && consoleTrigger !== null) {
+      this.#errorConsoleController.connect(consoleDialog, consoleTrigger);
     }
+    const eventsPanel = shadow.querySelector<HTMLDivElement>('[data-events-panel]');
+    if (eventsPanel !== null) this.#integrationController.connect(eventsPanel);
+    const importDialog = shadow.querySelector<HTMLElement>('[data-import-confirmation]');
+    if (importDialog !== null) this.#importController.connect(importDialog);
+    const workspace = shadow.querySelector<HTMLElement>('[data-project-workspace]');
+    if (workspace !== null) this.#projectWorkspaceController.connect(workspace);
+    const variables = shadow.querySelector<HTMLElement>('[data-variables]');
+    if (variables !== null) this.#variablesController.connect(variables);
+    const conflict = shadow.querySelector<HTMLElement>('[data-project-conflict]');
+    if (conflict !== null) this.#projectFeedbackController.connect(conflict);
   }
 
   // window 级守卫随 shadow 表面就绪而注册：upgrade 时 initialize 可能因 catalog 未注入而
@@ -1837,11 +1896,8 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private renderControls(): void {
-    this.#panelController.render(
-      undefined,
-      this.#datasetCatalogPort === undefined ? this.#dataPanel : undefined,
-    );
-    if (this.#datasetCatalogPort !== undefined) this.#datasetController.render(this.#dataPanel);
+    // 数据面板只由 renderProperties 渲染：renderControls 的调用场景（工具/脏状态/
+    // 剪贴板/项目阶段）不改变其输入，重复渲染既浪费也打断面板输入焦点。
     this.renderToolControls();
     this.renderOperationControls();
     this.renderProjectStatus();

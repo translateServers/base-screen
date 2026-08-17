@@ -54,6 +54,11 @@ export class DesignerIntegrationController {
     if (this.#eventsPanel !== undefined) this.#eventsPanel.replaceChildren();
   }
 
+  /** 释放面板引用（元素 disconnect 时由宿主调用；重连时 connect 重新注入）。 */
+  release(): void {
+    this.#eventsPanel = undefined;
+  }
+
   private emitBlueprintDiagnostic(code: ScreenDiagnostic['code']): void {
     this.callbacks.emitDiagnostics([
       { severity: 'error', code, path: [], message: DESIGNER_UI_TEXT.blueprint.requestFailed },

@@ -54,7 +54,7 @@ export class DesignerLayersController {
       renameDrafts: this.#renameDrafts,
       renamingId: this.#renamingId,
       renderLimit: this.#renderLimit,
-      canMove: (id, direction) => this.canMove(id, direction),
+      canMove: (id, direction, siblings) => this.canMove(id, direction, siblings),
     });
     if (view.diagnostics.length > 0) this.callbacks.emitDiagnostics(view.diagnostics);
   }
@@ -281,6 +281,8 @@ export class DesignerLayersController {
     this.#renamingId = undefined;
     this.#renderLimit = DESIGNER_LAYER_PAGE_SIZE;
     this.render(this.#layers);
+    // 释放面板引用：断开场景不再牵住 detached 节点；下一次 render(layers) 会重新注入。
+    this.#layers = undefined;
   }
 
   private select(componentId: string, event: Event): void {
@@ -345,7 +347,13 @@ export class DesignerLayersController {
     this.render(this.#layers);
   }
 
-  private canMove(componentId: string, direction: 'up' | 'down'): boolean {
+  // 渲染路径传入视图已排序的兄弟表（避免每行重新 filter+sort）；未传时（如 move
+  // 点击路径）自行计算，排序规则与 createDesignerLayerView 一致（zIndex 升序）。
+  private canMove(
+    componentId: string,
+    direction: 'up' | 'down',
+    siblings?: readonly string[],
+  ): boolean {
     const document = this.callbacks.getDocument();
     const component = document?.components.find((item) => item.id === componentId);
     if (
@@ -355,18 +363,18 @@ export class DesignerLayersController {
     ) {
       return false;
     }
-    const siblings = getSiblingIds(document, component.parentId);
-    const index = siblings.indexOf(componentId);
+    const ordered = siblings ?? getSiblingIds(document, component.parentId);
+    const index = ordered.indexOf(componentId);
     if (index < 0) return false;
     // 上移 = 减小 zIndex（向顶层），下移 = 增大 zIndex（向底层）。
     // 被移动组件与目标位置之间的全部兄弟都不得锁定：任何锁定兄弟都会迫使
     // 本组件（或与它交换 zIndex 的中间组件）跨越锁定边界，破坏锁定约束。
     const targetIndex = index + (direction === 'up' ? -1 : 1);
-    if (targetIndex < 0 || targetIndex >= siblings.length) return false;
+    if (targetIndex < 0 || targetIndex >= ordered.length) return false;
     const span =
       direction === 'up'
-        ? siblings.slice(targetIndex, index)
-        : siblings.slice(index + 1, targetIndex + 1);
+        ? ordered.slice(targetIndex, index)
+        : ordered.slice(index + 1, targetIndex + 1);
     return span.every((id) => !isScreenComponentEffectivelyLocked(document, id));
   }
 

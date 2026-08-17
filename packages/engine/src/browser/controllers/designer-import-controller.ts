@@ -81,6 +81,14 @@ export class DesignerImportController {
     this.render();
   }
 
+  /** 释放对话框引用并丢弃待确认导入（元素 disconnect 时由宿主调用；重连时重新注入）。 */
+  release(): void {
+    this.clear();
+    this.#dialog = undefined;
+    this.#title = undefined;
+    this.#body = undefined;
+  }
+
   private render(): void {
     const dialog = this.#dialog;
     if (dialog === undefined) return;

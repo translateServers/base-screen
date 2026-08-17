@@ -40,6 +40,12 @@ export class DesignerErrorConsoleController {
     this.render();
   }
 
+  /** 释放对话框/触发器引用（元素 disconnect 时由宿主调用；重连时 connect 重新注入）。 */
+  release(): void {
+    this.#dialog = undefined;
+    this.#trigger = undefined;
+  }
+
   recordMaterialLibraryState(state: BaseScreenMaterialLibraryState | undefined): void {
     this.#currentState = state;
     const entry = errorEntryFor(state, this.#nextEntryId);

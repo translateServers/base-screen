@@ -43,4 +43,9 @@ export class DesignerNotificationController {
   clear(): void {
     this.#container?.replaceChildren();
   }
+
+  /** 释放容器引用（元素 disconnect 时由宿主调用；重连时 connect 重新注入）。 */
+  release(): void {
+    this.#container = undefined;
+  }
 }

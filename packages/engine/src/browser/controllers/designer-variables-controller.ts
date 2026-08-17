@@ -44,6 +44,18 @@ export class DesignerVariablesController {
     this.render();
   }
 
+  /**
+   * 释放面板/文档引用与草稿态（元素 disconnect 时由宿主调用；重连时 connect 重新注入）。
+   * 草稿态随引用一并丢弃：脱离文档的半程重命名不应在重连后复活。
+   */
+  release(): void {
+    this.#panel = undefined;
+    this.#lastDocument = undefined;
+    this.#creating = false;
+    this.#renamingIndex = undefined;
+    this.#editingValueIndex = undefined;
+  }
+
   render(): void {
     const panel = this.#panel;
     if (panel === undefined) return;

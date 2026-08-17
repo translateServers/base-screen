@@ -97,6 +97,15 @@ export class DesignerTextEditController {
     this.finish();
   }
 
+  /**
+   * 结束进行中的编辑会话（元素 disconnect 时由宿主调用）：未编辑时零副作用，
+   * 编辑中按取消收口，避免拆卸后物料 visibility 残留与 overlay 监听器/引用滞留。
+   */
+  disconnect(): void {
+    if (this.#overlay === undefined) return;
+    this.finish();
+  }
+
   private finish(): void {
     const overlay = this.#overlay;
     this.#overlay = undefined;

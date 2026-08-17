@@ -43,6 +43,12 @@ export class DesignerProjectWorkspaceController {
     if (this.#workspace !== undefined) this.#workspace.hidden = true;
   }
 
+  /** 释放工作区/反馈引用（元素 disconnect 时由宿主调用；重连时 connect 重新注入）。 */
+  release(): void {
+    this.#workspace = undefined;
+    this.#feedback = undefined;
+  }
+
   onClick(target: Element): boolean {
     const control = target.closest<HTMLButtonElement>('[data-project-workspace-action]');
     const action = control?.dataset.projectWorkspaceAction;
