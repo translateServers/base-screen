@@ -26,9 +26,17 @@ class FakeSurfaceRoot {
     this.listeners.set(type, listeners);
   }
 
+  removeEventListener(type: string, listener: EventListener): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
   dispatch(type: string, target: unknown, extra: Record<string, unknown> = {}): void {
     const event = { target, ...extra } as Event;
     for (const listener of [...(this.listeners.get(type) ?? [])]) listener(event);
+  }
+
+  listenerCount(): number {
+    return [...this.listeners.values()].reduce((total, set) => total + set.size, 0);
   }
 }
 
@@ -221,6 +229,27 @@ describe('DesignerSurfaceRouter', () => {
 
     root.dispatch('click', new FakeElement());
 
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it('disconnect removes every mounted listener and reconnect restores dispatch', () => {
+    const root = new FakeSurfaceRoot();
+    const handler = vi.fn(() => false);
+    const router = new DesignerSurfaceRouter();
+    router.connect(root as unknown as ShadowRoot, bindings({ pointerDown: handler }));
+    const mounted = root.listenerCount();
+    expect(mounted).toBeGreaterThan(0);
+
+    router.disconnect();
+    expect(root.listenerCount()).toBe(0);
+
+    // 断开后事件不再分发；重连后恢复。
+    root.dispatch('pointerdown', new FakeElement());
+    expect(handler).not.toHaveBeenCalled();
+
+    router.connect(root as unknown as ShadowRoot, bindings({ pointerDown: handler }));
+    expect(root.listenerCount()).toBe(mounted);
+    root.dispatch('pointerdown', new FakeElement());
     expect(handler).toHaveBeenCalledTimes(1);
   });
 });

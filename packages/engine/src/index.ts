@@ -132,7 +132,7 @@ export {
   parseBaseScreenMaterialLibraryState,
 } from './material-library-state.js';
 
-import { createDesignerStyle } from './browser/styles/designer-style.js';
+import { adoptDesignerStyleSheets, createDesignerStyle } from './browser/styles/designer-style.js';
 import {
   buildScreenAuthoringEditorContext,
   createScreenAuthoringInstanceId,
@@ -1132,6 +1132,7 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   connectedCallback(): void {
     this.initialize();
+    this.reconnectSurfaces();
     if (this.#renderer !== undefined && this.#session.document !== undefined) {
       this.renderDocument(this.#session.document);
       this.renderInteraction();
@@ -1146,8 +1147,34 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#assetController.clear();
     this.#datasetController.clear();
     this.resetSessionSurfaces();
+    this.disconnectSurfaces();
     this.#session.cancelProjectOperation();
     this.#renderer?.clear();
+  }
+
+  // 表面监听的断开/重挂与 window 守卫对称：disconnect 时成对移除各控制器监听，
+  // 重连（未 unload，initialize 早退）时幂等重挂。connect 各自带同元素守卫，首连不重复。
+  private disconnectSurfaces(): void {
+    this.#workbenchController.disconnect();
+    this.#gestureController.disconnect();
+    this.#viewportController.disconnect();
+    this.#surfaceRouter.disconnect();
+    this.#panelController.dispose();
+  }
+
+  private reconnectSurfaces(): void {
+    const canvas = this.#canvas;
+    const viewport = this.#viewportElement;
+    if (canvas !== undefined && viewport !== undefined) {
+      this.#workbenchController.connect(canvas);
+      this.#gestureController.connect(canvas);
+      this.#gestureController.connectViewport(viewport);
+      this.#viewportController.connect(viewport, canvas);
+    }
+    const shadow = this.shadowRoot;
+    if (shadow !== null && shadow !== undefined) {
+      this.#surfaceRouter.connect(shadow, this.#surfaceBindings);
+    }
   }
 
   // window 级守卫随 shadow 表面就绪而注册：upgrade 时 initialize 可能因 catalog 未注入而
@@ -1683,8 +1710,12 @@ export class BaseScreenDesignerElement extends ElementBase {
       return;
     }
     const shadow = this.shadowRoot ?? this.attachShadow({ mode: 'open' });
+    // 优先挂共享构造样式表（多实例单一 CSSOM 副本）；环境不支持时回退 style 元素。
+    const styleFallback = adoptDesignerStyleSheets(shadow)
+      ? []
+      : [createDesignerStyle(this.ownerDocument)];
     shadow.replaceChildren(
-      createDesignerStyle(this.ownerDocument),
+      ...styleFallback,
       createDesignerWorkspace(
         this.ownerDocument,
         this.#catalog.list(),
@@ -2186,7 +2217,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#workbenchController.clearGuides();
     this.#layersController.clearSessionState();
     this.#panelController.clearClipboard();
-    this.#datasetController.clear();
     this.#datasetController.clear();
     this.#integrationController.clear();
     this.#projectFeedbackController.clear();

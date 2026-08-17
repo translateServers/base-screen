@@ -2478,3 +2478,62 @@ describe('DesignerGestureController snap session', () => {
     expect(reduceSelection).not.toHaveBeenCalled();
   });
 });
+
+describe('DesignerGestureController listener pairing', () => {
+  it('disconnect removes canvas and viewport listeners pairwise and reconnect remounts them', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const added: string[] = [];
+    const removed: string[] = [];
+    const listeners = new Map<EventListener, string>();
+    const makeSurface = () =>
+      ({
+        addEventListener: (type: string, listener: EventListener) => {
+          added.push(type);
+          listeners.set(listener, type);
+        },
+        removeEventListener: (type: string, listener: EventListener) => {
+          removed.push(type);
+          expect(listeners.get(listener)).toBe(type);
+          listeners.delete(listener);
+        },
+        querySelector: () => null,
+        querySelectorAll: () => [],
+        getRootNode: () => null,
+      }) as unknown as HTMLDivElement;
+    const canvas = makeSurface();
+    const viewport = makeSurface();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+
+    controller.connect(canvas);
+    controller.connectViewport(viewport);
+    // 画布 9 个监听 + 视窗 4 个监听；同表面重复 connect 幂等。
+    controller.connect(canvas);
+    expect(added).toHaveLength(13);
+    expect(listeners.size).toBe(13);
+
+    controller.disconnect();
+    expect(removed).toHaveLength(13);
+    expect(listeners.size).toBe(0);
+
+    controller.connect(canvas);
+    controller.connectViewport(viewport);
+    expect(added).toHaveLength(26);
+    expect(removed).toHaveLength(13);
+  });
+});

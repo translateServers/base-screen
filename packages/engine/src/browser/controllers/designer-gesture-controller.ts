@@ -149,6 +149,9 @@ export interface DesignerGestureCallbacks {
 
 export class DesignerGestureController {
   #canvas: HTMLDivElement | undefined;
+  #viewport: HTMLDivElement | undefined;
+  #canvasListeners: readonly { readonly type: string; readonly listener: EventListener }[] = [];
+  #viewportListeners: readonly { readonly type: string; readonly listener: EventListener }[] = [];
   #drag: Drag | undefined;
   #transform: Transform | undefined;
   #marquee: Marquee | undefined;
@@ -175,19 +178,26 @@ export class DesignerGestureController {
   }
 
   connect(canvas: HTMLDivElement): void {
+    if (this.#canvas === canvas) return;
+    this.removeListeners(this.#canvas, this.#canvasListeners);
     this.#canvas = canvas;
-    canvas.addEventListener('pointerdown', (event) => this.onPointerDown(event));
-    canvas.addEventListener('pointermove', (event) => this.onPointerMove(event));
-    canvas.addEventListener('pointerup', (event) => this.onPointerUp(event));
-    canvas.addEventListener('pointercancel', () => this.cancel());
-    canvas.addEventListener('lostpointercapture', () => this.cancel());
-    canvas.addEventListener('dblclick', (event) => this.onDoubleClick(event));
-    // 画布是可拖拽交互表面：系统性禁止原生文本选择（selectstart 是浏览器启动文本选择的
-    // 事件通道，即使 CSS user-select 未级联到某些内容也能拦截，参考 Nebula/Moveable）。
-    canvas.addEventListener('selectstart', (event) => event.preventDefault());
-    // 从物料面板拖拽物料到画布：dragover 需要 preventDefault 才能触发 drop。
-    canvas.addEventListener('dragover', (event) => this.onDragOverCanvas(event));
-    canvas.addEventListener('drop', (event) => this.onDropOnCanvas(event));
+    this.#canvasListeners = [
+      { type: 'pointerdown', listener: (event) => this.onPointerDown(event as PointerEvent) },
+      { type: 'pointermove', listener: (event) => this.onPointerMove(event as PointerEvent) },
+      { type: 'pointerup', listener: (event) => this.onPointerUp(event as PointerEvent) },
+      { type: 'pointercancel', listener: () => this.cancel() },
+      { type: 'lostpointercapture', listener: () => this.cancel() },
+      { type: 'dblclick', listener: (event) => this.onDoubleClick(event as MouseEvent) },
+      // 画布是可拖拽交互表面：系统性禁止原生文本选择（selectstart 是浏览器启动文本选择的
+      // 事件通道，即使 CSS user-select 未级联到某些内容也能拦截，参考 Nebula/Moveable）。
+      { type: 'selectstart', listener: (event) => event.preventDefault() },
+      // 从物料面板拖拽物料到画布：dragover 需要 preventDefault 才能触发 drop。
+      { type: 'dragover', listener: (event) => this.onDragOverCanvas(event as DragEvent) },
+      { type: 'drop', listener: (event) => this.onDropOnCanvas(event as DragEvent) },
+    ];
+    for (const { type, listener } of this.#canvasListeners) {
+      canvas.addEventListener(type, listener);
+    }
   }
 
   /**
@@ -196,18 +206,57 @@ export class DesignerGestureController {
    * 与画布空白点击的取消选中语义一致。
    */
   connectViewport(viewport: HTMLDivElement): void {
-    viewport.addEventListener('pointerdown', (event) =>
-      this.onViewportBackgroundPointerDown(event),
-    );
-    viewport.addEventListener('pointermove', (event) => {
-      if (!this.isCanvasEvent(event)) this.onPointerMove(event);
-    });
-    viewport.addEventListener('pointerup', (event) => {
-      if (!this.isCanvasEvent(event)) this.onPointerUp(event);
-    });
-    viewport.addEventListener('pointercancel', (event) => {
-      if (!this.isCanvasEvent(event)) this.cancel();
-    });
+    if (this.#viewport === viewport) return;
+    this.removeListeners(this.#viewport, this.#viewportListeners);
+    this.#viewport = viewport;
+    this.#viewportListeners = [
+      {
+        type: 'pointerdown',
+        listener: (event) => this.onViewportBackgroundPointerDown(event as PointerEvent),
+      },
+      {
+        type: 'pointermove',
+        listener: (event) => {
+          if (!this.isCanvasEvent(event)) this.onPointerMove(event as PointerEvent);
+        },
+      },
+      {
+        type: 'pointerup',
+        listener: (event) => {
+          if (!this.isCanvasEvent(event)) this.onPointerUp(event as PointerEvent);
+        },
+      },
+      {
+        type: 'pointercancel',
+        listener: (event) => {
+          if (!this.isCanvasEvent(event)) this.cancel();
+        },
+      },
+    ];
+    for (const { type, listener } of this.#viewportListeners) {
+      viewport.addEventListener(type, listener);
+    }
+  }
+
+  /** 成对移除画布与视窗监听并取消进行中的手势（元素 disconnect 时由宿主调用）。 */
+  disconnect(): void {
+    this.cancel();
+    this.removeListeners(this.#canvas, this.#canvasListeners);
+    this.removeListeners(this.#viewport, this.#viewportListeners);
+    this.#canvasListeners = [];
+    this.#viewportListeners = [];
+    this.#canvas = undefined;
+    this.#viewport = undefined;
+  }
+
+  private removeListeners(
+    target: HTMLDivElement | undefined,
+    listeners: readonly { readonly type: string; readonly listener: EventListener }[],
+  ): void {
+    if (target === undefined) return;
+    for (const { type, listener } of listeners) {
+      target.removeEventListener(type, listener);
+    }
   }
 
   private isCanvasEvent(event: Event): boolean {

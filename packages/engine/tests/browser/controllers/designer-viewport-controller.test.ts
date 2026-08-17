@@ -229,3 +229,40 @@ describe('DesignerViewportController space key', () => {
     ).toBe(false);
   });
 });
+
+describe('DesignerViewportController connect/disconnect', () => {
+  it('disconnect removes every mounted listener and reconnect remounts them', () => {
+    const { controller } = createController();
+    const added: string[] = [];
+    const removed: string[] = [];
+    const listeners = new Map<EventListener, string>();
+    const viewport = {
+      clientWidth: 800,
+      clientHeight: 600,
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      addEventListener: (type: string, listener: EventListener) => {
+        added.push(type);
+        listeners.set(listener, type);
+      },
+      removeEventListener: (type: string, listener: EventListener) => {
+        removed.push(type);
+        expect(listeners.get(listener)).toBe(type);
+        listeners.delete(listener);
+      },
+    } as unknown as HTMLDivElement;
+    const canvas = { style: {}, getRootNode: () => null } as unknown as HTMLDivElement;
+
+    controller.connect(viewport, canvas);
+    expect(added).toEqual(['wheel', 'blur', 'pointerenter', 'pointerleave']);
+    expect(listeners.size).toBe(4);
+
+    controller.disconnect();
+    expect(removed).toEqual(['wheel', 'blur', 'pointerenter', 'pointerleave']);
+    expect(listeners.size).toBe(0);
+    expect(controller.hovered).toBe(false);
+
+    controller.connect(viewport, canvas);
+    expect(added).toHaveLength(8);
+    expect(removed).toHaveLength(4);
+  });
+});

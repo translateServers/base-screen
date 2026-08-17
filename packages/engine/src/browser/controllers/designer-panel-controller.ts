@@ -107,6 +107,14 @@ export class DesignerPanelController {
     this.#pasteCount = 0;
   }
 
+  /** 清理挂起的搜索防抖计时器（元素 disconnect 时由宿主调用，避免对脱离 DOM 的面板渲染）。 */
+  dispose(): void {
+    if (this.#materialSearchTimer !== undefined) {
+      clearTimeout(this.#materialSearchTimer);
+      this.#materialSearchTimer = undefined;
+    }
+  }
+
   get hasClipboard(): boolean {
     return this.#clipboard !== undefined;
   }

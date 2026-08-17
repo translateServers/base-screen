@@ -1360,3 +1360,43 @@ describe('DesignerWorkbenchController ruler resize observation', () => {
     expect(observer?.disconnected).toBe(true);
   });
 });
+
+describe('DesignerWorkbenchController canvas listener pairing', () => {
+  it('connect/disconnect removes canvas listeners pairwise and reconnect remounts them', () => {
+    const added: string[] = [];
+    const removed: string[] = [];
+    const listeners = new Map<EventListener, string>();
+    const canvas = {
+      addEventListener: (type: string, listener: EventListener) => {
+        added.push(type);
+        listeners.set(listener, type);
+      },
+      removeEventListener: (type: string, listener: EventListener) => {
+        removed.push(type);
+        expect(listeners.get(listener)).toBe(type);
+        listeners.delete(listener);
+      },
+    } as unknown as HTMLDivElement;
+    const controller = new DesignerWorkbenchController({
+      getCanvas: () => canvas,
+      getDocument: () => undefined,
+      getInteraction: () => ({ focusedComponentId: null, selectedComponentIds: [] }),
+      getRoot: () => null,
+      getZoom: () => 1,
+    });
+
+    controller.connect(canvas);
+    expect(added).toEqual(['pointerdown', 'dblclick', 'lostpointercapture']);
+    // 同一画布重复 connect 是幂等的。
+    controller.connect(canvas);
+    expect(added).toHaveLength(3);
+
+    controller.disconnect();
+    expect(removed).toEqual(['pointerdown', 'dblclick', 'lostpointercapture']);
+    expect(listeners.size).toBe(0);
+
+    controller.connect(canvas);
+    expect(added).toHaveLength(6);
+    expect(removed).toHaveLength(3);
+  });
+});

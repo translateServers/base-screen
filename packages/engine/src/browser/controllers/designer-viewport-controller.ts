@@ -20,6 +20,7 @@ export class DesignerViewportController {
   #state: ScreenViewportState = { zoom: 1, offset: { x: 0, y: 0 } };
   #viewport: HTMLDivElement | undefined;
   #canvas: HTMLDivElement | undefined;
+  #listeners: readonly { readonly type: string; readonly listener: EventListener }[] = [];
   #spacePressed = false;
   #activeTool: DesignerToolId = 'select';
   #hovered = false;
@@ -38,23 +39,53 @@ export class DesignerViewportController {
   }
 
   connect(viewport: HTMLDivElement, canvas: HTMLDivElement): void {
+    if (this.#viewport === viewport && this.#canvas === canvas) return;
+    this.disconnect();
     this.#viewport = viewport;
     this.#canvas = canvas;
-    viewport.addEventListener('wheel', (event) => this.onWheel(event), { passive: false });
-    viewport.addEventListener('blur', () => {
-      this.releaseSpace();
-      this.callbacks.onBlur();
-    });
-    // hover 状态：空格抓手不依赖键盘焦点，鼠标移入视窗即可激活（PS 语义）。
-    // pointerenter/leave 不冒泡，且 pointer capture 期间不会误触发（enter/leave 派发到 capture 元素）。
-    viewport.addEventListener('pointerenter', () => {
-      this.#hovered = true;
-    });
-    viewport.addEventListener('pointerleave', () => {
-      this.#hovered = false;
-    });
+    this.#listeners = [
+      { type: 'wheel', listener: (event) => this.onWheel(event as WheelEvent) },
+      {
+        type: 'blur',
+        listener: () => {
+          this.releaseSpace();
+          this.callbacks.onBlur();
+        },
+      },
+      // hover 状态：空格抓手不依赖键盘焦点，鼠标移入视窗即可激活（PS 语义）。
+      // pointerenter/leave 不冒泡，且 pointer capture 期间不会误触发（enter/leave 派发到 capture 元素）。
+      {
+        type: 'pointerenter',
+        listener: () => {
+          this.#hovered = true;
+        },
+      },
+      {
+        type: 'pointerleave',
+        listener: () => {
+          this.#hovered = false;
+        },
+      },
+    ];
+    for (const { type, listener } of this.#listeners) {
+      viewport.addEventListener(type, listener, type === 'wheel' ? { passive: false } : undefined);
+    }
     viewport.tabIndex = 0;
     this.render();
+  }
+
+  /** 成对移除视窗监听并复位悬停状态（元素 disconnect 时由宿主调用）。 */
+  disconnect(): void {
+    const viewport = this.#viewport;
+    if (viewport !== undefined) {
+      for (const { type, listener } of this.#listeners) {
+        viewport.removeEventListener(type, listener);
+      }
+    }
+    this.#listeners = [];
+    this.#viewport = undefined;
+    this.#canvas = undefined;
+    this.#hovered = false;
   }
 
   /** 把键盘焦点收敛到 viewport 焦点容器，作为画布交互的统一快捷键命中目标。 */

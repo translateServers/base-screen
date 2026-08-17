@@ -96,6 +96,7 @@ export class DesignerWorkbenchController {
   #panelResizeCaptureTarget: HTMLElement | undefined;
   #guideCaptureTarget: HTMLDivElement | undefined;
   #connectedCanvas: HTMLDivElement | undefined;
+  #canvasListeners: readonly { readonly type: string; readonly listener: EventListener }[] = [];
   #snapSession: DesignerSnapSession = {};
   #snapCache:
     | {
@@ -123,15 +124,35 @@ export class DesignerWorkbenchController {
     if (canvas === undefined || this.#connectedCanvas === canvas) return;
     this.disconnect();
     this.#connectedCanvas = canvas;
-    canvas.addEventListener('pointerdown', (event) => this.onCanvasPointerDown(event));
-    canvas.addEventListener('dblclick', (event) => this.onDoubleClick(event));
-    canvas.addEventListener('lostpointercapture', (event) => this.onPointerCancel(event));
+    this.#canvasListeners = [
+      {
+        type: 'pointerdown',
+        listener: (event) => this.onCanvasPointerDown(event as PointerEvent),
+      },
+      { type: 'dblclick', listener: (event) => this.onDoubleClick(event as MouseEvent) },
+      {
+        type: 'lostpointercapture',
+        listener: (event) => this.onPointerCancel(event as PointerEvent),
+      },
+    ];
+    for (const { type, listener } of this.#canvasListeners) {
+      canvas.addEventListener(type, listener);
+    }
+    // 断开时 ResizeObserver 已销毁：重挂画布同时恢复标尺尺寸观察（幂等守卫）。
+    this.observeRulerResize();
   }
 
   disconnect(): void {
     this.cancelTransientState();
     this.#resizeObserver?.disconnect();
     this.#resizeObserver = undefined;
+    const canvas = this.#connectedCanvas;
+    if (canvas !== undefined) {
+      for (const { type, listener } of this.#canvasListeners) {
+        canvas.removeEventListener(type, listener);
+      }
+    }
+    this.#canvasListeners = [];
     this.#connectedCanvas = undefined;
   }
 

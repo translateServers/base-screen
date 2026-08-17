@@ -42,84 +42,81 @@ export interface DesignerSurfaceBindings {
 export class DesignerSurfaceRouter {
   #root: ShadowRoot | undefined;
   #connected = false;
+  #removers: Array<() => void> = [];
 
   connect(root: ShadowRoot, bindings: DesignerSurfaceBindings): void {
     if (this.#connected) return;
     this.#connected = true;
     this.#root = root;
-    this.#root.addEventListener('click', (event) => {
+    const add = (type: string, listener: EventListener, options?: AddEventListenerOptions) => {
+      root.addEventListener(type, listener, options);
+      this.#removers.push(() => root.removeEventListener(type, listener, options));
+    };
+    add('click', (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
       this.#dispatch(target, event, bindings.click);
     });
-    this.#root.addEventListener('contextmenu', (event) => {
+    add('contextmenu', (event) => {
       if (event.target instanceof Element) bindings.contextMenu(event.target, event);
     });
-    this.#root.addEventListener('change', (event) =>
-      this.#dispatch(event.target, event, bindings.change),
-    );
-    this.#root.addEventListener('input', (event) =>
-      this.#dispatch(event.target, event, bindings.input),
-    );
-    this.#root.addEventListener('dragstart', (event) =>
-      this.#dispatch(event.target, event, bindings.dragStart),
-    );
-    this.#root.addEventListener('dragover', (event) => bindings.dragOver(event.target, event));
-    this.#root.addEventListener('drop', (event) => bindings.drop(event.target, event));
-    this.#root.addEventListener('dragend', (event) => bindings.dragEnd(event.target, event));
-    this.#root.addEventListener('pointerdown', (event) =>
-      bindings.pointerDown(event.target, event),
-    );
-    this.#root.addEventListener('pointermove', (event) =>
-      bindings.pointerMove(event.target, event),
-    );
-    this.#root.addEventListener('pointerup', (event) => bindings.pointerUp(event.target, event));
-    this.#root.addEventListener('pointercancel', (event) =>
-      bindings.pointerCancel(event.target, event),
-    );
-    this.#root.addEventListener('mouseover', (event) => bindings.mouseOver(event.target, event));
-    this.#root.addEventListener('mouseout', (event) => bindings.mouseOut(event.target, event));
-    this.#root.addEventListener('lostpointercapture', (event) =>
-      bindings.pointerCancel(event.target, event),
-    );
-    this.#root.addEventListener('dblclick', (event) => bindings.doubleClick(event.target, event));
-    this.#root.addEventListener('focusout', (event) => bindings.focusOut(event.target, event));
-    this.#root.addEventListener('copy', (event) => {
+    add('change', (event) => this.#dispatch(event.target, event, bindings.change));
+    add('input', (event) => this.#dispatch(event.target, event, bindings.input));
+    add('dragstart', (event) => this.#dispatch(event.target, event, bindings.dragStart));
+    add('dragover', (event) => bindings.dragOver(event.target, event));
+    add('drop', (event) => bindings.drop(event.target, event));
+    add('dragend', (event) => bindings.dragEnd(event.target, event));
+    add('pointerdown', (event) => bindings.pointerDown(event.target, event));
+    add('pointermove', (event) => bindings.pointerMove(event.target, event));
+    add('pointerup', (event) => bindings.pointerUp(event.target, event));
+    add('pointercancel', (event) => bindings.pointerCancel(event.target, event));
+    add('mouseover', (event) => bindings.mouseOver(event.target, event));
+    add('mouseout', (event) => bindings.mouseOut(event.target, event));
+    add('lostpointercapture', (event) => bindings.pointerCancel(event.target, event));
+    add('dblclick', (event) => bindings.doubleClick(event.target, event));
+    add('focusout', (event) => bindings.focusOut(event.target, event));
+    add('copy', (event) => {
       if (event.target instanceof Element) bindings.copy(event.target, event);
     });
-    this.#root.addEventListener('cut', (event) => {
+    add('cut', (event) => {
       if (event.target instanceof Element) bindings.cut(event.target, event);
     });
-    this.#root.addEventListener('paste', (event) => {
+    add('paste', (event) => {
       if (event.target instanceof Element) bindings.paste(event.target, event);
     });
-    this.#root.addEventListener('selectstart', (event) => {
+    add('selectstart', (event) => {
       if (event.target instanceof Element) bindings.selectStart(event.target, event);
     });
-    this.#root.addEventListener('gesturestart', (event) => {
+    add('gesturestart', (event) => {
       if (event.target instanceof Element) bindings.gesture(event.target, event);
     });
-    this.#root.addEventListener('gesturechange', (event) => {
+    add('gesturechange', (event) => {
       if (event.target instanceof Element) bindings.gesture(event.target, event);
     });
-    this.#root.addEventListener(
+    add(
       'keydown',
       (event) => {
         if (event.target instanceof Element) bindings.keyDownCapture(event.target, event);
       },
       { capture: true },
     );
-    this.#root.addEventListener(
+    add(
       'keyup',
       (event) => {
         if (event.target instanceof Element) bindings.keyUpCapture(event.target, event);
       },
       { capture: true },
     );
-    this.#root.addEventListener('keydown', (event) =>
-      this.#dispatch(event.target, event, bindings.keyDown),
-    );
-    this.#root.addEventListener('keyup', (event) => bindings.keyUp(event.target, event));
+    add('keydown', (event) => this.#dispatch(event.target, event, bindings.keyDown));
+    add('keyup', (event) => bindings.keyUp(event.target, event));
+  }
+
+  /** 成对移除 connect 挂载的全部监听；重连时以同一 bindings 重新 connect 即可。 */
+  disconnect(): void {
+    for (const remove of this.#removers) remove();
+    this.#removers = [];
+    this.#root = undefined;
+    this.#connected = false;
   }
 
   #dispatch(
