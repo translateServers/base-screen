@@ -63,14 +63,13 @@ export function redoScreenHistory(history: ScreenHistoryState): ScreenHistorySta
 }
 
 function assertHistory(history: ScreenHistoryState): void {
-  assertCoreValidDocument(history.present);
-  for (const entry of history.past) {
-    assertCoreValidDocument(entry.before);
-    assertCoreValidDocument(entry.after);
-  }
-  for (const entry of history.future) {
-    assertCoreValidDocument(entry.before);
-    assertCoreValidDocument(entry.after);
+  if (
+    typeof history.present !== 'object' ||
+    history.present === null ||
+    !Array.isArray(history.past) ||
+    !Array.isArray(history.future)
+  ) {
+    throw new TypeError('Screen history state is corrupted.');
   }
 }
 

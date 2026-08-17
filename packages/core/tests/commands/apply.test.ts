@@ -247,6 +247,25 @@ describe('applyScreenDocumentCommand', () => {
       expect(result.document.components[2]?.props).toEqual({ value: 1 });
     }
   });
+
+  it('shares unchanged component references with the input document', () => {
+    const document = documentWithComponents();
+    const result = applyScreenDocumentCommand(document, {
+      type: 'update-components',
+      componentIds: ['other'],
+      patch: { name: 'Renamed' },
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.document).not.toBe(document);
+      expect(result.document.components[0]).toBe(document.components[0]);
+      expect(result.document.components[1]).toBe(document.components[1]);
+      expect(result.document.components[2]).not.toBe(document.components[2]);
+      expect(result.document.canvas).toBe(document.canvas);
+      expect(result.document.blueprint).toBe(document.blueprint);
+    }
+  });
 });
 
 describe('applyScreenDocumentTransaction', () => {

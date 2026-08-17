@@ -42,6 +42,13 @@ export function applyScreenDocumentCommand(
   command: ScreenDocumentCommand,
 ): ScreenCommandResult {
   assertCoreValidDocument(document);
+  return applyValidatedCommand(document, command);
+}
+
+function applyValidatedCommand(
+  document: ScreenDocument,
+  command: ScreenDocumentCommand,
+): ScreenCommandResult {
   if (!isRecord(command) || typeof command.type !== 'string') {
     return failure(document, invalid('Command must be an object with a known type.', []));
   }
@@ -96,7 +103,9 @@ export function applyScreenDocumentTransaction(
 
   let current = document;
   for (let index = 0; index < transaction.commands.length; index++) {
-    const result = applyScreenDocumentCommand(current, transaction.commands[index]!);
+    // 事务入口已断言语义，后续命令的输入来自上一命令 finalize 的已校验输出，
+    // 无需逐命令重复全量断言。
+    const result = applyValidatedCommand(current, transaction.commands[index]!);
     if (!result.ok) {
       return {
         ok: false,
@@ -387,7 +396,9 @@ function finalize(
   candidate: unknown,
   changedComponentIds: readonly string[],
 ): ScreenCommandResult {
-  const parsed = parseCandidateDocument(candidate);
+  // candidate 由 original 经引用共享派生：以 original 为 base，未变更部分
+  // 跳过克隆与结构校验，仅完整校验新增/变更的值。
+  const parsed = parseCandidateDocument(candidate, original);
   if (!parsed.ok) {
     return failure(original, parsed.diagnostics);
   }

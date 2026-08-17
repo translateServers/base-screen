@@ -856,6 +856,68 @@ describe('parseScreenDocument', () => {
   });
 });
 
+describe('parseScreenDocument with a shared base document', () => {
+  it('keeps references shared with base and clones changed values', () => {
+    const base = parse(document({ components: [component({ id: 'a' }), component({ id: 'b' })] }));
+    expect(base.ok).toBe(true);
+    if (!base.ok) return;
+    const changed = component({ id: 'b', name: 'Renamed' });
+    const candidate = { ...base.value, components: [base.value.components[0]!, changed] };
+
+    const result = parse(candidate, base.value);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.components[0]).toBe(base.value.components[0]);
+    expect(result.value.components[1]).not.toBe(changed);
+    expect(result.value.components[1]?.name).toBe('Renamed');
+    expect(result.value.canvas).toBe(base.value.canvas);
+    expect(result.value.blueprint).toBe(base.value.blueprint);
+  });
+
+  it('still validates components that are not shared with base', () => {
+    const base = parse(document({ components: [component({ id: 'a' })] }));
+    expect(base.ok).toBe(true);
+    if (!base.ok) return;
+    const invalid = component({ id: 'b', name: 'x'.repeat(300) });
+    const candidate = { ...base.value, components: [...base.value.components, invalid] };
+
+    const result = parse(candidate, base.value);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.code === 'DOCUMENT_FIELD_INVALID')).toBe(true);
+    }
+  });
+
+  it('still validates a replaced canvas and blueprint', () => {
+    const base = parse(document({}));
+    expect(base.ok).toBe(true);
+    if (!base.ok) return;
+
+    const badCanvas = parse(
+      { ...base.value, canvas: { width: 'wide', height: 1080, backgroundColor: '#000000' } },
+      base.value,
+    );
+    expect(badCanvas.ok).toBe(false);
+
+    const badBlueprint = parse({ ...base.value, blueprint: { rules: 'none' } }, base.value);
+    expect(badBlueprint.ok).toBe(false);
+  });
+
+  it('enforces value limits for newly added content', () => {
+    const base = parse(document({}));
+    expect(base.ok).toBe(true);
+    if (!base.ok) return;
+    const oversized = component({ id: 'big', props: { blob: 'x'.repeat(70_000) } });
+    const candidate = { ...base.value, components: [oversized] };
+
+    const result = parse(candidate, base.value);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.code === 'DOCUMENT_LIMIT_EXCEEDED')).toBe(true);
+    }
+  });
+});
+
 describe('parseScreenDocument canvas background image', () => {
   function canvasWithBackgroundImage(backgroundImage: unknown): Record<string, unknown> {
     return document({

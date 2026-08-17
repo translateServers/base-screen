@@ -9,13 +9,16 @@ export function assertCoreValidDocument(document: ScreenDocument): void {
   }
 }
 
-export function parseCandidateDocument(candidate: unknown):
+export function parseCandidateDocument(
+  candidate: unknown,
+  base?: ScreenDocument,
+):
   | { readonly ok: true; readonly document: ScreenDocument }
   | {
       readonly ok: false;
       readonly diagnostics: ReturnType<typeof parseScreenDocument>['diagnostics'];
     } {
-  const parsed = parseScreenDocument(candidate);
+  const parsed = parseScreenDocument(candidate, base);
   if (!parsed.ok) {
     return { ok: false, diagnostics: parsed.diagnostics };
   }

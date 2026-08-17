@@ -106,6 +106,7 @@ export function validateDocument(
   input: unknown,
   collector: DiagnosticCollector,
   phase: DiagnosticPhase = 'root',
+  base?: ScreenDocument,
 ): ScreenDocument | undefined {
   const at = (path: DiagnosticSegment[]): DiagnosticSegment[] =>
     phase === 'document' ? ['document', ...path] : path;
@@ -126,10 +127,23 @@ export function validateDocument(
     return undefined;
   }
 
-  const candidate = cloneJsonValue(input) as unknown as Record<string, unknown>;
+  // base 是同一文档经引用共享派生的候选：与 base 相同的引用已通过校验，
+  // 跳过克隆与结构校验；其余（新增/变更）值仍完整克隆与校验。
+  const sharedComponents = base === undefined ? undefined : new Set<unknown>(base.components);
+  const sharedVariables = base === undefined ? undefined : new Set<unknown>(base.variables);
+  const candidate = (base === undefined
+    ? cloneJsonValue(input)
+    : cloneDocumentCandidate(
+        input as Record<string, unknown>,
+        base,
+        sharedComponents!,
+        sharedVariables!,
+      )) as unknown as Record<string, unknown>;
   const diagnosticsBefore = collector.count;
   checkStrictObjectKeys(candidate, DOCUMENT_ROOT_FIELDS, at([]), collector, phase);
-  validateCanvas(candidate.canvas, at, collector, phase);
+  if (candidate.canvas !== base?.canvas) {
+    validateCanvas(candidate.canvas, at, collector, phase);
+  }
 
   const components = candidate.components;
   if (!Array.isArray(components)) {
@@ -150,6 +164,9 @@ export function validateDocument(
     for (let index = 0; index < components.length; index++) {
       if (collector.full) {
         break;
+      }
+      if (sharedComponents?.has(components[index])) {
+        continue;
       }
       validateComponent(components[index], ['components', index], at, collector, phase);
     }
@@ -175,11 +192,16 @@ export function validateDocument(
       if (collector.full) {
         break;
       }
+      if (sharedVariables?.has(variables[index])) {
+        continue;
+      }
       validateVariable(variables[index], index, at, collector, phase);
     }
   }
 
-  validateBlueprint(candidate.blueprint, at, collector, phase);
+  if (candidate.blueprint !== base?.blueprint) {
+    validateBlueprint(candidate.blueprint, at, collector, phase);
+  }
 
   if (collector.count > diagnosticsBefore) {
     return undefined;
@@ -190,6 +212,33 @@ export function validateDocument(
     return undefined;
   }
   return document;
+}
+
+function cloneDocumentCandidate(
+  input: Record<string, unknown>,
+  base: ScreenDocument,
+  sharedComponents: Set<unknown>,
+  sharedVariables: Set<unknown>,
+): Record<string, unknown> {
+  const baseRecord = base as unknown as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(input)) {
+    const value = input[key];
+    if (value === baseRecord[key]) {
+      result[key] = value;
+      continue;
+    }
+    if (key === 'components' && Array.isArray(value)) {
+      result[key] = value.map((item) => (sharedComponents.has(item) ? item : cloneJsonValue(item)));
+      continue;
+    }
+    if (key === 'variables' && Array.isArray(value)) {
+      result[key] = value.map((item) => (sharedVariables.has(item) ? item : cloneJsonValue(item)));
+      continue;
+    }
+    result[key] = cloneJsonValue(value);
+  }
+  return result;
 }
 
 function validateCanvas(

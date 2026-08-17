@@ -466,6 +466,44 @@ describe('BaseScreenRenderer', () => {
     expect(root.children.map((element) => element.style.zIndex)).toEqual(['0', '1', '2']);
   });
 
+  it('reuses mounts and skips re-parse for a same-reference re-render', () => {
+    const { root, renderer } = rendererWithRoot();
+    const doc = document([component('a', 0), component('b', 1)]);
+
+    expect(renderer.render(doc).ok).toBe(true);
+    const first = [...root.children];
+
+    // 同引用重渲染（如 setInteractive 原地重渲染）：不重挂载、不重建 DOM。
+    expect(renderer.render(doc).ok).toBe(true);
+    expect(root.children).toHaveLength(2);
+    expect(root.children[0]).toBe(first[0]);
+    expect(root.children[1]).toBe(first[1]);
+  });
+
+  it('validates only changed components for a structurally shared document', () => {
+    const { root, renderer } = rendererWithRoot();
+    const a = component('a', 0);
+    const b = component('b', 1);
+    expect(renderer.render(document([a, b])).ok).toBe(true);
+    const first = [...root.children];
+
+    // 派生文档：仅组件 a 的 position 变化，b 引用共享（命中校验缓存）。
+    const moved = { ...a, position: { x: 40, y: 20 } };
+    const result = renderer.render(document([moved, b]));
+
+    expect(result.ok).toBe(true);
+    expect(root.children[0]?.style.left).toBe('40px');
+    expect(root.children[0]?.style.top).toBe('20px');
+    // reconcile 路径复用全部挂载元素。
+    expect(root.children[0]).toBe(first[0]);
+    expect(root.children[1]).toBe(first[1]);
+
+    // clear 后缓存重置，重渲染仍成功（FakeMaterialElement.remove 不回收
+    // root.children 数组，故此处只断言渲染结果）。
+    renderer.clear();
+    expect(renderer.render(document([moved, b])).ok).toBe(true);
+  });
+
   it('R2 does not restart an unchanged host-resource resolve for unrelated edits', async () => {
     const root = new FakeRoot();
     let resolveCalls = 0;

@@ -59,4 +59,23 @@ describe('AE-CR-C01 canonical path updates', () => {
     const tooDeep = Array.from({ length: 20 }, (_, i) => `k${i}`);
     expect(getScreenJsonPath(root, tooDeep)).toBeUndefined();
   });
+
+  it('shares sibling subtrees across updates instead of deep cloning', () => {
+    const next = setScreenJsonPath(root, ['title', 'text'], '新标题');
+    expect(next).not.toBe(root);
+    expect(next?.title).not.toBe(root.title);
+    expect(next?.grid).toBe(root.grid);
+    expect(next?.series).toBe(root.series);
+
+    const moved = moveScreenJsonArrayItem(root, ['series'], 0, 1);
+    expect(moved?.series).not.toBe(root.series);
+    expect(getScreenJsonPath(moved, ['series', 0])).toBe(root.series[1]);
+    expect(moved?.title).toBe(root.title);
+    expect(moved?.grid).toBe(root.grid);
+
+    const removed = removeScreenJsonArrayItem(root, ['series'], 0);
+    expect(removed?.series).toHaveLength(1);
+    expect(getScreenJsonPath(removed, ['series', 0])).toBe(root.series[1]);
+    expect(removed?.title).toBe(root.title);
+  });
 });

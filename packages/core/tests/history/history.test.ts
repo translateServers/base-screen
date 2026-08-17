@@ -3,6 +3,7 @@ import {
   commitScreenHistory,
   createScreenHistory,
   redoScreenHistory,
+  type ScreenHistoryState,
   undoScreenHistory,
 } from '../../src/history/history.js';
 import { makeDocument } from '../__fixtures__/document.js';
@@ -42,6 +43,15 @@ describe('screen history', () => {
     expect(commitScreenHistory(history, history.present)).toBe(history);
     expect(undoScreenHistory(history)).toBe(history);
     expect(redoScreenHistory(history)).toBe(history);
+  });
+
+  it('throws for structurally corrupted history state', () => {
+    const history = createScreenHistory(documentWithColor('#111111'));
+    const corrupted = {
+      ...history,
+      past: 'corrupted' as unknown as ScreenHistoryState['past'],
+    };
+    expect(() => commitScreenHistory(corrupted, documentWithColor('#222222'))).toThrow(TypeError);
   });
 
   it('trims the oldest entries at the configured limit', () => {

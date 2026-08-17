@@ -122,10 +122,25 @@ type MountedMaterial = {
   readonly resource: MountedResourceState;
 };
 
+// 组件级校验缓存：同一组件引用 + 同一 catalog entry 表示 props/style/styleRules
+// 的 schema 校验结果可复用（文档不可变 + 结构共享，未变更组件跨 render 引用相同）。
+// 每次渲染按当前文档重建缓存表，条目数以当前组件数为上界。
+type CachedComponentValidation = {
+  readonly entry: BaseScreenMaterialCatalogEntry;
+  readonly props: ScreenJsonObject;
+  readonly style: ScreenJsonObject;
+};
+
+type ComponentValidationCache = { entries: Map<ScreenComponentNode, CachedComponentValidation> };
+
 class Renderer implements BaseScreenRenderer {
   #mounted = new Map<string, MountedMaterial>();
   #candidates = new Map<string, RenderCandidate>();
   #document: ScreenDocument | undefined;
+  // 上一次成功渲染的输入引用：作为增量 parse 的 base（P0-3 契约），
+  // 相同引用直接复用上次解析输出，跳过整文档重解析。
+  #lastValidatedInput: ScreenDocument | undefined;
+  #validationCache: ComponentValidationCache = { entries: new Map() };
   #variables: ScreenJsonObject = {};
   #dataSuspended = false;
   #disposed = false;
@@ -163,7 +178,10 @@ class Renderer implements BaseScreenRenderer {
     if (this.#disposed) {
       return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Renderer has been disposed.');
     }
-    const parsedDocument = parseScreenDocument(document);
+    const parsedDocument =
+      document === this.#lastValidatedInput && this.#document !== undefined
+        ? ({ ok: true, value: this.#document, diagnostics: [] } as const)
+        : parseScreenDocument(document, this.#lastValidatedInput);
     if (!parsedDocument.ok) {
       return parsedDocument;
     }
@@ -175,6 +193,7 @@ class Renderer implements BaseScreenRenderer {
       this.options.contributionIndex,
       this.#variables,
       this.#dataSuspended,
+      this.#validationCache,
     );
     if (!prepared.ok) {
       return prepared;
@@ -439,6 +458,8 @@ class Renderer implements BaseScreenRenderer {
     this.#mounted.clear();
     this.#candidates.clear();
     this.#document = undefined;
+    this.#lastValidatedInput = undefined;
+    this.#validationCache.entries.clear();
   }
 
   dispose(): void {
@@ -975,9 +996,13 @@ function prepareCandidates(
   contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
   variables: ScreenJsonObject,
   dataSuspended: boolean,
+  validationCache: ComponentValidationCache,
 ): ScreenParseResult<readonly RenderCandidate[]> {
   const candidates: RenderCandidate[] = [];
   const diagnostics: ScreenDiagnostic[] = [];
+  // 按当前文档重建缓存表（copy-over）：命中沿用，未命中校验后写入，
+  // 使缓存条目数始终以当前文档组件数为上界，不滞留已删除组件。
+  const nextEntries = new Map<ScreenComponentNode, CachedComponentValidation>();
   for (let index = 0; index < document.components.length; index++) {
     const component = document.components[index]!;
     const entry = catalog.get(component.type);
@@ -991,41 +1016,65 @@ function prepareCandidates(
       );
       continue;
     }
-    const props = validateBaseScreenMaterialProps(component.props, entry.manifest.propsSchema);
-    if (!props.ok) {
-      diagnostics.push(...prefixDiagnostics(props.diagnostics, ['components', index, 'props']));
-      continue;
-    }
-    const style = validateBaseScreenMaterialStyle(component.style, entry.manifest.styleSchema);
-    if (!style.ok) {
-      diagnostics.push(...prefixDiagnostics(style.diagnostics, ['components', index, 'style']));
-      continue;
-    }
-    // 条件样式规则（ADR-0058）：每条规则的 style 与基础样式合并后必须满足该物料
-    // styleSchema（静态、与数据无关），非法规则样式与非法 style 同路径失败关闭。
-    const styleRules = component.styleRules ?? [];
-    let styleRulesValid = true;
-    for (let ruleIndex = 0; ruleIndex < styleRules.length; ruleIndex++) {
-      const ruleStyle = validateBaseScreenMaterialStyle(
-        { ...style.value, ...styleRules[ruleIndex]!.style },
+    const cached = validationCache.entries.get(component);
+    let props: ScreenJsonObject;
+    let style: ScreenJsonObject;
+    if (cached !== undefined && cached.entry === entry) {
+      // 同一组件引用 + 同一 catalog entry：props/style/styleRules 已在先前
+      // 渲染完整通过 schema 校验（缓存只写入全量成功项），直接复用结果。
+      props = cached.props;
+      style = cached.style;
+      nextEntries.set(component, cached);
+    } else {
+      const validatedProps = validateBaseScreenMaterialProps(
+        component.props,
+        entry.manifest.propsSchema,
+      );
+      if (!validatedProps.ok) {
+        diagnostics.push(
+          ...prefixDiagnostics(validatedProps.diagnostics, ['components', index, 'props']),
+        );
+        continue;
+      }
+      const validatedStyle = validateBaseScreenMaterialStyle(
+        component.style,
         entry.manifest.styleSchema,
       );
-      if (!ruleStyle.ok) {
+      if (!validatedStyle.ok) {
         diagnostics.push(
-          ...prefixDiagnostics(ruleStyle.diagnostics, [
-            'components',
-            index,
-            'styleRules',
-            ruleIndex,
-            'style',
-          ]),
+          ...prefixDiagnostics(validatedStyle.diagnostics, ['components', index, 'style']),
         );
-        styleRulesValid = false;
-        break;
+        continue;
       }
-    }
-    if (!styleRulesValid) {
-      continue;
+      // 条件样式规则（ADR-0058）：每条规则的 style 与基础样式合并后必须满足该物料
+      // styleSchema（静态、与数据无关），非法规则样式与非法 style 同路径失败关闭。
+      const styleRules = component.styleRules ?? [];
+      let styleRulesValid = true;
+      for (let ruleIndex = 0; ruleIndex < styleRules.length; ruleIndex++) {
+        const ruleStyle = validateBaseScreenMaterialStyle(
+          { ...validatedStyle.value, ...styleRules[ruleIndex]!.style },
+          entry.manifest.styleSchema,
+        );
+        if (!ruleStyle.ok) {
+          diagnostics.push(
+            ...prefixDiagnostics(ruleStyle.diagnostics, [
+              'components',
+              index,
+              'styleRules',
+              ruleIndex,
+              'style',
+            ]),
+          );
+          styleRulesValid = false;
+          break;
+        }
+      }
+      if (!styleRulesValid) {
+        continue;
+      }
+      props = validatedProps.value;
+      style = validatedStyle.value;
+      nextEntries.set(component, { entry, props, style });
     }
     const data = getDataState(
       component,
@@ -1046,14 +1095,15 @@ function prepareCandidates(
         componentId: component.id,
         mode,
         interactive,
-        props: props.value,
-        style: style.value,
+        props,
+        style,
         size: { width: component.size.width, height: component.size.height },
         dataState: data.dataState,
       },
       resource: data.resource,
     });
   }
+  validationCache.entries = nextEntries;
   return diagnostics.length === 0
     ? { ok: true, value: candidates, diagnostics: [] }
     : { ok: false, diagnostics: sortDiagnostics(diagnostics) };
@@ -1175,19 +1225,31 @@ function applyMaterial(
   stackOrder: number,
 ): void {
   const position = component.position;
-  element.style.position = 'absolute';
-  element.style.left = `${position.x}px`;
-  element.style.top = `${position.y}px`;
-  element.style.width = `${component.size.width}px`;
-  element.style.height = `${component.size.height}px`;
+  // 同值守卫：reconcile 路径每次 render 都会重写全部几何样式；先读后写把
+  // 未变更属性的写次数降为 0，避免无关变更（如选区变化）触发全量 CSSOM 写入。
+  const style = element.style;
+  if (style.position !== 'absolute') style.position = 'absolute';
+  const left = `${position.x}px`;
+  if (style.left !== left) style.left = left;
+  const top = `${position.y}px`;
+  if (style.top !== top) style.top = top;
+  const width = `${component.size.width}px`;
+  if (style.width !== width) style.width = width;
+  const height = `${component.size.height}px`;
+  if (style.height !== height) style.height = height;
   // Core painter order makes root subtrees indivisible spans. A unique order avoids child zIndex
   // values escaping their root subtree while Material elements remain mounted on the canvas root.
-  element.style.zIndex = String(stackOrder);
-  element.dataset.baseScreenComponentId = component.id;
-  element.style.transformOrigin = 'center';
-  element.style.transform = `rotate(${component.rotation}deg)`;
+  const zIndex = String(stackOrder);
+  if (style.zIndex !== zIndex) style.zIndex = zIndex;
+  if (element.dataset.baseScreenComponentId !== component.id) {
+    element.dataset.baseScreenComponentId = component.id;
+  }
+  if (style.transformOrigin !== 'center') style.transformOrigin = 'center';
+  const transform = `rotate(${component.rotation}deg)`;
+  if (style.transform !== transform) style.transform = transform;
   element.model = model;
-  element.style.display = effectivelyHidden ? 'none' : 'block';
+  const display = effectivelyHidden ? 'none' : 'block';
+  if (style.display !== display) style.display = display;
 }
 
 function prefixDiagnostics(
