@@ -50,7 +50,11 @@ export function validateEnvelope(
     return undefined;
   }
 
-  const candidate = cloneJsonValue(input) as unknown as Record<string, unknown>;
+  // envelope 层只浅拷贝自有字段：document 由 validateDocument 内部克隆，
+  // 避免项目加载/保存往返对同一文档做两次深拷贝（preflight 已保证 JSON 安全）。
+  const candidate = { ...(input as Record<string, unknown>) };
+  const documentInput = candidate.document;
+  delete candidate.document;
   let failed = !checkEnvelopeKeys(candidate, collector);
 
   if (!validateOpaqueString(candidate.projectId, MAX_PROJECT_ID_BYTES, ['projectId'], collector)) {
@@ -132,7 +136,7 @@ export function validateEnvelope(
     return undefined;
   }
 
-  const document = validateDocument(candidate.document, collector, 'document');
+  const document = validateDocument(documentInput, collector, 'document');
   if (document === undefined) {
     return undefined;
   }
@@ -142,7 +146,8 @@ export function validateEnvelope(
     revision: candidate.revision as string,
     name: name as string,
     description: description as string | null,
-    metadata: metadata as ScreenJsonObject,
+    // metadata 与输入隔离：envelope 结果不得与调用方共享可变引用。
+    metadata: cloneJsonValue(metadata) as ScreenJsonObject,
     document,
   };
 }

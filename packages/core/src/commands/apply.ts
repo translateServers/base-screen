@@ -1,6 +1,7 @@
 import type { ScreenComponentNode, ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
 import {
   buildComponentIndex,
+  getAncestorIds,
   getDescendantIds,
   isEffectiveLocked,
 } from '../hierarchy/hierarchy.js';
@@ -270,22 +271,22 @@ function applyRemoveComponents(
       removed.add(descendant);
     }
   }
-  const locked = document.components.find(
-    (component) => removed.has(component.id) && isEffectiveLocked(index, component.id),
-  );
+  // 按文档序收集被移除组件（即后续 changed），锁检查只遍历该集合：
+  // 首个命中与原先全量扫描的首个命中一致（诊断消息保持文档序）。
+  const changed = document.components
+    .filter((component) => removed.has(component.id))
+    .map(({ id }) => id);
+  const locked = changed.find((id) => isEffectiveLocked(index, id));
   if (locked !== undefined) {
     return failure(
       document,
       diagnostic(
         'CORE_COMMAND_TARGET_LOCKED',
         ['componentIds'],
-        `Component "${locked.id}" is locked.`,
+        `Component "${locked}" is locked.`,
       ),
     );
   }
-  const changed = document.components
-    .filter((component) => removed.has(component.id))
-    .map(({ id }) => id);
   return finalize(
     document,
     {
@@ -319,8 +320,11 @@ function applyReparentComponents(
     return success(document, []);
   }
   const index = buildComponentIndex(document);
+  // 判定「是否为另一 target 的后代」改走祖先链：id 的祖先命中 targets 即为内层，
+  // 等价于原先对每个 target 展开 descendants 的 O(n²×d) 扫描，降为 O(n×depth)。
+  const targetSet = new Set(targets);
   const outerTargets = targets.filter(
-    (id) => !targets.some((candidate) => getDescendantIds(index, candidate).includes(id)),
+    (id) => !getAncestorIds(index, id).some((ancestor) => targetSet.has(ancestor)),
   );
   if (parentId !== null && !index.byId.has(parentId)) {
     return failure(
@@ -423,8 +427,15 @@ function getNetChangedComponentIds(
 ): readonly string[] {
   const afterById = new Map(after.components.map((component) => [component.id, component]));
   const beforeById = new Map(before.components.map((component) => [component.id, component]));
+  // 命令路径结构共享：未变更组件在 before/after 中是同一引用（areEqual(x, x) 恒真）。
+  // 先按引用短路，仅对引用变化（真正被命令改写）的少数组件做深比较，
+  // 语义与全量深比较完全一致，成本从 O(n×fields) 降为 O(changed×fields)。
   const current = after.components
-    .filter((component) => !areEqual(beforeById.get(component.id), component))
+    .filter(
+      (component) =>
+        beforeById.get(component.id) !== component &&
+        !areEqual(beforeById.get(component.id), component),
+    )
     .map(({ id }) => id);
   const removed = before.components
     .filter((component) => !afterById.has(component.id))
