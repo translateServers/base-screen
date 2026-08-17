@@ -8,7 +8,13 @@ export interface ComponentIndex {
   readonly childrenByParent: ReadonlyMap<string | null, readonly string[]>;
 }
 
+// 文档不可变：组件索引按文档引用缓存。事务内多命令、语义校验与各查询
+// 共享同一份索引，避免每个命令 O(n) 重建；WeakMap 随文档引用回收。
+const componentIndexCache = new WeakMap<ScreenDocument, ComponentIndex>();
+
 export function buildComponentIndex(document: ScreenDocument): ComponentIndex {
+  const cached = componentIndexCache.get(document);
+  if (cached !== undefined) return cached;
   const byId = new Map<string, { component: ScreenComponentNode; index: number }>();
   const childrenByParent = new Map<string | null, string[]>();
 
@@ -24,7 +30,9 @@ export function buildComponentIndex(document: ScreenDocument): ComponentIndex {
     }
   }
 
-  return { byId, childrenByParent };
+  const built: ComponentIndex = { byId, childrenByParent };
+  componentIndexCache.set(document, built);
+  return built;
 }
 
 export function getRootIds(index: ComponentIndex): readonly string[] {
@@ -123,7 +131,13 @@ function sortChildren(index: ComponentIndex, children: readonly string[]): reado
   return [...children].sort((a, b) => compareSiblings(index, a, b));
 }
 
+// 绘制顺序按文档引用缓存：顺序完全由不可变文档决定（zIndex + 文档序 DFS），
+// renderer 每次 render、engine 命中测试/框选重复调用时复用，避免重复排序全部兄弟组。
+const painterOrderCache = new WeakMap<ScreenDocument, readonly string[]>();
+
 export function getPainterOrder(document: ScreenDocument): readonly string[] {
+  const cached = painterOrderCache.get(document);
+  if (cached !== undefined) return cached;
   const index = buildComponentIndex(document);
   const result: string[] = [];
   const pending = [...sortChildren(index, getRootIds(index))].reverse();
@@ -145,6 +159,7 @@ export function getPainterOrder(document: ScreenDocument): readonly string[] {
     }
   }
 
+  painterOrderCache.set(document, result);
   return result;
 }
 

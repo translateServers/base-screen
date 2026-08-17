@@ -27,6 +27,8 @@ export interface DesignerLayerItem {
 export interface DesignerLayerView {
   readonly items: readonly DesignerLayerItem[];
   readonly diagnostics: readonly ScreenDiagnostic[];
+  /** 按父分组的已排序兄弟 id 表（zIndex 升序）：供 canMove 复用，避免每行重排。 */
+  readonly siblingsByParent: ReadonlyMap<string | null, readonly string[]>;
 }
 
 export interface DesignerLayersRenderOptions {
@@ -37,7 +39,12 @@ export interface DesignerLayersRenderOptions {
   readonly renameDrafts: ReadonlyMap<string, string>;
   readonly renamingId: string | null | undefined;
   readonly renderLimit: number;
-  readonly canMove: (componentId: string, direction: 'up' | 'down') => boolean;
+  /** canMove 收到该行所属父级的已排序兄弟表（渲染路径复用，避免每行重新 filter+sort）。 */
+  readonly canMove: (
+    componentId: string,
+    direction: 'up' | 'down',
+    siblings: readonly string[],
+  ) => boolean;
 }
 
 export const DESIGNER_LAYER_PAGE_SIZE = 100;
@@ -46,7 +53,9 @@ export function createDesignerLayerView(
   document: ScreenDocument | undefined,
   catalog: BaseScreenMaterialCatalog | undefined,
 ): DesignerLayerView {
-  if (document === undefined) return { items: [], diagnostics: [] };
+  if (document === undefined) {
+    return { items: [], diagnostics: [], siblingsByParent: new Map() };
+  }
   const byId = new Map(document.components.map((component) => [component.id, component]));
   const order = new Map(document.components.map((component, index) => [component.id, index]));
   const children = new Map<string | null, string[]>();
@@ -63,6 +72,7 @@ export function createDesignerLayerView(
   return {
     items,
     diagnostics: items.filter((item) => item.missingMaterial).map(missingMaterialDiagnostic),
+    siblingsByParent: children,
   };
 }
 
@@ -110,7 +120,8 @@ export function renderDesignerLayers(
         item.id === options.dropTargetId,
         item.id === options.renamingId,
         options.renameDrafts.get(item.id),
-        options.canMove,
+        (direction) =>
+          options.canMove(item.id, direction, view.siblingsByParent.get(item.parentId) ?? []),
       ),
     );
   }
@@ -233,7 +244,7 @@ function createLayerNode(
   dropTarget: boolean,
   renaming: boolean,
   renameDraft: string | undefined,
-  canMove: (componentId: string, direction: 'up' | 'down') => boolean,
+  canMove: (direction: 'up' | 'down') => boolean,
 ): HTMLElement {
   const row = ownerDocument.createElement('div');
   row.className = 'layer-row';
@@ -332,8 +343,8 @@ function createLayerNode(
       item.locked ? DESIGNER_UI_TEXT.layersPanel.unlock : DESIGNER_UI_TEXT.layersPanel.lock,
     ),
   );
-  actions.appendChild(moveButton(ownerDocument, item.id, 'up', canMove(item.id, 'up')));
-  actions.appendChild(moveButton(ownerDocument, item.id, 'down', canMove(item.id, 'down')));
+  actions.appendChild(moveButton(ownerDocument, item.id, 'up', canMove('up')));
+  actions.appendChild(moveButton(ownerDocument, item.id, 'down', canMove('down')));
   row.appendChild(actions);
   if (item.missingMaterial) {
     const diagnostic = ownerDocument.createElement('span');

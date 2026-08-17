@@ -76,6 +76,9 @@ interface Transform {
   readonly components: readonly ScreenComponentNode[];
   /** 变换预览覆盖的 Material 根元素内联样式（结束/取消手势时恢复，与拖拽 translate 清理对称）。 */
   readonly previewStyles: ReadonlyMap<string, TransformPreviewStyle>;
+  /** 手势开始时捕获的元素引用：pointermove 每帧复用，避免逐组件 querySelector（元素身份在手势期间稳定）。 */
+  readonly elements: ReadonlyMap<string, HTMLElement>;
+  readonly selection: HTMLElement | undefined;
 }
 
 interface Marquee {
@@ -152,6 +155,9 @@ export class DesignerGestureController {
   #viewport: HTMLDivElement | undefined;
   #canvasListeners: readonly { readonly type: string; readonly listener: EventListener }[] = [];
   #viewportListeners: readonly { readonly type: string; readonly listener: EventListener }[] = [];
+  // 手势辅助元素引用缓存（marquee 常驻、create 预览按需创建）：高频 pointermove 复用。
+  #marqueeElement: HTMLElement | undefined;
+  #createPreview: HTMLElement | undefined;
   #drag: Drag | undefined;
   #transform: Transform | undefined;
   #marquee: Marquee | undefined;
@@ -247,6 +253,8 @@ export class DesignerGestureController {
     this.#viewportListeners = [];
     this.#canvas = undefined;
     this.#viewport = undefined;
+    this.#marqueeElement = undefined;
+    this.#createPreview = undefined;
   }
 
   private removeListeners(
@@ -806,6 +814,15 @@ export class DesignerGestureController {
       document,
       roots.map((component) => component.id),
     );
+    // 元素引用在手势开始时一次性捕获：pointermove 预览与取消恢复复用同一份，
+    // 避免高频事件中逐组件 querySelector（与拖拽路径的 elements 缓存同模式）。
+    const elements = new Map<string, HTMLElement>();
+    for (const component of components) {
+      const element = canvas.querySelector<HTMLElement>(
+        `[data-base-screen-component-id="${component.id}"]`,
+      );
+      if (element !== null) elements.set(component.id, element);
+    }
     this.#transform = {
       pointerId: event.pointerId,
       kind: handle === undefined ? 'rotate' : 'resize',
@@ -813,6 +830,8 @@ export class DesignerGestureController {
       start: this.canvasPointFromPointer(event),
       components,
       previewStyles: captureTransformPreviewStyles(canvas, components),
+      elements,
+      selection: canvas.querySelector<HTMLElement>('[data-selection]') ?? undefined,
     };
   }
 
@@ -834,14 +853,8 @@ export class DesignerGestureController {
 
   private renderTransformPreview(event: PointerEvent): void {
     const transform = this.#transform;
-    const canvas = this.#canvas;
-    const selection = canvas?.querySelector<HTMLElement>('[data-selection]');
-    if (
-      transform === undefined ||
-      canvas === undefined ||
-      selection === null ||
-      selection === undefined
-    ) {
+    const selection = transform?.selection;
+    if (transform === undefined || selection === undefined || selection === null) {
       return;
     }
     const after = this.transformComponents(transform, event);
@@ -856,10 +869,8 @@ export class DesignerGestureController {
     // Material 根元素实时变换（V10）：resize/rotate 直接作用于组件元素，与 renderer 的
     // left/top/width/height + rotate() 定位一致；手势结束/取消时按捕获样式恢复。
     for (const component of after) {
-      const element = canvas.querySelector<HTMLElement>(
-        `[data-base-screen-component-id="${component.id}"]`,
-      );
-      if (element === null || element === undefined) continue;
+      const element = transform.elements.get(component.id);
+      if (element === undefined) continue;
       element.style.left = `${component.position.x}px`;
       element.style.top = `${component.position.y}px`;
       element.style.width = `${component.size.width}px`;
@@ -875,10 +886,8 @@ export class DesignerGestureController {
     this.callbacks.setSnapSessionActive?.(false);
     this.releasePointerCapture(this.#transform.pointerId);
     for (const [componentId, styles] of this.#transform.previewStyles) {
-      const element = this.#canvas?.querySelector<HTMLElement>(
-        `[data-base-screen-component-id="${componentId}"]`,
-      );
-      if (element === null || element === undefined) continue;
+      const element = this.#transform.elements.get(componentId);
+      if (element === undefined) continue;
       element.style.left = styles.left;
       element.style.top = styles.top;
       element.style.width = styles.width;
@@ -921,8 +930,8 @@ export class DesignerGestureController {
       this.releasePointerCapture(this.#marquee.pointerId);
       this.#marquee = undefined;
     }
-    const marquee = this.#canvas?.querySelector<HTMLElement>('[data-marquee]');
-    if (marquee !== null && marquee !== undefined) {
+    const marquee = this.marqueeElement();
+    if (marquee !== undefined) {
       marquee.style.display = 'none';
     }
     this.clearSnapPreview();
@@ -934,7 +943,8 @@ export class DesignerGestureController {
       this.releasePointerCapture(this.#create.pointerId);
       this.#create = undefined;
     }
-    this.#canvas?.querySelector<HTMLElement>('[data-create-preview]')?.remove();
+    this.#createPreview?.remove();
+    this.#createPreview = undefined;
     this.clearSnapPreview();
   }
 
@@ -1039,8 +1049,8 @@ export class DesignerGestureController {
   }
 
   private renderMarquee(start: Point, end: Point): void {
-    const marquee = this.#canvas?.querySelector<HTMLElement>('[data-marquee]');
-    if (marquee === null || marquee === undefined) {
+    const marquee = this.marqueeElement();
+    if (marquee === undefined) {
       return;
     }
     const rect = normalizedRect(start, end);
@@ -1051,20 +1061,31 @@ export class DesignerGestureController {
     marquee.style.height = `${rect.height}px`;
   }
 
+  // 框选辅助元素常驻画布：引用缓存（带 isConnected 校验兜底重查）供 pointermove 复用，
+  // 避免每帧 querySelector。
+  private marqueeElement(): HTMLElement | undefined {
+    if (this.#marqueeElement?.isConnected) return this.#marqueeElement;
+    this.#marqueeElement = this.#canvas?.querySelector<HTMLElement>('[data-marquee]') ?? undefined;
+    return this.#marqueeElement;
+  }
+
   private renderCreatePreview(create: Create, end: Point): void {
     const canvas = this.#canvas;
     if (canvas === undefined) return;
-    const preview =
-      canvas.querySelector<HTMLElement>('[data-create-preview]') ??
-      canvas.ownerDocument.createElement('div');
-    preview.className = 'create-preview';
-    preview.dataset.createPreview = 'true';
+    // 预览元素首次渲染时创建并缓存，后续帧直接复用（手势期间元素身份稳定）。
+    let preview = this.#createPreview;
+    if (preview === undefined || !preview.isConnected) {
+      preview = canvas.ownerDocument.createElement('div');
+      preview.className = 'create-preview';
+      preview.dataset.createPreview = 'true';
+      canvas.appendChild(preview);
+      this.#createPreview = preview;
+    }
     const rect = normalizedRect(create.start, end);
     preview.style.left = `${rect.x}px`;
     preview.style.top = `${rect.y}px`;
     preview.style.width = `${Math.max(1, rect.width)}px`;
     preview.style.height = `${Math.max(1, rect.height)}px`;
-    if (!preview.isConnected) canvas.appendChild(preview);
   }
 
   private releasePointerCapture(pointerId: number): void {
