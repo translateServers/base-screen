@@ -4,7 +4,7 @@
 > 最近更新：2026-08-16（封版后增量登记）
 
 本路线图列出下一阶段的候选方向与触发条件。**它不授权任何实现**：每一项启动前都必须先有已接受的 ADR
-与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域（当前共 19 份，完整清单以
+与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域（当前共 22 份，完整清单以
 Spec 索引为准）：
 
 - 封版后首批增量：[Material Library Host State](../specs/material-library-host-state/spec.md)（ADR-0031）、
@@ -27,7 +27,8 @@ Spec 索引为准）：
   [Designer Multi Selection Editing](../specs/designer-multi-selection-editing/spec.md)（ADR-0053）、
   [Designer Variable Management](../specs/designer-variable-management/spec.md)（ADR-0054）、
   [Official Material Visual Capabilities](../specs/official-material-visual-capabilities/spec.md)（ADR-0055）、
-  [Image Material URL Validation](../specs/image-material-url-validation/spec.md)（ADR-0056）。
+  [Image Material URL Validation](../specs/image-material-url-validation/spec.md)（ADR-0056）、
+  [Color Palette Gradient From Solid](../specs/color-palette-gradient-from-solid/spec.md)（ADR-0057）。
 
 ## 候选方向
 

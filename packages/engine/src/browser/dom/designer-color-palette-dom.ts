@@ -113,6 +113,44 @@ export function updateColorPaletteStop(
   return { ...state, stops };
 }
 
+/**
+ * 切换调色板模式；从单色切到渐变且色标还是未定制的内置默认时，按单色色系派生色标，
+ * 保证渐变首帧与单色同色系（ADR-0057）。已定制色标（非默认）原样保留。
+ * `previousMode` 是切换前的面板模式（mode radio 的 change 触发时其 checked 已是新值，
+ * 需从记录面板模式的 dataset 读取上一次模式）。
+ */
+export function switchColorPaletteMode(
+  state: ColorPaletteState,
+  nextMode: ColorPaletteMode,
+  previousMode: ColorPaletteMode,
+): ColorPaletteState {
+  if (nextMode !== 'solid' && previousMode === 'solid' && isDefaultColorPaletteStops(state.stops)) {
+    const stops = deriveColorPaletteStopsFromSolid(state.solid);
+    if (stops !== undefined) return { ...state, mode: nextMode, stops };
+  }
+  return { ...state, mode: nextMode };
+}
+
+/**
+ * 从单色派生同色系渐变色标（起点 = 单色，终点 = 向白混合 45% 的提亮；提亮与起点
+ * 无区分度时向黑混合 35% 加深）。仅接受 #rgb/#rgba/#rrggbb/#rrggbbaa；transparent
+ * 或不可解析返回 undefined（调用方保持默认色标）。
+ */
+export function deriveColorPaletteStopsFromSolid(
+  solid: string,
+): readonly ColorPaletteStop[] | undefined {
+  const rgb = hexToRgb(solid);
+  if (rgb === undefined) return undefined;
+  const suffix = rgb.alpha === undefined ? '' : rgb.alpha;
+  const start = `${rgbToHex(rgb.r, rgb.g, rgb.b)}${suffix}`;
+  const light = `${mixRgbHex(rgb, 255, 0.45)}${suffix}`;
+  const end = light === start ? `${mixRgbHex(rgb, 0, 0.35)}${suffix}` : light;
+  return [
+    { color: start, position: 0 },
+    { color: end, position: 100 },
+  ];
+}
+
 export function createDesignerColorPalette(
   ownerDocument: Document,
   value: string | undefined,
@@ -191,8 +229,12 @@ export function createDesignerColorPalette(
     if (current === undefined) return;
     const metadata = readColorPaletteControlMetadata(element);
     const selected = selectedColorPaletteStop(element, current.stops.length);
-    element.dataset.colorPaletteMode = target.value;
-    renderPaletteBody(body, { ...current, mode: target.value }, selected);
+    const previousMode = isColorPaletteMode(element.dataset.colorPaletteMode)
+      ? element.dataset.colorPaletteMode
+      : current.mode;
+    const next = switchColorPaletteMode(current, target.value, previousMode);
+    element.dataset.colorPaletteMode = next.mode;
+    renderPaletteBody(body, next, selected);
     applyColorPaletteControlMetadata(element, metadata);
   });
   element.addEventListener('input', (event) => {
@@ -968,4 +1010,53 @@ function clampStopPosition(
 
 function isValidColor(value: string | undefined): value is string {
   return value !== undefined && COLOR_PATTERN.test(value);
+}
+
+function isDefaultColorPaletteStops(stops: readonly ColorPaletteStop[]): boolean {
+  return (
+    stops.length === 2 &&
+    stops[0]?.color === DEFAULT_COLOR &&
+    stops[0]?.position === 0 &&
+    stops[1]?.color === DEFAULT_END_COLOR &&
+    stops[1]?.position === 100
+  );
+}
+
+function hexToRgb(
+  color: string | undefined,
+):
+  | { readonly r: number; readonly g: number; readonly b: number; readonly alpha?: string }
+  | undefined {
+  if (color === undefined) return undefined;
+  const match = color.toLowerCase().match(/^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/);
+  if (match === null || match === undefined) return undefined;
+  let value = match[1]!;
+  if (value.length === 3 || value.length === 4) {
+    value = [...value].map((character) => `${character}${character}`).join('');
+  }
+  const r = Number.parseInt(value.slice(0, 2), 16);
+  const g = Number.parseInt(value.slice(2, 4), 16);
+  const b = Number.parseInt(value.slice(4, 6), 16);
+  const alpha = value.length === 8 ? value.slice(6, 8) : undefined;
+  return alpha === undefined ? { r, g, b } : { r, g, b, alpha };
+}
+
+function mixChannel(channel: number, target: number, ratio: number): number {
+  return Math.round(channel + (target - channel) * ratio);
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, '0')).join('')}`;
+}
+
+function mixRgbHex(
+  rgb: { readonly r: number; readonly g: number; readonly b: number },
+  target: number,
+  ratio: number,
+): string {
+  return rgbToHex(
+    mixChannel(rgb.r, target, ratio),
+    mixChannel(rgb.g, target, ratio),
+    mixChannel(rgb.b, target, ratio),
+  );
 }

@@ -2759,6 +2759,75 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     return element?.querySelector('img')?.src === 'https://example.com/a.png';
   });
 
+  // 调色板切换模式继承单色色系（ADR-0057）：新建矩形（fill 默认单色 #2563eb），
+  // 把单色改为 #ff0000 后切到线性渐变，首帧色标起点 = 所选单色、终点 = 同色系提亮；
+  // 派生提交恰一条历史，撤销恢复到切换前的单色。
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const card = [...root.querySelectorAll('button')].find(
+      (button) => button.dataset.materialType === 'base.rectangle',
+    );
+    card.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-inspector-pane="appearance"]');
+    return panel?.querySelector('[data-style="fill"][data-color-palette-field="solid"]') !== null;
+  });
+  const paletteBefore = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].at(-1);
+    const id = element.getAttribute('data-base-screen-component-id');
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === id,
+    );
+    return { id, fill: component?.style?.fill };
+  });
+  await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-inspector-pane="appearance"]');
+    const solid = panel.querySelector('[data-style="fill"][data-color-palette-field="solid"]');
+    solid.value = '#ff0000';
+    const radio = panel.querySelector(
+      '[data-style="fill"][data-color-palette-field="mode"][value="linear-gradient"]',
+    );
+    radio.checked = true;
+    radio.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction((expected) => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].at(-1);
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === element.getAttribute('data-base-screen-component-id'),
+    );
+    return component?.style?.fill === expected;
+  }, 'linear-gradient(90deg, #ff0000 0%, #ff7373 100%)');
+  const paletteStops = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-inspector-pane="appearance"]');
+    const solid = panel.querySelector('[data-style="fill"][data-color-palette-field="solid"]');
+    const palette = solid.closest('[data-designer-color-palette]');
+    return [...palette.querySelectorAll('[data-color-palette-stop-handle]')].map(
+      (handle) => handle.dataset.colorPaletteStopColor,
+    );
+  });
+  if (JSON.stringify(paletteStops) !== JSON.stringify(['#ff0000', '#ff7373'])) {
+    throw new Error(`BROWSER_HARNESS_PALETTE_FAMILY_STOPS_FAILED:${paletteStops.join(',')}`);
+  }
+  // 撤销前聚焦视口（Ctrl+Z 需进入 designer 事件链）。
+  await page.evaluate(() => {
+    window.baseScreenHarness.designer.shadowRoot.querySelector('[data-viewport]').focus();
+  });
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction((undo) => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].at(-1);
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === element.getAttribute('data-base-screen-component-id'),
+    );
+    return component?.style?.fill === undo;
+  }, paletteBefore.fill);
+
   // 清空框选遗留的选择，避免污染后续断言步骤。
   await page.keyboard.press('Escape');
   await page.waitForFunction(

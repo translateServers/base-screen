@@ -5,12 +5,14 @@ import {
   type ColorPaletteState,
   clearColorPaletteDraftCache,
   createDesignerColorPalette,
+  deriveColorPaletteStopsFromSolid,
   MAX_COLOR_PALETTE_STOPS,
   MIN_COLOR_PALETTE_STOPS,
   parseColorPaletteValue,
   readDesignerColorPaletteValue,
   removeColorPaletteStop,
   serializeColorPaletteValue,
+  switchColorPaletteMode,
   updateColorPaletteStop,
 } from '../../../src/browser/dom/designer-color-palette-dom.js';
 
@@ -433,6 +435,157 @@ describe('createDesignerColorPalette', () => {
       (candidate) => candidate.dataset.colorPaletteAction === 'remove-stop',
     );
     expect(remove.map((button) => button.disabled)).toEqual([true]);
+  });
+});
+
+describe('deriveColorPaletteStopsFromSolid', () => {
+  it('derives a same-family tint from a regular solid color', () => {
+    expect(deriveColorPaletteStopsFromSolid('#ff0000')).toEqual([
+      { color: '#ff0000', position: 0 },
+      { color: '#ff7373', position: 100 },
+    ]);
+  });
+
+  it('derives visible stops for black and falls back to darkening for white', () => {
+    expect(deriveColorPaletteStopsFromSolid('#000000')).toEqual([
+      { color: '#000000', position: 0 },
+      { color: '#737373', position: 100 },
+    ]);
+    expect(deriveColorPaletteStopsFromSolid('#ffffff')).toEqual([
+      { color: '#ffffff', position: 0 },
+      { color: '#a6a6a6', position: 100 },
+    ]);
+  });
+
+  it('normalizes short hex and preserves alpha channels', () => {
+    expect(deriveColorPaletteStopsFromSolid('#f00')).toEqual([
+      { color: '#ff0000', position: 0 },
+      { color: '#ff7373', position: 100 },
+    ]);
+    expect(deriveColorPaletteStopsFromSolid('#ff000080')).toEqual([
+      { color: '#ff000080', position: 0 },
+      { color: '#ff737380', position: 100 },
+    ]);
+  });
+
+  it('returns undefined for transparent and unparseable solids', () => {
+    for (const value of [
+      'transparent',
+      'not-a-color',
+      'rgb(1, 2, 3)',
+      undefined as unknown as string,
+    ]) {
+      expect(deriveColorPaletteStopsFromSolid(value)).toBeUndefined();
+    }
+  });
+});
+
+describe('switchColorPaletteMode', () => {
+  const solidState: ColorPaletteState = {
+    mode: 'solid',
+    solid: '#123456',
+    stops: [
+      { color: '#000000', position: 0 },
+      { color: '#ffffff', position: 100 },
+    ],
+    angle: 90,
+    x: 50,
+    y: 50,
+  };
+
+  it('derives default stops from the solid color on solid → gradient', () => {
+    const linear = switchColorPaletteMode(solidState, 'linear-gradient', 'solid');
+    expect(linear.mode).toBe('linear-gradient');
+    expect(linear.stops).toEqual([
+      { color: '#123456', position: 0 },
+      { color: '#7d8fa2', position: 100 },
+    ]);
+    expect(linear.angle).toBe(90);
+    const radial = switchColorPaletteMode(solidState, 'radial-gradient', 'solid');
+    expect(radial.mode).toBe('radial-gradient');
+    expect(radial.stops).toEqual(linear.stops);
+    expect(radial.x).toBe(50);
+    expect(radial.y).toBe(50);
+  });
+
+  it('keeps customized stops on solid → gradient and between gradients', () => {
+    const customized: ColorPaletteState = {
+      ...solidState,
+      stops: [
+        { color: '#ff0000', position: 0 },
+        { color: '#0000ff', position: 100 },
+      ],
+    };
+    const gradient = switchColorPaletteMode(customized, 'linear-gradient', 'solid');
+    expect(gradient.stops).toEqual(customized.stops);
+    const radial = switchColorPaletteMode(gradient, 'radial-gradient', 'linear-gradient');
+    expect(radial.stops).toEqual(customized.stops);
+    expect(radial.angle).toBe(90);
+  });
+
+  it('derives exactly once: derived stops survive a solid round-trip', () => {
+    const derived = switchColorPaletteMode(solidState, 'linear-gradient', 'solid');
+    const back = switchColorPaletteMode(derived, 'solid', 'linear-gradient');
+    expect(back.mode).toBe('solid');
+    const again = switchColorPaletteMode(back, 'linear-gradient', 'solid');
+    expect(again.stops).toEqual([
+      { color: '#123456', position: 0 },
+      { color: '#7d8fa2', position: 100 },
+    ]);
+  });
+
+  it('does not derive when re-selecting the active mode', () => {
+    expect(switchColorPaletteMode(solidState, 'solid', 'solid')).toEqual(solidState);
+  });
+});
+
+describe('mode switch derives solid family in the DOM', () => {
+  it('derives the gradient from the solid color when switching to linear', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#123456');
+    const element = palette.element as unknown as FakeElement;
+    byField(element, 'solid')!.value = '#123456';
+    checkMode(element, 'linear-gradient');
+    modeRadio(element, 'linear-gradient').dispatchEvent(new Event('change', { bubbles: true }));
+    expect(element.dataset.colorPaletteMode).toBe('linear-gradient');
+    expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe(
+      'linear-gradient(90deg, #123456 0%, #7d8fa2 100%)',
+    );
+    expect(stopRows(element).map((handle) => handle.dataset.colorPaletteStopColor)).toEqual([
+      '#123456',
+      '#7d8fa2',
+    ]);
+  });
+
+  it('preserves customized stops when cycling solid → gradient → solid → gradient', () => {
+    const ownerDocument = new FakeDocument();
+    const value = 'linear-gradient(90deg, #ff0000 0%, #0000ff 100%)';
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, value);
+    const element = palette.element as unknown as FakeElement;
+    checkMode(element, 'linear-gradient');
+    element.dataset.colorPaletteMode = 'linear-gradient';
+    expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe(value);
+
+    checkMode(element, 'solid');
+    element.dataset.colorPaletteMode = 'solid';
+    modeRadio(element, 'solid').dispatchEvent(new Event('change', { bubbles: true }));
+    checkMode(element, 'linear-gradient');
+    modeRadio(element, 'linear-gradient').dispatchEvent(new Event('change', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe(value);
+  });
+
+  it('keeps document gradient stops when switching between gradient modes', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #112233 0%, #ffffff 100%)',
+    );
+    const element = palette.element as unknown as FakeElement;
+    checkMode(element, 'radial-gradient');
+    modeRadio(element, 'radial-gradient').dispatchEvent(new Event('change', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe(
+      'radial-gradient(circle at 50% 50%, #112233 0%, #ffffff 100%)',
+    );
   });
 });
 

@@ -48,6 +48,7 @@
 | [Designer Variable Management](./designer-variable-management/spec.md) | Designer 交互增量 | 变量管理：左侧面板「变量」Tab 提供静态变量新建/重命名/编辑值/删除与 host 变量只读展示（variableId）；提交复用 `replace-variables` 命令（恰一条历史）；删除/重命名引用保护（组件参数与蓝图引用，fail-closed）与重名保护；数据绑定/蓝图引用自动联动，公共契约零变化；依据 [ADR-0054](../decisions/ADR-0054-designer-variable-management.md)；2026-08-16 生效 |
 | [Official Material Visual Capabilities](./official-material-visual-capabilities/spec.md) | 物料能力增量 | 官方形状物料视觉能力：矩形/椭圆新增圆角（borderRadius）与阴影（shadowColor/blur/offset）字段，fill 渐变渲染为 background-image（容器同规则），补齐 ADR-0051 渐变渲染责任；椭圆固定 50% 圆角且面板隐藏 borderRadius；shadowColor 渐变跳过阴影；Manifest 能力扩展、旧文档零迁移，公共契约零变化；依据 [ADR-0055](../decisions/ADR-0055-official-material-visual-capabilities.md)；2026-08-16 生效 |
 | [Image Material URL Validation](./image-material-url-validation/spec.md) | 物料健壮性增量 | 图片物料 URL fail-closed 校验（复用 `isBoundedScreenImageUrl`，与画布背景/封面同规则）与加载失败占位回退：非法 URL 不创建 img、显示「图片地址无效」，img error 显示「图片加载失败」且重建不残留；公共契约零变化；依据 [ADR-0056](../decisions/ADR-0056-image-material-url-validation.md)；2026-08-16 生效 |
+| [Color Palette Gradient From Solid](./color-palette-gradient-from-solid/spec.md) | Designer 控件增量 | 三段式调色板单色 → 渐变切换继承单色色系：未定制（默认黑→白）色标按单色派生（起点=单色、终点=同色系提亮，纯白加深回退），已定制色标模式往返原样保留、线性↔径向互切保留；派生仅在交互切换路径，值格式/序列化/公共契约零变化；依据 [ADR-0057](../decisions/ADR-0057-color-palette-gradient-from-solid.md)；2026-08-16 生效 |
 
 ## 已归档
 
