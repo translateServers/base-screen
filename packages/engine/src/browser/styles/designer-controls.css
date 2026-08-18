@@ -45,6 +45,7 @@
 
 .designer-color-palette {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   overflow: hidden;
   border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-control);
@@ -120,6 +121,7 @@
 
 .designer-color-palette-fields {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--designer-space-3);
   padding: var(--designer-space-3);
 }
@@ -189,6 +191,7 @@
   align-items: center;
   gap: var(--designer-space-3);
   min-height: var(--designer-control-height-compact);
+  min-width: 0;
 }
 
 .designer-color-palette-alpha-label {
