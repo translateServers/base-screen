@@ -70,6 +70,10 @@ available; read [material-mcp.md](references/material-mcp.md) only when that pat
   URL. A manifest must declare stable `type`/`tagName` identity and complete defaults.
 - Host-resource data uses literal parameter values and declared binding roles. Do not put URLs, SQL,
   headers, cookies, tokens, credentials, service objects, or live rows in source metadata or docs.
+- Version resources are immutable assets bound to a material version. A material may reference only
+  resource keys that exist in the current version, and only through the documented
+  `useMaterialResource(key)` runtime API. Never invent keys, embed file URLs, or reference files
+  outside the version; missing resources must be reported to the user before any apply.
 - Use sanitized samples only to select layout, field roles, and value ranges. Never copy sample rows
   into defaults unless the request explicitly asks for static example content.
 - Events are declared manifest names with bounded JSON payloads and `base-screen-material-event`

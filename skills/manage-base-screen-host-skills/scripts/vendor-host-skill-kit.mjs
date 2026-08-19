@@ -174,12 +174,17 @@ async function assertSupplyState(
   const currentNames = [...managedCurrentFiles.keys()].sort();
   if (JSON.stringify(expectedNames) !== JSON.stringify(currentNames))
     throw new Error('Refusing to update host Skill tooling with missing or extra files.');
+  if (digestManifestFileHashes(existingManifest.files) !== existingManifest.sourceDigest)
+    throw new Error('Refusing to update a manually changed host Skill tooling manifest.');
   for (const [name, content] of managedCurrentFiles) {
-    if (sha256(content) !== existingManifest.files[name])
+    const actualDigest = sha256(content);
+    const previousDigest = existingManifest.files[name];
+    const nextDigest = nextManifest.files[name];
+    // A host may have received an upcoming supplier file before the managed manifest was updated.
+    // Adopt it only when its bytes exactly match this supplier revision; arbitrary edits still fail.
+    if (actualDigest !== previousDigest && actualDigest !== nextDigest)
       throw new Error(`Refusing to update manually changed managed file: ${name}`);
   }
-  if (digestFiles(managedCurrentFiles) !== existingManifest.sourceDigest)
-    throw new Error('Refusing to update a manually changed host Skill tooling manifest.');
   if (!MANAGED_SKILLS.every((skillName) => nextManifest.managedSkills.includes(skillName)))
     throw new Error('Next tooling manifest does not contain the complete managed Skill set.');
 }
@@ -471,6 +476,14 @@ function digestFiles(files) {
   const content = [...files.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([name, value]) => `${name}\0${sha256(value)}`)
+    .join('\n');
+  return sha256(content);
+}
+
+function digestManifestFileHashes(files) {
+  const content = Object.entries(files)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([name, digest]) => `${name}\0${digest}`)
     .join('\n');
   return sha256(content);
 }

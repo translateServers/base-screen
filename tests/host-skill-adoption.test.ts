@@ -90,6 +90,15 @@ function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
 
+function digestManifestFileHashes(files: Record<string, string>): string {
+  return sha256(
+    Object.entries(files)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, digest]) => `${name}\0${digest}`)
+      .join('\n'),
+  );
+}
+
 async function collectFiles(root: string, base: string): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   async function visit(directory: string): Promise<void> {
@@ -166,6 +175,46 @@ describe('host Skill adoption toolkit', () => {
 
       const second = await vendorHostSkillKit({ hostRoot: host.root });
       expect(second.configCreated).toBe(false);
+      await verifyHostSkills({ root: host.root });
+    } finally {
+      await rm(host.root, { recursive: true, force: true });
+    }
+  }, 60_000);
+
+  it('adopts a supplier-aligned host file that landed before the manifest update', async () => {
+    const host = await makeHost();
+    try {
+      await vendorHostSkillKit({ hostRoot: host.root });
+      const targetRelative =
+        'create-base-screen-host-material-skill/assets/host-material-skill-template/SKILL.md';
+      const manifestPath = join(host.root, '.base-screen', 'host-skill-tooling.json');
+      const toolingFile = join(
+        host.root,
+        '.base-screen',
+        'tooling',
+        'base-screen-host-skills',
+        targetRelative,
+      );
+      const manifest = await readJson<{
+        files: Record<string, string>;
+        sourceDigest: string;
+      }>(manifestPath);
+      const current = await readFile(toolingFile, 'utf8');
+      const previous = current.replace(
+        '- Version resources are immutable assets bound to a material version. A material may reference only\n' +
+          '  resource keys that exist in the current version, and only through the documented\n' +
+          '  `useMaterialResource(key)` runtime API. Never invent keys, embed file URLs, or reference files\n' +
+          '  outside the version; missing resources must be reported to the user before any apply.\n',
+        '',
+      );
+      expect(previous).not.toBe(current);
+      manifest.files[targetRelative] = sha256(previous);
+      manifest.sourceDigest = digestManifestFileHashes(manifest.files);
+      await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, 'utf8');
+
+      const result = await vendorHostSkillKit({ hostRoot: host.root });
+
+      expect(result.manifest.files[targetRelative]).toBe(sha256(current));
       await verifyHostSkills({ root: host.root });
     } finally {
       await rm(host.root, { recursive: true, force: true });
