@@ -95,6 +95,7 @@ interface Marquee {
   readonly startClientY: number;
   readonly union: boolean;
   readonly contain: boolean;
+  readonly clearSelectionOnClick: boolean;
   readonly moved: boolean;
 }
 
@@ -427,19 +428,7 @@ export class DesignerGestureController {
     const componentId = material?.dataset.baseScreenComponentId;
     if (componentId === undefined || material === null) {
       this.#editingParentId = null;
-      event.preventDefault();
-      // 框选从按下即捕获指针：pointerup 被重定向到画布，释放落在状态栏/面板等视窗之外
-      // 的表面也不会漏掉手势，避免 #marquee 悬挂导致 active 常驻、快捷键与右键菜单被吞。
-      this.capturePointer(event.pointerId);
-      this.#marquee = {
-        pointerId: event.pointerId,
-        start: this.canvasPointFromPointer(event),
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        union: event.ctrlKey || event.metaKey,
-        contain: event.altKey,
-        moved: false,
-      };
+      this.startMarquee(event, true);
       return;
     }
     const selectableComponentId = this.selectableComponentId(document, componentId);
@@ -451,6 +440,14 @@ export class DesignerGestureController {
       return;
     }
     if (isScreenComponentEffectivelyHidden(document, component.id)) {
+      return;
+    }
+    if (isScreenComponentEffectivelyLocked(document, component.id)) {
+      // 锁定组件不是画布选择目标，但在选择工具下也不能成为框选死区。
+      // 单击仍保持现有选择不变，越过拖动阈值后则从该位置正常发起框选。
+      if (this.callbacks.getActiveTool() === 'select') {
+        this.startMarquee(event, false);
+      }
       return;
     }
     if (event.ctrlKey || event.metaKey) {
@@ -635,7 +632,9 @@ export class DesignerGestureController {
       this.cancelMarquee();
       const rect = normalizedRect(marquee.start, end);
       if (rect.width < 1 || rect.height < 1) {
-        this.callbacks.reduceSelection({ type: 'clear-selection' });
+        if (marquee.clearSelectionOnClick) {
+          this.callbacks.reduceSelection({ type: 'clear-selection' });
+        }
         return;
       }
       const document = this.callbacks.getDocument();
@@ -649,14 +648,12 @@ export class DesignerGestureController {
       );
       const interaction = this.callbacks.getInteraction();
       const editingParentId = this.validEditingParentId(document);
+      const selectableIds = selectionTargetsInContext(document, ids, editingParentId).filter(
+        (componentId) => !isScreenComponentEffectivelyLocked(document, componentId),
+      );
       const componentIds = selectedRootIds(
         document,
-        marquee.union
-          ? [
-              ...interaction.selectedComponentIds,
-              ...selectionTargetsInContext(document, ids, editingParentId),
-            ]
-          : selectionTargetsInContext(document, ids, editingParentId),
+        marquee.union ? [...interaction.selectedComponentIds, ...selectableIds] : selectableIds,
       );
       this.callbacks.reduceSelection({
         type: 'replace-selection',
@@ -933,6 +930,23 @@ export class DesignerGestureController {
     // 平移结束须复位抓握光标（grabbing），否则 data-panning 残留 true，光标一直卡在实心抓握。
     this.callbacks.setPanning?.(false);
     this.clearSnapPreview();
+  }
+
+  private startMarquee(event: PointerEvent, clearSelectionOnClick: boolean): void {
+    event.preventDefault();
+    // 框选从按下即捕获指针：pointerup 被重定向到画布，释放落在状态栏/面板等视窗之外
+    // 的表面也不会漏掉手势，避免 #marquee 悬挂导致 active 常驻、快捷键与右键菜单被吞。
+    this.capturePointer(event.pointerId);
+    this.#marquee = {
+      pointerId: event.pointerId,
+      start: this.canvasPointFromPointer(event),
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      union: event.ctrlKey || event.metaKey,
+      contain: event.altKey,
+      clearSelectionOnClick,
+      moved: false,
+    };
   }
 
   private cancelMarquee(): void {

@@ -1038,6 +1038,106 @@ describe('DesignerGestureController cancellation', () => {
     });
   });
 
+  it('uses a locked component as a marquee origin but never a canvas selection target', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const first = document().components[0]!;
+    const locked = {
+      ...first,
+      id: 'locked',
+      status: { locked: true, hidden: false },
+    };
+    const unlocked = {
+      ...first,
+      id: 'unlocked',
+      position: { x: 150, y: 20 },
+      zIndex: 1,
+    };
+    const current = { ...document(), components: [locked, unlocked] };
+    const material = new FakeElement();
+    material.dataset.baseScreenComponentId = locked.id;
+    material.matches['[data-base-screen-component-id]'] = material;
+    canvas.registerMaterial(locked.id, material);
+    const reduceSelection = vi.fn();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: () => current,
+      getInteraction: () => ({
+        selectedComponentIds: [unlocked.id],
+        focusedComponentId: unlocked.id,
+      }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    for (const [index, modifier] of [{}, { ctrlKey: true }, { metaKey: true }].entries()) {
+      const pointerId = index + 1;
+      canvas.dispatch('pointerdown', {
+        pointerId,
+        clientX: 20,
+        clientY: 30,
+        preventDefault: () => undefined,
+        target: material,
+        ...modifier,
+      } as unknown as PointerEvent);
+
+      expect(controller.active).toBe(true);
+      expect(canvas.canvas.hasPointerCapture(pointerId)).toBe(true);
+
+      canvas.dispatch('pointerup', {
+        pointerId,
+        clientX: 20,
+        clientY: 30,
+      } as unknown as PointerEvent);
+
+      expect(controller.active).toBe(false);
+      expect(canvas.canvas.hasPointerCapture(pointerId)).toBe(false);
+    }
+
+    expect(reduceSelection).not.toHaveBeenCalled();
+
+    canvas.dispatch('pointerdown', {
+      pointerId: 4,
+      clientX: 20,
+      clientY: 30,
+      preventDefault: () => undefined,
+      target: material,
+    } as unknown as PointerEvent);
+    canvas.dispatch('pointermove', {
+      pointerId: 4,
+      clientX: 300,
+      clientY: 150,
+    } as unknown as PointerEvent);
+
+    expect(canvas.marquee.style.display).toBe('block');
+
+    canvas.dispatch('pointerup', {
+      pointerId: 4,
+      clientX: 300,
+      clientY: 150,
+    } as unknown as PointerEvent);
+
+    expect(reduceSelection).toHaveBeenCalledTimes(1);
+    expect(reduceSelection).toHaveBeenCalledWith({
+      type: 'replace-selection',
+      componentIds: ['unlocked'],
+      focusedComponentId: 'unlocked',
+    });
+    expect(controller.active).toBe(false);
+    expect(canvas.marquee.style.display).toBe('none');
+  });
+
   it('toggles the component under the selection overlay on a Ctrl/Cmd modifier click', () => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);
