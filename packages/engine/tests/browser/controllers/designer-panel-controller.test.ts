@@ -1131,17 +1131,33 @@ describe('DesignerPanelController material search and keyboard reachability', ()
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('Element', FakeElement);
     const controller = createController([]);
+    const firstWrap = new FakeElement('div', new FakeDocument());
+    firstWrap.dataset.materialType = 'base.text';
+    firstWrap.dataset.materialCard = 'base.text';
+    firstWrap.focus = vi.fn();
     const first = new FakeElement('button', new FakeDocument());
     first.dataset.materialType = 'base.text';
     first.focus = vi.fn();
+    const secondWrap = new FakeElement('div', new FakeDocument());
+    secondWrap.dataset.materialType = 'base.table';
+    secondWrap.dataset.materialCard = 'base.table';
+    secondWrap.focus = vi.fn();
     const second = new FakeElement('button', new FakeDocument());
     second.dataset.materialType = 'base.table';
     second.focus = vi.fn();
     const layout = {
-      querySelectorAll: (selector: string) =>
-        selector === '[data-material-type]' ? [first, second] : [],
+      dataset: { materialCard: 'layout' },
+      hidden: false,
+      querySelectorAll: (selector: string) => {
+        if (selector === '[data-material-type]') {
+          return [firstWrap, first, secondWrap, second];
+        }
+        return selector === 'button[data-material-type]' ? [first, second] : [];
+      },
     } as unknown as FakeElement;
+    firstWrap.closestResult = layout;
     first.closestResult = layout;
+    secondWrap.closestResult = layout;
     second.closestResult = layout;
     const preventDefault = vi.fn();
 
@@ -1154,6 +1170,8 @@ describe('DesignerPanelController material search and keyboard reachability', ()
     expect(handled).toBe(true);
     expect(preventDefault).toHaveBeenCalledTimes(1);
     expect(second.focus).toHaveBeenCalledTimes(1);
+    expect(firstWrap.focus).not.toHaveBeenCalled();
+    expect(secondWrap.focus).not.toHaveBeenCalled();
     const homeHandled = controller.onKeyDown({
       target: second as unknown as EventTarget,
       key: 'Home',

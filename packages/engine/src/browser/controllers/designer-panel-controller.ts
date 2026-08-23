@@ -714,7 +714,9 @@ export class DesignerPanelController {
   private navigateMaterialGrid(current: HTMLButtonElement, event: KeyboardEvent): boolean {
     const layout = current.closest<HTMLElement>('.designer');
     if (layout === null) return false;
-    const cards = [...layout.querySelectorAll<HTMLButtonElement>('[data-material-type]')].filter(
+    const cards = [
+      ...layout.querySelectorAll<HTMLButtonElement>('button[data-material-type]'),
+    ].filter(
       (card) =>
         !card.disabled && card.closest<HTMLElement>('[data-material-card]')?.hidden !== true,
     );
