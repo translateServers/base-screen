@@ -11,7 +11,9 @@ import {
   type BaseScreenCanvasBackgroundImageRequest,
   BaseScreenDesignerElement,
   type BaseScreenMaterialLibraryGrouping,
+  type BaseScreenMaterialLibraryItem,
   parseBaseScreenMaterialLibraryGrouping,
+  parseBaseScreenMaterialLibraryItems,
   ScreenProjectController,
   type ScreenProjectControllerChange,
   type ScreenProjectPhase,
@@ -28,6 +30,12 @@ describe('engine public lifecycle API', () => {
     >().toEqualTypeOf<BaseScreenMaterialLibraryGrouping | undefined>();
     expectTypeOf<typeof parseBaseScreenMaterialLibraryGrouping>().returns.toMatchTypeOf<
       ScreenParseResult<BaseScreenMaterialLibraryGrouping>
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['materialLibraryItems']
+    >().toEqualTypeOf<readonly BaseScreenMaterialLibraryItem[] | undefined>();
+    expectTypeOf<typeof parseBaseScreenMaterialLibraryItems>().returns.toMatchTypeOf<
+      ScreenParseResult<readonly BaseScreenMaterialLibraryItem[]>
     >();
   });
 

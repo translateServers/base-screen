@@ -104,6 +104,9 @@
 - **宿主多级物料分组**（封版后增量，生效中）：宿主以 JSON-safe 树投影控制组层级、名称和卡片顺序；Designer 提供全部入口、
   路径面包屑、当前层级子组与网格筛选，保持 Manifest、catalog、ScreenDocument 和 Renderer 不变。
   依据：[Host Material Library Grouping](../specs/host-material-library-grouping/spec.md)、[ADR-0033](../decisions/ADR-0033-host-controlled-material-library-grouping.md)。
+- **物料库条目投影**（封版后增量，生效中）：Designer 可接收严格、JSON-safe 的 `materialLibraryItems`；多个条目
+  可复用同一个 canonical `materialType`，并覆盖卡片名称、分类、封面与新实例默认值。运行构造器、文档 type 和 ABI
+  仍由不可变 catalog 决定；未配置时保持一类型一卡片。依据：[ADR-0060](../decisions/ADR-0060-material-library-item-projection.md)。
 - **物料库视觉层级**（封版后增量，生效中）：路径、当前层级、筛选、状态与缩略图网格采用紧凑的 data-dense/drill-down
   层级；仅消费现有 Designer Token，保留深浅主题、键盘焦点、forced-colors、reduced-motion 与无抖动约束。
   依据：[Designer Material Library Visual Refinement](../specs/designer-material-library-visual-refinement/spec.md)、[ADR-0034](../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)。

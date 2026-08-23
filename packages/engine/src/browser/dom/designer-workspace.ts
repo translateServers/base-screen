@@ -7,6 +7,7 @@ import {
 } from '../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import type { BaseScreenMaterialLibraryGrouping } from '../../material-library-grouping.js';
+import type { BaseScreenResolvedMaterialLibraryItem } from '../../material-library-items.js';
 import type { BaseScreenMaterialLibraryState } from '../../material-library-state.js';
 import { designerIcon, designerToolGlyph } from '../ui/designer-icons.js';
 import {
@@ -71,7 +72,7 @@ const SHORTCUT_HELP_SECTIONS = [
 
 export function createDesignerWorkspace(
   ownerDocument: Document,
-  materials: readonly BaseScreenMaterialCatalogEntry[],
+  materials: readonly (BaseScreenMaterialCatalogEntry | BaseScreenResolvedMaterialLibraryItem)[],
   toolMaterialTypes: DesignerToolMaterialTypes | undefined,
   materialLibraryState?: BaseScreenMaterialLibraryState,
   materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping,

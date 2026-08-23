@@ -37,6 +37,10 @@ import {
   hasMaterialLibraryGroup,
   materialLibraryGroupMaterialTypes,
 } from '../../material-library-grouping.js';
+import {
+  type BaseScreenResolvedMaterialLibraryItem,
+  createInitialDataSourceForMaterialLibraryItem,
+} from '../../material-library-items.js';
 import type { DesignerDescriptorDatasetFields } from '../dom/designer-descriptor-dom.js';
 import {
   createDescriptorArrayTransaction,
@@ -59,6 +63,7 @@ import {
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
+  readonly getMaterialLibraryItems?: () => readonly BaseScreenResolvedMaterialLibraryItem[];
   readonly getMaterialLibraryGrouping?: () => BaseScreenMaterialLibraryGrouping | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
@@ -356,8 +361,9 @@ export class DesignerPanelController {
     }
     const materialCard = target.closest<HTMLElement>('[data-material-type]');
     if (materialCard?.dataset.materialType !== undefined) {
-      this.addMaterial(materialCard.dataset.materialType);
-      this.recordRecentMaterial(materialCard.dataset.materialType);
+      const itemId = materialCard.dataset.materialItemId ?? materialCard.dataset.materialType;
+      this.addMaterial(itemId);
+      this.recordRecentMaterial(itemId);
       this.renderMaterials(materialCard.closest<HTMLElement>('.designer'));
       return;
     }
@@ -436,6 +442,7 @@ export class DesignerPanelController {
     const target = event.target;
     if (!(target instanceof HTMLElement)) return false;
     const materialType = target.closest<HTMLElement>('[data-material-type]')?.dataset.materialType;
+    const itemId = target.closest<HTMLElement>('[data-material-type]')?.dataset.materialItemId;
     if (
       materialType === undefined ||
       this.callbacks.isMaterialAvailable?.(materialType) === false
@@ -444,6 +451,7 @@ export class DesignerPanelController {
     }
     if (event.dataTransfer !== null && event.dataTransfer !== undefined) {
       event.dataTransfer.setData(MATERIAL_DRAG_TYPE, materialType);
+      if (itemId !== undefined) event.dataTransfer.setData(MATERIAL_LIBRARY_ITEM_DRAG_TYPE, itemId);
       event.dataTransfer.effectAllowed = 'copy';
     }
     return true;
@@ -602,8 +610,9 @@ export class DesignerPanelController {
         event.preventDefault();
         const type = materialCard.dataset.materialType;
         if (type !== undefined) {
-          this.addMaterial(type);
-          this.recordRecentMaterial(type);
+          const itemId = materialCard.dataset.materialItemId ?? type;
+          this.addMaterial(itemId);
+          this.recordRecentMaterial(itemId);
           this.renderMaterials(materialCard.closest<HTMLElement>('.designer'));
         }
         return true;
@@ -641,30 +650,34 @@ export class DesignerPanelController {
     return false;
   }
 
-  private addMaterial(type: string): void {
+  private addMaterial(itemId: string): void {
     const document = this.callbacks.getDocument();
-    const entry = this.callbacks.getCatalog()?.get(type);
+    const item = this.materialLibraryItem(itemId);
+    const entry =
+      item === undefined ? undefined : this.callbacks.getCatalog()?.get(item.materialType);
     if (
       document === undefined ||
+      item === undefined ||
       entry === undefined ||
-      this.callbacks.isMaterialAvailable?.(type) === false
+      this.callbacks.isMaterialAvailable?.(item.materialType) === false
     ) {
       return;
     }
     const index = document.components.length;
+    const manifest = item.manifest;
     const component: ScreenComponentNode = {
-      id: nextComponentId(document, entry.manifest.type),
-      type: entry.manifest.type,
-      name: entry.manifest.name,
+      id: nextComponentId(document, manifest.type),
+      type: manifest.type,
+      name: manifest.name,
       parentId: null,
       position: { x: 64 + index * 16, y: 64 + index * 16 },
-      size: entry.manifest.defaultSize,
+      size: manifest.defaultSize,
       rotation: 0,
       zIndex: index,
       status: { locked: false, hidden: false },
-      props: entry.manifest.defaultProps,
-      style: entry.manifest.defaultStyle,
-      dataSource: createInitialDataSource(entry.manifest),
+      props: manifest.defaultProps,
+      style: manifest.defaultStyle,
+      dataSource: createInitialDataSourceForMaterialLibraryItem(item),
     };
     const result = this.callbacks.executeCommand({ type: 'add-component', component });
     result.ok ? this.select([component.id]) : this.callbacks.emitDiagnostics(result.diagnostics);
@@ -742,25 +755,27 @@ export class DesignerPanelController {
         ? undefined
         : new Set(materialLibraryGroupMaterialTypes(grouping, this.#materialGroupId));
     for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
-      const type = card.dataset.materialCard;
-      const entry = type === undefined ? undefined : this.callbacks.getCatalog()?.get(type);
-      const category = entry?.manifest.category ?? card.dataset.materialCategory ?? '';
+      const itemId = card.dataset.materialCard;
+      const item = itemId === undefined ? undefined : this.materialLibraryItem(itemId);
+      const materialType = item?.materialType ?? card.dataset.materialType;
+      const category = item?.manifest.category ?? card.dataset.materialCategory ?? '';
       const searchable =
-        `${entry?.manifest.name ?? ''} ${type ?? ''} ${category}`.toLocaleLowerCase();
+        `${item?.manifest.name ?? ''} ${materialType ?? ''} ${category} ${item?.manifest.keywords.join(' ') ?? ''}`.toLocaleLowerCase();
       const included =
-        type !== undefined &&
+        itemId !== undefined &&
         (this.#materialFilter === 'all' ||
-          (this.#materialFilter === 'favorite' && this.#favoriteMaterials.has(type)) ||
-          (this.#materialFilter === 'recent' && this.#recentMaterials.includes(type))) &&
+          (this.#materialFilter === 'favorite' && this.#favoriteMaterials.has(itemId)) ||
+          (this.#materialFilter === 'recent' && this.#recentMaterials.includes(itemId))) &&
         searchable.includes(this.#materialSearch) &&
-        (groupedTypes === undefined || groupedTypes.has(type)) &&
+        (groupedTypes === undefined ||
+          (materialType !== undefined && groupedTypes.has(materialType))) &&
         (grouping !== undefined ||
           this.#materialCategory === undefined ||
           category === this.#materialCategory);
       card.hidden = !included;
       const favorite = card.querySelector<HTMLButtonElement>('[data-material-favorite]');
-      if (favorite !== null && type !== undefined) {
-        favorite.ariaPressed = String(this.#favoriteMaterials.has(type));
+      if (favorite !== null && itemId !== undefined) {
+        favorite.ariaPressed = String(this.#favoriteMaterials.has(itemId));
       }
     }
     const clear = layout.querySelector<HTMLButtonElement>('[data-material-search-clear]');
@@ -846,6 +861,15 @@ export class DesignerPanelController {
     return this.callbacks.getMaterialLibraryGrouping?.();
   }
 
+  private materialLibraryItem(id: string): BaseScreenResolvedMaterialLibraryItem | undefined {
+    const projected = this.callbacks.getMaterialLibraryItems?.().find((item) => item.id === id);
+    if (projected !== undefined) return projected;
+    const entry = this.callbacks.getCatalog()?.get(id);
+    return entry === undefined
+      ? undefined
+      : { id, materialType: entry.manifest.type, manifest: entry.manifest };
+  }
+
   private get groupEntry() {
     const type = this.callbacks.getGroupMaterialType();
     return type === undefined ? undefined : this.callbacks.getCatalog()?.get(type);
@@ -853,6 +877,7 @@ export class DesignerPanelController {
 }
 
 export const MATERIAL_DRAG_TYPE = 'application/x-base-screen-material';
+export const MATERIAL_LIBRARY_ITEM_DRAG_TYPE = 'application/x-base-screen-material-library-item';
 
 function isEditable(target: EventTarget | null): boolean {
   return (

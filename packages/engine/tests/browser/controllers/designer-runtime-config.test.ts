@@ -3,9 +3,10 @@ import type {
   ScreenHostVariablePort,
   ScreenProjectAdapter,
 } from '@base-screen/contracts';
-import type {
-  BaseScreenMaterialCatalog,
-  BaseScreenRuntimeContributionIndex,
+import {
+  type BaseScreenMaterialCatalog,
+  type BaseScreenRuntimeContributionIndex,
+  createBaseScreenMaterialCatalog,
 } from '@base-screen/plugin-core';
 import { describe, expect, it, vi } from 'vitest';
 import { BaseScreenDesignerElement } from '../../../src/index.js';
@@ -27,6 +28,39 @@ function groupingCatalog(): BaseScreenMaterialCatalog {
     has: (type) => entries.some((entry) => entry.manifest.type === type),
     list: () => entries as never,
   };
+}
+
+function projectableCatalog(): BaseScreenMaterialCatalog {
+  return createBaseScreenMaterialCatalog([
+    {
+      manifest: {
+        type: 'base.image',
+        tagName: 'base-image-material',
+        name: 'Image',
+        category: 'Base',
+        keywords: [],
+        defaultSize: { width: 100, height: 80 },
+        defaultProps: { source: '' },
+        defaultStyle: { opacity: 1 },
+        propsSchema: {
+          kind: 'object',
+          properties: { source: { kind: 'string', maxLength: 32 } },
+          required: ['source'],
+        },
+        propertyPanel: [],
+        styleSchema: {
+          kind: 'object',
+          properties: { opacity: { kind: 'number', minimum: 0, maximum: 1 } },
+          required: ['opacity'],
+        },
+        stylePanel: [],
+        events: [],
+        dataCapabilities: [],
+        designCapabilities: { resize: true, rotate: true, children: false },
+      },
+      constructor: class {} as never,
+    },
+  ]);
 }
 
 function resourcePort(): ScreenHostResourcePort {
@@ -102,6 +136,30 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
       'text',
       'charts',
     ]);
+  });
+
+  it('accepts host material library item projections and rejects invalid updates atomically', () => {
+    const designer = new BaseScreenDesignerElement();
+    const materialCatalog = projectableCatalog();
+    const items = [
+      { id: 'asset:12', materialType: 'base.image', defaultProps: { source: '12' } },
+      { id: 'asset:13', materialType: 'base.image', defaultProps: { source: '13' } },
+    ];
+
+    expect(designer.configure({ catalog: materialCatalog, materialLibraryItems: items }).ok).toBe(
+      true,
+    );
+    expect(designer.materialLibraryItems).toEqual(items);
+    const configured = designer.materialLibraryItems;
+
+    const rejected = designer.configure({
+      catalog: materialCatalog,
+      materialLibraryItems: [
+        { id: 'asset:broken', materialType: 'base.image', defaultProps: { source: 12 } },
+      ] as never,
+    });
+    expect(rejected.ok).toBe(false);
+    expect(designer.materialLibraryItems).toBe(configured);
   });
 
   it('rejects a designer host adapter whose capabilities disagree with its ports', () => {

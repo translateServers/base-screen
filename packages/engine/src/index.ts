@@ -106,6 +106,12 @@ import {
   validateBaseScreenMaterialLibraryGroupingForCatalog,
 } from './material-library-grouping.js';
 import {
+  type BaseScreenMaterialLibraryItem,
+  type BaseScreenResolvedMaterialLibraryItem,
+  parseBaseScreenMaterialLibraryItems,
+  resolveBaseScreenMaterialLibraryItems,
+} from './material-library-items.js';
+import {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenMaterialLibraryAction,
   type BaseScreenMaterialLibraryActionEventDetail,
@@ -123,6 +129,10 @@ export {
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
 } from './material-library-grouping.js';
+export {
+  type BaseScreenMaterialLibraryItem,
+  parseBaseScreenMaterialLibraryItems,
+} from './material-library-items.js';
 export {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenMaterialLibraryAction,
@@ -173,6 +183,7 @@ export interface BaseScreenDesignerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
   readonly materialLibraryState?: BaseScreenMaterialLibraryState;
   readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
+  readonly materialLibraryItems?: readonly BaseScreenMaterialLibraryItem[];
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly projectAdapter?: ScreenProjectAdapter;
   readonly toolMaterialTypes?: DesignerToolMaterialTypes;
@@ -197,6 +208,8 @@ export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #materialLibraryState: BaseScreenMaterialLibraryState | undefined;
   #materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
+  #materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
+  #resolvedMaterialLibraryItems: readonly BaseScreenResolvedMaterialLibraryItem[] = [];
   #runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
   #variablePort: ScreenHostVariablePort | undefined;
@@ -264,6 +277,8 @@ export class BaseScreenDesignerElement extends ElementBase {
   });
   readonly #gestureController = new DesignerGestureController({
     getCatalog: () => this.#catalog,
+    getMaterialLibraryItem: (id) =>
+      this.#resolvedMaterialLibraryItems.find((item) => item.id === id),
     getDocument: () => this.#session.document,
     getInteraction: () => this.#session.interaction,
     getViewport: () => this.#viewportController.state,
@@ -368,6 +383,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   });
   readonly #panelController = new DesignerPanelController({
     getCatalog: () => this.#catalog,
+    getMaterialLibraryItems: () => this.#resolvedMaterialLibraryItems,
     getMaterialLibraryGrouping: () => this.#materialLibraryGrouping,
     getDocument: () => this.#session.document,
     getDatasetFields: () => this.#datasetController.getFocusedDatasetFields(),
@@ -749,6 +765,17 @@ export class BaseScreenDesignerElement extends ElementBase {
       if (!parsed.ok) return parsed;
       materialLibraryState = parsed.value;
     }
+    let materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
+    if (configuration.materialLibraryItems !== undefined) {
+      const parsed = parseBaseScreenMaterialLibraryItems(configuration.materialLibraryItems);
+      if (!parsed.ok) return parsed;
+      materialLibraryItems = parsed.value;
+    }
+    const resolvedMaterialLibraryItems = resolveBaseScreenMaterialLibraryItems(
+      configuration.catalog,
+      materialLibraryItems,
+    );
+    if (!resolvedMaterialLibraryItems.ok) return resolvedMaterialLibraryItems;
     let materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
     if (configuration.materialLibraryGrouping !== undefined) {
       const parsed = parseBaseScreenMaterialLibraryGrouping(configuration.materialLibraryGrouping);
@@ -857,6 +884,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#catalog = configuration.catalog;
     this.#materialLibraryState = materialLibraryState;
     this.#materialLibraryGrouping = materialLibraryGrouping;
+    this.#materialLibraryItems = materialLibraryItems;
+    this.#resolvedMaterialLibraryItems = resolvedMaterialLibraryItems.value;
     this.#runtimeContributions = configuration.runtimeContributions;
     this.#toolMaterialTypes = configuration.toolMaterialTypes;
     this.#groupMaterialType = configuration.groupMaterialType;
@@ -877,6 +906,11 @@ export class BaseScreenDesignerElement extends ElementBase {
       ]);
       return;
     }
+    if (value === undefined) {
+      this.#catalog = undefined;
+      this.#resolvedMaterialLibraryItems = [];
+      return;
+    }
     if (value !== undefined && this.#materialLibraryGrouping !== undefined) {
       const validated = validateBaseScreenMaterialLibraryGroupingForCatalog(
         this.#materialLibraryGrouping,
@@ -887,7 +921,13 @@ export class BaseScreenDesignerElement extends ElementBase {
         return;
       }
     }
+    const resolved = resolveBaseScreenMaterialLibraryItems(value, this.#materialLibraryItems);
+    if (!resolved.ok) {
+      this.emitDiagnostics(resolved.diagnostics);
+      return;
+    }
     this.#catalog = value;
+    this.#resolvedMaterialLibraryItems = resolved.value;
   }
 
   get materialLibraryState(): BaseScreenMaterialLibraryState | undefined {
@@ -940,6 +980,43 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     this.#materialLibraryGrouping = validated.value;
     this.renderMaterialLibraryGrouping();
+  }
+
+  get materialLibraryItems(): readonly BaseScreenMaterialLibraryItem[] | undefined {
+    return this.#materialLibraryItems;
+  }
+
+  set materialLibraryItems(value: readonly BaseScreenMaterialLibraryItem[] | undefined) {
+    if (value === undefined) {
+      this.#materialLibraryItems = undefined;
+      if (this.#catalog === undefined) {
+        this.#resolvedMaterialLibraryItems = [];
+      } else {
+        const resolved = resolveBaseScreenMaterialLibraryItems(this.#catalog);
+        if (resolved.ok) this.#resolvedMaterialLibraryItems = resolved.value;
+      }
+      this.renderMaterialLibraryItems();
+      return;
+    }
+    if (this.#catalog === undefined) {
+      this.emitDiagnostics([
+        lifecycleDiagnostic('Material library items require a configured catalog.'),
+      ]);
+      return;
+    }
+    const parsed = parseBaseScreenMaterialLibraryItems(value);
+    if (!parsed.ok) {
+      this.emitDiagnostics(parsed.diagnostics);
+      return;
+    }
+    const resolved = resolveBaseScreenMaterialLibraryItems(this.#catalog, parsed.value);
+    if (!resolved.ok) {
+      this.emitDiagnostics(resolved.diagnostics);
+      return;
+    }
+    this.#materialLibraryItems = parsed.value;
+    this.#resolvedMaterialLibraryItems = resolved.value;
+    this.renderMaterialLibraryItems();
   }
 
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
@@ -1777,7 +1854,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       ...styleFallback,
       createDesignerWorkspace(
         this.ownerDocument,
-        this.#catalog.list(),
+        this.#resolvedMaterialLibraryItems,
         this.#toolMaterialTypes,
         this.#materialLibraryState,
         this.#materialLibraryGrouping,
@@ -1869,11 +1946,15 @@ export class BaseScreenDesignerElement extends ElementBase {
     if (layout === null) return;
     populateMaterialLibrary(
       layout,
-      this.#catalog.list(),
+      this.#resolvedMaterialLibraryItems,
       this.#materialLibraryState,
       this.#materialLibraryGrouping,
     );
     this.#panelController.refreshMaterialLibrary(layout);
+  }
+
+  private renderMaterialLibraryItems(): void {
+    this.renderMaterialLibraryGrouping();
   }
 
   private requestMaterialLibraryAction(action: BaseScreenMaterialLibraryAction): void {

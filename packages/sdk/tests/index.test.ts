@@ -6,6 +6,7 @@ import {
   defineBaseScreenElements,
   defineBaseScreenViewer,
   parseBaseScreenMaterialLibraryGrouping,
+  parseBaseScreenMaterialLibraryItems,
 } from '../src/index.js';
 
 describe('SDK product element registration', () => {
@@ -18,6 +19,11 @@ describe('SDK product element registration', () => {
       parseBaseScreenMaterialLibraryGrouping({
         groups: [{ id: 'content', label: 'Content', materialTypes: ['base.text'] }],
       }).ok,
+    ).toBe(true);
+    expect(
+      parseBaseScreenMaterialLibraryItems([
+        { id: 'asset:12', materialType: 'base.image', defaultProps: { source: '12' } },
+      ]).ok,
     ).toBe(true);
   });
 

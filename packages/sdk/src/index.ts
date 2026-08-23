@@ -20,10 +20,12 @@ export {
   type BaseScreenMaterialLibraryActionEventDetail,
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
+  type BaseScreenMaterialLibraryItem,
   type BaseScreenMaterialLibraryState,
   type BaseScreenMaterialLibraryStatus,
   defineBaseScreenDesigner,
   parseBaseScreenMaterialLibraryGrouping,
+  parseBaseScreenMaterialLibraryItems,
   parseBaseScreenMaterialLibraryState,
 } from './designer.js';
 export {

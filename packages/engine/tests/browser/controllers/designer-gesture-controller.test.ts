@@ -3,7 +3,10 @@ import type { ScreenDocumentTransaction, ScreenInteractionAction } from '@base-s
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DesignerGestureController } from '../../../src/browser/controllers/designer-gesture-controller.js';
-import { MATERIAL_DRAG_TYPE } from '../../../src/browser/controllers/designer-panel-controller.js';
+import {
+  MATERIAL_DRAG_TYPE,
+  MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
+} from '../../../src/browser/controllers/designer-panel-controller.js';
 
 // 元素类层次：FakeElementBase 对应 Element（所有元素），FakeElement 对应 HTMLElement。
 // 测试里 Element stub 为基类、HTMLElement stub 为子类，从而可以构造"是 Element 但
@@ -2027,6 +2030,82 @@ describe('DesignerGestureController material drop', () => {
         ],
       },
     ]);
+  });
+
+  it('uses projected item defaults while preserving the canonical type on drop', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const transactions: ScreenDocumentTransaction[] = [];
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getMaterialLibraryItem: (id) =>
+        id === 'asset:12'
+          ? ({
+              id,
+              materialType: 'base.rectangle',
+              defaultDataSource: {
+                type: 'host-resource',
+                resourceType: 'xj_asset',
+                resourceId: '12',
+                params: {},
+                binding: null,
+              },
+              manifest: {
+                type: 'base.rectangle',
+                name: 'Header asset',
+                defaultSize: { width: 320, height: 200 },
+                defaultProps: { source: '12' },
+                defaultStyle: { opacity: 0.8 },
+              },
+            } as never)
+          : undefined,
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: (transaction) => transactions.push(transaction),
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('drop', {
+      clientX: 30,
+      clientY: 40,
+      dataTransfer: {
+        types: [MATERIAL_DRAG_TYPE, MATERIAL_LIBRARY_ITEM_DRAG_TYPE],
+        getData: (type: string) =>
+          type === MATERIAL_LIBRARY_ITEM_DRAG_TYPE ? 'asset:12' : 'base.rectangle',
+      },
+      preventDefault: () => undefined,
+      stopPropagation: () => undefined,
+    } as unknown as PointerEvent);
+
+    const component = transactions[0]?.commands[0] as Extract<
+      ScreenDocumentTransaction['commands'][number],
+      { type: 'add-component' }
+    >;
+    expect(component.component).toMatchObject({
+      type: 'base.rectangle',
+      name: 'Header asset',
+      size: { width: 320, height: 200 },
+      props: { source: '12' },
+      style: { opacity: 0.8 },
+      dataSource: {
+        type: 'host-resource',
+        resourceType: 'xj_asset',
+        resourceId: '12',
+        params: {},
+        binding: null,
+      },
+    });
   });
 
   it('rounds fractional drop coordinates to two decimals like canvas drags', () => {

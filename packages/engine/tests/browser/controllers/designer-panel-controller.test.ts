@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   DesignerPanelController,
   MATERIAL_DRAG_TYPE,
+  MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
   MATERIAL_SEARCH_DEBOUNCE_MS,
 } from '../../../src/browser/controllers/designer-panel-controller.js';
 import {
@@ -824,6 +825,7 @@ describe('DesignerPanelController material drag', () => {
     const controller = createController();
     const card = new FakeElement('button', new FakeDocument());
     card.dataset.materialType = 'base.label';
+    card.dataset.materialItemId = 'asset:12';
     const target = new FakeElement('button', new FakeDocument());
     target.closestResult = card;
     const dataTransfer = { setData: vi.fn(), effectAllowed: '' };
@@ -831,6 +833,7 @@ describe('DesignerPanelController material drag', () => {
 
     expect(handled).toBe(true);
     expect(dataTransfer.setData).toHaveBeenCalledWith(MATERIAL_DRAG_TYPE, 'base.label');
+    expect(dataTransfer.setData).toHaveBeenCalledWith(MATERIAL_LIBRARY_ITEM_DRAG_TYPE, 'asset:12');
     expect(dataTransfer.effectAllowed).toBe('copy');
   });
 
@@ -845,7 +848,12 @@ describe('DesignerPanelController material drag', () => {
 });
 
 describe('DesignerPanelController material add', () => {
-  function createController(commands: unknown[], defaultData?: unknown): DesignerPanelController {
+  function createController(
+    commands: unknown[],
+    defaultData?: unknown,
+    projectedManifest?: Record<string, unknown>,
+    projectedDataSource?: Record<string, unknown>,
+  ): DesignerPanelController {
     return new DesignerPanelController({
       emitDiagnostics: () => undefined,
       executeCommand: (command) => {
@@ -868,6 +876,21 @@ describe('DesignerPanelController material add', () => {
           has: () => true,
           list: () => [],
         }) as unknown as BaseScreenMaterialCatalog,
+      ...(projectedManifest === undefined
+        ? {}
+        : {
+            getMaterialLibraryItems: () =>
+              [
+                {
+                  id: 'asset:12',
+                  materialType: 'base.text',
+                  manifest: projectedManifest,
+                  ...(projectedDataSource === undefined
+                    ? {}
+                    : { defaultDataSource: projectedDataSource }),
+                },
+              ] as never,
+          }),
       getDocument: document,
       getGroupMaterialType: () => undefined,
       getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
@@ -881,7 +904,11 @@ describe('DesignerPanelController material add', () => {
     });
   }
 
-  function clickMaterialCard(controller: DesignerPanelController, type: string): void {
+  function clickMaterialCard(
+    controller: DesignerPanelController,
+    type: string,
+    itemId?: string,
+  ): void {
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('Element', FakeElement);
     const layout = {
@@ -890,6 +917,7 @@ describe('DesignerPanelController material add', () => {
     } as unknown as FakeElement;
     const card = new FakeElement('button', new FakeDocument());
     card.dataset.materialType = type;
+    if (itemId !== undefined) card.dataset.materialItemId = itemId;
     card.closestResult = layout;
     const target = new FakeElement('button', new FakeDocument());
     target.closestResult = card;
@@ -916,6 +944,64 @@ describe('DesignerPanelController material add', () => {
     expect(commands).toHaveLength(1);
     const component = (commands[0] as { component: { dataSource: unknown } }).component;
     expect(component.dataSource).toBeNull();
+  });
+
+  it('creates canonical components from projected item defaults without changing material type', () => {
+    const commands: unknown[] = [];
+    const controller = createController(commands, undefined, {
+      type: 'base.text',
+      name: 'Header asset',
+      defaultSize: { width: 320, height: 200 },
+      defaultProps: { source: '12' },
+      defaultStyle: { opacity: 0.8 },
+      defaultData: 'projected',
+    });
+
+    clickMaterialCard(controller, 'base.text', 'asset:12');
+
+    const component = (commands[0] as { component: Record<string, unknown> }).component;
+    expect(component).toMatchObject({
+      type: 'base.text',
+      name: 'Header asset',
+      size: { width: 320, height: 200 },
+      props: { source: '12' },
+      style: { opacity: 0.8 },
+      dataSource: { type: 'static', value: 'projected' },
+    });
+  });
+
+  it('uses the projected host-resource template instead of Manifest.defaultData', () => {
+    const commands: unknown[] = [];
+    const controller = createController(
+      commands,
+      undefined,
+      {
+        type: 'base.text',
+        name: 'GIS map',
+        defaultSize: { width: 320, height: 200 },
+        defaultProps: { mapId: 12 },
+        defaultStyle: {},
+        defaultData: 'fallback',
+      },
+      {
+        type: 'host-resource',
+        resourceType: 'xj_gis_map',
+        resourceId: '12',
+        params: {},
+        binding: null,
+      },
+    );
+
+    clickMaterialCard(controller, 'base.text', 'asset:12');
+
+    const component = (commands[0] as { component: { dataSource: unknown } }).component;
+    expect(component.dataSource).toEqual({
+      type: 'host-resource',
+      resourceType: 'xj_gis_map',
+      resourceId: '12',
+      params: {},
+      binding: null,
+    });
   });
 });
 describe('DesignerPanelController material search and keyboard reachability', () => {

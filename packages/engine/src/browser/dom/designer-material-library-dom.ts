@@ -4,6 +4,7 @@ import {
   type BaseScreenMaterialLibraryGrouping,
   materialLibraryGroupMaterialTypes,
 } from '../../material-library-grouping.js';
+import type { BaseScreenResolvedMaterialLibraryItem } from '../../material-library-items.js';
 import {
   type BaseScreenMaterialLibraryAction,
   type BaseScreenMaterialLibraryState,
@@ -11,15 +12,21 @@ import {
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
 
 // 物料目录中未显式声明 libraryVisible 的条目默认可见（ADR-0021 语义）。
+type MaterialLibraryRenderable =
+  | BaseScreenMaterialCatalogEntry
+  | BaseScreenResolvedMaterialLibraryItem;
+
 export function visibleLibraryMaterials(
-  materials: readonly BaseScreenMaterialCatalogEntry[],
-): readonly BaseScreenMaterialCatalogEntry[] {
-  return materials.filter((entry) => entry.manifest.libraryVisible !== false);
+  materials: readonly MaterialLibraryRenderable[],
+): readonly BaseScreenResolvedMaterialLibraryItem[] {
+  return materials
+    .map(normalizeLibraryItem)
+    .filter((entry) => entry.manifest.libraryVisible !== false);
 }
 
 // 分类稳定排序：去重后按 localeCompare 排序，保证每次渲染顺序一致。
 export function materialLibraryCategories(
-  materials: readonly BaseScreenMaterialCatalogEntry[],
+  materials: readonly MaterialLibraryRenderable[],
 ): readonly string[] {
   return [...new Set(materials.map((entry) => entry.manifest.category))].sort((left, right) =>
     left.localeCompare(right),
@@ -85,22 +92,24 @@ export function materialCategoryHue(category: string): number {
 
 // 未配置宿主分组时保留 catalog 顺序；分组模式按宿主树和 materialTypes 声明顺序输出卡片。
 export function orderedMaterialLibraryMaterials(
-  materials: readonly BaseScreenMaterialCatalogEntry[],
+  materials: readonly MaterialLibraryRenderable[],
   grouping: BaseScreenMaterialLibraryGrouping | undefined,
-): readonly BaseScreenMaterialCatalogEntry[] {
+): readonly BaseScreenResolvedMaterialLibraryItem[] {
   const visible = visibleLibraryMaterials(materials);
   if (grouping === undefined) return visible;
-  const byType = new Map(visible.map((entry) => [entry.manifest.type, entry]));
-  return materialLibraryGroupMaterialTypes(grouping).flatMap((type) => {
-    const entry = byType.get(type);
-    return entry === undefined ? [] : [entry];
-  });
+  const byType = new Map<string, BaseScreenResolvedMaterialLibraryItem[]>();
+  for (const item of visible) {
+    const bucket = byType.get(item.materialType) ?? [];
+    bucket.push(item);
+    byType.set(item.materialType, bucket);
+  }
+  return materialLibraryGroupMaterialTypes(grouping).flatMap((type) => byType.get(type) ?? []);
 }
 
 // 填充物料库：卡片网格、兼容分类 chips、宿主分组导航、面板数量徽标与目录状态投影一次完成。
 export function populateMaterialLibrary(
   layout: ParentNode,
-  materials: readonly BaseScreenMaterialCatalogEntry[],
+  materials: readonly MaterialLibraryRenderable[],
   materialLibraryState?: BaseScreenMaterialLibraryState,
   materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping,
 ): void {
@@ -163,7 +172,7 @@ export function renderMaterialLibraryState(
   const draftTypes = new Set(state.draftTypes ?? []);
   const unavailableTypes = new Set(state.unavailableTypes ?? []);
   for (const card of layout.querySelectorAll<HTMLElement>('[data-material-card]')) {
-    const type = card.dataset.materialCard ?? '';
+    const type = card.dataset.materialType ?? '';
     const draft = draftTypes.has(type);
     const unavailable = unavailableTypes.has(type);
     card.toggleAttribute('data-material-draft', draft);
@@ -182,16 +191,18 @@ export function renderMaterialLibraryState(
 // 卡片可点击与拖拽添加（dragstart 由 DesignerPanelController 写入 dataTransfer）。
 function createMaterialCard(
   ownerDocument: Document,
-  entry: BaseScreenMaterialCatalogEntry,
+  entry: BaseScreenResolvedMaterialLibraryItem,
 ): HTMLElement {
   const wrap = ownerDocument.createElement('div');
   wrap.className = 'material-card-wrap';
-  wrap.dataset.materialCard = entry.manifest.type;
+  wrap.dataset.materialCard = entry.id;
+  wrap.dataset.materialType = entry.materialType;
   wrap.dataset.materialCategory = entry.manifest.category;
   const card = ownerDocument.createElement('button');
   card.type = 'button';
   card.className = 'designer-control designer-button material-card';
-  card.dataset.materialType = entry.manifest.type;
+  card.dataset.materialType = entry.materialType;
+  card.dataset.materialItemId = entry.id;
   card.draggable = true;
   // 可访问名称用 aria-label（名称与 type 已可见，不重复加 title，避免与工具按钮的 title 命中冲突）。
   card.ariaLabel = DESIGNER_UI_TEXT.addMaterial(entry.manifest.name);
@@ -200,7 +211,7 @@ function createMaterialCard(
   thumb.setAttribute('aria-hidden', 'true');
   thumb.style.setProperty('--material-hue', String(materialCategoryHue(entry.manifest.category)));
   thumb.innerHTML = designerIcon(
-    materialCategoryIcon(`${entry.manifest.category} ${entry.manifest.type}`),
+    materialCategoryIcon(`${entry.manifest.category} ${entry.materialType}`),
   );
   const cover = entry.manifest.cover;
   if (cover !== undefined) {
@@ -214,18 +225,29 @@ function createMaterialCard(
   name.textContent = entry.manifest.name;
   const type = ownerDocument.createElement('span');
   type.className = 'material-type';
-  type.textContent = entry.manifest.type;
+  type.textContent = entry.materialType;
   meta.append(name, type);
   card.append(thumb, meta);
   const favorite = ownerDocument.createElement('button');
   favorite.type = 'button';
   favorite.className = 'designer-control designer-button material-favorite';
-  favorite.dataset.materialFavorite = entry.manifest.type;
+  favorite.dataset.materialFavorite = entry.id;
   favorite.ariaLabel = DESIGNER_UI_TEXT.favoriteMaterial(entry.manifest.name);
   favorite.ariaPressed = 'false';
   favorite.innerHTML = designerIcon('star');
   wrap.append(card, favorite);
   return wrap;
+}
+
+function normalizeLibraryItem(
+  entry: MaterialLibraryRenderable,
+): BaseScreenResolvedMaterialLibraryItem {
+  if ('id' in entry && 'materialType' in entry) return entry;
+  return {
+    id: entry.manifest.type,
+    materialType: entry.manifest.type,
+    manifest: entry.manifest,
+  };
 }
 
 // 宿主封面（ADR-0040）：校验后的 URL 以属性赋值写入 img.src，不 fetch、不预取、不代理；

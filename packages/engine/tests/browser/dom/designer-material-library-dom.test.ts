@@ -154,6 +154,25 @@ function thumbOf(grid: FakeElement, index: number): FakeElement {
 }
 
 describe('material library card cover rendering', () => {
+  it('renders multiple palette items that share one canonical material type', () => {
+    const { grid, layout } = createLayout();
+    const manifest = entry('base.image').manifest;
+    populateMaterialLibrary(layout, [
+      { id: 'asset:12', materialType: 'base.image', manifest: { ...manifest, name: 'Header' } },
+      { id: 'asset:13', materialType: 'base.image', manifest: { ...manifest, name: 'Logo' } },
+    ]);
+
+    expect(grid.children).toHaveLength(2);
+    expect(grid.children.map((card) => card.dataset.materialCard)).toEqual([
+      'asset:12',
+      'asset:13',
+    ]);
+    expect(grid.children.map((card) => card.dataset.materialType)).toEqual([
+      'base.image',
+      'base.image',
+    ]);
+  });
+
   it('renders only the placeholder icon for materials without a declared cover', () => {
     const { grid, layout } = createLayout();
     populateMaterialLibrary(layout, [entry('base.text')]);

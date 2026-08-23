@@ -11,9 +11,11 @@ export {
   type BaseScreenMaterialLibraryActionEventDetail,
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
+  type BaseScreenMaterialLibraryItem,
   type BaseScreenMaterialLibraryState,
   type BaseScreenMaterialLibraryStatus,
   parseBaseScreenMaterialLibraryGrouping,
+  parseBaseScreenMaterialLibraryItems,
   parseBaseScreenMaterialLibraryState,
 } from '@base-screen/engine';
 

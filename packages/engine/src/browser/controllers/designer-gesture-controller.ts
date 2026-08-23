@@ -34,6 +34,10 @@ import type {
   DesignerToolId,
   DesignerToolMaterialTypes,
 } from '../../common/tools/designer-tools.js';
+import {
+  type BaseScreenResolvedMaterialLibraryItem,
+  createInitialDataSourceForMaterialLibraryItem,
+} from '../../material-library-items.js';
 import { createInitialDataSource } from '../dom/designer-panel-dom.js';
 import type {
   DesignerSnapPoint,
@@ -45,7 +49,10 @@ import {
   type DesignerClientPoint,
   getDesignerCanvasBounds,
 } from '../viewport/designer-canvas-coordinates.js';
-import { MATERIAL_DRAG_TYPE } from './designer-panel-controller.js';
+import {
+  MATERIAL_DRAG_TYPE,
+  MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
+} from './designer-panel-controller.js';
 
 // Movement below this screen-pixel distance is treated as a selection click, not a drag.
 // Otherwise a click could snap the component to a smart guide and move it.
@@ -111,6 +118,9 @@ interface Point {
 
 export interface DesignerGestureCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
+  readonly getMaterialLibraryItem?: (
+    id: string,
+  ) => BaseScreenResolvedMaterialLibraryItem | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getInteraction: () => {
     readonly selectedComponentIds: readonly string[];
@@ -995,7 +1005,10 @@ export class DesignerGestureController {
 
   // 从物料面板拖拽物料到画布：dragover 只有 preventDefault 才会放行 drop。
   private onDragOverCanvas(event: DragEvent): void {
-    if (!event.dataTransfer?.types.includes(MATERIAL_DRAG_TYPE)) {
+    if (
+      !event.dataTransfer?.types.includes(MATERIAL_DRAG_TYPE) &&
+      !event.dataTransfer?.types.includes(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
+    ) {
       return;
     }
     event.preventDefault();
@@ -1004,11 +1017,21 @@ export class DesignerGestureController {
 
   // 在画布上释放物料：以释放位置为左上角新增组件（吸附后），复用创建工具的默认尺寸与属性。
   private onDropOnCanvas(event: DragEvent): boolean {
+    const itemId = event.dataTransfer?.types.includes(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
+      ? event.dataTransfer.getData(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
+      : undefined;
     const type = event.dataTransfer?.getData(MATERIAL_DRAG_TYPE);
     if (type === undefined || type === '') return false;
+    const item =
+      itemId === undefined || itemId === ''
+        ? undefined
+        : this.callbacks.getMaterialLibraryItem?.(itemId);
+    if (itemId !== undefined && itemId !== '' && item === undefined) return false;
+    const materialType = item?.materialType ?? type;
     const document = this.callbacks.getDocument();
-    const entry = this.callbacks.getCatalog()?.get(type);
+    const entry = this.callbacks.getCatalog()?.get(materialType);
     if (document === undefined || entry === undefined) return false;
+    const manifest = item?.manifest ?? entry.manifest;
     // snapPoint 返回的吸附点带 snappedX/snappedY 辅助字段，不能直接写入组件 position
     // （fail-closed 校验会拒绝未知字段），这里只取规范化后的 x/y。
     // 与画布内拖拽一致：坐标只保留小数点后两位，并夹取到合法范围。
@@ -1022,12 +1045,12 @@ export class DesignerGestureController {
         {
           type: 'add-component',
           component: {
-            id: nextComponentId(document, entry.manifest.type),
-            type: entry.manifest.type,
-            name: entry.manifest.name,
+            id: nextComponentId(document, manifest.type),
+            type: manifest.type,
+            name: manifest.name,
             parentId: null,
             position,
-            size: entry.manifest.defaultSize,
+            size: manifest.defaultSize,
             rotation: 0,
             zIndex:
               document.components.reduce(
@@ -1035,9 +1058,12 @@ export class DesignerGestureController {
                 -1,
               ) + 1,
             status: { locked: false, hidden: false },
-            props: entry.manifest.defaultProps,
-            style: entry.manifest.defaultStyle,
-            dataSource: createInitialDataSource(entry.manifest),
+            props: manifest.defaultProps,
+            style: manifest.defaultStyle,
+            dataSource:
+              item === undefined
+                ? createInitialDataSource(manifest)
+                : createInitialDataSourceForMaterialLibraryItem(item),
           },
         },
       ],
