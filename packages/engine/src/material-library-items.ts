@@ -227,7 +227,13 @@ export function createInitialDataSourceForMaterialLibraryItem(
   if (Object.hasOwn(item, 'defaultDataSource')) return item.defaultDataSource ?? null;
   return item.manifest.defaultData === undefined
     ? null
-    : { type: 'static', value: item.manifest.defaultData };
+    : {
+        type: 'static',
+        value: item.manifest.defaultData,
+        ...(item.manifest.staticData?.kind === 'tabular'
+          ? { binding: item.manifest.staticData.defaultBinding }
+          : {}),
+      };
 }
 
 function projectManifest(

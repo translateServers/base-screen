@@ -217,10 +217,10 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
       {
         descriptorFieldId: 'dimensionField',
         descriptorTarget: 'data',
-        descriptorPath: JSON.stringify(['binding', 'dimension']),
+        descriptorPath: JSON.stringify(['binding', 'fields', 'dimension', 0]),
         descriptorControl: 'field-selector',
       },
-      'region',
+      'amount',
     );
     const bindingResult = createDescriptorFieldTransaction(
       bindingControl as unknown as EventTarget,
@@ -229,6 +229,19 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
       catalog(),
     );
     expect(bindingResult?.ok).toBe(true);
+    if (!bindingResult?.ok) return;
+    const bindingCommand = bindingResult.value.commands[0];
+    if (bindingCommand?.type === 'update-components') {
+      const source = bindingCommand.patch.dataSource as ScreenComponentNode['dataSource'];
+      expect(source?.type).toBe('host-resource');
+      if (source?.type === 'host-resource') {
+        expect(source.binding).not.toBeNull();
+        if (source.binding !== null) {
+          expect(source.binding.fields.dimension).toEqual(['amount']);
+          expect(source.binding.fields).not.toHaveProperty('fields');
+        }
+      }
+    }
   });
 });
 

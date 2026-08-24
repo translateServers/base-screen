@@ -3,12 +3,13 @@ import { chromium } from '@playwright/test';
 import { createServer } from 'vite';
 
 const screenshotDirectory = 'test-results/designer-workbench';
+const serverPort = Number(process.env.BASE_SCREEN_BROWSER_PORT ?? 4174);
 mkdirSync(screenshotDirectory, { recursive: true });
 
 const server = await createServer({
   root: 'examples/browser-harness',
   optimizeDeps: { force: true },
-  server: { host: '127.0.0.1', port: 4174, strictPort: true },
+  server: { host: '127.0.0.1', port: serverPort, strictPort: true },
 });
 
 try {
@@ -24,7 +25,7 @@ try {
       const page = await browser.newPage({ viewport });
       const pageErrors = [];
       page.on('pageerror', (error) => pageErrors.push(error));
-      await page.goto('http://127.0.0.1:4174', { waitUntil: 'networkidle' });
+      await page.goto(`http://127.0.0.1:${serverPort}`, { waitUntil: 'networkidle' });
       if (pageErrors.length > 0) {
         throw pageErrors[0];
       }
@@ -246,36 +247,64 @@ try {
                 '[data-base-screen-component-id=port-warning]',
               ).model.style,
           );
-        await page.waitForFunction(
-          () =>
-            window.baseScreenHarness.viewer.shadowRoot.querySelector(
-              '[data-base-screen-component-id=port-warning]',
-            )?.model.dataState.status === 'ready',
+        const designerPortStyle = () =>
+          page.evaluate(
+            () =>
+              window.baseScreenHarness.designer.shadowRoot.querySelector(
+                '[data-base-screen-component-id=port-warning]',
+              ).model.style,
+          );
+        await page.waitForFunction(() =>
+          [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
+            (element) =>
+              element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')
+                ?.model.dataState.status === 'ready',
+          ),
         );
         const portBase = await portStyle();
-        if (portBase.color !== '#9fb1c9' || portBase.fontWeight !== '400') {
+        const designerPortBase = await designerPortStyle();
+        if (
+          portBase.color !== '#9fb1c9' ||
+          portBase.fontWeight !== '400' ||
+          designerPortBase.color !== '#9fb1c9' ||
+          designerPortBase.fontWeight !== '400'
+        ) {
           throw new Error('BROWSER_HARNESS_STYLE_PORT_BASE_FAILED');
         }
         await page.evaluate(() => window.baseScreenHarness.setMetricValue(160));
-        await page.waitForFunction(
-          () =>
-            window.baseScreenHarness.viewer.shadowRoot.querySelector(
-              '[data-base-screen-component-id=port-warning]',
-            )?.model.style.color === '#ffa940',
+        await page.waitForFunction(() =>
+          [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
+            (element) =>
+              element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')
+                ?.model.style.color === '#ffa940',
+          ),
         );
         const portWarned = await portStyle();
-        if (portWarned.color !== '#ffa940' || portWarned.fontWeight !== '700') {
+        const designerPortWarned = await designerPortStyle();
+        if (
+          portWarned.color !== '#ffa940' ||
+          portWarned.fontWeight !== '700' ||
+          designerPortWarned.color !== '#ffa940' ||
+          designerPortWarned.fontWeight !== '700'
+        ) {
           throw new Error('BROWSER_HARNESS_STYLE_PORT_TRIGGER_FAILED');
         }
         await page.evaluate(() => window.baseScreenHarness.setMetricValue(20));
-        await page.waitForFunction(
-          () =>
-            window.baseScreenHarness.viewer.shadowRoot.querySelector(
-              '[data-base-screen-component-id=port-warning]',
-            )?.model.style.color === '#9fb1c9',
+        await page.waitForFunction(() =>
+          [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
+            (element) =>
+              element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')
+                ?.model.style.color === '#9fb1c9',
+          ),
         );
         const portRestored = await portStyle();
-        if (portRestored.color !== '#9fb1c9' || portRestored.fontWeight !== '400') {
+        const designerPortRestored = await designerPortStyle();
+        if (
+          portRestored.color !== '#9fb1c9' ||
+          portRestored.fontWeight !== '400' ||
+          designerPortRestored.color !== '#9fb1c9' ||
+          designerPortRestored.fontWeight !== '400'
+        ) {
           throw new Error('BROWSER_HARNESS_STYLE_PORT_RESTORE_FAILED');
         }
         await page.evaluate(() => window.baseScreenHarness.createDatasetDemo());
@@ -534,7 +563,7 @@ try {
           );
         }
         await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
-        await page.goto('http://127.0.0.1:4174/?designer', { waitUntil: 'networkidle' });
+        await page.goto(`http://127.0.0.1:${serverPort}/?designer`, { waitUntil: 'networkidle' });
         const authoringDesigner = page.locator('base-screen-designer');
         // ?designer 页面的 designer 初始化是异步的（custom element upgrade + load）：
         // 等待 publish 按钮的操作渲染完成（hidden 由 renderOperationControls 设置），
@@ -719,12 +748,17 @@ try {
           throw new Error(`BROWSER_HARNESS_IMAGE_TOOL_FAILED: ${imageType}`);
         }
         const image = authoringDesigner.locator('[data-base-screen-component-id^="base-image-"]');
+        const imageIdle = {
+          count: await image.count(),
+          state: await image.getAttribute('data-base-screen-data-state'),
+          text: await image.textContent(),
+        };
         if (
-          (await image.count()) !== 1 ||
-          (await image.getAttribute('data-base-screen-data-state')) !== 'idle' ||
-          (await image.textContent()) !== '\u672a\u8bbe\u7f6e\u56fe\u7247'
+          imageIdle.count !== 1 ||
+          imageIdle.state !== 'ready' ||
+          imageIdle.text !== '\u672a\u8bbe\u7f6e\u56fe\u7247'
         ) {
-          throw new Error('BROWSER_HARNESS_IMAGE_IDLE_STATE_FAILED');
+          throw new Error(`BROWSER_HARNESS_IMAGE_IDLE_STATE_FAILED:${JSON.stringify(imageIdle)}`);
         }
         await image.evaluate((element) => {
           element.model = { ...element.model, dataState: { status: 'loading' } };
@@ -920,13 +954,13 @@ try {
         await authoringDesigner.locator('[data-base-screen-component-id=title]').click();
         await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).click();
         const staticInput = authoringDesigner.locator(
-          '[data-inspector-pane=data] [data-data-source-static]',
+          '[data-inspector-pane=data] [data-static-scalar="string"]',
         );
         await staticInput.waitFor();
         await assertEditableShortcuts(page, authoringDesigner, staticInput);
-        await staticInput.fill('"Base Screen 设计器r"');
+        await staticInput.fill('Base Screen 设计器r');
         await authoringDesigner
-          .locator('[data-inspector-pane=data] [data-dataset-action="apply"]')
+          .locator('[data-inspector-pane=data] [data-static-action="apply"]')
           .click();
         await page.waitForFunction(() =>
           window.baseScreenHarness.designer.document.components.some(
@@ -2662,10 +2696,10 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   const variableNamesBefore = await page.evaluate(() =>
     window.baseScreenHarness.designer.document.variables.map((item) => item.name).join(','),
   );
-  if (variableNamesBefore !== 'count') {
+  if (variableNamesBefore !== 'count,region') {
     throw new Error(`BROWSER_HARNESS_VARIABLES_LIST_FAILED:${variableNamesBefore}`);
   }
-  // 新建变量 region = "north"（与 echarts-demo 参数引用的变量同名，用于验证引用保护）
+  // 新建未引用变量 temporary，保留新建能力覆盖；region 已由初始文档提供并被引用。
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-variables]');
@@ -2677,18 +2711,34 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     const root = window.baseScreenHarness.designer.shadowRoot;
     return root.querySelector('[data-variables] [data-variable-create-name]') !== null;
   });
+  const variableActionNames = await page.evaluate(() => {
+    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    return {
+      confirm: panel
+        .querySelector('[data-variable-action="confirm-create"]')
+        ?.getAttribute('aria-label'),
+      cancel: panel.querySelector('[data-variable-action="cancel"]')?.getAttribute('aria-label'),
+    };
+  });
+  if (
+    variableActionNames.confirm !== '确认' ||
+    variableActionNames.cancel !== '取消' ||
+    variableActionNames.confirm === variableActionNames.cancel
+  ) {
+    throw new Error('BROWSER_HARNESS_VARIABLE_ACTION_ACCESSIBLE_NAMES_FAILED');
+  }
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-variables]');
-    panel.querySelector('[data-variable-create-name]').value = 'region';
-    panel.querySelector('[data-variable-create-value]').value = '"north"';
+    panel.querySelector('[data-variable-create-name]').value = 'temporary';
+    panel.querySelector('[data-variable-create-value]').value = 'true';
     panel
       .querySelector('[data-variable-action="confirm-create"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
   await page.waitForFunction(() => {
     const names = window.baseScreenHarness.designer.document.variables.map((item) => item.name);
-    return names.includes('region');
+    return names.includes('temporary');
   });
   // 删除被引用的 region → 拒绝
   await page.evaluate(() => {
@@ -2721,7 +2771,7 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   });
   await page.waitForFunction(() => {
     const names = window.baseScreenHarness.designer.document.variables.map((item) => item.name);
-    return !names.includes('count') && names.includes('region');
+    return !names.includes('count') && names.includes('region') && names.includes('temporary');
   });
   // 撤销前把焦点移回画布视口（Ctrl+Z 需进入 designer 事件链）。
   await page.evaluate(() => {
@@ -2730,7 +2780,7 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   await page.keyboard.press(`${modifier}+z`);
   await page.waitForFunction(() => {
     const names = window.baseScreenHarness.designer.document.variables.map((item) => item.name);
-    return names.includes('count') && names.includes('region');
+    return names.includes('count') && names.includes('region') && names.includes('temporary');
   });
 
   // 官方物料视觉能力（ADR-0055）：矩形面板出现圆角/阴影字段，设置后画布样式生效
@@ -4055,6 +4105,42 @@ async function assertLayersAuthoring(designer, page) {
   ) {
     throw new Error('BROWSER_HARNESS_LAYER_LOCK_STATE_FAILED');
   }
+  // 锁定组件不是画布选择目标：左键单击保持既有选择；从锁定组件内部拖出时仍能
+  // 发起框选，且最终选区排除锁定项、保留命中的未锁定项。
+  const subtitle = tree.locator('[role=treeitem][data-layer-id=subtitle]');
+  await subtitle.locator('[data-layer-select=subtitle]').click({ force: true });
+  await designer.locator('[data-base-screen-component-id=title]').click({
+    position: { x: 6, y: 7 },
+  });
+  if (
+    (await subtitle.getAttribute('aria-selected')) !== 'true' ||
+    (await title.getAttribute('aria-selected')) !== 'false'
+  ) {
+    throw new Error('BROWSER_HARNESS_LOCKED_CANVAS_CLICK_SELECTION_FAILED');
+  }
+  const titleBox = await designer.locator('[data-base-screen-component-id=title]').boundingBox();
+  const subtitleBox = await designer
+    .locator('[data-base-screen-component-id=subtitle]')
+    .boundingBox();
+  if (titleBox === null || subtitleBox === null) {
+    throw new Error('BROWSER_HARNESS_LOCKED_MARQUEE_BOUNDS_MISSING');
+  }
+  await page.mouse.move(titleBox.x + 6, titleBox.y + 7);
+  await page.mouse.down();
+  await page.mouse.move(
+    subtitleBox.x + subtitleBox.width - 6,
+    subtitleBox.y + subtitleBox.height - 6,
+    { steps: 6 },
+  );
+  await page.mouse.up();
+  const marqueeSelection = await tree
+    .locator('[role=treeitem][aria-selected=true]')
+    .evaluateAll((items) => items.map((item) => item.getAttribute('data-layer-id')));
+  if (marqueeSelection.includes('title') || !marqueeSelection.includes('subtitle')) {
+    throw new Error(
+      `BROWSER_HARNESS_LOCKED_MARQUEE_SELECTION_FAILED:${JSON.stringify(marqueeSelection)}`,
+    );
+  }
   await lock.click({ force: true });
 }
 
@@ -4113,6 +4199,9 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   await dataPanel.locator('[data-dataset-descriptor]').waitFor();
   const descriptorSurface = await dataPanel.evaluate((panel) => ({
     parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
+    unlabelledParameterControls: [
+      ...panel.querySelectorAll('[data-dataset-parameter], [data-dataset-parameter-mode]'),
+    ].filter((control) => control.getAttribute('aria-label') === null).length,
     bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
     apply: panel.querySelector('[data-dataset-action="apply"]') !== null,
     previewActionCount: panel.querySelectorAll('[data-dataset-action="preview"]').length,
@@ -4129,6 +4218,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   }));
   if (
     descriptorSurface.parameterCount < 2 ||
+    descriptorSurface.unlabelledParameterControls !== 0 ||
     descriptorSurface.bindingCount !== 0 ||
     !descriptorSurface.apply ||
     descriptorSurface.previewActionCount !== 0 ||
@@ -4339,6 +4429,20 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   // AE-ED-C01/AE-EC-C01 ECharts 语义面板：受限 Descriptor 完成常见配置，无需 raw option。
   await designer.getByRole('tab', { name: '\u5916\u89c2' }).click();
   await designer.locator('[data-base-screen-component-id=echarts-demo]').click();
+  await page.waitForFunction(
+    () => {
+      const material = document
+        .querySelector('base-screen-designer')
+        ?.shadowRoot?.querySelector('[data-base-screen-component-id="echarts-demo"]');
+      return (
+        material?.getAttribute('data-base-screen-data-state') === 'ready' &&
+        material.querySelector('svg') !== null &&
+        material.querySelector('circle') !== null
+      );
+    },
+    undefined,
+    { timeout: 5000 },
+  );
   const appearance = designer.locator('[data-properties]');
   const sectionNames = await appearance
     .locator('.designer-descriptor-group-summary')
@@ -4399,6 +4503,20 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   if ((await fieldSelector.locator('option').count()) < 2) {
     throw new Error('BROWSER_HARNESS_ECHARTS_FIELD_SELECTOR_FAILED');
   }
+  await fieldSelector.selectOption('amount');
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'echarts-demo',
+      )?.dataSource?.binding?.fields?.dimension?.[0] === 'amount',
+  );
+  await fieldSelector.selectOption('category');
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'echarts-demo',
+      )?.dataSource?.binding?.fields?.dimension?.[0] === 'category',
+  );
   // AE-ED-C05 事件 tab：结构化事件声明 label 与能力提示。
   await designer.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
   const eventText = await events.textContent();
@@ -4755,12 +4873,15 @@ async function assertNativeEventsToggle(designer, page) {
       dataSource,
     });
     const chartValue = {
-      series: [{ id: 's1', label: '系列一', points: [{ x: 'north', y: 42 }] }],
-    };
-    const tableValue = {
-      columns: [
-        { id: 'amount', label: '金额', valueType: 'number', sortable: true, filterable: false },
+      fields: [
+        { id: 'category', label: '区域', valueType: 'string', nullable: false },
+        { id: 'amount', label: '金额', valueType: 'number', nullable: false },
       ],
+      rows: [{ category: 'north', amount: 42 }],
+    };
+    const chartBinding = { fields: { dimension: ['category'], measures: ['amount'] } };
+    const tableValue = {
+      fields: [{ id: 'amount', label: '金额', valueType: 'number', nullable: false }],
       rows: [{ amount: 42 }],
     };
     probeElement.catalog = catalog;
@@ -4768,7 +4889,16 @@ async function assertNativeEventsToggle(designer, page) {
       canvas: { width: 960, height: 540, backgroundColor: '#0b1220' },
       components: [
         component('probe-text', 'text', { x: 20, y: 20 }, { type: 'static', value: '探针文本' }),
-        component('probe-chart', 'chart', { x: 20, y: 100 }, { type: 'static', value: chartValue }),
+        component(
+          'probe-chart',
+          'chart',
+          { x: 20, y: 100 },
+          {
+            type: 'static',
+            value: chartValue,
+            binding: chartBinding,
+          },
+        ),
         component(
           'probe-echarts',
           'echarts',
@@ -4776,6 +4906,7 @@ async function assertNativeEventsToggle(designer, page) {
           {
             type: 'static',
             value: chartValue,
+            binding: chartBinding,
           },
         ),
         component(
@@ -4785,6 +4916,7 @@ async function assertNativeEventsToggle(designer, page) {
           {
             type: 'static',
             value: tableValue,
+            binding: { fields: { columns: ['amount'] } },
           },
         ),
         component('probe-react', 'react', { x: 20, y: 300 }, null),

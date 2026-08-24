@@ -97,6 +97,7 @@ export type {
   ScreenComponentStyleRule,
   ScreenComponentStyleRuleCondition,
   ScreenComponentStyleRuleOperator,
+  ScreenDataBinding,
   ScreenDocument,
   ScreenHostResourceBinding,
   ScreenHostResourceDataSource,

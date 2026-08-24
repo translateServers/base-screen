@@ -1082,6 +1082,12 @@ const result = designer.commitBlueprintEdit({
 if (!result.ok) showDiagnostics(result.diagnostics);
 ```
 
+用户取消或关闭宿主编辑器时，应释放对应请求，避免留下无效会话：
+
+```ts
+designer.cancelAuthoringEdit(request.requestId);
+```
+
 组件文本编辑使用 `commitComponentTextEdit()`。提交会校验 request ID、Designer 实例、revision、
 component identity、目标 schema、JSON 深度和容量；陈旧或无效候选不会修改文档和历史。宿主
 不要绕过这些入口操作 Designer 的 Shadow DOM 或内部 Store。

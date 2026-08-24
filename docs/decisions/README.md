@@ -77,6 +77,7 @@
 | [ADR-0058](./ADR-0058-component-conditional-style-rules.md) | 已接受 | 2026-08-17 | 组件条件样式规则：`ScreenComponentNode` 新增 JSON-safe `styleRules`（锚定组件 `dataState.value` 的有界路径条件 + Manifest `styleSchema` 内样式合并），Renderer 在 model 构造前求值派生 effective style、数据刷新自动重评估；`update-components` patch 扩展与 Designer 条件样式编辑区；Blueprint 与宿主边界不变 |
 | [ADR-0059](./ADR-0059-conditional-style-port.md) | 已接受 | 2026-08-17 | 宿主条件样式端口：渲染期同步纯函数覆盖，固定合并顺序与失败关闭回退，不进入文档 |
 | [ADR-0060](./ADR-0060-material-library-item-projection.md) | 已接受 | 2026-08-23 | Designer 物料库条目投影：多个宿主条目复用一个 canonical 运行物料类型，实例默认值覆盖经 Manifest 校验 |
+| [ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) | 已接受 | 2026-08-24 | 宿主受限可视化事件蓝图：事件、可选条件、有序动作与无副作用 trace，零图形依赖 |
 
 ## 计划决策
 

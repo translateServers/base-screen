@@ -49,22 +49,25 @@ export interface ScreenComponentStatus {
 export interface ScreenStaticDataSource {
   readonly type: 'static';
   readonly value: ScreenJsonValue;
+  readonly binding?: ScreenDataBinding;
 }
 
 export type ScreenHostResourceParameter =
   | { readonly kind: 'literal'; readonly value: ScreenJsonValue }
   | { readonly kind: 'variable'; readonly name: string };
 
-export interface ScreenHostResourceBinding {
+export interface ScreenDataBinding {
   readonly fields: Readonly<Record<string, readonly string[]>>;
 }
+
+export type ScreenHostResourceBinding = ScreenDataBinding;
 
 export interface ScreenHostResourceDataSource {
   readonly type: 'host-resource';
   readonly resourceType: string;
   readonly resourceId: string;
   readonly params: Readonly<Record<string, ScreenHostResourceParameter>>;
-  readonly binding: ScreenHostResourceBinding | null;
+  readonly binding: ScreenDataBinding | null;
 }
 
 export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenHostResourceDataSource;

@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-18（调色板紧凑布局与 alpha、组件条件样式规则与宿主条件样式端口、画布拖拽/形变 1px 网格）
+> 最近更新：2026-08-23（Manifest 静态数据描述、静态表格作者能力与统一 tabular adapter）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -89,6 +89,10 @@
 
 - **物料契约与 ABI**：manifest 类型、校验、只读 catalog 与同 realm Web Component ABI。
   依据：[Plugin Core Contract](../specs/archive/plugin-core-contract/spec.md)、[ADR-0003](../decisions/ADR-0003-web-component-material-abi-and-registration.md)。
+- **静态数据作者契约**（2026-08-23 增量）：Manifest 可选 `staticData` scalar/tabular 描述；canonical 静态
+  数据源可携带字段角色 binding，tabular 静态数据与宿主数据集复用物料 adapter。Designer 提供标量表单、
+  有界表格网格、列/行/类型/角色编辑、Excel/TSV 粘贴推断与高级 JSON；应用一条事务，取消零副作用，未声明
+  `staticData` 的自定义物料继续使用原始 JSON 路径。依据：[ADR-0028](../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)。
 - **官方数据物料契约**：图表与表格的最小数据语义契约。依据：[Official Data Material Contracts](../specs/archive/data-material-contracts/spec.md)、
   [ADR-0022](../decisions/ADR-0022-official-data-material-contracts.md)。
 - **物料库可见性**：Manifest 可选 `libraryVisible` 与 Designer 物料库过滤，容器移出物料库。

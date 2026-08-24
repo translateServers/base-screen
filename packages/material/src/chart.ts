@@ -23,19 +23,21 @@ export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   defaultSize: { width: 480, height: 280 },
   defaultProps: {},
   defaultData: {
-    series: [
-      {
-        id: 'amount',
-        label: '订单金额',
-        points: [
-          { x: 'north', y: 42 },
-          { x: 'south', y: 36 },
-          { x: 'east', y: 28 },
-          { x: 'west', y: 24 },
-          { x: 'central', y: 19 },
-        ],
-      },
+    fields: [
+      { id: 'region', label: '区域', valueType: 'string', nullable: false },
+      { id: 'amount', label: '订单金额', valueType: 'number', nullable: false },
     ],
+    rows: [
+      { region: 'north', amount: 42 },
+      { region: 'south', amount: 36 },
+      { region: 'east', amount: 28 },
+      { region: 'west', amount: 24 },
+      { region: 'central', amount: 19 },
+    ],
+  },
+  staticData: {
+    kind: 'tabular',
+    defaultBinding: { fields: { dimension: ['region'], measures: ['amount'] } },
   },
   defaultStyle: {
     backgroundColor: '#111827',

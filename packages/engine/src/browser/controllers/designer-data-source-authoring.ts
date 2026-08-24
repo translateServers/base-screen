@@ -1,5 +1,6 @@
 import {
   parseScreenJsonValue,
+  parseScreenTabularDataset,
   type ScreenDatasetDescriptor,
   type ScreenDiagnostic,
   type ScreenDocument,
@@ -16,6 +17,7 @@ import {
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialPropSchema,
+  type BaseScreenMaterialStaticDataDescriptor,
   type BaseScreenRuntimeContributionIndex,
   validateBaseScreenMaterialProps,
 } from '@base-screen/plugin-core';
@@ -37,6 +39,7 @@ interface DesignerDatasetTransactionOptions {
 export function createDesignerDatasetDraft(
   descriptor: ScreenDatasetDescriptor,
   source: ScreenDocument['components'][number]['dataSource'],
+  roles: readonly ScreenDataBindingRole[] = [],
 ): DesignerDatasetDraftView {
   const sameResource =
     source?.type === 'host-resource' &&
@@ -50,11 +53,35 @@ export function createDesignerDatasetDraft(
       params[parameter.name] = { kind: 'literal', value: parameter.defaultValue };
     }
   }
-  const fields = sameResource
+  const fields: Record<string, readonly string[]> = sameResource
     ? Object.fromEntries(
         Object.entries(source.binding?.fields ?? {}).map(([key, value]) => [key, [...value]]),
       )
     : {};
+  if (!sameResource) {
+    const used = new Set<string>();
+    for (const role of roles) {
+      const compatible = descriptor.fields.filter((field) =>
+        role.valueTypes.includes(field.valueType),
+      );
+      let selected: readonly string[] = [];
+      if (role.maxFields === 1) {
+        const field = compatible.find((item) => !used.has(item.id)) ?? compatible[0];
+        if (field !== undefined) selected = [field.id];
+      } else if (role.id === 'columns') {
+        selected = compatible.slice(0, role.maxFields).map((field) => field.id);
+      } else {
+        selected = compatible
+          .filter((field) => !used.has(field.id))
+          .slice(0, role.minFields)
+          .map((field) => field.id);
+      }
+      if (selected.length >= role.minFields) {
+        fields[role.id] = selected;
+        selected.forEach((id) => used.add(id));
+      }
+    }
+  }
   return {
     resourceType: descriptor.resourceType,
     resourceId: descriptor.resourceId,
@@ -133,6 +160,9 @@ export function toggleDesignerDatasetBindingField(
 export function createStaticDataSourceTransaction(
   componentId: string,
   draft: string,
+  descriptor?: BaseScreenMaterialStaticDataDescriptor,
+  binding?: ScreenHostResourceBinding,
+  roles: readonly ScreenDataBindingRole[] = [],
 ): ScreenParseResult<ScreenDocumentTransaction> {
   let value: unknown;
   try {
@@ -142,6 +172,22 @@ export function createStaticDataSourceTransaction(
   }
   const parsed = parseScreenJsonValue(value);
   if (!parsed.ok) return invalid('CORE_COMMAND_INVALID', DESIGNER_UI_TEXT.dataSource.staticInvalid);
+  if (descriptor?.kind === 'scalar' && typeof parsed.value !== descriptor.valueType) {
+    return invalid('CORE_COMMAND_INVALID', DESIGNER_UI_TEXT.dataSource.staticInvalid);
+  }
+  if (descriptor?.kind === 'tabular') {
+    const dataset = parseScreenTabularDataset(parsed.value);
+    if (!dataset.ok) return dataset;
+    const checked = validateScreenHostResourceBinding(binding ?? null, dataset.value.fields, roles);
+    if (!checked.ok) return checked;
+    return success(
+      updateDataSource(componentId, {
+        type: 'static',
+        value: dataset.value as unknown as ScreenJsonValue,
+        ...(binding === undefined ? {} : { binding }),
+      }),
+    );
+  }
   return success(updateDataSource(componentId, { type: 'static', value: parsed.value }));
 }
 

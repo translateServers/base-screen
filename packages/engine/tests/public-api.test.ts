@@ -120,6 +120,9 @@ describe('engine public lifecycle API', () => {
       InstanceType<typeof BaseScreenDesignerElement>['commitBlueprintEdit']
     >().parameters.toEqualTypeOf<[import('@base-screen/contracts').ScreenBlueprintCommitRequest]>();
     expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['cancelAuthoringEdit']
+    >().parameters.toEqualTypeOf<[string]>();
+    expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['requestComponentTextEdit']
     >().parameters.toEqualTypeOf<[import('@base-screen/contracts').ScreenComponentTextTarget]>();
     expectTypeOf<

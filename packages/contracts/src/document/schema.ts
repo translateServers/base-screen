@@ -113,9 +113,14 @@ const styleRuleSchema = z.strictObject({
   style: z.record(z.string(), z.any()),
 });
 
+const dataBindingSchema = z.strictObject({
+  fields: z.record(z.string().min(1).max(128), z.array(z.string().min(1).max(256)).min(1).max(256)),
+});
+
 export const staticDataSourceSchema = z.strictObject({
   type: z.literal('static'),
   value: z.any(),
+  binding: dataBindingSchema.optional(),
 });
 
 export const hostResourceDataSourceSchema = z.strictObject({
@@ -132,15 +137,7 @@ export const hostResourceDataSourceSchema = z.strictObject({
       }),
     ]),
   ),
-  binding: z.union([
-    z.strictObject({
-      fields: z.record(
-        z.string().min(1).max(128),
-        z.array(z.string().min(1).max(256)).min(1).max(256),
-      ),
-    }),
-    z.null(),
-  ]),
+  binding: z.union([dataBindingSchema, z.null()]),
 });
 
 export const componentSchema = z.strictObject({

@@ -1,6 +1,7 @@
 import type { ScreenDatasetDescriptor, ScreenHostResourceParameter } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import type {
   DesignerDatasetConfigurationOptions,
   DesignerDatasetDraftView,
@@ -12,16 +13,26 @@ export function renderDesignerDatasetConfiguration(
   const details = options.panel.ownerDocument.createElement('div');
   details.dataset.datasetDescriptor = 'true';
   details.className = 'designer-dataset-descriptor';
-  details.appendChild(renderDatasetSummary(details.ownerDocument, options.descriptor));
+  details.appendChild(
+    renderDatasetSummary(details.ownerDocument, options.descriptor, options.roles, options.draft),
+  );
   details.appendChild(renderParameters(details.ownerDocument, options));
   details.appendChild(renderBindings(details.ownerDocument, options));
-  details.appendChild(renderActions(details.ownerDocument, !options.resourceAvailable));
+  details.appendChild(
+    renderActions(
+      details.ownerDocument,
+      !options.resourceAvailable,
+      isDesignerDatasetBindingValid(options.descriptor, options.draft, options.roles),
+    ),
+  );
   return details;
 }
 
 function renderDatasetSummary(
   ownerDocument: Document,
   descriptor: ScreenDatasetDescriptor,
+  roles: readonly ScreenDataBindingRole[],
+  draft: DesignerDatasetDraftView | undefined,
 ): HTMLElement {
   const summary = ownerDocument.createElement('section');
   summary.className = 'designer-dataset-summary';
@@ -46,6 +57,29 @@ function renderDatasetSummary(
     description.textContent = descriptor.description;
     summary.appendChild(description);
   }
+  const shape = ownerDocument.createElement('span');
+  shape.className = 'designer-dataset-shape';
+  shape.textContent = DESIGNER_UI_TEXT.dataset.tabularShape;
+  summary.appendChild(shape);
+  const bindingSummary = ownerDocument.createElement('div');
+  bindingSummary.className = 'designer-dataset-binding-summary';
+  const bindingTitle = ownerDocument.createElement('strong');
+  bindingTitle.textContent = DESIGNER_UI_TEXT.dataset.bindingSummaryTitle;
+  const bindingText = ownerDocument.createElement('p');
+  const labels = roles.flatMap((role) => {
+    const selected = draft?.fields[role.id] ?? [];
+    return selected.length === 0
+      ? []
+      : [
+          `${DESIGNER_UI_TEXT.dataset.bindingRole(role.id)}：${selected
+            .map((id) => descriptor.fields.find((field) => field.id === id)?.label ?? id)
+            .join('、')}`,
+        ];
+  });
+  bindingText.textContent =
+    labels.length === 0 ? DESIGNER_UI_TEXT.dataset.bindingNone : labels.join('；');
+  bindingSummary.append(bindingTitle, bindingText);
+  summary.appendChild(bindingSummary);
   const schema = ownerDocument.createElement('ul');
   schema.className = 'designer-dataset-schema';
   for (const field of descriptor.fields) {
@@ -80,11 +114,14 @@ function renderParameters(
     const mode = ownerDocument.createElement('select');
     mode.className = 'designer-control designer-select';
     mode.dataset.datasetParameterMode = parameter.name;
+    mode.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label));
     appendOption(mode, 'literal', DESIGNER_UI_TEXT.dataset.literal, draft?.kind !== 'variable');
     appendOption(mode, 'variable', DESIGNER_UI_TEXT.dataset.variable, draft?.kind === 'variable');
     controls.appendChild(mode);
     if (draft?.kind === 'variable') {
-      controls.appendChild(variableControl(ownerDocument, parameter.name, draft, options));
+      controls.appendChild(
+        variableControl(ownerDocument, parameter.name, parameter.label, draft, options),
+      );
     } else {
       controls.appendChild(
         parameterControl(ownerDocument, options.descriptor, parameter.name, draft),
@@ -99,12 +136,17 @@ function renderParameters(
 function variableControl(
   ownerDocument: Document,
   parameterName: string,
+  parameterLabel: string,
   draft: Extract<ScreenHostResourceParameter, { readonly kind: 'variable' }>,
   options: DesignerDatasetConfigurationOptions,
 ): HTMLSelectElement {
   const variable = ownerDocument.createElement('select');
   variable.className = 'designer-control designer-select';
   variable.dataset.datasetParameter = parameterName;
+  variable.setAttribute(
+    'aria-label',
+    DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameterLabel),
+  );
   appendOption(variable, '', DESIGNER_UI_TEXT.dataset.selectVariable, draft.name === '');
   for (const name of options.variableNames) {
     appendOption(variable, name, name, draft.name === name);
@@ -154,8 +196,37 @@ function renderBindingRole(
   const compatibleFields = descriptor.fields.filter((field) =>
     role.valueTypes.includes(field.valueType),
   );
-  for (const field of compatibleFields) {
-    fieldList.appendChild(bindingField(ownerDocument, role.id, field, selected));
+  if (role.maxFields === 1) {
+    const select = ownerDocument.createElement('select');
+    select.className = 'designer-control designer-select designer-dataset-binding-select';
+    select.dataset.datasetBindingRole = role.id;
+    select.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.bindingRole(role.id));
+    appendOption(select, '', DESIGNER_UI_TEXT.dataset.selectField, selected.length === 0);
+    for (const field of compatibleFields) {
+      appendOption(
+        select,
+        field.id,
+        `${field.label} · ${field.valueType}`,
+        selected.includes(field.id),
+      );
+    }
+    fieldList.appendChild(select);
+  } else {
+    const actions = ownerDocument.createElement('div');
+    actions.className = 'designer-dataset-binding-role-actions';
+    actions.append(
+      bindingRoleAction(
+        ownerDocument,
+        role.id,
+        'select-all',
+        DESIGNER_UI_TEXT.dataset.bindingSelectAll,
+      ),
+      bindingRoleAction(ownerDocument, role.id, 'clear', DESIGNER_UI_TEXT.dataset.bindingClear),
+    );
+    roleHeading.appendChild(actions);
+    for (const field of compatibleFields) {
+      fieldList.appendChild(bindingField(ownerDocument, role.id, field, selected));
+    }
   }
   if (compatibleFields.length === 0) {
     const empty = ownerDocument.createElement('p');
@@ -165,6 +236,21 @@ function renderBindingRole(
   }
   roleSection.append(roleHeading, hint, fieldList);
   return roleSection;
+}
+
+function bindingRoleAction(
+  ownerDocument: Document,
+  roleId: string,
+  action: 'select-all' | 'clear',
+  label: string,
+): HTMLButtonElement {
+  const button = ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-control designer-button designer-dataset-binding-role-action';
+  button.dataset.datasetBindingRoleAction = action;
+  button.dataset.datasetBindingRoleId = roleId;
+  button.textContent = label;
+  return button;
 }
 
 function bindingField(
@@ -194,7 +280,11 @@ function configSection(ownerDocument: Document, title: string): HTMLElement {
   return section;
 }
 
-function renderActions(ownerDocument: Document, resourceUnavailable: boolean): HTMLElement {
+function renderActions(
+  ownerDocument: Document,
+  resourceUnavailable: boolean,
+  bindingValid: boolean,
+): HTMLElement {
   const actions = ownerDocument.createElement('div');
   actions.className = 'designer-dataset-actions';
   actions.append(
@@ -202,7 +292,7 @@ function renderActions(ownerDocument: Document, resourceUnavailable: boolean): H
       ownerDocument,
       'apply',
       DESIGNER_UI_TEXT.dataSource.apply('dataset'),
-      false,
+      resourceUnavailable || !bindingValid,
       'primary',
     ),
     actionButton(
@@ -232,6 +322,7 @@ function parameterControl(
       ? 'designer-control designer-textarea'
       : 'designer-control designer-input';
   input.dataset.datasetParameter = parameter.name;
+  input.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label));
   setParameterControlValue(input, parameter, draft);
   if (input instanceof HTMLInputElement) {
     if (parameter.editor === 'number') input.type = 'number';

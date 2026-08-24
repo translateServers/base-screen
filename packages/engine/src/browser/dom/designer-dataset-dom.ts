@@ -6,6 +6,7 @@ import type {
   DesignerDataSourcePanelOptions,
   DesignerDatasetDraftView,
 } from './designer-dataset-types.js';
+import { renderDesignerStaticData } from './designer-static-data-dom.js';
 
 export type {
   DesignerDataSourceMode,
@@ -74,23 +75,19 @@ function renderEmptySource(ownerDocument: Document): HTMLElement {
 }
 
 function renderStaticSource(options: DesignerDataSourcePanelOptions): HTMLElement {
-  const section = options.panel.ownerDocument.createElement('section');
-  section.className = 'designer-data-source-editor';
-  const heading = options.panel.ownerDocument.createElement('h4');
-  heading.textContent = DESIGNER_UI_TEXT.dataSource.staticTitle;
-  const label = options.panel.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-data-source-static';
-  const labelText = options.panel.ownerDocument.createElement('span');
-  labelText.className = 'designer-field-label';
-  labelText.textContent = DESIGNER_UI_TEXT.dataSource.staticValue;
-  const textarea = options.panel.ownerDocument.createElement('textarea');
-  textarea.className = 'designer-control designer-textarea';
-  textarea.dataset.dataSourceStatic = 'true';
-  textarea.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticValue);
-  textarea.value = options.staticDraft;
-  label.append(labelText, textarea);
-  section.append(heading, label, renderApplyAction(section.ownerDocument, 'static'));
-  return section;
+  return renderDesignerStaticData({
+    ownerDocument: options.panel.ownerDocument,
+    descriptor: options.staticDescriptor,
+    value: options.staticValue,
+    binding: options.staticBinding,
+    jsonDraft: options.staticDraft,
+    dialogOpen: options.staticDialogOpen,
+    tab: options.staticTab,
+    page: options.staticPage,
+    pasteDraft: options.staticPasteDraft,
+    firstRowIsHeader: options.staticFirstRowIsHeader,
+    roles: options.roles,
+  });
 }
 
 function renderDatasetSource(options: DesignerDataSourcePanelOptions): HTMLElement {

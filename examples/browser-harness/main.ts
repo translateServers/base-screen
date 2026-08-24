@@ -65,7 +65,12 @@ const officialMaterials = [
   defineBaseScreenTableMaterial(),
 ];
 if (!productElements.ok || officialMaterials.some((definition) => !definition.ok)) {
-  throw new Error('Base Screen browser harness failed to register its elements.');
+  const diagnostics = [productElements, ...officialMaterials]
+    .filter((result) => !result.ok)
+    .flatMap((result) => result.diagnostics);
+  throw new Error(
+    `Base Screen browser harness failed to register its elements: ${JSON.stringify(diagnostics)}`,
+  );
 }
 
 const designerAuthoringCapabilities = [
@@ -471,7 +476,10 @@ const screenDocument = {
       },
     },
   ],
-  variables: [{ type: 'static' as const, name: 'count', value: 0 }],
+  variables: [
+    { type: 'static' as const, name: 'count', value: 0 },
+    { type: 'static' as const, name: 'region', value: 'north' },
+  ],
   blueprint: {
     rules: [
       {
@@ -881,6 +889,8 @@ Object.assign(window, {
     },
     setMetricValue: (value: number) => {
       metricValue = value;
+      designer.refreshData('metric-warning');
+      designer.refreshData('port-warning');
       viewer.refreshData('metric-warning');
       viewer.refreshData('port-warning');
     },

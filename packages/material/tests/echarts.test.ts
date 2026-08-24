@@ -16,11 +16,19 @@ import {
 describe('official ECharts semantic material', () => {
   it('AE-EC-C01 publishes a valid manifest with a nested props schema and descriptor', () => {
     const parsed = parseBaseScreenMaterialManifest(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST);
-    expect(parsed.ok).toBe(true);
+    expect(parsed.ok, parsed.ok ? undefined : JSON.stringify(parsed.diagnostics)).toBe(true);
     if (!parsed.ok) return;
     expect(parsed.value.propsSchema.properties.series?.kind).toBe('array');
     expect(parsed.value.editorDescriptor?.appearance?.length).toBeGreaterThan(0);
     expect(parsed.value.editorDescriptor?.events?.[0]?.name).toBe('seriesClick');
+    const bindingSection = parsed.value.editorDescriptor?.data?.find(
+      (section) => section.id === 'binding',
+    );
+    expect(bindingSection?.fields.map((field) => field.path)).toEqual([
+      ['binding', 'fields', 'dimension', 0],
+      ['binding', 'fields', 'measures', 0],
+      ['binding', 'fields', 'measures', 1],
+    ]);
   });
 
   it('AE-EC-C01 default props satisfy the nested props schema', () => {
@@ -134,6 +142,8 @@ describe('official ECharts semantic material', () => {
       manifest: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
       element: BaseScreenEChartsMaterialElement,
     });
-    expect(definition.ok).toBe(true);
+    expect(definition.ok, definition.ok ? undefined : JSON.stringify(definition.diagnostics)).toBe(
+      true,
+    );
   });
 });

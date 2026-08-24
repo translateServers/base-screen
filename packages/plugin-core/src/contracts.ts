@@ -1,4 +1,5 @@
 import type {
+  ScreenDataBinding,
   ScreenDatasetValueType,
   ScreenJsonObject,
   ScreenJsonValue,
@@ -132,6 +133,17 @@ export interface BaseScreenMaterialTabularDataAdapter {
   }): ScreenParseResult<ScreenJsonValue>;
 }
 
+export type BaseScreenMaterialStaticDataDescriptor =
+  | {
+      readonly kind: 'scalar';
+      readonly valueType: 'string' | 'number' | 'boolean';
+      readonly multiline?: boolean;
+    }
+  | {
+      readonly kind: 'tabular';
+      readonly defaultBinding: ScreenDataBinding;
+    };
+
 export interface BaseScreenMaterialManifest {
   readonly type: string;
   readonly tagName: string;
@@ -142,6 +154,7 @@ export interface BaseScreenMaterialManifest {
   readonly defaultProps: ScreenJsonObject;
   readonly defaultStyle: ScreenJsonObject;
   readonly defaultData?: ScreenJsonValue;
+  readonly staticData?: BaseScreenMaterialStaticDataDescriptor;
   readonly propsSchema: BaseScreenMaterialObjectSchema;
   readonly propertyPanel: readonly BaseScreenMaterialPropertyPanelField[];
   readonly styleSchema: BaseScreenMaterialObjectSchema;

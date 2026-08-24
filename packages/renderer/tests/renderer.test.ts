@@ -102,6 +102,57 @@ function createDatasetCatalog(
   };
 }
 
+function createStaticDatasetCatalog(
+  adapter: BaseScreenMaterialTabularDataAdapter,
+): BaseScreenMaterialCatalog {
+  const fields = [
+    { id: 'name', label: 'Name', valueType: 'string' as const, nullable: false },
+    { id: 'amount', label: 'Amount', valueType: 'number' as const, nullable: false },
+  ];
+  const manifest: BaseScreenMaterialManifest = {
+    type: 'base.test',
+    tagName: 'base-screen-test',
+    name: 'Test',
+    category: 'Test',
+    keywords: [],
+    defaultSize: { width: 100, height: 40 },
+    defaultProps: {},
+    defaultStyle: {},
+    defaultData: { fields, rows: [{ name: 'A', amount: 2 }] },
+    staticData: {
+      kind: 'tabular',
+      defaultBinding: { fields: { columns: ['name', 'amount'] } },
+    },
+    styleSchema: { kind: 'object', properties: {}, required: [] },
+    stylePanel: [],
+    propsSchema: { kind: 'object', properties: {}, required: [] },
+    propertyPanel: [],
+    events: [],
+    dataCapabilities: ['static'],
+    dataBinding: {
+      roles: [
+        {
+          id: 'columns',
+          minFields: 1,
+          maxFields: 256,
+          valueTypes: ['string', 'number'],
+        },
+      ],
+    },
+    designCapabilities: { resize: true, rotate: true, children: true },
+  };
+  const entry = {
+    manifest,
+    constructor: FakeMaterialElement as unknown as BaseScreenMaterialConstructor,
+    tabularDataAdapter: adapter,
+  };
+  return {
+    get: (type) => (type === manifest.type ? entry : undefined),
+    has: (type) => type === manifest.type,
+    list: () => [entry],
+  };
+}
+
 function createEventCatalog(): BaseScreenMaterialCatalog {
   const manifest: BaseScreenMaterialManifest = {
     type: 'base.test',
@@ -650,6 +701,41 @@ describe('BaseScreenRenderer', () => {
     expect(root.children[0]?.model?.dataState).toEqual({
       status: 'ready',
       value: { columns: ['name'], rows: [{ name: 'A', amount: 2 }] },
+    });
+  });
+
+  it('projects a bound static tabular dataset through the same material adapter', () => {
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createStaticDatasetCatalog({
+        adapt: ({ dataset, fields }) => ({
+          ok: true,
+          value: { columns: fields.columns?.map((field) => field.id) ?? [], rows: dataset.rows },
+          diagnostics: [],
+        }),
+      }),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const source: ScreenComponentNode['dataSource'] = {
+      type: 'static',
+      value: {
+        fields: [
+          { id: 'name', label: 'Name', valueType: 'string', nullable: false },
+          { id: 'amount', label: 'Amount', valueType: 'number', nullable: false },
+        ],
+        rows: [{ name: 'North', amount: 42 }],
+      },
+      binding: { fields: { columns: ['name', 'amount'] } },
+    };
+
+    expect(renderer.render(document([component('dataset', 0, null, source)])).ok).toBe(true);
+    expect(root.children[0]?.model?.dataState).toEqual({
+      status: 'ready',
+      value: { columns: ['name', 'amount'], rows: [{ name: 'North', amount: 42 }] },
     });
   });
 

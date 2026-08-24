@@ -1124,9 +1124,19 @@ function getDataState(
     }
   | undefined {
   if (component.dataSource === null) {
-    return entry.manifest.defaultData === undefined
-      ? { dataState: { status: 'idle' }, resource: undefined }
-      : { dataState: { status: 'ready', value: entry.manifest.defaultData }, resource: undefined };
+    if (entry.manifest.defaultData === undefined) {
+      return { dataState: { status: 'idle' }, resource: undefined };
+    }
+    return {
+      dataState: adaptStaticData(
+        entry,
+        entry.manifest.defaultData,
+        entry.manifest.staticData?.kind === 'tabular'
+          ? entry.manifest.staticData.defaultBinding
+          : undefined,
+      ),
+      resource: undefined,
+    };
   }
   if (
     !entry.manifest.dataCapabilities.includes(
@@ -1213,7 +1223,73 @@ function getDataState(
     );
     return undefined;
   }
-  return { dataState: { status: 'ready', value: parsed.value }, resource: undefined };
+  return {
+    dataState: adaptStaticData(entry, parsed.value, component.dataSource.binding),
+    resource: undefined,
+  };
+}
+
+function adaptStaticData(
+  entry: BaseScreenMaterialCatalogEntry,
+  value: ScreenJsonValue,
+  binding: import('@base-screen/contracts').ScreenDataBinding | undefined,
+): BaseScreenMaterialDataState {
+  if (entry.manifest.staticData?.kind !== 'tabular') {
+    return { status: 'ready', value };
+  }
+  const dataset = parseScreenTabularDataset(value);
+  if (!dataset.ok) {
+    return {
+      status: 'error',
+      code: 'HOST_DATASET_INVALID',
+      message: 'Static dataset is invalid.',
+    };
+  }
+  const declaration = entry.manifest.dataBinding;
+  const adapter = entry.tabularDataAdapter;
+  if (binding === undefined || declaration === undefined || adapter === undefined) {
+    return {
+      status: 'error',
+      code: 'HOST_DATASET_BINDING_INVALID',
+      message: 'Static dataset binding is invalid.',
+    };
+  }
+  const validated = validateScreenHostResourceBinding(
+    binding,
+    dataset.value.fields,
+    declaration.roles,
+  );
+  if (!validated.ok) {
+    return {
+      status: 'error',
+      code: 'HOST_DATASET_BINDING_INVALID',
+      message: 'Static dataset binding is invalid.',
+    };
+  }
+  try {
+    const adapted = adapter.adapt({ dataset: dataset.value, fields: validated.value.fields });
+    if (!adapted.ok) {
+      return {
+        status: 'error',
+        code: 'HOST_DATASET_ADAPTER_FAILED',
+        message: 'Static dataset adapter failed.',
+      };
+    }
+    const parsed = parseScreenJsonValue(adapted.value, { maxBytes: 1024 * 1024 });
+    return parsed.ok
+      ? { status: 'ready', value: parsed.value }
+      : {
+          status: 'error',
+          code: 'HOST_DATASET_ADAPTER_FAILED',
+          message: 'Static dataset adapter failed.',
+        };
+  } catch {
+    return {
+      status: 'error',
+      code: 'HOST_DATASET_ADAPTER_FAILED',
+      message: 'Static dataset adapter failed.',
+    };
+  }
 }
 
 function applyMaterial(

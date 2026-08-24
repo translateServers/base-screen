@@ -51,6 +51,18 @@ const styleSchema = {
   properties: {
     color: { kind: 'string' as const },
     width: { kind: 'number' as const },
+    seriesColors: {
+      kind: 'array' as const,
+      items: {
+        kind: 'object' as const,
+        properties: {
+          field: { kind: 'string' as const },
+          color: { kind: 'string' as const },
+        },
+        required: ['field', 'color'],
+      },
+      maxItems: 8,
+    },
   },
   required: [],
 };
@@ -91,7 +103,7 @@ function descriptor(overrides: Record<string, unknown> = {}): Record<string, unk
           {
             id: 'xField',
             target: 'data',
-            path: ['binding', 'dimension'],
+            path: ['binding', 'fields', 'dimension'],
             label: '维度字段',
             control: 'field-selector',
           },
@@ -175,6 +187,50 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
 
   it('AE-DC-C01 accepts a descriptor embedded in a manifest', () => {
     const result = parseBaseScreenMaterialManifest(manifest({ editorDescriptor: descriptor() }));
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts item fields relative to a style array item schema', () => {
+    const input = descriptor({
+      appearance: [
+        {
+          id: 'series-colors',
+          label: '系列颜色',
+          fields: [
+            {
+              id: 'seriesColors',
+              target: 'style',
+              path: ['seriesColors'],
+              label: '系列颜色',
+              control: 'reorderable-array',
+              itemFields: [
+                {
+                  id: 'seriesField',
+                  target: 'style',
+                  path: ['field'],
+                  label: '字段',
+                  control: 'text',
+                },
+                {
+                  id: 'seriesColor',
+                  target: 'style',
+                  path: ['color'],
+                  label: '颜色',
+                  control: 'color',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const result = parseBaseScreenMaterialEditorDescriptor(
+      input,
+      propsSchema,
+      styleSchema,
+      ['valueClick'],
+      roles,
+    );
     expect(result.ok).toBe(true);
   });
 

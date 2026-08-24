@@ -226,8 +226,9 @@ function writeDataSourcePath(
     return dataSourceTransaction(component.id, nextSource);
   }
   if (root === 'binding') {
-    const role = String(path[1]);
-    const index = path[2];
+    if (path[1] !== 'fields') return undefined;
+    const role = String(path[2]);
+    const index = path[3];
     const fields = source.binding?.fields ?? {};
     const current = fields[role] ?? [];
     const nextFields =

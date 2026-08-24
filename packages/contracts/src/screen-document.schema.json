@@ -315,7 +315,32 @@
                     "type": "string",
                     "const": "static"
                   },
-                  "value": {}
+                  "value": {},
+                  "binding": {
+                    "type": "object",
+                    "properties": {
+                      "fields": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "additionalProperties": {
+                          "minItems": 1,
+                          "maxItems": 256,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        }
+                      }
+                    },
+                    "required": ["fields"],
+                    "additionalProperties": false
+                  }
                 },
                 "required": ["type", "value"],
                 "additionalProperties": false

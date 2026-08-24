@@ -97,7 +97,13 @@ export function createInitialDataSource(
 ): ScreenComponentDataSource | null {
   return manifest?.defaultData === undefined
     ? null
-    : { type: 'static', value: manifest.defaultData };
+    : {
+        type: 'static',
+        value: manifest.defaultData,
+        ...(manifest.staticData?.kind === 'tabular'
+          ? { binding: manifest.staticData.defaultBinding }
+          : {}),
+      };
 }
 
 export function renderDesignerProperties(

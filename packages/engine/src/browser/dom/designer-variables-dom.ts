@@ -187,7 +187,7 @@ function appendConfirmCancel(
   confirm.dataset.variableIndex = String(index);
   confirm.textContent = '✓';
   confirm.title = DESIGNER_UI_TEXT.variables.editHint;
-  confirm.ariaLabel = DESIGNER_UI_TEXT.variables.editHint;
+  confirm.ariaLabel = DESIGNER_UI_TEXT.variables.confirm;
   row.appendChild(confirm);
 
   const cancel = ownerDocument.createElement('button');
@@ -195,6 +195,7 @@ function appendConfirmCancel(
   cancel.className = 'designer-control designer-button designer-icon-button';
   cancel.dataset.variableAction = 'cancel';
   cancel.textContent = '✕';
-  cancel.ariaLabel = DESIGNER_UI_TEXT.variables.editHint;
+  cancel.title = DESIGNER_UI_TEXT.variables.editHint;
+  cancel.ariaLabel = DESIGNER_UI_TEXT.variables.cancel;
   row.appendChild(cancel);
 }

@@ -24,6 +24,7 @@ export type {
   BaseScreenMaterialPanelControl,
   BaseScreenMaterialPropertyPanelField,
   BaseScreenMaterialPropSchema,
+  BaseScreenMaterialStaticDataDescriptor,
   BaseScreenMaterialStringSchema,
   BaseScreenMaterialStylePanelField,
   BaseScreenMaterialTabularDataAdapter,

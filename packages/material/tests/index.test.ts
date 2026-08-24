@@ -1,3 +1,4 @@
+import { parseScreenTabularDataset } from '@base-screen/contracts';
 import {
   parseBaseScreenChartData,
   parseBaseScreenMaterialManifest,
@@ -59,8 +60,21 @@ describe('official materials', () => {
   });
 
   it('R7 declares default sample data that satisfies the official data contracts', () => {
-    expect(parseBaseScreenTableData(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.defaultData).ok).toBe(true);
-    expect(parseBaseScreenChartData(BASE_SCREEN_CHART_MATERIAL_MANIFEST.defaultData).ok).toBe(true);
+    const table = parseScreenTabularDataset(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.defaultData);
+    const chart = parseScreenTabularDataset(BASE_SCREEN_CHART_MATERIAL_MANIFEST.defaultData);
+    expect(table.ok).toBe(true);
+    expect(chart.ok).toBe(true);
+    if (!table.ok || !chart.ok) return;
+    const projectedTable = BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER.adapt({
+      dataset: table.value,
+      fields: { columns: table.value.fields },
+    });
+    const projectedChart = BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER.adapt({
+      dataset: chart.value,
+      fields: { dimension: [chart.value.fields[0]!], measures: [chart.value.fields[1]!] },
+    });
+    expect(projectedTable.ok && parseBaseScreenTableData(projectedTable.value).ok).toBe(true);
+    expect(projectedChart.ok && parseBaseScreenChartData(projectedChart.value).ok).toBe(true);
   });
 
   it('R3 declares the container as hidden from the material library', () => {

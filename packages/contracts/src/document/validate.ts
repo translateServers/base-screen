@@ -67,7 +67,7 @@ const COMPONENT_FIELDS = new Set([
 const POSITION_FIELDS = new Set(['x', 'y']);
 const SIZE_FIELDS = new Set(['width', 'height']);
 const STATUS_FIELDS = new Set(['locked', 'hidden']);
-const STATIC_DATA_SOURCE_FIELDS = new Set(['type', 'value']);
+const STATIC_DATA_SOURCE_FIELDS = new Set(['type', 'value', 'binding']);
 const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set([
   'type',
   'resourceType',
@@ -497,6 +497,19 @@ function validateComponent(
         ) {
           return false;
         }
+      }
+    }
+    if (dataSource.type === 'static' && isJsonObject(dataSource.binding)) {
+      if (
+        !checkStrictObjectKeys(
+          dataSource.binding,
+          HOST_RESOURCE_BINDING_FIELDS,
+          at([...baseSegments, 'dataSource', 'binding']),
+          collector,
+          phase,
+        )
+      ) {
+        return false;
       }
     }
   }

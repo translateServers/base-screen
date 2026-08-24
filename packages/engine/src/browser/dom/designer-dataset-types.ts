@@ -4,6 +4,7 @@ import type {
   ScreenHostResourceParameter,
 } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
+import type { BaseScreenMaterialStaticDataDescriptor } from '@base-screen/plugin-core';
 
 export type DesignerDataSourceMode = 'none' | 'static' | 'dataset';
 
@@ -19,6 +20,14 @@ export interface DesignerDataSourcePanelOptions {
   readonly mode: DesignerDataSourceMode;
   readonly availableModes: readonly DesignerDataSourceMode[];
   readonly staticDraft: string;
+  readonly staticDescriptor: BaseScreenMaterialStaticDataDescriptor | undefined;
+  readonly staticValue: import('@base-screen/contracts').ScreenJsonValue;
+  readonly staticBinding: import('@base-screen/contracts').ScreenDataBinding | undefined;
+  readonly staticDialogOpen: boolean;
+  readonly staticTab: 'table' | 'advanced';
+  readonly staticPage: number;
+  readonly staticPasteDraft: string;
+  readonly staticFirstRowIsHeader: boolean;
   readonly query: string;
   readonly catalogOpen: boolean;
   readonly items: readonly ScreenDatasetSummary[];

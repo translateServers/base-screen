@@ -593,11 +593,9 @@ function validateItemField(
       ? value.projection === 'style'
         ? styleSchema
         : propsSchema
-      : target === 'props'
+      : target === 'props' || target === 'style'
         ? itemsSchema
-        : target === 'style'
-          ? styleSchema
-          : undefined;
+        : undefined;
   validateFieldPath(target, rawPath, schema, undefined, collector, path);
   validateControlForSchema(target, control, rawPath, schema, collector, path);
 }
@@ -894,7 +892,15 @@ function validateFieldPath(
       }
       return;
     }
-    const role = path[1];
+    if (path[1] !== 'fields') {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        diagnosticPath,
+        'Data binding path must start with binding.fields.',
+      );
+      return;
+    }
+    const role = path[2];
     if (
       dataBindingRoles === undefined ||
       typeof role !== 'string' ||
@@ -907,11 +913,16 @@ function validateFieldPath(
       );
       return;
     }
-    if (path.length > 3) {
+    if (
+      path.length < 3 ||
+      path.length > 4 ||
+      (path.length === 4 &&
+        (typeof path[3] !== 'number' || !Number.isInteger(path[3]) || path[3] < 0))
+    ) {
       collector.add(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
         diagnosticPath,
-        'Data binding path is too deep.',
+        'Data binding path must reference a role or one non-negative field index.',
       );
     }
     return;

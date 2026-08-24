@@ -8,6 +8,9 @@
 > 规格：[Designer Authoring Extension](../specs/archive/designer-authoring-extension/spec.md)
 > 计划：[实施计划](../plans/archive/designer-authoring-extension/implementation-plan.md)
 
+> 2026-08-23 增补：Designer 内建静态数据作者能力扩展为 Manifest 可选 `staticData` 描述。
+> 该增补不改变自定义物料创作协议；未声明描述的物料继续使用原始 JSON 编辑路径。
+
 ## 1. 背景
 
 Designer 的属性面板只能编辑少量顶层标量（`propertyPanel`/`stylePanel` 单层 `prop`/`style` 字段），无法安全表达
@@ -79,6 +82,20 @@ ADR-0027 已把重型处理与长生命周期编辑会话划归宿主，但 Base
 2. Descriptor、桥与事件声明只承载 JSON-safe 数据：不含 component、function、DOM、Promise、服务对象、源码、
    凭证或任意网络配置。
 3. 任何把宿主职责迁回 Base Screen 的后续提案，必须由新的已接受 ADR 明确取代本决策并由生效中的 Spec 验收。
+
+### 2.7 静态数据描述与内建表格作者能力（2026-08-23 增补）
+
+1. Manifest 可选声明 `staticData`：`scalar` 描述 string/number/boolean 与多行文本；`tabular`
+   描述 canonical `ScreenTabularDataset` 与默认字段角色绑定。声明后的 `defaultData` 必须通过对应类型或
+   `parseScreenTabularDataset` 校验，默认绑定必须满足 Manifest 的角色数量和字段类型约束。
+2. `ScreenStaticDataSource` 可携带与宿主资源同形的字段角色 binding。Renderer 对声明为 tabular 的静态数据
+   复用物料 `tabularDataAdapter`，使静态数据与宿主资源进入同一物料运行时形态，不允许物料侧猜测字段角色。
+3. Designer 为 scalar 提供类型表单，为 tabular 提供有界表格编辑器、字段角色选择、每页最多 100 行的网格和
+   Excel/TSV 粘贴推断；表单与高级 JSON 共用草稿，无效输入只报告路径诊断，不写入文档。
+4. 应用静态数据与 binding 必须由单个 Core transaction 提交；取消零副作用，撤销/重做沿用现有 history。
+   数据集仍受 256 列、10000 行、1 MiB canonical 上限约束，不引入文件导入、网络处理或持久化。
+5. `requestComponentTextEdit('data')` 对 static 暴露并提交实际静态值，对 host-resource 只暴露 literal params；
+   两条路径都保留 request identity、revision、component identity、JSON budget、Schema 和单事务守卫。
 
 ## 3. 排除方案
 

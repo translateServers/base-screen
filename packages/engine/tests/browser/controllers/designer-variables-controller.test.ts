@@ -146,7 +146,12 @@ describe('designer variables controller', () => {
     controller.onClick(action('add'));
     const nameInput = panel.querySelector<FakeElement>('[data-variable-create-name]');
     const valueInput = panel.querySelector<FakeElement>('[data-variable-create-value]');
+    const confirm = panel.querySelector<FakeElement>('[data-variable-action="confirm-create"]');
+    const cancel = panel.querySelector<FakeElement>('[data-variable-action="cancel"]');
     expect(nameInput).not.toBeNull();
+    expect(confirm?.ariaLabel).toBe('确认');
+    expect(cancel?.ariaLabel).toBe('取消');
+    expect(confirm?.ariaLabel).not.toBe(cancel?.ariaLabel);
     nameInput!.value = 'region';
     valueInput!.value = '"north"';
     controller.onClick(action('confirm-create'));

@@ -153,10 +153,11 @@ function readDataSourcePath(
   }
   if (root === 'binding') {
     const fields = source?.type === 'host-resource' ? source.binding?.fields : undefined;
-    const role = String(path[1]);
+    if (path[1] !== 'fields') return undefined;
+    const role = String(path[2]);
     const values = fields?.[role];
     if (values === undefined) return undefined;
-    const index = path[2];
+    const index = path[3];
     return typeof index === 'number' ? values[index] : values;
   }
   return undefined;

@@ -118,7 +118,7 @@ describe('DesignerDatasetController', () => {
     const reports: unknown[] = [];
     const executeTransaction = vi.fn(() => success(baseDocument));
     const roles: readonly ScreenDataBindingRole[] = [
-      { id: 'measures', minFields: 1, maxFields: 1, valueTypes: ['number'] },
+      { id: 'measures', minFields: 1, maxFields: 1, valueTypes: ['date'] },
     ];
     const controller = createController({
       descriptor: { ...descriptor, parameters: [] },
@@ -190,6 +190,7 @@ describe('DesignerDatasetController', () => {
     controller.onClick(resourceTarget('orders') as unknown as Element);
     await waitForDescriptor(controller);
     controller.onClick(bindingFieldTarget('measures', 'amount') as unknown as Element);
+    controller.onClick(bindingFieldTarget('measures', 'amount') as unknown as Element);
     controller.onClick(actionTarget('apply') as unknown as Element);
 
     expect(transactions[0]).toMatchObject({
@@ -247,13 +248,14 @@ class FakeInput {
 }
 
 class FakeSelect {
-  readonly value = '';
+  readonly value: string;
   readonly selectedOptions: readonly { readonly value: string }[];
   readonly dataset: Record<string, string>;
 
   constructor(dataset: Record<string, string>, values: readonly string[]) {
     this.dataset = dataset;
     this.selectedOptions = values.map((value) => ({ value }));
+    this.value = values[0] ?? '';
   }
 }
 

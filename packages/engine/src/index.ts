@@ -23,6 +23,7 @@ import type {
   ScreenHostResourcePort,
   ScreenHostVariablePort,
   ScreenJsonObject,
+  ScreenJsonValue,
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
@@ -36,6 +37,7 @@ import {
   MAX_AUTHORING_SOURCE_BYTES,
   parseScreenDocument,
   parseScreenJsonValue,
+  parseScreenTabularDataset,
   SCREEN_AUTHORING_REQUEST_EVENT,
   serializeScreenDocument,
   validateScreenDesignerHostAdapter,
@@ -61,6 +63,7 @@ import {
   createBaseScreenRenderer,
 } from '@base-screen/renderer';
 import { DesignerAssetController } from './browser/controllers/designer-asset-controller.js';
+import { DesignerCanvasRuntimeController } from './browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerDatasetController } from './browser/controllers/designer-dataset-controller.js';
 import { DesignerErrorConsoleController } from './browser/controllers/designer-error-console-controller.js';
 import { DesignerGestureController } from './browser/controllers/designer-gesture-controller.js';
@@ -235,10 +238,18 @@ export class BaseScreenDesignerElement extends ElementBase {
   #contextMenu: HTMLElement | undefined;
   #lastSavedAt: number | undefined;
   readonly #instanceId = createScreenAuthoringInstanceId();
-  readonly #pendingAuthoringRequests = new Map<string, { readonly kind: string }>();
+  readonly #pendingAuthoringRequests = new Map<
+    string,
+    { readonly kind: string; readonly target?: ScreenComponentTextTarget }
+  >();
   #authoringGeneration = 0;
   readonly #notificationController = new DesignerNotificationController();
   readonly #errorConsoleController = new DesignerErrorConsoleController();
+  readonly #canvasRuntimeController = new DesignerCanvasRuntimeController({
+    getRenderer: () => this.#renderer,
+    getVariablePort: () => this.#variablePort,
+    emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
+  });
   #layers: HTMLDivElement | undefined;
   readonly #session = new DesignerSession({
     renderDocument: (document) => this.renderDocument(document),
@@ -1230,6 +1241,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.disconnectSurfaces();
     this.releaseSurfaces();
     this.#session.cancelProjectOperation();
+    this.#canvasRuntimeController.clear();
     this.#renderer?.clear();
   }
 
@@ -1463,7 +1475,23 @@ export class BaseScreenDesignerElement extends ElementBase {
     const requestId = createScreenAuthoringRequestId();
     const component = document.components.find((item) => item.id === componentId);
     if (component === undefined) return null;
-    this.#pendingAuthoringRequests.set(requestId, { kind: 'component-text' });
+    let sourceValue: ScreenJsonValue;
+    if (target === 'style') {
+      sourceValue = component.style;
+    } else if (target === 'props') {
+      sourceValue = component.props;
+    } else if (component.dataSource?.type === 'static') {
+      sourceValue = component.dataSource.value;
+    } else if (component.dataSource?.type === 'host-resource') {
+      sourceValue = Object.fromEntries(
+        Object.entries(component.dataSource.params).flatMap(([name, parameter]) =>
+          parameter.kind === 'literal' ? [[name, parameter.value]] : [],
+        ),
+      );
+    } else {
+      return null;
+    }
+    this.#pendingAuthoringRequests.set(requestId, { kind: 'component-text', target });
     this.dispatchEvent(
       new CustomEvent(SCREEN_AUTHORING_REQUEST_EVENT, {
         detail: {
@@ -1473,7 +1501,7 @@ export class BaseScreenDesignerElement extends ElementBase {
             componentId,
             documentRevision: this.#session.project?.revision ?? null,
             target,
-            source: JSON.stringify(component[target === 'style' ? 'style' : 'props']),
+            source: JSON.stringify(sourceValue),
             format: 'json',
             maxBytes: MAX_AUTHORING_SOURCE_BYTES,
           },
@@ -1506,13 +1534,18 @@ export class BaseScreenDesignerElement extends ElementBase {
     return true;
   }
 
+  cancelAuthoringEdit(requestId: string): boolean {
+    if (typeof requestId !== 'string' || requestId.length === 0) return false;
+    return this.#pendingAuthoringRequests.delete(requestId);
+  }
+
   commitComponentTextEdit(
     request: ScreenComponentTextCommitRequest,
   ): ScreenParseResult<ScreenDocument> {
     const document = this.#session.document;
     if (document === undefined) return this.commitGuardFailure('AUTHORING_EXPIRED');
     const pending = this.#pendingAuthoringRequests.get(request.requestId);
-    if (pending?.kind !== 'component-text') {
+    if (pending?.kind !== 'component-text' || pending.target !== request.target) {
       return this.commitGuardFailure('AUTHORING_REQUEST_INVALID');
     }
     const guards = validateScreenAuthoringCommitGuards({
@@ -1534,10 +1567,14 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     const source = parseScreenComponentTextSource(request.source, MAX_AUTHORING_SOURCE_BYTES);
     if (!source.ok) return { ok: false, diagnostics: source.diagnostics };
-    if (source.value === null || typeof source.value !== 'object' || Array.isArray(source.value)) {
-      return this.commitGuardFailure('AUTHORING_SOURCE_INVALID');
-    }
     if (request.target === 'props' || request.target === 'style') {
+      if (
+        source.value === null ||
+        typeof source.value !== 'object' ||
+        Array.isArray(source.value)
+      ) {
+        return this.commitGuardFailure('AUTHORING_SOURCE_INVALID');
+      }
       const schema = request.target === 'props' ? manifest.propsSchema : manifest.styleSchema;
       const candidate = source.value as ScreenJsonObject;
       const validator =
@@ -1546,26 +1583,65 @@ export class BaseScreenDesignerElement extends ElementBase {
           : validateBaseScreenMaterialStyle;
       const validated = validator(candidate, schema);
       if (!validated.ok) return { ok: false, diagnostics: validated.diagnostics };
-      const result = this.executeCommand({
-        type: 'update-components',
-        componentIds: [request.componentId],
-        patch: { [request.target]: validated.value },
+      const result = this.executeTransaction({
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: [request.componentId],
+            patch: { [request.target]: validated.value },
+          },
+        ],
       });
       if (result.ok) this.#pendingAuthoringRequests.delete(request.requestId);
       return result;
     }
     const currentSource = component.dataSource;
+    if (currentSource?.type === 'static') {
+      if (manifest.staticData?.kind === 'scalar') {
+        if (typeof source.value !== manifest.staticData.valueType) {
+          return this.commitGuardFailure('AUTHORING_SOURCE_INVALID');
+        }
+      } else if (manifest.staticData?.kind === 'tabular') {
+        const dataset = parseScreenTabularDataset(source.value);
+        if (!dataset.ok) return { ok: false, diagnostics: dataset.diagnostics };
+      }
+      const result = this.executeTransaction({
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: [request.componentId],
+            patch: { dataSource: { ...currentSource, value: source.value } },
+          },
+        ],
+      });
+      if (result.ok) this.#pendingAuthoringRequests.delete(request.requestId);
+      return result;
+    }
     if (currentSource?.type !== 'host-resource') {
       return this.commitGuardFailure('AUTHORING_PAYLOAD_INVALID');
     }
+    if (source.value === null || typeof source.value !== 'object' || Array.isArray(source.value)) {
+      return this.commitGuardFailure('AUTHORING_SOURCE_INVALID');
+    }
     const params = source.value as ScreenJsonObject;
-    const parameters = Object.fromEntries(
-      Object.entries(params).map(([name, value]) => [name, { kind: 'literal' as const, value }]),
-    );
-    const result = this.executeCommand({
-      type: 'update-components',
-      componentIds: [request.componentId],
-      patch: { dataSource: { ...currentSource, params: parameters } },
+    const parameters = {
+      ...Object.fromEntries(
+        Object.entries(currentSource.params).flatMap(([name, parameter]) =>
+          parameter.kind === 'variable' ? [[name, parameter]] : [],
+        ),
+      ),
+      ...Object.fromEntries(
+        Object.entries(params).map(([name, value]) => [name, { kind: 'literal' as const, value }]),
+      ),
+    };
+    const result = this.executeTransaction({
+      commands: [
+        {
+          type: 'update-components',
+          componentIds: [request.componentId],
+          patch: { dataSource: { ...currentSource, params: parameters } },
+        },
+      ],
     });
     if (result.ok) this.#pendingAuthoringRequests.delete(request.requestId);
     return result;
@@ -1797,7 +1873,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   refreshData(componentId?: string): void {
-    this.#renderer?.refreshData(componentId);
+    this.#canvasRuntimeController.refreshData(componentId);
     this.#previewController.refreshData(componentId);
   }
 
@@ -1836,6 +1912,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#session.unload();
     this.#lastSavedAt = undefined;
     this.resetSessionSurfaces();
+    this.#canvasRuntimeController.clear();
     this.#renderer?.dispose();
     this.#renderer = undefined;
     this.renderInteraction();
@@ -1915,7 +1992,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     if (this.#renderer === undefined) {
       return { ok: true, value: undefined, diagnostics: [] };
     }
-    const rendered = this.#renderer.render(document);
+    const rendered = this.#canvasRuntimeController.render(document);
     if (rendered.ok) this.#previewController.sync(document);
     return rendered.ok
       ? { ok: true, value: undefined, diagnostics: rendered.diagnostics }
@@ -2025,6 +2102,9 @@ export class BaseScreenDesignerElement extends ElementBase {
       // base-screen-material-event 同形同语义。
       onMaterialEvent: (event) => this.forwardNativeMaterialEvent(event),
       resourcePort: this.#resourcePort,
+      ...(this.#conditionalStylePort === undefined
+        ? {}
+        : { conditionalStylePort: this.#conditionalStylePort }),
       // 设计态渲染器获得设计执行上下文（RB2）：design mode，不绑定项目。
       executionMode: 'design',
       ...(this.#runtimeContributions === undefined

@@ -23,10 +23,10 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   defaultSize: { width: 560, height: 320 },
   defaultProps: {},
   defaultData: {
-    columns: [
-      { id: 'category', label: '区域', valueType: 'string', sortable: false, filterable: false },
-      { id: 'amount', label: '金额', valueType: 'number', sortable: true, filterable: false },
-      { id: 'orders', label: '订单数', valueType: 'number', sortable: true, filterable: false },
+    fields: [
+      { id: 'category', label: '区域', valueType: 'string', nullable: false },
+      { id: 'amount', label: '金额', valueType: 'number', nullable: false },
+      { id: 'orders', label: '订单数', valueType: 'number', nullable: false },
     ],
     rows: [
       { category: 'north', amount: 42, orders: 18 },
@@ -35,6 +35,10 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
       { category: 'west', amount: 24, orders: 9 },
       { category: 'central', amount: 19, orders: 7 },
     ],
+  },
+  staticData: {
+    kind: 'tabular',
+    defaultBinding: { fields: { columns: ['category', 'amount', 'orders'] } },
   },
   defaultStyle: {
     backgroundColor: '#111827',

@@ -403,21 +403,21 @@ export const BASE_SCREEN_ECHARTS_EDITOR_DESCRIPTOR: BaseScreenMaterialEditorDesc
         {
           id: 'dimensionField',
           target: 'data',
-          path: ['binding', 'dimension'],
+          path: ['binding', 'fields', 'dimension', 0],
           label: '维度字段',
           control: 'field-selector',
         },
         {
           id: 'measureField',
           target: 'data',
-          path: ['binding', 'measures', 0],
+          path: ['binding', 'fields', 'measures', 0],
           label: '主指标字段',
           control: 'field-selector',
         },
         {
           id: 'secondMeasureField',
           target: 'data',
-          path: ['binding', 'measures', 1],
+          path: ['binding', 'fields', 'measures', 1],
           label: '次指标字段',
           control: 'field-selector',
         },
@@ -480,7 +480,7 @@ export const BASE_SCREEN_ECHARTS_EDITOR_DESCRIPTOR: BaseScreenMaterialEditorDesc
       hint: '点击系列数据点触发',
       maxPayloadBytes: 65536,
       triggerContexts: ['blueprint'],
-      requiredCapability: 'blueprint.material-event',
+      requiredCapability: 'blueprint.trigger.material-event',
       payloadSchema: {
         kind: 'object',
         properties: {
@@ -526,19 +526,21 @@ export const BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
     advanced: { showDataLabels: false, axisLabelRotate: 0, symbolSize: 4, areaOpacity: 0.2 },
   },
   defaultData: {
-    series: [
-      {
-        id: 'amount',
-        label: '订单金额',
-        points: [
-          { x: 'north', y: 42 },
-          { x: 'south', y: 36 },
-          { x: 'east', y: 28 },
-          { x: 'west', y: 24 },
-          { x: 'central', y: 19 },
-        ],
-      },
+    fields: [
+      { id: 'region', label: '区域', valueType: 'string', nullable: false },
+      { id: 'amount', label: '订单金额', valueType: 'number', nullable: false },
     ],
+    rows: [
+      { region: 'north', amount: 42 },
+      { region: 'south', amount: 36 },
+      { region: 'east', amount: 28 },
+      { region: 'west', amount: 24 },
+      { region: 'central', amount: 19 },
+    ],
+  },
+  staticData: {
+    kind: 'tabular',
+    defaultBinding: { fields: { dimension: ['region'], measures: ['amount'] } },
   },
   defaultStyle: {
     backgroundColor: '#111827',

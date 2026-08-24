@@ -16,6 +16,7 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   defaultSize: { width: 320, height: 72 },
   defaultProps: {},
   defaultData: '文本',
+  staticData: { kind: 'scalar', valueType: 'string', multiline: true },
   defaultStyle: {
     color: '#ffffff',
     fontSize: 32,

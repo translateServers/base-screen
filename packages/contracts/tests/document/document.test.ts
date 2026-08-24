@@ -58,6 +58,45 @@ describe('parseScreenDocument', () => {
     }
   });
 
+  it('accepts a strict field binding on a static data source', () => {
+    const result = parse(
+      document({
+        components: [
+          component({
+            dataSource: {
+              type: 'static',
+              value: {
+                fields: [{ id: 'amount', label: 'Amount', valueType: 'number', nullable: false }],
+                rows: [{ amount: 42 }],
+              },
+              binding: { fields: { measures: ['amount'] } },
+            },
+          }),
+        ],
+      }),
+    );
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it('rejects an unknown static data binding shape', () => {
+    const result = parse(
+      document({
+        components: [
+          component({
+            dataSource: {
+              type: 'static',
+              value: [],
+              binding: { fields: { measures: ['amount'] }, extra: true },
+            },
+          }),
+        ],
+      }),
+    );
+
+    expect(result).toMatchObject({ ok: false });
+  });
+
   it('accepts solid, linear, and radial canvas backgrounds', () => {
     for (const background of [
       { type: 'solid', color: '#123456' },

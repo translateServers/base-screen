@@ -167,6 +167,58 @@ describe('material identity and manifests', () => {
     if (without.ok) expect(without.value.defaultData).toBeUndefined();
   });
 
+  it('accepts scalar static data and fails closed on a mismatched default value', () => {
+    const valid = parseBaseScreenMaterialManifest(
+      materialManifest({
+        defaultData: 'hello',
+        staticData: { kind: 'scalar', valueType: 'string', multiline: true },
+      }),
+    );
+    const invalid = parseBaseScreenMaterialManifest(
+      materialManifest({
+        defaultData: 42,
+        staticData: { kind: 'scalar', valueType: 'string' },
+      }),
+    );
+
+    expect(valid).toMatchObject({ ok: true });
+    expect(invalid).toMatchObject({ ok: false });
+  });
+
+  it('accepts canonical tabular defaults with a role-safe default binding', () => {
+    const manifest = parseBaseScreenMaterialManifest(
+      materialManifest({
+        dataBinding: {
+          roles: [
+            { id: 'dimension', minFields: 1, maxFields: 1, valueTypes: ['string'] },
+            { id: 'measures', minFields: 1, maxFields: 8, valueTypes: ['number'] },
+          ],
+        },
+        defaultData: {
+          fields: [
+            { id: 'region', label: 'Region', valueType: 'string', nullable: false },
+            { id: 'amount', label: 'Amount', valueType: 'number', nullable: false },
+          ],
+          rows: [{ region: 'North', amount: 42 }],
+        },
+        staticData: {
+          kind: 'tabular',
+          defaultBinding: { fields: { dimension: ['region'], measures: ['amount'] } },
+        },
+      }),
+    );
+    const invalidBinding = parseBaseScreenMaterialManifest({
+      ...(manifest.ok ? manifest.value : {}),
+      staticData: {
+        kind: 'tabular',
+        defaultBinding: { fields: { dimension: ['amount'], measures: ['missing'] } },
+      },
+    });
+
+    expect(manifest).toMatchObject({ ok: true });
+    expect(invalidBinding).toMatchObject({ ok: false });
+  });
+
   it('R7 rejects unsafe defaultData without invoking it', () => {
     let invoked = false;
     const unsafe = materialManifest({

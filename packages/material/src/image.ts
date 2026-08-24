@@ -15,6 +15,8 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   keywords: ['图片', '图像'],
   defaultSize: { width: 240, height: 160 },
   defaultProps: {},
+  defaultData: '',
+  staticData: { kind: 'scalar', valueType: 'string' },
   defaultStyle: { objectFit: 'contain', opacity: 1 },
   styleSchema: {
     kind: 'object',
@@ -58,7 +60,7 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
         ? model.dataState.value
         : '';
     if (source.length === 0) {
-      this.textContent = model.dataState.status === 'ready' ? '图片不可用' : '未设置图片';
+      this.textContent = '未设置图片';
       return;
     }
     // 有界 URL 校验（ADR-0056 R1，与画布背景/封面同规则）：非法 URL fail-closed，
