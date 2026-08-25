@@ -68,6 +68,11 @@ function appendDescriptorSection(
   const ownerDocument = container.ownerDocument;
   const sectionElement = ownerDocument.createElement('section');
   sectionElement.className = 'designer-inspector-section';
+  sectionElement.dataset.inspectorSearchKind = 'section';
+  sectionElement.dataset.inspectorSearchKey = `descriptor-section-${section.id}`;
+  sectionElement.dataset.inspectorSearchText = `${section.label} ${section.help ?? ''}`;
+  sectionElement.dataset.inspectorPreferenceContext = context.component.type;
+  if (section.advanced === true) sectionElement.dataset.inspectorAdvanced = 'true';
   const details = ownerDocument.createElement('details');
   details.className = 'designer-descriptor-group';
   details.open = section.advanced !== true && section.collapsed !== true;
@@ -213,6 +218,10 @@ function appendDescriptorField(
   // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
   const label = ownerDocument.createElement(palette === undefined ? 'label' : 'span');
   label.className = 'designer-field designer-field-label';
+  label.dataset.inspectorSearchKind = 'field';
+  label.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
+  label.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
+  if (field.advanced === true) label.dataset.inspectorAdvanced = 'true';
   label.textContent = field.label;
   const control =
     palette === undefined

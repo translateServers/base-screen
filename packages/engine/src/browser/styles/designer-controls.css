@@ -525,6 +525,11 @@
   color: var(--designer-text-secondary);
 }
 
+.designer-control[data-mixed="true"] {
+  border-style: dashed;
+  color: var(--designer-text-secondary);
+}
+
 .designer-control[aria-invalid="true"] {
   border-color: var(--designer-danger);
   background-color: color-mix(
@@ -613,6 +618,142 @@
   }
 }
 
+.designer-opacity-controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  align-items: center;
+  gap: var(--designer-space-3);
+}
+
+.designer-range {
+  min-width: 0;
+  width: 100%;
+  accent-color: var(--designer-accent);
+}
+
+.designer-flip-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.designer-flip-actions {
+  display: inline-flex;
+  gap: var(--designer-space-2);
+}
+
+.designer-flip-button {
+  width: 34px;
+  min-height: 28px;
+  padding: 0;
+  font-size: 16px;
+}
+
+.designer-quick-style-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--designer-space-2);
+}
+
+.designer-quick-style {
+  min-width: 0;
+  min-height: 54px;
+  padding: var(--designer-space-1);
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-control);
+}
+
+.designer-quick-style[aria-pressed="true"] {
+  border-color: var(--designer-accent);
+  box-shadow: inset 0 0 0 1px var(--designer-accent);
+}
+
+.designer-quick-style-preview {
+  display: flex;
+  height: 42px;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 3px;
+  padding: 5px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: linear-gradient(
+    145deg,
+    var(--designer-surface-canvas),
+    var(--designer-surface-raised)
+  );
+}
+
+.designer-quick-style-preview i {
+  display: block;
+  width: 7px;
+  height: calc(10px + var(--quick-bar-index) * 5px);
+  border-radius: 1px 1px 0 0;
+  background: hsl(calc(190 + var(--quick-bar-index) * 30) 75% 58%);
+}
+
+.quick-style-2 i,
+.quick-style-5 i {
+  background: hsl(calc(35 + var(--quick-bar-index) * 35) 78% 58%);
+}
+
+.quick-style-3 i,
+.quick-style-6 i {
+  background: hsl(calc(120 + var(--quick-bar-index) * 32) 66% 54%);
+}
+
+.quick-style-4 i,
+.quick-style-7 i {
+  height: calc(8px + (4 - var(--quick-bar-index)) * 6px);
+}
+
+.quick-style-8 i,
+.quick-style-9 i {
+  border-radius: 50%;
+  height: calc(7px + var(--quick-bar-index) * 4px);
+}
+
+.designer-quick-config-row {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-3);
+  margin-bottom: var(--designer-space-3);
+}
+
+.designer-quick-config-label {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.designer-quick-config-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.designer-quick-config-button {
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 var(--designer-space-2);
+}
+
+.quick-config-colors .designer-quick-config-button {
+  width: 24px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  border-color: color-mix(in srgb, var(--quick-color) 60%, var(--designer-border-default));
+  background: var(--quick-color);
+}
+
+.designer-quick-config-button[aria-pressed="true"] {
+  border-color: var(--designer-accent);
+  box-shadow: 0 0 0 2px var(--designer-accent-surface);
+}
+
 .designer-color {
   width: var(--designer-control-height);
   height: var(--designer-control-height);
@@ -635,25 +776,56 @@
 }
 
 .designer-button {
-  display: inline-grid;
+  box-sizing: border-box;
+  display: inline-flex;
+  min-width: 0;
   min-height: var(--designer-control-height);
   align-items: center;
   justify-content: center;
   gap: var(--designer-space-2);
   padding: 0 var(--designer-space-3);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  appearance: none;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
   cursor: pointer;
   font: var(--designer-font-small);
   font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  text-decoration: none;
   white-space: nowrap;
+  touch-action: manipulation;
   transform: translateZ(0);
+  transition: transform var(--designer-motion);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.designer-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 22%, var(--designer-border-strong));
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--designer-text-on-accent) 5%, transparent),
+    0 2px 6px color-mix(in srgb, var(--designer-accent) 10%, transparent);
 }
 
 .designer-button:not(:disabled):active {
-  transform: scale(0.96);
+  border-color: color-mix(in srgb, var(--designer-accent) 34%, var(--designer-border-strong));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--designer-surface-workspace) 38%, transparent);
+  transform: scale(0.985);
+}
+
+.designer-button:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
 }
 
 .designer-button[aria-busy="true"] {
   cursor: progress;
+  opacity: 0.84;
 }
 
 .designer-icon-button {
@@ -670,28 +842,87 @@
 }
 
 .designer-button[data-variant="primary"] {
+  border-color: var(--designer-button-primary-background);
+  background: var(--designer-button-primary-background);
+  color: var(--designer-text-on-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 18%, transparent);
+}
+
+.designer-button[data-variant="primary"]:hover:not(:disabled) {
   border-color: var(--designer-accent);
-  background: var(--designer-accent);
-  color: var(--designer-surface-workspace);
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--designer-accent) 24%, transparent);
+  background: var(--designer-button-primary-hover);
+  color: var(--designer-text-on-accent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--designer-accent) 24%, transparent);
+}
+
+.designer-button[data-variant="primary"]:not(:disabled):active {
+  border-color: var(--designer-button-primary-active);
+  background: var(--designer-button-primary-active);
+  box-shadow: inset 0 1px 2px var(--designer-button-primary-active-shadow);
+  transform: scale(0.985);
 }
 
 .designer-button[data-variant="danger"] {
+  border-color: color-mix(in srgb, var(--designer-danger) 48%, var(--designer-border-default));
+  background: color-mix(
+    in srgb,
+    var(--designer-danger-surface) 84%,
+    var(--designer-surface-control)
+  );
+  color: var(--designer-danger);
+}
+
+.designer-button[data-variant="danger"]:hover:not(:disabled) {
   border-color: var(--designer-danger);
   background: var(--designer-danger-surface);
   color: var(--designer-danger);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--designer-danger) 14%, transparent);
 }
 
 .designer-button[data-variant="ghost"] {
   border-color: transparent;
   background: transparent;
+  color: var(--designer-text-secondary);
+  box-shadow: none;
+}
+
+.designer-button[data-variant="ghost"]:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  box-shadow: none;
 }
 
 .designer-button[aria-pressed="true"],
 .designer-tab[aria-selected="true"] {
-  border-color: var(--designer-accent);
+  border-color: color-mix(in srgb, var(--designer-accent) 56%, var(--designer-border-default));
   background: var(--designer-accent-surface);
   color: var(--designer-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 14%, transparent);
+}
+
+.designer-button[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 72%, var(--designer-border-default));
+  background: color-mix(
+    in srgb,
+    var(--designer-accent-surface) 82%,
+    var(--designer-surface-control-hover)
+  );
+  color: var(--designer-accent);
+}
+
+.designer-button:disabled {
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-disabled);
+  box-shadow: none;
+  opacity: 0.72;
+  transform: none;
+}
+
+.designer-button[data-variant="ghost"]:disabled {
+  border-color: transparent;
+  background: transparent;
 }
 
 .designer-tab {
@@ -713,6 +944,8 @@
   height: var(--designer-icon-size);
   fill: none;
   stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   /* 装饰性图标不参与命中测试：点击图标落点应为按钮本身，避免 SVGElement 目标破坏控制器命中。 */
   pointer-events: none;
 }

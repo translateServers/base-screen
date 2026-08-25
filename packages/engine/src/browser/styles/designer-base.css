@@ -360,7 +360,7 @@
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  min-height: 26px;
+  min-height: 28px;
   gap: 5px;
   padding: 0 10px;
   border-color: var(--designer-border-subtle);
@@ -585,18 +585,18 @@
 
 .material-card-wrap .material-favorite {
   position: absolute;
-  top: var(--designer-space-3);
-  right: var(--designer-space-3);
+  top: var(--designer-space-2);
+  right: var(--designer-space-2);
   z-index: 1;
-  width: 20px;
-  height: 20px;
-  min-height: 20px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
   border-color: transparent;
-  border-radius: 4px;
-  background-color: color-mix(in srgb, var(--designer-surface-panel) 74%, transparent);
+  border-radius: 6px;
+  background-color: color-mix(in srgb, var(--designer-surface-panel) 82%, transparent);
   color: var(--designer-text-muted);
-  opacity: 0.46;
+  opacity: 0.7;
   transition:
     background-color var(--designer-motion),
     color var(--designer-motion),
@@ -630,8 +630,8 @@
 }
 
 .material-favorite svg {
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
 }
 
 /* 状态徽章：叠加在缩略图内下角（定位上下文为 .material-thumb），不占用卡片文档流。 */
@@ -680,13 +680,17 @@
   box-sizing: border-box;
 }
 
-.designer[data-workbench-mode="with-menu"] {
+.designer[data-workbench-mode="with-menu"],
+.designer[data-data-workbench-open="true"] {
   grid-template-columns: 0 0 minmax(360px, 1fr) 0 0;
 }
 
 .designer[data-workbench-mode="with-menu"] .rail,
 .designer[data-workbench-mode="with-menu"] .properties,
-.designer[data-workbench-mode="with-menu"] .panel-handle {
+.designer[data-workbench-mode="with-menu"] .panel-handle,
+.designer[data-data-workbench-open="true"] .rail,
+.designer[data-data-workbench-open="true"] .properties,
+.designer[data-data-workbench-open="true"] .panel-handle {
   display: none;
 }
 
@@ -708,10 +712,12 @@
 }
 
 .designer {
-  --left-panel-width: 298px;
-  --right-panel-width: 288px;
+  --left-panel-width: 404px;
+  --right-panel-width: 320px;
   --designer-topbar-height: 48px;
   position: relative;
+  container-name: designer-shell;
+  container-type: size;
   display: grid;
   grid-template-columns: var(--left-panel-width) 5px minmax(360px, 1fr) 5px var(--right-panel-width);
   grid-template-rows: 48px minmax(0, 1fr) 30px;
@@ -769,6 +775,7 @@
 
 .designer[data-left-collapsed="true"] [data-materials],
 .designer[data-left-collapsed="true"] [data-layers],
+.designer[data-left-collapsed="true"] [data-variables],
 .designer[data-right-collapsed="true"] .inspector-tabs,
 .designer[data-right-collapsed="true"] [data-inspector-pane] {
   display: none;
@@ -778,7 +785,7 @@
   display: none;
 }
 
-@media (max-width: 1023px), (max-height: 639px) {
+@container designer-shell (max-width: 1021px) or (max-height: 637px) {
   :host {
     min-width: 0;
     min-height: 0;
@@ -823,6 +830,7 @@
   .designer-control,
   .designer-tab,
   .layer-row,
+  .variable-row,
   .panel-handle,
   .material-card,
   .material-cover,

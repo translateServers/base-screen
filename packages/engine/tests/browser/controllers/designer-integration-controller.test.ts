@@ -108,6 +108,7 @@ function queryText(element: FakeElement): string {
 function createController(
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
   initial = document,
+  focusedComponentId: string | null = 'button-1',
 ) {
   const requestBlueprintEdit = vi.fn(() => true);
   const diagnostics: unknown[] = [];
@@ -116,8 +117,8 @@ function createController(
     getCatalog: () => undefined,
     getDocument: () => initial,
     getInteraction: () => ({
-      selectedComponentIds: ['button-1'],
-      focusedComponentId: 'button-1',
+      selectedComponentIds: focusedComponentId === null ? [] : [focusedComponentId],
+      focusedComponentId,
     }),
     getRuntimeContributions: () => runtimeContributions,
     requestBlueprintEdit,
@@ -135,22 +136,22 @@ class FakeTarget {
 }
 
 describe('EB-R7-C03 Designer events panel host boundary', () => {
-  it('renders the rule summary and a host request entry with capability gating', () => {
+  it('renders the read-only summary and a host locator entry', () => {
     const panel = panelElement();
     const { controller } = createController(authority('blueprint.trigger.material-event'));
     controller.connect(panel as unknown as HTMLElement);
     expect(queryText(panel)).toContain('0');
-    const button = panel.querySelector<HTMLButtonElement>('[data-action="open-blueprint"]');
+    const button = panel.querySelector<HTMLButtonElement>('[data-action="locate-blueprint"]');
     expect(button).not.toBeNull();
     expect(button?.disabled).toBe(false);
   });
 
-  it('disables the host request entry when the capability is missing', () => {
+  it('keeps the host locator available while reporting missing runtime capability', () => {
     const panel = panelElement();
     const { controller } = createController(authority('other.capability'));
     controller.connect(panel as unknown as HTMLElement);
-    const button = panel.querySelector<HTMLButtonElement>('[data-action="open-blueprint"]');
-    expect(button?.disabled).toBe(true);
+    const button = panel.querySelector<HTMLButtonElement>('[data-action="locate-blueprint"]');
+    expect(button?.disabled).toBe(false);
     expect(queryText(panel)).toContain('能力不可用');
   });
 
@@ -169,21 +170,35 @@ describe('EB-R7-C03 Designer events panel host boundary', () => {
       authority('blueprint.trigger.material-event'),
     );
     controller.connect(panel as unknown as HTMLElement);
-    const button = panel.querySelector<HTMLButtonElement>('[data-action="open-blueprint"]');
+    const button = panel.querySelector<HTMLButtonElement>('[data-action="locate-blueprint"]');
     expect(
       controller.onClick(
-        (button ?? new FakeTarget({ action: 'open-blueprint' })) as unknown as Element,
+        (button ?? new FakeTarget({ action: 'locate-blueprint' })) as unknown as Element,
       ),
     ).toBe(true);
-    expect(requestBlueprintEdit).toHaveBeenCalledTimes(1);
+    expect(requestBlueprintEdit).toHaveBeenCalledWith({ initialComponentId: 'button-1' });
 
     requestBlueprintEdit.mockReturnValue(false);
     expect(
       controller.onClick(
-        (button ?? new FakeTarget({ action: 'open-blueprint' })) as unknown as Element,
+        (button ?? new FakeTarget({ action: 'locate-blueprint' })) as unknown as Element,
       ),
     ).toBe(true);
     expect(diagnostics.length).toBeGreaterThan(0);
+  });
+
+  it('opens the whole-screen host bridge from the topbar without a component selection', () => {
+    const { controller, requestBlueprintEdit, diagnostics } = createController(
+      authority('blueprint.trigger.material-event'),
+      document,
+      null,
+    );
+
+    expect(
+      controller.onClick(new FakeTarget({ action: 'open-blueprint' }) as unknown as Element),
+    ).toBe(true);
+    expect(requestBlueprintEdit).toHaveBeenCalledWith();
+    expect(diagnostics).toHaveLength(0);
   });
 
   it('clears the panel without side effects', () => {

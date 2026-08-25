@@ -11,6 +11,7 @@ export const MAX_EDITOR_ITEM_PATH_DEPTH = 6;
 export const MAX_EDITOR_EVENTS = 64;
 export const MAX_EDITOR_HELP_LENGTH = 1024;
 export const MAX_EDITOR_CONDITION_VALUES = 16;
+export const MAX_EDITOR_FIELD_KEYWORDS = 16;
 
 export type BaseScreenMaterialEditorTarget = 'props' | 'style' | 'data' | 'interaction';
 
@@ -55,8 +56,12 @@ export interface BaseScreenMaterialEditorField {
   readonly label: string;
   readonly control: BaseScreenMaterialEditorControl;
   readonly help?: string;
+  /** 属性搜索别名；仅用于作者界面，不进入 Screen Document。 */
+  readonly keywords?: readonly string[];
   readonly when?: readonly BaseScreenMaterialEditorCondition[];
   readonly advanced?: boolean;
+  /** 是否允许多选检查器批量写入；未声明时按控件能力保守处理。 */
+  readonly batchable?: boolean;
   readonly placeholder?: string;
   readonly unit?: string;
   readonly min?: number;
@@ -134,8 +139,10 @@ const FIELD_KNOWN = new Set([
   'label',
   'control',
   'help',
+  'keywords',
   'when',
   'advanced',
+  'batchable',
   'placeholder',
   'unit',
   'min',
@@ -412,11 +419,31 @@ function validateField(
       'Editor field help must be a display string.',
     );
   }
+  if (value.keywords !== undefined) {
+    if (
+      !Array.isArray(value.keywords) ||
+      value.keywords.length > MAX_EDITOR_FIELD_KEYWORDS ||
+      value.keywords.some((keyword) => !isDisplayString(keyword, 64))
+    ) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [...path, 'keywords'],
+        'Editor field keywords must be a bounded list of display strings.',
+      );
+    }
+  }
   if (value.advanced !== undefined && typeof value.advanced !== 'boolean') {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
       [...path, 'advanced'],
       'Editor field advanced must be a boolean.',
+    );
+  }
+  if (value.batchable !== undefined && typeof value.batchable !== 'boolean') {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      [...path, 'batchable'],
+      'Editor field batchable must be a boolean.',
     );
   }
   if (value.placeholder !== undefined && !isDisplayString(value.placeholder, 256)) {

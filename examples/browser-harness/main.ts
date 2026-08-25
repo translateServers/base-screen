@@ -40,6 +40,7 @@ import {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   defineBaseScreenElements,
   SCREEN_AUTHORING_REQUEST_EVENT,
+  type ScreenAuthoringRequest,
 } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
 
@@ -191,7 +192,8 @@ const runtimeContributions = {
           },
         }
       : undefined,
-  hasBlueprintCapability: () => true,
+  hasBlueprintCapability: (capability: string) =>
+    (designerAuthoringCapabilities as readonly string[]).includes(capability),
 };
 
 const bridgeManifest = (type: string, tagName: string, name: string) => ({
@@ -723,21 +725,7 @@ const hostShell = document.querySelector<HTMLElement>('[data-host-shell]')!;
 const hostSelection = hostShell.querySelector<HTMLElement>('[data-host-selection]')!;
 const hostEditor = hostShell.querySelector<HTMLTextAreaElement>('[data-host-editor]')!;
 const hostStatus = hostShell.querySelector<HTMLOutputElement>('[data-host-status]')!;
-let pendingAuthoringRequest:
-  | {
-      readonly kind: 'component-text';
-      readonly requestId: string;
-      readonly componentId: string;
-      readonly documentRevision: string | null;
-      readonly target: string;
-    }
-  | {
-      readonly kind: 'blueprint';
-      readonly requestId: string;
-      readonly componentId: string | null;
-      readonly documentRevision: string | null;
-    }
-  | undefined;
+let pendingAuthoringRequest: ScreenAuthoringRequest | undefined;
 let pendingHostRevision: string | null = null;
 
 function setHostStatus(message: string, tone: 'ok' | 'error' = 'ok'): void {
@@ -755,30 +743,18 @@ function hostRequestForAction(action: string): boolean {
 }
 
 designer.addEventListener(SCREEN_AUTHORING_REQUEST_EVENT, (event) => {
-  const request = (event as CustomEvent<{ readonly request: unknown }>).detail.request as
-    | {
-        readonly kind: 'component-text';
-        readonly requestId: string;
-        readonly componentId: string;
-        readonly documentRevision: string | null;
-        readonly target: string;
-        readonly source: string;
-      }
-    | {
-        readonly kind: 'blueprint';
-        readonly requestId: string;
-        readonly componentId: string | null;
-        readonly documentRevision: string | null;
-        readonly blueprint: unknown;
-      };
+  const request = (event as CustomEvent<{ readonly request: ScreenAuthoringRequest }>).detail
+    .request;
   pendingAuthoringRequest = request;
   pendingHostRevision = request.documentRevision;
   hostEditor.value =
-    request.kind === 'component-text' ? request.source : JSON.stringify(request.blueprint, null, 2);
+    request.kind === 'component-text'
+      ? request.source
+      : JSON.stringify(request.context.document.blueprint, null, 2);
   setHostStatus(
     request.kind === 'component-text'
       ? `宿主编辑请求：${request.componentId} 的 ${request.target}`
-      : `宿主编辑请求：${request.componentId ?? '全局'} 的事件蓝图`,
+      : `宿主整屏编排请求：${request.context.document.components.length} 个组件，初始定位 ${request.context.initialComponentId ?? '无'}`,
   );
 });
 
@@ -829,7 +805,6 @@ hostShell.addEventListener('click', (event) => {
     const result = designer.commitBlueprintEdit({
       requestId: request.requestId,
       expectedRevision: pendingHostRevision,
-      componentId: request.componentId,
       blueprint: blueprint as never,
     });
     if (result.ok) {
@@ -844,6 +819,9 @@ hostShell.addEventListener('click', (event) => {
     return;
   }
   if (action === 'cancel') {
+    if (pendingAuthoringRequest !== undefined) {
+      designer.cancelAuthoringEdit(pendingAuthoringRequest.requestId);
+    }
     pendingAuthoringRequest = undefined;
     hostEditor.value = '';
     setHostStatus('宿主编辑已取消。');

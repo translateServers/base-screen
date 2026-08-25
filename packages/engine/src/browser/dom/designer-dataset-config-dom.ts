@@ -36,6 +36,9 @@ function renderDatasetSummary(
 ): HTMLElement {
   const summary = ownerDocument.createElement('section');
   summary.className = 'designer-dataset-summary';
+  summary.dataset.workbenchSection = 'source';
+  summary.dataset.inspectorSearchSection = 'true';
+  summary.tabIndex = -1;
   const header = ownerDocument.createElement('div');
   const title = ownerDocument.createElement('span');
   title.className = 'designer-dataset-summary-title';
@@ -84,6 +87,7 @@ function renderDatasetSummary(
   schema.className = 'designer-dataset-schema';
   for (const field of descriptor.fields) {
     const item = ownerDocument.createElement('li');
+    item.className = 'designer-field-label';
     item.textContent = field.label;
     schema.appendChild(item);
   }
@@ -95,7 +99,11 @@ function renderParameters(
   ownerDocument: Document,
   options: DesignerDatasetConfigurationOptions,
 ): HTMLElement {
-  const section = configSection(ownerDocument, DESIGNER_UI_TEXT.dataset.parameters);
+  const section = configSection(
+    ownerDocument,
+    DESIGNER_UI_TEXT.dataSource.requestTitle,
+    'parameters',
+  );
   if (options.descriptor.parameters.length === 0) {
     const empty = ownerDocument.createElement('p');
     empty.className = 'designer-empty-state';
@@ -158,7 +166,7 @@ function renderBindings(
   ownerDocument: Document,
   options: DesignerDatasetConfigurationOptions,
 ): HTMLElement {
-  const section = configSection(ownerDocument, DESIGNER_UI_TEXT.dataset.binding);
+  const section = configSection(ownerDocument, DESIGNER_UI_TEXT.dataset.binding, 'mapping');
   if (options.roles.length === 0) {
     const empty = ownerDocument.createElement('p');
     empty.className = 'designer-empty-state';
@@ -266,15 +274,20 @@ function bindingField(
   button.dataset.datasetBindingField = field.id;
   button.setAttribute('aria-pressed', String(selected.includes(field.id)));
   const label = ownerDocument.createElement('span');
+  label.className = 'designer-field-label';
   label.textContent = field.label;
   button.appendChild(label);
   return button;
 }
 
-function configSection(ownerDocument: Document, title: string): HTMLElement {
+function configSection(ownerDocument: Document, title: string, step?: string): HTMLElement {
   const section = ownerDocument.createElement('section');
+  section.tabIndex = -1;
   section.className = 'designer-dataset-config-section';
+  section.dataset.inspectorSearchSection = 'true';
+  if (step !== undefined) section.dataset.workbenchSection = step;
   const heading = ownerDocument.createElement('h4');
+  heading.className = 'designer-inspector-section-title';
   heading.textContent = title;
   section.appendChild(heading);
   return section;

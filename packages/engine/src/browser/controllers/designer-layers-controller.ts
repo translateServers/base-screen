@@ -12,12 +12,18 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
   createReparentTransaction,
   createSiblingReorderTransaction,
+  createSiblingSelectionReorderTransaction,
+  createZOrderTransaction,
 } from '../../common/operations/designer-layout-operations.js';
 import {
   createDesignerLayerView,
   DESIGNER_LAYER_PAGE_SIZE,
   renderDesignerLayers,
 } from '../dom/designer-layers-dom.js';
+import type {
+  DesignerLayerArrangeAction,
+  DesignerLayerGroupAction,
+} from '../dom/designer-layers-toolbar-dom.js';
 
 export interface DesignerLayersControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -28,7 +34,16 @@ export interface DesignerLayersControllerCallbacks {
   ) => ScreenParseResult<ScreenDocument>;
   readonly reduceSelection: (action: ScreenInteractionAction) => void;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
+  readonly canGroup?: () => boolean;
+  readonly canUngroup?: () => boolean;
+  readonly group?: () => ScreenParseResult<ScreenDocument>;
+  readonly ungroup?: () => ScreenParseResult<ScreenDocument>;
+  readonly locateComponent?: (componentId: string) => void;
 }
+
+// 图层单击会同步重绘树节点，浏览器因此可能无法在第二个新节点上合成原生 dblclick。
+// 保留一个紧凑的同图层点击窗口，用于跨 DOM 替换恢复桌面端双击语义。
+const LAYER_RENAME_DOUBLE_CLICK_MS = 500;
 
 export class DesignerLayersController {
   #search = '';
@@ -38,6 +53,7 @@ export class DesignerLayersController {
   #layers: HTMLElement | undefined;
   #renameDrafts = new Map<string, string>();
   #renamingId: string | undefined;
+  #lastLayerClick: { readonly componentId: string; readonly timeStamp: number } | undefined;
   #renderLimit = DESIGNER_LAYER_PAGE_SIZE;
 
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {}
@@ -54,6 +70,16 @@ export class DesignerLayersController {
       renameDrafts: this.#renameDrafts,
       renamingId: this.#renamingId,
       renderLimit: this.#renderLimit,
+      toolbarState: {
+        arrange: {
+          front: this.canArrangeSelection('front'),
+          up: this.canArrangeSelection('up'),
+          down: this.canArrangeSelection('down'),
+          back: this.canArrangeSelection('back'),
+        },
+        group: this.callbacks.canGroup?.() ?? false,
+        ungroup: this.callbacks.canUngroup?.() ?? false,
+      },
       canMove: (id, direction, siblings) => this.canMove(id, direction, siblings),
     });
     if (view.diagnostics.length > 0) this.callbacks.emitDiagnostics(view.diagnostics);
@@ -62,15 +88,43 @@ export class DesignerLayersController {
   onClick(event: Event): boolean {
     const target = event.target;
     if (!(target instanceof Element)) return false;
+    if (
+      target.closest(
+        '[data-layer-show-more], [data-layer-arrange], [data-layer-group-action], [data-layer-locate], [data-layer-collapse], [data-layer-toggle], [data-layer-move], .layer-actions, [data-layer-rename]',
+      ) !== null ||
+      (target.closest('[data-layer-select]') === null &&
+        target.closest('[data-layer-selectable="true"]') === null)
+    ) {
+      this.#lastLayerClick = undefined;
+    }
     const showMore = target.closest<HTMLElement>('[data-layer-show-more]');
     if (showMore !== null) {
       this.#renderLimit += DESIGNER_LAYER_PAGE_SIZE;
       this.render(showMore.closest<HTMLElement>('[data-layers]') ?? this.#layers);
       return true;
     }
+    const arrange = target.closest<HTMLElement>('[data-layer-arrange]')?.dataset.layerArrange as
+      | DesignerLayerArrangeAction
+      | undefined;
+    if (arrange !== undefined) {
+      this.arrangeSelection(arrange);
+      return true;
+    }
+    const groupAction = target.closest<HTMLElement>('[data-layer-group-action]')?.dataset
+      .layerGroupAction as DesignerLayerGroupAction | undefined;
+    if (groupAction !== undefined) {
+      const result = this.callbacks[groupAction]?.();
+      if (result !== undefined) this.report(result);
+      return true;
+    }
+    const locate = target.closest<HTMLElement>('[data-layer-locate]')?.dataset.layerLocate;
+    if (locate !== undefined) {
+      this.callbacks.locateComponent?.(locate);
+      return true;
+    }
     const select = target.closest<HTMLElement>('[data-layer-select]');
     if (select !== null) {
-      this.select(select.dataset.layerSelect!, event);
+      this.selectFromLayerClick(select.dataset.layerSelect!, event as MouseEvent);
       return true;
     }
     const collapse = target.closest<HTMLElement>('[data-layer-collapse]');
@@ -89,6 +143,15 @@ export class DesignerLayersController {
     const move = target.closest<HTMLElement>('[data-layer-move]');
     if (move !== null) {
       this.move(move.dataset.layerId!, move.dataset.layerMove as 'up' | 'down');
+      return true;
+    }
+    // 操作簇的空隙属于操作区，不应穿透为行选择；重命名输入由自身编辑流程接管。
+    if (target.closest('.layer-actions') !== null) return true;
+    if (target.closest('[data-layer-rename]') !== null) return false;
+    // DataV 风格整行命中：除折叠与独立操作按钮外，高亮到哪里就可以点到哪里。
+    const row = target.closest<HTMLElement>('[data-layer-selectable="true"]');
+    if (row?.dataset.layerId !== undefined) {
+      this.selectFromLayerClick(row.dataset.layerId, event as MouseEvent);
       return true;
     }
     return false;
@@ -147,17 +210,19 @@ export class DesignerLayersController {
   onDoubleClick(event: MouseEvent): boolean {
     const target = event.target;
     if (!(target instanceof Element)) return false;
+    if (
+      target.closest('.layer-actions') !== null ||
+      target.closest('[data-layer-collapse], [data-layer-rename]') !== null
+    )
+      return false;
     const select = target.closest<HTMLElement>('[data-layer-select]');
-    const id = select?.dataset.layerSelect;
-    if (select === null || select === undefined || id === undefined) return false;
-    const component = this.callbacks.getDocument()?.components.find((item) => item.id === id);
-    if (component === undefined || component.status.locked) return false;
-    this.#renamingId = id;
-    this.render(this.#layers);
-    const rename = this.#layers?.querySelector<HTMLInputElement>('[data-layer-rename]');
-    rename?.focus();
-    rename?.select();
-    return true;
+    const row = target.closest<HTMLElement>('[data-layer-selectable="true"]');
+    const id = select?.dataset.layerSelect ?? row?.dataset.layerId;
+    if (id === undefined) return false;
+    this.#lastLayerClick = undefined;
+    const renamed = this.beginRename(id);
+    if (renamed) event.preventDefault?.();
+    return renamed;
   }
 
   // 焦点离开重命名输入：值有变化时 change 事件随后接管提交；无变化时直接退出编辑态，
@@ -279,6 +344,7 @@ export class DesignerLayersController {
     this.#dropTargetId = undefined;
     this.#renameDrafts.clear();
     this.#renamingId = undefined;
+    this.#lastLayerClick = undefined;
     this.#renderLimit = DESIGNER_LAYER_PAGE_SIZE;
     this.render(this.#layers);
     // 释放面板引用：断开场景不再牵住 detached 节点；下一次 render(layers) 会重新注入。
@@ -298,6 +364,51 @@ export class DesignerLayersController {
     });
   }
 
+  private selectFromLayerClick(componentId: string, event: MouseEvent): void {
+    const modified = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
+    const primary = event.button === 0 || event.button === undefined;
+    const pointerClick = event.detail > 0;
+    const timeStamp = Number.isFinite(event.timeStamp) ? event.timeStamp : undefined;
+    const repeated =
+      !modified &&
+      primary &&
+      pointerClick &&
+      (event.detail >= 2 ||
+        (timeStamp !== undefined &&
+          this.#lastLayerClick?.componentId === componentId &&
+          timeStamp - this.#lastLayerClick.timeStamp >= 0 &&
+          timeStamp - this.#lastLayerClick.timeStamp <= LAYER_RENAME_DOUBLE_CLICK_MS));
+
+    this.#lastLayerClick =
+      !modified && primary && pointerClick && timeStamp !== undefined
+        ? { componentId, timeStamp }
+        : undefined;
+    if (repeated && this.beginRename(componentId)) {
+      this.#lastLayerClick = undefined;
+      event.preventDefault();
+      return;
+    }
+    this.select(componentId, event);
+  }
+
+  private beginRename(componentId: string): boolean {
+    const document = this.callbacks.getDocument();
+    const component = document?.components.find((item) => item.id === componentId);
+    if (
+      document === undefined ||
+      component === undefined ||
+      isScreenComponentEffectivelyHidden(document, componentId) ||
+      isScreenComponentEffectivelyLocked(document, componentId)
+    )
+      return false;
+    this.#renamingId = componentId;
+    this.render(this.#layers);
+    const rename = this.#layers?.querySelector<HTMLInputElement>('[data-layer-rename]');
+    rename?.focus();
+    rename?.select();
+    return true;
+  }
+
   private toggle(componentId: string, property: string): void {
     const component = this.callbacks
       .getDocument()
@@ -313,6 +424,26 @@ export class DesignerLayersController {
     const document = this.callbacks.getDocument()!;
     const transaction = createSiblingReorderTransaction(document, componentId, direction);
     if (transaction !== undefined) this.report(this.callbacks.executeTransaction(transaction));
+  }
+
+  private arrangeSelection(action: DesignerLayerArrangeAction): void {
+    const transaction = this.arrangeSelectionTransaction(action);
+    if (transaction !== undefined) this.report(this.callbacks.executeTransaction(transaction));
+  }
+
+  private canArrangeSelection(action: DesignerLayerArrangeAction): boolean {
+    return this.arrangeSelectionTransaction(action) !== undefined;
+  }
+
+  private arrangeSelectionTransaction(
+    action: DesignerLayerArrangeAction,
+  ): ScreenDocumentTransaction | undefined {
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return undefined;
+    const componentIds = this.callbacks.getInteraction().selectedComponentIds;
+    return action === 'front' || action === 'back'
+      ? createZOrderTransaction(document, componentIds, action)
+      : createSiblingSelectionReorderTransaction(document, componentIds, action);
   }
 
   private update(componentId: string, patch: ScreenComponentPatch): void {
@@ -348,7 +479,7 @@ export class DesignerLayersController {
   }
 
   // 渲染路径传入视图已排序的兄弟表（避免每行重新 filter+sort）；未传时（如 move
-  // 点击路径）自行计算，排序规则与 createDesignerLayerView 一致（zIndex 升序）。
+  // 点击路径）自行计算，排序规则与 createDesignerLayerView 一致（最前层在顶部）。
   private canMove(
     componentId: string,
     direction: 'up' | 'down',
@@ -366,7 +497,7 @@ export class DesignerLayersController {
     const ordered = siblings ?? getSiblingIds(document, component.parentId);
     const index = ordered.indexOf(componentId);
     if (index < 0) return false;
-    // 上移 = 减小 zIndex（向顶层），下移 = 增大 zIndex（向底层）。
+    // 上移 = 向列表顶部/绘制前层移动，下移 = 向列表底部/绘制后层移动。
     // 被移动组件与目标位置之间的全部兄弟都不得锁定：任何锁定兄弟都会迫使
     // 本组件（或与它交换 zIndex 的中间组件）跨越锁定边界，破坏锁定约束。
     const targetIndex = index + (direction === 'up' ? -1 : 1);
@@ -453,8 +584,8 @@ function getSiblingIds(document: ScreenDocument, parentId: string | null): reado
     .filter((component) => component.parentId === parentId)
     .sort(
       (left, right) =>
-        left.zIndex - right.zIndex ||
-        document.components.indexOf(left) - document.components.indexOf(right),
+        right.zIndex - left.zIndex ||
+        document.components.indexOf(right) - document.components.indexOf(left),
     )
     .map((component) => component.id);
 }

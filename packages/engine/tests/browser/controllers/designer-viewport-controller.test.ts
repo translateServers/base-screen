@@ -26,12 +26,16 @@ function createController() {
 function connectCanvas(controller: DesignerViewportController, width: number, height: number) {
   const listeners = new Map<string, (event: Event) => void>();
   const canvas = {
+    offsetLeft: 30,
+    offsetTop: 30,
     style: {},
     getRootNode: () => null,
   } as unknown as HTMLDivElement;
+  const focus = vi.fn();
   const viewport = {
     clientWidth: width,
     clientHeight: height,
+    focus,
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
     addEventListener: (type: string, listener: (event: Event) => void) =>
       listeners.set(type, listener),
@@ -40,6 +44,7 @@ function connectCanvas(controller: DesignerViewportController, width: number, he
   return {
     canvas,
     dispatch: (type: string, event: Event) => listeners.get(type)?.(event),
+    focus,
     viewport,
   };
 }
@@ -58,6 +63,16 @@ describe('DesignerViewportController zoom anchor', () => {
     controller.setZoomCentered(1.2);
     controller.setZoomCentered(1.5);
     expect(canvas.style.transform).toBe('translate(-200px, -150px) scale(1.5)');
+  });
+
+  it('centers a requested canvas point and returns keyboard focus to the viewport', () => {
+    const { controller } = createController();
+    const { canvas, focus } = connectCanvas(controller, 800, 600);
+
+    controller.centerOn({ x: 100, y: 50 });
+
+    expect(canvas.style.transform).toBe('translate(270px, 220px) scale(1)');
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });
 

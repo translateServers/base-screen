@@ -47,6 +47,9 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     borderColor: '#374151',
     fontSize: 13,
     rowHeight: 32,
+    opacity: 1,
+    flipX: false,
+    flipY: false,
   },
   styleSchema: {
     kind: 'object',
@@ -57,6 +60,9 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
       borderColor: { kind: 'string' },
       fontSize: { kind: 'number', minimum: 10, maximum: 32 },
       rowHeight: { kind: 'number', minimum: 20, maximum: 96 },
+      opacity: { kind: 'number', minimum: 0, maximum: 1 },
+      flipX: { kind: 'boolean' },
+      flipY: { kind: 'boolean' },
     },
     required: [
       'backgroundColor',

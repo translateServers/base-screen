@@ -1,3 +1,7 @@
+import {
+  parseScreenBlueprintAuthoringContext,
+  type ScreenBlueprintAuthoringContext,
+} from './blueprint-authoring.js';
 import type { ScreenParseResult } from './diagnostics.js';
 import type { ScreenJsonObject, ScreenJsonValue } from './json.js';
 
@@ -25,10 +29,8 @@ export type ScreenAuthoringRequest =
   | {
       readonly kind: 'blueprint';
       readonly requestId: string;
-      readonly componentId: string | null;
       readonly documentRevision: string | null;
-      readonly blueprint: ScreenJsonObject;
-      readonly maxBytes: number;
+      readonly context: ScreenBlueprintAuthoringContext;
     };
 
 export interface ScreenAuthoringEditorLimits {
@@ -63,17 +65,10 @@ export interface ScreenComponentTextCommitRequest {
 export interface ScreenBlueprintCommitRequest {
   readonly requestId: string;
   readonly expectedRevision: string | null;
-  readonly componentId: string | null;
   readonly blueprint: ScreenJsonObject;
 }
 
-const REQUEST_FIELDS_COMMON = new Set([
-  'kind',
-  'requestId',
-  'componentId',
-  'documentRevision',
-  'maxBytes',
-]);
+const REQUEST_FIELDS_COMMON = new Set(['kind', 'requestId', 'documentRevision']);
 
 export function parseScreenAuthoringRequest(
   input: unknown,
@@ -91,6 +86,8 @@ export function parseScreenAuthoringRequest(
     for (const key of Object.keys(record)) {
       if (
         !REQUEST_FIELDS_COMMON.has(key) &&
+        key !== 'componentId' &&
+        key !== 'maxBytes' &&
         key !== 'target' &&
         key !== 'source' &&
         key !== 'format'
@@ -142,19 +139,12 @@ export function parseScreenAuthoringRequest(
   }
   if (kind === 'blueprint') {
     for (const key of Object.keys(record)) {
-      if (!REQUEST_FIELDS_COMMON.has(key) && key !== 'blueprint') {
+      if (!REQUEST_FIELDS_COMMON.has(key) && key !== 'context') {
         return authoringFailure('AUTHORING_REQUEST_INVALID', [key], 'Unknown request field.');
       }
     }
     if (!isRequestId(record.requestId)) {
       return authoringFailure('AUTHORING_REQUEST_INVALID', ['requestId'], 'Request id is invalid.');
-    }
-    if (record.componentId !== null && typeof record.componentId !== 'string') {
-      return authoringFailure(
-        'AUTHORING_REQUEST_INVALID',
-        ['componentId'],
-        'Component id must be a string or null.',
-      );
     }
     if (record.documentRevision !== null && typeof record.documentRevision !== 'string') {
       return authoringFailure(
@@ -163,23 +153,24 @@ export function parseScreenAuthoringRequest(
         'Document revision must be a string or null.',
       );
     }
-    if (
-      record.blueprint === null ||
-      typeof record.blueprint !== 'object' ||
-      Array.isArray(record.blueprint)
-    ) {
-      return authoringFailure(
-        'AUTHORING_REQUEST_INVALID',
-        ['blueprint'],
-        'Blueprint snapshot must be an object.',
-      );
-    }
-    if (!isByteBudget(record.maxBytes)) {
-      return authoringFailure('AUTHORING_REQUEST_INVALID', ['maxBytes'], 'Byte budget is invalid.');
+    const context = parseScreenBlueprintAuthoringContext(record.context);
+    if (!context.ok) {
+      return {
+        ok: false,
+        diagnostics: context.diagnostics.map((diagnostic) => ({
+          ...diagnostic,
+          path: ['context', ...diagnostic.path],
+        })),
+      };
     }
     return {
       ok: true,
-      value: record as ScreenAuthoringRequest,
+      value: {
+        kind: 'blueprint',
+        requestId: record.requestId,
+        documentRevision: record.documentRevision as string | null,
+        context: context.value,
+      },
       diagnostics: [],
     };
   }

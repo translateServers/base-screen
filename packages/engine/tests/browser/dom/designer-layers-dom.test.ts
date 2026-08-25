@@ -84,6 +84,14 @@ function document(components: readonly ScreenComponentNode[]): ScreenDocument {
   };
 }
 
+function toolbarState() {
+  return {
+    arrange: { front: false, up: false, down: false, back: false },
+    group: false,
+    ungroup: false,
+  } as const;
+}
+
 describe('designer layers view', () => {
   it('uses canonical painter order and preserves missing-material nodes with diagnostics', () => {
     const view = createDesignerLayerView(
@@ -96,9 +104,9 @@ describe('designer layers view', () => {
     );
 
     expect(view.items.map((item) => [item.id, item.depth, item.hidden])).toEqual([
-      ['back', 0, false],
       ['root', 0, true],
       ['child', 1, true],
+      ['back', 0, false],
     ]);
     expect(view.items).toHaveLength(3);
     expect(view.diagnostics).toHaveLength(3);
@@ -117,15 +125,15 @@ describe('designer layers view', () => {
 
     expect(
       filterDesignerLayerItems(view.items, '', new Set(['container'])).map((item) => item.id),
-    ).toEqual(['back', 'container']);
+    ).toEqual(['container', 'back']);
     expect(
       filterDesignerLayerItems(view.items, 'target', new Set(['container'])).map((item) => item.id),
     ).toEqual(['container', 'target', 'grandchild']);
     expect(view.items.map((item) => item.id)).toEqual([
-      'back',
       'container',
       'target',
       'grandchild',
+      'back',
     ]);
   });
 
@@ -149,6 +157,7 @@ describe('designer layers view', () => {
       renameDrafts: new Map([['container', '本地草稿']]),
       renamingId: 'container',
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+      toolbarState: toolbarState(),
       canMove: () => true,
     });
 
@@ -158,17 +167,25 @@ describe('designer layers view', () => {
     expect(row.ariaCurrent).toBe('true');
     expect(row.attributes['aria-description']).toBe('已隐藏，已锁定，已选中，当前焦点，放置目标');
     expect(row.dataset.renaming).toBe('true');
+    expect(row.dataset.layerSelectable).toBeUndefined();
     expect(row.draggable).toBe(false);
     // 不渲染可见状态芯片：隐藏/锁定由常驻的警示色开关图标表达（aria-pressed），
     // 完整状态在 aria-description 中（见上方断言）。
     expect(row.children.find((child) => child.className === 'layer-state')).toBeUndefined();
     const actions = row.children.find((child) => child.className === 'layer-actions');
     expect(actions?.children.map((control) => control.ariaPressed)).toEqual([
+      '',
       'true',
       'true',
       '',
       '',
     ]);
+    expect(row.children.find((child) => child.dataset.layerSelect === 'container')?.disabled).toBe(
+      true,
+    );
+    const toolbar = layers.children[0]!.children[0]!;
+    expect(toolbar.attributes.role).toBe('toolbar');
+    expect(toolbar.children.filter((child) => child.type === 'button')).toHaveLength(6);
     expect(row.children.find((child) => child.dataset.layerRename === 'container')?.value).toBe(
       '本地草稿',
     );
@@ -187,11 +204,13 @@ describe('designer layers view', () => {
       renameDrafts: new Map(),
       renamingId: undefined,
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+      toolbarState: toolbarState(),
       canMove: () => true,
     });
 
     const idleRow = layers.children[1]!.children[0]!;
     expect(idleRow.dataset.renaming).toBeUndefined();
+    expect(idleRow.dataset.layerSelectable).toBe('true');
     expect(idleRow.children.find((child) => child.dataset.layerRename)).toBeUndefined();
     const idleSelect = idleRow.children.find((child) => child.dataset.layerSelect !== undefined);
     expect(
@@ -206,6 +225,7 @@ describe('designer layers view', () => {
       renameDrafts: new Map(),
       renamingId: 'container',
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+      toolbarState: toolbarState(),
       canMove: () => true,
     });
 
@@ -214,6 +234,34 @@ describe('designer layers view', () => {
     expect(
       renamingRow.children.find((child) => child.dataset.layerRename === 'container')?.value,
     ).toBe('container');
+  });
+
+  it('keeps locked layers selectable while disabling drag and rename affordances', () => {
+    const ownerDocument = new FakeDocument();
+    const layers = new FakeElement(ownerDocument);
+    const view = createDesignerLayerView(document([component('locked', null, 0)]), undefined);
+    const lockedView = {
+      ...view,
+      items: view.items.map((item) => ({ ...item, locked: true })),
+    };
+
+    renderDesignerLayers(layers as unknown as HTMLElement, lockedView, {
+      interaction: { selectedComponentIds: [], focusedComponentId: null },
+      search: '',
+      collapsed: new Set(),
+      dropTargetId: undefined,
+      renameDrafts: new Map(),
+      renamingId: undefined,
+      renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+      toolbarState: toolbarState(),
+      canMove: () => false,
+    });
+
+    const row = layers.children[1]!.children[0]!;
+    const select = row.children.find((child) => child.dataset.layerSelect === 'locked');
+    expect(row.dataset.layerSelectable).toBe('true');
+    expect(row.draggable).toBe(false);
+    expect(select?.disabled).toBe(false);
   });
 
   it('R6 renders large layer trees in stable pages with an explicit continuation control', () => {
@@ -236,6 +284,7 @@ describe('designer layers view', () => {
       renameDrafts: new Map(),
       renamingId: undefined,
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+      toolbarState: toolbarState(),
       canMove: () => true,
     });
 

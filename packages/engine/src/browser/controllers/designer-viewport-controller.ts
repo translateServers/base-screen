@@ -1,5 +1,9 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import { reduceScreenViewport, type ScreenViewportState } from '@base-screen/core';
+import {
+  reduceScreenViewport,
+  type ScreenPoint,
+  type ScreenViewportState,
+} from '@base-screen/core';
 import { DESIGNER_TOOLS, type DesignerToolId } from '../../common/tools/designer-tools.js';
 import { designerToolGlyph } from '../dom/designer-workspace.js';
 import {
@@ -114,6 +118,19 @@ export class DesignerViewportController {
   panBy(delta: { readonly x: number; readonly y: number }): void {
     this.#state = reduceScreenViewport(this.#state, { type: 'pan-by', delta });
     this.render();
+  }
+
+  centerOn(point: ScreenPoint): void {
+    const viewport = this.#viewport;
+    const canvas = this.#canvas;
+    if (viewport === undefined || canvas === undefined) return;
+    const target = { x: viewport.clientWidth / 2, y: viewport.clientHeight / 2 };
+    const current = {
+      x: canvas.offsetLeft + this.#state.offset.x + point.x * this.#state.zoom,
+      y: canvas.offsetTop + this.#state.offset.y + point.y * this.#state.zoom,
+    };
+    this.panBy({ x: target.x - current.x, y: target.y - current.y });
+    this.focus();
   }
 
   reset(): void {

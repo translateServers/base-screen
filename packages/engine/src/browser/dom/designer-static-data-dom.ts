@@ -28,7 +28,9 @@ export function renderDesignerStaticData(view: DesignerStaticDataView): HTMLElem
   const ownerDocument = view.ownerDocument;
   const section = ownerDocument.createElement('section');
   section.className = 'designer-data-source-editor';
+  section.dataset.inspectorSearchSection = 'true';
   const heading = ownerDocument.createElement('h4');
+  heading.className = 'designer-inspector-section-title';
   heading.textContent = DESIGNER_UI_TEXT.dataSource.staticTitle;
   section.appendChild(heading);
   if (view.descriptor?.kind === 'scalar') {
@@ -40,28 +42,90 @@ export function renderDesignerStaticData(view: DesignerStaticDataView): HTMLElem
     return section;
   }
   const parsed = parseScreenTabularDataset(view.value);
-  const summary = ownerDocument.createElement('div');
-  summary.className = 'designer-static-tabular-summary';
-  const text = ownerDocument.createElement('strong');
-  text.textContent = parsed.ok
+  const modes = ownerDocument.createElement('div');
+  modes.className = 'designer-static-data-tabs designer-static-inline-tabs';
+  modes.append(
+    tab(ownerDocument, 'table', DESIGNER_UI_TEXT.dataSource.staticForm, view.tab === 'table'),
+    tab(
+      ownerDocument,
+      'advanced',
+      DESIGNER_UI_TEXT.dataSource.staticAdvanced,
+      view.tab === 'advanced',
+    ),
+  );
+  section.appendChild(modes);
+  if (view.tab === 'advanced' || !parsed.ok) {
+    section.appendChild(renderAdvancedInput(ownerDocument, view.jsonDraft));
+  } else {
+    const summary = ownerDocument.createElement('div');
+    summary.className = 'designer-static-tabular-summary';
+    const text = ownerDocument.createElement('strong');
+    text.textContent = DESIGNER_UI_TEXT.dataSource.staticTabularSummary(
+      parsed.value.fields.length,
+      parsed.value.rows.length,
+    );
+    const roles = ownerDocument.createElement('small');
+    roles.textContent = bindingSummary(view, parsed.value);
+    summary.append(text, roles);
+    section.append(summary, renderRows(ownerDocument, parsed.value, view.page));
+  }
+  section.appendChild(renderApply(ownerDocument));
+  return section;
+}
+
+export function renderDesignerStaticDataWorkbench(view: DesignerStaticDataView): HTMLElement {
+  const parsed = parseScreenTabularDataset(view.value);
+  return renderStaticWorkbench(view.ownerDocument, view, parsed.ok ? parsed.value : undefined);
+}
+
+export function renderDesignerStaticDataMapping(view: DesignerStaticDataView): HTMLElement {
+  const section = view.ownerDocument.createElement('section');
+  section.className = 'designer-data-source-editor designer-static-inline-mapping';
+  section.dataset.inspectorSearchSection = 'true';
+  const heading = view.ownerDocument.createElement('h4');
+  heading.className = 'designer-inspector-section-title';
+  heading.textContent = DESIGNER_UI_TEXT.dataSource.mappingStep;
+  const parsed = parseScreenTabularDataset(view.value);
+  section.appendChild(heading);
+  if (!parsed.ok) {
+    const empty = view.ownerDocument.createElement('p');
+    empty.className = 'designer-empty-state';
+    empty.textContent = DESIGNER_UI_TEXT.dataSource.staticInvalid;
+    section.appendChild(empty);
+    return section;
+  }
+  section.append(
+    renderBindings(view.ownerDocument, view, parsed.value),
+    renderApply(view.ownerDocument),
+  );
+  return section;
+}
+
+export function renderDesignerStaticDataPreview(view: DesignerStaticDataView): HTMLElement {
+  const preview = view.ownerDocument.createElement('aside');
+  preview.className = 'designer-data-workbench-preview designer-static-inline-preview';
+  preview.dataset.workbenchSection = 'preview';
+  const header = view.ownerDocument.createElement('header');
+  const title = view.ownerDocument.createElement('h4');
+  title.textContent = DESIGNER_UI_TEXT.dataSource.responseTitle;
+  const parsed = parseScreenTabularDataset(view.value);
+  const meta = view.ownerDocument.createElement('span');
+  meta.dataset.status = parsed.ok ? 'ready' : 'error';
+  meta.textContent = parsed.ok
     ? DESIGNER_UI_TEXT.dataSource.staticTabularSummary(
         parsed.value.fields.length,
         parsed.value.rows.length,
       )
     : DESIGNER_UI_TEXT.dataSource.staticInvalid;
-  const roles = ownerDocument.createElement('small');
-  roles.textContent = bindingSummary(view, parsed.ok ? parsed.value : undefined);
-  const edit = ownerDocument.createElement('button');
-  edit.type = 'button';
-  edit.className = 'designer-control designer-button';
-  edit.dataset.staticAction = 'open';
-  edit.textContent = DESIGNER_UI_TEXT.dataSource.staticTabularEdit;
-  summary.append(text, roles, edit);
-  section.append(
-    summary,
-    renderStaticDialog(ownerDocument, view, parsed.ok ? parsed.value : undefined),
+  header.append(title, meta);
+  const code = view.ownerDocument.createElement('pre');
+  code.textContent = JSON.stringify(
+    parsed.ok ? parsed.value.rows.slice(0, 8) : view.value,
+    null,
+    2,
   );
-  return section;
+  preview.append(header, code);
+  return preview;
 }
 
 function renderScalar(ownerDocument: Document, view: DesignerStaticDataView): HTMLElement {
@@ -97,20 +161,28 @@ function renderScalar(ownerDocument: Document, view: DesignerStaticDataView): HT
   return label;
 }
 
-function renderStaticDialog(
+function renderStaticWorkbench(
   ownerDocument: Document,
   view: DesignerStaticDataView,
   dataset: ScreenTabularDataset | undefined,
-): HTMLDialogElement {
-  const dialog = ownerDocument.createElement('dialog');
-  dialog.className = 'designer-static-data-dialog';
-  dialog.dataset.staticDialog = 'true';
-  dialog.open = view.dialogOpen;
+): HTMLElement {
+  const workbench = ownerDocument.createElement('div');
+  workbench.className = 'designer-data-workbench-shell';
+  workbench.dataset.staticWorkbench = 'true';
+  workbench.dataset.inspectorPane = 'data';
+  workbench.dataset.inspectorSearchSection = 'true';
   const header = ownerDocument.createElement('header');
+  header.className = 'designer-workbench-header';
+  const heading = ownerDocument.createElement('div');
   const title = ownerDocument.createElement('h3');
   title.textContent = DESIGNER_UI_TEXT.dataSource.staticDialogTitle;
+  const draft = ownerDocument.createElement('span');
+  draft.className = 'designer-workbench-draft';
+  draft.textContent = DESIGNER_UI_TEXT.dataSource.draft;
+  heading.append(title, draft);
   const close = action(ownerDocument, 'cancel', DESIGNER_UI_TEXT.dataSource.staticCancel);
-  header.append(title, close);
+  close.textContent = DESIGNER_UI_TEXT.dataSource.backToCanvas;
+  header.append(heading, close);
   const tabs = ownerDocument.createElement('div');
   tabs.className = 'designer-static-data-tabs';
   tabs.append(
@@ -134,14 +206,46 @@ function renderStaticDialog(
       renderRows(ownerDocument, dataset, view.page),
     );
   }
+  const navigation = ownerDocument.createElement('nav');
+  navigation.className = 'designer-data-workbench-steps';
+  for (const [label, active] of [
+    [DESIGNER_UI_TEXT.dataSource.sourceStep, true],
+    [DESIGNER_UI_TEXT.dataSource.mappingStep, view.tab === 'table'],
+    [DESIGNER_UI_TEXT.dataSource.transformStep, false],
+    [DESIGNER_UI_TEXT.dataSource.previewStep, true],
+    [DESIGNER_UI_TEXT.dataSource.refreshStep, false],
+  ] as const) {
+    const item = ownerDocument.createElement('span');
+    item.dataset.active = String(active);
+    item.textContent = label;
+    navigation.appendChild(item);
+  }
+  const preview = ownerDocument.createElement('aside');
+  preview.className = 'designer-data-workbench-preview';
+  const previewTitle = ownerDocument.createElement('h4');
+  previewTitle.textContent = DESIGNER_UI_TEXT.dataSource.previewConsumer;
+  const previewMeta = ownerDocument.createElement('p');
+  previewMeta.textContent =
+    dataset === undefined
+      ? DESIGNER_UI_TEXT.dataSource.staticInvalid
+      : DESIGNER_UI_TEXT.dataSource.staticTabularSummary(
+          dataset.fields.length,
+          dataset.rows.length,
+        );
+  const previewCode = ownerDocument.createElement('pre');
+  previewCode.textContent = JSON.stringify(dataset?.rows.slice(0, 8) ?? view.value, null, 2);
+  preview.append(previewTitle, previewMeta, previewCode);
+  const body = ownerDocument.createElement('div');
+  body.className = 'designer-data-workbench-grid';
+  body.append(navigation, content, preview);
   const footer = ownerDocument.createElement('footer');
   footer.append(
     action(ownerDocument, 'restore', DESIGNER_UI_TEXT.dataSource.staticRestore),
     action(ownerDocument, 'cancel', DESIGNER_UI_TEXT.dataSource.staticCancel),
     action(ownerDocument, 'apply', DESIGNER_UI_TEXT.dataSource.apply('static'), 'primary'),
   );
-  dialog.append(header, tabs, content, footer);
-  return dialog;
+  workbench.append(header, tabs, body, footer);
+  return workbench;
 }
 
 function renderPaste(ownerDocument: Document, view: DesignerStaticDataView): HTMLElement {

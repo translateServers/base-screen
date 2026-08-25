@@ -35,6 +35,7 @@ export class DesignerVariablesController {
   #creating = false;
   #renamingIndex: number | undefined;
   #editingValueIndex: number | undefined;
+  #deletingIndex: number | undefined;
   #lastDocument: ScreenDocument | undefined;
 
   constructor(private readonly callbacks: DesignerVariablesCallbacks) {}
@@ -54,6 +55,7 @@ export class DesignerVariablesController {
     this.#creating = false;
     this.#renamingIndex = undefined;
     this.#editingValueIndex = undefined;
+    this.#deletingIndex = undefined;
   }
 
   render(): void {
@@ -69,6 +71,7 @@ export class DesignerVariablesController {
       creating: this.#creating,
       renamingIndex: this.#renamingIndex,
       editingValueIndex: this.#editingValueIndex,
+      deletingIndex: this.#deletingIndex,
     };
   }
 
@@ -83,26 +86,28 @@ export class DesignerVariablesController {
         this.#creating = true;
         this.#renamingIndex = undefined;
         this.#editingValueIndex = undefined;
-        this.render();
+        this.#deletingIndex = undefined;
+        this.renderAndFocus('[data-variable-create-name]');
         return true;
       case 'cancel':
-        this.#creating = false;
-        this.#renamingIndex = undefined;
-        this.#editingValueIndex = undefined;
-        this.render();
+        this.cancelEditing(index);
         return true;
       case 'rename':
+        this.#creating = false;
         this.#renamingIndex = index;
         this.#editingValueIndex = undefined;
-        this.render();
+        this.#deletingIndex = undefined;
+        this.renderAndFocus(`[data-variable-rename="${index}"]`);
         return true;
       case 'edit-value':
+        this.#creating = false;
         this.#editingValueIndex = index;
         this.#renamingIndex = undefined;
-        this.render();
+        this.#deletingIndex = undefined;
+        this.renderAndFocus(`[data-variable-value="${index}"]`);
         return true;
       case 'delete':
-        this.deleteVariable(index);
+        this.requestDelete(index);
         return true;
       case 'confirm-create':
         this.confirmCreate();
@@ -113,6 +118,9 @@ export class DesignerVariablesController {
       case 'confirm-value':
         this.confirmValue(index);
         return true;
+      case 'confirm-delete':
+        this.deleteVariable(index);
+        return true;
       default:
         return false;
     }
@@ -120,6 +128,19 @@ export class DesignerVariablesController {
 
   onKeyDown(event: KeyboardEvent): boolean {
     const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      event.key === 'Escape' &&
+      !event.isComposing &&
+      target.closest('[data-variable-editor="delete"]') !== null
+    ) {
+      event.preventDefault();
+      const index = Number(
+        target.closest<HTMLElement>('[data-variable-index]')?.dataset.variableIndex ?? -1,
+      );
+      this.cancelEditing(index);
+      return true;
+    }
     if (!(target instanceof HTMLInputElement)) return false;
     const isEditing =
       target.dataset.variableRename !== undefined ||
@@ -129,10 +150,8 @@ export class DesignerVariablesController {
     if (!isEditing) return false;
     if (event.key === 'Escape' && !event.isComposing) {
       event.preventDefault();
-      this.#creating = false;
-      this.#renamingIndex = undefined;
-      this.#editingValueIndex = undefined;
-      this.render();
+      const index = Number(target.dataset.variableRename ?? target.dataset.variableValue ?? -1);
+      this.cancelEditing(index);
       return true;
     }
     if (event.key === 'Enter' && !event.isComposing) {
@@ -158,21 +177,27 @@ export class DesignerVariablesController {
     const valueSource =
       this.#panel.querySelector<HTMLInputElement>('[data-variable-create-value]')?.value ?? '';
     if (!VARIABLE_NAME_PATTERN.test(name)) {
-      this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.nameInvalid));
+      this.reportFieldFailure(
+        '[data-variable-create-name]',
+        DESIGNER_UI_TEXT.variables.nameInvalid,
+      );
       return;
     }
     if (isVariableNameTaken(document.variables, name)) {
-      this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.nameTaken));
+      this.reportFieldFailure('[data-variable-create-name]', DESIGNER_UI_TEXT.variables.nameTaken);
       return;
     }
     const value = parseStaticVariableValue(valueSource);
     if (value === undefined) {
-      this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.valueInvalid));
+      this.reportFieldFailure(
+        '[data-variable-create-value]',
+        DESIGNER_UI_TEXT.variables.valueInvalid,
+      );
       return;
     }
-    this.commit([...document.variables, { type: 'static', name, value }]);
-    this.#creating = false;
-    this.render();
+    if (!this.commit([...document.variables, { type: 'static', name, value }])) return;
+    this.resetDraft();
+    this.renderAndFocus('[data-variable-action="add"]');
   }
 
   private confirmRename(index: number): void {
@@ -186,11 +211,17 @@ export class DesignerVariablesController {
         .querySelector<HTMLInputElement>(`[data-variable-rename="${index}"]`)
         ?.value.trim() ?? '';
     if (!VARIABLE_NAME_PATTERN.test(name)) {
-      this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.nameInvalid));
+      this.reportFieldFailure(
+        `[data-variable-rename="${index}"]`,
+        DESIGNER_UI_TEXT.variables.nameInvalid,
+      );
       return;
     }
     if (isVariableNameTaken(variables, name, index)) {
-      this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.nameTaken));
+      this.reportFieldFailure(
+        `[data-variable-rename="${index}"]`,
+        DESIGNER_UI_TEXT.variables.nameTaken,
+      );
       return;
     }
     // 引用保护（ADR-0054 R4）：旧名被文档引用时拒绝重命名。
@@ -199,9 +230,9 @@ export class DesignerVariablesController {
       return;
     }
     variables[index] = { ...variable, name };
-    this.commit(variables);
-    this.#renamingIndex = undefined;
-    this.render();
+    if (!this.commit(variables)) return;
+    this.resetDraft();
+    this.renderAndFocus(`[data-variable-action="rename"][data-variable-index="${index}"]`);
   }
 
   private confirmValue(index: number): void {
@@ -214,16 +245,19 @@ export class DesignerVariablesController {
       this.#panel.querySelector<HTMLInputElement>(`[data-variable-value="${index}"]`)?.value ?? '';
     const value = parseStaticVariableValue(valueSource);
     if (value === undefined) {
-      this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.valueInvalid));
+      this.reportFieldFailure(
+        `[data-variable-value="${index}"]`,
+        DESIGNER_UI_TEXT.variables.valueInvalid,
+      );
       return;
     }
     variables[index] = { ...variable, value };
-    this.commit(variables);
-    this.#editingValueIndex = undefined;
-    this.render();
+    if (!this.commit(variables)) return;
+    this.resetDraft();
+    this.renderAndFocus(`[data-variable-action="edit-value"][data-variable-index="${index}"]`);
   }
 
-  private deleteVariable(index: number): void {
+  private requestDelete(index: number): void {
     const document = this.#lastDocument ?? this.callbacks.getDocument();
     if (document === undefined) return;
     const variable = document.variables[index];
@@ -233,16 +267,76 @@ export class DesignerVariablesController {
       this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.referenced));
       return;
     }
-    this.commit(document.variables.filter((_, itemIndex) => itemIndex !== index));
+    this.#creating = false;
+    this.#renamingIndex = undefined;
+    this.#editingValueIndex = undefined;
+    this.#deletingIndex = index;
+    this.renderAndFocus(`[data-variable-action="confirm-delete"][data-variable-index="${index}"]`);
   }
 
-  private commit(variables: readonly ScreenVariable[]): void {
+  private deleteVariable(index: number): void {
+    const document = this.#lastDocument ?? this.callbacks.getDocument();
+    if (document === undefined) return;
+    const variable = document.variables[index];
+    if (variable === undefined || variable.type !== 'static') return;
+    if (isVariableReferenced(document, variable.name)) {
+      this.callbacks.report(failure(DESIGNER_UI_TEXT.variables.referenced));
+      return;
+    }
+    if (!this.commit(document.variables.filter((_, itemIndex) => itemIndex !== index))) return;
+    this.resetDraft();
+    this.renderAndFocus('[data-variable-action="add"]');
+  }
+
+  private cancelEditing(index: number): void {
+    const returnAction = this.#creating
+      ? 'add'
+      : this.#renamingIndex !== undefined
+        ? 'rename'
+        : this.#editingValueIndex !== undefined
+          ? 'edit-value'
+          : 'delete';
+    this.resetDraft();
+    const selector =
+      returnAction === 'add'
+        ? '[data-variable-action="add"]'
+        : `[data-variable-action="${returnAction}"][data-variable-index="${index}"]`;
+    this.renderAndFocus(selector);
+  }
+
+  private resetDraft(): void {
+    this.#creating = false;
+    this.#renamingIndex = undefined;
+    this.#editingValueIndex = undefined;
+    this.#deletingIndex = undefined;
+  }
+
+  private renderAndFocus(selector: string): void {
+    this.render();
+    this.#panel?.querySelector<HTMLElement>(selector)?.focus();
+  }
+
+  private reportFieldFailure(selector: string, message: string): void {
+    this.callbacks.report(failure(message));
+    const input = this.#panel?.querySelector<HTMLInputElement>(selector);
+    input?.setAttribute('aria-invalid', 'true');
+    const error = this.#panel?.querySelector<HTMLElement>('[data-variable-error]');
+    if (error !== null && error !== undefined) {
+      error.textContent = message;
+      error.hidden = false;
+    }
+    input?.focus();
+  }
+
+  private commit(variables: readonly ScreenVariable[]): boolean {
     const result = buildReplaceVariablesCommand(variables);
     if (!result.ok) {
       this.callbacks.report(result);
-      return;
+      return false;
     }
-    this.callbacks.report(this.callbacks.executeCommand(result.value));
+    const execution = this.callbacks.executeCommand(result.value);
+    this.callbacks.report(execution);
+    return execution.ok;
   }
 }
 

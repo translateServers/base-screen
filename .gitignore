@@ -14,3 +14,4 @@ packages/*/LICENSE
 .schema-build/
 .trae
 .zcode
+.agents

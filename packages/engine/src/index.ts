@@ -10,8 +10,9 @@ import type {
   ScreenAssetCatalogPort,
   ScreenAssetSummary,
   ScreenAuthoringEditorContext,
-  ScreenBlueprint,
+  ScreenBlueprintAuthoringContext,
   ScreenBlueprintCommitRequest,
+  ScreenBlueprintEditOptions,
   ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
   ScreenComponentTextCommitRequest,
@@ -34,7 +35,9 @@ import type {
   ScreenProjectSummary,
 } from '@base-screen/contracts';
 import {
+  MAX_AUTHORING_CANDIDATE_BYTES,
   MAX_AUTHORING_SOURCE_BYTES,
+  parseScreenBlueprintAuthoringContext,
   parseScreenDocument,
   parseScreenJsonValue,
   parseScreenTabularDataset,
@@ -64,6 +67,7 @@ import {
 } from '@base-screen/renderer';
 import { DesignerAssetController } from './browser/controllers/designer-asset-controller.js';
 import { DesignerCanvasRuntimeController } from './browser/controllers/designer-canvas-runtime-controller.js';
+import { DesignerCommandPaletteController } from './browser/controllers/designer-command-palette-controller.js';
 import { DesignerDatasetController } from './browser/controllers/designer-dataset-controller.js';
 import { DesignerErrorConsoleController } from './browser/controllers/designer-error-console-controller.js';
 import { DesignerGestureController } from './browser/controllers/designer-gesture-controller.js';
@@ -96,6 +100,7 @@ import {
   populateMaterialLibrary,
   renderMaterialLibraryState,
 } from './browser/dom/designer-workspace.js';
+import { designerIcon } from './browser/ui/designer-icons.js';
 import {
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
   type BaseScreenCanvasBackgroundImageRequestEventDetail,
@@ -103,6 +108,10 @@ import {
   buildCanvasBackgroundImageRequest,
   validateCanvasBackgroundImageCommitGuards,
 } from './canvas-background-image.js';
+import {
+  BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
+  type BaseScreenCanvasPresentationChangeEventDetail,
+} from './canvas-presentation.js';
 import {
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
@@ -128,6 +137,11 @@ export {
   type BaseScreenCanvasBackgroundImageRequestEventDetail,
 } from './canvas-background-image.js';
 export {
+  BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
+  type BaseScreenCanvasPresentationChangeEventDetail,
+  type BaseScreenCanvasScaleMode,
+} from './canvas-presentation.js';
+export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
@@ -148,11 +162,13 @@ export {
 import { adoptDesignerStyleSheets, createDesignerStyle } from './browser/styles/designer-style.js';
 import {
   buildScreenAuthoringEditorContext,
+  buildScreenBlueprintAuthoringContext,
   createScreenAuthoringInstanceId,
   createScreenAuthoringRequestId,
   parseScreenAuthoringBlueprintCandidate,
   parseScreenComponentTextSource,
   validateScreenAuthoringCommitGuards,
+  validateScreenBlueprintAuthoringCommitGuards,
 } from './common/operations/designer-authoring-bridge.js';
 import {
   createDesignerElementOperations,
@@ -240,9 +256,16 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #instanceId = createScreenAuthoringInstanceId();
   readonly #pendingAuthoringRequests = new Map<
     string,
-    { readonly kind: string; readonly target?: ScreenComponentTextTarget }
+    {
+      readonly kind: string;
+      readonly target?: ScreenComponentTextTarget;
+      readonly generation: number;
+      readonly documentGeneration?: number;
+      readonly documentRevision?: string | null;
+    }
   >();
   #authoringGeneration = 0;
+  #documentGeneration = 0;
   readonly #notificationController = new DesignerNotificationController();
   readonly #errorConsoleController = new DesignerErrorConsoleController();
   readonly #canvasRuntimeController = new DesignerCanvasRuntimeController({
@@ -254,7 +277,10 @@ export class BaseScreenDesignerElement extends ElementBase {
   readonly #session = new DesignerSession({
     renderDocument: (document) => this.renderDocument(document),
     renderInteraction: () => this.renderInteraction(),
-    emitChange: (document) => this.emitChange(document),
+    emitChange: (document) => {
+      this.#documentGeneration++;
+      this.emitChange(document);
+    },
     emitSelectionChange: (interaction) =>
       this.dispatchEvent(new CustomEvent('base-screen-selection-change', { detail: interaction })),
     onProjectChange: (_project, phase) => {
@@ -332,13 +358,25 @@ export class BaseScreenDesignerElement extends ElementBase {
     executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
     reduceSelection: (action) => this.#session.reduceSelection(action),
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
+    canGroup: () => this.#panelController.canGroup,
+    canUngroup: () => this.#panelController.canUngroup,
+    group: () => this.#panelController.group(),
+    ungroup: () => this.#panelController.ungroup(),
+    locateComponent: (componentId) => {
+      const component = this.#session.document?.components.find((item) => item.id === componentId);
+      if (component === undefined) return;
+      this.#viewportController.centerOn({
+        x: component.position.x + component.size.width / 2,
+        y: component.position.y + component.size.height / 2,
+      });
+    },
   });
   readonly #integrationController = new DesignerIntegrationController({
     getCatalog: () => this.#catalog,
     getDocument: () => this.#session.document,
     getInteraction: () => this.#session.interaction,
     getRuntimeContributions: () => this.#runtimeContributions,
-    requestBlueprintEdit: () => this.requestBlueprintEdit(),
+    requestBlueprintEdit: (options) => this.requestBlueprintEdit(options),
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
   });
   readonly #projectFeedbackController = new DesignerProjectFeedbackController({
@@ -386,6 +424,21 @@ export class BaseScreenDesignerElement extends ElementBase {
     executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
     report: (diagnostics) => this.emitDiagnostics(diagnostics),
     refresh: (componentId) => this.refreshData(componentId),
+    requestAuthoringAction: (action, detail) => {
+      this.dispatchEvent(
+        new CustomEvent('base-screen-dataset-authoring-action', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            action,
+            componentId: this.#session.interaction.focusedComponentId,
+            ...detail,
+          },
+        }),
+      );
+    },
+    getWorkbenchHost: () =>
+      this.shadowRoot?.querySelector<HTMLElement>('[data-data-workbench]') ?? undefined,
   });
   readonly #importController = new DesignerImportController({
     replaceDocument: (document) => this.replaceDocument(document),
@@ -413,7 +466,41 @@ export class BaseScreenDesignerElement extends ElementBase {
     isMaterialAvailable: (type) => !this.#materialLibraryState?.unavailableTypes?.includes(type),
     requestMaterialLibraryAction: (action) => this.requestMaterialLibraryAction(action),
     requestCanvasBackgroundImage: () => this.requestCanvasBackgroundImage(),
+    requestCanvasPresentationAction: (action) => {
+      this.dispatchEvent(
+        new CustomEvent('base-screen-canvas-presentation-action', {
+          bubbles: true,
+          composed: true,
+          detail: { action },
+        }),
+      );
+    },
+    onCanvasPresentationChange: (settings) => {
+      if (this.#canvas !== undefined) {
+        this.#canvas.style.opacity = String(settings.opacity);
+        this.#canvas.dataset.scaleMode = settings.scaleMode;
+        this.#canvas.dataset.backgroundAutoFill = String(settings.backgroundAutoFill);
+        this.#canvas.dataset.disableComponentLoading = String(settings.disableComponentLoading);
+      }
+      this.dispatchEvent(
+        new CustomEvent<BaseScreenCanvasPresentationChangeEventDetail>(
+          BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
+          {
+            bubbles: true,
+            composed: true,
+            detail: {
+              opacity: settings.opacity,
+              scaleMode: settings.scaleMode,
+              backgroundAutoFill: settings.backgroundAutoFill,
+              disableComponentLoading: settings.disableComponentLoading,
+              thumbnailUrl: settings.thumbnailUrl ?? null,
+            },
+          },
+        ),
+      );
+    },
     isCanvasBackgroundImageButtonVisible: () => this.#canvasBackgroundImageButton,
+    selectInspectorTab: (tab) => this.#workbenchController.selectInspectorTab(tab),
   });
   readonly #viewportController = new DesignerViewportController({
     getDocument: () => this.#session.document,
@@ -436,6 +523,12 @@ export class BaseScreenDesignerElement extends ElementBase {
     getZoom: () => this.#viewportController.state.zoom,
     // 状态栏「事件」开关：把设计态画布交互模式应用到渲染器（原地重渲染，不重建）。
     onNativeEventsChange: (enabled) => this.applyNativeEvents(enabled),
+  });
+  readonly #commandPaletteController = new DesignerCommandPaletteController({
+    getRoot: () => this.shadowRoot,
+    getDocument: () => this.#session.document,
+    renderKindIcon: (kind) =>
+      designerIcon(kind === 'material' ? 'grid' : kind === 'layer' ? 'layers' : 'terminal'),
   });
   readonly #operationHost: DesignerElementOperationsHost = {
     getDocument: () => this.#session.document,
@@ -521,6 +614,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#menuController.closeMenus();
       this.#menuController.closeContextMenu();
       this.#menuController.closeHelpPanel();
+      this.#commandPaletteController.close(false);
     },
     // 空格抓手与键盘焦点解耦：鼠标悬停视窗即可激活临时抓手（无需先点击聚焦）。
     onWindowKeyDown: (event) => this.#viewportController.onWindowKeyDown(event),
@@ -552,6 +646,7 @@ export class BaseScreenDesignerElement extends ElementBase {
         this.#menuController.closeContextMenu();
         return false;
       },
+      (target) => this.#commandPaletteController.onClick(target as Element),
       (target) => this.executeToolFromTarget(target as Element),
       (target) => this.executeOperationFromTarget(target as Element),
       (target) => this.onStatusZoomPreset(target as Element),
@@ -630,6 +725,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       },
     ],
     input: [
+      (target) => this.#commandPaletteController.onInput(target as Element),
       (target) => this.#assetController.onInput(target),
       (target) => this.#datasetController.onInput(target),
       (target, event) => this.#panelController.onInput(event),
@@ -698,7 +794,14 @@ export class BaseScreenDesignerElement extends ElementBase {
       return true;
     },
     focusOut: (target, event) => this.#layersController.onFocusOut(event as FocusEvent),
-    keyDownCapture: (target, event) => this.#eventSystem.swallow(event as KeyboardEvent),
+    keyDownCapture: (target, event) => {
+      const keyboardEvent = event as KeyboardEvent;
+      if (keyboardEvent.key === '/' && this.#commandPaletteController.onKeyDown(keyboardEvent)) {
+        keyboardEvent.stopImmediatePropagation();
+        return true;
+      }
+      return this.#eventSystem.swallow(keyboardEvent);
+    },
     keyUpCapture: (target, event) => {
       // 手势激活期间 keyup 同样全吞；但 Space 必须放行到 viewport 的 keyup，
       // 否则抓手状态（spacePressed）无法在拖拽中松开复位。
@@ -711,6 +814,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       return false;
     },
     keyDown: [
+      (target, event) => this.#commandPaletteController.onKeyDown(event as KeyboardEvent),
       (target, event) => this.#errorConsoleController.onKeyDown(event as KeyboardEvent),
       (target, event) => {
         const keyboardEvent = event as KeyboardEvent;
@@ -1402,7 +1506,10 @@ export class BaseScreenDesignerElement extends ElementBase {
     const document = this.#session.document;
     if (document === undefined) return false;
     const requestId = createScreenAuthoringRequestId();
-    this.#pendingAuthoringRequests.set(requestId, { kind: 'canvas-background-image' });
+    this.#pendingAuthoringRequests.set(requestId, {
+      kind: 'canvas-background-image',
+      generation: this.#authoringGeneration,
+    });
     this.dispatchEvent(
       new CustomEvent<BaseScreenCanvasBackgroundImageRequestEventDetail>(
         BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
@@ -1432,9 +1539,10 @@ export class BaseScreenDesignerElement extends ElementBase {
     backgroundImage: string | null,
     fit?: ScreenCanvasBackgroundImageFit,
   ): ScreenParseResult<ScreenDocument> {
+    const pending = this.#pendingAuthoringRequests.get(requestId);
     const guards = validateCanvasBackgroundImageCommitGuards({
-      pendingKind: this.#pendingAuthoringRequests.get(requestId)?.kind,
-      disposed: this.#authoringGeneration > 0,
+      pendingKind: pending?.kind,
+      disposed: pending !== undefined && pending.generation !== this.#authoringGeneration,
     });
     if (!guards.ok) {
       this.#pendingAuthoringRequests.delete(requestId);
@@ -1491,7 +1599,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     } else {
       return null;
     }
-    this.#pendingAuthoringRequests.set(requestId, { kind: 'component-text', target });
+    this.#pendingAuthoringRequests.set(requestId, {
+      kind: 'component-text',
+      target,
+      generation: this.#authoringGeneration,
+    });
     this.dispatchEvent(
       new CustomEvent(SCREEN_AUTHORING_REQUEST_EVENT, {
         detail: {
@@ -1511,22 +1623,67 @@ export class BaseScreenDesignerElement extends ElementBase {
     return requestId;
   }
 
-  requestBlueprintEdit(): boolean {
+  requestBlueprintEdit(options: ScreenBlueprintEditOptions = {}): boolean {
     const document = this.#session.document;
-    const componentId = this.#session.interaction.focusedComponentId;
-    if (document === undefined || componentId === null) return false;
+    if (
+      document === undefined ||
+      options === null ||
+      typeof options !== 'object' ||
+      Array.isArray(options) ||
+      Object.keys(options).some((key) => key !== 'initialComponentId')
+    ) {
+      return false;
+    }
+    const initialComponentId = options.initialComponentId ?? null;
+    if (
+      initialComponentId !== null &&
+      (typeof initialComponentId !== 'string' ||
+        !document.components.some((component) => component.id === initialComponentId))
+    ) {
+      return false;
+    }
     const requestId = createScreenAuthoringRequestId();
-    this.#pendingAuthoringRequests.set(requestId, { kind: 'blueprint' });
+    const documentRevision = this.#session.project?.revision ?? null;
+    let context: ScreenBlueprintAuthoringContext;
+    try {
+      const parsedContext = parseScreenBlueprintAuthoringContext(
+        buildScreenBlueprintAuthoringContext({
+          document,
+          initialComponentId,
+          catalog: this.#catalog,
+          runtimeContributions: this.#runtimeContributions,
+        }),
+      );
+      if (!parsedContext.ok) {
+        this.emitDiagnostics(parsedContext.diagnostics);
+        return false;
+      }
+      context = parsedContext.value;
+    } catch {
+      this.emitDiagnostics([
+        {
+          severity: 'error',
+          code: 'AUTHORING_REQUEST_INVALID',
+          path: ['context'],
+          message: DESIGNER_UI_TEXT.blueprint.requestFailed,
+        },
+      ]);
+      return false;
+    }
+    this.#pendingAuthoringRequests.set(requestId, {
+      kind: 'blueprint',
+      generation: this.#authoringGeneration,
+      documentGeneration: this.#documentGeneration,
+      documentRevision,
+    });
     this.dispatchEvent(
       new CustomEvent(SCREEN_AUTHORING_REQUEST_EVENT, {
         detail: {
           request: {
             kind: 'blueprint',
             requestId,
-            componentId,
-            documentRevision: this.#session.project?.revision ?? null,
-            blueprint: document.blueprint as unknown as ScreenJsonObject,
-            maxBytes: MAX_AUTHORING_SOURCE_BYTES,
+            documentRevision,
+            context,
           },
         },
       }),
@@ -1554,7 +1711,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       currentRevision: this.#session.project?.revision ?? null,
       componentId: request.componentId,
       componentExists: document.components.some((item) => item.id === request.componentId),
-      disposed: this.#authoringGeneration > 0,
+      disposed: pending.generation !== this.#authoringGeneration,
     });
     if (!guards.ok) {
       this.#pendingAuthoringRequests.delete(request.requestId);
@@ -1654,15 +1811,14 @@ export class BaseScreenDesignerElement extends ElementBase {
     if (pending?.kind !== 'blueprint') {
       return this.commitGuardFailure('AUTHORING_REQUEST_INVALID');
     }
-    const guards = validateScreenAuthoringCommitGuards({
+    const guards = validateScreenBlueprintAuthoringCommitGuards({
       requestId: request.requestId,
       expectedRevision: request.expectedRevision ?? null,
+      openedRevision: pending.documentRevision ?? null,
       currentRevision: this.#session.project?.revision ?? null,
-      componentId: request.componentId ?? undefined,
-      componentExists:
-        request.componentId === null ||
-        document.components.some((item) => item.id === request.componentId),
-      disposed: this.#authoringGeneration > 0,
+      openedDocumentGeneration: pending.documentGeneration ?? -1,
+      currentDocumentGeneration: this.#documentGeneration,
+      disposed: pending.generation !== this.#authoringGeneration,
     });
     if (!guards.ok) {
       this.#pendingAuthoringRequests.delete(request.requestId);
@@ -1670,17 +1826,21 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     const candidate = parseScreenAuthoringBlueprintCandidate(
       request.blueprint,
-      MAX_AUTHORING_SOURCE_BYTES,
+      MAX_AUTHORING_CANDIDATE_BYTES,
     );
     if (!candidate.ok) return { ok: false, diagnostics: candidate.diagnostics };
-    if (candidate.value === null || typeof candidate.value !== 'object') {
-      return this.commitGuardFailure('AUTHORING_PAYLOAD_INVALID');
-    }
-    const blueprint = candidate.value as unknown as ScreenBlueprint;
-    const compiled = compileScreenBlueprint(
-      { ...document, blueprint },
-      this.#runtimeContributions ?? { hasBlueprintCapability: () => false },
-    );
+    const parsedDocument = parseScreenDocument({ ...document, blueprint: candidate.value });
+    if (!parsedDocument.ok) return { ok: false, diagnostics: parsedDocument.diagnostics };
+    const blueprint = parsedDocument.value.blueprint;
+    const compiled = compileScreenBlueprint(parsedDocument.value, {
+      hasBlueprintCapability: (capability) => {
+        try {
+          return this.#runtimeContributions?.hasBlueprintCapability(capability) === true;
+        } catch {
+          return false;
+        }
+      },
+    });
     if (!compiled.ok) {
       return { ok: false, diagnostics: compiled.diagnostics };
     }
@@ -1956,9 +2116,8 @@ export class BaseScreenDesignerElement extends ElementBase {
       shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]')!,
     );
     this.renderMaterialLibraryState();
-    this.#integrationController.connect(
-      shadow.querySelector<HTMLDivElement>('[data-events-panel]')!,
-    );
+    const eventsPanel = shadow.querySelector<HTMLDivElement>('[data-events-panel]');
+    if (eventsPanel !== null) this.#integrationController.connect(eventsPanel);
     this.#importController.connect(
       shadow.querySelector<HTMLElement>('[data-import-confirmation]')!,
     );
@@ -2000,6 +2159,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private renderInteraction(): void {
+    this.#panelController.captureInspectorGroupPreferences(this.shadowRoot);
     this.renderSelection();
     this.renderProperties();
     this.renderInspectorInteraction();
@@ -2060,6 +2220,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.renderOperationControls();
     this.renderProjectStatus();
     this.#variablesController.render();
+    this.#panelController.refreshInspectorUi(this.shadowRoot);
   }
 
   private renderLayers(): void {
@@ -2086,6 +2247,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.shadowRoot
       ?.querySelector<HTMLButtonElement>('[data-inspector-tab="interaction"]')
       ?.toggleAttribute('disabled', !available);
+    const eventsPanel =
+      this.#interactionPanel?.querySelector<HTMLDivElement>('[data-events-panel]');
+    if (eventsPanel !== null && eventsPanel !== undefined) {
+      this.#integrationController.connect(eventsPanel);
+    }
   }
 
   private createRenderer(): void {

@@ -17,12 +17,14 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   defaultProps: {},
   defaultData: '',
   staticData: { kind: 'scalar', valueType: 'string' },
-  defaultStyle: { objectFit: 'contain', opacity: 1 },
+  defaultStyle: { objectFit: 'contain', opacity: 1, flipX: false, flipY: false },
   styleSchema: {
     kind: 'object',
     properties: {
       objectFit: { kind: 'enum', values: ['contain', 'cover', 'fill'] },
       opacity: { kind: 'number', minimum: 0, maximum: 1 },
+      flipX: { kind: 'boolean' },
+      flipY: { kind: 'boolean' },
     },
     required: ['objectFit', 'opacity'],
   },

@@ -42,14 +42,22 @@ class FakeElement {
   ) {}
 
   closest<T extends Element>(selector: string): T | null {
-    if (selector.startsWith('[data-')) {
-      const key = selector
-        .slice(6, -1)
-        .replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
-      if ((this.dataset as Record<string, string>)[key] !== undefined) return this as unknown as T;
+    const dataSelector = /^(?:([a-z]+))?\[data-([a-z0-9-]+)(?:="[^"]*")?\]$/i.exec(selector);
+    if (dataSelector !== null) {
+      const tagName = dataSelector[1]?.toLowerCase();
+      const key = dataSelector[2]!.replace(/-([a-z])/g, (_, letter: string) =>
+        letter.toUpperCase(),
+      );
+      if (
+        (tagName === undefined || this.tagName.toLowerCase() === tagName) &&
+        (this.dataset as Record<string, string>)[key] !== undefined
+      ) {
+        return this as unknown as T;
+      }
       const result = this.closestResult;
       if (
         result !== null &&
+        (tagName === undefined || result.tagName.toLowerCase() === tagName) &&
         (result.dataset as Record<string, string> | undefined)?.[key] !== undefined
       ) {
         return result as unknown as T;
@@ -228,7 +236,16 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'input')
         .map((element) => element.dataset.canvasProperty),
-    ).toEqual(['width', 'height', 'backgroundSolidColor', 'backgroundImage']);
+    ).toEqual([
+      'width',
+      'height',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      'backgroundSolidColor',
+      'backgroundImage',
+    ]);
     // 宿主选择按钮默认隐藏（ADR-0047）：未配置 canvasBackgroundImageButton 时不渲染。
     expect(
       descendants(properties).some(
@@ -279,6 +296,10 @@ describe('designer panel rendering', () => {
     ).toEqual([
       'width',
       'height',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
       'backgroundLinearAngle',
       'backgroundStopColor',
       'backgroundStopPosition',
@@ -358,18 +379,22 @@ describe('designer panel rendering', () => {
     const propertyInputs = descendants(properties)
       .filter((element) => element.tagName === 'input')
       .map((element) => element.dataset.property);
-    expect(propertyInputs.slice(0, 9)).toEqual([
-      'name',
+    expect(propertyInputs.slice(0, 8)).toEqual([
       'x',
       'y',
+      'rotation',
       'width',
       'height',
-      'rotation',
       'zIndex',
       'locked',
       'hidden',
     ]);
-    expect(propertyInputs.slice(9)).toHaveLength(14);
+    expect(propertyInputs).not.toContain('name');
+    expect(propertyInputs.slice(8)).toHaveLength(14);
+    expect(
+      descendants(properties).find((element) => element.dataset.propertySymbol === 'Z')?.dataset
+        .inspectorAdvanced,
+    ).toBe('true');
     // style.color 字段同样使用完整三段式调色板：渐变模式全部可用。
     const gradientModes = descendants(properties).filter(
       (element) => element.tagName === 'input' && element.dataset.colorPaletteField === 'mode',
@@ -1551,7 +1576,7 @@ describe('DesignerPanelController multi selection editing', () => {
     expect(transactions).toHaveLength(0);
   });
 
-  it('ignores an invalid batch geometry value without a transaction', () => {
+  it('reports invalid batch geometry input without executing a transaction', () => {
     const transactions: ScreenDocumentTransaction[] = [];
     const controller = createController(transactions);
     const target = new FakeInput('rotation', 'abc', 'multiProperty');
@@ -1559,6 +1584,7 @@ describe('DesignerPanelController multi selection editing', () => {
     controller.onPropertyChange({ target } as unknown as Event);
 
     expect(transactions).toHaveLength(0);
+    expect(target.ariaInvalid).toBe('true');
   });
 });
 
@@ -1727,6 +1753,25 @@ describe('designer conditional style rules', () => {
         ],
       },
     ]);
+  });
+
+  it('routes panel action buttons inside a density-scoped inspector container', () => {
+    const transactions: ScreenDocumentTransaction[] = [];
+    const diagnostics: unknown[] = [];
+    const controller = createRulesController(rulesDocument(undefined), transactions, diagnostics);
+    const container = new FakeElement('div', new FakeDocument());
+    container.dataset.inspectorDensity = 'all';
+    const button = new FakeElement('button', new FakeDocument());
+    button.dataset.styleRuleAdd = '';
+    button.closestResult = container;
+
+    controller.onClick({ target: button } as unknown as Event);
+
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0]?.commands[0]).toMatchObject({
+      type: 'update-components',
+      componentIds: ['label-1'],
+    });
   });
 
   it('R4 commits a removal by index as one transaction', () => {

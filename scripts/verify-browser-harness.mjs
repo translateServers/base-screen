@@ -18,6 +18,7 @@ try {
   try {
     for (const viewport of [
       { width: 1024, height: 640 },
+      { width: 1366, height: 768 },
       { width: 1440, height: 900 },
       { width: 1920, height: 1080 },
       { width: 390, height: 844 },
@@ -93,6 +94,7 @@ try {
       if (viewport.width > 800) {
         await assertDesktopWorkbench(designer, viewport);
         await assertTopbarProjectName(designer);
+        await assertCommandPalette(designer, page);
         await assertNativeEventsToggle(designer, page);
         await assertMaterialLibraryGrouping(page, designer);
         await assertMaterialLibraryHostState(page, designer, viewport);
@@ -421,12 +423,20 @@ try {
         if (bridgeEvents !== 2) {
           throw new Error('BROWSER_HARNESS_FRAMEWORK_BRIDGE_FAILED');
         }
+        await page.evaluate(() => {
+          document.body.dataset.layout = 'designer';
+          document.body.style.padding = '0';
+          document.querySelector('base-screen-designer').style.height = '100vh';
+        });
         const title = designer.locator('[data-base-screen-component-id=title]');
+        const canvasLocator = designer.locator('[data-canvas]');
+        await title.waitFor({ state: 'visible' });
+        await canvasLocator.waitFor({ state: 'visible' });
         const box = await title.boundingBox();
         if (box === null) {
           throw new Error('BROWSER_HARNESS_TITLE_MISSING');
         }
-        const titleCanvasBox = await designer.locator('[data-canvas]').boundingBox();
+        const titleCanvasBox = await canvasLocator.boundingBox();
         if (titleCanvasBox === null) {
           throw new Error('BROWSER_HARNESS_CANVAS_MISSING');
         }
@@ -930,22 +940,22 @@ try {
           .filter({ hasText: '\u6587\u6863\u5df2\u5bfc\u51fa\u3002' })
           .waitFor();
         await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).click();
-        await authoringDesigner.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
+        await authoringDesigner.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
         await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).focus();
         await page.keyboard.press('ArrowRight');
         const tabState = await authoringDesigner
-          .getByRole('tab', { name: '\u4ea4\u4e92' })
+          .getByRole('tab', { name: '\u9ad8\u7ea7' })
           .getAttribute('aria-selected');
         if (tabState !== 'true') throw new Error('BROWSER_HARNESS_TAB_KEYBOARD_FAILED');
-        await authoringDesigner.getByRole('tab', { name: '\u4ea4\u4e92' }).focus();
+        await authoringDesigner.getByRole('tab', { name: '\u9ad8\u7ea7' }).focus();
         await page.keyboard.press('Home');
         const firstTabState = await authoringDesigner
-          .getByRole('tab', { name: '\u5916\u89c2' })
+          .getByRole('tab', { name: '\u6837\u5f0f' })
           .getAttribute('aria-selected');
-        await authoringDesigner.getByRole('tab', { name: '\u5916\u89c2' }).focus();
+        await authoringDesigner.getByRole('tab', { name: '\u6837\u5f0f' }).focus();
         await page.keyboard.press('End');
         const lastTabState = await authoringDesigner
-          .getByRole('tab', { name: '\u4e8b\u4ef6' })
+          .getByRole('tab', { name: '\u9ad8\u7ea7' })
           .getAttribute('aria-selected');
         if (firstTabState !== 'true' || lastTabState !== 'true') {
           throw new Error('BROWSER_HARNESS_TAB_HOME_END_FAILED');
@@ -970,7 +980,7 @@ try {
               component.dataSource.value === 'Base Screen 设计器r',
           ),
         );
-        await authoringDesigner.getByRole('tab', { name: '\u5916\u89c2' }).click();
+        await authoringDesigner.getByRole('tab', { name: '\u6837\u5f0f' }).click();
         const rotation = authoringDesigner.locator(
           '[data-properties] input[data-property="rotation"]',
         );
@@ -984,6 +994,7 @@ try {
         if (!rotated) {
           throw new Error('BROWSER_HARNESS_INSPECTOR_ENTER_COMMIT_FAILED');
         }
+        await authoringDesigner.locator('[data-inspector-density="all"]').click();
         const zIndex = authoringDesigner.locator('[data-properties] input[data-property="zIndex"]');
         await zIndex.fill('1.5');
         await zIndex.press('Enter');
@@ -994,6 +1005,7 @@ try {
         ) {
           throw new Error('BROWSER_HARNESS_INSPECTOR_INVALID_DRAFT_FAILED');
         }
+        await authoringDesigner.locator('[data-inspector-density="basic"]').click();
         await authoringDesigner.locator('[data-base-screen-component-id=title]').click();
         const titlePosition = await page.evaluate(
           () =>
@@ -1149,6 +1161,7 @@ async function assertLeftPanelDesign(designer, page, viewport) {
     const root = element.shadowRoot;
     const rail = root.querySelector('[data-left-panel]');
     const railChildren = [...rail.children].map((child) => child.className || '');
+    const materialsPanel = root.querySelector('[data-materials]');
     const grid = root.querySelector('[data-material-grid]');
     const columns = grid === null ? '' : getComputedStyle(grid).gridTemplateColumns;
     const cards = [...root.querySelectorAll('[data-material-card]:not([hidden])')];
@@ -1172,6 +1185,8 @@ async function assertLeftPanelDesign(designer, page, viewport) {
       viewCount: railChildren.filter((name) => name === 'rail-view').length,
       materialsToolsInsideView:
         root.querySelector('[data-materials] [data-material-search]') !== null,
+      materialsPanelInlineGutter:
+        materialsPanel === null ? -1 : materialsPanel.offsetWidth - materialsPanel.clientWidth,
       gridDisplay: grid === null ? '' : getComputedStyle(grid).display,
       // 列数随面板宽度变化（auto-fill，窄面板单列、宽面板两列）：只断言列宽一致与
       // 卡片等宽，不硬编码列数/同列关系。
@@ -1192,6 +1207,7 @@ async function assertLeftPanelDesign(designer, page, viewport) {
     ia.viewIndex !== 2 ||
     ia.viewCount !== 3 ||
     !ia.materialsToolsInsideView ||
+    ia.materialsPanelInlineGutter !== 0 ||
     ia.gridDisplay !== 'grid' ||
     new Set(ia.columnValues).size !== 1 ||
     !ia.cardsEqualWidth ||
@@ -1440,10 +1456,14 @@ async function assertLeftPanelDesign(designer, page, viewport) {
   };
 
   const dragged = await readPanel();
+  const expectedDraggedRight = Math.max(
+    288,
+    Math.min(360, Math.round(layoutBox.width - 380 - 10 - 360)),
+  );
   const collapsedLeft = { ...(await collapseEvaluate('left')), ...(await readPanel()) };
   if (
     dragged.left !== 380 ||
-    dragged.right !== 360 ||
+    dragged.right !== expectedDraggedRight ||
     collapsedLeft.leftState !== 'true' ||
     collapsedLeft.left !== 48 ||
     collapsedLeft.arrow !== 'matrix(-1, 0, 0, -1, 0, 0)' ||
@@ -1485,7 +1505,7 @@ async function assertLeftPanelDesign(designer, page, viewport) {
     underThresholdRight.rightState !== 'true' ||
     underThresholdRight.right !== 48 ||
     expandedRight.rightState !== 'false' ||
-    expandedRight.right !== 360
+    expandedRight.right !== expectedDraggedRight
   ) {
     throw new Error(
       `BROWSER_HARNESS_PANEL_COLLAPSE_THRESHOLD_FAILED:${JSON.stringify({
@@ -1494,6 +1514,19 @@ async function assertLeftPanelDesign(designer, page, viewport) {
         underThresholdRight,
         expandedRight,
       })}`,
+    );
+  }
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - 288 - 2.5);
+  const inspectorMinimum = await readPanel();
+  await dragTo('right', layoutBox.x + layoutBox.width - 1 - 480 - 2.5);
+  const inspectorMaximum = await readPanel();
+  const expectedInspectorMaximum = Math.max(
+    288,
+    Math.min(480, Math.round(layoutBox.width - 380 - 10 - 360)),
+  );
+  if (inspectorMinimum.right !== 288 || inspectorMaximum.right !== expectedInspectorMaximum) {
+    throw new Error(
+      `BROWSER_HARNESS_INSPECTOR_WIDTH_RANGE_FAILED:${JSON.stringify({ inspectorMinimum, inspectorMaximum })}`,
     );
   }
   // 拖回默认宽度，恢复后续断言的现场。
@@ -1506,16 +1539,22 @@ async function assertLeftPanelDesign(designer, page, viewport) {
       right: Math.round(root.querySelector('.properties').getBoundingClientRect().width),
     };
   });
-  if (restored.left !== defaultWidths.left || restored.right !== defaultWidths.right) {
+  const expectedRestoredRight = Math.max(
+    288,
+    Math.min(defaultWidths.right, Math.round(layoutBox.width - defaultWidths.left - 10 - 360)),
+  );
+  if (restored.left !== defaultWidths.left || restored.right !== expectedRestoredRight) {
     throw new Error(
-      `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, defaultWidths })}`,
+      `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, defaultWidths, expectedRestoredRight })}`,
     );
   }
   await designer.locator('[data-panel-tab="materials"]').click();
 
-  // R5：图层树增强（嵌套文档独立实例验证：引导线变量、子项计数、hover 显示操作簇）。
+  // R5：图层树增强（嵌套文档独立实例验证：DataV 前置图层顺序、六项工具栏、
+  // 引导线变量、子项计数、定位入口与 hover/focus 展开操作簇）。
   await page.evaluate(() => {
     const { catalog } = window.baseScreenHarness;
+    const textManifest = window.baseScreenHarness.materialManifests.text;
     const probe = document.createElement('base-screen-designer');
     probe.setAttribute('data-layer-probe', 'true');
     probe.catalog = catalog;
@@ -1524,7 +1563,7 @@ async function assertLeftPanelDesign(designer, page, viewport) {
       components: [
         {
           id: 'probe-group',
-          type: 'base.container',
+          type: 'base.text',
           name: '\u5bb9\u5668',
           parentId: null,
           position: { x: 0, y: 0 },
@@ -1532,8 +1571,8 @@ async function assertLeftPanelDesign(designer, page, viewport) {
           rotation: 0,
           zIndex: 0,
           status: { locked: false, hidden: false },
-          props: {},
-          style: {},
+          props: structuredClone(textManifest.defaultProps),
+          style: structuredClone(textManifest.defaultStyle),
           dataSource: null,
         },
         {
@@ -1546,8 +1585,8 @@ async function assertLeftPanelDesign(designer, page, viewport) {
           rotation: 0,
           zIndex: 0,
           status: { locked: false, hidden: false },
-          props: {},
-          style: {},
+          props: structuredClone(textManifest.defaultProps),
+          style: structuredClone(textManifest.defaultStyle),
           dataSource: null,
         },
         {
@@ -1560,8 +1599,8 @@ async function assertLeftPanelDesign(designer, page, viewport) {
           rotation: 0,
           zIndex: 1,
           status: { locked: false, hidden: false },
-          props: {},
-          style: {},
+          props: structuredClone(textManifest.defaultProps),
+          style: structuredClone(textManifest.defaultStyle),
           dataSource: null,
         },
       ],
@@ -1578,24 +1617,39 @@ async function assertLeftPanelDesign(designer, page, viewport) {
     const groupRow = root.querySelector('[data-layer-id="probe-group"]');
     const childRow = root.querySelector('[data-layer-id="probe-a"]');
     const actions = childRow?.querySelector('.layer-actions');
-    // 显隐已下沉到按钮级（容器恒 opacity:1 + pointer-events:none），测量操作按钮本体。
+    const toolbar = root.querySelector('[data-layer-toolbar]');
+    // 显隐已下沉到按钮级，测量操作按钮本体。
     const actionButton = childRow?.querySelector(
-      '.layer-actions [data-layer-toggle], .layer-actions [data-layer-move]',
+      '.layer-actions [data-layer-locate], .layer-actions [data-layer-toggle], .layer-actions [data-layer-move]',
     );
     return {
       childDepth: childRow?.style.getPropertyValue('--layer-depth'),
       childIndent: childRow?.style.paddingInlineStart,
       count: groupRow?.querySelector('.layer-count')?.textContent,
+      childOrder: [
+        ...root.querySelectorAll(
+          '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
+        ),
+      ].map((row) => row.dataset.layerId),
+      toolbarButtons: toolbar?.querySelectorAll('button').length ?? 0,
+      toolbarButtonMinimum: Math.min(
+        ...[...(toolbar?.querySelectorAll('button') ?? [])].map((button) =>
+          Math.min(button.getBoundingClientRect().width, button.getBoundingClientRect().height),
+        ),
+      ),
       actionButtons:
         actions === null || actions === undefined
           ? 0
-          : actions.querySelectorAll('[data-layer-toggle], [data-layer-move]').length,
+          : actions.querySelectorAll('[data-layer-locate], [data-layer-toggle], [data-layer-move]')
+              .length,
       actionButtonOpacity:
         actionButton === null || actionButton === undefined
           ? ''
           : getComputedStyle(actionButton).opacity,
       iconButtons: [
-        ...(groupRow?.querySelectorAll('[data-layer-toggle] svg, [data-layer-move] svg') ?? []),
+        ...(groupRow?.querySelectorAll(
+          '[data-layer-locate] svg, [data-layer-toggle] svg, [data-layer-move] svg',
+        ) ?? []),
       ].length,
     };
   });
@@ -1603,14 +1657,148 @@ async function assertLeftPanelDesign(designer, page, viewport) {
     layerProbe.childDepth !== '1' ||
     layerProbe.childIndent !== '20px' ||
     layerProbe.count !== '2' ||
-    layerProbe.actionButtons !== 4 ||
+    JSON.stringify(layerProbe.childOrder) !== JSON.stringify(['probe-b', 'probe-a']) ||
+    layerProbe.toolbarButtons !== 6 ||
+    layerProbe.toolbarButtonMinimum < 24 ||
+    layerProbe.actionButtons !== 5 ||
     layerProbe.actionButtonOpacity !== '0' ||
-    layerProbe.iconButtons !== 4
+    layerProbe.iconButtons !== 5
   ) {
     throw new Error(`BROWSER_HARNESS_LAYER_TREE_DESIGN_FAILED:${JSON.stringify(layerProbe)}`);
   }
   const childRow = probe.locator('.layer-row[data-layer-id="probe-a"]');
   const childHeightBefore = await childRow.evaluate((element) => element.offsetHeight);
+  // 高亮整行必须都是有效选择命中区（操作按钮除外）；先点缩进空白，再点名称按钮，
+  // 两条路径都不得误触隐藏/锁定或改变 36px 紧凑行高。
+  await childRow.click({ position: { x: 1, y: childHeightBefore / 2 } });
+  await childRow.locator('[data-layer-select="probe-a"]').click();
+  const selectedState = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    const row = root.querySelector('[data-layer-id="probe-a"]');
+    const style = row === null ? undefined : getComputedStyle(row);
+    return {
+      selected: row?.getAttribute('aria-selected'),
+      hidden: row?.dataset.hidden ?? 'false',
+      height: row?.offsetHeight ?? 0,
+      cursor: style?.cursor,
+      backgroundColor: style?.backgroundColor,
+      boxShadow: style?.boxShadow,
+      frontDisabled: root.querySelector('[data-layer-arrange="front"]')?.disabled,
+      upDisabled: root.querySelector('[data-layer-arrange="up"]')?.disabled,
+      downDisabled: root.querySelector('[data-layer-arrange="down"]')?.disabled,
+      backDisabled: root.querySelector('[data-layer-arrange="back"]')?.disabled,
+    };
+  });
+  if (
+    selectedState.selected !== 'true' ||
+    selectedState.hidden !== 'false' ||
+    selectedState.height !== 36 ||
+    selectedState.cursor !== 'pointer' ||
+    selectedState.backgroundColor === 'rgba(0, 0, 0, 0)' ||
+    selectedState.boxShadow === 'none' ||
+    selectedState.frontDisabled !== false ||
+    selectedState.upDisabled !== false ||
+    selectedState.downDisabled !== true ||
+    selectedState.backDisabled !== true
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_SELECT_HIT_TARGET_FAILED:${JSON.stringify(selectedState)}`,
+    );
+  }
+  // 首次单击会重绘图层树；使用真实鼠标双击验证第二次点击跨新 DOM 行仍进入重命名，
+  // 且输入框立即获得焦点并保留原名称，而不是仅直接派发一个不可达的 dblclick。
+  await childRow.dblclick({ position: { x: 80, y: childHeightBefore / 2 }, delay: 60 });
+  const renameInput = probe.locator('[data-layer-rename="probe-a"]');
+  await renameInput.waitFor({ state: 'visible' });
+  const renameState = await renameInput.evaluate((input) => ({
+    focused: input.getRootNode().activeElement === input,
+    value: input.value,
+  }));
+  if (!renameState.focused || renameState.value !== '\u5b50\u9879\u7532') {
+    throw new Error(`BROWSER_HARNESS_LAYER_RENAME_FOCUS_FAILED:${JSON.stringify(renameState)}`);
+  }
+  await renameInput.fill('\u5b50\u9879\u7532\u5df2\u91cd\u547d\u540d');
+  await renameInput.press('Enter');
+  const renamedLayer = await probe.evaluate((element) => ({
+    documentName: element.document.components.find((component) => component.id === 'probe-a')?.name,
+    visibleName: element.shadowRoot
+      ?.querySelector('[data-layer-id="probe-a"] .layer-name')
+      ?.textContent?.trim(),
+    editing: element.shadowRoot?.querySelector('[data-layer-rename="probe-a"]') !== null,
+  }));
+  if (
+    renamedLayer.documentName !== '\u5b50\u9879\u7532\u5df2\u91cd\u547d\u540d' ||
+    renamedLayer.visibleName !== '\u5b50\u9879\u7532\u5df2\u91cd\u547d\u540d' ||
+    renamedLayer.editing
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_RENAME_COMMIT_FAILED:${JSON.stringify(renamedLayer)}`);
+  }
+  await probe.evaluate((element) => {
+    element.dataset.layerChangeCount = '0';
+    element.dataset.layerDiagnosticCodes = '';
+    element.dataset.layerClickedAction = '';
+    element.addEventListener('base-screen-change', () => {
+      element.dataset.layerChangeCount = String(Number(element.dataset.layerChangeCount) + 1);
+    });
+    element.addEventListener('base-screen-diagnostic', (event) => {
+      element.dataset.layerDiagnosticCodes = (event.detail?.diagnostics ?? [])
+        .map((diagnostic) => diagnostic.code)
+        .join(',');
+    });
+    element.shadowRoot.addEventListener('click', (event) => {
+      element.dataset.layerClickedAction =
+        event.target.closest?.('[data-layer-arrange]')?.dataset.layerArrange ?? '';
+    });
+  });
+  await probe.locator('[data-layer-arrange="up"]').click();
+  await page.waitForTimeout(100);
+  const arrangedState = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      childOrder: [
+        ...root.querySelectorAll(
+          '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
+        ),
+      ].map((row) => row.dataset.layerId),
+      zIndexes: Object.fromEntries(
+        element.document.components
+          .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
+          .map((component) => [component.id, component.zIndex]),
+      ),
+      changeCount: element.dataset.layerChangeCount,
+      diagnosticCodes: element.dataset.layerDiagnosticCodes,
+      clickedAction: element.dataset.layerClickedAction,
+      selectedIds: [...root.querySelectorAll('.layer-row[aria-selected="true"]')].map(
+        (row) => row.dataset.layerId,
+      ),
+    };
+  });
+  if (
+    JSON.stringify(arrangedState.childOrder) !== JSON.stringify(['probe-a', 'probe-b']) ||
+    arrangedState.zIndexes['probe-a'] <= arrangedState.zIndexes['probe-b'] ||
+    arrangedState.changeCount !== '1' ||
+    arrangedState.diagnosticCodes !== '' ||
+    arrangedState.clickedAction !== 'up' ||
+    JSON.stringify(arrangedState.selectedIds) !== JSON.stringify(['probe-a'])
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_TOOLBAR_ARRANGE_FAILED:${JSON.stringify(arrangedState)}`,
+    );
+  }
+  const canvasTransformBeforeLocate = await probe
+    .locator('[data-canvas]')
+    .evaluate((element) => element.style.transform);
+  await probe.locator('[data-layer-locate="probe-a"]').click();
+  const locateState = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      transform: root.querySelector('[data-canvas]')?.style.transform ?? '',
+      viewportFocused: root.activeElement === root.querySelector('[data-viewport]'),
+    };
+  });
+  if (locateState.transform === canvasTransformBeforeLocate || !locateState.viewportFocused) {
+    throw new Error(`BROWSER_HARNESS_LAYER_LOCATE_FAILED:${JSON.stringify(locateState)}`);
+  }
   await childRow.hover();
   await page.waitForTimeout(250);
   const childHeightAfter = await childRow.evaluate((element) => element.offsetHeight);
@@ -1623,6 +1811,30 @@ async function assertLeftPanelDesign(designer, page, viewport) {
       `BROWSER_HARNESS_LAYER_ACTIONS_REVEAL_FAILED:${JSON.stringify({ actionsOpacity, childHeightBefore, childHeightAfter })}`,
     );
   }
+  const actionCluster = childRow.locator('.layer-actions');
+  await actionCluster.hover();
+  await page.waitForTimeout(250);
+  const expandedActions = await actionCluster.evaluate((element) => ({
+    width: Math.round(element.getBoundingClientRect().width),
+    visibleButtons: [...element.querySelectorAll('button')].filter(
+      (button) => Number(getComputedStyle(button).opacity) > 0,
+    ).length,
+    rowHeight: element.closest('[data-layer-id]')?.offsetHeight ?? 0,
+  }));
+  if (
+    expandedActions.width < 120 ||
+    expandedActions.visibleButtons !== 5 ||
+    expandedActions.rowHeight !== childHeightBefore
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_ACTIONS_EXPAND_FAILED:${JSON.stringify(expandedActions)}`,
+    );
+  }
+  await page.mouse.move(viewport.width - 8, 8);
+  await page.waitForTimeout(200);
+  await probe.locator('[data-left-panel]').screenshot({
+    path: `${screenshotDirectory}/layers-panel-${viewport.width}x${viewport.height}.png`,
+  });
   await page.evaluate(() =>
     document.querySelector('base-screen-designer[data-layer-probe]')?.remove(),
   );
@@ -1793,6 +2005,8 @@ async function assertCoverThumbnail(page) {
 async function assertMaterialLibraryGrouping(page, designer) {
   const rootState = await designer.evaluate((element) => {
     const root = element.shadowRoot;
+    const rail = root.querySelector('[data-left-panel]');
+    if (rail instanceof HTMLElement) rail.scrollTop = 0;
     return {
       navigationHidden: root.querySelector('[data-material-groups]')?.hidden,
       categoriesHidden: root.querySelector('[data-material-categories]')?.hidden,
@@ -1812,6 +2026,14 @@ async function assertMaterialLibraryGrouping(page, designer) {
         const selectedFilter = root.querySelector('[data-material-filter="all"]');
         const card = root.querySelector('[data-material-card] .material-card');
         const thumb = card?.querySelector('.material-thumb');
+        const toolbar = root.querySelector('[data-material-library-toolbar]');
+        const grid = root.querySelector('[data-material-grid]');
+        const meta = card?.querySelector('.material-card-meta');
+        const name = card?.querySelector('.material-name');
+        const type = card?.querySelector('.material-type');
+        const favorite = root.querySelector('[data-material-card] [data-material-favorite]');
+        const panelCount = root.querySelector('[data-left-panel-count]');
+        const materialSearch = root.querySelector('[data-material-search]');
         return {
           navigationHeight: navigation?.getBoundingClientRect().height,
           breadcrumbsHeight: breadcrumbs?.getBoundingClientRect().height,
@@ -1830,6 +2052,30 @@ async function assertMaterialLibraryGrouping(page, designer) {
             thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).aspectRatio,
           thumbBackgroundImage:
             thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).backgroundImage,
+          toolbarDisplay:
+            toolbar === null || toolbar === undefined ? '' : getComputedStyle(toolbar).display,
+          gridOverflowY:
+            grid === null || grid === undefined ? '' : getComputedStyle(grid).overflowY,
+          metaDisplay: meta === null || meta === undefined ? '' : getComputedStyle(meta).display,
+          nameTitle: name?.getAttribute('title'),
+          typeTitle: type?.getAttribute('title'),
+          favoriteWidth:
+            favorite === null || favorite === undefined
+              ? 0
+              : favorite.getBoundingClientRect().width,
+          firstRowCardCount:
+            grid === null || grid === undefined
+              ? 0
+              : [...grid.children].filter(
+                  (entry) =>
+                    !entry.hidden &&
+                    entry.getBoundingClientRect().top ===
+                      grid.firstElementChild?.getBoundingClientRect().top,
+                ).length,
+          panelCountRole: panelCount?.getAttribute('role'),
+          panelCountLive: panelCount?.getAttribute('aria-live'),
+          panelCountLabel: panelCount?.getAttribute('aria-label'),
+          searchDescribedBy: materialSearch?.getAttribute('aria-describedby'),
         };
       })(),
     };
@@ -1858,7 +2104,19 @@ async function assertMaterialLibraryGrouping(page, designer) {
     rootState.visual.selectedFilterShadow === 'none' ||
     rootState.visual.cardMinHeight !== '32px' ||
     rootState.visual.thumbAspectRatio !== '16 / 10' ||
-    !rootState.visual.thumbBackgroundImage.includes('radial-gradient')
+    !rootState.visual.thumbBackgroundImage.includes('radial-gradient') ||
+    rootState.visual.toolbarDisplay !== 'block' ||
+    rootState.visual.gridOverflowY !== 'auto' ||
+    rootState.visual.metaDisplay !== 'grid' ||
+    rootState.visual.nameTitle !== null ||
+    rootState.visual.typeTitle !== 'base.text' ||
+    rootState.visual.favoriteWidth !== 28 ||
+    // 左轨当前允许 298–480px 拖宽；auto-fill 网格在默认 406px 下为 3 列，窄态为 2 列。
+    ![2, 3].includes(rootState.visual.firstRowCardCount) ||
+    rootState.visual.panelCountRole !== 'status' ||
+    rootState.visual.panelCountLive !== 'polite' ||
+    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a9 \u9879' ||
+    rootState.visual.searchDescribedBy !== 'designer-left-panel-count'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ROOT_FAILED:${JSON.stringify(rootState)}`);
   }
@@ -1891,10 +2149,11 @@ async function assertMaterialLibraryGrouping(page, designer) {
   if (
     dataGroup.selected !== 'true' ||
     dataGroup.children.join(',') !== 'charts,tables' ||
-    dataGroup.visible.join(',') !== 'base.chart,base.echarts,base.table' ||
-    dataGroup.gridTop !== rootState.gridTop
+    dataGroup.visible.join(',') !== 'base.chart,base.echarts,base.table'
   ) {
-    throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_DATA_FAILED:${JSON.stringify(dataGroup)}`);
+    throw new Error(
+      `BROWSER_HARNESS_MATERIAL_GROUPING_DATA_FAILED:${JSON.stringify({ dataGroup, rootGridTop: rootState.gridTop })}`,
+    );
   }
 
   const groupSearch = designer.locator('[data-material-search]');
@@ -1999,9 +2258,10 @@ async function assertMaterialLibraryGrouping(page, designer) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ATOMIC_FAILED:${JSON.stringify(invalid)}`);
   }
 
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     window.baseScreenHarness.designer.materialLibraryGrouping =
       window.baseScreenHarness.materialLibraryGrouping;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
 }
 
@@ -2075,10 +2335,12 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     consoleOpen.expanded !== 'true' ||
     !consoleOpen.focusedClose ||
     consoleOpen.entryCount !== 1 ||
-    consoleOpen.gridTop !== state.gridTop ||
-    JSON.stringify(consoleOpen.canvas) !== JSON.stringify(state.canvas)
+    Math.abs((consoleOpen.gridTop ?? 0) - (state.gridTop ?? 0)) > 2 ||
+    !rectWithin(consoleOpen.canvas, state.canvas)
   ) {
-    throw new Error(`BROWSER_HARNESS_ERROR_CONSOLE_OPEN_FAILED:${JSON.stringify(consoleOpen)}`);
+    throw new Error(
+      `BROWSER_HARNESS_ERROR_CONSOLE_OPEN_FAILED:${JSON.stringify({ baseline: state, open: consoleOpen })}`,
+    );
   }
   await designer.locator('[data-error-console]').screenshot({
     path: `${screenshotDirectory}/error-console-${viewport.width}x${viewport.height}.png`,
@@ -2152,10 +2414,22 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     throw new Error('BROWSER_HARNESS_MATERIAL_LIBRARY_SEARCH_EMPTY_FAILED');
   }
   await search.fill('');
+  await page.waitForFunction(
+    () => {
+      const designer = document.querySelector('base-screen-designer');
+      return (
+        (designer?.shadowRoot?.querySelectorAll('[data-material-card]:not([hidden])').length ?? 0) >
+        0
+      );
+    },
+    undefined,
+    { timeout: 5000 },
+  );
   await page.evaluate(() => {
     window.baseScreenHarness.designer.materialLibraryGrouping =
       window.baseScreenHarness.materialLibraryGrouping;
   });
+  await designer.locator('[data-material-library-status]').waitFor({ state: 'attached' });
 
   const expectedStates = [
     ['loading', undefined, null, true, null, 0],
@@ -2187,11 +2461,12 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
       rendered.hidden !== hidden ||
       (text !== undefined && !rendered.text?.includes(text)) ||
       rendered.actionCount !== actionCount ||
-      rendered.gridTop !== state.gridTop ||
-      JSON.stringify(rendered.canvas) !== JSON.stringify(state.canvas) ||
+      !rectWithin(rendered.canvas, state.canvas) ||
       rendered.consoleWidth !== state.consoleWidth
     ) {
-      throw new Error(`BROWSER_HARNESS_MATERIAL_LIBRARY_STATUS_FAILED:${JSON.stringify(rendered)}`);
+      throw new Error(
+        `BROWSER_HARNESS_MATERIAL_LIBRARY_STATUS_FAILED:${JSON.stringify({ status, rendered, expected: { text, role, hidden, surfaceStatus, actionCount }, baseline: { canvas: state.canvas, consoleWidth: state.consoleWidth } })}`,
+      );
     }
   }
 
@@ -2214,6 +2489,13 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     throw new Error(`BROWSER_HARNESS_ERROR_CONSOLE_CLEAR_FAILED:${JSON.stringify(cleared)}`);
   }
   await designer.locator('[data-error-console-close]').click();
+}
+
+function rectWithin(actual, expected, tolerance = 2) {
+  if (actual === undefined || expected === undefined) return actual === expected;
+  return ['x', 'y', 'width', 'height'].every(
+    (key) => Math.abs(actual[key] - expected[key]) <= tolerance,
+  );
 }
 
 async function assertAuthoringShortcutsAndIsolation(page, designer) {
@@ -2518,10 +2800,11 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     const titleRow = layers.querySelector('[data-layer-select="title"]');
     titleRow.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
-  await page.waitForFunction(() => {
-    const root = window.baseScreenHarness.designer.shadowRoot;
-    return root.querySelector('[data-inspector-pane="appearance"]')?.innerText.includes('名称');
-  });
+  await page.waitForFunction(
+    () =>
+      window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.length === 1 &&
+      window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.[0] === 'title',
+  );
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const layers = root.querySelector('[data-layers]');
@@ -2532,10 +2815,28 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   });
   await page.waitForFunction(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
-    return root
-      .querySelector('[data-inspector-pane="appearance"]')
-      ?.innerText.includes('已选择 2 个组件');
+    const panel = root.querySelector('[data-right-panel]');
+    return (
+      panel?.dataset.inspectorContextKind === 'multi-selection' &&
+      panel.querySelector('[data-right-panel-title]')?.textContent === '\u6279\u91cf\u914d\u7f6e'
+    );
   });
+  const batchChrome = await designer.locator('[data-right-panel]').evaluate((panel) => ({
+    title: panel.querySelector('[data-right-panel-title]')?.textContent,
+    arrangeButtons: panel.querySelectorAll('.designer-datav-batch-arrange-button').length,
+    positionValues: panel.querySelectorAll('.designer-datav-batch-readonly input:disabled').length,
+    hasUnifiedStyle: panel.querySelector('.designer-datav-batch-unified-style') !== null,
+    tabsDisplay: getComputedStyle(panel.querySelector('.inspector-tabs')).display,
+  }));
+  if (
+    batchChrome.title !== '\u6279\u91cf\u914d\u7f6e' ||
+    batchChrome.arrangeButtons !== 8 ||
+    batchChrome.positionValues !== 2 ||
+    !batchChrome.hasUnifiedStyle ||
+    batchChrome.tabsDisplay !== 'none'
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATAV_BATCH_CHROME_FAILED:${JSON.stringify(batchChrome)}`);
+  }
   const batchWidthControl = designer.locator('[data-multi-property="width"]');
   const batchWidthCount = await batchWidthControl.count();
   if (batchWidthCount !== 1) {
@@ -2545,6 +2846,13 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   if (batchStyleControls < 2) {
     throw new Error(`BROWSER_HARNESS_BATCH_STYLE_CONTROLS_FAILED:${batchStyleControls}`);
   }
+  const mixedWidth = await batchWidthControl.getAttribute('placeholder');
+  if (mixedWidth !== '\u6df7\u5408') {
+    throw new Error(`BROWSER_HARNESS_BATCH_MIXED_VALUE_FAILED:${mixedWidth}`);
+  }
+  await designer.locator('[data-right-panel]').screenshot({
+    path: `${screenshotDirectory}/inspector-mixed-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
   const batchBefore = await page.evaluate(() =>
     ['title', 'subtitle'].map((id) => {
       const component = window.baseScreenHarness.designer.document.components.find(
@@ -2699,6 +3007,132 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   if (variableNamesBefore !== 'count,region') {
     throw new Error(`BROWSER_HARNESS_VARIABLES_LIST_FAILED:${variableNamesBefore}`);
   }
+  const variableModule = await designer.locator('[data-variables]').evaluate((panel) => {
+    const row = panel.querySelector('[data-variable-row]');
+    const value = row?.querySelector('[data-variable-action="edit-value"]');
+    const add = panel.querySelector('[data-variable-action="add"]');
+    const addGlyph = add?.querySelector('.variable-button-glyph');
+    const addLabel = add?.querySelector('.variable-button-label');
+    const content = panel.querySelector('.variable-panel-content');
+    const actionSizes = [...(row?.querySelectorAll('.variable-actions button') ?? [])].map(
+      (button) => button.getBoundingClientRect().width,
+    );
+    return {
+      panelDisplay: getComputedStyle(panel).display,
+      panelOverflow: getComputedStyle(panel).overflow,
+      contentOverflowY: content === null ? undefined : getComputedStyle(content).overflowY,
+      duplicateTitle: panel.querySelector('.variable-panel-title') !== null,
+      description: panel.querySelector('.variable-panel-description')?.textContent,
+      listRole: panel.querySelector('.variable-list')?.getAttribute('role'),
+      rowDisplay: row === null ? undefined : getComputedStyle(row).display,
+      rowHeight: row?.getBoundingClientRect().height,
+      valueTag: value?.tagName,
+      addHeight: add?.getBoundingClientRect().height,
+      addDisplay: add === null ? undefined : getComputedStyle(add).display,
+      addGridColumns: add === null ? undefined : getComputedStyle(add).gridTemplateColumns,
+      addTextAlign: add === null ? undefined : getComputedStyle(add).textAlign,
+      addGlyphWidth: addGlyph?.getBoundingClientRect().width,
+      addGlyphHeight: addGlyph?.getBoundingClientRect().height,
+      addGlyphBackground:
+        addGlyph === null || addGlyph === undefined
+          ? undefined
+          : getComputedStyle(addGlyph).backgroundColor,
+      addLabelOverflow:
+        addLabel === null || addLabel === undefined
+          ? undefined
+          : getComputedStyle(addLabel).textOverflow,
+      addHasDecorativeSvg: add?.querySelector('svg')?.getAttribute('aria-hidden') === 'true',
+      actionSizes,
+      actionLabels: [...(row?.querySelectorAll('.variable-actions button') ?? [])].map((button) =>
+        button.getAttribute('aria-label'),
+      ),
+    };
+  });
+  if (
+    variableModule.panelDisplay !== 'grid' ||
+    variableModule.panelOverflow !== 'hidden' ||
+    variableModule.contentOverflowY !== 'auto' ||
+    variableModule.duplicateTitle ||
+    !variableModule.description?.includes('宿主变量') ||
+    variableModule.listRole !== 'list' ||
+    variableModule.rowDisplay !== 'grid' ||
+    (variableModule.rowHeight ?? 0) < 60 ||
+    variableModule.valueTag !== 'BUTTON' ||
+    (variableModule.addHeight ?? 0) < 40 ||
+    variableModule.addDisplay !== 'grid' ||
+    !variableModule.addGridColumns?.startsWith('24px ') ||
+    variableModule.addTextAlign !== 'left' ||
+    variableModule.addGlyphWidth !== 24 ||
+    variableModule.addGlyphHeight !== 24 ||
+    variableModule.addGlyphBackground === 'rgba(0, 0, 0, 0)' ||
+    variableModule.addLabelOverflow !== 'ellipsis' ||
+    !variableModule.addHasDecorativeSvg ||
+    variableModule.actionSizes.some((size) => size < 24) ||
+    variableModule.actionLabels.some((label) => !label?.includes('count'))
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLES_UI_QUALITY_FAILED:${JSON.stringify(variableModule)}`,
+    );
+  }
+  await designer.locator('[data-variables]').screenshot({
+    path: `${screenshotDirectory}/variables-module-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
+  const variableThemeQuality = await page.evaluate(async () => {
+    const designer = window.baseScreenHarness.designer;
+    const panel = designer.shadowRoot.querySelector('[data-variables]');
+    const add = panel.querySelector('[data-variable-action="add"]');
+    const sample = () => {
+      const addStyle = getComputedStyle(add);
+      const valueStyle = getComputedStyle(panel.querySelector('.variable-value-button'));
+      return {
+        addColor: addStyle.color,
+        addBackground: addStyle.backgroundColor,
+        valueColor: valueStyle.color,
+        valueBackground: valueStyle.backgroundColor,
+        rowBackground: getComputedStyle(panel.querySelector('[data-variable-row]')).backgroundColor,
+      };
+    };
+    const channels = (color) => {
+      const values = color.match(/[\d.]+/g)?.map(Number) ?? [];
+      return color.startsWith('color(srgb')
+        ? values.slice(0, 3)
+        : values.slice(0, 3).map((value) => value / 255);
+    };
+    const luminance = (color) =>
+      channels(color)
+        .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+        .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+    const contrast = () => {
+      const style = getComputedStyle(add);
+      const values = [luminance(style.color), luminance(style.backgroundColor)].sort(
+        (left, right) => right - left,
+      );
+      return (values[0] + 0.05) / (values[1] + 0.05);
+    };
+    designer.removeAttribute('theme');
+    const darkContrast = contrast();
+    designer.setAttribute('theme', 'light');
+    const immediate = sample();
+    const lightContrast = contrast();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const settled = sample();
+    designer.removeAttribute('theme');
+    return {
+      atomic: JSON.stringify(immediate) === JSON.stringify(settled),
+      darkContrast,
+      lightContrast,
+    };
+  });
+  if (
+    !variableThemeQuality.atomic ||
+    variableThemeQuality.darkContrast < 4.5 ||
+    variableThemeQuality.lightContrast < 4.5
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLES_THEME_QUALITY_FAILED:${JSON.stringify(variableThemeQuality)}`,
+    );
+  }
+  await page.waitForTimeout(200);
   // 新建未引用变量 temporary，保留新建能力覆盖；region 已由初始文档提供并被引用。
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
@@ -2718,14 +3152,149 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
         .querySelector('[data-variable-action="confirm-create"]')
         ?.getAttribute('aria-label'),
       cancel: panel.querySelector('[data-variable-action="cancel"]')?.getAttribute('aria-label'),
+      focused:
+        window.baseScreenHarness.designer.shadowRoot.activeElement ===
+        panel.querySelector('[data-variable-create-name]'),
+      labels: panel.querySelectorAll('.variable-field-label').length,
+      usesVectorIcon:
+        panel
+          .querySelector('[data-variable-action="confirm-create"] svg')
+          ?.getAttribute('aria-hidden') === 'true',
     };
   });
   if (
     variableActionNames.confirm !== '确认' ||
     variableActionNames.cancel !== '取消' ||
-    variableActionNames.confirm === variableActionNames.cancel
+    variableActionNames.confirm === variableActionNames.cancel ||
+    !variableActionNames.focused ||
+    variableActionNames.labels !== 2 ||
+    !variableActionNames.usesVectorIcon
   ) {
     throw new Error('BROWSER_HARNESS_VARIABLE_ACTION_ACCESSIBLE_NAMES_FAILED');
+  }
+  const buttonSystemQuality = await page.evaluate(async () => {
+    const designer = window.baseScreenHarness.designer;
+    const root = designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
+    const channels = (color) => {
+      const values = color.match(/[\d.]+/g)?.map(Number) ?? [];
+      return color.startsWith('color(srgb')
+        ? values.slice(0, 3)
+        : values.slice(0, 3).map((value) => value / 255);
+    };
+    const luminance = (color) =>
+      channels(color)
+        .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
+        .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
+    const contrast = (foreground, background) => {
+      const values = [luminance(foreground), luminance(background)].sort(
+        (left, right) => right - left,
+      );
+      return (values[0] + 0.05) / (values[1] + 0.05);
+    };
+    const sample = () => {
+      const primary = panel.querySelector('[data-variable-action="confirm-create"]');
+      const neutral = root.querySelector('[data-canvas-setting-action="capture-thumbnail"]');
+      const ghost = root.querySelector('[data-panel-collapse="left"]');
+      const pressed = root.querySelector('[data-material-filter="all"]');
+      const primaryStyle = getComputedStyle(primary);
+      const neutralStyle = getComputedStyle(neutral);
+      const ghostStyle = getComputedStyle(ghost);
+      const pressedStyle = getComputedStyle(pressed);
+      return {
+        primaryBackground: primaryStyle.backgroundColor,
+        primaryColor: primaryStyle.color,
+        primaryContrast: contrast(primaryStyle.color, primaryStyle.backgroundColor),
+        primaryHeight: primary.getBoundingClientRect().height,
+        neutralBackground: neutralStyle.backgroundColor,
+        neutralColor: neutralStyle.color,
+        neutralHeight: neutral.getBoundingClientRect().height,
+        neutralTransition: neutralStyle.transitionProperty,
+        ghostBackground: ghostStyle.backgroundColor,
+        ghostColor: ghostStyle.color,
+        ghostWidth: ghost.getBoundingClientRect().width,
+        ghostHeight: ghost.getBoundingClientRect().height,
+        pressedBackground: pressedStyle.backgroundColor,
+        pressedColor: pressedStyle.color,
+      };
+    };
+    designer.removeAttribute('theme');
+    const dark = sample();
+    designer.setAttribute('theme', 'light');
+    const lightImmediate = sample();
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    const lightSettled = sample();
+    designer.removeAttribute('theme');
+    return {
+      atomic: JSON.stringify(lightImmediate) === JSON.stringify(lightSettled),
+      dark,
+      light: lightSettled,
+    };
+  });
+  for (const theme of [buttonSystemQuality.dark, buttonSystemQuality.light]) {
+    if (
+      theme.primaryContrast < 4.5 ||
+      theme.primaryHeight < 28 ||
+      theme.neutralHeight < 28 ||
+      theme.ghostWidth < 32 ||
+      theme.ghostHeight < 32 ||
+      theme.neutralTransition !== 'transform' ||
+      theme.primaryBackground === theme.neutralBackground ||
+      theme.neutralBackground === theme.ghostBackground ||
+      theme.pressedBackground === theme.neutralBackground ||
+      theme.primaryColor === theme.neutralColor
+    ) {
+      throw new Error(
+        `BROWSER_HARNESS_BUTTON_SYSTEM_QUALITY_FAILED:${JSON.stringify(buttonSystemQuality)}`,
+      );
+    }
+  }
+  if (!buttonSystemQuality.atomic) {
+    throw new Error(
+      `BROWSER_HARNESS_BUTTON_SYSTEM_THEME_ATOMIC_FAILED:${JSON.stringify(buttonSystemQuality)}`,
+    );
+  }
+  const primaryAction = designer.locator(
+    '[data-variables] [data-variable-action="confirm-create"]',
+  );
+  const primaryIdle = await primaryAction.evaluate((button) => {
+    const style = getComputedStyle(button);
+    return {
+      background: style.backgroundColor,
+      height: button.offsetHeight,
+      transform: style.transform,
+      width: button.offsetWidth,
+    };
+  });
+  await primaryAction.hover();
+  const primaryHover = await primaryAction.evaluate((button) => {
+    const style = getComputedStyle(button);
+    return {
+      background: style.backgroundColor,
+      height: button.offsetHeight,
+      transform: style.transform,
+      width: button.offsetWidth,
+    };
+  });
+  await page.mouse.down();
+  const primaryActive = await primaryAction.evaluate((button) => ({
+    height: button.offsetHeight,
+    transform: getComputedStyle(button).transform,
+    width: button.offsetWidth,
+  }));
+  await page.mouse.move(0, 0);
+  await page.mouse.up();
+  if (
+    primaryIdle.background === primaryHover.background ||
+    primaryIdle.width !== primaryHover.width ||
+    primaryIdle.height !== primaryHover.height ||
+    primaryIdle.width !== primaryActive.width ||
+    primaryIdle.height !== primaryActive.height ||
+    primaryActive.transform === 'none'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_BUTTON_INTERACTION_FEEDBACK_FAILED:${JSON.stringify({ primaryIdle, primaryHover, primaryActive })}`,
+    );
   }
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
@@ -2758,7 +3327,7 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   if (!regionStillPresent) {
     throw new Error('BROWSER_HARNESS_VARIABLES_REFERENCE_GUARD_FAILED');
   }
-  // 删除未引用的 count → 生效且一条撤销恢复
+  // 删除未引用的 count → 先进入行内确认态，确认后生效且一条撤销恢复。
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-variables]');
@@ -2767,6 +3336,58 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     );
     row
       .querySelector('[data-variable-action="delete"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    return panel.querySelector('[data-variable-action="confirm-delete"]') !== null;
+  });
+  const pendingDelete = await page.evaluate(() => ({
+    countStillPresent: window.baseScreenHarness.designer.document.variables.some(
+      (item) => item.name === 'count',
+    ),
+    focusedAction:
+      window.baseScreenHarness.designer.shadowRoot.activeElement?.dataset.variableAction,
+  }));
+  if (!pendingDelete.countStillPresent || pendingDelete.focusedAction !== 'confirm-delete') {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLES_DELETE_CONFIRMATION_FAILED:${JSON.stringify(pendingDelete)}`,
+    );
+  }
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => {
+    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    return panel.querySelector('[data-variable-action="confirm-delete"]') === null;
+  });
+  const cancelledDelete = await page.evaluate(() => ({
+    countStillPresent: window.baseScreenHarness.designer.document.variables.some(
+      (item) => item.name === 'count',
+    ),
+    focusedAction:
+      window.baseScreenHarness.designer.shadowRoot.activeElement?.dataset.variableAction,
+  }));
+  if (!cancelledDelete.countStillPresent || cancelledDelete.focusedAction !== 'delete') {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLES_DELETE_CANCEL_FAILED:${JSON.stringify(cancelledDelete)}`,
+    );
+  }
+  await page.evaluate(() => {
+    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    const row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
+      entry.innerText.includes('count'),
+    );
+    row
+      .querySelector('[data-variable-action="delete"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    return panel.querySelector('[data-variable-action="confirm-delete"]') !== null;
+  });
+  await page.evaluate(() => {
+    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    panel
+      .querySelector('[data-variable-action="confirm-delete"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
   await page.waitForFunction(() => {
@@ -4184,9 +4805,10 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
       `BROWSER_HARNESS_TITLE_CLICK_FAILED:${JSON.stringify(titleClickProbe)}:${error}`,
     );
   }
-  await designer.getByRole('tab', { name: '\u6570\u636e' }).click();
+  await designer.getByRole('tab', { name: '\u6570\u636e\u6e90', exact: true }).click();
   const dataPanel = designer.locator('[data-inspector-pane=data]');
-  await dataPanel.locator('[data-data-source-mode="dataset"]').click();
+  const sourceMode = dataPanel.locator('[data-data-source-mode-select]');
+  await sourceMode.selectOption('dataset');
   const datasetQuery = dataPanel.locator('[data-dataset-query]');
   const datasetItem = dataPanel.locator('[data-dataset-resource-id="tabular-orders"]');
   if ((await datasetQuery.count()) !== 1) {
@@ -4197,40 +4819,182 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   await datasetItem.waitFor();
   await datasetItem.click();
   await dataPanel.locator('[data-dataset-descriptor]').waitFor();
-  const descriptorSurface = await dataPanel.evaluate((panel) => ({
-    parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
-    unlabelledParameterControls: [
-      ...panel.querySelectorAll('[data-dataset-parameter], [data-dataset-parameter-mode]'),
-    ].filter((control) => control.getAttribute('aria-label') === null).length,
-    bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
-    apply: panel.querySelector('[data-dataset-action="apply"]') !== null,
-    previewActionCount: panel.querySelectorAll('[data-dataset-action="preview"]').length,
-    actionsVisible: [...panel.querySelectorAll('[data-dataset-action]')].every((action) => {
-      const panelBox = panel.getBoundingClientRect();
-      const actionBox = action.getBoundingClientRect();
-      return (
-        actionBox.left >= panelBox.left &&
-        actionBox.right <= panelBox.right &&
-        actionBox.top >= panelBox.top &&
-        actionBox.bottom <= panelBox.bottom
-      );
-    }),
-  }));
+  const descriptorSurface = await dataPanel.evaluate((panel) => {
+    const layout = panel.closest('.designer');
+    const properties = panel.closest('.properties');
+    const flow = panel.querySelector('.designer-datav-data-flow');
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const sourceStep = panel.querySelector('[data-dataset-workbench-target="source"]');
+    const mappingStep = panel.querySelector('[data-dataset-workbench-target="mapping"]');
+    const previewStep = panel.querySelector('[data-dataset-workbench-target="preview"]');
+    const workbench = layout?.querySelector('[data-data-workbench]');
+    const flowBox = flow?.getBoundingClientRect();
+    const contentBox = content?.getBoundingClientRect();
+    const sourceBox = sourceStep?.getBoundingClientRect();
+    const mappingBox = mappingStep?.getBoundingClientRect();
+    const previewBox = previewStep?.getBoundingClientRect();
+    return {
+      parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
+      unlabelledParameterControls: [
+        ...panel.querySelectorAll('[data-dataset-parameter], [data-dataset-parameter-mode]'),
+      ].filter((control) => control.getAttribute('aria-label') === null).length,
+      bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
+      sourceMode: panel.querySelector('[data-data-source-mode-select]')?.value,
+      activeStep: flow?.dataset.activeStep,
+      stepCount: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
+      workbenchVisible:
+        workbench !== null && !workbench.hidden && getComputedStyle(workbench).display !== 'none',
+      propertiesVisible:
+        properties !== null &&
+        getComputedStyle(properties).display !== 'none' &&
+        properties.clientWidth > 0,
+      panelInlineGutter: panel.offsetWidth - panel.clientWidth,
+      horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1,
+      docked:
+        flowBox !== undefined &&
+        contentBox !== undefined &&
+        sourceBox !== undefined &&
+        mappingBox !== undefined &&
+        previewBox !== undefined &&
+        mappingBox.left >= contentBox.right - 1 &&
+        previewBox.top > sourceBox.bottom &&
+        mappingBox.right <= flowBox.right + 1,
+      fullscreenAction:
+        panel.querySelector('[data-dataset-authoring-action="fullscreen-edit"]') !== null,
+    };
+  });
   if (
     descriptorSurface.parameterCount < 2 ||
     descriptorSurface.unlabelledParameterControls !== 0 ||
     descriptorSurface.bindingCount !== 0 ||
-    !descriptorSurface.apply ||
-    descriptorSurface.previewActionCount !== 0 ||
-    !descriptorSurface.actionsVisible
+    descriptorSurface.sourceMode !== 'dataset' ||
+    descriptorSurface.activeStep !== 'source' ||
+    descriptorSurface.stepCount !== 3 ||
+    descriptorSurface.workbenchVisible ||
+    !descriptorSurface.propertiesVisible ||
+    descriptorSurface.panelInlineGutter !== 0 ||
+    descriptorSurface.horizontalOverflow ||
+    !descriptorSurface.docked ||
+    !descriptorSurface.fullscreenAction
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_DESCRIPTOR_SURFACE_FAILED:${JSON.stringify(descriptorSurface)}`,
     );
   }
+  const scrollContinuity = await dataPanel.evaluate((panel) => {
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const parameter = panel.querySelector('[data-dataset-parameter="region"]');
+    if (!(content instanceof HTMLElement) || !(parameter instanceof HTMLInputElement)) {
+      return { available: false, after: 0, before: 0, max: 0 };
+    }
+    const max = content.scrollHeight - content.clientHeight;
+    content.scrollTop = Math.min(80, max);
+    const before = content.scrollTop;
+    parameter.value = 'scroll-probe';
+    parameter.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+    const replacement = panel.querySelector('.designer-datav-data-flow-content');
+    return {
+      available: replacement instanceof HTMLElement,
+      after: replacement instanceof HTMLElement ? replacement.scrollTop : 0,
+      before,
+      max,
+    };
+  });
+  if (
+    !scrollContinuity.available ||
+    scrollContinuity.max <= 0 ||
+    scrollContinuity.before <= 0 ||
+    scrollContinuity.after !== scrollContinuity.before
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_FORM_SCROLL_CONTINUITY_FAILED:${JSON.stringify(scrollContinuity)}`,
+    );
+  }
+  await dataPanel
+    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]')
+    .click();
+  const switchedStepScroll = await dataPanel.evaluate((panel) => ({
+    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
+    scrollTop: panel.querySelector('.designer-datav-data-flow-content')?.scrollTop,
+  }));
+  if (switchedStepScroll.activeStep !== 'mapping' || switchedStepScroll.scrollTop !== 0) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_STEP_SCROLL_RESET_FAILED:${JSON.stringify(switchedStepScroll)}`,
+    );
+  }
+  await dataPanel
+    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="source"]')
+    .click();
+  const notificationSurface = designer.locator('[data-notifications]');
+  await notificationSurface.evaluate((surface) => {
+    surface.style.display = 'none';
+  });
+  await dataPanel
+    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="preview"]')
+    .click();
+  await dataPanel.locator('[data-dataset-action="test"]').click();
+  await dataPanel.locator('[data-workbench-section="preview"] [data-status="ready"]').waitFor();
+  const responsePreview = await dataPanel.evaluate((panel) => ({
+    rowCount: panel.querySelectorAll('.designer-data-preview-table-wrap tbody tr').length,
+    columnCount: panel.querySelectorAll('.designer-data-preview-table-wrap thead th').length,
+    status: panel.querySelector('[data-workbench-section="preview"] [data-status]')?.textContent,
+    paneScrollTop: panel.scrollTop,
+    workbenchVisible: !panel.closest('.designer')?.querySelector('[data-data-workbench]')?.hidden,
+  }));
+  if (
+    responsePreview.rowCount !== 2 ||
+    responsePreview.columnCount !== 2 ||
+    !responsePreview.status?.includes('\u8bf7\u6c42\u6210\u529f') ||
+    responsePreview.paneScrollTop !== 0 ||
+    responsePreview.workbenchVisible
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_RESPONSE_PREVIEW_FAILED:${JSON.stringify(responsePreview)}`,
+    );
+  }
+  const consumerTab = dataPanel.locator('[data-dataset-preview-tab="consumer"]');
+  await consumerTab.click();
+  await dataPanel.locator('[data-dataset-preview-tab="consumer"][aria-selected="true"]').waitFor();
+  const consumerPreview = await dataPanel.locator('.designer-data-preview-content').textContent();
+  if (!consumerPreview?.includes('category') || !consumerPreview.includes('amount')) {
+    throw new Error(`BROWSER_HARNESS_DATASET_CONSUMER_PREVIEW_FAILED:${consumerPreview}`);
+  }
+  const requestTab = dataPanel.locator('[data-dataset-preview-tab="request"]');
+  await requestTab.click();
+  await dataPanel.locator('[data-dataset-preview-tab="request"][aria-selected="true"]').waitFor();
+  const requestPreview = await dataPanel.locator('.designer-data-preview-content').textContent();
+  if (!requestPreview?.includes('tabular-orders') || !requestPreview.includes('params')) {
+    throw new Error(`BROWSER_HARNESS_DATASET_REQUEST_PREVIEW_FAILED:${requestPreview}`);
+  }
+  await dataPanel.screenshot({
+    path: `${screenshotDirectory}/data-panel-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
+  await notificationSurface.evaluate((surface) => {
+    surface.style.removeProperty('display');
+  });
+  await dataPanel
+    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="source"]')
+    .click();
   const region = dataPanel.locator('[data-dataset-parameter="region"]');
   await region.fill('north');
   await region.dispatchEvent('change');
+  await dataPanel
+    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]')
+    .click();
+  const mappingSurface = await dataPanel.evaluate((panel) => ({
+    bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
+    apply: panel.querySelector('[data-dataset-action="apply"]') !== null,
+    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
+  }));
+  if (
+    mappingSurface.bindingCount !== 0 ||
+    !mappingSurface.apply ||
+    mappingSurface.activeStep !== 'mapping'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_MAPPING_SURFACE_FAILED:${JSON.stringify(mappingSurface)}`,
+    );
+  }
   await dataPanel.locator('[data-dataset-action="apply"]').click();
   await page.waitForFunction(() => {
     const source = window.baseScreenHarness.designer.document.components.find(
@@ -4256,6 +5020,83 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   ) {
     throw new Error('BROWSER_HARNESS_DATASET_TRANSACTION_FAILED');
   }
+  const authoringSurface = await dataPanel.evaluate((panel) => ({
+    present: panel.querySelector('[data-dataset-authoring]') !== null,
+    editorModes: panel.querySelectorAll('[data-dataset-editor-mode]').length,
+    filterAction:
+      panel.querySelector('[data-dataset-authoring-action="configure-filter"]') !== null,
+    copyAction: panel.querySelector('[data-dataset-authoring-action="copy-data"]') !== null,
+    fullscreenAction:
+      panel.querySelector('[data-dataset-authoring-action="fullscreen-edit"]') !== null,
+    settingCount: panel.querySelectorAll('[data-dataset-authoring-setting]').length,
+    refreshStrategy:
+      panel.querySelector('[data-dataset-authoring-setting="refreshStrategy"]') !== null,
+    horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1,
+  }));
+  if (
+    !authoringSurface.present ||
+    authoringSurface.editorModes !== 2 ||
+    !authoringSurface.filterAction ||
+    !authoringSurface.copyAction ||
+    !authoringSurface.fullscreenAction ||
+    authoringSurface.settingCount !== 4 ||
+    !authoringSurface.refreshStrategy ||
+    authoringSurface.horizontalOverflow
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_AUTHORING_SURFACE_FAILED:${JSON.stringify(authoringSurface)}`,
+    );
+  }
+  await designer.locator('button[data-inspector-density="all"]').click();
+  await page.evaluate(() => {
+    window.__baseScreenDatasetAuthoringActions = [];
+    document
+      .querySelector('base-screen-designer')
+      .addEventListener('base-screen-dataset-authoring-action', (event) =>
+        window.__baseScreenDatasetAuthoringActions.push(event.detail),
+      );
+  });
+  await dataPanel.locator('[data-dataset-editor-mode="code"]').click();
+  await dataPanel.locator('[data-dataset-authoring-action="configure-filter"]').click();
+  await dataPanel.locator('[data-dataset-authoring-action="copy-data"]').click();
+  await dataPanel.locator('[data-dataset-authoring-action="fullscreen-edit"]').click();
+  await dataPanel.locator('[data-dataset-authoring-setting="loadingDisabled"]').check();
+  await dataPanel.locator('[data-dataset-authoring-setting="controlled"]').check();
+  await dataPanel
+    .locator('[data-dataset-authoring-setting="refreshStrategy"]')
+    .selectOption('auto');
+  const authoringActions = await page.evaluate(() => ({
+    actions: window.__baseScreenDatasetAuthoringActions.map((item) => item.action),
+    settings: window.__baseScreenDatasetAuthoringActions
+      .filter((item) => item.action === 'update-settings')
+      .map((item) => ({ setting: item.setting, value: item.value })),
+    autoIntervalEnabled: !window.baseScreenHarness.designer.shadowRoot
+      .querySelector('[data-dataset-authoring-setting="refreshInterval"]')
+      .hasAttribute('disabled'),
+  }));
+  if (
+    JSON.stringify(authoringActions.actions) !==
+      JSON.stringify([
+        'open-code-editor',
+        'configure-filter',
+        'copy-data',
+        'fullscreen-edit',
+        'update-settings',
+        'update-settings',
+        'update-settings',
+      ]) ||
+    JSON.stringify(authoringActions.settings) !==
+      JSON.stringify([
+        { setting: 'loadingDisabled', value: true },
+        { setting: 'controlled', value: true },
+        { setting: 'refreshStrategy', value: 'auto' },
+      ]) ||
+    !authoringActions.autoIntervalEnabled
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_AUTHORING_ACTION_FAILED:${JSON.stringify(authoringActions)}`,
+    );
+  }
   const notifications = designer.locator('[data-notification-tone="error"]');
   const notificationCount = await notifications.count();
   const notification = notifications.last();
@@ -4266,7 +5107,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   if ((await notifications.count()) !== notificationCount - 1) {
     throw new Error('BROWSER_HARNESS_NOTIFICATION_DISMISS_FAILED');
   }
-  await designer.getByRole('tab', { name: '\u4ea4\u4e92' }).click();
+  await designer.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
   const interaction = designer.locator('[data-inspector-pane=interaction]');
   const interactionText = await interaction.textContent();
   if (
@@ -4277,44 +5118,92 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   ) {
     throw new Error(`BROWSER_HARNESS_INTERACTION_CAPABILITY_FAILED:${interactionText}`);
   }
-  await designer.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
   const events = designer.locator('[data-events-panel]');
-  const requestButton = events.locator('[data-action="open-blueprint"]');
+  const requestButton = events.locator('[data-action="locate-blueprint"]');
   if (
     (await requestButton.isDisabled()) ||
     (await events.textContent())?.includes('\u4e0d\u53ef\u7528')
   ) {
     throw new Error('BROWSER_HARNESS_BLUEPRINT_CAPABILITY_FAILED');
   }
+  await designer.locator('[data-inspector-pane=interaction]').screenshot({
+    path: `${screenshotDirectory}/interaction-summary-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
   const hostEventCount = await page.evaluate(() => window.baseScreenHarness.hostEvents.length);
-  // AE-HB-C01/AE-ED-C07 宿主蓝图编辑闭环：请求（requestId/revision/快照）→ 宿主修改 canonical 快照 → 专用提交。
+  // 整屏宿主编排闭环：组件入口只提供初始定位，候选可跨组件，并以一次历史提交。
+  await page.evaluate(() => {
+    window.__baseScreenBlueprintRequests = [];
+    window.baseScreenHarness.designer.addEventListener('base-screen-authoring-request', (event) => {
+      if (event.detail.request.kind === 'blueprint') {
+        window.__baseScreenBlueprintRequests.push(event.detail.request);
+      }
+    });
+  });
+  await requestButton.click();
   const blueprintCommit = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
-    const requests = [];
-    const listener = (event) => requests.push(event.detail.request);
-    designer.addEventListener('base-screen-authoring-request', listener);
-    if (!designer.requestBlueprintEdit()) return { step: 'request', ok: false };
-    const request = requests.at(-1);
+    const request = window.__baseScreenBlueprintRequests.at(-1);
     if (request?.kind !== 'blueprint') return { step: 'kind', ok: false };
-    const rules = [...request.blueprint.rules];
+    const componentIds = request.context.document.components.map((component) => component.id);
+    const usedTypes = [
+      ...new Set(request.context.document.components.map((component) => component.type)),
+    ].sort();
+    const projectedTypes = request.context.materialEvents
+      .map((projection) => projection.materialType)
+      .sort();
+    const originalName = designer.document.components[0].name;
+    const detachedIdentity = request.context.document !== designer.document;
+    request.context.document.components[0].name = 'detached mutation';
+    const detachedMutation = designer.document.components[0].name === originalName;
+    const echartsProjection = request.context.materialEvents
+      .find((projection) => projection.materialType === 'base.echarts')
+      ?.events.find((event) => event.name === 'seriesClick');
+    const rules = [...request.context.document.blueprint.rules];
     rules.push({
       id: 'rule-2',
       trigger: {
         type: 'material-event',
-        componentId: request.componentId,
-        eventName: 'valueClick',
+        componentId: 'echarts-demo',
+        eventName: 'seriesClick',
       },
       actions: [],
     });
     const result = designer.commitBlueprintEdit({
       requestId: request.requestId,
       expectedRevision: request.documentRevision,
-      componentId: request.componentId,
       blueprint: { rules },
     });
-    return { step: 'commit', ok: result.ok, code: result.diagnostics?.[0]?.code };
+    return {
+      step: 'commit',
+      ok: result.ok,
+      code: result.diagnostics?.[0]?.code,
+      initialComponentId: request.context.initialComponentId,
+      componentIds,
+      completeProjection: JSON.stringify(usedTypes) === JSON.stringify(projectedTypes),
+      detachedIdentity,
+      detachedMutation,
+      hasScopedRequestFields: 'componentId' in request || 'blueprint' in request,
+      materialCapability: request.context.capabilities['blueprint.trigger.material-event'] === true,
+      echartsProjection: {
+        available: echartsProjection?.available,
+        maxPayloadBytes: echartsProjection?.maxPayloadBytes,
+        hasPayloadSchema: echartsProjection?.payloadSchema !== undefined,
+      },
+    };
   });
-  if (!blueprintCommit.ok) {
+  if (
+    !blueprintCommit.ok ||
+    blueprintCommit.initialComponentId !== 'title' ||
+    !blueprintCommit.componentIds.includes('echarts-demo') ||
+    !blueprintCommit.completeProjection ||
+    !blueprintCommit.detachedIdentity ||
+    !blueprintCommit.detachedMutation ||
+    blueprintCommit.hasScopedRequestFields ||
+    !blueprintCommit.materialCapability ||
+    !blueprintCommit.echartsProjection.available ||
+    blueprintCommit.echartsProjection.maxPayloadBytes !== 65536 ||
+    !blueprintCommit.echartsProjection.hasPayloadSchema
+  ) {
     throw new Error(
       `BROWSER_HARNESS_BLUEPRINT_HOST_COMMIT_FAILED:${JSON.stringify(blueprintCommit)}`,
     );
@@ -4322,28 +5211,131 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   await page.waitForFunction(
     () => window.baseScreenHarness.designer.document.blueprint.rules.length === 2,
   );
-  // 陈旧 revision 提交被拒绝，document 保持不变。
+  const blueprintHistory = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    const undo = designer.undo();
+    const afterUndo = designer.document.blueprint.rules.length;
+    const redo = designer.redo();
+    return {
+      undo: undo.ok,
+      redo: redo.ok,
+      afterUndo,
+      afterRedo: designer.document.blueprint.rules.length,
+    };
+  });
+  if (
+    !blueprintHistory.undo ||
+    !blueprintHistory.redo ||
+    blueprintHistory.afterUndo !== 1 ||
+    blueprintHistory.afterRedo !== 2
+  ) {
+    throw new Error(`BROWSER_HARNESS_BLUEPRINT_HISTORY_FAILED:${JSON.stringify(blueprintHistory)}`);
+  }
+
+  // 顶栏入口在清空组件选择后仍发起整屏请求，且不携带隐式初始定位。
+  await page.evaluate(() => {
+    const canvas = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-canvas]');
+    const bounds = canvas.getBoundingClientRect();
+    const pointer = {
+      bubbles: true,
+      composed: true,
+      pointerId: 9001,
+      button: 0,
+      clientX: bounds.left + 4,
+      clientY: bounds.top + 4,
+    };
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { ...pointer, buttons: 1 }));
+    canvas.dispatchEvent(new PointerEvent('pointerup', { ...pointer, buttons: 0 }));
+  });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('base-screen-designer').shadowRoot.querySelector('[data-selection]')
+        .style.display === 'none',
+  );
+  await page.evaluate(() => {
+    window.__baseScreenBlueprintRequests = [];
+  });
+  const topbarBlueprintButton = designer.locator('[data-action="open-blueprint"]');
+  await topbarBlueprintButton.click();
+  const globalRequest = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    const request = window.__baseScreenBlueprintRequests.at(-1);
+    if (request?.kind !== 'blueprint') return { ok: false, step: 'request' };
+    const cancelled = designer.cancelAuthoringEdit(request.requestId);
+    return {
+      ok: true,
+      initialComponentId: request.context.initialComponentId,
+      componentCount: request.context.document.components.length,
+      currentComponentCount: designer.document.components.length,
+      cancelled,
+    };
+  });
+  if (
+    !globalRequest.ok ||
+    globalRequest.initialComponentId !== null ||
+    globalRequest.componentCount !== globalRequest.currentComponentCount ||
+    !globalRequest.cancelled
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_BLUEPRINT_GLOBAL_REQUEST_FAILED:${JSON.stringify(globalRequest)}`,
+    );
+  }
+
+  // 打开后任意 canonical 文档修改都会推进 generation，并拒绝完整 Blueprint 覆盖。
+  const generationStale = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    window.__baseScreenBlueprintRequests = [];
+    designer.requestBlueprintEdit();
+    const request = window.__baseScreenBlueprintRequests.at(-1);
+    const changed = designer.executeCommand({
+      type: 'update-canvas',
+      patch: { backgroundColor: '#17212c' },
+    });
+    const result = designer.commitBlueprintEdit({
+      requestId: request.requestId,
+      expectedRevision: request.documentRevision,
+      blueprint: request.context.document.blueprint,
+    });
+    const restored = designer.undo();
+    return {
+      changed: changed.ok,
+      restored: restored.ok,
+      ok: result.ok,
+      code: result.diagnostics?.[0]?.code,
+      rules: designer.document.blueprint.rules.length,
+    };
+  });
+  if (
+    !generationStale.changed ||
+    !generationStale.restored ||
+    generationStale.ok ||
+    generationStale.code !== 'AUTHORING_STALE_REVISION' ||
+    generationStale.rules !== 2
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_BLUEPRINT_GENERATION_STALE_FAILED:${JSON.stringify(generationStale)}`,
+    );
+  }
+
+  // 陈旧外部 revision 提交被拒绝，document 保持不变。
   const staleCommit = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
-    const requests = [];
-    const listener = (event) => requests.push(event.detail.request);
-    designer.addEventListener('base-screen-authoring-request', listener);
+    window.__baseScreenBlueprintRequests = [];
     designer.requestBlueprintEdit();
-    const request = requests.at(-1);
-    const rules = [...window.baseScreenHarness.designer.document.blueprint.rules];
+    const request = window.__baseScreenBlueprintRequests.at(-1);
+    const rules = [...request.context.document.blueprint.rules];
     rules.push({
       id: 'rule-3',
       trigger: {
         type: 'material-event',
-        componentId: request.componentId,
-        eventName: 'valueClick',
+        componentId: 'echarts-demo',
+        eventName: 'seriesClick',
       },
       actions: [],
     });
     const result = designer.commitBlueprintEdit({
       requestId: request.requestId,
       expectedRevision: 'stale-revision',
-      componentId: request.componentId,
       blueprint: { rules },
     });
     return {
@@ -4359,6 +5351,131 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   ) {
     throw new Error(`BROWSER_HARNESS_BLUEPRINT_STALE_COMMIT_FAILED:${JSON.stringify(staleCommit)}`);
   }
+  const validationFailures = await page.evaluate(() => {
+    const { designer } = window.baseScreenHarness;
+    window.__baseScreenBlueprintRequests = [];
+    designer.requestBlueprintEdit();
+    const shapeRequest = window.__baseScreenBlueprintRequests.at(-1);
+    const invalidShape = designer.commitBlueprintEdit({
+      requestId: shapeRequest.requestId,
+      expectedRevision: shapeRequest.documentRevision,
+      blueprint: {
+        rules: shapeRequest.context.document.blueprint.rules,
+        editorState: { selectedNode: 'rule-2' },
+      },
+    });
+    designer.cancelAuthoringEdit(shapeRequest.requestId);
+
+    window.__baseScreenBlueprintRequests = [];
+    designer.requestBlueprintEdit();
+    const capabilityRequest = window.__baseScreenBlueprintRequests.at(-1);
+    const rules = [...capabilityRequest.context.document.blueprint.rules];
+    rules.push({
+      id: 'unavailable-capability',
+      trigger: { type: 'material-event', componentId: 'title', eventName: 'valueClick' },
+      actions: [],
+      requiredCapabilities: ['host.capability.unavailable'],
+    });
+    const unavailableCapability = designer.commitBlueprintEdit({
+      requestId: capabilityRequest.requestId,
+      expectedRevision: capabilityRequest.documentRevision,
+      blueprint: { rules },
+    });
+    designer.cancelAuthoringEdit(capabilityRequest.requestId);
+    return {
+      invalidShape: {
+        ok: invalidShape.ok,
+        code: invalidShape.diagnostics?.[0]?.code,
+      },
+      unavailableCapability: {
+        ok: unavailableCapability.ok,
+        code: unavailableCapability.diagnostics?.[0]?.code,
+      },
+      rules: designer.document.blueprint.rules.length,
+    };
+  });
+  if (
+    validationFailures.invalidShape.ok ||
+    validationFailures.invalidShape.code !== 'DOCUMENT_UNKNOWN_FIELD' ||
+    validationFailures.unavailableCapability.ok ||
+    validationFailures.unavailableCapability.code !== 'BLUEPRINT_CAPABILITY_UNAVAILABLE' ||
+    validationFailures.rules !== 2
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_BLUEPRINT_VALIDATION_FAILED:${JSON.stringify(validationFailures)}`,
+    );
+  }
+  const invalidSessions = await page.evaluate(() => {
+    const { catalog, designer } = window.baseScreenHarness;
+    const createDesigner = () => {
+      const isolated = document.createElement('base-screen-designer');
+      isolated.catalog = catalog;
+      isolated.runtimeContributions = designer.runtimeContributions;
+      document.body.append(isolated);
+      isolated.document = structuredClone(designer.document);
+      return isolated;
+    };
+    const first = createDesigner();
+    const second = createDesigner();
+    const firstRequests = [];
+    const secondRequests = [];
+    first.addEventListener('base-screen-authoring-request', (event) =>
+      firstRequests.push(event.detail.request),
+    );
+    second.addEventListener('base-screen-authoring-request', (event) =>
+      secondRequests.push(event.detail.request),
+    );
+    first.requestBlueprintEdit();
+    const firstRequest = firstRequests.at(-1);
+    const crossInstance = second.commitBlueprintEdit({
+      requestId: firstRequest.requestId,
+      expectedRevision: firstRequest.documentRevision,
+      blueprint: firstRequest.context.document.blueprint,
+    });
+    first.unload();
+    const unloaded = first.commitBlueprintEdit({
+      requestId: firstRequest.requestId,
+      expectedRevision: firstRequest.documentRevision,
+      blueprint: firstRequest.context.document.blueprint,
+    });
+    second.requestBlueprintEdit();
+    const secondRequest = secondRequests.at(-1);
+    const cancelled = second.cancelAuthoringEdit(secondRequest.requestId);
+    const cancelledCommit = second.commitBlueprintEdit({
+      requestId: secondRequest.requestId,
+      expectedRevision: secondRequest.documentRevision,
+      blueprint: secondRequest.context.document.blueprint,
+    });
+    first.remove();
+    second.remove();
+    return {
+      crossInstance: {
+        ok: crossInstance.ok,
+        code: crossInstance.diagnostics?.[0]?.code,
+      },
+      unloaded: { ok: unloaded.ok, code: unloaded.diagnostics?.[0]?.code },
+      cancelled,
+      cancelledCommit: {
+        ok: cancelledCommit.ok,
+        code: cancelledCommit.diagnostics?.[0]?.code,
+      },
+    };
+  });
+  if (
+    invalidSessions.crossInstance.ok ||
+    invalidSessions.crossInstance.code !== 'AUTHORING_REQUEST_INVALID' ||
+    invalidSessions.unloaded.ok ||
+    invalidSessions.unloaded.code !== 'AUTHORING_EXPIRED' ||
+    !invalidSessions.cancelled ||
+    invalidSessions.cancelledCommit.ok ||
+    invalidSessions.cancelledCommit.code !== 'AUTHORING_REQUEST_INVALID'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_BLUEPRINT_SESSION_GUARDS_FAILED:${JSON.stringify(invalidSessions)}`,
+    );
+  }
+
+  await designer.locator('[data-base-screen-component-id=title]').click();
   // AE-ED-C07 宿主组件文本编辑闭环（data target：写入既有 host-resource 参数，单 history entry）。
   const textCommit = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
@@ -4409,17 +5526,21 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   if ((await page.evaluate(() => window.baseScreenHarness.hostEvents.length)) !== hostEventCount) {
     throw new Error('BROWSER_HARNESS_BLUEPRINT_AUTHORING_EXECUTED_HOST_ACTION');
   }
-  // AE-ED-C06 内部事件面板只呈现摘要、能力状态与宿主请求入口，无内部表单/图形控件。
+  // 内部事件面板只呈现只读摘要、能力状态与宿主定位入口，无表单、图画布或节点操作。
   const internalSurface = await events.evaluate((panel) => ({
     hasRuleForm: panel.querySelector('[data-blueprint-rule]') !== null,
     hasGraph: panel.querySelector('[data-blueprint-graph]') !== null,
     hasExpression: panel.querySelector('[data-blueprint-expression]') !== null,
-    hasRequestEntry: panel.querySelector('[data-action="open-blueprint"]') !== null,
+    hasNodeOperation: panel.querySelector('[data-blueprint-node-operation]') !== null,
+    hasEditableField: panel.querySelector('input, select, textarea') !== null,
+    hasRequestEntry: panel.querySelector('[data-action="locate-blueprint"]') !== null,
   }));
   if (
     internalSurface.hasRuleForm ||
     internalSurface.hasGraph ||
     internalSurface.hasExpression ||
+    internalSurface.hasNodeOperation ||
+    internalSurface.hasEditableField ||
     !internalSurface.hasRequestEntry
   ) {
     throw new Error(
@@ -4427,7 +5548,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     );
   }
   // AE-ED-C01/AE-EC-C01 ECharts 语义面板：受限 Descriptor 完成常见配置，无需 raw option。
-  await designer.getByRole('tab', { name: '\u5916\u89c2' }).click();
+  await designer.getByRole('tab', { name: '\u6837\u5f0f' }).click();
   await designer.locator('[data-base-screen-component-id=echarts-demo]').click();
   await page.waitForFunction(
     () => {
@@ -4444,6 +5565,158 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     { timeout: 5000 },
   );
   const appearance = designer.locator('[data-properties]');
+  const contextActions = designer.locator('[data-inspector-context] .inspector-context-toggle');
+  const statusActions = appearance.locator(
+    'input[data-property="locked"], input[data-property="hidden"]',
+  );
+  if ((await contextActions.count()) !== 0 || (await statusActions.count()) !== 2) {
+    throw new Error('BROWSER_HARNESS_INSPECTOR_CONTEXT_ACTIONS_FAILED');
+  }
+  await designer.locator('[data-inspector-density="basic"]').click();
+  const datavChrome = await designer.locator('[data-right-panel]').evaluate((panel) => {
+    const search = panel.querySelector('[data-inspector-search-launch]');
+    const density = panel.querySelector('.inspector-density');
+    const quickStyle = panel.querySelector('[data-quick-style-section]');
+    const xField = panel.querySelector('[data-property="x"]')?.closest('[data-property-symbol]');
+    const yField = panel.querySelector('[data-property="y"]')?.closest('[data-property-symbol]');
+    const zField = panel.querySelector('[data-property-symbol="Z"]');
+    const subtitle = panel.querySelector('.inspector-context-subtitle');
+    const panelRect = panel.getBoundingClientRect();
+    const contextRect = panel.querySelector('.inspector-context')?.getBoundingClientRect();
+    const toolbarRect = panel.querySelector('.inspector-toolbar')?.getBoundingClientRect();
+    const xRect = xField?.getBoundingClientRect();
+    const yRect = yField?.getBoundingClientRect();
+    return {
+      searchWidth: search?.getBoundingClientRect().width,
+      toolbarInsideContext:
+        contextRect !== undefined &&
+        toolbarRect !== undefined &&
+        toolbarRect.top >= contextRect.top &&
+        toolbarRect.bottom <= contextRect.bottom,
+      geometryTopOffset: xRect === undefined ? undefined : xRect.top - panelRect.top,
+      geometryControlHeight: xRect?.height,
+      geometryColumnGap:
+        xRect === undefined || yRect === undefined ? undefined : yRect.left - xRect.right,
+      zHiddenInBasic: zField?.hidden,
+      hasNameProperty: panel.querySelector('[data-property="name"]') !== null,
+      densityDisplay: density === null ? undefined : getComputedStyle(density).display,
+      quickStyleSections: panel.querySelectorAll('[data-quick-style-section]').length,
+      quickStyleOpen: quickStyle?.querySelector('details')?.open,
+      quickStyleHasPresets: quickStyle?.querySelector('.designer-quick-style-grid') !== null,
+      quickStyleHasConfig: quickStyle?.querySelector('.designer-quick-config-row') !== null,
+      xSymbolRight: xField === null ? undefined : getComputedStyle(xField, '::before').right,
+      xInputAlign:
+        xField === null
+          ? undefined
+          : getComputedStyle(xField.querySelector('[data-property="x"]')).textAlign,
+      subtitle: subtitle?.textContent,
+      hasMaterialIcon:
+        panel.querySelector('.inspector-context-material-icon svg')?.getAttribute('aria-hidden') ===
+        'true',
+    };
+  });
+  if (
+    datavChrome.searchWidth !== 28 ||
+    !datavChrome.toolbarInsideContext ||
+    datavChrome.geometryTopOffset < 127 ||
+    datavChrome.geometryTopOffset > 133 ||
+    datavChrome.geometryControlHeight !== 28 ||
+    datavChrome.geometryColumnGap !== 14 ||
+    datavChrome.zHiddenInBasic !== true ||
+    datavChrome.hasNameProperty ||
+    datavChrome.densityDisplay === 'none' ||
+    datavChrome.quickStyleSections !== 1 ||
+    datavChrome.quickStyleOpen !== true ||
+    !datavChrome.quickStyleHasPresets ||
+    !datavChrome.quickStyleHasConfig ||
+    datavChrome.xSymbolRight !== '8px' ||
+    datavChrome.xInputAlign !== 'left' ||
+    !datavChrome.subtitle?.includes('base.echarts') ||
+    !datavChrome.hasMaterialIcon
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATAV_INSPECTOR_CHROME_FAILED:${JSON.stringify(datavChrome)}`);
+  }
+  await designer.locator('[data-inspector-density="all"]').click();
+  if (!(await appearance.locator('[data-property="zIndex"]').isVisible())) {
+    throw new Error('BROWSER_HARNESS_DATAV_FULL_GEOMETRY_FAILED');
+  }
+  await designer.locator('[data-inspector-density="basic"]').click();
+  if (await appearance.locator('[data-property="zIndex"]').isVisible()) {
+    throw new Error('BROWSER_HARNESS_DATAV_BASIC_GEOMETRY_FAILED');
+  }
+  const flipLabels = await appearance
+    .locator('[data-geometry-action]')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label')));
+  if (
+    JSON.stringify(flipLabels) !==
+    JSON.stringify(['\u6c34\u5e73\u7ffb\u8f6c', '\u5782\u76f4\u7ffb\u8f6c'])
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATAV_FLIP_LABELS_FAILED:${JSON.stringify(flipLabels)}`);
+  }
+  const quickPresets = appearance.locator('[data-quick-style]');
+  await quickPresets.nth(1).click();
+  await page.waitForFunction(() => {
+    const style = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'echarts-demo',
+    )?.style;
+    return (
+      style?.backgroundColor === '#0f172a' &&
+      style?.color === '#e2e8f0' &&
+      style?.gridColor === '#334155'
+    );
+  });
+  const presetStates = await appearance
+    .locator('[data-quick-style]')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-pressed')));
+  if (
+    presetStates[1] !== 'true' ||
+    presetStates.some((state, index) => index !== 1 && state === 'true')
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_QUICK_PRESET_STATE_FAILED:${JSON.stringify(presetStates)}`,
+    );
+  }
+  const quickColors = appearance.locator('[data-quick-config="colors"]');
+  const quickColorLabels = await quickColors.evaluateAll((buttons) =>
+    buttons.map((button) => button.getAttribute('aria-label')),
+  );
+  if (
+    JSON.stringify(quickColorLabels) !==
+    JSON.stringify([
+      '\u56fe\u8868\u989c\u8272 #38BDF8',
+      '\u56fe\u8868\u989c\u8272 #4ADE80',
+      '\u56fe\u8868\u989c\u8272 #F97316',
+      '\u56fe\u8868\u989c\u8272 #A78BFA',
+      '\u56fe\u8868\u989c\u8272 #FACC15',
+      '\u56fe\u8868\u989c\u8272 #FB7185',
+    ])
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_QUICK_COLOR_LABELS_FAILED:${JSON.stringify(quickColorLabels)}`,
+    );
+  }
+  await quickColors.nth(1).click();
+  await page.waitForFunction(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (candidate) => candidate.id === 'echarts-demo',
+    );
+    return (
+      component?.style.color === '#4ade80' &&
+      component.style.gridColor === '#4ade80' &&
+      component.props.series?.every((series) => series.color === '#4ade80')
+    );
+  });
+  const quickColorStates = await appearance
+    .locator('[data-quick-config="colors"]')
+    .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-pressed')));
+  if (
+    quickColorStates[1] !== 'true' ||
+    quickColorStates.some((state, index) => index !== 1 && state === 'true')
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_QUICK_COLOR_STATE_FAILED:${JSON.stringify(quickColorStates)}`,
+    );
+  }
   const sectionNames = await appearance
     .locator('.designer-descriptor-group-summary')
     .allTextContents();
@@ -4465,6 +5738,78 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   if (await advancedDetails.getAttribute('open')) {
     throw new Error('BROWSER_HARNESS_ECHARTS_ADVANCED_COLLAPSED_FAILED');
   }
+  await designer.locator('[data-inspector-search-launch]').click();
+  const inspectorSearch = designer.locator('[data-inspector-search]');
+  const expandedSearch = await designer.locator('[data-right-panel]').evaluate((panel) => ({
+    width: panel.querySelector('[data-inspector-search]')?.getBoundingClientRect().width,
+    workspaceDisplay: getComputedStyle(panel.querySelector('[data-inspector-search-workspace]'))
+      .display,
+    contextDisplay: getComputedStyle(panel.querySelector('[data-inspector-context]')).display,
+    toolbarDisplay: getComputedStyle(panel.querySelector('.inspector-toolbar')).display,
+    open: panel.hasAttribute('data-inspector-search-open'),
+  }));
+  if (
+    (expandedSearch.width ?? 0) < 260 ||
+    expandedSearch.workspaceDisplay !== 'grid' ||
+    expandedSearch.contextDisplay !== 'none' ||
+    expandedSearch.toolbarDisplay !== 'none' ||
+    !expandedSearch.open
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_INSPECTOR_SEARCH_EXPANSION_FAILED:${JSON.stringify(expandedSearch)}`,
+    );
+  }
+  await inspectorSearch.fill('\u6807\u7b7e\u65cb\u8f6c');
+  const advancedSearchResult = designer.locator('.inspector-search-result').filter({
+    hasText: '\u8f74\u6807\u7b7e\u65cb\u8f6c',
+  });
+  if (
+    (await advancedSearchResult.count()) !== 1 ||
+    !(await advancedSearchResult.textContent())?.includes('\u9ad8\u7ea7')
+  ) {
+    throw new Error('BROWSER_HARNESS_INSPECTOR_ADVANCED_SEARCH_FAILED');
+  }
+  const searchEditor = advancedSearchResult.locator('[data-descriptor-field-id="axisLabelRotate"]');
+  await searchEditor.fill('18');
+  await searchEditor.press('Enter');
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'echarts-demo',
+      )?.props.advanced?.axisLabelRotate === 18,
+  );
+  await advancedSearchResult.click({ button: 'right' });
+  const searchContextMenu = advancedSearchResult.locator('[data-inspector-search-menu]');
+  if (
+    !(await searchContextMenu.isVisible()) ||
+    (await searchContextMenu.locator('[data-inspector-search-copy-target]').count()) !== 1 ||
+    (await searchContextMenu.locator('[data-inspector-search-paste-target]').count()) !== 1
+  ) {
+    throw new Error('BROWSER_HARNESS_INSPECTOR_SEARCH_CONTEXT_MENU_FAILED');
+  }
+  await searchContextMenu.locator('[data-inspector-search-copy-target]').click();
+  await designer.locator('[data-right-panel]').screenshot({
+    path: `${screenshotDirectory}/inspector-search-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
+  await advancedSearchResult.locator('[data-inspector-search-target]').click();
+  if ((await designer.locator('[data-descriptor-field-id="axisLabelRotate"]').count()) !== 1) {
+    throw new Error('BROWSER_HARNESS_INSPECTOR_SEARCH_FOCUS_FAILED');
+  }
+  await designer.locator('button[data-inspector-density="all"]').click();
+  await advancedDetails.locator('summary').click();
+  for (const componentId of ['title', 'echarts-demo']) {
+    await page.evaluate((id) => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      root
+        .querySelector(`[data-layer-select="${id}"]`)
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    }, componentId);
+  }
+  if ((await advancedDetails.getAttribute('open')) === null) {
+    throw new Error('BROWSER_HARNESS_INSPECTOR_GROUP_PERSISTENCE_FAILED');
+  }
+  await advancedDetails.locator('summary').click();
+  await designer.locator('button[data-inspector-density="basic"]').click();
   const titleText = appearance.locator('[data-descriptor-field-id="titleText"]');
   await titleText.fill('\u9500\u552e\u8d8b\u52bf');
   await titleText.press('Enter');
@@ -4497,9 +5842,15 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   );
   // AE-ED-C04 数据 tab：字段选择器投影到宿主数据集字段。
   await designer.getByRole('tab', { name: '\u6570\u636e' }).click();
+  await designer
+    .locator(
+      '[data-inspector-pane=data] [data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]',
+    )
+    .click();
   const fieldSelector = designer.locator(
     '[data-inspector-pane=data] [data-descriptor-field-id="dimensionField"]',
   );
+  await fieldSelector.waitFor();
   if ((await fieldSelector.locator('option').count()) < 2) {
     throw new Error('BROWSER_HARNESS_ECHARTS_FIELD_SELECTOR_FAILED');
   }
@@ -4518,7 +5869,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
       )?.dataSource?.binding?.fields?.dimension?.[0] === 'category',
   );
   // AE-ED-C05 事件 tab：结构化事件声明 label 与能力提示。
-  await designer.getByRole('tab', { name: '\u4e8b\u4ef6' }).click();
+  await designer.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
   const eventText = await events.textContent();
   if (
     eventText === null ||
@@ -5107,6 +6458,64 @@ async function assertTopbarProjectName(designer) {
   if (title !== '浏览器验证') {
     throw new Error(`BROWSER_HARNESS_TOPBAR_PROJECT_NAME_FAILED: ${JSON.stringify(title)}`);
   }
+}
+
+async function assertCommandPalette(designer, page) {
+  const trigger = designer.locator('[data-command-palette-toggle]');
+  const palette = designer.locator('[data-command-palette]');
+  const input = designer.locator('[data-command-palette-search]');
+  await trigger.click();
+  await palette.waitFor({ state: 'visible' });
+  await input.fill('+ base.echarts');
+  const materialResult = designer.locator(
+    '[data-command-palette-result="material"][data-material-type="base.echarts"]',
+  );
+  await materialResult.waitFor({ state: 'visible' });
+  const materialState = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const result = root?.querySelector(
+      '[data-command-palette-result="material"][data-material-type="base.echarts"]',
+    );
+    return {
+      expanded: root?.querySelector('[data-command-palette-toggle]')?.ariaExpanded,
+      selected: result?.getAttribute('aria-selected'),
+      resultCount: root?.querySelectorAll('[data-command-palette-result]').length ?? 0,
+    };
+  });
+  if (
+    materialState.expanded !== 'true' ||
+    materialState.selected !== 'true' ||
+    materialState.resultCount !== 1
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_COMMAND_PALETTE_MATERIAL_FAILED:${JSON.stringify(materialState)}`,
+    );
+  }
+
+  await page.keyboard.press('Escape');
+  await palette.waitFor({ state: 'hidden' });
+  await page.keyboard.press('/');
+  await palette.waitFor({ state: 'visible' });
+  await input.fill('/ title');
+  const layerResult = designer.locator(
+    '[data-command-palette-result="layer"][data-layer-select="title"]',
+  );
+  await layerResult.waitFor({ state: 'visible' });
+  const layerState = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const result = root?.querySelector(
+      '[data-command-palette-result="layer"][data-layer-select="title"]',
+    );
+    return {
+      focused: root?.activeElement === root?.querySelector('[data-command-palette-search]'),
+      selected: result?.getAttribute('aria-selected'),
+    };
+  });
+  if (!layerState.focused || layerState.selected !== 'true') {
+    throw new Error(`BROWSER_HARNESS_COMMAND_PALETTE_LAYER_FAILED:${JSON.stringify(layerState)}`);
+  }
+  await page.keyboard.press('Escape');
+  await palette.waitFor({ state: 'hidden' });
 }
 
 async function assertDesktopWorkbench(designer, viewport) {

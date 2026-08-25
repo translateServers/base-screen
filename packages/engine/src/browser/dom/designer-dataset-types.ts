@@ -15,8 +15,49 @@ export interface DesignerDatasetDraftView {
   readonly fields: Readonly<Record<string, readonly string[]>>;
 }
 
+export type DesignerDatasetPreviewTab = 'response' | 'consumer' | 'request';
+
+export type DesignerDatasetWorkbenchStep =
+  | 'source'
+  | 'mapping'
+  | 'transform'
+  | 'preview'
+  | 'refresh';
+
+export type DesignerDatasetEditorMode = 'visual' | 'code';
+
+export type DesignerDatasetRefreshStrategy = 'once' | 'manual' | 'auto';
+
+export type DesignerDatasetAuthoringAction =
+  | 'open-code-editor'
+  | 'configure-filter'
+  | 'copy-data'
+  | 'fullscreen-edit'
+  | 'clear-cache'
+  | 'update-settings';
+
+export interface DesignerDatasetPreviewView {
+  readonly status: 'idle' | 'loading' | 'ready' | 'error';
+  readonly tab: DesignerDatasetPreviewTab;
+  readonly rawValue?: import('@base-screen/contracts').ScreenJsonValue;
+  readonly consumerValue?: import('@base-screen/contracts').ScreenJsonValue;
+  readonly message: string;
+  readonly testedAt?: string;
+  readonly open: boolean;
+}
+
+export interface DesignerDatasetAuthoringView {
+  readonly editorMode: DesignerDatasetEditorMode;
+  readonly filterConfigured: boolean;
+  readonly loadingDisabled: boolean;
+  readonly controlled: boolean;
+  readonly refreshStrategy: DesignerDatasetRefreshStrategy;
+  readonly refreshInterval: number;
+}
+
 export interface DesignerDataSourcePanelOptions {
   readonly panel: HTMLElement;
+  readonly scrollScope: string;
   readonly mode: DesignerDataSourceMode;
   readonly availableModes: readonly DesignerDataSourceMode[];
   readonly staticDraft: string;
@@ -39,6 +80,11 @@ export interface DesignerDataSourcePanelOptions {
   readonly catalogAvailable: boolean;
   readonly resourceAvailable: boolean;
   readonly feedback: string;
+  readonly dirty: boolean;
+  readonly confirmClose: boolean;
+  readonly preview: DesignerDatasetPreviewView;
+  readonly activeStep: DesignerDatasetWorkbenchStep;
+  readonly authoring: DesignerDatasetAuthoringView;
 }
 
 export interface DesignerDatasetConfigurationOptions {

@@ -47,7 +47,15 @@ function createCatalog(): BaseScreenMaterialCatalog {
     defaultSize: { width: 100, height: 40 },
     defaultProps: {},
     defaultStyle: {},
-    styleSchema: { kind: 'object', properties: {}, required: [] },
+    styleSchema: {
+      kind: 'object',
+      properties: {
+        flipX: { kind: 'boolean' },
+        flipY: { kind: 'boolean' },
+        opacity: { kind: 'number' },
+      },
+      required: [],
+    },
     stylePanel: [],
     propsSchema: { kind: 'object', properties: {}, required: [] },
     propertyPanel: [],
@@ -335,6 +343,25 @@ function rendererWithRoot(): {
     }),
   };
 }
+
+describe('BaseScreenRenderer material presentation styles', () => {
+  it('applies flip transforms and clamps material opacity during render', () => {
+    const { root, renderer } = rendererWithRoot();
+    const result = renderer.render(
+      document([
+        {
+          ...component('styled', 0),
+          rotation: 12,
+          style: { flipX: true, flipY: false, opacity: 1.5 },
+        },
+      ]),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(root.children[0]?.style.transform).toBe('rotate(12deg) scale(-1, 1)');
+    expect(root.children[0]?.style.opacity).toBe('1');
+  });
+});
 
 describe('BaseScreenRenderer canvas background image', () => {
   it('applies the canvas background image styles with a cover default', () => {

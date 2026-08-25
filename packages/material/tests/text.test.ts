@@ -118,6 +118,9 @@ describe('text material typography (ADR-0047)', () => {
     ]);
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultStyle).toEqual({
       color: '#ffffff',
+      opacity: 1,
+      flipX: false,
+      flipY: false,
       fontSize: 32,
       fontWeight: '400',
       textAlign: 'left',

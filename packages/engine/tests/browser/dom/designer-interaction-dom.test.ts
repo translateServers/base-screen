@@ -11,6 +11,7 @@ import {
 
 class FakeElement {
   readonly children: FakeElement[] = [];
+  readonly dataset: Record<string, string> = {};
   className = '';
   textContent = '';
 
@@ -98,8 +99,9 @@ describe('designer interaction projection', () => {
         undefined,
       ),
     ).toEqual({ design: ['调整大小'], previewEvents: [] });
-    expect(panel.children).toHaveLength(1);
+    expect(panel.children).toHaveLength(2);
     expect(panel.children[0]?.children[0]?.textContent).toBe('设计');
+    expect(panel.children[1]?.children[0]?.textContent).toBe('事件');
   });
 
   it('R9 exposes preview events only when the current authority grants them', () => {
@@ -123,7 +125,8 @@ describe('designer interaction projection', () => {
         materialCatalog,
         authority(false),
       ),
-    ).toBe(false);
-    expect(panel.textContent).toBe('当前组件没有公开交互能力。');
+    ).toBe(true);
+    expect(panel.children).toHaveLength(1);
+    expect(panel.children[0]?.children[0]?.textContent).toBe('事件');
   });
 });

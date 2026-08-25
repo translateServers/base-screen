@@ -1,11 +1,18 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenRuntimeContributionIndex,
+} from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   buildScreenAuthoringEditorContext,
+  buildScreenBlueprintAuthoringContext,
   createScreenAuthoringRequestId,
+  DESIGNER_BLUEPRINT_CAPABILITIES,
   parseScreenAuthoringBlueprintCandidate,
   parseScreenComponentTextSource,
   validateScreenAuthoringCommitGuards,
+  validateScreenBlueprintAuthoringCommitGuards,
 } from '../../../src/common/operations/designer-authoring-bridge.js';
 
 const document: ScreenDocument = {
@@ -110,6 +117,188 @@ describe('AE-ED-C07 detached editor context', () => {
     expect(context.blueprint).toEqual({ rules: [] });
     expect(context.limits.maxJsonDepth).toBeGreaterThan(0);
     expect(JSON.stringify(context)).not.toContain('function');
+  });
+});
+
+describe('document Blueprint authoring context', () => {
+  const globalDocument: ScreenDocument = {
+    ...document,
+    components: [
+      ...document.components,
+      {
+        id: 'table-1',
+        type: 'base.table',
+        name: '表格',
+        parentId: null,
+        position: { x: 20, y: 30 },
+        size: { width: 20, height: 20 },
+        rotation: 0,
+        zIndex: 1,
+        status: { locked: false, hidden: false },
+        props: {},
+        style: {},
+        dataSource: null,
+      },
+      {
+        ...document.components[0]!,
+        id: 'chart-2',
+        name: '图表 2',
+        zIndex: 2,
+      },
+    ],
+    blueprint: {
+      rules: [
+        {
+          id: 'table-rule',
+          trigger: { type: 'material-event', componentId: 'table-1', eventName: 'rowClick' },
+          actions: [],
+          requiredCapabilities: ['table.row-select'],
+        },
+      ],
+    },
+  };
+
+  function catalog(): BaseScreenMaterialCatalog {
+    return {
+      get: (type) => {
+        if (type === 'base.chart') {
+          return {
+            manifest: {
+              events: ['seriesClick'],
+              editorDescriptor: {
+                events: [
+                  {
+                    name: 'seriesClick',
+                    label: '系列点击',
+                    hint: '点击数据点',
+                    payloadSchema: {
+                      kind: 'object',
+                      properties: { id: { kind: 'string' } },
+                      required: ['id'],
+                    },
+                    maxPayloadBytes: 64 * 1024,
+                    triggerContexts: ['blueprint'],
+                    requiredCapability: 'chart.series-select',
+                  },
+                ],
+              },
+            },
+          } as never;
+        }
+        if (type === 'base.table') {
+          return {
+            manifest: {
+              events: ['rowClick'],
+              editorDescriptor: { events: [{ name: 'rowClick', label: '行点击' }] },
+            },
+          } as never;
+        }
+        return undefined;
+      },
+    } as BaseScreenMaterialCatalog;
+  }
+
+  function authority(): BaseScreenRuntimeContributionIndex {
+    return {
+      getResourceType: () => undefined,
+      hasBlueprintCapability: (capability) => {
+        if (capability === 'chart.series-select') throw new Error('authority unavailable');
+        return capability === DESIGNER_BLUEPRINT_CAPABILITIES.materialEvent;
+      },
+    };
+  }
+
+  it('projects every used material once while keeping initial focus advisory', () => {
+    const context = buildScreenBlueprintAuthoringContext({
+      document: globalDocument,
+      initialComponentId: 'chart-1',
+      catalog: catalog(),
+      runtimeContributions: authority(),
+    });
+
+    expect(context.document).not.toBe(globalDocument);
+    expect(context.document.components).toHaveLength(3);
+    expect(context.document.blueprint.rules[0]?.trigger.componentId).toBe('table-1');
+    expect(context.initialComponentId).toBe('chart-1');
+    expect(context.materialEvents.map((item) => item.materialType)).toEqual([
+      'base.chart',
+      'base.table',
+    ]);
+    expect(context.materialEvents[0]?.events[0]).toMatchObject({
+      name: 'seriesClick',
+      label: '系列点击',
+      hint: '点击数据点',
+      maxPayloadBytes: 64 * 1024,
+      requiredCapability: 'chart.series-select',
+      available: false,
+    });
+    expect(context.materialEvents[0]?.events[0]?.payloadSchema).toEqual({
+      kind: 'object',
+      properties: { id: { kind: 'string' } },
+      required: ['id'],
+    });
+    expect(context.capabilities['chart.series-select']).toBe(false);
+    expect(context.capabilities['table.row-select']).toBe(false);
+    expect(context.capabilities[DESIGNER_BLUEPRINT_CAPABILITIES.materialEvent]).toBe(true);
+  });
+
+  it('falls back to no initial focus and keeps the projection deeply detached', () => {
+    const materialCatalog = catalog();
+    const payloadSchema =
+      materialCatalog.get('base.chart')?.manifest.editorDescriptor?.events?.[0]?.payloadSchema;
+    const context = buildScreenBlueprintAuthoringContext({
+      document: globalDocument,
+      initialComponentId: 'missing',
+      catalog: materialCatalog,
+      runtimeContributions: authority(),
+    });
+
+    expect(context.initialComponentId).toBeNull();
+    expect(context.materialEvents[0]?.events[0]?.payloadSchema).not.toBe(payloadSchema);
+    expect(JSON.stringify(context)).not.toContain('function');
+  });
+});
+
+describe('document Blueprint authoring guards', () => {
+  const current = {
+    requestId: 'authoring-blueprint-1',
+    expectedRevision: 'revision-1',
+    openedRevision: 'revision-1',
+    currentRevision: 'revision-1',
+    openedDocumentGeneration: 7,
+    currentDocumentGeneration: 7,
+    disposed: false,
+  } as const;
+
+  it('accepts only the exact revision and document generation opened by the request', () => {
+    expect(validateScreenBlueprintAuthoringCommitGuards(current).ok).toBe(true);
+
+    const documentChanged = validateScreenBlueprintAuthoringCommitGuards({
+      ...current,
+      currentDocumentGeneration: 8,
+    });
+    expect(documentChanged.ok).toBe(false);
+    if (!documentChanged.ok) {
+      expect(documentChanged.diagnostics[0]?.code).toBe('AUTHORING_STALE_REVISION');
+    }
+
+    const externallyChanged = validateScreenBlueprintAuthoringCommitGuards({
+      ...current,
+      currentRevision: 'revision-2',
+    });
+    expect(externallyChanged.ok).toBe(false);
+  });
+
+  it('rejects mismatched expectations and disposed instances', () => {
+    expect(
+      validateScreenBlueprintAuthoringCommitGuards({
+        ...current,
+        expectedRevision: 'revision-0',
+      }).ok,
+    ).toBe(false);
+    const disposed = validateScreenBlueprintAuthoringCommitGuards({ ...current, disposed: true });
+    expect(disposed.ok).toBe(false);
+    if (!disposed.ok) expect(disposed.diagnostics[0]?.code).toBe('AUTHORING_EXPIRED');
   });
 });
 

@@ -85,10 +85,23 @@ export function createDesignerWorkspace(
       <span>${DESIGNER_UI_TEXT.smallScreenWarning}</span>
     </div>
 
+    <section class="designer-command-palette" data-command-palette hidden role="dialog" aria-modal="true" aria-label="${DESIGNER_UI_TEXT.commandPalette.dialog}">
+      <div class="designer-command-palette-card">
+        <label class="designer-command-palette-search">
+          <span aria-hidden="true">${designerIcon('search')}</span>
+          <input id="designer-command-palette-input" type="search" class="designer-control designer-input" data-command-palette-search autocomplete="off" spellcheck="false" placeholder="${DESIGNER_UI_TEXT.commandPalette.placeholder}" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" aria-controls="designer-command-palette-results">
+          <kbd>/</kbd>
+        </label>
+        <div class="designer-command-palette-results" id="designer-command-palette-results" data-command-palette-results role="listbox" aria-label="${DESIGNER_UI_TEXT.commandPalette.dialog}"></div>
+        <p class="designer-command-palette-empty" data-command-palette-empty hidden>${DESIGNER_UI_TEXT.commandPalette.empty}</p>
+        <footer>${DESIGNER_UI_TEXT.commandPalette.hint}</footer>
+      </div>
+    </section>
+
     <aside class="rail" data-left-panel>
       <header class="panel-heading">
-        <span class="panel-title">${DESIGNER_UI_TEXT.materials}</span>
-        <span class="panel-count" data-material-count>${visibleMaterials.length}</span>
+        <span class="panel-title" data-left-panel-title>${DESIGNER_UI_TEXT.materials}</span>
+        <span class="panel-count" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterials.length)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterials.length}">${visibleMaterials.length}</span>
         <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" title="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
         </button>
@@ -108,20 +121,22 @@ export function createDesignerWorkspace(
         </button>
       </div>
       <div class="rail-view" id="designer-materials-panel" role="tabpanel" aria-labelledby="designer-materials-tab" data-materials>
-        <div class="material-search">
-          <span class="material-search-glyph" aria-hidden="true">${designerIcon('search')}</span>
-          <input type="search" class="designer-control designer-input" data-material-search placeholder="${DESIGNER_UI_TEXT.materialsSearch}" aria-label="${DESIGNER_UI_TEXT.materialsSearch}">
-          <button type="button" class="designer-control designer-button designer-icon-button material-search-clear" data-variant="ghost" data-material-search-clear title="${DESIGNER_UI_TEXT.clearMaterialSearch}" aria-label="${DESIGNER_UI_TEXT.clearMaterialSearch}" hidden>
-            ${designerIcon('x')}
-          </button>
+        <div class="material-library-toolbar" data-material-library-toolbar>
+          <div class="material-search">
+            <span class="material-search-glyph" aria-hidden="true">${designerIcon('search')}</span>
+            <input type="search" class="designer-control designer-input" data-material-search placeholder="${DESIGNER_UI_TEXT.materialsSearch}" aria-label="${DESIGNER_UI_TEXT.materialsSearch}" aria-describedby="designer-left-panel-count">
+            <button type="button" class="designer-control designer-button designer-icon-button material-search-clear" data-variant="ghost" data-material-search-clear title="${DESIGNER_UI_TEXT.clearMaterialSearch}" aria-label="${DESIGNER_UI_TEXT.clearMaterialSearch}" hidden>
+              ${designerIcon('x')}
+            </button>
+          </div>
+          <div class="material-filters" role="group" aria-label="${DESIGNER_UI_TEXT.materialFilters}">
+            <button type="button" class="designer-control designer-button" data-material-filter="all" aria-pressed="true">${DESIGNER_UI_TEXT.allMaterials}</button>
+            <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">${DESIGNER_UI_TEXT.favoriteMaterials}</button>
+            <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">${DESIGNER_UI_TEXT.recentMaterials}</button>
+          </div>
+          <nav class="material-group-navigation" data-material-groups aria-label="${DESIGNER_UI_TEXT.materialGroups}" hidden></nav>
+          <div class="material-categories" data-material-categories role="group" aria-label="${DESIGNER_UI_TEXT.materialCategories}"></div>
         </div>
-        <div class="material-filters" role="group" aria-label="${DESIGNER_UI_TEXT.materialFilters}">
-          <button type="button" class="designer-control designer-button" data-material-filter="all" aria-pressed="true">${DESIGNER_UI_TEXT.allMaterials}</button>
-          <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">${DESIGNER_UI_TEXT.favoriteMaterials}</button>
-          <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">${DESIGNER_UI_TEXT.recentMaterials}</button>
-        </div>
-        <nav class="material-group-navigation" data-material-groups aria-label="${DESIGNER_UI_TEXT.materialGroups}" hidden></nav>
-        <div class="material-categories" data-material-categories role="group" aria-label="${DESIGNER_UI_TEXT.materialCategories}"></div>
         <div class="material-grid" data-material-grid></div>
         <p class="designer-empty-state material-search-empty" data-material-search-empty hidden>${DESIGNER_UI_TEXT.materialSearchEmpty}</p>
       </div>
@@ -134,8 +149,15 @@ export function createDesignerWorkspace(
     <main class="workspace">
       <header class="designer-topbar" aria-label="${DESIGNER_UI_TEXT.topbar}">
         <div class="topbar-brand">
-          <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>
-          <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
+          <span class="topbar-product-mark" aria-hidden="true">${designerIcon('shapes')}</span>
+          <span class="topbar-project-meta">
+            <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>
+            <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
+          </span>
+          <span class="topbar-mode-switch" role="group" aria-label="${DESIGNER_UI_TEXT.interactionWorkspace}">
+            <span class="topbar-mode-button" data-active="true" aria-current="page">${designerIcon('grid')}<span>${DESIGNER_UI_TEXT.canvasWorkspace}</span></span>
+            <button type="button" class="topbar-mode-button" data-action="open-blueprint" title="${DESIGNER_UI_TEXT.interactionWorkspaceHint}" aria-label="${DESIGNER_UI_TEXT.interactionWorkspaceHint}">${designerIcon('variable')}<span>${DESIGNER_UI_TEXT.interactionWorkspace}</span></button>
+          </span>
         </div>
         <div class="topbar-center">
           <div class="topbar-segment designer-tool-cluster" role="group" aria-label="${DESIGNER_UI_TEXT.tools}">
@@ -145,6 +167,11 @@ export function createDesignerWorkspace(
             ${actionButton('undo', designerIcon('undo'))}
             ${actionButton('redo', redoGlyph())}
           </div>
+          <button type="button" class="topbar-search-trigger" data-command-palette-toggle aria-expanded="false" aria-controls="designer-command-palette-input" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" title="${DESIGNER_UI_TEXT.commandPalette.trigger}">
+            ${designerIcon('search')}
+            <span>${DESIGNER_UI_TEXT.commandPalette.trigger}</span>
+            <kbd>/</kbd>
+          </button>
         </div>
         <div class="topbar-actions">
           <div class="topbar-segment topbar-zoom" role="group" aria-label="${DESIGNER_UI_TEXT.zoom}">
@@ -211,6 +238,9 @@ export function createDesignerWorkspace(
           </div>
         </div>
       </div>
+      <section class="designer-data-workbench" data-data-workbench hidden aria-label="${DESIGNER_UI_TEXT.dataSource.workbench}">
+        <div data-data-workbench-content></div>
+      </section>
       <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="${DESIGNER_UI_TEXT.contextMenu}" tabindex="-1"></div>
 
       <!-- Nebula-style status bar: left (tool + selection + project state) | center (canvas size) | right (Snap/Guide toggles + design mode + zoom menu). -->
@@ -272,17 +302,40 @@ export function createDesignerWorkspace(
 
     <aside class="properties" data-right-panel>
       <header class="panel-heading">
-        <span class="panel-title">${DESIGNER_UI_TEXT.inspector}</span>
+        <span class="panel-title" data-right-panel-title>${DESIGNER_UI_TEXT.inspectorUi.canvasConfiguration}</span>
         <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="right" title="${DESIGNER_UI_TEXT.collapseInspector}" aria-label="${DESIGNER_UI_TEXT.collapseInspector}">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
         </button>
       </header>
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
-        <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance">${DESIGNER_UI_TEXT.appearance}</button>
-        <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data">${DESIGNER_UI_TEXT.data}</button>
-        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction">${DESIGNER_UI_TEXT.interaction}</button>
-        <button type="button" class="designer-tab" id="designer-events-tab" role="tab" aria-controls="designer-events-panel" aria-selected="false" data-inspector-tab="events">${DESIGNER_UI_TEXT.events}</button>
+        <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span class="inspector-tab-icon">${designerIcon('sliders')}</span><span>${DESIGNER_UI_TEXT.appearance}</span></button>
+        <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span class="inspector-tab-icon">${designerIcon('grid')}</span><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>
+        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span class="inspector-tab-icon">${designerIcon('cube')}</span><span>${DESIGNER_UI_TEXT.inspectorUi.advanced}</span></button>
       </div>
+      <div class="inspector-context" data-inspector-context></div>
+      <div class="inspector-toolbar">
+        <button type="button" class="designer-control designer-button designer-icon-button inspector-search-launch" data-variant="ghost" data-inspector-search-launch title="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}" aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}">${designerIcon('search')}</button>
+        <div class="inspector-density" role="group" aria-label="${DESIGNER_UI_TEXT.inspector}">
+          <button type="button" class="designer-tab" data-inspector-density="basic" aria-pressed="true">${DESIGNER_UI_TEXT.inspectorUi.basic}</button>
+          <button type="button" class="designer-tab" data-inspector-density="all" aria-pressed="false">${DESIGNER_UI_TEXT.inspectorUi.all}</button>
+        </div>
+      </div>
+      <section class="inspector-search-workspace" data-inspector-search-workspace aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}" hidden>
+        <header class="inspector-search-workspace-header">
+          <button type="button" class="designer-control designer-button designer-icon-button inspector-search-back" data-variant="ghost" data-inspector-search-close title="${DESIGNER_UI_TEXT.inspectorUi.searchBack}" aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchBack}">${designerIcon('chevron-left')}</button>
+          <strong>${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}</strong>
+          <span class="inspector-search-workspace-icon" aria-hidden="true">${designerIcon('copy')}</span>
+        </header>
+        <label class="inspector-search">
+          <span aria-hidden="true">${designerIcon('search')}</span>
+          <input type="search" class="designer-control designer-input" data-inspector-search placeholder="${DESIGNER_UI_TEXT.inspectorUi.search}" aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchAria}">
+        </label>
+        <div class="inspector-search-instructions">
+          <span>${DESIGNER_UI_TEXT.inspectorUi.searchJumpHint}</span>
+          <span>${DESIGNER_UI_TEXT.inspectorUi.searchReuseHint}</span>
+        </div>
+        <div class="inspector-search-results" data-inspector-search-results hidden></div>
+      </section>
       <div class="inspector-pane" id="designer-appearance-panel" role="tabpanel" aria-labelledby="designer-appearance-tab" data-inspector-pane="appearance">
         <div data-properties></div>
       </div>
@@ -291,9 +344,6 @@ export function createDesignerWorkspace(
       </div>
       <div class="inspector-pane" id="designer-interaction-panel" role="tabpanel" aria-labelledby="designer-interaction-tab" data-inspector-pane="interaction" hidden>
         <p class="designer-empty-state">${DESIGNER_UI_TEXT.interactionPanelEmpty}</p>
-      </div>
-      <div class="inspector-pane" id="designer-events-panel" role="tabpanel" aria-labelledby="designer-events-tab" data-inspector-pane="events" hidden>
-        <div data-events-panel></div>
       </div>
     </aside>
 

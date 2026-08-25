@@ -22,6 +22,7 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { validateBaseScreenMaterialProps } from '@base-screen/plugin-core';
+import type { BaseScreenCanvasScaleMode } from '../../canvas-presentation.js';
 import {
   clampScreenCoordinate,
   roundScreenGeometry,
@@ -50,6 +51,7 @@ import {
   STYLE_RULE_OPERATORS,
 } from '../../common/operations/designer-style-rule-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
 import {
   createDesignerColorPalette,
   readDesignerColorPaletteValue,
@@ -58,11 +60,32 @@ import {
   type DesignerDescriptorDatasetFields,
   renderDesignerDescriptorZone,
 } from './designer-descriptor-dom.js';
+import { appendDesignerQuickStyle } from './designer-quick-style-dom.js';
 
 export interface DesignerPanelInput {
   readonly value: string;
   readonly checked?: boolean;
   readonly type?: string;
+}
+
+export type DesignerCanvasScaleMode = BaseScreenCanvasScaleMode;
+
+export interface DesignerCanvasPresentationSettings {
+  opacity: number;
+  scaleMode: DesignerCanvasScaleMode;
+  backgroundAutoFill: boolean;
+  disableComponentLoading: boolean;
+  thumbnailUrl: string | undefined;
+}
+
+export function createDesignerCanvasPresentationSettings(): DesignerCanvasPresentationSettings {
+  return {
+    opacity: 1,
+    scaleMode: 'fill',
+    backgroundAutoFill: true,
+    disableComponentLoading: false,
+    thumbnailUrl: undefined,
+  };
 }
 
 export interface DesignerCanvasBackgroundDrafts {
@@ -114,6 +137,7 @@ export function renderDesignerProperties(
   getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
   canvasBackgroundImageButtonVisible = false,
   canvasBackgroundDrafts = createDesignerCanvasBackgroundDrafts(document),
+  canvasPresentation = createDesignerCanvasPresentationSettings(),
 ): void {
   properties.replaceChildren();
   const context = getDesignerInspectorContext(document, interaction, catalog);
@@ -125,6 +149,7 @@ export function renderDesignerProperties(
         document,
         canvasBackgroundImageButtonVisible,
         canvasBackgroundDrafts,
+        canvasPresentation,
       );
     }
     return;
@@ -149,8 +174,9 @@ function appendComponentControls(
 ): void {
   const { component, manifest } = context;
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
-  appendInput(geometry, DESIGNER_UI_TEXT.propertiesPanel.name, 'name', component.name);
+  geometry.className += ' designer-datav-geometry-section';
   const geometryGrid = appendFieldGrid(geometry);
+  geometryGrid.className += ' designer-datav-geometry-grid';
   appendInput(
     geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.x,
@@ -164,6 +190,14 @@ function appendComponentControls(
     'y',
     component.position.y,
     'number',
+  );
+  appendInput(
+    geometryGrid,
+    DESIGNER_UI_TEXT.propertiesPanel.rotation,
+    'rotation',
+    component.rotation,
+    'number',
+    '-180',
   );
   appendInput(
     geometryGrid,
@@ -181,15 +215,8 @@ function appendComponentControls(
     'number',
     '1',
   );
-  appendInput(
-    geometryGrid,
-    DESIGNER_UI_TEXT.propertiesPanel.rotation,
-    'rotation',
-    component.rotation,
-    'number',
-    '-180',
-  );
-  appendInput(
+  if (manifest !== undefined) appendFlipActions(geometryGrid, component, manifest);
+  const zIndex = appendInput(
     geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.zIndex,
     'zIndex',
@@ -197,7 +224,8 @@ function appendComponentControls(
     'number',
     '0',
   );
-  const status = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.status);
+  zIndex.dataset.inspectorAdvanced = 'true';
+  const status = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.status, true);
   const statusGrid = appendFieldGrid(status);
   appendCheckbox(
     statusGrid,
@@ -215,6 +243,9 @@ function appendComponentControls(
     appendGroupActions(properties, context);
   }
   if (manifest === undefined) return;
+  appendCommonOpacityControl(properties, component, manifest);
+  appendDesignerQuickStyle(properties, manifest, { components: [component] });
+
   const descriptorAppearance = manifest.editorDescriptor?.appearance;
   if (descriptorAppearance !== undefined && descriptorAppearance.length > 0) {
     renderDesignerDescriptorZone(properties, descriptorAppearance, {
@@ -223,6 +254,7 @@ function appendComponentControls(
       catalog,
       getDatasetFields,
     });
+    appendStyleRulesSection(properties, component, manifest, document);
     return;
   }
   const content =
@@ -249,6 +281,7 @@ function appendComponentControls(
       ? undefined
       : appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.style);
   for (const field of stylePanel) {
+    if (field.style === 'opacity') continue;
     const schema = manifest.styleSchema.properties[field.style];
     if (schema !== undefined && style !== undefined) {
       appendStyleControl(
@@ -263,6 +296,101 @@ function appendComponentControls(
     }
   }
   appendStyleRulesSection(properties, component, manifest, document);
+}
+
+function appendCommonOpacityControl(
+  properties: HTMLElement,
+  component: ScreenComponentNode,
+  manifest: BaseScreenMaterialManifest,
+): void {
+  const schema = manifest.styleSchema.properties.opacity;
+  if (schema?.kind !== 'number') return;
+  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.commonStyle);
+  section.className += ' designer-datav-common-section';
+  const field = properties.ownerDocument.createElement('span');
+  field.className = 'designer-field designer-field-label designer-opacity-field';
+  field.textContent = DESIGNER_UI_TEXT.propertiesPanel.opacity;
+  const controls = properties.ownerDocument.createElement('span');
+  controls.className = 'designer-opacity-controls';
+  const range = properties.ownerDocument.createElement('input');
+  range.type = 'range';
+  range.className = 'designer-control designer-range';
+  range.min = '0';
+  range.max = '100';
+  range.step = '1';
+  range.value = String(Math.round(Number(component.style.opacity ?? 1) * 100));
+  range.dataset.style = 'opacity';
+  range.dataset.opacityPercent = 'true';
+  range.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.opacity);
+  const number = properties.ownerDocument.createElement('input');
+  number.type = 'number';
+  number.className = 'designer-control designer-input designer-number';
+  number.min = '0';
+  number.max = '1';
+  number.step = '0.01';
+  number.value = String(component.style.opacity ?? 1);
+  number.dataset.style = 'opacity';
+  number.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.opacity);
+  controls.appendChild(range);
+  controls.appendChild(number);
+  field.appendChild(controls);
+  appendFieldMessage(field, number, 'style-opacity');
+  section.appendChild(field);
+}
+
+function appendFlipActions(
+  parent: HTMLElement,
+  component: ScreenComponentNode,
+  manifest: BaseScreenMaterialManifest,
+): void {
+  const supportsHorizontal = manifest.styleSchema.properties.flipX?.kind === 'boolean';
+  const supportsVertical = manifest.styleSchema.properties.flipY?.kind === 'boolean';
+  if (!supportsHorizontal && !supportsVertical) return;
+  const field = parent.ownerDocument.createElement('div');
+  field.className = 'designer-field designer-field-label designer-flip-field';
+  field.textContent = DESIGNER_UI_TEXT.propertiesPanel.flipHorizontal;
+  const actions = parent.ownerDocument.createElement('span');
+  actions.className = 'designer-flip-actions';
+  if (supportsHorizontal) {
+    actions.appendChild(
+      flipButton(
+        parent.ownerDocument,
+        DESIGNER_UI_TEXT.propertiesPanel.flipHorizontal,
+        'flipX',
+        component.style.flipX === true,
+      ),
+    );
+  }
+  if (supportsVertical) {
+    const button = flipButton(
+      parent.ownerDocument,
+      DESIGNER_UI_TEXT.propertiesPanel.flipVertical,
+      'flipY',
+      component.style.flipY === true,
+    );
+    button.dataset.flipLabel = DESIGNER_UI_TEXT.propertiesPanel.flipVertical;
+    actions.appendChild(button);
+  }
+  field.appendChild(actions);
+  parent.appendChild(field);
+}
+
+function flipButton(
+  ownerDocument: Document,
+  label: string,
+  property: 'flipX' | 'flipY',
+  pressed: boolean,
+): HTMLButtonElement {
+  const button = ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-control designer-button designer-flip-button';
+  button.dataset.geometryAction = property;
+  button.dataset.flipLabel = label;
+  button.ariaPressed = String(pressed);
+  button.title = label;
+  button.setAttribute('aria-label', label);
+  button.textContent = property === 'flipX' ? '↔' : '↕';
+  return button;
 }
 
 function appendGroupOverview(
@@ -314,6 +442,8 @@ function appendMultiSelectionControls(
   catalog: BaseScreenMaterialCatalog | undefined,
 ): void {
   const summary = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionSummary);
+  summary.className += ' designer-datav-batch-summary';
+  summary.dataset.inspectorAdvanced = 'true';
   const list = properties.ownerDocument.createElement('ul');
   list.className = 'designer-inspector-summary';
   appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.multiSelect(context.summary.count));
@@ -336,37 +466,49 @@ function appendMultiSelectionControls(
   }
   summary.appendChild(list);
   const arrange = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.arrangeActions);
-  for (const [action, label] of [
-    ['align-left', DESIGNER_UI_TEXT.propertiesPanel.alignLeft],
-    ['align-center', DESIGNER_UI_TEXT.propertiesPanel.alignCenter],
-    ['align-right', DESIGNER_UI_TEXT.propertiesPanel.alignRight],
-    ['align-top', DESIGNER_UI_TEXT.propertiesPanel.alignTop],
-    ['align-middle', DESIGNER_UI_TEXT.propertiesPanel.alignMiddle],
-    ['align-bottom', DESIGNER_UI_TEXT.propertiesPanel.alignBottom],
+  arrange.className += ' designer-datav-batch-arrange';
+  const arrangeGrid = properties.ownerDocument.createElement('div');
+  arrangeGrid.className = 'designer-datav-batch-arrange-grid';
+  for (const [action, label, icon] of [
+    ['align-left', DESIGNER_UI_TEXT.propertiesPanel.alignLeft, 'align-left'],
+    ['align-center', DESIGNER_UI_TEXT.propertiesPanel.alignCenter, 'align-center'],
+    ['align-right', DESIGNER_UI_TEXT.propertiesPanel.alignRight, 'align-right'],
+    ['align-top', DESIGNER_UI_TEXT.propertiesPanel.alignTop, 'align-top'],
+    ['align-middle', DESIGNER_UI_TEXT.propertiesPanel.alignMiddle, 'align-middle'],
+    ['align-bottom', DESIGNER_UI_TEXT.propertiesPanel.alignBottom, 'align-bottom'],
   ] as const) {
-    appendActionButton(
-      arrange,
+    appendBatchArrangeButton(
+      arrangeGrid,
       label,
       action,
+      icon,
       !context.summary.canAlign,
       DESIGNER_UI_TEXT.propertiesPanel.alignUnavailableCount,
     );
   }
-  appendActionButton(
-    arrange,
+  appendBatchArrangeButton(
+    arrangeGrid,
     DESIGNER_UI_TEXT.propertiesPanel.distributeHorizontal,
+    'distribute-horizontal',
     'distribute-horizontal',
     !context.summary.canDistribute,
     DESIGNER_UI_TEXT.propertiesPanel.distributeUnavailableCount,
   );
-  appendActionButton(
-    arrange,
+  appendBatchArrangeButton(
+    arrangeGrid,
     DESIGNER_UI_TEXT.propertiesPanel.distributeVertical,
+    'distribute-vertical',
     'distribute-vertical',
     !context.summary.canDistribute,
     DESIGNER_UI_TEXT.propertiesPanel.distributeUnavailableCount,
   );
+  arrange.appendChild(arrangeGrid);
+  appendBatchGeometryControls(properties, context, interaction);
+  appendBatchQuickConfiguration(properties, context, interaction, catalog);
+  appendBatchStyleControls(properties, context, document, interaction, catalog);
   const actions = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupActions);
+  actions.className += ' designer-datav-batch-secondary-actions';
+  actions.dataset.inspectorAdvanced = 'true';
   appendActionButton(
     actions,
     DESIGNER_UI_TEXT.propertiesPanel.actionGroup,
@@ -374,14 +516,56 @@ function appendMultiSelectionControls(
     !context.summary.canGroup,
     multiSelectionGroupUnavailableReason(context.summary),
   );
-  appendBatchGeometryControls(properties, context, interaction);
-  appendBatchStyleControls(properties, context, document, interaction, catalog);
+  appendMultiSelectionStateActions(properties, context);
 }
 
 /**
  * 批量几何编辑区（ADR-0053 R1）：宽度/高度/旋转，值显示焦点组件当前值，
  * 编辑后应用到全部选中组件。全部锁定或无选中时禁用。
  */
+function appendMultiSelectionStateActions(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
+): void {
+  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionActions);
+  section.className += ' designer-datav-batch-secondary-actions';
+  section.dataset.inspectorAdvanced = 'true';
+  const allLocked = context.components.every((component) => component.status.locked);
+  const allHidden = context.components.every((component) => component.status.hidden);
+  appendActionButton(
+    section,
+    allLocked
+      ? DESIGNER_UI_TEXT.propertiesPanel.actionUnlock
+      : DESIGNER_UI_TEXT.propertiesPanel.actionLock,
+    allLocked ? 'unlock' : 'lock',
+    false,
+    '',
+  );
+  appendActionButton(
+    section,
+    allHidden
+      ? DESIGNER_UI_TEXT.propertiesPanel.actionShow
+      : DESIGNER_UI_TEXT.propertiesPanel.actionHide,
+    allHidden ? 'show' : 'hide',
+    false,
+    '',
+  );
+  appendActionButton(
+    section,
+    DESIGNER_UI_TEXT.propertiesPanel.actionDuplicate,
+    'duplicate',
+    false,
+    '',
+  );
+  appendActionButton(
+    section,
+    DESIGNER_UI_TEXT.propertiesPanel.actionDelete,
+    'delete',
+    allLocked,
+    allLocked ? DESIGNER_UI_TEXT.propertiesPanel.actionUnavailableAllLocked : '',
+  );
+}
+
 function appendBatchGeometryControls(
   properties: HTMLElement,
   context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
@@ -397,31 +581,99 @@ function appendBatchGeometryControls(
     ? DESIGNER_UI_TEXT.propertiesPanel.batchAllLocked
     : DESIGNER_UI_TEXT.propertiesPanel.batchActionsHint(context.summary.count);
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
-  const grid = appendFieldGrid(geometry);
+  geometry.className += ' designer-datav-batch-geometry';
+  const position = appendBatchFieldRow(
+    geometry,
+    DESIGNER_UI_TEXT.propertiesPanel.batchObjectPosition,
+  );
+  appendBatchReadOnlyInput(position, DESIGNER_UI_TEXT.propertiesPanel.x);
+  appendBatchReadOnlyInput(position, DESIGNER_UI_TEXT.propertiesPanel.y);
+  const size = appendBatchFieldRow(geometry, DESIGNER_UI_TEXT.propertiesPanel.batchObjectSize);
   appendBatchNumberInput(
-    grid,
+    size,
     DESIGNER_UI_TEXT.propertiesPanel.width,
     'width',
     focused.size.width,
+    context.components.some((item) => item.size.width !== focused.size.width),
     disabled,
     hint,
   );
   appendBatchNumberInput(
-    grid,
+    size,
     DESIGNER_UI_TEXT.propertiesPanel.height,
     'height',
     focused.size.height,
+    context.components.some((item) => item.size.height !== focused.size.height),
     disabled,
     hint,
   );
-  appendBatchNumberInput(
-    grid,
+  const rotation = appendBatchNumberInput(
+    geometry,
     DESIGNER_UI_TEXT.propertiesPanel.rotation,
     'rotation',
     focused.rotation,
+    context.components.some((item) => item.rotation !== focused.rotation),
     disabled,
     hint,
   );
+  rotation.dataset.inspectorAdvanced = 'true';
+}
+
+function appendBatchQuickConfiguration(
+  properties: HTMLElement,
+  context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
+  interaction: ScreenInteractionState,
+  catalog: BaseScreenMaterialCatalog | undefined,
+): void {
+  const focused =
+    context.components.find((item) => item.id === interaction.focusedComponentId) ??
+    context.components[0];
+  if (
+    focused === undefined ||
+    !context.components.every((component) => component.type === focused.type)
+  ) {
+    return;
+  }
+  const manifest = catalog?.get(focused.type)?.manifest;
+  if (manifest === undefined) return;
+  appendDesignerQuickStyle(properties, manifest, {
+    components: context.components,
+    includePresets: false,
+    preferenceContext: `batch:${manifest.type}`,
+    title: DESIGNER_UI_TEXT.propertiesPanel.quickConfiguration,
+    variant: 'batch',
+  });
+}
+
+function appendBatchFieldRow(parent: HTMLElement, labelText: string): HTMLElement {
+  const row = parent.ownerDocument.createElement('div');
+  row.className = 'designer-datav-batch-field-row';
+  const label = parent.ownerDocument.createElement('span');
+  label.className = 'designer-datav-batch-field-row-label';
+  label.textContent = labelText;
+  const controls = parent.ownerDocument.createElement('div');
+  controls.className = 'designer-datav-batch-field-row-controls';
+  row.appendChild(label);
+  row.appendChild(controls);
+  parent.appendChild(row);
+  return controls;
+}
+
+function appendBatchReadOnlyInput(parent: HTMLElement, labelText: string): void {
+  const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label designer-datav-batch-readonly';
+  label.textContent = labelText;
+  const input = parent.ownerDocument.createElement('input');
+  input.type = 'text';
+  input.className = 'designer-control designer-input';
+  input.placeholder = DESIGNER_UI_TEXT.propertiesPanel.multipleValues;
+  input.disabled = true;
+  input.setAttribute(
+    'aria-label',
+    `${labelText}：${DESIGNER_UI_TEXT.propertiesPanel.multipleValues}`,
+  );
+  label.appendChild(input);
+  parent.appendChild(label);
 }
 
 /**
@@ -438,7 +690,10 @@ function appendBatchStyleControls(
   if (document === undefined) return;
   const componentIds = context.components.map((item) => item.id);
   const fields = commonStyleFields(document, componentIds, catalog);
-  if (fields.length === 0) return;
+  if (fields.length === 0) {
+    appendBatchUnifiedStyleEmpty(properties);
+    return;
+  }
   const focused =
     context.components.find((item) => item.id === interaction.focusedComponentId) ??
     context.components[0];
@@ -449,7 +704,8 @@ function appendBatchStyleControls(
   const hint = disabled
     ? DESIGNER_UI_TEXT.propertiesPanel.batchAllLocked
     : DESIGNER_UI_TEXT.propertiesPanel.batchActionsHint(context.summary.count);
-  const style = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.style);
+  const style = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.unifiedStyle);
+  style.className += ' designer-datav-batch-unified-style';
   for (const field of fields) {
     const schema = manifest.styleSchema?.properties?.[field];
     const panelField = (manifest.stylePanel ?? []).find((item) => item.style === field);
@@ -459,12 +715,26 @@ function appendBatchStyleControls(
       panelField.label,
       field,
       focused.style[field],
+      context.components.some(
+        (item) => JSON.stringify(item.style[field]) !== JSON.stringify(focused.style[field]),
+      ),
       schema,
       panelField.control,
       disabled,
       hint,
     );
   }
+}
+
+function appendBatchUnifiedStyleEmpty(properties: HTMLElement): void {
+  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.unifiedStyle);
+  section.className += ' designer-datav-batch-unified-style';
+  const empty = properties.ownerDocument.createElement('button');
+  empty.type = 'button';
+  empty.className = 'designer-control designer-button designer-datav-batch-unified-empty';
+  empty.disabled = true;
+  empty.textContent = DESIGNER_UI_TEXT.propertiesPanel.noUnifiedStyle;
+  section.appendChild(empty);
 }
 
 export function renderDesignerDataPanel(
@@ -500,7 +770,10 @@ export function renderDesignerDataPanel(
   for (const value of ['none', ...capabilities]) {
     const option = panel.ownerDocument.createElement('option');
     option.value = value;
-    option.textContent = value === 'none' ? DESIGNER_UI_TEXT.propertiesPanel.none : value;
+    option.textContent =
+      value === 'none'
+        ? DESIGNER_UI_TEXT.propertiesPanel.none
+        : DESIGNER_UI_TEXT.dataSource.mode(value);
     option.selected = value === type;
     select.appendChild(option);
   }
@@ -551,6 +824,21 @@ export function createPropertyTransaction(
   canvasBackgroundDrafts?: DesignerCanvasBackgroundDrafts,
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   if (!isControl(target)) return undefined;
+  const geometryAction = target.dataset.geometryAction;
+  if (geometryAction === 'flipX' || geometryAction === 'flipY') {
+    const context = getDesignerInspectorContext(document, interaction, catalog);
+    if (context.kind !== 'single-material' || context.manifest === undefined) return undefined;
+    const schema = context.manifest.styleSchema.properties[geometryAction];
+    if (schema?.kind !== 'boolean') return undefined;
+    return success(
+      update(context.component.id, {
+        style: {
+          ...context.component.style,
+          [geometryAction]: context.component.style[geometryAction] !== true,
+        },
+      }),
+    );
+  }
   const context = getDesignerInspectorContext(document, interaction, catalog);
   if (context.kind !== 'single-material' && context.kind !== 'single-group') {
     return createCanvasTransaction(document, target, canvasBackgroundDrafts);
@@ -567,7 +855,7 @@ export function createPropertyTransaction(
     manifest !== undefined &&
     style !== undefined &&
     manifest.styleSchema.properties[style] !== undefined &&
-    manifest.stylePanel.some((field) => field.style === style)
+    (manifest.stylePanel.some((field) => field.style === style) || style === 'opacity')
   ) {
     const value = parsePropertyControlValue(target, manifest.styleSchema.properties[style]);
     return value === undefined
@@ -775,7 +1063,17 @@ export function createDataSourceTransaction(
   if (source?.type === 'static') {
     const value = parseScreenJsonValue(source.value);
     if (!value.ok) return dataSourceFailure(value.diagnostics[0]?.code ?? 'JSON_VALUE_INVALID');
-    return success(update(component.id, { dataSource: { type: source.type, value: value.value } }));
+    return success(
+      update(component.id, {
+        dataSource: {
+          type: source.type,
+          value: value.value,
+          ...(component.dataSource?.type === 'static' && component.dataSource.binding !== undefined
+            ? { binding: component.dataSource.binding }
+            : {}),
+        },
+      }),
+    );
   }
   if (source?.type === 'host-resource') {
     const resourceType = getResourceType(runtimeContributions, source.resourceType);
@@ -789,7 +1087,12 @@ export function createDataSourceTransaction(
     }
     return success(
       update(component.id, {
-        dataSource: { ...source, params: literalParameters(params.value), binding: null },
+        dataSource: {
+          ...source,
+          params: literalParameters(params.value),
+          binding:
+            component.dataSource?.type === 'host-resource' ? component.dataSource.binding : null,
+        },
       }),
     );
   }
@@ -803,6 +1106,11 @@ export function parsePropertyControlValue(
   const paletteValue = readDesignerColorPaletteValue(input as unknown as EventTarget);
   if (paletteValue !== undefined) return paletteValue;
   if (input.type === 'checkbox') return input.checked === true;
+  const dataset = (input as unknown as { readonly dataset?: DOMStringMap }).dataset;
+  if (dataset?.opacityPercent === 'true' && schema.kind === 'number') {
+    const percent = Number(input.value);
+    return Number.isFinite(percent) ? percent / 100 : undefined;
+  }
   if (schema.kind === 'number') {
     const value = Number(input.value);
     return Number.isFinite(value) ? value : undefined;
@@ -1000,10 +1308,12 @@ function appendInput(
   value: string | number,
   type = 'text',
   min?: string,
-): void {
+): HTMLLabelElement {
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
+  const symbol = geometryPropertySymbol(property);
+  if (symbol !== undefined) label.dataset.propertySymbol = symbol;
   const input = parent.ownerDocument.createElement('input');
   input.type = type;
   input.className = `designer-control designer-input${type === 'number' ? ' designer-number' : ''}`;
@@ -1013,6 +1323,17 @@ function appendInput(
   label.appendChild(input);
   appendFieldMessage(label, input, `property-${property}`);
   parent.appendChild(label);
+  return label;
+}
+
+function geometryPropertySymbol(property: string): string | undefined {
+  if (property === 'x') return 'X';
+  if (property === 'y') return 'Y';
+  if (property === 'width') return 'W';
+  if (property === 'height') return 'H';
+  if (property === 'rotation') return '°';
+  if (property === 'zIndex') return 'Z';
+  return undefined;
 }
 
 /** 批量数值输入（ADR-0053）：带 `data-multi-property` 标记，经独立事务分派。 */
@@ -1021,22 +1342,28 @@ function appendBatchNumberInput(
   labelText: string,
   multiProperty: string,
   value: number,
+  mixed: boolean,
   disabled: boolean,
   hint: string,
-): void {
+): HTMLLabelElement {
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
   const input = parent.ownerDocument.createElement('input');
   input.type = 'number';
   input.className = 'designer-control designer-input designer-number';
-  input.value = String(value);
+  input.value = mixed ? '' : String(value);
+  if (mixed) {
+    input.placeholder = DESIGNER_UI_TEXT.inspectorUi.mixed;
+    input.dataset.mixed = 'true';
+  }
   input.dataset.multiProperty = multiProperty;
   input.disabled = disabled;
   input.title = hint;
   label.appendChild(input);
   appendFieldMessage(label, input, `multi-property-${multiProperty}`);
   parent.appendChild(label);
+  return label;
 }
 
 /** 批量样式控件（ADR-0053）：复用单选控件渲染，color 字段走统一三段式调色板。 */
@@ -1045,6 +1372,7 @@ function appendBatchStyleControl(
   labelText: string,
   style: string,
   value: ScreenJsonValue | undefined,
+  mixed: boolean,
   schema: BaseScreenMaterialPropSchema,
   control: string,
   disabled: boolean,
@@ -1063,6 +1391,7 @@ function appendBatchStyleControl(
       input.dataset.multiProperty = `style:${style}`;
       input.disabled = disabled;
       input.title = hint;
+      if (mixed) input.dataset.mixed = 'true';
     }
     label.appendChild(palette.element);
     appendFieldMessage(label, palette.controls[0]!, `multi-style-${style}`);
@@ -1071,6 +1400,23 @@ function appendBatchStyleControl(
     input.dataset.multiProperty = `style:${style}`;
     input.disabled = disabled;
     input.title = hint;
+    if (mixed) {
+      input.dataset.mixed = 'true';
+      if (control === 'boolean' && input instanceof HTMLInputElement) {
+        input.checked = false;
+        input.indeterminate = true;
+      } else if (control === 'select' && input instanceof HTMLSelectElement) {
+        const option = parent.ownerDocument.createElement('option');
+        option.value = '';
+        option.textContent = DESIGNER_UI_TEXT.inspectorUi.mixed;
+        option.selected = true;
+        input.prepend(option);
+      } else {
+        input.value = '';
+        (input as HTMLInputElement | HTMLTextAreaElement).placeholder =
+          DESIGNER_UI_TEXT.inspectorUi.mixed;
+      }
+    }
     label.appendChild(input);
     appendFieldMessage(label, input, `multi-style-${style}`);
   }
@@ -1105,22 +1451,25 @@ function appendCanvasControls(
   document: ScreenDocument,
   canvasBackgroundImageButtonVisible: boolean,
   drafts: DesignerCanvasBackgroundDrafts,
+  canvasPresentation: DesignerCanvasPresentationSettings,
 ): void {
   const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvas);
-  appendCanvasInput(
-    section,
-    DESIGNER_UI_TEXT.propertiesPanel.canvasWidth,
-    'width',
-    document.canvas.width,
-    'number',
-  );
-  appendCanvasInput(
-    section,
-    DESIGNER_UI_TEXT.propertiesPanel.canvasHeight,
-    'height',
-    document.canvas.height,
-    'number',
-  );
+  section.className += ' designer-datav-canvas-section';
+  const size = parent.ownerDocument.createElement('div');
+  size.className = 'designer-canvas-size';
+  const sizeCaption = parent.ownerDocument.createElement('span');
+  sizeCaption.className = 'designer-canvas-row-label';
+  sizeCaption.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasDimensions;
+  const sizeControls = parent.ownerDocument.createElement('span');
+  sizeControls.className = 'designer-canvas-size-controls';
+  const width = createCanvasInput(sizeControls, 'W', 'width', document.canvas.width, 'number');
+  width.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.canvasWidth);
+  const height = createCanvasInput(sizeControls, 'H', 'height', document.canvas.height, 'number');
+  height.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.canvasHeight);
+  size.appendChild(sizeCaption);
+  size.appendChild(sizeControls);
+  section.appendChild(size);
+  appendCanvasPresentationControls(section, canvasPresentation);
   appendCanvasBackgroundControls(section, drafts);
   // 背景图片：URL 输入；宿主选择按钮（ADR-0046）默认隐藏，仅宿主配置
   // canvasBackgroundImageButton 后渲染（点击派发请求事件，宿主自开弹出框可视化选择）。
@@ -1159,12 +1508,156 @@ function appendCanvasControls(
   );
 }
 
+function appendCanvasPresentationControls(
+  parent: HTMLElement,
+  settings: DesignerCanvasPresentationSettings,
+): void {
+  const opacity = parent.ownerDocument.createElement('label');
+  opacity.className = 'designer-field designer-field-label designer-canvas-opacity';
+  opacity.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity;
+  const opacityControls = parent.ownerDocument.createElement('span');
+  opacityControls.className = 'designer-opacity-controls';
+  const range = parent.ownerDocument.createElement('input');
+  range.type = 'range';
+  range.className = 'designer-control designer-range';
+  range.min = '0';
+  range.max = '1';
+  range.step = '0.01';
+  range.value = String(settings.opacity);
+  range.dataset.canvasSetting = 'opacity';
+  range.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity);
+  const number = parent.ownerDocument.createElement('input');
+  number.type = 'number';
+  number.className = 'designer-control designer-input designer-number';
+  number.min = '0';
+  number.max = '1';
+  number.step = '0.01';
+  number.value = String(settings.opacity);
+  number.dataset.canvasSetting = 'opacity';
+  number.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity);
+  opacityControls.appendChild(range);
+  opacityControls.appendChild(number);
+  opacity.appendChild(opacityControls);
+  parent.appendChild(opacity);
+
+  const scale = parent.ownerDocument.createElement('label');
+  scale.className = 'designer-field designer-field-label designer-canvas-scale';
+  scale.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode;
+  const scaleControls = parent.ownerDocument.createElement('span');
+  scaleControls.className = 'designer-canvas-scale-options';
+  const scaleOptions: readonly [DesignerCanvasScaleMode, string][] = [
+    ['fill', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleFill],
+    ['fit', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleFit],
+    ['width', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleWidth],
+    ['height', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleHeight],
+    ['original', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleOriginal],
+    ['none', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleNone],
+  ];
+  for (const [value, label] of scaleOptions) {
+    const button = parent.ownerDocument.createElement('button');
+    button.type = 'button';
+    button.className = 'designer-control designer-button designer-canvas-scale-option';
+    button.dataset.canvasSetting = 'scaleMode';
+    button.dataset.canvasSettingValue = value;
+    button.textContent = label;
+    button.title = label;
+    button.ariaPressed = String(settings.scaleMode === value);
+    scaleControls.appendChild(button);
+  }
+  scale.appendChild(scaleControls);
+  parent.appendChild(scale);
+
+  appendCanvasSettingCheckbox(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundAutoFill,
+    'backgroundAutoFill',
+    settings.backgroundAutoFill,
+  );
+  appendCanvasSettingCheckbox(
+    parent,
+    DESIGNER_UI_TEXT.propertiesPanel.canvasDisableLoading,
+    'disableComponentLoading',
+    settings.disableComponentLoading,
+  );
+
+  const thumbnail = parent.ownerDocument.createElement('section');
+  thumbnail.className = 'designer-inspector-section designer-canvas-thumbnail';
+  thumbnail.dataset.inspectorSearchKind = 'section';
+  thumbnail.dataset.inspectorSearchText = DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnail;
+  const heading = parent.ownerDocument.createElement('h4');
+  heading.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnail;
+  const actions = parent.ownerDocument.createElement('div');
+  actions.className = 'designer-canvas-thumbnail-actions';
+  actions.appendChild(
+    canvasSettingAction(
+      parent.ownerDocument,
+      DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnailCapture,
+      'capture-thumbnail',
+    ),
+  );
+  actions.appendChild(
+    canvasSettingAction(
+      parent.ownerDocument,
+      DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnailUpload,
+      'upload-thumbnail',
+    ),
+  );
+  const preview = parent.ownerDocument.createElement('div');
+  preview.className = 'designer-canvas-thumbnail-preview';
+  if (settings.thumbnailUrl !== undefined) {
+    const image = parent.ownerDocument.createElement('img');
+    image.src = settings.thumbnailUrl;
+    image.alt = '';
+    preview.appendChild(image);
+  } else {
+    preview.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnailHint;
+  }
+  thumbnail.appendChild(heading);
+  thumbnail.appendChild(actions);
+  thumbnail.appendChild(preview);
+  parent.appendChild(thumbnail);
+}
+
+function appendCanvasSettingCheckbox(
+  parent: HTMLElement,
+  labelText: string,
+  setting: 'backgroundAutoFill' | 'disableComponentLoading',
+  checked: boolean,
+): void {
+  const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label designer-canvas-setting-checkbox';
+  label.textContent = labelText;
+  const input = parent.ownerDocument.createElement('input');
+  input.type = 'checkbox';
+  input.className = 'designer-checkbox';
+  input.checked = checked;
+  input.value = String(checked);
+  input.dataset.canvasSetting = setting;
+  label.appendChild(input);
+  parent.appendChild(label);
+}
+
+function canvasSettingAction(
+  ownerDocument: Document,
+  label: string,
+  action: string,
+): HTMLButtonElement {
+  const button = ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-control designer-button';
+  button.dataset.canvasSettingAction = action;
+  button.textContent = label;
+  return button;
+}
+
 function appendCanvasBackgroundControls(
   parent: HTMLElement,
   drafts: DesignerCanvasBackgroundDrafts,
 ): void {
   const type = parent.ownerDocument.createElement('label');
   type.className = 'designer-field designer-field-label';
+  type.dataset.canvasField = 'backgroundType';
+  type.dataset.inspectorAdvanced = 'true';
   type.textContent = DESIGNER_UI_TEXT.propertiesPanel.backgroundType;
   const select = type.ownerDocument.createElement('select');
   select.className = 'designer-control designer-select';
@@ -1187,7 +1680,7 @@ function appendCanvasBackgroundControls(
   if (drafts.activeType === 'solid') {
     appendCanvasInput(
       parent,
-      DESIGNER_UI_TEXT.propertiesPanel.backgroundColor,
+      DESIGNER_UI_TEXT.propertiesPanel.canvasBackground,
       'backgroundSolidColor',
       drafts.solid.color,
       'color',
@@ -1274,6 +1767,7 @@ function appendCanvasSelect(
 ): void {
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label';
+  label.dataset.canvasField = property;
   label.textContent = labelText;
   const select = parent.ownerDocument.createElement('select');
   select.className = 'designer-control designer-select';
@@ -1301,6 +1795,7 @@ function createCanvasInput(
   // color 输入用 span 容器：label 点击会激活 color input 弹出原生取色器。
   const label = parent.ownerDocument.createElement(type === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
+  label.dataset.canvasField = property;
   label.textContent = labelText;
   const input = parent.ownerDocument.createElement('input');
   input.type = type;
@@ -1326,6 +1821,7 @@ function appendCanvasInput(
   // color 输入用 span 容器：label 点击会激活 color input 弹出原生取色器。
   const label = parent.ownerDocument.createElement(type === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
+  label.dataset.canvasField = property;
   label.textContent = labelText;
   const input = parent.ownerDocument.createElement('input');
   input.type = type;
@@ -1554,7 +2050,7 @@ function appendStyleRulesSection(
 ): void {
   // 无可编辑样式键的物料（如组）不提供条件样式：规则样式覆盖需要 stylePanel 控件。
   if ((manifest.stylePanel ?? []).length === 0) return;
-  const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.conditionalStyles);
+  const section = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.conditionalStyles, true);
   const locked =
     document !== undefined && isScreenComponentEffectivelyLocked(document, component.id);
   const rules = component.styleRules ?? [];
@@ -1701,9 +2197,10 @@ function appendStyleRuleControl(
   parent.appendChild(label);
 }
 
-function appendSection(parent: HTMLElement, title: string): HTMLElement {
+function appendSection(parent: HTMLElement, title: string, advanced = false): HTMLElement {
   const section = parent.ownerDocument.createElement('section');
   section.className = 'designer-inspector-section';
+  if (advanced) section.dataset.inspectorAdvanced = 'true';
   const heading = parent.ownerDocument.createElement('h3');
   heading.className = 'designer-inspector-section-title';
   heading.textContent = title;
@@ -1742,6 +2239,26 @@ function appendActionButton(
     button.title = unavailableReason;
     button.ariaLabel = `${label}：${unavailableReason}`;
   }
+  parent.appendChild(button);
+}
+
+function appendBatchArrangeButton(
+  parent: HTMLElement,
+  label: string,
+  action: string,
+  icon: DesignerIconName,
+  disabled: boolean,
+  unavailableReason: string,
+): void {
+  const button = parent.ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className =
+    'designer-control designer-button designer-icon-button designer-datav-batch-arrange-button';
+  button.dataset.action = action;
+  button.title = disabled ? `${label}：${unavailableReason}` : label;
+  button.setAttribute('aria-label', button.title);
+  button.disabled = disabled;
+  button.innerHTML = designerIcon(icon);
   parent.appendChild(button);
 }
 

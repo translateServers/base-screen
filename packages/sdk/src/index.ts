@@ -7,11 +7,24 @@ export type {
   ScreenAuthoringEditorLimits,
   ScreenAuthoringRequest,
   ScreenAuthoringRequestEventDetail,
+  ScreenBlueprintAuthoringContext,
+  ScreenBlueprintAuthoringEvent,
+  ScreenBlueprintAuthoringLimits,
+  ScreenBlueprintAuthoringMaterialEvents,
   ScreenBlueprintCommitRequest,
+  ScreenBlueprintEditOptions,
   ScreenComponentTextCommitRequest,
   ScreenComponentTextTarget,
 } from '@base-screen/contracts';
-export { SCREEN_AUTHORING_REQUEST_EVENT } from '@base-screen/contracts';
+export {
+  MAX_AUTHORING_DOCUMENT_SNAPSHOT_BYTES,
+  MAX_BLUEPRINT_AUTHORING_CAPABILITIES,
+  MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES,
+  MAX_BLUEPRINT_AUTHORING_EVENTS_PER_MATERIAL,
+  MAX_BLUEPRINT_AUTHORING_PAYLOAD_SCHEMA_BYTES,
+  parseScreenBlueprintAuthoringContext,
+  SCREEN_AUTHORING_REQUEST_EVENT,
+} from '@base-screen/contracts';
 export {
   BASE_SCREEN_DESIGNER_TAG_NAME,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,

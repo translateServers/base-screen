@@ -6,11 +6,15 @@ import { renderDesignerVariables } from '../../../src/browser/dom/designer-varia
 class FakeElement {
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
+  readonly attributes: Record<string, string> = {};
   readonly style: Record<string, string> = {};
   value = '';
   hidden = false;
+  disabled = false;
   title = '';
   textContent = '';
+  innerHTML = '';
+  id = '';
   className = '';
   ariaLabel: string | null = null;
 
@@ -26,7 +30,17 @@ class FakeElement {
 
   addEventListener(): void {}
 
-  setAttribute(): void {}
+  setAttribute(name: string, value: string): void {
+    this.attributes[name] = value;
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes[name] ?? null;
+  }
+
+  focus(): void {
+    this.ownerDocument.activeElement = this;
+  }
 
   replaceChildren(...children: FakeElement[]): void {
     this.children.splice(0, this.children.length, ...children);
@@ -53,6 +67,8 @@ class FakeElement {
 }
 
 class FakeDocument {
+  activeElement: FakeElement | null = null;
+
   createElement(tagName: string): FakeElement {
     return new FakeElement(tagName, this);
   }
@@ -124,24 +140,35 @@ describe('designer variables controller', () => {
       { type: 'host', name: 'region', variableId: 'region-1' },
     ]);
 
+    const add = panel.querySelector<FakeElement>('[data-variable-action="add"]');
+    expect(add?.className).toContain('variable-add-button');
+    expect(descendants(add!).some((child) => child.className === 'variable-button-glyph')).toBe(
+      true,
+    );
+    expect(descendants(add!).some((child) => child.className === 'variable-button-label')).toBe(
+      true,
+    );
     const rows = descendants(panel).filter((child) => child.dataset.variableRow !== undefined);
     expect(rows).toHaveLength(2);
     const staticRow = rows[0]!;
-    expect(staticRow.children.some((child) => child.textContent === '静态')).toBe(true);
-    expect(staticRow.children.some((child) => child.textContent === 'count')).toBe(true);
+    expect(descendants(staticRow).some((child) => child.textContent === '静态')).toBe(true);
+    expect(descendants(staticRow).some((child) => child.textContent === 'count')).toBe(true);
     expect(
-      staticRow.children.filter((child) => child.dataset.variableAction !== undefined),
+      descendants(staticRow).filter((child) => child.dataset.variableAction !== undefined),
     ).toHaveLength(3); // 值/重命名/删除
     const hostRow = rows[1]!;
-    expect(hostRow.children.some((child) => child.textContent === '宿主')).toBe(true);
-    expect(hostRow.children.some((child) => child.textContent === 'region-1')).toBe(true);
+    expect(descendants(hostRow).some((child) => child.textContent === '宿主')).toBe(true);
+    expect(descendants(hostRow).some((child) => child.textContent === 'region-1')).toBe(true);
+    expect(hostRow.dataset.variableReadOnly).toBe('true');
     expect(
-      hostRow.children.filter((child) => child.dataset.variableAction !== undefined),
+      descendants(hostRow).filter((child) => child.dataset.variableAction !== undefined),
     ).toHaveLength(0); // host 只读
   });
 
   it('creates a static variable through the replace-variables command', () => {
-    const { controller, panel, commands } = harness([{ type: 'static', name: 'count', value: 0 }]);
+    const { controller, panel, commands, ownerDocument } = harness([
+      { type: 'static', name: 'count', value: 0 },
+    ]);
 
     controller.onClick(action('add'));
     const nameInput = panel.querySelector<FakeElement>('[data-variable-create-name]');
@@ -149,6 +176,7 @@ describe('designer variables controller', () => {
     const confirm = panel.querySelector<FakeElement>('[data-variable-action="confirm-create"]');
     const cancel = panel.querySelector<FakeElement>('[data-variable-action="cancel"]');
     expect(nameInput).not.toBeNull();
+    expect(ownerDocument.activeElement).toBe(nameInput);
     expect(confirm?.ariaLabel).toBe('确认');
     expect(cancel?.ariaLabel).toBe('取消');
     expect(confirm?.ariaLabel).not.toBe(cancel?.ariaLabel);
@@ -178,6 +206,10 @@ describe('designer variables controller', () => {
 
     expect(commands).toHaveLength(0);
     expect(reports).toHaveLength(1);
+    expect(valueInput?.getAttribute('aria-invalid')).toBe('true');
+    const inlineError = panel.querySelector<FakeElement>('[data-variable-error]');
+    expect(inlineError?.hidden).toBe(false);
+    expect(inlineError?.textContent).toBe('变量值不是合法 JSON。');
   });
 
   it('rejects creating a variable with a duplicate name', () => {
@@ -210,7 +242,7 @@ describe('designer variables controller', () => {
   });
 
   it('rejects deleting a referenced variable and allows unreferenced deletion', () => {
-    const { controller, commands } = harness([
+    const { controller, panel, commands } = harness([
       { type: 'static', name: 'count', value: 0 },
       { type: 'static', name: 'region', value: 'north' },
     ]);
@@ -218,7 +250,10 @@ describe('designer variables controller', () => {
     controller.onClick(action('delete', 1)); // region 被组件参数引用
     expect(commands).toHaveLength(0);
 
-    controller.onClick(action('delete', 0)); // count 未被引用
+    controller.onClick(action('delete', 0)); // count 未被引用，先进入确认态
+    expect(commands).toHaveLength(0);
+    expect(panel.querySelector('[data-variable-action="confirm-delete"]')).not.toBeNull();
+    controller.onClick(action('confirm-delete', 0));
     expect(commands).toHaveLength(1);
     expect(commands[0]).toEqual({
       type: 'replace-variables',
@@ -263,21 +298,33 @@ describe('designer variables rendering', () => {
       creating: false,
       renamingIndex: undefined,
       editingValueIndex: undefined,
+      deletingIndex: undefined,
     });
-    expect(descendants(panel).some((child) => child.className === 'designer-empty-state')).toBe(
-      true,
-    );
+    expect(
+      descendants(panel).some((child) => child.className.includes('designer-empty-state')),
+    ).toBe(true);
   });
 
-  it('renders the add button and create row on demand', () => {
+  it('renders the add button and labeled create editor on demand', () => {
     const ownerDocument = new FakeDocument();
     const panel = ownerDocument.createElement('div');
     renderDesignerVariables(
       panel as unknown as HTMLElement,
       document([{ type: 'static', name: 'count', value: 0 }]),
-      { creating: true, renamingIndex: undefined, editingValueIndex: undefined },
+      {
+        creating: true,
+        renamingIndex: undefined,
+        editingValueIndex: undefined,
+        deletingIndex: undefined,
+      },
     );
     expect(panel.querySelector('[data-variable-create-name]')).not.toBeNull();
     expect(panel.querySelector('[data-variable-create-value]')).not.toBeNull();
+    expect(
+      descendants(panel).filter((child) => child.className === 'variable-field-label'),
+    ).toHaveLength(2);
+    expect(
+      descendants(panel).some((child) => child.dataset.variableAction === 'add' && child.disabled),
+    ).toBe(true);
   });
 });

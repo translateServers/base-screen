@@ -1044,9 +1044,11 @@ const manifest = {
 
 ## 12. 接入宿主高级编辑器
 
-复杂 Blueprint、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。
-Designer 通过 `base-screen-authoring-request` 发起 JSON-safe 请求，宿主完成编辑后调用专用提交
-方法。
+交互编排、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。Base Screen
+不提供流程画布、规则列表编辑器、节点检查器、搜索、布局或试运行 UI，也不引入这些界面的图形库和编辑器
+依赖。Designer 内建界面只有顶栏整屏入口，以及右侧当前组件的只读事件/规则摘要与宿主定位入口。
+
+Designer 通过 `base-screen-authoring-request` 发起 JSON-safe 请求，宿主完成编辑后调用专用提交方法。
 
 ```ts
 import {
@@ -1060,22 +1062,42 @@ designer.addEventListener(SCREEN_AUTHORING_REQUEST_EVENT, (event) => {
 });
 ```
 
-宿主可以从自己的按钮或路由发起编辑请求：
+宿主可以从自己的按钮或路由发起编辑请求。无参数的 Blueprint 请求面向当前 Designer 中的整份文档，
+不要求先选择组件；传入 `initialComponentId` 只提示宿主初始定位，不限制读取、编辑或提交范围：
 
 ```ts
 designer.requestBlueprintEdit();
+designer.requestBlueprintEdit({ initialComponentId: 'chart-1' });
 designer.requestComponentTextEdit('props');
 designer.requestComponentTextEdit('style');
 designer.requestComponentTextEdit('data');
 ```
 
-提交时必须原样带回请求身份和预期 revision：
+Blueprint 请求的 `context` 是一份与 canonical 状态深度分离的整屏作者上下文：
+
+- `document`：完整 `ScreenDocument` 快照；
+- `initialComponentId`：可为空的宿主定位提示；
+- `materialEvents`：按文档实际使用的物料类型去重后的事件名称、文案、payload schema、payload 容量、
+  required capability 与可用状态；
+- `capabilities` 和 `limits`：当前 Blueprint 能力投影与提交容量限制。
+
+宿主应从 `request.context.document.blueprint` 创建草稿。提交时必须原样带回请求身份和预期 revision，
+并返回完整 Blueprint；提交协议不携带组件身份：
 
 ```ts
+if (request.kind !== 'blueprint') return;
+
+const editedBlueprint = await hostBlueprintEditor.open({
+  document: request.context.document,
+  initialComponentId: request.context.initialComponentId,
+  materialEvents: request.context.materialEvents,
+  capabilities: request.context.capabilities,
+  limits: request.context.limits,
+});
+
 const result = designer.commitBlueprintEdit({
   requestId: request.requestId,
   expectedRevision: request.documentRevision,
-  componentId: request.componentId,
   blueprint: editedBlueprint,
 });
 
@@ -1088,9 +1110,13 @@ if (!result.ok) showDiagnostics(result.diagnostics);
 designer.cancelAuthoringEdit(request.requestId);
 ```
 
-组件文本编辑使用 `commitComponentTextEdit()`。提交会校验 request ID、Designer 实例、revision、
-component identity、目标 schema、JSON 深度和容量；陈旧或无效候选不会修改文档和历史。宿主
-不要绕过这些入口操作 Designer 的 Shadow DOM 或内部 Store。
+Blueprint 提交会校验 request ID、Designer 实例、打开时的 document generation、外部 revision、
+完整 canonical 文档、compile/capability、JSON 深度和容量。请求打开后发生任何文档修改，完整 Blueprint
+覆盖都会失败关闭；合法提交只执行一次 `replace-blueprint`，因此只形成一条历史并可一次撤销。
+
+组件文本编辑协议保持不变，继续使用 `commitComponentTextEdit()` 并校验 component identity 与目标 schema。
+陈旧或无效候选不会修改文档和历史。宿主不要绕过这些入口操作 Designer 的 Shadow DOM 或内部 Store；宿主
+选择的编排 UI 技术栈及重型依赖也不应加入 Base Screen workspace 或 bundle。
 
 ## 13. React、Vue 和自定义物料
 

@@ -261,7 +261,7 @@ function createWorkbench(
     control.dataset.panelTab = tab;
     return control;
   });
-  const rightTabs = ['appearance', 'data', 'interaction', 'events'].map((tab) => {
+  const rightTabs = ['appearance', 'data', 'interaction'].map((tab) => {
     const control = new WorkbenchElement();
     control.dataset.inspectorTab = tab;
     return control;
@@ -979,7 +979,6 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(workbench.panes[0]?.hidden).toBe(false);
     expect(workbench.panes[1]?.hidden).toBe(true);
     expect(workbench.panes[2]?.hidden).toBe(true);
-    expect(workbench.panes[3]?.hidden).toBe(true);
     expect(workbench.panes[0]?.attributes.role).toBe('region');
     expect(workbench.panes[0]?.attributes['aria-label']).toBe('画布');
     expect(workbench.panes[0]?.attributes['aria-labelledby']).toBeUndefined();
@@ -1010,7 +1009,6 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(workbench.panes[0]?.hidden).toBe(false);
     expect(workbench.panes[1]?.hidden).toBe(true);
     expect(workbench.panes[2]?.hidden).toBe(true);
-    expect(workbench.panes[3]?.hidden).toBe(true);
     expect(workbench.panes[0]?.attributes.role).toBe('region');
     expect(workbench.panes[0]?.attributes['aria-label']).toBe('选择概览');
     expect(workbench.panes[0]?.attributes['aria-labelledby']).toBeUndefined();

@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-23（Manifest 静态数据描述、静态表格作者能力与统一 tabular adapter）
+> 最近更新：2026-08-25（整屏交互编排宿主桥与无内建编排 UI 边界）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -38,10 +38,14 @@
 - **主题 Token**：宿主可配置的 Designer chrome Token、dark/light 与自有滚动条边界。依据：[Designer Theme Tokens](../specs/archive/designer-theme-tokens/spec.md)、
   [ADR-0024](../decisions/ADR-0024-designer-public-style-tokens.md)。
 - **作者扩展（轻量基座）**：JSON-safe 声明式 Manifest Editor Descriptor、宿主作者桥、结构化事件声明与内建面板 primitives；
-  Blueprint 图形/代码/完整领域配置编辑器归宿主。依据：[Designer Authoring Extension](../specs/archive/designer-authoring-extension/spec.md)、
+  Blueprint 图形/代码/完整领域配置编辑器及其依赖归宿主。依据：[Designer Authoring Extension](../specs/archive/designer-authoring-extension/spec.md)、
   [ADR-0028](../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)。
-- **事件 Blueprint**：canonical Blueprint、Core compile/trace/replace/history/诊断、事件面板摘要/能力状态/宿主请求入口。
-  依据：[Designer Event Blueprint](../specs/archive/designer-event-blueprint/spec.md)、[ADR-0026](../decisions/ADR-0026-designer-event-blueprint-authoring.md)。
+- **整屏事件 Blueprint 宿主桥**：canonical Blueprint 与 Core compile/trace/replace/history/诊断保持不变；Blueprint
+  请求携带 detached 的完整当前文档、初始组件定位提示、在用物料事件/capability/容量投影，提交绑定 document
+  generation 与外部 revision，并以一次 `replace-blueprint` 形成一条历史。Designer 只保留顶栏整屏入口和组件
+  只读摘要/定位入口，不实现规则编辑器、流程画布、节点检查器、搜索、布局或试运行 UI。依据：
+  [Document Blueprint Host Bridge](../specs/document-blueprint-host-bridge/spec.md)、
+  [ADR-0061](../decisions/ADR-0061-host-constrained-visual-event-blueprint.md)。
 - **左侧面板信息架构与交互**（封版后增量，生效中）：缩略图网格组件库、按 Tab 隔离的工具栏、折叠图标轨、
   图层树引导线与图标操作、搜索清除与网格键盘可达性；既有 data-* 契约与宿主边界不变，零新依赖。
   依据：[Designer Left Panel](../specs/designer-left-panel/spec.md)、[ADR-0032](../decisions/ADR-0032-designer-left-panel-refactor.md)。

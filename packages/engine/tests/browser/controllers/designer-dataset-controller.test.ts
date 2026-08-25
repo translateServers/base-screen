@@ -2,6 +2,7 @@ import type {
   ScreenDatasetDescriptor,
   ScreenDocument,
   ScreenHostDatasetCatalogPort,
+  ScreenHostResourcePort,
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
@@ -135,6 +136,99 @@ describe('DesignerDatasetController', () => {
     expect(reports).toHaveLength(1);
   });
 
+  it('tests the current draft against the host resource without applying it', async () => {
+    const resolve = vi.fn<ScreenHostResourcePort['resolve']>(async () =>
+      success({
+        fields: [{ id: 'amount', label: '金额', valueType: 'number' as const }],
+        rows: [{ amount: 12 }],
+      }),
+    );
+    const executeTransaction = vi.fn(() => success(baseDocument));
+    const controller = createController({ descriptor, resolve, executeTransaction });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', class {});
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+
+    controller.onClick(resourceTarget('orders') as unknown as Element);
+    await waitForDescriptor(controller);
+    controller.onChange(
+      new FakeInput('north', { datasetParameter: 'region' }) as unknown as EventTarget,
+    );
+    controller.onClick(actionTarget('test') as unknown as Element);
+
+    await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
+    expect(resolve.mock.calls[0]?.[0]).toMatchObject({
+      componentId: 'text-1',
+      resourceType: 'dataset',
+      resourceId: 'orders',
+      params: { limit: 2, region: 'north' },
+    });
+    expect(executeTransaction).not.toHaveBeenCalled();
+  });
+
+  it('exposes dataset authoring controls as host-safe actions and local settings', async () => {
+    const actions: Array<{ action: string; detail?: Readonly<Record<string, unknown>> }> = [];
+    const controller = createController({
+      descriptor,
+      requestAuthoringAction: (action, detail) => {
+        actions.push(detail === undefined ? { action } : { action, detail });
+      },
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeSelect);
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+
+    controller.onClick(resourceTarget('orders') as unknown as Element);
+    await waitForDescriptor(controller);
+
+    controller.onClick(editorModeTarget('code') as unknown as Element);
+    controller.onClick(authoringActionTarget('configure-filter') as unknown as Element);
+    controller.onClick(authoringActionTarget('copy-data') as unknown as Element);
+    controller.onClick(authoringActionTarget('fullscreen-edit') as unknown as Element);
+    controller.onChange(
+      new FakeInput(
+        '',
+        { datasetAuthoringSetting: 'loadingDisabled' },
+        true,
+      ) as unknown as EventTarget,
+    );
+    controller.onChange(
+      new FakeSelect({ datasetAuthoringSetting: 'refreshStrategy' }, [
+        'auto',
+      ]) as unknown as EventTarget,
+    );
+    controller.onChange(
+      new FakeInput('45', { datasetAuthoringSetting: 'refreshInterval' }) as unknown as EventTarget,
+    );
+
+    expect(controller.authoring).toEqual({
+      editorMode: 'code',
+      filterConfigured: false,
+      loadingDisabled: true,
+      controlled: false,
+      refreshStrategy: 'auto',
+      refreshInterval: 45,
+    });
+    expect(actions).toEqual([
+      { action: 'open-code-editor' },
+      { action: 'configure-filter' },
+      { action: 'copy-data', detail: { value: 'null' } },
+      { action: 'fullscreen-edit' },
+      {
+        action: 'update-settings',
+        detail: { setting: 'loadingDisabled', value: true },
+      },
+      {
+        action: 'update-settings',
+        detail: { setting: 'refreshStrategy', value: 'auto' },
+      },
+      {
+        action: 'update-settings',
+        detail: { setting: 'refreshInterval', value: 45 },
+      },
+    ]);
+  });
+
   it('R5 accepts compatible selected fields for a declared role', async () => {
     const transactions: ScreenDocumentTransaction[] = [];
     const roles: readonly ScreenDataBindingRole[] = [
@@ -204,6 +298,47 @@ describe('DesignerDatasetController', () => {
     });
   });
 
+  it('preserves dirty authoring state when an unrelated commit replaces the component object', async () => {
+    const resourceDocument: ScreenDocument = {
+      ...baseDocument,
+      components: baseDocument.components.map((component) => ({
+        ...component,
+        dataSource: {
+          type: 'host-resource' as const,
+          resourceType: 'dataset',
+          resourceId: 'orders',
+          params: {
+            limit: { kind: 'literal' as const, value: 2 },
+            region: { kind: 'literal' as const, value: '' },
+          },
+          binding: null,
+        },
+      })),
+    };
+    let currentDocument = resourceDocument;
+    const controller = createController({
+      descriptor,
+      getDocument: () => currentDocument,
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', class {});
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+
+    controller.render(undefined);
+    controller.onClick(resourceTarget('orders') as unknown as Element);
+    await waitForDescriptor(controller);
+    controller.onClick(editorModeTarget('code') as unknown as Element);
+    controller.onChange(
+      new FakeInput('north', { datasetParameter: 'region' }) as unknown as EventTarget,
+    );
+
+    currentDocument = JSON.parse(JSON.stringify(currentDocument)) as ScreenDocument;
+    controller.render(undefined);
+
+    expect(controller.authoring.editorMode).toBe('code');
+    expect(controller.descriptor?.resourceId).toBe('orders');
+  });
+
   it('R5 switches to static data without routing the draft through the host catalog', () => {
     const transactions: ScreenDocumentTransaction[] = [];
     const controller = createController({
@@ -239,11 +374,13 @@ describe('DesignerDatasetController', () => {
 class FakeInput {
   readonly value: string;
   readonly dataset: Record<string, string>;
-  readonly checked = false;
+  readonly checked: boolean;
+  readonly type = 'text';
 
-  constructor(value: string, dataset: Record<string, string>) {
+  constructor(value: string, dataset: Record<string, string>, checked = false) {
     this.value = value;
     this.dataset = dataset;
+    this.checked = checked;
   }
 }
 
@@ -266,6 +403,12 @@ function createController(overrides: {
     transaction: ScreenDocumentTransaction,
   ) => ScreenParseResult<ScreenDocument>;
   readonly report?: (diagnostics: readonly unknown[]) => void;
+  readonly getDocument?: () => ScreenDocument;
+  readonly resolve?: ScreenHostResourcePort['resolve'];
+  readonly requestAuthoringAction?: (
+    action: string,
+    detail?: Readonly<Record<string, string | number | boolean>>,
+  ) => void;
 }): DesignerDatasetController {
   const entry = {
     manifest: {
@@ -298,19 +441,28 @@ function createController(overrides: {
     list: async () => success({ items: [] }),
     describe: async () => success(overrides.descriptor),
   };
-  return new DesignerDatasetController({
+  const callbacks = {
     getCatalogPort: () => port,
-    getDocument: () => baseDocument,
+    getDocument: overrides.getDocument ?? (() => baseDocument),
     getInteraction: (): ScreenInteractionState => ({
       selectedComponentIds: ['text-1'],
       focusedComponentId: 'text-1',
     }),
     getCatalog: () => catalog,
-    getResourcePort: () => ({ resolve: async () => success({} as ScreenJsonValue) }),
+    getResourcePort: () => ({
+      resolve: overrides.resolve ?? (async () => success({} as ScreenJsonValue)),
+    }),
     getRuntimeContributions: () => runtime,
     executeTransaction: overrides.executeTransaction ?? (() => success(baseDocument)),
     report: overrides.report ?? (() => undefined),
     refresh: () => undefined,
+  };
+  if (overrides.requestAuthoringAction === undefined) {
+    return new DesignerDatasetController(callbacks);
+  }
+  return new DesignerDatasetController({
+    ...callbacks,
+    requestAuthoringAction: overrides.requestAuthoringAction,
   });
 }
 
@@ -325,6 +477,20 @@ function actionTarget(action: string): { closest: (selector: string) => unknown 
   const button = { dataset: { datasetAction: action } };
   return {
     closest: (selector) => (selector === '[data-dataset-action]' ? button : null),
+  };
+}
+
+function authoringActionTarget(action: string): { closest: (selector: string) => unknown } {
+  const button = { dataset: { datasetAuthoringAction: action } };
+  return {
+    closest: (selector) => (selector === '[data-dataset-authoring-action]' ? button : null),
+  };
+}
+
+function editorModeTarget(mode: string): { closest: (selector: string) => unknown } {
+  const button = { dataset: { datasetEditorMode: mode } };
+  return {
+    closest: (selector) => (selector === '[data-dataset-editor-mode]' ? button : null),
   };
 }
 

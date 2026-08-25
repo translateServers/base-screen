@@ -7,6 +7,10 @@ import {
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
+import {
+  createDesignerLayerToolbar,
+  type DesignerLayerToolbarState,
+} from './designer-layers-toolbar-dom.js';
 import { materialCategoryIcon } from './designer-material-library-dom.js';
 
 export interface DesignerLayerItem {
@@ -39,6 +43,7 @@ export interface DesignerLayersRenderOptions {
   readonly renameDrafts: ReadonlyMap<string, string>;
   readonly renamingId: string | null | undefined;
   readonly renderLimit: number;
+  readonly toolbarState: DesignerLayerToolbarState;
   /** canMove 收到该行所属父级的已排序兄弟表（渲染路径复用，避免每行重新 filter+sort）。 */
   readonly canMove: (
     componentId: string,
@@ -82,9 +87,11 @@ export function renderDesignerLayers(
   options: DesignerLayersRenderOptions,
 ): void {
   layers.replaceChildren();
+  const controls = layers.ownerDocument.createElement('div');
+  controls.className = 'layer-panel-controls';
+  controls.appendChild(createDesignerLayerToolbar(layers.ownerDocument, options.toolbarState));
   const searchControl = layers.ownerDocument.createElement('label');
   searchControl.className = 'designer-field designer-field-label layer-search';
-  searchControl.textContent = DESIGNER_UI_TEXT.layersPanel.searchLabel;
   const glyph = layers.ownerDocument.createElement('span');
   glyph.className = 'layer-search-glyph';
   glyph.setAttribute('aria-hidden', 'true');
@@ -95,9 +102,11 @@ export function renderDesignerLayers(
   input.className = 'designer-control designer-input';
   input.value = options.search;
   input.placeholder = DESIGNER_UI_TEXT.layersPanel.searchPlaceholder;
+  input.ariaLabel = DESIGNER_UI_TEXT.layersPanel.searchLabel;
   input.dataset.layerSearch = 'true';
   searchControl.appendChild(input);
-  layers.appendChild(searchControl);
+  controls.appendChild(searchControl);
+  layers.appendChild(controls);
 
   const tree = layers.ownerDocument.createElement('div');
   tree.setAttribute('role', 'tree');
@@ -232,7 +241,7 @@ function compareSiblings(
 ): number {
   const left = byId.get(leftId)!;
   const right = byId.get(rightId)!;
-  return left.zIndex - right.zIndex || order.get(leftId)! - order.get(rightId)!;
+  return right.zIndex - left.zIndex || order.get(rightId)! - order.get(leftId)!;
 }
 
 function createLayerNode(
@@ -255,7 +264,12 @@ function createLayerNode(
   row.ariaLevel = String(item.depth + 1);
   row.ariaSelected = String(selected);
   row.dataset.layerId = item.id;
-  row.draggable = !item.hidden && !item.locked;
+  // 锁定只约束画布变换、拖拽与重命名；图层树仍需允许选中，以便查看并解除锁定。
+  const selectable = !item.hidden;
+  if (selectable) row.dataset.layerSelectable = 'true';
+  if (item.hidden) row.dataset.hidden = 'true';
+  if (item.locked) row.dataset.locked = 'true';
+  row.draggable = selectable && !item.locked;
   if (focused) row.ariaCurrent = 'true';
   if (dropTarget) row.dataset.dropTarget = 'true';
   if (renaming) row.dataset.renaming = 'true';
@@ -284,12 +298,12 @@ function createLayerNode(
     row.appendChild(spacer);
   }
 
-  const select = button(ownerDocument, '', DESIGNER_UI_TEXT.layersPanel.select);
+  const select = button(ownerDocument, '', DESIGNER_UI_TEXT.layersPanel.selectLayer(item.name));
   select.dataset.layerSelect = item.id;
   // 保留按钮基础类：字体/颜色/光标/焦点环由 .designer-control/.designer-button 提供，
   // .layer-select 只覆盖几何与绘制，否则名称会退化为 UA 默认字体与颜色。
   select.className = 'designer-control designer-button layer-select';
-  select.disabled = item.hidden;
+  select.disabled = !selectable;
   select.title = DESIGNER_UI_TEXT.layersPanel.renameHint;
   // 行首类型图标：与物料库同一派生规则，帮助快速区分图层内容形态。
   const glyph = ownerDocument.createElement('span');
@@ -301,9 +315,6 @@ function createLayerNode(
   name.className = 'layer-name';
   name.textContent = item.name;
   select.appendChild(name);
-  const type = ownerDocument.createElement('small');
-  type.textContent = item.type;
-  select.appendChild(type);
   if (item.childCount > 0) {
     const count = ownerDocument.createElement('span');
     count.className = 'layer-count';
@@ -323,10 +334,11 @@ function createLayerNode(
     rename.disabled = item.locked;
     row.appendChild(rename);
   }
-  // 图标操作簇：hover/focus-within/选中时逐图标淡入（CSS opacity），始终占位避免几何跳动；
+  // 图标操作簇：常态只露出定位，hover/focus 时向左展开；绝对定位不参与行高计算。
   // 已激活的隐藏/锁定开关常驻可见，作为行级状态指示。
   const actions = ownerDocument.createElement('span');
   actions.className = 'layer-actions';
+  actions.appendChild(locateButton(ownerDocument, item));
   actions.appendChild(
     layerButton(
       ownerDocument,
@@ -354,6 +366,13 @@ function createLayerNode(
     row.appendChild(diagnostic);
   }
   return row;
+}
+
+function locateButton(ownerDocument: Document, item: DesignerLayerItem): HTMLButtonElement {
+  const control = button(ownerDocument, '', DESIGNER_UI_TEXT.layersPanel.locate(item.name));
+  control.dataset.layerLocate = item.id;
+  control.innerHTML = designerIcon('locate');
+  return control;
 }
 
 function matchesLayerQuery(item: DesignerLayerItem, query: string): boolean {

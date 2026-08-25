@@ -87,11 +87,33 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
     expect(workbenchCss).toContain('aspect-ratio: 16 / 10;');
     expect(workbenchCss).toContain('scrollbar-gutter: stable;');
+    expect(workbenchCss).toContain('.properties[data-inspector-density="basic"]');
+    expect(workbenchCss).toContain(':not([data-inspector-searching])');
+    expect(workbenchCss).toContain('[data-inspector-advanced]');
+    expect(workbenchCss).toContain('grid-template-rows: 38px minmax(58px, auto) minmax(0, 1fr);');
+    expect(workbenchCss).toContain('grid-template-columns: 28px auto;');
+    expect(workbenchCss).toMatch(/> \.inspector-toolbar\s*\{[^}]*grid-row: 2;/s);
+    expect(workbenchCss).toContain('.properties[data-inspector-search-open]');
+    expect(workbenchCss).toContain('.inspector-search-workspace-header');
+    expect(workbenchCss).toContain('grid-template-rows: 40px auto auto minmax(0, 1fr);');
+    expect(workbenchCss).toContain('.designer-datav-section-summary');
+    expect(workbenchCss).toContain('right: 8px;');
     expect(workbenchCss).toContain('calc(var(--layer-depth, 0) * 20px);');
     expect(workbenchCss).toContain('.statusbar [data-project-status]');
     expect(workbenchCss).toContain('flex: 0 1 auto;');
     expect(workbenchCss).toContain('.statusbar [data-project-revision]');
     expect(workbenchCss).toContain('overflow-wrap: anywhere;');
+  });
+
+  it('keeps nested scrolling panel shells free of duplicate scrollbar gutters', () => {
+    expect(workbenchCss).toMatch(/\.rail-view\[data-materials\]\s*\{[^}]*scrollbar-gutter: auto;/s);
+    expect(workbenchCss).toMatch(
+      /\.properties \.inspector-pane\[data-inspector-pane="data"\]\s*\{[^}]*scrollbar-gutter: auto;/s,
+    );
+    expect(workbenchCss).toMatch(/\.material-grid\s*\{[^}]*scrollbar-gutter: stable;/s);
+    expect(workbenchCss).toMatch(
+      /\.properties \.designer-datav-data-flow-content\s*\{[^}]*scrollbar-gutter: stable;/s,
+    );
   });
 
   it('R3 renders a usable collapsed rail with rotating collapse arrows (ADR-0037)', () => {
@@ -210,24 +232,23 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).not.toContain('margin: 0 calc(var(--designer-space-5) * -1);');
   });
 
-  it('collapses the layer type label in interactive rows instead of squeezing the name', () => {
-    // 交互态（hover/focus-within/选中/激活开关）类型标注 opacity 归零的同时折叠宽度，
-    // 释放给 layer-name；仅淡出会保留不可见宽度并挤占名称（历史缺陷）。
-    const interactiveRule = workbenchCss.slice(
-      workbenchCss.indexOf('.layer-row:hover .layer-select small,'),
-      workbenchCss.indexOf('/* 操作图标无底板'),
-    );
-    expect(interactiveRule).toContain('.layer-row[aria-selected="true"] .layer-select small,');
-    expect(interactiveRule).toContain(
-      '.layer-row:has(.layer-actions .designer-button[aria-pressed="true"]) .layer-select small {',
-    );
-    expect(interactiveRule).toContain('opacity: 0;');
-    expect(interactiveRule).toContain('max-width: 0;');
-    // 静息态保留类型标注（42% 上限），仅交互态折叠。
-    expect(workbenchCss).toContain('max-width: 42%;');
+  it('keeps the DataV-style layer toolbar and tree geometry stable', () => {
+    expect(workbenchCss).toContain('.rail-view[data-layers]:not([hidden]) {');
+    expect(workbenchCss).toContain('grid-template-rows: auto minmax(0, 1fr);');
+    expect(workbenchCss).toContain('.layer-toolbar {');
     expect(workbenchCss).toContain(
-      'transition:\n    opacity var(--designer-motion),\n    max-width var(--designer-motion);',
+      'grid-template-columns: repeat(4, minmax(28px, 1fr)) 1px repeat(2, minmax(28px, 1fr));',
     );
+    expect(workbenchCss).toContain('.layer-toolbar-button:disabled {');
+    expect(workbenchCss).toContain('[data-layer-root] {');
+    expect(workbenchCss).toContain('scrollbar-gutter: stable;');
+    expect(workbenchCss).toContain('grid-template-columns: 24px minmax(0, 1fr);');
+    expect(workbenchCss).toContain('.layer-row[data-layer-selectable="true"] {');
+    expect(workbenchCss).toContain('.layer-row:has(.layer-select:focus-visible) {');
+    expect(workbenchCss).toContain('--layer-row-surface:');
+    expect(workbenchCss).toContain('inset 2px 0 0 var(--designer-accent)');
+    expect(workbenchCss).toContain('position: absolute;');
+    expect(workbenchCss).not.toContain('.layer-select small {');
   });
 
   it('R3 presents shortcut help as a scannable, responsive modal', () => {
@@ -251,6 +272,24 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('@media (forced-colors: active)');
     expect(workbenchCss).toContain('.canvas-guide-snap');
     expect(workbenchCss).toContain('background: Highlight;');
+  });
+
+  it('keeps all Designer buttons on one interaction-state contract', () => {
+    expect(tokensCss).toContain('--designer-button-primary-background: color-mix(');
+    expect(tokensCss).toContain('--designer-button-primary-hover: color-mix(');
+    expect(tokensCss).toContain('--designer-button-primary-active: color-mix(');
+    expect(controlsCss).toMatch(/\.designer-button\s*\{[^}]*touch-action: manipulation;/s);
+    expect(controlsCss).toMatch(/\.designer-button\s*\{[^}]*transition: transform/s);
+    expect(controlsCss).toContain('.designer-button:hover:not(:disabled) {');
+    expect(controlsCss).toContain(
+      '.designer-button[data-variant="primary"]:hover:not(:disabled) {',
+    );
+    expect(controlsCss).toContain('.designer-button[data-variant="danger"]:hover:not(:disabled) {');
+    expect(controlsCss).toContain('.designer-button[data-variant="ghost"]:hover:not(:disabled) {');
+    expect(controlsCss).toContain('.designer-button[aria-pressed="true"]:hover:not(:disabled) {');
+    expect(controlsCss).toContain('.designer-button:disabled {');
+    expect(controlsCss).toContain('color: var(--designer-text-on-accent);');
+    expect(controlsCss).not.toContain('transform: scale(0.96);');
   });
 
   it('R2 centers the selection outline on the component bounds so snap guides align with it', () => {
@@ -318,8 +357,8 @@ describe('designer workbench visual convergence', () => {
         atLeast(contrastRatio(foreground, background) ?? -1, 3);
       }
 
-      // accent 作为主按钮背景时，前景是 workspace 文本色，至少 3:1。
-      atLeast(contrastRatio(surface('accent'), surface('surface-workspace')) ?? -1, 3);
+      // 主按钮使用独立的深色化 accent token；最终组合色对比度由真实浏览器用例校验。
+      expect(tokensCss).toContain('--designer-button-primary-background: color-mix(');
     }
   });
 
@@ -354,11 +393,16 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('.designer-error-console {');
     expect(workbenchCss).toContain('.error-console-current {');
     expect(materialCardsCss).toContain('aspect-ratio: 16 / 10;');
-    // 自适应列数：卡片最小 128px（+6px 列距），面板拖宽至约 300px 时一行两列，窄面板回退单列；
-    // min(128px, 100%) 保证最窄面板（160px）下卡片不超出轨宽。
+    // 纵向功能轨占用 48px 后，卡片以 104px 为最小宽度维持双列密度，窄面板回退单列；
+    // min(104px, 100%) 保证最窄面板下卡片不超出内容区。
     expect(materialCardsCss).toContain(
-      'grid-template-columns: repeat(auto-fill, minmax(min(128px, 100%), 1fr));',
+      'grid-template-columns: repeat(auto-fill, minmax(min(104px, 100%), 1fr));',
     );
+    expect(workbenchCss).toContain('.material-library-toolbar {');
+    expect(workbenchCss).toContain('grid-template-rows: auto minmax(0, 1fr);');
+    expect(materialCardsCss).toContain('overflow: hidden auto;');
+    expect(materialCardsCss).toContain('.material-card-meta {');
+    expect(materialCardsCss).toContain('display: grid;');
     expect(materialCardsCss).toContain('hsl(var(--material-hue, 215)');
     // 交互只做绘制反馈：图标缩放、边框与阴影变化，禁止位移类变换（防抖）。
     expect(materialCardsCss).not.toContain('translateY(');

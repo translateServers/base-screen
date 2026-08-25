@@ -1,12 +1,15 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import type { ScreenBlueprintAuthoringContext, ScreenBlueprintEditOptions } from '../src/index.js';
 import {
   BASE_SCREEN_DESIGNER_TAG_NAME,
   BASE_SCREEN_VIEWER_TAG_NAME,
   defineBaseScreenDesigner,
   defineBaseScreenElements,
   defineBaseScreenViewer,
+  MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES,
   parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryItems,
+  parseScreenBlueprintAuthoringContext,
 } from '../src/index.js';
 
 describe('SDK product element registration', () => {
@@ -25,6 +28,17 @@ describe('SDK product element registration', () => {
         { id: 'asset:12', materialType: 'base.image', defaultProps: { source: '12' } },
       ]).ok,
     ).toBe(true);
+  });
+
+  it('re-exports the document Blueprint host bridge contract', () => {
+    expect(MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES).toBeGreaterThan(0);
+    expect(typeof parseScreenBlueprintAuthoringContext).toBe('function');
+    expectTypeOf<ScreenBlueprintEditOptions>().toEqualTypeOf<{
+      readonly initialComponentId?: string | null;
+    }>();
+    expectTypeOf<ScreenBlueprintAuthoringContext['initialComponentId']>().toEqualTypeOf<
+      string | null
+    >();
   });
 
   it('defines Viewer and Designer idempotently through the explicit SDK API', () => {

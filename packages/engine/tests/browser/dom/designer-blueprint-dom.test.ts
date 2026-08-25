@@ -176,9 +176,78 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
       catalog(),
       authority('blueprint.trigger.material-event'),
     );
-    expect(panel.querySelector('[data-action="open-blueprint"]')).not.toBeNull();
+    expect(panel.querySelector('[data-action="locate-blueprint"]')).not.toBeNull();
     expect(panel.querySelector('[data-blueprint-graph="true"]')).toBeNull();
     expect(panel.querySelector('[data-blueprint-expression="action"]')).toBeNull();
     expect(panel.querySelector('[data-blueprint-add-action="set-variable"]')).toBeNull();
+    expect(panel.querySelector('[data-blueprint-rule-editor="true"]')).toBeNull();
+    expect(panel.querySelector('[data-blueprint-node-operation="delete"]')).toBeNull();
+    expect(panel.querySelector('[data-blueprint-rule-sort="true"]')).toBeNull();
+    expect(
+      descendants(panel).filter((item) => ['input', 'select', 'textarea'].includes(item.tagName)),
+    ).toHaveLength(0);
+  });
+
+  it('projects DataV-style variable associations, conditions and actions as read-only cards', () => {
+    const panel = panelElement();
+    const configured: ScreenDocument = {
+      ...document,
+      variables: [{ type: 'static', name: 'selectedAmount', value: 0 }],
+      blueprint: {
+        rules: [
+          {
+            id: 'configured-rule',
+            trigger: {
+              type: 'material-event',
+              componentId: 'chart-1',
+              eventName: 'seriesClick',
+            },
+            condition: {
+              left: { kind: 'event-payload', path: ['amount'] },
+              operator: 'gte',
+              right: { kind: 'literal', value: 10 },
+            },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'selectedAmount',
+                value: { kind: 'event-payload', path: ['amount'] },
+              },
+              {
+                type: 'emit-host-event',
+                eventName: 'chart-selection',
+                payload: { kind: 'event-payload', path: [] },
+              },
+              {
+                type: 'host-action',
+                actionId: 'focus-record',
+                payload: { kind: 'variable', name: 'selectedAmount' },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    renderDesignerEventsPanel(
+      panel as unknown as HTMLElement,
+      configured,
+      { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' },
+      catalog(),
+      authority('blueprint.trigger.material-event'),
+    );
+
+    const text = queryText(panel);
+    expect(text).toContain('关联全局变量');
+    expect(text).toContain('系列点击 更新至 selectedAmount');
+    expect(text).toContain('动作触发条件');
+    expect(text).toContain('事件数据 · amount 大于等于 固定值 10');
+    expect(text).toContain('更新全局变量 · selectedAmount');
+    expect(text).toContain('发送宿主事件 · chart-selection');
+    expect(text).toContain('执行宿主动作 · focus-record');
+    expect(panel.querySelector('[data-blueprint-summary-rule="configured-rule"]')).not.toBeNull();
+    const interactionGroup = panel.querySelector<FakeElement>(
+      '[data-inspector-search-key="blueprint-interaction-events"]',
+    );
+    expect(interactionGroup?.dataset.inspectorPreferenceContext).toBe('base.chart');
   });
 });

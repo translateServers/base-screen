@@ -30,6 +30,11 @@ import {
   createGroupTransaction,
   createUngroupTransaction,
 } from '../../common/operations/designer-layout-operations.js';
+import {
+  createDesignerQuickStyleTransaction,
+  type DesignerQuickStyleAction,
+} from '../../common/operations/designer-quick-style.js';
+import { removeComponentCommands } from '../../common/operations/designer-remove-operations.js';
 import { selectedComponents } from '../../common/operations/designer-selection.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
@@ -46,17 +51,30 @@ import {
   createDescriptorArrayTransaction,
   createDescriptorFieldTransaction,
 } from '../dom/designer-descriptor-operations.js';
+import {
+  applyDesignerInspectorFilters,
+  type DesignerInspectorDensity,
+  renderDesignerInspectorContext,
+} from '../dom/designer-inspector-chrome-dom.js';
+import {
+  applyDesignerInspectorSearchStyle,
+  captureDesignerInspectorSearchStyle,
+  closeDesignerInspectorSearchMenus,
+  type DesignerInspectorSearchClipboard,
+} from '../dom/designer-inspector-search-dom.js';
 import { renderMaterialLibraryGroupNavigation } from '../dom/designer-material-library-group-dom.js';
 import {
   createCanvasBackgroundStopTransaction,
   createDataSourceTransaction,
   createDesignerCanvasBackgroundDrafts,
+  createDesignerCanvasPresentationSettings,
   createInitialDataSource,
   createMultiSelectionTransaction,
   createPropertyTransaction,
   createStyleRuleClickTransaction,
   createStyleRuleEditTransaction,
   type DesignerCanvasBackgroundDrafts,
+  type DesignerCanvasPresentationSettings,
   renderDesignerDataPanel,
   renderDesignerProperties,
 } from '../dom/designer-panel-dom.js';
@@ -85,12 +103,20 @@ export interface DesignerPanelControllerCallbacks {
   readonly requestMaterialLibraryAction?: (action: 'retry' | 'reload' | 'details') => void;
   /** 画布背景图宿主选择按钮点击（ADR-0046）：由宿主接管（打开图片选择弹出框），返回是否已有文档。 */
   readonly requestCanvasBackgroundImage?: () => boolean;
+  readonly requestCanvasPresentationAction?: (
+    action: 'capture-thumbnail' | 'upload-thumbnail',
+  ) => void;
+  readonly onCanvasPresentationChange?: (settings: DesignerCanvasPresentationSettings) => void;
   /** 画布背景图宿主选择按钮是否渲染（ADR-0049）：默认隐藏，仅宿主配置后显示。 */
   readonly isCanvasBackgroundImageButtonVisible?: () => boolean;
+  readonly selectInspectorTab?: (tab: 'appearance' | 'data' | 'interaction') => void;
 }
 
 // 搜索输入渲染防抖窗口（ADR-0042）：快速连续输入合并为一次渲染，避免每键一次布局失效。
 export const MATERIAL_SEARCH_DEBOUNCE_MS = 120;
+const INSPECTOR_DENSITY_STORAGE_KEY = 'base-screen.designer.inspector-density';
+const INSPECTOR_GROUPS_STORAGE_KEY = 'base-screen.designer.inspector-groups';
+const MAX_INSPECTOR_GROUP_PREFERENCES = 200;
 
 export class DesignerPanelController {
   #clipboard: BaseScreenClipboard | undefined;
@@ -100,10 +126,19 @@ export class DesignerPanelController {
   #materialCategory: string | undefined;
   #materialGroupId: string | undefined;
   #materialSearchTimer: ReturnType<typeof setTimeout> | undefined;
+  #inspectorDensity: DesignerInspectorDensity = 'basic';
+  #inspectorSearch = '';
+  #inspectorSearchOpen = false;
+  #inspectorSearchClipboard: DesignerInspectorSearchClipboard | undefined;
+  #inspectorPreferenceRestored = false;
+  #inspectorGroupPreferenceRestored = false;
+  readonly #inspectorGroupPreferences = new Map<string, boolean>();
   readonly #favoriteMaterials = new Set<string>();
   readonly #recentMaterials: string[] = [];
   readonly #canvasBackgroundDrafts: DesignerCanvasBackgroundDrafts =
     createDesignerCanvasBackgroundDrafts();
+  readonly #canvasPresentation: DesignerCanvasPresentationSettings =
+    createDesignerCanvasPresentationSettings();
 
   constructor(private readonly callbacks: DesignerPanelControllerCallbacks) {}
 
@@ -196,6 +231,64 @@ export class DesignerPanelController {
     return result;
   }
 
+  private updateSelectionStatus(
+    property: 'locked' | 'hidden',
+    value: boolean,
+  ): ScreenParseResult<ScreenDocument> {
+    const document = this.callbacks.getDocument();
+    const components =
+      document === undefined
+        ? []
+        : selectedComponents(document, this.interaction.selectedComponentIds);
+    if (document === undefined || components.length === 0) {
+      return failure('Selection status is unavailable.');
+    }
+    return this.callbacks.executeTransaction({
+      commands: components.map((component) => ({
+        type: 'update-components' as const,
+        componentIds: [component.id],
+        patch: { status: { ...component.status, [property]: value } },
+      })),
+    });
+  }
+
+  private deleteSelection(): ScreenParseResult<ScreenDocument> {
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return failure('Nothing to delete.');
+    const componentIds = selectedComponents(document, this.interaction.selectedComponentIds)
+      .filter((component) => !isScreenComponentEffectivelyLocked(document, component.id))
+      .map((component) => component.id);
+    if (componentIds.length === 0) return failure('Nothing to delete.');
+    const result = this.callbacks.executeTransaction({
+      commands: removeComponentCommands(document, componentIds),
+    });
+    if (result.ok) this.select([]);
+    return result;
+  }
+
+  private applyQuickStyle(button: HTMLButtonElement, action: DesignerQuickStyleAction): void {
+    const transaction = createDesignerQuickStyleTransaction(
+      this.callbacks.getDocument(),
+      this.interaction,
+      this.callbacks.getCatalog(),
+      action,
+    );
+    if (transaction === undefined) return;
+    if (!transaction.ok) {
+      this.callbacks.emitDiagnostics(transaction.diagnostics);
+      return;
+    }
+    const result = this.callbacks.executeTransaction(transaction.value);
+    if (result.ok) {
+      for (const control of button.parentElement?.querySelectorAll<HTMLButtonElement>(
+        `[data-quick-${button.dataset.quickStyle !== undefined ? 'style' : 'config'}]`,
+      ) ?? []) {
+        control.ariaPressed = String(control === button);
+      }
+    }
+    this.report(result);
+  }
+
   group(): ScreenParseResult<ScreenDocument> {
     const document = this.callbacks.getDocument();
     const entry = this.groupEntry;
@@ -275,6 +368,7 @@ export class DesignerPanelController {
         this.callbacks.getDatasetFields,
         this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
         this.#canvasBackgroundDrafts,
+        this.#canvasPresentation,
       );
     }
     renderDesignerDataPanel(
@@ -288,9 +382,141 @@ export class DesignerPanelController {
     );
   }
 
+  captureInspectorGroupPreferences(root: ShadowRoot | HTMLElement | null): void {
+    if (root === null) return;
+    let persistenceTarget: HTMLElement | undefined;
+    for (const section of root.querySelectorAll<HTMLElement>(
+      '[data-inspector-preference-context][data-inspector-search-key]',
+    )) {
+      const pane = section.closest<HTMLElement>('[data-inspector-pane]');
+      const preferenceKey = this.inspectorGroupPreferenceKey(section, pane);
+      const details = section.querySelector<HTMLDetailsElement>('details');
+      if (preferenceKey === undefined || details === null) continue;
+      const searchState = details.dataset.inspectorSearchWasOpen;
+      const open = searchState === undefined ? details.open : searchState === 'true';
+      this.#inspectorGroupPreferences.set(preferenceKey, open);
+      persistenceTarget ??= section;
+    }
+    if (persistenceTarget !== undefined) {
+      this.persistInspectorGroupPreferences(persistenceTarget);
+    }
+  }
+
+  refreshInspectorUi(root: ShadowRoot | HTMLElement | null): void {
+    if (root === null) return;
+    this.restoreInspectorPreference(root);
+    renderDesignerInspectorContext(
+      root.querySelector<HTMLElement>('[data-inspector-context]'),
+      this.callbacks.getDocument(),
+      this.interaction,
+      this.callbacks.getCatalog(),
+    );
+    const inspector = root.querySelector<HTMLElement>('[data-right-panel]');
+    if (inspector?.dataset.inspectorContextKind === 'canvas') {
+      this.#inspectorSearch = '';
+      this.#inspectorSearchOpen = false;
+      const input = root.querySelector<HTMLInputElement>('[data-inspector-search]');
+      if (input !== null) input.value = '';
+    }
+    inspector?.toggleAttribute('data-inspector-search-open', this.#inspectorSearchOpen);
+    const searchWorkspace = root.querySelector<HTMLElement>('[data-inspector-search-workspace]');
+    if (searchWorkspace !== null) searchWorkspace.hidden = !this.#inspectorSearchOpen;
+    this.applyInspectorGroupPreferences(root);
+    applyDesignerInspectorFilters(root, {
+      density: this.#inspectorDensity,
+      query: this.#inspectorSearch,
+    });
+  }
+
   onClick(event: Event): void {
     const target = event.target;
     if (!(target instanceof Element)) return;
+    const searchLaunch = target.closest<HTMLButtonElement>('[data-inspector-search-launch]');
+    if (searchLaunch !== null) {
+      const root = searchLaunch.getRootNode() as ShadowRoot;
+      this.#inspectorSearchOpen = true;
+      this.refreshInspectorUi(root);
+      root.querySelector<HTMLInputElement>('[data-inspector-search]')?.focus();
+      return;
+    }
+    const searchClose = target.closest<HTMLButtonElement>('[data-inspector-search-close]');
+    if (searchClose !== null) {
+      const root = searchClose.getRootNode() as ShadowRoot;
+      const input = root.querySelector<HTMLInputElement>('[data-inspector-search]');
+      if (input !== null) input.value = '';
+      this.#inspectorSearch = '';
+      this.#inspectorSearchOpen = false;
+      this.refreshInspectorUi(root);
+      root.querySelector<HTMLButtonElement>('[data-inspector-search-launch]')?.focus();
+      return;
+    }
+    const copyTarget = target.closest<HTMLButtonElement>('[data-inspector-search-copy-target]');
+    const copyKey = copyTarget?.dataset.inspectorSearchCopyTarget;
+    if (copyTarget !== null && copyTarget !== undefined && copyKey !== undefined) {
+      const root = copyTarget.getRootNode() as ShadowRoot;
+      this.#inspectorSearchClipboard = captureDesignerInspectorSearchStyle(root, copyKey);
+      closeDesignerInspectorSearchMenus(root);
+      return;
+    }
+    const pasteTarget = target.closest<HTMLButtonElement>('[data-inspector-search-paste-target]');
+    const pasteKey = pasteTarget?.dataset.inspectorSearchPasteTarget;
+    if (
+      pasteTarget !== null &&
+      pasteTarget !== undefined &&
+      pasteKey !== undefined &&
+      this.#inspectorSearchClipboard !== undefined
+    ) {
+      const root = pasteTarget.getRootNode() as ShadowRoot;
+      applyDesignerInspectorSearchStyle(root, pasteKey, this.#inspectorSearchClipboard);
+      closeDesignerInspectorSearchMenus(root);
+      return;
+    }
+    const density = target.closest<HTMLButtonElement>('button[data-inspector-density]')?.dataset
+      .inspectorDensity;
+    if (density === 'basic' || density === 'all') {
+      this.#inspectorDensity = density;
+      this.persistInspectorPreference(target, density);
+      this.refreshInspectorUi(target.getRootNode() as ShadowRoot);
+      return;
+    }
+    const groupSummary = target.closest<HTMLElement>('.designer-descriptor-group-summary');
+    if (groupSummary !== null) {
+      const details = groupSummary.closest<HTMLDetailsElement>('details');
+      const section = groupSummary.closest<HTMLElement>('[data-inspector-search-key]');
+      const pane = groupSummary.closest<HTMLElement>('[data-inspector-pane]');
+      const preferenceKey = this.inspectorGroupPreferenceKey(section, pane);
+      if (details !== null && preferenceKey !== undefined) {
+        // The summary's default toggle runs after click dispatch, so `details.open` still
+        // describes the previous state here. Persist the intended next state directly;
+        // reading it in a microtask races the browser's default action in Chromium.
+        this.#inspectorGroupPreferences.set(preferenceKey, !details.open);
+        this.persistInspectorGroupPreferences(groupSummary);
+      }
+    }
+    const searchResult = target.closest<HTMLButtonElement>('[data-inspector-search-target]');
+    const searchTab = searchResult?.dataset.inspectorSearchTab;
+    if (
+      searchResult !== null &&
+      searchResult !== undefined &&
+      (searchTab === 'appearance' || searchTab === 'data' || searchTab === 'interaction')
+    ) {
+      this.callbacks.selectInspectorTab?.(searchTab);
+      const root = searchResult.getRootNode() as ShadowRoot;
+      const key = searchResult.dataset.inspectorSearchTarget;
+      const field = [...root.querySelectorAll<HTMLElement>('[data-inspector-search-key]')].find(
+        (item) => item.dataset.inspectorSearchKey === key,
+      );
+      const inspectorSearch = root.querySelector<HTMLInputElement>('[data-inspector-search]');
+      if (inspectorSearch !== null) inspectorSearch.value = '';
+      this.#inspectorSearch = '';
+      this.#inspectorSearchOpen = false;
+      this.refreshInspectorUi(root);
+      field?.scrollIntoView({ block: 'center' });
+      field?.querySelector<HTMLElement>('input, select, textarea, button')?.focus();
+      field?.classList.add('inspector-search-highlight');
+      setTimeout(() => field?.classList.remove('inspector-search-highlight'), 900);
+      return;
+    }
     const clearSearch = target.closest<HTMLButtonElement>('[data-material-search-clear]');
     if (clearSearch !== null) {
       this.clearMaterialSearch(clearSearch.closest<HTMLElement>('.designer'));
@@ -359,6 +585,51 @@ export class DesignerPanelController {
       this.callbacks.requestCanvasBackgroundImage?.();
       return;
     }
+    const canvasPresentationAction = target.closest<HTMLButtonElement>(
+      '[data-canvas-setting-action]',
+    )?.dataset.canvasSettingAction;
+    if (
+      canvasPresentationAction === 'capture-thumbnail' ||
+      canvasPresentationAction === 'upload-thumbnail'
+    ) {
+      this.callbacks.requestCanvasPresentationAction?.(canvasPresentationAction);
+      return;
+    }
+    const scaleButton = target.closest<HTMLButtonElement>('[data-canvas-setting="scaleMode"]');
+    if (scaleButton !== null) {
+      const value = scaleButton.dataset.canvasSettingValue;
+      if (
+        value === 'fill' ||
+        value === 'fit' ||
+        value === 'width' ||
+        value === 'height' ||
+        value === 'original' ||
+        value === 'none'
+      ) {
+        this.#canvasPresentation.scaleMode = value;
+        this.callbacks.onCanvasPresentationChange?.(this.#canvasPresentation);
+        for (const control of scaleButton.parentElement?.querySelectorAll<HTMLButtonElement>(
+          '[data-canvas-setting="scaleMode"]',
+        ) ?? []) {
+          control.ariaPressed = String(control === scaleButton);
+        }
+      }
+      return;
+    }
+    const quickStyle = target.closest<HTMLButtonElement>('[data-quick-style]');
+    if (quickStyle !== null) {
+      const value = Number(quickStyle.dataset.quickStyle);
+      if (Number.isInteger(value)) {
+        this.applyQuickStyle(quickStyle, { kind: 'preset', value });
+      }
+      return;
+    }
+    const quickConfig = target.closest<HTMLButtonElement>('[data-quick-config]');
+    if (quickConfig !== null) {
+      const action = quickStyleActionFromButton(quickConfig);
+      if (action !== undefined) this.applyQuickStyle(quickConfig, action);
+      return;
+    }
     const materialCard = target.closest<HTMLElement>('[data-material-type]');
     if (materialCard?.dataset.materialType !== undefined) {
       const itemId = materialCard.dataset.materialItemId ?? materialCard.dataset.materialType;
@@ -419,6 +690,18 @@ export class DesignerPanelController {
         return this.report(this.group());
       case 'ungroup':
         return this.report(this.ungroup());
+      case 'lock':
+        return this.report(this.updateSelectionStatus('locked', true));
+      case 'unlock':
+        return this.report(this.updateSelectionStatus('locked', false));
+      case 'hide':
+        return this.report(this.updateSelectionStatus('hidden', true));
+      case 'show':
+        return this.report(this.updateSelectionStatus('hidden', false));
+      case 'duplicate':
+        return this.report(this.duplicate());
+      case 'delete':
+        return this.report(this.deleteSelection());
       case 'align-left':
       case 'align-center':
       case 'align-right':
@@ -459,6 +742,12 @@ export class DesignerPanelController {
 
   onPropertyChange(event: Event): void {
     const target = event.target;
+    const canvasSetting = (target as { readonly dataset?: DOMStringMap } | null)?.dataset
+      ?.canvasSetting;
+    if (canvasSetting !== undefined) {
+      this.updateCanvasPresentationSetting(target, canvasSetting);
+      return;
+    }
     const multiProperty = (target as { readonly dataset?: DOMStringMap } | null)?.dataset
       ?.multiProperty;
     if (multiProperty !== undefined && target !== null) {
@@ -570,9 +859,16 @@ export class DesignerPanelController {
 
   onInput(event: Event): boolean {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement) || target.dataset.materialSearch === undefined) {
+    if (!(target instanceof HTMLInputElement)) {
       return false;
     }
+    if (target.dataset.inspectorSearch !== undefined) {
+      this.#inspectorSearchOpen = true;
+      this.#inspectorSearch = target.value.trim().toLocaleLowerCase();
+      this.refreshInspectorUi(target.getRootNode() as ShadowRoot);
+      return true;
+    }
+    if (target.dataset.materialSearch === undefined) return false;
     // 防抖（ADR-0042）：窗口内再次输入重置计时器，触发时统一更新搜索状态并渲染一次。
     if (this.#materialSearchTimer !== undefined) {
       clearTimeout(this.#materialSearchTimer);
@@ -589,6 +885,26 @@ export class DesignerPanelController {
   onKeyDown(event: KeyboardEvent): boolean {
     if (event.key === 'Escape' && !event.isComposing) {
       const search = event.target;
+      if (
+        search instanceof HTMLInputElement &&
+        search.dataset.inspectorSearch !== undefined &&
+        (this.#inspectorSearch !== '' || search.value !== '')
+      ) {
+        event.preventDefault();
+        search.value = '';
+        this.#inspectorSearch = '';
+        this.refreshInspectorUi(search.getRootNode() as ShadowRoot);
+        search.focus();
+        return true;
+      }
+      if (search instanceof HTMLInputElement && search.dataset.inspectorSearch !== undefined) {
+        event.preventDefault();
+        const root = search.getRootNode() as ShadowRoot;
+        this.#inspectorSearchOpen = false;
+        this.refreshInspectorUi(root);
+        root.querySelector<HTMLButtonElement>('[data-inspector-search-launch]')?.focus();
+        return true;
+      }
       if (
         search instanceof HTMLInputElement &&
         search.dataset.materialSearch !== undefined &&
@@ -648,6 +964,119 @@ export class DesignerPanelController {
       return true;
     }
     return false;
+  }
+
+  private updateCanvasPresentationSetting(target: EventTarget | null, setting: string): void {
+    if (!(target instanceof HTMLInputElement)) return;
+    if (setting === 'opacity') {
+      const value = Number(target.value);
+      if (!Number.isFinite(value)) return;
+      this.#canvasPresentation.opacity = Math.min(1, Math.max(0, value));
+      this.callbacks.onCanvasPresentationChange?.(this.#canvasPresentation);
+      const root = target.getRootNode() as ShadowRoot | Document;
+      for (const control of root.querySelectorAll<HTMLInputElement>(
+        '[data-canvas-setting="opacity"]',
+      )) {
+        control.value = String(this.#canvasPresentation.opacity);
+      }
+      return;
+    }
+    if (setting === 'backgroundAutoFill') {
+      this.#canvasPresentation.backgroundAutoFill = target.checked;
+    } else if (setting === 'disableComponentLoading') {
+      this.#canvasPresentation.disableComponentLoading = target.checked;
+    }
+    this.callbacks.onCanvasPresentationChange?.(this.#canvasPresentation);
+  }
+
+  private restoreInspectorPreference(root: ShadowRoot | HTMLElement): void {
+    if (this.#inspectorPreferenceRestored) return;
+    this.#inspectorPreferenceRestored = true;
+    try {
+      const stored = root.ownerDocument.defaultView?.localStorage.getItem(
+        INSPECTOR_DENSITY_STORAGE_KEY,
+      );
+      if (stored === 'basic' || stored === 'all') this.#inspectorDensity = stored;
+    } catch {
+      // Sandboxed hosts may deny storage; basic mode is the safe default.
+    }
+  }
+
+  private persistInspectorPreference(target: Element, density: DesignerInspectorDensity): void {
+    try {
+      target.ownerDocument.defaultView?.localStorage.setItem(
+        INSPECTOR_DENSITY_STORAGE_KEY,
+        density,
+      );
+    } catch {
+      // Preference persistence is optional.
+    }
+  }
+
+  private applyInspectorGroupPreferences(root: ShadowRoot | HTMLElement): void {
+    this.restoreInspectorGroupPreferences(root);
+    for (const section of root.querySelectorAll<HTMLElement>('[data-inspector-search-key]')) {
+      const pane = section.closest<HTMLElement>('[data-inspector-pane]');
+      const preferenceKey = this.inspectorGroupPreferenceKey(section, pane);
+      const open =
+        preferenceKey === undefined
+          ? undefined
+          : this.#inspectorGroupPreferences.get(preferenceKey);
+      const details = section.querySelector<HTMLDetailsElement>('details');
+      if (details !== null && open !== undefined) details.open = open;
+    }
+  }
+
+  private restoreInspectorGroupPreferences(root: ShadowRoot | HTMLElement): void {
+    if (this.#inspectorGroupPreferenceRestored) return;
+    this.#inspectorGroupPreferenceRestored = true;
+    try {
+      const stored = root.ownerDocument.defaultView?.localStorage.getItem(
+        INSPECTOR_GROUPS_STORAGE_KEY,
+      );
+      if (stored === null || stored === undefined) return;
+      const entries = Object.entries(JSON.parse(stored) as Record<string, unknown>).slice(
+        -MAX_INSPECTOR_GROUP_PREFERENCES,
+      );
+      for (const [key, value] of entries) {
+        if (typeof value === 'boolean') this.#inspectorGroupPreferences.set(key, value);
+      }
+    } catch {
+      // Sandboxed hosts or malformed preferences fall back to descriptor defaults.
+    }
+  }
+
+  private persistInspectorGroupPreferences(target: Element): void {
+    try {
+      const entries = [...this.#inspectorGroupPreferences.entries()].slice(
+        -MAX_INSPECTOR_GROUP_PREFERENCES,
+      );
+      target.ownerDocument.defaultView?.localStorage.setItem(
+        INSPECTOR_GROUPS_STORAGE_KEY,
+        JSON.stringify(Object.fromEntries(entries)),
+      );
+    } catch {
+      // Preference persistence is optional.
+    }
+  }
+
+  private inspectorGroupPreferenceKey(
+    section: HTMLElement | null,
+    pane: HTMLElement | null,
+  ): string | undefined {
+    const sectionKey = section?.dataset.inspectorSearchKey;
+    const tab = pane?.dataset.inspectorPane;
+    if (sectionKey === undefined || tab === undefined) return undefined;
+    const document = this.callbacks.getDocument();
+    const focusedId = this.interaction.focusedComponentId;
+    const context =
+      section?.dataset.inspectorPreferenceContext ??
+      (focusedId === null
+        ? this.interaction.selectedComponentIds.length > 1
+          ? 'multi'
+          : 'canvas'
+        : (document?.components.find((component) => component.id === focusedId)?.type ?? 'canvas'));
+    return `${context}|${tab}|${sectionKey}`;
   }
 
   private addMaterial(itemId: string): void {
@@ -881,6 +1310,21 @@ export class DesignerPanelController {
 export const MATERIAL_DRAG_TYPE = 'application/x-base-screen-material';
 export const MATERIAL_LIBRARY_ITEM_DRAG_TYPE = 'application/x-base-screen-material-library-item';
 
+function quickStyleActionFromButton(
+  button: HTMLButtonElement,
+): DesignerQuickStyleAction | undefined {
+  const kind = button.dataset.quickConfig;
+  const value = button.dataset.quickConfigValue;
+  if (kind === 'colors' && value !== undefined) return { kind, value };
+  if (kind === 'text' && (value === '12' || value === '14' || value === '16')) {
+    return { kind, value: Number(value) as 12 | 14 | 16 };
+  }
+  if (kind === 'info' && (value === 'simple' || value === 'common' || value === 'detailed')) {
+    return { kind, value };
+  }
+  return undefined;
+}
+
 function isEditable(target: EventTarget | null): boolean {
   return (
     target instanceof HTMLInputElement ||
@@ -914,6 +1358,7 @@ function isDesignerDraft(target: EventTarget | null): boolean {
       dataset.canvasProperty !== undefined ||
       dataset.dataSourceType !== undefined ||
       dataset.dataSourceField !== undefined ||
+      dataset.multiProperty !== undefined ||
       dataset.styleRulePath !== undefined ||
       dataset.styleRuleOperator !== undefined ||
       dataset.styleRuleValue !== undefined ||

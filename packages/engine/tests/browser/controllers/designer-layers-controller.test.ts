@@ -166,6 +166,12 @@ function layerRow(id: string): FakeElement {
   return row;
 }
 
+function renderedLayerRow(panel: FakePanel, id: string): FakePanel {
+  const row = panel.children[1]!.children.find((item) => item.dataset.layerId === id);
+  if (row === undefined) throw new Error(`Missing rendered layer row ${id}.`);
+  return row;
+}
+
 describe('DesignerLayersController', () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -196,6 +202,82 @@ describe('DesignerLayersController', () => {
       { type: 'toggle-selection', componentId: 'layer-1' },
       { type: 'toggle-selection', componentId: 'layer-1' },
     ]);
+  });
+
+  it('uses the highlighted row as the pointer target without leaking action-cluster gaps', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const actions: unknown[] = [];
+    const controller = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: document, diagnostics: [] }),
+      getCatalog: () => undefined,
+      getDocument: () => document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      reduceSelection: (action) => actions.push(action),
+    });
+    const row = new FakeElement();
+    row.dataset.layerId = 'layer-1';
+    row.matches['[data-layer-selectable="true"]'] = row;
+
+    expect(controller.onClick({ target: row } as unknown as MouseEvent)).toBe(true);
+    expect(controller.onClick({ target: row, shiftKey: true } as unknown as MouseEvent)).toBe(true);
+
+    const actionGap = new FakeElement();
+    actionGap.matches['.layer-actions'] = actionGap;
+    expect(controller.onClick({ target: actionGap } as unknown as MouseEvent)).toBe(true);
+    expect(actions).toEqual([
+      { type: 'replace-selection', componentIds: ['layer-1'], focusedComponentId: 'layer-1' },
+      { type: 'toggle-selection', componentId: 'layer-1' },
+    ]);
+  });
+
+  it('runs DataV toolbar arrange, group, and locate actions through functional callbacks', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const arranged = createController(
+      createDocument([
+        component('back', null, 0),
+        component('middle', null, 1),
+        component('front', null, 2),
+      ]),
+      ['middle'],
+    );
+    const arrange = new FakeElement();
+    arrange.dataset.layerArrange = 'up';
+    arrange.matches['[data-layer-arrange]'] = arrange;
+
+    expect(arranged.controller.onClick({ target: arrange } as unknown as Event)).toBe(true);
+    expect(arranged.transactions).toHaveLength(1);
+    expect(
+      [...arranged.document().components]
+        .sort((left, right) => right.zIndex - left.zIndex)
+        .map((item) => item.id),
+    ).toEqual(['middle', 'front', 'back']);
+
+    const group = vi.fn(() => ({ ok: true as const, value: document, diagnostics: [] }));
+    const locateComponent = vi.fn();
+    const controller = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: document, diagnostics: [] }),
+      getCatalog: () => undefined,
+      getDocument: () => document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      group,
+      locateComponent,
+      reduceSelection: () => undefined,
+    });
+    const groupButton = new FakeElement();
+    groupButton.dataset.layerGroupAction = 'group';
+    groupButton.matches['[data-layer-group-action]'] = groupButton;
+    const locateButton = new FakeElement();
+    locateButton.dataset.layerLocate = 'middle';
+    locateButton.matches['[data-layer-locate]'] = locateButton;
+
+    expect(controller.onClick({ target: groupButton } as unknown as Event)).toBe(true);
+    expect(controller.onClick({ target: locateButton } as unknown as Event)).toBe(true);
+    expect(group).toHaveBeenCalledOnce();
+    expect(locateComponent).toHaveBeenCalledWith('middle');
   });
 
   it('R4 keeps keyboard tree movement on the shared selection path', () => {
@@ -287,13 +369,13 @@ describe('DesignerLayersController', () => {
     const state = createController(createDocument([component('layer-1', null, 0)]));
     const panel = new FakePanel();
     state.controller.render(panel as unknown as HTMLElement);
-    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBeUndefined();
 
-    const select = new FakeElement();
-    select.dataset.layerSelect = 'layer-1';
-    select.matches['[data-layer-select]'] = select;
-    expect(state.controller.onDoubleClick({ target: select } as unknown as MouseEvent)).toBe(true);
-    expect(panel.children[1]!.children[0]!.dataset.renaming).toBe('true');
+    const row = new FakeElement();
+    row.dataset.layerId = 'layer-1';
+    row.matches['[data-layer-selectable="true"]'] = row;
+    expect(state.controller.onDoubleClick({ target: row } as unknown as MouseEvent)).toBe(true);
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBe('true');
 
     const draft = new FakeInput('Renamed with double-click');
     draft.dataset.layerRename = 'layer-1';
@@ -309,7 +391,70 @@ describe('DesignerLayersController', () => {
 
     expect(state.transactions).toHaveLength(1);
     expect(state.document().components[0]?.name).toBe('Renamed with double-click');
-    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBeUndefined();
+  });
+
+  it('recognizes a double-click when selection rendering replaces the row between clicks', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const state = createController(createDocument([component('layer-1', null, 0)]));
+    const panel = new FakePanel();
+    state.controller.render(panel as unknown as HTMLElement);
+    const firstRow = new FakeElement();
+    firstRow.dataset.layerId = 'layer-1';
+    firstRow.matches['[data-layer-selectable="true"]'] = firstRow;
+    const replacementRow = new FakeElement();
+    replacementRow.dataset.layerId = 'layer-1';
+    replacementRow.matches['[data-layer-selectable="true"]'] = replacementRow;
+    const preventDefault = vi.fn();
+
+    expect(
+      state.controller.onClick({
+        target: firstRow,
+        button: 0,
+        detail: 1,
+        timeStamp: 100,
+        preventDefault,
+      } as unknown as MouseEvent),
+    ).toBe(true);
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBeUndefined();
+    expect(
+      state.controller.onClick({
+        target: replacementRow,
+        button: 0,
+        detail: 1,
+        timeStamp: 260,
+        preventDefault,
+      } as unknown as MouseEvent),
+    ).toBe(true);
+
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBe('true');
+    expect(preventDefault).toHaveBeenCalledOnce();
+  });
+
+  it('does not treat repeated keyboard or programmatic clicks as a rename gesture', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const state = createController(createDocument([component('layer-1', null, 0)]));
+    const panel = new FakePanel();
+    state.controller.render(panel as unknown as HTMLElement);
+    const row = new FakeElement();
+    row.dataset.layerId = 'layer-1';
+    row.matches['[data-layer-selectable="true"]'] = row;
+
+    for (const timeStamp of [100, 200]) {
+      state.controller.onClick({
+        target: row,
+        button: 0,
+        detail: 0,
+        timeStamp,
+        preventDefault: () => undefined,
+      } as unknown as MouseEvent);
+    }
+
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBeUndefined();
   });
 
   it('R6 refuses rename mode for locked components and exits on unchanged focus-out', () => {
@@ -331,19 +476,19 @@ describe('DesignerLayersController', () => {
     expect(state.controller.onDoubleClick({ target: lockedSelect } as unknown as MouseEvent)).toBe(
       false,
     );
-    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+    expect(renderedLayerRow(panel, 'locked').dataset.renaming).toBeUndefined();
 
     const select = new FakeElement();
     select.dataset.layerSelect = 'layer-1';
     select.matches['[data-layer-select]'] = select;
     state.controller.onDoubleClick({ target: select } as unknown as MouseEvent);
-    expect(panel.children[1]!.children[0]!.dataset.renaming).toBe('true');
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBe('true');
 
     const draft = new FakeInput('layer-1');
     draft.dataset.layerRename = 'layer-1';
     expect(state.controller.onFocusOut({ target: draft } as unknown as FocusEvent)).toBe(true);
     expect(state.transactions).toEqual([]);
-    expect(panel.children[1]!.children[0]!.dataset.renaming).toBeUndefined();
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBeUndefined();
   });
 
   it('R6 ignores focus-out of inputs removed by re-rendering', () => {
@@ -364,7 +509,7 @@ describe('DesignerLayersController', () => {
     detached.dataset.layerRename = 'layer-1';
     detached.isConnected = false;
     expect(state.controller.onFocusOut({ target: detached } as unknown as FocusEvent)).toBe(true);
-    expect(panel.children[1]!.children[0]!.dataset.renaming).toBe('true');
+    expect(renderedLayerRow(panel, 'layer-1').dataset.renaming).toBe('true');
   });
 
   it('R6 normalizes duplicate sibling z-indexes when reordering in one transaction', () => {
@@ -374,7 +519,7 @@ describe('DesignerLayersController', () => {
       createDocument([component('first', null, 0), component('second', null, 0)]),
     );
     const move = new FakeElement();
-    move.dataset.layerId = 'second';
+    move.dataset.layerId = 'first';
     move.dataset.layerMove = 'up';
     move.matches['[data-layer-move]'] = move;
 
@@ -410,7 +555,7 @@ describe('DesignerLayersController', () => {
   it('allows a move past unlocked siblings and blocks a move crossing a locked sibling', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('Element', FakeElement);
-    // 兄弟按 zIndex 升序 [locked(0), first(1), second(2)]：上移 = 减小 zIndex。
+    // 面板按前到后显示 [second(2), first(1), locked(0)]：上移朝绘制前层移动。
     const state = createController(
       createDocument([
         component('locked', null, 0, { locked: true }),
@@ -419,11 +564,11 @@ describe('DesignerLayersController', () => {
       ]),
     );
 
-    // second 上移（targetIndex=1，路径上是 first，未锁定）→ 执行移动。
-    clickMove(state, 'second', 'up');
+    // first 上移跨过 second（未锁定）→ 执行移动。
+    clickMove(state, 'first', 'up');
     expect(state.transactions).toHaveLength(1);
 
-    // first 上移（targetIndex=0，路径上是 locked，锁定）→ 不执行移动。
+    // first 下移跨过 locked（锁定）→ 不执行移动。
     const blocked = createController(
       createDocument([
         component('locked', null, 0, { locked: true }),
@@ -431,15 +576,15 @@ describe('DesignerLayersController', () => {
         component('second', null, 2),
       ]),
     );
-    clickMove(blocked, 'first', 'up');
+    clickMove(blocked, 'first', 'down');
     expect(blocked.transactions).toEqual([]);
   });
 
   it('blocks a move whose only crossing target is a locked sibling', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('Element', FakeElement);
-    // zIndex 升序 [first(0), locked(1), second(2)]：锁定组件夹在中间。
-    // second 上移会直接交换 locked → 禁；first 下移也会交换 locked → 禁。
+    // 面板顺序 [second(2), locked(1), first(0)]：锁定组件夹在中间。
+    // second 下移会直接交换 locked → 禁；first 上移也会交换 locked → 禁。
     const secondUp = createController(
       createDocument([
         component('first', null, 0),
@@ -450,7 +595,7 @@ describe('DesignerLayersController', () => {
     // 前置探针：确认锁定语义在测试文档上按预期生效。
     expect(isScreenComponentEffectivelyLocked(secondUp.document(), 'locked')).toBe(true);
     expect(isScreenComponentEffectivelyLocked(secondUp.document(), 'second')).toBe(false);
-    clickMove(secondUp, 'second', 'up');
+    clickMove(secondUp, 'second', 'down');
     expect(secondUp.transactions).toEqual([]);
 
     const firstDown = createController(
@@ -460,7 +605,7 @@ describe('DesignerLayersController', () => {
         component('second', null, 2),
       ]),
     );
-    clickMove(firstDown, 'first', 'down');
+    clickMove(firstDown, 'first', 'up');
     expect(firstDown.transactions).toEqual([]);
   });
 

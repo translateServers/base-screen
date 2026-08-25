@@ -1,0 +1,21 @@
+# 统一 LF 行尾（与 Biome 约定一致），关闭 autocrlf 的 CRLF 转换
+* text=auto eol=lf
+
+# 二进制资产显式声明，防止 eol 转换破坏
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.wasm binary

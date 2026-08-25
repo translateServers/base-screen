@@ -1321,8 +1321,16 @@ function applyMaterial(
     element.dataset.baseScreenComponentId = component.id;
   }
   if (style.transformOrigin !== 'center') style.transformOrigin = 'center';
-  const transform = `rotate(${component.rotation}deg)`;
+  const rotate = `rotate(${component.rotation}deg)`;
+  const scaleX = model.style.flipX === true ? -1 : 1;
+  const scaleY = model.style.flipY === true ? -1 : 1;
+  const transform = scaleX === 1 && scaleY === 1 ? rotate : `${rotate} scale(${scaleX}, ${scaleY})`;
   if (style.transform !== transform) style.transform = transform;
+  const opacity =
+    typeof model.style.opacity === 'number' && Number.isFinite(model.style.opacity)
+      ? String(Math.min(1, Math.max(0, model.style.opacity)))
+      : '';
+  if (style.opacity !== opacity) style.opacity = opacity;
   element.model = model;
   const display = effectivelyHidden ? 'none' : 'block';
   if (style.display !== display) style.display = display;

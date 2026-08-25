@@ -55,10 +55,25 @@ export function renderDesignerInteractionPanel(
     catalog,
     getDatasetFields,
   });
+  const hasEvents =
+    (manifest?.events.length ?? 0) > 0 || (manifest?.editorDescriptor?.events?.length ?? 0) > 0;
+  if (hasEvents) {
+    const events = panel.ownerDocument.createElement('section');
+    events.className = 'designer-inspector-section designer-events-section';
+    events.dataset.inspectorSearchText = `${DESIGNER_UI_TEXT.interaction} ${DESIGNER_UI_TEXT.events}`;
+    const eventsHeading = panel.ownerDocument.createElement('h3');
+    eventsHeading.className = 'designer-inspector-section-title';
+    eventsHeading.textContent = DESIGNER_UI_TEXT.events;
+    const eventsPanel = panel.ownerDocument.createElement('div');
+    eventsPanel.dataset.eventsPanel = 'true';
+    events.append(eventsHeading, eventsPanel);
+    panel.appendChild(events);
+  }
   if (
     capabilities.design.length === 0 &&
     capabilities.previewEvents.length === 0 &&
-    (manifest?.editorDescriptor?.interaction?.length ?? 0) === 0
+    (manifest?.editorDescriptor?.interaction?.length ?? 0) === 0 &&
+    !hasEvents
   ) {
     panel.textContent = DESIGNER_UI_TEXT.interactionPanel.noCapabilities;
     return false;

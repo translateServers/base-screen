@@ -7,8 +7,10 @@ import type {
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+  BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenCanvasBackgroundImageRequest,
+  type BaseScreenCanvasPresentationChangeEventDetail,
   BaseScreenDesignerElement,
   type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryItem,
@@ -37,6 +39,19 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<typeof parseBaseScreenMaterialLibraryItems>().returns.toMatchTypeOf<
       ScreenParseResult<readonly BaseScreenMaterialLibraryItem[]>
     >();
+  });
+
+  it('exports the canvas presentation host change contract', () => {
+    expect(BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT).toBe(
+      'base-screen-canvas-presentation-change',
+    );
+    expectTypeOf<BaseScreenCanvasPresentationChangeEventDetail>().toEqualTypeOf<{
+      readonly opacity: number;
+      readonly scaleMode: 'fill' | 'fit' | 'width' | 'height' | 'original' | 'none';
+      readonly backgroundAutoFill: boolean;
+      readonly disableComponentLoading: boolean;
+      readonly thumbnailUrl: string | null;
+    }>();
   });
 
   it('exports the canvas background image host request contract (ADR-0046)', () => {
@@ -125,6 +140,14 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['requestComponentTextEdit']
     >().parameters.toEqualTypeOf<[import('@base-screen/contracts').ScreenComponentTextTarget]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['requestBlueprintEdit']
+    >().parameters.toEqualTypeOf<
+      [options?: import('@base-screen/contracts').ScreenBlueprintEditOptions | undefined]
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['requestBlueprintEdit']
+    >().returns.toEqualTypeOf<boolean>();
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['instanceId']
     >().toEqualTypeOf<string>();

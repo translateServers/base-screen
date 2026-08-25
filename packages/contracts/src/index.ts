@@ -60,6 +60,21 @@ export {
   SCREEN_AUTHORING_REQUEST_EVENT,
 } from './types/authoring.js';
 export type {
+  ScreenBlueprintAuthoringContext,
+  ScreenBlueprintAuthoringEvent,
+  ScreenBlueprintAuthoringLimits,
+  ScreenBlueprintAuthoringMaterialEvents,
+  ScreenBlueprintEditOptions,
+} from './types/blueprint-authoring.js';
+export {
+  MAX_AUTHORING_DOCUMENT_SNAPSHOT_BYTES,
+  MAX_BLUEPRINT_AUTHORING_CAPABILITIES,
+  MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES,
+  MAX_BLUEPRINT_AUTHORING_EVENTS_PER_MATERIAL,
+  MAX_BLUEPRINT_AUTHORING_PAYLOAD_SCHEMA_BYTES,
+  parseScreenBlueprintAuthoringContext,
+} from './types/blueprint-authoring.js';
+export type {
   ScreenDatasetDescriptor,
   ScreenDatasetField,
   ScreenDatasetPage,

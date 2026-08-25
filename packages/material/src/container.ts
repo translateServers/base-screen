@@ -18,7 +18,14 @@ export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest
   keywords: ['容器', '分组'],
   defaultSize: { width: 320, height: 180 },
   defaultProps: {},
-  defaultStyle: { fill: 'transparent', borderColor: 'transparent', borderWidth: 1, opacity: 1 },
+  defaultStyle: {
+    fill: 'transparent',
+    borderColor: 'transparent',
+    borderWidth: 1,
+    opacity: 1,
+    flipX: false,
+    flipY: false,
+  },
   styleSchema: {
     kind: 'object',
     properties: {
@@ -26,6 +33,8 @@ export const BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST: BaseScreenMaterialManifest
       borderColor: { kind: 'string' },
       borderWidth: { kind: 'number', minimum: 0, maximum: 100 },
       opacity: { kind: 'number', minimum: 0, maximum: 1 },
+      flipX: { kind: 'boolean' },
+      flipY: { kind: 'boolean' },
     },
     required: ['fill', 'borderColor', 'borderWidth', 'opacity'],
   },

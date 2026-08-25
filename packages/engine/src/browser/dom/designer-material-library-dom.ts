@@ -148,7 +148,11 @@ export function populateMaterialLibrary(
     categoryRail.hidden = materialLibraryGrouping !== undefined || categories.length < 2;
   }
   const count = layout.querySelector<HTMLElement>('[data-material-count]');
-  if (count !== null) count.textContent = String(visible.length);
+  if (count !== null) {
+    count.textContent = String(visible.length);
+    count.ariaLabel = DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visible.length);
+    count.dataset.materialTotal = String(visible.length);
+  }
   renderMaterialLibraryState(layout, materialLibraryState);
 }
 
@@ -217,7 +221,7 @@ function createMaterialCard(
   if (cover !== undefined) {
     thumb.appendChild(createMaterialCoverImage(thumb.ownerDocument, cover, thumb));
   }
-  // 名称与类型同一基线行：名称优先，类型作等宽微型标注。
+  // 名称与类型分层呈现；类型的 title 为窄面板中的完整标识入口，名称沿用卡片可访问名称。
   const meta = ownerDocument.createElement('span');
   meta.className = 'material-card-meta';
   const name = ownerDocument.createElement('span');
@@ -226,6 +230,7 @@ function createMaterialCard(
   const type = ownerDocument.createElement('span');
   type.className = 'material-type';
   type.textContent = entry.materialType;
+  type.setAttribute('title', entry.materialType);
   meta.append(name, type);
   card.append(thumb, meta);
   const favorite = ownerDocument.createElement('button');

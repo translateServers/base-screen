@@ -2,7 +2,7 @@
 
 > 状态：维护期（阶段封版）
 > 阶段封版：2026-08-12
-> 最近更新：2026-08-16
+> 最近更新：2026-08-25
 > 定位：Base Screen 处于阶段成果维护期；历史 Spec 全部归档，封版后的增量需求以新的 ADR/Spec 承载
 
 ## 当前状态
@@ -27,6 +27,7 @@
 
 | Spec | 阶段 | 说明 |
 | --- | --- | --- |
+| [Document Blueprint Host Bridge](./document-blueprint-host-bridge/spec.md) | 作者契约与宿主集成增量 | Blueprint 作者桥提升为当前文档整屏 detached 上下文；无选择可请求、可选组件只作初始定位、完整提交绑定文档身份/revision；Engine 只保留顶栏入口与组件只读摘要，不提供编排 UI/UX 或引入重型依赖；依据 [ADR-0061](../decisions/ADR-0061-host-constrained-visual-event-blueprint.md)；2026-08-25 完成 |
 | [Material Library Host State](./material-library-host-state/spec.md) | 契约与产品增量 | 左侧物料库宿主状态投影：严格状态 schema、分类/搜索/草稿/不可用标记与 composed 宿主动作事件；保持不可变 catalog；依据 [ADR-0031](../decisions/ADR-0031-material-library-host-state.md)；2026-08-12 生效 |
 | [Designer Left Panel](./designer-left-panel/spec.md) | Designer 交互增量 | 左侧面板信息架构与交互重构：缩略图网格组件库、按 Tab 隔离工具栏、折叠图标轨、图层树增强与键盘可达性；依据 [ADR-0032](../decisions/ADR-0032-designer-left-panel-refactor.md)；2026-08-13 生效 |
 | [Host Material Library Grouping](./host-material-library-grouping/spec.md) | 宿主展示投影增量 | 宿主控制的多级物料分组树：严格 JSON-safe 解析、catalog 一致性、逐级导航和物料网格；依据 [ADR-0033](../decisions/ADR-0033-host-controlled-material-library-grouping.md)；2026-08-13 生效 |

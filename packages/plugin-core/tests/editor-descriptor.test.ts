@@ -123,6 +123,8 @@ function descriptor(overrides: Record<string, unknown> = {}): Record<string, unk
             label: '显示图例',
             control: 'boolean',
             advanced: true,
+            keywords: ['legend', '图例'],
+            batchable: true,
           },
         ],
       },

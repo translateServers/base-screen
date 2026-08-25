@@ -77,7 +77,7 @@
 | [ADR-0058](./ADR-0058-component-conditional-style-rules.md) | 已接受 | 2026-08-17 | 组件条件样式规则：`ScreenComponentNode` 新增 JSON-safe `styleRules`（锚定组件 `dataState.value` 的有界路径条件 + Manifest `styleSchema` 内样式合并），Renderer 在 model 构造前求值派生 effective style、数据刷新自动重评估；`update-components` patch 扩展与 Designer 条件样式编辑区；Blueprint 与宿主边界不变 |
 | [ADR-0059](./ADR-0059-conditional-style-port.md) | 已接受 | 2026-08-17 | 宿主条件样式端口：渲染期同步纯函数覆盖，固定合并顺序与失败关闭回退，不进入文档 |
 | [ADR-0060](./ADR-0060-material-library-item-projection.md) | 已接受 | 2026-08-23 | Designer 物料库条目投影：多个宿主条目复用一个 canonical 运行物料类型，实例默认值覆盖经 Manifest 校验 |
-| [ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) | 已接受 | 2026-08-24 | 宿主受限可视化事件蓝图：事件、可选条件、有序动作与无副作用 trace，零图形依赖 |
+| [ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) | 已接受 | 2026-08-24 | 整屏交互编排宿主桥：detached 文档上下文、初始定位提示、完整 Blueprint 单事务提交；编排 UI/UX 与依赖完全归宿主 |
 
 ## 计划决策
 
@@ -85,17 +85,18 @@ ADR-0025 已于 2026-08-09 接受，治理已接受、实施进行中；相关�
 [Data Runtime Hardening Spec](../specs/archive/data-runtime-hardening/spec.md)，XJ 侧见
 XJ Data Hub 仓库 `.agent/specs/data-runtime-hardening/spec.md`。
 
-ADR-0026 已于 2026-08-10 接受：事件 Blueprint 以键盘表单为唯一作者路径并新增 Core trace；图形路径整体延后，
-本期不引入图库。评估证据与实施计划见 [Designer Event Blueprint Spec](../specs/archive/designer-event-blueprint/spec.md)
-与 [候选评估报告](../plans/archive/designer-event-blueprint/dependency-evaluation.md)。2026-08-10 起，Engine 内部表单
-作者 UI 范围由 ADR-0028 移交宿主作者桥。
+ADR-0026 已于 2026-08-10 接受并建立 canonical 事件 Blueprint 与 Core trace。其 Engine 内部作者 UI 范围先由
+ADR-0028 移交宿主作者桥，再由 ADR-0061 明确收敛为整屏 detached 上下文：Base Screen 不实现表单或图形编排
+UI。历史评估见 [Designer Event Blueprint Spec](../specs/archive/designer-event-blueprint/spec.md) 与
+[候选评估报告](../plans/archive/designer-event-blueprint/dependency-evaluation.md)。
 
 ADR-0027 已于 2026-08-10 接受：Base Screen 定位为轻量、可嵌入的大屏设计器基座；项目、数据、资产、发布和
 长任务的真实处理由宿主负责，Base Screen 只拥有本地作者内核、渲染内核与有界宿主端口。
 
 ADR-0028 已于 2026-08-10 接受：物料 Manifest 可通过 JSON-safe 声明式 Editor Descriptor 描述外观/数据/交互/
 事件作者字段；Engine 提供有限内建面板 primitives 与宿主作者桥（requestId/revision/身份/实例守护 + 专用提交
-入口）；Blueprint 图形布局、代码编辑器、完整 ECharts option 与领域编辑器归宿主。规格见
+入口）。ADR-0061 进一步规定 Blueprint 请求面向整份当前文档，Engine 仅保留顶栏入口与组件只读摘要；编排
+UI、图形布局、代码编辑器、完整 ECharts option 与领域编辑器归宿主。规格见
 [Designer Authoring Extension Spec](../specs/archive/designer-authoring-extension/spec.md)。
 
 ADR-0029 已于 2026-08-11 接受：宿主托管可信物料包。宿主负责加载、审核与信任远程物料代码，Base Screen 不

@@ -39,7 +39,8 @@ interface DesignerWorkbenchCallbacks {
 type PanelSide = 'left' | 'right';
 type GuideAxis = 'x' | 'y';
 type LeftTab = 'materials' | 'layers' | 'variables';
-type RightTab = 'appearance' | 'data' | 'interaction' | 'events';
+export type DesignerInspectorTab = 'appearance' | 'data' | 'interaction';
+type RightTab = DesignerInspectorTab;
 type WorkbenchMode = 'standard' | 'with-menu' | 'fullscreen';
 
 // 双击移除参考线的判定窗口：同一参考线（轴 + 索引）的两次 pointerdown 间隔不超过该值。
@@ -50,6 +51,9 @@ const DESIGNER_GUIDE_DRAG_THRESHOLD = 3;
 
 /** 折叠态面板宽度（px），与 designer-base.css 折叠变量保持一致（ADR-0037）。 */
 const DESIGNER_COLLAPSED_PANEL_WIDTH = 48;
+const DESIGNER_INSPECTOR_WIDTH_STORAGE_KEY = 'base-screen.designer.inspector-width';
+const DESIGNER_INSPECTOR_MIN_WIDTH = 288;
+const DESIGNER_INSPECTOR_MAX_WIDTH = 480;
 
 /** 折叠态拖拽展开阈值（px）：往外拖到超过 48+阈值 的宽度才展开（参考 VSCode），
  *  阈值内保持折叠且不写宽度，避免微小移动误展开。 */
@@ -110,6 +114,7 @@ export class DesignerWorkbenchController {
   constructor(private readonly callbacks: DesignerWorkbenchCallbacks) {}
 
   initialize(): void {
+    this.restoreInspectorWidth();
     this.connect(this.callbacks.getCanvas());
     this.renderLayout();
     this.renderTabs();
@@ -388,12 +393,7 @@ export class DesignerWorkbenchController {
     }
     const rightTab =
       target.closest<HTMLButtonElement>('[data-inspector-tab]')?.dataset.inspectorTab;
-    if (
-      rightTab === 'appearance' ||
-      rightTab === 'data' ||
-      rightTab === 'interaction' ||
-      rightTab === 'events'
-    ) {
+    if (rightTab === 'appearance' || rightTab === 'data' || rightTab === 'interaction') {
       if (!this.rightTabAvailable(rightTab)) return true;
       this.#rightTab = rightTab;
       this.renderTabs();
@@ -417,6 +417,14 @@ export class DesignerWorkbenchController {
     return false;
   }
 
+  selectInspectorTab(tab: DesignerInspectorTab): void {
+    if (!this.rightTabAvailable(tab)) return;
+    this.#rightTab = tab;
+    this.#rightCollapsed = false;
+    this.renderLayout();
+    this.renderTabs();
+  }
+
   onKeyDown(event: KeyboardEvent): boolean {
     const target = event.target;
     if (!(target instanceof HTMLButtonElement) || target.getAttribute('role') !== 'tab')
@@ -425,8 +433,11 @@ export class DesignerWorkbenchController {
     if (direction === undefined) return false;
     const tabList = target.closest<HTMLElement>('[role="tablist"]');
     if (tabList === null) return false;
-    const controls = Array.from(tabList.querySelectorAll<HTMLButtonElement>('[role="tab"]'));
+    const controls = Array.from(tabList.querySelectorAll<HTMLButtonElement>('[role="tab"]')).filter(
+      (tab) => !tab.hidden && !tab.disabled,
+    );
     const current = controls.findIndex((tab) => tab === target);
+    if (current < 0 || controls.length === 0) return false;
     const next =
       direction === 'first'
         ? 0
@@ -547,7 +558,21 @@ export class DesignerWorkbenchController {
       layout.style.removeProperty(property);
       return;
     }
-    layout.style.setProperty(property, `${width}px`);
+    const safeWidth = side === 'right' ? Math.min(width, this.maxInspectorWidth(layout)) : width;
+    layout.style.setProperty(property, `${safeWidth}px`);
+  }
+
+  private maxInspectorWidth(layout: HTMLElement): number {
+    const rootStyle = layout.ownerDocument.defaultView?.getComputedStyle(layout);
+    const leftWidth = this.#leftCollapsed
+      ? DESIGNER_COLLAPSED_PANEL_WIDTH
+      : (this.#leftPanelWidth ??
+        (Number.parseFloat(rootStyle?.getPropertyValue('--left-panel-width') ?? '') || 404));
+    const available = layout.getBoundingClientRect().width - leftWidth - 10 - 360;
+    return Math.max(
+      DESIGNER_INSPECTOR_MIN_WIDTH,
+      Math.min(DESIGNER_INSPECTOR_MAX_WIDTH, available),
+    );
   }
 
   /** 折叠按钮语义随状态切换：收起↔展开（title/aria-label，文案入 designer-ui-text）。 */
@@ -577,6 +602,14 @@ export class DesignerWorkbenchController {
     const singleComponentSelected =
       selection.focusedComponentId !== null && selection.selectedComponentIds.length === 1;
     const dataTabAvailable = singleComponentSelected && this.rightTabAvailable('data');
+    const rightPanelTitle = root.querySelector<HTMLElement>('[data-right-panel-title]');
+    if (rightPanelTitle !== null) {
+      rightPanelTitle.textContent = singleComponentSelected
+        ? DESIGNER_UI_TEXT.inspectorUi.componentConfiguration
+        : selection.selectedComponentIds.length > 1
+          ? DESIGNER_UI_TEXT.inspectorUi.batchConfiguration
+          : DESIGNER_UI_TEXT.inspectorUi.canvasConfiguration;
+    }
     if (!singleComponentSelected || (this.#rightTab === 'data' && !dataTabAvailable)) {
       this.#rightTab = 'appearance';
     }
@@ -586,6 +619,27 @@ export class DesignerWorkbenchController {
     const materials = root.querySelector<HTMLElement>('[data-materials]');
     const layers = root.querySelector<HTMLElement>('[data-layers]');
     const variables = root.querySelector<HTMLElement>('[data-variables]');
+    const leftTitle = root.querySelector<HTMLElement>('[data-left-panel-title]');
+    const leftCount = root.querySelector<HTMLElement>('[data-left-panel-count]');
+    const leftPanelLabel =
+      this.#leftTab === 'materials'
+        ? DESIGNER_UI_TEXT.materials
+        : this.#leftTab === 'layers'
+          ? DESIGNER_UI_TEXT.layers
+          : DESIGNER_UI_TEXT.variables.title;
+    if (leftTitle !== null) {
+      leftTitle.textContent = leftPanelLabel;
+    }
+    if (leftCount !== null) {
+      const itemCount =
+        this.#leftTab === 'materials'
+          ? Number(leftCount.dataset.materialTotal ?? 0)
+          : this.#leftTab === 'layers'
+            ? (this.callbacks.getDocument()?.components.length ?? 0)
+            : (this.callbacks.getDocument()?.variables.length ?? 0);
+      leftCount.textContent = String(itemCount);
+      leftCount.ariaLabel = DESIGNER_UI_TEXT.leftPanelCount(leftPanelLabel, itemCount);
+    }
     if (materials !== null) materials.hidden = this.#leftTab !== 'materials';
     if (layers !== null) layers.hidden = this.#leftTab !== 'layers';
     if (variables !== null) variables.hidden = this.#leftTab !== 'variables';
@@ -642,9 +696,10 @@ export class DesignerWorkbenchController {
       resize.side === 'left'
         ? event.clientX - bounds.left - layout.clientLeft - handleCenter
         : bounds.right - event.clientX - layout.clientLeft - handleCenter;
+    const maxWidth = resize.side === 'left' ? 480 : this.maxInspectorWidth(layout);
     const clamped = Math.max(
-      resize.side === 'left' ? 200 : 220,
-      Math.min(resize.side === 'left' ? 480 : 520, width),
+      resize.side === 'left' ? 200 : DESIGNER_INSPECTOR_MIN_WIDTH,
+      Math.min(maxWidth, width),
     );
     if (resize.side === 'left') {
       // 折叠态拖拽展开阈值（ADR-0037，参考 VSCode）：以未钳制的目标宽度判定，
@@ -660,10 +715,43 @@ export class DesignerWorkbenchController {
         this.#rightCollapsed = false;
       }
       this.#rightPanelWidth = clamped;
+      this.persistInspectorWidth(clamped);
     }
     // 折叠态拖拽分隔条视为先展开再调整宽度（ADR-0037）：renderLayout 统一写回
     // 折叠 48px / 展开拖拽宽度的内联变量。
     this.renderLayout();
+  }
+
+  private restoreInspectorWidth(): void {
+    try {
+      const root = this.callbacks.getRoot();
+      const storage = root?.ownerDocument.defaultView?.localStorage;
+      const stored = storage?.getItem(DESIGNER_INSPECTOR_WIDTH_STORAGE_KEY);
+      if (stored === null || stored === undefined || stored === '') return;
+      const value = Number(stored);
+      if (!Number.isFinite(value)) return;
+      const layout = root?.querySelector<HTMLElement>('.designer');
+      const maxWidth =
+        layout === null || layout === undefined
+          ? DESIGNER_INSPECTOR_MAX_WIDTH
+          : this.maxInspectorWidth(layout);
+      this.#rightPanelWidth = Math.max(DESIGNER_INSPECTOR_MIN_WIDTH, Math.min(maxWidth, value));
+    } catch {
+      // Storage may be unavailable in sandboxed hosts; the CSS default remains authoritative.
+    }
+  }
+
+  private persistInspectorWidth(width: number): void {
+    try {
+      this.callbacks
+        .getRoot()
+        ?.ownerDocument.defaultView?.localStorage.setItem(
+          DESIGNER_INSPECTOR_WIDTH_STORAGE_KEY,
+          String(width),
+        );
+    } catch {
+      // Width persistence is an optional authoring preference.
+    }
   }
 
   private moveGuide(event: PointerEvent): void {

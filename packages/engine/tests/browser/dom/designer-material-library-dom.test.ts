@@ -154,6 +154,16 @@ function thumbOf(grid: FakeElement, index: number): FakeElement {
 }
 
 describe('material library card cover rendering', () => {
+  it('keeps the complete material type available in the compact card layout', () => {
+    const { grid, layout } = createLayout();
+    populateMaterialLibrary(layout, [entry('base.very-long-material-type')]);
+
+    const card = grid.children[0]!.children[0]!;
+    const meta = card.children[1]!;
+    expect(meta.children[0]!.attributes.title).toBeUndefined();
+    expect(meta.children[1]!.attributes.title).toBe('base.very-long-material-type');
+  });
+
   it('renders multiple palette items that share one canonical material type', () => {
     const { grid, layout } = createLayout();
     const manifest = entry('base.image').manifest;

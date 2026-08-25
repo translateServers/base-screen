@@ -10,10 +10,15 @@ import {
   type ScreenDocument,
   type ScreenHostDatasetCatalogPort,
   type ScreenHostResourcePort,
+  type ScreenJsonValue,
   type ScreenParseResult,
   type ScreenTabularDataset,
 } from '@base-screen/contracts';
-import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
+import {
+  type ScreenDocumentTransaction,
+  type ScreenInteractionState,
+  validateScreenHostResourceBinding,
+} from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogEntry,
@@ -22,7 +27,14 @@ import type {
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   type DesignerDataSourceMode,
+  type DesignerDataSourcePanelOptions,
+  type DesignerDatasetAuthoringAction,
+  type DesignerDatasetAuthoringView,
   type DesignerDatasetDraftView,
+  type DesignerDatasetPreviewTab,
+  type DesignerDatasetPreviewView,
+  type DesignerDatasetRefreshStrategy,
+  type DesignerDatasetWorkbenchStep,
   renderDesignerDataSourcePanel,
 } from '../dom/designer-dataset-dom.js';
 import { renderDesignerDescriptorZone } from '../dom/designer-descriptor-dom.js';
@@ -51,6 +63,11 @@ export interface DesignerDatasetControllerCallbacks {
   ) => ScreenParseResult<ScreenDocument>;
   readonly report: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly refresh: (componentId?: string) => void;
+  readonly requestAuthoringAction?: (
+    action: DesignerDatasetAuthoringAction,
+    detail?: Readonly<Record<string, string | number | boolean>>,
+  ) => void;
+  readonly getWorkbenchHost?: () => HTMLElement | undefined;
 }
 
 /** Owns the host dataset catalog and the data-source authoring surface. */
@@ -69,6 +86,13 @@ export class DesignerDatasetController {
   #staticFirstRowIsHeader = true;
   #catalogOpen = false;
   #feedbackText = '';
+  #draftDirty = false;
+  #confirmClose = false;
+  #preview: DesignerDatasetPreviewView = emptyDatasetPreview();
+  #activeStep: DesignerDatasetWorkbenchStep = 'source';
+  #authoring: DesignerDatasetAuthoringView = createDatasetAuthoringView();
+  #previewController: AbortController | undefined;
+  #previewGeneration = 0;
   #focusedComponentId: string | null = null;
   #syncedDataSource: ScreenDocument['components'][number]['dataSource'] | undefined;
   #panel: HTMLElement | undefined;
@@ -85,14 +109,14 @@ export class DesignerDatasetController {
 
   render(panel: HTMLElement | undefined): void {
     this.clearSurface();
-    if (panel === undefined) return;
-    this.#panel = panel;
     const component = this.currentComponent();
     if (component === undefined) {
-      panel.replaceChildren(DESIGNER_UI_TEXT.dataPanelEmpty);
+      if (panel !== undefined) panel.replaceChildren(DESIGNER_UI_TEXT.dataPanelEmpty);
       return;
     }
     const describeTarget = this.syncDraftToFocusedComponent();
+    if (panel === undefined) return;
+    this.#panel = panel;
     this.renderSurface();
     if (this.#mode !== 'dataset') return;
     this.#catalogController.ensureList();
@@ -121,6 +145,12 @@ export class DesignerDatasetController {
     this.#staticPasteDraft = '';
     this.#catalogOpen = false;
     this.#feedbackText = '';
+    this.#draftDirty = false;
+    this.#confirmClose = false;
+    this.cancelPreview();
+    this.#preview = emptyDatasetPreview();
+    this.#activeStep = 'source';
+    this.#authoring = createDatasetAuthoringView();
     this.#focusedComponentId = null;
     this.#syncedDataSource = undefined;
   }
@@ -199,7 +229,7 @@ export class DesignerDatasetController {
       const fieldId = bindingField.dataset.datasetBindingField;
       if (this.#draft !== undefined && role !== undefined && fieldId !== undefined) {
         this.#draft = toggleDesignerDatasetBindingField(this.#draft, role, fieldId);
-        this.renderSurface();
+        this.markDatasetDraftChanged();
       }
       return true;
     }
@@ -220,14 +250,94 @@ export class DesignerDatasetController {
             [role.id]: bindingAction.dataset.datasetBindingRoleAction === 'clear' ? [] : compatible,
           },
         };
-        this.renderSurface();
+        this.markDatasetDraftChanged();
       }
       return true;
     }
-    const action =
-      target.closest<HTMLButtonElement>('[data-dataset-action]')?.dataset.datasetAction;
+    const previewTab = target.closest<HTMLButtonElement>('[data-dataset-preview-tab]')?.dataset
+      .datasetPreviewTab as DesignerDatasetPreviewTab | undefined;
+    if (previewTab === 'response' || previewTab === 'consumer' || previewTab === 'request') {
+      this.#preview = { ...this.#preview, tab: previewTab };
+      this.renderSurface();
+      return true;
+    }
+    const workbenchStep =
+      target.closest<HTMLButtonElement>('[data-workbench-step]')?.dataset.workbenchStep;
+    if (workbenchStep !== undefined) {
+      this.focusWorkbenchSection(workbenchStep as DesignerDatasetWorkbenchStep);
+      return true;
+    }
+    const editorMode = target.closest<HTMLButtonElement>('[data-dataset-editor-mode]')?.dataset
+      .datasetEditorMode as DesignerDatasetAuthoringView['editorMode'] | undefined;
+    if (editorMode === 'visual' || editorMode === 'code') {
+      this.#authoring = { ...this.#authoring, editorMode };
+      if (editorMode === 'code') {
+        this.callbacks.requestAuthoringAction?.('open-code-editor');
+      }
+      this.renderSurface();
+      return true;
+    }
+    const authoringAction = target.closest<HTMLButtonElement>('[data-dataset-authoring-action]')
+      ?.dataset.datasetAuthoringAction as DesignerDatasetAuthoringAction | undefined;
+    if (authoringAction !== undefined) {
+      if (authoringAction === 'copy-data') {
+        this.callbacks.requestAuthoringAction?.(authoringAction, {
+          value: JSON.stringify(this.#preview.rawValue ?? null),
+        });
+      } else {
+        this.callbacks.requestAuthoringAction?.(authoringAction);
+      }
+      return true;
+    }
+    const actionTarget = target.closest<HTMLButtonElement>('[data-dataset-action]');
+    const action = actionTarget?.dataset.datasetAction;
+    if (action === 'select-step' || action === 'open-workbench') {
+      this.#confirmClose = false;
+      const requestedStep = actionTarget?.dataset.datasetWorkbenchTarget;
+      this.#activeStep = isDatasetWorkbenchStep(requestedStep) ? requestedStep : 'source';
+      if (this.#activeStep === 'preview') {
+        this.#preview = { ...this.#preview, open: true };
+      }
+      this.renderSurface();
+      if (this.#activeStep === 'source' && this.#mode === 'dataset') {
+        this.#catalogController.ensureList();
+      }
+      return true;
+    }
+    if (action === 'close-workbench') {
+      if (this.#mode === 'dataset' && this.#draftDirty) {
+        this.#confirmClose = true;
+        this.renderSurface();
+        return true;
+      }
+      this.#staticDialogOpen = false;
+      this.#confirmClose = false;
+      this.renderSurface();
+      return true;
+    }
+    if (action === 'keep-editing') {
+      this.#confirmClose = false;
+      this.renderSurface();
+      return true;
+    }
+    if (action === 'discard-workbench') {
+      this.restoreDatasetDraft();
+      this.#staticDialogOpen = false;
+      this.#confirmClose = false;
+      this.renderSurface();
+      return true;
+    }
+    if (action === 'toggle-preview') {
+      this.#preview = { ...this.#preview, open: !this.#preview.open };
+      this.renderSurface();
+      return true;
+    }
     if (action === 'apply') {
       this.apply();
+      return true;
+    }
+    if (action === 'test') {
+      void this.testDatasetDraft();
       return true;
     }
     if (action === 'refresh') {
@@ -250,6 +360,10 @@ export class DesignerDatasetController {
       !(target instanceof HTMLTextAreaElement)
     ) {
       return false;
+    }
+    if (target.dataset.dataSourceModeSelect !== undefined && target instanceof HTMLSelectElement) {
+      this.setSourceMode(target.value as DesignerDataSourceMode);
+      return true;
     }
     if (target.dataset.staticFirstRowHeader !== undefined && target instanceof HTMLInputElement) {
       this.#staticFirstRowIsHeader = target.checked;
@@ -282,6 +396,10 @@ export class DesignerDatasetController {
       this.renderSurface();
       return true;
     }
+    if (target.dataset.datasetAuthoringSetting !== undefined) {
+      this.updateAuthoringSetting(target.dataset.datasetAuthoringSetting, target);
+      return true;
+    }
     if (target.dataset.datasetParameterMode !== undefined) {
       const name = target.dataset.datasetParameterMode;
       if (this.#draft === undefined) return true;
@@ -293,7 +411,7 @@ export class DesignerDatasetController {
               value: defaultDatasetParameterValue(this.#descriptor, name),
             };
       this.#draft = { ...this.#draft, params: { ...this.#draft.params, [name]: value } };
-      this.renderSurface();
+      this.markDatasetDraftChanged();
       return true;
     }
     if (target.dataset.datasetParameter !== undefined) {
@@ -304,6 +422,7 @@ export class DesignerDatasetController {
           target.dataset.datasetParameter,
           target,
         );
+        this.markDatasetDraftChanged();
       }
       return true;
     }
@@ -313,7 +432,7 @@ export class DesignerDatasetController {
       const selectedValue = target.value || target.selectedOptions[0]?.value || '';
       const values = selectedValue === '' ? [] : [selectedValue];
       this.#draft = { ...this.#draft, fields: { ...this.#draft.fields, [roleId]: values } };
-      this.renderSurface();
+      this.markDatasetDraftChanged();
       return true;
     }
     return false;
@@ -338,10 +457,17 @@ export class DesignerDatasetController {
     return this.#descriptor;
   }
 
+  get authoring(): DesignerDatasetAuthoringView {
+    return this.#authoring;
+  }
+
   private setSourceMode(mode: DesignerDataSourceMode): void {
     if (!this.availableModes().includes(mode)) return;
     this.#mode = mode;
+    this.#activeStep = 'source';
+    this.#staticDialogOpen = false;
     this.#feedbackText = '';
+    this.#confirmClose = false;
     if (mode === 'static' && this.currentComponent()?.dataSource?.type !== 'static') {
       this.restoreStaticExample();
     }
@@ -376,6 +502,9 @@ export class DesignerDatasetController {
     );
     this.#mode = 'dataset';
     this.#catalogOpen = false;
+    this.#draftDirty = this.isDatasetDraftDirty();
+    this.#preview = emptyDatasetPreview();
+    this.#activeStep = 'source';
     this.#feedbackText = DESIGNER_UI_TEXT.dataset.selected(descriptor.name);
     this.renderSurface();
   }
@@ -426,10 +555,11 @@ export class DesignerDatasetController {
       return;
     }
     this.setFeedback(DESIGNER_UI_TEXT.dataSource.applied);
-    if (this.#mode === 'static') {
-      this.#staticDialogOpen = false;
-      this.renderSurface();
-    }
+    this.#draftDirty = false;
+    this.#confirmClose = false;
+    this.#staticDialogOpen = false;
+    this.#activeStep = 'source';
+    this.renderSurface();
   }
 
   private syncDraftToFocusedComponent():
@@ -438,10 +568,24 @@ export class DesignerDatasetController {
     const component = this.currentComponent();
     const focusedId = component?.id ?? null;
     const source = component?.dataSource;
-    if (focusedId === this.#focusedComponentId && source === this.#syncedDataSource) return;
+    if (focusedId === this.#focusedComponentId && sameJsonValue(source, this.#syncedDataSource)) {
+      // Session commits replace the document graph even when this component's data source did not
+      // change. Keep authoring drafts, preview state, and host settings alive across such commits.
+      this.#syncedDataSource = source;
+      return;
+    }
+    const sameFocusedComponent = focusedId === this.#focusedComponentId;
+    const activeStep = sameFocusedComponent ? this.#activeStep : 'source';
+    const authoring = sameFocusedComponent ? this.#authoring : createDatasetAuthoringView();
     this.#focusedComponentId = focusedId;
     this.#syncedDataSource = source;
     this.#feedbackText = '';
+    this.#draftDirty = false;
+    this.#confirmClose = false;
+    this.cancelPreview();
+    this.#preview = emptyDatasetPreview();
+    this.#activeStep = activeStep;
+    this.#authoring = authoring;
     if (source?.type === 'static') {
       this.#mode = 'static';
       this.#staticDraft = JSON.stringify(source.value, null, 2);
@@ -456,6 +600,7 @@ export class DesignerDatasetController {
     }
     if (source?.type === 'host-resource') {
       this.#mode = 'dataset';
+      this.#staticDialogOpen = false;
       this.#catalogOpen = false;
       if (
         this.#descriptor?.resourceType === source.resourceType &&
@@ -473,6 +618,7 @@ export class DesignerDatasetController {
       return { resourceType: source.resourceType, resourceId: source.resourceId };
     }
     this.#mode = 'none';
+    this.#staticDialogOpen = false;
     this.#descriptor = undefined;
     this.#draft = undefined;
     this.#catalogOpen = false;
@@ -843,11 +989,275 @@ export class DesignerDatasetController {
     return path === '' ? diagnostic.message : `${path}：${diagnostic.message}`;
   }
 
+  private markDatasetDraftChanged(): void {
+    this.#draftDirty = this.isDatasetDraftDirty();
+    this.#confirmClose = false;
+    this.#preview = {
+      ...emptyDatasetPreview(this.#preview.open),
+      tab: this.#preview.tab,
+    };
+    this.renderSurface();
+  }
+
+  private isDatasetDraftDirty(): boolean {
+    const source = this.currentComponent()?.dataSource;
+    const draft = this.#draft;
+    if (source?.type !== 'host-resource' || draft === undefined) return draft !== undefined;
+    if (source.resourceType !== draft.resourceType || source.resourceId !== draft.resourceId) {
+      return true;
+    }
+    const roles = this.currentEntry()?.manifest.dataBinding?.roles ?? [];
+    const binding = roles.length === 0 ? null : { fields: draft.fields };
+    return (
+      JSON.stringify(source.params) !== JSON.stringify(draft.params) ||
+      JSON.stringify(source.binding) !== JSON.stringify(binding)
+    );
+  }
+
+  private restoreDatasetDraft(): void {
+    const source = this.currentComponent()?.dataSource;
+    const descriptor = this.#descriptor;
+    if (source?.type === 'host-resource' && descriptor !== undefined) {
+      this.#draft = createDesignerDatasetDraft(
+        descriptor,
+        source,
+        this.currentEntry()?.manifest.dataBinding?.roles ?? [],
+      );
+    }
+    this.#draftDirty = false;
+    this.cancelPreview();
+    this.#preview = emptyDatasetPreview();
+  }
+
+  private updateAuthoringSetting(
+    setting: string,
+    target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  ): void {
+    let value: string | number | boolean;
+    if (setting === 'loadingDisabled' || setting === 'controlled') {
+      if (!(target instanceof HTMLInputElement)) return;
+      value = target.checked;
+      this.#authoring = { ...this.#authoring, [setting]: target.checked };
+    } else if (setting === 'refreshStrategy') {
+      if (!(target instanceof HTMLSelectElement)) return;
+      const refreshStrategy: DesignerDatasetRefreshStrategy =
+        target.value === 'auto' || target.value === 'manual' ? target.value : 'once';
+      value = refreshStrategy;
+      this.#authoring = { ...this.#authoring, refreshStrategy };
+    } else if (setting === 'refreshInterval') {
+      const parsed = Number(target.value);
+      if (!Number.isFinite(parsed)) return;
+      value = Math.min(3600, Math.max(1, Math.round(parsed)));
+      this.#authoring = { ...this.#authoring, refreshInterval: value };
+    } else {
+      return;
+    }
+    this.callbacks.requestAuthoringAction?.('update-settings', { setting, value });
+    this.renderSurface();
+  }
+
+  private focusWorkbenchSection(step: DesignerDatasetWorkbenchStep): void {
+    this.#activeStep = step;
+    if (step === 'preview') {
+      this.#preview = { ...this.#preview, open: true };
+    }
+    this.renderSurface();
+    const section =
+      this.#panel?.querySelector<HTMLElement>(`[data-workbench-section="${step}"]`) ??
+      this.callbacks
+        .getWorkbenchHost?.()
+        ?.querySelector<HTMLElement>(`[data-workbench-section="${step}"]`);
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    section?.focus({ preventScroll: true });
+  }
+
+  private async testDatasetDraft(): Promise<void> {
+    const descriptor = this.#descriptor;
+    const draft = this.#draft;
+    const component = this.currentComponent();
+    const port = this.callbacks.getResourcePort();
+    if (
+      descriptor === undefined ||
+      draft === undefined ||
+      component === undefined ||
+      port === undefined
+    ) {
+      return;
+    }
+    const params = this.resolvePreviewParameters(draft);
+    if (params === undefined) {
+      this.#preview = {
+        ...emptyDatasetPreview(true),
+        status: 'error',
+        message: DESIGNER_UI_TEXT.dataSource.testVariableUnavailable,
+      };
+      this.renderSurface();
+      return;
+    }
+    this.cancelPreview();
+    const controller = new AbortController();
+    const generation = this.#previewGeneration;
+    this.#previewController = controller;
+    this.#preview = {
+      ...emptyDatasetPreview(true),
+      status: 'loading',
+      tab: this.#preview.tab === 'request' ? 'response' : this.#preview.tab,
+      message: DESIGNER_UI_TEXT.dataSource.previewLoading,
+    };
+    this.renderSurface();
+    try {
+      const result = await port.resolve(
+        {
+          componentId: component.id,
+          resourceType: draft.resourceType,
+          resourceId: draft.resourceId,
+          params,
+        },
+        { signal: controller.signal },
+      );
+      if (controller.signal.aborted || generation !== this.#previewGeneration) return;
+      this.#previewController = undefined;
+      if (!result.ok) {
+        this.callbacks.report(result.diagnostics);
+        this.setPreviewError();
+        return;
+      }
+      const raw = parseScreenJsonValue(result.value, { maxBytes: 1024 * 1024 });
+      if (!raw.ok) {
+        this.callbacks.report(raw.diagnostics);
+        this.setPreviewError();
+        return;
+      }
+      const consumer = this.adaptDatasetPreview(raw.value);
+      if (!consumer.ok) {
+        this.callbacks.report(consumer.diagnostics);
+        this.setPreviewError();
+        return;
+      }
+      this.#preview = {
+        status: 'ready',
+        tab: this.#preview.tab,
+        rawValue: raw.value,
+        consumerValue: consumer.value,
+        message: DESIGNER_UI_TEXT.dataSource.testReady(datasetRecordCount(raw.value)),
+        testedAt: new Date().toLocaleTimeString(),
+        open: true,
+      };
+      this.#feedbackText = this.#preview.message;
+      this.renderSurface();
+    } catch {
+      if (!controller.signal.aborted && generation === this.#previewGeneration) {
+        this.#previewController = undefined;
+        this.setPreviewError();
+      }
+    }
+  }
+
+  private resolvePreviewParameters(
+    draft: DesignerDatasetDraftView,
+  ): Readonly<Record<string, ScreenJsonValue>> | undefined {
+    const params: Record<string, ScreenJsonValue> = {};
+    const document = this.callbacks.getDocument();
+    for (const [name, parameter] of Object.entries(draft.params)) {
+      if (parameter.kind === 'literal') {
+        params[name] = parameter.value;
+        continue;
+      }
+      const variable = document?.variables.find((item) => item.name === parameter.name);
+      if (variable?.type !== 'static') return undefined;
+      params[name] = variable.value;
+    }
+    return params;
+  }
+
+  private adaptDatasetPreview(value: ScreenJsonValue): ScreenParseResult<ScreenJsonValue> {
+    const entry = this.currentEntry();
+    const roles = entry?.manifest.dataBinding?.roles ?? [];
+    if (roles.length === 0 || entry?.tabularDataAdapter === undefined) {
+      return { ok: true, value, diagnostics: [] };
+    }
+    const dataset = parseScreenTabularDataset(value);
+    if (!dataset.ok) return dataset;
+    const binding = validateScreenHostResourceBinding(
+      { fields: this.#draft?.fields ?? {} },
+      dataset.value.fields,
+      roles,
+    );
+    if (!binding.ok) return binding;
+    try {
+      const adapted = entry.tabularDataAdapter.adapt({
+        dataset: dataset.value,
+        fields: binding.value.fields,
+      });
+      if (!adapted.ok) return adapted;
+      return parseScreenJsonValue(adapted.value, { maxBytes: 1024 * 1024 });
+    } catch {
+      return {
+        ok: false,
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'HOST_DATASET_ADAPTER_FAILED',
+            path: [],
+            message: DESIGNER_UI_TEXT.dataSource.testFailed,
+          },
+        ],
+      };
+    }
+  }
+
+  private setPreviewError(): void {
+    this.#preview = {
+      ...emptyDatasetPreview(true),
+      status: 'error',
+      message: DESIGNER_UI_TEXT.dataSource.testFailed,
+    };
+    this.#feedbackText = this.#preview.message;
+    this.renderSurface();
+  }
+
+  private cancelPreview(): void {
+    this.#previewGeneration++;
+    this.#previewController?.abort();
+    this.#previewController = undefined;
+  }
+
   private renderSurface(): void {
     const panel = this.#panel;
     if (panel === undefined) return;
-    const surface = renderDesignerDataSourcePanel({
+    const options = this.panelOptions(panel);
+    const surface = renderDesignerDataSourcePanel(options);
+    this.#feedback = surface.feedback;
+    const manifest = this.currentEntry()?.manifest;
+    const descriptorHost =
+      options.activeStep === 'mapping'
+        ? (panel.querySelector<HTMLElement>('.designer-datav-data-flow-content') ?? panel)
+        : undefined;
+    if (descriptorHost !== undefined) {
+      renderDesignerDescriptorZone(descriptorHost, manifest?.editorDescriptor?.data, {
+        document: this.callbacks.getDocument(),
+        interaction: this.callbacks.getInteraction(),
+        catalog: this.callbacks.getCatalog(),
+        getDatasetFields: () => this.getFocusedDatasetFields(),
+      });
+    }
+    this.renderDataWorkbench(options);
+  }
+
+  private panelOptions(panel: HTMLElement): DesignerDataSourcePanelOptions {
+    return {
       panel,
+      scrollScope: JSON.stringify([
+        this.#focusedComponentId,
+        this.#mode,
+        this.#activeStep,
+        this.#staticDialogOpen,
+        this.#staticTab,
+        this.#staticPage,
+        this.#catalogOpen,
+        this.#descriptor?.resourceType ?? null,
+        this.#descriptor?.resourceId ?? null,
+      ]),
       mode: this.#mode,
       availableModes: this.availableModes(),
       staticDraft: this.#staticDraft,
@@ -870,15 +1280,22 @@ export class DesignerDatasetController {
       catalogAvailable: this.callbacks.getCatalogPort() !== undefined,
       resourceAvailable: this.callbacks.getResourcePort() !== undefined,
       feedback: this.#feedbackText,
-    });
-    this.#feedback = surface.feedback;
-    const manifest = this.currentEntry()?.manifest;
-    renderDesignerDescriptorZone(panel, manifest?.editorDescriptor?.data, {
-      document: this.callbacks.getDocument(),
-      interaction: this.callbacks.getInteraction(),
-      catalog: this.callbacks.getCatalog(),
-      getDatasetFields: () => this.getFocusedDatasetFields(),
-    });
+      dirty: this.#draftDirty,
+      confirmClose: this.#confirmClose,
+      preview: this.#preview,
+      activeStep: this.#activeStep,
+      authoring: this.#authoring,
+    };
+  }
+
+  private renderDataWorkbench(options: DesignerDataSourcePanelOptions): void {
+    void options;
+    const host = this.callbacks.getWorkbenchHost?.();
+    if (host === undefined) return;
+    host.hidden = true;
+    const layout = host.closest<HTMLElement>('.designer');
+    if (layout !== null) delete layout.dataset.dataWorkbenchOpen;
+    host.replaceChildren();
   }
 
   private availableModes(): readonly DesignerDataSourceMode[] {
@@ -896,6 +1313,13 @@ export class DesignerDatasetController {
   }
 
   private clearSurface(): void {
+    const host = this.callbacks.getWorkbenchHost?.();
+    if (host !== undefined) {
+      host.hidden = true;
+      host.replaceChildren();
+      const layout = host.closest<HTMLElement>('.designer');
+      if (layout !== null) delete layout.dataset.dataWorkbenchOpen;
+    }
     this.#panel = undefined;
     this.#feedback = undefined;
   }
@@ -904,4 +1328,47 @@ export class DesignerDatasetController {
     this.#feedbackText = message;
     if (this.#feedback !== undefined) this.#feedback.textContent = message;
   }
+}
+
+function sameJsonValue(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function isDatasetWorkbenchStep(value: string | undefined): value is DesignerDatasetWorkbenchStep {
+  return (
+    value === 'source' ||
+    value === 'mapping' ||
+    value === 'transform' ||
+    value === 'preview' ||
+    value === 'refresh'
+  );
+}
+
+function createDatasetAuthoringView(): DesignerDatasetAuthoringView {
+  return {
+    editorMode: 'visual',
+    filterConfigured: false,
+    loadingDisabled: false,
+    controlled: false,
+    refreshStrategy: 'manual',
+    refreshInterval: 30,
+  };
+}
+
+function emptyDatasetPreview(open = false): DesignerDatasetPreviewView {
+  return {
+    status: 'idle',
+    tab: 'response',
+    message: '',
+    open,
+  };
+}
+
+function datasetRecordCount(value: ScreenJsonValue): number {
+  if (Array.isArray(value)) return value.length;
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const rows = (value as Readonly<Record<string, ScreenJsonValue>>).rows;
+    if (Array.isArray(rows)) return rows.length;
+  }
+  return value === null ? 0 : 1;
 }

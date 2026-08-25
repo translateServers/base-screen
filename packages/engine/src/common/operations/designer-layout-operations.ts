@@ -117,28 +117,63 @@ export function createSiblingReorderTransaction(
   componentId: string,
   direction: 'up' | 'down',
 ): ScreenDocumentTransaction | undefined {
-  const component = document.components.find((item) => item.id === componentId);
-  if (component === undefined) return undefined;
+  return createSiblingSelectionReorderTransaction(document, [componentId], direction);
+}
+
+/**
+ * 按图层面板的视觉顺序移动同级选区：列表顶部是最前层，因此 up 增大绘制层级，
+ * down 减小绘制层级。多选项各跨过一个未选中兄弟，并保持选区内部相对顺序。
+ */
+export function createSiblingSelectionReorderTransaction(
+  document: ScreenDocument,
+  componentIds: readonly string[],
+  direction: 'up' | 'down',
+): ScreenDocumentTransaction | undefined {
+  const selected = new Set(componentIds);
+  const targets = selectedComponents(document, componentIds);
+  if (selected.size === 0 || targets.length !== selected.size) return undefined;
+  if (targets.some((component) => isScreenComponentEffectivelyLocked(document, component.id)))
+    return undefined;
+  const parentIds = new Set(targets.map((component) => component.parentId));
+  if (parentIds.size !== 1) return undefined;
+  const parentId = targets[0]!.parentId;
   const siblings = document.components
-    .filter((item) => item.parentId === component.parentId)
+    .filter((item) => item.parentId === parentId)
     .sort(
       (left, right) =>
-        left.zIndex - right.zIndex ||
-        document.components.indexOf(left) - document.components.indexOf(right),
+        right.zIndex - left.zIndex ||
+        document.components.indexOf(right) - document.components.indexOf(left),
     );
-  const index = siblings.findIndex((item) => item.id === componentId);
-  const targetIndex = index + (direction === 'up' ? -1 : 1);
-  if (index < 0 || targetIndex < 0 || targetIndex >= siblings.length) return undefined;
-
   const reordered = [...siblings];
-  const [moved] = reordered.splice(index, 1);
-  reordered.splice(targetIndex, 0, moved!);
+  let moved = false;
+  if (direction === 'up') {
+    for (let index = 1; index < reordered.length; index++) {
+      const item = reordered[index]!;
+      const previous = reordered[index - 1]!;
+      if (!selected.has(item.id) || selected.has(previous.id)) continue;
+      if (isScreenComponentEffectivelyLocked(document, previous.id)) return undefined;
+      reordered[index - 1] = item;
+      reordered[index] = previous;
+      moved = true;
+    }
+  } else {
+    for (let index = reordered.length - 2; index >= 0; index--) {
+      const item = reordered[index]!;
+      const next = reordered[index + 1]!;
+      if (!selected.has(item.id) || selected.has(next.id)) continue;
+      if (isScreenComponentEffectivelyLocked(document, next.id)) return undefined;
+      reordered[index] = next;
+      reordered[index + 1] = item;
+      moved = true;
+    }
+  }
+  if (!moved) return undefined;
   const zIndexes = siblings.map((item) => item.zIndex);
   const orderedIndexes = zIndexes.every(
-    (value, position) => position === 0 || zIndexes[position - 1]! < value,
+    (value, position) => position === 0 || zIndexes[position - 1]! > value,
   )
     ? zIndexes
-    : siblings.map((_, position) => position);
+    : siblings.map((_, position) => siblings.length - position - 1);
   const commands = reordered.flatMap((item, position) => {
     const zIndex = orderedIndexes[position]!;
     return item.zIndex === zIndex
