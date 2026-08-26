@@ -229,7 +229,26 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('position: sticky;');
     expect(workbenchCss).toContain('bottom: 0;');
     expect(workbenchCss).toContain('max-width: 100%;');
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-actions \{\s*position: sticky;\s*bottom: 0;\s*z-index: 1;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties \.designer-datav-data-flow-content:has\(\.designer-dataset-actions\)\s*\{[^}]*padding-bottom: 0;/s,
+    );
     expect(workbenchCss).not.toContain('margin: 0 calc(var(--designer-space-5) * -1);');
+  });
+
+  it('R6 keeps the DataV-inspired data flow in one continuous inspector column', () => {
+    expect(workbenchCss).toMatch(
+      /\.properties \.designer-datav-data-flow\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*grid-template-rows: auto minmax\(0, 1fr\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties \.designer-datav-data-flow-progress\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties \.designer-data-workbench-preview\s*\{\s*display: block;/s,
+    );
+    expect(workbenchCss).not.toContain('writing-mode: vertical-rl;');
   });
 
   it('keeps the DataV-style layer toolbar and tree geometry stable', () => {

@@ -65,7 +65,10 @@ export function renderDesignerDataSourcePanel(
   feedback.setAttribute('aria-live', 'polite');
   feedback.textContent = options.feedback;
   const content = flow.querySelector<HTMLElement>('.designer-datav-data-flow-content');
-  (content ?? section).appendChild(feedback);
+  const host = content ?? section;
+  host.appendChild(feedback);
+  const actions = host.querySelector<HTMLElement>('.designer-dataset-actions');
+  if (actions !== null) host.appendChild(actions);
   panel.appendChild(section);
   dataSourcePanelScrollScopes.set(panel, options.scrollScope);
   if (content !== null && previousScroll !== undefined && preservesScroll) {
@@ -227,6 +230,8 @@ export function renderDesignerDatasetWorkbench(
 function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement {
   const section = options.panel.ownerDocument.createElement('section');
   section.className = 'designer-data-source-type';
+  section.dataset.workbenchSection = 'source';
+  section.tabIndex = -1;
   const heading = options.panel.ownerDocument.createElement('h3');
   heading.className = 'designer-inspector-section-title';
   heading.textContent = DESIGNER_UI_TEXT.dataSource.title;
@@ -255,7 +260,7 @@ function renderEmptySource(ownerDocument: Document): HTMLElement {
   empty.className = 'designer-data-source-empty';
   const text = ownerDocument.createElement('p');
   text.textContent = DESIGNER_UI_TEXT.dataSource.noneSelected;
-  empty.append(text, renderApplyAction(ownerDocument, 'none'));
+  empty.appendChild(text);
   return empty;
 }
 
@@ -284,6 +289,7 @@ function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): HTMLElem
   const section = ownerDocument.createElement('section');
   section.className = 'designer-dataset-section designer-datav-data-flow';
   section.dataset.datasetSection = 'true';
+  section.dataset.dataFlowLayout = 'continuous';
   section.dataset.inspectorSearchSection = 'true';
   const activeStep = inlineWorkbenchStep(options.activeStep);
   section.dataset.activeStep = activeStep;
@@ -328,88 +334,100 @@ function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): HTMLElem
   );
   response.dataset.dataStepDock = 'preview';
 
+  const progress = ownerDocument.createElement('nav');
+  progress.className = 'designer-datav-data-flow-progress';
+  progress.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.configurationFlow);
+  progress.append(source, mapping, response);
+
   const content = ownerDocument.createElement('div');
   content.className = 'designer-datav-data-flow-content';
-  content.dataset.workbenchSection = activeStep;
-  content.tabIndex = -1;
-  renderInlineStep(content, options, activeStep);
+  renderContinuousDataFlow(content, options);
 
-  section.append(source, content, mapping, response);
-  if (options.mode === 'dataset') {
-    const footer = renderDatasetAuthoring(options, 'footer');
-    footer.className += ' designer-datav-data-flow-footer';
-    section.appendChild(footer);
-  }
+  section.append(progress, content);
   return section;
 }
 
-function renderInlineStep(
+function renderContinuousDataFlow(
   content: HTMLElement,
   options: DesignerDataSourcePanelOptions,
-  activeStep: 'source' | 'mapping' | 'preview',
 ): void {
-  if (activeStep === 'source') {
-    content.appendChild(renderSourceMode(options));
-    if (options.mode === 'none') {
-      content.appendChild(renderEmptySource(content.ownerDocument));
-      return;
-    }
-    if (options.mode === 'static') {
-      content.appendChild(renderStaticSource(options));
-      return;
-    }
-    if (options.catalogOpen || options.descriptor === undefined) {
-      content.append(renderHostConnection(options), renderDatasetCatalog(options));
-      return;
-    }
-    const configuration = renderDesignerDatasetConfiguration({
-      panel: options.panel,
-      descriptor: options.descriptor,
-      draft: options.draft,
-      roles: options.roles,
-      variableNames: options.variableNames,
-      resourceAvailable: options.resourceAvailable,
-    });
-    configuration.querySelector('[data-workbench-section="mapping"]')?.remove();
-    configuration.querySelector('.designer-dataset-actions')?.remove();
-    content.append(configuration, renderDatasetAuthoring(options, 'editor'));
-    return;
-  }
-  if (activeStep === 'mapping') {
-    if (options.mode === 'static') {
-      content.appendChild(renderDesignerStaticDataMapping(staticDataView(options)));
-      return;
-    }
-    if (options.mode !== 'dataset' || options.descriptor === undefined) {
-      content.appendChild(renderEmptySource(content.ownerDocument));
-      return;
-    }
-    const configuration = renderDesignerDatasetConfiguration({
-      panel: options.panel,
-      descriptor: options.descriptor,
-      draft: options.draft,
-      roles: options.roles,
-      variableNames: options.variableNames,
-      resourceAvailable: options.resourceAvailable,
-    });
-    configuration.querySelector('[data-workbench-section="source"]')?.remove();
-    configuration.querySelector('[data-workbench-section="parameters"]')?.remove();
-    content.appendChild(configuration);
+  content.appendChild(renderSourceMode(options));
+  if (options.mode === 'none') {
+    content.append(
+      renderEmptySource(content.ownerDocument),
+      renderApplyAction(content.ownerDocument, 'none'),
+    );
     return;
   }
   if (options.mode === 'static') {
-    content.appendChild(renderDesignerStaticDataPreview(staticDataView(options)));
+    renderContinuousStaticDataFlow(content, options);
     return;
   }
-  if (options.mode !== 'dataset') {
-    content.appendChild(renderEmptySource(content.ownerDocument));
+  if (options.catalogOpen || options.descriptor === undefined) {
+    content.append(renderHostConnection(options), renderDatasetCatalog(options));
     return;
   }
-  const actions = content.ownerDocument.createElement('div');
+  const configuration = renderDesignerDatasetConfiguration({
+    panel: options.panel,
+    descriptor: options.descriptor,
+    draft: options.draft,
+    roles: options.roles,
+    variableNames: options.variableNames,
+    resourceAvailable: options.resourceAvailable,
+  });
+  const applyActions = configuration.querySelector<HTMLElement>('.designer-dataset-actions');
+  applyActions?.querySelector('[data-dataset-action="refresh"]')?.remove();
+  applyActions?.remove();
+  const advanced = renderDatasetAuthoring(options);
+  advanced.classList.add('designer-datav-advanced-settings');
+  advanced.dataset.workbenchSection = 'refresh';
+  advanced.tabIndex = -1;
+  const advancedHeading = advanced.querySelector<HTMLElement>('.designer-inspector-section-title');
+  if (advancedHeading !== null) {
+    advancedHeading.textContent = DESIGNER_UI_TEXT.dataSource.advancedSettings;
+  }
+  content.append(
+    configuration,
+    renderDatasetPreviewActions(content.ownerDocument, options),
+    renderDatasetPreview(content.ownerDocument, options),
+    advanced,
+  );
+  if (applyActions !== null) content.appendChild(applyActions);
+}
+
+function renderContinuousStaticDataFlow(
+  content: HTMLElement,
+  options: DesignerDataSourcePanelOptions,
+): void {
+  const view = staticDataView(options);
+  const source = renderStaticSource(options);
+  for (const actions of source.querySelectorAll<HTMLElement>('.designer-dataset-actions')) {
+    actions.remove();
+  }
+  content.appendChild(source);
+  if (options.staticDescriptor?.kind === 'tabular') {
+    const mapping = renderDesignerStaticDataMapping(view);
+    mapping.dataset.workbenchSection = 'mapping';
+    mapping.tabIndex = -1;
+    for (const actions of mapping.querySelectorAll<HTMLElement>('.designer-dataset-actions')) {
+      actions.remove();
+    }
+    const preview = renderDesignerStaticDataPreview(view);
+    preview.tabIndex = -1;
+    content.append(mapping, preview);
+  }
+  content.appendChild(renderApplyAction(content.ownerDocument, 'static'));
+}
+
+function renderDatasetPreviewActions(
+  ownerDocument: Document,
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement {
+  const actions = ownerDocument.createElement('div');
   actions.className = 'designer-datav-preview-actions';
   actions.append(
     datasetAction(
-      content.ownerDocument,
+      ownerDocument,
       'test',
       options.preview.status === 'loading'
         ? DESIGNER_UI_TEXT.dataSource.testing
@@ -419,9 +437,9 @@ function renderInlineStep(
         !options.resourceAvailable ||
         options.preview.status === 'loading',
     ),
-    datasetAction(content.ownerDocument, 'refresh', DESIGNER_UI_TEXT.dataset.refresh),
+    datasetAction(ownerDocument, 'refresh', DESIGNER_UI_TEXT.dataset.refresh),
   );
-  content.append(actions, renderDatasetPreview(content.ownerDocument, options));
+  return actions;
 }
 
 function sourceStepDetail(options: DesignerDataSourcePanelOptions): string {

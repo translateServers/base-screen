@@ -52,8 +52,11 @@ const DESIGNER_GUIDE_DRAG_THRESHOLD = 3;
 /** 折叠态面板宽度（px），与 designer-base.css 折叠变量保持一致（ADR-0037）。 */
 const DESIGNER_COLLAPSED_PANEL_WIDTH = 48;
 const DESIGNER_INSPECTOR_WIDTH_STORAGE_KEY = 'base-screen.designer.inspector-width';
+const DESIGNER_LEFT_PANEL_WIDTH_STORAGE_KEY = 'base-screen.designer.left-panel-width';
 const DESIGNER_INSPECTOR_MIN_WIDTH = 288;
 const DESIGNER_INSPECTOR_MAX_WIDTH = 480;
+const DESIGNER_LEFT_PANEL_MIN_WIDTH = 200;
+const DESIGNER_LEFT_PANEL_MAX_WIDTH = 480;
 
 /** 折叠态拖拽展开阈值（px）：往外拖到超过 48+阈值 的宽度才展开（参考 VSCode），
  *  阈值内保持折叠且不写宽度，避免微小移动误展开。 */
@@ -114,7 +117,7 @@ export class DesignerWorkbenchController {
   constructor(private readonly callbacks: DesignerWorkbenchCallbacks) {}
 
   initialize(): void {
-    this.restoreInspectorWidth();
+    this.restorePanelWidths();
     this.connect(this.callbacks.getCanvas());
     this.renderLayout();
     this.renderTabs();
@@ -709,6 +712,7 @@ export class DesignerWorkbenchController {
         this.#leftCollapsed = false;
       }
       this.#leftPanelWidth = clamped;
+      this.persistLeftPanelWidth(clamped);
     } else {
       if (this.#rightCollapsed) {
         if (width <= DESIGNER_COLLAPSED_PANEL_WIDTH + DESIGNER_COLLAPSED_EXPAND_THRESHOLD) return;
@@ -720,6 +724,28 @@ export class DesignerWorkbenchController {
     // 折叠态拖拽分隔条视为先展开再调整宽度（ADR-0037）：renderLayout 统一写回
     // 折叠 48px / 展开拖拽宽度的内联变量。
     this.renderLayout();
+  }
+
+  private restorePanelWidths(): void {
+    this.restoreLeftPanelWidth();
+    this.restoreInspectorWidth();
+  }
+
+  private restoreLeftPanelWidth(): void {
+    try {
+      const root = this.callbacks.getRoot();
+      const storage = root?.ownerDocument.defaultView?.localStorage;
+      const stored = storage?.getItem(DESIGNER_LEFT_PANEL_WIDTH_STORAGE_KEY);
+      if (stored === null || stored === undefined || stored === '') return;
+      const value = Number(stored);
+      if (!Number.isFinite(value)) return;
+      this.#leftPanelWidth = Math.max(
+        DESIGNER_LEFT_PANEL_MIN_WIDTH,
+        Math.min(DESIGNER_LEFT_PANEL_MAX_WIDTH, value),
+      );
+    } catch {
+      // Storage may be unavailable in sandboxed hosts; the CSS default remains authoritative.
+    }
   }
 
   private restoreInspectorWidth(): void {
@@ -738,6 +764,19 @@ export class DesignerWorkbenchController {
       this.#rightPanelWidth = Math.max(DESIGNER_INSPECTOR_MIN_WIDTH, Math.min(maxWidth, value));
     } catch {
       // Storage may be unavailable in sandboxed hosts; the CSS default remains authoritative.
+    }
+  }
+
+  private persistLeftPanelWidth(width: number): void {
+    try {
+      this.callbacks
+        .getRoot()
+        ?.ownerDocument.defaultView?.localStorage.setItem(
+          DESIGNER_LEFT_PANEL_WIDTH_STORAGE_KEY,
+          String(width),
+        );
+    } catch {
+      // Width persistence is an optional authoring preference.
     }
   }
 

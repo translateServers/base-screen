@@ -191,6 +191,8 @@ export const DESIGNER_UI_TEXT = {
     summaryStep: (index: number, label: string) => `${index} ${label}`,
     mappingSummary: (count: number) => `${count} 个字段已映射`,
     responseUnavailable: '尚未获取数据响应',
+    configurationFlow: '数据接入流程',
+    advancedSettings: '高级设置',
     authoringTitle: '数据配置',
     visualEditor: '可视化编辑',
     codeEditor: '代码编辑',

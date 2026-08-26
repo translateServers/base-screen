@@ -970,7 +970,7 @@ try {
         await assertEditableShortcuts(page, authoringDesigner, staticInput);
         await staticInput.fill('Base Screen 设计器r');
         await authoringDesigner
-          .locator('[data-inspector-pane=data] [data-static-action="apply"]')
+          .locator('[data-inspector-pane=data] [data-dataset-action="apply"]')
           .click();
         await page.waitForFunction(() =>
           window.baseScreenHarness.designer.document.components.some(
@@ -2703,6 +2703,7 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   await page.evaluate(() => document.querySelectorAll('base-screen-designer')[1]?.remove());
 
   // 框选（marquee）多选后，直接拖拽选中框（控制器）的空白区域应整体移动选中组件。
+  await designer.getByTitle('\u9009\u62e9').click();
   await zoomResetViaMenu(designer);
   await page.waitForFunction(
     () =>
@@ -2710,16 +2711,39 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
       '100%',
   );
   const marqueeCanvasBox = await designer.locator('[data-canvas]').boundingBox();
+  const marqueeViewportBox = await designer.locator('[data-viewport]').boundingBox();
   if (marqueeCanvasBox === null) throw new Error('BROWSER_HARNESS_MARQUEE_CANVAS_MISSING');
+  if (marqueeViewportBox === null) throw new Error('BROWSER_HARNESS_MARQUEE_VIEWPORT_MISSING');
+  const marqueeProbe = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const canvas = root?.querySelector('[data-canvas]');
+    const viewport = root?.querySelector('[data-viewport]');
+    return {
+      activeTool: root?.querySelector('[data-status-tool]')?.textContent,
+      canvas: canvas?.getBoundingClientRect().toJSON(),
+      viewport: viewport?.getBoundingClientRect().toJSON(),
+      selectedIds: [...(root?.querySelectorAll('[data-base-screen-selected="true"]') ?? [])].map(
+        (item) => item.getAttribute('data-base-screen-component-id'),
+      ),
+    };
+  });
   await page.evaluate(() => {
     window.__browserHarnessMarqueeEvents = [];
     window.baseScreenHarness.designer.addEventListener('base-screen-selection-change', (event) => {
       window.__browserHarnessMarqueeEvents.push(event.detail);
     });
   });
-  await page.mouse.move(marqueeCanvasBox.x + 40, marqueeCanvasBox.y + 40);
+  const marqueeStart = {
+    x: Math.max(marqueeCanvasBox.x + 40, marqueeViewportBox.x + 8),
+    y: Math.max(marqueeCanvasBox.y + 40, marqueeViewportBox.y + 8),
+  };
+  const marqueeEnd = {
+    x: Math.min(marqueeCanvasBox.x + 700, marqueeViewportBox.x + marqueeViewportBox.width - 8),
+    y: Math.min(marqueeCanvasBox.y + 240, marqueeViewportBox.y + marqueeViewportBox.height - 8),
+  };
+  await page.mouse.move(marqueeStart.x, marqueeStart.y);
   await page.mouse.down();
-  await page.mouse.move(marqueeCanvasBox.x + 700, marqueeCanvasBox.y + 240, { steps: 6 });
+  await page.mouse.move(marqueeEnd.x, marqueeEnd.y, { steps: 6 });
   await page.mouse.up();
   const marqueeSelection = await page.evaluate(
     () => window.__browserHarnessMarqueeEvents.at(-1)?.selectedComponentIds ?? [],
@@ -2729,7 +2753,9 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     !marqueeSelection.includes('subtitle') ||
     marqueeSelection.length < 2
   ) {
-    throw new Error(`BROWSER_HARNESS_MARQUEE_SELECTION_FAILED:${JSON.stringify(marqueeSelection)}`);
+    throw new Error(
+      `BROWSER_HARNESS_MARQUEE_SELECTION_FAILED:${JSON.stringify({ marqueeSelection, marqueeProbe })}`,
+    );
   }
   // 多选语义：框选后检查器隐藏"外观/数据/交互/事件"tab 栏，只保留外观 pane（选择概览）。
   const marqueeInspectorTabsHidden = await designer.locator('.inspector-tabs').isHidden();
@@ -2884,7 +2910,7 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   );
   // 批量宽度与批量字号各是一条历史：先把焦点从属性面板输入框移出（可编辑目标下
   // Ctrl+Z 走原生撤销、不路由设计器命令），再两次撤销逐级恢复。
-  await page.mouse.click(marqueeCanvasBox.x + 20, marqueeCanvasBox.y + 20);
+  await page.mouse.click(marqueeStart.x, marqueeStart.y);
   await page.keyboard.press(`${modifier}+z`);
   await page.waitForFunction(
     (before) =>
@@ -4142,18 +4168,18 @@ async function assertSnapWorkflow(designer, page) {
     const titleResult = window.baseScreenHarness.designer.executeCommand({
       type: 'update-components',
       componentIds: ['title'],
-      patch: { position: { x: 100, y: 100 }, rotation: 0 },
+      patch: { position: { x: 350, y: 100 }, rotation: 0 },
     });
     const subtitleResult = window.baseScreenHarness.designer.executeCommand({
       type: 'update-components',
       componentIds: ['subtitle'],
-      patch: { position: { x: 320, y: 100 }, rotation: 0 },
+      patch: { position: { x: 570, y: 100 }, rotation: 0 },
     });
     const hostDataResult = window.baseScreenHarness.designer.executeCommand({
       type: 'update-components',
       componentIds: ['host-data'],
       // 保留 title 左侧对齐轨道，专供验证拖拽时的 Moveable 式间距标注。
-      patch: { position: { x: 100, y: 300 }, rotation: 0 },
+      patch: { position: { x: 350, y: 300 }, rotation: 0 },
     });
     if (!titleResult.ok || !subtitleResult.ok || !hostDataResult.ok) {
       throw new Error('BROWSER_HARNESS_SNAP_BASELINE_FAILED');
@@ -4168,13 +4194,13 @@ async function assertSnapWorkflow(designer, page) {
         const subtitle = read('subtitle');
         const hostData = read('host-data');
         return (
-          title?.position.x === 100 &&
+          title?.position.x === 350 &&
           title?.position.y === 100 &&
           title?.rotation === 0 &&
-          subtitle?.position.x === 320 &&
+          subtitle?.position.x === 570 &&
           subtitle?.position.y === 100 &&
           subtitle?.rotation === 0 &&
-          hostData?.position.x === 100 &&
+          hostData?.position.x === 350 &&
           hostData?.position.y === 300 &&
           hostData?.rotation === 0
         );
@@ -4353,7 +4379,7 @@ async function assertSnapWorkflow(designer, page) {
   await page.mouse.move(startX, startY + targetDeltaY + 30, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', releaseDelta, 'RELEASE');
-  // title 与 host-data 的 left=100 已精确重合；即使 y 轴仍在 2px 捕获范围内，
+  // title 与 host-data 的 left=350 已精确重合；即使 y 轴仍在 2px 捕获范围内，
   // x 轴也不得因零校正而出现贯穿画布的辅助线。
   if ((await designer.locator('.canvas-guide-snap[data-axis="x"]').count()) !== 0) {
     throw new Error('BROWSER_HARNESS_SNAP_EXACT_X_GUIDE_FAILED');
@@ -4827,12 +4853,21 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     const sourceStep = panel.querySelector('[data-dataset-workbench-target="source"]');
     const mappingStep = panel.querySelector('[data-dataset-workbench-target="mapping"]');
     const previewStep = panel.querySelector('[data-dataset-workbench-target="preview"]');
+    const progress = panel.querySelector('.designer-datav-data-flow-progress');
+    const sourceSection = panel.querySelector('[data-workbench-section="source"]');
+    const mappingSection = panel.querySelector('[data-workbench-section="mapping"]');
+    const previewSection = panel.querySelector('[data-workbench-section="preview"]');
+    const advancedSection = panel.querySelector('.designer-datav-advanced-settings');
     const workbench = layout?.querySelector('[data-data-workbench]');
     const flowBox = flow?.getBoundingClientRect();
     const contentBox = content?.getBoundingClientRect();
     const sourceBox = sourceStep?.getBoundingClientRect();
     const mappingBox = mappingStep?.getBoundingClientRect();
     const previewBox = previewStep?.getBoundingClientRect();
+    const sourceSectionBox = sourceSection?.getBoundingClientRect();
+    const mappingSectionBox = mappingSection?.getBoundingClientRect();
+    const previewSectionBox = previewSection?.getBoundingClientRect();
+    const advancedSectionBox = advancedSection?.getBoundingClientRect();
     return {
       parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
       unlabelledParameterControls: [
@@ -4841,7 +4876,9 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
       bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
       sourceMode: panel.querySelector('[data-data-source-mode-select]')?.value,
       activeStep: flow?.dataset.activeStep,
+      layout: flow?.dataset.dataFlowLayout,
       stepCount: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
+      applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
       workbenchVisible:
         workbench !== null && !workbench.hidden && getComputedStyle(workbench).display !== 'none',
       propertiesVisible:
@@ -4850,15 +4887,24 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
         properties.clientWidth > 0,
       panelInlineGutter: panel.offsetWidth - panel.clientWidth,
       horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1,
-      docked:
+      continuous:
+        progress !== null &&
         flowBox !== undefined &&
         contentBox !== undefined &&
         sourceBox !== undefined &&
         mappingBox !== undefined &&
         previewBox !== undefined &&
-        mappingBox.left >= contentBox.right - 1 &&
-        previewBox.top > sourceBox.bottom &&
-        mappingBox.right <= flowBox.right + 1,
+        Math.abs(sourceBox.top - mappingBox.top) <= 1 &&
+        Math.abs(mappingBox.top - previewBox.top) <= 1 &&
+        Math.abs(contentBox.width - flowBox.width) <= 1,
+      ordered:
+        sourceSectionBox !== undefined &&
+        mappingSectionBox !== undefined &&
+        previewSectionBox !== undefined &&
+        advancedSectionBox !== undefined &&
+        sourceSectionBox.top < mappingSectionBox.top &&
+        mappingSectionBox.top < previewSectionBox.top &&
+        previewSectionBox.top < advancedSectionBox.top,
       fullscreenAction:
         panel.querySelector('[data-dataset-authoring-action="fullscreen-edit"]') !== null,
     };
@@ -4869,12 +4915,15 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     descriptorSurface.bindingCount !== 0 ||
     descriptorSurface.sourceMode !== 'dataset' ||
     descriptorSurface.activeStep !== 'source' ||
+    descriptorSurface.layout !== 'continuous' ||
     descriptorSurface.stepCount !== 3 ||
+    descriptorSurface.applyCount !== 1 ||
     descriptorSurface.workbenchVisible ||
     !descriptorSurface.propertiesVisible ||
     descriptorSurface.panelInlineGutter !== 0 ||
     descriptorSurface.horizontalOverflow ||
-    !descriptorSurface.docked ||
+    !descriptorSurface.continuous ||
+    !descriptorSurface.ordered ||
     !descriptorSurface.fullscreenAction
   ) {
     throw new Error(
@@ -4913,13 +4962,29 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   await dataPanel
     .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]')
     .click();
-  const switchedStepScroll = await dataPanel.evaluate((panel) => ({
-    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
-    scrollTop: panel.querySelector('.designer-datav-data-flow-content')?.scrollTop,
-  }));
-  if (switchedStepScroll.activeStep !== 'mapping' || switchedStepScroll.scrollTop !== 0) {
+  await page.waitForTimeout(400);
+  const stepNavigation = await dataPanel.evaluate((panel) => {
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const mapping = panel.querySelector('[data-workbench-section="mapping"]');
+    const contentBox = content?.getBoundingClientRect();
+    const mappingBox = mapping?.getBoundingClientRect();
+    return {
+      activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
+      scrollTop: content?.scrollTop,
+      mappingVisible:
+        contentBox !== undefined &&
+        mappingBox !== undefined &&
+        mappingBox.top >= contentBox.top - 1 &&
+        mappingBox.top < contentBox.bottom,
+    };
+  });
+  if (
+    stepNavigation.activeStep !== 'mapping' ||
+    stepNavigation.scrollTop <= 0 ||
+    !stepNavigation.mappingVisible
+  ) {
     throw new Error(
-      `BROWSER_HARNESS_DATASET_STEP_SCROLL_RESET_FAILED:${JSON.stringify(switchedStepScroll)}`,
+      `BROWSER_HARNESS_DATASET_STEP_NAVIGATION_FAILED:${JSON.stringify(stepNavigation)}`,
     );
   }
   await dataPanel
@@ -4983,12 +5048,12 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     .click();
   const mappingSurface = await dataPanel.evaluate((panel) => ({
     bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
-    apply: panel.querySelector('[data-dataset-action="apply"]') !== null,
+    applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
     activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
   }));
   if (
     mappingSurface.bindingCount !== 0 ||
-    !mappingSurface.apply ||
+    mappingSurface.applyCount !== 1 ||
     mappingSurface.activeStep !== 'mapping'
   ) {
     throw new Error(

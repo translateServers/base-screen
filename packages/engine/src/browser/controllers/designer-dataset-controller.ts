@@ -291,7 +291,17 @@ export class DesignerDatasetController {
     }
     const actionTarget = target.closest<HTMLButtonElement>('[data-dataset-action]');
     const action = actionTarget?.dataset.datasetAction;
-    if (action === 'select-step' || action === 'open-workbench') {
+    if (action === 'select-step') {
+      this.#confirmClose = false;
+      const requestedStep = actionTarget?.dataset.datasetWorkbenchTarget;
+      const step = isDatasetWorkbenchStep(requestedStep) ? requestedStep : 'source';
+      this.focusWorkbenchSection(step);
+      if (step === 'source' && this.#mode === 'dataset') {
+        this.#catalogController.ensureList();
+      }
+      return true;
+    }
+    if (action === 'open-workbench') {
       this.#confirmClose = false;
       const requestedStep = actionTarget?.dataset.datasetWorkbenchTarget;
       this.#activeStep = isDatasetWorkbenchStep(requestedStep) ? requestedStep : 'source';
@@ -299,9 +309,6 @@ export class DesignerDatasetController {
         this.#preview = { ...this.#preview, open: true };
       }
       this.renderSurface();
-      if (this.#activeStep === 'source' && this.#mode === 'dataset') {
-        this.#catalogController.ensureList();
-      }
       return true;
     }
     if (action === 'close-workbench') {

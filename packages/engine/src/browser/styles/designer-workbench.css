@@ -2518,6 +2518,7 @@ button.topbar-mode-button:hover {
 .designer-dataset-actions {
   position: sticky;
   bottom: 0;
+  z-index: 1;
   display: flex;
   min-width: 0;
   max-width: 100%;
@@ -5919,11 +5920,21 @@ button.topbar-mode-button:hover {
   display: grid;
   height: 100%;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) 35px;
-  grid-template-rows: 36px minmax(0, 1fr) 36px auto;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
   overflow: hidden;
   background: var(--designer-surface-workspace);
+}
+
+.properties .designer-datav-data-flow-progress {
+  display: grid;
+  min-width: 0;
+  grid-column: 1;
+  grid-row: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-bottom: 1px solid var(--designer-border-default);
+  background: var(--designer-surface-raised);
 }
 
 .properties .designer-datav-data-flow-content {
@@ -5937,14 +5948,30 @@ button.topbar-mode-button:hover {
   scrollbar-gutter: stable;
 }
 
+/* Sticky actions are constrained to the content box. Parent padding-bottom would
+   otherwise leave an 18px window where scrolled content peeks under the bar. */
+.properties .designer-datav-data-flow-content:has(.designer-dataset-actions) {
+  padding-bottom: 0;
+}
+
+.properties .designer-datav-data-flow-content .designer-dataset-actions {
+  padding-bottom: 18px;
+}
+
 .properties .designer-data-summary-step {
-  min-height: 36px;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: 7px;
-  padding: 0 12px;
+  min-width: 0;
+  min-height: 44px;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 5px;
+  padding: 6px;
   border: 0;
+  border-right: 1px solid var(--designer-border-subtle);
   border-radius: 0;
   background: var(--designer-surface-raised);
+}
+
+.properties .designer-data-summary-step:last-child {
+  border-right: 0;
 }
 
 .properties .designer-data-summary-step:hover {
@@ -5953,7 +5980,7 @@ button.topbar-mode-button:hover {
 
 .properties .designer-data-summary-step[aria-current="step"] {
   background: var(--designer-surface-control);
-  box-shadow: inset 2px 0 0 var(--designer-accent);
+  box-shadow: inset 0 -2px 0 var(--designer-accent);
 }
 
 .properties .designer-data-summary-step-marker {
@@ -5965,12 +5992,17 @@ button.topbar-mode-button:hover {
 
 .properties .designer-data-summary-step-copy {
   display: block;
+  min-width: 0;
 }
 
 .properties .designer-data-summary-step-copy strong {
+  display: block;
+  overflow: hidden;
   color: var(--designer-text-primary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .properties .designer-data-summary-step-copy small,
@@ -5978,34 +6010,8 @@ button.topbar-mode-button:hover {
   display: none;
 }
 
-.properties .designer-datav-data-flow [data-data-step-dock="source"] {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.properties .designer-datav-data-flow [data-data-step-dock="mapping"] {
-  width: 35px;
-  grid-column: 2;
-  grid-row: 1 / 4;
-  grid-template-columns: 18px auto;
-  align-content: center;
-  justify-content: center;
-  padding: 12px 0;
-  border-left: 1px solid var(--designer-border-default);
-  writing-mode: vertical-rl;
-}
-
-.properties
-  .designer-datav-data-flow
-  [data-data-step-dock="mapping"]
-  .designer-data-summary-step-marker {
-  transform: rotate(90deg);
-}
-
-.properties .designer-datav-data-flow [data-data-step-dock="preview"] {
-  grid-column: 1;
-  grid-row: 3;
-  border-top: 1px solid var(--designer-border-default);
+.properties .designer-datav-data-flow-content [data-workbench-section] {
+  scroll-margin-top: 12px;
 }
 
 .properties .designer-data-source-type {
@@ -6053,36 +6059,8 @@ button.topbar-mode-button:hover {
   text-transform: none;
 }
 
-.properties .designer-datav-data-flow-footer {
-  min-width: 0;
-  grid-column: 1 / -1;
-  grid-row: 4;
-  padding: 10px 12px 12px;
-  border-top: 1px solid var(--designer-border-default);
-  background: var(--designer-surface-workspace);
-}
-
-.properties .designer-datav-data-flow-footer .designer-dataset-authoring-settings {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 10px;
-}
-
-.properties .designer-datav-data-flow-footer .designer-dataset-authoring-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow: visible;
-  color: var(--designer-text-secondary);
-  font-size: 12px;
-  white-space: nowrap;
-}
-
-.properties .designer-datav-data-flow-footer .designer-dataset-refresh-controls {
-  grid-template-columns: minmax(0, 1fr) 52px auto;
-  gap: 6px;
-}
-
-.properties .designer-dataset-authoring[data-authoring-part="editor"] {
+.properties .designer-dataset-authoring[data-authoring-part="editor"],
+.properties .designer-datav-advanced-settings {
   margin-top: 14px;
   padding-top: 14px;
   border-top-color: var(--designer-border-subtle);
@@ -6096,6 +6074,7 @@ button.topbar-mode-button:hover {
 }
 
 .properties .designer-data-workbench-preview {
+  display: block;
   padding: 0;
   overflow: visible;
   border: 0;
