@@ -38,6 +38,7 @@ import {
   renderDesignerDataSourcePanel,
 } from '../dom/designer-dataset-dom.js';
 import { renderDesignerDescriptorZone } from '../dom/designer-descriptor-dom.js';
+import { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
 import {
   createDatasetDataSourceTransaction,
   createDesignerDatasetDraft,
@@ -97,8 +98,12 @@ export class DesignerDatasetController {
   #syncedDataSource: ScreenDocument['components'][number]['dataSource'] | undefined;
   #panel: HTMLElement | undefined;
   #feedback: HTMLElement | undefined;
+  readonly #dataFlowScrollSync: DesignerDataFlowScrollSync;
 
   constructor(private readonly callbacks: DesignerDatasetControllerCallbacks) {
+    this.#dataFlowScrollSync = new DesignerDataFlowScrollSync((step) =>
+      this.syncDataFlowProgress(step),
+    );
     this.#catalogController = new DesignerDatasetCatalogController({
       getPort: callbacks.getCatalogPort,
       report: callbacks.report,
@@ -1068,6 +1073,7 @@ export class DesignerDatasetController {
     if (step === 'preview') {
       this.#preview = { ...this.#preview, open: true };
     }
+    this.#dataFlowScrollSync.beginProgrammaticScroll(step);
     this.renderSurface();
     const section =
       this.#panel?.querySelector<HTMLElement>(`[data-workbench-section="${step}"]`) ??
@@ -1249,6 +1255,24 @@ export class DesignerDatasetController {
       });
     }
     this.renderDataWorkbench(options);
+    this.#dataFlowScrollSync.bind(panel);
+  }
+
+  private syncDataFlowProgress(step: DesignerDatasetWorkbenchStep): void {
+    const normalized = step === 'mapping' || step === 'preview' ? step : 'source';
+    if (normalized === this.#activeStep) return;
+    this.#activeStep = normalized;
+    const flow = this.#panel?.querySelector<HTMLElement>('.designer-datav-data-flow');
+    if (flow) flow.dataset.activeStep = normalized;
+    const progress = this.#panel?.querySelector<HTMLElement>('.designer-datav-data-flow-progress');
+    if (!progress) return;
+    for (const btn of progress.querySelectorAll<HTMLButtonElement>(
+      '[data-dataset-workbench-target]',
+    )) {
+      const target = btn.dataset.datasetWorkbenchTarget as DesignerDatasetWorkbenchStep | undefined;
+      const isActive = target === normalized;
+      btn.setAttribute('aria-current', isActive ? 'step' : 'false');
+    }
   }
 
   private panelOptions(panel: HTMLElement): DesignerDataSourcePanelOptions {
@@ -1257,7 +1281,6 @@ export class DesignerDatasetController {
       scrollScope: JSON.stringify([
         this.#focusedComponentId,
         this.#mode,
-        this.#activeStep,
         this.#staticDialogOpen,
         this.#staticTab,
         this.#staticPage,
@@ -1320,6 +1343,7 @@ export class DesignerDatasetController {
   }
 
   private clearSurface(): void {
+    this.#dataFlowScrollSync.clear();
     const host = this.callbacks.getWorkbenchHost?.();
     if (host !== undefined) {
       host.hidden = true;

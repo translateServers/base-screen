@@ -5983,11 +5983,23 @@ button.topbar-mode-button:hover {
   box-shadow: inset 0 -2px 0 var(--designer-accent);
 }
 
+.properties .designer-data-summary-step[aria-current="step"] .designer-data-summary-step-marker {
+  border-color: var(--designer-accent);
+  background: var(--designer-accent);
+  color: var(--designer-text-on-accent);
+}
+
 .properties .designer-data-summary-step-marker {
   width: 18px;
   height: 18px;
   border-color: var(--designer-border-strong);
   font-size: 9px;
+}
+
+.properties .designer-datav-data-flow-progress .designer-data-summary-step-marker {
+  border-color: var(--designer-border-strong);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
 }
 
 .properties .designer-data-summary-step-copy {

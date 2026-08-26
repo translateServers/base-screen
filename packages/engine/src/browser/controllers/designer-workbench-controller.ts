@@ -566,12 +566,17 @@ export class DesignerWorkbenchController {
   }
 
   private maxInspectorWidth(layout: HTMLElement): number {
+    const layoutWidth = layout.getBoundingClientRect().width;
+    // 宿主可能先挂载再显示设计器（例如 Vue v-show 的加载态）。此时布局宽度为 0，
+    // 不能把已持久化的检查器宽度误判为超限并压到最小值；待宿主可见后 CSS 会
+    // 直接使用这里保留的宽度，后续真实拖拽仍按可测量布局执行动态上限约束。
+    if (!Number.isFinite(layoutWidth) || layoutWidth <= 0) return DESIGNER_INSPECTOR_MAX_WIDTH;
     const rootStyle = layout.ownerDocument.defaultView?.getComputedStyle(layout);
     const leftWidth = this.#leftCollapsed
       ? DESIGNER_COLLAPSED_PANEL_WIDTH
       : (this.#leftPanelWidth ??
         (Number.parseFloat(rootStyle?.getPropertyValue('--left-panel-width') ?? '') || 404));
-    const available = layout.getBoundingClientRect().width - leftWidth - 10 - 360;
+    const available = layoutWidth - leftWidth - 10 - 360;
     return Math.max(
       DESIGNER_INSPECTOR_MIN_WIDTH,
       Math.min(DESIGNER_INSPECTOR_MAX_WIDTH, available),

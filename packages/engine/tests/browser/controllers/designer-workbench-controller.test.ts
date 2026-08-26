@@ -248,9 +248,27 @@ function createWorkbench(
   options: {
     readonly dataCapabilities?: readonly ('static' | 'host-resource')[];
     readonly onNativeEventsChange?: (enabled: boolean) => void;
+    readonly storage?: Map<string, string>;
   } = {},
 ) {
   const layout = new WorkbenchElement();
+  const storage = options.storage ?? new Map<string, string>();
+  const localStorage = {
+    getItem: (key: string) => storage.get(key) ?? null,
+    setItem: (key: string, value: string) => storage.set(key, value),
+  };
+  const defaultView = {
+    localStorage,
+    getComputedStyle: (element: WorkbenchElement) => ({
+      getPropertyValue: (property: string) =>
+        (element.style as unknown as Record<string, string>)[property] ?? '',
+    }),
+  };
+  (
+    layout.ownerDocument as typeof layout.ownerDocument & {
+      defaultView: typeof defaultView;
+    }
+  ).defaultView = defaultView;
   const viewport = new WorkbenchElement();
   const guides = new WorkbenchElement();
   const inspectorTabs = new WorkbenchElement();
@@ -339,6 +357,7 @@ function createWorkbench(
     ['[data-panel-handle="right"]', rightHandle],
   ]);
   const root = {
+    ownerDocument: { defaultView },
     querySelector: (selector: string) => elements.get(selector) ?? null,
     querySelectorAll: (selector: string) => {
       if (selector === '[data-panel-tab]') return leftTabs;
@@ -384,6 +403,7 @@ function createWorkbench(
     panes,
     rightCollapseControl,
     rightTabs,
+    storage,
     zoom,
   };
 }
@@ -565,6 +585,20 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(style['--right-panel-width']).toBe('48px');
     controller.onClick(clickTarget({ panelCollapse: 'right' }));
     expect(style['--right-panel-width']).toBe('340px');
+  });
+
+  it('restores the persisted inspector width when the host initializes while hidden', () => {
+    const storage = new Map<string, string>([['base-screen.designer.inspector-width', '420']]);
+    const workbench = createWorkbench({ storage });
+    const style = workbench.layout.style as unknown as Record<string, string>;
+
+    // XJ Data Hub 使用 v-show：自定义元素 connected 时宿主仍为 display:none，
+    // getBoundingClientRect().width 为 0。持久化宽度不得因此被压成 288px。
+    expect(workbench.layout.getBoundingClientRect().width).toBe(0);
+    workbench.controller.initialize();
+
+    expect(style['--right-panel-width']).toBe('420px');
+    expect(storage.get('base-screen.designer.inspector-width')).toBe('420');
   });
 
   it('R1 keeps the host default width when collapsing without a prior drag', () => {

@@ -1548,6 +1548,35 @@ async function assertLeftPanelDesign(designer, page, viewport) {
       `BROWSER_HARNESS_PANEL_WIDTH_RESTORE_FAILED:${JSON.stringify({ restored, defaultWidths, expectedRestoredRight })}`,
     );
   }
+  // XJ Data Hub 的路由加载态通过 v-show 先以 display:none 挂载设计器。验证右侧宽度在
+  // 0px 宿主中初始化后仍保持持久化值，并在宿主显示时直接生效。
+  const hiddenHostInspectorWidth = await page.evaluate(async () => {
+    const storageKey = 'base-screen.designer.inspector-width';
+    const previous = localStorage.getItem(storageKey);
+    localStorage.setItem(storageKey, '420');
+    const host = document.createElement('div');
+    host.style.cssText = 'display:none;width:1600px;height:900px';
+    const probe = document.createElement('base-screen-designer');
+    probe.catalog = window.baseScreenHarness.catalog;
+    probe.style.cssText = 'display:block;width:100%;height:800px';
+    host.append(probe);
+    document.body.append(host);
+    await Promise.resolve();
+    host.style.display = 'block';
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const width = Math.round(
+      probe.shadowRoot.querySelector('.properties').getBoundingClientRect().width,
+    );
+    host.remove();
+    if (previous === null) localStorage.removeItem(storageKey);
+    else localStorage.setItem(storageKey, previous);
+    return width;
+  });
+  if (hiddenHostInspectorWidth !== 420) {
+    throw new Error(
+      `BROWSER_HARNESS_HIDDEN_HOST_INSPECTOR_WIDTH_RESTORE_FAILED:${hiddenHostInspectorWidth}`,
+    );
+  }
   await designer.locator('[data-panel-tab="materials"]').click();
 
   // R5：图层树增强（嵌套文档独立实例验证：DataV 前置图层顺序、六项工具栏、
@@ -4968,8 +4997,16 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     const mapping = panel.querySelector('[data-workbench-section="mapping"]');
     const contentBox = content?.getBoundingClientRect();
     const mappingBox = mapping?.getBoundingClientRect();
+    const markerBackgrounds = Object.fromEntries(
+      [...panel.querySelectorAll('[data-dataset-workbench-target]')].map((button) => [
+        button.dataset.datasetWorkbenchTarget,
+        getComputedStyle(button.querySelector('.designer-data-summary-step-marker'))
+          .backgroundColor,
+      ]),
+    );
     return {
       activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
+      markerBackgrounds,
       scrollTop: content?.scrollTop,
       mappingVisible:
         contentBox !== undefined &&
@@ -4980,11 +5017,106 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   });
   if (
     stepNavigation.activeStep !== 'mapping' ||
+    stepNavigation.markerBackgrounds.mapping === stepNavigation.markerBackgrounds.source ||
+    stepNavigation.markerBackgrounds.mapping === stepNavigation.markerBackgrounds.preview ||
+    stepNavigation.markerBackgrounds.source !== stepNavigation.markerBackgrounds.preview ||
     stepNavigation.scrollTop <= 0 ||
     !stepNavigation.mappingVisible
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_STEP_NAVIGATION_FAILED:${JSON.stringify(stepNavigation)}`,
+    );
+  }
+  await dataPanel.evaluate((panel) => {
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    if (content instanceof HTMLElement) content.scrollTop = 0;
+  });
+  await dataPanel
+    .locator(
+      '[data-dataset-action="select-step"][data-dataset-workbench-target="source"][aria-current="step"]',
+    )
+    .waitFor({ timeout: 5_000 });
+  const scrollSyncedSourceBeforePreview = await dataPanel.evaluate((panel) => ({
+    markerBackgrounds: Object.fromEntries(
+      [...panel.querySelectorAll('[data-dataset-workbench-target]')].map((button) => [
+        button.dataset.datasetWorkbenchTarget,
+        getComputedStyle(button.querySelector('.designer-data-summary-step-marker'))
+          .backgroundColor,
+      ]),
+    ),
+  }));
+  if (
+    scrollSyncedSourceBeforePreview.markerBackgrounds.source ===
+      scrollSyncedSourceBeforePreview.markerBackgrounds.mapping ||
+    scrollSyncedSourceBeforePreview.markerBackgrounds.source ===
+      scrollSyncedSourceBeforePreview.markerBackgrounds.preview ||
+    scrollSyncedSourceBeforePreview.markerBackgrounds.mapping !==
+      scrollSyncedSourceBeforePreview.markerBackgrounds.preview
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_SCROLL_SYNC_SOURCE_MARKER_FAILED:${JSON.stringify(scrollSyncedSourceBeforePreview)}`,
+    );
+  }
+  await dataPanel.evaluate((panel) => {
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;
+  });
+  await dataPanel
+    .locator(
+      '[data-dataset-action="select-step"][data-dataset-workbench-target="preview"][aria-current="step"]',
+    )
+    .waitFor({ timeout: 5_000 });
+  const scrollSyncedPreview = await dataPanel.evaluate((panel) => ({
+    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
+    currentTargets: [
+      ...panel.querySelectorAll('[data-dataset-action="select-step"][aria-current="step"]'),
+    ].map((button) => button.dataset.datasetWorkbenchTarget),
+    overwrittenStates: [
+      ...panel.querySelectorAll('[data-dataset-action="select-step"][data-state="current"]'),
+    ].map((button) => button.dataset.datasetWorkbenchTarget),
+    markerBackgrounds: Object.fromEntries(
+      [...panel.querySelectorAll('[data-dataset-workbench-target]')].map((button) => [
+        button.dataset.datasetWorkbenchTarget,
+        getComputedStyle(button.querySelector('.designer-data-summary-step-marker'))
+          .backgroundColor,
+      ]),
+    ),
+  }));
+  if (
+    scrollSyncedPreview.activeStep !== 'preview' ||
+    scrollSyncedPreview.currentTargets.join(',') !== 'preview' ||
+    scrollSyncedPreview.overwrittenStates.length !== 0 ||
+    scrollSyncedPreview.markerBackgrounds.preview ===
+      scrollSyncedPreview.markerBackgrounds.source ||
+    scrollSyncedPreview.markerBackgrounds.preview ===
+      scrollSyncedPreview.markerBackgrounds.mapping ||
+    scrollSyncedPreview.markerBackgrounds.source !== scrollSyncedPreview.markerBackgrounds.mapping
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_SCROLL_SYNC_PREVIEW_FAILED:${JSON.stringify(scrollSyncedPreview)}`,
+    );
+  }
+  await dataPanel.evaluate((panel) => {
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    if (content instanceof HTMLElement) content.scrollTop = 0;
+  });
+  await dataPanel
+    .locator(
+      '[data-dataset-action="select-step"][data-dataset-workbench-target="source"][aria-current="step"]',
+    )
+    .waitFor({ timeout: 5_000 });
+  const scrollSyncedSource = await dataPanel.evaluate((panel) => ({
+    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
+    currentTargets: [
+      ...panel.querySelectorAll('[data-dataset-action="select-step"][aria-current="step"]'),
+    ].map((button) => button.dataset.datasetWorkbenchTarget),
+  }));
+  if (
+    scrollSyncedSource.activeStep !== 'source' ||
+    scrollSyncedSource.currentTargets.join(',') !== 'source'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_SCROLL_SYNC_SOURCE_FAILED:${JSON.stringify(scrollSyncedSource)}`,
     );
   }
   await dataPanel

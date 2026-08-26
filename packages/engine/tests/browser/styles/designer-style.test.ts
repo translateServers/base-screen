@@ -246,6 +246,12 @@ describe('designer workbench visual convergence', () => {
       /\.properties \.designer-datav-data-flow-progress\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
     );
     expect(workbenchCss).toMatch(
+      /\.properties\s+\.designer-data-summary-step\[aria-current="step"\]\s+\.designer-data-summary-step-marker\s*\{[^}]*border-color: var\(--designer-accent\);[^}]*background: var\(--designer-accent\);[^}]*color: var\(--designer-text-on-accent\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties\s+\.designer-datav-data-flow-progress\s+\.designer-data-summary-step-marker\s*\{[^}]*border-color: var\(--designer-border-strong\);[^}]*background: var\(--designer-surface-control\);[^}]*color: var\(--designer-text-muted\);/s,
+    );
+    expect(workbenchCss).toMatch(
       /\.properties \.designer-data-workbench-preview\s*\{\s*display: block;/s,
     );
     expect(workbenchCss).not.toContain('writing-mode: vertical-rl;');
