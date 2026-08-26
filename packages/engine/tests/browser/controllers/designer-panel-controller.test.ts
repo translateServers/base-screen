@@ -414,7 +414,7 @@ describe('designer panel rendering', () => {
     expect(colorFieldContainer?.tagName).toBe('span');
     expect(
       descendants(properties)
-        .filter((element) => element.tagName === 'h3')
+        .filter((element) => element.tagName === 'summary')
         .map((element) => element.textContent),
     ).toEqual(['几何', '状态', '内容', '样式', '条件样式']);
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
@@ -522,7 +522,7 @@ describe('designer panel rendering', () => {
 
     expect(
       descendants(properties)
-        .filter((element) => element.tagName === 'h3')
+        .filter((element) => element.tagName === 'summary')
         .map((element) => element.textContent),
     ).toContain('组概览');
     expect(descendants(properties).some((element) => element.textContent === '直接子项 1 个')).toBe(
@@ -536,6 +536,35 @@ describe('designer panel rendering', () => {
         .filter((element) => element.dataset.property === 'width')
         .map((element) => element.disabled),
     ).toEqual([false]);
+  });
+
+  it('renders inspector sections as collapsible disclosures with chevron summaries', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      document(),
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      catalog(),
+    );
+
+    const sections = descendants(properties).filter(
+      (element) =>
+        element.tagName === 'details' &&
+        element.className.includes('designer-inspector-disclosure'),
+    );
+    expect(sections.length).toBeGreaterThan(0);
+    for (const section of sections) {
+      const summary = section.children[0];
+      expect(summary?.tagName).toBe('summary');
+      expect(summary?.className).toContain('designer-inspector-section-title');
+      expect(summary?.className).toContain('designer-datav-section-summary');
+      const disclosure = summary?.children.find((child) =>
+        child.className.includes('designer-datav-section-disclosure'),
+      );
+      expect(disclosure).toBeDefined();
+    }
   });
 
   it('R9 keeps static sources available and requires host support plus contribution authority', () => {

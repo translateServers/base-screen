@@ -5692,10 +5692,13 @@ button.topbar-mode-button:hover {
   margin: 0 4px 4px 0;
 }
 
+/* 不设 scroll-padding：该属性会把边框附近（上下各 12px/72px 内）的焦点控件视为
+   "需要滚入视口"，浏览器在 mousedown 聚焦 checkbox/select 时把面板滚动位置强制
+   拖向控件中间，导致每次值变化滚动条都跳一下、直到控件稳定在 padding 区域内。
+   移除后焦点滚动退化为原生语义（仅在控件被裁剪时最小滚动）。 */
 .properties .inspector-pane {
   padding: 0 16px 24px;
   background: var(--designer-surface-panel);
-  scroll-padding-block: 12px 72px;
 }
 
 .properties .designer-inspector-section {
@@ -5850,7 +5853,8 @@ button.topbar-mode-button:hover {
 }
 
 .properties .designer-datav-section-summary::-webkit-details-marker,
-.properties .designer-datav-section-summary::after {
+.properties .designer-datav-section-summary::after,
+.properties .designer-datav-section-summary::before {
   display: none;
 }
 
@@ -5880,6 +5884,23 @@ button.topbar-mode-button:hover {
 .properties .designer-datav-section-disclosure svg {
   width: 12px;
   height: 12px;
+}
+
+/* Collapsible inspector sections: hover/keyboard feedback only, no geometry
+   changes so the panel never jitters. */
+.properties summary.designer-inspector-section-title {
+  user-select: none;
+  transition: color var(--designer-motion);
+}
+
+.properties summary.designer-inspector-section-title:hover {
+  color: var(--designer-text-primary);
+}
+
+.properties summary.designer-inspector-section-title:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
 }
 
 .properties .designer-quick-style-grid {

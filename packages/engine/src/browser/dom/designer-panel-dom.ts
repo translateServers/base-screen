@@ -2198,13 +2198,21 @@ function appendStyleRuleControl(
 }
 
 function appendSection(parent: HTMLElement, title: string, advanced = false): HTMLElement {
-  const section = parent.ownerDocument.createElement('section');
-  section.className = 'designer-inspector-section';
+  // Sections render as native disclosures so every region can be collapsed with
+  // pointer or keyboard; open state is persisted by the inspector group
+  // preferences machinery in DesignerPanelController.
+  const section = parent.ownerDocument.createElement('details');
+  section.className = 'designer-inspector-section designer-inspector-disclosure';
+  section.open = true;
   if (advanced) section.dataset.inspectorAdvanced = 'true';
-  const heading = parent.ownerDocument.createElement('h3');
-  heading.className = 'designer-inspector-section-title';
-  heading.textContent = title;
-  section.appendChild(heading);
+  const summary = parent.ownerDocument.createElement('summary');
+  summary.className = 'designer-inspector-section-title designer-datav-section-summary';
+  summary.textContent = title;
+  const disclosure = parent.ownerDocument.createElement('span');
+  disclosure.className = 'designer-datav-section-disclosure';
+  disclosure.innerHTML = designerIcon('chevron-down');
+  summary.appendChild(disclosure);
+  section.appendChild(summary);
   parent.appendChild(section);
   return section;
 }

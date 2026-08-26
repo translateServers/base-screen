@@ -10,6 +10,17 @@ export interface DesignerInspectorSearchClipboard {
   readonly checked?: boolean;
 }
 
+/**
+ * Inspector sections may either wrap a `<details>` or be one themselves; this
+ * resolves the toggleable disclosure for filters, preferences, and search.
+ */
+export function designerInspectorSectionDisclosure(
+  section: HTMLElement,
+): HTMLDetailsElement | null {
+  if (section.tagName === 'DETAILS') return section as HTMLDetailsElement;
+  return section.querySelector<HTMLDetailsElement>('details');
+}
+
 export function decorateDesignerInspectorSearchables(root: ShadowRoot | HTMLElement): void {
   let sequence = 0;
   for (const pane of root.querySelectorAll<HTMLElement>('[data-inspector-pane]')) {

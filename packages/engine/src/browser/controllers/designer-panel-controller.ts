@@ -61,6 +61,7 @@ import {
   captureDesignerInspectorSearchStyle,
   closeDesignerInspectorSearchMenus,
   type DesignerInspectorSearchClipboard,
+  designerInspectorSectionDisclosure,
 } from '../dom/designer-inspector-search-dom.js';
 import { renderMaterialLibraryGroupNavigation } from '../dom/designer-material-library-group-dom.js';
 import {
@@ -78,6 +79,10 @@ import {
   renderDesignerDataPanel,
   renderDesignerProperties,
 } from '../dom/designer-panel-dom.js';
+import {
+  DesignerInspectorScrollGuard,
+  isInspectorFormControlTarget,
+} from './designer-inspector-scroll-guard.js';
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -139,6 +144,8 @@ export class DesignerPanelController {
     createDesignerCanvasBackgroundDrafts();
   readonly #canvasPresentation: DesignerCanvasPresentationSettings =
     createDesignerCanvasPresentationSettings();
+  /** 检查器点击滚动守卫：控件 pointerdown 后窗口内的浏览器原生滚动会被还原。 */
+  readonly #clickScrollGuard = new DesignerInspectorScrollGuard();
 
   constructor(private readonly callbacks: DesignerPanelControllerCallbacks) {}
 
@@ -153,6 +160,21 @@ export class DesignerPanelController {
       clearTimeout(this.#materialSearchTimer);
       this.#materialSearchTimer = undefined;
     }
+    this.#clickScrollGuard.dispose();
+  }
+
+  /**
+   * 检查器表单控件 pointerdown：浏览器会把被裁剪的控件原生滚入视口（mousedown
+   * preventDefault 无法取消），导致点击 checkbox/select 时面板滚动条跳动。
+   * 在此武装滚动守卫，把窗口内的该滚动恢复回点击前的位置。
+   */
+  onPointerDown(event: PointerEvent): void {
+    if (!isPrimaryPointer(event)) return;
+    const target = event.target;
+    if (!(target instanceof HTMLElement) || !isInspectorFormControlTarget(target)) return;
+    const pane = findInspectorScrollContainer(target);
+    if (pane === undefined) return;
+    this.#clickScrollGuard.begin(pane);
   }
 
   get hasClipboard(): boolean {
@@ -359,6 +381,18 @@ export class DesignerPanelController {
   }
 
   render(properties: HTMLElement | undefined, dataPanel?: HTMLElement): void {
+    // 预挂载滚动守卫监听：稳定位置在用户首次交互前就绪（浏览器会在 pointerdown
+    // 派发前把被裁剪控件滚入视口，首次点击无法靠按下时刻快照恢复）。
+    const propertiesPane = properties?.parentElement;
+    if (propertiesPane !== null && propertiesPane !== undefined) {
+      this.#clickScrollGuard.ensureListeners(propertiesPane);
+    }
+    const dataFlowContent = dataPanel?.querySelector<HTMLElement>(
+      '.designer-datav-data-flow-content',
+    );
+    if (dataFlowContent !== null && dataFlowContent !== undefined) {
+      this.#clickScrollGuard.ensureListeners(dataFlowContent);
+    }
     if (properties !== undefined) {
       renderDesignerProperties(
         properties,
@@ -386,11 +420,11 @@ export class DesignerPanelController {
     if (root === null) return;
     let persistenceTarget: HTMLElement | undefined;
     for (const section of root.querySelectorAll<HTMLElement>(
-      '[data-inspector-preference-context][data-inspector-search-key]',
+      '[data-inspector-search-kind="section"][data-inspector-search-key]',
     )) {
       const pane = section.closest<HTMLElement>('[data-inspector-pane]');
       const preferenceKey = this.inspectorGroupPreferenceKey(section, pane);
-      const details = section.querySelector<HTMLDetailsElement>('details');
+      const details = designerInspectorSectionDisclosure(section);
       if (preferenceKey === undefined || details === null) continue;
       const searchState = details.dataset.inspectorSearchWasOpen;
       const open = searchState === undefined ? details.open : searchState === 'true';
@@ -479,7 +513,7 @@ export class DesignerPanelController {
       this.refreshInspectorUi(target.getRootNode() as ShadowRoot);
       return;
     }
-    const groupSummary = target.closest<HTMLElement>('.designer-descriptor-group-summary');
+    const groupSummary = target.closest<HTMLElement>('summary');
     if (groupSummary !== null) {
       const details = groupSummary.closest<HTMLDetailsElement>('details');
       const section = groupSummary.closest<HTMLElement>('[data-inspector-search-key]');
@@ -742,6 +776,10 @@ export class DesignerPanelController {
 
   onPropertyChange(event: Event): void {
     const target = event.target;
+    if (isInspectorFormControlTarget(target)) {
+      const pane = findInspectorScrollContainer(target as HTMLElement);
+      if (pane !== undefined) this.#clickScrollGuard.preserve(pane);
+    }
     const canvasSetting = (target as { readonly dataset?: DOMStringMap } | null)?.dataset
       ?.canvasSetting;
     if (canvasSetting !== undefined) {
@@ -1022,7 +1060,7 @@ export class DesignerPanelController {
         preferenceKey === undefined
           ? undefined
           : this.#inspectorGroupPreferences.get(preferenceKey);
-      const details = section.querySelector<HTMLDetailsElement>('details');
+      const details = designerInspectorSectionDisclosure(section);
       if (details !== null && open !== undefined) details.open = open;
     }
   }
@@ -1392,4 +1430,15 @@ function setDraftValidity(target: EventTarget | null, valid: boolean): void {
   if (message !== null && message !== undefined) {
     message.textContent = valid ? '' : DESIGNER_UI_TEXT.panel.enterValidValue;
   }
+}
+
+function isPrimaryPointer(event: PointerEvent): boolean {
+  return event.button === undefined || event.button === 0;
+}
+
+const INSPECTOR_SCROLL_CONTAINER_SELECTOR = '.inspector-pane, .designer-datav-data-flow-content';
+
+/** 找到控件所属的检查器滚动容器（外观/数据面板的滚动容器或数据流内容容器）。 */
+function findInspectorScrollContainer(control: HTMLElement): HTMLElement | undefined {
+  return control.closest<HTMLElement>(INSPECTOR_SCROLL_CONTAINER_SELECTOR) ?? undefined;
 }

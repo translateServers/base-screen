@@ -8,6 +8,7 @@ import {
   DESIGNER_INSPECTOR_SEARCH_SECTION_SELECTOR,
   decorateDesignerInspectorSearchables,
   designerInspectorSearchableText,
+  designerInspectorSectionDisclosure,
   renderDesignerInspectorSearchResults,
 } from './designer-inspector-search-dom.js';
 
@@ -117,7 +118,7 @@ export function applyDesignerInspectorFilters(
       ...section.querySelectorAll<HTMLElement>('[data-inspector-search-kind="field"]'),
     ].some((field) => !field.hasAttribute('data-inspector-filtered'));
     section.toggleAttribute('data-inspector-filtered', query !== '' && !ownMatch && !visibleChild);
-    const details = section.querySelector<HTMLDetailsElement>('details');
+    const details = designerInspectorSectionDisclosure(section);
     if (query !== '' && (ownMatch || visibleChild)) {
       if (details !== null && details.dataset.inspectorSearchWasOpen === undefined) {
         details.dataset.inspectorSearchWasOpen = String(details.open);

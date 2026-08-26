@@ -750,6 +750,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       return true;
     },
     pointerDown: (target, event) => {
+      this.#panelController.onPointerDown(event as PointerEvent);
       this.#workbenchController.onPointerDown(event as PointerEvent);
       return true;
     },

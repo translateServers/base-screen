@@ -116,6 +116,15 @@ describe('designer workbench visual convergence', () => {
     );
   });
 
+  it('keeps inspector pane focus scrolling free of scroll-padding nudges', () => {
+    // scroll-padding-block 会把边缘附近的焦点控件视为"需要滚入视口"：mousedown 聚焦
+    // checkbox/select 时浏览器每次都会把面板滚动位置拖向控件（一次变化一次跳动），
+    // 直到控件稳定在 padding 区域内。属性规则必须保持无 scroll-padding。
+    const paneRule = workbenchCss.match(/\.properties \.inspector-pane\s*\{([^}]*)\}/s);
+    expect(paneRule).not.toBeNull();
+    expect(paneRule?.[1]).not.toContain('scroll-padding');
+  });
+
   it('R3 renders a usable collapsed rail with rotating collapse arrows (ADR-0037)', () => {
     // 折叠轨：关闭 scrollbar-gutter 占用，标题/计数不占 flex 槽位。
     expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail,');
