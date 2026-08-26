@@ -8,6 +8,7 @@
 | 目标 | 文档 |
 | --- | --- |
 | 在应用中嵌入 Viewer、Designer、物料和宿主能力 | [集成指南](./usage.md) |
+| 创建可直接绑定数据集的自定义组件 | [数据集驱动自定义组件最佳实践](./custom-dataset-material-best-practice.md) |
 | 当前能力现状与维护基线 | [当前能力基线](./baseline/README.md) |
 | 下一阶段方向与候选主题 | [后续路线图](./roadmap/README.md) |
 | 了解包职责、演进方向和开发顺序 | [架构文档](./architecture/README.md) |

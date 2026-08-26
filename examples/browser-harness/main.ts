@@ -49,6 +49,7 @@ import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
 const hostedModule = await import('./hosted-material-package.ts');
 const hostedMaterialPackage = hostedModule.hostedMaterialPackage;
 const draftMaterialPackage = hostedModule.draftMaterialPackage;
+const hostedDatasetRankingManifest = hostedModule.hostedDatasetRankingManifest;
 
 if (new URLSearchParams(window.location.search).has('designer')) {
   document.body.dataset.layout = 'designer';
@@ -279,6 +280,11 @@ const materialLibraryGrouping = {
       label: '桥接',
       materialTypes: ['harness.react-button', 'harness.vue-button'],
     },
+    {
+      id: 'best-practices',
+      label: '最佳实践',
+      materialTypes: [hostedDatasetRankingManifest.type],
+    },
   ],
 } as const;
 
@@ -323,6 +329,16 @@ if (!hostedDefinitions.ok) {
 }
 const hostedEntries = hostedDefinitions.value;
 const hostedCatalog = createBaseScreenMaterialCatalog(hostedEntries);
+const hostedDatasetRankingEntry = hostedEntries.find(
+  (entry) => entry.manifest.type === hostedDatasetRankingManifest.type,
+);
+if (hostedDatasetRankingEntry === undefined) {
+  throw new Error('Base Screen browser harness is missing its dataset material best practice.');
+}
+const designerCatalog = createBaseScreenMaterialCatalog([
+  ...bridgeCatalog.list(),
+  hostedDatasetRankingEntry,
+]);
 const draftDefinitions = draftMaterialPackage.define();
 if (!draftDefinitions.ok) {
   throw new Error('Base Screen browser harness failed to register its draft material package.');
@@ -472,6 +488,29 @@ const screenDocument = {
         resourceId: 'tabular-orders',
         params: {
           limit: { kind: 'literal' as const, value: 2 },
+          region: { kind: 'variable' as const, name: 'region' },
+        },
+        binding: { fields: { dimension: ['category'], measures: ['amount'] } },
+      },
+    },
+    {
+      id: 'dataset-ranking-demo',
+      type: hostedDatasetRankingManifest.type,
+      name: '数据集排行卡',
+      parentId: null,
+      position: { x: 84, y: 390 },
+      size: { width: 420, height: 140 },
+      rotation: 0,
+      zIndex: 9,
+      status: { locked: false, hidden: false },
+      props: structuredClone(hostedDatasetRankingManifest.defaultProps),
+      style: structuredClone(hostedDatasetRankingManifest.defaultStyle),
+      dataSource: {
+        type: 'host-resource' as const,
+        resourceType: 'dataset',
+        resourceId: 'tabular-orders',
+        params: {
+          limit: { kind: 'literal' as const, value: 5 },
           region: { kind: 'variable' as const, name: 'region' },
         },
         binding: { fields: { dimension: ['category'], measures: ['amount'] } },
@@ -636,7 +675,7 @@ viewer.blueprintRuntimePort = {
     hostEvents.push(event);
   },
 };
-designer.catalog = bridgeCatalog;
+designer.catalog = designerCatalog;
 designer.materialLibraryGrouping = activeMaterialLibraryGrouping;
 designer.materialLibraryState = {
   status: 'partial',
@@ -657,7 +696,7 @@ designer.toolMaterialTypes = {
 };
 // 编组使用显式配置的容器物料（children=true），缺失时 Group 命令按 ADR-0012 保持禁用。
 designer.groupMaterialType = 'base.container';
-viewer.catalog = bridgeCatalog;
+viewer.catalog = designerCatalog;
 let envelope = {
   projectId: 'browser-harness',
   revision: '1',
@@ -836,7 +875,7 @@ hostShell.addEventListener('click', (event) => {
 
 Object.assign(window, {
   baseScreenHarness: {
-    catalog: bridgeCatalog,
+    catalog: designerCatalog,
     designer,
     pluginManager,
     viewer,
@@ -849,6 +888,7 @@ Object.assign(window, {
       table: BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
       react: reactBridge.value.manifest,
       vue: vueBridge.value.manifest,
+      datasetRanking: hostedDatasetRankingManifest,
     },
     datasetCatalog,
     datasetRequests,

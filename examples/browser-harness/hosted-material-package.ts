@@ -1,6 +1,7 @@
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialModel,
+  BaseScreenMaterialTabularDataAdapter,
   ScreenParseResult,
 } from '../../packages/plugin-core/src/index.ts';
 import { createMaterialPackage } from '../../packages/plugin-sdk/src/index.ts';
@@ -162,6 +163,270 @@ class HostedTinyElement extends HostedMaterialElement {
   }
 }
 
+/**
+ * 数据集驱动自定义物料最佳实践：
+ *
+ * - Manifest 只声明稳定字段角色，不感知 URL、SQL 或宿主查询实现；
+ * - adapter 把宿主表格数据投影为组件自己的最小视图模型；
+ * - element 只消费投影结果，并完整处理 loading / empty / error / ready；
+ * - staticData 与 host-resource 共用同一 adapter，作者可先用示例数据完成视觉设计。
+ */
+export const hostedDatasetRankingManifest = {
+  type: 'harness.dataset-ranking',
+  tagName: 'harness-dataset-ranking',
+  name: '数据集排行卡',
+  category: '最佳实践',
+  keywords: ['数据集', '排行', '自定义组件', '最佳实践'],
+  cover: '/dataset-ranking-cover.svg',
+  defaultSize: { width: 420, height: 220 },
+  defaultProps: { title: '区域营收排行', unit: '万元', maxItems: 5, showRank: true },
+  defaultData: {
+    fields: [
+      { id: 'category', label: '区域', valueType: 'string', nullable: false },
+      { id: 'amount', label: '营收', valueType: 'number', nullable: false, unit: '万元' },
+    ],
+    rows: [
+      { category: '华东', amount: 128 },
+      { category: '华南', amount: 96 },
+      { category: '华北', amount: 82 },
+      { category: '西南', amount: 64 },
+      { category: '西北', amount: 41 },
+    ],
+  },
+  staticData: {
+    kind: 'tabular' as const,
+    defaultBinding: { fields: { dimension: ['category'], measures: ['amount'] } },
+  },
+  defaultStyle: {
+    backgroundColor: '#0b1324',
+    textColor: '#e5eefb',
+    mutedColor: '#8ea3bd',
+    accentColor: '#31d7eb',
+    trackColor: '#1b2b42',
+  },
+  propsSchema: {
+    kind: 'object' as const,
+    properties: {
+      title: { kind: 'string' as const, minLength: 1, maxLength: 64 },
+      unit: { kind: 'string' as const, maxLength: 16 },
+      maxItems: { kind: 'number' as const, minimum: 1, maximum: 12 },
+      showRank: { kind: 'boolean' as const },
+    },
+    required: ['title', 'unit', 'maxItems', 'showRank'],
+  },
+  propertyPanel: [
+    { prop: 'title', label: '标题', control: 'text' as const },
+    { prop: 'unit', label: '单位', control: 'text' as const },
+    { prop: 'maxItems', label: '最多显示', control: 'number' as const },
+    { prop: 'showRank', label: '显示排名', control: 'boolean' as const },
+  ],
+  styleSchema: {
+    kind: 'object' as const,
+    properties: {
+      backgroundColor: { kind: 'string' as const },
+      textColor: { kind: 'string' as const },
+      mutedColor: { kind: 'string' as const },
+      accentColor: { kind: 'string' as const },
+      trackColor: { kind: 'string' as const },
+    },
+    required: ['backgroundColor', 'textColor', 'mutedColor', 'accentColor', 'trackColor'],
+  },
+  stylePanel: [
+    { style: 'backgroundColor', label: '背景色', control: 'color' as const },
+    { style: 'textColor', label: '文字色', control: 'color' as const },
+    { style: 'mutedColor', label: '辅助色', control: 'color' as const },
+    { style: 'accentColor', label: '强调色', control: 'color' as const },
+    { style: 'trackColor', label: '轨道色', control: 'color' as const },
+  ],
+  events: ['itemClick'],
+  dataCapabilities: ['static' as const, 'host-resource' as const],
+  dataBinding: {
+    roles: [
+      {
+        id: 'dimension',
+        minFields: 1,
+        maxFields: 1,
+        valueTypes: ['string' as const, 'date' as const],
+      },
+      { id: 'measures', minFields: 1, maxFields: 1, valueTypes: ['number' as const] },
+    ],
+  },
+  designCapabilities: { resize: true, rotate: false, children: false },
+};
+
+interface RankingItem {
+  readonly label: string;
+  readonly value: number;
+}
+
+class HostedDatasetRankingElement extends HostedMaterialElement {
+  static readonly manifest = hostedDatasetRankingManifest;
+
+  protected renderMaterial(): void {
+    const model = this.materialModel;
+    if (model === undefined || !this.isConnected) return;
+    this.replaceChildren();
+    this.style.display = 'block';
+    this.style.overflow = 'hidden';
+    this.style.boxSizing = 'border-box';
+    this.style.padding = '16px 18px';
+    this.style.border = `1px solid ${color(model.style.accentColor, '#31d7eb')}33`;
+    this.style.borderRadius = '14px';
+    this.style.background = color(model.style.backgroundColor, '#0b1324');
+    this.style.color = color(model.style.textColor, '#e5eefb');
+    this.style.font = '12px/1.4 system-ui, sans-serif';
+
+    const heading = this.ownerDocument.createElement('header');
+    heading.textContent = text(model.props.title, '区域营收排行');
+    heading.style.cssText =
+      'margin-bottom: 12px; overflow: hidden; font-size: 14px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap;';
+    this.appendChild(heading);
+
+    if (model.dataState.status !== 'ready') {
+      this.appendChild(
+        this.stateMessage(
+          model.dataState.status === 'loading'
+            ? '正在加载数据…'
+            : model.dataState.status === 'error'
+              ? '数据加载失败'
+              : '等待数据',
+        ),
+      );
+      return;
+    }
+    const items = readRankingItems(model.dataState.value).slice(
+      0,
+      Math.max(1, Math.min(12, Math.trunc(number(model.props.maxItems, 5)))),
+    );
+    if (items.length === 0) {
+      this.appendChild(this.stateMessage('暂无可展示数据'));
+      return;
+    }
+    const maximum = Math.max(1, ...items.map((item) => Math.max(0, item.value)));
+    const list = this.ownerDocument.createElement('ol');
+    list.style.cssText =
+      'display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; min-height: 0;';
+    items.forEach((item, index) => list.appendChild(this.rankingRow(item, index, maximum)));
+    this.appendChild(list);
+  }
+
+  private rankingRow(item: RankingItem, index: number, maximum: number): HTMLElement {
+    const model = this.model;
+    const row = this.ownerDocument.createElement('li');
+    row.style.minWidth = '0';
+    const button = this.ownerDocument.createElement('button');
+    button.type = 'button';
+    button.style.cssText =
+      'display: grid; grid-template-columns: 24px minmax(64px, 1fr) minmax(80px, 2fr) auto; align-items: center; gap: 8px; min-width: 0; padding: 0; border: 0; color: inherit; background: transparent; font: inherit; text-align: left; cursor: pointer;';
+    button.setAttribute('aria-label', `${item.label} ${item.value}`);
+    const rank = this.ownerDocument.createElement('span');
+    rank.textContent = model.props.showRank === false ? '•' : String(index + 1).padStart(2, '0');
+    rank.style.color = color(model.style.mutedColor, '#8ea3bd');
+    const label = this.ownerDocument.createElement('span');
+    label.textContent = item.label;
+    label.style.cssText = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap;';
+    const track = this.ownerDocument.createElement('span');
+    track.style.cssText = `display:block;height:6px;overflow:hidden;border-radius:999px;background:${color(model.style.trackColor, '#1b2b42')};`;
+    const fill = this.ownerDocument.createElement('i');
+    fill.style.cssText = `display:block;width:${Math.max(0, Math.min(100, (item.value / maximum) * 100))}%;height:100%;border-radius:inherit;background:${color(model.style.accentColor, '#31d7eb')};`;
+    track.appendChild(fill);
+    const value = this.ownerDocument.createElement('strong');
+    value.textContent = `${item.value.toLocaleString('zh-CN')}${text(model.props.unit, '')}`;
+    value.style.cssText = 'font-variant-numeric: tabular-nums; white-space: nowrap;';
+    button.append(rank, label, track, value);
+    button.addEventListener('click', () => {
+      if (this.model.interactive !== true) return;
+      this.dispatchEvent(
+        new CustomEvent('base-screen-material-event', {
+          bubbles: true,
+          composed: true,
+          detail: {
+            name: 'itemClick',
+            payload: { rowIndex: index, label: item.label, value: item.value },
+          },
+        }),
+      );
+    });
+    row.appendChild(button);
+    return row;
+  }
+
+  private stateMessage(message: string): HTMLElement {
+    const state = this.ownerDocument.createElement('div');
+    state.textContent = message;
+    state.style.cssText =
+      'display:grid;place-items:center;height:calc(100% - 34px);color:#8ea3bd;font-size:12px;';
+    return state;
+  }
+}
+
+const hostedDatasetRankingAdapter: BaseScreenMaterialTabularDataAdapter = {
+  adapt({ dataset, fields }) {
+    const dimension = fields.dimension?.[0];
+    const measure = fields.measures?.[0];
+    if (dimension === undefined || measure === undefined) return invalidRankingProjection();
+    return {
+      ok: true,
+      value: {
+        items: dataset.rows.flatMap((row) => {
+          const label = row[dimension.id];
+          const value = row[measure.id];
+          return (typeof label === 'string' || typeof label === 'number') &&
+            typeof value === 'number' &&
+            Number.isFinite(value)
+            ? [{ label: String(label), value }]
+            : [];
+        }),
+      },
+      diagnostics: [],
+    };
+  },
+};
+
+Object.defineProperty(HostedDatasetRankingElement, 'tabularDataAdapter', {
+  value: hostedDatasetRankingAdapter,
+});
+
+function readRankingItems(value: unknown): RankingItem[] {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return [];
+  const items = (value as { readonly items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+  return items.flatMap((item) => {
+    if (item === null || typeof item !== 'object' || Array.isArray(item)) return [];
+    const label = (item as { readonly label?: unknown }).label;
+    const value = (item as { readonly value?: unknown }).value;
+    return typeof label === 'string' && typeof value === 'number' && Number.isFinite(value)
+      ? [{ label, value }]
+      : [];
+  });
+}
+
+function invalidRankingProjection(): ScreenParseResult<never> {
+  return {
+    ok: false,
+    diagnostics: [
+      {
+        severity: 'error',
+        code: 'HOST_DATASET_BINDING_INVALID',
+        path: [],
+        message: 'Dataset ranking binding is invalid.',
+      },
+    ],
+  };
+}
+
+function text(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function color(value: unknown, fallback: string): string {
+  return typeof value === 'string' && value.length > 0 ? value : fallback;
+}
+
+function number(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
 const draftBadgeManifest = {
   ...hostedBadgeManifest,
   type: 'harness.draft-badge',
@@ -187,6 +452,10 @@ const packageResult = createMaterialPackage({
     {
       manifest: hostedTinyManifest,
       element: HostedTinyElement as never,
+    },
+    {
+      manifest: hostedDatasetRankingManifest,
+      element: HostedDatasetRankingElement as never,
     },
   ],
 });
