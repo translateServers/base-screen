@@ -32,6 +32,46 @@ describe('designer panel property parsing', () => {
     });
   });
 
+  it('rejects unsafe canvas background image URLs before canonical execution', () => {
+    const interaction = { selectedComponentIds: [], focusedComponentId: null };
+    const unsafe = createPropertyTransaction(
+      {
+        dataset: { canvasProperty: 'backgroundImage' },
+        value: 'javascript:alert(1)',
+      } as unknown as EventTarget,
+      dataDocument(),
+      interaction,
+      undefined,
+    );
+    const valid = createPropertyTransaction(
+      {
+        dataset: { canvasProperty: 'backgroundImage' },
+        value: '../assets/background.png',
+      } as unknown as EventTarget,
+      dataDocument(),
+      interaction,
+      undefined,
+    );
+
+    expect(unsafe).toMatchObject({
+      ok: false,
+      diagnostics: [
+        {
+          code: 'DOCUMENT_FIELD_INVALID',
+          path: ['canvas', 'backgroundImage'],
+        },
+      ],
+    });
+    expect(valid).toMatchObject({
+      ok: true,
+      value: {
+        commands: [
+          { type: 'update-canvas', patch: { backgroundImage: '../assets/background.png' } },
+        ],
+      },
+    });
+  });
+
   it('AE-ED-C02 rejects invalid number, enum, and json input before mutations', () => {
     const number: BaseScreenMaterialPropSchema = { kind: 'number' };
     const enumSchema: BaseScreenMaterialPropSchema = { kind: 'enum', values: ['left', 'right'] };

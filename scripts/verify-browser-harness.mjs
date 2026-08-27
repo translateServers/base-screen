@@ -4953,6 +4953,8 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     const mappingSection = panel.querySelector('[data-workbench-section="mapping"]');
     const previewSection = panel.querySelector('[data-workbench-section="preview"]');
     const advancedSection = panel.querySelector('.designer-datav-advanced-settings');
+    const bindingSummary = panel.querySelector('.designer-dataset-binding-summary');
+    const authoringSettings = panel.querySelector('.designer-dataset-authoring-settings');
     const workbench = layout?.querySelector('[data-data-workbench]');
     const flowBox = flow?.getBoundingClientRect();
     const contentBox = content?.getBoundingClientRect();
@@ -4969,6 +4971,23 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
         ...panel.querySelectorAll('[data-dataset-parameter], [data-dataset-parameter-mode]'),
       ].filter((control) => control.getAttribute('aria-label') === null).length,
       bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
+      bindingSummaryEmpty:
+        bindingSummary?.querySelector('.designer-dataset-binding-summary-empty') !== null,
+      bindingSummaryItemCount: bindingSummary?.querySelectorAll(
+        '.designer-dataset-binding-summary-item',
+      ).length,
+      authoringSettingsGroup: authoringSettings?.getAttribute('role') === 'group',
+      authoringCheckboxCount: authoringSettings?.querySelectorAll(
+        '.designer-dataset-authoring-checkbox',
+      ).length,
+      authoringSettingRowCount: authoringSettings?.querySelectorAll(
+        '.designer-dataset-authoring-setting-row',
+      ).length,
+      authoringSettingsHorizontalOverflow:
+        authoringSettings !== null &&
+        authoringSettings.scrollWidth > authoringSettings.clientWidth + 1,
+      copyActionDisabled:
+        panel.querySelector('[data-dataset-authoring-action="copy-data"]')?.disabled === true,
       sourceMode: panel.querySelector('[data-data-source-mode-select]')?.value,
       activeStep: flow?.dataset.activeStep,
       layout: flow?.dataset.dataFlowLayout,
@@ -5008,6 +5027,13 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     descriptorSurface.parameterCount < 2 ||
     descriptorSurface.unlabelledParameterControls !== 0 ||
     descriptorSurface.bindingCount !== 0 ||
+    !descriptorSurface.bindingSummaryEmpty ||
+    descriptorSurface.bindingSummaryItemCount !== 0 ||
+    !descriptorSurface.authoringSettingsGroup ||
+    descriptorSurface.authoringCheckboxCount !== 2 ||
+    descriptorSurface.authoringSettingRowCount !== 2 ||
+    descriptorSurface.authoringSettingsHorizontalOverflow ||
+    !descriptorSurface.copyActionDisabled ||
     descriptorSurface.sourceMode !== 'dataset' ||
     descriptorSurface.activeStep !== 'source' ||
     descriptorSurface.layout !== 'continuous' ||
@@ -5289,6 +5315,8 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     filterAction:
       panel.querySelector('[data-dataset-authoring-action="configure-filter"]') !== null,
     copyAction: panel.querySelector('[data-dataset-authoring-action="copy-data"]') !== null,
+    copyActionDisabled:
+      panel.querySelector('[data-dataset-authoring-action="copy-data"]')?.disabled === true,
     fullscreenAction:
       panel.querySelector('[data-dataset-authoring-action="fullscreen-edit"]') !== null,
     settingCount: panel.querySelectorAll('[data-dataset-authoring-setting]').length,
@@ -5301,6 +5329,7 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     authoringSurface.editorModes !== 2 ||
     !authoringSurface.filterAction ||
     !authoringSurface.copyAction ||
+    !authoringSurface.copyActionDisabled ||
     !authoringSurface.fullscreenAction ||
     authoringSurface.settingCount !== 4 ||
     !authoringSurface.refreshStrategy ||
@@ -5310,9 +5339,20 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_AUTHORING_SURFACE_FAILED:${JSON.stringify(authoringSurface)}`,
     );
   }
+  await dataPanel.locator('[data-dataset-action="test"]').click();
+  await dataPanel.locator('[data-dataset-authoring-action="copy-data"]:not(:disabled)').waitFor();
   await designer.locator('button[data-inspector-density="all"]').click();
   await page.evaluate(() => {
     window.__baseScreenDatasetAuthoringActions = [];
+    window.__baseScreenCopiedDataset = '';
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (value) => {
+          window.__baseScreenCopiedDataset = value;
+        },
+      },
+    });
     document
       .querySelector('base-screen-designer')
       .addEventListener('base-screen-dataset-authoring-action', (event) =>
@@ -5322,14 +5362,69 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   await dataPanel.locator('[data-dataset-editor-mode="code"]').click();
   await dataPanel.locator('[data-dataset-authoring-action="configure-filter"]').click();
   await dataPanel.locator('[data-dataset-authoring-action="copy-data"]').click();
-  await dataPanel.locator('[data-dataset-authoring-action="fullscreen-edit"]').click();
+  await dataPanel
+    .locator('[data-dataset-feedback]')
+    .filter({ hasText: '\u6570\u636e\u5df2\u590d\u5236\u5230\u526a\u8d34\u677f' })
+    .waitFor();
   await dataPanel.locator('[data-dataset-authoring-setting="loadingDisabled"]').check();
   await dataPanel.locator('[data-dataset-authoring-setting="controlled"]').check();
   await dataPanel
     .locator('[data-dataset-authoring-setting="refreshStrategy"]')
     .selectOption('auto');
+  await dataPanel.locator('[data-dataset-authoring-action="fullscreen-edit"]').click();
+  const datasetWorkbench = designer.locator('[data-data-workbench]');
+  await datasetWorkbench.waitFor({ state: 'visible' });
+  const fullscreenSurface = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const host = root.querySelector('[data-data-workbench]');
+    const layout = root.querySelector('.designer');
+    const close = host?.querySelector('[data-dataset-action="close-workbench"]');
+    return {
+      role: host?.getAttribute('role'),
+      modal: host?.getAttribute('aria-modal'),
+      shell: host?.querySelector('.designer-data-workbench-shell[data-kind="dataset"]') !== null,
+      layoutOpen: layout?.dataset.dataWorkbenchOpen,
+      topbarHidden: getComputedStyle(root.querySelector('.designer-topbar')).display === 'none',
+      closeFocused: root.activeElement === close,
+    };
+  });
+  if (
+    fullscreenSurface.role !== 'dialog' ||
+    fullscreenSurface.modal !== 'true' ||
+    !fullscreenSurface.shell ||
+    fullscreenSurface.layoutOpen !== 'true' ||
+    !fullscreenSurface.topbarHidden ||
+    !fullscreenSurface.closeFocused
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_FULLSCREEN_OPEN_FAILED:${JSON.stringify(fullscreenSurface)}`,
+    );
+  }
+  await datasetWorkbench.screenshot({
+    path: `${screenshotDirectory}/data-workbench-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
+  await datasetWorkbench.locator('[data-dataset-action="close-workbench"]').click();
+  await datasetWorkbench.waitFor({ state: 'hidden' });
+  const fullscreenClosed = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      layoutOpen: root.querySelector('.designer')?.dataset.dataWorkbenchOpen,
+      returnFocus: root.activeElement?.dataset.datasetAuthoringAction === 'fullscreen-edit',
+      propertiesVisible: getComputedStyle(root.querySelector('.properties')).display !== 'none',
+    };
+  });
+  if (
+    fullscreenClosed.layoutOpen !== undefined ||
+    !fullscreenClosed.returnFocus ||
+    !fullscreenClosed.propertiesVisible
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_FULLSCREEN_CLOSE_FAILED:${JSON.stringify(fullscreenClosed)}`,
+    );
+  }
   const authoringActions = await page.evaluate(() => ({
     actions: window.__baseScreenDatasetAuthoringActions.map((item) => item.action),
+    copiedDataset: window.__baseScreenCopiedDataset,
     settings: window.__baseScreenDatasetAuthoringActions
       .filter((item) => item.action === 'update-settings')
       .map((item) => ({ setting: item.setting, value: item.value })),
@@ -5343,11 +5438,12 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
         'open-code-editor',
         'configure-filter',
         'copy-data',
+        'update-settings',
+        'update-settings',
+        'update-settings',
         'fullscreen-edit',
-        'update-settings',
-        'update-settings',
-        'update-settings',
       ]) ||
+    JSON.parse(authoringActions.copiedDataset).rows?.length !== 2 ||
     JSON.stringify(authoringActions.settings) !==
       JSON.stringify([
         { setting: 'loadingDisabled', value: true },

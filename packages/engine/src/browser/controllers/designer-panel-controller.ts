@@ -650,6 +650,11 @@ export class DesignerPanelController {
       }
       return;
     }
+    const geometryAction = target.closest<HTMLButtonElement>('[data-geometry-action]');
+    if (geometryAction !== null) {
+      this.commitPropertyControl(geometryAction);
+      return;
+    }
     const quickStyle = target.closest<HTMLButtonElement>('[data-quick-style]');
     if (quickStyle !== null) {
       const value = Number(quickStyle.dataset.quickStyle);
@@ -872,27 +877,31 @@ export class DesignerPanelController {
       }
       return;
     }
+    if (this.commitPropertyControl(event.target)) return;
+    if (isDesignerDraft(event.target)) {
+      setDraftValidity(event.target, false);
+      this.callbacks.emitDiagnostics([invalidDraftDiagnostic()]);
+    }
+  }
+
+  private commitPropertyControl(target: EventTarget | null): boolean {
     const transaction = createPropertyTransaction(
-      event.target,
+      target,
       this.callbacks.getDocument(),
       this.interaction,
       this.callbacks.getCatalog(),
       this.#canvasBackgroundDrafts,
     );
-    if (transaction !== undefined) {
-      if (transaction.ok) {
-        setDraftValidity(event.target, true);
-        this.report(this.callbacks.executeTransaction(transaction.value));
-      } else {
-        setDraftValidity(event.target, false);
-        this.callbacks.emitDiagnostics(transaction.diagnostics);
-      }
-      return;
+    if (transaction === undefined) return false;
+    if (!transaction.ok) {
+      setDraftValidity(target, false);
+      this.callbacks.emitDiagnostics(transaction.diagnostics);
+      return true;
     }
-    if (isDesignerDraft(event.target)) {
-      setDraftValidity(event.target, false);
-      this.callbacks.emitDiagnostics([invalidDraftDiagnostic()]);
-    }
+    const result = this.callbacks.executeTransaction(transaction.value);
+    setDraftValidity(target, result.ok);
+    this.report(result);
+    return true;
   }
 
   onInput(event: Event): boolean {
@@ -1393,7 +1402,9 @@ function isDesignerDraft(target: EventTarget | null): boolean {
     dataset !== undefined &&
     (dataset.property !== undefined ||
       dataset.prop !== undefined ||
+      dataset.style !== undefined ||
       dataset.canvasProperty !== undefined ||
+      dataset.canvasSetting !== undefined ||
       dataset.dataSourceType !== undefined ||
       dataset.dataSourceField !== undefined ||
       dataset.multiProperty !== undefined ||

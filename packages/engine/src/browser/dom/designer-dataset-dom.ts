@@ -540,6 +540,8 @@ function renderDatasetAuthoring(
 
   const settings = options.panel.ownerDocument.createElement('div');
   settings.className = 'designer-dataset-authoring-settings';
+  settings.setAttribute('role', 'group');
+  settings.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.advancedSettings);
   settings.append(
     authoringCheckbox(
       options,
@@ -558,8 +560,14 @@ function renderDatasetAuthoring(
 
   const actions = options.panel.ownerDocument.createElement('div');
   actions.className = 'designer-dataset-authoring-actions';
-  actions.appendChild(
-    authoringAction(options.panel.ownerDocument, 'copy-data', DESIGNER_UI_TEXT.dataSource.copyData),
+  actions.append(
+    authoringAction(
+      options.panel.ownerDocument,
+      'copy-data',
+      DESIGNER_UI_TEXT.dataSource.copyData,
+      options.preview.rawValue === undefined,
+      DESIGNER_UI_TEXT.dataSource.copyDataHint,
+    ),
   );
   if (part !== 'footer') {
     actions.appendChild(
@@ -595,16 +603,22 @@ function authoringAction(
   ownerDocument: Document,
   action: DesignerDatasetAuthoringAction,
   label: string,
+  disabled = false,
+  disabledHint?: string,
 ): HTMLButtonElement {
   const button = ownerDocument.createElement('button');
   button.type = 'button';
   button.className = 'designer-control designer-button';
   button.dataset.datasetAuthoringAction = action;
+  button.disabled = disabled;
   if (action === 'copy-data' || action === 'fullscreen-edit') {
     button.classList.add('designer-icon-button', 'designer-dataset-authoring-icon-action');
     button.dataset.variant = 'ghost';
-    button.title = label;
-    button.setAttribute('aria-label', label);
+    button.title = disabled && disabledHint !== undefined ? disabledHint : label;
+    button.setAttribute(
+      'aria-label',
+      disabled && disabledHint !== undefined ? `${label} · ${disabledHint}` : label,
+    );
     button.innerHTML = designerIcon(action === 'copy-data' ? 'copy' : 'maximize');
   } else {
     button.textContent = label;
@@ -627,14 +641,17 @@ function authoringCheckbox(
   checked: boolean,
 ): HTMLLabelElement {
   const label = options.panel.ownerDocument.createElement('label');
-  label.className = 'designer-dataset-authoring-checkbox designer-field-label';
+  label.className = 'designer-dataset-authoring-checkbox';
   const input = options.panel.ownerDocument.createElement('input');
   input.type = 'checkbox';
   input.className = 'designer-checkbox';
   input.checked = checked;
   input.value = String(checked);
   input.dataset.datasetAuthoringSetting = setting;
-  label.append(input, options.panel.ownerDocument.createTextNode(labelText));
+  const text = options.panel.ownerDocument.createElement('span');
+  text.className = 'designer-dataset-authoring-setting-label';
+  text.textContent = labelText;
+  label.append(input, text);
   return label;
 }
 
@@ -642,9 +659,17 @@ function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTML
   const ownerDocument = options.panel.ownerDocument;
   const wrap = ownerDocument.createElement('div');
   wrap.className = 'designer-dataset-refresh-controls';
+  wrap.setAttribute('role', 'group');
+  wrap.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel);
+  const strategy = ownerDocument.createElement('label');
+  strategy.className = 'designer-dataset-authoring-setting-row';
+  const strategyLabel = ownerDocument.createElement('span');
+  strategyLabel.className = 'designer-dataset-authoring-setting-label';
+  strategyLabel.textContent = DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel;
   const select = ownerDocument.createElement('select');
   select.className = 'designer-control designer-select';
   select.dataset.datasetAuthoringSetting = 'refreshStrategy';
+  select.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel);
   for (const [value, label] of [
     ['once', DESIGNER_UI_TEXT.dataSource.refreshOnce],
     ['manual', DESIGNER_UI_TEXT.dataSource.manualRefresh],
@@ -656,6 +681,15 @@ function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTML
     option.selected = options.authoring.refreshStrategy === value;
     select.appendChild(option);
   }
+  strategy.append(strategyLabel, select);
+  const intervalRow = ownerDocument.createElement('label');
+  intervalRow.className = 'designer-dataset-authoring-setting-row';
+  intervalRow.dataset.disabled = String(options.authoring.refreshStrategy !== 'auto');
+  const intervalLabel = ownerDocument.createElement('span');
+  intervalLabel.className = 'designer-dataset-authoring-setting-label';
+  intervalLabel.textContent = DESIGNER_UI_TEXT.dataSource.refreshIntervalLabel;
+  const intervalControl = ownerDocument.createElement('span');
+  intervalControl.className = 'designer-dataset-refresh-interval-control';
   const interval = ownerDocument.createElement('input');
   interval.type = 'number';
   interval.className = 'designer-control designer-number-input';
@@ -665,10 +699,16 @@ function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTML
   interval.value = String(options.authoring.refreshInterval);
   interval.disabled = options.authoring.refreshStrategy !== 'auto';
   interval.dataset.datasetAuthoringSetting = 'refreshInterval';
-  interval.title = DESIGNER_UI_TEXT.dataSource.refreshInterval;
+  interval.setAttribute(
+    'aria-label',
+    `${DESIGNER_UI_TEXT.dataSource.refreshIntervalLabel} · ${DESIGNER_UI_TEXT.dataSource.refreshInterval}`,
+  );
   const unit = ownerDocument.createElement('span');
   unit.textContent = DESIGNER_UI_TEXT.dataSource.refreshInterval;
-  wrap.append(select, interval, unit);
+  unit.setAttribute('aria-hidden', 'true');
+  intervalControl.append(interval, unit);
+  intervalRow.append(intervalLabel, intervalControl);
+  wrap.append(strategy, intervalRow);
   return wrap;
 }
 

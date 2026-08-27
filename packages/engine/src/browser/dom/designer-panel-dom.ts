@@ -12,7 +12,11 @@ import type {
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
-import { MAX_STYLE_RULES_PER_COMPONENT, parseScreenJsonValue } from '@base-screen/contracts';
+import {
+  isBoundedScreenImageUrl,
+  MAX_STYLE_RULES_PER_COMPONENT,
+  parseScreenJsonValue,
+} from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type {
@@ -161,7 +165,32 @@ export function renderDesignerProperties(
   if (context.kind === 'single-group') {
     appendGroupOverview(properties, context);
   }
+  const locked =
+    document !== undefined && isScreenComponentEffectivelyLocked(document, context.component.id);
+  if (locked) appendLockedInspectorNotice(properties);
   appendComponentControls(properties, context, document, interaction, catalog, getDatasetFields);
+  if (locked) disableLockedComponentControls(properties);
+}
+
+function appendLockedInspectorNotice(properties: HTMLElement): void {
+  const notice = properties.ownerDocument.createElement('p');
+  notice.className = 'designer-inspector-lock-notice';
+  notice.setAttribute('role', 'status');
+  notice.textContent = DESIGNER_UI_TEXT.propertiesPanel.lockedEditingHint;
+  properties.appendChild(notice);
+}
+
+function disableLockedComponentControls(properties: HTMLElement): void {
+  for (const control of properties.querySelectorAll<
+    HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement
+  >('input, select, textarea, button')) {
+    const property = control.dataset.property;
+    if (property === 'locked' || property === 'hidden') continue;
+    control.disabled = true;
+    if (control.title === '') {
+      control.title = DESIGNER_UI_TEXT.propertiesPanel.lockedEditingHint;
+    }
+  }
 }
 
 function appendComponentControls(
@@ -1238,6 +1267,9 @@ function createCanvasTransaction(
     // 非空输入提交 URL（失败关闭校验在 canonical 解析处拒绝）；清空输入提交删除语义，
     // 与 setCanvasBackgroundImage(null) 一致（同时清除 fit）。
     const value = target.value.trim();
+    if (value !== '' && !isBoundedScreenImageUrl(value)) {
+      return canvasBackgroundImageFailure();
+    }
     return success({
       commands: [
         {
@@ -1657,7 +1689,6 @@ function appendCanvasBackgroundControls(
   const type = parent.ownerDocument.createElement('label');
   type.className = 'designer-field designer-field-label';
   type.dataset.canvasField = 'backgroundType';
-  type.dataset.inspectorAdvanced = 'true';
   type.textContent = DESIGNER_UI_TEXT.propertiesPanel.backgroundType;
   const select = type.ownerDocument.createElement('select');
   select.className = 'designer-control designer-select';
@@ -2459,5 +2490,19 @@ function dataSourceFailure(
   return {
     ok: false,
     diagnostics: [{ severity: 'error', code, path: [], message }],
+  };
+}
+
+function canvasBackgroundImageFailure(): ScreenParseResult<ScreenDocumentTransaction> {
+  return {
+    ok: false,
+    diagnostics: [
+      {
+        severity: 'error',
+        code: 'DOCUMENT_FIELD_INVALID',
+        path: ['canvas', 'backgroundImage'],
+        message: DESIGNER_UI_TEXT.propertiesPanel.backgroundImageInvalid,
+      },
+    ],
   };
 }

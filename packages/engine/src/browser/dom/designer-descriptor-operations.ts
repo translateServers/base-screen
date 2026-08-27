@@ -343,8 +343,15 @@ function resolveSchemaAt(
 ): BaseScreenMaterialPropSchema | undefined {
   let current: BaseScreenMaterialPropSchema | undefined = schema;
   for (const segment of path) {
-    if (current?.kind !== 'object' || typeof segment !== 'string') return undefined;
-    current = current.properties[segment];
+    if (current?.kind === 'object' && typeof segment === 'string') {
+      current = current.properties[segment];
+      continue;
+    }
+    if (current?.kind === 'array' && typeof segment === 'number') {
+      current = current.items;
+      continue;
+    }
+    return undefined;
   }
   return current;
 }

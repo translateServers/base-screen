@@ -75,6 +75,13 @@ class FakeElement {
 
   addEventListener(): void {}
 
+  querySelectorAll<T extends Element>(selector: string): T[] {
+    const tags = new Set(selector.split(',').map((tag) => tag.trim().toLowerCase()));
+    return descendants(this).filter((child) =>
+      tags.has(child.tagName.toLowerCase()),
+    ) as unknown as T[];
+  }
+
   setAttribute(): void {}
 
   replaceChildren(...children: FakeElement[]): void {
@@ -262,6 +269,10 @@ describe('designer panel rendering', () => {
         .filter((element) => element.tagName === 'option')
         .map((element) => element.value),
     ).toEqual(['solid', 'linear-gradient', 'radial-gradient', 'cover', 'contain']);
+    expect(
+      descendants(properties).find((element) => element.dataset.canvasField === 'backgroundType')
+        ?.dataset.inspectorAdvanced,
+    ).toBeUndefined();
   });
 
   it('renders linear and radial palette controls from the active canvas background', () => {
@@ -420,6 +431,44 @@ describe('designer panel rendering', () => {
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
       'Status',
     );
+  });
+
+  it('disables editable controls while preserving locked and hidden status toggles', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const lockedDocument: ScreenDocument = {
+      ...document(),
+      components: document().components.map((component) => ({
+        ...component,
+        status: { ...component.status, locked: true },
+      })),
+    };
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      lockedDocument,
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      catalog(),
+    );
+
+    const controls = descendants(properties).filter((element) =>
+      ['input', 'select', 'textarea', 'button'].includes(element.tagName.toLowerCase()),
+    );
+    const statusControls = controls.filter(
+      (control) => control.dataset.property === 'locked' || control.dataset.property === 'hidden',
+    );
+    expect(statusControls).toHaveLength(2);
+    expect(statusControls.every((control) => !control.disabled)).toBe(true);
+    expect(
+      controls
+        .filter((control) => !statusControls.includes(control))
+        .every((control) => control.disabled),
+    ).toBe(true);
+    expect(
+      descendants(properties).find((element) =>
+        element.className.includes('designer-inspector-lock-notice'),
+      )?.textContent,
+    ).toBe('组件已锁定，解锁后可编辑属性。');
   });
 
   it('R5 renders the image alternative-text control declared by its manifest', () => {
@@ -647,6 +696,65 @@ describe('DesignerPanelController property drafts', () => {
       ],
     ]);
   });
+
+  it('routes flip button clicks through the canonical property transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    vi.stubGlobal('HTMLTextAreaElement', FakeInput);
+    const transactions: ScreenDocumentTransaction[] = [];
+    const flipCatalog = {
+      get: () => ({
+        manifest: {
+          dataCapabilities: [],
+          propertyPanel: [],
+          propsSchema: { kind: 'object', properties: {}, required: [] },
+          stylePanel: [],
+          styleSchema: {
+            kind: 'object',
+            properties: { flipX: { kind: 'boolean' }, flipY: { kind: 'boolean' } },
+            required: [],
+          },
+        },
+      }),
+    } as unknown as BaseScreenMaterialCatalog;
+    const controller = new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: () => ({ ok: true, value: document(), diagnostics: [] }),
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return { ok: true, value: document(), diagnostics: [] };
+      },
+      getCatalog: () => flipCatalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+    const button = new FakeElement('button', new FakeDocument());
+    button.dataset.geometryAction = 'flipX';
+
+    controller.onClick({ target: button } as unknown as Event);
+
+    expect(transactions).toEqual([
+      {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['label-1'],
+            patch: { style: { color: '#ffffff', flipX: true } },
+          },
+        ],
+      },
+    ]);
+  });
 });
 
 describe('DesignerPanelController canvas background drafts', () => {
@@ -699,6 +807,31 @@ describe('DesignerPanelController canvas background drafts', () => {
     controller.onClick({ target: button } as unknown as Event);
 
     expect(request).toHaveBeenCalledOnce();
+  });
+
+  it('marks an unsafe canvas background image draft invalid before execution', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeInput);
+    vi.stubGlobal('HTMLTextAreaElement', FakeInput);
+    const { controller, diagnostics, transactions } = createCanvasController(() => ({
+      ok: true,
+      value: document(),
+      diagnostics: [],
+    }));
+    const target = new FakeInput('backgroundImage', 'javascript:alert(1)', 'canvasProperty');
+
+    controller.onPropertyChange({ target } as unknown as Event);
+
+    expect(transactions).toEqual([]);
+    expect(target.ariaInvalid).toBe('true');
+    expect(diagnostics).toEqual([
+      [
+        expect.objectContaining({
+          code: 'DOCUMENT_FIELD_INVALID',
+          path: ['canvas', 'backgroundImage'],
+        }),
+      ],
+    ]);
   });
 
   it('switches palette modes with retained per-mode drafts', () => {
@@ -829,7 +962,7 @@ describe('DesignerPanelController canvas background drafts', () => {
     ]);
   });
 
-  it('surfaces a failed background image transaction through the diagnostic channel', () => {
+  it('surfaces a canonical background image transaction failure and marks the draft invalid', () => {
     vi.stubGlobal('HTMLInputElement', FakeInput);
     const failure = {
       ok: false as const,
@@ -844,12 +977,16 @@ describe('DesignerPanelController canvas background drafts', () => {
       ],
     };
     const { controller, transactions, diagnostics } = createCanvasController(() => failure);
+    const target = new FakeInput(
+      'backgroundImage',
+      'https://cdn.example.com/background.png',
+      'canvasProperty',
+    );
 
-    controller.onPropertyChange({
-      target: new FakeInput('backgroundImage', 'javascript:alert(1)', 'canvasProperty'),
-    } as unknown as Event);
+    controller.onPropertyChange({ target } as unknown as Event);
 
     expect(transactions).toHaveLength(1);
+    expect(target.ariaInvalid).toBe('true');
     expect(diagnostics).toEqual([failure.diagnostics]);
   });
 });

@@ -24,6 +24,7 @@ const propsSchema = {
         properties: {
           name: { kind: 'string' as const },
           type: { kind: 'enum' as const, values: ['line', 'bar'] },
+          yAxisIndex: { kind: 'enum' as const, values: [0, 1] },
           color: { kind: 'string' as const },
         },
         required: [],
@@ -56,8 +57,8 @@ const document: ScreenDocument = {
       props: {
         title: { show: true, text: '标题' },
         series: [
-          { name: 'a', type: 'line', color: '#fff' },
-          { name: 'b', type: 'bar', color: '#000' },
+          { name: 'a', type: 'line', yAxisIndex: 0, color: '#fff' },
+          { name: 'b', type: 'bar', yAxisIndex: 1, color: '#000' },
         ],
       },
       style: { color: '#000000' },
@@ -125,6 +126,33 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
     expect(command?.type).toBe('update-components');
     if (command?.type === 'update-components') {
       expect((command.patch.props as { title: { text: string } }).title.text).toBe('新标题');
+    }
+  });
+
+  it('preserves numeric enum values inside repeatable array items', () => {
+    const control = new FakeControl(
+      {
+        descriptorFieldId: 'seriesYAxis',
+        descriptorTarget: 'props',
+        descriptorPath: JSON.stringify(['series', 0, 'yAxisIndex']),
+        descriptorControl: 'select',
+      },
+      '1',
+    );
+    const result = createDescriptorFieldTransaction(
+      control as unknown as EventTarget,
+      document,
+      interaction,
+      catalog(),
+    );
+
+    expect(result?.ok).toBe(true);
+    if (!result?.ok) return;
+    const command = result.value.commands[0];
+    if (command?.type === 'update-components') {
+      const series = (command.patch.props as { series: Array<{ yAxisIndex: number }> }).series;
+      expect(series[0]?.yAxisIndex).toBe(1);
+      expect(typeof series[0]?.yAxisIndex).toBe('number');
     }
   });
 

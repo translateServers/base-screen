@@ -145,7 +145,9 @@ export function isInspectorDraftTarget(target: EventTarget | null): boolean {
     dataset !== undefined &&
     (dataset.property !== undefined ||
       dataset.prop !== undefined ||
+      dataset.style !== undefined ||
       dataset.canvasProperty !== undefined ||
+      dataset.canvasSetting !== undefined ||
       dataset.dataSourceType !== undefined ||
       dataset.dataSourceField !== undefined ||
       dataset.descriptorFieldId !== undefined)

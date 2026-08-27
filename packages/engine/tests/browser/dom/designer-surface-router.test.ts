@@ -260,6 +260,12 @@ describe('designer surface keyboard helpers', () => {
     const event = { composedPath: () => [draft] } as KeyboardEvent;
     expect(getInspectorDraftTarget(event)).toBe(draft);
     expect(isInspectorDraftTarget({ dataset: { prop: 'y' } } as unknown as EventTarget)).toBe(true);
+    expect(
+      isInspectorDraftTarget({ dataset: { style: 'opacity' } } as unknown as EventTarget),
+    ).toBe(true);
+    expect(
+      isInspectorDraftTarget({ dataset: { canvasSetting: 'opacity' } } as unknown as EventTarget),
+    ).toBe(true);
     expect(isInspectorDraftTarget({ dataset: {} } as unknown as EventTarget)).toBe(false);
     expect(isInspectorDraftTarget(null)).toBe(false);
   });

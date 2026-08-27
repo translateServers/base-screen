@@ -53,6 +53,7 @@ const DESIGNER_GUIDE_DRAG_THRESHOLD = 3;
 const DESIGNER_COLLAPSED_PANEL_WIDTH = 48;
 const DESIGNER_INSPECTOR_WIDTH_STORAGE_KEY = 'base-screen.designer.inspector-width';
 const DESIGNER_LEFT_PANEL_WIDTH_STORAGE_KEY = 'base-screen.designer.left-panel-width';
+const DESIGNER_LEFT_PANEL_DEFAULT_WIDTH = 336;
 const DESIGNER_INSPECTOR_MIN_WIDTH = 288;
 const DESIGNER_INSPECTOR_MAX_WIDTH = 480;
 const DESIGNER_LEFT_PANEL_MIN_WIDTH = 200;
@@ -575,7 +576,8 @@ export class DesignerWorkbenchController {
     const leftWidth = this.#leftCollapsed
       ? DESIGNER_COLLAPSED_PANEL_WIDTH
       : (this.#leftPanelWidth ??
-        (Number.parseFloat(rootStyle?.getPropertyValue('--left-panel-width') ?? '') || 404));
+        (Number.parseFloat(rootStyle?.getPropertyValue('--left-panel-width') ?? '') ||
+          DESIGNER_LEFT_PANEL_DEFAULT_WIDTH));
     const available = layoutWidth - leftWidth - 10 - 360;
     return Math.max(
       DESIGNER_INSPECTOR_MIN_WIDTH,
@@ -583,23 +585,26 @@ export class DesignerWorkbenchController {
     );
   }
 
-  /** 折叠按钮语义随状态切换：收起↔展开（title/aria-label，文案入 designer-ui-text）。 */
+  /** 折叠按钮语义随状态切换：收起↔展开，并同步可访问的展开状态。 */
   private renderCollapseControls(): void {
     const root = this.callbacks.getRoot();
     if (root === null) return;
-    const setControl = (side: PanelSide, label: string) => {
+    const setControl = (side: PanelSide, label: string, expanded: boolean) => {
       const control = root.querySelector<HTMLElement>(`[data-panel-collapse="${side}"]`);
       if (control === null || control === undefined) return;
       control.title = label;
       control.setAttribute('aria-label', label);
+      control.setAttribute('aria-expanded', String(expanded));
     };
     setControl(
       'left',
       this.#leftCollapsed ? DESIGNER_UI_TEXT.expandMaterials : DESIGNER_UI_TEXT.collapseMaterials,
+      !this.#leftCollapsed,
     );
     setControl(
       'right',
       this.#rightCollapsed ? DESIGNER_UI_TEXT.expandInspector : DESIGNER_UI_TEXT.collapseInspector,
+      !this.#rightCollapsed,
     );
   }
 

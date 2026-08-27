@@ -40,6 +40,7 @@ function renderDatasetSummary(
   summary.dataset.inspectorSearchSection = 'true';
   summary.tabIndex = -1;
   const header = ownerDocument.createElement('div');
+  header.className = 'designer-dataset-summary-header';
   const title = ownerDocument.createElement('span');
   title.className = 'designer-dataset-summary-title';
   const eyebrow = ownerDocument.createElement('small');
@@ -66,22 +67,37 @@ function renderDatasetSummary(
   summary.appendChild(shape);
   const bindingSummary = ownerDocument.createElement('div');
   bindingSummary.className = 'designer-dataset-binding-summary';
+  const bindingHeader = ownerDocument.createElement('div');
+  bindingHeader.className = 'designer-dataset-binding-summary-header';
   const bindingTitle = ownerDocument.createElement('strong');
   bindingTitle.textContent = DESIGNER_UI_TEXT.dataset.bindingSummaryTitle;
-  const bindingText = ownerDocument.createElement('p');
-  const labels = roles.flatMap((role) => {
+  const bindings = roles.flatMap((role) => {
     const selected = draft?.fields[role.id] ?? [];
-    return selected.length === 0
-      ? []
-      : [
-          `${DESIGNER_UI_TEXT.dataset.bindingRole(role.id)}：${selected
-            .map((id) => descriptor.fields.find((field) => field.id === id)?.label ?? id)
-            .join('、')}`,
-        ];
+    if (selected.length === 0) return [];
+    return [
+      {
+        role: DESIGNER_UI_TEXT.dataset.bindingRole(role.id),
+        fields: selected.map(
+          (id) => descriptor.fields.find((field) => field.id === id)?.label ?? id,
+        ),
+      },
+    ];
   });
-  bindingText.textContent =
-    labels.length === 0 ? DESIGNER_UI_TEXT.dataset.bindingNone : labels.join('；');
-  bindingSummary.append(bindingTitle, bindingText);
+  const bindingCount = ownerDocument.createElement('span');
+  bindingCount.textContent = DESIGNER_UI_TEXT.dataset.selectedFields(
+    bindings.reduce((count, binding) => count + binding.fields.length, 0),
+  );
+  bindingHeader.append(bindingTitle, bindingCount);
+  bindingSummary.appendChild(bindingHeader);
+  if (bindings.length === 0) {
+    const empty = ownerDocument.createElement('p');
+    empty.className = 'designer-dataset-binding-summary-empty';
+    empty.textContent = DESIGNER_UI_TEXT.dataset.bindingNone;
+    bindingSummary.appendChild(empty);
+  }
+  for (const binding of bindings) {
+    bindingSummary.appendChild(renderBindingSummaryItem(ownerDocument, binding));
+  }
   summary.appendChild(bindingSummary);
   const schema = ownerDocument.createElement('ul');
   schema.className = 'designer-dataset-schema';
@@ -93,6 +109,42 @@ function renderDatasetSummary(
   }
   summary.appendChild(schema);
   return summary;
+}
+
+function renderBindingSummaryItem(
+  ownerDocument: Document,
+  binding: { readonly role: string; readonly fields: readonly string[] },
+): HTMLDetailsElement {
+  const details = ownerDocument.createElement('details');
+  details.className = 'designer-dataset-binding-summary-item';
+  const disclosure = ownerDocument.createElement('summary');
+  disclosure.className = 'designer-dataset-binding-summary-disclosure';
+  const preview = ownerDocument.createElement('span');
+  preview.className = 'designer-dataset-binding-summary-preview';
+  const role = ownerDocument.createElement('span');
+  role.className = 'designer-dataset-binding-summary-role';
+  role.textContent = binding.role;
+  role.title = binding.role;
+  const fields = ownerDocument.createElement('span');
+  fields.className = 'designer-dataset-binding-summary-value';
+  fields.textContent = binding.fields.join('、');
+  fields.title = binding.fields.join('、');
+  preview.append(role, fields);
+  disclosure.appendChild(preview);
+  disclosure.setAttribute('aria-label', `${binding.role}：${binding.fields.join('、')}`);
+
+  const expanded = ownerDocument.createElement('div');
+  expanded.className = 'designer-dataset-binding-summary-expanded';
+  const fieldList = ownerDocument.createElement('ul');
+  fieldList.className = 'designer-dataset-binding-summary-fields';
+  for (const field of binding.fields) {
+    const label = ownerDocument.createElement('li');
+    label.textContent = field;
+    fieldList.appendChild(label);
+  }
+  expanded.appendChild(fieldList);
+  details.append(disclosure, expanded);
+  return details;
 }
 
 function renderParameters(
@@ -201,6 +253,8 @@ function renderBindingRole(
   hint.textContent = DESIGNER_UI_TEXT.dataset.bindingHint(role.minFields, role.maxFields);
   const fieldList = ownerDocument.createElement('div');
   fieldList.className = 'designer-dataset-field-list';
+  fieldList.setAttribute('role', 'group');
+  fieldList.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.bindingRole(role.id));
   const compatibleFields = descriptor.fields.filter((field) =>
     role.valueTypes.includes(field.valueType),
   );
@@ -227,13 +281,22 @@ function renderBindingRole(
         ownerDocument,
         role.id,
         'select-all',
-        DESIGNER_UI_TEXT.dataset.bindingSelectAll,
+        compatibleFields.length > role.maxFields
+          ? DESIGNER_UI_TEXT.dataset.bindingSelectMaximum
+          : DESIGNER_UI_TEXT.dataset.bindingSelectAll,
+        selected.length === Math.min(compatibleFields.length, role.maxFields),
       ),
-      bindingRoleAction(ownerDocument, role.id, 'clear', DESIGNER_UI_TEXT.dataset.bindingClear),
+      bindingRoleAction(
+        ownerDocument,
+        role.id,
+        'clear',
+        DESIGNER_UI_TEXT.dataset.bindingClear,
+        selected.length === 0,
+      ),
     );
     roleHeading.appendChild(actions);
     for (const field of compatibleFields) {
-      fieldList.appendChild(bindingField(ownerDocument, role.id, field, selected));
+      fieldList.appendChild(bindingField(ownerDocument, role.id, field, selected, role.maxFields));
     }
   }
   if (compatibleFields.length === 0) {
@@ -251,6 +314,7 @@ function bindingRoleAction(
   roleId: string,
   action: 'select-all' | 'clear',
   label: string,
+  disabled = false,
 ): HTMLButtonElement {
   const button = ownerDocument.createElement('button');
   button.type = 'button';
@@ -258,6 +322,7 @@ function bindingRoleAction(
   button.dataset.datasetBindingRoleAction = action;
   button.dataset.datasetBindingRoleId = roleId;
   button.textContent = label;
+  button.disabled = disabled;
   return button;
 }
 
@@ -266,17 +331,22 @@ function bindingField(
   roleId: string,
   field: ScreenDatasetDescriptor['fields'][number],
   selected: readonly string[],
+  maxFields: number,
 ): HTMLButtonElement {
+  const isSelected = selected.includes(field.id);
   const button = ownerDocument.createElement('button');
   button.type = 'button';
   button.className = 'designer-control designer-dataset-field-option';
   button.dataset.datasetBindingRoleId = roleId;
   button.dataset.datasetBindingField = field.id;
-  button.setAttribute('aria-pressed', String(selected.includes(field.id)));
+  button.setAttribute('aria-pressed', String(isSelected));
+  button.disabled = !isSelected && selected.length >= maxFields;
   const label = ownerDocument.createElement('span');
   label.className = 'designer-field-label';
   label.textContent = field.label;
-  button.appendChild(label);
+  const type = ownerDocument.createElement('small');
+  type.textContent = field.valueType;
+  button.append(label, type);
   return button;
 }
 

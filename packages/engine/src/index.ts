@@ -424,6 +424,16 @@ export class BaseScreenDesignerElement extends ElementBase {
     executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
     report: (diagnostics) => this.emitDiagnostics(diagnostics),
     refresh: (componentId) => this.refreshData(componentId),
+    copyText: async (value) => {
+      const clipboard = this.ownerDocument.defaultView?.navigator.clipboard;
+      if (clipboard === undefined) return false;
+      try {
+        await clipboard.writeText(value);
+        return true;
+      } catch {
+        return false;
+      }
+    },
     requestAuthoringAction: (action, detail) => {
       this.dispatchEvent(
         new CustomEvent('base-screen-dataset-authoring-action', {

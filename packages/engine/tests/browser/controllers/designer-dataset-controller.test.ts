@@ -229,6 +229,36 @@ describe('DesignerDatasetController', () => {
     ]);
   });
 
+  it('copies a tested dataset response through the injected browser clipboard capability', async () => {
+    const copyText = vi.fn(async () => true);
+    const resolve = vi.fn<ScreenHostResourcePort['resolve']>(async () =>
+      success({
+        fields: [{ id: 'amount', label: '金额', valueType: 'number' as const }],
+        rows: [{ amount: 12 }],
+      }),
+    );
+    const controller = createController({ descriptor, resolve, copyText });
+
+    controller.onClick(resourceTarget('orders') as unknown as Element);
+    await waitForDescriptor(controller);
+    controller.onClick(actionTarget('test') as unknown as Element);
+    await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
+    await new Promise((resolvePending) => setTimeout(resolvePending, 0));
+    controller.onClick(authoringActionTarget('copy-data') as unknown as Element);
+
+    await vi.waitFor(() => expect(copyText).toHaveBeenCalledOnce());
+    expect(copyText).toHaveBeenCalledWith(
+      JSON.stringify(
+        {
+          fields: [{ id: 'amount', label: '金额', valueType: 'number' }],
+          rows: [{ amount: 12 }],
+        },
+        null,
+        2,
+      ),
+    );
+  });
+
   it('R5 accepts compatible selected fields for a declared role', async () => {
     const transactions: ScreenDocumentTransaction[] = [];
     const roles: readonly ScreenDataBindingRole[] = [
@@ -292,6 +322,49 @@ describe('DesignerDatasetController', () => {
         {
           patch: {
             dataSource: { binding: { fields: { measures: ['amount'] } } },
+          },
+        },
+      ],
+    });
+  });
+
+  it('toggles static multi-field bindings without native modifier-key selection', () => {
+    const transactions: ScreenDocumentTransaction[] = [];
+    const roles: readonly ScreenDataBindingRole[] = [
+      { id: 'measures', minFields: 1, maxFields: 2, valueTypes: ['number'] },
+    ];
+    const controller = createController({
+      descriptor: { ...descriptor, parameters: [] },
+      roles,
+      defaultData: {
+        fields: [
+          { id: 'amount', label: '金额', valueType: 'number' },
+          { id: 'profit', label: '利润', valueType: 'number' },
+        ],
+        rows: [{ amount: 12, profit: 4 }],
+      },
+      staticData: {
+        kind: 'tabular',
+        defaultBinding: { fields: { measures: ['amount'] } },
+      },
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return success(baseDocument);
+      },
+    });
+
+    controller.onClick(sourceModeTarget('static') as unknown as Element);
+    controller.onClick(staticBindingFieldTarget('measures', 'profit') as unknown as Element);
+    controller.onClick(staticActionTarget('apply') as unknown as Element);
+
+    expect(transactions[0]).toMatchObject({
+      commands: [
+        {
+          patch: {
+            dataSource: {
+              type: 'static',
+              binding: { fields: { measures: ['amount', 'profit'] } },
+            },
           },
         },
       ],
@@ -405,6 +478,12 @@ function createController(overrides: {
   readonly report?: (diagnostics: readonly unknown[]) => void;
   readonly getDocument?: () => ScreenDocument;
   readonly resolve?: ScreenHostResourcePort['resolve'];
+  readonly defaultData?: ScreenJsonValue;
+  readonly staticData?: {
+    readonly kind: 'tabular';
+    readonly defaultBinding: { readonly fields: Readonly<Record<string, readonly string[]>> };
+  };
+  readonly copyText?: (value: string) => Promise<boolean>;
   readonly requestAuthoringAction?: (
     action: string,
     detail?: Readonly<Record<string, string | number | boolean>>,
@@ -414,6 +493,8 @@ function createController(overrides: {
     manifest: {
       dataCapabilities: ['static', 'host-resource'],
       dataBinding: overrides.roles === undefined ? undefined : { roles: overrides.roles },
+      ...(overrides.defaultData === undefined ? {} : { defaultData: overrides.defaultData }),
+      ...(overrides.staticData === undefined ? {} : { staticData: overrides.staticData }),
     },
   };
   const catalog = {
@@ -457,11 +538,13 @@ function createController(overrides: {
     report: overrides.report ?? (() => undefined),
     refresh: () => undefined,
   };
+  const callbacksWithClipboard =
+    overrides.copyText === undefined ? callbacks : { ...callbacks, copyText: overrides.copyText };
   if (overrides.requestAuthoringAction === undefined) {
-    return new DesignerDatasetController(callbacks);
+    return new DesignerDatasetController(callbacksWithClipboard);
   }
   return new DesignerDatasetController({
-    ...callbacks,
+    ...callbacksWithClipboard,
     requestAuthoringAction: overrides.requestAuthoringAction,
   });
 }
@@ -477,6 +560,13 @@ function actionTarget(action: string): { closest: (selector: string) => unknown 
   const button = { dataset: { datasetAction: action } };
   return {
     closest: (selector) => (selector === '[data-dataset-action]' ? button : null),
+  };
+}
+
+function staticActionTarget(action: string): { closest: (selector: string) => unknown } {
+  const button = { dataset: { staticAction: action } };
+  return {
+    closest: (selector) => (selector === '[data-static-action]' ? button : null),
   };
 }
 
@@ -510,6 +600,18 @@ function bindingFieldTarget(
   };
   return {
     closest: (selector) => (selector === '[data-dataset-binding-field]' ? button : null),
+  };
+}
+
+function staticBindingFieldTarget(
+  roleId: string,
+  fieldId: string,
+): { closest: (selector: string) => unknown } {
+  const button = {
+    dataset: { staticBindingRole: roleId, staticBindingField: fieldId },
+  };
+  return {
+    closest: (selector) => (selector === '[data-static-binding-field]' ? button : null),
   };
 }
 

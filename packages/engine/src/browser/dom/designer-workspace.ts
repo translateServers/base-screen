@@ -98,11 +98,11 @@ export function createDesignerWorkspace(
       </div>
     </section>
 
-    <aside class="rail" data-left-panel>
+    <aside class="rail" id="designer-left-panel" data-left-panel aria-labelledby="designer-left-panel-title">
       <header class="panel-heading">
-        <span class="panel-title" data-left-panel-title>${DESIGNER_UI_TEXT.materials}</span>
+        <span class="panel-title" id="designer-left-panel-title" data-left-panel-title>${DESIGNER_UI_TEXT.materials}</span>
         <span class="panel-count" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterials.length)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterials.length}">${visibleMaterials.length}</span>
-        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" title="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}">
+        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" title="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}" aria-controls="designer-left-panel" aria-expanded="true">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
         </button>
       </header>
@@ -300,10 +300,11 @@ export function createDesignerWorkspace(
 
     <div class="panel-handle" data-panel-handle="right" role="separator" aria-orientation="vertical"></div>
 
-    <aside class="properties" data-right-panel>
+    <aside class="properties" id="designer-right-panel" data-right-panel aria-labelledby="designer-right-panel-title">
       <header class="panel-heading">
-        <span class="panel-title" data-right-panel-title>${DESIGNER_UI_TEXT.inspectorUi.canvasConfiguration}</span>
-        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="right" title="${DESIGNER_UI_TEXT.collapseInspector}" aria-label="${DESIGNER_UI_TEXT.collapseInspector}">
+        <span class="panel-title" id="designer-right-panel-title" data-right-panel-title>${DESIGNER_UI_TEXT.inspectorUi.canvasConfiguration}</span>
+        <span class="panel-collapsed-label" aria-hidden="true">${DESIGNER_UI_TEXT.inspector}</span>
+        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="right" title="${DESIGNER_UI_TEXT.collapseInspector}" aria-label="${DESIGNER_UI_TEXT.collapseInspector}" aria-controls="designer-right-panel" aria-expanded="true">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
         </button>
       </header>

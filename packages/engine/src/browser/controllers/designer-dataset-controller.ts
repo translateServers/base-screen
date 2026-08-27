@@ -36,6 +36,7 @@ import {
   type DesignerDatasetRefreshStrategy,
   type DesignerDatasetWorkbenchStep,
   renderDesignerDataSourcePanel,
+  renderDesignerDatasetWorkbench,
 } from '../dom/designer-dataset-dom.js';
 import { renderDesignerDescriptorZone } from '../dom/designer-descriptor-dom.js';
 import { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
@@ -68,6 +69,7 @@ export interface DesignerDatasetControllerCallbacks {
     action: DesignerDatasetAuthoringAction,
     detail?: Readonly<Record<string, string | number | boolean>>,
   ) => void;
+  readonly copyText?: (value: string) => Promise<boolean>;
   readonly getWorkbenchHost?: () => HTMLElement | undefined;
 }
 
@@ -85,6 +87,7 @@ export class DesignerDatasetController {
   #staticPage = 0;
   #staticPasteDraft = '';
   #staticFirstRowIsHeader = true;
+  #workbenchOpen = false;
   #catalogOpen = false;
   #feedbackText = '';
   #draftDirty = false;
@@ -148,6 +151,7 @@ export class DesignerDatasetController {
     this.#staticTab = 'table';
     this.#staticPage = 0;
     this.#staticPasteDraft = '';
+    this.#workbenchOpen = false;
     this.#catalogOpen = false;
     this.#feedbackText = '';
     this.#draftDirty = false;
@@ -205,6 +209,27 @@ export class DesignerDatasetController {
   }
 
   onClick(target: Element): boolean {
+    const staticBindingField = target.closest<HTMLButtonElement>('[data-static-binding-field]');
+    if (staticBindingField !== null) {
+      const role = this.currentEntry()?.manifest.dataBinding?.roles.find(
+        (candidate) => candidate.id === staticBindingField.dataset.staticBindingRole,
+      );
+      const fieldId = staticBindingField.dataset.staticBindingField;
+      if (role !== undefined && fieldId !== undefined) {
+        const selected = this.#staticBinding?.fields[role.id] ?? [];
+        const next = selected.includes(fieldId)
+          ? selected.filter((item) => item !== fieldId)
+          : selected.length < role.maxFields
+            ? [...selected, fieldId]
+            : selected;
+        this.#staticBinding = {
+          fields: { ...this.#staticBinding?.fields, [role.id]: next },
+        };
+        this.renderSurface();
+        this.restoreBindingFieldFocus('static', role.id, fieldId);
+      }
+      return true;
+    }
     const staticAction = target.closest<HTMLButtonElement>('[data-static-action]');
     if (staticAction !== null) {
       this.handleStaticAction(staticAction);
@@ -235,6 +260,7 @@ export class DesignerDatasetController {
       if (this.#draft !== undefined && role !== undefined && fieldId !== undefined) {
         this.#draft = toggleDesignerDatasetBindingField(this.#draft, role, fieldId);
         this.markDatasetDraftChanged();
+        this.restoreBindingFieldFocus('dataset', role.id, fieldId);
       }
       return true;
     }
@@ -286,9 +312,13 @@ export class DesignerDatasetController {
       ?.dataset.datasetAuthoringAction as DesignerDatasetAuthoringAction | undefined;
     if (authoringAction !== undefined) {
       if (authoringAction === 'copy-data') {
-        this.callbacks.requestAuthoringAction?.(authoringAction, {
-          value: JSON.stringify(this.#preview.rawValue ?? null),
-        });
+        void this.copyPreviewData();
+      } else if (authoringAction === 'fullscreen-edit') {
+        this.#workbenchOpen = true;
+        this.#confirmClose = false;
+        this.callbacks.requestAuthoringAction?.(authoringAction);
+        this.renderSurface();
+        this.focusDataWorkbench();
       } else {
         this.callbacks.requestAuthoringAction?.(authoringAction);
       }
@@ -307,6 +337,7 @@ export class DesignerDatasetController {
       return true;
     }
     if (action === 'open-workbench') {
+      this.#workbenchOpen = true;
       this.#confirmClose = false;
       const requestedStep = actionTarget?.dataset.datasetWorkbenchTarget;
       this.#activeStep = isDatasetWorkbenchStep(requestedStep) ? requestedStep : 'source';
@@ -314,6 +345,7 @@ export class DesignerDatasetController {
         this.#preview = { ...this.#preview, open: true };
       }
       this.renderSurface();
+      this.focusDataWorkbench();
       return true;
     }
     if (action === 'close-workbench') {
@@ -322,9 +354,11 @@ export class DesignerDatasetController {
         this.renderSurface();
         return true;
       }
+      this.#workbenchOpen = false;
       this.#staticDialogOpen = false;
       this.#confirmClose = false;
       this.renderSurface();
+      this.restoreFullscreenActionFocus();
       return true;
     }
     if (action === 'keep-editing') {
@@ -334,9 +368,11 @@ export class DesignerDatasetController {
     }
     if (action === 'discard-workbench') {
       this.restoreDatasetDraft();
+      this.#workbenchOpen = false;
       this.#staticDialogOpen = false;
       this.#confirmClose = false;
       this.renderSurface();
+      this.restoreFullscreenActionFocus();
       return true;
     }
     if (action === 'toggle-preview') {
@@ -451,6 +487,19 @@ export class DesignerDatasetController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
+    if (event.key === 'Escape' && this.#workbenchOpen) {
+      event.preventDefault();
+      if (this.#mode === 'dataset' && this.#draftDirty) {
+        this.#confirmClose = true;
+        this.renderSurface();
+      } else {
+        this.#workbenchOpen = false;
+        this.#confirmClose = false;
+        this.renderSurface();
+        this.restoreFullscreenActionFocus();
+      }
+      return true;
+    }
     if (event.key !== 'Enter' || event.isComposing) return false;
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return false;
@@ -477,6 +526,7 @@ export class DesignerDatasetController {
     if (!this.availableModes().includes(mode)) return;
     this.#mode = mode;
     this.#activeStep = 'source';
+    this.#workbenchOpen = false;
     this.#staticDialogOpen = false;
     this.#feedbackText = '';
     this.#confirmClose = false;
@@ -594,6 +644,7 @@ export class DesignerDatasetController {
     this.#feedbackText = '';
     this.#draftDirty = false;
     this.#confirmClose = false;
+    if (!sameFocusedComponent) this.#workbenchOpen = false;
     this.cancelPreview();
     this.#preview = emptyDatasetPreview();
     this.#activeStep = activeStep;
@@ -1319,13 +1370,84 @@ export class DesignerDatasetController {
   }
 
   private renderDataWorkbench(options: DesignerDataSourcePanelOptions): void {
-    void options;
     const host = this.callbacks.getWorkbenchHost?.();
     if (host === undefined) return;
-    host.hidden = true;
     const layout = host.closest<HTMLElement>('.designer');
-    if (layout !== null) delete layout.dataset.dataWorkbenchOpen;
     host.replaceChildren();
+    if (!this.#workbenchOpen || options.mode !== 'dataset' || options.descriptor === undefined) {
+      host.hidden = true;
+      host.removeAttribute('role');
+      host.removeAttribute('aria-modal');
+      host.removeAttribute('tabindex');
+      if (layout !== null) delete layout.dataset.dataWorkbenchOpen;
+      return;
+    }
+    host.hidden = false;
+    host.setAttribute('role', 'dialog');
+    host.setAttribute('aria-modal', 'true');
+    host.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.workbench);
+    host.tabIndex = -1;
+    host.appendChild(renderDesignerDatasetWorkbench(options));
+    if (layout !== null) layout.dataset.dataWorkbenchOpen = 'true';
+  }
+
+  private async copyPreviewData(): Promise<void> {
+    const rawValue = this.#preview.rawValue;
+    this.callbacks.requestAuthoringAction?.('copy-data', {
+      value: JSON.stringify(rawValue ?? null),
+    });
+    if (rawValue === undefined) {
+      this.setFeedback(DESIGNER_UI_TEXT.dataSource.copyDataUnavailable);
+      return;
+    }
+    let copied = false;
+    try {
+      copied = (await this.callbacks.copyText?.(JSON.stringify(rawValue, null, 2))) ?? false;
+    } catch {
+      copied = false;
+    }
+    this.setFeedback(
+      copied
+        ? DESIGNER_UI_TEXT.dataSource.copyDataSuccess
+        : DESIGNER_UI_TEXT.dataSource.copyDataFailed,
+    );
+  }
+
+  private focusDataWorkbench(): void {
+    const host = this.callbacks.getWorkbenchHost?.();
+    const close = host?.querySelector<HTMLButtonElement>('[data-dataset-action="close-workbench"]');
+    (close ?? host)?.focus({ preventScroll: true });
+  }
+
+  private restoreFullscreenActionFocus(): void {
+    this.#panel
+      ?.querySelector<HTMLButtonElement>('[data-dataset-authoring-action="fullscreen-edit"]')
+      ?.focus({ preventScroll: true });
+  }
+
+  private restoreBindingFieldFocus(
+    kind: 'dataset' | 'static',
+    roleId: string,
+    fieldId: string,
+  ): void {
+    const selector =
+      kind === 'dataset' ? '[data-dataset-binding-field]' : '[data-static-binding-field]';
+    const roleAttribute =
+      kind === 'dataset' ? 'data-dataset-binding-role-id' : 'data-static-binding-role';
+    const fieldAttribute =
+      kind === 'dataset' ? 'data-dataset-binding-field' : 'data-static-binding-field';
+    const roots = [this.callbacks.getWorkbenchHost?.(), this.#panel];
+    for (const root of roots) {
+      const button = [...(root?.querySelectorAll<HTMLButtonElement>(selector) ?? [])].find(
+        (candidate) =>
+          candidate.getAttribute(roleAttribute) === roleId &&
+          candidate.getAttribute(fieldAttribute) === fieldId,
+      );
+      if (button !== undefined) {
+        button.focus({ preventScroll: true });
+        return;
+      }
+    }
   }
 
   private availableModes(): readonly DesignerDataSourceMode[] {

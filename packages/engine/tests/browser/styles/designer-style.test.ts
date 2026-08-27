@@ -74,6 +74,8 @@ function themeBlocks(): Record<'dark' | 'light', string> {
 
 describe('designer workbench visual convergence', () => {
   it('R8 reserves stable tracks for workbench geometry and dynamic status content', () => {
+    expect(baseCss).toContain('--left-panel-width: 336px;');
+    expect(baseCss).toContain('--right-panel-width: 336px;');
     expect(baseCss).toContain('grid-template-rows: 48px minmax(0, 1fr) 30px;');
     expect(baseCss).toContain('grid-column: 1 / -1;');
     expect(workbenchCss).toContain('grid-template-rows: 20px minmax(0, 1fr);');
@@ -125,17 +127,41 @@ describe('designer workbench visual convergence', () => {
     expect(paneRule?.[1]).not.toContain('scroll-padding');
   });
 
-  it('R3 renders a usable collapsed rail with rotating collapse arrows (ADR-0037)', () => {
-    // 折叠轨：关闭 scrollbar-gutter 占用，标题/计数不占 flex 槽位。
+  it('R3 renders discoverable collapsed rails with stable controls (ADR-0037)', () => {
+    // 折叠轨：关闭 scrollbar-gutter 占用，左侧按钮使用独立的 48px 顶部控制槽。
     expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail,');
     expect(workbenchCss).toContain('.designer[data-right-collapsed="true"] .properties {');
     expect(workbenchCss).toContain('scrollbar-gutter: auto;');
-    expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail .panel-title,');
-    expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail .panel-count,');
-    expect(workbenchCss).toContain('display: none;');
-    // 折叠按钮防压扁。
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-left-collapsed="true"\] \.rail \.panel-heading\s*\{[^}]*position: relative;[^}]*box-sizing: border-box;[^}]*grid-column: 1;[^}]*grid-row: 1;[^}]*width: 48px;[^}]*height: 48px;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-right-collapsed="true"\] \.properties \.panel-heading\s*\{[^}]*box-sizing: border-box;[^}]*padding: 8px;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-left-collapsed="true"\] \.rail \.panel-heading,\s*\.designer\[data-right-collapsed="true"\] \.properties \.panel-heading\s*\{[^}]*background: linear-gradient\(/s,
+    );
+    // 属性表单控件的表面规则不得覆盖右侧面板的折叠按钮。
+    expect(workbenchCss).toContain('.properties .designer-control:not(.panel-collapse) {');
+    expect(workbenchCss).not.toContain('.properties .designer-control {');
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-left-collapsed="true"\] \.rail-tabs\s*\{[^}]*grid-row: 2;[^}]*padding-top: var\(--designer-space-2\);/s,
+    );
+    // 视觉按钮保持紧凑，但命中区达到 44px。
+    expect(workbenchCss).toMatch(/\.panel-collapse::before\s*\{[^}]*inset: -6px;/s);
+    expect(workbenchCss).toMatch(
+      /\.panel-collapse\s*\{[^}]*transition: transform var\(--designer-motion\);/s,
+    );
+    // 右侧折叠轨显示纵向属性上下文，而不是空白轨道；不使用 writing-mode。
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-right-collapsed="true"\] \.properties \.panel-collapsed-label\s*\{[^}]*display: block;[^}]*word-break: break-all;/s,
+    );
+    // 折叠按钮防压扁；分隔线仍保留指针事件，以支持越过阈值后拖拽展开。
     expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail .panel-collapse,');
     expect(workbenchCss).toContain('flex: none;');
+    expect(workbenchCss).not.toMatch(
+      /\.designer\[data-(?:left|right)-collapsed="true"\] > \[data-panel-handle[^}]*\{[^}]*pointer-events:\s*none;/s,
+    );
     // 左右箭头折叠态旋转 180°。
     expect(workbenchCss).toContain(
       '.designer[data-left-collapsed="true"] .rail .panel-collapse svg,',
@@ -264,6 +290,58 @@ describe('designer workbench visual convergence', () => {
       /\.properties \.designer-data-workbench-preview\s*\{\s*display: block;/s,
     );
     expect(workbenchCss).not.toContain('writing-mode: vertical-rl;');
+  });
+
+  it('keeps dataset summaries readable and settings stable in a narrow inspector', () => {
+    expect(workbenchCss).toContain('.designer-dataset-summary-header {');
+    expect(workbenchCss).not.toContain('.designer-dataset-summary > div {');
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-binding-summary-disclosure\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) 12px;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-binding-summary-role\s*\{[^}]*max-width: 88px;[^}]*text-overflow: ellipsis;[^}]*background: var\(--designer-accent-surface\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-binding-summary-value\s*\{[^}]*color: var\(--designer-text-primary\);[^}]*text-overflow: ellipsis;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-binding-summary-fields > li\s*\{[^}]*grid-template-columns: 5px minmax\(0, 1fr\);[^}]*overflow-wrap: anywhere;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-authoring-settings\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-authoring-checkbox\s*\{[^}]*display: flex;[^}]*min-height: 40px;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-refresh-controls\s*\{[^}]*grid-column: 1 \/ -1;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-authoring-setting-row\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/s,
+    );
+    expect(workbenchCss).not.toContain(
+      '.designer .designer-data-workbench {\n  display: none !important;',
+    );
+    expect(baseCss).toMatch(
+      /\.designer\[data-data-workbench-open="true"\]\s*\{[^}]*grid-template-rows: 0 minmax\(0, 1fr\) 0;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-refresh-interval-control\s*\{[^}]*grid-template-columns: 64px auto;/s,
+    );
+  });
+
+  it('presents multi-field selectors as stable, visible toggle controls', () => {
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-field-option\s*\{[^}]*min-height: 44px;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-field-option\[aria-pressed="true"\]\s*\{[^}]*border-color: var\(--designer-accent\);[^}]*box-shadow: inset 3px 0 0 var\(--designer-accent\);/s,
+    );
+    expect(workbenchCss).toContain(
+      '.designer-dataset-field-option:disabled:not([aria-pressed="true"]) {',
+    );
+    expect(workbenchCss).toContain('.designer-dataset-field-option::before {');
+    expect(workbenchCss).toContain('.designer-dataset-field-option::after {');
   });
 
   it('keeps the DataV-style layer toolbar and tree geometry stable', () => {
