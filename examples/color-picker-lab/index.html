@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Base Screen 独立颜色表单控件预览页。" />
+    <title>颜色表单控件 · Base Screen</title>
+    <link rel="stylesheet" href="/src/page.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <a href="/" class="brand">
+        <span aria-hidden="true"></span>
+        <strong>Base Screen</strong>
+      </a>
+      <span class="scope-badge">独立控件 · 未接入设计器</span>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p>FORM CONTROL PREVIEW</p>
+        <h1 id="page-title">颜色表单控件</h1>
+        <span>纯色、渐变、系列色板与数据颜色映射。这里只评审表单控件本身。</span>
+      </section>
+
+      <form class="control-gallery" data-preview-form>
+        <section class="preview-card preview-card--picker">
+          <header>
+            <div>
+              <span>基础颜色</span>
+              <strong>填充颜色</strong>
+            </div>
+            <small>单值</small>
+          </header>
+
+          <div class="form-field">
+            <label for="text-color">文本颜色</label>
+            <base-screen-color-control
+              id="text-color"
+              name="textColor"
+              value="#2483ff"
+              aria-label="文本颜色"
+              open
+            ></base-screen-color-control>
+            <p>选择纯色、线性渐变或径向渐变；当前颜色仍可通过 Hex 与 RGBA 精确编辑。</p>
+          </div>
+        </section>
+
+        <section class="preview-card preview-card--collection preview-card--palette">
+          <header>
+            <div>
+              <span>DataV 色板模式</span>
+              <strong>图表系列色</strong>
+            </div>
+            <small>颜色数组</small>
+          </header>
+
+          <div class="form-field">
+            <label for="series-palette">系列色板</label>
+            <base-screen-color-palette-control
+              id="series-palette"
+              name="seriesPalette"
+              aria-label="图表系列色板"
+            ></base-screen-color-palette-control>
+            <p>选择分类、顺序或发散色板，调整阶数、顺序与单个颜色。</p>
+          </div>
+        </section>
+
+        <section class="preview-card preview-card--collection preview-card--mapping">
+          <header>
+            <div>
+              <span>DataV 视觉映射模式</span>
+              <strong>数据颜色映射</strong>
+            </div>
+            <small>映射对象</small>
+          </header>
+
+          <div class="form-field">
+            <label for="data-color-mapping">颜色映射</label>
+            <base-screen-color-mapping-control
+              id="data-color-mapping"
+              name="dataColorMapping"
+              aria-label="数据颜色映射"
+            ></base-screen-color-mapping-control>
+            <p>支持分类值、数值分段与连续色阶，并提供未匹配数据的兜底颜色。</p>
+          </div>
+        </section>
+
+        <footer class="form-actions">
+          <button type="reset">重置</button>
+          <button type="submit">提交表单</button>
+        </footer>
+      </form>
+
+      <output class="value-readout" data-value-output aria-live="polite">
+        <span>当前表单值</span>
+        <code></code>
+      </output>
+
+      <a
+        class="research-link"
+        href="https://help.aliyun.com/zh/datav/datav-atlas/user-guide/visual-mapping-of-data/"
+        target="_blank"
+        rel="noreferrer"
+      >
+        DataV 颜色映射官方参考
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3h8v8M13 3 4 12" /></svg>
+      </a>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

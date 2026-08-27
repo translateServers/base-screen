@@ -192,6 +192,33 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('accepts explicit gradient capability only on descriptor color controls', () => {
+    const supported = descriptor();
+    firstField(supported, 0).control = 'color';
+    firstField(supported, 0).allowGradient = true;
+    const invalid = descriptor();
+    firstField(invalid, 0).allowGradient = true;
+
+    expect(
+      parseBaseScreenMaterialEditorDescriptor(
+        supported,
+        propsSchema,
+        styleSchema,
+        ['valueClick'],
+        roles,
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      parseBaseScreenMaterialEditorDescriptor(
+        invalid,
+        propsSchema,
+        styleSchema,
+        ['valueClick'],
+        roles,
+      ),
+    ).toMatchObject({ ok: false });
+  });
+
   it('accepts item fields relative to a style array item schema', () => {
     const input = descriptor({
       appearance: [

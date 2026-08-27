@@ -86,6 +86,75 @@ describe('designer panel property parsing', () => {
     expect(parsePropertyControlValue({ value: '{' }, object)).toBeUndefined();
   });
 
+  it('deletes an optional numeric style when its control is cleared', () => {
+    const manifest = {
+      type: 'base.text',
+      stylePanel: [
+        { style: 'fontSize', label: '字号', control: 'number' },
+        { style: 'lineHeight', label: '行高', control: 'number' },
+      ],
+      styleSchema: {
+        kind: 'object',
+        properties: {
+          fontSize: { kind: 'number', minimum: 1 },
+          lineHeight: { kind: 'number', minimum: 1, maximum: 512 },
+        },
+        required: ['fontSize'],
+      },
+      propertyPanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+    } as unknown as BaseScreenMaterialManifest;
+    const document = {
+      canvas: { width: 100, height: 100, backgroundColor: '#000000' },
+      components: [
+        {
+          id: 'text-1',
+          type: 'base.text',
+          name: '文本',
+          parentId: null,
+          position: { x: 0, y: 0 },
+          size: { width: 100, height: 40 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: { fontSize: 32, lineHeight: 40 },
+          dataSource: null,
+        },
+      ],
+      variables: [],
+      blueprint: { rules: [] },
+    } as ScreenDocument;
+    const catalog = {
+      get: () => ({ manifest }),
+    } as unknown as BaseScreenMaterialCatalog;
+
+    expect(
+      createPropertyTransaction(
+        {
+          dataset: { style: 'lineHeight' },
+          type: 'number',
+          value: '',
+        } as unknown as HTMLInputElement,
+        document,
+        { focusedComponentId: 'text-1', selectedComponentIds: ['text-1'] },
+        catalog,
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['text-1'],
+            patch: { style: { fontSize: 32 } },
+          },
+        ],
+      },
+      diagnostics: [],
+    });
+  });
+
   it('R3 rejects unsafe JSON property drafts before mutations', () => {
     const object: BaseScreenMaterialPropSchema = {
       kind: 'object',

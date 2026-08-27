@@ -67,6 +67,7 @@ export interface DesignerDataSourcePanelOptions {
   readonly staticDialogOpen: boolean;
   readonly staticTab: 'table' | 'advanced';
   readonly staticPage: number;
+  readonly staticPageSize: number;
   readonly staticPasteDraft: string;
   readonly staticFirstRowIsHeader: boolean;
   readonly query: string;

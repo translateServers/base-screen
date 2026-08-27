@@ -321,6 +321,28 @@ describe('material identity and manifests', () => {
       );
     }
   });
+
+  it('accepts explicit gradient capability only on color panel controls', () => {
+    const supported = parseBaseScreenMaterialManifest(
+      materialManifest({
+        stylePanel: [{ style: 'color', label: 'Color', control: 'color', allowGradient: true }],
+      }),
+    );
+    const wrongType = parseBaseScreenMaterialManifest(
+      materialManifest({
+        stylePanel: [{ style: 'color', label: 'Color', control: 'color', allowGradient: 'yes' }],
+      }),
+    );
+    const wrongControl = parseBaseScreenMaterialManifest(
+      materialManifest({
+        stylePanel: [{ style: 'color', label: 'Color', control: 'text', allowGradient: true }],
+      }),
+    );
+
+    expect(supported).toMatchObject({ ok: true });
+    expect(wrongType).toMatchObject({ ok: false });
+    expect(wrongControl).toMatchObject({ ok: false });
+  });
 });
 
 describe('material manifest cover', () => {

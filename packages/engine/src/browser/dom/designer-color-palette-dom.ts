@@ -1,5 +1,16 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
+import {
+  bindDesignerColorPaletteDismiss,
+  focusDesignerColorPaletteDialog,
+  restoreDesignerColorPaletteOpen,
+  setDesignerColorPaletteOpen,
+} from './designer-color-popover-dom.js';
+import {
+  createDesignerFillColorPicker,
+  setDesignerFillColorPickerDisabled,
+  updateDesignerFillColorPicker,
+} from './designer-fill-color-picker-dom.js';
 
 export const MIN_COLOR_PALETTE_STOPS = 2;
 export const MAX_COLOR_PALETTE_STOPS = 8;
@@ -27,6 +38,11 @@ export interface DesignerColorPalette {
   readonly controls: readonly HTMLInputElement[];
 }
 
+export interface DesignerColorPaletteOptions {
+  /** 缺省展示完整填充控件；传 false 时保留同一控件外观但只提供纯色编辑。 */
+  readonly allowGradient?: boolean;
+}
+
 const DEFAULT_COLOR = '#000000';
 const DEFAULT_END_COLOR = '#ffffff';
 const COLOR_PATTERN = /^(?:#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|transparent)$/i;
@@ -35,6 +51,12 @@ const COLOR_PATTERN = /^(?:#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|transparen
 export const MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES = 32;
 const paletteDraftCache = new Map<string, ColorPaletteState>();
 const paletteSelectionCache = new Map<string, number>();
+const paletteHueCache = new Map<string, { readonly hue: number; readonly color: string }>();
+const palettePlaneCache = new Map<
+  string,
+  { readonly saturation: number; readonly value: number; readonly color: string }
+>();
+const colorPalettePickerProxyDispatch = new WeakSet<HTMLElement>();
 
 function cacheColorPaletteDraft(fieldKey: string, state: ColorPaletteState): void {
   if (paletteDraftCache.size >= MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES) {
@@ -42,6 +64,8 @@ function cacheColorPaletteDraft(fieldKey: string, state: ColorPaletteState): voi
     if (oldest !== undefined) {
       paletteDraftCache.delete(oldest);
       paletteSelectionCache.delete(oldest);
+      paletteHueCache.delete(oldest);
+      palettePlaneCache.delete(oldest);
     }
   }
   paletteDraftCache.set(fieldKey, state);
@@ -55,9 +79,42 @@ function cacheColorPaletteSelection(fieldKey: string, index: number): void {
   paletteSelectionCache.set(fieldKey, index);
 }
 
+function cacheColorPaletteHue(fieldKey: string, hue: number, color: string): void {
+  if (
+    !paletteHueCache.has(fieldKey) &&
+    paletteHueCache.size >= MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES
+  ) {
+    const oldest = paletteHueCache.keys().next().value;
+    if (oldest !== undefined) paletteHueCache.delete(oldest);
+  }
+  paletteHueCache.set(fieldKey, { hue, color: color.toLowerCase() });
+}
+
+function cacheColorPalettePlane(
+  fieldKey: string,
+  saturation: number,
+  value: number,
+  color: string,
+): void {
+  if (
+    !palettePlaneCache.has(fieldKey) &&
+    palettePlaneCache.size >= MAX_COLOR_PALETTE_DRAFT_CACHE_ENTRIES
+  ) {
+    const oldest = palettePlaneCache.keys().next().value;
+    if (oldest !== undefined) palettePlaneCache.delete(oldest);
+  }
+  palettePlaneCache.set(fieldKey, {
+    saturation,
+    value,
+    color: color.toLowerCase(),
+  });
+}
+
 export function clearColorPaletteDraftCache(): void {
   paletteDraftCache.clear();
   paletteSelectionCache.clear();
+  paletteHueCache.clear();
+  palettePlaneCache.clear();
 }
 
 /** 测试支撑面：草稿/选中缓存当前条目数（与 clearColorPaletteDraftCache 配套）。 */
@@ -208,16 +265,113 @@ export function deriveColorPaletteStopsFromSolid(
   ];
 }
 
+function createColorPaletteTrigger(ownerDocument: Document, popoverId: string): HTMLButtonElement {
+  const trigger = ownerDocument.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'designer-control designer-color-palette-trigger';
+  trigger.dataset.colorPaletteAction = 'toggle';
+  trigger.setAttribute('aria-haspopup', 'dialog');
+  trigger.setAttribute('aria-controls', popoverId);
+  trigger.setAttribute('aria-expanded', 'false');
+  const swatch = ownerDocument.createElement('span');
+  swatch.className = 'designer-color-palette-trigger-swatch designer-fill-color-checkerboard';
+  swatch.dataset.colorPaletteTriggerSwatch = '';
+  swatch.setAttribute('aria-hidden', 'true');
+  const value = ownerDocument.createElement('span');
+  value.className = 'designer-color-palette-trigger-value';
+  value.dataset.colorPaletteTriggerValue = '';
+  const icon = ownerDocument.createElement('span');
+  icon.className = 'designer-color-palette-trigger-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  trigger.appendChild(swatch);
+  trigger.appendChild(value);
+  trigger.appendChild(icon);
+  return trigger;
+}
+
+function updateDesignerColorPaletteChrome(palette: HTMLElement, updatePicker = true): void {
+  const state = readPaletteState(palette);
+  if (state === undefined) return;
+  const serialized = serializeColorPaletteValue(state);
+  const trigger = palette.querySelector<HTMLButtonElement>('[data-color-palette-action="toggle"]');
+  const swatch = palette.querySelector<HTMLElement>('[data-color-palette-trigger-swatch]');
+  const value = palette.querySelector<HTMLElement>('[data-color-palette-trigger-value]');
+  if (trigger !== null) {
+    trigger.setAttribute(
+      'aria-label',
+      DESIGNER_UI_TEXT.propertiesPanel.colorPickerTrigger(serialized),
+    );
+    trigger.title = serialized;
+  }
+  if (swatch !== null) {
+    swatch.setAttribute('style', `--designer-color-palette-value:${serialized}`);
+  }
+  if (value !== null) value.textContent = colorPaletteTriggerSummary(state);
+  const picker = palette.querySelector<HTMLElement>('[data-designer-fill-color-picker]');
+  if (picker !== null && updatePicker) {
+    updateDesignerFillColorPicker(picker, activeDesignerColorPaletteValue(state, palette));
+  }
+}
+
+function colorPaletteTriggerSummary(state: ColorPaletteState): string {
+  if (state.mode === 'solid') return state.solid.toUpperCase();
+  return state.mode === 'linear-gradient'
+    ? DESIGNER_UI_TEXT.propertiesPanel.colorPickerLinearSummary(state.stops.length)
+    : DESIGNER_UI_TEXT.propertiesPanel.colorPickerRadialSummary(state.stops.length);
+}
+
+function activeDesignerColorPaletteValue(state: ColorPaletteState, palette: HTMLElement): string {
+  if (state.mode === 'solid') return state.solid;
+  return state.stops[selectedColorPaletteStop(palette, state.stops.length)]?.color ?? state.solid;
+}
+
+function applyDesignerFillColorPickerValue(
+  palette: HTMLElement,
+  value: string,
+  eventType: 'input' | 'change',
+): void {
+  const mode = palette.dataset.colorPaletteMode;
+  const field: ColorPaletteManualValueField = mode === 'solid' ? 'solid-value' : 'stop-value';
+  const manual = palette.querySelector<HTMLInputElement>(`[data-color-palette-field="${field}"]`);
+  const color = palette.querySelector<HTMLInputElement>(
+    `[data-color-palette-field="${mode === 'solid' ? 'solid' : 'stop-color'}"]`,
+  );
+  if (manual === null || color === null) return;
+  colorPalettePickerProxyDispatch.add(palette);
+  try {
+    manual.value = value;
+    syncColorPaletteManualValue(palette, manual, field);
+    color.dispatchEvent(new Event(eventType, { bubbles: true }));
+  } finally {
+    colorPalettePickerProxyDispatch.delete(palette);
+  }
+}
+
+function syncDesignerColorPaletteDisabled(palette: HTMLElement): void {
+  const disabled = [
+    ...palette.querySelectorAll<HTMLInputElement>('[data-color-palette-field]'),
+  ].some((input) => input.disabled);
+  const trigger = palette.querySelector<HTMLButtonElement>('[data-color-palette-action="toggle"]');
+  if (trigger !== null && trigger.disabled !== disabled) trigger.disabled = disabled;
+  const picker = palette.querySelector<HTMLElement>('[data-designer-fill-color-picker]');
+  if (picker !== null) setDesignerFillColorPickerDisabled(picker, disabled);
+  if (disabled) setDesignerColorPaletteOpen(palette, false);
+}
+
 export function createDesignerColorPalette(
   ownerDocument: Document,
   value: string | undefined,
   fieldKey?: string,
+  options: DesignerColorPaletteOptions = {},
 ): DesignerColorPalette {
-  const parsed = parseColorPaletteValue(value);
+  const allowGradient = options.allowGradient !== false;
+  const parsedValue = parseColorPaletteValue(value);
+  const parsed = allowGradient ? parsedValue : solidColorPaletteState(parsedValue);
   const cached = fieldKey === undefined ? undefined : paletteDraftCache.get(fieldKey);
   // 仅当文档值仍等于缓存当前模式的序列化结果时复用草稿（撤销/重做/替换文档会自然失效）。
-  const state =
+  const cachedState =
     cached !== undefined && serializeColorPaletteValue(cached) === value ? cached : parsed;
+  const state = allowGradient ? cachedState : solidColorPaletteState(cachedState);
   const cachedSelection = fieldKey === undefined ? undefined : paletteSelectionCache.get(fieldKey);
   const selectedStop = selectedColorPaletteStopFromCache(cachedSelection, state.stops.length);
   const element = ownerDocument.createElement('div');
@@ -225,43 +379,75 @@ export function createDesignerColorPalette(
   element.dataset.designerColorPalette = '';
   element.dataset.colorPaletteMode = state.mode;
   element.dataset.colorPaletteSelectedStop = String(selectedStop);
+  element.dataset.colorPaletteOpen = 'false';
   if (fieldKey !== undefined) element.dataset.colorPaletteKey = fieldKey;
+
+  const identity = Math.random().toString(36).slice(2);
+  const popoverId = `designer-color-popover-${identity}`;
+  const trigger = createColorPaletteTrigger(ownerDocument, popoverId);
+  element.appendChild(trigger);
+
+  const popover = ownerDocument.createElement('section');
+  popover.id = popoverId;
+  popover.className = 'designer-color-popover';
+  popover.dataset.colorPalettePopover = '';
+  popover.hidden = true;
+  popover.setAttribute('role', 'dialog');
+  popover.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.colorPickerTitle);
+  const toolbar = ownerDocument.createElement('div');
+  toolbar.className = 'designer-color-popover-toolbar';
+  const close = ownerDocument.createElement('button');
+  close.type = 'button';
+  close.className = 'designer-color-popover-close';
+  close.dataset.colorPaletteAction = 'close';
+  close.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.colorPickerClose);
+  close.innerHTML = designerIcon('x');
 
   const modes = ownerDocument.createElement('div');
   modes.className = 'designer-color-palette-modes';
   modes.setAttribute('role', 'radiogroup');
-  const groupName = `designer-color-mode-${Math.random().toString(36).slice(2)}`;
+  const groupName = `designer-color-mode-${identity}`;
   const modeControls: HTMLInputElement[] = [];
-  for (const [mode, label] of [
-    ['solid', DESIGNER_UI_TEXT.propertiesPanel.backgroundSolid],
-    ['linear-gradient', DESIGNER_UI_TEXT.propertiesPanel.backgroundLinear],
-    ['radial-gradient', DESIGNER_UI_TEXT.propertiesPanel.backgroundRadial],
-  ] as const) {
-    const modeLabel = ownerDocument.createElement('label');
-    modeLabel.className = 'designer-color-palette-mode';
-    const input = ownerDocument.createElement('input');
-    input.type = 'radio';
-    input.name = groupName;
-    input.value = mode;
-    input.checked = state.mode === mode;
-    input.dataset.colorPaletteField = 'mode';
-    const text = ownerDocument.createElement('span');
-    text.textContent = label;
-    modeLabel.appendChild(input);
-    modeLabel.appendChild(text);
-    modes.appendChild(modeLabel);
-    modeControls.push(input);
+  if (allowGradient) {
+    for (const [mode, label, iconName] of [
+      ['solid', DESIGNER_UI_TEXT.propertiesPanel.backgroundSolid, 'color-solid'],
+      ['linear-gradient', DESIGNER_UI_TEXT.propertiesPanel.backgroundLinear, 'color-linear'],
+      ['radial-gradient', DESIGNER_UI_TEXT.propertiesPanel.backgroundRadial, 'color-radial'],
+    ] as const) {
+      const modeLabel = ownerDocument.createElement('label');
+      modeLabel.className = 'designer-color-palette-mode';
+      modeLabel.title = label;
+      const input = ownerDocument.createElement('input');
+      input.type = 'radio';
+      input.name = groupName;
+      input.value = mode;
+      input.checked = state.mode === mode;
+      input.dataset.colorPaletteField = 'mode';
+      input.setAttribute('aria-label', label);
+      const icon = ownerDocument.createElement('span');
+      icon.className = 'designer-color-palette-mode-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = designerIcon(iconName);
+      modeLabel.appendChild(input);
+      modeLabel.appendChild(icon);
+      modes.appendChild(modeLabel);
+      modeControls.push(input);
+    }
+    toolbar.appendChild(modes);
   }
-  element.appendChild(modes);
+  toolbar.appendChild(close);
+  popover.appendChild(toolbar);
 
   const body = ownerDocument.createElement('div');
   body.className = 'designer-color-palette-fields';
   const { solid, solidValue, solidAlpha, stops, gradientInputs } = renderPaletteBody(
+    element,
     body,
     state,
     selectedStop,
   );
-  element.appendChild(body);
+  popover.appendChild(body);
+  element.appendChild(popover);
 
   element.addEventListener('click', (event) => {
     const target = event.target as Element | null;
@@ -273,6 +459,21 @@ export function createDesignerColorPalette(
     const button = target?.closest?.<HTMLButtonElement>('[data-color-palette-action]');
     if (button === null || button === undefined) return;
     const action = button.dataset.colorPaletteAction;
+    if (action === 'toggle') {
+      if (!button.disabled) {
+        const open = element.dataset.colorPaletteOpen !== 'true';
+        setDesignerColorPaletteOpen(element, open);
+        if (open && (event as MouseEvent).detail === 0) {
+          focusDesignerColorPaletteDialog(element);
+        }
+      }
+      return;
+    }
+    if (action === 'close') {
+      setDesignerColorPaletteOpen(element, false);
+      trigger.focus?.();
+      return;
+    }
     if (action === 'add-stop' || action === 'remove-stop') {
       applyDesignerColorPaletteStopAction(
         element,
@@ -286,6 +487,7 @@ export function createDesignerColorPalette(
     const field = target?.dataset?.colorPaletteField;
     if (isColorPaletteManualValueField(field)) {
       syncColorPaletteManualValue(element, target as HTMLInputElement, field);
+      updateDesignerColorPaletteChrome(element);
       return;
     }
     if (field !== 'mode' || !isColorPaletteMode(target?.value)) return;
@@ -298,14 +500,17 @@ export function createDesignerColorPalette(
       : current.mode;
     const next = switchColorPaletteMode(current, target.value, previousMode, selected);
     element.dataset.colorPaletteMode = next.mode;
-    renderPaletteBody(body, next, selected);
+    renderPaletteBody(element, body, next, selected);
     applyColorPaletteControlMetadata(element, metadata);
+    updateDesignerColorPaletteChrome(element, false);
+    syncDesignerColorPaletteDisabled(element);
   });
   element.addEventListener('input', (event) => {
     const target = event.target as
       | (Partial<HTMLInputElement> & { readonly dataset?: DOMStringMap })
       | null;
     if (target?.dataset === undefined || target.value === undefined) return;
+    if (colorPalettePickerProxyDispatch.has(element)) return;
     const field = target.dataset.colorPaletteField;
     if (isColorPaletteManualValueField(field)) {
       updateColorPaletteManualValueValidity(target as HTMLInputElement);
@@ -313,9 +518,11 @@ export function createDesignerColorPalette(
     }
     if (field === 'solid-alpha' || field === 'stop-alpha') {
       syncColorPaletteAlpha(element, target as HTMLInputElement, field);
+      updateDesignerColorPaletteChrome(element);
       return;
     }
     if (
+      field !== 'solid' &&
       field !== 'stop-position' &&
       field !== 'stop-color' &&
       field !== 'angle' &&
@@ -328,12 +535,37 @@ export function createDesignerColorPalette(
       syncColorPaletteStopEditor(element, target as HTMLInputElement, field);
     }
     updateColorPalettePreview(element);
+    updateDesignerColorPaletteChrome(element);
   });
+
+  element.addEventListener('keydown', (event) => {
+    const keyboardEvent = event as KeyboardEvent;
+    if (keyboardEvent.key !== 'Escape' || element.dataset.colorPaletteOpen !== 'true') return;
+    keyboardEvent.preventDefault();
+    setDesignerColorPaletteOpen(element, false);
+    trigger.focus?.();
+  });
+
+  bindDesignerColorPaletteDismiss(ownerDocument);
+  updateDesignerColorPaletteChrome(element, false);
+  restoreDesignerColorPaletteOpen(element);
+  const Observer = ownerDocument.defaultView?.MutationObserver;
+  if (Observer !== undefined) {
+    new Observer(() => syncDesignerColorPaletteDisabled(element)).observe(element, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ['disabled'],
+    });
+  }
 
   return {
     element,
     controls: [solid, solidValue, solidAlpha, ...stops, ...gradientInputs, ...modeControls],
   };
+}
+
+function solidColorPaletteState(state: ColorPaletteState): ColorPaletteState {
+  return state.mode === 'solid' ? state : switchColorPaletteMode(state, 'solid', state.mode, 0);
 }
 
 export function readDesignerColorPaletteValue(target: EventTarget | null): string | undefined {
@@ -374,8 +606,10 @@ export function applyDesignerColorPaletteStopAction(
           : selected;
   palette.dataset.colorPaletteMode = next.mode;
   palette.dataset.colorPaletteSelectedStop = String(nextSelected);
-  renderPaletteBody(body, next, nextSelected);
+  renderPaletteBody(palette, body, next, nextSelected);
   applyColorPaletteControlMetadata(palette, metadata);
+  updateDesignerColorPaletteChrome(palette, false);
+  syncDesignerColorPaletteDisabled(palette);
   const first = palette.querySelector<HTMLInputElement>(
     '[data-color-palette-field="solid"], [data-color-palette-field="stop-position"]',
   );
@@ -414,7 +648,7 @@ function applyColorPaletteControlMetadata(
   palette: HTMLElement,
   metadata: ColorPaletteControlMetadata,
 ): void {
-  for (const input of palette.querySelectorAll<HTMLInputElement>('input')) {
+  for (const input of palette.querySelectorAll<HTMLInputElement>('[data-color-palette-field]')) {
     for (const key of COLOR_PALETTE_METADATA_KEYS) {
       const value = metadata[key];
       if (value !== undefined) input.dataset[key] = value;
@@ -423,6 +657,7 @@ function applyColorPaletteControlMetadata(
 }
 
 function renderPaletteBody(
+  palette: HTMLElement,
   body: HTMLElement,
   state: ColorPaletteState,
   selectedStopIndex: number,
@@ -436,6 +671,16 @@ function renderPaletteBody(
   body.replaceChildren();
   const ownerDocument = body.ownerDocument;
   const selected = Math.min(Math.max(selectedStopIndex, 0), state.stops.length - 1);
+  const fieldKey = palette.dataset.colorPaletteKey;
+  const pickerValue = state.mode === 'solid' ? state.solid : state.stops[selected]!.color;
+  const cachedHue = fieldKey === undefined ? undefined : paletteHueCache.get(fieldKey);
+  const initialPickerHue =
+    cachedHue?.color === pickerValue.toLowerCase() ? cachedHue.hue : undefined;
+  const cachedPlane = fieldKey === undefined ? undefined : palettePlaneCache.get(fieldKey);
+  const initialPickerPlane =
+    cachedPlane?.color === pickerValue.toLowerCase()
+      ? { s: cachedPlane.saturation, v: cachedPlane.value }
+      : undefined;
   // 单色组 = 颜色控件 + 透明度滑杆同一行（紧凑布局增量）：渐变模式下整组
   // 隐藏（hide 规则 display: none），透明度滑杆不会脱离单色字段单独露出。
   const solidField = paletteColorControl(ownerDocument, state.solid, 'solid');
@@ -458,9 +703,6 @@ function renderPaletteBody(
   gradient.appendChild(createColorPaletteStopSlider(ownerDocument, preview, state, selected));
 
   const editor = createColorPaletteStopEditor(ownerDocument, state, selected);
-  gradient.appendChild(editor.element);
-
-  // 色标透明度与增删色标按钮同行（紧凑布局增量）。
   const stopAlpha = colorAlphaControl(ownerDocument, state.stops[selected]!.color, 'stop-alpha');
   stopAlpha.input.dataset.colorPaletteStopIndex = String(selected);
   const tools = ownerDocument.createElement('div');
@@ -482,13 +724,9 @@ function renderPaletteBody(
   remove.disabled = state.stops.length <= MIN_COLOR_PALETTE_STOPS;
   remove.dataset.colorPaletteStopIndex = String(selected);
   tools.appendChild(remove);
-  const stopFooter = ownerDocument.createElement('div');
-  stopFooter.className = 'designer-color-palette-stop-footer';
-  stopFooter.appendChild(stopAlpha.element);
-  stopFooter.appendChild(tools);
-  gradient.appendChild(stopFooter);
 
-  // 渐变参数（角度或中心 X/Y）行内一行（紧凑布局增量）。
+  // 色标位置、渐变参数和增删操作共用一条参数工具带；色标颜色与透明度仍由下方
+  // 统一取色器编辑，保留隐藏代理输入只用于既有事件与状态同步。
   const parameters = ownerDocument.createElement('div');
   parameters.className = 'designer-color-palette-parameters';
   const angle = inlineNumberField(
@@ -509,6 +747,7 @@ function renderPaletteBody(
     'x',
     0,
     100,
+    DESIGNER_UI_TEXT.propertiesPanel.x,
   );
   x.input.className += ' designer-color-palette-radial';
   x.element.className += ' designer-color-palette-radial';
@@ -520,13 +759,39 @@ function renderPaletteBody(
     'y',
     0,
     100,
+    DESIGNER_UI_TEXT.propertiesPanel.y,
   );
   y.input.className += ' designer-color-palette-radial';
   y.element.className += ' designer-color-palette-radial';
   parameters.appendChild(y.element);
-  gradient.appendChild(parameters);
+
+  const stopBar = ownerDocument.createElement('div');
+  stopBar.className = 'designer-color-palette-stop-bar';
+  stopBar.appendChild(editor.element);
+  stopBar.appendChild(stopAlpha.element);
+  stopBar.appendChild(parameters);
+  stopBar.appendChild(tools);
+  gradient.appendChild(stopBar);
 
   body.appendChild(gradient);
+  body.appendChild(
+    createDesignerFillColorPicker(
+      ownerDocument,
+      pickerValue,
+      {
+        input: (value) => applyDesignerFillColorPickerValue(palette, value, 'input'),
+        change: (value) => applyDesignerFillColorPickerValue(palette, value, 'change'),
+        hueChange: (hue, color) => {
+          if (fieldKey !== undefined) cacheColorPaletteHue(fieldKey, hue, color);
+        },
+        planeChange: (saturation, value, color) => {
+          if (fieldKey !== undefined) cacheColorPalettePlane(fieldKey, saturation, value, color);
+        },
+      },
+      initialPickerHue,
+      initialPickerPlane,
+    ),
+  );
   return {
     solid,
     solidValue,
@@ -806,6 +1071,7 @@ function inlineNumberField(
   field: string,
   min: number,
   max: number,
+  visibleLabel = labelText,
 ): { readonly element: HTMLElement; readonly input: HTMLInputElement } {
   const input = numberInput(ownerDocument, value, field, min, max);
   input.setAttribute('aria-label', labelText);
@@ -813,7 +1079,7 @@ function inlineNumberField(
   wrap.className = 'designer-color-palette-field-inline';
   const label = ownerDocument.createElement('span');
   label.className = 'designer-color-palette-field-inline-label';
-  label.textContent = labelText;
+  label.textContent = visibleLabel;
   wrap.appendChild(label);
   wrap.appendChild(input);
   return { element: wrap, input };
@@ -870,6 +1136,7 @@ function selectColorPaletteStop(palette: HTMLElement, index: number): void {
     position.max = String(index === stops.length - 1 ? 100 : stops[index + 1]!.position - 1);
   }
   if (remove !== null) remove.dataset.colorPaletteStopIndex = String(index);
+  updateDesignerColorPaletteChrome(palette);
 }
 
 /**
@@ -1090,6 +1357,11 @@ function updateColorPalettePreview(palette: HTMLElement): void {
   const state = readPaletteState(palette);
   const preview = palette.querySelector<HTMLElement>('.designer-color-palette-preview');
   if (state !== undefined && preview !== null) setColorPalettePreview(preview, state);
+  if (state !== undefined) {
+    // Picker-originated proxy events already rendered the semantic hue. Re-reading the rounded
+    // RGB proxy here would shift the hue thumb while saturation/value are being dragged.
+    updateDesignerColorPaletteChrome(palette, !colorPalettePickerProxyDispatch.has(palette));
+  }
 }
 
 function setColorPalettePreview(preview: HTMLElement, state: ColorPaletteState): void {
@@ -1189,8 +1461,14 @@ function addedColorPaletteStopIndex(
 }
 
 function readPaletteState(palette: HTMLElement): ColorPaletteState | undefined {
-  const mode = palette.querySelector<HTMLInputElement>('[data-color-palette-field="mode"]:checked')
-    ?.value as ColorPaletteMode | undefined;
+  const checkedMode = palette.querySelector<HTMLInputElement>(
+    '[data-color-palette-field="mode"]:checked',
+  )?.value;
+  const mode = isColorPaletteMode(checkedMode)
+    ? checkedMode
+    : isColorPaletteMode(palette.dataset.colorPaletteMode)
+      ? palette.dataset.colorPaletteMode
+      : undefined;
   const solidInput = palette.querySelector<HTMLInputElement>('[data-color-palette-field="solid"]');
   const solid = solidInput === null ? undefined : composedColorValue(solidInput);
   const solidValue = palette.querySelector<HTMLInputElement>(

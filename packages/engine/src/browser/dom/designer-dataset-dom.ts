@@ -278,6 +278,7 @@ function staticDataView(options: DesignerDataSourcePanelOptions): DesignerStatic
     dialogOpen: options.staticDialogOpen,
     tab: options.staticTab,
     page: options.staticPage,
+    pageSize: options.staticPageSize,
     pasteDraft: options.staticPasteDraft,
     firstRowIsHeader: options.staticFirstRowIsHeader,
     roles: options.roles,

@@ -213,6 +213,7 @@ function appendDescriptorField(
           ownerDocument,
           typeof value === 'string' ? value : undefined,
           `${context.component.id}:descriptor:${field.id}`,
+          { allowGradient: field.allowGradient === true },
         )
       : undefined;
   // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。

@@ -47,7 +47,7 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     required: ['color', 'fontSize', 'fontWeight', 'textAlign'],
   },
   stylePanel: [
-    { style: 'color', label: '颜色', control: 'color' },
+    { style: 'color', label: '颜色', control: 'color', allowGradient: true },
     { style: 'fontSize', label: '字号', control: 'number' },
     { style: 'fontWeight', label: '字重', control: 'select' },
     { style: 'textAlign', label: '水平对齐', control: 'select' },

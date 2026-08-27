@@ -332,7 +332,7 @@ describe('designer workbench visual convergence', () => {
 
   it('presents multi-field selectors as stable, visible toggle controls', () => {
     expect(workbenchCss).toMatch(
-      /\.designer-dataset-field-option\s*\{[^}]*min-height: 44px;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/s,
+      /\.designer-dataset-field-option\s*\{[^}]*min-height: 36px;[^}]*grid-template-columns: minmax\(0, 1fr\) auto;/s,
     );
     expect(workbenchCss).toMatch(
       /\.designer-dataset-field-option\[aria-pressed="true"\]\s*\{[^}]*border-color: var\(--designer-accent\);[^}]*box-shadow: inset 3px 0 0 var\(--designer-accent\);/s,
@@ -341,7 +341,75 @@ describe('designer workbench visual convergence', () => {
       '.designer-dataset-field-option:disabled:not([aria-pressed="true"]) {',
     );
     expect(workbenchCss).toContain('.designer-dataset-field-option::before {');
-    expect(workbenchCss).toContain('.designer-dataset-field-option::after {');
+    expect(workbenchCss).toMatch(
+      /\.designer-dataset-field-option::after\s*\{[^}]*top: 50%;[^}]*right: calc\(var\(--designer-space-3\) \+ 8px\);[^}]*transform: translate\(50%, -50%\) rotate\(45deg\);[^}]*transform-origin: center;/s,
+    );
+  });
+
+  it('keeps quick color controls on their authored swatch colors in the inspector', () => {
+    expect(workbenchCss).toMatch(
+      /\.properties \.quick-config-colors \.designer-quick-config-button\s*\{[^}]*border-color: color-mix\(in srgb, var\(--quick-color\) 60%, var\(--designer-border-default\)\);[^}]*background-color: var\(--quick-color\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.properties \.quick-config-colors \.designer-quick-config-button\[aria-pressed="true"\]\s*\{[^}]*border-color: var\(--designer-accent\);[^}]*box-shadow: 0 0 0 2px var\(--designer-accent-surface\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer-datav-quick-style-section\[data-quick-style-variant="batch"\][^{]*\.quick-config-colors[^{]*\.designer-quick-config-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow: inset 0 0 0 2px var\(--designer-text-primary\);/s,
+    );
+  });
+
+  it('keeps the fill color picker compact and its popover out of form layout flow', () => {
+    expect(controlsCss).toMatch(
+      /\.designer-color-palette-trigger\s*\{[^}]*width: 100%;[^}]*height: 34px;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-color-popover\s*\{[^}]*position: fixed;[^}]*box-sizing: border-box;[^}]*width: 280px;[^}]*max-height: 560px;/s,
+    );
+    expect(controlsCss).not.toContain('.designer-color-popover-heading');
+    expect(controlsCss).toMatch(
+      /\.designer-color-palette-modes\s*\{[^}]*grid-template-columns: repeat\(3, 28px\);/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-color-palette-mode\s*\{[^}]*width: 28px;[^}]*height: 28px;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-color-palette-mode-icon,[^{]*\.designer-color-palette-mode-icon svg\s*\{[^}]*width: 15px;[^}]*height: 15px;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-field:has\(> \.designer-color-palette\)\s*\{[^}]*overflow: visible;/s,
+    );
+    expect(controlsCss).toMatch(/\.designer-fill-color-plane\s*\{[^}]*height: 120px;/s);
+    expect(controlsCss).toContain('grid-template-columns: 1.55fr repeat(4, minmax(0, 1fr));');
+    expect(controlsCss).toMatch(
+      /\.designer-fill-color-channel \.designer-input\[type="number"\]\s*\{[^}]*appearance: textfield;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-color-palette-stop-bar\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\) minmax\(0, 1fr\) auto;[^}]*min-height: var\(--designer-control-height-compact\);/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-color-palette\[data-color-palette-mode="radial-gradient"\][^{]*\.designer-color-palette-parameters\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-color-palette-stop-bar \.designer-color-palette-action\s*\{[^}]*width: var\(--designer-control-height-compact\);[^}]*height: var\(--designer-control-height-compact\);/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-fill-color-hue-track,[^{]*\.designer-fill-color-alpha-track\s*\{[^}]*height: 16px;[^}]*overflow: visible;[^}]*padding-block: 3px;[^}]*background-clip: content-box;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-fill-color-hue,[^{]*\.designer-fill-color-alpha\s*\{[^}]*position: absolute;[^}]*height: 16px;[^}]*outline: 0;[^}]*cursor: ew-resize;[^}]*touch-action: none;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-fill-color-hue::-webkit-slider-thumb,[^{]*\.designer-fill-color-alpha::-webkit-slider-thumb\s*\{[^}]*width: 14px;[^}]*height: 14px;[^}]*border-radius: 50%;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-fill-color-hue::-moz-range-thumb,[^{]*\.designer-fill-color-alpha::-moz-range-thumb\s*\{[^}]*width: 14px;[^}]*height: 14px;[^}]*border-radius: 50%;/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-fill-color-hue:focus-visible,[^{]*\.designer-fill-color-alpha:focus-visible\s*\{[^}]*--designer-fill-slider-thumb-shadow:[^}]*var\(--designer-focus-ring\)[^}]*;/s,
+    );
+    expect(controlsCss).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.designer-fill-color-hue::-webkit-slider-thumb,[^{]*\.designer-fill-color-alpha::-webkit-slider-thumb\s*\{[^}]*transition-duration: 0s;[^}]*\}[^}]*\.designer-fill-color-hue::-moz-range-thumb,[^{]*\.designer-fill-color-alpha::-moz-range-thumb\s*\{[^}]*transition-duration: 0s;/s,
+    );
   });
 
   it('keeps the DataV-style layer toolbar and tree geometry stable', () => {

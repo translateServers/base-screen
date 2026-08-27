@@ -129,6 +129,74 @@ describe('DesignerInspectorScrollGuard', () => {
     expect(pane.scrollTop).toBe(500);
   });
 
+  it('restores a browser pre-scroll before its deferred scroll event is dispatched', () => {
+    let clock = 0;
+    const pane = new FakePane();
+    const guard = new DesignerInspectorScrollGuard(() => clock);
+
+    guard.ensureListeners(pane as unknown as HTMLElement);
+    pane.dispatchWheel();
+    pane.scrollTop = 500;
+    pane.dispatchScroll();
+    clock += 1_000;
+    // Real Chromium can update scrollTop synchronously, dispatch pointerdown, then enqueue the
+    // matching scroll event. The guard must use its last stable snapshot in this ordering.
+    pane.scrollTop = 548;
+    guard.begin(pane as unknown as HTMLElement);
+
+    expect(pane.scrollTop).toBe(500);
+    pane.dispatchScroll();
+    expect(pane.scrollTop).toBe(500);
+  });
+
+  it('keeps a deferred wheel scroll when pointerdown arrives before its scroll event', () => {
+    const pane = new FakePane();
+    const guard = new DesignerInspectorScrollGuard();
+
+    guard.ensureListeners(pane as unknown as HTMLElement);
+    pane.dispatchWheel();
+    pane.scrollTop = 500;
+    pane.dispatchScroll();
+    pane.dispatchWheel();
+    pane.scrollTop = 548;
+    guard.begin(pane as unknown as HTMLElement);
+
+    expect(pane.scrollTop).toBe(548);
+  });
+
+  it('restores a deferred edge reveal when the control was already mostly visible', () => {
+    const pane = new FakePane();
+    const guard = new DesignerInspectorScrollGuard();
+    const control = fakeControlRect(0, 16);
+
+    guard.ensureListeners(pane as unknown as HTMLElement);
+    pane.dispatchWheel();
+    pane.scrollTop = 500;
+    pane.dispatchScroll();
+    // The live control is now aligned to the top; at scrollTop 500 it was clipped by 8px.
+    pane.scrollTop = 492;
+    guard.begin(pane as unknown as HTMLElement, control);
+
+    expect(pane.scrollTop).toBe(500);
+  });
+
+  it('allows a fully offscreen control to scroll into view before pointerdown', () => {
+    const pane = new FakePane();
+    const guard = new DesignerInspectorScrollGuard();
+    const control = fakeControlRect(0, 16);
+
+    guard.ensureListeners(pane as unknown as HTMLElement);
+    pane.dispatchWheel();
+    pane.scrollTop = 500;
+    pane.dispatchScroll();
+    // At the previous position the control was 100px above the pane, so this is navigation,
+    // not the small edge nudge that the guard should undo.
+    pane.scrollTop = 400;
+    guard.begin(pane as unknown as HTMLElement, control);
+
+    expect(pane.scrollTop).toBe(400);
+  });
+
   it('restores the start of a multi-event browser pre-scroll batch', () => {
     let clock = 0;
     const pane = new FakePane();
@@ -193,6 +261,25 @@ describe('DesignerInspectorScrollGuard', () => {
     pane.scrollTop = 512;
     pane.dispatchScroll();
 
+    expect(pane.scrollTop).toBe(500);
+  });
+
+  it('keeps the pointerdown position when select change precedes the deferred scroll event', () => {
+    const pane = new FakePane();
+    const guard = new DesignerInspectorScrollGuard();
+
+    guard.ensureListeners(pane as unknown as HTMLElement);
+    pane.dispatchWheel();
+    pane.scrollTop = 500;
+    pane.dispatchScroll();
+    pane.scrollTop = 508;
+    guard.begin(pane as unknown as HTMLElement);
+    // Focus/native-select work can move the pane again before its pending scroll event arrives.
+    pane.scrollTop = 508;
+    guard.preserve(pane as unknown as HTMLElement);
+
+    expect(pane.scrollTop).toBe(500);
+    pane.dispatchScroll();
     expect(pane.scrollTop).toBe(500);
   });
 
@@ -278,7 +365,17 @@ class FakePane {
     this.#wheelHandler?.();
   }
 
+  getBoundingClientRect(): DOMRect {
+    return { bottom: 100, height: 100, top: 0 } as DOMRect;
+  }
+
   listenerCount(): number {
     return (this.#scrollHandler === undefined ? 0 : 1) + (this.#wheelHandler === undefined ? 0 : 1);
   }
+}
+
+function fakeControlRect(top: number, height: number): HTMLElement {
+  return {
+    getBoundingClientRect: () => ({ bottom: top + height, height, top }) as DOMRect,
+  } as unknown as HTMLElement;
 }

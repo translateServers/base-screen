@@ -30,7 +30,7 @@ const shapeStyleSchema = {
 };
 
 const shapeStylePanel = [
-  { style: 'fill', label: '填充', control: 'color' as const },
+  { style: 'fill', label: '填充', control: 'color' as const, allowGradient: true },
   { style: 'borderColor', label: '边框颜色', control: 'color' as const },
   { style: 'borderWidth', label: '边框宽度', control: 'number' as const },
   { style: 'borderRadius', label: '圆角', control: 'number' as const },

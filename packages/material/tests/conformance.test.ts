@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
+  BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
+  BaseScreenEChartsMaterialElement,
   BaseScreenTableMaterialElement,
 } from '../src/index.js';
 
@@ -58,13 +60,16 @@ function elementWith(
   }
 }
 
-function model(status: BaseScreenMaterialModel['dataState']['status']): BaseScreenMaterialModel {
+function model(
+  status: BaseScreenMaterialModel['dataState']['status'],
+  style: BaseScreenMaterialModel['style'] = {},
+): BaseScreenMaterialModel {
   return {
     componentId: 'c1',
     mode: 'viewer',
     interactive: false,
     props: {},
-    style: {},
+    style,
     size: { width: 100, height: 100 },
     dataState:
       status === 'ready'
@@ -121,5 +126,29 @@ describe('official material conformance (DRH-R7)', () => {
   it('official materials declare the host-resource data capability', () => {
     expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.dataCapabilities).toContain('host-resource');
     expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.dataCapabilities).toContain('host-resource');
+  });
+
+  it('renders declared gradient background fields while keeping unsupported colors solid-only', () => {
+    const gradient = 'linear-gradient(90deg, #112233 0%, #ffffff 100%)';
+    for (const Element of [
+      BaseScreenChartMaterialElement,
+      BaseScreenTableMaterialElement,
+      BaseScreenEChartsMaterialElement,
+    ]) {
+      const { element, threw } = elementWith(Element, model('idle', { backgroundColor: gradient }));
+      expect(threw).toBe(false);
+      expect(element.style.backgroundImage).toBe(gradient);
+      expect(element.style.backgroundColor).toBe('transparent');
+    }
+
+    expect(
+      BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.stylePanel.find(
+        (field) => field.style === 'backgroundColor',
+      )?.allowGradient,
+    ).toBe(true);
+    expect(
+      BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.stylePanel.find((field) => field.style === 'gridColor')
+        ?.allowGradient,
+    ).toBeUndefined();
   });
 });

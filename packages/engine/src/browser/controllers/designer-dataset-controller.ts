@@ -39,6 +39,11 @@ import {
   renderDesignerDatasetWorkbench,
 } from '../dom/designer-dataset-dom.js';
 import { renderDesignerDescriptorZone } from '../dom/designer-descriptor-dom.js';
+import {
+  DESIGNER_STATIC_DEFAULT_PAGE_SIZE,
+  normalizeDesignerStaticPageSize,
+  resolveDesignerStaticDataPagination,
+} from '../dom/designer-static-data-pagination.js';
 import { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
 import {
   createDatasetDataSourceTransaction,
@@ -85,6 +90,7 @@ export class DesignerDatasetController {
   #staticDialogOpen = false;
   #staticTab: 'table' | 'advanced' = 'table';
   #staticPage = 0;
+  #staticPageSize = DESIGNER_STATIC_DEFAULT_PAGE_SIZE;
   #staticPasteDraft = '';
   #staticFirstRowIsHeader = true;
   #workbenchOpen = false;
@@ -150,6 +156,7 @@ export class DesignerDatasetController {
     this.#staticDialogOpen = false;
     this.#staticTab = 'table';
     this.#staticPage = 0;
+    this.#staticPageSize = DESIGNER_STATIC_DEFAULT_PAGE_SIZE;
     this.#staticPasteDraft = '';
     this.#workbenchOpen = false;
     this.#catalogOpen = false;
@@ -200,6 +207,7 @@ export class DesignerDatasetController {
         Number(target.dataset.staticCellRow),
         target.dataset.staticCellField ?? '',
         target.value,
+        false,
       );
       return true;
     }
@@ -428,6 +436,21 @@ export class DesignerDatasetController {
         target instanceof HTMLInputElement && target.type === 'checkbox'
           ? target.checked
           : target.value,
+      );
+      return true;
+    }
+    if (target.dataset.staticPageSize !== undefined && target instanceof HTMLSelectElement) {
+      this.#staticPageSize = normalizeDesignerStaticPageSize(Number(target.value));
+      this.#staticPage = 0;
+      this.renderSurface();
+      return true;
+    }
+    if (target.dataset.staticCellRow !== undefined && target instanceof HTMLInputElement) {
+      this.updateStaticCell(
+        Number(target.dataset.staticCellRow),
+        target.dataset.staticCellField ?? '',
+        target.value,
+        false,
       );
       return true;
     }
@@ -742,7 +765,13 @@ export class DesignerDatasetController {
       return;
     }
     if (action === 'page-previous' || action === 'page-next') {
-      this.#staticPage = Math.max(0, this.#staticPage + (action === 'page-next' ? 1 : -1));
+      const rows = this.currentStaticDataset()?.rows.length ?? 0;
+      const nextPage = this.#staticPage + (action === 'page-next' ? 1 : -1);
+      this.#staticPage = resolveDesignerStaticDataPagination(
+        rows,
+        nextPage,
+        this.#staticPageSize,
+      ).page;
       this.renderSurface();
       return;
     }
@@ -817,7 +846,7 @@ export class DesignerDatasetController {
     return parsed.ok ? parsed.value : undefined;
   }
 
-  private setStaticDataset(dataset: ScreenTabularDataset): void {
+  private setStaticDataset(dataset: ScreenTabularDataset, render = true): void {
     const parsed = parseScreenTabularDataset(dataset);
     if (!parsed.ok) {
       this.callbacks.report(parsed.diagnostics);
@@ -826,10 +855,14 @@ export class DesignerDatasetController {
     }
     this.#staticValue = parsed.value as unknown as import('@base-screen/contracts').ScreenJsonValue;
     this.#staticDraft = JSON.stringify(parsed.value, null, 2);
-    const pages = Math.max(1, Math.ceil(parsed.value.rows.length / 100));
-    this.#staticPage = Math.min(this.#staticPage, pages - 1);
+    this.#staticPage = resolveDesignerStaticDataPagination(
+      parsed.value.rows.length,
+      this.#staticPage,
+      this.#staticPageSize,
+    ).page;
     this.setFeedback('');
-    this.renderSurface();
+    if (render) this.renderSurface();
+    else this.syncStaticDatasetPreview(parsed.value);
   }
 
   private updateStaticField(index: number, property: string | undefined, value: unknown): void {
@@ -896,7 +929,7 @@ export class DesignerDatasetController {
     this.setStaticDataset({ fields, rows });
   }
 
-  private updateStaticCell(rowIndex: number, fieldId: string, source: string): void {
+  private updateStaticCell(rowIndex: number, fieldId: string, source: string, render = true): void {
     const dataset = this.currentStaticDataset();
     const field = dataset?.fields.find((candidate) => candidate.id === fieldId);
     const row = dataset?.rows[rowIndex];
@@ -906,12 +939,26 @@ export class DesignerDatasetController {
       this.setFeedback(`rows.${rowIndex}.${fieldId}：${DESIGNER_UI_TEXT.panel.enterValidValue}`);
       return;
     }
-    this.setStaticDataset({
-      fields: dataset.fields,
-      rows: dataset.rows.map((candidate, index) =>
-        index === rowIndex ? { ...candidate, [fieldId]: value } : candidate,
-      ),
-    });
+    this.setStaticDataset(
+      {
+        fields: dataset.fields,
+        rows: dataset.rows.map((candidate, index) =>
+          index === rowIndex ? { ...candidate, [fieldId]: value } : candidate,
+        ),
+      },
+      render,
+    );
+  }
+
+  private syncStaticDatasetPreview(dataset: ScreenTabularDataset): void {
+    const value = JSON.stringify(dataset.rows.slice(0, 8), null, 2);
+    const roots = [this.#panel, this.callbacks.getWorkbenchHost?.()];
+    for (const root of roots) {
+      for (const preview of root?.querySelectorAll<HTMLElement>('[data-static-preview-value]') ??
+        []) {
+        preview.textContent = value;
+      }
+    }
   }
 
   private addStaticField(): void {
@@ -963,9 +1010,8 @@ export class DesignerDatasetController {
         field.nullable === true ? null : this.defaultCell(field.valueType),
       ]),
     );
+    this.#staticPage = Math.floor(dataset.rows.length / this.#staticPageSize);
     this.setStaticDataset({ fields: dataset.fields, rows: [...dataset.rows, row] });
-    this.#staticPage = Math.floor(dataset.rows.length / 100);
-    this.renderSurface();
   }
 
   private removeStaticRow(index: number): void {
@@ -1335,6 +1381,7 @@ export class DesignerDatasetController {
         this.#staticDialogOpen,
         this.#staticTab,
         this.#staticPage,
+        this.#staticPageSize,
         this.#catalogOpen,
         this.#descriptor?.resourceType ?? null,
         this.#descriptor?.resourceId ?? null,
@@ -1348,6 +1395,7 @@ export class DesignerDatasetController {
       staticDialogOpen: this.#staticDialogOpen,
       staticTab: this.#staticTab,
       staticPage: this.#staticPage,
+      staticPageSize: this.#staticPageSize,
       staticPasteDraft: this.#staticPasteDraft,
       staticFirstRowIsHeader: this.#staticFirstRowIsHeader,
       query: this.#catalogController.query,

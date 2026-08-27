@@ -661,12 +661,21 @@ function validatePanel(
       );
       continue;
     }
-    validateExactObject(
+    validateKnownObject(
       field,
-      new Set([fieldName, 'label', 'control']),
+      new Set([fieldName, 'label', 'control', 'allowGradient']),
       [panelName, index],
       collector,
     );
+    for (const required of [fieldName, 'label', 'control']) {
+      if (!Object.hasOwn(field, required)) {
+        collector.add(
+          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          [panelName, index, required],
+          'Manifest field is required.',
+        );
+      }
+    }
     const key = field[fieldName];
     if (typeof key !== 'string' || schema?.properties[key] === undefined) {
       collector.add(
@@ -697,6 +706,16 @@ function validatePanel(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
         [panelName, index, 'control'],
         'Panel control is unsupported.',
+      );
+    }
+    if (
+      field.allowGradient !== undefined &&
+      (typeof field.allowGradient !== 'boolean' || field.control !== 'color')
+    ) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [panelName, index, 'allowGradient'],
+        'Panel gradient support is only allowed as a boolean on color controls.',
       );
     }
   }

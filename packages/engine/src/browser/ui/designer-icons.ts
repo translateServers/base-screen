@@ -56,6 +56,12 @@ const ICONS = {
   cube: '<path d="m12 3 8 4.5v9L12 21l-8-4.5v-9z"/><path d="m4 7.5 8 4.5 8-4.5M12 12v9"/>',
   shapes: '<rect x="3" y="3" width="10" height="10" rx="2"/><circle cx="16.5" cy="16.5" r="4.5"/>',
   terminal: '<path d="m5 7 4 4-4 4M11 15h8"/>',
+  'color-solid':
+    '<rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor" stroke="none"/>',
+  'color-linear':
+    '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M5 18 18 5M10 20 21 9"/>',
+  'color-radial':
+    '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
 } as const;
 
 export type DesignerIconName = keyof typeof ICONS;

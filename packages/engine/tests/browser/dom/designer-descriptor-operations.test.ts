@@ -191,6 +191,13 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
       catalog(),
     );
     expect(styleResult?.ok).toBe(true);
+    if (!styleResult?.ok) return;
+    const styleCommand = styleResult.value.commands[0];
+    expect(styleCommand?.type).toBe('update-components');
+    if (styleCommand?.type === 'update-components') {
+      expect(styleCommand.patch.style).toEqual({ color: '#ff0000' });
+      expect(styleCommand.patch.props).toBeUndefined();
+    }
   });
 
   it('rejects values that violate the schema fail closed', () => {

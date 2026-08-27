@@ -301,6 +301,7 @@ function appendComponentControls(
         schema,
         field.control,
         `${component.id}:prop:${field.prop}`,
+        field.allowGradient === true,
       );
     }
   }
@@ -321,6 +322,7 @@ function appendComponentControls(
         schema,
         field.control,
         `${component.id}:style:${field.style}`,
+        field.allowGradient === true,
       );
     }
   }
@@ -749,6 +751,11 @@ function appendBatchStyleControls(
       ),
       schema,
       panelField.control,
+      context.components.every((item) =>
+        (catalog?.get(item.type)?.manifest.stylePanel ?? []).some(
+          (candidate) => candidate.style === field && candidate.allowGradient === true,
+        ),
+      ),
       disabled,
       hint,
     );
@@ -886,7 +893,13 @@ export function createPropertyTransaction(
     manifest.styleSchema.properties[style] !== undefined &&
     (manifest.stylePanel.some((field) => field.style === style) || style === 'opacity')
   ) {
-    const value = parsePropertyControlValue(target, manifest.styleSchema.properties[style]);
+    const schema = manifest.styleSchema.properties[style];
+    if (isClearedOptionalNumberControl(target, schema, manifest.styleSchema.required, style)) {
+      const nextStyle = { ...component.style };
+      delete nextStyle[style];
+      return createValidatedStyleTransaction(component.id, nextStyle, manifest.styleSchema);
+    }
+    const value = parsePropertyControlValue(target, schema);
     return value === undefined
       ? undefined
       : createValidatedStyleTransaction(
@@ -903,6 +916,11 @@ export function createPropertyTransaction(
     !manifest.propertyPanel.some((field) => field.prop === prop)
   ) {
     return undefined;
+  }
+  if (isClearedOptionalNumberControl(target, schema, manifest.propsSchema.required, prop)) {
+    const nextProps = { ...component.props };
+    delete nextProps[prop];
+    return createValidatedPropsTransaction(component.id, nextProps, manifest.propsSchema);
   }
   const value = parsePropertyControlValue(target, schema);
   if (value === undefined) return undefined;
@@ -1148,6 +1166,15 @@ export function parsePropertyControlValue(
   if (schema.kind === 'enum') return schema.values.find((value) => String(value) === input.value);
   if (schema.kind === 'string') return input.value;
   return parseJsonDraft(input.value);
+}
+
+function isClearedOptionalNumberControl(
+  input: DesignerPanelInput,
+  schema: BaseScreenMaterialPropSchema,
+  required: readonly string[],
+  field: string,
+): boolean {
+  return schema.kind === 'number' && input.value.trim() === '' && !required.includes(field);
 }
 
 function createGeometryTransaction(
@@ -1407,6 +1434,7 @@ function appendBatchStyleControl(
   mixed: boolean,
   schema: BaseScreenMaterialPropSchema,
   control: string,
+  allowGradient: boolean,
   disabled: boolean,
   hint: string,
 ): void {
@@ -1418,6 +1446,7 @@ function appendBatchStyleControl(
       parent.ownerDocument,
       typeof value === 'string' ? value : undefined,
       `multi:style:${style}`,
+      { allowGradient },
     );
     for (const input of palette.controls) {
       input.dataset.multiProperty = `style:${style}`;
@@ -2017,6 +2046,7 @@ function appendPropControl(
   schema: BaseScreenMaterialPropSchema,
   control: string,
   paletteKey: string,
+  allowGradient: boolean,
 ): void {
   const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
@@ -2026,6 +2056,7 @@ function appendPropControl(
       parent.ownerDocument,
       typeof value === 'string' ? value : undefined,
       paletteKey,
+      { allowGradient },
     );
     for (const input of palette.controls) input.dataset.prop = prop;
     label.appendChild(palette.element);
@@ -2047,6 +2078,7 @@ function appendStyleControl(
   schema: BaseScreenMaterialPropSchema,
   control: string,
   paletteKey: string,
+  allowGradient: boolean,
 ): void {
   const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
   label.className = 'designer-field designer-field-label';
@@ -2056,6 +2088,7 @@ function appendStyleControl(
       parent.ownerDocument,
       typeof value === 'string' ? value : undefined,
       paletteKey,
+      { allowGradient },
     );
     for (const input of palette.controls) input.dataset.style = style;
     label.appendChild(palette.element);
@@ -2185,6 +2218,7 @@ function appendStyleRuleBlock(
       schema,
       field.control,
       `${component.id}:style-rule:${index}:${field.style}`,
+      field.allowGradient === true,
       locked,
     );
   }
@@ -2200,6 +2234,7 @@ function appendStyleRuleControl(
   schema: BaseScreenMaterialPropSchema,
   control: string,
   paletteKey: string,
+  allowGradient: boolean,
   locked: boolean,
 ): void {
   const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
@@ -2211,6 +2246,7 @@ function appendStyleRuleControl(
       parent.ownerDocument,
       typeof value === 'string' ? value : undefined,
       paletteKey,
+      { allowGradient },
     );
     for (const input of palette.controls) {
       input.dataset.styleRuleStyle = marker;

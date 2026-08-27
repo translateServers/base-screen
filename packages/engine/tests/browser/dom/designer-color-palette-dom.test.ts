@@ -33,6 +33,8 @@ class FakeElement {
   title = '';
   className = '';
   textContent = '';
+  focused = false;
+  readonly capturedPointers = new Set<number>();
   dispatched: string[] = [];
   readonly listeners = new Map<string, EventListenerOrEventListenerObject[]>();
   readonly attributes = new Map<string, string>();
@@ -73,6 +75,10 @@ class FakeElement {
     this.attributes.set(name, value);
   }
 
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
+
   dispatchEvent(event: Event): boolean {
     this.dispatched.push(event.type);
     if (event.target === null) {
@@ -95,6 +101,45 @@ class FakeElement {
     return null;
   }
 
+  contains(target: FakeElement): boolean {
+    let node: FakeElement | null = target;
+    while (node !== null) {
+      if (node === this) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+
+  focus(): void {
+    this.focused = true;
+  }
+
+  getBoundingClientRect(): DOMRect {
+    return {
+      bottom: 100,
+      height: 100,
+      left: 0,
+      right: 100,
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    };
+  }
+
+  setPointerCapture(pointerId: number): void {
+    this.capturedPointers.add(pointerId);
+  }
+
+  hasPointerCapture(pointerId: number): boolean {
+    return this.capturedPointers.has(pointerId);
+  }
+
+  releasePointerCapture(pointerId: number): void {
+    this.capturedPointers.delete(pointerId);
+  }
+
   querySelector(selector: string): FakeElement | null {
     return this.querySelectorAll(selector)[0] ?? null;
   }
@@ -109,9 +154,87 @@ class FakeElement {
 }
 
 class FakeDocument {
+  readonly listeners = new Map<string, EventListenerOrEventListenerObject[]>();
+
   createElement(tagName: string): FakeElement {
     return new FakeElement(tagName, this);
   }
+
+  addEventListener(type: string, listener: EventListenerOrEventListenerObject): void {
+    const listeners = this.listeners.get(type) ?? [];
+    listeners.push(listener);
+    this.listeners.set(type, listeners);
+  }
+
+  dispatchEvent(event: Event): boolean {
+    for (const listener of this.listeners.get(event.type) ?? []) {
+      if (typeof listener === 'function') listener.call(this, event);
+      else listener.handleEvent(event);
+      if (
+        (event as Event & { readonly immediatePropagationStopped?: boolean })
+          .immediatePropagationStopped === true
+      ) {
+        break;
+      }
+    }
+    return !event.defaultPrevented;
+  }
+}
+
+function documentPointerEvent(
+  type:
+    | 'pointerdown'
+    | 'pointermove'
+    | 'pointerup'
+    | 'pointercancel'
+    | 'lostpointercapture'
+    | 'click',
+  target: FakeElement,
+  pointerType: 'mouse' | 'touch',
+  position: { readonly clientX: number; readonly clientY: number } = {
+    clientX: 0,
+    clientY: 0,
+  },
+): Event {
+  const state = { defaultPrevented: false, immediatePropagationStopped: false };
+  return {
+    type,
+    target,
+    button: 0,
+    isPrimary: true,
+    clientX: position.clientX,
+    clientY: position.clientY,
+    pointerId: 7,
+    pointerType,
+    get defaultPrevented() {
+      return state.defaultPrevented;
+    },
+    get immediatePropagationStopped() {
+      return state.immediatePropagationStopped;
+    },
+    composedPath: () => [target],
+    preventDefault() {
+      state.defaultPrevented = true;
+    },
+    stopImmediatePropagation() {
+      state.immediatePropagationStopped = true;
+    },
+  } as unknown as Event;
+}
+
+function documentKeyboardEvent(key: string, target: FakeElement): Event {
+  const state = { defaultPrevented: false };
+  return {
+    type: 'keydown',
+    key,
+    target,
+    get defaultPrevented() {
+      return state.defaultPrevented;
+    },
+    preventDefault() {
+      state.defaultPrevented = true;
+    },
+  } as unknown as Event;
 }
 
 function collectDescendants(root: FakeElement, selector: string, results: FakeElement[]): void {
@@ -144,6 +267,10 @@ function descendants(element: FakeElement): FakeElement[] {
 
 function byDataset(element: FakeElement, key: string): FakeElement | undefined {
   return descendants(element).find((candidate) => candidate.dataset[key] !== undefined);
+}
+
+function byAction(element: FakeElement, action: string): FakeElement | undefined {
+  return descendants(element).find((candidate) => candidate.dataset.colorPaletteAction === action);
 }
 
 function byField(element: FakeElement, field: string): FakeElement | undefined {
@@ -396,10 +523,10 @@ describe('createDesignerColorPalette', () => {
     const labels = descendants(linearElement)
       .filter((candidate) => candidate.tagName === 'span')
       .map((candidate) => candidate.textContent);
-    // 行内字段（紧凑布局增量）：参数与位置保留可见文字标签。
+    // 紧凑工具带保留位置/角度标签，径向轴用 X/Y 缩写并由 aria-label 补全语义。
     expect(labels).toContain('角度');
-    expect(labels).toContain('中心 X');
-    expect(labels).toContain('中心 Y');
+    expect(labels).toContain('X');
+    expect(labels).toContain('Y');
     expect(labels).toContain('位置');
     expect(labels).toContain('透明度');
     // 颜色控件不再渲染可见「颜色」文字标签（hex 自明），改由 aria-label 提供语义。
@@ -428,8 +555,8 @@ describe('createDesignerColorPalette', () => {
       .filter((candidate) => candidate.tagName === 'span')
       .map((candidate) => candidate.textContent);
     expect(radialLabels).toContain('角度');
-    expect(radialLabels).toContain('中心 X');
-    expect(radialLabels).toContain('中心 Y');
+    expect(radialLabels).toContain('X');
+    expect(radialLabels).toContain('Y');
   });
 
   it('renders gradient controls even when the current value is a solid color', () => {
@@ -708,7 +835,359 @@ describe('mode switch shares gradient state back to solid', () => {
 });
 
 describe('compact palette layout', () => {
-  it('puts the stop color and position in one editor row and alpha with tools in one footer row', () => {
+  it('keeps the picker behind one compact trigger and opens it as a dialog overlay', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#2483ff');
+    const element = palette.element as unknown as FakeElement;
+    const trigger = byAction(element, 'toggle')!;
+    const popover = byDataset(element, 'colorPalettePopover')! as FakeElement & {
+      hidden: boolean;
+    };
+
+    expect(trigger.attributes.get('aria-haspopup')).toBe('dialog');
+    expect(trigger.attributes.get('aria-expanded')).toBe('false');
+    expect(popover.attributes.get('role')).toBe('dialog');
+    expect(popover.hidden).toBe(true);
+
+    trigger.dispatchEvent(new Event('click', { bubbles: true }));
+    expect(element.dataset.colorPaletteOpen).toBe('true');
+    expect(trigger.attributes.get('aria-expanded')).toBe('true');
+    expect(popover.hidden).toBe(false);
+
+    byAction(element, 'close')!.dispatchEvent(new Event('click', { bubbles: true }));
+    expect(element.dataset.colorPaletteOpen).toBe('false');
+    expect(popover.hidden).toBe(true);
+  });
+
+  it('uses an icon-only mode toolbar without visible title or hint text', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#2483ff');
+    const element = palette.element as unknown as FakeElement;
+    const popover = byDataset(element, 'colorPalettePopover')!;
+    const toolbar = descendants(popover).find(
+      (candidate) => candidate.className === 'designer-color-popover-toolbar',
+    );
+    const modes = descendants(popover).filter(
+      (candidate) => candidate.className === 'designer-color-palette-mode',
+    );
+    const icons = descendants(popover).filter(
+      (candidate) => candidate.className === 'designer-color-palette-mode-icon',
+    );
+    const radios = descendants(popover).filter(
+      (candidate) => candidate.dataset.colorPaletteField === 'mode',
+    );
+
+    expect(toolbar).toBeDefined();
+    expect(
+      descendants(popover).some(
+        (candidate) => candidate.className === 'designer-color-popover-heading',
+      ),
+    ).toBe(false);
+    expect(modes).toHaveLength(3);
+    expect(modes.map((mode) => mode.textContent)).toEqual(['', '', '']);
+    expect(modes.map((mode) => mode.title)).toEqual(['单色', '线性渐变', '径向渐变']);
+    expect(radios.map((radio) => radio.attributes.get('aria-label'))).toEqual([
+      '单色',
+      '线性渐变',
+      '径向渐变',
+    ]);
+    expect(icons).toHaveLength(3);
+    expect(
+      icons.every((icon) =>
+        ((icon as FakeElement & { readonly innerHTML?: string }).innerHTML ?? '').includes('<svg'),
+      ),
+    ).toBe(true);
+  });
+
+  it('renders precise channels and quick colors while preserving the original proxy contract', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#112233');
+    const element = palette.element as unknown as FakeElement;
+    const picker = byDataset(element, 'designerFillColorPicker');
+    const channels = descendants(element).filter(
+      (candidate) => candidate.dataset.fillColorChannel !== undefined,
+    );
+    const quickColors = descendants(element).filter(
+      (candidate) => candidate.dataset.fillColorQuick !== undefined,
+    );
+
+    expect(picker).toBeDefined();
+    expect(channels.map((channel) => channel.dataset.fillColorChannel)).toEqual([
+      'hex',
+      'r',
+      'g',
+      'b',
+      'a',
+    ]);
+    expect(quickColors).toHaveLength(9);
+    expect(palette.controls.some((control) => control.dataset.colorPaletteField === 'solid')).toBe(
+      true,
+    );
+
+    quickColors[1]!.dispatchEvent(new Event('click', { bubbles: true }));
+    expect(readDesignerColorPaletteValue(byField(element, 'solid')!)).toBe('#39c5bb');
+  });
+
+  it('keeps the fill picker but omits gradient modes for solid-only color fields', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      'linear-gradient(90deg, #112233 0%, #ffffff 100%)',
+      'chart:grid-color',
+      { allowGradient: false },
+    );
+    const element = palette.element as unknown as FakeElement;
+
+    expect(element.dataset.colorPaletteMode).toBe('solid');
+    expect(byField(element, 'mode')).toBeUndefined();
+    expect(byDataset(element, 'designerFillColorPicker')).toBeDefined();
+    expect(readDesignerColorPaletteValue(palette.controls[0]!)).toBe('#112233');
+  });
+
+  it('restores an open popover when a committed color rerenders the same field', () => {
+    const ownerDocument = new FakeDocument();
+    const first = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#112233',
+      'title:style:color',
+    ).element as unknown as FakeElement;
+    byAction(first, 'toggle')!.dispatchEvent(new Event('click', { bubbles: true }));
+
+    const rerendered = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#39c5bb',
+      'title:style:color',
+    ).element as unknown as FakeElement;
+    expect(rerendered.dataset.colorPaletteOpen).toBe('true');
+    expect(byAction(rerendered, 'toggle')?.attributes.get('aria-expanded')).toBe('true');
+    expect(
+      (byDataset(rerendered, 'colorPalettePopover') as FakeElement & { hidden: boolean }).hidden,
+    ).toBe(false);
+
+    byAction(rerendered, 'close')!.dispatchEvent(new Event('click', { bubbles: true }));
+    const closed = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#39c5bb',
+      'title:style:color',
+    ).element as unknown as FakeElement;
+    expect(closed.dataset.colorPaletteOpen).toBe('false');
+  });
+
+  it('restores an achromatic picker hue when the same field rerenders', () => {
+    const ownerDocument = new FakeDocument();
+    const first = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#ffffff',
+      'title:style:color',
+    ).element as unknown as FakeElement;
+    const firstHue = descendants(first).find(
+      (candidate) => candidate.className === 'designer-fill-color-hue',
+    )!;
+    firstHue.value = '180';
+    firstHue.dispatchEvent(new Event('input'));
+    expect(firstHue.value).toBe('180');
+
+    const rerendered = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#ffffff',
+      'title:style:color',
+    ).element as unknown as FakeElement;
+    const rerenderedHue = descendants(rerendered).find(
+      (candidate) => candidate.className === 'designer-fill-color-hue',
+    )!;
+    expect(rerenderedHue.value).toBe('180');
+  });
+
+  it('keeps hue stationary while the color plane changes saturation and value', () => {
+    const ownerDocument = new FakeDocument();
+    const fieldKey = 'title:style:color';
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#0b1324',
+      fieldKey,
+    ).element as unknown as FakeElement;
+    const plane = descendants(palette).find(
+      (candidate) => candidate.className === 'designer-fill-color-plane',
+    )!;
+    const hue = descendants(palette).find(
+      (candidate) => candidate.className === 'designer-fill-color-hue',
+    )!;
+
+    expect(hue.value).toBe('221');
+    plane.dispatchEvent(
+      documentPointerEvent('pointerdown', plane, 'mouse', { clientX: 10, clientY: 86 }),
+    );
+    expect(hue.value).toBe('221');
+    plane.dispatchEvent(
+      documentPointerEvent('pointermove', plane, 'mouse', { clientX: 20, clientY: 86 }),
+    );
+    expect(hue.value).toBe('221');
+    plane.dispatchEvent(
+      documentPointerEvent('pointerup', plane, 'mouse', { clientX: 20, clientY: 86 }),
+    );
+    expect(hue.value).toBe('221');
+
+    const committed = readDesignerColorPaletteValue(byField(palette, 'solid')!);
+    const rerendered = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      committed,
+      fieldKey,
+    ).element as unknown as FakeElement;
+    const rerenderedHue = descendants(rerendered).find(
+      (candidate) => candidate.className === 'designer-fill-color-hue',
+    )!;
+    expect(rerenderedHue.value).toBe('221');
+  });
+
+  it('keeps the color plane thumb at the dragged position when RGB quantizes to black', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#ff0000',
+      'title:style:color',
+    ).element as unknown as FakeElement;
+    const plane = descendants(palette).find(
+      (candidate) => candidate.className === 'designer-fill-color-plane',
+    )!;
+    const picker = byDataset(palette, 'designerFillColorPicker')!;
+
+    plane.dispatchEvent(
+      documentPointerEvent('pointerdown', plane, 'mouse', { clientX: 75, clientY: 100 }),
+    );
+
+    expect(picker.attributes.get('style')).toContain('--designer-fill-saturation:75');
+    expect(picker.attributes.get('style')).toContain('--designer-fill-value:0');
+    expect(plane.attributes.get('aria-valuetext')).toBe('饱和度 75%，明度 0%');
+  });
+
+  it('restores the bottom-plane position after a palette re-render', () => {
+    const ownerDocument = new FakeDocument();
+    const fieldKey = 'title:style:color';
+    const first = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#ff0000',
+      fieldKey,
+    );
+    const firstElement = first.element as unknown as FakeElement;
+    const firstPlane = descendants(firstElement).find(
+      (candidate) => candidate.className === 'designer-fill-color-plane',
+    )!;
+    firstPlane.dispatchEvent(
+      documentPointerEvent('pointerdown', firstPlane, 'mouse', { clientX: 75, clientY: 100 }),
+    );
+    expect(readDesignerColorPaletteValue(first.controls[0]!)).toBe('#000000');
+
+    const rerendered = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#000000',
+      fieldKey,
+    ).element as unknown as FakeElement;
+    const picker = byDataset(rerendered, 'designerFillColorPicker')!;
+    expect(picker.attributes.get('style')).toContain('--designer-fill-saturation:75');
+    expect(picker.attributes.get('style')).toContain('--designer-fill-value:0');
+  });
+
+  it('keeps the anchored popover open when its inspector pane scrolls', () => {
+    const ownerDocument = new FakeDocument();
+    const pane = ownerDocument.createElement('div');
+    pane.dataset.inspectorPane = 'appearance';
+    const palette = createDesignerColorPalette(
+      ownerDocument as unknown as Document,
+      '#112233',
+      'title:style:color',
+    ).element as unknown as FakeElement;
+    pane.appendChild(palette);
+
+    byAction(palette, 'toggle')!.dispatchEvent(new Event('click', { bubbles: true }));
+    expect(palette.dataset.colorPaletteOpen).toBe('true');
+    pane.dispatchEvent(new Event('scroll'));
+    expect(palette.dataset.colorPaletteOpen).toBe('true');
+  });
+
+  it.each(['pointerup', 'pointercancel', 'lostpointercapture'] as const)(
+    'releases the color plane drag on %s and keeps achromatic hue editable',
+    (terminalEvent) => {
+      const ownerDocument = new FakeDocument();
+      const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#ffffff')
+        .element as unknown as FakeElement;
+      const plane = descendants(palette).find(
+        (candidate) => candidate.className === 'designer-fill-color-plane',
+      )!;
+      const hue = descendants(palette).find(
+        (candidate) => candidate.className === 'designer-fill-color-hue',
+      )!;
+      const outside = { clientX: -100, clientY: -100 };
+
+      plane.dispatchEvent(documentPointerEvent('pointerdown', plane, 'mouse', outside));
+      expect(plane.hasPointerCapture(7)).toBe(true);
+      plane.dispatchEvent(documentPointerEvent('pointermove', plane, 'mouse', outside));
+      if (terminalEvent === 'lostpointercapture') plane.capturedPointers.delete(7);
+      plane.dispatchEvent(documentPointerEvent(terminalEvent, plane, 'mouse', outside));
+      expect(plane.hasPointerCapture(7)).toBe(false);
+
+      hue.value = '180';
+      hue.dispatchEvent(new Event('input'));
+      expect(hue.value).toBe('180');
+      plane.dispatchEvent(
+        documentPointerEvent('pointermove', plane, 'mouse', { clientX: 75, clientY: 25 }),
+      );
+      expect(hue.value).toBe('180');
+    },
+  );
+
+  it.each(['mouse', 'touch'] as const)(
+    'consumes the first %s pointer sequence outside the open popover',
+    (pointerType) => {
+      const ownerDocument = new FakeDocument();
+      const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#112233')
+        .element as unknown as FakeElement;
+      const outside = ownerDocument.createElement('button');
+      const activations = { pointerdown: 0, pointerup: 0, click: 0 };
+      for (const type of ['pointerdown', 'pointerup', 'click'] as const) {
+        ownerDocument.addEventListener(type, () => {
+          activations[type] += 1;
+        });
+      }
+
+      byAction(palette, 'toggle')!.dispatchEvent(new Event('click', { bubbles: true }));
+      expect(palette.dataset.colorPaletteOpen).toBe('true');
+
+      for (const type of ['pointerdown', 'pointerup', 'click'] as const) {
+        const event = documentPointerEvent(type, outside, pointerType);
+        expect(ownerDocument.dispatchEvent(event)).toBe(false);
+      }
+      expect(palette.dataset.colorPaletteOpen).toBe('false');
+      expect(activations).toEqual({ pointerdown: 0, pointerup: 0, click: 0 });
+
+      for (const type of ['pointerdown', 'pointerup', 'click'] as const) {
+        ownerDocument.dispatchEvent(documentPointerEvent(type, outside, pointerType));
+      }
+      expect(activations).toEqual({ pointerdown: 1, pointerup: 1, click: 1 });
+    },
+  );
+
+  it('keeps Escape dismissal keyboard-only and returns focus to the trigger', () => {
+    const ownerDocument = new FakeDocument();
+    const palette = createDesignerColorPalette(ownerDocument as unknown as Document, '#112233')
+      .element as unknown as FakeElement;
+    const trigger = byAction(palette, 'toggle')!;
+    const outside = ownerDocument.createElement('button');
+    let outsideClicks = 0;
+    ownerDocument.addEventListener('click', () => {
+      outsideClicks += 1;
+    });
+
+    trigger.dispatchEvent(new Event('click', { bubbles: true }));
+    const escape = documentKeyboardEvent('Escape', outside);
+    expect(ownerDocument.dispatchEvent(escape)).toBe(false);
+    expect(palette.dataset.colorPaletteOpen).toBe('false');
+    expect(trigger.focused).toBe(true);
+
+    ownerDocument.dispatchEvent(documentPointerEvent('click', outside, 'mouse'));
+    expect(outsideClicks).toBe(1);
+  });
+
+  it('puts stop position, mode parameters, and stop actions in one compact toolbar', () => {
     const ownerDocument = new FakeDocument();
     const palette = createDesignerColorPalette(
       ownerDocument as unknown as Document,
@@ -721,18 +1200,30 @@ describe('compact palette layout', () => {
       stopColor.closest('.designer-color-palette-stop-editor'),
     );
     const stopAlpha = byField(element, 'stop-alpha')!;
-    const footer = stopAlpha.closest('.designer-color-palette-stop-footer');
-    expect(footer).not.toBeNull();
+    const stopBar = stopPosition.closest('.designer-color-palette-stop-bar');
+    expect(stopBar).not.toBeNull();
+    for (const control of [
+      stopAlpha,
+      byField(element, 'angle'),
+      byField(element, 'x'),
+      byField(element, 'y'),
+      byAction(element, 'add-stop'),
+      byAction(element, 'remove-stop'),
+    ]) {
+      expect(control?.closest('.designer-color-palette-stop-bar')).toBe(stopBar);
+    }
+
+    // 径向中心保留完整 aria-label，但视觉标签缩短为 X/Y。
+    expect(byField(element, 'x')?.attributes.get('aria-label')).toBe('中心 X');
+    expect(byField(element, 'y')?.attributes.get('aria-label')).toBe('中心 Y');
     expect(
-      byDataset(element, 'colorPaletteAction')?.closest('.designer-color-palette-stop-footer'),
-    ).toBe(footer);
-    // 渐变参数（角度/中心）同行内排列。
-    expect(byField(element, 'angle')?.closest('.designer-color-palette-parameters')).toBe(
-      byField(element, 'x')?.closest('.designer-color-palette-parameters'),
-    );
-    expect(byField(element, 'y')?.closest('.designer-color-palette-parameters')).toBe(
-      byField(element, 'angle')?.closest('.designer-color-palette-parameters'),
-    );
+      byField(element, 'x')?.closest('.designer-color-palette-field-inline')?.children[0]
+        ?.textContent,
+    ).toBe('X');
+    expect(
+      byField(element, 'y')?.closest('.designer-color-palette-field-inline')?.children[0]
+        ?.textContent,
+    ).toBe('Y');
   });
 });
 

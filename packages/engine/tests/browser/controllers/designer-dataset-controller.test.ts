@@ -371,6 +371,89 @@ describe('DesignerDatasetController', () => {
     });
   });
 
+  it('keeps consecutive static cell input in the current editor', () => {
+    const transactions: ScreenDocumentTransaction[] = [];
+    const controller = createController({
+      descriptor: { ...descriptor, parameters: [] },
+      defaultData: {
+        fields: [{ id: 'label', label: '名称', valueType: 'string' }],
+        rows: [{ label: '' }],
+      },
+      staticData: {
+        kind: 'tabular',
+        defaultBinding: { fields: {} },
+      },
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return success(baseDocument);
+      },
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', class {});
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+    const renderSurface = vi.spyOn(
+      controller as unknown as { renderSurface: () => void },
+      'renderSurface',
+    );
+
+    controller.onClick(sourceModeTarget('static') as unknown as Element);
+    renderSurface.mockClear();
+    for (const value of ['a', 'ab', 'abc']) {
+      controller.onInput(
+        new FakeInput(value, {
+          staticCellRow: '0',
+          staticCellField: 'label',
+        }) as unknown as EventTarget,
+      );
+    }
+    expect(renderSurface).not.toHaveBeenCalled();
+    controller.onClick(staticActionTarget('apply') as unknown as Element);
+
+    expect(transactions[0]).toMatchObject({
+      commands: [
+        {
+          patch: {
+            dataSource: {
+              type: 'static',
+              value: { rows: [{ label: 'abc' }] },
+            },
+          },
+        },
+      ],
+    });
+  });
+
+  it('pages static rows in practical windows and resets after changing the page size', () => {
+    const controller = createController({
+      descriptor: { ...descriptor, parameters: [] },
+      defaultData: {
+        fields: [{ id: 'label', label: '名称', valueType: 'string' }],
+        rows: Array.from({ length: 25 }, (_, index) => ({ label: `row-${index + 1}` })),
+      },
+      staticData: {
+        kind: 'tabular',
+        defaultBinding: { fields: {} },
+      },
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeSelect);
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+    const panelOptions = (
+      controller as unknown as {
+        panelOptions: (panel: HTMLElement) => { staticPage: number; staticPageSize: number };
+      }
+    ).panelOptions.bind(controller);
+
+    controller.onClick(sourceModeTarget('static') as unknown as Element);
+    controller.onClick(staticActionTarget('page-next') as unknown as Element);
+    expect(panelOptions({} as HTMLElement)).toMatchObject({ staticPage: 1, staticPageSize: 10 });
+
+    controller.onChange(
+      new FakeSelect({ staticPageSize: 'true' }, ['20']) as unknown as EventTarget,
+    );
+    expect(panelOptions({} as HTMLElement)).toMatchObject({ staticPage: 0, staticPageSize: 20 });
+  });
+
   it('preserves dirty authoring state when an unrelated commit replaces the component object', async () => {
     const resourceDocument: ScreenDocument = {
       ...baseDocument,

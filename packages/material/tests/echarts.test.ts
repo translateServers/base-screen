@@ -20,6 +20,11 @@ describe('official ECharts semantic material', () => {
     if (!parsed.ok) return;
     expect(parsed.value.propsSchema.properties.series?.kind).toBe('array');
     expect(parsed.value.editorDescriptor?.appearance?.length).toBeGreaterThan(0);
+    expect(parsed.value.editorDescriptor?.appearance?.[0]?.fields).toMatchObject([
+      { id: 'backgroundColor', allowGradient: true },
+      { id: 'textColor' },
+      { id: 'gridColor' },
+    ]);
     expect(parsed.value.editorDescriptor?.events?.[0]?.name).toBe('seriesClick');
     const bindingSection = parsed.value.editorDescriptor?.data?.find(
       (section) => section.id === 'binding',

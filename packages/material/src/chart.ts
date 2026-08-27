@@ -12,7 +12,10 @@ import {
   parseBaseScreenChartData,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
-import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import {
+  applyBackgroundColorOrGradient,
+  BaseScreenOfficialMaterialElement,
+} from './base-material.js';
 
 export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   type: 'base.chart',
@@ -62,7 +65,7 @@ export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     required: ['backgroundColor', 'color', 'gridColor', 'lineWidth'],
   },
   stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color' },
+    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'color', label: '文字色', control: 'color' },
     { style: 'gridColor', label: '网格色', control: 'color' },
     { style: 'lineWidth', label: '线宽', control: 'number' },
@@ -96,7 +99,7 @@ export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialEl
     this.replaceChildren();
     this.style.display = 'block';
     this.style.overflow = 'hidden';
-    this.style.backgroundColor = stringValue(model.style.backgroundColor);
+    applyBackgroundColorOrGradient(this, stringValue(model.style.backgroundColor));
     this.style.color = stringValue(model.style.color);
     this.setAttribute('role', 'img');
     this.setAttribute('aria-label', '图表');

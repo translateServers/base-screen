@@ -24,14 +24,30 @@ export class DesignerInspectorScrollGuard {
    * 控件 pointerdown 时调用。若浏览器刚在事件派发前隐式滚动了容器，先回到该滚动
    * 批次之前的位置；随后武装守卫，继续拦截焦点与重渲染产生的滚动。
    */
-  begin(pane: HTMLElement): void {
+  begin(pane: HTMLElement, control?: HTMLElement): void {
     this.ensureListeners(pane);
     const now = this.now();
     const snapshot = this.#snapshot(pane);
+    // Chromium can mutate scrollTop before pointerdown while deferring the corresponding
+    // scroll event until after pointerdown/change. Only undo the small reveal of a control that
+    // was already mostly visible; a fully offscreen control must still scroll into view so the
+    // subsequent pointerup lands on the same target.
+    const hasPendingUserScroll = this.#pendingUserScroll.has(pane);
+    const hasDeferredImplicitScroll =
+      pane.scrollTop !== snapshot.scrollTop &&
+      !hasPendingUserScroll &&
+      (control === undefined ||
+        wasControlMostlyVisibleBeforeScroll(pane, control, snapshot.scrollTop));
     const hasRecentImplicitScroll =
+      !hasPendingUserScroll &&
       !snapshot.intentional &&
       now - snapshot.lastScrollAt <= INSPECTOR_PRE_POINTER_SCROLL_WINDOW_MS;
-    const scrollTop = hasRecentImplicitScroll ? snapshot.batchStart : pane.scrollTop;
+    const deferredScrollStart = snapshot.intentional ? snapshot.scrollTop : snapshot.batchStart;
+    const scrollTop = hasDeferredImplicitScroll
+      ? deferredScrollStart
+      : hasRecentImplicitScroll
+        ? snapshot.batchStart
+        : pane.scrollTop;
     this.#arm(pane, scrollTop, now);
   }
 
@@ -41,7 +57,13 @@ export class DesignerInspectorScrollGuard {
    */
   preserve(pane: HTMLElement): void {
     this.ensureListeners(pane);
-    this.#arm(pane, pane.scrollTop, this.now());
+    const now = this.now();
+    const armed = this.#armed;
+    const scrollTop =
+      armed !== undefined && armed.pane === pane && now <= armed.until
+        ? armed.scrollTop
+        : pane.scrollTop;
+    this.#arm(pane, scrollTop, now);
   }
 
   /**
@@ -145,6 +167,28 @@ function createInspectorScrollSnapshot(scrollTop: number): InspectorScrollSnapsh
     lastScrollAt: Number.NEGATIVE_INFINITY,
     intentional: true,
   };
+}
+
+function wasControlMostlyVisibleBeforeScroll(
+  pane: HTMLElement,
+  control: HTMLElement,
+  previousScrollTop: number,
+): boolean {
+  const paneRect = pane.getBoundingClientRect();
+  const controlRect = control.getBoundingClientRect();
+  const scrollDelta = pane.scrollTop - previousScrollTop;
+  const previousTop = controlRect.top + scrollDelta;
+  const previousBottom = controlRect.bottom + scrollDelta;
+  const previousVisibleHeight = Math.max(
+    0,
+    Math.min(previousBottom, paneRect.bottom) - Math.max(previousTop, paneRect.top),
+  );
+  const tolerance = 1;
+  const isVisibleNow =
+    controlRect.top >= paneRect.top - tolerance &&
+    controlRect.bottom <= paneRect.bottom + tolerance;
+  const wasClipped = previousTop < paneRect.top || previousBottom > paneRect.bottom;
+  return isVisibleNow && wasClipped && previousVisibleHeight >= controlRect.height / 2;
 }
 
 /**

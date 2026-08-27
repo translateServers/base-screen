@@ -9,6 +9,11 @@ import type {
   BaseScreenMaterialStaticDataDescriptor,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { designerIcon } from '../ui/designer-icons.js';
+import {
+  DESIGNER_STATIC_PAGE_SIZE_OPTIONS,
+  resolveDesignerStaticDataPagination,
+} from './designer-static-data-pagination.js';
 
 export interface DesignerStaticDataView {
   readonly ownerDocument: Document;
@@ -19,6 +24,7 @@ export interface DesignerStaticDataView {
   readonly dialogOpen: boolean;
   readonly tab: 'table' | 'advanced';
   readonly page: number;
+  readonly pageSize: number;
   readonly pasteDraft: string;
   readonly firstRowIsHeader: boolean;
   readonly roles: readonly BaseScreenMaterialDataBindingRole[];
@@ -67,7 +73,7 @@ export function renderDesignerStaticData(view: DesignerStaticDataView): HTMLElem
     const roles = ownerDocument.createElement('small');
     roles.textContent = bindingSummary(view, parsed.value);
     summary.append(text, roles);
-    section.append(summary, renderRows(ownerDocument, parsed.value, view.page));
+    section.append(summary, renderRows(ownerDocument, parsed.value, view.page, view.pageSize));
   }
   section.appendChild(renderApply(ownerDocument));
   return section;
@@ -119,6 +125,7 @@ export function renderDesignerStaticDataPreview(view: DesignerStaticDataView): H
     : DESIGNER_UI_TEXT.dataSource.staticInvalid;
   header.append(title, meta);
   const code = view.ownerDocument.createElement('pre');
+  code.dataset.staticPreviewValue = 'true';
   code.textContent = JSON.stringify(
     parsed.ok ? parsed.value.rows.slice(0, 8) : view.value,
     null,
@@ -203,7 +210,7 @@ function renderStaticWorkbench(
       renderPaste(ownerDocument, view),
       renderFields(ownerDocument, dataset),
       renderBindings(ownerDocument, view, dataset),
-      renderRows(ownerDocument, dataset, view.page),
+      renderRows(ownerDocument, dataset, view.page, view.pageSize),
     );
   }
   const navigation = ownerDocument.createElement('nav');
@@ -424,6 +431,7 @@ function renderRows(
   ownerDocument: Document,
   dataset: ScreenTabularDataset,
   page: number,
+  pageSize: number,
 ): HTMLElement {
   const section = ownerDocument.createElement('section');
   section.className = 'designer-static-rows';
@@ -440,10 +448,9 @@ function renderRows(
   headRow.appendChild(ownerDocument.createElement('th'));
   head.appendChild(headRow);
   const body = ownerDocument.createElement('tbody');
-  const pages = Math.max(1, Math.ceil(dataset.rows.length / 100));
-  const safePage = Math.min(Math.max(0, page), pages - 1);
-  dataset.rows.slice(safePage * 100, safePage * 100 + 100).forEach((row, offset) => {
-    const rowIndex = safePage * 100 + offset;
+  const paginationState = resolveDesignerStaticDataPagination(dataset.rows.length, page, pageSize);
+  dataset.rows.slice(paginationState.start, paginationState.end).forEach((row, offset) => {
+    const rowIndex = paginationState.start + offset;
     const tr = ownerDocument.createElement('tr');
     dataset.fields.forEach((field) => {
       const td = ownerDocument.createElement('td');
@@ -469,25 +476,49 @@ function renderRows(
     body.appendChild(tr);
   });
   table.append(head, body);
-  const pagination = ownerDocument.createElement('div');
+  const footer = ownerDocument.createElement('footer');
+  footer.className = 'designer-static-rows-footer';
+  const pagination = ownerDocument.createElement('nav');
   pagination.className = 'designer-static-pagination';
+  pagination.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticPagination);
+  const pageSizeSelect = ownerDocument.createElement('select');
+  pageSizeSelect.className = 'designer-control designer-select';
+  pageSizeSelect.dataset.staticPageSize = 'true';
+  pageSizeSelect.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticRowsPerPage);
+  for (const option of DESIGNER_STATIC_PAGE_SIZE_OPTIONS) {
+    appendOption(
+      pageSizeSelect,
+      String(option),
+      DESIGNER_UI_TEXT.dataSource.staticRowsPerPageOption(option),
+      option === paginationState.pageSize,
+    );
+  }
   const pageText = ownerDocument.createElement('span');
-  pageText.textContent = DESIGNER_UI_TEXT.dataSource.staticPage(safePage + 1, pages);
-  const previous = action(
+  pageText.className = 'designer-static-page-status';
+  pageText.textContent = DESIGNER_UI_TEXT.dataSource.staticPage(
+    paginationState.page + 1,
+    paginationState.pages,
+  );
+  const previous = paginationAction(
     ownerDocument,
     'page-previous',
     DESIGNER_UI_TEXT.dataSource.staticPreviousPage,
+    'chevron-left',
   );
-  previous.toggleAttribute('disabled', safePage === 0);
-  const next = action(ownerDocument, 'page-next', DESIGNER_UI_TEXT.dataSource.staticNextPage);
-  next.toggleAttribute('disabled', safePage >= pages - 1);
-  pagination.append(previous, pageText, next);
-  section.append(
-    heading,
-    table,
+  previous.toggleAttribute('disabled', paginationState.page === 0);
+  const next = paginationAction(
+    ownerDocument,
+    'page-next',
+    DESIGNER_UI_TEXT.dataSource.staticNextPage,
+    'chevron-right',
+  );
+  next.toggleAttribute('disabled', paginationState.page >= paginationState.pages - 1);
+  pagination.append(pageSizeSelect, previous, pageText, next);
+  footer.append(
     action(ownerDocument, 'row-add', DESIGNER_UI_TEXT.dataSource.staticAddRow),
     pagination,
   );
+  section.append(heading, table, footer);
   return section;
 }
 
@@ -575,6 +606,20 @@ function action(
   button.dataset.staticAction = value;
   if (variant !== undefined) button.dataset.variant = variant;
   button.textContent = label;
+  return button;
+}
+
+function paginationAction(
+  ownerDocument: Document,
+  value: string,
+  label: string,
+  icon: 'chevron-left' | 'chevron-right',
+): HTMLButtonElement {
+  const button = action(ownerDocument, value, label);
+  button.classList.add('designer-icon-button', 'designer-static-page-button');
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.innerHTML = designerIcon(icon);
   return button;
 }
 

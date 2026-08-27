@@ -174,7 +174,7 @@ export class DesignerPanelController {
     if (!(target instanceof HTMLElement) || !isInspectorFormControlTarget(target)) return;
     const pane = findInspectorScrollContainer(target);
     if (pane === undefined) return;
-    this.#clickScrollGuard.begin(pane);
+    this.#clickScrollGuard.begin(pane, findInspectorFormControl(target));
   }
 
   get hasClipboard(): boolean {
@@ -1452,4 +1452,10 @@ const INSPECTOR_SCROLL_CONTAINER_SELECTOR = '.inspector-pane, .designer-datav-da
 /** 找到控件所属的检查器滚动容器（外观/数据面板的滚动容器或数据流内容容器）。 */
 function findInspectorScrollContainer(control: HTMLElement): HTMLElement | undefined {
   return control.closest<HTMLElement>(INSPECTOR_SCROLL_CONTAINER_SELECTOR) ?? undefined;
+}
+
+function findInspectorFormControl(target: HTMLElement): HTMLElement | undefined {
+  const direct = target.closest<HTMLElement>('input, select, textarea');
+  if (direct !== null) return direct;
+  return target.closest<HTMLLabelElement>('label')?.control ?? undefined;
 }

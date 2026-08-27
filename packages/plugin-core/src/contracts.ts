@@ -95,6 +95,8 @@ export interface BaseScreenMaterialPropertyPanelField {
   readonly prop: string;
   readonly label: string;
   readonly control: BaseScreenMaterialPanelControl;
+  /** `color` 控件是否接受线性/径向渐变；缺省仅接受纯色。 */
+  readonly allowGradient?: boolean;
 }
 
 export type BaseScreenMaterialPanelControl =
@@ -109,6 +111,8 @@ export interface BaseScreenMaterialStylePanelField {
   readonly style: string;
   readonly label: string;
   readonly control: BaseScreenMaterialPanelControl;
+  /** `color` 控件是否接受线性/径向渐变；缺省仅接受纯色。 */
+  readonly allowGradient?: boolean;
 }
 
 export interface BaseScreenMaterialDesignCapabilities {

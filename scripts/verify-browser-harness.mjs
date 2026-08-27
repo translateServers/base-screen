@@ -1100,6 +1100,7 @@ try {
             x + 1,
           titlePosition?.x,
         );
+        await assertInspectorFormScrollContinuity(page, authoringDesigner);
         await assertAuthoringShortcutsAndIsolation(page, authoringDesigner);
         await assertCanvasPrecision(authoringDesigner, page);
         await assertDataAndBlueprintAuthoring(authoringDesigner, page);
@@ -2593,6 +2594,109 @@ function rectWithin(actual, expected, tolerance = 2) {
   );
 }
 
+async function assertInspectorFormScrollContinuity(page, designer) {
+  await designer.locator('[data-panel-tab="layers"]').click();
+  await designer.locator('[data-layer-select="echarts-demo"] .layer-name').click();
+  await designer.locator('[data-inspector-tab="appearance"]').click();
+
+  const probes = [
+    {
+      kind: 'select',
+      selector: '[data-descriptor-field-id="legendPosition"]',
+    },
+    {
+      kind: 'checkbox',
+      selector: '[data-descriptor-field-id="gridShow"]',
+    },
+  ];
+  const results = [];
+
+  for (const probe of probes) {
+    await designer.evaluate((element, selector) => {
+      const root = element.shadowRoot;
+      const pane = root.querySelector('[data-inspector-pane="appearance"]');
+      const control = root.querySelector(selector);
+      if (!(pane instanceof HTMLElement) || !(control instanceof HTMLElement)) {
+        throw new Error(`BROWSER_HARNESS_INSPECTOR_SCROLL_CONTROL_MISSING:${selector}`);
+      }
+      const paneBox = pane.getBoundingClientRect();
+      const controlBox = control.getBoundingClientRect();
+      const controlContentTop = pane.scrollTop + controlBox.top - paneBox.top;
+      // Mirror a settled user scroll, then leave the control clipped by four pixels at the top.
+      // Chromium scrolls it into view before pointerdown and defers the scroll event.
+      pane.dispatchEvent(new WheelEvent('wheel', { bubbles: true, deltaY: 1 }));
+      pane.scrollTop = Math.min(
+        pane.scrollHeight - pane.clientHeight,
+        Math.max(0, Math.ceil(controlContentTop + 4)),
+      );
+    }, probe.selector);
+    await page.waitForTimeout(150);
+
+    const before = await designer.evaluate((element, selector) => {
+      const root = element.shadowRoot;
+      const pane = root.querySelector('[data-inspector-pane="appearance"]');
+      const control = root.querySelector(selector);
+      if (
+        !(pane instanceof HTMLElement) ||
+        !(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)
+      ) {
+        throw new Error(`BROWSER_HARNESS_INSPECTOR_SCROLL_CONTROL_MISSING:${selector}`);
+      }
+      const paneBox = pane.getBoundingClientRect();
+      const controlBox = control.getBoundingClientRect();
+      return {
+        clippedAtTop: controlBox.top < paneBox.top,
+        scrollTop: pane.scrollTop,
+        value:
+          control instanceof HTMLInputElement && control.type === 'checkbox'
+            ? control.checked
+            : control.value,
+      };
+    }, probe.selector);
+
+    await designer.locator(probe.selector).click();
+    if (probe.kind === 'select') {
+      await page.keyboard.press('ArrowDown');
+      await page.keyboard.press('Enter');
+    }
+    await page.waitForTimeout(250);
+
+    const after = await designer.evaluate((element, selector) => {
+      const root = element.shadowRoot;
+      const pane = root.querySelector('[data-inspector-pane="appearance"]');
+      const control = root.querySelector(selector);
+      if (
+        !(pane instanceof HTMLElement) ||
+        !(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)
+      ) {
+        throw new Error(`BROWSER_HARNESS_INSPECTOR_SCROLL_CONTROL_MISSING:${selector}`);
+      }
+      return {
+        scrollTop: pane.scrollTop,
+        value:
+          control instanceof HTMLInputElement && control.type === 'checkbox'
+            ? control.checked
+            : control.value,
+      };
+    }, probe.selector);
+    results.push({ ...probe, after, before });
+  }
+
+  if (
+    results.some(
+      ({ after, before }) =>
+        !before.clippedAtTop ||
+        before.scrollTop <= 0 ||
+        after.scrollTop !== before.scrollTop ||
+        after.value === before.value,
+    )
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_INSPECTOR_FORM_SCROLL_CONTINUITY_FAILED:${JSON.stringify(results)}`,
+    );
+  }
+}
+
 async function assertAuthoringShortcutsAndIsolation(page, designer) {
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
   await page.evaluate(() => {
@@ -2926,6 +3030,29 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
       window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.length === 1 &&
       window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.[0] === 'title',
   );
+  await designer.locator('[data-inspector-tab="appearance"]').click();
+  const lineHeightControl = designer.locator(
+    '[data-inspector-pane="appearance"] [data-style="lineHeight"]',
+  );
+  await lineHeightControl.fill('40');
+  await lineHeightControl.dispatchEvent('change');
+  await page.waitForFunction(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.style.lineHeight === 40;
+  });
+  await lineHeightControl.fill('');
+  await lineHeightControl.dispatchEvent('change');
+  await page.waitForFunction(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component !== undefined && !Object.hasOwn(component.style, 'lineHeight');
+  });
+  if ((await lineHeightControl.inputValue()) !== '') {
+    throw new Error('BROWSER_HARNESS_OPTIONAL_LINE_HEIGHT_CLEAR_FAILED');
+  }
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const layers = root.querySelector('[data-layers]');
@@ -3767,33 +3894,429 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
     );
     return component?.style?.fill === expected;
   }, '#0ea5e9');
-  const compactPalette = await page.evaluate(() => {
+  const compactPaletteBefore = await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-inspector-pane="appearance"]');
     const solid = panel?.querySelector('[data-style="fill"][data-color-palette-field="solid"]');
-    const alpha = panel?.querySelector(
-      '[data-style="fill"][data-color-palette-field="solid-alpha"]',
-    );
-    const colorControl = solid?.closest('.designer-color-palette-color-control');
-    const alphaRow = alpha?.closest('.designer-color-palette-alpha');
     const palette = solid?.closest('[data-designer-color-palette]');
-    if (colorControl === null || alphaRow === null || palette === null) {
+    const field = palette?.closest('.designer-field');
+    if (palette === null || field === null) {
       throw new Error('BROWSER_HARNESS_PALETTE_COMPACT_LAYOUT_MISSING');
     }
-    const colorBox = colorControl.getBoundingClientRect();
-    const alphaBox = alphaRow.getBoundingClientRect();
     return {
-      centerOffset: Math.abs(
-        colorBox.top + colorBox.height / 2 - (alphaBox.top + alphaBox.height / 2),
-      ),
-      height: palette.getBoundingClientRect().height,
+      fieldHeight: field.getBoundingClientRect().height,
+      paletteHeight: palette.getBoundingClientRect().height,
     };
   });
-  if (compactPalette.centerOffset > 1 || compactPalette.height >= 90) {
+  const fillPalette = designer.locator(
+    '[data-inspector-pane="appearance"] .designer-color-palette:has([data-style="fill"])',
+  );
+  await fillPalette.locator('.designer-color-palette-trigger').click();
+  const compactPaletteOpen = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-inspector-pane="appearance"]');
+    const solid = panel?.querySelector('[data-style="fill"][data-color-palette-field="solid"]');
+    const palette = solid?.closest('[data-designer-color-palette]');
+    const field = palette?.closest('.designer-field');
+    const popover = palette?.querySelector('.designer-color-popover');
+    if (palette === null || field === null || popover === null) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_POPOVER_MISSING');
+    }
+    const paneBox = panel.getBoundingClientRect();
+    const popoverBox = popover.getBoundingClientRect();
+    const modeControls = [...popover.querySelectorAll('[data-color-palette-field="mode"]')];
+    const modeLabels = modeControls.map((control) => control.closest('label'));
+    return {
+      fieldHeight: field.getBoundingClientRect().height,
+      fieldOverflow: getComputedStyle(field).overflow,
+      paletteHeight: palette.getBoundingClientRect().height,
+      popoverPosition: getComputedStyle(popover).position,
+      popoverPlacement: popover.dataset.colorPalettePlacement,
+      popoverWidth: popoverBox.width,
+      headingCount: popover.querySelectorAll('.designer-color-popover-heading').length,
+      modeAccessibleLabels: modeControls.map((control) => control.getAttribute('aria-label')),
+      modeIconCount: popover.querySelectorAll('.designer-color-palette-mode-icon svg').length,
+      modeSizes: modeLabels.map((label) => ({
+        height: label?.getBoundingClientRect().height,
+        width: label?.getBoundingClientRect().width,
+      })),
+      modeVisibleText: modeLabels.map((label) => label?.textContent?.trim()),
+      toolbarHeight: popover
+        .querySelector('.designer-color-popover-toolbar')
+        ?.getBoundingClientRect().height,
+      visibleWithinPane:
+        popoverBox.left >= paneBox.left - 1 &&
+        popoverBox.right <= paneBox.right + 1 &&
+        popoverBox.top >= paneBox.top - 1 &&
+        popoverBox.bottom <= paneBox.bottom + 1,
+    };
+  });
+  if (
+    compactPaletteBefore.paletteHeight !== 34 ||
+    Math.abs(compactPaletteBefore.fieldHeight - compactPaletteOpen.fieldHeight) > 0.1 ||
+    compactPaletteOpen.paletteHeight !== compactPaletteBefore.paletteHeight ||
+    compactPaletteOpen.fieldOverflow !== 'visible' ||
+    compactPaletteOpen.popoverPosition !== 'fixed' ||
+    !['top', 'bottom'].includes(compactPaletteOpen.popoverPlacement) ||
+    compactPaletteOpen.popoverWidth !== 280 ||
+    compactPaletteOpen.headingCount !== 0 ||
+    compactPaletteOpen.modeAccessibleLabels.join('|') !==
+      '\u5355\u8272|\u7ebf\u6027\u6e10\u53d8|\u5f84\u5411\u6e10\u53d8' ||
+    compactPaletteOpen.modeIconCount !== 3 ||
+    compactPaletteOpen.modeSizes.some((size) => size.width !== 28 || size.height !== 28) ||
+    compactPaletteOpen.modeVisibleText.some((text) => text !== '') ||
+    compactPaletteOpen.toolbarHeight !== 32 ||
+    !compactPaletteOpen.visibleWithinPane
+  ) {
     throw new Error(
-      `BROWSER_HARNESS_PALETTE_COMPACT_LAYOUT_FAILED:${JSON.stringify(compactPalette)}`,
+      `BROWSER_HARNESS_PALETTE_COMPACT_LAYOUT_FAILED:${JSON.stringify({ compactPaletteBefore, compactPaletteOpen })}`,
     );
   }
+
+  const measureGradientToolbar = async (mode) => {
+    await fillPalette.locator(`[data-color-palette-field="mode"][value="${mode}"]`).click();
+    await page.waitForFunction((expectedMode) => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      const palette = root
+        ?.querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+        ?.closest('[data-designer-color-palette]');
+      return palette?.dataset.colorPaletteMode === expectedMode;
+    }, mode);
+    return page.evaluate(() => {
+      const root = window.baseScreenHarness.designer.shadowRoot;
+      const palette = root
+        ?.querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+        ?.closest('[data-designer-color-palette]');
+      const popover = palette?.querySelector('.designer-color-popover');
+      const gradient = palette?.querySelector('.designer-color-palette-gradient');
+      const stopBar = palette?.querySelector('.designer-color-palette-stop-bar');
+      const picker = palette?.querySelector('.designer-fill-color-picker');
+      const actions = [...(stopBar?.querySelectorAll('.designer-color-palette-action') ?? [])];
+      if (
+        !(palette instanceof HTMLElement) ||
+        !(popover instanceof HTMLElement) ||
+        !(gradient instanceof HTMLElement) ||
+        !(stopBar instanceof HTMLElement) ||
+        !(picker instanceof HTMLElement)
+      ) {
+        throw new Error('BROWSER_HARNESS_GRADIENT_COMPACT_TOOLBAR_MISSING');
+      }
+      const visibleFields = [...stopBar.querySelectorAll('[data-color-palette-field]')]
+        .filter((field) => field.getBoundingClientRect().width > 0)
+        .map((field) => {
+          const box = field.getBoundingClientRect();
+          return {
+            field: field.dataset.colorPaletteField,
+            ariaLabel: field.getAttribute('aria-label'),
+            height: box.height,
+            top: box.top,
+            width: box.width,
+          };
+        });
+      const gradientBox = gradient.getBoundingClientRect();
+      const stopBarBox = stopBar.getBoundingClientRect();
+      const pickerBox = picker.getBoundingClientRect();
+      const popoverBox = popover.getBoundingClientRect();
+      return {
+        mode: palette.dataset.colorPaletteMode,
+        gradientHeight: gradientBox.height,
+        stopBarHeight: stopBarBox.height,
+        stopBarClientWidth: stopBar.clientWidth,
+        stopBarScrollWidth: stopBar.scrollWidth,
+        visibleFields,
+        actionSizes: actions.map((action) => {
+          const box = action.getBoundingClientRect();
+          return { height: box.height, width: box.width };
+        }),
+        pickerWithinPopover: pickerBox.bottom <= popoverBox.bottom,
+      };
+    });
+  };
+  const linearGradientToolbar = await measureGradientToolbar('linear-gradient');
+  const radialGradientToolbar = await measureGradientToolbar('radial-gradient');
+  const expectedGradientFields = {
+    'linear-gradient': ['stop-position', 'angle'],
+    'radial-gradient': ['stop-position', 'x', 'y'],
+  };
+  const gradientToolbars = [linearGradientToolbar, radialGradientToolbar];
+  if (
+    gradientToolbars.some(
+      (layout) =>
+        layout.gradientHeight !== 81 ||
+        layout.stopBarHeight !== 28 ||
+        layout.stopBarScrollWidth > layout.stopBarClientWidth ||
+        layout.visibleFields.map((field) => field.field).join('|') !==
+          expectedGradientFields[layout.mode]?.join('|') ||
+        layout.visibleFields.some((field) => field.height !== 28 || field.width < 32) ||
+        new Set(layout.visibleFields.map((field) => field.top)).size !== 1 ||
+        layout.actionSizes.some((size) => size.width !== 28 || size.height !== 28) ||
+        !layout.pickerWithinPopover,
+    ) ||
+    radialGradientToolbar.visibleFields.map((field) => field.ariaLabel).join('|') !==
+      '\u4f4d\u7f6e|\u4e2d\u5fc3 X|\u4e2d\u5fc3 Y'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_GRADIENT_COMPACT_TOOLBAR_FAILED:${JSON.stringify({ linearGradientToolbar, radialGradientToolbar })}`,
+    );
+  }
+  await fillPalette.locator('[data-color-palette-field="mode"][value="solid"]').click();
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const palette = root
+      ?.querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+      ?.closest('[data-designer-color-palette]');
+    return palette?.dataset.colorPaletteMode === 'solid';
+  });
+
+  const interactionInspectorTab = designer.locator('[data-inspector-tab="interaction"]');
+  await interactionInspectorTab.click();
+  const dismissedWithoutActivation = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const palette = root
+      .querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+      ?.closest('[data-designer-color-palette]');
+    return {
+      appearanceSelected: root
+        .querySelector('[data-inspector-tab="appearance"]')
+        ?.getAttribute('aria-selected'),
+      interactionSelected: root
+        .querySelector('[data-inspector-tab="interaction"]')
+        ?.getAttribute('aria-selected'),
+      popoverOpen: palette?.dataset.colorPaletteOpen,
+    };
+  });
+  if (
+    dismissedWithoutActivation.popoverOpen !== 'false' ||
+    dismissedWithoutActivation.appearanceSelected !== 'true' ||
+    dismissedWithoutActivation.interactionSelected !== 'false'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_PALETTE_DISMISS_CLICK_THROUGH_FAILED:${JSON.stringify(dismissedWithoutActivation)}`,
+    );
+  }
+  await interactionInspectorTab.click();
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.shadowRoot
+        ?.querySelector('[data-inspector-tab="interaction"]')
+        ?.getAttribute('aria-selected') === 'true',
+  );
+  await designer.locator('[data-inspector-tab="appearance"]').click();
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.shadowRoot
+        ?.querySelector('[data-inspector-tab="appearance"]')
+        ?.getAttribute('aria-selected') === 'true',
+  );
+  await fillPalette.locator('.designer-color-palette-trigger').click();
+  const fillColorSliderLayout = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const palette = root
+      ?.querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+      ?.closest('[data-designer-color-palette]');
+    const hue = palette?.querySelector('.designer-fill-color-hue');
+    const alpha = palette?.querySelector('.designer-fill-color-alpha');
+    const hueTrack = palette?.querySelector('.designer-fill-color-hue-track');
+    const alphaTrack = palette?.querySelector('.designer-fill-color-alpha-track');
+    const sliders = palette?.querySelector('.designer-fill-color-sliders');
+    if (
+      !(palette instanceof HTMLElement) ||
+      !(hue instanceof HTMLInputElement) ||
+      !(alpha instanceof HTMLInputElement) ||
+      !(hueTrack instanceof HTMLElement) ||
+      !(alphaTrack instanceof HTMLElement) ||
+      !(sliders instanceof HTMLElement)
+    ) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_SLIDER_CONTROLS_MISSING');
+    }
+    const measure = (input, track) => {
+      const inputBox = input.getBoundingClientRect();
+      const trackBox = track.getBoundingClientRect();
+      const inputStyle = getComputedStyle(input);
+      const trackStyle = getComputedStyle(track);
+      return {
+        inputHeight: inputBox.height,
+        trackHeight: trackBox.height,
+        cursor: inputStyle.cursor,
+        overflow: trackStyle.overflow,
+        paddingTop: trackStyle.paddingTop,
+        paddingBottom: trackStyle.paddingBottom,
+        bounds: {
+          left: inputBox.left,
+          top: inputBox.top,
+          width: inputBox.width,
+          height: inputBox.height,
+        },
+        value: Number(input.value),
+        max: Number(input.max),
+      };
+    };
+    return {
+      open: palette.dataset.colorPaletteOpen,
+      hue: measure(hue, hueTrack),
+      alpha: measure(alpha, alphaTrack),
+      verticalGap: alphaTrack.getBoundingClientRect().top - hueTrack.getBoundingClientRect().bottom,
+      slidersClientHeight: sliders.clientHeight,
+      slidersScrollHeight: sliders.scrollHeight,
+    };
+  });
+  const rangePoint = (control, value) => ({
+    x: control.bounds.left + 7 + (control.bounds.width - 14) * (value / control.max),
+    y: control.bounds.top + control.bounds.height / 2,
+  });
+  const hueDragFrom = rangePoint(fillColorSliderLayout.hue, fillColorSliderLayout.hue.value);
+  const hueDragTo = rangePoint(fillColorSliderLayout.hue, 90);
+  await page.mouse.move(hueDragFrom.x, hueDragFrom.y);
+  await page.mouse.down();
+  await page.mouse.move(hueDragTo.x, hueDragTo.y, { steps: 6 });
+  await page.mouse.up();
+  const alphaDragFrom = rangePoint(fillColorSliderLayout.alpha, fillColorSliderLayout.alpha.value);
+  const alphaDragTo = rangePoint(fillColorSliderLayout.alpha, 45);
+  await page.mouse.move(alphaDragFrom.x, alphaDragFrom.y);
+  await page.mouse.down();
+  await page.mouse.move(alphaDragTo.x, alphaDragTo.y, { steps: 6 });
+  await page.mouse.up();
+  const fillColorSliderDragResult = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const palette = root
+      ?.querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+      ?.closest('[data-designer-color-palette]');
+    const hue = palette?.querySelector('.designer-fill-color-hue');
+    const alpha = palette?.querySelector('.designer-fill-color-alpha');
+    return {
+      open: palette?.dataset.colorPaletteOpen,
+      hue: hue instanceof HTMLInputElement ? Number(hue.value) : undefined,
+      alpha: alpha instanceof HTMLInputElement ? Number(alpha.value) : undefined,
+    };
+  });
+  if (
+    fillColorSliderLayout.open !== 'true' ||
+    [fillColorSliderLayout.hue, fillColorSliderLayout.alpha].some(
+      (slider) =>
+        slider.inputHeight !== 16 ||
+        slider.trackHeight !== 16 ||
+        slider.cursor !== 'ew-resize' ||
+        slider.overflow !== 'visible' ||
+        slider.paddingTop !== '3px' ||
+        slider.paddingBottom !== '3px',
+    ) ||
+    fillColorSliderLayout.verticalGap !== 6 ||
+    fillColorSliderLayout.slidersScrollHeight > fillColorSliderLayout.slidersClientHeight ||
+    fillColorSliderDragResult.open !== 'true' ||
+    Math.abs((fillColorSliderDragResult.hue ?? Number.NaN) - 90) > 1 ||
+    Math.abs((fillColorSliderDragResult.alpha ?? Number.NaN) - 45) > 1
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_FILL_COLOR_SLIDER_STYLE_FAILED:${JSON.stringify({ fillColorSliderLayout, fillColorSliderDragResult })}`,
+    );
+  }
+  await fillPalette.locator('.designer-fill-color-alpha').evaluate((alpha) => {
+    if (!(alpha instanceof HTMLInputElement)) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_ALPHA_RESET_CONTROL_MISSING');
+    }
+    alpha.value = '100';
+    alpha.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    alpha.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
+  await fillPalette.locator('.designer-fill-color-hue').evaluate((hue) => {
+    if (!(hue instanceof HTMLInputElement)) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_HUE_STABILITY_CONTROL_MISSING');
+    }
+    hue.value = '221';
+    hue.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    hue.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
+  const fillPickerHueStabilityBounds = await page.evaluate(() => {
+    const plane = window.baseScreenHarness.designer.shadowRoot?.querySelector(
+      '.designer-fill-color-plane',
+    );
+    if (!(plane instanceof HTMLElement)) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_HUE_STABILITY_PLANE_MISSING');
+    }
+    const bounds = plane.getBoundingClientRect();
+    return {
+      x: bounds.left + bounds.width * 0.1,
+      y: bounds.top + bounds.height * 0.86,
+    };
+  });
+  await page.mouse.click(fillPickerHueStabilityBounds.x, fillPickerHueStabilityBounds.y);
+  const hueAfterPlaneClick = await page.evaluate(() => {
+    const hue = window.baseScreenHarness.designer.shadowRoot?.querySelector(
+      '.designer-fill-color-hue',
+    );
+    return hue instanceof HTMLInputElement ? Number(hue.value) : undefined;
+  });
+  if (hueAfterPlaneClick !== 221) {
+    throw new Error(`BROWSER_HARNESS_FILL_COLOR_HUE_JITTER:${hueAfterPlaneClick}`);
+  }
+  const fillPickerDragBounds = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const plane = root.querySelector('.designer-fill-color-plane');
+    const canvas = root.querySelector('[data-canvas]');
+    if (!(plane instanceof HTMLElement) || !(canvas instanceof HTMLElement)) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_DRAG_CONTROLS_MISSING');
+    }
+    const planeBox = plane.getBoundingClientRect();
+    const canvasBox = canvas.getBoundingClientRect();
+    return {
+      plane: {
+        x: planeBox.left + planeBox.width / 2,
+        y: planeBox.top + planeBox.height / 2,
+      },
+      canvas: {
+        x: canvasBox.left + canvasBox.width / 2,
+        y: canvasBox.top + canvasBox.height / 2,
+      },
+    };
+  });
+  await page.mouse.move(fillPickerDragBounds.plane.x, fillPickerDragBounds.plane.y);
+  await page.mouse.down();
+  await page.mouse.move(fillPickerDragBounds.canvas.x, fillPickerDragBounds.canvas.y, { steps: 8 });
+  await page.mouse.up();
+  await fillPalette.locator('.designer-fill-color-hue').evaluate((hue) => {
+    if (!(hue instanceof HTMLInputElement)) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_HUE_MISSING_AFTER_PLANE_DRAG');
+    }
+    hue.value = '340';
+    hue.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    hue.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
+  const hueAfterPlaneDrag = await page.evaluate(() => {
+    const hue = window.baseScreenHarness.designer.shadowRoot?.querySelector(
+      '.designer-fill-color-hue',
+    );
+    return hue instanceof HTMLInputElement ? Number(hue.value) : undefined;
+  });
+  if (hueAfterPlaneDrag === undefined || hueAfterPlaneDrag < 340) {
+    throw new Error(`BROWSER_HARNESS_FILL_COLOR_HUE_STUCK_AFTER_PLANE_DRAG:${hueAfterPlaneDrag}`);
+  }
+  await fillPalette.locator('[data-fill-color-quick="#39c5bb"]').click();
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const element = [...root.querySelectorAll('[data-base-screen-component-id]')].at(-1);
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === element?.getAttribute('data-base-screen-component-id'),
+    );
+    const palette = root
+      .querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+      ?.closest('[data-designer-color-palette]');
+    return component?.style?.fill === '#39c5bb' && palette?.dataset.colorPaletteOpen === 'true';
+  });
+  await page.evaluate(() => {
+    const panel = window.baseScreenHarness.designer.shadowRoot?.querySelector(
+      '[data-inspector-pane="appearance"]',
+    );
+    if (!(panel instanceof HTMLElement)) {
+      throw new Error('BROWSER_HARNESS_PALETTE_SCROLL_CONTROLS_MISSING');
+    }
+    panel.dispatchEvent(new Event('scroll'));
+  });
+  await page.waitForFunction(() => {
+    const palette = window.baseScreenHarness.designer.shadowRoot
+      ?.querySelector('[data-inspector-pane="appearance"] [data-style="fill"]')
+      ?.closest('[data-designer-color-palette]');
+    return palette?.dataset.colorPaletteOpen === 'true';
+  });
 
   // 手动 hex 输入：完整值同步原生 color input 与 alpha；输入框本身无边框、无焦点 outline。
   await page.evaluate(() => {
@@ -6013,6 +6536,49 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
     throw new Error(`BROWSER_HARNESS_DATAV_FLIP_LABELS_FAILED:${JSON.stringify(flipLabels)}`);
   }
   const quickPresets = appearance.locator('[data-quick-style]');
+  const colorCapabilities = await appearance.evaluate((panel) => ({
+    backgroundModes: panel.querySelectorAll(
+      '[data-descriptor-field-id="backgroundColor"][data-color-palette-field="mode"]',
+    ).length,
+    textModes: panel.querySelectorAll(
+      '[data-descriptor-field-id="textColor"][data-color-palette-field="mode"]',
+    ).length,
+    titleModes: panel.querySelectorAll(
+      '[data-descriptor-field-id="titleColor"][data-color-palette-field="mode"]',
+    ).length,
+  }));
+  if (
+    colorCapabilities.backgroundModes !== 3 ||
+    colorCapabilities.textModes !== 0 ||
+    colorCapabilities.titleModes !== 0
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_COLOR_CAPABILITIES_FAILED:${JSON.stringify(colorCapabilities)}`,
+    );
+  }
+  await appearance.evaluate((panel) => {
+    const linear = panel.querySelector(
+      '[data-descriptor-field-id="backgroundColor"][data-color-palette-field="mode"][value="linear-gradient"]',
+    );
+    if (!(linear instanceof HTMLInputElement)) {
+      throw new Error('BROWSER_HARNESS_ECHARTS_BACKGROUND_GRADIENT_CONTROL_MISSING');
+    }
+    linear.checked = true;
+    linear.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
+  await page.waitForFunction(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (candidate) => candidate.id === 'echarts-demo',
+    );
+    const material = window.baseScreenHarness.designer.shadowRoot?.querySelector(
+      '[data-base-screen-component-id="echarts-demo"]',
+    );
+    return (
+      component?.style.backgroundColor?.startsWith('linear-gradient(') &&
+      material?.style.backgroundImage.startsWith('linear-gradient(') &&
+      material.style.backgroundColor === 'transparent'
+    );
+  });
   await quickPresets.nth(1).click();
   await page.waitForFunction(() => {
     const style = window.baseScreenHarness.designer.document.components.find(
@@ -6052,6 +6618,25 @@ async function assertDataAndBlueprintAuthoring(designer, page) {
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATAV_QUICK_COLOR_LABELS_FAILED:${JSON.stringify(quickColorLabels)}`,
+    );
+  }
+  const quickColorPresentation = await quickColors.evaluateAll((buttons) =>
+    buttons.map((button) => ({
+      value: button.getAttribute('data-quick-config-value'),
+      backgroundColor: getComputedStyle(button).backgroundColor,
+    })),
+  );
+  const expectedQuickColorPresentation = [
+    { value: '#38bdf8', backgroundColor: 'rgb(56, 189, 248)' },
+    { value: '#4ade80', backgroundColor: 'rgb(74, 222, 128)' },
+    { value: '#f97316', backgroundColor: 'rgb(249, 115, 22)' },
+    { value: '#a78bfa', backgroundColor: 'rgb(167, 139, 250)' },
+    { value: '#facc15', backgroundColor: 'rgb(250, 204, 21)' },
+    { value: '#fb7185', backgroundColor: 'rgb(251, 113, 133)' },
+  ];
+  if (JSON.stringify(quickColorPresentation) !== JSON.stringify(expectedQuickColorPresentation)) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_QUICK_COLOR_PRESENTATION_FAILED:${JSON.stringify(quickColorPresentation)}`,
     );
   }
   await quickColors.nth(1).click();

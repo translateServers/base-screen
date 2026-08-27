@@ -12,7 +12,10 @@ import {
   parseBaseScreenTableData,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
-import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import {
+  applyBackgroundColorOrGradient,
+  BaseScreenOfficialMaterialElement,
+} from './base-material.js';
 
 export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   type: 'base.table',
@@ -74,9 +77,14 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     ],
   },
   stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color' },
+    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'color', label: '文字色', control: 'color' },
-    { style: 'headerBackgroundColor', label: '表头色', control: 'color' },
+    {
+      style: 'headerBackgroundColor',
+      label: '表头色',
+      control: 'color',
+      allowGradient: true,
+    },
     { style: 'borderColor', label: '边框色', control: 'color' },
     { style: 'fontSize', label: '字号', control: 'number' },
     { style: 'rowHeight', label: '行高', control: 'number' },
@@ -107,7 +115,7 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
     this.replaceChildren();
     this.style.display = 'block';
     this.style.overflow = 'auto';
-    this.style.backgroundColor = stringValue(model.style.backgroundColor);
+    applyBackgroundColorOrGradient(this, stringValue(model.style.backgroundColor));
     this.style.color = stringValue(model.style.color);
     this.setAttribute('role', 'region');
     this.setAttribute('aria-label', '表格');

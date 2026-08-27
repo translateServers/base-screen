@@ -75,10 +75,14 @@ class FakeElement {
 
   addEventListener(): void {}
 
+  querySelector<T extends Element>(selector: string): T | null {
+    return this.querySelectorAll<T>(selector)[0] ?? null;
+  }
+
   querySelectorAll<T extends Element>(selector: string): T[] {
-    const tags = new Set(selector.split(',').map((tag) => tag.trim().toLowerCase()));
+    const selectors = selector.split(',').map((part) => part.trim());
     return descendants(this).filter((child) =>
-      tags.has(child.tagName.toLowerCase()),
+      selectors.some((part) => matchesSelector(child, part)),
     ) as unknown as T[];
   }
 
@@ -152,7 +156,7 @@ function catalog(): BaseScreenMaterialCatalog {
             properties: { title: { kind: 'string' } },
             required: ['title'],
           },
-          stylePanel: [{ style: 'color', label: 'Color', control: 'color' }],
+          stylePanel: [{ style: 'color', label: 'Color', control: 'color', allowGradient: true }],
           styleSchema: {
             kind: 'object',
             properties: { color: { kind: 'string' } },
@@ -223,6 +227,22 @@ function resourceAuthority(): BaseScreenRuntimeContributionIndex {
 
 function descendants(element: FakeElement): FakeElement[] {
   return element.children.flatMap((child) => [child, ...descendants(child)]);
+}
+
+function matchesSelector(element: FakeElement, selector: string): boolean {
+  const dataSelector = /^\[data-([a-z0-9-]+)(?:="([^"]*)")?\](:checked)?$/i.exec(selector);
+  if (dataSelector !== null) {
+    const key = dataSelector[1]!.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
+    const value = element.dataset[key];
+    if (value === undefined || (dataSelector[2] !== undefined && value !== dataSelector[2])) {
+      return false;
+    }
+    return dataSelector[3] !== ':checked' || element.checked;
+  }
+  if (selector.startsWith('.')) {
+    return element.className.split(/\s+/).includes(selector.slice(1));
+  }
+  return element.tagName.toLowerCase() === selector.toLowerCase();
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -401,7 +421,8 @@ describe('designer panel rendering', () => {
       'hidden',
     ]);
     expect(propertyInputs).not.toContain('name');
-    expect(propertyInputs.slice(8)).toHaveLength(14);
+    // 原有属性/代理输入保持不变，并新增填充颜色控件的 hue、alpha 与五个精确通道输入。
+    expect(propertyInputs.slice(8)).toHaveLength(21);
     expect(
       descendants(properties).find((element) => element.dataset.propertySymbol === 'Z')?.dataset
         .inspectorAdvanced,
@@ -411,6 +432,11 @@ describe('designer panel rendering', () => {
       (element) => element.tagName === 'input' && element.dataset.colorPaletteField === 'mode',
     );
     expect(gradientModes.map((element) => element.disabled)).toEqual([false, false, false]);
+    expect(
+      descendants(properties).some(
+        (element) => element.dataset.designerFillColorPicker !== undefined,
+      ),
+    ).toBe(true);
     expect(
       descendants(properties).find((element) => element.dataset.colorPaletteField === 'solid')
         ?.value,

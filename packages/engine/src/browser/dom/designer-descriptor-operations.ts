@@ -22,7 +22,10 @@ import {
   type BaseScreenMaterialPropSchema,
   validateBaseScreenMaterialProps,
 } from '@base-screen/plugin-core';
-import { createValidatedPropsTransaction } from '../../common/operations/designer-layout-operations.js';
+import {
+  createValidatedPropsTransaction,
+  createValidatedStyleTransaction,
+} from '../../common/operations/designer-layout-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { readDesignerColorPaletteValue } from './designer-color-palette-dom.js';
 
@@ -197,7 +200,9 @@ function writeObjectPath(
       DESIGNER_UI_TEXT.propertiesPanel.dataSourceInvalid,
     );
   }
-  return createValidatedPropsTransaction(component.id, next, schema);
+  return target === 'props'
+    ? createValidatedPropsTransaction(component.id, next, schema)
+    : createValidatedStyleTransaction(component.id, next, schema);
 }
 
 function writeDataSourcePath(

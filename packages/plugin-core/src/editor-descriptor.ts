@@ -55,6 +55,8 @@ export interface BaseScreenMaterialEditorField {
   readonly path: readonly BaseScreenMaterialEditorPathSegment[];
   readonly label: string;
   readonly control: BaseScreenMaterialEditorControl;
+  /** `color` 控件是否接受线性/径向渐变；缺省仅接受纯色。 */
+  readonly allowGradient?: boolean;
   readonly help?: string;
   /** 属性搜索别名；仅用于作者界面，不进入 Screen Document。 */
   readonly keywords?: readonly string[];
@@ -138,6 +140,7 @@ const FIELD_KNOWN = new Set([
   'path',
   'label',
   'control',
+  'allowGradient',
   'help',
   'keywords',
   'when',
@@ -405,6 +408,7 @@ function validateField(
     );
     return;
   }
+  validateColorGradientCapability(value.allowGradient, control, path, collector);
   if (!isDisplayString(value.label, 256)) {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
@@ -601,6 +605,7 @@ function validateItemField(
     );
     return;
   }
+  validateColorGradientCapability(value.allowGradient, control, path, collector);
   if (!isDisplayString(value.label, 256)) {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
@@ -625,6 +630,22 @@ function validateItemField(
         : undefined;
   validateFieldPath(target, rawPath, schema, undefined, collector, path);
   validateControlForSchema(target, control, rawPath, schema, collector, path);
+}
+
+function validateColorGradientCapability(
+  value: unknown,
+  control: string,
+  path: readonly (string | number)[],
+  collector: PluginDiagnosticCollector,
+): void {
+  if (value === undefined) return;
+  if (typeof value !== 'boolean' || control !== 'color') {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      [...path, 'allowGradient'],
+      'Editor gradient support is only allowed as a boolean on color controls.',
+    );
+  }
 }
 
 function validateConditions(

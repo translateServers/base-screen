@@ -14,7 +14,10 @@ import {
   parseBaseScreenChartData,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
-import { BaseScreenOfficialMaterialElement } from './base-material.js';
+import {
+  applyBackgroundColorOrGradient,
+  BaseScreenOfficialMaterialElement,
+} from './base-material.js';
 
 const NUMBER = (minimum?: number, maximum?: number) => ({
   kind: 'number' as const,
@@ -130,6 +133,37 @@ export const BASE_SCREEN_ECHARTS_PROPS_SCHEMA = {
 
 export const BASE_SCREEN_ECHARTS_EDITOR_DESCRIPTOR: BaseScreenMaterialEditorDescriptor = {
   appearance: [
+    {
+      id: 'surface',
+      label: '组件',
+      fields: [
+        {
+          id: 'backgroundColor',
+          target: 'style',
+          path: ['backgroundColor'],
+          label: '背景色',
+          control: 'color',
+          allowGradient: true,
+          batchable: true,
+        },
+        {
+          id: 'textColor',
+          target: 'style',
+          path: ['color'],
+          label: '文字色',
+          control: 'color',
+          batchable: true,
+        },
+        {
+          id: 'gridColor',
+          target: 'style',
+          path: ['gridColor'],
+          label: '网格色',
+          control: 'color',
+          batchable: true,
+        },
+      ],
+    },
     {
       id: 'title',
       label: '标题',
@@ -563,7 +597,7 @@ export const BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
     required: ['backgroundColor', 'color', 'gridColor'],
   },
   stylePanel: [
-    { style: 'backgroundColor', label: '背景色', control: 'color' },
+    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'color', label: '文字色', control: 'color' },
     { style: 'gridColor', label: '网格色', control: 'color' },
   ],
@@ -597,7 +631,7 @@ export class BaseScreenEChartsMaterialElement extends BaseScreenOfficialMaterial
     this.replaceChildren();
     this.style.display = 'block';
     this.style.overflow = 'hidden';
-    this.style.backgroundColor = stringValue(model.style.backgroundColor);
+    applyBackgroundColorOrGradient(this, stringValue(model.style.backgroundColor));
     this.style.color = stringValue(model.style.color);
     this.setAttribute('role', 'img');
     this.setAttribute('aria-label', 'ECharts 图表');
