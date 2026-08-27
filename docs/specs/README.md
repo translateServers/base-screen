@@ -69,4 +69,4 @@
   Designer Engine、Designer Product Completion、Designer Workbench Control Styles、Directory Structure Rules、
   Designer Full Product、Designer Authoring And Project Lifecycle
 
-相关计划与评审见 [计划与评审](../plans/README.md)，当前架构见 [架构文档](../architecture/README.md)。
+相关计划与评审见 [计划与评审](../plans/README.md)，当前行为依据见 [能力基线](../baseline/README.md)。

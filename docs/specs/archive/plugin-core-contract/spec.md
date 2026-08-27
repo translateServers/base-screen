@@ -3,7 +3,7 @@
 > 状态：生效中
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/plugin-core` 的物料 ABI、插件协议、只读目录、标准事件与限权命令端口
-> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[ADR-0016](../../../decisions/ADR-0016-material-appearance-authoring-contract.md)（已接受）、[Contracts Foundation Spec](../contracts-foundation/spec.md)（生效中）、[Base Screen 长期演进总纲](../../../architecture/base-screen-evolution.md)（生效中）
+> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md)（已接受）、[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)（已接受）、[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[ADR-0016](../../../decisions/ADR-0016-material-appearance-authoring-contract.md)（已接受）、[Contracts Foundation Spec](../contracts-foundation/spec.md)（生效中）
 
 ## 1. Why
 

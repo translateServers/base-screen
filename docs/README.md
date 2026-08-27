@@ -11,7 +11,6 @@
 | 创建可直接绑定数据集的自定义组件 | [数据集驱动自定义组件最佳实践](./custom-dataset-material-best-practice.md) |
 | 当前能力现状与维护基线 | [当前能力基线](./baseline/README.md) |
 | 下一阶段方向与候选主题 | [后续路线图](./roadmap/README.md) |
-| 了解包职责、演进方向和开发顺序 | [架构文档](./architecture/README.md) |
 | 查看已接受、已取代和评审中的架构决策 | [架构决策记录](./decisions/README.md) |
 | 实施或验收功能 | [功能与工程规格](./specs/README.md) |
 | 查看实施计划、评审和技术调研 | [计划与评审](./plans/README.md) |
@@ -20,7 +19,6 @@
 
 ## 文档层级
 
-- **Architecture**：长期边界、包职责和开发顺序，不承载逐项任务进度。
 - **ADR**：影响公共契约、依赖、安全或兼容性的已审议决策。
 - **Baseline**：当前能力基线，维护期行为依据；新功能必须先写增量 Spec。
 - **Roadmap**：下一阶段方向与候选主题；不授权实现，启动时新建 ADR/Spec。

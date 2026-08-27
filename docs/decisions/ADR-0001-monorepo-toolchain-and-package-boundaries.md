@@ -3,7 +3,6 @@
 > 状态：已接受
 > 日期：2026-08-03
 > 定位：冻结 Base Screen 的工程基线、包发布形态、浏览器基线和十二包依赖门禁
-> 关联：[Base Screen 长期演进总纲](../architecture/base-screen-evolution.md)
 > 实施规格：[M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md)
 
 ## 1. 背景
@@ -569,7 +568,6 @@ ADR 落地完成的验收标准：
 
 ## 19. 参考
 
-- [Base Screen 长期演进总纲](../architecture/base-screen-evolution.md)
 - [Node.js Releases](https://nodejs.org/en/about/previous-releases)
 - [pnpm Installation and Compatibility](https://pnpm.io/installation)
 - [Vite 8 Migration and Browser Baseline](https://vite.dev/guide/migration)
