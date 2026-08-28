@@ -15,6 +15,7 @@ import type {
   BaseScreenMaterialConstructor,
   BaseScreenMaterialManifest,
   BaseScreenMaterialModel,
+  BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { vi } from 'vitest';
 
@@ -327,6 +328,7 @@ export async function createViewerHarness(options: {
   projectId?: string;
   documentRevision?: string;
   observer?: import('@base-screen/contracts').ScreenResourceObserver;
+  runtimeContributions?: BaseScreenRuntimeContributionIndex;
 }): Promise<{
   viewer: InstanceType<typeof import('../../src/viewer.js')['BaseScreenViewerElement']>;
   mount: FakeMount;
@@ -339,7 +341,8 @@ export async function createViewerHarness(options: {
   if (
     options.projectId !== undefined ||
     options.documentRevision !== undefined ||
-    options.observer !== undefined
+    options.observer !== undefined ||
+    options.runtimeContributions !== undefined
   ) {
     const configured = viewer.configure({
       catalog: options.catalog,
@@ -353,6 +356,9 @@ export async function createViewerHarness(options: {
         ? {}
         : { documentRevision: options.documentRevision }),
       ...(options.observer === undefined ? {} : { observer: options.observer }),
+      ...(options.runtimeContributions === undefined
+        ? {}
+        : { runtimeContributions: options.runtimeContributions }),
     });
     if (!configured.ok) {
       throw new Error('Viewer harness configure failed.');

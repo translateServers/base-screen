@@ -11,12 +11,63 @@ export function removeComponentCommands(
   componentIds: readonly string[],
 ): readonly ScreenDocumentCommand[] {
   const removed = removedComponentIds(document, componentIds);
-  const survivingRules = document.blueprint.rules.filter(
-    (rule) => !removed.has(rule.trigger.componentId),
-  );
+  const survivingRules: ScreenDocument['blueprint']['rules'][number][] = [];
+  const changedRuleIds = new Set<string>();
+  let rulesChanged = false;
+  for (const rule of document.blueprint.rules) {
+    if (removed.has(rule.trigger.componentId)) {
+      rulesChanged = true;
+      changedRuleIds.add(rule.id);
+      continue;
+    }
+    const actions = rule.actions.filter(
+      (action) => action.type !== 'component-visibility' || !removed.has(action.componentId),
+    );
+    if (actions.length !== rule.actions.length) {
+      rulesChanged = true;
+      changedRuleIds.add(rule.id);
+      if (actions.length === 0) continue;
+      survivingRules.push({ ...rule, actions });
+    } else {
+      survivingRules.push(rule);
+    }
+  }
+  const validLayoutNodeIds = new Set<string>();
+  for (const component of document.components) {
+    if (!removed.has(component.id)) validLayoutNodeIds.add(`component:${component.id}`);
+  }
+  for (const rule of survivingRules) {
+    if (rule.condition !== undefined) validLayoutNodeIds.add(`condition:${rule.id}`);
+    rule.actions.forEach((_action, index) => validLayoutNodeIds.add(`action:${rule.id}:${index}`));
+  }
+  const survivingLayoutNodes = document.blueprint.layout?.nodes.filter((node) => {
+    if (node.id.startsWith('action:')) {
+      return (
+        ![...changedRuleIds].some((ruleId) => node.id.startsWith(`action:${ruleId}:`)) &&
+        validLayoutNodeIds.has(node.id)
+      );
+    }
+    if (node.id.startsWith('component:') || node.id.startsWith('condition:')) {
+      return validLayoutNodeIds.has(node.id);
+    }
+    return true;
+  });
   const commands: ScreenDocumentCommand[] = [];
-  if (survivingRules.length !== document.blueprint.rules.length) {
-    commands.push({ type: 'replace-blueprint', blueprint: { rules: survivingRules } });
+  if (rulesChanged || survivingLayoutNodes?.length !== document.blueprint.layout?.nodes.length) {
+    commands.push({
+      type: 'replace-blueprint',
+      blueprint: {
+        rules: survivingRules,
+        ...(document.blueprint.layout === undefined
+          ? {}
+          : {
+              layout: {
+                ...document.blueprint.layout,
+                nodes: survivingLayoutNodes ?? [],
+              },
+            }),
+      },
+    });
   }
   commands.push({ type: 'remove-components', componentIds });
   return commands;

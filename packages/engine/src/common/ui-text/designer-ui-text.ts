@@ -683,7 +683,6 @@ export const DESIGNER_UI_TEXT = {
     operationFailed: '操作未完成，请重试。',
   },
   blueprint: {
-    summaryTitle: '事件概览',
     linkedVariablesTitle: '关联全局变量',
     linkedVariablesEmpty: (count: number) =>
       count === 0 ? '当前文档没有可关联变量。' : `尚未关联变量，可用变量 ${count} 个。`,
@@ -702,6 +701,8 @@ export const DESIGNER_UI_TEXT = {
     setVariableAction: (variableName: string) => `更新全局变量 · ${variableName}`,
     emitHostEventAction: (eventName: string) => `发送宿主事件 · ${eventName}`,
     hostAction: (actionId: string) => `执行宿主动作 · ${actionId}`,
+    visibilityAction: '组件显隐',
+    visibilityTransition: '过渡效果',
     literalValue: (value: string) => `固定值 ${value}`,
     eventPayloadValue: (path: string) => (path === '' ? '全部事件数据' : `事件数据 · ${path}`),
     variableValue: (name: string) => `变量 · ${name}`,
@@ -719,7 +720,6 @@ export const DESIGNER_UI_TEXT = {
         exists: '存在',
       })[operator] ?? operator,
     editorTitle: '整屏交互编排',
-    noComponent: '选择组件以查看事件规则。',
     ruleCount: (count: number) => `当前组件有 ${count} 条事件规则。`,
     ruleListItem: (eventName: string, count: number) => `${eventName}：${count} 条规则`,
     openBlueprint: '打开蓝图',

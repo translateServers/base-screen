@@ -288,6 +288,35 @@ describe('BaseScreenPluginManager', () => {
     }
   });
 
+  it('accepts the native component visibility Blueprint capability', async () => {
+    const plugin = runtime(
+      pluginManifest({
+        id: 'acme.visibility',
+        capabilities: ['blueprint.action.component-visibility'],
+        contributions: [
+          {
+            kind: 'blueprintCapability',
+            id: 'blueprint.action.component-visibility',
+            name: 'Component visibility',
+          },
+        ],
+      }),
+    );
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: {
+        'acme.visibility': ['blueprint.action.component-visibility'],
+      },
+    });
+
+    const activated = await manager.activate();
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(
+      activated.value.contributions.hasBlueprintCapability('blueprint.action.component-visibility'),
+    ).toBe(true);
+  });
+
   it('publishes query-only runtime contribution authority with its catalogs', async () => {
     const plugin = runtime(
       pluginManifest({

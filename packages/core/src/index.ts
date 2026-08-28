@@ -14,7 +14,9 @@ export type {
 export {
   compileScreenBlueprint,
   dispatchScreenBlueprintEvent,
+  SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
   type ScreenBlueprintActionTrace,
+  type ScreenBlueprintComponentVisibilityActionTrace,
   type ScreenBlueprintConditionTraceState,
   type ScreenBlueprintDispatchResult,
   type ScreenBlueprintEmitHostEventActionTrace,
@@ -24,6 +26,7 @@ export {
   type ScreenBlueprintRuleTrace,
   type ScreenBlueprintSetVariableActionTrace,
   type ScreenBlueprintTraceResult,
+  type ScreenBlueprintVisibilityEffect,
   traceScreenBlueprintEvent,
 } from './blueprint/runtime.js';
 export { applyScreenDocumentCommand, applyScreenDocumentTransaction } from './commands/apply.js';

@@ -231,6 +231,9 @@ function renderAction(panel: HTMLElement, action: ScreenBlueprintAction): HTMLEl
   } else if (action.type === 'emit-host-event') {
     title.textContent = DESIGNER_UI_TEXT.blueprint.emitHostEventAction(action.eventName);
     value.textContent = expressionSummary(action.payload);
+  } else if (action.type === 'component-visibility') {
+    title.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityAction} · ${action.componentId} · ${action.operation}`;
+    value.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityTransition} · ${action.transition?.effect ?? 'appear'}`;
   } else {
     title.textContent = DESIGNER_UI_TEXT.blueprint.hostAction(action.actionId);
     value.textContent = expressionSummary(action.payload);

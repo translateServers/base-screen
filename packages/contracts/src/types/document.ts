@@ -164,10 +164,33 @@ export interface ScreenBlueprintHostAction {
   readonly payload: ScreenBlueprintValueExpression;
 }
 
+export type ScreenBlueprintVisibilityOperation = 'show' | 'hide' | 'toggle';
+
+export type ScreenBlueprintVisibilityTransitionEffect = 'appear' | 'fade' | 'slide-up';
+
+export type ScreenBlueprintVisibilityTransitionEasing =
+  | 'linear'
+  | 'ease-in-out-quad'
+  | 'ease-in-out-expo';
+
+export interface ScreenBlueprintVisibilityTransition {
+  readonly effect: ScreenBlueprintVisibilityTransitionEffect;
+  readonly durationMs: number;
+  readonly easing: ScreenBlueprintVisibilityTransitionEasing;
+}
+
+export interface ScreenBlueprintComponentVisibilityAction {
+  readonly type: 'component-visibility';
+  readonly componentId: string;
+  readonly operation: ScreenBlueprintVisibilityOperation;
+  readonly transition?: ScreenBlueprintVisibilityTransition;
+}
+
 export type ScreenBlueprintAction =
   | ScreenBlueprintSetVariableAction
   | ScreenBlueprintEmitHostEventAction
-  | ScreenBlueprintHostAction;
+  | ScreenBlueprintHostAction
+  | ScreenBlueprintComponentVisibilityAction;
 
 export interface ScreenBlueprintRule {
   readonly id: string;
@@ -177,8 +200,27 @@ export interface ScreenBlueprintRule {
   readonly actions: readonly ScreenBlueprintAction[];
 }
 
+export interface ScreenBlueprintLayoutNode {
+  readonly id: string;
+  readonly x: number;
+  readonly y: number;
+  readonly collapsed?: boolean;
+}
+
+export interface ScreenBlueprintLayoutViewport {
+  readonly x: number;
+  readonly y: number;
+  readonly zoom: number;
+}
+
+export interface ScreenBlueprintLayout {
+  readonly nodes: readonly ScreenBlueprintLayoutNode[];
+  readonly viewport?: ScreenBlueprintLayoutViewport;
+}
+
 export interface ScreenBlueprint {
   readonly rules: readonly ScreenBlueprintRule[];
+  readonly layout?: ScreenBlueprintLayout;
 }
 
 export interface ScreenDocument {

@@ -637,6 +637,45 @@
                       },
                       "required": ["type", "actionId", "payload"],
                       "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "component-visibility"
+                        },
+                        "componentId": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                        },
+                        "operation": {
+                          "type": "string",
+                          "enum": ["show", "hide", "toggle"]
+                        },
+                        "transition": {
+                          "type": "object",
+                          "properties": {
+                            "effect": {
+                              "type": "string",
+                              "enum": ["appear", "fade", "slide-up"]
+                            },
+                            "durationMs": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 10000
+                            },
+                            "easing": {
+                              "type": "string",
+                              "enum": ["linear", "ease-in-out-quad", "ease-in-out-expo"]
+                            }
+                          },
+                          "required": ["effect", "durationMs", "easing"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["type", "componentId", "operation"],
+                      "additionalProperties": false
                     }
                   ]
                 }
@@ -645,6 +684,55 @@
             "required": ["id", "trigger", "actions"],
             "additionalProperties": false
           }
+        },
+        "layout": {
+          "type": "object",
+          "properties": {
+            "nodes": {
+              "maxItems": 20000,
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                  },
+                  "x": {
+                    "type": "number"
+                  },
+                  "y": {
+                    "type": "number"
+                  },
+                  "collapsed": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["id", "x", "y"],
+                "additionalProperties": false
+              }
+            },
+            "viewport": {
+              "type": "object",
+              "properties": {
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "zoom": {
+                  "type": "number",
+                  "minimum": 0.1,
+                  "maximum": 4
+                }
+              },
+              "required": ["x", "y", "zoom"],
+              "additionalProperties": false
+            }
+          },
+          "required": ["nodes"],
+          "additionalProperties": false
         }
       },
       "required": ["rules"],

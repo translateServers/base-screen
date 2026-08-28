@@ -10,6 +10,7 @@ import { BaseScreenMaterialMode } from '@base-screen/plugin-core';
 import { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { ScreenBlueprintHostActionPort } from '@base-screen/contracts';
 import type { ScreenBlueprintRuntimePort } from '@base-screen/contracts';
+import { ScreenBlueprintVisibilityEffect } from '@base-screen/core';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenHostResourcePort } from '@base-screen/contracts';
@@ -36,6 +37,8 @@ export interface BaseScreenMaterialEvent {
 // @public (undocumented)
 export interface BaseScreenRenderer {
     // (undocumented)
+    applyBlueprintVisibilityEffects(effects: readonly ScreenBlueprintVisibilityEffect[]): ScreenParseResult<null>;
+    // (undocumented)
     clear(): void;
     // (undocumented)
     dispose(): void;
@@ -46,6 +49,8 @@ export interface BaseScreenRenderer {
         readonly trigger?: ScreenResourceExecutionTrigger;
         readonly traceId?: string;
     }): ScreenParseResult<null>;
+    // (undocumented)
+    resetBlueprintVisibility(): void;
     setInteractive(enabled: boolean): ScreenParseResult<null>;
     // (undocumented)
     setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;

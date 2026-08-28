@@ -3,8 +3,6 @@ import {
   parseScreenDocument,
   parseScreenJsonValue,
   parseScreenTabularDataset,
-  type ScreenCanvas,
-  type ScreenCanvasBackground,
   type ScreenComponentNode,
   type ScreenDiagnostic,
   type ScreenDocument,
@@ -20,7 +18,7 @@ import {
 import {
   evaluateScreenHostResourceParameters,
   getPainterOrder,
-  isScreenComponentEffectivelyHidden,
+  type ScreenBlueprintVisibilityEffect,
   validateScreenHostResourceBinding,
 } from '@base-screen/core';
 import {
@@ -36,6 +34,8 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
+import { BlueprintVisibilityController } from './blueprint-visibility.js';
+import { applyCanvasBackground } from './canvas-background.js';
 import { ResourceRequestCoordinator } from './request-coordinator.js';
 import {
   cancelResourceState,
@@ -92,6 +92,10 @@ export interface BaseScreenRenderer {
    * 未渲染时只记录状态供下一次 render 使用。Viewer 与 Designer 共用该入口。
    */
   setInteractive(enabled: boolean): ScreenParseResult<null>;
+  applyBlueprintVisibilityEffects(
+    effects: readonly ScreenBlueprintVisibilityEffect[],
+  ): ScreenParseResult<null>;
+  resetBlueprintVisibility(): void;
   clear(): void;
   dispose(): void;
 }
@@ -146,9 +150,11 @@ class Renderer implements BaseScreenRenderer {
   #disposed = false;
   #interactive: boolean;
   #coordinator: ResourceRequestCoordinator | undefined;
+  #visibility: BlueprintVisibilityController;
 
   constructor(private readonly options: CreateBaseScreenRendererOptions) {
     this.#interactive = options.interactive;
+    this.#visibility = new BlueprintVisibilityController(options.root);
     if (!isResourceTimeoutValid(options.resourceTimeoutMs ?? 15_000)) {
       throw new RangeError('resourceTimeoutMs must be an integer between 100 and 60000.');
     }
@@ -201,6 +207,7 @@ class Renderer implements BaseScreenRenderer {
     const painterIndex = new Map(
       getPainterOrder(parsedDocument.value).map((componentId, index) => [componentId, index]),
     );
+    this.#visibility.prepare(parsedDocument.value);
     const candidates = [...prepared.value].sort(
       (left, right) => painterIndex.get(left.component.id)! - painterIndex.get(right.component.id)!,
     );
@@ -263,7 +270,7 @@ class Renderer implements BaseScreenRenderer {
           candidate.component,
           parsedDocument.value,
           this.#resolveEffectiveModel(candidate, candidate.model.dataState),
-          isScreenComponentEffectivelyHidden(parsedDocument.value, candidate.component.id),
+          this.#visibility.isHidden(candidate.component.id),
           stackOrder,
         );
       } catch {
@@ -271,12 +278,6 @@ class Renderer implements BaseScreenRenderer {
         continue;
       }
       this.options.root.appendChild(element);
-      element.style.display = isScreenComponentEffectivelyHidden(
-        parsedDocument.value,
-        candidate.component.id,
-      )
-        ? 'none'
-        : 'block';
       const mounted: MountedMaterial = {
         type: candidate.component.type,
         element,
@@ -354,6 +355,19 @@ class Renderer implements BaseScreenRenderer {
     // 原地重渲染：同 type 同 id 的挂载按 reconcile 路径复用元素与资源请求状态，
     // 仅更新模型（interactive 字段），不重挂载、不重取数、不闪烁。
     return this.render(this.#document);
+  }
+
+  applyBlueprintVisibilityEffects(
+    effects: readonly ScreenBlueprintVisibilityEffect[],
+  ): ScreenParseResult<null> {
+    if (this.#disposed) {
+      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Renderer has been disposed.');
+    }
+    return this.#visibility.apply(effects, this.#document, this.#mounted);
+  }
+
+  resetBlueprintVisibility(): void {
+    this.#visibility.reset();
   }
 
   /**
@@ -454,6 +468,7 @@ class Renderer implements BaseScreenRenderer {
   }
 
   clear(): void {
+    this.resetBlueprintVisibility();
     this.#coordinator?.abortAll();
     for (const mounted of this.#mounted.values()) {
       cancelResourceState(mounted.resource);
@@ -534,7 +549,7 @@ class Renderer implements BaseScreenRenderer {
       candidate.component,
       document,
       this.#resolveEffectiveModel(candidate, mounted.resource.dataState),
-      isScreenComponentEffectivelyHidden(document, candidate.component.id),
+      this.#visibility.isHidden(candidate.component.id),
       stackOrder,
     );
   }
@@ -1379,48 +1394,4 @@ function sortDiagnostics(diagnostics: readonly ScreenDiagnostic[]): readonly Scr
     const rightPath = right.path.join('/');
     return leftPath < rightPath ? -1 : leftPath > rightPath ? 1 : left.code < right.code ? -1 : 1;
   });
-}
-
-function applyCanvasBackground(root: HTMLElement, canvas: ScreenCanvas): void {
-  const background = canvas.background;
-  root.style.backgroundColor =
-    background?.type === 'solid' ? background.color : canvas.backgroundColor;
-
-  const imageLayers: string[] = [];
-  const sizes: string[] = [];
-  if (canvas.backgroundImage !== undefined) {
-    imageLayers.push(`url("${escapeCssString(canvas.backgroundImage)}")`);
-    sizes.push(canvas.backgroundImageFit === 'contain' ? 'contain' : 'cover');
-  }
-  const gradient = background === undefined ? undefined : canvasGradient(background);
-  if (gradient !== undefined) {
-    imageLayers.push(gradient);
-    sizes.push('100% 100%');
-  }
-
-  if (imageLayers.length === 0) {
-    root.style.backgroundImage = '';
-    root.style.backgroundSize = '';
-    root.style.backgroundPosition = '';
-    root.style.backgroundRepeat = '';
-    return;
-  }
-  root.style.backgroundImage = imageLayers.join(', ');
-  root.style.backgroundSize = sizes.join(', ');
-  root.style.backgroundPosition = imageLayers.map(() => 'center').join(', ');
-  root.style.backgroundRepeat = imageLayers.map(() => 'no-repeat').join(', ');
-}
-
-function canvasGradient(background: ScreenCanvasBackground): string | undefined {
-  if (background.type === 'solid') return undefined;
-  const stops = background.stops.map((stop) => `${stop.color} ${stop.position}%`).join(', ');
-  if (background.type === 'linear-gradient') {
-    return `linear-gradient(${background.angle}deg, ${stops})`;
-  }
-  return `radial-gradient(circle at ${background.position.x}% ${background.position.y}%, ${stops})`;
-}
-
-/** CSS 字符串转义（用于 url("...") 值；校验已拒绝空白/控制字符/反斜杠，此处防御性转义 `\` 与 `"`）。 */
-function escapeCssString(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }

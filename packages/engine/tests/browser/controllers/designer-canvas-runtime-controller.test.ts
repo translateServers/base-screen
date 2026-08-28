@@ -38,6 +38,11 @@ class FakeRenderer implements BaseScreenRenderer {
     return { ok: true, value: null, diagnostics: [] };
   }
 
+  applyBlueprintVisibilityEffects(): ScreenParseResult<null> {
+    return { ok: true, value: null, diagnostics: [] };
+  }
+
+  resetBlueprintVisibility(): void {}
   clear(): void {}
   dispose(): void {}
 }

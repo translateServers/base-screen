@@ -78,6 +78,46 @@ describe('removeComponentCommands', () => {
     expect(commands).toEqual([{ type: 'remove-components', componentIds: ['title'] }]);
   });
 
+  it('prunes visibility targets and persisted graph nodes without deleting the trigger', () => {
+    const source: ScreenDocument = {
+      ...document([component('button'), component('panel'), component('other')], []),
+      blueprint: {
+        rules: [
+          {
+            id: 'toggle-panel',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            actions: [
+              { type: 'component-visibility', componentId: 'panel', operation: 'toggle' },
+              {
+                type: 'emit-host-event',
+                eventName: 'kept',
+                payload: { kind: 'literal', value: null },
+              },
+            ],
+          },
+        ],
+        layout: {
+          nodes: [
+            { id: 'component:button', x: 0, y: 0 },
+            { id: 'component:panel', x: 300, y: 0 },
+            { id: 'component:other', x: 600, y: 0 },
+            { id: 'action:toggle-panel:1', x: 450, y: 140 },
+          ],
+        },
+      },
+    };
+
+    const commands = removeComponentCommands(source, ['panel']);
+    const blueprint = commands[0]?.type === 'replace-blueprint' ? commands[0].blueprint : undefined;
+    expect(blueprint?.rules[0]?.actions).toEqual([
+      { type: 'emit-host-event', eventName: 'kept', payload: { kind: 'literal', value: null } },
+    ]);
+    expect(blueprint?.layout?.nodes).toEqual([
+      { id: 'component:button', x: 0, y: 0 },
+      { id: 'component:other', x: 600, y: 0 },
+    ]);
+  });
+
   it('applies as a valid transaction end to end', () => {
     const source = document([component('title'), component('subtitle')], ['title']);
     const commands = removeComponentCommands(source, ['title']);

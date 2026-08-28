@@ -28,6 +28,7 @@ export const DESIGNER_BLUEPRINT_CAPABILITIES = {
   condition: 'blueprint.condition.compare',
   setVariable: 'blueprint.action.set-variable',
   emitHostEvent: 'blueprint.action.emit-host-event',
+  componentVisibility: 'blueprint.action.component-visibility',
 } as const;
 
 export interface ScreenAuthoringGuardInput {

@@ -11,6 +11,7 @@ const SUPPORTED_BLUEPRINT_CAPABILITIES = new Set([
   'blueprint.condition.compare',
   'blueprint.action.set-variable',
   'blueprint.action.emit-host-event',
+  'blueprint.action.component-visibility',
 ]);
 
 export function resolveCandidates(

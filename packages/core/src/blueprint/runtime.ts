@@ -1,5 +1,6 @@
 import {
   parseScreenJsonValue,
+  type ScreenBlueprintComponentVisibilityAction,
   type ScreenBlueprintCondition,
   type ScreenBlueprintHostEvent,
   type ScreenBlueprintValueExpression,
@@ -29,6 +30,16 @@ export interface ScreenBlueprintDispatchResult {
   readonly variables: ScreenJsonObject;
   readonly hostEvents: readonly ScreenBlueprintHostEvent[];
   readonly hostActions: readonly ScreenBlueprintHostEvent[];
+  readonly visibilityEffects: readonly ScreenBlueprintVisibilityEffect[];
+}
+
+export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY =
+  'blueprint.action.component-visibility';
+
+export interface ScreenBlueprintVisibilityEffect {
+  readonly componentId: string;
+  readonly operation: ScreenBlueprintComponentVisibilityAction['operation'];
+  readonly transition?: ScreenBlueprintComponentVisibilityAction['transition'];
 }
 
 export function compileScreenBlueprint(
@@ -40,6 +51,12 @@ export function compileScreenBlueprint(
       if (!capabilities.hasBlueprintCapability(capability)) {
         return failure('BLUEPRINT_CAPABILITY_UNAVAILABLE', 'Blueprint capability is unavailable.');
       }
+    }
+    if (
+      rule.actions.some((action) => action.type === 'component-visibility') &&
+      !capabilities.hasBlueprintCapability(SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY)
+    ) {
+      return failure('BLUEPRINT_CAPABILITY_UNAVAILABLE', 'Blueprint capability is unavailable.');
     }
   }
   const initialVariables: Record<string, ScreenJsonValue> = {};
@@ -53,14 +70,20 @@ export function compileScreenBlueprint(
         ...rule,
         trigger: { ...rule.trigger },
         ...(rule.condition ? { condition: cloneCondition(rule.condition) } : {}),
-        actions: rule.actions.map((action) => ({
-          ...action,
-          ...(action.type === 'set-variable'
-            ? { value: cloneExpression(action.value) }
-            : action.type === 'emit-host-event'
-              ? { payload: cloneExpression(action.payload) }
+        actions: rule.actions.map((action) => {
+          if (action.type === 'component-visibility') {
+            return {
+              ...action,
+              ...(action.transition === undefined ? {} : { transition: { ...action.transition } }),
+            };
+          }
+          return {
+            ...action,
+            ...(action.type === 'set-variable'
+              ? { value: cloneExpression(action.value) }
               : { payload: cloneExpression(action.payload) }),
-        })),
+          };
+        }),
       })),
       initialVariables,
     },
@@ -102,10 +125,20 @@ export interface ScreenBlueprintHostActionTrace {
   readonly detached: ScreenJsonObject;
 }
 
+export interface ScreenBlueprintComponentVisibilityActionTrace {
+  readonly type: 'component-visibility';
+  readonly actionIndex: number;
+  readonly componentId: string;
+  readonly operation: ScreenBlueprintComponentVisibilityAction['operation'];
+  readonly output: ScreenJsonValue;
+  readonly detached: ScreenJsonObject;
+}
+
 export type ScreenBlueprintActionTrace =
   | ScreenBlueprintSetVariableActionTrace
   | ScreenBlueprintEmitHostEventActionTrace
-  | ScreenBlueprintHostActionTrace;
+  | ScreenBlueprintHostActionTrace
+  | ScreenBlueprintComponentVisibilityActionTrace;
 
 export interface ScreenBlueprintRuleTrace {
   readonly ruleId: string;
@@ -142,6 +175,7 @@ function evaluateScreenBlueprintEvent(
   const variables = cloneObject(state);
   const hostEvents: ScreenBlueprintHostEvent[] = [];
   const hostActions: ScreenBlueprintHostEvent[] = [];
+  const visibilityEffects: ScreenBlueprintVisibilityEffect[] = [];
   const ruleTraces: ScreenBlueprintRuleTrace[] = [];
   for (const [ruleIndex, rule] of plan.rules.entries()) {
     const actions: ScreenBlueprintActionTrace[] = [];
@@ -172,7 +206,31 @@ function evaluateScreenBlueprintEvent(
     const nextVariables = { ...variables };
     const nextEvents = [...hostEvents];
     const nextActions = [...hostActions];
+    const nextVisibilityEffects = [...visibilityEffects];
     for (const [actionIndex, action] of rule.actions.entries()) {
+      if (action.type === 'component-visibility') {
+        nextVisibilityEffects.push({
+          componentId: action.componentId,
+          operation: action.operation,
+          ...(action.transition === undefined ? {} : { transition: { ...action.transition } }),
+        });
+        if (withTrace) {
+          actions.push({
+            type: 'component-visibility',
+            actionIndex,
+            componentId: action.componentId,
+            operation: action.operation,
+            output: { componentId: action.componentId, operation: action.operation },
+            detached: {
+              type: 'component-visibility',
+              actionIndex,
+              componentId: action.componentId,
+              operation: action.operation,
+            },
+          });
+        }
+        continue;
+      }
       const expression = action.type === 'set-variable' ? action.value : action.payload;
       const value = evaluateExpression(expression, parsedPayload.value, nextVariables);
       if (!value.ok) {
@@ -190,20 +248,28 @@ function evaluateScreenBlueprintEvent(
     Object.assign(variables, nextVariables);
     hostEvents.push(...nextEvents.slice(hostEvents.length));
     hostActions.push(...nextActions.slice(hostActions.length));
+    visibilityEffects.push(...nextVisibilityEffects.slice(visibilityEffects.length));
     if (withTrace) ruleTraces.push(ruleTrace);
   }
   if (!withTrace) {
-    return { ok: true, value: { variables, hostEvents, hostActions }, diagnostics: [] };
+    return {
+      ok: true,
+      value: { variables, hostEvents, hostActions, visibilityEffects },
+      diagnostics: [],
+    };
   }
   return {
     ok: true,
-    value: { variables, hostEvents, hostActions, ruleTraces },
+    value: { variables, hostEvents, hostActions, visibilityEffects, ruleTraces },
     diagnostics: [],
   };
 }
 
 function createActionTrace(
-  action: ScreenDocument['blueprint']['rules'][number]['actions'][number],
+  action: Exclude<
+    ScreenDocument['blueprint']['rules'][number]['actions'][number],
+    ScreenBlueprintComponentVisibilityAction
+  >,
   actionIndex: number,
   output: ScreenJsonValue,
 ): ScreenBlueprintActionTrace | undefined {

@@ -99,6 +99,15 @@ export function validateReferences(
         );
         clean = false;
       }
+      if (action.type === 'component-visibility' && !idToIndex.has(action.componentId)) {
+        collector.add(
+          'COMPONENT_PARENT_MISSING',
+          at(['blueprint', 'rules', index, 'actions', actionIndex, 'componentId']),
+          phase,
+          `Blueprint visibility action references unknown component id "${truncateKey(action.componentId)}".`,
+        );
+        clean = false;
+      }
     });
   });
   return clean;

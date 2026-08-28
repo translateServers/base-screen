@@ -5,6 +5,7 @@ import {
   MAX_BACKGROUND_GRADIENT_STOPS,
   MAX_BLUEPRINT_ACTIONS_PER_RULE,
   MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
+  MAX_BLUEPRINT_LAYOUT_NODES,
   MAX_BLUEPRINT_RULES,
   MAX_COMPONENTS,
   MAX_STYLE_RULE_ID_CODE_POINTS,
@@ -233,18 +234,59 @@ const hostActionSchema = z.strictObject({
   payload: blueprintValueExpressionSchema,
 });
 
+const componentVisibilityActionSchema = z.strictObject({
+  type: z.literal('component-visibility'),
+  componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  operation: z.enum(['show', 'hide', 'toggle']),
+  transition: z
+    .strictObject({
+      effect: z.enum(['appear', 'fade', 'slide-up']),
+      durationMs: z.number().int().min(0).max(10_000),
+      easing: z.enum(['linear', 'ease-in-out-quad', 'ease-in-out-expo']),
+    })
+    .optional(),
+});
+
 const blueprintRuleSchema = z.strictObject({
   id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   trigger: blueprintTriggerSchema,
   requiredCapabilities: z.array(z.string().regex(new RegExp(COMPONENT_ID_PATTERN))).optional(),
   condition: blueprintConditionSchema.optional(),
   actions: z
-    .array(z.union([setVariableActionSchema, emitHostEventActionSchema, hostActionSchema]))
+    .array(
+      z.union([
+        setVariableActionSchema,
+        emitHostEventActionSchema,
+        hostActionSchema,
+        componentVisibilityActionSchema,
+      ]),
+    )
     .max(MAX_BLUEPRINT_ACTIONS_PER_RULE),
+});
+
+const blueprintLayoutSchema = z.strictObject({
+  nodes: z
+    .array(
+      z.strictObject({
+        id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+        x: z.number().finite(),
+        y: z.number().finite(),
+        collapsed: z.boolean().optional(),
+      }),
+    )
+    .max(MAX_BLUEPRINT_LAYOUT_NODES),
+  viewport: z
+    .strictObject({
+      x: z.number().finite(),
+      y: z.number().finite(),
+      zoom: z.number().finite().min(0.1).max(4),
+    })
+    .optional(),
 });
 
 export const blueprintSchema = z.strictObject({
   rules: z.array(blueprintRuleSchema).max(MAX_BLUEPRINT_RULES),
+  layout: blueprintLayoutSchema.optional(),
 });
 
 export const documentSchema = z.strictObject({

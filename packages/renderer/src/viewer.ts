@@ -24,6 +24,8 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer, createBaseScreenRenderer } from './renderer.js';
+import { applyBlueprintDispatchToRenderer } from './viewer-blueprint-runtime.js';
+import { lifecycleFailure } from './viewer-lifecycle.js';
 
 const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
@@ -264,6 +266,7 @@ export class BaseScreenViewerElement extends ElementBase {
 
   set document(value: ScreenDocument | undefined) {
     this.cancelVariableResolution();
+    this.#renderer?.resetBlueprintVisibility();
     this.#document = value;
     this.compileBlueprint();
     this.initialize();
@@ -535,6 +538,7 @@ export class BaseScreenViewerElement extends ElementBase {
     if (this.#blueprintPlan === undefined || this.#blueprintVariables === undefined) {
       return;
     }
+    const previousVariables = this.#blueprintVariables;
     const result = dispatchScreenBlueprintEvent(this.#blueprintPlan, this.#blueprintVariables, {
       componentId: event.componentId,
       name: event.name,
@@ -548,14 +552,13 @@ export class BaseScreenViewerElement extends ElementBase {
     const renderer = this.#renderer;
     const document = this.#document;
     if (renderer !== undefined && document !== undefined) {
-      const variables = renderer.setVariables(result.value.variables);
-      if (variables.ok) {
-        const rendered = renderer.render(document, { trigger: 'variable' });
-        if (!rendered.ok || rendered.diagnostics.length > 0)
-          this.emitDiagnostics(rendered.diagnostics);
-      } else {
-        this.emitDiagnostics(variables.diagnostics);
-      }
+      const diagnostics = applyBlueprintDispatchToRenderer(
+        renderer,
+        document,
+        previousVariables,
+        result.value,
+      );
+      if (diagnostics.length > 0) this.emitDiagnostics(diagnostics);
     }
     for (const hostEvent of result.value.hostEvents) {
       if (this.#blueprintRuntimePort === undefined) {
@@ -687,11 +690,4 @@ function isScreenBlueprintHostActionPort(value: unknown): boolean {
     typeof value === 'object' &&
     typeof (value as Record<string, unknown>).execute === 'function'
   );
-}
-
-function lifecycleFailure(message: string): ScreenParseResult<null> {
-  return {
-    ok: false as const,
-    diagnostics: [{ severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message }],
-  };
 }

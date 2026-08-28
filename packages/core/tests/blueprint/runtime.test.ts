@@ -6,6 +6,58 @@ import {
 import { makeComponent, makeDocument, makeVariable } from '../__fixtures__/document.js';
 
 describe('Blueprint runtime', () => {
+  it('emits ordered component visibility effects and enforces the native capability', () => {
+    const document = makeDocument({
+      components: [makeComponent({ id: 'button' }), makeComponent({ id: 'panel' })],
+      blueprint: {
+        rules: [
+          {
+            id: 'toggle-panel',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
+            actions: [
+              {
+                type: 'component-visibility',
+                componentId: 'panel',
+                operation: 'toggle',
+                transition: {
+                  effect: 'fade',
+                  durationMs: 240,
+                  easing: 'ease-in-out-quad',
+                },
+              },
+              { type: 'component-visibility', componentId: 'panel', operation: 'show' },
+            ],
+          },
+        ],
+      },
+    });
+    expect(compileScreenBlueprint(document, { hasBlueprintCapability: () => false })).toMatchObject(
+      { ok: false },
+    );
+    const compiled = compileScreenBlueprint(document, { hasBlueprintCapability: () => true });
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) return;
+
+    const result = dispatchScreenBlueprintEvent(compiled.value, compiled.value.initialVariables, {
+      componentId: 'button',
+      name: 'click',
+      payload: {},
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      value: {
+        visibilityEffects: [
+          {
+            componentId: 'panel',
+            operation: 'toggle',
+            transition: { effect: 'fade', durationMs: 240, easing: 'ease-in-out-quad' },
+          },
+          { componentId: 'panel', operation: 'show' },
+        ],
+      },
+    });
+  });
+
   it('dispatches only matching rules into detached variable and host-event outputs', () => {
     const document = makeDocument({
       components: [makeComponent({ id: 'button' })],

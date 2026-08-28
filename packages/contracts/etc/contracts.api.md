@@ -224,11 +224,13 @@ export interface ScreenAuthoringRequestEventDetail {
 // @public (undocumented)
 export interface ScreenBlueprint {
     // (undocumented)
+    readonly layout?: ScreenBlueprintLayout;
+    // (undocumented)
     readonly rules: readonly ScreenBlueprintRule[];
 }
 
 // @public (undocumented)
-export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction;
+export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction;
 
 // @public (undocumented)
 export interface ScreenBlueprintAuthoringContext {
@@ -291,6 +293,18 @@ export interface ScreenBlueprintCommitRequest {
 }
 
 // @public (undocumented)
+export interface ScreenBlueprintComponentVisibilityAction {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly operation: ScreenBlueprintVisibilityOperation;
+    // (undocumented)
+    readonly transition?: ScreenBlueprintVisibilityTransition;
+    // (undocumented)
+    readonly type: 'component-visibility';
+}
+
+// @public (undocumented)
 export interface ScreenBlueprintCondition {
     // (undocumented)
     readonly left: ScreenBlueprintValueExpression;
@@ -338,6 +352,36 @@ export interface ScreenBlueprintHostEvent {
     readonly name: string;
     // (undocumented)
     readonly payload: ScreenJsonValue;
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintLayout {
+    // (undocumented)
+    readonly nodes: readonly ScreenBlueprintLayoutNode[];
+    // (undocumented)
+    readonly viewport?: ScreenBlueprintLayoutViewport;
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintLayoutNode {
+    // (undocumented)
+    readonly collapsed?: boolean;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintLayoutViewport {
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+    // (undocumented)
+    readonly zoom: number;
 }
 
 // @public (undocumented)
@@ -397,6 +441,25 @@ export type ScreenBlueprintValueExpression = {
     readonly kind: 'object';
     readonly properties: Readonly<Record<string, ScreenBlueprintValueExpression>>;
 };
+
+// @public (undocumented)
+export type ScreenBlueprintVisibilityOperation = 'show' | 'hide' | 'toggle';
+
+// @public (undocumented)
+export interface ScreenBlueprintVisibilityTransition {
+    // (undocumented)
+    readonly durationMs: number;
+    // (undocumented)
+    readonly easing: ScreenBlueprintVisibilityTransitionEasing;
+    // (undocumented)
+    readonly effect: ScreenBlueprintVisibilityTransitionEffect;
+}
+
+// @public (undocumented)
+export type ScreenBlueprintVisibilityTransitionEasing = 'linear' | 'ease-in-out-quad' | 'ease-in-out-expo';
+
+// @public (undocumented)
+export type ScreenBlueprintVisibilityTransitionEffect = 'appear' | 'fade' | 'slide-up';
 
 // @public (undocumented)
 export interface ScreenCanvas {

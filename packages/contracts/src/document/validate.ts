@@ -13,6 +13,7 @@ import type {
   ScreenDocument,
 } from '../types/document.js';
 import type { ScreenJsonValue } from '../types/json.js';
+import { validateBlueprintStrictKeys } from './blueprint-strict.js';
 import { isBoundedScreenImageUrl } from './image-url.js';
 import {
   MAX_BACKGROUND_COLOR_CODE_POINTS,
@@ -39,6 +40,7 @@ import {
   hostVariableSchema,
   staticVariableSchema,
 } from './schema.js';
+import { checkStrictObjectKeys, isJsonObject } from './strict-object.js';
 
 const DOCUMENT_ROOT_FIELDS = new Set(['canvas', 'components', 'variables', 'blueprint']);
 const CANVAS_FIELDS = new Set([
@@ -81,19 +83,6 @@ const STYLE_RULE_FIELDS = new Set(['id', 'when', 'style']);
 const STYLE_RULE_WHEN_FIELDS = new Set(['path', 'operator', 'value']);
 const VARIABLE_FIELDS = new Set(['type', 'name', 'value']);
 const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'variableId']);
-const BLUEPRINT_FIELDS = new Set(['rules']);
-const BLUEPRINT_RULE_FIELDS = new Set([
-  'id',
-  'trigger',
-  'requiredCapabilities',
-  'condition',
-  'actions',
-]);
-const BLUEPRINT_TRIGGER_FIELDS = new Set(['type', 'componentId', 'eventName']);
-const SET_VARIABLE_ACTION_FIELDS = new Set(['type', 'variableName', 'value']);
-const EMIT_HOST_EVENT_ACTION_FIELDS = new Set(['type', 'eventName', 'payload']);
-const HOST_ACTION_FIELDS = new Set(['type', 'actionId', 'payload']);
-const BLUEPRINT_CONDITION_FIELDS = new Set(['left', 'operator', 'right']);
 const CANVAS_PALETTE_COLOR_PATTERN =
   /^(?:transparent|#[0-9A-Fa-f]{3,4}|#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)$/;
 
@@ -663,67 +652,7 @@ function validateBlueprint(
     );
     return false;
   }
-  if (!checkStrictObjectKeys(blueprint, BLUEPRINT_FIELDS, at(['blueprint']), collector, phase)) {
-    return false;
-  }
-  if (Array.isArray(blueprint.rules)) {
-    for (let index = 0; index < blueprint.rules.length; index++) {
-      const rule = blueprint.rules[index];
-      const base = ['blueprint', 'rules', index] as DiagnosticSegment[];
-      if (
-        !isJsonObject(rule) ||
-        !checkStrictObjectKeys(rule, BLUEPRINT_RULE_FIELDS, at(base), collector, phase)
-      ) {
-        continue;
-      }
-      if (
-        isJsonObject(rule.trigger) &&
-        !checkStrictObjectKeys(
-          rule.trigger,
-          BLUEPRINT_TRIGGER_FIELDS,
-          at([...base, 'trigger']),
-          collector,
-          phase,
-        )
-      ) {
-        continue;
-      }
-      if (
-        isJsonObject(rule.condition) &&
-        !checkStrictObjectKeys(
-          rule.condition,
-          BLUEPRINT_CONDITION_FIELDS,
-          at([...base, 'condition']),
-          collector,
-          phase,
-        )
-      ) {
-        continue;
-      }
-      if (!Array.isArray(rule.actions)) {
-        continue;
-      }
-      for (let actionIndex = 0; actionIndex < rule.actions.length; actionIndex++) {
-        const action = rule.actions[actionIndex];
-        if (!isJsonObject(action)) {
-          continue;
-        }
-        const fields =
-          action.type === 'set-variable'
-            ? SET_VARIABLE_ACTION_FIELDS
-            : action.type === 'emit-host-event'
-              ? EMIT_HOST_EVENT_ACTION_FIELDS
-              : HOST_ACTION_FIELDS;
-        checkStrictObjectKeys(
-          action,
-          fields,
-          at([...base, 'actions', actionIndex]),
-          collector,
-          phase,
-        );
-      }
-    }
-  }
+  if (!validateBlueprintStrictKeys(blueprint, at, collector, phase)) return false;
   const result = blueprintSchema.safeParse(blueprint);
   if (!result.success) {
     addZodIssues(
@@ -782,6 +711,7 @@ function validateBlueprint(
     }
     for (let actionIndex = 0; actionIndex < rule.actions.length; actionIndex++) {
       const action = rule.actions[actionIndex] as Record<string, unknown>;
+      if (action.type === 'component-visibility') continue;
       const field = action.type === 'set-variable' ? 'value' : 'payload';
       validateBlueprintExpression(
         action[field] as ScreenBlueprintValueExpression,
@@ -937,24 +867,6 @@ function validateVariable(
   return true;
 }
 
-function checkStrictObjectKeys(
-  value: Record<string, unknown>,
-  known: ReadonlySet<string>,
-  base: DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-  code: ScreenDiagnosticCode = 'DOCUMENT_UNKNOWN_FIELD',
-): boolean {
-  let clean = true;
-  for (const key of Object.keys(value)) {
-    if (!known.has(key)) {
-      collector.add(code, [...base, key], phase, `Unknown field "${truncateKey(key)}".`);
-      clean = false;
-    }
-  }
-  return clean;
-}
-
 function addZodIssues(
   issues: readonly ZodIssueLike[],
   baseSegments: DiagnosticSegment[],
@@ -998,12 +910,4 @@ function variableFieldCode(field: string): ScreenDiagnosticCode {
     return 'VARIABLE_NAME_INVALID';
   }
   return 'DOCUMENT_FIELD_INVALID';
-}
-
-function isJsonObject(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function truncateKey(key: string): string {
-  return key.length > 128 ? `${key.slice(0, 128)}…` : key;
 }

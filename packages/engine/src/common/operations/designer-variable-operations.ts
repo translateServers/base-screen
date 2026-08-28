@@ -32,7 +32,7 @@ export function referencedVariableNames(document: ScreenDocument): ReadonlySet<s
       if (action.type === 'set-variable') {
         referenced.add(action.variableName);
         collectExpressionVariableReferences(action.value, referenced);
-      } else {
+      } else if (action.type !== 'component-visibility') {
         collectExpressionVariableReferences(action.payload, referenced);
       }
     }

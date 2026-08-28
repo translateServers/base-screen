@@ -5,6 +5,7 @@
 ```ts
 
 import type { ScreenBlueprint } from '@base-screen/contracts';
+import { ScreenBlueprintComponentVisibilityAction } from '@base-screen/contracts';
 import { ScreenBlueprintHostEvent } from '@base-screen/contracts';
 import { ScreenCanvas } from '@base-screen/contracts';
 import type { ScreenCanvasBackground } from '@base-screen/contracts';
@@ -124,6 +125,9 @@ export function reduceScreenViewport(state: ScreenViewportState, action: ScreenV
 export function removeScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], index: number): ScreenJsonObject | undefined;
 
 // @public (undocumented)
+export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY = "blueprint.action.component-visibility";
+
+// @public (undocumented)
 export interface ScreenAlignmentDelta {
     // (undocumented)
     readonly componentId: string;
@@ -135,12 +139,28 @@ export interface ScreenAlignmentDelta {
 export type ScreenAxis = 'x' | 'y';
 
 // @public (undocumented)
-export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace;
+export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace;
 
 // @public (undocumented)
 interface ScreenBlueprintCapabilityIndex {
     // (undocumented)
     readonly hasBlueprintCapability: (id: string) => boolean;
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintComponentVisibilityActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    // (undocumented)
+    readonly operation: ScreenBlueprintComponentVisibilityAction['operation'];
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'component-visibility';
 }
 
 // @public (undocumented)
@@ -154,6 +174,8 @@ export interface ScreenBlueprintDispatchResult {
     readonly hostEvents: readonly ScreenBlueprintHostEvent[];
     // (undocumented)
     readonly variables: ScreenJsonObject;
+    // (undocumented)
+    readonly visibilityEffects: readonly ScreenBlueprintVisibilityEffect[];
 }
 
 // @public (undocumented)
@@ -232,6 +254,16 @@ export interface ScreenBlueprintSetVariableActionTrace {
 export interface ScreenBlueprintTraceResult extends ScreenBlueprintDispatchResult {
     // (undocumented)
     readonly ruleTraces: readonly ScreenBlueprintRuleTrace[];
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintVisibilityEffect {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly operation: ScreenBlueprintComponentVisibilityAction['operation'];
+    // (undocumented)
+    readonly transition?: ScreenBlueprintComponentVisibilityAction['transition'];
 }
 
 // @public (undocumented)

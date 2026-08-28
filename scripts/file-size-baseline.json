@@ -1,7 +1,7 @@
 {
   "description": "Exact line-count ceilings for files that predate the repository size limits.",
   "exceptions": {
-    "packages/contracts/src/document/validate.ts": 1009,
+    "packages/contracts/src/document/validate.ts": 913,
     "packages/contracts/tests/document/document.test.ts": 1275,
     "packages/engine/src/browser/controllers/designer-dataset-controller.ts": 1585,
     "packages/engine/src/browser/controllers/designer-gesture-controller.ts": 1298,
@@ -27,8 +27,8 @@
     "packages/material/src/echarts.ts": 931,
     "packages/plugin-core/src/editor-descriptor.ts": 1191,
     "packages/plugin-core/src/material.ts": 1113,
-    "packages/renderer/src/renderer.ts": 1426,
-    "packages/renderer/src/viewer.ts": 697,
+    "packages/renderer/src/renderer.ts": 1397,
+    "packages/renderer/src/viewer.ts": 693,
     "packages/renderer/tests/renderer.test.ts": 1854,
     "packages/renderer/tests/resource-state-machine.test.ts": 933,
     "scripts/verify-browser-harness.mjs": 8680,
