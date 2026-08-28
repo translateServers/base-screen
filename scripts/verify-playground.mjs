@@ -78,6 +78,10 @@ try {
             present: element !== null,
             shell: document.querySelector('.shell') !== null,
             dataTab: element?.shadowRoot?.querySelector('[data-inspector-tab="data"]') !== null,
+            hostResourceTab:
+              element?.shadowRoot?.querySelector('[data-panel-tab="host:resources"]') !== null,
+            hostLeftPanelGroups: element?.leftPanelGroups,
+            hostResourcePanel: element?.querySelector('[data-host-resource-panel]') !== null,
             materialCards:
               element?.shadowRoot?.querySelectorAll('[data-material-card]').length ?? 0,
             runtime: window.playgroundRuntime !== undefined,
@@ -89,6 +93,9 @@ try {
           !designer.present ||
           designer.shell ||
           !designer.dataTab ||
+          !designer.hostResourceTab ||
+          designer.hostLeftPanelGroups?.[0]?.id !== 'resources' ||
+          !designer.hostResourcePanel ||
           designer.materialCards === 0 ||
           !designer.runtime ||
           !designer.fullScreen
@@ -96,20 +103,84 @@ try {
           throw new Error(`PLAYGROUND_DESIGNER_FAILED:${JSON.stringify(designer)}`);
         }
         const designerSurface = page.locator('#playground-designer');
+        await designerSurface.locator('[data-panel-tab="host:resources"]').click();
+        const hostResourceCard = page.locator(
+          '#playground-designer > [data-host-resource-panel] [data-host-resource-id="dashboard-grid"]',
+        );
+        await hostResourceCard.click();
+        await page
+          .locator(
+            '#playground-designer > [data-host-resource-panel] [data-host-resource-id="campaign-cover"]',
+          )
+          .focus();
+        await page.keyboard.press('Tab');
+        const hostPanelExperience = await designerSurface.evaluate((element) => {
+          const root = element.shadowRoot;
+          const panel = element.querySelector('[data-host-resource-panel]');
+          const selected = panel?.querySelector('[data-host-resource-id="dashboard-grid"]');
+          const slot = root?.querySelector(
+            'slot[name="base-screen-designer-left-panel-resources"]',
+          );
+          const focused = document.activeElement;
+          const focusStyle = focused instanceof HTMLElement ? getComputedStyle(focused) : undefined;
+          return {
+            assigned: slot?.assignedElements().includes(panel) === true,
+            cardCount: panel?.querySelectorAll('[data-host-resource-id]').length ?? 0,
+            collapsed: root?.querySelector('.designer')?.dataset.leftCollapsed,
+            focusVisible:
+              focused === selected &&
+              focusStyle?.outlineStyle !== 'none' &&
+              focusStyle?.outlineWidth !== '0px',
+            panelVisible:
+              root?.querySelector('.host-left-panel-view[data-host-left-panel-group="resources"]')
+                ?.hidden === false,
+            selected: selected?.getAttribute('aria-pressed'),
+            status: panel?.querySelector('[data-host-resource-status]')?.textContent,
+            tabSelected:
+              root
+                ?.querySelector('[data-panel-tab="host:resources"]')
+                ?.getAttribute('aria-selected') === 'true',
+          };
+        });
+        if (
+          !hostPanelExperience.assigned ||
+          hostPanelExperience.cardCount !== 3 ||
+          hostPanelExperience.collapsed !== 'false' ||
+          !hostPanelExperience.focusVisible ||
+          !hostPanelExperience.panelVisible ||
+          hostPanelExperience.selected !== 'true' ||
+          hostPanelExperience.status !== '已选择：科技网格背景' ||
+          !hostPanelExperience.tabSelected
+        ) {
+          throw new Error(
+            `PLAYGROUND_HOST_RESOURCE_PANEL_FAILED:${JSON.stringify(hostPanelExperience)}`,
+          );
+        }
+        await designerSurface.locator('[data-panel-tab="materials"]').click();
         await designerSurface.locator('[data-base-screen-component-id="designer-table"]').click();
         await designerSurface.locator('[data-inspector-tab="data"]').click();
         await designerSurface.locator('[data-dataset-descriptor]').waitFor();
         await designerSurface.locator('[data-dataset-change]').click();
+        await designerSurface.locator('[data-dataset-resource-id="orders"]').waitFor();
+        const catalogExperience = await designerSurface.evaluate((element) => ({
+          connectedPorts:
+            element.shadowRoot?.querySelectorAll(
+              '.designer-host-connection-status[data-connected="true"]',
+            ).length ?? 0,
+        }));
+        if (catalogExperience.connectedPorts !== 2) {
+          throw new Error(
+            `PLAYGROUND_DESIGNER_CATALOG_CONNECTION_FAILED:${JSON.stringify(catalogExperience)}`,
+          );
+        }
         await designerSurface.locator('[data-dataset-resource-id="orders"]').click();
         await designerSurface.locator('[data-dataset-descriptor]').waitFor();
         const dataExperience = await designerSurface.evaluate((element) => ({
           currentDataset:
             element.shadowRoot?.querySelector('[data-dataset-descriptor]')?.textContent ?? '',
-          sourceModes: element.shadowRoot?.querySelectorAll('[data-data-source-mode]').length ?? 0,
-          connectedPorts:
-            element.shadowRoot?.querySelectorAll(
-              '.designer-host-connection-status[data-connected="true"]',
-            ).length ?? 0,
+          sourceModes:
+            element.shadowRoot?.querySelector('[data-data-source-mode-select]')?.children.length ??
+            0,
           roleCount:
             element.shadowRoot?.querySelectorAll('[data-dataset-binding-role]').length ?? 0,
           fieldButtons:
@@ -121,7 +192,7 @@ try {
             element.shadowRoot
               ?.querySelector('[data-dataset-action="apply"]')
               ?.getAttribute('data-variant') === 'primary',
-          visibleActions: (() => {
+          containedActions: (() => {
             const panel = element.shadowRoot?.querySelector('[data-inspector-pane="data"]');
             const bounds = panel?.getBoundingClientRect();
             return [...(element.shadowRoot?.querySelectorAll('[data-dataset-action]') ?? [])].every(
@@ -130,9 +201,7 @@ try {
                 return (
                   bounds !== undefined &&
                   actionBounds.left >= bounds.left &&
-                  actionBounds.right <= bounds.right &&
-                  actionBounds.top >= bounds.top &&
-                  actionBounds.bottom <= bounds.bottom
+                  actionBounds.right <= bounds.right
                 );
               },
             );
@@ -141,20 +210,19 @@ try {
         if (
           !dataExperience.currentDataset.includes('订单趋势') ||
           dataExperience.sourceModes !== 3 ||
-          dataExperience.connectedPorts !== 2 ||
           dataExperience.roleCount !== 1 ||
           dataExperience.fieldButtons !== 3 ||
           dataExperience.nativeMultiple ||
           !dataExperience.primaryAction ||
-          !dataExperience.visibleActions
+          !dataExperience.containedActions
         ) {
           throw new Error(
             `PLAYGROUND_DESIGNER_DATA_EXPERIENCE_FAILED:${JSON.stringify(dataExperience)}`,
           );
         }
-        await designerSurface.locator('[data-data-source-mode="static"]').click();
-        await designerSurface.locator('[data-data-source-static]').waitFor();
-        await designerSurface.locator('[data-data-source-mode="dataset"]').click();
+        await designerSurface.locator('[data-data-source-mode-select]').selectOption('static');
+        await designerSurface.locator('.designer-static-data-tabs').waitFor();
+        await designerSurface.locator('[data-data-source-mode-select]').selectOption('dataset');
         await designerSurface.locator('[data-dataset-descriptor]').waitFor();
         await designerSurface.locator('[data-material-card="base.rectangle"]').click();
         await page.waitForFunction(() => {

@@ -30,8 +30,16 @@ import {
   defineBaseScreenTextMaterial,
 } from '../../packages/material/src/index.ts';
 import { createBaseScreenMaterialCatalog } from '../../packages/plugin-core/src/index.ts';
-import { defineBaseScreenElements } from '../../packages/sdk/src/index.ts';
+import {
+  type BaseScreenDesignerLeftPanelGroup,
+  defineBaseScreenElements,
+} from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
+import {
+  HOST_LEFT_PANEL_GROUPS,
+  type HostResourceDemoItemId,
+  renderHostResourcePanel,
+} from './host-resource-panel.ts';
 import {
   createPlaygroundDatasetCatalog,
   createPlaygroundResourcePort,
@@ -65,6 +73,7 @@ interface PlaygroundViewerElement extends HTMLElement {
 
 interface PlaygroundDesignerElement extends HTMLElement {
   catalog: typeof catalog;
+  leftPanelGroups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
   resourcePort: ReturnType<typeof createPlaygroundResourcePort>;
   variablePort: ReturnType<typeof createPlaygroundVariablePort>;
   datasetCatalogPort: ReturnType<typeof createPlaygroundDatasetCatalog>;
@@ -251,6 +260,7 @@ const PlaygroundApp = defineComponent({
     const viewer = ref<PlaygroundViewerElement | null>(null);
     const designer = ref<PlaygroundDesignerElement | null>(null);
     const designerChanges = ref(0);
+    const selectedHostResourceId = ref<HostResourceDemoItemId | null>(null);
     const observedDesigners = new WeakSet<PlaygroundDesignerElement>();
     const currentRoute = () => routes.find((item) => item.path === currentPath.value) ?? routes[0];
 
@@ -279,6 +289,7 @@ const PlaygroundApp = defineComponent({
         element.addEventListener('base-screen-change', () => {
           designerChanges.value += 1;
         });
+        element.leftPanelGroups = HOST_LEFT_PANEL_GROUPS;
         observedDesigners.add(element);
       }
       element.resourcePort = resourcePort;
@@ -350,12 +361,20 @@ const PlaygroundApp = defineComponent({
       const isDesignerRoute = currentPath.value === '/designer';
       if (isDesignerRoute) {
         return h('div', { class: 'designer-fullscreen' }, [
-          h('base-screen-designer', {
-            id: 'playground-designer',
-            'data-framework': 'vue',
-            'data-host-runtime': 'mock',
-            ref: designer,
-          }),
+          h(
+            'base-screen-designer',
+            {
+              id: 'playground-designer',
+              'data-framework': 'vue',
+              'data-host-runtime': 'mock',
+              ref: designer,
+            },
+            [
+              renderHostResourcePanel(selectedHostResourceId.value, (resourceId) => {
+                selectedHostResourceId.value = resourceId;
+              }),
+            ],
+          ),
         ]);
       }
       return h('div', { class: 'shell' }, [

@@ -138,6 +138,25 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     ]);
   });
 
+  it('accepts host left panel groups and keeps invalid runtime updates atomic', () => {
+    const designer = new BaseScreenDesignerElement();
+    const groups = [{ id: 'assets', label: 'Assets', icon: 'image' }] as const;
+
+    expect(designer.configure({ catalog: catalog(), leftPanelGroups: groups }).ok).toBe(true);
+    expect(designer.leftPanelGroups).toEqual(groups);
+    expect(Object.isFrozen(designer.leftPanelGroups)).toBe(true);
+
+    const rejected = designer.configure({
+      catalog: catalog(),
+      leftPanelGroups: [{ id: 'materials', label: 'Reserved' }],
+    });
+    expect(rejected.ok).toBe(false);
+    expect(designer.leftPanelGroups).toEqual(groups);
+
+    designer.leftPanelGroups = undefined;
+    expect(designer.leftPanelGroups).toBeUndefined();
+  });
+
   it('accepts host material library item projections and rejects invalid updates atomically', () => {
     const designer = new BaseScreenDesignerElement();
     const materialCatalog = projectableCatalog();

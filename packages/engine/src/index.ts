@@ -86,6 +86,7 @@ import { DesignerViewportController } from './browser/controllers/designer-viewp
 import { DesignerWorkbenchController } from './browser/controllers/designer-workbench-controller.js';
 import { DesignerEventSystem } from './browser/dom/designer-event-system.js';
 import { renderDesignerInteractionPanel } from './browser/dom/designer-interaction-dom.js';
+import { renderDesignerLeftPanelGroups } from './browser/dom/designer-left-panel-groups-dom.js';
 import { DesignerMenuController } from './browser/dom/designer-menu.js';
 import { renderDesignerSelection } from './browser/dom/designer-selection-dom.js';
 import {
@@ -113,6 +114,12 @@ import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   type BaseScreenCanvasPresentationChangeEventDetail,
 } from './canvas-presentation.js';
+import {
+  BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
+  type BaseScreenDesignerLeftPanelGroup,
+  type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
+  parseBaseScreenDesignerLeftPanelGroups,
+} from './designer-left-panel-groups.js';
 import {
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
@@ -142,6 +149,16 @@ export {
   type BaseScreenCanvasPresentationChangeEventDetail,
   type BaseScreenCanvasScaleMode,
 } from './canvas-presentation.js';
+export {
+  BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
+  BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS,
+  BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX,
+  type BaseScreenDesignerLeftPanelGroup,
+  type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
+  type BaseScreenDesignerLeftPanelGroupIcon,
+  baseScreenDesignerLeftPanelSlotName,
+  parseBaseScreenDesignerLeftPanelGroups,
+} from './designer-left-panel-groups.js';
 export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
@@ -201,6 +218,8 @@ const ElementBase =
 
 export interface BaseScreenDesignerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
+  /** ADR-0062：宿主左侧分组的 JSON-safe 导航描述；内容由对应公开命名 slot 提供。 */
+  readonly leftPanelGroups?: readonly BaseScreenDesignerLeftPanelGroup[];
   readonly materialLibraryState?: BaseScreenMaterialLibraryState;
   readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
   readonly materialLibraryItems?: readonly BaseScreenMaterialLibraryItem[];
@@ -226,6 +245,7 @@ export interface BaseScreenDesignerConfiguration {
 
 export class BaseScreenDesignerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
+  #leftPanelGroups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
   #materialLibraryState: BaseScreenMaterialLibraryState | undefined;
   #materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   #materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
@@ -537,6 +557,18 @@ export class BaseScreenDesignerElement extends ElementBase {
     getZoom: () => this.#viewportController.state.zoom,
     // 状态栏「事件」开关：把设计态画布交互模式应用到渲染器（原地重渲染，不重建）。
     onNativeEventsChange: (enabled) => this.applyNativeEvents(enabled),
+    onLeftPanelGroupChange: (groupId) => {
+      this.dispatchEvent(
+        new CustomEvent<BaseScreenDesignerLeftPanelGroupChangeEventDetail>(
+          BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
+          {
+            bubbles: true,
+            composed: true,
+            detail: { groupId: groupId ?? null },
+          },
+        ),
+      );
+    },
   });
   readonly #commandPaletteController = new DesignerCommandPaletteController({
     getRoot: () => this.shadowRoot,
@@ -889,6 +921,12 @@ export class BaseScreenDesignerElement extends ElementBase {
         diagnostics: [lifecycleDiagnostic('Designer catalog 必须是合法的物料目录。')],
       };
     }
+    let leftPanelGroups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
+    if (configuration.leftPanelGroups !== undefined) {
+      const parsed = parseBaseScreenDesignerLeftPanelGroups(configuration.leftPanelGroups);
+      if (!parsed.ok) return parsed;
+      leftPanelGroups = parsed.value;
+    }
     let materialLibraryState: BaseScreenMaterialLibraryState | undefined;
     if (configuration.materialLibraryState !== undefined) {
       const parsed = parseBaseScreenMaterialLibraryState(configuration.materialLibraryState);
@@ -1012,6 +1050,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     this.#conditionalStylePort = configuration.conditionalStylePort;
     this.#catalog = configuration.catalog;
+    this.#leftPanelGroups = leftPanelGroups;
     this.#materialLibraryState = materialLibraryState;
     this.#materialLibraryGrouping = materialLibraryGrouping;
     this.#materialLibraryItems = materialLibraryItems;
@@ -1058,6 +1097,30 @@ export class BaseScreenDesignerElement extends ElementBase {
     }
     this.#catalog = value;
     this.#resolvedMaterialLibraryItems = resolved.value;
+  }
+
+  get leftPanelGroups(): readonly BaseScreenDesignerLeftPanelGroup[] | undefined {
+    return this.#leftPanelGroups;
+  }
+
+  set leftPanelGroups(value: readonly BaseScreenDesignerLeftPanelGroup[] | undefined) {
+    if (value === undefined) {
+      this.#leftPanelGroups = undefined;
+      this.renderLeftPanelGroups();
+      return;
+    }
+    const parsed = parseBaseScreenDesignerLeftPanelGroups(value);
+    if (!parsed.ok) {
+      this.emitDiagnostics(parsed.diagnostics);
+      return;
+    }
+    this.#leftPanelGroups = parsed.value;
+    this.renderLeftPanelGroups();
+  }
+
+  /** 选择并展开一个已配置的宿主左侧分组；未挂载或 id 不存在时返回 false。 */
+  selectLeftPanelGroup(groupId: string): boolean {
+    return this.#workbenchController.selectLeftPanelGroup(groupId);
   }
 
   get materialLibraryState(): BaseScreenMaterialLibraryState | undefined {
@@ -2111,6 +2174,7 @@ export class BaseScreenDesignerElement extends ElementBase {
         this.#toolMaterialTypes,
         this.#materialLibraryState,
         this.#materialLibraryGrouping,
+        this.#leftPanelGroups,
       ),
     );
     this.#panelController.refreshMaterialLibrary(shadow.querySelector<HTMLElement>('.designer'));
@@ -2183,6 +2247,13 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.renderControls();
     this.#integrationController.render();
     this.#workbenchController.renderInspectorTabs();
+  }
+
+  private renderLeftPanelGroups(): void {
+    const layout = this.shadowRoot?.querySelector<HTMLElement>('.designer');
+    if (layout === null || layout === undefined) return;
+    renderDesignerLeftPanelGroups(layout, this.#leftPanelGroups);
+    this.#workbenchController.refreshLeftPanelGroups();
   }
 
   private renderMaterialLibraryState(): void {

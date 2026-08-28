@@ -22,3 +22,8 @@ pnpm dev:playground
 数据页工具栏可以切换模拟数据集和 `region` 变量，也可以打开延迟或失败开关，观察真实的
 loading、ready 和 error 状态。示例数据与端口实现位于 `mock-data.ts`，可作为接入真实 API
 时的替换边界。
+
+Designer 案例还通过公开 `leftPanelGroups` 与命名 slot 增加了一个“资源”分组。资源卡片及其选中状态完全由
+Vue 宿主管理，用于演示业务面板无需访问 Designer Shadow DOM 的接入方式。
+这些条目只是 Playground 的宿主模拟数据；Base Screen 不提供资源目录、搜索、上传、存储、权限或资源管理
+工作流，也不会把该示例面板作为 Engine/SDK 内建能力发布。

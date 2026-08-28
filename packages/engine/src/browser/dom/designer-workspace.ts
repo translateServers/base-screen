@@ -6,10 +6,12 @@ import {
   getDesignerToolShortcut,
 } from '../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import type { BaseScreenDesignerLeftPanelGroup } from '../../designer-left-panel-groups.js';
 import type { BaseScreenMaterialLibraryGrouping } from '../../material-library-grouping.js';
 import type { BaseScreenResolvedMaterialLibraryItem } from '../../material-library-items.js';
 import type { BaseScreenMaterialLibraryState } from '../../material-library-state.js';
 import { designerIcon, designerToolGlyph } from '../ui/designer-icons.js';
+import { renderDesignerLeftPanelGroups } from './designer-left-panel-groups-dom.js';
 import {
   populateMaterialLibrary,
   visibleLibraryMaterials,
@@ -76,6 +78,7 @@ export function createDesignerWorkspace(
   toolMaterialTypes: DesignerToolMaterialTypes | undefined,
   materialLibraryState?: BaseScreenMaterialLibraryState,
   materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping,
+  leftPanelGroups?: readonly BaseScreenDesignerLeftPanelGroup[],
 ): HTMLElement {
   const visibleMaterials = visibleLibraryMaterials(materials);
   const layout = ownerDocument.createElement('section');
@@ -435,6 +438,7 @@ export function createDesignerWorkspace(
     </div>`;
   layout.appendChild(helpDialog);
 
+  renderDesignerLeftPanelGroups(layout, leftPanelGroups);
   populateMaterialLibrary(layout, materials, materialLibraryState, materialLibraryGrouping);
   for (const tool of DESIGNER_TOOLS) {
     const control = layout.querySelector<HTMLButtonElement>(`[data-tool="${tool.id}"]`)!;

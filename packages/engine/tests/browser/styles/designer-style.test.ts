@@ -118,6 +118,18 @@ describe('designer workbench visual convergence', () => {
     );
   });
 
+  it('keeps host left panel groups bounded, stable, and hidden with the collapsed rail', () => {
+    expect(workbenchCss).toMatch(
+      /\.rail-tab-label\s*\{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.host-left-panel-content > slot::slotted\(\*\)\s*\{[^}]*box-sizing: border-box;[^}]*min-width: 0;[^}]*max-width: 100%;/s,
+    );
+    expect(baseCss).toContain(
+      '.designer[data-left-collapsed="true"] [data-host-left-panel-group][role="tabpanel"]',
+    );
+  });
+
   it('keeps inspector pane focus scrolling free of scroll-padding nudges', () => {
     // scroll-padding-block 会把边缘附近的焦点控件视为"需要滚入视口"：mousedown 聚焦
     // checkbox/select 时浏览器每次都会把面板滚动位置拖向控件（一次变化一次跳动），
@@ -564,6 +576,9 @@ describe('designer workbench visual convergence', () => {
     expect(baseCss).toContain('.material-group-children[data-scroll-end="true"],');
     expect(baseCss).toContain('mask-image: linear-gradient(');
     expect(baseCss).toContain('.material-filters .designer-button[aria-pressed="true"]');
+    expect(baseCss).toMatch(
+      /\.material-search input\s*\{[^}]*padding-left: calc\(var\(--designer-space-3\) \+ var\(--designer-control-height\)\);/s,
+    );
     expect(baseCss).toContain('.material-search-clear:not(:disabled):active');
     expect(baseCss).toContain(
       '.material-library-status-actions .designer-button:not(:disabled):active',

@@ -247,6 +247,8 @@ class WorkbenchElement {
 function createWorkbench(
   options: {
     readonly dataCapabilities?: readonly ('static' | 'host-resource')[];
+    readonly hostLeftPanelGroup?: { readonly id: string; readonly label: string };
+    readonly onLeftPanelGroupChange?: (groupId: string | undefined) => void;
     readonly onNativeEventsChange?: (enabled: boolean) => void;
     readonly storage?: Map<string, string>;
   } = {},
@@ -274,11 +276,32 @@ function createWorkbench(
   const inspectorTabs = new WorkbenchElement();
   const materials = new WorkbenchElement();
   const layers = new WorkbenchElement();
-  const leftTabs = ['materials', 'layers'].map((tab) => {
+  const leftTabs = [
+    { tab: 'materials', label: DESIGNER_UI_TEXT.materials },
+    { tab: 'layers', label: DESIGNER_UI_TEXT.layers },
+    ...(options.hostLeftPanelGroup === undefined
+      ? []
+      : [
+          {
+            tab: `host:${options.hostLeftPanelGroup.id}`,
+            label: options.hostLeftPanelGroup.label,
+          },
+        ]),
+  ].map(({ tab, label }) => {
     const control = new WorkbenchElement();
     control.dataset.panelTab = tab;
+    control.dataset.panelLabel = label;
     return control;
   });
+  const hostLeftPanelPanes =
+    options.hostLeftPanelGroup === undefined
+      ? []
+      : (() => {
+          const pane = new WorkbenchElement();
+          pane.dataset.hostLeftPanelGroup = options.hostLeftPanelGroup.id;
+          pane.hidden = true;
+          return [pane];
+        })();
   const rightTabs = ['appearance', 'data', 'interaction'].map((tab) => {
     const control = new WorkbenchElement();
     control.dataset.inspectorTab = tab;
@@ -293,6 +316,8 @@ function createWorkbench(
   const nativeEventsToggle = new WorkbenchElement();
   const leftCollapseControl = new WorkbenchElement();
   const rightCollapseControl = new WorkbenchElement();
+  const leftTitle = new WorkbenchElement();
+  const leftCount = new WorkbenchElement();
   // 面板分隔列 5px（.panel-handle::before 的 1px 高亮线居中，列中线 = 高亮线位置）。
   const handleRect = () => ({ bottom: 0, height: 0, left: 0, right: 5, top: 0, width: 5 });
   const leftHandle = new WorkbenchElement();
@@ -353,6 +378,8 @@ function createWorkbench(
     ['[data-status-toggle="native-events"]', nativeEventsToggle],
     ['[data-panel-collapse="left"]', leftCollapseControl],
     ['[data-panel-collapse="right"]', rightCollapseControl],
+    ['[data-left-panel-title]', leftTitle],
+    ['[data-left-panel-count]', leftCount],
     ['[data-panel-handle="left"]', leftHandle],
     ['[data-panel-handle="right"]', rightHandle],
   ]);
@@ -361,6 +388,8 @@ function createWorkbench(
     querySelector: (selector: string) => elements.get(selector) ?? null,
     querySelectorAll: (selector: string) => {
       if (selector === '[data-panel-tab]') return leftTabs;
+      if (selector === '.host-left-panel-view[data-host-left-panel-group]')
+        return hostLeftPanelPanes;
       if (selector === '[data-inspector-tab]') return rightTabs;
       if (selector === '[data-inspector-pane]') return panes;
       return [];
@@ -386,6 +415,9 @@ function createWorkbench(
       ...(options.onNativeEventsChange === undefined
         ? {}
         : { onNativeEventsChange: options.onNativeEventsChange }),
+      ...(options.onLeftPanelGroupChange === undefined
+        ? {}
+        : { onLeftPanelGroupChange: options.onLeftPanelGroupChange }),
       getRoot: () => root,
       getZoom: () => zoom.value,
     }),
@@ -397,7 +429,10 @@ function createWorkbench(
     layers,
     layout,
     leftCollapseControl,
+    leftCount,
+    leftTitle,
     leftTabs,
+    hostLeftPanelPanes,
     materials,
     nativeEventsToggle,
     panes,
@@ -494,6 +529,35 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(layout.dataset.leftCollapsed).toBe('false');
     expect(leftTabs[1]?.ariaSelected).toBe('true');
     expect(leftTabs[0]?.ariaSelected).toBe('false');
+  });
+
+  it('selects host groups, updates the panel header, and falls back when a group disappears', () => {
+    const changes: (string | undefined)[] = [];
+    const workbench = createWorkbench({
+      hostLeftPanelGroup: { id: 'assets', label: 'Assets' },
+      onLeftPanelGroupChange: (groupId) => changes.push(groupId),
+    });
+    workbench.controller.initialize();
+    workbench.controller.onClick(clickTarget({ panelCollapse: 'left' }));
+
+    expect(workbench.controller.selectLeftPanelGroup('assets')).toBe(true);
+    expect(workbench.layout.dataset.leftCollapsed).toBe('false');
+    expect(workbench.leftTabs[2]?.ariaSelected).toBe('true');
+    expect(workbench.hostLeftPanelPanes[0]?.hidden).toBe(false);
+    expect(workbench.materials.hidden).toBe(true);
+    expect(workbench.leftTitle.textContent).toBe('Assets');
+    expect(workbench.leftCount.hidden).toBe(true);
+    expect(changes).toEqual(['assets']);
+    expect(workbench.controller.selectLeftPanelGroup('missing')).toBe(false);
+
+    workbench.leftTabs.pop();
+    workbench.hostLeftPanelPanes.pop();
+    workbench.controller.refreshLeftPanelGroups();
+
+    expect(workbench.leftTabs[0]?.ariaSelected).toBe('true');
+    expect(workbench.materials.hidden).toBe(false);
+    expect(workbench.leftCount.hidden).toBe(false);
+    expect(changes).toEqual(['assets', undefined]);
   });
 
   it('keeps the panel highlight line centered under the pointer while resizing', () => {

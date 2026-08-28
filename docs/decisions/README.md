@@ -78,6 +78,7 @@
 | [ADR-0059](./ADR-0059-conditional-style-port.md) | 已接受 | 2026-08-17 | 宿主条件样式端口：渲染期同步纯函数覆盖，固定合并顺序与失败关闭回退，不进入文档 |
 | [ADR-0060](./ADR-0060-material-library-item-projection.md) | 已接受 | 2026-08-23 | Designer 物料库条目投影：多个宿主条目复用一个 canonical 运行物料类型，实例默认值覆盖经 Manifest 校验 |
 | [ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) | 已接受 | 2026-08-24 | 整屏交互编排宿主桥：detached 文档上下文、初始定位提示、完整 Blueprint 单事务提交；编排 UI/UX 与依赖完全归宿主 |
+| [ADR-0062](./ADR-0062-host-left-panel-groups.md) | 已接受 | 2026-08-28 | Designer 宿主左侧分组：严格 JSON-safe Tab 描述、专属命名 slot、程序化选择与切换事件；宿主内容生命周期留在 light DOM，不进入文档或 Engine Store |
 
 ## 计划决策
 

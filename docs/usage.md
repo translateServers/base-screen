@@ -1007,7 +1007,53 @@ designer.materialLibraryGrouping = materialLibraryGrouping;
 将 `designer.materialLibraryGrouping` 设为 `undefined` 会恢复既有 Manifest `category` 分类 UI。分组不会进入
 Manifest、catalog、ScreenDocument、历史、导出物、Renderer 或 Viewer，也不会触发联网或宿主存储。
 
-### 11.2 物料封面
+### 11.2 宿主扩展左侧分组
+
+宿主需要把资产、模板或 AI 工具等业务面板纳入左侧 `rail-tabs` 导航时，可配置最多 6 个严格的
+`leftPanelGroups`。描述只包含 `id`、`label` 与可选内建 `icon`；真实内容仍由宿主框架管理，并通过该分组专属
+命名 slot 投影到 Designer：
+
+```ts
+import {
+  BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
+  baseScreenDesignerLeftPanelSlotName,
+  type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
+} from '@base-screen/sdk';
+
+const assetPanel = document.createElement('acme-asset-panel');
+assetPanel.slot = baseScreenDesignerLeftPanelSlotName('assets');
+designer.append(assetPanel);
+
+designer.configure({
+  catalog,
+  leftPanelGroups: [{ id: 'assets', label: '资产', icon: 'image' }],
+});
+
+designer.addEventListener(BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT, (event) => {
+  const { groupId } = (event as CustomEvent<BaseScreenDesignerLeftPanelGroupChangeEventDetail>)
+    .detail;
+  assetPanel.toggleAttribute('data-active', groupId === 'assets');
+});
+
+// 无需查询 Shadow DOM；不存在或尚未挂载时返回 false。
+designer.selectLeftPanelGroup('assets');
+```
+
+运行时可更新 `designer.leftPanelGroups`；非法 id、保留 id（`materials`/`layers`/`variables`）、重复项、未知字段、
+非法图标或超过 6 项的数组会失败关闭并保留旧投影。删除当前宿主分组会自动回到「物料」。可用图标与 slot 前缀
+由 SDK 的 `BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS`、`BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX`
+导出，优先使用 `baseScreenDesignerLeftPanelSlotName(id)` 生成 slot 名。
+
+配置对象不接受 HTML、DOM Node、component 或 render function；这些内容是宿主可信 light DOM，只能经公开
+方法、端口和事件修改 Designer。Base Screen 不读取其业务状态，不负责请求/权限/持久化，也不会把内容、当前
+分组或选择状态写入 Manifest、catalog、ScreenDocument、历史、Renderer 或 Viewer。slot 内部点击、输入、
+快捷键和手势不会进入 Designer 的私有 data-* 事件路由，仍会正常冒泡给宿主。不要依赖
+`.rail-tabs`、`.rail-view`、Shadow DOM selector 或私有 `--designer-*` Token。
+
+`leftPanelGroups` 只是宿主业务 UI 的受限安放与导航能力，不表示 Base Screen 提供资产或资源。资源目录、搜索、
+上传、存储、权限、缩略图及其业务状态必须由宿主实现；不要据此在 Engine 中增加资源 Store 或管理工作流。
+
+### 11.3 物料封面
 
 物料作者或宿主可在 Material Manifest 中声明可选 `cover` 字段，为物料库卡片提供真实封面图（替代默认的
 确定性分类图标/色相占位）：
@@ -1033,7 +1079,7 @@ const manifest = {
 其余照片类封面保持 `cover` 铺满裁切；封面加载成功后占位层的彩色渐变/网格底色收为中性表面，透明素材不再
 透底。该行为是纯展示启发式，宿主无需任何改造；需要统一裁切出图的宿主应在自己的资产链路上生成缩略图。
 
-### 11.3 物料库渲染可扩展性
+### 11.4 物料库渲染可扩展性
 
 物料库卡片网格项默认启用 `content-visibility: auto` + `contain-intrinsic-size: auto 140px`
 （[ADR-0042](../docs/decisions/ADR-0042-material-library-render-scalability.md)）：屏外卡片跳过渲染，

@@ -102,6 +102,27 @@ describe('DesignerSurfaceRouter', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
+  it('leaves events from host left panel slots entirely to the host', () => {
+    const root = new FakeSurfaceRoot();
+    const click = vi.fn(() => false);
+    const pointerDown = vi.fn(() => false);
+    const keyDownCapture = vi.fn(() => false);
+    const target = new FakeElement();
+    const composedPath = () => [target, { dataset: { hostLeftPanelSlot: 'assets' } }];
+    new DesignerSurfaceRouter().connect(
+      root as unknown as ShadowRoot,
+      bindings({ click: [click], pointerDown, keyDownCapture }),
+    );
+
+    root.dispatch('click', target, { composedPath });
+    root.dispatch('pointerdown', target, { composedPath });
+    root.dispatch('keydown', target, { composedPath });
+
+    expect(click).not.toHaveBeenCalled();
+    expect(pointerDown).not.toHaveBeenCalled();
+    expect(keyDownCapture).not.toHaveBeenCalled();
+  });
+
   it('routes change, input and keydown chains until handled', () => {
     const root = new FakeSurfaceRoot();
     const change = [vi.fn(() => false), vi.fn(() => true), vi.fn(() => false)];

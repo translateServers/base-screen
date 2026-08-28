@@ -8,12 +8,16 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
+  BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenCanvasBackgroundImageRequest,
   type BaseScreenCanvasPresentationChangeEventDetail,
   BaseScreenDesignerElement,
+  type BaseScreenDesignerLeftPanelGroup,
+  type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
   type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryItem,
+  parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryItems,
   ScreenProjectController,
@@ -39,6 +43,27 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<typeof parseBaseScreenMaterialLibraryItems>().returns.toMatchTypeOf<
       ScreenParseResult<readonly BaseScreenMaterialLibraryItem[]>
     >();
+  });
+
+  it('exports the host left panel group contract', () => {
+    expect(BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT).toBe(
+      'base-screen-designer-left-panel-group-change',
+    );
+    expectTypeOf<InstanceType<typeof BaseScreenDesignerElement>['leftPanelGroups']>().toEqualTypeOf<
+      readonly BaseScreenDesignerLeftPanelGroup[] | undefined
+    >();
+    expectTypeOf<typeof parseBaseScreenDesignerLeftPanelGroups>().returns.toMatchTypeOf<
+      ScreenParseResult<readonly BaseScreenDesignerLeftPanelGroup[]>
+    >();
+    expectTypeOf<BaseScreenDesignerLeftPanelGroupChangeEventDetail>().toEqualTypeOf<{
+      readonly groupId: string | null;
+    }>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['selectLeftPanelGroup']
+    >().parameters.toEqualTypeOf<[string]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['selectLeftPanelGroup']
+    >().returns.toEqualTypeOf<boolean>();
   });
 
   it('exports the canvas presentation host change contract', () => {

@@ -7,6 +7,7 @@ import {
   defineBaseScreenElements,
   defineBaseScreenViewer,
   MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES,
+  parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryItems,
   parseScreenBlueprintAuthoringContext,
@@ -18,6 +19,9 @@ describe('SDK product element registration', () => {
   });
 
   it('re-exports the host material grouping parser', () => {
+    expect(
+      parseBaseScreenDesignerLeftPanelGroups([{ id: 'assets', label: 'Assets', icon: 'image' }]).ok,
+    ).toBe(true);
     expect(
       parseBaseScreenMaterialLibraryGrouping({
         groups: [{ id: 'content', label: 'Content', materialTypes: ['base.text'] }],

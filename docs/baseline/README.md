@@ -49,6 +49,11 @@
 - **左侧面板信息架构与交互**（封版后增量，生效中）：缩略图网格组件库、按 Tab 隔离的工具栏、折叠图标轨、
   图层树引导线与图标操作、搜索清除与网格键盘可达性；既有 data-* 契约与宿主边界不变，零新依赖。
   依据：[Designer Left Panel](../specs/designer-left-panel/spec.md)、[ADR-0032](../decisions/ADR-0032-designer-left-panel-refactor.md)。
+- **宿主左侧分组扩展**（2026-08-28 增量）：Designer 接受最多 6 个严格 JSON-safe 的 `leftPanelGroups`，
+  以有限内建图标生成可折叠、可键盘导航的 Tab；对应内容通过专属公开命名 slot 留在宿主 light DOM，
+  `selectLeftPanelGroup` 与 composed change event 不要求访问 Shadow DOM。热更新删除当前组回退「物料」，
+  宿主内容、状态、权限和请求不进入 Engine Store、ScreenDocument 或 Renderer。依据：
+  [ADR-0062](../decisions/ADR-0062-host-left-panel-groups.md)。
 - **视窗原生事件开关**（封版后增量，生效中）：状态栏「事件」与吸附/参考线同形态的 switch 控制设计态画布交互
   模式（默认关闭）；开启后组件原生事件经 `base-screen-material-event` 转发给宿主（与 Viewer 同形），renderer
   以实例级 `setInteractive` 原地重渲染，不重挂载、不重取数。依据：

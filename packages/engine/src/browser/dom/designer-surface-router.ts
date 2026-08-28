@@ -49,8 +49,14 @@ export class DesignerSurfaceRouter {
     this.#connected = true;
     this.#root = root;
     const add = (type: string, listener: EventListener, options?: AddEventListenerOptions) => {
-      root.addEventListener(type, listener, options);
-      this.#removers.push(() => root.removeEventListener(type, listener, options));
+      const guardedListener: EventListener = (event) => {
+        // ADR-0062：宿主命名 slot 的 light DOM 事件只属于宿主。事件仍正常冒泡，
+        // 但不得被 Designer 内部 data-* 路由、快捷键或手势处理器误识别。
+        if (isHostLeftPanelEvent(event)) return;
+        listener(event);
+      };
+      root.addEventListener(type, guardedListener, options);
+      this.#removers.push(() => root.removeEventListener(type, guardedListener, options));
     };
     add('click', (event) => {
       const target = event.target;
@@ -128,6 +134,14 @@ export class DesignerSurfaceRouter {
       if (handler(target, event)) return;
     }
   }
+}
+
+function isHostLeftPanelEvent(event: Event): boolean {
+  if (typeof event.composedPath !== 'function') return false;
+  return event.composedPath().some((target) => {
+    const dataset = (target as { readonly dataset?: DOMStringMap } | null)?.dataset;
+    return dataset?.hostLeftPanelSlot !== undefined;
+  });
 }
 
 export function isEditableTarget(target: EventTarget | null): boolean {

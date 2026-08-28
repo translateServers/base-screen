@@ -2,6 +2,7 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { hostLeftPanelGroupId, hostLeftPanelTab } from '../dom/designer-left-panel-groups-dom.js';
 import {
   collectDesignerSnapCandidates,
   DEFAULT_DESIGNER_CANVAS_AIDS,
@@ -34,11 +35,13 @@ interface DesignerWorkbenchCallbacks {
   readonly getZoom: () => number;
   /** 状态栏「事件」开关切换回调：组合根据此切换渲染器 interactive 状态。 */
   readonly onNativeEventsChange?: (enabled: boolean) => void;
+  /** 宿主左侧分组切换；切回内建分组时传 undefined。 */
+  readonly onLeftPanelGroupChange?: (groupId: string | undefined) => void;
 }
 
 type PanelSide = 'left' | 'right';
 type GuideAxis = 'x' | 'y';
-type LeftTab = 'materials' | 'layers' | 'variables';
+type LeftTab = 'materials' | 'layers' | 'variables' | `host:${string}`;
 export type DesignerInspectorTab = 'appearance' | 'data' | 'interaction';
 type RightTab = DesignerInspectorTab;
 type WorkbenchMode = 'standard' | 'with-menu' | 'fullscreen';
@@ -385,15 +388,8 @@ export class DesignerWorkbenchController {
       return true;
     }
     const leftTab = target.closest<HTMLButtonElement>('[data-panel-tab]')?.dataset.panelTab;
-    if (leftTab === 'materials' || leftTab === 'layers' || leftTab === 'variables') {
-      // 折叠图标轨：点击图标 Tab 先展开面板再切换，保证折叠态也能完成导航。
-      if (this.#leftCollapsed) {
-        this.#leftCollapsed = false;
-        this.renderLayout();
-      }
-      this.#leftTab = leftTab;
-      this.renderTabs();
-      return true;
+    if (leftTab !== undefined && isLeftTab(leftTab) && this.leftTabAvailable(leftTab)) {
+      return this.selectLeftTab(leftTab);
     }
     const rightTab =
       target.closest<HTMLButtonElement>('[data-inspector-tab]')?.dataset.inspectorTab;
@@ -427,6 +423,21 @@ export class DesignerWorkbenchController {
     this.#rightCollapsed = false;
     this.renderLayout();
     this.renderTabs();
+  }
+
+  selectLeftPanelGroup(groupId: string): boolean {
+    return this.selectLeftTab(hostLeftPanelTab(groupId));
+  }
+
+  refreshLeftPanelGroups(): void {
+    if (this.leftTabAvailable(this.#leftTab)) {
+      this.renderTabs();
+      return;
+    }
+    const previousGroupId = hostLeftPanelGroupId(this.#leftTab);
+    this.#leftTab = 'materials';
+    this.renderTabs();
+    if (previousGroupId !== undefined) this.callbacks.onLeftPanelGroupChange?.(undefined);
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
@@ -626,7 +637,10 @@ export class DesignerWorkbenchController {
     if (!singleComponentSelected || (this.#rightTab === 'data' && !dataTabAvailable)) {
       this.#rightTab = 'appearance';
     }
-    for (const control of root.querySelectorAll<HTMLButtonElement>('[data-panel-tab]')) {
+    const leftTabControls = Array.from(
+      root.querySelectorAll<HTMLButtonElement>('[data-panel-tab]'),
+    );
+    for (const control of leftTabControls) {
       control.ariaSelected = String(control.dataset.panelTab === this.#leftTab);
     }
     const materials = root.querySelector<HTMLElement>('[data-materials]');
@@ -634,16 +648,25 @@ export class DesignerWorkbenchController {
     const variables = root.querySelector<HTMLElement>('[data-variables]');
     const leftTitle = root.querySelector<HTMLElement>('[data-left-panel-title]');
     const leftCount = root.querySelector<HTMLElement>('[data-left-panel-count]');
+    const hostGroupId = hostLeftPanelGroupId(this.#leftTab);
     const leftPanelLabel =
-      this.#leftTab === 'materials'
-        ? DESIGNER_UI_TEXT.materials
-        : this.#leftTab === 'layers'
-          ? DESIGNER_UI_TEXT.layers
-          : DESIGNER_UI_TEXT.variables.title;
+      hostGroupId !== undefined
+        ? (leftTabControls.find((control) => control.dataset.panelTab === this.#leftTab)?.dataset
+            .panelLabel ?? hostGroupId)
+        : this.#leftTab === 'materials'
+          ? DESIGNER_UI_TEXT.materials
+          : this.#leftTab === 'layers'
+            ? DESIGNER_UI_TEXT.layers
+            : DESIGNER_UI_TEXT.variables.title;
     if (leftTitle !== null) {
       leftTitle.textContent = leftPanelLabel;
     }
-    if (leftCount !== null) {
+    if (leftCount !== null && hostGroupId !== undefined) {
+      leftCount.hidden = true;
+      leftCount.textContent = '';
+      leftCount.removeAttribute('aria-label');
+    } else if (leftCount !== null) {
+      leftCount.hidden = false;
       const itemCount =
         this.#leftTab === 'materials'
           ? Number(leftCount.dataset.materialTotal ?? 0)
@@ -656,6 +679,11 @@ export class DesignerWorkbenchController {
     if (materials !== null) materials.hidden = this.#leftTab !== 'materials';
     if (layers !== null) layers.hidden = this.#leftTab !== 'layers';
     if (variables !== null) variables.hidden = this.#leftTab !== 'variables';
+    for (const pane of root.querySelectorAll<HTMLElement>(
+      '.host-left-panel-view[data-host-left-panel-group]',
+    )) {
+      pane.hidden = pane.dataset.hostLeftPanelGroup !== hostGroupId;
+    }
     const inspectorTabs = root.querySelector<HTMLElement>('.inspector-tabs');
     if (inspectorTabs !== null) inspectorTabs.hidden = !singleComponentSelected;
     for (const control of root.querySelectorAll<HTMLButtonElement>('[data-inspector-tab]')) {
@@ -679,6 +707,31 @@ export class DesignerWorkbenchController {
         pane.removeAttribute('aria-label');
       }
     }
+  }
+
+  private selectLeftTab(tab: LeftTab): boolean {
+    if (!this.leftTabAvailable(tab)) return false;
+    if (this.#leftCollapsed) {
+      this.#leftCollapsed = false;
+      this.renderLayout();
+    }
+    const previousGroupId = hostLeftPanelGroupId(this.#leftTab);
+    this.#leftTab = tab;
+    this.renderTabs();
+    const nextGroupId = hostLeftPanelGroupId(tab);
+    if (previousGroupId !== nextGroupId) {
+      this.callbacks.onLeftPanelGroupChange?.(nextGroupId);
+    }
+    return true;
+  }
+
+  private leftTabAvailable(tab: LeftTab): boolean {
+    if (tab === 'materials' || tab === 'layers' || tab === 'variables') return true;
+    const root = this.callbacks.getRoot();
+    if (root === null) return false;
+    return Array.from(root.querySelectorAll<HTMLElement>('[data-panel-tab]')).some(
+      (control) => control.dataset.panelTab === tab,
+    );
   }
 
   private rightTabAvailable(tab: RightTab): boolean {
@@ -1256,6 +1309,15 @@ function tabDirection(key: string): -1 | 1 | 'first' | 'last' | undefined {
   if (key === 'Home') return 'first';
   if (key === 'End') return 'last';
   return undefined;
+}
+
+function isLeftTab(value: string): value is LeftTab {
+  return (
+    value === 'materials' ||
+    value === 'layers' ||
+    value === 'variables' ||
+    hostLeftPanelGroupId(value) !== undefined
+  );
 }
 
 function nonTabbedInspectorLabel(selectedComponentIds: readonly string[]): string {

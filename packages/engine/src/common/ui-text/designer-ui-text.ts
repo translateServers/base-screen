@@ -76,6 +76,7 @@ export const DESIGNER_UI_TEXT = {
   materialGroupSelect: (label: string) => `查看 ${label} 物料`,
   materialGroupCount: (count: number) => `${count} 个物料`,
   leftPanelCount: (label: string, count: number) => `${label}：${count} 项`,
+  hostLeftPanelEmpty: '宿主尚未提供此分组的内容。',
   materialSearchEmpty: '没有符合条件的物料。',
   materialDraft: '草稿',
   materialUnavailable: '不可用',

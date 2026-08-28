@@ -224,7 +224,7 @@
   box-sizing: border-box;
   width: 100%;
   padding-right: calc(var(--designer-space-3) + 22px);
-  padding-left: calc(var(--designer-space-3) + 20px);
+  padding-left: calc(var(--designer-space-3) + var(--designer-control-height));
   border-color: var(--designer-border-subtle);
   border-radius: 9px;
   background: color-mix(
@@ -783,6 +783,7 @@
 .designer[data-left-collapsed="true"] [data-materials],
 .designer[data-left-collapsed="true"] [data-layers],
 .designer[data-left-collapsed="true"] [data-variables],
+.designer[data-left-collapsed="true"] [data-host-left-panel-group][role="tabpanel"],
 .designer[data-right-collapsed="true"] .inspector-tabs,
 .designer[data-right-collapsed="true"] .inspector-context,
 .designer[data-right-collapsed="true"] .inspector-toolbar,
