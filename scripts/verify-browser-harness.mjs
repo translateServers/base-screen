@@ -1,21 +1,17 @@
 import { mkdirSync, readFileSync } from 'node:fs';
-import { chromium } from '@playwright/test';
-import { createServer } from 'vite';
+import { withViteBrowser } from './browser-verification.mjs';
 
 const screenshotDirectory = 'test-results/designer-workbench';
 const serverPort = Number(process.env.BASE_SCREEN_BROWSER_PORT ?? 4174);
 mkdirSync(screenshotDirectory, { recursive: true });
 
-const server = await createServer({
-  root: 'examples/browser-harness',
-  optimizeDeps: { force: true },
-  server: { host: '127.0.0.1', port: serverPort, strictPort: true },
-});
-
-try {
-  await server.listen();
-  const browser = await chromium.launch();
-  try {
+await withViteBrowser(
+  {
+    root: 'examples/browser-harness',
+    optimizeDeps: { force: true },
+    server: { port: serverPort },
+  },
+  async ({ baseUrl, browser }) => {
     for (const viewport of [
       { width: 1024, height: 640 },
       { width: 1366, height: 768 },
@@ -26,7 +22,7 @@ try {
       const page = await browser.newPage({ viewport });
       const pageErrors = [];
       page.on('pageerror', (error) => pageErrors.push(error));
-      await page.goto(`http://127.0.0.1:${serverPort}`, { waitUntil: 'networkidle' });
+      await page.goto(baseUrl, { waitUntil: 'networkidle' });
       if (pageErrors.length > 0) {
         throw pageErrors[0];
       }
@@ -239,6 +235,7 @@ try {
           await page.close();
           continue;
         }
+        await assertCanvasContentClipping(page);
         await page.evaluate(() => {
           delete document.body.dataset.layout;
           document.body.style.padding = '';
@@ -634,7 +631,7 @@ try {
           );
         }
         await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
-        await page.goto(`http://127.0.0.1:${serverPort}/?designer`, { waitUntil: 'networkidle' });
+        await page.goto(`${baseUrl}/?designer`, { waitUntil: 'networkidle' });
         const authoringDesigner = page.locator('base-screen-designer');
         // ?designer 页面的 designer 初始化是异步的（custom element upgrade + load）：
         // 等待 publish 按钮的操作渲染完成（hidden 由 renderOperationControls 设置），
@@ -1101,6 +1098,7 @@ try {
           titlePosition?.x,
         );
         await assertInspectorFormScrollContinuity(page, authoringDesigner);
+        await assertCoordinateEntry(page, authoringDesigner);
         await assertAuthoringShortcutsAndIsolation(page, authoringDesigner);
         await assertCanvasPrecision(authoringDesigner, page);
         await assertDataAndBlueprintAuthoring(authoringDesigner, page);
@@ -1213,12 +1211,8 @@ try {
       }
       await page.close();
     }
-  } finally {
-    await browser.close();
-  }
-} finally {
-  await server.close();
-}
+  },
+);
 
 // ADR-0032 左侧面板重构验证：信息架构、缩略图网格、键盘可达、折叠图标轨、图层树增强与无抖动。
 async function assertLeftPanelDesign(designer, page, viewport) {
@@ -1799,6 +1793,61 @@ async function assertLeftPanelDesign(designer, page, viewport) {
       `BROWSER_HARNESS_LAYER_SELECT_HIT_TARGET_FAILED:${JSON.stringify(selectedState)}`,
     );
   }
+  await probe.locator('[data-viewport]').focus();
+  await page.keyboard.press(']');
+  await page.waitForTimeout(50);
+  const shortcutUp = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      childOrder: [
+        ...root.querySelectorAll(
+          '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
+        ),
+      ].map((row) => row.dataset.layerId),
+      zIndexes: Object.fromEntries(
+        element.document.components
+          .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
+          .map((component) => [component.id, component.zIndex]),
+      ),
+      selectedIds: [...root.querySelectorAll('.layer-row[aria-selected="true"]')].map(
+        (row) => row.dataset.layerId,
+      ),
+    };
+  });
+  if (
+    JSON.stringify(shortcutUp.childOrder) !== JSON.stringify(['probe-a', 'probe-b']) ||
+    shortcutUp.zIndexes['probe-a'] <= shortcutUp.zIndexes['probe-b'] ||
+    JSON.stringify(shortcutUp.selectedIds) !== JSON.stringify(['probe-a'])
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_SHORTCUT_UP_FAILED:${JSON.stringify(shortcutUp)}`);
+  }
+  await page.keyboard.press('[');
+  await page.waitForTimeout(50);
+  const shortcutDown = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      childOrder: [
+        ...root.querySelectorAll(
+          '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
+        ),
+      ].map((row) => row.dataset.layerId),
+      zIndexes: Object.fromEntries(
+        element.document.components
+          .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
+          .map((component) => [component.id, component.zIndex]),
+      ),
+      selectedIds: [...root.querySelectorAll('.layer-row[aria-selected="true"]')].map(
+        (row) => row.dataset.layerId,
+      ),
+    };
+  });
+  if (
+    JSON.stringify(shortcutDown.childOrder) !== JSON.stringify(['probe-b', 'probe-a']) ||
+    shortcutDown.zIndexes['probe-a'] >= shortcutDown.zIndexes['probe-b'] ||
+    JSON.stringify(shortcutDown.selectedIds) !== JSON.stringify(['probe-a'])
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_SHORTCUT_DOWN_FAILED:${JSON.stringify(shortcutDown)}`);
+  }
   // 首次单击会重绘图层树；使用真实鼠标双击验证第二次点击跨新 DOM 行仍进入重命名，
   // 且输入框立即获得焦点并保留原名称，而不是仅直接派发一个不可达的 dblclick。
   await childRow.dblclick({ position: { x: 80, y: childHeightBefore / 2 }, delay: 60 });
@@ -1810,6 +1859,41 @@ async function assertLeftPanelDesign(designer, page, viewport) {
   }));
   if (!renameState.focused || renameState.value !== '\u5b50\u9879\u7532') {
     throw new Error(`BROWSER_HARNESS_LAYER_RENAME_FOCUS_FAILED:${JSON.stringify(renameState)}`);
+  }
+  await renameInput.press('End');
+  await renameInput.press(']');
+  const editableRightBracket = await probe.evaluate((element) => ({
+    value: element.shadowRoot?.querySelector('[data-layer-rename="probe-a"]')?.value,
+    zIndexes: Object.fromEntries(
+      element.document.components
+        .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
+        .map((component) => [component.id, component.zIndex]),
+    ),
+  }));
+  if (
+    editableRightBracket.value !== '\u5b50\u9879\u7532]' ||
+    editableRightBracket.zIndexes['probe-a'] >= editableRightBracket.zIndexes['probe-b']
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_SHORTCUT_EDITABLE_RIGHT_FAILED:${JSON.stringify(editableRightBracket)}`,
+    );
+  }
+  await renameInput.press('[');
+  const editableLeftBracket = await probe.evaluate((element) => ({
+    value: element.shadowRoot?.querySelector('[data-layer-rename="probe-a"]')?.value,
+    zIndexes: Object.fromEntries(
+      element.document.components
+        .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
+        .map((component) => [component.id, component.zIndex]),
+    ),
+  }));
+  if (
+    editableLeftBracket.value !== '\u5b50\u9879\u7532][' ||
+    editableLeftBracket.zIndexes['probe-a'] >= editableLeftBracket.zIndexes['probe-b']
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_SHORTCUT_EDITABLE_LEFT_FAILED:${JSON.stringify(editableLeftBracket)}`,
+    );
   }
   await renameInput.fill('\u5b50\u9879\u7532\u5df2\u91cd\u547d\u540d');
   await renameInput.press('Enter');
@@ -1922,6 +2006,109 @@ async function assertLeftPanelDesign(designer, page, viewport) {
   ) {
     throw new Error(
       `BROWSER_HARNESS_LAYER_ACTIONS_EXPAND_FAILED:${JSON.stringify(expandedActions)}`,
+    );
+  }
+  // Alt+[] 只切换选区：顺序复用完整图层树，跳过有效隐藏项，但保留锁定项；
+  // 多选以焦点项为锚点并收敛为单选，首尾不循环，文档与历史保持不变。
+  await probe.evaluate((element) => {
+    const [group, childA, childB] = element.document.components;
+    element.document = {
+      ...element.document,
+      components: [
+        { ...group, zIndex: 2, status: { locked: false, hidden: false } },
+        { ...childA, zIndex: 0, status: { locked: false, hidden: false } },
+        { ...childB, zIndex: 1, status: { locked: true, hidden: false } },
+        {
+          ...childA,
+          id: 'probe-hidden',
+          name: 'Hidden',
+          parentId: null,
+          zIndex: 3,
+          status: { locked: false, hidden: true },
+        },
+        {
+          ...childA,
+          id: 'probe-back',
+          name: 'Back',
+          parentId: null,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+        },
+      ],
+    };
+  });
+  await page.waitForTimeout(50);
+  const layerSelectionDocument = await probe.evaluate((element) =>
+    JSON.stringify(element.document),
+  );
+  const layerSelectionViewport = probe.locator('[data-viewport]');
+  await layerSelectionViewport.focus();
+  await page.keyboard.press('Alt+]');
+  await page.waitForTimeout(50);
+  const firstLayerSelection = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      selectedIds: [...root.querySelectorAll('.layer-row[aria-selected="true"]')].map(
+        (row) => row.dataset.layerId,
+      ),
+      focused: root.activeElement === root.querySelector('[data-viewport]'),
+      upDisabled: root.querySelector('[data-menu-action="select-layer-up"]')?.disabled,
+      downDisabled: root.querySelector('[data-menu-action="select-layer-down"]')?.disabled,
+      helpUp: root.querySelector('[data-help-operation="select-layer-up"] kbd')?.textContent,
+      helpDown: root.querySelector('[data-help-operation="select-layer-down"] kbd')?.textContent,
+    };
+  });
+  if (
+    JSON.stringify(firstLayerSelection.selectedIds) !== JSON.stringify(['probe-group']) ||
+    !firstLayerSelection.focused ||
+    firstLayerSelection.upDisabled !== true ||
+    firstLayerSelection.downDisabled !== false ||
+    firstLayerSelection.helpUp !== 'Alt+]' ||
+    firstLayerSelection.helpDown !== 'Alt+['
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_SELECTION_FIRST_FAILED:${JSON.stringify(firstLayerSelection)}`,
+    );
+  }
+  const selectionModifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await probe.locator('[data-layer-select="probe-a"]').click({ modifiers: [selectionModifier] });
+  await layerSelectionViewport.focus();
+  await page.keyboard.press('Alt+]');
+  await page.waitForTimeout(50);
+  const focusedMultiStep = await probe.evaluate((element) => ({
+    selectedIds: [...element.shadowRoot.querySelectorAll('.layer-row[aria-selected="true"]')].map(
+      (row) => row.dataset.layerId,
+    ),
+    document: JSON.stringify(element.document),
+    lockedSelected:
+      element.shadowRoot
+        .querySelector('[data-layer-id="probe-b"]')
+        ?.getAttribute('aria-selected') === 'true',
+  }));
+  if (
+    JSON.stringify(focusedMultiStep.selectedIds) !== JSON.stringify(['probe-b']) ||
+    !focusedMultiStep.lockedSelected ||
+    focusedMultiStep.document !== layerSelectionDocument
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_SELECTION_MULTI_FAILED:${JSON.stringify(focusedMultiStep)}`,
+    );
+  }
+  await page.keyboard.press('Alt+]');
+  await page.keyboard.press('Alt+]');
+  await page.waitForTimeout(50);
+  const boundarySelection = await probe.evaluate((element) => ({
+    selectedIds: [...element.shadowRoot.querySelectorAll('.layer-row[aria-selected="true"]')].map(
+      (row) => row.dataset.layerId,
+    ),
+    document: JSON.stringify(element.document),
+  }));
+  if (
+    JSON.stringify(boundarySelection.selectedIds) !== JSON.stringify(['probe-group']) ||
+    boundarySelection.document !== layerSelectionDocument
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_SELECTION_BOUNDARY_FAILED:${JSON.stringify(boundarySelection)}`,
     );
   }
   await page.mouse.move(viewport.width - 8, 8);
@@ -2569,6 +2756,14 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
       expanded: root.querySelector('[data-error-console-toggle]')?.getAttribute('aria-expanded'),
       focusedClose: root.activeElement?.hasAttribute('data-error-console-close'),
       entryCount: root.querySelectorAll('[data-error-console-entry]').length,
+      currentHeading: root.querySelector('.error-console-section-title')?.textContent?.trim(),
+      historyHeading: root.querySelector('.error-console-history-heading h3')?.textContent?.trim(),
+      historySummary: root
+        .querySelector('[data-error-console-history-summary]')
+        ?.textContent?.trim(),
+      historyOrder: root
+        .querySelector('[data-error-console-list]')
+        ?.getAttribute('data-error-console-order'),
       gridTop: root.querySelector('[data-material-grid]')?.getBoundingClientRect().top,
       canvas: root.querySelector('[data-canvas]')?.getBoundingClientRect().toJSON(),
     };
@@ -2578,6 +2773,10 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     consoleOpen.expanded !== 'true' ||
     !consoleOpen.focusedClose ||
     consoleOpen.entryCount !== 1 ||
+    consoleOpen.currentHeading !== '当前状态' ||
+    consoleOpen.historyHeading !== '历史记录' ||
+    consoleOpen.historySummary !== '1 条记录' ||
+    consoleOpen.historyOrder !== 'newest-first' ||
     Math.abs((consoleOpen.gridTop ?? 0) - (state.gridTop ?? 0)) > 2 ||
     !rectWithin(consoleOpen.canvas, state.canvas)
   ) {
@@ -2588,6 +2787,22 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
   await designer.locator('[data-error-console]').screenshot({
     path: `${screenshotDirectory}/error-console-${viewport.width}x${viewport.height}.png`,
   });
+
+  await page.keyboard.press('Shift+Tab');
+  const focusBeforeWrap = await designer.evaluate(
+    (element) =>
+      element.shadowRoot.activeElement?.hasAttribute('data-error-console-clear') ?? false,
+  );
+  await page.keyboard.press('Shift+Tab');
+  const focusAfterWrap = await designer.evaluate(
+    (element) =>
+      element.shadowRoot.activeElement?.getAttribute('data-material-library-action') ?? null,
+  );
+  if (!focusBeforeWrap || focusAfterWrap !== 'details') {
+    throw new Error(
+      `BROWSER_HARNESS_ERROR_CONSOLE_FOCUS_LOOP_FAILED:${JSON.stringify({ focusBeforeWrap, focusAfterWrap })}`,
+    );
+  }
 
   await designer.locator('[data-material-library-action="retry"]').click();
   await designer.locator('[data-material-library-action="details"]').click();
@@ -2731,7 +2946,19 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
   if (cleared.entryCount !== 0 || cleared.count !== '' || cleared.status !== 'update-available') {
     throw new Error(`BROWSER_HARNESS_ERROR_CONSOLE_CLEAR_FAILED:${JSON.stringify(cleared)}`);
   }
-  await designer.locator('[data-error-console-close]').click();
+  await designer.locator('[data-error-console]').click({ position: { x: 2, y: 2 } });
+  const backdropClosed = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      hidden: root.querySelector('[data-error-console]')?.hidden,
+      focusedTrigger: root.activeElement?.hasAttribute('data-error-console-toggle'),
+    };
+  });
+  if (backdropClosed.hidden !== true || !backdropClosed.focusedTrigger) {
+    throw new Error(
+      `BROWSER_HARNESS_ERROR_CONSOLE_BACKDROP_CLOSE_FAILED:${JSON.stringify(backdropClosed)}`,
+    );
+  }
 }
 
 function rectWithin(actual, expected, tolerance = 2) {
@@ -2842,6 +3069,292 @@ async function assertInspectorFormScrollContinuity(page, designer) {
       `BROWSER_HARNESS_INSPECTOR_FORM_SCROLL_CONTINUITY_FAILED:${JSON.stringify(results)}`,
     );
   }
+}
+
+async function assertCoordinateEntry(page, designer) {
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  const form = designer.locator('[data-coordinate-entry]');
+  const viewport = designer.locator('[data-viewport]');
+  const xInput = form.locator('[data-coordinate-entry-x]');
+  const yInput = form.locator('[data-coordinate-entry-y]');
+
+  await zoomResetViaMenu(designer);
+  await designer.getByTitle('\u9009\u62e9').click();
+  await designer.locator('[data-base-screen-component-id=title]').click();
+  const original = await page.evaluate(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    if (component === undefined) throw new Error('Missing title');
+    return { ...component.position };
+  });
+  await viewport.focus();
+  await page.keyboard.press('x');
+  await form.waitFor({ state: 'visible' });
+
+  const opened = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const form = root.querySelector('[data-coordinate-entry]');
+    const x = root.querySelector('[data-coordinate-entry-x]');
+    const y = root.querySelector('[data-coordinate-entry-y]');
+    const embeddedAxis = (input, axis) =>
+      input?.parentElement?.classList.contains('designer-coordinate-entry-input') === true &&
+      input.previousElementSibling?.textContent === axis &&
+      input.nextElementSibling?.textContent === 'px';
+    return {
+      activeX: root.activeElement === x,
+      buttonCount: form.querySelectorAll('button').length,
+      embeddedAxes: embeddedAxis(x, 'X') && embeddedAxis(y, 'Y'),
+      x: x.value,
+    };
+  });
+  if (
+    !opened.activeX ||
+    opened.buttonCount !== 0 ||
+    !opened.embeddedAxes ||
+    opened.x !== String(original.x)
+  ) {
+    throw new Error(`BROWSER_HARNESS_COORDINATE_OPEN_FAILED:${JSON.stringify(opened)}`);
+  }
+
+  const xDraft = (original.x + 23.456).toFixed(3);
+  const yDraft = (original.y + 17.654).toFixed(3);
+  const expected = {
+    x: Math.round(Number(xDraft) * 100) / 100,
+    y: Math.round(Number(yDraft) * 100) / 100,
+  };
+  await page.keyboard.type(xDraft);
+  if ((await xInput.inputValue()) !== xDraft) {
+    throw new Error('BROWSER_HARNESS_COORDINATE_X_AUTO_SELECT_FAILED');
+  }
+  await page.keyboard.press('Tab');
+  const tabbedToY = await designer.evaluate(
+    (element) =>
+      element.shadowRoot.activeElement ===
+      element.shadowRoot.querySelector('[data-coordinate-entry-y]'),
+  );
+  if (!tabbedToY) throw new Error('BROWSER_HARNESS_COORDINATE_TAB_FAILED');
+  await yInput.fill(yDraft);
+
+  const beforeViewportChange = await readCoordinateEntryGeometry(designer);
+  await viewport.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const event = (options) =>
+      element.dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          composed: true,
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+          ...options,
+        }),
+      );
+    event({ ctrlKey: true, deltaY: -120 });
+    event({ deltaX: 16, deltaY: -12 });
+  });
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+  );
+  const afterViewportChange = await readCoordinateEntryGeometry(designer);
+  if (
+    !coordinateEntryGeometryIsValid(beforeViewportChange) ||
+    !coordinateEntryGeometryIsValid(afterViewportChange) ||
+    Math.abs(beforeViewportChange.form.width - afterViewportChange.form.width) > 0.5 ||
+    Math.abs(beforeViewportChange.form.height - afterViewportChange.form.height) > 0.5
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_COORDINATE_VIEWPORT_PLACEMENT_FAILED:${JSON.stringify({
+        beforeViewportChange,
+        afterViewportChange,
+      })}`,
+    );
+  }
+
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(({ x, y }) => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.position.x === x && component.position.y === y;
+  }, expected);
+  const committedState = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      hidden: root.querySelector('[data-coordinate-entry]').hidden,
+      viewportFocused: root.activeElement === root.querySelector('[data-viewport]'),
+    };
+  });
+  if (!committedState.hidden || !committedState.viewportFocused) {
+    throw new Error(
+      `BROWSER_HARNESS_COORDINATE_COMMIT_FOCUS_FAILED:${JSON.stringify(committedState)}`,
+    );
+  }
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction(({ x, y }) => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.position.x === x && component.position.y === y;
+  }, original);
+  await zoomResetViaMenu(designer);
+
+  await designer.locator('[data-panel-tab="layers"]').click();
+  const group = await page.evaluate(() => {
+    const components = window.baseScreenHarness.designer.document.components;
+    const container = components.find(
+      (candidate) =>
+        candidate.type === 'base.container' &&
+        components.some((component) => component.parentId === candidate.id),
+    );
+    if (container === undefined) return null;
+    const ids = new Set([container.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const component of components) {
+        if (component.parentId !== null && ids.has(component.parentId) && !ids.has(component.id)) {
+          ids.add(component.id);
+          changed = true;
+        }
+      }
+    }
+    const items = components
+      .filter((component) => ids.has(component.id) && !component.status.locked)
+      .map((component) => ({ id: component.id, ...component.position }));
+    const x = Math.round((container.position.x + 19.235) * 100) / 100;
+    const y = Math.round((container.position.y - 11.345) * 100) / 100;
+    return {
+      id: container.id,
+      items,
+      target: { x, y },
+      delta: { x: x - container.position.x, y: y - container.position.y },
+    };
+  });
+  if (group === null || group.items.length < 2) {
+    throw new Error(`BROWSER_HARNESS_COORDINATE_GROUP_MISSING:${JSON.stringify(group)}`);
+  }
+  await designer.locator(`[data-layer-select="${group.id}"] .layer-name`).click();
+  await viewport.focus();
+  await page.keyboard.press('x');
+  await form.waitFor({ state: 'visible' });
+  await xInput.fill(group.target.x.toFixed(2));
+  await yInput.fill(group.target.y.toFixed(2));
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(
+    ({ items, delta }) =>
+      items.every((item) => {
+        const component = window.baseScreenHarness.designer.document.components.find(
+          (candidate) => candidate.id === item.id,
+        );
+        return (
+          component !== undefined &&
+          Math.abs(component.position.x - (item.x + delta.x)) < 0.01 &&
+          Math.abs(component.position.y - (item.y + delta.y)) < 0.01
+        );
+      }),
+    group,
+  );
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction(
+    (items) =>
+      items.every((item) => {
+        const component = window.baseScreenHarness.designer.document.components.find(
+          (candidate) => candidate.id === item.id,
+        );
+        return component?.position.x === item.x && component.position.y === item.y;
+      }),
+    group.items,
+  );
+
+  const layers = designer.locator('[data-layers]');
+  await layers.locator('[data-layer-select=title] .layer-name').click();
+  await layers.locator('[data-layer-select=subtitle] .layer-name').click({ modifiers: [modifier] });
+  await page.waitForFunction(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return (
+      root.querySelector('[data-layer-id="title"]')?.getAttribute('aria-selected') === 'true' &&
+      root.querySelector('[data-layer-id="subtitle"]')?.getAttribute('aria-selected') === 'true'
+    );
+  });
+  await viewport.focus();
+  await page.keyboard.press('x');
+  if (!(await form.isHidden())) throw new Error('BROWSER_HARNESS_COORDINATE_MULTI_ENABLED');
+
+  await layers.locator('[data-layer-select=title] .layer-name').click();
+  await viewport.focus();
+  await page.keyboard.press(`${modifier}+l`);
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find((item) => item.id === 'title')
+        ?.status.locked === true,
+  );
+  await page.keyboard.press('x');
+  if (!(await form.isHidden())) throw new Error('BROWSER_HARNESS_COORDINATE_LOCKED_ENABLED');
+  await page.keyboard.press(`${modifier}+Shift+l`);
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.document.components.find((item) => item.id === 'title')
+        ?.status.locked === false,
+  );
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('x');
+  if (!(await form.isHidden())) throw new Error('BROWSER_HARNESS_COORDINATE_EMPTY_ENABLED');
+  await layers.locator('[data-layer-search]').click();
+  await viewport.focus();
+}
+
+async function readCoordinateEntryGeometry(designer) {
+  return designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const viewport = root.querySelector('[data-viewport]');
+    const selection = root.querySelector('[data-selection]');
+    const form = root.querySelector('[data-coordinate-entry]');
+    const rect = (target) => {
+      const value = target.getBoundingClientRect();
+      return {
+        left: value.left,
+        top: value.top,
+        right: value.right,
+        bottom: value.bottom,
+        width: value.width,
+        height: value.height,
+      };
+    };
+    return {
+      form: rect(form),
+      parented: form.parentElement === viewport,
+      placement: form.dataset.coordinateEntryPlacement,
+      selection: rect(selection),
+      transform: getComputedStyle(form).transform,
+      viewport: rect(viewport),
+    };
+  });
+}
+
+function coordinateEntryGeometryIsValid(value) {
+  const inset = 7;
+  const inside =
+    value.parented &&
+    value.transform === 'none' &&
+    value.form.left >= value.viewport.left + inset &&
+    value.form.right <= value.viewport.right - inset &&
+    value.form.top >= value.viewport.top + inset &&
+    value.form.bottom <= value.viewport.bottom - inset;
+  if (!inside) return false;
+  if (value.placement === 'above-left') {
+    return Math.abs(value.selection.top - value.form.bottom - 8) <= 1.5;
+  }
+  if (value.placement === 'below-left') {
+    return Math.abs(value.form.top - value.selection.bottom - 8) <= 1.5;
+  }
+  if (value.placement === 'left-top') {
+    return Math.abs(value.selection.left - value.form.right - 8) <= 1.5;
+  }
+  if (value.placement === 'right-top') {
+    return Math.abs(value.form.left - value.selection.right - 8) <= 1.5;
+  }
+  return value.placement === 'clamped';
 }
 
 async function assertAuthoringShortcutsAndIsolation(page, designer) {
@@ -4593,6 +5106,168 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   );
 }
 
+async function assertCanvasContentClipping(page) {
+  await page.evaluate(() => {
+    const { catalog, materialManifests } = window.baseScreenHarness;
+    const textManifest = materialManifests.text;
+    const probe = document.createElement('base-screen-designer');
+    probe.dataset.canvasClipProbe = 'true';
+    probe.catalog = catalog;
+    probe.document = {
+      canvas: { width: 480, height: 270, backgroundColor: '#17212b' },
+      components: [
+        {
+          id: 'canvas-clip-component',
+          type: 'base.text',
+          name: 'Canvas clip probe',
+          parentId: null,
+          position: { x: 440, y: 80 },
+          size: { width: 100, height: 60 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: structuredClone(textManifest.defaultProps),
+          style: structuredClone(textManifest.defaultStyle),
+          dataSource: { type: 'static', value: 'Canvas clip probe' },
+        },
+      ],
+      variables: [],
+      blueprint: { rules: [] },
+    };
+    probe.style.cssText =
+      'position:fixed;inset:0;z-index:999;width:1400px;height:800px;background:#10151d;';
+    document.body.appendChild(probe);
+  });
+
+  const probe = page.locator('base-screen-designer[data-canvas-clip-probe]');
+  const component = probe.locator('[data-base-screen-component-id="canvas-clip-component"]');
+  try {
+    await component.waitFor({ state: 'visible' });
+    const clipped = await probe.evaluate((element) => {
+      const root = element.shadowRoot;
+      const canvas = root.querySelector('[data-canvas]');
+      const content = root.querySelector('[data-canvas-content]');
+      const material = root.querySelector(
+        '[data-base-screen-component-id="canvas-clip-component"]',
+      );
+      if (!(canvas instanceof HTMLElement) || !(content instanceof HTMLElement)) return null;
+      if (!(material instanceof HTMLElement)) return null;
+      const canvasRect = canvas.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      const materialRect = material.getBoundingClientRect();
+      const inside = {
+        x: Math.min(contentRect.right - 12, materialRect.right - 2),
+        y: Math.min(contentRect.bottom - 2, materialRect.top + materialRect.height / 2),
+      };
+      const outside = {
+        x: contentRect.right + Math.min(12, (materialRect.right - contentRect.right) / 2),
+        y: inside.y,
+      };
+      const componentIdAt = (point) =>
+        root.elementFromPoint(point.x, point.y)?.closest('[data-base-screen-component-id]')?.dataset
+          .baseScreenComponentId ?? null;
+      return {
+        overflow: getComputedStyle(content).overflow,
+        parentIsContent: material.parentElement === content,
+        canvasContainsContent:
+          contentRect.left >= canvasRect.left &&
+          contentRect.top >= canvasRect.top &&
+          contentRect.right <= canvasRect.right &&
+          contentRect.bottom <= canvasRect.bottom,
+        materialExtendsPastCanvas: materialRect.right > contentRect.right + 20,
+        insideHit: componentIdAt(inside),
+        outsideHit: componentIdAt(outside),
+        inside,
+      };
+    });
+    if (
+      clipped === null ||
+      clipped.overflow !== 'clip' ||
+      !clipped.parentIsContent ||
+      !clipped.canvasContainsContent ||
+      !clipped.materialExtendsPastCanvas ||
+      clipped.insideHit !== 'canvas-clip-component' ||
+      clipped.outsideHit === 'canvas-clip-component'
+    ) {
+      throw new Error(`BROWSER_HARNESS_CANVAS_CONTENT_CLIP_FAILED:${JSON.stringify(clipped)}`);
+    }
+
+    await page.mouse.click(clipped.inside.x, clipped.inside.y);
+    await probe.locator('[data-selection]').waitFor({ state: 'visible' });
+    const overlay = await probe.evaluate((element) => {
+      const root = element.shadowRoot;
+      const content = root.querySelector('[data-canvas-content]');
+      const handle = root.querySelector('[data-transform-handle="east"]');
+      if (!(content instanceof HTMLElement) || !(handle instanceof HTMLElement)) return null;
+      const contentRect = content.getBoundingClientRect();
+      const handleRect = handle.getBoundingClientRect();
+      const point = {
+        x: handleRect.left + handleRect.width / 2,
+        y: handleRect.top + handleRect.height / 2,
+      };
+      return {
+        outsideCanvas: point.x > contentRect.right,
+        hitHandle:
+          root.elementFromPoint(point.x, point.y)?.closest('[data-transform-handle="east"]') ===
+          handle,
+      };
+    });
+    if (overlay === null || !overlay.outsideCanvas || !overlay.hitHandle) {
+      throw new Error(
+        `BROWSER_HARNESS_CANVAS_AUTHORING_OVERLAY_CLIP_FAILED:${JSON.stringify(overlay)}`,
+      );
+    }
+
+    const previewOpened = await probe.evaluate((element) => element.togglePreview());
+    if (!previewOpened) throw new Error('BROWSER_HARNESS_CANVAS_PREVIEW_OPEN_FAILED');
+    const previewViewer = probe.locator('.direct-preview base-screen-viewer');
+    await previewViewer
+      .locator('[data-base-screen-component-id="canvas-clip-component"]')
+      .waitFor({ state: 'visible' });
+    const preview = await previewViewer.evaluate((element) => {
+      const root = element.shadowRoot;
+      const mount = root?.firstElementChild;
+      const material = root?.querySelector(
+        '[data-base-screen-component-id="canvas-clip-component"]',
+      );
+      if (!(root instanceof ShadowRoot)) return null;
+      if (!(mount instanceof HTMLElement) || !(material instanceof HTMLElement)) return null;
+      const mountRect = mount.getBoundingClientRect();
+      const materialRect = material.getBoundingClientRect();
+      const inside = {
+        x: Math.min(mountRect.right - 12, materialRect.right - 2),
+        y: Math.min(mountRect.bottom - 2, materialRect.top + materialRect.height / 2),
+      };
+      const outside = {
+        x: mountRect.right + Math.min(12, (materialRect.right - mountRect.right) / 2),
+        y: inside.y,
+      };
+      const componentIdAt = (point) =>
+        root.elementFromPoint(point.x, point.y)?.closest('[data-base-screen-component-id]')?.dataset
+          .baseScreenComponentId ?? null;
+      return {
+        overflow: getComputedStyle(mount).overflow,
+        parentIsMount: material.parentElement === mount,
+        materialExtendsPastCanvas: materialRect.right > mountRect.right + 20,
+        insideHit: componentIdAt(inside),
+        outsideHit: componentIdAt(outside),
+      };
+    });
+    if (
+      preview === null ||
+      preview.overflow !== 'hidden' ||
+      !preview.parentIsMount ||
+      !preview.materialExtendsPastCanvas ||
+      preview.insideHit !== 'canvas-clip-component' ||
+      preview.outsideHit === 'canvas-clip-component'
+    ) {
+      throw new Error(`BROWSER_HARNESS_CANVAS_PREVIEW_CLIP_FAILED:${JSON.stringify(preview)}`);
+    }
+  } finally {
+    await page.evaluate(() => document.querySelector('[data-canvas-clip-probe]')?.remove());
+  }
+}
+
 async function assertCanvasPrecision(designer, page) {
   const canvas = designer.locator('[data-canvas]');
   const ruler = designer.locator('.ruler-horizontal');
@@ -4963,6 +5638,33 @@ async function assertCanvasPrecision(designer, page) {
     );
   }
   await page.setViewportSize({ width: 1440, height: 900 });
+
+  // 隔离后续用例：真实双击行为已在上方覆盖；缩放与 resize 断言完成后，再沿公开 DOM
+  // 双击事件路径清理刻意保留的参考线，避免它拦截后续组件点击。
+  const guideCleanupDispatched = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const guide = root.querySelector('.canvas-guide-persistent');
+    if (!(guide instanceof HTMLElement)) return false;
+    const rect = guide.getBoundingClientRect();
+    return guide.dispatchEvent(
+      new MouseEvent('dblclick', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        clientX: rect.left + rect.width / 2,
+        clientY: rect.top + rect.height / 2,
+      }),
+    );
+  });
+  if (!guideCleanupDispatched) {
+    throw new Error('BROWSER_HARNESS_GUIDE_CLEANUP_TARGET_MISSING');
+  }
+  await page.waitForFunction(
+    () =>
+      window.baseScreenHarness.designer.shadowRoot?.querySelectorAll(
+        '[data-canvas-guides] > .canvas-guide-persistent',
+      ).length === 0,
+  );
 }
 
 // 浏览器级吸附工作流（R2/R4）：真实指针拖拽验证按距离吸附、阈值内保持与旋转候选；

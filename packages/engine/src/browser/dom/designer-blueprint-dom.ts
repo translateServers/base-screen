@@ -14,6 +14,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { DESIGNER_BLUEPRINT_CAPABILITIES } from '../../common/operations/designer-authoring-bridge.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { createDesignerButton } from './designer-ui-primitives.js';
 
 export function getDesignerFocusedMaterialEvents(
   document: ScreenDocument | undefined,
@@ -341,12 +342,7 @@ export function renderDesignerBlueprintSnapshot(
 }
 
 function createButton(ownerDocument: Document, label: string): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
-  button.textContent = label;
-  button.title = label;
-  return button;
+  return createDesignerButton(ownerDocument, { text: label, title: label });
 }
 
 function hasCapability(

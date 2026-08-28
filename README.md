@@ -37,4 +37,12 @@ pnpm build
 pnpm verify:m0
 ```
 
+公共声明或 package 子路径有意变化时，运行 `pnpm api:report` 更新并审查
+`packages/*/etc/*.api.md`，同时为受影响包补充 Changeset。`pnpm check:api` 只校验基线，
+不会自动接受 API 漂移。
+
+`pnpm lint` 还会运行 `pnpm check:file-size`：新文件必须遵守仓库的分层行数上限，已有超限文件
+按 `scripts/file-size-baseline.json` 中的逐文件精确上限冻结。拆分或缩减已有文件后运行
+`pnpm file-size:baseline` 下调基线；该命令不会接受新增超限文件或已有文件继续增长。
+
 仓库设计约束、决策、规格、计划和来源记录从 [文档索引](./docs/README.md) 进入。

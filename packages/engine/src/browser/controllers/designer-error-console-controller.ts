@@ -55,7 +55,7 @@ export class DesignerErrorConsoleController {
       return;
     }
 
-    const key = `${state?.status ?? ''}:${state?.failedCount ?? ''}`;
+    const key = errorKeyFor(state)!;
     if (key !== this.#lastErrorKey) {
       this.#lastErrorKey = key;
       this.#nextEntryId++;
@@ -75,7 +75,7 @@ export class DesignerErrorConsoleController {
     }
     if (target.closest<HTMLButtonElement>('[data-error-console-clear]') !== null) {
       this.#entries = [];
-      this.#lastErrorKey = undefined;
+      this.#lastErrorKey = errorKeyFor(this.#currentState);
       this.render();
       return true;
     }
@@ -83,14 +83,22 @@ export class DesignerErrorConsoleController {
       this.close();
       return true;
     }
+    const overlay = target.closest<HTMLElement>('[data-error-console]');
+    if (overlay !== null && target === overlay) {
+      this.close();
+      return true;
+    }
     return false;
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
-    if (event.key !== 'Escape' || !this.#open) return false;
-    event.preventDefault();
-    this.close();
-    return true;
+    if (!this.#open) return false;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.close();
+      return true;
+    }
+    return event.key === 'Tab' ? this.moveFocus(event) : false;
   }
 
   private close(): void {
@@ -110,20 +118,35 @@ export class DesignerErrorConsoleController {
       countElement.toggleAttribute('data-has-value', count > 0);
       countElement.textContent = count === 0 ? '' : count > 999 ? '999+' : String(count);
     }
+    const warning = count === 0 && isWarningState(this.#currentState);
     trigger.toggleAttribute('data-has-errors', count > 0);
-    trigger.toggleAttribute('data-has-warning', count === 0 && isWarningState(this.#currentState));
+    trigger.toggleAttribute('data-has-warning', warning);
     trigger.ariaExpanded = String(this.#open);
     trigger.ariaLabel =
-      count === 0
-        ? DESIGNER_UI_TEXT.errorConsole.openAria
-        : `${DESIGNER_UI_TEXT.errorConsole.openAria}，${DESIGNER_UI_TEXT.errorConsole.count(count)}`;
+      count > 0
+        ? `${DESIGNER_UI_TEXT.errorConsole.openAria}，${DESIGNER_UI_TEXT.errorConsole.count(count)}`
+        : warning
+          ? `${DESIGNER_UI_TEXT.errorConsole.openAria}，${DESIGNER_UI_TEXT.errorConsole.attention}`
+          : DESIGNER_UI_TEXT.errorConsole.openAria;
     dialog.hidden = !this.#open;
 
     const clear = dialog.querySelector<HTMLButtonElement>('[data-error-console-clear]');
     if (clear !== null) clear.disabled = this.#entries.length === 0;
     const summary = dialog.querySelector<HTMLElement>('[data-error-console-summary]');
     if (summary !== null) {
-      summary.textContent = count === 0 ? '' : DESIGNER_UI_TEXT.errorConsole.count(count);
+      summary.dataset.errorConsoleTone = count > 0 ? 'error' : warning ? 'warning' : 'empty';
+      summary.textContent =
+        count > 0
+          ? DESIGNER_UI_TEXT.errorConsole.count(count)
+          : warning
+            ? DESIGNER_UI_TEXT.errorConsole.attention
+            : '';
+    }
+    const historySummary = dialog.querySelector<HTMLElement>(
+      '[data-error-console-history-summary]',
+    );
+    if (historySummary !== null) {
+      historySummary.textContent = DESIGNER_UI_TEXT.errorConsole.historyCount(this.#entries.length);
     }
     this.renderCurrentState(dialog);
     this.renderEntries(dialog);
@@ -144,6 +167,9 @@ export class DesignerErrorConsoleController {
     const error = isErrorState(state);
     surface.setAttribute('role', error ? 'alert' : 'status');
     surface.setAttribute('aria-live', error ? 'assertive' : 'polite');
+    const sectionTitle = surface.ownerDocument.createElement('h3');
+    sectionTitle.className = 'error-console-section-title';
+    sectionTitle.textContent = DESIGNER_UI_TEXT.errorConsole.currentStatus;
     const copy = surface.ownerDocument.createElement('div');
     copy.className = 'material-library-status-copy';
     const title = surface.ownerDocument.createElement('strong');
@@ -151,7 +177,7 @@ export class DesignerErrorConsoleController {
     const description = surface.ownerDocument.createElement('span');
     description.textContent = materialLibraryDescription(state);
     copy.append(title, description);
-    surface.appendChild(copy);
+    surface.append(sectionTitle, copy);
 
     const actions = materialLibraryActions(state.status);
     if (actions.length === 0) return;
@@ -166,16 +192,20 @@ export class DesignerErrorConsoleController {
   private renderEntries(dialog: HTMLElement): void {
     const list = dialog.querySelector<HTMLElement>('[data-error-console-list]');
     if (list === null) return;
+    list.dataset.errorConsoleOrder = 'newest-first';
     list.replaceChildren();
     if (this.#entries.length === 0) {
       const empty = list.ownerDocument.createElement('p');
       empty.className = 'error-console-empty';
-      empty.textContent = DESIGNER_UI_TEXT.errorConsole.empty;
+      empty.textContent = isActionableState(this.#currentState)
+        ? DESIGNER_UI_TEXT.errorConsole.emptyWithCurrent
+        : DESIGNER_UI_TEXT.errorConsole.empty;
       list.appendChild(empty);
       return;
     }
 
-    for (const entry of this.#entries) {
+    for (let index = this.#entries.length - 1; index >= 0; index--) {
+      const entry = this.#entries[index]!;
       const item = list.ownerDocument.createElement('article');
       item.className = 'error-console-entry';
       item.dataset.errorConsoleTone = entry.tone;
@@ -183,14 +213,43 @@ export class DesignerErrorConsoleController {
       item.setAttribute('role', 'alert');
       const copy = list.ownerDocument.createElement('div');
       copy.className = 'error-console-entry-copy';
+      const heading = list.ownerDocument.createElement('div');
+      heading.className = 'error-console-entry-heading';
       const title = list.ownerDocument.createElement('strong');
       title.textContent = entry.title;
+      const record = list.ownerDocument.createElement('small');
+      record.textContent = DESIGNER_UI_TEXT.errorConsole.recordNumber(entry.id);
       const description = list.ownerDocument.createElement('span');
       description.textContent = entry.description;
-      copy.append(title, description);
+      heading.append(title, record);
+      copy.append(heading, description);
       item.appendChild(copy);
       list.appendChild(item);
     }
+  }
+
+  private moveFocus(event: KeyboardEvent): boolean {
+    const dialog = this.#dialog;
+    if (dialog === undefined) return false;
+    const clear = dialog.querySelector<HTMLButtonElement>('[data-error-console-clear]');
+    const close = dialog.querySelector<HTMLButtonElement>('[data-error-console-close]');
+    const actions = [
+      ...dialog.querySelectorAll<HTMLButtonElement>('[data-material-library-action]'),
+    ];
+    const controls = [clear, close, ...actions].filter(
+      (control): control is HTMLButtonElement => control !== null && !control.disabled,
+    );
+    if (controls.length === 0) return false;
+    const current = controls.findIndex((control) => control === event.target);
+    const nextIndex =
+      current < 0
+        ? event.shiftKey
+          ? controls.length - 1
+          : 0
+        : (current + (event.shiftKey ? -1 : 1) + controls.length) % controls.length;
+    event.preventDefault();
+    controls[nextIndex]?.focus();
+    return true;
   }
 }
 
@@ -257,4 +316,8 @@ function isErrorState(
 
 function isWarningState(state: BaseScreenMaterialLibraryState | undefined): boolean {
   return state?.status === 'offline' || state?.status === 'update-available';
+}
+
+function errorKeyFor(state: BaseScreenMaterialLibraryState | undefined): string | undefined {
+  return isErrorState(state) ? `${state.status}:${state.failedCount ?? ''}` : undefined;
 }

@@ -175,6 +175,52 @@ function renderedLayerRow(panel: FakePanel, id: string): FakePanel {
 describe('DesignerLayersController', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it('steps selection through the full layer tree without document transactions', () => {
+    const actions: unknown[] = [];
+    let interaction = {
+      selectedComponentIds: [] as readonly string[],
+      focusedComponentId: null as string | null,
+    };
+    const controller = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => {
+        throw new Error('Layer selection must not mutate the document.');
+      },
+      getCatalog: catalog,
+      getDocument: () =>
+        createDocument([
+          component('back', null, 0),
+          component('group', null, 2, { type: 'base.container' }),
+          component('child', 'group', 0, { locked: true }),
+          component('hidden', null, 3, { hidden: true }),
+        ]),
+      getInteraction: () => interaction,
+      reduceSelection: (action) => {
+        actions.push(action);
+        if (action.type === 'replace-selection') {
+          interaction = {
+            selectedComponentIds: action.componentIds,
+            focusedComponentId: action.focusedComponentId,
+          };
+        }
+      },
+    });
+
+    expect(controller.canStepSelection('up')).toBe(true);
+    expect(controller.canStepSelection('down')).toBe(true);
+    controller.stepSelection('down');
+    controller.stepSelection('down');
+    controller.stepSelection('down');
+    expect(controller.canStepSelection('down')).toBe(false);
+    controller.stepSelection('down');
+
+    expect(actions).toEqual([
+      { type: 'replace-selection', componentIds: ['group'], focusedComponentId: 'group' },
+      { type: 'replace-selection', componentIds: ['child'], focusedComponentId: 'child' },
+      { type: 'replace-selection', componentIds: ['back'], focusedComponentId: 'back' },
+    ]);
+  });
+
   it('R6 uses the Canvas selection reducer for plain and modifier layer clicks', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('Element', FakeElement);

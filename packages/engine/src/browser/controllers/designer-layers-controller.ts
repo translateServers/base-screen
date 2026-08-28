@@ -18,6 +18,8 @@ import {
 import {
   createDesignerLayerView,
   DESIGNER_LAYER_PAGE_SIZE,
+  type DesignerLayerSelectionDirection,
+  getDesignerLayerSelectionTarget,
   renderDesignerLayers,
 } from '../dom/designer-layers-dom.js';
 import type {
@@ -57,6 +59,20 @@ export class DesignerLayersController {
   #renderLimit = DESIGNER_LAYER_PAGE_SIZE;
 
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {}
+
+  canStepSelection(direction: DesignerLayerSelectionDirection): boolean {
+    return this.selectionStepTarget(direction) !== undefined;
+  }
+
+  stepSelection(direction: DesignerLayerSelectionDirection): void {
+    const componentId = this.selectionStepTarget(direction);
+    if (componentId === undefined) return;
+    this.callbacks.reduceSelection({
+      type: 'replace-selection',
+      componentIds: [componentId],
+      focusedComponentId: componentId,
+    });
+  }
 
   render(layers: HTMLElement | undefined): void {
     if (layers === undefined) return;
@@ -424,6 +440,14 @@ export class DesignerLayersController {
     const document = this.callbacks.getDocument()!;
     const transaction = createSiblingReorderTransaction(document, componentId, direction);
     if (transaction !== undefined) this.report(this.callbacks.executeTransaction(transaction));
+  }
+
+  private selectionStepTarget(direction: DesignerLayerSelectionDirection): string | undefined {
+    return getDesignerLayerSelectionTarget(
+      createDesignerLayerView(this.callbacks.getDocument(), this.callbacks.getCatalog()),
+      this.callbacks.getInteraction(),
+      direction,
+    );
   }
 
   private arrangeSelection(action: DesignerLayerArrangeAction): void {

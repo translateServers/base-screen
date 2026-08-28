@@ -15,6 +15,13 @@ import {
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { createDesignerColorPalette } from './designer-color-palette-dom.js';
+import {
+  appendDesignerFieldMessage,
+  createDesignerCheckbox,
+  createDesignerInput,
+  createDesignerSelect,
+  createDesignerTextarea,
+} from './designer-ui-primitives.js';
 
 export interface DesignerDescriptorDatasetFields {
   readonly id: string;
@@ -241,7 +248,7 @@ function appendDescriptorField(
     help.textContent = field.help;
     label.appendChild(help);
   }
-  appendFieldMessage(label, control, `descriptor-${field.id}`);
+  appendDesignerFieldMessage(label, control, `descriptor-${field.id}`);
   parent.appendChild(label);
 }
 
@@ -297,72 +304,57 @@ function createDescriptorControl(
 ): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
   const control = field.control;
   if (control === 'boolean') {
-    const input = ownerDocument.createElement('input');
-    input.type = 'checkbox';
-    input.className = 'designer-checkbox';
-    input.checked = value === true;
-    return input;
+    return createDesignerCheckbox(ownerDocument, { checked: value === true });
   }
   if (control === 'select' && schema?.kind === 'enum') {
-    const select = ownerDocument.createElement('select');
-    select.className = 'designer-control designer-select';
-    for (const optionValue of schema.values) {
-      const option = ownerDocument.createElement('option');
-      option.value = String(optionValue);
-      option.textContent = String(optionValue);
-      option.selected = value === optionValue;
-      select.appendChild(option);
-    }
-    return select;
+    return createDesignerSelect(ownerDocument, {
+      options: schema.values.map((optionValue) => ({
+        label: String(optionValue),
+        selected: value === optionValue,
+        value: String(optionValue),
+      })),
+    });
   }
   if (control === 'color') {
-    const input = ownerDocument.createElement('input');
-    input.type = 'color';
-    input.className = 'designer-control designer-color';
-    input.value = typeof value === 'string' ? value : '';
-    return input;
+    return createDesignerInput(ownerDocument, {
+      appearance: 'color',
+      value: typeof value === 'string' ? value : '',
+    });
   }
   if (control === 'json') {
-    const input = ownerDocument.createElement('textarea');
-    input.className = 'designer-control designer-textarea';
+    const input = createDesignerTextarea(ownerDocument);
     input.value = JSON.stringify(value);
     return input;
   }
   if (control === 'field-selector') {
     if (datasetFields.length > 0) {
-      const select = ownerDocument.createElement('select');
-      select.className = 'designer-control designer-select';
-      const empty = ownerDocument.createElement('option');
-      empty.value = '';
-      empty.textContent = DESIGNER_UI_TEXT.descriptor.noField;
-      empty.selected = value === undefined || value === '';
-      select.appendChild(empty);
-      for (const datasetField of datasetFields) {
-        const option = ownerDocument.createElement('option');
-        option.value = datasetField.id;
-        option.textContent = datasetField.label;
-        option.selected = value === datasetField.id;
-        select.appendChild(option);
-      }
-      return select;
+      return createDesignerSelect(ownerDocument, {
+        options: [
+          {
+            label: DESIGNER_UI_TEXT.descriptor.noField,
+            selected: value === undefined || value === '',
+            value: '',
+          },
+          ...datasetFields.map((datasetField) => ({
+            label: datasetField.label,
+            selected: value === datasetField.id,
+            value: datasetField.id,
+          })),
+        ],
+      });
     }
-    const input = ownerDocument.createElement('input');
-    input.type = 'text';
-    input.className = 'designer-control designer-input';
-    input.value = typeof value === 'string' ? value : '';
-    return input;
+    return createDesignerInput(ownerDocument, {
+      value: typeof value === 'string' ? value : '',
+    });
   }
   const numeric = control === 'number' || control === 'unit-number';
-  const input = ownerDocument.createElement('input');
-  input.type = numeric ? 'number' : 'text';
-  input.className = `designer-control designer-input${numeric ? ' designer-number' : ''}`;
-  input.value = String(value ?? '');
-  if (numeric) {
-    if (field.min !== undefined) input.min = String(field.min);
-    if (field.max !== undefined) input.max = String(field.max);
-    if (field.step !== undefined) input.step = String(field.step);
-  }
-  return input;
+  return createDesignerInput(ownerDocument, {
+    appearance: numeric ? 'number' : 'text',
+    ...(numeric && field.max !== undefined ? { max: field.max } : {}),
+    ...(numeric && field.min !== undefined ? { min: field.min } : {}),
+    ...(numeric && field.step !== undefined ? { step: field.step } : {}),
+    value: String(value ?? ''),
+  });
 }
 
 function descriptorFieldSchema(
@@ -531,7 +523,11 @@ function appendDescriptorItemField(
   control.dataset.descriptorPath = JSON.stringify([...arrayField.path, index, ...itemField.path]);
   control.dataset.descriptorControl = itemField.control;
   label.appendChild(control);
-  appendFieldMessage(label, control, `descriptor-${arrayField.id}-${index}-${itemField.id}`);
+  appendDesignerFieldMessage(
+    label,
+    control,
+    `descriptor-${arrayField.id}-${index}-${itemField.id}`,
+  );
   parent.appendChild(label);
 }
 
@@ -578,26 +574,4 @@ function arrayActionButton(
   button.dataset.descriptorArrayIndex = String(index);
   button.dataset.descriptorFieldId = field.id;
   return button;
-}
-
-function appendFieldMessage(
-  container: HTMLElement,
-  input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-  key: string,
-): void {
-  const id = `designer-field-${key}`;
-  const messageId = `${id}-message`;
-  input.id = id;
-  input.setAttribute('aria-describedby', messageId);
-  // 只有 label 容器才建立 for 关联：color 控件用 span 容器，点击字段文字不得激活
-  // color input（否则会弹出浏览器原生取色器）。
-  if (container.tagName.toLowerCase() === 'label') {
-    (container as HTMLLabelElement).htmlFor = id;
-  }
-  const message = container.ownerDocument.createElement('span');
-  message.id = messageId;
-  message.className = 'designer-field-message';
-  message.dataset.fieldMessage = 'true';
-  message.ariaLive = 'polite';
-  container.appendChild(message);
 }

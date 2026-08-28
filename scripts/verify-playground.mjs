@@ -1,16 +1,12 @@
-import { chromium } from '@playwright/test';
-import { createServer } from 'vite';
+import { withViteBrowser } from './browser-verification.mjs';
 
-const server = await createServer({
-  configFile: 'examples/playground/vite.config.ts',
-  root: 'examples/playground',
-  server: { host: '127.0.0.1', port: 4177, strictPort: true },
-});
-
-try {
-  await server.listen();
-  const browser = await chromium.launch();
-  try {
+await withViteBrowser(
+  {
+    configFile: 'examples/playground/vite.config.ts',
+    root: 'examples/playground',
+    server: { port: 4177 },
+  },
+  async ({ baseUrl, browser }) => {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
     const cases = [
       { path: '/', title: 'Vue 应用中的 Base Screen', state: 'ready', materials: 4 },
@@ -29,7 +25,7 @@ try {
     for (const item of cases) {
       const pageErrors = [];
       page.once('pageerror', (error) => pageErrors.push(error));
-      await page.goto(`http://127.0.0.1:4177${item.path}`, { waitUntil: 'networkidle' });
+      await page.goto(`${baseUrl}${item.path}`, { waitUntil: 'networkidle' });
       await page.waitForFunction(
         ({ expectedMaterials, expectedState, surface }) => {
           const viewer = document.querySelector(
@@ -254,9 +250,5 @@ try {
         });
       }
     }
-  } finally {
-    await browser.close();
-  }
-} finally {
-  await server.close();
-}
+  },
+);

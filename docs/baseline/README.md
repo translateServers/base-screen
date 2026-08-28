@@ -32,7 +32,18 @@
 
 ## Designer 能力
 
-- **画布交互**：单/多选移动、选区吸附、坐标换算与瞬态预览。依据：[Designer Canvas Precision](../specs/archive/designer-canvas-precision/spec.md)。
+- **画布交互**：单/多选移动、选区吸附、坐标换算与瞬态预览；选中同级图层后，`]` 向上移动一位、`[` 向下移动一位，
+  `Ctrl+]` / `Ctrl+[` 仍分别用于置顶/置底；`Alt+]` / `Alt+[` 按完整图层树向上/向下切换单选，跳过有效隐藏组件，
+  到达边界后停止。依据：[Designer Canvas Precision](../specs/archive/designer-canvas-precision/spec.md)。
+- **组件坐标快捷输入**（2026-08-28 增量）：单选未锁定组件后按 `X`，在选区左上角外侧以不随画布缩放的
+  非模态双输入浮层一次编辑 canonical X/Y（px）；仅 `Enter` 保存，`Esc` 或离开浮层直接丢弃草稿。
+  提交复用单条事务，普通组件同时更新两个坐标，组组件沿既有组平移语义移动可变子树，撤销一次恢复两个坐标。
+  多选、无选中、有效锁定、文本输入、IME、AltGr、按键重复与活动手势均不触发；Screen Document、SDK、
+  Custom Element 与宿主事件契约不变。
+- **画布内容裁剪**（2026-08-28 增量）：设计态 Renderer 输出由独立内容层按 canonical 画布边界裁剪，
+  超出画布的组件视觉与命中区域不显示；选区、变换手柄和参考线保留在外层作者覆盖层，贴边组件仍可编辑。
+  Renderer 的 preview/viewer 展示模式以同一 canonical 画布为可见与命中边界，Designer 直接预览和独立 Viewer 行为一致；
+  ScreenDocument、Renderer 公共 API 与宿主边界不变。
 - **事件系统**：浏览器默认键盘/鼠标行为管控、统一命令通道、手势抑制与零宿主影响守卫。依据：[Designer Event System](../specs/archive/designer-event-system/spec.md)、
   [ADR-0006](../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)。
 - **主题 Token**：宿主可配置的 Designer chrome Token、dark/light 与自有滚动条边界。依据：[Designer Theme Tokens](../specs/archive/designer-theme-tokens/spec.md)、
@@ -124,7 +135,8 @@
   层级；仅消费现有 Designer Token，保留深浅主题、键盘焦点、forced-colors、reduced-motion 与无抖动约束。
   依据：[Designer Material Library Visual Refinement](../specs/designer-material-library-visual-refinement/spec.md)、[ADR-0034](../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)。
 - **物料加载错误控制台**（封版后增量，生效中）：失败记录、当前目录状态和恢复动作通过固定宽度的底部状态栏入口在工作区弹窗中显示；
-  左侧物料库专用于搜索、分组和网格，保留状态 data-*、宿主动作、草稿/不可用标记、可访问性和无抖动。
+  当前状态与最新优先的有界历史明确分区，支持稳定清空、Tab 焦点闭环、Escape/遮罩关闭和焦点返回。左侧物料库专用于搜索、分组和网格，
+  保留状态 data-*、宿主动作、草稿/不可用标记、可访问性和无抖动。
   依据：[Material Library Error Console](../specs/material-library-feedback-workspace-placement/spec.md)、[ADR-0035](../decisions/ADR-0035-material-library-feedback-workspace-placement.md)。
 - **物料宿主封面**（封版后增量，生效中）：Manifest 可选 `cover` URL 字段（失败关闭校验，http(s)/根相对/
   点相对/协议相对），物料库卡片在固定缩略图区内渲染真实封面，确定性分类图标/色相保持占位与失败回退，

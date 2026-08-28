@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DesignerErrorConsoleController } from '../../../src/browser/controllers/designer-error-console-controller.js';
 
 class FakeElement {
@@ -55,6 +55,10 @@ class FakeElement {
     );
   }
 
+  querySelectorAll<T extends FakeElement>(selector: string): T[] {
+    return this.descendants().filter((element) => matchesDataSelector(element, selector)) as T[];
+  }
+
   closest<T extends FakeElement>(selector: string): T | null {
     if (matchesDataSelector(this, selector)) return this as unknown as T;
     return this.parent?.closest<T>(selector) ?? null;
@@ -89,6 +93,7 @@ function createSurface(): {
   readonly clear: FakeElement;
   readonly list: FakeElement;
   readonly status: FakeElement;
+  readonly historySummary: FakeElement;
 } {
   const ownerDocument = new FakeDocument();
   const trigger = ownerDocument.createElement();
@@ -98,8 +103,11 @@ function createSurface(): {
   trigger.append(count);
 
   const dialog = ownerDocument.createElement();
+  dialog.dataset.errorConsole = '';
   const summary = ownerDocument.createElement();
   summary.dataset.errorConsoleSummary = '';
+  const historySummary = ownerDocument.createElement();
+  historySummary.dataset.errorConsoleHistorySummary = '';
   const clear = ownerDocument.createElement();
   clear.dataset.errorConsoleClear = '';
   const close = ownerDocument.createElement();
@@ -108,8 +116,8 @@ function createSurface(): {
   status.dataset.materialLibraryStatus = '';
   const list = ownerDocument.createElement();
   list.dataset.errorConsoleList = '';
-  dialog.append(summary, clear, close, status, list);
-  return { dialog, trigger, close, clear, list, status };
+  dialog.append(summary, historySummary, clear, close, status, list);
+  return { dialog, trigger, close, clear, list, status, historySummary };
 }
 
 describe('DesignerErrorConsoleController', () => {
@@ -129,12 +137,14 @@ describe('DesignerErrorConsoleController', () => {
     expect(status.dataset.status).toBe('partial');
     expect(status.attributes.get('role')).toBe('alert');
     expect(
-      status.children[1]?.children.map((action) => action.dataset.materialLibraryAction),
+      status
+        .querySelectorAll('[data-material-library-action]')
+        .map((action) => action.dataset.materialLibraryAction),
     ).toEqual(['retry', 'details']);
   });
 
   it('R1 bounds history and preserves the active error count after clearing records', () => {
-    const { dialog, trigger, clear, list, status } = createSurface();
+    const { dialog, trigger, clear, list, status, historySummary } = createSurface();
     const controller = new DesignerErrorConsoleController();
     controller.connect(dialog as unknown as HTMLElement, trigger as unknown as HTMLButtonElement);
 
@@ -144,25 +154,70 @@ describe('DesignerErrorConsoleController', () => {
     controller.onClick(trigger as unknown as Element);
 
     expect(list.children).toHaveLength(50);
+    expect(list.children[0]?.dataset.errorConsoleEntry).toBe('51');
+    expect(list.children.at(-1)?.dataset.errorConsoleEntry).toBe('2');
+    expect(historySummary.textContent).toBe('50 条记录');
     controller.onClick(clear as unknown as Element);
     expect(list.children).toHaveLength(1);
     expect(status.hidden).toBe(false);
     expect(trigger.querySelector('[data-error-console-count]')?.textContent).toBe('51');
+
+    controller.recordMaterialLibraryState({ status: 'error', failedCount: 51 });
+    expect(list.children).toHaveLength(1);
+    expect(list.children[0]?.textContent).toContain('上方仍显示当前状态');
+    controller.recordMaterialLibraryState({ status: 'ready' });
+    controller.recordMaterialLibraryState({ status: 'error', failedCount: 51 });
+    expect(list.children[0]?.dataset.errorConsoleEntry).toBe('52');
   });
 
-  it('R3 closes with Escape and returns focus to the status-bar trigger', () => {
-    const { dialog, trigger, close, status } = createSurface();
+  it('R3 traps Tab focus, closes with Escape or the backdrop, and restores the trigger', () => {
+    const { dialog, trigger, clear, close, status } = createSurface();
     const controller = new DesignerErrorConsoleController();
     controller.connect(dialog as unknown as HTMLElement, trigger as unknown as HTMLButtonElement);
-    controller.recordMaterialLibraryState({ status: 'offline' });
+    controller.recordMaterialLibraryState({ status: 'partial', failedCount: 1 });
     controller.onClick(trigger as unknown as Element);
 
-    expect(status.attributes.get('role')).toBe('status');
+    const actions = status.querySelectorAll('[data-material-library-action]');
+    const preventDefault = vi.fn();
+    expect(
+      controller.onKeyDown({
+        key: 'Tab',
+        target: close,
+        shiftKey: true,
+        preventDefault,
+      } as unknown as KeyboardEvent),
+    ).toBe(true);
+    expect(clear.focused).toBe(true);
+    expect(
+      controller.onKeyDown({
+        key: 'Tab',
+        target: clear,
+        shiftKey: true,
+        preventDefault,
+      } as unknown as KeyboardEvent),
+    ).toBe(true);
+    expect(actions.at(-1)?.focused).toBe(true);
+    expect(preventDefault).toHaveBeenCalledTimes(2);
+
     expect(
       controller.onKeyDown({ key: 'Escape', preventDefault: () => undefined } as KeyboardEvent),
     ).toBe(true);
     expect(dialog.hidden).toBe(true);
     expect(trigger.focused).toBe(true);
-    expect(controller.onClick(close as unknown as Element)).toBe(true);
+
+    controller.onClick(trigger as unknown as Element);
+    expect(controller.onClick(dialog as unknown as Element)).toBe(true);
+    expect(dialog.hidden).toBe(true);
+  });
+
+  it('R3 presents warning states without inflating the error count', () => {
+    const { dialog, trigger, status } = createSurface();
+    const controller = new DesignerErrorConsoleController();
+    controller.connect(dialog as unknown as HTMLElement, trigger as unknown as HTMLButtonElement);
+    controller.recordMaterialLibraryState({ status: 'offline' });
+
+    expect(status.attributes.get('role')).toBe('status');
+    expect(trigger.ariaLabel).toContain('有待处理状态');
+    expect(trigger.querySelector('[data-error-console-count]')?.textContent).toBe('');
   });
 });

@@ -10,3 +10,4 @@
 | R3 | alert/status、深浅主题、forced-colors、reduced-motion 和网格/画布/状态栏零位移 | style tests、`verify-browser-harness.mjs`、控制台截图 | 通过 |
 | R4 | 状态 schema、data-*、无状态路径和公开 API 兼容 | Engine tests、browser harness | 通过 |
 | R5 | 格式化、Engine、浏览器和完整交付门禁 | `pnpm verify:browser`、`pnpm verify:m0` | 通过 |
+| R1、R3 | 状态/历分区、最新优先、清空去重、遮罩关闭与 Tab 焦点闭环 | controller/style tests、`verify-browser-harness.mjs`、`pnpm verify:m0` | 通过 |

@@ -1,6 +1,11 @@
 import type { ScreenDocument, ScreenVariable } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
+import {
+  createDesignerButton,
+  createDesignerIconButton,
+  createDesignerInput,
+} from './designer-ui-primitives.js';
 
 /** 变量面板交互状态：新建、重命名、值编辑与删除确认互斥。 */
 export interface DesignerVariablesDraft {
@@ -53,14 +58,14 @@ function appendToolbar(panel: HTMLElement, creating: boolean): void {
   description.textContent = DESIGNER_UI_TEXT.variables.description;
   toolbar.appendChild(description);
 
-  const add = panel.ownerDocument.createElement('button');
-  add.type = 'button';
-  add.className = 'designer-control designer-button variable-add-button';
-  add.dataset.variant = 'primary';
+  const add = createDesignerButton(panel.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.add,
+    className: 'variable-add-button',
+    disabled: creating,
+    title: DESIGNER_UI_TEXT.variables.add,
+    variant: 'primary',
+  });
   add.dataset.variableAction = 'add';
-  add.disabled = creating;
-  add.title = DESIGNER_UI_TEXT.variables.add;
-  add.ariaLabel = DESIGNER_UI_TEXT.variables.add;
   appendIconLabel(add, 'plus', DESIGNER_UI_TEXT.variables.add);
   toolbar.appendChild(add);
   panel.appendChild(toolbar);
@@ -278,9 +283,9 @@ function appendEditorField(editor: HTMLElement, options: EditorFieldOptions): HT
   label.className = 'variable-field-label';
   label.textContent = options.label;
   field.appendChild(label);
-  const input = editor.ownerDocument.createElement('input');
-  input.type = 'text';
-  input.className = 'designer-control designer-input variable-edit-input';
+  const input = createDesignerInput(editor.ownerDocument, {
+    className: 'variable-edit-input',
+  });
   input.dataset[options.dataKey] = options.dataValue ?? 'true';
   input.autocomplete = 'off';
   input.spellcheck = !options.json;
@@ -334,26 +339,22 @@ function appendEditorActions(
 ): void {
   const actions = editor.ownerDocument.createElement('footer');
   actions.className = 'variable-editor-actions';
-  const cancel = editor.ownerDocument.createElement('button');
-  cancel.type = 'button';
-  cancel.className = 'designer-control designer-button';
-  cancel.dataset.variant = 'ghost';
+  const cancel = createDesignerButton(editor.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.cancel,
+    text: DESIGNER_UI_TEXT.variables.cancel,
+    variant: 'ghost',
+  });
   cancel.dataset.variableAction = 'cancel';
   cancel.dataset.variableIndex = String(index);
-  cancel.textContent = DESIGNER_UI_TEXT.variables.cancel;
-  cancel.ariaLabel = DESIGNER_UI_TEXT.variables.cancel;
   actions.appendChild(cancel);
 
-  const confirm = editor.ownerDocument.createElement('button');
-  confirm.type = 'button';
-  confirm.className = 'designer-control designer-button';
-  confirm.dataset.variant = danger ? 'danger' : 'primary';
+  const confirm = createDesignerButton(editor.ownerDocument, {
+    ariaLabel: danger ? DESIGNER_UI_TEXT.variables.delete : DESIGNER_UI_TEXT.variables.confirm,
+    title: DESIGNER_UI_TEXT.variables.editHint,
+    variant: danger ? 'danger' : 'primary',
+  });
   confirm.dataset.variableAction = action;
   confirm.dataset.variableIndex = String(index);
-  confirm.title = DESIGNER_UI_TEXT.variables.editHint;
-  confirm.ariaLabel = danger
-    ? DESIGNER_UI_TEXT.variables.delete
-    : DESIGNER_UI_TEXT.variables.confirm;
   appendIconLabel(confirm, danger ? 'trash' : 'check', confirmLabel);
   actions.appendChild(confirm);
   editor.appendChild(actions);
@@ -375,15 +376,13 @@ function createIconAction(
   icon: DesignerIconName,
   label: string,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button designer-icon-button';
-  button.dataset.variant = 'ghost';
+  const button = createDesignerIconButton(ownerDocument, {
+    icon,
+    label,
+    variant: 'ghost',
+  });
   button.dataset.variableAction = action;
   button.dataset.variableIndex = String(index);
-  button.title = label;
-  button.ariaLabel = label;
-  button.innerHTML = designerIcon(icon);
   return button;
 }
 

@@ -4,6 +4,7 @@ import {
   createDesignerLayerView,
   DESIGNER_LAYER_PAGE_SIZE,
   filterDesignerLayerItems,
+  getDesignerLayerSelectionTarget,
   renderDesignerLayers,
 } from '../../../src/browser/dom/designer-layers-dom.js';
 
@@ -58,6 +59,7 @@ function component(
   parentId: string | null,
   zIndex: number,
   hidden = false,
+  locked = false,
 ): ScreenComponentNode {
   return {
     id,
@@ -68,7 +70,7 @@ function component(
     position: { x: 0, y: 0 },
     size: { width: 10, height: 10 },
     rotation: 0,
-    status: { hidden, locked: false },
+    status: { hidden, locked },
     props: {},
     style: {},
     dataSource: null,
@@ -93,6 +95,136 @@ function toolbarState() {
 }
 
 describe('designer layers view', () => {
+  it('resolves selection steps from the complete visual tree and skips only hidden layers', () => {
+    const view = createDesignerLayerView(
+      document([
+        component('back', null, 0),
+        component('group', null, 2),
+        component('child-back', 'group', 0),
+        component('child-front', 'group', 1, false, true),
+        component('hidden', null, 3, true),
+        component('same-z-first', null, 1),
+        component('same-z-last', null, 1),
+      ]),
+      undefined,
+    );
+
+    expect(view.items.map((item) => item.id)).toEqual([
+      'hidden',
+      'group',
+      'child-front',
+      'child-back',
+      'same-z-last',
+      'same-z-first',
+      'back',
+    ]);
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: [], focusedComponentId: null },
+        'up',
+      ),
+    ).toBe('group');
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: [], focusedComponentId: null },
+        'down',
+      ),
+    ).toBe('group');
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: ['group'], focusedComponentId: 'group' },
+        'down',
+      ),
+    ).toBe('child-front');
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: ['child-back'], focusedComponentId: 'child-back' },
+        'up',
+      ),
+    ).toBe('child-front');
+  });
+
+  it('uses focused multi-selection anchors, falls back visually, and never wraps', () => {
+    const view = createDesignerLayerView(
+      document([
+        component('back', null, 0),
+        component('middle', null, 1),
+        component('front', null, 2),
+      ]),
+      undefined,
+    );
+
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: ['front', 'back'], focusedComponentId: 'back' },
+        'up',
+      ),
+    ).toBe('middle');
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: ['back', 'front'], focusedComponentId: 'missing' },
+        'down',
+      ),
+    ).toBe('middle');
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: ['front'], focusedComponentId: 'front' },
+        'up',
+      ),
+    ).toBeUndefined();
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: ['back'], focusedComponentId: 'back' },
+        'down',
+      ),
+    ).toBeUndefined();
+    expect(
+      getDesignerLayerSelectionTarget(
+        view,
+        { selectedComponentIds: ['missing'], focusedComponentId: 'missing' },
+        'down',
+      ),
+    ).toBe('front');
+  });
+
+  it('handles single and empty selectable sequences at their boundaries', () => {
+    const single = createDesignerLayerView(document([component('only', null, 0)]), undefined);
+    const hiddenOnly = createDesignerLayerView(
+      document([component('hidden', null, 0, true)]),
+      undefined,
+    );
+
+    expect(
+      getDesignerLayerSelectionTarget(
+        single,
+        { selectedComponentIds: [], focusedComponentId: null },
+        'down',
+      ),
+    ).toBe('only');
+    expect(
+      getDesignerLayerSelectionTarget(
+        single,
+        { selectedComponentIds: ['only'], focusedComponentId: 'only' },
+        'up',
+      ),
+    ).toBeUndefined();
+    expect(
+      getDesignerLayerSelectionTarget(
+        hiddenOnly,
+        { selectedComponentIds: [], focusedComponentId: null },
+        'down',
+      ),
+    ).toBeUndefined();
+  });
+
   it('uses canonical painter order and preserves missing-material nodes with diagnostics', () => {
     const view = createDesignerLayerView(
       document([

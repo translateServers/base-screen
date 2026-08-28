@@ -118,6 +118,15 @@ describe('designer workbench visual convergence', () => {
     );
   });
 
+  it('clips rendered components at the canvas boundary without clipping authoring overlays', () => {
+    expect(workbenchCss).toMatch(
+      /\.canvas-content\s*\{[^}]*overflow: clip;[^}]*border-radius: inherit;/s,
+    );
+    const canvasRule = workbenchCss.match(/\.canvas\s*\{([^}]*)\}/s);
+    expect(canvasRule).not.toBeNull();
+    expect(canvasRule?.[1]).not.toContain('overflow:');
+  });
+
   it('keeps host left panel groups bounded, stable, and hidden with the collapsed rail', () => {
     expect(workbenchCss).toMatch(
       /\.rail-tab-label\s*\{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,
@@ -492,6 +501,36 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('pointer-events: auto;');
   });
 
+  it('keeps coordinate entry viewport-anchored, focusable, and geometrically stable', () => {
+    const coordinateCss = workbenchCss.slice(
+      workbenchCss.indexOf('.designer-coordinate-entry {'),
+      workbenchCss.indexOf('.viewport[data-grid="false"]'),
+    );
+
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry\s*\{[^}]*position: absolute;/s);
+    expect(coordinateCss).toContain('width: min(192px, calc(100% - 16px));');
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry\s*\{[^}]*border: 0;/s);
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry\s*\{[^}]*padding: 0;/s);
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry\s*\{[^}]*background: transparent;/s);
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry\s*\{[^}]*box-shadow: none;/s);
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry\[hidden\]\s*\{[^}]*display: none;/s);
+    expect(coordinateCss).toContain('grid-template-columns: repeat(2, minmax(0, 1fr));');
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry-error\s*\{[^}]*min-height: 14px;/s);
+    expect(coordinateCss).toMatch(/\.designer-coordinate-entry-input input\s*\{[^}]*border: 0;/s);
+    expect(coordinateCss).toMatch(
+      /\.designer-coordinate-entry-input input\s*\{[^}]*height: 26px;[^}]*min-height: 26px;/s,
+    );
+    expect(coordinateCss).toMatch(
+      /\.designer-coordinate-entry-input input\s*\{[^}]*padding-left: 22px;/s,
+    );
+    expect(coordinateCss).toMatch(
+      /\.designer-coordinate-entry-axis,[^{]*\.designer-coordinate-entry-unit\s*\{[^}]*z-index: 1;/s,
+    );
+    expect(coordinateCss).not.toContain('transform:');
+    expect(controlsCss).toContain('.designer-control:focus-visible');
+    expect(controlsCss).toContain('.designer-control[aria-invalid="true"]');
+  });
+
   it('R2 styles Moveable-like transient distance measurements with tokens', () => {
     expect(tokensCss).toContain('--designer-measurement-label:');
     expect(workbenchCss).toContain('.canvas-measurement {');
@@ -587,6 +626,12 @@ describe('designer workbench visual convergence', () => {
     expect(workbenchCss).toContain('width: 84px;');
     expect(workbenchCss).toContain('.designer-error-console {');
     expect(workbenchCss).toContain('.error-console-current {');
+    expect(workbenchCss).toContain('.error-console-history-heading {');
+    expect(workbenchCss).toContain('.error-console-entry-heading {');
+    expect(workbenchCss).toMatch(/\.error-console-list\s*\{[^}]*scrollbar-gutter:\s*stable;/s);
+    expect(workbenchCss).toContain(
+      '[data-error-console-summary][data-error-console-tone="warning"]',
+    );
     expect(materialCardsCss).toContain('aspect-ratio: 16 / 10;');
     // 纵向功能轨占用 48px 后，卡片以 104px 为最小宽度维持双列密度，窄面板回退单列；
     // min(104px, 100%) 保证最窄面板下卡片不超出内容区。

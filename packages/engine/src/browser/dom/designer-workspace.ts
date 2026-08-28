@@ -44,6 +44,9 @@ const SHORTCUT_HELP_SECTIONS = [
   {
     title: DESIGNER_UI_TEXT.shortcutHelpSections.arrange,
     operationIds: [
+      'edit-position',
+      'select-layer-up',
+      'select-layer-down',
       'nudge-left',
       'nudge-right',
       'nudge-up',
@@ -55,6 +58,8 @@ const SHORTCUT_HELP_SECTIONS = [
       'align-middle',
       'align-bottom',
       'bring-to-front',
+      'bring-forward',
+      'send-backward',
       'send-to-back',
     ],
   },
@@ -203,6 +208,7 @@ export function createDesignerWorkspace(
           ${menuButton('undo')}${menuButton('redo')}
           <div class="designer-menu-separator" role="separator"></div>
           ${menuButton('copy')}${menuButton('paste')}${menuButton('duplicate')}${menuButton('delete')}
+          ${menuButton('edit-position')}
           <div class="designer-menu-separator" role="separator"></div>
           ${menuButton('group')}${menuButton('ungroup')}
           ${submenuButton(DESIGNER_UI_TEXT.arrange, [
@@ -216,7 +222,7 @@ export function createDesignerWorkspace(
             'distribute-horizontal',
             'distribute-vertical',
           ])}
-          ${submenuButton(DESIGNER_UI_TEXT.layer, ['bring-to-front', 'send-to-back', 'lock', 'unlock', 'hide'])}
+          ${submenuButton(DESIGNER_UI_TEXT.layer, ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'])}
         </div>
         <div class="designer-menu" data-menu="view" hidden role="menu">
           ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-reset')}${menuButton('zoom-fit')}
@@ -235,10 +241,16 @@ export function createDesignerWorkspace(
         <div class="ruler ruler-vertical" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
         <div class="viewport" data-viewport>
           <div class="canvas" data-canvas>
+            <div class="canvas-content" data-canvas-content></div>
             <div class="selection" data-selection></div>
             <div class="marquee" data-marquee></div>
             <div class="canvas-guides" data-canvas-guides></div>
           </div>
+          <form class="designer-coordinate-entry" data-coordinate-entry role="dialog" aria-modal="false" aria-label="${DESIGNER_UI_TEXT.coordinateEntry.title}" autocomplete="off" novalidate hidden>
+            ${coordinateEntryField('x')}
+            ${coordinateEntryField('y')}
+            <p class="designer-coordinate-entry-error" id="designer-coordinate-entry-error" data-coordinate-entry-error role="alert" aria-live="assertive"></p>
+          </form>
         </div>
       </div>
       <section class="designer-data-workbench" data-data-workbench hidden aria-label="${DESIGNER_UI_TEXT.dataSource.workbench}">
@@ -272,7 +284,7 @@ export function createDesignerWorkspace(
             <span class="status-toggle-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.nativeEvent}</span>
           </button>
           <span class="status-divider" aria-hidden="true"></span>
-          <button type="button" class="designer-control designer-button status-console-trigger" data-error-console-toggle aria-controls="designer-error-console" aria-expanded="false" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}" title="${DESIGNER_UI_TEXT.errorConsole.openAria}">
+          <button type="button" class="designer-control designer-button status-console-trigger" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}" title="${DESIGNER_UI_TEXT.errorConsole.openAria}">
             ${designerIcon('terminal')}<span class="status-console-label">${DESIGNER_UI_TEXT.errorConsole.trigger}</span><span class="status-console-count" data-error-console-count></span>
           </button>
           <span class="status-divider" aria-hidden="true"></span>
@@ -288,7 +300,7 @@ export function createDesignerWorkspace(
           <header>
             <div class="error-console-heading">
               <h2 id="designer-error-console-title">${DESIGNER_UI_TEXT.errorConsole.title}</h2>
-              <span data-error-console-summary></span>
+              <span data-error-console-summary aria-atomic="true"></span>
             </div>
             <div class="error-console-actions">
               <button type="button" class="designer-control designer-button error-console-clear" data-error-console-clear>${DESIGNER_UI_TEXT.errorConsole.clear}</button>
@@ -296,7 +308,11 @@ export function createDesignerWorkspace(
             </div>
           </header>
           <section class="error-console-current" data-material-library-status aria-label="${DESIGNER_UI_TEXT.materialLibrary.label}" hidden></section>
-          <div class="error-console-list" data-error-console-list role="log" aria-live="polite"></div>
+          <div class="error-console-history-heading">
+            <h3>${DESIGNER_UI_TEXT.errorConsole.history}</h3>
+            <span data-error-console-history-summary></span>
+          </div>
+          <div class="error-console-list" data-error-console-list data-error-console-order="newest-first" role="log" aria-live="polite" aria-label="${DESIGNER_UI_TEXT.errorConsole.history}"></div>
         </div>
       </section>
     </main>
@@ -445,6 +461,11 @@ export function createDesignerWorkspace(
     control.disabled = tool.materialKey !== undefined && toolMaterialTypes?.[tool.id] === undefined;
   }
   return layout;
+}
+
+function coordinateEntryField(axis: 'x' | 'y'): string {
+  const label = axis.toUpperCase();
+  return `<label class="designer-coordinate-entry-field"><span class="designer-coordinate-entry-input"><span class="designer-coordinate-entry-axis" aria-hidden="true">${label}</span><input type="number" class="designer-control designer-input designer-number" data-coordinate-entry-${axis} data-coordinate-entry-axis="${axis}" inputmode="decimal" min="-1000000" max="1000000" step="0.01" aria-label="${label}" aria-describedby="designer-coordinate-entry-error"><span class="designer-coordinate-entry-unit" aria-hidden="true">${DESIGNER_UI_TEXT.coordinateEntry.unit}</span></span></label>`;
 }
 
 function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: string): string {

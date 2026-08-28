@@ -299,6 +299,11 @@ class Renderer implements BaseScreenRenderer {
     this.options.root.style.position = 'relative';
     this.options.root.style.width = `${parsedDocument.value.canvas.width}px`;
     this.options.root.style.height = `${parsedDocument.value.canvas.height}px`;
+    // preview/viewer 是最终展示表面，canonical 画布同时定义其可见与命中边界。
+    // design 模式不改写宿主 overflow，由 Designer 的独立内容层裁剪并保留作者覆盖层。
+    if (this.options.mode !== 'design' && this.options.root.style.overflow !== 'hidden') {
+      this.options.root.style.overflow = 'hidden';
+    }
     applyCanvasBackground(this.options.root, parsedDocument.value.canvas);
     this.#mounted = next;
     this.#candidates = new Map(candidates.map((candidate) => [candidate.component.id, candidate]));

@@ -57,17 +57,6 @@
 - 探索阶段命名规则：不要在文档、物料标识、标签名、清单、fixture、ADR、Spec、计划或公共 API 中引入或保留 `V1`/`V2`/`V3`、`v1`/`v2`/`v3`、`/vN`、`-vN`、诸如 `apiVersion`/`schemaVersion`/`implementationVersion` 的版本标记字段、按版本区分的分支或带版本后缀的公共名称。只使用一个当前形态和一个稳定名称。任何兼容性或版本化设计都必须在项目离开此阶段后，获得用户的明确批准。
 - `packages/contracts/src/screen-document.schema.json` 是一个已提交的黄金产物，由构建后的 schema 通过 `pnpm --filter @base-screen/contracts build` 以及随后的 `node scripts/emit-schema-golden.mjs` 生成。黄金产物更新要与其 schema 变更一起有意识地提交；构建只会把该文件复制进 `dist`。
 
-## 文档与出处
-
-- 功能 Spec 存放在 `docs/specs/<kebab-case-feature>/`（`spec.md`、`tasks.md`、`checklist.md`、`test-matrix.md` 一套）；计划存放在 `docs/plans/<kebab-case-feature>/`；ADR 存放在 `docs/decisions/`。保持它们有版本管理，不要把工作流输出留在 `.trae/` 中。
-- **维护期（阶段封版，2026-08-12 起）。** 全部历史 Spec 与计划已归档至 `docs/specs/archive/`、`docs/plans/archive/`；当前没有生效中的 Spec。当前能力基线见 `docs/baseline/README.md`，下一阶段方向见 `docs/roadmap/README.md`。新需求默认通过代码、测试和必要的基线/使用文档更新直接实现，不自动创建 ADR 或 Spec。只有改变架构、产品与宿主边界、包依赖模型、公共兼容或迁移策略的长期决策需要 ADR；只有范围较大且可分阶段交付、存在迁移/回滚风险，或用户明确要求的工作需要生效中的 Spec。不得为单个常规功能、修复、UI 调整、内部重构或局部 API 增补新建 ADR/Spec，也不得重新打开归档任务。
-- ADR 和 Spec 是有意维护的设计记录，不是每项工作的前置条件。活动的 Spec 授权其已定义范围，实施不得悄悄偏离；已触发文档门槛的公共边界变更必须在实现前或同一变更中更新相关 ADR/Spec。
-- **持久化 Spec 执行。** 当用户要求实现、执行、完成或整改某个活动的 Spec 时，把它的 `tasks.md` 和 `checklist.md` 当作完成状态机。只要还有任何适用项未勾选，就不要发送最终/完成回复。某个聚焦检查通过、`pnpm verify:m0` 通过或完成一个 Task 只是证据，并不代表 Spec 已完成。
-- **硬性 final 门槛。** 活动 Spec 存在时，`final` 只能在以下条件全部满足后发送：所有适用的顶层 Task 和子项、所有适用 checklist 项均为 `[x]`；测试矩阵已反映当前 case；必需质量门已通过。发送前必须执行 `rg -n "^- \[ \]" docs/specs/<feature>/{tasks,checklist}.md` 或等效逐文件检查。命令找到任何未勾选项时，禁止发送 `final`，即使用户只询问阶段性结果或某个 Task 已完成。
-- **恢复与继续门槛。** 任何继续、恢复、上下文压缩后的后续回合，先读取活动 Spec 的 `tasks.md`、`checklist.md` 和测试矩阵，确认第一个未勾选的适用项；将其标记为唯一进行中事项后立即继续执行。阶段性更新只能使用 `commentary`，不得以完成语气替代执行。除非用户明确暂停、转向其他工作或出现需要用户决策的阻塞，否则不得在一个已开始的活动 Spec 中止于状态报告或单个 Task。
-- 在结束持久化 Spec 工作前，核实每个适用的 Task 和 checklist 项都已用当前代码和自动化证据勾选，当 Spec 要求时需求到测试的映射是最新的，并且所有必需的质量门槛都已通过。随着证据的获得，增量更新 Spec 产物；永远不要在没有证据的情况下勾选某项为完成。
-- 每完成一个经核实的改动后，直接继续到下一个未勾选的适用项。只有在 Spec 完成条件满足、用户明确暂停或转向其他工作、或出现真正需要用户决策的阻塞时，才停止。遇到阻塞时，说明确切的未勾选项、所依据的契约/ADR 约束、已尝试的解决方案，以及需要用户做的决策。
-
 ## 代码与测试
 
 - **高内聚、低耦合。** 相关逻辑应聚合在同一模块/包内，跨模块只通过明确、最小化的公共接口交互；模块不得依赖其内部实现细节或兄弟模块的实现。职责单一，避免聚合体（god object）与循环依赖。上述分层（`common`/`browser`）、跨包公共导出以及依赖边界检查，都是本约定的具体落地。

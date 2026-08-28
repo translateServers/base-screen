@@ -1,5 +1,5 @@
 import type { ScreenDocument, ScreenProjectEnvelope } from '@base-screen/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   createDesignerElementOperations,
   type DesignerElementOperationsHost,
@@ -25,11 +25,22 @@ function projectValue(): ScreenProjectEnvelope {
   };
 }
 
-function createHost(overrides: {
-  getDocument?: () => ScreenDocument | undefined;
-  getProject?: () => ScreenProjectEnvelope | undefined;
-  hasPreviewHandler?: () => boolean;
-}): DesignerElementOperationsHost {
+type HostOverrides = Partial<
+  Pick<
+    DesignerElementOperationsHost,
+    | 'canEditPosition'
+    | 'canMutateSelection'
+    | 'canSelectLayer'
+    | 'getDocument'
+    | 'getProject'
+    | 'hasPreviewHandler'
+    | 'openCoordinateEntry'
+    | 'reorderSelection'
+    | 'selectLayer'
+  >
+>;
+
+function createHost(overrides: HostOverrides): DesignerElementOperationsHost {
   return {
     getDocument: overrides.getDocument ?? (() => documentValue()),
     canUndo: () => false,
@@ -81,12 +92,16 @@ function createHost(overrides: {
     cancelProjectOperation: () => undefined,
     setActiveTool: () => undefined,
     cancelGesture: () => undefined,
-    canMutateSelection: () => false,
+    canMutateSelection: overrides.canMutateSelection ?? (() => false),
+    canEditPosition: overrides.canEditPosition ?? (() => false),
+    canSelectLayer: overrides.canSelectLayer ?? (() => false),
     canSetSelectionStatus: () => false,
+    openCoordinateEntry: overrides.openCoordinateEntry ?? (() => undefined),
+    selectLayer: overrides.selectLayer ?? (() => undefined),
     deleteSelection: () => undefined,
     nudgeSelection: () => undefined,
     toggleSelectionStatus: () => undefined,
-    reorderSelection: () => undefined,
+    reorderSelection: overrides.reorderSelection ?? (() => undefined),
     toggleHelpPanel: () => undefined,
     fitViewportToSelectionOrCanvas: () => undefined,
     exportFromOperation: () => undefined,
@@ -133,5 +148,63 @@ describe('designer preview operation availability (ADR-0038)', () => {
   it('is disabled when there is no document regardless of mode', () => {
     const state = previewState(createHost({ getDocument: () => undefined }));
     expect(state.enabled).toBe(false);
+  });
+});
+
+describe('designer coordinate entry operation', () => {
+  it('exposes X and opens only while a valid position target is available', () => {
+    const openCoordinateEntry = vi.fn();
+    const enabled = createDesignerElementOperations(
+      createHost({ canEditPosition: () => true, openCoordinateEntry }),
+    ).find((operation) => operation.id === 'edit-position')!;
+
+    expect(enabled.shortcut).toBe('X');
+    expect(enabled.scope).toBe('canvas');
+    expect(enabled.isEnabled(undefined)).toBe(true);
+    enabled.execute(undefined);
+    expect(openCoordinateEntry).toHaveBeenCalledOnce();
+
+    const disabled = createDesignerElementOperations(
+      createHost({ canEditPosition: () => false, openCoordinateEntry }),
+    ).find((operation) => operation.id === 'edit-position')!;
+    expect(disabled.isEnabled(undefined)).toBe(false);
+  });
+});
+
+describe('designer sibling layer shortcut operations', () => {
+  it('maps brackets to one-step down and up selection actions', () => {
+    const reorderSelection = vi.fn();
+    const operations = createDesignerElementOperations(
+      createHost({ canMutateSelection: () => true, reorderSelection }),
+    );
+    const down = operations.find((operation) => operation.id === 'send-backward')!;
+    const up = operations.find((operation) => operation.id === 'bring-forward')!;
+
+    expect(down.shortcut).toBe('[');
+    expect(up.shortcut).toBe(']');
+    expect(down.isEnabled(undefined)).toBe(true);
+    expect(up.isEnabled(undefined)).toBe(true);
+
+    down.execute(undefined);
+    up.execute(undefined);
+    expect(reorderSelection.mock.calls).toEqual([['down'], ['up']]);
+  });
+});
+
+describe('designer layer selection shortcut operations', () => {
+  it('maps Alt brackets to repeatable, dynamically enabled canvas selection actions', () => {
+    const selectLayer = vi.fn();
+    const canSelectLayer = vi.fn((direction: 'up' | 'down') => direction === 'up');
+    const operations = createDesignerElementOperations(createHost({ canSelectLayer, selectLayer }));
+    const up = operations.find((operation) => operation.id === 'select-layer-up')!;
+    const down = operations.find((operation) => operation.id === 'select-layer-down')!;
+
+    expect(up).toMatchObject({ shortcut: 'Alt+]', scope: 'canvas', repeatable: true });
+    expect(down).toMatchObject({ shortcut: 'Alt+[', scope: 'canvas', repeatable: true });
+    expect(up.isEnabled(undefined)).toBe(true);
+    expect(down.isEnabled(undefined)).toBe(false);
+    up.execute(undefined);
+    expect(selectLayer).toHaveBeenCalledWith('up');
+    expect(canSelectLayer.mock.calls).toEqual([['up'], ['down']]);
   });
 });

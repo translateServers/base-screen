@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { verifyApiReports } from './api-reports.mjs';
 import { PACKAGE_DEFINITIONS } from './check-packages.mjs';
 
 const REQUIRED_LIFECYCLE_API = Object.freeze({
@@ -34,3 +35,5 @@ for (const directory of Object.keys(PACKAGE_DEFINITIONS)) {
     }
   }
 }
+
+verifyApiReports();

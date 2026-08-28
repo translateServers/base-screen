@@ -12,6 +12,7 @@ import {
   type DesignerLayerToolbarState,
 } from './designer-layers-toolbar-dom.js';
 import { materialCategoryIcon } from './designer-material-library-dom.js';
+import { createDesignerButton } from './designer-ui-primitives.js';
 
 export interface DesignerLayerItem {
   readonly id: string;
@@ -33,6 +34,32 @@ export interface DesignerLayerView {
   readonly diagnostics: readonly ScreenDiagnostic[];
   /** 按父分组的已排序兄弟 id 表（zIndex 升序）：供 canMove 复用，避免每行重排。 */
   readonly siblingsByParent: ReadonlyMap<string | null, readonly string[]>;
+}
+
+export type DesignerLayerSelectionDirection = 'up' | 'down';
+
+export function getDesignerLayerSelectionTarget(
+  view: Pick<DesignerLayerView, 'items'>,
+  interaction: ScreenInteractionState,
+  direction: DesignerLayerSelectionDirection,
+): string | undefined {
+  const selectableIds = view.items.filter((item) => !item.hidden).map((item) => item.id);
+  if (selectableIds.length === 0) return undefined;
+
+  const selectableIdSet = new Set(selectableIds);
+  const selectedIds = new Set(interaction.selectedComponentIds);
+  const focusedId = interaction.focusedComponentId;
+  const anchorId =
+    focusedId !== null && selectedIds.has(focusedId) && selectableIdSet.has(focusedId)
+      ? focusedId
+      : selectableIds.find((componentId) => selectedIds.has(componentId));
+  if (anchorId === undefined) return selectableIds[0];
+
+  const anchorIndex = selectableIds.indexOf(anchorId);
+  const targetIndex = anchorIndex + (direction === 'up' ? -1 : 1);
+  return targetIndex < 0 || targetIndex >= selectableIds.length
+    ? undefined
+    : selectableIds[targetIndex];
 }
 
 export interface DesignerLayersRenderOptions {
@@ -429,12 +456,7 @@ function moveButton(
 }
 
 function button(ownerDocument: Document, text: string, label: string): HTMLButtonElement {
-  const control = ownerDocument.createElement('button');
-  control.type = 'button';
-  control.className = 'designer-control designer-button';
-  control.textContent = text;
-  control.ariaLabel = label;
-  return control;
+  return createDesignerButton(ownerDocument, { ariaLabel: label, text });
 }
 
 function missingMaterialDiagnostic(item: DesignerLayerItem): ScreenDiagnostic {

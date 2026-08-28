@@ -5,7 +5,10 @@ import type {
   ScreenInteractionAction,
 } from '@base-screen/core';
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
-import { createZOrderTransaction } from './designer-layout-operations.js';
+import {
+  createSiblingSelectionReorderTransaction,
+  createZOrderTransaction,
+} from './designer-layout-operations.js';
 import { removeComponentCommands } from './designer-remove-operations.js';
 import { selectedComponents, selectionSubtree } from './designer-selection.js';
 
@@ -89,14 +92,14 @@ export class DesignerSelectionActions {
     );
   }
 
-  reorder(edge: 'front' | 'back'): void {
+  reorder(target: 'front' | 'up' | 'down' | 'back'): void {
     const document = this.callbacks.getDocument();
     if (document === undefined || !this.canMutate()) return;
-    const transaction = createZOrderTransaction(
-      document,
-      this.callbacks.getSelectedComponentIds(),
-      edge,
-    );
+    const componentIds = this.callbacks.getSelectedComponentIds();
+    const transaction =
+      target === 'front' || target === 'back'
+        ? createZOrderTransaction(document, componentIds, target)
+        : createSiblingSelectionReorderTransaction(document, componentIds, target);
     if (transaction !== undefined)
       this.callbacks.report(this.callbacks.executeTransaction(transaction));
   }

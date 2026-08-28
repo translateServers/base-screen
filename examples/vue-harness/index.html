@@ -64,7 +64,8 @@
 
       .stage {
         display: grid;
-        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        /* 验证视口固定为 1440×900；确定两行尺寸，避免子内容反向参与父网格计算。 */
+        grid-template-rows: 400px 400px;
         gap: 12px;
         min-height: 0;
       }

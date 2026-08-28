@@ -66,6 +66,67 @@ describe('resolveDesignerKeyboardPolicy', () => {
     ).toEqual({ kind: 'command', chord: 'Delete' });
   });
 
+  it('routes X only from an idle non-editable surface', () => {
+    const operation = { repeatable: false };
+    expect(key({ event: { key: 'x' }, operation })).toEqual({
+      kind: 'command',
+      chord: 'X',
+    });
+    expect(key({ event: { key: 'x' }, context: { editable: true }, operation })).toEqual({
+      kind: 'allow',
+    });
+    expect(key({ event: { key: 'x', isComposing: true }, operation })).toEqual({ kind: 'allow' });
+    expect(key({ event: { key: 'x', altGraph: true }, operation })).toEqual({ kind: 'allow' });
+    expect(key({ event: { key: 'x', repeat: true }, operation })).toEqual({ kind: 'block' });
+    expect(key({ event: { key: 'x' }, context: { gestureActive: true }, operation })).toEqual({
+      kind: 'block',
+    });
+  });
+
+  it('routes bracket layer steps only from an idle non-editable surface', () => {
+    const operation = { repeatable: false };
+    expect(key({ event: { key: '[' }, operation })).toEqual({
+      kind: 'command',
+      chord: '[',
+    });
+    expect(key({ event: { key: ']' }, operation })).toEqual({
+      kind: 'command',
+      chord: ']',
+    });
+    expect(key({ event: { key: '[' }, context: { editable: true }, operation })).toEqual({
+      kind: 'allow',
+    });
+    expect(key({ event: { key: ']', isComposing: true }, operation })).toEqual({ kind: 'allow' });
+    expect(key({ event: { key: ']', repeat: true }, operation })).toEqual({ kind: 'block' });
+    expect(key({ event: { key: '[' }, context: { gestureActive: true }, operation })).toEqual({
+      kind: 'block',
+    });
+  });
+
+  it('routes repeatable Alt bracket selection only from an idle non-editable surface', () => {
+    const operation = { repeatable: true };
+    expect(key({ event: { key: ']', altKey: true }, operation })).toEqual({
+      kind: 'command',
+      chord: 'Alt+]',
+    });
+    expect(key({ event: { key: '[', altKey: true, repeat: true }, operation })).toEqual({
+      kind: 'command',
+      chord: 'Alt+[',
+    });
+    expect(
+      key({ event: { key: ']', altKey: true }, context: { editable: true }, operation }),
+    ).toEqual({ kind: 'allow' });
+    expect(key({ event: { key: ']', altKey: true, isComposing: true }, operation })).toEqual({
+      kind: 'allow',
+    });
+    expect(
+      key({ event: { key: '[', altKey: true, ctrlKey: true, altGraph: true }, operation }),
+    ).toEqual({ kind: 'allow' });
+    expect(
+      key({ event: { key: '[', altKey: true }, context: { gestureActive: true }, operation }),
+    ).toEqual({ kind: 'block' });
+  });
+
   it('R1 blocks all-target conditional chords when no command executes', () => {
     expect(key({ event: { key: 's', ctrlKey: true } })).toEqual({ kind: 'block' });
     expect(key({ event: { key: '0', ctrlKey: true }, context: { editable: true } })).toEqual({

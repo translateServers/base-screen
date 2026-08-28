@@ -1,5 +1,6 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
+import type { DesignerIconName } from '../ui/designer-icons.js';
+import { createDesignerIconButton } from './designer-ui-primitives.js';
 
 export type DesignerLayerArrangeAction = 'front' | 'up' | 'down' | 'back';
 export type DesignerLayerGroupAction = 'group' | 'ungroup';
@@ -71,12 +72,10 @@ function iconButton(
   label: string,
   enabled: boolean,
 ): HTMLButtonElement {
-  const control = ownerDocument.createElement('button');
-  control.type = 'button';
-  control.className = 'designer-control designer-button designer-icon-button layer-toolbar-button';
-  control.title = label;
-  control.ariaLabel = label;
-  control.disabled = !enabled;
-  control.innerHTML = designerIcon(icon);
-  return control;
+  return createDesignerIconButton(ownerDocument, {
+    className: 'layer-toolbar-button',
+    disabled: !enabled,
+    icon,
+    label,
+  });
 }

@@ -65,6 +65,15 @@ import {
   renderDesignerDescriptorZone,
 } from './designer-descriptor-dom.js';
 import { appendDesignerQuickStyle } from './designer-quick-style-dom.js';
+import {
+  appendDesignerFieldMessage,
+  createDesignerButton,
+  createDesignerCheckbox,
+  createDesignerIconButton,
+  createDesignerInput,
+  createDesignerSelect,
+  createDesignerTextarea,
+} from './designer-ui-primitives.js';
 
 export interface DesignerPanelInput {
   readonly value: string;
@@ -365,7 +374,7 @@ function appendCommonOpacityControl(
   controls.appendChild(range);
   controls.appendChild(number);
   field.appendChild(controls);
-  appendFieldMessage(field, number, 'style-opacity');
+  appendDesignerFieldMessage(field, number, 'style-opacity');
   section.appendChild(field);
 }
 
@@ -412,15 +421,15 @@ function flipButton(
   property: 'flipX' | 'flipY',
   pressed: boolean,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button designer-flip-button';
+  const button = createDesignerButton(ownerDocument, {
+    ariaLabel: label,
+    className: 'designer-flip-button',
+    pressed,
+    text: property === 'flipX' ? '↔' : '↕',
+    title: label,
+  });
   button.dataset.geometryAction = property;
   button.dataset.flipLabel = label;
-  button.ariaPressed = String(pressed);
-  button.title = label;
-  button.setAttribute('aria-label', label);
-  button.textContent = property === 'flipX' ? '↔' : '↕';
   return button;
 }
 
@@ -1380,7 +1389,7 @@ function appendInput(
   input.dataset.property = property;
   if (min !== undefined) input.min = min;
   label.appendChild(input);
-  appendFieldMessage(label, input, `property-${property}`);
+  appendDesignerFieldMessage(label, input, `property-${property}`);
   parent.appendChild(label);
   return label;
 }
@@ -1420,7 +1429,7 @@ function appendBatchNumberInput(
   input.disabled = disabled;
   input.title = hint;
   label.appendChild(input);
-  appendFieldMessage(label, input, `multi-property-${multiProperty}`);
+  appendDesignerFieldMessage(label, input, `multi-property-${multiProperty}`);
   parent.appendChild(label);
   return label;
 }
@@ -1455,7 +1464,7 @@ function appendBatchStyleControl(
       if (mixed) input.dataset.mixed = 'true';
     }
     label.appendChild(palette.element);
-    appendFieldMessage(label, palette.controls[0]!, `multi-style-${style}`);
+    appendDesignerFieldMessage(label, palette.controls[0]!, `multi-style-${style}`);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control);
     input.dataset.multiProperty = `style:${style}`;
@@ -1479,7 +1488,7 @@ function appendBatchStyleControl(
       }
     }
     label.appendChild(input);
-    appendFieldMessage(label, input, `multi-style-${style}`);
+    appendDesignerFieldMessage(label, input, `multi-style-${style}`);
   }
   parent.appendChild(label);
 }
@@ -1493,17 +1502,16 @@ function appendCheckbox(
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
-  const input = parent.ownerDocument.createElement('input');
-  input.type = 'checkbox';
-  input.className = 'designer-checkbox';
-  input.checked = value;
-  input.value = String(input.checked);
+  const input = createDesignerCheckbox(parent.ownerDocument, {
+    checked: value,
+    value: String(value),
+  });
   input.dataset.property = property;
   input.addEventListener('change', () => {
     input.value = String(input.checked);
   });
   label.appendChild(input);
-  appendFieldMessage(label, input, `property-${property}`);
+  appendDesignerFieldMessage(label, input, `property-${property}`);
   parent.appendChild(label);
 }
 
@@ -1688,11 +1696,10 @@ function appendCanvasSettingCheckbox(
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label designer-canvas-setting-checkbox';
   label.textContent = labelText;
-  const input = parent.ownerDocument.createElement('input');
-  input.type = 'checkbox';
-  input.className = 'designer-checkbox';
-  input.checked = checked;
-  input.value = String(checked);
+  const input = createDesignerCheckbox(parent.ownerDocument, {
+    checked,
+    value: String(checked),
+  });
   input.dataset.canvasSetting = setting;
   label.appendChild(input);
   parent.appendChild(label);
@@ -1703,11 +1710,8 @@ function canvasSettingAction(
   label: string,
   action: string,
 ): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
+  const button = createDesignerButton(ownerDocument, { text: label });
   button.dataset.canvasSettingAction = action;
-  button.textContent = label;
   return button;
 }
 
@@ -1734,7 +1738,7 @@ function appendCanvasBackgroundControls(
   }
   select.value = drafts.activeType;
   type.appendChild(select);
-  appendFieldMessage(type, select, 'canvas-backgroundType');
+  appendDesignerFieldMessage(type, select, 'canvas-backgroundType');
   parent.appendChild(type);
 
   if (drafts.activeType === 'solid') {
@@ -1841,7 +1845,7 @@ function appendCanvasSelect(
   }
   select.value = value;
   label.appendChild(select);
-  appendFieldMessage(label, select, `canvas-${property}`);
+  appendDesignerFieldMessage(label, select, `canvas-${property}`);
   parent.appendChild(label);
 }
 
@@ -1866,7 +1870,7 @@ function createCanvasInput(
   input.value = String(value);
   input.dataset.canvasProperty = property;
   label.appendChild(input);
-  appendFieldMessage(label, input, `canvas-${property}`);
+  appendDesignerFieldMessage(label, input, `canvas-${property}`);
   parent.appendChild(label);
   return input;
 }
@@ -1892,7 +1896,7 @@ function appendCanvasInput(
   input.value = String(value);
   input.dataset.canvasProperty = property;
   label.appendChild(input);
-  appendFieldMessage(label, input, `canvas-${property}`);
+  appendDesignerFieldMessage(label, input, `canvas-${property}`);
   parent.appendChild(label);
   return input;
 }
@@ -1917,7 +1921,7 @@ function appendDataInput(
       : 'designer-control designer-input';
   input.dataset.dataSourceField = field;
   label.appendChild(input);
-  appendFieldMessage(label, input, `data-${field}`);
+  appendDesignerFieldMessage(label, input, `data-${field}`);
   parent.appendChild(label);
 }
 
@@ -2060,12 +2064,12 @@ function appendPropControl(
     );
     for (const input of palette.controls) input.dataset.prop = prop;
     label.appendChild(palette.element);
-    appendFieldMessage(label, palette.controls[0]!, `prop-${prop}`);
+    appendDesignerFieldMessage(label, palette.controls[0]!, `prop-${prop}`);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control);
     input.dataset.prop = prop;
     label.appendChild(input);
-    appendFieldMessage(label, input, `prop-${prop}`);
+    appendDesignerFieldMessage(label, input, `prop-${prop}`);
   }
   parent.appendChild(label);
 }
@@ -2092,12 +2096,12 @@ function appendStyleControl(
     );
     for (const input of palette.controls) input.dataset.style = style;
     label.appendChild(palette.element);
-    appendFieldMessage(label, palette.controls[0]!, `style-${style}`);
+    appendDesignerFieldMessage(label, palette.controls[0]!, `style-${style}`);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control);
     input.dataset.style = style;
     label.appendChild(input);
-    appendFieldMessage(label, input, `style-${style}`);
+    appendDesignerFieldMessage(label, input, `style-${style}`);
   }
   parent.appendChild(label);
 }
@@ -2253,13 +2257,13 @@ function appendStyleRuleControl(
       (input as HTMLInputElement).disabled = locked;
     }
     label.appendChild(palette.element);
-    appendFieldMessage(label, palette.controls[0]!, `style-rule-${index}-${style}`);
+    appendDesignerFieldMessage(label, palette.controls[0]!, `style-rule-${index}-${style}`);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control);
     input.dataset.styleRuleStyle = marker;
     input.disabled = locked;
     label.appendChild(input);
-    appendFieldMessage(label, input, `style-rule-${index}-${style}`);
+    appendDesignerFieldMessage(label, input, `style-rule-${index}-${style}`);
   }
   parent.appendChild(label);
 }
@@ -2325,15 +2329,16 @@ function appendBatchArrangeButton(
   disabled: boolean,
   unavailableReason: string,
 ): void {
-  const button = parent.ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className =
-    'designer-control designer-button designer-icon-button designer-datav-batch-arrange-button';
+  const title = disabled ? `${label}：${unavailableReason}` : label;
+  const button = createDesignerIconButton(parent.ownerDocument, {
+    ariaLabel: title,
+    className: 'designer-datav-batch-arrange-button',
+    disabled,
+    icon,
+    label,
+    title,
+  });
   button.dataset.action = action;
-  button.title = disabled ? `${label}：${unavailableReason}` : label;
-  button.setAttribute('aria-label', button.title);
-  button.disabled = disabled;
-  button.innerHTML = designerIcon(icon);
   parent.appendChild(button);
 }
 
@@ -2346,28 +2351,6 @@ function multiSelectionGroupUnavailableReason(
   return '';
 }
 
-function appendFieldMessage(
-  container: HTMLElement,
-  input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-  key: string,
-): void {
-  const id = `designer-field-${key}`;
-  const messageId = `${id}-message`;
-  input.id = id;
-  input.setAttribute('aria-describedby', messageId);
-  // 只有 label 容器才建立 for 关联：color 控件用 span 容器，点击字段文字不得激活
-  // color input（否则会弹出浏览器原生取色器）。
-  if (container.tagName.toLowerCase() === 'label') {
-    (container as HTMLLabelElement).htmlFor = id;
-  }
-  const message = container.ownerDocument.createElement('span');
-  message.id = messageId;
-  message.className = 'designer-field-message';
-  message.dataset.fieldMessage = 'true';
-  message.ariaLive = 'polite';
-  container.appendChild(message);
-}
-
 function createControl(
   ownerDocument: Document,
   value: ScreenJsonValue | undefined,
@@ -2375,38 +2358,27 @@ function createControl(
   control: string,
 ): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
   if (control === 'boolean') {
-    const input = ownerDocument.createElement('input');
-    input.type = 'checkbox';
-    input.className = 'designer-checkbox';
-    input.checked = value === true;
-    return input;
+    return createDesignerCheckbox(ownerDocument, { checked: value === true });
   }
   if (control === 'select' && schema.kind === 'enum') {
-    const select = ownerDocument.createElement('select');
-    select.className = 'designer-control designer-select';
-    for (const optionValue of schema.values) {
-      const option = ownerDocument.createElement('option');
-      option.value = String(optionValue);
-      option.textContent = String(optionValue);
-      option.selected = value === optionValue;
-      select.appendChild(option);
-    }
-    return select;
+    return createDesignerSelect(ownerDocument, {
+      options: schema.values.map((optionValue) => ({
+        label: String(optionValue),
+        selected: value === optionValue,
+        value: String(optionValue),
+      })),
+    });
   }
   if (control === 'json') {
-    const input = ownerDocument.createElement('textarea');
-    input.className = 'designer-control designer-textarea';
+    const input = createDesignerTextarea(ownerDocument);
     input.value = JSON.stringify(value);
     return input;
   }
-  const input = ownerDocument.createElement('input');
-  input.type = control === 'number' || control === 'color' ? control : 'text';
-  input.className =
-    control === 'color'
-      ? 'designer-control designer-color'
-      : `designer-control designer-input${control === 'number' ? ' designer-number' : ''}`;
-  input.value = String(value ?? '');
-  return input;
+  const appearance = control === 'number' || control === 'color' ? control : 'text';
+  return createDesignerInput(ownerDocument, {
+    appearance,
+    value: String(value ?? ''),
+  });
 }
 
 function defaultLinearBackground(): Extract<

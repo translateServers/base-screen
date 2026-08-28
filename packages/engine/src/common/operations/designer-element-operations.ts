@@ -91,11 +91,15 @@ export interface DesignerElementOperationsHost {
   readonly setActiveTool: (tool: DesignerToolId) => void;
   readonly cancelGesture: () => void;
   readonly canMutateSelection: () => boolean;
+  readonly canEditPosition: () => boolean;
+  readonly canSelectLayer: (direction: 'up' | 'down') => boolean;
   readonly canSetSelectionStatus: () => boolean;
+  readonly openCoordinateEntry: () => void;
+  readonly selectLayer: (direction: 'up' | 'down') => void;
   readonly deleteSelection: () => void;
   readonly nudgeSelection: (x: number, y: number) => void;
   readonly toggleSelectionStatus: (property: 'locked' | 'hidden', value: boolean) => void;
-  readonly reorderSelection: (edge: 'front' | 'back') => void;
+  readonly reorderSelection: (target: 'front' | 'up' | 'down' | 'back') => void;
   readonly toggleHelpPanel: () => void;
   readonly fitViewportToSelectionOrCanvas: () => void;
   readonly exportFromOperation: () => void;
@@ -185,6 +189,12 @@ export function createDesignerElementOperations(
       'nudge-down',
       () => host.canMutateSelection(),
       () => host.nudgeSelection(0, 1),
+    ),
+    simpleOperation(
+      'edit-position',
+      () => host.canEditPosition(),
+      () => host.openCoordinateEntry(),
+      'canvas',
     ),
     simpleOperation(
       'copy',
@@ -389,9 +399,33 @@ export function createDesignerElementOperations(
       'canvas',
     ),
     simpleOperation(
+      'select-layer-up',
+      () => host.canSelectLayer('up'),
+      () => host.selectLayer('up'),
+      'canvas',
+    ),
+    simpleOperation(
+      'select-layer-down',
+      () => host.canSelectLayer('down'),
+      () => host.selectLayer('down'),
+      'canvas',
+    ),
+    simpleOperation(
       'bring-to-front',
       () => host.canMutateSelection(),
       () => host.reorderSelection('front'),
+      'canvas',
+    ),
+    simpleOperation(
+      'bring-forward',
+      () => host.canMutateSelection(),
+      () => host.reorderSelection('up'),
+      'canvas',
+    ),
+    simpleOperation(
+      'send-backward',
+      () => host.canMutateSelection(),
+      () => host.reorderSelection('down'),
       'canvas',
     ),
     simpleOperation(
@@ -447,6 +481,8 @@ export function createDesignerElementOperations(
 // 连续型操作：按住重复（event.repeat）时允许连续执行，如连续删除或方向键微调。
 const REPEATABLE_OPERATION_IDS = new Set([
   'delete',
+  'select-layer-up',
+  'select-layer-down',
   'nudge-left',
   'nudge-right',
   'nudge-up',

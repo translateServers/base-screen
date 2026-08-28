@@ -1,10 +1,11 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
-import { applyScreenDocumentTransaction } from '@base-screen/core';
+import { applyScreenDocumentTransaction, type ScreenDocumentTransaction } from '@base-screen/core';
 import { describe, expect, it } from 'vitest';
 import {
   createSiblingReorderTransaction,
   createSiblingSelectionReorderTransaction,
 } from '../../../src/common/operations/designer-layout-operations.js';
+import { DesignerSelectionActions } from '../../../src/common/operations/designer-selection-actions.js';
 
 function component(
   id: string,
@@ -81,6 +82,40 @@ describe('DataV-style layer reorder transactions', () => {
 
     expect(transaction).toBeDefined();
     expect(displayOrder(source, transaction!)).toEqual(['front', 'lower', 'back', 'upper']);
+  });
+
+  it('routes selection actions to one-step up and down transactions', () => {
+    const source = document([
+      component('back', 0),
+      component('lower', 1),
+      component('upper', 2),
+      component('front', 3),
+    ]);
+    let selectedIds: readonly string[] = ['lower'];
+    const transactions: ScreenDocumentTransaction[] = [];
+    const actions = new DesignerSelectionActions({
+      getDocument: () => source,
+      getSelectedComponentIds: () => selectedIds,
+      executeCommand: () => ({ ok: true, value: source, diagnostics: [] }),
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return { ok: true, value: source, diagnostics: [] };
+      },
+      reduceSelection: () => undefined,
+      report: () => undefined,
+    });
+
+    actions.reorder('up');
+    const up = transactions[0];
+    expect(up).toBeDefined();
+    expect(displayOrder(source, up!)).toEqual(['front', 'lower', 'upper', 'back']);
+
+    transactions.length = 0;
+    selectedIds = ['upper'];
+    actions.reorder('down');
+    const down = transactions[0];
+    expect(down).toBeDefined();
+    expect(displayOrder(source, down!)).toEqual(['front', 'lower', 'upper', 'back']);
   });
 
   it('fails closed at visual boundaries, across parents, and across locked siblings', () => {

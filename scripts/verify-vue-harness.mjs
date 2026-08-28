@@ -76,6 +76,29 @@ try {
         window.vueHarness.viewer.shadowRoot?.querySelectorAll('[data-base-screen-component-id]')
           .length === 3,
     );
+    const layout = await page.evaluate(() => {
+      const designer = document.querySelector('base-screen-designer')?.getBoundingClientRect();
+      const viewer = document.querySelector('base-screen-viewer')?.getBoundingClientRect();
+      return {
+        bodyHeight: document.documentElement.scrollHeight,
+        bodyWidth: document.documentElement.scrollWidth,
+        designerHeight: designer?.height,
+        gap:
+          designer === undefined || viewer === undefined ? undefined : viewer.top - designer.bottom,
+        viewerHeight: viewer?.height,
+        viewportHeight: window.innerHeight,
+        viewportWidth: window.innerWidth,
+      };
+    });
+    if (
+      layout.bodyHeight > layout.viewportHeight ||
+      layout.bodyWidth > layout.viewportWidth ||
+      layout.designerHeight !== 400 ||
+      layout.viewerHeight !== 400 ||
+      layout.gap !== 12
+    ) {
+      throw new Error(`VUE_HARNESS_LAYOUT_FAILED: ${JSON.stringify(layout)}`);
+    }
 
     // 设计器物料面板（大屏设计器内 Vue 桥接物料必须出现在物料库中）。
     const paletteTypes = await page.evaluate(() =>

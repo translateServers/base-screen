@@ -53,7 +53,15 @@ const DESIGNER_CONTEXT_MENU = {
     'ungroup',
     {
       label: DESIGNER_UI_TEXT.layer,
-      entries: ['bring-to-front', 'send-to-back', 'lock', 'unlock', 'hide'],
+      entries: [
+        'bring-to-front',
+        'bring-forward',
+        'send-backward',
+        'send-to-back',
+        'lock',
+        'unlock',
+        'hide',
+      ],
     },
   ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
   multi: [
@@ -82,7 +90,15 @@ const DESIGNER_CONTEXT_MENU = {
     },
     {
       label: DESIGNER_UI_TEXT.layer,
-      entries: ['bring-to-front', 'send-to-back', 'lock', 'unlock', 'hide'],
+      entries: [
+        'bring-to-front',
+        'bring-forward',
+        'send-backward',
+        'send-to-back',
+        'lock',
+        'unlock',
+        'hide',
+      ],
     },
   ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
 };

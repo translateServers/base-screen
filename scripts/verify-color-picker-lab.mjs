@@ -1,18 +1,14 @@
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium } from '@playwright/test';
-import { createServer } from 'vite';
+import { withViteBrowser } from './browser-verification.mjs';
 
 const VERIFY_PORT = 4183;
-const server = await createServer({
-  root: 'examples/color-picker-lab',
-  server: { host: '127.0.0.1', port: VERIFY_PORT, strictPort: true },
-});
-
-try {
-  await server.listen();
-  const browser = await chromium.launch();
-  try {
+await withViteBrowser(
+  {
+    root: 'examples/color-picker-lab',
+    server: { port: VERIFY_PORT },
+  },
+  async ({ baseUrl, browser }) => {
     const page = await browser.newPage({ viewport: { width: 1200, height: 900 } });
     const pageErrors = [];
     const consoleErrors = [];
@@ -21,7 +17,7 @@ try {
       if (message.type() === 'error') consoleErrors.push(message.text());
     });
 
-    await page.goto(`http://127.0.0.1:${VERIFY_PORT}`, { waitUntil: 'networkidle' });
+    await page.goto(baseUrl, { waitUntil: 'networkidle' });
     const control = page.locator('#text-color');
     const palette = page.locator('base-screen-color-palette-control');
     const mapping = page.locator('base-screen-color-mapping-control');
@@ -429,9 +425,5 @@ try {
         `COLOR_FORM_CONTROL_RUNTIME_FAILED:${JSON.stringify({ pageErrors, consoleErrors })}`,
       );
     }
-  } finally {
-    await browser.close();
-  }
-} finally {
-  await server.close();
-}
+  },
+);

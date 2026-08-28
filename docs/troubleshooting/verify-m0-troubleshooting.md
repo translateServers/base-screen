@@ -1,7 +1,7 @@
 # verify:m0 门禁排障记录
 
 > 状态：生效中
-> 最近更新：2026-08-03
+> 最近更新：2026-08-28
 > 定位：记录 `pnpm verify:m0` 各门禁在 P0 实现中实际遇到的问题、根因与修复方法，避免重复排查
 > 关联：[M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md)、[Contracts Foundation Spec](../specs/archive/contracts-foundation/spec.md)
 
@@ -122,7 +122,35 @@ pnpm verify:tarball *> $null; Write-Output "verify:tarball=$LASTEXITCODE"
 - 原因：`scripts/verify-tarballs.mjs` 新增函数忘记补充 `node:fs` 导入。
 - 修复：补齐导入。属于笔误类，回归到脚本里新增 fs 用法时注意。
 
-## 7. 关键约定（避免误改）
+## 7. check:api
+
+### 7.1 API_REPORT_CHANGED
+
+- 症状：`check:api` 报 `API_REPORT_CHANGED`，并显示当前声明与已提交报告的差异。
+- 原因：某个 package 根入口或子路径的公开声明发生变化，但对应 `packages/<package>/etc/*.api.md`
+  尚未更新。
+- 修复：确认变化有意后运行 `pnpm api:report`，审查生成报告，并为报告变化涉及的 package 补充
+  Changeset。报告是生成产物，不要手工编辑。
+- 注意：Vue 报告分析会提示 API Extractor 使用 `skipLibCheck`；这是因为 API Extractor 内置的 TypeScript
+  版本落后于当前 Vue peer 类型。正常 `pnpm typecheck` 仍保持 `skipLibCheck: false`，该提示不代表包类型检查被放宽。
+
+## 8. check:file-size
+
+### 8.1 FILE_SIZE_LIMIT_EXCEEDED / FILE_SIZE_REGRESSION
+
+- 症状：`pnpm lint` 报新文件超过所属层上限，或已有超限文件高于
+  `scripts/file-size-baseline.json` 中记录的行数。
+- 原因：新模块没有在进入仓库前拆分，或历史大文件继续承载了新职责。
+- 修复：按职责拆分模块/测试；已有超限文件减少后运行 `pnpm file-size:baseline`，把精确上限同步下调。
+- 注意：`file-size:baseline` 只允许降低或删除已有例外，不能用来接受增长或新增超限文件；
+  `engine/src/common/vendor/` 是明确的 vendored source，不参与该门禁。
+
+### 8.2 FILE_SIZE_BASELINE_STALE
+
+- 症状：文件已经缩小或删除，但门禁要求更新基线。
+- 修复：运行 `pnpm file-size:baseline` 并提交变小后的基线，确保后续改动不能重新涨回原值。
+
+## 9. 关键约定（避免误改）
 
 - JSON Schema artifact 以 `packages/contracts/src/screen-document.schema.json` 为 golden：由 `scripts/emit-schema-golden.mjs`（从 dist 生成）产出并提交；构建时 `scripts/write-schema-artifact.mjs` 复制到 `dist/`；`document/json-schema.test.ts` 的 drift 测试保证 golden 与运行时生成一致。
 - 诊断 sentinel（`DIAGNOSTIC_LIMIT_REACHED`）的 path：cap 在 document 阶段触顶时为 `['document']`（envelope 场景需前缀），其余为 `[]`，见 `diagnostics/collector.ts`。

@@ -68,6 +68,7 @@ import {
 import { DesignerAssetController } from './browser/controllers/designer-asset-controller.js';
 import { DesignerCanvasRuntimeController } from './browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from './browser/controllers/designer-command-palette-controller.js';
+import { DesignerCoordinateEntryController } from './browser/controllers/designer-coordinate-entry-controller.js';
 import { DesignerDatasetController } from './browser/controllers/designer-dataset-controller.js';
 import { DesignerErrorConsoleController } from './browser/controllers/designer-error-console-controller.js';
 import { DesignerGestureController } from './browser/controllers/designer-gesture-controller.js';
@@ -546,7 +547,10 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#workbenchController.cancelTransientState();
       this.renderControls();
     },
-    onViewportChange: () => this.#workbenchController.renderCanvasPrecision(),
+    onViewportChange: () => {
+      this.#workbenchController.renderCanvasPrecision();
+      this.#coordinateEntryController.sync();
+    },
   });
   readonly #workbenchController = new DesignerWorkbenchController({
     getCanvas: () => this.#canvas,
@@ -575,6 +579,15 @@ export class BaseScreenDesignerElement extends ElementBase {
     getDocument: () => this.#session.document,
     renderKindIcon: (kind) =>
       designerIcon(kind === 'material' ? 'grid' : kind === 'layer' ? 'layers' : 'terminal'),
+  });
+  readonly #coordinateEntryController = new DesignerCoordinateEntryController({
+    getRoot: () => this.shadowRoot,
+    getDocument: () => this.#session.document,
+    getInteraction: () => this.#session.interaction,
+    getCatalog: () => this.#catalog,
+    executeTransaction: (transaction) => this.executeDesignerTransaction(transaction),
+    report: (result) => this.report(result),
+    focusViewport: () => this.#viewportController.focus(),
   });
   readonly #operationHost: DesignerElementOperationsHost = {
     getDocument: () => this.#session.document,
@@ -631,8 +644,20 @@ export class BaseScreenDesignerElement extends ElementBase {
     setActiveTool: (tool) => this.#viewportController.setActiveTool(tool),
     cancelGesture: () => this.cancelGesture(),
     canMutateSelection: () => this.#selectionActions.canMutate(),
+    canEditPosition: () => this.#coordinateEntryController.canOpen(),
+    canSelectLayer: (direction) => this.#layersController.canStepSelection(direction),
     canSetSelectionStatus: () => this.#selectionActions.canSetStatus(),
+    openCoordinateEntry: () => {
+      this.cancelGesture();
+      this.#workbenchController.cancelTransientState();
+      this.#commandPaletteController.close(false);
+      this.#menuController.closeMenus();
+      this.#menuController.closeContextMenu();
+      this.#menuController.closeHelpPanel();
+      this.#coordinateEntryController.open();
+    },
     deleteSelection: () => this.#selectionActions.delete(),
+    selectLayer: (direction) => this.#layersController.stepSelection(direction),
     nudgeSelection: (x, y) => this.#selectionActions.nudge(x, y),
     toggleSelectionStatus: (property, value) =>
       this.#selectionActions.toggleStatus(property, value),
@@ -661,6 +686,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#menuController.closeContextMenu();
       this.#menuController.closeHelpPanel();
       this.#commandPaletteController.close(false);
+      this.#coordinateEntryController.close(false);
     },
     // 空格抓手与键盘焦点解耦：鼠标悬停视窗即可激活临时抓手（无需先点击聚焦）。
     onWindowKeyDown: (event) => this.#viewportController.onWindowKeyDown(event),
@@ -685,6 +711,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     click: [
       (target) => this.#notificationController.dismiss(target as Element),
       (target) => this.#errorConsoleController.onClick(target as Element),
+      (target) => this.#coordinateEntryController.onClick(target),
       (target) => this.#menuController.onHelpClick(target as Element),
       (target) => this.#menuController.toggleMenuFromTarget(target as Element),
       () => {
@@ -762,6 +789,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       return false;
     },
     change: [
+      (target) => this.#coordinateEntryController.onChange(target),
       (target, event) => this.onImportChange(event),
       (target, event) => this.#layersController.onChange(event),
       (target) => this.#datasetController.onChange(target),
@@ -771,6 +799,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       },
     ],
     input: [
+      (target) => this.#coordinateEntryController.onInput(target),
       (target) => this.#commandPaletteController.onInput(target as Element),
       (target) => this.#assetController.onInput(target),
       (target) => this.#datasetController.onInput(target),
@@ -840,7 +869,10 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#workbenchController.onDoubleClick(mouseEvent);
       return true;
     },
-    focusOut: (target, event) => this.#layersController.onFocusOut(event as FocusEvent),
+    focusOut: (target, event) => {
+      this.#coordinateEntryController.onFocusOut(event as FocusEvent);
+      return this.#layersController.onFocusOut(event as FocusEvent);
+    },
     keyDownCapture: (target, event) => {
       const keyboardEvent = event as KeyboardEvent;
       if (keyboardEvent.key === '/' && this.#commandPaletteController.onKeyDown(keyboardEvent)) {
@@ -861,6 +893,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       return false;
     },
     keyDown: [
+      (target, event) => this.#coordinateEntryController.onKeyDown(event as KeyboardEvent),
       (target, event) => this.#commandPaletteController.onKeyDown(event as KeyboardEvent),
       (target, event) => this.#errorConsoleController.onKeyDown(event as KeyboardEvent),
       (target, event) => {
@@ -1430,6 +1463,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   // 表面监听的断开/重挂与 window 守卫对称：disconnect 时成对移除各控制器监听，
   // 重连（未 unload，initialize 早退）时幂等重挂。connect 各自带同元素守卫，首连不重复。
   private disconnectSurfaces(): void {
+    this.#coordinateEntryController.disconnect();
     this.#workbenchController.disconnect();
     this.#gestureController.disconnect();
     this.#viewportController.disconnect();
@@ -1479,6 +1513,7 @@ export class BaseScreenDesignerElement extends ElementBase {
       this.#gestureController.connectViewport(viewport);
       this.#viewportController.connect(viewport, canvas);
     }
+    this.#coordinateEntryController.connect();
     this.#surfaceRouter.connect(shadow, this.#surfaceBindings);
     this.#selection = shadow.querySelector<HTMLDivElement>('[data-selection]') ?? undefined;
     this.#properties = shadow.querySelector<HTMLDivElement>('[data-properties]') ?? undefined;
@@ -2215,6 +2250,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#gestureController.connect(this.#canvas);
     this.#gestureController.connectViewport(this.#viewportElement);
     this.#viewportController.connect(this.#viewportElement, this.#canvas);
+    this.#coordinateEntryController.connect();
     this.#surfaceRouter.connect(shadow, this.#surfaceBindings);
     this.connectWindowGuards();
     if (this.#session.document !== undefined) {
@@ -2232,15 +2268,28 @@ export class BaseScreenDesignerElement extends ElementBase {
       return { ok: true, value: undefined, diagnostics: [] };
     }
     const rendered = this.#canvasRuntimeController.render(document);
-    if (rendered.ok) this.#previewController.sync(document);
+    if (rendered.ok) {
+      this.syncCanvasFrameSize(document);
+      this.#previewController.sync(document);
+    }
     return rendered.ok
       ? { ok: true, value: undefined, diagnostics: rendered.diagnostics }
       : { ok: false, diagnostics: rendered.diagnostics };
   }
 
+  private syncCanvasFrameSize(document: ScreenDocument): void {
+    const canvas = this.#canvas;
+    if (canvas === undefined) return;
+    const width = `${document.canvas.width}px`;
+    const height = `${document.canvas.height}px`;
+    if (canvas.style.width !== width) canvas.style.width = width;
+    if (canvas.style.height !== height) canvas.style.height = height;
+  }
+
   private renderInteraction(): void {
     this.#panelController.captureInspectorGroupPreferences(this.shadowRoot);
     this.renderSelection();
+    this.#coordinateEntryController.sync();
     this.renderProperties();
     this.renderInspectorInteraction();
     this.renderLayers();
@@ -2345,10 +2394,12 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   private createRenderer(): void {
     if (this.#canvas === undefined || this.#catalog === undefined) return;
+    const content = this.#canvas.querySelector<HTMLDivElement>('[data-canvas-content]');
+    if (content === null) return;
     this.#renderer = createBaseScreenRenderer({
-      // 设计态不裁剪画布边界：画布外的组件保持可见、可点击/拖拽（渲染器在 design
-      // 模式不设置 overflow；查看器/最终屏幕才按画布尺寸裁剪）。
-      root: this.#canvas,
+      // Renderer 只挂载到内容层：内容层按 canonical 画布边界裁剪，外层 canvas
+      // 继续承载选区、变换手柄和参考线等作者覆盖层。
+      root: content,
       catalog: this.#catalog,
       mode: 'design',
       // 状态栏「事件」开关是交互模式的唯一来源：渲染器重建后开关状态保持。
@@ -2686,6 +2737,7 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   private resetSessionSurfaces(): void {
     this.cancelGesture();
+    this.#coordinateEntryController.close(false);
     this.#workbenchController.clearGuides();
     this.#layersController.clearSessionState();
     this.#panelController.clearClipboard();

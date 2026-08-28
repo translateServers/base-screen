@@ -345,6 +345,27 @@ function rendererWithRoot(): {
 }
 
 describe('BaseScreenRenderer material presentation styles', () => {
+  it('clips preview and viewer roots while preserving the design root overflow policy', () => {
+    const design = rendererWithRoot();
+    design.root.style.overflow = 'visible';
+    expect(design.renderer.render(document([component('design', 0)])).ok).toBe(true);
+    expect(design.root.style.overflow).toBe('visible');
+
+    for (const mode of ['preview', 'viewer'] as const) {
+      const root = new FakeRoot();
+      const renderer = createBaseScreenRenderer({
+        root: root as unknown as HTMLElement,
+        catalog: createCatalog(),
+        mode,
+        interactive: false,
+        onMaterialEvent: undefined,
+        resourcePort: undefined,
+      });
+      expect(renderer.render(document([component(mode, 0)])).ok).toBe(true);
+      expect(root.style.overflow).toBe('hidden');
+    }
+  });
+
   it('applies flip transforms and clamps material opacity during render', () => {
     const { root, renderer } = rendererWithRoot();
     const result = renderer.render(
