@@ -28,6 +28,7 @@ export interface DesignerStaticDataView {
   readonly pasteDraft: string;
   readonly firstRowIsHeader: boolean;
   readonly roles: readonly BaseScreenMaterialDataBindingRole[];
+  readonly scrollScope?: string;
 }
 
 export function renderDesignerStaticData(view: DesignerStaticDataView): HTMLElement {
@@ -73,7 +74,10 @@ export function renderDesignerStaticData(view: DesignerStaticDataView): HTMLElem
     const roles = ownerDocument.createElement('small');
     roles.textContent = bindingSummary(view, parsed.value);
     summary.append(text, roles);
-    section.append(summary, renderRows(ownerDocument, parsed.value, view.page, view.pageSize));
+    section.append(
+      summary,
+      renderRows(ownerDocument, parsed.value, view.page, view.pageSize, view.scrollScope),
+    );
   }
   section.appendChild(renderApply(ownerDocument));
   return section;
@@ -126,6 +130,9 @@ export function renderDesignerStaticDataPreview(view: DesignerStaticDataView): H
   header.append(title, meta);
   const code = view.ownerDocument.createElement('pre');
   code.dataset.staticPreviewValue = 'true';
+  if (view.scrollScope !== undefined) {
+    code.dataset.designerScrollScope = `static-preview:${view.scrollScope}`;
+  }
   code.textContent = JSON.stringify(
     parsed.ok ? parsed.value.rows.slice(0, 8) : view.value,
     null,
@@ -203,6 +210,9 @@ function renderStaticWorkbench(
   );
   const content = ownerDocument.createElement('div');
   content.className = 'designer-static-data-content';
+  if (view.scrollScope !== undefined) {
+    content.dataset.designerScrollScope = `static-workbench-editor:${view.scrollScope}`;
+  }
   if (view.tab === 'advanced' || dataset === undefined) {
     content.appendChild(renderAdvancedInput(ownerDocument, view.jsonDraft));
   } else {
@@ -210,7 +220,7 @@ function renderStaticWorkbench(
       renderPaste(ownerDocument, view),
       renderFields(ownerDocument, dataset),
       renderBindings(ownerDocument, view, dataset),
-      renderRows(ownerDocument, dataset, view.page, view.pageSize),
+      renderRows(ownerDocument, dataset, view.page, view.pageSize, view.scrollScope),
     );
   }
   const navigation = ownerDocument.createElement('nav');
@@ -229,6 +239,9 @@ function renderStaticWorkbench(
   }
   const preview = ownerDocument.createElement('aside');
   preview.className = 'designer-data-workbench-preview';
+  if (view.scrollScope !== undefined) {
+    preview.dataset.designerScrollScope = `static-workbench-preview:${view.scrollScope}`;
+  }
   const previewTitle = ownerDocument.createElement('h4');
   previewTitle.textContent = DESIGNER_UI_TEXT.dataSource.previewConsumer;
   const previewMeta = ownerDocument.createElement('p');
@@ -240,6 +253,9 @@ function renderStaticWorkbench(
           dataset.rows.length,
         );
   const previewCode = ownerDocument.createElement('pre');
+  if (view.scrollScope !== undefined) {
+    previewCode.dataset.designerScrollScope = `static-workbench-preview-code:${view.scrollScope}`;
+  }
   previewCode.textContent = JSON.stringify(dataset?.rows.slice(0, 8) ?? view.value, null, 2);
   preview.append(previewTitle, previewMeta, previewCode);
   const body = ownerDocument.createElement('div');
@@ -432,9 +448,13 @@ function renderRows(
   dataset: ScreenTabularDataset,
   page: number,
   pageSize: number,
+  scrollScope?: string,
 ): HTMLElement {
   const section = ownerDocument.createElement('section');
   section.className = 'designer-static-rows';
+  if (scrollScope !== undefined) {
+    section.dataset.designerScrollScope = `static-rows:${scrollScope}`;
+  }
   const heading = ownerDocument.createElement('h4');
   heading.textContent = DESIGNER_UI_TEXT.dataSource.staticRows;
   const table = ownerDocument.createElement('table');

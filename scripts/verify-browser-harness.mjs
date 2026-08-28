@@ -4290,6 +4290,67 @@ async function assertAuthoringShortcutsAndIsolation(page, designer) {
   if (hueAfterPlaneDrag === undefined || hueAfterPlaneDrag < 340) {
     throw new Error(`BROWSER_HARNESS_FILL_COLOR_HUE_STUCK_AFTER_PLANE_DRAG:${hueAfterPlaneDrag}`);
   }
+  const fillPickerScrollBefore = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const popover = root.querySelector(
+      '[data-inspector-pane="appearance"] .designer-color-popover:not([hidden])',
+    );
+    const plane = popover?.querySelector('.designer-fill-color-plane');
+    if (!(popover instanceof HTMLElement) || !(plane instanceof HTMLElement)) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_SCROLL_CONTROLS_MISSING');
+    }
+    const constraint = document.createElement('style');
+    constraint.dataset.fillColorScrollConstraint = '';
+    constraint.textContent = '.designer-color-popover { max-height: 198px !important; }';
+    root.appendChild(constraint);
+    popover.scrollTop = Math.min(80, popover.scrollHeight - popover.clientHeight);
+    const popoverBox = popover.getBoundingClientRect();
+    const planeBox = plane.getBoundingClientRect();
+    const visibleTop = Math.max(popoverBox.top + 2, planeBox.top + 2);
+    const visibleBottom = Math.min(popoverBox.bottom - 2, planeBox.bottom - 2);
+    return {
+      id: popover.id,
+      scrollTop: popover.scrollTop,
+      point: {
+        x: planeBox.left + planeBox.width * 0.72,
+        y: visibleTop + (visibleBottom - visibleTop) / 2,
+      },
+    };
+  });
+  await page.mouse.move(fillPickerScrollBefore.point.x, fillPickerScrollBefore.point.y);
+  await page.mouse.down();
+  await page.mouse.move(fillPickerScrollBefore.point.x - 18, fillPickerScrollBefore.point.y + 8, {
+    steps: 3,
+  });
+  await page.mouse.up();
+  await page.waitForFunction((previousId) => {
+    const popover = window.baseScreenHarness.designer.shadowRoot?.querySelector(
+      '[data-inspector-pane="appearance"] .designer-color-popover:not([hidden])',
+    );
+    return popover instanceof HTMLElement && popover.id !== previousId;
+  }, fillPickerScrollBefore.id);
+  const fillPickerScrollAfter = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const popover = root.querySelector(
+      '[data-inspector-pane="appearance"] .designer-color-popover:not([hidden])',
+    );
+    if (!(popover instanceof HTMLElement)) {
+      throw new Error('BROWSER_HARNESS_FILL_COLOR_SCROLL_POPOVER_MISSING');
+    }
+    const result = { id: popover.id, scrollTop: popover.scrollTop };
+    popover.scrollTop = 0;
+    root.querySelector('[data-fill-color-scroll-constraint]')?.remove();
+    return result;
+  });
+  if (
+    fillPickerScrollBefore.scrollTop <= 0 ||
+    fillPickerScrollAfter.id === fillPickerScrollBefore.id ||
+    Math.abs(fillPickerScrollAfter.scrollTop - fillPickerScrollBefore.scrollTop) > 1
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_FILL_COLOR_SCROLL_STABILITY_FAILED:${JSON.stringify({ fillPickerScrollBefore, fillPickerScrollAfter })}`,
+    );
+  }
   await fillPalette.locator('[data-fill-color-quick="#39c5bb"]').click();
   await page.waitForFunction(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;

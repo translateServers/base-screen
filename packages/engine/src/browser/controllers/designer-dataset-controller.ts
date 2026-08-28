@@ -76,6 +76,7 @@ export interface DesignerDatasetControllerCallbacks {
   ) => void;
   readonly copyText?: (value: string) => Promise<boolean>;
   readonly getWorkbenchHost?: () => HTMLElement | undefined;
+  readonly preserveScrollContinuity?: (render: () => void) => void;
 }
 
 /** Owns the host dataset catalog and the data-source authoring surface. */
@@ -1333,6 +1334,15 @@ export class DesignerDatasetController {
   }
 
   private renderSurface(): void {
+    const preserve = this.callbacks.preserveScrollContinuity;
+    if (preserve !== undefined) {
+      preserve(() => this.renderSurfaceContent());
+      return;
+    }
+    this.renderSurfaceContent();
+  }
+
+  private renderSurfaceContent(): void {
     const panel = this.#panel;
     if (panel === undefined) return;
     const options = this.panelOptions(panel);

@@ -952,6 +952,9 @@ describe('compact palette layout', () => {
       'title:style:color',
     ).element as unknown as FakeElement;
     byAction(first, 'toggle')!.dispatchEvent(new Event('click', { bubbles: true }));
+    expect(byDataset(first, 'colorPalettePopover')?.dataset.designerScrollScope).toBe(
+      'color-palette:title:style:color',
+    );
 
     const rerendered = createDesignerColorPalette(
       ownerDocument as unknown as Document,

@@ -38,18 +38,10 @@ export interface DesignerDataSourcePanelSurface {
   readonly feedback: HTMLElement;
 }
 
-const dataSourcePanelScrollScopes = new WeakMap<HTMLElement, string>();
-
 export function renderDesignerDataSourcePanel(
   options: DesignerDataSourcePanelOptions,
 ): DesignerDataSourcePanelSurface {
   const { panel } = options;
-  const previousContent = panel.querySelector<HTMLElement>('.designer-datav-data-flow-content');
-  const previousScroll =
-    previousContent === null
-      ? undefined
-      : { left: previousContent.scrollLeft, top: previousContent.scrollTop };
-  const preservesScroll = dataSourcePanelScrollScopes.get(panel) === options.scrollScope;
   panel.replaceChildren();
   const section = panel.ownerDocument.createElement('section');
   section.className = 'designer-data-source-panel';
@@ -70,11 +62,6 @@ export function renderDesignerDataSourcePanel(
   const actions = host.querySelector<HTMLElement>('.designer-dataset-actions');
   if (actions !== null) host.appendChild(actions);
   panel.appendChild(section);
-  dataSourcePanelScrollScopes.set(panel, options.scrollScope);
-  if (content !== null && previousScroll !== undefined && preservesScroll) {
-    content.scrollLeft = previousScroll.left;
-    content.scrollTop = previousScroll.top;
-  }
   return { feedback };
 }
 
@@ -185,6 +172,7 @@ export function renderDesignerDatasetWorkbench(
 
   const editor = ownerDocument.createElement('main');
   editor.className = 'designer-static-data-content';
+  editor.dataset.designerScrollScope = `data-workbench-editor:${options.scrollScope}`;
   editor.appendChild(renderHostConnection(options));
   if (options.catalogOpen || options.descriptor === undefined) {
     editor.appendChild(renderDatasetCatalog(options));
@@ -282,6 +270,7 @@ function staticDataView(options: DesignerDataSourcePanelOptions): DesignerStatic
     pasteDraft: options.staticPasteDraft,
     firstRowIsHeader: options.staticFirstRowIsHeader,
     roles: options.roles,
+    scrollScope: options.scrollScope,
   };
 }
 
@@ -342,6 +331,7 @@ function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): HTMLElem
 
   const content = ownerDocument.createElement('div');
   content.className = 'designer-datav-data-flow-content';
+  content.dataset.designerScrollScope = `data-source:${options.scrollScope}`;
   renderContinuousDataFlow(content, options);
 
   section.append(progress, content);
@@ -787,6 +777,7 @@ function renderDatasetPreview(
 ): HTMLElement {
   const preview = ownerDocument.createElement('aside');
   preview.className = 'designer-data-workbench-preview';
+  preview.dataset.designerScrollScope = `data-workbench-preview:${options.scrollScope}:${options.preview.tab}`;
   preview.dataset.workbenchSection = 'preview';
   preview.dataset.inspectorSearchSection = 'true';
   preview.dataset.inspectorSearchText = [
@@ -827,12 +818,16 @@ function renderDatasetPreview(
     content.appendChild(previewMessage(ownerDocument, DESIGNER_UI_TEXT.dataSource.previewLoading));
   } else if (options.preview.tab === 'request') {
     content.appendChild(
-      renderJsonPreview(ownerDocument, {
-        resourceType: options.draft?.resourceType,
-        resourceId: options.draft?.resourceId,
-        params: options.draft?.params,
-        fields: options.draft?.fields,
-      }),
+      renderJsonPreview(
+        ownerDocument,
+        {
+          resourceType: options.draft?.resourceType,
+          resourceId: options.draft?.resourceId,
+          params: options.draft?.params,
+          fields: options.draft?.fields,
+        },
+        `data-workbench-preview-json:${options.scrollScope}:${options.preview.tab}`,
+      ),
     );
   } else {
     const value =
@@ -843,7 +838,11 @@ function renderDatasetPreview(
             ownerDocument,
             options.preview.message || DESIGNER_UI_TEXT.dataSource.previewIdle,
           )
-        : renderPreviewValue(ownerDocument, value),
+        : renderPreviewValue(
+            ownerDocument,
+            value,
+            `data-workbench-preview-value:${options.scrollScope}:${options.preview.tab}`,
+          ),
     );
   }
   preview.append(header, tabs, content);
@@ -872,11 +871,13 @@ function previewMessage(ownerDocument: Document, message: string): HTMLElement {
 function renderPreviewValue(
   ownerDocument: Document,
   value: import('@base-screen/contracts').ScreenJsonValue,
+  scrollScope: string,
 ): HTMLElement {
   const rows = previewRows(value);
-  if (rows === undefined) return renderJsonPreview(ownerDocument, value);
+  if (rows === undefined) return renderJsonPreview(ownerDocument, value, scrollScope);
   const wrap = ownerDocument.createElement('div');
   wrap.className = 'designer-data-preview-table-wrap';
+  wrap.dataset.designerScrollScope = scrollScope;
   const table = ownerDocument.createElement('table');
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))].slice(0, 12);
   const head = ownerDocument.createElement('thead');
@@ -922,8 +923,13 @@ function isPreviewObject(
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function renderJsonPreview(ownerDocument: Document, value: unknown): HTMLElement {
+function renderJsonPreview(
+  ownerDocument: Document,
+  value: unknown,
+  scrollScope: string,
+): HTMLElement {
   const code = ownerDocument.createElement('pre');
+  code.dataset.designerScrollScope = scrollScope;
   code.textContent = JSON.stringify(value, null, 2);
   return code;
 }

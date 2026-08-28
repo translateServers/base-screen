@@ -79,6 +79,7 @@ import { DesignerPanelController } from './browser/controllers/designer-panel-co
 import { DesignerPreviewController } from './browser/controllers/designer-preview-controller.js';
 import { DesignerProjectFeedbackController } from './browser/controllers/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from './browser/controllers/designer-project-workspace-controller.js';
+import { DesignerScrollContinuityController } from './browser/controllers/designer-scroll-continuity-controller.js';
 import { DesignerTextEditController } from './browser/controllers/designer-text-edit-controller.js';
 import { DesignerVariablesController } from './browser/controllers/designer-variables-controller.js';
 import { DesignerViewportController } from './browser/controllers/designer-viewport-controller.js';
@@ -268,6 +269,7 @@ export class BaseScreenDesignerElement extends ElementBase {
   #documentGeneration = 0;
   readonly #notificationController = new DesignerNotificationController();
   readonly #errorConsoleController = new DesignerErrorConsoleController();
+  readonly #scrollContinuityController = new DesignerScrollContinuityController();
   readonly #canvasRuntimeController = new DesignerCanvasRuntimeController({
     getRenderer: () => this.#renderer,
     getVariablePort: () => this.#variablePort,
@@ -449,6 +451,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     },
     getWorkbenchHost: () =>
       this.shadowRoot?.querySelector<HTMLElement>('[data-data-workbench]') ?? undefined,
+    preserveScrollContinuity: (render) =>
+      this.#scrollContinuityController.preserve(this.shadowRoot, render),
   });
   readonly #importController = new DesignerImportController({
     replaceDocument: (document) => this.replaceDocument(document),
@@ -1368,6 +1372,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#viewportController.disconnect();
     this.#surfaceRouter.disconnect();
     this.#panelController.dispose();
+    this.#scrollContinuityController.dispose();
     // 结束进行中的画布文本编辑：避免拆卸后物料 visibility 残留与 overlay 监听滞留。
     this.#textEditController.disconnect();
     // 关闭菜单/上下文菜单/帮助面板：帮助面板的返回焦点引用随之释放。
@@ -2239,12 +2244,14 @@ export class BaseScreenDesignerElement extends ElementBase {
   }
 
   private renderProperties(): void {
-    this.#panelController.render(
-      this.#properties,
-      this.#datasetCatalogPort === undefined ? this.#dataPanel : undefined,
-    );
-    if (this.#datasetCatalogPort !== undefined) this.#datasetController.render(this.#dataPanel);
-    this.#assetController.render(this.#properties);
+    this.#scrollContinuityController.preserve(this.shadowRoot, () => {
+      this.#panelController.render(
+        this.#properties,
+        this.#datasetCatalogPort === undefined ? this.#dataPanel : undefined,
+      );
+      if (this.#datasetCatalogPort !== undefined) this.#datasetController.render(this.#dataPanel);
+      this.#assetController.render(this.#properties);
+    });
   }
 
   private renderInspectorInteraction(): void {

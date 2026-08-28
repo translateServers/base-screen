@@ -391,6 +391,9 @@ export function createDesignerColorPalette(
   popover.id = popoverId;
   popover.className = 'designer-color-popover';
   popover.dataset.colorPalettePopover = '';
+  if (fieldKey !== undefined) {
+    popover.dataset.designerScrollScope = `color-palette:${fieldKey}`;
+  }
   popover.hidden = true;
   popover.setAttribute('role', 'dialog');
   popover.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.colorPickerTitle);
