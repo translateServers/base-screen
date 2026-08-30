@@ -4,10 +4,10 @@
 
 ```ts
 
-import { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
-import { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { BaseScreenMaterialMode } from '@base-screen/plugin-core';
-import { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
+import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialMode } from '@base-screen/plugin-core';
+import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { ScreenBlueprintHostActionPort } from '@base-screen/contracts';
 import type { ScreenBlueprintRuntimePort } from '@base-screen/contracts';
 import { ScreenBlueprintVisibilityEffect } from '@base-screen/core';

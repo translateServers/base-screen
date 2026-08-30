@@ -9,8 +9,6 @@
     "packages/engine/src/common/project/project-controller.ts": 575,
     "packages/engine/src/common/ui-text/designer-ui-text.ts": 786,
     "packages/material/src/echarts.ts": 931,
-    "packages/renderer/src/renderer.ts": 1397,
-    "packages/renderer/src/viewer.ts": 693,
     "packages/renderer/tests/renderer.test.ts": 1854,
     "packages/renderer/tests/resource-state-machine.test.ts": 933,
     "scripts/verify-tarballs.mjs": 1100,
