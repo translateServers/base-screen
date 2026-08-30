@@ -1,7 +1,8 @@
 # DataV 高保真右侧检查器改造方案
 
 > 代码治理复核：2026-08-30
-> 当前状态：P0–P6 已完成并通过最终全仓与浏览器门禁
+> 当前状态：P0–P14 已完成，历史文件规模豁免已清零；`pnpm verify:m0` 与
+> `pnpm verify:browser` 已于 2026-08-30 通过
 
 ## 目标
 
@@ -104,6 +105,14 @@ Base Screen 以阿里云 DataV 7.0 官方文档和界面截图为视觉、内容
 | P4：手势状态机拆分 | 拖拽、变换、框选、创建与组编辑使用显式会话模块 | 已完成 |
 | P5：大型 DOM 构建器拆分 | 颜色面板与数据集 DOM 按模型、状态、视图和作者能力拆分 | 已完成 |
 | P6：验收脚本模块化 | 浏览器场景按领域拆分，并纳入独立 500 行规模门禁 | 已完成 |
+| P7：数据集控制器拆分 | 查询、草稿、预览、静态表格与宿主事件形成独立控制器 | 已完成 |
+| P8：Designer DOM 拆分 | 检查器与剩余大型 DOM 按页面、选择、descriptor、数据和物料职责拆分 | 已完成 |
+| P9：Engine 入口瘦身 | Custom Element 生命周期、作者桥、状态与公共方法移出发布入口 | 已完成 |
+| P10：渲染与物料治理 | renderer/viewer、manifest 校验、ECharts 与渲染测试按职责拆分 | 已完成 |
+| P11：Engine 余量治理 | 图层、画布辅助、操作契约与项目生命周期退出历史豁免 | 已完成 |
+| P12：契约校验治理 | Document 校验器与测试按领域拆分，保持失败关闭语义 | 已完成 |
+| P13：发布验证治理 | tarball 编排与消费者文件生成分离，并通过真实安装验收 | 已完成 |
+| P14：历史基线清零 | 最后一个根级测试聚合体拆分，文件规模基线不再包含例外 | 已完成 |
 
 ### P0：结构与防回退
 
@@ -180,25 +189,89 @@ Base Screen 以阿里云 DataV 7.0 官方文档和界面截图为视觉、内容
 - P3–P6 最终通过 `pnpm verify:m0` 与 `pnpm verify:browser`；公共 API、无副作用 Engine 导入、12 包
   tarball 消费者安装以及真实桌面/紧凑视口流程均保持通过。
 
-## 下一轮优化方案
+### P7：数据集作者流程拆分
 
-下一轮继续按风险和依赖方向消除历史规模基线，不新增产品范围：
+- `designer-dataset-controller.ts` 从 1585 行收敛为 153 行 facade；上下文、草稿、预览、surface、
+  静态表格和事件投影分别进入 `controllers/dataset/`。
+- deadline、取消、generation guard、目录选择、字段映射、测试响应与滚动同步仍由既有测试和浏览器
+  场景覆盖；DOM 不持有请求生命周期。
 
-1. **P7：数据集控制器状态拆分。** 将 1585 行 `designer-dataset-controller.ts` 按 catalog 查询、
-   草稿状态、测试请求、作者设置与宿主事件拆分；退出条件是 facade 与子控制器均不超过 400 行，
-   deadline、取消、generation guard 和失败关闭分支都有聚焦测试。
-2. **P8：检查器 DOM 装配治理。** 将 2516 行 `designer-panel-dom.ts` 按页面配置、批量概览、属性字段、
-   descriptor 和数据面板装配拆分，并治理 static-data、descriptor、menu 等剩余 DOM 基线；退出条件是
-   DOM 叶子不依赖 controller，事件只通过声明标记上浮，单模块不超过 500 行。
-3. **P9：Engine 公共入口瘦身。** 将 2862 行 `engine/src/index.ts` 中 Custom Element 生命周期、公共方法、
-   宿主 bridge 与注册编排拆为内部 mixin/适配模块，发布入口继续无副作用；退出条件是公共导出不变、
-   `check:api` 与 `check:engine-import` 通过，入口文件不再承担领域实现。
-4. **P10：渲染与物料契约治理。** 依次拆分 renderer、viewer、plugin-core descriptor/material 与官方
-   ECharts 物料的历史大文件；先冻结公开类型和跨包依赖，再按 viewer 渲染、资源状态机、编辑描述符、
-   物料 ABI 拆测试和实现，避免把 designer 能力下沉到 renderer。
+### P8：Designer DOM 目录治理
 
-每一阶段都先拆测试证据与最小接口，再迁移实现，随后立即运行包级 typecheck/测试、规模门禁和
-相关 browser 场景；阶段完成后直接进入下一阶段，直到约定批次全部通过最终门禁。
+- `designer-panel-dom.ts` 从 2516 行收敛为 24 行装配入口；页面配置、组件属性、多选、descriptor、
+  数据绑定与物料面板进入 `dom/panel/`，其余颜色、数据集、变量、图层和菜单也按模型/状态/视图拆分。
+- DOM 叶子继续只依赖 `common`、`ui` 或最小消费接口，不反向依赖 controller；交互通过稳定的
+  `data-*` 标记上浮给控制器。
+
+### P9：Engine 发布入口治理
+
+- `engine/src/index.ts` 从 2862 行收敛为 478 行；Custom Element options、状态、生命周期、作者桥、
+  公共方法和控制器装配进入 `designer-element/` 内部模块，单模块继续受 500 行门禁约束。
+- 公共导出保持不变，导入 `@base-screen/engine` 仍不注册元素、不访问存储；画布指针聚焦回归也加入
+  真实浏览器证据。
+
+### P10：renderer、plugin-core 与 material 治理
+
+- renderer 主实现从 1397 行降到 354 行，viewer 从 693 行降到 448 行；渲染候选、资源状态、物料
+  DOM、生命周期、Blueprint 与变量控制器各自独立，renderer 仍不感知 designer。
+- plugin-core 的 editor descriptor 从 1191 行降到 76 行 facade，material 校验从 1113 行降到
+  10 行 facade；schema、字段、条件、事件、面板与通用校验分别归位。
+- ECharts 官方物料拆成 schema、descriptor、manifest、definition、element 与数据适配模块；原 1854 行
+  renderer 测试聚合体拆为 presentation、data runtime、events、resilience、conditional style 与共享 fixture，
+  122 个用例保持通过。
+
+### P11：Engine 剩余历史豁免清理
+
+- 图层控制器按拖放会话与重命名/选择会话拆分，主控制器为 400 行；画布辅助把 ruler 和 snap candidate
+  数学下沉，主模块为 412 行。
+- 元素操作宿主契约独立成类型模块，操作注册主体为 448 行；项目控制器把 scheduler、诊断支持与 adapter
+  调用拆开，主控制器为 468 行。
+- 集中 UI 文案明确为 `ui-text-catalog` 权威纯数据源，使用独立 1000 行硬上限；浏览器内联可见文案禁令
+  没有放宽。至此 Engine 不再依赖历史文件规模豁免。
+
+### P12：Document 契约校验治理
+
+- `validate.ts` 从 913 行收敛为 156 行编排器；canvas、component、blueprint、variable 与诊断映射形成
+  独立校验模块，最大实现 343 行。
+- 未改变 fail-closed、严格字段、容量预算、引用校验或共享 base 快路径；原 1275 行测试拆成 4 个领域
+  文件，最大 410 行，54 个原用例和 contracts 全包 163 个用例保持通过。
+
+### P13：tarball 验收编排治理
+
+- `verify-tarballs.mjs` 从 1100 行降到 442 行，只保留依赖排序、打包、隔离安装和 smoke 编排；消费者
+  package、React/Vue/Vanilla 源文件及浏览器验证模板进入 664 行独立模块。
+- 仓库根目录和 tarball spec 作为显式参数注入，不保留隐式跨模块状态；12 包 publint/ATTW、临时消费者
+  安装及三类浏览器消费流程实际通过。
+
+### P14：历史文件规模基线清零
+
+- `host-skill-adoption.test.ts` 从 821 行降到 655 行，临时宿主、快照摘要与旧布局 fixture 下沉为
+  181 行共享模块，17 个迁移与失败恢复用例保持通过。
+- `scripts/file-size-baseline.json` 的 `exceptions` 现在为空；新增长文件只能通过职责拆分或新增明确的
+  纯数据/生成物类别解决，不能再借用历史豁免。
+
+## 下一轮优化方案（P15–P20）
+
+下一轮从“消除聚合文件”转向“持续证明 UI 质量与架构边界”，仍不扩大 Base Screen 产品范围：
+
+1. **P15：子层依赖自动化。** 把 `controllers/layers`、`dom/panel`、`designer-element`、renderer 运行时、
+   contract validators 的允许依赖编码进现有边界脚本；增加循环与反向导入测试。退出条件是目录语义可由
+   CI 证明，而不只依赖评审记忆。
+2. **P16：无抖动几何回归。** 在 1024 × 640 和桌面视口中记录 hover、focus、选择、主题、数据刷新、
+   面板折叠前后的关键 bounding box 与滚动轨道；覆盖字体/图片延迟和 overlay 打开关闭。退出条件是几何
+   变化仅来自显式状态或动画，稳定状态零意外位移。
+3. **P17：可访问性工作流矩阵。** 覆盖功能轨、图层树、检查器、颜色面板、数据步骤与命令面板的 Tab
+   顺序、焦点恢复、ARIA 数值/关系、高对比和减少动画偏好；把鼠标场景逐项配对为键盘场景。
+4. **P18：大文档性能预算。** 为高组件数、深图层、长物料目录和连续数据刷新建立可重复 benchmark，记录
+   render/mutation 次数、长任务和内存回收基线，再以实测值建立 ratchet；不在 Engine 引入持久缓存或后台
+   队列。
+5. **P19：样式与 Token 收敛。** 审计重复色值、间距、层级和 z-index，补齐稳定滚动轨道与 overlay 层级
+   清单；保持每个装配域唯一入口和 style node 原子更新。
+6. **P20：测试目标线治理。** 继续把 500–800 行测试按状态机/失败分支拆分，fixture 只暴露最小场景 API；
+   测试聚焦自定义校验、事务、取消与状态转换，不增加重复框架默认行为的断言。
+
+每一阶段先冻结可观察行为和最小接口，再迁移实现；阶段内使用聚焦测试，阶段退出时运行
+`pnpm verify:fast`，涉及视觉/交互时追加 `pnpm verify:browser`，交付批次最终运行 `pnpm verify:m0`。
 
 ## 验收原则
 

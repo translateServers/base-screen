@@ -17,7 +17,7 @@
 
 | 文档 | 状态 | 关联范围 |
 | --- | --- | --- |
-| [DataV 高保真右侧检查器与代码治理](./datav-inspired-designer-uiux/plan.md) | P0/P1/P2 已完成 | Designer 样式、Workbench 结构、稳定交互、可访问性与宿主边界验收 |
+| [DataV 高保真右侧检查器与代码治理](./datav-inspired-designer-uiux/plan.md) | P0–P14 已完成，P15–P20 已规划 | Designer UI/UX、目录边界、运行时拆分、零历史尺寸豁免与持续质量门禁 |
 
 ## 已归档
 
