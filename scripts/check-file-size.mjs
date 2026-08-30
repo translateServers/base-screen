@@ -21,6 +21,9 @@ export function fileSizePolicy(filePath) {
   if (!TRACKED_EXTENSION.test(normalized) || normalized.startsWith(VENDORED_SOURCE)) {
     return undefined;
   }
+  if (/^scripts\/browser-harness\/.*\.mjs$/.test(normalized)) {
+    return { category: 'browser-harness', limit: 500 };
+  }
   if (/^scripts\/verify-.*\.mjs$/.test(normalized)) {
     return { category: 'verification', limit: 800 };
   }

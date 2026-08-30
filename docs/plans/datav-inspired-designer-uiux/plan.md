@@ -1,7 +1,7 @@
 # DataV 高保真右侧检查器改造方案
 
 > 代码治理复核：2026-08-30
-> 当前状态：P0、P1、P2 已完成并通过最终门禁
+> 当前状态：P0–P6 已完成并通过最终全仓与浏览器门禁
 
 ## 目标
 
@@ -100,6 +100,10 @@ Base Screen 以阿里云 DataV 7.0 官方文档和界面截图为视觉、内容
 | P0：结构与防回退 | 大型样式、控制器和测试完成职责拆分；规模与装配顺序进入自动门禁 | 已完成 |
 | P1：稳定交互与可访问性 | 焦点反馈不改变几何；面板分隔条支持键盘、数值 ARIA 与边界约束 | 已完成 |
 | P2：边界与真实环境验收 | 不把宿主编辑器收回 Engine；聚焦测试、浏览器 harness 与全仓门禁形成证据 | 已完成 |
+| P3：检查器编排拆分 | 面板控制器成为编排 facade；检查器、物料、属性和选择职责独立 | 已完成 |
+| P4：手势状态机拆分 | 拖拽、变换、框选、创建与组编辑使用显式会话模块 | 已完成 |
+| P5：大型 DOM 构建器拆分 | 颜色面板与数据集 DOM 按模型、状态、视图和作者能力拆分 | 已完成 |
+| P6：验收脚本模块化 | 浏览器场景按领域拆分，并纳入独立 500 行规模门禁 | 已完成 |
 
 ### P0：结构与防回退
 
@@ -141,21 +145,57 @@ Base Screen 以阿里云 DataV 7.0 官方文档和界面截图为视觉、内容
   焦点样式与真实浏览器宽度/ARIA 同步。最终交付以 `pnpm verify:m0` 与 `pnpm verify:browser`
   同时通过为完成条件；两项已于 2026-08-30 通过。
 
+### P3：检查器编排拆分
+
+- `designer-panel-controller.ts` 从 1461 行收敛为 147 行 facade；回调契约、检查器导航、物料目录、
+  属性事务和选择编排分别进入 5 个模块，单个实现模块最大 400 行。
+- 原 2070 行测试拆为共享 fixture 与 rendering、drafts、materials、batch-rules 四类场景，最大测试
+  文件 550 行；原有 50 个面板控制器用例全部保留。
+- 事件委托顺序仍由 facade 唯一编排，descriptor 提交、失败关闭、批量事务和历史边界没有下沉到 DOM。
+
+### P4：手势状态机拆分
+
+- `designer-gesture-controller.ts` 从 1298 行收敛为 343 行；环境与回调契约之外，拖拽、变换、框选、
+  创建和组编辑分别形成显式会话模块，单模块最大 238 行。
+- 原 2718 行测试拆为共享 fixture 与 5 个场景文件，最大 608 行；48 个用例继续覆盖 pointer cancel、
+  capture 清理、实时预览、吸附、组编辑和双实例隔离。
+- 坐标换算仍由 viewport/common 纯逻辑提供，浏览器控制器只负责编排，没有形成反向依赖。
+
+### P5：颜色与数据集 DOM 拆分
+
+- `designer-color-palette-dom.ts` 从 1648 行收敛为 398 行 facade；模型、状态 DOM、主体 DOM 和值控件
+  分离，最大模块 497 行。原 1573 行测试拆为 fixture 与 3 类场景，最大 520 行，61 个用例通过。
+- `designer-dataset-dom.ts` 从 1068 行收敛为 247 行；数据流、作者动作、预览、目录和基础节点分别
+  下沉，新增模块最大 282 行，既有 460 行配置模块继续保持独立。
+- 可见文案仍只来自集中 UI 文案源；DOM 模块只构建节点、投影状态和声明事件标记，不依赖控制器。
+
+### P6：浏览器验收模块化
+
+- `verify-browser-harness.mjs` 从 8502 行收敛为 8 行入口；45 个模块分别覆盖视口初始化、桌面基线、
+  左侧面板、画布、作者工作流、数据集、Blueprint 宿主桥、ECharts descriptor 与事件系统。
+- 所有 browser harness 模块均不超过 500 行，当前最大文件 485 行；公共 Playwright 操作、稳定几何
+  和 overlay 约束集中为小型辅助模块，没有引入新依赖或改变验收顺序。
+- 文件规模门禁新增 `browser-harness` 类别与 500 行硬上限，并有根级单元测试锁定策略；原 8502 行
+  历史豁免可从规模基线移除。
+- P3–P6 最终通过 `pnpm verify:m0` 与 `pnpm verify:browser`；公共 API、无副作用 Engine 导入、12 包
+  tarball 消费者安装以及真实桌面/紧凑视口流程均保持通过。
+
 ## 下一轮优化方案
 
-下一轮保持公共契约与宿主边界不变，优先继续消除现有规模基线，而不是扩展产品范围：
+下一轮继续按风险和依赖方向消除历史规模基线，不新增产品范围：
 
-1. **P3：检查器编排拆分。** 将 `designer-panel-controller.ts` 按页面、单选、多选、descriptor
-   提交与反馈编排拆分；对应 2070 行测试先抽共享 fixture，再按状态场景拆分。退出条件是主控制器
-   低于 400 行、子控制器低于 400 行，历史与失败关闭测试不减少。
-2. **P4：手势状态机拆分。** 将 `designer-gesture-controller.ts` 的选择、移动、缩放、旋转与捕获清理
-   分成显式手势会话；坐标和吸附继续只依赖 viewport/common 纯逻辑。退出条件是 pointer cancel、
-   双实例隔离和单事务历史均有独立测试。
-3. **P5：大型 DOM 构建器拆分。** 优先治理颜色面板与数据集 DOM，把纯节点构建、值投影、事件标记
-   和提交编排分开；所有可见文案仍集中，DOM 层不得反向依赖 controller。
-4. **P6：验收脚本模块化。** 继续按 panel、canvas、dataset、Blueprint host bridge 等域拆分
-   browser harness；每个模块控制在 500 行内，并复用现有 Playwright 做关键尺寸、焦点顺序、
-   reduced-motion、forced-colors 与稳定几何检查，不引入新的视觉测试依赖。
+1. **P7：数据集控制器状态拆分。** 将 1585 行 `designer-dataset-controller.ts` 按 catalog 查询、
+   草稿状态、测试请求、作者设置与宿主事件拆分；退出条件是 facade 与子控制器均不超过 400 行，
+   deadline、取消、generation guard 和失败关闭分支都有聚焦测试。
+2. **P8：检查器 DOM 装配治理。** 将 2516 行 `designer-panel-dom.ts` 按页面配置、批量概览、属性字段、
+   descriptor 和数据面板装配拆分，并治理 static-data、descriptor、menu 等剩余 DOM 基线；退出条件是
+   DOM 叶子不依赖 controller，事件只通过声明标记上浮，单模块不超过 500 行。
+3. **P9：Engine 公共入口瘦身。** 将 2862 行 `engine/src/index.ts` 中 Custom Element 生命周期、公共方法、
+   宿主 bridge 与注册编排拆为内部 mixin/适配模块，发布入口继续无副作用；退出条件是公共导出不变、
+   `check:api` 与 `check:engine-import` 通过，入口文件不再承担领域实现。
+4. **P10：渲染与物料契约治理。** 依次拆分 renderer、viewer、plugin-core descriptor/material 与官方
+   ECharts 物料的历史大文件；先冻结公开类型和跨包依赖，再按 viewer 渲染、资源状态机、编辑描述符、
+   物料 ABI 拆测试和实现，避免把 designer 能力下沉到 renderer。
 
 每一阶段都先拆测试证据与最小接口，再迁移实现，随后立即运行包级 typecheck/测试、规模门禁和
 相关 browser 场景；阶段完成后直接进入下一阶段，直到约定批次全部通过最终门禁。
