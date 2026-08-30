@@ -5,7 +5,7 @@
 ```ts
 
 import { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
-import { BaseScreenMaterialEditorDescriptor } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialEditorDescriptor } from '@base-screen/plugin-core';
 import { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
 import { BaseScreenMaterialTabularDataAdapter } from '@base-screen/plugin-core';
