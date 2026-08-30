@@ -6,7 +6,7 @@
 > 映射：[test-matrix.md](./test-matrix.md)
 
 - [x] Task 1：`common/events/` 纯逻辑层（R2、R7）。
-  - [x] 新增 `engine/common/events/` 叶子子层：chord 规范化 v2（修饰键归一 + IME 守卫 + AltGr 守卫 + repeat 分类）。
+  - [x] 新增 `engine/common/events/` 叶子子层：增强 chord 规范化（修饰键归一 + IME 守卫 + AltGr 守卫 + repeat 分类）。
   - [x] 黑名单表：全目标（无条件 F5/Ctrl+R/Alt；条件 Ctrl+S/0/=/±）、非可编辑（无条件 Ctrl+W/T/N/P/J/Alt+←/→；条件 Ctrl+D/H/K/L/F）与 Firefox 快速查找条目。
   - [x] 上下文裁决：editable / 手势激活 / repeat 分类，输出"阻止默认 / 执行命令 / 放行"三态。
   - [x] operation 定义新增 `repeatable` 声明并接线（delete、nudge 系列为 true）。

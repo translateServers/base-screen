@@ -3,7 +3,7 @@
 > 状态：部分已取代（决策 4、5、7、8 及布局归属由 [ADR-0063](./ADR-0063-designer-blueprint-workbench-shell.md) 取代）
 > 日期：2026-08-24
 > 关联：[ADR-0013](./ADR-0013-core-canonical-blueprint-mutation.md)、[ADR-0026](./ADR-0026-designer-event-blueprint-authoring.md)、[ADR-0028](./ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
-> 增量规格：[Document Blueprint Host Bridge](../specs/document-blueprint-host-bridge/spec.md)
+> 增量规格：[Document Blueprint Host Bridge](../specs/archive/document-blueprint-host-bridge/spec.md)
 
 ## 背景
 

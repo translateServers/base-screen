@@ -3,7 +3,7 @@
 > 状态：已接受
 > 日期：2026-08-29
 > 取代范围：[ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) 的决策 4、5、7、8，以及“图布局不进入文档”的表述
-> 规格：[Designer Blueprint Workbench](../specs/designer-blueprint-workbench/spec.md)
+> 规格：[Designer Blueprint Workbench](../specs/archive/designer-blueprint-workbench/spec.md)
 
 ## 背景
 

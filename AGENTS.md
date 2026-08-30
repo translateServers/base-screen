@@ -5,7 +5,7 @@
 - 使用 Node `22.23.2`（见 `.node-version`）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
 - CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`。它依次运行 `format`（会写入文件）、`format:check`、`lint`、`typecheck`、`test`、`build`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
 - 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/tests/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
-- `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行 `scripts/check-boundaries.mjs`；`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
+- `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界、文件规模与文档治理检查；`pnpm check:docs` 可单独检查 Markdown 相对链接、ADR/Spec/Plan 索引、完成 Spec 归档和禁用版本命名。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
 - `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。门禁失败排查见 `docs/troubleshooting/verify-m0-troubleshooting.md`。
 - 手动验证用示例（workspace 成员）：`pnpm dev:browser-harness`、`pnpm dev:playground`、`pnpm dev:vue-harness` 起 Vite dev server；`verify:browser`、`verify:playground`、`verify:vue-harness`、`verify:runtime` 是对应的 Playwright 验证脚本。
 
@@ -13,6 +13,7 @@
 
 - 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `scripts/check-packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`react`、`vue`、`sdk` 和 `testing`。
 - 新增包、放宽包清单或改变跨包导出时，必须更新包及边界检查。仅当该变更改变长期架构决策、包依赖/所有权或公共兼容策略时，才新增或更新 ADR；只有跨多个独立交付阶段、需要迁移或回滚方案，或用户明确要求时，才创建 Spec。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API。
+- 文档治理以 `docs/README.md` 为入口、`docs/baseline/` 为当前能力依据。活动 ADR、Spec 与 Plan 必须登记到各自索引；Spec 的 Tasks/Checklist 全部完成或被后继依据取代时，必须在同一交付批次移入 `docs/specs/archive/` 并更新 Baseline、Roadmap 和引用。活动计划完成后同样移入 `docs/plans/archive/`。归档正文保留历史证据，不作为新实现授权。
 - 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`scripts/check-boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`scripts` 或 Nebula 的导入、被禁止的依赖图边，以及对 `testing` 的生产依赖。
 - 依赖白名单编码在 `scripts/check-boundaries.mjs` 中；只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖。新增依赖时，必须同时更新该白名单和包清单。
 - `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。

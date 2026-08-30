@@ -1,6 +1,6 @@
 # Moveable 逻辑层移植验证计划
 
-> 状态：完成（Day 1–4 全部落地，V1–V12 验证矩阵通过）
+> 状态：完成（Day 1–4 全部落地，G1–G12 验证矩阵通过）
 > 日期：2026-08-06
 > 依据：[ADR-0020](../../../decisions/ADR-0020-designer-canvas-interaction-pilot.md)、[Designer 依赖引入计划](../designer-dependency-introduction/implementation-plan.md)、[Designer Canvas Precision Spec](../../../specs/archive/designer-canvas-precision/spec.md)
 
@@ -20,7 +20,7 @@
 3. 合入 `engine/src/common/vendor/`，通过 Gate 1（无 DOM lib 编译）、子层方向、boundary、lint/typecheck/test。
 4. 行为等价测试：吸附/滞后/阈值/网格/旋转数学与上游推导数据一致。
 5. 渲染层接线：控制框、参考线、距离标签用自研 DOM，视觉维持 Nebula 对齐。
-6. V1–V12 验证矩阵全通过，`pnpm verify:m0` 通过。
+6. G1–G12 验证矩阵全通过，`pnpm verify:m0` 通过。
 
 ## 3. 移植清单
 
@@ -77,22 +77,22 @@ packages/engine/src/browser/                 # 渲染与接线（自研，不动
 - 适配规则：所有环境能力（window、rAF、event-emitter 注册）经构造 options/回调注入；vendor 内不出现
   `window.`/`document.`/`addEventListener` 顶层引用。
 
-## 5. 验证矩阵（V1–V12）
+## 5. 验证矩阵（G1–G12）
 
 | # | 项目 | 方法 | 通过标准 | 状态 |
 | --- | --- | --- | --- | --- |
-| V1 | 环境无关 | `check-engine-import.mjs` Gate 1 + Gate 2 | 无 DOM 全局引用、不 reach browser | ✅ 通过 |
-| V2 | 行为等价 | 吸附/滞后/阈值/网格/旋转数学单元测试（数据源自上游推导） | 与上游公式输出一致（浮点容差内） | ✅ 全部完成（snappable 10/10 + snapbounds/innerBounds 21/21） |
-| V3 | 控制框渲染 | 自研 DOM 渲染控制框/手柄/参考线 | 与现状视觉一致，无回归 | ✅ harness 全流程回归通过 |
-| V4 | 双实例 | 同页两个 Designer 同时拖拽 | 无共享状态串扰 | ✅ harness 实例隔离通过 |
-| V5 | zoom/pan | 10%、500%、非零 pan 下 drag+snap | 阈值 screen-pixel 语义、坐标确定 | ✅ 单测 zoom 0.1/5 + harness zoom/pan 流程 |
-| V6 | DPR | devicePixelRatio 2 截图 | 线宽与对齐坐标无错位 | ✅ 标尺 DPR 缓冲断言 + 渲染层未改动 |
-| V7 | cancel | pointercancel、lost capture、Esc | 预览与吸附线完整清理 | ✅ gesture/事件系统测试 + harness 覆盖 |
-| V8 | disconnect | 卸载/重建 Designer | listener/observer/capture 清理无残留 | ✅ 既有卸载/重连测试 + harness unload 流程 |
-| V9 | 多选 drag | 统一 delta 预览 | 一次 transaction 提交 | ✅ harness 多选拖拽断言 |
-| V10 | resize/rotate 实时预览 | Material 根元素实时变换 | 现状缺口消除（`designer-gesture-controller.ts:544`） | ✅ Day 3 完成（单测 + harness 真实指针） |
-| V11 | 视觉对比 | Playwright 同场景截图（试点 vs Nebula vs 现状） | 参考线/颜色/线宽/数字对齐一致 | ✅ harness 截图 + 视觉断言归档；Nebula 并排对比待外部环境 |
-| V12 | 回归 | engine focused checks + browser harness + `pnpm verify:m0` | 全绿 | ✅ 218 测试 + harness + verify:m0 通过 |
+| G1 | 环境无关 | `check-engine-import.mjs` Gate 1 + Gate 2 | 无 DOM 全局引用、不 reach browser | ✅ 通过 |
+| G2 | 行为等价 | 吸附/滞后/阈值/网格/旋转数学单元测试（数据源自上游推导） | 与上游公式输出一致（浮点容差内） | ✅ 全部完成（snappable 10/10 + snapbounds/innerBounds 21/21） |
+| G3 | 控制框渲染 | 自研 DOM 渲染控制框/手柄/参考线 | 与现状视觉一致，无回归 | ✅ harness 全流程回归通过 |
+| G4 | 双实例 | 同页两个 Designer 同时拖拽 | 无共享状态串扰 | ✅ harness 实例隔离通过 |
+| G5 | zoom/pan | 10%、500%、非零 pan 下 drag+snap | 阈值 screen-pixel 语义、坐标确定 | ✅ 单测 zoom 0.1/5 + harness zoom/pan 流程 |
+| G6 | DPR | devicePixelRatio 2 截图 | 线宽与对齐坐标无错位 | ✅ 标尺 DPR 缓冲断言 + 渲染层未改动 |
+| G7 | cancel | pointercancel、lost capture、Esc | 预览与吸附线完整清理 | ✅ gesture/事件系统测试 + harness 覆盖 |
+| G8 | disconnect | 卸载/重建 Designer | listener/observer/capture 清理无残留 | ✅ 既有卸载/重连测试 + harness unload 流程 |
+| G9 | 多选 drag | 统一 delta 预览 | 一次 transaction 提交 | ✅ harness 多选拖拽断言 |
+| G10 | resize/rotate 实时预览 | Material 根元素实时变换 | 现状缺口消除（`designer-gesture-controller.ts:544`） | ✅ Day 3 完成（单测 + harness 真实指针） |
+| G11 | 视觉对比 | Playwright 同场景截图（试点 vs Nebula vs 现状） | 参考线/颜色/线宽/数字对齐一致 | ✅ harness 截图 + 视觉断言归档；Nebula 并排对比待外部环境 |
+| G12 | 回归 | engine focused checks + browser harness + `pnpm verify:m0` | 全绿 | ✅ 218 测试 + harness + verify:m0 通过 |
 
 ## 6. 里程碑
 
@@ -103,7 +103,7 @@ packages/engine/src/browser/                 # 渲染与接线（自研，不动
   的智能参考线竞争、参考线收集改由 vendored `checkSnapPoses`/`getNearestSnapGuidelineInfo` 驱动，会话滞后层
   （释放带/同锚点跟随）与网格取整语义保留；`verify-browser-harness.mjs` 真实指针吸附工作流全绿（ALIGN/HOLD/
   GRID_LINE/RELEASE/ROTATED_CANDIDATE/guide 对齐）；双实例、zoom/pan、DPR 标尺验证通过。
-- **Day 3（2026-08-06 完成）**：V10 resize/rotate 实时预览——`renderTransformPreview` 同步 Material 根元素
+- **Day 3（2026-08-06 完成）**：G10 resize/rotate 实时预览——`renderTransformPreview` 同步 Material 根元素
   （left/top/width/height + rotate()，与 renderer 定位一致），手势开始捕获、取消/结束时恢复；gesture 新增
   3 个测试（预览/取消恢复/提交），harness 新增 `assertTransformPreviewWorkflow` 真实指针断言。
 - **Day 4（2026-08-06 完成）**：行为等价测试补全——新增 `moveable-snapbounds.test.ts`（21 例：
@@ -122,13 +122,13 @@ packages/engine/src/browser/                 # 渲染与接线（自研，不动
   `dist/common/vendor/`；build 脚本在 `tsc` 后清理该目录，避免内部实现泄漏进发布产物。
 - **gesto 状态机未接线**：Day 2 仅接入 snappable 数学；手势状态机仍为自研原生 Pointer Events 状态机
   （ADR-0006 契约保持），gesto vendor 保留作后续评估。因此 ADR-0006 无需重审（pilot §8.2 批准点不触发）。
-- **V11 视觉对比**：Playwright 截图与视觉断言（guide 对齐、线宽/颜色）已在 harness 内固化；与 Nebula
+- **G11 视觉对比**：Playwright 截图与视觉断言（guide 对齐、线宽/颜色）已在 harness 内固化；与 Nebula
   的同场景并排截图对比需外部环境，合入前以 harness 截图归档为准。
 
 ## 7. 退出与回退条件
 
 - 任一硬门禁失败即终止并回退：Gate 1/Gate 2 无法通过且注入适配不可行；行为等价测试无法达到上游一致；
-  视觉对比明显劣于现状；V12 无法全绿。
+  视觉对比明显劣于现状；G12 无法全绿。
 - 回退方式：删除 `common/vendor/` 与接线改动即可；公共 API、持久化数据、manifest、lockfile 全程不变，
   无兼容迁移。回退后维持现状自研实现，不再继续模拟 Moveable 行为。
 
@@ -146,5 +146,5 @@ packages/engine/src/browser/                 # 渲染与接线（自研，不动
 
 - 移植清单（逐文件：上游路径、commit/tag、裁剪说明、许可证 notice）。
 - `common/vendor/` 合入代码 + 行为等价测试。
-- V1–V12 结果记录、Playwright 对比截图。
+- G1–G12 结果记录、Playwright 对比截图。
 - 更新后的 ADR-0006、spec.md、checklist/tasks/test-matrix 与 provenance。

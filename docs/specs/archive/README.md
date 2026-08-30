@@ -1,7 +1,8 @@
 # 已归档规格
 
 > 状态：只读历史记录
-> 最近更新：2026-08-12
+> 最近更新：2026-08-30
+> 归档总数：58
 
 本目录保留已完成或被后继 Spec/ADR 取代的规格、任务和验收快照，用于追溯当时的范围、决策和实施进度。
 
@@ -9,7 +10,7 @@
 - 原有任务勾选状态按归档时快照保留，不自动迁移到后继规格。
 - 仍需实施时，后继规格必须在 `docs/specs/README.md` 的“生效中”区域登记；范围被取消时必须链接已接受 ADR。
 - 修复失效链接、补充归档说明或 provenance 可以修改归档文件；不得继续推进其中的未完成任务。
-- 2026-08-12 阶段封版：全部历史 Spec 归档，当前无生效中 Spec；新功能须新建 ADR/Spec（见 [索引](../README.md)）。
+- 2026-08-12 阶段封版时，全部历史 Spec 已归档；新功能须新建 ADR/Spec（见 [索引](../README.md)）。
 
 ## 目录
 
@@ -50,3 +51,34 @@
 
 > 注：2026-08-12 归档的 Spec 均为“需求 → 实现 → 测试 → 验收”闭环后封版；归档后不接受重新打开旧任务，
 > 后续扩展一律以新的增量 Spec 承载。
+
+## 2026-08-30 增量归档
+
+| 归档规格 | 后继依据 | 归档日期 |
+| --- | --- | --- |
+| [Material Library Host State](./material-library-host-state/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Left Panel](./designer-left-panel/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Host Material Library Grouping](./host-material-library-grouping/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Material Library Visual Refinement](./designer-material-library-visual-refinement/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Material Library Error Console](./material-library-feedback-workspace-placement/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Viewport Native Events](./designer-viewport-native-events/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Panel Collapse Fixes](./designer-panel-collapse-fixes/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Host Preview Handler](./designer-host-preview/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Topbar Project Title](./designer-topbar-project-title/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Material Cover Thumbnail](./material-cover-thumbnail/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Material Cover Adaptive Fit](./material-cover-adaptive-fit/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Material Library Render Scalability](./material-library-render-scalability/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Canvas Background Image](./canvas-background-image/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Text Material Typography](./text-material-typography/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Canvas Background Palette](./canvas-background-palette/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Unified Color Palette](./unified-color-palette/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Canvas Text Editing](./designer-canvas-text-editing/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Multi Selection Editing](./designer-multi-selection-editing/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Designer Variable Management](./designer-variable-management/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Official Material Visual Capabilities](./official-material-visual-capabilities/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Image Material URL Validation](./image-material-url-validation/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Color Palette Gradient From Solid](./color-palette-gradient-from-solid/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Component Conditional Style Rules](./component-conditional-style-rules/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Conditional Style Port](./conditional-style-port/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
+| [Document Blueprint Host Bridge](./document-blueprint-host-bridge/spec.md) | 已被 [Designer Blueprint Workbench](./designer-blueprint-workbench/spec.md) 取代 | 2026-08-30 |
+| [Designer Blueprint Workbench](./designer-blueprint-workbench/spec.md) | 已完成；依据 [ADR-0063](../../decisions/ADR-0063-designer-blueprint-workbench-shell.md) | 2026-08-30 |

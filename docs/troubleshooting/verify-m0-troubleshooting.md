@@ -1,7 +1,7 @@
 # verify:m0 门禁排障记录
 
 > 状态：生效中
-> 最近更新：2026-08-28
+> 最近更新：2026-08-30
 > 定位：记录 `pnpm verify:m0` 各门禁在 P0 实现中实际遇到的问题、根因与修复方法，避免重复排查
 > 关联：[M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md)、[Contracts Foundation Spec](../specs/archive/contracts-foundation/spec.md)
 
@@ -10,7 +10,8 @@
 `pnpm verify:m0` 按序执行：
 
 ```text
-format:check -> lint -> typecheck -> test -> build -> check:packages -> check:api -> verify:tarball
+format -> format:check -> lint -> typecheck -> test -> build -> check:packages -> check:api
+-> check:engine-import -> verify:tarball
 ```
 
 定位失败步骤：
@@ -18,11 +19,13 @@ format:check -> lint -> typecheck -> test -> build -> check:packages -> check:ap
 ```powershell
 pnpm format:check *> $null; Write-Output "format:check=$LASTEXITCODE"
 pnpm lint *> $null; Write-Output "lint=$LASTEXITCODE"
+pnpm check:docs *> $null; Write-Output "check:docs=$LASTEXITCODE"
 pnpm typecheck *> $null; Write-Output "typecheck=$LASTEXITCODE"
 pnpm test *> $null; Write-Output "test=$LASTEXITCODE"
 pnpm build *> $null; Write-Output "build=$LASTEXITCODE"
 pnpm check:packages *> $null; Write-Output "check:packages=$LASTEXITCODE"
 pnpm check:api *> $null; Write-Output "check:api=$LASTEXITCODE"
+pnpm check:engine-import *> $null; Write-Output "check:engine-import=$LASTEXITCODE"
 pnpm verify:tarball *> $null; Write-Output "verify:tarball=$LASTEXITCODE"
 ```
 
@@ -150,7 +153,38 @@ pnpm verify:tarball *> $null; Write-Output "verify:tarball=$LASTEXITCODE"
 - 症状：文件已经缩小或删除，但门禁要求更新基线。
 - 修复：运行 `pnpm file-size:baseline` 并提交变小后的基线，确保后续改动不能重新涨回原值。
 
-## 9. 关键约定（避免误改）
+## 9. check:docs
+
+### 9.1 DOC_LINK_TARGET_MISSING / DOC_LINK_TARGET_INVALID
+
+- 症状：Markdown 相对链接或图片指向不存在、无法解码或逃出仓库的路径。
+- 修复：按当前文件位置重算相对路径；移动 Spec/Plan 时同步更新外部引用。外部 URL、纯锚点和历史代码
+  格式路径不参与目标存在性检查。
+
+### 9.2 DOC_*_INDEX_MISSING / DOC_*_INDEX_ORPHAN / DOC_*_INDEX_DUPLICATE
+
+- 症状：ADR、Spec 或 Plan 的实际目录/文件与对应索引不一致。
+- 修复：活动条目登记到活动索引；完成或被取代的条目使用 Git 重命名移入 archive，并在归档索引登记。
+  不要通过删除索引行掩盖仍留在活动目录中的完成 Spec。
+
+### 9.3 DOC_ADR_*_MISMATCH / DOC_ADR_*_MISSING / DOC_ADR_FILE_DUPLICATE
+
+- 症状：ADR 文件名编号、一级标题、索引目标、日期或规范化状态不一致，或同一编号对应多个文件。
+- 修复：以 ADR 正文已审议状态为依据，使文件名、标题、日期和索引行一一对应；方向变化应新增 ADR 并
+  标记取代关系，不要通过复制编号或只改索引状态制造第二份事实来源。
+
+### 9.4 DOC_COMPLETED_SPEC_NOT_ARCHIVED
+
+- 症状：活动 Spec 的 Tasks 与 Checklist 已无未完成项，但目录仍位于 `docs/specs/`。
+- 修复：在同一交付批次归档 Spec、更新能力基线和 Roadmap，并重算相对链接。
+
+### 9.5 DOC_VERSION_MARKER_FORBIDDEN
+
+- 症状：文档引入按版本区分的公共名称、路径后缀或版本字段。
+- 修复：使用单一稳定名称；验证编号使用 Gate/Requirement 等语义标签。AGENTS 与 Roadmap 中用于说明
+  禁令的示例行由门禁显式豁免。
+
+## 10. 关键约定（避免误改）
 
 - JSON Schema artifact 以 `packages/contracts/src/screen-document.schema.json` 为 golden：由 `scripts/emit-schema-golden.mjs`（从 dist 生成）产出并提交；构建时 `scripts/write-schema-artifact.mjs` 复制到 `dist/`；`document/json-schema.test.ts` 的 drift 测试保证 golden 与运行时生成一致。
 - 诊断 sentinel（`DIAGNOSTIC_LIMIT_REACHED`）的 path：cap 在 document 阶段触顶时为 `['document']`（envelope 场景需前缀），其余为 `[]`，见 `diagnostics/collector.ts`。

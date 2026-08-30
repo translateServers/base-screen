@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-08-29
+> 最近更新：2026-08-30
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -36,7 +36,7 @@
 | [ADR-0017](./ADR-0017-designer-product-host-boundaries.md) | 已接受 | 2026-08-05 | 完整 Designer 产品的宿主边界 |
 | [ADR-0018](./ADR-0018-host-intents-assets-and-graph-blueprint.md) | 已接受 | 2026-08-05 | 宿主意图、资产与图形 Blueprint |
 | [ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md) | 已接受 | 2026-08-05 | Designer 专项编辑依赖准入 |
-| [ADR-0020](./ADR-0020-designer-canvas-interaction-pilot.md) | 已采纳 | 2026-08-06 | Designer 画布交互逻辑层移植（Moveable/Gesto 源码 vendor） |
+| [ADR-0020](./ADR-0020-designer-canvas-interaction-pilot.md) | 已接受 | 2026-08-06 | Designer 画布交互逻辑层移植（Moveable/Gesto 源码 vendor，实施与验证已完成） |
 | [ADR-0021](./ADR-0021-material-library-visibility.md) | 已接受 | 2026-08-07 | Material Manifest 可见性与 Designer 物料库过滤 |
 | [ADR-0022](./ADR-0022-official-data-material-contracts.md) | 已接受 | 2026-08-07 | 官方图表与表格数据语义契约 |
 | [ADR-0023](./ADR-0023-host-dataset-resource-integration.md) | 已接受 | 2026-08-07 | 宿主数据集目录、绑定与运行时取数 |
@@ -77,13 +77,13 @@
 | [ADR-0058](./ADR-0058-component-conditional-style-rules.md) | 已接受 | 2026-08-17 | 组件条件样式规则：`ScreenComponentNode` 新增 JSON-safe `styleRules`（锚定组件 `dataState.value` 的有界路径条件 + Manifest `styleSchema` 内样式合并），Renderer 在 model 构造前求值派生 effective style、数据刷新自动重评估；`update-components` patch 扩展与 Designer 条件样式编辑区；Blueprint 与宿主边界不变 |
 | [ADR-0059](./ADR-0059-conditional-style-port.md) | 已接受 | 2026-08-17 | 宿主条件样式端口：渲染期同步纯函数覆盖，固定合并顺序与失败关闭回退，不进入文档 |
 | [ADR-0060](./ADR-0060-material-library-item-projection.md) | 已接受 | 2026-08-23 | Designer 物料库条目投影：多个宿主条目复用一个 canonical 运行物料类型，实例默认值覆盖经 Manifest 校验 |
-| [ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) | 已接受 | 2026-08-24 | 整屏交互编排宿主桥：detached 文档上下文、初始定位提示、完整 Blueprint 单事务提交；编排 UI/UX 与依赖完全归宿主 |
+| [ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) | 部分已取代 | 2026-08-24 | 历史整屏 detached 编排宿主桥；决策 4、5、7、8 及布局归属已由 ADR-0063 取代 |
 | [ADR-0062](./ADR-0062-host-left-panel-groups.md) | 已接受 | 2026-08-28 | Designer 宿主左侧分组：严格 JSON-safe Tab 描述与 `workbenchModes`、Canvas/Blueprint 模式感知导航、跨模式复用专属命名 slot、程序化选择与切换事件；宿主内容生命周期留在 light DOM，不进入文档或 Engine Store |
 | [ADR-0063](./ADR-0063-designer-blueprint-workbench-shell.md) | 已接受 | 2026-08-29 | Designer Blueprint 一体化工作台壳层：共享文档/历史、Base 语义面板与严格 slot 协议、宿主中央图形渲染；部分取代 ADR-0061 |
 
 ## 计划决策
 
-ADR-0025 已于 2026-08-09 接受，治理已接受、实施进行中；相关任务与验收见
+ADR-0025 已于 2026-08-09 接受，实施与验收已经完成；相关历史任务与验收见
 [Data Runtime Hardening Spec](../specs/archive/data-runtime-hardening/spec.md)，XJ 侧见
 XJ Data Hub 仓库 `.agent/specs/data-runtime-hardening/spec.md`。
 

@@ -14,9 +14,9 @@ available; read [material-mcp.md](references/material-mcp.md) only when that pat
 
 1. Confirm the current directory is the host Git workspace and contains `{{ROOT_MARKER}}`. Do not
    create a workspace, install dependencies, commit, push, publish, or activate production code.
-2. Read [host.md](references/host.md), [workspace.json](references/workspace.json),
-   [material-contract.md](references/material-contract.md), [framework.md](references/framework.md),
-   [materials.json](references/materials.json), [components.json](references/components.json), and
+2. Read `references/host.md`, `references/workspace.json`,
+   [material-contract.md](references/material-contract.md), `references/framework.md`,
+   `references/materials.json`, `references/components.json`, and
    the matching resource/dataset references when the material consumes host data. Prefer the online
    MCP authoring context and template when available; otherwise use the optional local template index.
 3. Clarify whether the request creates a new material or revises an existing one. For a revision,
@@ -32,7 +32,7 @@ available; read [material-mcp.md](references/material-mcp.md) only when that pat
    `sourcePath`/`testPath`. Do not edit the configured registration file or plugin manifest in this
    mode. The host must build, test, review, and accept the candidate before writing a
    `draft-material-catalog.json` for one screen draft.
-6. If [material-provenance.json](references/material-provenance.json) exists, treat `online` entries
+6. If `references/material-provenance.json` exists, treat `online` entries
    as read-only compatibility references. Only `code` entries marked editable and covered by the
    workspace allowlist may be revised.
 7. Run the generated preflight validator before changing registration. For a new material, use the

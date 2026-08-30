@@ -31,5 +31,5 @@ The generated Skill never connects to a host port, queries live data, stores cre
 ## Resources
 
 - [input-bundle.md](references/input-bundle.md) defines the canonical snapshot shape, limits, and safety rules.
-- [host-skill-template](../assets/host-skill-template) contains the child Skill template and document validator.
+- [host-skill-template](./assets/host-skill-template/) contains the child Skill template and document validator.
 - `scripts/create-host-screen-skill.mjs` performs strict validation, deterministic rendering, and guarded atomic updates.

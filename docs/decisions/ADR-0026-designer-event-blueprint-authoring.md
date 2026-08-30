@@ -13,7 +13,8 @@ Designer Full Product 的 Task 5 需要把现有 Blueprint 表单与按钮式图
 完成的仓库外候选评估（同一私有 GraphAdapter、同一 fixture、同一 Chromium case，证据见评估报告）结论：
 
 - X6 栈（`@antv/x6@2.19.2` + selection/minimap 插件）17/17 case 通过，但实际消费者 gzip 增量约 135.4 KiB，
-  超出 ADR-0019 流程的 40 KiB 默认预算约 3.4 倍；且 3.x 插件线发布损坏、v2 MiniMap click-to-locate 为死代码。
+  超出 ADR-0019 流程的 40 KiB 默认预算约 3.4 倍；且 3.x 插件线发布损坏、旧插件线的 MiniMap
+  click-to-locate 为死代码。
 - Rete（`rete@2.0.6` + area/connection）在 Base Screen 自有 DOM/SVG renderer 下技术上可行（纠正 spike 17/17
   case、gzip 增量约 19.1 KiB），但 `rete@2.0.6` 声明 postinstall 违反硬门禁，且相对零依赖原生方案无新增能力。
 - 原生 DOM/SVG 与原生加 Dagre 布局通过全部已测硬门禁，但完整图形交互内核自研周期最长。

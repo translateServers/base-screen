@@ -70,7 +70,7 @@ fixture 包含两个线性规则（`trigger -> condition -> set-variable -> emit
 
 - **X6**：运行时完整图为 `@antv/x6@2.19.2`、Selection `2.2.2`、MiniMap `2.0.7`、`@antv/x6-common@2.0.16`、
   `@antv/x6-geometry@2.0.5`、`utility-types@3.11.0`、`lodash-es@4.18.1`；均 MIT，无 install/postinstall script，
-  2026-08-10 npm registry audit 无已知漏洞；核心仓库活跃，v2 插件线较旧。
+  2026-08-10 npm registry audit 无已知漏洞；核心仓库活跃，旧插件线较旧。
 - **Rete**：纠正 spike 以 `pnpm install --ignore-scripts` 完成，运行时完整图为 `rete@2.0.6`、
   `rete-area-plugin@2.3.2`、`rete-connection-plugin@2.0.5`、`@babel/runtime@7.29.7`；均 MIT，audit 无已知漏洞。
   `rete` 声明 `postinstall: node postinstall.js`（评估中未执行），违反 ADR-0026 字面硬门禁；connection plugin

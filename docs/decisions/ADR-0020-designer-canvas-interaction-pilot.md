@@ -1,6 +1,6 @@
 # ADR-0020：Designer 画布交互逻辑层移植（Moveable/Gesto 源码 vendor）
 
-> 状态：已采纳（实施中，见[移植验证计划](../plans/archive/designer-moveable-pilot/pilot-plan.md) §6/§6a 与测试矩阵）
+> 状态：已接受（实施与验证已完成，见[移植验证计划](../plans/archive/designer-moveable-pilot/pilot-plan.md) §6/§6a 与测试矩阵）
 > 日期：2026-08-06
 > 重审：[ADR-0006](./ADR-0006-designer-engine-dom-interactions-and-history.md) 第 1、4 条
 > 相关：[Moveable 逻辑层移植验证计划](../plans/archive/designer-moveable-pilot/pilot-plan.md)、[Designer 依赖引入计划](../plans/archive/designer-dependency-introduction/implementation-plan.md)
@@ -50,7 +50,7 @@
 - 移植代码不得引入全局状态、install script、运行时远程代码或公共 API 类型泄漏；不得 import
   `react`/`croact` 或任何第三方包。
 - 行为等价：吸附/滞后/网格/阈值以移植数学的单元测试为准，测试数据从上游源码推导并记录来源。
-- 通过 V1–V12 验证矩阵（Shadow DOM、双实例、10%–500% zoom、非零 pan、DPR、pointer cancel、disconnect、
+- 通过 G1–G12 验证矩阵（Shadow DOM、双实例、10%–500% zoom、非零 pan、DPR、pointer cancel、disconnect、
   输入/IME 不劫持、Playwright 同场景截图对比试点 vs Nebula vs 现状）。
 - 合入后删除被替换的自研吸附/变换分支，不保留双实现路径。
 
@@ -72,7 +72,7 @@
 ## 实施记录（2026-08-06）
 
 - 已合入：snappable 吸附数学接入 `designer-canvas-aids.ts`（drag/point 吸附竞争与参考线收集以上游
-  `checkSnapPoses` 为准，会话滞后层保留）；resize/rotate Material 实时预览（V10）。
+  `checkSnapPoses` 为准，会话滞后层保留）；resize/rotate Material 实时预览（G10）。
 - 适配：vendor 接入后做运行时中立严格化（`!`/type-only import，行为不变）；build 后清理 `dist/common/vendor`
   声明泄漏。详见[移植验证计划](../plans/archive/designer-moveable-pilot/pilot-plan.md) §6a。
 - 未接线：gesto 手势状态机（原生 Pointer Events 状态机继续承担手势编排，ADR-0006 契约未变，无需重审）；

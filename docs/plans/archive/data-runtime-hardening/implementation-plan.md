@@ -1,7 +1,7 @@
 # Data Runtime Hardening 实施计划
 
-> 状态：治理已接受，实施进行中（本计划不视为已实现）。Review Remediation Batch (2026-08-09)
-> 进行中：代码评审发现正确性缺陷，整改项见第 18 节。
+> 状态：已完成（治理已接受；Review Remediation Batch 于 2026-08-09 闭环）
+> 完成记录：代码评审发现的正确性缺陷与整改证据见第 18 节。
 > 研究输入：[数据模块设计原则深度研究](../研究报告.md)
 > 现有决策：[ADR-0023 Host Dataset Resource Integration](../../../decisions/ADR-0023-host-dataset-resource-integration.md)
 > 新增决策：[ADR-0025 Data Runtime Hardening](../../../decisions/ADR-0025-data-runtime-hardening.md)（已接受，2026-08-09）

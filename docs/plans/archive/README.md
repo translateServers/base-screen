@@ -1,7 +1,7 @@
 # 已归档计划与评审
 
 > 状态：只读历史记录
-> 最近更新：2026-08-12
+> 最近更新：2026-08-30
 
 本目录保留已完成或被后继 Spec/ADR 取代的实施计划、设计评审和技术调研，用于追溯当时的执行路径与研究结论。
 归档文档不替代已接受的 ADR 或生效中的 Spec；不得作为新实现的授权依据。
@@ -10,6 +10,7 @@
 
 | 文档 | 状态 | 关联范围 | 归档日期 |
 | --- | --- | --- | --- |
+| [DataV 高保真右侧检查器与代码治理](./datav-inspired-designer-uiux/plan.md) | P0–P14 已完成 | Designer UI/UX、目录与运行时拆分、文件规模基线清零；后继为 [Designer 持续质量治理](../continuous-quality-governance/plan.md) | 2026-08-30 |
 | [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/implementation-plan.md) | 历史实施计划 | [已归档 Spec](../../specs/archive/runtime-ecosystem-hardening/spec.md) | 2026-08-12 |
 | [Designer 依赖引入](./designer-dependency-introduction/implementation-plan.md) | 已评审、决策落地 | Moveable 源码 vendor、不引入 npm 依赖；条件候选见 [路线图](../../roadmap/README.md) | 2026-08-12 |
 | [Designer 依赖候选评估](./designer-dependency-introduction/dependency-evaluation.md) | 已评审（2026-08-06 决策落地） | [ADR-0020](../../decisions/ADR-0020-designer-canvas-interaction-pilot.md) | 2026-08-12 |
@@ -21,5 +22,6 @@
 | [Designer Event Blueprint](./designer-event-blueprint/implementation-plan.md) | 已决策（图形延后） | [Designer Event Blueprint Spec](../../specs/archive/designer-event-blueprint/spec.md)、[ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md) | 2026-08-12 |
 | [Designer Event Blueprint 依赖评估](./designer-event-blueprint/dependency-evaluation.md) | 已评审 | [Designer Event Blueprint Spec](../../specs/archive/designer-event-blueprint/spec.md) | 2026-08-12 |
 | [轻量 Designer 作者扩展](./designer-authoring-extension/implementation-plan.md) | 已实现 | [Designer Authoring Extension Spec](../../specs/archive/designer-authoring-extension/spec.md)、[ADR-0028](../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md) | 2026-08-12 |
+| [宿主草稿物料流程](./host-draft-material-workflow/implementation-plan.md) | 已实现 | [Host Draft Material Workflow Spec](../../specs/archive/host-draft-material-workflow/spec.md) | 2026-08-12 |
 | [宿主托管物料包](./host-material-package/implementation-plan.md) | 已实现 | [Host Material Package Spec](../../specs/archive/host-material-package/spec.md)、[ADR-0029](../../decisions/ADR-0029-host-managed-material-package-distribution.md)；[概论评估](./host-material-package/assessment.md) | 2026-08-12 |
 | [数据模块设计原则深度研究](./研究报告.md) | 已完成调研 | Data Runtime 数据设计输入 | 2026-08-12 |

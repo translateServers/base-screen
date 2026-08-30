@@ -9,7 +9,7 @@
 
 拟议设计方向成立（PS 级应用必须拥有系统级默认行为管控），但需要三处修正后才能进入 Spec：
 
-1. **拆分归属**：纯逻辑（chord 规范化 v2、黑名单表、上下文裁决）下沉到 `common/` 做环境无关可测实现；`browser/dom/` 只保留 DOM 编排（capture 监听、window 监听、生命周期），手势状态经回调注入 —— 遵守 `dom` 不得依赖 `controllers` 的分层。
+1. **拆分归属**：纯逻辑（增强 chord 规范化、黑名单表、上下文裁决）下沉到 `common/` 做环境无关可测实现；`browser/dom/` 只保留 DOM 编排（capture 监听、window 监听、生命周期），手势状态经回调注入 —— 遵守 `dom` 不得依赖 `controllers` 的分层。
 2. **范围分层**：评审确认存在 3 个真实正确性缺口（手势激活中快捷键漏入、浏览器 chrome 快捷键无拦截、画布滚轮滚宿主页面），应作为 P1；window 级守卫（DnD、剪贴板事件）为 P2；模态栈/遥测等系统化为 P3。
 3. **预期管理**：DevTools、隐身窗口等浏览器级快捷键页面无法可靠阻止，Spec 必须声明 best-effort 边界，完整锁定由宿主（kiosk/PWA）负责。
 
@@ -60,7 +60,7 @@
 
 | 层 | 职责 | 依据 |
 | --- | --- | --- |
-| `common/events/`（新叶子子层） | chord 规范化 v2（IME/AltGr/repeat 分类）、黑名单表、上下文裁决 | 沿用 `DesignerKeyboardEventShape` 模式（operation-registry.ts:66），环境无关、vitest 可测 |
+| `common/events/`（新叶子子层） | 增强 chord 规范化（IME/AltGr/repeat 分类）、黑名单表、上下文裁决 | 沿用 `DesignerKeyboardEventShape` 模式（operation-registry.ts:66），环境无关、vitest 可测 |
 | `browser/dom/designer-event-system.ts` | shadow capture 监听、window 监听、connect/disconnect 生命周期、手势状态回调注入 | 与 DesignerSurfaceRouter 同为纯 plumbing，组合根（index.ts）注入 bindings |
 | `controllers` | 手势 controller 增加 `setActive` 上报 | 现 `setPanning`（gesture-controller.ts:124）已有先例 |
 
@@ -103,7 +103,7 @@
 
 ## 6. 建议范围（阶段划分）
 
-- **P1 正确性**（一个 Spec 落地）：capture 黑名单（无条件+条件）、chord v2（IME/AltGr/repeat）、手势激活抑制、wheel 语义决策。
+- **P1 正确性**（一个 Spec 落地）：capture 黑名单（无条件+条件）、增强 chord 规范化（IME/AltGr/repeat）、手势激活抑制、wheel 语义决策。
 - **P2 窗口守卫**：window DnD、copy/cut/paste 事件、auxclick/gesturestart/touch-action、window blur 复位。
 - **P3 系统化**：模态栈、焦点环管理、事件遥测、resize/DPR、beforeunload 宿主契约。
 

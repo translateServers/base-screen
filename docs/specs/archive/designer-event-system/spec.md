@@ -60,7 +60,7 @@ Designer SHALL 用单一仲裁入口取代 `index.ts` `onKeyDown` 的散落逻�
 5. 命令通道：chord 规范化 → operation registry 查找与执行（沿用 `shortcutFromKeyboardEvent` 归一规则）。
 6. viewport 状态通道：Space（抓手）与缩放等 viewport 语义经同一入口调用，行为不变。
 
-chord 规范化 v2 SHALL 增加：
+增强 chord 规范化 SHALL 增加：
 
 - **AltGr 守卫**：`getModifierState('AltGraph') === true` 时不匹配任何带 Alt 的命令（防 `Ctrl+Alt+L/H/V`
   等对齐快捷键在 AltGr 布局误触发），默认行为放行。

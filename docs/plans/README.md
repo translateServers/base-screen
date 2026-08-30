@@ -17,12 +17,13 @@
 
 | 文档 | 状态 | 关联范围 |
 | --- | --- | --- |
-| [DataV 高保真右侧检查器与代码治理](./datav-inspired-designer-uiux/plan.md) | P0–P14 已完成，P15–P20 已规划 | Designer UI/UX、目录边界、运行时拆分、零历史尺寸豁免与持续质量门禁 |
+| [Designer 持续质量治理](./continuous-quality-governance/plan.md) | P15–P20 规划中 | 子层依赖、无抖动、可访问性、性能预算、样式 Token 与测试目标线 |
 
 ## 已归档
 
 全部历史计划与评审见 [docs/plans/archive/](./archive/README.md)，包括：
 
+- DataV 高保真右侧检查器与代码治理 P0–P14 完成成果
 - 基础与运行时：Runtime And Ecosystem Hardening、Data Runtime Hardening
 - Designer 增量：Designer 依赖引入、Moveable 逻辑层移植验证、事件系统设计评审、外部样式 Token、
   编组与右侧面板整改、事件 Blueprint
@@ -30,3 +31,4 @@
 - 调研：数据模块设计原则深度研究
 
 实现和验收时，请以 [功能与工程规格](../specs/README.md) 的生效中条目为准；当前无生效中 Spec。
+活动计划必须登记在本页，完成后与其证据同批移入归档。

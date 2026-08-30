@@ -12,7 +12,7 @@
 
 研究报告整改（Task 8）证据：`designer-canvas-coordinates.test.ts` 的 border/content-origin case；`designer-canvas-aids.test.ts` 的 point render-threshold/local-geometry case；`designer-workbench-controller.test.ts` 的 zoom overlay scale、正常/取消 capture 与 guide double-click case；`designer-gesture-controller.test.ts` 的 locked descendant drag 与 Alt subtree parent remap case；`verify-browser-harness.mjs` 的缩放复位框选与真实参考线双击流程；候选/测量路径通过共享 `ComponentIndex`，由 Engine typecheck/build 与 focused tests 覆盖。
 
-R2/R4 附带的变换实时预览（V10）：`designer-gesture-controller.test.ts` 的 preview/cancel-restore/commit case +
+R2/R4 附带的变换实时预览（G10）：`designer-gesture-controller.test.ts` 的 preview/cancel-restore/commit case +
 `verify-browser-harness.mjs` 的 `assertTransformPreviewWorkflow`（真实指针拖拽手柄，Material 根元素预览与提交一致）。
 
 新增 case 必须在名称或相邻注释中标记 R1–R4。任何 case rename、move 或 delete 必须同步本矩阵。

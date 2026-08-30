@@ -31,6 +31,7 @@ pnpm dev:browser-harness
 ```bash
 pnpm format:check
 pnpm lint
+pnpm check:docs
 pnpm typecheck
 pnpm test
 pnpm build
