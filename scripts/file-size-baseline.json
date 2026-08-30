@@ -3,7 +3,6 @@
   "exceptions": {
     "packages/contracts/src/document/validate.ts": 913,
     "packages/contracts/tests/document/document.test.ts": 1275,
-    "packages/engine/src/browser/controllers/designer-dataset-controller.ts": 1585,
     "packages/engine/src/browser/controllers/designer-layers-controller.ts": 615,
     "packages/engine/src/browser/dom/designer-descriptor-dom.ts": 577,
     "packages/engine/src/browser/dom/designer-menu.ts": 684,
