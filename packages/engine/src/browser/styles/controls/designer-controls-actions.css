@@ -1,0 +1,292 @@
+.designer-color {
+  width: var(--designer-control-height);
+  height: var(--designer-control-height);
+  padding: 3px;
+  cursor: pointer;
+}
+
+.designer-color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.designer-color::-webkit-color-swatch {
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: 4px;
+}
+
+.designer-color::-moz-color-swatch {
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: 4px;
+}
+
+.designer-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  min-width: 0;
+  min-height: var(--designer-control-height);
+  align-items: center;
+  justify-content: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-3);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  appearance: none;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  font: var(--designer-font-small);
+  font-weight: 600;
+  line-height: 1;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  touch-action: manipulation;
+  transform: translateZ(0);
+  transition: transform var(--designer-motion);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.designer-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 22%, var(--designer-border-strong));
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--designer-text-on-accent) 5%, transparent),
+    0 2px 6px color-mix(in srgb, var(--designer-accent) 10%, transparent);
+}
+
+.designer-button:not(:disabled):active {
+  border-color: color-mix(in srgb, var(--designer-accent) 34%, var(--designer-border-strong));
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--designer-surface-workspace) 38%, transparent);
+  transform: scale(0.985);
+}
+
+.designer-button:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.designer-button[aria-busy="true"] {
+  cursor: progress;
+  opacity: 0.84;
+}
+
+.designer-icon-button {
+  width: var(--designer-control-height);
+  height: var(--designer-control-height);
+  min-height: var(--designer-control-height);
+  padding: 0;
+}
+
+.designer-tool-button {
+  width: 38px;
+  height: 38px;
+  min-height: 38px;
+}
+
+.designer-button[data-variant="primary"] {
+  border-color: var(--designer-button-primary-background);
+  background: var(--designer-button-primary-background);
+  color: var(--designer-text-on-accent);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 18%, transparent);
+}
+
+.designer-button[data-variant="primary"]:hover:not(:disabled) {
+  border-color: var(--designer-accent);
+  background: var(--designer-button-primary-hover);
+  color: var(--designer-text-on-accent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--designer-accent) 24%, transparent);
+}
+
+.designer-button[data-variant="primary"]:not(:disabled):active {
+  border-color: var(--designer-button-primary-active);
+  background: var(--designer-button-primary-active);
+  box-shadow: inset 0 1px 2px var(--designer-button-primary-active-shadow);
+  transform: scale(0.985);
+}
+
+.designer-button[data-variant="danger"] {
+  border-color: color-mix(in srgb, var(--designer-danger) 48%, var(--designer-border-default));
+  background: color-mix(
+    in srgb,
+    var(--designer-danger-surface) 84%,
+    var(--designer-surface-control)
+  );
+  color: var(--designer-danger);
+}
+
+.designer-button[data-variant="danger"]:hover:not(:disabled) {
+  border-color: var(--designer-danger);
+  background: var(--designer-danger-surface);
+  color: var(--designer-danger);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--designer-danger) 14%, transparent);
+}
+
+.designer-button[data-variant="ghost"] {
+  border-color: transparent;
+  background: transparent;
+  color: var(--designer-text-secondary);
+  box-shadow: none;
+}
+
+.designer-button[data-variant="ghost"]:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  box-shadow: none;
+}
+
+.designer-button[aria-pressed="true"],
+.designer-tab[aria-selected="true"] {
+  border-color: color-mix(in srgb, var(--designer-accent) 56%, var(--designer-border-default));
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 14%, transparent);
+}
+
+.designer-button[aria-pressed="true"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 72%, var(--designer-border-default));
+  background: color-mix(
+    in srgb,
+    var(--designer-accent-surface) 82%,
+    var(--designer-surface-control-hover)
+  );
+  color: var(--designer-accent);
+}
+
+.designer-button:disabled {
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-disabled);
+  box-shadow: none;
+  opacity: 0.72;
+  transform: none;
+}
+
+.designer-button[data-variant="ghost"]:disabled {
+  border-color: transparent;
+  background: transparent;
+}
+
+.designer-tab {
+  transition:
+    background var(--designer-motion),
+    border-color var(--designer-motion),
+    color var(--designer-motion),
+    transform var(--designer-motion);
+}
+
+.designer-tab:not([aria-selected="true"]):hover {
+  color: var(--designer-text-secondary);
+  transform: translateY(-1px);
+}
+
+.designer-button svg,
+.designer-tab svg {
+  width: var(--designer-icon-size);
+  height: var(--designer-icon-size);
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* 装饰性图标不参与命中测试：点击图标落点应为按钮本身，避免 SVGElement 目标破坏控制器命中。 */
+  pointer-events: none;
+}
+
+.designer-tablist {
+  display: flex;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-1);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-workspace);
+}
+
+.designer-tab {
+  min-width: 0;
+  min-height: var(--designer-control-height-compact);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+  font: var(--designer-font-small);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-status,
+.designer-badge {
+  box-sizing: border-box;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 var(--designer-space-2);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+  font: var(--designer-font-small);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-empty-state {
+  margin: 0;
+  padding: var(--designer-space-7) var(--designer-space-5);
+  border: 1px dashed var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  color: var(--designer-text-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+/* 条件样式规则卡片（ADR-0058）：静态几何，增删规则时仅卡片数量变化。 */
+.designer-style-rule {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin: 0 0 var(--designer-space-3);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+}
+
+.designer-style-rule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  font-weight: 700;
+}
+
+.designer-dialog-surface {
+  box-sizing: border-box;
+  width: min(340px, 100%);
+  max-width: 340px;
+  padding: var(--designer-space-6);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-overlay);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-shadow-overlay);
+  overflow-wrap: anywhere;
+}
+
+.designer-dialog-actions {
+  display: flex;
+  justify-content: end;
+  gap: var(--designer-space-3);
+}
+
+.designer-button[hidden],
+.designer-tab[hidden],
+.designer-empty-state[hidden] {
+  display: none;
+}

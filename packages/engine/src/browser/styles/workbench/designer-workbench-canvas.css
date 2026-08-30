@@ -1,0 +1,717 @@
+/* viewport 是键盘事件容器（tabindex=0）：鼠标聚焦不绘制默认框，键盘聚焦使用内描边。 */
+.viewport:focus {
+  outline: none;
+}
+
+.viewport:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-coordinate-entry {
+  position: absolute;
+  z-index: var(--designer-z-workspace-overlay);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: 26px 14px;
+  width: min(192px, calc(100% - 16px));
+  box-sizing: border-box;
+  column-gap: var(--designer-space-2);
+  row-gap: var(--designer-space-1);
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  touch-action: auto;
+  user-select: none;
+}
+
+.designer-coordinate-entry[hidden] {
+  display: none;
+}
+
+.designer-coordinate-entry-field {
+  display: block;
+  min-width: 0;
+  color: var(--designer-text-secondary);
+  font-weight: 600;
+}
+
+.designer-coordinate-entry-input {
+  position: relative;
+  display: block;
+}
+
+.designer-coordinate-entry-input input {
+  width: 100%;
+  height: 26px;
+  min-height: 26px;
+  padding-left: 22px;
+  padding-right: 24px;
+  border: 0;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-numeric);
+}
+
+.designer-coordinate-entry-axis,
+.designer-coordinate-entry-unit {
+  position: absolute;
+  top: 50%;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  pointer-events: none;
+  translate: 0 -50%;
+  z-index: 1;
+}
+
+.designer-coordinate-entry-axis {
+  left: var(--designer-space-3);
+}
+
+.designer-coordinate-entry-unit {
+  right: var(--designer-space-3);
+}
+
+.designer-coordinate-entry-error {
+  grid-column: 1 / -1;
+  min-height: 14px;
+  margin: 0;
+  overflow: hidden;
+  color: var(--designer-danger);
+  font: var(--designer-font-small);
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-coordinate-entry-error:empty {
+  visibility: hidden;
+}
+
+.viewport[data-grid="false"] {
+  background-image: radial-gradient(
+    circle at 50% 0,
+    color-mix(in srgb, var(--designer-accent) 7%, transparent),
+    transparent 42%
+  );
+  background-size: 100% 100%;
+}
+
+/* 抓手工具或按住空格临时平移时，画布表面切换为抓握光标；拖拽中为实心抓握。 */
+.viewport[data-active-tool="hand"] {
+  cursor: grab;
+}
+.viewport[data-active-tool="hand"][data-panning="true"] {
+  cursor: grabbing;
+}
+/* 抓手工具激活时，选中框拖拽层/变换控件等交互覆盖层不覆盖抓握光标，
+   与 Nebula 一致：hand 工具下整个画布表面（含选中组件上）统一为 grab/grabbing。 */
+.viewport[data-active-tool="hand"] .selection-grab,
+.viewport[data-active-tool="hand"] .transform-handle,
+.viewport[data-active-tool="hand"] .transform-rotate {
+  cursor: grab;
+}
+.viewport[data-active-tool="hand"][data-panning="true"] .selection-grab,
+.viewport[data-active-tool="hand"][data-panning="true"] .transform-handle,
+.viewport[data-active-tool="hand"][data-panning="true"] .transform-rotate {
+  cursor: grabbing;
+}
+
+.canvas {
+  position: relative;
+  z-index: var(--designer-z-canvas);
+  min-width: 1px;
+  min-height: 1px;
+  border: 1px solid color-mix(in srgb, var(--designer-border-strong) 72%, transparent);
+  border-radius: 2px;
+  box-shadow: var(--designer-shadow-canvas);
+  color: initial;
+  font: initial;
+  transform-origin: top left;
+  /* 画布是可拖拽交互表面：禁用文本选择，避免拖拽组件时选中组件内的文本（参考 Nebula）。 */
+  user-select: none;
+  -webkit-user-select: none;
+  /* 画布表面不交给浏览器手势：平移/缩放由 wheel 通道接管。 */
+  touch-action: none;
+  transition: box-shadow var(--designer-motion-emphasis);
+}
+
+.canvas:hover {
+  box-shadow:
+    0 0 0 1px var(--designer-accent-surface),
+    var(--designer-shadow-canvas);
+}
+
+/* Renderer 内容独立裁剪到 canonical 画布边界；选区、变换手柄与参考线仍由外层
+   canvas 承载，贴边组件保持可编辑且不会把物料视觉泄漏到画布外。 */
+.canvas-content {
+  overflow: clip;
+  border-radius: inherit;
+}
+
+.selection,
+.marquee,
+.create-preview {
+  position: absolute;
+  z-index: var(--designer-z-canvas-selection);
+  pointer-events: none;
+}
+
+/* 选中框空白区域可拖拽移动组件：grab 层覆盖包围盒但用 clip-path 挖掉组件区域，
+   组件区域保持可点击（事件穿透到组件），handles/rotate 按 DOM 顺序优先命中。 */
+.selection-grab {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+}
+
+.canvas-guides {
+  position: absolute;
+  inset: 0;
+  z-index: var(--designer-z-canvas-guide);
+  pointer-events: none;
+}
+
+.canvas-guide {
+  position: absolute;
+  background: var(--designer-warning);
+}
+
+.canvas-guide-persistent {
+  background: transparent;
+  pointer-events: auto;
+}
+
+.canvas-guide-persistent::before {
+  position: absolute;
+  background: var(--designer-warning);
+  content: "";
+}
+
+.canvas-guide-persistent[data-axis="x"] {
+  width: var(--designer-overlay-hit-size, 9px);
+  cursor: ew-resize;
+}
+
+.canvas-guide-persistent[data-axis="x"]::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--designer-overlay-pixel, 1px);
+  translate: -50% 0;
+}
+
+.canvas-guide-persistent[data-axis="y"] {
+  height: var(--designer-overlay-hit-size, 9px);
+  cursor: ns-resize;
+}
+
+.canvas-guide-persistent[data-axis="y"]::before {
+  top: 50%;
+  right: 0;
+  left: 0;
+  height: var(--designer-overlay-pixel, 1px);
+  translate: 0 -50%;
+}
+
+/* 参考线视觉保持 1px，拖拽命中范围通过伪元素扩展为 9px 的不可见命中条
+   （各边 4.5px，命中条中心与参考线坐标重合）；伪元素继承 pointer-events: auto。 */
+.canvas-guide-persistent::after {
+  position: absolute;
+  content: "";
+}
+
+.canvas-guide-persistent[data-axis="x"]::after {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--designer-overlay-hit-size, 9px);
+  transform: translateX(-50%);
+}
+
+.canvas-guide-persistent[data-axis="y"]::after {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: var(--designer-overlay-hit-size, 9px);
+  transform: translateY(-50%);
+}
+
+.canvas-guide-preview {
+  opacity: 0.65;
+}
+
+/* 智能对齐线（参考 Moveable/Nebula）：蓝色系，参考线 1px，
+   吸附目标线（active）2px 更醒目 + 柔和发光，距离标签显示间距；
+   仅渲染阈值（1px）内的命中才显示，吸附与渲染分离。 */
+.canvas-guide-snap {
+  background: var(--designer-snap-guide);
+}
+
+.canvas-guide-snap-active {
+  background: var(--designer-snap-guide);
+  box-shadow:
+    0 0 var(--designer-overlay-glow-small, 2px) var(--designer-snap-guide),
+    0 0 var(--designer-overlay-glow-large, 6px)
+    color-mix(in srgb, var(--designer-snap-guide) 45%, transparent);
+}
+
+.canvas-guide[data-axis="x"].canvas-guide-snap {
+  width: var(--designer-overlay-pixel, 1px);
+}
+
+.canvas-guide[data-axis="x"].canvas-guide-snap-active {
+  width: var(--designer-overlay-active, 2px);
+}
+
+.canvas-guide[data-axis="y"].canvas-guide-snap {
+  height: var(--designer-overlay-pixel, 1px);
+}
+
+.canvas-guide[data-axis="y"].canvas-guide-snap-active {
+  height: var(--designer-overlay-active, 2px);
+}
+
+/* 选区对齐轨道上的布局间距：蓝色虚线段 + 红色数字，和吸附线解耦，不会参与命中。 */
+.canvas-measurement {
+  position: absolute;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+.canvas-measurement[data-axis="x"] {
+  height: var(--designer-overlay-pixel, 1px);
+  border-top: var(--designer-overlay-pixel, 1px) dashed var(--designer-snap-guide);
+}
+
+.canvas-measurement[data-axis="y"] {
+  width: var(--designer-overlay-pixel, 1px);
+  border-left: var(--designer-overlay-pixel, 1px) dashed var(--designer-snap-guide);
+}
+
+.canvas-measurement::before,
+.canvas-measurement::after {
+  position: absolute;
+  background: var(--designer-snap-guide);
+  content: "";
+}
+
+.canvas-measurement[data-axis="x"]::before,
+.canvas-measurement[data-axis="x"]::after {
+  top: calc(0px - var(--designer-overlay-cap-offset, 4px));
+  width: var(--designer-overlay-pixel, 1px);
+  height: var(--designer-overlay-cap-size, 7px);
+}
+
+.canvas-measurement[data-axis="x"]::before {
+  left: 0;
+}
+
+.canvas-measurement[data-axis="x"]::after {
+  right: 0;
+}
+
+.canvas-measurement[data-axis="y"]::before,
+.canvas-measurement[data-axis="y"]::after {
+  left: calc(0px - var(--designer-overlay-cap-offset, 4px));
+  width: var(--designer-overlay-cap-size, 7px);
+  height: var(--designer-overlay-pixel, 1px);
+}
+
+.canvas-measurement[data-axis="y"]::before {
+  top: 0;
+}
+
+.canvas-measurement[data-axis="y"]::after {
+  bottom: 0;
+}
+
+.canvas-measurement-label {
+  position: absolute;
+  color: var(--designer-measurement-label);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-overlay-font-size, 10px);
+  line-height: var(--designer-overlay-line-height, 14px);
+  text-shadow: 0 var(--designer-overlay-pixel, 1px) var(--designer-overlay-glow-small, 2px)
+    color-mix(in srgb, var(--designer-surface-workspace) 70%, transparent);
+  white-space: nowrap;
+}
+
+.canvas-measurement[data-axis="x"] .canvas-measurement-label {
+  top: var(--designer-overlay-label-offset, 5px);
+  left: 50%;
+  translate: -50% 0;
+}
+
+.canvas-measurement[data-axis="y"] .canvas-measurement-label {
+  top: 50%;
+  left: var(--designer-overlay-label-offset, 5px);
+  translate: 0 -50%;
+}
+
+.canvas-guide[data-axis="x"] {
+  top: 0;
+  bottom: 0;
+  width: var(--designer-overlay-pixel, 1px);
+  transform: translateX(-50%);
+}
+.canvas-guide[data-axis="y"] {
+  right: 0;
+  left: 0;
+  height: var(--designer-overlay-pixel, 1px);
+  transform: translateY(-50%);
+}
+/* 选中框视觉轮廓与吸附锚点使用同一选区几何（组件包围盒）：
+   outline-offset 取 -1px 使 2px 轮廓以边缘为中线，与 1px 吸附预览线重合。 */
+.selection {
+  outline: 2px solid var(--designer-accent);
+  outline-offset: -1px;
+}
+.marquee {
+  display: none;
+  border: 1px solid var(--designer-accent);
+  background: color-mix(in srgb, var(--designer-accent) 14%, transparent);
+}
+.create-preview {
+  border: 1px dashed var(--designer-accent);
+  background: color-mix(in srgb, var(--designer-accent) 14%, transparent);
+}
+
+.transform-handle,
+.transform-rotate {
+  position: absolute;
+  z-index: 1;
+  display: block;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: 1px solid var(--designer-accent);
+  background: var(--designer-surface-workspace);
+  pointer-events: auto;
+}
+
+.transform-handle {
+  translate: -50% -50%;
+}
+.handle-north-west {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+}
+.handle-north {
+  top: 0;
+  left: 50%;
+  cursor: ns-resize;
+}
+.handle-north-east {
+  top: 0;
+  left: 100%;
+  cursor: nesw-resize;
+}
+.handle-east {
+  top: 50%;
+  left: 100%;
+  cursor: ew-resize;
+}
+.handle-south-east {
+  top: 100%;
+  left: 100%;
+  cursor: nwse-resize;
+}
+.handle-south {
+  top: 100%;
+  left: 50%;
+  cursor: ns-resize;
+}
+.handle-south-west {
+  top: 100%;
+  left: 0;
+  cursor: nesw-resize;
+}
+.handle-west {
+  top: 50%;
+  left: 0;
+  cursor: ew-resize;
+}
+.transform-rotate {
+  top: -28px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  cursor: grab;
+  translate: -50% 0;
+}
+.transform-rotate::after {
+  position: absolute;
+  top: 9px;
+  left: 4px;
+  width: 1px;
+  height: 18px;
+  background: var(--designer-accent);
+  content: "";
+}
+
+.status-feedback {
+  max-width: 28ch;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-warning);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusbar [data-project-status] {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusbar [data-project-revision] {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-notifications {
+  position: absolute;
+  right: var(--designer-space-5);
+  bottom: calc(30px + var(--designer-space-5));
+  z-index: var(--designer-z-dialog);
+  display: grid;
+  width: min(360px, calc(100% - 2 * var(--designer-space-5)));
+  gap: var(--designer-space-3);
+  pointer-events: none;
+}
+
+.designer-notification {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-3) var(--designer-space-4);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-panel);
+  box-shadow: var(--designer-shadow-canvas);
+  pointer-events: auto;
+}
+
+.designer-notification[data-notification-tone="error"] {
+  border-color: var(--designer-danger);
+}
+
+.designer-notification[data-notification-tone="success"] {
+  border-color: var(--designer-accent);
+}
+
+.designer-notification-close {
+  margin-left: auto;
+}
+
+.designer-context-menu {
+  position: absolute;
+  z-index: var(--designer-z-dialog);
+  min-width: 200px;
+  /* 子菜单需要溢出到右侧；当前菜单已按上下文裁剪为短菜单。 */
+  max-height: none;
+  overflow: visible;
+  padding: var(--designer-space-2);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-overlay);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-shadow-overlay);
+  transform-origin: top left;
+  animation: designer-menu-in var(--designer-motion) cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.designer-context-menu[hidden] {
+  display: none;
+}
+
+/* 容器仅用于捕获焦点，聚焦时不绘制浏览器默认焦点框（菜单项自带 focus-visible 环）。 */
+.designer-context-menu:focus {
+  outline: none;
+}
+
+.designer-context-menu .designer-menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-6);
+  width: 100%;
+  min-height: var(--designer-control-height-compact);
+  padding: 0 var(--designer-space-5);
+  border: none;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-context-menu .designer-menu-item:hover:not(:disabled),
+.designer-context-menu .designer-menu-item:focus-visible:not(:disabled) {
+  background: var(--designer-accent-surface);
+  color: var(--designer-text-primary);
+  outline: none;
+}
+
+.designer-context-menu .designer-menu-item:disabled {
+  color: var(--designer-text-disabled);
+  cursor: default;
+}
+
+.designer-context-menu .designer-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-context-menu .designer-menu-item kbd {
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.designer-context-menu .designer-submenu {
+  position: absolute;
+  top: -1px;
+  left: calc(100% - 4px);
+  min-width: 200px;
+  padding: var(--designer-space-2);
+  overflow: auto;
+  overflow-x: hidden;
+  background: var(--designer-surface-overlay);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-overlay);
+  box-shadow: var(--designer-shadow-overlay);
+  z-index: calc(var(--designer-z-dialog) + 1);
+}
+
+.designer-context-menu .designer-submenu[data-submenu-side="left"] {
+  left: auto;
+  right: calc(100% - 4px);
+}
+
+.designer-context-menu .designer-submenu .designer-menu-item {
+  padding-left: var(--designer-space-5);
+}
+
+.project-conflict {
+  position: absolute;
+  right: 18px;
+  bottom: 40px;
+  z-index: var(--designer-z-dialog);
+  max-width: calc(100% - 36px);
+}
+
+.import-confirmation {
+  position: absolute;
+  inset: 0;
+  z-index: var(--designer-z-modal);
+  display: grid;
+  place-content: center;
+  padding: var(--designer-space-7);
+  background: var(--designer-surface-scrim);
+}
+
+.import-confirmation[hidden] {
+  display: none;
+}
+
+.project-conflict p,
+.import-confirmation p {
+  color: var(--designer-text-secondary);
+}
+
+.import-diagnostics {
+  display: grid;
+  gap: var(--designer-space-3);
+  margin: 0 0 var(--designer-space-5);
+  padding: 0;
+  list-style: none;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.import-diagnostic {
+  display: grid;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+}
+
+.import-diagnostic-code {
+  font: var(--designer-font-numeric);
+  color: var(--designer-danger);
+}
+
+.import-diagnostic-message {
+  font: var(--designer-font-small);
+  color: var(--designer-text-primary);
+}
+
+.import-diagnostic-path {
+  font: var(--designer-font-numeric);
+  color: var(--designer-text-muted);
+}
+
+.direct-preview,
+.project-workspace {
+  position: absolute;
+  /* 单条顶栏布局：顶部让出顶栏（52），底部让出状态栏（30），左右无固定工具轨。 */
+  inset: 52px 0 30px 0;
+  z-index: var(--designer-z-workspace-overlay);
+  overflow: auto;
+  padding: var(--designer-space-6);
+  background: var(--designer-surface-workspace);
+}
+
+.direct-preview header,
+.project-workspace header {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+}
+
+.direct-preview header,
+.project-workspace header {
+  margin-bottom: var(--designer-space-5);
+}
+
+.direct-preview base-screen-viewer {
+  display: block;
+  min-height: 200px;
+}
+
+.project-workspace {
+  display: grid;
+  align-content: start;
+  gap: var(--designer-space-5);
+}
+
+.project-workspace header {
+  justify-content: space-between;
+}
+
+.project-workspace h2,
+.designer-project-section h3 {
+  margin: 0;
+}

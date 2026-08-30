@@ -1,0 +1,737 @@
+/* DataV-like inspector composition: keep the public controls and contracts while matching the
+   compact authoring rail used by the reference designer. */
+.designer:not([data-right-collapsed="true"]) .properties {
+  position: relative;
+  --designer-inspector-control-surface: color-mix(
+    in srgb,
+    var(--designer-surface-control) 70%,
+    var(--designer-border-strong)
+  );
+  background: var(--designer-surface-panel);
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"]) {
+  grid-template-rows: 38px minmax(58px, auto) minmax(0, 1fr);
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .panel-heading {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 4;
+  width: 38px;
+  height: 38px;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .panel-heading
+  .panel-title {
+  display: none;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .panel-heading
+  .panel-collapse {
+  margin: 0;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .inspector-tabs {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .inspector-context {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .inspector-toolbar {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties:not([data-inspector-context-kind="canvas"])
+  > .inspector-pane {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.properties .inspector-tabs {
+  padding: 0 38px 0 0;
+  border-bottom-color: var(--designer-border-subtle);
+  background: var(--designer-surface-workspace);
+}
+
+.properties .inspector-tabs .designer-tab {
+  display: inline-flex;
+  min-height: 37px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 6px;
+  border: 0;
+  color: var(--designer-text-muted);
+  font-size: 12px;
+}
+
+.properties .inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-secondary);
+}
+
+.properties .inspector-tabs .designer-tab[aria-selected="true"] {
+  border: 0;
+  background: transparent;
+  color: var(--designer-text-primary);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.inspector-tab-icon,
+.inspector-tab-icon svg {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+}
+
+.properties .inspector-context {
+  min-height: 58px;
+  gap: 2px;
+  padding: 13px 132px 10px 20px;
+  border-bottom: 0;
+  background: var(--designer-surface-panel);
+}
+
+.properties .inspector-context-title-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.properties .inspector-context-material-icon {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  color: var(--designer-text-muted);
+}
+
+.properties .inspector-context-material-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
+.properties .inspector-context-identity strong {
+  color: var(--designer-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.properties .inspector-context-identity span {
+  color: var(--designer-text-muted);
+  font-size: 11px;
+}
+
+.properties .inspector-toolbar {
+  width: max-content;
+  min-height: 28px;
+  grid-template-columns: 28px auto;
+  align-self: start;
+  gap: 7px;
+  justify-self: end;
+  justify-content: end;
+  margin-top: 24px;
+  padding: 0 18px 0 0;
+  border-bottom: 0;
+  background: transparent;
+}
+
+.properties .inspector-search-launch {
+  width: 28px;
+  height: 28px;
+  border-color: var(--designer-border-default);
+  border-radius: 2px;
+  background: var(--designer-inspector-control-surface);
+  color: var(--designer-text-secondary);
+}
+
+.properties .inspector-density {
+  height: 28px;
+  padding: 1px;
+  border-color: var(--designer-border-default);
+  border-radius: 2px;
+  background: var(--designer-inspector-control-surface);
+}
+
+.properties .inspector-density .designer-tab {
+  min-height: 24px;
+  padding: 0 7px;
+  font-size: 11px;
+}
+
+.properties .inspector-density .designer-tab[aria-pressed="true"] {
+  border-color: transparent;
+  border-radius: 1px;
+  background: var(--designer-border-strong);
+  color: var(--designer-text-primary);
+}
+
+.properties[data-inspector-search-open] {
+  grid-template-rows: 38px minmax(0, 1fr) !important;
+}
+
+.properties[data-inspector-search-open] > .inspector-context,
+.properties[data-inspector-search-open] > .inspector-toolbar,
+.properties[data-inspector-search-open] > .inspector-pane {
+  display: none;
+}
+
+.properties > .inspector-search-workspace {
+  min-height: 0;
+  grid-row: 2 / -1;
+}
+
+.properties > .inspector-search-workspace:not([hidden]) {
+  display: grid;
+  grid-template-rows: 40px auto auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--designer-surface-panel);
+}
+
+.inspector-search-workspace-header {
+  display: grid;
+  min-height: 40px;
+  grid-template-columns: 28px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px 0 8px;
+  color: var(--designer-text-primary);
+}
+
+.inspector-search-workspace-header strong {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-search-back {
+  width: 26px;
+  height: 26px;
+  color: var(--designer-text-secondary);
+}
+
+.inspector-search-workspace-icon,
+.inspector-search-workspace-icon svg {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  color: var(--designer-text-muted);
+}
+
+.inspector-search-workspace .inspector-search {
+  position: relative;
+  width: auto;
+  margin: 0 12px 8px;
+}
+
+.inspector-search-workspace .inspector-search input {
+  width: 100%;
+  height: 30px;
+  padding: 0 9px 0 30px;
+  border-color: var(--designer-border-subtle);
+  border-radius: 2px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-primary);
+  font-size: 12px;
+}
+
+.inspector-search-instructions {
+  display: grid;
+  gap: 4px;
+  padding: 0 14px 12px;
+  border-bottom: 1px solid var(--designer-border-subtle);
+  color: var(--designer-text-muted);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.inspector-search-workspace .inspector-search-results {
+  max-height: none;
+  padding: 0;
+  border: 0;
+}
+
+.inspector-search-workspace .inspector-search-empty {
+  margin: 0;
+  padding: 24px 14px;
+}
+
+/* Multi-selection switches the inspector into the compact batch configuration surface. */
+.designer:not([data-right-collapsed="true"])
+.properties[data-inspector-context-kind="multi-selection"] {
+  grid-template-rows: 42px minmax(0, 1fr) !important;
+}
+
+.designer:not([data-right-collapsed="true"])
+  .properties[data-inspector-context-kind="multi-selection"]
+  > .panel-heading {
+  position: relative !important;
+  top: auto;
+  right: auto;
+  display: flex;
+  width: auto !important;
+  height: 42px;
+  grid-row: 1 !important;
+  justify-content: center;
+  padding: 0 36px;
+  border-bottom: 1px solid var(--designer-border-subtle);
+  background: var(--designer-surface-panel);
+}
+
+.properties[data-inspector-context-kind="multi-selection"] > .panel-heading .panel-title {
+  display: block !important;
+  color: var(--designer-text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.properties[data-inspector-context-kind="multi-selection"] > .panel-heading .panel-collapse {
+  position: absolute;
+  right: 6px;
+}
+
+.properties[data-inspector-context-kind="multi-selection"] > .inspector-tabs,
+.properties[data-inspector-context-kind="multi-selection"] > .inspector-context,
+.properties[data-inspector-context-kind="multi-selection"] > .inspector-toolbar,
+.properties[data-inspector-context-kind="multi-selection"] > .inspector-search-workspace {
+  display: none;
+}
+
+.properties[data-inspector-context-kind="multi-selection"] > .inspector-pane {
+  grid-row: 2 !important;
+  padding: 0 14px 24px;
+}
+
+.properties .designer-datav-batch-arrange,
+.properties .designer-datav-batch-geometry,
+.properties .designer-datav-batch-unified-style,
+.properties .designer-datav-quick-style-section[data-quick-style-variant="batch"] {
+  padding: 13px 0;
+}
+
+.properties .designer-datav-batch-arrange > .designer-inspector-section-title,
+.properties .designer-datav-batch-geometry > .designer-inspector-section-title,
+.properties
+  .designer-datav-quick-style-section[data-quick-style-variant="batch"]
+  .designer-datav-section-summary {
+  display: none;
+}
+
+.properties .designer-datav-batch-arrange-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+}
+
+.properties .designer-datav-batch-arrange-button {
+  width: 100%;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 1px;
+  background: transparent;
+  color: var(--designer-text-secondary);
+}
+
+.properties .designer-datav-batch-arrange-button:hover:not(:disabled),
+.properties .designer-datav-batch-arrange-button:focus-visible {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.properties .designer-datav-batch-arrange-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+.properties .designer-datav-batch-field-row {
+  display: grid;
+  min-height: 36px;
+  grid-template-columns: 76px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.properties .designer-datav-batch-field-row-label {
+  color: var(--designer-text-secondary);
+  font-size: 12px;
+}
+
+.properties .designer-datav-batch-field-row-controls {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.properties .designer-datav-batch-field-row-controls .designer-field {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 12px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  overflow: visible;
+  color: var(--designer-text-muted);
+}
+
+.properties .designer-datav-batch-field-row-controls .designer-input {
+  height: 28px;
+  padding: 0 7px;
+  text-align: right;
+}
+
+.properties .designer-datav-batch-readonly .designer-input:disabled {
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-muted);
+}
+
+.properties .designer-datav-batch-geometry > .designer-field[data-inspector-advanced] {
+  margin: 8px 0 0 84px;
+}
+
+.properties .designer-datav-quick-style-section[data-quick-style-variant="batch"] details,
+.properties
+  .designer-datav-quick-style-section[data-quick-style-variant="batch"]
+  .designer-datav-section-content {
+  display: block;
+}
+
+.properties
+  .designer-datav-quick-style-section[data-quick-style-variant="batch"]
+  .designer-quick-config-row {
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.properties
+  .designer-datav-quick-style-section[data-quick-style-variant="batch"]
+  .quick-config-colors {
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: 2px;
+}
+
+.properties
+  .designer-datav-quick-style-section[data-quick-style-variant="batch"]
+  .quick-config-colors
+  .designer-quick-config-button {
+  width: auto;
+  height: 25px;
+  min-height: 25px;
+  flex: 1 1 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.properties .designer-datav-batch-unified-style > .designer-inspector-section-title {
+  margin-bottom: 10px;
+  font-size: 12px;
+  text-transform: none;
+}
+
+.properties .designer-datav-batch-unified-empty {
+  width: 100%;
+  min-height: 32px;
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-muted);
+}
+
+.properties .designer-datav-batch-secondary-actions .designer-button {
+  margin: 0 4px 4px 0;
+}
+
+/* 不设 scroll-padding：该属性会把边框附近（上下各 12px/72px 内）的焦点控件视为
+   "需要滚入视口"，浏览器在 mousedown 聚焦 checkbox/select 时把面板滚动位置强制
+   拖向控件中间，导致每次值变化滚动条都跳一下、直到控件稳定在 padding 区域内。
+   移除后焦点滚动退化为原生语义（仅在控件被裁剪时最小滚动）。 */
+.properties .inspector-pane {
+  padding: 0 16px 24px;
+  background: var(--designer-surface-panel);
+}
+
+.properties .designer-inspector-section {
+  padding: 13px 0;
+}
+
+.properties .designer-inspector-section + .designer-inspector-section {
+  border-top-color: var(--designer-border-subtle);
+}
+
+.properties .designer-inspector-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+  margin-bottom: 10px;
+  color: var(--designer-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.properties .designer-inspector-section-title::after {
+  height: 1px;
+  min-width: var(--designer-space-6);
+  flex: 1;
+  background: var(--designer-border-subtle);
+  content: "";
+}
+
+.properties .designer-control:not(.panel-collapse) {
+  border-color: var(--designer-border-default);
+  border-radius: 2px;
+  background-color: var(--designer-inspector-control-surface);
+}
+
+.properties .quick-config-colors .designer-quick-config-button {
+  border-color: color-mix(in srgb, var(--quick-color) 60%, var(--designer-border-default));
+  background-color: var(--quick-color);
+}
+
+.properties .quick-config-colors .designer-quick-config-button[aria-pressed="true"] {
+  border-color: var(--designer-accent);
+  box-shadow: 0 0 0 2px var(--designer-accent-surface);
+}
+
+.properties
+  .designer-datav-quick-style-section[data-quick-style-variant="batch"]
+  .quick-config-colors
+  .designer-quick-config-button[aria-pressed="true"] {
+  box-shadow: inset 0 0 0 2px var(--designer-text-primary);
+}
+
+.properties .designer-inspector-lock-notice {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: 2px;
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  line-height: 1.5;
+}
+
+.properties .designer-input,
+.properties .designer-select {
+  height: 32px;
+  font-size: 12px;
+}
+
+.properties .designer-datav-geometry-section > .designer-inspector-section-title {
+  display: none;
+}
+
+.properties .designer-datav-geometry-section {
+  padding-top: 11px;
+}
+
+.properties .designer-datav-geometry-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  margin: 0;
+}
+
+.properties .designer-datav-geometry-grid .designer-field {
+  position: relative;
+  min-width: 0;
+  min-height: 28px;
+  margin: 0;
+}
+
+.properties .designer-datav-geometry-grid [data-property-symbol] {
+  display: block;
+  overflow: visible;
+  color: transparent;
+  font-size: 0;
+}
+
+.properties .designer-datav-geometry-grid [data-property-symbol]::before {
+  position: absolute;
+  top: 7px;
+  right: 8px;
+  z-index: 1;
+  color: var(--designer-text-muted);
+  content: attr(data-property-symbol);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  line-height: 14px;
+  pointer-events: none;
+}
+
+.properties .designer-datav-geometry-grid [data-property-symbol] .designer-input {
+  height: 28px;
+  padding-right: 25px;
+  color: var(--designer-text-primary);
+  font-size: 12px;
+  text-align: left;
+}
+
+.properties .designer-datav-geometry-grid .designer-field-message {
+  font-size: 10px;
+  white-space: normal;
+}
+
+.properties .designer-datav-geometry-grid .designer-flip-field {
+  display: block;
+  overflow: visible;
+  font-size: 0;
+}
+
+.properties .designer-datav-geometry-grid .designer-flip-actions {
+  display: grid;
+  height: 28px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid var(--designer-border-default);
+  border-radius: 2px;
+  background: var(--designer-border-default);
+}
+
+.properties .designer-datav-geometry-grid .designer-flip-button {
+  width: auto;
+  min-height: 26px;
+  border: 0;
+  border-radius: 0;
+  background: var(--designer-inspector-control-surface);
+  color: var(--designer-text-muted);
+  font-size: 14px;
+}
+
+.properties .designer-opacity-field {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--designer-text-secondary);
+  font-size: 12px;
+}
+
+.properties .designer-opacity-controls {
+  grid-template-columns: minmax(0, 1fr) 64px;
+  gap: 10px;
+}
+
+.properties .designer-datav-common-section {
+  padding-top: 4px;
+  border-top: 0;
+}
+
+.properties .designer-datav-common-section > .designer-inspector-section-title {
+  display: none;
+}
+
+.properties .designer-datav-section-summary {
+  margin: 0 0 10px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.properties .designer-datav-section-summary::-webkit-details-marker,
+.properties .designer-datav-section-summary::after,
+.properties .designer-datav-section-summary::before {
+  display: none;
+}
+
+.properties .designer-datav-section-disclosure {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  transform: rotate(0deg);
+  transition: transform var(--designer-motion);
+}
+
+.properties details:not([open]) > .designer-datav-section-summary {
+  margin-bottom: 0;
+}
+
+.properties
+  details:not([open])
+  > .designer-datav-section-summary
+  .designer-datav-section-disclosure {
+  transform: rotate(-90deg);
+}
+
+.properties .designer-datav-section-disclosure svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Collapsible inspector sections: hover/keyboard feedback only, no geometry
+   changes so the panel never jitters. */
+.properties summary.designer-inspector-section-title {
+  user-select: none;
+  transition: color var(--designer-motion);
+}
+
+.properties summary.designer-inspector-section-title:hover {
+  color: var(--designer-text-primary);
+}
+
+.properties summary.designer-inspector-section-title:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.properties .designer-quick-style-grid {
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.properties .designer-datav-quick-style-section .designer-quick-config-row:last-child {
+  margin-bottom: 0;
+}
+
+.properties .designer-quick-style {
+  min-height: 56px;
+  border-radius: 1px;
+  background: var(--designer-surface-workspace);
+}
+
+.properties .designer-quick-style[aria-pressed="true"] {
+  border-color: var(--designer-accent);
+  box-shadow: inset 0 0 0 1px var(--designer-accent);
+}

@@ -1,0 +1,113 @@
+@container designer-shell (max-width: 1021px) or (max-height: 637px) {
+  :host {
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .designer {
+    display: block;
+    min-height: 0;
+  }
+
+  .designer > :not(.small-screen-warning) {
+    display: none;
+  }
+
+  .small-screen-warning {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    padding: var(--designer-space-7);
+    color: var(--designer-warning);
+    text-align: center;
+  }
+}
+
+@keyframes designer-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :host,
+  .designer {
+    scroll-behavior: auto !important;
+  }
+
+  .designer-control,
+  .designer-tab,
+  .layer-row,
+  .variable-row,
+  .panel-handle,
+  .material-card,
+  .material-cover,
+  .material-thumb svg,
+  .canvas-guide-preview,
+  .selection,
+  .marquee,
+  .create-preview,
+  .project-conflict,
+  .import-confirmation,
+  .blueprint-workspace,
+  .direct-preview,
+  .designer-menu,
+  .designer-help-dialog,
+  .designer-error-console,
+  .designer-context-menu,
+  .designer-datav-section-disclosure,
+  .topbar-text-button {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .designer-menu .designer-submenu,
+  .designer-context-menu .designer-submenu,
+  .designer-help-dialog .help-content,
+  .rail,
+  .properties,
+  .blueprint-workspace,
+  .direct-preview,
+  .project-workspace {
+    scrollbar-color: auto;
+  }
+
+  .designer-control:focus-visible,
+  .designer-tab:focus-visible,
+  .designer-checkbox:focus-visible,
+  summary.designer-inspector-section-title:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+  }
+
+  .designer-control[aria-invalid="true"] {
+    outline: 2px solid Mark;
+    outline-offset: 2px;
+  }
+
+  .designer-button[aria-pressed="true"],
+  .designer-tab[aria-selected="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .material-group-navigation .material-group-breadcrumb-button[aria-pressed="true"],
+  .material-group-navigation .material-group-button[aria-pressed="true"],
+  .material-filters .designer-button[aria-pressed="true"],
+  .material-categories .designer-button[aria-pressed="true"] {
+    background: Highlight;
+    color: HighlightText;
+    box-shadow: none;
+  }
+
+  .material-badge {
+    border: 1px solid CanvasText;
+  }
+}

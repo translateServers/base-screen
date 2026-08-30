@@ -1,0 +1,44 @@
+.designer-field {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin-bottom: var(--designer-space-4);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.designer-field-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 画布背景图片行（ADR-0046）：URL 输入占满剩余宽度，宿主选择按钮固定右侧；
+   行的外边距承接 field 间距，避免行高超过输入框导致按钮与输入垂直错位。 */
+.designer-canvas-background-row {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  margin-bottom: var(--designer-space-4);
+}
+
+.designer-canvas-background-row .designer-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.designer-canvas-background-row .designer-button {
+  flex: none;
+  white-space: nowrap;
+}
+
+.designer-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-3);
+  margin-bottom: var(--designer-space-4);
+}
+
+.designer-field-grid .designer-field {
+  margin-bottom: 0;
+}

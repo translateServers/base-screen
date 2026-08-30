@@ -1,0 +1,123 @@
+@container designer-shell (max-width: 1180px) {
+  .topbar-search-trigger {
+    width: 32px;
+    flex: 0 0 32px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .topbar-search-trigger > span,
+  .topbar-search-trigger kbd,
+  .topbar-mode-button > span {
+    display: none;
+  }
+
+  .topbar-mode-switch {
+    margin-left: var(--designer-space-1);
+  }
+
+  .topbar-mode-button {
+    width: 28px;
+    padding: 0;
+  }
+}
+
+@container designer-shell (max-width: 1040px) {
+  .topbar-zoom {
+    display: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .designer-dataset-field-option[aria-pressed="true"] {
+    border-color: Highlight;
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+    background: Canvas;
+    color: CanvasText;
+    box-shadow: none;
+  }
+
+  .designer-dataset-field-option[aria-pressed="true"]::before {
+    border-color: Highlight;
+    background: Highlight;
+    box-shadow: none;
+  }
+
+  .designer-dataset-field-option[aria-pressed="true"]::after {
+    border-color: HighlightText;
+  }
+
+  .layer-row[aria-selected="true"],
+  .layer-row[aria-current="true"],
+  .layer-row[data-drop-target="true"],
+  [data-layer-root][data-drop-target="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .canvas {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+
+  .selection,
+  .marquee,
+  .create-preview {
+    border-color: Highlight;
+    outline-color: Highlight;
+    background: transparent;
+  }
+
+  .canvas-guide {
+    background: CanvasText;
+  }
+
+  .canvas-guide-persistent {
+    background: transparent;
+  }
+
+  .canvas-guide-persistent::before {
+    background: CanvasText;
+  }
+
+  .canvas-guide-snap {
+    background: Highlight;
+  }
+
+  .designer-dialog-surface,
+  .import-confirmation,
+  .error-console-card {
+    background: Canvas;
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+
+  .designer-command-palette-card,
+  .designer-command-palette-result {
+    border-color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+  }
+
+  .status-console-trigger[data-has-errors],
+  .status-console-trigger[data-has-warning] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .error-console-current,
+  .error-console-entry,
+  .error-console-empty {
+    border-color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .designer-dataset-field-option::before,
+  .designer-dataset-field-option::after {
+    transition-duration: 0s !important;
+  }
+}

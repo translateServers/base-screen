@@ -1,0 +1,33 @@
+import accessibilityCss from './designer-workbench-accessibility.css?inline';
+import canvasCss from './designer-workbench-canvas.css?inline';
+import dataBindingCss from './designer-workbench-data-binding.css?inline';
+import dataCatalogCss from './designer-workbench-data-catalog.css?inline';
+import dataEditorCss from './designer-workbench-data-editor.css?inline';
+import feedbackCss from './designer-workbench-feedback.css?inline';
+import inspectorCss from './designer-workbench-inspector.css?inline';
+import inspectorDataCss from './designer-workbench-inspector-data.css?inline';
+import layersCss from './designer-workbench-layers.css?inline';
+import materialsCss from './designer-workbench-materials.css?inline';
+import panelsCss from './designer-workbench-panels.css?inline';
+import shellCss from './designer-workbench-shell.css?inline';
+import topbarCss from './designer-workbench-topbar.css?inline';
+import variablesCss from './designer-workbench-variables.css?inline';
+
+// Feature files are concatenated in cascade order. Keep responsive and accessibility
+// overrides last so splitting the source never changes the original CSS behavior.
+export const DESIGNER_WORKBENCH_CSS = [
+  topbarCss,
+  feedbackCss,
+  shellCss,
+  panelsCss,
+  materialsCss,
+  dataCatalogCss,
+  dataBindingCss,
+  dataEditorCss,
+  layersCss,
+  variablesCss,
+  canvasCss,
+  inspectorCss,
+  inspectorDataCss,
+  accessibilityCss,
+].join('\n');

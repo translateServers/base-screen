@@ -1,10 +1,10 @@
-import baseCss from './designer-base.css?inline';
-import controlsCss from './designer-controls.css?inline';
+import { DESIGNER_BASE_CSS as baseCss } from './base/designer-base-style.js';
+import { DESIGNER_CONTROLS_CSS as controlsCss } from './controls/designer-controls-style.js';
 import tokensCss from './designer-tokens.css?inline';
-import workbenchCss from './designer-workbench.css?inline';
+import { DESIGNER_WORKBENCH_CSS as workbenchCss } from './workbench/designer-workbench-style.js';
 
-// 四层 CSS 按序拼接（tokens → base → controls → workbench）；测试消费此常量
-// 做精确断言（vitest 不处理 ?inline 后缀，模块内值为空串）。
+// 四层 CSS 按序拼接（tokens → base → controls → workbench）。workbench 内部继续按
+// 功能域编排；测试消费此常量做精确断言（vitest 不处理 ?inline 后缀，值为空串）。
 export const DESIGNER_CSS = [tokensCss, baseCss, controlsCss, workbenchCss].join('\n');
 
 export function createDesignerStyle(ownerDocument: Document): HTMLStyleElement {

@@ -1,0 +1,669 @@
+.rail,
+.properties,
+.designer-topbar,
+.statusbar {
+  background: var(--designer-surface-panel);
+}
+
+.designer-topbar {
+  position: relative;
+  z-index: var(--designer-z-workspace-overlay);
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-4);
+  padding: 0 var(--designer-space-5);
+  /* height 含 border：grid 行高 48px 与 .designer-topbar 总高一致，避免 1px 溢出到 ruler 行 */
+  box-sizing: border-box;
+  height: var(--designer-topbar-height);
+  border-bottom: 1px solid var(--designer-border-default);
+  background: var(--designer-surface-panel);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.topbar-brand,
+.topbar-center,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+}
+
+.topbar-brand {
+  flex: 0 1 auto;
+  min-width: 0;
+  gap: var(--designer-space-3);
+}
+
+.topbar-center {
+  min-width: 0;
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: var(--designer-space-2);
+}
+
+.topbar-actions {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  gap: var(--designer-space-2);
+}
+
+.topbar-product-mark {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--designer-accent) 55%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--designer-accent-surface) 76%, transparent);
+  color: var(--designer-accent);
+}
+
+.topbar-product-mark svg {
+  width: 16px;
+  height: 16px;
+}
+
+.topbar-project-meta {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.topbar-mode-switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 1px;
+  margin-left: var(--designer-space-3);
+  padding: 2px;
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: 5px;
+  background: var(--designer-surface-workspace);
+}
+
+.topbar-mode-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  min-width: 0;
+  min-height: 26px;
+  align-items: center;
+  justify-content: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-3);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+}
+
+button.topbar-mode-button {
+  cursor: pointer;
+}
+
+.topbar-mode-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+.topbar-mode-button[data-active="true"] {
+  border-color: var(--designer-border-default);
+  background: var(--designer-surface-control);
+  color: var(--designer-accent);
+}
+
+button.topbar-mode-button:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+/* 顶栏圆角分组：工具选择器 / 撤销重做 / 缩放。 */
+.topbar-segment {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: 8px;
+  background: color-mix(
+    in srgb,
+    var(--designer-surface-workspace) 80%,
+    var(--designer-surface-panel)
+  );
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--designer-text-primary) 3%, transparent);
+}
+
+.topbar-segment .designer-icon-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.topbar-segment .designer-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
+}
+
+.topbar-segment .designer-icon-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.topbar-segment kbd {
+  display: none;
+}
+
+.designer-tool-cluster .designer-tool-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  border-radius: 6px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.designer-tool-cluster .designer-tool-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  box-shadow: none;
+}
+
+.designer-tool-cluster .designer-tool-button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--designer-accent);
+  color: var(--designer-surface-workspace);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 30%, transparent);
+}
+
+.designer-tool-cluster {
+  flex: none;
+}
+
+.topbar-zoom .designer-icon-button {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+}
+
+.zoom-value {
+  box-sizing: border-box;
+  width: 52px;
+  height: 26px;
+  flex: 0 0 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-numeric);
+  font-size: 11px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition:
+    background var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.zoom-value:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--designer-border-subtle);
+  margin: 0 var(--designer-space-1);
+}
+
+.designer-project-name {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-save-status {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0;
+  border-radius: var(--designer-radius-control);
+  color: var(--designer-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  transition: background var(--designer-motion);
+}
+
+.topbar-save-status:hover {
+  background: transparent;
+}
+
+.topbar-search-trigger {
+  box-sizing: border-box;
+  display: inline-flex;
+  width: clamp(132px, 16vw, 220px);
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-3);
+  border: 1px solid var(--designer-border-default);
+  border-radius: 4px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  cursor: pointer;
+  font: var(--designer-font-small);
+  text-align: left;
+}
+
+.topbar-search-trigger:hover,
+.topbar-search-trigger[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--designer-accent) 60%, var(--designer-border-default));
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-secondary);
+}
+
+.topbar-search-trigger svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.topbar-search-trigger > span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-search-trigger kbd {
+  flex: none;
+  padding: 1px var(--designer-space-2);
+  border: 1px solid var(--designer-border-default);
+  border-radius: 3px;
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+}
+
+.designer-command-palette {
+  position: absolute;
+  z-index: var(--designer-z-modal);
+  inset: var(--designer-topbar-height) 0 30px;
+  display: grid;
+  align-items: start;
+  justify-items: center;
+  padding: var(--designer-space-7);
+  background: var(--designer-surface-scrim);
+}
+
+.designer-command-palette[hidden] {
+  display: none;
+}
+
+.designer-command-palette-card {
+  display: flex;
+  width: min(620px, calc(100% - 24px));
+  max-height: min(560px, calc(100% - 24px));
+  min-width: 0;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--designer-border-strong);
+  border-radius: var(--designer-radius-overlay);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-shadow-overlay);
+}
+
+.designer-command-palette-search {
+  display: flex;
+  min-height: 48px;
+  flex: none;
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-5);
+  border-bottom: 1px solid var(--designer-border-default);
+}
+
+.designer-command-palette-search > span {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--designer-accent);
+}
+
+.designer-command-palette-search svg {
+  width: 16px;
+  height: 16px;
+}
+
+.designer-command-palette-search input {
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-primary);
+  font-size: 13px;
+}
+
+.designer-command-palette-search input:focus {
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+}
+
+.designer-command-palette-search kbd,
+.designer-command-palette-kind {
+  flex: none;
+  padding: 2px var(--designer-space-2);
+  border: 1px solid var(--designer-border-default);
+  border-radius: 3px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: 9px;
+}
+
+.designer-command-palette-results {
+  min-height: 0;
+  overflow: hidden auto;
+  padding: var(--designer-space-3);
+  scrollbar-gutter: stable;
+}
+
+.designer-command-palette-result {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-3) var(--designer-space-4);
+  border: 1px solid transparent;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.designer-command-palette-result:hover:not(:disabled),
+.designer-command-palette-result:focus-visible:not(:disabled),
+.designer-command-palette-result[data-active="true"]:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 24%, transparent);
+  outline: 0;
+  background: var(--designer-accent-surface);
+  color: var(--designer-text-primary);
+}
+
+.designer-command-palette-result:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.designer-command-palette-glyph {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--designer-surface-control);
+  color: var(--designer-accent);
+}
+
+.designer-command-palette-glyph svg {
+  width: 14px;
+  height: 14px;
+}
+
+.designer-command-palette-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.designer-command-palette-copy strong,
+.designer-command-palette-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-command-palette-copy strong {
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.designer-command-palette-copy small {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.designer-command-palette-empty {
+  margin: 0;
+  padding: var(--designer-space-7);
+  color: var(--designer-text-muted);
+  text-align: center;
+}
+
+.designer-command-palette-card > footer {
+  flex: none;
+  padding: var(--designer-space-3) var(--designer-space-5);
+  border-top: 1px solid var(--designer-border-subtle);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.topbar-save-status svg {
+  width: 12px;
+  height: 12px;
+}
+
+.topbar-save-status[data-state="saving"] svg {
+  animation: designer-save-status-spin 1s linear infinite;
+}
+
+.topbar-save-status[data-state="dirty"] {
+  color: var(--designer-warning);
+}
+
+.topbar-save-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--designer-warning);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--designer-warning) 40%, transparent);
+}
+
+.topbar-save-status[data-state="saved"] svg {
+  color: var(--designer-success);
+}
+
+@keyframes designer-save-status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.designer-menu-triggers {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border-radius: 8px;
+}
+
+.designer-menu-trigger {
+  position: relative;
+  min-height: 28px;
+  padding: 0 var(--designer-space-3);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--designer-text-secondary);
+  font-weight: 500;
+  font-size: 12px;
+  transition:
+    background var(--designer-motion),
+    color var(--designer-motion),
+    border-color var(--designer-motion);
+}
+
+.designer-menu-trigger:hover:not([aria-expanded="true"]) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  border-color: transparent;
+}
+
+.designer-menu-trigger[aria-expanded="true"] {
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+  border-color: color-mix(in srgb, var(--designer-accent) 30%, transparent);
+}
+
+/* 右段带文案操作按钮：预览 / 保存 / 发布。独立于 .designer-button（inline-grid）的布局。 */
+/* HTML hidden 属性会被显式 display 覆盖：操作按钮/菜单项以 hidden 控制可用性时强制隐藏。 */
+.topbar-text-button[data-action][hidden],
+.designer-menu-item[data-action][hidden],
+.designer-menu-item[data-menu-action][hidden] {
+  display: none;
+}
+
+.topbar-text-button {
+  box-sizing: border-box;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  height: 26px;
+  gap: 4px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transform: translateZ(0);
+  transition:
+    background var(--designer-motion),
+    border-color var(--designer-motion),
+    color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    opacity var(--designer-motion);
+}
+
+.topbar-text-button-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.topbar-text-button svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+}
+
+.topbar-text-button .topbar-button-spinner {
+  display: none;
+}
+
+.topbar-text-button[aria-busy="true"] .topbar-text-button-glyph > svg:not(.topbar-button-spinner) {
+  display: none;
+}
+
+.topbar-text-button[aria-busy="true"] .topbar-button-spinner {
+  display: block;
+  animation: designer-button-spinner-spin 0.8s linear infinite;
+}
+
+.topbar-text-button:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+}
+
+.topbar-text-button:active:not(:disabled) {
+  transform: translateZ(0) scale(0.95);
+}
+
+.topbar-text-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.topbar-text-button[aria-busy="true"] {
+  cursor: progress;
+}
+
+@keyframes designer-button-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 预览按钮 - 纯 ghost，无背景无边框 */
+.topbar-text-button[data-action="preview"] {
+  padding: 0 6px;
+  color: var(--designer-text-secondary);
+}
+
+.topbar-text-button[data-action="preview"]:hover:not(:disabled) {
+  color: var(--designer-text-primary);
+}
+
+/* 保存按钮 - 极淡描边，hover 时轻微浮现 */
+.topbar-text-button[data-action="project-save"] {
+  border-color: color-mix(in srgb, var(--designer-border-default) 30%, transparent);
+  background: color-mix(in srgb, var(--designer-surface-control) 20%, transparent);
+}
+
+.topbar-text-button[data-action="project-save"]:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-border-default) 60%, transparent);
+  background: color-mix(in srgb, var(--designer-surface-control) 40%, transparent);
+}
+
+.topbar-text-button[data-action="project-save"]:active:not(:disabled) {
+  transform: translateZ(0) scale(0.96);
+}
+
+/* 发布按钮 - primary CTA 风格，品牌色填充 */
+.topbar-publish {
+  border-color: var(--designer-accent);
+  background: var(--designer-accent);
+  color: var(--designer-surface-workspace);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--designer-accent) 20%, transparent);
+}
+
+.topbar-publish:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 85%, white);
+  background: color-mix(in srgb, var(--designer-accent) 92%, white);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 25%, transparent);
+}
+
+.topbar-publish:active:not(:disabled) {
+  transform: translateZ(0) scale(0.96);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--designer-accent) 15%, transparent);
+}

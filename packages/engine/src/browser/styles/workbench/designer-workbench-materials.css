@@ -1,0 +1,200 @@
+/* 物料卡片：大缩略图 + 名称行；交互只改边框/阴影/图标缩放等绘制属性，几何恒定。 */
+.material-card {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  /* 覆盖 .designer-button 基类的居中约束：列方向子元素必须横向拉伸，
+     否则名称/类型行收缩为内容宽并被居中截断。 */
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: var(--designer-space-3);
+  margin: 0;
+  padding: var(--designer-space-2) var(--designer-space-2) var(--designer-space-3);
+  text-align: left;
+  border-color: var(--designer-border-subtle);
+  border-radius: 4px;
+  background: var(--designer-surface-raised);
+  box-shadow: none;
+  transition:
+    background-color var(--designer-motion),
+    border-color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+.material-card:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--designer-accent) 52%, var(--designer-border-default));
+  background-color: var(--designer-surface-control-hover);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 12%, transparent);
+  transform: translateZ(0);
+}
+
+.material-card:not(:disabled):active {
+  transform: translateZ(0);
+}
+
+.material-card:focus-visible {
+  z-index: 1;
+}
+
+/* 缩略图：分类色相驱动（--material-hue 由 DOM 确定性写入）的双色渐变 + 网格纹理，
+   模拟数据大屏的深色画布质感；深浅主题共用同一色相。 */
+.material-thumb {
+  position: relative;
+  display: grid;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, hsl(var(--material-hue, 215) 35% 52%) 22%, transparent);
+  border-radius: 3px;
+  background:
+    radial-gradient(
+      120% 90% at 18% 8%,
+      hsl(var(--material-hue, 215) 62% 58% / 22%),
+      transparent 56%
+    ),
+    linear-gradient(
+      158deg,
+      hsl(var(--material-hue, 215) 28% 25%),
+      hsl(var(--material-hue, 215) 32% 12%)
+    );
+  color: hsl(var(--material-hue, 215) 72% 82%);
+}
+
+.material-thumb::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      hsl(var(--material-hue, 215) 80% 85% / 8%) 0 1px,
+      transparent 1px 10px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      hsl(var(--material-hue, 215) 80% 85% / 8%) 0 1px,
+      transparent 1px 10px
+    );
+  content: "";
+  pointer-events: none;
+}
+
+.material-thumb svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  filter: drop-shadow(0 2px 6px hsl(var(--material-hue, 215) 80% 38% / 34%));
+  transition: transform var(--designer-motion);
+}
+
+.material-card:hover:not(:disabled) .material-thumb svg {
+  transform: scale(1.06);
+}
+
+/* 宿主封面：绝对铺满缩略图区（几何恒定），加载前透明露出占位图标，load 后 opacity 过渡显现；
+   error 由 DOM 移除图片，恢复占位图标与色相背景。 */
+.material-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--designer-motion);
+}
+
+.material-cover[data-material-cover-loaded] {
+  opacity: 1;
+}
+
+/* 封面加载完成后占位图标淡出（opacity 过渡，无几何变化）。
+   标记写在与图片同级的缩略图容器上，用后代选择器匹配，与 DOM 顺序无关。 */
+.material-thumb[data-material-cover-loaded] svg {
+  opacity: 0;
+  transition:
+    opacity var(--designer-motion),
+    transform var(--designer-motion);
+}
+
+:host([theme="light"]) .material-thumb {
+  border-color: color-mix(in srgb, hsl(var(--material-hue, 215) 45% 45%) 30%, transparent);
+  background:
+    radial-gradient(
+      120% 90% at 18% 8%,
+      hsl(var(--material-hue, 215) 85% 92% / 85%),
+      transparent 56%
+    ),
+    linear-gradient(
+      158deg,
+      hsl(var(--material-hue, 215) 62% 76%),
+      hsl(var(--material-hue, 215) 55% 62%)
+    );
+  color: hsl(var(--material-hue, 215) 50% 28%);
+}
+
+:host([theme="light"]) .material-thumb::before {
+  background-image:
+    repeating-linear-gradient(
+      0deg,
+      hsl(var(--material-hue, 215) 45% 35% / 8%) 0 1px,
+      transparent 1px 10px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      hsl(var(--material-hue, 215) 45% 35% / 8%) 0 1px,
+      transparent 1px 10px
+    );
+}
+
+/* 封面加载后占位层收起（ADR-0041）：底色切换为中性表面 Token——半透明素材不再透出彩色渐变/网格；
+   网格纹理直接隐藏（状态切换，无过渡）。contain 模式由缩略图容器标记驱动（不写内联样式），
+   cover 为缺省不写标记。规则置于浅色主题块之后，避免被主题背景覆盖。 */
+.material-thumb[data-material-cover-loaded] {
+  background: var(--designer-surface-canvas);
+}
+
+.material-thumb[data-material-cover-loaded]::before {
+  display: none;
+}
+
+.material-thumb[data-material-cover-fit="contain"] .material-cover {
+  object-fit: contain;
+}
+
+/* 名称与类型分两行，避免两个关键标识在窄卡片内互相挤压。 */
+.material-card-meta {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+  padding: 0 var(--designer-space-1) var(--designer-space-1);
+}
+
+.material-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-type {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

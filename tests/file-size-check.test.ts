@@ -25,6 +25,10 @@ describe('file size checks', () => {
       category: 'test',
       limit: 800,
     });
+    expect(fileSizePolicy('packages/engine/src/browser/styles/example.css')).toEqual({
+      category: 'ui-style',
+      limit: 800,
+    });
     expect(fileSizePolicy('packages/engine/src/common/vendor/example.ts')).toBeUndefined();
   });
 

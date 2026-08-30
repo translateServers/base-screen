@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const BASELINE_PATH = resolve('scripts/file-size-baseline.json');
-const SOURCE_EXTENSION = /\.(?:mjs|ts|tsx)$/;
+const TRACKED_EXTENSION = /\.(?:css|mjs|ts|tsx)$/;
 const VENDORED_SOURCE = 'packages/engine/src/common/vendor/';
 
 function normalizePath(filePath) {
@@ -18,7 +18,7 @@ export function countLogicalLines(source) {
 
 export function fileSizePolicy(filePath) {
   const normalized = normalizePath(filePath);
-  if (!SOURCE_EXTENSION.test(normalized) || normalized.startsWith(VENDORED_SOURCE)) {
+  if (!TRACKED_EXTENSION.test(normalized) || normalized.startsWith(VENDORED_SOURCE)) {
     return undefined;
   }
   if (/^scripts\/verify-.*\.mjs$/.test(normalized)) {
@@ -26,6 +26,9 @@ export function fileSizePolicy(filePath) {
   }
   if (normalized.startsWith('tests/') || normalized.includes('/tests/')) {
     return { category: 'test', limit: 800 };
+  }
+  if (/^packages\/[^/]+\/src\/.*\.css$/.test(normalized)) {
+    return { category: 'ui-style', limit: 800 };
   }
   if (/^packages\/[^/]+\/src\/browser\/controllers\//.test(normalized)) {
     return { category: 'ui-controller', limit: 400 };
@@ -106,7 +109,8 @@ function discoverFiles() {
   )
     .split('\0')
     .filter(Boolean)
-    .map(normalizePath);
+    .map(normalizePath)
+    .filter((path) => existsSync(path));
 }
 
 function collectFileLines() {

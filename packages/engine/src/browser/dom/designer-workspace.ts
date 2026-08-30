@@ -152,7 +152,7 @@ export function createDesignerWorkspace(
       <div class="rail-view" id="designer-variables-panel" role="tabpanel" aria-labelledby="designer-variables-tab" data-variables hidden></div>
     </aside>
 
-    <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical"></div>
+    <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical" aria-controls="designer-left-panel" aria-label="${DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.leftPanel)}" aria-valuemin="200" aria-valuemax="480" aria-valuenow="336" tabindex="0"></div>
 
     <main class="workspace">
       <header class="designer-topbar" aria-label="${DESIGNER_UI_TEXT.topbar}">
@@ -317,7 +317,7 @@ export function createDesignerWorkspace(
       </section>
     </main>
 
-    <div class="panel-handle" data-panel-handle="right" role="separator" aria-orientation="vertical"></div>
+    <div class="panel-handle" data-panel-handle="right" role="separator" aria-orientation="vertical" aria-controls="designer-right-panel" aria-label="${DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.inspector)}" aria-valuemin="288" aria-valuemax="480" aria-valuenow="336" tabindex="0"></div>
 
     <aside class="properties" id="designer-right-panel" data-right-panel aria-labelledby="designer-right-panel-title">
       <header class="panel-heading">

@@ -1,0 +1,412 @@
+/* 与物料搜索一致的视觉语言：内凹深底 + 大圆角，图标固定绝对定位在输入框内。 */
+.layer-search input {
+  height: 30px;
+  min-height: 30px;
+  padding-left: calc(var(--designer-space-3) + 20px);
+  border-color: var(--designer-border-subtle);
+  border-radius: 4px;
+  background: color-mix(
+    in srgb,
+    var(--designer-surface-workspace) 66%,
+    var(--designer-surface-panel)
+  );
+}
+
+.layer-search input:hover:not(:disabled) {
+  border-color: var(--designer-border-default);
+  background: color-mix(
+    in srgb,
+    var(--designer-surface-workspace) 58%,
+    var(--designer-surface-panel)
+  );
+}
+
+.layer-search input:focus {
+  background: var(--designer-surface-control);
+}
+
+.layer-search-glyph {
+  position: absolute;
+  bottom: 0;
+  left: var(--designer-space-3);
+  z-index: 1;
+  display: grid;
+  width: var(--designer-control-height);
+  height: 30px;
+  place-items: center;
+  color: var(--designer-text-muted);
+  pointer-events: none;
+}
+
+.layer-search:focus-within .layer-search-glyph {
+  color: var(--designer-accent);
+}
+
+.layer-search-glyph svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+}
+
+[data-layer-root] {
+  min-height: 0;
+  overflow: hidden auto;
+  padding: 8px 8px 12px;
+  scrollbar-gutter: stable;
+}
+
+/* 行几何常量：折叠与名称两列始终占位；右侧操作簇绝对定位且不参与行高计算。 */
+.layer-row {
+  --layer-row-surface: transparent;
+
+  position: relative;
+  display: grid;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 36px;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-1);
+  margin-bottom: 2px;
+  padding: 2px 6px;
+  border-radius: var(--designer-radius-control);
+  background-color: var(--layer-row-surface);
+  cursor: default;
+  transition:
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+.layer-row[data-layer-selectable="true"] {
+  cursor: pointer;
+}
+
+/* 缩进引导线：--layer-depth × 20px 宽度的重复渐变，零逐级 DOM；仅在深层层级可见。
+   left 偏移 = 行左内边距（space-2），使竖线精确穿过父级折叠箭头中心（缩进 20px 的 10px 处）。 */
+.layer-row::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: var(--designer-space-2);
+  width: calc(var(--layer-depth, 0) * 20px);
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 9px,
+    var(--designer-border-subtle) 9px 10px
+  );
+  content: "";
+  pointer-events: none;
+}
+
+.layer-row:hover,
+.layer-row:focus-within {
+  --layer-row-surface: var(--designer-surface-control-hover);
+}
+
+/* 选中反馈与整行命中范围完全重合：低饱和品牌底色 + 2px 左轨 + 1px 内描边。
+   只改变绘制属性，不改变行几何。 */
+.layer-row[aria-selected="true"] {
+  --layer-row-surface: color-mix(
+    in srgb,
+    var(--designer-accent) 15%,
+    var(--designer-surface-panel)
+  );
+
+  box-shadow:
+    inset 2px 0 0 var(--designer-accent),
+    inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 28%, transparent);
+}
+
+.layer-row[aria-selected="true"]:hover {
+  --layer-row-surface: color-mix(
+    in srgb,
+    var(--designer-accent) 20%,
+    var(--designer-surface-panel)
+  );
+}
+
+.layer-row[aria-current="true"]:not([aria-selected="true"]) {
+  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--designer-accent) 72%, transparent);
+}
+
+.layer-row[data-drop-target="true"],
+[data-layer-root][data-drop-target="true"] {
+  outline: 2px dashed var(--designer-accent);
+  outline-offset: -2px;
+}
+
+.layer-collapse-spacer {
+  width: 24px;
+  height: 24px;
+}
+
+.layer-select {
+  display: flex;
+  grid-column: 2;
+  min-width: 0;
+  min-height: 32px;
+  align-self: stretch;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 0 2px;
+  text-align: left;
+  border-color: transparent;
+  background: transparent;
+  transition:
+    border-color var(--designer-motion),
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    color var(--designer-motion),
+    padding-right var(--designer-motion);
+}
+
+/* 悬停反馈由整行承载（行底色变化），名称按钮保持透明，覆盖 .designer-control 通用
+   hover 的边框/底色，避免"行圆角套按钮圆角"的双层盒。 */
+.layer-select:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* 键盘仍聚焦语义按钮，但焦点环投影到与指针命中一致的整行，避免内外两个范围。 */
+.layer-select:focus-visible {
+  outline: none;
+}
+
+.layer-row:has(.layer-select:focus-visible) {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+/* 行首类型图标：与物料库同一派生规则；选中行提亮为品牌色，默认保持安静。 */
+.layer-glyph {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  place-items: center;
+  color: var(--designer-text-muted);
+  transition: color var(--designer-motion);
+}
+
+.layer-select .layer-glyph svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+}
+
+.layer-row:hover .layer-glyph {
+  color: var(--designer-text-secondary);
+}
+
+.layer-row[aria-selected="true"] .layer-glyph {
+  color: var(--designer-accent);
+}
+
+.layer-row[aria-selected="true"] .layer-name {
+  color: var(--designer-text-primary);
+}
+
+.layer-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font: var(--designer-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layer-row[data-hidden="true"] .layer-name,
+.layer-row[data-locked="true"] .layer-name {
+  color: var(--designer-text-muted);
+}
+
+.layer-row[data-hidden="true"] .layer-name {
+  opacity: 0.62;
+  text-decoration: line-through;
+}
+
+.layer-count {
+  flex: 0 0 auto;
+  min-width: 16px;
+  min-height: 16px;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--designer-border-default) 32%, transparent);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* 行内紧凑控件：折叠/操作图标按钮与重命名输入，恒定尺寸避免几何抖动。 */
+.layer-row > .designer-button:not(.layer-select),
+.layer-actions .designer-button {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  min-width: 0;
+  min-height: 24px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--designer-text-muted);
+}
+
+.layer-row > .designer-button:not(.layer-select):hover:not(:disabled),
+.layer-actions .designer-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.layer-actions .designer-button[aria-pressed="true"] {
+  border-color: transparent;
+  background: transparent;
+}
+
+/* 行内控件按压不缩放：小尺寸图标按钮的 scale 按压反馈会产生视觉抖动。 */
+.layer-row .designer-button:not(:disabled):active {
+  transform: translateZ(0);
+}
+
+.layer-row > .designer-button svg,
+.layer-actions .designer-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* 操作图标稍大，与 24px 按钮保持舒展比例。 */
+.layer-actions .designer-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 重命名模式：名称按钮隐藏、输入框同位同高替换，行几何不变。 */
+.layer-row[data-renaming="true"] .layer-select {
+  display: none;
+}
+
+.layer-row .designer-input {
+  grid-column: 2 / -1;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 var(--designer-space-2);
+  font: var(--designer-font-small);
+}
+
+/* 操作簇常态只露出最右侧的定位入口；指针进入该入口或键盘焦点进入操作簇时向左展开。
+   名称按钮保留完整宽度与独立命中区域，操作簇不参与网格布局，因此展开前后行高恒定。 */
+.layer-actions {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 1;
+  display: flex;
+  width: 24px;
+  align-items: center;
+  flex-direction: row-reverse;
+  gap: 0;
+  overflow: hidden;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: width var(--designer-motion);
+}
+
+.layer-actions .designer-button {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  border-radius: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    border-color var(--designer-motion),
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    color var(--designer-motion),
+    opacity var(--designer-motion);
+}
+
+/* 操作图标 hover 用品牌色浅底，比通用灰底更能传达可点性。 */
+.layer-actions .designer-button:hover:not(:disabled) {
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+/* 分组间距：状态开关（隐藏/锁定）与排序（上移/下移）之间拉大空隙，无需分隔线。 */
+.layer-actions .designer-button[data-layer-move="up"] {
+  margin-right: 3px;
+}
+
+.layer-actions:hover,
+.layer-actions:focus-within {
+  width: 123px;
+}
+
+.layer-row:hover .layer-actions,
+.layer-row:focus-within .layer-actions,
+.layer-row[aria-selected="true"] .layer-actions {
+  background: linear-gradient(90deg, transparent, var(--layer-row-surface) 12px);
+}
+
+/* 逐图标浮现：hover/focus-within/选中行显示整组；已激活的隐藏/锁定开关常驻可见可点，
+   作为行级状态指示（替代文字芯片），其余时刻行右侧保持干净。 */
+.layer-row:hover .layer-actions .designer-button,
+.layer-row:focus-within .layer-actions .designer-button,
+.layer-row[aria-selected="true"] .layer-actions .designer-button,
+.layer-actions .designer-button[aria-pressed="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* 排序按钮到达边界禁用：浮现时压暗（优先级高于浮现规则），常态随整组隐藏。 */
+.layer-row:hover .layer-actions .designer-button:disabled,
+.layer-row:focus-within .layer-actions .designer-button:disabled,
+.layer-row[aria-selected="true"] .layer-actions .designer-button:disabled {
+  opacity: 0.32;
+}
+
+/* 选中行内操作图标提亮一档，与行首 accent 图标、加粗名称的强调层级一致。 */
+.layer-row[aria-selected="true"] .layer-actions .designer-button:not([aria-pressed="true"]) {
+  color: var(--designer-text-secondary);
+}
+
+/* 激活的隐藏/锁定开关以警示色常驻提示（hover 时保持警示色，不被品牌色覆盖）。 */
+.layer-actions .designer-button[aria-pressed="true"],
+.layer-actions .designer-button[aria-pressed="true"]:hover:not(:disabled) {
+  color: var(--designer-warning);
+}
+
+/* 重命名模式：操作图标完全让位（输入框横跨整行；display 兜底压过常驻开关的显隐规则）。 */
+.layer-row[data-renaming="true"] .layer-actions {
+  display: none;
+}
+
+/* 诊断行：与名称文本左对齐（折叠列 20px + gap + 按钮边框 + 内边距）。 */
+.layer-diagnostic {
+  grid-column: 1 / -1;
+  padding-inline-start: 27px;
+  color: var(--designer-warning);
+}
+
+/* 分页“显示更多”：整行幽灵按钮，恒定高度，悬停仅改背景色。 */
+.layer-show-more {
+  width: 100%;
+  min-height: 24px;
+  margin-top: var(--designer-space-1);
+  border-color: transparent;
+  background: transparent;
+  color: var(--designer-text-muted);
+}
+
+.layer-show-more:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-secondary);
+}
