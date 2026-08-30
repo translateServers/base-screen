@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 const BASELINE_PATH = resolve('scripts/file-size-baseline.json');
 const TRACKED_EXTENSION = /\.(?:css|mjs|ts|tsx)$/;
 const VENDORED_SOURCE = 'packages/engine/src/common/vendor/';
+const DESIGNER_UI_TEXT_SOURCE = 'packages/engine/src/common/ui-text/designer-ui-text.ts';
 
 function normalizePath(filePath) {
   return filePath.replaceAll('\\', '/');
@@ -32,6 +33,11 @@ export function fileSizePolicy(filePath) {
   }
   if (/^packages\/[^/]+\/src\/.*\.css$/.test(normalized)) {
     return { category: 'ui-style', limit: 800 };
+  }
+  // This is the enforced source of truth for user-visible Designer copy. It is a pure-data
+  // catalog rather than a runtime aggregate, so it has a dedicated bounded policy.
+  if (normalized === DESIGNER_UI_TEXT_SOURCE) {
+    return { category: 'ui-text-catalog', limit: 1000 };
   }
   if (/^packages\/[^/]+\/src\/browser\/controllers\//.test(normalized)) {
     return { category: 'ui-controller', limit: 400 };

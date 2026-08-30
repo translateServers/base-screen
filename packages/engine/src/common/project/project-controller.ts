@@ -1,51 +1,35 @@
 import {
   parseScreenProjectEnvelope,
-  type ScreenDiagnostic,
   type ScreenDocument,
   type ScreenParseResult,
   type ScreenProjectAdapter,
   type ScreenProjectEnvelope,
   serializeScreenDocument,
 } from '@base-screen/contracts';
+import {
+  loadScreenProject,
+  publishScreenProject,
+  saveScreenProject,
+} from './project-adapter-invocation.js';
+import {
+  defaultScreenProjectScheduler,
+  failScreenProject as fail,
+  hasScreenProjectDiagnosticCode as hasCode,
+  isConsistentScreenProjectAdapter as isConsistentAdapter,
+  type ScreenProjectOperation as Operation,
+  type ScreenProjectPendingOperation as PendingOperation,
+  type ScreenProjectControllerOptions,
+  type ScreenProjectPhase,
+  type ScreenProjectScheduler,
+  serializeScreenProjectDocument as serialize,
+} from './project-controller-support.js';
 
-export type ScreenProjectPhase =
-  | 'unloaded'
-  | 'loading'
-  | 'ready'
-  | 'saving'
-  | 'publishing'
-  | 'conflict'
-  | 'error'
-  | 'disposed';
-
-export interface ScreenProjectScheduler {
-  wait(delayMs: number, signal: AbortSignal): Promise<void>;
-}
-
-export interface ScreenProjectControllerChange {
-  readonly phase: ScreenProjectPhase;
-  readonly project: ScreenProjectEnvelope | undefined;
-  readonly dirty: boolean;
-}
-
-export interface ScreenProjectControllerOptions {
-  readonly getDocument: () => ScreenDocument | undefined;
-  readonly replaceDocument: (document: ScreenDocument) => ScreenParseResult<ScreenDocument>;
-  readonly onChange?: (change: ScreenProjectControllerChange) => void;
-  readonly onDirtyChange?: (dirty: boolean) => void;
-  readonly onConflict?: () => void;
-  readonly scheduler?: ScreenProjectScheduler;
-}
-
-type Operation = 'load' | 'save' | 'publish';
-
-interface PendingOperation {
-  readonly generation: number;
-  readonly controller: AbortController;
-  readonly adapter: ScreenProjectAdapter | undefined;
-  readonly projectId: string | undefined;
-  readonly revision: string | undefined;
-}
+export type {
+  ScreenProjectControllerChange,
+  ScreenProjectControllerOptions,
+  ScreenProjectPhase,
+  ScreenProjectScheduler,
+} from './project-controller-support.js';
 
 export class ScreenProjectController {
   #adapter: ScreenProjectAdapter | undefined;
@@ -65,7 +49,7 @@ export class ScreenProjectController {
 
   constructor(options: ScreenProjectControllerOptions) {
     this.#options = options;
-    this.#scheduler = options.scheduler ?? defaultScheduler;
+    this.#scheduler = options.scheduler ?? defaultScreenProjectScheduler;
   }
 
   get adapter(): ScreenProjectAdapter | undefined {
@@ -138,7 +122,7 @@ export class ScreenProjectController {
 
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
-        const result = await this.callLoad(projectId, pending);
+        const result = await loadScreenProject(projectId, pending);
         if (!this.isCurrent(pending) || pending.controller.signal.aborted) {
           return fail('PROJECT_ABORTED', 'Project operation was cancelled.');
         }
@@ -203,7 +187,7 @@ export class ScreenProjectController {
       if (current === undefined || this.#adapter === undefined) {
         return fail('PROJECT_ADAPTER_INVALID', 'No loaded project is available to save.');
       }
-      const result = await this.callSave(current, document, pending);
+      const result = await saveScreenProject(current, document, pending);
       return this.applySaveResult(result, pending, current, snapshot.value);
     });
     this.#saveFlights.set(snapshot.value, operation);
@@ -241,7 +225,7 @@ export class ScreenProjectController {
       if (current === undefined || adapter?.publish === undefined) {
         return fail('PROJECT_PUBLISH_UNAVAILABLE', 'Project publishing is unavailable.');
       }
-      const result = await this.callPublish(current, pending);
+      const result = await publishScreenProject(current, pending);
       if (!this.isCurrent(pending) || pending.controller.signal.aborted) {
         return fail('PROJECT_ABORTED', 'Project operation was cancelled.');
       }
@@ -354,58 +338,6 @@ export class ScreenProjectController {
       () => this.completePending(pending),
     );
     return run;
-  }
-
-  private async callLoad(
-    projectId: string,
-    pending: PendingOperation,
-  ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    try {
-      if (pending.adapter === undefined) {
-        return fail('PROJECT_ADAPTER_INVALID', 'Project adapter is unavailable.');
-      }
-      return await pending.adapter.load({ projectId, signal: pending.controller.signal });
-    } catch {
-      return fail('PROJECT_UNAVAILABLE', 'Project load is unavailable.');
-    }
-  }
-
-  private async callSave(
-    project: ScreenProjectEnvelope,
-    document: ScreenDocument,
-    pending: PendingOperation,
-  ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    try {
-      if (pending.adapter === undefined) {
-        return fail('PROJECT_ADAPTER_INVALID', 'Project adapter is unavailable.');
-      }
-      return await pending.adapter.save({
-        projectId: project.projectId,
-        revision: project.revision,
-        document,
-        signal: pending.controller.signal,
-      });
-    } catch {
-      return fail('PROJECT_UNAVAILABLE', 'Project save is unavailable.');
-    }
-  }
-
-  private async callPublish(
-    project: ScreenProjectEnvelope,
-    pending: PendingOperation,
-  ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
-    try {
-      if (pending.adapter?.publish === undefined) {
-        return fail('PROJECT_PUBLISH_UNAVAILABLE', 'Project publishing is unavailable.');
-      }
-      return await pending.adapter.publish({
-        projectId: project.projectId,
-        revision: project.revision,
-        signal: pending.controller.signal,
-      });
-    } catch {
-      return fail('PROJECT_UNAVAILABLE', 'Project publish is unavailable.');
-    }
   }
 
   private applySaveResult(
@@ -533,43 +465,4 @@ export class ScreenProjectController {
   private notify(): void {
     this.#options.onChange?.({ phase: this.#phase, project: this.#project, dirty: this.#dirty });
   }
-}
-
-const defaultScheduler: ScreenProjectScheduler = {
-  wait(delayMs, signal) {
-    return new Promise((resolve, reject) => {
-      const timeout = setTimeout(resolve, delayMs);
-      signal.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timeout);
-          reject(new Error('aborted'));
-        },
-        { once: true },
-      );
-    });
-  },
-};
-
-function isConsistentAdapter(adapter: ScreenProjectAdapter | undefined): boolean {
-  return adapter === undefined || adapter.capabilities.publish === (adapter.publish !== undefined);
-}
-
-function hasCode(
-  diagnostics: readonly ScreenDiagnostic[],
-  code: ScreenDiagnostic['code'],
-): boolean {
-  return diagnostics.some((diagnostic) => diagnostic.code === code);
-}
-
-function serialize(document: ScreenDocument): ScreenParseResult<string> {
-  try {
-    return { ok: true, value: serializeScreenDocument(document), diagnostics: [] };
-  } catch {
-    return fail('PROJECT_ADAPTER_INVALID', 'Project document is invalid.');
-  }
-}
-
-function fail<T>(code: ScreenDiagnostic['code'], message: string): ScreenParseResult<T> {
-  return { ok: false, diagnostics: [{ severity: 'error', code, path: [], message }] };
 }

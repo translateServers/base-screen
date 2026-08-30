@@ -1,5 +1,3 @@
-import type { ScreenDocument } from '@base-screen/contracts';
-import { getScreenComponentBounds, isScreenComponentEffectivelyHidden } from '@base-screen/core';
 // 吸附竞争数学来自 vendored Moveable snappable（见 ADR-0020 与 common/vendor 的 MIT notice）：
 // 每锚点 × 每候选 offset/dist + 阈值过滤 + 最近排序全部由上游 checkSnap 语义保证。
 import {
@@ -7,6 +5,18 @@ import {
   getNearestSnapGuidelineInfo,
 } from '../../common/vendor/moveable/snappable/snap.js';
 import type { SnapGuideline, SnapInfo } from '../../common/vendor/moveable/types.js';
+import type { DesignerSnapCandidates } from './designer-canvas-snap-candidates.js';
+
+export {
+  type DesignerRulerMark,
+  type DesignerRulerOptions,
+  getDesignerRulerMarks,
+} from './designer-canvas-ruler.js';
+export {
+  collectDesignerSnapCandidates,
+  type DesignerSnapCandidate,
+  type DesignerSnapCandidates,
+} from './designer-canvas-snap-candidates.js';
 
 export const DESIGNER_SMART_GUIDE_THRESHOLD = 5;
 // 吸附保持范围倍率：1.0 = 捕获阈值本身（超出阈值立即释放），
@@ -26,21 +36,6 @@ export const DEFAULT_DESIGNER_CANVAS_AIDS: DesignerCanvasAidsState = {
   gridEnabled: true,
   smartGuidesEnabled: true,
 };
-
-/** 单个吸附候选：对齐坐标 + 参考线几何（起点与长度，参考 Moveable element guidelines 的局部线语义）。 */
-export interface DesignerSnapCandidate {
-  /** 对齐坐标（x 轴为 value，y 轴为 value）。 */
-  readonly value: number;
-  /** 参考线起点（正交方向，画布坐标）：组件边为其 top/left，画布/guide 为 0。 */
-  readonly start: number;
-  /** 参考线长度：组件边为其正交尺寸（height/width），画布/guide 为画布正交尺寸。 */
-  readonly size: number;
-}
-
-export interface DesignerSnapCandidates {
-  readonly x: readonly DesignerSnapCandidate[];
-  readonly y: readonly DesignerSnapCandidate[];
-}
 
 export interface DesignerSnapPoint {
   readonly guides?: DesignerSnapGuides | undefined;
@@ -108,21 +103,6 @@ export interface DesignerSelectionSnapBounds {
   readonly left: number;
   readonly right: number;
   readonly top: number;
-}
-
-export interface DesignerRulerMark {
-  readonly label: string;
-  readonly position: number;
-  readonly value: number;
-}
-
-export interface DesignerRulerOptions {
-  readonly devicePixelRatio: number;
-  readonly length: number;
-  readonly origin: number;
-  readonly zoom: number;
-  /** 可选：覆盖默认刻度间距（Nebula 语义：max(1, floor(50 / zoom)) 画布单位）。 */
-  readonly increment?: number | undefined;
 }
 
 export function snapDesignerCanvasPoint(
@@ -244,62 +224,6 @@ export function snapDesignerSelectionTranslation(
           },
         }),
   };
-}
-
-export function collectDesignerSnapCandidates(
-  document: ScreenDocument,
-  guides: { readonly x: readonly number[]; readonly y: readonly number[] },
-  excludedComponentIds: readonly string[] = [],
-): DesignerSnapCandidates {
-  const excluded = new Set(excludedComponentIds);
-  // x 轴候选：画布边（0/宽）+ 用户 guide + 组件边（不含画布中心点候选）。
-  const x: DesignerSnapCandidate[] = [
-    { value: 0, start: 0, size: document.canvas.height },
-    { value: document.canvas.width, start: 0, size: document.canvas.height },
-    ...guides.x.map((value) => ({ value, start: 0, size: document.canvas.height })),
-  ];
-  const y: DesignerSnapCandidate[] = [
-    { value: 0, start: 0, size: document.canvas.width },
-    { value: document.canvas.height, start: 0, size: document.canvas.width },
-    ...guides.y.map((value) => ({ value, start: 0, size: document.canvas.width })),
-  ];
-  for (const component of document.components) {
-    if (excluded.has(component.id) || isScreenComponentEffectivelyHidden(document, component.id)) {
-      continue;
-    }
-    const bounds = componentSnapBounds(component);
-    x.push(
-      { value: bounds.left, start: bounds.top, size: bounds.height },
-      { value: bounds.centerX, start: bounds.top, size: bounds.height },
-      { value: bounds.right, start: bounds.top, size: bounds.height },
-    );
-    y.push(
-      { value: bounds.top, start: bounds.left, size: bounds.width },
-      { value: bounds.centerY, start: bounds.left, size: bounds.width },
-      { value: bounds.bottom, start: bounds.left, size: bounds.width },
-    );
-  }
-  return { x: sortedUniqueCandidates(x), y: sortedUniqueCandidates(y) };
-}
-
-export function getDesignerRulerMarks(options: DesignerRulerOptions): readonly DesignerRulerMark[] {
-  const { devicePixelRatio, length, origin, zoom } = options;
-  if (!Number.isFinite(length) || !Number.isFinite(origin) || length <= 0 || zoom <= 0) {
-    return [];
-  }
-  const increment = options.increment ?? rulerIncrement(zoom);
-  const first = Math.ceil(-origin / zoom / increment) * increment;
-  const last = Math.floor((length - origin) / zoom / increment) * increment;
-  const pixelRatio = Math.max(1, Number.isFinite(devicePixelRatio) ? devicePixelRatio : 1);
-  const precision = 10 ** Math.max(0, -Math.floor(Math.log10(increment)));
-  const marks: DesignerRulerMark[] = [];
-  for (let value = first; value <= last && marks.length < 200; value += increment) {
-    const roundedValue = Math.round(value * precision) / precision;
-    const normalizedValue = roundedValue === 0 ? 0 : roundedValue;
-    const position = Math.round((origin + normalizedValue * zoom) * pixelRatio) / pixelRatio;
-    marks.push({ label: String(normalizedValue), position, value: normalizedValue });
-  }
-  return marks;
 }
 
 interface AxisResolution {
@@ -485,56 +409,4 @@ function collectGuideLines(
       value: hit.value,
     },
   ];
-}
-
-function rulerIncrement(zoom: number): number {
-  const target = 48 / zoom;
-  const magnitude = 10 ** Math.floor(Math.log10(target));
-  return ([1, 2, 5, 10].find((factor) => factor * magnitude >= target) ?? 10) * magnitude;
-}
-
-function componentSnapBounds(component: ScreenDocument['components'][number]): {
-  readonly bottom: number;
-  readonly centerX: number;
-  readonly centerY: number;
-  readonly height: number;
-  readonly left: number;
-  readonly right: number;
-  readonly top: number;
-  readonly width: number;
-} {
-  // Selection rendering and snapping must use the same Core geometry. Keeping a second
-  // rotation formula here caused sub-pixel drift between the outline and the snap anchors.
-  const visual = getScreenComponentBounds(component);
-  const centerX = component.position.x + component.size.width / 2;
-  const centerY = component.position.y + component.size.height / 2;
-  const left = visual.left;
-  const right = visual.right;
-  const top = visual.top;
-  const bottom = visual.bottom;
-  return {
-    bottom,
-    centerX,
-    centerY,
-    height: bottom - top,
-    left,
-    right,
-    top,
-    width: right - left,
-  };
-}
-
-// 同值候选合并（长度取更长者），按 value 升序；过滤非有限值。
-function sortedUniqueCandidates(
-  candidates: readonly DesignerSnapCandidate[],
-): readonly DesignerSnapCandidate[] {
-  const byValue = new Map<number, DesignerSnapCandidate>();
-  for (const candidate of candidates) {
-    if (!Number.isFinite(candidate.value)) continue;
-    const existing = byValue.get(candidate.value);
-    if (existing === undefined || candidate.size > existing.size) {
-      byValue.set(candidate.value, candidate);
-    }
-  }
-  return [...byValue.values()].sort((left, right) => left.value - right.value);
 }

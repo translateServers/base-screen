@@ -1,7 +1,5 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import {
-  applyScreenDocumentTransaction,
-  isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
   type ScreenComponentPatch,
   type ScreenDocumentTransaction,
@@ -10,7 +8,6 @@ import {
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
-  createReparentTransaction,
   createSiblingReorderTransaction,
   createSiblingSelectionReorderTransaction,
   createZOrderTransaction,
@@ -26,6 +23,8 @@ import type {
   DesignerLayerArrangeAction,
   DesignerLayerGroupAction,
 } from '../dom/designer-layers-toolbar-dom.js';
+import { DesignerLayerDragController } from './layers/designer-layer-drag-controller.js';
+import { DesignerLayerRenameController } from './layers/designer-layer-rename-controller.js';
 
 export interface DesignerLayersControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -43,22 +42,25 @@ export interface DesignerLayersControllerCallbacks {
   readonly locateComponent?: (componentId: string) => void;
 }
 
-// 图层单击会同步重绘树节点，浏览器因此可能无法在第二个新节点上合成原生 dblclick。
-// 保留一个紧凑的同图层点击窗口，用于跨 DOM 替换恢复桌面端双击语义。
-const LAYER_RENAME_DOUBLE_CLICK_MS = 500;
-
 export class DesignerLayersController {
   #search = '';
   #collapsed = new Set<string>();
-  #dropTargetId: string | null | undefined;
-  #draggedLayerId: string | undefined;
+  readonly #drag: DesignerLayerDragController;
   #layers: HTMLElement | undefined;
-  #renameDrafts = new Map<string, string>();
-  #renamingId: string | undefined;
-  #lastLayerClick: { readonly componentId: string; readonly timeStamp: number } | undefined;
+  readonly #rename: DesignerLayerRenameController;
   #renderLimit = DESIGNER_LAYER_PAGE_SIZE;
 
-  constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {}
+  constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {
+    this.#drag = new DesignerLayerDragController({
+      ...callbacks,
+      onDropTargetChange: () => this.render(this.#layers),
+    });
+    this.#rename = new DesignerLayerRenameController({
+      ...callbacks,
+      getLayers: () => this.#layers,
+      render: () => this.render(this.#layers),
+    });
+  }
 
   canStepSelection(direction: DesignerLayerSelectionDirection): boolean {
     return this.selectionStepTarget(direction) !== undefined;
@@ -82,9 +84,9 @@ export class DesignerLayersController {
       interaction: this.callbacks.getInteraction(),
       search: this.#search,
       collapsed: this.#collapsed,
-      dropTargetId: this.#dropTargetId,
-      renameDrafts: this.#renameDrafts,
-      renamingId: this.#renamingId,
+      dropTargetId: this.#drag.dropTargetId,
+      renameDrafts: this.#rename.drafts,
+      renamingId: this.#rename.renamingId,
       renderLimit: this.#renderLimit,
       toolbarState: {
         arrange: {
@@ -111,7 +113,7 @@ export class DesignerLayersController {
       (target.closest('[data-layer-select]') === null &&
         target.closest('[data-layer-selectable="true"]') === null)
     ) {
-      this.#lastLayerClick = undefined;
+      this.#rename.clearLastLayerClick();
     }
     const showMore = target.closest<HTMLElement>('[data-layer-show-more]');
     if (showMore !== null) {
@@ -140,7 +142,7 @@ export class DesignerLayersController {
     }
     const select = target.closest<HTMLElement>('[data-layer-select]');
     if (select !== null) {
-      this.selectFromLayerClick(select.dataset.layerSelect!, event as MouseEvent);
+      this.#rename.selectFromLayerClick(select.dataset.layerSelect!, event as MouseEvent);
       return true;
     }
     const collapse = target.closest<HTMLElement>('[data-layer-collapse]');
@@ -167,7 +169,7 @@ export class DesignerLayersController {
     // DataV 风格整行命中：除折叠与独立操作按钮外，高亮到哪里就可以点到哪里。
     const row = target.closest<HTMLElement>('[data-layer-selectable="true"]');
     if (row?.dataset.layerId !== undefined) {
-      this.selectFromLayerClick(row.dataset.layerId, event as MouseEvent);
+      this.#rename.selectFromLayerClick(row.dataset.layerId, event as MouseEvent);
       return true;
     }
     return false;
@@ -184,7 +186,7 @@ export class DesignerLayersController {
     }
     const id = target.dataset.layerRename;
     if (id === undefined) return false;
-    this.#renameDrafts.set(id, target.value);
+    this.#rename.updateDraft(id, target.value);
     return true;
   }
 
@@ -194,7 +196,7 @@ export class DesignerLayersController {
     if (target.dataset.layerSearch !== undefined) return true;
     const id = target.dataset.layerRename;
     if (id === undefined) return false;
-    this.commitRename(id, target.value);
+    this.#rename.commit(id, target.value);
     return true;
   }
 
@@ -205,21 +207,7 @@ export class DesignerLayersController {
     }
     if (!(target instanceof HTMLInputElement) || target.dataset.layerRename === undefined)
       return false;
-    const component = this.callbacks
-      .getDocument()
-      ?.components.find((item) => item.id === target.dataset.layerRename);
-    if (component === undefined) return false;
-    if (event.key === 'Escape') {
-      this.#renameDrafts.delete(component.id);
-      target.value = component.name;
-      this.endRename();
-      event.preventDefault();
-      return true;
-    }
-    if (event.key !== 'Enter' || event.isComposing) return false;
-    event.preventDefault();
-    this.commitRename(component.id, target.value);
-    return true;
+    return this.#rename.onKeyDown(target, event);
   }
 
   // 双击图层名称进入重命名：重命名输入框只在编辑期存在，名称行保持单行展示。
@@ -235,8 +223,8 @@ export class DesignerLayersController {
     const row = target.closest<HTMLElement>('[data-layer-selectable="true"]');
     const id = select?.dataset.layerSelect ?? row?.dataset.layerId;
     if (id === undefined) return false;
-    this.#lastLayerClick = undefined;
-    const renamed = this.beginRename(id);
+    this.#rename.clearLastLayerClick();
+    const renamed = this.#rename.begin(id);
     if (renamed) event.preventDefault?.();
     return renamed;
   }
@@ -250,14 +238,7 @@ export class DesignerLayersController {
     const target = event.target;
     if (!(target instanceof HTMLInputElement) || target.dataset.layerRename === undefined)
       return false;
-    if (!target.isConnected) return true;
-    const component = this.callbacks
-      .getDocument()
-      ?.components.find((item) => item.id === target.dataset.layerRename);
-    if (component === undefined || target.value !== component.name) return true;
-    this.#renameDrafts.delete(component.id);
-    this.endRename();
-    return true;
+    return this.#rename.onFocusOut(target);
   }
 
   private navigateTree(target: HTMLButtonElement, event: KeyboardEvent): boolean {
@@ -282,147 +263,35 @@ export class DesignerLayersController {
     if (next === undefined) return true;
     event.preventDefault();
     next.focus();
-    this.select(next.dataset.layerSelect!, event);
+    this.#rename.select(next.dataset.layerSelect!, event);
     return true;
   }
 
   onDragStart(event: DragEvent): boolean {
-    const row = getLayerRow(event.target);
-    const document = this.callbacks.getDocument();
-    if (row === undefined || document === undefined) return false;
-    if (
-      isScreenComponentEffectivelyHidden(document, row) ||
-      isScreenComponentEffectivelyLocked(document, row)
-    ) {
-      return false;
-    }
-    this.#draggedLayerId = row;
-    this.setDropTarget(undefined);
-    event.dataTransfer?.setData('text/plain', row);
-    if (event.dataTransfer !== null && event.dataTransfer !== undefined) {
-      event.dataTransfer.effectAllowed = 'move';
-    }
-    return true;
+    return this.#drag.onDragStart(event);
   }
 
   onDragOver(event: DragEvent): boolean {
-    const parentId = getDropParent(event.target);
-    if (
-      this.#draggedLayerId === undefined ||
-      parentId === undefined ||
-      parentId === this.#draggedLayerId
-    ) {
-      this.setDropTarget(undefined);
-      return false;
-    }
-    if (!this.canReparent(this.draggedSelection(), parentId)) {
-      this.setDropTarget(undefined);
-      return false;
-    }
-    event.preventDefault();
-    if (event.dataTransfer !== null && event.dataTransfer !== undefined) {
-      event.dataTransfer.dropEffect = 'move';
-    }
-    this.setDropTarget(parentId);
-    return true;
+    return this.#drag.onDragOver(event);
   }
 
   onDrop(event: DragEvent): boolean {
-    const parentId = getDropParent(event.target);
-    const componentIds = this.draggedSelection();
-    this.#draggedLayerId = undefined;
-    this.setDropTarget(undefined);
-    if (
-      parentId === undefined ||
-      componentIds.length === 0 ||
-      !this.canReparent(componentIds, parentId)
-    ) {
-      return false;
-    }
-    event.preventDefault();
-    this.report(
-      this.callbacks.executeTransaction(
-        createReparentTransaction(this.callbacks.getDocument()!, componentIds, parentId),
-      ),
-    );
-    return true;
+    return this.#drag.onDrop(event);
   }
 
   clearDrag(): void {
-    this.#draggedLayerId = undefined;
-    this.setDropTarget(undefined);
+    this.#drag.clear();
   }
 
   clearSessionState(): void {
     this.#search = '';
     this.#collapsed.clear();
-    this.#draggedLayerId = undefined;
-    this.#dropTargetId = undefined;
-    this.#renameDrafts.clear();
-    this.#renamingId = undefined;
-    this.#lastLayerClick = undefined;
+    this.#drag.reset();
+    this.#rename.reset();
     this.#renderLimit = DESIGNER_LAYER_PAGE_SIZE;
     this.render(this.#layers);
     // 释放面板引用：断开场景不再牵住 detached 节点；下一次 render(layers) 会重新注入。
     this.#layers = undefined;
-  }
-
-  private select(componentId: string, event: Event): void {
-    const modifiers = event as MouseEvent;
-    if (modifiers.shiftKey || modifiers.ctrlKey || modifiers.metaKey) {
-      this.callbacks.reduceSelection({ type: 'toggle-selection', componentId });
-      return;
-    }
-    this.callbacks.reduceSelection({
-      type: 'replace-selection',
-      componentIds: [componentId],
-      focusedComponentId: componentId,
-    });
-  }
-
-  private selectFromLayerClick(componentId: string, event: MouseEvent): void {
-    const modified = event.shiftKey || event.ctrlKey || event.metaKey || event.altKey;
-    const primary = event.button === 0 || event.button === undefined;
-    const pointerClick = event.detail > 0;
-    const timeStamp = Number.isFinite(event.timeStamp) ? event.timeStamp : undefined;
-    const repeated =
-      !modified &&
-      primary &&
-      pointerClick &&
-      (event.detail >= 2 ||
-        (timeStamp !== undefined &&
-          this.#lastLayerClick?.componentId === componentId &&
-          timeStamp - this.#lastLayerClick.timeStamp >= 0 &&
-          timeStamp - this.#lastLayerClick.timeStamp <= LAYER_RENAME_DOUBLE_CLICK_MS));
-
-    this.#lastLayerClick =
-      !modified && primary && pointerClick && timeStamp !== undefined
-        ? { componentId, timeStamp }
-        : undefined;
-    if (repeated && this.beginRename(componentId)) {
-      this.#lastLayerClick = undefined;
-      event.preventDefault();
-      return;
-    }
-    this.select(componentId, event);
-  }
-
-  private beginRename(componentId: string): boolean {
-    const document = this.callbacks.getDocument();
-    const component = document?.components.find((item) => item.id === componentId);
-    if (
-      document === undefined ||
-      component === undefined ||
-      isScreenComponentEffectivelyHidden(document, componentId) ||
-      isScreenComponentEffectivelyLocked(document, componentId)
-    )
-      return false;
-    this.#renamingId = componentId;
-    this.render(this.#layers);
-    const rename = this.#layers?.querySelector<HTMLInputElement>('[data-layer-rename]');
-    rename?.focus();
-    rename?.select();
-    return true;
   }
 
   private toggle(componentId: string, property: string): void {
@@ -478,30 +347,6 @@ export class DesignerLayersController {
     );
   }
 
-  private commitRename(componentId: string, name: string): void {
-    const component = this.callbacks
-      .getDocument()
-      ?.components.find((item) => item.id === componentId);
-    if (component === undefined || component.name === name) {
-      this.#renameDrafts.delete(componentId);
-      this.endRename();
-      return;
-    }
-    const result = this.callbacks.executeTransaction({
-      commands: [{ type: 'update-components', componentIds: [componentId], patch: { name } }],
-    });
-    this.#renameDrafts.delete(componentId);
-    if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
-    this.endRename();
-  }
-
-  // 无条件退出并重绘：事务路径会同步触发一次携带旧 renamingId 快照的面板渲染，
-  // 若这里按标志提前返回，残留的重命名 DOM 将无法被修正。渲染幂等，代价可忽略。
-  private endRename(): void {
-    this.#renamingId = undefined;
-    this.render(this.#layers);
-  }
-
   // 渲染路径传入视图已排序的兄弟表（避免每行重新 filter+sort）；未传时（如 move
   // 点击路径）自行计算，排序规则与 createDesignerLayerView 一致（最前层在顶部）。
   private canMove(
@@ -533,74 +378,14 @@ export class DesignerLayersController {
     return span.every((id) => !isScreenComponentEffectivelyLocked(document, id));
   }
 
-  private draggedSelection(): readonly string[] {
-    if (this.#draggedLayerId === undefined) return [];
-    const selected = this.callbacks.getInteraction().selectedComponentIds;
-    return selected.includes(this.#draggedLayerId) ? selected : [this.#draggedLayerId];
-  }
-
-  private canReparent(componentIds: readonly string[], parentId: string | null): boolean {
-    const document = this.callbacks.getDocument();
-    const sources =
-      document === undefined
-        ? []
-        : componentIds.map((componentId) =>
-            document.components.find((component) => component.id === componentId),
-          );
-    const parent =
-      parentId === null
-        ? undefined
-        : document?.components.find((component) => component.id === parentId);
-    return (
-      document !== undefined &&
-      componentIds.length > 0 &&
-      new Set(componentIds).size === componentIds.length &&
-      sources.every(
-        (component) =>
-          component !== undefined &&
-          !isScreenComponentEffectivelyHidden(document, component.id) &&
-          !isScreenComponentEffectivelyLocked(document, component.id),
-      ) &&
-      (parentId === null ||
-        (parent !== undefined &&
-          !isScreenComponentEffectivelyHidden(document, parentId) &&
-          !isScreenComponentEffectivelyLocked(document, parentId) &&
-          this.callbacks.getCatalog()?.get(parent.type)?.manifest.designCapabilities.children ===
-            true)) &&
-      applyScreenDocumentTransaction(
-        document,
-        createReparentTransaction(document, componentIds, parentId),
-      ).ok
-    );
-  }
-
   private report(result: ScreenParseResult<ScreenDocument>): void {
     if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
-  }
-
-  private setDropTarget(parentId: string | null | undefined): void {
-    if (this.#dropTargetId === parentId) return;
-    this.#dropTargetId = parentId;
-    this.render(this.#layers);
   }
 }
 
 function isLayerSelectButton(target: EventTarget | null): target is HTMLButtonElement {
   const candidate = target as { readonly dataset?: DOMStringMap; readonly tagName?: string } | null;
   return candidate?.tagName === 'BUTTON' && candidate.dataset?.layerSelect !== undefined;
-}
-
-function getLayerRow(target: EventTarget | null): string | undefined {
-  return target instanceof Element
-    ? target.closest<HTMLElement>('[data-layer-id]')?.dataset.layerId
-    : undefined;
-}
-
-function getDropParent(target: EventTarget | null): string | null | undefined {
-  if (!(target instanceof Element)) return undefined;
-  const row = target.closest<HTMLElement>('[data-layer-id]');
-  if (row !== null) return row.dataset.layerId;
-  return target.closest<HTMLElement>('[data-layer-root]') === null ? undefined : null;
 }
 
 function getSiblingIds(document: ScreenDocument, parentId: string | null): readonly string[] {

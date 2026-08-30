@@ -29,6 +29,10 @@ describe('file size checks', () => {
       category: 'ui-style',
       limit: 800,
     });
+    expect(fileSizePolicy('packages/engine/src/common/ui-text/designer-ui-text.ts')).toEqual({
+      category: 'ui-text-catalog',
+      limit: 1000,
+    });
     expect(fileSizePolicy('scripts/browser-harness/assert-example.mjs')).toEqual({
       category: 'browser-harness',
       limit: 500,

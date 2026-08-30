@@ -3,11 +3,6 @@
   "exceptions": {
     "packages/contracts/src/document/validate.ts": 913,
     "packages/contracts/tests/document/document.test.ts": 1275,
-    "packages/engine/src/browser/controllers/designer-layers-controller.ts": 615,
-    "packages/engine/src/browser/viewport/designer-canvas-aids.ts": 540,
-    "packages/engine/src/common/operations/designer-element-operations.ts": 541,
-    "packages/engine/src/common/project/project-controller.ts": 575,
-    "packages/engine/src/common/ui-text/designer-ui-text.ts": 786,
     "scripts/verify-tarballs.mjs": 1100,
     "tests/host-skill-adoption.test.ts": 821
   }

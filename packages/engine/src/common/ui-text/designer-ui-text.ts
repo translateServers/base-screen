@@ -1,5 +1,7 @@
 import type { ScreenDiagnostic } from '@base-screen/contracts';
 
+// Designer 用户可见文案的唯一权威目录。浏览器层的内联文案由 check-designer-ui.mjs 禁止，
+// 本纯数据目录由 check-file-size.mjs 的 ui-text-catalog 上限约束。
 export const DESIGNER_UI_TEXT = {
   materials: '物料',
   layers: '图层',
