@@ -3,7 +3,7 @@
   outline: none;
 }
 
-.viewport:focus-visible {
+.viewport:focus-visible:not([data-pointer-focus]) {
   outline: none;
   box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
 }

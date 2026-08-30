@@ -1,3 +1,46 @@
+export async function assertInitialCanvasPointerFocus(browser, baseUrl) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await page.goto(`${baseUrl}/?designer`, { waitUntil: 'networkidle' });
+    const designer = page.locator('base-screen-designer');
+    const component = designer.locator('[data-base-screen-component-id=title]');
+    const viewport = designer.locator('[data-viewport]');
+    await component.waitFor({ state: 'visible' });
+
+    await component.click({ position: { x: 12, y: 12 } });
+    const focusState = await viewport.evaluate((element) => ({
+      active: element.getRootNode().activeElement === element,
+      focusVisible: element.matches(':focus-visible'),
+      boxShadow: getComputedStyle(element).boxShadow,
+    }));
+
+    if (!focusState.active || focusState.focusVisible || focusState.boxShadow !== 'none') {
+      throw new Error(
+        `BROWSER_HARNESS_INITIAL_POINTER_FOCUS_VISIBLE_FAILED:${JSON.stringify(focusState)}`,
+      );
+    }
+
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    const keyboardFocusState = await viewport.evaluate((element) => ({
+      active: element.getRootNode().activeElement === element,
+      focusVisible: element.matches(':focus-visible'),
+      boxShadow: getComputedStyle(element).boxShadow,
+    }));
+    if (
+      !keyboardFocusState.active ||
+      !keyboardFocusState.focusVisible ||
+      keyboardFocusState.boxShadow === 'none'
+    ) {
+      throw new Error(
+        `BROWSER_HARNESS_KEYBOARD_FOCUS_VISIBLE_FAILED:${JSON.stringify(keyboardFocusState)}`,
+      );
+    }
+  } finally {
+    await page.close();
+  }
+}
+
 export async function assertCanvasBasics(designer, page) {
   const title = designer.locator('[data-base-screen-component-id=title]');
   const canvasLocator = designer.locator('[data-canvas]');

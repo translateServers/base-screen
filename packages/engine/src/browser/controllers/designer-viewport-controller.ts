@@ -52,6 +52,7 @@ export class DesignerViewportController {
       {
         type: 'blur',
         listener: () => {
+          delete viewport.dataset.pointerFocus;
           this.releaseSpace();
           this.callbacks.onBlur();
         },
@@ -85,6 +86,7 @@ export class DesignerViewportController {
       for (const { type, listener } of this.#listeners) {
         viewport.removeEventListener(type, listener);
       }
+      delete viewport.dataset.pointerFocus;
     }
     this.#listeners = [];
     this.#viewport = undefined;
@@ -95,6 +97,16 @@ export class DesignerViewportController {
   /** 把键盘焦点收敛到 viewport 焦点容器，作为画布交互的统一快捷键命中目标。 */
   focus(preventScroll = true): void {
     this.#viewport?.focus({ preventScroll });
+  }
+
+  /** 指针操作聚焦 viewport，但不把页面初始的 focus-visible 状态继承到画布。 */
+  focusFromPointer(preventScroll = true): void {
+    const viewport = this.#viewport;
+    if (viewport === undefined) return;
+    viewport.dataset.pointerFocus = '';
+    // focusVisible 是渐进增强；不支持该选项的基线浏览器由 data-pointer-focus CSS 守卫兜底。
+    const options = { preventScroll, focusVisible: false };
+    viewport.focus(options);
   }
 
   setZoom(zoom: number, anchor = { x: 0, y: 0 }): void {

@@ -35,6 +35,7 @@ function connectCanvas(controller: DesignerViewportController, width: number, he
   const viewport = {
     clientWidth: width,
     clientHeight: height,
+    dataset: {} as Record<string, string>,
     focus,
     getBoundingClientRect: () => ({ left: 0, top: 0 }),
     addEventListener: (type: string, listener: (event: Event) => void) =>
@@ -72,6 +73,31 @@ describe('DesignerViewportController zoom anchor', () => {
     controller.centerOn({ x: 100, y: 50 });
 
     expect(canvas.style.transform).toBe('translate(270px, 220px) scale(1)');
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+});
+
+describe('DesignerViewportController focus', () => {
+  it('keeps the initial pointer focus out of focus-visible and clears its fallback on blur', () => {
+    const { controller } = createController();
+    const { dispatch, focus, viewport } = connectCanvas(controller, 800, 600);
+
+    controller.focusFromPointer();
+
+    expect(viewport.dataset.pointerFocus).toBe('');
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true, focusVisible: false });
+
+    dispatch('blur', new Event('blur'));
+    expect(viewport.dataset.pointerFocus).toBeUndefined();
+  });
+
+  it('keeps ordinary programmatic focus eligible for keyboard focus-visible styling', () => {
+    const { controller } = createController();
+    const { focus, viewport } = connectCanvas(controller, 800, 600);
+
+    controller.focus();
+
+    expect(viewport.dataset.pointerFocus).toBeUndefined();
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
   });
 });
@@ -254,6 +280,7 @@ describe('DesignerViewportController connect/disconnect', () => {
     const viewport = {
       clientWidth: 800,
       clientHeight: 600,
+      dataset: {} as Record<string, string>,
       getBoundingClientRect: () => ({ left: 0, top: 0 }),
       addEventListener: (type: string, listener: EventListener) => {
         added.push(type);

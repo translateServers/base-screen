@@ -134,7 +134,9 @@ describe('designer workbench interaction and accessibility', () => {
 
   it('keeps keyboard focus visible on the canvas without changing viewport geometry', () => {
     expect(workbenchCss).toMatch(/\.viewport:focus\s*\{[^}]*outline: none;/s);
-    const focusVisibleRule = workbenchCss.match(/\.viewport:focus-visible\s*\{([^}]*)\}/s);
+    const focusVisibleRule = workbenchCss.match(
+      /\.viewport:focus-visible:not\(\[data-pointer-focus\]\)\s*\{([^}]*)\}/s,
+    );
 
     expect(focusVisibleRule?.[1]).toContain(
       'box-shadow: inset 0 0 0 2px var(--designer-focus-ring);',

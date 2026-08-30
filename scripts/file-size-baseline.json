@@ -8,7 +8,6 @@
     "packages/engine/src/common/operations/designer-element-operations.ts": 541,
     "packages/engine/src/common/project/project-controller.ts": 575,
     "packages/engine/src/common/ui-text/designer-ui-text.ts": 786,
-    "packages/engine/src/index.ts": 2862,
     "packages/material/src/echarts.ts": 931,
     "packages/plugin-core/src/editor-descriptor.ts": 1191,
     "packages/plugin-core/src/material.ts": 1113,
