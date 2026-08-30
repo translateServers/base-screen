@@ -1,7 +1,6 @@
 {
   "description": "Exact line-count ceilings for files that predate the repository size limits.",
   "exceptions": {
-    "scripts/verify-tarballs.mjs": 1100,
     "tests/host-skill-adoption.test.ts": 821
   }
 }
