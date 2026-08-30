@@ -304,6 +304,7 @@ export function forwardNativeMaterialEvent(
   element: DesignerElementHost,
   event: BaseScreenMaterialEvent,
 ): void {
+  getDesignerElementState(element).canvasRuntimeController.handleMaterialEvent(event);
   element.dispatchEvent(
     new CustomEvent<BaseScreenMaterialEvent>('base-screen-material-event', {
       bubbles: true,

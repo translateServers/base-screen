@@ -1,5 +1,7 @@
 import {
   parseScreenJsonValue,
+  type ScreenBlueprintHostActionPort,
+  type ScreenBlueprintHostEvent,
   type ScreenDiagnostic,
   type ScreenDocument,
   type ScreenHostVariablePort,
@@ -7,13 +9,23 @@ import {
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
-import type { BaseScreenRenderer } from '@base-screen/renderer';
+import {
+  compileScreenBlueprint,
+  dispatchScreenBlueprintEvent,
+  type ScreenBlueprintDispatchResult,
+  type ScreenBlueprintPlan,
+} from '@base-screen/core';
+import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialEvent, BaseScreenRenderer } from '@base-screen/renderer';
 
 const HOST_VARIABLE_TIMEOUT_MS = 15_000;
 
 export interface DesignerCanvasRuntimeControllerCallbacks {
   readonly getRenderer: () => BaseScreenRenderer | undefined;
   readonly getVariablePort: () => ScreenHostVariablePort | undefined;
+  readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
+  readonly getBlueprintHostActionPort: () => ScreenBlueprintHostActionPort | undefined;
+  readonly emitBlueprintHostEvent: (event: ScreenBlueprintHostEvent) => void;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
 }
 
@@ -25,6 +37,8 @@ export interface DesignerCanvasRuntimeControllerCallbacks {
  */
 export class DesignerCanvasRuntimeController {
   #document: ScreenDocument | undefined;
+  #blueprintPlan: ScreenBlueprintPlan | undefined;
+  #blueprintVariables: ScreenJsonObject | undefined;
   #variableController: AbortController | undefined;
   #variableGeneration = 0;
 
@@ -34,12 +48,16 @@ export class DesignerCanvasRuntimeController {
     const renderer = this.callbacks.getRenderer();
     this.#document = document;
     this.cancelVariableResolution();
+    renderer?.resetBlueprintVisibility();
+    this.compileBlueprint(document);
     if (renderer === undefined) return success();
 
-    const variables = collectStaticVariables(document);
+    const variables = this.collectRuntimeVariables(document);
     const hostVariables = document.variables.filter((variable) => variable.type === 'host');
     if (hostVariables.length === 0) {
-      return applyVariablesAndRender(renderer, document, variables);
+      const rendered = applyVariablesAndRender(renderer, document, variables);
+      if (rendered.ok) this.writeBlueprintVariables(variables);
+      return rendered;
     }
 
     renderer.suspendData();
@@ -65,15 +83,69 @@ export class DesignerCanvasRuntimeController {
     this.startHostVariableResolution(
       renderer,
       document,
-      collectStaticVariables(document),
+      this.collectRuntimeVariables(document),
       true,
       componentId,
     );
   }
 
+  handleMaterialEvent(event: BaseScreenMaterialEvent): void {
+    const plan = this.#blueprintPlan;
+    const previousVariables = this.#blueprintVariables;
+    if (plan === undefined || previousVariables === undefined) return;
+
+    const result = dispatchScreenBlueprintEvent(plan, previousVariables, {
+      componentId: event.componentId,
+      name: event.name,
+      payload: event.payload,
+    });
+    if (!result.ok) {
+      this.emitLifecycleDiagnostic('Blueprint event payload is invalid.');
+      return;
+    }
+
+    this.#blueprintVariables = result.value.variables;
+    const renderer = this.callbacks.getRenderer();
+    const document = this.#document;
+    if (renderer !== undefined && document !== undefined) {
+      const diagnostics = applyBlueprintDispatchToRenderer(
+        renderer,
+        document,
+        previousVariables,
+        result.value,
+      );
+      if (diagnostics.length > 0) this.callbacks.emitDiagnostics(diagnostics);
+    }
+
+    for (const hostEvent of result.value.hostEvents) {
+      try {
+        this.callbacks.emitBlueprintHostEvent(hostEvent);
+      } catch {
+        this.emitLifecycleDiagnostic('Blueprint host event failed.');
+      }
+    }
+    for (const hostAction of result.value.hostActions) {
+      const port = this.callbacks.getBlueprintHostActionPort();
+      if (port === undefined) {
+        this.emitLifecycleDiagnostic('Blueprint host action is unavailable.');
+        continue;
+      }
+      try {
+        void Promise.resolve(port.execute(hostAction)).catch(() => {
+          this.emitLifecycleDiagnostic('Blueprint host action failed.');
+        });
+      } catch {
+        this.emitLifecycleDiagnostic('Blueprint host action failed.');
+      }
+    }
+  }
+
   clear(): void {
     this.#document = undefined;
+    this.#blueprintPlan = undefined;
+    this.#blueprintVariables = undefined;
     this.cancelVariableResolution();
+    this.callbacks.getRenderer()?.resetBlueprintVisibility();
   }
 
   private startHostVariableResolution(
@@ -103,8 +175,32 @@ export class DesignerCanvasRuntimeController {
         this.callbacks.emitDiagnostics(rendered.diagnostics);
         return;
       }
+      this.writeBlueprintVariables(variables);
       if (refreshAfterRender) renderer.refreshData(refreshComponentId);
     });
+  }
+
+  private compileBlueprint(document: ScreenDocument): void {
+    const compiled = compileScreenBlueprint(
+      document,
+      this.callbacks.getRuntimeContributions() ?? { hasBlueprintCapability: () => false },
+    );
+    if (!compiled.ok) {
+      this.#blueprintPlan = undefined;
+      this.#blueprintVariables = undefined;
+      this.callbacks.emitDiagnostics(compiled.diagnostics);
+      return;
+    }
+    this.#blueprintPlan = compiled.value;
+    this.#blueprintVariables = compiled.value.initialVariables;
+  }
+
+  private collectRuntimeVariables(document: ScreenDocument): ScreenJsonObject {
+    return { ...collectStaticVariables(document), ...this.#blueprintVariables };
+  }
+
+  private writeBlueprintVariables(variables: ScreenJsonObject): void {
+    if (this.#blueprintPlan !== undefined) this.#blueprintVariables = variables;
   }
 
   private async resolveHostVariables(
@@ -162,6 +258,12 @@ export class DesignerCanvasRuntimeController {
       },
     ]);
   }
+
+  private emitLifecycleDiagnostic(message: string): void {
+    this.callbacks.emitDiagnostics([
+      { severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message },
+    ]);
+  }
 }
 
 function collectStaticVariables(document: ScreenDocument): ScreenJsonObject {
@@ -181,6 +283,28 @@ function applyVariablesAndRender(
   const applied = renderer.setVariables(variables);
   if (!applied.ok) return applied;
   return toVoidResult(renderer.render(document, trigger === undefined ? undefined : { trigger }));
+}
+
+function applyBlueprintDispatchToRenderer(
+  renderer: BaseScreenRenderer,
+  document: ScreenDocument,
+  previousVariables: ScreenJsonObject,
+  result: ScreenBlueprintDispatchResult,
+): readonly ScreenDiagnostic[] {
+  const diagnostics: ScreenDiagnostic[] = [];
+  // Dispatch clones the current JSON-safe state without reordering keys, so
+  // serialized equality avoids a material reconcile for visibility/event-only rules.
+  if (JSON.stringify(previousVariables) !== JSON.stringify(result.variables)) {
+    const variables = renderer.setVariables(result.variables);
+    if (variables.ok) {
+      diagnostics.push(...renderer.render(document, { trigger: 'variable' }).diagnostics);
+    } else {
+      diagnostics.push(...variables.diagnostics);
+    }
+  }
+  const visibility = renderer.applyBlueprintVisibilityEffects(result.visibilityEffects);
+  if (!visibility.ok) diagnostics.push(...visibility.diagnostics);
+  return diagnostics;
 }
 
 function toVoidResult(result: ScreenParseResult<null>): ScreenParseResult<void> {

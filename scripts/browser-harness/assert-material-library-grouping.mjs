@@ -108,8 +108,9 @@ async function assertMaterialLibraryGrouping(page, designer) {
     rootState.visual.nameTitle !== null ||
     rootState.visual.typeTitle !== 'base.text' ||
     rootState.visual.favoriteWidth !== 28 ||
-    // 左轨当前允许 298–480px 拖宽；auto-fill 网格在默认 406px 下为 3 列，窄态为 2 列。
-    ![2, 3].includes(rootState.visual.firstRowCardCount) ||
+    // 左轨当前允许 298–480px 拖宽；1024–1279px 紧凑断点固定 248px 时为 1 列，
+    // 常规窄态为 2 列，默认 406px 时为 3 列。
+    ![1, 2, 3].includes(rootState.visual.firstRowCardCount) ||
     rootState.visual.panelCountRole !== 'status' ||
     rootState.visual.panelCountLive !== 'polite' ||
     rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a10 \u9879' ||

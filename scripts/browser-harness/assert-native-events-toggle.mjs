@@ -67,8 +67,16 @@ async function assertNativeEventsToggle(designer, page) {
     const tick = () => new Promise((resolve) => setTimeout(resolve, 20));
     const probeElement = document.createElement('base-screen-designer');
     const probeEvents = [];
+    const probeBlueprintEvents = [];
+    const probeDiagnostics = [];
     probeElement.addEventListener('base-screen-material-event', (event) =>
       probeEvents.push(event.detail),
+    );
+    probeElement.addEventListener('base-screen-blueprint-event', (event) =>
+      probeBlueprintEvents.push(event.detail),
+    );
+    probeElement.addEventListener('base-screen-diagnostic', (event) =>
+      probeDiagnostics.push(...(event.detail?.diagnostics ?? [])),
     );
     const component = (id, manifestKey, position, dataSource) => ({
       id,
@@ -97,6 +105,7 @@ async function assertNativeEventsToggle(designer, page) {
       rows: [{ amount: 42 }],
     };
     probeElement.catalog = catalog;
+    probeElement.runtimeContributions = window.baseScreenHarness.designer.runtimeContributions;
     probeElement.document = {
       canvas: { width: 960, height: 540, backgroundColor: '#0b1220' },
       components: [
@@ -135,7 +144,30 @@ async function assertNativeEventsToggle(designer, page) {
         component('probe-vue', 'vue', { x: 240, y: 300 }, null),
       ],
       variables: [],
-      blueprint: { rules: [] },
+      blueprint: {
+        rules: [
+          {
+            id: 'probe-native-events-blueprint',
+            trigger: {
+              type: 'material-event',
+              componentId: 'probe-text',
+              eventName: 'valueClick',
+            },
+            actions: [
+              {
+                type: 'component-visibility',
+                componentId: 'probe-chart',
+                operation: 'toggle',
+              },
+              {
+                type: 'emit-host-event',
+                eventName: 'probe_blueprint_ran',
+                payload: { kind: 'literal', value: true },
+              },
+            ],
+          },
+        ],
+      },
     };
     document.body.appendChild(probeElement);
     await tick();
@@ -155,7 +187,15 @@ async function assertNativeEventsToggle(designer, page) {
       }
       return false;
     };
-    if (!(await bridgeReady())) return { bridgeTimeout: true };
+    if (!(await bridgeReady())) {
+      return {
+        bridgeTimeout: true,
+        probeDiagnostics,
+        renderedComponentIds: [...canvas.querySelectorAll('[data-base-screen-component-id]')].map(
+          (element) => element.getAttribute('data-base-screen-component-id'),
+        ),
+      };
+    }
     const dispatch = (componentId, selector) => {
       const target = canvas.querySelector(
         selector === null
@@ -214,6 +254,10 @@ async function assertNativeEventsToggle(designer, page) {
       dispatch('probe-vue', 'button'),
     ];
     const bridgeSilentCount = probeEvents.length;
+    const blueprintSilentCount = probeBlueprintEvents.length;
+    const chartVisibleWhileOff =
+      getComputedStyle(canvas.querySelector('[data-base-screen-component-id="probe-chart"]'))
+        .display !== 'none';
 
     // 开启：每类 element 的原生事件按 manifest 声明转发到宿主，hover 与桥接按钮交互恢复。
     probeElement.shadowRoot.querySelector('[data-status-toggle="native-events"]').click();
@@ -245,6 +289,10 @@ async function assertNativeEventsToggle(designer, page) {
         dispatch('probe-vue', 'button') &&
         matches({ componentId: 'probe-vue', type: 'harness.vue-button', name: 'valueClick' }),
     };
+    const blueprintVisibilityAfterOn =
+      getComputedStyle(canvas.querySelector('[data-base-screen-component-id="probe-chart"]'))
+        .display === 'none';
+    const blueprintEvent = probeBlueprintEvents.at(-1);
     const hoverOn = hoverCheck();
     const bridgeOn = { react: bridgeStyle('probe-react'), vue: bridgeStyle('probe-vue') };
     const onCount = probeEvents.length;
@@ -266,7 +314,11 @@ async function assertNativeEventsToggle(designer, page) {
       bridgeOff,
       bridgeSilentTargets,
       bridgeSilentCount,
+      blueprintSilentCount,
+      chartVisibleWhileOff,
       results,
+      blueprintVisibilityAfterOn,
+      blueprintEvent,
       hoverOn,
       bridgeOn,
       onCount,
@@ -287,6 +339,8 @@ async function assertNativeEventsToggle(designer, page) {
     probe.bridgeOff.vue !== 'none' ||
     probe.bridgeSilentTargets.some((hit) => hit !== true) ||
     probe.bridgeSilentCount !== 0 ||
+    probe.blueprintSilentCount !== 0 ||
+    probe.chartVisibleWhileOff !== true ||
     probe.toggleOff !== 'false' ||
     !probe.results.text ||
     !probe.results.chart ||
@@ -295,6 +349,9 @@ async function assertNativeEventsToggle(designer, page) {
     !probe.results.cell ||
     !probe.results.bridgeReact ||
     !probe.results.bridgeVue ||
+    probe.blueprintVisibilityAfterOn !== true ||
+    probe.blueprintEvent?.name !== 'probe_blueprint_ran' ||
+    probe.blueprintEvent?.payload !== true ||
     probe.hoverOn === null ||
     probe.hoverOn.before === probe.hoverOn.after ||
     probe.hoverOn.after !== '2' ||

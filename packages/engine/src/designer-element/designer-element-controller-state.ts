@@ -40,6 +40,16 @@ export function initializeDesignerElementControllers(
   state.canvasRuntimeController = new DesignerCanvasRuntimeController({
     getRenderer: () => state.renderer,
     getVariablePort: () => state.variablePort,
+    getRuntimeContributions: () => state.runtimeContributions,
+    getBlueprintHostActionPort: () => state.designerHostAdapter?.actions,
+    emitBlueprintHostEvent: (event) =>
+      element.dispatchEvent(
+        new CustomEvent('base-screen-blueprint-event', {
+          bubbles: true,
+          composed: true,
+          detail: event,
+        }),
+      ),
     emitDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
   });
   state.topbarController = new DesignerTopbarController({

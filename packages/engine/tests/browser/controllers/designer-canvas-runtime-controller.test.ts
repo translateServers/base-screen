@@ -1,10 +1,14 @@
 import type {
+  ScreenBlueprintHostActionPort,
+  ScreenBlueprintHostEvent,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenHostVariablePort,
   ScreenJsonObject,
   ScreenParseResult,
 } from '@base-screen/contracts';
+import type { ScreenBlueprintVisibilityEffect } from '@base-screen/core';
+import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { BaseScreenRenderer } from '@base-screen/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { DesignerCanvasRuntimeController } from '../../../src/browser/controllers/designer-canvas-runtime-controller.js';
@@ -13,6 +17,7 @@ class FakeRenderer implements BaseScreenRenderer {
   readonly calls: string[] = [];
   readonly variables: ScreenJsonObject[] = [];
   readonly refreshes: (string | undefined)[] = [];
+  readonly visibilityEffects: (readonly ScreenBlueprintVisibilityEffect[])[] = [];
 
   render(): ScreenParseResult<null> {
     this.calls.push('render');
@@ -38,7 +43,11 @@ class FakeRenderer implements BaseScreenRenderer {
     return { ok: true, value: null, diagnostics: [] };
   }
 
-  applyBlueprintVisibilityEffects(): ScreenParseResult<null> {
+  applyBlueprintVisibilityEffects(
+    effects: readonly ScreenBlueprintVisibilityEffect[],
+  ): ScreenParseResult<null> {
+    this.calls.push('visibility');
+    this.visibilityEffects.push(effects);
     return { ok: true, value: null, diagnostics: [] };
   }
 
@@ -70,19 +79,30 @@ function deferred<T>(): {
   return { promise, resolve };
 }
 
-function createHarness(variablePort?: ScreenHostVariablePort): {
+function createHarness(
+  variablePort?: ScreenHostVariablePort,
+  options: {
+    readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
+    readonly hostActionPort?: ScreenBlueprintHostActionPort;
+  } = {},
+): {
   readonly controller: DesignerCanvasRuntimeController;
   readonly renderer: FakeRenderer;
   readonly diagnostics: ScreenDiagnostic[][];
+  readonly hostEvents: ScreenBlueprintHostEvent[];
 } {
   const renderer = new FakeRenderer();
   const diagnostics: ScreenDiagnostic[][] = [];
+  const hostEvents: ScreenBlueprintHostEvent[] = [];
   const controller = new DesignerCanvasRuntimeController({
     getRenderer: () => renderer,
     getVariablePort: () => variablePort,
+    getRuntimeContributions: () => options.runtimeContributions,
+    getBlueprintHostActionPort: () => options.hostActionPort,
+    emitBlueprintHostEvent: (event) => hostEvents.push(event),
     emitDiagnostics: (items) => diagnostics.push([...items]),
   });
-  return { controller, renderer, diagnostics };
+  return { controller, renderer, diagnostics, hostEvents };
 }
 
 describe('DesignerCanvasRuntimeController', () => {
@@ -184,5 +204,107 @@ describe('DesignerCanvasRuntimeController', () => {
       { region: 'south' },
       { region: 'west' },
     ]);
+  });
+
+  it('dispatches Designer material events through the canonical blueprint runtime', () => {
+    const hostActions: ScreenBlueprintHostEvent[] = [];
+    const { controller, renderer, diagnostics, hostEvents } = createHarness(undefined, {
+      runtimeContributions: {
+        getResourceType: () => undefined,
+        hasBlueprintCapability: () => true,
+      },
+      hostActionPort: {
+        execute: (action) => {
+          hostActions.push(action);
+        },
+      },
+    });
+    const document: ScreenDocument = {
+      ...documentWith([{ type: 'static', name: 'status', value: 'idle' }]),
+      blueprint: {
+        rules: [
+          {
+            id: 'run-on-click',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'status',
+                value: { kind: 'literal', value: 'done' },
+              },
+              {
+                type: 'emit-host-event',
+                eventName: 'designer_blueprint_ran',
+                payload: { kind: 'event-payload', path: ['value'] },
+              },
+              {
+                type: 'host-action',
+                actionId: 'open_detail',
+                payload: { kind: 'literal', value: { id: 42 } },
+              },
+              {
+                type: 'component-visibility',
+                componentId: 'chart',
+                operation: 'toggle',
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    expect(controller.render(document).ok).toBe(true);
+    controller.handleMaterialEvent({
+      componentId: 'button',
+      type: 'base.text',
+      name: 'valueClick',
+      payload: { value: 'clicked' },
+    });
+
+    expect(renderer.calls).toEqual(['variables', 'render', 'variables', 'render', 'visibility']);
+    expect(renderer.variables).toEqual([{ status: 'idle' }, { status: 'done' }]);
+    expect(renderer.visibilityEffects).toEqual([[{ componentId: 'chart', operation: 'toggle' }]]);
+    expect(hostEvents).toEqual([{ name: 'designer_blueprint_ran', payload: 'clicked' }]);
+    expect(hostActions).toEqual([{ name: 'open_detail', payload: { id: 42 } }]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it('keeps the canvas renderable but disables blueprint dispatch when capability compile fails', () => {
+    const { controller, renderer, diagnostics } = createHarness(undefined, {
+      runtimeContributions: {
+        getResourceType: () => undefined,
+        hasBlueprintCapability: () => false,
+      },
+    });
+    const document: ScreenDocument = {
+      ...documentWith([]),
+      blueprint: {
+        rules: [
+          {
+            id: 'unsupported-visibility',
+            trigger: { type: 'material-event', componentId: 'button', eventName: 'valueClick' },
+            actions: [
+              {
+                type: 'component-visibility',
+                componentId: 'chart',
+                operation: 'hide',
+              },
+            ],
+          },
+        ],
+      },
+    };
+
+    expect(controller.render(document).ok).toBe(true);
+    controller.handleMaterialEvent({
+      componentId: 'button',
+      type: 'base.text',
+      name: 'valueClick',
+      payload: null,
+    });
+
+    expect(renderer.calls).toEqual(['variables', 'render']);
+    expect(renderer.visibilityEffects).toEqual([]);
+    expect(diagnostics[0]?.[0]?.code).toBe('BLUEPRINT_CAPABILITY_UNAVAILABLE');
   });
 });
