@@ -17,6 +17,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerAssetController } from '../browser/controllers/designer-asset-controller.js';
+import { DesignerBlueprintWorkbenchController } from '../browser/controllers/designer-blueprint-workbench-controller.js';
 import { DesignerCanvasRuntimeController } from '../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from '../browser/controllers/designer-command-palette-controller.js';
 import { DesignerCoordinateEntryController } from '../browser/controllers/designer-coordinate-entry-controller.js';
@@ -26,6 +27,7 @@ import { DesignerGestureController } from '../browser/controllers/designer-gestu
 import { DesignerImportController } from '../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../browser/controllers/designer-integration-controller.js';
 import { DesignerLayersController } from '../browser/controllers/designer-layers-controller.js';
+import { DesignerLeftPanelGroupEventController } from '../browser/controllers/designer-left-panel-group-events.js';
 import { DesignerNotificationController } from '../browser/controllers/designer-notification-controller.js';
 import { DesignerPanelController } from '../browser/controllers/designer-panel-controller.js';
 import { DesignerPreviewController } from '../browser/controllers/designer-preview-controller.js';
@@ -33,6 +35,7 @@ import { DesignerProjectFeedbackController } from '../browser/controllers/design
 import { DesignerProjectWorkspaceController } from '../browser/controllers/designer-project-workspace-controller.js';
 import { DesignerScrollContinuityController } from '../browser/controllers/designer-scroll-continuity-controller.js';
 import { DesignerTextEditController } from '../browser/controllers/designer-text-edit-controller.js';
+import { DesignerTopbarController } from '../browser/controllers/designer-topbar-controller.js';
 import { DesignerVariablesController } from '../browser/controllers/designer-variables-controller.js';
 import { DesignerViewportController } from '../browser/controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from '../browser/controllers/designer-workbench-controller.js';
@@ -41,18 +44,9 @@ import { DesignerMenuController } from '../browser/dom/designer-menu.js';
 import {
   type DesignerSurfaceBindings,
   DesignerSurfaceRouter,
-  getInspectorDraftTarget,
-  isEditableTarget,
-  isTextAreaDraft,
 } from '../browser/dom/designer-surface-router.js';
-import { designerIcon } from '../browser/ui/designer-icons.js';
-import {
-  BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
-  type BaseScreenCanvasPresentationChangeEventDetail,
-} from '../canvas-presentation.js';
 import { createScreenAuthoringInstanceId } from '../common/operations/designer-authoring-bridge.js';
 import {
-  createDesignerElementOperations,
   type DesignerElementOperationsHost,
   type DesignerOperationContext,
 } from '../common/operations/designer-element-operations.js';
@@ -61,11 +55,7 @@ import { DesignerSelectionActions } from '../common/operations/designer-selectio
 import { DesignerProjectGateway } from '../common/project/designer-project-gateway.js';
 import { DesignerSession } from '../common/session/designer-session.js';
 import { type DesignerToolMaterialTypes } from '../common/tools/designer-tools.js';
-import {
-  BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
-  type BaseScreenDesignerLeftPanelGroup,
-  type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
-} from '../designer-left-panel-groups.js';
+import { type BaseScreenDesignerLeftPanelGroup } from '../designer-left-panel-groups.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../material-library-grouping.js';
 import {
   type BaseScreenMaterialLibraryItem,
@@ -125,7 +115,10 @@ export interface DesignerElementState {
   >;
   authoringGeneration: number;
   documentGeneration: number;
+  leftPanelGroupEvents: DesignerLeftPanelGroupEventController;
+  blueprintWorkbenchController: DesignerBlueprintWorkbenchController;
   notificationController: DesignerNotificationController;
+  topbarController: DesignerTopbarController;
   errorConsoleController: DesignerErrorConsoleController;
   scrollContinuityController: DesignerScrollContinuityController;
   canvasRuntimeController: DesignerCanvasRuntimeController;
@@ -180,6 +173,7 @@ export function createDesignerElementState(
   >();
   state.authoringGeneration = 0;
   state.documentGeneration = 0;
+  state.leftPanelGroupEvents = new DesignerLeftPanelGroupEventController(element);
   state.notificationController = new DesignerNotificationController();
   state.errorConsoleController = new DesignerErrorConsoleController();
   state.scrollContinuityController = new DesignerScrollContinuityController();

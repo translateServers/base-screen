@@ -61,7 +61,9 @@ export async function assertDesktopBaseline(designer, page, viewport) {
     geometry.topbarBottom === undefined ||
     geometry.canvasTop < geometry.topbarBottom
   ) {
-    throw new Error(`BROWSER_HARNESS_GEOMETRY_FAILED: ${viewport.width}x${viewport.height}`);
+    throw new Error(
+      `BROWSER_HARNESS_GEOMETRY_FAILED:${viewport.width}x${viewport.height}:${JSON.stringify(geometry)}`,
+    );
   }
   await page.screenshot({
     path: `${screenshotDirectory}/${viewport.width}x${viewport.height}.png`,

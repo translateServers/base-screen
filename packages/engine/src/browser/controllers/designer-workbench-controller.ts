@@ -1,6 +1,7 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenDesignerWorkbenchMode } from '../../common/operations/designer-blueprint-protocol.js';
 import {
   type DesignerSnapPoint,
   type DesignerSnapPreview,
@@ -213,6 +214,18 @@ export class DesignerWorkbenchController {
 
   selectInspectorTab(tab: DesignerInspectorTab): void {
     this.#tabs.selectInspectorTab(tab);
+  }
+
+  get selectedLeftPanelGroupId(): string | undefined {
+    return this.#tabs.selectedLeftPanelGroupId;
+  }
+
+  setAuthoringMode(mode: BaseScreenDesignerWorkbenchMode): void {
+    this.#tabs.setAuthoringMode(mode);
+  }
+
+  expandLeftPanel(): void {
+    this.#panelLayout.expand('left');
   }
 
   selectLeftPanelGroup(groupId: string): boolean {

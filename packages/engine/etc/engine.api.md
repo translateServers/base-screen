@@ -10,14 +10,17 @@ import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-cor
 import type { ScreenAssetCatalogPort } from '@base-screen/contracts';
 import type { ScreenAssetSummary } from '@base-screen/contracts';
 import type { ScreenAuthoringEditorContext } from '@base-screen/contracts';
-import type { ScreenBlueprintCommitRequest } from '@base-screen/contracts';
-import type { ScreenBlueprintEditOptions } from '@base-screen/contracts';
+import { ScreenBlueprintAction } from '@base-screen/contracts';
+import { ScreenBlueprintCondition } from '@base-screen/contracts';
+import { ScreenBlueprintLayoutNode } from '@base-screen/contracts';
+import { ScreenBlueprintLayoutViewport } from '@base-screen/contracts';
 import type { ScreenCanvasBackground } from '@base-screen/contracts';
 import type { ScreenCanvasBackgroundImageFit } from '@base-screen/contracts';
 import { ScreenComponentDataSource } from '@base-screen/contracts';
 import type { ScreenComponentTextCommitRequest } from '@base-screen/contracts';
 import type { ScreenComponentTextTarget } from '@base-screen/contracts';
 import type { ScreenDesignerHostAdapter } from '@base-screen/contracts';
+import { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenDocumentCommand } from '@base-screen/core';
 import { ScreenDocumentTransaction } from '@base-screen/core';
@@ -36,11 +39,23 @@ import type { ScreenProjectSnapshotPort } from '@base-screen/contracts';
 import type { ScreenProjectSummary } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
 
+// @public (undocumented)
+export const BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT: 'base-screen-blueprint-canvas-command';
+
+// @public (undocumented)
+export const BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT: 'base-screen-blueprint-canvas-state';
+
+// @public (undocumented)
+export const BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME: 'application/x-base-screen-blueprint-node';
+
 // @public
 export const BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT = "base-screen-canvas-background-image-request";
 
 // @public (undocumented)
 export const BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT: 'base-screen-canvas-presentation-change';
+
+// @public (undocumented)
+export const BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT: 'base-screen-designer-blueprint-canvas';
 
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT: 'base-screen-designer-left-panel-group-change';
@@ -52,10 +67,242 @@ export const BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS: readonly ['chart', 'co
 export const BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX: 'base-screen-designer-left-panel-';
 
 // @public (undocumented)
+export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT: 'base-screen-designer-workbench-mode-change';
+
+// @public (undocumented)
 export const BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT: 'base-screen-material-library-action';
 
 // @public (undocumented)
 type BaseScreenAlignment = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
+
+// @public (undocumented)
+export type BaseScreenBlueprintCanvasCommand = (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'ready';
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'select';
+    readonly selection: BaseScreenBlueprintCanvasSelection;
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'connect';
+    readonly sourceNodeId: string;
+    readonly sourceHandle: string;
+    readonly targetNodeId: string;
+    readonly targetHandle: string;
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'delete-selection';
+    readonly selection: Exclude<BaseScreenBlueprintCanvasSelection, null>;
+}) | (BaseScreenBlueprintCanvasCommandBase & BaseScreenBlueprintCanvasInsertNode & {
+    readonly type: 'insert-node';
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'commit-layout';
+    readonly nodes: readonly ScreenBlueprintLayoutNode[];
+    readonly viewport?: ScreenBlueprintLayoutViewport;
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'commit-viewport';
+    readonly viewport: ScreenBlueprintLayoutViewport;
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'history-undo';
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'history-redo';
+}) | (BaseScreenBlueprintCanvasCommandBase & {
+    readonly type: 'run-simulation';
+    readonly componentId: string;
+    readonly eventName: string;
+    readonly payload: ScreenJsonValue;
+});
+
+// @public (undocumented)
+interface BaseScreenBlueprintCanvasCommandBase {
+    // (undocumented)
+    readonly commandId: string;
+    // (undocumented)
+    readonly documentRevision: number;
+    // (undocumented)
+    readonly generation: number;
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasCommandEventDetail {
+    // (undocumented)
+    readonly command: BaseScreenBlueprintCanvasCommand;
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasCommandResult {
+    // (undocumented)
+    readonly commandId: string;
+    // (undocumented)
+    readonly diagnostics: readonly ScreenDiagnostic[];
+    // (undocumented)
+    readonly status: 'accepted' | 'rejected';
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasEdge {
+    // (undocumented)
+    readonly actionIndex?: number;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'trigger' | 'action';
+    // (undocumented)
+    readonly operation?: 'show' | 'hide' | 'toggle';
+    // (undocumented)
+    readonly ruleId: string;
+    // (undocumented)
+    readonly source: string;
+    // (undocumented)
+    readonly sourceHandle: string;
+    // (undocumented)
+    readonly target: string;
+    // (undocumented)
+    readonly targetHandle: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasEventOption {
+    // (undocumented)
+    readonly available: boolean;
+    // (undocumented)
+    readonly label: string;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly requiredCapability?: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasGraph {
+    // (undocumented)
+    readonly edges: readonly BaseScreenBlueprintCanvasEdge[];
+    // (undocumented)
+    readonly nodes: readonly BaseScreenBlueprintCanvasNode[];
+    // (undocumented)
+    readonly viewport?: ScreenBlueprintLayoutViewport;
+}
+
+// @public (undocumented)
+export type BaseScreenBlueprintCanvasInsertNode = {
+    readonly kind: 'component';
+    readonly componentId: string;
+    readonly position?: BaseScreenBlueprintCanvasNodePosition;
+} | {
+    readonly kind: 'condition' | 'set-variable' | 'emit-host-event';
+    readonly variableName?: string;
+    readonly position?: BaseScreenBlueprintCanvasNodePosition;
+};
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasNode {
+    // (undocumented)
+    readonly action?: ScreenBlueprintAction;
+    // (undocumented)
+    readonly actionIndex?: number;
+    // (undocumented)
+    readonly collapsed?: boolean;
+    // (undocumented)
+    readonly componentId?: string;
+    // (undocumented)
+    readonly componentName?: string;
+    // (undocumented)
+    readonly condition?: ScreenBlueprintCondition;
+    // (undocumented)
+    readonly events?: readonly BaseScreenBlueprintCanvasEventOption[];
+    // (undocumented)
+    readonly hidden?: boolean;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: BaseScreenBlueprintCanvasNodeKind;
+    // (undocumented)
+    readonly materialType?: string;
+    // (undocumented)
+    readonly ruleId?: string;
+    // (undocumented)
+    readonly summary?: BaseScreenBlueprintCanvasNodeSummary;
+    // (undocumented)
+    readonly unconnected?: true;
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @public (undocumented)
+type BaseScreenBlueprintCanvasNodeKind = 'component' | 'condition' | 'action';
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasNodePosition {
+    // (undocumented)
+    readonly x: number;
+    // (undocumented)
+    readonly y: number;
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasNodeSummary {
+    // (undocumented)
+    readonly kind: 'condition' | 'set-variable' | 'emit-host-event' | 'host-action';
+    // (undocumented)
+    readonly order?: number;
+    // (undocumented)
+    readonly primary: string;
+    // (undocumented)
+    readonly secondary?: string;
+}
+
+// @public (undocumented)
+export type BaseScreenBlueprintCanvasSelection = {
+    readonly kind: 'node' | 'edge';
+    readonly id: string;
+} | null;
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasState {
+    // (undocumented)
+    readonly active: boolean;
+    // (undocumented)
+    readonly canRedo: boolean;
+    // (undocumented)
+    readonly canUndo: boolean;
+    // (undocumented)
+    readonly diagnostics: readonly ScreenDiagnostic[];
+    // (undocumented)
+    readonly documentRevision: number;
+    // (undocumented)
+    readonly generation: number;
+    // (undocumented)
+    readonly graph: BaseScreenBlueprintCanvasGraph;
+    // (undocumented)
+    readonly lastCommand?: BaseScreenBlueprintCanvasCommandResult;
+    // (undocumented)
+    readonly projectRevision: string | null;
+    // (undocumented)
+    readonly selection: BaseScreenBlueprintCanvasSelection;
+    // (undocumented)
+    readonly trace: BaseScreenBlueprintCanvasTrace | null;
+    // (undocumented)
+    readonly viewRequest?: {
+        readonly id: number;
+        readonly type: 'focus';
+        readonly targetId: string;
+    };
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasStateEventDetail {
+    // (undocumented)
+    readonly state: BaseScreenBlueprintCanvasState;
+}
+
+// @public (undocumented)
+export interface BaseScreenBlueprintCanvasTrace {
+    // (undocumented)
+    readonly executedEdgeIds: readonly string[];
+    // (undocumented)
+    readonly failedRuleIds: readonly string[];
+    // (undocumented)
+    readonly lines: readonly string[];
+}
 
 // @public (undocumented)
 export interface BaseScreenCanvasBackgroundImageRequest {
@@ -109,6 +356,8 @@ export interface BaseScreenDesignerConfiguration {
     readonly designerHostAdapter?: ScreenDesignerHostAdapter;
     // (undocumented)
     readonly groupMaterialType?: string;
+    // (undocumented)
+    readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
     readonly leftPanelGroups?: readonly BaseScreenDesignerLeftPanelGroup[];
     // (undocumented)
     readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
@@ -143,6 +392,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     get assetCatalogPort(): ScreenAssetCatalogPort | undefined;
     set assetCatalogPort(value: ScreenAssetCatalogPort | undefined);
     // (undocumented)
+    attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void;
+    // (undocumented)
     cancelAuthoringEdit(requestId: string): boolean;
     // (undocumented)
     cancelProjectOperation(): void;
@@ -153,8 +404,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     set catalog(value: BaseScreenMaterialCatalog | undefined);
     // (undocumented)
     cloneProject(projectId: string, name: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
-    // (undocumented)
-    commitBlueprintEdit(request: ScreenBlueprintCommitRequest): ScreenParseResult<ScreenDocument>;
     commitCanvasBackgroundImage(requestId: string, backgroundImage: string | null, fit?: ScreenCanvasBackgroundImageFit): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     commitComponentTextEdit(request: ScreenComponentTextCommitRequest): ScreenParseResult<ScreenDocument>;
@@ -231,6 +480,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     get materialLibraryState(): BaseScreenMaterialLibraryState | undefined;
     set materialLibraryState(value: BaseScreenMaterialLibraryState | undefined);
     // (undocumented)
+    static get observedAttributes(): readonly string[];
+    // (undocumented)
     paste(): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     get previewHandler(): ((document: ScreenDocument) => boolean) | undefined;
@@ -260,8 +511,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     reparent(componentIds: readonly string[], parentId: string | null): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument>;
-    // (undocumented)
-    requestBlueprintEdit(options?: ScreenBlueprintEditOptions): boolean;
     requestCanvasBackgroundImage(): boolean;
     // (undocumented)
     requestComponentTextEdit(target: ScreenComponentTextTarget): string | null;
@@ -281,6 +530,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     setCanvasBackground(background: ScreenCanvasBackground | null): ScreenParseResult<ScreenDocument>;
     setCanvasBackgroundImage(backgroundImage: string | null, fit?: ScreenCanvasBackgroundImageFit): ScreenParseResult<ScreenDocument>;
     // (undocumented)
+    setWorkbenchMode(mode: BaseScreenDesignerWorkbenchMode, options?: BaseScreenDesignerSetWorkbenchModeOptions): ScreenParseResult<null>;
+    // (undocumented)
     togglePreview(): ScreenParseResult<void>;
     // (undocumented)
     get toolMaterialTypes(): DesignerToolMaterialTypes | undefined;
@@ -294,6 +545,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get variablePort(): ScreenHostVariablePort | undefined;
     set variablePort(value: ScreenHostVariablePort | undefined);
+    // (undocumented)
+    get workbenchMode(): BaseScreenDesignerWorkbenchMode;
 }
 
 // @public (undocumented)
@@ -304,6 +557,7 @@ export interface BaseScreenDesignerLeftPanelGroup {
     readonly id: string;
     // (undocumented)
     readonly label: string;
+    readonly workbenchModes?: readonly BaseScreenDesignerWorkbenchMode[];
 }
 
 // @public (undocumented)
@@ -316,6 +570,36 @@ export type BaseScreenDesignerLeftPanelGroupIcon = (typeof BASE_SCREEN_DESIGNER_
 
 // @public (undocumented)
 export function baseScreenDesignerLeftPanelSlotName(groupId: string): string;
+
+// @public (undocumented)
+export interface BaseScreenDesignerSetWorkbenchModeOptions {
+    // (undocumented)
+    readonly focus?: BaseScreenDesignerWorkbenchFocus;
+}
+
+// @public (undocumented)
+export interface BaseScreenDesignerWorkbenchFocus {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'component' | 'rule' | 'action';
+}
+
+// @public (undocumented)
+export type BaseScreenDesignerWorkbenchMode = 'canvas' | 'blueprint';
+
+// @public (undocumented)
+export interface BaseScreenDesignerWorkbenchModeChangeEventDetail {
+    // (undocumented)
+    readonly mode: BaseScreenDesignerWorkbenchMode;
+    // (undocumented)
+    readonly previousMode: BaseScreenDesignerWorkbenchMode;
+    // (undocumented)
+    readonly reason: BaseScreenDesignerWorkbenchModeChangeReason;
+}
+
+// @public (undocumented)
+export type BaseScreenDesignerWorkbenchModeChangeReason = 'user' | 'api' | 'fallback';
 
 // @public (undocumented)
 type BaseScreenDistribution = 'horizontal' | 'vertical';
@@ -425,6 +709,9 @@ const ElementBase: {
     new (): HTMLElement;
     prototype: HTMLElement;
 };
+
+// @public (undocumented)
+export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasCommand>;
 
 // @public (undocumented)
 export function parseBaseScreenDesignerLeftPanelGroups(input: unknown): ScreenParseResult<readonly BaseScreenDesignerLeftPanelGroup[]>;

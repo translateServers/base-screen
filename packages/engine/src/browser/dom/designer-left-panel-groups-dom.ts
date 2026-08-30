@@ -2,6 +2,7 @@ import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX,
   type BaseScreenDesignerLeftPanelGroup,
+  baseScreenDesignerLeftPanelGroupSupportsMode,
   baseScreenDesignerLeftPanelSlotName,
 } from '../../designer-left-panel-groups.js';
 import { designerIcon } from '../ui/designer-icons.js';
@@ -17,41 +18,51 @@ export function renderDesignerLeftPanelGroups(
   if (tabs === null || rail === null) return;
   const focus = captureHostLeftPanelFocus(root);
 
-  for (const element of root.querySelectorAll<HTMLElement>('[data-host-left-panel-group]')) {
+  for (const element of root.querySelectorAll<HTMLElement>('[data-host-left-panel-rendered]')) {
     element.remove();
   }
 
   for (const group of groups ?? []) {
-    const tabId = `designer-host-${group.id}-tab`;
-    const panelId = `designer-host-${group.id}-panel`;
-    const tab = root.ownerDocument.createElement('button');
-    tab.type = 'button';
-    tab.className = 'designer-tab';
-    tab.id = tabId;
-    tab.setAttribute('role', 'tab');
-    tab.setAttribute('aria-controls', panelId);
-    tab.setAttribute('aria-selected', 'false');
-    tab.dataset.panelTab = `${HOST_TAB_PREFIX}${group.id}`;
-    tab.dataset.panelLabel = group.label;
-    tab.dataset.hostLeftPanelGroup = group.id;
-    tab.title = group.label;
+    const tabId = hostLeftPanelTabId(group.id);
+    const panelId = hostLeftPanelPanelId(group.id);
+    if (baseScreenDesignerLeftPanelGroupSupportsMode(group, 'canvas')) {
+      const tab = root.ownerDocument.createElement('button');
+      tab.type = 'button';
+      tab.className = 'designer-tab';
+      tab.id = tabId;
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-controls', panelId);
+      tab.setAttribute('aria-selected', 'false');
+      tab.dataset.panelTab = `${HOST_TAB_PREFIX}${group.id}`;
+      tab.dataset.panelLabel = group.label;
+      tab.dataset.hostLeftPanelGroup = group.id;
+      tab.dataset.hostLeftPanelMode = 'canvas';
+      tab.dataset.hostLeftPanelRendered = '';
+      tab.title = group.label;
 
-    const glyph = root.ownerDocument.createElement('span');
-    glyph.className = 'rail-tab-glyph';
-    glyph.setAttribute('aria-hidden', 'true');
-    glyph.innerHTML = designerIcon(group.icon ?? 'shapes');
-    const label = root.ownerDocument.createElement('span');
-    label.className = 'rail-tab-label';
-    label.textContent = group.label;
-    tab.append(glyph, label);
-    tabs.append(tab);
+      const glyph = root.ownerDocument.createElement('span');
+      glyph.className = 'rail-tab-glyph';
+      glyph.setAttribute('aria-hidden', 'true');
+      glyph.innerHTML = designerIcon(group.icon ?? 'shapes');
+      const label = root.ownerDocument.createElement('span');
+      label.className = 'rail-tab-label';
+      label.textContent = group.label;
+      tab.append(glyph, label);
+      tabs.append(tab);
+    }
 
     const panel = root.ownerDocument.createElement('div');
     panel.className = 'rail-view host-left-panel-view';
     panel.id = panelId;
     panel.setAttribute('role', 'tabpanel');
-    panel.setAttribute('aria-labelledby', tabId);
+    panel.setAttribute(
+      'aria-labelledby',
+      baseScreenDesignerLeftPanelGroupSupportsMode(group, 'canvas')
+        ? tabId
+        : blueprintHostLeftPanelTabId(group.id),
+    );
     panel.dataset.hostLeftPanelGroup = group.id;
+    panel.dataset.hostLeftPanelRendered = '';
     panel.hidden = true;
 
     const content = root.ownerDocument.createElement('div');
@@ -86,7 +97,7 @@ interface HostLeftPanelFocus {
 function captureHostLeftPanelFocus(root: HTMLElement): HostLeftPanelFocus | undefined {
   const rootNode = root.getRootNode() as ShadowRoot;
   const focusedTab = rootNode.activeElement?.closest<HTMLElement>(
-    '[role="tab"][data-host-left-panel-group]',
+    '[role="tab"][data-host-left-panel-mode="canvas"]',
   );
   if (focusedTab?.dataset.hostLeftPanelGroup !== undefined) {
     return { groupId: focusedTab.dataset.hostLeftPanelGroup, location: 'tab' };
@@ -120,11 +131,26 @@ function restoreHostLeftPanelFocus(
   focus: HostLeftPanelFocus | undefined,
 ): void {
   if (focus === undefined) return;
-  const retained = groups?.some((group) => group.id === focus.groupId) === true;
-  if (focus.location === 'content' && retained) return;
+  const retainedGroup = groups?.find((group) => group.id === focus.groupId);
+  if (focus.location === 'content' && retainedGroup !== undefined) return;
+  const retained =
+    retainedGroup !== undefined &&
+    baseScreenDesignerLeftPanelGroupSupportsMode(retainedGroup, 'canvas');
   const tab = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-panel-tab]')).find(
     (control) =>
       control.dataset.panelTab === (retained ? hostLeftPanelTab(focus.groupId) : 'materials'),
   );
   tab?.focus();
+}
+
+export function blueprintHostLeftPanelTabId(groupId: string): string {
+  return `designer-blueprint-host-${groupId}-tab`;
+}
+
+export function hostLeftPanelTabId(groupId: string): string {
+  return `designer-host-${groupId}-tab`;
+}
+
+export function hostLeftPanelPanelId(groupId: string): string {
+  return `designer-host-${groupId}-panel`;
 }

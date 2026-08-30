@@ -1,5 +1,5 @@
 import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
-import type { BaseScreenMaterialManifest, BaseScreenMaterialObjectSchema } from './contracts.js';
+import type { BaseScreenMaterialManifest } from './contracts.js';
 import { PluginDiagnosticCollector } from './diagnostics.js';
 import { parseBaseScreenMaterialEditorDescriptor } from './editor-descriptor.js';
 import { validateDefaultValues, validateMaterialFields } from './material-manifest-fields.js';

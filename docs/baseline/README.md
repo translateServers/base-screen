@@ -48,15 +48,15 @@
   [ADR-0006](../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)。
 - **主题 Token**：宿主可配置的 Designer chrome Token、dark/light 与自有滚动条边界。依据：[Designer Theme Tokens](../specs/archive/designer-theme-tokens/spec.md)、
   [ADR-0024](../decisions/ADR-0024-designer-public-style-tokens.md)。
-- **作者扩展（轻量基座）**：JSON-safe 声明式 Manifest Editor Descriptor、宿主作者桥、结构化事件声明与内建面板 primitives；
-  Blueprint 图形/代码/完整领域配置编辑器及其依赖归宿主。依据：[Designer Authoring Extension](../specs/archive/designer-authoring-extension/spec.md)、
+- **作者扩展（轻量基座）**：JSON-safe 声明式 Manifest Editor Descriptor、组件文本宿主作者桥、结构化事件声明与内建面板 primitives；
+  代码/完整领域配置编辑器及其依赖归宿主。依据：[Designer Authoring Extension](../specs/archive/designer-authoring-extension/spec.md)、
   [ADR-0028](../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)。
-- **整屏事件 Blueprint 宿主桥**：canonical Blueprint 与 Core compile/trace/replace/history/诊断保持不变；Blueprint
-  请求携带 detached 的完整当前文档、初始组件定位提示、在用物料事件/capability/容量投影，提交绑定 document
-  generation 与外部 revision，并以一次 `replace-blueprint` 形成一条历史。Designer 只保留顶栏整屏入口和组件
-  只读摘要/定位入口，不实现规则编辑器、流程画布、节点检查器、搜索、布局或试运行 UI。依据：
-  [Document Blueprint Host Bridge](../specs/document-blueprint-host-bridge/spec.md)、
-  [ADR-0061](../decisions/ADR-0061-host-constrained-visual-event-blueprint.md)。
+- **Canvas/Blueprint 一体化工作台**：固定全局工具栏在 Canvas 与 Blueprint 间切换；Blueprint 直接编辑当前
+  `ScreenDocument`，复用 Core compile/trace/replace、DesignerSession 历史、脏状态、预览、保存和发布门禁。
+  Base Screen 拥有左右语义面板、搜索、图投影和严格 generation/revision/idempotency slot 协议；宿主中央 slot
+  只拥有 Vue Flow/Dagre 等图形渲染、布局与手势。`blueprint.layout` 持久化位置/视口，模式/选择/trace 属 session。
+  依据：[Designer Blueprint Workbench](../specs/designer-blueprint-workbench/spec.md)、
+  [ADR-0063](../decisions/ADR-0063-designer-blueprint-workbench-shell.md)。
 - **左侧面板信息架构与交互**（封版后增量，生效中）：缩略图网格组件库、按 Tab 隔离的工具栏、折叠图标轨、
   图层树引导线与图标操作、搜索清除与网格键盘可达性；既有 data-* 契约与宿主边界不变，零新依赖。
   依据：[Designer Left Panel](../specs/designer-left-panel/spec.md)、[ADR-0032](../decisions/ADR-0032-designer-left-panel-refactor.md)。

@@ -87,7 +87,7 @@ export class DesignerLayerDragController {
     }
     event.preventDefault();
     const result = this.callbacks.executeTransaction(
-      createReparentTransaction(document, componentIds, parentId),
+      createReparentTransaction(componentIds, parentId),
     );
     if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
     return true;
@@ -137,10 +137,7 @@ export class DesignerLayerDragController {
           !isScreenComponentEffectivelyLocked(document, parentId) &&
           this.callbacks.getCatalog()?.get(parent.type)?.manifest.designCapabilities.children ===
             true)) &&
-      applyScreenDocumentTransaction(
-        document,
-        createReparentTransaction(document, componentIds, parentId),
-      ).ok
+      applyScreenDocumentTransaction(document, createReparentTransaction(componentIds, parentId)).ok
     );
   }
 

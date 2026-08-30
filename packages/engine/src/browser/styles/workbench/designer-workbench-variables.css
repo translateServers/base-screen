@@ -528,7 +528,7 @@
 }
 
 .ruler-horizontal {
-  grid-row: 1 / 2 !important;
+  grid-row: 2 / 3 !important;
   position: relative;
   overflow: hidden;
   /* 分隔线用 inset shadow 画：border 会在 border-box 下吃掉 canvas 1px 尺寸。 */

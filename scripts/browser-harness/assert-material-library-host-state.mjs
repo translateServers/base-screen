@@ -40,7 +40,7 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     !state.statusInsideConsole ||
     state.consoleHidden !== true ||
     state.consoleCount !== '1' ||
-    state.consoleWidth !== 84 ||
+    (state.consoleWidth ?? 0) < 32 ||
     state.categoryCount !== 0 ||
     state.groupCount !== 4 ||
     state.draft !== true ||

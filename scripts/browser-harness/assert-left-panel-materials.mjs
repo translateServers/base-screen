@@ -26,6 +26,7 @@ export async function assertLeftPanelMaterials(designer, page) {
       railChildren,
       railWidth: Math.round(rail.getBoundingClientRect().width),
       tabIndex: railChildren.indexOf('rail-tabs'),
+      blueprintIndex: railChildren.indexOf('blueprint-library'),
       viewIndex: railChildren.indexOf('rail-view'),
       viewCount: railChildren.filter((name) => name === 'rail-view').length,
       materialsToolsInsideView:
@@ -49,7 +50,8 @@ export async function assertLeftPanelMaterials(designer, page) {
   });
   if (
     ia.tabIndex !== 1 ||
-    ia.viewIndex !== 2 ||
+    ia.blueprintIndex !== 2 ||
+    ia.viewIndex !== 3 ||
     ia.viewCount !== 3 ||
     !ia.materialsToolsInsideView ||
     ia.materialsPanelInlineGutter !== 0 ||
@@ -181,7 +183,7 @@ export async function assertLeftPanelMaterials(designer, page) {
   if ((await componentCount(page)) !== countBeforeAdd + 1) {
     throw new Error('BROWSER_HARNESS_LEFT_PANEL_ENTER_ADD_FAILED');
   }
-  await designer.locator('.designer-topbar [data-action="undo"]').first().click();
+  await designer.locator('[data-canvas-local-toolbar] [data-action="undo"]').first().click();
   if ((await componentCount(page)) !== countBeforeAdd) {
     throw new Error('BROWSER_HARNESS_LEFT_PANEL_UNDO_RESTORE_FAILED');
   }

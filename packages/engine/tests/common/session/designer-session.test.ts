@@ -64,7 +64,7 @@ describe('DesignerSession', () => {
 
   it('keeps document, history, and selection unchanged when rendering a transaction fails', () => {
     let reject = false;
-    const { session } = createSession((next) =>
+    const { session } = createSession(() =>
       reject
         ? {
             ok: false,

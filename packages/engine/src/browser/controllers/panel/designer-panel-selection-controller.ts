@@ -158,7 +158,7 @@ export class DesignerPanelSelectionController {
       dataSource: createInitialDataSource(entry.manifest),
     };
     const result = this.callbacks.executeTransaction(
-      createGroupTransaction(document, group, this.interaction.selectedComponentIds),
+      createGroupTransaction(group, this.interaction.selectedComponentIds),
     );
     if (result.ok) this.select([group.id]);
     return result;

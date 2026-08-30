@@ -3,6 +3,7 @@ import {
   type ScreenDiagnostic,
   type ScreenParseResult,
 } from '@base-screen/contracts';
+import type { BaseScreenDesignerWorkbenchMode } from './common/operations/designer-blueprint-protocol.js';
 
 export const BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT =
   'base-screen-designer-left-panel-group-change' as const;
@@ -32,6 +33,8 @@ export interface BaseScreenDesignerLeftPanelGroup {
   readonly id: string;
   readonly label: string;
   readonly icon?: BaseScreenDesignerLeftPanelGroupIcon;
+  /** 省略时仅用于画布；显式声明后可用于画布、事件蓝图或两者。 */
+  readonly workbenchModes?: readonly BaseScreenDesignerWorkbenchMode[];
 }
 
 export interface BaseScreenDesignerLeftPanelGroupChangeEventDetail {
@@ -39,8 +42,9 @@ export interface BaseScreenDesignerLeftPanelGroupChangeEventDetail {
   readonly groupId: string | null;
 }
 
-const GROUP_FIELDS = new Set(['id', 'label', 'icon']);
+const GROUP_FIELDS = new Set(['id', 'label', 'icon', 'workbenchModes']);
 const GROUP_ICONS = new Set<string>(BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS);
+const WORKBENCH_MODES = new Set<BaseScreenDesignerWorkbenchMode>(['canvas', 'blueprint']);
 const GROUP_ID_PATTERN = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u;
 const RESERVED_GROUP_IDS = new Set(['layers', 'materials', 'variables']);
@@ -77,6 +81,13 @@ export function baseScreenDesignerLeftPanelSlotName(groupId: string): string {
   return `${BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX}${groupId}`;
 }
 
+export function baseScreenDesignerLeftPanelGroupSupportsMode(
+  group: BaseScreenDesignerLeftPanelGroup,
+  mode: BaseScreenDesignerWorkbenchMode,
+): boolean {
+  return group.workbenchModes?.includes(mode) ?? mode === 'canvas';
+}
+
 function parseGroup(
   value: unknown,
   index: number,
@@ -99,11 +110,26 @@ function parseGroup(
   const id = parseGroupId(value.id, [...path, 'id'], ids, diagnostics);
   const label = parseGroupLabel(value.label, [...path, 'label'], diagnostics);
   const icon = parseGroupIcon(value.icon, [...path, 'icon'], diagnostics);
-  if (id === undefined || label === undefined || (value.icon !== undefined && icon === undefined)) {
+  const workbenchModes = parseWorkbenchModes(
+    value.workbenchModes,
+    [...path, 'workbenchModes'],
+    diagnostics,
+  );
+  if (
+    id === undefined ||
+    label === undefined ||
+    (value.icon !== undefined && icon === undefined) ||
+    (value.workbenchModes !== undefined && workbenchModes === undefined)
+  ) {
     return undefined;
   }
 
-  return Object.freeze({ id, label, ...(icon === undefined ? {} : { icon }) });
+  return Object.freeze({
+    id,
+    label,
+    ...(icon === undefined ? {} : { icon }),
+    ...(workbenchModes === undefined ? {} : { workbenchModes }),
+  });
 }
 
 function parseGroupId(
@@ -158,6 +184,35 @@ function parseGroupIcon(
     return undefined;
   }
   return value as BaseScreenDesignerLeftPanelGroupIcon;
+}
+
+function parseWorkbenchModes(
+  value: unknown,
+  path: readonly (string | number)[],
+  diagnostics: ScreenDiagnostic[],
+): readonly BaseScreenDesignerWorkbenchMode[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value) || value.length === 0 || value.length > WORKBENCH_MODES.size) {
+    diagnostics.push(diagnostic(path, 'Designer left panel workbench modes are invalid.'));
+    return undefined;
+  }
+  const modes = new Set<BaseScreenDesignerWorkbenchMode>();
+  for (const [index, mode] of value.entries()) {
+    if (typeof mode !== 'string' || !WORKBENCH_MODES.has(mode as BaseScreenDesignerWorkbenchMode)) {
+      diagnostics.push(
+        diagnostic([...path, index], 'Designer left panel workbench mode is invalid.'),
+      );
+      return undefined;
+    }
+    if (modes.has(mode as BaseScreenDesignerWorkbenchMode)) {
+      diagnostics.push(
+        diagnostic([...path, index], 'Designer left panel workbench mode must be unique.'),
+      );
+      return undefined;
+    }
+    modes.add(mode as BaseScreenDesignerWorkbenchMode);
+  }
+  return Object.freeze([...modes]);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

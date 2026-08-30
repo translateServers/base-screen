@@ -3,7 +3,6 @@ import { DesignerMenuController } from '../browser/dom/designer-menu.js';
 import { DesignerSurfaceRouter } from '../browser/dom/designer-surface-router.js';
 import {
   createDesignerElementOperations,
-  type DesignerElementOperationsHost,
   type DesignerOperationContext,
 } from '../common/operations/designer-element-operations.js';
 import { DesignerOperationRegistry } from '../common/operations/designer-operation-registry.js';

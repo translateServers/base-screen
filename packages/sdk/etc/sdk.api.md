@@ -4,15 +4,39 @@
 
 ```ts
 
+import { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME } from '@base-screen/engine';
+import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX } from '@base-screen/engine';
+import { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasCommandEventDetail } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasCommandResult } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasEdge } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasEventOption } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasGraph } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasInsertNode } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasNode } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasNodePosition } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasNodeSummary } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasSelection } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasState } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasStateEventDetail } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasTrace } from '@base-screen/engine';
 import { BaseScreenDesignerElement } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroup } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroupChangeEventDetail } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroupIcon } from '@base-screen/engine';
 import { baseScreenDesignerLeftPanelSlotName } from '@base-screen/engine';
+import { BaseScreenDesignerSetWorkbenchModeOptions } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchFocus } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchMode } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchModeChangeEventDetail } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchModeChangeReason } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryAction } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryActionEventDetail } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryGroup } from '@base-screen/engine';
@@ -21,30 +45,27 @@ import { BaseScreenMaterialLibraryItem } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryState } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryStatus } from '@base-screen/engine';
 import { BaseScreenViewerElement } from '@base-screen/renderer';
-import { MAX_AUTHORING_DOCUMENT_SNAPSHOT_BYTES } from '@base-screen/contracts';
-import { MAX_BLUEPRINT_AUTHORING_CAPABILITIES } from '@base-screen/contracts';
-import { MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES } from '@base-screen/contracts';
-import { MAX_BLUEPRINT_AUTHORING_EVENTS_PER_MATERIAL } from '@base-screen/contracts';
-import { MAX_BLUEPRINT_AUTHORING_PAYLOAD_SCHEMA_BYTES } from '@base-screen/contracts';
+import { parseBaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { parseBaseScreenDesignerLeftPanelGroups } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryGrouping } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryItems } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryState } from '@base-screen/engine';
-import { parseScreenBlueprintAuthoringContext } from '@base-screen/contracts';
 import { SCREEN_AUTHORING_REQUEST_EVENT } from '@base-screen/contracts';
 import { ScreenAuthoringEditorContext } from '@base-screen/contracts';
 import { ScreenAuthoringEditorLimits } from '@base-screen/contracts';
 import { ScreenAuthoringRequest } from '@base-screen/contracts';
 import { ScreenAuthoringRequestEventDetail } from '@base-screen/contracts';
-import { ScreenBlueprintAuthoringContext } from '@base-screen/contracts';
-import { ScreenBlueprintAuthoringEvent } from '@base-screen/contracts';
-import { ScreenBlueprintAuthoringLimits } from '@base-screen/contracts';
-import { ScreenBlueprintAuthoringMaterialEvents } from '@base-screen/contracts';
-import { ScreenBlueprintCommitRequest } from '@base-screen/contracts';
-import { ScreenBlueprintEditOptions } from '@base-screen/contracts';
 import { ScreenComponentTextCommitRequest } from '@base-screen/contracts';
 import { ScreenComponentTextTarget } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
+
+export { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT }
+
+export { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT }
+
+export { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME }
+
+export { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT }
 
 export { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT }
 
@@ -55,10 +76,40 @@ export { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX }
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_TAG_NAME: 'base-screen-designer';
 
+export { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT }
+
 export { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT }
 
 // @public (undocumented)
 export const BASE_SCREEN_VIEWER_TAG_NAME: 'base-screen-viewer';
+
+export { BaseScreenBlueprintCanvasCommand }
+
+export { BaseScreenBlueprintCanvasCommandEventDetail }
+
+export { BaseScreenBlueprintCanvasCommandResult }
+
+export { BaseScreenBlueprintCanvasEdge }
+
+export { BaseScreenBlueprintCanvasEventOption }
+
+export { BaseScreenBlueprintCanvasGraph }
+
+export { BaseScreenBlueprintCanvasInsertNode }
+
+export { BaseScreenBlueprintCanvasNode }
+
+export { BaseScreenBlueprintCanvasNodePosition }
+
+export { BaseScreenBlueprintCanvasNodeSummary }
+
+export { BaseScreenBlueprintCanvasSelection }
+
+export { BaseScreenBlueprintCanvasState }
+
+export { BaseScreenBlueprintCanvasStateEventDetail }
+
+export { BaseScreenBlueprintCanvasTrace }
 
 export { BaseScreenDesignerElement }
 
@@ -69,6 +120,16 @@ export { BaseScreenDesignerLeftPanelGroupChangeEventDetail }
 export { BaseScreenDesignerLeftPanelGroupIcon }
 
 export { baseScreenDesignerLeftPanelSlotName }
+
+export { BaseScreenDesignerSetWorkbenchModeOptions }
+
+export { BaseScreenDesignerWorkbenchFocus }
+
+export { BaseScreenDesignerWorkbenchMode }
+
+export { BaseScreenDesignerWorkbenchModeChangeEventDetail }
+
+export { BaseScreenDesignerWorkbenchModeChangeReason }
 
 export { BaseScreenMaterialLibraryAction }
 
@@ -95,15 +156,7 @@ export function defineBaseScreenElements(): ScreenParseResult<null>;
 // @public (undocumented)
 export function defineBaseScreenViewer(): ScreenParseResult<CustomElementConstructor>;
 
-export { MAX_AUTHORING_DOCUMENT_SNAPSHOT_BYTES }
-
-export { MAX_BLUEPRINT_AUTHORING_CAPABILITIES }
-
-export { MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES }
-
-export { MAX_BLUEPRINT_AUTHORING_EVENTS_PER_MATERIAL }
-
-export { MAX_BLUEPRINT_AUTHORING_PAYLOAD_SCHEMA_BYTES }
+export { parseBaseScreenBlueprintCanvasCommand }
 
 export { parseBaseScreenDesignerLeftPanelGroups }
 
@@ -112,8 +165,6 @@ export { parseBaseScreenMaterialLibraryGrouping }
 export { parseBaseScreenMaterialLibraryItems }
 
 export { parseBaseScreenMaterialLibraryState }
-
-export { parseScreenBlueprintAuthoringContext }
 
 export { SCREEN_AUTHORING_REQUEST_EVENT }
 
@@ -124,18 +175,6 @@ export { ScreenAuthoringEditorLimits }
 export { ScreenAuthoringRequest }
 
 export { ScreenAuthoringRequestEventDetail }
-
-export { ScreenBlueprintAuthoringContext }
-
-export { ScreenBlueprintAuthoringEvent }
-
-export { ScreenBlueprintAuthoringLimits }
-
-export { ScreenBlueprintAuthoringMaterialEvents }
-
-export { ScreenBlueprintCommitRequest }
-
-export { ScreenBlueprintEditOptions }
 
 export { ScreenComponentTextCommitRequest }
 

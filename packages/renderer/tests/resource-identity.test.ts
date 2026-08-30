@@ -1,25 +1,5 @@
-import type {
-  ScreenAbortSignal,
-  ScreenComponentNode,
-  ScreenDocument,
-  ScreenHostResourceBinding,
-  ScreenHostResourceParameter,
-  ScreenHostResourcePort,
-  ScreenHostResourceRequest,
-  ScreenJsonValue,
-  ScreenParseResult,
-} from '@base-screen/contracts';
-import type {
-  BaseScreenMaterialCatalog,
-  BaseScreenMaterialConstructor,
-  BaseScreenMaterialDataBindingRole,
-  BaseScreenMaterialManifest,
-  BaseScreenMaterialModel,
-  BaseScreenMaterialTabularDataAdapter,
-} from '@base-screen/plugin-core';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { canonicalJsonString } from '../src/canonical-json.js';
-import { createBaseScreenRenderer } from '../src/renderer.js';
 import { getHostResourceKey } from '../src/resource-state.js';
 import { component, hostSource } from './__fixtures__/resource-state-machine-harness.js';
 

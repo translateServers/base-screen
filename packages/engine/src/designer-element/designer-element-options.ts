@@ -15,7 +15,6 @@ import type {
   BaseScreenConditionalStylePort,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import { renderMaterialLibraryState } from '../browser/dom/designer-workspace.js';
 import { type DesignerToolMaterialTypes } from '../common/tools/designer-tools.js';
 import {
   type BaseScreenMaterialLibraryGrouping,
@@ -37,7 +36,9 @@ import { type DesignerElementHost, getDesignerElementState } from './designer-el
 export function selectLeftPanelGroup(element: DesignerElementHost, groupId: string): boolean {
   const elementState = getDesignerElementState(element);
 
-  return elementState.workbenchController.selectLeftPanelGroup(groupId);
+  return elementState.blueprintWorkbenchController.mode === 'blueprint'
+    ? elementState.blueprintWorkbenchController.selectLeftPanelGroup(groupId)
+    : elementState.workbenchController.selectLeftPanelGroup(groupId);
 }
 
 export function readMaterialLibraryState(

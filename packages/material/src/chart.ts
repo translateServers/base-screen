@@ -1,8 +1,4 @@
-import type {
-  ScreenDatasetField,
-  ScreenParseResult,
-  ScreenTabularDataset,
-} from '@base-screen/contracts';
+import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenChartData,
   type BaseScreenMaterialCatalogEntry,

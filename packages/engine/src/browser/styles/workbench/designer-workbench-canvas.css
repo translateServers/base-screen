@@ -191,7 +191,7 @@
   content: "";
 }
 
-.canvas-guide-persistent[data-axis="x"] {
+.canvas-guide.canvas-guide-persistent[data-axis="x"] {
   width: var(--designer-overlay-hit-size, 9px);
   cursor: ew-resize;
 }
@@ -204,7 +204,7 @@
   translate: -50% 0;
 }
 
-.canvas-guide-persistent[data-axis="y"] {
+.canvas-guide.canvas-guide-persistent[data-axis="y"] {
   height: var(--designer-overlay-hit-size, 9px);
   cursor: ns-resize;
 }

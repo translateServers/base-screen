@@ -1,8 +1,9 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { BaseScreenDesignerWorkbenchMode } from '../../common/operations/designer-blueprint-protocol.js';
 import { DESIGNER_OPERATION_TEXT } from '../../common/operations/designer-operation-registry.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
-export type DesignerCommandPaletteKind = 'material' | 'layer' | 'command';
+export type DesignerCommandPaletteKind = 'material' | 'layer' | 'command' | 'blueprint';
 
 export interface DesignerCommandPaletteEntry {
   readonly kind: DesignerCommandPaletteKind;
@@ -14,6 +15,7 @@ export interface DesignerCommandPaletteEntry {
   readonly materialItemId?: string;
   readonly componentId?: string;
   readonly operationId?: keyof typeof DESIGNER_OPERATION_TEXT;
+  readonly blueprintTargetId?: string;
 }
 
 export interface DesignerCommandPaletteQuery {
@@ -24,6 +26,7 @@ export interface DesignerCommandPaletteQuery {
 export interface DesignerCommandPaletteControllerCallbacks {
   readonly getRoot: () => ShadowRoot | null;
   readonly getDocument: () => ScreenDocument | undefined;
+  readonly getWorkbenchMode: () => BaseScreenDesignerWorkbenchMode;
   readonly renderKindIcon: (kind: DesignerCommandPaletteKind) => string;
 }
 
@@ -183,7 +186,11 @@ export class DesignerCommandPaletteController {
     const empty = palette?.querySelector<HTMLElement>('[data-command-palette-empty]');
     const input = palette?.querySelector<HTMLInputElement>('[data-command-palette-search]');
     if (results === null || results === undefined || empty === null || empty === undefined) return;
-    const entries = filterDesignerCommandPaletteEntries(this.entries(), value);
+    const allEntries = this.entries();
+    const entries =
+      value.trim().length === 0 && this.callbacks.getWorkbenchMode() === 'blueprint'
+        ? allEntries.filter((entry) => entry.kind === 'blueprint').slice(0, MAX_RESULTS)
+        : filterDesignerCommandPaletteEntries(allEntries, value);
     results.replaceChildren(...entries.map((entry, index) => this.result(entry, index)));
     empty.hidden = entries.length !== 0;
     const first = results.querySelector<HTMLButtonElement>(
@@ -249,7 +256,55 @@ export class DesignerCommandPaletteController {
         operationId,
       };
     });
-    return [...materials, ...layers, ...commands];
+    const blueprint = this.blueprintEntries();
+    return this.callbacks.getWorkbenchMode() === 'blueprint'
+      ? [...blueprint, ...commands]
+      : [...materials, ...layers, ...commands];
+  }
+
+  private blueprintEntries(): readonly DesignerCommandPaletteEntry[] {
+    const document = this.callbacks.getDocument();
+    if (document === undefined) return [];
+    const components = document.components.map(
+      (component): DesignerCommandPaletteEntry => ({
+        kind: 'blueprint',
+        label: component.name,
+        detail: component.type,
+        searchText: `${component.name} ${component.type} ${component.id}`.toLocaleLowerCase(),
+        blueprintTargetId: `component:${component.id}`,
+      }),
+    );
+    const rules = document.blueprint.rules.flatMap((rule): DesignerCommandPaletteEntry[] => {
+      const ruleEntry: DesignerCommandPaletteEntry = {
+        kind: 'blueprint',
+        label: DESIGNER_UI_TEXT.blueprint.ruleSummary(rule.id),
+        detail: `${rule.trigger.componentId}.${rule.trigger.eventName}`,
+        searchText:
+          `${rule.id} ${rule.trigger.componentId} ${rule.trigger.eventName}`.toLocaleLowerCase(),
+        blueprintTargetId:
+          rule.condition !== undefined
+            ? `condition:${rule.id}`
+            : rule.actions.length === 0
+              ? `component:${rule.trigger.componentId}`
+              : `edge:${rule.id}:action:0`,
+      };
+      return [
+        ruleEntry,
+        ...rule.actions.map(
+          (action, actionIndex): DesignerCommandPaletteEntry => ({
+            kind: 'blueprint',
+            label: DESIGNER_UI_TEXT.blueprint.actionSummary(actionIndex),
+            detail: `${rule.id} · ${action.type}`,
+            searchText: `${rule.id} ${action.type} ${actionIndex}`.toLocaleLowerCase(),
+            blueprintTargetId:
+              action.type === 'component-visibility'
+                ? `edge:${rule.id}:action:${actionIndex}`
+                : `action:${rule.id}:${actionIndex}`,
+          }),
+        ),
+      ];
+    });
+    return [...components, ...rules];
   }
 
   private result(entry: DesignerCommandPaletteEntry, index: number): HTMLButtonElement {
@@ -279,6 +334,9 @@ export class DesignerCommandPaletteController {
     if (entry.materialItemId !== undefined) button.dataset.materialItemId = entry.materialItemId;
     if (entry.componentId !== undefined) button.dataset.layerSelect = entry.componentId;
     if (entry.operationId !== undefined) button.dataset.action = entry.operationId;
+    if (entry.blueprintTargetId !== undefined) {
+      button.dataset.blueprintSearchId = entry.blueprintTargetId;
+    }
     return button;
   }
 

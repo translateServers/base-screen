@@ -188,5 +188,7 @@ export function unload(element: DesignerElementHost): void {
   elementState.canvasRuntimeController.clear();
   elementState.renderer?.dispose();
   elementState.renderer = undefined;
+  elementState.blueprintWorkbenchController.setInitialMode('canvas');
+  elementState.blueprintWorkbenchController.resetSession();
   elementState.runtime.renderInteraction(element);
 }

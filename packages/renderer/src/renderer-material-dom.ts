@@ -1,10 +1,9 @@
-import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
+import type { ScreenComponentNode } from '@base-screen/contracts';
 import type { BaseScreenMaterialElement, BaseScreenMaterialModel } from '@base-screen/plugin-core';
 
 export function applyMaterial(
   element: BaseScreenMaterialElement,
   component: ScreenComponentNode,
-  document: ScreenDocument,
   model: BaseScreenMaterialModel,
   effectivelyHidden: boolean,
   stackOrder: number,

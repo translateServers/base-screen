@@ -20,7 +20,6 @@ import {
   type BaseScreenMaterialCatalog,
   type BaseScreenMaterialObjectSchema,
   type BaseScreenMaterialPropSchema,
-  validateBaseScreenMaterialProps,
 } from '@base-screen/plugin-core';
 import {
   createValidatedPropsTransaction,

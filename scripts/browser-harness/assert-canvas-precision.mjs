@@ -154,7 +154,7 @@ async function assertCanvasPrecision(designer, page) {
   );
   // 参考线层级：组件 z-index 取 Core painter order 索引（0..N-1），覆盖层 z-index 由组件数派生，
   // 参考线必须绘制在所有组件之上。探测参考线穿过的最上层组件（按 z-index 取最大）中心点，
-  // elementFromPoint 必须命中参考线本身（或 canvas-guides 层内元素），而非组件。
+  // elementsFromPoint 中参考线必须先于目标组件；通知等更高层工作台浮层可以合法遮挡两者。
   const guideLayer = await designer.evaluate((element) => {
     const root = element.shadowRoot;
     const guides = root.querySelectorAll('.canvas-guide-persistent');
@@ -187,19 +187,30 @@ async function assertCanvasPrecision(designer, page) {
         ? { x: guidePos, y: target.rect.y + target.rect.height / 2 }
         : { x: target.rect.x + target.rect.width / 2, y: guidePos };
     const hit = root.elementFromPoint(probe.x, probe.y);
+    const hitStack = root.elementsFromPoint(probe.x, probe.y);
+    const guideStackIndex = hitStack.findIndex(
+      (candidate) => candidate.closest?.('[data-canvas-guides]') !== null,
+    );
+    const targetStackIndex = hitStack.findIndex((candidate) => candidate === target.material);
     return {
       crossed: crossed.length,
       axis,
+      guideLayerZ: getComputedStyle(guide.parentElement).zIndex,
+      componentCountToken: getComputedStyle(element).getPropertyValue(
+        '--designer-canvas-component-count',
+      ),
       targetZ: target.z,
       targetId: target.material.dataset.baseScreenComponentId ?? null,
       probe,
       guidePos,
-      hitTag: hit?.tagName ?? null,
-      hitClass: typeof hit?.className === 'string' ? hit.className : null,
-      hitDataset: hit instanceof HTMLElement ? { ...hit.dataset } : null,
-      inGuides:
-        hit?.closest?.('[data-canvas-guides]') !== null &&
-        hit?.closest?.('[data-canvas-guides]') !== undefined,
+      guideStackIndex,
+      targetStackIndex,
+      guideAboveTarget:
+        guideStackIndex >= 0 && targetStackIndex >= 0 && guideStackIndex < targetStackIndex,
+      blockingOverlay:
+        hit?.closest?.('[data-canvas-guides]') === null
+          ? (hit?.closest?.('.designer-notification')?.className ?? null)
+          : null,
     };
   });
   if (guideLayer === null || guideLayer.crossed === 0) {
@@ -208,7 +219,7 @@ async function assertCanvasPrecision(designer, page) {
   if (guideLayer.targetZ < 2) {
     throw new Error(`BROWSER_HARNESS_GUIDE_LAYER_TARGET_WEAK:${JSON.stringify(guideLayer)}`);
   }
-  if (!guideLayer.inGuides) {
+  if (!guideLayer.guideAboveTarget) {
     throw new Error(
       `BROWSER_HARNESS_GUIDE_COVERED_BY_COMPONENT_FAILED:${JSON.stringify(guideLayer)}`,
     );
@@ -290,7 +301,7 @@ async function assertCanvasPrecision(designer, page) {
         await designer.evaluate((host) => {
           const root = host.shadowRoot;
           const viewport = root.querySelector('[data-viewport]');
-          const trigger = root.querySelector('[data-menu-toggle="view"]');
+          const trigger = root.querySelector('[data-menu-toggle="more"]');
           const menus = [...root.querySelectorAll('[data-menu]')].map((menu) => ({
             id: menu.dataset.menu,
             hidden: menu.hidden,

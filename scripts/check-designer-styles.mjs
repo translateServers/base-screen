@@ -20,9 +20,13 @@ const controlLayers = [
 ];
 const workbenchLayers = [
   'packages/engine/src/browser/styles/workbench/designer-workbench-topbar.css',
+  'packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-toolbar.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-feedback.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-shell.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-panels.css',
+  'packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-surface.css',
+  'packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-panels.css',
+  'packages/engine/src/browser/styles/workbench/designer-workbench-blueprint-details.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-materials.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-data-catalog.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-data-binding.css',
@@ -45,9 +49,13 @@ const controlBindings = [
 ];
 const workbenchBindings = [
   'topbarCss',
+  'blueprintToolbarCss',
   'feedbackCss',
   'shellCss',
   'panelsCss',
+  'blueprintSurfaceCss',
+  'blueprintPanelsCss',
+  'blueprintDetailsCss',
   'materialsCss',
   'dataCatalogCss',
   'dataBindingCss',

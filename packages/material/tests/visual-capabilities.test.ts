@@ -2,9 +2,7 @@ import type { ScreenJsonValue } from '@base-screen/contracts';
 import type { BaseScreenMaterialElement, BaseScreenMaterialModel } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
-  BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
-  BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
   BaseScreenContainerMaterialElement,
   BaseScreenEllipseMaterialElement,

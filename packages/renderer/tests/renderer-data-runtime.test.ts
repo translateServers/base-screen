@@ -1,19 +1,9 @@
 import type {
   ScreenComponentNode,
-  ScreenDocument,
   ScreenHostResourcePort,
-  ScreenJsonObject,
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
-import type {
-  BaseScreenMaterialCatalog,
-  BaseScreenMaterialConstructor,
-  BaseScreenMaterialDataBindingRole,
-  BaseScreenMaterialManifest,
-  BaseScreenMaterialModel,
-  BaseScreenMaterialTabularDataAdapter,
-} from '@base-screen/plugin-core';
 import { describe, expect, it, vi } from 'vitest';
 import { createBaseScreenRenderer } from '../src/renderer.js';
 import {
@@ -23,7 +13,6 @@ import {
   createImageCatalog,
   createStaticDatasetCatalog,
   document,
-  FakeMaterialElement,
   FakeRoot,
   rendererWithRoot,
 } from './__fixtures__/renderer-test-harness.js';

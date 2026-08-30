@@ -126,7 +126,9 @@ export function positionSubmenu(
   const wrapperBottom = wrapperRect.top + wrapperRect.height;
   const rightSpace = layoutRight - wrapperRight;
   const leftSpace = wrapperRect.left - layoutRect.left;
-  const opensLeft = rightSpace < submenuWidth + edgeGap && leftSpace >= submenuWidth + edgeGap;
+  const canOpenLeft = leftSpace >= submenuWidth + edgeGap;
+  const prefersLeft = submenu.closest('[data-menu="more"]') !== null;
+  const opensLeft = canOpenLeft && (prefersLeft || rightSpace < submenuWidth + edgeGap);
   submenu.dataset.submenuSide = opensLeft ? 'left' : 'right';
   submenu.style.left = opensLeft ? '' : 'calc(100% - 4px)';
   submenu.style.right = opensLeft ? 'calc(100% - 4px)' : '';

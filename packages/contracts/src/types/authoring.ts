@@ -1,7 +1,3 @@
-import {
-  parseScreenBlueprintAuthoringContext,
-  type ScreenBlueprintAuthoringContext,
-} from './blueprint-authoring.js';
 import type { ScreenParseResult } from './diagnostics.js';
 import type { ScreenJsonObject, ScreenJsonValue } from './json.js';
 
@@ -15,23 +11,16 @@ export const MAX_AUTHORING_COMPONENT_SNAPSHOT_BYTES = 1024 * 1024;
 
 export type ScreenComponentTextTarget = 'props' | 'style' | 'data';
 
-export type ScreenAuthoringRequest =
-  | {
-      readonly kind: 'component-text';
-      readonly requestId: string;
-      readonly componentId: string;
-      readonly documentRevision: string | null;
-      readonly target: ScreenComponentTextTarget;
-      readonly source: string;
-      readonly format: 'json' | 'expression';
-      readonly maxBytes: number;
-    }
-  | {
-      readonly kind: 'blueprint';
-      readonly requestId: string;
-      readonly documentRevision: string | null;
-      readonly context: ScreenBlueprintAuthoringContext;
-    };
+export interface ScreenAuthoringRequest {
+  readonly kind: 'component-text';
+  readonly requestId: string;
+  readonly componentId: string;
+  readonly documentRevision: string | null;
+  readonly target: ScreenComponentTextTarget;
+  readonly source: string;
+  readonly format: 'json' | 'expression';
+  readonly maxBytes: number;
+}
 
 export interface ScreenAuthoringEditorLimits {
   readonly maxSourceBytes: number;
@@ -60,12 +49,6 @@ export interface ScreenComponentTextCommitRequest {
   readonly componentId: string;
   readonly target: ScreenComponentTextTarget;
   readonly source: string;
-}
-
-export interface ScreenBlueprintCommitRequest {
-  readonly requestId: string;
-  readonly expectedRevision: string | null;
-  readonly blueprint: ScreenJsonObject;
 }
 
 const REQUEST_FIELDS_COMMON = new Set(['kind', 'requestId', 'documentRevision']);
@@ -133,43 +116,15 @@ export function parseScreenAuthoringRequest(
     }
     return {
       ok: true,
-      value: record as ScreenAuthoringRequest,
-      diagnostics: [],
-    };
-  }
-  if (kind === 'blueprint') {
-    for (const key of Object.keys(record)) {
-      if (!REQUEST_FIELDS_COMMON.has(key) && key !== 'context') {
-        return authoringFailure('AUTHORING_REQUEST_INVALID', [key], 'Unknown request field.');
-      }
-    }
-    if (!isRequestId(record.requestId)) {
-      return authoringFailure('AUTHORING_REQUEST_INVALID', ['requestId'], 'Request id is invalid.');
-    }
-    if (record.documentRevision !== null && typeof record.documentRevision !== 'string') {
-      return authoringFailure(
-        'AUTHORING_REQUEST_INVALID',
-        ['documentRevision'],
-        'Document revision must be a string or null.',
-      );
-    }
-    const context = parseScreenBlueprintAuthoringContext(record.context);
-    if (!context.ok) {
-      return {
-        ok: false,
-        diagnostics: context.diagnostics.map((diagnostic) => ({
-          ...diagnostic,
-          path: ['context', ...diagnostic.path],
-        })),
-      };
-    }
-    return {
-      ok: true,
       value: {
-        kind: 'blueprint',
-        requestId: record.requestId,
+        kind: 'component-text',
+        requestId: record.requestId as string,
+        componentId: record.componentId,
         documentRevision: record.documentRevision as string | null,
-        context: context.value,
+        target: record.target,
+        source: record.source,
+        format: record.format,
+        maxBytes: record.maxBytes,
       },
       diagnostics: [],
     };

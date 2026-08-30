@@ -1,4 +1,3 @@
-import type { ScreenDiagnostic } from '@base-screen/contracts';
 import type { BaseScreenPluginContribution } from '@base-screen/plugin-core';
 import { DiagnosticCollector } from './diagnostics.js';
 import type { Candidate, ManagerInput } from './preflight-types.js';

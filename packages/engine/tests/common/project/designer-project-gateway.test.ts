@@ -45,7 +45,7 @@ function ok<T>(value: T) {
   return { ok: true as const, value, diagnostics: [] };
 }
 
-function fail<T>(message: string) {
+function fail(message: string) {
   return {
     ok: false as const,
     diagnostics: [
@@ -84,7 +84,7 @@ interface GatewayHarness {
   readonly setDocument: (value: ScreenDocument | undefined) => void;
 }
 
-function createGateway(partial: Partial<GatewayHarness> = {}): GatewayHarness {
+function createGateway(): GatewayHarness {
   const ports: Record<string, unknown> = {};
   const catalog = (ports.catalog = {
     list: vi.fn(async () => ok([summary])),

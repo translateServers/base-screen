@@ -1,10 +1,12 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenDesignerWorkbenchMode } from '../../../common/operations/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
   hostLeftPanelGroupId,
   hostLeftPanelTab,
+  hostLeftPanelTabId,
 } from '../../dom/designer-left-panel-groups-dom.js';
 import type { DesignerPanelSide } from './designer-panel-layout-controller.js';
 
@@ -24,6 +26,7 @@ interface DesignerWorkbenchTabsCallbacks {
 export class DesignerWorkbenchTabsController {
   #leftTab: LeftTab = 'materials';
   #rightTab: RightTab = 'appearance';
+  #authoringMode: BaseScreenDesignerWorkbenchMode = 'canvas';
 
   constructor(private readonly callbacks: DesignerWorkbenchTabsCallbacks) {}
 
@@ -81,18 +84,39 @@ export class DesignerWorkbenchTabsController {
     this.render();
   }
 
+  get selectedLeftPanelGroupId(): string | undefined {
+    return hostLeftPanelGroupId(this.#leftTab);
+  }
+
+  setAuthoringMode(mode: BaseScreenDesignerWorkbenchMode): void {
+    if (this.#authoringMode === mode) return;
+    this.#authoringMode = mode;
+    if (mode === 'canvas') {
+      this.render();
+      return;
+    }
+    const root = this.callbacks.getRoot();
+    if (root === null) return;
+    for (const pane of root.querySelectorAll<HTMLElement>(
+      '.host-left-panel-view[data-host-left-panel-group]',
+    )) {
+      pane.hidden = true;
+    }
+  }
+
   selectLeftPanelGroup(groupId: string): boolean {
+    if (this.#authoringMode !== 'canvas') return false;
     return this.selectLeftTab(hostLeftPanelTab(groupId));
   }
 
   refreshLeftPanelGroups(): void {
     if (this.leftTabAvailable(this.#leftTab)) {
-      this.render();
+      if (this.#authoringMode === 'canvas') this.render();
       return;
     }
     const previousGroupId = hostLeftPanelGroupId(this.#leftTab);
     this.#leftTab = 'materials';
-    this.render();
+    if (this.#authoringMode === 'canvas') this.render();
     if (previousGroupId !== undefined) this.callbacks.onLeftPanelGroupChange?.(undefined);
   }
 
@@ -103,6 +127,7 @@ export class DesignerWorkbenchTabsController {
   private render(): void {
     const root = this.callbacks.getRoot();
     if (root === null) return;
+    if (this.#authoringMode === 'blueprint') return;
     const selection = this.callbacks.getInteraction();
     const singleComponentSelected =
       selection.focusedComponentId !== null && selection.selectedComponentIds.length === 1;
@@ -161,7 +186,11 @@ export class DesignerWorkbenchTabsController {
     for (const pane of root.querySelectorAll<HTMLElement>(
       '.host-left-panel-view[data-host-left-panel-group]',
     )) {
-      pane.hidden = pane.dataset.hostLeftPanelGroup !== hostGroupId;
+      const paneGroupId = pane.dataset.hostLeftPanelGroup;
+      pane.hidden = paneGroupId !== hostGroupId;
+      if (!pane.hidden && paneGroupId !== undefined) {
+        pane.setAttribute('aria-labelledby', hostLeftPanelTabId(paneGroupId));
+      }
     }
     const inspectorTabs = root.querySelector<HTMLElement>('.inspector-tabs');
     if (inspectorTabs !== null) inspectorTabs.hidden = !singleComponentSelected;

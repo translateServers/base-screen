@@ -125,9 +125,7 @@ describe('designer operations', () => {
   });
 
   it('reparents without changing the canonical canvas position', () => {
-    const parent = component('parent', 100, 200);
-    const child = component('child', 320, 450);
-    const transaction = createReparentTransaction(document([parent, child]), ['child'], 'parent');
+    const transaction = createReparentTransaction(['child'], 'parent');
 
     expect(transaction.commands).toEqual([
       { type: 'reparent-components', componentIds: ['child'], parentId: 'parent' },

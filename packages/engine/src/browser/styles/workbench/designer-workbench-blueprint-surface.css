@@ -1,0 +1,142 @@
+/* Recovered Blueprint workbench surface and mode projection. */
+.workspace {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  grid-template-rows: 40px 20px minmax(0, 1fr);
+  background: var(--designer-surface-workspace);
+}
+
+.workspace-local-toolbar {
+  box-sizing: border-box;
+  grid-row: 1 / 2;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: var(--designer-space-3);
+  padding: 3px var(--designer-space-4);
+  overflow: hidden;
+  border-bottom: 1px solid var(--designer-border-default);
+  background: var(--designer-surface-panel);
+}
+
+.workspace-local-toolbar .topbar-segment {
+  height: 32px;
+  padding: 1px;
+}
+
+.workspace-local-toolbar .designer-icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+}
+
+.canvas-stage {
+  position: relative;
+  display: grid;
+  min-height: 0;
+  grid-row: 3 / 4 !important;
+  grid-template-columns: 20px minmax(0, 1fr);
+}
+
+.designer-blueprint-surface {
+  position: relative;
+  grid-row: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--designer-surface-canvas);
+}
+
+.designer-blueprint-surface[hidden] {
+  display: none;
+}
+
+.designer-blueprint-surface slot {
+  display: block;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.designer-blueprint-surface slot::slotted([slot="base-screen-designer-blueprint-canvas"]) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.designer-blueprint-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--designer-space-7);
+  color: var(--designer-text-muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.designer-blueprint-surface[data-slot-ready="true"] .designer-blueprint-fallback {
+  display: none;
+}
+
+.designer[data-authoring-mode="blueprint"] .workspace-local-toolbar,
+.designer[data-authoring-mode="blueprint"] .ruler-corner,
+.designer[data-authoring-mode="blueprint"] .ruler-horizontal,
+.designer[data-authoring-mode="blueprint"] .canvas-stage,
+.designer[data-authoring-mode="blueprint"] .designer-data-workbench {
+  display: none;
+}
+
+.designer[data-authoring-mode="blueprint"] .designer-blueprint-surface {
+  display: grid;
+}
+
+.designer[data-authoring-mode="blueprint"] .rail > .rail-tabs,
+.designer[data-authoring-mode="blueprint"] .rail > .rail-view:not(.host-left-panel-view),
+.designer[data-authoring-mode="blueprint"] .inspector-tabs,
+.designer[data-authoring-mode="blueprint"] .inspector-context,
+.designer[data-authoring-mode="blueprint"] .inspector-toolbar,
+.designer[data-authoring-mode="blueprint"] .inspector-search-workspace,
+.designer[data-authoring-mode="blueprint"] [data-inspector-pane] {
+  display: none;
+}
+
+.designer[data-authoring-mode="blueprint"] .blueprint-library {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
+}
+
+.designer[data-authoring-mode="blueprint"] .rail > .host-left-panel-view:not([hidden]) {
+  z-index: 1;
+  display: block;
+  grid-column: 2;
+  grid-row: 2;
+  background: var(--designer-surface-panel);
+}
+
+.designer[data-authoring-mode="blueprint"] .blueprint-inspector {
+  display: grid;
+  grid-row: 2 / -1;
+}
+
+.designer[data-authoring-mode="blueprint"] .statusbar-end {
+  visibility: hidden;
+}
+
+.designer[data-authoring-mode="blueprint"][data-left-collapsed="true"] .blueprint-library-shell {
+  grid-template-columns: 48px 0;
+  grid-template-rows: 48px minmax(0, 1fr);
+}
+
+.designer[data-authoring-mode="blueprint"][data-left-collapsed="true"] .blueprint-library-main,
+.designer[data-authoring-mode="blueprint"][data-right-collapsed="true"] .blueprint-inspector {
+  display: none;
+}

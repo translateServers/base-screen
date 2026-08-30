@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX,
+  baseScreenDesignerLeftPanelGroupSupportsMode,
   baseScreenDesignerLeftPanelSlotName,
   parseBaseScreenDesignerLeftPanelGroups,
 } from '../src/designer-left-panel-groups.js';
@@ -8,7 +9,12 @@ import {
 describe('designer left panel host groups', () => {
   it('accepts and freezes bounded JSON-safe group descriptors', () => {
     const groups = [
-      { id: 'assets', label: 'Assets', icon: 'image' },
+      {
+        id: 'assets',
+        label: 'Assets',
+        icon: 'image',
+        workbenchModes: ['canvas', 'blueprint'],
+      },
       { id: 'ai.tools', label: 'AI tools', icon: 'sparkle' },
     ] as const;
 
@@ -19,6 +25,10 @@ describe('designer left panel host groups', () => {
     expect(result.value).toEqual(groups);
     expect(Object.isFrozen(result.value)).toBe(true);
     expect(Object.isFrozen(result.value[0])).toBe(true);
+    expect(Object.isFrozen(result.value[0]?.workbenchModes)).toBe(true);
+    expect(baseScreenDesignerLeftPanelGroupSupportsMode(result.value[0]!, 'blueprint')).toBe(true);
+    expect(baseScreenDesignerLeftPanelGroupSupportsMode(result.value[1]!, 'canvas')).toBe(true);
+    expect(baseScreenDesignerLeftPanelGroupSupportsMode(result.value[1]!, 'blueprint')).toBe(false);
     expect(baseScreenDesignerLeftPanelSlotName('assets')).toBe(
       `${BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX}assets`,
     );
@@ -30,6 +40,13 @@ describe('designer left panel host groups', () => {
     [[{ id: 'assets', label: ' Assets' }], [0, 'label']],
     [[{ id: 'assets', label: 'Assets\nTools' }], [0, 'label']],
     [[{ id: 'assets', label: 'Assets', icon: 'url' }], [0, 'icon']],
+    [[{ id: 'assets', label: 'Assets', workbenchModes: [] }], [0, 'workbenchModes']],
+    [
+      [{ id: 'assets', label: 'Assets', workbenchModes: ['canvas', 'canvas'] }],
+      [0, 'workbenchModes', 1],
+    ],
+    [[{ id: 'assets', label: 'Assets', workbenchModes: ['workspace'] }], [0, 'workbenchModes', 0]],
+    [[{ id: 'assets', label: 'Assets', workbenchModes: 'blueprint' }], [0, 'workbenchModes']],
     [[{ id: 'assets', label: 'Assets', content: '<script>' }], [0, 'content']],
     [
       [

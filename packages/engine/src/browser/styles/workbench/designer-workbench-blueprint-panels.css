@@ -1,0 +1,625 @@
+.blueprint-library,
+.blueprint-inspector {
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  scrollbar-gutter: stable;
+  background: var(--designer-surface-panel);
+}
+
+.blueprint-library {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.blueprint-inspector {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.blueprint-panel-intro {
+  padding: var(--designer-space-3) var(--designer-space-4);
+  border-bottom: 1px solid var(--designer-border-subtle);
+  background: var(--designer-surface-raised);
+}
+
+.blueprint-panel-intro p {
+  margin: 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 1.5;
+}
+
+.blueprint-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--designer-space-2);
+  margin-top: var(--designer-space-3);
+}
+
+.blueprint-overview > span {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+  padding: var(--designer-space-2);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-panel);
+  text-align: center;
+}
+
+.blueprint-overview strong {
+  color: var(--designer-text-primary);
+  font: var(--designer-font-numeric);
+  font-size: 13px;
+}
+
+.blueprint-overview small {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-panel-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-2) var(--designer-space-3) 0;
+  border-bottom: 1px solid var(--designer-border-subtle);
+}
+
+.blueprint-panel-tab {
+  position: relative;
+  min-width: 0;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--designer-space-1);
+  padding: 0 var(--designer-space-2);
+  border: 0;
+  border-radius: var(--designer-radius-control) var(--designer-radius-control) 0 0;
+  background: transparent;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+  font: var(--designer-font-small);
+}
+
+.blueprint-panel-tab::after {
+  position: absolute;
+  right: var(--designer-space-2);
+  bottom: -1px;
+  left: var(--designer-space-2);
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  content: "";
+}
+
+.blueprint-panel-tab:hover,
+.blueprint-panel-tab:focus-visible {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.blueprint-panel-tab:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+.blueprint-panel-tab[aria-selected="true"] {
+  color: var(--designer-text-primary);
+  font-weight: 600;
+}
+
+.blueprint-panel-tab[aria-selected="true"]::after {
+  background: var(--designer-accent);
+}
+
+.blueprint-panel-tab em {
+  min-width: 16px;
+  padding: 0 var(--designer-space-1);
+  border-radius: 8px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: 9px;
+  font-style: normal;
+  text-align: center;
+}
+
+.blueprint-panel-scroll {
+  min-height: 0;
+  overflow: hidden auto;
+  padding: var(--designer-space-4);
+  outline: 0;
+  scrollbar-gutter: stable;
+}
+
+.blueprint-panel-scroll:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.blueprint-library-search {
+  position: relative;
+  margin: 0;
+}
+
+.blueprint-library-search input {
+  width: 100%;
+  padding-left: 32px;
+}
+
+.blueprint-library-section {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin-top: var(--designer-space-5);
+}
+
+.blueprint-panel-scroll > .blueprint-library-section:first-child,
+.blueprint-panel-scroll > .blueprint-inspector-section:first-child {
+  margin-top: 0;
+}
+
+.blueprint-panel-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-7) var(--designer-space-4);
+  color: var(--designer-text-muted);
+  text-align: center;
+}
+
+.blueprint-panel-empty > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--designer-surface-raised);
+}
+
+.blueprint-panel-empty svg {
+  width: 17px;
+  height: 17px;
+}
+
+.blueprint-panel-empty p {
+  margin: 0;
+  font: var(--designer-font-small);
+  line-height: 1.5;
+}
+
+.blueprint-rule-context,
+.blueprint-logic-guide {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-raised);
+}
+
+.blueprint-rule-context > span,
+.blueprint-logic-guide > span:first-child {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+.blueprint-rule-context[data-ready="false"] > span {
+  background: var(--designer-surface-control);
+  color: var(--designer-text-disabled);
+}
+
+.blueprint-rule-context svg,
+.blueprint-logic-guide svg {
+  width: 14px;
+  height: 14px;
+}
+
+.blueprint-rule-context p {
+  margin: 0;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.blueprint-logic-guide {
+  margin-top: var(--designer-space-2);
+}
+
+.blueprint-logic-guide > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.blueprint-logic-guide strong,
+.blueprint-logic-guide small {
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.blueprint-logic-guide small {
+  color: var(--designer-text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.blueprint-library-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.blueprint-library-section > header span {
+  min-width: 18px;
+  padding: 1px var(--designer-space-2);
+  border-radius: 9px;
+  background: var(--designer-surface-control);
+  font: var(--designer-font-numeric);
+  text-align: center;
+}
+
+.blueprint-library-list {
+  display: grid;
+  gap: var(--designer-space-2);
+}
+
+.blueprint-library-item,
+.blueprint-logic-item {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-2) var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.blueprint-library-item:hover:not(:disabled),
+.blueprint-logic-item:hover:not(:disabled),
+.blueprint-library-item:focus-visible,
+.blueprint-logic-item:focus-visible {
+  border-color: color-mix(in srgb, var(--designer-accent) 44%, var(--designer-border-default));
+  outline: 0;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.blueprint-library-item:focus-visible,
+.blueprint-logic-item:focus-visible {
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
+}
+
+.blueprint-library-item:disabled,
+.blueprint-logic-item:disabled {
+  color: var(--designer-text-disabled);
+  cursor: default;
+  opacity: 0.56;
+}
+
+.blueprint-library-item > span:nth-child(2),
+.blueprint-logic-item > span:nth-child(2),
+.blueprint-inspector-heading > span:last-child,
+.blueprint-event-list > span > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.blueprint-library-item strong,
+.blueprint-logic-item strong,
+.blueprint-inspector-heading strong,
+.blueprint-event-list strong {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-library-item small,
+.blueprint-logic-item small,
+.blueprint-inspector-heading small,
+.blueprint-event-list small {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-library-item-glyph,
+.blueprint-logic-item > span:first-child {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+.blueprint-library-item svg,
+.blueprint-logic-item svg,
+.blueprint-inspector-heading svg {
+  width: 14px;
+  height: 14px;
+}
+
+.blueprint-library-locate {
+  color: var(--designer-text-muted);
+}
+
+.blueprint-library-hint,
+.blueprint-inspector-section p,
+.blueprint-event-list p {
+  margin: var(--designer-space-2) 0 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 1.5;
+}
+
+.blueprint-inspector-heading {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding-bottom: var(--designer-space-4);
+  border-bottom: 1px solid var(--designer-border-subtle);
+}
+
+.blueprint-inspector-heading > span:first-child {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+.blueprint-inspector-section {
+  margin-top: var(--designer-space-5);
+}
+
+.blueprint-inspector-section h3 {
+  margin: 0 0 var(--designer-space-3);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  font-weight: 600;
+}
+
+.blueprint-context-card {
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-raised);
+}
+
+.blueprint-context-card dl {
+  display: grid;
+  gap: var(--designer-space-3);
+  margin: 0;
+}
+
+.blueprint-context-card dl > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: var(--designer-space-3);
+}
+
+.blueprint-context-card dt,
+.blueprint-context-card dd {
+  margin: 0;
+  font: var(--designer-font-small);
+}
+
+.blueprint-context-card dt {
+  color: var(--designer-text-muted);
+}
+
+.blueprint-context-card dd {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-expression-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-2);
+}
+
+.blueprint-expression-grid > span {
+  min-width: 0;
+  display: grid;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-raised);
+}
+
+.blueprint-expression-grid small,
+.blueprint-expression-grid strong {
+  overflow: hidden;
+  font: var(--designer-font-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.blueprint-expression-grid small {
+  color: var(--designer-text-muted);
+}
+
+.blueprint-expression-grid strong {
+  color: var(--designer-text-primary);
+  font-weight: 600;
+}
+
+.blueprint-inspector-status ul,
+.blueprint-inspector-status ol {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.blueprint-inspector-status li {
+  display: grid;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-2) var(--designer-space-3);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.blueprint-inspector-status li strong {
+  color: var(--designer-text-primary);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+}
+
+.blueprint-inspector-status li small {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 9px;
+}
+
+.blueprint-trace-summary {
+  margin-bottom: var(--designer-space-3);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-accent-surface);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.blueprint-inspector-status li[data-severity="error"] {
+  border-left: 2px solid var(--designer-danger);
+}
+
+.blueprint-inspector-status li[data-severity="warning"] {
+  border-left: 2px solid var(--designer-warning);
+}
+
+.blueprint-inspector-status li[data-empty="true"] {
+  color: var(--designer-text-muted);
+}
+
+.blueprint-event-list {
+  display: grid;
+  gap: var(--designer-space-2);
+}
+
+.blueprint-event-list > span {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-2);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-raised);
+}
+
+.blueprint-event-list i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--designer-success);
+}
+
+.blueprint-event-list > span[data-available="false"] i {
+  background: var(--designer-text-disabled);
+}
+
+.blueprint-event-list em {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 9px;
+  font-style: normal;
+}
+
+.blueprint-inspector-field {
+  display: grid;
+  gap: var(--designer-space-2);
+  margin-top: var(--designer-space-4);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.blueprint-inspector-field .designer-control {
+  width: 100%;
+}
+
+.blueprint-delete-button {
+  width: 100%;
+  margin-top: var(--designer-space-6);
+}
+
+.blueprint-inspector-empty {
+  display: grid;
+  justify-items: center;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-7) var(--designer-space-4);
+  color: var(--designer-text-muted);
+  text-align: center;
+}
+
+.blueprint-inspector-empty > span {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--designer-surface-raised);
+}
+
+.blueprint-inspector-empty svg {
+  width: 20px;
+  height: 20px;
+}
+
+.blueprint-inspector-empty strong {
+  color: var(--designer-text-primary);
+}
+
+.blueprint-inspector-empty[data-state="healthy"] > span {
+  background: color-mix(in srgb, var(--designer-success) 14%, transparent);
+  color: var(--designer-success);
+}
+
+.blueprint-inspector-empty p {
+  margin: 0;
+  font: var(--designer-font-small);
+}

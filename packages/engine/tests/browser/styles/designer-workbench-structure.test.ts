@@ -1,14 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { baseCss, controlsCss, tokensCss, workbenchCss } from './designer-style-fixture.js';
+import { baseCss, tokensCss, workbenchCss } from './designer-style-fixture.js';
 
 describe('designer workbench structure and layout', () => {
   it('R8 reserves stable tracks for workbench geometry and dynamic status content', () => {
     expect(baseCss).toContain('--left-panel-width: 336px;');
     expect(baseCss).toContain('--right-panel-width: 336px;');
+    expect(baseCss).toMatch(
+      /@media \(min-width: 1024px\) and \(max-width: 1279px\)\s*\{[^}]*--left-panel-width: 248px;[^}]*--right-panel-width: 276px;/s,
+    );
     expect(baseCss).toContain('grid-template-rows: 48px minmax(0, 1fr) 30px;');
     expect(baseCss).toContain('grid-column: 1 / -1;');
     expect(workbenchCss).toContain('grid-template-rows: 20px minmax(0, 1fr);');
-    expect(workbenchCss).toContain('grid-row: 1 / 2 !important;');
+    expect(workbenchCss).toContain('grid-row: 3 / 4 !important;');
     expect(workbenchCss).toContain('padding: 0 var(--designer-space-4);');
     expect(workbenchCss).toContain('.ruler-horizontal {');
     expect(workbenchCss).toContain('grid-row: 2 / 3 !important;');
@@ -65,6 +68,32 @@ describe('designer workbench structure and layout', () => {
     );
     expect(baseCss).toContain(
       '.designer[data-left-collapsed="true"] [data-host-left-panel-group][role="tabpanel"]',
+    );
+    expect(workbenchCss).toContain(
+      '.designer[data-authoring-mode="blueprint"] .rail > .rail-view:not(.host-left-panel-view)',
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-authoring-mode="blueprint"\] \.rail > \.host-left-panel-view:not\(\[hidden\]\)\s*\{[^}]*grid-column: 2;[^}]*grid-row: 2;/s,
+    );
+    expect(workbenchCss).toMatch(/\.blueprint-library-main\[hidden\]\s*\{[^}]*display: none;/s);
+  });
+
+  it('projects the host Blueprint canvas into the stable workbench shell', () => {
+    expect(workbenchCss).toContain('.designer-blueprint-surface {');
+    expect(workbenchCss).toContain('slot::slotted([slot="base-screen-designer-blueprint-canvas"])');
+    expect(workbenchCss).toContain('.blueprint-library-shell');
+    expect(workbenchCss).toContain('.blueprint-inspector-shell');
+  });
+
+  it('keeps the Blueprint icon rail visible when the shared left panel is collapsed', () => {
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-authoring-mode="blueprint"\]\[data-left-collapsed="true"\]\s+\.blueprint-library-shell\s*\{[^}]*grid-template-columns: 48px 0;[^}]*grid-template-rows: 48px minmax\(0, 1fr\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-authoring-mode="blueprint"\]\[data-left-collapsed="true"\]\s+\.blueprint-library-main,[^{]*\{[^}]*display: none;/s,
+    );
+    expect(workbenchCss).not.toMatch(
+      /\.designer\[data-authoring-mode="blueprint"\]\[data-left-collapsed="true"\]\s+\.blueprint-library\s*\{[^}]*display: none;/s,
     );
   });
 

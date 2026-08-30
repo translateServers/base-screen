@@ -1,16 +1,19 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { ScreenBlueprintAuthoringContext, ScreenBlueprintEditOptions } from '../src/index.js';
+import type {
+  BaseScreenBlueprintCanvasState,
+  BaseScreenDesignerWorkbenchMode,
+} from '../src/index.js';
 import {
+  BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT,
   BASE_SCREEN_DESIGNER_TAG_NAME,
   BASE_SCREEN_VIEWER_TAG_NAME,
   defineBaseScreenDesigner,
   defineBaseScreenElements,
   defineBaseScreenViewer,
-  MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES,
+  parseBaseScreenBlueprintCanvasCommand,
   parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryItems,
-  parseScreenBlueprintAuthoringContext,
 } from '../src/index.js';
 
 describe('SDK product element registration', () => {
@@ -34,15 +37,20 @@ describe('SDK product element registration', () => {
     ).toBe(true);
   });
 
-  it('re-exports the document Blueprint host bridge contract', () => {
-    expect(MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES).toBeGreaterThan(0);
-    expect(typeof parseScreenBlueprintAuthoringContext).toBe('function');
-    expectTypeOf<ScreenBlueprintEditOptions>().toEqualTypeOf<{
-      readonly initialComponentId?: string | null;
-    }>();
-    expectTypeOf<ScreenBlueprintAuthoringContext['initialComponentId']>().toEqualTypeOf<
-      string | null
-    >();
+  it('re-exports the shared Blueprint canvas protocol', () => {
+    expect(BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT).toBe(
+      'base-screen-designer-blueprint-canvas',
+    );
+    expect(
+      parseBaseScreenBlueprintCanvasCommand({
+        type: 'ready',
+        commandId: 'ready-1',
+        generation: 1,
+        documentRevision: 2,
+      }).ok,
+    ).toBe(true);
+    expectTypeOf<BaseScreenDesignerWorkbenchMode>().toEqualTypeOf<'canvas' | 'blueprint'>();
+    expectTypeOf<BaseScreenBlueprintCanvasState['active']>().toEqualTypeOf<boolean>();
   });
 
   it('defines Viewer and Designer idempotently through the explicit SDK API', () => {

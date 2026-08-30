@@ -164,7 +164,7 @@ function appendQuickConfigRow(
   label.textContent = row.label;
   const controls = parent.ownerDocument.createElement('div');
   controls.className = `designer-quick-config-controls quick-config-${row.kind}`;
-  for (const [index, item] of row.values.entries()) {
+  for (const item of row.values) {
     const value =
       row.kind === 'text'
         ? ({ kind: 'text', value: Number(item.value) as 12 | 14 | 16 } as const)

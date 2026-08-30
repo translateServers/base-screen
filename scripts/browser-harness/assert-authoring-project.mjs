@@ -1,3 +1,5 @@
+import { openMoreSubmenu } from './harness-utils.mjs';
+
 export async function assertAuthoringProject(authoringDesigner, page) {
   // ?designer 页面的 designer 初始化是异步的（custom element upgrade + load）：
   // 等待 publish 按钮的操作渲染完成（hidden 由 renderOperationControls 设置），
@@ -106,17 +108,12 @@ export async function assertAuthoringProject(authoringDesigner, page) {
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
         ?.textContent === '\u64cd\u4f5c\u5931\u8d25 *',
   );
-  await authoringDesigner.locator('[data-menu-toggle="file"]').click();
-  if (
-    await authoringDesigner
-      .locator('.designer-menu[data-menu="file"] [data-menu-action="project-retry"]')
-      .isDisabled()
-  ) {
+  const fileMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  const retryAction = fileMenu.locator('[data-menu-action="project-retry"]');
+  if (await retryAction.isDisabled()) {
     throw new Error('BROWSER_HARNESS_RETRY_DISABLED');
   }
-  await authoringDesigner
-    .locator('.designer-menu[data-menu="file"] [data-menu-action="project-retry"]')
-    .click();
+  await retryAction.click();
   await page.waitForFunction(() => window.baseScreenHarness.getEnvelope().revision === '3');
   const retried = await page.evaluate(
     () =>

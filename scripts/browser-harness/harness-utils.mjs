@@ -2,14 +2,25 @@ async function componentCount(page) {
   return page.evaluate(() => window.baseScreenHarness.designer.document.components.length);
 }
 
-// 顶栏改版后网格移入“视图 > 画布辅助”子菜单，按真实菜单路径触发。
-// 打开 视图 > 画布辅助 子菜单。先 Escape 收起可能已展开的菜单，保证 helper 可重入。
+async function openMoreSubmenu(designer, label) {
+  const moreMenu = designer.locator('.designer-menu[data-menu="more"]');
+  if (await moreMenu.isHidden()) {
+    await designer.locator('[data-menu-toggle="more"]').click();
+  }
+  const trigger = moreMenu
+    .locator(':scope > .designer-menu-submenu-wrap > [data-submenu-toggle]')
+    .filter({ hasText: label });
+  if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
+    await trigger.click();
+  }
+  return moreMenu;
+}
+
+// 顶栏改版后画布辅助操作移入“更多 > 视图”，按真实菜单路径触发。
+// 先 Escape 收起可能已展开的菜单，保证 helper 可重入。
 async function openCanvasAidsMenu(designer, page) {
   await page.keyboard.press('Escape');
-  await designer.locator('[data-menu-toggle="view"]').click();
-  const viewMenu = designer.locator('.designer-menu[data-menu="view"]');
-  await viewMenu.locator('[data-submenu-toggle]').click();
-  return viewMenu;
+  return openMoreSubmenu(designer, '\u89c6\u56fe');
 }
 
 async function toggleGridViaMenu(designer, page) {
@@ -40,10 +51,8 @@ async function assertCanvasAidChecked(designer, page, actionId, expected) {
 }
 
 async function zoomResetViaMenu(designer) {
-  await designer.locator('[data-menu-toggle="view"]').click();
-  await designer
-    .locator('.designer-menu[data-menu="view"] [data-menu-action="zoom-reset"]')
-    .click();
+  const moreMenu = await openMoreSubmenu(designer, '\u89c6\u56fe');
+  await moreMenu.locator('[data-menu-action="zoom-reset"]').click();
 }
 
 async function componentPositions(page, ids) {
@@ -74,6 +83,7 @@ export {
   assertCanvasAidChecked,
   componentCount,
   componentPositions,
+  openMoreSubmenu,
   stableJson,
   toggleCanvasAidViaMenu,
   toggleGridViaMenu,

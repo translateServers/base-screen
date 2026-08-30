@@ -12,7 +12,7 @@ import type {
   BaseScreenMaterialEventDescriptor,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import { DESIGNER_BLUEPRINT_CAPABILITIES } from '../../common/operations/designer-authoring-bridge.js';
+import { DESIGNER_BLUEPRINT_CAPABILITIES } from '../../common/operations/designer-blueprint-capabilities.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { createDesignerButton } from './designer-ui-primitives.js';
 

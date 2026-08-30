@@ -42,13 +42,19 @@ export async function assertPanelLayout(designer, page) {
   const collapseEvaluate = async (side) => {
     await page.evaluate((panelSide) => {
       const root = window.baseScreenHarness.designer.shadowRoot;
-      root.querySelector(`[data-panel-collapse="${panelSide}"]`).click();
+      const panel = root.querySelector(
+        panelSide === 'left' ? '[data-left-panel]' : '[data-right-panel]',
+      );
+      panel.querySelector(`[data-panel-collapse="${panelSide}"]`).click();
     }, side);
     // 等待折叠过渡（--designer-motion 0.16s）结束后再读箭头 transform。
     await new Promise((resolve) => setTimeout(resolve, 220));
     return page.evaluate((panelSide) => {
       const root = window.baseScreenHarness.designer.shadowRoot;
-      const button = root.querySelector(`[data-panel-collapse="${panelSide}"]`);
+      const panel = root.querySelector(
+        panelSide === 'left' ? '[data-left-panel]' : '[data-right-panel]',
+      );
+      const button = panel.querySelector(`[data-panel-collapse="${panelSide}"]`);
       return {
         arrow: getComputedStyle(button.querySelector('svg')).transform,
         buttonWidth: Math.round(button.getBoundingClientRect().width),

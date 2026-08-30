@@ -1,8 +1,5 @@
 import type {
   ScreenAuthoringEditorContext,
-  ScreenBlueprintAuthoringContext,
-  ScreenBlueprintCommitRequest,
-  ScreenBlueprintEditOptions,
   ScreenComponentTextCommitRequest,
   ScreenComponentTextTarget,
   ScreenDiagnostic,
@@ -12,26 +9,19 @@ import type {
   ScreenParseResult,
 } from '@base-screen/contracts';
 import {
-  MAX_AUTHORING_CANDIDATE_BYTES,
   MAX_AUTHORING_SOURCE_BYTES,
-  parseScreenBlueprintAuthoringContext,
-  parseScreenDocument,
   parseScreenTabularDataset,
   SCREEN_AUTHORING_REQUEST_EVENT,
 } from '@base-screen/contracts';
-import { compileScreenBlueprint } from '@base-screen/core';
 import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
 import {
   buildScreenAuthoringEditorContext,
-  buildScreenBlueprintAuthoringContext,
   createScreenAuthoringRequestId,
-  parseScreenAuthoringBlueprintCandidate,
   parseScreenComponentTextSource,
   validateScreenAuthoringCommitGuards,
-  validateScreenBlueprintAuthoringCommitGuards,
 } from '../common/operations/designer-authoring-bridge.js';
 import { DESIGNER_UI_TEXT } from '../common/ui-text/designer-ui-text.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
@@ -104,79 +94,6 @@ export function requestComponentTextEdit(
     }),
   );
   return requestId;
-}
-
-export function requestBlueprintEdit(
-  element: DesignerElementHost,
-  options: ScreenBlueprintEditOptions = {},
-): boolean {
-  const elementState = getDesignerElementState(element);
-
-  const document = elementState.session.document;
-  if (
-    document === undefined ||
-    options === null ||
-    typeof options !== 'object' ||
-    Array.isArray(options) ||
-    Object.keys(options).some((key) => key !== 'initialComponentId')
-  ) {
-    return false;
-  }
-  const initialComponentId = options.initialComponentId ?? null;
-  if (
-    initialComponentId !== null &&
-    (typeof initialComponentId !== 'string' ||
-      !document.components.some((component) => component.id === initialComponentId))
-  ) {
-    return false;
-  }
-  const requestId = createScreenAuthoringRequestId();
-  const documentRevision = elementState.session.project?.revision ?? null;
-  let context: ScreenBlueprintAuthoringContext;
-  try {
-    const parsedContext = parseScreenBlueprintAuthoringContext(
-      buildScreenBlueprintAuthoringContext({
-        document,
-        initialComponentId,
-        catalog: elementState.catalog,
-        runtimeContributions: elementState.runtimeContributions,
-      }),
-    );
-    if (!parsedContext.ok) {
-      elementState.runtime.emitDiagnostics(element, parsedContext.diagnostics);
-      return false;
-    }
-    context = parsedContext.value;
-  } catch {
-    elementState.runtime.emitDiagnostics(element, [
-      {
-        severity: 'error',
-        code: 'AUTHORING_REQUEST_INVALID',
-        path: ['context'],
-        message: DESIGNER_UI_TEXT.blueprint.requestFailed,
-      },
-    ]);
-    return false;
-  }
-  elementState.pendingAuthoringRequests.set(requestId, {
-    kind: 'blueprint',
-    generation: elementState.authoringGeneration,
-    documentGeneration: elementState.documentGeneration,
-    documentRevision,
-  });
-  element.dispatchEvent(
-    new CustomEvent(SCREEN_AUTHORING_REQUEST_EVENT, {
-      detail: {
-        request: {
-          kind: 'blueprint',
-          requestId,
-          documentRevision,
-          context,
-        },
-      },
-    }),
-  );
-  return true;
 }
 
 export function cancelAuthoringEdit(element: DesignerElementHost, requestId: string): boolean {
@@ -294,59 +211,8 @@ export function commitComponentTextEdit(
   return result;
 }
 
-export function commitBlueprintEdit(
-  element: DesignerElementHost,
-  request: ScreenBlueprintCommitRequest,
-): ScreenParseResult<ScreenDocument> {
-  const elementState = getDesignerElementState(element);
-
-  const document = elementState.session.document;
-  if (document === undefined)
-    return elementState.runtime.commitGuardFailure(element, 'AUTHORING_EXPIRED');
-  const pending = elementState.pendingAuthoringRequests.get(request.requestId);
-  if (pending?.kind !== 'blueprint') {
-    return elementState.runtime.commitGuardFailure(element, 'AUTHORING_REQUEST_INVALID');
-  }
-  const guards = validateScreenBlueprintAuthoringCommitGuards({
-    requestId: request.requestId,
-    expectedRevision: request.expectedRevision ?? null,
-    openedRevision: pending.documentRevision ?? null,
-    currentRevision: elementState.session.project?.revision ?? null,
-    openedDocumentGeneration: pending.documentGeneration ?? -1,
-    currentDocumentGeneration: elementState.documentGeneration,
-    disposed: pending.generation !== elementState.authoringGeneration,
-  });
-  if (!guards.ok) {
-    elementState.pendingAuthoringRequests.delete(request.requestId);
-    return { ok: false, diagnostics: guards.diagnostics };
-  }
-  const candidate = parseScreenAuthoringBlueprintCandidate(
-    request.blueprint,
-    MAX_AUTHORING_CANDIDATE_BYTES,
-  );
-  if (!candidate.ok) return { ok: false, diagnostics: candidate.diagnostics };
-  const parsedDocument = parseScreenDocument({ ...document, blueprint: candidate.value });
-  if (!parsedDocument.ok) return { ok: false, diagnostics: parsedDocument.diagnostics };
-  const blueprint = parsedDocument.value.blueprint;
-  const compiled = compileScreenBlueprint(parsedDocument.value, {
-    hasBlueprintCapability: (capability) => {
-      try {
-        return elementState.runtimeContributions?.hasBlueprintCapability(capability) === true;
-      } catch {
-        return false;
-      }
-    },
-  });
-  if (!compiled.ok) {
-    return { ok: false, diagnostics: compiled.diagnostics };
-  }
-  const result = element.executeCommand({ type: 'replace-blueprint', blueprint });
-  if (result.ok) elementState.pendingAuthoringRequests.delete(request.requestId);
-  return result;
-}
-
 export function commitGuardFailure(
-  element: DesignerElementHost,
+  _element: DesignerElementHost,
   code: ScreenDiagnostic['code'],
 ): ScreenParseResult<ScreenDocument> {
   const message =

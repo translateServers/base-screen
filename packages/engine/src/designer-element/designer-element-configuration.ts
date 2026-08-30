@@ -17,6 +17,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import type { BaseScreenDesignerWorkbenchMode } from '../common/operations/designer-blueprint-protocol.js';
 import { type DesignerToolMaterialTypes } from '../common/tools/designer-tools.js';
 import {
   type BaseScreenDesignerLeftPanelGroup,
@@ -48,7 +49,8 @@ import { type DesignerElementHost, getDesignerElementState } from './designer-el
 
 export interface BaseScreenDesignerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
-  /** ADR-0062：宿主左侧分组的 JSON-safe 导航描述；内容由对应公开命名 slot 提供。 */
+  readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
+  /** ADR-0062：模式感知的宿主左侧分组；内容由跨模式复用的公开命名 slot 提供。 */
   readonly leftPanelGroups?: readonly BaseScreenDesignerLeftPanelGroup[];
   readonly materialLibraryState?: BaseScreenMaterialLibraryState;
   readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
@@ -95,6 +97,13 @@ export function configure(
     return {
       ok: false,
       diagnostics: [lifecycleDiagnostic('Designer catalog 必须是合法的物料目录。')],
+    };
+  }
+  const initialWorkbenchMode = configuration.initialWorkbenchMode ?? 'canvas';
+  if (initialWorkbenchMode !== 'canvas' && initialWorkbenchMode !== 'blueprint') {
+    return {
+      ok: false,
+      diagnostics: [lifecycleDiagnostic('Designer initialWorkbenchMode is invalid.')],
     };
   }
   let leftPanelGroups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
@@ -236,6 +245,7 @@ export function configure(
   elementState.groupMaterialType = configuration.groupMaterialType;
   elementState.previewHandler = configuration.previewHandler;
   elementState.canvasBackgroundImageButton = configuration.canvasBackgroundImageButton ?? false;
+  elementState.blueprintWorkbenchController.setInitialMode(initialWorkbenchMode);
   elementState.runtime.initialize(element);
   return { ok: true, value: null, diagnostics: [] };
 }

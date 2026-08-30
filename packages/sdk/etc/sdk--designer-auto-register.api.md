@@ -4,15 +4,39 @@
 
 ```ts
 
+import { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME } from '@base-screen/engine';
+import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX } from '@base-screen/engine';
+import { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasCommandEventDetail } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasCommandResult } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasEdge } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasEventOption } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasGraph } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasInsertNode } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasNode } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasNodePosition } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasNodeSummary } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasSelection } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasState } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasStateEventDetail } from '@base-screen/engine';
+import { BaseScreenBlueprintCanvasTrace } from '@base-screen/engine';
 import { BaseScreenDesignerElement } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroup } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroupChangeEventDetail } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroupIcon } from '@base-screen/engine';
 import { baseScreenDesignerLeftPanelSlotName } from '@base-screen/engine';
+import { BaseScreenDesignerSetWorkbenchModeOptions } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchFocus } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchMode } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchModeChangeEventDetail } from '@base-screen/engine';
+import { BaseScreenDesignerWorkbenchModeChangeReason } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryAction } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryActionEventDetail } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryGroup } from '@base-screen/engine';
@@ -20,11 +44,20 @@ import { BaseScreenMaterialLibraryGrouping } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryItem } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryState } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryStatus } from '@base-screen/engine';
+import { parseBaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { parseBaseScreenDesignerLeftPanelGroups } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryGrouping } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryItems } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryState } from '@base-screen/engine';
 import type { ScreenParseResult } from '@base-screen/contracts';
+
+export { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT }
+
+export { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT }
+
+export { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME }
+
+export { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT }
 
 export { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT }
 
@@ -35,7 +68,37 @@ export { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX }
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_TAG_NAME: 'base-screen-designer';
 
+export { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT }
+
 export { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT }
+
+export { BaseScreenBlueprintCanvasCommand }
+
+export { BaseScreenBlueprintCanvasCommandEventDetail }
+
+export { BaseScreenBlueprintCanvasCommandResult }
+
+export { BaseScreenBlueprintCanvasEdge }
+
+export { BaseScreenBlueprintCanvasEventOption }
+
+export { BaseScreenBlueprintCanvasGraph }
+
+export { BaseScreenBlueprintCanvasInsertNode }
+
+export { BaseScreenBlueprintCanvasNode }
+
+export { BaseScreenBlueprintCanvasNodePosition }
+
+export { BaseScreenBlueprintCanvasNodeSummary }
+
+export { BaseScreenBlueprintCanvasSelection }
+
+export { BaseScreenBlueprintCanvasState }
+
+export { BaseScreenBlueprintCanvasStateEventDetail }
+
+export { BaseScreenBlueprintCanvasTrace }
 
 export { BaseScreenDesignerElement }
 
@@ -46,6 +109,16 @@ export { BaseScreenDesignerLeftPanelGroupChangeEventDetail }
 export { BaseScreenDesignerLeftPanelGroupIcon }
 
 export { baseScreenDesignerLeftPanelSlotName }
+
+export { BaseScreenDesignerSetWorkbenchModeOptions }
+
+export { BaseScreenDesignerWorkbenchFocus }
+
+export { BaseScreenDesignerWorkbenchMode }
+
+export { BaseScreenDesignerWorkbenchModeChangeEventDetail }
+
+export { BaseScreenDesignerWorkbenchModeChangeReason }
 
 export { BaseScreenMaterialLibraryAction }
 
@@ -63,6 +136,8 @@ export { BaseScreenMaterialLibraryStatus }
 
 // @public (undocumented)
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor>;
+
+export { parseBaseScreenBlueprintCanvasCommand }
 
 export { parseBaseScreenDesignerLeftPanelGroups }
 

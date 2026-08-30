@@ -25,7 +25,8 @@
 - 宿主负责实际存储与检索、认证授权、业务路由与 Store、数据查询/聚合/缓存/ETL、资产存储与转码、发布部署、公开 URL、截图/视频/批量导出和长任务。Base Screen 只通过 JSON-safe intent、port、method 或 event 请求这些能力。
 - 需要凭证或租户状态、跨项目/跨实例共享、无明确容量上限、后台队列/持久缓存/长任务，或依赖特定业务基础设施的处理默认归宿主；不得在 Engine 中补建后端、通用网络客户端、任务队列或业务降级实现。
 - 物料自定义属性面板默认使用 JSON-safe、声明式的 Manifest Editor Descriptor 和 Base Screen 内建控件；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。
-- 事件 Blueprint 编辑器、代码编辑器和复杂 ECharts/领域配置编辑器由宿主拥有；Base Screen 只提供 detached 编辑上下文、canonical 校验、Core transaction、history/revision guard 和有界结果提交。源码、图形布局和编辑器 session 不进入 Screen Document。
+- 事件 Blueprint 采用一体化工作台边界：Base Screen 拥有当前实例内的顶部栏、左右面板、语义图投影、canonical 编辑、Core transaction、统一 history/revision guard 与有界 slot 协议；宿主拥有中央图形渲染、布局算法和画布手势。`blueprint.layout` 保存节点位置与视口，其余模式、选择、临时拖动和 trace 高亮只属 session。代码编辑器和复杂 ECharts/领域配置编辑器仍由宿主拥有。
+- 宿主左侧业务分组通过严格 `leftPanelGroups[].workbenchModes` 选择 Canvas、Blueprint 或两者；省略时仅用于 Canvas。同一分组跨模式只复用一份公开命名 slot/tabpanel，宿主 light DOM 不随模式切换重挂载，宿主仍拥有其内容生命周期和业务状态。
 - 宿主作者扩展通过公开 Custom Element method/event 和 JSON-safe authoring bridge 集成；宿主不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的通用 UI 注入逃生口。
 - 新增功能若能通过既有宿主边界完成，不得新增 Base Screen 内部工作流、package 或传输配置。只有改变产品定位、宿主/Engine 职责划分，或引入长期维护承诺的范围扩展才需要 ADR；此类改动仅在实施跨多个阶段、涉及迁移或用户明确要求时再创建 Spec。
 

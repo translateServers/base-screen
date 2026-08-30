@@ -35,7 +35,7 @@ Spec 索引为准）：
 | 方向 | 说明 | 前置/触发条件 | 相关归档材料 |
 | --- | --- | --- | --- |
 | 宿主侧项目/数据/发布能力 | 项目持久化、数据查询/聚合、资产存储、发布部署与长任务，按轻量基座边界归宿主实现 | 宿主侧立项，有明确业务容量 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) |
-| Blueprint 图形编辑器 | 事件 Blueprint 的图形布局/代码编辑器归宿主，Base Screen 只提供 detached 编辑上下文与有界提交 | 宿主立项图形编辑器；`@dagrejs/dagre` 等布局候选仅在该需求生效时进入试点 | [Designer Event Blueprint](../specs/archive/designer-event-blueprint/spec.md)、[依赖评估](../plans/archive/designer-event-blueprint/dependency-evaluation.md) |
+| Blueprint 扩展节点 | 一体化工作台已由 Base Screen 提供语义壳层、宿主提供中央图形；未来只在 canonical 需求成立时评估分组、过滤、模板或新控制流 | 先扩展 canonical Spec；不得由宿主 metadata 或私有 Store 旁路实现 | [Designer Blueprint Workbench](../specs/designer-blueprint-workbench/spec.md)、[ADR-0063](../decisions/ADR-0063-designer-blueprint-workbench-shell.md) |
 | 条件候选依赖试点 | `@floating-ui/dom`（碰撞感知 anchored overlay）、`@tanstack/virtual-core`（大图层树滚动缺口） | 对应需求成为生效中 Requirement 且出现可复现性能/正确性缺口（2026-08-16 评估：宿主贴组件锚定弹窗需求定案不做修改，触发条件未满足） | [依赖评估](../plans/archive/designer-dependency-introduction/dependency-evaluation.md) |
 | 复杂数据绑定（数据包） | 组件绑定复杂数据是否引入“数据包”概念，尚未决策 | 先完成评审并形成结论 | [数据绑定调研](../plans/数据绑定与数据包调研.md) |
 | 在线物料 MCP 扩展 | 在线物料查询/校验 MCP 的生产服务与运行包归宿主 | 宿主立项在线服务 | [ADR-0030](../decisions/ADR-0030-host-material-mcp-access.md)、[Host Material MCP Access](../specs/archive/host-material-mcp-access/spec.md) |

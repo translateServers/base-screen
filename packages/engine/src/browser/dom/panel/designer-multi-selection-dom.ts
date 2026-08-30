@@ -10,7 +10,6 @@ import {
   appendBatchArrangeButton,
   appendBatchNumberInput,
   appendBatchStyleControl,
-  appendFieldGrid,
   appendListItem,
   appendSection,
   multiSelectionGroupUnavailableReason,

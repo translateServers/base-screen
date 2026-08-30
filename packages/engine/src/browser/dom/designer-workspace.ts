@@ -1,4 +1,5 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
+import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '../../common/operations/designer-blueprint-protocol.js';
 import { DESIGNER_OPERATION_TEXT } from '../../common/operations/designer-operation-registry.js';
 import {
   DESIGNER_TOOLS,
@@ -25,7 +26,6 @@ import {
   coordinateEntryField,
   DESIGNER_ZOOM_PRESETS,
   labeledActionButton,
-  menuButton,
   previewGlyph,
   publishGlyph,
   redoGlyph,
@@ -86,6 +86,7 @@ export function createDesignerWorkspace(
           <span class="rail-tab-label">${DESIGNER_UI_TEXT.variables.title}</span>
         </button>
       </div>
+      <div class="blueprint-library" data-blueprint-library hidden></div>
       <div class="rail-view" id="designer-materials-panel" role="tabpanel" aria-labelledby="designer-materials-tab" data-materials>
         <div class="material-library-toolbar" data-material-library-toolbar>
           <div class="material-search">
@@ -120,79 +121,53 @@ export function createDesignerWorkspace(
             <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>
             <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
           </span>
-          <span class="topbar-mode-switch" role="group" aria-label="${DESIGNER_UI_TEXT.interactionWorkspace}">
-            <span class="topbar-mode-button" data-active="true" aria-current="page">${designerIcon('grid')}<span>${DESIGNER_UI_TEXT.canvasWorkspace}</span></span>
-            <button type="button" class="topbar-mode-button" data-action="open-blueprint" title="${DESIGNER_UI_TEXT.interactionWorkspaceHint}" aria-label="${DESIGNER_UI_TEXT.interactionWorkspaceHint}">${designerIcon('variable')}<span>${DESIGNER_UI_TEXT.interactionWorkspace}</span></button>
+          <span class="topbar-mode-switch" role="tablist" aria-label="${DESIGNER_UI_TEXT.interactionWorkspace}">
+            <button type="button" class="topbar-mode-button" data-workbench-mode-tab="canvas" data-active="true" role="tab" aria-selected="true" tabindex="0" title="${DESIGNER_UI_TEXT.canvasWorkspace}">${designerIcon('grid')}<span>${DESIGNER_UI_TEXT.canvasWorkspace}</span></button>
+            <button type="button" class="topbar-mode-button" data-workbench-mode-tab="blueprint" role="tab" aria-selected="false" tabindex="-1" title="${DESIGNER_UI_TEXT.interactionWorkspaceUnavailable}" aria-label="${DESIGNER_UI_TEXT.interactionWorkspaceUnavailable}" disabled>${designerIcon('variable')}<span>${DESIGNER_UI_TEXT.interactionWorkspace}</span></button>
           </span>
         </div>
         <div class="topbar-center">
-          <div class="topbar-segment designer-tool-cluster" role="group" aria-label="${DESIGNER_UI_TEXT.tools}">
-            ${DESIGNER_TOOLS.map((tool) => `<button type="button" class="designer-control designer-button designer-icon-button designer-tool-button tool-btn" data-variant="ghost" data-tool="${tool.id}" data-material-key="${tool.materialKey ?? ''}" title="${tool.label} (${getDesignerToolShortcut(tool.id)})" aria-label="${tool.label}">${designerToolGlyph(tool.id)}<kbd>${getDesignerToolShortcut(tool.id)}</kbd></button>`).join('')}
-          </div>
-          <div class="topbar-segment" role="group" aria-label="${DESIGNER_UI_TEXT.history}">
-            ${actionButton('undo', designerIcon('undo'))}
-            ${actionButton('redo', redoGlyph())}
-          </div>
           <button type="button" class="topbar-search-trigger" data-command-palette-toggle aria-expanded="false" aria-controls="designer-command-palette-input" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" title="${DESIGNER_UI_TEXT.commandPalette.trigger}">
             ${designerIcon('search')}
-            <span>${DESIGNER_UI_TEXT.commandPalette.trigger}</span>
+            <span data-command-palette-trigger-label>${DESIGNER_UI_TEXT.commandPalette.trigger}</span>
             <kbd>/</kbd>
           </button>
         </div>
         <div class="topbar-actions">
-          <div class="topbar-segment topbar-zoom" role="group" aria-label="${DESIGNER_UI_TEXT.zoom}">
-            ${actionButton('zoom-out', zoomOutGlyph())}
-            <output class="zoom-value" data-zoom>100%</output>
-            ${actionButton('zoom-in', zoomInGlyph())}
-          </div>
-          <span class="topbar-divider" aria-hidden="true"></span>
-          <div class="designer-menu-triggers" role="menubar" aria-label="${DESIGNER_UI_TEXT.designerMenu}">
-            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="file" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.file}</button>
-            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="edit" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.edit}</button>
-            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="view" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.view}</button>
-            <button type="button" class="designer-control designer-button designer-menu-trigger" data-variant="ghost" data-menu-toggle="tools" aria-expanded="false" role="menuitem">${DESIGNER_UI_TEXT.tools}</button>
-          </div>
+          <button type="button" class="topbar-icon-button" data-panel-collapse="right" aria-controls="designer-right-panel" aria-expanded="true" title="${DESIGNER_UI_TEXT.rightPanel}" aria-label="${DESIGNER_UI_TEXT.rightPanel}">${designerIcon('sliders')}</button>
+          <button type="button" class="topbar-icon-button" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" title="${DESIGNER_UI_TEXT.errorConsole.openAria}" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}">${designerIcon('terminal')}<span class="topbar-count" data-error-console-count></span></button>
+          <button type="button" class="topbar-icon-button" data-topbar-theme-toggle title="${DESIGNER_UI_TEXT.toggleTheme}" aria-label="${DESIGNER_UI_TEXT.toggleTheme}" aria-pressed="false">${designerIcon('eye')}</button>
+          <button type="button" class="topbar-icon-button" data-topbar-snapshot title="${DESIGNER_UI_TEXT.createSnapshot}" aria-label="${DESIGNER_UI_TEXT.createSnapshot}" disabled>${designerIcon('copy')}</button>
+          <button type="button" class="topbar-more-button" data-menu-toggle="more" aria-haspopup="menu" aria-expanded="false" title="${DESIGNER_UI_TEXT.more}" aria-label="${DESIGNER_UI_TEXT.more}">${designerIcon('sliders')}<span>${DESIGNER_UI_TEXT.more}</span></button>
           <span class="topbar-divider" aria-hidden="true"></span>
           ${labeledActionButton('preview', previewGlyph())}
           ${labeledActionButton('project-save', designerIcon('save'))}
           ${labeledActionButton('project-publish', publishGlyph(), 'topbar-publish')}
         </div>
-        <div class="designer-menu" data-menu="file" hidden role="menu">
-          ${menuButton('project-workspace')}${menuButton('import')}${menuButton('export')}
-          <div class="designer-menu-separator" role="separator"></div>
-          ${menuButton('project-save')}${menuButton('project-publish')}${menuButton('project-retry')}${menuButton('project-cancel')}
-        </div>
-        <div class="designer-menu" data-menu="edit" hidden role="menu">
-          ${menuButton('undo')}${menuButton('redo')}
-          <div class="designer-menu-separator" role="separator"></div>
-          ${menuButton('copy')}${menuButton('paste')}${menuButton('duplicate')}${menuButton('delete')}
-          ${menuButton('edit-position')}
-          <div class="designer-menu-separator" role="separator"></div>
-          ${menuButton('group')}${menuButton('ungroup')}
-          ${submenuButton(DESIGNER_UI_TEXT.arrange, [
-            'align-left',
-            'align-center',
-            'align-right',
-            'align-top',
-            'align-middle',
-            'align-bottom',
-            'separator',
-            'distribute-horizontal',
-            'distribute-vertical',
-          ])}
-          ${submenuButton(DESIGNER_UI_TEXT.layer, ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'])}
-        </div>
-        <div class="designer-menu" data-menu="view" hidden role="menu">
-          ${menuButton('zoom-in')}${menuButton('zoom-out')}${menuButton('zoom-reset')}${menuButton('zoom-fit')}
-          ${submenuButton(DESIGNER_UI_TEXT.canvasAids, ['toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
-        </div>
-        <div class="designer-menu" data-menu="tools" hidden role="menu">
-          ${menuButton('toggle-workbench')}${menuButton('show-help')}
+        <div class="designer-menu topbar-more-menu" data-menu="more" hidden role="menu" aria-label="${DESIGNER_UI_TEXT.more}">
+          ${submenuButton(DESIGNER_UI_TEXT.file, ['project-workspace', 'import', 'export', 'separator', 'project-save', 'project-publish', 'project-retry', 'project-cancel'])}
+          ${submenuButton(DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'separator', 'group', 'ungroup', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
+          ${submenuButton(DESIGNER_UI_TEXT.view, ['zoom-in', 'zoom-out', 'zoom-reset', 'zoom-fit', 'separator', 'toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
+          ${submenuButton(DESIGNER_UI_TEXT.tools, ['toggle-workbench', 'show-help'])}
         </div>
       </header>
 
       <input type="file" accept="application/json" data-import-document hidden>
 
+      <div class="workspace-local-toolbar" data-canvas-local-toolbar aria-label="${DESIGNER_UI_TEXT.tools}">
+        <div class="topbar-segment designer-tool-cluster" role="group" aria-label="${DESIGNER_UI_TEXT.tools}">
+          ${DESIGNER_TOOLS.map((tool) => `<button type="button" class="designer-control designer-button designer-icon-button designer-tool-button tool-btn" data-variant="ghost" data-tool="${tool.id}" data-material-key="${tool.materialKey ?? ''}" title="${tool.label} (${getDesignerToolShortcut(tool.id)})" aria-label="${tool.label}">${designerToolGlyph(tool.id)}<kbd>${getDesignerToolShortcut(tool.id)}</kbd></button>`).join('')}
+        </div>
+        <div class="topbar-segment" role="group" aria-label="${DESIGNER_UI_TEXT.history}">
+          ${actionButton('undo', designerIcon('undo'))}
+          ${actionButton('redo', redoGlyph())}
+        </div>
+        <div class="topbar-segment topbar-zoom" role="group" aria-label="${DESIGNER_UI_TEXT.zoom}">
+          ${actionButton('zoom-out', zoomOutGlyph())}
+          <output class="zoom-value" data-zoom>100%</output>
+          ${actionButton('zoom-in', zoomInGlyph())}
+        </div>
+      </div>
       <div class="ruler-corner" aria-hidden="true">${DESIGNER_UI_TEXT.rulerCornerUnit}</div>
       <div class="ruler ruler-horizontal" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
       <div class="canvas-stage">
@@ -211,6 +186,10 @@ export function createDesignerWorkspace(
           </form>
         </div>
       </div>
+      <section class="designer-blueprint-surface" data-blueprint-surface hidden aria-label="${DESIGNER_UI_TEXT.blueprint.canvas}">
+        <slot name="${BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT}" data-blueprint-canvas-slot></slot>
+        <div class="designer-blueprint-fallback" data-blueprint-fallback>${DESIGNER_UI_TEXT.blueprint.noHostCanvas}</div>
+      </section>
       <section class="designer-data-workbench" data-data-workbench hidden aria-label="${DESIGNER_UI_TEXT.dataSource.workbench}">
         <div data-data-workbench-content></div>
       </section>
@@ -240,10 +219,6 @@ export function createDesignerWorkspace(
           <span class="status-divider" aria-hidden="true"></span>
           <button type="button" class="status-toggle" data-status-toggle="native-events" role="switch" aria-checked="false" aria-label="${DESIGNER_UI_TEXT.nativeEvent}">
             <span class="status-toggle-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.nativeEvent}</span>
-          </button>
-          <span class="status-divider" aria-hidden="true"></span>
-          <button type="button" class="designer-control designer-button status-console-trigger" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}" title="${DESIGNER_UI_TEXT.errorConsole.openAria}">
-            ${designerIcon('terminal')}<span class="status-console-label">${DESIGNER_UI_TEXT.errorConsole.trigger}</span><span class="status-console-count" data-error-console-count></span>
           </button>
           <span class="status-divider" aria-hidden="true"></span>
           <button type="button" class="designer-control designer-button status-zoom-trigger" data-menu-toggle="status-zoom" data-status-zoom aria-haspopup="menu" aria-expanded="false" aria-label="${DESIGNER_UI_TEXT.zoomRatio}">100%</button>
@@ -290,6 +265,7 @@ export function createDesignerWorkspace(
         <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span class="inspector-tab-icon">${designerIcon('grid')}</span><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>
         <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span class="inspector-tab-icon">${designerIcon('cube')}</span><span>${DESIGNER_UI_TEXT.inspectorUi.advanced}</span></button>
       </div>
+      <div class="blueprint-inspector" data-blueprint-inspector hidden></div>
       <div class="inspector-context" data-inspector-context></div>
       <div class="inspector-toolbar">
         <button type="button" class="designer-control designer-button designer-icon-button inspector-search-launch" data-variant="ghost" data-inspector-search-launch title="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}" aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}">${designerIcon('search')}</button>

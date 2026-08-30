@@ -12,6 +12,8 @@ export function connectedCallback(element: DesignerElementHost): void {
     elementState.runtime.renderDocument(element, elementState.session.document);
     elementState.runtime.renderInteraction(element);
   }
+  if (element.shadowRoot !== null)
+    elementState.blueprintWorkbenchController.connect(element.shadowRoot);
   elementState.runtime.connectWindowGuards(element);
 }
 
@@ -19,6 +21,7 @@ export function disconnectedCallback(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
   elementState.eventSystem.disconnectWindowGuards();
+  elementState.blueprintWorkbenchController.disconnect();
   elementState.runtime.cancelGesture(element);
   elementState.runtime.invalidateAuthoringRequests(element);
   elementState.assetController.clear();
@@ -87,6 +90,7 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   }
   elementState.coordinateEntryController.connect();
   elementState.surfaceRouter.connect(shadow, elementState.surfaceBindings);
+  elementState.blueprintWorkbenchController.connect(shadow);
   elementState.selection = shadow.querySelector<HTMLDivElement>('[data-selection]') ?? undefined;
   elementState.properties = shadow.querySelector<HTMLDivElement>('[data-properties]') ?? undefined;
   elementState.dataPanel =

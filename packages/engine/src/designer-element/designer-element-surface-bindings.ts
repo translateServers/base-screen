@@ -1,5 +1,4 @@
 import {
-  type DesignerSurfaceBindings,
   getInspectorDraftTarget,
   isEditableTarget,
   isTextAreaDraft,
@@ -14,6 +13,9 @@ export function initializeDesignerElementSurfaceBindings(
     click: [
       (target) => state.notificationController.dismiss(target as Element),
       (target) => state.errorConsoleController.onClick(target as Element),
+      (target) => state.commandPaletteController.onClick(target as Element),
+      (target) => state.blueprintWorkbenchController.onClick(target as Element),
+      (target) => state.topbarController.onClick(target as Element),
       (target) => state.coordinateEntryController.onClick(target),
       (target) => state.menuController.onHelpClick(target as Element),
       (target) => state.menuController.toggleMenuFromTarget(target as Element),
@@ -22,7 +24,6 @@ export function initializeDesignerElementSurfaceBindings(
         state.menuController.closeContextMenu();
         return false;
       },
-      (target) => state.commandPaletteController.onClick(target as Element),
       (target) => state.runtime.executeToolFromTarget(element, target as Element),
       (target) => state.runtime.executeOperationFromTarget(element, target as Element),
       (target) => state.runtime.onStatusZoomPreset(element, target as Element),
@@ -34,8 +35,8 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.integrationController.onClick(target as Element),
       (target) => state.variablesController.onClick(target as Element),
       (target) => state.workbenchController.onClick(target as Element),
-      (target, event) => state.layersController.onClick(event as MouseEvent),
-      (target, event) => {
+      (_target, event) => state.layersController.onClick(event as MouseEvent),
+      (_target, event) => {
         state.panelController.onClick(event as MouseEvent);
         return true;
       },
@@ -92,51 +93,54 @@ export function initializeDesignerElementSurfaceBindings(
       return false;
     },
     change: [
+      (target) => state.blueprintWorkbenchController.onChange(target as Element),
       (target) => state.coordinateEntryController.onChange(target),
-      (target, event) => state.runtime.onImportChange(element, event),
-      (target, event) => state.layersController.onChange(event),
+      (_target, event) => state.runtime.onImportChange(element, event),
+      (_target, event) => state.layersController.onChange(event),
       (target) => state.datasetController.onChange(target),
-      (target, event) => {
+      (_target, event) => {
         state.panelController.onPropertyChange(event);
         return true;
       },
     ],
     input: [
+      (target) => state.blueprintWorkbenchController.onInput(target as Element),
       (target) => state.coordinateEntryController.onInput(target),
       (target) => state.commandPaletteController.onInput(target as Element),
       (target) => state.assetController.onInput(target),
       (target) => state.datasetController.onInput(target),
-      (target, event) => state.panelController.onInput(event),
-      (target, event) => {
+      (_target, event) => state.panelController.onInput(event),
+      (_target, event) => {
         state.layersController.onInput(event);
         return true;
       },
     ],
     dragStart: [
-      (target, event) => {
+      () => {
         // 标记本设计器发起的拖拽，供 window DnD 防线识别（零宿主干预）。
         state.eventSystem.markDragStart();
         return false;
       },
-      (target, event) => state.panelController.onDragStart(event as DragEvent),
-      (target, event) => state.layersController.onDragStart(event as DragEvent),
+      (_target, event) => state.blueprintWorkbenchController.onDragStart(event as DragEvent),
+      (_target, event) => state.panelController.onDragStart(event as DragEvent),
+      (_target, event) => state.layersController.onDragStart(event as DragEvent),
     ],
-    dragOver: (target, event) => state.layersController.onDragOver(event as DragEvent),
-    drop: (target, event) => state.layersController.onDrop(event as DragEvent),
+    dragOver: (_target, event) => state.layersController.onDragOver(event as DragEvent),
+    drop: (_target, event) => state.layersController.onDrop(event as DragEvent),
     dragEnd: () => {
       state.layersController.clearDrag();
       return true;
     },
-    pointerDown: (target, event) => {
+    pointerDown: (_target, event) => {
       state.panelController.onPointerDown(event as PointerEvent);
       state.workbenchController.onPointerDown(event as PointerEvent);
       return true;
     },
-    pointerMove: (target, event) => {
+    pointerMove: (_target, event) => {
       state.workbenchController.onPointerMove(event as PointerEvent);
       return true;
     },
-    mouseOver: (target, event) => {
+    mouseOver: (target) => {
       const element = target as Element | null;
       const wrapper = element?.closest<HTMLElement>('.designer-menu-submenu-wrap');
       if (wrapper !== null && wrapper !== undefined) {
@@ -158,25 +162,25 @@ export function initializeDesignerElementSurfaceBindings(
       }
       return false;
     },
-    pointerUp: (target, event) => {
+    pointerUp: (_target, event) => {
       state.workbenchController.onPointerUp(event as PointerEvent);
       return true;
     },
-    pointerCancel: (target, event) => {
+    pointerCancel: (_target, event) => {
       state.workbenchController.onPointerCancel(event as PointerEvent);
       return true;
     },
-    doubleClick: (target, event) => {
+    doubleClick: (_target, event) => {
       const mouseEvent = event as MouseEvent;
       if (state.layersController.onDoubleClick(mouseEvent)) return true;
       state.workbenchController.onDoubleClick(mouseEvent);
       return true;
     },
-    focusOut: (target, event) => {
+    focusOut: (_target, event) => {
       state.coordinateEntryController.onFocusOut(event as FocusEvent);
       return state.layersController.onFocusOut(event as FocusEvent);
     },
-    keyDownCapture: (target, event) => {
+    keyDownCapture: (_target, event) => {
       const keyboardEvent = event as KeyboardEvent;
       if (keyboardEvent.key === '/' && state.commandPaletteController.onKeyDown(keyboardEvent)) {
         keyboardEvent.stopImmediatePropagation();
@@ -184,7 +188,7 @@ export function initializeDesignerElementSurfaceBindings(
       }
       return state.eventSystem.swallow(keyboardEvent);
     },
-    keyUpCapture: (target, event) => {
+    keyUpCapture: (_target, event) => {
       // 手势激活期间 keyup 同样全吞；但 Space 必须放行到 viewport 的 keyup，
       // 否则抓手状态（spacePressed）无法在拖拽中松开复位。
       const keyboardEvent = event as KeyboardEvent;
@@ -196,16 +200,17 @@ export function initializeDesignerElementSurfaceBindings(
       return false;
     },
     keyDown: [
-      (target, event) => state.coordinateEntryController.onKeyDown(event as KeyboardEvent),
-      (target, event) => state.commandPaletteController.onKeyDown(event as KeyboardEvent),
-      (target, event) => state.errorConsoleController.onKeyDown(event as KeyboardEvent),
-      (target, event) => {
+      (_target, event) => state.blueprintWorkbenchController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.coordinateEntryController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.commandPaletteController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.errorConsoleController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         if (keyboardEvent.key !== 'Escape' || !state.menuController.closeHelpPanel()) return false;
         keyboardEvent.preventDefault();
         return true;
       },
-      (target, event) => {
+      (_target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         const inspectorDraft = getInspectorDraftTarget(keyboardEvent);
         if (
@@ -220,10 +225,10 @@ export function initializeDesignerElementSurfaceBindings(
         state.panelController.onPropertyChange({ target: inspectorDraft } as Event);
         return true;
       },
-      (target, event) => state.layersController.onKeyDown(event as KeyboardEvent),
-      (target, event) => state.variablesController.onKeyDown(event as KeyboardEvent),
-      (target, event) => state.datasetController.onKeyDown(event as KeyboardEvent),
-      (target, event) => {
+      (_target, event) => state.layersController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.variablesController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.datasetController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => {
         const keyboardEvent = event as KeyboardEvent;
         if (!state.panelController.onKeyDown(keyboardEvent)) {
           state.runtime.onKeyDown(element, keyboardEvent);
@@ -231,6 +236,6 @@ export function initializeDesignerElementSurfaceBindings(
         return true;
       },
     ],
-    keyUp: (target, event) => state.viewportController.onKeyUp(event as KeyboardEvent),
+    keyUp: (_target, event) => state.viewportController.onKeyUp(event as KeyboardEvent),
   };
 }

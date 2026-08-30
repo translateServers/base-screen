@@ -1010,8 +1010,8 @@ Manifest、catalog、ScreenDocument、历史、导出物、Renderer 或 Viewer�
 ### 11.2 宿主扩展左侧分组
 
 宿主需要把资产、模板或 AI 工具等业务面板纳入左侧 `rail-tabs` 导航时，可配置最多 6 个严格的
-`leftPanelGroups`。描述只包含 `id`、`label` 与可选内建 `icon`；真实内容仍由宿主框架管理，并通过该分组专属
-命名 slot 投影到 Designer：
+`leftPanelGroups`。描述包含 `id`、`label`、可选内建 `icon` 与可选 `workbenchModes`；真实内容仍由宿主框架
+管理，并通过该分组专属命名 slot 投影到 Designer：
 
 ```ts
 import {
@@ -1026,7 +1026,14 @@ designer.append(assetPanel);
 
 designer.configure({
   catalog,
-  leftPanelGroups: [{ id: 'assets', label: '资产', icon: 'image' }],
+  leftPanelGroups: [
+    {
+      id: 'assets',
+      label: '资产',
+      icon: 'image',
+      workbenchModes: ['canvas', 'blueprint'],
+    },
+  ],
 });
 
 designer.addEventListener(BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT, (event) => {
@@ -1035,14 +1042,17 @@ designer.addEventListener(BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT, (e
   assetPanel.toggleAttribute('data-active', groupId === 'assets');
 });
 
-// 无需查询 Shadow DOM；不存在或尚未挂载时返回 false。
+// 在当前工作台模式中选择该分组；无需查询 Shadow DOM，不支持当前模式时返回 false。
 designer.selectLeftPanelGroup('assets');
 ```
 
-运行时可更新 `designer.leftPanelGroups`；非法 id、保留 id（`materials`/`layers`/`variables`）、重复项、未知字段、
-非法图标或超过 6 项的数组会失败关闭并保留旧投影。删除当前宿主分组会自动回到「物料」。可用图标与 slot 前缀
-由 SDK 的 `BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS`、`BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX`
-导出，优先使用 `baseScreenDesignerLeftPanelSlotName(id)` 生成 slot 名。
+省略 `workbenchModes` 时保持兼容行为，只显示在 Canvas；也可以显式设置 `['blueprint']` 或
+`['canvas', 'blueprint']`。Canvas 与 Blueprint 分别记住当前 Tab，同一分组跨模式只使用一份 slot/tabpanel，模式
+切换不会重新挂载宿主 light DOM 子树。运行时可更新 `designer.leftPanelGroups`；非法 id、保留 id
+（`materials`/`layers`/`variables`）、重复项、未知字段、非法图标、空/重复/未知模式或超过 6 项的数组会失败关闭并
+保留旧投影。删除当前宿主分组时，Canvas 自动回到「物料」，Blueprint 自动回到「组件」。可用图标与 slot 前缀
+由 SDK 的 `BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS`、`BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX` 导出，
+优先使用 `baseScreenDesignerLeftPanelSlotName(id)` 生成 slot 名。
 
 配置对象不接受 HTML、DOM Node、component 或 render function；这些内容是宿主可信 light DOM，只能经公开
 方法、端口和事件修改 Designer。Base Screen 不读取其业务状态，不负责请求/权限/持久化，也不会把内容、当前
@@ -1088,81 +1098,80 @@ const manifest = {
 （Safari < 18、Firefox < 125）静默退回全量渲染，功能与行为不变；宿主无需任何改造，也不应依赖
 卡片是否被跳过渲染（目录、DOM 结构、可访问性与拖拽语义均不变）。
 
-## 12. 接入宿主高级编辑器
+## 12. 接入 Blueprint 工作台与宿主高级编辑器
 
-交互编排、代码、完整 ECharts 配置和领域编辑器由宿主渲染在 Designer Shadow DOM 之外。Base Screen
-不提供流程画布、规则列表编辑器、节点检查器、搜索、布局或试运行 UI，也不引入这些界面的图形库和编辑器
-依赖。Designer 内建界面只有顶栏整屏入口，以及右侧当前组件的只读事件/规则摘要与宿主定位入口。
+Blueprint 使用 Designer 内的一体化工作台：Base Screen 渲染全局顶部栏、左右语义面板和底部状态，宿主通过
+固定 slot 提供中央图形画布。Blueprint 编辑直接进入当前 `ScreenDocument` 和统一历史，没有“应用蓝图”或
+“取消草稿”。代码、完整 ECharts 配置和其它领域编辑器仍由宿主在 Shadow DOM 之外提供。
 
-Designer 通过 `base-screen-authoring-request` 发起 JSON-safe 请求，宿主完成编辑后调用专用提交方法。
+宿主应在 `configure()` / `load()` 前把一个中央画布元素放入 Designer light DOM：
 
 ```ts
 import {
-  SCREEN_AUTHORING_REQUEST_EVENT,
-  type ScreenAuthoringRequestEventDetail,
+  BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
+  BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT,
+  BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT,
+  type BaseScreenBlueprintCanvasCommandEventDetail,
+  type BaseScreenBlueprintCanvasStateEventDetail,
 } from '@base-screen/sdk';
 
-designer.addEventListener(SCREEN_AUTHORING_REQUEST_EVENT, (event) => {
-  const { request } = (event as CustomEvent<ScreenAuthoringRequestEventDetail>).detail;
-  hostAuthoringEditor.open(request);
-});
-```
+const canvas = document.createElement('xj-blueprint-canvas');
+canvas.slot = BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT;
+designer.append(canvas);
 
-宿主可以从自己的按钮或路由发起编辑请求。无参数的 Blueprint 请求面向当前 Designer 中的整份文档，
-不要求先选择组件；传入 `initialComponentId` 只提示宿主初始定位，不限制读取、编辑或提交范围：
-
-```ts
-designer.requestBlueprintEdit();
-designer.requestBlueprintEdit({ initialComponentId: 'chart-1' });
-designer.requestComponentTextEdit('props');
-designer.requestComponentTextEdit('style');
-designer.requestComponentTextEdit('data');
-```
-
-Blueprint 请求的 `context` 是一份与 canonical 状态深度分离的整屏作者上下文：
-
-- `document`：完整 `ScreenDocument` 快照；
-- `initialComponentId`：可为空的宿主定位提示；
-- `materialEvents`：按文档实际使用的物料类型去重后的事件名称、文案、payload schema、payload 容量、
-  required capability 与可用状态；
-- `capabilities` 和 `limits`：当前 Blueprint 能力投影与提交容量限制。
-
-宿主应从 `request.context.document.blueprint` 创建草稿。提交时必须原样带回请求身份和预期 revision，
-并返回完整 Blueprint；提交协议不携带组件身份：
-
-```ts
-if (request.kind !== 'blueprint') return;
-
-const editedBlueprint = await hostBlueprintEditor.open({
-  document: request.context.document,
-  initialComponentId: request.context.initialComponentId,
-  materialEvents: request.context.materialEvents,
-  capabilities: request.context.capabilities,
-  limits: request.context.limits,
+canvas.addEventListener(BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT, (event) => {
+  const { state } = (event as CustomEvent<BaseScreenBlueprintCanvasStateEventDetail>).detail;
+  renderGraph(state.graph, { active: state.active, selection: state.selection });
 });
 
-const result = designer.commitBlueprintEdit({
-  requestId: request.requestId,
-  expectedRevision: request.documentRevision,
-  blueprint: editedBlueprint,
-});
-
-if (!result.ok) showDiagnostics(result.diagnostics);
+function selectNode(id: string, state: BaseScreenBlueprintCanvasStateEventDetail['state']) {
+  const detail: BaseScreenBlueprintCanvasCommandEventDetail = {
+    command: {
+      type: 'select',
+      commandId: crypto.randomUUID(),
+      generation: state.generation,
+      documentRevision: state.documentRevision,
+      selection: { kind: 'node', id },
+    },
+  };
+  canvas.dispatchEvent(new CustomEvent(BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT, {
+    bubbles: true,
+    composed: true,
+    detail,
+  }));
+}
 ```
 
-用户取消或关闭宿主编辑器时，应释放对应请求，避免留下无效会话：
+状态快照是冻结、JSON-safe 的权威投影，包含 generation、document revision、active、graph、selection、
+diagnostics、trace、view request 和最近命令结果。宿主不得修改它，也不得把 callback、Vue component、服务对象
+或 Engine 私有引用送回。命令严格覆盖 ready、select、connect、delete-selection、insert-node、commit-layout、
+commit-viewport、history-undo、history-redo 和 run-simulation；每条命令必须复用最新 generation/revision 并使用
+唯一 command id。未知字段、越界值、重复或过期命令均失败关闭，随后会收到新的权威状态。
+
+模式可由用户页签或公开 API 切换：
 
 ```ts
-designer.cancelAuthoringEdit(request.requestId);
+designer.configure({
+  catalog,
+  initialWorkbenchMode: 'canvas',
+  projectAdapter,
+});
+
+designer.setWorkbenchMode('blueprint', {
+  focus: { kind: 'component', id: 'chart-1' },
+});
+
+console.log(designer.workbenchMode); // 'blueprint'
 ```
 
-Blueprint 提交会校验 request ID、Designer 实例、打开时的 document generation、外部 revision、
-完整 canonical 文档、compile/capability、JSON 深度和容量。请求打开后发生任何文档修改，完整 Blueprint
-覆盖都会失败关闭；合法提交只执行一次 `replace-blueprint`，因此只形成一条历史并可一次撤销。
+slot 不存在时 Blueprint 页签禁用；活动期间 slot 被移除时 Designer 原子回退 Canvas，并以
+`base-screen-designer-workbench-mode-change` 的 `fallback` reason 和诊断通知宿主。宿主应保持中央元素挂载，按
+state.active 暂停交互，并在 false → true 时重新测量 Vue Flow 等图形画布。节点拖动、缩放和自动布局只在手势
+结束时提交，避免逐帧事务。
 
-组件文本编辑协议保持不变，继续使用 `commitComponentTextEdit()` 并校验 component identity 与目标 schema。
-陈旧或无效候选不会修改文档和历史。宿主不要绕过这些入口操作 Designer 的 Shadow DOM 或内部 Store；宿主
-选择的编排 UI 技术栈及重型依赖也不应加入 Base Screen workspace 或 bundle。
+组件文本编辑协议保持不变：`requestComponentTextEdit()`、`commitComponentTextEdit()` 与
+`base-screen-authoring-request` 继续校验 component identity、revision 和目标 schema。宿主不要访问 Designer
+Shadow DOM、内部 Store 或 `src` 路径；Vue Flow、Dagre 等中央图形依赖也不应加入 Base Screen workspace。
 
 ## 13. React、Vue 和自定义物料
 

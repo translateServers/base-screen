@@ -11,6 +11,34 @@ export {
 } from '../canvas-presentation.js';
 
 export {
+  BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
+  BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT,
+  BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME,
+  BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT,
+  BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT,
+  type BaseScreenBlueprintCanvasCommand,
+  type BaseScreenBlueprintCanvasCommandEventDetail,
+  type BaseScreenBlueprintCanvasCommandResult,
+  type BaseScreenBlueprintCanvasEdge,
+  type BaseScreenBlueprintCanvasEventOption,
+  type BaseScreenBlueprintCanvasGraph,
+  type BaseScreenBlueprintCanvasInsertNode,
+  type BaseScreenBlueprintCanvasNode,
+  type BaseScreenBlueprintCanvasNodePosition,
+  type BaseScreenBlueprintCanvasNodeSummary,
+  type BaseScreenBlueprintCanvasSelection,
+  type BaseScreenBlueprintCanvasState,
+  type BaseScreenBlueprintCanvasStateEventDetail,
+  type BaseScreenBlueprintCanvasTrace,
+  type BaseScreenDesignerSetWorkbenchModeOptions,
+  type BaseScreenDesignerWorkbenchFocus,
+  type BaseScreenDesignerWorkbenchMode,
+  type BaseScreenDesignerWorkbenchModeChangeEventDetail,
+  type BaseScreenDesignerWorkbenchModeChangeReason,
+  parseBaseScreenBlueprintCanvasCommand,
+} from '../common/operations/designer-blueprint-protocol.js';
+
+export {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX,

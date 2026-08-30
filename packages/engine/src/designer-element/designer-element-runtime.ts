@@ -1,12 +1,10 @@
 import {
   cancelAuthoringEdit,
-  commitBlueprintEdit,
   commitComponentTextEdit,
   commitGuardFailure,
   focusedComponentType,
   getAuthoringEditorContext,
   invalidateAuthoringRequests,
-  requestBlueprintEdit,
   requestComponentTextEdit,
 } from './designer-element-authoring.js';
 import {
@@ -158,9 +156,12 @@ import {
   reportProject,
   resetSessionSurfaces,
 } from './designer-element-status.js';
+import { readWorkbenchMode, setWorkbenchMode } from './designer-element-workbench.js';
 
 export const designerElementRuntime = {
   readCatalog,
+  readWorkbenchMode,
+  setWorkbenchMode,
   configure,
   writeCatalog,
   readLeftPanelGroups,
@@ -219,10 +220,8 @@ export const designerElementRuntime = {
   readInstanceId,
   getAuthoringEditorContext,
   requestComponentTextEdit,
-  requestBlueprintEdit,
   cancelAuthoringEdit,
   commitComponentTextEdit,
-  commitBlueprintEdit,
   commitGuardFailure,
   focusedComponentType,
   invalidateAuthoringRequests,

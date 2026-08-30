@@ -29,9 +29,13 @@ const controlsCssFiles = [
 ] as const;
 const workbenchCssFiles = [
   '../../../src/browser/styles/workbench/designer-workbench-topbar.css',
+  '../../../src/browser/styles/workbench/designer-workbench-blueprint-toolbar.css',
   '../../../src/browser/styles/workbench/designer-workbench-feedback.css',
   '../../../src/browser/styles/workbench/designer-workbench-shell.css',
   '../../../src/browser/styles/workbench/designer-workbench-panels.css',
+  '../../../src/browser/styles/workbench/designer-workbench-blueprint-surface.css',
+  '../../../src/browser/styles/workbench/designer-workbench-blueprint-panels.css',
+  '../../../src/browser/styles/workbench/designer-workbench-blueprint-details.css',
   '../../../src/browser/styles/workbench/designer-workbench-materials.css',
   '../../../src/browser/styles/workbench/designer-workbench-data-catalog.css',
   '../../../src/browser/styles/workbench/designer-workbench-data-binding.css',

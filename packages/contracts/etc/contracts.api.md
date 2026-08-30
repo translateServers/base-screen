@@ -26,9 +26,6 @@ export const MAX_AUTHORING_CANDIDATE_BYTES: number;
 export const MAX_AUTHORING_COMPONENT_SNAPSHOT_BYTES: number;
 
 // @public (undocumented)
-export const MAX_AUTHORING_DOCUMENT_SNAPSHOT_BYTES: number;
-
-// @public (undocumented)
 export const MAX_AUTHORING_JSON_DEPTH = 32;
 
 // @public (undocumented)
@@ -36,18 +33,6 @@ export const MAX_AUTHORING_REQUEST_ID_LENGTH = 128;
 
 // @public (undocumented)
 export const MAX_AUTHORING_SOURCE_BYTES: number;
-
-// @public (undocumented)
-export const MAX_BLUEPRINT_AUTHORING_CAPABILITIES = 256;
-
-// @public (undocumented)
-export const MAX_BLUEPRINT_AUTHORING_CONTEXT_BYTES: number;
-
-// @public (undocumented)
-export const MAX_BLUEPRINT_AUTHORING_EVENTS_PER_MATERIAL = 64;
-
-// @public (undocumented)
-export const MAX_BLUEPRINT_AUTHORING_PAYLOAD_SCHEMA_BYTES: number;
 
 // @public (undocumented)
 export const MAX_DATASET_BYTES: number;
@@ -101,9 +86,6 @@ export function parseScreenAuthoringEditorContext(input: unknown): ScreenParseRe
 
 // @public (undocumented)
 export function parseScreenAuthoringRequest(input: unknown): ScreenParseResult<ScreenAuthoringRequest>;
-
-// @public (undocumented)
-export function parseScreenBlueprintAuthoringContext(input: unknown): ScreenParseResult<ScreenBlueprintAuthoringContext>;
 
 // @public (undocumented)
 export function parseScreenDatasetDescriptor(input: unknown): ScreenParseResult<ScreenDatasetDescriptor>;
@@ -199,21 +181,24 @@ export interface ScreenAuthoringEditorLimits {
 }
 
 // @public (undocumented)
-export type ScreenAuthoringRequest = {
-    readonly kind: 'component-text';
-    readonly requestId: string;
+export interface ScreenAuthoringRequest {
+    // (undocumented)
     readonly componentId: string;
+    // (undocumented)
     readonly documentRevision: string | null;
-    readonly target: ScreenComponentTextTarget;
-    readonly source: string;
+    // (undocumented)
     readonly format: 'json' | 'expression';
+    // (undocumented)
+    readonly kind: 'component-text';
+    // (undocumented)
     readonly maxBytes: number;
-} | {
-    readonly kind: 'blueprint';
+    // (undocumented)
     readonly requestId: string;
-    readonly documentRevision: string | null;
-    readonly context: ScreenBlueprintAuthoringContext;
-};
+    // (undocumented)
+    readonly source: string;
+    // (undocumented)
+    readonly target: ScreenComponentTextTarget;
+}
 
 // @public (undocumented)
 export interface ScreenAuthoringRequestEventDetail {
@@ -231,66 +216,6 @@ export interface ScreenBlueprint {
 
 // @public (undocumented)
 export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction;
-
-// @public (undocumented)
-export interface ScreenBlueprintAuthoringContext {
-    // (undocumented)
-    readonly capabilities: Readonly<Record<string, boolean>>;
-    // (undocumented)
-    readonly document: ScreenDocument;
-    // (undocumented)
-    readonly initialComponentId: string | null;
-    // (undocumented)
-    readonly limits: ScreenBlueprintAuthoringLimits;
-    // (undocumented)
-    readonly materialEvents: readonly ScreenBlueprintAuthoringMaterialEvents[];
-}
-
-// @public (undocumented)
-export interface ScreenBlueprintAuthoringEvent {
-    // (undocumented)
-    readonly available: boolean;
-    // (undocumented)
-    readonly hint?: string;
-    // (undocumented)
-    readonly label?: string;
-    // (undocumented)
-    readonly maxPayloadBytes?: number;
-    // (undocumented)
-    readonly name: string;
-    // (undocumented)
-    readonly payloadSchema?: ScreenJsonObject;
-    // (undocumented)
-    readonly requiredCapability?: string;
-}
-
-// @public (undocumented)
-export interface ScreenBlueprintAuthoringLimits {
-    // (undocumented)
-    readonly maxCandidateBytes: number;
-    // (undocumented)
-    readonly maxDocumentBytes: number;
-    // (undocumented)
-    readonly maxJsonDepth: number;
-}
-
-// @public (undocumented)
-export interface ScreenBlueprintAuthoringMaterialEvents {
-    // (undocumented)
-    readonly events: readonly ScreenBlueprintAuthoringEvent[];
-    // (undocumented)
-    readonly materialType: string;
-}
-
-// @public (undocumented)
-export interface ScreenBlueprintCommitRequest {
-    // (undocumented)
-    readonly blueprint: ScreenJsonObject;
-    // (undocumented)
-    readonly expectedRevision: string | null;
-    // (undocumented)
-    readonly requestId: string;
-}
 
 // @public (undocumented)
 export interface ScreenBlueprintComponentVisibilityAction {
@@ -312,12 +237,6 @@ export interface ScreenBlueprintCondition {
     readonly operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'exists';
     // (undocumented)
     readonly right?: ScreenBlueprintValueExpression;
-}
-
-// @public (undocumented)
-export interface ScreenBlueprintEditOptions {
-    // (undocumented)
-    readonly initialComponentId?: string | null;
 }
 
 // @public (undocumented)

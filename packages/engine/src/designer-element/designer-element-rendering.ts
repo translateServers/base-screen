@@ -84,6 +84,7 @@ export function initialize(element: DesignerElementHost): void {
   elementState.viewportController.connect(elementState.viewportElement, elementState.canvas);
   elementState.coordinateEntryController.connect();
   elementState.surfaceRouter.connect(shadow, elementState.surfaceBindings);
+  elementState.blueprintWorkbenchController.connect(shadow);
   elementState.runtime.connectWindowGuards(element);
   if (elementState.session.document !== undefined) {
     elementState.runtime.renderDocument(element, elementState.session.document);
@@ -149,6 +150,7 @@ export function renderLeftPanelGroups(element: DesignerElementHost): void {
   if (layout === null || layout === undefined) return;
   renderDesignerLeftPanelGroups(layout, elementState.leftPanelGroups);
   elementState.workbenchController.refreshLeftPanelGroups();
+  elementState.blueprintWorkbenchController.refreshLeftPanelGroups();
 }
 
 export function renderDesignerElementMaterialLibraryState(element: DesignerElementHost): void {
@@ -216,6 +218,8 @@ export function renderControls(element: DesignerElementHost): void {
   elementState.runtime.renderProjectStatus(element);
   elementState.variablesController.render();
   elementState.panelController.refreshInspectorUi(element.shadowRoot);
+  elementState.topbarController.render();
+  elementState.blueprintWorkbenchController.render();
 }
 
 export function renderLayers(element: DesignerElementHost): void {

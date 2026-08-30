@@ -45,7 +45,7 @@ export function reparent(
       diagnostics: [lifecycleDiagnostic('The selected parent does not accept children.')],
     };
   }
-  return element.executeTransaction(createReparentTransaction(document, componentIds, parentId));
+  return element.executeTransaction(createReparentTransaction(componentIds, parentId));
 }
 
 export function align(

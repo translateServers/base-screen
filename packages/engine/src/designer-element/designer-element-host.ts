@@ -2,8 +2,6 @@ import type {
   ScreenAssetCatalogPort,
   ScreenAssetSummary,
   ScreenAuthoringEditorContext,
-  ScreenBlueprintCommitRequest,
-  ScreenBlueprintEditOptions,
   ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
   ScreenComponentTextCommitRequest,
@@ -28,6 +26,10 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import type {
+  BaseScreenDesignerSetWorkbenchModeOptions,
+  BaseScreenDesignerWorkbenchMode,
+} from '../common/operations/designer-blueprint-protocol.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -62,7 +64,12 @@ export interface DesignerElementHost extends HTMLElement {
   projectSnapshotPort: ScreenProjectSnapshotPort | undefined;
   document: ScreenDocument | undefined;
   readonly instanceId: string;
+  readonly workbenchMode: BaseScreenDesignerWorkbenchMode;
   configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null>;
+  setWorkbenchMode(
+    mode: BaseScreenDesignerWorkbenchMode,
+    options?: BaseScreenDesignerSetWorkbenchModeOptions,
+  ): ScreenParseResult<null>;
   selectLeftPanelGroup(groupId: string): boolean;
   connectedCallback(): void;
   disconnectedCallback(): void;
@@ -83,12 +90,10 @@ export interface DesignerElementHost extends HTMLElement {
   ): ScreenParseResult<ScreenDocument>;
   getAuthoringEditorContext(): ScreenAuthoringEditorContext;
   requestComponentTextEdit(target: ScreenComponentTextTarget): string | null;
-  requestBlueprintEdit(options?: ScreenBlueprintEditOptions): boolean;
   cancelAuthoringEdit(requestId: string): boolean;
   commitComponentTextEdit(
     request: ScreenComponentTextCommitRequest,
   ): ScreenParseResult<ScreenDocument>;
-  commitBlueprintEdit(request: ScreenBlueprintCommitRequest): ScreenParseResult<ScreenDocument>;
   group(): ScreenParseResult<ScreenDocument>;
   ungroup(): ScreenParseResult<ScreenDocument>;
   reparent(

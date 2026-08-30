@@ -1,13 +1,10 @@
-import type {
-  ScreenBlueprintEditOptions,
-  ScreenDiagnostic,
-  ScreenDocument,
-} from '@base-screen/contracts';
+import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import type { BaseScreenDesignerSetWorkbenchModeOptions } from '../../common/operations/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { renderDesignerEventsPanel } from '../dom/designer-blueprint-dom.js';
 
@@ -16,7 +13,7 @@ export interface DesignerIntegrationCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
-  readonly requestBlueprintEdit: (options?: ScreenBlueprintEditOptions) => boolean;
+  readonly openBlueprint: (options?: BaseScreenDesignerSetWorkbenchModeOptions) => boolean;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
 }
 
@@ -49,11 +46,13 @@ export class DesignerIntegrationController {
       this.emitBlueprintDiagnostic('BLUEPRINT_CAPABILITY_UNAVAILABLE');
       return true;
     }
-    const requested =
+    const opened =
       action === 'locate-blueprint'
-        ? this.callbacks.requestBlueprintEdit({ initialComponentId: focusedComponentId })
-        : this.callbacks.requestBlueprintEdit();
-    if (!requested) {
+        ? this.callbacks.openBlueprint({
+            focus: { kind: 'component', id: focusedComponentId! },
+          })
+        : this.callbacks.openBlueprint();
+    if (!opened) {
       this.emitBlueprintDiagnostic('BLUEPRINT_CAPABILITY_UNAVAILABLE');
     }
     return true;

@@ -6,7 +6,6 @@ import type {
   ScreenHostResourceBinding,
   ScreenHostResourceParameter,
   ScreenHostResourcePort,
-  ScreenHostResourceRequest,
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';

@@ -206,6 +206,7 @@ export function resetSessionSurfaces(element: DesignerElementHost): void {
   elementState.projectWorkspaceController.clear();
   elementState.importController.clear();
   elementState.notificationController.clear();
+  elementState.blueprintWorkbenchController.resetSession();
 }
 
 export function report(

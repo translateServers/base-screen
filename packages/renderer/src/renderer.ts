@@ -148,13 +148,7 @@ class Renderer implements BaseScreenRenderer {
       const existing = this.#state.mounted.get(candidate.component.id);
       if (existing !== undefined && existing.type === candidate.component.type) {
         try {
-          const toResolve = reconcileMountedMaterial(
-            this.#state,
-            candidate,
-            existing,
-            parsedDocument.value,
-            stackOrder,
-          );
+          const toResolve = reconcileMountedMaterial(this.#state, candidate, existing, stackOrder);
           if (toResolve !== undefined) {
             pendingResolves.push({ candidate: toResolve, mounted: existing });
           }
@@ -189,7 +183,6 @@ class Renderer implements BaseScreenRenderer {
         applyMaterial(
           element,
           candidate.component,
-          parsedDocument.value,
           resolveEffectiveModel(this.#state, candidate, candidate.model.dataState),
           this.#state.visibility.isHidden(candidate.component.id),
           stackOrder,

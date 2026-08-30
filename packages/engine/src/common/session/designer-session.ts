@@ -1,6 +1,5 @@
 import {
   parseScreenDocument,
-  type ScreenDiagnostic,
   type ScreenDocument,
   type ScreenParseResult,
   type ScreenProjectAdapter,

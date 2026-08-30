@@ -21,7 +21,7 @@ async function assertDesignerControlStyles(designer) {
     input.value = 'canary';
     canary.append(button, input);
     canvas.appendChild(canary);
-    const toolbar = root.querySelector('.designer-topbar [data-action="undo"]');
+    const toolbar = root.querySelector('[data-canvas-local-toolbar] [data-action="undo"]');
     const viewer = document.querySelector('base-screen-viewer');
     const materialThumb = root.querySelector('.material-thumb');
     const before = {
@@ -88,7 +88,7 @@ async function assertDesignerControlStyles(designer) {
   });
   if (
     styles === undefined ||
-    styles.toolbarHeight !== 28 ||
+    styles.toolbarHeight !== 32 ||
     styles.theme === styles.lightTheme ||
     styles.materialThumbBackground === undefined ||
     styles.materialThumbBackground === styles.lightMaterialThumbBackground ||

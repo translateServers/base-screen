@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { assertEditableShortcuts } from './assert-editable-shortcuts.mjs';
-import { stableJson } from './harness-utils.mjs';
+import { openMoreSubmenu, stableJson } from './harness-utils.mjs';
 import { assertOverlayContained } from './layout-assertions.mjs';
 
 export async function assertAuthoringImportAndInspector(authoringDesigner, page) {
@@ -8,10 +8,8 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
     () => window.baseScreenHarness.designer.document.components.length,
   );
   const chooserPromise = page.waitForEvent('filechooser');
-  await authoringDesigner.locator('[data-menu-toggle="file"]').click();
-  await authoringDesigner
-    .locator('.designer-menu[data-menu="file"] [data-menu-action="import"]')
-    .click();
+  const importMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  await importMenu.locator('[data-menu-action="import"]').click();
   const chooser = await chooserPromise;
   const importDocument = await page.evaluate(() => window.baseScreenHarness.designer.document);
   await chooser.setFiles({
@@ -34,10 +32,8 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
     () => window.baseScreenHarness.designer.document.components.length,
   );
   const invalidChooserPromise = page.waitForEvent('filechooser');
-  await authoringDesigner.locator('[data-menu-toggle="file"]').click();
-  await authoringDesigner
-    .locator('.designer-menu[data-menu="file"] [data-menu-action="import"]')
-    .click();
+  const invalidImportMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  await invalidImportMenu.locator('[data-menu-action="import"]').click();
   const invalidChooser = await invalidChooserPromise;
   await invalidChooser.setFiles({
     name: 'broken.json',
@@ -77,10 +73,8 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
   }
   // 导出：文件菜单导出触发浏览器下载 .json，内容与当前文档一致并展示成功通知。
   const exportDownloadPromise = page.waitForEvent('download');
-  await authoringDesigner.locator('[data-menu-toggle="file"]').click();
-  await authoringDesigner
-    .locator('.designer-menu[data-menu="file"] [data-menu-action="export"]')
-    .click();
+  const exportMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  await exportMenu.locator('[data-menu-action="export"]').click();
   const exportDownload = await exportDownloadPromise;
   const exportPath = await exportDownload.path();
   if (exportPath === null) throw new Error('BROWSER_HARNESS_EXPORT_PATH_MISSING');
@@ -98,10 +92,11 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
       })}`,
     );
   }
-  await authoringDesigner
+  const exportNotification = authoringDesigner
     .locator('[data-notification-tone="success"]')
-    .filter({ hasText: '\u6587\u6863\u5df2\u5bfc\u51fa\u3002' })
-    .waitFor();
+    .filter({ hasText: '\u6587\u6863\u5df2\u5bfc\u51fa\u3002' });
+  await exportNotification.waitFor();
+  await exportNotification.getByRole('button', { name: '\u5173\u95ed\u901a\u77e5' }).click();
   await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).click();
   await authoringDesigner.getByRole('tab', { name: '\u9ad8\u7ea7' }).click();
   await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).focus();

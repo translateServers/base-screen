@@ -23,7 +23,6 @@ export interface DesignerEventSystemCallbacks {
 // 上下文注入与监听生命周期，全部裁决逻辑在 common/events（环境无关、单元可测）。
 export class DesignerEventSystem {
   #ownerWindow: Window | undefined;
-  #root: ShadowRoot | undefined;
   #ownDragInFlight = false;
   readonly #windowListeners = new Map<string, (event: Event) => void>();
 
@@ -72,7 +71,6 @@ export class DesignerEventSystem {
   connectWindowGuards(ownerWindow: Window, root: ShadowRoot): void {
     if (this.#ownerWindow !== undefined) return;
     this.#ownerWindow = ownerWindow;
-    this.#root = root;
     const onDrag = (event: Event) => {
       const dragEvent = event as DragEvent;
       const overOwnSurface = dragEvent.composedPath().includes(root);
@@ -111,7 +109,6 @@ export class DesignerEventSystem {
     this.#windowListeners.clear();
     this.#ownDragInFlight = false;
     this.#ownerWindow = undefined;
-    this.#root = undefined;
   }
 }
 

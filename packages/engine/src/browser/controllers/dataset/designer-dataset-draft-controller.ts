@@ -1,4 +1,4 @@
-import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenParseResult } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDataSourceMode } from '../../dom/designer-dataset-dom.js';

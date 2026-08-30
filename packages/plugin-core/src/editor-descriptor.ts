@@ -7,7 +7,6 @@ import {
   EDITOR_ZONES,
   MAX_EDITOR_SECTIONS_PER_ZONE,
 } from './editor-descriptor-model.js';
-import { resolveSchema } from './editor-descriptor-schema.js';
 import { validateSections } from './editor-descriptor-sections.js';
 import { isRecord } from './editor-descriptor-validation-utils.js';
 

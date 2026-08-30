@@ -6,7 +6,6 @@ import type {
   ScreenDesignerHostAdapter,
   ScreenDiagnosticCode,
   ScreenDocument,
-  ScreenHostDatasetCatalogPort,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
   ScreenProjectEnvelope,

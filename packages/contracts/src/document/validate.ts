@@ -1,8 +1,4 @@
-import {
-  DiagnosticCollector,
-  type DiagnosticPhase,
-  type DiagnosticSegment,
-} from '../diagnostics/collector.js';
+import { DiagnosticCollector, type DiagnosticPhase } from '../diagnostics/collector.js';
 import { cloneJsonValue } from '../json/clone.js';
 import { preflightJsonValue } from '../json/preflight.js';
 import type { ScreenDocument } from '../types/document.js';

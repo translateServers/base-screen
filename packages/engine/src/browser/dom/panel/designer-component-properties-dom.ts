@@ -18,8 +18,6 @@ import { appendCanvasControls } from './designer-canvas-properties-dom.js';
 import {
   createDesignerCanvasBackgroundDrafts,
   createDesignerCanvasPresentationSettings,
-  type DesignerCanvasBackgroundDrafts,
-  type DesignerCanvasPresentationSettings,
   syncCanvasBackgroundDrafts,
 } from './designer-canvas-transactions.js';
 import { appendMultiSelectionControls } from './designer-multi-selection-dom.js';

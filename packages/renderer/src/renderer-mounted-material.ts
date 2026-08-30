@@ -1,4 +1,3 @@
-import type { ScreenDocument } from '@base-screen/contracts';
 import { parseBaseScreenMaterialEventDetail } from '@base-screen/plugin-core';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
 import { adaptResourceResult } from './renderer-host-resource.js';
@@ -17,7 +16,6 @@ export function reconcileMountedMaterial(
   state: RendererState,
   candidate: RenderCandidate,
   mounted: MountedMaterial,
-  document: ScreenDocument,
   stackOrder: number,
 ): RenderCandidate | undefined {
   const resource = candidate.resource;
@@ -32,14 +30,14 @@ export function reconcileMountedMaterial(
     resourceState.rawValue = undefined;
     resourceState.requestSlotId = undefined;
     resourceState.dataState = candidate.model.dataState;
-    applyMountedModel(state, candidate, mounted, document, stackOrder);
+    applyMountedModel(state, candidate, mounted, stackOrder);
     return undefined;
   }
   if (resourceState.resourceKey !== resource.key) {
     // New raw identity: the render loop starts the resolve after the commit.
     resourceState.rawValue = undefined;
     resourceState.dataState = { status: 'loading' };
-    applyMountedModel(state, candidate, mounted, document, stackOrder);
+    applyMountedModel(state, candidate, mounted, stackOrder);
     return candidate;
   }
   // Same raw identity: preserve the in-flight request, controller, timer,
@@ -52,7 +50,7 @@ export function reconcileMountedMaterial(
     }
     resourceState.projectionKey = resource.projectionKey;
   }
-  applyMountedModel(state, candidate, mounted, document, stackOrder);
+  applyMountedModel(state, candidate, mounted, stackOrder);
   return undefined;
 }
 
@@ -60,13 +58,11 @@ export function applyMountedModel(
   state: RendererState,
   candidate: RenderCandidate,
   mounted: MountedMaterial,
-  document: ScreenDocument,
   stackOrder: number,
 ): void {
   applyMaterial(
     mounted.element,
     candidate.component,
-    document,
     resolveEffectiveModel(state, candidate, mounted.resource.dataState),
     state.visibility.isHidden(candidate.component.id),
     stackOrder,

@@ -1,4 +1,5 @@
 import { DesignerAssetController } from '../browser/controllers/designer-asset-controller.js';
+import { DesignerBlueprintWorkbenchController } from '../browser/controllers/designer-blueprint-workbench-controller.js';
 import { DesignerCanvasRuntimeController } from '../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from '../browser/controllers/designer-command-palette-controller.js';
 import { DesignerCoordinateEntryController } from '../browser/controllers/designer-coordinate-entry-controller.js';
@@ -12,6 +13,7 @@ import { DesignerPreviewController } from '../browser/controllers/designer-previ
 import { DesignerProjectFeedbackController } from '../browser/controllers/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from '../browser/controllers/designer-project-workspace-controller.js';
 import { DesignerTextEditController } from '../browser/controllers/designer-text-edit-controller.js';
+import { DesignerTopbarController } from '../browser/controllers/designer-topbar-controller.js';
 import { DesignerVariablesController } from '../browser/controllers/designer-variables-controller.js';
 import { DesignerViewportController } from '../browser/controllers/designer-viewport-controller.js';
 import { DesignerWorkbenchController } from '../browser/controllers/designer-workbench-controller.js';
@@ -22,19 +24,32 @@ import {
 } from '../canvas-presentation.js';
 import { DesignerProjectGateway } from '../common/project/designer-project-gateway.js';
 import { DesignerSession } from '../common/session/designer-session.js';
-import {
-  BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
-  type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
-} from '../designer-left-panel-groups.js';
 import type { DesignerElementHost, DesignerElementState } from './designer-element-state.js';
 
 export function initializeDesignerElementControllers(
   element: DesignerElementHost,
   state: DesignerElementState,
 ): void {
+  const syncActiveLeftPanelGroup = (): void => {
+    state.leftPanelGroupEvents.sync(
+      state.blueprintWorkbenchController.mode === 'blueprint'
+        ? state.blueprintWorkbenchController.selectedLeftPanelGroupId
+        : state.workbenchController.selectedLeftPanelGroupId,
+    );
+  };
   state.canvasRuntimeController = new DesignerCanvasRuntimeController({
     getRenderer: () => state.renderer,
     getVariablePort: () => state.variablePort,
+    emitDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
+  });
+  state.topbarController = new DesignerTopbarController({
+    getHost: () => element,
+    canCreateSnapshot: () =>
+      state.session.project !== undefined &&
+      state.projectSnapshotPort !== undefined &&
+      !state.runtime.isProjectBusy(element),
+    createSnapshot: (name) => element.createSnapshot(name),
+    notify: (message) => state.notificationController.notify(message, 'success'),
     emitDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
   });
   state.session = new DesignerSession({
@@ -42,6 +57,7 @@ export function initializeDesignerElementControllers(
     renderInteraction: () => state.runtime.renderInteraction(element),
     emitChange: (document) => {
       state.documentGeneration++;
+      state.blueprintWorkbenchController.dispatchState();
       state.runtime.emitChange(element, document);
     },
     emitSelectionChange: (interaction) =>
@@ -145,7 +161,7 @@ export function initializeDesignerElementControllers(
     getDocument: () => state.session.document,
     getInteraction: () => state.session.interaction,
     getRuntimeContributions: () => state.runtimeContributions,
-    requestBlueprintEdit: (options) => element.requestBlueprintEdit(options),
+    openBlueprint: (options) => element.setWorkbenchMode('blueprint', options).ok,
     emitDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
   });
   state.projectFeedbackController = new DesignerProjectFeedbackController({
@@ -311,24 +327,40 @@ export function initializeDesignerElementControllers(
     getZoom: () => state.viewportController.state.zoom,
     // 状态栏「事件」开关：把设计态画布交互模式应用到渲染器（原地重渲染，不重建）。
     onNativeEventsChange: (enabled) => state.runtime.applyNativeEvents(element, enabled),
-    onLeftPanelGroupChange: (groupId) => {
-      element.dispatchEvent(
-        new CustomEvent<BaseScreenDesignerLeftPanelGroupChangeEventDetail>(
-          BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
-          {
-            bubbles: true,
-            composed: true,
-            detail: { groupId: groupId ?? null },
-          },
-        ),
-      );
-    },
+    onLeftPanelGroupChange: syncActiveLeftPanelGroup,
+  });
+  state.blueprintWorkbenchController = new DesignerBlueprintWorkbenchController({
+    getHost: () => element,
+    getDocument: () => state.session.document,
+    getCatalog: () => state.catalog,
+    getRuntimeContributions: () => state.runtimeContributions,
+    getDocumentRevision: () => state.documentGeneration,
+    getProjectRevision: () => state.session.project?.revision ?? null,
+    canUndo: () => state.session.canUndo,
+    canRedo: () => state.session.canRedo,
+    getLeftPanelGroups: () => state.leftPanelGroups,
+    setWorkbenchAuthoringMode: (mode) => state.workbenchController.setAuthoringMode(mode),
+    expandLeftPanel: () => state.workbenchController.expandLeftPanel(),
+    onActiveLeftPanelGroupChange: syncActiveLeftPanelGroup,
+    executeCommand: (command) => state.runtime.executeDesignerCommand(element, command),
+    undo: () => element.undo(),
+    redo: () => element.redo(),
+    emitDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
   });
   state.commandPaletteController = new DesignerCommandPaletteController({
     getRoot: () => element.shadowRoot,
     getDocument: () => state.session.document,
+    getWorkbenchMode: () => state.blueprintWorkbenchController.mode,
     renderKindIcon: (kind) =>
-      designerIcon(kind === 'material' ? 'grid' : kind === 'layer' ? 'layers' : 'terminal'),
+      designerIcon(
+        kind === 'material'
+          ? 'grid'
+          : kind === 'layer'
+            ? 'layers'
+            : kind === 'blueprint'
+              ? 'variable'
+              : 'terminal',
+      ),
   });
   state.coordinateEntryController = new DesignerCoordinateEntryController({
     getRoot: () => element.shadowRoot,

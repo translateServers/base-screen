@@ -123,10 +123,12 @@ function discoverFiles() {
 }
 
 function collectFileLines() {
-  return discoverFiles().map((path) => ({
-    lines: countLogicalLines(readFileSync(path, 'utf8')),
-    path,
-  }));
+  return discoverFiles()
+    .filter((path) => existsSync(path))
+    .map((path) => ({
+      lines: countLogicalLines(readFileSync(path, 'utf8')),
+      path,
+    }));
 }
 
 function currentExceptions(fileLines) {

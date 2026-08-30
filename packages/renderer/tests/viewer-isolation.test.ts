@@ -2,8 +2,6 @@ import type {
   ScreenComponentNode,
   ScreenDocument,
   ScreenHostResourcePort,
-  ScreenJsonValue,
-  ScreenParseResult,
 } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,

@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-08-16
+> 最近更新：2026-08-29
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -78,7 +78,8 @@
 | [ADR-0059](./ADR-0059-conditional-style-port.md) | 已接受 | 2026-08-17 | 宿主条件样式端口：渲染期同步纯函数覆盖，固定合并顺序与失败关闭回退，不进入文档 |
 | [ADR-0060](./ADR-0060-material-library-item-projection.md) | 已接受 | 2026-08-23 | Designer 物料库条目投影：多个宿主条目复用一个 canonical 运行物料类型，实例默认值覆盖经 Manifest 校验 |
 | [ADR-0061](./ADR-0061-host-constrained-visual-event-blueprint.md) | 已接受 | 2026-08-24 | 整屏交互编排宿主桥：detached 文档上下文、初始定位提示、完整 Blueprint 单事务提交；编排 UI/UX 与依赖完全归宿主 |
-| [ADR-0062](./ADR-0062-host-left-panel-groups.md) | 已接受 | 2026-08-28 | Designer 宿主左侧分组：严格 JSON-safe Tab 描述、专属命名 slot、程序化选择与切换事件；宿主内容生命周期留在 light DOM，不进入文档或 Engine Store |
+| [ADR-0062](./ADR-0062-host-left-panel-groups.md) | 已接受 | 2026-08-28 | Designer 宿主左侧分组：严格 JSON-safe Tab 描述与 `workbenchModes`、Canvas/Blueprint 模式感知导航、跨模式复用专属命名 slot、程序化选择与切换事件；宿主内容生命周期留在 light DOM，不进入文档或 Engine Store |
+| [ADR-0063](./ADR-0063-designer-blueprint-workbench-shell.md) | 已接受 | 2026-08-29 | Designer Blueprint 一体化工作台壳层：共享文档/历史、Base 语义面板与严格 slot 协议、宿主中央图形渲染；部分取代 ADR-0061 |
 
 ## 计划决策
 
@@ -87,8 +88,8 @@ ADR-0025 已于 2026-08-09 接受，治理已接受、实施进行中；相关�
 XJ Data Hub 仓库 `.agent/specs/data-runtime-hardening/spec.md`。
 
 ADR-0026 已于 2026-08-10 接受并建立 canonical 事件 Blueprint 与 Core trace。其 Engine 内部作者 UI 范围先由
-ADR-0028 移交宿主作者桥，再由 ADR-0061 明确收敛为整屏 detached 上下文：Base Screen 不实现表单或图形编排
-UI。历史评估见 [Designer Event Blueprint Spec](../specs/archive/designer-event-blueprint/spec.md) 与
+ADR-0028 移交宿主作者桥，再由 ADR-0061 收敛为整屏 detached 上下文；ADR-0063 最终改为 Base Screen 拥有有界
+工作台壳层和语义编辑、宿主只提供中央图形渲染。历史评估见 [Designer Event Blueprint Spec](../specs/archive/designer-event-blueprint/spec.md) 与
 [候选评估报告](../plans/archive/designer-event-blueprint/dependency-evaluation.md)。
 
 ADR-0027 已于 2026-08-10 接受：Base Screen 定位为轻量、可嵌入的大屏设计器基座；项目、数据、资产、发布和
@@ -96,8 +97,9 @@ ADR-0027 已于 2026-08-10 接受：Base Screen 定位为轻量、可嵌入的�
 
 ADR-0028 已于 2026-08-10 接受：物料 Manifest 可通过 JSON-safe 声明式 Editor Descriptor 描述外观/数据/交互/
 事件作者字段；Engine 提供有限内建面板 primitives 与宿主作者桥（requestId/revision/身份/实例守护 + 专用提交
-入口）。ADR-0061 进一步规定 Blueprint 请求面向整份当前文档，Engine 仅保留顶栏入口与组件只读摘要；编排
-UI、图形布局、代码编辑器、完整 ECharts option 与领域编辑器归宿主。规格见
+入口）。ADR-0061 曾规定 Blueprint 使用整屏 detached 请求；ADR-0063 已移除该分支，当前 Blueprint 直接编辑
+当前文档并由 Engine 提供工作台壳层，图形框架与布局算法仍归宿主。代码编辑器、完整 ECharts option 与领域编辑器
+继续归宿主。规格见
 [Designer Authoring Extension Spec](../specs/archive/designer-authoring-extension/spec.md)。
 
 ADR-0029 已于 2026-08-11 接受：宿主托管可信物料包。宿主负责加载、审核与信任远程物料代码，Base Screen 不

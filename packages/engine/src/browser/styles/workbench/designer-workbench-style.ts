@@ -1,4 +1,8 @@
 import accessibilityCss from './designer-workbench-accessibility.css?inline';
+import blueprintDetailsCss from './designer-workbench-blueprint-details.css?inline';
+import blueprintPanelsCss from './designer-workbench-blueprint-panels.css?inline';
+import blueprintSurfaceCss from './designer-workbench-blueprint-surface.css?inline';
+import blueprintToolbarCss from './designer-workbench-blueprint-toolbar.css?inline';
 import canvasCss from './designer-workbench-canvas.css?inline';
 import dataBindingCss from './designer-workbench-data-binding.css?inline';
 import dataCatalogCss from './designer-workbench-data-catalog.css?inline';
@@ -17,9 +21,13 @@ import variablesCss from './designer-workbench-variables.css?inline';
 // overrides last so splitting the source never changes the original CSS behavior.
 export const DESIGNER_WORKBENCH_CSS = [
   topbarCss,
+  blueprintToolbarCss,
   feedbackCss,
   shellCss,
   panelsCss,
+  blueprintSurfaceCss,
+  blueprintPanelsCss,
+  blueprintDetailsCss,
   materialsCss,
   dataCatalogCss,
   dataBindingCss,

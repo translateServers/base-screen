@@ -1,3 +1,5 @@
+import { openMoreSubmenu } from './harness-utils.mjs';
+
 export async function assertInitialCanvasPointerFocus(browser, baseUrl) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   try {
@@ -124,10 +126,8 @@ export async function assertCanvasBasics(designer, page) {
   if ((await snapToggle.getAttribute('aria-checked')) !== 'true') {
     throw new Error('BROWSER_HARNESS_SNAP_TOGGLE_ON_FAILED');
   }
-  await designer.locator('[data-menu-toggle="tools"]').click();
-  await designer
-    .locator('.designer-menu[data-menu="tools"] [data-menu-action="show-help"]')
-    .click();
+  const toolsMenu = await openMoreSubmenu(designer, '\u5de5\u5177');
+  await toolsMenu.locator('[data-menu-action="show-help"]').click();
   const helpMenu = designer.locator('[data-help-dialog]');
   if (
     (await helpMenu.isHidden()) ||

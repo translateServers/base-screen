@@ -1,20 +1,4 @@
-import type {
-  ScreenComponentNode,
-  ScreenDocument,
-  ScreenHostResourcePort,
-  ScreenJsonObject,
-  ScreenJsonValue,
-  ScreenParseResult,
-} from '@base-screen/contracts';
-import type {
-  BaseScreenMaterialCatalog,
-  BaseScreenMaterialConstructor,
-  BaseScreenMaterialDataBindingRole,
-  BaseScreenMaterialManifest,
-  BaseScreenMaterialModel,
-  BaseScreenMaterialTabularDataAdapter,
-} from '@base-screen/plugin-core';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createBaseScreenRenderer } from '../src/renderer.js';
 import {
   component,

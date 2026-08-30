@@ -1,3 +1,5 @@
+import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '../../common/operations/designer-blueprint-protocol.js';
+
 export interface DesignerSurfaceHandler {
   (target: EventTarget | null, event: Event): boolean;
 }
@@ -40,19 +42,17 @@ export interface DesignerSurfaceBindings {
 // shadowRoot 级事件路由：把设计器表面（菜单、工具、操作、图层、画布、键盘）
 // 的监听挂载与顺序分发集中到一处，避免组合根内散落 addEventListener。
 export class DesignerSurfaceRouter {
-  #root: ShadowRoot | undefined;
   #connected = false;
   #removers: Array<() => void> = [];
 
   connect(root: ShadowRoot, bindings: DesignerSurfaceBindings): void {
     if (this.#connected) return;
     this.#connected = true;
-    this.#root = root;
     const add = (type: string, listener: EventListener, options?: AddEventListenerOptions) => {
       const guardedListener: EventListener = (event) => {
         // ADR-0062：宿主命名 slot 的 light DOM 事件只属于宿主。事件仍正常冒泡，
         // 但不得被 Designer 内部 data-* 路由、快捷键或手势处理器误识别。
-        if (isHostLeftPanelEvent(event)) return;
+        if (isHostSlottedEvent(event)) return;
         listener(event);
       };
       root.addEventListener(type, guardedListener, options);
@@ -121,7 +121,6 @@ export class DesignerSurfaceRouter {
   disconnect(): void {
     for (const remove of this.#removers) remove();
     this.#removers = [];
-    this.#root = undefined;
     this.#connected = false;
   }
 
@@ -136,11 +135,18 @@ export class DesignerSurfaceRouter {
   }
 }
 
-function isHostLeftPanelEvent(event: Event): boolean {
+function isHostSlottedEvent(event: Event): boolean {
   if (typeof event.composedPath !== 'function') return false;
   return event.composedPath().some((target) => {
-    const dataset = (target as { readonly dataset?: DOMStringMap } | null)?.dataset;
-    return dataset?.hostLeftPanelSlot !== undefined;
+    const element = target as {
+      readonly dataset?: DOMStringMap;
+      readonly getAttribute?: (name: string) => string | null;
+    } | null;
+    return (
+      element?.dataset?.hostLeftPanelSlot !== undefined ||
+      element?.dataset?.blueprintCanvasHost !== undefined ||
+      element?.getAttribute?.('slot') === BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT
+    );
   });
 }
 

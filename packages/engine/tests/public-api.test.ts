@@ -15,6 +15,8 @@ import {
   BaseScreenDesignerElement,
   type BaseScreenDesignerLeftPanelGroup,
   type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
+  type BaseScreenDesignerSetWorkbenchModeOptions,
+  type BaseScreenDesignerWorkbenchMode,
   type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryItem,
   parseBaseScreenDesignerLeftPanelGroups,
@@ -54,6 +56,9 @@ describe('engine public lifecycle API', () => {
     >();
     expectTypeOf<typeof parseBaseScreenDesignerLeftPanelGroups>().returns.toMatchTypeOf<
       ScreenParseResult<readonly BaseScreenDesignerLeftPanelGroup[]>
+    >();
+    expectTypeOf<BaseScreenDesignerLeftPanelGroup['workbenchModes']>().toEqualTypeOf<
+      readonly BaseScreenDesignerWorkbenchMode[] | undefined
     >();
     expectTypeOf<BaseScreenDesignerLeftPanelGroupChangeEventDetail>().toEqualTypeOf<{
       readonly groupId: string | null;
@@ -157,22 +162,19 @@ describe('engine public lifecycle API', () => {
       [import('@base-screen/contracts').ScreenComponentTextCommitRequest]
     >();
     expectTypeOf<
-      InstanceType<typeof BaseScreenDesignerElement>['commitBlueprintEdit']
-    >().parameters.toEqualTypeOf<[import('@base-screen/contracts').ScreenBlueprintCommitRequest]>();
-    expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['cancelAuthoringEdit']
     >().parameters.toEqualTypeOf<[string]>();
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['requestComponentTextEdit']
     >().parameters.toEqualTypeOf<[import('@base-screen/contracts').ScreenComponentTextTarget]>();
     expectTypeOf<
-      InstanceType<typeof BaseScreenDesignerElement>['requestBlueprintEdit']
-    >().parameters.toEqualTypeOf<
-      [options?: import('@base-screen/contracts').ScreenBlueprintEditOptions | undefined]
-    >();
+      InstanceType<typeof BaseScreenDesignerElement>['workbenchMode']
+    >().toEqualTypeOf<BaseScreenDesignerWorkbenchMode>();
     expectTypeOf<
-      InstanceType<typeof BaseScreenDesignerElement>['requestBlueprintEdit']
-    >().returns.toEqualTypeOf<boolean>();
+      InstanceType<typeof BaseScreenDesignerElement>['setWorkbenchMode']
+    >().parameters.toEqualTypeOf<
+      [BaseScreenDesignerWorkbenchMode, (BaseScreenDesignerSetWorkbenchModeOptions | undefined)?]
+    >();
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['instanceId']
     >().toEqualTypeOf<string>();

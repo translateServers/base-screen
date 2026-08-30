@@ -1,6 +1,6 @@
 # Document Blueprint Host Bridge Spec
 
-> 状态：已完成（行为依据）
+> 状态：已取代（detached Blueprint 路径由 [Designer Blueprint Workbench](../designer-blueprint-workbench/spec.md) 取代；本文件仅作历史行为依据）
 > 日期：2026-08-25
 > 依据：[ADR-0061](../../decisions/ADR-0061-host-constrained-visual-event-blueprint.md)
 

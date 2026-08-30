@@ -12,8 +12,6 @@ import type {
   ScreenAssetCatalogPort,
   ScreenAssetSummary,
   ScreenAuthoringEditorContext,
-  ScreenBlueprintCommitRequest,
-  ScreenBlueprintEditOptions,
   ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
   ScreenComponentTextCommitRequest,
@@ -38,6 +36,10 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import type {
+  BaseScreenDesignerSetWorkbenchModeOptions,
+  BaseScreenDesignerWorkbenchMode,
+} from './common/operations/designer-blueprint-protocol.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -60,8 +62,27 @@ const ElementBase =
 export class BaseScreenDesignerElement extends ElementBase {
   readonly #designerState = createDesignerElementState(this, designerElementRuntime);
 
+  static get observedAttributes(): readonly string[] {
+    return ['theme'];
+  }
+
+  attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void {
+    if (name === 'theme' && previousValue !== value) this.#designerState.topbarController.render();
+  }
+
   get catalog(): BaseScreenMaterialCatalog | undefined {
     return this.#designerState.runtime.readCatalog(this);
+  }
+
+  get workbenchMode(): BaseScreenDesignerWorkbenchMode {
+    return this.#designerState.runtime.readWorkbenchMode(this);
+  }
+
+  setWorkbenchMode(
+    mode: BaseScreenDesignerWorkbenchMode,
+    options: BaseScreenDesignerSetWorkbenchModeOptions = {},
+  ): ScreenParseResult<null> {
+    return this.#designerState.runtime.setWorkbenchMode(this, mode, options);
   }
 
   /**
@@ -321,10 +342,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.requestComponentTextEdit(this, target);
   }
 
-  requestBlueprintEdit(options: ScreenBlueprintEditOptions = {}): boolean {
-    return this.#designerState.runtime.requestBlueprintEdit(this, options);
-  }
-
   cancelAuthoringEdit(requestId: string): boolean {
     return this.#designerState.runtime.cancelAuthoringEdit(this, requestId);
   }
@@ -333,10 +350,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     request: ScreenComponentTextCommitRequest,
   ): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.commitComponentTextEdit(this, request);
-  }
-
-  commitBlueprintEdit(request: ScreenBlueprintCommitRequest): ScreenParseResult<ScreenDocument> {
-    return this.#designerState.runtime.commitBlueprintEdit(this, request);
   }
 
   group(): ScreenParseResult<ScreenDocument> {

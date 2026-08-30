@@ -227,7 +227,3 @@ function normalizeRotation(rotation: number): number {
   const normalized = ((((rotation + 180) % 360) + 360) % 360) - 180;
   return Object.is(normalized, -0) ? 0 : normalized;
 }
-
-function clampSize(value: number): number {
-  return Math.max(1, Math.min(1_000_000, value));
-}

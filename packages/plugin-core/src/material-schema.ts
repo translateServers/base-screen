@@ -4,8 +4,6 @@ import { PluginDiagnosticCollector } from './diagnostics.js';
 import { MAX_SCHEMA_DEPTH } from './material-validation-constants.js';
 import {
   failure,
-  isFiniteNumber,
-  isNonNegativeInteger,
   isRecord,
   isScalar,
   parsePluginJson,

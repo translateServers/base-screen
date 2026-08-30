@@ -1,4 +1,4 @@
-import type { ScreenComponentNode, ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
 import {
   buildComponentIndex,
   getAncestorIds,

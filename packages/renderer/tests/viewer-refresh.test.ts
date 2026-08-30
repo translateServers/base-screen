@@ -31,7 +31,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       ],
       [hostVariable('region', 'region')],
     );
-    const { viewer } = await createViewerHarness({
+    await createViewerHarness({
       catalog,
       document: screen,
       resourcePort: resources.port,
@@ -281,7 +281,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       ],
       [hostVariable('region', 'region')],
     );
-    const { viewer, mount } = await createViewerHarness({
+    const { viewer } = await createViewerHarness({
       catalog,
       document: screen,
       resourcePort: resources.port,
@@ -342,7 +342,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       [component('a', hostSource('orders', { region: { kind: 'variable', name: 'region' } }))],
       [hostVariable('region', 'region')],
     );
-    const { viewer, dispatched } = await createViewerHarness({
+    const { dispatched } = await createViewerHarness({
       catalog,
       document: screen,
       resourcePort: resources.port,
@@ -382,7 +382,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
         ],
       },
     );
-    const { viewer, mount } = await createViewerHarness({
+    const { mount } = await createViewerHarness({
       catalog,
       document: screen,
       resourcePort: resources.port,
@@ -508,7 +508,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       resourcePort: resourcesA.port,
       variablePort: variablesA.port,
     });
-    const harnessB = await createViewerHarness({
+    await createViewerHarness({
       catalog,
       document: screen,
       resourcePort: resourcesB.port,

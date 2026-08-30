@@ -37,7 +37,13 @@ import {
 import { createBaseScreenPluginManager } from '../../packages/plugin-manager/src/index.ts';
 import { createReactMaterialDefinition } from '../../packages/react/src/index.ts';
 import {
+  BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
+  BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
+  type BaseScreenBlueprintCanvasCommand,
+  type BaseScreenBlueprintCanvasCommandEventDetail,
+  type BaseScreenBlueprintCanvasState,
+  type BaseScreenBlueprintCanvasStateEventDetail,
   defineBaseScreenElements,
   SCREEN_AUTHORING_REQUEST_EVENT,
   type ScreenAuthoringRequest,
@@ -82,6 +88,7 @@ const designerAuthoringCapabilities = [
   'blueprint.condition.compare',
   'blueprint.action.set-variable',
   'blueprint.action.emit-host-event',
+  'blueprint.action.component-visibility',
 ] as const;
 const designerAuthoringPlugin: BaseScreenPluginRuntime = {
   manifest: {
@@ -540,6 +547,64 @@ const screenDocument = {
 
 const designer = document.querySelector('base-screen-designer')!;
 const viewer = document.querySelector('base-screen-viewer')!;
+const blueprintCanvas = designer.querySelector<HTMLElement>('[data-harness-blueprint-canvas]')!;
+const blueprintGraph = blueprintCanvas.querySelector<HTMLElement>(
+  '[data-harness-blueprint-graph]',
+)!;
+let blueprintCanvasState: BaseScreenBlueprintCanvasState | undefined;
+let blueprintCommandSequence = 0;
+let readyBlueprintGeneration = -1;
+
+type BlueprintCanvasCommandInput = BaseScreenBlueprintCanvasCommand extends infer Command
+  ? Command extends BaseScreenBlueprintCanvasCommand
+    ? Omit<Command, 'commandId' | 'generation' | 'documentRevision'>
+    : never
+  : never;
+
+function renderBlueprintCanvasState(state: BaseScreenBlueprintCanvasState): void {
+  blueprintCanvas.dataset.active = String(state.active);
+  const heading = document.createElement('strong');
+  heading.textContent = `${state.graph.nodes.length} 个节点 · ${state.graph.edges.length} 条连线`;
+  const detail = document.createElement('span');
+  detail.textContent = `generation ${state.generation} · revision ${state.documentRevision}`;
+  const selection = document.createElement('span');
+  selection.textContent =
+    state.selection === null
+      ? '未选择图元素'
+      : `已选择 ${state.selection.kind}: ${state.selection.id}`;
+  blueprintGraph.replaceChildren(heading, detail, selection);
+}
+
+blueprintCanvas.addEventListener(BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT, (event) => {
+  const state = (event as CustomEvent<BaseScreenBlueprintCanvasStateEventDetail>).detail.state;
+  blueprintCanvasState = state;
+  renderBlueprintCanvasState(state);
+  if (readyBlueprintGeneration !== state.generation) {
+    readyBlueprintGeneration = state.generation;
+    sendBlueprintCanvasCommand({ type: 'ready' });
+  }
+});
+
+function sendBlueprintCanvasCommand(
+  input: BlueprintCanvasCommandInput,
+  commandId = `harness-${++blueprintCommandSequence}`,
+): boolean {
+  const state = blueprintCanvasState;
+  if (state === undefined) return false;
+  const command = {
+    ...input,
+    commandId,
+    generation: state.generation,
+    documentRevision: state.documentRevision,
+  } as BaseScreenBlueprintCanvasCommand;
+  blueprintCanvas.dispatchEvent(
+    new CustomEvent<BaseScreenBlueprintCanvasCommandEventDetail>(
+      BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
+      { bubbles: true, composed: true, detail: { command } },
+    ),
+  );
+  return true;
+}
 const hostEvents: unknown[] = [];
 // 设计态「事件」开关开启后，画布内组件原生事件转发到宿主的日志（与 Viewer 事件同形）。
 const designerNativeEvents: unknown[] = [];
@@ -773,7 +838,7 @@ function setHostStatus(message: string, tone: 'ok' | 'error' = 'ok'): void {
 }
 
 function hostRequestForAction(action: string): boolean {
-  if (action === 'blueprint') return designer.requestBlueprintEdit();
+  if (action === 'blueprint') return designer.setWorkbenchMode('blueprint').ok;
   if (action === 'component-text' || action === 'component-data') {
     const target = action === 'component-text' ? 'props' : 'data';
     return designer.requestComponentTextEdit(target) !== null;
@@ -786,15 +851,8 @@ designer.addEventListener(SCREEN_AUTHORING_REQUEST_EVENT, (event) => {
     .request;
   pendingAuthoringRequest = request;
   pendingHostRevision = request.documentRevision;
-  hostEditor.value =
-    request.kind === 'component-text'
-      ? request.source
-      : JSON.stringify(request.context.document.blueprint, null, 2);
-  setHostStatus(
-    request.kind === 'component-text'
-      ? `宿主编辑请求：${request.componentId} 的 ${request.target}`
-      : `宿主整屏编排请求：${request.context.document.components.length} 个组件，初始定位 ${request.context.initialComponentId ?? '无'}`,
-  );
+  hostEditor.value = request.source;
+  setHostStatus(`宿主编辑请求：${request.componentId} 的 ${request.target}`);
 });
 
 designer.addEventListener('base-screen-selection-change', (event) => {
@@ -815,40 +873,16 @@ hostShell.addEventListener('click', (event) => {
       return;
     }
     const request = pendingAuthoringRequest;
-    if (request.kind === 'component-text') {
-      const result = designer.commitComponentTextEdit({
-        requestId: request.requestId,
-        expectedRevision: pendingHostRevision,
-        componentId: request.componentId,
-        target: request.target as 'props' | 'style' | 'data',
-        source: hostEditor.value,
-      });
-      if (result.ok) {
-        pendingAuthoringRequest = undefined;
-        setHostStatus('组件文本编辑已提交，产生一条历史记录。');
-      } else {
-        setHostStatus(
-          `提交被拒绝：${result.diagnostics.map((item) => item.code).join(',')}`,
-          'error',
-        );
-      }
-      return;
-    }
-    let blueprint: unknown;
-    try {
-      blueprint = JSON.parse(hostEditor.value);
-    } catch {
-      setHostStatus('蓝图候选不是合法 JSON。', 'error');
-      return;
-    }
-    const result = designer.commitBlueprintEdit({
+    const result = designer.commitComponentTextEdit({
       requestId: request.requestId,
       expectedRevision: pendingHostRevision,
-      blueprint: blueprint as never,
+      componentId: request.componentId,
+      target: request.target as 'props' | 'style' | 'data',
+      source: hostEditor.value,
     });
     if (result.ok) {
       pendingAuthoringRequest = undefined;
-      setHostStatus('蓝图编辑已提交，产生一条历史记录。');
+      setHostStatus('组件文本编辑已提交，产生一条历史记录。');
     } else {
       setHostStatus(
         `提交被拒绝：${result.diagnostics.map((item) => item.code).join(',')}`,
@@ -867,7 +901,9 @@ hostShell.addEventListener('click', (event) => {
     return;
   }
   if (hostRequestForAction(action ?? '')) {
-    setHostStatus('已发起宿主编辑请求，等待编辑器返回。');
+    setHostStatus(
+      action === 'blueprint' ? '已切换到交互编排工作台。' : '已发起宿主编辑请求，等待编辑器返回。',
+    );
   } else {
     setHostStatus('无法发起宿主编辑请求。', 'error');
   }
@@ -896,6 +932,9 @@ Object.assign(window, {
     materialLibraryGrouping: activeMaterialLibraryGrouping,
     hostShell,
     pendingAuthoringRequest: () => pendingAuthoringRequest,
+    blueprintCanvas,
+    blueprintCanvasState: () => blueprintCanvasState,
+    sendBlueprintCanvasCommand,
     setDatasetRegion: (value: string) => {
       datasetRegion = value;
     },

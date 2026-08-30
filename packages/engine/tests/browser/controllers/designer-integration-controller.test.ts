@@ -110,7 +110,7 @@ function createController(
   initial = document,
   focusedComponentId: string | null = 'button-1',
 ) {
-  const requestBlueprintEdit = vi.fn(() => true);
+  const openBlueprint = vi.fn(() => true);
   const diagnostics: unknown[] = [];
   const controller = new DesignerIntegrationController({
     emitDiagnostics: (value) => diagnostics.push(value),
@@ -121,9 +121,9 @@ function createController(
       focusedComponentId,
     }),
     getRuntimeContributions: () => runtimeContributions,
-    requestBlueprintEdit,
+    openBlueprint,
   });
-  return { controller, diagnostics, requestBlueprintEdit };
+  return { controller, diagnostics, openBlueprint };
 }
 
 class FakeTarget {
@@ -166,7 +166,7 @@ describe('EB-R7-C03 Designer events panel host boundary', () => {
 
   it('forwards the host edit request and reports failures', () => {
     const panel = panelElement();
-    const { controller, requestBlueprintEdit, diagnostics } = createController(
+    const { controller, openBlueprint, diagnostics } = createController(
       authority('blueprint.trigger.material-event'),
     );
     controller.connect(panel as unknown as HTMLElement);
@@ -176,9 +176,11 @@ describe('EB-R7-C03 Designer events panel host boundary', () => {
         (button ?? new FakeTarget({ action: 'locate-blueprint' })) as unknown as Element,
       ),
     ).toBe(true);
-    expect(requestBlueprintEdit).toHaveBeenCalledWith({ initialComponentId: 'button-1' });
+    expect(openBlueprint).toHaveBeenCalledWith({
+      focus: { kind: 'component', id: 'button-1' },
+    });
 
-    requestBlueprintEdit.mockReturnValue(false);
+    openBlueprint.mockReturnValue(false);
     expect(
       controller.onClick(
         (button ?? new FakeTarget({ action: 'locate-blueprint' })) as unknown as Element,
@@ -188,7 +190,7 @@ describe('EB-R7-C03 Designer events panel host boundary', () => {
   });
 
   it('opens the whole-screen host bridge from the topbar without a component selection', () => {
-    const { controller, requestBlueprintEdit, diagnostics } = createController(
+    const { controller, openBlueprint, diagnostics } = createController(
       authority('blueprint.trigger.material-event'),
       document,
       null,
@@ -197,7 +199,7 @@ describe('EB-R7-C03 Designer events panel host boundary', () => {
     expect(
       controller.onClick(new FakeTarget({ action: 'open-blueprint' }) as unknown as Element),
     ).toBe(true);
-    expect(requestBlueprintEdit).toHaveBeenCalledWith();
+    expect(openBlueprint).toHaveBeenCalledWith();
     expect(diagnostics).toHaveLength(0);
   });
 
@@ -238,7 +240,7 @@ describe('catalog-driven summary', () => {
         focusedComponentId: 'button-1',
       }),
       getRuntimeContributions: () => authority('blueprint.trigger.material-event'),
-      requestBlueprintEdit: () => true,
+      openBlueprint: () => true,
     });
     controller.connect(panel as unknown as HTMLElement);
     expect(queryText(panel)).toContain('click');
