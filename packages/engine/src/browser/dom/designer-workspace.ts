@@ -20,62 +20,20 @@ import {
 // 工具图标供 controllers 层消费（controllers 可依赖 dom，但不得直接依赖 ui 叶子层）。
 export { designerToolGlyph };
 
-// Nebula 缩放下拉预设（状态栏缩放百分比菜单）。
-const DESIGNER_ZOOM_PRESETS = [25, 50, 75, 100, 125, 150, 200] as const;
-
-const SHORTCUT_HELP_SECTIONS = [
-  {
-    title: DESIGNER_UI_TEXT.shortcutHelpSections.edit,
-    operationIds: [
-      'undo',
-      'redo',
-      'copy',
-      'paste',
-      'duplicate',
-      'delete',
-      'select-all',
-      'group',
-      'ungroup',
-      'lock',
-      'unlock',
-      'hide',
-    ],
-  },
-  {
-    title: DESIGNER_UI_TEXT.shortcutHelpSections.arrange,
-    operationIds: [
-      'edit-position',
-      'select-layer-up',
-      'select-layer-down',
-      'nudge-left',
-      'nudge-right',
-      'nudge-up',
-      'nudge-down',
-      'align-left',
-      'align-center',
-      'align-right',
-      'align-top',
-      'align-middle',
-      'align-bottom',
-      'bring-to-front',
-      'bring-forward',
-      'send-backward',
-      'send-to-back',
-    ],
-  },
-  {
-    title: DESIGNER_UI_TEXT.shortcutHelpSections.canvas,
-    operationIds: [
-      'zoom-in',
-      'zoom-out',
-      'zoom-fit',
-      'toggle-guides',
-      'toggle-border-guides',
-      'toggle-workbench',
-      'show-help',
-    ],
-  },
-] as const;
+import {
+  actionButton,
+  coordinateEntryField,
+  DESIGNER_ZOOM_PRESETS,
+  labeledActionButton,
+  menuButton,
+  previewGlyph,
+  publishGlyph,
+  redoGlyph,
+  SHORTCUT_HELP_SECTIONS,
+  submenuButton,
+  zoomInGlyph,
+  zoomOutGlyph,
+} from './workspace/designer-workspace-template.js';
 
 export function createDesignerWorkspace(
   ownerDocument: Document,
@@ -463,67 +421,6 @@ export function createDesignerWorkspace(
   return layout;
 }
 
-function coordinateEntryField(axis: 'x' | 'y'): string {
-  const label = axis.toUpperCase();
-  return `<label class="designer-coordinate-entry-field"><span class="designer-coordinate-entry-input"><span class="designer-coordinate-entry-axis" aria-hidden="true">${label}</span><input type="number" class="designer-control designer-input designer-number" data-coordinate-entry-${axis} data-coordinate-entry-axis="${axis}" inputmode="decimal" min="-1000000" max="1000000" step="0.01" aria-label="${label}" aria-describedby="designer-coordinate-entry-error"><span class="designer-coordinate-entry-unit" aria-hidden="true">${DESIGNER_UI_TEXT.coordinateEntry.unit}</span></span></label>`;
-}
-
-function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: string): string {
-  const operation = DESIGNER_OPERATION_TEXT[action];
-  const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
-  return `<button type="button" class="designer-control designer-button designer-icon-button toolbar-btn" data-variant="neutral" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}">${glyph}</button>`;
-}
-
-// Nebula 顶栏右段的带文案操作按钮（预览/保存/发布）：图标 + 标签。
-// 不使用 .designer-button（inline-grid 会导致图标/文字垂直堆叠），用 .topbar-text-button 独立控制布局。
-// glyph 容器内同时包含原图标和 spinner，固定 13×13 尺寸，切换 loading 状态时宽度稳定无抖动。
-function labeledActionButton(
-  action: keyof typeof DESIGNER_OPERATION_TEXT,
-  glyph: string,
-  extraClass = '',
-): string {
-  const operation = DESIGNER_OPERATION_TEXT[action];
-  const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
-  return `<button type="button" class="topbar-text-button ${extraClass}" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}${spinnerGlyph()}</span><span>${operation.label}</span></button>`;
-}
-
-function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {
-  const operation = DESIGNER_OPERATION_TEXT[action];
-  const shortcut = 'shortcut' in operation ? `<kbd>${operation.shortcut}</kbd>` : '';
-  return `<button type="button" class="designer-control designer-button designer-menu-item" data-menu-action="${action}" role="menuitem"><span>${operation.label}</span>${shortcut}</button>`;
-}
-
-export type DesignerMenuEntry =
-  | keyof typeof DESIGNER_OPERATION_TEXT
-  | 'separator'
-  | { readonly label: string; readonly entries: readonly DesignerMenuEntry[] };
-
-export type DesignerContextMenuAction = DesignerMenuEntry;
-
-function submenuButton(label: string, entries: readonly DesignerMenuEntry[]): string {
-  return `<div class="designer-menu-submenu-wrap">
-    <button type="button" class="designer-control designer-button designer-menu-item designer-menu-submenu-trigger" data-submenu-toggle aria-haspopup="menu" aria-expanded="false" role="menuitem"><span>${label}</span><span class="designer-menu-submenu-arrow" aria-hidden="true">&gt;</span></button>
-    <div class="designer-menu designer-submenu" data-submenu hidden role="menu">${menuEntriesHtml(entries)}</div>
-  </div>`;
-}
-
-function menuEntriesHtml(entries: readonly DesignerMenuEntry[]): string {
-  return entries
-    .map((entry) =>
-      entry === 'separator'
-        ? '<div class="designer-menu-separator" data-menu-separator role="separator"></div>'
-        : typeof entry === 'string'
-          ? menuButton(entry)
-          : submenuButton(entry.label, entry.entries),
-    )
-    .join('');
-}
-
-// 画布右键菜单按右键目标动态组合：'separator' 渲染分组分隔线。
-export function contextMenuHtml(actions: readonly DesignerContextMenuAction[]): string {
-  return menuEntriesHtml(actions);
-}
-
 // 物料库 DOM（网格卡片、分类派生、状态投影）沉淀在独立模块；为兼容既有消费方在此转发导出。
 export {
   materialCategoryHue,
@@ -535,50 +432,11 @@ export {
   renderMaterialLibraryState,
   visibleLibraryMaterials,
 } from './designer-material-library-dom.js';
-
-// 浏览器原生下载：以 application/json Blob 生成 .json 文件（导入使用文件选择器，导出使用下载锚点）。
-export function downloadDesignerDocument(
-  ownerDocument: Document,
-  filename: string,
-  contents: string,
-): void {
-  const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
-  const anchor = ownerDocument.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.hidden = true;
-  ownerDocument.body.append(anchor);
-  anchor.click();
-  anchor.remove();
-  URL.revokeObjectURL(url);
-}
-
-function redoGlyph(): string {
-  return toolbarIcon('M12 6H7a3 3 0 0 0-3 3v0M11 5l2 2-2 2');
-}
-
-function previewGlyph(): string {
-  return toolbarIcon(
-    'M8 5a4 4 0 0 0-5 3 4 4 0 0 0 5 3 4 4 0 0 0 5-3 4 4 0 0 0-5-3zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2z',
-  );
-}
-
-function publishGlyph(): string {
-  return toolbarIcon('M8 3l4 7H4zM4 12h8');
-}
-
-function zoomOutGlyph(): string {
-  return toolbarIcon('M6 8h4M4 4h8v8H4z');
-}
-
-function zoomInGlyph(): string {
-  return toolbarIcon('M6 8h4M8 6v4M4 4h8v8H4z');
-}
-
-function toolbarIcon(path: string): string {
-  return `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
-}
-
-function spinnerGlyph(): string {
-  return '<svg class="topbar-button-spinner" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 2a6 6 0 1 1-6 6"/></svg>';
-}
+export type {
+  DesignerContextMenuAction,
+  DesignerMenuEntry,
+} from './workspace/designer-workspace-template.js';
+export {
+  contextMenuHtml,
+  downloadDesignerDocument,
+} from './workspace/designer-workspace-template.js';
