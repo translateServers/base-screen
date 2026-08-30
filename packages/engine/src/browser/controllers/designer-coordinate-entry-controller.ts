@@ -6,7 +6,7 @@ import {
   type DesignerCoordinateAxis,
   getDesignerCoordinateEntryTarget,
   parseDesignerCoordinateEntry,
-} from '../../common/operations/designer-coordinate-entry.js';
+} from '../../common/operations/element/designer-coordinate-entry.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerCoordinateEntryControllerCallbacks {

@@ -1,7 +1,7 @@
 import type { ScreenParseResult } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerDataSourceMode } from '../../dom/designer-dataset-dom.js';
+import type { DesignerDataSourceMode } from '../../dom/dataset/designer-dataset-dom.js';
 import {
   createDatasetDataSourceTransaction,
   createDesignerDatasetDraft,
@@ -11,7 +11,7 @@ import {
   designerDataSourceModes,
   toggleDesignerDatasetBindingField,
   updateDesignerDatasetParameter,
-} from '../designer-data-source-authoring.js';
+} from './designer-data-source-authoring.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import {
   createDatasetAuthoringView,
@@ -26,7 +26,6 @@ export function setSourceMode(
   context.state.mode = mode;
   context.state.activeStep = 'source';
   context.state.workbenchOpen = false;
-  context.state.staticDialogOpen = false;
   context.state.feedbackText = '';
   context.state.confirmClose = false;
   if (mode === 'static' && context.currentComponent()?.dataSource?.type !== 'static') {
@@ -122,7 +121,6 @@ export function applyDatasetDraft(context: DesignerDatasetControllerContext): vo
   context.setFeedback(DESIGNER_UI_TEXT.dataSource.applied);
   context.state.draftDirty = false;
   context.state.confirmClose = false;
-  context.state.staticDialogOpen = false;
   context.state.activeStep = 'source';
   context.renderSurface();
 }
@@ -160,7 +158,6 @@ export function syncDraftToFocusedComponent(
     context.state.staticDraft = JSON.stringify(source.value, null, 2);
     context.state.staticValue = source.value;
     context.state.staticBinding = source.binding;
-    context.state.staticDialogOpen = false;
     context.state.staticPage = 0;
     context.state.descriptor = undefined;
     context.state.draft = undefined;
@@ -169,7 +166,6 @@ export function syncDraftToFocusedComponent(
   }
   if (source?.type === 'host-resource') {
     context.state.mode = 'dataset';
-    context.state.staticDialogOpen = false;
     context.state.catalogOpen = false;
     if (
       context.state.descriptor?.resourceType === source.resourceType &&
@@ -187,7 +183,6 @@ export function syncDraftToFocusedComponent(
     return { resourceType: source.resourceType, resourceId: source.resourceId };
   }
   context.state.mode = 'none';
-  context.state.staticDialogOpen = false;
   context.state.descriptor = undefined;
   context.state.draft = undefined;
   context.state.catalogOpen = false;

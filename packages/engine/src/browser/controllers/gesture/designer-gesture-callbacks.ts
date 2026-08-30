@@ -5,11 +5,11 @@ import type {
   ScreenViewportState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type {
   DesignerToolId,
   DesignerToolMaterialTypes,
 } from '../../../common/tools/designer-tools.js';
-import type { BaseScreenResolvedMaterialLibraryItem } from '../../../material-library-items.js';
 import type {
   DesignerSnapPoint,
   DesignerSnapPreview,

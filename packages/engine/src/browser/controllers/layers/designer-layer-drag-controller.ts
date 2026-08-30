@@ -7,7 +7,7 @@ import {
   type ScreenInteractionState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { createReparentTransaction } from '../../../common/operations/designer-layout-operations.js';
+import { createReparentTransaction } from '../../../common/operations/element/designer-layout-operations.js';
 
 interface DesignerLayerDragControllerCallbacks {
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;

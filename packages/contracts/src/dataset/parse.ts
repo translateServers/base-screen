@@ -1,21 +1,40 @@
 import { parseScreenJsonValue } from '../json/parse.js';
 import type {
   ScreenDatasetDescriptor,
-  ScreenDatasetField,
   ScreenDatasetPage,
-  ScreenDatasetParameter,
   ScreenDatasetSummary,
   ScreenTabularDataset,
 } from '../types/dataset.js';
 import type { ScreenDiagnostic, ScreenParseResult } from '../types/diagnostics.js';
-import type { ScreenJsonObject, ScreenJsonValue } from '../types/json.js';
+import { MAX_DATASET_BYTES, MAX_DATASET_PAGE_ITEMS } from './constants.js';
+import {
+  diagnostic,
+  invalidDataset,
+  invalidDescriptor,
+  mapDatasetJsonDiagnostics,
+  mapDescriptorJsonDiagnostics,
+  sortDiagnostics,
+} from './diagnostics.js';
+import { parseFields, parseParameters, parseRows } from './structure.js';
+import {
+  checkExact,
+  isCursor,
+  isFiniteInteger,
+  isRecord,
+  validateDisplayString,
+  validateIdentifier,
+  validateNullableDisplayString,
+  validateResourceId,
+} from './validation.js';
 
-export const MAX_DATASET_FIELDS = 256;
-export const MAX_DATASET_ROWS = 10_000;
-export const MAX_DATASET_BYTES = 1024 * 1024;
-export const MAX_DATASET_PAGE_ITEMS = 50;
-export const MAX_DATASET_FIELD_UNIT_LENGTH = 64;
-export const MAX_DATASET_FIELD_FORMAT_LENGTH = 128;
+export {
+  MAX_DATASET_BYTES,
+  MAX_DATASET_FIELD_FORMAT_LENGTH,
+  MAX_DATASET_FIELD_UNIT_LENGTH,
+  MAX_DATASET_FIELDS,
+  MAX_DATASET_PAGE_ITEMS,
+  MAX_DATASET_ROWS,
+} from './constants.js';
 
 export function parseScreenTabularDataset(input: unknown): ScreenParseResult<ScreenTabularDataset> {
   const parsed = parseScreenJsonValue(input, { maxBytes: MAX_DATASET_BYTES });
@@ -165,407 +184,4 @@ export function parseScreenDatasetPage(input: unknown): ScreenParseResult<Screen
         },
         diagnostics: [],
       };
-}
-
-function parseFields(
-  input: ScreenJsonValue | undefined,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-  code: 'HOST_DATASET_INVALID' | 'HOST_DATASET_DESCRIPTOR_INVALID',
-): readonly ScreenDatasetField[] | undefined {
-  if (!Array.isArray(input) || input.length > MAX_DATASET_FIELDS) {
-    diagnostics.push(diagnostic(code, path, 'Dataset fields are invalid.'));
-    return undefined;
-  }
-  const ids = new Set<string>();
-  const fields: ScreenDatasetField[] = [];
-  input.forEach((item, index) => {
-    const itemPath = [...path, index];
-    if (!isRecord(item)) {
-      diagnostics.push(diagnostic(code, itemPath, 'Dataset field is invalid.'));
-      return;
-    }
-    checkExact(
-      item,
-      new Set(['id', 'label', 'valueType', 'nullable', 'unit', 'format']),
-      itemPath,
-      diagnostics,
-      code,
-    );
-    validateFieldId(item.id, [...itemPath, 'id'], diagnostics, code);
-    validateDisplayString(item.label, [...itemPath, 'label'], diagnostics, false, code);
-    if (!isDatasetValueType(item.valueType)) {
-      diagnostics.push(
-        diagnostic(code, [...itemPath, 'valueType'], 'Dataset field valueType is invalid.'),
-      );
-    }
-    if (item.nullable !== undefined && typeof item.nullable !== 'boolean') {
-      diagnostics.push(
-        diagnostic(code, [...itemPath, 'nullable'], 'Dataset field nullable is invalid.'),
-      );
-    }
-    if (item.unit !== undefined) {
-      validateDisplayHint(
-        item.unit,
-        [...itemPath, 'unit'],
-        diagnostics,
-        code,
-        'unit',
-        MAX_DATASET_FIELD_UNIT_LENGTH,
-      );
-    }
-    if (item.format !== undefined) {
-      validateDisplayHint(
-        item.format,
-        [...itemPath, 'format'],
-        diagnostics,
-        code,
-        'format',
-        MAX_DATASET_FIELD_FORMAT_LENGTH,
-      );
-    }
-    if (typeof item.id === 'string') {
-      if (ids.has(item.id))
-        diagnostics.push(
-          diagnostic(code, [...itemPath, 'id'], 'Dataset field ids must be unique.'),
-        );
-      ids.add(item.id);
-    }
-    fields.push(item as unknown as ScreenDatasetField);
-  });
-  return fields;
-}
-
-function parseRows(
-  input: ScreenJsonValue | undefined,
-  fields: readonly ScreenDatasetField[] | undefined,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-): readonly ScreenJsonObject[] | undefined {
-  if (!Array.isArray(input) || input.length > MAX_DATASET_ROWS) {
-    diagnostics.push(diagnostic('HOST_DATASET_INVALID', path, 'Dataset rows are invalid.'));
-    return undefined;
-  }
-  const fieldById = new Map((fields ?? []).map((field) => [field.id, field]));
-  const rows: ScreenJsonObject[] = [];
-  input.forEach((item, rowIndex) => {
-    const rowPath = [...path, rowIndex];
-    if (!isRecord(item)) {
-      diagnostics.push(diagnostic('HOST_DATASET_INVALID', rowPath, 'Dataset row is invalid.'));
-      return;
-    }
-    const row: Record<string, ScreenJsonValue> = {};
-    for (const [key, cell] of Object.entries(item)) {
-      const field = fieldById.get(key);
-      if (field === undefined) {
-        diagnostics.push(
-          diagnostic(
-            'HOST_DATASET_INVALID',
-            [...rowPath, key],
-            'Dataset row contains an undeclared field.',
-          ),
-        );
-        continue;
-      }
-      if (field.nullable === false && cell === null) {
-        diagnostics.push(
-          diagnostic('HOST_DATASET_INVALID', [...rowPath, key], 'Dataset cell is not nullable.'),
-        );
-        continue;
-      }
-      if (!validCell(cell, field.valueType)) {
-        diagnostics.push(
-          diagnostic('HOST_DATASET_INVALID', [...rowPath, key], 'Dataset cell type is invalid.'),
-        );
-        continue;
-      }
-      row[key] = cell;
-    }
-    for (const field of fields ?? []) {
-      if (field.nullable === false && !Object.prototype.hasOwnProperty.call(item, field.id)) {
-        diagnostics.push(
-          diagnostic(
-            'HOST_DATASET_INVALID',
-            [...rowPath, field.id],
-            'Dataset cell is missing for a non-nullable field.',
-          ),
-        );
-      }
-    }
-    rows.push(row);
-  });
-  return rows;
-}
-
-function parseParameters(
-  input: ScreenJsonValue | undefined,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-): readonly ScreenDatasetParameter[] | undefined {
-  if (!Array.isArray(input) || input.length > 256) {
-    diagnostics.push(
-      diagnostic('HOST_DATASET_DESCRIPTOR_INVALID', path, 'Dataset parameters are invalid.'),
-    );
-    return undefined;
-  }
-  const names = new Set<string>();
-  const parameters: ScreenDatasetParameter[] = [];
-  input.forEach((item, index) => {
-    const itemPath = [...path, index];
-    if (!isRecord(item)) {
-      diagnostics.push(
-        diagnostic('HOST_DATASET_DESCRIPTOR_INVALID', itemPath, 'Dataset parameter is invalid.'),
-      );
-      return;
-    }
-    checkExact(
-      item,
-      new Set(['name', 'label', 'editor', 'defaultValue']),
-      itemPath,
-      diagnostics,
-      'HOST_DATASET_DESCRIPTOR_INVALID',
-    );
-    validateIdentifier(
-      item.name,
-      [...itemPath, 'name'],
-      diagnostics,
-      'HOST_DATASET_DESCRIPTOR_INVALID',
-    );
-    validateDisplayString(
-      item.label,
-      [...itemPath, 'label'],
-      diagnostics,
-      false,
-      'HOST_DATASET_DESCRIPTOR_INVALID',
-    );
-    if (item.editor !== undefined && !isDatasetEditor(item.editor)) {
-      diagnostics.push(
-        diagnostic(
-          'HOST_DATASET_DESCRIPTOR_INVALID',
-          [...itemPath, 'editor'],
-          'Dataset parameter editor is invalid.',
-        ),
-      );
-    }
-    if (item.defaultValue !== undefined && !isPlainJsonValue(item.defaultValue)) {
-      diagnostics.push(
-        diagnostic(
-          'HOST_DATASET_DESCRIPTOR_INVALID',
-          [...itemPath, 'defaultValue'],
-          'Dataset parameter default is invalid.',
-        ),
-      );
-    }
-    if (typeof item.name === 'string') {
-      if (names.has(item.name))
-        diagnostics.push(
-          diagnostic(
-            'HOST_DATASET_DESCRIPTOR_INVALID',
-            [...itemPath, 'name'],
-            'Dataset parameter names must be unique.',
-          ),
-        );
-      names.add(item.name);
-    }
-    parameters.push(item as unknown as ScreenDatasetParameter);
-  });
-  return parameters;
-}
-
-function checkExact(
-  value: ScreenJsonObject,
-  fields: ReadonlySet<string>,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-  code: 'HOST_DATASET_INVALID' | 'HOST_DATASET_DESCRIPTOR_INVALID',
-): void {
-  for (const key of Object.keys(value)) {
-    if (!fields.has(key))
-      diagnostics.push(diagnostic(code, [...path, key], 'Unknown dataset field.'));
-  }
-}
-
-function validCell(value: ScreenJsonValue, type: string): boolean {
-  if (value === null) return true;
-  if (type === 'string') return typeof value === 'string';
-  if (type === 'number') return typeof value === 'number' && Number.isFinite(value);
-  if (type === 'boolean') return typeof value === 'boolean';
-  return type === 'date' && typeof value === 'string' && isIsoDate(value);
-}
-
-function isIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:?\d{2}))?$/.test(value))
-    return false;
-  const time = Date.parse(value);
-  return Number.isFinite(time);
-}
-
-/** 参数默认值必须是普通 JSON 值（parseScreenJsonValue 已整体保证，此处显式兜底）。 */
-function isPlainJsonValue(value: unknown): boolean {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return true;
-  if (typeof value === 'number') return Number.isFinite(value);
-  return typeof value === 'object';
-}
-
-function isDatasetValueType(value: unknown): boolean {
-  return value === 'string' || value === 'number' || value === 'boolean' || value === 'date';
-}
-
-function isDatasetEditor(value: unknown): boolean {
-  return (
-    value === 'text' ||
-    value === 'number' ||
-    value === 'boolean' ||
-    value === 'date' ||
-    value === 'json'
-  );
-}
-
-function validateIdentifier(
-  value: unknown,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-  code = 'HOST_DATASET_DESCRIPTOR_INVALID',
-): void {
-  if (typeof value !== 'string' || !/^[A-Za-z][A-Za-z0-9._:-]{0,127}$/.test(value))
-    diagnostics.push(
-      diagnostic(code as ScreenDiagnostic['code'], path, 'Dataset identifier is invalid.'),
-    );
-}
-
-function validateFieldId(
-  value: unknown,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-  code: 'HOST_DATASET_INVALID' | 'HOST_DATASET_DESCRIPTOR_INVALID',
-): void {
-  if (
-    typeof value !== 'string' ||
-    value.length < 1 ||
-    value.length > 256 ||
-    /[\u0000-\u001f\u007f]/.test(value)
-  ) {
-    diagnostics.push(diagnostic(code, path, 'Dataset field id is invalid.'));
-  }
-}
-
-function validateResourceId(
-  value: unknown,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-): void {
-  if (typeof value !== 'string' || value.length < 1 || value.length > 256)
-    diagnostics.push(
-      diagnostic('HOST_DATASET_DESCRIPTOR_INVALID', path, 'Dataset resource id is invalid.'),
-    );
-}
-
-function validateDisplayString(
-  value: unknown,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-  allowEmpty: boolean,
-  code = 'HOST_DATASET_DESCRIPTOR_INVALID',
-): void {
-  if (
-    typeof value !== 'string' ||
-    (!allowEmpty && value.length === 0) ||
-    value.length > 256 ||
-    /[\u0000-\u001f\u007f]/.test(value)
-  )
-    diagnostics.push(
-      diagnostic(code as ScreenDiagnostic['code'], path, 'Dataset display text is invalid.'),
-    );
-}
-
-function validateNullableDisplayString(
-  value: unknown,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-): void {
-  if (value !== null) validateDisplayString(value, path, diagnostics, true);
-}
-
-function validateDisplayHint(
-  value: unknown,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-  code: 'HOST_DATASET_INVALID' | 'HOST_DATASET_DESCRIPTOR_INVALID',
-  hint: 'unit' | 'format',
-  maxCodeUnits: number,
-): void {
-  if (
-    typeof value !== 'string' ||
-    value.length === 0 ||
-    value.length > maxCodeUnits ||
-    /[\u0000-\u001f\u007f-\u009f]/.test(value)
-  ) {
-    diagnostics.push(diagnostic(code, path, `Dataset field ${hint} is invalid.`));
-  }
-}
-
-function isCursor(value: unknown): value is string {
-  return typeof value === 'string' && value.length <= 4096 && !/[\u0000-\u001f\u007f]/.test(value);
-}
-
-function isRecord(value: ScreenJsonValue | undefined): value is ScreenJsonObject {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isFiniteInteger(value: unknown): value is number {
-  return typeof value === 'number' && Number.isInteger(value) && Number.isFinite(value);
-}
-
-function diagnostic(
-  code: ScreenDiagnostic['code'],
-  path: readonly (string | number)[],
-  message: string,
-): ScreenDiagnostic {
-  return { severity: 'error', code, path, message };
-}
-
-function invalidDataset(
-  path: readonly (string | number)[],
-  message: string,
-): ScreenParseResult<never> {
-  return { ok: false, diagnostics: [diagnostic('HOST_DATASET_INVALID', path, message)] };
-}
-
-function invalidDescriptor(
-  path: readonly (string | number)[],
-  message: string,
-): ScreenParseResult<never> {
-  return { ok: false, diagnostics: [diagnostic('HOST_DATASET_DESCRIPTOR_INVALID', path, message)] };
-}
-
-function mapDatasetJsonDiagnostics(
-  diagnostics: readonly ScreenDiagnostic[],
-): ScreenParseResult<never> {
-  return {
-    ok: false,
-    diagnostics: diagnostics.map((item) => ({
-      ...item,
-      code: item.code === 'JSON_LIMIT_EXCEEDED' ? 'HOST_DATASET_INVALID' : 'HOST_DATASET_INVALID',
-    })),
-  };
-}
-
-function mapDescriptorJsonDiagnostics(
-  diagnostics: readonly ScreenDiagnostic[],
-): ScreenParseResult<never> {
-  return {
-    ok: false,
-    diagnostics: diagnostics.map((item) => ({
-      ...item,
-      code: 'HOST_DATASET_DESCRIPTOR_INVALID' as const,
-    })),
-  };
-}
-
-function sortDiagnostics(diagnostics: readonly ScreenDiagnostic[]): readonly ScreenDiagnostic[] {
-  return [...diagnostics].sort((left, right) => {
-    const a = left.path.join('/');
-    const b = right.path.join('/');
-    return a < b ? -1 : a > b ? 1 : left.code < right.code ? -1 : 1;
-  });
 }

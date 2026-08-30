@@ -122,8 +122,7 @@ function assertR1FailureMatrix(matrix) {
   expect(matrix.dispose?.status === 'disposed', 'DISPOSE_STATUS');
   expect(matrix.dispose?.message === 'Remote plugin sandbox was disposed.', 'DISPOSE_MESSAGE');
   expect(
-    JSON.stringify(matrix.remoteCapabilityProbe?.initKeys) ===
-      JSON.stringify(['protocolVersion', 'type']),
+    JSON.stringify(matrix.remoteCapabilityProbe?.initKeys) === JSON.stringify(['type']),
     'CAPABILITY_INIT_SHAPE',
   );
   expect(matrix.remoteCapabilityProbe?.material === true, 'MATERIAL_NO_ACCESS');
@@ -139,27 +138,26 @@ function remoteDocument(pathname) {
   switch (pathname) {
     case '/before-ready.html':
       message =
-        "parent.postMessage({ protocolVersion: 1, type: 'emit-event', name: 'early', payload: null }, event.origin);";
+        "parent.postMessage({ type: 'emit-event', name: 'early', payload: null }, event.origin);";
       break;
     case '/never-ready.html':
       message = '';
       break;
     case '/malformed.html':
       message =
-        "parent.postMessage({ protocolVersion: 1, type: 'unknown-type', name: 'x', payload: { url: 'http://127.0.0.1:4177/canary', error: 'Error: canary\\n    at remote', credential: 'canary credential' } }, event.origin);";
+        "parent.postMessage({ type: 'unknown-type', name: 'x', payload: { url: 'http://127.0.0.1:4177/canary', error: 'Error: canary\\n    at remote', credential: 'canary credential' } }, event.origin);";
       break;
     case '/repeat-ready.html':
       message =
-        "parent.postMessage({ protocolVersion: 1, type: 'ready' }, event.origin);\n" +
-        "parent.postMessage({ protocolVersion: 1, type: 'ready' }, event.origin);";
+        "parent.postMessage({ type: 'ready' }, event.origin);\n" +
+        "parent.postMessage({ type: 'ready' }, event.origin);";
       break;
     case '/capability-probe.html':
       message = `const inaccessible = (name) => {
             try { return parent[name] === undefined; } catch { return true; }
           };
-          parent.postMessage({ protocolVersion: 1, type: 'ready' }, event.origin);
+          parent.postMessage({ type: 'ready' }, event.origin);
           parent.postMessage({
-            protocolVersion: 1,
             type: 'emit-event',
             name: 'capability_probe',
             payload: {
@@ -176,12 +174,12 @@ function remoteDocument(pathname) {
     default:
       message = `let parentAccessBlocked = false;
            try { void parent.document; } catch { parentAccessBlocked = true; }
-           parent.postMessage({ protocolVersion: 1, type: 'ready' }, event.origin);
-           parent.postMessage({ protocolVersion: 1, type: 'emit-event', name: 'capability_check', payload: { parentAccessBlocked } }, event.origin);`;
+           parent.postMessage({ type: 'ready' }, event.origin);
+           parent.postMessage({ type: 'emit-event', name: 'capability_check', payload: { parentAccessBlocked } }, event.origin);`;
   }
   return `<!doctype html><script>
     addEventListener('message', (event) => {
-      if (event.data?.protocolVersion === 1 && event.data?.type === 'base-screen-init') {
+      if (event.data?.type === 'base-screen-init') {
         ${message}
       }
     });

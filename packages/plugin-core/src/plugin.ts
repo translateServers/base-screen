@@ -7,7 +7,7 @@ import {
 } from '@base-screen/contracts';
 import { type BaseScreenPluginManifest, type PluginCommandRequest } from './contracts.js';
 import { PluginDiagnosticCollector } from './diagnostics.js';
-import { validateBaseScreenMaterialIdentity, validatePropsSchema } from './material.js';
+import { validateBaseScreenMaterialIdentity, validatePropsSchema } from './material/material.js';
 
 const MAX_PLUGIN_MANIFEST_BYTES = 128 * 1024;
 const MAX_COMMAND_BYTES = 256 * 1024;

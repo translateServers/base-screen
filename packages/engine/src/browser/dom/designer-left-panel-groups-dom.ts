@@ -1,10 +1,10 @@
-import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX,
   type BaseScreenDesignerLeftPanelGroup,
   baseScreenDesignerLeftPanelGroupSupportsMode,
   baseScreenDesignerLeftPanelSlotName,
-} from '../../designer-left-panel-groups.js';
+} from '../../common/operations/workbench/designer-left-panel-groups.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
 
 const HOST_TAB_PREFIX = 'host:';

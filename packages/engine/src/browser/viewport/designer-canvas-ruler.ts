@@ -1,3 +1,6 @@
+// 标尺刻度数学：按 zoom 从 1/2/5 数量级序列中挑选目标像素间距（约 48px），
+// 生成刻度值/标签/像素位置序列。纯计算、无 DOM，渲染由 designer-ruler-renderer.ts 负责。
+
 export interface DesignerRulerMark {
   readonly label: string;
   readonly position: number;

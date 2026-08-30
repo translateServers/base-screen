@@ -5,8 +5,8 @@
 ```ts
 
 import type { ScreenBlueprint } from '@base-screen/contracts';
-import { ScreenBlueprintComponentVisibilityAction } from '@base-screen/contracts';
-import { ScreenBlueprintHostEvent } from '@base-screen/contracts';
+import type { ScreenBlueprintComponentVisibilityAction } from '@base-screen/contracts';
+import type { ScreenBlueprintHostEvent } from '@base-screen/contracts';
 import { ScreenCanvas } from '@base-screen/contracts';
 import type { ScreenCanvasBackground } from '@base-screen/contracts';
 import type { ScreenCanvasBackgroundImageFit } from '@base-screen/contracts';
@@ -21,7 +21,7 @@ import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenHostResourceBinding } from '@base-screen/contracts';
 import { ScreenHostResourceParameter } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
-import { ScreenJsonValue } from '@base-screen/contracts';
+import type { ScreenJsonValue } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenPosition } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';

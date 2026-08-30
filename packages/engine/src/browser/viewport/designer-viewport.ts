@@ -1,3 +1,6 @@
+// 视口状态数学：zoom 夹紧区间、fit-to-screen 缩放、滚轮缩放锚点与 pan 增量，
+// 以及视口 CSS transform 字符串的生成。纯计算，DOM 事件由 controllers 层接线。
+
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenPoint, ScreenViewportState } from '@base-screen/core';
 
@@ -28,10 +31,6 @@ export function getFitDesignerZoom(
 export function getViewportAnchor(event: WheelEvent, viewport: HTMLElement): ScreenPoint {
   const bounds = viewport.getBoundingClientRect();
   return { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
-}
-
-export function getPanDelta(event: PointerEvent, start: ScreenPoint): ScreenPoint {
-  return { x: event.clientX - start.x, y: event.clientY - start.y };
 }
 
 export function viewportTransform(viewport: ScreenViewportState): string {

@@ -12,25 +12,25 @@ import type {
 import {
   clampScreenCoordinate,
   roundScreenGeometry,
-} from '../../../common/operations/designer-geometry.js';
+} from '../../../common/operations/element/designer-geometry.js';
+import {
+  createValidatedPropsTransaction,
+  createValidatedStyleTransaction,
+} from '../../../common/operations/element/designer-layout-operations.js';
 import {
   createGroupRotationTransaction,
   createGroupSizeTransaction,
-} from '../../../common/operations/designer-group.js';
+} from '../../../common/operations/selection/designer-group.js';
+import {
+  createMultiSelectionGeometryTransaction,
+  createMultiSelectionStyleTransaction,
+} from '../../../common/operations/selection/designer-multi-selection-operations.js';
 import {
   createGroupPositionTransaction,
   type DesignerInspectorContext,
   getDesignerInspectorContext,
-} from '../../../common/operations/designer-inspector.js';
-import {
-  createValidatedPropsTransaction,
-  createValidatedStyleTransaction,
-} from '../../../common/operations/designer-layout-operations.js';
-import {
-  createMultiSelectionGeometryTransaction,
-  createMultiSelectionStyleTransaction,
-} from '../../../common/operations/designer-multi-selection-operations.js';
-import { readDesignerColorPaletteValue } from '../designer-color-palette-dom.js';
+} from '../../../common/operations/style/designer-inspector.js';
+import { readDesignerColorPaletteValue } from '../color/designer-color-palette-dom.js';
 import {
   createCanvasTransaction,
   type DesignerCanvasBackgroundDrafts,

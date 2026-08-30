@@ -16,6 +16,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./remote-sandbox": {
+      "types": "./dist/remote-sandbox.d.ts",
+      "import": "./dist/remote-sandbox.js"
     }
   },
   "scripts": {

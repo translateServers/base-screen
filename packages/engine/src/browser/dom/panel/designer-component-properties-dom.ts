@@ -8,10 +8,10 @@ import type {
 import {
   type DesignerInspectorContext,
   getDesignerInspectorContext,
-} from '../../../common/operations/designer-inspector.js';
+} from '../../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerDescriptorDatasetFields } from '../designer-descriptor-dom.js';
-import { renderDesignerDescriptorZone } from '../designer-descriptor-dom.js';
+import type { DesignerDescriptorDatasetFields } from '../descriptor/designer-descriptor-dom.js';
+import { renderDesignerDescriptorZone } from '../descriptor/designer-descriptor-dom.js';
 import { appendDesignerQuickStyle } from '../designer-quick-style-dom.js';
 import { appendDesignerFieldMessage, createDesignerButton } from '../designer-ui-primitives.js';
 import { appendCanvasControls } from './designer-canvas-properties-dom.js';

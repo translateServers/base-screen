@@ -1,9 +1,9 @@
-import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import type {
   BaseScreenMaterialLibraryAction,
   BaseScreenMaterialLibraryState,
-} from '../../material-library-state.js';
-import { materialLibraryActions } from '../dom/designer-material-library-dom.js';
+} from '../../common/operations/material-library/material-library-state.js';
+import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { materialLibraryActions } from '../dom/material-library/designer-material-library-dom.js';
 
 const MAX_ERROR_ENTRIES = 50;
 

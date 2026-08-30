@@ -10,12 +10,9 @@ export interface DesignerStaticDataView {
   readonly value: ScreenJsonValue;
   readonly binding: ScreenDataBinding | undefined;
   readonly jsonDraft: string;
-  readonly dialogOpen: boolean;
   readonly tab: 'table' | 'advanced';
   readonly page: number;
   readonly pageSize: number;
-  readonly pasteDraft: string;
-  readonly firstRowIsHeader: boolean;
   readonly roles: readonly BaseScreenMaterialDataBindingRole[];
   readonly scrollScope?: string;
 }

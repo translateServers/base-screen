@@ -8,6 +8,8 @@
     "exactOptionalPropertyTypes": true,
     "useUnknownInCatchVariables": true,
     "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noUncheckedSideEffectImports": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,

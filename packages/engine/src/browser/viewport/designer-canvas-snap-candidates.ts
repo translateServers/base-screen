@@ -1,3 +1,7 @@
+// 吸附候选派生：从 canonical document 收集画布边、用户 guide 与可见组件的
+// 边/中心线候选（对齐坐标 + 参考线局部几何），供 vendored Moveable checkSnapPoses
+// 做最近吸附竞争。候选不携带 DOM 引用，是纯数据投影。
+
 import type { ScreenDocument } from '@base-screen/contracts';
 import { getScreenComponentBounds, isScreenComponentEffectivelyHidden } from '@base-screen/core';
 

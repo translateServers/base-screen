@@ -2,14 +2,14 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import {
   clampScreenCoordinate,
   roundScreenGeometry,
-} from '../../../common/operations/designer-geometry.js';
+} from '../../../common/operations/element/designer-geometry.js';
+import { createInitialDataSourceForMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type { DesignerToolId } from '../../../common/tools/designer-tools.js';
-import { createInitialDataSourceForMaterialLibraryItem } from '../../../material-library-items.js';
-import { createInitialDataSource } from '../../dom/designer-panel-dom.js';
+import { createInitialDataSource } from '../../dom/panel/designer-panel-dom.js';
 import {
   MATERIAL_DRAG_TYPE,
   MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
-} from '../designer-panel-controller.js';
+} from '../panel/designer-panel-controller.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
 import {
   DesignerGestureEnvironment,

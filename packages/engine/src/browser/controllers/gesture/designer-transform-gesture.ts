@@ -1,15 +1,15 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import { getScreenSelectionBounds, isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import {
-  selectedComponents,
-  selectionSubtree,
-} from '../../../common/operations/designer-selection.js';
-import {
   type BaseScreenTransformHandle,
   createTransformTransaction,
   resizeScreenComponents,
   rotateScreenComponents,
-} from '../../../common/operations/designer-transform.js';
+} from '../../../common/operations/element/designer-transform.js';
+import {
+  selectedComponents,
+  selectionSubtree,
+} from '../../../common/operations/selection/designer-selection.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
 import {
   DesignerGestureEnvironment,

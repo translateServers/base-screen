@@ -3,8 +3,8 @@ import { getScreenSelectionBounds, isScreenComponentEffectivelyLocked } from '@b
 import {
   clampScreenCoordinate,
   roundScreenStep,
-} from '../../../common/operations/designer-geometry.js';
-import { selectionSubtree } from '../../../common/operations/designer-selection.js';
+} from '../../../common/operations/element/designer-geometry.js';
+import { selectionSubtree } from '../../../common/operations/selection/designer-selection.js';
 import type { DesignerSnapTranslation } from '../../viewport/designer-canvas-aids.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
 import { DesignerGestureEnvironment } from './designer-gesture-environment.js';

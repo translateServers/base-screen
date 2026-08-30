@@ -6,8 +6,8 @@ import type {
 } from '@base-screen/contracts';
 import { isBoundedScreenImageUrl } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
-import type { BaseScreenCanvasScaleMode } from '../../../canvas-presentation.js';
-import { roundScreenGeometry } from '../../../common/operations/designer-geometry.js';
+import type { BaseScreenCanvasScaleMode } from '../../../common/operations/canvas/canvas-presentation.js';
+import { roundScreenGeometry } from '../../../common/operations/element/designer-geometry.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { success } from './designer-panel-transaction-utils.js';
 

@@ -1,6 +1,6 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import type { ScreenDocumentCommand, ScreenDocumentTransaction } from '@base-screen/core';
-import { hasSelectedAncestor } from './designer-selection.js';
+import { hasSelectedAncestor } from './selection/designer-selection.js';
 
 export interface BaseScreenClipboard {
   readonly components: readonly ScreenComponentNode[];

@@ -1,5 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerContextMenuAction } from '../designer-workspace.js';
+import type { DesignerContextMenuAction } from '../workspace/designer-workspace.js';
 
 export interface DesignerMenuControllerCallbacks {
   readonly getRoot: () => ShadowRoot | null;

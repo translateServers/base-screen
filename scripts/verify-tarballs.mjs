@@ -391,6 +391,11 @@ if (!result.ok) {
     }
     if (directory === 'plugin-manager') {
       smokeSource = `import { createBaseScreenPluginManager } from '${barePackage}';
+import { createBaseScreenRemotePluginSandbox } from '${barePackage}/remote-sandbox';
+
+if (typeof createBaseScreenRemotePluginSandbox !== 'function') {
+  throw new Error('plugin-manager: remote sandbox export missing');
+}
 
 const manager = createBaseScreenPluginManager({
   instanceId: 'tarball-consumer',

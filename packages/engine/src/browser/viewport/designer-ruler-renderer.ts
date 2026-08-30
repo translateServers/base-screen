@@ -1,3 +1,6 @@
+// 标尺渲染：把 designer-canvas-ruler.ts 的刻度序列绘制到横竖两个 canvas 上，
+// 含 devicePixelRatio 与画布原点换算；使用 canvas 自身显示尺寸避免 1px 裁剪。
+
 import { getDesignerRulerMarks } from './designer-canvas-aids.js';
 import {
   type DesignerCanvasBounds,

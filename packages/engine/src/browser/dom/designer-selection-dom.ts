@@ -5,11 +5,11 @@ import {
   isScreenComponentEffectivelyLocked,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenTransformHandle } from '../../common/operations/element/designer-transform.js';
 import {
   selectedComponents,
   selectionSubtree,
-} from '../../common/operations/designer-selection.js';
-import type { BaseScreenTransformHandle } from '../../common/operations/designer-transform.js';
+} from '../../common/operations/selection/designer-selection.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export function renderDesignerSelection(

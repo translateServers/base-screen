@@ -1,3 +1,6 @@
+// 拖动时的布局间距标注收集：为当前选区收集同轨道相邻组件之间的 gap 测量线
+// （即吸附时画布上显示的 46 / 48 / 59 这类间距数字）。纯计算，不含 DOM 渲染。
+
 import type { ScreenDocument } from '@base-screen/contracts';
 import { getScreenComponentBounds, isScreenComponentEffectivelyHidden } from '@base-screen/core';
 import {

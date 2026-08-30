@@ -1,8 +1,8 @@
 import { createBaseScreenMaterialCatalog } from '../../packages/plugin-core/src/index.ts';
 import { createBaseScreenPluginManager } from '../../packages/plugin-manager/src/index.ts';
 import { createBaseScreenRemotePluginSandbox } from '../../packages/plugin-manager/src/remote-sandbox.ts';
-import { createBaseScreenRenderer } from '../../packages/renderer/src/renderer.ts';
-import { BaseScreenViewerElement } from '../../packages/renderer/src/viewer.ts';
+import { createBaseScreenRenderer } from '../../packages/renderer/src/renderer/renderer.ts';
+import { BaseScreenViewerElement } from '../../packages/renderer/src/viewer/viewer.ts';
 import { runHostResourceConformance } from '../../packages/testing/src/host-resource.ts';
 
 const target = document.querySelector<HTMLElement>('#sandbox-root');

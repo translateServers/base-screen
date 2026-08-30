@@ -8,7 +8,7 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
   type DesignerDescriptorDatasetFields,
   renderDesignerDescriptorZone,
-} from '../designer-descriptor-dom.js';
+} from '../descriptor/designer-descriptor-dom.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import { dataCapabilities } from './designer-data-source-model.js';
 

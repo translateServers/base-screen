@@ -7,7 +7,7 @@ import type {
   ScreenParseResult,
   ScreenSize,
 } from '@base-screen/contracts';
-import type { BaseScreenMaterialEditorDescriptor } from './editor-descriptor.js';
+import type { BaseScreenMaterialEditorDescriptor } from './editor/editor-descriptor.js';
 
 export const BASE_SCREEN_MATERIAL_EVENT = 'base-screen-material-event' as const;
 

@@ -3,9 +3,9 @@ export {
   type BaseScreenRenderer,
   type CreateBaseScreenRendererOptions,
   createBaseScreenRenderer,
-} from './renderer.js';
+} from './renderer/renderer.js';
 export {
   type BaseScreenViewerConfiguration,
   BaseScreenViewerElement,
   type BaseScreenViewerRefreshOptions,
-} from './viewer.js';
+} from './viewer/viewer.js';

@@ -1,0 +1,6 @@
+export const MAX_DATASET_FIELDS = 256;
+export const MAX_DATASET_ROWS = 10_000;
+export const MAX_DATASET_BYTES = 1024 * 1024;
+export const MAX_DATASET_PAGE_ITEMS = 50;
+export const MAX_DATASET_FIELD_UNIT_LENGTH = 64;
+export const MAX_DATASET_FIELD_FORMAT_LENGTH = 128;

@@ -89,7 +89,7 @@ class RemotePluginSandbox implements BaseScreenRemotePluginSandbox {
       return;
     }
     this.element.contentWindow?.postMessage(
-      { protocolVersion: 1, type: 'base-screen-init' },
+      { type: 'base-screen-init' },
       this.options.expectedOrigin,
     );
   };
@@ -231,15 +231,15 @@ function parseMessage(input: unknown): ScreenParseResult<RemoteMessage> {
     return failure('REMOTE_PLUGIN_PROTOCOL_INVALID', 'Remote plugin protocol message is invalid.');
   }
   const message = parsed.value as Record<string, ScreenJsonValue>;
-  if (message.protocolVersion !== 1 || typeof message.type !== 'string') {
+  if (typeof message.type !== 'string') {
     return failure('REMOTE_PLUGIN_PROTOCOL_INVALID', 'Remote plugin protocol message is invalid.');
   }
-  if (message.type === 'ready' && hasExactKeys(message, ['protocolVersion', 'type'])) {
+  if (message.type === 'ready' && hasExactKeys(message, ['type'])) {
     return { ok: true, value: { type: 'ready' }, diagnostics: [] };
   }
   if (
     message.type === 'emit-event' &&
-    hasExactKeys(message, ['protocolVersion', 'type', 'name', 'payload']) &&
+    hasExactKeys(message, ['type', 'name', 'payload']) &&
     isIdentifier(message.name) &&
     Object.hasOwn(message, 'payload')
   ) {

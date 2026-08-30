@@ -6,12 +6,12 @@ import type {
 } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { getDesignerInspectorContext } from '../../../common/operations/designer-inspector.js';
+import { getDesignerInspectorContext } from '../../../common/operations/style/designer-inspector.js';
 import {
   createStyleRuleDraft,
   createStyleRulesTransaction,
   STYLE_RULE_OPERATORS,
-} from '../../../common/operations/designer-style-rule-operations.js';
+} from '../../../common/operations/style/designer-style-rule-operations.js';
 import { parseJsonDraft } from './designer-data-source-model.js';
 import { isControl } from './designer-panel-transaction-utils.js';
 import { parsePropertyControlValue } from './designer-property-transactions.js';

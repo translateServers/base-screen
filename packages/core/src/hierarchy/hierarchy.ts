@@ -39,10 +39,6 @@ export function getRootIds(index: ComponentIndex): readonly string[] {
   return index.childrenByParent.get(null) ?? [];
 }
 
-export function getParentId(index: ComponentIndex, id: string): string | null {
-  return index.byId.get(id)?.component.parentId ?? null;
-}
-
 export function getAncestorIds(index: ComponentIndex, id: string): readonly string[] {
   const ancestors: string[] = [];
   let current = index.byId.get(id);
@@ -161,10 +157,6 @@ export function getPainterOrder(document: ScreenDocument): readonly string[] {
 
   painterOrderCache.set(document, result);
   return result;
-}
-
-export function getComponentIndex(index: ComponentIndex, id: string): number | undefined {
-  return index.byId.get(id)?.index;
 }
 
 export function getDescendantSet(

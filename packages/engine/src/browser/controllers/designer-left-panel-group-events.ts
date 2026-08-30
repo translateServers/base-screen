@@ -1,7 +1,7 @@
 import {
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
-} from '../../designer-left-panel-groups.js';
+} from '../../common/operations/workbench/designer-left-panel-groups.js';
 
 export class DesignerLeftPanelGroupEventController {
   #activeGroupId: string | null = null;

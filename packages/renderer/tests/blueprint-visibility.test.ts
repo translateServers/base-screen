@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createBaseScreenRenderer } from '../src/renderer.js';
+import { createBaseScreenRenderer } from '../src/renderer/renderer.js';
 import {
   component,
   createHostResourceCatalog,
@@ -9,7 +9,7 @@ import {
   document,
   FakeMount,
   flush,
-} from './__fixtures__/viewer-test-harness.js';
+} from './viewer/__fixtures__/viewer-test-harness.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();

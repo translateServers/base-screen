@@ -4,7 +4,7 @@ import {
   DESIGNER_QUICK_STYLE_PALETTES,
   designerQuickStyleActionApplied,
   designerQuickStyleActionSupported,
-} from '../../common/operations/designer-quick-style.js';
+} from '../../common/operations/style/designer-quick-style.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
 

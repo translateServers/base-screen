@@ -9,7 +9,7 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type {
   DesignerDatasetDraftView,
   DesignerDatasetPreviewTab,
-} from '../../dom/designer-dataset-dom.js';
+} from '../../dom/dataset/designer-dataset-dom.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import { emptyDatasetPreview } from './designer-dataset-controller-context.js';
 

@@ -7,7 +7,7 @@ import {
   hasDirectChildren,
   parentIdOf,
   selectionTargetInContext,
-} from '../../../common/operations/designer-selection.js';
+} from '../../../common/operations/selection/designer-selection.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
 
 /** Owns navigation and hit projection for editing children inside a group. */

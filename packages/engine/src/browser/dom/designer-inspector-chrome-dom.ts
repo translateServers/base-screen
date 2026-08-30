@@ -1,7 +1,7 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { getDesignerInspectorContext } from '../../common/operations/designer-inspector.js';
+import { getDesignerInspectorContext } from '../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
 import {

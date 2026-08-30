@@ -8,7 +8,7 @@ import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import {
   type DesignerDescriptorDatasetFields,
   renderDesignerDescriptorZone,
-} from './designer-descriptor-dom.js';
+} from './descriptor/designer-descriptor-dom.js';
 
 const MATERIAL_EVENT_CAPABILITY = 'blueprint.trigger.material-event';
 

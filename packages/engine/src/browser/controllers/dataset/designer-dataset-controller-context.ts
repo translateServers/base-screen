@@ -21,10 +21,10 @@ import type {
   DesignerDatasetDraftView,
   DesignerDatasetPreviewView,
   DesignerDatasetWorkbenchStep,
-} from '../../dom/designer-dataset-dom.js';
-import { DESIGNER_STATIC_DEFAULT_PAGE_SIZE } from '../../dom/designer-static-data-pagination.js';
-import type { DesignerDataFlowScrollSync } from '../designer-data-flow-scroll-sync.js';
-import type { DesignerDatasetCatalogController } from '../designer-dataset-catalog-controller.js';
+} from '../../dom/dataset/designer-dataset-dom.js';
+import { DESIGNER_STATIC_DEFAULT_PAGE_SIZE } from '../../dom/static-data/designer-static-data-pagination.js';
+import type { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
+import type { DesignerDatasetCatalogController } from './designer-dataset-catalog-controller.js';
 
 export interface DesignerDatasetControllerCallbacks {
   readonly getCatalogPort: () => ScreenHostDatasetCatalogPort | undefined;
@@ -54,12 +54,9 @@ export class DesignerDatasetControllerState {
   staticDraft = 'null';
   staticValue: ScreenJsonValue = null;
   staticBinding: ScreenDataBinding | undefined;
-  staticDialogOpen = false;
   staticTab: 'table' | 'advanced' = 'table';
   staticPage = 0;
   staticPageSize = DESIGNER_STATIC_DEFAULT_PAGE_SIZE;
-  staticPasteDraft = '';
-  staticFirstRowIsHeader = true;
   workbenchOpen = false;
   catalogOpen = false;
   feedbackText = '';
@@ -82,11 +79,9 @@ export class DesignerDatasetControllerState {
     this.staticDraft = 'null';
     this.staticValue = null;
     this.staticBinding = undefined;
-    this.staticDialogOpen = false;
     this.staticTab = 'table';
     this.staticPage = 0;
     this.staticPageSize = DESIGNER_STATIC_DEFAULT_PAGE_SIZE;
-    this.staticPasteDraft = '';
     this.workbenchOpen = false;
     this.catalogOpen = false;
     this.feedbackText = '';

@@ -1,4 +1,4 @@
-import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '../../common/operations/designer-blueprint-protocol.js';
+import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
 
 export interface DesignerSurfaceHandler {
   (target: EventTarget | null, event: Event): boolean;

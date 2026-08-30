@@ -8,7 +8,7 @@ import type {
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { createPropertyTransaction } from '../dom/designer-panel-dom.js';
+import { createPropertyTransaction } from '../dom/panel/designer-panel-dom.js';
 
 export interface DesignerAssetControllerCallbacks {
   readonly executeTransaction: (

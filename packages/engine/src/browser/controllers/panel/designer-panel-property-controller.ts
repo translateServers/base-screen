@@ -3,12 +3,12 @@ import type { ScreenDocumentTransaction } from '@base-screen/core';
 import {
   createDesignerQuickStyleTransaction,
   type DesignerQuickStyleAction,
-} from '../../../common/operations/designer-quick-style.js';
+} from '../../../common/operations/style/designer-quick-style.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
   createDescriptorArrayTransaction,
   createDescriptorFieldTransaction,
-} from '../../dom/designer-descriptor-operations.js';
+} from '../../dom/descriptor/designer-descriptor-operations.js';
 import {
   createCanvasBackgroundStopTransaction,
   createDataSourceTransaction,
@@ -22,7 +22,7 @@ import {
   type DesignerCanvasPresentationSettings,
   renderDesignerDataPanel,
   renderDesignerProperties,
-} from '../../dom/designer-panel-dom.js';
+} from '../../dom/panel/designer-panel-dom.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 
 export class DesignerPanelPropertyController {

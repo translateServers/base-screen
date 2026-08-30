@@ -9,7 +9,7 @@ import {
   createClipboard,
   createPasteTransaction,
 } from '../../../common/operations/designer-clipboard.js';
-import { roundScreenGeometry } from '../../../common/operations/designer-geometry.js';
+import { roundScreenGeometry } from '../../../common/operations/element/designer-geometry.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
@@ -17,10 +17,10 @@ import {
   createDistributionTransaction,
   createGroupTransaction,
   createUngroupTransaction,
-} from '../../../common/operations/designer-layout-operations.js';
-import { removeComponentCommands } from '../../../common/operations/designer-remove-operations.js';
-import { selectedComponents } from '../../../common/operations/designer-selection.js';
-import { createInitialDataSource } from '../../dom/designer-panel-dom.js';
+} from '../../../common/operations/element/designer-layout-operations.js';
+import { removeComponentCommands } from '../../../common/operations/selection/designer-remove-operations.js';
+import { selectedComponents } from '../../../common/operations/selection/designer-selection.js';
+import { createInitialDataSource } from '../../dom/panel/designer-panel-dom.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 
 /** Owns selection commands and the internal component clipboard. */

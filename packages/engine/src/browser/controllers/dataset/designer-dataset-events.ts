@@ -3,7 +3,7 @@ import type {
   DesignerDatasetAuthoringAction,
   DesignerDatasetAuthoringView,
   DesignerDatasetRefreshStrategy,
-} from '../../dom/designer-dataset-dom.js';
+} from '../../dom/dataset/designer-dataset-dom.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import {
   describeDataset,
@@ -133,7 +133,6 @@ function handleDatasetAction(context: DesignerDatasetControllerContext, target: 
   if (action === 'discard-workbench') {
     context.restoreDatasetDraft();
     context.state.workbenchOpen = false;
-    context.state.staticDialogOpen = false;
     context.state.confirmClose = false;
     context.renderSurface();
     context.restoreFullscreenActionFocus();
@@ -173,7 +172,6 @@ function closeWorkbench(context: DesignerDatasetControllerContext): true {
     return true;
   }
   context.state.workbenchOpen = false;
-  context.state.staticDialogOpen = false;
   context.state.confirmClose = false;
   context.renderSurface();
   context.restoreFullscreenActionFocus();

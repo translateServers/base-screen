@@ -2,7 +2,7 @@ import { isScreenComponentEffectivelyLocked, queryScreenComponentsInRect } from 
 import {
   selectedRootIds,
   selectionTargetsInContext,
-} from '../../../common/operations/designer-selection.js';
+} from '../../../common/operations/selection/designer-selection.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
 import {
   DesignerGestureEnvironment,

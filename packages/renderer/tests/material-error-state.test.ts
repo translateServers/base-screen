@@ -18,7 +18,7 @@ import type {
   BaseScreenMaterialTabularDataAdapter,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
-import { createBaseScreenRenderer } from '../src/renderer.js';
+import { createBaseScreenRenderer } from '../src/renderer/renderer.js';
 
 class FakeMaterialElement {
   readonly dataset: Record<string, string> = {};

@@ -3,12 +3,12 @@ import {
   type BaseScreenMaterialLibraryGrouping,
   hasMaterialLibraryGroup,
   materialLibraryGroupMaterialTypes,
-} from '../../../material-library-grouping.js';
+} from '../../../common/operations/material-library/material-library-grouping.js';
 import {
   type BaseScreenResolvedMaterialLibraryItem,
   createInitialDataSourceForMaterialLibraryItem,
-} from '../../../material-library-items.js';
-import { renderMaterialLibraryGroupNavigation } from '../../dom/designer-material-library-group-dom.js';
+} from '../../../common/operations/material-library/material-library-items.js';
+import { renderMaterialLibraryGroupNavigation } from '../../dom/material-library/designer-material-library-group-dom.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 
 export const MATERIAL_DRAG_TYPE = 'application/x-base-screen-material';

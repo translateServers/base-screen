@@ -63,7 +63,7 @@ export type {
   BaseScreenMaterialEditorSection,
   BaseScreenMaterialEditorTarget,
   BaseScreenMaterialEventDescriptor,
-} from './editor-descriptor.js';
+} from './editor/editor-descriptor.js';
 export {
   MAX_EDITOR_CONDITION_VALUES,
   MAX_EDITOR_CONDITIONS,
@@ -76,12 +76,12 @@ export {
   MAX_EDITOR_SECTIONS_PER_ZONE,
   parseBaseScreenMaterialEditorDescriptor,
   resolveSchema,
-} from './editor-descriptor.js';
+} from './editor/editor-descriptor.js';
 export {
   parseBaseScreenMaterialEventDetail,
   parseBaseScreenMaterialManifest,
   validateBaseScreenMaterialIdentity,
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
-} from './material.js';
+} from './material/material.js';
 export { parseBaseScreenPluginManifest, parsePluginCommandRequest } from './plugin.js';

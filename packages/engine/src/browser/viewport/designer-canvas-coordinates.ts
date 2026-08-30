@@ -1,3 +1,7 @@
+// 画布坐标换算：client（视口）坐标 → 画布坐标。
+// 关键点是边框内偏移（clientLeft/clientTop 随 zoom 缩放）必须先扣除再除以缩放比，
+// 否则边框宽度会随缩放级别污染落点坐标（框选/拖拽抖动的常见来源）。
+
 export interface DesignerClientPoint {
   readonly clientX: number;
   readonly clientY: number;

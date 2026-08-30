@@ -3,6 +3,39 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import type { DesignerStaticDataView } from './designer-static-data-view.js';
 
+export function renderScalar(ownerDocument: Document, view: DesignerStaticDataView): HTMLElement {
+  const label = ownerDocument.createElement('label');
+  label.className = 'designer-field';
+  const caption = ownerDocument.createElement('span');
+  caption.className = 'designer-field-label';
+  const descriptor = view.descriptor;
+  if (descriptor?.kind !== 'scalar') return label;
+  caption.textContent =
+    descriptor.valueType === 'string'
+      ? DESIGNER_UI_TEXT.dataSource.staticScalarString
+      : descriptor.valueType === 'number'
+        ? DESIGNER_UI_TEXT.dataSource.staticScalarNumber
+        : DESIGNER_UI_TEXT.dataSource.staticScalarBoolean;
+  const input =
+    descriptor.valueType === 'string' && descriptor.multiline === true
+      ? ownerDocument.createElement('textarea')
+      : ownerDocument.createElement('input');
+  input.className =
+    input instanceof HTMLTextAreaElement
+      ? 'designer-control designer-textarea'
+      : 'designer-control designer-input';
+  input.dataset.staticScalar = descriptor.valueType;
+  if (input instanceof HTMLInputElement && descriptor.valueType === 'number') input.type = 'number';
+  if (input instanceof HTMLInputElement && descriptor.valueType === 'boolean') {
+    input.type = 'checkbox';
+    input.checked = view.value === true;
+  } else {
+    input.value = String(view.value ?? '');
+  }
+  label.append(caption, input);
+  return label;
+}
+
 export function renderAdvancedInput(ownerDocument: Document, value: string): HTMLElement {
   const label = ownerDocument.createElement('label');
   label.className = 'designer-field designer-data-source-static';
@@ -25,51 +58,6 @@ export function renderApply(ownerDocument: Document): HTMLElement {
     action(ownerDocument, 'apply', DESIGNER_UI_TEXT.dataSource.apply('static'), 'primary'),
   );
   return actions;
-}
-
-export function fieldInput(
-  ownerDocument: Document,
-  index: number,
-  property: 'id' | 'label',
-  value: string,
-  label: string,
-): HTMLInputElement {
-  const input = ownerDocument.createElement('input');
-  input.className = 'designer-control designer-input';
-  input.dataset.staticFieldIndex = String(index);
-  input.dataset.staticFieldProperty = property;
-  input.value = value;
-  input.setAttribute('aria-label', label);
-  return input;
-}
-
-export function fieldType(
-  ownerDocument: Document,
-  index: number,
-  value: string,
-): HTMLSelectElement {
-  const select = ownerDocument.createElement('select');
-  select.className = 'designer-control designer-select';
-  select.dataset.staticFieldIndex = String(index);
-  select.dataset.staticFieldProperty = 'valueType';
-  select.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticFieldType);
-  for (const type of ['string', 'number', 'boolean', 'date'])
-    appendOption(select, type, type, value === type);
-  return select;
-}
-
-export function fieldNullable(
-  ownerDocument: Document,
-  index: number,
-  checked: boolean,
-): HTMLInputElement {
-  const input = ownerDocument.createElement('input');
-  input.type = 'checkbox';
-  input.dataset.staticFieldIndex = String(index);
-  input.dataset.staticFieldProperty = 'nullable';
-  input.checked = checked;
-  input.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticFieldNullable);
-  return input;
 }
 
 export function tab(

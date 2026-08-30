@@ -1,5 +1,5 @@
 import type { ScreenDocument } from '@base-screen/contracts';
-import type { BaseScreenDesignerWorkbenchMode } from '../../common/operations/designer-blueprint-protocol.js';
+import type { BaseScreenDesignerWorkbenchMode } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_OPERATION_TEXT } from '../../common/operations/designer-operation-registry.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 

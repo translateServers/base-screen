@@ -1,13 +1,21 @@
-import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
-import {
-  buildComponentIndex,
-  getAncestorIds,
-  getDescendantIds,
-  isEffectiveLocked,
-} from '../hierarchy/hierarchy.js';
+import type { ScreenDocument } from '@base-screen/contracts';
 import { prefixDiagnostic, sortDiagnostics } from '../internal/diagnostics.js';
-import { assertCoreValidDocument, parseCandidateDocument } from '../internal/document.js';
+import { assertCoreValidDocument } from '../internal/document.js';
 import { areEqual } from '../internal/equality.js';
+import {
+  applyAddComponentCommand,
+  applyRemoveComponentsCommand,
+  applyReparentComponentsCommand,
+  applyUpdateComponentsCommand,
+} from './apply-component-commands.js';
+import { isExactPatch, isRecord } from './command-input.js';
+import {
+  finalizeScreenCommand,
+  invalidScreenCommand,
+  screenCommandDiagnostic,
+  screenCommandFailure,
+  screenCommandSuccess,
+} from './command-result.js';
 import type {
   ScreenCommandResult,
   ScreenDocumentCommand,
@@ -15,18 +23,6 @@ import type {
   ScreenTransactionResult,
 } from './types.js';
 
-const PATCH_FIELDS = new Set([
-  'name',
-  'position',
-  'size',
-  'rotation',
-  'zIndex',
-  'status',
-  'props',
-  'style',
-  'styleRules',
-  'dataSource',
-]);
 // canvas patch 字段白名单（ADR-0043：backgroundImage/backgroundImageFit 为可选字段，
 // patch 中值为 null 表示删除该字段——canvas 全部字段均不可空，null 无歧义）。
 const CANVAS_FIELDS = new Set([
@@ -46,34 +42,6 @@ export function applyScreenDocumentCommand(
   return applyValidatedCommand(document, command);
 }
 
-function applyValidatedCommand(
-  document: ScreenDocument,
-  command: ScreenDocumentCommand,
-): ScreenCommandResult {
-  if (!isRecord(command) || typeof command.type !== 'string') {
-    return failure(document, invalid('Command must be an object with a known type.', []));
-  }
-
-  switch (command.type) {
-    case 'update-canvas':
-      return applyCanvas(document, command.patch);
-    case 'add-component':
-      return applyAddComponent(document, command.component);
-    case 'update-components':
-      return applyUpdateComponents(document, command.componentIds, command.patch);
-    case 'remove-components':
-      return applyRemoveComponents(document, command.componentIds);
-    case 'reparent-components':
-      return applyReparentComponents(document, command.componentIds, command.parentId);
-    case 'replace-blueprint':
-      return applyBlueprint(document, command.blueprint);
-    case 'replace-variables':
-      return applyVariables(document, command.variables);
-    default:
-      return failure(document, invalid('Command type is not supported.', ['type']));
-  }
-}
-
 export function applyScreenDocumentTransaction(
   document: ScreenDocument,
   transaction: ScreenDocumentTransaction,
@@ -84,7 +52,7 @@ export function applyScreenDocumentTransaction(
       ok: false,
       document,
       failedCommandIndex: 0,
-      diagnostics: invalid('Transaction commands must be an array.', ['commands']),
+      diagnostics: invalidScreenCommand('Transaction commands must be an array.', ['commands']),
     };
   }
   if (transaction.commands.length > 1000) {
@@ -93,7 +61,7 @@ export function applyScreenDocumentTransaction(
       document,
       failedCommandIndex: 0,
       diagnostics: [
-        diagnostic(
+        screenCommandDiagnostic(
           'CORE_COMMAND_LIMIT_EXCEEDED',
           ['commands'],
           'Transaction exceeds 1000 commands.',
@@ -128,15 +96,49 @@ export function applyScreenDocumentTransaction(
   };
 }
 
+function applyValidatedCommand(
+  document: ScreenDocument,
+  command: ScreenDocumentCommand,
+): ScreenCommandResult {
+  if (!isRecord(command) || typeof command.type !== 'string') {
+    return screenCommandFailure(
+      document,
+      invalidScreenCommand('Command must be an object with a known type.', []),
+    );
+  }
+
+  switch (command.type) {
+    case 'update-canvas':
+      return applyCanvas(document, command.patch);
+    case 'add-component':
+      return applyAddComponentCommand(document, command.component);
+    case 'update-components':
+      return applyUpdateComponentsCommand(document, command.componentIds, command.patch);
+    case 'remove-components':
+      return applyRemoveComponentsCommand(document, command.componentIds);
+    case 'reparent-components':
+      return applyReparentComponentsCommand(document, command.componentIds, command.parentId);
+    case 'replace-blueprint':
+      return applyBlueprint(document, command.blueprint);
+    case 'replace-variables':
+      return applyVariables(document, command.variables);
+    default:
+      return screenCommandFailure(
+        document,
+        invalidScreenCommand('Command type is not supported.', ['type']),
+      );
+  }
+}
+
 function applyCanvas(document: ScreenDocument, patch: unknown): ScreenCommandResult {
   if (!isExactPatch(patch, CANVAS_FIELDS)) {
-    return failure(
+    return screenCommandFailure(
       document,
-      invalid('Canvas patch contains an unknown or invalid field.', ['patch']),
+      invalidScreenCommand('Canvas patch contains an unknown or invalid field.', ['patch']),
     );
   }
   if (Object.keys(patch).length === 0) {
-    return success(document, []);
+    return screenCommandSuccess(document, []);
   }
   // null 值表示删除字段（canvas 字段均不可空，无歧义）；其余值合并。
   const canvas = { ...document.canvas } as Record<string, unknown>;
@@ -148,277 +150,33 @@ function applyCanvas(document: ScreenDocument, patch: unknown): ScreenCommandRes
     }
   }
   if (areEqual(document.canvas, canvas)) {
-    return success(document, []);
+    return screenCommandSuccess(document, []);
   }
-  return finalize(document, { ...document, canvas }, []);
-}
-
-function applyAddComponent(document: ScreenDocument, component: unknown): ScreenCommandResult {
-  if (!isRecord(component)) {
-    return failure(document, invalid('Component must be an object.', ['component']));
-  }
-  const index = buildComponentIndex(document);
-  if (typeof component.id !== 'string') {
-    return failure(document, invalid('Component id must be a string.', ['component', 'id']));
-  }
-  if (index.byId.has(component.id)) {
-    return failure(
-      document,
-      diagnostic('CORE_COMMAND_INVALID', ['component', 'id'], 'Component id already exists.'),
-    );
-  }
-  if (component.parentId !== null && !index.byId.has(component.parentId as string)) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_PARENT_INVALID',
-        ['component', 'parentId'],
-        'Component parent does not exist.',
-      ),
-    );
-  }
-  if (component.parentId !== null && isEffectiveLocked(index, component.parentId as string)) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_TARGET_LOCKED',
-        ['component', 'parentId'],
-        'Component parent is locked.',
-      ),
-    );
-  }
-  return finalize(document, { ...document, components: [...document.components, component] }, [
-    component.id,
-  ]);
-}
-
-function applyUpdateComponents(
-  document: ScreenDocument,
-  componentIds: unknown,
-  patch: unknown,
-): ScreenCommandResult {
-  if (!isStringArray(componentIds)) {
-    return failure(document, invalid('Component ids must be a string array.', ['componentIds']));
-  }
-  if (!isExactPatch(patch, PATCH_FIELDS) || Object.keys(patch).length === 0) {
-    return failure(document, invalid('Component patch must contain known fields.', ['patch']));
-  }
-  const targets = canonicalTargetIds(document, componentIds);
-  if (targets === undefined) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_TARGET_MISSING',
-        ['componentIds'],
-        'One or more components do not exist.',
-      ),
-    );
-  }
-  if (targets.length === 0) {
-    return success(document, []);
-  }
-  const index = buildComponentIndex(document);
-  const locked = targets.find((id) => isEffectiveLocked(index, id));
-  if (locked !== undefined && !isStatusOnlyPatch(patch)) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_TARGET_LOCKED',
-        ['componentIds'],
-        `Component "${locked}" is locked.`,
-      ),
-    );
-  }
-  const components = document.components.map((component) =>
-    targets.includes(component.id) ? patchDocument(component, patch) : component,
-  );
-  const changed = targets.filter((id) => {
-    const entry = index.byId.get(id)!;
-    return !areEqual(entry.component, components[entry.index]);
-  });
-  if (changed.length === 0) {
-    return success(document, []);
-  }
-  return finalize(document, { ...document, components }, changed);
-}
-
-function applyRemoveComponents(
-  document: ScreenDocument,
-  componentIds: unknown,
-): ScreenCommandResult {
-  if (!isStringArray(componentIds)) {
-    return failure(document, invalid('Component ids must be a string array.', ['componentIds']));
-  }
-  const targets = canonicalTargetIds(document, componentIds);
-  if (targets === undefined) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_TARGET_MISSING',
-        ['componentIds'],
-        'One or more components do not exist.',
-      ),
-    );
-  }
-  if (targets.length === 0) {
-    return success(document, []);
-  }
-  const index = buildComponentIndex(document);
-  const removed = new Set<string>();
-  for (const target of targets) {
-    removed.add(target);
-    for (const descendant of getDescendantIds(index, target)) {
-      removed.add(descendant);
-    }
-  }
-  // 按文档序收集被移除组件（即后续 changed），锁检查只遍历该集合：
-  // 首个命中与原先全量扫描的首个命中一致（诊断消息保持文档序）。
-  const changed = document.components
-    .filter((component) => removed.has(component.id))
-    .map(({ id }) => id);
-  const locked = changed.find((id) => isEffectiveLocked(index, id));
-  if (locked !== undefined) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_TARGET_LOCKED',
-        ['componentIds'],
-        `Component "${locked}" is locked.`,
-      ),
-    );
-  }
-  return finalize(
-    document,
-    {
-      ...document,
-      components: document.components.filter((component) => !removed.has(component.id)),
-    },
-    changed,
-  );
-}
-
-function applyReparentComponents(
-  document: ScreenDocument,
-  componentIds: unknown,
-  parentId: unknown,
-): ScreenCommandResult {
-  if (!isStringArray(componentIds) || (parentId !== null && typeof parentId !== 'string')) {
-    return failure(document, invalid('Reparent command fields are invalid.', []));
-  }
-  const targets = canonicalTargetIds(document, componentIds);
-  if (targets === undefined) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_TARGET_MISSING',
-        ['componentIds'],
-        'One or more components do not exist.',
-      ),
-    );
-  }
-  if (targets.length === 0) {
-    return success(document, []);
-  }
-  const index = buildComponentIndex(document);
-  // 判定「是否为另一 target 的后代」改走祖先链：id 的祖先命中 targets 即为内层，
-  // 等价于原先对每个 target 展开 descendants 的 O(n²×d) 扫描，降为 O(n×depth)。
-  const targetSet = new Set(targets);
-  const outerTargets = targets.filter(
-    (id) => !getAncestorIds(index, id).some((ancestor) => targetSet.has(ancestor)),
-  );
-  if (parentId !== null && !index.byId.has(parentId)) {
-    return failure(
-      document,
-      diagnostic('CORE_COMMAND_PARENT_INVALID', ['parentId'], 'New parent does not exist.'),
-    );
-  }
-  const descendants = new Set<string>();
-  for (const target of outerTargets) {
-    descendants.add(target);
-    for (const descendant of getDescendantIds(index, target)) {
-      descendants.add(descendant);
-    }
-  }
-  if (parentId !== null && descendants.has(parentId)) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_PARENT_INVALID',
-        ['parentId'],
-        'New parent cannot be a target or descendant.',
-      ),
-    );
-  }
-  const lockedTarget = outerTargets.find((id) => isEffectiveLocked(index, id));
-  if (lockedTarget !== undefined || (parentId !== null && isEffectiveLocked(index, parentId))) {
-    return failure(
-      document,
-      diagnostic(
-        'CORE_COMMAND_TARGET_LOCKED',
-        [],
-        'Reparenting crosses a locked component boundary.',
-      ),
-    );
-  }
-  const changed = outerTargets.filter((id) => index.byId.get(id)!.component.parentId !== parentId);
-  if (changed.length === 0) {
-    return success(document, []);
-  }
-  const changedSet = new Set(changed);
-  return finalize(
-    document,
-    {
-      ...document,
-      components: document.components.map((component) =>
-        changedSet.has(component.id) ? { ...component, parentId } : component,
-      ),
-    },
-    changed,
-  );
+  return finalizeScreenCommand(document, { ...document, canvas }, []);
 }
 
 function applyVariables(document: ScreenDocument, variables: unknown): ScreenCommandResult {
   if (!Array.isArray(variables)) {
-    return failure(document, invalid('Variables must be an array.', ['variables']));
+    return screenCommandFailure(
+      document,
+      invalidScreenCommand('Variables must be an array.', ['variables']),
+    );
   }
   if (areEqual(document.variables, variables)) {
-    return success(document, []);
+    return screenCommandSuccess(document, []);
   }
-  return finalize(document, { ...document, variables }, []);
+  return finalizeScreenCommand(document, { ...document, variables }, []);
 }
 
 function applyBlueprint(document: ScreenDocument, blueprint: unknown): ScreenCommandResult {
   if (!isRecord(blueprint) || !Array.isArray(blueprint.rules)) {
-    return failure(document, invalid('Blueprint must be a canonical object.', ['blueprint']));
+    return screenCommandFailure(
+      document,
+      invalidScreenCommand('Blueprint must be a canonical object.', ['blueprint']),
+    );
   }
-  if (areEqual(document.blueprint, blueprint)) return success(document, []);
-  return finalize(document, { ...document, blueprint }, []);
-}
-
-function finalize(
-  original: ScreenDocument,
-  candidate: unknown,
-  changedComponentIds: readonly string[],
-): ScreenCommandResult {
-  // candidate 由 original 经引用共享派生：以 original 为 base，未变更部分
-  // 跳过克隆与结构校验，仅完整校验新增/变更的值。
-  const parsed = parseCandidateDocument(candidate, original);
-  if (!parsed.ok) {
-    return failure(original, parsed.diagnostics);
-  }
-  return success(parsed.document, changedComponentIds);
-}
-
-function canonicalTargetIds(
-  document: ScreenDocument,
-  componentIds: readonly string[],
-): readonly string[] | undefined {
-  const unique = new Set(componentIds);
-  const ids = new Set(document.components.map((component) => component.id));
-  if ([...unique].some((id) => !ids.has(id))) {
-    return undefined;
-  }
-  return document.components.filter((component) => unique.has(component.id)).map(({ id }) => id);
+  if (areEqual(document.blueprint, blueprint)) return screenCommandSuccess(document, []);
+  return finalizeScreenCommand(document, { ...document, blueprint }, []);
 }
 
 function getNetChangedComponentIds(
@@ -441,57 +199,4 @@ function getNetChangedComponentIds(
     .filter((component) => !afterById.has(component.id))
     .map(({ id }) => id);
   return [...current, ...removed];
-}
-
-function patchDocument<T extends object>(base: T, patch: Record<string, unknown>): T {
-  return { ...base, ...patch };
-}
-
-function isExactPatch(
-  value: unknown,
-  allowed: ReadonlySet<string>,
-): value is Record<string, unknown> {
-  return isRecord(value) && Object.keys(value).every((key) => allowed.has(key));
-}
-
-function isStatusOnlyPatch(value: unknown): boolean {
-  return isRecord(value) && Object.keys(value).length === 1 && value.status !== undefined;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
-function isStringArray(value: unknown): value is readonly string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
-}
-
-function success(
-  document: ScreenDocument,
-  changedComponentIds: readonly string[],
-): ScreenCommandResult {
-  return { ok: true, document, changedComponentIds, diagnostics: [] };
-}
-
-function failure(
-  document: ScreenDocument,
-  diagnostics: readonly ScreenDiagnostic[] | ScreenDiagnostic,
-): ScreenCommandResult {
-  return {
-    ok: false,
-    document,
-    diagnostics: sortDiagnostics(Array.isArray(diagnostics) ? diagnostics : [diagnostics]),
-  };
-}
-
-function invalid(message: string, path: readonly (string | number)[]): readonly ScreenDiagnostic[] {
-  return [diagnostic('CORE_COMMAND_INVALID', path, message)];
-}
-
-function diagnostic(
-  code: ScreenDiagnostic['code'],
-  path: readonly (string | number)[],
-  message: string,
-): ScreenDiagnostic {
-  return { severity: 'error', code, path, message };
 }

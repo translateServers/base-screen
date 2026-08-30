@@ -10,7 +10,7 @@ export interface DesignerKeyboardEventShape {
   readonly shiftKey: boolean;
 }
 
-// chord 规范化 v2：从键盘事件提取统一快捷键串（与操作注册表元数据同构）。
+// chord 规范化：从键盘事件提取统一快捷键串（与操作注册表元数据同构）。
 // - Backspace 归一为 Delete（与注册表语义一致）；
 // - Cmd 归一为 Ctrl（macOS 与 Windows 共用同一命令元数据）；
 // - IME 组合期（isComposing / Process 键）与 AltGr 布局不产生命令 chord，

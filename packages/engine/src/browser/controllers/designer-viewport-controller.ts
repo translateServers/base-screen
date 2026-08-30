@@ -5,7 +5,7 @@ import {
   type ScreenViewportState,
 } from '@base-screen/core';
 import { DESIGNER_TOOLS, type DesignerToolId } from '../../common/tools/designer-tools.js';
-import { designerToolGlyph } from '../dom/designer-workspace.js';
+import { designerToolGlyph } from '../dom/workspace/designer-workspace.js';
 import {
   clampDesignerZoom,
   getFitDesignerZoom,

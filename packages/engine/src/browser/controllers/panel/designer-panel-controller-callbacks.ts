@@ -14,10 +14,10 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import type { BaseScreenMaterialLibraryGrouping } from '../../../material-library-grouping.js';
-import type { BaseScreenResolvedMaterialLibraryItem } from '../../../material-library-items.js';
-import type { DesignerDescriptorDatasetFields } from '../../dom/designer-descriptor-dom.js';
-import type { DesignerCanvasPresentationSettings } from '../../dom/designer-panel-dom.js';
+import type { BaseScreenMaterialLibraryGrouping } from '../../../common/operations/material-library/material-library-grouping.js';
+import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
+import type { DesignerDescriptorDatasetFields } from '../../dom/descriptor/designer-descriptor-dom.js';
+import type { DesignerCanvasPresentationSettings } from '../../dom/panel/designer-panel-dom.js';
 
 export interface DesignerPanelControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;

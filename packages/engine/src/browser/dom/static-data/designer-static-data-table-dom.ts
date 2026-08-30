@@ -1,57 +1,17 @@
 import type { ScreenTabularDataset } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
-  DESIGNER_STATIC_PAGE_SIZE_OPTIONS,
-  resolveDesignerStaticDataPagination,
-} from '../designer-static-data-pagination.js';
-import {
   action,
   appendOption,
-  fieldInput,
-  fieldNullable,
-  fieldType,
   indexedAction,
   paginationAction,
   roleAction,
 } from './designer-static-data-controls.js';
+import {
+  DESIGNER_STATIC_PAGE_SIZE_OPTIONS,
+  resolveDesignerStaticDataPagination,
+} from './designer-static-data-pagination.js';
 import type { DesignerStaticDataView } from './designer-static-data-view.js';
-
-export function renderFields(ownerDocument: Document, dataset: ScreenTabularDataset): HTMLElement {
-  const section = ownerDocument.createElement('section');
-  section.className = 'designer-static-fields';
-  const heading = ownerDocument.createElement('h4');
-  heading.textContent = DESIGNER_UI_TEXT.dataSource.staticFields;
-  section.appendChild(heading);
-  dataset.fields.forEach((field, index) => {
-    const row = ownerDocument.createElement('div');
-    row.className = 'designer-static-field-row';
-    row.append(
-      fieldInput(ownerDocument, index, 'id', field.id, DESIGNER_UI_TEXT.dataSource.staticFieldId),
-      fieldInput(
-        ownerDocument,
-        index,
-        'label',
-        field.label,
-        DESIGNER_UI_TEXT.dataSource.staticFieldLabel,
-      ),
-      fieldType(ownerDocument, index, field.valueType),
-      fieldNullable(ownerDocument, index, field.nullable === true),
-      indexedAction(ownerDocument, 'field-up', index, DESIGNER_UI_TEXT.descriptor.moveUp),
-      indexedAction(ownerDocument, 'field-down', index, DESIGNER_UI_TEXT.descriptor.moveDown),
-      indexedAction(
-        ownerDocument,
-        'field-remove',
-        index,
-        DESIGNER_UI_TEXT.dataSource.staticRemoveField,
-      ),
-    );
-    section.appendChild(row);
-  });
-  section.appendChild(
-    action(ownerDocument, 'field-add', DESIGNER_UI_TEXT.dataSource.staticAddField),
-  );
-  return section;
-}
 
 export function renderBindings(
   ownerDocument: Document,

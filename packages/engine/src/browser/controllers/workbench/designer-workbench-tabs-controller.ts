@@ -1,7 +1,7 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import type { BaseScreenDesignerWorkbenchMode } from '../../../common/operations/designer-blueprint-protocol.js';
+import type { BaseScreenDesignerWorkbenchMode } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
   hostLeftPanelGroupId,

@@ -4,9 +4,9 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import type { BaseScreenDesignerSetWorkbenchModeOptions } from '../../common/operations/designer-blueprint-protocol.js';
+import type { BaseScreenDesignerSetWorkbenchModeOptions } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import { renderDesignerEventsPanel } from '../dom/designer-blueprint-dom.js';
+import { renderDesignerEventsPanel } from '../dom/blueprint/designer-blueprint-dom.js';
 
 export interface DesignerIntegrationCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;

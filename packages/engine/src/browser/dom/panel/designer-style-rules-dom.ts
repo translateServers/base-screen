@@ -10,9 +10,9 @@ import type {
   BaseScreenMaterialManifest,
   BaseScreenMaterialPropSchema,
 } from '@base-screen/plugin-core';
-import { STYLE_RULE_OPERATORS } from '../../../common/operations/designer-style-rule-operations.js';
+import { STYLE_RULE_OPERATORS } from '../../../common/operations/style/designer-style-rule-operations.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { createDesignerColorPalette } from '../designer-color-palette-dom.js';
+import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import { appendSection, createControl } from './designer-panel-primitives.js';
 

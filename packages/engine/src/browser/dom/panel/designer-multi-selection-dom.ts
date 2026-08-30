@@ -1,8 +1,8 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import type { DesignerInspectorContext } from '../../../common/operations/designer-inspector.js';
-import { commonStyleFields } from '../../../common/operations/designer-multi-selection-operations.js';
+import { commonStyleFields } from '../../../common/operations/selection/designer-multi-selection-operations.js';
+import type { DesignerInspectorContext } from '../../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { appendDesignerQuickStyle } from '../designer-quick-style-dom.js';
 import {

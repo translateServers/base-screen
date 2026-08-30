@@ -99,9 +99,8 @@ successor ADR 应采用以下可验收语义，或提供安全性等价且可在
 
 ```ts
 type RemoteSandboxMessage =
-  | { readonly protocolVersion: 1; readonly type: 'ready' }
+  | { readonly type: 'ready' }
   | {
-      readonly protocolVersion: 1;
       readonly type: 'emit-event';
       readonly name: string;
       readonly payload: ScreenJsonValue;

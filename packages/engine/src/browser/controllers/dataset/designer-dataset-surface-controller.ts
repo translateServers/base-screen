@@ -4,9 +4,9 @@ import {
   type DesignerDatasetWorkbenchStep,
   renderDesignerDataSourcePanel,
   renderDesignerDatasetWorkbench,
-} from '../../dom/designer-dataset-dom.js';
-import { renderDesignerDescriptorZone } from '../../dom/designer-descriptor-dom.js';
-import { designerDataSourceModes } from '../designer-data-source-authoring.js';
+} from '../../dom/dataset/designer-dataset-dom.js';
+import { renderDesignerDescriptorZone } from '../../dom/descriptor/designer-descriptor-dom.js';
+import { designerDataSourceModes } from './designer-data-source-authoring.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 
 export function renderDatasetSurface(context: DesignerDatasetControllerContext): void {
@@ -63,7 +63,7 @@ export function syncDataFlowProgress(
   }
 }
 
-export function createDatasetPanelOptions(
+function createDatasetPanelOptions(
   context: DesignerDatasetControllerContext,
   panel: HTMLElement,
 ): DesignerDataSourcePanelOptions {
@@ -72,7 +72,6 @@ export function createDatasetPanelOptions(
     scrollScope: JSON.stringify([
       context.state.focusedComponentId,
       context.state.mode,
-      context.state.staticDialogOpen,
       context.state.staticTab,
       context.state.staticPage,
       context.state.staticPageSize,
@@ -86,12 +85,9 @@ export function createDatasetPanelOptions(
     staticDescriptor: context.currentEntry()?.manifest.staticData,
     staticValue: context.state.staticValue,
     staticBinding: context.state.staticBinding,
-    staticDialogOpen: context.state.staticDialogOpen,
     staticTab: context.state.staticTab,
     staticPage: context.state.staticPage,
     staticPageSize: context.state.staticPageSize,
-    staticPasteDraft: context.state.staticPasteDraft,
-    staticFirstRowIsHeader: context.state.staticFirstRowIsHeader,
     query: context.catalogController.query,
     catalogOpen: context.state.catalogOpen,
     items: context.catalogController.items,

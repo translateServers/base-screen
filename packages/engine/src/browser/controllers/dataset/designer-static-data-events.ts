@@ -3,22 +3,15 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
   normalizeDesignerStaticPageSize,
   resolveDesignerStaticDataPagination,
-} from '../../dom/designer-static-data-pagination.js';
-import { parseDesignerTsv } from '../designer-static-tabular.js';
+} from '../../dom/static-data/designer-static-data-pagination.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import {
-  addStaticField,
   addStaticRow,
   currentStaticDataset,
-  defaultStaticBinding,
   formatStaticDiagnostic,
-  moveStaticField,
-  removeStaticField,
   removeStaticRow,
-  setStaticDataset,
   setStaticValue,
   updateStaticCell,
-  updateStaticField,
 } from './designer-static-table-controller.js';
 
 export function handleStaticInput(
@@ -30,10 +23,6 @@ export function handleStaticInput(
     syncStaticValueFromJson(context);
     return true;
   }
-  if (target.dataset.staticPaste !== undefined) {
-    context.state.staticPasteDraft = target.value;
-    return true;
-  }
   if (target.dataset.staticScalar !== undefined) {
     if (target.dataset.staticScalar === 'number') {
       const value = Number(target.value);
@@ -42,15 +31,6 @@ export function handleStaticInput(
     } else if (target.dataset.staticScalar === 'string') {
       setStaticValue(context, target.value);
     }
-    return true;
-  }
-  if (target.dataset.staticFieldIndex !== undefined) {
-    updateStaticField(
-      context,
-      Number(target.dataset.staticFieldIndex),
-      target.dataset.staticFieldProperty,
-      target.value,
-    );
     return true;
   }
   if (target.dataset.staticCellRow !== undefined) {
@@ -105,23 +85,8 @@ export function handleStaticChange(
   context: DesignerDatasetControllerContext,
   target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
 ): boolean {
-  if (target.dataset.staticFirstRowHeader !== undefined && target instanceof HTMLInputElement) {
-    context.state.staticFirstRowIsHeader = target.checked;
-    return true;
-  }
   if (target.dataset.staticScalar === 'boolean' && target instanceof HTMLInputElement) {
     setStaticValue(context, target.checked);
-    return true;
-  }
-  if (target.dataset.staticFieldIndex !== undefined) {
-    updateStaticField(
-      context,
-      Number(target.dataset.staticFieldIndex),
-      target.dataset.staticFieldProperty,
-      target instanceof HTMLInputElement && target.type === 'checkbox'
-        ? target.checked
-        : target.value,
-    );
     return true;
   }
   if (target.dataset.staticPageSize !== undefined && target instanceof HTMLSelectElement) {
@@ -161,54 +126,13 @@ function handleStaticAction(
   button: HTMLButtonElement,
 ): void {
   const action = button.dataset.staticAction;
-  if (action === 'open') {
-    context.state.staticDialogOpen = true;
-    context.renderSurface();
-    return;
-  }
-  if (action === 'cancel') {
-    const source = context.currentComponent()?.dataSource;
-    if (source?.type === 'static') {
-      context.state.staticValue = source.value;
-      context.state.staticBinding = source.binding;
-      context.state.staticDraft = JSON.stringify(source.value, null, 2);
-    } else {
-      context.restoreStaticExample(false);
-    }
-    context.state.staticDialogOpen = false;
-    context.state.feedbackText = '';
-    context.renderSurface();
-    return;
-  }
   if (action === 'apply') {
     context.apply();
-    return;
-  }
-  if (action === 'restore') {
-    context.restoreStaticExample();
     return;
   }
   if (action === 'tab-table' || action === 'tab-advanced') {
     context.state.staticTab = action === 'tab-table' ? 'table' : 'advanced';
     context.renderSurface();
-    return;
-  }
-  if (action === 'paste') {
-    const parsed = parseDesignerTsv(
-      context.state.staticPasteDraft,
-      context.state.staticFirstRowIsHeader,
-    );
-    if (!parsed.ok) {
-      context.callbacks.report(parsed.diagnostics);
-      context.setFeedback(formatStaticDiagnostic(context, parsed.diagnostics[0]));
-      return;
-    }
-    context.state.staticBinding = defaultStaticBinding(context, parsed.value);
-    setStaticDataset(context, parsed.value);
-    return;
-  }
-  if (action === 'field-add') {
-    addStaticField(context);
     return;
   }
   if (action === 'row-add') {
@@ -250,9 +174,6 @@ function handleStaticAction(
   }
   const index = Number(button.dataset.staticIndex);
   if (!Number.isInteger(index)) return;
-  if (action === 'field-remove') removeStaticField(context, index);
-  if (action === 'field-up') moveStaticField(context, index, -1);
-  if (action === 'field-down') moveStaticField(context, index, 1);
   if (action === 'row-remove') removeStaticRow(context, index);
 }
 

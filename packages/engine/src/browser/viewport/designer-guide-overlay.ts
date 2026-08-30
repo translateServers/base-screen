@@ -1,3 +1,6 @@
+// 画布参考线覆盖层渲染：把常驻 guide、拖拽预览线、吸附参考线与间距测量标注
+// 绘制到 [data-canvas-guides] 容器（每次全量重建，用 CSS transform 对齐 zoom）。
+
 import type {
   DesignerCanvasAidsState,
   DesignerCanvasMeasurement,
