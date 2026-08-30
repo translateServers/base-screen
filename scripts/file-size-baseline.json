@@ -1,8 +1,6 @@
 {
   "description": "Exact line-count ceilings for files that predate the repository size limits.",
   "exceptions": {
-    "packages/contracts/src/document/validate.ts": 913,
-    "packages/contracts/tests/document/document.test.ts": 1275,
     "scripts/verify-tarballs.mjs": 1100,
     "tests/host-skill-adoption.test.ts": 821
   }

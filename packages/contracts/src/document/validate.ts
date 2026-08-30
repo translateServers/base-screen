@@ -3,93 +3,19 @@ import {
   type DiagnosticPhase,
   type DiagnosticSegment,
 } from '../diagnostics/collector.js';
-import { canonicalByteLength, codePointLength, hasControlCharacter } from '../json/canonical.js';
 import { cloneJsonValue } from '../json/clone.js';
 import { preflightJsonValue } from '../json/preflight.js';
-import type { ScreenDiagnosticCode } from '../types/diagnostics.js';
-import type {
-  ScreenBlueprintValueExpression,
-  ScreenCanvasBackground,
-  ScreenDocument,
-} from '../types/document.js';
-import type { ScreenJsonValue } from '../types/json.js';
-import { validateBlueprintStrictKeys } from './blueprint-strict.js';
-import { isBoundedScreenImageUrl } from './image-url.js';
-import {
-  MAX_BACKGROUND_COLOR_CODE_POINTS,
-  MAX_BACKGROUND_IMAGE_CODE_POINTS,
-  MAX_BLUEPRINT_ACTIONS_PER_RULE,
-  MAX_BLUEPRINT_EXPRESSION_BYTES,
-  MAX_BLUEPRINT_EXPRESSION_CONTAINERS,
-  MAX_BLUEPRINT_EXPRESSION_DEPTH,
-  MAX_BLUEPRINT_RULES,
-  MAX_CANONICAL_DOCUMENT_BYTES,
-  MAX_COMPONENTS,
-  MAX_DATA_SOURCE_VALUE_BYTES,
-  MAX_NAME_CODE_POINTS,
-  MAX_STYLE_RULE_ID_CODE_POINTS,
-  MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
-  MAX_STYLE_RULE_VALUE_BYTES,
-  MAX_VARIABLES,
-} from './limits.js';
+import type { ScreenDocument } from '../types/document.js';
+import { MAX_CANONICAL_DOCUMENT_BYTES, MAX_COMPONENTS, MAX_VARIABLES } from './limits.js';
 import { validateReferences } from './references.js';
-import {
-  blueprintSchema,
-  canvasSchema,
-  componentSchema,
-  hostVariableSchema,
-  staticVariableSchema,
-} from './schema.js';
-import { checkStrictObjectKeys, isJsonObject } from './strict-object.js';
+import { checkStrictObjectKeys } from './strict-object.js';
+import { validateBlueprint } from './validate-blueprint.js';
+import { validateCanvas } from './validate-canvas.js';
+import { validateComponent } from './validate-component.js';
+import type { DocumentDiagnosticPath } from './validate-support.js';
+import { validateVariable } from './validate-variable.js';
 
 const DOCUMENT_ROOT_FIELDS = new Set(['canvas', 'components', 'variables', 'blueprint']);
-const CANVAS_FIELDS = new Set([
-  'width',
-  'height',
-  'backgroundColor',
-  'background',
-  'backgroundImage',
-  'backgroundImageFit',
-]);
-const COMPONENT_FIELDS = new Set([
-  'id',
-  'type',
-  'name',
-  'parentId',
-  'position',
-  'size',
-  'rotation',
-  'zIndex',
-  'status',
-  'props',
-  'style',
-  'styleRules',
-  'dataSource',
-]);
-const POSITION_FIELDS = new Set(['x', 'y']);
-const SIZE_FIELDS = new Set(['width', 'height']);
-const STATUS_FIELDS = new Set(['locked', 'hidden']);
-const STATIC_DATA_SOURCE_FIELDS = new Set(['type', 'value', 'binding']);
-const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set([
-  'type',
-  'resourceType',
-  'resourceId',
-  'params',
-  'binding',
-]);
-const HOST_RESOURCE_PARAMETER_FIELDS = new Set(['kind', 'value', 'name']);
-const HOST_RESOURCE_BINDING_FIELDS = new Set(['fields']);
-const STYLE_RULE_FIELDS = new Set(['id', 'when', 'style']);
-const STYLE_RULE_WHEN_FIELDS = new Set(['path', 'operator', 'value']);
-const VARIABLE_FIELDS = new Set(['type', 'name', 'value']);
-const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'variableId']);
-const CANVAS_PALETTE_COLOR_PATTERN =
-  /^(?:transparent|#[0-9A-Fa-f]{3,4}|#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)$/;
-
-type ZodIssueLike = {
-  readonly path: readonly PropertyKey[];
-  readonly message: string;
-};
 
 export function validateDocument(
   input: unknown,
@@ -97,7 +23,7 @@ export function validateDocument(
   phase: DiagnosticPhase = 'root',
   base?: ScreenDocument,
 ): ScreenDocument | undefined {
-  const at = (path: DiagnosticSegment[]): DiagnosticSegment[] =>
+  const at: DocumentDiagnosticPath = (path) =>
     phase === 'document' ? ['document', ...path] : path;
 
   if (input === null || typeof input !== 'object' || Array.isArray(input)) {
@@ -130,77 +56,16 @@ export function validateDocument(
       )) as unknown as Record<string, unknown>;
   const diagnosticsBefore = collector.count;
   checkStrictObjectKeys(candidate, DOCUMENT_ROOT_FIELDS, at([]), collector, phase);
-  if (candidate.canvas !== base?.canvas) {
-    validateCanvas(candidate.canvas, at, collector, phase);
-  }
-
-  const components = candidate.components;
-  if (!Array.isArray(components)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['components']),
-      phase,
-      'Expected components to be an array.',
-    );
-  } else if (components.length > MAX_COMPONENTS) {
-    collector.add(
-      'DOCUMENT_LIMIT_EXCEEDED',
-      at(['components']),
-      phase,
-      `Document has more than ${MAX_COMPONENTS} components.`,
-    );
-  } else {
-    for (let index = 0; index < components.length; index++) {
-      if (collector.full) {
-        break;
-      }
-      if (sharedComponents?.has(components[index])) {
-        continue;
-      }
-      validateComponent(components[index], ['components', index], at, collector, phase);
-    }
-  }
-
-  const variables = candidate.variables;
-  if (!Array.isArray(variables)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['variables']),
-      phase,
-      'Expected variables to be an array.',
-    );
-  } else if (variables.length > MAX_VARIABLES) {
-    collector.add(
-      'DOCUMENT_LIMIT_EXCEEDED',
-      at(['variables']),
-      phase,
-      `Document has more than ${MAX_VARIABLES} variables.`,
-    );
-  } else {
-    for (let index = 0; index < variables.length; index++) {
-      if (collector.full) {
-        break;
-      }
-      if (sharedVariables?.has(variables[index])) {
-        continue;
-      }
-      validateVariable(variables[index], index, at, collector, phase);
-    }
-  }
-
+  if (candidate.canvas !== base?.canvas) validateCanvas(candidate.canvas, at, collector, phase);
+  validateComponents(candidate.components, sharedComponents, at, collector, phase);
+  validateVariables(candidate.variables, sharedVariables, at, collector, phase);
   if (candidate.blueprint !== base?.blueprint) {
     validateBlueprint(candidate.blueprint, at, collector, phase);
   }
 
-  if (collector.count > diagnosticsBefore) {
-    return undefined;
-  }
-
+  if (collector.count > diagnosticsBefore) return undefined;
   const document = candidate as unknown as ScreenDocument;
-  if (!validateReferences(document, at, collector, phase)) {
-    return undefined;
-  }
-  return document;
+  return validateReferences(document, at, collector, phase) ? document : undefined;
 }
 
 function cloneDocumentCandidate(
@@ -215,699 +80,77 @@ function cloneDocumentCandidate(
     const value = input[key];
     if (value === baseRecord[key]) {
       result[key] = value;
-      continue;
-    }
-    if (key === 'components' && Array.isArray(value)) {
+    } else if (key === 'components' && Array.isArray(value)) {
       result[key] = value.map((item) => (sharedComponents.has(item) ? item : cloneJsonValue(item)));
-      continue;
-    }
-    if (key === 'variables' && Array.isArray(value)) {
+    } else if (key === 'variables' && Array.isArray(value)) {
       result[key] = value.map((item) => (sharedVariables.has(item) ? item : cloneJsonValue(item)));
-      continue;
+    } else {
+      result[key] = cloneJsonValue(value);
     }
-    result[key] = cloneJsonValue(value);
   }
   return result;
 }
 
-function validateCanvas(
-  canvas: unknown,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  if (!isJsonObject(canvas)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['canvas']),
-      phase,
-      'Expected canvas to be an object.',
-    );
-    return false;
-  }
-  if (
-    !checkStrictObjectKeys(
-      canvas,
-      CANVAS_FIELDS,
-      at(['canvas']),
-      collector,
-      phase,
-      'DOCUMENT_UNKNOWN_FIELD',
-    )
-  ) {
-    return false;
-  }
-  const result = canvasSchema.safeParse(canvas);
-  if (!result.success) {
-    addZodIssues(result.error.issues, ['canvas'], canvasFieldCode, at, collector, phase);
-    return false;
-  }
-  let clean = true;
-  const backgroundColor = canvas.backgroundColor as string;
-  if (codePointLength(backgroundColor) > MAX_BACKGROUND_COLOR_CODE_POINTS) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['canvas', 'backgroundColor']),
-      phase,
-      `Canvas backgroundColor exceeds ${MAX_BACKGROUND_COLOR_CODE_POINTS} code points.`,
-    );
-    clean = false;
-  }
-  if (hasControlCharacter(backgroundColor)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['canvas', 'backgroundColor']),
-      phase,
-      'Canvas backgroundColor must not contain control characters.',
-    );
-    clean = false;
-  }
-  const background = canvas.background as ScreenCanvasBackground | undefined;
-  if (
-    background !== undefined &&
-    !validateCanvasBackgroundColors(background, at, collector, phase)
-  ) {
-    clean = false;
-  }
-  const backgroundImage = canvas.backgroundImage;
-  if (
-    backgroundImage !== undefined &&
-    !isBoundedScreenImageUrl(backgroundImage, MAX_BACKGROUND_IMAGE_CODE_POINTS)
-  ) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['canvas', 'backgroundImage']),
-      phase,
-      'Canvas backgroundImage must be a bounded HTTP(S) or relative URL string.',
-    );
-    clean = false;
-  }
-  return clean;
-}
-
-function validateCanvasBackgroundColors(
-  background: ScreenCanvasBackground,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  const colors =
-    background.type === 'solid'
-      ? [{ color: background.color, path: ['background', 'color'] as DiagnosticSegment[] }]
-      : background.stops.map((stop, index) => ({
-          color: stop.color,
-          path: ['background', 'stops', index, 'color'] as DiagnosticSegment[],
-        }));
-  let clean = true;
-  for (const { color, path } of colors) {
-    if (
-      codePointLength(color) <= MAX_BACKGROUND_COLOR_CODE_POINTS &&
-      !hasControlCharacter(color) &&
-      CANVAS_PALETTE_COLOR_PATTERN.test(color)
-    ) {
-      continue;
-    }
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['canvas', ...path]),
-      phase,
-      `Canvas palette colors must be hex colors or transparent and must be at most ${MAX_BACKGROUND_COLOR_CODE_POINTS} code points.`,
-    );
-    clean = false;
-  }
-  return clean;
-}
-
-function validateComponent(
-  component: unknown,
-  baseSegments: DiagnosticSegment[],
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  if (!isJsonObject(component)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(baseSegments),
-      phase,
-      'Expected a component to be an object.',
-    );
-    return false;
-  }
-  if (
-    !checkStrictObjectKeys(
-      component,
-      COMPONENT_FIELDS,
-      at(baseSegments),
-      collector,
-      phase,
-      'DOCUMENT_UNKNOWN_FIELD',
-    )
-  ) {
-    return false;
-  }
-  const position = component.position;
-  if (
-    isJsonObject(position) &&
-    !checkStrictObjectKeys(
-      position,
-      POSITION_FIELDS,
-      at([...baseSegments, 'position']),
-      collector,
-      phase,
-      'DOCUMENT_UNKNOWN_FIELD',
-    )
-  ) {
-    return false;
-  }
-  const size = component.size;
-  if (
-    isJsonObject(size) &&
-    !checkStrictObjectKeys(
-      size,
-      SIZE_FIELDS,
-      at([...baseSegments, 'size']),
-      collector,
-      phase,
-      'DOCUMENT_UNKNOWN_FIELD',
-    )
-  ) {
-    return false;
-  }
-  const status = component.status;
-  if (
-    isJsonObject(status) &&
-    !checkStrictObjectKeys(
-      status,
-      STATUS_FIELDS,
-      at([...baseSegments, 'status']),
-      collector,
-      phase,
-      'DOCUMENT_UNKNOWN_FIELD',
-    )
-  ) {
-    return false;
-  }
-  const styleRules = component.styleRules;
-  if (Array.isArray(styleRules)) {
-    for (let ruleIndex = 0; ruleIndex < styleRules.length; ruleIndex++) {
-      const rule = styleRules[ruleIndex];
-      const ruleBase = [...baseSegments, 'styleRules', ruleIndex] as DiagnosticSegment[];
-      if (
-        !isJsonObject(rule) ||
-        !checkStrictObjectKeys(rule, STYLE_RULE_FIELDS, at(ruleBase), collector, phase)
-      ) {
-        return false;
-      }
-      if (
-        isJsonObject(rule.when) &&
-        !checkStrictObjectKeys(
-          rule.when,
-          STYLE_RULE_WHEN_FIELDS,
-          at([...ruleBase, 'when']),
-          collector,
-          phase,
-        )
-      ) {
-        return false;
-      }
-    }
-  }
-  const dataSource = component.dataSource;
-  if (isJsonObject(dataSource)) {
-    const fields =
-      dataSource.type === 'host-resource'
-        ? HOST_RESOURCE_DATA_SOURCE_FIELDS
-        : STATIC_DATA_SOURCE_FIELDS;
-    if (
-      !checkStrictObjectKeys(
-        dataSource,
-        fields,
-        at([...baseSegments, 'dataSource']),
-        collector,
-        phase,
-        'DOCUMENT_UNKNOWN_FIELD',
-      )
-    ) {
-      return false;
-    }
-    if (dataSource.type === 'host-resource') {
-      const params = dataSource.params;
-      if (isJsonObject(params)) {
-        for (const [key, parameter] of Object.entries(params)) {
-          if (
-            isJsonObject(parameter) &&
-            !checkStrictObjectKeys(
-              parameter,
-              parameter.kind === 'variable'
-                ? new Set(['kind', 'name'])
-                : parameter.kind === 'literal'
-                  ? new Set(['kind', 'value'])
-                  : HOST_RESOURCE_PARAMETER_FIELDS,
-              at([...baseSegments, 'dataSource', 'params', key]),
-              collector,
-              phase,
-            )
-          ) {
-            return false;
-          }
-        }
-      }
-      const binding = dataSource.binding;
-      if (isJsonObject(binding)) {
-        if (
-          !checkStrictObjectKeys(
-            binding,
-            HOST_RESOURCE_BINDING_FIELDS,
-            at([...baseSegments, 'dataSource', 'binding']),
-            collector,
-            phase,
-          )
-        ) {
-          return false;
-        }
-      }
-    }
-    if (dataSource.type === 'static' && isJsonObject(dataSource.binding)) {
-      if (
-        !checkStrictObjectKeys(
-          dataSource.binding,
-          HOST_RESOURCE_BINDING_FIELDS,
-          at([...baseSegments, 'dataSource', 'binding']),
-          collector,
-          phase,
-        )
-      ) {
-        return false;
-      }
-    }
-  }
-  const result = componentSchema.safeParse(component);
-  if (!result.success) {
-    addZodIssues(result.error.issues, baseSegments, componentFieldCode, at, collector, phase);
-    return false;
-  }
-  let clean = true;
-  const name = component.name as string;
-  if (codePointLength(name) > MAX_NAME_CODE_POINTS) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at([...baseSegments, 'name']),
-      phase,
-      `Component name exceeds ${MAX_NAME_CODE_POINTS} code points.`,
-    );
-    clean = false;
-  }
-  if (hasControlCharacter(name)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at([...baseSegments, 'name']),
-      phase,
-      'Component name must not contain control characters.',
-    );
-    clean = false;
-  }
-  if (!/\S/.test(name)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at([...baseSegments, 'name']),
-      phase,
-      'Component name must contain at least one non-whitespace character.',
-    );
-    clean = false;
-  }
-  if (!validateComponentStyleRules(component.styleRules, baseSegments, at, collector, phase)) {
-    clean = false;
-  }
-  if (
-    dataSource !== null &&
-    typeof dataSource === 'object' &&
-    !Array.isArray(dataSource) &&
-    (dataSource as Record<string, unknown>).type === 'static'
-  ) {
-    const value = (dataSource as Record<string, unknown>).value as ScreenJsonValue;
-    if (canonicalByteLength(value) > MAX_DATA_SOURCE_VALUE_BYTES) {
-      collector.add(
-        'DOCUMENT_LIMIT_EXCEEDED',
-        at([...baseSegments, 'dataSource', 'value']),
-        phase,
-        `Static data source value exceeds ${MAX_DATA_SOURCE_VALUE_BYTES} UTF-8 bytes.`,
-      );
-      clean = false;
-    }
-  }
-  return clean;
-}
-
-function validateComponentStyleRules(
-  styleRules: unknown,
-  baseSegments: DiagnosticSegment[],
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  if (!Array.isArray(styleRules)) {
-    return true;
-  }
-  let clean = true;
-  const seenIds = new Set<string>();
-  for (let index = 0; index < styleRules.length; index++) {
-    const rule = styleRules[index];
-    if (!isJsonObject(rule)) {
-      continue;
-    }
-    const base = [...baseSegments, 'styleRules', index] as DiagnosticSegment[];
-    const id = rule.id;
-    if (typeof id === 'string') {
-      if (codePointLength(id) > MAX_STYLE_RULE_ID_CODE_POINTS) {
-        collector.add(
-          'DOCUMENT_FIELD_INVALID',
-          at([...base, 'id']),
-          phase,
-          `Style rule id exceeds ${MAX_STYLE_RULE_ID_CODE_POINTS} code points.`,
-        );
-        clean = false;
-      }
-      if (seenIds.has(id)) {
-        collector.add(
-          'DOCUMENT_FIELD_INVALID',
-          at([...base, 'id']),
-          phase,
-          'Style rule ids must be unique within a component.',
-        );
-        clean = false;
-      }
-      seenIds.add(id);
-    }
-    const when = rule.when;
-    if (!isJsonObject(when)) {
-      continue;
-    }
-    const path = when.path;
-    if (Array.isArray(path)) {
-      for (let segmentIndex = 0; segmentIndex < path.length; segmentIndex++) {
-        const segment = path[segmentIndex];
-        if (
-          typeof segment === 'string' &&
-          codePointLength(segment) > MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS
-        ) {
-          collector.add(
-            'DOCUMENT_FIELD_INVALID',
-            at([...base, 'when', 'path', segmentIndex]),
-            phase,
-            `Style rule path segment exceeds ${MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS} code points.`,
-          );
-          clean = false;
-        }
-      }
-    }
-    if (when.value !== undefined) {
-      const valueBytes = canonicalByteLength(when.value as ScreenJsonValue);
-      if (valueBytes > MAX_STYLE_RULE_VALUE_BYTES) {
-        collector.add(
-          'DOCUMENT_LIMIT_EXCEEDED',
-          at([...base, 'when', 'value']),
-          phase,
-          `Style rule value exceeds ${MAX_STYLE_RULE_VALUE_BYTES} UTF-8 bytes.`,
-        );
-        clean = false;
-      }
-    }
-  }
-  return clean;
-}
-
-function validateBlueprint(
-  blueprint: unknown,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  if (!isJsonObject(blueprint)) {
-    collector.add(
-      'DOCUMENT_FIELD_INVALID',
-      at(['blueprint']),
-      phase,
-      'Blueprint must be an object.',
-    );
-    return false;
-  }
-  if (!validateBlueprintStrictKeys(blueprint, at, collector, phase)) return false;
-  const result = blueprintSchema.safeParse(blueprint);
-  if (!result.success) {
-    addZodIssues(
-      result.error.issues,
-      ['blueprint'],
-      () => 'DOCUMENT_FIELD_INVALID',
-      at,
-      collector,
-      phase,
-    );
-    return false;
-  }
-  const rules = blueprint.rules as readonly unknown[];
-  if (rules.length > MAX_BLUEPRINT_RULES) {
-    collector.add(
-      'DOCUMENT_LIMIT_EXCEEDED',
-      at(['blueprint', 'rules']),
-      phase,
-      'Blueprint has too many rules.',
-    );
-    return false;
-  }
-  for (let index = 0; index < rules.length; index++) {
-    const rule = rules[index] as {
-      readonly actions: readonly unknown[];
-      readonly condition?: {
-        readonly left: ScreenBlueprintValueExpression;
-        readonly right?: ScreenBlueprintValueExpression;
-      };
-    };
-    if (rule.actions.length > MAX_BLUEPRINT_ACTIONS_PER_RULE) {
-      collector.add(
-        'DOCUMENT_LIMIT_EXCEEDED',
-        at(['blueprint', 'rules', index, 'actions']),
-        phase,
-        'Blueprint rule has too many actions.',
-      );
-    }
-    if (rule.condition) {
-      validateBlueprintExpression(
-        rule.condition.left,
-        ['blueprint', 'rules', index, 'condition', 'left'],
-        at,
-        collector,
-        phase,
-      );
-      if (rule.condition.right !== undefined) {
-        validateBlueprintExpression(
-          rule.condition.right,
-          ['blueprint', 'rules', index, 'condition', 'right'],
-          at,
-          collector,
-          phase,
-        );
-      }
-    }
-    for (let actionIndex = 0; actionIndex < rule.actions.length; actionIndex++) {
-      const action = rule.actions[actionIndex] as Record<string, unknown>;
-      if (action.type === 'component-visibility') continue;
-      const field = action.type === 'set-variable' ? 'value' : 'payload';
-      validateBlueprintExpression(
-        action[field] as ScreenBlueprintValueExpression,
-        ['blueprint', 'rules', index, 'actions', actionIndex, field],
-        at,
-        collector,
-        phase,
-      );
-    }
-  }
-  return true;
-}
-
-function validateBlueprintExpression(
-  expression: ScreenBlueprintValueExpression,
-  base: DiagnosticSegment[],
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  let clean = true;
-  if (
-    canonicalByteLength(expression as unknown as ScreenJsonValue) > MAX_BLUEPRINT_EXPRESSION_BYTES
-  ) {
-    collector.add(
-      'DOCUMENT_LIMIT_EXCEEDED',
-      at(base),
-      phase,
-      `Blueprint expression exceeds ${MAX_BLUEPRINT_EXPRESSION_BYTES} UTF-8 bytes.`,
-    );
-    clean = false;
-  }
-  const budget = { containers: 0 };
-  return walkBlueprintExpression(expression, base, 1, budget, at, collector, phase) && clean;
-}
-
-function walkBlueprintExpression(
-  expression: ScreenBlueprintValueExpression,
-  base: DiagnosticSegment[],
-  depth: number,
-  budget: { containers: number },
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  if (depth > MAX_BLUEPRINT_EXPRESSION_DEPTH) {
-    collector.add(
-      'DOCUMENT_LIMIT_EXCEEDED',
-      at(base),
-      phase,
-      `Blueprint expression nesting exceeds ${MAX_BLUEPRINT_EXPRESSION_DEPTH}.`,
-    );
-    return false;
-  }
-  if (expression.kind !== 'array' && expression.kind !== 'object') {
-    return true;
-  }
-  budget.containers++;
-  if (budget.containers > MAX_BLUEPRINT_EXPRESSION_CONTAINERS) {
-    collector.add(
-      'DOCUMENT_LIMIT_EXCEEDED',
-      at(base),
-      phase,
-      `Blueprint expression has more than ${MAX_BLUEPRINT_EXPRESSION_CONTAINERS} containers.`,
-    );
-    return false;
-  }
-  let clean = true;
-  if (expression.kind === 'array') {
-    for (let index = 0; index < expression.items.length; index++) {
-      if (
-        !walkBlueprintExpression(
-          expression.items[index]!,
-          [...base, 'items', index],
-          depth + 1,
-          budget,
-          at,
-          collector,
-          phase,
-        )
-      ) {
-        clean = false;
-      }
-    }
-    return clean;
-  }
-  if (Object.keys(expression.properties).length > MAX_BLUEPRINT_EXPRESSION_CONTAINERS) {
-    collector.add(
-      'DOCUMENT_LIMIT_EXCEEDED',
-      at([...base, 'properties']),
-      phase,
-      `Blueprint expression object has more than ${MAX_BLUEPRINT_EXPRESSION_CONTAINERS} properties.`,
-    );
-    return false;
-  }
-  for (const [key, value] of Object.entries(expression.properties)) {
-    if (
-      !walkBlueprintExpression(
-        value,
-        [...base, 'properties', key],
-        depth + 1,
-        budget,
-        at,
-        collector,
-        phase,
-      )
-    ) {
-      clean = false;
-    }
-  }
-  return clean;
-}
-
-function validateVariable(
-  variable: unknown,
-  index: number,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
-  collector: DiagnosticCollector,
-  phase: DiagnosticPhase,
-): boolean {
-  const base = at(['variables', index]);
-  if (!isJsonObject(variable)) {
-    collector.add('DOCUMENT_FIELD_INVALID', base, phase, 'Expected a variable to be an object.');
-    return false;
-  }
-  if (
-    !checkStrictObjectKeys(
-      variable,
-      variable.type === 'host' ? HOST_VARIABLE_FIELDS : VARIABLE_FIELDS,
-      base,
-      collector,
-      phase,
-      'DOCUMENT_UNKNOWN_FIELD',
-    )
-  ) {
-    return false;
-  }
-  const result =
-    variable.type === 'host'
-      ? hostVariableSchema.safeParse(variable)
-      : staticVariableSchema.safeParse(variable);
-  if (!result.success) {
-    addZodIssues(
-      result.error.issues,
-      ['variables', index],
-      variableFieldCode,
-      at,
-      collector,
-      phase,
-    );
-    return false;
-  }
-  return true;
-}
-
-function addZodIssues(
-  issues: readonly ZodIssueLike[],
-  baseSegments: DiagnosticSegment[],
-  codeForField: (field: string) => ScreenDiagnosticCode,
-  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+function validateComponents(
+  components: unknown,
+  shared: Set<unknown> | undefined,
+  at: DocumentDiagnosticPath,
   collector: DiagnosticCollector,
   phase: DiagnosticPhase,
 ): void {
-  for (const issue of issues) {
-    if (collector.full) {
-      return;
+  if (!Array.isArray(components)) {
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at(['components']),
+      phase,
+      'Expected components to be an array.',
+    );
+    return;
+  }
+  if (components.length > MAX_COMPONENTS) {
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at(['components']),
+      phase,
+      `Document has more than ${MAX_COMPONENTS} components.`,
+    );
+    return;
+  }
+  for (let index = 0; index < components.length && !collector.full; index++) {
+    if (!shared?.has(components[index])) {
+      validateComponent(components[index], ['components', index], at, collector, phase);
     }
-    const path: DiagnosticSegment[] = [];
-    for (const segment of issue.path) {
-      if (typeof segment === 'string' || typeof segment === 'number') {
-        path.push(segment);
-      }
+  }
+}
+
+function validateVariables(
+  variables: unknown,
+  shared: Set<unknown> | undefined,
+  at: DocumentDiagnosticPath,
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): void {
+  if (!Array.isArray(variables)) {
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at(['variables']),
+      phase,
+      'Expected variables to be an array.',
+    );
+    return;
+  }
+  if (variables.length > MAX_VARIABLES) {
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at(['variables']),
+      phase,
+      `Document has more than ${MAX_VARIABLES} variables.`,
+    );
+    return;
+  }
+  for (let index = 0; index < variables.length && !collector.full; index++) {
+    if (!shared?.has(variables[index])) {
+      validateVariable(variables[index], index, at, collector, phase);
     }
-    const first = path[0];
-    const code = typeof first === 'string' ? codeForField(first) : 'DOCUMENT_FIELD_INVALID';
-    collector.add(code, at([...baseSegments, ...path]), phase, issue.message);
   }
-}
-
-function canvasFieldCode(_field: string): ScreenDiagnosticCode {
-  return 'DOCUMENT_FIELD_INVALID';
-}
-
-function componentFieldCode(field: string): ScreenDiagnosticCode {
-  if (field === 'position' || field === 'size' || field === 'rotation' || field === 'zIndex') {
-    return 'COMPONENT_GEOMETRY_INVALID';
-  }
-  if (field === 'type') {
-    return 'COMPONENT_TYPE_INVALID';
-  }
-  return 'DOCUMENT_FIELD_INVALID';
-}
-
-function variableFieldCode(field: string): ScreenDiagnosticCode {
-  if (field === 'name') {
-    return 'VARIABLE_NAME_INVALID';
-  }
-  return 'DOCUMENT_FIELD_INVALID';
 }
