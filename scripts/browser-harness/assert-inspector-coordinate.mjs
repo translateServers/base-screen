@@ -112,7 +112,7 @@ async function assertCoordinateEntry(page, designer) {
   const yInput = form.locator('[data-coordinate-entry-y]');
 
   await zoomResetViaMenu(designer);
-  await designer.getByTitle('\u9009\u62e9').click();
+  await designer.locator('[data-tool="select"]').click();
   await designer.locator('[data-base-screen-component-id=title]').click();
   const original = await page.evaluate(() => {
     const component = window.baseScreenHarness.designer.document.components.find(

@@ -8,7 +8,7 @@ export async function assertAuthoringSelection(page, designer) {
       window.__browserHarnessSelectionEvents.push(event.detail);
     });
   });
-  await designer.getByTitle('\u9009\u62e9').click();
+  await designer.locator('[data-tool="select"]').click();
   const title = designer.locator('[data-base-screen-component-id=title]');
   await designer.getByRole('tab', { name: '\u56fe\u5c42' }).click();
   const layers = designer.locator('[data-layers]');

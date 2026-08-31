@@ -1,5 +1,5 @@
 export async function assertDatasetSurface(designer, page) {
-  await designer.getByTitle('\u9009\u62e9').click();
+  await designer.locator('[data-tool="select"]').click();
   const titleClickProbe = await designer.evaluate((element) => {
     const root = element.shadowRoot;
     const canvas = root.querySelector('[data-canvas]');

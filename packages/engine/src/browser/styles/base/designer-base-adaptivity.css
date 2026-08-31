@@ -105,8 +105,8 @@
     outline-offset: -2px;
   }
 
-  .material-group-navigation .material-group-breadcrumb-button[aria-pressed="true"],
   .material-group-navigation .material-group-button[aria-pressed="true"],
+  .material-group-navigation .material-group-button[aria-pressed="true"]:hover:not(:disabled),
   .material-filters .designer-button[aria-pressed="true"],
   .material-categories .designer-button[aria-pressed="true"] {
     background: Highlight;
@@ -116,5 +116,9 @@
 
   .material-badge {
     border: 1px solid CanvasText;
+  }
+
+  .material-group-button[aria-pressed="true"] .material-group-glyph {
+    color: HighlightText;
   }
 }

@@ -135,13 +135,18 @@
   草稿/不可用标记、composed 宿主动作事件（retry/reload/details）；保持不可变 catalog 与宿主加载边界。
   依据：[Material Library Host State](../specs/archive/material-library-host-state/spec.md)、[ADR-0031](../decisions/ADR-0031-material-library-host-state.md)。
 - **宿主多级物料分组**（封版后增量，已纳入基线）：宿主以 JSON-safe 树投影控制组层级、名称和卡片顺序；Designer 提供全部入口、
-  路径面包屑、当前层级子组与网格筛选，保持 Manifest、catalog、ScreenDocument 和 Renderer 不变。
+  常驻一级分类、子分类原位钻取和网格筛选；父组聚合自身及后代物料，末级保留同级入口，支持本类聚合和返回上级。
+  分组计数按 canonical 物料类型计算；宿主更新保留有效选择，删除当前组回到全部。保持 Manifest、catalog、ScreenDocument 和 Renderer 不变。
   依据：[Host Material Library Grouping](../specs/archive/host-material-library-grouping/spec.md)、[ADR-0033](../decisions/ADR-0033-host-controlled-material-library-grouping.md)。
 - **物料库条目投影**（封版后增量，已纳入基线）：Designer 可接收严格、JSON-safe 的 `materialLibraryItems`；多个条目
   可复用同一个 canonical `materialType`，并覆盖卡片名称、分类、封面与新实例默认值。运行构造器、文档 type 和 ABI
   仍由不可变 catalog 决定；未配置时保持一类型一卡片。依据：[ADR-0060](../decisions/ADR-0060-material-library-item-projection.md)。
-- **物料库视觉层级**（封版后增量，已纳入基线）：路径、当前层级、筛选、状态与缩略图网格采用紧凑的 data-dense/drill-down
-  层级；仅消费现有 Designer Token，保留深浅主题、键盘焦点、forced-colors、reduced-motion 与无抖动约束。
+- **物料库视觉层级**（封版后增量，已纳入基线）：搜索和筛选固定在顶部，分类采用 44px 图标栏 + 76px 子分类栏，条目行高 32px，
+  一级分类复用 SVG 图标，`title` 和可访问性描述提供完整名称、路径及类型数量；子分类为单行列表，数量徽标仅在浮层显示。
+  两列独立纵向滚动并预留轨道；物料内容区小于 264px 时用当前分类按钮打开有界浮层，卡片保留全宽，左面板仍为 200–480px。
+  子分类直接从「全部」开始，深层分支才出现整行返回入口；左右键钻取/返回，上下/Home/End 移动焦点，Enter/Space 选择。
+  切换分类结果回顶，无结果支持清除筛选并返回搜索框；完整路径提示、Escape/外部点击关闭和焦点返回均为实例内交互；浮层复用导航 DOM，
+  不挤压网格，关闭面板或切换模式时清理。仅消费现有 Designer Token，保留深浅主题、forced-colors、reduced-motion 与无抖动约束。
   依据：[Designer Material Library Visual Refinement](../specs/archive/designer-material-library-visual-refinement/spec.md)、[ADR-0034](../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)。
 - **物料加载错误控制台**（封版后增量，已纳入基线）：失败记录、当前目录状态和恢复动作通过固定宽度的底部状态栏入口在工作区弹窗中显示；
   当前状态与最新优先的有界历史明确分区，支持稳定清空、Tab 焦点闭环、Escape/遮罩关闭和焦点返回。左侧物料库专用于搜索、分组和网格，

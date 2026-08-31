@@ -7,6 +7,7 @@ const source = (file) => readFileSync(resolve(root, file), 'utf8');
 const baseLayers = [
   'packages/engine/src/browser/styles/base/designer-base-menus.css',
   'packages/engine/src/browser/styles/base/designer-base-library.css',
+  'packages/engine/src/browser/styles/base/designer-base-material-groups.css',
   'packages/engine/src/browser/styles/base/designer-base-shell.css',
   'packages/engine/src/browser/styles/base/designer-base-adaptivity.css',
 ];
@@ -38,7 +39,7 @@ const workbenchLayers = [
   'packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-accessibility.css',
 ];
-const baseBindings = ['menusCss', 'libraryCss', 'shellCss', 'adaptivityCss'];
+const baseBindings = ['menusCss', 'libraryCss', 'materialGroupsCss', 'shellCss', 'adaptivityCss'];
 const controlBindings = [
   'fieldsCss',
   'colorPaletteCss',

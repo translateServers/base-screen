@@ -296,7 +296,7 @@ const materialLibraryGrouping = {
 } as const;
 
 // 变长标签压力演示分组：仅在 URL 携带 ?material-group-stress 时替换默认分组，
-// 用于人工验收分组按钮轨道的自适应宽度、168px 省略号截断与横向滚动，不影响默认验收数据。
+// 用于人工验收长名称截断、分栏钻取与窄面板浮层，不影响默认验收数据。
 const materialLibraryStressGrouping = {
   groups: [
     { id: 'foundation', label: '基础', materialTypes: ['base.text'] },
@@ -307,7 +307,11 @@ const materialLibraryStressGrouping = {
       label: '数据可视化图表组件超长名称',
       children: [
         { id: 'charts', label: '图表', materialTypes: ['base.chart'] },
-        { id: 'echarts', label: 'ECharts 高级图表', materialTypes: ['base.echarts'] },
+        {
+          id: 'advanced',
+          label: '高级图表',
+          children: [{ id: 'echarts', label: 'ECharts 高级图表', materialTypes: ['base.echarts'] }],
+        },
         {
           id: 'tables',
           label: '一个超长的分组名称用来验证省略号截断效果',
@@ -319,6 +323,11 @@ const materialLibraryStressGrouping = {
       id: 'bridges',
       label: '跨框架桥接物料',
       materialTypes: ['harness.react-button', 'harness.vue-button'],
+    },
+    {
+      id: 'best-practices',
+      label: '宿主数据集最佳实践',
+      materialTypes: [hostedDatasetRankingManifest.type],
     },
   ],
 } as const;

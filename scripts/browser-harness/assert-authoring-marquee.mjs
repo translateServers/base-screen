@@ -4,7 +4,7 @@ import { componentPositions, zoomResetViaMenu } from './harness-utils.mjs';
 export async function assertAuthoringMarquee(page, designer) {
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
   // 框选（marquee）多选后，直接拖拽选中框（控制器）的空白区域应整体移动选中组件。
-  await designer.getByTitle('\u9009\u62e9').click();
+  await designer.locator('[data-tool="select"]').click();
   await zoomResetViaMenu(designer);
   await page.waitForFunction(
     () =>

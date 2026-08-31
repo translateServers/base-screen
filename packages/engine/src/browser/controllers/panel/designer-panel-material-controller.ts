@@ -8,7 +8,7 @@ import {
   type BaseScreenResolvedMaterialLibraryItem,
   createInitialDataSourceForMaterialLibraryItem,
 } from '../../../common/operations/material-library/material-library-items.js';
-import { renderMaterialLibraryGroupNavigation } from '../../dom/material-library/designer-material-library-group-dom.js';
+import { DesignerMaterialGroupNavigationController } from './designer-material-group-navigation-controller.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 
 export const MATERIAL_DRAG_TYPE = 'application/x-base-screen-material';
@@ -25,10 +25,14 @@ export class DesignerPanelMaterialController {
   #searchTimer: ReturnType<typeof setTimeout> | undefined;
   readonly #favorites = new Set<string>();
   readonly #recents: string[] = [];
+  readonly #navigation = new DesignerMaterialGroupNavigationController((groupId, layout) =>
+    this.selectGroup(groupId, layout),
+  );
 
   constructor(private readonly callbacks: DesignerPanelControllerCallbacks) {}
 
   dispose(): void {
+    this.#navigation.dispose();
     if (this.#searchTimer !== undefined) {
       clearTimeout(this.#searchTimer);
       this.#searchTimer = undefined;
@@ -43,28 +47,31 @@ export class DesignerPanelMaterialController {
     ) {
       this.#groupId = undefined;
     }
-    if (layout === null) return;
-    renderMaterialLibraryGroupNavigation(layout, grouping, this.#groupId);
+    if (layout === null) {
+      this.#navigation.dispose();
+      return;
+    }
+    this.#navigation.refresh(layout, grouping, this.#groupId);
     this.render(layout);
   }
 
   onClick(target: Element): boolean {
+    if (this.#navigation.onClick(target)) return true;
+    const reset = target.closest<HTMLElement>('[data-material-library-reset]');
+    if (reset?.dataset.materialLibraryReset !== undefined) {
+      this.#filter = 'all';
+      this.#category = undefined;
+      this.#groupId = undefined;
+      const layout = reset.closest<HTMLElement>('.designer');
+      if (layout !== null) this.#navigation.refresh(layout, this.grouping, undefined);
+      this.clearSearch(layout);
+      const grid = layout?.querySelector<HTMLElement>('[data-material-grid]');
+      if (grid != null) grid.scrollTop = 0;
+      return true;
+    }
     const clearSearch = target.closest<HTMLButtonElement>('[data-material-search-clear]');
     if (clearSearch !== null) {
       this.clearSearch(clearSearch.closest<HTMLElement>('.designer'));
-      return true;
-    }
-    const allGroups = target.closest<HTMLButtonElement>('[data-material-group-all]');
-    if (allGroups !== null) {
-      this.selectGroup(undefined, allGroups.closest<HTMLElement>('.designer'));
-      return true;
-    }
-    const group =
-      target.closest<HTMLButtonElement>('[data-material-group]')?.dataset.materialGroup ??
-      target.closest<HTMLButtonElement>('[data-material-group-breadcrumb]')?.dataset
-        .materialGroupBreadcrumb;
-    if (group !== undefined) {
-      this.selectGroup(group, target.closest<HTMLElement>('.designer'));
       return true;
     }
     const favorite = target.closest<HTMLButtonElement>('[data-material-favorite]');
@@ -137,6 +144,7 @@ export class DesignerPanelMaterialController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
+    if (this.#navigation.onKeyDown(event)) return true;
     const search = event.target;
     if (
       event.key === 'Escape' &&
@@ -209,10 +217,13 @@ export class DesignerPanelMaterialController {
     ) {
       return;
     }
+    const changed = this.#groupId !== groupId;
     this.#groupId = groupId;
     if (layout === null) return;
-    renderMaterialLibraryGroupNavigation(layout, grouping, this.#groupId);
+    this.#navigation.refresh(layout, grouping, this.#groupId);
     this.render(layout);
+    const grid = layout.querySelector<HTMLElement>('[data-material-grid]');
+    if (changed && grid !== null) grid.scrollTop = 0;
   }
 
   private clearSearch(layout: HTMLElement | null): void {
@@ -306,6 +317,13 @@ export class DesignerPanelMaterialController {
       control.ariaPressed = String(control.dataset.materialCategoryFilter === this.#category);
     }
     const empty = layout.querySelector<HTMLElement>('[data-material-search-empty]');
+    const reset = layout.querySelector<HTMLElement>('[data-material-library-reset]');
+    if (reset !== null)
+      reset.hidden =
+        this.#search === '' &&
+        this.#filter === 'all' &&
+        this.#groupId === undefined &&
+        (grouping !== undefined || this.#category === undefined);
     if (empty !== null) {
       empty.hidden = [...layout.querySelectorAll<HTMLElement>('[data-material-card]')].some(
         (card) => !card.hidden,

@@ -252,25 +252,53 @@ describe('designer workbench interaction and accessibility', () => {
     );
 
     expect(baseCss).toContain('.material-group-navigation {');
-    expect(baseCss).toContain('grid-template-rows: 24px 28px;');
-    expect(baseCss).toContain('height: 56px;');
+    expect(baseCss).toContain('grid-template-columns: 44px 76px;');
+    expect(baseCss).toContain('grid-template-columns: 120px minmax(0, 1fr);');
+    expect(baseCss).toContain('grid-template-rows: 32px minmax(0, 1fr);');
     expect(baseCss).toContain('.material-group-navigation .material-group-button {');
-    expect(baseCss).toContain('display: inline-flex;');
+    expect(baseCss).toContain('flex: 0 0 32px;');
+    expect(baseCss).not.toContain('.material-group-heading {');
+    expect(baseCss).toMatch(/\.material-group-roots\s*\{[^}]*padding-inline: 0;/s);
+    expect(baseCss).toMatch(
+      /\.material-group-navigation \.material-group-back\s*\{[^}]*width: 100%;[^}]*height: 32px;/s,
+    );
+    expect(baseCss).toMatch(
+      /\.material-group-navigation \.material-group-button\[aria-pressed="true"\]:hover:not\(:disabled\)\s*\{[^}]*color: var\(--designer-text-primary\);/s,
+    );
+    expect(baseCss).toMatch(
+      /\.material-group-glyph,\s*\.material-group-glyph svg\s*\{[^}]*width: 16px;[^}]*height: 16px;/s,
+    );
+    expect(baseCss).toMatch(
+      /\.material-group-roots \.material-group-label,\s*\.material-group-roots \.material-group-meta\s*\{[^}]*display: none;/s,
+    );
+    expect(baseCss).toMatch(/\.material-group-count\s*\{[^}]*display: none;/s);
+    expect(baseCss).toMatch(
+      /\.material-group-popover \.material-group-children \.material-group-count\s*\{[^}]*display: grid;/s,
+    );
     expect(baseCss).toContain('.material-group-count {');
-    expect(baseCss).toContain('width: 16px;');
-    // 分组导航行高容不下原生滚动条轨道（会裁剪按钮）：两行隐藏滚动条，
-    // 可滚动性由 data-scroll-start/end 驱动的边缘渐隐表达，遮罩不含颜色以兼容主题切换。
-    expect(baseCss).not.toContain('scrollbar-gutter');
-    expect(baseCss).toContain('scrollbar-width: none;');
-    expect(baseCss).toContain('.material-group-children::-webkit-scrollbar {');
-    expect(baseCss).toContain('.material-group-children[data-scroll-start="true"],');
-    expect(baseCss).toContain('.material-group-children[data-scroll-end="true"],');
-    expect(baseCss).toContain('mask-image: linear-gradient(');
+    expect(baseCss).toContain('flex: 0 0 24px;');
+    // 两列独立纵向滚动，预留滚动条轨道；切换分类不改变导航或卡片区宽度。
+    expect(baseCss).toMatch(
+      /\.material-group-roots,\s*\.material-group-children\s*\{[^}]*scrollbar-gutter: stable;/s,
+    );
+    expect(baseCss).toContain('scrollbar-width: thin;');
+    expect(baseCss).not.toContain('data-scroll-start');
+    expect(baseCss).not.toContain('data-scroll-end');
+    expect(baseCss).toContain('@container material-library (width < 264px)');
+    expect(workbenchCss).toContain('container-name: material-library;');
+    expect(baseCss).toMatch(/\.material-group-overlay\s*\{[^}]*position: absolute;/s);
+    expect(baseCss).toMatch(/\.material-group-popover\s*\{[^}]*width: 288px;[^}]*height: 360px;/s);
     expect(baseCss).toContain('.material-filters .designer-button[aria-pressed="true"]');
     expect(baseCss).toMatch(
       /\.material-search input,\s*\.layer-search input\s*\{[^}]*padding-left: calc\(var\(--designer-space-3\) \+ var\(--designer-control-height\)\);/s,
     );
     expect(baseCss).toContain('.material-search-clear:not(:disabled):active');
+    expect(baseCss).toMatch(
+      /\.material-search \.material-search-clear\s*\{[^}]*top: 0;[^}]*bottom: 0;[^}]*width: 24px;[^}]*height: 24px;[^}]*margin-block: auto;/s,
+    );
+    expect(baseCss).toMatch(
+      /\.material-search input::-webkit-search-cancel-button\s*\{[^}]*display: none;/s,
+    );
     expect(baseCss).toContain(
       '.material-library-status-actions .designer-button:not(:disabled):active',
     );
@@ -285,7 +313,7 @@ describe('designer workbench interaction and accessibility', () => {
       '[data-error-console-summary][data-error-console-tone="warning"]',
     );
     expect(materialCardsCss).toContain('aspect-ratio: 16 / 10;');
-    // 纵向功能轨占用 48px 后，卡片以 104px 为最小宽度维持双列密度，窄面板回退单列；
+    // 纵向功能轨和分类列以外，卡片以 104px 为最小宽度自适应列数；
     // min(104px, 100%) 保证最窄面板下卡片不超出内容区。
     expect(materialCardsCss).toContain(
       'grid-template-columns: repeat(auto-fill, minmax(min(104px, 100%), 1fr));',

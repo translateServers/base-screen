@@ -118,7 +118,7 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
   if (firstTabState !== 'true' || lastTabState !== 'true') {
     throw new Error('BROWSER_HARNESS_TAB_HOME_END_FAILED');
   }
-  await authoringDesigner.getByTitle('\u9009\u62e9').click();
+  await authoringDesigner.locator('[data-tool="select"]').click();
   await authoringDesigner.locator('[data-base-screen-component-id=title]').click();
   await authoringDesigner.getByRole('tab', { name: '\u6570\u636e' }).click();
   const staticInput = authoringDesigner.locator(

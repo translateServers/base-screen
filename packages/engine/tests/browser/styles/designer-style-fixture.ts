@@ -16,6 +16,7 @@ function readCss(file: string): string {
 const baseCssFiles = [
   '../../../src/browser/styles/base/designer-base-menus.css',
   '../../../src/browser/styles/base/designer-base-library.css',
+  '../../../src/browser/styles/base/designer-base-material-groups.css',
   '../../../src/browser/styles/base/designer-base-shell.css',
   '../../../src/browser/styles/base/designer-base-adaptivity.css',
 ] as const;

@@ -72,15 +72,40 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <button type="button" class="designer-control designer-button" data-material-filter="favorite" aria-pressed="false">${DESIGNER_UI_TEXT.favoriteMaterials}</button>
             <button type="button" class="designer-control designer-button" data-material-filter="recent" aria-pressed="false">${DESIGNER_UI_TEXT.recentMaterials}</button>
           </div>
-          <nav class="material-group-navigation" data-material-groups aria-label="${DESIGNER_UI_TEXT.materialGroups}" hidden></nav>
+          <button type="button" class="designer-control designer-button material-group-toggle" data-material-group-toggle data-material-group-action="toggle" aria-haspopup="dialog" aria-expanded="false" aria-controls="designer-material-group-popover" hidden>
+            <span class="material-group-toggle-glyph" aria-hidden="true">${designerIcon('grid')}</span>
+            <span data-material-group-toggle-label>${DESIGNER_UI_TEXT.allMaterialGroups}</span>
+            <span class="material-group-toggle-chevron" aria-hidden="true">${designerIcon('chevron-down')}</span>
+          </button>
           <div class="material-categories" data-material-categories role="group" aria-label="${DESIGNER_UI_TEXT.materialCategories}"></div>
         </div>
-        <div class="material-grid" data-material-grid></div>
-        <p class="designer-empty-state material-search-empty" data-material-search-empty hidden>${DESIGNER_UI_TEXT.materialSearchEmpty}</p>
+        <div class="material-library-content" data-material-library-content>
+          <div class="material-group-inline" data-material-group-inline hidden>
+            <nav class="material-group-navigation" data-material-groups aria-label="${DESIGNER_UI_TEXT.materialGroups}" hidden></nav>
+          </div>
+          <div class="material-library-results">
+            <div class="material-grid" data-material-grid></div>
+            <div class="designer-empty-state material-search-empty" data-material-search-empty hidden>
+              <span role="status">${DESIGNER_UI_TEXT.materialSearchEmpty}</span>
+              <button type="button" class="designer-control designer-button" data-material-library-reset>${DESIGNER_UI_TEXT.materialResetFilters}</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="rail-view" id="designer-layers-panel" role="tabpanel" aria-labelledby="designer-layers-tab" data-layers hidden></div>
       <div class="rail-view" id="designer-variables-panel" role="tabpanel" aria-labelledby="designer-variables-tab" data-variables hidden></div>
     </aside>
+
+    <div class="material-group-overlay" data-material-group-overlay hidden>
+      <div class="material-group-backdrop" data-material-group-action="close" aria-hidden="true"></div>
+      <section class="material-group-popover" id="designer-material-group-popover" data-material-group-popover role="dialog" aria-label="${DESIGNER_UI_TEXT.materialGroups}">
+        <header class="material-group-popover-heading">
+          <span>${DESIGNER_UI_TEXT.materialCategories}</span>
+          <button type="button" class="designer-control designer-button designer-icon-button" data-material-group-action="close" aria-label="${DESIGNER_UI_TEXT.materialGroupClose}" title="${DESIGNER_UI_TEXT.materialGroupClose}">${designerIcon('x')}</button>
+        </header>
+        <div class="material-group-popover-content" data-material-group-popover-content></div>
+      </section>
+    </div>
 
     <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical" aria-controls="designer-left-panel" aria-label="${DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.leftPanel)}" aria-valuemin="200" aria-valuemax="480" aria-valuenow="336" tabindex="0"></div>
 

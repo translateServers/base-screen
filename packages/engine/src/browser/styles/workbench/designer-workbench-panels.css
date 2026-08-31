@@ -2,10 +2,9 @@
   position: relative;
   z-index: 1;
   min-width: 0;
-  padding: var(--designer-space-5) var(--designer-space-5) 10px;
+  padding: var(--designer-space-4);
   border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--designer-surface-workspace) 36%, transparent);
 }
 
 .inspector-context {
@@ -459,9 +458,18 @@
 }
 
 .rail-view[data-materials] .material-search-empty {
-  grid-row: 2;
+  display: grid;
+  grid-area: 1 / 1;
   align-self: start;
-  margin: var(--designer-space-5);
+  justify-items: center;
+  gap: var(--designer-space-4);
+  margin: var(--designer-space-4);
+  padding: var(--designer-space-5) var(--designer-space-2);
+}
+
+.rail-view[data-materials] .material-search-empty[hidden],
+.material-search-empty .designer-button[hidden] {
+  display: none;
 }
 
 .rail .designer-button:focus-visible,

@@ -1,204 +1,263 @@
 import { describe, expect, it } from 'vitest';
 import { renderMaterialLibraryGroupNavigation } from '../../../../src/browser/dom/material-library/designer-material-library-group-dom.js';
-import { parseBaseScreenMaterialLibraryGrouping } from '../../../../src/common/operations/material-library/material-library-grouping.js';
+import type { BaseScreenMaterialLibraryGroup } from '../../../../src/common/operations/material-library/material-library-grouping.js';
+import {
+  createMaterialGroupLayout,
+  materialGrouping,
+  parseGrouping,
+} from './material-group-dom-fixture.js';
 
-interface FakeWheelEvent {
-  deltaX?: number;
-  deltaY?: number;
-  deltaMode?: number;
-  preventDefault?: () => void;
-}
-
-// 分组导航的滚动可用性依赖布局测量（scrollWidth/clientWidth/scrollLeft）。
-// 节点环境没有布局引擎，用按标签共享 metrics 的假元素驱动溢出/未溢出两种场景。
-class FakeElement {
-  readonly attributes: Record<string, string> = {};
-  readonly children: FakeElement[] = [];
-  readonly dataset: Record<string, string> = {};
-  readonly listeners = new Map<string, ((event: FakeWheelEvent) => void)[]>();
-  className = '';
-  hidden = false;
-  textContent = '';
-  type = '';
-  ariaLabel = '';
-  ariaPressed = '';
-  scrollLeft = 0;
-
-  constructor(
-    readonly ownerDocument: FakeDocument,
-    readonly tagName: string,
-  ) {}
-
-  get scrollWidth(): number {
-    return this.tagName === 'div' ? this.ownerDocument.metrics.scrollWidth : 0;
-  }
-
-  get clientWidth(): number {
-    return this.tagName === 'div' ? this.ownerDocument.metrics.clientWidth : 0;
-  }
-
-  appendChild(child: FakeElement): FakeElement {
-    this.children.push(child);
-    return child;
-  }
-
-  append(...children: FakeElement[]): void {
-    this.children.push(...children);
-  }
-
-  replaceChildren(...children: FakeElement[]): void {
-    this.children.splice(0, this.children.length, ...children);
-  }
-
-  setAttribute(name: string, value: string): void {
-    this.attributes[name] = value;
-  }
-
-  addEventListener(type: string, listener: (event: FakeWheelEvent) => void): void {
-    const listeners = this.listeners.get(type) ?? [];
-    listeners.push(listener);
-    this.listeners.set(type, listeners);
-  }
-
-  emit(type: string, event: FakeWheelEvent = {}): void {
-    for (const listener of this.listeners.get(type) ?? []) listener(event);
-  }
-}
-
-class FakeDocument {
-  metrics = { scrollWidth: 0, clientWidth: 0 };
-
-  createElement(tagName: string): FakeElement {
-    return new FakeElement(this, tagName);
-  }
-}
-
-function createLayout() {
-  const document = new FakeDocument();
-  const navigation = new FakeElement(document, 'nav');
-  const layout = {
-    querySelector: (selector: string) =>
-      selector === '[data-material-groups]' ? navigation : null,
-  };
-  return { document, navigation, layout: layout as unknown as ParentNode };
-}
-
-function grouping() {
-  const parsed = parseBaseScreenMaterialLibraryGrouping({
-    groups: [
-      {
-        id: 'data',
-        label: 'Data',
-        children: [
-          { id: 'charts', label: 'Charts', materialTypes: ['base.chart'] },
-          { id: 'tables', label: 'Tables', materialTypes: ['base.table'] },
-        ],
-      },
-      { id: 'foundation', label: 'Foundation', materialTypes: ['base.text'] },
-    ],
+describe('material group column navigation', () => {
+  it('keeps ordered roots visible, with an explicit all-materials entry in both columns', () => {
+    const { layout, navigation, trigger, content } = createMaterialGroupLayout();
+    const view = renderMaterialLibraryGroupNavigation(layout, materialGrouping(), undefined)!;
+    expect(navigation.hidden).toBe(false);
+    expect(trigger.hidden).toBe(false);
+    expect(content.dataset.materialGrouped).toBe('true');
+    expect(
+      [...view.roots.children].map((entry) => (entry as HTMLElement).dataset.materialGroupKey),
+    ).toEqual(['all', 'group:foundation', 'group:data']);
+    expect(view.children.children.length).toBe(1);
+    expect(view.children.querySelector('[aria-pressed="true"]')?.textContent).toContain('5');
+    expect(view.back.hidden).toBe(true);
+    expect(view.children.querySelector('.material-group-label')?.textContent).toBe('全部');
+    expect(navigation.querySelector('.material-group-heading')).toBeNull();
   });
-  if (!parsed.ok) throw new Error('Fixture grouping must parse.');
-  return parsed.value;
-}
 
-describe('renderMaterialLibraryGroupNavigation scroll affordance', () => {
-  it('keeps edge fades off and ignores the wheel when the content fits', () => {
-    const { document, navigation, layout } = createLayout();
-    document.metrics = { scrollWidth: 200, clientWidth: 200 };
-    renderMaterialLibraryGroupNavigation(layout, grouping(), undefined);
+  it('keeps root icons decorative and exposes full paths and counts without visible labels', () => {
+    const { layout } = createMaterialGroupLayout();
+    const view = renderMaterialLibraryGroupNavigation(layout, materialGrouping(), 'data')!;
+    expect(
+      [...view.roots.querySelectorAll<HTMLElement>('.material-group-glyph')].map((glyph) => ({
+        icon: glyph.dataset.icon,
+        hidden: glyph.hidden,
+        decorative: glyph.getAttribute('aria-hidden'),
+      })),
+    ).toEqual([
+      { icon: 'grid', hidden: false, decorative: 'true' },
+      { icon: 'text', hidden: false, decorative: 'true' },
+      { icon: 'chart', hidden: false, decorative: 'true' },
+    ]);
+    const data = view.roots.querySelector<HTMLButtonElement>('[data-material-group="data"]')!;
+    expect(data.title).toBe('Data（4 个物料）');
+    expect(data.ariaLabel).toBe('查看 Data 物料');
+    expect(data.getAttribute('aria-description')).toBe(data.title);
+    const tables = view.children.querySelector<HTMLButtonElement>(
+      '[data-material-group="tables"]',
+    )!;
+    expect(tables.title).toBe('Data / Tables（1 个物料）');
+    expect(tables.querySelector<HTMLElement>('.material-group-glyph')?.hidden).toBe(true);
+  });
 
-    const [breadcrumbs, groups] = navigation.children;
-    expect(breadcrumbs?.dataset).toEqual({ scrollStart: 'false', scrollEnd: 'false' });
-    expect(groups?.dataset).toEqual({ scrollStart: 'false', scrollEnd: 'false' });
+  it('prefers category icons, falls back for unknown groups, and updates glyphs in place', () => {
+    const { layout } = createMaterialGroupLayout();
+    const groups = [
+      { id: 'named', label: '基础', materialTypes: ['base.image'] },
+      { id: 'custom', label: '<b>Custom</b>', materialTypes: ['host.custom'] },
+    ];
+    const view = renderMaterialLibraryGroupNavigation(layout, parseGrouping({ groups }), 'named')!;
+    const named = view.roots.querySelector<HTMLButtonElement>('[data-material-group="named"]')!;
+    const glyph = named.querySelector<HTMLElement>('.material-group-glyph')!;
+    const custom = view.roots.querySelector<HTMLElement>('[data-material-group="custom"]')!;
+    expect(glyph.dataset.icon).toBe('shapes');
+    expect(custom.querySelector<HTMLElement>('.material-group-glyph')?.dataset.icon).toBe(
+      'container',
+    );
+    expect(custom.querySelector<HTMLElement>('.material-group-glyph')?.innerHTML).not.toContain(
+      '<b>',
+    );
+    expect(custom.title).toBe('<b>Custom</b>（1 个物料）');
+    renderMaterialLibraryGroupNavigation(
+      layout,
+      parseGrouping({ groups: [{ ...groups[0], label: 'Images' }, groups[1]] }),
+      'named',
+    );
+    expect(view.roots.querySelector('[data-material-group="named"]')).toBe(named);
+    expect(named.querySelector('.material-group-glyph')).toBe(glyph);
+    expect(glyph.dataset.icon).toBe('image');
+    expect(named.title).toBe('Images（1 个物料）');
+    expect(named.ariaPressed).toBe('true');
+  });
 
-    let prevented = 0;
-    groups?.emit('wheel', {
-      deltaY: 120,
-      deltaX: 0,
-      deltaMode: 0,
-      preventDefault: () => prevented++,
+  it('selects a parent aggregate and keeps leaf siblings reachable without going back', () => {
+    const { layout } = createMaterialGroupLayout();
+    const grouping = materialGrouping();
+    const parent = renderMaterialLibraryGroupNavigation(layout, grouping, 'data')!;
+    expect(
+      parent.roots.querySelector<HTMLElement>('[data-material-group="data"]')?.ariaPressed,
+    ).toBe('true');
+    expect(
+      [...parent.children.querySelectorAll<HTMLElement>('[data-material-group]')].map(
+        (button) => button.dataset.materialGroup,
+      ),
+    ).toEqual(['charts', 'tables']);
+    expect(
+      parent.children.querySelector<HTMLElement>('[data-material-group-current]')?.ariaPressed,
+    ).toBe('true');
+    expect(parent.children.querySelector('.material-group-count')?.textContent).toBe('4');
+
+    const leaf = renderMaterialLibraryGroupNavigation(layout, grouping, 'tables')!;
+    expect(leaf.children).toBe(parent.children);
+    expect(
+      leaf.children.querySelector<HTMLElement>('[data-material-group="tables"]')?.ariaPressed,
+    ).toBe('true');
+    expect(
+      leaf.children.querySelector<HTMLElement>('[data-material-group-current]')?.ariaPressed,
+    ).toBe('false');
+    expect(leaf.heading.textContent).toBe('');
+    expect(leaf.back.hidden).toBe(true);
+  });
+
+  it('drills branches in place while retaining their own material types in the aggregate', () => {
+    const { layout, trigger } = createMaterialGroupLayout();
+    const view = renderMaterialLibraryGroupNavigation(layout, materialGrouping(), 'charts')!;
+    expect(view.back.hidden).toBe(false);
+    expect(view.back.dataset.materialGroupBreadcrumb).toBe('data');
+    expect(view.heading.textContent).toBe('Data');
+    expect(view.back.contains(view.heading)).toBe(true);
+    expect(view.back.title).toBe('返回上一级分类：Data');
+    expect(view.children.querySelector('.material-group-count')?.textContent).toBe('3');
+    expect(
+      [...view.children.querySelectorAll<HTMLElement>('[data-material-group]')].map(
+        (button) => button.dataset.materialGroup,
+      ),
+    ).toEqual(['bars', 'lines']);
+    expect(trigger.title).toBe('全部物料 / Data / Charts');
+    expect(trigger.querySelector('[data-material-group-toggle-label]')?.textContent).toBe('Charts');
+  });
+
+  it('resets only the child scroll on a new branch and preserves scrolling between leaf siblings', () => {
+    const { layout } = createMaterialGroupLayout();
+    const grouping = materialGrouping();
+    const view = renderMaterialLibraryGroupNavigation(layout, grouping, 'data')!;
+    view.roots.scrollTop = 20;
+    view.children.scrollTop = 80;
+    renderMaterialLibraryGroupNavigation(layout, grouping, 'charts');
+    expect(view.roots.scrollTop).toBe(20);
+    expect(view.children.scrollTop).toBe(0);
+    view.children.scrollTop = 40;
+    renderMaterialLibraryGroupNavigation(layout, grouping, 'bars');
+    expect(view.children.scrollTop).toBe(40);
+    renderMaterialLibraryGroupNavigation(layout, grouping, 'lines');
+    expect(view.children.scrollTop).toBe(40);
+  });
+
+  it('preserves button identity and column scrolling across selection and host reorder updates', () => {
+    const { layout } = createMaterialGroupLayout();
+    const grouping = materialGrouping();
+    const before = renderMaterialLibraryGroupNavigation(layout, grouping, 'data')!;
+    const root = before.roots.querySelector('[data-material-group="data"]');
+    const leaf = before.children.querySelector('[data-material-group="tables"]');
+    before.roots.scrollTop = 12;
+    before.children.scrollTop = 24;
+    const selected = renderMaterialLibraryGroupNavigation(layout, grouping, 'tables')!;
+    expect(selected.roots.querySelector('[data-material-group="data"]')).toBe(root);
+    expect(selected.children.querySelector('[data-material-group="tables"]')).toBe(leaf);
+    expect(selected.roots.scrollTop).toBe(12);
+    expect(selected.children.scrollTop).toBe(24);
+    const reordered = parseGrouping({ groups: [...grouping.groups].reverse() });
+    const updated = renderMaterialLibraryGroupNavigation(layout, reordered, 'tables')!;
+    expect(updated.roots.children[1]).toBe(root);
+    expect(updated.children.querySelector('[data-material-group="tables"]')).toBe(leaf);
+  });
+
+  it('keeps reserved UI keys distinct from host ids named all and current', () => {
+    const { layout } = createMaterialGroupLayout();
+    const grouping = parseGrouping({
+      groups: [
+        {
+          id: 'all',
+          label: 'All',
+          children: [{ id: 'current', label: 'Current', materialTypes: ['base.text'] }],
+        },
+      ],
     });
-    expect(prevented).toBe(0);
-    expect(groups?.scrollLeft).toBe(0);
+    const first = renderMaterialLibraryGroupNavigation(layout, grouping, 'all')!;
+    const second = renderMaterialLibraryGroupNavigation(layout, grouping, 'current')!;
+    expect(first.roots.children.length).toBe(2);
+    expect(second.children.children.length).toBe(2);
+    expect(
+      second.children.querySelector<HTMLElement>('[data-material-group="current"]')?.ariaPressed,
+    ).toBe('true');
   });
 
-  it('flags only the overflowing edge and follows scroll position updates', () => {
-    const { document, navigation, layout } = createLayout();
-    document.metrics = { scrollWidth: 300, clientWidth: 100 };
-    renderMaterialLibraryGroupNavigation(layout, grouping(), undefined);
-
-    const groups = navigation.children[1];
-    expect(groups?.dataset).toEqual({ scrollStart: 'false', scrollEnd: 'true' });
-
-    groups!.scrollLeft = 200;
-    groups?.emit('scroll');
-    expect(groups?.dataset).toEqual({ scrollStart: 'true', scrollEnd: 'false' });
-
-    groups!.scrollLeft = 120;
-    groups?.emit('scroll');
-    expect(groups?.dataset).toEqual({ scrollStart: 'true', scrollEnd: 'true' });
+  it('preserves focus when host updates reorder or remove groups', () => {
+    const { layout, document } = createMaterialGroupLayout();
+    const grouping = materialGrouping();
+    const view = renderMaterialLibraryGroupNavigation(layout, grouping, 'data')!;
+    const data = view.roots.querySelector<HTMLButtonElement>('[data-material-group="data"]')!;
+    data.focus();
+    renderMaterialLibraryGroupNavigation(
+      layout,
+      parseGrouping({ groups: [...grouping.groups].reverse() }),
+      'data',
+    );
+    expect(document.activeElement).toBe(data);
+    renderMaterialLibraryGroupNavigation(
+      layout,
+      parseGrouping({ groups: [grouping.groups[0]] }),
+      undefined,
+    );
+    expect(document.activeElement).toBe(view.roots.querySelector('[data-material-group-all]'));
   });
 
-  it('maps vertical wheel deltas to horizontal scrolling and releases at the edges', () => {
-    const { document, navigation, layout } = createLayout();
-    document.metrics = { scrollWidth: 300, clientWidth: 100 };
-    renderMaterialLibraryGroupNavigation(layout, grouping(), undefined);
-    const groups = navigation.children[1]!;
-
-    let prevented = 0;
-    const wheel = (event: FakeWheelEvent) =>
-      groups.emit('wheel', {
-        deltaMode: 0,
-        deltaX: 0,
-        ...event,
-        preventDefault: () => prevented++,
-      });
-
-    wheel({ deltaY: 120 });
-    expect(groups.scrollLeft).toBe(120);
-    expect(prevented).toBe(1);
-    groups.emit('scroll');
-    expect(groups.dataset).toEqual({ scrollStart: 'true', scrollEnd: 'true' });
-
-    // 已到右端：继续向下滚动不再拦截，事件沿滚动链交给外层容器。
-    groups.scrollLeft = 200;
-    wheel({ deltaY: 120 });
-    expect(groups.scrollLeft).toBe(200);
-    expect(prevented).toBe(1);
-
-    // 左端向上滚动同样放行；水平占优的滚轮事件保持原生行为。
-    groups.scrollLeft = 0;
-    wheel({ deltaY: -120 });
-    wheel({ deltaY: 40, deltaX: 80 });
-    expect(groups.scrollLeft).toBe(0);
-    expect(prevented).toBe(1);
-
-    // 行滚动（deltaMode=1）按行高换算，页滚动（deltaMode=2）按可视宽度换算。
-    wheel({ deltaY: 3, deltaMode: 1 });
-    expect(groups.scrollLeft).toBe(48);
-    wheel({ deltaY: 1, deltaMode: 2 });
-    expect(groups.scrollLeft).toBe(148);
-    expect(prevented).toBe(3);
+  it('renders all 128 supported groups as independent, keyboard-reachable root entries', () => {
+    const { layout } = createMaterialGroupLayout();
+    const groups = Array.from({ length: 128 }, (_, index) => ({
+      id: `group${index}`,
+      label: `Group ${index}`,
+      materialTypes: [`base.item${index}`],
+    }));
+    const view = renderMaterialLibraryGroupNavigation(
+      layout,
+      parseGrouping({ groups }),
+      'group127',
+    )!;
+    expect(view.roots.querySelectorAll('[data-material-group]')).toHaveLength(128);
+    expect(
+      view.roots.querySelector('[data-material-group-all] .material-group-count')?.textContent,
+    ).toBe('128');
+    expect(
+      view.roots.querySelector<HTMLButtonElement>('[data-material-group="group127"]')?.tabIndex,
+    ).toBe(0);
   });
 
-  it('reveals the current level in overflowing breadcrumbs after drilling down', () => {
-    const { document, navigation, layout } = createLayout();
-    document.metrics = { scrollWidth: 300, clientWidth: 100 };
-    renderMaterialLibraryGroupNavigation(layout, grouping(), 'charts');
-
-    const [breadcrumbs] = navigation.children;
-    expect(breadcrumbs?.scrollLeft).toBe(200);
-    expect(breadcrumbs?.dataset).toEqual({ scrollStart: 'true', scrollEnd: 'false' });
+  it('renders the deepest supported level, full long labels and three-digit totals safely', () => {
+    const { layout } = createMaterialGroupLayout();
+    const label = '<b>' + 'Long name '.repeat(9) + '</b>';
+    const validLabel = label.slice(0, 96);
+    let group: BaseScreenMaterialLibraryGroup = {
+      id: 'level7',
+      label: validLabel,
+      materialTypes: Array.from({ length: 512 }, (_, index) => 'base.item' + index),
+    };
+    for (let index = 6; index >= 0; index--)
+      group = { id: 'level' + index, label: 'Level ' + index, children: [group] };
+    const view = renderMaterialLibraryGroupNavigation(
+      layout,
+      parseGrouping({ groups: [group] }),
+      'level7',
+    )!;
+    const leaf = view.children.querySelector<HTMLElement>('[data-material-group="level7"]')!;
+    expect(leaf.querySelector('.material-group-label')?.textContent).toBe(validLabel);
+    expect(leaf.querySelector('.material-group-count')?.textContent).toBe('512');
+    expect(leaf.title).toContain(validLabel);
+    expect(view.back.dataset.materialGroupBreadcrumb).toBe('level5');
+    expect(view.roots.querySelector('.material-group-count')?.textContent).toBe('512');
   });
 
-  it('hides the navigation and drops previous rows when the grouping is removed', () => {
-    const { document, navigation, layout } = createLayout();
-    document.metrics = { scrollWidth: 300, clientWidth: 100 };
-    renderMaterialLibraryGroupNavigation(layout, grouping(), undefined);
-    expect(navigation.children.length).toBeGreaterThan(0);
-
-    renderMaterialLibraryGroupNavigation(layout, undefined, undefined);
+  it('restores the flat-category layout when grouping is removed and supports reconfiguration', () => {
+    const { layout, navigation, inline, trigger, content } = createMaterialGroupLayout();
+    const grouping = materialGrouping();
+    renderMaterialLibraryGroupNavigation(layout, grouping, 'data');
+    expect(renderMaterialLibraryGroupNavigation(layout, undefined, undefined)).toBeUndefined();
     expect(navigation.hidden).toBe(true);
+    expect(inline.hidden).toBe(true);
+    expect(trigger.hidden).toBe(true);
+    expect(content.dataset.materialGrouped).toBe('false');
     expect(navigation.children).toEqual([]);
+    expect(
+      renderMaterialLibraryGroupNavigation(layout, grouping, undefined)?.roots.children.length,
+    ).toBe(3);
   });
 });

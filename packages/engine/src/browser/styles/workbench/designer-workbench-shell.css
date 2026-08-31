@@ -534,6 +534,8 @@
 }
 
 .rail-view[data-materials] {
+  container-name: material-library;
+  container-type: inline-size;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   padding: 0;
