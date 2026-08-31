@@ -44,6 +44,9 @@
   提交复用单条事务，普通组件同时更新两个坐标，组组件沿既有组平移语义移动可变子树，撤销一次恢复两个坐标。
   多选、无选中、有效锁定、文本输入、IME、AltGr、按键重复与活动手势均不触发；Screen Document、SDK、
   Custom Element 与宿主事件契约不变。
+- **组件尺寸快捷输入**（2026-08-31 增量）：单选未锁定组件后按 `W`，在同一位置以不随画布缩放的
+  非模态双输入浮层一次编辑 canonical W/H（px）；`Enter`、`Esc`、失焦和无效目标的行为与坐标输入一致。
+  普通组件以单条事务同步更新宽高，组组件从左上锚点缩放可变子树，撤销一次恢复全部尺寸与位置。
 - **画布内容裁剪**（2026-08-28 增量）：设计态 Renderer 输出由独立内容层按 canonical 画布边界裁剪，
   超出画布的组件视觉与命中区域不显示；选区、变换手柄和参考线保留在外层作者覆盖层，贴边组件仍可编辑。
   Renderer 的 preview/viewer 展示模式以同一 canonical 画布为可见与命中边界，Designer 直接预览和独立 Viewer 行为一致；
@@ -69,7 +72,9 @@
   `selectLeftPanelGroup` 与 composed change event 不要求访问 Shadow DOM。热更新删除当前组回退「物料」，
   宿主内容、状态、权限和请求不进入 Engine Store、ScreenDocument 或 Renderer。依据：
   [ADR-0062](../decisions/ADR-0062-host-left-panel-groups.md)。
-- **视窗原生事件开关**（封版后增量，已纳入基线）：状态栏「事件」与吸附/参考线同形态的 switch 控制设计态画布交互
+- **参考线显示入口**（2026-08-31 增量）：标尺左上角眼睛按钮替代底部状态栏「参考线」开关，
+  图标与视图菜单、`Ctrl+;` 共享显示状态；隐藏保留已有参考线，按钮支持键盘操作且固定为 20 × 20px。
+- **视窗原生事件开关**（封版后增量，已纳入基线）：状态栏「事件」与「吸附」同形态的 switch 控制设计态画布交互
   模式（默认关闭）；开启后组件原生事件经 `base-screen-material-event` 转发给宿主（与 Viewer 同形），renderer
   以实例级 `setInteractive` 原地重渲染，不重挂载、不重取数。依据：
   [Designer Viewport Native Events](../specs/archive/designer-viewport-native-events/spec.md)、

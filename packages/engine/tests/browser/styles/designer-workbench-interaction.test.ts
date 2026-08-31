@@ -268,7 +268,7 @@ describe('designer workbench interaction and accessibility', () => {
     expect(baseCss).toContain('mask-image: linear-gradient(');
     expect(baseCss).toContain('.material-filters .designer-button[aria-pressed="true"]');
     expect(baseCss).toMatch(
-      /\.material-search input\s*\{[^}]*padding-left: calc\(var\(--designer-space-3\) \+ var\(--designer-control-height\)\);/s,
+      /\.material-search input,\s*\.layer-search input\s*\{[^}]*padding-left: calc\(var\(--designer-space-3\) \+ var\(--designer-control-height\)\);/s,
     );
     expect(baseCss).toContain('.material-search-clear:not(:disabled):active');
     expect(baseCss).toContain(

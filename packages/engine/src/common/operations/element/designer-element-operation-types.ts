@@ -79,9 +79,11 @@ export interface DesignerElementOperationsHost {
   readonly cancelGesture: () => void;
   readonly canMutateSelection: () => boolean;
   readonly canEditPosition: () => boolean;
+  readonly canEditSize: () => boolean;
   readonly canSelectLayer: (direction: 'up' | 'down') => boolean;
   readonly canSetSelectionStatus: () => boolean;
   readonly openCoordinateEntry: () => void;
+  readonly openSizeEntry: () => void;
   readonly selectLayer: (direction: 'up' | 'down') => void;
   readonly deleteSelection: () => void;
   readonly nudgeSelection: (x: number, y: number) => void;

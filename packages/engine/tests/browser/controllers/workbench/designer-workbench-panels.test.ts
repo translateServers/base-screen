@@ -345,6 +345,44 @@ describe('DesignerWorkbenchController instance state', () => {
     expect(controller.snapEnabled).toBe(false);
   });
 
+  it.each([' ', 'Enter'])('activates the ruler guide switch once per %j key press', (key) => {
+    const { controller, guidesToggle } = createWorkbench();
+    controller.initialize();
+    const event = {
+      key,
+      target: clickTarget({ statusToggle: 'guides' }),
+      preventDefault: vi.fn(),
+    } as unknown as KeyboardEvent;
+
+    expect(controller.onKeyDown(event)).toBe(true);
+    expect(event.preventDefault).toHaveBeenCalledOnce();
+    expect(controller.guidesVisible).toBe(false);
+    expect(guidesToggle.attributes['aria-checked']).toBe('false');
+
+    expect(controller.onKeyDown({ ...event, repeat: true } as KeyboardEvent)).toBe(true);
+    expect(controller.guidesVisible).toBe(false);
+
+    expect(controller.onKeyDown(event)).toBe(true);
+    expect(controller.guidesVisible).toBe(true);
+    expect(guidesToggle.attributes['aria-checked']).toBe('true');
+  });
+
+  it('leaves modified and composing guide-switch keys to their existing routes', () => {
+    vi.stubGlobal('HTMLButtonElement', class {});
+    const { controller } = createWorkbench();
+    for (const modifier of ['altKey', 'ctrlKey', 'metaKey', 'shiftKey', 'isComposing']) {
+      const event = {
+        key: 'Enter',
+        target: clickTarget({ statusToggle: 'guides' }),
+        preventDefault: vi.fn(),
+        [modifier]: true,
+      } as unknown as KeyboardEvent;
+      expect(controller.onKeyDown(event)).toBe(false);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+      expect(controller.guidesVisible).toBe(true);
+    }
+  });
+
   it('routes the bottom status native events switch through the workbench click handler', () => {
     const changed: boolean[] = [];
     const { controller } = createWorkbench({

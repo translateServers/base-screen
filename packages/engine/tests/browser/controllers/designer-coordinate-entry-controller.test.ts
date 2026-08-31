@@ -6,6 +6,7 @@ import {
   DesignerCoordinateEntryController,
   placeDesignerCoordinateEntry,
 } from '../../../src/browser/controllers/designer-coordinate-entry-controller.js';
+import { DesignerSizeEntryController } from '../../../src/browser/controllers/designer-size-entry-controller.js';
 
 interface TestRect {
   readonly left: number;
@@ -162,6 +163,10 @@ function setup(options: { readonly document?: ScreenDocument } = {}) {
   const x = new FakeElement(root);
   const y = new FakeElement(root);
   const error = new FakeElement(root);
+  const sizeForm = new FakeElement(root, rectangle(0, 0, 220, 63));
+  const width = new FakeElement(root);
+  const height = new FakeElement(root);
+  const sizeError = new FakeElement(root);
   form.dataset.coordinateEntry = '';
   x.dataset.coordinateEntryAxis = 'x';
   y.dataset.coordinateEntryAxis = 'y';
@@ -170,7 +175,16 @@ function setup(options: { readonly document?: ScreenDocument } = {}) {
   form.setQuery('[data-coordinate-entry-x]', x);
   form.setQuery('[data-coordinate-entry-y]', y);
   form.setQuery('[data-coordinate-entry-error]', error);
+  sizeForm.dataset.sizeEntry = '';
+  width.dataset.sizeEntryAxis = 'width';
+  height.dataset.sizeEntryAxis = 'height';
+  sizeForm.hidden = true;
+  sizeForm.append(width, height, sizeError);
+  sizeForm.setQuery('[data-size-entry-width]', width);
+  sizeForm.setQuery('[data-size-entry-height]', height);
+  sizeForm.setQuery('[data-size-entry-error]', sizeError);
   root.set('[data-coordinate-entry]', form);
+  root.set('[data-size-entry]', sizeForm);
   root.set('[data-viewport]', viewport);
   root.set('[data-selection]', selection);
 
@@ -194,7 +208,17 @@ function setup(options: { readonly document?: ScreenDocument } = {}) {
     report,
     focusViewport,
   });
+  const sizeController = new DesignerSizeEntryController({
+    getRoot: () => root as unknown as ShadowRoot,
+    getDocument: () => currentDocument,
+    getInteraction: () => interaction,
+    getCatalog: () => catalog(),
+    executeTransaction,
+    report,
+    focusViewport,
+  });
   controller.connect();
+  sizeController.connect();
 
   return {
     controller,
@@ -202,7 +226,10 @@ function setup(options: { readonly document?: ScreenDocument } = {}) {
     executeTransaction,
     focusViewport,
     form,
+    height,
     root,
+    sizeController,
+    sizeForm,
     setDocument: (value: ScreenDocument) => {
       currentDocument = value;
     },
@@ -210,6 +237,7 @@ function setup(options: { readonly document?: ScreenDocument } = {}) {
       interaction = value;
     },
     viewport,
+    width,
     x,
     y,
   };
@@ -287,6 +315,36 @@ describe('DesignerCoordinateEntryController', () => {
       ],
     });
     expect(fixture.form.hidden).toBe(true);
+    expect(fixture.focusViewport).toHaveBeenCalledOnce();
+    expect(fixture.root.activeElement).toBe(fixture.viewport);
+  });
+
+  it('opens W/H and submits both rounded sizes in one transaction on Enter', () => {
+    const fixture = setup();
+
+    expect(fixture.sizeController.open()).toBe(true);
+    expect(fixture.sizeForm.hidden).toBe(false);
+    expect(fixture.width.value).toBe('100');
+    expect(fixture.height.value).toBe('50');
+    expect(fixture.root.activeElement).toBe(fixture.width);
+    expect(fixture.width.selectCount).toBe(1);
+
+    fixture.width.value = '123.456';
+    fixture.height.value = '45.678';
+    const enter = keyboardEvent('Enter', fixture.height);
+    expect(fixture.sizeController.onKeyDown(enter)).toBe(true);
+    expect(enter.preventDefault).toHaveBeenCalledOnce();
+    expect(fixture.executeTransaction).toHaveBeenCalledOnce();
+    expect(fixture.executeTransaction.mock.calls[0]?.[0]).toEqual({
+      commands: [
+        {
+          type: 'update-components',
+          componentIds: ['title'],
+          patch: { size: { width: 123.46, height: 45.68 } },
+        },
+      ],
+    });
+    expect(fixture.sizeForm.hidden).toBe(true);
     expect(fixture.focusViewport).toHaveBeenCalledOnce();
     expect(fixture.root.activeElement).toBe(fixture.viewport);
   });

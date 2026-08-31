@@ -98,8 +98,7 @@ export class DesignerWorkbenchController {
     this.#guides.disconnect();
   }
 
-  // 吸附会话生命周期：手势开始时启用（候选缓存 + 滞后状态），手势结束时清空。
-  // 会话内文档与参考线不会变化，候选集合只需计算一次；滞后状态按轴独立，避免手势间残留。
+  // 手势首帧建立吸附/测量共享的几何快照，结束或取消后释放；每轴独立记录吸附状态。
   setSnapSessionActive(active: boolean): void {
     this.#snap.setSessionActive(active);
   }
@@ -124,8 +123,7 @@ export class DesignerWorkbenchController {
     return this.#snap.snapSelectionOffset(bounds, offset, excludedComponentIds);
   }
 
-  // 吸附预览：选区平移始终传入 guides（可能为空），单点/变换路径无 guides 时才回退到
-  // snappedX/snappedY 单线，避免已重合的选区边界被回退路径画成贯穿画布的辅助线。
+  // 预览只绘制求解器显式给出的 guides，吸附结果本身不代表已经进入显示阈值。
   renderSnapPreview(point: DesignerSnapPreview | undefined): void {
     this.#snap.renderPreview(point);
   }
@@ -148,7 +146,7 @@ export class DesignerWorkbenchController {
     return this.#snap.isCanvasAidEnabled(aid);
   }
 
-  /** 用户参考线显示开关（视图 > 画布辅助 > 参考线，与状态栏 Guide 开关共用）。 */
+  /** 用户参考线显示开关（视图 > 画布辅助 > 参考线，与标尺角眼睛按钮共用）。 */
   get guidesVisible(): boolean {
     return this.#guides.visible;
   }
@@ -194,7 +192,7 @@ export class DesignerWorkbenchController {
       return true;
     }
     if (this.#tabs.onClick(target)) return true;
-    // 状态栏 Snap/Guide 开关（Nebula 语义：VSCode 风格开关，状态栏开关与菜单/快捷键共享状态）。
+    // 状态栏与标尺角的辅助开关共用菜单/快捷键状态。
     const statusToggle =
       target.closest<HTMLButtonElement>('[data-status-toggle]')?.dataset.statusToggle;
     if (statusToggle === 'snap') {
@@ -237,6 +235,22 @@ export class DesignerWorkbenchController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
+    if (
+      !event.isComposing &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      (event.key === ' ' || event.key === 'Enter')
+    ) {
+      const target = event.target as Element | null;
+      const toggle = target?.closest?.<HTMLButtonElement>('[data-status-toggle]');
+      if (toggle !== null && toggle !== undefined && !toggle.disabled) {
+        event.preventDefault();
+        if (!event.repeat) this.onClick(target!);
+        return true;
+      }
+    }
     if (this.#panelLayout.onKeyDown(event)) return true;
     return this.#tabs.onKeyDown(event);
   }
@@ -280,6 +294,7 @@ export class DesignerWorkbenchController {
   cancelTransientState(): void {
     this.#guides.resetTransient();
     this.#panelLayout.cancelResize();
+    this.#snap.setSessionActive(false);
     this.#snap.clearPreview();
     this.#guides.render();
   }
@@ -295,7 +310,7 @@ export class DesignerWorkbenchController {
     this.#guides.clear();
   }
 
-  // 状态栏 Snap/Guide/Native Events 开关的开合态与 aria-checked 同步（开关与菜单/快捷键共用同一状态源）。
+  // 状态栏与标尺角开关的 aria-checked 同步到菜单/快捷键共用的状态源。
   private renderStatusToggles(): void {
     const root = this.callbacks.getRoot();
     if (root === null) return;

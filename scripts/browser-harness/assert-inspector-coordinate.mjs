@@ -337,6 +337,96 @@ async function assertCoordinateEntry(page, designer) {
   await viewport.focus();
 }
 
+async function assertSizeEntry(page, designer) {
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  const form = designer.locator('[data-size-entry]');
+  const viewport = designer.locator('[data-viewport]');
+  const widthInput = form.locator('[data-size-entry-width]');
+  const heightInput = form.locator('[data-size-entry-height]');
+
+  await designer.locator('[data-base-screen-component-id=title]').click();
+  const original = await page.evaluate(() => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    if (component === undefined) throw new Error('Missing title');
+    return { ...component.size };
+  });
+  await viewport.focus();
+  await page.keyboard.press('w');
+  await form.waitFor({ state: 'visible' });
+
+  const opened = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const form = root.querySelector('[data-size-entry]');
+    const width = root.querySelector('[data-size-entry-width]');
+    const height = root.querySelector('[data-size-entry-height]');
+    const embeddedAxis = (input, axis) =>
+      input?.parentElement?.classList.contains('designer-coordinate-entry-input') === true &&
+      input.previousElementSibling?.textContent === axis &&
+      input.nextElementSibling?.textContent === 'px';
+    return {
+      activeWidth: root.activeElement === width,
+      buttonCount: form.querySelectorAll('button').length,
+      embeddedAxes: embeddedAxis(width, 'W') && embeddedAxis(height, 'H'),
+      width: width.value,
+    };
+  });
+  if (
+    !opened.activeWidth ||
+    opened.buttonCount !== 0 ||
+    !opened.embeddedAxes ||
+    opened.width !== String(original.width)
+  ) {
+    throw new Error(`BROWSER_HARNESS_SIZE_OPEN_FAILED:${JSON.stringify(opened)}`);
+  }
+
+  const widthDraft = (original.width + 37.456).toFixed(3);
+  const heightDraft = (original.height + 21.654).toFixed(3);
+  const expected = {
+    width: Math.round(Number(widthDraft) * 100) / 100,
+    height: Math.round(Number(heightDraft) * 100) / 100,
+  };
+  await page.keyboard.type(widthDraft);
+  if ((await widthInput.inputValue()) !== widthDraft) {
+    throw new Error('BROWSER_HARNESS_SIZE_WIDTH_AUTO_SELECT_FAILED');
+  }
+  await page.keyboard.press('Tab');
+  const tabbedToHeight = await designer.evaluate(
+    (element) =>
+      element.shadowRoot.activeElement ===
+      element.shadowRoot.querySelector('[data-size-entry-height]'),
+  );
+  if (!tabbedToHeight) throw new Error('BROWSER_HARNESS_SIZE_TAB_FAILED');
+  await heightInput.fill(heightDraft);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(({ width, height }) => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.size.width === width && component.size.height === height;
+  }, expected);
+  const committedState = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      hidden: root.querySelector('[data-size-entry]').hidden,
+      viewportFocused: root.activeElement === root.querySelector('[data-viewport]'),
+    };
+  });
+  if (!committedState.hidden || !committedState.viewportFocused) {
+    throw new Error(`BROWSER_HARNESS_SIZE_COMMIT_FOCUS_FAILED:${JSON.stringify(committedState)}`);
+  }
+  await page.keyboard.press(`${modifier}+z`);
+  await page.waitForFunction(({ width, height }) => {
+    const component = window.baseScreenHarness.designer.document.components.find(
+      (item) => item.id === 'title',
+    );
+    return component?.size.width === width && component.size.height === height;
+  }, original);
+  await page.keyboard.press('Escape');
+  await viewport.focus();
+}
+
 async function readCoordinateEntryGeometry(designer) {
   return designer.evaluate((element) => {
     const root = element.shadowRoot;
@@ -390,4 +480,4 @@ function coordinateEntryGeometryIsValid(value) {
   return value.placement === 'clamped';
 }
 
-export { assertCoordinateEntry, assertInspectorFormScrollContinuity };
+export { assertCoordinateEntry, assertInspectorFormScrollContinuity, assertSizeEntry };

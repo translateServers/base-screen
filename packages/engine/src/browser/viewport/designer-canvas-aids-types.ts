@@ -2,7 +2,7 @@ export const DESIGNER_SMART_GUIDE_THRESHOLD = 5;
 // 吸附保持范围倍率：1.0 = 捕获阈值本身（超出阈值立即释放），
 // 对齐 Nebula/Moveable 的每帧重新判定语义（Moveable snapThreshold=5，无额外滞后带）。
 export const DESIGNER_SNAP_RELEASE_MULTIPLIER = 1;
-// 对齐线渲染阈值（px，文档坐标）：仅距离 ≤ 该值的命中才绘制参考线，
+// 对齐线渲染阈值（屏幕 px，按 zoom 换算成文档坐标）：仅距离 ≤ 该值的命中才绘制参考线，
 // 对应 Moveable 的 snapRenderThreshold（默认 1）——吸附（5px）与渲染（1px）分离，
 // 接近阶段无线，几乎贴合时才出现线。
 export const DESIGNER_SNAP_RENDER_THRESHOLD = 1;

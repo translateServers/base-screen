@@ -104,6 +104,12 @@ export function createDesignerElementOperations(
       'canvas',
     ),
     simpleOperation(
+      'edit-size',
+      () => host.canEditSize(),
+      () => host.openSizeEntry(),
+      'canvas',
+    ),
+    simpleOperation(
       'copy',
       () => host.getSelection().selectedComponentIds.length > 0,
       () => host.copy(),

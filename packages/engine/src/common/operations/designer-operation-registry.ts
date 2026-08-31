@@ -90,6 +90,7 @@ export const DESIGNER_OPERATION_TEXT = {
   'nudge-up': { label: '上移', tooltip: '向上微调', shortcut: 'ArrowUp' },
   'nudge-down': { label: '下移', tooltip: '向下微调', shortcut: 'ArrowDown' },
   'edit-position': { label: '快速输入坐标', tooltip: '输入选中组件的 X/Y 坐标', shortcut: 'X' },
+  'edit-size': { label: '快速输入尺寸', tooltip: '输入选中组件的 W/H 尺寸', shortcut: 'W' },
   copy: { label: '复制', tooltip: '复制选中组件', shortcut: 'Ctrl+C' },
   paste: { label: '粘贴', tooltip: '粘贴组件', shortcut: 'Ctrl+V' },
   duplicate: { label: '原地复制', tooltip: '原地复制选中组件', shortcut: 'Ctrl+D' },

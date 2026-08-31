@@ -17,6 +17,7 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.blueprintWorkbenchController.onClick(target as Element),
       (target) => state.topbarController.onClick(target as Element),
       (target) => state.coordinateEntryController.onClick(target),
+      (target) => state.sizeEntryController.onClick(target),
       (target) => state.menuController.onHelpClick(target as Element),
       (target) => state.menuController.toggleMenuFromTarget(target as Element),
       () => {
@@ -94,6 +95,7 @@ export function initializeDesignerElementSurfaceBindings(
     change: [
       (target) => state.blueprintWorkbenchController.onChange(target as Element),
       (target) => state.coordinateEntryController.onChange(target),
+      (target) => state.sizeEntryController.onChange(target),
       (_target, event) => state.runtime.onImportChange(element, event),
       (_target, event) => state.layersController.onChange(event),
       (target) => state.datasetController.onChange(target),
@@ -105,6 +107,7 @@ export function initializeDesignerElementSurfaceBindings(
     input: [
       (target) => state.blueprintWorkbenchController.onInput(target as Element),
       (target) => state.coordinateEntryController.onInput(target),
+      (target) => state.sizeEntryController.onInput(target),
       (target) => state.commandPaletteController.onInput(target as Element),
       (target) => state.datasetController.onInput(target),
       (_target, event) => state.panelController.onInput(event),
@@ -176,6 +179,7 @@ export function initializeDesignerElementSurfaceBindings(
     },
     focusOut: (_target, event) => {
       state.coordinateEntryController.onFocusOut(event as FocusEvent);
+      state.sizeEntryController.onFocusOut(event as FocusEvent);
       return state.layersController.onFocusOut(event as FocusEvent);
     },
     keyDownCapture: (_target, event) => {
@@ -200,6 +204,7 @@ export function initializeDesignerElementSurfaceBindings(
     keyDown: [
       (_target, event) => state.blueprintWorkbenchController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.coordinateEntryController.onKeyDown(event as KeyboardEvent),
+      (_target, event) => state.sizeEntryController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.commandPaletteController.onKeyDown(event as KeyboardEvent),
       (_target, event) => state.errorConsoleController.onKeyDown(event as KeyboardEvent),
       (_target, event) => {

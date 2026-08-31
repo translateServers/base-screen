@@ -6,6 +6,7 @@ import { assertEventSystemGuards } from './assert-event-system-guards.mjs';
 import {
   assertCoordinateEntry,
   assertInspectorFormScrollContinuity,
+  assertSizeEntry,
 } from './assert-inspector-coordinate.mjs';
 import { assertLayersAuthoring } from './assert-layers-authoring.mjs';
 import { assertSnapWorkflow } from './assert-snap-workflow.mjs';
@@ -15,6 +16,7 @@ import { assertOverlayContained } from './layout-assertions.mjs';
 export async function assertAuthoringAdvanced(authoringDesigner, page) {
   await assertInspectorFormScrollContinuity(page, authoringDesigner);
   await assertCoordinateEntry(page, authoringDesigner);
+  await assertSizeEntry(page, authoringDesigner);
   await assertAuthoringShortcutsAndIsolation(page, authoringDesigner);
   await assertCanvasPrecision(authoringDesigner, page);
   await assertDataAndBlueprintAuthoring(authoringDesigner, page);

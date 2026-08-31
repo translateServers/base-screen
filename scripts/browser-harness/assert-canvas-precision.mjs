@@ -9,10 +9,24 @@ import {
 async function assertCanvasPrecision(designer, page) {
   const canvas = designer.locator('[data-canvas]');
   const ruler = designer.locator('.ruler-horizontal');
+  const guidesToggle = designer.locator('.ruler-corner[data-status-toggle="guides"]');
+  const persistentGuides = designer.locator('[data-canvas-guides] > .canvas-guide-persistent');
   const canvasBox = await canvas.boundingBox();
   const rulerBox = await ruler.boundingBox();
-  if (canvasBox === null || rulerBox === null) {
+  const cornerBox = await guidesToggle.boundingBox();
+  const verticalRulerBox = await designer.locator('.ruler-vertical').boundingBox();
+  if (canvasBox === null || rulerBox === null || cornerBox === null || verticalRulerBox === null) {
     throw new Error('BROWSER_HARNESS_CANVAS_AIDS_REGION_MISSING');
+  }
+  if (
+    cornerBox.y !== rulerBox.y ||
+    cornerBox.x !== verticalRulerBox.x ||
+    cornerBox.width !== verticalRulerBox.width ||
+    cornerBox.height !== rulerBox.height ||
+    cornerBox.y + cornerBox.height !== verticalRulerBox.y ||
+    (await designer.locator('.statusbar [data-status-toggle="guides"]').count()) !== 0
+  ) {
+    throw new Error('BROWSER_HARNESS_RULER_GUIDES_TOGGLE_PLACEMENT_FAILED');
   }
   const beforeDocument = await page.evaluate(() =>
     JSON.stringify(window.baseScreenHarness.designer.document),
@@ -329,23 +343,29 @@ async function assertCanvasPrecision(designer, page) {
     throw new Error('BROWSER_HARNESS_GRID_TOGGLE_BACK_FAILED');
   }
   await assertCanvasAidChecked(designer, page, 'toggle-grid', 'true');
-  // 参考线开关（菜单与状态栏共用状态源）：菜单关闭后状态栏开关同步为 false。
+  // 标尺眼睛与菜单/键盘共用参考线状态；隐藏只影响显示，恢复后保留原参考线。
+  const guidesCount = await persistentGuides.count();
+  if (guidesCount === 0) throw new Error('BROWSER_HARNESS_GUIDES_TOGGLE_FIXTURE_MISSING');
+  const assertGuidesToggle = async (visible) => {
+    const expected = String(visible);
+    if (
+      (await guidesToggle.getAttribute('aria-checked')) !== expected ||
+      !(await guidesToggle.locator(`[data-guide-visibility="${expected}"]`).isVisible()) ||
+      (await guidesToggle.locator(`[data-guide-visibility="${!visible}"]`).isVisible()) ||
+      (await persistentGuides.count()) !== (visible ? guidesCount : 0)
+    ) {
+      throw new Error(`BROWSER_HARNESS_RULER_GUIDES_TOGGLE_STATE_FAILED:${expected}`);
+    }
+    await assertCanvasAidChecked(designer, page, 'toggle-guides', expected);
+  };
+  await guidesToggle.click();
+  await assertGuidesToggle(false);
   await toggleCanvasAidViaMenu(designer, page, 'toggle-guides');
-  if (
-    (await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !==
-    'false'
-  ) {
-    throw new Error('BROWSER_HARNESS_GUIDES_TOGGLE_FAILED');
-  }
-  await assertCanvasAidChecked(designer, page, 'toggle-guides', 'false');
-  await toggleCanvasAidViaMenu(designer, page, 'toggle-guides');
-  if (
-    (await designer.locator('[data-status-toggle="guides"]').getAttribute('aria-checked')) !==
-    'true'
-  ) {
-    throw new Error('BROWSER_HARNESS_GUIDES_TOGGLE_BACK_FAILED');
-  }
-  await assertCanvasAidChecked(designer, page, 'toggle-guides', 'true');
+  await assertGuidesToggle(true);
+  await guidesToggle.press('Space');
+  await assertGuidesToggle(false);
+  await guidesToggle.press('Enter');
+  await assertGuidesToggle(true);
   // 边框参考线开关往返：菜单勾选状态随开关翻转。
   await toggleCanvasAidViaMenu(designer, page, 'toggle-border-guides');
   await assertCanvasAidChecked(designer, page, 'toggle-border-guides', 'false');

@@ -1,3 +1,4 @@
+import { assertPointSnapOverlay, assertSnapOverlayReuse } from './assert-snap-overlay.mjs';
 import { componentPositions, zoomResetViaMenu } from './harness-utils.mjs';
 
 // 结束前把文档恢复到调用前状态，避免污染后续断言。
@@ -90,6 +91,7 @@ async function assertSnapWorkflow(designer, page) {
     };
     return { title: read('title'), subtitle: read('subtitle') };
   });
+  await assertPointSnapOverlay(designer, page);
   const title = designer.locator('[data-base-screen-component-id=title]');
   await title.evaluate((element) => {
     const rect = element.getBoundingClientRect();
@@ -222,6 +224,7 @@ async function assertSnapWorkflow(designer, page) {
     );
   }
   // 捕获阈值内（4px ≤ 5px）每帧重新吸附：保持吸附目标（×1.0，无额外释放带，Nebula/Moveable 语义）。
+  await assertSnapOverlayReuse(designer, page, { x: startX, y: startY + targetDeltaY });
   await page.mouse.move(startX, startY + targetDeltaY + 4, { steps: 2 });
   translate = await readTranslate('title');
   await expectAxis(translate, 'y', targetDeltaY, 'HOLD');

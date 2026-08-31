@@ -2,12 +2,12 @@
 // （即吸附时画布上显示的 46 / 48 / 59 这类间距数字）。纯计算，不含 DOM 渲染。
 
 import type { ScreenDocument } from '@base-screen/contracts';
-import { getScreenComponentBounds, isScreenComponentEffectivelyHidden } from '@base-screen/core';
 import {
   DESIGNER_SNAP_RENDER_THRESHOLD,
   type DesignerCanvasMeasurement,
   type DesignerSelectionSnapBounds,
-} from './designer-canvas-aids.js';
+} from './designer-canvas-aids-types.js';
+import { collectDesignerSnapComponentBounds } from './designer-canvas-snap-geometry.js';
 
 interface Interval {
   readonly end: number;
@@ -28,12 +28,20 @@ export function collectDesignerCanvasMeasurements(
   selectedComponentIds: readonly string[],
   zoom = 1,
 ): readonly DesignerCanvasMeasurement[] {
+  return measureDesignerCanvasBounds(
+    collectDesignerSnapComponentBounds(document, new Set(selectedComponentIds)),
+    selection,
+    zoom,
+  );
+}
+
+/** Gesture path: reuse the same static component geometry as the snap index. */
+export function measureDesignerCanvasBounds(
+  components: readonly DesignerSelectionSnapBounds[],
+  selection: DesignerSelectionSnapBounds,
+  zoom = 1,
+): readonly DesignerCanvasMeasurement[] {
   const tolerance = DESIGNER_SNAP_RENDER_THRESHOLD / Math.max(zoom, Number.EPSILON);
-  const selected = new Set(selectedComponentIds);
-  const components = document.components
-    .filter((component) => !selected.has(component.id))
-    .filter((component) => !isScreenComponentEffectivelyHidden(document, component.id))
-    .map((component) => getScreenComponentBounds(component));
   const measurements: DesignerCanvasMeasurement[] = [];
 
   for (const position of uniqueAnchors(selection.left, selection.right)) {
@@ -82,7 +90,11 @@ function uniqueAnchors(start: number, end: number): readonly number[] {
 }
 
 function matchesAnchor(position: number, start: number, end: number, tolerance: number): boolean {
-  return [start, (start + end) / 2, end].some((anchor) => Math.abs(anchor - position) <= tolerance);
+  return (
+    Math.abs(start - position) <= tolerance ||
+    Math.abs((start + end) / 2 - position) <= tolerance ||
+    Math.abs(end - position) <= tolerance
+  );
 }
 
 function hasEffectiveOverlap(

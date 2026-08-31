@@ -12,7 +12,12 @@ describe('DesignerWorkbenchController canvas state', () => {
     workbench.controller.initialize();
     const originalDocument = structuredClone(workbench.document);
 
-    workbench.controller.renderSnapPreview({ x: 50, y: 40, snappedX: 50 });
+    workbench.controller.renderSnapPreview({
+      x: 50,
+      y: 40,
+      snappedX: 50,
+      guides: { x: [{ value: 50 }] },
+    });
 
     expect(workbench.guides.children).toHaveLength(1);
     expect(workbench.guides.children[0]!.className).toBe(
@@ -65,8 +70,8 @@ describe('DesignerWorkbenchController canvas state', () => {
       y: 0,
       snappedX: 130,
       snappedY: 166,
-      guides: {},
     });
+    expect(preview.guides).toBeUndefined();
 
     workbench.controller.renderSnapPreview(preview);
     expect(workbench.guides.children).toHaveLength(0);
@@ -128,13 +133,23 @@ describe('DesignerWorkbenchController canvas state', () => {
     const workbench = createWorkbench();
     workbench.controller.initialize();
 
-    workbench.controller.renderSnapPreview({ x: 50, y: 40, snappedX: 50 });
+    workbench.controller.renderSnapPreview({
+      x: 50,
+      y: 40,
+      snappedX: 50,
+      guides: { x: [{ value: 50 }] },
+    });
     expect(workbench.guides.children).toHaveLength(1);
     workbench.controller.toggleSnap();
     expect(workbench.guides.children).toHaveLength(0);
 
     workbench.controller.toggleSnap();
-    workbench.controller.renderSnapPreview({ x: 50, y: 40, snappedX: 50 });
+    workbench.controller.renderSnapPreview({
+      x: 50,
+      y: 40,
+      snappedX: 50,
+      guides: { x: [{ value: 50 }] },
+    });
     expect(workbench.guides.children).toHaveLength(1);
     workbench.controller.toggleBorderGuides();
     expect(workbench.guides.children).toHaveLength(0);

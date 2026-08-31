@@ -199,6 +199,7 @@ export function resetSessionSurfaces(element: DesignerElementHost): void {
 
   elementState.runtime.cancelGesture(element);
   elementState.coordinateEntryController.close(false);
+  elementState.sizeEntryController.close(false);
   elementState.workbenchController.clearGuides();
   elementState.layersController.clearSessionState();
   elementState.panelController.clearClipboard();

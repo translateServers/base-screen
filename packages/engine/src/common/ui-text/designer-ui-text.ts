@@ -137,6 +137,11 @@ export const DESIGNER_UI_TEXT = {
     invalid: '请输入有效的 X/Y 坐标。',
     submitFailed: '坐标未保存，请检查当前组件状态。',
   },
+  sizeEntry: {
+    title: '快速输入尺寸',
+    invalid: '请输入有效的 W/H 尺寸。',
+    submitFailed: '尺寸未保存，请检查当前组件状态。',
+  },
   tools: '工具',
   history: '历史记录',
   project: '项目',
@@ -554,7 +559,7 @@ export const DESIGNER_UI_TEXT = {
     arrange: '排列',
     canvas: '画布与视图',
   },
-  rulerCornerUnit: 'px',
+  rulerGuidesToggle: '切换参考线显示',
   selection: {
     resizeHandle: (dir: string) => `调整大小：${dir}`,
     rotate: '旋转选中组件',

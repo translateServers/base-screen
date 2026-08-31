@@ -4,10 +4,10 @@ import {
   clientPointToDesignerCanvasPoint,
   getDesignerCanvasBounds,
 } from '../../viewport/designer-canvas-coordinates.js';
+import type { DesignerGuideSnapPreview } from '../../viewport/designer-canvas-snap-preview.js';
 import {
   type DesignerGuideAxis,
-  type DesignerGuideSnapPreview,
-  renderDesignerGuideOverlay,
+  DesignerGuideOverlay,
 } from '../../viewport/designer-guide-overlay.js';
 import { renderDesignerRulers } from '../../viewport/designer-ruler-renderer.js';
 
@@ -38,6 +38,7 @@ const DESIGNER_GUIDE_DOUBLE_CLICK_MS = 500;
 const DESIGNER_GUIDE_DRAG_THRESHOLD = 3;
 
 export class DesignerGuideController {
+  readonly #overlay = new DesignerGuideOverlay();
   #guides: { x: number[]; y: number[] } = { x: [], y: [] };
   #visible = true;
   #drag: GuideDrag | undefined;
@@ -94,6 +95,7 @@ export class DesignerGuideController {
     }
     this.#canvasListeners = [];
     this.#connectedCanvas = undefined;
+    this.#overlay.disconnect();
   }
 
   observeRulerResize(): void {
@@ -208,7 +210,7 @@ export class DesignerGuideController {
     if (root === null || canvas === undefined) return;
     const snap = this.callbacks.getSnapState();
     const canvasSize = this.callbacks.getDocument()?.canvas;
-    renderDesignerGuideOverlay({
+    this.#overlay.render({
       canvas,
       canvasAids: snap.canvasAids,
       canvasSize:

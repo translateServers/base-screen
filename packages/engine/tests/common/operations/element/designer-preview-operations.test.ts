@@ -29,12 +29,14 @@ type HostOverrides = Partial<
   Pick<
     DesignerElementOperationsHost,
     | 'canEditPosition'
+    | 'canEditSize'
     | 'canMutateSelection'
     | 'canSelectLayer'
     | 'getDocument'
     | 'getProject'
     | 'hasPreviewHandler'
     | 'openCoordinateEntry'
+    | 'openSizeEntry'
     | 'reorderSelection'
     | 'selectLayer'
   >
@@ -94,9 +96,11 @@ function createHost(overrides: HostOverrides): DesignerElementOperationsHost {
     cancelGesture: () => undefined,
     canMutateSelection: overrides.canMutateSelection ?? (() => false),
     canEditPosition: overrides.canEditPosition ?? (() => false),
+    canEditSize: overrides.canEditSize ?? (() => false),
     canSelectLayer: overrides.canSelectLayer ?? (() => false),
     canSetSelectionStatus: () => false,
     openCoordinateEntry: overrides.openCoordinateEntry ?? (() => undefined),
+    openSizeEntry: overrides.openSizeEntry ?? (() => undefined),
     selectLayer: overrides.selectLayer ?? (() => undefined),
     deleteSelection: () => undefined,
     nudgeSelection: () => undefined,
@@ -167,6 +171,26 @@ describe('designer coordinate entry operation', () => {
     const disabled = createDesignerElementOperations(
       createHost({ canEditPosition: () => false, openCoordinateEntry }),
     ).find((operation) => operation.id === 'edit-position')!;
+    expect(disabled.isEnabled(undefined)).toBe(false);
+  });
+});
+
+describe('designer size entry operation', () => {
+  it('exposes W and opens only while a valid size target is available', () => {
+    const openSizeEntry = vi.fn();
+    const enabled = createDesignerElementOperations(
+      createHost({ canEditSize: () => true, openSizeEntry }),
+    ).find((operation) => operation.id === 'edit-size')!;
+
+    expect(enabled.shortcut).toBe('W');
+    expect(enabled.scope).toBe('canvas');
+    expect(enabled.isEnabled(undefined)).toBe(true);
+    enabled.execute(undefined);
+    expect(openSizeEntry).toHaveBeenCalledOnce();
+
+    const disabled = createDesignerElementOperations(
+      createHost({ canEditSize: () => false, openSizeEntry }),
+    ).find((operation) => operation.id === 'edit-size')!;
     expect(disabled.isEnabled(undefined)).toBe(false);
   });
 });

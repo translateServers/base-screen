@@ -1,23 +1,18 @@
-// 画布参考线覆盖层渲染：把常驻 guide、拖拽预览线、吸附参考线与间距测量标注
-// 绘制到 [data-canvas-guides] 容器（每次全量重建，用 CSS transform 对齐 zoom）。
+// Persistent guides and transient previews share one instance-owned, incrementally updated layer.
 
-import type {
-  DesignerCanvasAidsState,
-  DesignerCanvasMeasurement,
-  DesignerSnapGuideLine,
-} from './designer-canvas-aids.js';
+import type { DesignerCanvasAidsState } from './designer-canvas-aids-types.js';
+import type { DesignerGuideSnapPreview } from './designer-canvas-snap-preview.js';
+import {
+  createDesignerGuideOverlayNode,
+  type DesignerGuideAxis,
+  type DesignerGuideOverlayItem,
+  type DesignerGuideOverlayNode,
+  updateDesignerGuideOverlayNode,
+} from './designer-guide-overlay-nodes.js';
 
-export type DesignerGuideAxis = 'x' | 'y';
+export type { DesignerGuideAxis } from './designer-guide-overlay-nodes.js';
 
-export interface DesignerGuideSnapPreview {
-  readonly x: readonly DesignerSnapGuideLine[] | undefined;
-  readonly y: readonly DesignerSnapGuideLine[] | undefined;
-  readonly activeX: number | undefined;
-  readonly activeY: number | undefined;
-  readonly measurements: readonly DesignerCanvasMeasurement[] | undefined;
-}
-
-interface DesignerGuideOverlayOptions {
+export interface DesignerGuideOverlayOptions {
   readonly canvas: HTMLDivElement;
   readonly canvasAids: DesignerCanvasAidsState;
   readonly canvasSize: { readonly height: number; readonly width: number } | undefined;
@@ -33,117 +28,124 @@ interface DesignerGuideOverlayOptions {
   readonly zoom: number;
 }
 
-export function renderDesignerGuideOverlay(options: DesignerGuideOverlayOptions): void {
-  const container = options.root.querySelector<HTMLElement>('[data-canvas-guides]');
-  if (container === null || container === undefined) return;
-  setCanvasOverlayScale(container, options.zoom);
-  container.replaceChildren();
-  for (const axis of ['x', 'y'] as const) {
-    renderAxisGuides(container, axis, options);
+export class DesignerGuideOverlay {
+  #container: HTMLElement | undefined;
+  #zoom: number | undefined;
+  readonly #nodes = new Map<string, DesignerGuideOverlayNode>();
+
+  render(options: DesignerGuideOverlayOptions): void {
+    const container = options.root.querySelector<HTMLElement>('[data-canvas-guides]');
+    if (container === null || container === undefined) {
+      this.disconnect();
+      return;
+    }
+    if (container !== this.#container) {
+      this.disconnect();
+      this.#container = container;
+    }
+    if (this.#zoom !== options.zoom) {
+      setCanvasOverlayScale(container, options.zoom);
+      this.#zoom = options.zoom;
+    }
+    const items = collectOverlayItems(options);
+    const keys = new Set(items.map((item) => item.key));
+    for (const [key, node] of this.#nodes) {
+      if (keys.has(key)) continue;
+      node.element.remove();
+      this.#nodes.delete(key);
+    }
+
+    let cursor = container.firstElementChild;
+    for (const item of items) {
+      let node = this.#nodes.get(item.key);
+      if (node === undefined) {
+        node = createDesignerGuideOverlayNode(options.canvas.ownerDocument, item);
+        this.#nodes.set(item.key, node);
+      }
+      updateDesignerGuideOverlayNode(node, item);
+      if (node.element === cursor) cursor = cursor.nextElementSibling;
+      else container.insertBefore(node.element, cursor);
+    }
   }
-  if (!options.snapEnabled || !options.canvasAids.smartGuidesEnabled) return;
-  for (const measurement of options.snapPreview?.measurements ?? []) {
-    container.appendChild(createMeasurement(options.canvas.ownerDocument, measurement));
+
+  disconnect(): void {
+    for (const node of this.#nodes.values()) node.element.remove();
+    this.#nodes.clear();
+    this.#container = undefined;
+    this.#zoom = undefined;
   }
 }
 
-function renderAxisGuides(
-  container: HTMLElement,
+function collectOverlayItems(options: DesignerGuideOverlayOptions): DesignerGuideOverlayItem[] {
+  const items: DesignerGuideOverlayItem[] = [];
+  for (const axis of ['x', 'y'] as const) collectAxisGuides(items, axis, options);
+  if (!options.snapEnabled || !options.canvasAids.smartGuidesEnabled) return items;
+  const ordinals = { x: 0, y: 0 };
+  for (const measurement of options.snapPreview?.measurements ?? []) {
+    items.push({
+      key: 'measurement:' + measurement.axis + ':' + ordinals[measurement.axis]++,
+      kind: 'measurement',
+      measurement,
+    });
+  }
+  return items;
+}
+
+function collectAxisGuides(
+  items: DesignerGuideOverlayItem[],
   axis: DesignerGuideAxis,
   options: DesignerGuideOverlayOptions,
 ): void {
+  const preview = options.guidePreview;
   for (const [index, value] of options.guides[axis].entries()) {
-    const preview = options.guidePreview;
     if (preview?.axis === axis && options.drag?.guideIndex === index) {
       if (isGuideWithinCanvas(axis, preview.value, options.canvasSize)) {
-        container.appendChild(
-          createGuide(options.canvas.ownerDocument, axis, preview.value, 'preview'),
-        );
+        items.push({
+          key: 'preview:' + axis,
+          kind: 'guide',
+          axis,
+          variant: 'preview',
+          line: { value: preview.value },
+        });
       }
       continue;
     }
     if (options.guidesVisible) {
-      container.appendChild(
-        createGuide(options.canvas.ownerDocument, axis, value, 'persistent', index),
-      );
+      items.push({
+        key: 'persistent:' + axis + ':' + index,
+        kind: 'guide',
+        axis,
+        variant: 'persistent',
+        index,
+        line: { value },
+      });
     }
   }
-  const preview = options.guidePreview;
   if (
     preview?.axis === axis &&
     options.drag?.guideIndex === undefined &&
     isGuideWithinCanvas(axis, preview.value, options.canvasSize)
   ) {
-    container.appendChild(
-      createGuide(options.canvas.ownerDocument, axis, preview.value, 'preview'),
-    );
+    items.push({
+      key: 'preview:' + axis,
+      kind: 'guide',
+      axis,
+      variant: 'preview',
+      line: { value: preview.value },
+    });
   }
-  const snapLines = options.snapPreview?.[axis];
-  if (snapLines === undefined) return;
+  if (!options.snapEnabled || !options.canvasAids.smartGuidesEnabled) return;
   const activeValue = options.snapPreview?.[axis === 'x' ? 'activeX' : 'activeY'];
-  for (const line of snapLines) {
-    container.appendChild(
-      createSnapGuide(options.canvas.ownerDocument, axis, line, line.value === activeValue),
-    );
+  for (const [index, line] of (options.snapPreview?.[axis] ?? []).entries()) {
+    items.push({
+      key: 'snap:' + axis + ':' + index,
+      kind: 'guide',
+      axis,
+      variant: 'snap',
+      active: line.value === activeValue,
+      line,
+    });
   }
-}
-
-function createSnapGuide(
-  document: Document,
-  axis: DesignerGuideAxis,
-  line: DesignerSnapGuideLine,
-  active: boolean,
-): HTMLElement {
-  const guide = createGuide(document, axis, line.value, 'snap');
-  // 组件参考线只覆盖参考组件的正交范围；画布与用户参考线保持全画布默认。
-  if (line.start !== undefined && line.size !== undefined && line.size > 0) {
-    guide.style[axis === 'x' ? 'top' : 'left'] = `${line.start}px`;
-    guide.style[axis === 'x' ? 'height' : 'width'] = `${line.size}px`;
-  }
-  if (active) guide.classList.add('canvas-guide-snap-active');
-  return guide;
-}
-
-function createMeasurement(
-  document: Document,
-  measurement: DesignerCanvasMeasurement,
-): HTMLElement {
-  const marker = document.createElement('div');
-  marker.className = 'canvas-measurement';
-  marker.dataset.axis = measurement.axis;
-  if (measurement.axis === 'x') {
-    marker.style.left = `${measurement.from}px`;
-    marker.style.top = `${measurement.position}px`;
-    marker.style.width = `${measurement.to - measurement.from}px`;
-  } else {
-    marker.style.left = `${measurement.position}px`;
-    marker.style.top = `${measurement.from}px`;
-    marker.style.height = `${measurement.to - measurement.from}px`;
-  }
-  const label = document.createElement('span');
-  label.className = 'canvas-measurement-label';
-  // Match Moveable's default snapDigit: visual measurements are whole, unitless pixels.
-  label.textContent = String(Math.round(measurement.distance));
-  marker.appendChild(label);
-  return marker;
-}
-
-function createGuide(
-  document: Document,
-  axis: DesignerGuideAxis,
-  value: number,
-  kind: 'persistent' | 'preview' | 'snap',
-  index?: number,
-): HTMLElement {
-  const guide = document.createElement('div');
-  guide.className = `canvas-guide canvas-guide-${kind}`;
-  guide.dataset.axis = axis;
-  if (kind === 'persistent' && index !== undefined) {
-    guide.dataset.canvasGuide = 'true';
-    guide.dataset.guideIndex = String(index);
-  }
-  guide.style[axis === 'x' ? 'left' : 'top'] = `${value}px`;
-  return guide;
 }
 
 function isGuideWithinCanvas(
@@ -169,7 +171,8 @@ function setCanvasOverlayScale(container: HTMLElement, zoom: number): void {
     '--designer-overlay-line-height': 14,
     '--designer-overlay-pixel': 1,
   } as const;
-  for (const [property, multiplier] of Object.entries(sizes)) {
-    container.style.setProperty(property, `${unit * multiplier}px`);
-  }
+  // This layer owns its inline scale declarations; replace them atomically, only on zoom changes.
+  container.style.cssText = Object.entries(sizes)
+    .map(([property, multiplier]) => property + ':' + unit * multiplier + 'px')
+    .join(';');
 }

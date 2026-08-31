@@ -1,8 +1,8 @@
-/* 搜索框：内凹深底 + 大圆角，左侧搜索图标，右侧清除按钮；图标绝对定位不参与文档流。 */
-.material-search input {
+/* 资源面板搜索框：内凹深底 + 大圆角，左侧搜索图标；图标绝对定位不参与文档流。 */
+.material-search input,
+.layer-search input {
   box-sizing: border-box;
   width: 100%;
-  padding-right: calc(var(--designer-space-3) + 22px);
   padding-left: calc(var(--designer-space-3) + var(--designer-control-height));
   border-color: var(--designer-border-subtle);
   border-radius: 9px;
@@ -13,7 +13,12 @@
   );
 }
 
-.material-search input:hover:not(:disabled) {
+.material-search input {
+  padding-right: calc(var(--designer-space-3) + 22px);
+}
+
+.material-search input:hover:not(:disabled),
+.layer-search input:hover:not(:disabled) {
   border-color: var(--designer-border-default);
   background: color-mix(
     in srgb,
@@ -22,11 +27,13 @@
   );
 }
 
-.material-search input:focus {
+.material-search input:focus,
+.layer-search input:focus {
   background: var(--designer-surface-control);
 }
 
-.material-search-glyph {
+.material-search-glyph,
+.layer-search-glyph {
   position: absolute;
   bottom: 0;
   left: var(--designer-space-3);
@@ -39,7 +46,8 @@
   pointer-events: none;
 }
 
-.material-search-glyph svg {
+.material-search-glyph svg,
+.layer-search-glyph svg {
   width: 13px;
   height: 13px;
   fill: none;
@@ -47,7 +55,9 @@
 }
 
 .material-search input:focus ~ .material-search-glyph,
-.material-search:focus-within .material-search-glyph {
+.material-search:focus-within .material-search-glyph,
+.layer-search input:focus ~ .layer-search-glyph,
+.layer-search:focus-within .layer-search-glyph {
   color: var(--designer-accent);
 }
 

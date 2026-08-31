@@ -27,6 +27,7 @@ import { DesignerLeftPanelGroupEventController } from '../../browser/controllers
 import { DesignerNotificationController } from '../../browser/controllers/designer-notification-controller.js';
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
 import { DesignerScrollContinuityController } from '../../browser/controllers/designer-scroll-continuity-controller.js';
+import { DesignerSizeEntryController } from '../../browser/controllers/designer-size-entry-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTopbarController } from '../../browser/controllers/designer-topbar-controller.js';
 import { DesignerVariablesController } from '../../browser/controllers/designer-variables-controller.js';
@@ -137,6 +138,7 @@ export interface DesignerElementState {
   workbenchController: DesignerWorkbenchController;
   commandPaletteController: DesignerCommandPaletteController;
   coordinateEntryController: DesignerCoordinateEntryController;
+  sizeEntryController: DesignerSizeEntryController;
   operationHost: DesignerElementOperationsHost;
   operations: DesignerOperationRegistry<DesignerOperationContext | undefined>;
   eventSystem: DesignerEventSystem;

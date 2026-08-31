@@ -10,6 +10,7 @@ import {
   previewGlyph,
   publishGlyph,
   redoGlyph,
+  sizeEntryField,
   submenuButton,
   zoomInGlyph,
   zoomOutGlyph,
@@ -116,7 +117,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         </div>
         <div class="designer-menu topbar-more-menu" data-menu="more" hidden role="menu" aria-label="${DESIGNER_UI_TEXT.more}">
           ${submenuButton(DESIGNER_UI_TEXT.file, ['project-workspace', 'import', 'export', 'separator', 'project-save', 'project-publish', 'project-retry', 'project-cancel'])}
-          ${submenuButton(DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'separator', 'group', 'ungroup', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
+          ${submenuButton(DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'edit-size', 'separator', 'group', 'ungroup', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
           ${submenuButton(DESIGNER_UI_TEXT.view, ['zoom-in', 'zoom-out', 'zoom-reset', 'zoom-fit', 'separator', 'toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
           ${submenuButton(DESIGNER_UI_TEXT.tools, ['toggle-workbench', 'show-help'])}
         </div>
@@ -138,7 +139,10 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           ${actionButton('zoom-in', zoomInGlyph())}
         </div>
       </div>
-      <div class="ruler-corner" aria-hidden="true">${DESIGNER_UI_TEXT.rulerCornerUnit}</div>
+      <button type="button" class="ruler-corner" data-status-toggle="guides" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.guides}" title="${DESIGNER_UI_TEXT.rulerGuidesToggle}">
+        <span data-guide-visibility="true" aria-hidden="true">${designerIcon('eye')}</span>
+        <span data-guide-visibility="false" aria-hidden="true">${designerIcon('eye-off')}</span>
+      </button>
       <div class="ruler ruler-horizontal" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
       <div class="canvas-stage">
         <div class="ruler ruler-vertical" aria-hidden="true"><canvas class="ruler-canvas" data-ruler-canvas></canvas></div>
@@ -154,6 +158,11 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             ${coordinateEntryField('y')}
             <p class="designer-coordinate-entry-error" id="designer-coordinate-entry-error" data-coordinate-entry-error role="alert" aria-live="assertive"></p>
           </form>
+          <form class="designer-coordinate-entry designer-size-entry" data-size-entry role="dialog" aria-modal="false" aria-label="${DESIGNER_UI_TEXT.sizeEntry.title}" autocomplete="off" novalidate hidden>
+            ${sizeEntryField('width')}
+            ${sizeEntryField('height')}
+            <p class="designer-coordinate-entry-error" id="designer-size-entry-error" data-size-entry-error role="alert" aria-live="assertive"></p>
+          </form>
         </div>
       </div>
       <section class="designer-blueprint-surface" data-blueprint-surface hidden aria-label="${DESIGNER_UI_TEXT.blueprint.canvas}">
@@ -165,7 +174,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       </section>
       <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="${DESIGNER_UI_TEXT.contextMenu}" tabindex="-1"></div>
 
-      <!-- Nebula-style status bar: left (tool + selection + project state) | center (canvas size) | right (Snap/Guide toggles + design mode + zoom menu). -->
+      <!-- Status bar: left (tool + selection + project state) | center (canvas size) | right (Snap/Native Events toggles + zoom menu). -->
       <footer class="statusbar">
         <div class="statusbar-group statusbar-start">
           <span class="status-tool" data-status-tool>${designerToolGlyph('select')}<span class="status-tool-name">${DESIGNER_TOOLS.find((tool) => tool.id === 'select')?.label ?? ''}</span></span>
@@ -182,9 +191,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <div class="statusbar-group statusbar-end">
           <button type="button" class="status-toggle" data-status-toggle="snap" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.snap}">
             <span class="status-toggle-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.snap}</span>
-          </button>
-          <button type="button" class="status-toggle" data-status-toggle="guides" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.guides}">
-            <span class="status-toggle-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.guides}</span>
           </button>
           <span class="status-divider" aria-hidden="true"></span>
           <button type="button" class="status-toggle" data-status-toggle="native-events" role="switch" aria-checked="false" aria-label="${DESIGNER_UI_TEXT.nativeEvent}">

@@ -2,6 +2,9 @@ import type { ScreenDocument } from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { DesignerWorkbenchController } from '../../../../src/browser/controllers/workbench/designer-workbench-controller.js';
 import { DESIGNER_UI_TEXT } from '../../../../src/common/ui-text/designer-ui-text.js';
+import { WorkbenchElement } from './designer-workbench-element.js';
+
+export { WorkbenchElement } from './designer-workbench-element.js';
 
 export function captureTarget() {
   const captures = new Set<number>();
@@ -11,81 +14,6 @@ export function captureTarget() {
     hasPointerCapture: (pointerId: number) => captures.has(pointerId),
     releasePointerCapture: (pointerId: number) => captures.delete(pointerId),
   };
-}
-export class WorkbenchElement {
-  readonly children: WorkbenchElement[] = [];
-  replaceChildrenCalls = 0;
-  readonly captures = new Set<number>();
-  readonly attributes: Record<string, string> = {};
-  readonly dataset: Record<string, string> = {};
-  readonly style = {
-    setProperty: (property: string, value: string) => {
-      (this.style as unknown as Record<string, string>)[property] = value;
-    },
-    removeProperty: (property: string) => {
-      delete (this.style as unknown as Record<string, string>)[property];
-    },
-  };
-  className = '';
-  ariaPressed = '';
-  ariaSelected = '';
-  title = '';
-  hidden = false;
-  textContent = '';
-  clientLeft = 0;
-  getBoundingClientRect = () => ({
-    bottom: 0,
-    height: 0,
-    left: 0,
-    right: 0,
-    top: 0,
-    width: 0,
-  });
-
-  setPointerCapture(pointerId: number): void {
-    this.captures.add(pointerId);
-  }
-
-  hasPointerCapture(pointerId: number): boolean {
-    return this.captures.has(pointerId);
-  }
-
-  releasePointerCapture(pointerId: number): void {
-    this.captures.delete(pointerId);
-  }
-
-  readonly classList = {
-    add: (name: string) => {
-      this.className = this.className === '' ? name : `${this.className} ${name}`;
-    },
-  };
-
-  readonly ownerDocument = { createElement: () => new WorkbenchElement() };
-
-  appendChild(child: WorkbenchElement): WorkbenchElement {
-    this.children.push(child);
-    return child;
-  }
-
-  replaceChildren(...children: WorkbenchElement[]): void {
-    this.replaceChildrenCalls += 1;
-    this.children.splice(0, this.children.length, ...children);
-  }
-
-  setAttribute(name: string, value: string): void {
-    this.attributes[name] = value;
-    if (name === 'aria-pressed') this.ariaPressed = value;
-  }
-
-  removeAttribute(name: string): void {
-    delete this.attributes[name];
-  }
-
-  closest<T extends Element>(selector: string): T | null {
-    return (
-      selector === '[data-canvas-guide]' && this.dataset.canvasGuide === 'true' ? this : null
-    ) as T | null;
-  }
 }
 
 export function createWorkbench(
@@ -157,6 +85,7 @@ export function createWorkbench(
     return pane;
   });
   const grid = new WorkbenchElement();
+  const guidesToggle = new WorkbenchElement();
   const nativeEventsToggle = new WorkbenchElement();
   const leftCollapseControl = new WorkbenchElement();
   const rightCollapseControl = new WorkbenchElement();
@@ -219,6 +148,7 @@ export function createWorkbench(
     ['[data-layers]', layers],
     ['.inspector-tabs', inspectorTabs],
     ['[data-action="toggle-grid"]', grid],
+    ['[data-status-toggle="guides"]', guidesToggle],
     ['[data-status-toggle="native-events"]', nativeEventsToggle],
     ['[data-panel-collapse="left"]', leftCollapseControl],
     ['[data-panel-collapse="right"]', rightCollapseControl],
@@ -268,6 +198,7 @@ export function createWorkbench(
     document,
     grid,
     guides,
+    guidesToggle,
     inspectorTabs,
     interaction,
     layers,

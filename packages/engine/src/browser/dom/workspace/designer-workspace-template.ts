@@ -25,6 +25,7 @@ export const SHORTCUT_HELP_SECTIONS = [
     title: DESIGNER_UI_TEXT.shortcutHelpSections.arrange,
     operationIds: [
       'edit-position',
+      'edit-size',
       'select-layer-up',
       'select-layer-down',
       'nudge-left',
@@ -60,6 +61,11 @@ export const SHORTCUT_HELP_SECTIONS = [
 export function coordinateEntryField(axis: 'x' | 'y'): string {
   const label = axis.toUpperCase();
   return `<label class="designer-coordinate-entry-field"><span class="designer-coordinate-entry-input"><span class="designer-coordinate-entry-axis" aria-hidden="true">${label}</span><input type="number" class="designer-control designer-input designer-number" data-coordinate-entry-${axis} data-coordinate-entry-axis="${axis}" inputmode="decimal" min="-1000000" max="1000000" step="0.01" aria-label="${label}" aria-describedby="designer-coordinate-entry-error"><span class="designer-coordinate-entry-unit" aria-hidden="true">${DESIGNER_UI_TEXT.coordinateEntry.unit}</span></span></label>`;
+}
+
+export function sizeEntryField(axis: 'width' | 'height'): string {
+  const label = axis === 'width' ? 'W' : 'H';
+  return `<label class="designer-coordinate-entry-field"><span class="designer-coordinate-entry-input"><span class="designer-coordinate-entry-axis" aria-hidden="true">${label}</span><input type="number" class="designer-control designer-input designer-number" data-size-entry-${axis} data-size-entry-axis="${axis}" inputmode="decimal" min="1" max="1000000" step="0.01" aria-label="${label}" aria-describedby="designer-size-entry-error"><span class="designer-coordinate-entry-unit" aria-hidden="true">${DESIGNER_UI_TEXT.coordinateEntry.unit}</span></span></label>`;
 }
 
 export function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: string): string {

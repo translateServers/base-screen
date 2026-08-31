@@ -6,6 +6,7 @@ import { DesignerCoordinateEntryController } from '../../browser/controllers/des
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
+import { DesignerSizeEntryController } from '../../browser/controllers/designer-size-entry-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTopbarController } from '../../browser/controllers/designer-topbar-controller.js';
 import { DesignerVariablesController } from '../../browser/controllers/designer-variables-controller.js';
@@ -320,6 +321,7 @@ export function initializeDesignerElementControllers(
     onViewportChange: () => {
       state.workbenchController.renderCanvasPrecision();
       state.coordinateEntryController.sync();
+      state.sizeEntryController.sync();
     },
   });
   state.workbenchController = new DesignerWorkbenchController({
@@ -367,6 +369,16 @@ export function initializeDesignerElementControllers(
       ),
   });
   state.coordinateEntryController = new DesignerCoordinateEntryController({
+    getRoot: () => element.shadowRoot,
+    getDocument: () => state.session.document,
+    getInteraction: () => state.session.interaction,
+    getCatalog: () => state.catalog,
+    executeTransaction: (transaction) =>
+      state.runtime.executeDesignerTransaction(element, transaction),
+    report: (result) => state.runtime.report(element, result),
+    focusViewport: () => state.viewportController.focus(),
+  });
+  state.sizeEntryController = new DesignerSizeEntryController({
     getRoot: () => element.shadowRoot,
     getDocument: () => state.session.document,
     getInteraction: () => state.session.interaction,

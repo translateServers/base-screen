@@ -1,11 +1,8 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import {
-  collectDesignerSnapCandidates,
   DEFAULT_DESIGNER_CANVAS_AIDS,
   type DesignerCanvasAidsState,
   type DesignerSelectionSnapBounds,
-  type DesignerSnapCandidates,
-  type DesignerSnapGuideLine,
   type DesignerSnapPoint,
   type DesignerSnapPreview,
   type DesignerSnapSession,
@@ -13,8 +10,18 @@ import {
   snapDesignerCanvasPoint,
   snapDesignerSelectionTranslation,
 } from '../../viewport/designer-canvas-aids.js';
-import { collectDesignerCanvasMeasurements } from '../../viewport/designer-canvas-measurements.js';
-import type { DesignerGuideSnapPreview } from '../../viewport/designer-guide-overlay.js';
+import { measureDesignerCanvasBounds } from '../../viewport/designer-canvas-measurements.js';
+import { createDesignerSnapCandidates } from '../../viewport/designer-canvas-snap-candidates.js';
+import {
+  collectDesignerSnapComponentBounds,
+  type DesignerSnapComponentBounds,
+} from '../../viewport/designer-canvas-snap-geometry.js';
+import { DesignerSnapIndex } from '../../viewport/designer-canvas-snap-index.js';
+import {
+  type DesignerGuideSnapPreview,
+  equalDesignerSnapPreviews,
+  projectDesignerSnapPreview,
+} from '../../viewport/designer-canvas-snap-preview.js';
 
 interface DesignerSnapCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
@@ -26,17 +33,18 @@ interface DesignerSnapCallbacks {
   readonly renderStatus: () => void;
 }
 
+interface DesignerSnapGeometry {
+  readonly components: readonly DesignerSnapComponentBounds[] | undefined;
+  readonly excluded: ReadonlySet<string>;
+  readonly index: DesignerSnapIndex;
+}
+
 export class DesignerSnapController {
   #canvasAids: DesignerCanvasAidsState = DEFAULT_DESIGNER_CANVAS_AIDS;
   #enabled = true;
   #preview: DesignerGuideSnapPreview | undefined;
   #session: DesignerSnapSession = {};
-  #cache:
-    | {
-        readonly candidates: DesignerSnapCandidates;
-        readonly excludedKey: string;
-      }
-    | undefined;
+  #cache: DesignerSnapGeometry | undefined;
   #sessionActive = false;
 
   constructor(private readonly callbacks: DesignerSnapCallbacks) {}
@@ -67,8 +75,7 @@ export class DesignerSnapController {
 
   setSessionActive(active: boolean): void {
     this.#sessionActive = active;
-    this.#cache = undefined;
-    if (!active) this.#session = {};
+    this.invalidateCandidates();
   }
 
   invalidateCandidates(): void {
@@ -84,12 +91,11 @@ export class DesignerSnapController {
     point: { readonly x: number; readonly y: number },
     excludedComponentIds: readonly string[] = [],
   ): DesignerSnapPoint {
-    if (!this.#enabled) return { x: point.x, y: point.y };
-    const candidates = this.resolveCandidates(excludedComponentIds);
+    if (!this.#enabled || !this.#canvasAids.smartGuidesEnabled) return { x: point.x, y: point.y };
     return snapDesignerCanvasPoint(
       point,
       this.#canvasAids,
-      candidates,
+      this.resolveGeometry(excludedComponentIds).index,
       this.callbacks.getZoom(),
       this.#sessionActive ? this.#session : undefined,
     );
@@ -100,42 +106,40 @@ export class DesignerSnapController {
     offset: { readonly x: number; readonly y: number },
     excludedComponentIds: readonly string[] = [],
   ): DesignerSnapTranslation {
-    if (!this.#enabled) return { x: offset.x, y: offset.y };
-    const document = this.callbacks.getDocument();
+    if (!this.#enabled || !this.#canvasAids.smartGuidesEnabled) return { x: offset.x, y: offset.y };
+    const geometry = this.resolveGeometry(excludedComponentIds);
+    const zoom = this.callbacks.getZoom();
     const snapped = snapDesignerSelectionTranslation(
       bounds,
       offset,
       this.#canvasAids,
-      this.resolveCandidates(excludedComponentIds, document),
-      this.callbacks.getZoom(),
+      geometry.index,
+      zoom,
       this.#sessionActive ? this.#session : undefined,
     );
     return {
       ...snapped,
-      // 选区路径显式传入空 guides，避免精确重合时被单点路径的回退线误渲染。
-      guides: snapped.guides ?? {},
-      ...(document === undefined || !this.#canvasAids.smartGuidesEnabled
+      ...(geometry.components === undefined
         ? {}
         : {
-            measurements: collectDesignerCanvasMeasurements(
-              document,
+            measurements: measureDesignerCanvasBounds(
+              geometry.components,
               translateSelectionBounds(bounds, snapped),
-              excludedComponentIds,
-              this.callbacks.getZoom(),
+              zoom,
             ),
           }),
     };
   }
 
   renderPreview(point: DesignerSnapPreview | undefined): void {
-    if (!this.#enabled) {
+    if (!this.#enabled || !this.#canvasAids.smartGuidesEnabled) {
       if (this.#preview === undefined) return;
       this.#preview = undefined;
       this.callbacks.renderGuides();
       return;
     }
-    const nextPreview = toSnapPreviewState(point);
-    if (snapPreviewRenderKey(this.#preview) === snapPreviewRenderKey(nextPreview)) {
+    const nextPreview = projectDesignerSnapPreview(point);
+    if (equalDesignerSnapPreviews(this.#preview, nextPreview)) {
       this.#preview = nextPreview;
       return;
     }
@@ -172,28 +176,35 @@ export class DesignerSnapController {
     this.callbacks.renderGuides();
   }
 
-  private resolveCandidates(
-    excludedComponentIds: readonly string[],
-    document = this.callbacks.getDocument(),
-  ): DesignerSnapCandidates {
-    if (document === undefined) return guidesCandidates(this.callbacks.getGuides());
-    if (!this.#sessionActive) {
-      return collectDesignerSnapCandidates(
-        document,
-        this.callbacks.getGuides(),
-        excludedComponentIds,
-      );
+  private resolveGeometry(excludedComponentIds: readonly string[]): DesignerSnapGeometry {
+    const excluded = new Set(excludedComponentIds);
+    if (
+      this.#sessionActive &&
+      this.#cache !== undefined &&
+      this.#cache.excluded.size === excluded.size &&
+      excludedComponentIds.every((id) => this.#cache!.excluded.has(id))
+    ) {
+      return this.#cache;
     }
-    const excludedKey = JSON.stringify([...new Set(excludedComponentIds)].sort());
-    if (this.#cache?.excludedKey === excludedKey) return this.#cache.candidates;
-    this.#session = {};
-    const candidates = collectDesignerSnapCandidates(
-      document,
-      this.callbacks.getGuides(),
-      excludedComponentIds,
-    );
-    this.#cache = { candidates, excludedKey };
-    return candidates;
+    const document = this.callbacks.getDocument();
+    const components =
+      document === undefined ? undefined : collectDesignerSnapComponentBounds(document, excluded);
+    const geometry: DesignerSnapGeometry = {
+      components,
+      excluded,
+      index: new DesignerSnapIndex(
+        createDesignerSnapCandidates(
+          document?.canvas,
+          this.callbacks.getGuides(),
+          components ?? [],
+        ),
+      ),
+    };
+    if (this.#sessionActive) {
+      this.#session = {};
+      this.#cache = geometry;
+    }
+    return geometry;
   }
 
   private renderCanvasAids(): void {
@@ -207,47 +218,6 @@ export class DesignerSnapController {
       .querySelector<HTMLButtonElement>('[data-action="toggle-grid"]')
       ?.setAttribute('aria-pressed', String(this.#canvasAids.gridEnabled));
   }
-}
-
-function guidesCandidates(guides: {
-  readonly x: readonly number[];
-  readonly y: readonly number[];
-}): DesignerSnapCandidates {
-  return {
-    x: guides.x.map((value) => ({ value, start: 0, size: 0 })),
-    y: guides.y.map((value) => ({ value, start: 0, size: 0 })),
-  };
-}
-
-function toSnapPreviewState(
-  point: DesignerSnapPreview | undefined,
-): DesignerGuideSnapPreview | undefined {
-  if (point === undefined) return undefined;
-  if (point.guides !== undefined) {
-    const x = point.guides.x?.length === 0 ? undefined : point.guides.x;
-    const y = point.guides.y?.length === 0 ? undefined : point.guides.y;
-    return {
-      x,
-      y,
-      activeX: x === undefined ? undefined : point.snappedX,
-      activeY: y === undefined ? undefined : point.snappedY,
-      measurements: point.measurements,
-    };
-  }
-  const activeLine = (value: number | undefined): readonly DesignerSnapGuideLine[] | undefined =>
-    value === undefined ? undefined : [{ value }];
-  return {
-    x: activeLine(point.snappedX),
-    y: activeLine(point.snappedY),
-    activeX: point.snappedX,
-    activeY: point.snappedY,
-    measurements: point.measurements,
-  };
-}
-
-function snapPreviewRenderKey(preview: DesignerGuideSnapPreview | undefined): string {
-  if (preview === undefined) return '';
-  return JSON.stringify(preview);
 }
 
 function translateSelectionBounds(

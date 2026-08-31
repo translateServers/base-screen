@@ -37,6 +37,7 @@ export function disconnectSurfaces(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
   elementState.coordinateEntryController.disconnect();
+  elementState.sizeEntryController.disconnect();
   elementState.workbenchController.disconnect();
   elementState.gestureController.disconnect();
   elementState.viewportController.disconnect();
@@ -88,6 +89,7 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
     elementState.viewportController.connect(viewport, canvas);
   }
   elementState.coordinateEntryController.connect();
+  elementState.sizeEntryController.connect();
   elementState.surfaceRouter.connect(shadow, elementState.surfaceBindings);
   elementState.blueprintWorkbenchController.connect(shadow);
   elementState.selection = shadow.querySelector<HTMLDivElement>('[data-selection]') ?? undefined;

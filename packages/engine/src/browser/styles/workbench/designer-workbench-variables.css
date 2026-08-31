@@ -543,6 +543,8 @@
 }
 
 .ruler-corner {
+  box-sizing: border-box;
+  grid-row: 2 / 3;
   position: absolute;
   top: 0;
   left: 0;
@@ -551,11 +553,39 @@
   width: 20px;
   height: 20px;
   place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
   border-right: 1px solid var(--designer-border-default);
   border-bottom: 1px solid var(--designer-border-default);
   background: var(--designer-surface-panel);
   color: var(--designer-text-muted);
-  font-size: 9px;
+  cursor: pointer;
+}
+
+.ruler-corner:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.ruler-corner:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+.ruler-corner [data-guide-visibility] {
+  display: grid;
+  place-items: center;
+}
+
+.ruler-corner svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ruler-corner[aria-checked="true"] [data-guide-visibility="false"],
+.ruler-corner[aria-checked="false"] [data-guide-visibility="true"] {
+  display: none;
 }
 
 .ruler-canvas {

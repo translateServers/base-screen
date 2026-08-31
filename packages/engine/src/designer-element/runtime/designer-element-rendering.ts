@@ -86,6 +86,7 @@ export function initialize(element: DesignerElementHost): void {
   elementState.gestureController.connectViewport(elementState.viewportElement);
   elementState.viewportController.connect(elementState.viewportElement, elementState.canvas);
   elementState.coordinateEntryController.connect();
+  elementState.sizeEntryController.connect();
   elementState.surfaceRouter.connect(shadow, elementState.surfaceBindings);
   elementState.blueprintWorkbenchController.connect(shadow);
   elementState.runtime.connectWindowGuards(element);
@@ -138,6 +139,7 @@ export function renderInteraction(element: DesignerElementHost): void {
   elementState.panelController.captureInspectorGroupPreferences(element.shadowRoot);
   elementState.runtime.renderSelection(element);
   elementState.coordinateEntryController.sync();
+  elementState.sizeEntryController.sync();
   elementState.runtime.renderProperties(element);
   elementState.runtime.renderInspectorInteraction(element);
   elementState.runtime.renderLayers(element);

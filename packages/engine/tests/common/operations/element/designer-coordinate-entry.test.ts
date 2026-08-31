@@ -3,8 +3,11 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   createDesignerCoordinateEntryTransaction,
+  createDesignerSizeEntryTransaction,
   getDesignerCoordinateEntryTarget,
+  getDesignerSizeEntryTarget,
   parseDesignerCoordinateEntry,
+  parseDesignerSizeEntry,
 } from '../../../../src/common/operations/element/designer-coordinate-entry.js';
 
 function component(
@@ -64,6 +67,17 @@ describe('designer coordinate entry operations', () => {
     });
   });
 
+  it('parses positive sizes with the canonical precision and bounds', () => {
+    expect(parseDesignerSizeEntry({ width: '123.456', height: '1000001' })).toEqual({
+      ok: true,
+      value: { width: 123.46, height: 1_000_000 },
+    });
+    expect(parseDesignerSizeEntry({ width: '0', height: 'Infinity' })).toEqual({
+      ok: false,
+      invalidAxes: ['width', 'height'],
+    });
+  });
+
   it('creates one absolute position update and omits unchanged values', () => {
     const source = document([component('title')]);
     const interaction = { selectedComponentIds: ['title'], focusedComponentId: 'title' };
@@ -84,6 +98,30 @@ describe('designer coordinate entry operations', () => {
       createDesignerCoordinateEntryTransaction(source, interaction, catalog(), {
         x: 120,
         y: 130,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('creates one absolute size update and omits unchanged values', () => {
+    const source = document([component('title')]);
+    const interaction = { selectedComponentIds: ['title'], focusedComponentId: 'title' };
+
+    expect(
+      createDesignerSizeEntryTransaction(source, interaction, catalog(), {
+        width: 200.126,
+        height: 40.555,
+      })?.commands,
+    ).toEqual([
+      {
+        type: 'update-components',
+        componentIds: ['title'],
+        patch: { size: { width: 200.13, height: 40.56 } },
+      },
+    ]);
+    expect(
+      createDesignerSizeEntryTransaction(source, interaction, catalog(), {
+        width: 100,
+        height: 50,
       }),
     ).toBeUndefined();
   });
@@ -113,6 +151,33 @@ describe('designer coordinate entry operations', () => {
     ]);
   });
 
+  it('scales a selected group and mutable descendants from its top-left anchor', () => {
+    const source = document([
+      component('group'),
+      component('child', 'group'),
+      component('locked', 'group', { locked: true, hidden: false }),
+    ]);
+    const interaction = { selectedComponentIds: ['group'], focusedComponentId: 'group' };
+
+    expect(
+      createDesignerSizeEntryTransaction(source, interaction, catalog(), {
+        width: 200,
+        height: 100,
+      })?.commands,
+    ).toEqual([
+      {
+        type: 'update-components',
+        componentIds: ['group'],
+        patch: { position: { x: 100, y: 100 }, size: { width: 200, height: 100 } },
+      },
+      {
+        type: 'update-components',
+        componentIds: ['child'],
+        patch: { position: { x: 140, y: 160 }, size: { width: 200, height: 100 } },
+      },
+    ]);
+  });
+
   it('rejects multi-selection and effectively locked targets', () => {
     const source = document([
       component('first'),
@@ -122,6 +187,13 @@ describe('designer coordinate entry operations', () => {
 
     expect(
       getDesignerCoordinateEntryTarget(
+        source,
+        { selectedComponentIds: ['first', 'second'], focusedComponentId: 'second' },
+        catalog(),
+      ),
+    ).toBeUndefined();
+    expect(
+      getDesignerSizeEntryTarget(
         source,
         { selectedComponentIds: ['first', 'second'], focusedComponentId: 'second' },
         catalog(),

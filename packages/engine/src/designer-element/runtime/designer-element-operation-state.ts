@@ -70,6 +70,7 @@ export function initializeDesignerElementOperations(
     cancelGesture: () => state.runtime.cancelGesture(element),
     canMutateSelection: () => state.selectionActions.canMutate(),
     canEditPosition: () => state.coordinateEntryController.canOpen(),
+    canEditSize: () => state.sizeEntryController.canOpen(),
     canSelectLayer: (direction) => state.layersController.canStepSelection(direction),
     canSetSelectionStatus: () => state.selectionActions.canSetStatus(),
     openCoordinateEntry: () => {
@@ -79,7 +80,18 @@ export function initializeDesignerElementOperations(
       state.menuController.closeMenus();
       state.menuController.closeContextMenu();
       state.menuController.closeHelpPanel();
+      state.sizeEntryController.close(false);
       state.coordinateEntryController.open();
+    },
+    openSizeEntry: () => {
+      state.runtime.cancelGesture(element);
+      state.workbenchController.cancelTransientState();
+      state.commandPaletteController.close(false);
+      state.menuController.closeMenus();
+      state.menuController.closeContextMenu();
+      state.menuController.closeHelpPanel();
+      state.coordinateEntryController.close(false);
+      state.sizeEntryController.open();
     },
     deleteSelection: () => state.selectionActions.delete(),
     selectLayer: (direction) => state.layersController.stepSelection(direction),
@@ -112,6 +124,7 @@ export function initializeDesignerElementOperations(
       state.menuController.closeHelpPanel();
       state.commandPaletteController.close(false);
       state.coordinateEntryController.close(false);
+      state.sizeEntryController.close(false);
     },
     // 空格抓手与键盘焦点解耦：鼠标悬停视窗即可激活临时抓手（无需先点击聚焦）。
     onWindowKeyDown: (event) => state.viewportController.onWindowKeyDown(event),
