@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-30（增量 Spec 归档与代码治理基线收口）
+> 最近更新：2026-08-31（宿主资源 authoring intent）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 **维护期内的任何修改都必须新建增量 Spec（并先有已接受的 ADR）**，不得以本基线或归档 Spec 直接授权实现。
@@ -167,6 +167,13 @@
 
 ## 宿主边界与数据运行时
 
+- **宿主资源作者协议**（2026-08-31 增量）：宿主资源面板通过 `leftPanelGroups` 的 Canvas-only 命名
+  slot 提交严格 JSON-safe、8 KiB 有界 intent；Designer 提供公开插入、同类型 dataSource-only 替换和
+  原生拖放，校验当前 catalog 可见性、Manifest capability 与资源贡献；单次 Core transaction、可见
+  画布中心/吸附落点、undo/redo 和状态变化事件保持统一。旧素材目录端口、能力位、listAssets 和内置
+  素材控制器已删除；目录、权限、分页、缩略图、签名和删除保护均归宿主。依据：
+  [ADR-0064](../decisions/ADR-0064-host-resource-authoring-intent.md)、
+  [验收记录](../specs/archive/host-resource-authoring/spec.md)。
 - **轻量基座定位**：项目、数据、资产、发布、长任务等真实处理归宿主，Base Screen 通过 JSON-safe intent/port/method/event
   请求宿主能力。依据：[ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、
   [ADR-0017](../decisions/ADR-0017-designer-product-host-boundaries.md)。

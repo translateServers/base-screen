@@ -2,6 +2,7 @@ import type { ScreenDatasetDescriptor } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDatasetAuthoringView } from '../../dom/dataset/designer-dataset-dom.js';
 import { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
+import { designerDataSourceModes } from './designer-data-source-authoring.js';
 import { DesignerDatasetCatalogController } from './designer-dataset-catalog-controller.js';
 import {
   type DesignerDatasetControllerCallbacks,
@@ -92,6 +93,9 @@ export class DesignerDatasetController {
       return;
     }
     const describeTarget = syncDraftToFocusedComponent(this.#context);
+    if (!designerDataSourceModes(this.#context.currentEntry()).includes('dataset')) {
+      this.#catalogController.clear();
+    }
     if (panel === undefined) return;
     this.#state.panel = panel;
     this.renderSurface();

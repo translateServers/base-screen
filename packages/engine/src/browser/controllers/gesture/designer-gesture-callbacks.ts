@@ -1,10 +1,16 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import type {
+  ScreenDiagnostic,
+  ScreenDocument,
+  ScreenParseResult,
+  ScreenPosition,
+} from '@base-screen/contracts';
 import type {
   ScreenDocumentTransaction,
   ScreenInteractionAction,
   ScreenViewportState,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenHostResourceAuthoringIntent } from '../../../common/operations/host-resource/host-resource-authoring.js';
 import type { BaseScreenResolvedMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type {
   DesignerToolId,
@@ -50,6 +56,14 @@ export interface DesignerGestureCallbacks {
   readonly setSnapSessionActive?: (active: boolean) => void;
   readonly reduceSelection: (action: ScreenInteractionAction) => void;
   readonly reportTransaction: (transaction: ScreenDocumentTransaction) => void;
+  readonly validateHostResourceIntent?: (
+    intent: BaseScreenHostResourceAuthoringIntent,
+  ) => ScreenParseResult<BaseScreenHostResourceAuthoringIntent>;
+  readonly insertHostResourceAt?: (
+    intent: BaseScreenHostResourceAuthoringIntent,
+    position: ScreenPosition,
+  ) => ScreenParseResult<ScreenDocument>;
+  readonly reportDiagnostics?: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly renderSelection: () => void;
   readonly focusViewport?: () => void;
   readonly setPanning?: (panning: boolean) => void;

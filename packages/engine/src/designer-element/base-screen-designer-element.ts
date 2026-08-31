@@ -1,6 +1,4 @@
 import type {
-  ScreenAssetCatalogPort,
-  ScreenAssetSummary,
   ScreenAuthoringEditorContext,
   ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
@@ -34,6 +32,7 @@ import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
 } from '../common/operations/element/designer-layout-operations.js';
+import type { BaseScreenHostResourceAuthoringIntent } from '../common/operations/host-resource/host-resource-authoring.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../common/operations/material-library/material-library-state.js';
@@ -210,14 +209,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#designerState.runtime.writeDatasetCatalogPort(this, value);
   }
 
-  get assetCatalogPort(): ScreenAssetCatalogPort | undefined {
-    return this.#designerState.runtime.readAssetCatalogPort(this);
-  }
-
-  set assetCatalogPort(value: ScreenAssetCatalogPort | undefined) {
-    this.#designerState.runtime.writeAssetCatalogPort(this, value);
-  }
-
   get projectCatalogPort(): ScreenProjectCatalogPort | undefined {
     return this.#designerState.runtime.readProjectCatalogPort(this);
   }
@@ -272,6 +263,21 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   executeTransaction(transaction: ScreenDocumentTransaction): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.executeTransaction(this, transaction);
+  }
+
+  /** 以严格宿主资源 intent 在当前可见画布中心创建并选中新组件。 */
+  insertHostResource(
+    intent: BaseScreenHostResourceAuthoringIntent,
+  ): ScreenParseResult<ScreenDocument> {
+    return this.#designerState.runtime.insertHostResource(this, intent);
+  }
+
+  /** 仅替换同类型组件的 canonical dataSource，不改变几何、样式或显示属性。 */
+  replaceHostResource(
+    componentId: string,
+    intent: BaseScreenHostResourceAuthoringIntent,
+  ): ScreenParseResult<ScreenDocument> {
+    return this.#designerState.runtime.replaceHostResource(this, componentId, intent);
   }
 
   /**
@@ -441,10 +447,6 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>> {
     return this.#designerState.runtime.restoreSnapshot(this, snapshotId);
-  }
-
-  listAssets(query = ''): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>> {
-    return this.#designerState.runtime.listAssets(this, query);
   }
 
   refreshData(componentId?: string): void {

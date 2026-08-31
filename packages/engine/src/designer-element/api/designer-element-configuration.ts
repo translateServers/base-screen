@@ -174,7 +174,6 @@ export function configure(
   }
   if (adapter !== undefined) {
     elementState.designerHostAdapter = adapter;
-    elementState.assetCatalogPort = adapter.assets;
     elementState.projectCatalogPort = adapter.projectCatalog;
     elementState.projectPreviewPort = adapter.projectPreview;
     elementState.projectSnapshotPort = adapter.projectSnapshots;
@@ -183,7 +182,6 @@ export function configure(
     elementState.datasetCatalogPort = adapter.datasetCatalog;
   } else {
     elementState.designerHostAdapter = undefined;
-    elementState.assetCatalogPort = configuration.assetCatalogPort;
     elementState.projectCatalogPort = configuration.projectCatalogPort;
     elementState.projectPreviewPort = configuration.projectPreviewPort;
     elementState.projectSnapshotPort = configuration.projectSnapshotPort;

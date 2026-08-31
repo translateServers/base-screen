@@ -702,7 +702,6 @@ const designerHostAdapter: ScreenDesignerHostAdapter = {
     projectCatalog: false,
     projectPreview: false,
     projectSnapshots: false,
-    assets: false,
     resources: true,
     datasetCatalog: true,
     variables: true,
@@ -1063,7 +1062,46 @@ designer.selectLeftPanelGroup('assets');
 `leftPanelGroups` 只是宿主业务 UI 的受限安放与导航能力，不表示 Base Screen 提供资产或资源。资源目录、搜索、
 上传、存储、权限、缩略图及其业务状态必须由宿主实现；不要据此在 Engine 中增加资源 Store 或管理工作流。
 
-### 11.3 物料封面
+### 11.3 宿主资源插入、拖放与替换
+
+宿主资源面板只能提交 canonical 资源身份；签名 URL、token、header、请求对象和完整组件命令均不得进入载荷：
+
+```ts
+import {
+  writeBaseScreenHostResourceDragData,
+  type BaseScreenHostResourceAuthoringIntent,
+} from '@base-screen/sdk';
+
+const intent: BaseScreenHostResourceAuthoringIntent = {
+  materialType: 'base.image',
+  dataSource: {
+    type: 'host-resource',
+    resourceType: 'xj_asset',
+    resourceId: 'asset-12',
+    params: {},
+    binding: null,
+  },
+  name: '首页封面',
+};
+
+// 双击或“添加”：在当前可见画布中心创建并选中；未挂载视窗时回退画布中心。
+const inserted = designer.insertHostResource(intent);
+
+// 替换：要求目标存在、type 完全相同且 Manifest 支持 host-resource；只更新 dataSource。
+const replaced = designer.replaceHostResource('base-image-7', intent);
+
+resourceCard.addEventListener('dragstart', (event) => {
+  if (event.dataTransfer !== null) writeBaseScreenHostResourceDragData(event.dataTransfer, intent);
+});
+```
+
+intent 仅允许 `materialType`、`dataSource` 与可选 `name`，最大 8 KiB；方法和 drop 均重新校验当前实例
+catalog、Manifest capability、runtime resource contribution 与 canonical dataSource。插入使用 Manifest 的
+默认尺寸、props 与 style，生成 ID/zIndex 并夹紧到画布；替换保留名称、几何、样式和显示属性。两者各自只提交
+一次 Core transaction。宿主应把市场/订阅过滤后的 catalog 配置给 Designer；不在该 catalog 中的资源对应
+物料不能插入、拖入或替换。
+
+### 11.4 物料封面
 
 物料作者或宿主可在 Material Manifest 中声明可选 `cover` 字段，为物料库卡片提供真实封面图（替代默认的
 确定性分类图标/色相占位）：
@@ -1089,7 +1127,7 @@ const manifest = {
 其余照片类封面保持 `cover` 铺满裁切；封面加载成功后占位层的彩色渐变/网格底色收为中性表面，透明素材不再
 透底。该行为是纯展示启发式，宿主无需任何改造；需要统一裁切出图的宿主应在自己的资产链路上生成缩略图。
 
-### 11.4 物料库渲染可扩展性
+### 11.5 物料库渲染可扩展性
 
 物料库卡片网格项默认启用 `content-visibility: auto` + `contain-intrinsic-size: auto 140px`
 （[ADR-0042](../docs/decisions/ADR-0042-material-library-render-scalability.md)）：屏外卡片跳过渲染，

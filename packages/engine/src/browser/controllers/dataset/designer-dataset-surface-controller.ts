@@ -67,6 +67,7 @@ function createDatasetPanelOptions(
   context: DesignerDatasetControllerContext,
   panel: HTMLElement,
 ): DesignerDataSourcePanelOptions {
+  const source = context.currentComponent()?.dataSource;
   return {
     panel,
     scrollScope: JSON.stringify([
@@ -81,6 +82,9 @@ function createDatasetPanelOptions(
     ]),
     mode: context.state.mode,
     availableModes: availableModes(context),
+    ...(source?.type === 'host-resource'
+      ? { hostResource: { resourceType: source.resourceType, resourceId: source.resourceId } }
+      : {}),
     staticDraft: context.state.staticDraft,
     staticDescriptor: context.currentEntry()?.manifest.staticData,
     staticValue: context.state.staticValue,

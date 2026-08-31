@@ -1,12 +1,13 @@
 import type {
   ScreenDatasetDescriptor,
   ScreenDatasetSummary,
+  ScreenHostResourceDataSource,
   ScreenHostResourceParameter,
 } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import type { BaseScreenMaterialStaticDataDescriptor } from '@base-screen/plugin-core';
 
-export type DesignerDataSourceMode = 'none' | 'static' | 'dataset';
+export type DesignerDataSourceMode = 'none' | 'static' | 'dataset' | 'host-resource';
 
 export interface DesignerDatasetDraftView {
   readonly resourceType: string;
@@ -60,6 +61,7 @@ export interface DesignerDataSourcePanelOptions {
   readonly scrollScope: string;
   readonly mode: DesignerDataSourceMode;
   readonly availableModes: readonly DesignerDataSourceMode[];
+  readonly hostResource?: Pick<ScreenHostResourceDataSource, 'resourceType' | 'resourceId'>;
   readonly staticDraft: string;
   readonly staticDescriptor: BaseScreenMaterialStaticDataDescriptor | undefined;
   readonly staticValue: import('@base-screen/contracts').ScreenJsonValue;

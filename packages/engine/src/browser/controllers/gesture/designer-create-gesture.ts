@@ -3,6 +3,10 @@ import {
   clampScreenCoordinate,
   roundScreenGeometry,
 } from '../../../common/operations/element/designer-geometry.js';
+import {
+  BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
+  parseBaseScreenHostResourceDragData,
+} from '../../../common/operations/host-resource/host-resource-authoring.js';
 import { createInitialDataSourceForMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type { DesignerToolId } from '../../../common/tools/designer-tools.js';
 import { createInitialDataSource } from '../../dom/panel/designer-panel-dom.js';
@@ -136,6 +140,24 @@ export class DesignerCreateGesture {
   }
 
   onDragOver(event: DragEvent): void {
+    if (event.dataTransfer?.types.includes(BASE_SCREEN_HOST_RESOURCE_DRAG_MIME)) {
+      const payload = event.dataTransfer.getData(BASE_SCREEN_HOST_RESOURCE_DRAG_MIME);
+      // Native dragover exposes MIME types but protects the data store. Accept only a
+      // candidate here; drop always reparses the actual payload and rechecks the catalog.
+      if (payload === '') {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+        return;
+      }
+      const parsed = parseBaseScreenHostResourceDragData(payload);
+      const validated = parsed.ok
+        ? (this.callbacks.validateHostResourceIntent?.(parsed.value) ?? parsed)
+        : parsed;
+      if (!validated.ok) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
+      return;
+    }
     if (
       !event.dataTransfer?.types.includes(MATERIAL_DRAG_TYPE) &&
       !event.dataTransfer?.types.includes(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
@@ -147,6 +169,28 @@ export class DesignerCreateGesture {
   }
 
   onDrop(event: DragEvent): boolean {
+    if (event.dataTransfer?.types.includes(BASE_SCREEN_HOST_RESOURCE_DRAG_MIME)) {
+      event.preventDefault();
+      event.stopPropagation();
+      const parsed = parseBaseScreenHostResourceDragData(
+        event.dataTransfer.getData(BASE_SCREEN_HOST_RESOURCE_DRAG_MIME),
+      );
+      const validated = parsed.ok
+        ? (this.callbacks.validateHostResourceIntent?.(parsed.value) ?? parsed)
+        : parsed;
+      if (!validated.ok) {
+        this.callbacks.reportDiagnostics?.(validated.diagnostics);
+        return true;
+      }
+      const inserted = this.callbacks.insertHostResourceAt?.(
+        validated.value,
+        this.environment.snapCanvasPoint(event),
+      );
+      if (inserted === undefined) return true;
+      if (!inserted.ok) this.callbacks.reportDiagnostics?.(inserted.diagnostics);
+      this.environment.clearSnapPreview();
+      return true;
+    }
     const itemId = event.dataTransfer?.types.includes(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
       ? event.dataTransfer.getData(MATERIAL_LIBRARY_ITEM_DRAG_TYPE)
       : undefined;

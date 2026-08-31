@@ -9,6 +9,7 @@ import {
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
+  BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenCanvasBackgroundImageRequest,
   type BaseScreenCanvasPresentationChangeEventDetail,
@@ -17,14 +18,17 @@ import {
   type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
   type BaseScreenDesignerSetWorkbenchModeOptions,
   type BaseScreenDesignerWorkbenchMode,
+  type BaseScreenHostResourceAuthoringIntent,
   type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryItem,
   parseBaseScreenDesignerLeftPanelGroups,
+  parseBaseScreenHostResourceAuthoringIntent,
   parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryItems,
   ScreenProjectController,
   type ScreenProjectControllerChange,
   type ScreenProjectPhase,
+  writeBaseScreenHostResourceDragData,
 } from '../src/index.js';
 
 describe('engine public lifecycle API', () => {
@@ -69,6 +73,22 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['selectLeftPanelGroup']
     >().returns.toEqualTypeOf<boolean>();
+  });
+
+  it('exports strict host resource authoring and drag contracts', () => {
+    expect(BASE_SCREEN_HOST_RESOURCE_DRAG_MIME).toBe('application/x-base-screen-host-resource');
+    expectTypeOf<typeof parseBaseScreenHostResourceAuthoringIntent>().returns.toEqualTypeOf<
+      ScreenParseResult<BaseScreenHostResourceAuthoringIntent>
+    >();
+    expectTypeOf<typeof writeBaseScreenHostResourceDragData>().returns.toEqualTypeOf<
+      ScreenParseResult<null>
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['insertHostResource']
+    >().parameters.toEqualTypeOf<[BaseScreenHostResourceAuthoringIntent]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['replaceHostResource']
+    >().parameters.toEqualTypeOf<[string, BaseScreenHostResourceAuthoringIntent]>();
   });
 
   it('exports the canvas presentation host change contract', () => {

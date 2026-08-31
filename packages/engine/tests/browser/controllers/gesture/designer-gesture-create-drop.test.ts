@@ -5,6 +5,7 @@ import {
   MATERIAL_DRAG_TYPE,
   MATERIAL_LIBRARY_ITEM_DRAG_TYPE,
 } from '../../../../src/browser/controllers/panel/designer-panel-controller.js';
+import { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME } from '../../../../src/index.js';
 import {
   catalog,
   createCanvas,
@@ -16,6 +17,117 @@ import {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('DesignerGestureController material drop', () => {
+  it('revalidates and inserts a host resource intent at the snapped drop point', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const insertHostResourceAt = vi.fn(() => ({
+      ok: true as const,
+      value: document(),
+      diagnostics: [],
+    }));
+    const intent = {
+      materialType: 'base.image',
+      dataSource: {
+        type: 'host-resource' as const,
+        resourceType: 'xj_asset',
+        resourceId: '12',
+        params: {},
+        binding: null,
+      },
+    };
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: () => ({ x: 64, y: 80, snappedX: 64, snappedY: 80 }),
+      zoomBy: () => undefined,
+      validateHostResourceIntent: (value) => ({ ok: true, value, diagnostics: [] }),
+      insertHostResourceAt,
+    });
+    controller.connect(canvas.canvas);
+
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    canvas.dispatch('dragover', {
+      dataTransfer: {
+        types: [BASE_SCREEN_HOST_RESOURCE_DRAG_MIME],
+        getData: () => '',
+      },
+      preventDefault,
+    } as unknown as PointerEvent);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(insertHostResourceAt).not.toHaveBeenCalled();
+    preventDefault.mockClear();
+    canvas.dispatch('drop', {
+      clientX: 30,
+      clientY: 40,
+      dataTransfer: {
+        types: [BASE_SCREEN_HOST_RESOURCE_DRAG_MIME],
+        getData: () => JSON.stringify(intent),
+      },
+      preventDefault,
+      stopPropagation,
+    } as unknown as PointerEvent);
+
+    expect(insertHostResourceAt).toHaveBeenCalledWith(
+      intent,
+      expect.objectContaining({ x: 64, y: 80 }),
+    );
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(stopPropagation).toHaveBeenCalledOnce();
+  });
+
+  it('reports and ignores an invalid host resource drag payload', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const canvas = createCanvas();
+    const reportDiagnostics = vi.fn();
+    const insertHostResourceAt = vi.fn();
+    const controller = new DesignerGestureController({
+      getActiveTool: () => 'select',
+      getCatalog: catalog,
+      getDocument: document,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getToolMaterialTypes: () => undefined,
+      getViewport: () => ({ zoom: 1, offset: { x: 0, y: 0 } }),
+      isHandActive: () => false,
+      panBy: () => undefined,
+      reduceSelection: () => undefined,
+      renderSelection: () => undefined,
+      reportTransaction: () => undefined,
+      snapCanvasSelection: (_bounds, translation) => translation,
+      snapCanvasPoint: (point) => point,
+      zoomBy: () => undefined,
+      insertHostResourceAt,
+      reportDiagnostics,
+    });
+    controller.connect(canvas.canvas);
+
+    canvas.dispatch('drop', {
+      dataTransfer: {
+        types: [BASE_SCREEN_HOST_RESOURCE_DRAG_MIME],
+        getData: () => '{',
+      },
+      preventDefault: () => undefined,
+      stopPropagation: () => undefined,
+    } as unknown as PointerEvent);
+
+    expect(insertHostResourceAt).not.toHaveBeenCalled();
+    expect(reportDiagnostics).toHaveBeenCalledWith([
+      expect.objectContaining({ code: 'AUTHORING_PAYLOAD_INVALID' }),
+    ]);
+  });
+
   it('adds a component at the drop point when a material is dropped on the canvas', () => {
     vi.stubGlobal('Element', FakeElement);
     vi.stubGlobal('HTMLElement', FakeElement);

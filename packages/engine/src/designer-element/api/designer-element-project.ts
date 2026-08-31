@@ -1,5 +1,4 @@
 import type {
-  ScreenAssetSummary,
   ScreenDocument,
   ScreenParseResult,
   ScreenProjectEnvelope,
@@ -112,15 +111,6 @@ export function restoreSnapshot(
   const elementState = getDesignerElementState(element);
 
   return elementState.projectGateway.restoreSnapshot(snapshotId);
-}
-
-export function listAssets(
-  element: DesignerElementHost,
-  query = '',
-): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>> {
-  const elementState = getDesignerElementState(element);
-
-  return elementState.projectGateway.listAssets(query);
 }
 
 export function refreshData(element: DesignerElementHost, componentId?: string): void {

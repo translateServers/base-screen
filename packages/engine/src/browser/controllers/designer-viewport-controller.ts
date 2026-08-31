@@ -7,6 +7,10 @@ import {
 import { DESIGNER_TOOLS, type DesignerToolId } from '../../common/tools/designer-tools.js';
 import { designerToolGlyph } from '../dom/workspace/designer-workspace.js';
 import {
+  clientPointToDesignerCanvasPoint,
+  getDesignerCanvasBounds,
+} from '../viewport/designer-canvas-coordinates.js';
+import {
   clampDesignerZoom,
   getFitDesignerZoom,
   getViewportAnchor,
@@ -143,6 +147,29 @@ export class DesignerViewportController {
     };
     this.panBy({ x: target.x - current.x, y: target.y - current.y });
     this.focus();
+  }
+
+  /** 当前可见视窗中心对应的 canonical 画布坐标；表面尚未建立时由调用方回退。 */
+  visibleCanvasCenter(): ScreenPoint | undefined {
+    const viewport = this.#viewport;
+    const canvas = this.#canvas;
+    if (
+      viewport === undefined ||
+      canvas === undefined ||
+      viewport.clientWidth <= 0 ||
+      viewport.clientHeight <= 0
+    ) {
+      return undefined;
+    }
+    const bounds = viewport.getBoundingClientRect();
+    return clientPointToDesignerCanvasPoint(
+      {
+        clientX: bounds.left + viewport.clientWidth / 2,
+        clientY: bounds.top + viewport.clientHeight / 2,
+      },
+      getDesignerCanvasBounds(canvas),
+      this.#state.zoom,
+    );
   }
 
   reset(): void {

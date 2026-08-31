@@ -36,6 +36,13 @@ export {
   type BaseScreenCanvasScaleMode,
 } from '../common/operations/canvas/canvas-presentation.js';
 export {
+  BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
+  type BaseScreenHostResourceAuthoringIntent,
+  type BaseScreenHostResourceDragDataTransfer,
+  parseBaseScreenHostResourceAuthoringIntent,
+  writeBaseScreenHostResourceDragData,
+} from '../common/operations/host-resource/host-resource-authoring.js';
+export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,

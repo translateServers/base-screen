@@ -34,7 +34,6 @@ export interface ScreenDesignerHostCapabilities {
   readonly projectCatalog: boolean;
   readonly projectPreview: boolean;
   readonly projectSnapshots: boolean;
-  readonly assets: boolean;
   readonly resources: boolean;
   readonly datasetCatalog: boolean;
   readonly variables: boolean;
@@ -46,7 +45,6 @@ export interface ScreenDesignerHostAdapter {
   readonly projectCatalog?: ScreenProjectCatalogPort;
   readonly projectPreview?: ScreenProjectPreviewPort;
   readonly projectSnapshots?: ScreenProjectSnapshotPort;
-  readonly assets?: ScreenAssetCatalogPort;
   readonly resources?: ScreenHostResourcePort;
   readonly datasetCatalog?: ScreenHostDatasetCatalogPort;
   readonly variables?: ScreenHostVariablePort;
@@ -157,24 +155,6 @@ export interface ScreenProjectSnapshotPort {
   ): Promise<ScreenParseResult<void>>;
 }
 
-export interface ScreenAssetSummary {
-  readonly assetId: string;
-  readonly name: string;
-  readonly mediaType: string;
-}
-
-export interface ScreenAssetCatalogRequest {
-  readonly query: string;
-  readonly signal: ScreenAbortSignal;
-}
-
-export interface ScreenAssetCatalogPort {
-  list(
-    request: ScreenAssetCatalogRequest,
-  ): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>>;
-  canDelete(assetId: string, signal: ScreenAbortSignal): Promise<ScreenParseResult<boolean>>;
-}
-
 export interface ScreenHostResourceRequest {
   readonly componentId: string;
   readonly resourceType: string;
@@ -262,7 +242,6 @@ export function validateScreenDesignerHostAdapter(
     ['projectCatalog', 'projectCatalog', ['list', 'create', 'clone', 'delete', 'import', 'export']],
     ['projectPreview', 'projectPreview', ['load']],
     ['projectSnapshots', 'projectSnapshots', ['list', 'create', 'restore', 'delete']],
-    ['assets', 'assets', ['list', 'canDelete']],
     ['resources', 'resources', ['resolve']],
     ['datasetCatalog', 'datasetCatalog', ['list', 'describe']],
     ['variables', 'variables', ['resolve']],

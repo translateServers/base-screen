@@ -1,16 +1,15 @@
 # Base Screen 功能与工程规格
 
-> 状态：维护期（当前无生效中 Spec）
+> 状态：维护期（无生效中 Spec）
 > 阶段封版：2026-08-12
-> 最近更新：2026-08-30
-> 最近归档：2026-08-30（封版后 26 个增量 Spec 完成收口）
+> 最近更新：2026-08-31
+> 最近归档：2026-08-31（Host Resource Authoring）
 
 ## 当前状态
 
-- **当前无生效中 Spec。** 现有能力以[当前能力基线](../baseline/README.md)为准；下一阶段方向见
-  [后续路线图](../roadmap/README.md)。
-- **共 58 个 Spec 已归档。** 2026-08-12 阶段封版归档 32 个历史 Spec，2026-08-30 将封版后已经完成
-  或被取代的 26 个增量 Spec 归档至 [archive/](./archive/README.md)。
+- **当前无生效中 Spec。** 已交付能力以[当前能力基线](../baseline/README.md)为准。
+- **共 59 个 Spec 已归档。** 2026-08-12 阶段封版归档 32 个历史 Spec，2026-08-30 归档 26 个增量，
+  2026-08-31 归档 Host Resource Authoring；详见 [archive/](./archive/README.md)。
 - **新功能必须重新建立 ADR/Spec。** 启动实现前先接受 ADR、建立生效中的增量 Spec，并在本页“生效中”
   区域登记；不得重新打开归档任务授权新实现。
 
@@ -27,6 +26,9 @@
 当前无生效中 Spec。
 
 ## 最近归档批次
+
+2026-08-31：[Host Resource Authoring](./archive/host-resource-authoring/spec.md) 完成严格资源 intent、
+插入/替换、原生拖放和旧素材端口移除；完整门禁及宿主浏览器闭环通过。
 
 2026-08-30 归档的 26 个增量 Spec 覆盖：
 

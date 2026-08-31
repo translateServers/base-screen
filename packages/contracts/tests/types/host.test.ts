@@ -1,7 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import type {
   ScreenAbortSignal,
-  ScreenAssetCatalogPort,
   ScreenBlueprintHostActionPort,
   ScreenDesignerHostAdapter,
   ScreenDiagnosticCode,
@@ -64,7 +63,7 @@ describe('project lifecycle contracts', () => {
     >();
   });
 
-  it('exports abort-aware catalog, preview, snapshot, and asset ports', () => {
+  it('exports abort-aware catalog, preview, and snapshot ports', () => {
     expectTypeOf<ScreenProjectCatalogPort['list']>().parameters.toMatchTypeOf<
       [{ readonly signal: ScreenAbortSignal }]
     >();
@@ -86,9 +85,6 @@ describe('project lifecycle contracts', () => {
         },
       ]
     >();
-    expectTypeOf<ScreenAssetCatalogPort['list']>().parameters.toMatchTypeOf<
-      [{ readonly query: string; readonly signal: ScreenAbortSignal }]
-    >();
   });
 
   it('R2 keeps every optional product port explicitly capability-gated', () => {
@@ -97,7 +93,6 @@ describe('project lifecycle contracts', () => {
         readonly projectCatalog: boolean;
         readonly projectPreview: boolean;
         readonly projectSnapshots: boolean;
-        readonly assets: boolean;
         readonly resources: boolean;
         readonly datasetCatalog: boolean;
         readonly variables: boolean;
@@ -106,7 +101,6 @@ describe('project lifecycle contracts', () => {
       readonly projectCatalog?: ScreenProjectCatalogPort;
       readonly projectPreview?: ScreenProjectPreviewPort;
       readonly projectSnapshots?: ScreenProjectSnapshotPort;
-      readonly assets?: ScreenAssetCatalogPort;
     }>();
     expectTypeOf<ScreenBlueprintHostActionPort['execute']>().parameters.toEqualTypeOf<
       [import('../../src/index.js').ScreenBlueprintHostEvent]
@@ -119,7 +113,6 @@ describe('project lifecycle contracts', () => {
         projectCatalog: true,
         projectPreview: false,
         projectSnapshots: false,
-        assets: false,
         resources: false,
         datasetCatalog: false,
         variables: false,
@@ -141,7 +134,6 @@ describe('project lifecycle contracts', () => {
         projectCatalog: true,
         projectPreview: false,
         projectSnapshots: false,
-        assets: false,
         resources: false,
         datasetCatalog: false,
         variables: false,

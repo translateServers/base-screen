@@ -262,7 +262,12 @@ export const DESIGNER_UI_TEXT = {
     configured: '已配置',
     notConfigured: '未配置',
     mode: (mode: string) =>
-      ({ none: '无数据', static: '静态数据', dataset: '宿主数据集' })[mode] ?? mode,
+      ({ none: '无数据', static: '静态数据', dataset: '宿主数据集', 'host-resource': '宿主资源' })[
+        mode
+      ] ?? mode,
+    hostResourceManaged: '请通过宿主资源面板添加或替换资源。',
+    hostResourceSummary: (resourceType: string, resourceId: string) =>
+      `当前资源：${resourceType} / ${resourceId}。请通过宿主资源面板替换。`,
     noneSelected: '当前组件不使用数据。',
     staticTitle: '静态数据',
     staticValue: 'JSON 数据',

@@ -1,5 +1,4 @@
 import type {
-  ScreenAssetCatalogPort,
   ScreenDocument,
   ScreenProjectCatalogPort,
   ScreenProjectEnvelope,
@@ -77,7 +76,6 @@ interface GatewayHarness {
   readonly catalog: ScreenProjectCatalogPort;
   readonly preview: ScreenProjectPreviewPort;
   readonly snapshots: ScreenProjectSnapshotPort;
-  readonly assets: ScreenAssetCatalogPort;
   readonly replaceDocument: ReturnType<typeof vi.fn>;
   readonly loadProject: ReturnType<typeof vi.fn>;
   readonly setProject: (value: ScreenProjectEnvelope | undefined) => void;
@@ -103,16 +101,11 @@ function createGateway(): GatewayHarness {
     restore: vi.fn(async () => ok(project)),
     delete: vi.fn(async () => ok(undefined)),
   }) as unknown as ScreenProjectSnapshotPort;
-  const assets = (ports.assets = {
-    list: vi.fn(async () => ok([])),
-    canDelete: vi.fn(async () => ok(true)),
-  }) as unknown as ScreenAssetCatalogPort;
   let currentProject: ScreenProjectEnvelope | undefined = project;
   let currentDocument: ScreenDocument | undefined = document;
   const replaceDocument = vi.fn(() => ok(document));
   const loadProject = vi.fn(async () => ok(project));
   const gateway = new DesignerProjectGateway({
-    getAssetCatalogPort: () => assets,
     getProjectCatalogPort: () => catalog,
     getProjectPreviewPort: () => preview,
     getProjectSnapshotPort: () => snapshots,
@@ -126,7 +119,6 @@ function createGateway(): GatewayHarness {
     catalog,
     preview,
     snapshots,
-    assets,
     replaceDocument,
     loadProject,
     setProject: (value) => {
@@ -147,7 +139,6 @@ describe('DesignerProjectGateway', () => {
       snapshots: true,
     });
     const bare = new DesignerProjectGateway({
-      getAssetCatalogPort: () => undefined,
       getProjectCatalogPort: () => undefined,
       getProjectPreviewPort: () => undefined,
       getProjectSnapshotPort: () => undefined,
@@ -162,7 +153,6 @@ describe('DesignerProjectGateway', () => {
   it('guards catalog operations with lifecycle diagnostics when the port is missing', async () => {
     const harness = createGateway();
     const bare = new DesignerProjectGateway({
-      getAssetCatalogPort: () => undefined,
       getProjectCatalogPort: () => undefined,
       getProjectPreviewPort: () => undefined,
       getProjectSnapshotPort: () => undefined,
@@ -182,7 +172,6 @@ describe('DesignerProjectGateway', () => {
       await bare.listSnapshots(),
       await bare.createSnapshot('快照'),
       await bare.restoreSnapshot('snapshot-1'),
-      await bare.listAssets(),
     ];
     for (const failure of failures) {
       expect(lifecycleFailure(failure)).toBe(true);
@@ -245,11 +234,5 @@ describe('DesignerProjectGateway', () => {
       fail('替换失败。'),
     );
     expect(harness.loadProject).not.toHaveBeenCalled();
-  });
-
-  it('delegates asset listing with the query filter', async () => {
-    const harness = createGateway();
-    await harness.gateway.listAssets('图片');
-    expect(harness.assets.list).toHaveBeenCalledWith(expect.objectContaining({ query: '图片' }));
   });
 });

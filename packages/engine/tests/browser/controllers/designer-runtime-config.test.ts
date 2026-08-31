@@ -190,7 +190,6 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
           projectCatalog: true,
           projectPreview: false,
           projectSnapshots: false,
-          assets: false,
           resources: false,
           datasetCatalog: false,
           variables: false,

@@ -12,6 +12,7 @@ import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT } from '@base-screen
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT } from '@base-screen/engine';
+import { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommandEventDetail } from '@base-screen/engine';
@@ -37,6 +38,8 @@ import { BaseScreenDesignerWorkbenchFocus } from '@base-screen/engine';
 import { BaseScreenDesignerWorkbenchMode } from '@base-screen/engine';
 import { BaseScreenDesignerWorkbenchModeChangeEventDetail } from '@base-screen/engine';
 import { BaseScreenDesignerWorkbenchModeChangeReason } from '@base-screen/engine';
+import { BaseScreenHostResourceAuthoringIntent } from '@base-screen/engine';
+import { BaseScreenHostResourceDragDataTransfer } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryAction } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryActionEventDetail } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryGroup } from '@base-screen/engine';
@@ -46,10 +49,12 @@ import { BaseScreenMaterialLibraryState } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryStatus } from '@base-screen/engine';
 import { parseBaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { parseBaseScreenDesignerLeftPanelGroups } from '@base-screen/engine';
+import { parseBaseScreenHostResourceAuthoringIntent } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryGrouping } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryItems } from '@base-screen/engine';
 import { parseBaseScreenMaterialLibraryState } from '@base-screen/engine';
 import type { ScreenParseResult } from '@base-screen/contracts';
+import { writeBaseScreenHostResourceDragData } from '@base-screen/engine';
 
 export { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT }
 
@@ -69,6 +74,8 @@ export { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX }
 export const BASE_SCREEN_DESIGNER_TAG_NAME: 'base-screen-designer';
 
 export { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT }
+
+export { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME }
 
 export { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT }
 
@@ -120,6 +127,10 @@ export { BaseScreenDesignerWorkbenchModeChangeEventDetail }
 
 export { BaseScreenDesignerWorkbenchModeChangeReason }
 
+export { BaseScreenHostResourceAuthoringIntent }
+
+export { BaseScreenHostResourceDragDataTransfer }
+
 export { BaseScreenMaterialLibraryAction }
 
 export { BaseScreenMaterialLibraryActionEventDetail }
@@ -141,11 +152,15 @@ export { parseBaseScreenBlueprintCanvasCommand }
 
 export { parseBaseScreenDesignerLeftPanelGroups }
 
+export { parseBaseScreenHostResourceAuthoringIntent }
+
 export { parseBaseScreenMaterialLibraryGrouping }
 
 export { parseBaseScreenMaterialLibraryItems }
 
 export { parseBaseScreenMaterialLibraryState }
+
+export { writeBaseScreenHostResourceDragData }
 
 // (No @packageDocumentation comment for this package)
 

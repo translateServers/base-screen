@@ -24,7 +24,6 @@ export function disconnectedCallback(element: DesignerElementHost): void {
   elementState.blueprintWorkbenchController.disconnect();
   elementState.runtime.cancelGesture(element);
   elementState.runtime.invalidateAuthoringRequests(element);
-  elementState.assetController.clear();
   elementState.datasetController.clear();
   elementState.runtime.resetSessionSurfaces(element);
   elementState.runtime.disconnectSurfaces(element);

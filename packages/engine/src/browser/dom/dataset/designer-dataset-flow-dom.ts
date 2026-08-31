@@ -78,6 +78,24 @@ export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): H
   section.dataset.datasetSection = 'true';
   section.dataset.dataFlowLayout = 'continuous';
   section.dataset.inspectorSearchSection = 'true';
+  if (options.mode === 'host-resource') {
+    const content = ownerDocument.createElement('div');
+    content.className = 'designer-datav-data-flow-content';
+    content.dataset.designerScrollScope = `data-source:${options.scrollScope}`;
+    const summary = ownerDocument.createElement('p');
+    summary.className = 'designer-data-source-empty';
+    summary.dataset.hostResourceSummary = 'true';
+    summary.textContent =
+      options.hostResource === undefined
+        ? DESIGNER_UI_TEXT.dataSource.hostResourceManaged
+        : DESIGNER_UI_TEXT.dataSource.hostResourceSummary(
+            options.hostResource.resourceType,
+            options.hostResource.resourceId,
+          );
+    content.append(renderSourceMode(options), summary);
+    section.appendChild(content);
+    return section;
+  }
   const activeStep = inlineWorkbenchStep(options.activeStep);
   section.dataset.activeStep = activeStep;
   const mappedFields = Object.values(options.draft?.fields ?? {}).flat().length;

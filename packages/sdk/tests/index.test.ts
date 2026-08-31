@@ -6,12 +6,14 @@ import type {
 import {
   BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT,
   BASE_SCREEN_DESIGNER_TAG_NAME,
+  BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
   BASE_SCREEN_VIEWER_TAG_NAME,
   defineBaseScreenDesigner,
   defineBaseScreenElements,
   defineBaseScreenViewer,
   parseBaseScreenBlueprintCanvasCommand,
   parseBaseScreenDesignerLeftPanelGroups,
+  parseBaseScreenHostResourceAuthoringIntent,
   parseBaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryItems,
 } from '../src/index.js';
@@ -34,6 +36,19 @@ describe('SDK product element registration', () => {
       parseBaseScreenMaterialLibraryItems([
         { id: 'asset:12', materialType: 'base.image', defaultProps: { source: '12' } },
       ]).ok,
+    ).toBe(true);
+    expect(BASE_SCREEN_HOST_RESOURCE_DRAG_MIME).toBe('application/x-base-screen-host-resource');
+    expect(
+      parseBaseScreenHostResourceAuthoringIntent({
+        materialType: 'base.image',
+        dataSource: {
+          type: 'host-resource',
+          resourceType: 'xj_asset',
+          resourceId: '12',
+          params: {},
+          binding: null,
+        },
+      }).ok,
     ).toBe(true);
   });
 

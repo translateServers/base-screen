@@ -1,5 +1,4 @@
 import type {
-  ScreenAssetCatalogPort,
   ScreenDesignerHostAdapter,
   ScreenDocument,
   ScreenHostDatasetCatalogPort,
@@ -39,7 +38,6 @@ export function writeDesignerHostAdapter(
 
   if (value === undefined) {
     elementState.designerHostAdapter = undefined;
-    element.assetCatalogPort = undefined;
     element.projectCatalogPort = undefined;
     element.projectPreviewPort = undefined;
     element.projectSnapshotPort = undefined;
@@ -60,7 +58,6 @@ export function writeDesignerHostAdapter(
     return;
   }
   elementState.designerHostAdapter = parsed.value;
-  element.assetCatalogPort = parsed.value.assets;
   element.projectCatalogPort = parsed.value.projectCatalog;
   element.projectPreviewPort = parsed.value.projectPreview;
   element.projectSnapshotPort = parsed.value.projectSnapshots;
@@ -146,24 +143,6 @@ export function writeDatasetCatalogPort(
 
   elementState.datasetCatalogPort = value;
   elementState.runtime.renderInteraction(element);
-}
-
-export function readAssetCatalogPort(
-  element: DesignerElementHost,
-): ScreenAssetCatalogPort | undefined {
-  const elementState = getDesignerElementState(element);
-
-  return elementState.assetCatalogPort;
-}
-
-export function writeAssetCatalogPort(
-  element: DesignerElementHost,
-  value: ScreenAssetCatalogPort | undefined,
-) {
-  const elementState = getDesignerElementState(element);
-
-  elementState.assetCatalogPort = value;
-  elementState.runtime.renderProperties(element);
 }
 
 export function readProjectCatalogPort(

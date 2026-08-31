@@ -1,5 +1,4 @@
 import type {
-  ScreenAssetCatalogPort,
   ScreenComponentTextTarget,
   ScreenDesignerHostAdapter,
   ScreenDocument,
@@ -18,7 +17,6 @@ import type {
 import { type BaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
 import { DesignerDatasetController } from '../../browser/controllers/dataset/designer-dataset-controller.js';
-import { DesignerAssetController } from '../../browser/controllers/designer-asset-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerCoordinateEntryController } from '../../browser/controllers/designer-coordinate-entry-controller.js';
@@ -84,7 +82,6 @@ export interface DesignerElementState {
   conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   datasetCatalogPort: ScreenHostDatasetCatalogPort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
-  assetCatalogPort: ScreenAssetCatalogPort | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
   projectPreviewPort: ScreenProjectPreviewPort | undefined;
   projectSnapshotPort: ScreenProjectSnapshotPort | undefined;
@@ -133,7 +130,6 @@ export interface DesignerElementState {
   projectFeedbackController: DesignerProjectFeedbackController;
   previewController: DesignerPreviewController;
   projectWorkspaceController: DesignerProjectWorkspaceController;
-  assetController: DesignerAssetController;
   datasetController: DesignerDatasetController;
   importController: DesignerImportController;
   panelController: DesignerPanelController;

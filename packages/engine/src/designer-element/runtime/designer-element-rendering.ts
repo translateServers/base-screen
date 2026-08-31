@@ -241,7 +241,6 @@ export function renderProperties(element: DesignerElementHost): void {
     );
     if (elementState.datasetCatalogPort !== undefined)
       elementState.datasetController.render(elementState.dataPanel);
-    elementState.assetController.render(elementState.properties);
   });
 }
 

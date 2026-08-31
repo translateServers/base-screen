@@ -32,6 +32,7 @@ export function setSourceMode(
     context.restoreStaticExample();
   }
   if (mode !== 'dataset') {
+    context.catalogController.clear();
     context.renderSurface();
     return;
   }
@@ -56,8 +57,15 @@ export async function describeDataset(
   resourceType: string,
   resourceId: string,
 ): Promise<void> {
+  if (!availableModes(context).includes('dataset')) return;
+  const focusedId = context.currentComponent()?.id;
   const descriptor = await context.catalogController.describe(resourceType, resourceId);
-  if (descriptor === undefined) return;
+  if (
+    descriptor === undefined ||
+    context.currentComponent()?.id !== focusedId ||
+    !availableModes(context).includes('dataset')
+  )
+    return;
   context.state.descriptor = descriptor;
   context.state.draft = createDesignerDatasetDraft(
     descriptor,
@@ -74,6 +82,8 @@ export async function describeDataset(
 }
 
 export function applyDatasetDraft(context: DesignerDatasetControllerContext): void {
+  // Opaque resource identity is authored only through the public host-resource intent methods.
+  if (context.state.mode === 'host-resource') return;
   const component = context.currentComponent();
   const document = context.callbacks.getDocument();
   if (component === undefined || document === undefined) return;
@@ -165,6 +175,13 @@ export function syncDraftToFocusedComponent(
     return;
   }
   if (source?.type === 'host-resource') {
+    if (!availableModes(context).includes('dataset')) {
+      context.state.mode = 'host-resource';
+      context.state.descriptor = undefined;
+      context.state.draft = undefined;
+      context.state.catalogOpen = false;
+      return;
+    }
     context.state.mode = 'dataset';
     context.state.catalogOpen = false;
     if (

@@ -40,7 +40,6 @@ import {
   ungroup,
 } from '../api/designer-element-editing.js';
 import {
-  readAssetCatalogPort,
   readConditionalStylePort,
   readDatasetCatalogPort,
   readDesignerHostAdapter,
@@ -50,7 +49,6 @@ import {
   readProjectSnapshotPort,
   readResourcePort,
   readVariablePort,
-  writeAssetCatalogPort,
   writeConditionalStylePort,
   writeDatasetCatalogPort,
   writeDesignerHostAdapter,
@@ -61,6 +59,12 @@ import {
   writeResourcePort,
   writeVariablePort,
 } from '../api/designer-element-host-properties.js';
+import {
+  insertHostResource,
+  insertHostResourceAt,
+  replaceHostResource,
+  validateHostResourceAuthoringIntent,
+} from '../api/designer-element-host-resource.js';
 import {
   readCanvasBackgroundImageButton,
   readGroupMaterialType,
@@ -89,7 +93,6 @@ import {
   deleteProject,
   exportProject,
   importProject,
-  listAssets,
   listProjects,
   listSnapshots,
   load,
@@ -195,8 +198,6 @@ export const designerElementRuntime = {
   writeConditionalStylePort,
   readDatasetCatalogPort,
   writeDatasetCatalogPort,
-  readAssetCatalogPort,
-  writeAssetCatalogPort,
   readProjectCatalogPort,
   writeProjectCatalogPort,
   readProjectPreviewPort,
@@ -215,6 +216,10 @@ export const designerElementRuntime = {
   replaceDocument,
   executeCommand,
   executeTransaction,
+  insertHostResource,
+  insertHostResourceAt,
+  replaceHostResource,
+  validateHostResourceAuthoringIntent,
   setCanvasBackground,
   setCanvasBackgroundImage,
   requestCanvasBackgroundImage,
@@ -250,7 +255,6 @@ export const designerElementRuntime = {
   listSnapshots,
   createSnapshot,
   restoreSnapshot,
-  listAssets,
   refreshData,
   save,
   publish,

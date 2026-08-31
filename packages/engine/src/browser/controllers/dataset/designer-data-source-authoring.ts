@@ -114,10 +114,11 @@ export function designerDataSourceModes(
   entry: BaseScreenMaterialCatalogEntry | undefined,
 ): readonly DesignerDataSourceMode[] {
   const capabilities = entry?.manifest.dataCapabilities ?? [];
+  const resourceMode = entry?.manifest.dataBinding === undefined ? 'host-resource' : 'dataset';
   return [
     'none',
     ...(capabilities.includes('static') ? (['static'] as const) : []),
-    ...(capabilities.includes('host-resource') ? (['dataset'] as const) : []),
+    ...(capabilities.includes('host-resource') ? ([resourceMode] as const) : []),
   ];
 }
 

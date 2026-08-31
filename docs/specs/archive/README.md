@@ -1,8 +1,8 @@
 # 已归档规格
 
 > 状态：只读历史记录
-> 最近更新：2026-08-30
-> 归档总数：58
+> 最近更新：2026-08-31
+> 归档总数：59
 
 本目录保留已完成或被后继 Spec/ADR 取代的规格、任务和验收快照，用于追溯当时的范围、决策和实施进度。
 
@@ -16,6 +16,7 @@
 
 | 归档规格 | 后继依据 | 归档日期 |
 | --- | --- | --- |
+| [Host Resource Authoring](./host-resource-authoring/spec.md) | 已完成；[ADR-0064](../../decisions/ADR-0064-host-resource-authoring-intent.md) | 2026-08-31 |
 | [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | [Designer Engine](./designer-engine/spec.md) | 2026-08-04 |
 | [Designer Engine](./designer-engine/spec.md) | 已完成（无后继） | 2026-08-05 |
 | [Core Domain](./core-domain/spec.md) | 已完成（无后继） | 2026-08-05 |

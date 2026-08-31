@@ -1,6 +1,5 @@
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
 import { DesignerDatasetController } from '../../browser/controllers/dataset/designer-dataset-controller.js';
-import { DesignerAssetController } from '../../browser/controllers/designer-asset-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerCoordinateEntryController } from '../../browser/controllers/designer-coordinate-entry-controller.js';
@@ -96,7 +95,6 @@ export function initializeDesignerElementControllers(
     },
   });
   state.projectGateway = new DesignerProjectGateway({
-    getAssetCatalogPort: () => state.assetCatalogPort,
     getProjectCatalogPort: () => state.projectCatalogPort,
     getProjectPreviewPort: () => state.projectPreviewPort,
     getProjectSnapshotPort: () => state.projectSnapshotPort,
@@ -127,6 +125,11 @@ export function initializeDesignerElementControllers(
     reduceSelection: (action) => state.session.reduceSelection(action),
     reportTransaction: (transaction) =>
       state.runtime.executeDesignerTransaction(element, transaction),
+    validateHostResourceIntent: (intent) =>
+      state.runtime.validateHostResourceAuthoringIntent(element, intent),
+    insertHostResourceAt: (intent, position) =>
+      state.runtime.insertHostResourceAt(element, intent, position),
+    reportDiagnostics: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
     renderSelection: () => state.runtime.renderSelection(element),
     focusViewport: () => state.viewportController.focusFromPointer(),
     setPanning: (panning) => state.viewportController.setPanning(panning),
@@ -200,15 +203,6 @@ export function initializeDesignerElementControllers(
     previewProject: (published) => element.previewProject(published),
     report: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
     restoreSnapshot: (snapshotId) => element.restoreSnapshot(snapshotId),
-  });
-  state.assetController = new DesignerAssetController({
-    executeTransaction: (transaction) =>
-      state.runtime.executeDesignerTransaction(element, transaction),
-    getCatalog: () => state.catalog,
-    getDocument: () => state.session.document,
-    getInteraction: () => state.session.interaction,
-    getPort: () => state.assetCatalogPort,
-    report: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
   });
   state.datasetController = new DesignerDatasetController({
     getCatalogPort: () => state.datasetCatalogPort,

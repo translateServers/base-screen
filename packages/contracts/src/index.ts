@@ -127,9 +127,6 @@ export type {
 } from './types/execution.js';
 export type {
   ScreenAbortSignal,
-  ScreenAssetCatalogPort,
-  ScreenAssetCatalogRequest,
-  ScreenAssetSummary,
   ScreenBlueprintHostActionPort,
   ScreenBlueprintHostEvent,
   ScreenBlueprintRuntimePort,

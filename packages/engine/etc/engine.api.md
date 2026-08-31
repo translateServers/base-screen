@@ -7,8 +7,6 @@
 import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
-import type { ScreenAssetCatalogPort } from '@base-screen/contracts';
-import type { ScreenAssetSummary } from '@base-screen/contracts';
 import type { ScreenAuthoringEditorContext } from '@base-screen/contracts';
 import type { ScreenBlueprintAction } from '@base-screen/contracts';
 import type { ScreenBlueprintCondition } from '@base-screen/contracts';
@@ -25,6 +23,7 @@ import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenDocumentCommand } from '@base-screen/core';
 import { ScreenDocumentTransaction } from '@base-screen/core';
 import type { ScreenHostDatasetCatalogPort } from '@base-screen/contracts';
+import { ScreenHostResourceDataSource } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
 import type { ScreenHostVariablePort } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
@@ -68,6 +67,9 @@ export const BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX: 'base-screen-designer-
 
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT: 'base-screen-designer-workbench-mode-change';
+
+// @public (undocumented)
+export const BASE_SCREEN_HOST_RESOURCE_DRAG_MIME: 'application/x-base-screen-host-resource';
 
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT: 'base-screen-material-library-action';
@@ -344,8 +346,6 @@ export type BaseScreenCanvasScaleMode = 'fill' | 'fit' | 'width' | 'height' | 'o
 
 // @public (undocumented)
 export interface BaseScreenDesignerConfiguration {
-    // (undocumented)
-    readonly assetCatalogPort?: ScreenAssetCatalogPort;
     readonly canvasBackgroundImageButton?: boolean;
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
@@ -388,9 +388,6 @@ export interface BaseScreenDesignerConfiguration {
 export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument>;
-    // (undocumented)
-    get assetCatalogPort(): ScreenAssetCatalogPort | undefined;
-    set assetCatalogPort(value: ScreenAssetCatalogPort | undefined);
     // (undocumented)
     attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void;
     // (undocumented)
@@ -457,13 +454,12 @@ export class BaseScreenDesignerElement extends ElementBase {
     importDocument(document: unknown): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     importProject(name: string, document: ScreenDocument): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
+    insertHostResource(intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     get instanceId(): string;
     // (undocumented)
     get leftPanelGroups(): readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
     set leftPanelGroups(value: readonly BaseScreenDesignerLeftPanelGroup[] | undefined);
-    // (undocumented)
-    listAssets(query?: string): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>>;
     // (undocumented)
     listProjects(query?: string, published?: boolean | undefined): Promise<ScreenParseResult<readonly ScreenProjectSummary[]>>;
     // (undocumented)
@@ -511,6 +507,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     reparent(componentIds: readonly string[], parentId: string | null): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument>;
+    replaceHostResource(componentId: string, intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<ScreenDocument>;
     requestCanvasBackgroundImage(): boolean;
     // (undocumented)
     requestComponentTextEdit(target: ScreenComponentTextTarget): string | null;
@@ -603,6 +600,24 @@ export type BaseScreenDesignerWorkbenchModeChangeReason = 'user' | 'api' | 'fall
 
 // @public (undocumented)
 type BaseScreenDistribution = 'horizontal' | 'vertical';
+
+// @public (undocumented)
+export interface BaseScreenHostResourceAuthoringIntent {
+    // (undocumented)
+    readonly dataSource: ScreenHostResourceDataSource;
+    // (undocumented)
+    readonly materialType: string;
+    // (undocumented)
+    readonly name?: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenHostResourceDragDataTransfer {
+    // (undocumented)
+    effectAllowed?: string;
+    // (undocumented)
+    setData(format: string, data: string): void;
+}
 
 // @public (undocumented)
 export type BaseScreenMaterialLibraryAction = 'retry' | 'reload' | 'details';
@@ -717,6 +732,9 @@ export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenPar
 export function parseBaseScreenDesignerLeftPanelGroups(input: unknown): ScreenParseResult<readonly BaseScreenDesignerLeftPanelGroup[]>;
 
 // @public (undocumented)
+export function parseBaseScreenHostResourceAuthoringIntent(input: unknown): ScreenParseResult<BaseScreenHostResourceAuthoringIntent>;
+
+// @public (undocumented)
 export function parseBaseScreenMaterialLibraryGrouping(input: unknown): ScreenParseResult<BaseScreenMaterialLibraryGrouping>;
 
 // @public (undocumented)
@@ -796,6 +814,9 @@ export interface ScreenProjectScheduler {
     // (undocumented)
     wait(delayMs: number, signal: AbortSignal): Promise<void>;
 }
+
+// @public (undocumented)
+export function writeBaseScreenHostResourceDragData(dataTransfer: BaseScreenHostResourceDragDataTransfer, intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<null>;
 
 // (No @packageDocumentation comment for this package)
 

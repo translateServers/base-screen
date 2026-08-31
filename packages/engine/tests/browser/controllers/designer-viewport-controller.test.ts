@@ -51,6 +51,22 @@ function connectCanvas(controller: DesignerViewportController, width: number, he
 }
 
 describe('DesignerViewportController zoom anchor', () => {
+  it('projects the visible center using canvas bounds, border and zoom', () => {
+    const { controller } = createController();
+    expect(controller.visibleCanvasCenter()).toBeUndefined();
+    const { canvas, viewport } = connectCanvas(controller, 800, 600);
+    Object.assign(viewport, { getBoundingClientRect: () => ({ left: 100, top: 50 }) });
+    Object.assign(canvas, {
+      clientLeft: 1,
+      clientTop: 1,
+      getBoundingClientRect: () => ({ left: 150, top: 100 }),
+    });
+    controller.setZoom(2);
+    expect(controller.visibleCanvasCenter()).toEqual({ x: 174, y: 124 });
+    Object.assign(viewport, { clientWidth: 0 });
+    expect(controller.visibleCanvasCenter()).toBeUndefined();
+  });
+
   it('R4 setZoomCentered anchors the viewport center point', () => {
     const { controller } = createController();
     const { canvas } = connectCanvas(controller, 800, 600);

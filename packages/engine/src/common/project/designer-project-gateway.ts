@@ -1,6 +1,4 @@
 import type {
-  ScreenAssetCatalogPort,
-  ScreenAssetSummary,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenParseResult,
@@ -19,7 +17,6 @@ export interface DesignerProjectGatewayCapabilities {
 }
 
 export interface DesignerProjectGatewayOptions {
-  readonly getAssetCatalogPort: () => ScreenAssetCatalogPort | undefined;
   readonly getProjectCatalogPort: () => ScreenProjectCatalogPort | undefined;
   readonly getProjectPreviewPort: () => ScreenProjectPreviewPort | undefined;
   readonly getProjectSnapshotPort: () => ScreenProjectSnapshotPort | undefined;
@@ -29,7 +26,7 @@ export interface DesignerProjectGatewayOptions {
   readonly loadProject: (projectId: string) => Promise<ScreenParseResult<ScreenProjectEnvelope>>;
 }
 
-// 宿主端口门面：集中承载项目目录、预览、快照与资产端口的可用性守卫、
+// 宿主端口门面：集中承载项目目录、预览与快照端口的可用性守卫、
 // 中止信号和结果映射，元素与控制器只需消费本网关，不再各自拼装端口调用。
 export class DesignerProjectGateway {
   constructor(private readonly options: DesignerProjectGatewayOptions) {}
@@ -145,12 +142,6 @@ export class DesignerProjectGateway {
           : { ok: false, diagnostics: replaced.diagnostics };
       });
   }
-
-  listAssets(query = ''): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>> {
-    const port = this.options.getAssetCatalogPort();
-    if (port === undefined) return Promise.resolve(assetCatalogUnavailable());
-    return port.list({ query, signal: new AbortController().signal });
-  }
 }
 
 function lifecycleUnavailable(message: string): ScreenDiagnostic {
@@ -175,12 +166,5 @@ function snapshotPortUnavailable<T>(): ScreenParseResult<T> {
   return {
     ok: false,
     diagnostics: [lifecycleUnavailable('Project snapshot capability is unavailable.')],
-  };
-}
-
-function assetCatalogUnavailable<T>(): ScreenParseResult<T> {
-  return {
-    ok: false,
-    diagnostics: [lifecycleUnavailable('Asset catalog capability is unavailable.')],
   };
 }

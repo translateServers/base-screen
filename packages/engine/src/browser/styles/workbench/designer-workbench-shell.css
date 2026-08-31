@@ -549,6 +549,7 @@
 
 .host-left-panel-content {
   min-width: 0;
+  height: 100%;
 }
 
 .host-left-panel-content > slot {

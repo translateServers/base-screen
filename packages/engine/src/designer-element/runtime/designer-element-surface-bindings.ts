@@ -30,7 +30,6 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.importController.onClick(target as Element),
       (target) => state.projectFeedbackController.onClick(target as Element),
       (target) => state.projectWorkspaceController.onClick(target as Element),
-      (target) => state.assetController.onClick(target as Element),
       (target) => state.datasetController.onClick(target as Element),
       (target) => state.integrationController.onClick(target as Element),
       (target) => state.variablesController.onClick(target as Element),
@@ -107,7 +106,6 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.blueprintWorkbenchController.onInput(target as Element),
       (target) => state.coordinateEntryController.onInput(target),
       (target) => state.commandPaletteController.onInput(target as Element),
-      (target) => state.assetController.onInput(target),
       (target) => state.datasetController.onInput(target),
       (_target, event) => state.panelController.onInput(event),
       (_target, event) => {

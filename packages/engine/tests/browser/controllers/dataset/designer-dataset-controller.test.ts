@@ -107,7 +107,7 @@ describe('DesignerDatasetController', () => {
                 limit: { kind: 'literal', value: 2 },
                 region: { kind: 'literal', value: 'north' },
               },
-              binding: null,
+              binding: { fields: { columns: ['amount'] } },
             },
           },
         },
@@ -436,7 +436,7 @@ describe('DesignerDatasetController', () => {
             limit: { kind: 'literal' as const, value: 2 },
             region: { kind: 'literal' as const, value: '' },
           },
-          binding: null,
+          binding: { fields: { columns: ['amount'] } },
         },
       })),
     };
@@ -544,7 +544,16 @@ function createController(overrides: {
   const entry = {
     manifest: {
       dataCapabilities: ['static', 'host-resource'],
-      dataBinding: overrides.roles === undefined ? undefined : { roles: overrides.roles },
+      dataBinding: {
+        roles: overrides.roles ?? [
+          {
+            id: 'columns',
+            minFields: 0,
+            maxFields: 256,
+            valueTypes: ['string', 'number', 'boolean', 'date'],
+          },
+        ],
+      },
       ...(overrides.defaultData === undefined ? {} : { defaultData: overrides.defaultData }),
       ...(overrides.staticData === undefined ? {} : { staticData: overrides.staticData }),
     },

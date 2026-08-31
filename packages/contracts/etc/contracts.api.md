@@ -125,32 +125,6 @@ export interface ScreenAbortSignal {
 }
 
 // @public (undocumented)
-export interface ScreenAssetCatalogPort {
-    // (undocumented)
-    canDelete(assetId: string, signal: ScreenAbortSignal): Promise<ScreenParseResult<boolean>>;
-    // (undocumented)
-    list(request: ScreenAssetCatalogRequest): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>>;
-}
-
-// @public (undocumented)
-export interface ScreenAssetCatalogRequest {
-    // (undocumented)
-    readonly query: string;
-    // (undocumented)
-    readonly signal: ScreenAbortSignal;
-}
-
-// @public (undocumented)
-export interface ScreenAssetSummary {
-    // (undocumented)
-    readonly assetId: string;
-    // (undocumented)
-    readonly mediaType: string;
-    // (undocumented)
-    readonly name: string;
-}
-
-// @public (undocumented)
 export interface ScreenAuthoringEditorContext {
     // (undocumented)
     readonly blueprint: ScreenJsonObject | null;
@@ -589,8 +563,6 @@ export interface ScreenDesignerHostAdapter {
     // (undocumented)
     readonly actions?: ScreenBlueprintHostActionPort;
     // (undocumented)
-    readonly assets?: ScreenAssetCatalogPort;
-    // (undocumented)
     readonly capabilities: ScreenDesignerHostCapabilities;
     // (undocumented)
     readonly datasetCatalog?: ScreenHostDatasetCatalogPort;
@@ -610,8 +582,6 @@ export interface ScreenDesignerHostAdapter {
 export interface ScreenDesignerHostCapabilities {
     // (undocumented)
     readonly actions: boolean;
-    // (undocumented)
-    readonly assets: boolean;
     // (undocumented)
     readonly datasetCatalog: boolean;
     // (undocumented)

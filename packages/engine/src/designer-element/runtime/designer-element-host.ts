@@ -1,6 +1,4 @@
 import type {
-  ScreenAssetCatalogPort,
-  ScreenAssetSummary,
   ScreenAuthoringEditorContext,
   ScreenCanvasBackground,
   ScreenCanvasBackgroundImageFit,
@@ -34,6 +32,7 @@ import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
 } from '../../common/operations/element/designer-layout-operations.js';
+import type { BaseScreenHostResourceAuthoringIntent } from '../../common/operations/host-resource/host-resource-authoring.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../../common/operations/material-library/material-library-state.js';
@@ -58,7 +57,6 @@ export interface DesignerElementHost extends HTMLElement {
   variablePort: ScreenHostVariablePort | undefined;
   conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   datasetCatalogPort: ScreenHostDatasetCatalogPort | undefined;
-  assetCatalogPort: ScreenAssetCatalogPort | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
   projectPreviewPort: ScreenProjectPreviewPort | undefined;
   projectSnapshotPort: ScreenProjectSnapshotPort | undefined;
@@ -77,6 +75,13 @@ export interface DesignerElementHost extends HTMLElement {
   replaceDocument(document: ScreenDocument): ScreenParseResult<ScreenDocument>;
   executeCommand(command: ScreenDocumentCommand): ScreenParseResult<ScreenDocument>;
   executeTransaction(transaction: ScreenDocumentTransaction): ScreenParseResult<ScreenDocument>;
+  insertHostResource(
+    intent: BaseScreenHostResourceAuthoringIntent,
+  ): ScreenParseResult<ScreenDocument>;
+  replaceHostResource(
+    componentId: string,
+    intent: BaseScreenHostResourceAuthoringIntent,
+  ): ScreenParseResult<ScreenDocument>;
   setCanvasBackground(background: ScreenCanvasBackground | null): ScreenParseResult<ScreenDocument>;
   setCanvasBackgroundImage(
     backgroundImage: string | null,
@@ -126,7 +131,6 @@ export interface DesignerElementHost extends HTMLElement {
   listSnapshots(): Promise<ScreenParseResult<readonly ScreenProjectSnapshot[]>>;
   createSnapshot(name: string): Promise<ScreenParseResult<ScreenProjectSnapshot>>;
   restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
-  listAssets(query?: string): Promise<ScreenParseResult<readonly ScreenAssetSummary[]>>;
   refreshData(componentId?: string): void;
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
