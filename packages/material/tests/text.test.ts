@@ -95,6 +95,54 @@ function modelWithStyle(style: BaseScreenMaterialModel['style']): BaseScreenMate
 }
 
 describe('text material typography (ADR-0047)', () => {
+  it('keeps automatic width opt-in and restores numeric geometry when disabled', () => {
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propsSchema.required).not.toContain('autoWidth');
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propertyPanel).toContainEqual({
+      prop: 'autoWidth',
+      label: '自适应宽度',
+      control: 'boolean',
+    });
+    const element = mountText({ ...BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultStyle });
+    expect(element.style.width).toBe('320px');
+    expect(element.style.whiteSpace).toBe('pre-wrap');
+    element.model = {
+      ...element.model,
+      props: { autoWidth: true },
+      dataState: { status: 'ready', value: '长行 text\n短行' },
+    };
+    expect(element.textContent).toBe('长行 text\n短行');
+    expect(element.style).toMatchObject({
+      width: 'max-content',
+      minWidth: '1px',
+      maxWidth: '1000000px',
+      whiteSpace: 'pre',
+    });
+    element.model = {
+      ...element.model,
+      props: { autoWidth: false },
+      size: { width: 175.5, height: 72 },
+    };
+    expect(element.style).toMatchObject({
+      width: '175.5px',
+      minWidth: '',
+      maxWidth: '',
+      whiteSpace: 'pre-wrap',
+    });
+    expect(element.textContent).toBe('长行 text\n短行');
+  });
+
+  it('preserves renderer visibility when automatic text data updates while hidden', () => {
+    const element = mountText({ ...BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultStyle });
+    element.style.display = 'none';
+    element.model = {
+      ...element.model,
+      props: { autoWidth: true },
+      dataState: { status: 'ready', value: 'Updated hidden text' },
+    };
+    expect(element.style.display).toBe('none');
+    expect(element.textContent).toBe('Updated hidden text');
+  });
+
   it('declares optional verticalAlign/letterSpacing/lineHeight/lineSpacing with defaults and passes validation', () => {
     expect(parseBaseScreenMaterialManifest(BASE_SCREEN_TEXT_MATERIAL_MANIFEST).ok).toBe(true);
     expect(

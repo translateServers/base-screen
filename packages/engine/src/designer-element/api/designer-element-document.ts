@@ -55,7 +55,12 @@ export function executeTransaction(
   return elementState.session.executeTransaction(
     document === undefined
       ? transaction
-      : withDerivedDesignerGroupBounds(document, transaction, elementState.groupMaterialType),
+      : withDerivedDesignerGroupBounds(
+          document,
+          transaction,
+          elementState.groupMaterialType,
+          (next) => elementState.autoWidthController.project(next) ?? next,
+        ),
   );
 }
 

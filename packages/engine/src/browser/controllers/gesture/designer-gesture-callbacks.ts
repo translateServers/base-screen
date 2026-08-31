@@ -28,6 +28,7 @@ export interface DesignerGestureCallbacks {
     id: string,
   ) => BaseScreenResolvedMaterialLibraryItem | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
+  readonly getCanonicalDocument?: () => ScreenDocument | undefined;
   readonly getInteraction: () => {
     readonly selectedComponentIds: readonly string[];
     readonly focusedComponentId: string | null;

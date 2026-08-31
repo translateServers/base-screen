@@ -4,9 +4,11 @@ import {
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
 } from '@base-screen/core';
+import { normalizeDesignerAutoWidthTransaction } from '../../common/operations/element/designer-auto-width.js';
 import { selectedComponents } from '../../common/operations/selection/designer-selection.js';
 import { type DesignerToolId } from '../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { getDesignerGeometryDocument } from './designer-element-geometry.js';
 import { lifecycleDiagnostic } from './designer-element-guards.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
 
@@ -45,6 +47,19 @@ export function executeDesignerCommit(
     | { readonly command: ScreenDocumentCommand },
 ): ScreenParseResult<ScreenDocument> {
   const elementState = getDesignerElementState(element);
+  const document = elementState.session.document;
+  const geometry = getDesignerGeometryDocument(elementState);
+  if (document !== undefined && geometry !== undefined) {
+    const normalized = normalizeDesignerAutoWidthTransaction(
+      document,
+      geometry,
+      'transaction' in commit ? commit.transaction : { commands: [commit.command] },
+    );
+    commit =
+      'command' in commit && normalized.commands.length === 1
+        ? { command: normalized.commands[0]! }
+        : { transaction: normalized };
+  }
 
   let result: ScreenParseResult<ScreenDocument> | undefined;
   const executed = elementState.operations.execute('document.commit', {
@@ -97,7 +112,7 @@ export function executeToolFromTarget(element: DesignerElementHost, target: Elem
 export function fitViewportToSelectionOrCanvas(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
-  const document = elementState.session.document;
+  const document = getDesignerGeometryDocument(elementState);
   if (document === undefined) return;
   const bounds = getScreenSelectionBounds(
     selectedComponents(document, elementState.session.interaction.selectedComponentIds),

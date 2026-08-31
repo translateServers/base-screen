@@ -130,7 +130,7 @@ export class DesignerPanelSelectionController {
   }
 
   group(): ScreenParseResult<ScreenDocument> {
-    const document = this.callbacks.getDocument();
+    const document = this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument();
     const entry = this.groupEntry;
     const selected =
       document === undefined
@@ -179,7 +179,7 @@ export class DesignerPanelSelectionController {
   }
 
   align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument> {
-    const document = this.callbacks.getDocument();
+    const document = this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument();
     if (document === undefined || !this.canAlign) return failure('Alignment is unavailable.');
     return this.callbacks.executeTransaction(
       createAlignmentTransaction(document, this.interaction.selectedComponentIds, alignment),
@@ -187,7 +187,7 @@ export class DesignerPanelSelectionController {
   }
 
   distribute(distribution: BaseScreenDistribution): ScreenParseResult<ScreenDocument> {
-    const document = this.callbacks.getDocument();
+    const document = this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument();
     if (document === undefined || !this.canDistribute) {
       return failure('Distribution is unavailable.');
     }

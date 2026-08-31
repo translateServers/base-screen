@@ -14,7 +14,7 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   category: '基础',
   keywords: ['文本', '标签'],
   defaultSize: { width: 320, height: 72 },
-  defaultProps: {},
+  defaultProps: { autoWidth: false },
   defaultData: '文本',
   staticData: { kind: 'scalar', valueType: 'string', multiline: true },
   defaultStyle: {
@@ -56,8 +56,8 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'lineHeight', label: '行高', control: 'number' },
     { style: 'lineSpacing', label: '行间距', control: 'number' },
   ],
-  propsSchema: { kind: 'object', properties: {}, required: [] },
-  propertyPanel: [],
+  propsSchema: { kind: 'object', properties: { autoWidth: { kind: 'boolean' } }, required: [] },
+  propertyPanel: [{ prop: 'autoWidth', label: '自适应宽度', control: 'boolean' }],
   events: ['valueClick'],
   dataCapabilities: ['static', 'host-resource'],
   designCapabilities: { resize: true, rotate: true, children: false },
@@ -125,9 +125,14 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
       lineHeightCss = `${fontSize + lineSpacing}px`;
     }
     this.style.lineHeight = lineHeightCss;
-    this.style.display = 'block';
+    if (this.style.display !== 'none') this.style.display = 'block';
     this.style.overflow = 'hidden';
-    this.style.whiteSpace = 'pre-wrap';
+    const autoWidth = model.props.autoWidth === true;
+    this.style.width = autoWidth ? 'max-content' : `${model.size.width}px`;
+    this.style.minWidth = autoWidth ? '1px' : '';
+    this.style.maxWidth = autoWidth ? '1000000px' : '';
+    this.style.boxSizing = autoWidth ? 'border-box' : '';
+    this.style.whiteSpace = autoWidth ? 'pre' : 'pre-wrap';
   }
 
   private ensureTextWrapper(): HTMLDivElement {

@@ -23,6 +23,10 @@ export {
   defineBaseScreenImageMaterial,
 } from './image.js';
 export {
+  type BaseScreenMaterialLoadingOptions,
+  createBaseScreenMaterialLoadingElement,
+} from './loading.js';
+export {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
   BaseScreenEllipseMaterialElement,

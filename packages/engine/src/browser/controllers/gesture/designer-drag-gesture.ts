@@ -109,7 +109,7 @@ export class DesignerDragGesture {
     }
     const translation = this.translation(state, event);
     this.cancel();
-    const document = this.callbacks.getDocument();
+    const document = this.callbacks.getCanonicalDocument?.() ?? this.callbacks.getDocument();
     if (event.altKey && document !== undefined) {
       this.duplicate(document, state, translation);
       return true;
@@ -162,6 +162,7 @@ export class DesignerDragGesture {
     state: DragState,
     translation: DesignerSnapTranslation,
   ): void {
+    const canonical = new Map(document.components.map((component) => [component.id, component]));
     const copiedIds = new Map(
       state.components.map((source, index) => [
         source.id,
@@ -172,7 +173,7 @@ export class DesignerDragGesture {
       commands: state.components.map((source, index) => ({
         type: 'add-component' as const,
         component: {
-          ...source,
+          ...(canonical.get(source.id) ?? source),
           id: copiedIds.get(source.id)!,
           name: `${source.name} copy`,
           parentId:

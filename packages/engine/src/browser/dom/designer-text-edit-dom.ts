@@ -18,6 +18,7 @@ export function createTextEditOverlay(
   material: HTMLElement,
   initialText: string,
   zoom: number,
+  autoWidth = false,
 ): HTMLElement {
   const overlay = canvas.ownerDocument.createElement('div');
   const canvasRect = canvas.getBoundingClientRect();
@@ -64,6 +65,19 @@ export function createTextEditOverlay(
     // 其他组件图层或选择框覆盖。
     'z-index: calc(var(--designer-z-canvas-selection, 0) + 1)',
   ].join('; ');
+
+  if (autoWidth) {
+    overlay.style.width = 'max-content';
+    overlay.style.minWidth = '1px';
+    overlay.style.maxWidth = '1000000px';
+    overlay.style.whiteSpace = 'pre';
+    // The material's local box remains authoritative under rotation/flip/viewport zoom.
+    if (material.style.left) overlay.style.left = material.style.left;
+    if (material.style.top) overlay.style.top = material.style.top;
+    if (material.style.height) overlay.style.height = material.style.height;
+    if (style?.transform) overlay.style.transform = style.transform;
+    overlay.style.transformOrigin = 'center';
+  }
 
   if (style != null) {
     // overlay 是 flex column：交叉轴（align-items）决定水平位置，主轴（justify-content）

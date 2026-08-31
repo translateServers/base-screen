@@ -160,6 +160,23 @@ export class DesignerPairEntryController<Axis extends string, Value> {
     this.position();
   }
 
+  refreshGeometry(): void {
+    if (!this.isOpen || this.#target === undefined) return;
+    const target = this.target();
+    if (target === undefined || target.id !== this.#target.id) {
+      this.close(false);
+      return;
+    }
+    for (const axis of this.callbacks.axes) {
+      const input = this.input(axis);
+      if (input.value === finiteDraft(this.#target.values[axis])) {
+        input.value = finiteDraft(target.values[axis]);
+      }
+    }
+    this.#target = target;
+    this.position();
+  }
+
   onClick(target: EventTarget | null): boolean {
     if (!this.isOpen || this.#form === undefined) return false;
     if (contains(this.#form, target)) return true;

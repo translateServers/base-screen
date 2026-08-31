@@ -211,6 +211,9 @@ export function resetSessionSurfaces(element: DesignerElementHost): void {
   elementState.importController.clear();
   elementState.notificationController.clear();
   elementState.blueprintWorkbenchController.resetSession();
+  elementState.autoWidthController.clear();
+  elementState.autoWidthController.sync(elementState.session.document);
+  elementState.runtime.renderInteraction(element);
 }
 
 export function report(

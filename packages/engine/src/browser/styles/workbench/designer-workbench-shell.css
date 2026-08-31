@@ -175,7 +175,6 @@
 .properties {
   min-height: 0;
   overflow: hidden;
-  scrollbar-gutter: stable;
   background: var(--designer-surface-panel);
 }
 
@@ -189,7 +188,6 @@
 .properties {
   display: grid;
   grid-template-rows: 44px auto auto auto minmax(0, 1fr);
-  scrollbar-gutter: stable;
   border-left: 1px solid var(--designer-border-default);
 }
 
@@ -525,7 +523,6 @@
   min-height: 0;
   overflow: hidden auto;
   padding: var(--designer-space-5);
-  scrollbar-gutter: stable;
 }
 
 .rail-view {

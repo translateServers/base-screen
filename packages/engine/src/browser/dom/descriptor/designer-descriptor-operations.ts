@@ -365,7 +365,7 @@ function defaultForSchema(schema: BaseScreenMaterialPropSchema): ScreenJsonValue
     case 'string':
       return '';
     case 'number':
-      return 0;
+      return Math.max(schema.minimum ?? -Infinity, Math.min(schema.maximum ?? Infinity, 0));
     case 'boolean':
       return false;
     case 'enum':

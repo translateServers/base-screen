@@ -349,6 +349,11 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
     protected renderMaterial(): void;
 }
 
+// @public
+export interface BaseScreenMaterialLoadingOptions {
+    readonly label?: string;
+}
+
 // @public (undocumented)
 abstract class BaseScreenOfficialMaterialElement extends ElementBase {
     // (undocumented)
@@ -393,6 +398,9 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
     // (undocumented)
     protected renderMaterial(): void;
 }
+
+// @public
+export function createBaseScreenMaterialLoadingElement(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): HTMLElement;
 
 // @public (undocumented)
 export function defineBaseScreenChartMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;

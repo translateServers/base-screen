@@ -7,6 +7,7 @@ import { assertCanvasBasics, assertInitialCanvasPointerFocus } from './assert-ca
 import { assertDesktopBaseline } from './assert-desktop-baseline.mjs';
 import { assertMaterialGroupNavigation } from './assert-material-group-navigation.mjs';
 import { assertRuntimeData } from './assert-runtime-data.mjs';
+import { assertTextAutoWidth } from './assert-text-auto-width.mjs';
 import { openViewport } from './open-viewport.mjs';
 
 export async function runBrowserHarness(serverPort) {
@@ -19,6 +20,7 @@ export async function runBrowserHarness(serverPort) {
     async ({ baseUrl, browser }) => {
       await assertInitialCanvasPointerFocus(browser, baseUrl);
       await assertMaterialGroupNavigation(browser, baseUrl);
+      await assertTextAutoWidth(browser, baseUrl);
       for (const viewport of [
         { width: 1024, height: 640 },
         { width: 1366, height: 768 },

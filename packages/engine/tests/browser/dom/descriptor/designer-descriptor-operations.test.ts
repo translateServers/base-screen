@@ -1,5 +1,8 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialCatalog,
+  BaseScreenMaterialObjectSchema,
+} from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   createDescriptorArrayTransaction,
@@ -77,11 +80,11 @@ const document: ScreenDocument = {
 
 const interaction = { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' };
 
-function catalog(): BaseScreenMaterialCatalog {
+function catalog(schema: BaseScreenMaterialObjectSchema = propsSchema): BaseScreenMaterialCatalog {
   return {
     get: () => ({
       manifest: {
-        propsSchema,
+        propsSchema: schema,
         styleSchema,
         dataBinding: { roles: [{ id: 'dimension' }] },
       },
@@ -281,6 +284,60 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
 });
 
 describe('AE-ED-C03 array transactions', () => {
+  it.each([
+    { name: 'positive', bounds: { minimum: 40, maximum: 800 }, expected: 40 },
+    { name: 'negative', bounds: { minimum: -800, maximum: -40 }, expected: -40 },
+    { name: 'including zero', bounds: { minimum: -4, maximum: 4 }, expected: 0 },
+    { name: 'fractional', bounds: { minimum: 0.5, maximum: 2.75 }, expected: 0.5 },
+    { name: 'unbounded', bounds: {}, expected: 0 },
+  ])(
+    'adds a valid numeric item for $name bounds without changing the source',
+    ({ bounds, expected }) => {
+      const schema: BaseScreenMaterialObjectSchema = {
+        kind: 'object',
+        properties: {
+          columns: {
+            kind: 'array',
+            items: {
+              kind: 'object',
+              properties: { width: { kind: 'number', ...bounds } },
+              required: ['width'],
+            },
+            maxItems: 4,
+          },
+        },
+        required: ['columns'],
+      };
+      const source: ScreenDocument = {
+        ...document,
+        components: [{ ...document.components[0]!, props: { columns: [] } }],
+      };
+      const original = structuredClone(source);
+      const result = createDescriptorArrayTransaction(
+        {
+          dataset: {
+            descriptorArrayPath: JSON.stringify(['columns']),
+            descriptorArrayAction: 'add',
+            descriptorArrayIndex: '0',
+          },
+        } as unknown as EventTarget,
+        source,
+        interaction,
+        catalog(schema),
+      );
+      expect(result?.ok).toBe(true);
+      if (!result?.ok) return;
+      expect(result.value.commands).toEqual([
+        {
+          type: 'update-components',
+          componentIds: ['chart-1'],
+          patch: { props: { columns: [{ width: expected }] } },
+        },
+      ]);
+      expect(source).toEqual(original);
+    },
+  );
+
   it('adds, removes and reorders repeatable array items with schema limits', () => {
     const add = createDescriptorArrayTransaction(
       {

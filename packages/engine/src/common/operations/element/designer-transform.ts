@@ -4,6 +4,7 @@ import {
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
 } from '@base-screen/core';
+import { isDesignerAutoWidthText } from './designer-auto-width.js';
 import { clampScreenCoordinate, clampScreenSize, roundScreenStep } from './designer-geometry.js';
 
 export type BaseScreenTransformHandle =
@@ -47,7 +48,10 @@ export function resizeScreenComponents(
       ),
     },
     size: {
-      width: roundScreenStep(clampScreenSize(component.size.width * scaleX)),
+      width:
+        isDesignerAutoWidthText(component) && scaleX === 1
+          ? component.size.width
+          : roundScreenStep(clampScreenSize(component.size.width * scaleX)),
       height: roundScreenStep(clampScreenSize(component.size.height * scaleY)),
     },
   }));

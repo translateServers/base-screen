@@ -24,6 +24,8 @@ export interface DesignerPanelControllerCallbacks {
   readonly getMaterialLibraryItems?: () => readonly BaseScreenResolvedMaterialLibraryItem[];
   readonly getMaterialLibraryGrouping?: () => BaseScreenMaterialLibraryGrouping | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
+  /** Read-only rendering/geometry input; clipboard and data editing use getDocument. */
+  readonly getGeometryDocument?: () => ScreenDocument | undefined;
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;

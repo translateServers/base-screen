@@ -81,6 +81,7 @@
 | [ADR-0062](./ADR-0062-host-left-panel-groups.md) | 已接受 | 2026-08-28 | Designer 宿主左侧分组：严格 JSON-safe Tab 描述与 `workbenchModes`、Canvas/Blueprint 模式感知导航、跨模式复用专属命名 slot、程序化选择与切换事件；宿主内容生命周期留在 light DOM，不进入文档或 Engine Store |
 | [ADR-0063](./ADR-0063-designer-blueprint-workbench-shell.md) | 已接受 | 2026-08-29 | Designer Blueprint 一体化工作台壳层：共享文档/历史、Base 语义面板与严格 slot 协议、宿主中央图形渲染；部分取代 ADR-0061 |
 | [ADR-0064](./ADR-0064-host-resource-authoring-intent.md) | 已接受 | 2026-08-30 | 宿主资源目录只提交严格 authoring intent；Designer 提供单事务插入、替换与拖放，删除旧素材目录端口 |
+| [ADR-0065](./ADR-0065-text-auto-width-runtime-geometry.md) | 已接受 | 2026-08-31 | 官方文本自适应宽度；持久尺寸与只读运行时几何分离，统一尺寸编辑和历史语义 |
 
 ## 计划决策
 

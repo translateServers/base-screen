@@ -699,6 +699,8 @@
 .direct-preview base-screen-viewer {
   display: block;
   min-height: 200px;
+  /* Match the canvas font reset instead of inheriting workbench UI typography. */
+  font: initial;
 }
 
 .project-workspace {

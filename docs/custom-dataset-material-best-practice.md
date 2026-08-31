@@ -121,6 +121,24 @@ renderRanking(items);
 
 错误信息只呈现用户可理解的状态，不显示 SQL、内部地址、Token 或后端异常正文。
 
+通用 loading 展示可以直接复用 `@base-screen/material`（也由 `@base-screen/sdk/material` 转发）的
+`createBaseScreenMaterialLoadingElement`，无需在每个宿主重复实现 spinner：
+
+```ts
+import { createBaseScreenMaterialLoadingElement } from '@base-screen/material';
+
+if (model.dataState.status === 'loading') {
+  content.replaceChildren(
+    createBaseScreenMaterialLoadingElement(content.ownerDocument, { label: '数据加载中' }),
+  );
+  return;
+}
+```
+
+`content` 是物料内部尺寸稳定的内容容器。工厂返回尚未挂载的展示节点，继承颜色与字体，内部样式隔离，
+带有可访问状态文本并遵守减少动态效果设置；导入和创建均不注册自定义元素、不请求数据、不启动 JavaScript
+定时器。物料仍拥有状态判断、节点挂载和移除，可选择自定义加载表现。此工具不会覆盖物料根节点的画布几何。
+
 ## 四、用户在设计器中的最短路径
 
 1. 从「最佳实践」分组拖入「数据集排行卡」。

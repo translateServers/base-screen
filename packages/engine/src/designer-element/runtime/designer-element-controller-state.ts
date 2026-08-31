@@ -24,6 +24,7 @@ import {
 } from '../../common/operations/canvas/canvas-presentation.js';
 import { DesignerProjectGateway } from '../../common/project/designer-project-gateway.js';
 import { DesignerSession } from '../../common/session/designer-session.js';
+import { getDesignerGeometryDocument } from './designer-element-geometry.js';
 import type { DesignerElementHost, DesignerElementState } from './designer-element-state.js';
 
 export function initializeDesignerElementControllers(
@@ -108,7 +109,8 @@ export function initializeDesignerElementControllers(
     getCatalog: () => state.catalog,
     getMaterialLibraryItem: (id) =>
       state.resolvedMaterialLibraryItems.find((item) => item.id === id),
-    getDocument: () => state.session.document,
+    getDocument: () => getDesignerGeometryDocument(state),
+    getCanonicalDocument: () => state.session.document,
     getInteraction: () => state.session.interaction,
     getViewport: () => state.viewportController.state,
     panBy: (delta) => state.viewportController.panBy(delta),
@@ -122,7 +124,10 @@ export function initializeDesignerElementControllers(
     snapCanvasSelection: (bounds, offset, excludedComponentIds) =>
       state.workbenchController.snapSelectionOffset(bounds, offset, excludedComponentIds),
     renderSnapPreview: (point) => state.workbenchController.renderSnapPreview(point),
-    setSnapSessionActive: (active) => state.workbenchController.setSnapSessionActive(active),
+    setSnapSessionActive: (active) => {
+      state.autoWidthController.setFrozen(active);
+      state.workbenchController.setSnapSessionActive(active);
+    },
     reduceSelection: (action) => state.session.reduceSelection(action),
     reportTransaction: (transaction) =>
       state.runtime.executeDesignerTransaction(element, transaction),
@@ -142,7 +147,9 @@ export function initializeDesignerElementControllers(
     getZoom: () => state.viewportController.state.zoom,
     executeCommand: (command) => element.executeCommand(command),
     report: (result) => state.runtime.report(element, result),
-    onEditingChange: () => {},
+    onEditingChange: (editing) => {
+      if (state.selection !== undefined) state.selection.style.visibility = editing ? 'hidden' : '';
+    },
   });
   state.variablesController = new DesignerVariablesController({
     getDocument: () => state.session.document,
@@ -162,7 +169,9 @@ export function initializeDesignerElementControllers(
     group: () => state.panelController.group(),
     ungroup: () => state.panelController.ungroup(),
     locateComponent: (componentId) => {
-      const component = state.session.document?.components.find((item) => item.id === componentId);
+      const component = getDesignerGeometryDocument(state)?.components.find(
+        (item) => item.id === componentId,
+      );
       if (component === undefined) return;
       state.viewportController.centerOn({
         x: component.position.x + component.size.width / 2,
@@ -254,6 +263,7 @@ export function initializeDesignerElementControllers(
     getMaterialLibraryItems: () => state.resolvedMaterialLibraryItems,
     getMaterialLibraryGrouping: () => state.materialLibraryGrouping,
     getDocument: () => state.session.document,
+    getGeometryDocument: () => getDesignerGeometryDocument(state),
     getDatasetFields: () => state.datasetController.getFocusedDatasetFields(),
     getGroupMaterialType: () => state.groupMaterialType,
     getInteraction: () => state.session.interaction,
@@ -326,7 +336,7 @@ export function initializeDesignerElementControllers(
   });
   state.workbenchController = new DesignerWorkbenchController({
     getCanvas: () => state.canvas,
-    getDocument: () => state.session.document,
+    getDocument: () => getDesignerGeometryDocument(state),
     getInteraction: () => state.session.interaction,
     getCatalog: () => state.catalog,
     getRoot: () => element.shadowRoot,
@@ -380,7 +390,7 @@ export function initializeDesignerElementControllers(
   });
   state.sizeEntryController = new DesignerSizeEntryController({
     getRoot: () => element.shadowRoot,
-    getDocument: () => state.session.document,
+    getDocument: () => getDesignerGeometryDocument(state),
     getInteraction: () => state.session.interaction,
     getCatalog: () => state.catalog,
     executeTransaction: (transaction) =>

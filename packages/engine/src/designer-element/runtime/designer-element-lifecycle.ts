@@ -36,6 +36,7 @@ export function disconnectedCallback(element: DesignerElementHost): void {
 export function disconnectSurfaces(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
+  elementState.autoWidthController.clear();
   elementState.coordinateEntryController.disconnect();
   elementState.sizeEntryController.disconnect();
   elementState.workbenchController.disconnect();

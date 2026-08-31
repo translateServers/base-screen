@@ -252,21 +252,21 @@ describe('designer workbench interaction and accessibility', () => {
     );
 
     expect(baseCss).toContain('.material-group-navigation {');
-    expect(baseCss).toContain('grid-template-columns: 44px 76px;');
-    expect(baseCss).toContain('grid-template-columns: 120px minmax(0, 1fr);');
+    expect(baseCss).toContain('grid-template-columns: 32px 76px;');
+    expect(baseCss).toContain('grid-template-columns: 108px minmax(0, 1fr);');
     expect(baseCss).toContain('grid-template-rows: 32px minmax(0, 1fr);');
     expect(baseCss).toContain('.material-group-navigation .material-group-button {');
-    expect(baseCss).toContain('flex: 0 0 32px;');
+    expect(baseCss).toContain('flex: 0 0 var(--designer-control-height-compact);');
     expect(baseCss).not.toContain('.material-group-heading {');
     expect(baseCss).toMatch(/\.material-group-roots\s*\{[^}]*padding-inline: 0;/s);
     expect(baseCss).toMatch(
-      /\.material-group-navigation \.material-group-back\s*\{[^}]*width: 100%;[^}]*height: 32px;/s,
+      /\.material-group-navigation \.material-group-back,\s*\.material-group-navigation \.material-group-button\s*\{[^}]*width: 100%;[^}]*height: var\(--designer-control-height-compact\);/s,
     );
     expect(baseCss).toMatch(
       /\.material-group-navigation \.material-group-button\[aria-pressed="true"\]:hover:not\(:disabled\)\s*\{[^}]*color: var\(--designer-text-primary\);/s,
     );
     expect(baseCss).toMatch(
-      /\.material-group-glyph,\s*\.material-group-glyph svg\s*\{[^}]*width: 16px;[^}]*height: 16px;/s,
+      /\.material-group-glyph,\s*\.material-group-glyph svg,\s*\.material-group-toggle-glyph,\s*\.material-group-toggle-glyph svg\s*\{[^}]*width: var\(--designer-icon-size\);[^}]*height: var\(--designer-icon-size\);/s,
     );
     expect(baseCss).toMatch(
       /\.material-group-roots \.material-group-label,\s*\.material-group-roots \.material-group-meta\s*\{[^}]*display: none;/s,
@@ -277,11 +277,13 @@ describe('designer workbench interaction and accessibility', () => {
     );
     expect(baseCss).toContain('.material-group-count {');
     expect(baseCss).toContain('flex: 0 0 24px;');
-    // 两列独立纵向滚动，预留滚动条轨道；切换分类不改变导航或卡片区宽度。
+    // 两列独立纵向滚动，隐藏滚动条（无可见滚动条，同 .material-categories 模式）。
     expect(baseCss).toMatch(
-      /\.material-group-roots,\s*\.material-group-children\s*\{[^}]*scrollbar-gutter: stable;/s,
+      /\.material-group-roots,\s*\.material-group-children\s*\{[^}]*scrollbar-width: none;/s,
     );
-    expect(baseCss).toContain('scrollbar-width: thin;');
+    expect(baseCss).toMatch(
+      /\.material-group-roots::-webkit-scrollbar,\s*\.material-group-children::-webkit-scrollbar\s*\{[^}]*display: none;/s,
+    );
     expect(baseCss).not.toContain('data-scroll-start');
     expect(baseCss).not.toContain('data-scroll-end');
     expect(baseCss).toContain('@container material-library (width < 264px)');

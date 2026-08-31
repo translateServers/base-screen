@@ -47,7 +47,6 @@ describe('official materials', () => {
 
   it('R5 drives official material content through data, not prop forms', () => {
     for (const manifest of [
-      BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
       BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
       BASE_SCREEN_CHART_MATERIAL_MANIFEST,
       BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
@@ -56,6 +55,8 @@ describe('official materials', () => {
       expect(manifest.propsSchema).toEqual({ kind: 'object', properties: {}, required: [] });
       expect(manifest.defaultProps).toEqual({});
     }
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propsSchema.properties).not.toHaveProperty('text');
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultProps).toEqual({ autoWidth: false });
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.defaultData).toBe('文本');
   });
 

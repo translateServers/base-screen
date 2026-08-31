@@ -66,7 +66,13 @@ export class DesignerTextEditController {
     // 编辑期间隐藏物料元素本体：overlay 为透明层（视觉复制物料样式），旧文本透出会与
     // 编辑内容重叠（用户可见"新旧文本重叠"）。隐藏后露出的是画布背景，与正常视觉一致。
     material.style.visibility = 'hidden';
-    this.#overlay = createTextEditOverlay(canvas, material, text, this.callbacks.getZoom());
+    this.#overlay = createTextEditOverlay(
+      canvas,
+      material,
+      text,
+      this.callbacks.getZoom(),
+      component?.props.autoWidth === true,
+    );
     this.#overlay.addEventListener('keydown', this.onKeyDown);
     this.#overlay.addEventListener('blur', this.onBlur);
     selectAllTextInOverlay(this.#overlay);

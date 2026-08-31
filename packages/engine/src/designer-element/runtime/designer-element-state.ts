@@ -17,6 +17,7 @@ import type {
 import { type BaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
 import { DesignerDatasetController } from '../../browser/controllers/dataset/designer-dataset-controller.js';
+import type { DesignerAutoWidthController } from '../../browser/controllers/designer-auto-width-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
 import { DesignerCoordinateEntryController } from '../../browser/controllers/designer-coordinate-entry-controller.js';
@@ -62,6 +63,7 @@ import { DesignerProjectGateway } from '../../common/project/designer-project-ga
 import { DesignerSession } from '../../common/session/designer-session.js';
 import { type DesignerToolMaterialTypes } from '../../common/tools/designer-tools.js';
 import { initializeDesignerElementControllers } from './designer-element-controller-state.js';
+import { createDesignerAutoWidthController } from './designer-element-geometry.js';
 import type { DesignerElementHost } from './designer-element-host.js';
 import { initializeDesignerElementOperations } from './designer-element-operation-state.js';
 import type { DesignerElementRuntime } from './designer-element-runtime.js';
@@ -120,6 +122,7 @@ export interface DesignerElementState {
   errorConsoleController: DesignerErrorConsoleController;
   scrollContinuityController: DesignerScrollContinuityController;
   canvasRuntimeController: DesignerCanvasRuntimeController;
+  autoWidthController: DesignerAutoWidthController;
   layers: HTMLDivElement | undefined;
   session: DesignerSession;
   projectGateway: DesignerProjectGateway;
@@ -175,6 +178,7 @@ export function createDesignerElementState(
   state.notificationController = new DesignerNotificationController();
   state.errorConsoleController = new DesignerErrorConsoleController();
   state.scrollContinuityController = new DesignerScrollContinuityController();
+  state.autoWidthController = createDesignerAutoWidthController(element, state);
   initializeDesignerElementControllers(element, state);
   initializeDesignerElementOperations(element, state);
   initializeDesignerElementSurfaceBindings(element, state);

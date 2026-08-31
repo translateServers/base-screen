@@ -120,6 +120,7 @@ export function withDerivedDesignerGroupBounds(
   document: ScreenDocument,
   transaction: ScreenDocumentTransaction,
   groupMaterialType: string | undefined,
+  projectGeometry?: (document: ScreenDocument) => ScreenDocument,
 ): ScreenDocumentTransaction {
   if (
     groupMaterialType === undefined ||
@@ -153,7 +154,7 @@ export function withDerivedDesignerGroupBounds(
     if (explicitGeometry.has(group.id) || isScreenComponentEffectivelyLocked(current, group.id)) {
       continue;
     }
-    const descendants = getDescendants(current, group.id);
+    const descendants = getDescendants(projectGeometry?.(current) ?? current, group.id);
     const bounds = getScreenSelectionBounds(descendants);
     if (bounds === null) continue;
     const position = { x: bounds.left, y: bounds.top };

@@ -17,6 +17,7 @@ import {
   type BaseScreenMaterialLibraryAction,
   type BaseScreenMaterialLibraryActionEventDetail,
 } from '../../common/operations/material-library/material-library-state.js';
+import { getDesignerGeometryDocument } from './designer-element-geometry.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
 
 export function initialize(element: DesignerElementHost): void {
@@ -114,6 +115,8 @@ export function renderDocument(
   }
   const rendered = elementState.canvasRuntimeController.render(document);
   if (rendered.ok) {
+    elementState.autoWidthController.sync(document);
+    elementState.workbenchController.invalidateGeometry();
     elementState.runtime.syncCanvasFrameSize(element, document);
     elementState.previewController.sync(document);
   }
@@ -207,7 +210,7 @@ export function renderSelection(element: DesignerElementHost): void {
   renderDesignerSelection(
     elementState.selection,
     element.ownerDocument,
-    elementState.session.document,
+    getDesignerGeometryDocument(elementState),
     elementState.session.interaction.selectedComponentIds,
     elementState.catalog,
   );

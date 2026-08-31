@@ -37,7 +37,7 @@ export class DesignerPanelPropertyController {
     if (properties !== undefined) {
       renderDesignerProperties(
         properties,
-        this.callbacks.getDocument(),
+        this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument(),
         this.callbacks.getInteraction(),
         this.callbacks.getCatalog(),
         this.callbacks.getDatasetFields,
@@ -152,7 +152,7 @@ export class DesignerPanelPropertyController {
     if (multiProperty !== undefined && target !== null) {
       const transaction = createMultiSelectionTransaction(
         target,
-        this.callbacks.getDocument(),
+        this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument(),
         this.callbacks.getInteraction(),
         this.callbacks.getCatalog(),
       );
@@ -294,7 +294,7 @@ export class DesignerPanelPropertyController {
   private commitPropertyControl(target: EventTarget | null): boolean {
     const transaction = createPropertyTransaction(
       target,
-      this.callbacks.getDocument(),
+      this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument(),
       this.callbacks.getInteraction(),
       this.callbacks.getCatalog(),
       this.#canvasBackgroundDrafts,

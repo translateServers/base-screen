@@ -38,6 +38,7 @@ export class DesignerMarqueeGesture {
 
   start(event: PointerEvent, clearSelectionOnClick: boolean): void {
     event.preventDefault();
+    this.callbacks.setSnapSessionActive?.(true);
     this.environment.capturePointer(event.pointerId);
     this.#state = {
       pointerId: event.pointerId,
@@ -102,6 +103,7 @@ export class DesignerMarqueeGesture {
 
   cancel(): void {
     if (this.#state !== undefined) {
+      this.callbacks.setSnapSessionActive?.(false);
       this.environment.releasePointer(this.#state.pointerId);
       this.#state = undefined;
     }

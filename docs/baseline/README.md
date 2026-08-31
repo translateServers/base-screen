@@ -116,6 +116,10 @@
 
 ## 物料体系
 
+- **共享加载展示**：`@base-screen/material` 与 `@base-screen/sdk/material` 提供无注册副作用的
+  `createBaseScreenMaterialLoadingElement`，继承物料配色和字体、隔离样式并支持减少动态效果。
+  物料继续根据公共 `dataState` 决定何时挂载，不把查询或生命周期转移到基座。
+  用法见[自定义数据物料最佳实践](../custom-dataset-material-best-practice.md)。
 - **物料契约与 ABI**：manifest 类型、校验、只读 catalog 与同 realm Web Component ABI。
   依据：[Plugin Core Contract](../specs/archive/plugin-core-contract/spec.md)、[ADR-0003](../decisions/ADR-0003-web-component-material-abi-and-registration.md)。
 - **静态数据作者契约**（2026-08-23 增量）：Manifest 可选 `staticData` scalar/tabular 描述；canonical 静态
@@ -174,6 +178,12 @@
   Manifest 与属性面板经既有 schema 驱动通道自动生效，Engine 与文档契约零改动。依据：
   [Text Material Typography](../specs/archive/text-material-typography/spec.md)、
   [ADR-0047](../decisions/ADR-0047-text-material-typography.md)。
+- **官方文本自适应宽度**（2026-08-31 增量）：`base.text` 的可选 `props.autoWidth` 默认关闭；
+  开启后按最长手动换行撑宽、保留空格且不自动折行，位置和高度不变。Designer、预览及 Viewer
+  使用相同物料排版；内部共享观察器将实际宽度投影到选择、命中、框选、吸附与布局操作，不写入
+  canonical 文档、脏状态或历史。手动调宽、多选/编组横向缩放在同一事务中退出自适应，只调高
+  保留固定宽度记录；关闭开关固定当前显示宽度。隐藏缓存、手势冻结、双击编辑和复制/导出均保持
+  持久尺寸与运行时尺寸的边界。依据：[ADR-0065](../decisions/ADR-0065-text-auto-width-runtime-geometry.md)。
 
 ## 宿主边界与数据运行时
 

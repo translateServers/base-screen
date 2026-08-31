@@ -1,3 +1,7 @@
+/* 物料分组导航（.material-group-navigation）及配套弹层/切换样式。
+   颜色、字号、间距等一律使用 --designer-* 设计 token，便于统一维护。 */
+
+/* 内容区网格：分组内联导航 + 结果列表，默认单列，分组展开时为双列。 */
 .material-library-content,
 .material-library-results {
   display: grid;
@@ -8,7 +12,7 @@
 }
 
 .material-library-content[data-material-grouped="true"] {
-  grid-template-columns: 120px minmax(0, 1fr);
+  grid-template-columns: 108px minmax(0, 1fr);
 }
 
 .material-library-results > .material-grid {
@@ -24,34 +28,51 @@
   overflow: hidden;
 }
 
+/* 导航容器（紧凑布局）：roots 列（32px）+ 子分组列（76px）；弹层内由下方覆盖为自适应宽度。 */
 .material-group-navigation {
   display: grid;
-  grid-template-columns: 44px 76px;
+  grid-template-columns: 32px 76px;
   height: 100%;
   min-width: 0;
   min-height: 0;
-  margin: 0;
   background: var(--designer-surface-panel);
 }
 
+/* roots / secondary / children 三列均为纵向 flex 容器。 */
 .material-group-roots,
+.material-group-secondary,
 .material-group-children {
-  box-sizing: border-box;
   display: flex;
   min-width: 0;
   min-height: 0;
   flex-direction: column;
+}
+
+/* 可滚动列表列：共享盒模型与内边距；隐藏滚动条但保留纵向滚动（同 .material-categories）。 */
+.material-group-roots,
+.material-group-children {
+  box-sizing: border-box;
   gap: var(--designer-space-1);
-  padding: var(--designer-space-2) 2px;
+  padding: var(--designer-space-2) var(--designer-space-1);
   overflow: hidden auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  scrollbar-width: thin;
+  scrollbar-width: none;
+}
+
+/* WebKit（Chrome/Safari）隐藏滚动条。 */
+.material-group-roots::-webkit-scrollbar,
+.material-group-children::-webkit-scrollbar {
+  display: none;
+}
+
+/* roots 与 secondary 右侧分隔线。 */
+.material-group-roots,
+.material-group-secondary {
+  border-right: 1px solid var(--designer-border-subtle);
 }
 
 .material-group-roots {
   padding-inline: 0;
-  border-right: 1px solid var(--designer-border-subtle);
   background: color-mix(
     in srgb,
     var(--designer-surface-workspace) 40%,
@@ -59,18 +80,11 @@
   );
 }
 
-.material-group-secondary {
-  display: flex;
-  min-width: 0;
-  min-height: 0;
-  flex-direction: column;
-  border-right: 1px solid var(--designer-border-subtle);
-}
-
 .material-group-children {
   flex: 1;
 }
 
+/* 单行截断：标题、分组标签与切换标签共用。 */
 .material-group-heading-label,
 .material-group-label,
 .material-group-toggle [data-material-group-toggle-label] {
@@ -80,56 +94,59 @@
   white-space: nowrap;
 }
 
-.material-group-navigation .material-group-back {
+/* 返回按钮与分组按钮：抽取共享外观，差异属性分开声明，避免重复。 */
+.material-group-navigation .material-group-back,
+.material-group-navigation .material-group-button {
   display: flex;
   width: 100%;
   min-width: 0;
-  height: 32px;
-  min-height: 32px;
-  flex: 0 0 32px;
-  justify-content: flex-start;
-  gap: 2px;
-  padding: 0 var(--designer-space-2);
+  height: var(--designer-control-height-compact);
+  min-height: var(--designer-control-height-compact);
+  flex: 0 0 var(--designer-control-height-compact);
+  gap: var(--designer-space-1);
   border-color: transparent;
-  border-bottom-color: var(--designer-border-subtle);
-  border-radius: 0;
   background: transparent;
   color: var(--designer-text-secondary);
+  /* font 简写会重置基础按钮的 font-weight:600 / line-height:1，使导航项更轻量。 */
   font: var(--designer-font-small);
+}
+
+.material-group-navigation .material-group-back {
+  justify-content: flex-start;
+  padding: 0 var(--designer-space-2);
+  border-bottom-color: var(--designer-border-subtle);
+  border-radius: 0;
 }
 
 .material-group-navigation .material-group-button {
   box-sizing: border-box;
-  display: flex;
-  width: 100%;
-  min-width: 0;
-  height: 32px;
-  min-height: 32px;
-  flex: 0 0 32px;
   align-items: center;
   justify-content: space-between;
-  gap: 2px;
   padding: 0 var(--designer-space-1);
-  border-color: transparent;
   border-radius: 3px;
-  background: transparent;
   box-shadow: none;
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
   text-align: center;
 }
 
+/* roots 列按钮仅显示图标：居中并收窄左右内边距。 */
 .material-group-navigation .material-group-roots .material-group-button {
   justify-content: center;
-  padding: 0 2px;
+  padding: 0 var(--designer-space-1);
+}
+
+/* 图标尺寸统一：glyph 为 16px。flex 仅作用于作为 flex item 的图标容器，防止被压缩。 */
+.material-group-glyph,
+.material-group-glyph svg,
+.material-group-toggle-glyph,
+.material-group-toggle-glyph svg {
+  display: block;
+  width: var(--designer-icon-size);
+  height: var(--designer-icon-size);
 }
 
 .material-group-glyph,
-.material-group-glyph svg {
-  display: block;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+.material-group-toggle-glyph {
+  flex: 0 0 var(--designer-icon-size);
 }
 
 .material-group-label {
@@ -140,7 +157,7 @@
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  gap: 2px;
+  gap: var(--designer-space-1);
   min-height: 14px;
 }
 
@@ -166,15 +183,24 @@
   display: grid;
 }
 
+/* 箭头 12px：分组 chevron / 返回按钮 svg / 切换 chevron 共用。 */
 .material-group-chevron,
 .material-group-chevron svg,
-.material-group-back svg {
+.material-group-back svg,
+.material-group-toggle-chevron,
+.material-group-toggle-chevron svg {
   display: block;
   width: 12px;
   height: 12px;
+}
+
+.material-group-chevron,
+.material-group-back svg,
+.material-group-toggle-chevron {
   flex: 0 0 12px;
 }
 
+/* 交互状态：hover / 选中 / active / 焦点。 */
 .material-group-navigation .material-group-button:hover:not(:disabled),
 .material-group-navigation .material-group-back:hover:not(:disabled) {
   border-color: transparent;
@@ -188,7 +214,8 @@
   border-color: transparent;
   background: var(--designer-accent-surface);
   color: var(--designer-text-primary);
-  box-shadow: inset 2px 0 0 var(--designer-accent);
+  /* 选中态不再绘制左侧 accent 竖线，仅以底色与文字区分；box-shadow:none 同时中和基础按钮的内嵌描边。 */
+  box-shadow: none;
 }
 
 .material-group-button[aria-pressed="true"] .material-group-glyph {
@@ -212,10 +239,11 @@
   outline-offset: -3px;
 }
 
+/* 工具栏切换按钮（窄容器时替代内联导航）。 */
 .material-library-toolbar .material-group-toggle {
   display: none;
   width: 100%;
-  height: 32px;
+  height: var(--designer-control-height-compact);
   min-width: 0;
   align-items: center;
   justify-content: space-between;
@@ -228,28 +256,13 @@
   flex: 1;
 }
 
-.material-group-toggle-glyph,
-.material-group-toggle-glyph svg {
-  display: block;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-}
-
-.material-group-toggle-chevron,
-.material-group-toggle-chevron svg {
-  display: block;
-  width: 12px;
-  height: 12px;
-  flex: 0 0 12px;
-}
-
 .material-library-toolbar .material-group-toggle[aria-expanded="true"] {
   border-color: var(--designer-accent);
   background: var(--designer-accent-surface);
   color: var(--designer-text-primary);
 }
 
+/* 弹层：overlay + backdrop + popover。 */
 .material-group-overlay {
   position: absolute;
   z-index: 200;
@@ -293,9 +306,10 @@
 }
 
 .material-group-popover .material-group-navigation {
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: 32px minmax(0, 1fr);
 }
 
+/* 窄容器降级：隐藏内联导航，改用工具栏切换按钮。 */
 @container material-library (width < 264px) {
   .material-library-content[data-material-grouped="true"] {
     grid-template-columns: minmax(0, 1fr);
@@ -310,6 +324,7 @@
   }
 }
 
+/* hidden 属性统一隐藏。 */
 .material-group-inline[hidden],
 .material-group-navigation[hidden],
 .material-group-overlay[hidden],

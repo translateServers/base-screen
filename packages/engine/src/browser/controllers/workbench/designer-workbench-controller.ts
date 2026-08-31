@@ -103,6 +103,10 @@ export class DesignerWorkbenchController {
     this.#snap.setSessionActive(active);
   }
 
+  invalidateGeometry(): void {
+    this.#snap.invalidateCandidates();
+  }
+
   snapPoint(
     point: { readonly x: number; readonly y: number },
     excludedComponentIds: readonly string[] = [],
