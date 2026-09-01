@@ -12,6 +12,7 @@ import {
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
   BaseScreenContainerMaterialElement,
   BaseScreenEChartsMaterialElement,
@@ -149,6 +150,7 @@ const catalog = createBaseScreenMaterialCatalog([
   {
     manifest: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
     constructor: BaseScreenTextMaterialElement,
+    tabularDataAdapter: BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
   },
   {
     manifest: BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
@@ -625,6 +627,7 @@ let datasetRegion = 'north';
 let datasetDelay = false;
 let metricValue = 42;
 const datasetRequests: unknown[] = [];
+const variableRequests: Array<{ readonly variableId: string; readonly purpose: string }> = [];
 const resourcePort = {
   async resolve(request: {
     readonly resourceId: string;
@@ -668,8 +671,91 @@ const resourcePort = {
   },
 };
 const variablePort = {
-  async resolve() {
+  async resolve(request: {
+    readonly variableId: string;
+    readonly purpose: 'runtime' | 'authoring-preview';
+  }) {
+    variableRequests.push({ variableId: request.variableId, purpose: request.purpose });
+    if (request.variableId === 'private-token' && request.purpose === 'authoring-preview') {
+      return {
+        ok: false as const,
+        diagnostics: [
+          {
+            severity: 'error' as const,
+            code: 'HOST_VARIABLE_CATALOG_FAILED' as const,
+            path: [],
+            message: 'secret-value-should-never-render',
+          },
+        ],
+      };
+    }
+    if (request.variableId === 'tenant-region' && datasetRegion === 'variable-error') {
+      return {
+        ok: false as const,
+        diagnostics: [
+          {
+            severity: 'error' as const,
+            code: 'HOST_VARIABLE_CATALOG_FAILED' as const,
+            path: [],
+            message: 'Harness variable resolution failed.',
+          },
+        ],
+      };
+    }
     return { ok: true as const, value: datasetRegion, diagnostics: [] };
+  },
+};
+const variableCatalog = {
+  async list({ query }: { readonly query: string }) {
+    const normalized = query.trim().toLocaleLowerCase();
+    const items = [
+      {
+        variableId: 'tenant-region',
+        name: 'tenantRegion',
+        description: '当前租户区域',
+      },
+      {
+        variableId: 'private-token',
+        name: 'privateToken',
+        description: '无权预览的敏感变量',
+      },
+    ].filter((item) =>
+      [item.variableId, item.name, item.description].some((value) =>
+        value.toLocaleLowerCase().includes(normalized),
+      ),
+    );
+    return { ok: true as const, value: { items }, diagnostics: [] };
+  },
+  async describe({ variableId }: { readonly variableId: string }) {
+    const descriptor =
+      variableId === 'tenant-region'
+        ? {
+            variableId,
+            name: 'tenantRegion',
+            description: '当前租户区域',
+            previewable: true,
+          }
+        : variableId === 'private-token'
+          ? {
+              variableId,
+              name: 'privateToken',
+              description: '无权预览的敏感变量',
+              previewable: true,
+            }
+          : undefined;
+    return descriptor === undefined
+      ? {
+          ok: false as const,
+          diagnostics: [
+            {
+              severity: 'error' as const,
+              code: 'HOST_VARIABLE_CATALOG_FAILED' as const,
+              path: [],
+              message: 'Harness variable descriptor was not found.',
+            },
+          ],
+        }
+      : { ok: true as const, value: descriptor, diagnostics: [] };
   },
 };
 const datasetCatalog = {
@@ -721,6 +807,7 @@ const datasetCatalog = {
 };
 designer.resourcePort = resourcePort;
 designer.variablePort = variablePort;
+designer.variableCatalogPort = variableCatalog;
 designer.datasetCatalogPort = datasetCatalog;
 designer.runtimeContributions = pluginManager.snapshot.contributions;
 // ADR-0059 宿主条件样式端口：阈值与视觉映射归宿主告警体系，屏幕只消费结果。
@@ -937,6 +1024,8 @@ Object.assign(window, {
     },
     datasetCatalog,
     datasetRequests,
+    variableCatalog,
+    variableRequests,
     materialLibraryActions,
     materialLibraryGrouping: activeMaterialLibraryGrouping,
     hostShell,

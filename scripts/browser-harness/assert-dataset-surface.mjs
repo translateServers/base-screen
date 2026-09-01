@@ -1,6 +1,6 @@
 export async function assertDatasetSurface(designer, page) {
   await designer.locator('[data-tool="select"]').click();
-  const titleClickProbe = await designer.evaluate((element) => {
+  const targetClickProbe = await designer.evaluate((element) => {
     const root = element.shadowRoot;
     const canvas = root.querySelector('[data-canvas]');
     const canvasBox = canvas.getBoundingClientRect();
@@ -10,32 +10,31 @@ export async function assertDatasetSurface(designer, page) {
       size: item.size,
       zIndex: item.zIndex,
     }));
-    const title = positions.find((item) => item.id === 'title');
+    const target = positions.find((item) => item.id === 'dataset-ranking-demo');
     const overlapped = positions.filter((item) => {
-      if (item.id === 'title' || item.zIndex <= title.zIndex) return false;
+      if (item.id === target.id || item.zIndex <= target.zIndex) return false;
       return (
-        item.position.x < title.position.x + title.size.width &&
-        item.position.x + item.size.width > title.position.x &&
-        item.position.y < title.position.y + title.size.height &&
-        item.position.y + item.size.height > title.position.y
+        item.position.x < target.position.x + target.size.width &&
+        item.position.x + item.size.width > target.position.x &&
+        item.position.y < target.position.y + target.size.height &&
+        item.position.y + item.size.height > target.position.y
       );
     });
     return {
       canvasTransform: canvas.style.transform,
       canvasBox: { x: canvasBox.x, y: canvasBox.y },
       zoom: root.querySelector('[data-zoom]')?.textContent,
-      title,
+      target,
       overlapped,
     };
   });
   try {
-    // 前序物料面板添加的组件（base-text-6 等）与 title 重叠，点击左上角未被遮挡的区域。
-    await designer.locator('[data-base-screen-component-id=title]').click({
+    await designer.locator('[data-base-screen-component-id=dataset-ranking-demo]').click({
       position: { x: 6, y: 7 },
     });
   } catch (error) {
     throw new Error(
-      `BROWSER_HARNESS_TITLE_CLICK_FAILED:${JSON.stringify(titleClickProbe)}:${error}`,
+      `BROWSER_HARNESS_DATASET_TARGET_CLICK_FAILED:${JSON.stringify(targetClickProbe)}:${error}`,
     );
   }
   await designer.getByRole('tab', { name: '\u6570\u636e\u6e90', exact: true }).click();
@@ -44,6 +43,9 @@ export async function assertDatasetSurface(designer, page) {
   await sourceMode.selectOption('dataset');
   const datasetQuery = dataPanel.locator('[data-dataset-query]');
   const datasetItem = dataPanel.locator('[data-dataset-resource-id="tabular-orders"]');
+  if ((await datasetQuery.count()) === 0) {
+    await dataPanel.locator('[data-dataset-change]').click();
+  }
   if ((await datasetQuery.count()) !== 1) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_SEARCH_SURFACE_FAILED:${await dataPanel.textContent()}`,
@@ -138,9 +140,9 @@ export async function assertDatasetSurface(designer, page) {
   if (
     descriptorSurface.parameterCount < 2 ||
     descriptorSurface.unlabelledParameterControls !== 0 ||
-    descriptorSurface.bindingCount !== 0 ||
-    !descriptorSurface.bindingSummaryEmpty ||
-    descriptorSurface.bindingSummaryItemCount !== 0 ||
+    descriptorSurface.bindingCount !== 4 ||
+    descriptorSurface.bindingSummaryEmpty ||
+    descriptorSurface.bindingSummaryItemCount !== 2 ||
     !descriptorSurface.authoringSettingsGroup ||
     descriptorSurface.authoringCheckboxCount !== 2 ||
     descriptorSurface.authoringSettingRowCount !== 2 ||
@@ -163,6 +165,7 @@ export async function assertDatasetSurface(designer, page) {
       `BROWSER_HARNESS_DATASET_DESCRIPTOR_SURFACE_FAILED:${JSON.stringify(descriptorSurface)}`,
     );
   }
+  await dataPanel.locator('[data-dataset-parameter-mode="region"]').selectOption('literal');
   const scrollContinuity = await dataPanel.evaluate((panel) => {
     const content = panel.querySelector('.designer-datav-data-flow-content');
     const parameter = panel.querySelector('[data-dataset-parameter="region"]');

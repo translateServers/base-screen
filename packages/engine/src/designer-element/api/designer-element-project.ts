@@ -120,6 +120,15 @@ export function refreshData(element: DesignerElementHost, componentId?: string):
   elementState.previewController.refreshData(componentId);
 }
 
+export function refreshVariables(
+  element: DesignerElementHost,
+  options?: import('@base-screen/contracts').ScreenVariableRefreshOptions,
+): void {
+  const elementState = getDesignerElementState(element);
+  elementState.canvasRuntimeController.refreshVariables(options);
+  elementState.previewController.refreshVariables(options);
+}
+
 export function save(
   element: DesignerElementHost,
 ): Promise<ScreenParseResult<ScreenProjectEnvelope>> {

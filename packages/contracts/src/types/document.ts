@@ -113,12 +113,14 @@ export interface ScreenComponentNode {
 export interface ScreenStaticVariable {
   readonly type: 'static';
   readonly name: string;
+  readonly description?: string;
   readonly value: ScreenJsonValue;
 }
 
 export interface ScreenHostVariable {
   readonly type: 'host';
   readonly name: string;
+  readonly description?: string;
   readonly variableId: string;
 }
 

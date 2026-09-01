@@ -133,6 +133,27 @@ describe('host resources are not implicitly dataset catalog entries', () => {
     harness.controller.clear();
   });
 
+  it('does not expose opaque host resources for scalar materials with field bindings', () => {
+    const scalarDatasetEntry = {
+      manifest: {
+        dataCapabilities: ['static', 'host-resource'],
+        staticData: { kind: 'scalar', valueType: 'string' },
+        dataBinding: {
+          roles: [
+            {
+              id: 'value',
+              minFields: 1,
+              maxFields: 1,
+              valueTypes: ['string', 'number', 'boolean', 'date'],
+            },
+          ],
+        },
+      },
+    } as unknown as BaseScreenMaterialCatalogEntry;
+
+    expect(designerDataSourceModes(scalarDatasetEntry)).toEqual(['none', 'static', 'dataset']);
+  });
+
   it('cancels an in-flight dataset description when switching to an opaque resource', async () => {
     let finish: ((result: ScreenParseResult<ScreenDatasetDescriptor>) => void) | undefined;
     let signal: ScreenAbortSignal | undefined;

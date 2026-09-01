@@ -13,27 +13,35 @@ import type { ScreenDocumentCommand } from '@base-screen/core';
  * - Blueprint 条件与动作表达式中 `kind: 'variable'` 的 `name`（递归）。
  */
 export function referencedVariableNames(document: ScreenDocument): ReadonlySet<string> {
-  const referenced = new Set<string>();
+  return new Set(variableReferenceCounts(document).keys());
+}
+
+/** Counts every canonical reference location for variable-panel disclosure. */
+export function variableReferenceCounts(document: ScreenDocument): ReadonlyMap<string, number> {
+  const referenced = new Map<string, number>();
+  const add = (name: string): void => {
+    referenced.set(name, (referenced.get(name) ?? 0) + 1);
+  };
   for (const component of document.components) {
     const source = component.dataSource;
     if (source?.type !== 'host-resource') continue;
     for (const parameter of Object.values(source.params)) {
-      if (parameter?.kind === 'variable') referenced.add(parameter.name);
+      if (parameter?.kind === 'variable') add(parameter.name);
     }
   }
   for (const rule of document.blueprint.rules) {
     if (rule.condition !== undefined) {
-      collectExpressionVariableReferences(rule.condition.left, referenced);
+      collectExpressionVariableReferences(rule.condition.left, add);
       if (rule.condition.right !== undefined) {
-        collectExpressionVariableReferences(rule.condition.right, referenced);
+        collectExpressionVariableReferences(rule.condition.right, add);
       }
     }
     for (const action of rule.actions) {
       if (action.type === 'set-variable') {
-        referenced.add(action.variableName);
-        collectExpressionVariableReferences(action.value, referenced);
+        add(action.variableName);
+        collectExpressionVariableReferences(action.value, add);
       } else if (action.type !== 'component-visibility') {
-        collectExpressionVariableReferences(action.payload, referenced);
+        collectExpressionVariableReferences(action.payload, add);
       }
     }
   }
@@ -85,20 +93,20 @@ export function buildReplaceVariablesCommand(
 
 function collectExpressionVariableReferences(
   expression: ScreenBlueprintValueExpression,
-  referenced: Set<string>,
+  add: (name: string) => void,
 ): void {
   switch (expression.kind) {
     case 'variable':
-      referenced.add(expression.name);
+      add(expression.name);
       return;
     case 'array':
       for (const item of expression.items) {
-        collectExpressionVariableReferences(item, referenced);
+        collectExpressionVariableReferences(item, add);
       }
       return;
     case 'object':
       for (const item of Object.values(expression.properties)) {
-        collectExpressionVariableReferences(item, referenced);
+        collectExpressionVariableReferences(item, add);
       }
       return;
     default:

@@ -186,9 +186,11 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 `define*Material()` 成功值就是可放入 catalog 的 entry，并且重复调用同一 constructor 时幂等。
 不要在多个模块里无条件直接调用 `customElements.define()`。
 
-官方物料还包括椭圆、图片、容器、图表、ECharts 和表格。图表、ECharts、表格使用宿主表格
-数据时，目录项还要分别携带包中导出的 `*_TABULAR_DATA_ADAPTER`。`examples/browser-harness`
-包含完整官方目录。
+官方物料还包括椭圆、图片、容器、图表、ECharts 和表格。文本、图表、ECharts、表格使用宿主
+表格数据时，目录项还要分别携带包中导出的 `*_TABULAR_DATA_ADAPTER`。文本的 `value` 角色接收
+一个字符串、数值、布尔或日期字段，显示数据集首行对应值；空行或空值投影为空文本。文本原有的
+标量静态数据保持不变；在 Designer 中只暴露「宿主数据集」，不再额外显示通用「宿主资源」选项。
+`examples/browser-harness` 包含完整官方目录。
 
 ## 5. 加载和校验文档
 
@@ -765,11 +767,13 @@ const designerHostAdapter: ScreenDesignerHostAdapter = {
     projectSnapshots: false,
     resources: true,
     datasetCatalog: true,
+    variableCatalog: true,
     variables: true,
     actions: false,
   },
   resources: resourcePort,
   datasetCatalog: datasetCatalogPort,
+  variableCatalog: variableCatalogPort,
   variables: variablePort,
 };
 
@@ -791,6 +795,7 @@ const configured = designer.configure({
 | `assets` | 查询资产摘要和删除前检查 | 上传、转码、缩略图、存储和删除 |
 | `resources` | 根据稳定资源标识解析数据 | 查询、凭证、缓存和结果裁剪 |
 | `datasetCatalog` | 为 Designer 提供数据集名称、字段和参数元数据 | 数据目录、搜索和权限 |
+| `variableCatalog` | 为 Designer 提供可选宿主变量摘要与预览声明 | 变量发现、权限、敏感性和真实来源 |
 | `variables` | 解析文档中的宿主变量 | 全局状态、租户上下文和敏感值 |
 | `actions` | 声明 JSON-safe host action 端口 | 业务动作、授权、幂等和审计 |
 
@@ -805,6 +810,7 @@ Blueprint host action，示例因此使用 `actions: false`；Viewer 和发布�
 
 - `datasetCatalogPort`：Designer 发现数据集并读取字段、参数编辑元数据。
 - `resourcePort`：Viewer/Designer 按稳定 `resourceType + resourceId` 查询数据。
+- `variableCatalogPort`：Designer 搜索严格的宿主变量目录并按需读取预览声明。
 - `variablePort`：把文档中的宿主变量 ID 解析为当前运行值。
 
 ### 9.1 数据集目录
@@ -864,18 +870,58 @@ Base Screen 在安全结果投影阶段处理。表格数据应符合 `ScreenTab
 ### 9.3 宿主变量
 
 ```ts
-import type { ScreenHostVariablePort } from '@base-screen/contracts';
+import type {
+  ScreenHostVariableCatalogPort,
+  ScreenHostVariablePort,
+} from '@base-screen/contracts';
 
-const variablePort: ScreenHostVariablePort = {
-  async resolve({ variableId, signal }) {
-    return hostVariableService.resolve({ variableId, signal });
+const variableCatalogPort: ScreenHostVariableCatalogPort = {
+  async list({ query, cursor, limit, signal }) {
+    return hostVariableService.list({ query, cursor, limit, signal });
+  },
+
+  async describe({ variableId, signal }) {
+    return hostVariableService.describe({ variableId, signal });
   },
 };
+
+const variablePort: ScreenHostVariablePort = {
+  async resolve({ variableId, purpose, signal }) {
+    return hostVariableService.resolve({ variableId, purpose, signal });
+  },
+};
+
+designer.configure({
+  catalog,
+  variableCatalogPort,
+  variablePort,
+});
 ```
 
-文档只保存类似 `{ type: 'host', name: 'region', variableId: 'current-region' }` 的引用。实际租户、
-用户和路由状态留在宿主。缺少变量端口、解析失败或结果不是 JSON-safe 值时，资源不会带着
-猜测值继续查询。
+`list()` 每页最多 50 项，只返回 `variableId`/`name`/`description`；`describe()` 额外
+返回 `previewable`。响应严格拒绝未知字段、重复 ID、非法名称/游标和超限内容。
+直接配置 `variableCatalogPort` 时必须同时配置 `variablePort`；Adapter 形式则必须同时开启
+`variableCatalog` 与 `variables` capability。
+
+`purpose` 是必填权限边界：`runtime` 用于 Viewer/Designer 运行求值，
+`authoring-preview` 用于变量面板预览和数据源测试。宿主应对敏感变量拒绝后者。
+预览只在当前会话显示有界摘要，不写入 Screen Document 或历史。
+
+文档只保存类似
+`{ type: 'host', name: 'region', description: '当前区域', variableId: 'current-region' }`
+的引用。实际租户、用户、URL、查询、过滤和路由状态留在宿主。缺少变量端口、
+解析失败或结果不是 JSON-safe 值时，资源不会带着猜测值继续查询。
+
+宿主状态改变后显式请求刷新：
+
+```ts
+viewer.refreshVariables({ variableIds: ['current-region'], traceId: 'route-change-42' });
+designer.refreshVariables(); // 刷新当前文档的全部 host 变量
+```
+
+同一 `variableId` 的多个别名只解析一次并同步提交。多变量刷新为原子批次：任一失败
+保留上次成功快照且不发资源请求；值未变化时也不重新查询依赖组件。自动更新由宿主
+调度后调用该方法，Base Screen 不内建轮询或订阅。
 
 ### 9.4 Resource type 和 capability
 
@@ -1265,6 +1311,12 @@ diagnostics、trace、view request 和最近命令结果。宿主不得修改它
 或 Engine 私有引用送回。命令严格覆盖 ready、select、connect、delete-selection、insert-node、commit-layout、
 commit-viewport、history-undo、history-redo 和 run-simulation；每条命令必须复用最新 generation/revision 并使用
 唯一 command id。未知字段、越界值、重复或过期命令均失败关闭，随后会收到新的权威状态。
+
+已连接的 `set-variable` 动作在右侧配置中可选 JSON 固定值、完整触发事件、触发物料
+Manifest `editorDescriptor.events[].payloadSchema` 声明的字段路径，或其他全局变量。
+这些选项分别写入现有 `literal` / `event-payload` / `variable` 表达式；不接受 JavaScript、
+表达式字符串或未声明事件路径。`array`/`object` 表达式继续可解析和运行，本批不提供
+新的复合表达式作者控件。
 
 模式可由用户页签或公开 API 切换：
 

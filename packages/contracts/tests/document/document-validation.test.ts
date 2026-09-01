@@ -397,6 +397,31 @@ describe('parseScreenDocument validation', () => {
     }
   });
 
+  it('accepts empty and bounded variable descriptions and rejects control and over-limit text', () => {
+    const accepted = parse(
+      document({
+        variables: [
+          { type: 'static', name: 'empty', description: '', value: 0 },
+          { type: 'static', name: 'count', description: '🚀'.repeat(4_096), value: 1 },
+          { type: 'host', name: 'tenant', description: '当前租户', variableId: 'tenant-id' },
+        ],
+      }),
+    );
+    expect(accepted).toMatchObject({ ok: true });
+    for (const description of ['bad\ntext', 'x'.repeat(4_097)]) {
+      expect(
+        parse(
+          document({
+            variables: [{ type: 'static', name: 'count', description, value: 1 }],
+          }),
+        ),
+      ).toMatchObject({
+        ok: false,
+        diagnostics: [{ path: ['variables', 0, 'description'] }],
+      });
+    }
+  });
+
   it('does not mutate input and is deterministic', () => {
     const input = document({
       components: [component({ id: 'a' }), component({ id: 'b', parentId: 'a' })],

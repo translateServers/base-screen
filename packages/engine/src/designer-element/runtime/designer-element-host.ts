@@ -8,6 +8,7 @@ import type {
   ScreenDocument,
   ScreenHostDatasetCatalogPort,
   ScreenHostResourcePort,
+  ScreenHostVariableCatalogPort,
   ScreenHostVariablePort,
   ScreenParseResult,
   ScreenProjectAdapter,
@@ -17,6 +18,7 @@ import type {
   ScreenProjectSnapshot,
   ScreenProjectSnapshotPort,
   ScreenProjectSummary,
+  ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
 import type {
@@ -56,6 +58,7 @@ export interface DesignerElementHost extends HTMLElement {
   resourcePort: ScreenHostResourcePort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   variablePort: ScreenHostVariablePort | undefined;
+  variableCatalogPort: ScreenHostVariableCatalogPort | undefined;
   conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   datasetCatalogPort: ScreenHostDatasetCatalogPort | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
@@ -133,6 +136,7 @@ export interface DesignerElementHost extends HTMLElement {
   createSnapshot(name: string): Promise<ScreenParseResult<ScreenProjectSnapshot>>;
   restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   refreshData(componentId?: string): void;
+  refreshVariables(options?: ScreenVariableRefreshOptions): void;
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   retryLastProjectOperation(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;

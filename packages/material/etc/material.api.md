@@ -311,6 +311,9 @@ export const BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDa
 export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest;
 
 // @public (undocumented)
+export const BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDataAdapter;
+
+// @public (undocumented)
 export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialElement {
     // (undocumented)
     static readonly manifest: BaseScreenMaterialManifest;

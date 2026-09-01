@@ -21,6 +21,7 @@ import { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenResourceExecutionMode } from '@base-screen/contracts';
 import { ScreenResourceExecutionTrigger } from '@base-screen/contracts';
 import { ScreenResourceObserver } from '@base-screen/contracts';
+import type { ScreenVariableRefreshOptions } from '@base-screen/contracts';
 
 // @public (undocumented)
 export interface BaseScreenMaterialEvent {
@@ -111,6 +112,8 @@ export class BaseScreenViewerElement extends ElementBase {
     refreshData(componentId?: string): void;
     // (undocumented)
     refreshData(options: BaseScreenViewerRefreshOptions): void;
+    // (undocumented)
+    refreshVariables(options?: ScreenVariableRefreshOptions): void;
     // (undocumented)
     get resourcePort(): ScreenHostResourcePort | undefined;
     set resourcePort(value: ScreenHostResourcePort | undefined);

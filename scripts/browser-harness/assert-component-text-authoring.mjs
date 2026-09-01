@@ -12,7 +12,7 @@ export async function assertComponentTextAuthoring(designer, page, hostEventCoun
     const result = designer.commitComponentTextEdit({
       requestId,
       expectedRevision: request?.documentRevision ?? null,
-      componentId: 'title',
+      componentId: 'dataset-ranking-demo',
       target: 'data',
       source: '{"region":"south"}',
     });
@@ -23,7 +23,7 @@ export async function assertComponentTextAuthoring(designer, page, hostEventCoun
   }
   await page.waitForFunction(() => {
     const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'title',
+      (component) => component.id === 'dataset-ranking-demo',
     )?.dataSource;
     return source?.type === 'host-resource' && source.params.region?.value === 'south';
   });
@@ -38,7 +38,7 @@ export async function assertComponentTextAuthoring(designer, page, hostEventCoun
     const result = designer.commitComponentTextEdit({
       requestId,
       expectedRevision: request?.documentRevision ?? null,
-      componentId: 'title',
+      componentId: 'dataset-ranking-demo',
       target: 'data',
       source: '{broken',
     });

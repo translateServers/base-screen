@@ -110,10 +110,10 @@ async function assertMaterialLibraryGrouping(page, designer) {
     rootState.groups.join(',') !== 'foundation,data,bridges,best-practices' ||
     rootState.cards.join(',') !== expectedCards.join(',') ||
     rootState.visual.navigationHeight < 150 ||
-    rootState.visual.navigationWidth !== (compact ? 286 : 120) ||
+    rootState.visual.navigationWidth !== (compact ? 286 : 108) ||
     rootState.visual.headingHeight !== 0 ||
-    rootState.visual.rootsWidth !== 44 ||
-    rootState.visual.rootHeight !== 32 ||
+    rootState.visual.rootsWidth !== 32 ||
+    rootState.visual.rootHeight !== 28 ||
     rootState.visual.rootGlyphWidth !== 16 ||
     rootState.visual.rootLabelDisplay !== 'none' ||
     rootState.visual.rootTitle !== '基础（4 个物料）' ||

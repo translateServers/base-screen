@@ -27,6 +27,17 @@
   overflow-wrap: anywhere;
 }
 
+.variable-panel-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px;
+  gap: var(--designer-space-2);
+}
+
+.variable-panel-filters .designer-control {
+  min-width: 0;
+  height: 30px;
+}
+
 .designer-button.variable-add-button {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
@@ -224,10 +235,37 @@
 
 .variable-actions {
   display: flex;
-  min-width: 52px;
+  min-width: 104px;
   align-items: center;
   justify-content: flex-end;
   gap: var(--designer-space-1);
+}
+
+.variable-meta {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.variable-reference-count {
+  padding: 1px var(--designer-space-2);
+  border-radius: 999px;
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.variable-description {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .variable-actions .designer-button {
@@ -368,6 +406,76 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--designer-space-3);
+}
+
+.variable-create-types {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-2);
+}
+
+.variable-host-catalog {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-2);
+}
+
+.variable-host-catalog-list {
+  display: grid;
+  max-height: 180px;
+  gap: var(--designer-space-1);
+  overflow: hidden auto;
+  scrollbar-gutter: stable;
+}
+
+.variable-host-catalog-item {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  gap: var(--designer-space-2);
+  justify-content: start;
+  text-align: left;
+}
+
+.variable-host-catalog-item code,
+.variable-host-catalog-item span,
+.variable-selected-host-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-catalog-feedback {
+  min-height: 15px;
+  margin: 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+}
+
+.variable-preview {
+  display: grid;
+  min-width: 0;
+  max-height: 180px;
+  gap: var(--designer-space-2);
+  overflow: hidden auto;
+  padding: var(--designer-space-3);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-workspace);
+  scrollbar-gutter: stable;
+}
+
+.variable-preview strong {
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.variable-preview pre {
+  margin: 0;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-numeric);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .variable-editor-title {

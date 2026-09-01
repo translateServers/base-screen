@@ -180,7 +180,7 @@ export async function assertAuthoringVariables(page, designer) {
     variableActionNames.cancel !== '取消' ||
     variableActionNames.confirm === variableActionNames.cancel ||
     !variableActionNames.focused ||
-    variableActionNames.labels !== 2 ||
+    variableActionNames.labels !== 3 ||
     !variableActionNames.usesVectorIcon
   ) {
     throw new Error('BROWSER_HARNESS_VARIABLE_ACTION_ACCESSIBLE_NAMES_FAILED');

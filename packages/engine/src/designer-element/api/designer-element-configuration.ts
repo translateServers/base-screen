@@ -24,6 +24,7 @@ import {
   isBaseScreenMaterialCatalog,
   isBaseScreenRuntimeContributionIndex,
   isScreenHostResourcePort,
+  isScreenHostVariableCatalogPort,
   isScreenHostVariablePort,
   lifecycleDiagnostic,
 } from '../runtime/designer-element-guards.js';
@@ -141,6 +142,25 @@ export function configure(
     };
   }
   if (
+    configuration.variableCatalogPort !== undefined &&
+    !isScreenHostVariableCatalogPort(configuration.variableCatalogPort)
+  ) {
+    return {
+      ok: false,
+      diagnostics: [lifecycleDiagnostic('Designer variable catalog port 必须包含 list/describe。')],
+    };
+  }
+  if (
+    configuration.designerHostAdapter === undefined &&
+    configuration.variableCatalogPort !== undefined &&
+    configuration.variablePort === undefined
+  ) {
+    return {
+      ok: false,
+      diagnostics: [lifecycleDiagnostic('Designer variable catalog requires variablePort.')],
+    };
+  }
+  if (
     configuration.conditionalStylePort !== undefined &&
     !isBaseScreenConditionalStylePort(configuration.conditionalStylePort)
   ) {
@@ -185,6 +205,7 @@ export function configure(
     elementState.projectSnapshotPort = adapter.projectSnapshots;
     elementState.resourcePort = adapter.resources;
     elementState.variablePort = adapter.variables;
+    elementState.variableCatalogPort = adapter.variableCatalog;
     elementState.datasetCatalogPort = adapter.datasetCatalog;
   } else {
     elementState.designerHostAdapter = undefined;
@@ -193,6 +214,7 @@ export function configure(
     elementState.projectSnapshotPort = configuration.projectSnapshotPort;
     elementState.resourcePort = configuration.resourcePort;
     elementState.variablePort = configuration.variablePort;
+    elementState.variableCatalogPort = configuration.variableCatalogPort;
     elementState.datasetCatalogPort = configuration.datasetCatalogPort;
   }
   elementState.conditionalStylePort = configuration.conditionalStylePort;

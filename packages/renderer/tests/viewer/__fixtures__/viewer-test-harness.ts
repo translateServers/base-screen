@@ -269,6 +269,7 @@ export function createImmediateResourcePort(): {
 
 export type PendingVariableRequest = {
   readonly variableId: string;
+  readonly purpose: 'runtime' | 'authoring-preview';
   readonly signal: ScreenAbortSignal;
   aborted: boolean;
   resolveRequest: (value: ScreenParseResult<ScreenJsonValue>) => void;
@@ -287,6 +288,7 @@ export function createVariablePort(
     resolve: (request) => {
       const pending: PendingVariableRequest = {
         variableId: request.variableId,
+        purpose: request.purpose,
         signal: request.signal,
         aborted: false,
         resolveRequest: () => {},

@@ -3,6 +3,7 @@ import {
   type ScreenDocument,
   type ScreenParseResult,
 } from '@base-screen/contracts';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
   componentBlueprintNodeId,
   deleteDesignerBlueprintSelection,
@@ -46,6 +47,7 @@ import {
 export interface DesignerBlueprintPanelsCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getGraph: () => BaseScreenBlueprintCanvasGraph;
+  readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getComponentLibrary: () => readonly BaseScreenBlueprintCanvasNode[];
   readonly getSelection: () => BaseScreenBlueprintCanvasSelection;
   readonly getDiagnostics: () => ScreenParseResult<unknown>['diagnostics'];
@@ -128,6 +130,7 @@ export class DesignerBlueprintPanelsController {
       this.#inspectorTab,
       this.callbacks.getDiagnostics(),
       this.callbacks.getTrace(),
+      this.callbacks.getCatalog(),
     );
     if (this.callbacks.getMode() === 'blueprint' && this.#library !== undefined) {
       syncDesignerBlueprintHostLeftPanel(
@@ -315,7 +318,12 @@ export class DesignerBlueprintPanelsController {
       actionIndex
     ];
     if (!Number.isInteger(actionIndex) || action === undefined) return true;
-    const updated = updateDesignerBlueprintActionFromTarget(target, document, action);
+    const updated = updateDesignerBlueprintActionFromTarget(
+      target,
+      document,
+      action,
+      this.callbacks.getCatalog(),
+    );
     if (!updated.ok) {
       this.callbacks.emitDiagnostics(updated.diagnostics);
       return true;

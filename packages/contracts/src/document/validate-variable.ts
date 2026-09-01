@@ -7,8 +7,8 @@ import {
   variableFieldCode,
 } from './validate-support.js';
 
-const VARIABLE_FIELDS = new Set(['type', 'name', 'value']);
-const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'variableId']);
+const VARIABLE_FIELDS = new Set(['type', 'name', 'description', 'value']);
+const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'description', 'variableId']);
 
 export function validateVariable(
   variable: unknown,

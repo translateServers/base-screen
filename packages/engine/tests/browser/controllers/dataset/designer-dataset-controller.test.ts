@@ -3,6 +3,7 @@ import type {
   ScreenDocument,
   ScreenHostDatasetCatalogPort,
   ScreenHostResourcePort,
+  ScreenHostVariablePort,
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
@@ -164,6 +165,73 @@ describe('DesignerDatasetController', () => {
       params: { limit: 2, region: 'north' },
     });
     expect(executeTransaction).not.toHaveBeenCalled();
+  });
+
+  it('resolves host variable parameters for authoring preview and blocks requests on denial', async () => {
+    const resourceResolve = vi.fn<ScreenHostResourcePort['resolve']>(async () => success({}));
+    const variableResolve = vi.fn<ScreenHostVariablePort['resolve']>(async () => success('north'));
+    const hostDocument: ScreenDocument = {
+      ...baseDocument,
+      variables: [{ type: 'host', name: 'tenantRegion', variableId: 'tenant-region' }],
+    };
+    const controller = createController({
+      descriptor,
+      getDocument: () => hostDocument,
+      resolve: resourceResolve,
+      resolveVariable: variableResolve,
+    });
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    vi.stubGlobal('HTMLSelectElement', FakeSelect);
+    vi.stubGlobal('HTMLTextAreaElement', class {});
+
+    controller.onClick(resourceTarget('orders') as unknown as Element);
+    await waitForDescriptor(controller);
+    controller.onChange(
+      new FakeInput('variable', { datasetParameterMode: 'region' }) as unknown as EventTarget,
+    );
+    controller.onChange(
+      new FakeSelect({ datasetParameter: 'region' }, ['tenantRegion']) as unknown as EventTarget,
+    );
+    controller.onClick(actionTarget('test') as unknown as Element);
+
+    await vi.waitFor(() => expect(resourceResolve).toHaveBeenCalledOnce());
+    expect(variableResolve).toHaveBeenCalledWith({
+      variableId: 'tenant-region',
+      purpose: 'authoring-preview',
+      signal: expect.any(AbortSignal),
+    });
+    expect(resourceResolve.mock.calls[0]?.[0]).toMatchObject({
+      params: { limit: 2, region: 'north' },
+    });
+
+    const deniedResource = vi.fn<ScreenHostResourcePort['resolve']>();
+    const denied = createController({
+      descriptor,
+      getDocument: () => hostDocument,
+      resolve: deniedResource,
+      resolveVariable: async () => ({
+        ok: false,
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'HOST_RESOURCE_ACCESS_DENIED',
+            path: [],
+            message: 'Denied.',
+          },
+        ],
+      }),
+    });
+    denied.onClick(resourceTarget('orders') as unknown as Element);
+    await waitForDescriptor(denied);
+    denied.onChange(
+      new FakeInput('variable', { datasetParameterMode: 'region' }) as unknown as EventTarget,
+    );
+    denied.onChange(
+      new FakeSelect({ datasetParameter: 'region' }, ['tenantRegion']) as unknown as EventTarget,
+    );
+    denied.onClick(actionTarget('test') as unknown as Element);
+    await new Promise((resolvePending) => setTimeout(resolvePending, 0));
+    expect(deniedResource).not.toHaveBeenCalled();
   });
 
   it('exposes dataset authoring controls as host-safe actions and local settings', async () => {
@@ -530,6 +598,7 @@ function createController(overrides: {
   readonly report?: (diagnostics: readonly unknown[]) => void;
   readonly getDocument?: () => ScreenDocument;
   readonly resolve?: ScreenHostResourcePort['resolve'];
+  readonly resolveVariable?: ScreenHostVariablePort['resolve'];
   readonly defaultData?: ScreenJsonValue;
   readonly staticData?: {
     readonly kind: 'tabular';
@@ -594,6 +663,8 @@ function createController(overrides: {
     getResourcePort: () => ({
       resolve: overrides.resolve ?? (async () => success({} as ScreenJsonValue)),
     }),
+    getVariablePort: () =>
+      overrides.resolveVariable === undefined ? undefined : { resolve: overrides.resolveVariable },
     getRuntimeContributions: () => runtime,
     executeTransaction: overrides.executeTransaction ?? (() => success(baseDocument)),
     report: overrides.report ?? (() => undefined),

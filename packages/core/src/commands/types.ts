@@ -42,7 +42,12 @@ export type ScreenDocumentCommand =
       readonly parentId: string | null;
     }
   | { readonly type: 'replace-blueprint'; readonly blueprint: ScreenBlueprint }
-  | { readonly type: 'replace-variables'; readonly variables: readonly ScreenVariable[] };
+  | { readonly type: 'replace-variables'; readonly variables: readonly ScreenVariable[] }
+  | {
+      readonly type: 'rename-variable';
+      readonly variableName: string;
+      readonly nextName: string;
+    };
 
 export interface ScreenComponentPatch {
   readonly name?: string;

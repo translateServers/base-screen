@@ -25,6 +25,7 @@ import { ScreenDocumentTransaction } from '@base-screen/core';
 import type { ScreenHostDatasetCatalogPort } from '@base-screen/contracts';
 import { ScreenHostResourceDataSource } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
+import type { ScreenHostVariableCatalogPort } from '@base-screen/contracts';
 import type { ScreenHostVariablePort } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
@@ -37,6 +38,7 @@ import type { ScreenProjectSnapshot } from '@base-screen/contracts';
 import type { ScreenProjectSnapshotPort } from '@base-screen/contracts';
 import type { ScreenProjectSummary } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
+import type { ScreenVariableRefreshOptions } from '@base-screen/contracts';
 
 // @public (undocumented)
 export const BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT: 'base-screen-blueprint-canvas-command';
@@ -391,6 +393,8 @@ export interface BaseScreenDesignerConfiguration {
     // (undocumented)
     readonly toolMaterialTypes?: DesignerToolMaterialTypes;
     // (undocumented)
+    readonly variableCatalogPort?: ScreenHostVariableCatalogPort;
+    // (undocumented)
     readonly variablePort?: ScreenHostVariablePort;
 }
 
@@ -514,6 +518,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)
+    refreshVariables(options?: ScreenVariableRefreshOptions): void;
+    // (undocumented)
     reloadRemote(discardChanges?: boolean): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
     reparent(componentIds: readonly string[], parentId: string | null): ScreenParseResult<ScreenDocument>;
@@ -551,6 +557,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     ungroup(): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     unload(): void;
+    // (undocumented)
+    get variableCatalogPort(): ScreenHostVariableCatalogPort | undefined;
+    set variableCatalogPort(value: ScreenHostVariableCatalogPort | undefined);
     // (undocumented)
     get variablePort(): ScreenHostVariablePort | undefined;
     set variablePort(value: ScreenHostVariablePort | undefined);

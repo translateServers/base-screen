@@ -238,4 +238,81 @@ describe('Designer Blueprint panel DOM', () => {
     expect(container.innerHTML).toContain('该节点已保存到当前文档');
     expect(container.innerHTML).toContain('data-blueprint-delete');
   });
+
+  it('renders keyboard-native set-variable source controls from declared event fields', () => {
+    const container = { innerHTML: '' } as HTMLElement;
+    const configuredDocument: ScreenDocument = {
+      ...document,
+      variables: [
+        { type: 'static', name: 'selected', value: null },
+        { type: 'static', name: 'fallback', value: 1 },
+      ],
+      blueprint: {
+        rules: [
+          {
+            ...document.blueprint.rules[0]!,
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'selected',
+                value: { kind: 'event-payload', path: ['row', 'id'] },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const configuredGraph = {
+      ...graph,
+      edges: [
+        {
+          ...graph.edges[0]!,
+          id: 'edge:rule-1:action:0',
+          kind: 'action' as const,
+          actionIndex: 0,
+        },
+      ],
+    };
+    const catalog = {
+      get: () => ({
+        manifest: {
+          editorDescriptor: {
+            events: [
+              {
+                name: 'click',
+                payloadSchema: {
+                  kind: 'object',
+                  properties: {
+                    row: {
+                      kind: 'object',
+                      properties: { id: { kind: 'string' } },
+                      required: [],
+                    },
+                  },
+                  required: [],
+                },
+              },
+            ],
+          },
+        },
+      }),
+    } as never;
+
+    renderDesignerBlueprintInspector(
+      container,
+      configuredDocument,
+      configuredGraph,
+      { kind: 'edge', id: 'edge:rule-1:action:0' },
+      'configuration',
+      [],
+      null,
+      catalog,
+    );
+
+    expect(container.innerHTML).toContain('data-blueprint-action-value-source');
+    expect(container.innerHTML).toContain('data-blueprint-action-event-path');
+    expect(container.innerHTML).toContain('row.id');
+    expect(container.innerHTML).toContain('value="variable"');
+    expect(container.innerHTML).toContain('<select');
+  });
 });

@@ -32,6 +32,15 @@ export function isScreenHostVariablePort(value: unknown): boolean {
   );
 }
 
+export function isScreenHostVariableCatalogPort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).list === 'function' &&
+    typeof (value as Record<string, unknown>).describe === 'function'
+  );
+}
+
 export function isBaseScreenConditionalStylePort(value: unknown): boolean {
   return (
     value !== null &&

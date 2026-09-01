@@ -34,16 +34,6 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
   ) {
     return;
   }
-  const params = resolvePreviewParameters(context, draft);
-  if (params === undefined) {
-    context.state.preview = {
-      ...emptyDatasetPreview(true),
-      status: 'error',
-      message: DESIGNER_UI_TEXT.dataSource.testVariableUnavailable,
-    };
-    context.renderSurface();
-    return;
-  }
   context.cancelPreview();
   const controller = new AbortController();
   const generation = context.state.previewGeneration;
@@ -56,6 +46,19 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
   };
   context.renderSurface();
   try {
+    const params = await resolvePreviewParameters(context, draft, controller);
+    if (controller.signal.aborted || generation !== context.state.previewGeneration) return;
+    if (params === undefined) {
+      context.state.previewController = undefined;
+      context.state.preview = {
+        ...emptyDatasetPreview(true),
+        status: 'error',
+        message: DESIGNER_UI_TEXT.dataSource.testVariableUnavailable,
+      };
+      context.state.feedbackText = context.state.preview.message;
+      context.renderSurface();
+      return;
+    }
     const result = await port.resolve(
       {
         componentId: component.id,
@@ -103,20 +106,67 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
   }
 }
 
-function resolvePreviewParameters(
+async function resolvePreviewParameters(
   context: DesignerDatasetControllerContext,
   draft: DesignerDatasetDraftView,
-): Readonly<Record<string, ScreenJsonValue>> | undefined {
+  controller: AbortController,
+): Promise<Readonly<Record<string, ScreenJsonValue>> | undefined> {
   const params: Record<string, ScreenJsonValue> = {};
   const document = context.callbacks.getDocument();
+  const hostVariables = new Map<string, string>();
   for (const [name, parameter] of Object.entries(draft.params)) {
     if (parameter.kind === 'literal') {
       params[name] = parameter.value;
       continue;
     }
     const variable = document?.variables.find((item) => item.name === parameter.name);
-    if (variable?.type !== 'static') return undefined;
-    params[name] = variable.value;
+    if (variable?.type === 'static') {
+      params[name] = variable.value;
+      continue;
+    }
+    if (variable?.type !== 'host') return undefined;
+    hostVariables.set(name, variable.variableId);
+  }
+  if (hostVariables.size === 0) return params;
+  const port = context.callbacks.getVariablePort?.();
+  if (port === undefined) return undefined;
+  const ids = [...new Set(hostVariables.values())];
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const timeout = new Promise<undefined>((resolve) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        resolve(undefined);
+      }, 15_000);
+    });
+    const batch = Promise.all(
+      ids.map(async (variableId) => ({
+        variableId,
+        result: await port.resolve({
+          variableId,
+          purpose: 'authoring-preview',
+          signal: controller.signal,
+        }),
+      })),
+    );
+    const settled = await Promise.race([batch, timeout]);
+    if (settled === undefined || controller.signal.aborted) return undefined;
+    const values = new Map<string, ScreenJsonValue>();
+    for (const { variableId, result } of settled) {
+      if (!result.ok) return undefined;
+      const parsed = parseScreenJsonValue(result.value, { maxBytes: 1024 * 1024 });
+      if (!parsed.ok) return undefined;
+      values.set(variableId, parsed.value);
+    }
+    for (const [name, variableId] of hostVariables) {
+      const value = values.get(variableId);
+      if (value === undefined) return undefined;
+      params[name] = value;
+    }
+  } catch {
+    return undefined;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
   }
   return params;
 }

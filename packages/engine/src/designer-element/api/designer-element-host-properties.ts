@@ -3,6 +3,7 @@ import type {
   ScreenDocument,
   ScreenHostDatasetCatalogPort,
   ScreenHostResourcePort,
+  ScreenHostVariableCatalogPort,
   ScreenHostVariablePort,
   ScreenProjectCatalogPort,
   ScreenProjectPreviewPort,
@@ -42,6 +43,7 @@ export function writeDesignerHostAdapter(
     element.projectPreviewPort = undefined;
     element.projectSnapshotPort = undefined;
     element.resourcePort = undefined;
+    element.variableCatalogPort = undefined;
     element.variablePort = undefined;
     element.datasetCatalogPort = undefined;
     return;
@@ -51,7 +53,11 @@ export function writeDesignerHostAdapter(
     elementState.runtime.emitDiagnostics(element, parsed.diagnostics);
     return;
   }
-  if (elementState.renderer !== undefined && parsed.value.resources !== elementState.resourcePort) {
+  if (
+    elementState.renderer !== undefined &&
+    (parsed.value.resources !== elementState.resourcePort ||
+      parsed.value.variables !== elementState.variablePort)
+  ) {
     elementState.runtime.emitDiagnostics(element, [
       lifecycleDiagnostic('Resource port cannot change after initialization. Call unload first.'),
     ]);
@@ -62,7 +68,11 @@ export function writeDesignerHostAdapter(
   element.projectPreviewPort = parsed.value.projectPreview;
   element.projectSnapshotPort = parsed.value.projectSnapshots;
   element.resourcePort = parsed.value.resources;
+  if (parsed.value.variableCatalog === undefined) element.variableCatalogPort = undefined;
   element.variablePort = parsed.value.variables;
+  if (parsed.value.variableCatalog !== undefined) {
+    element.variableCatalogPort = parsed.value.variableCatalog;
+  }
   element.datasetCatalogPort = parsed.value.datasetCatalog;
 }
 
@@ -99,7 +109,34 @@ export function writeVariablePort(
     ]);
     return;
   }
+  if (value === undefined && elementState.variableCatalogPort !== undefined) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Variable port cannot be removed while variable catalog is enabled.'),
+    ]);
+    return;
+  }
   elementState.variablePort = value;
+}
+
+export function readVariableCatalogPort(
+  element: DesignerElementHost,
+): ScreenHostVariableCatalogPort | undefined {
+  return getDesignerElementState(element).variableCatalogPort;
+}
+
+export function writeVariableCatalogPort(
+  element: DesignerElementHost,
+  value: ScreenHostVariableCatalogPort | undefined,
+) {
+  const elementState = getDesignerElementState(element);
+  if (value !== undefined && elementState.variablePort === undefined) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Variable catalog requires a variable port.'),
+    ]);
+    return;
+  }
+  elementState.variableCatalogPort = value;
+  elementState.runtime.renderInteraction(element);
 }
 
 export function readConditionalStylePort(

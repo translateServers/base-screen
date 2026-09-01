@@ -47,6 +47,7 @@ export {
 } from './table.js';
 export {
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
   BaseScreenTextMaterialElement,
   defineBaseScreenTextMaterial,
 } from './text.js';

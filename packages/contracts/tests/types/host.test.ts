@@ -95,6 +95,7 @@ describe('project lifecycle contracts', () => {
         readonly projectSnapshots: boolean;
         readonly resources: boolean;
         readonly datasetCatalog: boolean;
+        readonly variableCatalog: boolean;
         readonly variables: boolean;
         readonly actions: boolean;
       };
@@ -115,6 +116,7 @@ describe('project lifecycle contracts', () => {
         projectSnapshots: false,
         resources: false,
         datasetCatalog: false,
+        variableCatalog: false,
         variables: false,
         actions: false,
       },
@@ -136,10 +138,31 @@ describe('project lifecycle contracts', () => {
         projectSnapshots: false,
         resources: false,
         datasetCatalog: false,
+        variableCatalog: false,
         variables: false,
         actions: false,
       },
       projectCatalog: catalog,
+    });
+    expect(result).toMatchObject({ ok: false, diagnostics: [{ code: 'PROJECT_ADAPTER_INVALID' }] });
+  });
+
+  it('requires variable resolution whenever the host variable catalog is enabled', () => {
+    const result = validateScreenDesignerHostAdapter({
+      capabilities: {
+        projectCatalog: false,
+        projectPreview: false,
+        projectSnapshots: false,
+        resources: false,
+        datasetCatalog: false,
+        variableCatalog: true,
+        variables: false,
+        actions: false,
+      },
+      variableCatalog: {
+        list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
+        describe: async () => ({ ok: false as const, diagnostics: [] }),
+      },
     });
     expect(result).toMatchObject({ ok: false, diagnostics: [{ code: 'PROJECT_ADAPTER_INVALID' }] });
   });

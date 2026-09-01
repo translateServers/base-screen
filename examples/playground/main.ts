@@ -18,6 +18,7 @@ import {
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
   BaseScreenEllipseMaterialElement,
   BaseScreenRectangleMaterialElement,
@@ -161,7 +162,11 @@ if (customElements.get(vueStatusDefinition.value.manifest.tagName) === undefined
 }
 
 const catalog = createBaseScreenMaterialCatalog([
-  { manifest: BASE_SCREEN_TEXT_MATERIAL_MANIFEST, constructor: BaseScreenTextMaterialElement },
+  {
+    manifest: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+    constructor: BaseScreenTextMaterialElement,
+    tabularDataAdapter: BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
+  },
   {
     manifest: BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
     constructor: BaseScreenRectangleMaterialElement,

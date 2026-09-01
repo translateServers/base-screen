@@ -5,11 +5,17 @@ import type {
   ScreenBlueprintValueExpression,
   ScreenDocument,
 } from '@base-screen/contracts';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type {
   BaseScreenBlueprintCanvasGraph,
   BaseScreenBlueprintCanvasNode,
   BaseScreenBlueprintCanvasSelection,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
+import {
+  type DesignerBlueprintSetVariableSource,
+  designerBlueprintEventFieldPaths,
+  designerBlueprintSetVariableSource,
+} from '../../../common/operations/blueprint/designer-blueprint-value-sources.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { escapeAttribute, escapeHtml } from './designer-blueprint-dom-helpers.js';
@@ -20,6 +26,7 @@ export function renderDesignerBlueprintConfiguration(
   document: ScreenDocument | undefined,
   graph: BaseScreenBlueprintCanvasGraph,
   selection: BaseScreenBlueprintCanvasSelection,
+  catalog?: BaseScreenMaterialCatalog,
 ): string {
   if (document === undefined || selection === null) return emptyInspector();
   const node =
@@ -47,7 +54,7 @@ export function renderDesignerBlueprintConfiguration(
       ${downstreamActionSection(document, action)}
       ${configurationSection(
         DESIGNER_UI_TEXT.blueprint.interactionActions,
-        actionFields(document, rule.id, actionIndex, action),
+        actionFields(document, rule.id, actionIndex, action, catalog),
       )}
       ${anchorSection(rule)}
       ${deleteButton()}`;
@@ -215,6 +222,7 @@ function actionFields(
   ruleId: string,
   actionIndex: number,
   action: ScreenBlueprintAction,
+  catalog: BaseScreenMaterialCatalog | undefined,
 ): string {
   const data = `data-rule-id="${escapeAttribute(ruleId)}" data-action-index="${actionIndex}"`;
   if (action.type === 'component-visibility') {
@@ -228,14 +236,22 @@ function actionFields(
     </label>`;
   }
   if (action.type === 'set-variable') {
+    const source = designerBlueprintSetVariableSource(action.value);
+    const eventFields = designerBlueprintEventFieldPaths(document, ruleId, catalog);
+    const sourceVariables = document.variables.filter(
+      (variable) => variable.name !== action.variableName,
+    );
     return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.variableName}</span>
       <select class="designer-control designer-select" data-blueprint-action-variable ${data}>
         ${document.variables.map((variable) => `<option value="${escapeAttribute(variable.name)}"${variable.name === action.variableName ? ' selected' : ''}>${escapeHtml(variable.name)}</option>`).join('')}
       </select>
     </label>
-    <label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.literalJson}</span>
-      <input type="text" class="designer-control designer-input" value="${escapeAttribute(expressionJson(action.value))}" data-blueprint-action-value ${data}>
-    </label>`;
+    <label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.valueSource}</span>
+      <select class="designer-control designer-select" data-blueprint-action-value-source ${data}>
+        ${valueSourceOptions(source, eventFields.length > 0, sourceVariables.length > 0)}
+      </select>
+    </label>
+    ${valueSourceField(action.value, source, eventFields, sourceVariables, data)}`;
   }
   if (action.type === 'emit-host-event') {
     return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.eventName}</span>
@@ -289,6 +305,84 @@ function deleteButton(): string {
 
 function expressionJson(expression: ScreenBlueprintValueExpression): string {
   return expression.kind === 'literal' ? JSON.stringify(expression.value) : '';
+}
+
+function valueSourceOptions(
+  selected: DesignerBlueprintSetVariableSource,
+  hasEventFields: boolean,
+  hasVariables: boolean,
+): string {
+  const options: readonly {
+    readonly value: DesignerBlueprintSetVariableSource;
+    readonly label: string;
+    readonly disabled?: boolean;
+  }[] = [
+    { value: 'literal', label: DESIGNER_UI_TEXT.blueprint.valueSources.literal },
+    { value: 'event', label: DESIGNER_UI_TEXT.blueprint.valueSources.event },
+    {
+      value: 'event-field',
+      label: DESIGNER_UI_TEXT.blueprint.valueSources.eventField,
+      disabled: !hasEventFields,
+    },
+    {
+      value: 'variable',
+      label: DESIGNER_UI_TEXT.blueprint.valueSources.variable,
+      disabled: !hasVariables,
+    },
+    ...(selected === 'advanced'
+      ? ([
+          {
+            value: 'advanced' as const,
+            label: DESIGNER_UI_TEXT.blueprint.valueSources.advanced,
+            disabled: true,
+          },
+        ] as const)
+      : []),
+  ];
+  return options
+    .map(
+      (option) =>
+        `<option value="${option.value}"${option.value === selected ? ' selected' : ''}${option.disabled === true ? ' disabled' : ''}>${option.label}</option>`,
+    )
+    .join('');
+}
+
+function valueSourceField(
+  expression: ScreenBlueprintValueExpression,
+  source: DesignerBlueprintSetVariableSource,
+  eventFields: readonly (readonly string[])[],
+  variables: ScreenDocument['variables'],
+  data: string,
+): string {
+  if (source === 'literal') {
+    return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.literalJson}</span>
+      <input type="text" class="designer-control designer-input" value="${escapeAttribute(expressionJson(expression))}" data-blueprint-action-value ${data}>
+    </label>`;
+  }
+  if (source === 'event-field') {
+    if (eventFields.length === 0)
+      return `<p>${DESIGNER_UI_TEXT.blueprint.noDeclaredEventFields}</p>`;
+    const current = expression.kind === 'event-payload' ? expression.path : [];
+    return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.eventField}</span>
+      <select class="designer-control designer-select" data-blueprint-action-event-path ${data}>
+        ${eventFields.map((path) => `<option value="${escapeAttribute(JSON.stringify(path))}"${samePath(path, current) ? ' selected' : ''}>${escapeHtml(path.join('.'))}</option>`).join('')}
+      </select>
+    </label>`;
+  }
+  if (source === 'variable') {
+    if (variables.length === 0) return `<p>${DESIGNER_UI_TEXT.blueprint.noSourceVariables}</p>`;
+    const current = expression.kind === 'variable' ? expression.name : '';
+    return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.sourceVariable}</span>
+      <select class="designer-control designer-select" data-blueprint-action-source-variable ${data}>
+        ${variables.map((variable) => `<option value="${escapeAttribute(variable.name)}"${variable.name === current ? ' selected' : ''}>${escapeHtml(variable.name)}</option>`).join('')}
+      </select>
+    </label>`;
+  }
+  return '';
+}
+
+function samePath(left: readonly string[], right: readonly (string | number)[]): boolean {
+  return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }
 
 function visibilityLabel(operation: 'show' | 'hide' | 'toggle'): string {

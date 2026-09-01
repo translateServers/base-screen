@@ -16,6 +16,7 @@
 
 | 归档规格 | 后继依据 | 归档日期 |
 | --- | --- | --- |
+| [DataV-Inspired Global Variables](./datav-inspired-global-variables/spec.md) | 已完成；[ADR-0067](../../decisions/ADR-0067-datav-inspired-global-variables.md) | 2026-09-01 |
 | [Host Resource Authoring](./host-resource-authoring/spec.md) | 已完成；[ADR-0064](../../decisions/ADR-0064-host-resource-authoring-intent.md) | 2026-08-31 |
 | [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | [Designer Engine](./designer-engine/spec.md) | 2026-08-04 |
 | [Designer Engine](./designer-engine/spec.md) | 已完成（无后继） | 2026-08-05 |

@@ -3,6 +3,7 @@ import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
   BaseScreenMaterialManifest,
+  BaseScreenMaterialTabularDataAdapter,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { BaseScreenOfficialMaterialElement, isGradientColorValue } from './base-material.js';
@@ -60,6 +61,16 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   propertyPanel: [{ prop: 'autoWidth', label: '自适应宽度', control: 'boolean' }],
   events: ['valueClick'],
   dataCapabilities: ['static', 'host-resource'],
+  dataBinding: {
+    roles: [
+      {
+        id: 'value',
+        minFields: 1,
+        maxFields: 1,
+        valueTypes: ['string', 'number', 'boolean', 'date'],
+      },
+    ],
+  },
   designCapabilities: { resize: true, rotate: true, children: false },
 };
 
@@ -191,4 +202,37 @@ export function defineBaseScreenTextMaterial(): ScreenParseResult<BaseScreenMate
     element: BaseScreenTextMaterialElement as BaseScreenMaterialConstructor,
   });
   return definition.ok ? definition.value.define() : definition;
+}
+
+const BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDataAdapter = {
+  adapt({ dataset, fields }) {
+    const field = fields.value?.[0];
+    if (field === undefined) return invalidTextProjection();
+    const value = dataset.rows[0]?.[field.id];
+    return {
+      ok: true,
+      value: value === null || value === undefined ? '' : String(value),
+      diagnostics: [],
+    };
+  },
+};
+
+Object.defineProperty(BaseScreenTextMaterialElement, 'tabularDataAdapter', {
+  value: BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
+});
+
+export { BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER };
+
+function invalidTextProjection(): ScreenParseResult<never> {
+  return {
+    ok: false,
+    diagnostics: [
+      {
+        severity: 'error',
+        code: 'HOST_DATASET_BINDING_INVALID',
+        path: [],
+        message: 'Text dataset binding is invalid.',
+      },
+    ],
+  };
 }

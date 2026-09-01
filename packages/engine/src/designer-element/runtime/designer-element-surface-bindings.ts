@@ -99,6 +99,7 @@ export function initializeDesignerElementSurfaceBindings(
       (_target, event) => state.runtime.onImportChange(element, event),
       (_target, event) => state.layersController.onChange(event),
       (target) => state.datasetController.onChange(target),
+      (target) => state.variablesController.onChange(target),
       (_target, event) => {
         state.panelController.onPropertyChange(event);
         return true;
@@ -110,6 +111,7 @@ export function initializeDesignerElementSurfaceBindings(
       (target) => state.sizeEntryController.onInput(target),
       (target) => state.commandPaletteController.onInput(target as Element),
       (target) => state.datasetController.onInput(target),
+      (target) => state.variablesController.onInput(target),
       (_target, event) => state.panelController.onInput(event),
       (_target, event) => {
         state.layersController.onInput(event);

@@ -52,6 +52,12 @@ export const MAX_DATASET_PAGE_ITEMS = 50;
 // @public (undocumented)
 export const MAX_DATASET_ROWS = 10000;
 
+// @public (undocumented)
+export const MAX_HOST_VARIABLE_CATALOG_BYTES: number;
+
+// @public (undocumented)
+export const MAX_HOST_VARIABLE_PAGE_ITEMS = 50;
+
 // @public
 export const MAX_SCREEN_MATERIAL_ERROR_MESSAGE_LENGTH = 256;
 
@@ -95,6 +101,12 @@ export function parseScreenDatasetPage(input: unknown): ScreenParseResult<Screen
 
 // @public
 export function parseScreenDocument(input: unknown, base?: ScreenDocument): ScreenParseResult<ScreenDocument>;
+
+// @public (undocumented)
+export function parseScreenHostVariableDescriptor(input: unknown): ScreenParseResult<ScreenHostVariableDescriptor>;
+
+// @public (undocumented)
+export function parseScreenHostVariablePage(input: unknown): ScreenParseResult<ScreenHostVariablePage>;
 
 // @public (undocumented)
 export function parseScreenJsonValue(input: unknown, options?: ScreenJsonParseOptions): ScreenParseResult<ScreenJsonValue>;
@@ -575,6 +587,8 @@ export interface ScreenDesignerHostAdapter {
     // (undocumented)
     readonly resources?: ScreenHostResourcePort;
     // (undocumented)
+    readonly variableCatalog?: ScreenHostVariableCatalogPort;
+    // (undocumented)
     readonly variables?: ScreenHostVariablePort;
 }
 
@@ -593,6 +607,8 @@ export interface ScreenDesignerHostCapabilities {
     // (undocumented)
     readonly resources: boolean;
     // (undocumented)
+    readonly variableCatalog: boolean;
+    // (undocumented)
     readonly variables: boolean;
 }
 
@@ -609,7 +625,7 @@ export interface ScreenDiagnostic {
 }
 
 // @public (undocumented)
-export type ScreenDiagnosticCode = 'DOCUMENT_NOT_OBJECT' | 'DOCUMENT_UNKNOWN_FIELD' | 'DOCUMENT_FIELD_INVALID' | 'DOCUMENT_LIMIT_EXCEEDED' | 'JSON_VALUE_INVALID' | 'JSON_LIMIT_EXCEEDED' | 'JSON_NUMBER_NON_FINITE' | 'JSON_CYCLE' | 'JSON_PROTOTYPE_INVALID' | 'JSON_DANGEROUS_KEY' | 'COMPONENT_ID_DUPLICATE' | 'COMPONENT_PARENT_MISSING' | 'COMPONENT_PARENT_SELF' | 'COMPONENT_PARENT_CYCLE' | 'COMPONENT_TYPE_INVALID' | 'COMPONENT_GEOMETRY_INVALID' | 'VARIABLE_NAME_INVALID' | 'VARIABLE_NAME_DUPLICATE' | 'ENVELOPE_INVALID' | 'ENVELOPE_UNKNOWN_FIELD' | 'DIAGNOSTIC_LIMIT_REACHED' | 'CORE_COMMAND_INVALID' | 'CORE_COMMAND_TARGET_MISSING' | 'CORE_COMMAND_TARGET_LOCKED' | 'CORE_COMMAND_TARGET_HIDDEN' | 'CORE_COMMAND_PARENT_INVALID' | 'CORE_COMMAND_LIMIT_EXCEEDED' | 'CORE_GEOMETRY_INVALID' | 'CORE_INVARIANT_VIOLATION' | 'PLUGIN_CORE_MANIFEST_NOT_OBJECT' | 'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD' | 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' | 'PLUGIN_CORE_LIMIT_EXCEEDED' | 'PLUGIN_CORE_IDENTITY_INVALID' | 'PLUGIN_CORE_TAG_NAME_INVALID' | 'PLUGIN_CORE_IDENTITY_CONFLICT' | 'PLUGIN_CORE_DEPENDENCY_MISSING' | 'PLUGIN_CORE_DEPENDENCY_CYCLE' | 'PLUGIN_CORE_CAPABILITY_UNDECLARED' | 'PLUGIN_CORE_CAPABILITY_UNAUTHORIZED' | 'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE' | 'PLUGIN_CORE_CONTRIBUTION_DUPLICATE' | 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN' | 'PLUGIN_CORE_CONTRIBUTION_CONFLICT' | 'PLUGIN_CORE_EVENT_INVALID' | 'PLUGIN_CORE_EVENT_PAYLOAD_INVALID' | 'PLUGIN_CORE_COMMAND_UNAUTHORIZED' | 'PLUGIN_CORE_COMMAND_ARGUMENT_INVALID' | 'PLUGIN_CORE_COMMAND_RESULT_INVALID' | 'PLUGIN_CORE_SESSION_INVALID' | 'PLUGIN_CORE_LIFECYCLE_INVALID' | 'PLUGIN_CORE_RENDER_FAILED' | 'PLUGIN_CORE_DATA_CONTRACT_INVALID' | 'REMOTE_PLUGIN_PROTOCOL_INVALID' | 'REMOTE_PLUGIN_ORIGIN_INVALID' | 'REMOTE_PLUGIN_TIMEOUT' | 'REMOTE_PLUGIN_DISPOSED' | 'PROJECT_ADAPTER_INVALID' | 'PROJECT_UNAVAILABLE' | 'PROJECT_CONFLICT' | 'PROJECT_ABORTED' | 'PROJECT_DIRTY' | 'PROJECT_PUBLISH_UNAVAILABLE' | 'HOST_RESOURCE_ACCESS_DENIED' | 'HOST_RESOURCE_UNAVAILABLE' | 'HOST_RESOURCE_TIMEOUT' | 'HOST_RESOURCE_FAILED' | 'HOST_RESOURCE_INVALID' | 'HOST_DATASET_CATALOG_FAILED' | 'HOST_DATASET_DESCRIPTOR_INVALID' | 'HOST_DATASET_INVALID' | 'HOST_DATASET_PARAMETER_INVALID' | 'HOST_DATASET_BINDING_INVALID' | 'HOST_DATASET_ADAPTER_FAILED' | 'HOST_DATASET_UNAVAILABLE' | 'HOST_DATASET_VARIABLE_INVALID' | 'BLUEPRINT_CAPABILITY_UNAVAILABLE' | 'BLUEPRINT_EXPRESSION_INVALID' | 'BLUEPRINT_CONDITION_INVALID' | 'AUTHORING_REQUEST_INVALID' | 'AUTHORING_STALE_REVISION' | 'AUTHORING_COMPONENT_MISSING' | 'AUTHORING_INSTANCE_MISMATCH' | 'AUTHORING_EXPIRED' | 'AUTHORING_LIMIT_EXCEEDED' | 'AUTHORING_SOURCE_INVALID' | 'AUTHORING_PAYLOAD_INVALID';
+export type ScreenDiagnosticCode = 'DOCUMENT_NOT_OBJECT' | 'DOCUMENT_UNKNOWN_FIELD' | 'DOCUMENT_FIELD_INVALID' | 'DOCUMENT_LIMIT_EXCEEDED' | 'JSON_VALUE_INVALID' | 'JSON_LIMIT_EXCEEDED' | 'JSON_NUMBER_NON_FINITE' | 'JSON_CYCLE' | 'JSON_PROTOTYPE_INVALID' | 'JSON_DANGEROUS_KEY' | 'COMPONENT_ID_DUPLICATE' | 'COMPONENT_PARENT_MISSING' | 'COMPONENT_PARENT_SELF' | 'COMPONENT_PARENT_CYCLE' | 'COMPONENT_TYPE_INVALID' | 'COMPONENT_GEOMETRY_INVALID' | 'VARIABLE_NAME_INVALID' | 'VARIABLE_NAME_DUPLICATE' | 'ENVELOPE_INVALID' | 'ENVELOPE_UNKNOWN_FIELD' | 'DIAGNOSTIC_LIMIT_REACHED' | 'CORE_COMMAND_INVALID' | 'CORE_COMMAND_TARGET_MISSING' | 'CORE_COMMAND_TARGET_LOCKED' | 'CORE_COMMAND_TARGET_HIDDEN' | 'CORE_COMMAND_PARENT_INVALID' | 'CORE_COMMAND_LIMIT_EXCEEDED' | 'CORE_GEOMETRY_INVALID' | 'CORE_INVARIANT_VIOLATION' | 'PLUGIN_CORE_MANIFEST_NOT_OBJECT' | 'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD' | 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' | 'PLUGIN_CORE_LIMIT_EXCEEDED' | 'PLUGIN_CORE_IDENTITY_INVALID' | 'PLUGIN_CORE_TAG_NAME_INVALID' | 'PLUGIN_CORE_IDENTITY_CONFLICT' | 'PLUGIN_CORE_DEPENDENCY_MISSING' | 'PLUGIN_CORE_DEPENDENCY_CYCLE' | 'PLUGIN_CORE_CAPABILITY_UNDECLARED' | 'PLUGIN_CORE_CAPABILITY_UNAUTHORIZED' | 'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE' | 'PLUGIN_CORE_CONTRIBUTION_DUPLICATE' | 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN' | 'PLUGIN_CORE_CONTRIBUTION_CONFLICT' | 'PLUGIN_CORE_EVENT_INVALID' | 'PLUGIN_CORE_EVENT_PAYLOAD_INVALID' | 'PLUGIN_CORE_COMMAND_UNAUTHORIZED' | 'PLUGIN_CORE_COMMAND_ARGUMENT_INVALID' | 'PLUGIN_CORE_COMMAND_RESULT_INVALID' | 'PLUGIN_CORE_SESSION_INVALID' | 'PLUGIN_CORE_LIFECYCLE_INVALID' | 'PLUGIN_CORE_RENDER_FAILED' | 'PLUGIN_CORE_DATA_CONTRACT_INVALID' | 'REMOTE_PLUGIN_PROTOCOL_INVALID' | 'REMOTE_PLUGIN_ORIGIN_INVALID' | 'REMOTE_PLUGIN_TIMEOUT' | 'REMOTE_PLUGIN_DISPOSED' | 'PROJECT_ADAPTER_INVALID' | 'PROJECT_UNAVAILABLE' | 'PROJECT_CONFLICT' | 'PROJECT_ABORTED' | 'PROJECT_DIRTY' | 'PROJECT_PUBLISH_UNAVAILABLE' | 'HOST_RESOURCE_ACCESS_DENIED' | 'HOST_RESOURCE_UNAVAILABLE' | 'HOST_RESOURCE_TIMEOUT' | 'HOST_RESOURCE_FAILED' | 'HOST_RESOURCE_INVALID' | 'HOST_DATASET_CATALOG_FAILED' | 'HOST_DATASET_DESCRIPTOR_INVALID' | 'HOST_DATASET_INVALID' | 'HOST_DATASET_PARAMETER_INVALID' | 'HOST_DATASET_BINDING_INVALID' | 'HOST_DATASET_ADAPTER_FAILED' | 'HOST_DATASET_UNAVAILABLE' | 'HOST_DATASET_VARIABLE_INVALID' | 'HOST_VARIABLE_CATALOG_FAILED' | 'HOST_VARIABLE_DESCRIPTOR_INVALID' | 'BLUEPRINT_CAPABILITY_UNAVAILABLE' | 'BLUEPRINT_EXPRESSION_INVALID' | 'BLUEPRINT_CONDITION_INVALID' | 'AUTHORING_REQUEST_INVALID' | 'AUTHORING_STALE_REVISION' | 'AUTHORING_COMPONENT_MISSING' | 'AUTHORING_INSTANCE_MISMATCH' | 'AUTHORING_EXPIRED' | 'AUTHORING_LIMIT_EXCEEDED' | 'AUTHORING_SOURCE_INVALID' | 'AUTHORING_PAYLOAD_INVALID';
 
 // @public (undocumented)
 export type ScreenDiagnosticPath = readonly (string | number)[];
@@ -713,11 +729,55 @@ export interface ScreenHostResourceResolveOptions {
 // @public (undocumented)
 export interface ScreenHostVariable {
     // (undocumented)
+    readonly description?: string;
+    // (undocumented)
     readonly name: string;
     // (undocumented)
     readonly type: 'host';
     // (undocumented)
     readonly variableId: string;
+}
+
+// @public (undocumented)
+export interface ScreenHostVariableCatalogListRequest {
+    // (undocumented)
+    readonly cursor?: string;
+    // (undocumented)
+    readonly limit: number;
+    // (undocumented)
+    readonly query: string;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+}
+
+// @public (undocumented)
+export interface ScreenHostVariableCatalogPort {
+    // (undocumented)
+    describe(request: ScreenHostVariableDescribeRequest): Promise<ScreenParseResult<ScreenHostVariableDescriptor>>;
+    // (undocumented)
+    list(request: ScreenHostVariableCatalogListRequest): Promise<ScreenParseResult<ScreenHostVariablePage>>;
+}
+
+// @public (undocumented)
+export interface ScreenHostVariableDescribeRequest {
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+    // (undocumented)
+    readonly variableId: string;
+}
+
+// @public (undocumented)
+export interface ScreenHostVariableDescriptor extends ScreenHostVariableSummary {
+    // (undocumented)
+    readonly previewable: boolean;
+}
+
+// @public (undocumented)
+export interface ScreenHostVariablePage {
+    // (undocumented)
+    readonly items: readonly ScreenHostVariableSummary[];
+    // (undocumented)
+    readonly nextCursor?: string;
 }
 
 // @public (undocumented)
@@ -729,7 +789,19 @@ export interface ScreenHostVariablePort {
 // @public (undocumented)
 export interface ScreenHostVariableRequest {
     // (undocumented)
+    readonly purpose: 'runtime' | 'authoring-preview';
+    // (undocumented)
     readonly signal: ScreenAbortSignal;
+    // (undocumented)
+    readonly variableId: string;
+}
+
+// @public (undocumented)
+export interface ScreenHostVariableSummary {
+    // (undocumented)
+    readonly description: string | null;
+    // (undocumented)
+    readonly name: string;
     // (undocumented)
     readonly variableId: string;
 }
@@ -1071,6 +1143,8 @@ export interface ScreenStaticDataSource {
 // @public (undocumented)
 export interface ScreenStaticVariable {
     // (undocumented)
+    readonly description?: string;
+    // (undocumented)
     readonly name: string;
     // (undocumented)
     readonly type: 'static';
@@ -1090,6 +1164,13 @@ export interface ScreenTabularDataset {
 
 // @public (undocumented)
 export type ScreenVariable = ScreenStaticVariable | ScreenHostVariable;
+
+// @public (undocumented)
+export interface ScreenVariableRefreshOptions {
+    // (undocumented)
+    readonly traceId?: string;
+    readonly variableIds?: readonly string[];
+}
 
 // @public (undocumented)
 export function serializeScreenDocument(document: ScreenDocument): string;

@@ -56,6 +56,7 @@ export class DesignerBlueprintWorkbenchController {
     this.#panels = new DesignerBlueprintPanelsController({
       getDocument: callbacks.getDocument,
       getGraph: () => this.graph,
+      getCatalog: callbacks.getCatalog,
       getComponentLibrary: () => this.componentLibrary,
       getSelection: () => this.#selection,
       getDiagnostics: () => this.#bridge.stateDiagnostics(),

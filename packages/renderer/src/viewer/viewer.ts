@@ -10,6 +10,7 @@ import type {
   ScreenParseResult,
   ScreenResourceExecutionMode,
   ScreenResourceObserver,
+  ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import {
   compileScreenBlueprint,
@@ -242,6 +243,10 @@ export class BaseScreenViewerElement extends ElementBase {
   refreshData(options: BaseScreenViewerRefreshOptions): void;
   refreshData(componentIdOrOptions?: string | BaseScreenViewerRefreshOptions): void {
     this.#variableRuntime.refreshData(componentIdOrOptions);
+  }
+
+  refreshVariables(options?: ScreenVariableRefreshOptions): void {
+    this.#variableRuntime.refreshVariables(options);
   }
 
   private initialize(): void {

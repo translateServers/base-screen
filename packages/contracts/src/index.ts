@@ -138,6 +138,9 @@ export type {
   ScreenHostResourcePort,
   ScreenHostResourceRequest,
   ScreenHostResourceResolveOptions,
+  ScreenHostVariableCatalogListRequest,
+  ScreenHostVariableCatalogPort,
+  ScreenHostVariableDescribeRequest,
   ScreenHostVariablePort,
   ScreenHostVariableRequest,
   ScreenProjectAdapter,
@@ -161,3 +164,15 @@ export type {
 } from './types/host.js';
 export { validateScreenDesignerHostAdapter } from './types/host.js';
 export type { ScreenJsonObject, ScreenJsonValue } from './types/json.js';
+export type {
+  ScreenHostVariableDescriptor,
+  ScreenHostVariablePage,
+  ScreenHostVariableSummary,
+  ScreenVariableRefreshOptions,
+} from './types/variable.js';
+export {
+  MAX_HOST_VARIABLE_CATALOG_BYTES,
+  MAX_HOST_VARIABLE_PAGE_ITEMS,
+  parseScreenHostVariableDescriptor,
+  parseScreenHostVariablePage,
+} from './variable/parse.js';

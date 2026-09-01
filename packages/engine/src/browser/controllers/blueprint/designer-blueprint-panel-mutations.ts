@@ -5,6 +5,8 @@ import {
   type ScreenDocument,
   type ScreenParseResult,
 } from '@base-screen/contracts';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { designerBlueprintEventFieldPaths } from '../../../common/operations/blueprint/designer-blueprint-value-sources.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 
 const CONDITION_OPERATORS = new Set<ScreenBlueprintCondition['operator']>([
@@ -28,6 +30,7 @@ export function updateDesignerBlueprintActionFromTarget(
   target: Element,
   document: ScreenDocument,
   action: ScreenBlueprintAction,
+  catalog?: BaseScreenMaterialCatalog,
 ): ScreenParseResult<ScreenBlueprintAction | null> {
   if (target.matches('[data-blueprint-visibility-operation]')) {
     const operation = (target as HTMLSelectElement).value;
@@ -73,6 +76,44 @@ export function updateDesignerBlueprintActionFromTarget(
       return failure('AUTHORING_SOURCE_INVALID');
     }
   }
+  if (target.matches('[data-blueprint-action-value-source]')) {
+    if (action.type !== 'set-variable') return success(null);
+    const source = (target as HTMLSelectElement).value;
+    return updateValueSource(
+      source,
+      document,
+      action,
+      catalog,
+      (target as HTMLElement).dataset.ruleId,
+    );
+  }
+  if (target.matches('[data-blueprint-action-event-path]')) {
+    if (action.type !== 'set-variable') return success(null);
+    const ruleId = (target as HTMLElement).dataset.ruleId;
+    const paths =
+      ruleId === undefined ? [] : designerBlueprintEventFieldPaths(document, ruleId, catalog);
+    try {
+      const candidate = JSON.parse((target as HTMLSelectElement).value) as unknown;
+      const path =
+        Array.isArray(candidate) && candidate.every((item) => typeof item === 'string')
+          ? candidate
+          : undefined;
+      return path !== undefined && paths.some((item) => samePath(item, path))
+        ? success({ ...action, value: { kind: 'event-payload', path } })
+        : failure();
+    } catch {
+      return failure();
+    }
+  }
+  if (target.matches('[data-blueprint-action-source-variable]')) {
+    if (action.type !== 'set-variable') return success(null);
+    const name = (target as HTMLSelectElement).value;
+    return document.variables.some(
+      (variable) => variable.name === name && variable.name !== action.variableName,
+    )
+      ? success({ ...action, value: { kind: 'variable', name } })
+      : failure();
+  }
   if (target.matches('[data-blueprint-action-event]')) {
     const eventName = (target as HTMLInputElement).value.trim();
     return action.type === 'emit-host-event' && eventName.length > 0 && eventName.length <= 256
@@ -80,6 +121,44 @@ export function updateDesignerBlueprintActionFromTarget(
       : success(null);
   }
   return success(null);
+}
+
+function updateValueSource(
+  source: string,
+  document: ScreenDocument,
+  action: Extract<ScreenBlueprintAction, { readonly type: 'set-variable' }>,
+  catalog: BaseScreenMaterialCatalog | undefined,
+  ruleId: string | undefined,
+): ScreenParseResult<ScreenBlueprintAction | null> {
+  if (source === 'literal') {
+    return success({
+      ...action,
+      value: action.value.kind === 'literal' ? action.value : { kind: 'literal', value: null },
+    });
+  }
+  if (source === 'event') {
+    return success({ ...action, value: { kind: 'event-payload', path: [] } });
+  }
+  if (source === 'event-field') {
+    const path =
+      ruleId === undefined
+        ? undefined
+        : designerBlueprintEventFieldPaths(document, ruleId, catalog)[0];
+    return path === undefined
+      ? failure()
+      : success({ ...action, value: { kind: 'event-payload', path } });
+  }
+  if (source === 'variable') {
+    const variable = document.variables.find((candidate) => candidate.name !== action.variableName);
+    return variable === undefined
+      ? failure()
+      : success({ ...action, value: { kind: 'variable', name: variable.name } });
+  }
+  return failure();
+}
+
+function samePath(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }
 
 function success<T>(value: T): ScreenParseResult<T> {

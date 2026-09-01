@@ -378,6 +378,10 @@ export type ScreenDocumentCommand = {
 } | {
     readonly type: 'replace-variables';
     readonly variables: readonly ScreenVariable[];
+} | {
+    readonly type: 'rename-variable';
+    readonly variableName: string;
+    readonly nextName: string;
 };
 
 // @public (undocumented)

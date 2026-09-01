@@ -7,10 +7,14 @@
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialTabularDataAdapter } from '@base-screen/plugin-core';
 import type { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
 export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest;
+
+// @public (undocumented)
+export const BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDataAdapter;
 
 // @public (undocumented)
 abstract class BaseScreenOfficialMaterialElement extends ElementBase {

@@ -1,4 +1,5 @@
 import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type {
   BaseScreenBlueprintCanvasGraph,
   BaseScreenBlueprintCanvasSelection,
@@ -25,6 +26,7 @@ export function renderDesignerBlueprintInspector(
   activeTab: DesignerBlueprintInspectorTab,
   diagnostics: readonly ScreenDiagnostic[],
   trace: BaseScreenBlueprintCanvasTrace | null,
+  catalog?: BaseScreenMaterialCatalog,
 ): void {
   if (container === undefined) return;
   const counts: Record<DesignerBlueprintInspectorTab, number> = {
@@ -41,7 +43,7 @@ export function renderDesignerBlueprintInspector(
       </div>
     </header>
     <div class="blueprint-panel-scroll" id="designer-blueprint-inspector-${activeTab}-panel" role="tabpanel" aria-labelledby="designer-blueprint-inspector-${activeTab}-tab" tabindex="0" aria-live="polite">
-      ${inspectorPane(activeTab, document, graph, selection, diagnostics, trace)}
+      ${inspectorPane(activeTab, document, graph, selection, diagnostics, trace, catalog)}
     </div>
   </div>`;
 }
@@ -53,10 +55,11 @@ function inspectorPane(
   selection: BaseScreenBlueprintCanvasSelection,
   diagnostics: readonly ScreenDiagnostic[],
   trace: BaseScreenBlueprintCanvasTrace | null,
+  catalog: BaseScreenMaterialCatalog | undefined,
 ): string {
   if (activeTab === 'problems') return problemsPane(diagnostics);
   if (activeTab === 'trace') return tracePane(trace);
-  return renderDesignerBlueprintConfiguration(document, graph, selection);
+  return renderDesignerBlueprintConfiguration(document, graph, selection, catalog);
 }
 
 function problemsPane(diagnostics: readonly ScreenDiagnostic[]): string {

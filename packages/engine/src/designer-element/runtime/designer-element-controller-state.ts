@@ -170,6 +170,8 @@ export function initializeDesignerElementControllers(
   });
   state.variablesController = new DesignerVariablesController({
     getDocument: () => state.session.document,
+    getCatalogPort: () => state.variableCatalogPort,
+    getVariablePort: () => state.variablePort,
     executeCommand: (command) => element.executeCommand(command),
     report: (result) => state.runtime.report(element, result),
   });
@@ -237,6 +239,7 @@ export function initializeDesignerElementControllers(
     getInteraction: () => state.session.interaction,
     getCatalog: () => state.catalog,
     getResourcePort: () => state.resourcePort,
+    getVariablePort: () => state.variablePort,
     getRuntimeContributions: () => state.runtimeContributions,
     executeTransaction: (transaction) =>
       state.runtime.executeDesignerTransaction(element, transaction),

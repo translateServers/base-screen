@@ -83,8 +83,13 @@ describe('serializeScreenDocument', () => {
           },
         ],
         variables: [
-          { type: 'static', name: 'count', value: 42 },
-          { type: 'host', name: 'tenant', variableId: 'tenant-context' },
+          { type: 'static', name: 'count', description: '当前计数', value: 42 },
+          {
+            type: 'host',
+            name: 'tenant',
+            description: '当前租户',
+            variableId: 'tenant-context',
+          },
         ],
       }),
     );

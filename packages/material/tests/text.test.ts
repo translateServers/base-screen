@@ -2,7 +2,11 @@ import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
 import { parseBaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { describe, expect, it } from 'vitest';
-import { BASE_SCREEN_TEXT_MATERIAL_MANIFEST, BaseScreenTextMaterialElement } from '../src/index.js';
+import {
+  BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
+  BaseScreenTextMaterialElement,
+} from '../src/index.js';
 
 /**
  * 文本物料排版能力（ADR-0047）：
@@ -95,6 +99,64 @@ function modelWithStyle(style: BaseScreenMaterialModel['style']): BaseScreenMate
 }
 
 describe('text material typography (ADR-0047)', () => {
+  it('declares a single dataset value role for every canonical scalar field type', () => {
+    expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.dataBinding).toEqual({
+      roles: [
+        {
+          id: 'value',
+          minFields: 1,
+          maxFields: 1,
+          valueTypes: ['string', 'number', 'boolean', 'date'],
+        },
+      ],
+    });
+    expect(
+      Object.getOwnPropertyDescriptor(BaseScreenTextMaterialElement, 'tabularDataAdapter')?.value,
+    ).toBe(BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER);
+  });
+
+  it.each([
+    ['label', '华北', '华北'],
+    ['amount', 12.5, '12.5'],
+    ['active', true, 'true'],
+    ['day', '2026-09-01', '2026-09-01'],
+  ] as const)('projects the first dataset row field %s to text', (fieldId, value, expected) => {
+    const valueTypes = {
+      label: 'string',
+      amount: 'number',
+      active: 'boolean',
+      day: 'date',
+    } as const;
+    const field = { id: fieldId, label: fieldId, valueType: valueTypes[fieldId] };
+    expect(
+      BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER.adapt({
+        dataset: { fields: [field], rows: [{ [fieldId]: value }, { [fieldId]: 'ignored' }] },
+        fields: { value: [field] },
+      }),
+    ).toEqual({ ok: true, value: expected, diagnostics: [] });
+  });
+
+  it('projects empty or null dataset values to stable empty text', () => {
+    const field = { id: 'label', label: '标签', valueType: 'string' as const };
+    for (const rows of [[], [{ label: null }]] as const) {
+      expect(
+        BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER.adapt({
+          dataset: { fields: [field], rows },
+          fields: { value: [field] },
+        }),
+      ).toEqual({ ok: true, value: '', diagnostics: [] });
+    }
+  });
+
+  it('rejects a missing dataset value binding without throwing', () => {
+    expect(
+      BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER.adapt({
+        dataset: { fields: [], rows: [] },
+        fields: {},
+      }).ok,
+    ).toBe(false);
+  });
+
   it('keeps automatic width opt-in and restores numeric geometry when disabled', () => {
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propsSchema.required).not.toContain('autoWidth');
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.propertyPanel).toContainEqual({

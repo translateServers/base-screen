@@ -12,10 +12,19 @@ export async function assertMaterialGroupUsability(page, designer) {
     (await children
       .locator('[data-material-group-current] .material-group-label')
       .textContent()) !== '全部' ||
-    rootBounds.width < 32 ||
-    rootBounds.height !== 32
+    rootBounds.width < 31 ||
+    rootBounds.height !== 28
   ) {
-    throw new Error('MATERIAL_GROUP_COMPACT_HIERARCHY_FAILED');
+    throw new Error(
+      `MATERIAL_GROUP_COMPACT_HIERARCHY_FAILED:${JSON.stringify({
+        backVisible: await back.isVisible(),
+        headingCount: await designer.locator('.material-group-heading').count(),
+        currentLabel: await children
+          .locator('[data-material-group-current] .material-group-label')
+          .textContent(),
+        rootBounds,
+      })}`,
+    );
   }
 
   // A selected category stays selected on hover; keyboard focus is a separate visual state.
@@ -41,7 +50,7 @@ export async function assertMaterialGroupUsability(page, designer) {
   const secondaryBounds = await designer.locator('.material-group-secondary').boundingBox();
   if (
     backBounds === null ||
-    backBounds.height !== 32 ||
+    backBounds.height !== 28 ||
     backBounds.width < secondaryBounds.width - 1 ||
     !(await back.getAttribute('title')).includes('数据可视化')
   ) {

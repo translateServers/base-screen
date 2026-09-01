@@ -1,4 +1,8 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import type {
+  ScreenDocument,
+  ScreenHostVariableCatalogPort,
+  ScreenHostVariablePort,
+} from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
 import { DesignerVariablesController } from '../../../src/browser/controllers/designer-variables-controller.js';
 import { renderDesignerVariables } from '../../../src/browser/dom/designer-variables-dom.js';
@@ -104,13 +108,21 @@ function document(variables: ScreenDocument['variables']): ScreenDocument {
   };
 }
 
-function harness(variables: ScreenDocument['variables']) {
+function harness(
+  variables: ScreenDocument['variables'],
+  ports: {
+    readonly catalog?: ScreenHostVariableCatalogPort;
+    readonly variable?: ScreenHostVariablePort;
+  } = {},
+) {
   const commands: unknown[] = [];
   const reports: unknown[] = [];
   const ownerDocument = new FakeDocument();
   const panel = ownerDocument.createElement('div');
   const controller = new DesignerVariablesController({
     getDocument: () => document(variables),
+    getCatalogPort: () => ports.catalog,
+    getVariablePort: () => ports.variable,
     executeCommand: (command) => {
       commands.push(command);
       return { ok: true, value: document(variables), diagnostics: [] };
@@ -123,8 +135,8 @@ function harness(variables: ScreenDocument['variables']) {
   return { controller, panel, commands, reports, ownerDocument };
 }
 
-function action(kind: string, index?: number): never {
-  const dataset: Record<string, string> = { variableAction: kind };
+function action(kind: string, index?: number, extra: Record<string, string> = {}): never {
+  const dataset: Record<string, string> = { variableAction: kind, ...extra };
   if (index !== undefined) dataset.variableIndex = String(index);
   return { closest: () => ({ dataset }) } as never;
 }
@@ -155,14 +167,14 @@ describe('designer variables controller', () => {
     expect(descendants(staticRow).some((child) => child.textContent === 'count')).toBe(true);
     expect(
       descendants(staticRow).filter((child) => child.dataset.variableAction !== undefined),
-    ).toHaveLength(3); // 值/重命名/删除
+    ).toHaveLength(5); // 值/重命名/描述/复制/删除
     const hostRow = rows[1]!;
     expect(descendants(hostRow).some((child) => child.textContent === '宿主')).toBe(true);
     expect(descendants(hostRow).some((child) => child.textContent === 'region-1')).toBe(true);
-    expect(hostRow.dataset.variableReadOnly).toBe('true');
+    expect(hostRow.dataset.variableIdReadOnly).toBe('true');
     expect(
       descendants(hostRow).filter((child) => child.dataset.variableAction !== undefined),
-    ).toHaveLength(0); // host 只读
+    ).toHaveLength(5); // 重命名/描述/复制/删除/预览；仅 variableId 只读
   });
 
   it('creates a static variable through the replace-variables command', () => {
@@ -261,7 +273,7 @@ describe('designer variables controller', () => {
     });
   });
 
-  it('rejects renaming a referenced variable', () => {
+  it('renames a referenced variable through the atomic core command', () => {
     const { controller, panel, commands } = harness([
       { type: 'static', name: 'region', value: 'north' },
     ]);
@@ -271,7 +283,9 @@ describe('designer variables controller', () => {
     renameInput!.value = 'region2';
     controller.onClick(action('confirm-rename', 0));
 
-    expect(commands).toHaveLength(0);
+    expect(commands).toEqual([
+      { type: 'rename-variable', variableName: 'region', nextName: 'region2' },
+    ]);
   });
 
   it('renames an unreferenced variable', () => {
@@ -284,9 +298,92 @@ describe('designer variables controller', () => {
 
     expect(commands).toHaveLength(1);
     expect(commands[0]).toEqual({
-      type: 'replace-variables',
-      variables: [{ type: 'static', name: 'total', value: 0 }],
+      type: 'rename-variable',
+      variableName: 'count',
+      nextName: 'total',
     });
+  });
+
+  it('edits descriptions and opens duplicate variables as uncommitted prefilled drafts', () => {
+    const { controller, panel, commands } = harness([
+      { type: 'static', name: 'count', description: 'old', value: 2 },
+    ]);
+
+    controller.onClick(action('edit-description', 0));
+    panel.querySelector<FakeElement>('[data-variable-description="0"]')!.value = 'new description';
+    controller.onClick(action('confirm-description', 0));
+    expect(commands[0]).toEqual({
+      type: 'replace-variables',
+      variables: [{ type: 'static', name: 'count', description: 'new description', value: 2 }],
+    });
+
+    controller.onClick(action('duplicate', 0));
+    expect(commands).toHaveLength(1);
+    expect(controller.currentDraft().create).toMatchObject({
+      type: 'static',
+      name: 'countCopy',
+      description: 'old',
+      valueSource: '2',
+    });
+    controller.onClick(action('cancel', -1));
+    controller.onClick(action('add'));
+    expect(controller.currentDraft().create).toMatchObject({
+      type: 'static',
+      name: '',
+      description: '',
+      valueSource: 'null',
+      variableId: undefined,
+    });
+  });
+
+  it('creates host variables only after selecting a strict catalog descriptor', async () => {
+    const catalog: ScreenHostVariableCatalogPort = {
+      async list() {
+        return {
+          ok: true,
+          value: {
+            items: [{ variableId: 'region-id', name: 'region', description: 'Host region' }],
+          },
+          diagnostics: [],
+        };
+      },
+      async describe({ variableId }) {
+        return {
+          ok: true,
+          value: { variableId, name: 'region', description: 'Host region', previewable: true },
+          diagnostics: [],
+        };
+      },
+    };
+    const { controller, panel, commands } = harness([], { catalog });
+
+    controller.onClick(action('add'));
+    controller.onClick(action('create-type-host'));
+    await Promise.resolve();
+    controller.onClick(action('select-host', undefined, { variableId: 'region-id' }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(controller.currentDraft().create).toMatchObject({
+      type: 'host',
+      name: 'region',
+      description: 'Host region',
+      variableId: 'region-id',
+    });
+    expect(panel.querySelector('[data-variable-selected-host-id]')).not.toBeNull();
+
+    controller.onClick(action('confirm-create'));
+    expect(commands).toEqual([
+      {
+        type: 'replace-variables',
+        variables: [
+          {
+            type: 'host',
+            name: 'region',
+            description: 'Host region',
+            variableId: 'region-id',
+          },
+        ],
+      },
+    ]);
   });
 });
 
@@ -296,9 +393,34 @@ describe('designer variables rendering', () => {
     const panel = ownerDocument.createElement('div');
     renderDesignerVariables(panel as unknown as HTMLElement, document([]), {
       creating: false,
+      create: {
+        type: 'static',
+        name: '',
+        description: '',
+        valueSource: 'null',
+        variableId: undefined,
+        catalogQuery: '',
+        catalogItems: [],
+        catalogCursor: undefined,
+        catalogFeedback: '',
+      },
       renamingIndex: undefined,
+      editingDescriptionIndex: undefined,
       editingValueIndex: undefined,
       deletingIndex: undefined,
+      search: '',
+      typeFilter: 'all',
+      referenceCounts: new Map(),
+      catalog: {
+        query: '',
+        items: [],
+        nextCursor: undefined,
+        feedback: '',
+        selected: undefined,
+        previewVariableId: undefined,
+        previewStatus: 'idle',
+        previewSummary: undefined,
+      },
     });
     expect(
       descendants(panel).some((child) => child.className.includes('designer-empty-state')),
@@ -313,16 +435,41 @@ describe('designer variables rendering', () => {
       document([{ type: 'static', name: 'count', value: 0 }]),
       {
         creating: true,
+        create: {
+          type: 'static',
+          name: '',
+          description: '',
+          valueSource: 'null',
+          variableId: undefined,
+          catalogQuery: '',
+          catalogItems: [],
+          catalogCursor: undefined,
+          catalogFeedback: '',
+        },
         renamingIndex: undefined,
+        editingDescriptionIndex: undefined,
         editingValueIndex: undefined,
         deletingIndex: undefined,
+        search: '',
+        typeFilter: 'all',
+        referenceCounts: new Map(),
+        catalog: {
+          query: '',
+          items: [],
+          nextCursor: undefined,
+          feedback: '',
+          selected: undefined,
+          previewVariableId: undefined,
+          previewStatus: 'idle',
+          previewSummary: undefined,
+        },
       },
     );
     expect(panel.querySelector('[data-variable-create-name]')).not.toBeNull();
     expect(panel.querySelector('[data-variable-create-value]')).not.toBeNull();
     expect(
       descendants(panel).filter((child) => child.className === 'variable-field-label'),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(
       descendants(panel).some((child) => child.dataset.variableAction === 'add' && child.disabled),
     ).toBe(true);

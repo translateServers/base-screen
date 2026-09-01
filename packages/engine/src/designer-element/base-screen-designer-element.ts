@@ -8,6 +8,7 @@ import type {
   ScreenDocument,
   ScreenHostDatasetCatalogPort,
   ScreenHostResourcePort,
+  ScreenHostVariableCatalogPort,
   ScreenHostVariablePort,
   ScreenParseResult,
   ScreenProjectAdapter,
@@ -17,6 +18,7 @@ import type {
   ScreenProjectSnapshot,
   ScreenProjectSnapshotPort,
   ScreenProjectSummary,
+  ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
 import type {
@@ -195,6 +197,13 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   set variablePort(value: ScreenHostVariablePort | undefined) {
     this.#designerState.runtime.writeVariablePort(this, value);
+  }
+
+  get variableCatalogPort(): ScreenHostVariableCatalogPort | undefined {
+    return this.#designerState.runtime.readVariableCatalogPort(this);
+  }
+  set variableCatalogPort(value: ScreenHostVariableCatalogPort | undefined) {
+    this.#designerState.runtime.writeVariableCatalogPort(this, value);
   }
 
   get conditionalStylePort(): BaseScreenConditionalStylePort | undefined {
@@ -455,6 +464,10 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   refreshData(componentId?: string): void {
     return this.#designerState.runtime.refreshData(this, componentId);
+  }
+
+  refreshVariables(options?: ScreenVariableRefreshOptions): void {
+    return this.#designerState.runtime.refreshVariables(this, options);
   }
 
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {

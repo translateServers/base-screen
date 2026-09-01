@@ -8,6 +8,7 @@ import {
   MAX_BLUEPRINT_LAYOUT_NODES,
   MAX_BLUEPRINT_RULES,
   MAX_COMPONENTS,
+  MAX_DESCRIPTION_CODE_POINTS,
   MAX_STYLE_RULE_ID_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENTS,
@@ -20,6 +21,15 @@ export const MATERIAL_TYPE_PATTERN = SCREEN_MATERIAL_TYPE_PATTERN;
 export const VARIABLE_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]{0,127}$';
 export const BLUEPRINT_PATH_SEGMENT_PATTERN =
   '^(?!(?:__proto__|prototype|constructor)$)[A-Za-z_][A-Za-z0-9_]{0,127}$';
+
+const variableDescriptionSchema = z
+  .string()
+  .refine((value) => [...value].length <= MAX_DESCRIPTION_CODE_POINTS, {
+    message: `Description must not exceed ${MAX_DESCRIPTION_CODE_POINTS} code points.`,
+  })
+  .refine((value) => !/[\u0000-\u001f\u007f-\u009f]/u.test(value), {
+    message: 'Description must not contain control characters.',
+  });
 
 const canvasBackgroundColorSchema = z.string().min(1).max(MAX_BACKGROUND_COLOR_CODE_POINTS);
 const canvasColorStopSchema = z.strictObject({
@@ -160,12 +170,14 @@ export const componentSchema = z.strictObject({
 export const staticVariableSchema = z.strictObject({
   type: z.literal('static'),
   name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+  description: variableDescriptionSchema.optional(),
   value: z.any(),
 });
 
 export const hostVariableSchema = z.strictObject({
   type: z.literal('host'),
   name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+  description: variableDescriptionSchema.optional(),
   variableId: z.string().min(1).max(256),
 });
 

@@ -16,11 +16,17 @@ import { DesignerCanvasRuntimeController } from '../../../src/browser/controller
 class FakeRenderer implements BaseScreenRenderer {
   readonly calls: string[] = [];
   readonly variables: ScreenJsonObject[] = [];
+  readonly contexts: Array<{ readonly trigger?: string; readonly traceId?: string } | undefined> =
+    [];
   readonly refreshes: (string | undefined)[] = [];
   readonly visibilityEffects: (readonly ScreenBlueprintVisibilityEffect[])[] = [];
 
-  render(): ScreenParseResult<null> {
+  render(
+    _document?: ScreenDocument,
+    context?: { readonly trigger?: string; readonly traceId?: string },
+  ): ScreenParseResult<null> {
     this.calls.push('render');
+    this.contexts.push(context);
     return { ok: true, value: null, diagnostics: [] };
   }
 
@@ -143,6 +149,7 @@ describe('DesignerCanvasRuntimeController', () => {
     );
     expect(resolve).toHaveBeenCalledWith({
       variableId: 'tenant-region',
+      purpose: 'runtime',
       signal: expect.any(AbortSignal),
     });
     expect(renderer.variables).toEqual([{ count: 2, region: 'north' }]);
@@ -204,6 +211,82 @@ describe('DesignerCanvasRuntimeController', () => {
       { region: 'south' },
       { region: 'west' },
     ]);
+  });
+
+  it('deduplicates host ids, synchronizes aliases, and skips unchanged refresh renders', async () => {
+    let value = 'north';
+    const requests: Array<{ readonly variableId: string; readonly purpose: string }> = [];
+    const { controller, renderer } = createHarness({
+      resolve: async (request) => {
+        requests.push(request);
+        return { ok: true, value, diagnostics: [] };
+      },
+    });
+    controller.render(
+      documentWith([
+        { type: 'host', name: 'region', variableId: 'shared-region' },
+        { type: 'host', name: 'regionAlias', variableId: 'shared-region' },
+      ]),
+    );
+    await vi.waitFor(() => expect(renderer.variables).toHaveLength(1));
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ variableId: 'shared-region', purpose: 'runtime' });
+    expect(renderer.variables[0]).toEqual({ region: 'north', regionAlias: 'north' });
+
+    value = 'south';
+    controller.refreshVariables({
+      variableIds: ['shared-region', 'shared-region'],
+      traceId: 't-1',
+    });
+    await vi.waitFor(() => expect(renderer.variables).toHaveLength(2));
+    expect(renderer.variables[1]).toEqual({ region: 'south', regionAlias: 'south' });
+    expect(renderer.contexts.at(-1)).toEqual({ trigger: 'variable', traceId: 't-1' });
+
+    controller.refreshVariables({ variableIds: ['shared-region'] });
+    await vi.waitFor(() => expect(requests).toHaveLength(3));
+    await Promise.resolve();
+    expect(renderer.variables).toHaveLength(2);
+    expect(renderer.contexts).toHaveLength(3);
+  });
+
+  it('keeps the last successful snapshot when any variable in a refresh batch fails', async () => {
+    let refresh = false;
+    const { controller, renderer, diagnostics } = createHarness({
+      resolve: async ({ variableId }) =>
+        refresh && variableId === 'page-id'
+          ? {
+              ok: false,
+              diagnostics: [
+                {
+                  severity: 'error' as const,
+                  code: 'HOST_DATASET_VARIABLE_INVALID' as const,
+                  path: [],
+                  message: 'Unavailable.',
+                },
+              ],
+            }
+          : {
+              ok: true,
+              value: variableId === 'region-id' ? (refresh ? 'south' : 'north') : 1,
+              diagnostics: [],
+            },
+    });
+    controller.render(
+      documentWith([
+        { type: 'host', name: 'region', variableId: 'region-id' },
+        { type: 'host', name: 'page', variableId: 'page-id' },
+      ]),
+    );
+    await vi.waitFor(() => expect(renderer.variables).toHaveLength(1));
+    refresh = true;
+
+    controller.refreshVariables();
+    await vi.waitFor(() => expect(diagnostics).toHaveLength(1));
+
+    expect(renderer.variables).toEqual([{ region: 'north', page: 1 }]);
+    expect(renderer.contexts).toHaveLength(2);
+    expect(renderer.refreshes).toEqual([]);
   });
 
   it('dispatches Designer material events through the canonical blueprint runtime', () => {

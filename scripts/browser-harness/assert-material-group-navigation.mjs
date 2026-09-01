@@ -40,7 +40,7 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       ) {
         throw new Error(`MATERIAL_GROUP_RESPONSIVE_FAILED:${JSON.stringify({ width, before })}`);
       }
-      if (!compact && before.navigation.width !== 120) {
+      if (!compact && before.navigation.width !== 108) {
         throw new Error(`MATERIAL_GROUP_COLUMN_WIDTH_FAILED:${JSON.stringify(before)}`);
       }
       if (compact) {
@@ -130,7 +130,7 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       accessibility.outline === 'none' ||
       accessibility.transition !== '0s' ||
       accessibility.glyphWidth !== 16 ||
-      accessibility.height !== 32 ||
+      accessibility.height !== 28 ||
       !accessibility.title.endsWith('（3 个物料）') ||
       accessibility.description !== accessibility.title ||
       accessibility.countWidth !== 24

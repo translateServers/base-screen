@@ -8,6 +8,7 @@ import {
   applyReparentComponentsCommand,
   applyUpdateComponentsCommand,
 } from './apply-component-commands.js';
+import { applyRenameVariableCommand } from './apply-variable-command.js';
 import { isExactPatch, isRecord } from './command-input.js';
 import {
   finalizeScreenCommand,
@@ -122,6 +123,8 @@ function applyValidatedCommand(
       return applyBlueprint(document, command.blueprint);
     case 'replace-variables':
       return applyVariables(document, command.variables);
+    case 'rename-variable':
+      return applyRenameVariableCommand(document, command);
     default:
       return screenCommandFailure(
         document,

@@ -4,6 +4,7 @@ import type { ScreenDocument } from './document.js';
 import type { ScreenProjectEnvelope } from './envelope.js';
 import type { ScreenResourceExecutionContext } from './execution.js';
 import type { ScreenJsonValue } from './json.js';
+import type { ScreenHostVariableDescriptor, ScreenHostVariablePage } from './variable.js';
 
 export interface ScreenProjectLoadRequest {
   readonly projectId: string;
@@ -36,6 +37,7 @@ export interface ScreenDesignerHostCapabilities {
   readonly projectSnapshots: boolean;
   readonly resources: boolean;
   readonly datasetCatalog: boolean;
+  readonly variableCatalog: boolean;
   readonly variables: boolean;
   readonly actions: boolean;
 }
@@ -47,6 +49,7 @@ export interface ScreenDesignerHostAdapter {
   readonly projectSnapshots?: ScreenProjectSnapshotPort;
   readonly resources?: ScreenHostResourcePort;
   readonly datasetCatalog?: ScreenHostDatasetCatalogPort;
+  readonly variableCatalog?: ScreenHostVariableCatalogPort;
   readonly variables?: ScreenHostVariablePort;
   readonly actions?: ScreenBlueprintHostActionPort;
 }
@@ -206,11 +209,33 @@ export interface ScreenHostDatasetCatalogPort {
 
 export interface ScreenHostVariableRequest {
   readonly variableId: string;
+  readonly purpose: 'runtime' | 'authoring-preview';
   readonly signal: ScreenAbortSignal;
 }
 
 export interface ScreenHostVariablePort {
   resolve(request: ScreenHostVariableRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
+}
+
+export interface ScreenHostVariableCatalogListRequest {
+  readonly query: string;
+  readonly cursor?: string;
+  readonly limit: number;
+  readonly signal: ScreenAbortSignal;
+}
+
+export interface ScreenHostVariableDescribeRequest {
+  readonly variableId: string;
+  readonly signal: ScreenAbortSignal;
+}
+
+export interface ScreenHostVariableCatalogPort {
+  list(
+    request: ScreenHostVariableCatalogListRequest,
+  ): Promise<ScreenParseResult<ScreenHostVariablePage>>;
+  describe(
+    request: ScreenHostVariableDescribeRequest,
+  ): Promise<ScreenParseResult<ScreenHostVariableDescriptor>>;
 }
 
 export interface ScreenBlueprintHostEvent {
@@ -244,6 +269,7 @@ export function validateScreenDesignerHostAdapter(
     ['projectSnapshots', 'projectSnapshots', ['list', 'create', 'restore', 'delete']],
     ['resources', 'resources', ['resolve']],
     ['datasetCatalog', 'datasetCatalog', ['list', 'describe']],
+    ['variableCatalog', 'variableCatalog', ['list', 'describe']],
     ['variables', 'variables', ['resolve']],
     ['actions', 'actions', ['execute']],
   ] as const;
@@ -268,6 +294,11 @@ export function validateScreenDesignerHostAdapter(
         `Designer host capability "${capability}" does not match its port.`,
       );
     }
+  }
+  if (capabilityRecord.variableCatalog === true && capabilityRecord.variables !== true) {
+    return invalidDesignerHostAdapter(
+      'Designer host variable catalog requires the variables capability.',
+    );
   }
   return { ok: true, value: adapter as unknown as ScreenDesignerHostAdapter, diagnostics: [] };
 }

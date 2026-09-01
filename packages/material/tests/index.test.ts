@@ -16,6 +16,7 @@ import {
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
+  BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
   BaseScreenContainerMaterialElement,
   BaseScreenEllipseMaterialElement,
@@ -86,7 +87,7 @@ describe('official materials', () => {
     expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.libraryVisible).toBeUndefined();
   });
 
-  it('R3 projects selected tabular fields for official table and chart materials', () => {
+  it('R3 projects selected tabular fields for official text, table, and chart materials', () => {
     const dataset = {
       fields: [
         { id: 'name', label: '名称', valueType: 'string' as const },
@@ -112,6 +113,12 @@ describe('official materials', () => {
       ok: true,
       value: { series: [{ id: 'amount', points: [{ x: '北区', y: 12 }] }] },
     });
+    expect(
+      BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER.adapt({
+        dataset,
+        fields: { value: [dataset.fields[1]!] },
+      }),
+    ).toEqual({ ok: true, value: '12', diagnostics: [] });
   });
 
   it('does not access or register custom elements at module import time', () => {

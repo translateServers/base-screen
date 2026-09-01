@@ -1,28 +1,54 @@
-import type { ScreenDocument, ScreenVariable } from '@base-screen/contracts';
+import type {
+  ScreenDocument,
+  ScreenHostVariableDescriptor,
+  ScreenHostVariableSummary,
+  ScreenVariable,
+} from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
-import { createDesignerButton } from './designer-ui-primitives.js';
-
+import {
+  createDesignerButton,
+  createDesignerInput,
+  createDesignerSelect,
+} from './designer-ui-primitives.js';
 import {
   appendCreateEditor,
   appendDeleteConfirmation,
+  appendDescriptionEditor,
   appendIconLabel,
-  appendInlineEditor,
+  appendRenameEditor,
+  appendValueEditor,
   createBadge,
   createIconAction,
+  type DesignerVariableCreateDraft,
 } from './designer-variables-editor-dom.js';
 
-/** 变量面板交互状态：新建、重命名、值编辑与删除确认互斥。 */
 export interface DesignerVariablesDraft {
   readonly creating: boolean;
+  readonly create: DesignerVariableCreateDraft;
   readonly renamingIndex: number | undefined;
+  readonly editingDescriptionIndex: number | undefined;
   readonly editingValueIndex: number | undefined;
   readonly deletingIndex: number | undefined;
+  readonly search: string;
+  readonly typeFilter: 'all' | ScreenVariable['type'];
+  readonly referenceCounts: ReadonlyMap<string, number>;
+  readonly catalog: DesignerVariableCatalogView;
 }
 
 const VALUE_SUMMARY_LENGTH = 40;
 
-/** 渲染左侧「变量」面板（ADR-0054 R1-R3）。 */
+export interface DesignerVariableCatalogView {
+  readonly query: string;
+  readonly items: readonly ScreenHostVariableSummary[];
+  readonly nextCursor: string | undefined;
+  readonly feedback: string;
+  readonly selected: ScreenHostVariableDescriptor | undefined;
+  readonly previewVariableId: string | undefined;
+  readonly previewStatus: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error';
+  readonly previewSummary: string | undefined;
+}
+
 export function renderDesignerVariables(
   panel: HTMLElement,
   document: ScreenDocument | undefined,
@@ -31,13 +57,16 @@ export function renderDesignerVariables(
   panel.replaceChildren();
   const variables = document?.variables ?? [];
   panel.dataset.variableCount = String(variables.length);
-  appendToolbar(panel, draft.creating);
+  appendToolbar(panel, draft);
 
   const content = panel.ownerDocument.createElement('div');
   content.className = 'variable-panel-content';
-  if (draft.creating) appendCreateEditor(content);
+  if (draft.creating) appendCreateEditor(content, draft.create);
 
-  if (variables.length === 0) {
+  const visible = variables
+    .map((variable, index) => ({ variable, index }))
+    .filter(({ variable }) => matchesFilter(variable, draft));
+  if (visible.length === 0) {
     const empty = panel.ownerDocument.createElement('p');
     empty.className = 'designer-empty-state variable-empty-state';
     empty.textContent = DESIGNER_UI_TEXT.variables.empty;
@@ -47,26 +76,44 @@ export function renderDesignerVariables(
     list.className = 'variable-list';
     list.setAttribute('role', 'list');
     list.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.list);
-    for (let index = 0; index < variables.length; index++) {
-      appendVariableRow(list, variables[index]!, index, draft);
-    }
+    for (const { variable, index } of visible) appendVariableRow(list, variable, index, draft);
     content.appendChild(list);
   }
   panel.appendChild(content);
 }
 
-function appendToolbar(panel: HTMLElement, creating: boolean): void {
+function appendToolbar(panel: HTMLElement, draft: DesignerVariablesDraft): void {
   const toolbar = panel.ownerDocument.createElement('div');
   toolbar.className = 'variable-panel-toolbar';
   const description = panel.ownerDocument.createElement('p');
   description.className = 'variable-panel-description';
   description.textContent = DESIGNER_UI_TEXT.variables.description;
   toolbar.appendChild(description);
-
+  const filters = panel.ownerDocument.createElement('div');
+  filters.className = 'variable-panel-filters';
+  const search = createDesignerInput(panel.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.search,
+    placeholder: DESIGNER_UI_TEXT.variables.search,
+    value: draft.search,
+  });
+  search.dataset.variableSearch = 'true';
+  filters.appendChild(search);
+  const type = createDesignerSelect(panel.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.filterAll,
+    value: draft.typeFilter,
+    options: [
+      { value: 'all', label: DESIGNER_UI_TEXT.variables.filterAll },
+      { value: 'static', label: DESIGNER_UI_TEXT.variables.typeStatic },
+      { value: 'host', label: DESIGNER_UI_TEXT.variables.typeHost },
+    ],
+  });
+  type.dataset.variableTypeFilter = 'true';
+  filters.appendChild(type);
+  toolbar.appendChild(filters);
   const add = createDesignerButton(panel.ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.add,
     className: 'variable-add-button',
-    disabled: creating,
+    disabled: draft.creating,
     title: DESIGNER_UI_TEXT.variables.add,
     variant: 'primary',
   });
@@ -87,67 +134,103 @@ function appendVariableRow(
   row.dataset.variableRow = String(index);
   row.dataset.variableType = variable.type;
   row.setAttribute('role', 'listitem');
-
-  if (draft.renamingIndex === index && variable.type === 'static') {
+  if (draft.renamingIndex === index) {
     row.dataset.variableEditor = 'rename';
-    appendInlineEditor(row, variable, index, 'rename');
+    appendRenameEditor(row, variable, index);
+  } else if (draft.editingDescriptionIndex === index) {
+    row.dataset.variableEditor = 'description';
+    appendDescriptionEditor(row, variable, index);
   } else if (draft.editingValueIndex === index && variable.type === 'static') {
     row.dataset.variableEditor = 'value';
-    appendInlineEditor(row, variable, index, 'value');
-  } else if (draft.deletingIndex === index && variable.type === 'static') {
+    appendValueEditor(row, variable, index);
+  } else if (draft.deletingIndex === index) {
     row.dataset.variableEditor = 'delete';
     appendDeleteConfirmation(row, variable.name, index);
   } else {
-    appendVariableSummary(row, variable, index);
+    appendVariableSummary(row, variable, index, draft);
   }
   list.appendChild(row);
 }
 
-function appendVariableSummary(row: HTMLElement, variable: ScreenVariable, index: number): void {
+function appendVariableSummary(
+  row: HTMLElement,
+  variable: ScreenVariable,
+  index: number,
+  draft: DesignerVariablesDraft,
+): void {
   const header = row.ownerDocument.createElement('div');
   header.className = 'variable-row-header';
   header.appendChild(createBadge(row.ownerDocument, variable.type));
-
   const name = row.ownerDocument.createElement('code');
   name.className = 'variable-name';
   name.textContent = variable.name;
   name.title = variable.name;
   header.appendChild(name);
-
-  if (variable.type === 'static') {
-    const actions = row.ownerDocument.createElement('div');
-    actions.className = 'variable-actions';
-    actions.setAttribute('role', 'group');
-    actions.setAttribute('aria-label', variable.name);
-    actions.appendChild(
-      createIconAction(
-        row.ownerDocument,
-        'rename',
-        index,
-        'pencil',
-        DESIGNER_UI_TEXT.variables.renameVariable(variable.name),
-      ),
-    );
-    const remove = createIconAction(
+  const actions = row.ownerDocument.createElement('div');
+  actions.className = 'variable-actions';
+  actions.setAttribute('role', 'group');
+  actions.setAttribute('aria-label', variable.name);
+  actions.appendChild(
+    createIconAction(
       row.ownerDocument,
-      'delete',
+      'rename',
       index,
-      'trash',
-      DESIGNER_UI_TEXT.variables.deleteVariable(variable.name),
-    );
-    remove.dataset.variant = 'danger';
-    actions.appendChild(remove);
-    header.appendChild(actions);
-  } else {
-    row.dataset.variableReadOnly = 'true';
-  }
+      'pencil',
+      DESIGNER_UI_TEXT.variables.renameVariable(variable.name),
+    ),
+  );
+  actions.appendChild(
+    createIconAction(
+      row.ownerDocument,
+      'edit-description',
+      index,
+      'sliders',
+      DESIGNER_UI_TEXT.variables.editDescription(variable.name),
+    ),
+  );
+  actions.appendChild(
+    createIconAction(
+      row.ownerDocument,
+      'duplicate',
+      index,
+      'copy',
+      DESIGNER_UI_TEXT.variables.duplicate(variable.name),
+    ),
+  );
+  const remove = createIconAction(
+    row.ownerDocument,
+    'delete',
+    index,
+    'trash',
+    DESIGNER_UI_TEXT.variables.deleteVariable(variable.name),
+  );
+  remove.dataset.variant = 'danger';
+  actions.appendChild(remove);
+  header.appendChild(actions);
   row.appendChild(header);
 
+  const meta = row.ownerDocument.createElement('div');
+  meta.className = 'variable-meta';
+  const referenceCount = row.ownerDocument.createElement('span');
+  referenceCount.className = 'variable-reference-count';
+  referenceCount.textContent = DESIGNER_UI_TEXT.variables.references(
+    draft.referenceCounts.get(variable.name) ?? 0,
+  );
+  meta.appendChild(referenceCount);
+  if (variable.description !== undefined) {
+    const description = row.ownerDocument.createElement('span');
+    description.className = 'variable-description';
+    description.textContent = variable.description;
+    meta.appendChild(description);
+  }
+  row.appendChild(meta);
+
   if (variable.type === 'host') {
-    row.appendChild(createHostDetail(row.ownerDocument, variable.variableId));
+    row.dataset.variableIdReadOnly = 'true';
+    row.appendChild(createHostDetail(row.ownerDocument, variable.variableId, variable.name, index));
+    appendPreview(row, variable.variableId, draft.catalog);
     return;
   }
-
   const serialized = JSON.stringify(variable.value);
   const valueButton = row.ownerDocument.createElement('button');
   valueButton.type = 'button';
@@ -171,7 +254,12 @@ function appendVariableSummary(row: HTMLElement, variable: ScreenVariable, index
   row.appendChild(valueButton);
 }
 
-function createHostDetail(ownerDocument: Document, variableId: string): HTMLElement {
+function createHostDetail(
+  ownerDocument: Document,
+  variableId: string,
+  variableName: string,
+  index: number,
+): HTMLElement {
   const detail = ownerDocument.createElement('div');
   detail.className = 'variable-host-detail';
   const label = ownerDocument.createElement('span');
@@ -183,11 +271,54 @@ function createHostDetail(ownerDocument: Document, variableId: string): HTMLElem
   id.textContent = variableId;
   id.title = variableId;
   detail.appendChild(id);
-  const readOnly = ownerDocument.createElement('span');
-  readOnly.className = 'variable-readonly';
-  appendIconLabel(readOnly, 'lock', DESIGNER_UI_TEXT.variables.readOnly);
-  detail.appendChild(readOnly);
+  const preview = createIconAction(
+    ownerDocument,
+    'preview',
+    index,
+    'eye',
+    DESIGNER_UI_TEXT.variables.preview(variableName),
+  );
+  preview.dataset.variableId = variableId;
+  detail.appendChild(preview);
   return detail;
+}
+
+function appendPreview(
+  row: HTMLElement,
+  variableId: string,
+  catalog: DesignerVariableCatalogView,
+): void {
+  if (catalog.previewVariableId !== variableId || catalog.previewStatus === 'idle') return;
+  const preview = row.ownerDocument.createElement('section');
+  preview.className = 'variable-preview';
+  preview.dataset.variablePreviewStatus = catalog.previewStatus;
+  const label = row.ownerDocument.createElement('strong');
+  label.textContent =
+    catalog.previewStatus === 'ready'
+      ? DESIGNER_UI_TEXT.variables.previewReady
+      : catalog.previewStatus === 'loading'
+        ? DESIGNER_UI_TEXT.variables.previewLoading
+        : catalog.previewStatus === 'unavailable'
+          ? DESIGNER_UI_TEXT.variables.previewUnavailable
+          : DESIGNER_UI_TEXT.variables.previewFailed;
+  preview.appendChild(label);
+  if (catalog.previewSummary !== undefined) {
+    const summary = row.ownerDocument.createElement('pre');
+    summary.textContent = catalog.previewSummary;
+    preview.appendChild(summary);
+  }
+  row.appendChild(preview);
+}
+
+function matchesFilter(variable: ScreenVariable, draft: DesignerVariablesDraft): boolean {
+  if (draft.typeFilter !== 'all' && variable.type !== draft.typeFilter) return false;
+  const query = draft.search.trim().toLocaleLowerCase();
+  if (query === '') return true;
+  return [
+    variable.name,
+    variable.description ?? '',
+    variable.type === 'host' ? variable.variableId : '',
+  ].some((value) => value.toLocaleLowerCase().includes(query));
 }
 
 function summarizeValue(serialized: string): string {

@@ -1,18 +1,18 @@
-import {
-  parseScreenJsonValue,
-  type ScreenDiagnostic,
-  type ScreenDocument,
-  type ScreenHostVariablePort,
-  type ScreenJsonObject,
-  type ScreenJsonValue,
-  type ScreenParseResult,
-  type ScreenResourceExecutionTrigger,
+import type {
+  ScreenDiagnostic,
+  ScreenDocument,
+  ScreenHostVariable,
+  ScreenHostVariablePort,
+  ScreenJsonObject,
+  ScreenJsonValue,
+  ScreenResourceExecutionTrigger,
+  ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import type { ScreenBlueprintPlan } from '@base-screen/core';
+import { canonicalJsonString } from '../canonical-json.js';
 import type { BaseScreenRenderer } from '../renderer/renderer.js';
 import type { BaseScreenViewerRefreshOptions } from './viewer-configuration.js';
-
-const HOST_VARIABLE_TIMEOUT_MS = 15_000;
+import { resolveHostVariableBatch } from './viewer-host-variable-resolution.js';
 
 export interface ViewerVariableControllerHost {
   readonly readRenderer: () => BaseScreenRenderer | undefined;
@@ -32,6 +32,9 @@ export class ViewerVariableController {
   #variableRefresh: Promise<boolean> | undefined;
   #pendingRefreshAll = false;
   readonly #pendingRefreshComponents = new Set<string>();
+  #pendingVariableRefreshAll = false;
+  readonly #pendingVariableIds = new Set<string>();
+  #pendingVariableTraceId: string | undefined;
   #nextTrigger: ScreenResourceExecutionTrigger = 'manual';
   #nextTraceId: string | undefined;
   #hasRenderedDocument = false;
@@ -57,6 +60,26 @@ export class ViewerVariableController {
     this.start(componentId, true);
   }
 
+  refreshVariables(options: ScreenVariableRefreshOptions = {}): void {
+    const document = this.#host.readDocument();
+    if (document === undefined) return;
+    const availableIds = new Set(
+      document.variables
+        .filter((variable) => variable.type === 'host')
+        .map((variable) => variable.variableId),
+    );
+    const requested =
+      options.variableIds === undefined
+        ? undefined
+        : [...new Set(options.variableIds)].filter((variableId) => availableIds.has(variableId));
+    if ((requested?.length ?? availableIds.size) === 0) return;
+    if (this.#variableRefresh !== undefined) {
+      this.#queueVariableRefresh(requested, options.traceId);
+      return;
+    }
+    this.#startVariableRefresh(requested, options.traceId);
+  }
+
   #hasComponent(componentId: string): boolean {
     return (
       this.#host.readDocument()?.components.some((component) => component.id === componentId) ??
@@ -79,6 +102,7 @@ export class ViewerVariableController {
         this.#pendingRefreshComponents.clear();
         this.#nextTrigger = 'manual';
         this.#nextTraceId = undefined;
+        this.#drainVariableRefresh();
         return;
       }
       // 进行中 refresh 队列完成后补发刷新：携带排队期间记录的 trigger/trace
@@ -98,7 +122,55 @@ export class ViewerVariableController {
       this.#nextTraceId = undefined;
       this.#pendingRefreshAll = false;
       this.#pendingRefreshComponents.clear();
+      this.#drainVariableRefresh();
     });
+  }
+
+  #startVariableRefresh(requestedIds: readonly string[] | undefined, traceId?: string): void {
+    const task = this.#resolveVariablesOnly(requestedIds, traceId);
+    this.#variableRefresh = task;
+    void task.then(() => {
+      if (this.#variableRefresh !== task) return;
+      this.#variableRefresh = undefined;
+      if (this.#pendingRefreshAll || this.#pendingRefreshComponents.size > 0) {
+        const componentId =
+          !this.#pendingRefreshAll && this.#pendingRefreshComponents.size === 1
+            ? [...this.#pendingRefreshComponents][0]
+            : undefined;
+        this.#pendingRefreshAll = false;
+        this.#pendingRefreshComponents.clear();
+        this.start(componentId, true);
+        return;
+      }
+      this.#drainVariableRefresh();
+    });
+  }
+
+  #queueVariableRefresh(requestedIds: readonly string[] | undefined, traceId?: string): void {
+    if (requestedIds === undefined) {
+      this.#pendingVariableRefreshAll = true;
+      this.#pendingVariableIds.clear();
+    } else if (!this.#pendingVariableRefreshAll) {
+      for (const variableId of requestedIds) this.#pendingVariableIds.add(variableId);
+    }
+    this.#pendingVariableTraceId = traceId;
+  }
+
+  #drainVariableRefresh(): void {
+    if (
+      this.#variableRefresh !== undefined ||
+      (!this.#pendingVariableRefreshAll && this.#pendingVariableIds.size === 0)
+    ) {
+      return;
+    }
+    const requestedIds = this.#pendingVariableRefreshAll
+      ? undefined
+      : [...this.#pendingVariableIds];
+    const traceId = this.#pendingVariableTraceId;
+    this.#pendingVariableRefreshAll = false;
+    this.#pendingVariableIds.clear();
+    this.#pendingVariableTraceId = undefined;
+    this.#startVariableRefresh(requestedIds, traceId);
   }
 
   async #resolveVariablesAndRender(
@@ -134,33 +206,21 @@ export class ViewerVariableController {
       ...plan.initialVariables,
       ...this.#host.readBlueprintVariables(),
     };
-    for (const variable of document.variables) {
-      if (variable.type !== 'host') continue;
+    const hostVariables = document.variables.filter((variable) => variable.type === 'host');
+    if (hostVariables.length > 0) {
       const variablePort = this.#host.readVariablePort();
       if (variablePort === undefined) {
         this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
         return false;
       }
-      try {
-        const result = await resolveHostVariable(variablePort, variable.variableId, controller);
-        if (result === undefined) {
-          this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
-          return false;
-        }
-        if (!result.ok || controller.signal.aborted) {
-          if (!controller.signal.aborted)
-            this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
-          return false;
-        }
-        const parsed = parseScreenJsonValue(result.value, { maxBytes: 1024 * 1024 });
-        if (!parsed.ok) {
-          this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
-          return false;
-        }
-        variables[variable.name] = parsed.value;
-      } catch {
+      const values = await resolveHostVariableBatch(document, variablePort, controller);
+      if (values === undefined) {
         if (!controller.signal.aborted) this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
         return false;
+      }
+      for (const variable of hostVariables) {
+        const value = values.get(variable.variableId);
+        if (value !== undefined) variables[variable.name] = value;
       }
     }
     if (
@@ -205,12 +265,82 @@ export class ViewerVariableController {
     return true;
   }
 
+  async #resolveVariablesOnly(
+    requestedIds: readonly string[] | undefined,
+    traceId: string | undefined,
+  ): Promise<boolean> {
+    const renderer = this.#host.readRenderer();
+    const document = this.#host.readDocument();
+    const previous = this.#host.readBlueprintVariables();
+    if (renderer === undefined || document === undefined || previous === undefined) return false;
+    const hostVariables = document.variables.filter(
+      (variable): variable is ScreenHostVariable =>
+        variable.type === 'host' &&
+        (requestedIds === undefined || requestedIds.includes(variable.variableId)),
+    );
+    if (hostVariables.length === 0) return true;
+    const port = this.#host.readVariablePort();
+    if (port === undefined) {
+      this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
+      return false;
+    }
+    const generation = ++this.#variableGeneration;
+    const controller = new AbortController();
+    this.#variableController = controller;
+    const values = await resolveHostVariableBatch(document, port, controller, requestedIds);
+    if (values === undefined) {
+      if (!controller.signal.aborted) this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
+      return false;
+    }
+    if (
+      controller.signal.aborted ||
+      generation !== this.#variableGeneration ||
+      this.#host.readRenderer() !== renderer ||
+      this.#host.readDocument() !== document ||
+      this.#host.readBlueprintVariables() !== previous
+    ) {
+      return false;
+    }
+    const variables: Record<string, ScreenJsonValue> = { ...previous };
+    let changed = false;
+    for (const variable of hostVariables) {
+      const value = values.get(variable.variableId);
+      if (value === undefined) continue;
+      const previousValue = variables[variable.name];
+      if (
+        previousValue === undefined ||
+        canonicalJsonString(previousValue) !== canonicalJsonString(value)
+      ) {
+        changed = true;
+      }
+      variables[variable.name] = value;
+    }
+    if (!changed) return true;
+    const applied = renderer.setVariables(variables);
+    if (!applied.ok) {
+      this.#host.emitDiagnostics(applied.diagnostics);
+      return false;
+    }
+    const rendered = renderer.render(document, { trigger: 'variable', traceId: traceId ?? '' });
+    if (!rendered.ok || rendered.diagnostics.length > 0) {
+      renderer.setVariables(previous);
+      this.#host.emitDiagnostics(rendered.diagnostics);
+      return false;
+    }
+    this.#host.writeBlueprintVariables(variables);
+    return true;
+  }
+
   cancel(): void {
     this.#variableGeneration++;
     this.#variableController?.abort();
     this.#variableController = undefined;
+    this.#variableRefresh = undefined;
     this.#pendingRefreshAll = false;
     this.#pendingRefreshComponents.clear();
+    this.#pendingVariableRefreshAll = false;
+    this.#pendingVariableIds.clear();
+    this.#pendingVariableTraceId = undefined;
   }
 
   reset(): void {
@@ -218,24 +348,5 @@ export class ViewerVariableController {
     this.#hasRenderedDocument = false;
     this.#nextTrigger = 'manual';
     this.#nextTraceId = undefined;
-  }
-}
-
-async function resolveHostVariable(
-  port: ScreenHostVariablePort,
-  variableId: string,
-  controller: AbortController,
-): Promise<ScreenParseResult<ScreenJsonValue> | undefined> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<undefined>((resolve) => {
-    timer = setTimeout(() => {
-      controller.abort();
-      resolve(undefined);
-    }, HOST_VARIABLE_TIMEOUT_MS);
-  });
-  try {
-    return await Promise.race([port.resolve({ variableId, signal: controller.signal }), timeout]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
   }
 }

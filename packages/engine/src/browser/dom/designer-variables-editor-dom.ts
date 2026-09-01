@@ -1,4 +1,4 @@
-import type { ScreenVariable } from '@base-screen/contracts';
+import type { ScreenHostVariableSummary, ScreenVariable } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
 import {
@@ -6,6 +6,18 @@ import {
   createDesignerIconButton,
   createDesignerInput,
 } from './designer-ui-primitives.js';
+
+export interface DesignerVariableCreateDraft {
+  readonly type: ScreenVariable['type'];
+  readonly name: string;
+  readonly description: string;
+  readonly valueSource: string;
+  readonly variableId: string | undefined;
+  readonly catalogQuery: string;
+  readonly catalogItems: readonly ScreenHostVariableSummary[];
+  readonly catalogCursor: string | undefined;
+  readonly catalogFeedback: string;
+}
 
 export function createBadge(ownerDocument: Document, type: ScreenVariable['type']): HTMLElement {
   const badge = ownerDocument.createElement('span');
@@ -16,62 +28,114 @@ export function createBadge(ownerDocument: Document, type: ScreenVariable['type'
   return badge;
 }
 
-export function appendCreateEditor(content: HTMLElement): void {
+export function appendCreateEditor(content: HTMLElement, draft: DesignerVariableCreateDraft): void {
   const editor = content.ownerDocument.createElement('section');
   editor.className = 'variable-editor variable-create-row';
   editor.dataset.variableEditor = 'create';
+  editor.dataset.variableCreateType = draft.type;
   editor.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.createTitle);
-  appendEditorHeading(editor, DESIGNER_UI_TEXT.variables.createTitle);
+  appendEditorHeading(
+    editor,
+    draft.type === 'static'
+      ? DESIGNER_UI_TEXT.variables.createStaticTitle
+      : DESIGNER_UI_TEXT.variables.createHostTitle,
+    undefined,
+    draft.type,
+  );
+  appendCreateTypeChooser(editor, draft.type);
   const errorId = 'designer-variable-create-error';
-  appendEditorField(editor, {
+  const name = appendEditorField(editor, {
     label: DESIGNER_UI_TEXT.variables.name,
     hint: DESIGNER_UI_TEXT.variables.nameHint,
     dataKey: 'variableCreateName',
     describedBy: errorId,
   });
-  appendEditorField(editor, {
-    label: DESIGNER_UI_TEXT.variables.value,
-    hint: DESIGNER_UI_TEXT.variables.valueHint,
-    dataKey: 'variableCreateValue',
+  name.value = draft.name;
+  const description = appendEditorField(editor, {
+    label: DESIGNER_UI_TEXT.variables.descriptionLabel,
+    hint: DESIGNER_UI_TEXT.variables.descriptionHint,
+    dataKey: 'variableCreateDescription',
     describedBy: errorId,
-    json: true,
   });
+  description.value = draft.description;
+  if (draft.type === 'static') {
+    const value = appendEditorField(editor, {
+      label: DESIGNER_UI_TEXT.variables.value,
+      hint: DESIGNER_UI_TEXT.variables.valueHint,
+      dataKey: 'variableCreateValue',
+      describedBy: errorId,
+      json: true,
+    });
+    value.value = draft.valueSource;
+  } else {
+    appendHostCatalog(editor, draft);
+  }
   appendEditorError(editor, errorId);
   appendEditorActions(editor, 'confirm-create', -1, DESIGNER_UI_TEXT.variables.create);
   content.appendChild(editor);
 }
 
-export function appendInlineEditor(
+export function appendRenameEditor(
+  row: HTMLElement,
+  variable: ScreenVariable,
+  index: number,
+): void {
+  appendEditorHeading(row, DESIGNER_UI_TEXT.variables.renameTitle, variable.name, variable.type);
+  const errorId = `designer-variable-rename-error-${index}`;
+  const input = appendEditorField(row, {
+    label: DESIGNER_UI_TEXT.variables.name,
+    hint: DESIGNER_UI_TEXT.variables.nameHint,
+    dataKey: 'variableRename',
+    dataValue: String(index),
+    describedBy: errorId,
+  });
+  input.value = variable.name;
+  appendEditorError(row, errorId);
+  appendEditorActions(row, 'confirm-rename', index, DESIGNER_UI_TEXT.variables.save);
+}
+
+export function appendDescriptionEditor(
+  row: HTMLElement,
+  variable: ScreenVariable,
+  index: number,
+): void {
+  appendEditorHeading(
+    row,
+    DESIGNER_UI_TEXT.variables.editDescriptionTitle,
+    variable.name,
+    variable.type,
+  );
+  const errorId = `designer-variable-description-error-${index}`;
+  const input = appendEditorField(row, {
+    label: DESIGNER_UI_TEXT.variables.descriptionLabel,
+    hint: DESIGNER_UI_TEXT.variables.descriptionHint,
+    dataKey: 'variableDescription',
+    dataValue: String(index),
+    describedBy: errorId,
+  });
+  input.value = variable.description ?? '';
+  appendEditorError(row, errorId);
+  appendEditorActions(row, 'confirm-description', index, DESIGNER_UI_TEXT.variables.save);
+}
+
+export function appendValueEditor(
   row: HTMLElement,
   variable: Extract<ScreenVariable, { type: 'static' }>,
   index: number,
-  kind: 'rename' | 'value',
 ): void {
-  const title =
-    kind === 'rename'
-      ? DESIGNER_UI_TEXT.variables.renameTitle
-      : DESIGNER_UI_TEXT.variables.editValueTitle;
-  appendEditorHeading(row, title, variable.name);
-  const errorId = `designer-variable-${kind}-error-${index}`;
+  appendEditorHeading(row, DESIGNER_UI_TEXT.variables.editValueTitle, variable.name, variable.type);
+  const errorId = `designer-variable-value-error-${index}`;
   const input = appendEditorField(row, {
-    label: kind === 'rename' ? DESIGNER_UI_TEXT.variables.name : DESIGNER_UI_TEXT.variables.value,
-    hint:
-      kind === 'rename'
-        ? DESIGNER_UI_TEXT.variables.nameHint
-        : DESIGNER_UI_TEXT.variables.valueHint,
-    dataKey: kind === 'rename' ? 'variableRename' : 'variableValue',
+    label: DESIGNER_UI_TEXT.variables.value,
+    hint: DESIGNER_UI_TEXT.variables.valueHint,
+    dataKey: 'variableValue',
     dataValue: String(index),
     describedBy: errorId,
-    json: kind === 'value',
+    json: true,
   });
-  input.value = kind === 'rename' ? variable.name : JSON.stringify(variable.value);
+  input.value = JSON.stringify(variable.value);
   appendEditorError(row, errorId);
-  appendEditorActions(
-    row,
-    kind === 'rename' ? 'confirm-rename' : 'confirm-value',
-    index,
-    DESIGNER_UI_TEXT.variables.save,
-  );
+  appendEditorActions(row, 'confirm-value', index, DESIGNER_UI_TEXT.variables.save);
 }
 
 export function appendDeleteConfirmation(row: HTMLElement, name: string, index: number): void {
@@ -94,13 +158,110 @@ export function appendDeleteConfirmation(row: HTMLElement, name: string, index: 
   appendEditorActions(row, 'confirm-delete', index, DESIGNER_UI_TEXT.variables.delete, true);
 }
 
+export function createIconAction(
+  ownerDocument: Document,
+  action: 'rename' | 'edit-description' | 'duplicate' | 'delete' | 'preview',
+  index: number,
+  icon: DesignerIconName,
+  label: string,
+): HTMLButtonElement {
+  const button = createDesignerIconButton(ownerDocument, { icon, label, variant: 'ghost' });
+  button.dataset.variableAction = action;
+  button.dataset.variableIndex = String(index);
+  return button;
+}
+
+export function appendIconLabel(target: HTMLElement, icon: DesignerIconName, label: string): void {
+  const glyph = target.ownerDocument.createElement('span');
+  glyph.className = 'variable-button-glyph';
+  glyph.innerHTML = designerIcon(icon);
+  target.appendChild(glyph);
+  const copy = target.ownerDocument.createElement('span');
+  copy.className = 'variable-button-label';
+  copy.textContent = label;
+  target.appendChild(copy);
+}
+
+function appendCreateTypeChooser(editor: HTMLElement, selected: ScreenVariable['type']): void {
+  const chooser = editor.ownerDocument.createElement('div');
+  chooser.className = 'variable-create-types';
+  chooser.setAttribute('role', 'group');
+  for (const [type, label] of [
+    ['static', DESIGNER_UI_TEXT.variables.createStatic],
+    ['host', DESIGNER_UI_TEXT.variables.createHost],
+  ] as const) {
+    const button = createDesignerButton(editor.ownerDocument, {
+      text: label,
+      pressed: type === selected,
+      variant: type === selected ? 'primary' : 'ghost',
+    });
+    button.dataset.variableAction = type === 'static' ? 'create-type-static' : 'create-type-host';
+    chooser.appendChild(button);
+  }
+  editor.appendChild(chooser);
+}
+
+function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDraft): void {
+  const section = editor.ownerDocument.createElement('section');
+  section.className = 'variable-host-catalog';
+  const search = createDesignerInput(editor.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.catalogSearch,
+    placeholder: DESIGNER_UI_TEXT.variables.catalogSearch,
+    value: draft.catalogQuery,
+  });
+  search.dataset.variableCatalogSearch = 'true';
+  section.appendChild(search);
+  const list = editor.ownerDocument.createElement('div');
+  list.className = 'variable-host-catalog-list';
+  for (const item of draft.catalogItems) {
+    const button = createDesignerButton(editor.ownerDocument, {
+      className: 'variable-host-catalog-item',
+      pressed: item.variableId === draft.variableId,
+      title: DESIGNER_UI_TEXT.variables.selectHost(item.name),
+      variant: item.variableId === draft.variableId ? 'primary' : 'ghost',
+    });
+    button.dataset.variableAction = 'select-host';
+    button.dataset.variableId = item.variableId;
+    const name = editor.ownerDocument.createElement('code');
+    name.textContent = item.name;
+    const description = editor.ownerDocument.createElement('span');
+    description.textContent = item.description ?? '';
+    button.appendChild(name);
+    button.appendChild(description);
+    list.appendChild(button);
+  }
+  section.appendChild(list);
+  if (draft.catalogCursor !== undefined) {
+    const more = createDesignerButton(editor.ownerDocument, {
+      text: DESIGNER_UI_TEXT.variables.loadMore,
+      variant: 'ghost',
+    });
+    more.dataset.variableAction = 'catalog-more';
+    section.appendChild(more);
+  }
+  const feedback = editor.ownerDocument.createElement('p');
+  feedback.className = 'variable-catalog-feedback';
+  feedback.textContent = draft.catalogFeedback;
+  section.appendChild(feedback);
+  if (draft.variableId !== undefined) {
+    const selected = editor.ownerDocument.createElement('code');
+    selected.className = 'variable-selected-host-id';
+    selected.textContent = draft.variableId;
+    selected.dataset.variableSelectedHostId = draft.variableId;
+    section.appendChild(selected);
+  }
+  editor.appendChild(section);
+}
+
 interface EditorFieldOptions {
   readonly label: string;
   readonly hint: string;
   readonly dataKey:
     | 'variableCreateName'
+    | 'variableCreateDescription'
     | 'variableCreateValue'
     | 'variableRename'
+    | 'variableDescription'
     | 'variableValue';
   readonly dataValue?: string;
   readonly describedBy: string;
@@ -114,9 +275,7 @@ function appendEditorField(editor: HTMLElement, options: EditorFieldOptions): HT
   label.className = 'variable-field-label';
   label.textContent = options.label;
   field.appendChild(label);
-  const input = createDesignerInput(editor.ownerDocument, {
-    className: 'variable-edit-input',
-  });
+  const input = createDesignerInput(editor.ownerDocument, { className: 'variable-edit-input' });
   input.dataset[options.dataKey] = options.dataValue ?? 'true';
   input.autocomplete = 'off';
   input.spellcheck = !options.json;
@@ -132,10 +291,15 @@ function appendEditorField(editor: HTMLElement, options: EditorFieldOptions): HT
   return input;
 }
 
-function appendEditorHeading(editor: HTMLElement, title: string, context?: string): void {
+function appendEditorHeading(
+  editor: HTMLElement,
+  title: string,
+  context?: string,
+  type: ScreenVariable['type'] = 'static',
+): void {
   const heading = editor.ownerDocument.createElement('header');
   heading.className = 'variable-editor-heading';
-  heading.appendChild(createBadge(editor.ownerDocument, 'static'));
+  heading.appendChild(createBadge(editor.ownerDocument, type));
   const copy = editor.ownerDocument.createElement('span');
   copy.className = 'variable-editor-title';
   const strong = editor.ownerDocument.createElement('strong');
@@ -163,7 +327,12 @@ function appendEditorError(editor: HTMLElement, id: string): void {
 
 function appendEditorActions(
   editor: HTMLElement,
-  action: 'confirm-create' | 'confirm-rename' | 'confirm-value' | 'confirm-delete',
+  action:
+    | 'confirm-create'
+    | 'confirm-rename'
+    | 'confirm-description'
+    | 'confirm-value'
+    | 'confirm-delete',
   index: number,
   confirmLabel: string,
   danger = false,
@@ -178,7 +347,6 @@ function appendEditorActions(
   cancel.dataset.variableAction = 'cancel';
   cancel.dataset.variableIndex = String(index);
   actions.appendChild(cancel);
-
   const confirm = createDesignerButton(editor.ownerDocument, {
     ariaLabel: danger ? DESIGNER_UI_TEXT.variables.delete : DESIGNER_UI_TEXT.variables.confirm,
     title: DESIGNER_UI_TEXT.variables.editHint,
@@ -189,32 +357,4 @@ function appendEditorActions(
   appendIconLabel(confirm, danger ? 'trash' : 'check', confirmLabel);
   actions.appendChild(confirm);
   editor.appendChild(actions);
-}
-
-export function createIconAction(
-  ownerDocument: Document,
-  action: 'rename' | 'delete',
-  index: number,
-  icon: DesignerIconName,
-  label: string,
-): HTMLButtonElement {
-  const button = createDesignerIconButton(ownerDocument, {
-    icon,
-    label,
-    variant: 'ghost',
-  });
-  button.dataset.variableAction = action;
-  button.dataset.variableIndex = String(index);
-  return button;
-}
-
-export function appendIconLabel(target: HTMLElement, icon: DesignerIconName, label: string): void {
-  const glyph = target.ownerDocument.createElement('span');
-  glyph.className = 'variable-button-glyph';
-  glyph.innerHTML = designerIcon(icon);
-  target.appendChild(glyph);
-  const copy = target.ownerDocument.createElement('span');
-  copy.className = 'variable-button-label';
-  copy.textContent = label;
-  target.appendChild(copy);
 }

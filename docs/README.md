@@ -27,7 +27,7 @@
 - **Plan**：实施顺序、设计评审或调研过程；计划本身不替代 Spec 或 ADR。
 - **Provenance**：外部参考的来源、授权和归属记录。
 
-2026-08-30 文档治理后，当前没有生效中的 Spec；共 58 个已完成或已取代 Spec 归档于
+2026-09-01 文档治理后，当前没有生效中的 Spec；共 60 个已完成或已取代 Spec 归档于
 `docs/specs/archive/`。`docs/plans/` 只保留待评审调研和持续治理计划，已完成计划归档于
 `docs/plans/archive/`。归档材料只用于历史追溯，不能作为新实现或验收的依据。具体规则见
 [Spec 索引](./specs/README.md)、[Spec 归档](./specs/archive/README.md)和[计划索引](./plans/README.md)。

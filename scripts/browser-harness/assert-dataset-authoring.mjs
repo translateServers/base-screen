@@ -36,7 +36,7 @@ export async function assertDatasetAuthoring(designer, page) {
   await consumerTab.click();
   await dataPanel.locator('[data-dataset-preview-tab="consumer"][aria-selected="true"]').waitFor();
   const consumerPreview = await dataPanel.locator('.designer-data-preview-content').textContent();
-  if (!consumerPreview?.includes('category') || !consumerPreview.includes('amount')) {
+  if (!consumerPreview?.includes('label') || !consumerPreview.includes('value')) {
     throw new Error(`BROWSER_HARNESS_DATASET_CONSUMER_PREVIEW_FAILED:${consumerPreview}`);
   }
   const requestTab = dataPanel.locator('[data-dataset-preview-tab="request"]');
@@ -67,7 +67,7 @@ export async function assertDatasetAuthoring(designer, page) {
     activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
   }));
   if (
-    mappingSurface.bindingCount !== 0 ||
+    mappingSurface.bindingCount !== 4 ||
     mappingSurface.applyCount !== 1 ||
     mappingSurface.activeStep !== 'mapping'
   ) {
@@ -78,7 +78,7 @@ export async function assertDatasetAuthoring(designer, page) {
   await dataPanel.locator('[data-dataset-action="apply"]').click();
   await page.waitForFunction(() => {
     const source = window.baseScreenHarness.designer.document.components.find(
-      (component) => component.id === 'title',
+      (component) => component.id === 'dataset-ranking-demo',
     )?.dataSource;
     return (
       source?.type === 'host-resource' &&
@@ -90,12 +90,13 @@ export async function assertDatasetAuthoring(designer, page) {
   const appliedDatasetSource = await page.evaluate(
     () =>
       window.baseScreenHarness.designer.document.components.find(
-        (component) => component.id === 'title',
+        (component) => component.id === 'dataset-ranking-demo',
       )?.dataSource,
   );
   if (
     appliedDatasetSource?.type !== 'host-resource' ||
-    appliedDatasetSource.binding !== null ||
+    appliedDatasetSource.binding?.fields.dimension?.[0] !== 'category' ||
+    appliedDatasetSource.binding.fields.measures?.[0] !== 'amount' ||
     appliedDatasetSource.params.region?.kind !== 'literal'
   ) {
     throw new Error('BROWSER_HARNESS_DATASET_TRANSACTION_FAILED');
@@ -262,7 +263,7 @@ export async function assertDatasetAuthoring(designer, page) {
   const interactionText = await interaction.textContent();
   if (
     interactionText === null ||
-    !['\u8c03\u6574\u5927\u5c0f', '\u65cb\u8f6c', '\u9884\u89c8', 'valueClick'].every((value) =>
+    !['\u8c03\u6574\u5927\u5c0f', '\u9884\u89c8', 'itemClick'].every((value) =>
       interactionText.includes(value),
     )
   ) {
@@ -278,6 +279,9 @@ export async function assertDatasetAuthoring(designer, page) {
   }
   await designer.locator('[data-inspector-pane=interaction]').screenshot({
     path: `${screenshotDirectory}/interaction-summary-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
+  await designer.locator('[data-base-screen-component-id=title]').click({
+    position: { x: 6, y: 7 },
   });
   const hostEventCount = await page.evaluate(() => window.baseScreenHarness.hostEvents.length);
   return hostEventCount;

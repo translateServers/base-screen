@@ -2,6 +2,7 @@ import type {
   ScreenDocument,
   ScreenHostResourcePort,
   ScreenHostVariablePort,
+  ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
@@ -26,6 +27,7 @@ type PreviewViewer = HTMLElement & {
   };
   unload?: () => void;
   refreshData?: (componentId?: string) => void;
+  refreshVariables?: (options?: ScreenVariableRefreshOptions) => void;
   document?: ScreenDocument;
 };
 
@@ -64,6 +66,10 @@ export class DesignerPreviewController {
   refreshData(componentId?: string): void {
     const viewer = this.viewer();
     viewer?.refreshData?.(componentId);
+  }
+
+  refreshVariables(options?: ScreenVariableRefreshOptions): void {
+    this.viewer()?.refreshVariables?.(options);
   }
 
   sync(document?: ScreenDocument): void {
