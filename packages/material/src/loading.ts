@@ -13,6 +13,26 @@ export function createBaseScreenMaterialLoadingElement(
   ownerDocument: Document,
   options: BaseScreenMaterialLoadingOptions = {},
 ): HTMLElement {
+  return createMaterialLoadingView(ownerDocument, resolveMaterialLoadingLabel(options)).element;
+}
+
+/** Internal option validation shared by standalone views and containers. */
+export function resolveMaterialLoadingLabel(
+  options: BaseScreenMaterialLoadingOptions | undefined,
+  fallback = '加载中',
+): string {
+  const label = options?.label;
+  if (label !== undefined && typeof label !== 'string') {
+    throw new TypeError('Material loading label must be a string.');
+  }
+  return label === undefined ? fallback : label;
+}
+
+/** Internal view handle; the public standalone factory exposes only its element. */
+export function createMaterialLoadingView(
+  ownerDocument: Document,
+  initialLabel: string,
+): { element: HTMLElement; setLabel(label: string): void } {
   const element = ownerDocument.createElement('div');
   element.setAttribute('data-base-screen-material-loading', '');
   element.setAttribute('role', 'status');
@@ -24,12 +44,22 @@ export function createBaseScreenMaterialLoadingElement(
     :host {
       display: flex; box-sizing: border-box; width: 100%; height: 100%;
       min-width: 0; min-height: 0; align-items: center; justify-content: center;
-      gap: 8px; overflow: hidden; color: inherit; font: inherit; line-height: 1.4;
+      gap: var(--base-screen-loading-gap, 8px); overflow: hidden; font: inherit;
+      color: var(--base-screen-loading-color, inherit);
+      font-size: var(--base-screen-loading-font-size, inherit); line-height: 1.4;
+      background: var(--base-screen-loading-background, transparent);
+      border: var(--base-screen-loading-border, 0 solid transparent);
+      border-radius: var(--base-screen-loading-radius, 0);
+      padding: var(--base-screen-loading-padding, 0);
     }
+    :host([hidden]) { display: none; }
     .spinner {
-      box-sizing: border-box; flex: 0 0 18px; width: 18px; height: 18px;
-      border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%;
-      animation: spin 900ms linear infinite;
+      box-sizing: border-box; flex: 0 0 var(--base-screen-loading-spinner-size, 18px);
+      width: var(--base-screen-loading-spinner-size, 18px);
+      height: var(--base-screen-loading-spinner-size, 18px);
+      border: var(--base-screen-loading-spinner-width, 2px) solid currentColor;
+      border-right-color: transparent; border-radius: 50%;
+      animation: spin var(--base-screen-loading-duration, 900ms) linear infinite;
     }
     .label { min-width: 0; overflow-wrap: anywhere; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -37,10 +67,17 @@ export function createBaseScreenMaterialLoadingElement(
   `;
   const spinner = ownerDocument.createElement('span');
   spinner.className = 'spinner';
+  spinner.setAttribute('part', 'spinner');
   spinner.setAttribute('aria-hidden', 'true');
   const label = ownerDocument.createElement('span');
   label.className = 'label';
-  label.textContent = options.label ?? '加载中';
+  label.setAttribute('part', 'label');
+  label.textContent = initialLabel;
   shadow.append(style, spinner, label);
-  return element;
+  return {
+    element,
+    setLabel(value) {
+      if (label.textContent !== value) label.textContent = value;
+    },
+  };
 }

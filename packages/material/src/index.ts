@@ -27,6 +27,11 @@ export {
   createBaseScreenMaterialLoadingElement,
 } from './loading.js';
 export {
+  type BaseScreenMaterialLoadingContainer,
+  type BaseScreenMaterialLoadingState,
+  createBaseScreenMaterialLoadingContainer,
+} from './loading-container.js';
+export {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
   BaseScreenEllipseMaterialElement,

@@ -5,6 +5,7 @@
 ```ts
 
 import { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialEditorDescriptor } from '@base-screen/plugin-core';
 import { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
@@ -350,8 +351,21 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
 }
 
 // @public
+export interface BaseScreenMaterialLoadingContainer {
+    dispose(): void;
+    readonly element: HTMLElement;
+    update(state: BaseScreenMaterialLoadingState, options?: BaseScreenMaterialLoadingOptions): void;
+}
+
+// @public
 export interface BaseScreenMaterialLoadingOptions {
     readonly label?: string;
+}
+
+// @public
+export interface BaseScreenMaterialLoadingState {
+    // (undocumented)
+    readonly status: BaseScreenMaterialDataState['status'] | 'empty';
 }
 
 // @public (undocumented)
@@ -398,6 +412,9 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
     // (undocumented)
     protected renderMaterial(): void;
 }
+
+// @public
+export function createBaseScreenMaterialLoadingContainer(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): BaseScreenMaterialLoadingContainer;
 
 // @public
 export function createBaseScreenMaterialLoadingElement(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): HTMLElement;

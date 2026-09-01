@@ -116,10 +116,11 @@
 
 ## 物料体系
 
-- **共享加载展示**：`@base-screen/material` 与 `@base-screen/sdk/material` 提供无注册副作用的
-  `createBaseScreenMaterialLoadingElement`，继承物料配色和字体、隔离样式并支持减少动态效果。
-  物料继续根据公共 `dataState` 决定何时挂载，不把查询或生命周期转移到基座。
-  用法见[自定义数据物料最佳实践](../custom-dataset-material-best-practice.md)。
+- **共享加载展示与容器**：`@base-screen/material` 与 `@base-screen/sdk/material` 提供无注册副作用的
+  `createBaseScreenMaterialLoadingContainer`，观察公共数据态或物料派生的展示状态，统一显隐、inert、
+  无障碍与清理，保留内容节点。CSS 变量和公开 part 支持宿主定制并尊重减少动态效果；独立展示工厂
+  `createBaseScreenMaterialLoadingElement` 继续可用。查询与业务状态解释仍归宿主/物料，不强制 Renderer
+  接管所有物料。用法见[公共加载容器](../material-loading.md)。
 - **物料契约与 ABI**：manifest 类型、校验、只读 catalog 与同 realm Web Component ABI。
   依据：[Plugin Core Contract](../specs/archive/plugin-core-contract/spec.md)、[ADR-0003](../decisions/ADR-0003-web-component-material-abi-and-registration.md)。
 - **静态数据作者契约**（2026-08-23 增量）：Manifest 可选 `staticData` scalar/tabular 描述；canonical 静态

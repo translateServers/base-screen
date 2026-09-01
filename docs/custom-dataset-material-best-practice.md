@@ -121,23 +121,27 @@ renderRanking(items);
 
 错误信息只呈现用户可理解的状态，不显示 SQL、内部地址、Token 或后端异常正文。
 
-通用 loading 展示可以直接复用 `@base-screen/material`（也由 `@base-screen/sdk/material` 转发）的
-`createBaseScreenMaterialLoadingElement`，无需在每个宿主重复实现 spinner：
+通用物料可复用 `@base-screen/material`（也由 `@base-screen/sdk/material` 转发）的公共加载容器，
+避免在每个宿主重复切换 spinner：
 
 ```ts
-import { createBaseScreenMaterialLoadingElement } from '@base-screen/material';
+import { createBaseScreenMaterialLoadingContainer } from '@base-screen/material';
 
-if (model.dataState.status === 'loading') {
-  content.replaceChildren(
-    createBaseScreenMaterialLoadingElement(content.ownerDocument, { label: '数据加载中' }),
-  );
-  return;
-}
+const loading = createBaseScreenMaterialLoadingContainer(mount.ownerDocument, {
+  label: '数据加载中',
+});
+loading.element.append(content);
+mount.append(loading.element);
+// 接收新 model 时更新，加载显隐和无障碍由容器处理。
+loading.update(model.dataState);
+// 物料卸载时清理。
+loading.dispose();
 ```
 
-`content` 是物料内部尺寸稳定的内容容器。工厂返回尚未挂载的展示节点，继承颜色与字体，内部样式隔离，
-带有可访问状态文本并遵守减少动态效果设置；导入和创建均不注册自定义元素、不请求数据、不启动 JavaScript
-定时器。物料仍拥有状态判断、节点挂载和移除，可选择自定义加载表现。此工具不会覆盖物料根节点的画布几何。
+`mount` 是物料内部尺寸稳定的挂载点，`content` 的渲染和生命周期仍由物料拥有；状态切换不会因容器
+删除或重建内容。默认加载界面继承配色与字体，支持 CSS 变量、公开 part 与减少动态效果。导入和创建
+不注册元素、不请求数据、不启动 JavaScript 定时器，也不覆盖物料根节点的画布几何。需要其他刷新策略
+的物料可以不采用此容器。接口边界、样式变量及空态约定见[公共加载容器](material-loading.md)。
 
 ## 四、用户在设计器中的最短路径
 

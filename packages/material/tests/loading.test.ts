@@ -1,40 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createBaseScreenMaterialLoadingElement } from '../src/loading.js';
-
-class TestNode {
-  readonly attributes: Record<string, string> = {};
-  readonly children: TestNode[] = [];
-  shadowRoot: TestNode | undefined;
-  textContent = '';
-  className = '';
-
-  constructor(readonly tagName: string) {}
-
-  setAttribute(name: string, value: string): void {
-    this.attributes[name] = value;
-  }
-
-  attachShadow(): TestNode {
-    this.shadowRoot = new TestNode('#shadow-root');
-    return this.shadowRoot;
-  }
-
-  append(...nodes: TestNode[]): void {
-    this.children.push(...nodes);
-  }
-}
-
-function documentFixture() {
-  const nodes: TestNode[] = [];
-  const document = {
-    createElement(tagName: string) {
-      const node = new TestNode(tagName);
-      nodes.push(node);
-      return node;
-    },
-  } as unknown as Document;
-  return { document, nodes };
-}
+import { documentFixture } from './__fixtures__/loading-dom.js';
 
 describe('shared material loading view', () => {
   it('uses only the supplied owner document and creates detached, independent views', () => {
@@ -62,5 +28,13 @@ describe('shared material loading view', () => {
     expect(fixture.nodes[2]?.attributes['aria-hidden']).toBe('true');
     expect(fixture.nodes[0]?.children).toEqual([]);
     expect(fixture.nodes[0]?.shadowRoot?.children).toEqual(fixture.nodes.slice(1));
+  });
+
+  it('rejects invalid labels before allocating a view', () => {
+    const fixture = documentFixture();
+    expect(() =>
+      createBaseScreenMaterialLoadingElement(fixture.document, { label: 1 as never }),
+    ).toThrow('Material loading label must be a string.');
+    expect(fixture.nodes).toEqual([]);
   });
 });
