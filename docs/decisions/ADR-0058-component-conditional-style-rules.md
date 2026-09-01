@@ -1,6 +1,6 @@
 # ADR-0058：组件条件样式规则（数据驱动投影）
 
-> 状态：已接受
+> 状态：部分已取代（决策 6 的 Designer 内建编辑器由 [ADR-0066](./ADR-0066-host-owned-conditional-style-authoring.md) 取代）
 > 日期：2026-08-17
 > 关联：[ADR-0002](./ADR-0002-canonical-screen-document.md)、[ADR-0005](./ADR-0005-renderer-dom-shadow-dom-and-product-elements.md)、[ADR-0016](./ADR-0016-material-appearance-authoring-contract.md)、[ADR-0023](./ADR-0023-host-dataset-resource-integration.md)、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)
 

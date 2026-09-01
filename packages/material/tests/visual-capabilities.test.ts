@@ -18,6 +18,8 @@ class StubNode {
   textContent = '';
   src = '';
   alt = '';
+  naturalWidth = 0;
+  naturalHeight = 0;
   isConnected = true;
 
   constructor(readonly tagName: string) {}
@@ -130,7 +132,7 @@ describe('shape material visual capabilities', () => {
     expect(style.borderWidth).toBe('1px');
   });
 
-  it('declares borderRadius and shadow fields in the manifest', () => {
+  it('declares borderRadius, shadow, and rectangle gradient-border capabilities', () => {
     const schema = BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.styleSchema;
     if (schema?.kind !== 'object') throw new Error('unexpected schema');
     expect(schema.properties.borderRadius).toEqual({ kind: 'number', minimum: 0, maximum: 512 });
@@ -148,6 +150,16 @@ describe('shape material visual capabilities', () => {
     ).toBe(true);
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.borderRadius).toBe(0);
     expect(BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle.shadowColor).toBe('');
+    expect(
+      BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.stylePanel.find(
+        (field) => field.style === 'borderColor',
+      )?.allowGradient,
+    ).toBe(true);
+    expect(
+      BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST.stylePanel.find(
+        (field) => field.style === 'borderColor',
+      )?.allowGradient,
+    ).toBeUndefined();
   });
 
   it('renders borderRadius and boxShadow on the rectangle', () => {
@@ -202,6 +214,61 @@ describe('shape material visual capabilities', () => {
     );
     expect(solid.style.backgroundColor).toBe('#ff0000');
     expect(solid.style.backgroundImage).toBe('');
+  });
+
+  it('renders a rounded gradient border on a masked internal layer', () => {
+    const border = 'linear-gradient(135deg, #ff0000 0%, #0000ff 100%)';
+    const { created, style } = mount(
+      BaseScreenRectangleMaterialElement,
+      styleModel({
+        fill: 'transparent',
+        borderColor: border,
+        borderWidth: 4,
+        borderRadius: 12,
+      }),
+    );
+
+    expect(style.backgroundColor).toBe('transparent');
+    expect(style.borderColor).toBe('transparent');
+    expect(style.borderWidth).toBe('0px');
+    expect(created).toHaveLength(1);
+    expect(created[0]!.style).toMatchObject({
+      position: 'absolute',
+      inset: '0',
+      boxSizing: 'border-box',
+      borderRadius: 'inherit',
+      pointerEvents: 'none',
+      display: 'block',
+      backgroundImage: border,
+      padding: '4px',
+      maskComposite: 'exclude',
+      webkitMaskComposite: 'xor',
+    });
+  });
+
+  it('reuses and clears the gradient border layer when switching back to a solid border', () => {
+    const gradient = 'radial-gradient(circle at 50% 50%, #ffffff 0%, #000000 100%)';
+    const mounted = mount(
+      BaseScreenRectangleMaterialElement,
+      styleModel({ fill: '#ffffff', borderColor: gradient, borderWidth: 3, borderRadius: 8 }),
+    );
+    const layer = mounted.created[0]!;
+
+    mounted.setModel(
+      styleModel({ fill: '#ffffff', borderColor: '#ff765c', borderWidth: 2, borderRadius: 8 }),
+    );
+    expect(mounted.style.borderColor).toBe('#ff765c');
+    expect(mounted.style.borderWidth).toBe('2px');
+    expect(layer.style.display).toBe('none');
+    expect(layer.style.backgroundImage).toBe('');
+    expect(layer.style.mask).toBe('');
+
+    mounted.setModel(
+      styleModel({ fill: '#ffffff', borderColor: gradient, borderWidth: 5, borderRadius: 8 }),
+    );
+    expect(mounted.created).toHaveLength(1);
+    expect(layer.style.display).toBe('block');
+    expect(layer.style.padding).toBe('5px');
   });
 
   it('keeps the ellipse radius fixed at 50% and hides the borderRadius panel field', () => {
@@ -260,5 +327,72 @@ describe('image material url validation', () => {
     for (const listener of image.listeners.get('error') ?? []) listener();
     expect(element.textContent).toBe('图片加载失败');
     expect(image.isConnected).toBe(false);
+  });
+
+  it('projects natural dimensions after the current image loads', () => {
+    const { element, created } = mount(
+      BaseScreenImageMaterialElement,
+      dataModel('https://host/cover.png'),
+    );
+    const dataset = (element as unknown as { readonly dataset: Record<string, string> }).dataset;
+    const image = created[0]!;
+    image.naturalWidth = 320;
+    image.naturalHeight = 200;
+
+    for (const listener of image.listeners.get('load') ?? []) listener();
+
+    expect(dataset.baseScreenImageNaturalWidth).toBe('320');
+    expect(dataset.baseScreenImageNaturalHeight).toBe('200');
+  });
+
+  it('clears natural dimensions on source changes and ignores stale image events', () => {
+    const mounted = mount(BaseScreenImageMaterialElement, dataModel('https://host/first.png'));
+    const dataset = (mounted.element as unknown as { readonly dataset: Record<string, string> })
+      .dataset;
+    const first = mounted.created[0]!;
+    first.naturalWidth = 320;
+    first.naturalHeight = 200;
+    for (const listener of first.listeners.get('load') ?? []) listener();
+
+    mounted.setModel(dataModel('https://host/second.png'));
+    expect(dataset.baseScreenImageNaturalWidth).toBeUndefined();
+    expect(dataset.baseScreenImageNaturalHeight).toBeUndefined();
+    const second = mounted.created[1]!;
+    first.naturalWidth = 640;
+    first.naturalHeight = 400;
+    for (const listener of first.listeners.get('load') ?? []) listener();
+    expect(dataset.baseScreenImageNaturalWidth).toBeUndefined();
+
+    second.naturalWidth = 200;
+    second.naturalHeight = 24;
+    for (const listener of second.listeners.get('load') ?? []) listener();
+    for (const listener of first.listeners.get('error') ?? []) listener();
+    expect(dataset.baseScreenImageNaturalWidth).toBe('200');
+    expect(dataset.baseScreenImageNaturalHeight).toBe('24');
+
+    for (const listener of second.listeners.get('error') ?? []) listener();
+    expect(dataset.baseScreenImageNaturalWidth).toBeUndefined();
+    expect(dataset.baseScreenImageNaturalHeight).toBeUndefined();
+  });
+
+  it('clears natural dimensions for loading and invalid sources', () => {
+    const mounted = mount(BaseScreenImageMaterialElement, dataModel('https://host/cover.png'));
+    const dataset = (mounted.element as unknown as { readonly dataset: Record<string, string> })
+      .dataset;
+    const image = mounted.created[0]!;
+    image.naturalWidth = 320;
+    image.naturalHeight = 200;
+    for (const listener of image.listeners.get('load') ?? []) listener();
+
+    mounted.setModel({
+      ...dataModel(''),
+      dataState: { status: 'loading' },
+    });
+    expect(dataset.baseScreenImageNaturalWidth).toBeUndefined();
+    expect(dataset.baseScreenImageNaturalHeight).toBeUndefined();
+
+    mounted.setModel(dataModel('javascript:alert(1)'));
+    expect(dataset.baseScreenImageNaturalWidth).toBeUndefined();
+    expect(dataset.baseScreenImageNaturalHeight).toBeUndefined();
   });
 });

@@ -17,6 +17,7 @@ import { DesignerPanelController } from '../../browser/controllers/panel/designe
 import { DesignerProjectFeedbackController } from '../../browser/controllers/project/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from '../../browser/controllers/project/designer-project-workspace-controller.js';
 import { DesignerWorkbenchController } from '../../browser/controllers/workbench/designer-workbench-controller.js';
+import { readDesignerImageNaturalSize } from '../../browser/dom/designer-image-metadata-dom.js';
 import { designerIcon } from '../../browser/ui/designer-icons.js';
 import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
@@ -280,6 +281,7 @@ export function initializeDesignerElementControllers(
     getMaterialLibraryGrouping: () => state.materialLibraryGrouping,
     getDocument: () => state.session.document,
     getGeometryDocument: () => getDesignerGeometryDocument(state),
+    getImageNaturalSize: (componentId) => readDesignerImageNaturalSize(state.canvas, componentId),
     getDatasetFields: () => state.datasetController.getFocusedDatasetFields(),
     getGroupMaterialType: () => state.groupMaterialType,
     getInteraction: () => state.session.interaction,

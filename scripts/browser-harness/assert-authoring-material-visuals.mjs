@@ -1,7 +1,7 @@
 export async function assertAuthoringMaterialVisuals(page, designer) {
   const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
   // 官方物料视觉能力（ADR-0055）：矩形面板出现圆角/阴影字段，设置后画布样式生效
-  // （圆角/阴影/渐变 fill 渲染为 background-image）。
+  // （圆角/阴影/渐变 fill，以及不改变 canonical bounds 的渐变 border）。
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const card = [...root.querySelectorAll('button')].find(
@@ -12,7 +12,13 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
   await page.waitForFunction(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-inspector-pane="appearance"]');
-    return panel?.innerText.includes('圆角') && panel.innerText.includes('阴影模糊');
+    return (
+      panel?.innerText.includes('圆角') &&
+      panel.innerText.includes('阴影模糊') &&
+      panel.querySelector(
+        '[data-style="borderColor"][data-color-palette-field="mode"][value="linear-gradient"]',
+      ) !== null
+    );
   });
   const visualResult = await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
@@ -35,6 +41,8 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
           shadowOffsetX: 4,
           shadowOffsetY: 6,
           fill: 'linear-gradient(90deg, #ff0000, #0000ff)',
+          borderColor: 'linear-gradient(135deg, #ff765c 0%, #7c6cff 100%)',
+          borderWidth: 4,
         },
       },
     });
@@ -46,10 +54,22 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
     const element = [...root.querySelectorAll('[data-base-screen-component-id]')].find(
       (entry) => entry.tagName.toLowerCase() === 'base-screen-rectangle',
     );
+    const border = element?.querySelector('[data-base-screen-gradient-border]');
+    const elementBounds = element?.getBoundingClientRect();
+    const borderBounds = border?.getBoundingClientRect();
     return (
       element?.style.borderRadius === '16px' &&
       element?.style.boxShadow !== '' &&
-      element?.style.backgroundImage.startsWith('linear-gradient(')
+      element?.style.backgroundImage.startsWith('linear-gradient(') &&
+      element?.style.borderWidth === '0px' &&
+      border?.style.backgroundImage.startsWith('linear-gradient(') &&
+      border?.style.padding === '4px' &&
+      border?.style.borderRadius === 'inherit' &&
+      border?.style.pointerEvents === 'none' &&
+      ['exclude', 'xor'].includes(border?.style.maskComposite) &&
+      ['exclude', 'xor'].includes(border?.style.webkitMaskComposite) &&
+      elementBounds?.width === borderBounds?.width &&
+      elementBounds?.height === borderBounds?.height
     );
   });
 

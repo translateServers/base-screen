@@ -41,6 +41,20 @@ const shapeStylePanel = [
   { style: 'opacity', label: '不透明度', control: 'number' as const },
 ];
 
+const rectangleStylePanel = shapeStylePanel.map((field) =>
+  field.style === 'borderColor' ? { ...field, allowGradient: true } : field,
+);
+
+const GRADIENT_BORDER_MASK =
+  'linear-gradient(#ffffff 0 0) content-box, linear-gradient(#ffffff 0 0)';
+
+type GradientBorderStyle = CSSStyleDeclaration & {
+  mask: string;
+  maskComposite: string;
+  webkitMask: string;
+  webkitMaskComposite: string;
+};
+
 const shapeDefaultStyle = {
   fill: '#2563eb',
   borderColor: '#1d4ed8',
@@ -65,7 +79,7 @@ export const BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest
   defaultProps: {},
   defaultStyle: shapeDefaultStyle,
   styleSchema: shapeStyleSchema,
-  stylePanel: shapeStylePanel,
+  stylePanel: rectangleStylePanel,
   propsSchema: { kind: 'object', properties: {}, required: [] },
   propertyPanel: [],
   events: [],
@@ -84,21 +98,74 @@ export const BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
 };
 
 class BaseScreenShapeMaterialElement extends BaseScreenOfficialMaterialElement {
+  #gradientBorderLayer: HTMLDivElement | undefined;
+
   protected renderMaterial(): void {
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
     const { style } = model;
     applyBackgroundColorOrGradient(this, typeof style.fill === 'string' ? style.fill : '');
     this.style.boxSizing = 'border-box';
-    this.style.borderColor = typeof style.borderColor === 'string' ? style.borderColor : '';
-    this.style.borderStyle = 'solid';
-    this.style.borderWidth = typeof style.borderWidth === 'number' ? `${style.borderWidth}px` : '';
+    this.renderBorder(
+      typeof style.borderColor === 'string' ? style.borderColor : '',
+      typeof style.borderWidth === 'number' ? style.borderWidth : undefined,
+    );
     this.style.opacity = typeof style.opacity === 'number' ? String(style.opacity) : '';
     this.style.borderRadius =
       typeof style.borderRadius === 'number' && Number.isFinite(style.borderRadius)
         ? `${style.borderRadius}px`
         : '0px';
     this.style.boxShadow = this.shadowStyle(style);
+  }
+
+  private renderBorder(color: string, width: number | undefined): void {
+    const gradient = isGradientColorValue(color);
+    this.style.borderColor = gradient ? 'transparent' : color;
+    this.style.borderStyle = 'solid';
+    this.style.borderWidth = gradient ? '0px' : width === undefined ? '' : `${width}px`;
+    this.renderGradientBorder(
+      gradient && width !== undefined && width > 0 ? color : undefined,
+      width,
+    );
+  }
+
+  private renderGradientBorder(gradient: string | undefined, width: number | undefined): void {
+    const layer =
+      gradient === undefined ? this.#gradientBorderLayer : this.ensureGradientBorderLayer();
+    if (layer === undefined) return;
+    const style = layer.style as GradientBorderStyle;
+    if (gradient === undefined || width === undefined) {
+      style.display = 'none';
+      style.backgroundImage = '';
+      style.padding = '';
+      style.mask = '';
+      style.maskComposite = '';
+      style.webkitMask = '';
+      style.webkitMaskComposite = '';
+      return;
+    }
+    style.display = 'block';
+    style.backgroundImage = gradient;
+    style.padding = `${width}px`;
+    style.webkitMask = GRADIENT_BORDER_MASK;
+    style.webkitMaskComposite = 'xor';
+    style.mask = GRADIENT_BORDER_MASK;
+    style.maskComposite = 'exclude';
+  }
+
+  private ensureGradientBorderLayer(): HTMLDivElement {
+    if (this.#gradientBorderLayer !== undefined) return this.#gradientBorderLayer;
+    const layer = this.ownerDocument.createElement('div');
+    layer.setAttribute('data-base-screen-gradient-border', '');
+    layer.setAttribute('aria-hidden', 'true');
+    layer.style.position = 'absolute';
+    layer.style.inset = '0';
+    layer.style.boxSizing = 'border-box';
+    layer.style.borderRadius = 'inherit';
+    layer.style.pointerEvents = 'none';
+    this.appendChild(layer);
+    this.#gradientBorderLayer = layer;
+    return layer;
   }
 
   private shadowStyle(style: Readonly<Record<string, unknown>>): string {

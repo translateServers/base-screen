@@ -18,7 +18,3 @@ export {
   createPropertyTransaction,
   parsePropertyControlValue,
 } from './designer-property-transactions.js';
-export {
-  createStyleRuleClickTransaction,
-  createStyleRuleEditTransaction,
-} from './designer-style-rule-transactions.js';

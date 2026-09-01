@@ -42,7 +42,11 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
 export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialElement {
   static readonly manifest = BASE_SCREEN_IMAGE_MATERIAL_MANIFEST;
 
+  #renderGeneration = 0;
+
   protected renderMaterial(): void {
+    const renderGeneration = ++this.#renderGeneration;
+    this.#clearNaturalSize();
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
     this.replaceChildren();
@@ -72,20 +76,41 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
       return;
     }
     const image = this.ownerDocument.createElement('img');
-    image.src = source;
     image.alt = '';
     image.style.width = '100%';
     image.style.height = '100%';
     image.style.objectFit =
       typeof model.style.objectFit === 'string' ? model.style.objectFit : 'contain';
+    // 自然尺寸仅投影到当前物料宿主，供 Designer 的一次性倍图操作读取；不进入
+    // Material Model 或公共 ABI。generation guard 防止换源后的过期事件恢复旧尺寸。
+    image.addEventListener('load', () => {
+      if (renderGeneration !== this.#renderGeneration || !image.isConnected) return;
+      if (
+        !Number.isFinite(image.naturalWidth) ||
+        !Number.isFinite(image.naturalHeight) ||
+        image.naturalWidth <= 0 ||
+        image.naturalHeight <= 0
+      ) {
+        this.#clearNaturalSize();
+        return;
+      }
+      this.dataset.baseScreenImageNaturalWidth = String(image.naturalWidth);
+      this.dataset.baseScreenImageNaturalHeight = String(image.naturalHeight);
+    });
     // 加载失败回退（ADR-0056 R2）：移除失效图片并显示占位，重建不残留旧图片。
     image.addEventListener('error', () => {
-      if (image.isConnected) {
-        image.remove();
-        this.textContent = '图片加载失败';
-      }
+      if (renderGeneration !== this.#renderGeneration || !image.isConnected) return;
+      this.#clearNaturalSize();
+      image.remove();
+      this.textContent = '图片加载失败';
     });
+    image.src = source;
     this.appendChild(image);
+  }
+
+  #clearNaturalSize(): void {
+    delete this.dataset.baseScreenImageNaturalWidth;
+    delete this.dataset.baseScreenImageNaturalHeight;
   }
 }
 

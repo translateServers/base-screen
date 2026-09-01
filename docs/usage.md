@@ -554,6 +554,22 @@ designer.executeCommand({
 该选项仅适用于 `base.text`，不提供自适应高度、容器填充或自定义物料尺寸协议。架构边界见
 [ADR-0065](./decisions/ADR-0065-text-auto-width-runtime-geometry.md)。
 
+#### 官方图片倍图尺寸
+
+单选官方图片组件 `base.image` 后，几何属性区会显示无状态的 `1x`、`2x`、`3x`、`4x`
+按钮。图片加载完成后，点击按钮会把当前自然尺寸一次性换算为固定宽高：
+`width = naturalWidth / 倍率`、`height = naturalHeight / 倍率`。`1x` 使用原图自然尺寸，
+`2x`、`3x`、`4x` 分别除以对应倍率；结果按统一几何规则保留两位小数，并限制在
+`1..1000000`。
+
+每次实际变化只提交一个 `update-components` 事务，且只修改 `size`；相同尺寸不会新增历史。
+倍率不会写入文档，也没有 `autoSize` 或 `pixelRatio` 字段。换图、重新加载或数据刷新不会继续
+调整宽高，后续拖拽与宽高输入仍按普通固定尺寸工作。结果允许超出画布，Viewer、预览与导出只
+消费已经写入的固定宽高。
+
+图片尚未加载、自然尺寸无效或组件已锁定时不会修改文档，并会产生诊断；多选和非官方图片
+物料不显示这组按钮。图片资产的上传、转码和多规格管理仍由宿主负责。
+
 #### 画布调色板
 
 画布背景支持单色、线性渐变和径向渐变（ADR-0048）。`canvas.background` 是严格的 JSON-safe 判别对象；未声明时，既有 `backgroundColor` 继续表示单色。结构化调色板颜色仅接受十六进制色值或 `transparent`，渐变有 2..8 个位置严格递增的色标。Designer 的「画布」面板提供三种模式，宿主可使用同一事务语义设置或清除：
@@ -578,7 +594,7 @@ designer.setCanvasBackground(null);
 
 属性面板与 Manifest Editor Descriptor 中所有 `control: 'color'` 字段共享同一个三段式调色板（ADR-0050/0051），已全面替换原生单色 input：单色、线性渐变、径向渐变三种模式无条件可用。渐变模式支持添加/删除 2..8 个色标、编辑每个色标的颜色与位置，并设置线性角度或径向中心。控件采用紧凑行内排布：单色的颜色与透明度同行，色标的颜色与位置同行，色标透明度与增删按钮同行。每个颜色控件的无边框 hex 输入支持 `#RGB`、`#RGBA`、`#RRGGBB` 与 `#RRGGBBAA`（也保留 `transparent` token）；失焦/提交时同步 swatch、透明度和色标，未完成或非法输入不会写入文档，输入本身不显示焦点 outline。单色切到渐变仍按既有色系派生；从渐变切回单色时，当前选中色标的颜色（含透明度）成为单色值，`transparent` 色标保持原单色。字段值仍是普通字符串：单色为色值，渐变保存为规范化 CSS 渐变字符串，物料渲染与既有文档无需改动。切换模式不会丢失各模式的编辑草稿；撤销/重做或替换文档会按文档值重新解析。
 
-渐变字符串是否真正生效取决于物料渲染端的消费方式：写 CSS `background` 类属性的字段（如 `backgroundColor`、`fill`）天然生效；官方文本物料（`base.text`）的 `color` 字段经 `background-clip: text` 渲染渐变文字（文字透明、渐变按字形显示）；`border-color`、SVG 图表与 ECharts option 内部色等不接受 CSS 渐变字符串的属性不会渲染渐变，这类字段请使用单色。
+渐变字符串是否真正生效取决于物料渲染端的消费方式：写 CSS `background` 类属性的字段（如 `backgroundColor`、`fill`）天然生效；官方文本物料（`base.text`）的 `color` 字段经 `background-clip: text` 渲染渐变文字（文字透明、渐变按字形显示）；官方矩形物料（`base.rectangle`）的 `borderColor` 通过组件内遮罩层渲染渐变边框，支持既有 `borderWidth` 与 `borderRadius`，且不改变组件外部尺寸。原生 `border-color`、SVG 图表与 ECharts option 内部色等未做专门适配的属性仍不接受 CSS 渐变字符串，这类字段请使用单色。
 
 #### 画布背景图片
 
@@ -953,6 +969,9 @@ const configured = viewer.configure({
   ]
 }
 ```
+
+Designer 不提供 `styleRules` 内建编辑区。既有文档规则继续正常解析和渲染；确需维护文档规则时，
+由宿主生成 canonical 文档，或通过公开 `update-components` 事务整体替换 `styleRules`。
 
 **通道二：`conditionalStylePort`**（ADR-0059）适合判定与视觉映射都归宿主告警体系维护的场景：
 阈值调整零文档变更、多租户同屏不同视觉策略。`resolve` 必须是同步纯函数（相同输入返回相同

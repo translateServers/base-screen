@@ -5,6 +5,7 @@ import { assertAuthoringMaterials } from './assert-authoring-materials.mjs';
 import { assertAuthoringProject } from './assert-authoring-project.mjs';
 import { assertCanvasBasics, assertInitialCanvasPointerFocus } from './assert-canvas-basics.mjs';
 import { assertDesktopBaseline } from './assert-desktop-baseline.mjs';
+import { assertImageDensitySize } from './assert-image-density-size.mjs';
 import { assertMaterialGroupNavigation } from './assert-material-group-navigation.mjs';
 import { assertRuntimeData } from './assert-runtime-data.mjs';
 import { assertTextAutoWidth } from './assert-text-auto-width.mjs';
@@ -21,6 +22,7 @@ export async function runBrowserHarness(serverPort) {
       await assertInitialCanvasPointerFocus(browser, baseUrl);
       await assertMaterialGroupNavigation(browser, baseUrl);
       await assertTextAutoWidth(browser, baseUrl);
+      await assertImageDensitySize(browser, baseUrl);
       for (const viewport of [
         { width: 1024, height: 640 },
         { width: 1366, height: 768 },

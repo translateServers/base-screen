@@ -3,6 +3,7 @@ import type {
   ScreenDocument,
   ScreenHostResourcePort,
   ScreenParseResult,
+  ScreenSize,
 } from '@base-screen/contracts';
 import type {
   ScreenDocumentCommand,
@@ -26,6 +27,8 @@ export interface DesignerPanelControllerCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   /** Read-only rendering/geometry input; clipboard and data editing use getDocument. */
   readonly getGeometryDocument?: () => ScreenDocument | undefined;
+  /** 当前图片物料宿主投影的内部自然尺寸；仅用于一次性倍图尺寸换算。 */
+  readonly getImageNaturalSize?: (componentId: string) => ScreenSize | undefined;
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;

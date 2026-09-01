@@ -1,5 +1,6 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
+import { createDesignerImageDensityTransaction } from '../../../common/operations/element/designer-image-density.js';
 import {
   createDesignerQuickStyleTransaction,
   type DesignerQuickStyleAction,
@@ -16,8 +17,6 @@ import {
   createDesignerCanvasPresentationSettings,
   createMultiSelectionTransaction,
   createPropertyTransaction,
-  createStyleRuleClickTransaction,
-  createStyleRuleEditTransaction,
   type DesignerCanvasBackgroundDrafts,
   type DesignerCanvasPresentationSettings,
   renderDesignerDataPanel,
@@ -102,6 +101,11 @@ export class DesignerPanelPropertyController {
       this.commitPropertyControl(geometryAction);
       return true;
     }
+    const imageDensityAction = target.closest<HTMLButtonElement>('[data-image-density-action]');
+    if (imageDensityAction !== null) {
+      this.applyImageDensity(imageDensityAction);
+      return true;
+    }
     const quickStyle = target.closest<HTMLButtonElement>('[data-quick-style]');
     if (quickStyle !== null) {
       const value = Number(quickStyle.dataset.quickStyle);
@@ -125,18 +129,7 @@ export class DesignerPanelPropertyController {
       this.executeOptionalTransaction(transaction);
       return true;
     }
-    const styleRuleAction =
-      target.closest<HTMLElement>('[data-style-rule-add]') ??
-      target.closest<HTMLElement>('[data-style-rule-remove]');
-    if (styleRuleAction === null) return false;
-    const transaction = createStyleRuleClickTransaction(
-      styleRuleAction,
-      this.callbacks.getDocument(),
-      this.callbacks.getInteraction(),
-      this.callbacks.getCatalog(),
-    );
-    this.executeOptionalTransaction(transaction);
-    return true;
+    return false;
   }
 
   onPropertyChange(event: Event): void {
@@ -191,16 +184,6 @@ export class DesignerPanelPropertyController {
     );
     if (dataTransaction !== undefined) {
       this.executeDraftTransaction(target, dataTransaction);
-      return;
-    }
-    const styleRuleTransaction = createStyleRuleEditTransaction(
-      target,
-      this.callbacks.getDocument(),
-      this.callbacks.getInteraction(),
-      this.callbacks.getCatalog(),
-    );
-    if (styleRuleTransaction !== undefined) {
-      this.executeDraftTransaction(target, styleRuleTransaction);
       return;
     }
     if (this.commitPropertyControl(target)) return;
@@ -291,6 +274,24 @@ export class DesignerPanelPropertyController {
     this.report(result);
   }
 
+  private applyImageDensity(button: HTMLButtonElement): void {
+    const componentId = button.dataset.imageDensityComponentId ?? '';
+    const density = Number(button.dataset.imageDensityAction);
+    const transaction = createDesignerImageDensityTransaction(
+      this.callbacks.getDocument(),
+      componentId,
+      this.callbacks.getImageNaturalSize?.(componentId),
+      density,
+    );
+    if (!transaction.ok) {
+      this.callbacks.emitDiagnostics(transaction.diagnostics);
+      return;
+    }
+    if (transaction.value !== undefined) {
+      this.report(this.callbacks.executeTransaction(transaction.value));
+    }
+  }
+
   private commitPropertyControl(target: EventTarget | null): boolean {
     const transaction = createPropertyTransaction(
       target,
@@ -363,11 +364,7 @@ function isDesignerDraft(target: EventTarget | null): boolean {
       dataset.canvasSetting !== undefined ||
       dataset.dataSourceType !== undefined ||
       dataset.dataSourceField !== undefined ||
-      dataset.multiProperty !== undefined ||
-      dataset.styleRulePath !== undefined ||
-      dataset.styleRuleOperator !== undefined ||
-      dataset.styleRuleValue !== undefined ||
-      dataset.styleRuleStyle !== undefined)
+      dataset.multiProperty !== undefined)
   );
 }
 

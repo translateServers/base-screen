@@ -222,10 +222,50 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'summary')
         .map((element) => element.textContent),
-    ).toEqual(['几何', '状态', '内容', '样式', '条件样式']);
+    ).toEqual(['几何', '状态', '内容', '样式']);
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
       'Status',
     );
+  });
+
+  it('does not expose an editor for existing document conditional style rules', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const base = document();
+    const withRules: ScreenDocument = {
+      ...base,
+      components: base.components.map((component) => ({
+        ...component,
+        styleRules: [
+          {
+            id: 'warn',
+            when: { path: ['level'], operator: 'eq', value: 'warn' },
+            style: { color: '#ff4d4f' },
+          },
+        ],
+      })),
+    };
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      withRules,
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      catalog(),
+    );
+
+    const all = descendants(properties);
+    expect(all.some((element) => element.textContent === '条件样式')).toBe(false);
+    expect(
+      all.every(
+        (element) =>
+          element.dataset.styleRuleAdd === undefined &&
+          element.dataset.styleRuleRemove === undefined &&
+          element.dataset.styleRulePath === undefined &&
+          element.dataset.styleRuleOperator === undefined &&
+          element.dataset.styleRuleValue === undefined &&
+          element.dataset.styleRuleStyle === undefined,
+      ),
+    ).toBe(true);
   });
 
   it('disables editable controls while preserving locked and hidden status toggles', () => {
@@ -293,6 +333,28 @@ describe('designer panel rendering', () => {
         value: '销售趋势图',
       },
     );
+    const densityActions = descendants(properties).filter(
+      (element) => element.dataset.imageDensityAction !== undefined,
+    );
+    expect(densityActions.map((element) => element.dataset.imageDensityAction)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+    ]);
+    expect(densityActions.map((element) => element.textContent)).toEqual(['1x', '2x', '3x', '4x']);
+    expect(densityActions.map((element) => element.dataset.imageDensityComponentId)).toEqual([
+      'label-1',
+      'label-1',
+      'label-1',
+      'label-1',
+    ]);
+    expect(densityActions.map((element) => element.title)).toEqual([
+      '按原图自然尺寸设置宽高',
+      '按 2 倍图设置宽高',
+      '按 3 倍图设置宽高',
+      '按 4 倍图设置宽高',
+    ]);
   });
 
   it('renders no material properties for a multi-selection', () => {
@@ -316,6 +378,9 @@ describe('designer panel rendering', () => {
     expect(descendants(properties).some((element) => element.dataset.prop !== undefined)).toBe(
       false,
     );
+    expect(
+      descendants(properties).some((element) => element.dataset.imageDensityAction !== undefined),
+    ).toBe(false);
     expect(
       descendants(properties).some((element) => element.textContent === '已选择 2 个组件。'),
     ).toBe(true);

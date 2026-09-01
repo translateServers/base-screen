@@ -31,7 +31,6 @@ import {
   appendSection,
   appendStyleControl,
 } from './designer-panel-primitives.js';
-import { appendStyleRulesSection } from './designer-style-rules-dom.js';
 
 export function renderDesignerProperties(
   properties: HTMLElement,
@@ -154,6 +153,9 @@ function appendComponentControls(
     '0',
   );
   zIndex.dataset.inspectorAdvanced = 'true';
+  if (context.kind === 'single-material' && component.type === 'base.image') {
+    appendImageDensityActions(geometryGrid, component.id);
+  }
   const status = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.status, true);
   const statusGrid = appendFieldGrid(status);
   appendCheckbox(
@@ -183,7 +185,6 @@ function appendComponentControls(
       catalog,
       getDatasetFields,
     });
-    appendStyleRulesSection(properties, component, manifest, document);
     return;
   }
   const content =
@@ -226,7 +227,28 @@ function appendComponentControls(
       );
     }
   }
-  appendStyleRulesSection(properties, component, manifest, document);
+}
+
+function appendImageDensityActions(parent: HTMLElement, componentId: string): void {
+  const field = parent.ownerDocument.createElement('div');
+  field.className = 'designer-field designer-field-label designer-image-density-field';
+  field.textContent = DESIGNER_UI_TEXT.propertiesPanel.imageDensity;
+  const actions = parent.ownerDocument.createElement('span');
+  actions.className = 'designer-image-density-actions';
+  for (const density of [1, 2, 3, 4] as const) {
+    const title = DESIGNER_UI_TEXT.propertiesPanel.imageDensityAction(density);
+    const button = createDesignerButton(parent.ownerDocument, {
+      ariaLabel: title,
+      className: 'designer-image-density-button',
+      text: DESIGNER_UI_TEXT.propertiesPanel.imageDensityValue(density),
+      title,
+    });
+    button.dataset.imageDensityAction = String(density);
+    button.dataset.imageDensityComponentId = componentId;
+    actions.appendChild(button);
+  }
+  field.appendChild(actions);
+  parent.appendChild(field);
 }
 
 function appendCommonOpacityControl(

@@ -113,6 +113,105 @@ describe('DesignerPanelController property drafts', () => {
       },
     ]);
   });
+
+  it('routes image density clicks through one fixed-size transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const transactions: ScreenDocumentTransaction[] = [];
+    const source: ScreenDocument = {
+      ...document(),
+      components: [
+        {
+          ...document().components[0]!,
+          type: 'base.image',
+          size: { width: 240, height: 160 },
+        },
+      ],
+    };
+    const controller = new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: () => ({ ok: true, value: source, diagnostics: [] }),
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return { ok: true, value: source, diagnostics: [] };
+      },
+      getCatalog: catalog,
+      getDocument: () => source,
+      getImageNaturalSize: () => ({ width: 320, height: 200 }),
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: source, diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: source, diagnostics: [] }),
+    });
+    const button = new FakeElement('button', new FakeDocument());
+    button.dataset.imageDensityAction = '3';
+    button.dataset.imageDensityComponentId = 'label-1';
+
+    controller.onClick({ target: button } as unknown as Event);
+
+    expect(transactions).toEqual([
+      {
+        commands: [
+          {
+            type: 'update-components',
+            componentIds: ['label-1'],
+            patch: { size: { width: 106.67, height: 66.67 } },
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('diagnoses unavailable image dimensions without executing a transaction', () => {
+    vi.stubGlobal('Element', FakeElement);
+    vi.stubGlobal('HTMLElement', FakeElement);
+    const transactions: ScreenDocumentTransaction[] = [];
+    const diagnostics: unknown[] = [];
+    const source: ScreenDocument = {
+      ...document(),
+      components: [{ ...document().components[0]!, type: 'base.image' }],
+    };
+    const controller = new DesignerPanelController({
+      emitDiagnostics: (value) => diagnostics.push(value),
+      executeCommand: () => ({ ok: true, value: source, diagnostics: [] }),
+      executeTransaction: (transaction) => {
+        transactions.push(transaction);
+        return { ok: true, value: source, diagnostics: [] };
+      },
+      getCatalog: catalog,
+      getDocument: () => source,
+      getImageNaturalSize: () => undefined,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      redo: () => ({ ok: true, value: source, diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: source, diagnostics: [] }),
+    });
+    const button = new FakeElement('button', new FakeDocument());
+    button.dataset.imageDensityAction = '2';
+    button.dataset.imageDensityComponentId = 'label-1';
+
+    controller.onClick({ target: button } as unknown as Event);
+
+    expect(transactions).toEqual([]);
+    expect(diagnostics).toEqual([
+      [
+        expect.objectContaining({
+          code: 'CORE_COMMAND_INVALID',
+          message: 'Image natural size is unavailable or invalid.',
+        }),
+      ],
+    ]);
+  });
 });
 
 describe('DesignerPanelController canvas background drafts', () => {
