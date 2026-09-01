@@ -7,6 +7,7 @@
 import { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME } from '@base-screen/engine';
+import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS } from '@base-screen/engine';
@@ -28,6 +29,7 @@ import { BaseScreenBlueprintCanvasSelection } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasState } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasStateEventDetail } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasTrace } from '@base-screen/engine';
+import { BaseScreenDesignerBackRequestEventDetail } from '@base-screen/engine';
 import { BaseScreenDesignerElement } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroup } from '@base-screen/engine';
 import { BaseScreenDesignerLeftPanelGroupChangeEventDetail } from '@base-screen/engine';
@@ -61,6 +63,8 @@ export { BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT }
 export { BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT }
 
 export { BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME }
+
+export { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT }
 
 export { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT }
 
@@ -106,6 +110,8 @@ export { BaseScreenBlueprintCanvasState }
 export { BaseScreenBlueprintCanvasStateEventDetail }
 
 export { BaseScreenBlueprintCanvasTrace }
+
+export { BaseScreenDesignerBackRequestEventDetail }
 
 export { BaseScreenDesignerElement }
 

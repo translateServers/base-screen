@@ -509,6 +509,25 @@ const configured = designer.configure({
 保持既有失败语义；直接文档模式的内置浮层不受影响。预览路由、鉴权、草稿存储与窗口打开全部
 由宿主实现，Base Screen 不新增网络、存储或窗口管理职责。
 
+#### 宿主返回请求
+
+需要从 Designer 返回宿主业务页面时，在 `configure()` 中声明 `backButton: true`。Base Screen 在
+顶栏渲染返回按钮，并在点击时派发可穿透 Shadow DOM 的 composed 事件；目标路由、未保存确认和
+鉴权继续由宿主处理：
+
+```ts
+import { BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT } from '@base-screen/sdk';
+
+designer.configure({ catalog, projectAdapter, backButton: true });
+designer.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, () => {
+  // 宿主在这里执行未保存确认，再返回自己的业务路由。
+  router.push('/screens');
+});
+```
+
+按钮默认隐藏。事件会冒泡且 `composed: true`，`detail` 固定为 `{ source: 'topbar' }`。宿主不应
+访问 Designer Shadow DOM，也不需要在设计器外重复渲染返回按钮。
+
 #### 官方文本自适应宽度
 
 选中官方文本组件，在属性面板勾选「自适应宽度」。组件按内容的最长一行撑宽，保留空格与手动

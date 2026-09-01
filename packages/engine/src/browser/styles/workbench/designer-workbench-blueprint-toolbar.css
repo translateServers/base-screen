@@ -167,6 +167,10 @@ button.topbar-mode-button:disabled {
   cursor: default;
 }
 
+.topbar-icon-button[hidden] {
+  display: none;
+}
+
 .topbar-icon-button svg,
 .topbar-more-button svg {
   width: 15px;

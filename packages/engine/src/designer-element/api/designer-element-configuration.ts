@@ -107,6 +107,12 @@ export function configure(
       diagnostics: [lifecycleDiagnostic('Designer previewHandler 必须是函数。')],
     };
   }
+  if (configuration.backButton !== undefined && typeof configuration.backButton !== 'boolean') {
+    return {
+      ok: false,
+      diagnostics: [lifecycleDiagnostic('Designer backButton 必须是布尔值。')],
+    };
+  }
   if (
     configuration.canvasBackgroundImageButton !== undefined &&
     typeof configuration.canvasBackgroundImageButton !== 'boolean'
@@ -200,6 +206,7 @@ export function configure(
   elementState.toolMaterialTypes = configuration.toolMaterialTypes;
   elementState.groupMaterialType = configuration.groupMaterialType;
   elementState.previewHandler = configuration.previewHandler;
+  elementState.backButton = configuration.backButton ?? false;
   elementState.canvasBackgroundImageButton = configuration.canvasBackgroundImageButton ?? false;
   elementState.blueprintWorkbenchController.setInitialMode(initialWorkbenchMode);
   elementState.runtime.initialize(element);

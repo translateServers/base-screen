@@ -91,6 +91,7 @@ export interface DesignerElementState {
   groupMaterialType: string | undefined;
   toolMaterialTypes: DesignerToolMaterialTypes | undefined;
   previewHandler: ((document: ScreenDocument) => boolean) | undefined;
+  backButton: boolean;
   canvasBackgroundImageButton: boolean;
   renderer: BaseScreenRenderer | undefined;
   canvas: HTMLDivElement | undefined;
@@ -160,6 +161,7 @@ export function createDesignerElementState(
   const state = { runtime } as DesignerElementState;
   designerElementStates.set(element, state);
   state.resolvedMaterialLibraryItems = [];
+  state.backButton = false;
   state.canvasBackgroundImageButton = false;
   state.instanceId = createScreenAuthoringInstanceId();
   state.pendingAuthoringRequests = new Map<

@@ -54,6 +54,9 @@ export const BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT = "base-screen-ca
 export const BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT: 'base-screen-canvas-presentation-change';
 
 // @public (undocumented)
+export const BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT: 'base-screen-designer-back-request';
+
+// @public (undocumented)
 export const BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT: 'base-screen-designer-blueprint-canvas';
 
 // @public (undocumented)
@@ -345,7 +348,14 @@ export interface BaseScreenCanvasPresentationChangeEventDetail {
 export type BaseScreenCanvasScaleMode = 'fill' | 'fit' | 'width' | 'height' | 'original' | 'none';
 
 // @public (undocumented)
+export interface BaseScreenDesignerBackRequestEventDetail {
+    // (undocumented)
+    readonly source: 'topbar';
+}
+
+// @public (undocumented)
 export interface BaseScreenDesignerConfiguration {
+    readonly backButton?: boolean;
     readonly canvasBackgroundImageButton?: boolean;
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
@@ -390,6 +400,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     align(alignment: BaseScreenAlignment): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     attributeChangedCallback(name: string, previousValue: string | null, value: string | null): void;
+    // (undocumented)
+    get backButton(): boolean;
     // (undocumented)
     cancelAuthoringEdit(requestId: string): boolean;
     // (undocumented)

@@ -48,6 +48,7 @@ export interface DesignerElementHost extends HTMLElement {
   materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   readonly previewHandler: ((document: ScreenDocument) => boolean) | undefined;
+  readonly backButton: boolean;
   readonly canvasBackgroundImageButton: boolean;
   projectAdapter: ScreenProjectAdapter | undefined;
   toolMaterialTypes: DesignerToolMaterialTypes | undefined;

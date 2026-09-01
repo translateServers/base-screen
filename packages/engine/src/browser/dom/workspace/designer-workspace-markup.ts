@@ -112,6 +112,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
     <main class="workspace">
       <header class="designer-topbar" aria-label="${DESIGNER_UI_TEXT.topbar}">
         <div class="topbar-brand">
+          <button type="button" class="topbar-icon-button" data-topbar-back title="${DESIGNER_UI_TEXT.back}" aria-label="${DESIGNER_UI_TEXT.back}" hidden>${designerIcon('chevron-left')}</button>
           <span class="topbar-product-mark" aria-hidden="true">${designerIcon('shapes')}</span>
           <span class="topbar-project-meta">
             <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>

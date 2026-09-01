@@ -3,6 +3,8 @@ import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerTopbarControllerCallbacks {
   readonly getHost: () => HTMLElement;
+  readonly isBackButtonVisible: () => boolean;
+  readonly requestBack: () => void;
   readonly canCreateSnapshot: () => boolean;
   readonly createSnapshot: (name: string) => Promise<ScreenParseResult<unknown>>;
   readonly notify: (message: string) => void;
@@ -13,6 +15,10 @@ export class DesignerTopbarController {
   constructor(private readonly callbacks: DesignerTopbarControllerCallbacks) {}
 
   onClick(target: Element): boolean {
+    if (target.closest('[data-topbar-back]') !== null) {
+      if (this.callbacks.isBackButtonVisible()) this.callbacks.requestBack();
+      return true;
+    }
     if (target.closest('[data-topbar-theme-toggle]') !== null) {
       const host = this.callbacks.getHost();
       host.setAttribute('theme', host.getAttribute('theme') === 'light' ? 'dark' : 'light');
@@ -29,6 +35,8 @@ export class DesignerTopbarController {
     const host = this.callbacks.getHost();
     const root = host.shadowRoot;
     if (root === null) return;
+    const back = root.querySelector<HTMLButtonElement>('[data-topbar-back]');
+    if (back !== null) back.hidden = !this.callbacks.isBackButtonVisible();
     const theme = root.querySelector<HTMLButtonElement>('[data-topbar-theme-toggle]');
     if (theme !== null) theme.ariaPressed = String(host.getAttribute('theme') === 'light');
     const snapshot = root.querySelector<HTMLButtonElement>('[data-topbar-snapshot]');

@@ -66,6 +66,7 @@ import {
   validateHostResourceAuthoringIntent,
 } from '../api/designer-element-host-resource.js';
 import {
+  readBackButton,
   readCanvasBackgroundImageButton,
   readGroupMaterialType,
   readMaterialLibraryGrouping,
@@ -180,6 +181,7 @@ export const designerElementRuntime = {
   writeMaterialLibraryItems,
   readRuntimeContributions,
   readPreviewHandler,
+  readBackButton,
   readCanvasBackgroundImageButton,
   writeRuntimeContributions,
   readProjectAdapter,

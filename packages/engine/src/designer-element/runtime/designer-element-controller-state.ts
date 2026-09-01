@@ -22,6 +22,10 @@ import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   type BaseScreenCanvasPresentationChangeEventDetail,
 } from '../../common/operations/canvas/canvas-presentation.js';
+import {
+  BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
+  type BaseScreenDesignerBackRequestEventDetail,
+} from '../../common/operations/workbench/designer-navigation.js';
 import { DesignerProjectGateway } from '../../common/project/designer-project-gateway.js';
 import { DesignerSession } from '../../common/session/designer-session.js';
 import { getDesignerGeometryDocument } from './designer-element-geometry.js';
@@ -55,6 +59,18 @@ export function initializeDesignerElementControllers(
   });
   state.topbarController = new DesignerTopbarController({
     getHost: () => element,
+    isBackButtonVisible: () => state.backButton,
+    requestBack: () =>
+      element.dispatchEvent(
+        new CustomEvent<BaseScreenDesignerBackRequestEventDetail>(
+          BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
+          {
+            bubbles: true,
+            composed: true,
+            detail: { source: 'topbar' },
+          },
+        ),
+      ),
     canCreateSnapshot: () =>
       state.session.project !== undefined &&
       state.projectSnapshotPort !== undefined &&

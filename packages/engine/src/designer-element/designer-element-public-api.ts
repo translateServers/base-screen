@@ -69,3 +69,7 @@ export {
   baseScreenDesignerLeftPanelSlotName,
   parseBaseScreenDesignerLeftPanelGroups,
 } from '../common/operations/workbench/designer-left-panel-groups.js';
+export {
+  BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT,
+  type BaseScreenDesignerBackRequestEventDetail,
+} from '../common/operations/workbench/designer-navigation.js';

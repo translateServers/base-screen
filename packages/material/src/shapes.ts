@@ -89,6 +89,7 @@ class BaseScreenShapeMaterialElement extends BaseScreenOfficialMaterialElement {
     if (model === undefined || !this.isConnected) return;
     const { style } = model;
     applyBackgroundColorOrGradient(this, typeof style.fill === 'string' ? style.fill : '');
+    this.style.boxSizing = 'border-box';
     this.style.borderColor = typeof style.borderColor === 'string' ? style.borderColor : '';
     this.style.borderStyle = 'solid';
     this.style.borderWidth = typeof style.borderWidth === 'number' ? `${style.borderWidth}px` : '';

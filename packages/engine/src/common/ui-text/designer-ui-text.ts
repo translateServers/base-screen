@@ -122,6 +122,7 @@ export const DESIGNER_UI_TEXT = {
   },
   leftPanel: '左侧面板',
   topbar: '设计器顶栏',
+  back: '返回',
   unnamedProject: '未命名大屏',
   canvasWorkspace: '画布',
   interactionWorkspace: '交互编排',

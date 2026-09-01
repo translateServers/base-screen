@@ -360,6 +360,32 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.canvasBackgroundImageButton).toBe(false);
   });
 
+  it('accepts the host back button flag and exposes it via getter', () => {
+    const designer = new BaseScreenDesignerElement();
+    expect(designer.backButton).toBe(false);
+
+    const configured = designer.configure({
+      catalog: catalog(),
+      backButton: true,
+    });
+    expect(configured.ok).toBe(true);
+    expect(designer.backButton).toBe(true);
+  });
+
+  it('rejects a non-boolean host back button flag before committing', () => {
+    const designer = new BaseScreenDesignerElement();
+    const firstCatalog = catalog();
+    expect(designer.configure({ catalog: firstCatalog }).ok).toBe(true);
+
+    const result = designer.configure({
+      catalog: catalog(),
+      backButton: 'yes' as unknown as boolean,
+    });
+    expect(result.ok).toBe(false);
+    expect(designer.catalog).toBe(firstCatalog);
+    expect(designer.backButton).toBe(false);
+  });
+
   it('rejects a non-function preview handler before committing any field (RB3)', () => {
     const designer = new BaseScreenDesignerElement();
     const result = designer.configure({

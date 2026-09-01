@@ -24,7 +24,13 @@ function component(id: string, type: string, locked = false): ScreenComponentNod
     zIndex: 0,
     status: { locked, hidden: false },
     props: {},
-    style: { fill: '#000000', borderWidth: 1, color: '#ffffff', fontSize: 12 },
+    style: {
+      fill: '#000000',
+      borderColor: '#111111',
+      borderWidth: 1,
+      color: '#ffffff',
+      fontSize: 12,
+    },
     dataSource: null,
   };
 }
@@ -51,12 +57,14 @@ const SHAPE_MANIFEST: BaseScreenMaterialManifest = {
     kind: 'object',
     properties: {
       fill: { kind: 'string' },
+      borderColor: { kind: 'string' },
       borderWidth: { kind: 'number', minimum: 0, maximum: 100 },
     },
     required: [],
   },
   stylePanel: [
     { style: 'fill', label: '填充', control: 'color' },
+    { style: 'borderColor', label: '边框颜色', control: 'color' },
     { style: 'borderWidth', label: '边框宽度', control: 'number' },
   ],
   propsSchema: { kind: 'object', properties: {}, required: [] },
@@ -141,6 +149,31 @@ describe('designer multi selection operations', () => {
     expect(result.document.components.find((c) => c.id === 'a')?.style.color).toBe('#ff0000');
     expect(result.document.components.find((c) => c.id === 'b')?.style.color).toBe('#ffffff');
     expect(result.document.components.find((c) => c.id === 'c')?.style.color).toBe('#ff0000');
+  });
+
+  it('enables zero-width borders when their color changes in a batch', () => {
+    const shapes = ['a', 'b'].map((id) => {
+      const item = component(id, 'test.shape');
+      return { ...item, style: { ...item.style, borderWidth: 0 } };
+    });
+    const source = document(shapes);
+    const transaction = createMultiSelectionStyleTransaction(
+      source,
+      ['a', 'b'],
+      'borderColor',
+      '#ff765c',
+      catalog(),
+    );
+
+    expect(transaction).toMatchObject({
+      ok: true,
+      value: {
+        commands: [
+          { patch: { style: { borderColor: '#ff765c', borderWidth: 1 } } },
+          { patch: { style: { borderColor: '#ff765c', borderWidth: 1 } } },
+        ],
+      },
+    });
   });
 
   it('rejects a style field outside the intersection', () => {

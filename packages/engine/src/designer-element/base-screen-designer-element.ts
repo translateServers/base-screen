@@ -137,6 +137,10 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.readPreviewHandler(this);
   }
 
+  get backButton(): boolean {
+    return this.#designerState.runtime.readBackButton(this);
+  }
+
   get canvasBackgroundImageButton(): boolean {
     return this.#designerState.runtime.readCanvasBackgroundImageButton(this);
   }

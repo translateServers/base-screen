@@ -114,6 +114,22 @@ function dataModel(value: ScreenJsonValue): BaseScreenMaterialModel {
 }
 
 describe('shape material visual capabilities', () => {
+  it('keeps visible borders within the canonical component bounds', () => {
+    const { style } = mount(
+      BaseScreenRectangleMaterialElement,
+      styleModel({
+        ...BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.defaultStyle,
+        borderColor: '#ff765c',
+        borderWidth: 1,
+      }),
+    );
+
+    expect(style.boxSizing).toBe('border-box');
+    expect(style.borderColor).toBe('#ff765c');
+    expect(style.borderStyle).toBe('solid');
+    expect(style.borderWidth).toBe('1px');
+  });
+
   it('declares borderRadius and shadow fields in the manifest', () => {
     const schema = BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST.styleSchema;
     if (schema?.kind !== 'object') throw new Error('unexpected schema');

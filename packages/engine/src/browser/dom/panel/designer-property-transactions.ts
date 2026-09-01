@@ -30,6 +30,7 @@ import {
   type DesignerInspectorContext,
   getDesignerInspectorContext,
 } from '../../../common/operations/style/designer-inspector.js';
+import { createDesignerStyleFieldPatch } from '../../../common/operations/style/designer-style-field.js';
 import { readDesignerColorPaletteValue } from '../color/designer-color-palette-dom.js';
 import {
   createCanvasTransaction,
@@ -96,7 +97,7 @@ export function createPropertyTransaction(
       ? undefined
       : createValidatedStyleTransaction(
           component.id,
-          { ...component.style, [style]: value },
+          createDesignerStyleFieldPatch(component.style, style, value, manifest),
           manifest.styleSchema,
         );
   }

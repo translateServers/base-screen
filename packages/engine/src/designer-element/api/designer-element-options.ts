@@ -161,6 +161,12 @@ export function readPreviewHandler(
   return elementState.previewHandler;
 }
 
+export function readBackButton(element: DesignerElementHost): boolean {
+  const elementState = getDesignerElementState(element);
+
+  return elementState.backButton;
+}
+
 export function readCanvasBackgroundImageButton(element: DesignerElementHost): boolean {
   const elementState = getDesignerElementState(element);
 

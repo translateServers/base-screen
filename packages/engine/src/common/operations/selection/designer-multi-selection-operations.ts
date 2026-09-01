@@ -3,6 +3,7 @@ import type { ScreenDocumentCommand, ScreenDocumentTransaction } from '@base-scr
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { clampScreenSize, roundScreenGeometry } from '../element/designer-geometry.js';
+import { createDesignerStyleFieldPatch } from '../style/designer-style-field.js';
 import { selectedComponents } from './designer-selection.js';
 
 /**
@@ -59,7 +60,7 @@ export function createMultiSelectionStyleTransaction(
     commands.push({
       type: 'update-components',
       componentIds: [component.id],
-      patch: { style: { ...component.style, [style]: value } },
+      patch: { style: createDesignerStyleFieldPatch(component.style, style, value, manifest) },
     });
   }
   if (commands.length === 0) return undefined;
