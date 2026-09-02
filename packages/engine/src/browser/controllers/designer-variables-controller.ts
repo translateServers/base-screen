@@ -6,7 +6,7 @@ import {
   type ScreenVariable,
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
-import { variableReferenceCounts } from '../../common/operations/designer-variable-operations.js';
+import { collectVariableReferences } from '../../common/operations/designer-variable-operations.js';
 import {
   type DesignerVariablesDraft,
   renderDesignerVariables,
@@ -27,6 +27,7 @@ export class DesignerVariablesController {
   #panel: HTMLElement | undefined;
   #search = '';
   #typeFilter: 'all' | ScreenVariable['type'] = 'all';
+  #expandedReferenceName: string | undefined;
   #lastDocument: ScreenDocument | undefined;
   readonly #catalog: DesignerVariableCatalogController;
   readonly #editor: DesignerVariableEditorController;
@@ -56,6 +57,7 @@ export class DesignerVariablesController {
   release(): void {
     this.#panel = undefined;
     this.#lastDocument = undefined;
+    this.#expandedReferenceName = undefined;
     this.#catalog.clear();
     this.#editor.reset();
   }
@@ -72,6 +74,19 @@ export class DesignerVariablesController {
     const document = this.#lastDocument ?? this.callbacks.getDocument();
     const catalog = this.#catalog.view;
     const editor = this.#editor.view;
+    const references = document === undefined ? [] : collectVariableReferences(document);
+    const referenceCounts = new Map<string, number>();
+    for (const reference of references) {
+      referenceCounts.set(
+        reference.variableName,
+        (referenceCounts.get(reference.variableName) ?? 0) + 1,
+      );
+    }
+    const expandedReferenceName = references.some(
+      (reference) => reference.variableName === this.#expandedReferenceName,
+    )
+      ? this.#expandedReferenceName
+      : undefined;
     return {
       creating: editor.creating,
       create: {
@@ -91,7 +106,9 @@ export class DesignerVariablesController {
       deletingIndex: editor.deletingIndex,
       search: this.#search,
       typeFilter: this.#typeFilter,
-      referenceCounts: document === undefined ? new Map() : variableReferenceCounts(document),
+      referenceCounts,
+      references,
+      expandedReferenceName,
       catalog,
     };
   }
@@ -134,6 +151,15 @@ export class DesignerVariablesController {
       case 'duplicate':
         this.#editor.duplicateVariable(index);
         return true;
+      case 'references': {
+        const variable =
+          this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
+        if (variable === undefined) return true;
+        this.#expandedReferenceName =
+          this.#expandedReferenceName === variable.name ? undefined : variable.name;
+        this.renderAndFocus(`[data-variable-action="references"][data-variable-index="${index}"]`);
+        return true;
+      }
       case 'delete':
         this.#editor.requestDelete(index);
         return true;
@@ -189,6 +215,20 @@ export class DesignerVariablesController {
 
   onKeyDown(event: KeyboardEvent): boolean {
     const target = event.target;
+    if (
+      target instanceof HTMLElement &&
+      !event.isComposing &&
+      !event.altKey &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      (event.key === 'Enter' || event.key === ' ') &&
+      target.closest('[data-variable-action="references"]') !== null
+    ) {
+      event.preventDefault();
+      if (!event.repeat) this.onClick(target);
+      return true;
+    }
     if (
       target instanceof HTMLElement &&
       event.key === 'Escape' &&

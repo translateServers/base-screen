@@ -3,7 +3,7 @@ import type {
   ScreenHostVariableCatalogPort,
   ScreenHostVariablePort,
 } from '@base-screen/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DesignerVariablesController } from '../../../src/browser/controllers/designer-variables-controller.js';
 import { renderDesignerVariables } from '../../../src/browser/dom/designer-variables-dom.js';
 
@@ -174,7 +174,7 @@ describe('designer variables controller', () => {
     expect(hostRow.dataset.variableIdReadOnly).toBe('true');
     expect(
       descendants(hostRow).filter((child) => child.dataset.variableAction !== undefined),
-    ).toHaveLength(5); // 重命名/描述/复制/删除/预览；仅 variableId 只读
+    ).toHaveLength(6); // 引用/重命名/描述/复制/删除/预览；仅 variableId 只读
   });
 
   it('creates a static variable through the replace-variables command', () => {
@@ -271,6 +271,69 @@ describe('designer variables controller', () => {
       type: 'replace-variables',
       variables: [{ type: 'static', name: 'region', value: 'north' }],
     });
+  });
+
+  it('expands exact reference locations and exposes the canvas navigation target', () => {
+    const { controller, panel } = harness([{ type: 'static', name: 'region', value: 'north' }]);
+
+    const toggle = panel.querySelector<FakeElement>('[data-variable-action="references"]');
+    expect(toggle?.textContent).toBe('1 处引用');
+    expect(toggle?.getAttribute('aria-expanded')).toBe('false');
+
+    controller.onClick(action('references', 0));
+    const reference = panel.querySelector<FakeElement>(
+      '[data-variable-reference-target="component-parameter"]',
+    );
+    expect(reference?.dataset.layerSelect).toBe('chart');
+    expect(
+      panel
+        .querySelector<FakeElement>('[data-variable-action="references"]')
+        ?.getAttribute('aria-expanded'),
+    ).toBe('true');
+
+    controller.onClick(action('references', 0));
+    expect(panel.querySelector('[data-variable-reference-target]')).toBeNull();
+  });
+
+  it('toggles exact references from Enter or Space without repeat activation', () => {
+    const { controller } = harness([{ type: 'static', name: 'region', value: 'north' }]);
+    class ReferenceToggle {
+      readonly dataset = { variableAction: 'references', variableIndex: '0' };
+
+      closest(selector: string): ReferenceToggle | null {
+        return selector.includes('data-variable-action') || selector.includes('data-variable-index')
+          ? this
+          : null;
+      }
+    }
+    vi.stubGlobal('HTMLElement', ReferenceToggle);
+    const press = (key: 'Enter' | ' ', repeat = false) => {
+      const preventDefault = vi.fn();
+      const handled = controller.onKeyDown({
+        target: new ReferenceToggle(),
+        key,
+        repeat,
+        isComposing: false,
+        altKey: false,
+        ctrlKey: false,
+        metaKey: false,
+        shiftKey: false,
+        preventDefault,
+      } as unknown as KeyboardEvent);
+      expect(handled).toBe(true);
+      expect(preventDefault).toHaveBeenCalledOnce();
+    };
+
+    try {
+      press('Enter');
+      expect(controller.currentDraft().expandedReferenceName).toBe('region');
+      press('Enter', true);
+      expect(controller.currentDraft().expandedReferenceName).toBe('region');
+      press(' ');
+      expect(controller.currentDraft().expandedReferenceName).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('renames a referenced variable through the atomic core command', () => {
@@ -411,6 +474,8 @@ describe('designer variables rendering', () => {
       search: '',
       typeFilter: 'all',
       referenceCounts: new Map(),
+      references: [],
+      expandedReferenceName: undefined,
       catalog: {
         query: '',
         items: [],
@@ -453,6 +518,8 @@ describe('designer variables rendering', () => {
         search: '',
         typeFilter: 'all',
         referenceCounts: new Map(),
+        references: [],
+        expandedReferenceName: undefined,
         catalog: {
           query: '',
           items: [],

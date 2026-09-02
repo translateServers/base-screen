@@ -4,6 +4,7 @@ import type {
   ScreenHostVariableSummary,
   ScreenVariable,
 } from '@base-screen/contracts';
+import type { DesignerVariableReference } from '../../common/operations/designer-variable-operations.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
 import {
@@ -11,6 +12,10 @@ import {
   createDesignerInput,
   createDesignerSelect,
 } from './designer-ui-primitives.js';
+import {
+  appendVariableReferenceList,
+  createVariableReferenceCount,
+} from './designer-variable-references-dom.js';
 import {
   appendCreateEditor,
   appendDeleteConfirmation,
@@ -33,6 +38,8 @@ export interface DesignerVariablesDraft {
   readonly search: string;
   readonly typeFilter: 'all' | ScreenVariable['type'];
   readonly referenceCounts: ReadonlyMap<string, number>;
+  readonly references: readonly DesignerVariableReference[];
+  readonly expandedReferenceName: string | undefined;
   readonly catalog: DesignerVariableCatalogView;
 }
 
@@ -211,12 +218,18 @@ function appendVariableSummary(
 
   const meta = row.ownerDocument.createElement('div');
   meta.className = 'variable-meta';
-  const referenceCount = row.ownerDocument.createElement('span');
-  referenceCount.className = 'variable-reference-count';
-  referenceCount.textContent = DESIGNER_UI_TEXT.variables.references(
-    draft.referenceCounts.get(variable.name) ?? 0,
+  const references = draft.references.filter(
+    (reference) => reference.variableName === variable.name,
   );
-  meta.appendChild(referenceCount);
+  meta.appendChild(
+    createVariableReferenceCount(
+      row.ownerDocument,
+      variable,
+      index,
+      draft.referenceCounts.get(variable.name) ?? 0,
+      draft.expandedReferenceName === variable.name,
+    ),
+  );
   if (variable.description !== undefined) {
     const description = row.ownerDocument.createElement('span');
     description.className = 'variable-description';
@@ -224,6 +237,9 @@ function appendVariableSummary(
     meta.appendChild(description);
   }
   row.appendChild(meta);
+  if (draft.expandedReferenceName === variable.name) {
+    appendVariableReferenceList(row, variable, index, references);
+  }
 
   if (variable.type === 'host') {
     row.dataset.variableIdReadOnly = 'true';

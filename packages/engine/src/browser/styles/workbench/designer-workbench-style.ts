@@ -15,6 +15,7 @@ import materialsCss from './designer-workbench-materials.css?inline';
 import panelsCss from './designer-workbench-panels.css?inline';
 import shellCss from './designer-workbench-shell.css?inline';
 import topbarCss from './designer-workbench-topbar.css?inline';
+import variableReferencesCss from './designer-workbench-variable-references.css?inline';
 import variablesCss from './designer-workbench-variables.css?inline';
 
 // Feature files are concatenated in cascade order. Keep responsive and accessibility
@@ -34,6 +35,7 @@ export const DESIGNER_WORKBENCH_CSS = [
   dataEditorCss,
   layersCss,
   variablesCss,
+  variableReferencesCss,
   canvasCss,
   inspectorCss,
   inspectorDataCss,

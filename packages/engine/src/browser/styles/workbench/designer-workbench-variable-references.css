@@ -1,0 +1,122 @@
+button.variable-reference-count {
+  box-sizing: border-box;
+  min-height: 22px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+button.variable-reference-count:hover {
+  border-color: color-mix(in srgb, var(--designer-accent) 42%, var(--designer-border-default));
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+button.variable-reference-count:focus-visible {
+  border-color: var(--designer-accent);
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
+}
+
+button.variable-reference-count[aria-expanded="true"] {
+  border-color: color-mix(in srgb, var(--designer-accent) 38%, var(--designer-border-default));
+  background: var(--designer-accent-surface);
+  color: var(--designer-accent);
+}
+
+.variable-references {
+  min-width: 0;
+  padding: var(--designer-space-2);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-workspace);
+}
+
+.variable-reference-list {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-1);
+}
+
+.variable-reference-link {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.variable-reference-link:hover {
+  border-color: var(--designer-border-default);
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.variable-reference-link:focus-visible {
+  border-color: var(--designer-accent);
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
+}
+
+.variable-reference-glyph {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  color: var(--designer-text-muted);
+}
+
+.variable-reference-glyph svg {
+  width: 14px;
+  height: 14px;
+}
+
+.variable-reference-link:hover .variable-reference-glyph,
+.variable-reference-link:focus-visible .variable-reference-glyph {
+  color: var(--designer-accent);
+}
+
+.variable-reference-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.variable-reference-copy strong,
+.variable-reference-copy small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-reference-copy strong {
+  color: inherit;
+  font: var(--designer-font-small);
+  font-weight: 650;
+}
+
+.variable-reference-copy small {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 10px;
+}
+
+.variable-reference-kind {
+  padding: 1px var(--designer-space-2);
+  border-radius: 999px;
+  background: var(--designer-surface-panel);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 10px;
+  white-space: nowrap;
+}

@@ -8,11 +8,51 @@ export async function assertHostVariableAuthoring(page, designer) {
   if (Number.parseInt(references ?? '0', 10) < 2) {
     throw new Error(`BROWSER_HARNESS_VARIABLE_REFERENCE_COUNT_FAILED:${references}`);
   }
+  await assertReferenceNavigation(page, designer);
 
   await assertSearchAndFilter(page, designer);
   await assertDescriptionDuplicateAndPreview(page, designer);
   await assertAtomicRenames(page, designer);
   await assertHostVariableRefresh(page);
+}
+
+async function assertReferenceNavigation(page, designer) {
+  let region = variableRow(designer, 'region');
+  await region.locator('[data-variable-action="references"]').click();
+  region = variableRow(designer, 'region');
+  const actual = await region
+    .locator('[data-variable-reference-target="component-parameter"]')
+    .evaluateAll((links) => links.map((link) => link.dataset.layerSelect));
+  const expected = await page.evaluate(() =>
+    window.baseScreenHarness.designer.document.components
+      .filter(
+        (component) =>
+          component.dataSource?.type === 'host-resource' &&
+          Object.values(component.dataSource.params).some(
+            (parameter) => parameter.kind === 'variable' && parameter.name === 'region',
+          ),
+      )
+      .map((component) => component.id),
+  );
+  if (JSON.stringify(actual) !== JSON.stringify(expected) || actual.length < 2) {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLE_REFERENCE_TARGETS_FAILED:${JSON.stringify({ actual, expected })}`,
+    );
+  }
+  await region.locator('[data-variable-reference-target="component-parameter"]').first().click();
+  await page.waitForFunction(
+    (componentId) =>
+      window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.[0] === componentId,
+    actual[0],
+  );
+  region = variableRow(designer, 'region');
+  const expanded = await region
+    .locator('[data-variable-action="references"]')
+    .getAttribute('aria-expanded');
+  if (expanded !== 'true') {
+    throw new Error(`BROWSER_HARNESS_VARIABLE_REFERENCE_EXPANSION_FAILED:${expanded}`);
+  }
+  await region.locator('[data-variable-action="references"]').click();
 }
 
 async function createHostVariable(page, designer, variableId, expectedName) {

@@ -3,9 +3,11 @@ import { applyScreenDocumentTransaction } from '@base-screen/core';
 import { describe, expect, it } from 'vitest';
 import {
   buildReplaceVariablesCommand,
+  collectVariableReferences,
   isVariableNameTaken,
   isVariableReferenced,
   referencedVariableNames,
+  variableReferenceCounts,
 } from '../../../src/common/operations/designer-variable-operations.js';
 
 function component(id: string, dataSource: ScreenComponentNode['dataSource']): ScreenComponentNode {
@@ -106,6 +108,87 @@ describe('designer variable operations', () => {
     expect(referenced.has('count')).toBe(true);
     expect(referenced.has('total')).toBe(true);
     expect(referenced.has('nested')).toBe(true);
+  });
+
+  it('enumerates stable component and blueprint targets for every nested reference', () => {
+    const source = document(
+      [],
+      [
+        component('chart', {
+          type: 'host-resource',
+          resourceType: 'dataset',
+          resourceId: 'orders',
+          params: { region: { kind: 'variable', name: 'selected' } },
+          binding: { fields: {} },
+        }),
+      ],
+      {
+        rules: [
+          {
+            id: 'rule-1',
+            trigger: { type: 'material-event', componentId: 'chart', eventName: 'click' },
+            condition: {
+              left: {
+                kind: 'object',
+                properties: { filters: { kind: 'variable', name: 'selected' } },
+              },
+              operator: 'eq',
+              right: { kind: 'variable', name: 'other' },
+            },
+            actions: [
+              {
+                type: 'set-variable',
+                variableName: 'selected',
+                value: {
+                  kind: 'array',
+                  items: [{ kind: 'variable', name: 'selected' }],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    );
+
+    expect(collectVariableReferences(source, 'selected')).toEqual([
+      {
+        kind: 'component-parameter',
+        variableName: 'selected',
+        componentId: 'chart',
+        componentName: 'chart',
+        parameterName: 'region',
+      },
+      {
+        kind: 'blueprint-condition',
+        variableName: 'selected',
+        ruleId: 'rule-1',
+        side: 'left',
+        expressionPath: ['filters'],
+        blueprintTargetId: 'condition:rule-1',
+      },
+      {
+        kind: 'blueprint-action-target',
+        variableName: 'selected',
+        ruleId: 'rule-1',
+        actionIndex: 0,
+        blueprintTargetId: 'action:rule-1:0',
+      },
+      {
+        kind: 'blueprint-action-expression',
+        variableName: 'selected',
+        ruleId: 'rule-1',
+        actionIndex: 0,
+        field: 'value',
+        expressionPath: [0],
+        blueprintTargetId: 'action:rule-1:0',
+      },
+    ]);
+    expect(variableReferenceCounts(source)).toEqual(
+      new Map([
+        ['selected', 4],
+        ['other', 1],
+      ]),
+    );
   });
 
   it('detects duplicate variable names with an exception index', () => {
