@@ -2,7 +2,7 @@ export async function assertHostVariableAuthoring(page, designer) {
   await createHostVariable(page, designer, 'tenant-region', 'tenantRegion');
   await createHostVariable(page, designer, 'private-token', 'privateToken');
 
-  const references = await variableRow(designer, 'region')
+  const references = await (await expandedVariableRow(designer, 'region'))
     .locator('.variable-reference-count')
     .textContent();
   if (Number.parseInt(references ?? '0', 10) < 2) {
@@ -17,7 +17,7 @@ export async function assertHostVariableAuthoring(page, designer) {
 }
 
 async function assertReferenceNavigation(page, designer) {
-  let region = variableRow(designer, 'region');
+  let region = await expandedVariableRow(designer, 'region');
   await region.locator('[data-variable-action="references"]').click();
   region = variableRow(designer, 'region');
   const actual = await region
@@ -92,7 +92,7 @@ async function assertSearchAndFilter(page, designer) {
 }
 
 async function assertDescriptionDuplicateAndPreview(page, designer) {
-  let tenant = variableRow(designer, 'tenantRegion');
+  let tenant = await expandedVariableRow(designer, 'tenantRegion');
   await tenant.locator('[data-variable-action="edit-description"]').click();
   await tenant.locator('[data-variable-description]').fill('Updated host description');
   await tenant.locator('[data-variable-action="confirm-description"]').click();
@@ -122,7 +122,7 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
     throw new Error(`BROWSER_HARNESS_VARIABLE_PREVIEW_FAILED:${tenantPreview}`);
   }
 
-  const privateVariable = variableRow(designer, 'privateToken');
+  const privateVariable = await expandedVariableRow(designer, 'privateToken');
   await privateVariable.locator('[data-variable-action="preview"]').click();
   await privateVariable.locator('[data-variable-preview-status="error"]').waitFor();
   const leak = await designer.evaluate((element) =>
@@ -140,7 +140,7 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
 }
 
 async function assertAtomicRenames(page, designer) {
-  let region = variableRow(designer, 'region');
+  let region = await expandedVariableRow(designer, 'region');
   await region.locator('[data-variable-action="rename"]').click();
   await region.locator('[data-variable-rename]').fill('selectedRegion');
   await region.locator('[data-variable-action="confirm-rename"]').click();
@@ -155,6 +155,23 @@ async function assertAtomicRenames(page, designer) {
         .every((parameter) => parameter.name !== 'region')
     );
   });
+  const renamedDisclosure = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const row = [...root.querySelectorAll('[data-variable-row]')].find((entry) =>
+      entry.innerText.includes('selectedRegion'),
+    );
+    return {
+      expanded: row
+        ?.querySelector('[data-variable-action="toggle-variable"]')
+        ?.getAttribute('aria-expanded'),
+      focusedAction: root.activeElement?.dataset.variableAction,
+    };
+  });
+  if (renamedDisclosure.expanded !== 'true' || renamedDisclosure.focusedAction !== 'rename') {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLE_RENAME_DISCLOSURE_FAILED:${JSON.stringify(renamedDisclosure)}`,
+    );
+  }
   const undo = await page.evaluate(() => window.baseScreenHarness.designer.undo().ok);
   const redo = await page.evaluate(() => window.baseScreenHarness.designer.redo().ok);
   const finalUndo = await page.evaluate(() => window.baseScreenHarness.designer.undo().ok);
@@ -173,7 +190,7 @@ async function assertAtomicRenames(page, designer) {
     throw new Error('BROWSER_HARNESS_VARIABLE_RENAME_HISTORY_FAILED');
   }
 
-  const tenant = variableRow(designer, 'tenantRegion');
+  const tenant = await expandedVariableRow(designer, 'tenantRegion');
   await tenant.locator('[data-variable-action="rename"]').click();
   await tenant.locator('[data-variable-rename]').fill('runtimeRegion');
   await tenant.locator('[data-variable-action="confirm-rename"]').click();
@@ -281,4 +298,12 @@ async function assertHostVariableRefresh(page) {
 
 function variableRow(designer, name) {
   return designer.locator('[data-variable-row]').filter({ hasText: name }).first();
+}
+
+async function expandedVariableRow(designer, name) {
+  let row = variableRow(designer, name);
+  const toggle = row.locator('[data-variable-action="toggle-variable"]');
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
+  row = variableRow(designer, name);
+  return row;
 }

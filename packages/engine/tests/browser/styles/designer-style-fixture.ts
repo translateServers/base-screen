@@ -43,6 +43,7 @@ const workbenchCssFiles = [
   '../../../src/browser/styles/workbench/designer-workbench-data-editor.css',
   '../../../src/browser/styles/workbench/designer-workbench-layers.css',
   '../../../src/browser/styles/workbench/designer-workbench-variables.css',
+  '../../../src/browser/styles/workbench/designer-workbench-variable-editor.css',
   '../../../src/browser/styles/workbench/designer-workbench-canvas.css',
   '../../../src/browser/styles/workbench/designer-workbench-inspector.css',
   '../../../src/browser/styles/workbench/designer-workbench-inspector-data.css',

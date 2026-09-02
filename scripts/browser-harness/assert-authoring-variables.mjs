@@ -21,6 +21,15 @@ export async function assertAuthoringVariables(page, designer) {
     throw new Error(`BROWSER_HARNESS_VARIABLES_LIST_FAILED:${variableNamesBefore}`);
   }
   const variableModule = await designer.locator('[data-variables]').evaluate((panel) => {
+    const collapsedRow = panel.querySelector('[data-variable-row]');
+    const collapsedValueHidden =
+      collapsedRow?.querySelector('[data-variable-action="edit-value"]') === null;
+    const collapsedToggleLabel = collapsedRow
+      ?.querySelector('[data-variable-action="toggle-variable"]')
+      ?.getAttribute('aria-label');
+    collapsedRow
+      ?.querySelector('[data-variable-action="toggle-variable"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
     const row = panel.querySelector('[data-variable-row]');
     const value = row?.querySelector('[data-variable-action="edit-value"]');
     const add = panel.querySelector('[data-variable-action="add"]');
@@ -36,6 +45,9 @@ export async function assertAuthoringVariables(page, designer) {
       contentOverflowY: content === null ? undefined : getComputedStyle(content).overflowY,
       duplicateTitle: panel.querySelector('.variable-panel-title') !== null,
       description: panel.querySelector('.variable-panel-description')?.textContent,
+      quickSteps: panel.querySelectorAll('.variable-quick-step').length,
+      collapsedValueHidden,
+      collapsedToggleLabel,
       listRole: panel.querySelector('.variable-list')?.getAttribute('role'),
       rowDisplay: row === null ? undefined : getComputedStyle(row).display,
       rowHeight: row?.getBoundingClientRect().height,
@@ -66,7 +78,10 @@ export async function assertAuthoringVariables(page, designer) {
     variableModule.panelOverflow !== 'hidden' ||
     variableModule.contentOverflowY !== 'auto' ||
     variableModule.duplicateTitle ||
-    !variableModule.description?.includes('宿主变量') ||
+    !variableModule.description?.includes('组件之间') ||
+    variableModule.quickSteps !== 2 ||
+    !variableModule.collapsedValueHidden ||
+    !variableModule.collapsedToggleLabel?.includes('展开全局变量 count') ||
     variableModule.listRole !== 'list' ||
     variableModule.rowDisplay !== 'grid' ||
     (variableModule.rowHeight ?? 0) < 60 ||
@@ -180,7 +195,7 @@ export async function assertAuthoringVariables(page, designer) {
     variableActionNames.cancel !== '取消' ||
     variableActionNames.confirm === variableActionNames.cancel ||
     !variableActionNames.focused ||
-    variableActionNames.labels !== 3 ||
+    variableActionNames.labels !== 4 ||
     !variableActionNames.usesVectorIcon
   ) {
     throw new Error('BROWSER_HARNESS_VARIABLE_ACTION_ACCESSIBLE_NAMES_FAILED');
@@ -326,7 +341,13 @@ export async function assertAuthoringVariables(page, designer) {
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-variables]');
-    const row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
+    let row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
+      entry.innerText.includes('region'),
+    );
+    row
+      .querySelector('[data-variable-action="toggle-variable"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
       entry.innerText.includes('region'),
     );
     row
@@ -344,7 +365,13 @@ export async function assertAuthoringVariables(page, designer) {
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-variables]');
-    const row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
+    let row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
+      entry.innerText.includes('count'),
+    );
+    row
+      .querySelector('[data-variable-action="toggle-variable"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
       entry.innerText.includes('count'),
     );
     row

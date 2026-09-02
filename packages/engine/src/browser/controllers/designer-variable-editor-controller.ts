@@ -37,6 +37,7 @@ interface DesignerVariableEditorCallbacks {
   readonly getPanel: () => HTMLElement | undefined;
   readonly getCatalog: () => DesignerVariableCatalogController;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
+  readonly onVariableRenamed: (variableName: string, nextName: string) => void;
   readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
   readonly renderAndFocus: (selector: string) => void;
 }
@@ -46,7 +47,7 @@ export class DesignerVariableEditorController {
   #createType: ScreenVariable['type'] = 'static';
   #createName = '';
   #createDescription = '';
-  #createValueSource = 'null';
+  #createValueSource = '';
   #selectedHostId: string | undefined;
   #renamingIndex: number | undefined;
   #editingDescriptionIndex: number | undefined;
@@ -171,6 +172,7 @@ export class DesignerVariableEditorController {
     });
     this.callbacks.report(execution);
     if (!execution.ok) return;
+    this.callbacks.onVariableRenamed(variable.name, name);
     this.reset();
     this.callbacks.renderAndFocus(
       `[data-variable-action="rename"][data-variable-index="${index}"]`,
@@ -296,7 +298,7 @@ export class DesignerVariableEditorController {
     this.#createType = 'static';
     this.#createName = '';
     this.#createDescription = '';
-    this.#createValueSource = 'null';
+    this.#createValueSource = '';
     this.#selectedHostId = undefined;
     this.#renamingIndex = undefined;
     this.#editingDescriptionIndex = undefined;

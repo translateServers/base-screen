@@ -19,11 +19,16 @@ export function normalizeDesignerVariableDescription(source: string): string | u
 }
 
 export function parseDesignerStaticVariableValue(source: string): ScreenJsonValue | undefined {
+  const normalized = source.trim();
+  if (normalized === '') return '';
   let parsed: unknown;
   try {
-    parsed = JSON.parse(source);
+    parsed = JSON.parse(normalized);
   } catch {
-    return undefined;
+    if (normalized.startsWith('{') || normalized.startsWith('[') || normalized.startsWith('"')) {
+      return undefined;
+    }
+    parsed = source;
   }
   const result = parseScreenJsonValue(parsed);
   return result.ok ? result.value : undefined;

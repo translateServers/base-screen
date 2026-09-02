@@ -27,6 +27,7 @@ export class DesignerVariablesController {
   #panel: HTMLElement | undefined;
   #search = '';
   #typeFilter: 'all' | ScreenVariable['type'] = 'all';
+  #expandedVariableName: string | undefined;
   #expandedReferenceName: string | undefined;
   #lastDocument: ScreenDocument | undefined;
   readonly #catalog: DesignerVariableCatalogController;
@@ -44,6 +45,10 @@ export class DesignerVariablesController {
       getPanel: () => this.#panel,
       getCatalog: () => this.#catalog,
       executeCommand: callbacks.executeCommand,
+      onVariableRenamed: (variableName, nextName) => {
+        if (this.#expandedVariableName === variableName) this.#expandedVariableName = nextName;
+        if (this.#expandedReferenceName === variableName) this.#expandedReferenceName = nextName;
+      },
       report: callbacks.report,
       renderAndFocus: (selector) => this.renderAndFocus(selector),
     });
@@ -57,6 +62,7 @@ export class DesignerVariablesController {
   release(): void {
     this.#panel = undefined;
     this.#lastDocument = undefined;
+    this.#expandedVariableName = undefined;
     this.#expandedReferenceName = undefined;
     this.#catalog.clear();
     this.#editor.reset();
@@ -87,6 +93,11 @@ export class DesignerVariablesController {
     )
       ? this.#expandedReferenceName
       : undefined;
+    const expandedVariableName = document?.variables.some(
+      (variable) => variable.name === this.#expandedVariableName,
+    )
+      ? this.#expandedVariableName
+      : undefined;
     return {
       creating: editor.creating,
       create: {
@@ -108,6 +119,7 @@ export class DesignerVariablesController {
       typeFilter: this.#typeFilter,
       referenceCounts,
       references,
+      expandedVariableName,
       expandedReferenceName,
       catalog,
     };
@@ -151,6 +163,20 @@ export class DesignerVariablesController {
       case 'duplicate':
         this.#editor.duplicateVariable(index);
         return true;
+      case 'toggle-variable': {
+        const variable =
+          this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
+        if (variable === undefined) return true;
+        const expanded = this.#expandedVariableName === variable.name;
+        this.#expandedVariableName = expanded ? undefined : variable.name;
+        if (expanded && this.#expandedReferenceName === variable.name) {
+          this.#expandedReferenceName = undefined;
+        }
+        this.renderAndFocus(
+          `[data-variable-action="toggle-variable"][data-variable-index="${index}"]`,
+        );
+        return true;
+      }
       case 'references': {
         const variable =
           this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
@@ -271,7 +297,9 @@ export class DesignerVariablesController {
 
   private renderAndFocus(selector: string): void {
     this.render();
-    this.#panel?.querySelector<HTMLElement>(selector)?.focus();
+    const panel = this.#panel;
+    const target = panel?.querySelector<HTMLElement>(selector);
+    (target ?? panel?.querySelector<HTMLElement>('[data-variable-action="add"]'))?.focus();
   }
 
   private renderAndRestoreInput(selector: string, position: number): void {

@@ -54,7 +54,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         </button>
         <button type="button" class="designer-tab" id="designer-variables-tab" role="tab" aria-controls="designer-variables-panel" aria-selected="false" data-panel-tab="variables" title="${DESIGNER_UI_TEXT.variables.title}">
           <span class="rail-tab-glyph" aria-hidden="true">${designerIcon('variable')}</span>
-          <span class="rail-tab-label">${DESIGNER_UI_TEXT.variables.title}</span>
+          <span class="rail-tab-label">${DESIGNER_UI_TEXT.variables.shortTitle}</span>
         </button>
       </div>
       <div class="blueprint-library" data-blueprint-library hidden></div>

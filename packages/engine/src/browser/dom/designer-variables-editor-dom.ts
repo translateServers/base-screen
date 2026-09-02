@@ -1,11 +1,7 @@
 import type { ScreenHostVariableSummary, ScreenVariable } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
-import {
-  createDesignerButton,
-  createDesignerIconButton,
-  createDesignerInput,
-} from './designer-ui-primitives.js';
+import { createDesignerButton, createDesignerInput } from './designer-ui-primitives.js';
 
 export interface DesignerVariableCreateDraft {
   readonly type: ScreenVariable['type'];
@@ -34,15 +30,11 @@ export function appendCreateEditor(content: HTMLElement, draft: DesignerVariable
   editor.dataset.variableEditor = 'create';
   editor.dataset.variableCreateType = draft.type;
   editor.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.createTitle);
-  appendEditorHeading(
-    editor,
-    draft.type === 'static'
-      ? DESIGNER_UI_TEXT.variables.createStaticTitle
-      : DESIGNER_UI_TEXT.variables.createHostTitle,
-    undefined,
-    draft.type,
-  );
-  appendCreateTypeChooser(editor, draft.type);
+  appendEditorHeading(editor, DESIGNER_UI_TEXT.variables.createTitle);
+  const intro = editor.ownerDocument.createElement('p');
+  intro.className = 'variable-editor-intro';
+  intro.textContent = DESIGNER_UI_TEXT.variables.createIntro;
+  editor.appendChild(intro);
   const errorId = 'designer-variable-create-error';
   const name = appendEditorField(editor, {
     label: DESIGNER_UI_TEXT.variables.name,
@@ -58,6 +50,7 @@ export function appendCreateEditor(content: HTMLElement, draft: DesignerVariable
     describedBy: errorId,
   });
   description.value = draft.description;
+  appendCreateTypeChooser(editor, draft.type);
   if (draft.type === 'static') {
     const value = appendEditorField(editor, {
       label: DESIGNER_UI_TEXT.variables.value,
@@ -158,19 +151,6 @@ export function appendDeleteConfirmation(row: HTMLElement, name: string, index: 
   appendEditorActions(row, 'confirm-delete', index, DESIGNER_UI_TEXT.variables.delete, true);
 }
 
-export function createIconAction(
-  ownerDocument: Document,
-  action: 'rename' | 'edit-description' | 'duplicate' | 'delete' | 'preview',
-  index: number,
-  icon: DesignerIconName,
-  label: string,
-): HTMLButtonElement {
-  const button = createDesignerIconButton(ownerDocument, { icon, label, variant: 'ghost' });
-  button.dataset.variableAction = action;
-  button.dataset.variableIndex = String(index);
-  return button;
-}
-
 export function appendIconLabel(target: HTMLElement, icon: DesignerIconName, label: string): void {
   const glyph = target.ownerDocument.createElement('span');
   glyph.className = 'variable-button-glyph';
@@ -183,27 +163,50 @@ export function appendIconLabel(target: HTMLElement, icon: DesignerIconName, lab
 }
 
 function appendCreateTypeChooser(editor: HTMLElement, selected: ScreenVariable['type']): void {
+  const section = editor.ownerDocument.createElement('section');
+  section.className = 'variable-source-field';
+  const fieldLabel = editor.ownerDocument.createElement('span');
+  fieldLabel.className = 'variable-field-label';
+  fieldLabel.textContent = DESIGNER_UI_TEXT.variables.source;
+  section.appendChild(fieldLabel);
   const chooser = editor.ownerDocument.createElement('div');
   chooser.className = 'variable-create-types';
   chooser.setAttribute('role', 'group');
-  for (const [type, label] of [
-    ['static', DESIGNER_UI_TEXT.variables.createStatic],
-    ['host', DESIGNER_UI_TEXT.variables.createHost],
+  chooser.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.source);
+  for (const [type, label, hint] of [
+    [
+      'static',
+      DESIGNER_UI_TEXT.variables.createStatic,
+      DESIGNER_UI_TEXT.variables.createStaticHint,
+    ],
+    ['host', DESIGNER_UI_TEXT.variables.createHost, DESIGNER_UI_TEXT.variables.createHostHint],
   ] as const) {
     const button = createDesignerButton(editor.ownerDocument, {
-      text: label,
+      ariaLabel: label,
+      className: 'variable-source-option',
       pressed: type === selected,
       variant: type === selected ? 'primary' : 'ghost',
     });
     button.dataset.variableAction = type === 'static' ? 'create-type-static' : 'create-type-host';
+    const title = editor.ownerDocument.createElement('strong');
+    title.textContent = label;
+    button.appendChild(title);
+    const description = editor.ownerDocument.createElement('small');
+    description.textContent = hint;
+    button.appendChild(description);
     chooser.appendChild(button);
   }
-  editor.appendChild(chooser);
+  section.appendChild(chooser);
+  editor.appendChild(section);
 }
 
 function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDraft): void {
   const section = editor.ownerDocument.createElement('section');
   section.className = 'variable-host-catalog';
+  const label = editor.ownerDocument.createElement('span');
+  label.className = 'variable-field-label';
+  label.textContent = DESIGNER_UI_TEXT.variables.createHost;
+  section.appendChild(label);
   const search = createDesignerInput(editor.ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.catalogSearch,
     placeholder: DESIGNER_UI_TEXT.variables.catalogSearch,
@@ -295,11 +298,11 @@ function appendEditorHeading(
   editor: HTMLElement,
   title: string,
   context?: string,
-  type: ScreenVariable['type'] = 'static',
+  type?: ScreenVariable['type'],
 ): void {
   const heading = editor.ownerDocument.createElement('header');
   heading.className = 'variable-editor-heading';
-  heading.appendChild(createBadge(editor.ownerDocument, type));
+  if (type !== undefined) heading.appendChild(createBadge(editor.ownerDocument, type));
   const copy = editor.ownerDocument.createElement('span');
   copy.className = 'variable-editor-title';
   const strong = editor.ownerDocument.createElement('strong');

@@ -3,6 +3,7 @@ import type {
   ScreenHostVariableCatalogPort,
   ScreenHostVariablePort,
 } from '@base-screen/contracts';
+import { applyScreenDocumentCommand } from '@base-screen/core';
 import { describe, expect, it, vi } from 'vitest';
 import { DesignerVariablesController } from '../../../src/browser/controllers/designer-variables-controller.js';
 import { renderDesignerVariables } from '../../../src/browser/dom/designer-variables-dom.js';
@@ -51,16 +52,21 @@ class FakeElement {
     this.textContent = '';
   }
 
-  /** 简易选择器：`[data-key="value"]` 或 `[data-key]` 在子树内匹配。 */
+  /** 简易选择器：一个或多个连续的 `[data-key="value"]` / `[data-key]` 在子树内匹配。 */
   querySelector<T extends FakeElement>(selector: string): T | null {
-    const match = /^\[data-([a-z-]+)(?:="([^"]*)")?\]$/.exec(selector);
-    if (match === null) return null;
-    const key = match[1]!.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
-    const value = match[2];
+    const matches = [...selector.matchAll(/\[data-([a-z-]+)(?:="([^"]*)")?\]/g)];
+    if (matches.length === 0 || matches.map((match) => match[0]).join('') !== selector) return null;
+    const predicates = matches.map((match) => ({
+      key: match[1]!.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase()),
+      value: match[2],
+    }));
     const walk = (element: FakeElement): FakeElement | null => {
       for (const child of element.children) {
-        const candidate = child.dataset[key];
-        if (candidate !== undefined && (value === undefined || candidate === value)) return child;
+        const matched = predicates.every(({ key, value }) => {
+          const candidate = child.dataset[key];
+          return candidate !== undefined && (value === undefined || candidate === value);
+        });
+        if (matched) return child;
         const nested = walk(child);
         if (nested !== null) return nested;
       }
@@ -147,7 +153,7 @@ function descendants(element: FakeElement): FakeElement[] {
 
 describe('designer variables controller', () => {
   it('renders the variable list with type badges and host read-only rows', () => {
-    const { panel } = harness([
+    const { controller, panel } = harness([
       { type: 'static', name: 'count', value: 0 },
       { type: 'host', name: 'region', variableId: 'region-1' },
     ]);
@@ -163,18 +169,23 @@ describe('designer variables controller', () => {
     const rows = descendants(panel).filter((child) => child.dataset.variableRow !== undefined);
     expect(rows).toHaveLength(2);
     const staticRow = rows[0]!;
-    expect(descendants(staticRow).some((child) => child.textContent === '静态')).toBe(true);
+    expect(descendants(staticRow).some((child) => child.textContent === '静态值')).toBe(true);
     expect(descendants(staticRow).some((child) => child.textContent === 'count')).toBe(true);
+    expect(staticRow.querySelector('[data-variable-action="edit-value"]')).toBeNull();
+
+    controller.onClick(action('toggle-variable', 0));
+    const expandedStatic = descendants(panel).find((child) => child.dataset.variableRow === '0')!;
+    expect(expandedStatic.querySelector('[data-variable-action="edit-value"]')).not.toBeNull();
     expect(
-      descendants(staticRow).filter((child) => child.dataset.variableAction !== undefined),
-    ).toHaveLength(5); // 值/重命名/描述/复制/删除
-    const hostRow = rows[1]!;
-    expect(descendants(hostRow).some((child) => child.textContent === '宿主')).toBe(true);
+      expandedStatic.querySelector('[data-variable-action="edit-description"]'),
+    ).not.toBeNull();
+
+    controller.onClick(action('toggle-variable', 1));
+    const hostRow = descendants(panel).find((child) => child.dataset.variableRow === '1')!;
+    expect(descendants(hostRow).some((child) => child.textContent === '宿主提供')).toBe(true);
     expect(descendants(hostRow).some((child) => child.textContent === 'region-1')).toBe(true);
     expect(hostRow.dataset.variableIdReadOnly).toBe('true');
-    expect(
-      descendants(hostRow).filter((child) => child.dataset.variableAction !== undefined),
-    ).toHaveLength(6); // 引用/重命名/描述/复制/删除/预览；仅 variableId 只读
+    expect(hostRow.querySelector('[data-variable-action="preview"]')).not.toBeNull();
   });
 
   it('creates a static variable through the replace-variables command', () => {
@@ -193,7 +204,7 @@ describe('designer variables controller', () => {
     expect(cancel?.ariaLabel).toBe('取消');
     expect(confirm?.ariaLabel).not.toBe(cancel?.ariaLabel);
     nameInput!.value = 'region';
-    valueInput!.value = '"north"';
+    valueInput!.value = 'north';
     controller.onClick(action('confirm-create'));
 
     expect(commands).toHaveLength(1);
@@ -221,7 +232,9 @@ describe('designer variables controller', () => {
     expect(valueInput?.getAttribute('aria-invalid')).toBe('true');
     const inlineError = panel.querySelector<FakeElement>('[data-variable-error]');
     expect(inlineError?.hidden).toBe(false);
-    expect(inlineError?.textContent).toBe('变量值不是合法 JSON。');
+    expect(inlineError?.textContent).toBe(
+      '初始值格式无效；对象、数组或带引号文本须使用有效 JSON。',
+    );
   });
 
   it('rejects creating a variable with a duplicate name', () => {
@@ -276,8 +289,9 @@ describe('designer variables controller', () => {
   it('expands exact reference locations and exposes the canvas navigation target', () => {
     const { controller, panel } = harness([{ type: 'static', name: 'region', value: 'north' }]);
 
+    controller.onClick(action('toggle-variable', 0));
     const toggle = panel.querySelector<FakeElement>('[data-variable-action="references"]');
-    expect(toggle?.textContent).toBe('1 处引用');
+    expect(toggle?.textContent).toBe('1 处使用');
     expect(toggle?.getAttribute('aria-expanded')).toBe('false');
 
     controller.onClick(action('references', 0));
@@ -351,6 +365,46 @@ describe('designer variables controller', () => {
     ]);
   });
 
+  it('keeps a renamed variable and its references expanded with focus restored', () => {
+    let current = document([{ type: 'static', name: 'region', value: 'north' }]);
+    const ownerDocument = new FakeDocument();
+    const panel = ownerDocument.createElement('div');
+    const controller = new DesignerVariablesController({
+      getDocument: () => current,
+      executeCommand: (command) => {
+        const result = applyScreenDocumentCommand(current, command);
+        if (!result.ok) return result;
+        current = result.document;
+        return { ok: true, value: current, diagnostics: result.diagnostics };
+      },
+      report: () => {},
+    });
+    controller.connect(panel as unknown as HTMLElement);
+    controller.onClick(action('toggle-variable', 0));
+    controller.onClick(action('references', 0));
+    controller.onClick(action('rename', 0));
+    panel.querySelector<FakeElement>('[data-variable-rename="0"]')!.value = 'selectedRegion';
+
+    controller.onClick(action('confirm-rename', 0));
+
+    expect(current.variables[0]?.name).toBe('selectedRegion');
+    expect(controller.currentDraft()).toMatchObject({
+      expandedVariableName: 'selectedRegion',
+      expandedReferenceName: 'selectedRegion',
+    });
+    expect(
+      panel
+        .querySelector<FakeElement>('[data-variable-action="toggle-variable"]')
+        ?.getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect(
+      panel
+        .querySelector<FakeElement>('[data-variable-action="references"]')
+        ?.getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect(ownerDocument.activeElement?.dataset.variableAction).toBe('rename');
+  });
+
   it('renames an unreferenced variable', () => {
     const { controller, panel, commands } = harness([{ type: 'static', name: 'count', value: 0 }]);
 
@@ -394,7 +448,7 @@ describe('designer variables controller', () => {
       type: 'static',
       name: '',
       description: '',
-      valueSource: 'null',
+      valueSource: '',
       variableId: undefined,
     });
   });
@@ -475,6 +529,7 @@ describe('designer variables rendering', () => {
       typeFilter: 'all',
       referenceCounts: new Map(),
       references: [],
+      expandedVariableName: undefined,
       expandedReferenceName: undefined,
       catalog: {
         query: '',
@@ -519,6 +574,7 @@ describe('designer variables rendering', () => {
         typeFilter: 'all',
         referenceCounts: new Map(),
         references: [],
+        expandedVariableName: undefined,
         expandedReferenceName: undefined,
         catalog: {
           query: '',
@@ -536,7 +592,7 @@ describe('designer variables rendering', () => {
     expect(panel.querySelector('[data-variable-create-value]')).not.toBeNull();
     expect(
       descendants(panel).filter((child) => child.className === 'variable-field-label'),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
     expect(
       descendants(panel).some((child) => child.dataset.variableAction === 'add' && child.disabled),
     ).toBe(true);
