@@ -601,7 +601,7 @@ function createDataDocument(
     params: {
       limit: { kind: 'literal' as const, value: 5 } satisfies ScreenHostResourceParameter,
       region: useRegionVariable
-        ? ({ kind: 'variable', name: 'region' } satisfies ScreenHostResourceParameter)
+        ? ({ kind: 'variable', variableId: 'region' } satisfies ScreenHostResourceParameter)
         : ({ kind: 'literal', value: runtimeState.region } satisfies ScreenHostResourceParameter),
     },
   };
@@ -644,7 +644,18 @@ function createDataDocument(
         },
       },
     ],
-    variables: useRegionVariable ? [{ type: 'host', name: 'region', variableId: 'region' }] : [],
+    variables: useRegionVariable
+      ? [
+          {
+            type: 'data-source',
+            id: 'region',
+            name: 'region',
+            initialValue: null,
+            sourceId: 'region',
+            controlled: true,
+          },
+        ]
+      : [],
     blueprint: { rules: [] },
   };
 }

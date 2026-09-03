@@ -92,7 +92,7 @@ export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   propsSchema: { kind: 'object', properties: {}, required: [] },
   propertyPanel: [],
   events: ['rowClick', 'cellClick'],
-  dataCapabilities: ['static', 'host-resource'],
+  dataCapabilities: ['static', 'host-resource', 'variable'],
   dataBinding: {
     roles: [
       {

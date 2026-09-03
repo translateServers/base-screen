@@ -27,7 +27,7 @@ export function parseScreenHostVariableDescriptor(
   }
   checkExact(
     parsed.value,
-    new Set(['variableId', 'name', 'description', 'previewable']),
+    new Set(['sourceId', 'sourceType', 'name', 'description', 'previewable']),
     [],
     diagnostics,
   );
@@ -41,7 +41,8 @@ export function parseScreenHostVariableDescriptor(
   return {
     ok: true,
     value: {
-      variableId: parsed.value.variableId as string,
+      sourceId: parsed.value.sourceId as string,
+      sourceType: parsed.value.sourceType as 'data-source' | 'url-query',
       name: parsed.value.name as string,
       description: parsed.value.description as string | null,
       previewable: parsed.value.previewable as boolean,
@@ -75,20 +76,26 @@ export function parseScreenHostVariablePage(
         diagnostics.push(diagnostic(path, 'Host variable summary must be an object.'));
         return;
       }
-      checkExact(item, new Set(['variableId', 'name', 'description']), path, diagnostics);
+      checkExact(
+        item,
+        new Set(['sourceId', 'sourceType', 'name', 'description']),
+        path,
+        diagnostics,
+      );
       const before = diagnostics.length;
       validateSummaryFields(item, path, diagnostics);
-      if (typeof item.variableId === 'string') {
-        if (ids.has(item.variableId)) {
+      if (typeof item.sourceId === 'string') {
+        if (ids.has(item.sourceId)) {
           diagnostics.push(
-            diagnostic([...path, 'variableId'], 'Host variable page contains a duplicate id.'),
+            diagnostic([...path, 'sourceId'], 'Variable source page contains a duplicate id.'),
           );
         }
-        ids.add(item.variableId);
+        ids.add(item.sourceId);
       }
       if (diagnostics.length === before) {
         items.push({
-          variableId: item.variableId as string,
+          sourceId: item.sourceId as string,
+          sourceType: item.sourceType as 'data-source' | 'url-query',
           name: item.name as string,
           description: item.description as string | null,
         });
@@ -131,12 +138,15 @@ function validateSummaryFields(
   diagnostics: ScreenDiagnostic[],
 ): void {
   if (
-    typeof value.variableId !== 'string' ||
-    value.variableId.length === 0 ||
-    value.variableId.length > MAX_VARIABLE_ID_CODE_UNITS ||
-    CONTROL_CHARACTER_PATTERN.test(value.variableId)
+    typeof value.sourceId !== 'string' ||
+    value.sourceId.length === 0 ||
+    value.sourceId.length > MAX_VARIABLE_ID_CODE_UNITS ||
+    CONTROL_CHARACTER_PATTERN.test(value.sourceId)
   ) {
-    diagnostics.push(diagnostic([...path, 'variableId'], 'Host variable id is invalid.'));
+    diagnostics.push(diagnostic([...path, 'sourceId'], 'Variable source id is invalid.'));
+  }
+  if (value.sourceType !== 'data-source' && value.sourceType !== 'url-query') {
+    diagnostics.push(diagnostic([...path, 'sourceType'], 'Variable source type is invalid.'));
   }
   if (typeof value.name !== 'string' || !VARIABLE_NAME_PATTERN.test(value.name)) {
     diagnostics.push(diagnostic([...path, 'name'], 'Host variable name is invalid.'));

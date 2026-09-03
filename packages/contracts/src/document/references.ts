@@ -3,7 +3,7 @@ import {
   type DiagnosticPhase,
   type DiagnosticSegment,
 } from '../diagnostics/collector.js';
-import type { ScreenDocument } from '../types/document.js';
+import type { ScreenBlueprintValueExpression, ScreenDocument } from '../types/document.js';
 
 export function validateReferences(
   document: ScreenDocument,
@@ -54,7 +54,19 @@ export function validateReferences(
     clean = false;
   }
   const names = new Set<string>();
+  const variableIds = new Set<string>();
   document.variables.forEach((variable, index) => {
+    if (variableIds.has(variable.id)) {
+      collector.add(
+        'VARIABLE_NAME_DUPLICATE',
+        at(['variables', index, 'id']),
+        phase,
+        `Duplicate variable id "${truncateKey(variable.id)}".`,
+      );
+      clean = false;
+    } else {
+      variableIds.add(variable.id);
+    }
     if (names.has(variable.name)) {
       collector.add(
         'VARIABLE_NAME_DUPLICATE',
@@ -65,6 +77,30 @@ export function validateReferences(
       clean = false;
     } else {
       names.add(variable.name);
+    }
+  });
+  document.components.forEach((component, componentIndex) => {
+    const source = component.dataSource;
+    if (source?.type === 'variable' && !variableIds.has(source.variableId)) {
+      collector.add(
+        'VARIABLE_NAME_INVALID',
+        at(['components', componentIndex, 'dataSource', 'variableId']),
+        phase,
+        `Component data source references unknown variable id "${truncateKey(source.variableId)}".`,
+      );
+      clean = false;
+    }
+    if (source?.type !== 'host-resource') return;
+    for (const [parameterName, parameter] of Object.entries(source.params)) {
+      if (parameter.kind === 'variable' && !variableIds.has(parameter.variableId)) {
+        collector.add(
+          'VARIABLE_NAME_INVALID',
+          at(['components', componentIndex, 'dataSource', 'params', parameterName, 'variableId']),
+          phase,
+          `Host resource parameter references unknown variable id "${truncateKey(parameter.variableId)}".`,
+        );
+        clean = false;
+      }
     }
   });
   const ruleIds = new Set<string>();
@@ -80,7 +116,7 @@ export function validateReferences(
     } else {
       ruleIds.add(rule.id);
     }
-    if (!idToIndex.has(rule.trigger.componentId)) {
+    if (rule.trigger.type === 'material-event' && !idToIndex.has(rule.trigger.componentId)) {
       collector.add(
         'COMPONENT_PARENT_MISSING',
         at(['blueprint', 'rules', index, 'trigger', 'componentId']),
@@ -89,17 +125,54 @@ export function validateReferences(
       );
       clean = false;
     }
+    if (rule.trigger.type === 'variable-event' && !variableIds.has(rule.trigger.variableId)) {
+      collector.add(
+        'VARIABLE_NAME_INVALID',
+        at(['blueprint', 'rules', index, 'trigger', 'variableId']),
+        phase,
+        `Blueprint trigger references unknown variable id "${truncateKey(rule.trigger.variableId)}".`,
+      );
+      clean = false;
+    }
+    if (rule.condition !== undefined) {
+      clean =
+        validateExpressionVariables(
+          rule.condition.left,
+          variableIds,
+          ['blueprint', 'rules', index, 'condition', 'left'],
+          at,
+          collector,
+          phase,
+        ) && clean;
+      if (rule.condition.right !== undefined) {
+        clean =
+          validateExpressionVariables(
+            rule.condition.right,
+            variableIds,
+            ['blueprint', 'rules', index, 'condition', 'right'],
+            at,
+            collector,
+            phase,
+          ) && clean;
+      }
+    }
     rule.actions.forEach((action, actionIndex) => {
-      if (action.type === 'set-variable' && !names.has(action.variableName)) {
+      if (
+        (action.type === 'set-variable' || action.type === 'request-variable') &&
+        !variableIds.has(action.variableId)
+      ) {
         collector.add(
           'VARIABLE_NAME_INVALID',
-          at(['blueprint', 'rules', index, 'actions', actionIndex, 'variableName']),
+          at(['blueprint', 'rules', index, 'actions', actionIndex, 'variableId']),
           phase,
-          `Blueprint action references unknown variable "${truncateKey(action.variableName)}".`,
+          `Blueprint action references unknown variable id "${truncateKey(action.variableId)}".`,
         );
         clean = false;
       }
-      if (action.type === 'component-visibility' && !idToIndex.has(action.componentId)) {
+      if (
+        (action.type === 'component-visibility' || action.type === 'request-component-data') &&
+        !idToIndex.has(action.componentId)
+      ) {
         collector.add(
           'COMPONENT_PARENT_MISSING',
           at(['blueprint', 'rules', index, 'actions', actionIndex, 'componentId']),
@@ -108,9 +181,78 @@ export function validateReferences(
         );
         clean = false;
       }
+      const expression =
+        action.type === 'set-variable'
+          ? action.value
+          : action.type === 'emit-host-event' || action.type === 'host-action'
+            ? action.payload
+            : undefined;
+      if (expression !== undefined) {
+        clean =
+          validateExpressionVariables(
+            expression,
+            variableIds,
+            [
+              'blueprint',
+              'rules',
+              index,
+              'actions',
+              actionIndex,
+              action.type === 'set-variable' ? 'value' : 'payload',
+            ],
+            at,
+            collector,
+            phase,
+          ) && clean;
+      }
     });
   });
   return clean;
+}
+
+function validateExpressionVariables(
+  expression: ScreenBlueprintValueExpression,
+  variableIds: ReadonlySet<string>,
+  base: DiagnosticSegment[],
+  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  if (expression.kind === 'variable') {
+    if (variableIds.has(expression.variableId)) return true;
+    collector.add(
+      'VARIABLE_NAME_INVALID',
+      at([...base, 'variableId']),
+      phase,
+      `Blueprint expression references unknown variable id "${truncateKey(expression.variableId)}".`,
+    );
+    return false;
+  }
+  if (expression.kind === 'array') {
+    return expression.items.every((item, index) =>
+      validateExpressionVariables(
+        item,
+        variableIds,
+        [...base, 'items', index],
+        at,
+        collector,
+        phase,
+      ),
+    );
+  }
+  if (expression.kind === 'object') {
+    return Object.entries(expression.properties).every(([key, value]) =>
+      validateExpressionVariables(
+        value,
+        variableIds,
+        [...base, 'properties', key],
+        at,
+        collector,
+        phase,
+      ),
+    );
+  }
+  return true;
 }
 
 function findParentCycles(

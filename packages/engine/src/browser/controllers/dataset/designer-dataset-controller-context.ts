@@ -53,6 +53,7 @@ export class DesignerDatasetControllerState {
   descriptor: ScreenDatasetDescriptor | undefined;
   draft: DesignerDatasetDraftView | undefined;
   mode: DesignerDataSourceMode = 'none';
+  variableSourceId = '';
   staticDraft = 'null';
   staticValue: ScreenJsonValue = null;
   staticBinding: ScreenDataBinding | undefined;
@@ -78,6 +79,7 @@ export class DesignerDatasetControllerState {
     this.descriptor = undefined;
     this.draft = undefined;
     this.mode = 'none';
+    this.variableSourceId = '';
     this.staticDraft = 'null';
     this.staticValue = null;
     this.staticBinding = undefined;

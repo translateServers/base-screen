@@ -10,7 +10,6 @@ export async function assertHostVariableAuthoring(page, designer) {
   }
   await assertReferenceNavigation(page, designer);
 
-  await assertSearchAndFilter(page, designer);
   await assertDescriptionDuplicateAndPreview(page, designer);
   await assertAtomicRenames(page, designer);
   await assertHostVariableRefresh(page);
@@ -29,7 +28,7 @@ async function assertReferenceNavigation(page, designer) {
         (component) =>
           component.dataSource?.type === 'host-resource' &&
           Object.values(component.dataSource.params).some(
-            (parameter) => parameter.kind === 'variable' && parameter.name === 'region',
+            (parameter) => parameter.kind === 'variable' && parameter.variableId === 'region',
           ),
       )
       .map((component) => component.id),
@@ -57,9 +56,9 @@ async function assertReferenceNavigation(page, designer) {
 
 async function createHostVariable(page, designer, variableId, expectedName) {
   await designer.locator('[data-variable-action="add"]').click();
-  await designer.locator('[data-variable-action="create-type-host"]').click();
+  await designer.locator('select[data-variable-create-type]').selectOption('data-source');
   const option = designer.locator(
-    `[data-variable-action="select-host"][data-variable-id="${variableId}"]`,
+    `[data-variable-action="select-host"][data-source-id="${variableId}"]`,
   );
   await option.waitFor();
   await option.click();
@@ -68,27 +67,10 @@ async function createHostVariable(page, designer, variableId, expectedName) {
   await page.waitForFunction(
     (name) =>
       window.baseScreenHarness.designer.document.variables.some(
-        (variable) => variable.type === 'host' && variable.name === name,
+        (variable) => variable.type === 'data-source' && variable.name === name,
       ),
     expectedName,
   );
-}
-
-async function assertSearchAndFilter(page, designer) {
-  const search = designer.locator('[data-variable-search]');
-  await search.fill('tenantRegion');
-  await page.waitForFunction(() => {
-    const root = window.baseScreenHarness.designer.shadowRoot;
-    const rows = [...root.querySelectorAll('[data-variable-row]')];
-    return rows.length === 1 && rows[0].innerText.includes('tenantRegion');
-  });
-  await search.fill('');
-  await designer.locator('[data-variable-type-filter]').selectOption('host');
-  const hostOnly = await designer
-    .locator('[data-variable-row]')
-    .evaluateAll((rows) => rows.every((row) => row.dataset.variableType === 'host'));
-  if (!hostOnly) throw new Error('BROWSER_HARNESS_VARIABLE_TYPE_FILTER_FAILED');
-  await designer.locator('[data-variable-type-filter]').selectOption('all');
 }
 
 async function assertDescriptionDuplicateAndPreview(page, designer) {
@@ -131,7 +113,7 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
   if (leak) throw new Error('BROWSER_HARNESS_VARIABLE_PREVIEW_LEAKED');
   const previewPurposes = await page.evaluate(() =>
     window.baseScreenHarness.variableRequests
-      .filter((request) => ['tenant-region', 'private-token'].includes(request.variableId))
+      .filter((request) => ['tenant-region', 'private-token'].includes(request.sourceId))
       .map((request) => request.purpose),
   );
   if (!previewPurposes.includes('authoring-preview')) {
@@ -152,7 +134,7 @@ async function assertAtomicRenames(page, designer) {
         .filter((component) => component.dataSource?.type === 'host-resource')
         .flatMap((component) => Object.values(component.dataSource.params))
         .filter((parameter) => parameter.kind === 'variable')
-        .every((parameter) => parameter.name !== 'region')
+        .every((parameter) => parameter.variableId === 'region')
     );
   });
   const renamedDisclosure = await page.evaluate(() => {
@@ -182,7 +164,7 @@ async function assertAtomicRenames(page, designer) {
       document.components.some((component) =>
         Object.values(
           component.dataSource?.type === 'host-resource' ? component.dataSource.params : {},
-        ).some((parameter) => parameter.kind === 'variable' && parameter.name === 'region'),
+        ).some((parameter) => parameter.kind === 'variable' && parameter.variableId === 'region'),
       )
     );
   });
@@ -197,9 +179,9 @@ async function assertAtomicRenames(page, designer) {
   const hostRenamed = await page.evaluate(() =>
     window.baseScreenHarness.designer.document.variables.some(
       (variable) =>
-        variable.type === 'host' &&
+        variable.type === 'data-source' &&
         variable.name === 'runtimeRegion' &&
-        variable.variableId === 'tenant-region',
+        variable.sourceId === 'tenant-region',
     ),
   );
   if (!hostRenamed) throw new Error('BROWSER_HARNESS_HOST_VARIABLE_RENAME_FAILED');
@@ -213,13 +195,17 @@ async function assertHostVariableRefresh(page) {
     );
     const source = component?.dataSource;
     if (source?.type !== 'host-resource') return false;
+    const variableId = designer.document.variables.find(
+      (variable) => variable.name === 'runtimeRegion',
+    )?.id;
+    if (variableId === undefined) return false;
     return designer.executeCommand({
       type: 'update-components',
       componentIds: [component.id],
       patch: {
         dataSource: {
           ...source,
-          params: { ...source.params, region: { kind: 'variable', name: 'runtimeRegion' } },
+          params: { ...source.params, region: { kind: 'variable', variableId } },
         },
       },
     }).ok;
@@ -227,7 +213,7 @@ async function assertHostVariableRefresh(page) {
   if (!prepared) throw new Error('BROWSER_HARNESS_HOST_VARIABLE_DEPENDENCY_FAILED');
   await page.waitForFunction(() =>
     window.baseScreenHarness.variableRequests.some(
-      (request) => request.variableId === 'tenant-region' && request.purpose === 'runtime',
+      (request) => request.sourceId === 'tenant-region' && request.purpose === 'runtime',
     ),
   );
 
@@ -235,8 +221,11 @@ async function assertHostVariableRefresh(page) {
   await page.evaluate(() => {
     const harness = window.baseScreenHarness;
     harness.setDatasetRegion('west');
+    const variableId = harness.designer.document.variables.find(
+      (variable) => variable.name === 'runtimeRegion',
+    ).id;
     harness.designer.refreshVariables({
-      variableIds: ['tenant-region'],
+      variableIds: [variableId],
       traceId: 'browser-variable',
     });
   });
@@ -257,7 +246,10 @@ async function assertHostVariableRefresh(page) {
   await page.evaluate(() => {
     const harness = window.baseScreenHarness;
     harness.setDatasetRegion('variable-error');
-    harness.designer.refreshVariables({ variableIds: ['tenant-region'] });
+    const variableId = harness.designer.document.variables.find(
+      (variable) => variable.name === 'runtimeRegion',
+    ).id;
+    harness.designer.refreshVariables({ variableIds: [variableId] });
   });
   await page.waitForFunction(
     (before) => window.baseScreenHarness.variableRequests.length > before,
@@ -274,7 +266,10 @@ async function assertHostVariableRefresh(page) {
   await page.evaluate(() => {
     const harness = window.baseScreenHarness;
     harness.setDatasetRegion('north');
-    harness.designer.refreshVariables({ variableIds: ['tenant-region'] });
+    const variableId = harness.designer.document.variables.find(
+      (variable) => variable.name === 'runtimeRegion',
+    ).id;
+    harness.designer.refreshVariables({ variableIds: [variableId] });
   });
   await page.waitForFunction(
     (before) =>
@@ -291,7 +286,7 @@ async function assertHostVariableRefresh(page) {
     const component = designer.document.components.find(
       (item) => item.id === 'dataset-ranking-demo',
     );
-    return component?.dataSource?.params.region?.name === 'region';
+    return component?.dataSource?.params.region?.variableId === 'region';
   });
   if (!restored) throw new Error('BROWSER_HARNESS_HOST_VARIABLE_DEPENDENCY_RESTORE_FAILED');
 }

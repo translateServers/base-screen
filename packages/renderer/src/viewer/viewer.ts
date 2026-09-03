@@ -10,11 +10,14 @@ import type {
   ScreenParseResult,
   ScreenResourceExecutionMode,
   ScreenResourceObserver,
+  ScreenVariableHandle,
   ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
+import { parseScreenJsonValue } from '@base-screen/contracts';
 import {
   compileScreenBlueprint,
   dispatchScreenBlueprintEvent,
+  type ScreenBlueprintEvent,
   type ScreenBlueprintPlan,
 } from '@base-screen/core';
 import type {
@@ -31,6 +34,7 @@ import {
 } from './viewer-configuration.js';
 import { lifecycleFailure } from './viewer-lifecycle.js';
 import { ViewerVariableController } from './viewer-variable-controller.js';
+import { ViewerVariableHandles, viewerVariableValuesEqual } from './viewer-variable-handles.js';
 
 const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
@@ -60,13 +64,19 @@ export class BaseScreenViewerElement extends ElementBase {
   #mount: HTMLDivElement | undefined;
   #projectId: string | undefined;
   #documentRevision: string | undefined;
+  readonly #variableHandles = new ViewerVariableHandles({
+    readDocument: () => this.#document,
+    readVariables: () => this.#blueprintVariables,
+    setValue: (id, value) => this.setVariableValue(id, value),
+    reportListenerFailure: () => this.emitLifecycleDiagnostic('Variable change listener failed.'),
+  });
   readonly #variableRuntime = new ViewerVariableController({
     readRenderer: () => this.#renderer,
     readDocument: () => this.#document,
     readBlueprintPlan: () => this.#blueprintPlan,
     readBlueprintVariables: () => this.#blueprintVariables,
     writeBlueprintVariables: (variables) => {
-      this.#blueprintVariables = variables;
+      this.writeBlueprintVariables(variables, true);
     },
     readVariablePort: () => this.#variablePort,
     emitDiagnostic: (code) => this.emitDiagnostic(code),
@@ -234,6 +244,7 @@ export class BaseScreenViewerElement extends ElementBase {
 
   unload(): void {
     this.#variableRuntime.reset();
+    this.#variableHandles.clear();
     this.disposeRenderer();
     this.#document = undefined;
     this.compileBlueprint();
@@ -247,6 +258,10 @@ export class BaseScreenViewerElement extends ElementBase {
 
   refreshVariables(options?: ScreenVariableRefreshOptions): void {
     this.#variableRuntime.refreshVariables(options);
+  }
+
+  getVariable(id: string): ScreenVariableHandle | undefined {
+    return this.#variableHandles.get(id);
   }
 
   private initialize(): void {
@@ -323,20 +338,27 @@ export class BaseScreenViewerElement extends ElementBase {
     readonly name: string;
     readonly payload: ScreenJsonValue;
   }): void {
-    if (this.#blueprintPlan === undefined || this.#blueprintVariables === undefined) {
-      return;
-    }
-    const previousVariables = this.#blueprintVariables;
-    const result = dispatchScreenBlueprintEvent(this.#blueprintPlan, this.#blueprintVariables, {
+    this.handleBlueprintEvent({
+      type: 'material-event',
       componentId: event.componentId,
       name: event.name,
       payload: event.payload,
     });
+  }
+
+  private handleBlueprintEvent(event: ScreenBlueprintEvent, depth = 0): void {
+    if (this.#blueprintPlan === undefined || this.#blueprintVariables === undefined) return;
+    if (depth > 32) {
+      this.emitLifecycleDiagnostic('Blueprint variable event cycle exceeded its limit.');
+      return;
+    }
+    const previousVariables = this.#blueprintVariables;
+    const result = dispatchScreenBlueprintEvent(this.#blueprintPlan, previousVariables, event);
     if (!result.ok) {
       this.emitLifecycleDiagnostic('Blueprint event payload is invalid.');
       return;
     }
-    this.#blueprintVariables = result.value.variables;
+    const changedVariables = this.writeBlueprintVariables(result.value.variables, false);
     const renderer = this.#renderer;
     const document = this.#document;
     if (renderer !== undefined && document !== undefined) {
@@ -366,6 +388,81 @@ export class BaseScreenViewerElement extends ElementBase {
         });
       }
     }
+    for (const componentId of result.value.componentDataRequests) {
+      renderer?.refreshData(componentId);
+    }
+    if (result.value.variableRequests.length > 0) {
+      this.#variableRuntime.refreshVariables({
+        variableIds: [...new Set(result.value.variableRequests)],
+      });
+    }
+    for (const variableId of changedVariables) {
+      this.handleBlueprintEvent(
+        {
+          type: 'variable-event',
+          variableId,
+          name: 'data-updated',
+          payload: result.value.variables[variableId] ?? null,
+        },
+        depth + 1,
+      );
+    }
+  }
+
+  private setVariableValue(id: string, value: ScreenJsonValue): ScreenParseResult<null> {
+    const parsed = parseScreenJsonValue(value);
+    if (!parsed.ok) return parsed;
+    const renderer = this.#renderer;
+    const document = this.#document;
+    const previous = this.#blueprintVariables;
+    if (
+      renderer === undefined ||
+      document === undefined ||
+      previous === undefined ||
+      !document.variables.some((variable) => variable.id === id)
+    ) {
+      return lifecycleFailure('Viewer variable is unavailable.');
+    }
+    if (viewerVariableValuesEqual(previous[id], parsed.value)) {
+      return { ok: true, value: null, diagnostics: [] };
+    }
+    const variables = { ...previous, [id]: parsed.value };
+    const applied = renderer.setVariables(variables);
+    if (!applied.ok) return applied;
+    const rendered = renderer.render(document, { trigger: 'variable' });
+    if (!rendered.ok) {
+      renderer.setVariables(previous);
+      return rendered;
+    }
+    this.writeBlueprintVariables(variables, false);
+    this.handleBlueprintEvent({
+      type: 'variable-event',
+      variableId: id,
+      name: 'data-updated',
+      payload: parsed.value,
+    });
+    return { ok: true, value: null, diagnostics: rendered.diagnostics };
+  }
+
+  private writeBlueprintVariables(
+    variables: ScreenJsonObject,
+    emitEvents = false,
+  ): readonly string[] {
+    const previous = this.#blueprintVariables;
+    this.#blueprintVariables = variables;
+    if (previous === undefined) return [];
+    const changed = this.#variableHandles.notify(previous, variables);
+    if (emitEvents) {
+      for (const variableId of changed) {
+        this.handleBlueprintEvent({
+          type: 'variable-event',
+          variableId,
+          name: 'data-updated',
+          payload: variables[variableId] ?? null,
+        });
+      }
+    }
+    return changed;
   }
 
   private emitDiagnostic(code: ScreenDiagnostic['code']): void {

@@ -35,6 +35,7 @@ export function readDataSourceFields(
       readonly static: string;
       readonly resourceType: string;
       readonly resourceId: string;
+      readonly variableId: string;
       readonly params: string;
     }
   | undefined {
@@ -53,6 +54,7 @@ export function readDataSourceFields(
     resourceType:
       value('resourceType') || (source?.type === 'host-resource' ? source.resourceType : ''),
     resourceId: value('resourceId') || (source?.type === 'host-resource' ? source.resourceId : ''),
+    variableId: value('variableId') || (source?.type === 'variable' ? source.variableId : ''),
     params:
       value('params') || (source?.type === 'host-resource' ? JSON.stringify(source.params) : '{}'),
   };
@@ -63,7 +65,7 @@ export function dataCapabilities(
   catalog: BaseScreenMaterialCatalog | undefined,
   hostResourceAvailable: boolean,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
-): readonly ('static' | 'host-resource')[] | undefined {
+): readonly ('static' | 'host-resource' | 'variable')[] | undefined {
   return catalog
     ?.get(component?.type ?? '')
     ?.manifest.dataCapabilities.filter(
@@ -90,6 +92,7 @@ export function createDataSource(
     readonly static: string;
     readonly resourceType: string;
     readonly resourceId: string;
+    readonly variableId: string;
     readonly params: string;
   },
 ): ScreenComponentDataSource | null | undefined {
@@ -108,6 +111,9 @@ export function createDataSource(
       params: literalParameters(params),
       binding: null,
     };
+  }
+  if (type === 'variable' && fields.variableId !== '') {
+    return { type, variableId: fields.variableId };
   }
   return undefined;
 }

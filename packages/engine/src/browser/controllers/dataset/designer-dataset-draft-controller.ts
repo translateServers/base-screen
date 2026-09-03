@@ -7,6 +7,7 @@ import {
   createDesignerDatasetDraft,
   createEmptyDataSourceTransaction,
   createStaticDataSourceTransaction,
+  createVariableDataSourceTransaction,
   defaultDatasetParameterValue,
   designerDataSourceModes,
   toggleDesignerDatasetBindingField,
@@ -97,6 +98,12 @@ export function applyDatasetDraft(context: DesignerDatasetControllerContext): vo
       entry?.manifest.staticData,
       context.state.staticBinding,
       entry?.manifest.dataBinding?.roles ?? [],
+    );
+  } else if (context.state.mode === 'variable') {
+    transaction = createVariableDataSourceTransaction(
+      document,
+      component.id,
+      context.state.variableSourceId,
     );
   } else {
     const descriptor = context.state.descriptor;
@@ -199,7 +206,16 @@ export function syncDraftToFocusedComponent(
     context.state.draft = undefined;
     return { resourceType: source.resourceType, resourceId: source.resourceId };
   }
+  if (source?.type === 'variable') {
+    context.state.mode = 'variable';
+    context.state.variableSourceId = source.variableId;
+    context.state.descriptor = undefined;
+    context.state.draft = undefined;
+    context.state.catalogOpen = false;
+    return;
+  }
   context.state.mode = 'none';
+  context.state.variableSourceId = '';
   context.state.descriptor = undefined;
   context.state.draft = undefined;
   context.state.catalogOpen = false;
@@ -259,7 +275,7 @@ export function updateDatasetParameterMode(
   if (name === undefined || context.state.draft === undefined) return;
   const value =
     target.value === 'variable'
-      ? { kind: 'variable' as const, name: '' }
+      ? { kind: 'variable' as const, variableId: '' }
       : {
           kind: 'literal' as const,
           value: defaultDatasetParameterValue(context.state.descriptor, name),

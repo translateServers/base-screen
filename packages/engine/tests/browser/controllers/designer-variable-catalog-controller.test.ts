@@ -4,6 +4,7 @@ import type {
   ScreenHostVariablePort,
   ScreenJsonValue,
   ScreenParseResult,
+  ScreenVariable,
 } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
 import { DesignerVariableCatalogController } from '../../../src/browser/controllers/designer-variable-catalog-controller.js';
@@ -22,16 +23,17 @@ describe('DesignerVariableCatalogController', () => {
     });
     const controller = createController(catalog);
 
+    controller.ensureList('data-source');
     controller.updateQuery('first');
     controller.updateQuery('second');
-    expect(signals[0]?.aborted).toBe(true);
-    pending[1]!.resolve(page('second-id'));
+    expect(signals[1]?.aborted).toBe(true);
+    pending[2]!.resolve(page('second-id'));
     await settle();
-    pending[0]!.resolve(page('first-id'));
+    pending[1]!.resolve(page('first-id'));
     await settle();
 
     expect(controller.view.query).toBe('second');
-    expect(controller.view.items.map((item) => item.variableId)).toEqual(['second-id']);
+    expect(controller.view.items.map((item) => item.sourceId)).toEqual(['second-id']);
   });
 
   it('rejects duplicate ids across catalog pages without replacing the valid page', async () => {
@@ -45,13 +47,13 @@ describe('DesignerVariableCatalogController', () => {
       }),
     );
 
-    controller.ensureList();
+    controller.ensureList('data-source');
     await settle();
     controller.loadMore();
     await settle();
 
     expect(calls).toEqual(['first', 'next']);
-    expect(controller.view.items.map((item) => item.variableId)).toEqual(['shared']);
+    expect(controller.view.items.map((item) => item.sourceId)).toEqual(['shared']);
     expect(controller.view.feedback).toBe('宿主变量目录加载失败。');
   });
 
@@ -70,7 +72,7 @@ describe('DesignerVariableCatalogController', () => {
     };
     const controller = createController(catalogPort(), variablePort);
 
-    await controller.preview('previewable');
+    await controller.preview(dynamicVariable('previewable'));
     expect(purposes).toEqual(['authoring-preview']);
     expect(controller.view.previewStatus).toBe('ready');
     expect(new TextEncoder().encode(controller.view.previewSummary).byteLength).toBeLessThanOrEqual(
@@ -88,7 +90,7 @@ describe('DesignerVariableCatalogController', () => {
         },
       ],
     };
-    await controller.preview('denied');
+    await controller.preview(dynamicVariable('denied'));
     expect(controller.view.previewStatus).toBe('error');
     expect(controller.view.previewSummary).toBeUndefined();
   });
@@ -102,7 +104,7 @@ describe('DesignerVariableCatalogController', () => {
       },
     });
 
-    await controller.preview('private');
+    await controller.preview(dynamicVariable('private'));
 
     expect(resolves).toBe(0);
     expect(controller.view.previewStatus).toBe('unavailable');
@@ -131,27 +133,46 @@ function catalogPort(
       (async () => ({ ok: true, value: { items: [] }, diagnostics: [] }) as const),
     describe:
       overrides.describe ??
-      (async ({ variableId }) => ({
+      (async ({ sourceId }) => ({
         ok: true,
         value: {
-          variableId,
+          sourceId,
+          sourceType: 'data-source',
           name: 'catalogVariable',
           description: null,
-          previewable: variableId !== 'private',
+          previewable: sourceId !== 'private',
         },
         diagnostics: [],
       })),
   };
 }
 
-function page(variableId: string, nextCursor?: string): ScreenParseResult<ScreenHostVariablePage> {
+function page(sourceId: string, nextCursor?: string): ScreenParseResult<ScreenHostVariablePage> {
   return {
     ok: true,
     value: {
-      items: [{ variableId, name: 'catalogVariable', description: null }],
+      items: [
+        {
+          sourceId,
+          sourceType: 'data-source',
+          name: 'catalogVariable',
+          description: null,
+        },
+      ],
       ...(nextCursor === undefined ? {} : { nextCursor }),
     },
     diagnostics: [],
+  };
+}
+
+function dynamicVariable(sourceId: string): ScreenVariable {
+  return {
+    type: 'data-source',
+    id: `variable-${sourceId}`,
+    name: sourceId,
+    initialValue: null,
+    sourceId,
+    controlled: true,
   };
 }
 

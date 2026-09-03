@@ -30,18 +30,17 @@ export interface DesignerBlueprintNodeInsertion {
 export function insertDesignerBlueprintLibraryNode(
   document: ScreenDocument,
   kind: DesignerBlueprintUnconnectedNodeKind,
-  variableName?: string,
+  variableId?: string,
   position?: DesignerBlueprintNodePosition,
 ): DesignerBlueprintNodeInsertion | null {
   if (
-    variableName !== undefined &&
-    (kind !== 'set-variable' ||
-      !document.variables.some((variable) => variable.name === variableName))
+    variableId !== undefined &&
+    (kind !== 'set-variable' || !document.variables.some((variable) => variable.id === variableId))
   ) {
     return null;
   }
   const nodes = materializeDesignerBlueprintLayoutNodes(document);
-  const nodeId = nextDesignerBlueprintUnconnectedNodeId(nodes, kind, variableName);
+  const nodeId = nextDesignerBlueprintUnconnectedNodeId(nodes, kind, variableId);
   return {
     nodeId,
     blueprint: appendDesignerBlueprintLayoutNode(document.blueprint, nodes, nodeId, position),
@@ -66,8 +65,8 @@ export function buildDesignerBlueprintUnconnectedNode(
       unconnected: true,
     };
   }
-  const variableName = resolveDesignerBlueprintUnconnectedVariable(document, unconnected);
-  const action = createDesignerBlueprintAction(unconnected.kind, document, variableName);
+  const variableId = resolveDesignerBlueprintUnconnectedVariable(document, unconnected);
+  const action = createDesignerBlueprintAction(unconnected.kind, document, variableId);
   const summary =
     action === null
       ? { kind: 'set-variable' as const, primary: '', secondary: '' }

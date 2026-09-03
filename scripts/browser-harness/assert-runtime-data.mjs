@@ -23,6 +23,32 @@ export async function assertRuntimeData(page, viewer) {
   if (resourceDomState !== 'ready') {
     throw new Error('BROWSER_HARNESS_RESOURCE_DOM_STATE_FAILED');
   }
+  const variableExamples = await page.evaluate(() => {
+    const harness = window.baseScreenHarness;
+    const readValue = (componentId) =>
+      harness.viewer.shadowRoot.querySelector(`[data-base-screen-component-id="${componentId}"]`)
+        ?.model.dataState.value;
+    return {
+      dataSourceValue: readValue('host-data'),
+      urlQueryValue: readValue('subtitle'),
+      runtimeSourceTypes: [
+        ...new Set(
+          harness.variableRequests
+            .filter((request) => request.purpose === 'runtime')
+            .map((request) => request.sourceType),
+        ),
+      ].sort(),
+    };
+  });
+  if (
+    variableExamples.dataSourceValue !== 'north' ||
+    variableExamples.urlQueryValue !== 'browser-harness' ||
+    variableExamples.runtimeSourceTypes.join(',') !== 'data-source,url-query'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLE_TYPE_EXAMPLES_FAILED:${JSON.stringify(variableExamples)}`,
+    );
+  }
   // 条件样式规则（ADR-0058）：阈值双向穿越——命中变红加粗、回落恢复基础样式。
   await viewer.locator('[data-base-screen-component-id=metric-warning]').waitFor();
   const metricStyle = () =>

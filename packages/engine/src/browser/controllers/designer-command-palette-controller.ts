@@ -275,17 +275,22 @@ export class DesignerCommandPaletteController {
       }),
     );
     const rules = document.blueprint.rules.flatMap((rule): DesignerCommandPaletteEntry[] => {
+      const triggerId =
+        rule.trigger.type === 'material-event' ? rule.trigger.componentId : rule.trigger.variableId;
+      const triggerNode =
+        rule.trigger.type === 'material-event'
+          ? `component:${rule.trigger.componentId}`
+          : `variable:${rule.trigger.variableId}`;
       const ruleEntry: DesignerCommandPaletteEntry = {
         kind: 'blueprint',
         label: DESIGNER_UI_TEXT.blueprint.ruleSummary(rule.id),
-        detail: `${rule.trigger.componentId}.${rule.trigger.eventName}`,
-        searchText:
-          `${rule.id} ${rule.trigger.componentId} ${rule.trigger.eventName}`.toLocaleLowerCase(),
+        detail: `${triggerId}.${rule.trigger.eventName}`,
+        searchText: `${rule.id} ${triggerId} ${rule.trigger.eventName}`.toLocaleLowerCase(),
         blueprintTargetId:
           rule.condition !== undefined
             ? `condition:${rule.id}`
             : rule.actions.length === 0
-              ? `component:${rule.trigger.componentId}`
+              ? triggerNode
               : `edge:${rule.id}:action:0`,
       };
       return [

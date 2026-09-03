@@ -8,29 +8,43 @@ export interface DesignerVariableCreateDraft {
   readonly name: string;
   readonly description: string;
   readonly valueSource: string;
-  readonly variableId: string | undefined;
+  readonly sourceId: string | undefined;
+  readonly processorId: string;
+  readonly controlled: boolean;
+  readonly autoUpdate: boolean;
+  readonly autoUpdateInterval: string;
   readonly catalogQuery: string;
   readonly catalogItems: readonly ScreenHostVariableSummary[];
   readonly catalogCursor: string | undefined;
   readonly catalogFeedback: string;
+  readonly previewStatus: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error';
+  readonly previewSummary: string | undefined;
 }
 
 export function createBadge(ownerDocument: Document, type: ScreenVariable['type']): HTMLElement {
   const badge = ownerDocument.createElement('span');
   badge.className = 'variable-badge';
   badge.dataset.variableType = type;
-  badge.textContent =
-    type === 'static' ? DESIGNER_UI_TEXT.variables.typeStatic : DESIGNER_UI_TEXT.variables.typeHost;
+  badge.textContent = sourceTypeLabel(type);
   return badge;
 }
 
-export function appendCreateEditor(content: HTMLElement, draft: DesignerVariableCreateDraft): void {
+export function appendCreateEditor(
+  content: HTMLElement,
+  draft: DesignerVariableCreateDraft,
+  configuringIndex?: number,
+): void {
   const editor = content.ownerDocument.createElement('section');
   editor.className = 'variable-editor variable-create-row';
-  editor.dataset.variableEditor = 'create';
+  editor.dataset.variableEditor = configuringIndex === undefined ? 'create' : 'configuration';
+  editor.dataset.variableIndex = String(configuringIndex ?? -1);
   editor.dataset.variableCreateType = draft.type;
-  editor.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.createTitle);
-  appendEditorHeading(editor, DESIGNER_UI_TEXT.variables.createTitle);
+  const title =
+    configuringIndex === undefined
+      ? DESIGNER_UI_TEXT.variables.createTitle
+      : DESIGNER_UI_TEXT.variables.editConfigurationTitle;
+  editor.setAttribute('aria-label', title);
+  appendEditorHeading(editor, title);
   const intro = editor.ownerDocument.createElement('p');
   intro.className = 'variable-editor-intro';
   intro.textContent = DESIGNER_UI_TEXT.variables.createIntro;
@@ -51,20 +65,62 @@ export function appendCreateEditor(content: HTMLElement, draft: DesignerVariable
   });
   description.value = draft.description;
   appendCreateTypeChooser(editor, draft.type);
-  if (draft.type === 'static') {
-    const value = appendEditorField(editor, {
-      label: DESIGNER_UI_TEXT.variables.value,
-      hint: DESIGNER_UI_TEXT.variables.valueHint,
-      dataKey: 'variableCreateValue',
-      describedBy: errorId,
-      json: true,
-    });
-    value.value = draft.valueSource;
-  } else {
+  const value = appendEditorField(editor, {
+    label: DESIGNER_UI_TEXT.variables.initialValue,
+    hint: DESIGNER_UI_TEXT.variables.valueHint,
+    dataKey: 'variableCreateValue',
+    describedBy: errorId,
+    json: true,
+  });
+  value.value = draft.valueSource;
+  if (draft.type !== 'static') {
     appendHostCatalog(editor, draft);
+    const processor = appendEditorField(editor, {
+      label: DESIGNER_UI_TEXT.variables.processor,
+      hint: DESIGNER_UI_TEXT.variables.processorHint,
+      dataKey: 'variableCreateProcessor',
+      describedBy: errorId,
+    });
+    processor.value = draft.processorId;
+    appendCheckboxField(
+      editor,
+      DESIGNER_UI_TEXT.variables.controlled,
+      DESIGNER_UI_TEXT.variables.controlledHint,
+      'variableCreateControlled',
+      draft.controlled,
+    );
+    if (draft.type === 'data-source') {
+      appendCheckboxField(
+        editor,
+        DESIGNER_UI_TEXT.variables.autoUpdate,
+        DESIGNER_UI_TEXT.variables.autoUpdateHint,
+        'variableCreateAutoUpdate',
+        draft.autoUpdate,
+      );
+      const interval = appendEditorField(editor, {
+        label: DESIGNER_UI_TEXT.variables.autoUpdateFrequency,
+        hint: DESIGNER_UI_TEXT.variables.autoUpdateFrequencyHint,
+        dataKey: 'variableCreateAutoUpdateInterval',
+        describedBy: errorId,
+      });
+      interval.type = 'number';
+      interval.min = '1';
+      interval.max = '86400';
+      interval.step = '1';
+      interval.value = draft.autoUpdateInterval;
+      interval.disabled = !draft.autoUpdate;
+    }
+    appendResponseField(editor, draft, configuringIndex);
   }
   appendEditorError(editor, errorId);
-  appendEditorActions(editor, 'confirm-create', -1, DESIGNER_UI_TEXT.variables.create);
+  appendEditorActions(
+    editor,
+    configuringIndex === undefined ? 'confirm-create' : 'confirm-config',
+    configuringIndex ?? -1,
+    configuringIndex === undefined
+      ? DESIGNER_UI_TEXT.variables.create
+      : DESIGNER_UI_TEXT.variables.save,
+  );
   content.appendChild(editor);
 }
 
@@ -111,22 +167,18 @@ export function appendDescriptionEditor(
   appendEditorActions(row, 'confirm-description', index, DESIGNER_UI_TEXT.variables.save);
 }
 
-export function appendValueEditor(
-  row: HTMLElement,
-  variable: Extract<ScreenVariable, { type: 'static' }>,
-  index: number,
-): void {
+export function appendValueEditor(row: HTMLElement, variable: ScreenVariable, index: number): void {
   appendEditorHeading(row, DESIGNER_UI_TEXT.variables.editValueTitle, variable.name, variable.type);
   const errorId = `designer-variable-value-error-${index}`;
   const input = appendEditorField(row, {
-    label: DESIGNER_UI_TEXT.variables.value,
+    label: DESIGNER_UI_TEXT.variables.initialValue,
     hint: DESIGNER_UI_TEXT.variables.valueHint,
     dataKey: 'variableValue',
     dataValue: String(index),
     describedBy: errorId,
     json: true,
   });
-  input.value = JSON.stringify(variable.value);
+  input.value = JSON.stringify(variable.initialValue);
   appendEditorError(row, errorId);
   appendEditorActions(row, 'confirm-value', index, DESIGNER_UI_TEXT.variables.save);
 }
@@ -163,41 +215,25 @@ export function appendIconLabel(target: HTMLElement, icon: DesignerIconName, lab
 }
 
 function appendCreateTypeChooser(editor: HTMLElement, selected: ScreenVariable['type']): void {
-  const section = editor.ownerDocument.createElement('section');
-  section.className = 'variable-source-field';
-  const fieldLabel = editor.ownerDocument.createElement('span');
-  fieldLabel.className = 'variable-field-label';
-  fieldLabel.textContent = DESIGNER_UI_TEXT.variables.source;
-  section.appendChild(fieldLabel);
-  const chooser = editor.ownerDocument.createElement('div');
-  chooser.className = 'variable-create-types';
-  chooser.setAttribute('role', 'group');
-  chooser.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.source);
-  for (const [type, label, hint] of [
-    [
-      'static',
-      DESIGNER_UI_TEXT.variables.createStatic,
-      DESIGNER_UI_TEXT.variables.createStaticHint,
-    ],
-    ['host', DESIGNER_UI_TEXT.variables.createHost, DESIGNER_UI_TEXT.variables.createHostHint],
-  ] as const) {
-    const button = createDesignerButton(editor.ownerDocument, {
-      ariaLabel: label,
-      className: 'variable-source-option',
-      pressed: type === selected,
-      variant: type === selected ? 'primary' : 'ghost',
-    });
-    button.dataset.variableAction = type === 'static' ? 'create-type-static' : 'create-type-host';
-    const title = editor.ownerDocument.createElement('strong');
-    title.textContent = label;
-    button.appendChild(title);
-    const description = editor.ownerDocument.createElement('small');
-    description.textContent = hint;
-    button.appendChild(description);
-    chooser.appendChild(button);
+  const field = editor.ownerDocument.createElement('label');
+  field.className = 'variable-field variable-source-field';
+  const label = editor.ownerDocument.createElement('span');
+  label.className = 'variable-field-label';
+  label.textContent = DESIGNER_UI_TEXT.variables.source;
+  field.appendChild(label);
+  const select = editor.ownerDocument.createElement('select');
+  select.className = 'variable-edit-input';
+  select.dataset.variableCreateType = 'true';
+  select.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.source);
+  for (const type of ['static', 'data-source', 'url-query'] as const) {
+    const option = editor.ownerDocument.createElement('option');
+    option.value = type;
+    option.textContent = sourceTypeLabel(type);
+    option.selected = type === selected;
+    select.appendChild(option);
   }
-  section.appendChild(chooser);
-  editor.appendChild(section);
+  field.appendChild(select);
+  editor.appendChild(field);
 }
 
 function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDraft): void {
@@ -205,7 +241,7 @@ function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDra
   section.className = 'variable-host-catalog';
   const label = editor.ownerDocument.createElement('span');
   label.className = 'variable-field-label';
-  label.textContent = DESIGNER_UI_TEXT.variables.createHost;
+  label.textContent = sourceTypeLabel(draft.type);
   section.appendChild(label);
   const search = createDesignerInput(editor.ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.catalogSearch,
@@ -219,12 +255,12 @@ function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDra
   for (const item of draft.catalogItems) {
     const button = createDesignerButton(editor.ownerDocument, {
       className: 'variable-host-catalog-item',
-      pressed: item.variableId === draft.variableId,
+      pressed: item.sourceId === draft.sourceId,
       title: DESIGNER_UI_TEXT.variables.selectHost(item.name),
-      variant: item.variableId === draft.variableId ? 'primary' : 'ghost',
+      variant: item.sourceId === draft.sourceId ? 'primary' : 'ghost',
     });
     button.dataset.variableAction = 'select-host';
-    button.dataset.variableId = item.variableId;
+    button.dataset.sourceId = item.sourceId;
     const name = editor.ownerDocument.createElement('code');
     name.textContent = item.name;
     const description = editor.ownerDocument.createElement('span');
@@ -246,14 +282,88 @@ function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDra
   feedback.className = 'variable-catalog-feedback';
   feedback.textContent = draft.catalogFeedback;
   section.appendChild(feedback);
-  if (draft.variableId !== undefined) {
+  if (draft.sourceId !== undefined) {
     const selected = editor.ownerDocument.createElement('code');
     selected.className = 'variable-selected-host-id';
-    selected.textContent = draft.variableId;
-    selected.dataset.variableSelectedHostId = draft.variableId;
+    selected.textContent = draft.sourceId;
+    selected.dataset.variableSelectedHostId = draft.sourceId;
     section.appendChild(selected);
   }
   editor.appendChild(section);
+}
+
+function appendCheckboxField(
+  editor: HTMLElement,
+  label: string,
+  hint: string,
+  dataKey: 'variableCreateControlled' | 'variableCreateAutoUpdate',
+  checked: boolean,
+): void {
+  const field = editor.ownerDocument.createElement('label');
+  field.className = 'variable-checkbox-field';
+  const input = editor.ownerDocument.createElement('input');
+  input.type = 'checkbox';
+  input.checked = checked;
+  input.dataset[dataKey] = 'true';
+  const copy = editor.ownerDocument.createElement('span');
+  const title = editor.ownerDocument.createElement('strong');
+  title.textContent = label;
+  const description = editor.ownerDocument.createElement('small');
+  description.textContent = hint;
+  copy.appendChild(title);
+  copy.appendChild(description);
+  field.appendChild(input);
+  field.appendChild(copy);
+  editor.appendChild(field);
+}
+
+function appendResponseField(
+  editor: HTMLElement,
+  draft: DesignerVariableCreateDraft,
+  configuringIndex: number | undefined,
+): void {
+  const section = editor.ownerDocument.createElement('section');
+  section.className = 'variable-response-field';
+  const heading = editor.ownerDocument.createElement('div');
+  const label = editor.ownerDocument.createElement('span');
+  label.className = 'variable-field-label';
+  label.textContent = DESIGNER_UI_TEXT.variables.responseResult;
+  heading.appendChild(label);
+  if (configuringIndex !== undefined) {
+    const refresh = createDesignerButton(editor.ownerDocument, {
+      text: DESIGNER_UI_TEXT.variables.responseRefresh,
+      variant: 'ghost',
+    });
+    refresh.dataset.variableAction = 'preview';
+    refresh.dataset.variableIndex = String(configuringIndex);
+    heading.appendChild(refresh);
+  }
+  section.appendChild(heading);
+  if (draft.previewSummary !== undefined) {
+    const response = editor.ownerDocument.createElement('pre');
+    response.textContent = draft.previewSummary;
+    section.appendChild(response);
+  } else {
+    const response = editor.ownerDocument.createElement('p');
+    response.textContent =
+      draft.previewStatus === 'loading'
+        ? DESIGNER_UI_TEXT.variables.previewLoading
+        : draft.previewStatus === 'unavailable'
+          ? DESIGNER_UI_TEXT.variables.previewUnavailable
+          : draft.previewStatus === 'error'
+            ? DESIGNER_UI_TEXT.variables.previewFailed
+            : DESIGNER_UI_TEXT.variables.responseEmpty;
+    section.appendChild(response);
+  }
+  editor.appendChild(section);
+}
+
+function sourceTypeLabel(type: ScreenVariable['type']): string {
+  return type === 'static'
+    ? DESIGNER_UI_TEXT.variables.typeStatic
+    : type === 'data-source'
+      ? DESIGNER_UI_TEXT.variables.typeDataSource
+      : DESIGNER_UI_TEXT.variables.typeUrlQuery;
 }
 
 interface EditorFieldOptions {
@@ -263,6 +373,8 @@ interface EditorFieldOptions {
     | 'variableCreateName'
     | 'variableCreateDescription'
     | 'variableCreateValue'
+    | 'variableCreateProcessor'
+    | 'variableCreateAutoUpdateInterval'
     | 'variableRename'
     | 'variableDescription'
     | 'variableValue';
@@ -332,6 +444,7 @@ function appendEditorActions(
   editor: HTMLElement,
   action:
     | 'confirm-create'
+    | 'confirm-config'
     | 'confirm-rename'
     | 'confirm-description'
     | 'confirm-value'

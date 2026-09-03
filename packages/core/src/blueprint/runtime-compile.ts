@@ -24,7 +24,9 @@ export function compileScreenBlueprint(
   }
   const initialVariables: Record<string, ScreenJsonValue> = {};
   for (const variable of document.variables) {
-    if (variable.type === 'static') initialVariables[variable.name] = cloneValue(variable.value);
+    initialVariables[variable.id] = cloneValue(
+      variable.type !== 'static' && variable.controlled ? null : variable.initialValue,
+    );
   }
   return {
     ok: true,
@@ -34,10 +36,16 @@ export function compileScreenBlueprint(
         trigger: { ...rule.trigger },
         ...(rule.condition ? { condition: cloneCondition(rule.condition) } : {}),
         actions: rule.actions.map((action) => {
-          if (action.type === 'component-visibility') {
+          if (
+            action.type === 'component-visibility' ||
+            action.type === 'request-variable' ||
+            action.type === 'request-component-data'
+          ) {
             return {
               ...action,
-              ...(action.transition === undefined ? {} : { transition: { ...action.transition } }),
+              ...(action.type === 'component-visibility' && action.transition !== undefined
+                ? { transition: { ...action.transition } }
+                : {}),
             };
           }
           return {

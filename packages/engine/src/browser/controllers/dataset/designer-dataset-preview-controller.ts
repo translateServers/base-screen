@@ -1,6 +1,7 @@
 import {
   parseScreenJsonValue,
   parseScreenTabularDataset,
+  type ScreenDynamicVariable,
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
@@ -113,24 +114,26 @@ async function resolvePreviewParameters(
 ): Promise<Readonly<Record<string, ScreenJsonValue>> | undefined> {
   const params: Record<string, ScreenJsonValue> = {};
   const document = context.callbacks.getDocument();
-  const hostVariables = new Map<string, string>();
+  const hostVariables = new Map<string, ScreenDynamicVariable>();
   for (const [name, parameter] of Object.entries(draft.params)) {
     if (parameter.kind === 'literal') {
       params[name] = parameter.value;
       continue;
     }
-    const variable = document?.variables.find((item) => item.name === parameter.name);
+    const variable = document?.variables.find((item) => item.id === parameter.variableId);
     if (variable?.type === 'static') {
-      params[name] = variable.value;
+      params[name] = variable.initialValue;
       continue;
     }
-    if (variable?.type !== 'host') return undefined;
-    hostVariables.set(name, variable.variableId);
+    if (variable === undefined) return undefined;
+    hostVariables.set(name, variable);
   }
   if (hostVariables.size === 0) return params;
   const port = context.callbacks.getVariablePort?.();
   if (port === undefined) return undefined;
-  const ids = [...new Set(hostVariables.values())];
+  const variables = [
+    ...new Map([...hostVariables.values()].map((variable) => [variable.id, variable])).values(),
+  ];
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     const timeout = new Promise<undefined>((resolve) => {
@@ -140,10 +143,18 @@ async function resolvePreviewParameters(
       }, 15_000);
     });
     const batch = Promise.all(
-      ids.map(async (variableId) => ({
-        variableId,
+      variables.map(async (variable) => ({
+        variable,
         result: await port.resolve({
-          variableId,
+          variableId: variable.id,
+          sourceId: variable.sourceId,
+          sourceType: variable.type,
+          initialValue: variable.initialValue,
+          controlled: variable.controlled,
+          ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
+          ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
+            ? { autoUpdate: variable.autoUpdate }
+            : {}),
           purpose: 'authoring-preview',
           signal: controller.signal,
         }),
@@ -152,14 +163,14 @@ async function resolvePreviewParameters(
     const settled = await Promise.race([batch, timeout]);
     if (settled === undefined || controller.signal.aborted) return undefined;
     const values = new Map<string, ScreenJsonValue>();
-    for (const { variableId, result } of settled) {
+    for (const { variable, result } of settled) {
       if (!result.ok) return undefined;
       const parsed = parseScreenJsonValue(result.value, { maxBytes: 1024 * 1024 });
       if (!parsed.ok) return undefined;
-      values.set(variableId, parsed.value);
+      values.set(variable.id, parsed.value);
     }
-    for (const [name, variableId] of hostVariables) {
-      const value = values.get(variableId);
+    for (const [name, variable] of hostVariables) {
+      const value = values.get(variable.id);
       if (value === undefined) return undefined;
       params[name] = value;
     }

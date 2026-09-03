@@ -136,7 +136,7 @@ describe('parseScreenDocument', () => {
           },
         }),
       ],
-      variables: [{ type: 'static', name: 'count', value: 0 }],
+      variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
         rules: [
           {
@@ -145,7 +145,7 @@ describe('parseScreenDocument', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'count',
+                variableId: 'count',
                 value: { kind: 'literal', value: 1 },
               },
             ],
@@ -180,7 +180,9 @@ describe('parseScreenDocument', () => {
           props: { nested: { list: [1, 2, -0] }, 中文: '值' },
         }),
       ],
-      variables: [{ type: 'static', name: 'count', value: { deep: [true, null] } }],
+      variables: [
+        { type: 'static', id: 'count', name: 'count', initialValue: { deep: [true, null] } },
+      ],
     });
     const result = parse(input);
     expect(result.ok).toBe(true);

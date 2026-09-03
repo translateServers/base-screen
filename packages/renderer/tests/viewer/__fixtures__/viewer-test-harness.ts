@@ -187,7 +187,14 @@ export function hostSource(
 }
 
 export function hostVariable(name: string, variableId: string): ScreenVariable {
-  return { type: 'host', name, variableId };
+  return {
+    type: 'data-source',
+    id: name,
+    name,
+    initialValue: null,
+    sourceId: variableId,
+    controlled: true,
+  };
 }
 
 export function document(
@@ -269,6 +276,7 @@ export function createImmediateResourcePort(): {
 
 export type PendingVariableRequest = {
   readonly variableId: string;
+  readonly sourceId: string;
   readonly purpose: 'runtime' | 'authoring-preview';
   readonly signal: ScreenAbortSignal;
   aborted: boolean;
@@ -288,6 +296,7 @@ export function createVariablePort(
     resolve: (request) => {
       const pending: PendingVariableRequest = {
         variableId: request.variableId,
+        sourceId: request.sourceId,
         purpose: request.purpose,
         signal: request.signal,
         aborted: false,
@@ -302,7 +311,7 @@ export function createVariablePort(
           pending.resolveRequest = resolve;
         });
       }
-      const value = values[request.variableId];
+      const value = values[request.sourceId];
       return value === undefined
         ? Promise.resolve({
             ok: false as const,

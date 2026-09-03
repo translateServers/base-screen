@@ -309,11 +309,14 @@ export function component(
   };
 }
 
-export function document(components: readonly ScreenComponentNode[]): ScreenDocument {
+export function document(
+  components: readonly ScreenComponentNode[],
+  variables: ScreenDocument['variables'] = [],
+): ScreenDocument {
   return {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components,
-    variables: [],
+    variables,
     blueprint: { rules: [] },
   };
 }

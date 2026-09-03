@@ -35,7 +35,7 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   propsSchema: { kind: 'object', properties: {}, required: [] },
   propertyPanel: [],
   events: [],
-  dataCapabilities: ['static', 'host-resource'],
+  dataCapabilities: ['static', 'host-resource', 'variable'],
   designCapabilities: { resize: true, rotate: true, children: false },
 };
 

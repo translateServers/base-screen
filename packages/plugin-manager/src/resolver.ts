@@ -5,12 +5,15 @@ import type { Candidate, ManagerInput } from './preflight-types.js';
 const MAX_DEPENDENCY_EDGES = 16_384;
 const SUPPORTED_BLUEPRINT_CAPABILITIES = new Set([
   'blueprint.trigger.material-event',
+  'blueprint.trigger.variable-event',
   'blueprint.value.event-payload',
   'blueprint.value.variable',
   'blueprint.condition.compare',
   'blueprint.action.set-variable',
   'blueprint.action.emit-host-event',
   'blueprint.action.component-visibility',
+  'blueprint.action.request-variable',
+  'blueprint.action.request-component-data',
 ]);
 
 export function resolveCandidates(

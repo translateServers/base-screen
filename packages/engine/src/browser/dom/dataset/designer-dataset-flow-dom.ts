@@ -56,6 +56,33 @@ function renderStaticSource(options: DesignerDataSourcePanelOptions): HTMLElemen
   return renderDesignerStaticData(staticDataView(options));
 }
 
+function renderVariableSource(options: DesignerDataSourcePanelOptions): HTMLElement {
+  const ownerDocument = options.panel.ownerDocument;
+  const section = ownerDocument.createElement('section');
+  section.className = 'designer-data-source-variable';
+  const field = ownerDocument.createElement('label');
+  field.className = 'designer-field designer-field-label';
+  const caption = ownerDocument.createElement('span');
+  caption.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
+  const select = ownerDocument.createElement('select');
+  select.className = 'designer-control designer-select';
+  select.dataset.dataVariableSource = 'true';
+  const empty = ownerDocument.createElement('option');
+  empty.value = '';
+  empty.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
+  select.appendChild(empty);
+  for (const variable of options.variables) {
+    const option = ownerDocument.createElement('option');
+    option.value = variable.id;
+    option.textContent = variable.name;
+    option.selected = variable.id === options.variableSourceId;
+    select.appendChild(option);
+  }
+  field.append(caption, select);
+  section.append(field, renderApplyAction(ownerDocument, 'variable'));
+  return section;
+}
+
 function staticDataView(options: DesignerDataSourcePanelOptions): DesignerStaticDataView {
   return {
     ownerDocument: options.panel.ownerDocument,
@@ -169,6 +196,10 @@ function renderContinuousDataFlow(
     renderContinuousStaticDataFlow(content, options);
     return;
   }
+  if (options.mode === 'variable') {
+    content.appendChild(renderVariableSource(options));
+    return;
+  }
   if (options.catalogOpen || options.descriptor === undefined) {
     content.append(renderHostConnection(options), renderDatasetCatalog(options));
     return;
@@ -178,7 +209,7 @@ function renderContinuousDataFlow(
     descriptor: options.descriptor,
     draft: options.draft,
     roles: options.roles,
-    variableNames: options.variableNames,
+    variables: options.variables,
     resourceAvailable: options.resourceAvailable,
   });
   const applyActions = configuration.querySelector<HTMLElement>('.designer-dataset-actions');

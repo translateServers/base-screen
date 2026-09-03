@@ -3,11 +3,12 @@ import type {
   ScreenDatasetSummary,
   ScreenHostResourceDataSource,
   ScreenHostResourceParameter,
+  ScreenVariable,
 } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import type { BaseScreenMaterialStaticDataDescriptor } from '@base-screen/plugin-core';
 
-export type DesignerDataSourceMode = 'none' | 'static' | 'dataset' | 'host-resource';
+export type DesignerDataSourceMode = 'none' | 'static' | 'variable' | 'dataset' | 'host-resource';
 
 export interface DesignerDatasetDraftView {
   readonly resourceType: string;
@@ -62,6 +63,7 @@ export interface DesignerDataSourcePanelOptions {
   readonly mode: DesignerDataSourceMode;
   readonly availableModes: readonly DesignerDataSourceMode[];
   readonly hostResource?: Pick<ScreenHostResourceDataSource, 'resourceType' | 'resourceId'>;
+  readonly variableSourceId: string;
   readonly staticDraft: string;
   readonly staticDescriptor: BaseScreenMaterialStaticDataDescriptor | undefined;
   readonly staticValue: import('@base-screen/contracts').ScreenJsonValue;
@@ -76,7 +78,7 @@ export interface DesignerDataSourcePanelOptions {
   readonly descriptor: ScreenDatasetDescriptor | undefined;
   readonly draft: DesignerDatasetDraftView | undefined;
   readonly roles: readonly ScreenDataBindingRole[];
-  readonly variableNames: readonly string[];
+  readonly variables: readonly Pick<ScreenVariable, 'id' | 'name'>[];
   readonly catalogAvailable: boolean;
   readonly resourceAvailable: boolean;
   readonly feedback: string;
@@ -92,6 +94,6 @@ export interface DesignerDatasetConfigurationOptions {
   readonly descriptor: ScreenDatasetDescriptor;
   readonly draft: DesignerDatasetDraftView | undefined;
   readonly roles: readonly ScreenDataBindingRole[];
-  readonly variableNames: readonly string[];
+  readonly variables: readonly Pick<ScreenVariable, 'id' | 'name'>[];
   readonly resourceAvailable: boolean;
 }

@@ -19,6 +19,7 @@ export interface DesignerVariablesCallbacks {
   readonly getCatalogPort?: () => ScreenHostVariableCatalogPort | undefined;
   readonly getVariablePort?: () => ScreenHostVariablePort | undefined;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
+  readonly addToBlueprint?: (variableId: string) => void;
   readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
 }
 
@@ -27,8 +28,8 @@ export class DesignerVariablesController {
   #panel: HTMLElement | undefined;
   #search = '';
   #typeFilter: 'all' | ScreenVariable['type'] = 'all';
-  #expandedVariableName: string | undefined;
-  #expandedReferenceName: string | undefined;
+  #expandedVariableId: string | undefined;
+  #expandedReferenceId: string | undefined;
   #lastDocument: ScreenDocument | undefined;
   readonly #catalog: DesignerVariableCatalogController;
   readonly #editor: DesignerVariableEditorController;
@@ -45,10 +46,7 @@ export class DesignerVariablesController {
       getPanel: () => this.#panel,
       getCatalog: () => this.#catalog,
       executeCommand: callbacks.executeCommand,
-      onVariableRenamed: (variableName, nextName) => {
-        if (this.#expandedVariableName === variableName) this.#expandedVariableName = nextName;
-        if (this.#expandedReferenceName === variableName) this.#expandedReferenceName = nextName;
-      },
+      onVariableRenamed: () => {},
       report: callbacks.report,
       renderAndFocus: (selector) => this.renderAndFocus(selector),
     });
@@ -62,8 +60,8 @@ export class DesignerVariablesController {
   release(): void {
     this.#panel = undefined;
     this.#lastDocument = undefined;
-    this.#expandedVariableName = undefined;
-    this.#expandedReferenceName = undefined;
+    this.#expandedVariableId = undefined;
+    this.#expandedReferenceId = undefined;
     this.#catalog.clear();
     this.#editor.reset();
   }
@@ -84,32 +82,39 @@ export class DesignerVariablesController {
     const referenceCounts = new Map<string, number>();
     for (const reference of references) {
       referenceCounts.set(
-        reference.variableName,
-        (referenceCounts.get(reference.variableName) ?? 0) + 1,
+        reference.variableId,
+        (referenceCounts.get(reference.variableId) ?? 0) + 1,
       );
     }
     const expandedReferenceName = references.some(
-      (reference) => reference.variableName === this.#expandedReferenceName,
+      (reference) => reference.variableId === this.#expandedReferenceId,
     )
-      ? this.#expandedReferenceName
+      ? this.#expandedReferenceId
       : undefined;
     const expandedVariableName = document?.variables.some(
-      (variable) => variable.name === this.#expandedVariableName,
+      (variable) => variable.id === this.#expandedVariableId,
     )
-      ? this.#expandedVariableName
+      ? this.#expandedVariableId
       : undefined;
     return {
       creating: editor.creating,
+      configuringIndex: editor.configuringIndex,
       create: {
         type: editor.createType,
         name: editor.createName,
         description: editor.createDescription,
         valueSource: editor.createValueSource,
-        variableId: editor.selectedHostId,
+        sourceId: editor.selectedSourceId,
+        processorId: editor.createProcessorId,
+        controlled: editor.createControlled,
+        autoUpdate: editor.createAutoUpdate,
+        autoUpdateInterval: editor.createAutoUpdateInterval,
         catalogQuery: catalog.query,
         catalogItems: catalog.items,
         catalogCursor: catalog.nextCursor,
         catalogFeedback: catalog.feedback,
+        previewStatus: catalog.previewStatus,
+        previewSummary: catalog.previewSummary,
       },
       renamingIndex: editor.renamingIndex,
       editingDescriptionIndex: editor.editingDescriptionIndex,
@@ -137,12 +142,19 @@ export class DesignerVariablesController {
         this.#editor.beginCreate('static');
         return true;
       case 'create-type-static':
-      case 'create-type-host':
-        this.#editor.switchCreateType(action === 'create-type-static' ? 'static' : 'host');
+      case 'create-type-data-source':
+      case 'create-type-url-query':
+        this.#editor.switchCreateType(
+          action === 'create-type-static'
+            ? 'static'
+            : action === 'create-type-data-source'
+              ? 'data-source'
+              : 'url-query',
+        );
         return true;
       case 'select-host':
         this.#editor.captureCreateInputs();
-        void this.#editor.selectHost(actionTarget!.dataset.variableId ?? '');
+        void this.#editor.selectHost(actionTarget!.dataset.sourceId ?? '');
         return true;
       case 'catalog-more':
         this.#editor.captureCreateInputs();
@@ -153,6 +165,9 @@ export class DesignerVariablesController {
         return true;
       case 'rename':
         this.#editor.beginRowEdit(index, 'rename');
+        return true;
+      case 'edit-config':
+        this.#editor.beginConfiguration(index);
         return true;
       case 'edit-description':
         this.#editor.beginRowEdit(index, 'description');
@@ -167,10 +182,10 @@ export class DesignerVariablesController {
         const variable =
           this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
         if (variable === undefined) return true;
-        const expanded = this.#expandedVariableName === variable.name;
-        this.#expandedVariableName = expanded ? undefined : variable.name;
-        if (expanded && this.#expandedReferenceName === variable.name) {
-          this.#expandedReferenceName = undefined;
+        const expanded = this.#expandedVariableId === variable.id;
+        this.#expandedVariableId = expanded ? undefined : variable.id;
+        if (expanded && this.#expandedReferenceId === variable.id) {
+          this.#expandedReferenceId = undefined;
         }
         this.renderAndFocus(
           `[data-variable-action="toggle-variable"][data-variable-index="${index}"]`,
@@ -181,8 +196,8 @@ export class DesignerVariablesController {
         const variable =
           this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
         if (variable === undefined) return true;
-        this.#expandedReferenceName =
-          this.#expandedReferenceName === variable.name ? undefined : variable.name;
+        this.#expandedReferenceId =
+          this.#expandedReferenceId === variable.id ? undefined : variable.id;
         this.renderAndFocus(`[data-variable-action="references"][data-variable-index="${index}"]`);
         return true;
       }
@@ -190,11 +205,21 @@ export class DesignerVariablesController {
         this.#editor.requestDelete(index);
         return true;
       case 'preview': {
-        const variableId = actionTarget!.dataset.variableId;
-        if (variableId !== undefined) void this.#catalog.preview(variableId);
+        const variable =
+          this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
+        if (variable !== undefined) void this.#catalog.preview(variable);
+        return true;
+      }
+      case 'add-to-blueprint': {
+        const variable =
+          this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
+        if (variable !== undefined) this.callbacks.addToBlueprint?.(variable.id);
         return true;
       }
       case 'confirm-create':
+        this.#editor.confirmCreate();
+        return true;
+      case 'confirm-config':
         this.#editor.confirmCreate();
         return true;
       case 'confirm-rename':
@@ -230,9 +255,36 @@ export class DesignerVariablesController {
   }
 
   onChange(target: EventTarget | null): boolean {
+    if (target instanceof HTMLInputElement) {
+      if (target.dataset.variableCreateControlled !== undefined) {
+        this.#editor.captureCreateInputs();
+        return true;
+      }
+      if (target.dataset.variableCreateAutoUpdate !== undefined) {
+        this.#editor.captureCreateInputs();
+        this.renderAndFocus('[data-variable-create-auto-update]');
+        return true;
+      }
+      return false;
+    }
     if (!(target instanceof HTMLSelectElement)) return false;
+    if (target.dataset.variableCreateType !== undefined) {
+      if (
+        target.value === 'static' ||
+        target.value === 'data-source' ||
+        target.value === 'url-query'
+      ) {
+        this.#editor.switchCreateType(target.value);
+      }
+      return true;
+    }
     if (target.dataset.variableTypeFilter === undefined) return false;
-    if (target.value !== 'all' && target.value !== 'static' && target.value !== 'host')
+    if (
+      target.value !== 'all' &&
+      target.value !== 'static' &&
+      target.value !== 'data-source' &&
+      target.value !== 'url-query'
+    )
       return false;
     this.#typeFilter = target.value;
     this.renderAndFocus('[data-variable-type-filter]');

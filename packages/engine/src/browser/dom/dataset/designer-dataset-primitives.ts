@@ -20,7 +20,7 @@ export function datasetAction(
 
 export function renderApplyAction(
   ownerDocument: Document,
-  mode: Extract<DesignerDataSourceMode, 'none' | 'static'>,
+  mode: Extract<DesignerDataSourceMode, 'none' | 'static' | 'variable'>,
 ): HTMLElement {
   const actions = ownerDocument.createElement('div');
   actions.className = 'designer-dataset-actions';

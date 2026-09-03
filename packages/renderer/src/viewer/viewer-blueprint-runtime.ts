@@ -23,7 +23,9 @@ export function applyBlueprintDispatchToRenderer(
       diagnostics.push(...variables.diagnostics);
     }
   }
-  const visibility = renderer.applyBlueprintVisibilityEffects(result.visibilityEffects);
-  if (!visibility.ok) diagnostics.push(...visibility.diagnostics);
+  if (result.visibilityEffects.length > 0) {
+    const visibility = renderer.applyBlueprintVisibilityEffects(result.visibilityEffects);
+    if (!visibility.ok) diagnostics.push(...visibility.diagnostics);
+  }
   return diagnostics;
 }

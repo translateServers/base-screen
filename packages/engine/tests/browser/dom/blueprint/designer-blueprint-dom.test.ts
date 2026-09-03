@@ -188,11 +188,13 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
     ).toHaveLength(0);
   });
 
-  it('projects DataV-style variable associations, conditions and actions as read-only cards', () => {
+  it('projects DataV-style conditions and actions without the deprecated association module', () => {
     const panel = panelElement();
     const configured: ScreenDocument = {
       ...document,
-      variables: [{ type: 'static', name: 'selectedAmount', value: 0 }],
+      variables: [
+        { type: 'static', id: 'selectedAmount', name: 'selectedAmount', initialValue: 0 },
+      ],
       blueprint: {
         rules: [
           {
@@ -210,7 +212,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'selectedAmount',
+                variableId: 'selectedAmount',
                 value: { kind: 'event-payload', path: ['amount'] },
               },
               {
@@ -221,7 +223,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
               {
                 type: 'host-action',
                 actionId: 'focus-record',
-                payload: { kind: 'variable', name: 'selectedAmount' },
+                payload: { kind: 'variable', variableId: 'selectedAmount' },
               },
             ],
           },
@@ -237,8 +239,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
     );
 
     const text = queryText(panel);
-    expect(text).toContain('关联全局变量');
-    expect(text).toContain('系列点击 更新至 selectedAmount');
+    expect(text).not.toContain('关联全局变量');
     expect(text).toContain('动作触发条件');
     expect(text).toContain('事件数据 · amount 大于等于 固定值 10');
     expect(text).toContain('更新全局变量 · selectedAmount');

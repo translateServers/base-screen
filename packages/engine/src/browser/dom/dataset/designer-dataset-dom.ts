@@ -168,7 +168,7 @@ export function renderDesignerDatasetWorkbench(
       descriptor: options.descriptor,
       draft: options.draft,
       roles: options.roles,
-      variableNames: options.variableNames,
+      variables: options.variables,
       resourceAvailable: options.resourceAvailable,
     });
     configuration.querySelector('.designer-dataset-actions')?.remove();

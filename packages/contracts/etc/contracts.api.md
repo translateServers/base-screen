@@ -201,7 +201,7 @@ export interface ScreenBlueprint {
 }
 
 // @public (undocumented)
-export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction;
+export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintRequestVariableAction | ScreenBlueprintRequestComponentDataAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction;
 
 // @public (undocumented)
 export interface ScreenBlueprintComponentVisibilityAction {
@@ -300,6 +300,22 @@ export interface ScreenBlueprintMaterialEventTrigger {
 }
 
 // @public (undocumented)
+export interface ScreenBlueprintRequestComponentDataAction {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly type: 'request-component-data';
+}
+
+// @public (undocumented)
+export interface ScreenBlueprintRequestVariableAction {
+    // (undocumented)
+    readonly type: 'request-variable';
+    // (undocumented)
+    readonly variableId: string;
+}
+
+// @public (undocumented)
 export interface ScreenBlueprintRule {
     // (undocumented)
     readonly actions: readonly ScreenBlueprintAction[];
@@ -310,7 +326,7 @@ export interface ScreenBlueprintRule {
     // (undocumented)
     readonly requiredCapabilities?: readonly string[];
     // (undocumented)
-    readonly trigger: ScreenBlueprintMaterialEventTrigger;
+    readonly trigger: ScreenBlueprintTrigger;
 }
 
 // @public (undocumented)
@@ -326,8 +342,11 @@ export interface ScreenBlueprintSetVariableAction {
     // (undocumented)
     readonly value: ScreenBlueprintValueExpression;
     // (undocumented)
-    readonly variableName: string;
+    readonly variableId: string;
 }
+
+// @public (undocumented)
+export type ScreenBlueprintTrigger = ScreenBlueprintMaterialEventTrigger | ScreenBlueprintVariableEventTrigger;
 
 // @public (undocumented)
 export type ScreenBlueprintValueExpression = {
@@ -338,7 +357,7 @@ export type ScreenBlueprintValueExpression = {
     readonly path: readonly string[];
 } | {
     readonly kind: 'variable';
-    readonly name: string;
+    readonly variableId: string;
 } | {
     readonly kind: 'array';
     readonly items: readonly ScreenBlueprintValueExpression[];
@@ -346,6 +365,16 @@ export type ScreenBlueprintValueExpression = {
     readonly kind: 'object';
     readonly properties: Readonly<Record<string, ScreenBlueprintValueExpression>>;
 };
+
+// @public (undocumented)
+export interface ScreenBlueprintVariableEventTrigger {
+    // (undocumented)
+    readonly eventName: 'data-updated' | 'request-state';
+    // (undocumented)
+    readonly type: 'variable-event';
+    // (undocumented)
+    readonly variableId: string;
+}
 
 // @public (undocumented)
 export type ScreenBlueprintVisibilityOperation = 'show' | 'hide' | 'toggle';
@@ -414,7 +443,7 @@ export interface ScreenCanvasColorStop {
 }
 
 // @public (undocumented)
-export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenHostResourceDataSource;
+export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenHostResourceDataSource | ScreenVariableDataSource;
 
 // @public (undocumented)
 export interface ScreenComponentNode {
@@ -571,6 +600,20 @@ export interface ScreenDatasetSummary {
 export type ScreenDatasetValueType = 'string' | 'number' | 'boolean' | 'date';
 
 // @public (undocumented)
+export interface ScreenDataSourceVariable extends ScreenVariableBase {
+    // (undocumented)
+    readonly autoUpdate?: ScreenVariableAutoUpdate;
+    // (undocumented)
+    readonly controlled: boolean;
+    // (undocumented)
+    readonly processorId?: string;
+    // (undocumented)
+    readonly sourceId: string;
+    // (undocumented)
+    readonly type: 'data-source';
+}
+
+// @public (undocumented)
 export interface ScreenDesignerHostAdapter {
     // (undocumented)
     readonly actions?: ScreenBlueprintHostActionPort;
@@ -646,6 +689,9 @@ export interface ScreenDocument {
 }
 
 // @public (undocumented)
+export type ScreenDynamicVariable = ScreenDataSourceVariable | ScreenUrlQueryVariable;
+
+// @public (undocumented)
 export interface ScreenHostDatasetCatalogListRequest {
     // (undocumented)
     readonly cursor?: string;
@@ -698,7 +744,7 @@ export type ScreenHostResourceParameter = {
     readonly value: ScreenJsonValue;
 } | {
     readonly kind: 'variable';
-    readonly name: string;
+    readonly variableId: string;
 };
 
 // @public (undocumented)
@@ -727,18 +773,6 @@ export interface ScreenHostResourceResolveOptions {
 }
 
 // @public (undocumented)
-export interface ScreenHostVariable {
-    // (undocumented)
-    readonly description?: string;
-    // (undocumented)
-    readonly name: string;
-    // (undocumented)
-    readonly type: 'host';
-    // (undocumented)
-    readonly variableId: string;
-}
-
-// @public (undocumented)
 export interface ScreenHostVariableCatalogListRequest {
     // (undocumented)
     readonly cursor?: string;
@@ -748,6 +782,8 @@ export interface ScreenHostVariableCatalogListRequest {
     readonly query: string;
     // (undocumented)
     readonly signal: ScreenAbortSignal;
+    // (undocumented)
+    readonly sourceType: 'data-source' | 'url-query';
 }
 
 // @public (undocumented)
@@ -763,7 +799,7 @@ export interface ScreenHostVariableDescribeRequest {
     // (undocumented)
     readonly signal: ScreenAbortSignal;
     // (undocumented)
-    readonly variableId: string;
+    readonly sourceId: string;
 }
 
 // @public (undocumented)
@@ -789,9 +825,23 @@ export interface ScreenHostVariablePort {
 // @public (undocumented)
 export interface ScreenHostVariableRequest {
     // (undocumented)
+    readonly autoUpdate?: {
+        readonly intervalSeconds: number;
+    };
+    // (undocumented)
+    readonly controlled: boolean;
+    // (undocumented)
+    readonly initialValue: ScreenJsonValue;
+    // (undocumented)
+    readonly processorId?: string;
+    // (undocumented)
     readonly purpose: 'runtime' | 'authoring-preview';
     // (undocumented)
     readonly signal: ScreenAbortSignal;
+    // (undocumented)
+    readonly sourceId: string;
+    // (undocumented)
+    readonly sourceType: 'data-source' | 'url-query';
     // (undocumented)
     readonly variableId: string;
 }
@@ -803,7 +853,9 @@ export interface ScreenHostVariableSummary {
     // (undocumented)
     readonly name: string;
     // (undocumented)
-    readonly variableId: string;
+    readonly sourceId: string;
+    // (undocumented)
+    readonly sourceType: 'data-source' | 'url-query';
 }
 
 // @public (undocumented)
@@ -1141,15 +1193,9 @@ export interface ScreenStaticDataSource {
 }
 
 // @public (undocumented)
-export interface ScreenStaticVariable {
-    // (undocumented)
-    readonly description?: string;
-    // (undocumented)
-    readonly name: string;
+export interface ScreenStaticVariable extends ScreenVariableBase {
     // (undocumented)
     readonly type: 'static';
-    // (undocumented)
-    readonly value: ScreenJsonValue;
 }
 
 // @public (undocumented)
@@ -1163,7 +1209,61 @@ export interface ScreenTabularDataset {
 }
 
 // @public (undocumented)
-export type ScreenVariable = ScreenStaticVariable | ScreenHostVariable;
+export interface ScreenUrlQueryVariable extends ScreenVariableBase {
+    // (undocumented)
+    readonly controlled: boolean;
+    // (undocumented)
+    readonly processorId?: string;
+    // (undocumented)
+    readonly sourceId: string;
+    // (undocumented)
+    readonly type: 'url-query';
+}
+
+// @public (undocumented)
+export type ScreenVariable = ScreenStaticVariable | ScreenDynamicVariable;
+
+// @public (undocumented)
+export interface ScreenVariableAutoUpdate {
+    // (undocumented)
+    readonly intervalSeconds: number;
+}
+
+// @public (undocumented)
+export interface ScreenVariableBase {
+    // (undocumented)
+    readonly description?: string;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly initialValue: ScreenJsonValue;
+    // (undocumented)
+    readonly name: string;
+}
+
+// @public (undocumented)
+export interface ScreenVariableDataSource {
+    // (undocumented)
+    readonly binding?: ScreenDataBinding;
+    // (undocumented)
+    readonly processorId?: string;
+    // (undocumented)
+    readonly type: 'variable';
+    // (undocumented)
+    readonly variableId: string;
+}
+
+// @public (undocumented)
+export interface ScreenVariableHandle {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    onChange(listener: (value: ScreenJsonValue) => void): () => void;
+    // (undocumented)
+    set(value: ScreenJsonValue): ScreenParseResult<null>;
+    // (undocumented)
+    readonly value: ScreenJsonValue;
+}
 
 // @public (undocumented)
 export interface ScreenVariableRefreshOptions {

@@ -19,6 +19,7 @@ import { DesignerProjectWorkspaceController } from '../../browser/controllers/pr
 import { DesignerWorkbenchController } from '../../browser/controllers/workbench/designer-workbench-controller.js';
 import { readDesignerImageNaturalSize } from '../../browser/dom/designer-image-metadata-dom.js';
 import { designerIcon } from '../../browser/ui/designer-icons.js';
+import { insertDesignerBlueprintVariableNode } from '../../common/operations/blueprint/designer-blueprint-model.js';
 import {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   type BaseScreenCanvasPresentationChangeEventDetail,
@@ -173,6 +174,19 @@ export function initializeDesignerElementControllers(
     getCatalogPort: () => state.variableCatalogPort,
     getVariablePort: () => state.variablePort,
     executeCommand: (command) => element.executeCommand(command),
+    addToBlueprint: (variableId) => {
+      const document = state.session.document;
+      if (document === undefined) return;
+      const blueprint = insertDesignerBlueprintVariableNode(document, variableId);
+      if (blueprint !== null) {
+        const result = element.executeCommand({ type: 'replace-blueprint', blueprint });
+        if (!result.ok) {
+          state.runtime.report(element, result);
+          return;
+        }
+      }
+      element.setWorkbenchMode('blueprint', { focus: { kind: 'variable', id: variableId } });
+    },
     report: (result) => state.runtime.report(element, result),
   });
   state.layersController = new DesignerLayersController({

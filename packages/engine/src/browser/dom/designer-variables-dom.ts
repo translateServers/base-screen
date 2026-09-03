@@ -29,6 +29,7 @@ import {
 
 export interface DesignerVariablesDraft {
   readonly creating: boolean;
+  readonly configuringIndex: number | undefined;
   readonly create: DesignerVariableCreateDraft;
   readonly renamingIndex: number | undefined;
   readonly editingDescriptionIndex: number | undefined;
@@ -38,12 +39,12 @@ export interface DesignerVariablesDraft {
   readonly typeFilter: 'all' | ScreenVariable['type'];
   readonly referenceCounts: ReadonlyMap<string, number>;
   readonly references: readonly DesignerVariableReference[];
+  /** Stable variable id, retained under the historical view key for API locality. */
   readonly expandedVariableName: string | undefined;
+  /** Stable variable id, retained under the historical view key for API locality. */
   readonly expandedReferenceName: string | undefined;
   readonly catalog: DesignerVariableCatalogView;
 }
-
-const VALUE_SUMMARY_LENGTH = 40;
 
 export interface DesignerVariableCatalogView {
   readonly query: string;
@@ -55,6 +56,8 @@ export interface DesignerVariableCatalogView {
   readonly previewStatus: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error';
   readonly previewSummary: string | undefined;
 }
+
+const VALUE_SUMMARY_LENGTH = 48;
 
 export function renderDesignerVariables(
   panel: HTMLElement,
@@ -68,21 +71,19 @@ export function renderDesignerVariables(
 
   const content = panel.ownerDocument.createElement('div');
   content.className = 'variable-panel-content';
-  if (draft.creating) appendCreateEditor(content, draft.create);
-
-  const visible = variables
-    .map((variable, index) => ({ variable, index }))
-    .filter(({ variable }) => matchesFilter(variable, draft));
-  if (visible.length === 0) {
-    appendVariablesEmptyState(content, variables.length === 0);
-  } else {
-    const list = panel.ownerDocument.createElement('div');
-    list.className = 'variable-list';
-    list.setAttribute('role', 'list');
-    list.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.list);
-    for (const { variable, index } of visible) appendVariableRow(list, variable, index, draft);
-    content.appendChild(list);
+  const list = panel.ownerDocument.createElement('div');
+  list.className = 'variable-list';
+  list.setAttribute('role', 'list');
+  list.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.list);
+  if (draft.creating && draft.configuringIndex === undefined) {
+    appendCreateEditor(list, draft.create);
   }
+  for (const [index, variable] of variables.entries()) {
+    if (draft.configuringIndex === index) appendCreateEditor(list, draft.create, index);
+    else appendVariableRow(list, variable, index, draft);
+  }
+  if (!draft.creating && variables.length === 0) appendVariablesEmptyState(content, true);
+  else content.appendChild(list);
   panel.appendChild(content);
 }
 
@@ -96,6 +97,7 @@ function appendVariableRow(
   row.className = 'variable-row';
   row.dataset.variableRow = String(index);
   row.dataset.variableType = variable.type;
+  row.dataset.variableId = variable.id;
   row.setAttribute('role', 'listitem');
   if (draft.renamingIndex === index) {
     row.dataset.variableEditor = 'rename';
@@ -103,7 +105,7 @@ function appendVariableRow(
   } else if (draft.editingDescriptionIndex === index) {
     row.dataset.variableEditor = 'description';
     appendDescriptionEditor(row, variable, index);
-  } else if (draft.editingValueIndex === index && variable.type === 'static') {
+  } else if (draft.editingValueIndex === index) {
     row.dataset.variableEditor = 'value';
     appendValueEditor(row, variable, index);
   } else if (draft.deletingIndex === index) {
@@ -121,7 +123,8 @@ function appendVariableSummary(
   index: number,
   draft: DesignerVariablesDraft,
 ): void {
-  const expanded = draft.expandedVariableName === variable.name;
+  const expanded = draft.expandedVariableName === variable.id;
+  row.dataset.expanded = String(expanded);
   const header = row.ownerDocument.createElement('div');
   header.className = 'variable-row-header';
   const toggle = createDesignerButton(row.ownerDocument, {
@@ -134,28 +137,33 @@ function appendVariableSummary(
   toggle.dataset.variableAction = 'toggle-variable';
   toggle.dataset.variableIndex = String(index);
   toggle.setAttribute('aria-expanded', String(expanded));
-  const identity = row.ownerDocument.createElement('span');
-  identity.className = 'variable-identity';
+  const chevron = row.ownerDocument.createElement('span');
+  chevron.className = 'variable-row-chevron';
+  chevron.innerHTML = designerIcon(expanded ? 'chevron-down' : 'chevron-right');
+  toggle.appendChild(chevron);
+  header.appendChild(toggle);
+
+  const identity = row.ownerDocument.createElement('div');
+  identity.className = 'variable-row-identity';
   identity.appendChild(createBadge(row.ownerDocument, variable.type));
   const name = row.ownerDocument.createElement('code');
   name.className = 'variable-name';
   name.textContent = variable.name;
   name.title = variable.name;
   identity.appendChild(name);
-  toggle.appendChild(identity);
-  const summary = row.ownerDocument.createElement('code');
-  summary.className = 'variable-row-summary';
-  summary.textContent =
-    variable.type === 'static'
-      ? summarizeValue(formatValueForDisplay(variable.value))
-      : DESIGNER_UI_TEXT.variables.sourceHost;
-  summary.title = variable.type === 'static' ? JSON.stringify(variable.value) : variable.variableId;
-  toggle.appendChild(summary);
-  const chevron = row.ownerDocument.createElement('span');
-  chevron.className = 'variable-row-chevron';
-  chevron.innerHTML = designerIcon(expanded ? 'chevron-down' : 'chevron-right');
-  toggle.appendChild(chevron);
-  header.appendChild(toggle);
+  header.appendChild(identity);
+
+  const usage = createVariableReferenceCount(
+    row.ownerDocument,
+    variable,
+    index,
+    draft.referenceCounts.get(variable.id) ?? 0,
+    draft.expandedReferenceName === variable.id,
+  );
+  usage.className = `${usage.className} variable-row-usage`.trim();
+  header.appendChild(usage);
+  header.appendChild(createRowContext(row.ownerDocument, variable));
+  appendCompactActions(header, variable, index);
   row.appendChild(header);
   if (!expanded) return;
 
@@ -167,42 +175,158 @@ function appendVariableSummary(
     createDetailLine(
       row.ownerDocument,
       DESIGNER_UI_TEXT.variables.source,
-      variable.type === 'static'
-        ? DESIGNER_UI_TEXT.variables.sourceStatic
-        : DESIGNER_UI_TEXT.variables.sourceHost,
+      sourceLabel(variable.type),
     ),
   );
-  const references = draft.references.filter(
-    (reference) => reference.variableName === variable.name,
-  );
-  if (variable.type === 'host') {
-    row.dataset.variableIdReadOnly = 'true';
-    details.appendChild(createHostDetail(row.ownerDocument, variable.variableId));
-  } else {
-    details.appendChild(createValueDetail(row.ownerDocument, variable, index));
+  details.appendChild(createValueDetail(row.ownerDocument, variable, index));
+  if (variable.type !== 'static') {
+    details.appendChild(
+      createCodeDetail(row.ownerDocument, DESIGNER_UI_TEXT.variables.sourceId, variable.sourceId),
+    );
+    details.appendChild(
+      createDetailLine(
+        row.ownerDocument,
+        DESIGNER_UI_TEXT.variables.controlled,
+        variable.controlled
+          ? DESIGNER_UI_TEXT.variables.enabled
+          : DESIGNER_UI_TEXT.variables.disabled,
+      ),
+    );
+    if (variable.processorId !== undefined) {
+      details.appendChild(
+        createCodeDetail(
+          row.ownerDocument,
+          DESIGNER_UI_TEXT.variables.processor,
+          variable.processorId,
+        ),
+      );
+    }
+    if (variable.type === 'data-source') {
+      details.appendChild(
+        createDetailLine(
+          row.ownerDocument,
+          DESIGNER_UI_TEXT.variables.autoUpdate,
+          variable.autoUpdate === undefined
+            ? DESIGNER_UI_TEXT.variables.disabled
+            : DESIGNER_UI_TEXT.variables.autoUpdateInterval(variable.autoUpdate.intervalSeconds),
+        ),
+      );
+    }
+    appendPreview(details, variable.id, draft.catalog);
   }
-  const usage = row.ownerDocument.createElement('div');
-  usage.className = 'variable-usage';
-  const usageLabel = row.ownerDocument.createElement('span');
-  usageLabel.className = 'variable-detail-label';
-  usageLabel.textContent = DESIGNER_UI_TEXT.variables.usage;
-  usage.appendChild(usageLabel);
-  usage.appendChild(
-    createVariableReferenceCount(
-      row.ownerDocument,
+  if (draft.expandedReferenceName === variable.id) {
+    appendVariableReferenceList(
+      details,
       variable,
       index,
-      draft.referenceCounts.get(variable.name) ?? 0,
-      draft.expandedReferenceName === variable.name,
+      draft.references.filter((reference) => reference.variableId === variable.id),
+    );
+  }
+  row.appendChild(details);
+}
+
+function createRowContext(ownerDocument: Document, variable: ScreenVariable): HTMLElement {
+  const context = ownerDocument.createElement('div');
+  context.className = 'variable-row-context';
+  const label = ownerDocument.createElement('span');
+  label.className = 'variable-row-context-label';
+  label.textContent =
+    variable.type === 'static'
+      ? DESIGNER_UI_TEXT.variables.initialValue
+      : DESIGNER_UI_TEXT.variables.sourceId;
+  const value = ownerDocument.createElement('code');
+  value.className = 'variable-row-context-value';
+  value.textContent =
+    variable.type === 'static'
+      ? summarizeValue(formatValue(variable.initialValue))
+      : variable.sourceId;
+  value.title = variable.type === 'static' ? formatValue(variable.initialValue) : variable.sourceId;
+  context.appendChild(label);
+  context.appendChild(value);
+  return context;
+}
+
+function appendCompactActions(header: HTMLElement, variable: ScreenVariable, index: number): void {
+  const actions = header.ownerDocument.createElement('div');
+  actions.className = 'variable-row-actions';
+  actions.setAttribute('role', 'group');
+  actions.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.actions(variable.name));
+  if (variable.type !== 'static') {
+    actions.appendChild(
+      createIconAction(
+        header.ownerDocument,
+        'preview',
+        index,
+        'eye',
+        DESIGNER_UI_TEXT.variables.preview(variable.name),
+      ),
+    );
+  }
+  actions.appendChild(
+    createIconAction(
+      header.ownerDocument,
+      'edit-config',
+      index,
+      'sliders',
+      DESIGNER_UI_TEXT.variables.editConfiguration(variable.name),
     ),
   );
-  details.appendChild(usage);
-  if (draft.expandedReferenceName === variable.name) {
-    appendVariableReferenceList(details, variable, index, references);
-  }
-  if (variable.type === 'host') appendPreview(details, variable.variableId, draft.catalog);
-  appendVariableActions(details, variable, index);
-  row.appendChild(details);
+  actions.appendChild(
+    createIconAction(
+      header.ownerDocument,
+      'add-to-blueprint',
+      index,
+      'plus',
+      DESIGNER_UI_TEXT.variables.addToBlueprint(variable.name),
+    ),
+  );
+  actions.appendChild(
+    createIconAction(
+      header.ownerDocument,
+      'rename',
+      index,
+      'pencil',
+      DESIGNER_UI_TEXT.variables.renameVariable(variable.name),
+    ),
+  );
+  actions.appendChild(
+    createIconAction(
+      header.ownerDocument,
+      'duplicate',
+      index,
+      'copy',
+      DESIGNER_UI_TEXT.variables.duplicate(variable.name),
+    ),
+  );
+  const remove = createIconAction(
+    header.ownerDocument,
+    'delete',
+    index,
+    'trash',
+    DESIGNER_UI_TEXT.variables.deleteVariable(variable.name),
+  );
+  remove.dataset.variant = 'danger';
+  actions.appendChild(remove);
+  header.appendChild(actions);
+}
+
+function createIconAction(
+  ownerDocument: Document,
+  action: 'preview' | 'edit-config' | 'add-to-blueprint' | 'rename' | 'duplicate' | 'delete',
+  index: number,
+  icon: 'eye' | 'sliders' | 'plus' | 'pencil' | 'copy' | 'trash',
+  label: string,
+): HTMLButtonElement {
+  const button = createDesignerButton(ownerDocument, {
+    ariaLabel: label,
+    className: 'variable-icon-action',
+    title: label,
+    variant: 'ghost',
+  });
+  button.dataset.variableAction = action;
+  button.dataset.variableIndex = String(index);
+  appendIconLabel(button, icon, '');
+  return button;
 }
 
 function createDescriptionAction(
@@ -213,55 +337,28 @@ function createDescriptionAction(
   const button = createDesignerButton(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.editDescription(variable.name),
     className: 'variable-description-action',
+    title: variable.description ?? DESIGNER_UI_TEXT.variables.addDescription,
     variant: 'ghost',
   });
   button.dataset.variableAction = 'edit-description';
   button.dataset.variableIndex = String(index);
-  const glyph = ownerDocument.createElement('span');
-  glyph.className = 'variable-detail-glyph';
-  glyph.innerHTML = designerIcon('sliders');
-  button.appendChild(glyph);
+  const label = ownerDocument.createElement('span');
+  label.className = 'variable-detail-label';
+  label.textContent = DESIGNER_UI_TEXT.variables.descriptionLabel;
+  button.appendChild(label);
   const copy = ownerDocument.createElement('span');
+  copy.className = 'variable-description-copy';
   copy.textContent = variable.description ?? DESIGNER_UI_TEXT.variables.addDescription;
   button.appendChild(copy);
   return button;
 }
 
-function createDetailLine(ownerDocument: Document, label: string, value: string): HTMLElement {
-  const detail = ownerDocument.createElement('div');
-  detail.className = 'variable-detail-line';
-  const labelElement = ownerDocument.createElement('span');
-  labelElement.className = 'variable-detail-label';
-  labelElement.textContent = label;
-  detail.appendChild(labelElement);
-  const valueElement = ownerDocument.createElement('span');
-  valueElement.className = 'variable-detail-copy';
-  valueElement.textContent = value;
-  detail.appendChild(valueElement);
-  return detail;
-}
-
-function createHostDetail(ownerDocument: Document, variableId: string): HTMLElement {
-  const detail = ownerDocument.createElement('div');
-  detail.className = 'variable-host-detail';
-  const label = ownerDocument.createElement('span');
-  label.className = 'variable-detail-label';
-  label.textContent = DESIGNER_UI_TEXT.variables.variableId;
-  detail.appendChild(label);
-  const id = ownerDocument.createElement('code');
-  id.className = 'variable-host-id';
-  id.textContent = variableId;
-  id.title = variableId;
-  detail.appendChild(id);
-  return detail;
-}
-
 function createValueDetail(
   ownerDocument: Document,
-  variable: Extract<ScreenVariable, { type: 'static' }>,
+  variable: ScreenVariable,
   index: number,
 ): HTMLElement {
-  const serialized = JSON.stringify(variable.value);
+  const serialized = formatValue(variable.initialValue);
   const button = createDesignerButton(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.editValue(variable.name),
     className: 'variable-value-button',
@@ -272,90 +369,43 @@ function createValueDetail(
   button.dataset.variableIndex = String(index);
   const label = ownerDocument.createElement('span');
   label.className = 'variable-detail-label';
-  label.textContent = DESIGNER_UI_TEXT.variables.value;
+  label.textContent = DESIGNER_UI_TEXT.variables.initialValue;
   button.appendChild(label);
   const value = ownerDocument.createElement('code');
   value.className = 'variable-value';
-  value.textContent = summarizeValue(formatValueForDisplay(variable.value));
+  value.textContent = summarizeValue(serialized);
   button.appendChild(value);
-  const editGlyph = ownerDocument.createElement('span');
-  editGlyph.className = 'variable-detail-glyph';
-  editGlyph.innerHTML = designerIcon('pencil');
-  button.appendChild(editGlyph);
+  const edit = ownerDocument.createElement('span');
+  edit.className = 'variable-detail-glyph';
+  edit.innerHTML = designerIcon('pencil');
+  button.appendChild(edit);
   return button;
 }
 
-function appendVariableActions(
-  details: HTMLElement,
-  variable: ScreenVariable,
-  index: number,
-): void {
-  const actions = details.ownerDocument.createElement('footer');
-  actions.className = 'variable-actions';
-  actions.setAttribute('role', 'group');
-  actions.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.actions(variable.name));
-  if (variable.type === 'host') {
-    const preview = createTextAction(
-      details.ownerDocument,
-      'preview',
-      index,
-      'eye',
-      DESIGNER_UI_TEXT.variables.previewAction,
-      DESIGNER_UI_TEXT.variables.preview(variable.name),
-    );
-    preview.dataset.variableId = variable.variableId;
-    actions.appendChild(preview);
-  }
-  actions.appendChild(
-    createTextAction(
-      details.ownerDocument,
-      'rename',
-      index,
-      'pencil',
-      DESIGNER_UI_TEXT.variables.rename,
-      DESIGNER_UI_TEXT.variables.renameVariable(variable.name),
-    ),
-  );
-  actions.appendChild(
-    createTextAction(
-      details.ownerDocument,
-      'duplicate',
-      index,
-      'copy',
-      DESIGNER_UI_TEXT.variables.copy,
-      DESIGNER_UI_TEXT.variables.duplicate(variable.name),
-    ),
-  );
-  const remove = createTextAction(
-    details.ownerDocument,
-    'delete',
-    index,
-    'trash',
-    DESIGNER_UI_TEXT.variables.delete,
-    DESIGNER_UI_TEXT.variables.deleteVariable(variable.name),
-  );
-  remove.dataset.variant = 'danger';
-  actions.appendChild(remove);
-  details.appendChild(actions);
+function createDetailLine(ownerDocument: Document, label: string, value: string): HTMLElement {
+  const line = ownerDocument.createElement('div');
+  line.className = 'variable-detail-line';
+  const key = ownerDocument.createElement('span');
+  key.className = 'variable-detail-label';
+  key.textContent = label;
+  const copy = ownerDocument.createElement('span');
+  copy.className = 'variable-detail-copy';
+  copy.textContent = value;
+  line.appendChild(key);
+  line.appendChild(copy);
+  return line;
 }
 
-function createTextAction(
-  ownerDocument: Document,
-  action: 'rename' | 'duplicate' | 'delete' | 'preview',
-  index: number,
-  icon: 'pencil' | 'copy' | 'trash' | 'eye',
-  label: string,
-  accessibleLabel: string,
-): HTMLButtonElement {
-  const button = createDesignerButton(ownerDocument, {
-    ariaLabel: accessibleLabel,
-    className: 'variable-text-action',
-    variant: 'ghost',
-  });
-  button.dataset.variableAction = action;
-  button.dataset.variableIndex = String(index);
-  appendIconLabel(button, icon, label);
-  return button;
+function createCodeDetail(ownerDocument: Document, label: string, value: string): HTMLElement {
+  const line = createDetailLine(ownerDocument, label, value);
+  line.lastElementChild?.replaceWith(
+    Object.assign(ownerDocument.createElement('code'), {
+      className: 'variable-host-id',
+      textContent: value,
+      title: value,
+    }),
+  );
+  return line;
 }
 
 function appendPreview(
@@ -385,25 +435,18 @@ function appendPreview(
   row.appendChild(preview);
 }
 
-function matchesFilter(variable: ScreenVariable, draft: DesignerVariablesDraft): boolean {
-  if (draft.typeFilter !== 'all' && variable.type !== draft.typeFilter) return false;
-  const query = draft.search.trim().toLocaleLowerCase();
-  if (query === '') return true;
-  return [
-    variable.name,
-    variable.description ?? '',
-    variable.type === 'host' ? variable.variableId : '',
-  ].some((value) => value.toLocaleLowerCase().includes(query));
+function sourceLabel(type: ScreenVariable['type']): string {
+  return type === 'static'
+    ? DESIGNER_UI_TEXT.variables.typeStatic
+    : type === 'data-source'
+      ? DESIGNER_UI_TEXT.variables.typeDataSource
+      : DESIGNER_UI_TEXT.variables.typeUrlQuery;
 }
 
-function summarizeValue(serialized: string): string {
-  return serialized.length > VALUE_SUMMARY_LENGTH
-    ? `${serialized.slice(0, VALUE_SUMMARY_LENGTH)}…`
-    : serialized;
-}
-
-function formatValueForDisplay(
-  value: Extract<ScreenVariable, { type: 'static' }>['value'],
-): string {
+function formatValue(value: ScreenVariable['initialValue']): string {
   return typeof value === 'string' && value !== '' ? value : JSON.stringify(value);
+}
+
+function summarizeValue(value: string): string {
+  return value.length > VALUE_SUMMARY_LENGTH ? `${value.slice(0, VALUE_SUMMARY_LENGTH)}…` : value;
 }

@@ -84,12 +84,15 @@ if (!productElements.ok || officialMaterials.some((definition) => !definition.ok
 
 const designerAuthoringCapabilities = [
   'blueprint.trigger.material-event',
+  'blueprint.trigger.variable-event',
   'blueprint.value.event-payload',
   'blueprint.value.variable',
   'blueprint.condition.compare',
   'blueprint.action.set-variable',
   'blueprint.action.emit-host-event',
   'blueprint.action.component-visibility',
+  'blueprint.action.request-variable',
+  'blueprint.action.request-component-data',
 ] as const;
 const designerAuthoringPlugin: BaseScreenPluginRuntime = {
   manifest: {
@@ -394,7 +397,10 @@ const screenDocument = {
       status: { locked: false, hidden: false },
       props: {},
       style: { color: '#9fb1c9', fontSize: 20, fontWeight: '400', textAlign: 'left' },
-      dataSource: { type: 'static' as const, value: '拖动文本，编辑属性，撤销或重做。' },
+      dataSource: {
+        type: 'variable' as const,
+        variableId: 'browser-url-query-campaign',
+      },
     },
     {
       id: 'host-data',
@@ -408,7 +414,10 @@ const screenDocument = {
       status: { locked: false, hidden: false },
       props: {},
       style: { color: '#39c5bb', fontSize: 16, fontWeight: '400', textAlign: 'left' },
-      dataSource: { type: 'static' as const, value: '宿主资源已就绪' },
+      dataSource: {
+        type: 'variable' as const,
+        variableId: 'browser-data-source-region',
+      },
     },
     {
       // 条件样式预警演示（ADR-0058）：宿主指标 >100 时变红加粗，回落自动恢复基础样式。
@@ -506,7 +515,7 @@ const screenDocument = {
         resourceId: 'tabular-orders',
         params: {
           limit: { kind: 'literal' as const, value: 2 },
-          region: { kind: 'variable' as const, name: 'region' },
+          region: { kind: 'variable' as const, variableId: 'region' },
         },
         binding: { fields: { dimension: ['category'], measures: ['amount'] } },
       },
@@ -529,15 +538,33 @@ const screenDocument = {
         resourceId: 'tabular-orders',
         params: {
           limit: { kind: 'literal' as const, value: 5 },
-          region: { kind: 'variable' as const, name: 'region' },
+          region: { kind: 'variable' as const, variableId: 'region' },
         },
         binding: { fields: { dimension: ['category'], measures: ['amount'] } },
       },
     },
   ],
   variables: [
-    { type: 'static' as const, name: 'count', value: 0 },
-    { type: 'static' as const, name: 'region', value: 'north' },
+    { type: 'static' as const, id: 'count', name: 'count', initialValue: 0 },
+    { type: 'static' as const, id: 'region', name: 'region', initialValue: 'north' },
+    {
+      type: 'data-source' as const,
+      id: 'browser-data-source-region',
+      name: 'dataSourceRegion',
+      description: 'Browser Harness 数据源变量案例',
+      initialValue: 'fallback-region',
+      sourceId: 'browser-region',
+      controlled: false,
+    },
+    {
+      type: 'url-query' as const,
+      id: 'browser-url-query-campaign',
+      name: 'urlCampaign',
+      description: 'Browser Harness URL 查询参数变量案例',
+      initialValue: 'organic',
+      sourceId: 'campaign',
+      controlled: false,
+    },
   ],
   blueprint: {
     rules: [
@@ -627,7 +654,12 @@ let datasetRegion = 'north';
 let datasetDelay = false;
 let metricValue = 42;
 const datasetRequests: unknown[] = [];
-const variableRequests: Array<{ readonly variableId: string; readonly purpose: string }> = [];
+const variableRequests: Array<{
+  readonly variableId: string;
+  readonly sourceId: string;
+  readonly sourceType: 'data-source' | 'url-query';
+  readonly purpose: string;
+}> = [];
 const resourcePort = {
   async resolve(request: {
     readonly resourceId: string;
@@ -673,10 +705,27 @@ const resourcePort = {
 const variablePort = {
   async resolve(request: {
     readonly variableId: string;
+    readonly sourceId: string;
+    readonly sourceType: 'data-source' | 'url-query';
     readonly purpose: 'runtime' | 'authoring-preview';
   }) {
-    variableRequests.push({ variableId: request.variableId, purpose: request.purpose });
-    if (request.variableId === 'private-token' && request.purpose === 'authoring-preview') {
+    variableRequests.push({
+      variableId: request.variableId,
+      sourceId: request.sourceId,
+      sourceType: request.sourceType,
+      purpose: request.purpose,
+    });
+    if (request.sourceType === 'url-query') {
+      return {
+        ok: true as const,
+        value: new URLSearchParams(window.location.search).get(request.sourceId) ?? 'organic',
+        diagnostics: [],
+      };
+    }
+    if (request.sourceId === 'browser-region') {
+      return { ok: true as const, value: 'north', diagnostics: [] };
+    }
+    if (request.sourceId === 'private-token' && request.purpose === 'authoring-preview') {
       return {
         ok: false as const,
         diagnostics: [
@@ -689,7 +738,7 @@ const variablePort = {
         ],
       };
     }
-    if (request.variableId === 'tenant-region' && datasetRegion === 'variable-error') {
+    if (request.sourceId === 'tenant-region' && datasetRegion === 'variable-error') {
       return {
         ok: false as const,
         diagnostics: [
@@ -706,43 +755,83 @@ const variablePort = {
   },
 };
 const variableCatalog = {
-  async list({ query }: { readonly query: string }) {
+  async list({
+    query,
+    sourceType,
+  }: {
+    readonly query: string;
+    readonly sourceType: 'data-source' | 'url-query';
+  }) {
     const normalized = query.trim().toLocaleLowerCase();
     const items = [
       {
-        variableId: 'tenant-region',
+        sourceId: 'browser-region',
+        sourceType: 'data-source' as const,
+        name: 'dataSourceRegion',
+        description: 'Browser Harness 数据源变量案例',
+      },
+      {
+        sourceId: 'tenant-region',
+        sourceType: 'data-source' as const,
         name: 'tenantRegion',
         description: '当前租户区域',
       },
       {
-        variableId: 'private-token',
+        sourceId: 'private-token',
+        sourceType: 'data-source' as const,
         name: 'privateToken',
         description: '无权预览的敏感变量',
       },
-    ].filter((item) =>
-      [item.variableId, item.name, item.description].some((value) =>
-        value.toLocaleLowerCase().includes(normalized),
-      ),
+      {
+        sourceId: 'campaign',
+        sourceType: 'url-query' as const,
+        name: 'urlCampaign',
+        description: 'Browser Harness URL 查询参数变量案例',
+      },
+    ].filter(
+      (item) =>
+        item.sourceType === sourceType &&
+        [item.sourceId, item.name, item.description].some((value) =>
+          value.toLocaleLowerCase().includes(normalized),
+        ),
     );
     return { ok: true as const, value: { items }, diagnostics: [] };
   },
-  async describe({ variableId }: { readonly variableId: string }) {
+  async describe({ sourceId }: { readonly sourceId: string }) {
     const descriptor =
-      variableId === 'tenant-region'
+      sourceId === 'browser-region'
         ? {
-            variableId,
-            name: 'tenantRegion',
-            description: '当前租户区域',
+            sourceId,
+            sourceType: 'data-source' as const,
+            name: 'dataSourceRegion',
+            description: 'Browser Harness 数据源变量案例',
             previewable: true,
           }
-        : variableId === 'private-token'
+        : sourceId === 'tenant-region'
           ? {
-              variableId,
-              name: 'privateToken',
-              description: '无权预览的敏感变量',
+              sourceId,
+              sourceType: 'data-source' as const,
+              name: 'tenantRegion',
+              description: '当前租户区域',
               previewable: true,
             }
-          : undefined;
+          : sourceId === 'private-token'
+            ? {
+                sourceId,
+                sourceType: 'data-source' as const,
+                name: 'privateToken',
+                description: '无权预览的敏感变量',
+                previewable: true,
+              }
+            : sourceId === 'campaign'
+              ? {
+                  sourceId,
+                  sourceType: 'url-query' as const,
+                  name: 'urlCampaign',
+                  description: 'Browser Harness URL 查询参数变量案例',
+                  previewable: true,
+                }
+              : undefined;
     return descriptor === undefined
       ? {
           ok: false as const,
@@ -1078,7 +1167,7 @@ Object.assign(window, {
               resourceId: 'tabular-orders',
               params: {
                 limit: { kind: 'literal' as const, value: 2 },
-                region: { kind: 'variable' as const, name: 'region' },
+                region: { kind: 'variable' as const, variableId: 'region' },
               },
               binding: { fields: { columns: ['category', 'amount'] } },
             },
@@ -1101,13 +1190,22 @@ Object.assign(window, {
               resourceId: 'tabular-orders',
               params: {
                 limit: { kind: 'literal' as const, value: 2 },
-                region: { kind: 'variable' as const, name: 'region' },
+                region: { kind: 'variable' as const, variableId: 'region' },
               },
               binding: { fields: { dimension: ['category'], measures: ['amount'] } },
             },
           },
         ],
-        variables: [{ type: 'host' as const, name: 'region', variableId: 'region' }],
+        variables: [
+          {
+            type: 'data-source' as const,
+            id: 'region',
+            name: 'region',
+            initialValue: null,
+            sourceId: 'region',
+            controlled: true,
+          },
+        ],
         blueprint: { rules: [] },
       };
       document.body.appendChild(demo);

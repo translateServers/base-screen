@@ -1,6 +1,7 @@
 import {
   parseScreenJsonValue,
   type ScreenDocument,
+  type ScreenDynamicVariable,
   type ScreenHostVariablePort,
   type ScreenJsonValue,
 } from '@base-screen/contracts';
@@ -16,8 +17,8 @@ export async function resolveHostVariableBatch(
 ): Promise<ReadonlyMap<string, ScreenJsonValue> | undefined> {
   const availableIds = new Set(
     document.variables
-      .filter((variable) => variable.type === 'host')
-      .map((variable) => variable.variableId),
+      .filter((variable): variable is ScreenDynamicVariable => variable.type !== 'static')
+      .map((variable) => variable.id),
   );
   const ids = new Set(
     requestedIds === undefined
@@ -35,14 +36,28 @@ export async function resolveHostVariableBatch(
   });
   try {
     const requests = Promise.all(
-      [...ids].map(async (variableId) => ({
-        variableId,
-        result: await port.resolve({
+      [...ids].map(async (variableId) => {
+        const variable = document.variables.find(
+          (candidate): candidate is ScreenDynamicVariable =>
+            candidate.id === variableId && candidate.type !== 'static',
+        )!;
+        return {
           variableId,
-          purpose: 'runtime',
-          signal: controller.signal,
-        }),
-      })),
+          result: await port.resolve({
+            variableId: variable.id,
+            sourceId: variable.sourceId,
+            sourceType: variable.type,
+            initialValue: variable.initialValue,
+            controlled: variable.controlled,
+            ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
+            ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
+              ? { autoUpdate: variable.autoUpdate }
+              : {}),
+            purpose: 'runtime',
+            signal: controller.signal,
+          }),
+        };
+      }),
     );
     const settled = await Promise.race([requests, timeout]);
     if (settled === undefined || controller.signal.aborted) return undefined;

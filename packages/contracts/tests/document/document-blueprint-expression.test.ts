@@ -11,7 +11,16 @@ describe('parseScreenDocument blueprint expressions', () => {
     const result = parse(
       document({
         components: [component({ id: 'button' })],
-        variables: [{ type: 'host', name: 'tenant', variableId: 'tenant-context' }],
+        variables: [
+          {
+            type: 'data-source',
+            id: 'tenant',
+            name: 'tenant',
+            initialValue: null,
+            sourceId: 'tenant-context',
+            controlled: true,
+          },
+        ],
         blueprint: {
           rules: [
             {
@@ -21,7 +30,7 @@ describe('parseScreenDocument blueprint expressions', () => {
                 {
                   type: 'host-action',
                   actionId: 'project.notify',
-                  payload: { kind: 'variable', name: 'tenant' },
+                  payload: { kind: 'variable', variableId: 'tenant' },
                 },
               ],
             },
@@ -35,7 +44,17 @@ describe('parseScreenDocument blueprint expressions', () => {
   it('R6 rejects transport details on host variables and actions', () => {
     const result = parse(
       document({
-        variables: [{ type: 'host', name: 'tenant', variableId: 'tenant-context', url: '/secret' }],
+        variables: [
+          {
+            type: 'data-source',
+            id: 'tenant',
+            name: 'tenant',
+            initialValue: null,
+            sourceId: 'tenant-context',
+            controlled: true,
+            url: '/secret',
+          },
+        ],
       }),
     );
     expect(result.ok).toBe(false);
@@ -45,13 +64,13 @@ describe('parseScreenDocument blueprint expressions', () => {
   it('rejects legacy raw blueprint action values and invalid condition right placement', () => {
     const rawValue = document({
       components: [component({ id: 'button' })],
-      variables: [{ type: 'static', name: 'count', value: 0 }],
+      variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
         rules: [
           {
             id: 'raw',
             trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-            actions: [{ type: 'set-variable', variableName: 'count', value: 1 }],
+            actions: [{ type: 'set-variable', variableId: 'count', value: 1 }],
           },
         ],
       },
@@ -98,7 +117,7 @@ describe('parseScreenDocument blueprint expressions', () => {
   it('rejects unknown expression fields and dangerous event paths', () => {
     const expressionExtra = document({
       components: [component({ id: 'button' })],
-      variables: [{ type: 'static', name: 'count', value: 0 }],
+      variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
         rules: [
           {
@@ -107,7 +126,7 @@ describe('parseScreenDocument blueprint expressions', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'count',
+                variableId: 'count',
                 value: { kind: 'literal', value: 1, extra: true },
               },
             ],
@@ -117,7 +136,7 @@ describe('parseScreenDocument blueprint expressions', () => {
     });
     const dangerousPath = document({
       components: [component({ id: 'button' })],
-      variables: [{ type: 'static', name: 'count', value: 0 }],
+      variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
       blueprint: {
         rules: [
           {
@@ -126,7 +145,7 @@ describe('parseScreenDocument blueprint expressions', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'count',
+                variableId: 'count',
                 value: { kind: 'event-payload', path: ['constructor'] },
               },
             ],
@@ -147,7 +166,7 @@ describe('parseScreenDocument blueprint expressions', () => {
     const result = parse(
       document({
         components: [component({ id: 'button' })],
-        variables: [{ type: 'static', name: 'count', value: 0 }],
+        variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
           rules: [
             {
@@ -156,7 +175,7 @@ describe('parseScreenDocument blueprint expressions', () => {
               actions: [
                 {
                   type: 'set-variable',
-                  variableName: 'count',
+                  variableId: 'count',
                   value: { kind: 'object', properties },
                 },
               ],
@@ -197,33 +216,33 @@ describe('parseScreenDocument blueprint expressions', () => {
     const cases = [
       document({
         components: [component({ id: 'button' })],
-        variables: [{ type: 'static', name: 'count', value: 0 }],
+        variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
           rules: [
             {
               id: 'deep',
               trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-              actions: [{ type: 'set-variable', variableName: 'count', value: deep }],
+              actions: [{ type: 'set-variable', variableId: 'count', value: deep }],
             },
           ],
         },
       }),
       document({
         components: [component({ id: 'button' })],
-        variables: [{ type: 'static', name: 'count', value: 0 }],
+        variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
           rules: [
             {
               id: 'containers',
               trigger: { type: 'material-event', componentId: 'button', eventName: 'click' },
-              actions: [{ type: 'set-variable', variableName: 'count', value: containers }],
+              actions: [{ type: 'set-variable', variableId: 'count', value: containers }],
             },
           ],
         },
       }),
       document({
         components: [component({ id: 'button' })],
-        variables: [{ type: 'static', name: 'count', value: 0 }],
+        variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
           rules: [
             {
@@ -232,7 +251,7 @@ describe('parseScreenDocument blueprint expressions', () => {
               actions: [
                 {
                   type: 'set-variable',
-                  variableName: 'count',
+                  variableId: 'count',
                   value: { kind: 'literal', value: 'x'.repeat(MAX_BLUEPRINT_EXPRESSION_BYTES) },
                 },
               ],

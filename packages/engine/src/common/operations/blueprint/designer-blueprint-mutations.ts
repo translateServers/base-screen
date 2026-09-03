@@ -29,6 +29,7 @@ import {
   type DesignerBlueprintNodePosition,
   materializeDesignerBlueprintLayoutNodes,
   parseDesignerBlueprintUnconnectedNodeId,
+  variableBlueprintNodeId,
 } from './designer-blueprint-node-ids.js';
 import type { BaseScreenBlueprintCanvasSelection } from './designer-blueprint-protocol.js';
 
@@ -39,6 +40,18 @@ export function insertDesignerBlueprintComponentNode(
 ): ScreenBlueprint | null {
   if (!document.components.some((component) => component.id === componentId)) return null;
   const id = componentBlueprintNodeId(componentId);
+  const nodes = materializeDesignerBlueprintLayoutNodes(document);
+  if (nodes.some((node) => node.id === id)) return null;
+  return appendDesignerBlueprintLayoutNode(document.blueprint, nodes, id, position);
+}
+
+export function insertDesignerBlueprintVariableNode(
+  document: ScreenDocument,
+  variableId: string,
+  position?: DesignerBlueprintNodePosition,
+): ScreenBlueprint | null {
+  if (!document.variables.some((variable) => variable.id === variableId)) return null;
+  const id = variableBlueprintNodeId(variableId);
   const nodes = materializeDesignerBlueprintLayoutNodes(document);
   if (nodes.some((node) => node.id === id)) return null;
   return appendDesignerBlueprintLayoutNode(document.blueprint, nodes, id, position);
@@ -60,6 +73,7 @@ export function createDesignerVisibilityRule(
     !document.components.some((component) => component.id === targetComponentId) ||
     document.blueprint.rules.some(
       (rule) =>
+        rule.trigger.type === 'material-event' &&
         rule.trigger.componentId === sourceComponentId &&
         rule.trigger.eventName === eventName &&
         rule.actions.some(
@@ -84,7 +98,7 @@ export function insertDesignerBlueprintNode(
   document: ScreenDocument,
   kind: 'condition' | 'set-variable' | 'emit-host-event',
   ruleId: string,
-  variableName?: string,
+  variableId?: string,
   position?: DesignerBlueprintNodePosition,
 ): ScreenBlueprint | null {
   const rule = document.blueprint.rules.find((candidate) => candidate.id === ruleId);
@@ -108,7 +122,7 @@ export function insertDesignerBlueprintNode(
           position,
         );
   }
-  const action = createDesignerBlueprintAction(kind, document, variableName);
+  const action = createDesignerBlueprintAction(kind, document, variableId);
   if (action === null) return null;
   const actionIndex = rule.actions.length;
   const updated = updateRule(document.blueprint, ruleId, (candidate) => ({
@@ -130,6 +144,7 @@ export function deleteDesignerBlueprintSelection(
   selection: Exclude<BaseScreenBlueprintCanvasSelection, null>,
 ): ScreenBlueprint | null {
   if (selection.kind === 'edge') {
+    if (selection.id.startsWith('dependency:')) return null;
     const edge = parseEdgeId(selection.id);
     if (edge === null) return null;
     if (edge.actionIndex === undefined) {
@@ -155,7 +170,7 @@ export function deleteDesignerBlueprintSelection(
     const componentId = selection.id.slice('component:'.length);
     let updated: ScreenBlueprint = blueprint;
     for (const rule of blueprint.rules) {
-      if (rule.trigger.componentId === componentId) {
+      if (rule.trigger.type === 'material-event' && rule.trigger.componentId === componentId) {
         updated = removeRule(updated, rule.id);
         continue;
       }
@@ -169,6 +184,16 @@ export function deleteDesignerBlueprintSelection(
         .reverse();
       for (const actionIndex of actionIndexes) {
         updated = removeAction(updated, rule.id, actionIndex) ?? updated;
+      }
+    }
+    return removeLayoutNodes(updated, new Set([selection.id]));
+  }
+  if (selection.id.startsWith('variable:')) {
+    const variableId = selection.id.slice('variable:'.length);
+    let updated: ScreenBlueprint = blueprint;
+    for (const rule of blueprint.rules) {
+      if (rule.trigger.type === 'variable-event' && rule.trigger.variableId === variableId) {
+        updated = removeRule(updated, rule.id);
       }
     }
     return removeLayoutNodes(updated, new Set([selection.id]));

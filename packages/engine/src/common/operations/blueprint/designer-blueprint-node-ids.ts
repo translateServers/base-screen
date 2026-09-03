@@ -16,6 +16,10 @@ export function componentBlueprintNodeId(componentId: string): string {
   return `component:${componentId}`;
 }
 
+export function variableBlueprintNodeId(variableId: string): string {
+  return `variable:${variableId}`;
+}
+
 export function conditionBlueprintNodeId(ruleId: string): string {
   return `condition:${ruleId}`;
 }
@@ -27,14 +31,14 @@ export function actionBlueprintNodeId(ruleId: string, actionIndex: number): stri
 export function nextDesignerBlueprintUnconnectedNodeId(
   nodes: readonly ScreenBlueprintLayoutNode[],
   kind: DesignerBlueprintUnconnectedNodeKind,
-  variableName?: string,
+  variableId?: string,
 ): string {
   const used = new Set(nodes.map((node) => node.id));
   const variableToken =
     kind === 'set-variable'
-      ? variableName === undefined
+      ? variableId === undefined
         ? 'auto'
-        : designerBlueprintVariableToken(variableName)
+        : designerBlueprintVariableToken(variableId)
       : undefined;
   let sequence = 1;
   while (true) {
@@ -73,11 +77,11 @@ export function resolveDesignerBlueprintUnconnectedVariable(
   node: DesignerBlueprintUnconnectedNodeId,
 ): string | undefined {
   if (node.kind !== 'set-variable') return undefined;
-  if (node.variableToken === 'auto') return document.variables[0]?.name;
+  if (node.variableToken === 'auto') return document.variables[0]?.id;
   const matches = document.variables.filter(
-    (variable) => designerBlueprintVariableToken(variable.name) === node.variableToken,
+    (variable) => designerBlueprintVariableToken(variable.id) === node.variableToken,
   );
-  return matches.length === 1 ? matches[0]?.name : undefined;
+  return matches.length === 1 ? matches[0]?.id : undefined;
 }
 
 export function materializeDesignerBlueprintLayoutNodes(
@@ -94,7 +98,12 @@ export function materializeDesignerBlueprintLayoutNodes(
     if (!nodes.has(id)) nodes.set(id, { id, x: 72, y: 72 + index * 252 });
   };
   document.blueprint.rules.forEach((rule, ruleIndex) => {
-    addComponent(rule.trigger.componentId);
+    if (rule.trigger.type === 'material-event') addComponent(rule.trigger.componentId);
+    else {
+      const variableId = variableBlueprintNodeId(rule.trigger.variableId);
+      if (!nodes.has(variableId))
+        nodes.set(variableId, { id: variableId, x: 72, y: 72 + ruleIndex * 252 });
+    }
     if (rule.condition !== undefined) {
       const id = conditionBlueprintNodeId(rule.id);
       nodes.set(id, { id, x: 440, y: 72 + ruleIndex * 164 });

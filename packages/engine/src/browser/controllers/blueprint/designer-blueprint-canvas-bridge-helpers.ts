@@ -1,5 +1,7 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
+import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { DesignerBlueprintConnectionFailureReason } from '../../../common/operations/blueprint/designer-blueprint-connection.js';
+import type { BaseScreenBlueprintCanvasCommandResult } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 
 export function cloneAndFreeze<T>(value: T): T {
@@ -16,6 +18,31 @@ export function diagnostic(code: ScreenDiagnostic['code'], message: string): Scr
 
 export function failure<T>(code: ScreenDiagnostic['code'], message: string): ScreenParseResult<T> {
   return { ok: false, diagnostics: [diagnostic(code, message)] };
+}
+
+export function rejectedBlueprintCanvasCommand(
+  input: unknown,
+  diagnostics: readonly ScreenDiagnostic[],
+): BaseScreenBlueprintCanvasCommandResult {
+  const commandId =
+    isRecord(input) && typeof input.commandId === 'string'
+      ? input.commandId.slice(0, 128)
+      : 'invalid-command';
+  return cloneAndFreeze({ commandId, status: 'rejected', diagnostics });
+}
+
+export function blueprintCapabilityReader(
+  readIndex: () => BaseScreenRuntimeContributionIndex | undefined,
+): { readonly hasBlueprintCapability: (id: string) => boolean } {
+  return {
+    hasBlueprintCapability: (id) => {
+      try {
+        return readIndex()?.hasBlueprintCapability(id) === true;
+      } catch {
+        return false;
+      }
+    },
+  };
 }
 
 export function designerBlueprintConnectionFailureMessage(

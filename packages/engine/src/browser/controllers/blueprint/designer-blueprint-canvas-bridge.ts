@@ -23,6 +23,8 @@ import {
   componentBlueprintNodeId,
   deleteDesignerBlueprintSelection,
   insertDesignerBlueprintComponentNode,
+  insertDesignerBlueprintVariableNode,
+  variableBlueprintNodeId,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import {
   BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
@@ -40,11 +42,13 @@ import {
 import { insertDesignerBlueprintLibraryNode } from '../../../common/operations/blueprint/designer-blueprint-unconnected-nodes.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
+  blueprintCapabilityReader,
   cloneAndFreeze,
   designerBlueprintConnectionFailureMessage,
   diagnostic,
   failure,
   isRecord,
+  rejectedBlueprintCanvasCommand,
 } from './designer-blueprint-canvas-bridge-helpers.js';
 
 const MAX_PROCESSED_COMMANDS = 256;
@@ -261,12 +265,21 @@ export class DesignerBlueprintCanvasBridge {
                   command.position,
                 ),
               }
-            : insertDesignerBlueprintLibraryNode(
-                document,
-                command.kind,
-                command.variableName,
-                command.position,
-              );
+            : command.kind === 'variable'
+              ? {
+                  nodeId: variableBlueprintNodeId(command.variableId),
+                  blueprint: insertDesignerBlueprintVariableNode(
+                    document,
+                    command.variableId,
+                    command.position,
+                  ),
+                }
+              : insertDesignerBlueprintLibraryNode(
+                  document,
+                  command.kind,
+                  command.variableId,
+                  command.position,
+                );
         result = this.commitBlueprint(insertion === null ? null : insertion.blueprint);
         if (result.ok && insertion !== null) {
           result = this.callbacks.select({ kind: 'node', id: insertion.nodeId }, false);
@@ -369,28 +382,12 @@ export class DesignerBlueprintCanvasBridge {
   }
 
   private rejectUnknown(input: unknown, diagnostics: readonly ScreenDiagnostic[]): void {
-    const commandId =
-      isRecord(input) && typeof input.commandId === 'string'
-        ? input.commandId.slice(0, 128)
-        : 'invalid-command';
-    this.#lastCommand = cloneAndFreeze<BaseScreenBlueprintCanvasCommandResult>({
-      commandId,
-      status: 'rejected',
-      diagnostics,
-    });
+    this.#lastCommand = rejectedBlueprintCanvasCommand(input, diagnostics);
     this.callbacks.render();
     this.callbacks.emitDiagnostics(diagnostics);
   }
 
   private get capabilities(): { readonly hasBlueprintCapability: (id: string) => boolean } {
-    return {
-      hasBlueprintCapability: (id) => {
-        try {
-          return this.callbacks.getRuntimeContributions()?.hasBlueprintCapability(id) === true;
-        } catch {
-          return false;
-        }
-      },
-    };
+    return blueprintCapabilityReader(this.callbacks.getRuntimeContributions);
   }
 }

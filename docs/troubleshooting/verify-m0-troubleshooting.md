@@ -137,21 +137,14 @@ pnpm verify:tarball *> $null; Write-Output "verify:tarball=$LASTEXITCODE"
 - 注意：Vue 报告分析会提示 API Extractor 使用 `skipLibCheck`；这是因为 API Extractor 内置的 TypeScript
   版本落后于当前 Vue peer 类型。正常 `pnpm typecheck` 仍保持 `skipLibCheck: false`，该提示不代表包类型检查被放宽。
 
-## 8. check:file-size
+## 8. 模块完整性审查
 
-### 8.1 FILE_SIZE_LIMIT_EXCEEDED / FILE_SIZE_REGRESSION
-
-- 症状：`pnpm lint` 报新文件超过所属层上限，或已有超限文件高于
-  `scripts/file-size-baseline.json` 中记录的行数。
-- 原因：新模块没有在进入仓库前拆分，或历史大文件继续承载了新职责。
-- 修复：按职责拆分模块/测试；已有超限文件减少后运行 `pnpm file-size:baseline`，把精确上限同步下调。
-- 注意：`file-size:baseline` 只允许降低或删除已有例外，不能用来接受增长或新增超限文件；
-  `engine/src/common/vendor/` 是明确的 vendored source，不参与该门禁。
-
-### 8.2 FILE_SIZE_BASELINE_STALE
-
-- 症状：文件已经缩小或删除，但门禁要求更新基线。
-- 修复：运行 `pnpm file-size:baseline` 并提交变小后的基线，确保后续改动不能重新涨回原值。
+- 仓库不按文件行数阻断 CI，也不维护逐文件行数 baseline。
+- 模块过大与否由职责判断：若其中存在可独立命名、测试、复用或演进的行为，应按该边界拆分；若状态、
+  失败分支和辅助逻辑共同完成同一行为，应保持在一个内聚模块中。
+- 排查聚合体时优先看依赖方向、循环引用、共享可变状态和测试准备是否跨越多个无关领域；对应的自动证据
+  来自 `pnpm check:boundaries`、`pnpm typecheck`、`pnpm test` 和适用的浏览器验证。
+- 不要创建只转发调用、只重命名私有符号或迫使阅读者跨文件追踪同一状态机的拆分。
 
 ## 9. check:docs
 

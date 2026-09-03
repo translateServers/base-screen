@@ -2,7 +2,7 @@ import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { DESIGNER_BLUEPRINT_UI_TEXT } from './designer-blueprint-ui-text.js';
 
 // Designer 用户可见文案的唯一权威目录。浏览器层的内联文案由 check-designer-ui.mjs 禁止，
-// 本纯数据目录由 check-file-size.mjs 的 ui-text-catalog 上限约束。
+// 本纯数据目录是 Designer 用户可见文案的权威来源；按文案域维护，不按行数拆散。
 export const DESIGNER_UI_TEXT = {
   materials: '物料',
   layers: '图层',
@@ -278,9 +278,13 @@ export const DESIGNER_UI_TEXT = {
     configured: '已配置',
     notConfigured: '未配置',
     mode: (mode: string) =>
-      ({ none: '无数据', static: '静态数据', dataset: '宿主数据集', 'host-resource': '宿主资源' })[
-        mode
-      ] ?? mode,
+      ({
+        none: '无数据',
+        static: '静态数据',
+        variable: '全局变量',
+        dataset: '宿主数据集',
+        'host-resource': '宿主资源',
+      })[mode] ?? mode,
     hostResourceManaged: '请通过宿主资源面板添加或替换资源。',
     hostResourceSummary: (resourceType: string, resourceId: string) =>
       `当前资源：${resourceType} / ${resourceId}。请通过宿主资源面板替换。`,
@@ -309,7 +313,12 @@ export const DESIGNER_UI_TEXT = {
     connected: '已连接',
     disconnected: '未连接',
     apply: (mode: string) =>
-      ({ none: '移除数据', static: '应用静态数据', dataset: '应用数据集' })[mode] ?? '应用',
+      ({
+        none: '移除数据',
+        static: '应用静态数据',
+        variable: '应用全局变量',
+        dataset: '应用数据集',
+      })[mode] ?? '应用',
     applied: '数据源已应用。',
   },
   interactionPanelEmpty: '交互设置将在预览中生效。',
@@ -525,6 +534,7 @@ export const DESIGNER_UI_TEXT = {
   variables: {
     title: '全局变量',
     shortTitle: '变量',
+    managementTitle: '全局变量管理',
     description: '在组件之间传递和复用值，用于数据联动与交互编排。',
     guideTitle: '使用方法',
     guideCreate: '先新建变量并设置初始值',
@@ -547,21 +557,40 @@ export const DESIGNER_UI_TEXT = {
     name: '变量名',
     nameHint: '例如 selectedRegion；创建后可在数据或交互中选择。',
     value: '初始值',
+    initialValue: '初始值',
     valueHint: '文本可直接输入；数字、true、null、对象和数组按 JSON 解析。',
     descriptionLabel: '说明（可选）',
     descriptionHint: '说明变量保存的内容和用途，便于后续查找。',
     descriptionInvalid: '变量描述无效（最多 4096 个字符，且不允许控制字符）。',
     variableId: '宿主变量 ID',
+    sourceId: '来源 ID',
     readOnly: 'ID 只读',
     typeStatic: '静态值',
     typeHost: '宿主提供',
+    typeDataSource: '数据源请求',
+    typeUrlQuery: 'URL 查询条件',
     expandVariable: (name: string) => `展开全局变量 ${name}`,
     collapseVariable: (name: string) => `收起全局变量 ${name}`,
     sourceStatic: '手动设置',
     sourceHost: '宿主目录',
+    controlled: '受控模式',
+    controlledHint: '开启后，运行时忽略初始值，以宿主响应或交互写入为准。',
+    enabled: '已开启',
+    disabled: '已关闭',
+    processor: '过滤器',
+    processorHint: '可选；填写由宿主管理并执行的数据过滤器 ID。',
+    processorInvalid: '过滤器 ID 最多 256 个字符。',
+    autoUpdate: '自动更新',
+    autoUpdateHint: '开启后保存轮询频次；由宿主按该配置触发变量刷新。',
+    autoUpdateFrequency: '轮询频次（秒）',
+    autoUpdateFrequencyHint: '请输入 1 到 86400 之间的整数。',
+    autoUpdateInvalid: '轮询频次必须是 1 到 86400 之间的整数。',
+    autoUpdateInterval: (seconds: number) => `每 ${seconds} 秒`,
     usage: '使用位置',
     unused: '尚未使用',
     actions: (name: string) => `管理全局变量 ${name}`,
+    editConfiguration: (name: string) => `编辑变量 ${name} 的配置`,
+    editConfigurationTitle: '编辑全局变量',
     rename: '重命名',
     renameTitle: '重命名变量',
     renameVariable: (name: string) => `重命名变量 ${name}`,
@@ -582,6 +611,7 @@ export const DESIGNER_UI_TEXT = {
       `条件${side === 'left' ? '左值' : '右值'}${path === '' ? '' : ` · ${path}`}`,
     referenceAction: (actionIndex: number) => `动作 ${actionIndex + 1}`,
     referenceActionTarget: '变量赋值目标',
+    referenceVariableTrigger: '变量事件触发器',
     referenceActionExpression: (field: 'value' | 'payload', path: string) =>
       `动作${field === 'value' ? '赋值' : '参数'} · ${field}${path}`,
     editValueTitle: '编辑变量值',
@@ -610,6 +640,10 @@ export const DESIGNER_UI_TEXT = {
     previewUnavailable: '该宿主变量不允许作者预览。',
     previewFailed: '作者预览不可用或未获授权。',
     previewReady: '当前值预览（仅本次会话）',
+    responseResult: '数据响应结果',
+    responseRefresh: '刷新',
+    responseEmpty: '保存变量后，可刷新查看宿主返回的实时响应结果。',
+    addToBlueprint: (name: string) => `将变量 ${name} 添加到蓝图`,
     editHint: 'Enter 确认，Esc 取消',
     save: '保存',
     confirm: '确认',

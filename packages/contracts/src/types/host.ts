@@ -209,6 +209,12 @@ export interface ScreenHostDatasetCatalogPort {
 
 export interface ScreenHostVariableRequest {
   readonly variableId: string;
+  readonly sourceId: string;
+  readonly sourceType: 'data-source' | 'url-query';
+  readonly initialValue: ScreenJsonValue;
+  readonly controlled: boolean;
+  readonly processorId?: string;
+  readonly autoUpdate?: { readonly intervalSeconds: number };
   readonly purpose: 'runtime' | 'authoring-preview';
   readonly signal: ScreenAbortSignal;
 }
@@ -219,13 +225,14 @@ export interface ScreenHostVariablePort {
 
 export interface ScreenHostVariableCatalogListRequest {
   readonly query: string;
+  readonly sourceType: 'data-source' | 'url-query';
   readonly cursor?: string;
   readonly limit: number;
   readonly signal: ScreenAbortSignal;
 }
 
 export interface ScreenHostVariableDescribeRequest {
-  readonly variableId: string;
+  readonly sourceId: string;
   readonly signal: ScreenAbortSignal;
 }
 

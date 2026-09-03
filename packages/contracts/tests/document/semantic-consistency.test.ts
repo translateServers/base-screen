@@ -114,8 +114,8 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
     const result = parseScreenDocument(
       document({
         variables: [
-          { type: 'static', name: 'count', value: 1 },
-          { type: 'static', name: 'count', value: 2 },
+          { type: 'static', id: 'count', name: 'count', initialValue: 1 },
+          { type: 'static', id: 'count-copy', name: 'count', initialValue: 2 },
         ],
       }),
     );
@@ -185,7 +185,7 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
               actions: [
                 {
                   type: 'set-variable',
-                  variableName: 'ghost',
+                  variableId: 'ghost',
                   value: { kind: 'literal', value: 1 },
                 },
               ],
@@ -203,7 +203,7 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
         0,
         'actions',
         0,
-        'variableName',
+        'variableId',
       ]);
     }
   });
@@ -212,7 +212,7 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
     const result = parseScreenDocument(
       document({
         components: [component({ id: 'child', parentId: 'parent' }), component({ id: 'parent' })],
-        variables: [{ type: 'static', name: 'count', value: 0 }],
+        variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
         blueprint: {
           rules: [
             {
@@ -221,7 +221,7 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
               actions: [
                 {
                   type: 'set-variable',
-                  variableName: 'count',
+                  variableId: 'count',
                   value: { kind: 'literal', value: 1 },
                 },
               ],
@@ -240,7 +240,16 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
     const result = parseScreenDocument(
       document({
         components: [component({ id: 'card-a' })],
-        variables: [{ type: 'host', name: 'tenant', variableId: 'tenant-context' }],
+        variables: [
+          {
+            type: 'data-source',
+            id: 'tenant',
+            name: 'tenant',
+            initialValue: null,
+            sourceId: 'tenant-context',
+            controlled: true,
+          },
+        ],
         blueprint: {
           rules: [
             {
@@ -250,7 +259,7 @@ describe('parseScreenDocument RB4 semantic consistency', () => {
                 {
                   type: 'host-action',
                   actionId: 'project.notify',
-                  payload: { kind: 'variable', name: 'tenant' },
+                  payload: { kind: 'variable', variableId: 'tenant' },
                 },
               ],
             },

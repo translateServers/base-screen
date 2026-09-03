@@ -389,12 +389,12 @@
                               "type": "string",
                               "const": "variable"
                             },
-                            "name": {
+                            "variableId": {
                               "type": "string",
-                              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
                             }
                           },
-                          "required": ["kind", "name"],
+                          "required": ["kind", "variableId"],
                           "additionalProperties": false
                         }
                       ]
@@ -437,6 +437,51 @@
                 "additionalProperties": false
               },
               {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "variable"
+                  },
+                  "variableId": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                  },
+                  "binding": {
+                    "type": "object",
+                    "properties": {
+                      "fields": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 128
+                        },
+                        "additionalProperties": {
+                          "minItems": 1,
+                          "maxItems": 256,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          }
+                        }
+                      }
+                    },
+                    "required": ["fields"],
+                    "additionalProperties": false
+                  },
+                  "processorId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                },
+                "required": ["type", "variableId"],
+                "additionalProperties": false
+              },
+              {
                 "type": "null"
               }
             ]
@@ -471,6 +516,10 @@
                 "type": "string",
                 "const": "static"
               },
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+              },
               "name": {
                 "type": "string",
                 "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
@@ -478,9 +527,9 @@
               "description": {
                 "type": "string"
               },
-              "value": {}
+              "initialValue": {}
             },
-            "required": ["type", "name", "value"],
+            "required": ["type", "id", "name", "initialValue"],
             "additionalProperties": false
           },
           {
@@ -488,7 +537,11 @@
             "properties": {
               "type": {
                 "type": "string",
-                "const": "host"
+                "const": "data-source"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
               },
               "name": {
                 "type": "string",
@@ -497,13 +550,70 @@
               "description": {
                 "type": "string"
               },
-              "variableId": {
+              "initialValue": {},
+              "sourceId": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
+              },
+              "processorId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "controlled": {
+                "type": "boolean"
+              },
+              "autoUpdate": {
+                "type": "object",
+                "properties": {
+                  "intervalSeconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 86400
+                  }
+                },
+                "required": ["intervalSeconds"],
+                "additionalProperties": false
               }
             },
-            "required": ["type", "name", "variableId"],
+            "required": ["type", "id", "name", "initialValue", "sourceId", "controlled"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "const": "url-query"
+              },
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+              },
+              "description": {
+                "type": "string"
+              },
+              "initialValue": {},
+              "sourceId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "processorId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "controlled": {
+                "type": "boolean"
+              }
+            },
+            "required": ["type", "id", "name", "initialValue", "sourceId", "controlled"],
             "additionalProperties": false
           }
         ]
@@ -523,23 +633,46 @@
                 "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
               },
               "trigger": {
-                "type": "object",
-                "properties": {
-                  "type": {
-                    "type": "string",
-                    "const": "material-event"
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "material-event"
+                      },
+                      "componentId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                      },
+                      "eventName": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                      }
+                    },
+                    "required": ["type", "componentId", "eventName"],
+                    "additionalProperties": false
                   },
-                  "componentId": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-                  },
-                  "eventName": {
-                    "type": "string",
-                    "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "const": "variable-event"
+                      },
+                      "variableId": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                      },
+                      "eventName": {
+                        "type": "string",
+                        "enum": ["data-updated", "request-state"]
+                      }
+                    },
+                    "required": ["type", "variableId", "eventName"],
+                    "additionalProperties": false
                   }
-                },
-                "required": ["type", "componentId", "eventName"],
-                "additionalProperties": false
+                ]
               },
               "requiredCapabilities": {
                 "type": "array",
@@ -597,15 +730,45 @@
                           "type": "string",
                           "const": "set-variable"
                         },
-                        "variableName": {
+                        "variableId": {
                           "type": "string",
-                          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
                         },
                         "value": {
                           "$ref": "#/$defs/__schema0"
                         }
                       },
-                      "required": ["type", "variableName", "value"],
+                      "required": ["type", "variableId", "value"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "request-variable"
+                        },
+                        "variableId": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                        }
+                      },
+                      "required": ["type", "variableId"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "request-component-data"
+                        },
+                        "componentId": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                        }
+                      },
+                      "required": ["type", "componentId"],
                       "additionalProperties": false
                     },
                     {
@@ -788,12 +951,12 @@
               "type": "string",
               "const": "variable"
             },
-            "name": {
+            "variableId": {
               "type": "string",
-              "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,127}$"
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
             }
           },
-          "required": ["kind", "name"],
+          "required": ["kind", "variableId"],
           "additionalProperties": false
         },
         {

@@ -76,7 +76,7 @@ export const BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest =
   propsSchema: BASE_SCREEN_ECHARTS_PROPS_SCHEMA,
   propertyPanel: [],
   events: ['seriesClick'],
-  dataCapabilities: ['static', 'host-resource'],
+  dataCapabilities: ['static', 'host-resource', 'variable'],
   dataBinding: {
     roles: [
       {

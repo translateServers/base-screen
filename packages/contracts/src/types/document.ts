@@ -54,7 +54,7 @@ export interface ScreenStaticDataSource {
 
 export type ScreenHostResourceParameter =
   | { readonly kind: 'literal'; readonly value: ScreenJsonValue }
-  | { readonly kind: 'variable'; readonly name: string };
+  | { readonly kind: 'variable'; readonly variableId: string };
 
 export interface ScreenDataBinding {
   readonly fields: Readonly<Record<string, readonly string[]>>;
@@ -70,7 +70,17 @@ export interface ScreenHostResourceDataSource {
   readonly binding: ScreenDataBinding | null;
 }
 
-export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenHostResourceDataSource;
+export interface ScreenVariableDataSource {
+  readonly type: 'variable';
+  readonly variableId: string;
+  readonly binding?: ScreenDataBinding;
+  readonly processorId?: string;
+}
+
+export type ScreenComponentDataSource =
+  | ScreenStaticDataSource
+  | ScreenHostResourceDataSource
+  | ScreenVariableDataSource;
 
 export type ScreenComponentStyleRuleOperator =
   | 'eq'
@@ -110,21 +120,39 @@ export interface ScreenComponentNode {
   readonly dataSource: ScreenComponentDataSource | null;
 }
 
-export interface ScreenStaticVariable {
+export interface ScreenVariableBase {
+  readonly id: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly initialValue: ScreenJsonValue;
+}
+
+export interface ScreenStaticVariable extends ScreenVariableBase {
   readonly type: 'static';
-  readonly name: string;
-  readonly description?: string;
-  readonly value: ScreenJsonValue;
 }
 
-export interface ScreenHostVariable {
-  readonly type: 'host';
-  readonly name: string;
-  readonly description?: string;
-  readonly variableId: string;
+export interface ScreenVariableAutoUpdate {
+  readonly intervalSeconds: number;
 }
 
-export type ScreenVariable = ScreenStaticVariable | ScreenHostVariable;
+export interface ScreenDataSourceVariable extends ScreenVariableBase {
+  readonly type: 'data-source';
+  readonly sourceId: string;
+  readonly processorId?: string;
+  readonly controlled: boolean;
+  readonly autoUpdate?: ScreenVariableAutoUpdate;
+}
+
+export interface ScreenUrlQueryVariable extends ScreenVariableBase {
+  readonly type: 'url-query';
+  readonly sourceId: string;
+  readonly processorId?: string;
+  readonly controlled: boolean;
+}
+
+export type ScreenDynamicVariable = ScreenDataSourceVariable | ScreenUrlQueryVariable;
+
+export type ScreenVariable = ScreenStaticVariable | ScreenDynamicVariable;
 
 export interface ScreenBlueprintMaterialEventTrigger {
   readonly type: 'material-event';
@@ -132,10 +160,20 @@ export interface ScreenBlueprintMaterialEventTrigger {
   readonly eventName: string;
 }
 
+export interface ScreenBlueprintVariableEventTrigger {
+  readonly type: 'variable-event';
+  readonly variableId: string;
+  readonly eventName: 'data-updated' | 'request-state';
+}
+
+export type ScreenBlueprintTrigger =
+  | ScreenBlueprintMaterialEventTrigger
+  | ScreenBlueprintVariableEventTrigger;
+
 export type ScreenBlueprintValueExpression =
   | { readonly kind: 'literal'; readonly value: ScreenJsonValue }
   | { readonly kind: 'event-payload'; readonly path: readonly string[] }
-  | { readonly kind: 'variable'; readonly name: string }
+  | { readonly kind: 'variable'; readonly variableId: string }
   | { readonly kind: 'array'; readonly items: readonly ScreenBlueprintValueExpression[] }
   | {
       readonly kind: 'object';
@@ -150,8 +188,18 @@ export interface ScreenBlueprintCondition {
 
 export interface ScreenBlueprintSetVariableAction {
   readonly type: 'set-variable';
-  readonly variableName: string;
+  readonly variableId: string;
   readonly value: ScreenBlueprintValueExpression;
+}
+
+export interface ScreenBlueprintRequestVariableAction {
+  readonly type: 'request-variable';
+  readonly variableId: string;
+}
+
+export interface ScreenBlueprintRequestComponentDataAction {
+  readonly type: 'request-component-data';
+  readonly componentId: string;
 }
 
 export interface ScreenBlueprintEmitHostEventAction {
@@ -190,13 +238,15 @@ export interface ScreenBlueprintComponentVisibilityAction {
 
 export type ScreenBlueprintAction =
   | ScreenBlueprintSetVariableAction
+  | ScreenBlueprintRequestVariableAction
+  | ScreenBlueprintRequestComponentDataAction
   | ScreenBlueprintEmitHostEventAction
   | ScreenBlueprintHostAction
   | ScreenBlueprintComponentVisibilityAction;
 
 export interface ScreenBlueprintRule {
   readonly id: string;
-  readonly trigger: ScreenBlueprintMaterialEventTrigger;
+  readonly trigger: ScreenBlueprintTrigger;
   readonly requiredCapabilities?: readonly string[];
   readonly condition?: ScreenBlueprintCondition;
   readonly actions: readonly ScreenBlueprintAction[];

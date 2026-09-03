@@ -16,6 +16,7 @@ import panelsCss from './designer-workbench-panels.css?inline';
 import shellCss from './designer-workbench-shell.css?inline';
 import topbarCss from './designer-workbench-topbar.css?inline';
 import variableEditorCss from './designer-workbench-variable-editor.css?inline';
+import variableListCss from './designer-workbench-variable-list.css?inline';
 import variableReferencesCss from './designer-workbench-variable-references.css?inline';
 import variablesCss from './designer-workbench-variables.css?inline';
 
@@ -35,6 +36,7 @@ export const DESIGNER_WORKBENCH_CSS = [
   dataBindingCss,
   dataEditorCss,
   layersCss,
+  variableListCss,
   variablesCss,
   variableEditorCss,
   variableReferencesCss,

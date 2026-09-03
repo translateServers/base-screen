@@ -13,8 +13,11 @@ const BLUEPRINT_RULE_FIELDS = new Set([
   'condition',
   'actions',
 ]);
-const BLUEPRINT_TRIGGER_FIELDS = new Set(['type', 'componentId', 'eventName']);
-const SET_VARIABLE_ACTION_FIELDS = new Set(['type', 'variableName', 'value']);
+const MATERIAL_EVENT_TRIGGER_FIELDS = new Set(['type', 'componentId', 'eventName']);
+const VARIABLE_EVENT_TRIGGER_FIELDS = new Set(['type', 'variableId', 'eventName']);
+const SET_VARIABLE_ACTION_FIELDS = new Set(['type', 'variableId', 'value']);
+const REQUEST_VARIABLE_ACTION_FIELDS = new Set(['type', 'variableId']);
+const REQUEST_COMPONENT_DATA_ACTION_FIELDS = new Set(['type', 'componentId']);
 const EMIT_HOST_EVENT_ACTION_FIELDS = new Set(['type', 'eventName', 'payload']);
 const HOST_ACTION_FIELDS = new Set(['type', 'actionId', 'payload']);
 const COMPONENT_VISIBILITY_ACTION_FIELDS = new Set([
@@ -104,7 +107,9 @@ function validateRuleStrictKeys(
     isJsonObject(rule.trigger) &&
     !checkStrictObjectKeys(
       rule.trigger,
-      BLUEPRINT_TRIGGER_FIELDS,
+      rule.trigger.type === 'variable-event'
+        ? VARIABLE_EVENT_TRIGGER_FIELDS
+        : MATERIAL_EVENT_TRIGGER_FIELDS,
       at([...base, 'trigger']),
       collector,
       phase,
@@ -142,11 +147,15 @@ function validateActionStrictKeys(
   const fields =
     action.type === 'set-variable'
       ? SET_VARIABLE_ACTION_FIELDS
-      : action.type === 'emit-host-event'
-        ? EMIT_HOST_EVENT_ACTION_FIELDS
-        : action.type === 'component-visibility'
-          ? COMPONENT_VISIBILITY_ACTION_FIELDS
-          : HOST_ACTION_FIELDS;
+      : action.type === 'request-variable'
+        ? REQUEST_VARIABLE_ACTION_FIELDS
+        : action.type === 'request-component-data'
+          ? REQUEST_COMPONENT_DATA_ACTION_FIELDS
+          : action.type === 'emit-host-event'
+            ? EMIT_HOST_EVENT_ACTION_FIELDS
+            : action.type === 'component-visibility'
+              ? COMPONENT_VISIBILITY_ACTION_FIELDS
+              : HOST_ACTION_FIELDS;
   checkStrictObjectKeys(action, fields, at([...base, 'actions', actionIndex]), collector, phase);
   if (action.type === 'component-visibility' && isJsonObject(action.transition)) {
     checkStrictObjectKeys(

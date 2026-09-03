@@ -131,6 +131,15 @@ function inspectorHeading(
           : '@base-screen/logic/condition',
     };
   }
+  if (node?.kind === 'variable') {
+    return {
+      title: node.variableName ?? node.variableId ?? DESIGNER_UI_TEXT.blueprint.globalVariables,
+      detail:
+        node.variableType === undefined
+          ? DESIGNER_UI_TEXT.blueprint.globalVariables
+          : DESIGNER_UI_TEXT.blueprint.variableKind[node.variableType],
+    };
+  }
   if (node?.kind === 'action') {
     return {
       title:

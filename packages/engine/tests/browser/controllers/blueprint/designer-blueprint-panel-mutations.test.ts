@@ -5,7 +5,7 @@ import { updateDesignerBlueprintActionFromTarget } from '../../../../src/browser
 
 const action = {
   type: 'set-variable' as const,
-  variableName: 'selected',
+  variableId: 'selected',
   value: { kind: 'literal' as const, value: null },
 };
 
@@ -28,8 +28,8 @@ const document: ScreenDocument = {
     },
   ],
   variables: [
-    { type: 'static', name: 'selected', value: null },
-    { type: 'static', name: 'fallback', value: 1 },
+    { type: 'static', id: 'selected', name: 'selected', initialValue: null },
+    { type: 'static', id: 'fallback', name: 'fallback', initialValue: 1 },
   ],
   blueprint: {
     rules: [
@@ -88,7 +88,7 @@ describe('Designer Blueprint set-variable value sources', () => {
     expect(change('[data-blueprint-action-value-source]', 'variable')).toEqual({
       ok: true,
       diagnostics: [],
-      value: { ...action, value: { kind: 'variable', name: 'fallback' } },
+      value: { ...action, value: { kind: 'variable', variableId: 'fallback' } },
     });
   });
 

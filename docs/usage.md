@@ -876,18 +876,18 @@ import type {
 } from '@base-screen/contracts';
 
 const variableCatalogPort: ScreenHostVariableCatalogPort = {
-  async list({ query, cursor, limit, signal }) {
-    return hostVariableService.list({ query, cursor, limit, signal });
+  async list({ query, sourceType, cursor, limit, signal }) {
+    return hostVariableService.list({ query, sourceType, cursor, limit, signal });
   },
 
-  async describe({ variableId, signal }) {
-    return hostVariableService.describe({ variableId, signal });
+  async describe({ sourceId, signal }) {
+    return hostVariableService.describe({ sourceId, signal });
   },
 };
 
 const variablePort: ScreenHostVariablePort = {
-  async resolve({ variableId, purpose, signal }) {
-    return hostVariableService.resolve({ variableId, purpose, signal });
+  async resolve(request) {
+    return hostVariableService.resolve(request);
   },
 };
 
@@ -898,39 +898,62 @@ designer.configure({
 });
 ```
 
-`list()` 每页最多 50 项，只返回 `variableId`/`name`/`description`；`describe()` 额外
-返回 `previewable`。响应严格拒绝未知字段、重复 ID、非法名称/游标和超限内容。
+`list()` 按 `data-source | url-query` 来源分页，每页最多 50 项，只返回
+`sourceId`/`sourceType`/`name`/`description`；`describe()` 额外返回 `previewable`。响应严格拒绝
+未知字段、重复 ID、非法名称/游标和超限内容。
 直接配置 `variableCatalogPort` 时必须同时配置 `variablePort`；Adapter 形式则必须同时开启
 `variableCatalog` 与 `variables` capability。
 
-`purpose` 是必填权限边界：`runtime` 用于 Viewer/Designer 运行求值，
-`authoring-preview` 用于变量面板预览和数据源测试。宿主应对敏感变量拒绝后者。
-预览只在当前会话显示有界摘要，不写入 Screen Document 或历史。
+变量端口收到文档变量的稳定 `variableId`、`sourceId`、`sourceType`、`initialValue`、`controlled`、
+可选 `processorId`/`autoUpdate`，以及必填权限边界 `purpose`。`runtime` 用于 Viewer/Designer 运行
+求值，`authoring-preview` 用于配置表单的数据响应预览。宿主应对敏感变量拒绝后者；预览只在当前
+会话显示有界摘要，不写入 Screen Document 或历史。
 
-作者从左侧「变量」进入闭环：新建静态值或从宿主目录选择变量，再在组件数据参数中选择「变量」，
-或在交互编排中用 `set-variable` 更新它。变量行默认折叠，展开后可查看来源、初始值/宿主 ID、
-精确使用位置及重命名、复制、删除和预览动作。静态值可直接输入普通文本；数字、布尔、`null`、
-对象和数组按 JSON 解析。重命名会原子更新所有引用，并保持当前详情/引用展开和键盘焦点。
+作者从 Blueprint 左侧「全局变量管理」进入闭环：来源固定为静态值、数据源请求和 URL 查询条件；
+完整配置包含名称、描述、初始值、过滤器、数据响应、受控模式和自动更新。变量行悬停提供编辑、加入
+Blueprint、重命名、复制和删除，右侧使用次数可展开精确位置。静态值可直接输入普通文本；数字、
+布尔、`null`、对象和数组按 JSON 解析。重命名只改变展示名，稳定 ID 与全部引用保持不变。
 
-文档只保存类似
-`{ type: 'host', name: 'region', description: '当前区域', variableId: 'current-region' }`
-的引用。实际租户、用户、URL、查询、过滤和路由状态留在宿主。缺少变量端口、
-解析失败或结果不是 JSON-safe 值时，资源不会带着猜测值继续查询。
-
-变量面板中的引用数可以展开为逐项位置：组件 `host-resource` 参数会定位到对应画布组件；
-Blueprint 条件、`set-variable` 目标以及递归动作表达式会切换到蓝图并选中对应节点。
-清单只投影当前 canonical document，不持久化索引，也不向宿主发送组件、规则或表达式详情。
-
-宿主状态改变后显式请求刷新：
+文档保存类似以下严格配置；实际 URL、API/SQL、凭证和过滤代码留在宿主：
 
 ```ts
-viewer.refreshVariables({ variableIds: ['current-region'], traceId: 'route-change-42' });
-designer.refreshVariables(); // 刷新当前文档的全部 host 变量
+const regionVariable = {
+  id: 'region',
+  type: 'data-source',
+  name: 'region',
+  description: '当前区域',
+  sourceId: 'current-region',
+  initialValue: '华东',
+  processorId: 'normalize-region',
+  controlled: false,
+  autoUpdate: { intervalSeconds: 30 },
+};
 ```
 
-同一 `variableId` 的多个别名只解析一次并同步提交。多变量刷新为原子批次：任一失败
-保留上次成功快照且不发资源请求；值未变化时也不重新查询依赖组件。自动更新由宿主
-调度后调用该方法，Base Screen 不内建轮询或订阅。
+受控动态变量在运行快照中忽略 `initialValue`，当前值由宿主解析或交互写入。缺少变量端口、解析失败
+或结果不是 JSON-safe 值时，资源不会带着猜测值继续查询。
+
+组件可把变量绑定到 `host-resource` 参数，或直接使用
+`{ type: 'variable', variableId: 'region' }` 作为数据源。Blueprint 变量节点提供数据更新/请求状态事件、
+导入变量和请求组件数据动作；文档引用推导的依赖边不可删除，作者创建的普通规则边可删除。引用清单
+只投影当前 canonical document，不持久化索引，也不向宿主发送组件、规则或表达式详情。
+
+运行时以文档变量 ID 读写、监听和刷新：
+
+```ts
+const region = viewer.getVariable('region');
+const stop = region?.onChange((value) => console.log(value));
+region?.set('华北');
+
+viewer.refreshVariables({ variableIds: ['region'], traceId: 'route-change-42' });
+designer.refreshVariables(); // 刷新当前文档的全部动态变量
+
+stop?.();
+```
+
+`variableIds` 填写文档变量 ID。动态解析和 `.set()` 都会通知监听器，触发 `data-updated` Blueprint
+事件并差量刷新依赖组件。`autoUpdate.intervalSeconds` 会随请求提供给宿主，实际调度仍由宿主调用
+`refreshVariables`，Base Screen 不内建轮询或订阅。
 
 ### 9.4 Resource type 和 capability
 

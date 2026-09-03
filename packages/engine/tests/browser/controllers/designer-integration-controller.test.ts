@@ -24,7 +24,7 @@ const document: ScreenDocument = {
       dataSource: null,
     },
   ],
-  variables: [{ type: 'static', name: 'count', value: 0 }],
+  variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 0 }],
   blueprint: { rules: [] },
 };
 

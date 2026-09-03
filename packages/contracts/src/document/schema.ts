@@ -144,11 +144,18 @@ export const hostResourceDataSourceSchema = z.strictObject({
       z.strictObject({ kind: z.literal('literal'), value: z.any() }),
       z.strictObject({
         kind: z.literal('variable'),
-        name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+        variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
       }),
     ]),
   ),
   binding: z.union([dataBindingSchema, z.null()]),
+});
+
+export const variableDataSourceSchema = z.strictObject({
+  type: z.literal('variable'),
+  variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+  binding: dataBindingSchema.optional(),
+  processorId: z.string().min(1).max(256).optional(),
 });
 
 export const componentSchema = z.strictObject({
@@ -164,28 +171,55 @@ export const componentSchema = z.strictObject({
   props: z.record(z.string(), z.any()),
   style: z.record(z.string(), z.any()),
   styleRules: z.array(styleRuleSchema).max(MAX_STYLE_RULES_PER_COMPONENT).optional(),
-  dataSource: z.union([staticDataSourceSchema, hostResourceDataSourceSchema, z.null()]),
+  dataSource: z.union([
+    staticDataSourceSchema,
+    hostResourceDataSourceSchema,
+    variableDataSourceSchema,
+    z.null(),
+  ]),
 });
 
 export const staticVariableSchema = z.strictObject({
   type: z.literal('static'),
+  id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
   description: variableDescriptionSchema.optional(),
-  value: z.any(),
+  initialValue: z.any(),
 });
 
-export const hostVariableSchema = z.strictObject({
-  type: z.literal('host'),
+const dynamicVariableFields = {
+  id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
   description: variableDescriptionSchema.optional(),
-  variableId: z.string().min(1).max(256),
+  initialValue: z.any(),
+  sourceId: z.string().min(1).max(256),
+  processorId: z.string().min(1).max(256).optional(),
+  controlled: z.boolean(),
+} as const;
+
+export const dataSourceVariableSchema = z.strictObject({
+  type: z.literal('data-source'),
+  ...dynamicVariableFields,
+  autoUpdate: z.strictObject({ intervalSeconds: z.number().int().min(1).max(86_400) }).optional(),
 });
 
-const blueprintTriggerSchema = z.strictObject({
-  type: z.literal('material-event'),
-  componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
-  eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+export const urlQueryVariableSchema = z.strictObject({
+  type: z.literal('url-query'),
+  ...dynamicVariableFields,
 });
+
+const blueprintTriggerSchema = z.union([
+  z.strictObject({
+    type: z.literal('material-event'),
+    componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+    eventName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+  }),
+  z.strictObject({
+    type: z.literal('variable-event'),
+    variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+    eventName: z.enum(['data-updated', 'request-state']),
+  }),
+]);
 
 const blueprintValueExpressionSchema: z.ZodTypeAny = z.lazy(() =>
   z.union([
@@ -196,7 +230,7 @@ const blueprintValueExpressionSchema: z.ZodTypeAny = z.lazy(() =>
     }),
     z.strictObject({
       kind: z.literal('variable'),
-      name: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+      variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
     }),
     z.strictObject({
       kind: z.literal('array'),
@@ -230,8 +264,18 @@ const blueprintConditionSchema = z
 
 const setVariableActionSchema = z.strictObject({
   type: z.literal('set-variable'),
-  variableName: z.string().regex(new RegExp(VARIABLE_NAME_PATTERN)),
+  variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   value: blueprintValueExpressionSchema,
+});
+
+const requestVariableActionSchema = z.strictObject({
+  type: z.literal('request-variable'),
+  variableId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
+});
+
+const requestComponentDataActionSchema = z.strictObject({
+  type: z.literal('request-component-data'),
+  componentId: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
 });
 
 const emitHostEventActionSchema = z.strictObject({
@@ -268,6 +312,8 @@ const blueprintRuleSchema = z.strictObject({
     .array(
       z.union([
         setVariableActionSchema,
+        requestVariableActionSchema,
+        requestComponentDataActionSchema,
         emitHostEventActionSchema,
         hostActionSchema,
         componentVisibilityActionSchema,
@@ -304,6 +350,8 @@ export const blueprintSchema = z.strictObject({
 export const documentSchema = z.strictObject({
   canvas: canvasSchema,
   components: z.array(componentSchema).max(MAX_COMPONENTS),
-  variables: z.array(z.union([staticVariableSchema, hostVariableSchema])).max(MAX_VARIABLES),
+  variables: z
+    .array(z.union([staticVariableSchema, dataSourceVariableSchema, urlQueryVariableSchema]))
+    .max(MAX_VARIABLES),
   blueprint: blueprintSchema,
 });

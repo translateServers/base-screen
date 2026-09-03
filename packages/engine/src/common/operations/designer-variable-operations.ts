@@ -9,14 +9,14 @@ import type { ScreenDocumentCommand } from '@base-screen/core';
 export type DesignerVariableReference =
   | {
       readonly kind: 'component-parameter';
-      readonly variableName: string;
+      readonly variableId: string;
       readonly componentId: string;
       readonly componentName: string;
       readonly parameterName: string;
     }
   | {
       readonly kind: 'blueprint-condition';
-      readonly variableName: string;
+      readonly variableId: string;
       readonly ruleId: string;
       readonly side: 'left' | 'right';
       readonly expressionPath: readonly (string | number)[];
@@ -24,36 +24,45 @@ export type DesignerVariableReference =
     }
   | {
       readonly kind: 'blueprint-action-target';
-      readonly variableName: string;
+      readonly variableId: string;
       readonly ruleId: string;
       readonly actionIndex: number;
       readonly blueprintTargetId: string;
     }
   | {
       readonly kind: 'blueprint-action-expression';
-      readonly variableName: string;
+      readonly variableId: string;
       readonly ruleId: string;
       readonly actionIndex: number;
       readonly field: 'value' | 'payload';
       readonly expressionPath: readonly (string | number)[];
+      readonly blueprintTargetId: string;
+    }
+  | {
+      readonly kind: 'blueprint-trigger';
+      readonly variableId: string;
+      readonly ruleId: string;
       readonly blueprintTargetId: string;
     };
 
 /**
  * 文档内对变量名的全部引用集合（ADR-0054 R4）：
  * - 组件 `host-resource` 数据源参数中 `kind: 'variable'` 的 `name`；
- * - Blueprint `set-variable` 动作的 `variableName`；
+ * - Blueprint 变量事件、表达式与动作中的稳定 `variableId`；
  * - Blueprint 条件与动作表达式中 `kind: 'variable'` 的 `name`（递归）。
  */
-export function referencedVariableNames(document: ScreenDocument): ReadonlySet<string> {
+export function referencedVariableIds(document: ScreenDocument): ReadonlySet<string> {
   return new Set(variableReferenceCounts(document).keys());
 }
+
+/** @deprecated The returned keys are stable ids. */
+export const referencedVariableNames = referencedVariableIds;
 
 /** Counts every canonical reference location for variable-panel disclosure. */
 export function variableReferenceCounts(document: ScreenDocument): ReadonlyMap<string, number> {
   const referenced = new Map<string, number>();
   for (const reference of collectVariableReferences(document)) {
-    referenced.set(reference.variableName, (referenced.get(reference.variableName) ?? 0) + 1);
+    referenced.set(reference.variableId, (referenced.get(reference.variableId) ?? 0) + 1);
   }
   return referenced;
 }
@@ -61,18 +70,27 @@ export function variableReferenceCounts(document: ScreenDocument): ReadonlyMap<s
 /** Enumerates every canonical reference with a stable authoring target. */
 export function collectVariableReferences(
   document: ScreenDocument,
-  variableName?: string,
+  variableId?: string,
 ): readonly DesignerVariableReference[] {
   const references: DesignerVariableReference[] = [];
-  const include = (name: string): boolean => variableName === undefined || name === variableName;
+  const include = (id: string): boolean => variableId === undefined || id === variableId;
   for (const component of document.components) {
     const source = component.dataSource;
-    if (source?.type !== 'host-resource') continue;
-    for (const [parameterName, parameter] of Object.entries(source.params)) {
-      if (parameter?.kind !== 'variable' || !include(parameter.name)) continue;
+    if (source?.type === 'variable' && include(source.variableId)) {
       references.push({
         kind: 'component-parameter',
-        variableName: parameter.name,
+        variableId: source.variableId,
+        componentId: component.id,
+        componentName: component.name,
+        parameterName: '$data',
+      });
+    }
+    if (source?.type !== 'host-resource') continue;
+    for (const [parameterName, parameter] of Object.entries(source.params)) {
+      if (parameter?.kind !== 'variable' || !include(parameter.variableId)) continue;
+      references.push({
+        kind: 'component-parameter',
+        variableId: parameter.variableId,
         componentId: component.id,
         componentName: component.name,
         parameterName,
@@ -80,12 +98,20 @@ export function collectVariableReferences(
     }
   }
   for (const rule of document.blueprint.rules) {
+    if (rule.trigger.type === 'variable-event' && include(rule.trigger.variableId)) {
+      references.push({
+        kind: 'blueprint-trigger',
+        variableId: rule.trigger.variableId,
+        ruleId: rule.id,
+        blueprintTargetId: `trigger:${rule.id}`,
+      });
+    }
     if (rule.condition !== undefined) {
       collectExpressionVariableReferences(rule.condition.left, [], (name, expressionPath) => {
         if (!include(name)) return;
         references.push({
           kind: 'blueprint-condition',
-          variableName: name,
+          variableId: name,
           ruleId: rule.id,
           side: 'left',
           expressionPath,
@@ -97,7 +123,7 @@ export function collectVariableReferences(
           if (!include(name)) return;
           references.push({
             kind: 'blueprint-condition',
-            variableName: name,
+            variableId: name,
             ruleId: rule.id,
             side: 'right',
             expressionPath,
@@ -109,10 +135,10 @@ export function collectVariableReferences(
     for (const [actionIndex, action] of rule.actions.entries()) {
       const blueprintTargetId = `action:${rule.id}:${actionIndex}`;
       if (action.type === 'set-variable') {
-        if (include(action.variableName)) {
+        if (include(action.variableId)) {
           references.push({
             kind: 'blueprint-action-target',
-            variableName: action.variableName,
+            variableId: action.variableId,
             ruleId: rule.id,
             actionIndex,
             blueprintTargetId,
@@ -122,7 +148,7 @@ export function collectVariableReferences(
           if (!include(name)) return;
           references.push({
             kind: 'blueprint-action-expression',
-            variableName: name,
+            variableId: name,
             ruleId: rule.id,
             actionIndex,
             field: 'value',
@@ -130,12 +156,22 @@ export function collectVariableReferences(
             blueprintTargetId,
           });
         });
-      } else if (action.type !== 'component-visibility') {
+      } else if (action.type === 'request-variable') {
+        if (include(action.variableId)) {
+          references.push({
+            kind: 'blueprint-action-target',
+            variableId: action.variableId,
+            ruleId: rule.id,
+            actionIndex,
+            blueprintTargetId,
+          });
+        }
+      } else if (action.type === 'emit-host-event' || action.type === 'host-action') {
         collectExpressionVariableReferences(action.payload, [], (name, expressionPath) => {
           if (!include(name)) return;
           references.push({
             kind: 'blueprint-action-expression',
-            variableName: name,
+            variableId: name,
             ruleId: rule.id,
             actionIndex,
             field: 'payload',
@@ -152,8 +188,8 @@ export function collectVariableReferences(
 /**
  * 变量名是否已被文档其他位置引用（删除/重命名前调用，ADR-0054 R4）。
  */
-export function isVariableReferenced(document: ScreenDocument, name: string): boolean {
-  return referencedVariableNames(document).has(name);
+export function isVariableReferenced(document: ScreenDocument, variableId: string): boolean {
+  return referencedVariableIds(document).has(variableId);
 }
 
 /**
@@ -195,11 +231,11 @@ export function buildReplaceVariablesCommand(
 function collectExpressionVariableReferences(
   expression: ScreenBlueprintValueExpression,
   path: readonly (string | number)[],
-  add: (name: string, path: readonly (string | number)[]) => void,
+  add: (variableId: string, path: readonly (string | number)[]) => void,
 ): void {
   switch (expression.kind) {
     case 'variable':
-      add(expression.name, path);
+      add(expression.variableId, path);
       return;
     case 'array':
       for (const [index, item] of expression.items.entries()) {

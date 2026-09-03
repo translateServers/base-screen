@@ -69,7 +69,7 @@ export const BASE_SCREEN_CHART_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   propsSchema: { kind: 'object', properties: {}, required: [] },
   propertyPanel: [],
   events: ['pointClick'],
-  dataCapabilities: ['static', 'host-resource'],
+  dataCapabilities: ['static', 'host-resource', 'variable'],
   dataBinding: {
     roles: [
       {

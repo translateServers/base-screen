@@ -20,10 +20,10 @@ export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT =
 
 export type BaseScreenDesignerWorkbenchMode = 'canvas' | 'blueprint';
 export type BaseScreenDesignerWorkbenchModeChangeReason = 'user' | 'api' | 'fallback';
-export type BaseScreenBlueprintCanvasNodeKind = 'component' | 'condition' | 'action';
+export type BaseScreenBlueprintCanvasNodeKind = 'component' | 'variable' | 'condition' | 'action';
 
 export interface BaseScreenDesignerWorkbenchFocus {
-  readonly kind: 'component' | 'rule' | 'action';
+  readonly kind: 'component' | 'variable' | 'rule' | 'action';
   readonly id: string;
 }
 
@@ -45,7 +45,13 @@ export interface BaseScreenBlueprintCanvasEventOption {
 }
 
 export interface BaseScreenBlueprintCanvasNodeSummary {
-  readonly kind: 'condition' | 'set-variable' | 'emit-host-event' | 'host-action';
+  readonly kind:
+    | 'condition'
+    | 'set-variable'
+    | 'request-variable'
+    | 'request-component-data'
+    | 'emit-host-event'
+    | 'host-action';
   readonly primary: string;
   readonly secondary?: string;
   readonly order?: number;
@@ -62,6 +68,11 @@ export interface BaseScreenBlueprintCanvasNode {
   readonly materialType?: string;
   readonly hidden?: boolean;
   readonly events?: readonly BaseScreenBlueprintCanvasEventOption[];
+  readonly variableId?: string;
+  readonly variableName?: string;
+  readonly variableType?: 'static' | 'data-source' | 'url-query';
+  readonly variableDescription?: string;
+  readonly variableInitialValue?: ScreenJsonValue;
   readonly ruleId?: string;
   readonly actionIndex?: number;
   readonly condition?: ScreenBlueprintCondition;
@@ -76,9 +87,11 @@ export interface BaseScreenBlueprintCanvasEdge {
   readonly target: string;
   readonly sourceHandle: string;
   readonly targetHandle: string;
-  readonly ruleId: string;
+  readonly ruleId?: string;
   readonly actionIndex?: number;
-  readonly kind: 'trigger' | 'action';
+  readonly kind: 'trigger' | 'action' | 'dependency';
+  readonly locked?: boolean;
+  readonly deletable?: boolean;
   readonly operation?: 'show' | 'hide' | 'toggle';
 }
 
@@ -100,8 +113,13 @@ export type BaseScreenBlueprintCanvasInsertNode =
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
     }
   | {
+      readonly kind: 'variable';
+      readonly variableId: string;
+      readonly position?: BaseScreenBlueprintCanvasNodePosition;
+    }
+  | {
       readonly kind: 'condition' | 'set-variable' | 'emit-host-event';
-      readonly variableName?: string;
+      readonly variableId?: string;
       readonly position?: BaseScreenBlueprintCanvasNodePosition;
     };
 

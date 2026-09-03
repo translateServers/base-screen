@@ -12,9 +12,13 @@ export type {
   ScreenBlueprintEmitHostEventActionTrace,
   ScreenBlueprintEvent,
   ScreenBlueprintHostActionTrace,
+  ScreenBlueprintMaterialEvent,
   ScreenBlueprintPlan,
+  ScreenBlueprintRequestComponentDataActionTrace,
+  ScreenBlueprintRequestVariableActionTrace,
   ScreenBlueprintRuleTrace,
   ScreenBlueprintSetVariableActionTrace,
   ScreenBlueprintTraceResult,
+  ScreenBlueprintVariableEvent,
   ScreenBlueprintVisibilityEffect,
 } from './runtime-types.js';

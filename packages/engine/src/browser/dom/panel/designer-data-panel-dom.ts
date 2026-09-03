@@ -82,6 +82,27 @@ export function renderDesignerDataPanel(
       source?.type === 'host-resource' ? JSON.stringify(source.params) : '{}',
     );
   }
+  if (capabilities.includes('variable')) {
+    const variableLabel = panel.ownerDocument.createElement('label');
+    variableLabel.className = 'designer-field designer-field-label';
+    variableLabel.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
+    const variableSelect = panel.ownerDocument.createElement('select');
+    variableSelect.className = 'designer-control designer-select';
+    variableSelect.dataset.dataSourceField = 'variableId';
+    const empty = panel.ownerDocument.createElement('option');
+    empty.value = '';
+    empty.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
+    variableSelect.appendChild(empty);
+    for (const variable of document?.variables ?? []) {
+      const option = panel.ownerDocument.createElement('option');
+      option.value = variable.id;
+      option.textContent = variable.name;
+      option.selected = source?.type === 'variable' && source.variableId === variable.id;
+      variableSelect.appendChild(option);
+    }
+    variableLabel.appendChild(variableSelect);
+    panel.appendChild(variableLabel);
+  }
   const manifest = component === undefined ? undefined : catalog?.get(component.type)?.manifest;
   renderDesignerDescriptorZone(panel, manifest?.editorDescriptor?.data, {
     document,

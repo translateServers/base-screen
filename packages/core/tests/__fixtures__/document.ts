@@ -37,8 +37,9 @@ export function makeVariable(
 ): ScreenStaticVariable {
   return {
     type: 'static',
+    id: overrides.id ?? overrides.name ?? 'var1',
     name: overrides.name ?? 'var1',
-    value: overrides.value ?? null,
+    initialValue: overrides.initialValue ?? null,
     ...overrides,
   };
 }

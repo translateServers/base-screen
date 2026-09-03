@@ -77,6 +77,12 @@ export function createDataSourceTransaction(
       }),
     );
   }
+  if (
+    source?.type === 'variable' &&
+    !document?.variables.some((variable) => variable.id === source.variableId)
+  ) {
+    return dataSourceFailure('CORE_COMMAND_INVALID');
+  }
   return success(update(component.id, { dataSource: source }));
 }
 

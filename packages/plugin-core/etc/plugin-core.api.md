@@ -289,7 +289,7 @@ export interface BaseScreenMaterialManifest {
         readonly roles: readonly BaseScreenMaterialDataBindingRole[];
     };
     // (undocumented)
-    readonly dataCapabilities: readonly ('static' | 'host-resource')[];
+    readonly dataCapabilities: readonly ('static' | 'host-resource' | 'variable')[];
     // (undocumented)
     readonly defaultData?: ScreenJsonValue;
     // (undocumented)

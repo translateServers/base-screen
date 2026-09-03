@@ -117,8 +117,8 @@ describe('DesignerCanvasRuntimeController', () => {
 
     const result = controller.render(
       documentWith([
-        { type: 'static', name: 'region', value: 'north' },
-        { type: 'static', name: 'count', value: 2 },
+        { type: 'static', id: 'region', name: 'region', initialValue: 'north' },
+        { type: 'static', id: 'count', name: 'count', initialValue: 2 },
       ]),
     );
 
@@ -128,17 +128,24 @@ describe('DesignerCanvasRuntimeController', () => {
   });
 
   it('suspends resources until host variables resolve, then renders with the full snapshot', async () => {
-    const resolve = vi.fn(async ({ variableId }: { variableId: string }) => ({
+    const resolve = vi.fn(async ({ sourceId }: { sourceId: string }) => ({
       ok: true as const,
-      value: variableId === 'tenant-region' ? 'north' : null,
+      value: sourceId === 'tenant-region' ? 'north' : null,
       diagnostics: [],
     }));
     const { controller, renderer, diagnostics } = createHarness({ resolve });
 
     const result = controller.render(
       documentWith([
-        { type: 'static', name: 'count', value: 2 },
-        { type: 'host', name: 'region', variableId: 'tenant-region' },
+        { type: 'static', id: 'count', name: 'count', initialValue: 2 },
+        {
+          type: 'data-source',
+          id: 'region',
+          name: 'region',
+          initialValue: null,
+          sourceId: 'tenant-region',
+          controlled: true,
+        },
       ]),
     );
     expect(result.ok).toBe(true);
@@ -148,7 +155,11 @@ describe('DesignerCanvasRuntimeController', () => {
       expect(renderer.calls).toEqual(['suspend', 'render', 'variables', 'render']),
     );
     expect(resolve).toHaveBeenCalledWith({
-      variableId: 'tenant-region',
+      variableId: 'region',
+      sourceId: 'tenant-region',
+      sourceType: 'data-source',
+      initialValue: null,
+      controlled: true,
       purpose: 'runtime',
       signal: expect.any(AbortSignal),
     });
@@ -160,7 +171,16 @@ describe('DesignerCanvasRuntimeController', () => {
     const { controller, renderer, diagnostics } = createHarness();
 
     controller.render(
-      documentWith([{ type: 'host', name: 'region', variableId: 'tenant-region' }]),
+      documentWith([
+        {
+          type: 'data-source',
+          id: 'region',
+          name: 'region',
+          initialValue: null,
+          sourceId: 'tenant-region',
+          controlled: true,
+        },
+      ]),
     );
     await vi.waitFor(() => expect(diagnostics).toHaveLength(1));
 
@@ -177,10 +197,22 @@ describe('DesignerCanvasRuntimeController', () => {
     const { controller, renderer } = createHarness({ resolve: () => pending.promise });
 
     controller.render(
-      documentWith([{ type: 'host', name: 'region', variableId: 'tenant-region' }]),
+      documentWith([
+        {
+          type: 'data-source',
+          id: 'region',
+          name: 'region',
+          initialValue: null,
+          sourceId: 'tenant-region',
+          controlled: true,
+        },
+      ]),
     );
     controller.render(
-      documentWith([{ type: 'static', name: 'region', value: 'south' }], '#111111'),
+      documentWith(
+        [{ type: 'static', id: 'region', name: 'region', initialValue: 'south' }],
+        '#111111',
+      ),
     );
     pending.resolve({ ok: true, value: 'north', diagnostics: [] });
     await Promise.resolve();
@@ -195,7 +227,16 @@ describe('DesignerCanvasRuntimeController', () => {
     const { controller, renderer } = createHarness({
       resolve: async () => ({ ok: true, value: region, diagnostics: [] }),
     });
-    const document = documentWith([{ type: 'host', name: 'region', variableId: 'tenant-region' }]);
+    const document = documentWith([
+      {
+        type: 'data-source',
+        id: 'region',
+        name: 'region',
+        initialValue: null,
+        sourceId: 'tenant-region',
+        controlled: true,
+      },
+    ]);
     controller.render(document);
     await vi.waitFor(() => expect(renderer.variables).toHaveLength(1));
 
@@ -213,7 +254,7 @@ describe('DesignerCanvasRuntimeController', () => {
     ]);
   });
 
-  it('deduplicates host ids, synchronizes aliases, and skips unchanged refresh renders', async () => {
+  it('refreshes stable variable ids independently and skips unchanged renders', async () => {
     let value = 'north';
     const requests: Array<{ readonly variableId: string; readonly purpose: string }> = [];
     const { controller, renderer } = createHarness({
@@ -224,27 +265,41 @@ describe('DesignerCanvasRuntimeController', () => {
     });
     controller.render(
       documentWith([
-        { type: 'host', name: 'region', variableId: 'shared-region' },
-        { type: 'host', name: 'regionAlias', variableId: 'shared-region' },
+        {
+          type: 'data-source',
+          id: 'region',
+          name: 'region',
+          initialValue: null,
+          sourceId: 'shared-region',
+          controlled: true,
+        },
+        {
+          type: 'data-source',
+          id: 'regionAlias',
+          name: 'regionAlias',
+          initialValue: null,
+          sourceId: 'shared-region',
+          controlled: true,
+        },
       ]),
     );
     await vi.waitFor(() => expect(renderer.variables).toHaveLength(1));
 
-    expect(requests).toHaveLength(1);
-    expect(requests[0]).toMatchObject({ variableId: 'shared-region', purpose: 'runtime' });
+    expect(requests).toHaveLength(2);
+    expect(requests.map((request) => request.variableId)).toEqual(['region', 'regionAlias']);
     expect(renderer.variables[0]).toEqual({ region: 'north', regionAlias: 'north' });
 
     value = 'south';
     controller.refreshVariables({
-      variableIds: ['shared-region', 'shared-region'],
+      variableIds: ['region', 'region'],
       traceId: 't-1',
     });
     await vi.waitFor(() => expect(renderer.variables).toHaveLength(2));
-    expect(renderer.variables[1]).toEqual({ region: 'south', regionAlias: 'south' });
+    expect(renderer.variables[1]).toEqual({ region: 'south', regionAlias: 'north' });
     expect(renderer.contexts.at(-1)).toEqual({ trigger: 'variable', traceId: 't-1' });
 
-    controller.refreshVariables({ variableIds: ['shared-region'] });
-    await vi.waitFor(() => expect(requests).toHaveLength(3));
+    controller.refreshVariables({ variableIds: ['region'] });
+    await vi.waitFor(() => expect(requests).toHaveLength(4));
     await Promise.resolve();
     expect(renderer.variables).toHaveLength(2);
     expect(renderer.contexts).toHaveLength(3);
@@ -253,8 +308,8 @@ describe('DesignerCanvasRuntimeController', () => {
   it('keeps the last successful snapshot when any variable in a refresh batch fails', async () => {
     let refresh = false;
     const { controller, renderer, diagnostics } = createHarness({
-      resolve: async ({ variableId }) =>
-        refresh && variableId === 'page-id'
+      resolve: async ({ sourceId }) =>
+        refresh && sourceId === 'page-id'
           ? {
               ok: false,
               diagnostics: [
@@ -268,14 +323,28 @@ describe('DesignerCanvasRuntimeController', () => {
             }
           : {
               ok: true,
-              value: variableId === 'region-id' ? (refresh ? 'south' : 'north') : 1,
+              value: sourceId === 'region-id' ? (refresh ? 'south' : 'north') : 1,
               diagnostics: [],
             },
     });
     controller.render(
       documentWith([
-        { type: 'host', name: 'region', variableId: 'region-id' },
-        { type: 'host', name: 'page', variableId: 'page-id' },
+        {
+          type: 'data-source',
+          id: 'region',
+          name: 'region',
+          initialValue: null,
+          sourceId: 'region-id',
+          controlled: true,
+        },
+        {
+          type: 'data-source',
+          id: 'page',
+          name: 'page',
+          initialValue: null,
+          sourceId: 'page-id',
+          controlled: true,
+        },
       ]),
     );
     await vi.waitFor(() => expect(renderer.variables).toHaveLength(1));
@@ -303,7 +372,7 @@ describe('DesignerCanvasRuntimeController', () => {
       },
     });
     const document: ScreenDocument = {
-      ...documentWith([{ type: 'static', name: 'status', value: 'idle' }]),
+      ...documentWith([{ type: 'static', id: 'status', name: 'status', initialValue: 'idle' }]),
       blueprint: {
         rules: [
           {
@@ -312,7 +381,7 @@ describe('DesignerCanvasRuntimeController', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'status',
+                variableId: 'status',
                 value: { kind: 'literal', value: 'done' },
               },
               {
@@ -349,6 +418,48 @@ describe('DesignerCanvasRuntimeController', () => {
     expect(renderer.visibilityEffects).toEqual([[{ componentId: 'chart', operation: 'toggle' }]]);
     expect(hostEvents).toEqual([{ name: 'designer_blueprint_ran', payload: 'clicked' }]);
     expect(hostActions).toEqual([{ name: 'open_detail', payload: { id: 42 } }]);
+    expect(diagnostics).toEqual([]);
+  });
+
+  it('exposes stable variable handles and dispatches data-updated rules', () => {
+    const { controller, diagnostics } = createHarness();
+    const document: ScreenDocument = {
+      ...documentWith([
+        { type: 'static', id: 'status-id', name: 'status', initialValue: 'idle' },
+        { type: 'static', id: 'mirror-id', name: 'mirror', initialValue: 'idle' },
+      ]),
+      blueprint: {
+        rules: [
+          {
+            id: 'mirror-status',
+            trigger: {
+              type: 'variable-event',
+              variableId: 'status-id',
+              eventName: 'data-updated',
+            },
+            actions: [
+              {
+                type: 'set-variable',
+                variableId: 'mirror-id',
+                value: { kind: 'variable', variableId: 'status-id' },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    expect(controller.render(document).ok).toBe(true);
+    const changes: unknown[] = [];
+    const handle = controller.getVariable('status-id');
+    const stop = handle?.onChange((value) => changes.push(value));
+
+    expect(handle?.value).toBe('idle');
+    expect(handle?.set('ready').ok).toBe(true);
+    expect(handle?.value).toBe('ready');
+    expect(controller.getVariable('mirror-id')?.value).toBe('ready');
+    expect(changes).toEqual(['ready']);
+    expect(controller.getVariable('missing')).toBeUndefined();
+    stop?.();
     expect(diagnostics).toEqual([]);
   });
 

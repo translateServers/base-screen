@@ -139,7 +139,7 @@ export interface ScreenAlignmentDelta {
 export type ScreenAxis = 'x' | 'y';
 
 // @public (undocumented)
-export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace;
+export type ScreenBlueprintActionTrace = ScreenBlueprintSetVariableActionTrace | ScreenBlueprintRequestVariableActionTrace | ScreenBlueprintRequestComponentDataActionTrace | ScreenBlueprintEmitHostEventActionTrace | ScreenBlueprintHostActionTrace | ScreenBlueprintComponentVisibilityActionTrace;
 
 // @public (undocumented)
 interface ScreenBlueprintCapabilityIndex {
@@ -169,9 +169,13 @@ export type ScreenBlueprintConditionTraceState = 'not-evaluated' | 'none' | 'pas
 // @public (undocumented)
 export interface ScreenBlueprintDispatchResult {
     // (undocumented)
+    readonly componentDataRequests: readonly string[];
+    // (undocumented)
     readonly hostActions: readonly ScreenBlueprintHostEvent[];
     // (undocumented)
     readonly hostEvents: readonly ScreenBlueprintHostEvent[];
+    // (undocumented)
+    readonly variableRequests: readonly string[];
     // (undocumented)
     readonly variables: ScreenJsonObject;
     // (undocumented)
@@ -193,14 +197,7 @@ export interface ScreenBlueprintEmitHostEventActionTrace {
 }
 
 // @public (undocumented)
-export interface ScreenBlueprintEvent {
-    // (undocumented)
-    readonly componentId: string;
-    // (undocumented)
-    readonly name: string;
-    // (undocumented)
-    readonly payload: ScreenJsonValue;
-}
+export type ScreenBlueprintEvent = ScreenBlueprintMaterialEvent | ScreenBlueprintVariableEvent;
 
 // @public (undocumented)
 export interface ScreenBlueprintHostActionTrace {
@@ -217,11 +214,51 @@ export interface ScreenBlueprintHostActionTrace {
 }
 
 // @public (undocumented)
+interface ScreenBlueprintMaterialEvent {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type?: 'material-event';
+}
+
+// @public (undocumented)
 export interface ScreenBlueprintPlan {
     // (undocumented)
     readonly initialVariables: ScreenJsonObject;
     // (undocumented)
     readonly rules: ScreenDocument['blueprint']['rules'];
+}
+
+// @public (undocumented)
+interface ScreenBlueprintRequestComponentDataActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'request-component-data';
+}
+
+// @public (undocumented)
+interface ScreenBlueprintRequestVariableActionTrace {
+    // (undocumented)
+    readonly actionIndex: number;
+    // (undocumented)
+    readonly detached: ScreenJsonObject;
+    // (undocumented)
+    readonly output: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'request-variable';
+    // (undocumented)
+    readonly variableId: string;
 }
 
 // @public (undocumented)
@@ -247,13 +284,25 @@ export interface ScreenBlueprintSetVariableActionTrace {
     // (undocumented)
     readonly type: 'set-variable';
     // (undocumented)
-    readonly variableName: string;
+    readonly variableId: string;
 }
 
 // @public (undocumented)
 export interface ScreenBlueprintTraceResult extends ScreenBlueprintDispatchResult {
     // (undocumented)
     readonly ruleTraces: readonly ScreenBlueprintRuleTrace[];
+}
+
+// @public (undocumented)
+interface ScreenBlueprintVariableEvent {
+    // (undocumented)
+    readonly name: 'data-updated' | 'request-state';
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+    // (undocumented)
+    readonly type: 'variable-event';
+    // (undocumented)
+    readonly variableId: string;
 }
 
 // @public (undocumented)
@@ -380,7 +429,7 @@ export type ScreenDocumentCommand = {
     readonly variables: readonly ScreenVariable[];
 } | {
     readonly type: 'rename-variable';
-    readonly variableName: string;
+    readonly variableId: string;
     readonly nextName: string;
 };
 

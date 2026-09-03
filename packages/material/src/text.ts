@@ -60,7 +60,7 @@ export const BASE_SCREEN_TEXT_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   propsSchema: { kind: 'object', properties: { autoWidth: { kind: 'boolean' } }, required: [] },
   propertyPanel: [{ prop: 'autoWidth', label: '自适应宽度', control: 'boolean' }],
   events: ['valueClick'],
-  dataCapabilities: ['static', 'host-resource'],
+  dataCapabilities: ['static', 'host-resource', 'variable'],
   dataBinding: {
     roles: [
       {

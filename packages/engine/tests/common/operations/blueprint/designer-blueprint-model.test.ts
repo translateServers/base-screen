@@ -29,7 +29,7 @@ const document: ScreenDocument = {
     style: {},
     dataSource: null,
   })),
-  variables: [{ type: 'static', name: 'selected', value: null }],
+  variables: [{ type: 'static', id: 'selected', name: 'selected', initialValue: null }],
   blueprint: { rules: [] },
 };
 
@@ -86,7 +86,7 @@ describe('shared Blueprint model', () => {
         ...withRule,
         variables: [
           ...withRule.variables,
-          { type: 'static' as const, name: 'alternate', value: 1 },
+          { type: 'static' as const, id: 'alternate', name: 'alternate', initialValue: 1 },
         ],
       },
       'set-variable',
@@ -95,7 +95,7 @@ describe('shared Blueprint model', () => {
     );
     expect(withNamedVariable?.rules[0]?.actions.at(-1)).toMatchObject({
       type: 'set-variable',
-      variableName: 'alternate',
+      variableId: 'alternate',
     });
     const projection = buildDesignerBlueprintGraph(
       { ...document, blueprint: withCondition! },

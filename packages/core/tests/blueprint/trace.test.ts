@@ -10,7 +10,7 @@ import { makeComponent, makeDocument, makeVariable } from '../__fixtures__/docum
 function planDocument() {
   return makeDocument({
     components: [makeComponent({ id: 'button' })],
-    variables: [makeVariable({ name: 'count', value: 0 })],
+    variables: [makeVariable({ name: 'count', initialValue: 0 })],
     blueprint: {
       rules: [
         {
@@ -35,7 +35,7 @@ function planDocument() {
           actions: [
             {
               type: 'set-variable',
-              variableName: 'count',
+              variableId: 'count',
               value: { kind: 'literal', value: 1 },
             },
           ],
@@ -46,7 +46,7 @@ function planDocument() {
           actions: [
             {
               type: 'set-variable',
-              variableName: 'count',
+              variableId: 'count',
               value: { kind: 'event-payload', path: ['value'] },
             },
             {
@@ -100,7 +100,7 @@ describe('EB-R7-C01 Core trace equivalence', () => {
     expect(react?.actions[0]).toMatchObject({
       type: 'set-variable',
       actionIndex: 0,
-      variableName: 'count',
+      variableId: 'count',
       output: 7,
     });
     expect(react?.actions[1]).toMatchObject({
@@ -170,8 +170,8 @@ describe('EB-R7-C01 Core trace equivalence', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'count',
-                value: { kind: 'variable', name: 'missing' },
+                variableId: 'count',
+                value: { kind: 'variable', variableId: 'missing' },
               },
             ],
           },

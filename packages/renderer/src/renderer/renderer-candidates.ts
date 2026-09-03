@@ -183,16 +183,12 @@ function getDataState(
       resource: undefined,
     };
   }
-  if (
-    !entry.manifest.dataCapabilities.includes(
-      component.dataSource.type === 'static' ? 'static' : 'host-resource',
-    )
-  ) {
+  if (!entry.manifest.dataCapabilities.includes(component.dataSource.type)) {
     diagnostics.push(
       diagnostic(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
         ['components', index, 'dataSource'],
-        'Material does not accept static data.',
+        'Material does not accept the configured data source.',
       ),
     );
     return undefined;
@@ -259,6 +255,30 @@ function getDataState(
         key: getHostResourceKey(component, evaluated.value.params),
         projectionKey: getProjectionKey(component.dataSource),
       },
+    };
+  }
+  if (component.dataSource.type === 'variable') {
+    const value = variables[component.dataSource.variableId];
+    if (value === undefined) {
+      return {
+        dataState: {
+          status: 'error',
+          code: 'HOST_DATASET_INVALID',
+          message: 'Variable data is unavailable.',
+        },
+        resource: undefined,
+      };
+    }
+    const parsed = parseScreenJsonValue(value, { maxBytes: 1024 * 1024 });
+    if (!parsed.ok) {
+      diagnostics.push(
+        ...prefixDiagnostics(parsed.diagnostics, ['components', index, 'dataSource', 'variableId']),
+      );
+      return undefined;
+    }
+    return {
+      dataState: adaptStaticData(entry, parsed.value, component.dataSource.binding),
+      resource: undefined,
     };
   }
   const parsed = parseScreenJsonValue(component.dataSource.value, { maxBytes: 1024 * 1024 });

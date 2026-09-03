@@ -2,14 +2,14 @@
 
 > 状态：维护期（无生效中 Spec）
 > 阶段封版：2026-08-12
-> 最近更新：2026-09-01
-> 最近归档：2026-09-01（DataV-Inspired Global Variables）
+> 最近更新：2026-09-03
+> 最近归档：2026-09-03（DataV Global Variables）
 
 ## 当前状态
 
 - **当前无生效中 Spec。** 已交付能力以[当前能力基线](../baseline/README.md)为准。
-- **共 60 个 Spec 已归档。** 2026-08-12 阶段封版归档 32 个历史 Spec，2026-08-30 归档 26 个增量，
-  随后归档 Host Resource Authoring 与 DataV-Inspired Global Variables；详见 [archive/](./archive/README.md)。
+- **共 61 个 Spec 已归档。** 2026-08-12 阶段封版归档 32 个历史 Spec，后续增量均已完成并归档；
+  详见 [archive/](./archive/README.md)。
 - **新功能必须重新建立 ADR/Spec。** 启动实现前先接受 ADR、建立生效中的增量 Spec，并在本页“生效中”
   区域登记；不得重新打开归档任务授权新实现。
 
@@ -27,8 +27,11 @@
 
 ## 最近归档批次
 
+2026-09-03：[DataV Global Variables](./archive/datav-global-variables/spec.md) 完成 DataV 三类来源、
+完整配置字段、稳定 ID 引用、Blueprint 变量节点、运行时变量句柄与一次性迁移。
+
 2026-09-01：[DataV-Inspired Global Variables](./archive/datav-inspired-global-variables/spec.md)
-完成变量描述、严格宿主目录、作者预览、原子重命名、差量刷新和 Blueprint 赋值来源。
+已由 ADR-0068 和 DataV Global Variables Spec 取代。
 
 2026-08-31：[Host Resource Authoring](./archive/host-resource-authoring/spec.md) 完成严格资源 intent、
 插入/替换、原生拖放和旧素材端口移除；完整门禁及宿主浏览器闭环通过。

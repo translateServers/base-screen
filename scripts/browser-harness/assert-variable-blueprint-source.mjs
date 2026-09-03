@@ -13,7 +13,7 @@ export async function assertVariableBlueprintSource(designer, page) {
     const rule = rules[ruleIndex];
     rule.actions.push({
       type: 'set-variable',
-      variableName: 'region',
+      variableId: 'region',
       value: { kind: 'literal', value: 'north' },
     });
     const actionIndex = rule.actions.length - 1;
@@ -115,8 +115,8 @@ export async function assertVariableBlueprintSource(designer, page) {
   const canonicalValue = await page.evaluate(
     () =>
       window.baseScreenHarness.designer.document.variables.find(
-        (variable) => variable.name === 'region',
-      )?.value,
+        (variable) => variable.id === 'region',
+      )?.initialValue,
   );
   if (canonicalValue !== 'north') {
     throw new Error('BROWSER_HARNESS_VARIABLE_BLUEPRINT_PERSISTED_RUNTIME_VALUE');

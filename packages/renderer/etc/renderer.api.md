@@ -21,6 +21,7 @@ import { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenResourceExecutionMode } from '@base-screen/contracts';
 import { ScreenResourceExecutionTrigger } from '@base-screen/contracts';
 import { ScreenResourceObserver } from '@base-screen/contracts';
+import type { ScreenVariableHandle } from '@base-screen/contracts';
 import type { ScreenVariableRefreshOptions } from '@base-screen/contracts';
 
 // @public (undocumented)
@@ -108,6 +109,8 @@ export class BaseScreenViewerElement extends ElementBase {
     // (undocumented)
     get document(): ScreenDocument | undefined;
     set document(value: ScreenDocument | undefined);
+    // (undocumented)
+    getVariable(id: string): ScreenVariableHandle | undefined;
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)

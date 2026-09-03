@@ -28,13 +28,13 @@ export function designerBlueprintEventFieldPaths(
   catalog: BaseScreenMaterialCatalog | undefined,
 ): readonly (readonly string[])[] {
   const rule = document.blueprint.rules.find((candidate) => candidate.id === ruleId);
-  const component = document.components.find(
-    (candidate) => candidate.id === rule?.trigger.componentId,
-  );
+  if (rule?.trigger.type !== 'material-event') return [];
+  const trigger = rule.trigger;
+  const component = document.components.find((candidate) => candidate.id === trigger.componentId);
   const schema = catalog
     ?.get(component?.type ?? '')
     ?.manifest.editorDescriptor?.events?.find(
-      (event) => event.name === rule?.trigger.eventName,
+      (event) => event.name === trigger.eventName,
     )?.payloadSchema;
   return schema === undefined ? [] : collectObjectPaths(schema);
 }

@@ -92,7 +92,13 @@ export function validateBlueprint(
     }
     for (let actionIndex = 0; actionIndex < rule.actions.length; actionIndex++) {
       const action = rule.actions[actionIndex] as Record<string, unknown>;
-      if (action.type === 'component-visibility') continue;
+      if (
+        action.type === 'component-visibility' ||
+        action.type === 'request-variable' ||
+        action.type === 'request-component-data'
+      ) {
+        continue;
+      }
       const field = action.type === 'set-variable' ? 'value' : 'payload';
       validateBlueprintExpression(
         action[field] as ScreenBlueprintValueExpression,

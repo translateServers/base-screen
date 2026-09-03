@@ -1,6 +1,5 @@
 import {
   parseScreenJsonValue,
-  type ScreenBlueprintComponentVisibilityAction,
   type ScreenBlueprintHostEvent,
   type ScreenDocument,
   type ScreenJsonObject,
@@ -52,6 +51,8 @@ function evaluateScreenBlueprintEvent(
   const hostEvents: ScreenBlueprintHostEvent[] = [];
   const hostActions: ScreenBlueprintHostEvent[] = [];
   const visibilityEffects: ScreenBlueprintVisibilityEffect[] = [];
+  const variableRequests: string[] = [];
+  const componentDataRequests: string[] = [];
   const ruleTraces: ScreenBlueprintRuleTrace[] = [];
   for (const [ruleIndex, rule] of plan.rules.entries()) {
     const actions: ScreenBlueprintActionTrace[] = [];
@@ -61,7 +62,7 @@ function evaluateScreenBlueprintEvent(
       condition: 'not-evaluated',
       actions,
     };
-    if (rule.trigger.componentId !== event.componentId || rule.trigger.eventName !== event.name) {
+    if (!triggerMatches(rule.trigger, event)) {
       if (withTrace) ruleTraces.push(ruleTrace);
       continue;
     }
@@ -83,6 +84,8 @@ function evaluateScreenBlueprintEvent(
     const nextEvents = [...hostEvents];
     const nextActions = [...hostActions];
     const nextVisibilityEffects = [...visibilityEffects];
+    const nextVariableRequests = [...variableRequests];
+    const nextComponentDataRequests = [...componentDataRequests];
     for (const [actionIndex, action] of rule.actions.entries()) {
       if (action.type === 'component-visibility') {
         nextVisibilityEffects.push({
@@ -107,12 +110,44 @@ function evaluateScreenBlueprintEvent(
         }
         continue;
       }
+      if (action.type === 'request-variable') {
+        nextVariableRequests.push(action.variableId);
+        if (withTrace) {
+          const output = { variableId: action.variableId };
+          actions.push({
+            type: 'request-variable',
+            actionIndex,
+            variableId: action.variableId,
+            output,
+            detached: { type: 'request-variable', actionIndex, variableId: action.variableId },
+          });
+        }
+        continue;
+      }
+      if (action.type === 'request-component-data') {
+        nextComponentDataRequests.push(action.componentId);
+        if (withTrace) {
+          const output = { componentId: action.componentId };
+          actions.push({
+            type: 'request-component-data',
+            actionIndex,
+            componentId: action.componentId,
+            output,
+            detached: {
+              type: 'request-component-data',
+              actionIndex,
+              componentId: action.componentId,
+            },
+          });
+        }
+        continue;
+      }
       const expression = action.type === 'set-variable' ? action.value : action.payload;
       const value = evaluateExpression(expression, parsedPayload.value, nextVariables);
       if (!value.ok) {
         return indexedFailure(value, [ruleIndex, actionIndex]);
       }
-      if (action.type === 'set-variable') nextVariables[action.variableName] = value.value;
+      if (action.type === 'set-variable') nextVariables[action.variableId] = value.value;
       else if (action.type === 'emit-host-event')
         nextEvents.push({ name: action.eventName, payload: value.value });
       else nextActions.push({ name: action.actionId, payload: value.value });
@@ -125,26 +160,43 @@ function evaluateScreenBlueprintEvent(
     hostEvents.push(...nextEvents.slice(hostEvents.length));
     hostActions.push(...nextActions.slice(hostActions.length));
     visibilityEffects.push(...nextVisibilityEffects.slice(visibilityEffects.length));
+    variableRequests.push(...nextVariableRequests.slice(variableRequests.length));
+    componentDataRequests.push(...nextComponentDataRequests.slice(componentDataRequests.length));
     if (withTrace) ruleTraces.push(ruleTrace);
   }
   if (!withTrace) {
     return {
       ok: true,
-      value: { variables, hostEvents, hostActions, visibilityEffects },
+      value: {
+        variables,
+        hostEvents,
+        hostActions,
+        visibilityEffects,
+        variableRequests,
+        componentDataRequests,
+      },
       diagnostics: [],
     };
   }
   return {
     ok: true,
-    value: { variables, hostEvents, hostActions, visibilityEffects, ruleTraces },
+    value: {
+      variables,
+      hostEvents,
+      hostActions,
+      visibilityEffects,
+      variableRequests,
+      componentDataRequests,
+      ruleTraces,
+    },
     diagnostics: [],
   };
 }
 
 function createActionTrace(
-  action: Exclude<
+  action: Extract<
     ScreenDocument['blueprint']['rules'][number]['actions'][number],
-    ScreenBlueprintComponentVisibilityAction
+    { readonly type: 'set-variable' | 'emit-host-event' | 'host-action' }
   >,
   actionIndex: number,
   output: ScreenJsonValue,
@@ -153,9 +205,9 @@ function createActionTrace(
     return {
       type: 'set-variable',
       actionIndex,
-      variableName: action.variableName,
+      variableId: action.variableId,
       output,
-      detached: { type: 'set-variable', actionIndex, variableName: action.variableName, output },
+      detached: { type: 'set-variable', actionIndex, variableId: action.variableId, output },
     };
   }
   if (action.type === 'emit-host-event') {
@@ -174,6 +226,19 @@ function createActionTrace(
     output,
     detached: { type: 'host-action', actionIndex, actionId: action.actionId, output },
   };
+}
+
+function triggerMatches(
+  trigger: ScreenDocument['blueprint']['rules'][number]['trigger'],
+  event: ScreenBlueprintEvent,
+): boolean {
+  const eventType = event.type ?? 'material-event';
+  if (trigger.type !== eventType || trigger.eventName !== event.name) return false;
+  return trigger.type === 'material-event' && 'componentId' in event
+    ? trigger.componentId === event.componentId
+    : trigger.type === 'variable-event' && event.type === 'variable-event'
+      ? trigger.variableId === event.variableId
+      : false;
 }
 
 interface MutableRuleTrace {

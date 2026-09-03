@@ -85,6 +85,8 @@ function createDatasetPanelOptions(
     ...(source?.type === 'host-resource'
       ? { hostResource: { resourceType: source.resourceType, resourceId: source.resourceId } }
       : {}),
+    variableSourceId:
+      source?.type === 'variable' ? source.variableId : context.state.variableSourceId,
     staticDraft: context.state.staticDraft,
     staticDescriptor: context.currentEntry()?.manifest.staticData,
     staticValue: context.state.staticValue,
@@ -99,7 +101,10 @@ function createDatasetPanelOptions(
     descriptor: context.state.descriptor,
     draft: context.state.draft,
     roles: context.currentEntry()?.manifest.dataBinding?.roles ?? [],
-    variableNames: (context.callbacks.getDocument()?.variables ?? []).map((item) => item.name),
+    variables: (context.callbacks.getDocument()?.variables ?? []).map(({ id, name }) => ({
+      id,
+      name,
+    })),
     catalogAvailable: context.callbacks.getCatalogPort() !== undefined,
     resourceAvailable: context.callbacks.getResourcePort() !== undefined,
     feedback: context.state.feedbackText,

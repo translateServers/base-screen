@@ -168,9 +168,9 @@ pnpm verify:m0
 `packages/*/etc/*.api.md`，同时为受影响包补充 Changeset。`pnpm check:api` 只校验基线，
 不会自动接受 API 漂移。
 
-`pnpm lint` 还会运行 `pnpm check:file-size`：新文件必须遵守仓库的分层行数上限，已有超限文件
-按 `scripts/file-size-baseline.json` 中的逐文件精确上限冻结。拆分或缩减已有文件后运行
-`pnpm file-size:baseline` 下调基线；该命令不会接受新增超限文件或已有文件继续增长。
+仓库不以文件行数作为 CI 门禁。模块按完整功能行为组织：只有职责可以独立命名、测试、复用或演进时
+才拆分，不能为了缩短文件制造转发层或打散同一状态机。`pnpm lint`、类型检查、测试、包边界和浏览器
+验证共同约束模块的依赖方向与可观察行为。
 
 ## 文档导航
 

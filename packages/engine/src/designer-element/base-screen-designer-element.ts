@@ -18,6 +18,7 @@ import type {
   ScreenProjectSnapshot,
   ScreenProjectSnapshotPort,
   ScreenProjectSummary,
+  ScreenVariableHandle,
   ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
@@ -278,14 +279,12 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.executeTransaction(this, transaction);
   }
 
-  /** 以严格宿主资源 intent 在当前可见画布中心创建并选中新组件。 */
   insertHostResource(
     intent: BaseScreenHostResourceAuthoringIntent,
   ): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.insertHostResource(this, intent);
   }
 
-  /** 仅替换同类型组件的 canonical dataSource，不改变几何、样式或显示属性。 */
   replaceHostResource(
     componentId: string,
     intent: BaseScreenHostResourceAuthoringIntent,
@@ -313,11 +312,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.setCanvasBackgroundImage(this, backgroundImage, fit);
   }
 
-  /**
-   * 宿主背景图选择请求（ADR-0046）：登记宿主会话并派发
-   * `base-screen-canvas-background-image-request`（composed）。宿主监听后打开自己的图片选择
-   * 弹出框，经 `commitCanvasBackgroundImage` 注入；无文档时返回 false 且不派发。
-   */
   requestCanvasBackgroundImage(): boolean {
     return this.#designerState.runtime.requestCanvasBackgroundImage(this);
   }
@@ -468,6 +462,10 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   refreshVariables(options?: ScreenVariableRefreshOptions): void {
     return this.#designerState.runtime.refreshVariables(this, options);
+  }
+
+  getVariable(id: string): ScreenVariableHandle | undefined {
+    return this.#designerState.canvasRuntimeController.getVariable(id);
   }
 
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>> {

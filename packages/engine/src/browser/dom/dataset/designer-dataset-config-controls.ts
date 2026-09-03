@@ -16,9 +16,9 @@ export function variableControl(
     'aria-label',
     DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameterLabel),
   );
-  appendOption(variable, '', DESIGNER_UI_TEXT.dataset.selectVariable, draft.name === '');
-  for (const name of options.variableNames) {
-    appendOption(variable, name, name, draft.name === name);
+  appendOption(variable, '', DESIGNER_UI_TEXT.dataset.selectVariable, draft.variableId === '');
+  for (const item of options.variables) {
+    appendOption(variable, item.id, item.name, draft.variableId === item.id);
   }
   return variable;
 }

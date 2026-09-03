@@ -50,7 +50,7 @@ describe('designer variable operations', () => {
           resourceType: 'dataset',
           resourceId: 'orders',
           params: {
-            region: { kind: 'variable', name: 'region' },
+            region: { kind: 'variable', variableId: 'region' },
             limit: { kind: 'literal', value: 2 },
           },
           binding: { fields: {} },
@@ -70,14 +70,14 @@ describe('designer variable operations', () => {
           id: 'r1',
           trigger: { type: 'material-event', componentId: 'a', eventName: 'click' },
           condition: {
-            left: { kind: 'variable', name: 'count' },
+            left: { kind: 'variable', variableId: 'count' },
             operator: 'gt',
             right: { kind: 'literal', value: 0 },
           },
           actions: [
             {
               type: 'set-variable',
-              variableName: 'count',
+              variableId: 'count',
               value: { kind: 'event-payload', path: ['value'] },
             },
             {
@@ -85,7 +85,7 @@ describe('designer variable operations', () => {
               eventName: 'changed',
               payload: {
                 kind: 'object',
-                properties: { total: { kind: 'variable', name: 'total' } },
+                properties: { total: { kind: 'variable', variableId: 'total' } },
               },
             },
           ],
@@ -97,7 +97,7 @@ describe('designer variable operations', () => {
             {
               type: 'host-action',
               actionId: 'act',
-              payload: { kind: 'array', items: [{ kind: 'variable', name: 'nested' }] },
+              payload: { kind: 'array', items: [{ kind: 'variable', variableId: 'nested' }] },
             },
           ],
         },
@@ -118,7 +118,7 @@ describe('designer variable operations', () => {
           type: 'host-resource',
           resourceType: 'dataset',
           resourceId: 'orders',
-          params: { region: { kind: 'variable', name: 'selected' } },
+          params: { region: { kind: 'variable', variableId: 'selected' } },
           binding: { fields: {} },
         }),
       ],
@@ -130,18 +130,18 @@ describe('designer variable operations', () => {
             condition: {
               left: {
                 kind: 'object',
-                properties: { filters: { kind: 'variable', name: 'selected' } },
+                properties: { filters: { kind: 'variable', variableId: 'selected' } },
               },
               operator: 'eq',
-              right: { kind: 'variable', name: 'other' },
+              right: { kind: 'variable', variableId: 'other' },
             },
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'selected',
+                variableId: 'selected',
                 value: {
                   kind: 'array',
-                  items: [{ kind: 'variable', name: 'selected' }],
+                  items: [{ kind: 'variable', variableId: 'selected' }],
                 },
               },
             ],
@@ -153,14 +153,14 @@ describe('designer variable operations', () => {
     expect(collectVariableReferences(source, 'selected')).toEqual([
       {
         kind: 'component-parameter',
-        variableName: 'selected',
+        variableId: 'selected',
         componentId: 'chart',
         componentName: 'chart',
         parameterName: 'region',
       },
       {
         kind: 'blueprint-condition',
-        variableName: 'selected',
+        variableId: 'selected',
         ruleId: 'rule-1',
         side: 'left',
         expressionPath: ['filters'],
@@ -168,14 +168,14 @@ describe('designer variable operations', () => {
       },
       {
         kind: 'blueprint-action-target',
-        variableName: 'selected',
+        variableId: 'selected',
         ruleId: 'rule-1',
         actionIndex: 0,
         blueprintTargetId: 'action:rule-1:0',
       },
       {
         kind: 'blueprint-action-expression',
-        variableName: 'selected',
+        variableId: 'selected',
         ruleId: 'rule-1',
         actionIndex: 0,
         field: 'value',
@@ -193,8 +193,8 @@ describe('designer variable operations', () => {
 
   it('detects duplicate variable names with an exception index', () => {
     const variables: readonly ScreenVariable[] = [
-      { type: 'static', name: 'a', value: 1 },
-      { type: 'static', name: 'b', value: 2 },
+      { type: 'static', id: 'a', name: 'a', initialValue: 1 },
+      { type: 'static', id: 'b', name: 'b', initialValue: 2 },
     ];
 
     expect(isVariableNameTaken(variables, 'a')).toBe(true);
@@ -205,9 +205,11 @@ describe('designer variable operations', () => {
 
   it('builds a replace-variables command applied as a single transaction', () => {
     const variables: readonly ScreenVariable[] = [
-      { type: 'static', name: 'region', value: 'north' },
+      { type: 'static', id: 'region', name: 'region', initialValue: 'north' },
     ];
-    const source = document([{ type: 'static', name: 'region', value: 'south' }]);
+    const source = document([
+      { type: 'static', id: 'region', name: 'region', initialValue: 'south' },
+    ]);
 
     const result = buildReplaceVariablesCommand(variables);
     expect(result.ok).toBe(true);
@@ -221,8 +223,9 @@ describe('designer variable operations', () => {
   it('rejects more than 1000 variables with a diagnostic', () => {
     const variables = Array.from({ length: 1001 }, (_, index) => ({
       type: 'static' as const,
+      id: `v${index}`,
       name: `v${index}`,
-      value: index,
+      initialValue: index,
     }));
     const result = buildReplaceVariablesCommand(variables);
     expect(result.ok).toBe(false);

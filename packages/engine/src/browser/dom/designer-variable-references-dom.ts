@@ -77,7 +77,7 @@ function createReferenceLink(
   } else {
     button.dataset.blueprintSearchId = reference.blueprintTargetId;
     label.textContent =
-      reference.kind === 'blueprint-condition'
+      reference.kind === 'blueprint-trigger' || reference.kind === 'blueprint-condition'
         ? DESIGNER_UI_TEXT.variables.referenceRule(reference.ruleId)
         : `${DESIGNER_UI_TEXT.variables.referenceRule(reference.ruleId)} · ${DESIGNER_UI_TEXT.variables.referenceAction(reference.actionIndex)}`;
     detail.textContent = referenceDetail(reference);
@@ -99,6 +99,9 @@ function referenceDetail(
       reference.side,
       formatExpressionPath(reference.expressionPath),
     );
+  }
+  if (reference.kind === 'blueprint-trigger') {
+    return DESIGNER_UI_TEXT.variables.referenceVariableTrigger;
   }
   if (reference.kind === 'blueprint-action-target') {
     return DESIGNER_UI_TEXT.variables.referenceActionTarget;

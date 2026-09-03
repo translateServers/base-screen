@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-08-30
+> 最近更新：2026-09-03
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -70,7 +70,7 @@
 | [ADR-0051](./ADR-0051-unified-color-palette-replaces-color-input.md) | 已接受 | 2026-08-16 | 三段式调色板全面替换原生 color input：取消 ADR-0050 决策 2 的字段级门控，三种模式对所有颜色字段无条件可用；渐变渲染消费由物料渲染端负责，官方文本物料以 background-clip: text 支持渐变文字 |
 | [ADR-0052](./ADR-0052-designer-canvas-text-editing.md) | 已接受 | 2026-08-16 | Designer 画布内文本直接编辑：双击可编辑文本组件进入 contenteditable overlay 编辑会话（仅 `base.text` + static 字符串 dataSource，fail-closed），Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 经既有 `isEditableTarget` 通道放行 IME 与原生编辑键；不侵入物料/Renderer DOM，公共契约零变化 |
 | [ADR-0053](./ADR-0053-designer-multi-selection-editing.md) | 已接受 | 2026-08-16 | Designer 多选批量属性编辑：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑（复用 createControl / 三段式调色板），值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派，单选通道零改动，公共契约零变化 |
-| [ADR-0054](./ADR-0054-designer-variable-management.md) | 部分已取代 | 2026-08-16 | 变量面板入口、静态值编辑、重名和引用删除保护仍有效；host 只读、引用重命名和公共契约结论由 ADR-0067 取代 |
+| [ADR-0054](./ADR-0054-designer-variable-management.md) | 部分已取代 | 2026-08-16 | 变量面板入口、复制、删除保护和撤销语义仍有效；按名称引用及 host 变量结论由 ADR-0068 取代 |
 | [ADR-0055](./ADR-0055-official-material-visual-capabilities.md) | 已接受 | 2026-08-16 | 官方物料视觉能力：形状（矩形/椭圆）新增圆角与阴影字段（borderRadius/shadowColor/shadowBlur/shadowOffsetX/Y，椭圆固定 50% 圆角），fill 渐变渲染为 background-image（容器同规则）——补齐 ADR-0051 渐变渲染责任到形状/容器；shadowColor 渐变跳过阴影（box-shadow 不接受 <image>）；Manifest 能力扩展，公共契约零变化 |
 | [ADR-0056](./ADR-0056-image-material-url-validation.md) | 已接受 | 2026-08-16 | 图片物料 URL 校验与失败回退：静态数据源复用 `isBoundedScreenImageUrl`（与画布背景/封面同规则），非法 URL fail-closed 显示「图片地址无效」占位且不创建 img；img error 移除失效图片显示「图片加载失败」占位；公共契约零变化 |
 | [ADR-0057](./ADR-0057-color-palette-gradient-from-solid.md) | 已接受 | 2026-08-16 | 调色板切换模式继承单色色系：单色 → 线性/径向渐变切换时，未定制（默认黑→白）色标按单色派生同色系渐变（起点=单色、终点=提亮，纯白加深回退）；已定制色标模式往返原样保留；派生仅发生在交互切换路径，值格式与序列化不变，公共契约零变化 |
@@ -83,7 +83,8 @@
 | [ADR-0064](./ADR-0064-host-resource-authoring-intent.md) | 已接受 | 2026-08-30 | 宿主资源目录只提交严格 authoring intent；Designer 提供单事务插入、替换与拖放，删除旧素材目录端口 |
 | [ADR-0065](./ADR-0065-text-auto-width-runtime-geometry.md) | 已接受 | 2026-08-31 | 官方文本自适应宽度；持久尺寸与只读运行时几何分离，统一尺寸编辑和历史语义 |
 | [ADR-0066](./ADR-0066-host-owned-conditional-style-authoring.md) | 已接受 | 2026-09-01 | 条件样式作者入口归宿主：移除 Designer 内建规则编辑器，保留 `styleRules` 文档兼容、Renderer 求值与 `conditionalStylePort` |
-| [ADR-0067](./ADR-0067-datav-inspired-global-variables.md) | 已接受 | 2026-09-01 | DataV 启发的全局变量：严格宿主目录、作者预览、原子重命名与显式刷新；部分取代 ADR-0054 |
+| [ADR-0067](./ADR-0067-datav-inspired-global-variables.md) | 已取代 | 2026-09-01 | 历史 DataV 启发方案；`static \| host` 与按名称寻址由 ADR-0068 取代 |
+| [ADR-0068](./ADR-0068-datav-global-variables.md) | 已接受 | 2026-09-03 | DataV 全局变量语义对齐：三类来源、完整配置、稳定 ID、Blueprint 节点与运行时句柄 |
 
 ## 计划决策
 

@@ -6,6 +6,7 @@ import {
   type ScreenHostVariableCatalogPort,
   type ScreenHostVariableDescriptor,
   type ScreenHostVariablePort,
+  type ScreenVariable,
 } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import type { DesignerVariableCatalogView } from '../dom/designer-variables-dom.js';
@@ -27,6 +28,7 @@ export class DesignerVariableCatalogController {
   #detailController: AbortController | undefined;
   #listGeneration = 0;
   #detailGeneration = 0;
+  #sourceType: 'data-source' | 'url-query' | undefined;
   #view: DesignerVariableCatalogView = emptyView();
   readonly #descriptors = new Map<string, ScreenHostVariableDescriptor>();
 
@@ -36,30 +38,37 @@ export class DesignerVariableCatalogController {
     return this.#view;
   }
 
-  ensureList(): void {
+  ensureList(sourceType: 'data-source' | 'url-query'): void {
+    if (this.#sourceType !== sourceType) {
+      this.#sourceType = sourceType;
+      this.#view = emptyView();
+    }
     if (this.#view.items.length === 0) void this.#list(undefined);
   }
 
   updateQuery(query: string): void {
     if (query === this.#view.query) return;
     this.#view = { ...emptyView(), query };
-    void this.#list(undefined);
+    if (this.#sourceType !== undefined) void this.#list(undefined);
   }
 
   loadMore(): void {
     if (this.#view.nextCursor !== undefined) void this.#list(this.#view.nextCursor);
   }
 
-  async select(variableId: string): Promise<ScreenHostVariableDescriptor | undefined> {
-    const descriptor = await this.#describe(variableId);
+  async select(sourceId: string): Promise<ScreenHostVariableDescriptor | undefined> {
+    const descriptor = await this.#describe(sourceId);
     if (descriptor === undefined) return undefined;
     this.#view = { ...this.#view, selected: descriptor };
     this.callbacks.render();
     return descriptor;
   }
 
-  async preview(variableId: string): Promise<void> {
-    const descriptor = this.#descriptors.get(variableId) ?? (await this.#describe(variableId));
+  async preview(variable: ScreenVariable): Promise<void> {
+    if (variable.type === 'static') return;
+    const variableId = variable.id;
+    const descriptor =
+      this.#descriptors.get(variable.sourceId) ?? (await this.#describe(variable.sourceId));
     if (descriptor === undefined) return;
     if (!descriptor.previewable) {
       this.#view = {
@@ -96,7 +105,19 @@ export class DesignerVariableCatalogController {
         }, PREVIEW_TIMEOUT_MS);
       });
       const settled = await Promise.race([
-        port.resolve({ variableId, purpose: 'authoring-preview', signal: controller.signal }),
+        port.resolve({
+          variableId,
+          sourceId: variable.sourceId,
+          sourceType: variable.type,
+          initialValue: variable.initialValue,
+          controlled: variable.controlled,
+          ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
+          ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
+            ? { autoUpdate: variable.autoUpdate }
+            : {}),
+          purpose: 'authoring-preview',
+          signal: controller.signal,
+        }),
         timeout,
       ]);
       if (controller.signal.aborted || generation !== this.#detailGeneration) return;
@@ -136,6 +157,7 @@ export class DesignerVariableCatalogController {
     this.#listGeneration++;
     this.#detailGeneration++;
     this.#descriptors.clear();
+    this.#sourceType = undefined;
     this.#view = emptyView();
   }
 
@@ -151,7 +173,8 @@ export class DesignerVariableCatalogController {
 
   async #list(cursor: string | undefined): Promise<void> {
     const port = this.callbacks.getCatalogPort();
-    if (port === undefined) {
+    const sourceType = this.#sourceType;
+    if (port === undefined || sourceType === undefined) {
       this.#view = { ...this.#view, feedback: DESIGNER_UI_TEXT.variables.catalogUnavailable };
       this.callbacks.render();
       return;
@@ -165,6 +188,7 @@ export class DesignerVariableCatalogController {
     try {
       const result = await port.list({
         query: this.#view.query,
+        sourceType,
         ...(cursor === undefined ? {} : { cursor }),
         limit: 50,
         signal: controller.signal,
@@ -186,7 +210,10 @@ export class DesignerVariableCatalogController {
       }
       const items =
         cursor === undefined ? parsed.value.items : [...this.#view.items, ...parsed.value.items];
-      if (new Set(items.map(({ variableId }) => variableId)).size !== items.length) {
+      if (
+        items.some((item) => item.sourceType !== sourceType) ||
+        new Set(items.map(({ sourceId }) => sourceId)).size !== items.length
+      ) {
         this.callbacks.report([catalogDiagnostic('Host variable page repeats an existing id.')]);
         this.#view = { ...this.#view, feedback: DESIGNER_UI_TEXT.variables.catalogFailed };
         this.callbacks.render();
@@ -211,8 +238,8 @@ export class DesignerVariableCatalogController {
     }
   }
 
-  async #describe(variableId: string): Promise<ScreenHostVariableDescriptor | undefined> {
-    const cached = this.#descriptors.get(variableId);
+  async #describe(sourceId: string): Promise<ScreenHostVariableDescriptor | undefined> {
+    const cached = this.#descriptors.get(sourceId);
     if (cached !== undefined) return cached;
     const port = this.callbacks.getCatalogPort();
     if (port === undefined) return undefined;
@@ -221,7 +248,7 @@ export class DesignerVariableCatalogController {
     const generation = ++this.#detailGeneration;
     this.#detailController = controller;
     try {
-      const result = await port.describe({ variableId, signal: controller.signal });
+      const result = await port.describe({ sourceId, signal: controller.signal });
       if (controller.signal.aborted || generation !== this.#detailGeneration) return undefined;
       this.#detailController = undefined;
       if (!result.ok) {
@@ -229,7 +256,7 @@ export class DesignerVariableCatalogController {
         return undefined;
       }
       const parsed = parseScreenHostVariableDescriptor(result.value);
-      if (!parsed.ok || parsed.value.variableId !== variableId) {
+      if (!parsed.ok || parsed.value.sourceId !== sourceId) {
         this.callbacks.report(
           parsed.ok
             ? [catalogDiagnostic('Host variable descriptor id does not match the request.')]
@@ -237,7 +264,7 @@ export class DesignerVariableCatalogController {
         );
         return undefined;
       }
-      this.#descriptors.set(variableId, parsed.value);
+      this.#descriptors.set(sourceId, parsed.value);
       return parsed.value;
     } catch {
       return undefined;

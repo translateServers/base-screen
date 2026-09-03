@@ -12,13 +12,61 @@ import {
 } from './__fixtures__/viewer-test-harness.js';
 
 describe('BaseScreenViewerElement host variable refresh', () => {
-  it('deduplicates host ids, synchronizes aliases, and marks runtime purpose', async () => {
+  it('exposes stable variable handles and dispatches data-updated rules', async () => {
+    const screen = document(
+      [],
+      [
+        { type: 'static', id: 'status-id', name: 'status', initialValue: 'idle' },
+        { type: 'static', id: 'mirror-id', name: 'mirror', initialValue: 'idle' },
+      ],
+      {
+        rules: [
+          {
+            id: 'mirror-status',
+            trigger: {
+              type: 'variable-event',
+              variableId: 'status-id',
+              eventName: 'data-updated',
+            },
+            actions: [
+              {
+                type: 'set-variable',
+                variableId: 'mirror-id',
+                value: { kind: 'variable', variableId: 'status-id' },
+              },
+            ],
+          },
+        ],
+      },
+    );
+    const { viewer } = await createViewerHarness({
+      catalog: createHostResourceCatalog(),
+      document: screen,
+      resourcePort: createImmediateResourcePort().port,
+      variablePort: createVariablePort({}).port,
+    });
+    await flush();
+    const changes: unknown[] = [];
+    const handle = viewer.getVariable('status-id');
+    const stop = handle?.onChange((value) => changes.push(value));
+
+    expect(handle?.value).toBe('idle');
+    expect(handle?.set('ready').ok).toBe(true);
+    expect(handle?.value).toBe('ready');
+    expect(viewer.getVariable('mirror-id')?.value).toBe('ready');
+    expect(changes).toEqual(['ready']);
+    expect(viewer.getVariable('missing')).toBeUndefined();
+    stop?.();
+    viewer.unload();
+  });
+
+  it('resolves each stable variable id while preserving shared host sources', async () => {
     const variables = createVariablePort({ shared: 'north' });
     const resources = createImmediateResourcePort();
     const screen = document(
       [
-        component('a', hostSource('orders', { value: { kind: 'variable', name: 'first' } })),
-        component('b', hostSource('orders', { value: { kind: 'variable', name: 'second' } })),
+        component('a', hostSource('orders', { value: { kind: 'variable', variableId: 'first' } })),
+        component('b', hostSource('orders', { value: { kind: 'variable', variableId: 'second' } })),
       ],
       [hostVariable('first', 'shared'), hostVariable('second', 'shared')],
     );
@@ -30,8 +78,13 @@ describe('BaseScreenViewerElement host variable refresh', () => {
     });
     await flush();
 
-    expect(variables.requests).toHaveLength(1);
-    expect(variables.requests[0]).toMatchObject({ variableId: 'shared', purpose: 'runtime' });
+    expect(variables.requests).toHaveLength(2);
+    expect(variables.requests).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ variableId: 'first', sourceId: 'shared', purpose: 'runtime' }),
+        expect.objectContaining({ variableId: 'second', sourceId: 'shared', purpose: 'runtime' }),
+      ]),
+    );
     expect(resources.requests.map((request) => request.request.params)).toEqual([
       { value: 'north' },
       { value: 'north' },
@@ -44,8 +97,11 @@ describe('BaseScreenViewerElement host variable refresh', () => {
     const resources = createImmediateResourcePort();
     const screen = document(
       [
-        component('a', hostSource('orders', { region: { kind: 'variable', name: 'region' } })),
-        component('b', hostSource('orders', { page: { kind: 'variable', name: 'page' } })),
+        component(
+          'a',
+          hostSource('orders', { region: { kind: 'variable', variableId: 'region' } }),
+        ),
+        component('b', hostSource('orders', { page: { kind: 'variable', variableId: 'page' } })),
       ],
       [hostVariable('region', 'region-id'), hostVariable('page', 'page-id')],
     );
@@ -58,18 +114,22 @@ describe('BaseScreenViewerElement host variable refresh', () => {
     await flush();
 
     variables.values['region-id'] = 'south';
-    viewer.refreshVariables({ variableIds: ['region-id', 'region-id'], traceId: 'var-trace' });
+    viewer.refreshVariables({ variableIds: ['region', 'region'], traceId: 'var-trace' });
     await flush();
 
     expect(variables.requests).toHaveLength(3);
-    expect(variables.requests[2]).toMatchObject({ variableId: 'region-id', purpose: 'runtime' });
+    expect(variables.requests[2]).toMatchObject({
+      variableId: 'region',
+      sourceId: 'region-id',
+      purpose: 'runtime',
+    });
     expect(resources.requests).toHaveLength(3);
     expect(resources.requests[2]).toMatchObject({
       request: { componentId: 'a', params: { region: 'south' } },
       context: { trigger: 'variable', traceId: 'var-trace' },
     });
 
-    viewer.refreshVariables({ variableIds: ['region-id'] });
+    viewer.refreshVariables({ variableIds: ['region'] });
     await flush();
     expect(variables.requests).toHaveLength(4);
     expect(resources.requests).toHaveLength(3);
@@ -81,8 +141,11 @@ describe('BaseScreenViewerElement host variable refresh', () => {
     const resources = createImmediateResourcePort();
     const screen = document(
       [
-        component('a', hostSource('orders', { region: { kind: 'variable', name: 'region' } })),
-        component('b', hostSource('orders', { page: { kind: 'variable', name: 'page' } })),
+        component(
+          'a',
+          hostSource('orders', { region: { kind: 'variable', variableId: 'region' } }),
+        ),
+        component('b', hostSource('orders', { page: { kind: 'variable', variableId: 'page' } })),
       ],
       [hostVariable('region', 'region-id'), hostVariable('page', 'page-id')],
     );
@@ -93,14 +156,14 @@ describe('BaseScreenViewerElement host variable refresh', () => {
       variablePort: variables.port,
     });
     variables.requests
-      .find((request) => request.variableId === 'region-id')!
+      .find((request) => request.variableId === 'region')!
       .resolveRequest({
         ok: true,
         value: 'north',
         diagnostics: [],
       });
     variables.requests
-      .find((request) => request.variableId === 'page-id')!
+      .find((request) => request.variableId === 'page')!
       .resolveRequest({
         ok: true,
         value: 1,
@@ -145,8 +208,8 @@ describe('BaseScreenViewerElement host variable refresh', () => {
     variables.requests[1]!.resolveRequest({ ok: true, value: 1, diagnostics: [] });
     await flush();
 
-    viewer.refreshVariables({ variableIds: ['region-id'] });
-    viewer.refreshVariables({ variableIds: ['page-id'] });
+    viewer.refreshVariables({ variableIds: ['region'] });
+    viewer.refreshVariables({ variableIds: ['page'] });
     viewer.refreshVariables();
     expect(variables.requests).toHaveLength(3);
     variables.requests[2]!.resolveRequest({ ok: true, value: 'north', diagnostics: [] });
@@ -158,7 +221,7 @@ describe('BaseScreenViewerElement host variable refresh', () => {
         .slice(3)
         .map(({ variableId }) => variableId)
         .sort(),
-    ).toEqual(['page-id', 'region-id']);
+    ).toEqual(['page', 'region']);
     variables.requests[3]!.resolveRequest({ ok: true, value: 'north', diagnostics: [] });
     variables.requests[4]!.resolveRequest({ ok: true, value: 1, diagnostics: [] });
     await flush();

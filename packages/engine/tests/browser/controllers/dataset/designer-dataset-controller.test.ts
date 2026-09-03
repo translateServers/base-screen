@@ -172,7 +172,16 @@ describe('DesignerDatasetController', () => {
     const variableResolve = vi.fn<ScreenHostVariablePort['resolve']>(async () => success('north'));
     const hostDocument: ScreenDocument = {
       ...baseDocument,
-      variables: [{ type: 'host', name: 'tenantRegion', variableId: 'tenant-region' }],
+      variables: [
+        {
+          type: 'data-source',
+          id: 'tenantRegion',
+          name: 'tenantRegion',
+          initialValue: null,
+          sourceId: 'tenant-region',
+          controlled: true,
+        },
+      ],
     };
     const controller = createController({
       descriptor,
@@ -196,7 +205,11 @@ describe('DesignerDatasetController', () => {
 
     await vi.waitFor(() => expect(resourceResolve).toHaveBeenCalledOnce());
     expect(variableResolve).toHaveBeenCalledWith({
-      variableId: 'tenant-region',
+      variableId: 'tenantRegion',
+      sourceId: 'tenant-region',
+      sourceType: 'data-source',
+      initialValue: null,
+      controlled: true,
       purpose: 'authoring-preview',
       signal: expect.any(AbortSignal),
     });

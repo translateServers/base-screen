@@ -27,7 +27,7 @@ export function summarizeDesignerBlueprintAction(
   if (action.type === 'set-variable') {
     return {
       kind: action.type,
-      primary: action.variableName,
+      primary: action.variableId,
       secondary: summarizeExpression(action.value),
       order: actionIndex + 1,
     };
@@ -37,6 +37,22 @@ export function summarizeDesignerBlueprintAction(
       kind: action.type,
       primary: action.eventName,
       secondary: summarizeExpression(action.payload),
+      order: actionIndex + 1,
+    };
+  }
+  if (action.type === 'request-variable') {
+    return {
+      kind: action.type,
+      primary: action.variableId,
+      secondary: 'request',
+      order: actionIndex + 1,
+    };
+  }
+  if (action.type === 'request-component-data') {
+    return {
+      kind: action.type,
+      primary: action.componentId,
+      secondary: 'request',
       order: actionIndex + 1,
     };
   }
@@ -55,7 +71,7 @@ function summarizeExpression(expression: ScreenBlueprintValueExpression): string
     case 'event-payload':
       return `event.${expression.path.join('.') || '*'}`;
     case 'variable':
-      return `$${expression.name}`;
+      return `$${expression.variableId}`;
     case 'array':
       return `array(${expression.items.length})`;
     case 'object':

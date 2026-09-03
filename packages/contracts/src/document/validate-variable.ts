@@ -1,5 +1,9 @@
 import type { DiagnosticCollector, DiagnosticPhase } from '../diagnostics/collector.js';
-import { hostVariableSchema, staticVariableSchema } from './schema.js';
+import {
+  dataSourceVariableSchema,
+  staticVariableSchema,
+  urlQueryVariableSchema,
+} from './schema.js';
 import { checkStrictObjectKeys, isJsonObject } from './strict-object.js';
 import {
   addZodIssues,
@@ -7,8 +11,28 @@ import {
   variableFieldCode,
 } from './validate-support.js';
 
-const VARIABLE_FIELDS = new Set(['type', 'name', 'description', 'value']);
-const HOST_VARIABLE_FIELDS = new Set(['type', 'name', 'description', 'variableId']);
+const STATIC_VARIABLE_FIELDS = new Set(['type', 'id', 'name', 'description', 'initialValue']);
+const DATA_SOURCE_VARIABLE_FIELDS = new Set([
+  'type',
+  'id',
+  'name',
+  'description',
+  'initialValue',
+  'sourceId',
+  'processorId',
+  'controlled',
+  'autoUpdate',
+]);
+const URL_QUERY_VARIABLE_FIELDS = new Set([
+  'type',
+  'id',
+  'name',
+  'description',
+  'initialValue',
+  'sourceId',
+  'processorId',
+  'controlled',
+]);
 
 export function validateVariable(
   variable: unknown,
@@ -25,7 +49,11 @@ export function validateVariable(
   if (
     !checkStrictObjectKeys(
       variable,
-      variable.type === 'host' ? HOST_VARIABLE_FIELDS : VARIABLE_FIELDS,
+      variable.type === 'data-source'
+        ? DATA_SOURCE_VARIABLE_FIELDS
+        : variable.type === 'url-query'
+          ? URL_QUERY_VARIABLE_FIELDS
+          : STATIC_VARIABLE_FIELDS,
       base,
       collector,
       phase,
@@ -35,9 +63,11 @@ export function validateVariable(
     return false;
   }
   const result =
-    variable.type === 'host'
-      ? hostVariableSchema.safeParse(variable)
-      : staticVariableSchema.safeParse(variable);
+    variable.type === 'data-source'
+      ? dataSourceVariableSchema.safeParse(variable)
+      : variable.type === 'url-query'
+        ? urlQueryVariableSchema.safeParse(variable)
+        : staticVariableSchema.safeParse(variable);
   if (!result.success) {
     addZodIssues(
       result.error.issues,

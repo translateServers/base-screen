@@ -59,10 +59,10 @@ export function updateDesignerBlueprintActionFromTarget(
     });
   }
   if (target.matches('[data-blueprint-action-variable]')) {
-    const variableName = (target as HTMLSelectElement).value;
+    const variableId = (target as HTMLSelectElement).value;
     return action.type === 'set-variable' &&
-      document.variables.some((variable) => variable.name === variableName)
-      ? success({ ...action, variableName })
+      document.variables.some((variable) => variable.id === variableId)
+      ? success({ ...action, variableId })
       : success(null);
   }
   if (target.matches('[data-blueprint-action-value]')) {
@@ -107,11 +107,11 @@ export function updateDesignerBlueprintActionFromTarget(
   }
   if (target.matches('[data-blueprint-action-source-variable]')) {
     if (action.type !== 'set-variable') return success(null);
-    const name = (target as HTMLSelectElement).value;
+    const variableId = (target as HTMLSelectElement).value;
     return document.variables.some(
-      (variable) => variable.name === name && variable.name !== action.variableName,
+      (variable) => variable.id === variableId && variable.id !== action.variableId,
     )
-      ? success({ ...action, value: { kind: 'variable', name } })
+      ? success({ ...action, value: { kind: 'variable', variableId } })
       : failure();
   }
   if (target.matches('[data-blueprint-action-event]')) {
@@ -149,10 +149,10 @@ function updateValueSource(
       : success({ ...action, value: { kind: 'event-payload', path } });
   }
   if (source === 'variable') {
-    const variable = document.variables.find((candidate) => candidate.name !== action.variableName);
+    const variable = document.variables.find((candidate) => candidate.id !== action.variableId);
     return variable === undefined
       ? failure()
-      : success({ ...action, value: { kind: 'variable', name: variable.name } });
+      : success({ ...action, value: { kind: 'variable', variableId: variable.id } });
   }
   return failure();
 }

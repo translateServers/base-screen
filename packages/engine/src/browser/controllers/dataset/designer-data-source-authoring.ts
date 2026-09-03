@@ -118,6 +118,7 @@ export function designerDataSourceModes(
   return [
     'none',
     ...(capabilities.includes('static') ? (['static'] as const) : []),
+    ...(capabilities.includes('variable') ? (['variable'] as const) : []),
     ...(capabilities.includes('host-resource') ? ([resourceMode] as const) : []),
   ];
 }
@@ -131,7 +132,7 @@ export function updateDesignerDatasetParameter(
   if (target instanceof HTMLSelectElement) {
     return {
       ...draft,
-      params: { ...draft.params, [name]: { kind: 'variable', name: target.value } },
+      params: { ...draft.params, [name]: { kind: 'variable', variableId: target.value } },
     };
   }
   const parameter = descriptor.parameters.find((item) => item.name === name);
@@ -200,7 +201,7 @@ export function createDatasetDataSourceTransaction(
     if (
       value === undefined ||
       (value.kind === 'variable' &&
-        !options.document.variables.some((item) => item.name === value.name))
+        !options.document.variables.some((item) => item.id === value.variableId))
     ) {
       return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
     }
@@ -242,6 +243,17 @@ export function createEmptyDataSourceTransaction(
   componentId: string,
 ): ScreenParseResult<ScreenDocumentTransaction> {
   return success(updateDataSource(componentId, null));
+}
+
+export function createVariableDataSourceTransaction(
+  document: ScreenDocument,
+  componentId: string,
+  variableId: string,
+): ScreenParseResult<ScreenDocumentTransaction> {
+  if (!document.variables.some((variable) => variable.id === variableId)) {
+    return invalid('CORE_COMMAND_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
+  }
+  return success(updateDataSource(componentId, { type: 'variable', variableId }));
 }
 
 export function defaultDatasetParameterValue(

@@ -1,7 +1,8 @@
 # ADR-0067：DataV 启发的全局变量完善
 
-> 状态：已接受
+> 状态：已取代
 > 日期：2026-09-01
+> 取代：[ADR-0068](./ADR-0068-datav-global-variables.md)
 > 关联：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、
 > [ADR-0054](./ADR-0054-designer-variable-management.md)、
 > [ADR-0063](./ADR-0063-designer-blueprint-workbench-shell.md)

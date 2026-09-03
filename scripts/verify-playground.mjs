@@ -205,7 +205,7 @@ await withViteBrowser(
         }));
         if (
           !dataExperience.currentDataset.includes('订单趋势') ||
-          dataExperience.sourceModes !== 3 ||
+          dataExperience.sourceModes !== 4 ||
           dataExperience.roleCount !== 1 ||
           dataExperience.fieldButtons !== 3 ||
           dataExperience.nativeMultiple ||

@@ -49,7 +49,9 @@ const document: ScreenDocument = {
       dataSource: null,
     },
   ],
-  variables: [{ type: 'static', name: 'selected<script>', value: null }],
+  variables: [
+    { type: 'static', id: 'selected<script>', name: 'selected<script>', initialValue: null },
+  ],
   blueprint: {
     rules: [
       {
@@ -138,7 +140,8 @@ describe('Designer Blueprint panel DOM', () => {
     expect(container.innerHTML).toContain('组件');
     expect(container.innerHTML).toContain('逻辑');
     expect(container.innerHTML).toContain('变量');
-    expect(container.innerHTML).toContain('data-blueprint-insert="set-variable"');
+    expect(container.innerHTML).toContain('data-blueprint-add-variable="selected&lt;script&gt;"');
+    expect(container.innerHTML).toContain('data-blueprint-drag-kind="variable"');
     expect(container.innerHTML).toContain('selected&lt;script&gt;');
     expect(container.innerHTML).not.toContain('selected<script>');
   });
@@ -244,8 +247,8 @@ describe('Designer Blueprint panel DOM', () => {
     const configuredDocument: ScreenDocument = {
       ...document,
       variables: [
-        { type: 'static', name: 'selected', value: null },
-        { type: 'static', name: 'fallback', value: 1 },
+        { type: 'static', id: 'selected', name: 'selected', initialValue: null },
+        { type: 'static', id: 'fallback', name: 'fallback', initialValue: 1 },
       ],
       blueprint: {
         rules: [
@@ -254,7 +257,7 @@ describe('Designer Blueprint panel DOM', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'selected',
+                variableId: 'selected',
                 value: { kind: 'event-payload', path: ['row', 'id'] },
               },
             ],

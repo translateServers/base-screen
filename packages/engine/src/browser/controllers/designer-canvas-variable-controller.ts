@@ -2,7 +2,7 @@ import {
   parseScreenJsonValue,
   type ScreenDiagnostic,
   type ScreenDocument,
-  type ScreenHostVariable,
+  type ScreenDynamicVariable,
   type ScreenHostVariablePort,
   type ScreenJsonObject,
   type ScreenJsonValue,
@@ -67,7 +67,7 @@ export class DesignerCanvasVariableController {
   refreshVariables(options: ScreenVariableRefreshOptions = {}): void {
     const document = this.callbacks.getDocument();
     if (document === undefined) return;
-    const availableIds = new Set(hostVariablesOf(document).map(({ variableId }) => variableId));
+    const availableIds = new Set(hostVariablesOf(document).map(({ id }) => id));
     const requestedIds =
       options.variableIds === undefined
         ? undefined
@@ -104,8 +104,8 @@ export class DesignerCanvasVariableController {
       }
       const variables: Record<string, ScreenJsonValue> = { ...initialVariables };
       for (const variable of hostVariablesOf(document)) {
-        const value = values.get(variable.variableId);
-        if (value !== undefined) variables[variable.name] = value;
+        const value = values.get(variable.id);
+        if (value !== undefined) variables[variable.id] = value;
       }
       const rendered = applyVariablesAndRender(renderer, document, variables, 'variable');
       if (!rendered.ok || rendered.diagnostics.length > 0) {
@@ -143,12 +143,12 @@ export class DesignerCanvasVariableController {
       const variables: Record<string, ScreenJsonValue> = { ...previous };
       let changed = false;
       for (const variable of hostVariablesOf(document)) {
-        if (requestedIds !== undefined && !requestedIds.includes(variable.variableId)) continue;
-        const value = values.get(variable.variableId);
+        if (requestedIds !== undefined && !requestedIds.includes(variable.id)) continue;
+        const value = values.get(variable.id);
         if (value === undefined) continue;
-        const oldValue = variables[variable.name];
+        const oldValue = variables[variable.id];
         if (oldValue === undefined || !jsonEqual(oldValue, value)) changed = true;
-        variables[variable.name] = value;
+        variables[variable.id] = value;
       }
       if (!changed) {
         this.#drain();
@@ -179,11 +179,11 @@ export class DesignerCanvasVariableController {
   ): Promise<ReadonlyMap<string, ScreenJsonValue> | undefined> {
     const port = this.callbacks.getVariablePort();
     if (port === undefined) return undefined;
-    const availableIds = new Set(hostVariablesOf(document).map(({ variableId }) => variableId));
+    const available = new Map(hostVariablesOf(document).map((variable) => [variable.id, variable]));
     const ids = new Set(
       requestedIds === undefined
-        ? availableIds
-        : requestedIds.filter((variableId) => availableIds.has(variableId)),
+        ? available.keys()
+        : requestedIds.filter((variableId) => available.has(variableId)),
     );
     let timer: ReturnType<typeof setTimeout> | undefined;
     const timeout = new Promise<undefined>((resolve) => {
@@ -194,14 +194,25 @@ export class DesignerCanvasVariableController {
     });
     try {
       const requests = Promise.all(
-        [...ids].map(async (variableId) => ({
-          variableId,
-          result: await port.resolve({
+        [...ids].map(async (variableId) => {
+          const variable = available.get(variableId)!;
+          return {
             variableId,
-            purpose: 'runtime',
-            signal: controller.signal,
-          }),
-        })),
+            result: await port.resolve({
+              variableId,
+              sourceId: variable.sourceId,
+              sourceType: variable.type,
+              initialValue: variable.initialValue,
+              controlled: variable.controlled,
+              ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
+              ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
+                ? { autoUpdate: variable.autoUpdate }
+                : {}),
+              purpose: 'runtime',
+              signal: controller.signal,
+            }),
+          };
+        }),
       );
       const settled = await Promise.race([requests, timeout]);
       if (settled === undefined || controller.signal.aborted) return undefined;
@@ -277,9 +288,9 @@ export class DesignerCanvasVariableController {
   }
 }
 
-function hostVariablesOf(document: ScreenDocument): readonly ScreenHostVariable[] {
+function hostVariablesOf(document: ScreenDocument): readonly ScreenDynamicVariable[] {
   return document.variables.filter(
-    (variable): variable is ScreenHostVariable => variable.type === 'host',
+    (variable): variable is ScreenDynamicVariable => variable.type !== 'static',
   );
 }
 

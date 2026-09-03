@@ -5,7 +5,7 @@
 - 使用 Node `22.23.2`（见 `.node-version`）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
 - CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`。它依次运行 `format`（会写入文件）、`format:check`、`lint`、`typecheck`、`test`、`build`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
 - 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/tests/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
-- `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界、文件规模与文档治理检查；`pnpm check:docs` 可单独检查 Markdown 相对链接、ADR/Spec/Plan 索引、完成 Spec 归档和禁用版本命名。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
+- `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界与文档治理检查；`pnpm check:docs` 可单独检查 Markdown 相对链接、ADR/Spec/Plan 索引、完成 Spec 归档和禁用版本命名。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
 - `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。门禁失败排查见 `docs/troubleshooting/verify-m0-troubleshooting.md`。
 - 手动验证用示例（workspace 成员）：`pnpm dev:browser-harness`、`pnpm dev:playground`、`pnpm dev:vue-harness` 起 Vite dev server；`verify:browser`、`verify:playground`、`verify:vue-harness`、`verify:runtime` 是对应的 Playwright 验证脚本。
 
@@ -65,4 +65,4 @@
 - Biome 是唯一的格式化/检查工具：2 个空格、LF、单引号、分号、100 列行宽。使用 `pnpm format` 应用格式化；不要为样式添加 ESLint 或 Prettier。
 - **样式稳定性：不得出现抖动。** Designer/Viewer 样式改动不得引入视觉抖动（jitter/flicker），包括但不限于：布局在初次渲染或数据/状态变化时发生位移、滚动条出现/消失导致内容跳动、hover/active 状态改变几何或边框宽度、字体加载后文本换行重排、主题切换时出现闪烁或回退。判定与做法：几何变化只允许由状态切换或过渡动画驱动；避免在布局/绘制路径上依赖异步加载资源（字体、图片、字体测量）；`overflow: auto/scroll` 容器应预留稳定轨道；不使用会改变元素尺寸的 hover 样式（改用 `outline`/`box-shadow`/`transform` 等不触发 reflow 的方式）；主题/Token 变化走单一 style node 原子更新，不逐属性打补丁。
 - 测试自定义校验、转换、区分/条件 schema、安全辅助函数、服务分支和 hook 状态转换。不要添加只重复内置 Zod 校验或默认未知键剥离行为的测试。
-- 文件大小阈值是审查信号：领域/运行时模块以 300 行为目标，超过 500 行拆分；UI 控制器以 250 行为目标，超过 400 行拆分；契约/schema 文件以 400 行为目标，超过 600 行拆分；测试以 500 行为目标，超过 800 行拆分。生成/纯数据产物可豁免，但必须注明其生成器或权威来源。
+- **按完整职责组织模块，不设机械行数上限。** 一个模块可以完整承载同一功能行为及其紧密相关的状态、失败分支和辅助逻辑；只有识别出可独立命名、测试、复用或演进的职责时才拆分。不得为缩短文件制造仅转发调用、打散状态机或迫使阅读者跨文件追踪同一行为的薄模块；也不得借“功能完整”容纳互不相关的聚合体。生成/纯数据产物仍须注明生成器或权威来源。

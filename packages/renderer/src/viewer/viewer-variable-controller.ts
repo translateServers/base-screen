@@ -1,7 +1,7 @@
 import type {
   ScreenDiagnostic,
   ScreenDocument,
-  ScreenHostVariable,
+  ScreenDynamicVariable,
   ScreenHostVariablePort,
   ScreenJsonObject,
   ScreenJsonValue,
@@ -65,8 +65,8 @@ export class ViewerVariableController {
     if (document === undefined) return;
     const availableIds = new Set(
       document.variables
-        .filter((variable) => variable.type === 'host')
-        .map((variable) => variable.variableId),
+        .filter((variable) => variable.type !== 'static')
+        .map((variable) => variable.id),
     );
     const requested =
       options.variableIds === undefined
@@ -206,8 +206,8 @@ export class ViewerVariableController {
       ...plan.initialVariables,
       ...this.#host.readBlueprintVariables(),
     };
-    const hostVariables = document.variables.filter((variable) => variable.type === 'host');
-    if (hostVariables.length > 0) {
+    const dynamicVariables = document.variables.filter((variable) => variable.type !== 'static');
+    if (dynamicVariables.length > 0) {
       const variablePort = this.#host.readVariablePort();
       if (variablePort === undefined) {
         this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
@@ -218,9 +218,9 @@ export class ViewerVariableController {
         if (!controller.signal.aborted) this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
         return false;
       }
-      for (const variable of hostVariables) {
-        const value = values.get(variable.variableId);
-        if (value !== undefined) variables[variable.name] = value;
+      for (const variable of dynamicVariables) {
+        const value = values.get(variable.id);
+        if (value !== undefined) variables[variable.id] = value;
       }
     }
     if (
@@ -231,7 +231,6 @@ export class ViewerVariableController {
     ) {
       return false;
     }
-    this.#host.writeBlueprintVariables(variables);
     const applied = renderer.setVariables(variables);
     if (!applied.ok) {
       this.#host.emitDiagnostics(applied.diagnostics);
@@ -242,6 +241,7 @@ export class ViewerVariableController {
       this.#host.emitDiagnostics(rendered.diagnostics);
       return false;
     }
+    this.#host.writeBlueprintVariables(variables);
     if (!forceRefresh) {
       // 首次成功渲染标记完成，后续文档替换使用 document-change 触发。
       this.#hasRenderedDocument = true;
@@ -273,12 +273,12 @@ export class ViewerVariableController {
     const document = this.#host.readDocument();
     const previous = this.#host.readBlueprintVariables();
     if (renderer === undefined || document === undefined || previous === undefined) return false;
-    const hostVariables = document.variables.filter(
-      (variable): variable is ScreenHostVariable =>
-        variable.type === 'host' &&
-        (requestedIds === undefined || requestedIds.includes(variable.variableId)),
+    const dynamicVariables = document.variables.filter(
+      (variable): variable is ScreenDynamicVariable =>
+        variable.type !== 'static' &&
+        (requestedIds === undefined || requestedIds.includes(variable.id)),
     );
-    if (hostVariables.length === 0) return true;
+    if (dynamicVariables.length === 0) return true;
     const port = this.#host.readVariablePort();
     if (port === undefined) {
       this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
@@ -303,17 +303,17 @@ export class ViewerVariableController {
     }
     const variables: Record<string, ScreenJsonValue> = { ...previous };
     let changed = false;
-    for (const variable of hostVariables) {
-      const value = values.get(variable.variableId);
+    for (const variable of dynamicVariables) {
+      const value = values.get(variable.id);
       if (value === undefined) continue;
-      const previousValue = variables[variable.name];
+      const previousValue = variables[variable.id];
       if (
         previousValue === undefined ||
         canonicalJsonString(previousValue) !== canonicalJsonString(value)
       ) {
         changed = true;
       }
-      variables[variable.name] = value;
+      variables[variable.id] = value;
     }
     if (!changed) return true;
     const applied = renderer.setVariables(variables);

@@ -15,7 +15,7 @@ export function removeComponentCommands(
   const changedRuleIds = new Set<string>();
   let rulesChanged = false;
   for (const rule of document.blueprint.rules) {
-    if (removed.has(rule.trigger.componentId)) {
+    if (rule.trigger.type === 'material-event' && removed.has(rule.trigger.componentId)) {
       rulesChanged = true;
       changedRuleIds.add(rule.id);
       continue;
@@ -36,6 +36,7 @@ export function removeComponentCommands(
   for (const component of document.components) {
     if (!removed.has(component.id)) validLayoutNodeIds.add(`component:${component.id}`);
   }
+  for (const variable of document.variables) validLayoutNodeIds.add(`variable:${variable.id}`);
   for (const rule of survivingRules) {
     if (rule.condition !== undefined) validLayoutNodeIds.add(`condition:${rule.id}`);
     rule.actions.forEach((_action, index) => validLayoutNodeIds.add(`action:${rule.id}:${index}`));

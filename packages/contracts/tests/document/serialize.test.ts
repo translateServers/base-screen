@@ -83,12 +83,15 @@ describe('serializeScreenDocument', () => {
           },
         ],
         variables: [
-          { type: 'static', name: 'count', description: '当前计数', value: 42 },
+          { type: 'static', id: 'count', name: 'count', description: '当前计数', initialValue: 42 },
           {
-            type: 'host',
+            type: 'data-source',
+            id: 'tenant',
             name: 'tenant',
             description: '当前租户',
-            variableId: 'tenant-context',
+            initialValue: null,
+            sourceId: 'tenant-context',
+            controlled: true,
           },
         ],
       }),
@@ -114,13 +117,22 @@ describe('serializeScreenDocument', () => {
               resourceId: 'orders',
               params: {
                 limit: { kind: 'literal', value: 5 },
-                tenant: { kind: 'variable', name: 'tenant' },
+                tenant: { kind: 'variable', variableId: 'tenant' },
               },
               binding: { fields: { columns: ['name', 'amount'] } },
             },
           },
         ],
-        variables: [{ type: 'host', name: 'tenant', variableId: 'tenant-context' }],
+        variables: [
+          {
+            type: 'data-source',
+            id: 'tenant',
+            name: 'tenant',
+            initialValue: null,
+            sourceId: 'tenant-context',
+            controlled: true,
+          },
+        ],
       }),
     );
     const reparsed = parseScreenDocument(JSON.parse(serializeScreenDocument(input)));

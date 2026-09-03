@@ -324,6 +324,10 @@ export class DesignerBlueprintWorkbenchController {
       const id = `component:${focus.id}`;
       return graph.nodes.some((node) => node.id === id) ? id : undefined;
     }
+    if (focus.kind === 'variable') {
+      const id = `variable:${focus.id}`;
+      return graph.nodes.some((node) => node.id === id) ? id : undefined;
+    }
     if (focus.kind === 'rule') {
       return (
         graph.nodes.find((node) => node.ruleId === focus.id)?.id ??

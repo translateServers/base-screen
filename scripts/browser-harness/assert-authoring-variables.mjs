@@ -1,3 +1,4 @@
+import { assertVariableListThemeQuality } from './assert-variable-list-theme-quality.mjs';
 import { screenshotDirectory } from './constants.mjs';
 
 export async function assertAuthoringVariables(page, designer) {
@@ -17,8 +18,20 @@ export async function assertAuthoringVariables(page, designer) {
   const variableNamesBefore = await page.evaluate(() =>
     window.baseScreenHarness.designer.document.variables.map((item) => item.name).join(','),
   );
-  if (variableNamesBefore !== 'count,region') {
+  if (variableNamesBefore !== 'count,region,dataSourceRegion,urlCampaign') {
     throw new Error(`BROWSER_HARNESS_VARIABLES_LIST_FAILED:${variableNamesBefore}`);
+  }
+  const variableTypesBefore = await page.evaluate(() =>
+    [
+      ...new Set(
+        window.baseScreenHarness.designer.document.variables.map((variable) => variable.type),
+      ),
+    ]
+      .sort()
+      .join(','),
+  );
+  if (variableTypesBefore !== 'data-source,static,url-query') {
+    throw new Error(`BROWSER_HARNESS_VARIABLE_TYPES_FAILED:${variableTypesBefore}`);
   }
   const variableModule = await designer.locator('[data-variables]').evaluate((panel) => {
     const collapsedRow = panel.querySelector('[data-variable-row]');
@@ -36,9 +49,21 @@ export async function assertAuthoringVariables(page, designer) {
     const addGlyph = add?.querySelector('.variable-button-glyph');
     const addLabel = add?.querySelector('.variable-button-label');
     const content = panel.querySelector('.variable-panel-content');
-    const actionSizes = [...(row?.querySelectorAll('.variable-actions button') ?? [])].map(
+    const actionSizes = [...(row?.querySelectorAll('.variable-row-actions button') ?? [])].map(
       (button) => button.getBoundingClientRect().width,
     );
+    const identity = row?.querySelector('.variable-row-identity');
+    const actions = row?.querySelector('.variable-row-actions');
+    const context = row?.querySelector('.variable-row-context');
+    const toggle = row?.querySelector('[data-variable-action="toggle-variable"]');
+    const identityRect = identity?.getBoundingClientRect();
+    const actionsRect = actions?.getBoundingClientRect();
+    const firstAction = actions?.querySelector('button');
+    firstAction?.focus();
+    const keyboardActionVisible =
+      firstAction === panel.getRootNode().activeElement &&
+      getComputedStyle(actions).opacity === '1';
+    toggle?.focus();
     return {
       panelDisplay: getComputedStyle(panel).display,
       panelOverflow: getComputedStyle(panel).overflow,
@@ -68,9 +93,29 @@ export async function assertAuthoringVariables(page, designer) {
           : getComputedStyle(addLabel).textOverflow,
       addHasDecorativeSvg: add?.querySelector('svg')?.getAttribute('aria-hidden') === 'true',
       actionSizes,
-      actionLabels: [...(row?.querySelectorAll('.variable-actions button') ?? [])].map((button) =>
-        button.getAttribute('aria-label'),
+      actionLabels: [...(row?.querySelectorAll('.variable-row-actions button') ?? [])].map(
+        (button) => button.getAttribute('aria-label'),
       ),
+      actionsBelowIdentity:
+        identityRect !== undefined &&
+        actionsRect !== undefined &&
+        actionsRect.top >= identityRect.bottom - 1,
+      contextValue: context?.querySelector('code')?.textContent,
+      headerHeight: row?.querySelector('.variable-row-header')?.getBoundingClientRect().height,
+      identityOpacity:
+        identity === null || identity === undefined
+          ? undefined
+          : getComputedStyle(identity).opacity,
+      keyboardActionVisible,
+      nameWidth: row?.querySelector('.variable-name')?.getBoundingClientRect().width,
+      toggleHeight: toggle?.getBoundingClientRect().height,
+      variableTypes: [
+        ...new Set(
+          [...panel.querySelectorAll('[data-variable-row]')].map(
+            (variableRow) => variableRow.dataset.variableType,
+          ),
+        ),
+      ].sort(),
     };
   });
   if (
@@ -78,8 +123,8 @@ export async function assertAuthoringVariables(page, designer) {
     variableModule.panelOverflow !== 'hidden' ||
     variableModule.contentOverflowY !== 'auto' ||
     variableModule.duplicateTitle ||
-    !variableModule.description?.includes('组件之间') ||
-    variableModule.quickSteps !== 2 ||
+    variableModule.description !== '全局变量管理' ||
+    variableModule.quickSteps !== 0 ||
     !variableModule.collapsedValueHidden ||
     !variableModule.collapsedToggleLabel?.includes('展开全局变量 count') ||
     variableModule.listRole !== 'list' ||
@@ -96,7 +141,15 @@ export async function assertAuthoringVariables(page, designer) {
     variableModule.addLabelOverflow !== 'ellipsis' ||
     !variableModule.addHasDecorativeSvg ||
     variableModule.actionSizes.some((size) => size < 24) ||
-    variableModule.actionLabels.some((label) => !label?.includes('count'))
+    variableModule.actionLabels.some((label) => !label?.includes('count')) ||
+    !variableModule.actionsBelowIdentity ||
+    variableModule.contextValue !== '0' ||
+    (variableModule.headerHeight ?? 0) < 72 ||
+    variableModule.identityOpacity !== '1' ||
+    !variableModule.keyboardActionVisible ||
+    (variableModule.nameWidth ?? 0) < 24 ||
+    variableModule.toggleHeight !== variableModule.headerHeight ||
+    variableModule.variableTypes.join(',') !== 'data-source,static,url-query'
   ) {
     throw new Error(
       `BROWSER_HARNESS_VARIABLES_UI_QUALITY_FAILED:${JSON.stringify(variableModule)}`,
@@ -105,62 +158,7 @@ export async function assertAuthoringVariables(page, designer) {
   await designer.locator('[data-variables]').screenshot({
     path: `${screenshotDirectory}/variables-module-${page.viewportSize()?.width ?? 'desktop'}.png`,
   });
-  const variableThemeQuality = await page.evaluate(async () => {
-    const designer = window.baseScreenHarness.designer;
-    const panel = designer.shadowRoot.querySelector('[data-variables]');
-    const add = panel.querySelector('[data-variable-action="add"]');
-    const sample = () => {
-      const addStyle = getComputedStyle(add);
-      const valueStyle = getComputedStyle(panel.querySelector('.variable-value-button'));
-      return {
-        addColor: addStyle.color,
-        addBackground: addStyle.backgroundColor,
-        valueColor: valueStyle.color,
-        valueBackground: valueStyle.backgroundColor,
-        rowBackground: getComputedStyle(panel.querySelector('[data-variable-row]')).backgroundColor,
-      };
-    };
-    const channels = (color) => {
-      const values = color.match(/[\d.]+/g)?.map(Number) ?? [];
-      return color.startsWith('color(srgb')
-        ? values.slice(0, 3)
-        : values.slice(0, 3).map((value) => value / 255);
-    };
-    const luminance = (color) =>
-      channels(color)
-        .map((value) => (value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4))
-        .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0);
-    const contrast = () => {
-      const style = getComputedStyle(add);
-      const values = [luminance(style.color), luminance(style.backgroundColor)].sort(
-        (left, right) => right - left,
-      );
-      return (values[0] + 0.05) / (values[1] + 0.05);
-    };
-    designer.removeAttribute('theme');
-    const darkContrast = contrast();
-    designer.setAttribute('theme', 'light');
-    const immediate = sample();
-    const lightContrast = contrast();
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    const settled = sample();
-    designer.removeAttribute('theme');
-    return {
-      atomic: JSON.stringify(immediate) === JSON.stringify(settled),
-      darkContrast,
-      lightContrast,
-    };
-  });
-  if (
-    !variableThemeQuality.atomic ||
-    variableThemeQuality.darkContrast < 4.5 ||
-    variableThemeQuality.lightContrast < 4.5
-  ) {
-    throw new Error(
-      `BROWSER_HARNESS_VARIABLES_THEME_QUALITY_FAILED:${JSON.stringify(variableThemeQuality)}`,
-    );
-  }
-  await page.waitForTimeout(200);
+  await assertVariableListThemeQuality(page);
   // 新建未引用变量 temporary，保留新建能力覆盖；region 已由初始文档提供并被引用。
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;

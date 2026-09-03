@@ -9,7 +9,7 @@ describe('host dataset Core helpers', () => {
   it('R3 evaluates literals and variables into detached ordinary JSON', () => {
     const params = {
       limit: { kind: 'literal' as const, value: 20 },
-      tenant: { kind: 'variable' as const, name: 'tenant' },
+      tenant: { kind: 'variable' as const, variableId: 'tenant' },
     };
     const result = evaluateScreenHostResourceParameters(params, { tenant: { id: 'a' } });
     expect(result).toEqual({
@@ -23,7 +23,10 @@ describe('host dataset Core helpers', () => {
 
   it('R3 fails closed for a missing variable or an invalid role binding', () => {
     expect(
-      evaluateScreenHostResourceParameters({ tenant: { kind: 'variable', name: 'missing' } }, {}),
+      evaluateScreenHostResourceParameters(
+        { tenant: { kind: 'variable', variableId: 'missing' } },
+        {},
+      ),
     ).toMatchObject({ ok: false, diagnostics: [{ code: 'HOST_DATASET_PARAMETER_INVALID' }] });
     expect(
       validateScreenHostResourceBinding(
@@ -37,7 +40,7 @@ describe('host dataset Core helpers', () => {
   it('R8 optional parameters keep unset/literal/variable authoring states and only persist present items', () => {
     const params = {
       region: { kind: 'literal' as const, value: '华东' },
-      tenant: { kind: 'variable' as const, name: 'tenant' },
+      tenant: { kind: 'variable' as const, variableId: 'tenant' },
     };
     const evaluated = evaluateScreenHostResourceParameters(params, { tenant: 't-1' });
     expect(evaluated.ok).toBe(true);

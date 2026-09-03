@@ -19,9 +19,9 @@ export function evaluateExpression(
     case 'event-payload':
       return resolvePath(payload, expression.path);
     case 'variable': {
-      if (!Object.hasOwn(variables, expression.name))
+      if (!Object.hasOwn(variables, expression.variableId))
         return failure('BLUEPRINT_EXPRESSION_INVALID', 'Blueprint variable is missing.');
-      return cloneResult(variables[expression.name]!);
+      return cloneResult(variables[expression.variableId]!);
     }
     case 'array': {
       const values: ScreenJsonValue[] = [];

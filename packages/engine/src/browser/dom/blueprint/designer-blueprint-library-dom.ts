@@ -82,7 +82,7 @@ function libraryPane(
     return componentPane(graph, componentLibrary, selection, normalized);
   }
   if (activeTab === 'logic') return logicPane(normalized);
-  return variablePane(document, normalized);
+  return variablePane(document, graph, selection, normalized);
 }
 
 function componentPane(
@@ -177,15 +177,31 @@ function logicPane(query: string): string {
     )}`;
 }
 
-function variablePane(document: ScreenDocument | undefined, query: string): string {
+function variablePane(
+  document: ScreenDocument | undefined,
+  graph: BaseScreenBlueprintCanvasGraph,
+  selection: BaseScreenBlueprintCanvasSelection,
+  query: string,
+): string {
+  const placed = new Set(
+    graph.nodes.filter((node) => node.kind === 'variable').map((node) => node.id),
+  );
   const variables = (document?.variables ?? []).filter((variable) =>
-    `${variable.name} ${variable.type} ${variable.type === 'host' ? variable.variableId : JSON.stringify(variable.value)}`
+    `${variable.name} ${variable.type} ${variable.type === 'static' ? JSON.stringify(variable.initialValue) : variable.sourceId}`
       .toLocaleLowerCase()
       .includes(query),
   );
   if (variables.length === 0) return emptyState(DESIGNER_UI_TEXT.blueprint.noVariables);
-  return `${directNodeContext()}<div class="blueprint-palette-list">
-    ${variables.map((variable) => variableItem(variable)).join('')}
+  return `<div class="blueprint-palette-list">
+    ${variables
+      .map((variable) =>
+        variableItem(
+          variable,
+          placed.has(`variable:${variable.id}`),
+          selection?.kind === 'node' && selection.id === `variable:${variable.id}`,
+        ),
+      )
+      .join('')}
   </div>`;
 }
 
@@ -249,12 +265,19 @@ function logicItem(
   </div>`;
 }
 
-function variableItem(variable: ScreenVariable): string {
-  const detail = variable.type === 'host' ? variable.variableId : JSON.stringify(variable.value);
-  return `<div class="blueprint-palette-item" data-kind="variable" draggable="true" data-blueprint-drag-kind="set-variable" data-variable-name="${escapeAttribute(variable.name)}" data-blueprint-drag-label="${escapeAttribute(variable.name)}">
-    <button type="button" class="blueprint-palette-primary" data-blueprint-insert="set-variable" data-variable-name="${escapeAttribute(variable.name)}" aria-label="${escapeAttribute(DESIGNER_UI_TEXT.blueprint.addVariableAction(variable.name))}">
+function variableItem(variable: ScreenVariable, placed: boolean, selected: boolean): string {
+  const detail =
+    variable.type === 'static' ? JSON.stringify(variable.initialValue) : variable.sourceId;
+  const action = placed
+    ? `data-blueprint-select-node="variable:${escapeAttribute(variable.id)}"`
+    : `data-blueprint-add-variable="${escapeAttribute(variable.id)}"`;
+  const actionLabel = placed
+    ? DESIGNER_UI_TEXT.blueprint.locateVariable(variable.name)
+    : DESIGNER_UI_TEXT.blueprint.addVariableNode(variable.name);
+  return `<div class="blueprint-palette-item" data-kind="variable" data-placed="${String(placed)}" data-selected="${String(selected)}"${placed ? '' : ` draggable="true" data-blueprint-drag-kind="variable" data-variable-id="${escapeAttribute(variable.id)}" data-blueprint-drag-label="${escapeAttribute(variable.name)}"`}>
+    <button type="button" class="blueprint-palette-primary" ${action} aria-label="${escapeAttribute(actionLabel)}">
       <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon('variable')}</span>
-      <span><strong>${escapeHtml(variable.name)}</strong><small>${escapeHtml(DESIGNER_UI_TEXT.blueprint.variableKind[variable.type])} · ${escapeHtml(detail)}</small></span><span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span>
+      <span><strong>${escapeHtml(variable.name)}</strong><small>${escapeHtml(DESIGNER_UI_TEXT.blueprint.variableKind[variable.type])} · ${escapeHtml(detail)}</small></span>${placed ? `<em>${DESIGNER_UI_TEXT.blueprint.placed}</em>` : `<span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span>`}
     </button>
   </div>`;
 }

@@ -190,6 +190,93 @@
   overflow-wrap: anywhere;
 }
 
+.variable-checkbox-field {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-workspace);
+  cursor: pointer;
+}
+
+.variable-checkbox-field > input {
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--designer-accent);
+}
+
+.variable-checkbox-field > input:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.variable-checkbox-field > span {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-1);
+}
+
+.variable-checkbox-field strong {
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  font-weight: 600;
+}
+
+.variable-checkbox-field small {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: 10px;
+  line-height: 15px;
+  overflow-wrap: anywhere;
+}
+
+.variable-response-field {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-3);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-workspace);
+}
+
+.variable-response-field > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-2);
+}
+
+.variable-response-field .designer-button {
+  min-height: 24px;
+  padding: 0 var(--designer-space-2);
+}
+
+.variable-response-field p,
+.variable-response-field pre {
+  min-width: 0;
+  max-height: 160px;
+  margin: 0;
+  overflow: hidden auto;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  scrollbar-gutter: stable;
+}
+
+.variable-response-field pre {
+  color: var(--designer-text-primary);
+  font: var(--designer-font-numeric);
+  white-space: pre-wrap;
+}
+
 .variable-editor-error {
   margin: 0;
   padding: var(--designer-space-2) var(--designer-space-3);

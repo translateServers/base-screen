@@ -164,7 +164,7 @@ export interface BaseScreenMaterialManifest {
   readonly styleSchema: BaseScreenMaterialObjectSchema;
   readonly stylePanel: readonly BaseScreenMaterialStylePanelField[];
   readonly events: readonly string[];
-  readonly dataCapabilities: readonly ('static' | 'host-resource')[];
+  readonly dataCapabilities: readonly ('static' | 'host-resource' | 'variable')[];
   readonly dataBinding?: { readonly roles: readonly BaseScreenMaterialDataBindingRole[] };
   readonly designCapabilities: BaseScreenMaterialDesignCapabilities;
   readonly libraryVisible?: boolean;

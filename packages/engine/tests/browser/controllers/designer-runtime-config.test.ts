@@ -75,9 +75,15 @@ function variablePort(): ScreenHostVariablePort {
 function variableCatalogPort(): ScreenHostVariableCatalogPort {
   return {
     list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
-    describe: async ({ variableId }) => ({
+    describe: async ({ sourceId }) => ({
       ok: true as const,
-      value: { variableId, name: 'hostVariable', description: null, previewable: false },
+      value: {
+        sourceId,
+        sourceType: 'data-source' as const,
+        name: 'hostVariable',
+        description: null,
+        previewable: false,
+      },
       diagnostics: [],
     }),
   };

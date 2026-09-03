@@ -41,11 +41,20 @@ export function nextDesignerVariableCopyName(
   return nextDesignerVariableName(variables, `${name.slice(0, 123)}Copy`);
 }
 
+export function nextDesignerVariableId(variables: readonly ScreenVariable[]): string {
+  const ids = new Set(variables.map((variable) => variable.id));
+  for (let index = 1; index <= 10_000; index++) {
+    const id = `variable-${index}`;
+    if (!ids.has(id)) return id;
+  }
+  return `variable-${variables.length + 1}`;
+}
+
 export function nextDesignerVariableName(
   variables: readonly ScreenVariable[],
   preferred: string,
 ): string {
-  const safePreferred = isDesignerVariableName(preferred) ? preferred : 'hostVariable';
+  const safePreferred = isDesignerVariableName(preferred) ? preferred : 'globalVariable';
   if (!isVariableNameTaken(variables, safePreferred)) return safePreferred;
   for (let suffix = 2; suffix < 10_000; suffix++) {
     const tail = String(suffix);

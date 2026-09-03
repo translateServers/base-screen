@@ -4,7 +4,7 @@ export async function openViewport({ baseUrl, browser, viewport }) {
   const page = await browser.newPage({ viewport });
   const pageErrors = [];
   page.on('pageerror', (error) => pageErrors.push(error));
-  await page.goto(baseUrl, { waitUntil: 'networkidle' });
+  await page.goto(`${baseUrl}/?campaign=browser-harness`, { waitUntil: 'networkidle' });
   if (pageErrors.length > 0) {
     throw pageErrors[0];
   }

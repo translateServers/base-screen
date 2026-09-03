@@ -34,7 +34,15 @@ export function renderDesignerBlueprintConfiguration(
   const edge =
     selection.kind === 'edge' ? graph.edges.find((item) => item.id === selection.id) : undefined;
   if (node?.kind === 'component') return componentConfiguration(document, node);
+  if (node?.kind === 'variable') return variableConfiguration(document, node);
   if (node?.unconnected === true) return unconnectedConfiguration(node);
+  if (edge?.kind === 'dependency') {
+    return `${nodeInformation(edge.id, DESIGNER_UI_TEXT.blueprint.selectionType.edge)}
+      ${configurationSection(
+        DESIGNER_UI_TEXT.blueprint.nodeConnectionState,
+        `<p>${DESIGNER_UI_TEXT.blueprint.lockedDependency}</p>`,
+      )}`;
+  }
   const ruleId = edge?.ruleId ?? node?.ruleId;
   const rule = document.blueprint.rules.find((item) => item.id === ruleId);
   if (rule === undefined) return emptyInspector();
@@ -72,7 +80,7 @@ function componentConfiguration(
 ): string {
   const related = document.blueprint.rules.filter(
     (rule) =>
-      rule.trigger.componentId === node.componentId ||
+      (rule.trigger.type === 'material-event' && rule.trigger.componentId === node.componentId) ||
       rule.actions.some(
         (action) =>
           action.type === 'component-visibility' && action.componentId === node.componentId,
@@ -104,6 +112,43 @@ function componentConfiguration(
     ${deleteButton()}`;
 }
 
+function variableConfiguration(
+  document: ScreenDocument,
+  node: BaseScreenBlueprintCanvasNode,
+): string {
+  const variable = document.variables.find((candidate) => candidate.id === node.variableId);
+  if (variable === undefined) return emptyInspector();
+  const related = document.blueprint.rules.filter(
+    (rule) =>
+      (rule.trigger.type === 'variable-event' && rule.trigger.variableId === variable.id) ||
+      rule.actions.some(
+        (action) =>
+          (action.type === 'set-variable' || action.type === 'request-variable') &&
+          action.variableId === variable.id,
+      ),
+  ).length;
+  const source = variable.type === 'static' ? variable.type : variable.sourceId;
+  return `${nodeInformation(variable.id, DESIGNER_UI_TEXT.blueprint.variableKind[variable.type])}
+    ${configurationSection(
+      DESIGNER_UI_TEXT.blueprint.variableValueTitle,
+      `<dl class="blueprint-inspector-facts">
+        ${contextRow(DESIGNER_UI_TEXT.variables.name, variable.name)}
+        ${contextRow(DESIGNER_UI_TEXT.variables.sourceId, source)}
+        ${contextRow(DESIGNER_UI_TEXT.variables.initialValue, JSON.stringify(variable.initialValue))}
+      </dl>`,
+    )}
+    ${configurationSection(
+      DESIGNER_UI_TEXT.blueprint.outputEvents,
+      `<div class="blueprint-port-list">${(node.events ?? [])
+        .map(
+          (event) =>
+            `<span><i aria-hidden="true"></i><strong>${escapeHtml(event.label)}</strong><small>${escapeHtml(event.name)}</small></span>`,
+        )
+        .join('')}</div><p>${DESIGNER_UI_TEXT.blueprint.ruleCount(related)}</p>`,
+    )}
+    ${deleteButton()}`;
+}
+
 function unconnectedConfiguration(node: BaseScreenBlueprintCanvasNode): string {
   const type =
     node.kind === 'condition'
@@ -113,7 +158,7 @@ function unconnectedConfiguration(node: BaseScreenBlueprintCanvasNode): string {
     node.kind === 'condition' && node.condition !== undefined
       ? `${DESIGNER_UI_TEXT.blueprint.eventPayloadValue('')} · ${DESIGNER_UI_TEXT.blueprint.conditionOperator(node.condition.operator)}`
       : node.action?.type === 'set-variable'
-        ? DESIGNER_UI_TEXT.blueprint.setVariableAction(node.action.variableName)
+        ? DESIGNER_UI_TEXT.blueprint.setVariableAction(node.action.variableId)
         : node.action?.type === 'emit-host-event'
           ? DESIGNER_UI_TEXT.blueprint.emitHostEventAction(node.action.eventName)
           : DESIGNER_UI_TEXT.blueprint.nodeNeedsConfiguration;
@@ -145,11 +190,17 @@ function nodeInformation(id: string, type: string): string {
 }
 
 function upstreamSection(document: ScreenDocument, rule: ScreenBlueprintRule): string {
-  const source = document.components.find((component) => component.id === rule.trigger.componentId);
+  const trigger = rule.trigger;
+  const source =
+    trigger.type === 'material-event'
+      ? (document.components.find((component) => component.id === trigger.componentId)?.name ??
+        trigger.componentId)
+      : (document.variables.find((variable) => variable.id === trigger.variableId)?.name ??
+        trigger.variableId);
   return configurationSection(
     DESIGNER_UI_TEXT.blueprint.upstreamEventDescription,
     `<div class="blueprint-inspector-pair">
-      ${valueCard(DESIGNER_UI_TEXT.blueprint.sourceComponent, source?.name ?? rule.trigger.componentId)}
+      ${valueCard(DESIGNER_UI_TEXT.blueprint.sourceComponent, source)}
       ${valueCard(DESIGNER_UI_TEXT.blueprint.eventIdentifier, rule.trigger.eventName)}
     </div>`,
   );
@@ -181,10 +232,14 @@ function actionDescription(
     action.type === 'component-visibility'
       ? `${document.components.find((component) => component.id === action.componentId)?.name ?? action.componentId} · ${visibilityLabel(action.operation)}`
       : action.type === 'set-variable'
-        ? DESIGNER_UI_TEXT.blueprint.setVariableAction(action.variableName)
-        : action.type === 'emit-host-event'
-          ? DESIGNER_UI_TEXT.blueprint.emitHostEventAction(action.eventName)
-          : DESIGNER_UI_TEXT.blueprint.hostAction(action.actionId);
+        ? DESIGNER_UI_TEXT.blueprint.setVariableAction(action.variableId)
+        : action.type === 'request-variable'
+          ? `request-variable · ${action.variableId}`
+          : action.type === 'request-component-data'
+            ? `request-component-data · ${action.componentId}`
+            : action.type === 'emit-host-event'
+              ? DESIGNER_UI_TEXT.blueprint.emitHostEventAction(action.eventName)
+              : DESIGNER_UI_TEXT.blueprint.hostAction(action.actionId);
   return `<span><em>${index + 1}</em><strong>${escapeHtml(description)}</strong><small>${escapeHtml(action.type)}</small></span>`;
 }
 
@@ -239,11 +294,11 @@ function actionFields(
     const source = designerBlueprintSetVariableSource(action.value);
     const eventFields = designerBlueprintEventFieldPaths(document, ruleId, catalog);
     const sourceVariables = document.variables.filter(
-      (variable) => variable.name !== action.variableName,
+      (variable) => variable.id !== action.variableId,
     );
-    return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.variableName}</span>
+    return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.variableId}</span>
       <select class="designer-control designer-select" data-blueprint-action-variable ${data}>
-        ${document.variables.map((variable) => `<option value="${escapeAttribute(variable.name)}"${variable.name === action.variableName ? ' selected' : ''}>${escapeHtml(variable.name)}</option>`).join('')}
+        ${document.variables.map((variable) => `<option value="${escapeAttribute(variable.id)}"${variable.id === action.variableId ? ' selected' : ''}>${escapeHtml(variable.name)}</option>`).join('')}
       </select>
     </label>
     <label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.valueSource}</span>
@@ -258,6 +313,9 @@ function actionFields(
       <input type="text" class="designer-control designer-input" value="${escapeAttribute(action.eventName)}" data-blueprint-action-event ${data}>
     </label>`;
   }
+  if (action.type === 'request-variable') return `<code>${escapeHtml(action.variableId)}</code>`;
+  if (action.type === 'request-component-data')
+    return `<code>${escapeHtml(action.componentId)}</code>`;
   return `<code>${escapeHtml(action.actionId)}</code>`;
 }
 
@@ -289,7 +347,7 @@ function expressionLabel(expression: ScreenBlueprintValueExpression): string {
     return DESIGNER_UI_TEXT.blueprint.eventPayloadValue(expression.path.join('.'));
   }
   if (expression.kind === 'variable')
-    return DESIGNER_UI_TEXT.blueprint.variableValue(expression.name);
+    return DESIGNER_UI_TEXT.blueprint.variableValue(expression.variableId);
   if (expression.kind === 'array')
     return DESIGNER_UI_TEXT.blueprint.arrayValue(expression.items.length);
   return DESIGNER_UI_TEXT.blueprint.objectValue(Object.keys(expression.properties).length);
@@ -371,10 +429,10 @@ function valueSourceField(
   }
   if (source === 'variable') {
     if (variables.length === 0) return `<p>${DESIGNER_UI_TEXT.blueprint.noSourceVariables}</p>`;
-    const current = expression.kind === 'variable' ? expression.name : '';
+    const current = expression.kind === 'variable' ? expression.variableId : '';
     return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.sourceVariable}</span>
       <select class="designer-control designer-select" data-blueprint-action-source-variable ${data}>
-        ${variables.map((variable) => `<option value="${escapeAttribute(variable.name)}"${variable.name === current ? ' selected' : ''}>${escapeHtml(variable.name)}</option>`).join('')}
+        ${variables.map((variable) => `<option value="${escapeAttribute(variable.id)}"${variable.id === current ? ' selected' : ''}>${escapeHtml(variable.name)}</option>`).join('')}
       </select>
     </label>`;
   }

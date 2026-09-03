@@ -6,6 +6,25 @@ import {
 import { makeComponent, makeDocument, makeVariable } from '../__fixtures__/document.js';
 
 describe('Blueprint runtime', () => {
+  it('ignores a dynamic variable initial value while controlled mode is enabled', () => {
+    const compiled = compileScreenBlueprint(
+      makeDocument({
+        variables: [
+          {
+            type: 'data-source',
+            id: 'region',
+            name: 'region',
+            initialValue: 'fallback',
+            sourceId: 'region-source',
+            controlled: true,
+          },
+        ],
+      }),
+    );
+
+    expect(compiled).toMatchObject({ ok: true, value: { initialVariables: { region: null } } });
+  });
+
   it('emits ordered component visibility effects and enforces the native capability', () => {
     const document = makeDocument({
       components: [makeComponent({ id: 'button' }), makeComponent({ id: 'panel' })],
@@ -61,7 +80,7 @@ describe('Blueprint runtime', () => {
   it('dispatches only matching rules into detached variable and host-event outputs', () => {
     const document = makeDocument({
       components: [makeComponent({ id: 'button' })],
-      variables: [makeVariable({ name: 'count', value: 0 })],
+      variables: [makeVariable({ name: 'count', initialValue: 0 })],
       blueprint: {
         rules: [
           {
@@ -70,7 +89,7 @@ describe('Blueprint runtime', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'count',
+                variableId: 'count',
                 value: { kind: 'literal', value: 1 },
               },
               {
@@ -141,7 +160,7 @@ describe('Blueprint runtime', () => {
   it('evaluates each rule action against the pending atomic variable state', () => {
     const document = makeDocument({
       components: [makeComponent({ id: 'button' })],
-      variables: [makeVariable({ name: 'count', value: 0 })],
+      variables: [makeVariable({ name: 'count', initialValue: 0 })],
       blueprint: {
         rules: [
           {
@@ -150,13 +169,13 @@ describe('Blueprint runtime', () => {
             actions: [
               {
                 type: 'set-variable',
-                variableName: 'count',
+                variableId: 'count',
                 value: { kind: 'literal', value: 2 },
               },
               {
                 type: 'emit-host-event',
                 eventName: 'count-updated',
-                payload: { kind: 'variable', name: 'count' },
+                payload: { kind: 'variable', variableId: 'count' },
               },
             ],
           },

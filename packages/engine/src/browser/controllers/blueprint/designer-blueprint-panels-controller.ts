@@ -8,8 +8,10 @@ import {
   componentBlueprintNodeId,
   deleteDesignerBlueprintSelection,
   insertDesignerBlueprintComponentNode,
+  insertDesignerBlueprintVariableNode,
   updateDesignerBlueprintAction,
   updateDesignerBlueprintCondition,
+  variableBlueprintNodeId,
 } from '../../../common/operations/blueprint/designer-blueprint-model.js';
 import type {
   BaseScreenBlueprintCanvasGraph,
@@ -32,7 +34,6 @@ import {
 } from '../../dom/blueprint/designer-blueprint-inspector-dom.js';
 import {
   type DesignerBlueprintLibraryTab,
-  isDesignerBlueprintLibraryBuiltinTab,
   renderDesignerBlueprintLibrary,
 } from '../../dom/blueprint/designer-blueprint-library-dom.js';
 import {
@@ -43,6 +44,7 @@ import {
   isDesignerBlueprintConditionOperator,
   updateDesignerBlueprintActionFromTarget,
 } from './designer-blueprint-panel-mutations.js';
+import { isInspectorTab, isLibraryTab } from './designer-blueprint-panel-tabs.js';
 
 export interface DesignerBlueprintPanelsCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
@@ -191,6 +193,22 @@ export class DesignerBlueprintPanelsController {
       this.report(result);
       return true;
     }
+    const variableId = target.closest<HTMLElement>('[data-blueprint-add-variable]')?.dataset
+      .blueprintAddVariable;
+    if (variableId !== undefined) {
+      const document = this.callbacks.getDocument();
+      const id = variableBlueprintNodeId(variableId);
+      if (this.callbacks.getGraph().nodes.some((node) => node.id === id)) {
+        this.callbacks.select({ kind: 'node', id }, true);
+        return true;
+      }
+      const result = this.callbacks.commitBlueprint(
+        document === undefined ? null : insertDesignerBlueprintVariableNode(document, variableId),
+      );
+      if (result.ok) this.callbacks.select({ kind: 'node', id }, true);
+      this.report(result);
+      return true;
+    }
     const insert = target.closest<HTMLButtonElement>('[data-blueprint-insert]');
     if (insert !== null) {
       const kind = insert.dataset.blueprintInsert;
@@ -199,7 +217,7 @@ export class DesignerBlueprintPanelsController {
         const insertion =
           document === undefined
             ? null
-            : insertDesignerBlueprintLibraryNode(document, kind, insert.dataset.variableName);
+            : insertDesignerBlueprintLibraryNode(document, kind, insert.dataset.variableId);
         const result = this.callbacks.commitBlueprint(insertion?.blueprint ?? null);
         if (result.ok && insertion !== null) {
           this.callbacks.select({ kind: 'node', id: insertion.nodeId }, true);
@@ -232,12 +250,14 @@ export class DesignerBlueprintPanelsController {
     let payload: BaseScreenBlueprintCanvasInsertNode | undefined;
     if (kind === 'component' && source.dataset.componentId !== undefined) {
       payload = { kind, componentId: source.dataset.componentId };
+    } else if (kind === 'variable' && source.dataset.variableId !== undefined) {
+      payload = { kind, variableId: source.dataset.variableId };
     } else if (kind === 'condition' || kind === 'set-variable' || kind === 'emit-host-event') {
       payload = {
         kind,
-        ...(source.dataset.variableName === undefined
+        ...(source.dataset.variableId === undefined
           ? {}
-          : { variableName: source.dataset.variableName }),
+          : { variableId: source.dataset.variableId }),
       };
     }
     if (payload === undefined) return false;
@@ -366,24 +386,4 @@ export class DesignerBlueprintPanelsController {
           group.id === groupId && baseScreenDesignerLeftPanelGroupSupportsMode(group, 'blueprint'),
       );
   }
-}
-
-function isLibraryTab(
-  value: string | undefined,
-  groups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined,
-): value is DesignerBlueprintLibraryTab {
-  if (value === undefined) return false;
-  if (isDesignerBlueprintLibraryBuiltinTab(value)) return true;
-  const groupId = hostLeftPanelGroupId(value);
-  return (
-    groupId !== undefined &&
-    groups?.some(
-      (group) =>
-        group.id === groupId && baseScreenDesignerLeftPanelGroupSupportsMode(group, 'blueprint'),
-    ) === true
-  );
-}
-
-function isInspectorTab(value: string | undefined): value is DesignerBlueprintInspectorTab {
-  return value === 'configuration' || value === 'problems' || value === 'trace';
 }

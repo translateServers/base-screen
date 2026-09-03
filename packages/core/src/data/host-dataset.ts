@@ -31,7 +31,7 @@ export function extractScreenHostResourceVariableDependencies(
   return [
     ...new Set(
       Object.values(params).flatMap((parameter) =>
-        parameter.kind === 'variable' ? [parameter.name] : [],
+        parameter.kind === 'variable' ? [parameter.variableId] : [],
       ),
     ),
   ].sort();
@@ -43,7 +43,7 @@ export function evaluateScreenHostResourceParameters(
 ): ScreenParseResult<ScreenHostResourceParameterEvaluation> {
   const values: Record<string, ScreenJsonValue> = {};
   for (const [name, parameter] of Object.entries(params)) {
-    const value = parameter.kind === 'literal' ? parameter.value : variables[parameter.name];
+    const value = parameter.kind === 'literal' ? parameter.value : variables[parameter.variableId];
     if (value === undefined) {
       return failure('HOST_DATASET_PARAMETER_INVALID', ['params', name]);
     }

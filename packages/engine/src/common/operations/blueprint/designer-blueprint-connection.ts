@@ -1,9 +1,10 @@
-import type { ScreenBlueprint, ScreenDocument } from '@base-screen/contracts';
+import type {
+  ScreenBlueprint,
+  ScreenBlueprintTrigger,
+  ScreenDocument,
+} from '@base-screen/contracts';
 import { normalizeDesignerBlueprintRuleCapabilities } from './designer-blueprint-capabilities.js';
-import {
-  createDesignerVisibilityRule,
-  type DesignerBlueprintEventOption,
-} from './designer-blueprint-model.js';
+import type { DesignerBlueprintEventOption } from './designer-blueprint-model.js';
 import {
   createDesignerBlueprintAction,
   createDesignerVisibilityAction,
@@ -58,6 +59,18 @@ export function connectDesignerBlueprintNodes(
       events,
     );
   }
+  const sourceVariableId = variableIdFromBlueprintNodeId(document, sourceNodeId);
+  if (
+    sourceVariableId !== undefined &&
+    (eventName === 'data-updated' || eventName === 'request-state')
+  ) {
+    return connectDesignerBlueprintTrigger(
+      document,
+      { type: 'variable-event', variableId: sourceVariableId, eventName },
+      targetNodeId,
+      targetHandle,
+    );
+  }
   const unconnectedSource = parseDesignerBlueprintUnconnectedNodeId(sourceNodeId);
   if (unconnectedSource?.kind === 'condition' && sourceHandle === 'condition:true') {
     return { ok: false, reason: 'source-unconnected' };
@@ -89,27 +102,48 @@ function connectDesignerBlueprintEvent(
   ) {
     return { ok: false, reason: 'invalid' };
   }
+  return connectDesignerBlueprintTrigger(
+    document,
+    { type: 'material-event', componentId: sourceComponentId, eventName },
+    targetNodeId,
+    targetHandle,
+  );
+}
+
+function connectDesignerBlueprintTrigger(
+  document: ScreenDocument,
+  trigger: ScreenBlueprintTrigger,
+  targetNodeId: string,
+  targetHandle: string,
+): DesignerBlueprintConnectionResult {
   const targetComponentId = componentIdFromBlueprintNodeId(document, targetNodeId);
   const operation = handleValue(targetHandle, 'visibility:');
   if (
     targetComponentId !== undefined &&
     (operation === 'show' || operation === 'hide' || operation === 'toggle')
   ) {
-    const rule = createDesignerVisibilityRule(
-      document,
-      sourceComponentId,
-      eventName,
-      targetComponentId,
-      operation,
-      events,
+    const duplicate = document.blueprint.rules.some(
+      (rule) =>
+        JSON.stringify(rule.trigger) === JSON.stringify(trigger) &&
+        rule.actions.some(
+          (action) =>
+            action.type === 'component-visibility' &&
+            action.componentId === targetComponentId &&
+            action.operation === operation,
+        ),
     );
-    return rule === null
-      ? { ok: false, reason: 'duplicate' }
-      : {
-          ok: true,
-          blueprint: { ...document.blueprint, rules: [...document.blueprint.rules, rule] },
-          selection: { kind: 'edge', id: `edge:${rule.id}:action:0` },
-        };
+    if (duplicate) return { ok: false, reason: 'duplicate' };
+    const sourceId = trigger.type === 'material-event' ? trigger.componentId : trigger.variableId;
+    const rule = normalizeDesignerBlueprintRuleCapabilities({
+      id: nextRuleId(document.blueprint, `${sourceId}-${trigger.eventName}-${operation}`),
+      trigger,
+      actions: [createDesignerVisibilityAction(targetComponentId, operation)],
+    });
+    return {
+      ok: true,
+      blueprint: { ...document.blueprint, rules: [...document.blueprint.rules, rule] },
+      selection: { kind: 'edge', id: `edge:${rule.id}:action:0` },
+    };
   }
   const target = parseDesignerBlueprintUnconnectedNodeId(targetNodeId);
   if (target === null) return { ok: false, reason: 'invalid' };
@@ -119,7 +153,8 @@ function connectDesignerBlueprintEvent(
   if (target.kind !== 'condition' && targetHandle !== 'action:in') {
     return { ok: false, reason: 'invalid' };
   }
-  const ruleId = nextRuleId(document.blueprint, `${sourceComponentId}-${eventName}-${target.kind}`);
+  const sourceId = trigger.type === 'material-event' ? trigger.componentId : trigger.variableId;
+  const ruleId = nextRuleId(document.blueprint, `${sourceId}-${trigger.eventName}-${target.kind}`);
   const action =
     target.kind === 'condition'
       ? null
@@ -133,7 +168,7 @@ function connectDesignerBlueprintEvent(
   }
   const rule = normalizeDesignerBlueprintRuleCapabilities({
     id: ruleId,
-    trigger: { type: 'material-event', componentId: sourceComponentId, eventName },
+    trigger,
     ...(target.kind === 'condition' ? { condition: defaultDesignerBlueprintCondition() } : {}),
     actions: action === null ? [] : [action],
   });
@@ -235,6 +270,15 @@ function componentIdFromBlueprintNodeId(
   return document.components.some((component) => component.id === componentId)
     ? componentId
     : undefined;
+}
+
+function variableIdFromBlueprintNodeId(
+  document: ScreenDocument,
+  nodeId: string,
+): string | undefined {
+  if (!nodeId.startsWith('variable:')) return undefined;
+  const variableId = nodeId.slice('variable:'.length);
+  return document.variables.some((variable) => variable.id === variableId) ? variableId : undefined;
 }
 
 function handleValue(handle: string, prefix: string): string | undefined {

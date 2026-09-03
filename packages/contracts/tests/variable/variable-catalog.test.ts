@@ -11,7 +11,14 @@ import {
 describe('host variable catalog contracts', () => {
   it('strictly parses detached summaries and preview descriptors', () => {
     const pageInput = {
-      items: [{ variableId: 'tenant-id', name: 'tenantId', description: '当前租户' }],
+      items: [
+        {
+          sourceId: 'tenant-id',
+          sourceType: 'data-source',
+          name: 'tenantId',
+          description: '当前租户',
+        },
+      ],
       nextCursor: 'opaque-next-page',
     };
     const page = parseScreenHostVariablePage(pageInput);
@@ -23,7 +30,8 @@ describe('host variable catalog contracts', () => {
     }
     expect(
       parseScreenHostVariableDescriptor({
-        variableId: 'tenant-id',
+        sourceId: 'tenant-id',
+        sourceType: 'data-source',
         name: 'tenantId',
         description: null,
         previewable: true,
@@ -35,16 +43,19 @@ describe('host variable catalog contracts', () => {
     const cases = [
       {
         items: [
-          { variableId: 'same', name: 'first', description: null },
-          { variableId: 'same', name: 'second', description: null },
+          { sourceId: 'same', sourceType: 'data-source', name: 'first', description: null },
+          { sourceId: 'same', sourceType: 'data-source', name: 'second', description: null },
         ],
       },
-      { items: [{ variableId: 'id', name: '1bad', description: null }] },
+      {
+        items: [{ sourceId: 'id', sourceType: 'data-source', name: '1bad', description: null }],
+      },
       { items: [], nextCursor: '' },
       { items: [], nextCursor: 'bad\nvalue' },
       {
         items: Array.from({ length: MAX_HOST_VARIABLE_PAGE_ITEMS + 1 }, (_, index) => ({
-          variableId: `id-${index}`,
+          sourceId: `id-${index}`,
+          sourceType: 'data-source',
           name: `name${index}`,
           description: null,
         })),
@@ -59,7 +70,8 @@ describe('host variable catalog contracts', () => {
     }
     expect(
       parseScreenHostVariableDescriptor({
-        variableId: 'id',
+        sourceId: 'id',
+        sourceType: 'data-source',
         name: 'name',
         description: null,
         previewable: true,
@@ -76,6 +88,7 @@ describe('host variable catalog contracts', () => {
       [
         {
           readonly query: string;
+          readonly sourceType: 'data-source' | 'url-query';
           readonly limit: number;
           readonly signal: { readonly aborted: boolean };
         },
@@ -83,6 +96,9 @@ describe('host variable catalog contracts', () => {
     >();
     expectTypeOf<ScreenHostVariableRequest>().toMatchTypeOf<{
       readonly variableId: string;
+      readonly sourceId: string;
+      readonly sourceType: 'data-source' | 'url-query';
+      readonly controlled: boolean;
       readonly purpose: 'runtime' | 'authoring-preview';
     }>();
     expectTypeOf<ScreenVariableRefreshOptions>().toMatchTypeOf<{

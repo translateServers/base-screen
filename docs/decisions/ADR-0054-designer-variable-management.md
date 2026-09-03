@@ -1,7 +1,7 @@
 # ADR-0054：Designer 变量管理
 
-> 状态：部分已取代（host 只读、引用重命名和公共契约结论由
-> [ADR-0067](./ADR-0067-datav-inspired-global-variables.md) 取代）
+> 状态：部分已取代（按名称引用、host 变量和公共契约结论由
+> [ADR-0068](./ADR-0068-datav-global-variables.md) 取代）
 > 日期：2026-08-16
 > 关联：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、
 > [ADR-0023](./ADR-0023-host-dataset-resource-integration.md)

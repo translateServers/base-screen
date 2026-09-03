@@ -1,5 +1,6 @@
 export interface ScreenHostVariableSummary {
-  readonly variableId: string;
+  readonly sourceId: string;
+  readonly sourceType: 'data-source' | 'url-query';
   readonly name: string;
   readonly description: string | null;
 }
@@ -14,7 +15,16 @@ export interface ScreenHostVariablePage {
 }
 
 export interface ScreenVariableRefreshOptions {
-  /** Omission refreshes every host variable referenced by the current document. */
+  /** Omission refreshes every dynamic variable in the current document. */
   readonly variableIds?: readonly string[];
   readonly traceId?: string;
+}
+
+export interface ScreenVariableHandle {
+  readonly id: string;
+  readonly value: import('./json.js').ScreenJsonValue;
+  set(
+    value: import('./json.js').ScreenJsonValue,
+  ): import('./diagnostics.js').ScreenParseResult<null>;
+  onChange(listener: (value: import('./json.js').ScreenJsonValue) => void): () => void;
 }

@@ -192,6 +192,12 @@ export function handleDatasetChange(
     setSourceMode(context, target.value as DesignerDataSourceMode);
     return true;
   }
+  if (target.dataset.dataVariableSource !== undefined && target instanceof HTMLSelectElement) {
+    context.state.variableSourceId = target.value;
+    context.state.draftDirty = true;
+    context.renderSurface();
+    return true;
+  }
   if (handleStaticChange(context, target)) return true;
   if (target.dataset.datasetAuthoringSetting !== undefined) {
     updateAuthoringSetting(context, target.dataset.datasetAuthoringSetting, target);

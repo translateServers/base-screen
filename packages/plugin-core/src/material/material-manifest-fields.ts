@@ -57,14 +57,15 @@ export function validateMaterialFields(
     );
   } else if (
     manifest.dataCapabilities.some(
-      (capability) => capability !== 'static' && capability !== 'host-resource',
+      (capability) =>
+        capability !== 'static' && capability !== 'host-resource' && capability !== 'variable',
     ) ||
     new Set(manifest.dataCapabilities).size !== manifest.dataCapabilities.length
   ) {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
       ['dataCapabilities'],
-      'Only unique static data capability declarations are supported.',
+      'Only unique static, host-resource, and variable data capability declarations are supported.',
     );
   }
   validateDesignCapabilities(manifest.designCapabilities, collector);

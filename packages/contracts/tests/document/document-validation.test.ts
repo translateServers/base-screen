@@ -48,7 +48,9 @@ describe('parseScreenDocument validation', () => {
         path: ['components', 0, 'postion'],
       },
       {
-        input: document({ variables: [{ type: 'static', name: 'a', value: 1, extra: true }] }),
+        input: document({
+          variables: [{ type: 'static', id: 'a', name: 'a', initialValue: 1, extra: true }],
+        }),
         path: ['variables', 0, 'extra'],
       },
     ];
@@ -69,8 +71,10 @@ describe('parseScreenDocument validation', () => {
     delete (withMissingPosition.components as Array<Record<string, unknown>>)[0]?.position;
     const withMissingStatus = document({ components: [component()] });
     delete (withMissingStatus.components as Array<Record<string, unknown>>)[0]?.status;
-    const withMissingVariable = document({ variables: [{ type: 'static', name: 'a', value: 1 }] });
-    delete (withMissingVariable.variables as Array<Record<string, unknown>>)[0]?.value;
+    const withMissingVariable = document({
+      variables: [{ type: 'static', id: 'a', name: 'a', initialValue: 1 }],
+    });
+    delete (withMissingVariable.variables as Array<Record<string, unknown>>)[0]?.initialValue;
     const withMissingCanvas = document();
     delete (withMissingCanvas.canvas as Record<string, unknown>).width;
     const cases: Array<[Record<string, unknown>, (string | number)[], string]> = [
@@ -78,7 +82,7 @@ describe('parseScreenDocument validation', () => {
       [withMissingId, ['components', 0, 'id'], 'DOCUMENT_FIELD_INVALID'],
       [withMissingPosition, ['components', 0, 'position'], 'COMPONENT_GEOMETRY_INVALID'],
       [withMissingStatus, ['components', 0, 'status'], 'DOCUMENT_FIELD_INVALID'],
-      [withMissingVariable, ['variables', 0, 'value'], 'DOCUMENT_FIELD_INVALID'],
+      [withMissingVariable, ['variables', 0, 'initialValue'], 'DOCUMENT_FIELD_INVALID'],
     ];
     for (const [input, path, code] of cases) {
       const result = parse(input);
@@ -179,7 +183,7 @@ describe('parseScreenDocument validation', () => {
     const badParent = parse(document({ components: [component({ parentId: 'has space' })] }));
     expect(badParent.ok).toBe(false);
     const badVariable = parse(
-      document({ variables: [{ type: 'static', name: '1abc', value: 0 }] }),
+      document({ variables: [{ type: 'static', id: '1abc', name: '1abc', initialValue: 0 }] }),
     );
     expect(badVariable.ok).toBe(false);
     if (!badVariable.ok) {
@@ -277,8 +281,8 @@ describe('parseScreenDocument validation', () => {
   it('rejects duplicate variable names', () => {
     const input = document({
       variables: [
-        { type: 'static', name: 'a', value: 1 },
-        { type: 'static', name: 'a', value: 2 },
+        { type: 'static', id: 'a', name: 'a', initialValue: 1 },
+        { type: 'static', id: 'b', name: 'a', initialValue: 2 },
       ],
     });
     const result = parse(input);
@@ -302,8 +306,9 @@ describe('parseScreenDocument validation', () => {
     const manyVariables = document({
       variables: Array.from({ length: 1_001 }, (_, index) => ({
         type: 'static' as const,
+        id: `v${index}`,
         name: `v${index}`,
-        value: 0,
+        initialValue: 0,
       })),
     });
     const variablesResult = parse(manyVariables);
@@ -351,7 +356,7 @@ describe('parseScreenDocument validation', () => {
   it('orders diagnostics deterministically by path', () => {
     const input = document({
       components: [component({ position: { x: 1_000_001, y: 0 } })],
-      variables: [{ type: 'static', name: '1bad', value: 0 }],
+      variables: [{ type: 'static', id: 'variable-1', name: '1bad', initialValue: 0 }],
     });
     const result = parse(input);
     expect(result.ok).toBe(false);
@@ -385,7 +390,7 @@ describe('parseScreenDocument validation', () => {
           dataSource: { type: 'static', value: secret },
         }),
       ],
-      variables: [{ type: 'static', name: 'a', value: secret }],
+      variables: [{ type: 'static', id: 'a', name: 'a', initialValue: secret }],
     });
     const result = parse(input);
     expect(result.ok).toBe(false);
@@ -401,9 +406,23 @@ describe('parseScreenDocument validation', () => {
     const accepted = parse(
       document({
         variables: [
-          { type: 'static', name: 'empty', description: '', value: 0 },
-          { type: 'static', name: 'count', description: '🚀'.repeat(4_096), value: 1 },
-          { type: 'host', name: 'tenant', description: '当前租户', variableId: 'tenant-id' },
+          { type: 'static', id: 'empty', name: 'empty', description: '', initialValue: 0 },
+          {
+            type: 'static',
+            id: 'count',
+            name: 'count',
+            description: '🚀'.repeat(4_096),
+            initialValue: 1,
+          },
+          {
+            type: 'data-source',
+            id: 'tenant',
+            name: 'tenant',
+            description: '当前租户',
+            initialValue: null,
+            sourceId: 'tenant-id',
+            controlled: true,
+          },
         ],
       }),
     );
@@ -412,7 +431,9 @@ describe('parseScreenDocument validation', () => {
       expect(
         parse(
           document({
-            variables: [{ type: 'static', name: 'count', description, value: 1 }],
+            variables: [
+              { type: 'static', id: 'count', name: 'count', description, initialValue: 1 },
+            ],
           }),
         ),
       ).toMatchObject({

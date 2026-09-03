@@ -14,6 +14,7 @@ class FakeElement {
   readonly attributes: Record<string, string> = {};
   readonly style: Record<string, string> = {};
   value = '';
+  checked = false;
   hidden = false;
   disabled = false;
   title = '';
@@ -104,7 +105,7 @@ function document(variables: ScreenDocument['variables']): ScreenDocument {
           type: 'host-resource',
           resourceType: 'dataset',
           resourceId: 'orders',
-          params: { region: { kind: 'variable', name: 'region' } },
+          params: { region: { kind: 'variable', variableId: 'region' } },
           binding: { fields: {} },
         },
       },
@@ -152,10 +153,17 @@ function descendants(element: FakeElement): FakeElement[] {
 }
 
 describe('designer variables controller', () => {
-  it('renders the variable list with type badges and host read-only rows', () => {
+  it('renders inline variable rows with source details and stable ids', () => {
     const { controller, panel } = harness([
-      { type: 'static', name: 'count', value: 0 },
-      { type: 'host', name: 'region', variableId: 'region-1' },
+      { type: 'static', id: 'count', name: 'count', initialValue: 0 },
+      {
+        type: 'data-source',
+        id: 'region',
+        name: 'region',
+        initialValue: null,
+        sourceId: 'region-1',
+        controlled: true,
+      },
     ]);
 
     const add = panel.querySelector<FakeElement>('[data-variable-action="add"]');
@@ -171,10 +179,16 @@ describe('designer variables controller', () => {
     const staticRow = rows[0]!;
     expect(descendants(staticRow).some((child) => child.textContent === '静态值')).toBe(true);
     expect(descendants(staticRow).some((child) => child.textContent === 'count')).toBe(true);
+    expect(staticRow.dataset.expanded).toBe('false');
+    expect(descendants(staticRow).some((child) => child.className === 'variable-row-context')).toBe(
+      true,
+    );
+    expect(descendants(staticRow).some((child) => child.textContent === '0')).toBe(true);
     expect(staticRow.querySelector('[data-variable-action="edit-value"]')).toBeNull();
 
     controller.onClick(action('toggle-variable', 0));
     const expandedStatic = descendants(panel).find((child) => child.dataset.variableRow === '0')!;
+    expect(expandedStatic.dataset.expanded).toBe('true');
     expect(expandedStatic.querySelector('[data-variable-action="edit-value"]')).not.toBeNull();
     expect(
       expandedStatic.querySelector('[data-variable-action="edit-description"]'),
@@ -182,15 +196,15 @@ describe('designer variables controller', () => {
 
     controller.onClick(action('toggle-variable', 1));
     const hostRow = descendants(panel).find((child) => child.dataset.variableRow === '1')!;
-    expect(descendants(hostRow).some((child) => child.textContent === '宿主提供')).toBe(true);
+    expect(descendants(hostRow).some((child) => child.textContent === '数据源请求')).toBe(true);
     expect(descendants(hostRow).some((child) => child.textContent === 'region-1')).toBe(true);
-    expect(hostRow.dataset.variableIdReadOnly).toBe('true');
+    expect(hostRow.dataset.variableId).toBe('region');
     expect(hostRow.querySelector('[data-variable-action="preview"]')).not.toBeNull();
   });
 
   it('creates a static variable through the replace-variables command', () => {
     const { controller, panel, commands, ownerDocument } = harness([
-      { type: 'static', name: 'count', value: 0 },
+      { type: 'static', id: 'count', name: 'count', initialValue: 0 },
     ]);
 
     controller.onClick(action('add'));
@@ -211,10 +225,51 @@ describe('designer variables controller', () => {
     expect(commands[0]).toEqual({
       type: 'replace-variables',
       variables: [
-        { type: 'static', name: 'count', value: 0 },
-        { type: 'static', name: 'region', value: 'north' },
+        { type: 'static', id: 'count', name: 'count', initialValue: 0 },
+        { type: 'static', id: 'variable-1', name: 'region', initialValue: 'north' },
       ],
     });
+  });
+
+  it('edits DataV filter, controlled mode, and automatic update fields inline', () => {
+    const variable = {
+      type: 'data-source' as const,
+      id: 'region',
+      name: 'region',
+      initialValue: 'fallback',
+      sourceId: 'region-source',
+      controlled: false,
+    };
+    const { controller, panel, commands } = harness([variable]);
+
+    controller.onClick(action('edit-config', 0));
+    const processor = panel.querySelector<FakeElement>('[data-variable-create-processor]');
+    const controlled = panel.querySelector<FakeElement>('[data-variable-create-controlled]');
+    const autoUpdate = panel.querySelector<FakeElement>('[data-variable-create-auto-update]');
+    const interval = panel.querySelector<FakeElement>(
+      '[data-variable-create-auto-update-interval]',
+    );
+    expect(panel.querySelector('[data-variable-action="confirm-config"]')).not.toBeNull();
+    expect(descendants(panel).some((child) => child.textContent === '数据响应结果')).toBe(true);
+    processor!.value = 'filter-region';
+    controlled!.checked = true;
+    autoUpdate!.checked = true;
+    interval!.value = '15';
+    controller.onClick(action('confirm-config', 0));
+
+    expect(commands).toEqual([
+      {
+        type: 'replace-variables',
+        variables: [
+          {
+            ...variable,
+            processorId: 'filter-region',
+            controlled: true,
+            autoUpdate: { intervalSeconds: 15 },
+          },
+        ],
+      },
+    ]);
   });
 
   it('rejects creating a variable with an invalid JSON value', () => {
@@ -238,7 +293,9 @@ describe('designer variables controller', () => {
   });
 
   it('rejects creating a variable with a duplicate name', () => {
-    const { controller, panel, commands } = harness([{ type: 'static', name: 'count', value: 0 }]);
+    const { controller, panel, commands } = harness([
+      { type: 'static', id: 'count', name: 'count', initialValue: 0 },
+    ]);
 
     controller.onClick(action('add'));
     const nameInput = panel.querySelector<FakeElement>('[data-variable-create-name]');
@@ -251,7 +308,9 @@ describe('designer variables controller', () => {
   });
 
   it('edits a static variable value as parsed JSON', () => {
-    const { controller, panel, commands } = harness([{ type: 'static', name: 'count', value: 0 }]);
+    const { controller, panel, commands } = harness([
+      { type: 'static', id: 'count', name: 'count', initialValue: 0 },
+    ]);
 
     controller.onClick(action('edit-value', 0));
     const valueInput = panel.querySelector<FakeElement>('[data-variable-value="0"]');
@@ -262,14 +321,14 @@ describe('designer variables controller', () => {
     expect(commands).toHaveLength(1);
     expect(commands[0]).toEqual({
       type: 'replace-variables',
-      variables: [{ type: 'static', name: 'count', value: 42 }],
+      variables: [{ type: 'static', id: 'count', name: 'count', initialValue: 42 }],
     });
   });
 
   it('rejects deleting a referenced variable and allows unreferenced deletion', () => {
     const { controller, panel, commands } = harness([
-      { type: 'static', name: 'count', value: 0 },
-      { type: 'static', name: 'region', value: 'north' },
+      { type: 'static', id: 'count', name: 'count', initialValue: 0 },
+      { type: 'static', id: 'region', name: 'region', initialValue: 'north' },
     ]);
 
     controller.onClick(action('delete', 1)); // region 被组件参数引用
@@ -282,12 +341,14 @@ describe('designer variables controller', () => {
     expect(commands).toHaveLength(1);
     expect(commands[0]).toEqual({
       type: 'replace-variables',
-      variables: [{ type: 'static', name: 'region', value: 'north' }],
+      variables: [{ type: 'static', id: 'region', name: 'region', initialValue: 'north' }],
     });
   });
 
   it('expands exact reference locations and exposes the canvas navigation target', () => {
-    const { controller, panel } = harness([{ type: 'static', name: 'region', value: 'north' }]);
+    const { controller, panel } = harness([
+      { type: 'static', id: 'region', name: 'region', initialValue: 'north' },
+    ]);
 
     controller.onClick(action('toggle-variable', 0));
     const toggle = panel.querySelector<FakeElement>('[data-variable-action="references"]');
@@ -310,7 +371,9 @@ describe('designer variables controller', () => {
   });
 
   it('toggles exact references from Enter or Space without repeat activation', () => {
-    const { controller } = harness([{ type: 'static', name: 'region', value: 'north' }]);
+    const { controller } = harness([
+      { type: 'static', id: 'region', name: 'region', initialValue: 'north' },
+    ]);
     class ReferenceToggle {
       readonly dataset = { variableAction: 'references', variableIndex: '0' };
 
@@ -352,7 +415,7 @@ describe('designer variables controller', () => {
 
   it('renames a referenced variable through the atomic core command', () => {
     const { controller, panel, commands } = harness([
-      { type: 'static', name: 'region', value: 'north' },
+      { type: 'static', id: 'region', name: 'region', initialValue: 'north' },
     ]);
 
     controller.onClick(action('rename', 0));
@@ -361,12 +424,14 @@ describe('designer variables controller', () => {
     controller.onClick(action('confirm-rename', 0));
 
     expect(commands).toEqual([
-      { type: 'rename-variable', variableName: 'region', nextName: 'region2' },
+      { type: 'rename-variable', variableId: 'region', nextName: 'region2' },
     ]);
   });
 
   it('keeps a renamed variable and its references expanded with focus restored', () => {
-    let current = document([{ type: 'static', name: 'region', value: 'north' }]);
+    let current = document([
+      { type: 'static', id: 'region', name: 'region', initialValue: 'north' },
+    ]);
     const ownerDocument = new FakeDocument();
     const panel = ownerDocument.createElement('div');
     const controller = new DesignerVariablesController({
@@ -389,8 +454,8 @@ describe('designer variables controller', () => {
 
     expect(current.variables[0]?.name).toBe('selectedRegion');
     expect(controller.currentDraft()).toMatchObject({
-      expandedVariableName: 'selectedRegion',
-      expandedReferenceName: 'selectedRegion',
+      expandedVariableName: 'region',
+      expandedReferenceName: 'region',
     });
     expect(
       panel
@@ -406,7 +471,9 @@ describe('designer variables controller', () => {
   });
 
   it('renames an unreferenced variable', () => {
-    const { controller, panel, commands } = harness([{ type: 'static', name: 'count', value: 0 }]);
+    const { controller, panel, commands } = harness([
+      { type: 'static', id: 'count', name: 'count', initialValue: 0 },
+    ]);
 
     controller.onClick(action('rename', 0));
     const renameInput = panel.querySelector<FakeElement>('[data-variable-rename="0"]');
@@ -416,14 +483,14 @@ describe('designer variables controller', () => {
     expect(commands).toHaveLength(1);
     expect(commands[0]).toEqual({
       type: 'rename-variable',
-      variableName: 'count',
+      variableId: 'count',
       nextName: 'total',
     });
   });
 
   it('edits descriptions and opens duplicate variables as uncommitted prefilled drafts', () => {
     const { controller, panel, commands } = harness([
-      { type: 'static', name: 'count', description: 'old', value: 2 },
+      { type: 'static', id: 'count', name: 'count', description: 'old', initialValue: 2 },
     ]);
 
     controller.onClick(action('edit-description', 0));
@@ -431,7 +498,15 @@ describe('designer variables controller', () => {
     controller.onClick(action('confirm-description', 0));
     expect(commands[0]).toEqual({
       type: 'replace-variables',
-      variables: [{ type: 'static', name: 'count', description: 'new description', value: 2 }],
+      variables: [
+        {
+          type: 'static',
+          id: 'count',
+          name: 'count',
+          description: 'new description',
+          initialValue: 2,
+        },
+      ],
     });
 
     controller.onClick(action('duplicate', 0));
@@ -449,25 +524,38 @@ describe('designer variables controller', () => {
       name: '',
       description: '',
       valueSource: '',
-      variableId: undefined,
+      sourceId: undefined,
     });
   });
 
-  it('creates host variables only after selecting a strict catalog descriptor', async () => {
+  it('creates data-source variables only after selecting a strict catalog descriptor', async () => {
     const catalog: ScreenHostVariableCatalogPort = {
       async list() {
         return {
           ok: true,
           value: {
-            items: [{ variableId: 'region-id', name: 'region', description: 'Host region' }],
+            items: [
+              {
+                sourceId: 'region-id',
+                sourceType: 'data-source',
+                name: 'region',
+                description: 'Host region',
+              },
+            ],
           },
           diagnostics: [],
         };
       },
-      async describe({ variableId }) {
+      async describe({ sourceId }) {
         return {
           ok: true,
-          value: { variableId, name: 'region', description: 'Host region', previewable: true },
+          value: {
+            sourceId,
+            sourceType: 'data-source',
+            name: 'region',
+            description: 'Host region',
+            previewable: true,
+          },
           diagnostics: [],
         };
       },
@@ -475,15 +563,15 @@ describe('designer variables controller', () => {
     const { controller, panel, commands } = harness([], { catalog });
 
     controller.onClick(action('add'));
-    controller.onClick(action('create-type-host'));
+    controller.onClick(action('create-type-data-source'));
     await Promise.resolve();
-    controller.onClick(action('select-host', undefined, { variableId: 'region-id' }));
+    controller.onClick(action('select-host', undefined, { sourceId: 'region-id' }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(controller.currentDraft().create).toMatchObject({
-      type: 'host',
+      type: 'data-source',
       name: 'region',
       description: 'Host region',
-      variableId: 'region-id',
+      sourceId: 'region-id',
     });
     expect(panel.querySelector('[data-variable-selected-host-id]')).not.toBeNull();
 
@@ -493,10 +581,13 @@ describe('designer variables controller', () => {
         type: 'replace-variables',
         variables: [
           {
-            type: 'host',
+            type: 'data-source',
+            id: 'variable-1',
             name: 'region',
             description: 'Host region',
-            variableId: 'region-id',
+            initialValue: '',
+            sourceId: 'region-id',
+            controlled: false,
           },
         ],
       },
@@ -510,16 +601,23 @@ describe('designer variables rendering', () => {
     const panel = ownerDocument.createElement('div');
     renderDesignerVariables(panel as unknown as HTMLElement, document([]), {
       creating: false,
+      configuringIndex: undefined,
       create: {
         type: 'static',
         name: '',
         description: '',
         valueSource: 'null',
-        variableId: undefined,
+        sourceId: undefined,
+        processorId: '',
+        controlled: false,
+        autoUpdate: false,
+        autoUpdateInterval: '30',
         catalogQuery: '',
         catalogItems: [],
         catalogCursor: undefined,
         catalogFeedback: '',
+        previewStatus: 'idle',
+        previewSummary: undefined,
       },
       renamingIndex: undefined,
       editingDescriptionIndex: undefined,
@@ -552,19 +650,26 @@ describe('designer variables rendering', () => {
     const panel = ownerDocument.createElement('div');
     renderDesignerVariables(
       panel as unknown as HTMLElement,
-      document([{ type: 'static', name: 'count', value: 0 }]),
+      document([{ type: 'static', id: 'count', name: 'count', initialValue: 0 }]),
       {
         creating: true,
+        configuringIndex: undefined,
         create: {
           type: 'static',
           name: '',
           description: '',
           valueSource: 'null',
-          variableId: undefined,
+          sourceId: undefined,
+          processorId: '',
+          controlled: false,
+          autoUpdate: false,
+          autoUpdateInterval: '30',
           catalogQuery: '',
           catalogItems: [],
           catalogCursor: undefined,
           catalogFeedback: '',
+          previewStatus: 'idle',
+          previewSummary: undefined,
         },
         renamingIndex: undefined,
         editingDescriptionIndex: undefined,

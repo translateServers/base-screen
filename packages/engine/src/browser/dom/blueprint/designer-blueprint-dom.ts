@@ -46,7 +46,9 @@ export function renderDesignerEventsPanel(
   panel.replaceChildren();
   const focused = interaction.focusedComponentId;
   const rules =
-    document?.blueprint.rules.filter((rule) => rule.trigger.componentId === focused) ?? [];
+    document?.blueprint.rules.filter(
+      (rule) => rule.trigger.type === 'material-event' && rule.trigger.componentId === focused,
+    ) ?? [];
   const preferenceContext = document?.components.find((item) => item.id === focused)?.type;
   const events = getDesignerFocusedMaterialEvents(document, interaction, catalog);
   const descriptors = getDesignerFocusedEventDescriptors(document, interaction, catalog);
@@ -54,7 +56,6 @@ export function renderDesignerEventsPanel(
     runtimeContributions,
     DESIGNER_BLUEPRINT_CAPABILITIES.materialEvent,
   );
-  appendVariableAssociationGroup(panel, document, rules, descriptors, preferenceContext);
   appendInteractionEventGroup(
     panel,
     rules,
@@ -79,53 +80,6 @@ export function renderDesignerEventsPanel(
     unavailable.setAttribute('role', 'status');
     unavailable.textContent = DESIGNER_UI_TEXT.blueprint.unavailable;
     editorSection.appendChild(unavailable);
-  }
-}
-
-function appendVariableAssociationGroup(
-  panel: HTMLElement,
-  document: ScreenDocument | undefined,
-  rules: readonly ScreenBlueprintRule[],
-  descriptors: readonly BaseScreenMaterialEventDescriptor[],
-  preferenceContext: string | undefined,
-): void {
-  const associations = rules.flatMap((rule) =>
-    rule.actions.flatMap((action) => (action.type === 'set-variable' ? [{ rule, action }] : [])),
-  );
-  const { body } = appendBlueprintGroup(
-    panel,
-    DESIGNER_UI_TEXT.blueprint.linkedVariablesTitle,
-    associations.length,
-    'blueprint-linked-variables',
-    preferenceContext,
-  );
-  if (associations.length === 0) {
-    body.appendChild(
-      blueprintEmpty(
-        panel.ownerDocument,
-        DESIGNER_UI_TEXT.blueprint.linkedVariablesEmpty(document?.variables.length ?? 0),
-      ),
-    );
-    return;
-  }
-  for (const association of associations) {
-    const row = panel.ownerDocument.createElement('div');
-    row.className = 'designer-blueprint-variable-row';
-    const copy = panel.ownerDocument.createElement('span');
-    const title = panel.ownerDocument.createElement('strong');
-    title.textContent = DESIGNER_UI_TEXT.blueprint.linkedVariable(
-      eventLabel(association.rule.trigger.eventName, descriptors),
-      association.action.variableName,
-    );
-    const value = panel.ownerDocument.createElement('small');
-    value.textContent = expressionSummary(association.action.value);
-    copy.append(title, value);
-    const status = panel.ownerDocument.createElement('span');
-    status.className = 'designer-blueprint-state';
-    status.dataset.state = 'ready';
-    status.textContent = DESIGNER_UI_TEXT.blueprint.enabled;
-    row.append(copy, status);
-    body.appendChild(row);
   }
 }
 
@@ -225,7 +179,7 @@ function renderAction(panel: HTMLElement, action: ScreenBlueprintAction): HTMLEl
   const title = panel.ownerDocument.createElement('strong');
   const value = panel.ownerDocument.createElement('small');
   if (action.type === 'set-variable') {
-    title.textContent = DESIGNER_UI_TEXT.blueprint.setVariableAction(action.variableName);
+    title.textContent = DESIGNER_UI_TEXT.blueprint.setVariableAction(action.variableId);
     value.textContent = expressionSummary(action.value);
   } else if (action.type === 'emit-host-event') {
     title.textContent = DESIGNER_UI_TEXT.blueprint.emitHostEventAction(action.eventName);
@@ -233,6 +187,12 @@ function renderAction(panel: HTMLElement, action: ScreenBlueprintAction): HTMLEl
   } else if (action.type === 'component-visibility') {
     title.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityAction} · ${action.componentId} · ${action.operation}`;
     value.textContent = `${DESIGNER_UI_TEXT.blueprint.visibilityTransition} · ${action.transition?.effect ?? 'appear'}`;
+  } else if (action.type === 'request-variable') {
+    title.textContent = `request-variable · ${action.variableId}`;
+    value.textContent = DESIGNER_UI_TEXT.blueprint.globalVariables;
+  } else if (action.type === 'request-component-data') {
+    title.textContent = `request-component-data · ${action.componentId}`;
+    value.textContent = DESIGNER_UI_TEXT.blueprint.layers;
   } else {
     title.textContent = DESIGNER_UI_TEXT.blueprint.hostAction(action.actionId);
     value.textContent = expressionSummary(action.payload);
@@ -298,7 +258,7 @@ function expressionSummary(expression: ScreenBlueprintValueExpression): string {
     return DESIGNER_UI_TEXT.blueprint.eventPayloadValue(expression.path.join('.'));
   }
   if (expression.kind === 'variable') {
-    return DESIGNER_UI_TEXT.blueprint.variableValue(expression.name);
+    return DESIGNER_UI_TEXT.blueprint.variableValue(expression.variableId);
   }
   if (expression.kind === 'array') {
     return DESIGNER_UI_TEXT.blueprint.arrayValue(expression.items.length);
@@ -308,13 +268,6 @@ function expressionSummary(expression: ScreenBlueprintValueExpression): string {
 
 function truncate(value: string, limit = 48): string {
   return value.length <= limit ? value : `${value.slice(0, limit - 1)}…`;
-}
-
-function eventLabel(
-  eventName: string,
-  descriptors: readonly BaseScreenMaterialEventDescriptor[],
-): string {
-  return descriptors.find((descriptor) => descriptor.name === eventName)?.label ?? eventName;
 }
 
 function blueprintEmpty(ownerDocument: Document, text: string): HTMLElement {

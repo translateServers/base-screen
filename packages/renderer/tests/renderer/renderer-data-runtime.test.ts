@@ -308,10 +308,13 @@ describe('BaseScreenRenderer data runtime', () => {
       type: 'host-resource',
       resourceId: 'orders',
       resourceType: 'dataset',
-      params: { region: { kind: 'variable', name: 'region' } },
+      params: { region: { kind: 'variable', variableId: 'region' } },
       binding: null,
     };
-    const screen = document([component('dependent', 0, null, source)]);
+    const screen = document(
+      [component('dependent', 0, null, source)],
+      [{ type: 'static', id: 'region', name: 'region', initialValue: null }],
+    );
 
     expect(renderer.render(screen).ok).toBe(true);
     expect(resolveCalls).toBe(0);

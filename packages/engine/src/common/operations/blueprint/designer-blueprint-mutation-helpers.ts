@@ -16,17 +16,16 @@ import {
 export function createDesignerBlueprintAction(
   kind: 'set-variable' | 'emit-host-event',
   document: ScreenDocument,
-  variableName?: string,
+  variableId?: string,
 ): Exclude<ScreenBlueprintAction, ScreenBlueprintComponentVisibilityAction> | null {
   if (kind === 'set-variable') {
     const variable =
-      document.variables.find((candidate) => candidate.name === variableName) ??
-      document.variables[0];
+      document.variables.find((candidate) => candidate.id === variableId) ?? document.variables[0];
     return variable === undefined
       ? null
       : {
           type: 'set-variable',
-          variableName: variable.name,
+          variableId: variable.id,
           value: { kind: 'literal', value: null },
         };
   }

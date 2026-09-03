@@ -14,6 +14,7 @@ export function parseDesignerWorkbenchModeRequest(
     !isRecord(options.focus) ||
     Object.keys(options.focus).some((key) => key !== 'kind' && key !== 'id') ||
     (options.focus.kind !== 'component' &&
+      options.focus.kind !== 'variable' &&
       options.focus.kind !== 'rule' &&
       options.focus.kind !== 'action') ||
     typeof options.focus.id !== 'string' ||
