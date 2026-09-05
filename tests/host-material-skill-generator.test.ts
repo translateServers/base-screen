@@ -175,10 +175,12 @@ describe('host material Skill generator', () => {
       'src/plugins/acme.ts',
     ];
     await writeFile(file, `${JSON.stringify(snapshot)}\n`);
-    snapshot.datasets[0]!.parameters = [{ name: 'wrong', label: 'Wrong', editor: 'text' }];
+    snapshot.datasets[0]!.parameters = [
+      { name: 'wrong', label: 'Wrong', valueType: 'string', required: true, minimum: 1 },
+    ];
     await writeFile(file, `${JSON.stringify(snapshot)}\n`);
     await expect(createHostMaterialSkill({ snapshotFile: file, checkOnly: true })).rejects.toThrow(
-      'parameters must match resource type metrics.configSchema.properties exactly',
+      'HOST_DATASET_DESCRIPTOR_INVALID',
     );
 
     await rm(dirname(file), { recursive: true, force: true });

@@ -1,7 +1,8 @@
 import {
+  evaluateScreenDatasetParameters,
   parseScreenJsonValue,
   parseScreenTabularDataset,
-  type ScreenDatasetDescriptor,
+  type ScreenDatasetDefinition,
   type ScreenDiagnostic,
   type ScreenDocument,
   type ScreenHostResourceBinding,
@@ -16,10 +17,7 @@ import {
 } from '@base-screen/core';
 import {
   type BaseScreenMaterialCatalogEntry,
-  type BaseScreenMaterialPropSchema,
   type BaseScreenMaterialStaticDataDescriptor,
-  type BaseScreenRuntimeContributionIndex,
-  validateBaseScreenMaterialProps,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type {
@@ -30,21 +28,17 @@ import type {
 interface DesignerDatasetTransactionOptions {
   readonly document: ScreenDocument;
   readonly componentId: string;
-  readonly descriptor: ScreenDatasetDescriptor;
+  readonly descriptor: ScreenDatasetDefinition;
   readonly draft: DesignerDatasetDraftView;
   readonly roles: readonly ScreenDataBindingRole[];
-  readonly runtime: NonNullable<ReturnType<BaseScreenRuntimeContributionIndex['getResourceType']>>;
 }
 
 export function createDesignerDatasetDraft(
-  descriptor: ScreenDatasetDescriptor,
+  descriptor: ScreenDatasetDefinition,
   source: ScreenDocument['components'][number]['dataSource'],
   roles: readonly ScreenDataBindingRole[] = [],
 ): DesignerDatasetDraftView {
-  const sameResource =
-    source?.type === 'host-resource' &&
-    source.resourceType === descriptor.resourceType &&
-    source.resourceId === descriptor.resourceId;
+  const sameResource = source?.type === 'dataset' && source.datasetId === descriptor.datasetId;
   const params: Record<string, ScreenHostResourceParameter> = {};
   for (const parameter of descriptor.parameters) {
     const existing = sameResource ? source.params[parameter.name] : undefined;
@@ -83,8 +77,7 @@ export function createDesignerDatasetDraft(
     }
   }
   return {
-    resourceType: descriptor.resourceType,
-    resourceId: descriptor.resourceId,
+    datasetId: descriptor.datasetId,
     params,
     fields,
   };
@@ -92,20 +85,13 @@ export function createDesignerDatasetDraft(
 
 export function readDesignerDatasetParameter(
   input: HTMLInputElement | HTMLTextAreaElement,
-  parameter: ScreenDatasetDescriptor['parameters'][number],
+  parameter: ScreenDatasetDefinition['parameters'][number],
 ): ScreenJsonValue | undefined {
-  if (parameter.editor === 'boolean' && input instanceof HTMLInputElement) return input.checked;
-  if (parameter.editor === 'number') {
+  if (parameter.valueType === 'boolean' && input instanceof HTMLInputElement) return input.checked;
+  if (parameter.valueType === 'number') {
+    if (input.value.trim() === '') return undefined;
     const value = Number(input.value);
     return Number.isFinite(value) ? value : undefined;
-  }
-  if (parameter.editor === 'json') {
-    try {
-      const parsed = parseScreenJsonValue(JSON.parse(input.value));
-      return parsed.ok ? parsed.value : undefined;
-    } catch {
-      return undefined;
-    }
   }
   return input.value;
 }
@@ -114,18 +100,18 @@ export function designerDataSourceModes(
   entry: BaseScreenMaterialCatalogEntry | undefined,
 ): readonly DesignerDataSourceMode[] {
   const capabilities = entry?.manifest.dataCapabilities ?? [];
-  const resourceMode = entry?.manifest.dataBinding === undefined ? 'host-resource' : 'dataset';
   return [
     'none',
     ...(capabilities.includes('static') ? (['static'] as const) : []),
     ...(capabilities.includes('variable') ? (['variable'] as const) : []),
-    ...(capabilities.includes('host-resource') ? ([resourceMode] as const) : []),
+    ...(capabilities.includes('dataset') ? (['dataset'] as const) : []),
+    ...(capabilities.includes('host-resource') ? (['host-resource'] as const) : []),
   ];
 }
 
 export function updateDesignerDatasetParameter(
   draft: DesignerDatasetDraftView,
-  descriptor: ScreenDatasetDescriptor,
+  descriptor: ScreenDatasetDefinition,
   name: string,
   target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
 ): DesignerDatasetDraftView {
@@ -199,8 +185,8 @@ export function createDatasetDataSourceTransaction(
   for (const parameter of options.descriptor.parameters) {
     const value = options.draft.params[parameter.name];
     if (
-      value === undefined ||
-      (value.kind === 'variable' &&
+      (value === undefined && parameter.required) ||
+      (value?.kind === 'variable' &&
         !options.document.variables.some((item) => item.id === value.variableId))
     ) {
       return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
@@ -209,14 +195,23 @@ export function createDatasetDataSourceTransaction(
 
   const literalValues: Record<string, ScreenJsonValue> = {};
   for (const [name, parameter] of Object.entries(options.draft.params)) {
-    const schema = options.runtime.configSchema.properties[name];
-    if (schema === undefined) {
+    const definition = options.descriptor.parameters.find((item) => item.name === name);
+    if (definition === undefined)
       return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
-    }
     literalValues[name] =
-      parameter.kind === 'literal' ? parameter.value : schemaPlaceholder(schema);
+      parameter.kind === 'literal'
+        ? parameter.value
+        : (definition.allowedValues?.[0] ??
+          definition.defaultValue ??
+          (definition.valueType === 'number'
+            ? (definition.minimum ?? 0)
+            : definition.valueType === 'boolean'
+              ? false
+              : definition.valueType === 'date'
+                ? '2000-01-01'
+                : ''));
   }
-  const validated = validateBaseScreenMaterialProps(literalValues, options.runtime.configSchema);
+  const validated = evaluateScreenDatasetParameters(options.descriptor.parameters, literalValues);
   if (!validated.ok) return validated;
 
   const binding: ScreenHostResourceBinding | null =
@@ -230,9 +225,8 @@ export function createDatasetDataSourceTransaction(
 
   return success(
     updateDataSource(options.componentId, {
-      type: 'host-resource',
-      resourceType: options.descriptor.resourceType,
-      resourceId: options.descriptor.resourceId,
+      type: 'dataset',
+      datasetId: options.descriptor.datasetId,
       params: options.draft.params,
       binding,
     }),
@@ -257,7 +251,7 @@ export function createVariableDataSourceTransaction(
 }
 
 export function defaultDatasetParameterValue(
-  descriptor: ScreenDatasetDescriptor | undefined,
+  descriptor: ScreenDatasetDefinition | undefined,
   name: string,
 ): ScreenJsonValue {
   return descriptor?.parameters.find((parameter) => parameter.name === name)?.defaultValue ?? null;
@@ -276,29 +270,6 @@ function updateDataSource(
       },
     ],
   };
-}
-
-function schemaPlaceholder(schema: BaseScreenMaterialPropSchema): ScreenJsonValue {
-  switch (schema.kind) {
-    case 'string':
-      return '';
-    case 'number':
-      return schema.minimum ?? 0;
-    case 'boolean':
-      return false;
-    case 'enum':
-      return schema.values[0] ?? null;
-    case 'array':
-      return Array.from({ length: schema.minItems ?? 0 }, () => schemaPlaceholder(schema.items));
-    case 'object': {
-      const value: Record<string, ScreenJsonValue> = {};
-      for (const name of schema.required) {
-        const property = schema.properties[name];
-        if (property !== undefined) value[name] = schemaPlaceholder(property);
-      }
-      return value;
-    }
-  }
 }
 
 function success<T>(value: T): ScreenParseResult<T> {

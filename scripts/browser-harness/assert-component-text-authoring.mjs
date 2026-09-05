@@ -1,6 +1,6 @@
 export async function assertComponentTextAuthoring(designer, page, hostEventCount) {
   const events = designer.locator('[data-events-panel]');
-  // AE-ED-C07 宿主组件文本编辑闭环（data target：写入既有 host-resource 参数，单 history entry）。
+  // AE-ED-C07 宿主组件文本编辑闭环（data target：写入既有 dataset 参数，单 history entry）。
   const textCommit = await page.evaluate(() => {
     const { designer } = window.baseScreenHarness;
     const requests = [];
@@ -25,7 +25,7 @@ export async function assertComponentTextAuthoring(designer, page, hostEventCoun
     const source = window.baseScreenHarness.designer.document.components.find(
       (component) => component.id === 'dataset-ranking-demo',
     )?.dataSource;
-    return source?.type === 'host-resource' && source.params.region?.value === 'south';
+    return source?.type === 'dataset' && source.params.region?.value === 'south';
   });
   // 无效 JSON 文本提交被拒绝，document 与 history 不变。
   const invalidText = await page.evaluate(() => {

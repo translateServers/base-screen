@@ -81,9 +81,8 @@ export async function assertDatasetAuthoring(designer, page) {
       (component) => component.id === 'dataset-ranking-demo',
     )?.dataSource;
     return (
-      source?.type === 'host-resource' &&
-      source.resourceType === 'dataset' &&
-      source.resourceId === 'tabular-orders' &&
+      source?.type === 'dataset' &&
+      source.datasetId === 'tabular-orders' &&
       source.params.region?.kind === 'literal'
     );
   });
@@ -94,7 +93,7 @@ export async function assertDatasetAuthoring(designer, page) {
       )?.dataSource,
   );
   if (
-    appliedDatasetSource?.type !== 'host-resource' ||
+    appliedDatasetSource?.type !== 'dataset' ||
     appliedDatasetSource.binding?.fields.dimension?.[0] !== 'category' ||
     appliedDatasetSource.binding.fields.measures?.[0] !== 'amount' ||
     appliedDatasetSource.params.region?.kind !== 'literal'

@@ -1,12 +1,14 @@
 import type {
   ScreenBlueprintHostActionPort,
   ScreenBlueprintRuntimePort,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenHostVariablePort,
   ScreenParseResult,
   ScreenResourceExecutionMode,
   ScreenResourceObserver,
 } from '@base-screen/contracts';
+import { isScreenHostDatasetPort } from '@base-screen/contracts';
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
@@ -26,6 +28,7 @@ import { lifecycleFailure } from './viewer-lifecycle.js';
 export interface BaseScreenViewerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
   readonly resourcePort?: ScreenHostResourcePort;
+  readonly datasetPort?: ScreenHostDatasetPort;
   readonly variablePort?: ScreenHostVariablePort;
   /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，无独立 setter）。 */
   readonly conditionalStylePort?: BaseScreenConditionalStylePort;
@@ -59,6 +62,12 @@ export function parseBaseScreenViewerConfiguration(
 ): ScreenParseResult<NormalizedBaseScreenViewerConfiguration> {
   if (!isBaseScreenMaterialCatalog(configuration.catalog)) {
     return lifecycleFailure('Viewer catalog 必须是合法的物料目录。');
+  }
+  if (
+    configuration.datasetPort !== undefined &&
+    !isScreenHostDatasetPort(configuration.datasetPort)
+  ) {
+    return lifecycleFailure('Viewer dataset port must provide list, describe and query.');
   }
   const resourceTimeoutMs = configuration.resourceTimeoutMs ?? 15_000;
   if (

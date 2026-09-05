@@ -65,7 +65,7 @@ export function dataCapabilities(
   catalog: BaseScreenMaterialCatalog | undefined,
   hostResourceAvailable: boolean,
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
-): readonly ('static' | 'host-resource' | 'variable')[] | undefined {
+): readonly ('static' | 'dataset' | 'host-resource' | 'variable')[] | undefined {
   return catalog
     ?.get(component?.type ?? '')
     ?.manifest.dataCapabilities.filter(

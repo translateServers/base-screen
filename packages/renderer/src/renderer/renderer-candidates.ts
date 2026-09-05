@@ -193,7 +193,7 @@ function getDataState(
     );
     return undefined;
   }
-  if (component.dataSource.type === 'host-resource') {
+  if (component.dataSource.type === 'host-resource' || component.dataSource.type === 'dataset') {
     if (dataSuspended) {
       return { dataState: { status: 'loading' }, resource: undefined };
     }
@@ -208,8 +208,15 @@ function getDataState(
         resource: undefined,
       };
     }
-    const resourceType = contributionIndex?.getResourceType(component.dataSource.resourceType);
-    if (contributionIndex !== undefined && resourceType === undefined) {
+    const resourceType =
+      component.dataSource.type === 'host-resource'
+        ? contributionIndex?.getResourceType(component.dataSource.resourceType)
+        : undefined;
+    if (
+      component.dataSource.type === 'host-resource' &&
+      contributionIndex !== undefined &&
+      resourceType === undefined
+    ) {
       diagnostics.push(
         diagnostic(
           'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',

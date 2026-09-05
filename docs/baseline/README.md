@@ -91,6 +91,10 @@
 - **宿主返回入口**（2026-09-01 增量）：`backButton` 配置让 Base Screen 在 Designer 顶栏渲染返回按钮，
   点击后派发 composed `base-screen-designer-back-request` 事件；业务路由、未保存确认和鉴权仍归宿主，
   宿主无需访问 Shadow DOM 或重复渲染返回按钮。
+- **大屏缩略图归宿主**（2026-09-05 边界修复）：Designer 不提供截取、上传或保存大屏缩略图的内建入口；
+  截图、上传、来源并发保护、存储和业务列表展示均归宿主。此前画布属性面板中无实现、无能力门禁的
+  “截取封面 / 上传”占位入口及不可写的 `thumbnailUrl` 呈现字段已删除。Material Manifest 的 `cover`
+  仍是物料库展示契约，由宿主提供 URL，语义不变。依据：[ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)。
 - **顶栏项目标题修复**（封版后缺陷修复增量，已纳入基线）：`renderProjectStatus` 回写加载项目名称，公共契约
   零变化。依据：[Designer Topbar Project Title](../specs/archive/designer-topbar-project-title/spec.md)、
   [ADR-0039](../decisions/ADR-0039-designer-topbar-project-title.md)。

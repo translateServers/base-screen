@@ -1,7 +1,6 @@
 [
   {
-    "resourceType": "metrics",
-    "resourceId": "daily-sales",
+    "datasetId": "publication:daily-sales",
     "classification": "sanitized",
     "dataset": {
       "fields": [

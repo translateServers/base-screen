@@ -1,6 +1,6 @@
 import type {
-  ScreenDatasetDescriptor,
-  ScreenDatasetPage,
+  ScreenDatasetDefinition,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenHostVariablePort,
   ScreenJsonObject,
@@ -20,17 +20,17 @@ export interface PlaygroundRuntimeState {
 
 export interface PlaygroundRequestLog {
   readonly componentId: string;
-  readonly resourceId: string;
+  readonly datasetId: string;
   readonly params: Readonly<Record<string, unknown>>;
   readonly at: string;
 }
 
-const DATASETS: readonly ScreenDatasetDescriptor[] = [
+const DATASETS: readonly ScreenDatasetDefinition[] = [
   {
-    resourceType: 'dataset',
-    resourceId: 'orders',
+    datasetId: 'orders',
     name: '订单趋势',
     description: '按区域聚合的订单金额，可同时供表格和图表使用。',
+    groupId: 'system',
     fields: [
       { id: 'category', label: '区域', valueType: 'string' },
       { id: 'amount', label: '订单金额', valueType: 'number' },
@@ -40,22 +40,26 @@ const DATASETS: readonly ScreenDatasetDescriptor[] = [
       {
         name: 'limit',
         label: '返回条数',
-        editor: 'number',
+        valueType: 'number',
+        required: false,
+        minimum: 1,
+        maximum: 100,
         defaultValue: 5,
       },
       {
         name: 'region',
         label: '区域',
-        editor: 'text',
+        valueType: 'string',
+        required: false,
         defaultValue: 'north',
       },
     ],
   },
   {
-    resourceType: 'dataset',
-    resourceId: 'inventory',
+    datasetId: 'inventory',
     name: '库存概览',
     description: '按区域展示库存数量和缺货风险。',
+    groupId: 'external',
     fields: [
       { id: 'category', label: '区域', valueType: 'string' },
       { id: 'amount', label: '库存量', valueType: 'number' },
@@ -65,13 +69,17 @@ const DATASETS: readonly ScreenDatasetDescriptor[] = [
       {
         name: 'limit',
         label: '返回条数',
-        editor: 'number',
+        valueType: 'number',
+        required: false,
+        minimum: 1,
+        maximum: 100,
         defaultValue: 5,
       },
       {
         name: 'region',
         label: '区域',
-        editor: 'text',
+        valueType: 'string',
+        required: false,
         defaultValue: 'north',
       },
     ],
@@ -136,30 +144,35 @@ export function createPlaygroundRuntimeState(): PlaygroundRuntimeState {
   };
 }
 
-export function createPlaygroundDatasetCatalog() {
+export function createPlaygroundDatasetPort(state: PlaygroundRuntimeState): ScreenHostDatasetPort {
   return {
-    async list(request: {
-      readonly query?: string;
-    }): Promise<ScreenParseResult<ScreenDatasetPage>> {
+    queryScope: 'dataset',
+    async groups() {
+      return {
+        ok: true,
+        value: [
+          { id: 'system', name: '系统数据' },
+          { id: 'external', name: '外部数据' },
+        ],
+        diagnostics: [],
+      };
+    },
+    async list(request) {
       const query = request.query ?? '';
       const items = DATASETS.filter(
-        (dataset) => query.length === 0 || dataset.resourceId.includes(query),
-      ).map(({ resourceType, resourceId, name, description }) => ({
-        resourceType,
-        resourceId,
+        (dataset) =>
+          (request.groupId === undefined || dataset.groupId === request.groupId) &&
+          (query.length === 0 || dataset.datasetId.includes(query)),
+      ).map(({ datasetId, name, description, groupId }) => ({
+        datasetId,
         name,
         description,
+        groupId,
       }));
       return { ok: true, value: { items }, diagnostics: [] };
     },
-    async describe(request: {
-      readonly resourceType: string;
-      readonly resourceId: string;
-    }): Promise<ScreenParseResult<ScreenDatasetDescriptor>> {
-      const descriptor = DATASETS.find(
-        (item) =>
-          item.resourceType === request.resourceType && item.resourceId === request.resourceId,
-      );
+    async describe(request) {
+      const descriptor = DATASETS.find((item) => item.datasetId === request.datasetId);
       return descriptor === undefined
         ? {
             ok: false,
@@ -174,22 +187,15 @@ export function createPlaygroundDatasetCatalog() {
           }
         : { ok: true, value: descriptor, diagnostics: [] };
     },
-  };
-}
-
-export function createPlaygroundResourcePort(
-  state: PlaygroundRuntimeState,
-): ScreenHostResourcePort {
-  return {
-    async resolve(request, options) {
+    async query(request, options) {
       state.requests.unshift({
         componentId: request.componentId,
-        resourceId: request.resourceId,
+        datasetId: request.datasetId,
         params: request.params,
         at: new Date().toISOString(),
       });
       if (state.delayed) await wait(450, options.signal);
-      if (state.failed || request.resourceId === 'playground-error') {
+      if (state.failed || request.datasetId === 'playground-error') {
         return {
           ok: false,
           diagnostics: [
@@ -202,24 +208,41 @@ export function createPlaygroundResourcePort(
           ],
         };
       }
-      const datasetId = request.resourceId === 'inventory' ? 'inventory' : 'orders';
+      const datasetId = request.datasetId === 'inventory' ? 'inventory' : 'orders';
       const limit = readLimit(request.params.limit);
       const selectedRegion = readRegion(request.params.region);
       const revision = state.revision;
       const rows = ROWS[datasetId]
         .filter((row) => selectedRegion === undefined || row.category === selectedRegion)
-        .map((row) => ({
-          ...row,
-          amount: row.amount + revision,
-        }))
+        .map((row) => ({ ...row, amount: row.amount + revision }))
         .slice(0, limit);
       return {
         ok: true,
         value: {
-          fields: DATASETS.find((item) => item.resourceId === datasetId)?.fields ?? [],
+          fields: DATASETS.find((item) => item.datasetId === datasetId)?.fields ?? [],
           rows,
         },
         diagnostics: [],
+      };
+    },
+  };
+}
+
+export function createPlaygroundResourcePort(
+  _state: PlaygroundRuntimeState,
+): ScreenHostResourcePort {
+  return {
+    async resolve() {
+      return {
+        ok: false,
+        diagnostics: [
+          {
+            severity: 'error',
+            code: 'HOST_RESOURCE_UNAVAILABLE',
+            path: [],
+            message: 'Playground host resource is unavailable.',
+          },
+        ],
       };
     },
   };
@@ -247,7 +270,7 @@ export function createPlaygroundVariablePort(
   };
 }
 
-export function listPlaygroundDatasets(): readonly ScreenDatasetDescriptor[] {
+export function listPlaygroundDatasets(): readonly ScreenDatasetDefinition[] {
   return DATASETS;
 }
 

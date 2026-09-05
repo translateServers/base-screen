@@ -56,15 +56,16 @@
       "id": "data-resources",
       "title": "数据集与宿主资源",
       "owner": "base-screen + host",
-      "availability": "current",
-      "boundary": "基座维护绑定、取消、deadline 与结果投影；目录、查询、聚合、缓存、鉴权归宿主。",
-      "publicApi": ["ScreenHostResourcePort", "ScreenHostDatasetCatalogPort"],
+      "availability": "in-progress; host consumes the dataset port; full data-service cutover pending",
+      "boundary": "独立 dataset 端口已同步并接通宿主 Designer/Viewer。目录、查询、鉴权及调度归宿主。设计器本地验证不代表系统与外部来源、数据清理和联合验收已经完成。",
+      "publicApi": ["ScreenHostDatasetPort", "ScreenDatasetDataSource", "ScreenHostResourcePort"],
       "references": [
-        "packages/contracts/src/types/host.ts",
-        "packages/core/src/data/host-dataset.ts",
-        "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md"
+        "packages/contracts/src/types/dataset-port.ts",
+        "packages/contracts/src/types/document.ts",
+        "packages/renderer/src/resource/dataset-query-port.ts",
+        "docs/specs/independent-dataset-consumption/spec.md"
       ],
-      "checks": ["contracts", "core"]
+      "checks": ["contracts", "core", "renderer", "engine"]
     },
     {
       "id": "variables",
@@ -119,6 +120,20 @@
         "docs/usage.md",
         "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md",
         "packages/engine/src/designer-element/base-screen-designer-element.ts"
+      ],
+      "checks": ["engine"]
+    },
+    {
+      "id": "screen-thumbnail",
+      "title": "大屏缩略图生命周期",
+      "owner": "host",
+      "availability": "host-owned; no Base Screen authoring UI",
+      "boundary": "Base Screen 可提供通用只读 Renderer，但不提供大屏缩略图的截取、上传、存储或业务列表入口；这些能力及其权限、并发和失败策略由宿主统一拥有。",
+      "publicApi": [],
+      "references": [
+        "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md",
+        "docs/baseline/README.md",
+        "docs/usage.md"
       ],
       "checks": ["engine"]
     },

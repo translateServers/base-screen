@@ -51,8 +51,7 @@ export function renderDatasetPreview(
       renderJsonPreview(
         ownerDocument,
         {
-          resourceType: options.draft?.resourceType,
-          resourceId: options.draft?.resourceId,
+          datasetId: options.draft?.datasetId,
           params: options.draft?.params,
           fields: options.draft?.fields,
         },

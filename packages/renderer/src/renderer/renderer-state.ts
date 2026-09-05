@@ -1,5 +1,6 @@
 import type { ScreenJsonObject, ScreenResourceExecutionContext } from '@base-screen/contracts';
 import { BlueprintVisibilityController } from '../blueprint-visibility.js';
+import { DATASET_QUERY_KIND, DatasetQueryPort } from '../resource/dataset-query-port.js';
 import { ResourceRequestCoordinator } from '../resource/request-coordinator.js';
 import { cancelResourceState } from '../resource/resource-state.js';
 import type { CreateBaseScreenRendererOptions } from './renderer.js';
@@ -21,6 +22,7 @@ export interface RendererState {
   disposed: boolean;
   interactive: boolean;
   coordinator: ResourceRequestCoordinator | undefined;
+  readonly datasetQueries: DatasetQueryPort;
   readonly visibility: BlueprintVisibilityController;
 }
 
@@ -40,13 +42,16 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
     disposed: false,
     interactive: options.interactive,
     coordinator: undefined,
+    datasetQueries: new DatasetQueryPort(options.resourcePort, options.datasetPort),
     visibility: new BlueprintVisibilityController(options.root),
   };
-  if (options.resourcePort !== undefined) {
+  if (options.resourcePort !== undefined || options.datasetPort !== undefined) {
     state.coordinator = new ResourceRequestCoordinator(
-      options.resourcePort,
+      state.datasetQueries,
       (resourceType) =>
-        options.contributionIndex?.getResourceType(resourceType)?.queryScope === 'resource',
+        resourceType === DATASET_QUERY_KIND
+          ? options.datasetPort?.queryScope === 'dataset'
+          : options.contributionIndex?.getResourceType(resourceType)?.queryScope === 'resource',
       options.resourceTimeoutMs ?? 15_000,
       (key, componentId, context) =>
         emitObserver(

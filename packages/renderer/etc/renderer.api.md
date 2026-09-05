@@ -13,6 +13,7 @@ import type { ScreenBlueprintRuntimePort } from '@base-screen/contracts';
 import { ScreenBlueprintVisibilityEffect } from '@base-screen/core';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
+import { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourcePort } from '@base-screen/contracts';
 import type { ScreenHostVariablePort } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
@@ -70,6 +71,8 @@ export interface BaseScreenViewerConfiguration {
     readonly catalog: BaseScreenMaterialCatalog;
     readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
+    readonly datasetPort?: ScreenHostDatasetPort;
+    // (undocumented)
     readonly documentRevision?: string;
     // (undocumented)
     readonly instanceId?: string;
@@ -104,6 +107,8 @@ export class BaseScreenViewerElement extends ElementBase {
     configure(configuration: BaseScreenViewerConfiguration): ScreenParseResult<null>;
     // (undocumented)
     connectedCallback(): void;
+    // (undocumented)
+    get datasetPort(): ScreenHostDatasetPort | undefined;
     // (undocumented)
     disconnectedCallback(): void;
     // (undocumented)
@@ -149,6 +154,8 @@ export interface CreateBaseScreenRendererOptions {
     readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
     readonly contributionIndex?: BaseScreenRuntimeContributionIndex;
+    // (undocumented)
+    readonly datasetPort?: ScreenHostDatasetPort;
     // (undocumented)
     readonly documentRevision?: string;
     // (undocumented)

@@ -99,9 +99,9 @@ the selected authoring route.
   references for identity and compatibility; they are not copied or overwritten.
 - `resourceTypes` is an array of `dataResourceType` contributions and is validated by the Plugin
   Core parser.
-- `datasets` is an array of `ScreenDatasetDescriptor` values. Parameter names must match the selected
-  resource type `configSchema` exactly.
-- `datasetSamples` is optional. Each item has `resourceType`, `resourceId`,
+- `datasets` is an array of `ScreenDatasetDefinition` values. Each immutable dataset owns its
+  parameter definitions and constraints.
+- `datasetSamples` is optional. Each item has `datasetId`,
   `classification: "sanitized"`, and a bounded `dataset` parsed by Contracts. Samples never grant
   write or network authority.
 - `materialProvenance` is optional. It marks published materials as `code` or `online`; online

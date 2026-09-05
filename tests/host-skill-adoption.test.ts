@@ -433,9 +433,9 @@ describe('host Skill adoption toolkit', () => {
       'acme.chart',
       'acme.text',
     ]);
-    expect(first.canonical.datasets.map((item: { resourceId: string }) => item.resourceId)).toEqual(
-      ['daily-sales'],
-    );
+    expect(first.canonical.datasets.map((item: { datasetId: string }) => item.datasetId)).toEqual([
+      'publication:daily-sales',
+    ]);
   });
 
   it('enforces the exporter deadline', async () => {

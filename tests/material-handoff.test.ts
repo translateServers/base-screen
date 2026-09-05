@@ -35,8 +35,7 @@ describe('material handoff contracts', () => {
       defaultSize: { width: 240, height: 80 },
       dataFields: [
         {
-          resourceType: 'metrics',
-          resourceId: 'daily-sales',
+          datasetId: 'publication:daily-sales',
           fieldId: 'sales',
           valueType: 'number',
         },

@@ -4,6 +4,7 @@ import { pathToFileURL } from 'node:url';
 import {
   CONFIG,
   CONSUMER,
+  digestPaths,
   fail,
   fileHash,
   fingerprints,
@@ -21,6 +22,7 @@ import {
   safePath,
   tarFiles,
   validateIndex,
+  walk,
   writeChanged,
 } from './files.mjs';
 import { execute, runCheck } from './runner.mjs';
@@ -49,6 +51,12 @@ export function hostCommand(roots, host, id) {
     repo: 'host',
     cwd: spec.cwd ? safePath(roots.host, spec.cwd) : roots.host,
   };
+}
+
+export function hostDerivationDigest(root, host) {
+  const config = readJson(join(root, CONFIG));
+  const paths = [config.adapter, ...(host.deriveInputs || []).flatMap((path) => walk(root, path))];
+  return digestPaths(root, paths);
 }
 
 export function supplierCommand(roots, delivery = true) {
@@ -251,12 +259,23 @@ export async function synchronize(roots, host, task, options = {}) {
     await recoverSync(roots, host, { run });
   }
   const health = sourceHealth(roots.host, host);
-  if (!health.ok && health.state !== 'unregistered') fail('SOURCE_DRIFT', health.issues.join(', '));
+  const managedExpansion =
+    health.issues.length === 1 &&
+    health.issues[0] === 'MANAGED_FILE_SET_INVALID' &&
+    Object.keys(health.source?.managedFiles ?? {}).every((name) =>
+      managedFiles(roots.host, host.managed).includes(name),
+    );
+  if (!health.ok && health.state !== 'unregistered' && !managedExpansion) {
+    fail('SOURCE_DRIFT', health.issues.join(', '));
+  }
   const current = fingerprints(roots.base);
+  const derivationDigest = hostDerivationDigest(roots.host, host);
+  const needsDerivation =
+    managedExpansion || health.source?.hostDerivationDigest !== derivationDigest;
   const needsPackages = health.source?.packageInputsDigest !== current.packages;
   const previousSnapshot = optionalJson(join(roots.host, SNAPSHOT));
   const needsContext = previousSnapshot?.source?.knowledgeDigest !== current.knowledge;
-  if (!needsPackages && !needsContext)
+  if (!needsPackages && !needsContext && !needsDerivation)
     return { changed: false, packages: false, context: false, checks: [] };
 
   const beforeNames = managedFiles(roots.host, host.managed);
@@ -268,7 +287,18 @@ export async function synchronize(roots, host, task, options = {}) {
   );
   // A prior successful sync can remain uncommitted across tasks. Verified provenance
   // accounts for those outputs; an unregistered or drifted set does not.
-  if (existingChanges.length && !health.ok)
+  const accounted = new Set([
+    ...Object.keys(health.source?.managedFiles || {}),
+    ...Object.keys(health.source?.lockfiles || {}),
+    ...(health.source?.packages || []).map((item) => 'frontend/vendor/base-screen/' + item.file),
+    SOURCE,
+    SNAPSHOT,
+  ]);
+  if (
+    existingChanges.length &&
+    !health.ok &&
+    (!managedExpansion || existingChanges.some((name) => !accounted.has(name)))
+  )
     fail('PREEXISTING_MANAGED_CHANGES', existingChanges.join(', '));
 
   const checks = [];
@@ -318,7 +348,9 @@ export async function synchronize(roots, host, task, options = {}) {
         );
       }
       capture(roots.host, host, journal);
-      for (const id of [...host.install, ...host.derive, ...host.validate]) {
+    }
+    if (needsPackages || needsDerivation) {
+      for (const id of [...(needsPackages ? host.install : []), ...host.derive, ...host.validate]) {
         if (host.install.includes(id)) journal.installTouched = true;
         writeChanged(safePath(roots.host, journalName), json(journal));
         try {
@@ -332,12 +364,19 @@ export async function synchronize(roots, host, task, options = {}) {
       }
       if (fingerprints(roots.base).tree !== verified.tree)
         fail('SUPPLIER_CHANGED_DURING_SYNC', roots.base);
+      if (hostDerivationDigest(roots.host, host) !== derivationDigest)
+        fail('HOST_INPUT_CHANGED_DURING_SYNC', roots.host);
       const source = {
-        sourceRepo: 'base-screen',
-        ...revision(roots.base),
-        treeDigest: fingerprints(roots.base).tree,
-        packageInputsDigest: verified.packages,
-        packages: packed.map(({ path: _path, ...entry }) => entry),
+        ...(needsPackages
+          ? {
+              sourceRepo: 'base-screen',
+              ...revision(roots.base),
+              treeDigest: fingerprints(roots.base).tree,
+              packageInputsDigest: verified.packages,
+              packages: packed.map(({ path: _path, ...entry }) => entry),
+            }
+          : health.source),
+        hostDerivationDigest: derivationDigest,
         lockfiles: Object.fromEntries(
           host.lockfiles.map((name) => [name, fileHash(safePath(roots.host, name))]),
         ),

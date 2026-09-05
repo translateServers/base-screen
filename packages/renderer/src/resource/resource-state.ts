@@ -1,5 +1,6 @@
 import type {
   ScreenComponentNode,
+  ScreenDatasetDataSource,
   ScreenHostResourceDataSource,
   ScreenJsonObject,
   ScreenJsonValue,
@@ -7,6 +8,7 @@ import type {
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import { canonicalJsonString } from '../canonical-json.js';
+import { DATASET_QUERY_KIND } from './dataset-query-port.js';
 
 /**
  * Per-mounted-component resource lifecycle state. The renderer models each
@@ -69,6 +71,8 @@ export function getHostResourceKey(
   params: ScreenJsonObject,
 ): string {
   const source = component.dataSource;
+  if (source?.type === 'dataset')
+    return `${DATASET_QUERY_KIND}\u0000${source.datasetId}\u0000${canonicalJsonString(params)}`;
   if (source === null || source.type !== 'host-resource') {
     throw new Error('Host resource key requires a host-resource source.');
   }
@@ -76,6 +80,8 @@ export function getHostResourceKey(
 }
 
 /** Projection identity derived from the field binding (or the literal null). */
-export function getProjectionKey(source: ScreenHostResourceDataSource): string {
+export function getProjectionKey(
+  source: ScreenHostResourceDataSource | ScreenDatasetDataSource,
+): string {
   return canonicalJsonString(source.binding as unknown as ScreenJsonValue);
 }

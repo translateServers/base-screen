@@ -85,7 +85,7 @@ export function collectVariableReferences(
         parameterName: '$data',
       });
     }
-    if (source?.type !== 'host-resource') continue;
+    if (source?.type !== 'host-resource' && source?.type !== 'dataset') continue;
     for (const [parameterName, parameter] of Object.entries(source.params)) {
       if (parameter?.kind !== 'variable' || !include(parameter.variableId)) continue;
       references.push({

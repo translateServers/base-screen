@@ -23,15 +23,14 @@ Use one of these data sources:
 
 ```json
 {
-  "type": "host-resource",
-  "resourceType": "metrics",
-  "resourceId": "daily-sales",
+  "type": "dataset",
+  "datasetId": "publication:daily-sales",
   "params": { "range": { "kind": "literal", "value": "30d" } },
   "binding": { "fields": { "dimension": ["date"], "measures": ["sales"] } }
 }
 ```
 
 Use only props and style values accepted by the selected manifest schemas. Keep component IDs unique,
-keep resource parameters literal, leave `variables` empty, and leave `blueprint.rules` empty. The
-validator checks the full canonical parser, material catalog, resource schemas, dataset fields and
+keep dataset parameters literal, leave `variables` empty, and leave `blueprint.rules` empty. The
+validator checks the full canonical parser, material catalog, dataset parameters and fields, and
 binding roles.

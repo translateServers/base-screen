@@ -1,13 +1,22 @@
 [
   {
-    "resourceType": "metrics",
-    "resourceId": "daily-sales",
+    "datasetId": "publication:daily-sales",
+    "groupId": "system",
     "name": "Daily sales",
     "description": "Daily sales metrics",
     "fields": [
       { "id": "day", "label": "Day", "valueType": "date" },
       { "id": "sales", "label": "Sales", "valueType": "number" }
     ],
-    "parameters": [{ "name": "range", "label": "Range", "editor": "text", "defaultValue": "7d" }]
+    "parameters": [
+      {
+        "name": "range",
+        "label": "Range",
+        "valueType": "string",
+        "required": true,
+        "defaultValue": "7d",
+        "maxLength": 16
+      }
+    ]
   }
 ]

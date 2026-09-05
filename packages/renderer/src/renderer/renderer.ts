@@ -3,6 +3,7 @@ import {
   parseScreenJsonValue,
   type ScreenDiagnostic,
   type ScreenDocument,
+  type ScreenHostDatasetPort,
   type ScreenHostResourcePort,
   type ScreenJsonObject,
   type ScreenJsonValue,
@@ -45,6 +46,7 @@ export interface CreateBaseScreenRendererOptions {
   readonly onMaterialEvent: ((event: BaseScreenMaterialEvent) => void) | undefined;
   readonly onDiagnostic?: (diagnostic: ScreenDiagnostic) => void;
   readonly resourcePort: ScreenHostResourcePort | undefined;
+  readonly datasetPort?: ScreenHostDatasetPort;
   /** ADR-0059 宿主条件样式端口：缺省时与既有渲染路径逐字节一致。 */
   readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly resourceTimeoutMs?: number;
@@ -326,6 +328,7 @@ class Renderer implements BaseScreenRenderer {
   clear(): void {
     this.resetBlueprintVisibility();
     this.#state.coordinator?.abortAll();
+    this.#state.datasetQueries.clear();
     for (const mounted of this.#state.mounted.values()) {
       cancelResourceState(mounted.resource);
       mounted.element.removeEventListener('base-screen-material-event', mounted.onEvent);

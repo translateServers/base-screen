@@ -32,9 +32,8 @@
       "props": {},
       "style": { "color": "#ffffff" },
       "dataSource": {
-        "type": "host-resource",
-        "resourceType": "metrics",
-        "resourceId": "daily-sales",
+        "type": "dataset",
+        "datasetId": "publication:daily-sales",
         "params": { "range": { "kind": "literal", "value": "7d" } },
         "binding": { "fields": { "dimension": ["day"], "measures": ["sales"] } }
       }

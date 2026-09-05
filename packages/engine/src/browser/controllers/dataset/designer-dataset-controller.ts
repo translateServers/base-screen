@@ -1,4 +1,4 @@
-import type { ScreenDatasetDescriptor } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDatasetAuthoringView } from '../../dom/dataset/designer-dataset-dom.js';
 import { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
@@ -102,7 +102,7 @@ export class DesignerDatasetController {
     if (this.#state.mode !== 'dataset') return;
     this.#catalogController.ensureList();
     if (describeTarget !== undefined) {
-      void describeDataset(this.#context, describeTarget.resourceType, describeTarget.resourceId);
+      void describeDataset(this.#context, describeTarget.datasetId);
     }
   }
 
@@ -135,7 +135,7 @@ export class DesignerDatasetController {
     return handleDatasetKeyDown(this.#context, event);
   }
 
-  get descriptor(): ScreenDatasetDescriptor | undefined {
+  get descriptor(): ScreenDatasetDefinition | undefined {
     return this.#state.descriptor;
   }
 

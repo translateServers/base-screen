@@ -210,7 +210,7 @@ function writeDataSourcePath(
   target: EventTarget,
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   const source = component.dataSource;
-  if (source?.type !== 'host-resource') {
+  if (source?.type !== 'host-resource' && source?.type !== 'dataset') {
     return descriptorFailure(
       'HOST_DATASET_BINDING_INVALID',
       ['dataSource'],

@@ -100,7 +100,6 @@ describe('engine public lifecycle API', () => {
       readonly scaleMode: 'fill' | 'fit' | 'width' | 'height' | 'original' | 'none';
       readonly backgroundAutoFill: boolean;
       readonly disableComponentLoading: boolean;
-      readonly thumbnailUrl: string | null;
     }>();
   });
 

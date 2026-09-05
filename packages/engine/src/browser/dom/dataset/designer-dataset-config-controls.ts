@@ -1,4 +1,4 @@
-import type { ScreenDatasetDescriptor, ScreenHostResourceParameter } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition, ScreenHostResourceParameter } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDatasetConfigurationOptions } from './designer-dataset-types.js';
 
@@ -64,26 +64,25 @@ export function renderActions(
 
 export function parameterControl(
   ownerDocument: Document,
-  descriptor: ScreenDatasetDescriptor,
+  descriptor: ScreenDatasetDefinition,
   name: string,
   draft: ScreenHostResourceParameter | undefined,
 ): HTMLInputElement | HTMLTextAreaElement {
   const parameter = descriptor.parameters.find((item) => item.name === name)!;
-  const input =
-    parameter.editor === 'json'
-      ? ownerDocument.createElement('textarea')
-      : ownerDocument.createElement('input');
-  input.className =
-    parameter.editor === 'json'
-      ? 'designer-control designer-textarea'
-      : 'designer-control designer-input';
+  const input = ownerDocument.createElement('input');
+  input.className = 'designer-control designer-input';
   input.dataset.datasetParameter = parameter.name;
   input.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label));
   setParameterControlValue(input, parameter, draft);
   if (input instanceof HTMLInputElement) {
-    if (parameter.editor === 'number') input.type = 'number';
-    if (parameter.editor === 'boolean') input.type = 'checkbox';
-    if (parameter.editor === 'date') input.type = 'date';
+    if (parameter.valueType === 'number') input.type = 'number';
+    if (parameter.valueType === 'boolean') input.type = 'checkbox';
+    if (parameter.valueType === 'date')
+      input.placeholder = DESIGNER_UI_TEXT.dataset.parameterDatePlaceholder;
+    input.required = parameter.required;
+    if (parameter.minimum !== undefined) input.min = String(parameter.minimum);
+    if (parameter.maximum !== undefined) input.max = String(parameter.maximum);
+    if (parameter.maxLength !== undefined) input.maxLength = parameter.maxLength;
   }
   return input;
 }
@@ -120,14 +119,14 @@ export function appendOption(
 
 function setParameterControlValue(
   input: HTMLInputElement | HTMLTextAreaElement,
-  parameter: ScreenDatasetDescriptor['parameters'][number],
+  parameter: ScreenDatasetDefinition['parameters'][number],
   draft: ScreenHostResourceParameter | undefined,
 ): void {
   const value = draft?.kind === 'literal' ? draft.value : parameter.defaultValue;
-  if (input instanceof HTMLInputElement && parameter.editor === 'boolean') {
+  if (input instanceof HTMLInputElement && parameter.valueType === 'boolean') {
     input.checked = value === true;
     input.value = String(input.checked);
     return;
   }
-  input.value = parameter.editor === 'json' ? JSON.stringify(value ?? null) : String(value ?? '');
+  input.value = String(value ?? '');
 }

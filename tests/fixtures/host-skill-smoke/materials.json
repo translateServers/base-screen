@@ -39,7 +39,7 @@
     "propsSchema": { "kind": "object", "properties": {}, "required": [] },
     "propertyPanel": [],
     "events": [],
-    "dataCapabilities": ["host-resource"],
+    "dataCapabilities": ["dataset"],
     "dataBinding": {
       "roles": [
         { "id": "dimension", "minFields": 1, "maxFields": 1, "valueTypes": ["date", "string"] },

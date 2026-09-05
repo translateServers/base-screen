@@ -22,7 +22,7 @@ import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenDocumentCommand } from '@base-screen/core';
 import { ScreenDocumentTransaction } from '@base-screen/core';
-import type { ScreenHostDatasetCatalogPort } from '@base-screen/contracts';
+import type { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourceDataSource } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
 import type { ScreenHostVariableCatalogPort } from '@base-screen/contracts';
@@ -361,8 +361,6 @@ export interface BaseScreenCanvasPresentationChangeEventDetail {
     readonly opacity: number;
     // (undocumented)
     readonly scaleMode: BaseScreenCanvasScaleMode;
-    // (undocumented)
-    readonly thumbnailUrl: string | null;
 }
 
 // @public (undocumented)
@@ -382,7 +380,7 @@ export interface BaseScreenDesignerConfiguration {
     readonly catalog: BaseScreenMaterialCatalog;
     readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
-    readonly datasetCatalogPort?: ScreenHostDatasetCatalogPort;
+    readonly datasetPort?: ScreenHostDatasetPort;
     // (undocumented)
     readonly designerHostAdapter?: ScreenDesignerHostAdapter;
     // (undocumented)
@@ -454,8 +452,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     createSnapshot(name: string): Promise<ScreenParseResult<ScreenProjectSnapshot>>;
     // (undocumented)
-    get datasetCatalogPort(): ScreenHostDatasetCatalogPort | undefined;
-    set datasetCatalogPort(value: ScreenHostDatasetCatalogPort | undefined);
+    get datasetPort(): ScreenHostDatasetPort | undefined;
+    set datasetPort(value: ScreenHostDatasetPort | undefined);
     // (undocumented)
     deleteProject(projectId: string, revision: string): Promise<ScreenParseResult<void>>;
     // (undocumented)

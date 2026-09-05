@@ -69,12 +69,14 @@ describe('host screen Skill generator', () => {
     await rm(dirname(file), { recursive: true, force: true });
   });
 
-  it('rejects descriptor parameters that do not match resource configSchema', async () => {
+  it('rejects inconsistent dataset-owned parameter metadata', async () => {
     const { snapshot, file } = await writeSnapshotFile();
-    snapshot.datasets[0]!.parameters = [{ name: 'unknown', label: 'Unknown', editor: 'text' }];
+    snapshot.datasets[0]!.parameters = [
+      { name: 'unknown', label: 'Unknown', valueType: 'string', required: true, minimum: 1 },
+    ];
     await writeFile(file, `${JSON.stringify(snapshot)}\n`);
     await expect(createHostSkill({ snapshotFile: file, checkOnly: true })).rejects.toThrow(
-      'parameters must match resource type metrics.configSchema.properties exactly',
+      'HOST_DATASET_DESCRIPTOR_INVALID',
     );
     await rm(dirname(file), { recursive: true, force: true });
   });

@@ -81,16 +81,6 @@ export class DesignerPanelPropertyController {
       this.callbacks.requestCanvasBackgroundImage?.();
       return true;
     }
-    const canvasPresentationAction = target.closest<HTMLButtonElement>(
-      '[data-canvas-setting-action]',
-    )?.dataset.canvasSettingAction;
-    if (
-      canvasPresentationAction === 'capture-thumbnail' ||
-      canvasPresentationAction === 'upload-thumbnail'
-    ) {
-      this.callbacks.requestCanvasPresentationAction?.(canvasPresentationAction);
-      return true;
-    }
     const scaleButton = target.closest<HTMLButtonElement>('[data-canvas-setting="scaleMode"]');
     if (scaleButton !== null) {
       this.updateScaleMode(scaleButton);

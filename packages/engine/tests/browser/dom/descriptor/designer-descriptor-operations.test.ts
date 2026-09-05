@@ -66,9 +66,8 @@ const document: ScreenDocument = {
       },
       style: { color: '#000000' },
       dataSource: {
-        type: 'host-resource',
-        resourceType: 'dataset',
-        resourceId: 'r1',
+        type: 'dataset',
+        datasetId: 'r1',
         params: { limit: { kind: 'literal', value: 10 } },
         binding: { fields: { dimension: ['region'] } },
       },
@@ -245,8 +244,8 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
     const command = paramsResult.value.commands[0];
     if (command?.type === 'update-components') {
       const source = command.patch.dataSource as ScreenComponentNode['dataSource'];
-      expect(source?.type).toBe('host-resource');
-      if (source?.type === 'host-resource') {
+      expect(source?.type).toBe('dataset');
+      if (source?.type === 'dataset') {
         expect(source.params.limit).toEqual({ kind: 'literal', value: 25 });
       }
     }
@@ -271,8 +270,8 @@ describe('AE-ED-C03 descriptor transactions write canonical paths', () => {
     const bindingCommand = bindingResult.value.commands[0];
     if (bindingCommand?.type === 'update-components') {
       const source = bindingCommand.patch.dataSource as ScreenComponentNode['dataSource'];
-      expect(source?.type).toBe('host-resource');
-      if (source?.type === 'host-resource') {
+      expect(source?.type).toBe('dataset');
+      if (source?.type === 'dataset') {
         expect(source.binding).not.toBeNull();
         if (source.binding !== null) {
           expect(source.binding.fields.dimension).toEqual(['amount']);

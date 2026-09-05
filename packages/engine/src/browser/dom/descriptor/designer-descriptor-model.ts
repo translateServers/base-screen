@@ -98,11 +98,17 @@ function readDataSourcePath(
 ): ScreenJsonValue | undefined {
   const root = path[0];
   if (root === 'params') {
-    const parameter = source?.type === 'host-resource' ? source.params[String(path[1])] : undefined;
+    const parameter =
+      source?.type === 'host-resource' || source?.type === 'dataset'
+        ? source.params[String(path[1])]
+        : undefined;
     return parameter?.kind === 'literal' ? parameter.value : undefined;
   }
   if (root === 'binding') {
-    const fields = source?.type === 'host-resource' ? source.binding?.fields : undefined;
+    const fields =
+      source?.type === 'host-resource' || source?.type === 'dataset'
+        ? source.binding?.fields
+        : undefined;
     if (path[1] !== 'fields') return undefined;
     const role = String(path[2]);
     const values = fields?.[role];

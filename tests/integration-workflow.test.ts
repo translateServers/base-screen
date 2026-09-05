@@ -91,6 +91,41 @@ describe('cross-repository integration workflow', () => {
     expect(f.calls.filter((id) => id === 'pack-contracts')).toHaveLength(2);
   });
 
+  it('allows an adapter to add a guarded managed path without accepting prior drift', async () => {
+    const f = fixture();
+    await f.begin();
+    await f.invoke(['sync', '--task', 'work']);
+    write(join(f.host, 'managed-tooling/manifest.json'), '{"generator":"fixture"}\n');
+    f.adapter.managed.push('managed-tooling');
+    write(
+      join(f.host, 'scripts/adapter.mjs'),
+      'export const integrationHost = ' + JSON.stringify(f.adapter, null, 2) + ';\n',
+    );
+    const count = f.calls.length;
+    expect((await f.invoke(['sync', '--task', 'work'])).packages).toBe(false);
+    expect(f.calls.slice(count)).toEqual(['derive', 'validate']);
+    expect((await f.invoke(['status'])).ok).toBe(true);
+  });
+
+  it('regenerates host outputs when declared generator inputs change without rebuilding packages', async () => {
+    const f = fixture();
+    Object.assign(f.adapter, { deriveInputs: ['scripts/generate.mjs'] });
+    write(
+      join(f.host, 'scripts/adapter.mjs'),
+      'export const integrationHost = ' + JSON.stringify(f.adapter),
+    );
+    write(join(f.host, 'scripts/generate.mjs'), 'first');
+    await f.begin();
+    await f.invoke(['sync', '--task', 'work']);
+    const count = f.calls.length;
+    write(join(f.host, 'scripts/generate.mjs'), 'second');
+    expect((await f.invoke(['status'])).pendingContext).toBe(true);
+    const result = await f.invoke(['sync', '--task', 'work']);
+    expect(result.packages).toBe(false);
+    expect(f.calls.slice(count)).toEqual(['derive', 'validate']);
+    expect((await f.invoke(['sync', '--task', 'work'])).changed).toBe(false);
+  });
+
   it.each(['pack', 'lock', 'installed', 'derived'])('rejects %s drift', async (kind) => {
     const f = fixture();
     await f.begin();

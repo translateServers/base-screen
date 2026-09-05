@@ -1,17 +1,19 @@
 import {
-  parseScreenDatasetDescriptor,
-  parseScreenDatasetPage,
-  type ScreenDatasetDescriptor,
-  type ScreenDatasetPage,
-  type ScreenDatasetSummary,
+  parseScreenDatasetDefinition,
+  parseScreenDatasetEntries,
+  parseScreenDatasetGroups,
+  type ScreenDatasetDefinition,
+  type ScreenDatasetEntries,
+  type ScreenDatasetEntry,
+  type ScreenDatasetGroup,
   type ScreenDiagnostic,
-  type ScreenHostDatasetCatalogPort,
+  type ScreenHostDatasetPort,
   type ScreenParseResult,
 } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 
 interface DesignerDatasetCatalogControllerCallbacks {
-  readonly getPort: () => ScreenHostDatasetCatalogPort | undefined;
+  readonly getPort: () => ScreenHostDatasetPort | undefined;
   readonly report: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly setFeedback: (message: string) => void;
   readonly render: () => void;
@@ -26,7 +28,11 @@ export class DesignerDatasetCatalogController {
   #query = '';
   #listedQuery: string | undefined;
   #cursor: string | undefined;
-  #items: readonly ScreenDatasetSummary[] = [];
+  #items: readonly ScreenDatasetEntry[] = [];
+  #groups: readonly ScreenDatasetGroup[] = [];
+  #groupId: string | undefined;
+  #groupsAbort: AbortController | undefined;
+  #groupsLoaded = false;
 
   constructor(private readonly callbacks: DesignerDatasetCatalogControllerCallbacks) {}
 
@@ -34,15 +40,36 @@ export class DesignerDatasetCatalogController {
     return this.#query;
   }
 
+  get groups(): readonly ScreenDatasetGroup[] {
+    return this.#groups;
+  }
+  get groupId(): string | undefined {
+    return this.#groupId;
+  }
+
+  updateGroup(groupId: string | undefined): void {
+    if (
+      groupId === this.#groupId ||
+      (groupId !== undefined && !this.#groups.some((group) => group.id === groupId))
+    )
+      return;
+    this.#groupId = groupId;
+    this.#items = [];
+    this.#cursor = undefined;
+    this.#listedQuery = undefined;
+    void this.list(undefined);
+  }
+
   get cursor(): string | undefined {
     return this.#cursor;
   }
 
-  get items(): readonly ScreenDatasetSummary[] {
+  get items(): readonly ScreenDatasetEntry[] {
     return this.#items;
   }
 
   ensureList(): void {
+    if (!this.#groupsLoaded && this.#groupsAbort === undefined) void this.loadGroups();
     if (this.#items.length === 0 || this.#listedQuery !== this.#query) {
       void this.list(undefined);
     }
@@ -59,10 +86,7 @@ export class DesignerDatasetCatalogController {
     if (this.#cursor !== undefined) void this.list(this.#cursor);
   }
 
-  async describe(
-    resourceType: string,
-    resourceId: string,
-  ): Promise<ScreenDatasetDescriptor | undefined> {
+  async describe(datasetId: string): Promise<ScreenDatasetDefinition | undefined> {
     const port = this.callbacks.getPort();
     if (port === undefined) {
       this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.unavailable);
@@ -73,9 +97,9 @@ export class DesignerDatasetCatalogController {
     this.#describeAbort = controller;
     const requestId = ++this.#describeRequestId;
     this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.describeLoading);
-    let result: ScreenParseResult<ScreenDatasetDescriptor>;
+    let result: ScreenParseResult<ScreenDatasetDefinition>;
     try {
-      result = await port.describe({ resourceType, resourceId, signal: controller.signal });
+      result = await port.describe({ datasetId, signal: controller.signal });
     } catch {
       if (!controller.signal.aborted && requestId === this.#describeRequestId) {
         this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.describeFailed);
@@ -88,9 +112,13 @@ export class DesignerDatasetCatalogController {
       this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.describeFailed);
       return;
     }
-    const parsed = parseScreenDatasetDescriptor(result.value);
+    const parsed = parseScreenDatasetDefinition(result.value);
     if (!parsed.ok) {
       this.callbacks.report(parsed.diagnostics);
+      this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.describeFailed);
+      return;
+    }
+    if (parsed.value.datasetId !== datasetId) {
       this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.describeFailed);
       return;
     }
@@ -98,6 +126,11 @@ export class DesignerDatasetCatalogController {
   }
 
   clear(): void {
+    this.#groupsAbort?.abort();
+    this.#groupsAbort = undefined;
+    this.#groups = [];
+    this.#groupId = undefined;
+    this.#groupsLoaded = false;
     this.#listAbort?.abort();
     this.#describeAbort?.abort();
     this.#query = '';
@@ -119,10 +152,11 @@ export class DesignerDatasetCatalogController {
     this.#listAbort = controller;
     const requestId = ++this.#requestId;
     this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.loading);
-    let result: ScreenParseResult<ScreenDatasetPage>;
+    let result: ScreenParseResult<ScreenDatasetEntries>;
     try {
       result = await port.list({
         query: this.#query,
+        ...(this.#groupId === undefined ? {} : { groupId: this.#groupId }),
         ...(cursor === undefined ? {} : { cursor }),
         limit: 50,
         signal: controller.signal,
@@ -139,7 +173,7 @@ export class DesignerDatasetCatalogController {
       this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.loadFailed);
       return;
     }
-    const parsed = parseScreenDatasetPage(result.value);
+    const parsed = parseScreenDatasetEntries(result.value);
     if (!parsed.ok) {
       this.callbacks.report(parsed.diagnostics);
       this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.loadFailed);
@@ -151,5 +185,38 @@ export class DesignerDatasetCatalogController {
     this.#listedQuery = this.#query;
     this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.shown(this.#items.length));
     this.callbacks.render();
+  }
+
+  private async loadGroups(): Promise<void> {
+    const port = this.callbacks.getPort();
+    if (port?.groups === undefined) {
+      this.#groupsLoaded = true;
+      return;
+    }
+    const controller = new AbortController();
+    this.#groupsAbort = controller;
+    const timer = setTimeout(() => controller.abort(), 15_000);
+    try {
+      const response = await port.groups({ signal: controller.signal });
+      if (controller.signal.aborted || this.#groupsAbort !== controller) return;
+      if (!response.ok) {
+        this.callbacks.report(response.diagnostics);
+        return;
+      }
+      const parsed = parseScreenDatasetGroups(response.value);
+      if (!parsed.ok) {
+        this.callbacks.report(parsed.diagnostics);
+        return;
+      }
+      this.#groups = parsed.value;
+      this.#groupsLoaded = true;
+      this.callbacks.render();
+    } catch {
+      if (!controller.signal.aborted)
+        this.callbacks.setFeedback(DESIGNER_UI_TEXT.dataset.loadFailed);
+    } finally {
+      clearTimeout(timer);
+      if (this.#groupsAbort === controller) this.#groupsAbort = undefined;
+    }
   }
 }

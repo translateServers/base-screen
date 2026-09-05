@@ -157,11 +157,7 @@ function handleDatasetAction(context: DesignerDatasetControllerContext, target: 
   }
   const item = target.closest<HTMLElement>('[data-dataset-resource-id]');
   if (item?.dataset.datasetResourceId === undefined) return false;
-  void describeDataset(
-    context,
-    item.dataset.datasetResourceType ?? 'dataset',
-    item.dataset.datasetResourceId,
-  );
+  void describeDataset(context, item.dataset.datasetResourceId);
   return true;
 }
 
@@ -190,6 +186,10 @@ export function handleDatasetChange(
     return false;
   if (target.dataset.dataSourceModeSelect !== undefined && target instanceof HTMLSelectElement) {
     setSourceMode(context, target.value as DesignerDataSourceMode);
+    return true;
+  }
+  if (target.dataset.datasetGroup !== undefined && target instanceof HTMLSelectElement) {
+    context.catalogController.updateGroup(target.value || undefined);
     return true;
   }
   if (target.dataset.dataVariableSource !== undefined && target instanceof HTMLSelectElement) {

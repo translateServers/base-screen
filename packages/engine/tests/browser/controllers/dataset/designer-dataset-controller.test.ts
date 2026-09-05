@@ -1,7 +1,7 @@
 import type {
-  ScreenDatasetDescriptor,
+  ScreenDatasetDefinition,
   ScreenDocument,
-  ScreenHostDatasetCatalogPort,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenHostVariablePort,
   ScreenJsonValue,
@@ -41,9 +41,8 @@ const baseDocument: ScreenDocument = {
   blueprint: { rules: [] },
 };
 
-const descriptor: ScreenDatasetDescriptor = {
-  resourceType: 'dataset',
-  resourceId: 'orders',
+const descriptor: ScreenDatasetDefinition = {
+  datasetId: 'orders',
   name: '订单',
   description: null,
   fields: [{ id: 'amount', label: '金额', valueType: 'number' }],
@@ -51,13 +50,15 @@ const descriptor: ScreenDatasetDescriptor = {
     {
       name: 'limit',
       label: '行数',
-      editor: 'number',
+      valueType: 'number',
+      required: true,
       defaultValue: 2,
     },
     {
       name: 'region',
       label: '区域',
-      editor: 'text',
+      valueType: 'string',
+      required: false,
     },
   ],
 };
@@ -86,7 +87,7 @@ describe('DesignerDatasetController', () => {
 
     controller.onClick(resourceTarget('orders') as unknown as Element);
     await waitForDescriptor(controller);
-    expect(controller.descriptor?.resourceId).toBe('orders');
+    expect(controller.descriptor?.datasetId).toBe('orders');
 
     controller.onChange(
       new FakeInput('north', { datasetParameter: 'region' }) as unknown as EventTarget,
@@ -101,9 +102,9 @@ describe('DesignerDatasetController', () => {
           componentIds: ['text-1'],
           patch: {
             dataSource: {
-              type: 'host-resource',
-              resourceType: 'dataset',
-              resourceId: 'orders',
+              type: 'dataset',
+
+              datasetId: 'orders',
               params: {
                 limit: { kind: 'literal', value: 2 },
                 region: { kind: 'literal', value: 'north' },
@@ -160,8 +161,8 @@ describe('DesignerDatasetController', () => {
     await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
     expect(resolve.mock.calls[0]?.[0]).toMatchObject({
       componentId: 'text-1',
-      resourceType: 'dataset',
-      resourceId: 'orders',
+
+      datasetId: 'orders',
       params: { limit: 2, region: 'north' },
     });
     expect(executeTransaction).not.toHaveBeenCalled();
@@ -510,9 +511,9 @@ describe('DesignerDatasetController', () => {
       components: baseDocument.components.map((component) => ({
         ...component,
         dataSource: {
-          type: 'host-resource' as const,
-          resourceType: 'dataset',
-          resourceId: 'orders',
+          type: 'dataset' as const,
+
+          datasetId: 'orders',
           params: {
             limit: { kind: 'literal' as const, value: 2 },
             region: { kind: 'literal' as const, value: '' },
@@ -542,7 +543,7 @@ describe('DesignerDatasetController', () => {
     controller.render(undefined);
 
     expect(controller.authoring.editorMode).toBe('code');
-    expect(controller.descriptor?.resourceId).toBe('orders');
+    expect(controller.descriptor?.datasetId).toBe('orders');
   });
 
   it('R5 switches to static data without routing the draft through the host catalog', () => {
@@ -603,7 +604,7 @@ class FakeSelect {
 }
 
 function createController(overrides: {
-  readonly descriptor: ScreenDatasetDescriptor;
+  readonly descriptor: ScreenDatasetDefinition;
   readonly roles?: readonly ScreenDataBindingRole[];
   readonly executeTransaction?: (
     transaction: ScreenDocumentTransaction,
@@ -625,7 +626,7 @@ function createController(overrides: {
 }): DesignerDatasetController {
   const entry = {
     manifest: {
-      dataCapabilities: ['static', 'host-resource'],
+      dataCapabilities: ['static', 'dataset'],
       dataBinding: {
         roles: overrides.roles ?? [
           {
@@ -661,9 +662,11 @@ function createController(overrides: {
     }),
     hasBlueprintCapability: () => false,
   } as BaseScreenRuntimeContributionIndex;
-  const port: ScreenHostDatasetCatalogPort = {
+  const port: ScreenHostDatasetPort = {
     list: async () => success({ items: [] }),
     describe: async () => success(overrides.descriptor),
+    query: (overrides.resolve ??
+      (async () => success({ fields: [], rows: [] }))) as ScreenHostDatasetPort['query'],
   };
   const callbacks = {
     getCatalogPort: () => port,
@@ -694,8 +697,8 @@ function createController(overrides: {
   });
 }
 
-function resourceTarget(resourceId: string): { closest: (selector: string) => unknown } {
-  const item = { dataset: { datasetResourceId: resourceId, datasetResourceType: 'dataset' } };
+function resourceTarget(datasetId: string): { closest: (selector: string) => unknown } {
+  const item = { dataset: { datasetResourceId: datasetId, datasetResourceType: 'dataset' } };
   return {
     closest: (selector) => (selector === '[data-dataset-resource-id]' ? item : null),
   };
@@ -761,5 +764,5 @@ function staticBindingFieldTarget(
 }
 
 async function waitForDescriptor(controller: DesignerDatasetController): Promise<void> {
-  await vi.waitFor(() => expect(controller.descriptor?.resourceId).toBe('orders'));
+  await vi.waitFor(() => expect(controller.descriptor?.datasetId).toBe('orders'));
 }

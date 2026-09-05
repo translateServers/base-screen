@@ -1,10 +1,6 @@
 import type { ScreenCanvasColorStop, ScreenDocument } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import {
-  appendDesignerFieldMessage,
-  createDesignerButton,
-  createDesignerCheckbox,
-} from '../designer-ui-primitives.js';
+import { appendDesignerFieldMessage, createDesignerCheckbox } from '../designer-ui-primitives.js';
 import type {
   DesignerCanvasBackgroundDrafts,
   DesignerCanvasPresentationSettings,
@@ -145,43 +141,6 @@ function appendCanvasPresentationControls(
     'disableComponentLoading',
     settings.disableComponentLoading,
   );
-
-  const thumbnail = parent.ownerDocument.createElement('section');
-  thumbnail.className = 'designer-inspector-section designer-canvas-thumbnail';
-  thumbnail.dataset.inspectorSearchKind = 'section';
-  thumbnail.dataset.inspectorSearchText = DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnail;
-  const heading = parent.ownerDocument.createElement('h4');
-  heading.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnail;
-  const actions = parent.ownerDocument.createElement('div');
-  actions.className = 'designer-canvas-thumbnail-actions';
-  actions.appendChild(
-    canvasSettingAction(
-      parent.ownerDocument,
-      DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnailCapture,
-      'capture-thumbnail',
-    ),
-  );
-  actions.appendChild(
-    canvasSettingAction(
-      parent.ownerDocument,
-      DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnailUpload,
-      'upload-thumbnail',
-    ),
-  );
-  const preview = parent.ownerDocument.createElement('div');
-  preview.className = 'designer-canvas-thumbnail-preview';
-  if (settings.thumbnailUrl !== undefined) {
-    const image = parent.ownerDocument.createElement('img');
-    image.src = settings.thumbnailUrl;
-    image.alt = '';
-    preview.appendChild(image);
-  } else {
-    preview.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasThumbnailHint;
-  }
-  thumbnail.appendChild(heading);
-  thumbnail.appendChild(actions);
-  thumbnail.appendChild(preview);
-  parent.appendChild(thumbnail);
 }
 
 function appendCanvasSettingCheckbox(
@@ -200,16 +159,6 @@ function appendCanvasSettingCheckbox(
   input.dataset.canvasSetting = setting;
   label.appendChild(input);
   parent.appendChild(label);
-}
-
-function canvasSettingAction(
-  ownerDocument: Document,
-  label: string,
-  action: string,
-): HTMLButtonElement {
-  const button = createDesignerButton(ownerDocument, { text: label });
-  button.dataset.canvasSettingAction = action;
-  return button;
 }
 
 function appendCanvasBackgroundControls(

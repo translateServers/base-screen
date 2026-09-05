@@ -66,7 +66,10 @@ export function requestComponentTextEdit(
     sourceValue = component.props;
   } else if (component.dataSource?.type === 'static') {
     sourceValue = component.dataSource.value;
-  } else if (component.dataSource?.type === 'host-resource') {
+  } else if (
+    component.dataSource?.type === 'host-resource' ||
+    component.dataSource?.type === 'dataset'
+  ) {
     sourceValue = Object.fromEntries(
       Object.entries(component.dataSource.params).flatMap(([name, parameter]) =>
         parameter.kind === 'literal' ? [[name, parameter.value]] : [],
@@ -184,7 +187,7 @@ export function commitComponentTextEdit(
     if (result.ok) elementState.pendingAuthoringRequests.delete(request.requestId);
     return result;
   }
-  if (currentSource?.type !== 'host-resource') {
+  if (currentSource?.type !== 'host-resource' && currentSource?.type !== 'dataset') {
     return elementState.runtime.commitGuardFailure(element, 'AUTHORING_PAYLOAD_INVALID');
   }
   if (source.value === null || typeof source.value !== 'object' || Array.isArray(source.value)) {

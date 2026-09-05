@@ -17,8 +17,8 @@ declared object schemas. Binding roles use `id`, `minFields`, `maxFields`, and `
 
 ## Data and events
 
-Use `dataCapabilities: ["static"]` for self-contained data, or include `"host-resource"` and declare
-roles for host dataset bindings. A tabular adapter is a static `tabularDataAdapter` on the native
+Use `dataCapabilities: ["static"]` for self-contained data, or include `"dataset"` and declare
+roles for dataset bindings. Reserve `"host-resource"` for non-tabular host resources. A tabular adapter is a static `tabularDataAdapter` on the native
 constructor and returns a JSON-safe parse result. React/Vue bridges receive a normalized model; keep
 field adaptation in the component or use a native wrapper when an adapter is required.
 

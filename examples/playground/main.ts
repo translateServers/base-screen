@@ -33,6 +33,7 @@ import {
 import { createBaseScreenMaterialCatalog } from '../../packages/plugin-core/src/index.ts';
 import {
   type BaseScreenDesignerLeftPanelGroup,
+  type BaseScreenViewerElement,
   defineBaseScreenElements,
 } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
@@ -42,7 +43,7 @@ import {
   renderHostResourcePanel,
 } from './host-resource-panel.ts';
 import {
-  createPlaygroundDatasetCatalog,
+  createPlaygroundDatasetPort,
   createPlaygroundResourcePort,
   createPlaygroundRuntimeState,
   createPlaygroundVariablePort,
@@ -62,22 +63,14 @@ interface PlaygroundRoute {
   readonly document: () => ScreenDocument;
 }
 
-interface PlaygroundViewerElement extends HTMLElement {
-  catalog: typeof catalog;
-  resourcePort: ReturnType<typeof createPlaygroundResourcePort>;
-  variablePort: ReturnType<typeof createPlaygroundVariablePort>;
-  runtimeContributions: typeof runtimeContributions;
-  document: ScreenDocument | undefined;
-  resourceTimeoutMs: number;
-  refreshData: (componentId?: string) => void;
-}
+type PlaygroundViewerElement = BaseScreenViewerElement;
 
 interface PlaygroundDesignerElement extends HTMLElement {
   catalog: typeof catalog;
   leftPanelGroups: readonly BaseScreenDesignerLeftPanelGroup[] | undefined;
   resourcePort: ReturnType<typeof createPlaygroundResourcePort>;
   variablePort: ReturnType<typeof createPlaygroundVariablePort>;
-  datasetCatalogPort: ReturnType<typeof createPlaygroundDatasetCatalog>;
+  datasetPort: ReturnType<typeof createPlaygroundDatasetPort>;
   runtimeContributions: typeof runtimeContributions;
   toolMaterialTypes: {
     readonly text: string;
@@ -189,29 +182,14 @@ const catalog = createBaseScreenMaterialCatalog([
 ]);
 
 const runtimeContributions = {
-  getResourceType: (resourceType: string) =>
-    resourceType === 'dataset'
-      ? {
-          kind: 'dataResourceType' as const,
-          id: 'dataset',
-          name: '数据集',
-          configSchema: {
-            kind: 'object' as const,
-            properties: {
-              limit: { kind: 'number' as const, minimum: 1, maximum: 100 },
-              region: { kind: 'string' as const },
-            },
-            required: [],
-          },
-        }
-      : undefined,
+  getResourceType: () => undefined,
   hasBlueprintCapability: () => true,
 };
 
 const runtimeState = reactive<PlaygroundRuntimeState>(createPlaygroundRuntimeState());
 const resourcePort = createPlaygroundResourcePort(runtimeState);
 const variablePort = createPlaygroundVariablePort(runtimeState);
-const datasetCatalog = createPlaygroundDatasetCatalog();
+const datasetPort = createPlaygroundDatasetPort(runtimeState);
 
 const routes: readonly PlaygroundRoute[] = [
   {
@@ -267,6 +245,7 @@ const PlaygroundApp = defineComponent({
     const designerChanges = ref(0);
     const selectedHostResourceId = ref<HostResourceDemoItemId | null>(null);
     const observedDesigners = new WeakSet<PlaygroundDesignerElement>();
+    const configuredViewers = new WeakSet<PlaygroundViewerElement>();
     const currentRoute = () => routes.find((item) => item.path === currentPath.value) ?? routes[0];
 
     const navigate = (path: PlaygroundPath): void => {
@@ -279,11 +258,18 @@ const PlaygroundApp = defineComponent({
     const syncViewer = (): void => {
       const element = viewer.value;
       if (element === null) return;
-      element.resourcePort = resourcePort;
-      element.variablePort = variablePort;
-      element.resourceTimeoutMs = 3000;
-      element.runtimeContributions = runtimeContributions;
-      element.catalog = catalog;
+      if (!configuredViewers.has(element)) {
+        const configured = element.configure({
+          catalog,
+          resourcePort,
+          datasetPort,
+          variablePort,
+          resourceTimeoutMs: 3000,
+          runtimeContributions,
+        });
+        if (!configured.ok) throw new Error('Playground Viewer configuration failed.');
+        configuredViewers.add(element);
+      }
       element.document = currentRoute().document();
     };
 
@@ -299,7 +285,7 @@ const PlaygroundApp = defineComponent({
       }
       element.resourcePort = resourcePort;
       element.variablePort = variablePort;
-      element.datasetCatalogPort = datasetCatalog;
+      element.datasetPort = datasetPort;
       element.runtimeContributions = runtimeContributions;
       element.toolMaterialTypes = {
         text: 'base.text',
@@ -447,7 +433,7 @@ const PlaygroundApp = defineComponent({
                       },
                     },
                     listPlaygroundDatasets().map((dataset) =>
-                      h('option', { value: dataset.resourceId }, dataset.name),
+                      h('option', { value: dataset.datasetId }, dataset.name),
                     ),
                   ),
                 ])
@@ -544,7 +530,7 @@ const PlaygroundApp = defineComponent({
                   .map((request) =>
                     h('li', [
                       h('code', request.componentId),
-                      h('span', `${request.resourceId} · ${String(request.params.region ?? '-')}`),
+                      h('span', `${request.datasetId} · ${String(request.params.region ?? '-')}`),
                     ]),
                   ),
               ),
@@ -559,7 +545,7 @@ const PlaygroundApp = defineComponent({
 createApp(PlaygroundApp).mount('#app');
 
 Object.assign(window, {
-  playgroundRuntime: { state: runtimeState, resourcePort, variablePort, datasetCatalog },
+  playgroundRuntime: { state: runtimeState, resourcePort, variablePort, datasetPort },
 });
 
 function createBasicDocument(): ScreenDocument {
@@ -595,9 +581,8 @@ function createDataDocument(
   useRegionVariable = true,
 ): ScreenDocument {
   const source = {
-    type: 'host-resource' as const,
-    resourceType: 'dataset',
-    resourceId: runtimeState.datasetId,
+    type: 'dataset' as const,
+    datasetId: runtimeState.datasetId,
     params: {
       limit: { kind: 'literal' as const, value: 5 } satisfies ScreenHostResourceParameter,
       region: useRegionVariable
@@ -678,9 +663,8 @@ function createErrorDocument(): ScreenDocument {
         props: {},
         style: { color: '#ff9c9c', fontSize: 18, fontWeight: '400', textAlign: 'left' },
         dataSource: {
-          type: 'host-resource',
-          resourceType: 'dataset',
-          resourceId: 'playground-error',
+          type: 'dataset',
+          datasetId: 'playground-error',
           params: {},
           binding: null,
         },
@@ -752,6 +736,6 @@ function toPlaygroundPath(pathname: string): PlaygroundPath {
 
 function datasetDescription(datasetId: PlaygroundDatasetId): string {
   return (
-    listPlaygroundDatasets().find((dataset) => dataset.resourceId === datasetId)?.description ?? ''
+    listPlaygroundDatasets().find((dataset) => dataset.datasetId === datasetId)?.description ?? ''
   );
 }

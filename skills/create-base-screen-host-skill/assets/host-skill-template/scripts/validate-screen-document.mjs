@@ -160,6 +160,8 @@ export async function validateScreenDocumentFile(documentPath, options = {}) {
     }
     if (component.dataSource.type === 'host-resource') {
       validateHostResource(issues, apis, component, component.dataSource, material, refs, path);
+    } else if (component.dataSource.type === 'dataset') {
+      validateDataset(issues, apis, component.dataSource, material, refs, path);
     }
   }
   return issues;
@@ -248,7 +250,7 @@ async function loadReferences(apis, issues, options = {}) {
   const datasets = new Map();
   const datasetValues = await parseReferenceArray('datasets.json', issues);
   for (const [index, item] of datasetValues.entries()) {
-    const parsed = apis.parseScreenDatasetDescriptor(item);
+    const parsed = apis.parseScreenDatasetDefinition(item);
     if (!parsed.ok) addDiagnostics(issues, parsed.diagnostics, ['references', 'datasets', index]);
     else datasets.set(datasetKey(parsed.value), parsed.value);
   }
@@ -311,16 +313,6 @@ function validateHostResource(issues, apis, component, dataSource, material, ref
     });
     return;
   }
-  const dataset = refs.datasets.get(`${dataSource.resourceType}:${dataSource.resourceId}`);
-  if (dataset === undefined) {
-    issues.push({
-      severity: 'error',
-      code: 'HOST_SKILL_DATASET_UNKNOWN',
-      path: [...path, 'dataSource', 'resourceId'],
-      message: `Dataset ${dataSource.resourceType}:${dataSource.resourceId} is not in the host catalog.`,
-    });
-    return;
-  }
   const values = {};
   for (const [name, parameter] of Object.entries(dataSource.params)) {
     if (parameter.kind !== 'literal') {
@@ -335,6 +327,37 @@ function validateHostResource(issues, apis, component, dataSource, material, ref
     }
   }
   checkSchema(issues, apis.validateBaseScreenMaterialProps(values, resource.configSchema), [
+    ...path,
+    'dataSource',
+    'params',
+  ]);
+}
+
+function validateDataset(issues, apis, dataSource, material, refs, path) {
+  const dataset = refs.datasets.get(dataSource.datasetId);
+  if (dataset === undefined) {
+    issues.push({
+      severity: 'error',
+      code: 'HOST_SKILL_DATASET_UNKNOWN',
+      path: [...path, 'dataSource', 'datasetId'],
+      message: `Dataset ${dataSource.datasetId} is not in the host catalog.`,
+    });
+    return;
+  }
+  const values = {};
+  for (const [name, parameter] of Object.entries(dataSource.params)) {
+    if (parameter.kind !== 'literal') {
+      issues.push({
+        severity: 'error',
+        code: 'HOST_SKILL_VARIABLE_PARAMETER_UNSUPPORTED',
+        path: [...path, 'dataSource', 'params', name],
+        message: 'Host Skill dataset parameters must be literal.',
+      });
+    } else {
+      values[name] = parameter.value;
+    }
+  }
+  checkSchema(issues, apis.evaluateScreenDatasetParameters(dataset.parameters, values), [
     ...path,
     'dataSource',
     'params',
@@ -432,7 +455,7 @@ async function findRepoRoot() {
 }
 
 function datasetKey(dataset) {
-  return `${dataset.resourceType}:${dataset.resourceId}`;
+  return dataset.datasetId;
 }
 
 function formatIssue(issue) {

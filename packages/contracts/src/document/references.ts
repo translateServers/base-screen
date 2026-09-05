@@ -90,7 +90,7 @@ export function validateReferences(
       );
       clean = false;
     }
-    if (source?.type !== 'host-resource') return;
+    if (source?.type !== 'host-resource' && source?.type !== 'dataset') return;
     for (const [parameterName, parameter] of Object.entries(source.params)) {
       if (parameter.kind === 'variable' && !variableIds.has(parameter.variableId)) {
         collector.add(

@@ -16,6 +16,7 @@
 
 | ADR | 状态 | 日期 | 主题 |
 | --- | --- | --- | --- |
+| [ADR-0069](./ADR-0069-independent-dataset-consumption.md) | 已接受 | 2026-09-05 | 独立数据集端口、参数权威及宿主消费重构 |
 | [ADR-0001](./ADR-0001-monorepo-toolchain-and-package-boundaries.md) | 已接受 | 2026-08-03 | Monorepo、工具链、私有阶段版本与十二包依赖边界 |
 
 | [ADR-0002](./ADR-0002-canonical-screen-document.md) | 已接受 | 2026-08-04 | Canonical Screen Document 契约 |

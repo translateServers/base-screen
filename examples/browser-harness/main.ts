@@ -440,11 +440,8 @@ const screenDocument = {
         },
       ],
       dataSource: {
-        type: 'host-resource' as const,
-        resourceType: 'dataset',
-        resourceId: 'metric-value',
-        params: { limit: { kind: 'literal' as const, value: 1 } },
-        binding: null,
+        type: 'variable' as const,
+        variableId: 'metric-value',
       },
     },
     {
@@ -462,11 +459,8 @@ const screenDocument = {
       props: {},
       style: { color: '#9fb1c9', fontSize: 16, fontWeight: '400', textAlign: 'left' },
       dataSource: {
-        type: 'host-resource' as const,
-        resourceType: 'dataset',
-        resourceId: 'metric-value',
-        params: { limit: { kind: 'literal' as const, value: 1 } },
-        binding: null,
+        type: 'variable' as const,
+        variableId: 'metric-value',
       },
     },
     {
@@ -510,9 +504,8 @@ const screenDocument = {
       props: structuredClone(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.defaultProps),
       style: structuredClone(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.defaultStyle),
       dataSource: {
-        type: 'host-resource' as const,
-        resourceType: 'dataset',
-        resourceId: 'tabular-orders',
+        type: 'dataset' as const,
+        datasetId: 'tabular-orders',
         params: {
           limit: { kind: 'literal' as const, value: 2 },
           region: { kind: 'variable' as const, variableId: 'region' },
@@ -533,9 +526,8 @@ const screenDocument = {
       props: structuredClone(hostedDatasetRankingManifest.defaultProps),
       style: structuredClone(hostedDatasetRankingManifest.defaultStyle),
       dataSource: {
-        type: 'host-resource' as const,
-        resourceType: 'dataset',
-        resourceId: 'tabular-orders',
+        type: 'dataset' as const,
+        datasetId: 'tabular-orders',
         params: {
           limit: { kind: 'literal' as const, value: 5 },
           region: { kind: 'variable' as const, variableId: 'region' },
@@ -547,6 +539,7 @@ const screenDocument = {
   variables: [
     { type: 'static' as const, id: 'count', name: 'count', initialValue: 0 },
     { type: 'static' as const, id: 'region', name: 'region', initialValue: 'north' },
+    { type: 'static' as const, id: 'metric-value', name: 'metricValue', initialValue: 42 },
     {
       type: 'data-source' as const,
       id: 'browser-data-source-region',
@@ -661,15 +654,126 @@ const variableRequests: Array<{
   readonly purpose: string;
 }> = [];
 const resourcePort = {
-  async resolve(request: {
-    readonly resourceId: string;
+  async resolve() {
+    return { ok: true as const, value: { records: 5 }, diagnostics: [] };
+  },
+};
+const datasetPort = {
+  queryScope: 'dataset' as const,
+  async groups() {
+    return {
+      ok: true as const,
+      value: [
+        { id: 'system', name: '系统数据' },
+        { id: 'external', name: '外部数据' },
+      ],
+      diagnostics: [],
+    };
+  },
+  async list() {
+    return {
+      ok: true as const,
+      value: {
+        items: [
+          {
+            datasetId: 'tabular-orders',
+            name: '订单数据集',
+            description: '用于浏览器验证的表格与图表数据。',
+            groupId: 'system',
+          },
+        ],
+      },
+      diagnostics: [],
+    };
+  },
+  async describe({ datasetId }: { readonly datasetId: string }) {
+    if (datasetId === 'auto-text-data') {
+      return {
+        ok: true as const,
+        value: {
+          datasetId,
+          name: '自适应文本',
+          description: null,
+          groupId: 'system',
+          fields: [{ id: 'value', label: '文本', valueType: 'string' as const }],
+          parameters: [],
+        },
+        diagnostics: [],
+      };
+    }
+    if (datasetId === 'metric-value') {
+      return {
+        ok: true as const,
+        value: {
+          datasetId,
+          name: '指标值',
+          description: null,
+          groupId: 'system',
+          fields: [{ id: 'value', label: '指标值', valueType: 'number' as const }],
+          parameters: [],
+        },
+        diagnostics: [],
+      };
+    }
+    return {
+      ok: true as const,
+      value: {
+        datasetId: 'tabular-orders',
+        name: '订单数据集',
+        description: '用于浏览器验证的表格与图表数据。',
+        groupId: 'system',
+        fields: [
+          { id: 'category', label: '分类', valueType: 'string' as const },
+          { id: 'amount', label: '金额', valueType: 'number' as const },
+        ],
+        parameters: [
+          {
+            name: 'limit',
+            label: '行数',
+            valueType: 'number' as const,
+            required: false,
+            minimum: 1,
+            maximum: 100,
+            defaultValue: 2,
+          },
+          {
+            name: 'region',
+            label: '区域',
+            valueType: 'string' as const,
+            required: false,
+          },
+        ],
+      },
+      diagnostics: [],
+    };
+  },
+  async query(request: {
+    readonly componentId: string;
+    readonly datasetId: string;
     readonly params: Readonly<Record<string, unknown>>;
   }) {
     datasetRequests.push(request);
-    if (request.resourceId === 'metric-value') {
-      return { ok: true as const, value: metricValue, diagnostics: [] };
+    if (request.datasetId === 'auto-text-data') {
+      return {
+        ok: true as const,
+        value: {
+          fields: [{ id: 'value', label: '文本', valueType: 'string' as const }],
+          rows: [{ value: window.autoWidthResourceValue ?? '' }],
+        },
+        diagnostics: [],
+      };
     }
-    if (request.resourceId === 'tabular-orders') {
+    if (request.datasetId === 'metric-value') {
+      return {
+        ok: true as const,
+        value: {
+          fields: [{ id: 'value', label: '指标值', valueType: 'number' as const }],
+          rows: [{ value: metricValue }],
+        },
+        diagnostics: [],
+      };
+    }
+    if (request.datasetId === 'tabular-orders') {
       if (datasetDelay) await new Promise((resolve) => setTimeout(resolve, 500));
       if (request.params.region === 'error') {
         return {
@@ -699,7 +803,17 @@ const resourcePort = {
         diagnostics: [],
       };
     }
-    return { ok: true as const, value: { records: 5 }, diagnostics: [] };
+    return {
+      ok: false as const,
+      diagnostics: [
+        {
+          severity: 'error' as const,
+          code: 'HOST_RESOURCE_UNAVAILABLE' as const,
+          path: [],
+          message: 'Harness dataset is unavailable.',
+        },
+      ],
+    };
   },
 };
 const variablePort = {
@@ -847,57 +961,10 @@ const variableCatalog = {
       : { ok: true as const, value: descriptor, diagnostics: [] };
   },
 };
-const datasetCatalog = {
-  async list() {
-    return {
-      ok: true as const,
-      value: {
-        items: [
-          {
-            resourceType: 'dataset',
-            resourceId: 'tabular-orders',
-            name: '订单数据集',
-            description: '用于浏览器验证的表格与图表数据。',
-          },
-        ],
-      },
-      diagnostics: [],
-    };
-  },
-  async describe() {
-    return {
-      ok: true as const,
-      value: {
-        resourceType: 'dataset',
-        resourceId: 'tabular-orders',
-        name: '订单数据集',
-        description: '用于浏览器验证的表格与图表数据。',
-        fields: [
-          { id: 'category', label: '分类', valueType: 'string' as const },
-          { id: 'amount', label: '金额', valueType: 'number' as const },
-        ],
-        parameters: [
-          {
-            name: 'limit',
-            label: '行数',
-            editor: 'number' as const,
-            defaultValue: 2,
-          },
-          {
-            name: 'region',
-            label: '区域',
-            editor: 'text' as const,
-          },
-        ],
-      },
-      diagnostics: [],
-    };
-  },
-};
 designer.resourcePort = resourcePort;
 designer.variablePort = variablePort;
 designer.variableCatalogPort = variableCatalog;
-designer.datasetCatalogPort = datasetCatalog;
+designer.datasetPort = datasetPort;
 designer.runtimeContributions = pluginManager.snapshot.contributions;
 // ADR-0059 宿主条件样式端口：阈值与视觉映射归宿主告警体系，屏幕只消费结果。
 // 初始化前经守卫 setter 提交（与 resourcePort 同形）；两个元素共用同一宿主实现。
@@ -916,15 +983,6 @@ const conditionalStylePort = {
   },
 };
 designer.conditionalStylePort = conditionalStylePort;
-viewer.conditionalStylePort = conditionalStylePort;
-viewer.resourcePort = resourcePort;
-viewer.variablePort = variablePort;
-viewer.runtimeContributions = pluginManager.snapshot.contributions;
-viewer.blueprintRuntimePort = {
-  emit(event) {
-    hostEvents.push(event);
-  },
-};
 designer.catalog = designerCatalog;
 designer.materialLibraryGrouping = activeMaterialLibraryGrouping;
 designer.materialLibraryState = {
@@ -946,7 +1004,22 @@ designer.toolMaterialTypes = {
 };
 // 编组使用显式配置的容器物料（children=true），缺失时 Group 命令按 ADR-0012 保持禁用。
 designer.groupMaterialType = 'base.container';
-viewer.catalog = designerCatalog;
+const viewerConfigured = viewer.configure({
+  catalog: designerCatalog,
+  resourcePort,
+  datasetPort,
+  variablePort,
+  conditionalStylePort,
+  runtimeContributions,
+  blueprintRuntimePort: {
+    emit: (event) => {
+      hostEvents.push(event);
+    },
+  },
+});
+if (!viewerConfigured.ok) {
+  throw new Error('Browser Harness Viewer configuration failed.');
+}
 let envelope = {
   projectId: 'browser-harness',
   revision: '1',
@@ -1111,7 +1184,7 @@ Object.assign(window, {
       vue: vueBridge.value.manifest,
       datasetRanking: hostedDatasetRankingManifest,
     },
-    datasetCatalog,
+    datasetPort,
     datasetRequests,
     variableCatalog,
     variableRequests,
@@ -1133,19 +1206,21 @@ Object.assign(window, {
     },
     setMetricValue: (value: number) => {
       metricValue = value;
-      designer.refreshData('metric-warning');
-      designer.refreshData('port-warning');
-      viewer.refreshData('metric-warning');
-      viewer.refreshData('port-warning');
+      designer.getVariable('metric-value')?.set(value);
+      viewer.getVariable('metric-value')?.set(value);
     },
     createDatasetDemo: () => {
       const demo = document.createElement('base-screen-viewer') as typeof viewer;
       demo.dataset.datasetDemo = 'true';
-      demo.catalog = bridgeCatalog;
-      demo.resourcePort = resourcePort;
-      demo.variablePort = variablePort;
-      demo.resourceTimeoutMs = 100;
-      demo.runtimeContributions = runtimeContributions;
+      const configured = demo.configure({
+        catalog: bridgeCatalog,
+        resourcePort,
+        datasetPort,
+        variablePort,
+        resourceTimeoutMs: 100,
+        runtimeContributions,
+      });
+      if (!configured.ok) throw new Error('Dataset demo configuration failed.');
       demo.document = {
         canvas: { width: 960, height: 540, backgroundColor: '#111827' },
         components: [
@@ -1162,9 +1237,8 @@ Object.assign(window, {
             props: BASE_SCREEN_TABLE_MATERIAL_MANIFEST.defaultProps,
             style: BASE_SCREEN_TABLE_MATERIAL_MANIFEST.defaultStyle,
             dataSource: {
-              type: 'host-resource' as const,
-              resourceType: 'dataset',
-              resourceId: 'tabular-orders',
+              type: 'dataset' as const,
+              datasetId: 'tabular-orders',
               params: {
                 limit: { kind: 'literal' as const, value: 2 },
                 region: { kind: 'variable' as const, variableId: 'region' },
@@ -1185,9 +1259,8 @@ Object.assign(window, {
             props: BASE_SCREEN_CHART_MATERIAL_MANIFEST.defaultProps,
             style: BASE_SCREEN_CHART_MATERIAL_MANIFEST.defaultStyle,
             dataSource: {
-              type: 'host-resource' as const,
-              resourceType: 'dataset',
-              resourceId: 'tabular-orders',
+              type: 'dataset' as const,
+              datasetId: 'tabular-orders',
               params: {
                 limit: { kind: 'literal' as const, value: 2 },
                 region: { kind: 'variable' as const, variableId: 'region' },

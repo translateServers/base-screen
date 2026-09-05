@@ -350,6 +350,94 @@
                 "properties": {
                   "type": {
                     "type": "string",
+                    "const": "dataset"
+                  },
+                  "datasetId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256,
+                    "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
+                  },
+                  "params": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "literal"
+                            },
+                            "value": {}
+                          },
+                          "required": ["kind", "value"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "variable"
+                            },
+                            "variableId": {
+                              "type": "string",
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+                            }
+                          },
+                          "required": ["kind", "variableId"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "binding": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "fields": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128
+                            },
+                            "additionalProperties": {
+                              "minItems": 1,
+                              "maxItems": 256,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 256
+                              }
+                            }
+                          }
+                        },
+                        "required": ["fields"],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": ["type", "datasetId", "params", "binding"],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
                     "const": "host-resource"
                   },
                   "resourceType": {

@@ -29,6 +29,10 @@ Base Screen 提供两个 Custom Element：
 Screen Document 只保存可移植的 canonical 数据。URL、SQL、token、请求头、数据库连接、宿主
 服务对象、编辑器 session 和部署配置都不得写入文档。
 
+大屏缩略图同样属于宿主：Base Screen Designer 不提供截取、上传或保存缩略图的内建入口。
+宿主可在保存成功后使用自己的只读渲染、截图、上传和来源校验链路。物料库的 Manifest `cover`
+只是宿主提供的展示 URL，不代表 Base Screen 拥有封面上传或资产存储。
+
 ## 2. 选择接入模式
 
 宿主通常使用以下三种模式之一：

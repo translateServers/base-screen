@@ -206,7 +206,7 @@ export function configure(
     elementState.resourcePort = adapter.resources;
     elementState.variablePort = adapter.variables;
     elementState.variableCatalogPort = adapter.variableCatalog;
-    elementState.datasetCatalogPort = adapter.datasetCatalog;
+    elementState.datasetPort = adapter.datasets;
   } else {
     elementState.designerHostAdapter = undefined;
     elementState.projectCatalogPort = configuration.projectCatalogPort;
@@ -215,7 +215,7 @@ export function configure(
     elementState.resourcePort = configuration.resourcePort;
     elementState.variablePort = configuration.variablePort;
     elementState.variableCatalogPort = configuration.variableCatalogPort;
-    elementState.datasetCatalogPort = configuration.datasetCatalogPort;
+    elementState.datasetPort = configuration.datasetPort;
   }
   elementState.conditionalStylePort = configuration.conditionalStylePort;
   elementState.catalog = configuration.catalog;

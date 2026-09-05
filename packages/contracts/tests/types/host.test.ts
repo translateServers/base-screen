@@ -94,7 +94,7 @@ describe('project lifecycle contracts', () => {
         readonly projectPreview: boolean;
         readonly projectSnapshots: boolean;
         readonly resources: boolean;
-        readonly datasetCatalog: boolean;
+        readonly datasets: boolean;
         readonly variableCatalog: boolean;
         readonly variables: boolean;
         readonly actions: boolean;
@@ -115,7 +115,7 @@ describe('project lifecycle contracts', () => {
         projectPreview: false,
         projectSnapshots: false,
         resources: false,
-        datasetCatalog: false,
+        datasets: false,
         variableCatalog: false,
         variables: false,
         actions: false,
@@ -137,7 +137,7 @@ describe('project lifecycle contracts', () => {
         projectPreview: false,
         projectSnapshots: false,
         resources: false,
-        datasetCatalog: false,
+        datasets: false,
         variableCatalog: false,
         variables: false,
         actions: false,
@@ -154,7 +154,7 @@ describe('project lifecycle contracts', () => {
         projectPreview: false,
         projectSnapshots: false,
         resources: false,
-        datasetCatalog: false,
+        datasets: false,
         variableCatalog: true,
         variables: false,
         actions: false,

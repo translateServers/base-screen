@@ -194,22 +194,21 @@ export async function assertTextAutoWidth(browser, baseUrl) {
     await page.evaluate(() => {
       const designer = window.baseScreenHarness.designer;
       window.autoWidthResourceValue = '短数据';
-      designer.resourcePort.resolve = async () => ({
+      designer.datasetPort.query = async () => ({
         ok: true,
-        value: window.autoWidthResourceValue,
+        value: {
+          fields: [{ id: 'value', label: '文本', valueType: 'string' }],
+          rows: [{ value: window.autoWidthResourceValue }],
+        },
         diagnostics: [],
       });
     });
     await patchAutoWidthText(page, {
       dataSource: {
-        type: 'host-resource',
-        resourceType: 'dataset',
-        resourceId: 'auto-text-data',
-        params: {
-          limit: { kind: 'literal', value: 1 },
-          region: { kind: 'literal', value: 'north' },
-        },
-        binding: null,
+        type: 'dataset',
+        datasetId: 'auto-text-data',
+        params: {},
+        binding: { fields: { value: ['value'] } },
       },
     });
     await expect(text).toHaveText('短数据');

@@ -30,6 +30,7 @@ import {
 import { runCheck, verificationKey } from './runner.mjs';
 import {
   hostCommand,
+  hostDerivationDigest,
   loadHost,
   sourceHealth,
   supplierCommand,
@@ -231,7 +232,10 @@ export async function inspect(roots, host) {
       dirty: health.source?.dirty ?? null,
     },
     pendingPackages: source ? source.packages !== health.source?.packageInputsDigest : null,
-    pendingContext: source ? source.knowledge !== consumed?.source?.knowledgeDigest : null,
+    pendingContext: source
+      ? source.knowledge !== consumed?.source?.knowledgeDigest ||
+        health.source?.hostDerivationDigest !== hostDerivationDigest(roots.host, host)
+      : null,
     issues: [...health.issues, ...toolingHealth(roots)],
     recovery,
     capabilities: index.capabilities.map((item) => ({

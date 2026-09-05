@@ -248,7 +248,7 @@ export function initializeDesignerElementControllers(
     restoreSnapshot: (snapshotId) => element.restoreSnapshot(snapshotId),
   });
   state.datasetController = new DesignerDatasetController({
-    getCatalogPort: () => state.datasetCatalogPort,
+    getCatalogPort: () => state.datasetPort,
     getDocument: () => state.session.document,
     getInteraction: () => state.session.interaction,
     getCatalog: () => state.catalog,
@@ -317,15 +317,6 @@ export function initializeDesignerElementControllers(
     requestMaterialLibraryAction: (action) =>
       state.runtime.requestMaterialLibraryAction(element, action),
     requestCanvasBackgroundImage: () => element.requestCanvasBackgroundImage(),
-    requestCanvasPresentationAction: (action) => {
-      element.dispatchEvent(
-        new CustomEvent('base-screen-canvas-presentation-action', {
-          bubbles: true,
-          composed: true,
-          detail: { action },
-        }),
-      );
-    },
     onCanvasPresentationChange: (settings) => {
       if (state.canvas !== undefined) {
         state.canvas.style.opacity = String(settings.opacity);
@@ -344,7 +335,6 @@ export function initializeDesignerElementControllers(
               scaleMode: settings.scaleMode,
               backgroundAutoFill: settings.backgroundAutoFill,
               disableComponentLoading: settings.disableComponentLoading,
-              thumbnailUrl: settings.thumbnailUrl ?? null,
             },
           },
         ),

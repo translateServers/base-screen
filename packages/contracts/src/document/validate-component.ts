@@ -46,6 +46,7 @@ const HOST_RESOURCE_DATA_SOURCE_FIELDS = new Set([
   'params',
   'binding',
 ]);
+const DATASET_DATA_SOURCE_FIELDS = new Set(['type', 'datasetId', 'params', 'binding']);
 const VARIABLE_DATA_SOURCE_FIELDS = new Set(['type', 'variableId', 'binding', 'processorId']);
 const HOST_RESOURCE_PARAMETER_FIELDS = new Set(['kind', 'value', 'variableId']);
 const HOST_RESOURCE_BINDING_FIELDS = new Set(['fields']);
@@ -183,11 +184,13 @@ function validateDataSourceStrictKeys(
 ): boolean {
   if (!isJsonObject(dataSource)) return true;
   const fields =
-    dataSource.type === 'host-resource'
-      ? HOST_RESOURCE_DATA_SOURCE_FIELDS
-      : dataSource.type === 'variable'
-        ? VARIABLE_DATA_SOURCE_FIELDS
-        : STATIC_DATA_SOURCE_FIELDS;
+    dataSource.type === 'dataset'
+      ? DATASET_DATA_SOURCE_FIELDS
+      : dataSource.type === 'host-resource'
+        ? HOST_RESOURCE_DATA_SOURCE_FIELDS
+        : dataSource.type === 'variable'
+          ? VARIABLE_DATA_SOURCE_FIELDS
+          : STATIC_DATA_SOURCE_FIELDS;
   if (
     !checkStrictObjectKeys(
       dataSource,
@@ -200,7 +203,12 @@ function validateDataSourceStrictKeys(
   ) {
     return false;
   }
-  if (dataSource.type === 'host-resource' && isJsonObject(dataSource.params)) {
+  if (
+    (dataSource.type === 'dataset' ||
+      dataSource.type === 'host-resource' ||
+      dataSource.type === 'dataset') &&
+    isJsonObject(dataSource.params)
+  ) {
     for (const [key, parameter] of Object.entries(dataSource.params)) {
       if (
         isJsonObject(parameter) &&
@@ -221,7 +229,8 @@ function validateDataSourceStrictKeys(
     }
   }
   if (
-    (dataSource.type === 'host-resource' ||
+    (dataSource.type === 'dataset' ||
+      dataSource.type === 'host-resource' ||
       dataSource.type === 'static' ||
       dataSource.type === 'variable') &&
     isJsonObject(dataSource.binding) &&

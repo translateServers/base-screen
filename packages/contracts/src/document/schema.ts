@@ -158,6 +158,17 @@ export const variableDataSourceSchema = z.strictObject({
   processorId: z.string().min(1).max(256).optional(),
 });
 
+export const datasetDataSourceSchema = z.strictObject({
+  type: z.literal('dataset'),
+  datasetId: z
+    .string()
+    .min(1)
+    .max(256)
+    .regex(/^[^\u0000-\u001f\u007f-\u009f]+$/u),
+  params: hostResourceDataSourceSchema.shape.params,
+  binding: z.union([dataBindingSchema, z.null()]),
+});
+
 export const componentSchema = z.strictObject({
   id: z.string().regex(new RegExp(COMPONENT_ID_PATTERN)),
   type: z.string().regex(new RegExp(MATERIAL_TYPE_PATTERN)),
@@ -173,6 +184,7 @@ export const componentSchema = z.strictObject({
   styleRules: z.array(styleRuleSchema).max(MAX_STYLE_RULES_PER_COMPONENT).optional(),
   dataSource: z.union([
     staticDataSourceSchema,
+    datasetDataSourceSchema,
     hostResourceDataSourceSchema,
     variableDataSourceSchema,
     z.null(),

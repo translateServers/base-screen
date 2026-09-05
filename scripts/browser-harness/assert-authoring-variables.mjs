@@ -18,7 +18,7 @@ export async function assertAuthoringVariables(page, designer) {
   const variableNamesBefore = await page.evaluate(() =>
     window.baseScreenHarness.designer.document.variables.map((item) => item.name).join(','),
   );
-  if (variableNamesBefore !== 'count,region,dataSourceRegion,urlCampaign') {
+  if (variableNamesBefore !== 'count,region,metricValue,dataSourceRegion,urlCampaign') {
     throw new Error(`BROWSER_HARNESS_VARIABLES_LIST_FAILED:${variableNamesBefore}`);
   }
   const variableTypesBefore = await page.evaluate(() =>
@@ -220,7 +220,7 @@ export async function assertAuthoringVariables(page, designer) {
     };
     const sample = () => {
       const primary = panel.querySelector('[data-variable-action="confirm-create"]');
-      const neutral = root.querySelector('[data-canvas-setting-action="capture-thumbnail"]');
+      const neutral = root.querySelector('[data-canvas-setting="scaleMode"][aria-pressed="false"]');
       const ghost = root.querySelector('[data-panel-collapse="left"]');
       const pressed = root.querySelector('[data-material-filter="all"]');
       const primaryStyle = getComputedStyle(primary);

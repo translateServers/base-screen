@@ -36,6 +36,16 @@ function pnpmEntry() {
   return entry;
 }
 
+function batchArgument(value) {
+  if (/[\r\n"%!&|<>^]/.test(value)) fail('PNPM_PATH_UNSAFE', value);
+  return '"' + value + '"';
+}
+
+function shellArgument(value) {
+  if (/[\r\n\0]/.test(value)) fail('PNPM_PATH_UNSAFE', value);
+  return "'" + value.replaceAll("'", "'\\''") + "'";
+}
+
 export async function execute(command, log) {
   let executable;
   let args;
@@ -62,22 +72,21 @@ export async function execute(command, log) {
   if (process.platform === 'win32') {
     writeChanged(
       join(shimDirectory, 'pnpm.cmd'),
-      '@echo off\r\n"%BASE_SCREEN_INTEGRATION_NODE%" "%BASE_SCREEN_INTEGRATION_PNPM%" %*\r\n',
+      '@' + batchArgument(process.execPath) + ' ' + batchArgument(corepack) + ' %*\r\n',
     );
   } else {
     const shim = join(shimDirectory, 'pnpm');
     writeChanged(
       shim,
-      '#!/bin/sh\nexec "$BASE_SCREEN_INTEGRATION_NODE" "$BASE_SCREEN_INTEGRATION_PNPM" "$@"\n',
+      '#!/bin/sh\nexec ' +
+        shellArgument(process.execPath) +
+        ' ' +
+        shellArgument(corepack) +
+        ' "$@"\n',
     );
     chmodSync(shim, 0o755);
   }
-  const env = {
-    ...process.env,
-    COREPACK_ENABLE_DOWNLOAD_PROMPT: '0',
-    BASE_SCREEN_INTEGRATION_NODE: process.execPath,
-    BASE_SCREEN_INTEGRATION_PNPM: corepack,
-  };
+  const env = { ...process.env, COREPACK_ENABLE_DOWNLOAD_PROMPT: '0' };
   const pathKey = Object.keys(env).find((key) => key.toLowerCase() === 'path') || 'PATH';
   env[pathKey] = shimDirectory + delimiter + (env[pathKey] || '');
   const fd = openSync(log, 'a');

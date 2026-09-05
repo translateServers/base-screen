@@ -34,14 +34,9 @@ const ARRAY_SORT_KEY = {
   components: (item) => (isObject(item) && typeof item.id === 'string' ? item.id : ''),
   materials: (item) => (isObject(item) && typeof item.type === 'string' ? item.type : ''),
   resourceTypes: (item) => (isObject(item) && typeof item.id === 'string' ? item.id : ''),
-  datasets: (item) =>
-    isObject(item) && typeof item.resourceType === 'string' && typeof item.resourceId === 'string'
-      ? `${item.resourceType}:${item.resourceId}`
-      : '',
+  datasets: (item) => (isObject(item) && typeof item.datasetId === 'string' ? item.datasetId : ''),
   datasetSamples: (item) =>
-    isObject(item) && typeof item.resourceType === 'string' && typeof item.resourceId === 'string'
-      ? `${item.resourceType}:${item.resourceId}`
-      : '',
+    isObject(item) && typeof item.datasetId === 'string' ? item.datasetId : '',
   materialProvenance: (item) => (isObject(item) && typeof item.type === 'string' ? item.type : ''),
   materialTemplates: (item) => (isObject(item) && typeof item.id === 'string' ? item.id : ''),
 };

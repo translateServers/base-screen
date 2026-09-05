@@ -319,8 +319,8 @@ Object.assign(window, {
               contributions: [
                 {
                   kind: 'dataResourceType',
-                  id: 'dataset',
-                  name: 'Dataset',
+                  id: 'host_api',
+                  name: 'Host API',
                   configSchema: {
                     kind: 'object',
                     properties: { limit: { kind: 'number' } },
@@ -355,7 +355,7 @@ Object.assign(window, {
       viewer.document = {
         ...createResourceDocument({
           type: 'host-resource',
-          resourceType: 'dataset',
+          resourceType: 'host_api',
           resourceId: 'orders',
           params: { limit: { kind: 'literal', value: 'invalid' } },
           binding: null,
@@ -391,7 +391,7 @@ Object.assign(window, {
           resource?.model?.dataState?.status === 'error' &&
           resource?.model?.dataState?.code === 'HOST_RESOURCE_FAILED' &&
           activated.value.contributions.hasBlueprintCapability('blueprint.value.variable') &&
-          activated.value.contributions.getResourceType('dataset') !== undefined
+          activated.value.contributions.getResourceType('host_api') !== undefined
         );
       } finally {
         viewer.remove();

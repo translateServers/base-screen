@@ -242,9 +242,9 @@ export function renderProperties(element: DesignerElementHost): void {
   elementState.scrollContinuityController.preserve(element.shadowRoot, () => {
     elementState.panelController.render(
       elementState.properties,
-      elementState.datasetCatalogPort === undefined ? elementState.dataPanel : undefined,
+      elementState.datasetPort === undefined ? elementState.dataPanel : undefined,
     );
-    if (elementState.datasetCatalogPort !== undefined)
+    if (elementState.datasetPort !== undefined)
       elementState.datasetController.render(elementState.dataPanel);
   });
 }
@@ -287,6 +287,7 @@ export function createRenderer(element: DesignerElementHost): void {
     // base-screen-material-event 同形同语义。
     onMaterialEvent: (event) => elementState.runtime.forwardNativeMaterialEvent(element, event),
     resourcePort: elementState.resourcePort,
+    ...(elementState.datasetPort === undefined ? {} : { datasetPort: elementState.datasetPort }),
     ...(elementState.conditionalStylePort === undefined
       ? {}
       : { conditionalStylePort: elementState.conditionalStylePort }),

@@ -1,4 +1,6 @@
 import {
+  evaluateScreenDatasetParameters,
+  parseScreenDatasetDefinition,
   parseScreenJsonValue,
   parseScreenTabularDataset,
   type ScreenDynamicVariable,
@@ -26,7 +28,7 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
   const descriptor = context.state.descriptor;
   const draft = context.state.draft;
   const component = context.currentComponent();
-  const port = context.callbacks.getResourcePort();
+  const port = context.callbacks.getCatalogPort();
   if (
     descriptor === undefined ||
     draft === undefined ||
@@ -46,8 +48,41 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
     message: DESIGNER_UI_TEXT.dataSource.previewLoading,
   };
   context.renderSurface();
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<undefined>((resolve) => {
+    deadlineTimer = setTimeout(() => {
+      if (generation === context.state.previewGeneration && !controller.signal.aborted) {
+        controller.abort();
+        setPreviewError(context);
+      }
+      resolve(undefined);
+    }, 15_000);
+  });
   try {
-    const params = await resolvePreviewParameters(context, draft, controller);
+    const described = await Promise.race([
+      port.describe({ datasetId: draft.datasetId, signal: controller.signal }),
+      deadline,
+    ]);
+    if (
+      described === undefined ||
+      controller.signal.aborted ||
+      generation !== context.state.previewGeneration
+    )
+      return;
+    if (!described.ok) {
+      context.callbacks.report(described.diagnostics);
+      setPreviewError(context);
+      return;
+    }
+    const checkedDefinition = parseScreenDatasetDefinition(described.value);
+    if (!checkedDefinition.ok || checkedDefinition.value.datasetId !== draft.datasetId) {
+      setPreviewError(context);
+      return;
+    }
+    const params = await Promise.race([
+      resolvePreviewParameters(context, draft, controller),
+      deadline,
+    ]);
     if (controller.signal.aborted || generation !== context.state.previewGeneration) return;
     if (params === undefined) {
       context.state.previewController = undefined;
@@ -60,17 +95,28 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
       context.renderSurface();
       return;
     }
-    const result = await port.resolve(
-      {
-        componentId: component.id,
-        resourceType: draft.resourceType,
-        resourceId: draft.resourceId,
-        params,
-      },
-      { signal: controller.signal },
+    const validatedParams = evaluateScreenDatasetParameters(
+      checkedDefinition.value.parameters,
+      params,
     );
+    if (!validatedParams.ok) {
+      setPreviewError(context);
+      return;
+    }
+    const result = await Promise.race([
+      port.query(
+        {
+          componentId: component.id,
+          datasetId: draft.datasetId,
+          params: validatedParams.value,
+        },
+        { signal: controller.signal },
+      ),
+      deadline,
+    ]);
     if (controller.signal.aborted || generation !== context.state.previewGeneration) return;
     context.state.previewController = undefined;
+    if (result === undefined) return;
     if (!result.ok) {
       context.callbacks.report(result.diagnostics);
       setPreviewError(context);
@@ -104,6 +150,8 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
       context.state.previewController = undefined;
       setPreviewError(context);
     }
+  } finally {
+    if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
   }
 }
 

@@ -1,8 +1,8 @@
 import type {
   ScreenAbortSignal,
-  ScreenDatasetDescriptor,
+  ScreenDatasetDefinition,
   ScreenDocument,
-  ScreenHostDatasetCatalogPort,
+  ScreenHostDatasetPort,
   ScreenParseResult,
 } from '@base-screen/contracts';
 import type {
@@ -14,9 +14,8 @@ import { designerDataSourceModes } from '../../../../src/browser/controllers/dat
 import { DesignerDatasetController } from '../../../../src/browser/controllers/dataset/designer-dataset-controller.js';
 
 const success = <T>(value: T): ScreenParseResult<T> => ({ ok: true, value, diagnostics: [] });
-const descriptor: ScreenDatasetDescriptor = {
-  resourceType: 'dataset',
-  resourceId: 'orders',
+const descriptor: ScreenDatasetDefinition = {
+  datasetId: 'orders',
   name: 'Orders',
   description: null,
   fields: [{ id: 'amount', label: 'Amount', valueType: 'number' }],
@@ -26,7 +25,7 @@ const descriptor: ScreenDatasetDescriptor = {
 function entry(tabular = false): BaseScreenMaterialCatalogEntry {
   return {
     manifest: {
-      dataCapabilities: ['static', 'host-resource'],
+      dataCapabilities: tabular ? ['static', 'dataset'] : ['static', 'host-resource'],
       ...(tabular
         ? {
             dataBinding: {
@@ -54,13 +53,21 @@ function document(type: string, resourceType: string, resourceId: string): Scree
         status: { locked: false, hidden: false },
         props: {},
         style: {},
-        dataSource: {
-          type: 'host-resource',
-          resourceType,
-          resourceId,
-          params: {},
-          binding: type === 'table' ? { fields: { columns: ['amount'] } } : null,
-        },
+        dataSource:
+          type === 'table'
+            ? {
+                type: 'dataset',
+                datasetId: resourceId,
+                params: {},
+                binding: { fields: { columns: ['amount'] } },
+              }
+            : {
+                type: 'host-resource',
+                resourceType,
+                resourceId,
+                params: {},
+                binding: type === 'table' ? { fields: { columns: ['amount'] } } : null,
+              },
       },
     ],
     variables: [],
@@ -68,16 +75,17 @@ function document(type: string, resourceType: string, resourceId: string): Scree
   };
 }
 
-function setup(
-  initial: ScreenDocument,
-  describeResource?: ScreenHostDatasetCatalogPort['describe'],
-) {
+function setup(initial: ScreenDocument, describeResource?: ScreenHostDatasetPort['describe']) {
   let current = initial;
-  const list = vi.fn<ScreenHostDatasetCatalogPort['list']>(async () => success({ items: [] }));
+  const list = vi.fn<ScreenHostDatasetPort['list']>(async () => success({ items: [] }));
   const describeHost = vi.fn(describeResource ?? (async () => success(descriptor)));
   const report = vi.fn();
   const controller = new DesignerDatasetController({
-    getCatalogPort: () => ({ list, describe: describeHost }),
+    getCatalogPort: () => ({
+      list,
+      describe: describeHost,
+      query: async () => success({ fields: [], rows: [] }),
+    }),
     getDocument: () => current,
     getInteraction: () => ({ selectedComponentIds: ['selected'], focusedComponentId: 'selected' }),
     getCatalog: () =>
@@ -136,7 +144,7 @@ describe('host resources are not implicitly dataset catalog entries', () => {
   it('does not expose opaque host resources for scalar materials with field bindings', () => {
     const scalarDatasetEntry = {
       manifest: {
-        dataCapabilities: ['static', 'host-resource'],
+        dataCapabilities: ['static', 'dataset'],
         staticData: { kind: 'scalar', valueType: 'string' },
         dataBinding: {
           roles: [
@@ -155,7 +163,7 @@ describe('host resources are not implicitly dataset catalog entries', () => {
   });
 
   it('cancels an in-flight dataset description when switching to an opaque resource', async () => {
-    let finish: ((result: ScreenParseResult<ScreenDatasetDescriptor>) => void) | undefined;
+    let finish: ((result: ScreenParseResult<ScreenDatasetDefinition>) => void) | undefined;
     let signal: ScreenAbortSignal | undefined;
     const harness = setup(document('table', 'dataset', 'orders'), (request) => {
       signal = request.signal;

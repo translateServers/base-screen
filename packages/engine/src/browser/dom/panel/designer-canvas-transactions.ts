@@ -18,7 +18,6 @@ export interface DesignerCanvasPresentationSettings {
   scaleMode: DesignerCanvasScaleMode;
   backgroundAutoFill: boolean;
   disableComponentLoading: boolean;
-  thumbnailUrl: string | undefined;
 }
 
 export function createDesignerCanvasPresentationSettings(): DesignerCanvasPresentationSettings {
@@ -27,7 +26,6 @@ export function createDesignerCanvasPresentationSettings(): DesignerCanvasPresen
     scaleMode: 'fill',
     backgroundAutoFill: true,
     disableComponentLoading: false,
-    thumbnailUrl: undefined,
   };
 }
 

@@ -26,7 +26,7 @@ async function assertReferenceNavigation(page, designer) {
     window.baseScreenHarness.designer.document.components
       .filter(
         (component) =>
-          component.dataSource?.type === 'host-resource' &&
+          component.dataSource?.type === 'dataset' &&
           Object.values(component.dataSource.params).some(
             (parameter) => parameter.kind === 'variable' && parameter.variableId === 'region',
           ),
@@ -131,7 +131,7 @@ async function assertAtomicRenames(page, designer) {
     return (
       document.variables.some((variable) => variable.name === 'selectedRegion') &&
       document.components
-        .filter((component) => component.dataSource?.type === 'host-resource')
+        .filter((component) => component.dataSource?.type === 'dataset')
         .flatMap((component) => Object.values(component.dataSource.params))
         .filter((parameter) => parameter.kind === 'variable')
         .every((parameter) => parameter.variableId === 'region')
@@ -163,7 +163,7 @@ async function assertAtomicRenames(page, designer) {
       document.variables.some((variable) => variable.name === 'region') &&
       document.components.some((component) =>
         Object.values(
-          component.dataSource?.type === 'host-resource' ? component.dataSource.params : {},
+          component.dataSource?.type === 'dataset' ? component.dataSource.params : {},
         ).some((parameter) => parameter.kind === 'variable' && parameter.variableId === 'region'),
       )
     );
@@ -194,7 +194,7 @@ async function assertHostVariableRefresh(page) {
       (item) => item.id === 'dataset-ranking-demo',
     );
     const source = component?.dataSource;
-    if (source?.type !== 'host-resource') return false;
+    if (source?.type !== 'dataset') return false;
     const variableId = designer.document.variables.find(
       (variable) => variable.name === 'runtimeRegion',
     )?.id;
@@ -234,7 +234,7 @@ async function assertHostVariableRefresh(page) {
       window.baseScreenHarness.datasetRequests
         .slice(before)
         .some(
-          (request) => request.resourceId === 'tabular-orders' && request.params.region === 'west',
+          (request) => request.datasetId === 'tabular-orders' && request.params.region === 'west',
         ),
     beforeSuccess,
   );
@@ -276,7 +276,7 @@ async function assertHostVariableRefresh(page) {
       window.baseScreenHarness.datasetRequests
         .slice(before)
         .some(
-          (request) => request.resourceId === 'tabular-orders' && request.params.region === 'north',
+          (request) => request.datasetId === 'tabular-orders' && request.params.region === 'north',
         ),
     resourcesAfterFailure,
   );

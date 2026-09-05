@@ -3,6 +3,7 @@ import type {
   ScreenBlueprintRuntimePort,
   ScreenDiagnostic,
   ScreenDocument,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenHostVariablePort,
   ScreenJsonObject,
@@ -48,6 +49,7 @@ export type {
 export class BaseScreenViewerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
+  #datasetPort: ScreenHostDatasetPort | undefined;
   #variablePort: ScreenHostVariablePort | undefined;
   #conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   #contributionIndex: BaseScreenRuntimeContributionIndex | undefined;
@@ -98,6 +100,7 @@ export class BaseScreenViewerElement extends ElementBase {
     const value = parsed.value;
     this.#catalog = value.catalog;
     this.#resourcePort = value.resourcePort;
+    this.#datasetPort = value.datasetPort;
     this.#variablePort = value.variablePort;
     this.#conditionalStylePort = value.conditionalStylePort;
     this.#contributionIndex = value.runtimeContributions;
@@ -130,6 +133,10 @@ export class BaseScreenViewerElement extends ElementBase {
       return;
     }
     this.#catalog = value;
+  }
+
+  get datasetPort(): ScreenHostDatasetPort | undefined {
+    return this.#datasetPort;
   }
 
   get resourcePort(): ScreenHostResourcePort | undefined {
@@ -287,6 +294,7 @@ export class BaseScreenViewerElement extends ElementBase {
         );
       },
       resourcePort: this.#resourcePort,
+      ...(this.#datasetPort === undefined ? {} : { datasetPort: this.#datasetPort }),
       ...(this.#conditionalStylePort === undefined
         ? {}
         : { conditionalStylePort: this.#conditionalStylePort }),

@@ -11,7 +11,7 @@ Design with the host catalog and guidelines in this Skill. The output is a compl
 
 1. Read `references/host.md` and follow its visual rules.
 2. Prefer the compatible host MCP for current material discovery, then search `references/materials.json` as the offline fallback. Read a material's manifest before using it.
-3. Match each host-backed data component to one entry in `references/datasets.json` and one resource type in `references/resource-types.json`. Read the optional matching sample only when it helps choose a visual treatment.
+3. Match each dataset component to one immutable entry in `references/datasets.json`. Use `resource-types.json` only for non-tabular host resources. Read a matching sanitized sample only when it helps choose a visual treatment.
 4. Read [document-contract.md](references/document-contract.md) for the output shape. Never add fields to the canonical document.
 5. If `references/material-provenance.json` exists, use it to distinguish `code` and `online` materials. Online materials are read-only references. A draft catalog is never implicit; use only the file explicitly supplied by the host.
 
@@ -19,9 +19,9 @@ Design with the host catalog and guidelines in this Skill. The output is a compl
 
 - For a new request, choose the canvas from `host.md`, establish a stable grid, then place a visual hierarchy of title, summary, trends, comparisons, and detail areas appropriate to the request.
 - For an existing document, validate it first and preserve component IDs, unchanged components, and unrelated props/style. Change only what the request requires.
-- Use only material `type` values from `materials.json`, resource identities from `datasets.json`, and parameter names accepted by the selected resource type's `configSchema`.
+- Use only material `type` values from `materials.json`, dataset identities from `datasets.json`, and parameters declared by the selected dataset definition.
 - Keep every resource parameter literal in this scope. Keep `variables: []` and `blueprint: { "rules": [] }` unless the host Skill is regenerated with a broader contract.
-- Use `dataSource.type: "host-resource"` for host datasets and set binding roles only with declared dataset field IDs and compatible value types. Use static data only when the material declares `static` capability.
+- Use `dataSource.type: "dataset"` for tabular datasets and set binding roles only with declared field IDs and compatible value types. Use `host-resource` only for non-tabular host resources.
 - Do not invent URLs, SQL, credentials, host actions, variables, event rules, material types, resource IDs, fields, or undocumented props. If the formal catalog and an explicitly supplied draft catalog do not contain a required material type, stop and write a validated `material-request.json` with `requestId`, `hostId`, `screenDraftId`, purpose, framework, size, data fields, and events; the helper `node scripts/create-material-request.mjs` can create it after the host supplies those values. Do not fabricate a manifest.
 
 ## Validate and deliver

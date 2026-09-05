@@ -1,4 +1,4 @@
-import type { ScreenDatasetDescriptor, ScreenDatasetPage } from './dataset.js';
+import type { ScreenHostDatasetPort } from './dataset-port.js';
 import type { ScreenParseResult } from './diagnostics.js';
 import type { ScreenDocument } from './document.js';
 import type { ScreenProjectEnvelope } from './envelope.js';
@@ -36,7 +36,7 @@ export interface ScreenDesignerHostCapabilities {
   readonly projectPreview: boolean;
   readonly projectSnapshots: boolean;
   readonly resources: boolean;
-  readonly datasetCatalog: boolean;
+  readonly datasets: boolean;
   readonly variableCatalog: boolean;
   readonly variables: boolean;
   readonly actions: boolean;
@@ -48,7 +48,7 @@ export interface ScreenDesignerHostAdapter {
   readonly projectPreview?: ScreenProjectPreviewPort;
   readonly projectSnapshots?: ScreenProjectSnapshotPort;
   readonly resources?: ScreenHostResourcePort;
-  readonly datasetCatalog?: ScreenHostDatasetCatalogPort;
+  readonly datasets?: ScreenHostDatasetPort;
   readonly variableCatalog?: ScreenHostVariableCatalogPort;
   readonly variables?: ScreenHostVariablePort;
   readonly actions?: ScreenBlueprintHostActionPort;
@@ -187,26 +187,6 @@ export interface ScreenHostResourcePort {
   ): Promise<ScreenParseResult<ScreenJsonValue>>;
 }
 
-export interface ScreenHostDatasetCatalogListRequest {
-  readonly query: string;
-  readonly cursor?: string;
-  readonly limit: number;
-  readonly signal: ScreenAbortSignal;
-}
-
-export interface ScreenHostDatasetDescribeRequest {
-  readonly resourceType: string;
-  readonly resourceId: string;
-  readonly signal: ScreenAbortSignal;
-}
-
-export interface ScreenHostDatasetCatalogPort {
-  list(request: ScreenHostDatasetCatalogListRequest): Promise<ScreenParseResult<ScreenDatasetPage>>;
-  describe(
-    request: ScreenHostDatasetDescribeRequest,
-  ): Promise<ScreenParseResult<ScreenDatasetDescriptor>>;
-}
-
 export interface ScreenHostVariableRequest {
   readonly variableId: string;
   readonly sourceId: string;
@@ -275,7 +255,7 @@ export function validateScreenDesignerHostAdapter(
     ['projectPreview', 'projectPreview', ['load']],
     ['projectSnapshots', 'projectSnapshots', ['list', 'create', 'restore', 'delete']],
     ['resources', 'resources', ['resolve']],
-    ['datasetCatalog', 'datasetCatalog', ['list', 'describe']],
+    ['datasets', 'datasets', ['list', 'describe', 'query']],
     ['variableCatalog', 'variableCatalog', ['list', 'describe']],
     ['variables', 'variables', ['resolve']],
     ['actions', 'actions', ['execute']],

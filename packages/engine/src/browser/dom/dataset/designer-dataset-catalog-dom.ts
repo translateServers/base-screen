@@ -1,4 +1,4 @@
-import type { ScreenDatasetSummary } from '@base-screen/contracts';
+import type { ScreenDatasetEntry } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDataSourcePanelOptions } from './designer-dataset-types.js';
 
@@ -83,21 +83,35 @@ export function renderDatasetCatalog(options: DesignerDataSourcePanelOptions): H
     button.textContent = DESIGNER_UI_TEXT.dataset.loadMore;
     results.appendChild(button);
   }
-  browser.append(heading, search, results);
+  browser.append(heading);
+  if (options.groups !== undefined && options.groups.length > 0) {
+    const groups = options.panel.ownerDocument.createElement('select');
+    groups.className = 'designer-control designer-select';
+    groups.dataset.datasetGroup = 'true';
+    groups.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.group);
+    for (const group of [{ id: '', name: DESIGNER_UI_TEXT.dataset.allGroups }, ...options.groups]) {
+      const option = options.panel.ownerDocument.createElement('option');
+      option.value = group.id;
+      option.textContent = group.name;
+      option.selected = group.id === (options.groupId ?? '');
+      groups.appendChild(option);
+    }
+    browser.appendChild(groups);
+  }
+  browser.append(search, results);
   return browser;
 }
 
 function datasetItem(
   ownerDocument: Document,
-  item: ScreenDatasetSummary,
+  item: ScreenDatasetEntry,
   selected: DesignerDataSourcePanelOptions['descriptor'],
 ): HTMLButtonElement {
   const button = ownerDocument.createElement('button');
   button.type = 'button';
   button.className = 'designer-control designer-button designer-dataset-item';
-  button.dataset.datasetResourceId = item.resourceId;
-  button.dataset.datasetResourceType = item.resourceType;
-  button.setAttribute('aria-pressed', String(selected?.resourceId === item.resourceId));
+  button.dataset.datasetResourceId = item.datasetId;
+  button.setAttribute('aria-pressed', String(selected?.datasetId === item.datasetId));
   button.setAttribute(
     'aria-label',
     item.description === null ? item.name : item.name + '：' + item.description,

@@ -103,7 +103,6 @@ export async function readAndValidateSnapshot(snapshotFile, apis) {
   const materials = parseManifestArray(snapshot.materials, apis, errors);
   const resourceTypes = parseResourceTypes(snapshot.resourceTypes, apis, errors);
   const datasets = parseDatasetArray(snapshot.datasets, apis, errors);
-  validateDatasetParameterAuthority(datasets, resourceTypes, apis, errors);
   const samples = parseSamples(snapshot.datasetSamples ?? [], datasets, apis, errors);
   const provenance = parseMaterialProvenance(snapshot.materialProvenance, materials, errors);
   const templates = validateMaterialTemplates(
@@ -240,7 +239,7 @@ function parseDatasetArray(input, apis, errors) {
   const result = [];
   const seen = new Set();
   input.forEach((item, index) => {
-    const parsed = apis.parseScreenDatasetDescriptor(item);
+    const parsed = apis.parseScreenDatasetDefinition(item);
     if (!parsed.ok) {
       addDiagnostics(errors, `datasets.json[${index}]`, parsed.diagnostics);
       return;
@@ -251,46 +250,6 @@ function parseDatasetArray(input, apis, errors) {
     result.push(parsed.value);
   });
   return result.sort((left, right) => datasetKey(left).localeCompare(datasetKey(right)));
-}
-
-function validateDatasetParameterAuthority(datasets, resourceTypes, apis, errors) {
-  const resources = new Map(resourceTypes.map((item) => [item.id, item]));
-  for (const [index, dataset] of datasets.entries()) {
-    const resource = resources.get(dataset.resourceType);
-    if (resource === undefined) {
-      errors.push(
-        `datasets.json[${index}] references unknown resource type ${dataset.resourceType}`,
-      );
-      continue;
-    }
-    const schemaNames = Object.keys(resource.configSchema.properties);
-    const descriptorNames = dataset.parameters.map((parameter) => parameter.name);
-    if (!sameStringSet(schemaNames, descriptorNames)) {
-      errors.push(
-        `datasets.json[${index}].parameters must match resource type ${dataset.resourceType}.configSchema.properties exactly`,
-      );
-    }
-    for (const parameter of dataset.parameters) {
-      if (parameter.defaultValue === undefined) continue;
-      const property = resource.configSchema.properties[parameter.name];
-      if (property === undefined) continue;
-      const propertySchema = {
-        kind: 'object',
-        properties: { [parameter.name]: property },
-        required: [parameter.name],
-      };
-      const parsed = apis.validateBaseScreenMaterialProps(
-        { [parameter.name]: parameter.defaultValue },
-        propertySchema,
-      );
-      if (!parsed.ok)
-        addDiagnostics(
-          errors,
-          `datasets.json.${datasetKey(dataset)}.parameters.${parameter.name}`,
-          parsed.diagnostics,
-        );
-    }
-  }
 }
 
 function parseSamples(input, datasets, apis, errors) {
@@ -309,13 +268,13 @@ function parseSamples(input, datasets, apis, errors) {
     }
     exactKeys(
       item,
-      ['resourceType', 'resourceId', 'classification', 'dataset'],
+      ['datasetId', 'classification', 'dataset'],
       `dataset-samples.json[${index}]`,
       errors,
     );
     if (item.classification !== 'sanitized')
       errors.push(`dataset-samples.json[${index}].classification must be sanitized`);
-    const key = `${String(item.resourceType)}:${String(item.resourceId)}`;
+    const key = String(item.datasetId);
     if (seen.has(key)) errors.push(`dataset-samples.json[${index}] identity is duplicated: ${key}`);
     seen.add(key);
     const descriptor = descriptors.get(key);
@@ -336,19 +295,14 @@ function parseSamples(input, datasets, apis, errors) {
       errors.push(`dataset-samples.json[${index}] fields do not match descriptor ${key}`);
     }
     result.push({
-      resourceType: item.resourceType,
-      resourceId: item.resourceId,
+      datasetId: item.datasetId,
       classification: 'sanitized',
       dataset: parsed.value,
     });
   });
   if (totalBytes > MAX_SAMPLE_TOTAL_BYTES)
     errors.push(`dataset samples exceed ${MAX_SAMPLE_TOTAL_BYTES} bytes in total`);
-  return result.sort((left, right) =>
-    `${left.resourceType}:${left.resourceId}`.localeCompare(
-      `${right.resourceType}:${right.resourceId}`,
-    ),
-  );
+  return result.sort((left, right) => left.datasetId.localeCompare(right.datasetId));
 }
 
 async function renderSkillFiles(bundle, apis) {
@@ -495,7 +449,8 @@ async function loadPublicApis() {
   );
   const required = [
     ['parseScreenDocument', contracts],
-    ['parseScreenDatasetDescriptor', contracts],
+    ['parseScreenDatasetDefinition', contracts],
+    ['evaluateScreenDatasetParameters', contracts],
     ['parseScreenTabularDataset', contracts],
     ['SCREEN_DOCUMENT_JSON_SCHEMA', contracts],
     ['parseBaseScreenMaterialManifest', pluginCore],
@@ -581,21 +536,13 @@ function exactKeys(value, keys, name, errors) {
     if (!Object.hasOwn(value, key)) errors.push(`${name} is missing field ${key}`);
 }
 
-function sameStringSet(left, right) {
-  return (
-    left.length === right.length &&
-    new Set(left).size === left.length &&
-    left.every((item) => right.includes(item))
-  );
-}
-
 function sameFields(left, right) {
   const normalize = (fields) => fields.map((field) => JSON.stringify(field)).sort();
   return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
 }
 
 function datasetKey(dataset) {
-  return `${dataset.resourceType}:${dataset.resourceId}`;
+  return dataset.datasetId;
 }
 
 function addDiagnostics(errors, prefix, diagnostics) {

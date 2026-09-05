@@ -17,7 +17,7 @@ describe('dataset material best practice', () => {
         kind: 'tabular',
         defaultBinding: { fields: { dimension: ['category'], measures: ['amount'] } },
       },
-      dataCapabilities: ['static', 'host-resource'],
+      dataCapabilities: ['static', 'dataset'],
       dataBinding: {
         roles: [
           { id: 'dimension', minFields: 1, maxFields: 1 },

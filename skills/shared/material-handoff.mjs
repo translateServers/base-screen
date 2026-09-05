@@ -222,13 +222,12 @@ function validateDataFields(value, path, errors) {
       errors.push(`${fieldPath} must contain an object`);
       return;
     }
-    exactKeys(field, ['resourceType', 'resourceId', 'fieldId', 'valueType'], fieldPath, errors);
-    safeIdentifier(field.resourceType, `${fieldPath}.resourceType`, errors);
-    safeText(field.resourceId, `${fieldPath}.resourceId`, errors, 256);
+    exactKeys(field, ['datasetId', 'fieldId', 'valueType'], fieldPath, errors);
+    safeText(field.datasetId, `${fieldPath}.datasetId`, errors, 256);
     safeIdentifier(field.fieldId, `${fieldPath}.fieldId`, errors);
     if (!['string', 'number', 'boolean', 'date'].includes(field.valueType))
       errors.push(`${fieldPath}.valueType is invalid`);
-    const identity = `${field.resourceType}:${field.resourceId}:${field.fieldId}`;
+    const identity = `${field.datasetId}:${field.fieldId}`;
     if (seen.has(identity)) errors.push(`${fieldPath} identity is duplicated: ${identity}`);
     seen.add(identity);
   });

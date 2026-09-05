@@ -48,9 +48,6 @@ export interface DesignerPanelControllerCallbacks {
   readonly requestMaterialLibraryAction?: (action: 'retry' | 'reload' | 'details') => void;
   /** 画布背景图宿主选择按钮点击（ADR-0046）：由宿主接管（打开图片选择弹出框），返回是否已有文档。 */
   readonly requestCanvasBackgroundImage?: () => boolean;
-  readonly requestCanvasPresentationAction?: (
-    action: 'capture-thumbnail' | 'upload-thumbnail',
-  ) => void;
   readonly onCanvasPresentationChange?: (settings: DesignerCanvasPresentationSettings) => void;
   /** 画布背景图宿主选择按钮是否渲染（ADR-0049）：默认隐藏，仅宿主配置后显示。 */
   readonly isCanvasBackgroundImageButtonVisible?: () => boolean;

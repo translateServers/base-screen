@@ -1,12 +1,16 @@
 export {
+  evaluateScreenDatasetParameters,
+  parseScreenDatasetDefinition,
+  parseScreenDatasetEntries,
+  parseScreenDatasetGroups,
+} from './dataset/definition.js';
+export {
   MAX_DATASET_BYTES,
   MAX_DATASET_FIELD_FORMAT_LENGTH,
   MAX_DATASET_FIELD_UNIT_LENGTH,
   MAX_DATASET_FIELDS,
   MAX_DATASET_PAGE_ITEMS,
   MAX_DATASET_ROWS,
-  parseScreenDatasetDescriptor,
-  parseScreenDatasetPage,
   parseScreenTabularDataset,
 } from './dataset/parse.js';
 export type {
@@ -59,15 +63,23 @@ export {
   SCREEN_AUTHORING_REQUEST_EVENT,
 } from './types/authoring.js';
 export type {
-  ScreenDatasetDescriptor,
   ScreenDatasetField,
-  ScreenDatasetPage,
-  ScreenDatasetParameter,
-  ScreenDatasetParameterEditor,
-  ScreenDatasetSummary,
   ScreenDatasetValueType,
   ScreenTabularDataset,
 } from './types/dataset.js';
+export type {
+  ScreenDatasetDefinition,
+  ScreenDatasetDescribeRequest,
+  ScreenDatasetEntries,
+  ScreenDatasetEntry,
+  ScreenDatasetGroup,
+  ScreenDatasetListRequest,
+  ScreenDatasetParameterDefinition,
+  ScreenDatasetParameterValue,
+  ScreenDatasetQueryRequest,
+  ScreenHostDatasetPort,
+} from './types/dataset-port.js';
+export { isScreenHostDatasetPort } from './types/dataset-port.js';
 export type {
   ScreenDiagnostic,
   ScreenDiagnosticCode,
@@ -110,6 +122,7 @@ export type {
   ScreenComponentStyleRuleOperator,
   ScreenDataBinding,
   ScreenDataSourceVariable,
+  ScreenDatasetDataSource,
   ScreenDocument,
   ScreenDynamicVariable,
   ScreenHostResourceBinding,
@@ -141,9 +154,6 @@ export type {
   ScreenBlueprintRuntimePort,
   ScreenDesignerHostAdapter,
   ScreenDesignerHostCapabilities,
-  ScreenHostDatasetCatalogListRequest,
-  ScreenHostDatasetCatalogPort,
-  ScreenHostDatasetDescribeRequest,
   ScreenHostResourcePort,
   ScreenHostResourceRequest,
   ScreenHostResourceResolveOptions,

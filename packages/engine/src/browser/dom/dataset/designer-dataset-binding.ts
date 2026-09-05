@@ -1,9 +1,9 @@
-import type { ScreenDatasetDescriptor } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import type { DesignerDatasetDraftView } from './designer-dataset-types.js';
 
 export function isDesignerDatasetBindingValid(
-  descriptor: ScreenDatasetDescriptor,
+  descriptor: ScreenDatasetDefinition,
   draft: DesignerDatasetDraftView | undefined,
   roles: readonly ScreenDataBindingRole[],
 ): boolean {

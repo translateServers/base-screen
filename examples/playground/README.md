@@ -1,7 +1,8 @@
 # Base Screen Playground
 
 这是一个由 Vue 驱动的宿主应用示例。页面状态、数据集目录、变量端口和资源端口都由
-Vue 应用管理，`base-screen-viewer` 仍通过公开属性消费 canonical Screen Document。
+Vue 应用管理，`base-screen-viewer` 通过 `configure({ catalog, datasetPort, ... })` 一次性提交运行依赖，
+再通过公开 `document` 属性消费 canonical Screen Document。`datasetPort` 是只读回读属性，不能直接赋值。
 
 启动：
 

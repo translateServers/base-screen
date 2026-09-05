@@ -1,4 +1,4 @@
-import type { ScreenDatasetField, ScreenDatasetParameter } from '../types/dataset.js';
+import type { ScreenDatasetField } from '../types/dataset.js';
 import type { ScreenDiagnostic } from '../types/diagnostics.js';
 import type { ScreenJsonObject, ScreenJsonValue } from '../types/json.js';
 import {
@@ -10,14 +10,11 @@ import {
 import { diagnostic } from './diagnostics.js';
 import {
   checkExact,
-  isDatasetEditor,
   isDatasetValueType,
-  isPlainJsonValue,
   isRecord,
   validateDisplayHint,
   validateDisplayString,
   validateFieldId,
-  validateIdentifier,
   validCell,
 } from './validation.js';
 
@@ -149,79 +146,4 @@ export function parseRows(
     rows.push(row);
   });
   return rows;
-}
-
-export function parseParameters(
-  input: ScreenJsonValue | undefined,
-  path: readonly (string | number)[],
-  diagnostics: ScreenDiagnostic[],
-): readonly ScreenDatasetParameter[] | undefined {
-  if (!Array.isArray(input) || input.length > 256) {
-    diagnostics.push(
-      diagnostic('HOST_DATASET_DESCRIPTOR_INVALID', path, 'Dataset parameters are invalid.'),
-    );
-    return undefined;
-  }
-  const names = new Set<string>();
-  const parameters: ScreenDatasetParameter[] = [];
-  input.forEach((item, index) => {
-    const itemPath = [...path, index];
-    if (!isRecord(item)) {
-      diagnostics.push(
-        diagnostic('HOST_DATASET_DESCRIPTOR_INVALID', itemPath, 'Dataset parameter is invalid.'),
-      );
-      return;
-    }
-    checkExact(
-      item,
-      new Set(['name', 'label', 'editor', 'defaultValue']),
-      itemPath,
-      diagnostics,
-      'HOST_DATASET_DESCRIPTOR_INVALID',
-    );
-    validateIdentifier(
-      item.name,
-      [...itemPath, 'name'],
-      diagnostics,
-      'HOST_DATASET_DESCRIPTOR_INVALID',
-    );
-    validateDisplayString(
-      item.label,
-      [...itemPath, 'label'],
-      diagnostics,
-      false,
-      'HOST_DATASET_DESCRIPTOR_INVALID',
-    );
-    if (item.editor !== undefined && !isDatasetEditor(item.editor)) {
-      diagnostics.push(
-        diagnostic(
-          'HOST_DATASET_DESCRIPTOR_INVALID',
-          [...itemPath, 'editor'],
-          'Dataset parameter editor is invalid.',
-        ),
-      );
-    }
-    if (item.defaultValue !== undefined && !isPlainJsonValue(item.defaultValue)) {
-      diagnostics.push(
-        diagnostic(
-          'HOST_DATASET_DESCRIPTOR_INVALID',
-          [...itemPath, 'defaultValue'],
-          'Dataset parameter default is invalid.',
-        ),
-      );
-    }
-    if (typeof item.name === 'string') {
-      if (names.has(item.name))
-        diagnostics.push(
-          diagnostic(
-            'HOST_DATASET_DESCRIPTOR_INVALID',
-            [...itemPath, 'name'],
-            'Dataset parameter names must be unique.',
-          ),
-        );
-      names.add(item.name);
-    }
-    parameters.push(item as unknown as ScreenDatasetParameter);
-  });
-  return parameters;
 }

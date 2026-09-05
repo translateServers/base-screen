@@ -38,14 +38,10 @@ export function setSourceMode(
     return;
   }
   const source = context.currentComponent()?.dataSource;
-  if (
-    source?.type === 'host-resource' &&
-    (context.state.descriptor?.resourceType !== source.resourceType ||
-      context.state.descriptor.resourceId !== source.resourceId)
-  ) {
+  if (source?.type === 'dataset' && context.state.descriptor?.datasetId !== source.datasetId) {
     context.state.catalogOpen = false;
     context.renderSurface();
-    void describeDataset(context, source.resourceType, source.resourceId);
+    void describeDataset(context, source.datasetId);
   } else {
     context.state.catalogOpen = context.state.descriptor === undefined;
     context.renderSurface();
@@ -55,12 +51,11 @@ export function setSourceMode(
 
 export async function describeDataset(
   context: DesignerDatasetControllerContext,
-  resourceType: string,
-  resourceId: string,
+  datasetId: string,
 ): Promise<void> {
   if (!availableModes(context).includes('dataset')) return;
   const focusedId = context.currentComponent()?.id;
-  const descriptor = await context.catalogController.describe(resourceType, resourceId);
+  const descriptor = await context.catalogController.describe(datasetId);
   if (
     descriptor === undefined ||
     context.currentComponent()?.id !== focusedId ||
@@ -108,11 +103,7 @@ export function applyDatasetDraft(context: DesignerDatasetControllerContext): vo
   } else {
     const descriptor = context.state.descriptor;
     const draft = context.state.draft;
-    const runtime =
-      descriptor === undefined
-        ? undefined
-        : context.callbacks.getRuntimeContributions()?.getResourceType(descriptor.resourceType);
-    if (descriptor === undefined || draft === undefined || runtime === undefined) {
+    if (descriptor === undefined || draft === undefined) {
       context.setFeedback(DESIGNER_UI_TEXT.dataset.incomplete);
       return;
     }
@@ -122,7 +113,6 @@ export function applyDatasetDraft(context: DesignerDatasetControllerContext): vo
       descriptor,
       draft,
       roles: context.currentEntry()?.manifest.dataBinding?.roles ?? [],
-      runtime,
     });
   }
   if (!transaction.ok) {
@@ -144,7 +134,7 @@ export function applyDatasetDraft(context: DesignerDatasetControllerContext): vo
 
 export function syncDraftToFocusedComponent(
   context: DesignerDatasetControllerContext,
-): { readonly resourceType: string; readonly resourceId: string } | undefined {
+): { readonly datasetId: string } | undefined {
   const component = context.currentComponent();
   const focusedId = component?.id ?? null;
   const source = component?.dataSource;
@@ -182,6 +172,13 @@ export function syncDraftToFocusedComponent(
     return;
   }
   if (source?.type === 'host-resource') {
+    context.state.mode = 'host-resource';
+    context.state.descriptor = undefined;
+    context.state.draft = undefined;
+    context.state.catalogOpen = false;
+    return;
+  }
+  if (source?.type === 'dataset') {
     if (!availableModes(context).includes('dataset')) {
       context.state.mode = 'host-resource';
       context.state.descriptor = undefined;
@@ -191,10 +188,7 @@ export function syncDraftToFocusedComponent(
     }
     context.state.mode = 'dataset';
     context.state.catalogOpen = false;
-    if (
-      context.state.descriptor?.resourceType === source.resourceType &&
-      context.state.descriptor.resourceId === source.resourceId
-    ) {
+    if (context.state.descriptor?.datasetId === source.datasetId) {
       context.state.draft = createDesignerDatasetDraft(
         context.state.descriptor,
         source,
@@ -204,7 +198,7 @@ export function syncDraftToFocusedComponent(
     }
     context.state.descriptor = undefined;
     context.state.draft = undefined;
-    return { resourceType: source.resourceType, resourceId: source.resourceId };
+    return { datasetId: source.datasetId };
   }
   if (source?.type === 'variable') {
     context.state.mode = 'variable';
@@ -337,8 +331,8 @@ export function markDatasetDraftChanged(context: DesignerDatasetControllerContex
 function isDatasetDraftDirty(context: DesignerDatasetControllerContext): boolean {
   const source = context.currentComponent()?.dataSource;
   const draft = context.state.draft;
-  if (source?.type !== 'host-resource' || draft === undefined) return draft !== undefined;
-  if (source.resourceType !== draft.resourceType || source.resourceId !== draft.resourceId) {
+  if (source?.type !== 'dataset' || draft === undefined) return draft !== undefined;
+  if (source.datasetId !== draft.datasetId) {
     return true;
   }
   const roles = context.currentEntry()?.manifest.dataBinding?.roles ?? [];
@@ -352,7 +346,7 @@ function isDatasetDraftDirty(context: DesignerDatasetControllerContext): boolean
 export function restoreDatasetDraft(context: DesignerDatasetControllerContext): void {
   const source = context.currentComponent()?.dataSource;
   const descriptor = context.state.descriptor;
-  if (source?.type === 'host-resource' && descriptor !== undefined) {
+  if (source?.type === 'dataset' && descriptor !== undefined) {
     context.state.draft = createDesignerDatasetDraft(
       descriptor,
       source,

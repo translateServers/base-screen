@@ -58,7 +58,10 @@ export function validateMaterialFields(
   } else if (
     manifest.dataCapabilities.some(
       (capability) =>
-        capability !== 'static' && capability !== 'host-resource' && capability !== 'variable',
+        capability !== 'dataset' &&
+        capability !== 'static' &&
+        capability !== 'host-resource' &&
+        capability !== 'variable',
     ) ||
     new Set(manifest.dataCapabilities).size !== manifest.dataCapabilities.length
   ) {

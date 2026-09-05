@@ -4,8 +4,8 @@ import {
   MAX_DATASET_FIELD_UNIT_LENGTH,
   MAX_DATASET_FIELDS,
   MAX_DATASET_ROWS,
-  parseScreenDatasetDescriptor,
-  parseScreenDatasetPage,
+  parseScreenDatasetDefinition,
+  parseScreenDatasetEntries,
   parseScreenTabularDataset,
 } from '../../src/index.js';
 
@@ -81,9 +81,8 @@ describe('host tabular dataset contracts', () => {
   });
 
   it('R2 strictly parses safe descriptors and opaque catalog pages', () => {
-    const descriptor = parseScreenDatasetDescriptor({
-      resourceType: 'dataset',
-      resourceId: 'orders',
+    const descriptor = parseScreenDatasetDefinition({
+      datasetId: 'orders',
       name: '订单数据',
       description: null,
       fields: [{ id: 'amount', label: '金额', valueType: 'number' }],
@@ -91,23 +90,21 @@ describe('host tabular dataset contracts', () => {
         {
           name: 'region',
           label: '区域',
-          editor: 'text',
+          valueType: 'string',
+          required: false,
           defaultValue: '华东',
         },
       ],
     });
-    const page = parseScreenDatasetPage({
-      items: [
-        { resourceType: 'dataset', resourceId: 'orders', name: '订单数据', description: null },
-      ],
+    const page = parseScreenDatasetEntries({
+      items: [{ datasetId: 'orders', name: '订单数据', description: null }],
       nextCursor: 'opaque-next-page',
     });
     expect(descriptor).toMatchObject({ ok: true });
     expect(page).toMatchObject({ ok: true });
     expect(
-      parseScreenDatasetDescriptor({
-        resourceType: 'dataset',
-        resourceId: 'orders',
+      parseScreenDatasetDefinition({
+        datasetId: 'orders',
         name: '订单数据',
         description: null,
         fields: [],
@@ -149,9 +146,8 @@ describe('DRH-R6 public dataset field metadata', () => {
       input.fields[0]!.unit = '已修改';
       expect(result.value.fields[0]!.unit).toBe('元');
     }
-    const descriptor = parseScreenDatasetDescriptor({
-      resourceType: 'dataset',
-      resourceId: 'orders',
+    const descriptor = parseScreenDatasetDefinition({
+      datasetId: 'orders',
       name: '订单数据',
       description: null,
       fields: [
@@ -190,9 +186,8 @@ describe('DRH-R6 public dataset field metadata', () => {
     rejectField({ valueType: 'number', semanticType: 'currency' });
     rejectField({ valueType: 'number', color: '#fff' });
     expect(
-      parseScreenDatasetDescriptor({
-        resourceType: 'dataset',
-        resourceId: 'orders',
+      parseScreenDatasetDefinition({
+        datasetId: 'orders',
         name: '订单数据',
         description: null,
         fields: [{ id: 'amount', label: '金额', valueType: 'number', semanticType: 'currency' }],
@@ -271,9 +266,8 @@ describe('DRH-R6 public dataset field metadata', () => {
     });
     expect(atLimit).toMatchObject({ ok: true });
     expect(
-      parseScreenDatasetDescriptor({
-        resourceType: 'dataset',
-        resourceId: 'orders',
+      parseScreenDatasetDefinition({
+        datasetId: 'orders',
         name: '订单数据',
         description: null,
         fields: [{ id: 'amount', label: '金额', valueType: 'number', unit: '\u0007' }],

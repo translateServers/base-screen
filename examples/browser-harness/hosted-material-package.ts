@@ -239,7 +239,7 @@ export const hostedDatasetRankingManifest = {
     { style: 'trackColor', label: '轨道色', control: 'color' as const },
   ],
   events: ['itemClick'],
-  dataCapabilities: ['static' as const, 'host-resource' as const],
+  dataCapabilities: ['static' as const, 'dataset' as const],
   dataBinding: {
     roles: [
       {

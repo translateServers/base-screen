@@ -1,4 +1,4 @@
-import type { ScreenDatasetDescriptor } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
@@ -37,7 +37,7 @@ export function renderDesignerDatasetConfiguration(
 
 function renderDatasetSummary(
   ownerDocument: Document,
-  descriptor: ScreenDatasetDescriptor,
+  descriptor: ScreenDatasetDefinition,
   roles: readonly ScreenDataBindingRole[],
   draft: DesignerDatasetDraftView | undefined,
 ): HTMLElement {
@@ -219,7 +219,7 @@ function renderBindings(
 
 function renderBindingRole(
   ownerDocument: Document,
-  descriptor: ScreenDatasetDescriptor,
+  descriptor: ScreenDatasetDefinition,
   role: ScreenDataBindingRole,
   draft: DesignerDatasetDraftView | undefined,
 ): HTMLElement {
@@ -315,7 +315,7 @@ function bindingRoleAction(
 function bindingField(
   ownerDocument: Document,
   roleId: string,
-  field: ScreenDatasetDescriptor['fields'][number],
+  field: ScreenDatasetDefinition['fields'][number],
   selected: readonly string[],
   maxFields: number,
 ): HTMLButtonElement {

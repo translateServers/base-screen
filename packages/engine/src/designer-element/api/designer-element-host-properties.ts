@@ -1,7 +1,7 @@
 import type {
   ScreenDesignerHostAdapter,
   ScreenDocument,
-  ScreenHostDatasetCatalogPort,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenHostVariableCatalogPort,
   ScreenHostVariablePort,
@@ -45,7 +45,7 @@ export function writeDesignerHostAdapter(
     element.resourcePort = undefined;
     element.variableCatalogPort = undefined;
     element.variablePort = undefined;
-    element.datasetCatalogPort = undefined;
+    element.datasetPort = undefined;
     return;
   }
   const parsed = validateScreenDesignerHostAdapter(value);
@@ -73,7 +73,7 @@ export function writeDesignerHostAdapter(
   if (parsed.value.variableCatalog !== undefined) {
     element.variableCatalogPort = parsed.value.variableCatalog;
   }
-  element.datasetCatalogPort = parsed.value.datasetCatalog;
+  element.datasetPort = parsed.value.datasets;
 }
 
 export function writeResourcePort(
@@ -166,19 +166,19 @@ export function writeConditionalStylePort(
 
 export function readDatasetCatalogPort(
   element: DesignerElementHost,
-): ScreenHostDatasetCatalogPort | undefined {
+): ScreenHostDatasetPort | undefined {
   const elementState = getDesignerElementState(element);
 
-  return elementState.datasetCatalogPort;
+  return elementState.datasetPort;
 }
 
 export function writeDatasetCatalogPort(
   element: DesignerElementHost,
-  value: ScreenHostDatasetCatalogPort | undefined,
+  value: ScreenHostDatasetPort | undefined,
 ) {
   const elementState = getDesignerElementState(element);
 
-  elementState.datasetCatalogPort = value;
+  elementState.datasetPort = value;
   elementState.runtime.renderInteraction(element);
 }
 

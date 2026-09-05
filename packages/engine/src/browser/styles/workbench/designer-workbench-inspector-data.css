@@ -294,16 +294,12 @@
   order: 6;
 }
 
-.properties .designer-canvas-thumbnail {
+.properties .designer-datav-canvas-section [data-canvas-field="backgroundImage"] {
   order: 7;
 }
 
-.properties .designer-datav-canvas-section [data-canvas-field="backgroundImage"] {
-  order: 8;
-}
-
 .properties .designer-datav-canvas-section [data-canvas-field="backgroundImageFit"] {
-  order: 9;
+  order: 8;
 }
 
 .properties .designer-canvas-size-controls {
@@ -386,43 +382,6 @@
 
 .properties .designer-canvas-setting-checkbox .designer-checkbox {
   order: 2;
-}
-
-.properties .designer-canvas-thumbnail {
-  gap: 9px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--designer-border-subtle);
-}
-
-.properties .designer-canvas-thumbnail h4 {
-  color: var(--designer-text-secondary);
-  font-size: 12px;
-  font-weight: 400;
-}
-
-.properties .designer-canvas-thumbnail-preview {
-  position: relative;
-  min-height: 94px;
-  border-color: var(--designer-border-default);
-  border-radius: 1px;
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--designer-accent-surface) 70%, transparent),
-      transparent 54%
-    ),
-    linear-gradient(
-      25deg,
-      var(--designer-surface-control) 0 42%,
-      var(--designer-surface-canvas) 43% 100%
-    );
-  color: var(--designer-text-muted);
-  font-size: 10px;
-}
-
-.properties .designer-canvas-thumbnail-actions .designer-button {
-  min-height: 30px;
-  font-size: 11px;
 }
 
 .designer-project-section {

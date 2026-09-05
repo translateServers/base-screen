@@ -22,7 +22,12 @@ const MANAGED_SKILLS = [
 ];
 const MANAGED_AUXILIARY = ['shared/material-handoff.mjs', 'shared/material-mcp-contract.mjs'];
 
-export async function vendorHostSkillKit({ hostRoot, packageManager, snapshotScript } = {}) {
+export async function vendorHostSkillKit({
+  hostRoot,
+  packageManager,
+  snapshotScript,
+  skipLegacyRefresh = false,
+} = {}) {
   if (typeof hostRoot !== 'string' || hostRoot.length === 0)
     throw new Error('--host must point to a host repository.');
   const targetRoot = resolve(hostRoot);
@@ -101,7 +106,7 @@ export async function vendorHostSkillKit({ hostRoot, packageManager, snapshotScr
         );
       }
     }
-    await refreshHostSkills({ root: targetRoot, dryRun: true });
+    if (!skipLegacyRefresh) await refreshHostSkills({ root: targetRoot, dryRun: true });
     toolkit = await installManagedFiles(
       targetToolingRoot,
       targetManifestPath,

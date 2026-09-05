@@ -123,9 +123,11 @@ describe('official material conformance (DRH-R7)', () => {
     expect(result.ok).toBe(false);
   });
 
-  it('official materials declare the host-resource data capability', () => {
-    expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.dataCapabilities).toContain('host-resource');
-    expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.dataCapabilities).toContain('host-resource');
+  it('official tabular materials declare the independent dataset capability', () => {
+    expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.dataCapabilities).toContain('dataset');
+    expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.dataCapabilities).toContain('dataset');
+    expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.dataCapabilities).not.toContain('host-resource');
+    expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.dataCapabilities).not.toContain('host-resource');
   });
 
   it('renders declared gradient background fields while keeping unsupported colors solid-only', () => {

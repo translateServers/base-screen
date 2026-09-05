@@ -7,6 +7,7 @@ import {
 } from '@base-screen/contracts';
 import { validateScreenHostResourceBinding } from '@base-screen/core';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
+import { DATASET_QUERY_KIND } from '../resource/dataset-query-port.js';
 import { cancelResourceState } from '../resource/resource-state.js';
 import type { ResolveContext } from './renderer.js';
 import { diagnostic } from './renderer-diagnostics.js';
@@ -23,7 +24,11 @@ export async function resolveHostResource(
 ): Promise<void> {
   const source = candidate.component.dataSource;
   const resource = candidate.resource;
-  if (source === null || source.type !== 'host-resource' || resource === undefined) {
+  if (
+    source === null ||
+    (source.type !== 'host-resource' && source.type !== 'dataset') ||
+    resource === undefined
+  ) {
     return;
   }
   const resourceState = mounted.resource;
@@ -62,7 +67,11 @@ export async function resolveHostResource(
   resourceState.executionContext = executionContext;
   const requestId = `${candidate.component.id}:${resource.key}:${generation}`;
   const startedAt = Date.now();
-  if (state.options.resourcePort === undefined) {
+  if (
+    source.type === 'dataset'
+      ? state.options.datasetPort === undefined
+      : state.options.resourcePort === undefined
+  ) {
     emitObserver(
       state,
       'started',
@@ -97,12 +106,12 @@ export async function resolveHostResource(
   try {
     const { resolution, shared, slotId } = state.coordinator!.request(
       resource.key,
-      source.resourceType,
+      source.type === 'dataset' ? DATASET_QUERY_KIND : source.resourceType,
       candidate.component.id,
       {
         componentId: candidate.component.id,
-        resourceType: source.resourceType,
-        resourceId: source.resourceId,
+        resourceType: source.type === 'dataset' ? DATASET_QUERY_KIND : source.resourceType,
+        resourceId: source.type === 'dataset' ? source.datasetId : source.resourceId,
         params: resource.params,
       },
       executionContext,
@@ -278,7 +287,11 @@ export function adaptResourceResult(
   value: ScreenJsonValue,
 ): BaseScreenMaterialDataState {
   const source = candidate.component.dataSource;
-  if (source === null || source.type !== 'host-resource' || source.binding === null) {
+  if (
+    source === null ||
+    (source.type !== 'host-resource' && source.type !== 'dataset') ||
+    source.binding === null
+  ) {
     return { status: 'ready', value };
   }
   const dataset = parseScreenTabularDataset(value);

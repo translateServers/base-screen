@@ -1,9 +1,9 @@
 import type {
   ScreenDataBinding,
-  ScreenDatasetDescriptor,
+  ScreenDatasetDefinition,
   ScreenDiagnostic,
   ScreenDocument,
-  ScreenHostDatasetCatalogPort,
+  ScreenHostDatasetPort,
   ScreenHostResourcePort,
   ScreenHostVariablePort,
   ScreenJsonValue,
@@ -28,7 +28,7 @@ import type { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-syn
 import type { DesignerDatasetCatalogController } from './designer-dataset-catalog-controller.js';
 
 export interface DesignerDatasetControllerCallbacks {
-  readonly getCatalogPort: () => ScreenHostDatasetCatalogPort | undefined;
+  readonly getCatalogPort: () => ScreenHostDatasetPort | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
@@ -50,7 +50,7 @@ export interface DesignerDatasetControllerCallbacks {
 }
 
 export class DesignerDatasetControllerState {
-  descriptor: ScreenDatasetDescriptor | undefined;
+  descriptor: ScreenDatasetDefinition | undefined;
   draft: DesignerDatasetDraftView | undefined;
   mode: DesignerDataSourceMode = 'none';
   variableSourceId = '';

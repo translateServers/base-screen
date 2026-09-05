@@ -48,6 +48,13 @@ describe('designer panel rendering', () => {
         (element) => element.dataset.canvasBackgroundImageAction !== undefined,
       ),
     ).toBe(false);
+    expect(
+      descendants(properties).some(
+        (element) =>
+          element.dataset.canvasSettingAction !== undefined ||
+          element.className.includes('designer-canvas-thumbnail'),
+      ),
+    ).toBe(false);
     const fit = descendants(properties).find(
       (element) => element.dataset.canvasProperty === 'backgroundImageFit',
     );

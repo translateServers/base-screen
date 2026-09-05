@@ -62,6 +62,13 @@ export interface ScreenDataBinding {
 
 export type ScreenHostResourceBinding = ScreenDataBinding;
 
+export interface ScreenDatasetDataSource {
+  readonly type: 'dataset';
+  readonly datasetId: string;
+  readonly params: Readonly<Record<string, ScreenHostResourceParameter>>;
+  readonly binding: ScreenDataBinding | null;
+}
+
 export interface ScreenHostResourceDataSource {
   readonly type: 'host-resource';
   readonly resourceType: string;
@@ -79,6 +86,7 @@ export interface ScreenVariableDataSource {
 
 export type ScreenComponentDataSource =
   | ScreenStaticDataSource
+  | ScreenDatasetDataSource
   | ScreenHostResourceDataSource
   | ScreenVariableDataSource;
 

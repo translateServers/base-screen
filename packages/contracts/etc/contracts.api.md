@@ -4,11 +4,17 @@
 
 ```ts
 
+// @public
+export function evaluateScreenDatasetParameters(definitions: readonly ScreenDatasetParameterDefinition[], input: unknown): ScreenParseResult<ScreenJsonObject>;
+
 // @public (undocumented)
 export function isBoundedScreenImageUrl(value: unknown, maxCodePoints?: number): value is string;
 
 // @public (undocumented)
 export function isScreenAuthoringRequest(value: unknown): value is ScreenAuthoringRequest;
+
+// @public (undocumented)
+export function isScreenHostDatasetPort(input: unknown): input is ScreenHostDatasetPort;
 
 // @public (undocumented)
 export function isScreenMaterialErrorCode(value: unknown): value is ScreenMaterialErrorCode;
@@ -94,10 +100,13 @@ export function parseScreenAuthoringEditorContext(input: unknown): ScreenParseRe
 export function parseScreenAuthoringRequest(input: unknown): ScreenParseResult<ScreenAuthoringRequest>;
 
 // @public (undocumented)
-export function parseScreenDatasetDescriptor(input: unknown): ScreenParseResult<ScreenDatasetDescriptor>;
+export function parseScreenDatasetDefinition(input: unknown): ScreenParseResult<ScreenDatasetDefinition>;
 
 // @public (undocumented)
-export function parseScreenDatasetPage(input: unknown): ScreenParseResult<ScreenDatasetPage>;
+export function parseScreenDatasetEntries(input: unknown): ScreenParseResult<ScreenDatasetEntries>;
+
+// @public (undocumented)
+export function parseScreenDatasetGroups(input: unknown): ScreenParseResult<readonly ScreenDatasetGroup[]>;
 
 // @public
 export function parseScreenDocument(input: unknown, base?: ScreenDocument): ScreenParseResult<ScreenDocument>;
@@ -443,7 +452,7 @@ export interface ScreenCanvasColorStop {
 }
 
 // @public (undocumented)
-export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenHostResourceDataSource | ScreenVariableDataSource;
+export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenDatasetDataSource | ScreenHostResourceDataSource | ScreenVariableDataSource;
 
 // @public (undocumented)
 export interface ScreenComponentNode {
@@ -530,19 +539,51 @@ export interface ScreenDataBinding {
 }
 
 // @public (undocumented)
-export interface ScreenDatasetDescriptor {
+export interface ScreenDatasetDataSource {
     // (undocumented)
-    readonly description: string | null;
+    readonly binding: ScreenDataBinding | null;
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly params: Readonly<Record<string, ScreenHostResourceParameter>>;
+    // (undocumented)
+    readonly type: 'dataset';
+}
+
+// @public (undocumented)
+export interface ScreenDatasetDefinition extends ScreenDatasetEntry {
     // (undocumented)
     readonly fields: readonly ScreenDatasetField[];
     // (undocumented)
+    readonly parameters: readonly ScreenDatasetParameterDefinition[];
+}
+
+// @public (undocumented)
+export interface ScreenDatasetDescribeRequest {
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+}
+
+// @public (undocumented)
+export interface ScreenDatasetEntries {
+    // (undocumented)
+    readonly items: readonly ScreenDatasetEntry[];
+    // (undocumented)
+    readonly nextCursor?: string;
+}
+
+// @public (undocumented)
+export interface ScreenDatasetEntry {
+    // (undocumented)
+    readonly datasetId: string;
+    // (undocumented)
+    readonly description: string | null;
+    // (undocumented)
+    readonly groupId?: string;
+    // (undocumented)
     readonly name: string;
-    // (undocumented)
-    readonly parameters: readonly ScreenDatasetParameter[];
-    // (undocumented)
-    readonly resourceId: string;
-    // (undocumented)
-    readonly resourceType: string;
 }
 
 // @public (undocumented)
@@ -562,38 +603,60 @@ export interface ScreenDatasetField {
 }
 
 // @public (undocumented)
-export interface ScreenDatasetPage {
+export interface ScreenDatasetGroup {
     // (undocumented)
-    readonly items: readonly ScreenDatasetSummary[];
+    readonly id: string;
     // (undocumented)
-    readonly nextCursor?: string;
+    readonly name: string;
+}
+
+// @public (undocumented)
+export interface ScreenDatasetListRequest {
+    // (undocumented)
+    readonly cursor?: string;
+    // (undocumented)
+    readonly groupId?: string;
+    // (undocumented)
+    readonly limit: number;
+    // (undocumented)
+    readonly query: string;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
 }
 
 // @public
-export interface ScreenDatasetParameter {
+export interface ScreenDatasetParameterDefinition {
     // (undocumented)
-    readonly defaultValue?: ScreenJsonValue;
+    readonly allowedValues?: readonly ScreenDatasetParameterValue[];
     // (undocumented)
-    readonly editor?: ScreenDatasetParameterEditor;
+    readonly defaultValue?: ScreenDatasetParameterValue;
     // (undocumented)
     readonly label: string;
     // (undocumented)
+    readonly maximum?: number;
+    // (undocumented)
+    readonly maxLength?: number;
+    // (undocumented)
+    readonly minimum?: number;
+    // (undocumented)
     readonly name: string;
+    // (undocumented)
+    readonly required: boolean;
+    // (undocumented)
+    readonly valueType: ScreenDatasetValueType;
 }
 
 // @public (undocumented)
-export type ScreenDatasetParameterEditor = 'text' | 'number' | 'boolean' | 'date' | 'json';
+export type ScreenDatasetParameterValue = string | number | boolean;
 
 // @public (undocumented)
-export interface ScreenDatasetSummary {
+export interface ScreenDatasetQueryRequest {
     // (undocumented)
-    readonly description: string | null;
+    readonly componentId: string;
     // (undocumented)
-    readonly name: string;
+    readonly datasetId: string;
     // (undocumented)
-    readonly resourceId: string;
-    // (undocumented)
-    readonly resourceType: string;
+    readonly params: ScreenJsonObject;
 }
 
 // @public (undocumented)
@@ -620,7 +683,7 @@ export interface ScreenDesignerHostAdapter {
     // (undocumented)
     readonly capabilities: ScreenDesignerHostCapabilities;
     // (undocumented)
-    readonly datasetCatalog?: ScreenHostDatasetCatalogPort;
+    readonly datasets?: ScreenHostDatasetPort;
     // (undocumented)
     readonly projectCatalog?: ScreenProjectCatalogPort;
     // (undocumented)
@@ -640,7 +703,7 @@ export interface ScreenDesignerHostCapabilities {
     // (undocumented)
     readonly actions: boolean;
     // (undocumented)
-    readonly datasetCatalog: boolean;
+    readonly datasets: boolean;
     // (undocumented)
     readonly projectCatalog: boolean;
     // (undocumented)
@@ -691,34 +754,19 @@ export interface ScreenDocument {
 // @public (undocumented)
 export type ScreenDynamicVariable = ScreenDataSourceVariable | ScreenUrlQueryVariable;
 
-// @public (undocumented)
-export interface ScreenHostDatasetCatalogListRequest {
+// @public
+export interface ScreenHostDatasetPort {
     // (undocumented)
-    readonly cursor?: string;
+    describe(request: ScreenDatasetDescribeRequest): Promise<ScreenParseResult<ScreenDatasetDefinition>>;
     // (undocumented)
-    readonly limit: number;
+    groups?(request: {
+        readonly signal: ScreenAbortSignal;
+    }): Promise<ScreenParseResult<readonly ScreenDatasetGroup[]>>;
     // (undocumented)
-    readonly query: string;
+    list(request: ScreenDatasetListRequest): Promise<ScreenParseResult<ScreenDatasetEntries>>;
     // (undocumented)
-    readonly signal: ScreenAbortSignal;
-}
-
-// @public (undocumented)
-export interface ScreenHostDatasetCatalogPort {
-    // (undocumented)
-    describe(request: ScreenHostDatasetDescribeRequest): Promise<ScreenParseResult<ScreenDatasetDescriptor>>;
-    // (undocumented)
-    list(request: ScreenHostDatasetCatalogListRequest): Promise<ScreenParseResult<ScreenDatasetPage>>;
-}
-
-// @public (undocumented)
-export interface ScreenHostDatasetDescribeRequest {
-    // (undocumented)
-    readonly resourceId: string;
-    // (undocumented)
-    readonly resourceType: string;
-    // (undocumented)
-    readonly signal: ScreenAbortSignal;
+    query(request: ScreenDatasetQueryRequest, options: ScreenHostResourceResolveOptions): Promise<ScreenParseResult<ScreenTabularDataset>>;
+    readonly queryScope?: 'dataset';
 }
 
 // @public (undocumented)
