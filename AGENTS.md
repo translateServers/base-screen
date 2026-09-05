@@ -1,5 +1,11 @@
 # Base Screen 仓库指南
 
+## 跨仓协作入口
+
+- 涉及 xjdatahub 接入、职责划分、包同步或联合验收时，先执行 pnpm integration status，再按能力执行 context；使用 [跨仓工作流 Skill](.agents/skills/base-screen-integration-workflow/SKILL.md)，不全量读取两个仓库的知识库。
+- 同一任务可按已确定职责修改双方相关源码；同步采用任务记录和受管文件保护。上游当前源码与下游实际包分开核验，未同步能力不得视为已接入。
+- 规范唯一维护在 Skill 的 references/workflow.md；提交、推送、部署和生产操作仍遵循用户授权。
+
 ## 环境搭建与验证
 
 - 使用 Node `22.23.2`（见 `.node-version`）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。

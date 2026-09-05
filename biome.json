@@ -11,6 +11,7 @@
       "!**/playwright-report",
       "!**/test-results",
       "!**/tarballs",
+      "!**/.base-screen/local",
       "!**/*.tsbuildinfo",
       "!packages/engine/src/common/vendor",
       "!pnpm-lock.yaml"

@@ -14,4 +14,8 @@ packages/*/LICENSE
 .schema-build/
 .trae
 .zcode
-.agents
+.agents/*
+!.agents/skills/
+.agents/skills/*
+!.agents/skills/base-screen-integration-workflow/
+.base-screen/local/

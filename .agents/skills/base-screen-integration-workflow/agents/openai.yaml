@@ -1,0 +1,4 @@
+interface:
+  display_name: "Base Screen 跨仓工作流"
+  short_description: "按能力加载上下文，协调 Base Screen 与宿主同步和联合验证"
+  default_prompt: "使用 $base-screen-integration-workflow 处理当前跨仓需求，先查看实际消费状态与相关能力。"

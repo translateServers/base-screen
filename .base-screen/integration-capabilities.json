@@ -1,0 +1,140 @@
+{
+  "capabilities": [
+    {
+      "id": "document-history",
+      "title": "规范文档、事务与历史",
+      "owner": "base-screen",
+      "availability": "current",
+      "boundary": "基座维护严格文档、事务与历史；宿主维护实际存储、权限和业务记录。",
+      "publicApi": ["@base-screen/contracts", "@base-screen/core", "ScreenProjectAdapter"],
+      "references": [
+        "packages/contracts/src/index.ts",
+        "packages/core/src/index.ts",
+        "docs/usage.md"
+      ],
+      "checks": ["contracts", "core"]
+    },
+    {
+      "id": "designer",
+      "title": "Designer 画布与检查器",
+      "owner": "base-screen",
+      "availability": "current",
+      "boundary": "本地编辑质量与会话编排归基座，宿主通过公开配置和事件组合业务页面。",
+      "publicApi": ["@base-screen/sdk/designer", "BaseScreenDesignerElement.configure"],
+      "references": [
+        "packages/engine/src/designer-element/base-screen-designer-element.ts",
+        "packages/engine/tests/browser/controllers",
+        "docs/usage.md"
+      ],
+      "checks": ["engine"]
+    },
+    {
+      "id": "viewer",
+      "title": "Viewer 与纯展示",
+      "owner": "base-screen",
+      "availability": "current",
+      "boundary": "基座按规范文档渲染；宿主提供资源、变量和容器尺寸。",
+      "publicApi": ["@base-screen/sdk/viewer", "BaseScreenViewerElement.configure"],
+      "references": ["packages/renderer/src/index.ts", "packages/renderer/tests", "docs/usage.md"],
+      "checks": ["renderer"]
+    },
+    {
+      "id": "materials",
+      "title": "物料契约与加载",
+      "owner": "base-screen + host",
+      "availability": "current",
+      "boundary": "基座维护 Manifest、物料 ABI 和有界加载协议；审核、分发、沙箱及业务物料由宿主实现。",
+      "publicApi": ["@base-screen/plugin-core", "@base-screen/plugin-manager", "@base-screen/vue"],
+      "references": [
+        "packages/plugin-core/src/index.ts",
+        "packages/plugin-manager/src/index.ts",
+        "docs/usage.md"
+      ],
+      "checks": ["plugin-core", "plugin-manager"]
+    },
+    {
+      "id": "data-resources",
+      "title": "数据集与宿主资源",
+      "owner": "base-screen + host",
+      "availability": "current",
+      "boundary": "基座维护绑定、取消、deadline 与结果投影；目录、查询、聚合、缓存、鉴权归宿主。",
+      "publicApi": ["ScreenHostResourcePort", "ScreenHostDatasetCatalogPort"],
+      "references": [
+        "packages/contracts/src/types/host.ts",
+        "packages/core/src/data/host-dataset.ts",
+        "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md"
+      ],
+      "checks": ["contracts", "core"]
+    },
+    {
+      "id": "variables",
+      "title": "全局变量",
+      "owner": "base-screen + host",
+      "availability": "current",
+      "boundary": "基座维护稳定变量身份与规范引用；宿主提供数据源和当前查询参数，执行实际求值。",
+      "publicApi": ["ScreenHostVariablePort", "ScreenHostVariableCatalogPort"],
+      "references": [
+        "packages/contracts/src/types/host.ts",
+        "packages/engine/src/common/operations/designer-variable-operations.ts",
+        "docs/usage.md"
+      ],
+      "checks": ["contracts", "engine"]
+    },
+    {
+      "id": "blueprint",
+      "title": "事件 Blueprint 工作台",
+      "owner": "base-screen + host",
+      "availability": "current",
+      "boundary": "基座拥有语义、工作台面板、统一历史和命令；宿主拥有中央画布、布局算法、手势和业务动作执行。",
+      "publicApi": ["base-screen-designer-blueprint-canvas", "@base-screen/sdk"],
+      "references": [
+        "docs/usage.md",
+        "packages/engine/src/designer-element/designer-element-public-api.ts",
+        "packages/contracts/src/index.ts"
+      ],
+      "checks": ["contracts", "engine"]
+    },
+    {
+      "id": "conditional-style",
+      "title": "条件样式与宿主视觉策略",
+      "owner": "base-screen + host",
+      "availability": "current; event-driven replacement requires design",
+      "boundary": "styleRules 求值和 conditionalStylePort 当前存在；Designer 没有内建规则编辑区。事件驱动替代尚未设计，不视为已废弃。",
+      "publicApi": ["ScreenComponentNode.styleRules", "BaseScreenConditionalStylePort"],
+      "references": [
+        "docs/decisions/ADR-0066-host-owned-conditional-style-authoring.md",
+        "docs/decisions/ADR-0059-conditional-style-port.md",
+        "docs/usage.md"
+      ],
+      "checks": ["contracts", "renderer"]
+    },
+    {
+      "id": "host-entrypoints",
+      "title": "宿主入口与业务工作流",
+      "owner": "host",
+      "availability": "current",
+      "boundary": "返回、预览、资源与业务面板通过公开入口组合；路由、上传、发布、截图与长任务由宿主执行。",
+      "publicApi": ["base-screen-designer-back-request", "leftPanelGroups", "previewHandler"],
+      "references": [
+        "docs/usage.md",
+        "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md",
+        "packages/engine/src/designer-element/base-screen-designer-element.ts"
+      ],
+      "checks": ["engine"]
+    },
+    {
+      "id": "integration-workflow",
+      "title": "跨仓开发工作流",
+      "owner": "base-screen + host",
+      "availability": "current",
+      "boundary": "上游维护通用工具与能力索引，宿主维护消费映射和执行命令；不改变产品运行时边界。",
+      "publicApi": ["pnpm integration"],
+      "references": [
+        ".agents/skills/base-screen-integration-workflow/SKILL.md",
+        ".agents/skills/base-screen-integration-workflow/scripts/workflow.mjs",
+        "tests/integration-workflow.test.ts"
+      ],
+      "checks": ["workflow"]
+    }
+  ]
+}
