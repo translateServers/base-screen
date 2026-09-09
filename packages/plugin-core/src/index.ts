@@ -31,6 +31,7 @@ export type {
   BaseScreenPluginActivationContext,
   BaseScreenPluginCatalog,
   BaseScreenPluginCatalogEntry,
+  BaseScreenPluginCommandHandler,
   BaseScreenPluginContribution,
   BaseScreenPluginDependency,
   BaseScreenPluginManifest,

@@ -1,4 +1,5 @@
 import type {
+  BaseScreenPluginCommandHandler,
   BaseScreenPluginManifest,
   BaseScreenPluginRuntime,
   PluginCommandPort,
@@ -22,6 +23,7 @@ export interface Candidate {
   readonly activate: BaseScreenPluginRuntime['activate'];
   readonly deactivate: BaseScreenPluginRuntime['deactivate'];
   readonly dispose: BaseScreenPluginRuntime['dispose'];
+  readonly commands: ReadonlyMap<string, BaseScreenPluginCommandHandler>;
 }
 
 export interface ActivationSession {
@@ -31,5 +33,6 @@ export interface ActivationSession {
     readonly grantedCapabilities: readonly string[];
     readonly commandPort: PluginCommandPort | undefined;
   };
+  isValid(): boolean;
   invalidate(): void;
 }

@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-08-31（宿主资源 authoring intent）
+> 最近更新：2026-09-06（插件贡献命令与宿主装配）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 变更依据当前用户需求与适用的已接受决策实施。长期架构、职责或兼容策略变化需要 ADR；
@@ -229,6 +229,11 @@
   依据：[Remote Plugin Sandbox](../specs/archive/remote-plugin-sandbox/spec.md)、[ADR-0009](../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)。
 - **插件生命周期与权限**：候选预检、依赖解析、能力授权与实例级 contribution authority。
   依据：[Plugin Manager Runtime](../specs/archive/plugin-manager-runtime/spec.md)、[ADR-0015](../decisions/ADR-0015-runtime-contribution-authority.md)。
+- **贡献命令与 Core 命令端口**（2026-09-06 增量）：runtime 可选 `commands` 必须与 Manifest
+  `command` 贡献一一对应；Manager `executeContributionCommand` 在 active 会话内分发。
+  Designer 可选 `pluginCatalog` / `pluginCommandPort` 把已授权命令列入命令面板；插件经
+  `command.execute` 拿到的 Core adapter 只能编排已有 `ScreenDocumentCommand`。
+  Renderer contribution index 不增加 command 查询。plugin-sdk 提供 `createPluginPackage`。
 
 ## 历史迁移
 

@@ -10,6 +10,8 @@ import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { PluginCommandPort } from '@base-screen/plugin-core';
+import type { PluginCommandRequest } from '@base-screen/plugin-core';
+import type { ScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
@@ -26,6 +28,8 @@ export interface BaseScreenPluginManager {
     deactivate(): Promise<ScreenParseResult<null>>;
     // (undocumented)
     dispose(): Promise<ScreenParseResult<null>>;
+    // (undocumented)
+    executeContributionCommand(request: PluginCommandRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
     // (undocumented)
     readonly snapshot: BaseScreenPluginManagerSnapshot | undefined;
     // (undocumented)
@@ -63,6 +67,9 @@ export interface BaseScreenPluginManagerSnapshot {
 
 // @public (undocumented)
 export type BaseScreenPluginManagerStatus = 'inactive' | 'activating' | 'active' | 'deactivating' | 'failed' | 'disposing' | 'disposed';
+
+// @public (undocumented)
+export function createBaseScreenPluginContributionCommandPort(manager: BaseScreenPluginManager): PluginCommandPort;
 
 // @public (undocumented)
 export function createBaseScreenPluginManager(options: BaseScreenPluginManagerOptions): BaseScreenPluginManager;

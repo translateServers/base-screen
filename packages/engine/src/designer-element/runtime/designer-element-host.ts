@@ -24,7 +24,9 @@ import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@bas
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
+  BaseScreenPluginCatalog,
   BaseScreenRuntimeContributionIndex,
+  PluginCommandPort,
 } from '@base-screen/plugin-core';
 import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
@@ -49,6 +51,8 @@ export interface DesignerElementHost extends HTMLElement {
   materialLibraryGrouping: BaseScreenMaterialLibraryGrouping | undefined;
   materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
+  pluginCatalog: BaseScreenPluginCatalog | undefined;
+  pluginCommandPort: PluginCommandPort | undefined;
   readonly previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   readonly backButton: boolean;
   readonly canvasBackgroundImageButton: boolean;

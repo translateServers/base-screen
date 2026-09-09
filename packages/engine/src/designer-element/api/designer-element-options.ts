@@ -1,5 +1,9 @@
 import type { ScreenDocument, ScreenProjectAdapter } from '@base-screen/contracts';
-import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
+import type {
+  BaseScreenPluginCatalog,
+  BaseScreenRuntimeContributionIndex,
+  PluginCommandPort,
+} from '@base-screen/plugin-core';
 import {
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,
@@ -15,7 +19,11 @@ import {
   parseBaseScreenMaterialLibraryState,
 } from '../../common/operations/material-library/material-library-state.js';
 import { type DesignerToolMaterialTypes } from '../../common/tools/designer-tools.js';
-import { lifecycleDiagnostic } from '../runtime/designer-element-guards.js';
+import {
+  isBaseScreenPluginCatalog,
+  isPluginCommandPort,
+  lifecycleDiagnostic,
+} from '../runtime/designer-element-guards.js';
 import {
   type DesignerElementHost,
   getDesignerElementState,
@@ -188,6 +196,64 @@ export function writeRuntimeContributions(
     return;
   }
   elementState.runtimeContributions = value;
+}
+
+export function readPluginCatalog(
+  element: DesignerElementHost,
+): BaseScreenPluginCatalog | undefined {
+  const elementState = getDesignerElementState(element);
+
+  return elementState.pluginCatalog;
+}
+
+export function writePluginCatalog(
+  element: DesignerElementHost,
+  value: BaseScreenPluginCatalog | undefined,
+) {
+  const elementState = getDesignerElementState(element);
+
+  if (elementState.renderer !== undefined && value !== elementState.pluginCatalog) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Plugin catalog cannot change after initialization. Call unload first.'),
+    ]);
+    return;
+  }
+  if (value !== undefined && !isBaseScreenPluginCatalog(value)) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Designer plugin catalog 必须是合法的插件目录。'),
+    ]);
+    return;
+  }
+  elementState.pluginCatalog = value;
+}
+
+export function readPluginCommandPort(element: DesignerElementHost): PluginCommandPort | undefined {
+  const elementState = getDesignerElementState(element);
+
+  return elementState.pluginCommandPort;
+}
+
+export function writePluginCommandPort(
+  element: DesignerElementHost,
+  value: PluginCommandPort | undefined,
+) {
+  const elementState = getDesignerElementState(element);
+
+  if (elementState.renderer !== undefined && value !== elementState.pluginCommandPort) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic(
+        'Plugin command port cannot change after initialization. Call unload first.',
+      ),
+    ]);
+    return;
+  }
+  if (value !== undefined && !isPluginCommandPort(value)) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Designer plugin command port 必须是含 execute 的对象。'),
+    ]);
+    return;
+  }
+  elementState.pluginCommandPort = value;
 }
 
 export function readProjectAdapter(element: DesignerElementHost): ScreenProjectAdapter | undefined {

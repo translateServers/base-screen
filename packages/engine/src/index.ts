@@ -1,11 +1,14 @@
 export {
+  type CreateBaseScreenCorePluginCommandPortOptions,
+  createBaseScreenCorePluginCommandPort,
+} from './common/operations/plugin/designer-plugin-command-port.js';
+export {
   ScreenProjectController,
   type ScreenProjectControllerChange,
   type ScreenProjectControllerOptions,
   type ScreenProjectPhase,
   type ScreenProjectScheduler,
 } from './common/project/project-controller.js';
-
 export {
   type BaseScreenDesignerConfiguration,
   BaseScreenDesignerElement,

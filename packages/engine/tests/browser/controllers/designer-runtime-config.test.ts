@@ -6,6 +6,7 @@ import type {
 } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalog,
+  type BaseScreenPluginCatalog,
   type BaseScreenRuntimeContributionIndex,
   createBaseScreenMaterialCatalog,
 } from '@base-screen/plugin-core';
@@ -329,6 +330,14 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     });
     expect(contributionsResult.ok).toBe(false);
     expect(badContributions.runtimeContributions).toBeUndefined();
+
+    const badPluginCatalog = new BaseScreenDesignerElement();
+    const pluginCatalogResult = badPluginCatalog.configure({
+      catalog: catalog(),
+      pluginCatalog: {} as unknown as BaseScreenPluginCatalog,
+    });
+    expect(pluginCatalogResult.ok).toBe(false);
+    expect(badPluginCatalog.pluginCatalog).toBeUndefined();
   });
 
   it('a failed project adapter bind leaves prior fields and the session untouched (RB3)', () => {

@@ -1,8 +1,10 @@
-import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenDiagnostic, ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenPluginCatalogEntry,
+  type BaseScreenPluginCommandHandler,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
+  parsePluginCommandRequest,
 } from '@base-screen/plugin-core';
 import { createRuntimeContributionIndex } from './contributions.js';
 import { failure, sortDiagnostics } from './diagnostics.js';
@@ -25,6 +27,7 @@ class PluginManager implements BaseScreenPluginManager {
   #snapshot: BaseScreenPluginManagerSnapshot | undefined;
   #active: Array<{ readonly plugin: PlannedPlugin; readonly session: ActivationSession }> = [];
   #disposalOrder: PlannedPlugin[] = [];
+  #commands = new Map<string, ContributionCommand>();
   #disposePromise: Promise<ScreenParseResult<null>> | undefined;
   #queue: Promise<void> = Promise.resolve();
 
@@ -51,6 +54,12 @@ class PluginManager implements BaseScreenPluginManager {
       this.#disposePromise = this.enqueue(() => this.performDispose());
     }
     return this.#disposePromise;
+  }
+
+  executeContributionCommand(
+    request: Parameters<BaseScreenPluginManager['executeContributionCommand']>[0],
+  ): Promise<ScreenParseResult<ScreenJsonValue>> {
+    return this.enqueue(() => this.performExecuteContributionCommand(request));
   }
 
   private enqueue<T>(
@@ -103,6 +112,7 @@ class PluginManager implements BaseScreenPluginManager {
     if (diagnostics.length > 0) {
       const rollbackDiagnostics = await deactivateEntries(active);
       this.#active = [];
+      this.#commands = new Map();
       this.#snapshot = undefined;
       this.#status = rollbackDiagnostics.length === 0 ? 'inactive' : 'failed';
       return failureResult([...diagnostics, ...rollbackDiagnostics]);
@@ -114,6 +124,7 @@ class PluginManager implements BaseScreenPluginManager {
     }));
     const plugins = createBaseScreenPluginCatalog(pluginEntries);
     this.#active = active;
+    this.#commands = collectContributionCommands(active);
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
       plugins,
@@ -129,6 +140,7 @@ class PluginManager implements BaseScreenPluginManager {
     }
     this.#status = 'deactivating';
     this.#snapshot = undefined;
+    this.#commands = new Map();
     const diagnostics = await deactivateEntries(this.#active);
     this.#active = [];
     this.#status = diagnostics.length === 0 ? 'inactive' : 'failed';
@@ -143,6 +155,7 @@ class PluginManager implements BaseScreenPluginManager {
     }
     this.#status = 'disposing';
     this.#snapshot = undefined;
+    this.#commands = new Map();
     const diagnostics = await deactivateEntries(this.#active);
     this.#active = [];
     for (const plugin of [...this.#disposalOrder].reverse()) {
@@ -169,6 +182,59 @@ class PluginManager implements BaseScreenPluginManager {
     if (existing !== -1) this.#disposalOrder.splice(existing, 1);
     this.#disposalOrder.push(plugin);
   }
+
+  private async performExecuteContributionCommand(
+    request: Parameters<BaseScreenPluginManager['executeContributionCommand']>[0],
+  ): Promise<ScreenParseResult<ScreenJsonValue>> {
+    const parsed = parsePluginCommandRequest(request);
+    if (!parsed.ok) return parsed;
+    if (this.#status !== 'active') {
+      return failure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        [],
+        'Plugin manager cannot execute contribution commands from its current state.',
+      );
+    }
+    const command = this.#commands.get(parsed.value.commandId);
+    if (command === undefined) {
+      return failure(
+        'PLUGIN_CORE_COMMAND_UNAUTHORIZED',
+        ['commandId'],
+        'Plugin contribution command is not available.',
+      );
+    }
+    if (!command.isValid()) {
+      return failure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        [],
+        'Plugin activation session is no longer valid.',
+      );
+    }
+    try {
+      const result = await command.handler(parsed.value.args);
+      if (result === undefined) {
+        return { ok: true, value: null, diagnostics: [] };
+      }
+      if (
+        result === null ||
+        typeof result !== 'object' ||
+        typeof (result as { readonly ok?: unknown }).ok !== 'boolean'
+      ) {
+        return failure(
+          'PLUGIN_CORE_COMMAND_RESULT_INVALID',
+          [],
+          'Plugin contribution command returned an invalid result.',
+        );
+      }
+      return result as ScreenParseResult<ScreenJsonValue>;
+    } catch {
+      return failure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        ['commandId'],
+        'Plugin contribution command failed.',
+      );
+    }
+  }
 }
 
 async function deactivateEntries(
@@ -192,6 +258,31 @@ async function deactivateEntries(
     }
   }
   return diagnostics;
+}
+
+type ContributionCommand = {
+  readonly handler: BaseScreenPluginCommandHandler;
+  readonly isValid: () => boolean;
+};
+
+function collectContributionCommands(
+  entries: readonly { readonly plugin: PlannedPlugin; readonly session: ActivationSession }[],
+): Map<string, ContributionCommand> {
+  const commands = new Map<string, ContributionCommand>();
+  for (const entry of entries) {
+    for (const [commandId, handler] of entry.plugin.commands) {
+      const contribution = entry.plugin.manifest.contributions.find(
+        (item) => item.kind === 'command' && item.id === commandId,
+      );
+      if (contribution === undefined || contribution.kind !== 'command') continue;
+      if (!entry.plugin.grantedCapabilities.includes(contribution.requiredCapability)) continue;
+      commands.set(commandId, {
+        handler,
+        isValid: () => entry.session.isValid(),
+      });
+    }
+  }
+  return commands;
 }
 
 function diagnostic(

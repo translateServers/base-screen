@@ -58,6 +58,8 @@ export {
   type BaseScreenMaterialLibraryState,
   type BaseScreenMaterialLibraryStatus,
   baseScreenDesignerLeftPanelSlotName,
+  type CreateBaseScreenCorePluginCommandPortOptions,
+  createBaseScreenCorePluginCommandPort,
   defineBaseScreenDesigner,
   parseBaseScreenBlueprintCanvasCommand,
   parseBaseScreenDesignerLeftPanelGroups,

@@ -1,6 +1,8 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import type { BaseScreenPluginCatalog, PluginCommandPort } from '@base-screen/plugin-core';
 import type { BaseScreenDesignerWorkbenchMode } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { DESIGNER_OPERATION_TEXT } from '../../common/operations/designer-operation-registry.js';
+import { listDesignerPluginCommandPaletteItems } from '../../common/operations/plugin/designer-plugin-commands.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export type DesignerCommandPaletteKind = 'material' | 'layer' | 'command' | 'blueprint';
@@ -15,6 +17,7 @@ export interface DesignerCommandPaletteEntry {
   readonly materialItemId?: string;
   readonly componentId?: string;
   readonly operationId?: keyof typeof DESIGNER_OPERATION_TEXT;
+  readonly pluginCommandId?: string;
   readonly blueprintTargetId?: string;
 }
 
@@ -27,6 +30,9 @@ export interface DesignerCommandPaletteControllerCallbacks {
   readonly getRoot: () => ShadowRoot | null;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getWorkbenchMode: () => BaseScreenDesignerWorkbenchMode;
+  readonly getPluginCatalog?: () => BaseScreenPluginCatalog | undefined;
+  readonly getPluginCommandPort?: () => PluginCommandPort | undefined;
+  readonly executePluginCommand?: (commandId: string) => void;
   readonly renderKindIcon: (kind: DesignerCommandPaletteKind) => string;
 }
 
@@ -84,7 +90,12 @@ export class DesignerCommandPaletteController {
     }
     const result = target.closest<HTMLButtonElement>('[data-command-palette-result]');
     if (result !== null) {
+      const commandId = result.dataset.pluginCommand;
       this.close(false);
+      if (commandId !== undefined && result.disabled === false) {
+        this.callbacks.executePluginCommand?.(commandId);
+        return true;
+      }
       return false;
     }
     const overlay = target.closest<HTMLElement>('[data-command-palette]');
@@ -256,10 +267,23 @@ export class DesignerCommandPaletteController {
         operationId,
       };
     });
+    const pluginCommands = listDesignerPluginCommandPaletteItems(
+      this.callbacks.getPluginCatalog?.(),
+      this.callbacks.getPluginCommandPort?.() !== undefined,
+    ).map(
+      (command): DesignerCommandPaletteEntry => ({
+        kind: 'command',
+        label: command.name,
+        detail: command.id,
+        searchText: `${command.name} ${command.id}`.toLocaleLowerCase(),
+        disabled: command.disabled,
+        pluginCommandId: command.id,
+      }),
+    );
     const blueprint = this.blueprintEntries();
     return this.callbacks.getWorkbenchMode() === 'blueprint'
-      ? [...blueprint, ...commands]
-      : [...materials, ...layers, ...commands];
+      ? [...blueprint, ...commands, ...pluginCommands]
+      : [...materials, ...layers, ...commands, ...pluginCommands];
   }
 
   private blueprintEntries(): readonly DesignerCommandPaletteEntry[] {
@@ -339,6 +363,7 @@ export class DesignerCommandPaletteController {
     if (entry.materialItemId !== undefined) button.dataset.materialItemId = entry.materialItemId;
     if (entry.componentId !== undefined) button.dataset.layerSelect = entry.componentId;
     if (entry.operationId !== undefined) button.dataset.action = entry.operationId;
+    if (entry.pluginCommandId !== undefined) button.dataset.pluginCommand = entry.pluginCommandId;
     if (entry.blueprintTargetId !== undefined) {
       button.dataset.blueprintSearchId = entry.blueprintTargetId;
     }

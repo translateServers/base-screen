@@ -58,6 +58,24 @@ export function isBaseScreenRuntimeContributionIndex(value: unknown): boolean {
   );
 }
 
+export function isBaseScreenPluginCatalog(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).get === 'function' &&
+    typeof (value as Record<string, unknown>).has === 'function' &&
+    typeof (value as Record<string, unknown>).list === 'function'
+  );
+}
+
+export function isPluginCommandPort(value: unknown): boolean {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof (value as Record<string, unknown>).execute === 'function'
+  );
+}
+
 export function projectPhaseLabel(phase: ScreenProjectPhase): string {
   return DESIGNER_UI_TEXT.projectPhases[phase];
 }

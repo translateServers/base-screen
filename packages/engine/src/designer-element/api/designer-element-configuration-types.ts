@@ -13,7 +13,9 @@ import type {
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
+  BaseScreenPluginCatalog,
   BaseScreenRuntimeContributionIndex,
+  PluginCommandPort,
 } from '@base-screen/plugin-core';
 import type { BaseScreenDesignerWorkbenchMode } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
 import type { BaseScreenMaterialLibraryGrouping } from '../../common/operations/material-library/material-library-grouping.js';
@@ -31,6 +33,8 @@ export interface BaseScreenDesignerConfiguration {
   readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
   readonly materialLibraryItems?: readonly BaseScreenMaterialLibraryItem[];
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
+  readonly pluginCatalog?: BaseScreenPluginCatalog;
+  readonly pluginCommandPort?: PluginCommandPort;
   readonly projectAdapter?: ScreenProjectAdapter;
   readonly toolMaterialTypes?: DesignerToolMaterialTypes;
   readonly groupMaterialType?: string;

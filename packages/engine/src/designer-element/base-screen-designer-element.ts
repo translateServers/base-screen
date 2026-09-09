@@ -25,7 +25,9 @@ import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@bas
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
+  BaseScreenPluginCatalog,
   BaseScreenRuntimeContributionIndex,
+  PluginCommandPort,
 } from '@base-screen/plugin-core';
 import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
@@ -134,6 +136,22 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get runtimeContributions(): BaseScreenRuntimeContributionIndex | undefined {
     return this.#designerState.runtime.readRuntimeContributions(this);
+  }
+
+  get pluginCatalog(): BaseScreenPluginCatalog | undefined {
+    return this.#designerState.runtime.readPluginCatalog(this);
+  }
+
+  set pluginCatalog(value: BaseScreenPluginCatalog | undefined) {
+    this.#designerState.runtime.writePluginCatalog(this, value);
+  }
+
+  get pluginCommandPort(): PluginCommandPort | undefined {
+    return this.#designerState.runtime.readPluginCommandPort(this);
+  }
+
+  set pluginCommandPort(value: PluginCommandPort | undefined) {
+    this.#designerState.runtime.writePluginCommandPort(this, value);
   }
 
   get previewHandler(): ((document: ScreenDocument) => boolean) | undefined {

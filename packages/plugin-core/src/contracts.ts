@@ -246,6 +246,10 @@ export interface PluginCommandPort {
   execute(request: PluginCommandRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
 }
 
+export type BaseScreenPluginCommandHandler = (
+  args: ScreenJsonValue,
+) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
+
 export interface BaseScreenPluginActivationContext {
   readonly instanceId: string;
   readonly pluginId: string;
@@ -255,6 +259,7 @@ export interface BaseScreenPluginActivationContext {
 
 export interface BaseScreenPluginRuntime {
   readonly manifest: BaseScreenPluginManifest;
+  readonly commands?: Readonly<Record<string, BaseScreenPluginCommandHandler>>;
   activate(context: BaseScreenPluginActivationContext): void | Promise<void>;
   deactivate(): void | Promise<void>;
   dispose(): void | Promise<void>;

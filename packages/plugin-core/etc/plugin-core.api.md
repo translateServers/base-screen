@@ -458,6 +458,9 @@ export interface BaseScreenPluginCatalogEntry {
 }
 
 // @public (undocumented)
+export type BaseScreenPluginCommandHandler = (args: ScreenJsonValue) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
+
+// @public (undocumented)
 export type BaseScreenPluginContribution = {
     readonly kind: 'material';
     readonly type: string;
@@ -501,6 +504,8 @@ export interface BaseScreenPluginManifest {
 export interface BaseScreenPluginRuntime {
     // (undocumented)
     activate(context: BaseScreenPluginActivationContext): void | Promise<void>;
+    // (undocumented)
+    readonly commands?: Readonly<Record<string, BaseScreenPluginCommandHandler>>;
     // (undocumented)
     deactivate(): void | Promise<void>;
     // (undocumented)

@@ -102,4 +102,51 @@ describe('definePlugin', () => {
     };
     expect(definePlugin(runtime).ok).toBe(true);
   });
+
+  it('requires command handlers to match command contributions exactly', () => {
+    const manifest = {
+      id: 'acme.commands',
+      dependencies: [],
+      capabilities: ['command.execute'],
+      contributions: [
+        {
+          kind: 'command' as const,
+          id: 'refresh',
+          name: 'Refresh',
+          requiredCapability: 'command.execute',
+        },
+      ],
+    };
+    const missing = definePlugin({
+      manifest,
+      activate: () => undefined,
+      deactivate: () => undefined,
+      dispose: () => undefined,
+    });
+    expect(missing.ok).toBe(false);
+    if (!missing.ok) {
+      expect(missing.diagnostics[0]?.code).toBe('PLUGIN_CORE_MANIFEST_FIELD_INVALID');
+    }
+    const extra = definePlugin({
+      manifest: {
+        id: 'acme.example',
+        dependencies: [],
+        capabilities: [],
+        contributions: [],
+      },
+      commands: { extra: () => undefined },
+      activate: () => undefined,
+      deactivate: () => undefined,
+      dispose: () => undefined,
+    });
+    expect(extra.ok).toBe(false);
+    const matched = definePlugin({
+      manifest,
+      commands: { refresh: () => undefined },
+      activate: () => undefined,
+      deactivate: () => undefined,
+      dispose: () => undefined,
+    });
+    expect(matched.ok).toBe(true);
+  });
 });

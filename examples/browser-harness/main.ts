@@ -35,7 +35,10 @@ import {
   type BaseScreenPluginRuntime,
   createBaseScreenMaterialCatalog,
 } from '../../packages/plugin-core/src/index.ts';
-import { createBaseScreenPluginManager } from '../../packages/plugin-manager/src/index.ts';
+import {
+  createBaseScreenPluginContributionCommandPort,
+  createBaseScreenPluginManager,
+} from '../../packages/plugin-manager/src/index.ts';
 import { createReactMaterialDefinition } from '../../packages/react/src/index.ts';
 import {
   BASE_SCREEN_BLUEPRINT_CANVAS_COMMAND_EVENT,
@@ -110,12 +113,21 @@ const designerAuthoringPlugin: BaseScreenPluginRuntime = {
           required: ['limit'],
         },
       },
+      {
+        kind: 'command',
+        id: 'harness.ping',
+        name: 'Harness ping',
+        requiredCapability: 'blueprint.value.variable',
+      },
       ...designerAuthoringCapabilities.map((id) => ({
         kind: 'blueprintCapability' as const,
         id,
         name: id,
       })),
     ],
+  },
+  commands: {
+    'harness.ping': () => ({ ok: true as const, value: { ok: true }, diagnostics: [] }),
   },
   activate() {},
   deactivate() {},
@@ -996,6 +1008,10 @@ designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => 
   materialLibraryActions.push((event as CustomEvent<{ action: string }>).detail.action);
 });
 designer.runtimeContributions = runtimeContributions;
+if (pluginManager.snapshot !== undefined) {
+  designer.pluginCatalog = pluginManager.snapshot.plugins;
+  designer.pluginCommandPort = createBaseScreenPluginContributionCommandPort(pluginManager);
+}
 designer.toolMaterialTypes = {
   text: 'base.text',
   rectangle: 'base.rectangle',

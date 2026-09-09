@@ -22,7 +22,9 @@ import {
 import {
   isBaseScreenConditionalStylePort,
   isBaseScreenMaterialCatalog,
+  isBaseScreenPluginCatalog,
   isBaseScreenRuntimeContributionIndex,
+  isPluginCommandPort,
   isScreenHostResourcePort,
   isScreenHostVariableCatalogPort,
   isScreenHostVariablePort,
@@ -182,6 +184,24 @@ export function configure(
       ],
     };
   }
+  if (
+    configuration.pluginCatalog !== undefined &&
+    !isBaseScreenPluginCatalog(configuration.pluginCatalog)
+  ) {
+    return {
+      ok: false,
+      diagnostics: [lifecycleDiagnostic('Designer plugin catalog 必须是合法的插件目录。')],
+    };
+  }
+  if (
+    configuration.pluginCommandPort !== undefined &&
+    !isPluginCommandPort(configuration.pluginCommandPort)
+  ) {
+    return {
+      ok: false,
+      diagnostics: [lifecycleDiagnostic('Designer plugin command port 必须是含 execute 的对象。')],
+    };
+  }
   let adapter: ScreenDesignerHostAdapter | undefined;
   if (configuration.designerHostAdapter !== undefined) {
     const parsed = validateScreenDesignerHostAdapter(configuration.designerHostAdapter);
@@ -225,6 +245,8 @@ export function configure(
   elementState.materialLibraryItems = materialLibraryItems;
   elementState.resolvedMaterialLibraryItems = resolvedMaterialLibraryItems.value;
   elementState.runtimeContributions = configuration.runtimeContributions;
+  elementState.pluginCatalog = configuration.pluginCatalog;
+  elementState.pluginCommandPort = configuration.pluginCommandPort;
   elementState.toolMaterialTypes = configuration.toolMaterialTypes;
   elementState.groupMaterialType = configuration.groupMaterialType;
   elementState.previewHandler = configuration.previewHandler;

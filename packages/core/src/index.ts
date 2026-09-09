@@ -30,6 +30,7 @@ export {
   traceScreenBlueprintEvent,
 } from './blueprint/runtime.js';
 export { applyScreenDocumentCommand, applyScreenDocumentTransaction } from './commands/apply.js';
+export { parseScreenDocumentCommand } from './commands/parse-command.js';
 export type {
   ScreenCanvasPatch,
   ScreenCommandResult,

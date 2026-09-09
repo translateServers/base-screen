@@ -976,6 +976,81 @@ viewer.configure({
 使用 `@base-screen/plugin-manager` 时应采用 `activate()` 成功返回的 snapshot；插件未激活、
 resource type 未贡献或 capability 未授权时保持失败关闭。
 
+### 9.5 插件装配与贡献命令
+
+插件必须由宿主显式导入、审核并交给 Plugin Manager。首期信任模型是同 realm 受信代码：
+capability 限制的是 Base Screen 集成点，不是 JavaScript 环境权限。远程发现、dynamic import
+和不可信执行仍归宿主，不进入 Base Screen。
+
+作者用 `@base-screen/plugin-sdk` 声明插件；宿主激活后把 snapshot 交给 Viewer/Designer：
+
+```ts
+import { definePlugin, createPluginPackage } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenPluginManager,
+  createBaseScreenPluginContributionCommandPort,
+} from '@base-screen/plugin-manager';
+import { createBaseScreenCorePluginCommandPort } from '@base-screen/engine';
+
+const defined = definePlugin({
+  manifest: {
+    id: 'acme.tools',
+    dependencies: [],
+    capabilities: ['command.execute'],
+    contributions: [
+      {
+        kind: 'command',
+        id: 'acme.refresh',
+        name: 'Refresh metrics',
+        requiredCapability: 'command.execute',
+      },
+    ],
+  },
+  commands: {
+    'acme.refresh': () => ({ ok: true, value: null, diagnostics: [] }),
+  },
+  activate() {},
+  deactivate() {},
+  dispose() {},
+});
+if (!defined.ok) throw new Error('Plugin is invalid');
+
+let designer: BaseScreenDesignerElement;
+const manager = createBaseScreenPluginManager({
+  instanceId: 'screen-a',
+  standaloneMaterialTagNames,
+  plugins: [defined.value],
+  grantedCapabilities: { 'acme.tools': ['command.execute'] },
+  registry: { get: (tagName) => customElements.get(tagName) },
+  createCommandPort: () =>
+    createBaseScreenCorePluginCommandPort({
+      executeCommand: (command) => designer.executeCommand(command),
+    }),
+});
+const activated = await manager.activate();
+if (!activated.ok) throw new Error('Plugin activation failed');
+
+designer = document.querySelector('base-screen-designer')!;
+designer.configure({
+  catalog: activated.value.materials,
+  runtimeContributions: activated.value.contributions,
+  pluginCatalog: activated.value.plugins,
+  pluginCommandPort: createBaseScreenPluginContributionCommandPort(manager),
+});
+```
+
+两条命令方向不要混用：
+
+- **贡献命令**：Manifest 声明 `kind: 'command'`，handler 在 runtime `commands` 上。Designer
+  命令面板列出已授权项；点击后走 `pluginCommandPort`，由 Manager 分发到对应 handler。
+- **Core 命令端口**：仅当授予 `command.execute` 时，插件 `activate(context)` 才能拿到
+  `context.commandPort`。该端口只接受已有 `ScreenDocumentCommand` JSON（`commandId` 等于
+  命令 `type`），不能定义新的文档 mutation。
+
+`pluginCatalog` / `pluginCommandPort` 与 `runtimeContributions` 一样，初始化后变更必须先
+`unload()`。Viewer 不提供命令面板。`createPluginPackage({ id, plugin, materials? })` 可把
+插件与可选物料包组合；package `id` 只用于宿主诊断，不进入 Screen Document。
+
 ## 10. 物料事件、宿主事件和宿主动作
 
 Viewer 把物料交互冒泡为 `base-screen-material-event`：

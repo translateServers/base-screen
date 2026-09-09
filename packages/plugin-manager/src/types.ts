@@ -1,4 +1,4 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
@@ -6,6 +6,7 @@ import type {
   BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
+  PluginCommandRequest,
 } from '@base-screen/plugin-core';
 
 export type BaseScreenPluginManagerStatus =
@@ -44,4 +45,7 @@ export interface BaseScreenPluginManager {
   activate(): Promise<ScreenParseResult<BaseScreenPluginManagerSnapshot>>;
   deactivate(): Promise<ScreenParseResult<null>>;
   dispose(): Promise<ScreenParseResult<null>>;
+  executeContributionCommand(
+    request: PluginCommandRequest,
+  ): Promise<ScreenParseResult<ScreenJsonValue>>;
 }

@@ -104,4 +104,25 @@ describe('Plugin Manager preflight', () => {
     );
     expect(activated).toBe(false);
   });
+
+  it('rejects command contributions that lack matching handlers', async () => {
+    const plugin = runtime(
+      manifest({
+        capabilities: ['command.execute'],
+        contributions: [
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+          },
+        ],
+      }),
+    );
+    const result = await manager([plugin], { 'acme.plugin': ['command.execute'] }).activate();
+    expect(result.ok).toBe(false);
+    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+    );
+  });
 });

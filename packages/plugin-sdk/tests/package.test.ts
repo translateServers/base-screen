@@ -8,6 +8,7 @@ import {
   type CreateMaterialDefinitionOptions,
   type CreateMaterialPackageOptions,
   createMaterialPackage,
+  createPluginPackage,
 } from '../src/index.js';
 
 function manifest(overrides: Record<string, unknown> = {}) {
@@ -465,5 +466,54 @@ describe('createMaterialPackage', () => {
       const entry = defined.value.find((item) => item.manifest.type === 'acme.metric-card');
       expect(entry?.tabularDataAdapter).toBeDefined();
     });
+  });
+});
+
+describe('createPluginPackage', () => {
+  it('accepts a capability-only plugin without materials', () => {
+    const result = createPluginPackage({
+      id: 'acme.tools',
+      plugin: {
+        manifest: {
+          id: 'acme.tools',
+          dependencies: [],
+          capabilities: [],
+          contributions: [],
+        },
+        activate: () => undefined,
+        deactivate: () => undefined,
+        dispose: () => undefined,
+      },
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const defined = result.value.define();
+    expect(defined.ok).toBe(true);
+    if (defined.ok) {
+      expect(defined.value.materials).toEqual([]);
+      expect(defined.value.runtime.manifest.id).toBe('acme.tools');
+    }
+  });
+
+  it('rejects command handlers that are not declared as contributions', () => {
+    const result = createPluginPackage({
+      id: 'acme.tools',
+      plugin: {
+        manifest: {
+          id: 'acme.tools',
+          dependencies: [],
+          capabilities: [],
+          contributions: [],
+        },
+        commands: { extra: () => undefined },
+        activate: () => undefined,
+        deactivate: () => undefined,
+        dispose: () => undefined,
+      },
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
+    }
   });
 });

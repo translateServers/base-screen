@@ -13,7 +13,9 @@ import type {
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
+  BaseScreenPluginCatalog,
   BaseScreenRuntimeContributionIndex,
+  PluginCommandPort,
 } from '@base-screen/plugin-core';
 import { type BaseScreenRenderer } from '@base-screen/renderer';
 import { DesignerBlueprintWorkbenchController } from '../../browser/controllers/blueprint/designer-blueprint-workbench-controller.js';
@@ -81,6 +83,8 @@ export interface DesignerElementState {
   materialLibraryItems: readonly BaseScreenMaterialLibraryItem[] | undefined;
   resolvedMaterialLibraryItems: readonly BaseScreenResolvedMaterialLibraryItem[];
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
+  pluginCatalog: BaseScreenPluginCatalog | undefined;
+  pluginCommandPort: PluginCommandPort | undefined;
   resourcePort: ScreenHostResourcePort | undefined;
   variablePort: ScreenHostVariablePort | undefined;
   variableCatalogPort: ScreenHostVariableCatalogPort | undefined;

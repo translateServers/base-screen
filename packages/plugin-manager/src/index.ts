@@ -1,3 +1,4 @@
+export { createBaseScreenPluginContributionCommandPort } from './contribution-command-port.js';
 export { createBaseScreenPluginManager } from './manager.js';
 export type {
   BaseScreenCustomElementRegistryPort,

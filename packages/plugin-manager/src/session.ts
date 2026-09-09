@@ -19,6 +19,9 @@ export function createActivationSession(
       grantedCapabilities: Object.freeze([...grantedCapabilities]),
       commandPort,
     }),
+    isValid() {
+      return valid;
+    },
     invalidate() {
       valid = false;
     },

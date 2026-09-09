@@ -392,6 +392,15 @@ export function initializeDesignerElementControllers(
     getRoot: () => element.shadowRoot,
     getDocument: () => state.session.document,
     getWorkbenchMode: () => state.blueprintWorkbenchController.mode,
+    getPluginCatalog: () => state.pluginCatalog,
+    getPluginCommandPort: () => state.pluginCommandPort,
+    executePluginCommand: (commandId) => {
+      const port = state.pluginCommandPort;
+      if (port === undefined) return;
+      void port.execute({ commandId, args: null }).then((result) => {
+        if (!result.ok) state.runtime.emitDiagnostics(element, result.diagnostics);
+      });
+    },
     renderKindIcon: (kind) =>
       designerIcon(
         kind === 'material'

@@ -31,6 +31,21 @@ export interface BaseScreenMaterialPackage {
     readonly materials: readonly BaseScreenMaterialDefinition[];
 }
 
+// @public (undocumented)
+export interface BaseScreenPluginPackage {
+    // (undocumented)
+    define(): ScreenParseResult<{
+        readonly runtime: BaseScreenPluginRuntime;
+        readonly materials: readonly BaseScreenMaterialCatalogEntry[];
+    }>;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly materials: readonly BaseScreenMaterialDefinition[];
+    // (undocumented)
+    readonly plugin: BaseScreenPluginRuntime;
+}
+
 // @public
 export function createBaseScreenMaterialEditorDescriptor(input: unknown, options?: {
     readonly propsSchema?: BaseScreenMaterialManifest['propsSchema'];
@@ -61,6 +76,19 @@ export interface CreateMaterialPackageOptions {
     readonly id: string;
     // (undocumented)
     readonly materials: readonly CreateMaterialDefinitionOptions[];
+}
+
+// @public (undocumented)
+export function createPluginPackage(options: CreatePluginPackageOptions): ScreenParseResult<BaseScreenPluginPackage>;
+
+// @public (undocumented)
+export interface CreatePluginPackageOptions {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly materials?: readonly CreateMaterialDefinitionOptions[];
+    // (undocumented)
+    readonly plugin: BaseScreenPluginRuntime;
 }
 
 // @public (undocumented)

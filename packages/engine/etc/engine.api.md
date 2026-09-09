@@ -6,7 +6,9 @@
 
 import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
+import { PluginCommandPort } from '@base-screen/plugin-core';
 import type { ScreenAuthoringEditorContext } from '@base-screen/contracts';
 import type { ScreenBlueprintAction } from '@base-screen/contracts';
 import type { ScreenBlueprintCondition } from '@base-screen/contracts';
@@ -394,6 +396,10 @@ export interface BaseScreenDesignerConfiguration {
     readonly materialLibraryItems?: readonly BaseScreenMaterialLibraryItem[];
     // (undocumented)
     readonly materialLibraryState?: BaseScreenMaterialLibraryState;
+    // (undocumented)
+    readonly pluginCatalog?: BaseScreenPluginCatalog;
+    // (undocumented)
+    readonly pluginCommandPort?: PluginCommandPort;
     readonly previewHandler?: (document: ScreenDocument) => boolean;
     // (undocumented)
     readonly projectAdapter?: ScreenProjectAdapter;
@@ -515,6 +521,12 @@ export class BaseScreenDesignerElement extends ElementBase {
     static get observedAttributes(): readonly string[];
     // (undocumented)
     paste(): ScreenParseResult<ScreenDocument>;
+    // (undocumented)
+    get pluginCatalog(): BaseScreenPluginCatalog | undefined;
+    set pluginCatalog(value: BaseScreenPluginCatalog | undefined);
+    // (undocumented)
+    get pluginCommandPort(): PluginCommandPort | undefined;
+    set pluginCommandPort(value: PluginCommandPort | undefined);
     // (undocumented)
     get previewHandler(): ((document: ScreenDocument) => boolean) | undefined;
     // (undocumented)
@@ -724,6 +736,15 @@ export interface BaseScreenMaterialLibraryState {
 
 // @public (undocumented)
 export type BaseScreenMaterialLibraryStatus = 'loading' | 'ready' | 'offline' | 'partial' | 'error' | 'update-available';
+
+// @public (undocumented)
+export function createBaseScreenCorePluginCommandPort(options: CreateBaseScreenCorePluginCommandPortOptions): PluginCommandPort;
+
+// @public (undocumented)
+export interface CreateBaseScreenCorePluginCommandPortOptions {
+    // (undocumented)
+    readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument> | Promise<ScreenParseResult<ScreenDocument>>;
+}
 
 // @public (undocumented)
 const DESIGNER_TOOLS: readonly [{

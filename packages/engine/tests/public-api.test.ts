@@ -4,6 +4,7 @@ import type {
   ScreenProjectEnvelope,
   ScreenProjectSummary,
 } from '@base-screen/contracts';
+import type { BaseScreenPluginCatalog, PluginCommandPort } from '@base-screen/plugin-core';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
@@ -21,6 +22,7 @@ import {
   type BaseScreenHostResourceAuthoringIntent,
   type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryItem,
+  createBaseScreenCorePluginCommandPort,
   parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenHostResourceAuthoringIntent,
   parseBaseScreenMaterialLibraryGrouping,
@@ -32,6 +34,18 @@ import {
 } from '../src/index.js';
 
 describe('engine public lifecycle API', () => {
+  it('exports the plugin contribution command host contract', () => {
+    expectTypeOf<InstanceType<typeof BaseScreenDesignerElement>['pluginCatalog']>().toEqualTypeOf<
+      BaseScreenPluginCatalog | undefined
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['pluginCommandPort']
+    >().toEqualTypeOf<PluginCommandPort | undefined>();
+    expectTypeOf<
+      typeof createBaseScreenCorePluginCommandPort
+    >().returns.toEqualTypeOf<PluginCommandPort>();
+  });
+
   it('exports the material library host projection contract', () => {
     expect(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT).toBe('base-screen-material-library-action');
     expectTypeOf<

@@ -1,6 +1,7 @@
 import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
+  type BaseScreenPluginCommandHandler,
   type BaseScreenPluginManifest,
   type BaseScreenPluginRuntime,
   parseBaseScreenPluginManifest,
@@ -23,6 +24,7 @@ export interface PlannedPlugin {
   readonly activate: BaseScreenPluginRuntime['activate'];
   readonly deactivate: BaseScreenPluginRuntime['deactivate'];
   readonly dispose: BaseScreenPluginRuntime['dispose'];
+  readonly commands: ReadonlyMap<string, BaseScreenPluginCommandHandler>;
   createSession(): ActivationSession;
 }
 
@@ -82,6 +84,7 @@ function parsePluginCandidates(
       const activate = readOwnValue(runtime, 'activate');
       const deactivate = readOwnValue(runtime, 'deactivate');
       const dispose = readOwnValue(runtime, 'dispose');
+      const commandsValue = readOwnValue(runtime, 'commands');
       if (
         manifest === undefined ||
         activate === undefined ||
@@ -122,6 +125,8 @@ function parsePluginCandidates(
         );
         continue;
       }
+      const commands = readCommandHandlers(commandsValue, parsed.value, index, diagnostics);
+      if (commands === undefined) continue;
       candidates.push({
         index,
         runtime: runtime as BaseScreenPluginRuntime,
@@ -129,6 +134,7 @@ function parsePluginCandidates(
         activate: activate as BaseScreenPluginRuntime['activate'],
         deactivate: deactivate as BaseScreenPluginRuntime['deactivate'],
         dispose: dispose as BaseScreenPluginRuntime['dispose'],
+        commands,
       });
     } catch {
       diagnostics.add(
@@ -146,6 +152,71 @@ function readOwnValue(value: object, key: string): unknown | undefined {
   return descriptor !== undefined && Object.hasOwn(descriptor, 'value')
     ? descriptor.value
     : undefined;
+}
+
+function readCommandHandlers(
+  value: unknown,
+  manifest: BaseScreenPluginManifest,
+  pluginIndex: number,
+  diagnostics: DiagnosticCollector,
+): ReadonlyMap<string, BaseScreenPluginCommandHandler> | undefined {
+  const declared = manifest.contributions
+    .filter((contribution) => contribution.kind === 'command')
+    .map((contribution) => contribution.id);
+  if (value === undefined) {
+    if (declared.length === 0) return new Map();
+    diagnostics.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['plugins', pluginIndex, 'commands'],
+      'Plugin command contributions require matching command handlers.',
+    );
+    return undefined;
+  }
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    diagnostics.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['plugins', pluginIndex, 'commands'],
+      'Plugin command handlers must be an object.',
+    );
+    return undefined;
+  }
+  const handlers = new Map<string, BaseScreenPluginCommandHandler>();
+  let invalid = false;
+  for (const key of Object.getOwnPropertyNames(value)) {
+    const handler = readOwnValue(value, key);
+    if (typeof handler !== 'function') {
+      diagnostics.add(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        ['plugins', pluginIndex, 'commands', key],
+        'Plugin command handler is invalid.',
+      );
+      invalid = true;
+      continue;
+    }
+    handlers.set(key, handler as BaseScreenPluginCommandHandler);
+  }
+  const declaredSet = new Set(declared);
+  for (const id of declared) {
+    if (!handlers.has(id)) {
+      diagnostics.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        ['plugins', pluginIndex, 'commands', id],
+        'Plugin command contribution is missing a handler.',
+      );
+      invalid = true;
+    }
+  }
+  for (const id of handlers.keys()) {
+    if (!declaredSet.has(id)) {
+      diagnostics.add(
+        'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+        ['plugins', pluginIndex, 'commands', id],
+        'Plugin command handler is not declared as a contribution.',
+      );
+      invalid = true;
+    }
+  }
+  return invalid ? undefined : handlers;
 }
 
 function areEqual(left: unknown, right: unknown): boolean {

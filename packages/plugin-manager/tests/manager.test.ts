@@ -629,4 +629,63 @@ describe('BaseScreenPluginManager', () => {
     expect((await manager.dispose()).ok).toBe(true);
     expect(disposed).toBe(1);
   });
+
+  it('dispatches declared contribution commands and invalidates them after deactivate', async () => {
+    let calls = 0;
+    const plugin = runtime(
+      pluginManifest({
+        id: 'acme.commands',
+        capabilities: ['command.execute'],
+        contributions: [
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+          },
+        ],
+      }),
+    );
+    Object.defineProperty(plugin, 'commands', {
+      value: {
+        refresh: () => {
+          calls++;
+          return { ok: true as const, value: { ran: true }, diagnostics: [] };
+        },
+      },
+    });
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.commands': ['command.execute'] },
+      createCommandPort: () => ({
+        execute: async () => ({ ok: true as const, value: null, diagnostics: [] }),
+      }),
+    });
+
+    expect((await manager.activate()).ok).toBe(true);
+    const executed = await manager.executeContributionCommand({ commandId: 'refresh', args: null });
+    expect(executed.ok).toBe(true);
+    if (executed.ok) expect(executed.value).toEqual({ ran: true });
+    expect(calls).toBe(1);
+    expect((await manager.deactivate()).ok).toBe(true);
+    const after = await manager.executeContributionCommand({ commandId: 'refresh', args: null });
+    expect(after.ok).toBe(false);
+    if (!after.ok) {
+      expect(after.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    }
+  });
+
+  it('rejects command handlers that are not declared as contributions', async () => {
+    const plugin = runtime(pluginManifest({ id: 'acme.extra-handler' }));
+    Object.defineProperty(plugin, 'commands', {
+      value: { extra: () => undefined },
+    });
+    const result = await createBaseScreenPluginManager(managerOptions([plugin])).activate();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN'),
+      ).toBe(true);
+    }
+  });
 });

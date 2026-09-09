@@ -110,6 +110,9 @@ export function isScreenComponentEffectivelyLocked(document: ScreenDocument, com
 export function moveScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], from: number, to: number): ScreenJsonObject | undefined;
 
 // @public (undocumented)
+export function parseScreenDocumentCommand(input: unknown): ScreenParseResult<ScreenDocumentCommand>;
+
+// @public (undocumented)
 export function queryScreenComponentsInRect(document: ScreenDocument, rect: ScreenRect, mode: 'intersect' | 'contain'): readonly string[];
 
 // @public (undocumented)
