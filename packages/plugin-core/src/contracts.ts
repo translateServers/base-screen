@@ -1,6 +1,7 @@
 import type {
   ScreenDataBinding,
   ScreenDatasetValueType,
+  ScreenDocument,
   ScreenJsonObject,
   ScreenJsonValue,
   ScreenMaterialErrorCode,
@@ -10,6 +11,8 @@ import type {
 import type { BaseScreenMaterialEditorDescriptor } from './editor/editor-descriptor.js';
 
 export const BASE_SCREEN_MATERIAL_EVENT = 'base-screen-material-event' as const;
+
+export const BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT = 'base-screen-plugin-panel-action' as const;
 
 export type BaseScreenMaterialMode = 'design' | 'preview' | 'viewer';
 
@@ -204,6 +207,13 @@ export interface BaseScreenPluginDependency {
   readonly id: string;
 }
 
+export type BaseScreenPluginCommandMenu =
+  | 'commandPalette'
+  | 'menu.tools'
+  | 'context.canvas'
+  | 'context.component'
+  | 'context.multi';
+
 export type BaseScreenPluginContribution =
   | { readonly kind: 'material'; readonly type: string; readonly tagName: string }
   | {
@@ -211,6 +221,10 @@ export type BaseScreenPluginContribution =
       readonly id: string;
       readonly name: string;
       readonly requiredCapability: string;
+      /** 省略时仅出现在命令面板。写出时为完整列表；空数组表示不投影到任何 chrome。 */
+      readonly menus?: readonly BaseScreenPluginCommandMenu[];
+      /** 与内建操作或工具 chord 冲突时忽略快捷键，命令仍可通过菜单或面板调用。 */
+      readonly shortcut?: string;
     }
   | {
       readonly kind: 'dataResourceType';
@@ -221,7 +235,14 @@ export type BaseScreenPluginContribution =
        *  in-flight 共享；缺省为组件域，不共享。仅作声明，不含其它运行时语义。 */
       readonly queryScope?: 'resource';
     }
-  | { readonly kind: 'blueprintCapability'; readonly id: string; readonly name: string };
+  | { readonly kind: 'blueprintCapability'; readonly id: string; readonly name: string }
+  | {
+      readonly kind: 'panel';
+      readonly id: string;
+      readonly name: string;
+      /** 由宿主 registry 解析的 custom element 标签；面板元素接收设计快照作为 model。 */
+      readonly tagName: string;
+    };
 
 export interface BaseScreenRuntimeContributionIndex {
   getResourceType(
@@ -246,6 +267,30 @@ export interface PluginCommandPort {
   execute(request: PluginCommandRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
 }
 
+/** 一次读取内的文档与选区快照：取自同一时刻，避免插件跨两次读取拼出撕裂状态。 */
+export interface BaseScreenPluginDesignSnapshot {
+  readonly document: ScreenDocument;
+  readonly selectedComponentIds: readonly string[];
+  readonly focusedComponentId: string | null;
+}
+
+/** 只读侧端口；与 PluginCommandPort 同为异步，便于宿主经跨realm代理满足同一形状。 */
+export interface PluginDesignReadPort {
+  read(): Promise<ScreenParseResult<BaseScreenPluginDesignSnapshot>>;
+}
+
+/** 面板派发的动作；`panelId` 用于拒绝某个面板冒充另一个面板。 */
+export interface BaseScreenPluginPanelActionDetail {
+  readonly panelId: string;
+  readonly commandId: string;
+  readonly args: ScreenJsonValue;
+}
+
+/** 与 BaseScreenMaterialElement 同形：宿主写入 model，元素自行渲染；不得注入 render function 或 DOM 节点。 */
+export interface BaseScreenPluginPanelElement extends HTMLElement {
+  model: BaseScreenPluginDesignSnapshot;
+}
+
 export type BaseScreenPluginCommandHandler = (
   args: ScreenJsonValue,
 ) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
@@ -255,6 +300,7 @@ export interface BaseScreenPluginActivationContext {
   readonly pluginId: string;
   readonly grantedCapabilities: readonly string[];
   readonly commandPort: PluginCommandPort | undefined;
+  readonly designReadPort: PluginDesignReadPort | undefined;
 }
 
 export interface BaseScreenPluginRuntime {
@@ -275,4 +321,21 @@ export interface BaseScreenPluginCatalog {
   get(pluginId: string): BaseScreenPluginCatalogEntry | undefined;
   has(pluginId: string): boolean;
   list(): readonly BaseScreenPluginCatalogEntry[];
+}
+
+export interface BaseScreenPluginPanelConstructor extends CustomElementConstructor {
+  new (): BaseScreenPluginPanelElement;
+}
+
+export interface BaseScreenPluginPanelCatalogEntry {
+  /** 面板归属插件；用于拒绝某个面板冒充另一个面板或另一插件的面板。 */
+  readonly pluginId: string;
+  readonly contribution: BaseScreenPluginContribution & { readonly kind: 'panel' };
+  readonly constructor: BaseScreenPluginPanelConstructor;
+}
+
+export interface BaseScreenPluginPanelCatalog {
+  get(panelId: string): BaseScreenPluginPanelCatalogEntry | undefined;
+  has(panelId: string): boolean;
+  list(): readonly BaseScreenPluginPanelCatalogEntry[];
 }

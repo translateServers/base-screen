@@ -4,6 +4,7 @@ import {
   type BaseScreenPluginCommandHandler,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
+  createBaseScreenPluginPanelCatalog,
   parsePluginCommandRequest,
 } from '@base-screen/plugin-core';
 import { createRuntimeContributionIndex } from './contributions.js';
@@ -127,6 +128,7 @@ class PluginManager implements BaseScreenPluginManager {
     this.#commands = collectContributionCommands(active);
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
+      panels: createBaseScreenPluginPanelCatalog(plan.value.panels),
       plugins,
       contributions: createRuntimeContributionIndex(plugins),
     };

@@ -34,6 +34,8 @@ import {
   type BaseScreenMaterialConstructor,
   type BaseScreenPluginRuntime,
   createBaseScreenMaterialCatalog,
+  type PluginCommandPort,
+  type PluginDesignReadPort,
 } from '../../packages/plugin-core/src/index.ts';
 import {
   createBaseScreenPluginContributionCommandPort,
@@ -48,11 +50,14 @@ import {
   type BaseScreenBlueprintCanvasCommandEventDetail,
   type BaseScreenBlueprintCanvasState,
   type BaseScreenBlueprintCanvasStateEventDetail,
+  createBaseScreenCorePluginCommandPort,
+  createBaseScreenCorePluginDesignReadPort,
   defineBaseScreenElements,
   SCREEN_AUTHORING_REQUEST_EVENT,
   type ScreenAuthoringRequest,
 } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
+import { defineHarnessPluginPanel, HARNESS_PLUGIN_PANEL_TAG_NAME } from './plugin-panel-element.ts';
 
 // 宿主受控动态加载（ADR-0029）：外部物料包经宿主发起的 import() 进入页面，
 // 由宿主审核模块来源并负责失败处理；Base Screen 只消费加载后的可信模块。
@@ -66,6 +71,8 @@ if (new URLSearchParams(window.location.search).has('designer')) {
 }
 
 const productElements = defineBaseScreenElements();
+// 面板标签必须在 manager 激活前注册：preflight 会按贡献声明的 tagName 查询宿主 registry。
+defineHarnessPluginPanel();
 const officialMaterials = [
   defineBaseScreenTextMaterial(),
   defineBaseScreenRectangleMaterial(),
@@ -97,11 +104,22 @@ const designerAuthoringCapabilities = [
   'blueprint.action.request-variable',
   'blueprint.action.request-component-data',
 ] as const;
+// command.execute 与 design.read 单独声明：下面的 blueprintCapability 贡献由
+// designerAuthoringCapabilities 逐项生成，混入端口能力会产出非法的蓝图能力贡献。
+const designerAuthoringPluginCapabilities = [
+  ...designerAuthoringCapabilities,
+  'command.execute',
+  'design.read',
+];
+// 插件命令按当前选区计算位移量：先读快照拿到组件现状，再决定写入什么 patch。
+const HARNESS_PLUGIN_NUDGE_X = 40;
+let designerCommandPort: PluginCommandPort | undefined;
+let designerDesignReadPort: PluginDesignReadPort | undefined;
 const designerAuthoringPlugin: BaseScreenPluginRuntime = {
   manifest: {
     id: 'browser-harness-authoring',
     dependencies: [],
-    capabilities: designerAuthoringCapabilities,
+    capabilities: designerAuthoringPluginCapabilities,
     contributions: [
       {
         kind: 'dataResourceType',
@@ -115,9 +133,17 @@ const designerAuthoringPlugin: BaseScreenPluginRuntime = {
       },
       {
         kind: 'command',
-        id: 'harness.ping',
-        name: 'Harness ping',
-        requiredCapability: 'blueprint.value.variable',
+        id: 'harness.nudge-selection',
+        name: 'Nudge selection',
+        requiredCapability: 'command.execute',
+        menus: ['commandPalette', 'menu.tools', 'context.canvas'],
+        shortcut: 'Ctrl+Shift+P',
+      },
+      {
+        kind: 'panel',
+        id: 'harness.panel',
+        name: 'Harness panel',
+        tagName: HARNESS_PLUGIN_PANEL_TAG_NAME,
       },
       ...designerAuthoringCapabilities.map((id) => ({
         kind: 'blueprintCapability' as const,
@@ -127,11 +153,73 @@ const designerAuthoringPlugin: BaseScreenPluginRuntime = {
     ],
   },
   commands: {
-    'harness.ping': () => ({ ok: true as const, value: { ok: true }, diagnostics: [] }),
+    'harness.nudge-selection': async (commandArgs) => {
+      if (designerCommandPort === undefined || designerDesignReadPort === undefined) {
+        return {
+          ok: false as const,
+          diagnostics: [
+            {
+              severity: 'error' as const,
+              code: 'PLUGIN_CORE_SESSION_INVALID' as const,
+              path: [],
+              message: 'Plugin command and read ports are not available.',
+            },
+          ],
+        };
+      }
+      const snapshot = await designerDesignReadPort.read();
+      if (!snapshot.ok) {
+        return { ok: false as const, diagnostics: snapshot.diagnostics };
+      }
+      const targetId =
+        snapshot.value.focusedComponentId ?? snapshot.value.selectedComponentIds[0] ?? null;
+      const target =
+        targetId === null
+          ? undefined
+          : snapshot.value.document.components.find((component) => component.id === targetId);
+      if (target === undefined) {
+        return {
+          ok: false as const,
+          diagnostics: [
+            {
+              severity: 'error' as const,
+              code: 'PLUGIN_CORE_COMMAND_ARGUMENT_INVALID' as const,
+              path: [],
+              message: 'Select a component before running this command.',
+            },
+          ],
+        };
+      }
+      // chrome 触发时 args 为 null（ADR-0070），面板触发时带 step；位移不同可分辨来源。
+      const step =
+        typeof commandArgs === 'object' &&
+        commandArgs !== null &&
+        typeof (commandArgs as { step?: unknown }).step === 'number'
+          ? (commandArgs as { step: number }).step
+          : HARNESS_PLUGIN_NUDGE_X;
+      return designerCommandPort.execute({
+        commandId: 'update-components',
+        args: {
+          componentIds: [target.id],
+          patch: {
+            position: { x: target.position.x + step, y: target.position.y },
+          },
+        },
+      });
+    },
   },
-  activate() {},
-  deactivate() {},
-  dispose() {},
+  activate(context) {
+    designerCommandPort = context.commandPort;
+    designerDesignReadPort = context.designReadPort;
+  },
+  deactivate() {
+    designerCommandPort = undefined;
+    designerDesignReadPort = undefined;
+  },
+  dispose() {
+    designerCommandPort = undefined;
+    designerDesignReadPort = undefined;
+  },
 };
 
 const pluginManager = createBaseScreenPluginManager({
@@ -140,11 +228,22 @@ const pluginManager = createBaseScreenPluginManager({
     .filter((definition) => definition.ok)
     .map((definition) => definition.value.manifest.tagName),
   plugins: [designerAuthoringPlugin],
-  grantedCapabilities: { 'browser-harness-authoring': designerAuthoringCapabilities },
+  grantedCapabilities: { 'browser-harness-authoring': designerAuthoringPluginCapabilities },
   registry: {
     get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
   },
-  createCommandPort: undefined,
+  // 入站端口把插件命令接进 designer 的文档事务（含 history 提交），因此插件改动可撤销。
+  // manager 在此处激活，designer 元素要稍后才从 DOM 取得，故端口内必须惰性引用。
+  createCommandPort: () =>
+    createBaseScreenCorePluginCommandPort({
+      executeCommand: (command) => designer.executeCommand(command),
+    }),
+  // 只读侧与写入侧配对：插件先读快照再决定发哪条 ScreenDocumentCommand。
+  createDesignReadPort: () =>
+    createBaseScreenCorePluginDesignReadPort({
+      getDocument: () => designer.document,
+      getSelection: () => designer.selection,
+    }),
 });
 const managerActivated = await pluginManager.activate();
 if (
@@ -156,7 +255,8 @@ if (
   pluginManager.snapshot.contributions.getResourceType('dataset') === undefined ||
   !designerAuthoringCapabilities.every((capability) =>
     pluginManager.snapshot?.contributions.hasBlueprintCapability(capability),
-  )
+  ) ||
+  pluginManager.snapshot.panels.get('harness.panel') === undefined
 ) {
   throw new Error('Base Screen browser harness failed to inspect its material registry.');
 }
@@ -1010,6 +1110,7 @@ designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => 
 designer.runtimeContributions = runtimeContributions;
 if (pluginManager.snapshot !== undefined) {
   designer.pluginCatalog = pluginManager.snapshot.plugins;
+  designer.pluginPanels = pluginManager.snapshot.panels;
   designer.pluginCommandPort = createBaseScreenPluginContributionCommandPort(pluginManager);
 }
 designer.toolMaterialTypes = {

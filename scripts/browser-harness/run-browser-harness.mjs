@@ -7,6 +7,10 @@ import { assertCanvasBasics, assertInitialCanvasPointerFocus } from './assert-ca
 import { assertDesktopBaseline } from './assert-desktop-baseline.mjs';
 import { assertImageDensitySize } from './assert-image-density-size.mjs';
 import { assertMaterialGroupNavigation } from './assert-material-group-navigation.mjs';
+import {
+  assertPluginCommandDocumentLoop,
+  assertPluginPanelLoop,
+} from './assert-plugin-command-loop.mjs';
 import { assertRuntimeData } from './assert-runtime-data.mjs';
 import { assertTextAutoWidth } from './assert-text-auto-width.mjs';
 import { openViewport } from './open-viewport.mjs';
@@ -48,6 +52,9 @@ export async function runBrowserHarness(serverPort) {
         await assertAuthoringMaterials(authoringDesigner, page);
         await assertAuthoringImportAndInspector(authoringDesigner, page);
         await assertAuthoringAdvanced(authoringDesigner, page);
+        // 该断言会改动画布选区，放在最后避免污染前面的作者断言。
+        await assertPluginCommandDocumentLoop(authoringDesigner, page);
+        await assertPluginPanelLoop(authoringDesigner, page);
         await page.close();
       }
     },

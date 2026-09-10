@@ -8,9 +8,10 @@ import {
   hostLeftPanelTab,
   hostLeftPanelTabId,
 } from '../../dom/designer-left-panel-groups-dom.js';
+import { pluginPanelGroupId } from '../../dom/plugin/designer-plugin-panel-dom.js';
 import type { DesignerPanelSide } from './designer-panel-layout-controller.js';
 
-type LeftTab = 'materials' | 'layers' | 'variables' | `host:${string}`;
+type LeftTab = 'materials' | 'layers' | 'variables' | `host:${string}` | `plugin:${string}`;
 export type DesignerInspectorTab = 'appearance' | 'data' | 'interaction';
 type RightTab = DesignerInspectorTab;
 
@@ -102,6 +103,9 @@ export class DesignerWorkbenchTabsController {
     )) {
       pane.hidden = true;
     }
+    for (const view of root.querySelectorAll<HTMLElement>('[data-plugin-panel-view]')) {
+      view.hidden = true;
+    }
   }
 
   selectLeftPanelGroup(groupId: string): boolean {
@@ -155,17 +159,18 @@ export class DesignerWorkbenchTabsController {
     const leftTitle = root.querySelector<HTMLElement>('[data-left-panel-title]');
     const leftCount = root.querySelector<HTMLElement>('[data-left-panel-count]');
     const hostGroupId = hostLeftPanelGroupId(this.#leftTab);
+    const dynamicGroupId = hostGroupId ?? pluginPanelGroupId(this.#leftTab);
     const leftPanelLabel =
-      hostGroupId !== undefined
+      dynamicGroupId !== undefined
         ? (leftTabControls.find((control) => control.dataset.panelTab === this.#leftTab)?.dataset
-            .panelLabel ?? hostGroupId)
+            .panelLabel ?? dynamicGroupId)
         : this.#leftTab === 'materials'
           ? DESIGNER_UI_TEXT.materials
           : this.#leftTab === 'layers'
             ? DESIGNER_UI_TEXT.layers
             : DESIGNER_UI_TEXT.variables.title;
     if (leftTitle !== null) leftTitle.textContent = leftPanelLabel;
-    if (leftCount !== null && hostGroupId !== undefined) {
+    if (leftCount !== null && dynamicGroupId !== undefined) {
       leftCount.hidden = true;
       leftCount.textContent = '';
       leftCount.removeAttribute('aria-label');
@@ -191,6 +196,9 @@ export class DesignerWorkbenchTabsController {
       if (!pane.hidden && paneGroupId !== undefined) {
         pane.setAttribute('aria-labelledby', hostLeftPanelTabId(paneGroupId));
       }
+    }
+    for (const view of root.querySelectorAll<HTMLElement>('[data-plugin-panel-view]')) {
+      view.hidden = view.dataset.pluginPanelView !== pluginPanelGroupId(this.#leftTab);
     }
     const inspectorTabs = root.querySelector<HTMLElement>('.inspector-tabs');
     if (inspectorTabs !== null) inspectorTabs.hidden = !singleComponentSelected;
@@ -264,7 +272,8 @@ function isLeftTab(value: string): value is LeftTab {
     value === 'materials' ||
     value === 'layers' ||
     value === 'variables' ||
-    hostLeftPanelGroupId(value) !== undefined
+    hostLeftPanelGroupId(value) !== undefined ||
+    pluginPanelGroupId(value) !== undefined
   );
 }
 

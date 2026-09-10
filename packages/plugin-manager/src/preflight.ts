@@ -3,13 +3,14 @@ import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenPluginCommandHandler,
   type BaseScreenPluginManifest,
+  type BaseScreenPluginPanelCatalogEntry,
   type BaseScreenPluginRuntime,
   parseBaseScreenPluginManifest,
 } from '@base-screen/plugin-core';
 import { DiagnosticCollector } from './diagnostics.js';
 import { snapshotManagerInput } from './input.js';
 import type { ActivationSession, Candidate } from './preflight-types.js';
-import { inspectMaterialRegistry } from './registry.js';
+import { inspectMaterialRegistry, inspectPluginPanels } from './registry.js';
 import { resolveCandidates, validateCapabilityPlan } from './resolver.js';
 import { createActivationSession } from './session.js';
 import type { BaseScreenPluginManagerOptions } from './types.js';
@@ -30,6 +31,7 @@ export interface PlannedPlugin {
 
 export interface ActivationPlan {
   readonly materials: readonly BaseScreenMaterialCatalogEntry[];
+  readonly panels: readonly BaseScreenPluginPanelCatalogEntry[];
   readonly plugins: readonly PlannedPlugin[];
 }
 
@@ -47,10 +49,13 @@ export function createActivationPlan(
   if (diagnostics.hasErrors) return diagnostics.failure();
   const materials = inspectMaterialRegistry(input.value, ordered, diagnostics);
   if (diagnostics.hasErrors) return diagnostics.failure();
+  const panels = inspectPluginPanels(ordered, input.value.registryGet, diagnostics);
+  if (diagnostics.hasErrors) return diagnostics.failure();
   return {
     ok: true,
     value: {
       materials,
+      panels,
       plugins: ordered.map((candidate) => {
         const grantedCapabilities = grants.get(candidate)!;
         return Object.freeze({

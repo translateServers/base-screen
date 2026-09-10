@@ -68,6 +68,28 @@ export function isBaseScreenPluginCatalog(value: unknown): boolean {
   );
 }
 
+export function isBaseScreenPluginPanelCatalog(value: unknown): boolean {
+  if (
+    value === null ||
+    typeof value !== 'object' ||
+    typeof (value as Record<string, unknown>).get !== 'function' ||
+    typeof (value as Record<string, unknown>).has !== 'function' ||
+    typeof (value as Record<string, unknown>).list !== 'function'
+  ) {
+    return false;
+  }
+  // 两种 catalog 形状相同，只能按条目内容区分：面板目录每一项必须携带 panel 贡献。
+  // 不要改用 entry.constructor 判定，任何普通对象都继承 constructor，那个检查是空的。
+  return (value as { list: () => readonly unknown[] })
+    .list()
+    .every(
+      (entry) =>
+        entry !== null &&
+        typeof entry === 'object' &&
+        (entry as { contribution?: { kind?: unknown } }).contribution?.kind === 'panel',
+    );
+}
+
 export function isPluginCommandPort(value: unknown): boolean {
   return (
     value !== null &&

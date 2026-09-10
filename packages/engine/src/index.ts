@@ -3,6 +3,10 @@ export {
   createBaseScreenCorePluginCommandPort,
 } from './common/operations/plugin/designer-plugin-command-port.js';
 export {
+  type CreateBaseScreenCorePluginDesignReadPortOptions,
+  createBaseScreenCorePluginDesignReadPort,
+} from './common/operations/plugin/designer-plugin-design-read-port.js';
+export {
   ScreenProjectController,
   type ScreenProjectControllerChange,
   type ScreenProjectControllerOptions,

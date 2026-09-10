@@ -3,10 +3,12 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
+  BaseScreenPluginPanelCatalog,
   BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
   PluginCommandRequest,
+  PluginDesignReadPort,
 } from '@base-screen/plugin-core';
 
 export type BaseScreenPluginManagerStatus =
@@ -20,6 +22,7 @@ export type BaseScreenPluginManagerStatus =
 
 export interface BaseScreenPluginManagerSnapshot {
   readonly materials: BaseScreenMaterialCatalog;
+  readonly panels: BaseScreenPluginPanelCatalog;
   readonly plugins: BaseScreenPluginCatalog;
   readonly contributions: BaseScreenRuntimeContributionIndex;
 }
@@ -36,6 +39,9 @@ export interface BaseScreenPluginManagerOptions {
   readonly registry: BaseScreenCustomElementRegistryPort;
   readonly createCommandPort:
     | ((input: { readonly instanceId: string; readonly pluginId: string }) => PluginCommandPort)
+    | undefined;
+  readonly createDesignReadPort?:
+    | ((input: { readonly instanceId: string; readonly pluginId: string }) => PluginDesignReadPort)
     | undefined;
 }
 

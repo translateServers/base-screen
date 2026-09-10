@@ -38,6 +38,16 @@ export function snapshotManagerInput(
       );
     }
     if (
+      values.createDesignReadPort !== undefined &&
+      typeof values.createDesignReadPort !== 'function'
+    ) {
+      diagnostics.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        ['createDesignReadPort'],
+        'Design read port factory is invalid.',
+      );
+    }
+    if (
       diagnostics.hasErrors ||
       standaloneMaterialTagNames === undefined ||
       runtimes === undefined ||
@@ -56,6 +66,7 @@ export function snapshotManagerInput(
         registry: registry.value,
         registryGet: registry.get,
         createCommandPort: values.createCommandPort as ManagerInput['createCommandPort'],
+        createDesignReadPort: values.createDesignReadPort as ManagerInput['createDesignReadPort'],
       }),
       diagnostics: [],
     };
@@ -80,6 +91,7 @@ function readOptions(
       readonly grantedCapabilities: unknown;
       readonly registry: unknown;
       readonly createCommandPort: unknown;
+      readonly createDesignReadPort: unknown;
     }
   | undefined {
   const fields = [
@@ -103,6 +115,17 @@ function readOptions(
       values[field] = descriptor.value;
     }
   }
+  // 可选工厂：缺键即无端口，与显式 undefined 同义；能力门控已负责拒绝无工厂的 design.read。
+  const readPort = Object.getOwnPropertyDescriptor(value, 'createDesignReadPort');
+  if (readPort !== undefined && !Object.hasOwn(readPort, 'value')) {
+    diagnostics.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['createDesignReadPort'],
+      'Manager option must be an own data property.',
+    );
+  } else {
+    values.createDesignReadPort = readPort?.value;
+  }
   return diagnostics.hasErrors
     ? undefined
     : (values as {
@@ -112,6 +135,7 @@ function readOptions(
         readonly grantedCapabilities: unknown;
         readonly registry: unknown;
         readonly createCommandPort: unknown;
+        readonly createDesignReadPort: unknown;
       });
 }
 

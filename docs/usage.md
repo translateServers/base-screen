@@ -986,32 +986,68 @@ capability 限制的是 Base Screen 集成点，不是 JavaScript 环境权限�
 
 ```ts
 import { definePlugin, createPluginPackage } from '@base-screen/plugin-sdk';
+import type { PluginCommandPort, PluginDesignReadPort } from '@base-screen/plugin-core';
 import {
   createBaseScreenPluginManager,
   createBaseScreenPluginContributionCommandPort,
 } from '@base-screen/plugin-manager';
-import { createBaseScreenCorePluginCommandPort } from '@base-screen/engine';
+import {
+  createBaseScreenCorePluginCommandPort,
+  createBaseScreenCorePluginDesignReadPort,
+} from '@base-screen/engine';
+
+let commandPort: PluginCommandPort | undefined;
+let designReadPort: PluginDesignReadPort | undefined;
 
 const defined = definePlugin({
   manifest: {
     id: 'acme.tools',
     dependencies: [],
-    capabilities: ['command.execute'],
+    capabilities: ['command.execute', 'design.read'],
     contributions: [
       {
         kind: 'command',
         id: 'acme.refresh',
         name: 'Refresh metrics',
         requiredCapability: 'command.execute',
+        menus: ['commandPalette', 'menu.tools', 'context.canvas'],
+        shortcut: 'Ctrl+Shift+P',
       },
     ],
   },
   commands: {
-    'acme.refresh': () => ({ ok: true, value: null, diagnostics: [] }),
+    // 先读快照、再决定写什么：位移量来自组件现状，而不是插件自带的常量。
+    'acme.refresh': async () => {
+      if (commandPort === undefined || designReadPort === undefined) {
+        return { ok: false, diagnostics: [] };
+      }
+      const snapshot = await designReadPort.read();
+      if (!snapshot.ok) return snapshot;
+      const target = snapshot.value.document.components.find(
+        (component) => component.id === snapshot.value.focusedComponentId,
+      );
+      if (target === undefined) return { ok: false, diagnostics: [] };
+      return commandPort.execute({
+        commandId: 'update-components',
+        args: {
+          componentIds: [target.id],
+          patch: { position: { x: target.position.x + 40, y: target.position.y } },
+        },
+      });
+    },
   },
-  activate() {},
-  deactivate() {},
-  dispose() {},
+  activate(context) {
+    commandPort = context.commandPort;
+    designReadPort = context.designReadPort;
+  },
+  deactivate() {
+    commandPort = undefined;
+    designReadPort = undefined;
+  },
+  dispose() {
+    commandPort = undefined;
+    designReadPort = undefined;
+  },
 });
 if (!defined.ok) throw new Error('Plugin is invalid');
 
@@ -1020,11 +1056,16 @@ const manager = createBaseScreenPluginManager({
   instanceId: 'screen-a',
   standaloneMaterialTagNames,
   plugins: [defined.value],
-  grantedCapabilities: { 'acme.tools': ['command.execute'] },
+  grantedCapabilities: { 'acme.tools': ['command.execute', 'design.read'] },
   registry: { get: (tagName) => customElements.get(tagName) },
   createCommandPort: () =>
     createBaseScreenCorePluginCommandPort({
       executeCommand: (command) => designer.executeCommand(command),
+    }),
+  createDesignReadPort: () =>
+    createBaseScreenCorePluginDesignReadPort({
+      getDocument: () => designer.document,
+      getSelection: () => designer.selection,
     }),
 });
 const activated = await manager.activate();
@@ -1035,21 +1076,49 @@ designer.configure({
   catalog: activated.value.materials,
   runtimeContributions: activated.value.contributions,
   pluginCatalog: activated.value.plugins,
+  pluginPanels: activated.value.panels,
   pluginCommandPort: createBaseScreenPluginContributionCommandPort(manager),
 });
 ```
 
 两条命令方向不要混用：
 
-- **贡献命令**：Manifest 声明 `kind: 'command'`，handler 在 runtime `commands` 上。Designer
-  命令面板列出已授权项；点击后走 `pluginCommandPort`，由 Manager 分发到对应 handler。
+- **贡献命令**：Manifest 声明 `kind: 'command'`，handler 在 runtime `commands` 上。可选
+  `menus` 把命令投影到命令面板、更多→工具、画布/组件/多选右键；省略 `menus` 时只出现在命令
+  面板。可选 `shortcut` 不得覆盖内建操作或工具 chord，冲突时忽略快捷键、命令仍可从菜单调用。
+  点击走 `pluginCommandPort`，由 Manager 分发到对应 handler。
 - **Core 命令端口**：仅当授予 `command.execute` 时，插件 `activate(context)` 才能拿到
   `context.commandPort`。该端口只接受已有 `ScreenDocumentCommand` JSON（`commandId` 等于
   命令 `type`），不能定义新的文档 mutation。
+- **Core 只读端口**：仅当授予 `design.read` 时才能拿到 `context.designReadPort`。`read()`
+  返回一次调用内取到的原子快照 `{ document, selectedComponentIds, focusedComponentId }`，是
+  JSON 往返后的深冻结私有副本：写入不触及 canonical 文档，严格模式下改写会抛 `TypeError`。
+  只提供按需读取，没有变更通知；要"按现状行动"就在 handler 里先 `read()` 再 `execute()`。
 
-`pluginCatalog` / `pluginCommandPort` 与 `runtimeContributions` 一样，初始化后变更必须先
-`unload()`。Viewer 不提供命令面板。`createPluginPackage({ id, plugin, materials? })` 可把
-插件与可选物料包组合；package `id` 只用于宿主诊断，不进入 Screen Document。
+三者可以组合：chrome 触发贡献命令，handler 用只读端口取现状，再用 Core 命令端口写回事务（可
+撤销）。`design.read` 被授予但宿主未提供 `createDesignReadPort` 时激活失败关闭。
+
+插件还可以贡献一个面板，这是目前唯一被授权的插件 UI 面（[ADR-0072](./decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)）：
+
+```ts
+// manifest.contributions 内
+{ kind: 'panel', id: 'acme.monitor', name: '监控台', tagName: 'acme-monitor' }
+```
+
+- `tagName` 由宿主 `registry` 端口解析，与物料同一信任模型（宿主负责加载与审核来源）；解析不到
+  时激活失败关闭。
+- Designer 把面板挂在左栏（宿主分组之后，并保持容器末尾以免改变 rail 键盘导航顺序），写入与
+  `designReadPort` 同形的快照作为 `model`。宿主只在文档代际或选区真的变化时重新赋值，面板不要
+  依赖自己被反复重建。
+- 面板回传意图派发 `base-screen-plugin-panel-action`，detail 为 `{ panelId, commandId, args }`。
+  Engine 校验 `panelId` 归属后派发到该插件自己的贡献命令，`args` 原样送到 handler 的第二参数。
+
+不引入 `when` 条件语言、工具栏、任意 DOM 注入或具名槽位协议；自定义视图与检查器面板仍另立 ADR。
+
+`pluginCatalog` / `pluginPanels` / `pluginCommandPort` 与 `runtimeContributions` 一样，初始化后
+变更必须先 `unload()`。Viewer 不提供命令面板与插件面板。
+`createPluginPackage({ id, plugin, materials? })` 可把插件与可选物料包组合；package `id` 只用于
+宿主诊断，不进入 Screen Document。
 
 ## 10. 物料事件、宿主事件和宿主动作
 

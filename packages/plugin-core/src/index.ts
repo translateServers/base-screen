@@ -1,6 +1,7 @@
 export {
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
+  createBaseScreenPluginPanelCatalog,
 } from './catalog.js';
 export type {
   BaseScreenConditionalStylePort,
@@ -32,15 +33,23 @@ export type {
   BaseScreenPluginCatalog,
   BaseScreenPluginCatalogEntry,
   BaseScreenPluginCommandHandler,
+  BaseScreenPluginCommandMenu,
   BaseScreenPluginContribution,
   BaseScreenPluginDependency,
+  BaseScreenPluginDesignSnapshot,
   BaseScreenPluginManifest,
+  BaseScreenPluginPanelActionDetail,
+  BaseScreenPluginPanelCatalog,
+  BaseScreenPluginPanelCatalogEntry,
+  BaseScreenPluginPanelConstructor,
+  BaseScreenPluginPanelElement,
   BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
   PluginCommandRequest,
+  PluginDesignReadPort,
 } from './contracts.js';
-export { BASE_SCREEN_MATERIAL_EVENT } from './contracts.js';
+export { BASE_SCREEN_MATERIAL_EVENT, BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT } from './contracts.js';
 export type {
   BaseScreenChartData,
   BaseScreenChartPoint,
@@ -85,4 +94,8 @@ export {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from './material/material.js';
-export { parseBaseScreenPluginManifest, parsePluginCommandRequest } from './plugin.js';
+export {
+  parseBaseScreenPluginManifest,
+  parseBaseScreenPluginPanelActionDetail,
+  parsePluginCommandRequest,
+} from './plugin.js';

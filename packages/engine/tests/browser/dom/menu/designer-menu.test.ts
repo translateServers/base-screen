@@ -350,6 +350,32 @@ describe('DesignerMenuController context menu resolution', () => {
     expect(menu.innerHTML).not.toContain('data-menu-action="copy"');
   });
 
+  it('appends plugin commands with data-plugin-command on the canvas context menu', () => {
+    const menu = new FakeMenu();
+    const controller = new DesignerMenuController({
+      getRoot: () => new FakeRoot(workspace) as unknown as ShadowRoot,
+      getContextMenu: () => menu as unknown as HTMLElement,
+      getSelectedComponentIds: () => [],
+      getOperationState: () => undefined,
+      getPluginCommandItems: (target) =>
+        target === 'context.canvas'
+          ? [
+              {
+                id: 'harness.ping',
+                name: 'Harness ping',
+                disabled: false,
+                shortcut: 'Ctrl+Shift+P',
+              },
+            ]
+          : [],
+    });
+    openAt(controller, new FakeElement([]));
+
+    expect(menu.innerHTML).toContain('data-plugin-command="harness.ping"');
+    expect(menu.innerHTML).toContain('Harness ping');
+    expect(menu.innerHTML).not.toContain('data-menu-action="harness.ping"');
+  });
+
   it('anchors an oversized menu at the cursor instead of snapping to the origin', () => {
     const menu = new FakeMenu();
     menu.offsetHeight = 700;

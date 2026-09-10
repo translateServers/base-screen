@@ -7,10 +7,12 @@
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialConstructor } from '@base-screen/plugin-core';
 import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenPluginPanelCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { PluginCommandPort } from '@base-screen/plugin-core';
 import type { PluginCommandRequest } from '@base-screen/plugin-core';
+import type { PluginDesignReadPort } from '@base-screen/plugin-core';
 import type { ScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
 
@@ -44,6 +46,11 @@ export interface BaseScreenPluginManagerOptions {
         readonly pluginId: string;
     }) => PluginCommandPort) | undefined;
     // (undocumented)
+    readonly createDesignReadPort?: ((input: {
+        readonly instanceId: string;
+        readonly pluginId: string;
+    }) => PluginDesignReadPort) | undefined;
+    // (undocumented)
     readonly grantedCapabilities: Readonly<Record<string, readonly string[]>>;
     // (undocumented)
     readonly instanceId: string;
@@ -61,6 +68,8 @@ export interface BaseScreenPluginManagerSnapshot {
     readonly contributions: BaseScreenRuntimeContributionIndex;
     // (undocumented)
     readonly materials: BaseScreenMaterialCatalog;
+    // (undocumented)
+    readonly panels: BaseScreenPluginPanelCatalog;
     // (undocumented)
     readonly plugins: BaseScreenPluginCatalog;
 }

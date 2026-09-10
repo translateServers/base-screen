@@ -52,6 +52,8 @@ import { BaseScreenMaterialLibraryStatus } from '@base-screen/engine';
 import { BaseScreenViewerElement } from '@base-screen/renderer';
 import { createBaseScreenCorePluginCommandPort } from '@base-screen/engine';
 import { CreateBaseScreenCorePluginCommandPortOptions } from '@base-screen/engine';
+import { createBaseScreenCorePluginDesignReadPort } from '@base-screen/engine';
+import { CreateBaseScreenCorePluginDesignReadPortOptions } from '@base-screen/engine';
 import { parseBaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { parseBaseScreenDesignerLeftPanelGroups } from '@base-screen/engine';
 import { parseBaseScreenHostResourceAuthoringIntent } from '@base-screen/engine';
@@ -169,6 +171,10 @@ export { BaseScreenViewerElement }
 export { createBaseScreenCorePluginCommandPort }
 
 export { CreateBaseScreenCorePluginCommandPortOptions }
+
+export { createBaseScreenCorePluginDesignReadPort }
+
+export { CreateBaseScreenCorePluginDesignReadPortOptions }
 
 // @public (undocumented)
 export function defineBaseScreenDesigner(): ScreenParseResult<CustomElementConstructor>;

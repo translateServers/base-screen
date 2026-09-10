@@ -232,8 +232,28 @@
 - **贡献命令与 Core 命令端口**（2026-09-06 增量）：runtime 可选 `commands` 必须与 Manifest
   `command` 贡献一一对应；Manager `executeContributionCommand` 在 active 会话内分发。
   Designer 可选 `pluginCatalog` / `pluginCommandPort` 把已授权命令列入命令面板；插件经
-  `command.execute` 拿到的 Core adapter 只能编排已有 `ScreenDocumentCommand`。
+  `command.execute` 拿到的 Core adapter 只能编排已有 `ScreenDocumentCommand`。该入站写入自
+  2026-09-09 起由 browser-harness 端到端行使（此前仅有实现与文档，无调用方接线）。
   Renderer contribution index 不增加 command 查询。plugin-sdk 提供 `createPluginPackage`。
+- **贡献命令 chrome 投影**（[ADR-0070](../decisions/ADR-0070-plugin-command-chrome-projection.md)）：
+  `command` 贡献可选 `menus` / `shortcut`。省略 `menus` 仅命令面板；写出的 `menus` 为完整列表。
+  Designer 投影到命令面板、更多→工具与画布右键，菜单项使用 `data-plugin-command`。快捷键不得覆盖
+  内建 chord。不新增 contribution kind，不扩展 ADR-0015 index。
+- **插件设计上下文只读访问**（2026-09-09，[ADR-0071](../decisions/ADR-0071-plugin-design-context-read-access.md)）：
+  新增 `design.read` 能力；授予且宿主提供 `createDesignReadPort`（可选 manager 入参，缺工厂则失败
+  关闭）后，`activate(context)` 拿到 `context.designReadPort`。`read()` 返回同一次调用内取到的原子
+  快照 `{ document, selectedComponentIds, focusedComponentId }`，是 JSON 往返后的深冻结私有副本，
+  写入不触及 canonical 文档。只做按需读取，不提供变更通知，也不开放订阅或任意状态查询。
+  `base-screen-designer` 新增公开只读 `selection`，返回 core 既有 `ScreenInteractionState`，
+  不新增类型或跨包导出。贡献命令 handler 由此可先读现状再写回可撤销事务。
+- **插件面板贡献**（2026-09-10，[ADR-0072](../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)）：
+  新增 `kind: 'panel'` 贡献（`id` / `name` / `tagName`），构造函数由宿主 registry 解析，与物料同一信任
+  模型，解析不到即激活失败关闭。Designer 把面板挂在左栏宿主分组之后并保持容器末尾（否则会静默改变
+  rail 键盘导航顺序），写入与 `designReadPort` 同形的快照作为 `model`，只在文档代际或选区变化时重新
+  赋值；刷新同时挂 `emitChange` 与 `renderInteraction`，因为文档提交不经后者。面板经
+  `base-screen-plugin-panel-action` 回传 `{ panelId, commandId, args }`，Engine 校验归属后派发到该插件
+  自己的贡献命令——这是唯一放开真实 `args` 的路径，chrome 触发仍为 `null`。不引入 `when`、工具栏、
+  任意 DOM 注入或具名槽位协议。
 
 ## 历史迁移
 

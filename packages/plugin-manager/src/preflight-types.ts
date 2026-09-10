@@ -1,8 +1,8 @@
 import type {
+  BaseScreenPluginActivationContext,
   BaseScreenPluginCommandHandler,
   BaseScreenPluginManifest,
   BaseScreenPluginRuntime,
-  PluginCommandPort,
 } from '@base-screen/plugin-core';
 import type { BaseScreenPluginManagerOptions } from './types.js';
 
@@ -14,6 +14,7 @@ export interface ManagerInput {
   readonly registry: BaseScreenPluginManagerOptions['registry'];
   readonly registryGet: (tagName: string) => unknown;
   readonly createCommandPort: BaseScreenPluginManagerOptions['createCommandPort'];
+  readonly createDesignReadPort: BaseScreenPluginManagerOptions['createDesignReadPort'];
 }
 
 export interface Candidate {
@@ -27,12 +28,7 @@ export interface Candidate {
 }
 
 export interface ActivationSession {
-  readonly context: {
-    readonly instanceId: string;
-    readonly pluginId: string;
-    readonly grantedCapabilities: readonly string[];
-    readonly commandPort: PluginCommandPort | undefined;
-  };
+  readonly context: BaseScreenPluginActivationContext;
   isValid(): boolean;
   invalidate(): void;
 }

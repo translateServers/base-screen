@@ -14,6 +14,7 @@ import {
   DESIGNER_CONTEXT_MENU,
   type DesignerMenuControllerCallbacks,
 } from './designer-menu-model.js';
+import { pluginCommandMenuSection, renderPluginToolsMenu } from './designer-plugin-command-menu.js';
 
 export type {
   DesignerMenuControllerCallbacks,
@@ -48,6 +49,7 @@ export class DesignerMenuController {
     if (isOpening) {
       const menu = root.querySelector<HTMLElement>(`[data-menu="${menuId}"]`);
       if (menu !== null) {
+        renderPluginToolsMenu(menu, this.callbacks);
         menu.hidden = false;
         positionMenu(menu, toggle, root);
         renderMenuState(this.callbacks, menu);
@@ -194,7 +196,11 @@ export class DesignerMenuController {
         }
         const prevIndex = (currentIndex - 1 + triggers.length) % triggers.length;
         const prevTrigger = triggers[prevIndex];
-        if (prevTrigger !== undefined) switchToMenu(this.callbacks, prevTrigger, root);
+        if (prevTrigger !== undefined) {
+          switchToMenu(this.callbacks, prevTrigger, root, (menu) =>
+            renderPluginToolsMenu(menu, this.callbacks),
+          );
+        }
         return true;
       }
       case 'ArrowRight': {
@@ -207,7 +213,11 @@ export class DesignerMenuController {
         if (openMenu.dataset.submenu !== undefined) return true;
         const nextIndex = (currentIndex + 1) % triggers.length;
         const nextTrigger = triggers[nextIndex];
-        if (nextTrigger !== undefined) switchToMenu(this.callbacks, nextTrigger, root);
+        if (nextTrigger !== undefined) {
+          switchToMenu(this.callbacks, nextTrigger, root, (menu) =>
+            renderPluginToolsMenu(menu, this.callbacks),
+          );
+        }
         return true;
       }
       case 'ArrowDown': {
@@ -294,13 +304,14 @@ export class DesignerMenuController {
     // 右键命中选区框（拖拽空白区/变换手柄/旋转控制，含多选包围盒内的间隙）时按当前选择解析菜单；
     // 未命中选区的组件与空白画布保持单组件/画布菜单。
     const inSelectionBox = targetElement?.closest('[data-selection]') !== null;
-    menu.innerHTML = contextMenuHtml(
+    const kind =
       selectedIds.length > 1 && (onSelectedComponent || inSelectionBox)
-        ? DESIGNER_CONTEXT_MENU.multi
+        ? 'multi'
         : component !== null || (inSelectionBox && selectedIds.length === 1)
-          ? DESIGNER_CONTEXT_MENU.component
-          : DESIGNER_CONTEXT_MENU.canvas,
-    );
+          ? 'component'
+          : 'canvas';
+    const pluginItems = this.callbacks.getPluginCommandItems?.(`context.${kind}`) ?? [];
+    menu.innerHTML = `${contextMenuHtml(DESIGNER_CONTEXT_MENU[kind])}${pluginCommandMenuSection(pluginItems)}`;
     this.renderContextMenuState();
     menu.hidden = false;
     const bounds = workspace.getBoundingClientRect();

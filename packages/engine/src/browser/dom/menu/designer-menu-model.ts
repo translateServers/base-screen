@@ -1,3 +1,4 @@
+import type { DesignerPluginCommandItem } from '../../../common/operations/plugin/designer-plugin-commands.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerContextMenuAction } from '../workspace/designer-workspace.js';
 
@@ -6,6 +7,9 @@ export interface DesignerMenuControllerCallbacks {
   readonly getContextMenu: () => HTMLElement | undefined;
   readonly getSelectedComponentIds: () => readonly string[];
   readonly getOperationState: (id: string) => DesignerOperationStateShape | undefined;
+  readonly getPluginCommandItems?: (
+    menu: 'menu.tools' | 'context.canvas' | 'context.component' | 'context.multi',
+  ) => readonly DesignerPluginCommandItem[];
 }
 
 export interface DesignerOperationStateShape {

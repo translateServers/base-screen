@@ -114,7 +114,12 @@ export function initializeDesignerElementOperations(
   );
   state.eventSystem = new DesignerEventSystem({
     isGestureActive: () => state.gestureController.active,
-    findOperation: (chord) => state.operations.findByShortcut(chord),
+    findOperation: (chord) => {
+      const operation = state.operations.findByShortcut(chord);
+      if (operation !== undefined) return operation;
+      const pluginCommand = state.runtime.findPluginCommandByShortcut(element, chord);
+      return pluginCommand === undefined ? undefined : { repeatable: false };
+    },
     onWindowBlur: () => {
       // 窗口失焦统一复位设计器内部状态（不触达宿主）。
       state.runtime.cancelGesture(element);
@@ -144,6 +149,7 @@ export function initializeDesignerElementOperations(
     getContextMenu: () => state.contextMenu,
     getSelectedComponentIds: () => state.session.interaction.selectedComponentIds,
     getOperationState: (id) => state.operations.getState(id, undefined),
+    getPluginCommandItems: (menu) => state.runtime.listPluginCommandItems(element, menu),
   });
   state.surfaceRouter = new DesignerSurfaceRouter();
 }

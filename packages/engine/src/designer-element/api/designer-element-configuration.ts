@@ -23,6 +23,7 @@ import {
   isBaseScreenConditionalStylePort,
   isBaseScreenMaterialCatalog,
   isBaseScreenPluginCatalog,
+  isBaseScreenPluginPanelCatalog,
   isBaseScreenRuntimeContributionIndex,
   isPluginCommandPort,
   isScreenHostResourcePort,
@@ -194,6 +195,17 @@ export function configure(
     };
   }
   if (
+    configuration.pluginPanels !== undefined &&
+    !isBaseScreenPluginPanelCatalog(configuration.pluginPanels)
+  ) {
+    return {
+      ok: false,
+      diagnostics: [
+        lifecycleDiagnostic('Designer plugin panels 必须是携带 panel 贡献的面板目录。'),
+      ],
+    };
+  }
+  if (
     configuration.pluginCommandPort !== undefined &&
     !isPluginCommandPort(configuration.pluginCommandPort)
   ) {
@@ -246,6 +258,7 @@ export function configure(
   elementState.resolvedMaterialLibraryItems = resolvedMaterialLibraryItems.value;
   elementState.runtimeContributions = configuration.runtimeContributions;
   elementState.pluginCatalog = configuration.pluginCatalog;
+  elementState.pluginPanels = configuration.pluginPanels;
   elementState.pluginCommandPort = configuration.pluginCommandPort;
   elementState.toolMaterialTypes = configuration.toolMaterialTypes;
   elementState.groupMaterialType = configuration.groupMaterialType;

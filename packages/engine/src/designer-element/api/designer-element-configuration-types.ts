@@ -14,6 +14,7 @@ import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
+  BaseScreenPluginPanelCatalog,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
 } from '@base-screen/plugin-core';
@@ -34,6 +35,7 @@ export interface BaseScreenDesignerConfiguration {
   readonly materialLibraryItems?: readonly BaseScreenMaterialLibraryItem[];
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
   readonly pluginCatalog?: BaseScreenPluginCatalog;
+  readonly pluginPanels?: BaseScreenPluginPanelCatalog;
   readonly pluginCommandPort?: PluginCommandPort;
   readonly projectAdapter?: ScreenProjectAdapter;
   readonly toolMaterialTypes?: DesignerToolMaterialTypes;

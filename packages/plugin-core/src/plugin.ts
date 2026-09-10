@@ -5,9 +5,17 @@ import {
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
-import { type BaseScreenPluginManifest, type PluginCommandRequest } from './contracts.js';
+import {
+  type BaseScreenPluginManifest,
+  type BaseScreenPluginPanelActionDetail,
+  type PluginCommandRequest,
+} from './contracts.js';
 import { PluginDiagnosticCollector } from './diagnostics.js';
-import { validateBaseScreenMaterialIdentity, validatePropsSchema } from './material/material.js';
+import {
+  isValidCustomElementName,
+  validateBaseScreenMaterialIdentity,
+  validatePropsSchema,
+} from './material/material.js';
 
 const MAX_PLUGIN_MANIFEST_BYTES = 128 * 1024;
 const MAX_COMMAND_BYTES = 256 * 1024;
@@ -71,6 +79,51 @@ export function parsePluginCommandRequest(input: unknown): ScreenParseResult<Plu
   return collector.hasErrors
     ? collector.failure()
     : collector.result(request as unknown as PluginCommandRequest);
+}
+
+export function parseBaseScreenPluginPanelActionDetail(
+  input: unknown,
+): ScreenParseResult<BaseScreenPluginPanelActionDetail> {
+  const parsed = parsePluginJson<ScreenJsonValue>(input, MAX_COMMAND_BYTES);
+  if (!parsed.ok) {
+    return parsed;
+  }
+  if (!isRecord(parsed.value)) {
+    return failure(
+      'PLUGIN_CORE_EVENT_INVALID',
+      [],
+      'Plugin panel action detail must be an object.',
+    );
+  }
+  const detail = parsed.value;
+  const collector = new PluginDiagnosticCollector();
+  validateExactObject(detail, new Set(['panelId', 'commandId', 'args']), [], collector);
+  validatePanelActionIdentifier(detail, 'panelId', collector);
+  validatePanelActionIdentifier(detail, 'commandId', collector);
+  if (!Object.hasOwn(detail, 'args')) {
+    collector.add(
+      'PLUGIN_CORE_EVENT_PAYLOAD_INVALID',
+      ['args'],
+      'Plugin panel action arguments are required.',
+    );
+  }
+  return collector.hasErrors
+    ? collector.failure()
+    : collector.result(detail as unknown as BaseScreenPluginPanelActionDetail);
+}
+
+function validatePanelActionIdentifier(
+  detail: ScreenJsonObject,
+  field: 'panelId' | 'commandId',
+  collector: PluginDiagnosticCollector,
+): void {
+  if (!isIdentifier(detail[field])) {
+    collector.add(
+      'PLUGIN_CORE_EVENT_INVALID',
+      [field],
+      `Plugin panel action ${field} must be an ASCII identifier.`,
+    );
+  }
 }
 
 function validateDependencies(
@@ -230,12 +283,15 @@ function validateContribution(
         new Set(['kind', 'id', 'name', 'requiredCapability']),
         path,
         collector,
+        new Set(['menus', 'shortcut']),
       );
       validateContributionIdentityFields(contribution, path, collector, [
         'id',
         'requiredCapability',
       ]);
       validateDisplayName(contribution.name, [...path, 'name'], collector);
+      validateCommandMenus(contribution.menus, [...path, 'menus'], collector);
+      validateCommandShortcut(contribution.shortcut, [...path, 'shortcut'], collector);
       return typeof contribution.id === 'string' ? `command:${contribution.id}` : undefined;
     case 'dataResourceType': {
       validateExactObject(
@@ -278,6 +334,24 @@ function validateContribution(
       return typeof contribution.id === 'string'
         ? `blueprintCapability:${contribution.id}`
         : undefined;
+    case 'panel': {
+      validateExactObject(
+        contribution,
+        new Set(['kind', 'id', 'name', 'tagName']),
+        path,
+        collector,
+      );
+      validateContributionIdentityFields(contribution, path, collector, ['id']);
+      validateDisplayName(contribution.name, [...path, 'name'], collector);
+      if (!isValidCustomElementName(contribution.tagName)) {
+        collector.add(
+          'PLUGIN_CORE_TAG_NAME_INVALID',
+          [...path, 'tagName'],
+          'Panel tagName is not a valid custom element name.',
+        );
+      }
+      return typeof contribution.id === 'string' ? `panel:${contribution.id}` : undefined;
+    }
     default:
       collector.add(
         'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
@@ -313,6 +387,106 @@ function validateDisplayName(
   if (typeof value !== 'string' || [...value].length === 0 || [...value].length > 256) {
     collector.add('PLUGIN_CORE_MANIFEST_FIELD_INVALID', path, 'Contribution name is invalid.');
   }
+}
+
+const COMMAND_MENUS = new Set([
+  'commandPalette',
+  'menu.tools',
+  'context.canvas',
+  'context.component',
+  'context.multi',
+]);
+
+const SHORTCUT_MODIFIERS = new Set(['Ctrl', 'Cmd', 'Alt', 'Shift']);
+const NAMED_SHORTCUT_KEYS = new Set([
+  'Delete',
+  'Escape',
+  'Enter',
+  'Tab',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'ArrowDown',
+  'F1',
+  'F2',
+  'F3',
+  'F4',
+  'F5',
+  'F6',
+  'F7',
+  'F8',
+  'F9',
+  'F10',
+  'F11',
+  'F12',
+]);
+
+function validateCommandMenus(
+  value: ScreenJsonValue | undefined,
+  path: readonly (string | number)[],
+  collector: PluginDiagnosticCollector,
+): void {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || value.length > COMMAND_MENUS.size) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      path,
+      'Command menus must be an array of known menu ids.',
+    );
+    return;
+  }
+  const seen = new Set<string>();
+  for (let index = 0; index < value.length; index++) {
+    const menu = value[index];
+    if (typeof menu !== 'string' || !COMMAND_MENUS.has(menu)) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [...path, index],
+        'Command menu id is unsupported.',
+      );
+      continue;
+    }
+    if (seen.has(menu)) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [...path, index],
+        'Command menu id is duplicated.',
+      );
+    } else {
+      seen.add(menu);
+    }
+  }
+}
+
+function validateCommandShortcut(
+  value: ScreenJsonValue | undefined,
+  path: readonly (string | number)[],
+  collector: PluginDiagnosticCollector,
+): void {
+  if (value === undefined) return;
+  if (typeof value !== 'string' || value.length === 0 || value.length > 64 || !isShortcut(value)) {
+    collector.add('PLUGIN_CORE_MANIFEST_FIELD_INVALID', path, 'Command shortcut is invalid.');
+  }
+}
+
+function isShortcut(value: string): boolean {
+  const parts = value.split('+');
+  if (parts.length === 0 || parts.some((part) => part.length === 0)) return false;
+  const key = parts[parts.length - 1]!;
+  const modifiers = parts.slice(0, -1);
+  const seen = new Set<string>();
+  for (const modifier of modifiers) {
+    if (!SHORTCUT_MODIFIERS.has(modifier) || seen.has(modifier)) return false;
+    seen.add(modifier);
+  }
+  if (key.length === 1) {
+    return /^[A-Z0-9=\[\]\\;',./`\-]$/.test(key);
+  }
+  return NAMED_SHORTCUT_KEYS.has(key);
 }
 
 function validateExactObject(

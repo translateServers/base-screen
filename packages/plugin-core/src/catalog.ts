@@ -5,6 +5,8 @@ import type {
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
   BaseScreenPluginCatalogEntry,
+  BaseScreenPluginPanelCatalog,
+  BaseScreenPluginPanelCatalogEntry,
 } from './contracts.js';
 
 export function createBaseScreenMaterialCatalog(
@@ -83,6 +85,34 @@ export function createBaseScreenPluginCatalog(
     },
     has(pluginId) {
       return byId.has(pluginId);
+    },
+    list() {
+      return [...sorted];
+    },
+  };
+}
+
+export function createBaseScreenPluginPanelCatalog(
+  entries: readonly BaseScreenPluginPanelCatalogEntry[],
+): BaseScreenPluginPanelCatalog {
+  assertUnique(entries, (entry) => entry.contribution.id, 'panel id');
+  const sorted = entries
+    .map((entry) =>
+      freeze({
+        pluginId: entry.pluginId,
+        contribution: cloneJson(entry.contribution),
+        // 构造函数是运行时实体，与物料 catalog 同理按引用保留，不参与 JSON 克隆。
+        constructor: entry.constructor,
+      }),
+    )
+    .sort((left, right) => compareStrings(left.contribution.id, right.contribution.id));
+  const byId = new Map(sorted.map((entry) => [entry.contribution.id, entry]));
+  return {
+    get(panelId) {
+      return byId.get(panelId);
+    },
+    has(panelId) {
+      return byId.has(panelId);
     },
     list() {
       return [...sorted];

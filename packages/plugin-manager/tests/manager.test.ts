@@ -1,5 +1,7 @@
 import {
   type BaseScreenMaterialConstructor,
+  type BaseScreenPluginActivationContext,
+  type BaseScreenPluginDesignSnapshot,
   type BaseScreenPluginManifest,
   type BaseScreenPluginRuntime,
   createBaseScreenMaterialCatalog,
@@ -7,6 +9,7 @@ import {
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { createBaseScreenPluginManager } from '../src/manager.js';
+import type { BaseScreenPluginManagerOptions } from '../src/types.js';
 
 function materialManifest(overrides: Record<string, unknown> = {}) {
   return {
@@ -63,6 +66,14 @@ function constructorFor(
   return class {
     static readonly manifest = manifest;
   } as unknown as BaseScreenMaterialConstructor;
+}
+
+function designSnapshot(componentIds: readonly string[]): BaseScreenPluginDesignSnapshot {
+  return {
+    document: { canvas: {}, components: [], variables: [], blueprint: {} },
+    selectedComponentIds: componentIds,
+    focusedComponentId: componentIds[0] ?? null,
+  } as unknown as BaseScreenPluginDesignSnapshot;
 }
 
 function managerOptions(
@@ -686,6 +697,159 @@ describe('BaseScreenPluginManager', () => {
       expect(
         result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN'),
       ).toBe(true);
+    }
+  });
+
+  it('exposes a design read port that stops serving after deactivate', async () => {
+    let context: BaseScreenPluginActivationContext | undefined;
+    const snapshot = designSnapshot(['title']);
+    const plugin = runtime(pluginManifest({ id: 'acme.reader', capabilities: ['design.read'] }), {
+      activate: (activation) => {
+        context = activation;
+      },
+    });
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.reader': ['design.read'] },
+      createDesignReadPort: () => ({
+        read: async () => ({ ok: true as const, value: snapshot, diagnostics: [] }),
+      }),
+    });
+
+    expect((await manager.activate()).ok).toBe(true);
+    expect(context?.designReadPort).toBeDefined();
+    const read = await context?.designReadPort?.read();
+    expect(read?.ok).toBe(true);
+    if (read?.ok) expect(read.value?.selectedComponentIds).toEqual(['title']);
+
+    expect((await manager.deactivate()).ok).toBe(true);
+    const stale = await context?.designReadPort?.read();
+    expect(stale?.ok).toBe(false);
+    if (stale !== undefined && !stale.ok) {
+      expect(stale.diagnostics[0]?.code).toBe('PLUGIN_CORE_SESSION_INVALID');
+    }
+  });
+
+  it('fails activation when design.read is granted without a read port factory', async () => {
+    const plugin = runtime(pluginManifest({ id: 'acme.readless', capabilities: ['design.read'] }));
+    const result = await createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.readless': ['design.read'] },
+    }).activate();
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE'),
+      ).toBe(true);
+    }
+  });
+
+  it('never builds a read port for plugins without design.read', async () => {
+    let builds = 0;
+    let context: BaseScreenPluginActivationContext | undefined;
+    const plugin = runtime(pluginManifest({ id: 'acme.no-read' }), {
+      activate: (activation) => {
+        context = activation;
+      },
+    });
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      createDesignReadPort: () => {
+        builds++;
+        return {
+          read: async () => ({ ok: true as const, value: designSnapshot([]), diagnostics: [] }),
+        };
+      },
+    });
+
+    expect((await manager.activate()).ok).toBe(true);
+    expect(builds).toBe(0);
+    expect(context?.designReadPort).toBeUndefined();
+  });
+
+  it('activates with manager options that omit createDesignReadPort', async () => {
+    const plugin = runtime(pluginManifest({ id: 'acme.legacy-options' }));
+    const options = managerOptions([plugin]) as BaseScreenPluginManagerOptions;
+
+    expect((await createBaseScreenPluginManager(options).activate()).ok).toBe(true);
+  });
+
+  function panelPlugin(pluginId: string, panelId: string, tagName: string) {
+    return runtime(
+      pluginManifest({
+        id: pluginId,
+        contributions: [{ kind: 'panel', id: panelId, name: 'Monitor', tagName }],
+      }),
+    );
+  }
+
+  it('resolves declared panels from the host registry into the snapshot', async () => {
+    const panelConstructor = class {} as unknown as BaseScreenMaterialConstructor;
+    const plugin = panelPlugin('acme.panelist', 'acme.monitor', 'acme-monitor');
+    const manager = createBaseScreenPluginManager(
+      managerOptions([plugin], new Map([['acme-monitor', panelConstructor]])),
+    );
+
+    expect((await manager.activate()).ok).toBe(true);
+    const entry = manager.snapshot?.panels.get('acme.monitor');
+    expect(entry?.pluginId).toBe('acme.panelist');
+    expect(entry?.contribution.tagName).toBe('acme-monitor');
+    expect(entry?.constructor).toBe(panelConstructor);
+    expect(manager.snapshot?.panels.list()).toHaveLength(1);
+  });
+
+  it('fails activation when a declared panel tag is not registered', async () => {
+    const manager = createBaseScreenPluginManager(
+      managerOptions([panelPlugin('acme.panelist', 'acme.monitor', 'acme-monitor')]),
+    );
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID')).toBe(
+        true,
+      );
+    }
+  });
+
+  it('reports a diagnostic when the registry query for a panel throws', async () => {
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([panelPlugin('acme.panelist', 'acme.monitor', 'acme-monitor')]),
+      registry: {
+        get: () => {
+          throw new Error('registry unavailable');
+        },
+      },
+    });
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID')).toBe(
+        true,
+      );
+    }
+  });
+
+  it('rejects two panels that claim the same custom element tag', async () => {
+    const shared = class {} as unknown as BaseScreenMaterialConstructor;
+    const manager = createBaseScreenPluginManager(
+      managerOptions(
+        [
+          panelPlugin('acme.one', 'acme.monitor', 'acme-monitor'),
+          panelPlugin('acme.two', 'acme.gauge', 'acme-monitor'),
+        ],
+        new Map([['acme-monitor', shared]]),
+      ),
+    );
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_CONFLICT')).toBe(
+        true,
+      );
     }
   });
 });

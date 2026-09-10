@@ -177,6 +177,11 @@ export function isValidTagName(tagName: unknown, type: unknown): boolean {
   if (!isScreenMaterialType(type)) {
     return false;
   }
+  return isValidCustomElementName(tagName);
+}
+
+/** custom element 名字规则：含连字符、小写起始、非 xml 前缀、非保留名。 */
+export function isValidCustomElementName(tagName: unknown): boolean {
   if (
     typeof tagName !== 'string' ||
     tagName.length < 2 ||

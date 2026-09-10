@@ -147,6 +147,7 @@ export function renderInteraction(element: DesignerElementHost): void {
   elementState.runtime.renderInspectorInteraction(element);
   elementState.runtime.renderLayers(element);
   elementState.runtime.renderControls(element);
+  elementState.runtime.syncDesignerPluginPanels(element);
   elementState.integrationController.render();
   elementState.workbenchController.renderInspectorTabs();
 }
@@ -157,6 +158,7 @@ export function renderLeftPanelGroups(element: DesignerElementHost): void {
   const layout = element.shadowRoot?.querySelector<HTMLElement>('.designer');
   if (layout === null || layout === undefined) return;
   renderDesignerLeftPanelGroups(layout, elementState.leftPanelGroups);
+  elementState.runtime.syncDesignerPluginPanels(element);
   elementState.workbenchController.refreshLeftPanelGroups();
   elementState.blueprintWorkbenchController.refreshLeftPanelGroups();
 }
@@ -324,6 +326,16 @@ export function forwardNativeMaterialEvent(
 
 export function executeOperationFromTarget(element: DesignerElementHost, target: Element): boolean {
   const elementState = getDesignerElementState(element);
+
+  const pluginControl = target.closest<HTMLButtonElement>('[data-plugin-command]');
+  const pluginCommandId = pluginControl?.dataset.pluginCommand;
+  if (pluginControl !== null && pluginCommandId !== undefined) {
+    if (pluginControl.disabled) return true;
+    elementState.menuController.closeContextMenu();
+    elementState.menuController.closeMenus();
+    elementState.runtime.executePluginCommand(element, pluginCommandId);
+    return true;
+  }
 
   const control = target.closest<HTMLButtonElement>('[data-action], [data-menu-action]');
   const id = control?.dataset.action ?? control?.dataset.menuAction;

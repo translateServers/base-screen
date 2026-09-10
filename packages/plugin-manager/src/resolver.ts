@@ -107,23 +107,28 @@ export function validateCapabilityPlan(
           ['plugins', candidate.index, 'manifest', 'capabilities'],
           'Plugin capability is not approved by the host.',
         );
-      } else if (capability === 'command.execute' && input.createCommandPort === undefined) {
-        diagnostics.add(
-          'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
-          ['plugins', candidate.index, 'manifest', 'capabilities'],
-          'Plugin command capability has no compatible port factory.',
-        );
-      } else if (
-        capability !== 'command.execute' &&
-        !SUPPORTED_BLUEPRINT_CAPABILITIES.has(capability)
-      ) {
+      } else if (capability === 'command.execute' || capability === 'design.read') {
+        const hasFactory =
+          capability === 'command.execute'
+            ? input.createCommandPort !== undefined
+            : input.createDesignReadPort !== undefined;
+        if (!hasFactory) {
+          diagnostics.add(
+            'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
+            ['plugins', candidate.index, 'manifest', 'capabilities'],
+            'Plugin capability has no compatible port factory.',
+          );
+        } else {
+          granted.push(capability);
+        }
+      } else if (SUPPORTED_BLUEPRINT_CAPABILITIES.has(capability)) {
+        granted.push(capability);
+      } else {
         diagnostics.add(
           'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
           ['plugins', candidate.index, 'manifest', 'capabilities'],
           'Plugin capability is not supported by this host.',
         );
-      } else {
-        granted.push(capability);
       }
     }
     grants.set(candidate, Object.freeze(granted.sort(compareStrings)));

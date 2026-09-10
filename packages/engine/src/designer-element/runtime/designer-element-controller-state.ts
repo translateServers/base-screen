@@ -87,6 +87,8 @@ export function initializeDesignerElementControllers(
     emitChange: (document) => {
       state.documentGeneration++;
       state.blueprintWorkbenchController.dispatchState();
+      // 文档提交/撤销/重做/替换都不经 renderInteraction，面板必须在这里也拿到新快照。
+      state.runtime.syncDesignerPluginPanels(element);
       state.runtime.emitChange(element, document);
     },
     emitSelectionChange: (interaction) =>
@@ -394,13 +396,7 @@ export function initializeDesignerElementControllers(
     getWorkbenchMode: () => state.blueprintWorkbenchController.mode,
     getPluginCatalog: () => state.pluginCatalog,
     getPluginCommandPort: () => state.pluginCommandPort,
-    executePluginCommand: (commandId) => {
-      const port = state.pluginCommandPort;
-      if (port === undefined) return;
-      void port.execute({ commandId, args: null }).then((result) => {
-        if (!result.ok) state.runtime.emitDiagnostics(element, result.diagnostics);
-      });
-    },
+    executePluginCommand: (commandId) => state.runtime.executePluginCommand(element, commandId),
     renderKindIcon: (kind) =>
       designerIcon(
         kind === 'material'

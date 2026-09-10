@@ -274,8 +274,8 @@ export class DesignerCommandPaletteController {
       (command): DesignerCommandPaletteEntry => ({
         kind: 'command',
         label: command.name,
-        detail: command.id,
-        searchText: `${command.name} ${command.id}`.toLocaleLowerCase(),
+        detail: command.shortcut ?? command.id,
+        searchText: `${command.name} ${command.id} ${command.shortcut ?? ''}`.toLocaleLowerCase(),
         disabled: command.disabled,
         pluginCommandId: command.id,
       }),

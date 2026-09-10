@@ -7,8 +7,10 @@
 import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenPluginPanelCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import { PluginCommandPort } from '@base-screen/plugin-core';
+import type { PluginDesignReadPort } from '@base-screen/plugin-core';
 import type { ScreenAuthoringEditorContext } from '@base-screen/contracts';
 import type { ScreenBlueprintAction } from '@base-screen/contracts';
 import type { ScreenBlueprintCondition } from '@base-screen/contracts';
@@ -29,6 +31,7 @@ import { ScreenHostResourceDataSource } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
 import type { ScreenHostVariableCatalogPort } from '@base-screen/contracts';
 import type { ScreenHostVariablePort } from '@base-screen/contracts';
+import { ScreenInteractionState } from '@base-screen/core';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
@@ -400,6 +403,8 @@ export interface BaseScreenDesignerConfiguration {
     readonly pluginCatalog?: BaseScreenPluginCatalog;
     // (undocumented)
     readonly pluginCommandPort?: PluginCommandPort;
+    // (undocumented)
+    readonly pluginPanels?: BaseScreenPluginPanelCatalog;
     readonly previewHandler?: (document: ScreenDocument) => boolean;
     // (undocumented)
     readonly projectAdapter?: ScreenProjectAdapter;
@@ -528,6 +533,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     get pluginCommandPort(): PluginCommandPort | undefined;
     set pluginCommandPort(value: PluginCommandPort | undefined);
     // (undocumented)
+    get pluginPanels(): BaseScreenPluginPanelCatalog | undefined;
+    set pluginPanels(value: BaseScreenPluginPanelCatalog | undefined);
+    // (undocumented)
     get previewHandler(): ((document: ScreenDocument) => boolean) | undefined;
     // (undocumented)
     previewProject(published: boolean): Promise<ScreenParseResult<ScreenDocument>>;
@@ -575,6 +583,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined);
     // (undocumented)
     save(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
+    // (undocumented)
+    get selection(): ScreenInteractionState;
     selectLeftPanelGroup(groupId: string): boolean;
     setCanvasBackground(background: ScreenCanvasBackground | null): ScreenParseResult<ScreenDocument>;
     setCanvasBackgroundImage(backgroundImage: string | null, fit?: ScreenCanvasBackgroundImageFit): ScreenParseResult<ScreenDocument>;
@@ -744,6 +754,17 @@ export function createBaseScreenCorePluginCommandPort(options: CreateBaseScreenC
 export interface CreateBaseScreenCorePluginCommandPortOptions {
     // (undocumented)
     readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument> | Promise<ScreenParseResult<ScreenDocument>>;
+}
+
+// @public
+export function createBaseScreenCorePluginDesignReadPort(options: CreateBaseScreenCorePluginDesignReadPortOptions): PluginDesignReadPort;
+
+// @public (undocumented)
+export interface CreateBaseScreenCorePluginDesignReadPortOptions {
+    // (undocumented)
+    readonly getDocument: () => ScreenDocument | undefined;
+    // (undocumented)
+    readonly getSelection: () => ScreenInteractionState;
 }
 
 // @public (undocumented)

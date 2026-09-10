@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-09-03
+> 最近更新：2026-09-09
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -16,6 +16,9 @@
 
 | ADR | 状态 | 日期 | 主题 |
 | --- | --- | --- | --- |
+| [ADR-0072](./ADR-0072-plugin-panel-contribution-minimal-loop.md) | 已接受 | 2026-09-10 | 插件面板贡献的最小闭环：`kind: 'panel'`、复用快照 model 与带 args 的动作回路 |
+| [ADR-0071](./ADR-0071-plugin-design-context-read-access.md) | 已接受 | 2026-09-09 | 插件设计上下文只读访问：`design.read`、原子快照与 Designer `selection` |
+| [ADR-0070](./ADR-0070-plugin-command-chrome-projection.md) | 已接受 | 2026-09-06 | 插件 command 贡献的 menus/shortcut 与 Designer chrome 投影 |
 | [ADR-0069](./ADR-0069-independent-dataset-consumption.md) | 已接受 | 2026-09-05 | 独立数据集端口、参数权威及宿主消费重构 |
 | [ADR-0001](./ADR-0001-monorepo-toolchain-and-package-boundaries.md) | 已接受 | 2026-08-03 | Monorepo、工具链、私有阶段版本与十二包依赖边界 |
 

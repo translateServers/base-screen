@@ -4,7 +4,11 @@ import type {
   ScreenDocument,
   ScreenParseResult,
 } from '@base-screen/contracts';
-import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
+import {
+  type ScreenDocumentCommand,
+  type ScreenDocumentTransaction,
+  type ScreenInteractionState,
+} from '@base-screen/core';
 import {
   BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
   type BaseScreenCanvasBackgroundImageRequestEventDetail,
@@ -23,6 +27,12 @@ export function getDocument(element: DesignerElementHost): ScreenDocument | unde
   const elementState = getDesignerElementState(element);
 
   return elementState.session.document;
+}
+
+export function getSelection(element: DesignerElementHost): ScreenInteractionState {
+  const elementState = getDesignerElementState(element);
+
+  return elementState.session.interaction;
 }
 
 export function replaceDocument(

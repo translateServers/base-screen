@@ -6,6 +6,7 @@ import {
   parseBaseScreenMaterialEventDetail,
   parseBaseScreenMaterialManifest,
   parseBaseScreenPluginManifest,
+  parseBaseScreenPluginPanelActionDetail,
   parsePluginCommandRequest,
   validateBaseScreenMaterialIdentity,
   validateBaseScreenMaterialProps,
@@ -493,6 +494,141 @@ describe('plugin manifests and catalogs', () => {
     }
   });
 
+  it('accepts optional command menus and shortcut, and rejects unknown values', () => {
+    const omitted = parseBaseScreenPluginManifest(pluginManifest());
+    const written = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'material',
+            type: 'acme.kpi-card',
+            tagName: 'acme-kpi-card',
+          },
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+            menus: ['commandPalette', 'menu.tools', 'context.canvas'],
+            shortcut: 'Ctrl+Shift+P',
+          },
+        ],
+      }),
+    );
+    const emptyMenus = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'command',
+            id: 'hidden',
+            name: 'Hidden',
+            requiredCapability: 'command.execute',
+            menus: [],
+          },
+        ],
+      }),
+    );
+    const unknownMenu = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+            menus: ['toolbar'],
+          },
+        ],
+      }),
+    );
+    const invalidShortcut = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+            shortcut: 'Ctrl++',
+          },
+        ],
+      }),
+    );
+    const unknownField = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+            when: 'always',
+          },
+        ],
+      }),
+    );
+
+    expect(omitted.ok).toBe(true);
+    if (omitted.ok) {
+      const command = omitted.value.contributions.find((item) => item.kind === 'command');
+      expect(command).toEqual({
+        kind: 'command',
+        id: 'refresh',
+        name: 'Refresh',
+        requiredCapability: 'command.execute',
+      });
+    }
+    expect(written.ok).toBe(true);
+    if (written.ok) {
+      expect(written.value.contributions[1]).toMatchObject({
+        menus: ['commandPalette', 'menu.tools', 'context.canvas'],
+        shortcut: 'Ctrl+Shift+P',
+      });
+    }
+    expect(emptyMenus.ok).toBe(true);
+    const lowercaseShortcut = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+            shortcut: 'Ctrl+p',
+          },
+        ],
+      }),
+    );
+    const duplicateMenus = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'command',
+            id: 'refresh',
+            name: 'Refresh',
+            requiredCapability: 'command.execute',
+            menus: ['commandPalette', 'commandPalette'],
+          },
+        ],
+      }),
+    );
+    expect(lowercaseShortcut.ok).toBe(false);
+    expect(duplicateMenus.ok).toBe(false);
+    expect(unknownMenu.ok).toBe(false);
+    if (!unknownMenu.ok) {
+      expect(
+        unknownMenu.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID'),
+      ).toBe(true);
+    }
+    expect(invalidShortcut.ok).toBe(false);
+    expect(unknownField.ok).toBe(false);
+    if (!unknownField.ok) {
+      expect(
+        unknownField.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD'),
+      ).toBe(true);
+    }
+  });
+
   it('rejects duplicate contribution identities and malformed dependencies', () => {
     const duplicate = parseBaseScreenPluginManifest(
       pluginManifest({
@@ -561,6 +697,113 @@ describe('plugin manifests and catalogs', () => {
     if (!invalid.ok) {
       expect(
         invalid.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID'),
+      ).toBe(true);
+    }
+  });
+
+  it('validates panel contributions by custom element name rules and exact fields', () => {
+    const accepted = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          { kind: 'panel', id: 'acme.monitor', name: '监控台', tagName: 'acme-monitor' },
+        ],
+      }),
+    );
+    const noHyphen = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [{ kind: 'panel', id: 'acme.p', name: 'P', tagName: 'monitor' }],
+      }),
+    );
+    const reserved = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [{ kind: 'panel', id: 'acme.p', name: 'P', tagName: 'font-face' }],
+      }),
+    );
+    const extraField = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'panel',
+            id: 'acme.p',
+            name: 'P',
+            tagName: 'acme-p',
+            location: 'leftPanel',
+          },
+        ],
+      }),
+    );
+    const duplicated = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          { kind: 'panel', id: 'acme.p', name: 'One', tagName: 'acme-one' },
+          { kind: 'panel', id: 'acme.p', name: 'Two', tagName: 'acme-two' },
+        ],
+      }),
+    );
+
+    expect(accepted.ok).toBe(true);
+    expect(noHyphen.ok).toBe(false);
+    if (!noHyphen.ok) {
+      expect(
+        noHyphen.diagnostics.some((item) => item.code === 'PLUGIN_CORE_TAG_NAME_INVALID'),
+      ).toBe(true);
+    }
+    expect(reserved.ok).toBe(false);
+    expect(extraField.ok).toBe(false);
+    if (!extraField.ok) {
+      expect(
+        extraField.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD'),
+      ).toBe(true);
+    }
+    expect(duplicated.ok).toBe(false);
+    if (!duplicated.ok) {
+      expect(
+        duplicated.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_DUPLICATE'),
+      ).toBe(true);
+    }
+  });
+
+  it('parses panel action details and rejects spoofable or malformed shapes', () => {
+    const valid = parseBaseScreenPluginPanelActionDetail({
+      panelId: 'acme.monitor',
+      commandId: 'acme.refresh',
+      args: { region: 'north' },
+    });
+    const nullArgs = parseBaseScreenPluginPanelActionDetail({
+      panelId: 'acme.monitor',
+      commandId: 'acme.refresh',
+      args: null,
+    });
+    const missingArgs = parseBaseScreenPluginPanelActionDetail({
+      panelId: 'acme.monitor',
+      commandId: 'acme.refresh',
+    });
+    const extraField = parseBaseScreenPluginPanelActionDetail({
+      panelId: 'acme.monitor',
+      commandId: 'acme.refresh',
+      args: null,
+      componentId: 'title',
+    });
+    const badCommandId = parseBaseScreenPluginPanelActionDetail({
+      panelId: 'acme.monitor',
+      commandId: 'not an identifier',
+      args: null,
+    });
+
+    expect(valid.ok).toBe(true);
+    // args 允许 null：面板可以只按身份触发一条无参命令。
+    expect(nullArgs.ok).toBe(true);
+    for (const rejected of [missingArgs, extraField, badCommandId]) {
+      expect(rejected.ok).toBe(false);
+    }
+    if (!badCommandId.ok) {
+      expect(
+        badCommandId.diagnostics.some((item) => item.code === 'PLUGIN_CORE_EVENT_INVALID'),
+      ).toBe(true);
+    }
+    if (!extraField.ok) {
+      expect(
+        extraField.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD'),
       ).toBe(true);
     }
   });

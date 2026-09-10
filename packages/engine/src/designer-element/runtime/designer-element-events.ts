@@ -167,7 +167,14 @@ export function onKeyDown(element: DesignerElementHost, event: KeyboardEvent): v
   if (policy.kind === 'command') {
     event.preventDefault();
     const operation = elementState.operations.findByShortcut(policy.chord);
-    if (operation !== undefined) elementState.operations.execute(operation.id, undefined);
+    if (operation !== undefined) {
+      elementState.operations.execute(operation.id, undefined);
+      return;
+    }
+    const pluginCommand = elementState.runtime.findPluginCommandByShortcut(element, policy.chord);
+    if (pluginCommand !== undefined && !pluginCommand.disabled) {
+      elementState.runtime.executePluginCommand(element, pluginCommand.id);
+    }
     return;
   }
   if (!event.defaultPrevented) elementState.viewportController.onKeyDown(event);

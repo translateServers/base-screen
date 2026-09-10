@@ -1,6 +1,7 @@
 import type { ScreenDocument, ScreenProjectAdapter } from '@base-screen/contracts';
 import type {
   BaseScreenPluginCatalog,
+  BaseScreenPluginPanelCatalog,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
 } from '@base-screen/plugin-core';
@@ -21,6 +22,7 @@ import {
 import { type DesignerToolMaterialTypes } from '../../common/tools/designer-tools.js';
 import {
   isBaseScreenPluginCatalog,
+  isBaseScreenPluginPanelCatalog,
   isPluginCommandPort,
   lifecycleDiagnostic,
 } from '../runtime/designer-element-guards.js';
@@ -225,6 +227,35 @@ export function writePluginCatalog(
     return;
   }
   elementState.pluginCatalog = value;
+}
+
+export function readPluginPanels(
+  element: DesignerElementHost,
+): BaseScreenPluginPanelCatalog | undefined {
+  const elementState = getDesignerElementState(element);
+
+  return elementState.pluginPanels;
+}
+
+export function writePluginPanels(
+  element: DesignerElementHost,
+  value: BaseScreenPluginPanelCatalog | undefined,
+) {
+  const elementState = getDesignerElementState(element);
+
+  if (elementState.renderer !== undefined && value !== elementState.pluginPanels) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Plugin panels cannot change after initialization. Call unload first.'),
+    ]);
+    return;
+  }
+  if (value !== undefined && !isBaseScreenPluginPanelCatalog(value)) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Designer plugin panels 必须是携带 panel 贡献的面板目录。'),
+    ]);
+    return;
+  }
+  elementState.pluginPanels = value;
 }
 
 export function readPluginCommandPort(element: DesignerElementHost): PluginCommandPort | undefined {

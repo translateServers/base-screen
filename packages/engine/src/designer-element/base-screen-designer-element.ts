@@ -21,11 +21,16 @@ import type {
   ScreenVariableHandle,
   ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
-import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
+import {
+  type ScreenDocumentCommand,
+  type ScreenDocumentTransaction,
+  type ScreenInteractionState,
+} from '@base-screen/core';
 import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
+  BaseScreenPluginPanelCatalog,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
 } from '@base-screen/plugin-core';
@@ -154,6 +159,14 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#designerState.runtime.writePluginCommandPort(this, value);
   }
 
+  get pluginPanels(): BaseScreenPluginPanelCatalog | undefined {
+    return this.#designerState.runtime.readPluginPanels(this);
+  }
+
+  set pluginPanels(value: BaseScreenPluginPanelCatalog | undefined) {
+    this.#designerState.runtime.writePluginPanels(this, value);
+  }
+
   get previewHandler(): ((document: ScreenDocument) => boolean) | undefined {
     return this.#designerState.runtime.readPreviewHandler(this);
   }
@@ -271,6 +284,10 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   set document(value: ScreenDocument | undefined) {
     this.#designerState.runtime.writeDocument(this, value);
+  }
+
+  get selection(): ScreenInteractionState {
+    return this.#designerState.runtime.getSelection(this);
   }
 
   connectedCallback(): void {

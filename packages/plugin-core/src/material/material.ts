@@ -8,3 +8,4 @@ export {
   validateBaseScreenMaterialStyle,
   validatePropsSchema,
 } from './material-schema.js';
+export { isValidCustomElementName } from './material-validation-utils.js';

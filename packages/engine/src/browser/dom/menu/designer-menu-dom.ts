@@ -76,7 +76,7 @@ function renderSubmenuVisibility(menu: HTMLElement): void {
     const trigger = wrapper.querySelector<HTMLButtonElement>('[data-submenu-toggle]');
     if (submenu === null || trigger === null) continue;
     const hasAvailableItem = Array.from(
-      submenu.querySelectorAll<HTMLButtonElement>('[data-menu-action]'),
+      submenu.querySelectorAll<HTMLButtonElement>('[data-menu-action], [data-plugin-command]'),
     ).some((item) => !item.hidden);
     wrapper.hidden = !hasAvailableItem;
     if (!hasAvailableItem) {
@@ -156,6 +156,7 @@ export function switchToMenu(
   callbacks: DesignerMenuControllerCallbacks,
   trigger: HTMLButtonElement,
   root: ShadowRoot,
+  prepareMenu?: (menu: HTMLElement) => void,
 ): void {
   const menuId = trigger.dataset.menuToggle;
   if (menuId === undefined) return;
@@ -169,6 +170,7 @@ export function switchToMenu(
   closeSubmenus(root);
   const menu = root.querySelector<HTMLElement>(`[data-menu="${menuId}"]`);
   if (menu !== null) {
+    prepareMenu?.(menu);
     menu.hidden = false;
     positionMenu(menu, trigger, root);
     renderMenuState(callbacks, menu);

@@ -1,6 +1,8 @@
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
+  BaseScreenPluginPanelCatalogEntry,
+  BaseScreenPluginPanelConstructor,
 } from '@base-screen/plugin-core';
 import { parseBaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import { DiagnosticCollector } from './diagnostics.js';
@@ -68,6 +70,65 @@ export function inspectMaterialRegistry(
     byType.set(manifest.type, entry);
   }
   return [...byType.values()];
+}
+
+export function inspectPluginPanels(
+  candidates: readonly Candidate[],
+  registryGet: (tagName: string) => unknown,
+  diagnostics: DiagnosticCollector,
+): readonly BaseScreenPluginPanelCatalogEntry[] {
+  const byId = new Map<string, BaseScreenPluginPanelCatalogEntry>();
+  const tagOwners = new Map<string, string>();
+  for (const candidate of candidates) {
+    for (let index = 0; index < candidate.manifest.contributions.length; index++) {
+      const contribution = candidate.manifest.contributions[index]!;
+      if (contribution.kind !== 'panel') continue;
+      const path = ['plugins', candidate.index, 'manifest', 'contributions', index];
+      const constructor = queryPanelConstructor(
+        registryGet,
+        contribution.tagName,
+        path,
+        diagnostics,
+      );
+      if (constructor === undefined) continue;
+      const priorOwner = tagOwners.get(contribution.tagName);
+      if (priorOwner !== undefined && priorOwner !== contribution.id) {
+        diagnostics.add(
+          'PLUGIN_CORE_IDENTITY_CONFLICT',
+          path,
+          'Panel tag resolves to a different panel.',
+        );
+        continue;
+      }
+      tagOwners.set(contribution.tagName, contribution.id);
+      byId.set(contribution.id, {
+        pluginId: candidate.manifest.id,
+        contribution,
+        constructor,
+      });
+    }
+  }
+  return [...byId.values()];
+}
+
+function queryPanelConstructor(
+  registryGet: (tagName: string) => unknown,
+  tagName: string,
+  path: readonly (string | number)[],
+  diagnostics: DiagnosticCollector,
+): BaseScreenPluginPanelConstructor | undefined {
+  let value: unknown;
+  try {
+    value = registryGet(tagName);
+  } catch {
+    diagnostics.add('PLUGIN_CORE_IDENTITY_INVALID', path, 'Registry query failed.');
+    return undefined;
+  }
+  if (typeof value !== 'function') {
+    diagnostics.add('PLUGIN_CORE_IDENTITY_INVALID', path, 'Panel tag is not registered.');
+    return undefined;
+  }
+  return value as BaseScreenPluginPanelConstructor;
 }
 
 function readTabularDataAdapter(

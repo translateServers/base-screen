@@ -7,6 +7,7 @@
 import type { ScreenDataBinding } from '@base-screen/contracts';
 import { ScreenDatasetField } from '@base-screen/contracts';
 import type { ScreenDatasetValueType } from '@base-screen/contracts';
+import type { ScreenDocument } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
@@ -16,6 +17,9 @@ import { ScreenTabularDataset } from '@base-screen/contracts';
 
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_EVENT: 'base-screen-material-event';
+
+// @public (undocumented)
+export const BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT: 'base-screen-plugin-panel-action';
 
 // @public (undocumented)
 export interface BaseScreenChartData {
@@ -430,6 +434,8 @@ export interface BaseScreenPluginActivationContext {
     // (undocumented)
     readonly commandPort: PluginCommandPort | undefined;
     // (undocumented)
+    readonly designReadPort: PluginDesignReadPort | undefined;
+    // (undocumented)
     readonly grantedCapabilities: readonly string[];
     // (undocumented)
     readonly instanceId: string;
@@ -461,6 +467,9 @@ export interface BaseScreenPluginCatalogEntry {
 export type BaseScreenPluginCommandHandler = (args: ScreenJsonValue) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
 
 // @public (undocumented)
+export type BaseScreenPluginCommandMenu = 'commandPalette' | 'menu.tools' | 'context.canvas' | 'context.component' | 'context.multi';
+
+// @public (undocumented)
 export type BaseScreenPluginContribution = {
     readonly kind: 'material';
     readonly type: string;
@@ -470,6 +479,8 @@ export type BaseScreenPluginContribution = {
     readonly id: string;
     readonly name: string;
     readonly requiredCapability: string;
+    readonly menus?: readonly BaseScreenPluginCommandMenu[];
+    readonly shortcut?: string;
 } | {
     readonly kind: 'dataResourceType';
     readonly id: string;
@@ -480,12 +491,27 @@ export type BaseScreenPluginContribution = {
     readonly kind: 'blueprintCapability';
     readonly id: string;
     readonly name: string;
+} | {
+    readonly kind: 'panel';
+    readonly id: string;
+    readonly name: string;
+    readonly tagName: string;
 };
 
 // @public (undocumented)
 export interface BaseScreenPluginDependency {
     // (undocumented)
     readonly id: string;
+}
+
+// @public
+export interface BaseScreenPluginDesignSnapshot {
+    // (undocumented)
+    readonly document: ScreenDocument;
+    // (undocumented)
+    readonly focusedComponentId: string | null;
+    // (undocumented)
+    readonly selectedComponentIds: readonly string[];
 }
 
 // @public (undocumented)
@@ -498,6 +524,49 @@ export interface BaseScreenPluginManifest {
     readonly dependencies: readonly BaseScreenPluginDependency[];
     // (undocumented)
     readonly id: string;
+}
+
+// @public
+export interface BaseScreenPluginPanelActionDetail {
+    // (undocumented)
+    readonly args: ScreenJsonValue;
+    // (undocumented)
+    readonly commandId: string;
+    // (undocumented)
+    readonly panelId: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenPluginPanelCatalog {
+    // (undocumented)
+    get(panelId: string): BaseScreenPluginPanelCatalogEntry | undefined;
+    // (undocumented)
+    has(panelId: string): boolean;
+    // (undocumented)
+    list(): readonly BaseScreenPluginPanelCatalogEntry[];
+}
+
+// @public (undocumented)
+export interface BaseScreenPluginPanelCatalogEntry {
+    // (undocumented)
+    readonly constructor: BaseScreenPluginPanelConstructor;
+    // (undocumented)
+    readonly contribution: BaseScreenPluginContribution & {
+        readonly kind: 'panel';
+    };
+    readonly pluginId: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenPluginPanelConstructor extends CustomElementConstructor {
+    // (undocumented)
+    new (): BaseScreenPluginPanelElement;
+}
+
+// @public
+export interface BaseScreenPluginPanelElement extends HTMLElement {
+    // (undocumented)
+    model: BaseScreenPluginDesignSnapshot;
 }
 
 // @public (undocumented)
@@ -549,6 +618,9 @@ export function createBaseScreenMaterialCatalog(entries: readonly BaseScreenMate
 export function createBaseScreenPluginCatalog(entries: readonly BaseScreenPluginCatalogEntry[]): BaseScreenPluginCatalog;
 
 // @public (undocumented)
+export function createBaseScreenPluginPanelCatalog(entries: readonly BaseScreenPluginPanelCatalogEntry[]): BaseScreenPluginPanelCatalog;
+
+// @public (undocumented)
 export const MAX_EDITOR_CONDITION_VALUES = 16;
 
 // @public (undocumented)
@@ -593,6 +665,9 @@ export function parseBaseScreenMaterialManifest(input: unknown): ScreenParseResu
 export function parseBaseScreenPluginManifest(input: unknown): ScreenParseResult<BaseScreenPluginManifest>;
 
 // @public (undocumented)
+export function parseBaseScreenPluginPanelActionDetail(input: unknown): ScreenParseResult<BaseScreenPluginPanelActionDetail>;
+
+// @public (undocumented)
 export function parseBaseScreenTableData(input: unknown): ScreenParseResult<BaseScreenTableData>;
 
 // @public (undocumented)
@@ -610,6 +685,12 @@ export interface PluginCommandRequest {
     readonly args: ScreenJsonValue;
     // (undocumented)
     readonly commandId: string;
+}
+
+// @public
+export interface PluginDesignReadPort {
+    // (undocumented)
+    read(): Promise<ScreenParseResult<BaseScreenPluginDesignSnapshot>>;
 }
 
 // @public (undocumented)

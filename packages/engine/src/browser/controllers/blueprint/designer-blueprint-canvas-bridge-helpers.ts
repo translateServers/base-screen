@@ -2,11 +2,10 @@ import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { DesignerBlueprintConnectionFailureReason } from '../../../common/operations/blueprint/designer-blueprint-connection.js';
 import type { BaseScreenBlueprintCanvasCommandResult } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
+import { cloneAndFreeze } from '../../../common/tools/designer-json-snapshot.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 
-export function cloneAndFreeze<T>(value: T): T {
-  return deepFreeze(JSON.parse(JSON.stringify(value)) as T);
-}
+export { cloneAndFreeze };
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -52,12 +51,4 @@ export function designerBlueprintConnectionFailureMessage(
   if (reason === 'source-unconnected') return DESIGNER_UI_TEXT.blueprint.sourceNodeUnconnected;
   if (reason === 'unconfigured') return DESIGNER_UI_TEXT.blueprint.nodeNeedsConfiguration;
   return DESIGNER_UI_TEXT.blueprint.invalidConnection;
-}
-
-function deepFreeze<T>(value: T): T {
-  if (value !== null && typeof value === 'object') {
-    for (const child of Object.values(value as Record<string, unknown>)) deepFreeze(child);
-    Object.freeze(value);
-  }
-  return value;
 }
