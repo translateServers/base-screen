@@ -9,6 +9,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialEditorCondition,
   BaseScreenMaterialEditorField,
+  BaseScreenPluginInspectorControlCatalog,
 } from '@base-screen/plugin-core';
 
 export interface DesignerDescriptorDatasetFields {
@@ -21,12 +22,15 @@ export interface DesignerDescriptorPanelInput {
   readonly interaction: ScreenInteractionState;
   readonly catalog: BaseScreenMaterialCatalog | undefined;
   readonly getDatasetFields?: (() => readonly DesignerDescriptorDatasetFields[]) | undefined;
+  /** 授权目录：custom 控件只能从这里取构造函数，绝不按清单标签直接 createElement。 */
+  readonly inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined;
 }
 
 export interface DesignerDescriptorContext {
   readonly component: ScreenComponentNode;
   readonly manifest: NonNullable<ReturnType<BaseScreenMaterialCatalog['get']>>['manifest'];
   readonly datasetFields: readonly DesignerDescriptorDatasetFields[];
+  readonly inspectorControls: BaseScreenPluginInspectorControlCatalog | undefined;
 }
 
 export function getDesignerDescriptorContext(
@@ -39,7 +43,12 @@ export function getDesignerDescriptorContext(
     component === undefined ? undefined : input.catalog?.get(component.type)?.manifest;
   return component === undefined || manifest === undefined
     ? undefined
-    : { component, manifest, datasetFields: input.getDatasetFields?.() ?? [] };
+    : {
+        component,
+        manifest,
+        datasetFields: input.getDatasetFields?.() ?? [],
+        inspectorControls: input.inspectorControls,
+      };
 }
 
 export function isDescriptorFieldVisible(

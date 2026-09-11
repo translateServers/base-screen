@@ -10,6 +10,7 @@ import {
   createDescriptorControl,
   descriptorFieldSchema,
 } from './designer-descriptor-control-dom.js';
+import { appendDescriptorCustomControl } from './designer-descriptor-custom-control-dom.js';
 import {
   type DesignerDescriptorContext,
   isDescriptorFieldVisible,
@@ -65,6 +66,10 @@ function appendDescriptorField(
 ): void {
   if (field.control === 'group') {
     appendDescriptorGroup(parent, field, context);
+    return;
+  }
+  if (field.control === 'custom') {
+    appendDescriptorCustomControl(parent, field, context);
     return;
   }
   if (

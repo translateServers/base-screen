@@ -28,7 +28,8 @@ export type BaseScreenMaterialEditorControl =
   | 'repeatable-array'
   | 'reorderable-array'
   | 'field-selector'
-  | 'unit-number';
+  | 'unit-number'
+  | 'custom';
 
 export type BaseScreenMaterialEditorConditionOperator =
   | 'eq'
@@ -54,6 +55,10 @@ export interface BaseScreenMaterialEditorField {
   readonly path: readonly BaseScreenMaterialEditorPathSegment[];
   readonly label: string;
   readonly control: BaseScreenMaterialEditorControl;
+  /** 仅 `custom` 控件使用：引用已授权的 inspectorControl 标签。
+   *  这只是引用而非实例化许可——Engine 只实例化 plugin-manager 从宿主 registry
+   *  解析出的目录项，绝不按清单里的标签名 createElement。 */
+  readonly tagName?: string;
   /** `color` 控件是否接受线性/径向渐变；缺省仅接受纯色。 */
   readonly allowGradient?: boolean;
   readonly help?: string;
@@ -115,6 +120,8 @@ export const EDITOR_CONTROLS: ReadonlySet<string> = new Set([
   'reorderable-array',
   'field-selector',
   'unit-number',
+  // 不进 SCALAR_CONTROLS / ARRAY_CONTROLS：因此不能绑 data，也不能冒充数组容器。
+  'custom',
 ]);
 
 export const SCALAR_CONTROLS: ReadonlySet<string> = new Set([
@@ -139,6 +146,7 @@ export const FIELD_KNOWN = new Set([
   'path',
   'label',
   'control',
+  'tagName',
   'allowGradient',
   'help',
   'keywords',

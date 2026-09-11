@@ -1,6 +1,8 @@
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
+  BaseScreenPluginInspectorControlCatalogEntry,
+  BaseScreenPluginInspectorControlConstructor,
   BaseScreenPluginPanelCatalogEntry,
   BaseScreenPluginPanelConstructor,
 } from '@base-screen/plugin-core';
@@ -84,11 +86,12 @@ export function inspectPluginPanels(
       const contribution = candidate.manifest.contributions[index]!;
       if (contribution.kind !== 'panel') continue;
       const path = ['plugins', candidate.index, 'manifest', 'contributions', index];
-      const constructor = queryPanelConstructor(
+      const constructor = queryAuthorizedConstructor(
         registryGet,
         contribution.tagName,
         path,
         diagnostics,
+        'Panel tag is not registered.',
       );
       if (constructor === undefined) continue;
       const priorOwner = tagOwners.get(contribution.tagName);
@@ -104,19 +107,64 @@ export function inspectPluginPanels(
       byId.set(contribution.id, {
         pluginId: candidate.manifest.id,
         contribution,
-        constructor,
+        constructor: constructor as BaseScreenPluginPanelConstructor,
       });
     }
   }
   return [...byId.values()];
 }
 
-function queryPanelConstructor(
+export function inspectInspectorControls(
+  candidates: readonly Candidate[],
+  registryGet: (tagName: string) => unknown,
+  diagnostics: DiagnosticCollector,
+): readonly BaseScreenPluginInspectorControlCatalogEntry[] {
+  const byId = new Map<string, BaseScreenPluginInspectorControlCatalogEntry>();
+  const tagOwners = new Map<string, string>();
+  for (const candidate of candidates) {
+    for (let index = 0; index < candidate.manifest.contributions.length; index++) {
+      const contribution = candidate.manifest.contributions[index]!;
+      if (contribution.kind !== 'inspectorControl') continue;
+      const path = ['plugins', candidate.index, 'manifest', 'contributions', index];
+      const constructor = queryAuthorizedConstructor(
+        registryGet,
+        contribution.tagName,
+        path,
+        diagnostics,
+        'Inspector control tag is not registered.',
+      );
+      if (constructor === undefined) continue;
+      const priorOwner = tagOwners.get(contribution.tagName);
+      if (priorOwner !== undefined && priorOwner !== contribution.id) {
+        diagnostics.add(
+          'PLUGIN_CORE_IDENTITY_CONFLICT',
+          path,
+          'Inspector control tag resolves to a different control.',
+        );
+        continue;
+      }
+      tagOwners.set(contribution.tagName, contribution.id);
+      byId.set(contribution.id, {
+        pluginId: candidate.manifest.id,
+        contribution,
+        constructor: constructor as BaseScreenPluginInspectorControlConstructor,
+      });
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
+ * 宿主 registry 是唯一来源：描述里出现的 tagName 若未被某个 inspectorControl 贡献声明并
+ * 解析成功，就永远不会进入目录，Engine 也就拿不到它的构造函数。
+ */
+function queryAuthorizedConstructor(
   registryGet: (tagName: string) => unknown,
   tagName: string,
   path: readonly (string | number)[],
   diagnostics: DiagnosticCollector,
-): BaseScreenPluginPanelConstructor | undefined {
+  notRegisteredMessage: string,
+): CustomElementConstructor | undefined {
   let value: unknown;
   try {
     value = registryGet(tagName);
@@ -125,10 +173,10 @@ function queryPanelConstructor(
     return undefined;
   }
   if (typeof value !== 'function') {
-    diagnostics.add('PLUGIN_CORE_IDENTITY_INVALID', path, 'Panel tag is not registered.');
+    diagnostics.add('PLUGIN_CORE_IDENTITY_INVALID', path, notRegisteredMessage);
     return undefined;
   }
-  return value as BaseScreenPluginPanelConstructor;
+  return value as CustomElementConstructor;
 }
 
 function readTabularDataAdapter(

@@ -1,5 +1,6 @@
 import type { BaseScreenMaterialObjectSchema } from '../contracts.js';
 import { PluginDiagnosticCollector } from '../diagnostics.js';
+import { isValidCustomElementName } from '../material/material-validation-utils.js';
 import {
   EDITOR_CONTROLS,
   FIELD_KNOWN,
@@ -101,6 +102,7 @@ function validateItemField(
     return;
   }
   validateColorGradientCapability(value.allowGradient, control, path, collector);
+  validateCustomControlBinding(value.tagName, control, target, path, collector);
   if (!isDisplayString(value.label, 256)) {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
@@ -139,6 +141,44 @@ export function validateColorGradientCapability(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
       [...path, 'allowGradient'],
       'Editor gradient support is only allowed as a boolean on color controls.',
+    );
+  }
+}
+
+/**
+ * `custom` 控件只声明引用哪个标签，授权发生在 plugin-manager 解析宿主 registry 之后；
+ * 校验期拿不到 registry，所以这里只保证形状合法。target 限 props/style，
+ * 使写回始终走既有 props/style 事务路径。
+ */
+export function validateCustomControlBinding(
+  tagName: unknown,
+  control: string,
+  target: string,
+  path: readonly (string | number)[],
+  collector: PluginDiagnosticCollector,
+): void {
+  if (control !== 'custom') {
+    if (tagName !== undefined) {
+      collector.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        [...path, 'tagName'],
+        'Editor tagName is only allowed on custom controls.',
+      );
+    }
+    return;
+  }
+  if (target !== 'props' && target !== 'style') {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      [...path, 'target'],
+      'Custom editor controls are only allowed on props or style targets.',
+    );
+  }
+  if (!isValidCustomElementName(tagName)) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      [...path, 'tagName'],
+      'Custom editor control tagName is not a valid custom element name.',
     );
   }
 }

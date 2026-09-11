@@ -45,12 +45,108 @@
         border-radius: 8px;
         background: #0e1620;
         color: #d7e2f0;
-        font: 13px/1.5 system-ui, sans-serif;
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
         box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
       }
 
-      body[data-layout='designer'] #host-shell {
+      body[data-layout="designer"] #host-shell {
         display: none;
+      }
+
+      body[data-layout="designer"][data-case-host-shell] #host-shell {
+        display: grid;
+      }
+
+      #feature-cases {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        z-index: 11;
+        display: grid;
+        gap: 8px;
+        width: 280px;
+        max-width: calc(100vw - 24px);
+        max-height: 55vh;
+        overflow: auto;
+        padding: 12px;
+        border: 1px solid #2b3a4e;
+        border-radius: 8px;
+        background: #0e1620;
+        color: #d7e2f0;
+        font:
+          13px/1.5 system-ui,
+          sans-serif;
+        box-shadow: 0 8px 24px rgb(0 0 0 / 45%);
+        scrollbar-gutter: stable;
+      }
+
+      #feature-cases[hidden] {
+        display: none;
+      }
+
+      #feature-cases header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 700;
+      }
+
+      #feature-cases header a {
+        color: #9fb1c9;
+        font-weight: 500;
+        text-decoration: none;
+      }
+
+      #feature-cases header a:hover {
+        color: #d7e2f0;
+      }
+
+      #feature-cases .feature-cases-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      #feature-cases p {
+        margin: 0;
+        color: #9fb1c9;
+      }
+
+      #feature-cases nav {
+        display: grid;
+        gap: 4px;
+      }
+
+      #feature-cases button {
+        padding: 4px 10px;
+        border: 1px solid #2b3a4e;
+        border-radius: 6px;
+        background: #17212b;
+        color: #d7e2f0;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      #feature-cases button:hover {
+        outline: 1px solid #39c5bb;
+        outline-offset: -1px;
+      }
+
+      #feature-cases button[aria-current="page"] {
+        border-color: #39c5bb;
+        background: #14343a;
+      }
+
+      #feature-cases code {
+        display: block;
+        margin-top: 4px;
+        color: #86c99a;
+        font:
+          11px/1.4 ui-monospace,
+          monospace;
       }
 
       #host-shell header {
@@ -64,7 +160,9 @@
         border: 1px solid #2b3a4e;
         border-radius: 6px;
         color: #d7e2f0;
-        font: 12px/1.4 ui-monospace, monospace;
+        font:
+          12px/1.4 ui-monospace,
+          monospace;
       }
 
       #host-shell output {
@@ -73,7 +171,7 @@
         color: #86c99a;
       }
 
-      #host-shell output[data-tone='error'] {
+      #host-shell output[data-tone="error"] {
         color: #ff8197;
       }
 
@@ -92,16 +190,16 @@
         cursor: pointer;
       }
 
-      body[data-layout='designer'] {
+      body[data-layout="designer"] {
         display: block;
       }
 
-      body[data-layout='designer'] base-screen-designer {
+      body[data-layout="designer"] base-screen-designer {
         display: block;
         width: 100%;
       }
 
-      body[data-layout='designer'] base-screen-viewer {
+      body[data-layout="designer"] base-screen-viewer {
         display: none;
       }
 
@@ -115,7 +213,9 @@
         overflow: hidden;
         color: #d7e2f0;
         background: #0b1016;
-        font: 12px/1.4 system-ui, sans-serif;
+        font:
+          12px/1.4 system-ui,
+          sans-serif;
       }
 
       [data-harness-blueprint-toolbar] {
@@ -165,16 +265,33 @@
         aria-label="Harness Blueprint canvas"
       >
         <header data-harness-blueprint-toolbar>Harness 图形画布</header>
-        <main data-harness-blueprint-graph aria-live="polite">等待 Blueprint 状态</main>
+        <main data-harness-blueprint-graph aria-live="polite">
+          等待 Blueprint 状态
+        </main>
       </section>
     </base-screen-designer>
     <base-screen-viewer></base-screen-viewer>
+    <aside id="feature-cases" data-feature-cases hidden aria-label="专项案例">
+      <header>
+        专项案例
+        <span class="feature-cases-actions">
+          <a href="./cases.html">目录</a>
+          <button type="button" data-feature-cases-close>关闭</button>
+        </span>
+      </header>
+      <p data-feature-cases-hint>选择一条专项案例，设计器会跳到对应选区或面板。</p>
+      <nav data-feature-cases-list></nav>
+    </aside>
     <section id="host-shell" data-host-shell aria-label="宿主作者面板">
       <header>宿主作者面板</header>
       <p data-host-selection>未选择组件</p>
       <div class="host-actions">
-        <button type="button" data-host-action="component-text">编辑组件 props</button>
-        <button type="button" data-host-action="component-data">编辑数据参数</button>
+        <button type="button" data-host-action="component-text">
+          编辑组件 props
+        </button>
+        <button type="button" data-host-action="component-data">
+          编辑数据参数
+        </button>
         <button type="button" data-host-action="blueprint">切换交互编排</button>
       </div>
       <label>

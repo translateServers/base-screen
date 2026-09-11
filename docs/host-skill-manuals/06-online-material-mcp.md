@@ -8,7 +8,7 @@
 
 ```text
 pnpm build
-pnpm dev:material-mcp -- --snapshot <宿主仓库>/.base-screen/host-snapshot.json
+node examples/material-mcp-server/server.mjs --snapshot <宿主仓库>/.base-screen/host-snapshot.json
 ```
 
 参考服务使用 stdio，不含认证，只用于本地接入和契约验证。AI 客户端配置 `node` 命令、参考服务绝对路径和 `--snapshot` 快照绝对路径；Base Screen 不自动修改客户端配置。

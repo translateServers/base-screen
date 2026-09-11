@@ -796,6 +796,7 @@ export const DESIGNER_UI_TEXT = {
     removeItem: '移除',
     addItem: '添加',
     item: (index: number) => `第 ${index} 项`,
+    unsupportedControl: (tagName: string) => `控件 ${tagName} 未由宿主注册，无法编辑此字段。`,
   },
   textEditing: {
     hint: 'Enter 提交，Shift+Enter 换行，Esc 取消',

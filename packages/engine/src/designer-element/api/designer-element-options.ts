@@ -1,6 +1,7 @@
 import type { ScreenDocument, ScreenProjectAdapter } from '@base-screen/contracts';
 import type {
   BaseScreenPluginCatalog,
+  BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginPanelCatalog,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
@@ -22,6 +23,7 @@ import {
 import { type DesignerToolMaterialTypes } from '../../common/tools/designer-tools.js';
 import {
   isBaseScreenPluginCatalog,
+  isBaseScreenPluginInspectorControlCatalog,
   isBaseScreenPluginPanelCatalog,
   isPluginCommandPort,
   lifecycleDiagnostic,
@@ -256,6 +258,35 @@ export function writePluginPanels(
     return;
   }
   elementState.pluginPanels = value;
+}
+
+export function readInspectorControls(
+  element: DesignerElementHost,
+): BaseScreenPluginInspectorControlCatalog | undefined {
+  const elementState = getDesignerElementState(element);
+
+  return elementState.inspectorControls;
+}
+
+export function writeInspectorControls(
+  element: DesignerElementHost,
+  value: BaseScreenPluginInspectorControlCatalog | undefined,
+) {
+  const elementState = getDesignerElementState(element);
+
+  if (elementState.renderer !== undefined && value !== elementState.inspectorControls) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Inspector controls cannot change after initialization. Call unload.'),
+    ]);
+    return;
+  }
+  if (value !== undefined && !isBaseScreenPluginInspectorControlCatalog(value)) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic('Designer inspector controls 必须是携带 inspectorControl 贡献的目录。'),
+    ]);
+    return;
+  }
+  elementState.inspectorControls = value;
 }
 
 export function readPluginCommandPort(element: DesignerElementHost): PluginCommandPort | undefined {

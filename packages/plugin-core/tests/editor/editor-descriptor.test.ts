@@ -517,6 +517,112 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
   });
 });
 
+describe('custom editor control', () => {
+  function parseField(field: Record<string, unknown>) {
+    return parseBaseScreenMaterialEditorDescriptor(
+      { appearance: [{ id: 'text', label: '文本', fields: [field] }] },
+      propsSchema,
+      styleSchema,
+      ['valueClick'],
+      roles,
+    );
+  }
+
+  it('CD-CT-01 accepts a custom control bound to a props path', () => {
+    const result = parseField({
+      id: 'accent',
+      target: 'props',
+      path: ['accent'],
+      label: '强调色',
+      control: 'custom',
+      tagName: 'acme-color-wheel',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.appearance?.[0]?.fields[0]).toMatchObject({
+      control: 'custom',
+      tagName: 'acme-color-wheel',
+    });
+  });
+
+  it('CD-CT-02 binds any resolved shape since the control owns its value semantics', () => {
+    expect(
+      parseField({
+        id: 'legend',
+        target: 'props',
+        path: ['legend'],
+        label: '图例',
+        control: 'custom',
+        tagName: 'acme-legend-editor',
+      }).ok,
+    ).toBe(true);
+    expect(
+      parseField({
+        id: 'grid',
+        target: 'props',
+        path: ['grid'],
+        label: '网格',
+        control: 'custom',
+        tagName: 'acme-grid-editor',
+      }).ok,
+    ).toBe(true);
+    expect(
+      parseField({
+        id: 'color',
+        target: 'style',
+        path: ['color'],
+        label: '颜色',
+        control: 'custom',
+        tagName: 'acme-color-wheel',
+      }).ok,
+    ).toBe(true);
+  });
+
+  it('CD-CT-03 requires a legal custom element name on the custom control', () => {
+    for (const tagName of [undefined, 'monitor', 'ACME-Wheel', 'font-face', 7]) {
+      const result = parseField({
+        id: 'accent',
+        target: 'props',
+        path: ['accent'],
+        label: '强调色',
+        control: 'custom',
+        ...(tagName === undefined ? {} : { tagName }),
+      });
+      expect(result.ok).toBe(false);
+    }
+  });
+
+  it('CD-CT-04 keeps custom controls off the data target', () => {
+    const result = parseField({
+      id: 'xField',
+      target: 'data',
+      path: ['binding', 'fields', 'dimension'],
+      label: '维度字段',
+      control: 'custom',
+      tagName: 'acme-field-picker',
+    });
+
+    expect(result.ok).toBe(false);
+  });
+
+  it('CD-CT-05 rejects a tagName on a built-in control', () => {
+    const result = parseField({
+      id: 'title',
+      target: 'props',
+      path: ['title'],
+      label: '标题',
+      control: 'text',
+      tagName: 'acme-stray',
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.path.includes('tagName'))).toBe(true);
+    }
+  });
+});
+
 describe('resolveSchema', () => {
   it('resolves nested object paths and array items', () => {
     const legend = resolveSchema(['legend', 'show'], propsSchema);

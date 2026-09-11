@@ -7,6 +7,7 @@
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialConstructor } from '@base-screen/plugin-core';
 import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenPluginInspectorControlCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginPanelCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
@@ -66,6 +67,8 @@ export interface BaseScreenPluginManagerOptions {
 export interface BaseScreenPluginManagerSnapshot {
     // (undocumented)
     readonly contributions: BaseScreenRuntimeContributionIndex;
+    // (undocumented)
+    readonly inspectorControls: BaseScreenPluginInspectorControlCatalog;
     // (undocumented)
     readonly materials: BaseScreenMaterialCatalog;
     // (undocumented)

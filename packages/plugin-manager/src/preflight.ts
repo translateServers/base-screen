@@ -2,6 +2,7 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenPluginCommandHandler,
+  type BaseScreenPluginInspectorControlCatalogEntry,
   type BaseScreenPluginManifest,
   type BaseScreenPluginPanelCatalogEntry,
   type BaseScreenPluginRuntime,
@@ -10,7 +11,11 @@ import {
 import { DiagnosticCollector } from './diagnostics.js';
 import { snapshotManagerInput } from './input.js';
 import type { ActivationSession, Candidate } from './preflight-types.js';
-import { inspectMaterialRegistry, inspectPluginPanels } from './registry.js';
+import {
+  inspectInspectorControls,
+  inspectMaterialRegistry,
+  inspectPluginPanels,
+} from './registry.js';
 import { resolveCandidates, validateCapabilityPlan } from './resolver.js';
 import { createActivationSession } from './session.js';
 import type { BaseScreenPluginManagerOptions } from './types.js';
@@ -32,6 +37,7 @@ export interface PlannedPlugin {
 export interface ActivationPlan {
   readonly materials: readonly BaseScreenMaterialCatalogEntry[];
   readonly panels: readonly BaseScreenPluginPanelCatalogEntry[];
+  readonly inspectorControls: readonly BaseScreenPluginInspectorControlCatalogEntry[];
   readonly plugins: readonly PlannedPlugin[];
 }
 
@@ -51,11 +57,14 @@ export function createActivationPlan(
   if (diagnostics.hasErrors) return diagnostics.failure();
   const panels = inspectPluginPanels(ordered, input.value.registryGet, diagnostics);
   if (diagnostics.hasErrors) return diagnostics.failure();
+  const inspectorControls = inspectInspectorControls(ordered, input.value.registryGet, diagnostics);
+  if (diagnostics.hasErrors) return diagnostics.failure();
   return {
     ok: true,
     value: {
       materials,
       panels,
+      inspectorControls,
       plugins: ordered.map((candidate) => {
         const grantedCapabilities = grants.get(candidate)!;
         return Object.freeze({

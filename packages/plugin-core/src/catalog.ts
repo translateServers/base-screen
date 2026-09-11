@@ -5,6 +5,8 @@ import type {
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
   BaseScreenPluginCatalogEntry,
+  BaseScreenPluginInspectorControlCatalog,
+  BaseScreenPluginInspectorControlCatalogEntry,
   BaseScreenPluginPanelCatalog,
   BaseScreenPluginPanelCatalogEntry,
 } from './contracts.js';
@@ -113,6 +115,39 @@ export function createBaseScreenPluginPanelCatalog(
     },
     has(panelId) {
       return byId.has(panelId);
+    },
+    list() {
+      return [...sorted];
+    },
+  };
+}
+
+export function createBaseScreenPluginInspectorControlCatalog(
+  entries: readonly BaseScreenPluginInspectorControlCatalogEntry[],
+): BaseScreenPluginInspectorControlCatalog {
+  assertUnique(entries, (entry) => entry.contribution.id, 'inspector control id');
+  assertUnique(entries, (entry) => entry.contribution.tagName, 'inspector control tag');
+  const sorted = entries
+    .map((entry) =>
+      freeze({
+        pluginId: entry.pluginId,
+        contribution: cloneJson(entry.contribution),
+        // 构造函数按引用保留，与物料/面板目录同理，不参与 JSON 克隆。
+        constructor: entry.constructor,
+      }),
+    )
+    .sort((left, right) => compareStrings(left.contribution.id, right.contribution.id));
+  const byId = new Map(sorted.map((entry) => [entry.contribution.id, entry]));
+  const byTag = new Map(sorted.map((entry) => [entry.contribution.tagName, entry]));
+  return {
+    get(controlId) {
+      return byId.get(controlId);
+    },
+    getByTagName(tagName) {
+      return byTag.get(tagName);
+    },
+    has(tagName) {
+      return byTag.has(tagName);
     },
     list() {
       return [...sorted];

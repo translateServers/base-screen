@@ -168,7 +168,7 @@ export interface BaseScreenMaterialEditorCondition {
 export type BaseScreenMaterialEditorConditionOperator = 'eq' | 'neq' | 'exists' | 'not-exists' | 'in' | 'not-in';
 
 // @public (undocumented)
-export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number';
+export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'custom';
 
 // @public (undocumented)
 export interface BaseScreenMaterialEditorDescriptor {
@@ -211,6 +211,7 @@ export interface BaseScreenMaterialEditorField {
     readonly projection?: BaseScreenMaterialEditorProjection;
     // (undocumented)
     readonly step?: number;
+    readonly tagName?: string;
     // (undocumented)
     readonly target: BaseScreenMaterialEditorTarget;
     // (undocumented)
@@ -496,6 +497,11 @@ export type BaseScreenPluginContribution = {
     readonly id: string;
     readonly name: string;
     readonly tagName: string;
+} | {
+    readonly kind: 'inspectorControl';
+    readonly id: string;
+    readonly name: string;
+    readonly tagName: string;
 };
 
 // @public (undocumented)
@@ -512,6 +518,58 @@ export interface BaseScreenPluginDesignSnapshot {
     readonly focusedComponentId: string | null;
     // (undocumented)
     readonly selectedComponentIds: readonly string[];
+}
+
+// @public
+export interface BaseScreenPluginInspectorControlCatalog {
+    // (undocumented)
+    get(controlId: string): BaseScreenPluginInspectorControlCatalogEntry | undefined;
+    // (undocumented)
+    getByTagName(tagName: string): BaseScreenPluginInspectorControlCatalogEntry | undefined;
+    // (undocumented)
+    has(tagName: string): boolean;
+    // (undocumented)
+    list(): readonly BaseScreenPluginInspectorControlCatalogEntry[];
+}
+
+// @public (undocumented)
+export interface BaseScreenPluginInspectorControlCatalogEntry {
+    // (undocumented)
+    readonly constructor: BaseScreenPluginInspectorControlConstructor;
+    // (undocumented)
+    readonly contribution: BaseScreenPluginContribution & {
+        readonly kind: 'inspectorControl';
+    };
+    // (undocumented)
+    readonly pluginId: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenPluginInspectorControlConstructor extends CustomElementConstructor {
+    // (undocumented)
+    new (): BaseScreenPluginInspectorControlElement;
+}
+
+// @public
+export interface BaseScreenPluginInspectorControlElement extends HTMLElement {
+    // (undocumented)
+    model: BaseScreenPluginInspectorControlModel;
+    // (undocumented)
+    value: ScreenJsonValue;
+}
+
+// @public
+export interface BaseScreenPluginInspectorControlModel {
+    // (undocumented)
+    readonly componentId: string;
+    // (undocumented)
+    readonly componentType: string;
+    // (undocumented)
+    readonly path: readonly (string | number)[];
+    // (undocumented)
+    readonly target: 'props' | 'style';
+    // (undocumented)
+    readonly value: ScreenJsonValue | undefined;
 }
 
 // @public (undocumented)
@@ -616,6 +674,9 @@ export function createBaseScreenMaterialCatalog(entries: readonly BaseScreenMate
 
 // @public (undocumented)
 export function createBaseScreenPluginCatalog(entries: readonly BaseScreenPluginCatalogEntry[]): BaseScreenPluginCatalog;
+
+// @public (undocumented)
+export function createBaseScreenPluginInspectorControlCatalog(entries: readonly BaseScreenPluginInspectorControlCatalogEntry[]): BaseScreenPluginInspectorControlCatalog;
 
 // @public (undocumented)
 export function createBaseScreenPluginPanelCatalog(entries: readonly BaseScreenPluginPanelCatalogEntry[]): BaseScreenPluginPanelCatalog;

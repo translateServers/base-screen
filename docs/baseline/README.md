@@ -254,6 +254,15 @@
   `base-screen-plugin-panel-action` 回传 `{ panelId, commandId, args }`，Engine 校验归属后派发到该插件
   自己的贡献命令——这是唯一放开真实 `args` 的路径，chrome 触发仍为 `null`。不引入 `when`、工具栏、
   任意 DOM 注入或具名槽位协议。
+- **属性面板插件自定义控件**（2026-09-10，[ADR-0073](../decisions/ADR-0073-inspector-custom-form-controls.md)）：
+  editorDescriptor 字段可用 `control: 'custom'` + `tagName` 绑定 `props`/`style` 路径；控件由
+  `kind: 'inspectorControl'` 贡献声明、plugin-manager 在 preflight 从宿主 registry 解析为
+  `snapshot.inspectorControls`，解析不到即激活失败关闭。**授权依据是贡献而非注册**：Engine 只
+  `new entry.constructor()`，绝不 `createElement(tagName)`；未授权标签渲染为降级提示且不进写回路径。
+  控件与内建控件同形（宿主写 `model`，控件派发 `change`，宿主读 `value`），因此复用
+  `update-components` props/style 事务，撤销与 dirty 语义自动继承；读回值必须 JSON-safe，否则视为未编辑。
+  不放开 `data`/`interaction` target，不提供变更订阅。已知盲区：`validateControlForSchema` 对无法解析的
+  path 提前返回，因此绑到不存在的 props 路径不会在校验期报错（既有行为，对所有控件一致）。
 
 ## 历史迁移
 

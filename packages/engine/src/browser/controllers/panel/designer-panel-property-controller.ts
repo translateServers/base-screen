@@ -43,6 +43,7 @@ export class DesignerPanelPropertyController {
         this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
         this.#canvasBackgroundDrafts,
         this.#canvasPresentation,
+        this.callbacks.getInspectorControls?.(),
       );
     }
     renderDesignerDataPanel(

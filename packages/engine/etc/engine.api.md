@@ -7,6 +7,7 @@
 import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
+import type { BaseScreenPluginInspectorControlCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginPanelCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import { PluginCommandPort } from '@base-screen/plugin-core';
@@ -392,6 +393,8 @@ export interface BaseScreenDesignerConfiguration {
     readonly groupMaterialType?: string;
     // (undocumented)
     readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
+    // (undocumented)
+    readonly inspectorControls?: BaseScreenPluginInspectorControlCatalog;
     readonly leftPanelGroups?: readonly BaseScreenDesignerLeftPanelGroup[];
     // (undocumented)
     readonly materialLibraryGrouping?: BaseScreenMaterialLibraryGrouping;
@@ -502,6 +505,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     importProject(name: string, document: ScreenDocument): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
     insertHostResource(intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<ScreenDocument>;
+    // (undocumented)
+    get inspectorControls(): BaseScreenPluginInspectorControlCatalog | undefined;
+    set inspectorControls(value: BaseScreenPluginInspectorControlCatalog | undefined);
     // (undocumented)
     get instanceId(): string;
     // (undocumented)

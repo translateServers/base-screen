@@ -151,6 +151,11 @@ export function validateControlForSchema(
     }
     return;
   }
+  // 显式分支：不能让它落到下面 expected === undefined 的静默放行路径。
+  // 自定义控件可绑任意已解析形状，值语义由控件自身负责，这里只确认 path 命中 schema。
+  if (control === 'custom') {
+    return;
+  }
   const expected =
     control === 'number' || control === 'unit-number'
       ? 'number'

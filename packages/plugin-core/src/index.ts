@@ -1,6 +1,7 @@
 export {
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
+  createBaseScreenPluginInspectorControlCatalog,
   createBaseScreenPluginPanelCatalog,
 } from './catalog.js';
 export type {
@@ -37,6 +38,11 @@ export type {
   BaseScreenPluginContribution,
   BaseScreenPluginDependency,
   BaseScreenPluginDesignSnapshot,
+  BaseScreenPluginInspectorControlCatalog,
+  BaseScreenPluginInspectorControlCatalogEntry,
+  BaseScreenPluginInspectorControlConstructor,
+  BaseScreenPluginInspectorControlElement,
+  BaseScreenPluginInspectorControlModel,
   BaseScreenPluginManifest,
   BaseScreenPluginPanelActionDetail,
   BaseScreenPluginPanelCatalog,

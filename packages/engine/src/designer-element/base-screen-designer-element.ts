@@ -30,6 +30,7 @@ import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
+  BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginPanelCatalog,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
@@ -165,6 +166,14 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   set pluginPanels(value: BaseScreenPluginPanelCatalog | undefined) {
     this.#designerState.runtime.writePluginPanels(this, value);
+  }
+
+  get inspectorControls(): BaseScreenPluginInspectorControlCatalog | undefined {
+    return this.#designerState.runtime.readInspectorControls(this);
+  }
+
+  set inspectorControls(value: BaseScreenPluginInspectorControlCatalog | undefined) {
+    this.#designerState.runtime.writeInspectorControls(this, value);
   }
 
   get previewHandler(): ((document: ScreenDocument) => boolean) | undefined {

@@ -70,7 +70,7 @@ base-screen/
 │   ├── vue/
 │   ├── sdk/
 │   └── testing/
-├── examples/             # Vanilla、React、Vue 和 tarball consumer
+├── examples/   # Vanilla、React、Vue 和 tarball consumer
 ├── scripts/              # 边界、包、license、tarball 和发布检查
 ├── package.json          # private workspace root
 ├── .changeset/

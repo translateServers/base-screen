@@ -4,6 +4,7 @@ import {
   type BaseScreenPluginCommandHandler,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
+  createBaseScreenPluginInspectorControlCatalog,
   createBaseScreenPluginPanelCatalog,
   parsePluginCommandRequest,
 } from '@base-screen/plugin-core';
@@ -129,6 +130,9 @@ class PluginManager implements BaseScreenPluginManager {
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
       panels: createBaseScreenPluginPanelCatalog(plan.value.panels),
+      inspectorControls: createBaseScreenPluginInspectorControlCatalog(
+        plan.value.inspectorControls,
+      ),
       plugins,
       contributions: createRuntimeContributionIndex(plugins),
     };

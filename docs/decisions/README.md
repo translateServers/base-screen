@@ -16,6 +16,7 @@
 
 | ADR | 状态 | 日期 | 主题 |
 | --- | --- | --- | --- |
+| [ADR-0073](./ADR-0073-inspector-custom-form-controls.md) | 已接受 | 2026-09-10 | 属性面板插件自定义表单控件：`control: 'custom'` 与按贡献授权的实例化 |
 | [ADR-0072](./ADR-0072-plugin-panel-contribution-minimal-loop.md) | 已接受 | 2026-09-10 | 插件面板贡献的最小闭环：`kind: 'panel'`、复用快照 model 与带 args 的动作回路 |
 | [ADR-0071](./ADR-0071-plugin-design-context-read-access.md) | 已接受 | 2026-09-09 | 插件设计上下文只读访问：`design.read`、原子快照与 Designer `selection` |
 | [ADR-0070](./ADR-0070-plugin-command-chrome-projection.md) | 已接受 | 2026-09-06 | 插件 command 贡献的 menus/shortcut 与 Designer chrome 投影 |

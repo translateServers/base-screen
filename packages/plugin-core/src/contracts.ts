@@ -242,6 +242,13 @@ export type BaseScreenPluginContribution =
       readonly name: string;
       /** 由宿主 registry 解析的 custom element 标签；面板元素接收设计快照作为 model。 */
       readonly tagName: string;
+    }
+  | {
+      readonly kind: 'inspectorControl';
+      readonly id: string;
+      readonly name: string;
+      /** 由宿主 registry 解析的 custom element 标签；editorDescriptor 字段用 tagName 引用它。 */
+      readonly tagName: string;
     };
 
 export interface BaseScreenRuntimeContributionIndex {
@@ -338,4 +345,43 @@ export interface BaseScreenPluginPanelCatalog {
   get(panelId: string): BaseScreenPluginPanelCatalogEntry | undefined;
   has(panelId: string): boolean;
   list(): readonly BaseScreenPluginPanelCatalogEntry[];
+}
+
+/** 自定义检查器控件收到的 JSON-safe 上下文。绑定路径未设置时 value 为 undefined。 */
+export interface BaseScreenPluginInspectorControlModel {
+  readonly value: ScreenJsonValue | undefined;
+  readonly componentId: string;
+  readonly componentType: string;
+  readonly target: 'props' | 'style';
+  readonly path: readonly (string | number)[];
+}
+
+/**
+ * 与内建输入控件同一契约：宿主写 model，用户在控件里改值后派发 change，
+ * 宿主读 value 并走既有 props/style 事务。这样自定义控件不需要新的写回通道，
+ * 撤销、dirty 与批量编辑语义自动与内建控件一致。
+ */
+export interface BaseScreenPluginInspectorControlElement extends HTMLElement {
+  model: BaseScreenPluginInspectorControlModel;
+  value: ScreenJsonValue;
+}
+
+export interface BaseScreenPluginInspectorControlConstructor extends CustomElementConstructor {
+  new (): BaseScreenPluginInspectorControlElement;
+}
+
+export interface BaseScreenPluginInspectorControlCatalogEntry {
+  readonly pluginId: string;
+  readonly contribution: BaseScreenPluginContribution & {
+    readonly kind: 'inspectorControl';
+  };
+  readonly constructor: BaseScreenPluginInspectorControlConstructor;
+}
+
+/** 授权目录：Engine 只能实例化这里出现过的标签，绝不按清单里的 tagName 直接 createElement。 */
+export interface BaseScreenPluginInspectorControlCatalog {
+  getByTagName(tagName: string): BaseScreenPluginInspectorControlCatalogEntry | undefined;
+  get(controlId: string): BaseScreenPluginInspectorControlCatalogEntry | undefined;
+  has(tagName: string): boolean;
+  list(): readonly BaseScreenPluginInspectorControlCatalogEntry[];
 }

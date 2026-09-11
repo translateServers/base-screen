@@ -852,4 +852,65 @@ describe('BaseScreenPluginManager', () => {
       );
     }
   });
+
+  function controlPlugin(pluginId: string, controlId: string, tagName: string) {
+    return runtime(
+      pluginManifest({
+        id: pluginId,
+        contributions: [{ kind: 'inspectorControl', id: controlId, name: 'Control', tagName }],
+      }),
+    );
+  }
+
+  it('resolves declared inspector controls into the authorized catalog', async () => {
+    const controlConstructor = class {} as unknown as BaseScreenMaterialConstructor;
+    const manager = createBaseScreenPluginManager(
+      managerOptions(
+        [controlPlugin('acme.controls', 'acme.wheel', 'acme-wheel')],
+        new Map([['acme-wheel', controlConstructor]]),
+      ),
+    );
+
+    expect((await manager.activate()).ok).toBe(true);
+    const byId = manager.snapshot?.inspectorControls.get('acme.wheel');
+    expect(byId?.pluginId).toBe('acme.controls');
+    expect(manager.snapshot?.inspectorControls.getByTagName('acme-wheel')).toBe(byId);
+    expect(manager.snapshot?.inspectorControls.has('acme-wheel')).toBe(true);
+    expect(manager.snapshot?.inspectorControls.has('acme-never-registered')).toBe(false);
+  });
+
+  it('fails activation when a declared inspector control tag is not registered', async () => {
+    const manager = createBaseScreenPluginManager(
+      managerOptions([controlPlugin('acme.controls', 'acme.wheel', 'acme-wheel')]),
+    );
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID')).toBe(
+        true,
+      );
+    }
+  });
+
+  it('rejects two inspector controls claiming the same custom element tag', async () => {
+    const shared = class {} as unknown as BaseScreenMaterialConstructor;
+    const manager = createBaseScreenPluginManager(
+      managerOptions(
+        [
+          controlPlugin('acme.one', 'acme.wheel', 'acme-shared'),
+          controlPlugin('acme.two', 'acme.dial', 'acme-shared'),
+        ],
+        new Map([['acme-shared', shared]]),
+      ),
+    );
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_CONFLICT')).toBe(
+        true,
+      );
+    }
+  });
 });

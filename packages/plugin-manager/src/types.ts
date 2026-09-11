@@ -3,6 +3,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
+  BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginPanelCatalog,
   BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
@@ -23,6 +24,7 @@ export type BaseScreenPluginManagerStatus =
 export interface BaseScreenPluginManagerSnapshot {
   readonly materials: BaseScreenMaterialCatalog;
   readonly panels: BaseScreenPluginPanelCatalog;
+  readonly inspectorControls: BaseScreenPluginInspectorControlCatalog;
   readonly plugins: BaseScreenPluginCatalog;
   readonly contributions: BaseScreenRuntimeContributionIndex;
 }

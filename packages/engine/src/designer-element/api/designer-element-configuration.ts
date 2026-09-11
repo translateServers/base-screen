@@ -23,6 +23,7 @@ import {
   isBaseScreenConditionalStylePort,
   isBaseScreenMaterialCatalog,
   isBaseScreenPluginCatalog,
+  isBaseScreenPluginInspectorControlCatalog,
   isBaseScreenPluginPanelCatalog,
   isBaseScreenRuntimeContributionIndex,
   isPluginCommandPort,
@@ -206,6 +207,17 @@ export function configure(
     };
   }
   if (
+    configuration.inspectorControls !== undefined &&
+    !isBaseScreenPluginInspectorControlCatalog(configuration.inspectorControls)
+  ) {
+    return {
+      ok: false,
+      diagnostics: [
+        lifecycleDiagnostic('Designer inspector controls 必须是携带 inspectorControl 贡献的目录。'),
+      ],
+    };
+  }
+  if (
     configuration.pluginCommandPort !== undefined &&
     !isPluginCommandPort(configuration.pluginCommandPort)
   ) {
@@ -259,6 +271,7 @@ export function configure(
   elementState.runtimeContributions = configuration.runtimeContributions;
   elementState.pluginCatalog = configuration.pluginCatalog;
   elementState.pluginPanels = configuration.pluginPanels;
+  elementState.inspectorControls = configuration.inspectorControls;
   elementState.pluginCommandPort = configuration.pluginCommandPort;
   elementState.toolMaterialTypes = configuration.toolMaterialTypes;
   elementState.groupMaterialType = configuration.groupMaterialType;

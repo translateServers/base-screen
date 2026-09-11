@@ -302,6 +302,7 @@ export function initializeDesignerElementControllers(
     getGeometryDocument: () => getDesignerGeometryDocument(state),
     getImageNaturalSize: (componentId) => readDesignerImageNaturalSize(state.canvas, componentId),
     getDatasetFields: () => state.datasetController.getFocusedDatasetFields(),
+    getInspectorControls: () => state.inspectorControls,
     getGroupMaterialType: () => state.groupMaterialType,
     getInteraction: () => state.session.interaction,
     getResourcePort: () => state.resourcePort,

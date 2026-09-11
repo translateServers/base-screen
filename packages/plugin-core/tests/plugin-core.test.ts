@@ -763,6 +763,64 @@ describe('plugin manifests and catalogs', () => {
     }
   });
 
+  it('validates inspectorControl contributions by tag rules and exact fields', () => {
+    const accepted = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'inspectorControl',
+            id: 'acme.color-wheel',
+            name: '色轮',
+            tagName: 'acme-color-wheel',
+          },
+        ],
+      }),
+    );
+    const badTag = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          { kind: 'inspectorControl', id: 'acme.c', name: 'C', tagName: 'colorwheel' },
+        ],
+      }),
+    );
+    const extraField = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          {
+            kind: 'inspectorControl',
+            id: 'acme.c',
+            name: 'C',
+            tagName: 'acme-c',
+            control: 'custom',
+          },
+        ],
+      }),
+    );
+    const duplicated = parseBaseScreenPluginManifest(
+      pluginManifest({
+        contributions: [
+          { kind: 'inspectorControl', id: 'acme.c', name: 'One', tagName: 'acme-one' },
+          { kind: 'inspectorControl', id: 'acme.c', name: 'Two', tagName: 'acme-two' },
+        ],
+      }),
+    );
+
+    expect(accepted.ok).toBe(true);
+    expect(badTag.ok).toBe(false);
+    if (!badTag.ok) {
+      expect(badTag.diagnostics.some((item) => item.code === 'PLUGIN_CORE_TAG_NAME_INVALID')).toBe(
+        true,
+      );
+    }
+    expect(extraField.ok).toBe(false);
+    expect(duplicated.ok).toBe(false);
+    if (!duplicated.ok) {
+      expect(
+        duplicated.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_DUPLICATE'),
+      ).toBe(true);
+    }
+  });
+
   it('parses panel action details and rejects spoofable or malformed shapes', () => {
     const valid = parseBaseScreenPluginPanelActionDetail({
       panelId: 'acme.monitor',

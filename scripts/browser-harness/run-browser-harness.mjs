@@ -8,6 +8,7 @@ import { assertDesktopBaseline } from './assert-desktop-baseline.mjs';
 import { assertImageDensitySize } from './assert-image-density-size.mjs';
 import { assertMaterialGroupNavigation } from './assert-material-group-navigation.mjs';
 import {
+  assertInspectorCustomControl,
   assertPluginCommandDocumentLoop,
   assertPluginPanelLoop,
 } from './assert-plugin-command-loop.mjs';
@@ -55,6 +56,7 @@ export async function runBrowserHarness(serverPort) {
         // 该断言会改动画布选区，放在最后避免污染前面的作者断言。
         await assertPluginCommandDocumentLoop(authoringDesigner, page);
         await assertPluginPanelLoop(authoringDesigner, page);
+        await assertInspectorCustomControl(authoringDesigner, page);
         await page.close();
       }
     },

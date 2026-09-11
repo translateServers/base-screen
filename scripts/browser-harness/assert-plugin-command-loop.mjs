@@ -244,6 +244,137 @@ export async function assertPluginPanelLoop(designer, page) {
   await page.evaluate(() => window.baseScreenHarness.designer.undo());
 }
 
+const DEMO_COMPONENT_ID = 'inspector-demo';
+const DEMO_COMPONENT_TYPE = 'harness.inspector-demo';
+const CONTROL_TAG = 'harness-select-tone';
+const UNAUTHORIZED_TAG = 'harness-never-authorized';
+
+async function readInspectorControlState(page) {
+  return page.evaluate(
+    ([demoId, controlTag, unauthorizedTag]) => {
+      const designer = window.baseScreenHarness.designer;
+      const component = designer.document.components.find((item) => item.id === demoId);
+      const root = designer.shadowRoot;
+      const control = root.querySelector(controlTag);
+      return {
+        tone: component?.props?.tone,
+        caption: component?.props?.caption,
+        controlRendered: control !== null,
+        controlOwner: control?.dataset?.descriptorCustomOwner ?? null,
+        pressed: control
+          ? [...control.shadowRoot.querySelectorAll('[data-tone-choice]')]
+              .filter((button) => button.getAttribute('aria-pressed') === 'true')
+              .map((button) => button.dataset.toneChoice)
+          : [],
+        probeRendered: root.querySelector(unauthorizedTag) !== null,
+        unsupported: root.querySelector('.designer-descriptor-unsupported')?.textContent ?? null,
+      };
+    },
+    [DEMO_COMPONENT_ID, CONTROL_TAG, UNAUTHORIZED_TAG],
+  );
+}
+
+// 属性面板自定义控件的两半：已授权标签渲染出控件、读到当前值、写回可撤销的 props 事务；
+// 已注册但未被 inspectorControl 贡献的标签必须不实例化，只能降级为可见提示。
+// 后者是授权模型的关键——依据是"插件贡献了什么"，不是"宿主注册了什么"。
+export async function assertInspectorCustomControl(designer, page) {
+  await page.waitForFunction(() => window.baseScreenHarness.designer.document !== undefined);
+  await page.evaluate(() => {
+    window.baseScreenHarness.inspectorDiagnostics = [];
+    window.baseScreenHarness.designer.addEventListener('base-screen-diagnostic', (event) => {
+      window.baseScreenHarness.inspectorDiagnostics.push(...event.detail.diagnostics);
+    });
+  });
+
+  const added = await page.evaluate(
+    ([id, type]) => {
+      const designer = window.baseScreenHarness.designer;
+      const result = designer.executeCommand({
+        type: 'add-component',
+        component: {
+          id,
+          type,
+          name: 'Inspector demo',
+          parentId: null,
+          position: { x: 60, y: 420 },
+          size: { width: 240, height: 80 },
+          rotation: 0,
+          zIndex: 40,
+          status: { locked: false, hidden: false },
+          props: { title: 'Inspector demo', tone: 'neutral', caption: 'untouched' },
+          style: {},
+          dataSource: { type: 'static', value: null },
+        },
+      });
+      return { ok: result.ok, diagnostics: result.diagnostics };
+    },
+    [DEMO_COMPONENT_ID, DEMO_COMPONENT_TYPE],
+  );
+  if (added.ok !== true) {
+    throw new Error(`BROWSER_HARNESS_INSPECTOR_ADD_FAILED:${JSON.stringify(added.diagnostics)}`);
+  }
+
+  await designer.getByRole('tab', { name: '图层' }).click();
+  await designer.locator(`[data-layer-select=${DEMO_COMPONENT_ID}]`).click({ force: true });
+  await page.waitForFunction(
+    () => window.baseScreenHarness.designer.selection.focusedComponentId === 'inspector-demo',
+  );
+  // 检查器只在选中单个组件时出现，切到属性区后再读控件状态。
+  await designer.locator('[data-inspector-tab="appearance"]').click();
+
+  const initial = await readInspectorControlState(page);
+  if (
+    !initial.controlRendered ||
+    initial.controlOwner !== 'browser-harness-authoring' ||
+    initial.pressed.join() !== 'neutral'
+  ) {
+    throw new Error(`BROWSER_HARNESS_INSPECTOR_CONTROL_FAILED:${JSON.stringify(initial)}`);
+  }
+  if (initial.probeRendered || initial.unsupported === null) {
+    throw new Error(`BROWSER_HARNESS_INSPECTOR_AUTHORIZATION_FAILED:${JSON.stringify(initial)}`);
+  }
+
+  await designer
+    .locator(`${CONTROL_TAG} [data-tone-choice="warning"]`)
+    .click({ timeout: 15_000, force: true });
+  await page.waitForFunction(
+    (id) =>
+      window.baseScreenHarness.designer.document.components.find((c) => c.id === id)?.props
+        ?.tone === 'warning',
+    DEMO_COMPONENT_ID,
+  );
+  const written = await readInspectorControlState(page);
+  if (written.pressed.join() !== 'warning' || written.caption !== 'untouched') {
+    throw new Error(`BROWSER_HARNESS_INSPECTOR_WRITE_BACK_FAILED:${JSON.stringify(written)}`);
+  }
+
+  // 撤销必须同时回退文档与控件显示，证明确实走了 history 而不是控件自己记了状态。
+  await page.evaluate(() => window.baseScreenHarness.designer.undo());
+  await page.waitForFunction(
+    (id) =>
+      window.baseScreenHarness.designer.document.components.find((c) => c.id === id)?.props
+        ?.tone === 'neutral',
+    DEMO_COMPONENT_ID,
+  );
+  const undone = await readInspectorControlState(page);
+  if (undone.pressed.join() !== 'neutral') {
+    throw new Error(`BROWSER_HARNESS_INSPECTOR_UNDO_FAILED:${JSON.stringify(undone)}`);
+  }
+
+  const diagnostics = await page.evaluate(() => window.baseScreenHarness.inspectorDiagnostics);
+  if (diagnostics.length > 0) {
+    throw new Error(`BROWSER_HARNESS_INSPECTOR_DIAGNOSTICS_FAILED:${JSON.stringify(diagnostics)}`);
+  }
+  await page.evaluate(
+    (id) =>
+      window.baseScreenHarness.designer.executeCommand({
+        type: 'remove-components',
+        componentIds: [id],
+      }),
+    DEMO_COMPONENT_ID,
+  );
+}
+
 async function readAuthoritativeState(page) {
   return page.evaluate(() => {
     const designer = window.baseScreenHarness.designer;

@@ -352,6 +352,26 @@ function validateContribution(
       }
       return typeof contribution.id === 'string' ? `panel:${contribution.id}` : undefined;
     }
+    case 'inspectorControl': {
+      validateExactObject(
+        contribution,
+        new Set(['kind', 'id', 'name', 'tagName']),
+        path,
+        collector,
+      );
+      validateContributionIdentityFields(contribution, path, collector, ['id']);
+      validateDisplayName(contribution.name, [...path, 'name'], collector);
+      if (!isValidCustomElementName(contribution.tagName)) {
+        collector.add(
+          'PLUGIN_CORE_TAG_NAME_INVALID',
+          [...path, 'tagName'],
+          'Inspector control tagName is not a valid custom element name.',
+        );
+      }
+      return typeof contribution.id === 'string'
+        ? `inspectorControl:${contribution.id}`
+        : undefined;
+    }
     default:
       collector.add(
         'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',

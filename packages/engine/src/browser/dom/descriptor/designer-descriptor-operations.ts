@@ -20,6 +20,7 @@ import {
   type BaseScreenMaterialCatalog,
   type BaseScreenMaterialObjectSchema,
   type BaseScreenMaterialPropSchema,
+  type BaseScreenPluginInspectorControlElement,
 } from '@base-screen/plugin-core';
 import {
   createValidatedPropsTransaction,
@@ -56,12 +57,7 @@ export function createDescriptorFieldTransaction(
     return writeObjectPath(
       component,
       control.path,
-      parseControlValue(
-        control,
-        target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-        manifest.propsSchema,
-        control.path,
-      ),
+      descriptorFieldValue(control, target, manifest.propsSchema, control.path),
       manifest.propsSchema,
       'props',
     );
@@ -70,12 +66,7 @@ export function createDescriptorFieldTransaction(
     return writeObjectPath(
       component,
       control.path,
-      parseControlValue(
-        control,
-        target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
-        manifest.styleSchema,
-        control.path,
-      ),
+      descriptorFieldValue(control, target, manifest.styleSchema, control.path),
       manifest.styleSchema,
       'style',
     );
@@ -262,6 +253,27 @@ function dataSourceTransaction(
     },
     diagnostics: [],
   };
+}
+
+function descriptorFieldValue(
+  control: DescriptorFieldDataset,
+  target: EventTarget | null,
+  schema: BaseScreenMaterialObjectSchema | undefined,
+  path: readonly (string | number)[],
+): ScreenJsonValue | undefined {
+  if (control.control !== 'custom') {
+    return parseControlValue(
+      control,
+      target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+      schema,
+      path,
+    );
+  }
+  const value = (target as Partial<BaseScreenPluginInspectorControlElement> | null)?.value;
+  if (value === undefined) return undefined;
+  // 插件返回的东西必须是 JSON-safe：不能把 DOM 节点、函数或类实例写进 canonical 文档。
+  const parsed = parseScreenJsonValue(value);
+  return parsed.ok ? parsed.value : undefined;
 }
 
 function parseControlValue(

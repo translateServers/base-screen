@@ -16,6 +16,7 @@
 | 查看实施计划、评审和技术调研 | [计划与评审](./plans/README.md) |
 | 追溯外部参考、许可和 no-copy 边界 | [来源记录](./provenance/README.md) |
 | 排查 M0 验证失败 | [验证故障排查](./troubleshooting/verify-m0-troubleshooting.md) |
+| 改完功能后查看专项案例 | [专项案例怎么看](./guides/feature-cases.md) |
 
 ## 文档层级
 

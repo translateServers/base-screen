@@ -13,7 +13,7 @@
 - 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/tests/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
 - `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界与文档治理检查；`pnpm check:docs` 可单独检查 Markdown 相对链接、ADR/Spec/Plan 索引、完成 Spec 归档和禁用版本命名。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
 - `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。门禁失败排查见 `docs/troubleshooting/verify-m0-troubleshooting.md`。
-- 手动验证用示例（workspace 成员）：`pnpm dev:browser-harness`、`pnpm dev:playground`、`pnpm dev:vue-harness` 起 Vite dev server；`verify:browser`、`verify:playground`、`verify:vue-harness`、`verify:runtime` 是对应的 Playwright 验证脚本。
+- 手动验证只有一个示例入口 `examples/browser-harness`：`pnpm dev:browser-harness` 起 Vite dev server，`pnpm verify:browser` 是对应的 Playwright 验证脚本。改完功能后先打开它的 [`/cases.html`](examples/browser-harness/cases.html) 导航页（按改动面 / 关键词筛选专项案例），再按 [专项案例怎么看](docs/guides/feature-cases.md) 进 `?designer&case=` 场景；不要为此引入 Storybook。默认 `/` 与 `?designer` 保持 Playwright 路径。另有 `examples/host-quickstart`（最小 Viewer，由 `verify:tarball` 验证）与 `examples/material-mcp-server`（物料 MCP 参考服务，由根级测试与 `verify:material-mcp` 验证），不设 dev 命令。
 
 ## 包边界
 
@@ -31,7 +31,7 @@
 - Base Screen 负责 canonical document、严格契约、当前实例内的命令/事务/历史/画布/检查器、Viewer/Designer 渲染、物料 ABI，以及有界请求的取消、deadline、generation guard 和安全结果投影。
 - 宿主负责实际存储与检索、认证授权、业务路由与 Store、数据查询/聚合/缓存/ETL、资产存储与转码、发布部署、公开 URL、截图/视频/批量导出和长任务。Base Screen 只通过 JSON-safe intent、port、method 或 event 请求这些能力。
 - 需要凭证或租户状态、跨项目/跨实例共享、无明确容量上限、后台队列/持久缓存/长任务，或依赖特定业务基础设施的处理默认归宿主；不得在 Engine 中补建后端、通用网络客户端、任务队列或业务降级实现。
-- 物料自定义属性面板默认使用 JSON-safe、声明式的 Manifest Editor Descriptor 和 Base Screen 内建控件；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。
+- 物料自定义属性面板使用 JSON-safe、声明式的 Manifest Editor Descriptor，控件为 Base Screen 内建控件或宿主授权的插件贡献控件（`control: 'custom'` + `kind: 'inspectorControl'`，仅绑 `props`/`style`）；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。Engine 只实例化 plugin-manager 解析出的授权目录项，绝不按清单标签 `createElement`——宿主注册过某标签不构成授权，未授权标签渲染为降级提示。依据见 [ADR-0073](docs/decisions/ADR-0073-inspector-custom-form-controls.md)。
 - 事件 Blueprint 采用一体化工作台边界：Base Screen 拥有当前实例内的顶部栏、左右面板、语义图投影、canonical 编辑、Core transaction、统一 history/revision guard 与有界 slot 协议；宿主拥有中央图形渲染、布局算法和画布手势。`blueprint.layout` 保存节点位置与视口，其余模式、选择、临时拖动和 trace 高亮只属 session。代码编辑器和复杂 ECharts/领域配置编辑器仍由宿主拥有。
 - 宿主左侧业务分组通过严格 `leftPanelGroups[].workbenchModes` 选择 Canvas、Blueprint 或两者；省略时仅用于 Canvas。同一分组跨模式只复用一份公开命名 slot/tabpanel，宿主 light DOM 不随模式切换重挂载，宿主仍拥有其内容生命周期和业务状态。
 - 宿主作者扩展通过公开 Custom Element method/event 和 JSON-safe authoring bridge 集成；宿主不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的通用 UI 注入逃生口。

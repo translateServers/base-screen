@@ -1113,10 +1113,33 @@ designer.configure({
 - 面板回传意图派发 `base-screen-plugin-panel-action`，detail 为 `{ panelId, commandId, args }`。
   Engine 校验 `panelId` 归属后派发到该插件自己的贡献命令，`args` 原样送到 handler 的第二参数。
 
-不引入 `when` 条件语言、工具栏、任意 DOM 注入或具名槽位协议；自定义视图与检查器面板仍另立 ADR。
+不引入 `when` 条件语言、工具栏、任意 DOM 注入或具名槽位协议；自定义视图容器仍另立 ADR。
 
-`pluginCatalog` / `pluginPanels` / `pluginCommandPort` 与 `runtimeContributions` 一样，初始化后
-变更必须先 `unload()`。Viewer 不提供命令面板与插件面板。
+属性面板里的表单控件也可以由插件贡献，授权方式与面板相同但更严格：
+
+```ts
+// 插件 manifest.contributions：声明并授权这个控件标签
+{ kind: 'inspectorControl', id: 'acme.tone', name: '语气控件', tagName: 'acme-tone' }
+```
+
+```ts
+// 物料 editorDescriptor 的 appearance 字段：绑定到 props 路径
+{ id: 'tone', target: 'props', path: ['tone'], label: '语气', control: 'custom', tagName: 'acme-tone' }
+```
+
+- **注册不等于授权**：Engine 只实例化 `pluginManager.snapshot.inspectorControls` 里的构造函数，绝不
+  `createElement(tagName)`。宿主注册过该标签但没有插件贡献它，该字段渲染为"控件未由宿主注册"提示，
+  且不进入写回路径。
+- 控件契约与内建控件同形：宿主写 `element.model`（`{ value, componentId, componentType, target, path }`），
+  用户改值后控件派发 `change`，宿主读 `element.value` 并走既有 `update-components` props/style 事务，
+  因此撤销、dirty 与校验语义自动继承。读回的值必须 JSON-safe，否则视为未编辑。
+- 只允许 `target: 'props' | 'style'`；`data` 绑定字段仍只能 `field-selector`，`interaction` 不放开。
+- 无变更订阅：控件要反映外部编辑，只能依赖宿主在重绘时重新赋 `model`。
+
+依据见 [ADR-0073](./decisions/ADR-0073-inspector-custom-form-controls.md)。
+
+`pluginCatalog` / `pluginPanels` / `inspectorControls` / `pluginCommandPort` 与
+`runtimeContributions` 一样，初始化后变更必须先 `unload()`。Viewer 不提供命令面板与插件面板。
 `createPluginPackage({ id, plugin, materials? })` 可把插件与可选物料包组合；package `id` 只用于
 宿主诊断，不进入 Screen Document。
 
@@ -1727,9 +1750,8 @@ export async function loadApprovedMaterialCatalog(
 
 仓库中的可运行宿主示例：
 
+- `examples/browser-harness`：项目 adapter、完整官方物料、宿主作者桥和外部物料包；日常唯一 dev 入口（`pnpm dev:browser-harness`）。
 - `examples/host-quickstart`：只导入公开包入口的最小 Viewer；会被复制到仓库外并以 tarball 验证。
-- `examples/playground`：Vue 宿主、Viewer/Designer、数据集和变量切换。
-- `examples/browser-harness`：项目 adapter、完整官方物料、宿主作者桥和外部物料包。
-- `examples/runtime-harness`：宿主资源、Blueprint 端口和远程插件隔离验证。
+- `examples/material-mcp-server`：面向上层工具链的物料模板 MCP provider。
 
-后三个是本仓库的开发/验收 harness，会直接引用 workspace 源码，不应当作独立项目的安装模板。
+`browser-harness` 是本仓库的开发/验收 harness，会直接引用 workspace 源码，不应当作独立项目的安装模板。

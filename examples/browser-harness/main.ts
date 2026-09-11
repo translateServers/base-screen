@@ -57,6 +57,12 @@ import {
   type ScreenAuthoringRequest,
 } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
+import { mountFeatureCases } from './feature-cases.ts';
+import {
+  defineHarnessInspectorFixtures,
+  HARNESS_INSPECTOR_CONTROL_TAG_NAME,
+  harnessInspectorDemoMaterialPackage,
+} from './inspector-control-fixture.ts';
 import { defineHarnessPluginPanel, HARNESS_PLUGIN_PANEL_TAG_NAME } from './plugin-panel-element.ts';
 
 // 宿主受控动态加载（ADR-0029）：外部物料包经宿主发起的 import() 进入页面，
@@ -66,13 +72,15 @@ const hostedMaterialPackage = hostedModule.hostedMaterialPackage;
 const draftMaterialPackage = hostedModule.draftMaterialPackage;
 const hostedDatasetRankingManifest = hostedModule.hostedDatasetRankingManifest;
 
-if (new URLSearchParams(window.location.search).has('designer')) {
+const harnessSearch = new URLSearchParams(window.location.search);
+if (harnessSearch.has('designer') || harnessSearch.has('case') || harnessSearch.has('cases')) {
   document.body.dataset.layout = 'designer';
 }
 
 const productElements = defineBaseScreenElements();
 // 面板标签必须在 manager 激活前注册：preflight 会按贡献声明的 tagName 查询宿主 registry。
 defineHarnessPluginPanel();
+defineHarnessInspectorFixtures();
 const officialMaterials = [
   defineBaseScreenTextMaterial(),
   defineBaseScreenRectangleMaterial(),
@@ -144,6 +152,12 @@ const designerAuthoringPlugin: BaseScreenPluginRuntime = {
         id: 'harness.panel',
         name: 'Harness panel',
         tagName: HARNESS_PLUGIN_PANEL_TAG_NAME,
+      },
+      {
+        kind: 'inspectorControl',
+        id: 'harness.tone-control',
+        name: 'Tone control',
+        tagName: HARNESS_INSPECTOR_CONTROL_TAG_NAME,
       },
       ...designerAuthoringCapabilities.map((id) => ({
         kind: 'blueprintCapability' as const,
@@ -256,7 +270,8 @@ if (
   !designerAuthoringCapabilities.every((capability) =>
     pluginManager.snapshot?.contributions.hasBlueprintCapability(capability),
   ) ||
-  pluginManager.snapshot.panels.get('harness.panel') === undefined
+  pluginManager.snapshot.panels.get('harness.panel') === undefined ||
+  pluginManager.snapshot.inspectorControls.get('harness.tone-control') === undefined
 ) {
   throw new Error('Base Screen browser harness failed to inspect its material registry.');
 }
@@ -461,6 +476,10 @@ if (!hostedDefinitions.ok) {
   throw new Error('Base Screen browser harness failed to register its hosted material package.');
 }
 const hostedEntries = hostedDefinitions.value;
+const inspectorDemoDefinitions = harnessInspectorDemoMaterialPackage.define();
+if (!inspectorDemoDefinitions.ok) {
+  throw new Error('Base Screen browser harness failed to register its inspector control fixture.');
+}
 const hostedCatalog = createBaseScreenMaterialCatalog(hostedEntries);
 const hostedDatasetRankingEntry = hostedEntries.find(
   (entry) => entry.manifest.type === hostedDatasetRankingManifest.type,
@@ -471,6 +490,7 @@ if (hostedDatasetRankingEntry === undefined) {
 const designerCatalog = createBaseScreenMaterialCatalog([
   ...bridgeCatalog.list(),
   hostedDatasetRankingEntry,
+  inspectorDemoDefinitions.value[0]!,
 ]);
 const draftDefinitions = draftMaterialPackage.define();
 if (!draftDefinitions.ok) {
@@ -1111,6 +1131,7 @@ designer.runtimeContributions = runtimeContributions;
 if (pluginManager.snapshot !== undefined) {
   designer.pluginCatalog = pluginManager.snapshot.plugins;
   designer.pluginPanels = pluginManager.snapshot.panels;
+  designer.inspectorControls = pluginManager.snapshot.inspectorControls;
   designer.pluginCommandPort = createBaseScreenPluginContributionCommandPort(pluginManager);
 }
 designer.toolMaterialTypes = {
@@ -1283,6 +1304,8 @@ hostShell.addEventListener('click', (event) => {
     setHostStatus('无法发起宿主编辑请求。', 'error');
   }
 });
+
+mountFeatureCases(designer);
 
 Object.assign(window, {
   baseScreenHarness: {

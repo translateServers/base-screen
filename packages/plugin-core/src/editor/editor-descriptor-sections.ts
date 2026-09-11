@@ -1,7 +1,11 @@
 import type { BaseScreenMaterialObjectSchema } from '../contracts.js';
 import { PluginDiagnosticCollector } from '../diagnostics.js';
 import { validateConditions } from './editor-descriptor-conditions.js';
-import { validateColorGradientCapability, validateItemFields } from './editor-descriptor-items.js';
+import {
+  validateColorGradientCapability,
+  validateCustomControlBinding,
+  validateItemFields,
+} from './editor-descriptor-items.js';
 import {
   ARRAY_CONTROLS,
   EDITOR_CONTROLS,
@@ -196,6 +200,7 @@ function validateField(
     return;
   }
   validateColorGradientCapability(value.allowGradient, control, path, collector);
+  validateCustomControlBinding(value.tagName, control, target, path, collector);
   if (!isDisplayString(value.label, 256)) {
     collector.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',

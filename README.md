@@ -104,21 +104,21 @@ pnpm build
 pnpm dev:browser-harness
 ```
 
-打开终端输出的本地地址即可查看浏览器组合示例。在地址后追加 `?designer` 可切换为设计器布局，
-追加 `?designer&material-group-stress` 可体验多级分类、长名称和窄面板浮层。
+打开终端输出的本地地址即可查看浏览器组合示例。专项案例导航页是 `/cases.html`；
+`?designer` 仍是验收用全屏设计器。完整对照见
+[专项案例怎么看](./docs/guides/feature-cases.md)。
 
 示例自带演示文档与模拟宿主能力。接入真实业务时，替换宿主适配器和端口实现，并使用包的公开导出。
 
 ## 示例
 
+日常只需一个入口：`pnpm dev:browser-harness`。其余两个示例不提供 `dev` 命令。
+
 | 示例 | 主要用途 | 运行或验证入口 |
 | --- | --- | --- |
+| [browser-harness](./examples/browser-harness) | Viewer、Designer、官方物料、项目适配器和插件管理器组合；导航页 `/cases.html` | `pnpm dev:browser-harness` |
 | [host-quickstart](./examples/host-quickstart/README.md) | 仅使用公开 API 的最小 Vanilla / Vite Viewer 宿主 | 按示例说明接入；由 `pnpm verify:tarball` 验证 |
-| [browser-harness](./examples/browser-harness) | Viewer、Designer、官方物料、项目适配器和插件管理器组合 | `pnpm dev:browser-harness` |
-| [playground](./examples/playground/README.md) | Vue 宿主中的设计器、数据绑定、失败状态与业务资源面板 | `pnpm dev:playground` |
-| [vue-harness](./examples/vue-harness) | Vue 物料桥接与 ECharts 渲染 | `pnpm dev:vue-harness` |
-| [runtime-harness](./examples/runtime-harness) | 远程插件沙箱、宿主资源和 Blueprint 运行时 | `pnpm verify:runtime` |
-| [color-picker-lab](./examples/color-picker-lab) | 颜色与渐变控件的独立交互实验 | `pnpm dev:color-picker-lab` |
+| [material-mcp-server](./examples/material-mcp-server) | 面向上层工具链的物料模板 MCP provider | `node examples/material-mcp-server/server.mjs`；由 `pnpm verify:material-mcp` 验证 |
 
 ## 包结构
 
@@ -162,7 +162,7 @@ pnpm verify:m0
 
 `verify:m0` 会先执行格式化并写入文件，再运行静态检查、类型检查、测试、构建、包与 API 边界检查，
 最后将 tarball 安装到临时消费者工程中验证。`pnpm verify:fast` 可用于不含 tarball 验证的日常迭代。
-浏览器交互检查另见 `pnpm verify:browser`、`pnpm verify:playground` 和 `pnpm verify:vue-harness`。
+浏览器交互检查为 `pnpm verify:browser`。
 
 公共声明或 package 子路径有意变化时，运行 `pnpm api:report` 更新并审查
 `packages/*/etc/*.api.md`，同时为受影响包补充 Changeset。`pnpm check:api` 只校验基线，
@@ -182,6 +182,7 @@ pnpm verify:m0
 | 为宿主配置大屏设计与物料创建 Skill | [宿主 Skill 快速接入](./docs/host-skill-manuals/01-quick-start.md) |
 | 架构取舍与职责划分 | [架构决策记录](./docs/decisions/README.md) |
 | 后续方向与候选主题 | [路线图](./docs/roadmap/README.md) |
+| 改完后查看专项案例 | [专项案例怎么看](./docs/guides/feature-cases.md) |
 | 验证失败排查 | [开发门禁故障排查](./docs/troubleshooting/verify-m0-troubleshooting.md) |
 
 规格、计划、归档与来源记录统一从[文档索引](./docs/README.md)进入。当前能力以 Baseline 和已接受的 ADR

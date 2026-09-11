@@ -14,6 +14,7 @@ import type {
   BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
+  BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginPanelCatalog,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
@@ -86,6 +87,7 @@ export interface DesignerElementState {
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined;
   pluginCatalog: BaseScreenPluginCatalog | undefined;
   pluginPanels: BaseScreenPluginPanelCatalog | undefined;
+  inspectorControls: BaseScreenPluginInspectorControlCatalog | undefined;
   pluginCommandPort: PluginCommandPort | undefined;
   resourcePort: ScreenHostResourcePort | undefined;
   variablePort: ScreenHostVariablePort | undefined;

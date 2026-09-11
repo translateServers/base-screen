@@ -13,6 +13,7 @@ import type {
 } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
+  BaseScreenPluginInspectorControlCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialLibraryGrouping } from '../../../common/operations/material-library/material-library-grouping.js';
@@ -30,6 +31,8 @@ export interface DesignerPanelControllerCallbacks {
   /** 当前图片物料宿主投影的内部自然尺寸；仅用于一次性倍图尺寸换算。 */
   readonly getImageNaturalSize?: (componentId: string) => ScreenSize | undefined;
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
+  /** 授权目录：custom 控件只能从这里取构造函数。缺省即不渲染任何自定义控件。 */
+  readonly getInspectorControls?: () => BaseScreenPluginInspectorControlCatalog | undefined;
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;

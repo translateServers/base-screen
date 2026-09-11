@@ -4,6 +4,7 @@ import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
+  BaseScreenPluginInspectorControlCatalog,
 } from '@base-screen/plugin-core';
 import {
   type DesignerInspectorContext,
@@ -41,6 +42,7 @@ export function renderDesignerProperties(
   canvasBackgroundImageButtonVisible = false,
   canvasBackgroundDrafts = createDesignerCanvasBackgroundDrafts(document),
   canvasPresentation = createDesignerCanvasPresentationSettings(),
+  inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined,
 ): void {
   properties.replaceChildren();
   const context = getDesignerInspectorContext(document, interaction, catalog);
@@ -67,7 +69,15 @@ export function renderDesignerProperties(
   const locked =
     document !== undefined && isScreenComponentEffectivelyLocked(document, context.component.id);
   if (locked) appendLockedInspectorNotice(properties);
-  appendComponentControls(properties, context, document, interaction, catalog, getDatasetFields);
+  appendComponentControls(
+    properties,
+    context,
+    document,
+    interaction,
+    catalog,
+    getDatasetFields,
+    inspectorControls,
+  );
   if (locked) disableLockedComponentControls(properties);
 }
 
@@ -99,6 +109,7 @@ function appendComponentControls(
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
   getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
+  inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined,
 ): void {
   const { component, manifest } = context;
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
@@ -184,6 +195,7 @@ function appendComponentControls(
       interaction,
       catalog,
       getDatasetFields,
+      inspectorControls,
     });
     return;
   }
