@@ -16,12 +16,18 @@ const SUPPORTED_BLUEPRINT_CAPABILITIES = new Set([
   'blueprint.action.request-component-data',
 ]);
 
+/**
+ * 解析幸存候选：重复 id 按稳定顺序 first-wins（后声明方获得诊断并被排除出图），
+ * 依赖缺失/成环只标记对应候选，不再整体熔断——调用方按诊断归属淘汰插件后重入，
+ * 直到幸存集合稳定。返回值是当前幸存集的拓扑序（可能只包含一部分候选）。
+ */
 export function resolveCandidates(
   candidates: readonly Candidate[],
   diagnostics: DiagnosticCollector,
 ): readonly Candidate[] {
   const ordered = [...candidates].sort(compareCandidates);
   const byId = new Map<string, Candidate>();
+  const deduped: Candidate[] = [];
   for (const candidate of ordered) {
     if (byId.has(candidate.manifest.id)) {
       diagnostics.add(
@@ -29,18 +35,20 @@ export function resolveCandidates(
         ['plugins', candidate.index, 'manifest', 'id'],
         'Plugin id is duplicated.',
       );
-    } else {
-      byId.set(candidate.manifest.id, candidate);
+      continue;
     }
+    byId.set(candidate.manifest.id, candidate);
+    deduped.push(candidate);
   }
-  validateContributions(ordered, diagnostics);
-  if (diagnostics.hasErrors) return [];
+  validateContributions(deduped, diagnostics);
 
   let edgeCount = 0;
-  const remaining = new Map(byId);
+  const remaining = new Map<string, Candidate>();
   const dependencyCount = new Map<string, number>();
   const dependents = new Map<string, string[]>();
-  for (const candidate of ordered) {
+  const unresolvedDeps = new Set<string>();
+  for (const candidate of deduped) {
+    remaining.set(candidate.manifest.id, candidate);
     let count = 0;
     for (const dependency of candidate.manifest.dependencies) {
       edgeCount++;
@@ -51,6 +59,7 @@ export function resolveCandidates(
           ['plugins', candidate.index, 'manifest', 'dependencies'],
           'Plugin dependency is missing from the candidate set.',
         );
+        unresolvedDeps.add(candidate.manifest.id);
         continue;
       }
       count++;
@@ -63,10 +72,13 @@ export function resolveCandidates(
   if (edgeCount > MAX_DEPENDENCY_EDGES) {
     diagnostics.add('PLUGIN_CORE_LIMIT_EXCEEDED', ['plugins'], 'Dependency edge limit exceeded.');
   }
-  if (diagnostics.hasErrors) return [];
 
   const resolved: Candidate[] = [];
-  const ready = ordered.filter((candidate) => dependencyCount.get(candidate.manifest.id) === 0);
+  const ready = deduped.filter(
+    (candidate) =>
+      dependencyCount.get(candidate.manifest.id) === 0 &&
+      !unresolvedDeps.has(candidate.manifest.id),
+  );
   while (ready.length > 0) {
     const current = ready.shift()!;
     if (!remaining.delete(current.manifest.id)) continue;
@@ -75,20 +87,21 @@ export function resolveCandidates(
       const nextCount = dependencyCount.get(dependentId)! - 1;
       dependencyCount.set(dependentId, nextCount);
       const dependent = remaining.get(dependentId);
-      if (nextCount === 0 && dependent !== undefined) {
+      if (nextCount === 0 && dependent !== undefined && !unresolvedDeps.has(dependentId)) {
         ready.push(dependent);
         ready.sort(compareCandidates);
       }
     }
   }
   for (const candidate of [...remaining.values()].sort(compareCandidates)) {
+    if (unresolvedDeps.has(candidate.manifest.id)) continue;
     diagnostics.add(
       'PLUGIN_CORE_DEPENDENCY_CYCLE',
       ['plugins', candidate.index, 'manifest', 'dependencies'],
       'Plugin dependency graph contains a cycle.',
     );
   }
-  return diagnostics.hasErrors ? [] : resolved;
+  return resolved;
 }
 
 export function validateCapabilityPlan(

@@ -12,6 +12,7 @@ import { createRuntimeContributionIndex } from './contributions.js';
 import { failure, sortDiagnostics } from './diagnostics.js';
 import { type ActivationSession, createActivationPlan, type PlannedPlugin } from './preflight.js';
 import type {
+  BaseScreenPluginActivationFailure,
   BaseScreenPluginManager,
   BaseScreenPluginManagerOptions,
   BaseScreenPluginManagerSnapshot,
@@ -86,13 +87,36 @@ class PluginManager implements BaseScreenPluginManager {
     this.#status = 'activating';
     const plan = createActivationPlan(this.options);
     if (!plan.ok) {
+      // 全局门失败：输入快照或宿主自营物料不可用，保持未激活。
       this.#status = 'inactive';
       return plan;
     }
     const active: Array<{ readonly plugin: PlannedPlugin; readonly session: ActivationSession }> =
       [];
-    const diagnostics: ScreenDiagnostic[] = [];
+    const failures: BaseScreenPluginActivationFailure[] = plan.value.failures.map((item) => ({
+      ...item,
+    }));
+    const failedIds = new Set(
+      failures.flatMap((item) => (item.pluginId === '' ? [] : [item.pluginId])),
+    );
     for (const plugin of plan.value.plugins) {
+      // 运行期级联：声明的依赖已失败时不再调用该插件的生命周期钩子。
+      const failedDependency = plugin.manifest.dependencies.find((dep) => failedIds.has(dep.id));
+      if (failedDependency !== undefined) {
+        failures.push({
+          index: plugin.index,
+          pluginId: plugin.manifest.id,
+          diagnostics: [
+            diagnostic(
+              'PLUGIN_CORE_DEPENDENCY_MISSING',
+              ['plugins', plugin.index, 'manifest', 'dependencies'],
+              'Plugin dependency failed to activate.',
+            ),
+          ],
+        });
+        failedIds.add(plugin.manifest.id);
+        continue;
+      }
       let session: ActivationSession | undefined;
       try {
         session = plugin.createSession();
@@ -100,26 +124,26 @@ class PluginManager implements BaseScreenPluginManager {
         active.push({ plugin, session });
         this.recordActivated(plugin);
       } catch {
+        // 失败爆炸半径收敛：单插件激活失败只排除自身并失效其会话端口，
+        // 已激活插件与核心目录不受影响，不再整体回滚。
         session?.invalidate();
-        diagnostics.push(
-          diagnostic(
-            'PLUGIN_CORE_LIFECYCLE_INVALID',
-            ['plugins', plugin.index],
-            'Plugin activation failed.',
-          ),
-        );
-        break;
+        failures.push({
+          index: plugin.index,
+          pluginId: plugin.manifest.id,
+          diagnostics: [
+            diagnostic(
+              'PLUGIN_CORE_LIFECYCLE_INVALID',
+              ['plugins', plugin.index],
+              'Plugin activation failed.',
+            ),
+          ],
+        });
+        failedIds.add(plugin.manifest.id);
       }
     }
-    if (diagnostics.length > 0) {
-      const rollbackDiagnostics = await deactivateEntries(active);
-      this.#active = [];
-      this.#commands = new Map();
-      this.#snapshot = undefined;
-      this.#status = rollbackDiagnostics.length === 0 ? 'inactive' : 'failed';
-      return failureResult([...diagnostics, ...rollbackDiagnostics]);
-    }
-    const pluginEntries: BaseScreenPluginCatalogEntry[] = plan.value.plugins.map((plugin) => ({
+    failures.sort((first, second) => first.index - second.index);
+    // 目录只发布成功激活的插件：运行期失败者连同其贡献一并排除。
+    const pluginEntries: BaseScreenPluginCatalogEntry[] = active.map(({ plugin }) => ({
       manifest: plugin.manifest,
       grantedCapabilities: plugin.grantedCapabilities,
       contributions: plugin.manifest.contributions,
@@ -135,6 +159,7 @@ class PluginManager implements BaseScreenPluginManager {
       ),
       plugins,
       contributions: createRuntimeContributionIndex(plugins),
+      failures: Object.freeze(failures.map((item) => Object.freeze({ ...item }))),
     };
     this.#status = 'active';
     return { ok: true, value: this.#snapshot, diagnostics: [] };

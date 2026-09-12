@@ -14,6 +14,7 @@ import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-cor
 import type { PluginCommandPort } from '@base-screen/plugin-core';
 import type { PluginCommandRequest } from '@base-screen/plugin-core';
 import type { PluginDesignReadPort } from '@base-screen/plugin-core';
+import type { ScreenDiagnostic } from '@base-screen/contracts';
 import type { ScreenJsonValue } from '@base-screen/contracts';
 import type { ScreenParseResult } from '@base-screen/contracts';
 
@@ -21,6 +22,16 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 export interface BaseScreenCustomElementRegistryPort {
     // (undocumented)
     get(tagName: string): BaseScreenMaterialConstructor | undefined;
+}
+
+// @public
+interface BaseScreenPluginActivationFailure {
+    // (undocumented)
+    readonly diagnostics: readonly ScreenDiagnostic[];
+    // (undocumented)
+    readonly index: number;
+    // (undocumented)
+    readonly pluginId: string;
 }
 
 // @public (undocumented)
@@ -66,6 +77,8 @@ export interface BaseScreenPluginManagerOptions {
 export interface BaseScreenPluginManagerSnapshot {
     // (undocumented)
     readonly contributions: BaseScreenRuntimeContributionIndex;
+    // (undocumented)
+    readonly failures: readonly BaseScreenPluginActivationFailure[];
     // (undocumented)
     readonly inspectorControls: BaseScreenPluginInspectorControlCatalog;
     // (undocumented)

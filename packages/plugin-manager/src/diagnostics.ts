@@ -15,6 +15,10 @@ export class DiagnosticCollector {
     return this.#items.length > 0;
   }
 
+  get items(): readonly ScreenDiagnostic[] {
+    return this.#items;
+  }
+
   failure<T>(): ScreenParseResult<T> {
     return { ok: false, diagnostics: sortDiagnostics(this.#items) };
   }

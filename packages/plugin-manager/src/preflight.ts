@@ -1,4 +1,4 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenPluginCommandHandler,
@@ -34,55 +34,151 @@ export interface PlannedPlugin {
   createSession(): ActivationSession;
 }
 
+/** 单个插件的失败记录：pluginId 取自其 canonical manifest；manifest 未能解析时为空串。 */
+export interface PlannedPluginFailure {
+  readonly index: number;
+  readonly pluginId: string;
+  readonly diagnostics: readonly ScreenDiagnostic[];
+}
+
 export interface ActivationPlan {
   readonly materials: readonly BaseScreenMaterialCatalogEntry[];
   readonly panels: readonly BaseScreenPluginPanelCatalogEntry[];
   readonly inspectorControls: readonly BaseScreenPluginInspectorControlCatalogEntry[];
   readonly plugins: readonly PlannedPlugin[];
+  readonly failures: readonly PlannedPluginFailure[];
 }
 
+/**
+ * 激活计划：全局门（输入快照、宿主自营物料、不可归因的配置错误）失败关闭；
+ * 可归因到单个插件的失败只排除该插件——幂等收敛直到幸存集合稳定，
+ * 跨插件冲突按稳定顺序 first-wins，后声明方失败，依赖失败级联排除。
+ */
 export function createActivationPlan(
   options: BaseScreenPluginManagerOptions,
 ): ScreenParseResult<ActivationPlan> {
   const input = snapshotManagerInput(options);
   if (!input.ok) return input;
-  const diagnostics = new DiagnosticCollector();
-  const candidates = parsePluginCandidates(input.value.runtimes, diagnostics);
-  if (diagnostics.hasErrors) return diagnostics.failure();
-  const ordered = resolveCandidates(candidates, diagnostics);
-  if (diagnostics.hasErrors) return diagnostics.failure();
-  const grants = validateCapabilityPlan(ordered, input.value, diagnostics);
-  if (diagnostics.hasErrors) return diagnostics.failure();
-  const materials = inspectMaterialRegistry(input.value, ordered, diagnostics);
-  if (diagnostics.hasErrors) return diagnostics.failure();
-  const panels = inspectPluginPanels(ordered, input.value.registryGet, diagnostics);
-  if (diagnostics.hasErrors) return diagnostics.failure();
-  const inspectorControls = inspectInspectorControls(ordered, input.value.registryGet, diagnostics);
-  if (diagnostics.hasErrors) return diagnostics.failure();
-  return {
-    ok: true,
-    value: {
-      materials,
-      panels,
-      inspectorControls,
-      plugins: ordered.map((candidate) => {
-        const grantedCapabilities = grants.get(candidate)!;
-        return Object.freeze({
-          ...candidate,
-          grantedCapabilities,
-          createSession: () => createActivationSession(input.value, candidate, grantedCapabilities),
-        });
-      }),
-    },
-    diagnostics: [],
-  };
+  const parseCollector = new DiagnosticCollector();
+  const parsed = parsePluginCandidates(input.value.runtimes, parseCollector);
+  let survivors = parsed.candidates;
+  const failures: PlannedPluginFailure[] = [
+    ...withPluginIdentities(attributeByPlugin(parseCollector.items), parsed.identities),
+  ];
+
+  // 收敛循环：每一轮只会淘汰插件，淘汰后其依赖方级联失败，直到没有新的排除。
+  for (;;) {
+    const round = new DiagnosticCollector();
+    const ordered = resolveCandidates(survivors, round);
+    const grants = validateCapabilityPlan(ordered, input.value, round);
+    const materials = inspectMaterialRegistry(input.value, ordered, round);
+    const panels = inspectPluginPanels(ordered, input.value.registryGet, round);
+    const inspectorControls = inspectInspectorControls(ordered, input.value.registryGet, round);
+
+    const global = attributeGlobal(round.items);
+    if (global.length > 0) {
+      return {
+        ok: false,
+        diagnostics: sortAll([...failures.flatMap((item) => item.diagnostics), ...global]),
+      };
+    }
+    const attributed = attributeByPlugin(round.items);
+    const excludedIndexes = new Set(attributed.map((failure) => failure.index));
+    if (excludedIndexes.size === 0) {
+      return {
+        ok: true,
+        value: {
+          materials,
+          panels,
+          inspectorControls,
+          failures: sortFailures(withPluginIdentities(failures, parsed.identities)),
+          plugins: ordered.map((candidate) => {
+            const grantedCapabilities = grants.get(candidate)!;
+            return Object.freeze({
+              ...candidate,
+              grantedCapabilities,
+              createSession: () =>
+                createActivationSession(input.value, candidate, grantedCapabilities),
+            });
+          }),
+        },
+        diagnostics: [],
+      };
+    }
+    failures.push(...attributed);
+    survivors = survivors.filter((candidate) => !excludedIndexes.has(candidate.index));
+  }
+}
+
+function attributeByPlugin(diagnostics: readonly ScreenDiagnostic[]): PlannedPluginFailure[] {
+  const byIndex = new Map<number, ScreenDiagnostic[]>();
+  for (const item of diagnostics) {
+    const index = pluginIndexAt(item.path);
+    if (index === undefined) continue;
+    const list = byIndex.get(index) ?? [];
+    list.push(item);
+    byIndex.set(index, list);
+  }
+  return [...byIndex.entries()]
+    .map(([index, items]) => ({
+      index,
+      pluginId: '',
+      diagnostics: sortAll(items),
+    }))
+    .sort((first, second) => first.index - second.index);
+}
+
+/** 把失败记录的 pluginId 用已知身份回填：清单已解析的插件才拥有身份。 */
+function withPluginIdentities(
+  failures: readonly PlannedPluginFailure[],
+  identities: ReadonlyMap<number, string>,
+): readonly PlannedPluginFailure[] {
+  return failures.map((failure) => {
+    if (failure.pluginId !== '') return failure;
+    const pluginId = identities.get(failure.index);
+    return pluginId === undefined ? failure : { ...failure, pluginId };
+  });
+}
+
+function attributeGlobal(diagnostics: readonly ScreenDiagnostic[]): readonly ScreenDiagnostic[] {
+  return diagnostics.filter((item) => pluginIndexAt(item.path) === undefined);
+}
+
+function pluginIndexAt(path: readonly (string | number)[]): number | undefined {
+  if (path[0] !== 'plugins') return undefined;
+  const index = path[1];
+  return typeof index === 'number' ? index : undefined;
+}
+
+function sortFailures(failures: readonly PlannedPluginFailure[]): readonly PlannedPluginFailure[] {
+  return [...failures].sort((first, second) => first.index - second.index);
+}
+
+function sortAll(diagnostics: readonly ScreenDiagnostic[]): readonly ScreenDiagnostic[] {
+  return [...diagnostics].sort((left, right) => {
+    const byPath = comparePathLength(left.path, right.path);
+    if (byPath !== 0) return byPath;
+    if (left.code !== right.code) return left.code < right.code ? -1 : 1;
+    return left.message < right.message ? -1 : 1;
+  });
+}
+
+function comparePathLength(
+  left: readonly (string | number)[],
+  right: readonly (string | number)[],
+): number {
+  return left.length - right.length;
 }
 
 function parsePluginCandidates(
   runtimes: readonly unknown[],
   diagnostics: DiagnosticCollector,
-): readonly Candidate[] {
+): {
+  readonly candidates: readonly Candidate[];
+  readonly identities: ReadonlyMap<number, string>;
+} {
   const candidates: Candidate[] = [];
+  const identities = new Map<number, string>();
   for (let index = 0; index < runtimes.length; index++) {
     try {
       const runtime = runtimes[index];
@@ -139,6 +235,7 @@ function parsePluginCandidates(
         );
         continue;
       }
+      identities.set(index, parsed.value.id);
       const commands = readCommandHandlers(commandsValue, parsed.value, index, diagnostics);
       if (commands === undefined) continue;
       candidates.push({
@@ -158,7 +255,7 @@ function parsePluginCandidates(
       );
     }
   }
-  return candidates;
+  return { candidates, identities };
 }
 
 function readOwnValue(value: object, key: string): unknown | undefined {

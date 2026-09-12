@@ -283,6 +283,13 @@
   "注册一处、清单一处"的两份账，也不再自建冲突校验；类型/身份级冲突仍由 manager preflight 裁决。
   `createCommandPort` 选项真正可选：缺键与显式 `undefined` 同义，仅授予 `command.execute` 时才需要
   提供工厂。
+- **插件失败爆炸半径收敛**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md)）：
+  激活原子性从"全部插件整体回滚"收敛为**每插件原子**——可归因到单插件的预检失败（清单解析、
+  能力授权、registry 解析、跨插件冲突）只排除该插件；跨插件冲突按稳定顺序 first-wins，后声明方
+  失败；运行期 `activate()` 失败只失效自身会话并级联其声明依赖方，已激活插件与核心目录不受影响。
+  `snapshot.failures` 逐插件记录 `{ index, pluginId, diagnostics }`；宿主自营物料
+  （`standaloneMaterialTagNames`）解析失败仍是全局门，整体保持未激活。宿主如需"全或无"语义，
+  可在 activate 后检查 `failures` 并自行 deactivate。
 
 ## 历史迁移
 

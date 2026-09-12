@@ -1,4 +1,4 @@
-import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenDiagnostic, ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
@@ -21,12 +21,20 @@ export type BaseScreenPluginManagerStatus =
   | 'disposing'
   | 'disposed';
 
+/** 单个插件的激活失败记录：失败不扩散，其余插件的贡献照常发布。 */
+export interface BaseScreenPluginActivationFailure {
+  readonly index: number;
+  readonly pluginId: string;
+  readonly diagnostics: readonly ScreenDiagnostic[];
+}
+
 export interface BaseScreenPluginManagerSnapshot {
   readonly materials: BaseScreenMaterialCatalog;
   readonly panels: BaseScreenPluginPanelCatalog;
   readonly inspectorControls: BaseScreenPluginInspectorControlCatalog;
   readonly plugins: BaseScreenPluginCatalog;
   readonly contributions: BaseScreenRuntimeContributionIndex;
+  readonly failures: readonly BaseScreenPluginActivationFailure[];
 }
 
 export interface BaseScreenCustomElementRegistryPort {

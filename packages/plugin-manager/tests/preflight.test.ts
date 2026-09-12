@@ -36,7 +36,7 @@ function manager(plugins: readonly BaseScreenPluginRuntime[], grantedCapabilitie
 }
 
 describe('Plugin Manager preflight', () => {
-  it('rejects duplicate plugin identities before any lifecycle hook', async () => {
+  it('isolates duplicate plugin identities with first-wins resolution', async () => {
     let calls = 0;
     const first = runtime(manifest({ id: 'acme.duplicate' }), () => {
       calls++;
@@ -47,50 +47,51 @@ describe('Plugin Manager preflight', () => {
 
     const result = await manager([first, second]).activate();
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
-      'PLUGIN_CORE_IDENTITY_CONFLICT',
-    );
-    expect(calls).toBe(0);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(calls).toBe(1);
+    expect(result.value.plugins.list().map((entry) => entry.manifest.id)).toEqual([
+      'acme.duplicate',
+    ]);
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]).toMatchObject({ pluginId: 'acme.duplicate' });
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_IDENTITY_CONFLICT',
+      ),
+    ).toBe(true);
   });
 
-  it('rejects contribution identities claimed by separate plugins', async () => {
-    const first = runtime(
-      manifest({
-        id: 'acme.first',
-        contributions: [
-          {
-            kind: 'dataResourceType',
-            id: 'dataset',
-            name: 'Dataset',
-            configSchema: { kind: 'object', properties: {}, required: [] },
-          },
-        ],
-      }),
-    );
+  it('isolates contribution identities claimed by separate plugins with first-wins resolution', async () => {
+    const contribution = {
+      kind: 'dataResourceType' as const,
+      id: 'dataset',
+      name: 'Dataset',
+      configSchema: { kind: 'object' as const, properties: {}, required: [] },
+    };
+    const first = runtime(manifest({ id: 'acme.first', contributions: [contribution] }));
     const second = runtime(
       manifest({
         id: 'acme.second',
-        contributions: [
-          {
-            kind: 'dataResourceType',
-            id: 'dataset',
-            name: 'Dataset copy',
-            configSchema: { kind: 'object', properties: {}, required: [] },
-          },
-        ],
+        contributions: [{ ...contribution, name: 'Dataset copy' }],
       }),
     );
 
     const result = await manager([first, second]).activate();
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
-      'PLUGIN_CORE_CONTRIBUTION_CONFLICT',
-    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]).toMatchObject({ pluginId: 'acme.second' });
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_CONFLICT',
+      ),
+    ).toBe(true);
+    expect(result.value.contributions.getResourceType('dataset')?.name).toBe('Dataset');
   });
 
-  it('rejects requested capabilities that the host did not approve', async () => {
+  it('isolates requested capabilities that the host did not approve', async () => {
     let activated = false;
     const plugin = runtime(manifest({ capabilities: ['command.execute'] }), () => {
       activated = true;
@@ -98,14 +99,18 @@ describe('Plugin Manager preflight', () => {
 
     const result = await manager([plugin]).activate();
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
-      'PLUGIN_CORE_CAPABILITY_UNAUTHORIZED',
-    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
     expect(activated).toBe(false);
+    expect(result.value.failures).toHaveLength(1);
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_CAPABILITY_UNAUTHORIZED',
+      ),
+    ).toBe(true);
   });
 
-  it('rejects command contributions that lack matching handlers', async () => {
+  it('isolates command contributions that lack matching handlers', async () => {
     const plugin = runtime(
       manifest({
         capabilities: ['command.execute'],
@@ -120,9 +125,13 @@ describe('Plugin Manager preflight', () => {
       }),
     );
     const result = await manager([plugin], { 'acme.plugin': ['command.execute'] }).activate();
-    expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ),
+    ).toBe(true);
   });
 });

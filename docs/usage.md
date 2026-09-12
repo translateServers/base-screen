@@ -982,6 +982,12 @@ resource type 未贡献或 capability 未授权时保持失败关闭。
 capability 限制的是 Base Screen 集成点，不是 JavaScript 环境权限。远程发现、dynamic import
 和不可信执行仍归宿主，不进入 Base Screen。
 
+激活失败的影响范围按插件收敛：清单解析、能力授权、registry 解析失败或 `activate()` 抛错的插件
+被单独排除并级联其声明依赖方，其余插件的贡献照常发布；失败明细在 `snapshot.failures`
+（`{ index, pluginId, diagnostics }`）中逐插件可观察。只有输入快照非法或宿主自营物料
+（`standaloneMaterialTagNames`）解析失败这类无法归属到单个插件的全局门失败，才会让整个
+`activate()` 返回失败。跨插件贡献冲突按稳定顺序 first-wins：先声明方保留，后声明方失败。
+
 作者用 `@base-screen/plugin-sdk` 声明插件；宿主激活后把 snapshot 交给 Viewer/Designer：
 
 custom element 注册与插件输入的组装可以用 `createPluginRegistration` 收敛为一次调用：它先对

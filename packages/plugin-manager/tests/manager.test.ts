@@ -210,7 +210,7 @@ describe('BaseScreenPluginManager', () => {
     expect(manager.snapshot).toBeUndefined();
   });
 
-  it('finishes all preflight failures before creating ports or calling hooks', async () => {
+  it('isolates a dependency cycle: failing plugins are recorded without hooks or ports', async () => {
     let hooksCalled = 0;
     let portsCreated = 0;
     const first = runtime(
@@ -238,19 +238,24 @@ describe('BaseScreenPluginManager', () => {
     });
 
     const result = await manager.activate();
-    expect(result.ok).toBe(false);
-    expect(JSON.stringify(result)).not.toContain('canary secret must not escape');
-    if (!result.ok) {
-      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_DEPENDENCY_CYCLE')).toBe(
-        true,
-      );
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures.map((failure) => failure.pluginId)).toEqual([
+      'acme.first',
+      'acme.second',
+    ]);
+    expect(
+      result.value.failures.every((failure) =>
+        failure.diagnostics.some((item) => item.code === 'PLUGIN_CORE_DEPENDENCY_CYCLE'),
+      ),
+    ).toBe(true);
     expect(hooksCalled).toBe(0);
     expect(portsCreated).toBe(0);
-    expect(manager.snapshot).toBeUndefined();
+    expect(result.value.plugins.list()).toHaveLength(0);
+    expect(manager.status).toBe('active');
   });
 
-  it('rolls back successful plugins and invalidates their session ports after activation failure', async () => {
+  it('isolates a failing plugin and keeps successful plugins active with valid ports', async () => {
     const log: string[] = [];
     let capturedPort: PluginCommandPort | undefined;
     const base = runtime(pluginManifest({ id: 'acme.base', capabilities: ['command.execute'] }), {
@@ -274,18 +279,24 @@ describe('BaseScreenPluginManager', () => {
     });
 
     const result = await manager.activate();
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(log).toEqual(['activate:base']);
+    expect(manager.status).toBe('active');
+    expect(result.value.failures).toMatchObject([{ pluginId: 'acme.failing', index: 1 }]);
+    expect(result.value.failures[0]?.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    expect(result.value.plugins.list().map((entry) => entry.manifest.id)).toEqual(['acme.base']);
+    // base 的会话端口保持有效；失败插件的 JSON 凭据不进入任何快照诊断。
+    expect(JSON.stringify(result.value.failures)).not.toContain('canary secret must not escape');
+    const executed = await capturedPort?.execute({ commandId: 'run', args: null });
+    expect(executed?.ok).toBe(true);
+
+    const deactivated = await manager.deactivate();
+    expect(deactivated.ok).toBe(true);
     expect(log).toEqual(['activate:base', 'deactivate:base']);
-    expect(manager.status).toBe('inactive');
-    expect(manager.snapshot).toBeUndefined();
-    const afterRollback = await capturedPort?.execute({ commandId: 'run', args: null });
-    expect(afterRollback?.ok).toBe(false);
-    if (afterRollback?.ok === false) {
-      expect(afterRollback.diagnostics[0]?.code).toBe('PLUGIN_CORE_SESSION_INVALID');
-    }
   });
 
-  it('fails closed for unknown Blueprint capability contributions', async () => {
+  it('isolates unknown Blueprint capability contributions', async () => {
     const plugin = runtime(
       pluginManifest({
         id: 'acme.unknown-capability',
@@ -305,12 +316,17 @@ describe('BaseScreenPluginManager', () => {
     });
 
     const activated = await manager.activate();
-    expect(activated.ok).toBe(false);
-    if (!activated.ok) {
-      expect(
-        activated.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN'),
-      ).toBe(true);
-    }
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(activated.value.failures).toHaveLength(1);
+    expect(activated.value.failures[0]).toMatchObject({ pluginId: 'acme.unknown-capability' });
+    expect(
+      activated.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+      ),
+    ).toBe(true);
+    expect(activated.value.plugins.list()).toHaveLength(0);
+    expect(activated.value.contributions.hasBlueprintCapability('blueprint.unknown')).toBe(false);
   });
 
   it('accepts the native component visibility Blueprint capability', async () => {
@@ -444,8 +460,7 @@ describe('BaseScreenPluginManager', () => {
     );
   });
 
-  it('does not query the registry when manifest parsing fails', async () => {
-    let queries = 0;
+  it('keeps standalone material resolution as a global gate', async () => {
     let hooks = 0;
     const invalid = {
       manifest: {
@@ -465,18 +480,58 @@ describe('BaseScreenPluginManager', () => {
       ...managerOptions([invalid]),
       standaloneMaterialTagNames: ['acme-kpi-card'],
       registry: {
-        get: () => {
-          queries++;
-          return undefined;
-        },
+        get: () => undefined,
       },
     });
 
     const result = await manager.activate();
 
+    // 插件清单失败可隔离，但宿主自营物料解析失败是全局门：整体保持未激活。
     expect(result.ok).toBe(false);
-    expect(queries).toBe(0);
+    expect(
+      result.ok
+        ? []
+        : result.diagnostics.some((item) => item.path[0] === 'standaloneMaterialTagNames'),
+    ).toBe(true);
     expect(hooks).toBe(0);
+    expect(manager.snapshot).toBeUndefined();
+    expect(manager.status).toBe('inactive');
+  });
+
+  it('isolates a plugin whose manifest fails to parse', async () => {
+    let hooks = 0;
+    const invalid = {
+      manifest: {
+        id: 'acme.invalid',
+        dependencies: [],
+        capabilities: [],
+        contributions: [],
+        extra: true,
+      },
+      activate: () => {
+        hooks++;
+      },
+      deactivate: () => undefined,
+      dispose: () => undefined,
+    } as unknown as BaseScreenPluginRuntime;
+    const standalone = constructorFor(materialManifest());
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([invalid], new Map([['acme-kpi-card', standalone]])),
+      standaloneMaterialTagNames: ['acme-kpi-card'],
+      registry: {
+        get: (tagName) => (tagName === 'acme-kpi-card' ? standalone : undefined),
+      },
+    });
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]?.index).toBe(0);
+    expect(result.value.failures[0]?.diagnostics.length).toBeGreaterThan(0);
+    expect(hooks).toBe(0);
+    expect(result.value.plugins.list()).toHaveLength(0);
+    expect(result.value.materials.list()).toHaveLength(1);
   });
 
   it('enforces the standalone material limit before registry queries', async () => {
@@ -501,7 +556,7 @@ describe('BaseScreenPluginManager', () => {
     expect(queries).toBe(0);
   });
 
-  it('rejects missing dependencies before creating a session', async () => {
+  it('isolates a plugin with missing dependencies before creating a session', async () => {
     let ports = 0;
     let hooks = 0;
     const plugin = runtime(
@@ -527,12 +582,81 @@ describe('BaseScreenPluginManager', () => {
 
     const result = await manager.activate();
 
-    expect(result.ok).toBe(false);
-    expect(result.ok ? [] : result.diagnostics.map((item) => item.code)).toContain(
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]).toMatchObject({ pluginId: 'acme.needs-missing' });
+    expect(result.value.failures[0]?.diagnostics.map((item) => item.code)).toContain(
       'PLUGIN_CORE_DEPENDENCY_MISSING',
     );
     expect(ports).toBe(0);
     expect(hooks).toBe(0);
+  });
+
+  it('cascades runtime failure to dependents while independent plugins stay active', async () => {
+    const log: string[] = [];
+    const base = runtime(pluginManifest({ id: 'acme.base' }), {
+      activate: () => Promise.reject(new Error('base failed')),
+    });
+    const dependent = runtime(
+      pluginManifest({ id: 'acme.dependent', dependencies: [{ id: 'acme.base' }] }),
+      {
+        activate: () => {
+          log.push('activate:dependent');
+        },
+      },
+    );
+    const independent = runtime(pluginManifest({ id: 'acme.independent' }), {
+      activate: () => {
+        log.push('activate:independent');
+      },
+    });
+    const manager = createBaseScreenPluginManager(managerOptions([base, dependent, independent]));
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(log).toEqual(['activate:independent']);
+    expect(result.value.failures.map((failure) => failure.pluginId)).toEqual([
+      'acme.base',
+      'acme.dependent',
+    ]);
+    expect(result.value.failures[0]?.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    expect(result.value.failures[1]?.diagnostics[0]?.code).toBe('PLUGIN_CORE_DEPENDENCY_MISSING');
+    expect(result.value.plugins.list().map((entry) => entry.manifest.id)).toEqual([
+      'acme.independent',
+    ]);
+  });
+
+  it('publishes an empty catalog snapshot when every plugin fails', async () => {
+    const failing = runtime(pluginManifest({ id: 'acme.failing' }), {
+      activate: () => {
+        throw new Error('boom');
+      },
+    });
+    const isolated = runtime(
+      pluginManifest({
+        id: 'acme.isolated',
+        capabilities: ['blueprint.unknown'],
+        contributions: [{ kind: 'blueprintCapability', id: 'blueprint.unknown', name: 'Unknown' }],
+      }),
+    );
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([failing, isolated]),
+      grantedCapabilities: { 'acme.isolated': ['blueprint.unknown'] },
+    });
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures.map((failure) => failure.pluginId)).toEqual([
+      'acme.failing',
+      'acme.isolated',
+    ]);
+    expect(result.value.plugins.list()).toHaveLength(0);
+    expect(manager.status).toBe('active');
+    expect((await manager.deactivate()).ok).toBe(true);
+    expect(manager.snapshot).toBeUndefined();
   });
 
   it('rejects a tag that resolves to different constructors', async () => {
@@ -704,18 +828,21 @@ describe('BaseScreenPluginManager', () => {
     }
   });
 
-  it('rejects command handlers that are not declared as contributions', async () => {
+  it('isolates command handlers that are not declared as contributions', async () => {
     const plugin = runtime(pluginManifest({ id: 'acme.extra-handler' }));
     Object.defineProperty(plugin, 'commands', {
       value: { extra: () => undefined },
     });
-    const result = await createBaseScreenPluginManager(managerOptions([plugin])).activate();
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(
-        result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN'),
-      ).toBe(true);
-    }
+    const activated = await createBaseScreenPluginManager(managerOptions([plugin])).activate();
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(activated.value.failures).toHaveLength(1);
+    expect(activated.value.failures[0]?.pluginId).toBe('acme.extra-handler');
+    expect(
+      activated.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+      ),
+    ).toBe(true);
   });
 
   it('exposes a design read port that stops serving after deactivate', async () => {
@@ -748,19 +875,22 @@ describe('BaseScreenPluginManager', () => {
     }
   });
 
-  it('fails activation when design.read is granted without a read port factory', async () => {
+  it('isolates design.read granted without a read port factory', async () => {
     const plugin = runtime(pluginManifest({ id: 'acme.readless', capabilities: ['design.read'] }));
-    const result = await createBaseScreenPluginManager({
+    const activated = await createBaseScreenPluginManager({
       ...managerOptions([plugin]),
       grantedCapabilities: { 'acme.readless': ['design.read'] },
     }).activate();
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(
-        result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE'),
-      ).toBe(true);
-    }
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(activated.value.failures).toHaveLength(1);
+    expect(activated.value.failures[0]?.pluginId).toBe('acme.readless');
+    expect(
+      activated.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
+      ),
+    ).toBe(true);
   });
 
   it('never builds a read port for plugins without design.read', async () => {
@@ -817,21 +947,25 @@ describe('BaseScreenPluginManager', () => {
     expect(manager.snapshot?.panels.list()).toHaveLength(1);
   });
 
-  it('fails activation when a declared panel tag is not registered', async () => {
+  it('isolates a declared panel tag that is not registered', async () => {
     const manager = createBaseScreenPluginManager(
       managerOptions([panelPlugin('acme.panelist', 'acme.monitor', 'acme-monitor')]),
     );
 
     const result = await manager.activate();
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID')).toBe(
-        true,
-      );
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]?.pluginId).toBe('acme.panelist');
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID',
+      ),
+    ).toBe(true);
+    expect(result.value.panels.list()).toHaveLength(0);
   });
 
-  it('reports a diagnostic when the registry query for a panel throws', async () => {
+  it('isolates a plugin whose panel registry query throws', async () => {
     const manager = createBaseScreenPluginManager({
       ...managerOptions([panelPlugin('acme.panelist', 'acme.monitor', 'acme-monitor')]),
       registry: {
@@ -842,15 +976,18 @@ describe('BaseScreenPluginManager', () => {
     });
 
     const result = await manager.activate();
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID')).toBe(
-        true,
-      );
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]?.pluginId).toBe('acme.panelist');
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID',
+      ),
+    ).toBe(true);
   });
 
-  it('rejects two panels that claim the same custom element tag', async () => {
+  it('keeps the first panel claim and isolates the conflicting plugin', async () => {
     const shared = class {} as unknown as BaseScreenMaterialConstructor;
     const manager = createBaseScreenPluginManager(
       managerOptions(
@@ -863,12 +1000,17 @@ describe('BaseScreenPluginManager', () => {
     );
 
     const result = await manager.activate();
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_CONFLICT')).toBe(
-        true,
-      );
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.panels.get('acme.monitor')?.pluginId).toBe('acme.one');
+    expect(result.value.panels.list()).toHaveLength(1);
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]).toMatchObject({ pluginId: 'acme.two' });
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_IDENTITY_CONFLICT',
+      ),
+    ).toBe(true);
   });
 
   function controlPlugin(pluginId: string, controlId: string, tagName: string) {
@@ -897,21 +1039,25 @@ describe('BaseScreenPluginManager', () => {
     expect(manager.snapshot?.inspectorControls.has('acme-never-registered')).toBe(false);
   });
 
-  it('fails activation when a declared inspector control tag is not registered', async () => {
+  it('isolates a declared inspector control tag that is not registered', async () => {
     const manager = createBaseScreenPluginManager(
       managerOptions([controlPlugin('acme.controls', 'acme.wheel', 'acme-wheel')]),
     );
 
     const result = await manager.activate();
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID')).toBe(
-        true,
-      );
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]?.pluginId).toBe('acme.controls');
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_IDENTITY_INVALID',
+      ),
+    ).toBe(true);
+    expect(result.value.inspectorControls.list()).toHaveLength(0);
   });
 
-  it('rejects two inspector controls claiming the same custom element tag', async () => {
+  it('keeps the first inspector control claim and isolates the conflicting plugin', async () => {
     const shared = class {} as unknown as BaseScreenMaterialConstructor;
     const manager = createBaseScreenPluginManager(
       managerOptions(
@@ -924,11 +1070,16 @@ describe('BaseScreenPluginManager', () => {
     );
 
     const result = await manager.activate();
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.diagnostics.some((item) => item.code === 'PLUGIN_CORE_IDENTITY_CONFLICT')).toBe(
-        true,
-      );
-    }
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.inspectorControls.get('acme.wheel')?.pluginId).toBe('acme.one');
+    expect(result.value.inspectorControls.list()).toHaveLength(1);
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]).toMatchObject({ pluginId: 'acme.two' });
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_IDENTITY_CONFLICT',
+      ),
+    ).toBe(true);
   });
 });
