@@ -1,14 +1,14 @@
 # Base Screen 后续路线图
 
 > 状态：方向候选，不授权实现
-> 最近更新：2026-09-11（插件系统架构演进设计评审与 ADR-0074）
+> 最近更新：2026-09-12（外围插件承载 P0–P6 交付并归档）
 
 本路线图列出下一阶段的候选方向与触发条件。**它不授权任何实现**：每一项启动前都必须先有已接受的 ADR
 与生效中的 Spec，并登记到 [Spec 索引](../specs/README.md) 的“生效中”区域。
 
 ## 当前维护状态
 
-- 当前生效中 Spec 以 [Spec 索引](../specs/README.md) 为准。已完成或被取代的 61 个 Spec 见
+- 当前生效中 Spec 以 [Spec 索引](../specs/README.md) 为准。已完成或被取代的 62 个 Spec 见
   [归档索引](../specs/archive/README.md)。
 - 已交付能力和维护期行为以[当前能力基线](../baseline/README.md)为准。
 - P15–P20 工程质量工作见 [Designer 持续质量治理计划](../plans/continuous-quality-governance/plan.md)；该计划
@@ -19,7 +19,7 @@
 
 | 方向 | 说明 | 前置/触发条件 | 相关材料 |
 | --- | --- | --- | --- |
-| ~~外围插件承载（P0–P6）~~（已交付，2026-09-12） | 六个阶段全部完成并归档：[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md)、[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、[ADR-0075](../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md) | 已完成 | [设计评审](../plans/plugin-architecture-evolution/design-review.md) |
+| ~~外围插件承载（P0–P6）~~（已交付，2026-09-12） | 六个阶段全部完成并归档：[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md)、[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、[ADR-0075](../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md) | 已完成 | [设计评审](../plans/archive/plugin-architecture-evolution/design-review.md) |
 | 画布背景宿主资源 | 背景图片改为 static/host-resource 判别 source，并复用宿主资源 Tab | 用户计划明确独立第二阶段；需单独公共契约 Spec，数据库转换与部署另行授权 | [ADR-0064](../decisions/ADR-0064-host-resource-authoring-intent.md) |
 | 宿主侧项目/数据/发布能力 | 项目持久化、数据查询/聚合、资产存储、发布部署与长任务，按轻量基座边界归宿主实现 | 宿主侧立项，有明确业务容量 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) |
 | Blueprint 扩展节点 | 一体化工作台已由 Base Screen 提供语义壳层、宿主提供中央图形；未来只在 canonical 需求成立时评估分组、过滤、模板或新控制流 | 先扩展 canonical Spec；不得由宿主 metadata 或私有 Store 旁路实现 | [Designer Blueprint Workbench](../specs/archive/designer-blueprint-workbench/spec.md)、[ADR-0063](../decisions/ADR-0063-designer-blueprint-workbench-shell.md) |

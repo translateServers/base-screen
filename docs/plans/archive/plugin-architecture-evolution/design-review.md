@@ -1,15 +1,26 @@
 # 插件系统架构演进设计评审
 
-> 状态：已评审通过（方向确认，不授权实现）
+> 状态：已归档（2026-09-12）。原为「已评审通过（方向确认，不授权实现）」，其 P0–P6 已全部交付并归档，本文转只读历史记录。
 > 日期：2026-09-11（第三次修订：定位为「核心库之外的能力承载通道」，物料只是其中一部分）
 > 评审结论：2026-09-11 通过方向；实施前仍须有已接受的 ADR 与生效中的 Spec
 > 范围：插件系统的定位、承载面、证据基线、缺口分析与长期演进方向
 > 动机（用户确认）：把更多能力**移出核心库、以插件形态交付**；用插件做物料只是其中一部分功能
-> 关联：[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md)、[ADR-0015](../../decisions/ADR-0015-runtime-contribution-authority.md)、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](../../decisions/ADR-0029-host-managed-material-package-distribution.md)、[ADR-0070](../../decisions/ADR-0070-plugin-command-chrome-projection.md)、[ADR-0071](../../decisions/ADR-0071-plugin-design-context-read-access.md)、[ADR-0072](../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)、[ADR-0073](../../decisions/ADR-0073-inspector-custom-form-controls.md)
+> 关联：[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md)、[ADR-0015](../../../decisions/ADR-0015-runtime-contribution-authority.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md)、[ADR-0070](../../../decisions/ADR-0070-plugin-command-chrome-projection.md)、[ADR-0071](../../../decisions/ADR-0071-plugin-design-context-read-access.md)、[ADR-0072](../../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)、[ADR-0073](../../../decisions/ADR-0073-inspector-custom-form-controls.md)、[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、[ADR-0075](../../../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)
 
-本文是**设计评审**，不是实施授权。任何阶段的启动前提都是：先有已接受的 ADR，再有生效中的 Spec，并登记到 [Spec 索引](../../specs/README.md)。
+本文是**设计评审**，不是实施授权。任何阶段的启动前提都是：先有已接受的 ADR，再有生效中的 Spec，并登记到 [Spec 索引](../../../specs/README.md)。
 
-证据基线为跨仓实测：上游 checkout 与 XJDataHub 宿主实际代码，经 [跨仓工作流](../../../.agents/skills/base-screen-integration-workflow/SKILL.md) 的 `integration status` 与 `integration context materials` 核对。宿主侧路径只作证据引用，不是本仓库文件。
+## 后续处置（2026-09-12，归档时补记）
+
+本文的路线图 P0–P6 已全部交付，[外围插件分区 Spec](../../../specs/archive/peripheral-plugin-partition/spec.md) 已归档。正文§2.2/§2.3、§4、§6、§7、§9 保留的是**评审当时的现状描述与取舍方向**，其中以下几处已被实现取代，阅读时以本条为准：
+
+- **§2.3 与 §4 第 4 点所述的"任一插件激活失败即整体回滚"已不再成立。** 现状为**每插件原子**：可归因到单插件的预检失败只排除该插件，运行期 `activate()` 失败只失效自身会话并级联其声明依赖方；`snapshot.failures` 逐插件记录。宿主自营物料解析失败仍为全局门。当前行为见[能力基线](../../../baseline/README.md)。
+- **§9 D3 的裁决（"维持整体回滚，留待实施阶段"）未被执行**，实际改为每插件原子收敛失败影响面，未等"插件数增长"。这不削弱"不留半成品目录"的性质。
+- **§4 第 4 点 / §6 Q5 / §7 G4 所述"急切激活"已不再是唯一形态。** 已交付 `activation: 'lazy'` 与 `ensureActive`：预检与目录发布保持一次完成（授权不放松），activate 钩子推迟到贡献首次使用时按拓扑序运行。
+- **§7 G6/G7 中的能力集合硬编码已解决。** `resolver` 的能力判定收敛为声明表 `PLUGIN_CAPABILITY_DESCRIPTORS`（新增能力只改一处）；**贡献判别联合仍按 P5 触发条件保持门控**——未出现第 7 类贡献，故未做描述符驱动的内核改造。
+- **§6 Q8 兼容性问题已裁决**（[ADR-0075](../../../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)）：锁步批次交付 + 以 api 基线治理的 `plugin-core`/`plugin-sdk` 稳定子集，不引入版本标记。
+- **§2.2 的"12 项能力/6 类贡献/2 个端口"计数仍然有效**；首批承载范围未新增贡献类型与能力。
+
+证据基线为跨仓实测：上游 checkout 与 XJDataHub 宿主实际代码，经 [跨仓工作流](../../../../.agents/skills/base-screen-integration-workflow/SKILL.md) 的 `integration status` 与 `integration context materials` 核对。宿主侧路径只作证据引用，不是本仓库文件。
 
 ## 0. 结论摘要
 
@@ -56,7 +67,7 @@
 
 ### 1.3 驱动二：功能承载面（命令、面板、检查器控件）
 
-核心库已经建好这些承载面，且都有决策记录：命令与 chrome 投影（[ADR-0070](../../decisions/ADR-0070-plugin-command-chrome-projection.md)）、左栏面板（[ADR-0072](../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)）、属性面板自定义控件（[ADR-0073](../../decisions/ADR-0073-inspector-custom-form-controls.md)）、设计上下文只读访问（[ADR-0071](../../decisions/ADR-0071-plugin-design-context-read-access.md)）。
+核心库已经建好这些承载面，且都有决策记录：命令与 chrome 投影（[ADR-0070](../../../decisions/ADR-0070-plugin-command-chrome-projection.md)）、左栏面板（[ADR-0072](../../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)）、属性面板自定义控件（[ADR-0073](../../../decisions/ADR-0073-inspector-custom-form-controls.md)）、设计上下文只读访问（[ADR-0071](../../../decisions/ADR-0071-plugin-design-context-read-access.md)）。
 
 它们目前在生产里没有采用者（第 3 节 F1、F3），但**按本定位它们属于目标承载面而非待冻结的投机功能**。第二次修订曾据"零采用者"倾向冻结它们，该判断已撤回。
 
@@ -93,7 +104,7 @@ XJDataHub 经插件清单注入自己的图表物料定义，与其它物料混�
 
 宿主显式提供同 realm 受信模块；Base Screen 不 fetch、不 dynamic import、不发现远程代码。能力是「声明 ∩ 宿主批准 ∩ 宿主支持」的交集；激活上下文不含 Store、路由、DOM 根、凭据或通用服务对象。
 
-要点：**能力系统限制的是集成点，不是 JS 环境权威**（[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) 决策 1 已明确不作恶意代码沙箱承诺）。
+要点：**能力系统限制的是集成点，不是 JS 环境权威**（[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) 决策 1 已明确不作恶意代码沙箱承诺）。
 
 ## 3. 宿主实测证据
 
@@ -127,11 +138,11 @@ XJDataHub 经插件清单注入自己的图表物料定义，与其它物料混�
 
 现有信任档只有两个：宿主自写（受信、同 realm）与第三方（范围外）。本定位引入第三个档：**外围插件**——由基座团队或宿主编写、可带受控第三方依赖、独立于 `packages/` 交付。
 
-关键约束：**它不得获得任何运行时特权。** 必须走与宿主插件完全相同的通道——宿主提供候选、宿主加载、宿主授权。否则会绕过 [ADR-0029](../../decisions/ADR-0029-host-managed-material-package-distribution.md) 的"宿主负责加载与信任"。
+关键约束：**它不得获得任何运行时特权。** 必须走与宿主插件完全相同的通道——宿主提供候选、宿主加载、宿主授权。否则会绕过 [ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md) 的"宿主负责加载与信任"。
 
 ### 5.2 依赖准入规则（继承而非新建）
 
-[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md) 已给出可直接复用的准入原则：
+[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md) 已给出可直接复用的准入原则：
 
 - 第三方依赖必须置于**私有 adapter** 之后，不导出第三方类型、状态或 document shape。
 - adapter 必须以 canonical state 为唯一提交来源，支持 Shadow DOM、双实例、cleanup 与 package replacement。
@@ -221,7 +232,7 @@ P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方�
 
 ### D2 兼容性策略与探索阶段约束的冲突（**需你裁决**）
 
-本项目处于探索阶段，治理规则明令禁止版本标记字段与版本化命名（[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md) 亦有意移除版本语义）。但 Q8 的兼容性问题一旦有独立交付的外围插件就会真实存在：`packages/` 内的包靠 workspace 协议天然同步，外围插件是独立发布物，必须能感知基座契约变化。
+本项目处于探索阶段，治理规则明令禁止版本标记字段与版本化命名（[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md) 亦有意移除版本语义）。但 Q8 的兼容性问题一旦有独立交付的外围插件就会真实存在：`packages/` 内的包靠 workspace 协议天然同步，外围插件是独立发布物，必须能感知基座契约变化。
 
 **这两个要求目前互相冲突，且不能靠工程手段绕过——它需要显式批准。** 三个可选方向：
 
@@ -242,26 +253,26 @@ P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方�
 - 不在 Base Screen 内建执行沙箱（F13：沙箱归宿主）。
 - 不导出第三方类型、状态或 document shape 越过物料 ABI（继承 ADR-0019）。
 - 不把完整图表 option 或领域配置编辑器收进基座（AGENTS 既有边界：归宿主）。
-- 不做通用依赖注入或服务定位器（违反 [ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)）。
+- 不做通用依赖注入或服务定位器（违反 [ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)）。
 - 不让 Base Screen 侧出现 fetch / dynamic import / 网络客户端 / 存储。
-- 不为菜单引入 `when` 条件表达式语言（[ADR-0070](../../decisions/ADR-0070-plugin-command-chrome-projection.md) 已推迟）。
+- 不为菜单引入 `when` 条件表达式语言（[ADR-0070](../../../decisions/ADR-0070-plugin-command-chrome-projection.md) 已推迟）。
 - 不给插件开放 canonical 文档的可变写入口。
 - 不让 `engine` 依赖 `plugin-manager`。
 
 ## 11. 评审结论与后续治理
 
-**评审结论（2026-09-11）：方向通过。** 通过的是本报告的定位、证据基线与路线图排序；它**不授权任何实现**。按项目治理，每个阶段启动前仍须有已接受的 ADR 与生效中的 Spec，并登记到 [Spec 索引](../../specs/README.md)。
+**评审结论（2026-09-11）：方向通过。** 通过的是本报告的定位、证据基线与路线图排序；它**不授权任何实现**。按项目治理，每个阶段启动前仍须有已接受的 ADR 与生效中的 Spec，并登记到 [Spec 索引](../../../specs/README.md)。
 
 ### 11.1 承载骨架 ADR：已产出
 
-[ADR-0074](../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md) 于 2026-09-11 接受，覆盖外围插件的承载位置与依赖分区。与既有决策的关系最终判定如下（其中对 ADR-0019 的判断修正了本节初稿）：
+[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md) 于 2026-09-11 接受，覆盖外围插件的承载位置与依赖分区。与既有决策的关系最终判定如下（其中对 ADR-0019 的判断修正了本节初稿）：
 
 | 既有 ADR | 关系 |
 | --- | --- |
-| [ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md) | **扩展，不取代**。初稿判为"需部分取代"，工作结论修正：ADR-0019 约束的是"把依赖装进核心包"，本决策方向相反（把依赖留在核心库之外），二者不冲突。因此采纳其准入规则并保持其完整有效 |
-| [ADR-0029](../../decisions/ADR-0029-host-managed-material-package-distribution.md) | 引用。外围插件仍由宿主加载与信任，不新增信任通道 |
-| [ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) | 引用。外围插件仍是宿主显式提供的同 realm 受信模块，不改变信任边界 |
-| [ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md) | **无冲突**。因 D2 选择不引入版本化设计，ADR-0014 继续完整生效 |
+| [ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md) | **扩展，不取代**。初稿判为"需部分取代"，工作结论修正：ADR-0019 约束的是"把依赖装进核心包"，本决策方向相反（把依赖留在核心库之外），二者不冲突。因此采纳其准入规则并保持其完整有效 |
+| [ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md) | 引用。外围插件仍由宿主加载与信任，不新增信任通道 |
+| [ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) | 引用。外围插件仍是宿主显式提供的同 realm 受信模块，不改变信任边界 |
+| [ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md) | **无冲突**。因 D2 选择不引入版本化设计，ADR-0014 继续完整生效 |
 
 ### 11.2 已裁决
 
@@ -271,7 +282,11 @@ P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方�
 | D2 兼容性策略 | 不引入版本标记字段与版本化命名。外围插件只依赖 `plugin-core` 与 `plugin-sdk` 的公共导出，契约偏差由边界检查与规范快照发现 | 在不触及探索阶段治理规则的前提下覆盖可预见需求；版本化设计保持未决，需显式批准才能开启 |
 | D3 失败影响范围 | 维持整体回滚；插件数增长后改为按插件分组原子发布（组内原子、组间独立），留待实施阶段 | 不阻塞 P0，且不削弱"不留半成品目录"的既有性质 |
 
+> D3 执行结果（2026-09-12 补记）：未按"维持整体回滚"执行，也未采用"按插件分组"的中间形态，而是提前收敛为**每插件原子**；理由与现状见本文开头「后续处置」。
+
 首批承载范围一并限定：只承载渲染类与现有 6 类贡献能表达的功能类能力，**不新增贡献类型与能力**，因此内核表驱动改造不启动。
+
+> 执行结果（2026-09-12 补记）："不新增贡献类型与能力"已遵守。但**能力层已表驱动化**——`PLUGIN_CAPABILITY_DESCRIPTORS` 使新增能力只改一处；**贡献判别联合仍保持门控**，未出现第 7 类贡献，故未做描述符驱动的内核改造。详见本文开头「后续处置」。
 
 ### 11.3 启动顺序
 
@@ -279,3 +294,5 @@ P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方�
 2. **P0 与 P1 并行推进**：P0 给出外围插件能放哪里，P1 把作者成本从「每插件手写一遍」降为「一次声明」。首批承载范围已限定为既有 6 类贡献，P5 不启动。
 3. **拿真 ECharts 物料做首个验证案例**：依赖明确、数据契约已存在、当前实现是手绘近似。它的落地会同时验证 P0 的分区是否成立、P1 的作者面是否够用、P4 的配置承载面（`inspectorControl` 与 `editorDescriptor`）是否真的需要。
 4. 跨仓侧现状：`pnpm integration status` 报 `consumed.state = drifted`、`pendingPackages` 与 `pendingContext` 为真。若要同步到宿主，须按跨仓工作流建立命名任务，不得直接改受管文件。
+
+> 启动顺序执行结果（2026-09-12 补记）：1–3 均已执行——外围插件分区 Spec 落地并归档，作者面由 `createPluginRegistration` 收敛为一次调用，`plugins/plugin-echarts` 作为首个验证案例落地其 command / panel / inspectorControl 三面。第 4 条跨仓同步状态为评审当时实测，**当前是否仍 drifted 须以 `pnpm integration status` 实时结果为准**，不以本文为准。

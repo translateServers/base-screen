@@ -2,16 +2,16 @@
 
 > 状态：维护期（阶段封版）
 > 阶段封版：2026-08-12
-> 最近更新：2026-09-11
+> 最近更新：2026-09-12（插件系统架构演进设计评审完成并归档）
 
 本目录保留实施计划、设计评审和技术调研。计划说明执行路径或研究结论，不替代已接受的 ADR 或生效中的 Spec。
 2026-08-12 阶段封版：已完成的历史实施计划、评估和评审全部归档至 [archive/](./archive/README.md)。
 
 ## 已评审通过
 
-| 文档 | 状态 | 关联范围 |
-| --- | --- | --- |
-| [插件系统架构演进设计评审](./plugin-architecture-evolution/design-review.md) | 2026-09-11 评审通过（方向确认，不授权实现） | 插件定位为「核心库之外的能力承载通道」，物料只是其中一部分；外围插件与依赖隔离、作者成本、失败影响面与惰性激活；待裁决 D1 外围插件目录与依赖分区、D2 兼容性策略 |
+当前无生效中的已评审文档。插件系统架构演进设计评审的 P0–P6 已全部交付，
+已于 2026-09-12 与[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md) 同批归档至
+[archive/plugin-architecture-evolution/](./archive/plugin-architecture-evolution/design-review.md)。
 
 ## 待评审
 

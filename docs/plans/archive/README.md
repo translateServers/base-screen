@@ -1,7 +1,7 @@
 # 已归档计划与评审
 
 > 状态：只读历史记录
-> 最近更新：2026-09-03
+> 最近更新：2026-09-12
 
 本目录保留已完成或被后继 Spec/ADR 取代的实施计划、设计评审和技术调研，用于追溯当时的执行路径与研究结论。
 归档文档不替代已接受的 ADR 或生效中的 Spec；不得作为新实现的授权依据。
@@ -10,6 +10,7 @@
 
 | 文档 | 状态 | 关联范围 | 归档日期 |
 | --- | --- | --- | --- |
+| [插件系统架构演进设计评审](./plugin-architecture-evolution/design-review.md) | P0–P6 已交付（归档时补记后续处置） | [外围插件分区 Spec](../../specs/archive/peripheral-plugin-partition/spec.md)、[ADR-0074](../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、[ADR-0075](../../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md) | 2026-09-12 |
 | [DataV 全局变量调研](./datav-global-variables/research.md) | 2026-09-03 已复核 | [ADR-0068](../../decisions/ADR-0068-datav-global-variables.md)、[DataV Global Variables Spec](../../specs/archive/datav-global-variables/spec.md) | 2026-09-01 |
 | [DataV 高保真右侧检查器与代码治理](./datav-inspired-designer-uiux/plan.md) | P0–P14 已完成 | Designer UI/UX、目录与运行时拆分、文件规模基线清零；后继为 [Designer 持续质量治理](../continuous-quality-governance/plan.md) | 2026-08-30 |
 | [Runtime And Ecosystem Hardening](./runtime-ecosystem-hardening/implementation-plan.md) | 历史实施计划 | [已归档 Spec](../../specs/archive/runtime-ecosystem-hardening/spec.md) | 2026-08-12 |

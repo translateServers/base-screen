@@ -30,6 +30,11 @@
 
 ## 最近归档批次
 
+2026-09-12：[外围插件分区](./archive/peripheral-plugin-partition/spec.md) 确立顶层 `plugins/` 外围插件区与
+按区依赖白名单，落地六类贡献点的 Engine 承载接线，并收敛插件运行时的失败影响范围（每插件原子）、
+惰性激活（`activation: 'lazy'` 与 `ensureActive`）与能力判定表驱动；兼容策略见
+[ADR-0075](../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)。
+
 2026-09-03：[DataV Global Variables](./archive/datav-global-variables/spec.md) 完成 DataV 三类来源、
 完整配置字段、稳定 ID 引用、Blueprint 变量节点、运行时变量句柄与一次性迁移。
 

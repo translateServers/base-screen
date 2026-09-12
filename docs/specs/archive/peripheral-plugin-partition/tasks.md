@@ -1,6 +1,6 @@
 # Peripheral Plugin Partition Tasks
 
-> 状态：生效中
+> 状态：已完成（2026-09-12 归档，全部任务完成）
 > 最近更新：2026-09-12
 > 依据：[spec.md](./spec.md)
 
