@@ -1,4 +1,16 @@
+<div align="center">
+  <img src="./docs/assets/banner.svg" alt="Base Screen：轻量、可嵌入、跨框架的大屏设计器基座" width="100%">
+</div>
+
 # Base Screen
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+![Node](https://img.shields.io/badge/node-%E2%89%A522.20-339933?logo=nodedotjs&logoColor=white)
+![pnpm](https://img.shields.io/badge/pnpm-11.18.0-F69220?logo=pnpm&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-7.0-3178C6?logo=typescript&logoColor=white)
+![Code style](https://img.shields.io/badge/code_style-Biome-60A5FA)
+
+> Lightweight, embeddable, cross-framework dashboard designer foundation for the web.
 
 Base Screen 是一个轻量、可嵌入、跨框架的大屏设计器基座，为现有 Web 应用提供可视化编辑、只读渲染和
 物料扩展能力。宿主可以只接入展示页，也可以嵌入完整的设计器工作台，同时保留自己的业务界面和技术栈。
@@ -7,8 +19,15 @@ Base Screen 是一个轻量、可嵌入、跨框架的大屏设计器基座，�
 描述可使用的可视组件。Designer 编辑和 Viewer 展示围绕同一份文档工作；项目、数据、资产、发布和长任务的
 真实处理由宿主负责，Base Screen 提供当前实例内的编辑、渲染与有界宿主端口。
 
-[快速体验](#快速体验) · [集成指南](./docs/usage.md) · [当前能力基线](./docs/baseline/README.md) ·
+[快速体验](#快速体验) · [在你的应用中使用](#在你的应用中使用) · [集成指南](./docs/usage.md) ·
 [文档索引](./docs/README.md)
+
+## 产品预览
+
+![Base Screen 设计器：物料库、画布与属性检查器](./docs/assets/designer-preview.png)
+
+上图来自仓库自带的浏览器示例：左侧是官方物料库，中央画布混合了文本、按钮、数据列表与图表组件，
+右侧是画布与页面属性检查器。
 
 ## 适用场景
 
@@ -37,6 +56,76 @@ Base Screen 的交付重点是可组合的前端基座。示例中的项目目�
   插件能力授权、主题 Token、公开命名 slot，以及宿主资源插入、拖放和替换。
 
 完整能力、约束与实现依据见[当前能力基线](./docs/baseline/README.md)。
+
+## 快速体验
+
+本仓库开发环境要求 Node.js `22.23.2`、pnpm `11.18.0`。
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build
+pnpm dev:browser-harness
+```
+
+打开终端输出的本地地址即可查看浏览器组合示例；专项案例导航页是 `/cases.html`，`?designer` 为
+验收用全屏设计器（即上文截图）。示例自带演示文档与模拟宿主能力，浏览方式见
+[专项案例怎么看](./docs/guides/feature-cases.md)。
+
+## 在你的应用中使用
+
+接入通常分为四步：注册元素与物料 → 组装物料目录 → 解析文档 → 配置并装载。最小 Viewer 工程：
+
+```html
+<body>
+  <base-screen-viewer></base-screen-viewer>
+</body>
+```
+
+```ts
+import { parseScreenDocument } from '@base-screen/contracts';
+import {
+  defineBaseScreenRectangleMaterial,
+  defineBaseScreenTextMaterial,
+} from '@base-screen/material';
+import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
+
+// 1. 注册 <base-screen-viewer> 与官方物料
+const viewerDefinition = defineBaseScreenViewer();
+const text = defineBaseScreenTextMaterial();
+const rectangle = defineBaseScreenRectangleMaterial();
+if (!viewerDefinition.ok || !text.ok || !rectangle.ok) {
+  throw new Error('Base Screen Custom Element registration failed.');
+}
+
+// 2. 组装当前实例可用的物料目录
+const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
+
+// 3. 解析文档；入参为 Screen Document JSON，解析是 fail-closed 的，请处理返回的诊断
+const parsed = parseScreenDocument(screenDocumentJson);
+
+// 4. 配置实例并装载文档（configure 同样返回结果对象，此处从简）
+const viewer = document.querySelector('base-screen-viewer')!;
+viewer.configure({ catalog, instanceId: 'my-viewer', mode: 'viewer' });
+viewer.document = parsed.value;
+```
+
+按接入方式区分三种集成模式：
+
+| 模式 | 公共元素 | 文档与保存方式 |
+| --- | --- | --- |
+| 只读展示 | `base-screen-viewer` | 宿主加载并校验文档后赋给 `document` |
+| 宿主控制的编辑 | `base-screen-designer` | 宿主设置 `document`，监听 `base-screen-change` 保存草稿 |
+| 项目会话编辑 | `base-screen-designer` | 配置 `projectAdapter`，通过 `load(projectId)`、`save()` 对接项目服务 |
+
+直接文档模式与项目模式应分别使用；绑定项目适配器后，通过项目 API 加载，不再直接赋值 `document`。
+
+**获取包**：`@base-screen/*` 是私有、仅 ESM 的包，不在公共 npm registry 发布。同一 pnpm workspace
+可直接声明 workspace 依赖；独立仓库使用发布方提供的完整同批次包集（tarball），单个 SDK tarball
+不是可独立安装的交付物。安装、初始化、数据接入与自定义物料的完整流程见
+[集成指南](./docs/usage.md)；最小可运行 Viewer 工程见
+[Host Quickstart](./examples/host-quickstart/README.md)。接入真实业务时，替换示例中的宿主适配器
+和端口实现，并只使用包的公开导出。
 
 ## 核心模型
 
@@ -71,45 +160,6 @@ flowchart LR
 或长期运行的任务，应通过宿主能力完成。边界依据见
 [ADR-0027：轻量设计器基座与宿主处理](./docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)。
 
-## 集成模式
-
-| 模式 | 公共元素 | 文档与保存方式 |
-| --- | --- | --- |
-| 只读展示 | `base-screen-viewer` | 宿主加载并校验文档后赋给 `document` |
-| 宿主控制的编辑 | `base-screen-designer` | 宿主设置 `document`，监听 `base-screen-change` 保存草稿 |
-| 项目会话编辑 | `base-screen-designer` | 配置 `projectAdapter`，通过 `load(projectId)`、`save()` 对接项目服务 |
-
-接入通常分为四步：
-
-1. 确认依赖来源，安装所需包，并在浏览器入口显式注册 Viewer / Designer 和物料。
-2. 创建物料目录，确保它包含文档使用的全部物料类型。
-3. 先注册诊断与变更监听，再通过 `configure()` 配置目录、所需宿主端口及项目模式的适配器。
-4. 直接文档模式使用 `@base-screen/contracts` 校验后赋值 `document`；项目模式由适配器校验输入，
-   通过 `load(projectId)` 加载项目。
-
-直接文档模式与项目模式应分别使用；绑定项目适配器后，通过项目 API 加载，不再直接赋值 `document`。
-详细安装、初始化、资源接入和自定义物料示例见[集成指南](./docs/usage.md)；最小 Viewer 宿主见
-[Host Quickstart](./examples/host-quickstart/README.md)。
-
-**当前包为私有、仅 ESM 的包。** 同一 pnpm workspace 可直接接入；独立仓库必须使用发布方提供的完整
-同批次包集。单个 SDK tarball 不是可独立安装的交付物，不能把本仓库的开发安装命令当作外部项目安装流程。
-
-## 快速体验
-
-本仓库开发环境要求 Node.js `22.23.2`、pnpm `11.18.0`。
-
-```bash
-pnpm install --frozen-lockfile
-pnpm build
-pnpm dev:browser-harness
-```
-
-打开终端输出的本地地址即可查看浏览器组合示例。专项案例导航页是 `/cases.html`；
-`?designer` 仍是验收用全屏设计器。完整对照见
-[专项案例怎么看](./docs/guides/feature-cases.md)。
-
-示例自带演示文档与模拟宿主能力。接入真实业务时，替换宿主适配器和端口实现，并使用包的公开导出。
-
 ## 示例
 
 日常只需一个入口：`pnpm dev:browser-harness`。其余两个示例不提供 `dev` 命令。
@@ -141,37 +191,6 @@ pnpm dev:browser-harness
 跨包调用只使用声明的公共导出。物料契约由 `plugin-core` 拥有，`renderer` 不依赖具体官方物料，
 `sdk` 负责组合而不实现各包的领域逻辑。仓库分层与依赖规则见 [AGENTS.md](./AGENTS.md)。
 
-## 开发检查
-
-日常检查：
-
-```bash
-pnpm format:check
-pnpm lint
-pnpm check:docs
-pnpm typecheck
-pnpm test
-pnpm build
-```
-
-影响包、构建产物或公共契约的改动，交付前运行完整门禁：
-
-```bash
-pnpm verify:m0
-```
-
-`verify:m0` 会先执行格式化并写入文件，再运行静态检查、类型检查、测试、构建、包与 API 边界检查，
-最后将 tarball 安装到临时消费者工程中验证。`pnpm verify:fast` 可用于不含 tarball 验证的日常迭代。
-浏览器交互检查为 `pnpm verify:browser`。
-
-公共声明或 package 子路径有意变化时，运行 `pnpm api:report` 更新并审查
-`packages/*/etc/*.api.md`，同时为受影响包补充 Changeset。`pnpm check:api` 只校验基线，
-不会自动接受 API 漂移。
-
-仓库不以文件行数作为 CI 门禁。模块按完整功能行为组织：只有职责可以独立命名、测试、复用或演进时
-才拆分，不能为了缩短文件制造转发层或打散同一状态机。`pnpm lint`、类型检查、测试、包边界和浏览器
-验证共同约束模块的依赖方向与可观察行为。
-
 ## 文档导航
 
 | 想了解的内容 | 入口 |
@@ -187,6 +206,11 @@ pnpm verify:m0
 
 规格、计划、归档与来源记录统一从[文档索引](./docs/README.md)进入。当前能力以 Baseline 和已接受的 ADR
 为依据，路线图中的候选主题不代表已经实现。
+
+## 参与贡献
+
+欢迎 issue 与 PR。提交信息遵循 Conventional Commits；环境搭建、分层边界、检查门禁与文档治理规则
+统一见 [AGENTS.md](./AGENTS.md)。
 
 ## 许可证
 

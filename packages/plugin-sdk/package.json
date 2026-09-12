@@ -1,8 +1,13 @@
 {
   "name": "@base-screen/plugin-sdk",
   "version": "0.0.0",
+  "description": "面向插件与物料作者的定义、注册和物料包辅助",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
   "type": "module",
   "files": [
     "dist"

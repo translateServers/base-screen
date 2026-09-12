@@ -1,8 +1,13 @@
 {
   "name": "@base-screen/plugin-core",
   "version": "0.0.0",
+  "description": "物料与插件契约、Manifest 校验和 catalog",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
   "type": "module",
   "files": [
     "dist"

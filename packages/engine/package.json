@@ -1,8 +1,13 @@
 {
   "name": "@base-screen/engine",
   "version": "0.0.0",
+  "description": "Designer 会话、画布交互、检查器和工作台编排",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
   "type": "module",
   "files": [
     "dist"

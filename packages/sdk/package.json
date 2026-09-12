@@ -1,8 +1,13 @@
 {
   "name": "@base-screen/sdk",
   "version": "0.0.0",
+  "description": "Viewer、Designer、物料与插件的产品级组合入口",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
   "type": "module",
   "files": [
     "dist"

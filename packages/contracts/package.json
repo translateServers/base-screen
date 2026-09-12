@@ -1,8 +1,13 @@
 {
   "name": "@base-screen/contracts",
   "version": "0.0.0",
+  "description": "Screen Document、宿主契约、严格解析、诊断、序列化与 JSON Schema",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
   "type": "module",
   "files": [
     "dist"

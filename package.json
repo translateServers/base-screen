@@ -1,10 +1,26 @@
 {
   "name": "base-screen-monorepo",
   "version": "0.0.0",
+  "description": "轻量、可嵌入、跨框架的大屏设计器基座：统一文档、画布设计、独立 Viewer 与物料扩展",
+  "keywords": [
+    "big-screen",
+    "dashboard-designer",
+    "web-components",
+    "visualization",
+    "embeddable",
+    "designer"
+  ],
+  "author": "zhouan190",
   "private": true,
   "license": "MIT",
   "type": "module",
   "packageManager": "pnpm@11.18.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
+  "homepage": "https://gitee.com/nebula_78/base-screen#readme",
+  "bugs": "https://gitee.com/nebula_78/base-screen/issues",
   "engines": {
     "node": ">=22.20.0"
   },

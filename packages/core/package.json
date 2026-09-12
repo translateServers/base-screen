@@ -1,8 +1,13 @@
 {
   "name": "@base-screen/core",
   "version": "0.0.0",
+  "description": "文档命令、事务、历史与 Blueprint 运行时",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
   "type": "module",
   "files": [
     "dist"

@@ -1,8 +1,13 @@
 {
   "name": "@base-screen/react",
   "version": "0.0.0",
+  "description": "将 React 组件桥接为 Base Screen 物料",
   "private": true,
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://gitee.com/nebula_78/base-screen.git"
+  },
   "type": "module",
   "files": [
     "dist"
