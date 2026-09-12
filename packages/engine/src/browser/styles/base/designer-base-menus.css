@@ -182,6 +182,15 @@
   padding-left: var(--designer-space-5);
 }
 
+/* 内含“已展开”嵌套子菜单的面板必须允许溢出：三级及更深的浮层相对当前行定位、会伸出
+   父面板，父面板的 overflow 会把浮层裁成不可见且不可命中。与 .designer-context-menu 根
+   菜单同理，此时同时解除 positionSubmenu 写入的行内 max-height，避免出现“盒高被夹紧
+   但内容溢出”的错位。未展开嵌套时保留滚动，继续承接超长面板。 */
+.designer-menu .designer-submenu:has(> .designer-menu-submenu-wrap > [data-submenu]:not([hidden])) {
+  overflow: visible;
+  max-height: none !important;
+}
+
 .designer-menu .designer-submenu[data-submenu-side="left"] {
   left: auto;
   right: calc(100% - 4px);

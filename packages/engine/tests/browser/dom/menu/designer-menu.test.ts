@@ -41,6 +41,14 @@ class FakeElement {
     if (this.chain.includes(selector)) return this;
     return this.parent !== null ? this.parent.closest(selector) : null;
   }
+  contains(other: unknown): boolean {
+    let node = other instanceof FakeElement ? other : null;
+    while (node !== null) {
+      if (node === this) return true;
+      node = node.parent;
+    }
+    return false;
+  }
   querySelector(selector: string): FakeElement | null {
     return this.child !== null && this.child.chain.includes(selector) ? this.child : null;
   }
@@ -260,6 +268,35 @@ describe('DesignerMenuController submenu collapse behavior', () => {
 
     controller.onSubmenuPointerOut(first.trigger as unknown as HTMLButtonElement, null);
     expect(first.hidden).toBe(true);
+  });
+
+  it('keeps the parent submenu open when the pointer enters a nested submenu', () => {
+    const outer = submenu();
+    const inner = submenu();
+    // 内层 wrap 挂到外层 [data-submenu] 下，形成三级嵌套（如 编辑 > 排列）。
+    inner.trigger.parent = outer.items[0]!;
+    const controller = new DesignerMenuController({
+      getRoot: () => createMenubarRoot([outer]) as unknown as ShadowRoot,
+      getContextMenu: () => undefined,
+      getSelectedComponentIds: () => [],
+      getOperationState: () => undefined,
+    });
+
+    controller.onSubmenuEnter(outer.trigger as unknown as HTMLButtonElement);
+    controller.onSubmenuEnter(inner.trigger as unknown as HTMLButtonElement);
+    expect(outer.hidden).toBe(false);
+    expect(inner.hidden).toBe(false);
+
+    // 指针从外层子菜单移入内层 wrap：相关目标仍在外层 wrap 内，父级不得收起。
+    controller.onSubmenuPointerOut(
+      outer.trigger as unknown as HTMLButtonElement,
+      inner.trigger as unknown as EventTarget,
+    );
+    expect(outer.hidden).toBe(false);
+
+    // 指针真正离开外层 wrap 时仍收起。
+    controller.onSubmenuPointerOut(outer.trigger as unknown as HTMLButtonElement, null);
+    expect(outer.hidden).toBe(true);
   });
 
   it('flips a submenu upward and constrains its height near the bottom edge', () => {

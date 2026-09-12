@@ -1,7 +1,7 @@
 // 工作台外壳、项目/物料作者流、视窗原生事件与桌面基线几何
 // 由 4 个原 assert 模块合并；调用顺序由 run-browser-harness.mjs 编排。
 import { screenshotDirectory } from '../shared/constants.mjs';
-import { openMoreSubmenu } from '../shared/harness-utils.mjs';
+import { hoverNestedSubmenu, openMoreSubmenu } from '../shared/harness-utils.mjs';
 import {
   assertOverlayContained,
   assertPositiveNonOverlappingRects,
@@ -123,7 +123,48 @@ async function assertDesktopWorkbench(designer, viewport) {
   assertPositiveNonOverlappingRects(workbench.vertical, 'VERTICAL', viewport);
 }
 
-export { assertCommandPalette, assertDesktopWorkbench, assertTopbarProjectName };
+export {
+  assertCommandPalette,
+  assertDesktopWorkbench,
+  assertNestedMenuFlyout,
+  assertTopbarProjectName,
+};
+
+// 顶栏“更多 > 编辑 > 层级”三级菜单：指针移入三级浮层后，二级/三级都应保持展开且浮层可命中。
+// 回归两类缺陷：进入内层嵌套 wrap 时按“最近 wrap 相等”判定离开而收起父级；浮层被父面板
+// overflow 裁成不可见且 elementFromPoint 落空。
+async function assertNestedMenuFlyout(designer, page) {
+  await page.keyboard.press('Escape');
+  const panel = await hoverNestedSubmenu(designer, page, '\u7f16\u8f91', '\u5c42\u7ea7');
+  if (await panel.isHidden()) {
+    throw new Error('BROWSER_HARNESS_NESTED_SUBMENU_COLLAPSED_FAILED');
+  }
+  const probe = await panel.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    const root = element.getRootNode();
+    const hitPoint = { x: rect.left + 20, y: rect.top + 20 };
+    const hit = root.elementFromPoint(hitPoint.x, hitPoint.y);
+    const item = element.querySelector('[data-menu-action="bring-to-front"]');
+    const itemRect = item?.getBoundingClientRect();
+    const itemHit =
+      itemRect === undefined
+        ? null
+        : root.elementFromPoint(
+            itemRect.left + itemRect.width / 2,
+            itemRect.top + itemRect.height / 2,
+          );
+    return {
+      rectWidth: rect.width,
+      rectHeight: rect.height,
+      hittable: hit !== null && element.contains(hit),
+      itemHittable: item !== null && itemHit !== null && item.contains(itemHit),
+    };
+  });
+  await page.keyboard.press('Escape');
+  if (probe.rectWidth === 0 || probe.rectHeight === 0 || !probe.hittable || !probe.itemHittable) {
+    throw new Error(`BROWSER_HARNESS_NESTED_SUBMENU_CLIPPED_FAILED:${JSON.stringify(probe)}`);
+  }
+}
 
 // ---- 源模块：assert-authoring-project.mjs ----
 export async function assertAuthoringProject(authoringDesigner, page) {

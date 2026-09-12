@@ -26,6 +26,7 @@ import {
   assertDirectPreviewCycle,
   assertHostIntegrations,
   assertNativeEventsToggle,
+  assertNestedMenuFlyout,
   assertTextDataStates,
   assertTopbarProjectName,
 } from './authoring/assert-workbench.mjs';
@@ -109,6 +110,7 @@ export async function runBrowserHarness(serverPort) {
         });
         await assertCoverThumbnail(page);
         await assertDesktopBaseline(designer, page, viewport);
+        await assertNestedMenuFlyout(designer, page);
         if (viewport.width !== 1440) {
           await page.close();
           continue;

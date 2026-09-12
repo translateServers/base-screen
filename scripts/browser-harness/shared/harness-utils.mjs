@@ -23,6 +23,30 @@ async function openCanvasAidsMenu(designer, page) {
   return openMoreSubmenu(designer, '\u89c6\u56fe');
 }
 
+// 打开“更多 > <level2Label>”，再沿真实 hover 路径把指针从三级触发行水平移入其浮层，
+// 返回已展开的三级浮层 locator。层级浮层与触发行有 4px 重叠，水平移入保持在同一 wrap 内，
+// 用于回归“进入内层嵌套后父级被误收起”与“浮层被祖先面板裁剪”两类缺陷。
+async function hoverNestedSubmenu(designer, page, level2Label, level3Label) {
+  const moreMenu = await openMoreSubmenu(designer, level2Label);
+  // 三级 wrap 的判定：直接挂在某个 [data-submenu] 之下（二级 wrap 挂在 [data-menu] 之下）。
+  const nestedWrap = moreMenu
+    .locator('[data-submenu] > .designer-menu-submenu-wrap')
+    .filter({ hasText: level3Label });
+  const trigger = nestedWrap.locator('[data-submenu-toggle]');
+  await trigger.waitFor({ state: 'visible' });
+  await trigger.hover();
+  const panel = nestedWrap.locator('[data-submenu]');
+  await panel.waitFor({ state: 'visible' });
+  const triggerBox = await trigger.boundingBox();
+  const panelBox = await panel.boundingBox();
+  if (triggerBox === null || panelBox === null) {
+    throw new Error('BROWSER_HARNESS_NESTED_SUBMENU_GEOMETRY_MISSING');
+  }
+  const enterX = Math.max(panelBox.x + 8, panelBox.x + panelBox.width - 24);
+  await page.mouse.move(enterX, triggerBox.y + triggerBox.height / 2, { steps: 6 });
+  return panel;
+}
+
 async function toggleGridViaMenu(designer, page) {
   const viewMenu = await openCanvasAidsMenu(designer, page);
   await viewMenu.locator('[data-submenu] [data-menu-action="toggle-grid"]').click();
@@ -83,6 +107,7 @@ export {
   assertCanvasAidChecked,
   componentCount,
   componentPositions,
+  hoverNestedSubmenu,
   openMoreSubmenu,
   stableJson,
   toggleCanvasAidViaMenu,

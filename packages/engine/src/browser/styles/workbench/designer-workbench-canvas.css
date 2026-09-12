@@ -612,6 +612,14 @@
   padding-left: var(--designer-space-5);
 }
 
+/* 含“已展开”嵌套子菜单的面板不得裁剪，理由同 .designer-menu .designer-submenu:has(...)：
+   三级浮层溢出父面板，同时解除行内 max-height 夹紧以免盒高与内容错位。 */
+.designer-context-menu
+.designer-submenu:has(> .designer-menu-submenu-wrap > [data-submenu]:not([hidden])) {
+  overflow: visible;
+  max-height: none !important;
+}
+
 .project-conflict {
   position: absolute;
   right: 18px;

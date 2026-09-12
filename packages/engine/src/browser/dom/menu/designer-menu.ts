@@ -123,13 +123,13 @@ export class DesignerMenuController {
     }
   }
 
-  /** 鼠标离开触发按钮或其子菜单项时收起；relatedTarget 仍在同一子菜单内时保持展开。 */
+  /** 鼠标离开触发按钮或其子菜单项时收起；relatedTarget 仍落在本子菜单包裹层内时保持展开。 */
   onSubmenuPointerOut(toggle: HTMLButtonElement, relatedTarget: EventTarget | null): void {
     const wrapper = toggle.closest<HTMLElement>('.designer-menu-submenu-wrap');
     if (wrapper === null) return;
-    const stillInside =
-      relatedTarget instanceof Element &&
-      relatedTarget.closest('.designer-menu-submenu-wrap') === wrapper;
+    // 用包含判定而非最近 wrap 相等判定：进入更深层（第三级及以后）嵌套 wrap 时，
+    // relatedTarget 的最近 wrap 是更内层节点，会误判为离开并把父级子菜单连带收起。
+    const stillInside = relatedTarget instanceof Element && wrapper.contains(relatedTarget);
     if (!stillInside) this.onSubmenuLeave(toggle);
   }
 
