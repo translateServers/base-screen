@@ -3,18 +3,35 @@ import { DiagnosticCollector } from './diagnostics.js';
 import type { Candidate, ManagerInput } from './preflight-types.js';
 
 const MAX_DEPENDENCY_EDGES = 16_384;
-const SUPPORTED_BLUEPRINT_CAPABILITIES = new Set([
-  'blueprint.trigger.material-event',
-  'blueprint.trigger.variable-event',
-  'blueprint.value.event-payload',
-  'blueprint.value.variable',
-  'blueprint.condition.compare',
-  'blueprint.action.set-variable',
-  'blueprint.action.emit-host-event',
-  'blueprint.action.component-visibility',
-  'blueprint.action.request-variable',
-  'blueprint.action.request-component-data',
+
+/**
+ * 能力判定表：宿主与插件可引入的能力集合在此一处声明。
+ * `port` 指明该能力需要宿主提供的端口工厂（无 factory 即 CAPABILITY_INCOMPATIBLE）；
+ * `blueprint` 标记可作为 blueprintCapability 贡献被引用的能力 id。
+ * 新增能力只需在表里加一行，管线不再堆积条件分支。
+ */
+export interface PluginCapabilityDescriptor {
+  readonly id: string;
+  readonly port?: 'command' | 'design';
+  readonly blueprint?: boolean;
+}
+
+export const PLUGIN_CAPABILITY_DESCRIPTORS: readonly PluginCapabilityDescriptor[] = Object.freeze([
+  { id: 'command.execute', port: 'command' },
+  { id: 'design.read', port: 'design' },
+  { id: 'blueprint.trigger.material-event', blueprint: true },
+  { id: 'blueprint.trigger.variable-event', blueprint: true },
+  { id: 'blueprint.value.event-payload', blueprint: true },
+  { id: 'blueprint.value.variable', blueprint: true },
+  { id: 'blueprint.condition.compare', blueprint: true },
+  { id: 'blueprint.action.set-variable', blueprint: true },
+  { id: 'blueprint.action.emit-host-event', blueprint: true },
+  { id: 'blueprint.action.component-visibility', blueprint: true },
+  { id: 'blueprint.action.request-variable', blueprint: true },
+  { id: 'blueprint.action.request-component-data', blueprint: true },
 ]);
+
+const CAPABILITY_TABLE = new Map(PLUGIN_CAPABILITY_DESCRIPTORS.map((item) => [item.id, item]));
 
 /**
  * 解析幸存候选：重复 id 按稳定顺序 first-wins（后声明方获得诊断并被排除出图），
@@ -114,39 +131,41 @@ export function validateCapabilityPlan(
     const hostGrants = new Set(input.grantedCapabilities.get(candidate.manifest.id) ?? []);
     const granted: string[] = [];
     for (const capability of candidate.manifest.capabilities) {
+      const descriptor = CAPABILITY_TABLE.get(capability);
       if (!hostGrants.has(capability)) {
         diagnostics.add(
           'PLUGIN_CORE_CAPABILITY_UNAUTHORIZED',
           ['plugins', candidate.index, 'manifest', 'capabilities'],
           'Plugin capability is not approved by the host.',
         );
-      } else if (capability === 'command.execute' || capability === 'design.read') {
-        const hasFactory =
-          capability === 'command.execute'
-            ? input.createCommandPort !== undefined
-            : input.createDesignReadPort !== undefined;
-        if (!hasFactory) {
-          diagnostics.add(
-            'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
-            ['plugins', candidate.index, 'manifest', 'capabilities'],
-            'Plugin capability has no compatible port factory.',
-          );
-        } else {
-          granted.push(capability);
-        }
-      } else if (SUPPORTED_BLUEPRINT_CAPABILITIES.has(capability)) {
-        granted.push(capability);
-      } else {
+      } else if (descriptor === undefined) {
         diagnostics.add(
           'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
           ['plugins', candidate.index, 'manifest', 'capabilities'],
           'Plugin capability is not supported by this host.',
         );
+      } else if (descriptor.port !== undefined && !hasPortFactory(input, descriptor.port)) {
+        diagnostics.add(
+          'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE',
+          ['plugins', candidate.index, 'manifest', 'capabilities'],
+          'Plugin capability has no compatible port factory.',
+        );
+      } else {
+        granted.push(capability);
       }
     }
     grants.set(candidate, Object.freeze(granted.sort(compareStrings)));
   }
   return grants;
+}
+
+function hasPortFactory(
+  input: ManagerInput,
+  port: NonNullable<PluginCapabilityDescriptor['port']>,
+): boolean {
+  return port === 'command'
+    ? input.createCommandPort !== undefined
+    : input.createDesignReadPort !== undefined;
 }
 
 function validateContributions(
@@ -179,7 +198,7 @@ function validateContributions(
         );
       }
       if (contribution.kind === 'blueprintCapability') {
-        if (!SUPPORTED_BLUEPRINT_CAPABILITIES.has(contribution.id)) {
+        if (CAPABILITY_TABLE.get(contribution.id)?.blueprint !== true) {
           diagnostics.add(
             'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
             ['plugins', candidate.index, 'manifest', 'contributions', index],
