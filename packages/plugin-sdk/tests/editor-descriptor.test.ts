@@ -59,9 +59,9 @@ describe('createBaseScreenMaterialEditorDescriptor', () => {
     );
     expect(result.ok).toBe(true);
     const manifest = parseBaseScreenMaterialManifest({
-      type: 'base.echarts',
-      tagName: 'base-screen-echarts',
-      name: 'ECharts',
+      type: 'fixture.chart',
+      tagName: 'fixture-chart',
+      name: '图表夹具',
       category: '数据',
       keywords: [],
       defaultSize: { width: 480, height: 280 },

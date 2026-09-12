@@ -13,7 +13,7 @@ export const FEATURE_CASE_CATALOG = [
   {
     id: 'canvas',
     title: '画布与官方物料',
-    summary: '默认设计器文档：文本、桥接按钮、ECharts 与数据集排行卡。',
+    summary: '默认设计器文档：文本、桥接按钮、语义图表与数据集排行卡。',
     lookAt: '画布标题/副标题、React/Vue 桥接、右侧图表与排行卡。',
     packages: ['engine', 'material', 'renderer', 'sdk'],
     focused: 'pnpm --filter @base-screen/engine test',
@@ -71,10 +71,10 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
-    id: 'echarts',
-    title: 'ECharts 语义配置',
-    summary: '官方图表物料的分组、字段与高级折叠。',
-    lookAt: '选中「ECharts 语义图」后的右侧外观/数据分区。',
+    id: 'semantic-chart',
+    title: '语义图表配置',
+    summary: 'harness 语义图表演示物料的分组、字段与高级折叠。',
+    lookAt: '选中「语义图表」后的右侧外观/数据分区。',
     packages: ['material', 'engine'],
     focused: 'pnpm --filter @base-screen/material test',
     verify: 'pnpm verify:browser',

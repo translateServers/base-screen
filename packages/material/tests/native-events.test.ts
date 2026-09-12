@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
-  BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
@@ -12,7 +11,6 @@ import {
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
   BaseScreenChartMaterialElement,
   BaseScreenContainerMaterialElement,
-  BaseScreenEChartsMaterialElement,
   BaseScreenEllipseMaterialElement,
   BaseScreenImageMaterialElement,
   BaseScreenRectangleMaterialElement,
@@ -23,7 +21,7 @@ import {
 /**
  * 官方物料原生事件（Designer「事件」开关，ADR-0036）全覆盖：
  * - 声明表：全部官方 element 的事件声明与交互能力一一对应；
- * - 门控：text/echarts/chart/table 只在 model.interactive === true 时派发
+ * - 门控：text/chart/table 只在 model.interactive === true 时派发
  *   base-screen-material-event，关闭时零事件；
  * - payload 形状与 manifest 声明的事件名一致。
  * 无 DOM 环境（node）下以最小 stub 驱动真实物料类：事件监听与派发按浏览器语义模拟。
@@ -172,14 +170,6 @@ function clickableNode(created: readonly StubNode[], tagName: string): StubNode 
   return node;
 }
 
-function lastClickableNode(created: readonly StubNode[], tagName: string): StubNode {
-  const node = [...created]
-    .reverse()
-    .find((candidate) => candidate.tagName === tagName && candidate.listeners.has('click'));
-  if (node === undefined) throw new Error(`No clickable ${tagName} node rendered.`);
-  return node;
-}
-
 function fireClick(node: StubNode, event: unknown = {}): void {
   for (const listener of node.listeners.get('click') ?? []) listener(event);
 }
@@ -187,7 +177,6 @@ function fireClick(node: StubNode, event: unknown = {}): void {
 describe('official material native event declarations', () => {
   it('declares events for exactly the interactive official elements', () => {
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.events).toEqual(['valueClick']);
-    expect(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.events).toEqual(['seriesClick']);
     expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.events).toEqual(['pointClick']);
     expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.events).toEqual(['rowClick', 'cellClick']);
     expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.events).toEqual([]);
@@ -232,40 +221,6 @@ describe('official material native events (interactive gating)', () => {
     expect(harness.events[0]?.detail).toEqual({
       name: 'pointClick',
       payload: { seriesId: 's1', pointIndex: 0, x: 'north', y: 42 },
-    });
-  });
-
-  it('echarts gates native css hover affordances and seriesClick by interactive', () => {
-    const props = { interactions: { hover: true, select: false, click: 'host-event' } };
-    const harness = mountElement(
-      BaseScreenEChartsMaterialElement,
-      readyModel(chartData(), false, props),
-    );
-    const circle = clickableNode(harness.created, 'circle');
-
-    // 关闭：无 hover 监听、无 pointer 光标（原生 CSS 事件同样被门控），点击零事件。
-    expect(circle.listeners.has('mouseenter')).toBe(false);
-    expect(circle.listeners.has('mouseleave')).toBe(false);
-    expect(circle.style.cursor).toBeUndefined();
-    fireClick(circle);
-    expect(harness.events).toHaveLength(0);
-
-    harness.setModel(readyModel(chartData(), true, props));
-    const interactiveCircle = lastClickableNode(harness.created, 'circle');
-    expect(interactiveCircle.listeners.has('mouseenter')).toBe(true);
-    expect(interactiveCircle.listeners.has('mouseleave')).toBe(true);
-    expect(interactiveCircle.style.cursor).toBe('pointer');
-    // 开启：hover 放大（symbolSize/2）与离开复位（hover=true → symbolSize/3）生效。
-    for (const listener of interactiveCircle.listeners.get('mouseenter') ?? []) listener({});
-    expect(interactiveCircle.attributes.r).toBe('2');
-    for (const listener of interactiveCircle.listeners.get('mouseleave') ?? []) listener({});
-    expect(interactiveCircle.attributes.r).toBe('1.3333333333333333');
-
-    fireClick(interactiveCircle);
-    expect(harness.events).toHaveLength(1);
-    expect(harness.events[0]?.detail).toEqual({
-      name: 'seriesClick',
-      payload: { seriesIndex: 0, seriesName: '系列一', pointIndex: 0, x: 'north', y: 42 },
     });
   });
 

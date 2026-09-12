@@ -1,7 +1,7 @@
 # Base Screen 架构决策记录
 
 > 状态：生效中
-> 最近更新：2026-09-09
+> 最近更新：2026-09-11
 > 定位：索引 Base Screen 的架构决策、状态及其影响范围
 
 ## 使用规则
@@ -16,6 +16,7 @@
 
 | ADR | 状态 | 日期 | 主题 |
 | --- | --- | --- | --- |
+| [ADR-0074](./ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md) | 已接受 | 2026-09-11 | 外围插件承载位置与依赖分区：新增顶层 `plugins/` 分区，核心库依赖白名单与固定包清单不变；外围插件无运行时特权，依赖准入沿用 ADR-0019 |
 | [ADR-0073](./ADR-0073-inspector-custom-form-controls.md) | 已接受 | 2026-09-10 | 属性面板插件自定义表单控件：`control: 'custom'` 与按贡献授权的实例化 |
 | [ADR-0072](./ADR-0072-plugin-panel-contribution-minimal-loop.md) | 已接受 | 2026-09-10 | 插件面板贡献的最小闭环：`kind: 'panel'`、复用快照 model 与带 args 的动作回路 |
 | [ADR-0071](./ADR-0071-plugin-design-context-read-access.md) | 已接受 | 2026-09-09 | 插件设计上下文只读访问：`design.read`、原子快照与 Designer `selection` |

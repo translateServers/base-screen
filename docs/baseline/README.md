@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-09-06（插件贡献命令与宿主装配）
+> 最近更新：2026-09-11（插件面板与自定义控件、官方物料范围调整）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 变更依据当前用户需求与适用的已接受决策实施。长期架构、职责或兼容策略变化需要 ADR；
@@ -20,7 +20,7 @@
   不引入 npm 交互依赖。依据：[Designer 依赖候选评估](../plans/archive/designer-dependency-introduction/dependency-evaluation.md)、
   [ADR-0020](../decisions/ADR-0020-designer-canvas-interaction-pilot.md)。
 - **代码与验证治理**（2026-09-03）：Designer controller/DOM、Engine 发布入口、Renderer、Plugin Core、
-  ECharts、Document 校验和 tarball 编排已按职责拆分；browser harness 已模块化。当前不设机械行数上限，
+  Document 校验和 tarball 编排已按职责拆分；browser harness 已模块化。当前不设机械行数上限，
   以功能行为完整、职责内聚和可独立测试/演进作为模块拆分标准。P0–P14 证据见[归档治理计划](../plans/archive/datav-inspired-designer-uiux/plan.md)，
   后续质量门禁见[持续质量治理计划](../plans/continuous-quality-governance/plan.md)。
 
@@ -132,6 +132,11 @@
   接管所有物料。用法见[公共加载容器](../material-loading.md)。
 - **物料契约与 ABI**：manifest 类型、校验、只读 catalog 与同 realm Web Component ABI。
   依据：[Plugin Core Contract](../specs/archive/plugin-core-contract/spec.md)、[ADR-0003](../decisions/ADR-0003-web-component-material-abi-and-registration.md)。
+- **官方物料范围**（2026-09-11 调整）：核心库官方物料为文本、矩形、椭圆、图片、容器、图表与表格；
+  原 `base.echarts` 手绘近似物料已整体移出 `packages/material`（公共导出、`./echarts` 子路径、构建入口
+  与自动注册一并移除），其受限 Editor Descriptor 载体以非发布演示物料 `harness.semantic-chart` 保留在
+  `examples/browser-harness`，真实图表能力归外围插件承载，核心库不再发布自称 ECharts 的物料。
+  依据：[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)。
 - **静态数据作者契约**（2026-08-23 增量）：Manifest 可选 `staticData` scalar/tabular 描述；canonical 静态
   数据源可携带字段角色 binding，tabular 静态数据与宿主数据集复用物料 adapter。Designer 提供标量表单、
   有界表格网格、列/行/类型/角色编辑、Excel/TSV 粘贴推断与高级 JSON；应用一条事务，取消零副作用，未声明

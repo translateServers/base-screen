@@ -10,14 +10,6 @@ export {
   defineBaseScreenContainerMaterial,
 } from './container.js';
 export {
-  BASE_SCREEN_ECHARTS_EDITOR_DESCRIPTOR,
-  BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
-  BASE_SCREEN_ECHARTS_PROPS_SCHEMA,
-  BASE_SCREEN_ECHARTS_TABULAR_DATA_ADAPTER,
-  BaseScreenEChartsMaterialElement,
-  defineBaseScreenEChartsMaterial,
-} from './echarts.js';
-export {
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BaseScreenImageMaterialElement,
   defineBaseScreenImageMaterial,

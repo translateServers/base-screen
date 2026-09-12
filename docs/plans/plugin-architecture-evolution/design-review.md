@@ -1,0 +1,281 @@
+# 插件系统架构演进设计评审
+
+> 状态：已评审通过（方向确认，不授权实现）
+> 日期：2026-09-11（第三次修订：定位为「核心库之外的能力承载通道」，物料只是其中一部分）
+> 评审结论：2026-09-11 通过方向；实施前仍须有已接受的 ADR 与生效中的 Spec
+> 范围：插件系统的定位、承载面、证据基线、缺口分析与长期演进方向
+> 动机（用户确认）：把更多能力**移出核心库、以插件形态交付**；用插件做物料只是其中一部分功能
+> 关联：[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md)、[ADR-0015](../../decisions/ADR-0015-runtime-contribution-authority.md)、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](../../decisions/ADR-0029-host-managed-material-package-distribution.md)、[ADR-0070](../../decisions/ADR-0070-plugin-command-chrome-projection.md)、[ADR-0071](../../decisions/ADR-0071-plugin-design-context-read-access.md)、[ADR-0072](../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)、[ADR-0073](../../decisions/ADR-0073-inspector-custom-form-controls.md)
+
+本文是**设计评审**，不是实施授权。任何阶段的启动前提都是：先有已接受的 ADR，再有生效中的 Spec，并登记到 [Spec 索引](../../specs/README.md)。
+
+证据基线为跨仓实测：上游 checkout 与 XJDataHub 宿主实际代码，经 [跨仓工作流](../../../.agents/skills/base-screen-integration-workflow/SKILL.md) 的 `integration status` 与 `integration context materials` 核对。宿主侧路径只作证据引用，不是本仓库文件。
+
+## 0. 结论摘要
+
+**插件系统在本项目里的定位是「核心库之外的能力承载与交付通道」**：让能力可以在 12 个核心包之外实现、演进与交付，而不必挤进固定的包清单、依赖白名单与基座发布节奏。物料只是这条通道承载的一类内容，不是它的全部。
+
+这条定位有两个驱动因素，它们对架构的要求不同：
+
+| 驱动 | 涉及内容 | 硬性原因 |
+| --- | --- | --- |
+| **第三方依赖无法进入核心库** | 图表、地图、富文本、代码编辑器等**渲染类**能力 | `scripts/check-boundaries.mjs` 的外部依赖白名单只有 `contracts: ['zod']`，其余任何包引入外部依赖即 `FORBIDDEN_EXTERNAL_DEPENDENCY` 失败 |
+| **能力演进不想被核心库边界绑住** | 命令、面板、检查器控件、数据资源类型、蓝图能力等**功能类**能力 | `packages/` 固定 12 个包且只发布 `dist`；新增或调整要改包边界、白名单与边界检查 |
+
+第一条是"别无选择"：`packages/material` 的 `./echarts` 就因此是个**手绘 SVG 占位物**——它把数据折成坐标、逐点画 `polyline` / `rect` / `circle`，没有 tooltip、图例、坐标轴刻度或主题，因为它不能引入任何图表库。真 ECharts 只能走插件。
+
+第二条是"主动选择"：把功能放在插件里，核心库的契约与发布节奏就只需为"承载协议"负责，不必为每个具体能力负责。
+
+**建议主轴（第三次修订）：先把承载面做可靠，再扩大承载内容。** 顺序为：P0 承载骨架（外围插件目录与依赖分区）→ P1 作者面 SDK（阻塞项）→ P2 声明与接线收敛 → P3 失败影响范围与惰性激活 → P4 界面与命令承载面落地 → P5 内核表驱动（条件触发）→ P6 兼容性策略（需用户批准）。
+
+修订说明：初版以 `examples/browser-harness` 推演"插件生态"，排出组合/观测/执行隔离序列；第二次修订以 XJDataHub 实测证据与"依赖隔离"动机把主线收窄到物料与依赖分区，并倾向冻结界面扩展面；本次修订依据"物料只是插件的一部分功能"**恢复界面与命令承载面的一等地位**，并撤回第二次修订中"冻结界面扩展面"的判断。三次修订共用同一套实测证据（第 3 节），差别在目标定位。
+
+## 1. 动机与真实约束
+
+### 1.1 硬约束
+
+| 约束 | 内容 | 后果 |
+| --- | --- | --- |
+| 外部依赖白名单 | 仅 `contracts` 可用 `zod`；React/Vue 仅作各自桥接包的 peer | 核心库无法承载任何图表、地图、富文本、代码编辑器类依赖 |
+| 包清单固定 | `packages/` 固定 12 个包，由 `scripts/check-packages.mjs` 强制 | 不能靠"再加一个包"来隔离依赖或承载新能力 |
+| 跨包导入 | 只能使用声明的公共导出；依赖白名单按目录名编码 | 依赖策略与包目录结构强绑定 |
+| 只发布 dist | 每个包私有、仅 ESM、只发布 `dist` | 外围能力不能借用核心包的内部实现 |
+
+**结论：插件是能力在核心库之外实现与交付的唯一合规通道。**
+
+### 1.2 驱动一：第三方依赖隔离（以图表为例）
+
+`packages/material/src/echarts/` 曾有完整的一套声明：manifest、props schema、editor descriptor、数据适配器，以及 `BaseScreenEChartsMaterialElement`。但渲染是手绘 SVG 近似——满足数据与事件契约，不提供真实图表能力。
+
+> 后续处置（2026-09-11）：该物料已整体移出核心库。`packages/material` 不再发布任何自称 ECharts 的物料；其 descriptor 载体以 `harness.semantic-chart` 的形式保留在 `examples/browser-harness`（非发布物），用于继续验证受限 Editor Descriptor 的能力面。真实图表能力由外围插件 `plugins/plugin-echarts` 承载。
+
+正确的切分不是"删掉它"，而是分清职责：
+
+- **数据契约留在核心库**：`plugin-core` 的 `BaseScreenChartData` 与 `parseBaseScreenChartData` 是跨插件共享的语义，必须稳定且无依赖。
+- **渲染实现外移**：真 ECharts 的适配器与实例管理属于第三方依赖区，走插件交付。
+
+### 1.3 驱动二：功能承载面（命令、面板、检查器控件）
+
+核心库已经建好这些承载面，且都有决策记录：命令与 chrome 投影（[ADR-0070](../../decisions/ADR-0070-plugin-command-chrome-projection.md)）、左栏面板（[ADR-0072](../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)）、属性面板自定义控件（[ADR-0073](../../decisions/ADR-0073-inspector-custom-form-controls.md)）、设计上下文只读访问（[ADR-0071](../../decisions/ADR-0071-plugin-design-context-read-access.md)）。
+
+它们目前在生产里没有采用者（第 3 节 F1、F3），但**按本定位它们属于目标承载面而非待冻结的投机功能**。第二次修订曾据"零采用者"倾向冻结它们，该判断已撤回。
+
+一条边界仍需保留：AGENTS 明确"完整 ECharts option 与领域配置编辑器归宿主"。因此**物料渲染可插件化，复杂配置编辑器仍归宿主**，除非后续有决策改变这一分工。
+
+### 1.4 宿主已有的先例
+
+XJDataHub 经插件清单注入自己的图表物料定义，与其它物料混在同一份 manifest 的 `contributions` 中。这证明通道可用，但也暴露了成本：宿主手写裸 runtime、能力清单声明三处（第 3 节 F4/F5/F7）。
+
+## 2. 现状盘点
+
+### 2.1 三个包的职责切分
+
+| 包 | 平面 | 职责 | 关键约束 |
+| --- | --- | --- | --- |
+| `plugin-core` | 契约平面 | 清单解析、贡献类型联合、端口与目录接口、运行时贡献权威 | 框架中立、无 DOM、无副作用，可在 Node 中 import |
+| `plugin-manager` | 解析与运行时平面 | 候选摄入、能力计划、贡献计划、激活计划、生命周期、原子发布 | 唯一拥有生命周期与授权 |
+| `plugin-sdk` | 作者平面 | `definePlugin` / `createMaterialPackage` / `createPluginPackage` | 只是 `plugin-core` 的友好封装 |
+
+### 2.2 当前扩展面
+
+- **贡献类型（6）**：`material`、`command`、`dataResourceType`、`blueprintCapability`、`panel`、`inspectorControl`。
+- **能力（12）**：`command.execute`、`design.read`，以及 10 个蓝图节点能力。
+- **端口（2）**：`PluginCommandPort.execute`（出站写入，经命令总线）、`PluginDesignReadPort.read`（入站只读原子快照）。
+- **Chrome 投影面（5）** 与 **UI 挂载面（2）**：左栏面板、属性面板自定义控件。
+
+### 2.3 生命周期与发布语义
+
+`inactive → activating → active → deactivating → failed → disposing → disposed`，操作经内部串行队列；激活按拓扑序，回滚/停用/销毁按成功激活的逆序；会话端口在清理钩子前失效；目录与运行时贡献权威在所有插件激活成功后一次性提交，**任一插件激活失败即整体回滚**。
+
+这条语义在"1 个插件"时是优点，在"N 个带重依赖的插件"时是风险源——而扩大承载内容正是让 N 变大的方向。
+
+### 2.4 信任模型
+
+宿主显式提供同 realm 受信模块；Base Screen 不 fetch、不 dynamic import、不发现远程代码。能力是「声明 ∩ 宿主批准 ∩ 宿主支持」的交集；激活上下文不含 Store、路由、DOM 根、凭据或通用服务对象。
+
+要点：**能力系统限制的是集成点，不是 JS 环境权威**（[ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) 决策 1 已明确不作恶意代码沙箱承诺）。
+
+## 3. 宿主实测证据
+
+| 编号 | 事实 | 证据 |
+| --- | --- | --- |
+| F1 | 生产仅 1 个插件 `xjdatahub.dashboard`，贡献为物料约 28 项 + 数据资源类型 4 项 + 蓝图能力 10 项；`command`、`panel`、`inspectorControl` 零声明 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:32-96` |
+| F2 | 三个生命周期钩子全为空实现 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:120-126` |
+| F3 | 宿主只消费快照的 `materials` 与 `contributions`；`plugins`、`panels`、`inspectorControls` 从未读取 | `xjdatahub/frontend/src/views/dashboard/BaseScreenEditor.vue:141`；`xjdatahub/frontend/src/base-screen/xjDesignerConfig.ts:113`；`xjdatahub/frontend/src/base-screen/xjViewerConfig.ts:58` |
+| F4 | 能力授权退化为恒等式：`capabilities` 与 `grantedCapabilities` 是同一个数组，声明者即批准者 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:35` 与 `:147` |
+| F5 | 同一份能力清单被声明三处：`capabilities`、`grantedCapabilities`、并按 `.map()` 派生 `blueprintCapability` 贡献 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:35,94,147` |
+| F6 | 同一踩坑在上游参考宿主复现，并留下注释说明混入端口能力会产出非法蓝图贡献 | `examples/browser-harness/main.ts:115-116` |
+| F7 | `plugin-sdk` 的插件作者面在生产零使用；宿主手写裸 `BaseScreenPluginRuntime` 对象字面量 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:120-126` |
+| F8 | 宿主重复实现 preflight 已有的物料类型冲突校验 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:137-141` 对比 `packages/plugin-manager/src/registry.ts` |
+| F9 | 同一批物料须在两处分别登记：自定义元素注册与清单贡献声明，必须手工保持一致 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:107-118,142` |
+| F10 | 生产宿主使用 `as never` 类型逃生口，说明 registry 端口对宿主不友好 | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:150` |
+| F11 | `createCommandPort` 必填但可为空，宿主被迫显式传 `undefined` | `xjdatahub/frontend/src/base-screen/xjdatahub-plugin.ts:153` |
+| F12 | 官方 echarts 物料是手绘 SVG 近似物，不引入任何图表库 | `packages/material/src/echarts/echarts-element.ts:49-180` |
+| F13 | 沙箱归属已有定论：跨仓 `materials` 能力边界写明「审核、分发、沙箱及业务物料由宿主实现」 | `pnpm integration context materials` 的 upstream 与 consumed boundary |
+
+## 4. 由证据得出的判断
+
+1. **内核的形状已经够用，缺的是承载面之外的三件事：作者成本、失败影响面、内核扩展成本。** 现有 6 类贡献、12 项能力、2 个端口覆盖了当前设想的能力类型；问题在于每多一个插件、多一类贡献，成本如何增长。
+2. **能力模型对宿主自写插件提供的是仪式。** 声明者等于批准者（F4），三交集只剩基座侧的宿主支持集合在生效。它的安全价值只在"声明者 ≠ 批准者"时成立。**外围插件仍应走同一套机制，不新增信任通道**——官方性体现在包的作者与发布者，不体现在运行时特权。
+3. **界面与命令承载面是本定位的目标之一，不是待冻结的投机功能。** 手绘版 echarts 只需 12 个内建控件；真 ECharts 的系列、坐标轴、tooltip、主题配置远超内建控件覆盖范围，正是 `inspectorControl` 与 `editorDescriptor` 的用途。
+4. **插件数量增长会把两条现有语义变成问题**：急切激活（启动成本）与整体回滚（失败影响面）。
+5. **执行隔离不是本仓库的职责，已移交宿主（F13）。** 本报告讨论的依赖隔离（构建与打包期把第三方依赖挡在核心库外）与执行隔离（运行期防恶意代码）是两件事，不可混同。
+
+## 5. 目标形态
+
+### 5.1 外围插件：第三个信任档
+
+现有信任档只有两个：宿主自写（受信、同 realm）与第三方（范围外）。本定位引入第三个档：**外围插件**——由基座团队或宿主编写、可带受控第三方依赖、独立于 `packages/` 交付。
+
+关键约束：**它不得获得任何运行时特权。** 必须走与宿主插件完全相同的通道——宿主提供候选、宿主加载、宿主授权。否则会绕过 [ADR-0029](../../decisions/ADR-0029-host-managed-material-package-distribution.md) 的"宿主负责加载与信任"。
+
+### 5.2 依赖准入规则（继承而非新建）
+
+[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md) 已给出可直接复用的准入原则：
+
+- 第三方依赖必须置于**私有 adapter** 之后，不导出第三方类型、状态或 document shape。
+- adapter 必须以 canonical state 为唯一提交来源，支持 Shadow DOM、双实例、cleanup 与 package replacement。
+- 安装前记录实际 Vite minified 与 gzip 增量、lockfile 新增数、许可证、漏洞、维护状态、browser matrix 与移除方案。
+
+对图表场景的直接含义：**图表库实例与 option 类型绝不越过物料 ABI**；跨越边界的只能是 canonical 文档中的 JSON 与既有数据契约。
+
+### 5.3 承载内容的分层
+
+| 层次 | 内容 | 归属 |
+| --- | --- | --- |
+| 语义契约 | 数据形状、事件名、样式 token、ABI | **核心库**，稳定且零第三方依赖 |
+| 承载协议 | 清单、贡献、能力、生命周期、端口、原子发布 | **核心库**（现有三包） |
+| 具体能力实现 | 物料渲染、命令、面板、检查器控件、数据资源类型 | **外围插件** |
+| 复杂领域编辑器 | 完整图表 option、代码编辑器 | **宿主**（AGENTS 既有边界） |
+
+## 6. 必须先回答的架构问题
+
+| 编号 | 问题 | 若不回答的后果 |
+| --- | --- | --- |
+| Q1 | 外围插件放在哪个目录？（不能进 `packages/`：包清单固定、白名单按目录名编码） | 无法在保持核心库干净的前提下承载重依赖 |
+| Q2 | 边界检查如何分区？（核心区零外部依赖，外围区受控白名单） | 要么开口子污染核心库，要么外围插件无法合入 |
+| Q3 | 外围插件与宿主插件的信任关系如何表述？ | 可能被误认为可获运行时特权，破坏 ADR-0029 |
+| Q4 | 一个插件激活失败时，是否仍整体回滚？ | N 个插件下单个失败拖垮全部；重依赖放大了失败概率 |
+| Q5 | 急切激活是否可接受？ | 每个插件各带数百 KB 到数 MB 依赖时，启动成本线性叠加 |
+| Q6 | 外移内容是否需要**现有 6 类贡献之外**的新贡献类型？ | 若需要（如工具栏项、状态栏项、新 chrome 位置），则判定逻辑必须从硬编码改为可扩展，否则每类都要改三个包 |
+| Q7 | 外移内容是否需要**现有 12 项能力之外**的新能力？ | 同上：能力集合由 `packages/plugin-manager/src/resolver.ts` 的硬编码集合决定，宿主与插件都无法自行引入 |
+| Q8 | 外围插件与基座契约的兼容性如何管理？ | 基座演进会静默破坏已发布的插件 |
+
+## 7. 缺口分析
+
+**由本定位直接产生**
+
+| 编号 | 缺口 | 关联 |
+| --- | --- | --- |
+| G1 | 无外围插件的目录与依赖分区策略 | Q1、Q2 |
+| G2 | 无"外围但无特权"的信任档表述 | Q3 |
+| G3 | 激活失败整体回滚，失败影响面无法收敛 | Q4 |
+| G4 | 急切激活，启动成本随插件数叠加 | Q5 |
+| G5 | 兼容性无管理手段 | Q8 |
+| G6 | 贡献类型是闭合联合、管线非表驱动，每加一类要改三处 | Q6 |
+| G7 | 能力集合硬编码，插件与宿主都无法引入新能力 | Q7 |
+
+**宿主已付出成本（实测，会随插件数倍增）**
+
+| 编号 | 缺口 | 证据 |
+| --- | --- | --- |
+| G8 | 作者面 SDK 零使用，宿主手写裸 runtime | F7 |
+| G9 | 同一份能力清单须声明三处 | F4、F5、F6 |
+| G10 | 物料须在两处分别登记并手工保持一致 | F9 |
+| G11 | 宿主重复实现基座已有的冲突校验 | F8 |
+| G12 | registry 端口类型不友好，迫使 `as never` | F10 |
+| G13 | 可选端口仍为必填，产生声明噪音 | F11 |
+
+**暂不处理（需求未出现）**
+
+| 编号 | 缺口 | 说明 |
+| --- | --- | --- |
+| G14 | 依赖只提供顺序、不提供可达性 | 仅在插件间需要互相扩展时才成立 |
+
+## 8. 修订后的路线图
+
+| 阶段 | 目标 | 交付面 | 退出条件 |
+| --- | --- | --- | --- |
+| **P0 承载骨架** | 确立外围插件的落地位置与依赖分区 | 外围插件目录 + `check-packages`/`check-boundaries` 分区策略 + 准入规则（继承 ADR-0019） | 一个带真实第三方依赖的插件能合入，且核心库白名单不变（消 G1） |
+| **P1 作者面 SDK（阻塞项）** | 让作者不必手写裸 runtime 与重复声明 | `plugin-sdk` 的真正作者封装：一次声明派生 runtime、能力与贡献；会话作用域端口持有 | 新插件接入不含手写 runtime，能力清单只声明一处（消 G8、G9） |
+| **P2 声明与接线收敛** | 注册与贡献声明合成一步；冲突校验交回 preflight；可选端口可选 | 注册编排辅助 + 选项类型 | 宿主不再手工保持两处一致，也不再自建冲突检查（消 G10、G11、G13） |
+| **P3 失败影响范围与惰性激活** | 单个插件失败不拖垮全部；按需激活 | `plugin-manager` 生命周期与激活计划 | 一个插件失败时其余插件的贡献仍可用；启动成本不随插件数线性增长（消 G3、G4） |
+| **P4 界面与命令承载面落地** | 让外移的功能内容有落点 | `command`、`panel`、`inspectorControl` 在真实能力上落地 | 至少一类外移能力用上这三个面（消 G12 中的判断依赖） |
+| **P5 内核表驱动（条件触发）** | 新增贡献类型或能力不再改三处 | 描述符驱动的判定与 preflight | 仅在 P4 或后续暴露出"需要第 7 类贡献或第 13 项能力"时启动（消 G6、G7） |
+| **P6 兼容性策略** | 管理外围插件与基座契约的兼容 | **需用户显式批准**（见第 9 节约束冲突） | 基座演进能被插件感知并给出可读诊断（消 G5） |
+| **范围外** | 执行隔离与沙箱（归宿主，F13）、插件间组合（G14） | — | 需求出现并形成生效中的 Requirement 后再启动 |
+
+P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方向与顺序。P5 是唯一有条件触发的阶段。
+
+## 9. 决策点
+
+### D1 外围插件的目录与依赖分区（P0 的前提）
+
+| 选项 | 内容 | 获得 | 放弃 |
+| --- | --- | --- | --- |
+| 一 独立顶层目录（倾向） | 新增顶层目录承载外围插件，边界检查按区给出不同的外部依赖白名单 | 核心库白名单不变即可承载重依赖；分区清晰 | 需改两个边界脚本；新目录需要自己的构建与发布约定 |
+| 二 宿主仓库承载 | 外围插件同样放宿主侧，由宿主维护 | 零结构调整；沿用 F3 已有通道 | "基座侧承载面"失去意义；基座团队无法独立发布与验证 |
+| 三 核心库开口子 | 给 `packages/material` 增加受控白名单 | 最少改动 | 正是本定位要避免的结果；核心库不再零依赖 |
+
+倾向选项一：它是唯一同时满足"核心库零依赖"与"外围可独立交付"的选项。
+
+### D2 兼容性策略与探索阶段约束的冲突（**需你裁决**）
+
+本项目处于探索阶段，治理规则明令禁止版本标记字段与版本化命名（[ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md) 亦有意移除版本语义）。但 Q8 的兼容性问题一旦有独立交付的外围插件就会真实存在：`packages/` 内的包靠 workspace 协议天然同步，外围插件是独立发布物，必须能感知基座契约变化。
+
+**这两个要求目前互相冲突，且不能靠工程手段绕过——它需要显式批准。** 三个可选方向：
+
+| 选项 | 内容 | 代价 |
+| --- | --- | --- |
+| 一 维持现状，暂不管理兼容 | 外围插件与基座同步发布、同步升级 | 外围插件数量少时可接受；数量增长后升级成本陡增 |
+| 二 收紧绑定 | 外围插件仅依赖 `plugin-core` 的稳定子集，通过规范快照校验 | 需要先定义"稳定子集"这一新契约概念 |
+| 三 引入版本化设计 | 显式批准版本标记字段与兼容策略 | 与探索阶段规则直接冲突，需要新的 ADR 并明确退出探索阶段 |
+
+### D3 失败影响范围策略（P3 的取舍）
+
+现状整体回滚保证了"不留半成品目录"。要收敛失败影响面，需在**原子性**与**可用性**之间选择：按插件分组原子发布（组内原子、组间独立），或允许部分插件失败而整体仍可用。**建议选前者**：对原子性的削弱最小——分组内仍保持原子，只是不再要求全部插件同时成功。
+
+## 10. 明确不做
+
+- 不为承载第三方依赖而放宽核心库白名单（那正是本定位要避免的）。
+- 不给外围插件任何运行时特权通道——它们与宿主插件走同一机制。
+- 不在 Base Screen 内建执行沙箱（F13：沙箱归宿主）。
+- 不导出第三方类型、状态或 document shape 越过物料 ABI（继承 ADR-0019）。
+- 不把完整图表 option 或领域配置编辑器收进基座（AGENTS 既有边界：归宿主）。
+- 不做通用依赖注入或服务定位器（违反 [ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)）。
+- 不让 Base Screen 侧出现 fetch / dynamic import / 网络客户端 / 存储。
+- 不为菜单引入 `when` 条件表达式语言（[ADR-0070](../../decisions/ADR-0070-plugin-command-chrome-projection.md) 已推迟）。
+- 不给插件开放 canonical 文档的可变写入口。
+- 不让 `engine` 依赖 `plugin-manager`。
+
+## 11. 评审结论与后续治理
+
+**评审结论（2026-09-11）：方向通过。** 通过的是本报告的定位、证据基线与路线图排序；它**不授权任何实现**。按项目治理，每个阶段启动前仍须有已接受的 ADR 与生效中的 Spec，并登记到 [Spec 索引](../../specs/README.md)。
+
+### 11.1 承载骨架 ADR：已产出
+
+[ADR-0074](../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md) 于 2026-09-11 接受，覆盖外围插件的承载位置与依赖分区。与既有决策的关系最终判定如下（其中对 ADR-0019 的判断修正了本节初稿）：
+
+| 既有 ADR | 关系 |
+| --- | --- |
+| [ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md) | **扩展，不取代**。初稿判为"需部分取代"，工作结论修正：ADR-0019 约束的是"把依赖装进核心包"，本决策方向相反（把依赖留在核心库之外），二者不冲突。因此采纳其准入规则并保持其完整有效 |
+| [ADR-0029](../../decisions/ADR-0029-host-managed-material-package-distribution.md) | 引用。外围插件仍由宿主加载与信任，不新增信任通道 |
+| [ADR-0004](../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) | 引用。外围插件仍是宿主显式提供的同 realm 受信模块，不改变信任边界 |
+| [ADR-0014](../../decisions/ADR-0014-plugin-manifest-identity-only.md) | **无冲突**。因 D2 选择不引入版本化设计，ADR-0014 继续完整生效 |
+
+### 11.2 已裁决
+
+| 决策 | 结论 | 依据 |
+| --- | --- | --- |
+| D1 承载位置与依赖分区 | 新增顶层 `plugins/`，与 `packages/` 平行；依赖白名单按区维护，外围区逐插件显式申报，不接受通配与继承 | 唯一同时满足「核心库零第三方依赖」与「外围可独立交付」的选项 |
+| D2 兼容性策略 | 不引入版本标记字段与版本化命名。外围插件只依赖 `plugin-core` 与 `plugin-sdk` 的公共导出，契约偏差由边界检查与规范快照发现 | 在不触及探索阶段治理规则的前提下覆盖可预见需求；版本化设计保持未决，需显式批准才能开启 |
+| D3 失败影响范围 | 维持整体回滚；插件数增长后改为按插件分组原子发布（组内原子、组间独立），留待实施阶段 | 不阻塞 P0，且不削弱"不留半成品目录"的既有性质 |
+
+首批承载范围一并限定：只承载渲染类与现有 6 类贡献能表达的功能类能力，**不新增贡献类型与能力**，因此内核表驱动改造不启动。
+
+### 11.3 启动顺序
+
+1. **先产出 P0 的生效中 Spec**：范围限于 `plugins/` 分区的落地与 `scripts/check-boundaries.mjs` 的分区改造，含反向依赖失败关闭与未申报依赖失败关闭。ADR-0074 只授权方向，实施仍须 Spec。
+2. **P0 与 P1 并行推进**：P0 给出外围插件能放哪里，P1 把作者成本从「每插件手写一遍」降为「一次声明」。首批承载范围已限定为既有 6 类贡献，P5 不启动。
+3. **拿真 ECharts 物料做首个验证案例**：依赖明确、数据契约已存在、当前实现是手绘近似。它的落地会同时验证 P0 的分区是否成立、P1 的作者面是否够用、P4 的配置承载面（`inspectorControl` 与 `editorDescriptor`）是否真的需要。
+4. 跨仓侧现状：`pnpm integration status` 报 `consumed.state = drifted`、`pendingPackages` 与 `pendingContext` 为真。若要同步到宿主，须按跨仓工作流建立命名任务，不得直接改受管文件。

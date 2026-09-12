@@ -3,11 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
-  BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
-  BaseScreenEChartsMaterialElement,
   BaseScreenTableMaterialElement,
 } from '../src/index.js';
 
@@ -132,11 +130,7 @@ describe('official material conformance (DRH-R7)', () => {
 
   it('renders declared gradient background fields while keeping unsupported colors solid-only', () => {
     const gradient = 'linear-gradient(90deg, #112233 0%, #ffffff 100%)';
-    for (const Element of [
-      BaseScreenChartMaterialElement,
-      BaseScreenTableMaterialElement,
-      BaseScreenEChartsMaterialElement,
-    ]) {
+    for (const Element of [BaseScreenChartMaterialElement, BaseScreenTableMaterialElement]) {
       const { element, threw } = elementWith(Element, model('idle', { backgroundColor: gradient }));
       expect(threw).toBe(false);
       expect(element.style.backgroundImage).toBe(gradient);
@@ -144,12 +138,12 @@ describe('official material conformance (DRH-R7)', () => {
     }
 
     expect(
-      BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.stylePanel.find(
+      BASE_SCREEN_CHART_MATERIAL_MANIFEST.stylePanel.find(
         (field) => field.style === 'backgroundColor',
       )?.allowGradient,
     ).toBe(true);
     expect(
-      BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.stylePanel.find((field) => field.style === 'gridColor')
+      BASE_SCREEN_CHART_MATERIAL_MANIFEST.stylePanel.find((field) => field.style === 'gridColor')
         ?.allowGradient,
     ).toBeUndefined();
   });

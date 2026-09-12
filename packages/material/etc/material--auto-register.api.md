@@ -14,9 +14,6 @@ export function defineBaseScreenChartMaterial(): ScreenParseResult<BaseScreenMat
 export function defineBaseScreenContainerMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
 
 // @public (undocumented)
-export function defineBaseScreenEChartsMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
-
-// @public (undocumented)
 export function defineBaseScreenEllipseMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
 
 // @public (undocumented)

@@ -190,7 +190,7 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 `define*Material()` 成功值就是可放入 catalog 的 entry，并且重复调用同一 constructor 时幂等。
 不要在多个模块里无条件直接调用 `customElements.define()`。
 
-官方物料还包括椭圆、图片、容器、图表、ECharts 和表格。文本、图表、ECharts、表格使用宿主
+官方物料还包括椭圆、图片、容器、图表和表格。文本、图表、表格使用宿主
 表格数据时，目录项还要分别携带包中导出的 `*_TABULAR_DATA_ADAPTER`。文本的 `value` 角色接收
 一个字符串、数值、布尔或日期字段，显示数据集首行对应值；空行或空值投影为空文本。文本原有的
 标量静态数据保持不变；在 Designer 中只暴露「宿主数据集」，不再额外显示通用「宿主资源」选项。
@@ -600,7 +600,7 @@ designer.setCanvasBackground(null);
 
 属性面板与 Manifest Editor Descriptor 中所有 `control: 'color'` 字段共享同一个三段式调色板（ADR-0050/0051），已全面替换原生单色 input：单色、线性渐变、径向渐变三种模式无条件可用。渐变模式支持添加/删除 2..8 个色标、编辑每个色标的颜色与位置，并设置线性角度或径向中心。控件采用紧凑行内排布：单色的颜色与透明度同行，色标的颜色与位置同行，色标透明度与增删按钮同行。每个颜色控件的无边框 hex 输入支持 `#RGB`、`#RGBA`、`#RRGGBB` 与 `#RRGGBBAA`（也保留 `transparent` token）；失焦/提交时同步 swatch、透明度和色标，未完成或非法输入不会写入文档，输入本身不显示焦点 outline。单色切到渐变仍按既有色系派生；从渐变切回单色时，当前选中色标的颜色（含透明度）成为单色值，`transparent` 色标保持原单色。字段值仍是普通字符串：单色为色值，渐变保存为规范化 CSS 渐变字符串，物料渲染与既有文档无需改动。切换模式不会丢失各模式的编辑草稿；撤销/重做或替换文档会按文档值重新解析。
 
-渐变字符串是否真正生效取决于物料渲染端的消费方式：写 CSS `background` 类属性的字段（如 `backgroundColor`、`fill`）天然生效；官方文本物料（`base.text`）的 `color` 字段经 `background-clip: text` 渲染渐变文字（文字透明、渐变按字形显示）；官方矩形物料（`base.rectangle`）的 `borderColor` 通过组件内遮罩层渲染渐变边框，支持既有 `borderWidth` 与 `borderRadius`，且不改变组件外部尺寸。原生 `border-color`、SVG 图表与 ECharts option 内部色等未做专门适配的属性仍不接受 CSS 渐变字符串，这类字段请使用单色。
+渐变字符串是否真正生效取决于物料渲染端的消费方式：写 CSS `background` 类属性的字段（如 `backgroundColor`、`fill`）天然生效；官方文本物料（`base.text`）的 `color` 字段经 `background-clip: text` 渲染渐变文字（文字透明、渐变按字形显示）；官方矩形物料（`base.rectangle`）的 `borderColor` 通过组件内遮罩层渲染渐变边框，支持既有 `borderWidth` 与 `borderRadius`，且不改变组件外部尺寸。原生 `border-color`、SVG 图表与图表库 option 内部色等未做专门适配的属性仍不接受 CSS 渐变字符串，这类字段请使用单色。
 
 #### 画布背景图片
 
@@ -1165,8 +1165,8 @@ Designer 默认关闭画布内组件原生事件。打开底部状态栏「事�
 （`data-status-toggle="native-events"`）后，设计态画布切到交互模式：组件原生事件
 （如文本 `valueClick`、图表 `seriesClick`、表格行点击）以同样的 `base-screen-material-event`
 CustomEvent 从 designer 元素转发给宿主，`detail` 与 Viewer 完全同形
-（`{ componentId, type, name, payload }`）；原生 CSS/悬停交互也随开关一起生效：echarts 数据点的
-pointer 光标与悬停放大、React/Vue 桥接渲染的原生控件（button 等）的 hover/active/focus 样式，
+（`{ componentId, type, name, payload }`）；原生 CSS/悬停交互也随开关一起生效：物料自身声明的
+pointer 光标与悬停反馈、React/Vue 桥接渲染的原生控件（button 等）的 hover/active/focus 样式，
 开关关闭时全部静默（桥接控件以 pointer-events 门控，不影响设计器选择/拖拽）：
 
 ```ts
@@ -1469,7 +1469,7 @@ const manifest = {
 
 Blueprint 使用 Designer 内的一体化工作台：Base Screen 渲染全局顶部栏、左右语义面板和底部状态，宿主通过
 固定 slot 提供中央图形画布。Blueprint 编辑直接进入当前 `ScreenDocument` 和统一历史，没有“应用蓝图”或
-“取消草稿”。代码、完整 ECharts 配置和其它领域编辑器仍由宿主在 Shadow DOM 之外提供。
+“取消草稿”。代码、完整图表库 option 配置和其它领域编辑器仍由宿主在 Shadow DOM 之外提供。
 
 宿主应在 `configure()` / `load()` 前把一个中央画布元素放入 Designer light DOM：
 

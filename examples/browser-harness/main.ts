@@ -4,8 +4,6 @@ import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
-  BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
-  BASE_SCREEN_ECHARTS_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
@@ -15,7 +13,6 @@ import {
   BASE_SCREEN_TEXT_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
   BaseScreenContainerMaterialElement,
-  BaseScreenEChartsMaterialElement,
   BaseScreenEllipseMaterialElement,
   BaseScreenImageMaterialElement,
   BaseScreenRectangleMaterialElement,
@@ -23,7 +20,6 @@ import {
   BaseScreenTextMaterialElement,
   defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
-  defineBaseScreenEChartsMaterial,
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
@@ -64,6 +60,12 @@ import {
   harnessInspectorDemoMaterialPackage,
 } from './inspector-control-fixture.ts';
 import { defineHarnessPluginPanel, HARNESS_PLUGIN_PANEL_TAG_NAME } from './plugin-panel-element.ts';
+import {
+  defineHarnessSemanticChartMaterial,
+  HARNESS_SEMANTIC_CHART_MATERIAL_MANIFEST,
+  HARNESS_SEMANTIC_CHART_TABULAR_DATA_ADAPTER,
+  HarnessSemanticChartMaterialElement,
+} from './semantic-chart-material.ts';
 
 // 宿主受控动态加载（ADR-0029）：外部物料包经宿主发起的 import() 进入页面，
 // 由宿主审核模块来源并负责失败处理；Base Screen 只消费加载后的可信模块。
@@ -88,7 +90,7 @@ const officialMaterials = [
   defineBaseScreenImageMaterial(),
   defineBaseScreenContainerMaterial(),
   defineBaseScreenChartMaterial(),
-  defineBaseScreenEChartsMaterial(),
+  defineHarnessSemanticChartMaterial(),
   defineBaseScreenTableMaterial(),
 ];
 if (!productElements.ok || officialMaterials.some((definition) => !definition.ok)) {
@@ -304,9 +306,9 @@ const catalog = createBaseScreenMaterialCatalog([
     tabularDataAdapter: BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
   },
   {
-    manifest: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
-    constructor: BaseScreenEChartsMaterialElement,
-    tabularDataAdapter: BASE_SCREEN_ECHARTS_TABULAR_DATA_ADAPTER,
+    manifest: HARNESS_SEMANTIC_CHART_MATERIAL_MANIFEST,
+    constructor: HarnessSemanticChartMaterialElement,
+    tabularDataAdapter: HARNESS_SEMANTIC_CHART_TABULAR_DATA_ADAPTER,
   },
   {
     manifest: BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
@@ -410,7 +412,7 @@ const materialLibraryGrouping = {
       id: 'data',
       label: '数据',
       children: [
-        { id: 'charts', label: '图表', materialTypes: ['base.chart', 'base.echarts'] },
+        { id: 'charts', label: '图表', materialTypes: ['base.chart', 'harness.semantic-chart'] },
         { id: 'tables', label: '表格', materialTypes: ['base.table'] },
       ],
     },
@@ -442,7 +444,9 @@ const materialLibraryStressGrouping = {
         {
           id: 'advanced',
           label: '高级图表',
-          children: [{ id: 'echarts', label: 'ECharts 高级图表', materialTypes: ['base.echarts'] }],
+          children: [
+            { id: 'semantic-chart', label: '语义图表', materialTypes: ['harness.semantic-chart'] },
+          ],
         },
         {
           id: 'tables',
@@ -624,17 +628,17 @@ const screenDocument = {
       dataSource: null,
     },
     {
-      id: 'echarts-demo',
-      type: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.type,
-      name: 'ECharts 语义图',
+      id: 'semantic-chart-demo',
+      type: HARNESS_SEMANTIC_CHART_MATERIAL_MANIFEST.type,
+      name: '语义图表',
       parentId: null,
       position: { x: 560, y: 320 },
       size: { width: 340, height: 220 },
       rotation: 0,
       zIndex: 6,
       status: { locked: false, hidden: false },
-      props: structuredClone(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.defaultProps),
-      style: structuredClone(BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST.defaultStyle),
+      props: structuredClone(HARNESS_SEMANTIC_CHART_MATERIAL_MANIFEST.defaultProps),
+      style: structuredClone(HARNESS_SEMANTIC_CHART_MATERIAL_MANIFEST.defaultStyle),
       dataSource: {
         type: 'dataset' as const,
         datasetId: 'tabular-orders',
@@ -1120,7 +1124,7 @@ designer.materialLibraryGrouping = activeMaterialLibraryGrouping;
 designer.materialLibraryState = {
   status: 'partial',
   failedCount: 1,
-  draftTypes: ['base.echarts'],
+  draftTypes: ['harness.semantic-chart'],
   unavailableTypes: ['base.table'],
 };
 const materialLibraryActions: string[] = [];
@@ -1318,7 +1322,7 @@ Object.assign(window, {
     materialManifests: {
       text: BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
       chart: BASE_SCREEN_CHART_MATERIAL_MANIFEST,
-      echarts: BASE_SCREEN_ECHARTS_MATERIAL_MANIFEST,
+      semanticChart: HARNESS_SEMANTIC_CHART_MATERIAL_MANIFEST,
       table: BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
       react: reactBridge.value.manifest,
       vue: vueBridge.value.manifest,

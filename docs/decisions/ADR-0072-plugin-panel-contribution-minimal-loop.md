@@ -28,4 +28,4 @@ ADR-0070 打通了出站触发，ADR-0071 补上了入站读写，但插件仍�
   - 宿主分组每次渲染都**移除再追加**自己的 tab，面板 tab 若不保持容器末尾，rail 键盘导航顺序会被静默改变（已有一次 ArrowDown 因此落到面板上）。
   - 只挂 `renderInteraction` 会让面板在文档提交后静止；`emitChange` 才是覆盖提交/撤销/重做的点。
 - 面板可见性目前等价于"宿主是否激活该插件、registry 里是否有该标签、是否传入 `pluginPanels`"，宿主无法在不激活插件的前提下单独禁止面板。需要更细粒度时再加 capability。
-- 验证：`packages/plugin-core/tests/plugin-core.test.ts` 覆盖 panel 身份与 tagName 规则、动作 detail 的 fail-closed 解析；`packages/plugin-manager/tests/manager.test.ts` 覆盖 registry 解析、未注册/查询抛错/一标签多面板三类失败路径；`packages/engine/tests/common/operations/plugin/designer-plugin-panels.test.ts` 覆盖归属拒绝、快照隔离与刷新指纹；`scripts/browser-harness/assert-plugin-command-loop.mjs` 端到端跑通并断言位移正好等于面板给的 20 而非 chrome 默认的 40（args 丢失会指名报 `ARGS_LOST`）。
+- 验证：`packages/plugin-core/tests/plugin-core.test.ts` 覆盖 panel 身份与 tagName 规则、动作 detail 的 fail-closed 解析；`packages/plugin-manager/tests/manager.test.ts` 覆盖 registry 解析、未注册/查询抛错/一标签多面板三类失败路径；`packages/engine/tests/common/operations/plugin/designer-plugin-panels.test.ts` 覆盖归属拒绝、快照隔离与刷新指纹；`scripts/browser-harness/plugins/assert-plugins.mjs` 端到端跑通并断言位移正好等于面板给的 20 而非 chrome 默认的 40（args 丢失会指名报 `ARGS_LOST`）。

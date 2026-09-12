@@ -208,6 +208,21 @@ importers:
         specifier: ^3.5.0
         version: 3.5.40(typescript@7.0.2)
 
+  plugins/plugin-echarts:
+    dependencies:
+      '@base-screen/contracts':
+        specifier: workspace:^
+        version: link:../../packages/contracts
+      '@base-screen/plugin-core':
+        specifier: workspace:^
+        version: link:../../packages/plugin-core
+      '@base-screen/plugin-sdk':
+        specifier: workspace:^
+        version: link:../../packages/plugin-sdk
+      echarts:
+        specifier: 6.1.0
+        version: 6.1.0
+
 packages:
 
   '@andrewbranch/untar.js@1.0.3':

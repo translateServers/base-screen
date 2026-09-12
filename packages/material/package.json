@@ -32,10 +32,6 @@
       "types": "./dist/container.d.ts",
       "import": "./dist/container.js"
     },
-    "./echarts": {
-      "types": "./dist/echarts.d.ts",
-      "import": "./dist/echarts.js"
-    },
     "./image": {
       "types": "./dist/image.d.ts",
       "import": "./dist/image.js"

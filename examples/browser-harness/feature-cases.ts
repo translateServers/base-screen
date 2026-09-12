@@ -122,10 +122,10 @@ async function applyDataset(designer: BaseScreenDesignerElement): Promise<void> 
   await painted();
 }
 
-async function applyEcharts(designer: BaseScreenDesignerElement): Promise<void> {
+async function applySemanticChart(designer: BaseScreenDesignerElement): Promise<void> {
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
-  await selectLayer(designer, 'echarts-demo');
+  await selectLayer(designer, 'semantic-chart-demo');
   clickShadow(designer, '[data-inspector-tab="appearance"]');
   await painted();
 }
@@ -158,7 +158,7 @@ const CASE_APPLIERS = {
   'plugin-panel': applyPluginPanel,
   'inspector-control': applyInspectorControl,
   dataset: applyDataset,
-  echarts: applyEcharts,
+  'semantic-chart': applySemanticChart,
   blueprint: applyBlueprint,
   'host-authoring': applyHostAuthoring,
   variables: applyVariables,

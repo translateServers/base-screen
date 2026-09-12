@@ -28,4 +28,4 @@ ADR-0070 打通了出站投影（chrome → 插件 handler），2026-09-09 补�
 - 单一 `requiredCapability` 无法表达"既要读又要写"的贡献命令：菜单项仍按单个能力门控，无选区时由 handler 返回诊断说明原因。多能力门控待出现实际需求再议。
 - 快照按读取次数做 JSON 深拷贝，成本随 canonical 文档体积增长；文档体积已由 `contracts` 的字节上限约束，且读取只发生在用户动作触发时。
 - 本决策的快照形状被后继 [ADR-0072](./ADR-0072-plugin-panel-contribution-minimal-loop.md) 直接复用为插件面板的 `model`，未新增状态类型；"按需读取、不做变更通知"的边界在面板侧同样成立（宿主推送，不提供订阅）。
-- 验证：`packages/engine/tests/common/operations/plugin/designer-plugin-design-read-port.test.ts` 覆盖私有副本、深冻结与无文档失败关闭；`packages/plugin-manager/tests/manager.test.ts` 覆盖能力门控、会话失效后拒读与可选入参；`scripts/browser-harness/assert-plugin-command-loop.mjs` 端到端跑真实 UI，并以反向对照确认断言能抓到"忽略选区"的实现（`DECOY_MOVED` 快速失败，而非 30s 超时）。
+- 验证：`packages/engine/tests/common/operations/plugin/designer-plugin-design-read-port.test.ts` 覆盖私有副本、深冻结与无文档失败关闭；`packages/plugin-manager/tests/manager.test.ts` 覆盖能力门控、会话失效后拒读与可选入参；`scripts/browser-harness/plugins/assert-plugins.mjs` 端到端跑真实 UI，并以反向对照确认断言能抓到"忽略选区"的实现（`DECOY_MOVED` 快速失败，而非 30s 超时）。

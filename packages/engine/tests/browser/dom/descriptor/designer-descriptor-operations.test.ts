@@ -49,7 +49,7 @@ const document: ScreenDocument = {
   components: [
     {
       id: 'chart-1',
-      type: 'base.echarts',
+      type: 'fixture.chart',
       name: '图表',
       parentId: null,
       position: { x: 0, y: 0 },

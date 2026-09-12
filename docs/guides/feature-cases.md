@@ -39,30 +39,30 @@ pnpm dev:browser-harness
 | 插件面板 model / action | `/?designer&case=plugin-panel` | `pnpm --filter @base-screen/plugin-core test` | `pnpm verify:browser` |
 | 检查器 `control: 'custom'` | `/?designer&case=inspector-control` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
 | 数据集端口、绑定、四态 | `/?designer&case=dataset` | `pnpm --filter @base-screen/renderer test` | `pnpm verify:browser` |
-| 官方物料 Manifest / 面板 | `/?designer&case=echarts` | `pnpm --filter @base-screen/material test` | `pnpm verify:browser` |
+| 官方物料 Manifest / 面板、语义图表 | `/?designer&case=semantic-chart` | `pnpm --filter @base-screen/material test` | `pnpm verify:browser` |
 | 宿主作者桥、组件文本提交 | `/?designer&case=host-authoring` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
 | 变量目录与刷新 | `/?designer&case=variables` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
 | Vue / React 物料桥 | `/?designer&case=canvas`（含桥接按钮） | `pnpm --filter @base-screen/vue test` | `pnpm verify:browser` |
 | Viewer 纯展示 | `/` 右侧 Viewer | `pnpm --filter @base-screen/renderer test` | `pnpm verify:browser` |
 
-自动化证据在 `scripts/browser-harness/assert-*.mjs`。历史需求对照见归档 Spec 的 `test-matrix.md`，那些文件不授权新实现。
+自动化证据在 `scripts/browser-harness/` 下按功能域分目录的 `assert-*.mjs`（域模块内部按原断言职责分节，导出函数名不变）；调用顺序与视口编排由 `scripts/browser-harness/run-browser-harness.mjs` 统一决定。历史需求对照见归档 Spec 的 `test-matrix.md`，那些文件不授权新实现。
 
 ## 案例目录
 
 目录文案以 [`examples/browser-harness/feature-case-catalog.ts`](../../examples/browser-harness/feature-case-catalog.ts) 为准；场景跳转在 `feature-cases.ts`。
 
-| `case` | 打开后看什么 | 对应断言 |
+| `case` | 打开后看什么 | 对应断言（域模块） |
 | --- | --- | --- |
-| `canvas` | 默认演示文档与官方物料 | `assert-canvas-basics.mjs`、桌面基线 |
-| `material-groups` | 超长分组名、钻取、分类浮层 | `assert-material-group-navigation.mjs` |
-| `plugin-command` | 选中副标题后走命令面板 / `Ctrl+Shift+P` | `assert-plugin-command-loop.mjs` |
+| `canvas` | 默认演示文档与官方物料 | `canvas/assert-canvas.mjs`、桌面基线 |
+| `material-groups` | 超长分组名、钻取、分类浮层 | `materials/assert-materials.mjs` |
+| `plugin-command` | 选中副标题后走命令面板 / `Ctrl+Shift+P` | `plugins/assert-plugins.mjs` |
 | `plugin-panel` | 左栏 Harness panel 的选区与 nudge | 同上 |
 | `inspector-control` | 授权语气控件写入；未授权标签降级 | 同上 |
-| `dataset` | 排行卡与数据面板绑定 | `assert-dataset-authoring.mjs` |
-| `echarts` | ECharts 语义配置分区 | `assert-echarts-authoring.mjs` |
-| `blueprint` | 交互编排工作台与宿主图形槽 | `assert-blueprint-workbench.mjs` |
-| `host-authoring` | 右下角宿主作者面板 | `assert-component-text-authoring.mjs` |
-| `variables` | 左侧变量目录 | `assert-authoring-variables.mjs` |
+| `dataset` | 排行卡与数据面板绑定 | `dataset/assert-dataset.mjs` |
+| `semantic-chart` | 语义图表演示物料的分组、字段与高级折叠 | `blueprint/assert-blueprint.mjs` |
+| `blueprint` | 交互编排工作台与宿主图形槽 | `blueprint/assert-blueprint.mjs` |
+| `host-authoring` | 右下角宿主作者面板 | `authoring/assert-workbench.mjs` |
+| `variables` | 左侧变量目录 | `variables/assert-variables.mjs` |
 
 `inspector-control` 会往当前项目里加一块演示物料；只用于人眼核对，不影响默认 `/` 与 `?designer` 验收文档。
 

@@ -9,7 +9,6 @@ export default createViteLibraryConfig(packageRoot, {
   'auto-register': `${packageRoot}src/auto-register.ts`,
   chart: `${packageRoot}src/chart.ts`,
   container: `${packageRoot}src/container.ts`,
-  echarts: `${packageRoot}src/echarts.ts`,
   image: `${packageRoot}src/image.ts`,
   index: `${packageRoot}src/index.ts`,
   shapes: `${packageRoot}src/shapes.ts`,

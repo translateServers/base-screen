@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, posix } from 'node:path';
 import { PACKAGE_DEFINITIONS } from './check-packages.mjs';
 
 const ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze({
@@ -27,12 +27,36 @@ const ALLOWED_EXTERNAL_DEPENDENCIES = Object.freeze({
   contracts: ['zod'],
 });
 
+// ADR-0074：外围插件分区。packages 区维持零第三方依赖；plugins 区逐插件显式申报，
+// 不接受通配与继承。依赖方向单向：plugins 可用 packages，packages 绝不可用 plugins。
+const PLUGIN_ROOT = 'plugins';
+const PLUGIN_ALLOWED_WORKSPACE_DEPENDENCIES = Object.freeze([
+  'contracts',
+  'plugin-core',
+  'plugin-sdk',
+]);
+const PLUGIN_ALLOWED_EXTERNAL_DEPENDENCIES = Object.freeze({
+  'plugin-echarts': ['echarts'],
+});
+
 function fail(code, detail) {
   throw new Error(`${code}: ${detail}`);
 }
 
 function readManifest(directory) {
   return JSON.parse(readFileSync(join('packages', directory, 'package.json'), 'utf8'));
+}
+
+function readPluginManifest(directory) {
+  return JSON.parse(readFileSync(join(PLUGIN_ROOT, directory, 'package.json'), 'utf8'));
+}
+
+function listDirectories(base) {
+  if (!existsSync(base)) return [];
+  return readdirSync(base, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
 }
 
 function packageDirectoryByName(name) {
@@ -84,8 +108,8 @@ export function detectCycle(graph) {
   return [...graph.keys()].some(visit);
 }
 
-function collectSourceFiles(directory) {
-  const roots = [join('packages', directory, 'src'), join('packages', directory, 'tests')];
+function collectSourceFiles(base, directory) {
+  const roots = [join(base, directory, 'src'), join(base, directory, 'tests')];
   const files = [];
   const visit = (current) => {
     for (const entry of readdirSync(current, { withFileTypes: true })) {
@@ -112,11 +136,14 @@ function collectImports(source) {
   return imports;
 }
 
-function validateManifestDependencies(directory, manifest, graph) {
+function validateManifestDependencies(directory, manifest, graph, pluginPackageNames) {
   const allowedWorkspaceDependencies = new Set(ALLOWED_WORKSPACE_DEPENDENCIES[directory]);
   const dependencies = [];
 
   for (const [dependencyName] of dependencyEntries(manifest)) {
+    if (pluginPackageNames.has(dependencyName)) {
+      fail('PLUGIN_DEPENDENCY_FORBIDDEN', `${directory} -> ${dependencyName}`);
+    }
     const dependencyDirectory = packageDirectoryByName(dependencyName);
     if (dependencyDirectory) {
       if (dependencyDirectory === 'testing' && directory !== 'testing') {
@@ -148,14 +175,35 @@ function validateManifestDependencies(directory, manifest, graph) {
   graph.set(directory, dependencies);
 }
 
-function validateSourceImports(directory, manifest) {
-  const declaredDependencies = new Set(dependencyEntries(manifest).map(([name]) => name));
-  const buildWithTsc = PACKAGE_DEFINITIONS[directory].build === 'tsc';
+// 外围插件：workspace 依赖限制在稳定契约面，外部依赖必须逐插件显式申报（ADR-0074 决策 2、6）。
+function validatePluginManifestDependencies(directory, manifest) {
+  for (const [dependencyName] of dependencyEntries(manifest)) {
+    const dependencyDirectory = packageDirectoryByName(dependencyName);
+    if (dependencyDirectory) {
+      if (!PLUGIN_ALLOWED_WORKSPACE_DEPENDENCIES.includes(dependencyDirectory)) {
+        fail('FORBIDDEN_PLUGIN_WORKSPACE_DEPENDENCY', `${directory} -> ${dependencyName}`);
+      }
+      continue;
+    }
+    if (frameworkRoot(dependencyName)) {
+      fail('FORBIDDEN_PLUGIN_EXTERNAL_DEPENDENCY', `${directory} -> ${dependencyName}`);
+    }
+    if (!PLUGIN_ALLOWED_EXTERNAL_DEPENDENCIES[directory]?.includes(dependencyName)) {
+      fail('FORBIDDEN_PLUGIN_EXTERNAL_DEPENDENCY', `${directory} -> ${dependencyName}`);
+    }
+  }
+}
 
-  for (const sourceFile of collectSourceFiles(directory)) {
+function validateSourceImports(base, directory, manifest, requireExtension) {
+  const declaredDependencies = new Set(dependencyEntries(manifest).map(([name]) => name));
+  const root = `${base}/${directory}`;
+  const isPlugin = base === PLUGIN_ROOT;
+
+  for (const sourceFile of collectSourceFiles(base, directory)) {
     const source = readFileSync(sourceFile, 'utf8');
+    const normalizedFile = sourceFile.split(/[\\/]/).join('/');
     for (const importName of collectImports(source)) {
-      if (importName.startsWith('../') && importName.includes('/packages/')) {
+      if (importName.startsWith('../') && importName.includes(`/${base}/`)) {
         fail('SOURCE_DEEP_IMPORT', `${sourceFile} -> ${importName}`);
       }
       if (
@@ -165,8 +213,15 @@ function validateSourceImports(directory, manifest) {
       ) {
         fail('FORBIDDEN_SOURCE_ROOT', `${sourceFile} -> ${importName}`);
       }
+      // 外围插件之间不允许相对路径互相引用：只能经各自声明的工作区依赖协作。
+      if (isPlugin && importName.startsWith('.')) {
+        const target = posix.normalize(posix.join(posix.dirname(normalizedFile), importName));
+        if (target !== root && !target.startsWith(`${root}/`)) {
+          fail('PLUGIN_RELATIVE_IMPORT_ESCAPE', `${sourceFile} -> ${importName}`);
+        }
+      }
       if (
-        buildWithTsc &&
+        requireExtension &&
         importName.startsWith('.') &&
         !importName.endsWith('.js') &&
         !importName.endsWith('.json')
@@ -187,11 +242,27 @@ function validateSourceImports(directory, manifest) {
 }
 
 export function validateBoundaries() {
+  const pluginManifests = new Map(
+    listDirectories(PLUGIN_ROOT).map((directory) => [directory, readPluginManifest(directory)]),
+  );
+  const pluginPackageNames = new Set(
+    [...pluginManifests.values()].map((manifest) => manifest.name),
+  );
+
   const graph = new Map();
   for (const directory of Object.keys(PACKAGE_DEFINITIONS)) {
     const manifest = readManifest(directory);
-    validateManifestDependencies(directory, manifest, graph);
-    validateSourceImports(directory, manifest);
+    validateManifestDependencies(directory, manifest, graph, pluginPackageNames);
+    validateSourceImports(
+      'packages',
+      directory,
+      manifest,
+      PACKAGE_DEFINITIONS[directory].build === 'tsc',
+    );
+  }
+  for (const [directory, manifest] of pluginManifests) {
+    validatePluginManifestDependencies(directory, manifest);
+    validateSourceImports(PLUGIN_ROOT, directory, manifest, false);
   }
   if (detectCycle(graph)) {
     fail('DEPENDENCY_CYCLE', 'workspace production dependency graph');

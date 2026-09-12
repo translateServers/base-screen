@@ -27,4 +27,4 @@ ADR-0072 给了插件左栏面板，但物料属性面板仍是闭合的：`EDIT
 - 属性面板第一次可以被第三方扩展，且新增控件不需改 Base Screen 代码；同时授权边界比左栏面板更严格，因为它落在文档写入路径上。
 - 一条校验盲区必须记录：`validateControlForSchema` 对无法解析的 path 提前返回，因此 `custom` 绑到不存在的 props 路径不会在校验期报错。这是既有行为（所有控件相同），本决策未收紧。
 - 未授权标签在渲染期降级，而非在解析期报错：这是不可避免的，因为 editorDescriptor 由物料包声明、而控件由另一方的插件贡献，两者在包级别没有相互可见性。
-- 验证：`packages/plugin-core/tests/editor/editor-descriptor.test.ts` 覆盖 tagName 合法性、跨控件误用与 target 限制；`packages/plugin-core/tests/plugin-core.test.ts` 覆盖 `inspectorControl` 贡献校验；`packages/plugin-manager/tests/manager.test.ts` 覆盖授权目录解析、未注册与标签争用三类失败；`scripts/browser-harness/assert-plugin-command-loop.mjs` 端到端断言授权控件渲染并读到当前值、点击写回 props 事务、undo 同时回退文档与控件显示，并断言未授权标签**不出现**且给出降级提示。
+- 验证：`packages/plugin-core/tests/editor/editor-descriptor.test.ts` 覆盖 tagName 合法性、跨控件误用与 target 限制；`packages/plugin-core/tests/plugin-core.test.ts` 覆盖 `inspectorControl` 贡献校验；`packages/plugin-manager/tests/manager.test.ts` 覆盖授权目录解析、未注册与标签争用三类失败；`scripts/browser-harness/plugins/assert-plugins.mjs` 端到端断言授权控件渲染并读到当前值、点击写回 props 事务、undo 同时回退文档与控件显示，并断言未授权标签**不出现**且给出降级提示。
