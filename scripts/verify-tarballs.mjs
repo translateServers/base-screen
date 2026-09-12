@@ -15,6 +15,7 @@ import {
   writeTarballConsumerFiles,
   writeVanillaTarballConsumerFiles,
 } from './tarball-consumer-files.mjs';
+import { writeVueHostTarballConsumerFiles } from './vue-host-consumer-files.mjs';
 
 function run(command, args, cwd) {
   const executable = process.platform === 'win32' && command === 'pnpm' ? 'pnpm.cmd' : command;
@@ -209,6 +210,35 @@ function verifyVanillaTarballConsumer() {
       'sdk',
     ],
     ['react', 'react-dom', 'vue'],
+  );
+  run('pnpm', ['run', 'typecheck'], consumer);
+  run('pnpm', ['run', 'build'], consumer);
+  run('pnpm', ['run', 'verify'], consumer);
+}
+
+/**
+ * 宿主自建 Vue 工程的外部消费者校验：复制 `examples/vue-host`，依赖换成真实 tarball，
+ * 跑 typecheck / build / 浏览器闭环。它验证的是"宿主写自己的 Vue 应用来用这套 ABI"，
+ * 而不是基座自带的 fixture。
+ */
+function verifyVueHostTarballConsumer() {
+  const consumer = mkdtempSync(join(temporaryRoot, 'vue-host-consumer-'));
+  writeVueHostTarballConsumerFiles(consumer, tarballSpec, root);
+  run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
+  assertConsumerIsolation(
+    consumer,
+    'vue-host',
+    [
+      'contracts',
+      'engine',
+      'material',
+      'plugin-core',
+      'plugin-manager',
+      'plugin-sdk',
+      'sdk',
+      'vue',
+    ],
+    ['react', 'react-dom'],
   );
   run('pnpm', ['run', 'typecheck'], consumer);
   run('pnpm', ['run', 'build'], consumer);
@@ -442,6 +472,7 @@ if (controller.phase !== 'ready' || controller.dirty) {
   verifyVanillaTarballConsumer();
   verifyBridgeTarballConsumer('react');
   verifyBridgeTarballConsumer('vue');
+  verifyVueHostTarballConsumer();
 } finally {
   rmSync(temporaryRoot, { force: true, recursive: true });
 }
