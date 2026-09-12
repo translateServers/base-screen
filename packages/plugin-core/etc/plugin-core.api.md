@@ -482,13 +482,7 @@ export type BaseScreenPluginContribution = {
     readonly requiredCapability: string;
     readonly menus?: readonly BaseScreenPluginCommandMenu[];
     readonly shortcut?: string;
-} | {
-    readonly kind: 'dataResourceType';
-    readonly id: string;
-    readonly name: string;
-    readonly configSchema: BaseScreenMaterialObjectSchema;
-    readonly queryScope?: 'resource';
-} | {
+} | BaseScreenPluginDataResourceTypeContribution | {
     readonly kind: 'blueprintCapability';
     readonly id: string;
     readonly name: string;
@@ -503,6 +497,19 @@ export type BaseScreenPluginContribution = {
     readonly name: string;
     readonly tagName: string;
 };
+
+// @public
+export interface BaseScreenPluginDataResourceTypeContribution {
+    // (undocumented)
+    readonly configSchema: BaseScreenMaterialObjectSchema;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'dataResourceType';
+    // (undocumented)
+    readonly name: string;
+    readonly queryScope?: 'resource';
+}
 
 // @public (undocumented)
 export interface BaseScreenPluginDependency {
@@ -644,11 +651,10 @@ export interface BaseScreenPluginRuntime {
 // @public (undocumented)
 export interface BaseScreenRuntimeContributionIndex {
     // (undocumented)
-    getResourceType(resourceType: string): (BaseScreenPluginContribution & {
-        readonly kind: 'dataResourceType';
-    }) | undefined;
+    getResourceType(resourceType: string): BaseScreenPluginDataResourceTypeContribution | undefined;
     // (undocumented)
     hasBlueprintCapability(capability: string): boolean;
+    listResourceTypes?(): readonly BaseScreenPluginDataResourceTypeContribution[];
 }
 
 // @public (undocumented)

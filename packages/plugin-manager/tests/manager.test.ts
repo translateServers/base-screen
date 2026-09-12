@@ -369,6 +369,10 @@ describe('BaseScreenPluginManager', () => {
     expect(activated.value.contributions.hasBlueprintCapability('blueprint.value.variable')).toBe(
       true,
     );
+    const resourceTypes = activated.value.contributions.listResourceTypes?.();
+    expect(resourceTypes?.map((item) => item.id)).toEqual(['dataset']);
+    expect(resourceTypes?.[0]?.name).toBe('Dataset');
+    expect(Object.isFrozen(resourceTypes)).toBe(true);
     expect('resourceTypes' in activated.value.contributions).toBe(false);
     await manager.deactivate();
     expect(manager.snapshot).toBeUndefined();

@@ -522,6 +522,7 @@ export const DESIGNER_UI_TEXT = {
     none: '无',
     value: '值',
     resourceType: '资源类型',
+    resourceTypePlaceholder: '选择资源类型',
     resourceId: '资源 ID',
     params: '参数',
     resourceTypeUnavailable: '资源类型不可用，未保存修改。',

@@ -667,7 +667,7 @@ describe('plugin manifests and catalogs', () => {
         contributions: [
           {
             kind: 'dataResourceType',
-            id: 'acme.metric',
+            id: 'acme_metric',
             name: '指标',
             configSchema: { kind: 'object', properties: {}, required: [] },
             queryScope: 'resource',
@@ -680,7 +680,7 @@ describe('plugin manifests and catalogs', () => {
         contributions: [
           {
             kind: 'dataResourceType',
-            id: 'acme.metric',
+            id: 'acme_metric',
             name: '指标',
             configSchema: { kind: 'object', properties: {}, required: [] },
             queryScope: 'component',
@@ -697,6 +697,38 @@ describe('plugin manifests and catalogs', () => {
     if (!invalid.ok) {
       expect(
         invalid.diagnostics.some((item) => item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID'),
+      ).toBe(true);
+    }
+  });
+
+  it('requires dataResourceType ids to satisfy the document resourceType name pattern', () => {
+    const parse = (id: string) =>
+      parseBaseScreenPluginManifest(
+        pluginManifest({
+          contributions: [
+            {
+              kind: 'dataResourceType',
+              id,
+              name: '指标',
+              configSchema: { kind: 'object', properties: {}, required: [] },
+            },
+          ],
+        }),
+      );
+
+    expect(parse('acme_metric').ok).toBe(true);
+    const dotted = parse('acme.metric');
+    const leadingDigit = parse('2nd_metric');
+    expect(dotted.ok).toBe(false);
+    expect(leadingDigit.ok).toBe(false);
+    for (const rejected of [dotted, leadingDigit]) {
+      if (rejected.ok) continue;
+      expect(
+        rejected.diagnostics.some(
+          (item) =>
+            item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' &&
+            item.path.join('.') === 'contributions.0.id',
+        ),
       ).toBe(true);
     }
   });

@@ -74,7 +74,7 @@
 
 ### R9 承载面按贡献点接线
 
-Engine 承载面已接入 `pluginCatalog`、`pluginCommandPort`、`pluginPanels`、`inspectorControls` 与 `runtimeContributions`。蓝图能力经 `blueprintCapability` 由运行时贡献索引读取。数据资源类型的 Engine 侧承载尚未接线，属后续阶段。
+Engine 承载面已接入 `pluginCatalog`、`pluginCommandPort`、`pluginPanels`、`inspectorControls` 与 `runtimeContributions`。蓝图能力经 `blueprintCapability` 由运行时贡献索引读取。数据资源类型已接入 Engine 作者面：贡献索引可枚举授权类型，数据面板以选择器呈现并沿用事务期 `configSchema` 校验；`dataResourceType` id 必须满足文档 `resourceType` 命名模式。
 
 ## 6. 承载面现状
 
@@ -85,7 +85,7 @@ Engine 承载面已接入 `pluginCatalog`、`pluginCommandPort`、`pluginPanels`
 | `panel` | 已就位 | 已接线（`pluginPanels`） |
 | `inspectorControl` | 已就位 | 已接线（`inspectorControls`，遵循 ADR-0073 的 JSON-safe 约束） |
 | `blueprintCapability` | 已就位 | 已接线（蓝图画布桥读取运行时贡献） |
-| `dataResourceType` | 已就位 | 未接线（后续阶段） |
+| `dataResourceType` | 已就位 | 已接线（数据面板类型选择器与事务期 `configSchema` 校验） |
 
 ## 7. 验证与完成定义
 

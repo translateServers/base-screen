@@ -1,16 +1,13 @@
 import type {
   BaseScreenPluginCatalog,
-  BaseScreenPluginContribution,
+  BaseScreenPluginDataResourceTypeContribution,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 
 export function createRuntimeContributionIndex(
   plugins: BaseScreenPluginCatalog,
 ): BaseScreenRuntimeContributionIndex {
-  const resourceTypes = new Map<
-    string,
-    BaseScreenPluginContribution & { readonly kind: 'dataResourceType' }
-  >();
+  const resourceTypes = new Map<string, BaseScreenPluginDataResourceTypeContribution>();
   const blueprintCapabilities = new Set<string>();
   for (const plugin of plugins.list()) {
     for (const contribution of plugin.contributions) {
@@ -24,12 +21,18 @@ export function createRuntimeContributionIndex(
       }
     }
   }
+  const resourceTypeList: readonly BaseScreenPluginDataResourceTypeContribution[] = Object.freeze(
+    [...resourceTypes.values()].sort((first, second) => first.id.localeCompare(second.id)),
+  );
   return Object.freeze({
     getResourceType(resourceType: string) {
       return resourceTypes.get(resourceType);
     },
     hasBlueprintCapability(capability: string) {
       return blueprintCapabilities.has(capability);
+    },
+    listResourceTypes() {
+      return resourceTypeList;
     },
   });
 }

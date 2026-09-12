@@ -1,4 +1,4 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
@@ -10,7 +10,7 @@ import {
   renderDesignerDescriptorZone,
 } from '../descriptor/designer-descriptor-dom.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
-import { dataCapabilities } from './designer-data-source-model.js';
+import { dataCapabilities, listDataResourceTypes } from './designer-data-source-model.js';
 
 export function renderDesignerDataPanel(
   panel: HTMLElement | undefined,
@@ -63,12 +63,7 @@ export function renderDesignerDataPanel(
     );
   }
   if (capabilities.includes('host-resource')) {
-    appendDataInput(
-      panel,
-      DESIGNER_UI_TEXT.propertiesPanel.resourceType,
-      'resourceType',
-      source?.type === 'host-resource' ? source.resourceType : '',
-    );
+    appendResourceTypeField(panel, source, runtimeContributions);
     appendDataInput(
       panel,
       DESIGNER_UI_TEXT.propertiesPanel.resourceId,
@@ -110,6 +105,39 @@ export function renderDesignerDataPanel(
     catalog,
     getDatasetFields,
   });
+}
+
+function appendResourceTypeField(
+  parent: HTMLElement,
+  source: ScreenComponentNode['dataSource'],
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+): void {
+  const value = source?.type === 'host-resource' ? source.resourceType : '';
+  const resourceTypes = listDataResourceTypes(runtimeContributions);
+  if (resourceTypes === undefined) {
+    appendDataInput(parent, DESIGNER_UI_TEXT.propertiesPanel.resourceType, 'resourceType', value);
+    return;
+  }
+  const label = parent.ownerDocument.createElement('label');
+  label.className = 'designer-field designer-field-label';
+  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.resourceType;
+  const select = parent.ownerDocument.createElement('select');
+  select.className = 'designer-control designer-select';
+  select.dataset.dataSourceField = 'resourceType';
+  const placeholder = parent.ownerDocument.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = DESIGNER_UI_TEXT.propertiesPanel.resourceTypePlaceholder;
+  select.appendChild(placeholder);
+  for (const resourceType of resourceTypes) {
+    const option = parent.ownerDocument.createElement('option');
+    option.value = resourceType.id;
+    option.textContent = resourceType.name;
+    option.selected = resourceType.id === value;
+    select.appendChild(option);
+  }
+  label.appendChild(select);
+  appendDesignerFieldMessage(label, select, 'data-resourceType');
+  parent.appendChild(label);
 }
 
 function appendDataInput(

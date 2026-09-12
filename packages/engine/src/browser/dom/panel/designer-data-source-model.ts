@@ -9,6 +9,7 @@ import { parseScreenJsonValue } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
+  BaseScreenPluginDataResourceTypeContribution,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 
@@ -44,7 +45,7 @@ export function readDataSourceFields(
   const type = panel.querySelector<HTMLSelectElement>('[data-data-source-type]')?.value;
   if (type === undefined) return undefined;
   const value = (field: string) =>
-    panel.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+    panel.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(
       `[data-data-source-field="${field}"]`,
     )?.value ?? '';
   const source = component.dataSource;
@@ -81,6 +82,18 @@ export function getResourceType(
 ) {
   try {
     return runtimeContributions?.getResourceType(resourceType);
+  } catch {
+    return undefined;
+  }
+}
+
+/** 枚举当前授权的数据资源类型贡献；索引未实现枚举（宿主自建最小索引）时返回 undefined，
+ *  调用方应退回自由文本输入，保持与旧索引的兼容。 */
+export function listDataResourceTypes(
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+): readonly BaseScreenPluginDataResourceTypeContribution[] | undefined {
+  try {
+    return runtimeContributions?.listResourceTypes?.();
   } catch {
     return undefined;
   }

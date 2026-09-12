@@ -37,6 +37,7 @@ export {
   parseScreenDocument,
   parseScreenProjectEnvelope,
 } from './document/parse.js';
+export { VARIABLE_NAME_PATTERN } from './document/schema.js';
 export {
   ScreenSerializationError,
   serializeScreenDocument,

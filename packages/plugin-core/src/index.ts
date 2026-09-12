@@ -36,6 +36,7 @@ export type {
   BaseScreenPluginCommandHandler,
   BaseScreenPluginCommandMenu,
   BaseScreenPluginContribution,
+  BaseScreenPluginDataResourceTypeContribution,
   BaseScreenPluginDependency,
   BaseScreenPluginDesignSnapshot,
   BaseScreenPluginInspectorControlCatalog,

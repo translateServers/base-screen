@@ -4,6 +4,7 @@ import {
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
+  VARIABLE_NAME_PATTERN,
 } from '@base-screen/contracts';
 import {
   type BaseScreenPluginManifest,
@@ -303,6 +304,18 @@ function validateContribution(
       );
       validateContributionIdentityFields(contribution, path, collector, ['id']);
       validateDisplayName(contribution.name, [...path, 'name'], collector);
+      // dataResourceType id 会被写进文档 dataSource.resourceType，必须满足文档契约的
+      // 命名模式（contracts 的 VARIABLE_NAME_PATTERN），否则作者期合法、提交文档时才失败。
+      if (
+        typeof contribution.id === 'string' &&
+        new RegExp(VARIABLE_NAME_PATTERN).test(contribution.id) === false
+      ) {
+        collector.add(
+          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          [...path, 'id'],
+          'dataResourceType id must match the screen variable name pattern so it can be stored as dataSource.resourceType.',
+        );
+      }
       const schema = validatePropsSchema(
         contribution.configSchema,
         [...path, 'configSchema'],

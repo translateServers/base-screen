@@ -268,6 +268,13 @@
   `update-components` props/style 事务，撤销与 dirty 语义自动继承；读回值必须 JSON-safe，否则视为未编辑。
   不放开 `data`/`interaction` target，不提供变更订阅。已知盲区：`validateControlForSchema` 对无法解析的
   path 提前返回，因此绑到不存在的 props 路径不会在校验期报错（既有行为，对所有控件一致）。
+- **数据资源类型作者面承载**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md) R9）：
+  `kind: 'dataResourceType'` 贡献进入 Engine 作者面——运行时贡献索引支持 `listResourceTypes()` 枚举，
+  属性面板宿主资源数据源以授权类型选择器呈现（索引不可枚举时回退文本输入），事务期与渲染期继续按
+  `configSchema` 校验参数。`dataResourceType` id 收敛到文档 `resourceType` 命名模式
+  （`VARIABLE_NAME_PATTERN`，由 contracts 导出），不满足模式的清单在解析期失败关闭，杜绝
+  "作者期合法、提交文档才失败"的裂缝。渲染器侧补齐未知资源类型 `PLUGIN_CORE_CONTRIBUTION_UNKNOWN`
+  的回归测试。
 
 ## 历史迁移
 

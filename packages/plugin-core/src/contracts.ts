@@ -214,6 +214,17 @@ export type BaseScreenPluginCommandMenu =
   | 'context.component'
   | 'context.multi';
 
+/** 声明一类宿主资源的数据资源类型：id 进入文档 `resourceType`，configSchema 约束其参数。 */
+export interface BaseScreenPluginDataResourceTypeContribution {
+  readonly kind: 'dataResourceType';
+  readonly id: string;
+  readonly name: string;
+  readonly configSchema: BaseScreenMaterialObjectSchema;
+  /** 显式共享声明（Data Runtime Hardening / DRH-R2）：仅 'resource' 开启同实例
+   *  in-flight 共享；缺省为组件域，不共享。仅作声明，不含其它运行时语义。 */
+  readonly queryScope?: 'resource';
+}
+
 export type BaseScreenPluginContribution =
   | { readonly kind: 'material'; readonly type: string; readonly tagName: string }
   | {
@@ -226,15 +237,7 @@ export type BaseScreenPluginContribution =
       /** 与内建操作或工具 chord 冲突时忽略快捷键，命令仍可通过菜单或面板调用。 */
       readonly shortcut?: string;
     }
-  | {
-      readonly kind: 'dataResourceType';
-      readonly id: string;
-      readonly name: string;
-      readonly configSchema: BaseScreenMaterialObjectSchema;
-      /** 显式共享声明（Data Runtime Hardening / DRH-R2）：仅 'resource' 开启同实例
-       *  in-flight 共享；缺省为组件域，不共享。仅作声明，不含其它运行时语义。 */
-      readonly queryScope?: 'resource';
-    }
+  | BaseScreenPluginDataResourceTypeContribution
   | { readonly kind: 'blueprintCapability'; readonly id: string; readonly name: string }
   | {
       readonly kind: 'panel';
@@ -252,10 +255,11 @@ export type BaseScreenPluginContribution =
     };
 
 export interface BaseScreenRuntimeContributionIndex {
-  getResourceType(
-    resourceType: string,
-  ): (BaseScreenPluginContribution & { readonly kind: 'dataResourceType' }) | undefined;
+  getResourceType(resourceType: string): BaseScreenPluginDataResourceTypeContribution | undefined;
   hasBlueprintCapability(capability: string): boolean;
+  /** 枚举当前生效的数据资源类型贡献，供作者面生成类型选择器。
+   *  可选：宿主自建的最小索引可以只实现按 id 查询，消费方须容忍缺失。 */
+  listResourceTypes?(): readonly BaseScreenPluginDataResourceTypeContribution[];
 }
 
 export interface BaseScreenPluginManifest {

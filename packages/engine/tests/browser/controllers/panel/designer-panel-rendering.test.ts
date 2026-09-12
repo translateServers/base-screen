@@ -8,6 +8,7 @@ import {
   catalog,
   descendants,
   document,
+  enumerableResourceAuthority,
   FakeDocument,
   groupCatalog,
   imageCatalog,
@@ -519,5 +520,51 @@ describe('designer panel rendering', () => {
         .filter((element) => element.tagName === 'option')
         .map((element) => element.value),
     ).toEqual(['none', 'static', 'host-resource']);
+  });
+
+  it('R9 renders a resource type picker from enumerated contributions and falls back to text input', () => {
+    const ownerDocument = new FakeDocument();
+    const withPicker = ownerDocument.createElement('div');
+    const withFallback = ownerDocument.createElement('div');
+    const hostResourceDocument = document({
+      type: 'host-resource',
+      resourceType: 'asset',
+      resourceId: 'product-42',
+      params: {},
+      binding: null,
+    });
+
+    renderDesignerDataPanel(
+      withPicker as unknown as HTMLElement,
+      hostResourceDocument,
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      catalog(),
+      true,
+      enumerableResourceAuthority(),
+    );
+    renderDesignerDataPanel(
+      withFallback as unknown as HTMLElement,
+      hostResourceDocument,
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      catalog(),
+      true,
+      resourceAuthority(),
+    );
+
+    const picker = descendants(withPicker).find(
+      (element) => element.dataset.dataSourceField === 'resourceType',
+    );
+    expect(picker?.tagName).toBe('select');
+    const options = picker?.children ?? [];
+    expect(options.map((option) => option.value)).toEqual(['', 'asset']);
+    expect(options[0]?.textContent).toBe('选择资源类型');
+    expect(options[1]?.textContent).toBe('资源');
+    expect(options[1]?.selected).toBe(true);
+
+    const fallback = descendants(withFallback).find(
+      (element) => element.dataset.dataSourceField === 'resourceType',
+    );
+    expect(fallback?.tagName).toBe('input');
+    expect(fallback?.value).toBe('asset');
   });
 });

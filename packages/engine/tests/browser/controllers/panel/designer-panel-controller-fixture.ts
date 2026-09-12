@@ -209,6 +209,21 @@ export function resourceAuthority(): BaseScreenRuntimeContributionIndex {
   };
 }
 
+/** 支持枚举的宿主索引形态（与 plugin-manager 快照一致），用于钉住资源类型选择器渲染。 */
+export function enumerableResourceAuthority(): BaseScreenRuntimeContributionIndex {
+  const resourceType = {
+    kind: 'dataResourceType',
+    id: 'asset',
+    name: '资源',
+    configSchema: { kind: 'object', properties: {}, required: [] },
+  } as const;
+  return {
+    getResourceType: (candidate) => (candidate === resourceType.id ? resourceType : undefined),
+    hasBlueprintCapability: () => false,
+    listResourceTypes: () => [resourceType],
+  };
+}
+
 export function descendants(element: FakeElement): FakeElement[] {
   return element.children.flatMap((child) => [child, ...descendants(child)]);
 }

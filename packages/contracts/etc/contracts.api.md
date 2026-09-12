@@ -1326,6 +1326,9 @@ export function serializeScreenDocument(document: ScreenDocument): string;
 // @public (undocumented)
 export function validateScreenDesignerHostAdapter(input: unknown): ScreenParseResult<ScreenDesignerHostAdapter>;
 
+// @public (undocumented)
+export const VARIABLE_NAME_PATTERN = "^[A-Za-z_][A-Za-z0-9_]{0,127}$";
+
 // (No @packageDocumentation comment for this package)
 
 ```
