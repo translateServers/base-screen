@@ -27,7 +27,7 @@
 
 ## 后续阶段
 
-- [ ] 声明与接线收敛：六类贡献点的声明形态与 Engine 接线对齐
+- [x] 声明与接线收敛：六类贡献点的声明形态与 Engine 接线对齐——`createPluginRegistration` 把 custom element 注册与 manager 输入组装收敛为一次调用（冲突预检先于第一个 define，幂等重放放行）；`createCommandPort` 选项真正可选，缺键与显式 undefined 同义
 - [x] `dataResourceType` 的 Engine 侧承载接线（R9）：贡献索引支持枚举，数据面板渲染授权类型选择器（无枚举时回退文本输入）；`dataResourceType` id 收敛到文档 `resourceType` 命名模式；渲染器补 `PLUGIN_CORE_CONTRIBUTION_UNKNOWN` 回归测试
 - [ ] 失败爆炸半径收敛：单个插件失败不影响其他插件与核心库目录
 - [ ] 懒激活：按贡献点实际使用时机激活，避免启动期全量激活

@@ -101,6 +101,7 @@ export {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from './material/material.js';
+export { isValidCustomElementName } from './material/material-validation-utils.js';
 export {
   parseBaseScreenPluginManifest,
   parseBaseScreenPluginPanelActionDetail,

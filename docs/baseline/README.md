@@ -275,6 +275,14 @@
   （`VARIABLE_NAME_PATTERN`，由 contracts 导出），不满足模式的清单在解析期失败关闭，杜绝
   "作者期合法、提交文档才失败"的裂缝。渲染器侧补齐未知资源类型 `PLUGIN_CORE_CONTRIBUTION_UNKNOWN`
   的回归测试。
+- **插件注册编排与可选端口**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md)）：
+  `@base-screen/plugin-sdk` 新增 `createPluginRegistration`——创建期完成输入校验、runtime 规范化与
+  计划内 tag 冲突检查，`define()` 先对注册表做整体冲突预检（任何冲突发生在第一个 define 之前，
+  同构造函数重放视为幂等），随后统一注册插件包物料、宿主物料与面板/控件元素，返回值直接作为
+  `createBaseScreenPluginManager` 的 `plugins` 与 `standaloneMaterialTagNames`。宿主不再手工维护
+  "注册一处、清单一处"的两份账，也不再自建冲突校验；类型/身份级冲突仍由 manager preflight 裁决。
+  `createCommandPort` 选项真正可选：缺键与显式 `undefined` 同义，仅授予 `command.execute` 时才需要
+  提供工厂。
 
 ## 历史迁移
 

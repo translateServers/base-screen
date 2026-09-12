@@ -100,7 +100,6 @@ function readOptions(
     'plugins',
     'grantedCapabilities',
     'registry',
-    'createCommandPort',
   ] as const;
   const values: Record<string, unknown> = {};
   for (const field of fields) {
@@ -115,7 +114,18 @@ function readOptions(
       values[field] = descriptor.value;
     }
   }
-  // 可选工厂：缺键即无端口，与显式 undefined 同义；能力门控已负责拒绝无工厂的 design.read。
+  // 可选工厂：缺键即无端口，与显式 undefined 同义；能力门控已负责拒绝无工厂的
+  // command.execute 与 design.read。
+  const readCommandPort = Object.getOwnPropertyDescriptor(value, 'createCommandPort');
+  if (readCommandPort !== undefined && !Object.hasOwn(readCommandPort, 'value')) {
+    diagnostics.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['createCommandPort'],
+      'Manager option must be an own data property.',
+    );
+  } else {
+    values.createCommandPort = readCommandPort?.value;
+  }
   const readPort = Object.getOwnPropertyDescriptor(value, 'createDesignReadPort');
   if (readPort !== undefined && !Object.hasOwn(readPort, 'value')) {
     diagnostics.add(

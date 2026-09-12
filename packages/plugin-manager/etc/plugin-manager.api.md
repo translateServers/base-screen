@@ -41,8 +41,7 @@ export interface BaseScreenPluginManager {
 
 // @public (undocumented)
 export interface BaseScreenPluginManagerOptions {
-    // (undocumented)
-    readonly createCommandPort: ((input: {
+    readonly createCommandPort?: ((input: {
         readonly instanceId: string;
         readonly pluginId: string;
     }) => PluginCommandPort) | undefined;

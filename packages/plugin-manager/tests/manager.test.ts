@@ -116,6 +116,20 @@ describe('BaseScreenPluginManager', () => {
     expect(hooks).toBe(0);
   });
 
+  it('activates plugins without any command capability when createCommandPort is omitted', async () => {
+    const options: Record<string, unknown> = { ...managerOptions([runtime(pluginManifest())]) };
+    delete options.createCommandPort;
+    const manager = createBaseScreenPluginManager(
+      options as unknown as Parameters<typeof createBaseScreenPluginManager>[0],
+    );
+
+    const activated = await manager.activate();
+    expect(activated.ok).toBe(true);
+    if (!activated.ok) return;
+    expect(activated.value.plugins.get('acme.plugin')).toBeDefined();
+    await manager.deactivate();
+  });
+
   it('activates dependencies in deterministic order then atomically publishes catalogs', async () => {
     const log: string[] = [];
     const material = materialManifest();

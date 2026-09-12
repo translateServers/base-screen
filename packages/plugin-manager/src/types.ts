@@ -39,7 +39,8 @@ export interface BaseScreenPluginManagerOptions {
   readonly plugins: readonly BaseScreenPluginRuntime[];
   readonly grantedCapabilities: Readonly<Record<string, readonly string[]>>;
   readonly registry: BaseScreenCustomElementRegistryPort;
-  readonly createCommandPort:
+  /** 可选：仅当插件声明 `command.execute` 能力时才必须有对应工厂；缺省等价于显式 undefined。 */
+  readonly createCommandPort?:
     | ((input: { readonly instanceId: string; readonly pluginId: string }) => PluginCommandPort)
     | undefined;
   readonly createDesignReadPort?:

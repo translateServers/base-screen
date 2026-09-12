@@ -687,6 +687,9 @@ export function createBaseScreenPluginInspectorControlCatalog(entries: readonly 
 // @public (undocumented)
 export function createBaseScreenPluginPanelCatalog(entries: readonly BaseScreenPluginPanelCatalogEntry[]): BaseScreenPluginPanelCatalog;
 
+// @public
+export function isValidCustomElementName(tagName: unknown): boolean;
+
 // @public (undocumented)
 export const MAX_EDITOR_CONDITION_VALUES = 16;
 

@@ -984,6 +984,35 @@ capability 限制的是 Base Screen 集成点，不是 JavaScript 环境权限�
 
 作者用 `@base-screen/plugin-sdk` 声明插件；宿主激活后把 snapshot 交给 Viewer/Designer：
 
+custom element 注册与插件输入的组装可以用 `createPluginRegistration` 收敛为一次调用：它先对
+全部待注册 tag（插件包物料、宿主物料、面板/控件元素）做整体冲突预检——任何冲突都发生在第一个
+`define()` 之前，已注册为同一构造函数视为幂等重放——然后统一注册，返回值直接展开为
+`createBaseScreenPluginManager` 的 `plugins` 与 `standaloneMaterialTagNames`：
+
+```ts
+import { createPluginRegistration } from '@base-screen/plugin-sdk';
+
+const registration = createPluginRegistration({
+  plugins: [defined.value],
+  materials: [hostOwnedMaterialPackage],
+  elements: [
+    { tagName: 'acme-monitor-panel', element: AcmeMonitorPanelElement },
+  ],
+});
+const registered = registration.define();
+if (!registered.ok) throw new Error('Plugin registration failed');
+
+const manager = createBaseScreenPluginManager({
+  instanceId: 'screen-a',
+  standaloneMaterialTagNames: registered.value.standaloneMaterialTagNames,
+  plugins: registered.value.plugins,
+  // ...
+});
+```
+
+不使用编排辅助时，按下一例手工装配；`createCommandPort` 只在授予 `command.execute` 时需要，
+未授予可直接省略：
+
 ```ts
 import { definePlugin, createPluginPackage } from '@base-screen/plugin-sdk';
 import type { PluginCommandPort, PluginDesignReadPort } from '@base-screen/plugin-core';
