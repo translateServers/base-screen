@@ -19,7 +19,7 @@
 
 | 方向 | 说明 | 前置/触发条件 | 相关材料 |
 | --- | --- | --- | --- |
-| 外围插件承载（P0–P6） | 把带第三方依赖的渲染类能力与功能类能力移出核心库，经顶层 `plugins/` 以插件交付；核心库 12 包与依赖白名单不变 | 已有 ADR-0074 与生效中的[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md)；后续阶段按 Spec 推进 | [设计评审](../plans/plugin-architecture-evolution/design-review.md)、[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md) |
+| ~~外围插件承载（P0–P6）~~（已交付，2026-09-12） | 六个阶段全部完成并归档：[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md)、[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、[ADR-0075](../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md) | 已完成 | [设计评审](../plans/plugin-architecture-evolution/design-review.md) |
 | 画布背景宿主资源 | 背景图片改为 static/host-resource 判别 source，并复用宿主资源 Tab | 用户计划明确独立第二阶段；需单独公共契约 Spec，数据库转换与部署另行授权 | [ADR-0064](../decisions/ADR-0064-host-resource-authoring-intent.md) |
 | 宿主侧项目/数据/发布能力 | 项目持久化、数据查询/聚合、资产存储、发布部署与长任务，按轻量基座边界归宿主实现 | 宿主侧立项，有明确业务容量 | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) |
 | Blueprint 扩展节点 | 一体化工作台已由 Base Screen 提供语义壳层、宿主提供中央图形；未来只在 canonical 需求成立时评估分组、过滤、模板或新控制流 | 先扩展 canonical Spec；不得由宿主 metadata 或私有 Store 旁路实现 | [Designer Blueprint Workbench](../specs/archive/designer-blueprint-workbench/spec.md)、[ADR-0063](../decisions/ADR-0063-designer-blueprint-workbench-shell.md) |

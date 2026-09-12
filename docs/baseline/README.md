@@ -268,14 +268,14 @@
   `update-components` props/style 事务，撤销与 dirty 语义自动继承；读回值必须 JSON-safe，否则视为未编辑。
   不放开 `data`/`interaction` target，不提供变更订阅。已知盲区：`validateControlForSchema` 对无法解析的
   path 提前返回，因此绑到不存在的 props 路径不会在校验期报错（既有行为，对所有控件一致）。
-- **数据资源类型作者面承载**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md) R9）：
+- **数据资源类型作者面承载**（2026-09-12，[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md) R9）：
   `kind: 'dataResourceType'` 贡献进入 Engine 作者面——运行时贡献索引支持 `listResourceTypes()` 枚举，
   属性面板宿主资源数据源以授权类型选择器呈现（索引不可枚举时回退文本输入），事务期与渲染期继续按
   `configSchema` 校验参数。`dataResourceType` id 收敛到文档 `resourceType` 命名模式
   （`VARIABLE_NAME_PATTERN`，由 contracts 导出），不满足模式的清单在解析期失败关闭，杜绝
   "作者期合法、提交文档才失败"的裂缝。渲染器侧补齐未知资源类型 `PLUGIN_CORE_CONTRIBUTION_UNKNOWN`
   的回归测试。
-- **插件注册编排与可选端口**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md)）：
+- **插件注册编排与可选端口**（2026-09-12，[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md)）：
   `@base-screen/plugin-sdk` 新增 `createPluginRegistration`——创建期完成输入校验、runtime 规范化与
   计划内 tag 冲突检查，`define()` 先对注册表做整体冲突预检（任何冲突发生在第一个 define 之前，
   同构造函数重放视为幂等），随后统一注册插件包物料、宿主物料与面板/控件元素，返回值直接作为
@@ -283,14 +283,14 @@
   "注册一处、清单一处"的两份账，也不再自建冲突校验；类型/身份级冲突仍由 manager preflight 裁决。
   `createCommandPort` 选项真正可选：缺键与显式 `undefined` 同义，仅授予 `command.execute` 时才需要
   提供工厂。
-- **插件失败爆炸半径收敛**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md)）：
+- **插件失败爆炸半径收敛**（2026-09-12，[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md)）：
   激活原子性从"全部插件整体回滚"收敛为**每插件原子**——可归因到单插件的预检失败（清单解析、
   能力授权、registry 解析、跨插件冲突）只排除该插件；跨插件冲突按稳定顺序 first-wins，后声明方
   失败；运行期 `activate()` 失败只失效自身会话并级联其声明依赖方，已激活插件与核心目录不受影响。
   `snapshot.failures` 逐插件记录 `{ index, pluginId, diagnostics }`；宿主自营物料
   （`standaloneMaterialTagNames`）解析失败仍是全局门，整体保持未激活。宿主如需"全或无"语义，
   可在 activate 后检查 `failures` 并自行 deactivate。
-- **插件懒激活**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md)）：
+- **插件懒激活**（2026-09-12，[外围插件分区 Spec](../specs/archive/peripheral-plugin-partition/spec.md)）：
   `createBaseScreenPluginManager` 新增 `activation: 'lazy'` 模式与 `ensureActive(pluginId)`。
   lazy 模式下 activate() 只完成预检与目录发布（授权语义与 eager 完全一致，目录与命令面板立即可见），
   插件 activate 钩子推迟到其贡献命令或面板动作首次经 manager 使用时按依赖拓扑序运行，

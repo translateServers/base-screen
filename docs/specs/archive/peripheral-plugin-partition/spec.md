@@ -1,9 +1,9 @@
 # Peripheral Plugin Partition Spec
 
-> 状态：生效中
+> 状态：已完成（2026-09-12 归档）
 > 最近更新：2026-09-12
 > 定位：把「能力由插件承载」落到可执行的分区与承载面上——核心库保持零第三方依赖，第三方依赖只以逐插件显式申报的方式存在于外围插件区
-> 依据：[ADR-0074](../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)（已接受）、[ADR-0019](../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)（已接受）、[ADR-0073](../../decisions/ADR-0073-inspector-custom-form-controls.md)（已接受）
+> 依据：[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)（已接受）、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)（已接受）、[ADR-0073](../../../decisions/ADR-0073-inspector-custom-form-controls.md)（已接受）
 
 ## 1. 生效条件
 
@@ -91,10 +91,5 @@ Engine 承载面已接入 `pluginCatalog`、`pluginCommandPort`、`pluginPanels`
 
 已通过的静态门禁：`check:docs`、`check:boundaries`、`check:packages`、`check:api`、`format:check`、`lint`，以及 material / plugin-sdk / engine / plugin-core / plugin-manager / plugin-echarts 各包测试。
 
-仍未闭环、需在执行环境具备后补齐：
-
-- 在普通 shell 执行 `pnpm install`（当前会话沙箱无法创建符号链接），使 `plugins/plugin-echarts` 可经 pnpm 构建与测试。
-- 执行 `pnpm verify:browser`，验证 harness 侧 `harness.semantic-chart` 与原 `base.echarts` 断言等价。
-- 全量 `pnpm verify:m0`。
-
-本 Spec 的全部任务与清单项完成后，须在同一交付批次移入 `docs/specs/archive/` 并更新索引、Baseline 与引用。
+环境待办（普通 shell 的 pnpm install、verify:browser 与全量 verify:m0）已于 2026-09-12 补齐并通过；
+本 Spec 的全部任务与清单项于 2026-09-12 完成，同一批次移入 docs/specs/archive/ 并更新索引、Baseline 与引用。

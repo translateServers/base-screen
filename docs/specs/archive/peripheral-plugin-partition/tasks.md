@@ -31,10 +31,10 @@
 - [x] `dataResourceType` 的 Engine 侧承载接线（R9）：贡献索引支持枚举，数据面板渲染授权类型选择器（无枚举时回退文本输入）；`dataResourceType` id 收敛到文档 `resourceType` 命名模式；渲染器补 `PLUGIN_CORE_CONTRIBUTION_UNKNOWN` 回归测试
 - [x] 失败爆炸半径收敛：单个插件失败不影响其他插件与核心库目录——可归因到单插件的预检失败（清单解析、能力授权、registry 解析、跨插件冲突的 first-wins 后声明方）只排除该插件并级联其依赖方；运行期 `activate` 失败同样只失效自身会话；快照新增 `failures` 记录，宿主自营物料解析失败仍为全局门
 - [x] 懒激活：按贡献点实际使用时机激活，避免启动期全量激活——manager 新增 `activation: lazy` 模式与 `ensureActive` 显式触发：预检与目录发布保持一次完成（授权不放松），插件 activate 钩子推迟到其贡献命令/面板动作首次经 manager 使用或显式 ensureActive 时按拓扑序运行；懒激活失败记入 snapshot.failures 并拒绝重试
-- [ ] UI 与命令承载面采纳：把既有内建面板与命令逐步外包给插件通道
+- [x] UI 与命令承载面采纳（按评审 P4 验收口径：外移能力在 command、panel、inspectorControl 三面真实落地）——plugin-echarts 新增 toggle-series-type 命令（design.read 读现状 + 可撤销 update-components 写回）、图表概览面板（面板动作回调自身命令）与 editorDescriptor 声明的系列类型自定义控件（inspectorControl 贡献授权），并接入 browser-harness manager 与授权
 - [x] 条件内核表驱动：以数据表替换条件分支堆积——resolver 的能力判定收敛为声明表`PLUGIN_CAPABILITY_DESCRIPTORS`（id + port 工厂要求 + blueprint 标记），能力授权、端口兼容性与 blueprintCapability 贡献校验都查同一张表，新增能力只改一处；贡献判别联合的类型化 switch 按评审 P5 的触发条件保持门控（出现第 7 类贡献时再表驱动化）
-- [ ] 兼容性设计（需用户明确批准后启动）
+- [x] 兼容性设计（用户 2026-09-12 批准启动）——[ADR-0075](../../../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)：锁步批次交付 + 以 api 基线治理的 plugin-core/plugin-sdk 稳定子集，运行期契约不匹配失败关闭且可观察；不引入版本标记
 
 ## 收尾
 
-- [ ] 全部任务完成后，同一批次移入 `docs/specs/archive/` 并更新索引、Baseline 与引用
+- [x] 全部任务完成后，同一批次移入 `docs/specs/archive/` 并更新索引、Baseline 与引用（2026-09-12）

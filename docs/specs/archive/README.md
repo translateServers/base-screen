@@ -16,6 +16,7 @@
 
 | 归档规格 | 后继依据 | 归档日期 |
 | --- | --- | --- |
+| [外围插件分区](./peripheral-plugin-partition/spec.md) | 已完成（2026-09-12，含后续阶段全部任务） | 2026-09-12 |
 | [DataV Global Variables](./datav-global-variables/spec.md) | 已完成；[ADR-0068](../../decisions/ADR-0068-datav-global-variables.md) | 2026-09-03 |
 | [DataV-Inspired Global Variables](./datav-inspired-global-variables/spec.md) | 由 [ADR-0068](../../decisions/ADR-0068-datav-global-variables.md) 取代 | 2026-09-01 |
 | [Host Resource Authoring](./host-resource-authoring/spec.md) | 已完成；[ADR-0064](../../decisions/ADR-0064-host-resource-authoring-intent.md) | 2026-08-31 |
