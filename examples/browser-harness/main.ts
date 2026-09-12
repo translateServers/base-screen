@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { h } from 'vue';
+import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '../../packages/contracts/src/index.ts';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
@@ -53,6 +54,10 @@ import {
   type ScreenAuthoringRequest,
 } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
+import {
+  createPluginEchartsRuntime,
+  registerPluginEcharts,
+} from '../../plugins/plugin-echarts/src/index.ts';
 import { mountFeatureCases } from './feature-cases.ts';
 import {
   defineHarnessInspectorFixtures,
@@ -82,6 +87,7 @@ if (harnessSearch.has('designer') || harnessSearch.has('case') || harnessSearch.
 const productElements = defineBaseScreenElements();
 // 面板标签必须在 manager 激活前注册：preflight 会按贡献声明的 tagName 查询宿主 registry。
 defineHarnessPluginPanel();
+registerPluginEcharts();
 defineHarnessInspectorFixtures();
 const officialMaterials = [
   defineBaseScreenTextMaterial(),
@@ -102,18 +108,7 @@ if (!productElements.ok || officialMaterials.some((definition) => !definition.ok
   );
 }
 
-const designerAuthoringCapabilities = [
-  'blueprint.trigger.material-event',
-  'blueprint.trigger.variable-event',
-  'blueprint.value.event-payload',
-  'blueprint.value.variable',
-  'blueprint.condition.compare',
-  'blueprint.action.set-variable',
-  'blueprint.action.emit-host-event',
-  'blueprint.action.component-visibility',
-  'blueprint.action.request-variable',
-  'blueprint.action.request-component-data',
-] as const;
+const designerAuthoringCapabilities = SCREEN_BLUEPRINT_CAPABILITY_IDS;
 // command.execute 与 design.read 单独声明：下面的 blueprintCapability 贡献由
 // designerAuthoringCapabilities 逐项生成，混入端口能力会产出非法的蓝图能力贡献。
 const designerAuthoringPluginCapabilities = [
@@ -243,8 +238,9 @@ const pluginManager = createBaseScreenPluginManager({
   standaloneMaterialTagNames: officialMaterials
     .filter((definition) => definition.ok)
     .map((definition) => definition.value.manifest.tagName),
-  plugins: [designerAuthoringPlugin],
+  plugins: [designerAuthoringPlugin, createPluginEchartsRuntime()],
   grantedCapabilities: { 'browser-harness-authoring': designerAuthoringPluginCapabilities },
+  'base-screen.echarts': ['command.execute', 'design.read'],
   registry: {
     get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
   },
