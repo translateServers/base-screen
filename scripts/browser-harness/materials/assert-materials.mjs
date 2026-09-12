@@ -135,7 +135,9 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       accessibility.transition !== '0s' ||
       accessibility.glyphWidth !== 16 ||
       accessibility.height !== 28 ||
-      !accessibility.title.endsWith('（3 个物料）') ||
+      // data 分组含子孙：base.chart + plugin.echarts（charts）、
+      // harness.semantic-chart（advanced）、base.table（tables），共 4 个。
+      !accessibility.title.endsWith('（4 个物料）') ||
       accessibility.description !== accessibility.title ||
       accessibility.countWidth !== 24
     ) {
@@ -415,22 +417,24 @@ export async function assertMaterialGroupUpdates(page, designer) {
   });
   const count = () =>
     designer.locator('[data-material-group-current="library"] .material-group-count').textContent();
-  if ((await count()) !== '10' || (await designer.locator('[data-material-card]').count()) !== 11)
+  // 类型数 = 目录中可见类型（11，含 plugin.echarts）；卡片数 = 2 条 base.text 条目 +
+  // 其余 10 个类型各一条 = 12。
+  if ((await count()) !== '11' || (await designer.locator('[data-material-card]').count()) !== 12)
     throw new Error('MATERIAL_GROUP_TYPE_VS_ITEM_COUNT_FAILED');
   await designer.locator('[data-material-search]').fill('Alpha');
   await designer.locator('[data-material-search-clear]').waitFor({ state: 'visible' });
   if (
     (await designer.locator('[data-material-card]:not([hidden])').count()) !== 1 ||
-    (await count()) !== '10'
+    (await count()) !== '11'
   )
     throw new Error('MATERIAL_GROUP_SEARCH_CHANGED_COUNT');
   await designer.locator('[data-material-favorite="text:one"]').click();
   await designer.locator('[data-material-filter="favorite"]').click();
-  if ((await count()) !== '10') throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
+  if ((await count()) !== '11') throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
   await designer.locator('[data-material-search-clear]').click();
   await designer.locator('[data-material-filter="recent"]').click();
   const empty = designer.locator('[data-material-search-empty]');
-  if (!(await empty.isVisible()) || (await count()) !== '10')
+  if (!(await empty.isVisible()) || (await count()) !== '11')
     throw new Error('MATERIAL_GROUP_EMPTY_STATE_FAILED');
   const emptyBounds = await empty.boundingBox();
   const resultsBounds = await designer.locator('.material-library-results').boundingBox();
@@ -561,7 +565,7 @@ export async function assertMaterialGroupUsability(page, designer) {
     reset.query !== '' ||
     reset.allGroups !== 'true' ||
     reset.allItems !== 'true' ||
-    reset.visible !== 10 ||
+    reset.visible !== 11 ||
     !reset.emptyHidden
   )
     throw new Error(`MATERIAL_GROUP_EMPTY_RECOVERY_FAILED:${JSON.stringify(reset)}`);
@@ -703,6 +707,8 @@ async function assertMaterialLibraryGrouping(page, designer) {
     'base.image',
     'base.chart',
     'harness.semantic-chart',
+    // 外围插件贡献的物料也进目录与物料库，故与官方/宿主物料同列断言。
+    'plugin.echarts',
     'base.table',
     'harness.react-button',
     'harness.vue-button',
@@ -739,7 +745,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     ![1, 2, 3].includes(rootState.visual.firstRowCardCount) ||
     rootState.visual.panelCountRole !== 'status' ||
     rootState.visual.panelCountLive !== 'polite' ||
-    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a10 \u9879' ||
+    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a11 \u9879' ||
     rootState.visual.searchDescribedBy !== 'designer-left-panel-count'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ROOT_FAILED:${JSON.stringify(rootState)}`);
@@ -779,7 +785,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
   if (
     dataGroup.selected !== 'true' ||
     dataGroup.children.join(',') !== 'charts,tables' ||
-    dataGroup.visible.join(',') !== 'base.chart,harness.semantic-chart,base.table' ||
+    dataGroup.visible.join(',') !== 'base.chart,harness.semantic-chart,plugin.echarts,base.table' ||
     dataGroup.gridTop !== rootState.gridTop
   ) {
     throw new Error(
@@ -838,7 +844,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     sibling: element.shadowRoot.querySelector('[data-material-group="tables"]') !== null,
   }));
   if (
-    chartsGroup.visible.join(',') !== 'base.chart,harness.semantic-chart' ||
+    chartsGroup.visible.join(',') !== 'base.chart,harness.semantic-chart,plugin.echarts' ||
     chartsGroup.parent !== 'true' ||
     !chartsGroup.sibling
   ) {
@@ -878,7 +884,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     !dynamic.sameCanvas ||
     dynamic.groups.join(',') !== 'bridges,foundation,data,best-practices' ||
     dynamic.cards.join(',') !==
-      'harness.react-button,harness.vue-button,base.text,base.rectangle,base.ellipse,base.image,base.chart,harness.semantic-chart,base.table,harness.dataset-ranking'
+      'harness.react-button,harness.vue-button,base.text,base.rectangle,base.ellipse,base.image,base.chart,harness.semantic-chart,plugin.echarts,base.table,harness.dataset-ranking'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_UPDATE_FAILED:${JSON.stringify(dynamic)}`);
   }

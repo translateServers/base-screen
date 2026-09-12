@@ -223,6 +223,15 @@ importers:
         specifier: 6.1.0
         version: 6.1.0
 
+  plugins/plugin-metrics:
+    dependencies:
+      '@base-screen/plugin-core':
+        specifier: workspace:^
+        version: link:../../packages/plugin-core
+      '@base-screen/plugin-sdk':
+        specifier: workspace:^
+        version: link:../../packages/plugin-sdk
+
 packages:
 
   '@andrewbranch/untar.js@1.0.3':

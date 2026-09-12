@@ -114,6 +114,27 @@ async function applyInspectorControl(designer: BaseScreenDesignerElement): Promi
   await painted();
 }
 
+async function applyPluginMaterial(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  // 插件物料必须先被加进文档才能看到渲染结果；断言侧会自行添加，这里只定位到物料库分类。
+  await until(
+    () => designer.shadowRoot?.querySelector('[data-material-card="plugin.echarts"]') !== null,
+  );
+  clickShadow(designer, '[data-panel-tab="materials"]');
+  await painted();
+}
+
+async function applyPluginDataResource(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  // 资源类型作者面在数据面板；选中一个声明 host-resource 的组件后即可看到资源类型。
+  const target = designer.document?.components.find((item) => item.id === 'host-data')?.id;
+  if (target !== undefined) await selectLayer(designer, target);
+  clickShadow(designer, '[data-inspector-tab="data"]');
+  await painted();
+}
+
 async function applyDataset(designer: BaseScreenDesignerElement): Promise<void> {
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
@@ -157,6 +178,8 @@ const CASE_APPLIERS = {
   'plugin-command': applyPluginCommand,
   'plugin-panel': applyPluginPanel,
   'inspector-control': applyInspectorControl,
+  'plugin-material': applyPluginMaterial,
+  'plugin-data-resource': applyPluginDataResource,
   dataset: applyDataset,
   'semantic-chart': applySemanticChart,
   blueprint: applyBlueprint,

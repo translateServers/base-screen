@@ -58,6 +58,12 @@ import {
   createPluginEchartsRuntime,
   registerPluginEcharts,
 } from '../../plugins/plugin-echarts/src/index.ts';
+import {
+  createPluginMetricsRuntime,
+  PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
+  PLUGIN_METRICS_ID,
+  PLUGIN_METRICS_RESOURCE_TYPE_ID,
+} from '../../plugins/plugin-metrics/src/index.ts';
 import { mountFeatureCases } from './feature-cases.ts';
 import {
   defineHarnessInspectorFixtures,
@@ -108,7 +114,12 @@ if (!productElements.ok || officialMaterials.some((definition) => !definition.ok
   );
 }
 
-const designerAuthoringCapabilities = SCREEN_BLUEPRINT_CAPABILITY_IDS;
+// 贡献身份跨插件唯一（manager 的 preflight 强制），因此同一个蓝图能力不能被两个插件
+// 同时声明。这里把其中一个让给外围插件 plugin-metrics：既避免冲突，也让"能力由插件
+// 而非宿主提供"这条通道真正被演示；union 仍覆盖全部能力 id，授权面不变。
+const designerAuthoringCapabilities = SCREEN_BLUEPRINT_CAPABILITY_IDS.filter(
+  (id) => id !== PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
+);
 // command.execute 与 design.read 单独声明：下面的 blueprintCapability 贡献由
 // designerAuthoringCapabilities 逐项生成，混入端口能力会产出非法的蓝图能力贡献。
 const designerAuthoringPluginCapabilities = [
@@ -238,9 +249,13 @@ const pluginManager = createBaseScreenPluginManager({
   standaloneMaterialTagNames: officialMaterials
     .filter((definition) => definition.ok)
     .map((definition) => definition.value.manifest.tagName),
-  plugins: [designerAuthoringPlugin, createPluginEchartsRuntime()],
-  grantedCapabilities: { 'browser-harness-authoring': designerAuthoringPluginCapabilities },
-  'base-screen.echarts': ['command.execute', 'design.read'],
+  plugins: [designerAuthoringPlugin, createPluginEchartsRuntime(), createPluginMetricsRuntime()],
+  grantedCapabilities: {
+    'browser-harness-authoring': designerAuthoringPluginCapabilities,
+    'base-screen.echarts': ['command.execute', 'design.read'],
+    // 声明者即批准者只在此处是宿主自营插件；蓝图能力仍需宿主支持表认可才生效。
+    [PLUGIN_METRICS_ID]: [PLUGIN_METRICS_BLUEPRINT_CAPABILITY],
+  },
   registry: {
     get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
   },
@@ -258,21 +273,68 @@ const pluginManager = createBaseScreenPluginManager({
     }),
 });
 const managerActivated = await pluginManager.activate();
-if (
-  !managerActivated.ok ||
-  pluginManager.snapshot === undefined ||
-  !['base.text', 'base.rectangle', 'base.ellipse', 'base.image', 'base.container'].every((type) =>
-    pluginManager.snapshot?.materials.has(type),
-  ) ||
-  pluginManager.snapshot.contributions.getResourceType('dataset') === undefined ||
-  !designerAuthoringCapabilities.every((capability) =>
-    pluginManager.snapshot?.contributions.hasBlueprintCapability(capability),
-  ) ||
-  pluginManager.snapshot.panels.get('harness.panel') === undefined ||
-  pluginManager.snapshot.inspectorControls.get('harness.tone-control') === undefined
-) {
-  throw new Error('Base Screen browser harness failed to inspect its material registry.');
+if (!managerActivated.ok || pluginManager.snapshot === undefined) {
+  throw new Error(
+    `Base Screen browser harness failed to activate its plugins: ${JSON.stringify(managerActivated)}`,
+  );
 }
+const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
+  ['snapshot', true],
+  [
+    'standalone-materials',
+    ['base.text', 'base.rectangle', 'base.ellipse', 'base.image', 'base.container'].every((type) =>
+      pluginManager.snapshot?.materials.has(type),
+    ),
+  ],
+  [
+    'authoring-resource-type',
+    pluginManager.snapshot.contributions.getResourceType('dataset') !== undefined,
+  ],
+  [
+    'authoring-blueprint-capabilities',
+    designerAuthoringCapabilities.every((capability) =>
+      pluginManager.snapshot?.contributions.hasBlueprintCapability(capability),
+    ),
+  ],
+  ['authoring-panel', pluginManager.snapshot.panels.get('harness.panel') !== undefined],
+  [
+    'authoring-inspector-control',
+    pluginManager.snapshot.inspectorControls.get('harness.tone-control') !== undefined,
+  ],
+  // 外围插件的贡献必须真的进入快照：preflight 会因能力未授权、tag 未注册或依赖缺失
+  // 静默把整个插件排除，只断言宿主自营插件会漏掉这种"声明了但从未生效"。
+  [
+    'echarts-plugin-catalogued',
+    pluginManager.snapshot.plugins.get('base-screen.echarts') !== undefined,
+  ],
+  [
+    'echarts-material-catalogued',
+    pluginManager.snapshot.materials.get('plugin.echarts') !== undefined,
+  ],
+  [
+    'metrics-resource-type',
+    pluginManager.snapshot.contributions.getResourceType(PLUGIN_METRICS_RESOURCE_TYPE_ID) !==
+      undefined,
+  ],
+  [
+    'metrics-blueprint-capability',
+    pluginManager.snapshot.contributions.hasBlueprintCapability(
+      PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
+    ),
+  ],
+  ['no-activation-failures', pluginManager.snapshot.failures.length === 0],
+];
+const failedPluginChecks = pluginChecks.filter(([, ok]) => !ok).map(([label]) => label);
+if (failedPluginChecks.length > 0) {
+  throw new Error(
+    `Base Screen browser harness plugin snapshot checks failed: ${failedPluginChecks.join(', ')}; failures=${JSON.stringify(
+      pluginManager.snapshot.failures,
+    )}`,
+  );
+}
+// 贡献索引的唯一来源就是 manager 快照：不再在 harness 里复刻一份字面量索引，
+// 否则插件通道没有真正被验证，且两处会各自漂移。
+const runtimeContributions = pluginManager.snapshot.contributions;
 
 const catalog = createBaseScreenMaterialCatalog([
   {
@@ -312,27 +374,6 @@ const catalog = createBaseScreenMaterialCatalog([
     tabularDataAdapter: BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   },
 ]);
-
-const runtimeContributions = {
-  getResourceType: (resourceType: string) =>
-    resourceType === 'dataset'
-      ? {
-          kind: 'dataResourceType' as const,
-          id: 'dataset',
-          name: '数据集',
-          configSchema: {
-            kind: 'object' as const,
-            properties: {
-              limit: { kind: 'number' as const, minimum: 1, maximum: 100 },
-              region: { kind: 'string' as const },
-            },
-            required: ['limit'],
-          },
-        }
-      : undefined,
-  hasBlueprintCapability: (capability: string) =>
-    (designerAuthoringCapabilities as readonly string[]).includes(capability),
-};
 
 const bridgeManifest = (type: string, tagName: string, name: string) => ({
   type,
@@ -408,7 +449,13 @@ const materialLibraryGrouping = {
       id: 'data',
       label: '数据',
       children: [
-        { id: 'charts', label: '图表', materialTypes: ['base.chart', 'harness.semantic-chart'] },
+        {
+          id: 'charts',
+          label: '图表',
+          // 插件贡献的物料与外移的图表能力同列：分组必须覆盖目录中每个可见物料，
+          // 否则 grouping 会因"缺少可见物料类型"被整体拒绝。
+          materialTypes: ['base.chart', 'harness.semantic-chart', 'plugin.echarts'],
+        },
         { id: 'tables', label: '表格', materialTypes: ['base.table'] },
       ],
     },
@@ -436,7 +483,7 @@ const materialLibraryStressGrouping = {
       id: 'data',
       label: '数据可视化图表组件超长名称',
       children: [
-        { id: 'charts', label: '图表', materialTypes: ['base.chart'] },
+        { id: 'charts', label: '图表', materialTypes: ['base.chart', 'plugin.echarts'] },
         {
           id: 'advanced',
           label: '高级图表',
@@ -487,8 +534,17 @@ const hostedDatasetRankingEntry = hostedEntries.find(
 if (hostedDatasetRankingEntry === undefined) {
   throw new Error('Base Screen browser harness is missing its dataset material best practice.');
 }
+// 插件声明的物料必须并入设计器目录才会真正渲染：manager 的 preflight 已把插件的
+// material 贡献按宿主 registry 解析成 catalog entry。快照同时含宿主自营物料
+// （standaloneMaterialTagNames），它们在下面已由 catalog/bridgeCatalog 声明，
+// 故只取尚未出现的类型，避免 catalog 的唯一性校验冲突。
+const declaredMaterialTypes = new Set(bridgeCatalog.list().map((entry) => entry.manifest.type));
+const pluginMaterials = (pluginManager.snapshot?.materials.list() ?? []).filter(
+  (entry) => !declaredMaterialTypes.has(entry.manifest.type),
+);
 const designerCatalog = createBaseScreenMaterialCatalog([
   ...bridgeCatalog.list(),
+  ...pluginMaterials,
   hostedDatasetRankingEntry,
   inspectorDemoDefinitions.value[0]!,
 ]);
@@ -1127,7 +1183,6 @@ const materialLibraryActions: string[] = [];
 designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => {
   materialLibraryActions.push((event as CustomEvent<{ action: string }>).detail.action);
 });
-designer.runtimeContributions = runtimeContributions;
 if (pluginManager.snapshot !== undefined) {
   designer.pluginCatalog = pluginManager.snapshot.plugins;
   designer.pluginPanels = pluginManager.snapshot.panels;

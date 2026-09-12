@@ -38,6 +38,8 @@ pnpm dev:browser-harness
 | 插件命令、菜单、快捷键 | `/?designer&case=plugin-command` | `pnpm --filter @base-screen/plugin-manager test` | `pnpm verify:browser` |
 | 插件面板 model / action | `/?designer&case=plugin-panel` | `pnpm --filter @base-screen/plugin-core test` | `pnpm verify:browser` |
 | 检查器 `control: 'custom'` | `/?designer&case=inspector-control` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
+| 插件贡献的物料（外围插件） | `/?designer&case=plugin-material` | `pnpm --filter @base-screen/plugin-echarts test` | `pnpm verify:browser` |
+| 插件数据资源类型与蓝图能力 | `/?designer&case=plugin-data-resource` | `pnpm --filter @base-screen/plugin-metrics test` | `pnpm verify:browser` |
 | 数据集端口、绑定、四态 | `/?designer&case=dataset` | `pnpm --filter @base-screen/renderer test` | `pnpm verify:browser` |
 | 官方物料 Manifest / 面板、语义图表 | `/?designer&case=semantic-chart` | `pnpm --filter @base-screen/material test` | `pnpm verify:browser` |
 | 宿主作者桥、组件文本提交 | `/?designer&case=host-authoring` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
@@ -58,6 +60,8 @@ pnpm dev:browser-harness
 | `plugin-command` | 选中副标题后走命令面板 / `Ctrl+Shift+P` | `plugins/assert-plugins.mjs` |
 | `plugin-panel` | 左栏 Harness panel 的选区与 nudge | 同上 |
 | `inspector-control` | 授权语气控件写入；未授权标签降级 | 同上 |
+| `plugin-material` | 插件贡献的物料进目录并渲染出第三方图表 | `plugins/assert-plugin-contributions.mjs` |
+| `plugin-data-resource` | 插件声明的资源类型授权资源作者入口 | 同上 |
 | `dataset` | 排行卡与数据面板绑定 | `dataset/assert-dataset.mjs` |
 | `semantic-chart` | 语义图表演示物料的分组、字段与高级折叠 | `blueprint/assert-blueprint.mjs` |
 | `blueprint` | 交互编排工作台与宿主图形槽 | `blueprint/assert-blueprint.mjs` |

@@ -56,6 +56,11 @@ import {
   assertMaterialLibraryHostState,
 } from './materials/assert-materials.mjs';
 import {
+  assertPluginBlueprintCapability,
+  assertPluginMaterialRenders,
+  assertPluginResourceTypeSelectable,
+} from './plugins/assert-plugin-contributions.mjs';
+import {
   assertInspectorCustomControl,
   assertPluginCommandDocumentLoop,
   assertPluginPanelLoop,
@@ -152,6 +157,10 @@ export async function runBrowserHarness(serverPort) {
         await assertPluginCommandDocumentLoop(authoringDesigner, page);
         await assertPluginPanelLoop(authoringDesigner, page);
         await assertInspectorCustomControl(authoringDesigner, page);
+        // 外围插件承载面：贡献的物料真的渲染、资源类型可选、蓝图能力归属插件。
+        await assertPluginMaterialRenders(authoringDesigner, page);
+        await assertPluginResourceTypeSelectable(authoringDesigner, page);
+        await assertPluginBlueprintCapability(page);
         await page.close();
       }
     },
