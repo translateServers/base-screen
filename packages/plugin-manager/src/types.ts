@@ -54,6 +54,10 @@ export interface BaseScreenPluginManagerOptions {
   readonly createDesignReadPort?:
     | ((input: { readonly instanceId: string; readonly pluginId: string }) => PluginDesignReadPort)
     | undefined;
+  /** 激活时机：`eager`（缺省）在 activate() 时运行全部插件钩子；`lazy` 把钩子推迟到
+   *  该插件贡献首次经 manager 使用（贡献命令、面板动作）或显式 `ensureActive` 时。
+   *  预检与目录发布在两种模式下完全一致，授权不因懒激活放松。 */
+  readonly activation?: 'eager' | 'lazy';
 }
 
 export interface BaseScreenPluginManager {
@@ -62,6 +66,9 @@ export interface BaseScreenPluginManager {
   activate(): Promise<ScreenParseResult<BaseScreenPluginManagerSnapshot>>;
   deactivate(): Promise<ScreenParseResult<null>>;
   dispose(): Promise<ScreenParseResult<null>>;
+  /** 懒激活模式下显式激活一个尚未运行的插件（含其声明依赖的拓扑前置）。
+   *  eager 模式下插件已全部激活，调用等价于空操作。 */
+  ensureActive(pluginId: string): Promise<ScreenParseResult<null>>;
   executeContributionCommand(
     request: PluginCommandRequest,
   ): Promise<ScreenParseResult<ScreenJsonValue>>;

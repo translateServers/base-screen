@@ -42,6 +42,7 @@ export interface BaseScreenPluginManager {
     deactivate(): Promise<ScreenParseResult<null>>;
     // (undocumented)
     dispose(): Promise<ScreenParseResult<null>>;
+    ensureActive(pluginId: string): Promise<ScreenParseResult<null>>;
     // (undocumented)
     executeContributionCommand(request: PluginCommandRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
     // (undocumented)
@@ -52,6 +53,7 @@ export interface BaseScreenPluginManager {
 
 // @public (undocumented)
 export interface BaseScreenPluginManagerOptions {
+    readonly activation?: 'eager' | 'lazy';
     readonly createCommandPort?: ((input: {
         readonly instanceId: string;
         readonly pluginId: string;

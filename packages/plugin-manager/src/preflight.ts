@@ -47,6 +47,7 @@ export interface ActivationPlan {
   readonly inspectorControls: readonly BaseScreenPluginInspectorControlCatalogEntry[];
   readonly plugins: readonly PlannedPlugin[];
   readonly failures: readonly PlannedPluginFailure[];
+  readonly activation: 'eager' | 'lazy';
 }
 
 /**
@@ -91,6 +92,7 @@ export function createActivationPlan(
           materials,
           panels,
           inspectorControls,
+          activation: input.value.activation,
           failures: sortFailures(withPluginIdentities(failures, parsed.identities)),
           plugins: ordered.map((candidate) => {
             const grantedCapabilities = grants.get(candidate)!;

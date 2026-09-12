@@ -47,6 +47,15 @@ export function snapshotManagerInput(
         'Design read port factory is invalid.',
       );
     }
+    const activation: 'eager' | 'lazy' =
+      values.activation === undefined || values.activation === 'eager' ? 'eager' : 'lazy';
+    if (values.activation !== undefined && activation !== values.activation) {
+      diagnostics.add(
+        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+        ['activation'],
+        'Activation must be "eager" or "lazy".',
+      );
+    }
     if (
       diagnostics.hasErrors ||
       standaloneMaterialTagNames === undefined ||
@@ -67,6 +76,7 @@ export function snapshotManagerInput(
         registryGet: registry.get,
         createCommandPort: values.createCommandPort as ManagerInput['createCommandPort'],
         createDesignReadPort: values.createDesignReadPort as ManagerInput['createDesignReadPort'],
+        activation,
       }),
       diagnostics: [],
     };
@@ -92,6 +102,7 @@ function readOptions(
       readonly registry: unknown;
       readonly createCommandPort: unknown;
       readonly createDesignReadPort: unknown;
+      readonly activation: unknown;
     }
   | undefined {
   const fields = [
@@ -136,6 +147,16 @@ function readOptions(
   } else {
     values.createDesignReadPort = readPort?.value;
   }
+  const readActivation = Object.getOwnPropertyDescriptor(value, 'activation');
+  if (readActivation !== undefined && !Object.hasOwn(readActivation, 'value')) {
+    diagnostics.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['activation'],
+      'Manager option must be an own data property.',
+    );
+  } else {
+    values.activation = readActivation?.value;
+  }
   return diagnostics.hasErrors
     ? undefined
     : (values as {
@@ -146,6 +167,7 @@ function readOptions(
         readonly registry: unknown;
         readonly createCommandPort: unknown;
         readonly createDesignReadPort: unknown;
+        readonly activation: unknown;
       });
 }
 

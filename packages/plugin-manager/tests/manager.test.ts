@@ -1082,4 +1082,187 @@ describe('BaseScreenPluginManager', () => {
       ),
     ).toBe(true);
   });
+
+  describe('lazy activation', () => {
+    function lazyManager(
+      plugins: readonly BaseScreenPluginRuntime[],
+      grants: Record<string, string[]> = {},
+    ) {
+      return createBaseScreenPluginManager({
+        ...managerOptions(plugins),
+        grantedCapabilities: grants,
+        activation: 'lazy',
+        createCommandPort: () => ({
+          execute: async () => ({ ok: true as const, value: null, diagnostics: [] }),
+        }),
+      });
+    }
+
+    function pingPlugin(id: string, options: { fail?: boolean; calls?: string[] } = {}) {
+      const commandId = `${id}.ping`;
+      const activatedFlag = `activate:${id}`;
+      const deactivatedFlag = `deactivate:${id}`;
+      const plugin = runtime(
+        pluginManifest({
+          id,
+          capabilities: ['command.execute'],
+          contributions: [
+            {
+              kind: 'command',
+              id: commandId,
+              name: 'Ping',
+              requiredCapability: 'command.execute',
+            },
+          ],
+        }),
+        {
+          activate: () => {
+            if (options.fail === true) throw new Error('lazy boom');
+            options.calls?.push(activatedFlag);
+          },
+          deactivate: () => {
+            options.calls?.push(deactivatedFlag);
+          },
+        },
+      );
+      Object.defineProperty(plugin, 'commands', {
+        value: {
+          [commandId]: () => ({
+            ok: true as const,
+            value: options.calls?.filter((item) => item === activatedFlag).length ?? 0,
+            diagnostics: [],
+          }),
+        },
+      });
+      return plugin;
+    }
+
+    it('defers plugin hooks until their contribution command is first used', async () => {
+      const calls: string[] = [];
+      const plugin = pingPlugin('acme.lazy', { calls });
+      const manager = lazyManager([plugin], { 'acme.lazy': ['command.execute'] });
+
+      const result = await manager.activate();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(calls).toEqual([]);
+      expect(result.value.plugins.list().map((entry) => entry.manifest.id)).toEqual(['acme.lazy']);
+      expect(manager.status).toBe('active');
+
+      const first = await manager.executeContributionCommand({
+        commandId: 'acme.lazy.ping',
+        args: null,
+      });
+      expect(first.ok ? first.value : undefined).toBe(1);
+      const second = await manager.executeContributionCommand({
+        commandId: 'acme.lazy.ping',
+        args: null,
+      });
+      expect(second.ok ? second.value : undefined).toBe(1);
+      expect(calls).toEqual(['activate:acme.lazy']);
+    });
+
+    it('records a lazy activation failure and refuses further use without retry', async () => {
+      const plugin = pingPlugin('acme.broken', { fail: true });
+      const manager = lazyManager([plugin], { 'acme.broken': ['command.execute'] });
+
+      expect((await manager.activate()).ok).toBe(true);
+      const first = await manager.executeContributionCommand({
+        commandId: 'acme.broken.ping',
+        args: null,
+      });
+      expect(first.ok).toBe(false);
+      if (!first.ok) {
+        expect(first.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+      }
+      const second = await manager.executeContributionCommand({
+        commandId: 'acme.broken.ping',
+        args: null,
+      });
+      expect(second.ok).toBe(false);
+      expect(manager.snapshot?.failures.map((failure) => failure.pluginId)).toEqual([
+        'acme.broken',
+      ]);
+      expect((await manager.ensureActive('acme.broken')).ok).toBe(false);
+    });
+
+    it('activates the dependency chain in topological order on ensureActive', async () => {
+      const calls: string[] = [];
+      const base = pingPlugin('acme.base', { calls });
+      const dependent = runtime(
+        pluginManifest({
+          id: 'acme.dependent',
+          capabilities: ['command.execute'],
+          dependencies: [{ id: 'acme.base' }],
+          contributions: [
+            {
+              kind: 'command',
+              id: 'acme.dependent.ping',
+              name: 'Ping',
+              requiredCapability: 'command.execute',
+            },
+          ],
+        }),
+        {
+          activate: () => {
+            calls.push('activate:acme.dependent');
+          },
+        },
+      );
+      Object.defineProperty(dependent, 'commands', {
+        value: {
+          'acme.dependent.ping': () => ({ ok: true as const, value: null, diagnostics: [] }),
+        },
+      });
+      const manager = lazyManager([dependent, base], {
+        'acme.base': ['command.execute'],
+        'acme.dependent': ['command.execute'],
+      });
+
+      expect((await manager.activate()).ok).toBe(true);
+      expect(calls).toEqual([]);
+      const ensured = await manager.ensureActive('acme.dependent');
+      expect(ensured.ok).toBe(true);
+      expect(calls).toEqual(['activate:acme.base', 'activate:acme.dependent']);
+      const dispatched = await manager.executeContributionCommand({
+        commandId: 'acme.dependent.ping',
+        args: null,
+      });
+      expect(dispatched.ok).toBe(true);
+      expect(calls).toEqual(['activate:acme.base', 'activate:acme.dependent']);
+    });
+
+    it('deactivates only the plugins that were lazily activated', async () => {
+      const calls: string[] = [];
+      const lazyPlugin = pingPlugin('acme.lazy-only', { calls });
+      const idle = runtime(pluginManifest({ id: 'acme.idle' }), {
+        activate: () => {
+          calls.push('activate:acme.idle');
+        },
+        deactivate: () => {
+          calls.push('deactivate:acme.idle');
+        },
+      });
+      const manager = lazyManager([lazyPlugin, idle], { 'acme.lazy-only': ['command.execute'] });
+
+      expect((await manager.activate()).ok).toBe(true);
+      expect((await manager.ensureActive('acme.lazy-only')).ok).toBe(true);
+      expect(calls).toEqual(['activate:acme.lazy-only']);
+      expect((await manager.deactivate()).ok).toBe(true);
+      expect(calls).toEqual(['activate:acme.lazy-only', 'deactivate:acme.lazy-only']);
+      expect(manager.status).toBe('inactive');
+    });
+
+    it('rejects ensureActive for unknown plugin ids', async () => {
+      const manager = lazyManager([pingPlugin('acme.lazy')], {
+        'acme.lazy': ['command.execute'],
+      });
+      expect((await manager.activate()).ok).toBe(true);
+      const ensured = await manager.ensureActive('acme.unknown');
+      expect(ensured.ok).toBe(false);
+      if (!ensured.ok) {
+        expect(ensured.diagnostics[0]?.code).toBe('PLUGIN_CORE_IDENTITY_INVALID');
+      }
+    });
+  });
 });

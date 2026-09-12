@@ -290,6 +290,12 @@
   `snapshot.failures` 逐插件记录 `{ index, pluginId, diagnostics }`；宿主自营物料
   （`standaloneMaterialTagNames`）解析失败仍是全局门，整体保持未激活。宿主如需"全或无"语义，
   可在 activate 后检查 `failures` 并自行 deactivate。
+- **插件懒激活**（2026-09-12，[外围插件分区 Spec](../specs/peripheral-plugin-partition/spec.md)）：
+  `createBaseScreenPluginManager` 新增 `activation: 'lazy'` 模式与 `ensureActive(pluginId)`。
+  lazy 模式下 activate() 只完成预检与目录发布（授权语义与 eager 完全一致，目录与命令面板立即可见），
+  插件 activate 钩子推迟到其贡献命令或面板动作首次经 manager 使用时按依赖拓扑序运行，
+  也可由宿主显式 ensureActive。懒激活失败记入 snapshot.failures 并失败关闭、拒绝重试；
+  deactivate 只回收真正运行过的插件。eager 行为保持缺省不变。
 
 ## 历史迁移
 

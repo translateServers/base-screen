@@ -15,6 +15,7 @@ export interface ManagerInput {
   readonly registryGet: (tagName: string) => unknown;
   readonly createCommandPort: BaseScreenPluginManagerOptions['createCommandPort'];
   readonly createDesignReadPort: BaseScreenPluginManagerOptions['createDesignReadPort'];
+  readonly activation: 'eager' | 'lazy';
 }
 
 export interface Candidate {

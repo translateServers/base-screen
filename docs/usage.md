@@ -988,6 +988,11 @@ capability 限制的是 Base Screen 集成点，不是 JavaScript 环境权限�
 （`standaloneMaterialTagNames`）解析失败这类无法归属到单个插件的全局门失败，才会让整个
 `activate()` 返回失败。跨插件贡献冲突按稳定顺序 first-wins：先声明方保留，后声明方失败。
 
+启动期不想运行全部插件钩子时，给 `createBaseScreenPluginManager` 传 `activation: 'lazy'`：
+预检与目录发布照常一次完成（命令面板、面板、目录都可见），插件 `activate(context)` 推迟到其
+贡献命令或面板动作首次经 manager 使用时按依赖拓扑序运行，也可用 `manager.ensureActive(pluginId)`
+显式触发。懒激活失败的插件记入 `snapshot.failures` 并失败关闭、拒绝重试；eager（缺省）行为不变。
+
 作者用 `@base-screen/plugin-sdk` 声明插件；宿主激活后把 snapshot 交给 Viewer/Designer：
 
 custom element 注册与插件输入的组装可以用 `createPluginRegistration` 收敛为一次调用：它先对
