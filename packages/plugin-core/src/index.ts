@@ -35,6 +35,7 @@ export type {
   BaseScreenPluginCatalogEntry,
   BaseScreenPluginCommandHandler,
   BaseScreenPluginCommandMenu,
+  BaseScreenPluginContextMenu,
   BaseScreenPluginContribution,
   BaseScreenPluginDataResourceTypeContribution,
   BaseScreenPluginDependency,
@@ -56,7 +57,11 @@ export type {
   PluginCommandRequest,
   PluginDesignReadPort,
 } from './contracts.js';
-export { BASE_SCREEN_MATERIAL_EVENT, BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT } from './contracts.js';
+export {
+  BASE_SCREEN_MATERIAL_EVENT,
+  BASE_SCREEN_PLUGIN_COMMAND_MENUS,
+  BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT,
+} from './contracts.js';
 export type {
   BaseScreenChartData,
   BaseScreenChartPoint,

@@ -1,4 +1,5 @@
 import type { ScreenDocument } from '@base-screen/contracts';
+import { SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
@@ -9,8 +10,6 @@ import {
   type DesignerDescriptorDatasetFields,
   renderDesignerDescriptorZone,
 } from './descriptor/designer-descriptor-dom.js';
-
-const MATERIAL_EVENT_CAPABILITY = 'blueprint.trigger.material-event';
 
 export interface DesignerInteractionCapabilities {
   readonly design: readonly string[];
@@ -129,7 +128,10 @@ function hasMaterialEventCapability(
   runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
 ): boolean {
   try {
-    return runtimeContributions?.hasBlueprintCapability(MATERIAL_EVENT_CAPABILITY) === true;
+    return (
+      runtimeContributions?.hasBlueprintCapability(SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY) ===
+      true
+    );
   } catch {
     return false;
   }

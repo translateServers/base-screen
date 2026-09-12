@@ -5,13 +5,13 @@ import type {
   ScreenBlueprintValueExpression,
   ScreenDocument,
 } from '@base-screen/contracts';
+import { SCREEN_BLUEPRINT_CAPABILITIES } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialEventDescriptor,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import { DESIGNER_BLUEPRINT_CAPABILITIES } from '../../../common/operations/blueprint/designer-blueprint-capabilities.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerButton } from '../designer-ui-primitives.js';
 
@@ -54,7 +54,7 @@ export function renderDesignerEventsPanel(
   const descriptors = getDesignerFocusedEventDescriptors(document, interaction, catalog);
   const capabilityAvailable = hasCapability(
     runtimeContributions,
-    DESIGNER_BLUEPRINT_CAPABILITIES.materialEvent,
+    SCREEN_BLUEPRINT_CAPABILITIES.materialEvent,
   );
   appendInteractionEventGroup(
     panel,

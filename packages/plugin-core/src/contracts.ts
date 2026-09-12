@@ -207,8 +207,19 @@ export interface BaseScreenPluginDependency {
   readonly id: string;
 }
 
-export type BaseScreenPluginCommandMenu =
-  | 'commandPalette'
+/** 命令 chrome 位置词汇的唯一来源：由它派生类型与清单校验集合，避免两处手写字面量漂移。 */
+export const BASE_SCREEN_PLUGIN_COMMAND_MENUS = [
+  'commandPalette',
+  'menu.tools',
+  'context.canvas',
+  'context.component',
+  'context.multi',
+] as const;
+
+export type BaseScreenPluginCommandMenu = (typeof BASE_SCREEN_PLUGIN_COMMAND_MENUS)[number];
+
+/** 右键上下文菜单位置。`commandPalette` 不是上下文菜单，故此处是必要的子集而非重复声明。 */
+export type BaseScreenPluginContextMenu =
   | 'menu.tools'
   | 'context.canvas'
   | 'context.component'

@@ -18,6 +18,9 @@ import { ScreenTabularDataset } from '@base-screen/contracts';
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_EVENT: 'base-screen-material-event';
 
+// @public
+export const BASE_SCREEN_PLUGIN_COMMAND_MENUS: readonly ['commandPalette', 'menu.tools', 'context.canvas', 'context.component', 'context.multi'];
+
 // @public (undocumented)
 export const BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT: 'base-screen-plugin-panel-action';
 
@@ -468,7 +471,10 @@ export interface BaseScreenPluginCatalogEntry {
 export type BaseScreenPluginCommandHandler = (args: ScreenJsonValue) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
 
 // @public (undocumented)
-export type BaseScreenPluginCommandMenu = 'commandPalette' | 'menu.tools' | 'context.canvas' | 'context.component' | 'context.multi';
+export type BaseScreenPluginCommandMenu = (typeof BASE_SCREEN_PLUGIN_COMMAND_MENUS)[number];
+
+// @public
+export type BaseScreenPluginContextMenu = 'menu.tools' | 'context.canvas' | 'context.component' | 'context.multi';
 
 // @public (undocumented)
 export type BaseScreenPluginContribution = {

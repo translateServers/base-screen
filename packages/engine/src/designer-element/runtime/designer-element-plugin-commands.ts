@@ -1,4 +1,5 @@
 import type { ScreenJsonValue } from '@base-screen/contracts';
+import type { BaseScreenPluginContextMenu } from '@base-screen/plugin-core';
 import {
   renderDesignerPluginPanels,
   updateDesignerPluginPanelModels,
@@ -18,7 +19,7 @@ import { type DesignerElementHost, getDesignerElementState } from './designer-el
 
 export function listPluginCommandItems(
   element: DesignerElementHost,
-  menu: 'menu.tools' | 'context.canvas' | 'context.component' | 'context.multi',
+  menu: BaseScreenPluginContextMenu,
 ): readonly DesignerPluginCommandItem[] {
   const state = getDesignerElementState(element);
   return listDesignerPluginCommandItems(

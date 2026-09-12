@@ -3,14 +3,12 @@ import type {
   ScreenBlueprintValueExpression,
   ScreenDocument,
 } from '@base-screen/contracts';
+import { SCREEN_BLUEPRINT_CAPABILITIES } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
-import {
-  DESIGNER_BLUEPRINT_CAPABILITIES,
-  hasDesignerBlueprintCapability,
-} from './designer-blueprint-capabilities.js';
+import { hasDesignerBlueprintCapability } from './designer-blueprint-capabilities.js';
 import type { DesignerBlueprintEventOption } from './designer-blueprint-model-types.js';
 import {
   actionBlueprintNodeId,
@@ -48,7 +46,7 @@ export function buildDesignerBlueprintEventOptions(
 ): readonly DesignerBlueprintEventOption[] {
   const materialEventAvailable = hasDesignerBlueprintCapability(
     runtimeContributions,
-    DESIGNER_BLUEPRINT_CAPABILITIES.materialEvent,
+    SCREEN_BLUEPRINT_CAPABILITIES.materialEvent,
   );
   return document.components.flatMap((component) => {
     const manifest = catalog?.get(component.type)?.manifest;

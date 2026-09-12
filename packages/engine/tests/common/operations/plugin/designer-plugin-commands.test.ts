@@ -1,4 +1,7 @@
-import { createBaseScreenPluginCatalog } from '@base-screen/plugin-core';
+import {
+  type BaseScreenPluginCommandMenu,
+  createBaseScreenPluginCatalog,
+} from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import {
   findDesignerPluginCommandByShortcut,
@@ -10,13 +13,7 @@ function catalog(
   contributions: readonly {
     readonly id: string;
     readonly name: string;
-    readonly menus?: readonly (
-      | 'commandPalette'
-      | 'menu.tools'
-      | 'context.canvas'
-      | 'context.component'
-      | 'context.multi'
-    )[];
+    readonly menus?: readonly BaseScreenPluginCommandMenu[];
     readonly shortcut?: string;
   }[],
 ) {

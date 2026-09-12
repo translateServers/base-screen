@@ -129,6 +129,29 @@ export function parseScreenTabularDataset(input: unknown): ScreenParseResult<Scr
 // @public (undocumented)
 export const SCREEN_AUTHORING_REQUEST_EVENT: 'base-screen-authoring-request';
 
+// @public
+export const SCREEN_BLUEPRINT_CAPABILITIES: {
+    readonly materialEvent: 'blueprint.trigger.material-event';
+    readonly variableEvent: 'blueprint.trigger.variable-event';
+    readonly eventPayload: 'blueprint.value.event-payload';
+    readonly variable: 'blueprint.value.variable';
+    readonly condition: 'blueprint.condition.compare';
+    readonly setVariable: 'blueprint.action.set-variable';
+    readonly emitHostEvent: 'blueprint.action.emit-host-event';
+    readonly componentVisibility: 'blueprint.action.component-visibility';
+    readonly requestVariable: 'blueprint.action.request-variable';
+    readonly requestComponentData: 'blueprint.action.request-component-data';
+};
+
+// @public
+export const SCREEN_BLUEPRINT_CAPABILITY_IDS: readonly ['blueprint.trigger.material-event', 'blueprint.trigger.variable-event', 'blueprint.value.event-payload', 'blueprint.value.variable', 'blueprint.condition.compare', 'blueprint.action.set-variable', 'blueprint.action.emit-host-event', 'blueprint.action.component-visibility', 'blueprint.action.request-variable', 'blueprint.action.request-component-data'];
+
+// @public (undocumented)
+export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY = "blueprint.action.component-visibility";
+
+// @public (undocumented)
+export const SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY = "blueprint.trigger.material-event";
+
 // @public (undocumented)
 export const SCREEN_DOCUMENT_JSON_SCHEMA: ScreenJsonObject;
 
@@ -211,6 +234,9 @@ export interface ScreenBlueprint {
 
 // @public (undocumented)
 export type ScreenBlueprintAction = ScreenBlueprintSetVariableAction | ScreenBlueprintRequestVariableAction | ScreenBlueprintRequestComponentDataAction | ScreenBlueprintEmitHostEventAction | ScreenBlueprintHostAction | ScreenBlueprintComponentVisibilityAction;
+
+// @public (undocumented)
+export type ScreenBlueprintCapabilityId = (typeof SCREEN_BLUEPRINT_CAPABILITY_IDS)[number];
 
 // @public (undocumented)
 export interface ScreenBlueprintComponentVisibilityAction {

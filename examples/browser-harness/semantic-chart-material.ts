@@ -1,8 +1,9 @@
-import type {
-  ScreenDatasetField,
-  ScreenJsonValue,
-  ScreenParseResult,
-  ScreenTabularDataset,
+import {
+  SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY,
+  type ScreenDatasetField,
+  type ScreenJsonValue,
+  type ScreenParseResult,
+  type ScreenTabularDataset,
 } from '../../packages/contracts/src/index.ts';
 import {
   applyBackgroundColorOrGradient,
@@ -522,7 +523,7 @@ export const HARNESS_SEMANTIC_CHART_EDITOR_DESCRIPTOR: BaseScreenMaterialEditorD
       hint: '点击系列数据点触发',
       maxPayloadBytes: 65536,
       triggerContexts: ['blueprint'],
-      requiredCapability: 'blueprint.trigger.material-event',
+      requiredCapability: SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY,
       payloadSchema: {
         kind: 'object',
         properties: {

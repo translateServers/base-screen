@@ -1,9 +1,14 @@
-import type { ScreenDocument, ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
+import {
+  SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
+  type ScreenDocument,
+  type ScreenJsonValue,
+  type ScreenParseResult,
+} from '@base-screen/contracts';
 import { cloneCondition, cloneExpression, cloneValue, failure } from './runtime-json.js';
 import type { ScreenBlueprintCapabilityIndex, ScreenBlueprintPlan } from './runtime-types.js';
 
-export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY =
-  'blueprint.action.component-visibility';
+// 能力 id 的唯一来源在 contracts；此处保留同名再导出以维持 core 的公共 API 形状。
+export { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY };
 
 export function compileScreenBlueprint(
   document: ScreenDocument,

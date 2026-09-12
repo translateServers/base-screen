@@ -1,3 +1,4 @@
+import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/contracts';
 import type { BaseScreenPluginContribution } from '@base-screen/plugin-core';
 import { DiagnosticCollector } from './diagnostics.js';
 import type { Candidate, ManagerInput } from './preflight-types.js';
@@ -19,16 +20,9 @@ export interface PluginCapabilityDescriptor {
 export const PLUGIN_CAPABILITY_DESCRIPTORS: readonly PluginCapabilityDescriptor[] = Object.freeze([
   { id: 'command.execute', port: 'command' },
   { id: 'design.read', port: 'design' },
-  { id: 'blueprint.trigger.material-event', blueprint: true },
-  { id: 'blueprint.trigger.variable-event', blueprint: true },
-  { id: 'blueprint.value.event-payload', blueprint: true },
-  { id: 'blueprint.value.variable', blueprint: true },
-  { id: 'blueprint.condition.compare', blueprint: true },
-  { id: 'blueprint.action.set-variable', blueprint: true },
-  { id: 'blueprint.action.emit-host-event', blueprint: true },
-  { id: 'blueprint.action.component-visibility', blueprint: true },
-  { id: 'blueprint.action.request-variable', blueprint: true },
-  { id: 'blueprint.action.request-component-data', blueprint: true },
+  // 蓝图能力 id 的唯一来源在 contracts：engine 需据同一词汇归一化规则能力，
+  // 两侧各自硬编码会在漂移时静默授权失败。
+  ...SCREEN_BLUEPRINT_CAPABILITY_IDS.map((id) => ({ id, blueprint: true })),
 ]);
 
 const CAPABILITY_TABLE = new Map(PLUGIN_CAPABILITY_DESCRIPTORS.map((item) => [item.id, item]));

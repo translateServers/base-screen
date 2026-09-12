@@ -4,6 +4,7 @@
 
 ```ts
 
+import { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY } from '@base-screen/contracts';
 import type { ScreenBlueprint } from '@base-screen/contracts';
 import type { ScreenBlueprintComponentVisibilityAction } from '@base-screen/contracts';
 import type { ScreenBlueprintHostEvent } from '@base-screen/contracts';
@@ -127,8 +128,7 @@ export function reduceScreenViewport(state: ScreenViewportState, action: ScreenV
 // @public (undocumented)
 export function removeScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], index: number): ScreenJsonObject | undefined;
 
-// @public (undocumented)
-export const SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY = "blueprint.action.component-visibility";
+export { SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY }
 
 // @public (undocumented)
 export interface ScreenAlignmentDelta {

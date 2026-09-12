@@ -23,6 +23,13 @@ export {
   normalizeScreenMaterialError,
   SCREEN_MATERIAL_ERROR_CODES,
 } from './diagnostics/material-error.js';
+export {
+  SCREEN_BLUEPRINT_CAPABILITIES,
+  SCREEN_BLUEPRINT_CAPABILITY_IDS,
+  SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
+  SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY,
+  type ScreenBlueprintCapabilityId,
+} from './document/blueprint-capabilities.js';
 export { isScreenMaterialType } from './document/identity.js';
 export { isBoundedScreenImageUrl } from './document/image-url.js';
 export { SCREEN_DOCUMENT_JSON_SCHEMA } from './document/json-schema.js';

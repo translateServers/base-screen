@@ -7,6 +7,7 @@ import {
   VARIABLE_NAME_PATTERN,
 } from '@base-screen/contracts';
 import {
+  BASE_SCREEN_PLUGIN_COMMAND_MENUS,
   type BaseScreenPluginManifest,
   type BaseScreenPluginPanelActionDetail,
   type PluginCommandRequest,
@@ -422,13 +423,7 @@ function validateDisplayName(
   }
 }
 
-const COMMAND_MENUS = new Set([
-  'commandPalette',
-  'menu.tools',
-  'context.canvas',
-  'context.component',
-  'context.multi',
-]);
+const COMMAND_MENUS = new Set<string>(BASE_SCREEN_PLUGIN_COMMAND_MENUS);
 
 const SHORTCUT_MODIFIERS = new Set(['Ctrl', 'Cmd', 'Alt', 'Shift']);
 const NAMED_SHORTCUT_KEYS = new Set([
