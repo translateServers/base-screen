@@ -43,6 +43,10 @@ export {
   writeBaseScreenHostResourceDragData,
 } from '../common/operations/host-resource/host-resource-authoring.js';
 export {
+  type BaseScreenComponentInsertionIntent,
+  parseBaseScreenComponentInsertionIntent,
+} from '../common/operations/material-component/material-component.js';
+export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,

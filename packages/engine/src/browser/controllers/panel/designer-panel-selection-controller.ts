@@ -18,6 +18,7 @@ import {
   createGroupTransaction,
   createUngroupTransaction,
 } from '../../../common/operations/element/designer-layout-operations.js';
+import { nextMaterialComponentId } from '../../../common/operations/material-component/material-component.js';
 import { removeComponentCommands } from '../../../common/operations/selection/designer-remove-operations.js';
 import { selectedComponents } from '../../../common/operations/selection/designer-selection.js';
 import { createInitialDataSource } from '../../dom/panel/designer-panel-dom.js';
@@ -141,7 +142,7 @@ export class DesignerPanelSelectionController {
       return failure('Grouping is unavailable.');
     }
     const group: ScreenComponentNode = {
-      id: nextComponentId(document, entry.manifest.type),
+      id: nextMaterialComponentId(document, entry.manifest.type),
       type: entry.manifest.type,
       name: entry.manifest.name,
       parentId: selected[0]?.parentId ?? null,
@@ -336,14 +337,6 @@ export class DesignerPanelSelectionController {
     const type = this.callbacks.getGroupMaterialType();
     return type === undefined ? undefined : this.callbacks.getCatalog()?.get(type);
   }
-}
-
-function nextComponentId(document: ScreenDocument, type: string): string {
-  const base = type.replace(/[^A-Za-z0-9]+/g, '-');
-  let index = document.components.length + 1;
-  const ids = new Set(document.components.map((component) => component.id));
-  while (ids.has(`${base}-${index}`)) index++;
-  return `${base}-${index}`;
 }
 
 function failure(message: string): ScreenParseResult<ScreenDocument> {

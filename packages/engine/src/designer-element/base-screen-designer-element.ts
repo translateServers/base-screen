@@ -44,6 +44,7 @@ import {
   type BaseScreenDistribution,
 } from '../common/operations/element/designer-layout-operations.js';
 import type { BaseScreenHostResourceAuthoringIntent } from '../common/operations/host-resource/host-resource-authoring.js';
+import type { BaseScreenComponentInsertionIntent } from '../common/operations/material-component/material-component.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../common/operations/material-library/material-library-state.js';
@@ -321,6 +322,15 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   executeTransaction(transaction: ScreenDocumentTransaction): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.executeTransaction(this, transaction);
+  }
+
+  /**
+   * 按物料类型插入组件实例，使用 manifest 默认值。省略 `position` 时放在可见画布中心。
+   * 一次事务提交（可撤销），成功后新组件成为唯一选中项。需要自定义 props/style 时，
+   * 插入后再 `executeCommand({type:'update-components'})`。
+   */
+  insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument> {
+    return this.#designerState.runtime.insertComponent(this, intent);
   }
 
   insertHostResource(

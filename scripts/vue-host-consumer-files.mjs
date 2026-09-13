@@ -120,6 +120,57 @@ try {
     throw new Error('VUE_HOST_TARBALL_SAVE_FAILED: ' + JSON.stringify(saved));
   }
 
+  // 5) 公开的程序化插入入口：宿主不碰私有拖放，也不手搓完整组件节点。
+  const inserted = await page.evaluate(() => {
+    const { designer } = window.__vueHost;
+    const before = designer.document.components.length;
+    // 省略 position：应落在可见画布中心并整体在画布内。
+    const result = designer.insertComponent({ materialType: 'vue-host.product-card' });
+    const document_ = designer.document;
+    const node = result.ok
+      ? document_.components.find((c) => c.type === 'vue-host.product-card' && c.id !== 'stock-card')
+      : undefined;
+    return {
+      ok: result.ok,
+      codes: (result.diagnostics ?? []).map((d) => d.code),
+      grew: document_.components.length === before + 1,
+      node: node === undefined ? null : {
+        id: node.id,
+        name: node.name,
+        props: node.props,
+        size: node.size,
+        insideCanvas:
+          node.position.x >= 0 && node.position.y >= 0 &&
+          node.position.x + node.size.width <= document_.canvas.width &&
+          node.position.y + node.size.height <= document_.canvas.height,
+      },
+      selected: [...designer.selection.selectedComponentIds],
+    };
+  });
+  if (!inserted.ok || !inserted.grew || inserted.node === null) {
+    throw new Error('VUE_HOST_TARBALL_INSERT_COMPONENT_FAILED: ' + JSON.stringify(inserted));
+  }
+  // 按 manifest 默认值构造：默认 props 与名称都应来自 manifest，且新组件被选中。
+  if (inserted.node.name !== '商品卡' || inserted.node.props.title !== '商品') {
+    throw new Error('VUE_HOST_TARBALL_INSERT_DEFAULTS_FAILED: ' + JSON.stringify(inserted.node));
+  }
+  if (!inserted.node.insideCanvas) {
+    throw new Error('VUE_HOST_TARBALL_INSERT_POSITION_FAILED: ' + JSON.stringify(inserted.node));
+  }
+  if (inserted.selected.join() !== inserted.node.id) {
+    throw new Error('VUE_HOST_TARBALL_INSERT_SELECTION_FAILED: ' + JSON.stringify(inserted));
+  }
+
+  // 未知物料类型必须失败关闭。
+  const rejected = await page.evaluate(() => {
+    const { designer } = window.__vueHost;
+    const result = designer.insertComponent({ materialType: 'no.such-material' });
+    return { ok: result.ok, codes: (result.diagnostics ?? []).map((d) => d.code) };
+  });
+  if (rejected.ok) {
+    throw new Error('VUE_HOST_TARBALL_INSERT_UNKNOWN_ACCEPTED: ' + JSON.stringify(rejected));
+  }
+
   if (errors.length > 0) {
     throw new Error('VUE_HOST_TARBALL_PAGE_ERRORS: ' + JSON.stringify(errors));
   }

@@ -4,6 +4,7 @@ import {
   clampScreenCoordinate,
   roundScreenStep,
 } from '../../../common/operations/element/designer-geometry.js';
+import { nextMaterialComponentId } from '../../../common/operations/material-component/material-component.js';
 import { selectionSubtree } from '../../../common/operations/selection/designer-selection.js';
 import type { DesignerSnapTranslation } from '../../viewport/designer-canvas-aids.js';
 import type { DesignerGestureCallbacks } from './designer-gesture-callbacks.js';
@@ -166,7 +167,7 @@ export class DesignerDragGesture {
     const copiedIds = new Map(
       state.components.map((source, index) => [
         source.id,
-        nextComponentId(document, `${source.type}-${index}`),
+        nextMaterialComponentId(document, `${source.type}-${index}`),
       ]),
     );
     this.callbacks.reportTransaction({
@@ -202,12 +203,4 @@ function mutableSelectionSubtree(
   return selectionSubtree(document, componentIds).filter(
     (component) => !isScreenComponentEffectivelyLocked(document, component.id),
   );
-}
-
-function nextComponentId(document: ScreenDocument, type: string): string {
-  const base = type.replace(/[^A-Za-z0-9]+/g, '-');
-  let index = document.components.length + 1;
-  const ids = new Set(document.components.map((component) => component.id));
-  while (ids.has(`${base}-${index}`)) index++;
-  return `${base}-${index}`;
 }

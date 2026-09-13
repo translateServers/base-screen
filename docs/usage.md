@@ -196,6 +196,109 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 标量静态数据保持不变；在 Designer 中只暴露「宿主数据集」，不再额外显示通用「宿主资源」选项。
 `examples/browser-harness` 包含完整官方目录。
 
+### 4.1 物料 manifest 字段参考
+
+物料 manifest 是**严格**对象：未知字段会被拒绝；下表除标注「可选」外全部必填。
+写自有物料时照此表即可，不必去读示例工程。
+
+| 字段 | 必填 | 说明 |
+| --- | --- | --- |
+| `type` | ✓ | 物料类型标识，形如 `vendor.name`；文档 `components[].type` 引用它 |
+| `tagName` | ✓ | 该物料的 Custom Element 标签名，须含连字符且全小写 |
+| `name` | ✓ | 物料显示名 |
+| `category` | ✓ | 物料库分类名 |
+| `keywords` | ✓ | 搜索关键词数组，可为空数组 |
+| `defaultSize` | ✓ | `{ width, height }`，拖入/程序化插入时的初始尺寸 |
+| `defaultProps` | ✓ | 初始 props，须满足 `propsSchema` |
+| `defaultStyle` | ✓ | 初始 style，须满足 `styleSchema` |
+| `propsSchema` | ✓ | 属性 JSON Schema（根为 `object`），驱动属性面板与提交校验 |
+| `propertyPanel` | ✓ | 属性面板字段列表，可为空数组 |
+| `styleSchema` | ✓ | 样式 JSON Schema（根为 `object`） |
+| `stylePanel` | ✓ | 样式面板字段列表，可为空数组 |
+| `events` | ✓ | 该物料派发的事件名数组，可为空数组 |
+| `dataCapabilities` | ✓ | 数据来源能力子集：`static` / `dataset` / `host-resource` / `variable` |
+| `designCapabilities` | ✓ | `{ resize, rotate, children }` 三个布尔值 |
+| `defaultData` | 可选 | 静态默认数据；存在时新组件初值为 `{ type: 'static', value: defaultData }` |
+| `staticData` | 可选 | `{ kind: 'scalar', valueType }` 或 `{ kind: 'tabular', defaultBinding }` |
+| `dataBinding` | 可选 | 数据绑定角色声明（宿主数据集字段映射用） |
+| `libraryVisible` | 可选 | 设为 `false` 时不出现在物料库，也不能被程序化插入 |
+| `editorDescriptor` | 可选 | 声明式作者面板描述符（见第 12 节）；自定义控件经此引用 |
+| `cover` | 可选 | 物料库封面 |
+
+> `propsSchema` / `styleSchema` 中被 `required` 引用的字段在提交时按 schema 校验。常见错误是把
+> 枚举字段写成别的类型：例如枚举约定为 `'400' | '700'` 时传数字 `600`，提交会报
+> `PLUGIN_CORE_MANIFEST_FIELD_INVALID`。
+
+### 4.2 宿主自有物料的最小完整示例
+
+下面是一个**自包含**的自定义物料（不依赖任何示例工程），可直接复制：
+
+```ts
+import type {
+  BaseScreenMaterialManifest,
+  BaseScreenMaterialModel,
+} from '@base-screen/plugin-core';
+import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+
+const MANIFEST: BaseScreenMaterialManifest = {
+  type: 'acme.stock-card',
+  tagName: 'acme-stock-card',
+  name: '库存卡',
+  category: '业务',
+  keywords: ['库存'],
+  defaultSize: { width: 260, height: 120 },
+  defaultProps: { title: '仓库', stock: 0 },
+  defaultStyle: { color: '#e8eefb' },
+  propsSchema: {
+    kind: 'object',
+    properties: {
+      title: { kind: 'string' },
+      stock: { kind: 'number', minimum: 0 },
+    },
+    required: ['title', 'stock'],
+  },
+  propertyPanel: [
+    { prop: 'title', label: '名称', control: 'text' },
+    { prop: 'stock', label: '库存', control: 'number' },
+  ],
+  styleSchema: { kind: 'object', properties: { color: { kind: 'string' } }, required: [] },
+  stylePanel: [{ style: 'color', label: '文字色', control: 'color' }],
+  events: [],
+  dataCapabilities: ['static'],
+  designCapabilities: { resize: true, rotate: true, children: false },
+};
+
+class AcmeStockCardElement extends HTMLElement {
+  // createMaterialDefinition 会校对静态 manifest 与传入 manifest 一致，务必写上。
+  static readonly manifest = MANIFEST;
+
+  #model: BaseScreenMaterialModel | undefined;
+  get model(): BaseScreenMaterialModel {
+    if (this.#model === undefined) throw new Error('Stock card model has not been set.');
+    return this.#model;
+  }
+  set model(value: BaseScreenMaterialModel) {
+    this.#model = value;
+    // 按 value.props / value.style / value.dataState 渲染；不要缓存跨实例状态。
+  }
+  connectedCallback(): void {
+    this.style.display = 'block';
+  }
+}
+
+const definition = createMaterialDefinition({ manifest: MANIFEST, element: AcmeStockCardElement });
+if (!definition.ok) throw new Error('物料定义无效');
+const entry = definition.value.define();
+if (!entry.ok) throw new Error('物料注册失败');
+```
+
+`createMaterialDefinition(...).define()` 等价于「校验 manifest + 注册 Custom Element」，
+返回值为可放入 catalog 的 entry。自定义元素必须实现 `model` 的 getter/setter——
+宿主写 model，元素自行渲染。
+
+> 注册依赖浏览器 `customElements` 全局，**不能在 Node/SSR 侧调用**；服务端渲染项目只能把注册
+> 放进客户端入口。在 Node 里调用 `define*Material()` 会返回 `ok: false`，且原因不是物料本身有问题。
+
 ## 5. 加载和校验文档
 
 从 API、数据库、文件或 URL 得到的值都视为不可信输入，进入 Viewer/Designer 前使用
@@ -689,7 +792,46 @@ designer.addEventListener(
 instanceId、documentRevision 与当前背景值）；宿主弹出框、资产目录与上传全部归宿主，Base
 Screen 不内嵌选择器。
 
-### 7.3 配置 Designer 主题
+### 7.3 程序化插入组件实例
+
+需要由宿主代码（自动化测试、AI 生成大屏、模板实例化）往文档里加组件时，用
+`designer.insertComponent(intent)`。它按物料 manifest 的默认值构造节点，因此宿主不必自己把
+`defaultSize` / `defaultProps` / `defaultStyle` / 数据源再展开一遍：
+
+```ts
+const inserted = designer.insertComponent({
+  materialType: 'acme.stock-card',
+  // name 与 position 都可省略：省略 position 时放在当前可见画布中心。
+  name: '仓库 A',
+  position: { x: 120, y: 80 },
+});
+if (!inserted.ok) showDiagnostics(inserted.diagnostics);
+```
+
+语义边界：
+
+- 只按 manifest 默认值建节点，**不接受自定义 props/style**；需要改值时插入后再发
+  `update-components`（发 `props` 时请展开既有 props，见下一条注意）。
+- 位置保证整体落在画布内；超出右/下边界时贴边而不是溢出。
+- 一次事务提交，因此可撤销；成功后新组件成为唯一选中项。
+- 物料必须已在该实例的 catalog 中且未设 `libraryVisible: false`，否则失败关闭。
+
+> **`update-components` 的 `patch` 按顶层键整体替换。** 想只改 `props.stock` 时必须把完整
+> `props` 拼出来（如 `patch: { props: { ...component.props, stock: 9 } }`）；只发
+> `{ props: { stock: 9 } }` 会丢掉 schema 里同样必填的其他字段，提交时被
+> `propsSchema` 拒绝。
+
+### 7.4 组件名的可编辑位置
+
+Designer 的**属性面板不提供组件 `name` 字段**——它只呈现几何属性与物料 manifest 声明
+的 `propertyPanel` / `stylePanel` 字段。canonical 组件名有两处修改途径：
+
+- 图层列表双击条目重命名（面向用户）；
+- 宿主发 `update-components` 且 `patch: { name }`（面向前述自动化场景）。
+
+把这条当成能力边界而非缺陷；需求评审时若要求"在属性面板改组件名"，应改用上述两处之一。
+
+### 7.5 配置 Designer 主题
 
 `base-screen-designer` 提供 CSS Custom Properties，用于让 Designer 的顶栏、工具栏、面板、
 菜单、对话框、控件和自有滚动条与宿主的视觉语义保持一致。主题只作用于 Designer chrome：

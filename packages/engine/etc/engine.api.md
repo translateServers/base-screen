@@ -36,6 +36,7 @@ import { ScreenInteractionState } from '@base-screen/core';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
+import { ScreenPosition } from '@base-screen/contracts';
 import type { ScreenProjectAdapter } from '@base-screen/contracts';
 import type { ScreenProjectCatalogPort } from '@base-screen/contracts';
 import { ScreenProjectEnvelope } from '@base-screen/contracts';
@@ -373,6 +374,14 @@ export interface BaseScreenCanvasPresentationChangeEventDetail {
 export type BaseScreenCanvasScaleMode = 'fill' | 'fit' | 'width' | 'height' | 'original' | 'none';
 
 // @public (undocumented)
+export interface BaseScreenComponentInsertionIntent {
+    // (undocumented)
+    readonly materialType: string;
+    readonly name?: string;
+    readonly position?: ScreenPosition;
+}
+
+// @public (undocumented)
 export interface BaseScreenDesignerBackRequestEventDetail {
     // (undocumented)
     readonly source: 'topbar';
@@ -503,6 +512,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     importDocument(document: unknown): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     importProject(name: string, document: ScreenDocument): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
+    insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     insertHostResource(intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<ScreenDocument>;
     // (undocumented)
@@ -818,6 +828,9 @@ const ElementBase: {
 
 // @public (undocumented)
 export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasCommand>;
+
+// @public (undocumented)
+export function parseBaseScreenComponentInsertionIntent(input: unknown): ScreenParseResult<BaseScreenComponentInsertionIntent>;
 
 // @public (undocumented)
 export function parseBaseScreenDesignerLeftPanelGroups(input: unknown): ScreenParseResult<readonly BaseScreenDesignerLeftPanelGroup[]>;

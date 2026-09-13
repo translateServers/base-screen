@@ -11,7 +11,10 @@ import {
   type ScreenPosition,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
-import { roundScreenGeometry } from '../element/designer-geometry.js';
+import {
+  clipMaterialPositionToCanvas,
+  createMaterialComponent,
+} from '../material-component/material-component.js';
 
 export const BASE_SCREEN_HOST_RESOURCE_DRAG_MIME =
   'application/x-base-screen-host-resource' as const;
@@ -166,22 +169,12 @@ export function createHostResourceComponent(
   intent: BaseScreenHostResourceAuthoringIntent,
   position: ScreenPosition,
 ): ScreenComponentNode {
-  return {
-    id: nextComponentId(document, manifest.type),
-    type: manifest.type,
-    name: intent.name ?? manifest.name,
-    parentId: null,
-    position: clampPositionToCanvas(document, manifest, position),
-    size: manifest.defaultSize,
-    rotation: 0,
-    zIndex:
-      document.components.reduce((maximum, component) => Math.max(maximum, component.zIndex), -1) +
-      1,
-    status: { locked: false, hidden: false },
-    props: manifest.defaultProps,
-    style: manifest.defaultStyle,
+  // 节点构造与 id 生成共用物料组件工厂，避免第三份实现漂移。
+  return createMaterialComponent(document, manifest, {
+    position: clipMaterialPositionToCanvas(document, manifest, position),
+    ...(intent.name === undefined ? {} : { name: intent.name }),
     dataSource: intent.dataSource,
-  };
+  });
 }
 
 export function centeredHostResourcePosition(
@@ -189,39 +182,10 @@ export function centeredHostResourcePosition(
   manifest: BaseScreenMaterialManifest,
   center: ScreenPosition,
 ): ScreenPosition {
-  return clampPositionToCanvas(document, manifest, {
+  return clipMaterialPositionToCanvas(document, manifest, {
     x: center.x - manifest.defaultSize.width / 2,
     y: center.y - manifest.defaultSize.height / 2,
   });
-}
-
-function clampPositionToCanvas(
-  document: ScreenDocument,
-  manifest: BaseScreenMaterialManifest,
-  position: ScreenPosition,
-): ScreenPosition {
-  return {
-    x: roundScreenGeometry(
-      Math.max(
-        0,
-        Math.min(position.x, Math.max(0, document.canvas.width - manifest.defaultSize.width)),
-      ),
-    ),
-    y: roundScreenGeometry(
-      Math.max(
-        0,
-        Math.min(position.y, Math.max(0, document.canvas.height - manifest.defaultSize.height)),
-      ),
-    ),
-  };
-}
-
-function nextComponentId(document: ScreenDocument, type: string): string {
-  const base = type.replace(/[^A-Za-z0-9]+/g, '-');
-  let index = document.components.length + 1;
-  const ids = new Set(document.components.map((component) => component.id));
-  while (ids.has(`${base}-${index}`)) index++;
-  return `${base}-${index}`;
 }
 
 function intentValidationDocument(input: Record<string, unknown>): unknown {

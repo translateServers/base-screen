@@ -8,24 +8,11 @@ import type {
 import { parseScreenJsonValue } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
-  BaseScreenMaterialManifest,
   BaseScreenPluginDataResourceTypeContribution,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 
-export function createInitialDataSource(
-  manifest: BaseScreenMaterialManifest | undefined,
-): ScreenComponentDataSource | null {
-  return manifest?.defaultData === undefined
-    ? null
-    : {
-        type: 'static',
-        value: manifest.defaultData,
-        ...(manifest.staticData?.kind === 'tabular'
-          ? { binding: manifest.staticData.defaultBinding }
-          : {}),
-      };
-}
+export { createInitialMaterialDataSource as createInitialDataSource } from '../../../common/operations/material-component/material-component.js';
 
 export function readDataSourceFields(
   target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,

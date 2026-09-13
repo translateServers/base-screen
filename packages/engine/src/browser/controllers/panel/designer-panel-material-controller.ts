@@ -1,4 +1,5 @@
-import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
+import type { ScreenComponentNode } from '@base-screen/contracts';
+import { nextMaterialComponentId } from '../../../common/operations/material-component/material-component.js';
 import {
   type BaseScreenMaterialLibraryGrouping,
   hasMaterialLibraryGroup,
@@ -192,7 +193,7 @@ export class DesignerPanelMaterialController {
     const index = document.components.length;
     const manifest = item.manifest;
     const component: ScreenComponentNode = {
-      id: nextComponentId(document, manifest.type),
+      id: nextMaterialComponentId(document, manifest.type),
       type: manifest.type,
       name: manifest.name,
       parentId: null,
@@ -351,12 +352,4 @@ export class DesignerPanelMaterialController {
       ? undefined
       : { id, materialType: entry.manifest.type, manifest: entry.manifest };
   }
-}
-
-function nextComponentId(document: ScreenDocument, type: string): string {
-  const base = type.replace(/[^A-Za-z0-9]+/g, '-');
-  let index = document.components.length + 1;
-  const ids = new Set(document.components.map((component) => component.id));
-  while (ids.has(`${base}-${index}`)) index++;
-  return `${base}-${index}`;
 }

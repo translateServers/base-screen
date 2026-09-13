@@ -1,6 +1,8 @@
 import type {
   ScreenDesignerHostAdapter,
+  ScreenDocument,
   ScreenParseResult,
+  ScreenPosition,
   ScreenProjectEnvelope,
   ScreenProjectSummary,
 } from '@base-screen/contracts';
@@ -19,6 +21,7 @@ import {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenCanvasBackgroundImageRequest,
   type BaseScreenCanvasPresentationChangeEventDetail,
+  type BaseScreenComponentInsertionIntent,
   BaseScreenDesignerElement,
   type BaseScreenDesignerLeftPanelGroup,
   type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
@@ -29,6 +32,7 @@ import {
   type BaseScreenMaterialLibraryItem,
   createBaseScreenCorePluginCommandPort,
   createBaseScreenCorePluginDesignReadPort,
+  parseBaseScreenComponentInsertionIntent,
   parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenHostResourceAuthoringIntent,
   parseBaseScreenMaterialLibraryGrouping,
@@ -115,6 +119,23 @@ describe('engine public lifecycle API', () => {
     expectTypeOf<
       InstanceType<typeof BaseScreenDesignerElement>['replaceHostResource']
     >().parameters.toEqualTypeOf<[string, BaseScreenHostResourceAuthoringIntent]>();
+  });
+
+  it('exports the component insertion contract for host automation', () => {
+    // 宿主此前只能手搓完整 ScreenComponentNode 或驱动私有拖放；这条公开入口让
+    // 自动化测试、AI 生成大屏与模板实例化有合规路径。
+    expectTypeOf<typeof parseBaseScreenComponentInsertionIntent>().returns.toEqualTypeOf<
+      ScreenParseResult<BaseScreenComponentInsertionIntent>
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['insertComponent']
+    >().parameters.toEqualTypeOf<[BaseScreenComponentInsertionIntent]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['insertComponent']
+    >().returns.toEqualTypeOf<ScreenParseResult<ScreenDocument>>();
+    expectTypeOf<BaseScreenComponentInsertionIntent['position']>().toEqualTypeOf<
+      ScreenPosition | undefined
+    >();
   });
 
   it('exports the canvas presentation host change contract', () => {

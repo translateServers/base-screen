@@ -1,4 +1,3 @@
-import type { ScreenDocument } from '@base-screen/contracts';
 import {
   clampScreenCoordinate,
   roundScreenGeometry,
@@ -7,6 +6,7 @@ import {
   BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
   parseBaseScreenHostResourceDragData,
 } from '../../../common/operations/host-resource/host-resource-authoring.js';
+import { nextMaterialComponentId } from '../../../common/operations/material-component/material-component.js';
 import { createInitialDataSourceForMaterialLibraryItem } from '../../../common/operations/material-library/material-library-items.js';
 import type { DesignerToolId } from '../../../common/tools/designer-tools.js';
 import { createInitialDataSource } from '../../dom/panel/designer-panel-dom.js';
@@ -97,7 +97,7 @@ export class DesignerCreateGesture {
         {
           type: 'add-component',
           component: {
-            id: nextComponentId(document, entry.manifest.type),
+            id: nextMaterialComponentId(document, entry.manifest.type),
             type: entry.manifest.type,
             name: entry.manifest.name,
             parentId: null,
@@ -216,7 +216,7 @@ export class DesignerCreateGesture {
         {
           type: 'add-component',
           component: {
-            id: nextComponentId(document, manifest.type),
+            id: nextMaterialComponentId(document, manifest.type),
             type: manifest.type,
             name: manifest.name,
             parentId: null,
@@ -262,14 +262,6 @@ export class DesignerCreateGesture {
     preview.style.width = `${Math.max(1, rect.width)}px`;
     preview.style.height = `${Math.max(1, rect.height)}px`;
   }
-}
-
-function nextComponentId(document: ScreenDocument, type: string): string {
-  const base = type.replace(/[^A-Za-z0-9]+/g, '-');
-  let index = document.components.length + 1;
-  const ids = new Set(document.components.map((component) => component.id));
-  while (ids.has(`${base}-${index}`)) index++;
-  return `${base}-${index}`;
 }
 
 function normalizedRect(start: DesignerGesturePoint, end: DesignerGesturePoint) {
