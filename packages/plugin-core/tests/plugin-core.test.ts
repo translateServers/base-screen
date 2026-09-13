@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   type BaseScreenMaterialConstructor,
+  type BaseScreenPluginPanelElement,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
   parseBaseScreenMaterialEventDetail,
@@ -980,5 +981,24 @@ describe('plugin manifests and catalogs', () => {
       'acme.zeta-card',
     ]);
     expect(excluded.get('acme.alpha-card')).toBeUndefined();
+  });
+});
+
+describe('plugin panel element model contract', () => {
+  it('permits an unset model so panels can render before the first snapshot', () => {
+    // Engine 先挂载面板元素（触发 connectedCallback），再写入快照；文档未就绪时整轮不写。
+    // 因此契约必须允许 model 为 undefined，否则按类型实现的元素会在挂载时崩溃。
+    const element: BaseScreenPluginPanelElement = {
+      model: undefined,
+    } as unknown as BaseScreenPluginPanelElement;
+    expect(element.model).toBeUndefined();
+
+    const set: BaseScreenPluginPanelElement['model'] = {
+      document: {} as never,
+      selectedComponentIds: [],
+      focusedComponentId: null,
+    };
+    element.model = set;
+    expect(element.model).toBe(set);
   });
 });

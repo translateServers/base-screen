@@ -18,7 +18,7 @@ export class HarnessPluginPanelElement extends HTMLElement implements BaseScreen
     this.attachShadow({ mode: 'open' });
   }
 
-  set model(value: BaseScreenPluginDesignSnapshot) {
+  set model(value: BaseScreenPluginDesignSnapshot | undefined) {
     this.#model = value;
     this.#writes += 1;
     this.#render();

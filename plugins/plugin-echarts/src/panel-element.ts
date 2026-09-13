@@ -10,6 +10,10 @@ import { PLUGIN_ECHARTS_PANEL_ID, PLUGIN_ECHARTS_TOGGLE_COMMAND_ID } from './plu
  * 左栏图表概览面板：宿主写 model（设计快照），元素自渲染聚焦图表的系列类型，
  * 按钮经 base-screen-plugin-panel-action 回调本插件的贡献命令——panelId 与命令
  * 归属由 Engine 校验。不注入 render function、不依赖 Engine 私有 DOM。
+ *
+ * `model` 在首次写入前是 undefined（Engine 先挂载再写快照，文档未就绪时整轮不写），
+ * 所以这里如实返回 undefined，并让渲染在无 model 时降级——不要在 `connectedCallback`
+ * 里假设 model 已经存在。
  */
 export class PluginEchartsPanelElement extends HTMLElement implements BaseScreenPluginPanelElement {
   #model: BaseScreenPluginDesignSnapshot | undefined;
@@ -18,14 +22,11 @@ export class PluginEchartsPanelElement extends HTMLElement implements BaseScreen
     return [];
   }
 
-  get model(): BaseScreenPluginDesignSnapshot {
-    if (this.#model === undefined) {
-      throw new Error('Panel model has not been set.');
-    }
+  get model(): BaseScreenPluginDesignSnapshot | undefined {
     return this.#model;
   }
 
-  set model(value: BaseScreenPluginDesignSnapshot) {
+  set model(value: BaseScreenPluginDesignSnapshot | undefined) {
     this.#model = value;
     this.#render();
   }

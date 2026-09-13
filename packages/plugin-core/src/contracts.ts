@@ -308,9 +308,15 @@ export interface BaseScreenPluginPanelActionDetail {
   readonly args: ScreenJsonValue;
 }
 
-/** 与 BaseScreenMaterialElement 同形：宿主写入 model，元素自行渲染；不得注入 render function 或 DOM 节点。 */
+/**
+ * 与 BaseScreenMaterialElement 同形：宿主写入 model，元素自行渲染；不得注入 render function 或 DOM 节点。
+ *
+ * `model` 在首次写入前为 `undefined`：Engine 先挂载元素（触发 `connectedCallback`），再写入快照；
+ * 文档尚未就绪时可能整轮都不写入。因此面板元素必须能在没有 model 时安全渲染（例如显示"未选中"），
+ * 不得假设 `connectedCallback` 时 model 已存在。
+ */
 export interface BaseScreenPluginPanelElement extends HTMLElement {
-  model: BaseScreenPluginDesignSnapshot;
+  model: BaseScreenPluginDesignSnapshot | undefined;
 }
 
 export type BaseScreenPluginCommandHandler = (

@@ -637,7 +637,7 @@ export interface BaseScreenPluginPanelConstructor extends CustomElementConstruct
 // @public
 export interface BaseScreenPluginPanelElement extends HTMLElement {
     // (undocumented)
-    model: BaseScreenPluginDesignSnapshot;
+    model: BaseScreenPluginDesignSnapshot | undefined;
 }
 
 // @public (undocumented)

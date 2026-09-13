@@ -1163,6 +1163,39 @@ const manager = createBaseScreenPluginManager({
 });
 ```
 
+#### 插件面板元素的生命周期
+
+面板元素（`kind: 'panel'` 贡献的 tagName）与自定义检查器控件不同：**`model` 在首次写入前是
+`undefined`**。Engine 先挂载元素（触发 `connectedCallback`），再按文档代际/选区变化写入快照；
+文档尚未就绪时可能整轮都不写。因此面板元素必须：
+
+- 在 `model` 为 `undefined` 时也能安全渲染（例如显示"未选中"降级态）；
+- **不要**在 `connectedCallback` 里假设 `model` 已存在，也不要把 getter 实现成
+  `model` 未赋值就 throw——那会让面板一挂载就崩。
+
+`BaseScreenPluginPanelElement['model']` 的类型已声明为
+`BaseScreenPluginDesignSnapshot | undefined`，如实反映这一时序：
+
+```ts
+class AcmeMonitorPanelElement extends HTMLElement implements BaseScreenPluginPanelElement {
+  #model: BaseScreenPluginDesignSnapshot | undefined;
+
+  get model(): BaseScreenPluginDesignSnapshot | undefined {
+    return this.#model;
+  }
+  set model(value: BaseScreenPluginDesignSnapshot | undefined) {
+    this.#model = value;
+    this.render();
+  }
+  connectedCallback(): void {
+    this.render(); // model 可能仍是 undefined，render 必须容忍。
+  }
+}
+```
+
+自定义检查器控件（`kind: 'inspectorControl'`）没有这个问题：Engine 在把它挂进面板**之前**
+就写好了 `model` 与初值。
+
 不使用编排辅助时，按下一例手工装配；`createCommandPort` 只在授予 `command.execute` 时需要，
 未授予可直接省略：
 
