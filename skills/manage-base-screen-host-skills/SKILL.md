@@ -13,17 +13,17 @@ itself and it never changes a material registration file.
 
 Prefer the shortest safe path:
 
-- First setup or managed upgrade: from the Base Screen repository, run the supplier once with
-  `--host <host-root>`. The command is idempotent: it detects first install, managed upgrade, or
-  legacy-layout migration, installs the toolkit under `.base-screen/tooling`, creates missing config,
-  registers the unified `base-screen:skills` package script, validates the export, and refreshes both
-  host Skills.
+- First setup or managed upgrade: run the supplier once with `--host <host-root>`. The command is
+  idempotent: it detects first install, managed upgrade, or legacy-layout migration, installs the
+  toolkit under `.base-screen/tooling`, creates missing config, registers the unified
+  `base-screen:skills` package script, validates the export, and refreshes both host Skills.
+  Run it from the Base Screen checkout, or from an unpacked host Skill kit (see *Getting the kit*).
 - Routine refresh: from the host root, run `pnpm base-screen:skills`. It pulls the latest snapshot
   and atomically refreshes the canonical snapshot and both generated Skills.
 - CI: run `pnpm base-screen:skills verify`. It is offline and needs no token.
 
 ```text
-node skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <host-root>
+node <kit>/skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <host-root>
 cd <host-root>
 pnpm base-screen:skills
 pnpm base-screen:skills verify
@@ -31,6 +31,21 @@ pnpm base-screen:skills verify
 
 The only required host-specific implementation is the snapshot package script. The host owns it
 because it already has the correct authentication, tenant selection, and catalog filtering logic.
+
+## Getting the kit without cloning Base Screen
+
+External hosts do not need the Base Screen repository. Ask the supplier for the packaged host Skill
+kit (the supplier runs `pnpm pack:host-skill-kit`, producing `base-screen-host-skill-kit/` and a
+matching `.tgz`). Unpack it anywhere and run the supplier command above from there.
+
+**Prerequisite:** the generators validate host snapshots with the public Base Screen packages, so
+the **host workspace must have the same-batch `@base-screen/contracts`, `@base-screen/core`,
+`@base-screen/plugin-core` and `@base-screen/plugin-sdk` installed**; add `@base-screen/react` or
+`@base-screen/vue` only when the host authors React or Vue materials. `plugin-sdk` is required even
+for native materials because the generated material Skill tells authors to call
+`createMaterialDefinition` from it. If a package is missing, the generator exits with a message
+telling you to install it; it never bundles or downloads those packages itself.
+
 
 ## Repository contract
 
@@ -114,11 +129,12 @@ on failure.
 
 ## Toolkit updates
 
-The Base Screen source repository supplies the managed toolkit (two generators, the coordinator, the
-shared handoff helper, and the snapshot module) with:
+The supplier ships the managed toolkit (two generators, the coordinator, the shared package loader,
+the handoff helper, and the snapshot module) as the packaged host Skill kit. Run the supplier once
+per update:
 
 ```text
-node skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <host-root>
+node <kit>/skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <host-root>
 ```
 
 The supplier records source and per-file digests in `.base-screen/host-skill-tooling.json`. It

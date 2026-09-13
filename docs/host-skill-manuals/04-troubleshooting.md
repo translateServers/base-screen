@@ -10,7 +10,7 @@
 处理：从 Base Screen 仓库再次执行安装命令：
 
 ```text
-node skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
+node <kit>/skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
 ```
 
 命令会判断是首次安装还是受管升级。若报"manually changed managed file"或"Refusing to

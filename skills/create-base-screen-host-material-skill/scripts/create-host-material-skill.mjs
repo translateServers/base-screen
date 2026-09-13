@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, rename, rm, stat, writeFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import { homedir, tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { loadBaseScreenModule as loadModule } from '../../shared/host-package-loader.mjs';
 import { validateMaterialProvenance } from '../../shared/material-handoff.mjs';
 import {
   materialCatalogDigest,
@@ -712,42 +712,6 @@ async function loadPublicApis() {
   if (missing.length > 0)
     throw new Error(`Base Screen public packages are missing exports: ${missing.join(', ')}`);
   return all;
-}
-
-async function loadModule(packageName, fallback) {
-  try {
-    const entry = resolveHostPackage(packageName);
-    return await import(pathToFileURL(entry).href);
-  } catch {
-    try {
-      return await import(pathToFileURL(fallback).href);
-    } catch (error) {
-      throw new Error(
-        `Cannot load ${packageName}; build or install Base Screen public packages first: ${error.message}`,
-      );
-    }
-  }
-}
-
-function resolveHostPackage(packageName) {
-  const roots = [
-    process.env.BASE_SCREEN_HOST_WORKSPACE_ROOT,
-    process.cwd(),
-    join(process.cwd(), 'frontend'),
-  ].filter((root) => typeof root === 'string' && root.length > 0);
-  const seen = new Set();
-  for (const root of roots) {
-    const workspaceRoot = resolve(root);
-    if (seen.has(workspaceRoot)) continue;
-    seen.add(workspaceRoot);
-    try {
-      const require = createRequire(join(workspaceRoot, 'package.json'));
-      return require.resolve(packageName, { conditions: new Set(['node', 'import']) });
-    } catch {
-      // Try the next workspace root, then use the checked-out package as a fallback.
-    }
-  }
-  throw new Error(`Cannot resolve ${packageName} from the host workspace.`);
 }
 
 async function findRepoRoot() {

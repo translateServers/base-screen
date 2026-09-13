@@ -14,7 +14,7 @@
 在 Base Screen 仓库执行：
 
 ```text
-node skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
+node <kit>/skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
 ```
 
 这个命令是幂等的，会一次性完成：

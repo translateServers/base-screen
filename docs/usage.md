@@ -140,11 +140,19 @@ import '@base-screen/material/auto-register';
 `package.json` 提供 `export:base-screen-skill-context` 脚本。该脚本负责复用宿主现有认证和目录
 接口，将脱敏的单一规范快照写入 `BASE_SCREEN_HOST_SKILL_SNAPSHOT_FILE` 指向的临时文件。
 
-然后在 Base Screen 仓库执行一次：
+**不需要克隆 Base Screen 仓库。** 发布方向宿主提供打包好的宿主 Skill 工具包
+（发布方执行 `pnpm pack:host-skill-kit`，产出 `base-screen-host-skill-kit/` 目录与同名 `.tgz`），
+宿主解包到任意位置后，从工具包目录执行一次：
 
 ```text
-node skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
+node <kit>/skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
 ```
+
+**前置条件：** 生成器用 Base Screen 公开包校验快照，因此宿主 workspace 需要装有**同批次**的
+`@base-screen/contracts`、`@base-screen/core`、`@base-screen/plugin-core` 与
+`@base-screen/plugin-sdk`；宿主创作 React / Vue 物料时再按需加 `@base-screen/react` 或
+`@base-screen/vue`。即使只做原生物料也要有 `plugin-sdk`——生成的物料 Skill 会指引作者调用其中的
+`createMaterialDefinition`。缺失时命令会明确提示安装，工具包自身不内嵌也不下载这些包。
 
 这一个命令是幂等的：它会安装或安全更新 `.base-screen/tooling` 下的宿主工具包（不参与 Codex
 Skill 发现）、生成缺失配置、注册统一的 `base-screen:skills` 包脚本，并同步大屏设计与物料创建

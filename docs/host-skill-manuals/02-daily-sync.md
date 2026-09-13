@@ -76,7 +76,7 @@ pnpm base-screen:skills verify
 Base Screen 发布新版本工具包后，再次执行安装命令即可受管升级：
 
 ```text
-node skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
+node <kit>/skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.mjs --host <宿主仓库路径>
 ```
 
 命令会自动判断是升级而不是覆盖，先校验工具包摘要，再整体替换；失败时恢复旧工具包和旧
