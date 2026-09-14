@@ -304,6 +304,13 @@ if (!entry.ok) throw new Error('物料注册失败');
 返回值为可放入 catalog 的 entry。自定义元素必须实现 `model` 的 getter/setter——
 宿主写 model，元素自行渲染。
 
+> **不要给物料宿主元素设置 `width`/`height`。** 渲染器在写入 `model` 之前，已经把 canonical
+> `component.size` 写成宿主元素的像素 `width`/`height`；物料在 `renderMaterial()` 里再写一次
+> 就把它覆盖掉了——最常见的写法 `width: 100%; height: 100%` 会让组件撑满整个画布，而不是声明的
+> 尺寸。内部布局请用子元素的 `width: 100%; height: 100%` 表达，宿主元素本身只设 `display` /
+> `overflow` / 颜色这类不参与几何的属性。`display` 由渲染器按组件 `hidden` 状态接管
+> （`none`/`block`），物料也不要与它争抢。
+
 > 注册依赖浏览器 `customElements` 全局，**不能在 Node/SSR 侧调用**；服务端渲染项目只能把注册
 > 放进客户端入口。在 Node 里调用 `define*Material()` 会返回 `ok: false`，且原因不是物料本身有问题。
 
