@@ -43,9 +43,9 @@ export class PluginEchartsElement extends HTMLElement {
     if (model === undefined || !this.isConnected) {
       return;
     }
+    // 只设 display：宿主元素的宽高由渲染器按 canonical `component.size` 写死，
+    // 这里再写 `100%` 会把组件撑满画布（曾被 E2E 的几何门禁捕获）。
     this.style.display = 'block';
-    this.style.width = '100%';
-    this.style.height = '100%';
     this.style.backgroundColor = readString(model.style.backgroundColor, 'transparent');
     const handle = this.#ensureHandle();
     if (model.dataState.status !== 'ready') {

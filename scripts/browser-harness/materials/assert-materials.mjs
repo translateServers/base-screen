@@ -1676,3 +1676,109 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
     return component?.style?.fill === undo;
   }, paletteBefore.fill);
 }
+
+/**
+ * 目录内每个物料的渲染盒必须等于 canonical `component.size`。
+ *
+ * 唯一例外是 `base.text` 的自适应宽度：宽度由引擎的 `DesignerAutoWidthController` 测量后
+ * 投影回文档，物料写 `max-content` 只是让浏览器可测量（该控制器读的就是物料元素自身的
+ * computed width）。除此之外，物料在 `renderMaterial()` 里写宿主元素的 `width`/`height`
+ * 都会覆盖渲染器写入的像素尺寸——最常见的 `100%/100%` 会让组件撑满整个画布。这个 bug 已在
+ * `plugin-echarts` 与 `plugin-datav-materials` 的四个物料上各出现一次，所以由这条覆盖全目录
+ * 的断言兜底，而不是逐个物料写断言：新增物料不遵守就在这里失败。
+ *
+ * 覆盖所有 catalog 条目（含 `libraryVisible: false` 的容器类物料），并把全部违规一次性报出，
+ * 避免"修一个露一个"。
+ */
+export async function assertMaterialGeometry(page, designer) {
+  await page.waitForFunction(() => window.baseScreenHarness.designer.document !== undefined);
+  const results = await page.evaluate(async () => {
+    const harness = window.baseScreenHarness;
+    const designerInstance = harness.designer;
+    const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    const measured = [];
+
+    // 隐藏物料被公开 `insertComponent` 有意拒绝——那是面向物料库的作者入口。这类物料按
+    // manifest 默认值手搭节点，形状与引擎的 createInitialMaterialDataSource 一致
+    // （tabular 物料必须带 defaultBinding，否则渲染器不会跑 adapter）。
+    const buildComponent = (manifest, id) => ({
+      id,
+      type: manifest.type,
+      name: manifest.name,
+      parentId: null,
+      position: { x: 24, y: 24 },
+      size: manifest.defaultSize,
+      rotation: 0,
+      zIndex: 1,
+      status: { locked: false, hidden: false },
+      props: manifest.defaultProps,
+      style: manifest.defaultStyle,
+      dataSource:
+        manifest.defaultData === undefined
+          ? null
+          : {
+              type: 'static',
+              value: manifest.defaultData,
+              ...(manifest.staticData?.kind === 'tabular'
+                ? { binding: manifest.staticData.defaultBinding }
+                : {}),
+            },
+    });
+
+    let index = 0;
+    for (const entry of harness.catalog.list()) {
+      const type = entry.manifest.type;
+      let id = null;
+      if (entry.manifest.libraryVisible === false) {
+        const probeId = `geometry-probe-${index++}`;
+        const added = designerInstance.executeCommand({
+          type: 'add-component',
+          component: buildComponent(entry.manifest, probeId),
+        });
+        if (!added.ok) {
+          measured.push({ type, error: added.diagnostics.map((item) => item.code).join(',') });
+          continue;
+        }
+        id = probeId;
+      } else {
+        const inserted = designerInstance.insertComponent({ materialType: type });
+        if (!inserted.ok) {
+          measured.push({ type, error: inserted.diagnostics.map((item) => item.code).join(',') });
+          continue;
+        }
+        id = designerInstance.selection.focusedComponentId;
+      }
+      // 渲染器与物料的 renderMaterial 都在本次写入链内同步完成，再等两帧让布局落定。
+      await nextFrame();
+      await nextFrame();
+      const component = designerInstance.document.components.find((item) => item.id === id);
+      const node = designerInstance.shadowRoot.querySelector(
+        `[data-base-screen-component-id=${id ?? ''}]`,
+      );
+      const rect = node?.getBoundingClientRect();
+      measured.push({
+        type,
+        declared: { w: component?.size.width ?? null, h: component?.size.height ?? null },
+        box: rect === undefined ? null : { w: +rect.width.toFixed(2), h: +rect.height.toFixed(2) },
+      });
+      if (id !== null) {
+        designerInstance.executeCommand({ type: 'remove-components', componentIds: [id] });
+        await nextFrame();
+      }
+    }
+    return measured;
+  });
+
+  const offenders = results.filter((row) => {
+    if (row.error !== undefined) return true;
+    if (row.box === null || row.declared.w === null || row.declared.h === null) return true;
+    return Math.abs(row.box.w - row.declared.w) > 1 || Math.abs(row.box.h - row.declared.h) > 1;
+  });
+  if (offenders.length > 0) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_GEOMETRY_FAILED:${JSON.stringify(offenders)}`);
+  }
+  // 至少确认跑过若干物料，避免目录为空时"零违规"假通过。
+  if (results.length < 10) {
+    throw new Error(`BROWSER_HARNESS_MATERIAL_GEOMETRY_EMPTY:${results.length}`);
+  }
+}

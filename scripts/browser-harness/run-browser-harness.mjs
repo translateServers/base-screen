@@ -51,6 +51,7 @@ import {
   assertAuthoringMaterialVisuals,
   assertCoverThumbnail,
   assertImageDensitySize,
+  assertMaterialGeometry,
   assertMaterialGroupNavigation,
   assertMaterialLibraryGrouping,
   assertMaterialLibraryHostState,
@@ -168,6 +169,8 @@ export async function runBrowserHarness(serverPort) {
         await assertDatavMaterialsRender(authoringDesigner, page);
         await assertDatavInspectorControl(authoringDesigner, page);
         await assertDatavCycleCommand(authoringDesigner, page);
+        // 兜底不变式：目录内每个物料的渲染盒必须等于声明尺寸（放最后，避免污染前面的断言）。
+        await assertMaterialGeometry(page, authoringDesigner);
         await page.close();
       }
     },

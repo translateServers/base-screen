@@ -304,12 +304,19 @@ if (!entry.ok) throw new Error('物料注册失败');
 返回值为可放入 catalog 的 entry。自定义元素必须实现 `model` 的 getter/setter——
 宿主写 model，元素自行渲染。
 
-> **不要给物料宿主元素设置 `width`/`height`。** 渲染器在写入 `model` 之前，已经把 canonical
-> `component.size` 写成宿主元素的像素 `width`/`height`；物料在 `renderMaterial()` 里再写一次
-> 就把它覆盖掉了——最常见的写法 `width: 100%; height: 100%` 会让组件撑满整个画布，而不是声明的
-> 尺寸。内部布局请用子元素的 `width: 100%; height: 100%` 表达，宿主元素本身只设 `display` /
-> `overflow` / 颜色这类不参与几何的属性。`display` 由渲染器按组件 `hidden` 状态接管
-> （`none`/`block`），物料也不要与它争抢。
+> **物料渲染盒必须等于 `component.size`。** 渲染器在写入 `model` 之前，已经把 canonical
+> `component.size` 写成宿主元素的像素 `width`/`height`，所以：
+>
+> - **不要**在 `renderMaterial()` 里再写宿主元素的 `width`/`height`——最常见的
+>   `width: 100%; height: 100%` 会把组件撑满整个画布，而不是声明的尺寸。内部布局请用子元素的
+>   `100%` 表达，宿主元素本身只设不参与几何的属性。
+> - **画边框的物料要设 `box-sizing: border-box`**，否则 `borderWidth` 会加在声明尺寸之外
+>   （1px 边框让实际盒子大 2px）。官方形状与容器物料都这么做。
+> - `display` 由渲染器按组件 `hidden` 状态接管（`none`/`block`），物料不要与它争抢。
+>
+> 唯一例外是 `base.text` 的自适应宽度：其宽度由引擎测量后投影回文档，物料写 `max-content`
+> 是为了让浏览器可测量。这条不变式由 `pnpm verify:browser` 的目录级断言
+> （`BROWSER_HARNESS_MATERIAL_GEOMETRY_FAILED`）兜底，覆盖 `catalog` 内每个物料。
 
 > 注册依赖浏览器 `customElements` 全局，**不能在 Node/SSR 侧调用**；服务端渲染项目只能把注册
 > 放进客户端入口。在 Node 里调用 `define*Material()` 会返回 `ok: false`，且原因不是物料本身有问题。

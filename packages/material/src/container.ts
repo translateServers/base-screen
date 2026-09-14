@@ -59,6 +59,9 @@ export class BaseScreenContainerMaterialElement extends BaseScreenOfficialMateri
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
     const { style } = model;
+    // 边框画在组件盒之内：渲染器把 canonical `component.size` 写成宿主元素的像素宽高，
+    // 若按 content-box 解析，1px 边框会让实际盒子比声明尺寸大 2px（与形状物料同因）。
+    this.style.boxSizing = 'border-box';
     applyBackgroundColorOrGradient(this, typeof style.fill === 'string' ? style.fill : '');
     this.style.borderColor = typeof style.borderColor === 'string' ? style.borderColor : '';
     this.style.borderStyle = 'solid';
