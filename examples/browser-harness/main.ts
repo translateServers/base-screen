@@ -72,6 +72,13 @@ import {
   PLUGIN_METRICS_ID,
   PLUGIN_METRICS_RESOURCE_TYPE_ID,
 } from '../../plugins/plugin-metrics/src/index.ts';
+import {
+  createPluginPipelineRuntime,
+  PLUGIN_PIPELINE_ID,
+  PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
+  PLUGIN_PIPELINE_SPOTLIGHT_EVENT,
+  PLUGIN_PIPELINE_TOP_BY_PROCESSOR_ID,
+} from '../../plugins/plugin-pipeline/src/index.ts';
 import { mountFeatureCases } from './feature-cases.ts';
 import {
   defineHarnessInspectorFixtures,
@@ -263,6 +270,7 @@ const pluginManager = createBaseScreenPluginManager({
     createPluginEchartsRuntime(),
     createPluginMetricsRuntime(),
     createPluginDatavRuntime(),
+    createPluginPipelineRuntime(),
   ],
   grantedCapabilities: {
     'browser-harness-authoring': designerAuthoringPluginCapabilities,
@@ -271,6 +279,8 @@ const pluginManager = createBaseScreenPluginManager({
     [PLUGIN_DATAV_ID]: ['command.execute', 'design.read'],
     // 声明者即批准者只在此处是宿主自营插件；蓝图能力仍需宿主支持表认可才生效。
     [PLUGIN_METRICS_ID]: [PLUGIN_METRICS_BLUEPRINT_CAPABILITY],
+    // ADR-0076：运行期插件。动作能力必须显式批准，动作才进入可执行集合。
+    [PLUGIN_PIPELINE_ID]: ['data.process', 'blueprint.action.execute'],
   },
   registry: {
     get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
@@ -823,6 +833,29 @@ const screenDocument = {
           },
         ],
       },
+      {
+        // ADR-0076：引用插件声明的宿主动作。已声明即走宿主动作端口，未声明会被 manager
+        // 失败关闭；这条规则同时是端到端断言的入口（点标题 → 动作执行）。
+        id: 'plugin-action-demo',
+        trigger: {
+          type: 'material-event' as const,
+          componentId: 'subtitle',
+          eventName: 'valueClick',
+        },
+        actions: [
+          {
+            type: 'host-action' as const,
+            actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
+            payload: {
+              kind: 'object' as const,
+              properties: {
+                color: { kind: 'literal' as const, value: '#ffa940' },
+                strokeWidth: { kind: 'literal' as const, value: 3 },
+              },
+            },
+          },
+        ],
+      },
     ],
   },
 };
@@ -1217,8 +1250,37 @@ designer.variablePort = variablePort;
 designer.variableCatalogPort = variableCatalog;
 designer.datasetPort = datasetPort;
 designer.runtimeContributions = pluginManager.snapshot.contributions;
-// ADR-0059 宿主条件样式端口：阈值与视觉映射归宿主告警体系，屏幕只消费结果。
-// 初始化前经守卫 setter 提交（与 resourcePort 同形）；两个元素共用同一宿主实现。
+// ADR-0076：宿主把蓝图宿主动作接到 manager 的插件动作路由。designerHostAdapter 是**聚合**
+// 端口，赋值时会用它自己的字段重写各单项端口，因此这里把宿主已有的端口对象原样透传，
+// 否则会把上面刚设好的 resourcePort/variablePort/datasetPort 一并清空。
+const pluginActionRequests: Array<{ readonly actionId: string; readonly payload: unknown }> = [];
+designer.designerHostAdapter = {
+  capabilities: {
+    projectCatalog: false,
+    projectPreview: false,
+    projectSnapshots: false,
+    resources: true,
+    datasets: true,
+    variableCatalog: true,
+    variables: true,
+    actions: true,
+  },
+  resources: resourcePort,
+  datasets: datasetPort,
+  variableCatalog,
+  variables: variablePort,
+  actions: {
+    async execute(action) {
+      // Engine 只做「已声明」门禁后把请求抛给宿主；宿主再路由到 manager 的插件动作路由。
+      // 未声明的 actionId 由 manager 失败关闭，不会静默成功。
+      pluginActionRequests.push({ actionId: action.actionId, payload: action.payload });
+      await pluginManager.executeBlueprintAction({
+        actionId: action.actionId,
+        payload: action.payload as never,
+      });
+    },
+  },
+};
 const conditionalStylePort = {
   resolve({
     componentId,
@@ -1430,6 +1492,12 @@ Object.assign(window, {
     catalog: designerCatalog,
     designer,
     pluginManager,
+    // ADR-0076：运行期贡献的观察点。
+    pluginActionRequests,
+    applyPluginDataProcessor: (request) => pluginManager.applyDataProcessor(request),
+    pluginPipelineSpotlightEvent: PLUGIN_PIPELINE_SPOTLIGHT_EVENT,
+    pluginPipelineProcessorId: PLUGIN_PIPELINE_TOP_BY_PROCESSOR_ID,
+    pluginPipelineActionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
     viewer,
     hostEvents,
     designerNativeEvents,

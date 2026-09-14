@@ -1380,6 +1380,82 @@ designer.configure({
 `createPluginPackage({ id, plugin, materials? })` 可把插件与可选物料包组合；package `id` 只用于
 宿主诊断，不进入 Screen Document。
 
+### 9.6 插件贡献运行期行为（数据处理器与蓝图宿主动作）
+
+前面几节都是**作者面**贡献：插件加物料、面板、检查器控件，或声明资源类型。若要让插件参与
+**文档的运行时语义**——即 DataV 里"数据过滤器"与"宿主动作"那一类能力——用这两类贡献
+（ADR-0076）：
+
+```ts
+definePlugin({
+  manifest: {
+    id: 'acme.pipeline',
+    dependencies: [],
+    capabilities: ['data.process', 'blueprint.action.execute'],
+    contributions: [
+      // 文档的 dataSource/变量 processorId 引用它
+      { kind: 'dataProcessor', id: 'topBy', name: '取前 N 条',
+        configSchema: { kind: 'object', properties: {
+          field: { kind: 'string' }, count: { kind: 'number' } }, required: ['field', 'count'] } },
+      // 文档的 blueprint host-action.actionId 引用它
+      { kind: 'blueprintAction', id: 'acme.pipeline.spotlight', name: '高亮组件',
+        payloadSchema: { kind: 'object', properties: {}, required: [] },
+        requiredCapability: 'blueprint.action.execute' },
+    ],
+  },
+  dataProcessors: {
+    topBy: (value, config) => ({ ok: true, value: rank(value, config), diagnostics: [] }),
+  },
+  blueprintActions: {
+    'acme.pipeline.spotlight': (payload) => ({ ok: true, value: null, diagnostics: [] }),
+  },
+  // activate / deactivate / dispose 必填，同其它插件
+});
+```
+
+**两个方向都必须是宿主→插件**：宿主（或 Engine）发起请求，manager 把请求路由到上面这两个
+handler 记录里。因此这两项能力**没有端口工厂**——它们不要求宿主为插件提供任何东西，只标记
+"该插件声明的处理器/动作可被执行"。这与 `command.execute`（插件→宿主，需要 `createCommandPort`）
+方向相反，别对齐错。
+
+宿主侧两处接线：
+
+```ts
+// 数据处理器：宿主在自己的变量/数据源解析里按 processorId 组合。
+const processed = await manager.applyDataProcessor({
+  processorId: 'topBy',
+  value: upstream,            // 上游 JSON 值
+  config: { field: 'value', count: 10 },
+});
+
+// 蓝图宿主动作：接到 designerHostAdapter.actions（Host Action Port），
+// 由 Engine 作为宿主动作抛出后转发到 manager。
+designer.designerHostAdapter = {
+  capabilities: { /* ...其余为 false */, actions: true },
+  actions: { async execute(action) { await manager.executeBlueprintAction(action); } },
+};
+```
+
+> **`designerHostAdapter` 是聚合端口。** 赋值时它会用自身的 `resources` / `variables` /
+> `datasets` / `variableCatalog` 字段**重写**对应的单项端口，未提供的会被清空。若宿主既要单项
+> 端口又要宿主动作，必须在适配器里把这些端口对象原样透传，否则刚才设置的端口会被静默清掉。
+
+**行为收紧（ADR-0076 的目的之一）**，接入时注意：
+
+- `host-action.actionId` 此前是个**无授权的通吃端口**——任何 id 都直接交给宿主解释。现在
+  **必须引用已声明动作**：manager 对未声明 id 返回 `PLUGIN_CORE_CONTRIBUTION_UNKNOWN` 失败关闭。
+- `processorId` 此前只是透传给宿主的字符串，**没有任何注册表**。现在未声明的 `processorId`
+  同样失败关闭。依赖这两处宽松行为的存量接入需要改为声明式。
+- 作者面同步反映同一事实：蓝图动作节点与检查器对未声明动作显示"未声明的宿主动作"，而不是
+  让作者配完后在运行期静默失败。
+
+**边界不变**：插件仍是同 realm 受信代码（ADR-0004），这两类贡献不引入用户可编写脚本、
+不引入沙箱、也不给 Base Screen 增加后端/加工职责——实际连接、聚合、脱敏仍归宿主（ADR-0027）。
+用户可在界面里编写过滤代码的那种能力属于另一个决策（需执行隔离），本阶段不做。
+
+完整可运行示例见 [`plugins/plugin-pipeline`](../plugins/plugin-pipeline)——它是首个**只贡献运行期
+行为、零界面元素**的插件；浏览器侧见 `/?designer&case=plugin-runtime`。
+
 ## 10. 物料事件、宿主事件和宿主动作
 
 Viewer 把物料交互冒泡为 `base-screen-material-event`：

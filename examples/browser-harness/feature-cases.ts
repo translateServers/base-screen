@@ -301,6 +301,14 @@ async function applyPluginDatavMaterials(designer: BaseScreenDesignerElement): P
   await painted();
 }
 
+/** 运行期贡献案例：选中挂着插件动作规则的组件，露出宿主动作的声明名。 */
+async function applyPluginRuntime(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  await selectLayer(designer, 'subtitle');
+  await painted();
+}
+
 async function applyDataset(designer: BaseScreenDesignerElement): Promise<void> {
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
@@ -347,6 +355,7 @@ const CASE_APPLIERS = {
   'plugin-material': applyPluginMaterial,
   'plugin-data-resource': applyPluginDataResource,
   'plugin-datav-materials': applyPluginDatavMaterials,
+  'plugin-runtime': applyPluginRuntime,
   dataset: applyDataset,
   'semantic-chart': applySemanticChart,
   blueprint: applyBlueprint,

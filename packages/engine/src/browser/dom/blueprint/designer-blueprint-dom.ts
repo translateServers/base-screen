@@ -132,12 +132,30 @@ function appendInteractionEventGroup(
         : DESIGNER_UI_TEXT.blueprint.capabilityUnavailable;
       event.appendChild(status);
     }
-    eventRules.forEach((rule, index) => event.appendChild(renderRuleCard(panel, rule, index)));
+    eventRules.forEach((rule, index) =>
+      event.appendChild(renderRuleCard(panel, rule, index, runtimeContributions)),
+    );
     body.appendChild(event);
   }
 }
 
-function renderRuleCard(panel: HTMLElement, rule: ScreenBlueprintRule, index: number): HTMLElement {
+function readDeclaredAction(
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+  actionId: string,
+): { readonly name: string } | undefined {
+  try {
+    return runtimeContributions?.getBlueprintAction?.(actionId);
+  } catch {
+    return undefined;
+  }
+}
+
+function renderRuleCard(
+  panel: HTMLElement,
+  rule: ScreenBlueprintRule,
+  index: number,
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+): HTMLElement {
   const card = panel.ownerDocument.createElement('article');
   card.className = 'designer-blueprint-rule-card';
   card.dataset.blueprintSummaryRule = rule.id;
@@ -167,13 +185,19 @@ function renderRuleCard(panel: HTMLElement, rule: ScreenBlueprintRule, index: nu
   if (rule.actions.length === 0) {
     actions.appendChild(blueprintEmpty(panel.ownerDocument, DESIGNER_UI_TEXT.blueprint.noActions));
   } else {
-    for (const action of rule.actions) actions.appendChild(renderAction(panel, action));
+    for (const action of rule.actions) {
+      actions.appendChild(renderAction(panel, action, runtimeContributions));
+    }
   }
   card.append(header, facts, actions);
   return card;
 }
 
-function renderAction(panel: HTMLElement, action: ScreenBlueprintAction): HTMLElement {
+function renderAction(
+  panel: HTMLElement,
+  action: ScreenBlueprintAction,
+  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
+): HTMLElement {
   const row = panel.ownerDocument.createElement('div');
   row.className = 'designer-blueprint-action-row';
   const title = panel.ownerDocument.createElement('strong');
@@ -194,7 +218,13 @@ function renderAction(panel: HTMLElement, action: ScreenBlueprintAction): HTMLEl
     title.textContent = `request-component-data · ${action.componentId}`;
     value.textContent = DESIGNER_UI_TEXT.blueprint.layers;
   } else {
-    title.textContent = DESIGNER_UI_TEXT.blueprint.hostAction(action.actionId);
+    // ADR-0076：宿主动作由插件声明。已声明显示其清单名，未声明明确标出——
+    // 执行侧同样会失败关闭，作者面提前把同一事实讲清楚。
+    const declared = readDeclaredAction(runtimeContributions, action.actionId);
+    title.textContent =
+      declared === undefined
+        ? DESIGNER_UI_TEXT.blueprint.hostActionUndeclared(action.actionId)
+        : DESIGNER_UI_TEXT.blueprint.hostActionDeclared(declared.name, action.actionId);
     value.textContent = expressionSummary(action.payload);
   }
   row.append(title, value);

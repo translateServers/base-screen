@@ -216,7 +216,7 @@ export function buildDesignerBlueprintGraph(
               ruleId: rule.id,
               actionIndex,
               action,
-              summary: summarizeDesignerBlueprintAction(action, actionIndex),
+              summary: summarizeDesignerBlueprintAction(action, actionIndex, runtimeContributions),
             },
             saved,
           ),

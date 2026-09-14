@@ -91,6 +91,17 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'plugin-runtime',
+    title: '插件运行期贡献',
+    summary: '插件声明的数据处理器与蓝图宿主动作：变换值、执行动作，未声明则失败关闭。',
+    lookAt:
+      '选中「副标题」，交互面板里宿主动作显示插件声明名「高亮选中组件」；控制台可调 applyPluginDataProcessor。',
+    packages: ['plugin-core', 'plugin-manager', 'engine'],
+    focused: 'pnpm --filter @base-screen/plugin-manager test',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'dataset',
     title: '数据集排行卡',
     summary: '宿主数据集绑定、字段映射与四态渲染。',

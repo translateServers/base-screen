@@ -297,6 +297,18 @@
   也可由宿主显式 ensureActive。懒激活失败记入 snapshot.failures 并失败关闭、拒绝重试；
   deactivate 只回收真正运行过的插件。eager 行为保持缺省不变。
 
+- **插件运行期贡献**（2026-09-14，[ADR-0076](../decisions/ADR-0076-plugin-blueprint-actions-and-data-processors.md)）：
+  新增 `kind: 'blueprintAction'` 与 `kind: 'dataProcessor'` 两类贡献，使插件首次能参与**文档的运行时
+  语义**，而不只是作者面。此前两处是"声明侧存在、供给侧缺失"：`processorId` 只是透传给宿主的字符串
+  （无任何注册表），`host-action.actionId` 既无注册表也无授权（宿主自由解释任何 id）。现在两者都必须
+  引用已声明贡献，未声明失败关闭（`PLUGIN_CORE_CONTRIBUTION_UNKNOWN`）；`blueprintAction` 的
+  `requiredCapability` 走"声明 ∩ 批准 ∩ 支持"，与 command 一致。两项能力（`data.process`、
+  `blueprint.action.execute`）都是**宿主→插件**方向，因此无端口工厂——manager 经
+  `executeBlueprintAction` / `applyDataProcessor` 路由到插件自己的 handler 记录，Engine 永不直接调用
+  插件代码（ADR-0029）。**未修改 screen-document 契约**：两个 id 本就是既有模式下的不透明字符串，
+  schema、黄金产物与解析器均未变。插件仍是同 realm 受信代码（ADR-0004），不引入用户脚本执行与沙箱，
+  数据加工职责仍归宿主（ADR-0027）。示例见 [`plugins/plugin-pipeline`](../../plugins/plugin-pipeline)。
+
 ## 历史迁移
 
 - **Nebula Importer**：离线 legacy export 转换、审计报告与 provenance。

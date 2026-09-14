@@ -69,6 +69,11 @@ import {
   assertPluginCommandDocumentLoop,
   assertPluginPanelLoop,
 } from './plugins/assert-plugins.mjs';
+import {
+  assertPluginBlueprintActionExecutes,
+  assertPluginBlueprintActionUndeclaredFailsClosed,
+  assertPluginDataProcessor,
+} from './plugins/assert-runtime-contributions.mjs';
 import { assertRuntimeData } from './runtime/assert-runtime-data.mjs';
 import { screenshotDirectory } from './shared/constants.mjs';
 import { openViewport } from './shared/open-viewport.mjs';
@@ -169,6 +174,10 @@ export async function runBrowserHarness(serverPort) {
         await assertDatavMaterialsRender(authoringDesigner, page);
         await assertDatavInspectorControl(authoringDesigner, page);
         await assertDatavCycleCommand(authoringDesigner, page);
+        // ADR-0076：插件运行期贡献（处理器变换、动作执行、未声明失败关闭）。
+        await assertPluginDataProcessor(page);
+        await assertPluginBlueprintActionExecutes(page);
+        await assertPluginBlueprintActionUndeclaredFailsClosed(page);
         // 兜底不变式：目录内每个物料的渲染盒必须等于声明尺寸（放最后，避免污染前面的断言）。
         await assertMaterialGeometry(page, authoringDesigner);
         await page.close();

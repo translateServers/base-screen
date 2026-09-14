@@ -164,6 +164,10 @@ export const DESIGNER_BLUEPRINT_UI_TEXT = {
   setVariableAction: (variableId: string) => `更新全局变量 · ${variableId}`,
   emitHostEventAction: (eventName: string) => `发送宿主事件 · ${eventName}`,
   hostAction: (actionId: string) => `执行宿主动作 · ${actionId}`,
+  /** 动作名取自插件声明（ADR-0076）：作者面显示声明名，未声明时明确标出而不是静默执行失败。 */
+  hostActionDeclared: (name: string, actionId: string) => `${name} · ${actionId}`,
+  hostActionUndeclared: (actionId: string) => `未声明的宿主动作 · ${actionId}`,
+  actionNotDeclared: '未声明',
   visibilityAction: '组件显隐',
   visibilityTransition: '过渡效果',
   literalValue: (value: string) => `固定值 ${value}`,

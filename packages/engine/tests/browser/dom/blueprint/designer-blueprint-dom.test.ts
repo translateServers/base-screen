@@ -112,6 +112,25 @@ function authority(...capabilities: string[]): BaseScreenRuntimeContributionInde
   };
 }
 
+/** ADR-0076：带一个已声明动作的索引，用于验证作者面显示声明名。 */
+function authorityWithAction(actionId: string, name: string): BaseScreenRuntimeContributionIndex {
+  return {
+    getResourceType: () => undefined,
+    hasBlueprintCapability: () => true,
+    getBlueprintAction: (candidate) =>
+      candidate === actionId
+        ? {
+            kind: 'blueprintAction',
+            id: actionId,
+            name,
+            payloadSchema: { kind: 'object', properties: {}, required: [] },
+            requiredCapability: 'blueprint.action.execute',
+          }
+        : undefined,
+    listBlueprintActions: () => [],
+  };
+}
+
 function catalog(): BaseScreenMaterialCatalog {
   return {
     get: () => ({
@@ -244,11 +263,74 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
     expect(text).toContain('事件数据 · amount 大于等于 固定值 10');
     expect(text).toContain('更新全局变量 · selectedAmount');
     expect(text).toContain('发送宿主事件 · chart-selection');
-    expect(text).toContain('执行宿主动作 · focus-record');
+    // ADR-0076：该索引进没有声明 focus-record，作者面必须明确标为未声明，
+    // 而不是沿用过时的 "执行宿主动作" 文案让作者误以为可用。
+    expect(text).toContain('未声明的宿主动作 · focus-record');
     expect(panel.querySelector('[data-blueprint-summary-rule="configured-rule"]')).not.toBeNull();
     const interactionGroup = panel.querySelector<FakeElement>(
       '[data-inspector-search-key="blueprint-interaction-events"]',
     );
     expect(interactionGroup?.dataset.inspectorPreferenceContext).toBe('base.chart');
+  });
+
+  // ADR-0076：动作被插件声明时作者面显示声明名（而非裸 id），与执行面"已声明才可执行"
+  // 同源——作者看到的可用性必须与实际能否执行一致，否则会配出永远不生效的动作。
+  it('shows the declared name for a declared action and marks undeclared ones', () => {
+    const panel = panelElement();
+    const configured = {
+      canvas: { width: 960, height: 540, backgroundColor: '#000000' },
+      components: [
+        {
+          id: 'chart-1',
+          type: 'base.chart',
+          name: 'Chart',
+          parentId: null,
+          position: { x: 0, y: 0 },
+          size: { width: 480, height: 280 },
+          rotation: 0,
+          zIndex: 1,
+          status: { locked: false, hidden: false },
+          props: {},
+          style: {},
+          dataSource: null,
+        },
+      ],
+      variables: [],
+      blueprint: {
+        rules: [
+          {
+            id: 'declared-rule',
+            trigger: {
+              type: 'material-event',
+              componentId: 'chart-1',
+              eventName: 'seriesClick',
+            },
+            actions: [
+              {
+                type: 'host-action',
+                actionId: 'plugin.pipeline.spotlight',
+                payload: { kind: 'literal', value: null },
+              },
+              {
+                type: 'host-action',
+                actionId: 'never.declared',
+                payload: { kind: 'literal', value: null },
+              },
+            ],
+          },
+        ],
+      },
+    };
+    renderDesignerEventsPanel(
+      panel as unknown as HTMLElement,
+      configured as never,
+      { selectedComponentIds: ['chart-1'], focusedComponentId: 'chart-1' },
+      catalog(),
+      authorityWithAction('plugin.pipeline.spotlight', '高亮选中组件'),
+    );
+
+    const text = queryText(panel);
+    expect(text).toContain('高亮选中组件 · plugin.pipeline.spotlight');
+    expect(text).toContain('未声明的宿主动作 · never.declared');
   });
 });
