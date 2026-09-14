@@ -81,6 +81,16 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'plugin-datav-materials',
+    title: '插件大屏组件包',
+    summary: '零第三方依赖的渲染类插件：四个大屏物料 + 自有检查器控件 + 事务命令。',
+    lookAt: '画布上的翻牌器/水位图/轮播列表/装饰边框，以及选中边框后的插件样式选择器。',
+    packages: ['plugin-core', 'plugin-manager', 'engine', 'plugin-sdk'],
+    focused: 'pnpm --filter @base-screen/plugin-datav-materials test',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'dataset',
     title: '数据集排行卡',
     summary: '宿主数据集绑定、字段映射与四态渲染。',

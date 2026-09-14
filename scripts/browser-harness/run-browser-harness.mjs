@@ -56,6 +56,9 @@ import {
   assertMaterialLibraryHostState,
 } from './materials/assert-materials.mjs';
 import {
+  assertDatavCycleCommand,
+  assertDatavInspectorControl,
+  assertDatavMaterialsRender,
   assertPluginBlueprintCapability,
   assertPluginMaterialRenders,
   assertPluginResourceTypeSelectable,
@@ -161,6 +164,10 @@ export async function runBrowserHarness(serverPort) {
         await assertPluginMaterialRenders(authoringDesigner, page);
         await assertPluginResourceTypeSelectable(authoringDesigner, page);
         await assertPluginBlueprintCapability(page);
+        // 大屏组件插件：元素内部结构、自有检查器控件、事务命令三条承载面。
+        await assertDatavMaterialsRender(authoringDesigner, page);
+        await assertDatavInspectorControl(authoringDesigner, page);
+        await assertDatavCycleCommand(authoringDesigner, page);
         await page.close();
       }
     },

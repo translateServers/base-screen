@@ -17,7 +17,8 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
     const materials = await designer.locator('[data-base-screen-component-id]').elementHandles();
     const documentBefore = await designer.evaluate((element) => JSON.stringify(element.document));
     const roots = designer.locator('[data-material-group-list="roots"]');
-    if ((await roots.locator('[data-material-group]').count()) !== 6) {
+    // 压力分组含 7 个根：基础/图形/媒体/数据可视化图表组件超长名称/大屏组件超长分组名称/跨框架桥接物料/宿主数据集最佳实践。
+    if ((await roots.locator('[data-material-group]').count()) !== 7) {
       throw new Error('MATERIAL_GROUP_STRESS_FIXTURE_INVALID');
     }
 
@@ -417,24 +418,24 @@ export async function assertMaterialGroupUpdates(page, designer) {
   });
   const count = () =>
     designer.locator('[data-material-group-current="library"] .material-group-count').textContent();
-  // 类型数 = 目录中可见类型（11，含 plugin.echarts）；卡片数 = 2 条 base.text 条目 +
-  // 其余 10 个类型各一条 = 12。
-  if ((await count()) !== '11' || (await designer.locator('[data-material-card]').count()) !== 12)
+  // 类型数 = 目录中可见类型（15，含 plugin.echarts 与四个 datav 大屏物料）；卡片数 =
+  // 2 条 base.text 条目 + 其余 14 个类型各一条 = 16。
+  if ((await count()) !== '15' || (await designer.locator('[data-material-card]').count()) !== 16)
     throw new Error('MATERIAL_GROUP_TYPE_VS_ITEM_COUNT_FAILED');
   await designer.locator('[data-material-search]').fill('Alpha');
   await designer.locator('[data-material-search-clear]').waitFor({ state: 'visible' });
   if (
     (await designer.locator('[data-material-card]:not([hidden])').count()) !== 1 ||
-    (await count()) !== '11'
+    (await count()) !== '15'
   )
     throw new Error('MATERIAL_GROUP_SEARCH_CHANGED_COUNT');
   await designer.locator('[data-material-favorite="text:one"]').click();
   await designer.locator('[data-material-filter="favorite"]').click();
-  if ((await count()) !== '11') throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
+  if ((await count()) !== '15') throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
   await designer.locator('[data-material-search-clear]').click();
   await designer.locator('[data-material-filter="recent"]').click();
   const empty = designer.locator('[data-material-search-empty]');
-  if (!(await empty.isVisible()) || (await count()) !== '11')
+  if (!(await empty.isVisible()) || (await count()) !== '15')
     throw new Error('MATERIAL_GROUP_EMPTY_STATE_FAILED');
   const emptyBounds = await empty.boundingBox();
   const resultsBounds = await designer.locator('.material-library-results').boundingBox();
@@ -565,7 +566,7 @@ export async function assertMaterialGroupUsability(page, designer) {
     reset.query !== '' ||
     reset.allGroups !== 'true' ||
     reset.allItems !== 'true' ||
-    reset.visible !== 11 ||
+    reset.visible !== 15 ||
     !reset.emptyHidden
   )
     throw new Error(`MATERIAL_GROUP_EMPTY_RECOVERY_FAILED:${JSON.stringify(reset)}`);
@@ -710,6 +711,11 @@ async function assertMaterialLibraryGrouping(page, designer) {
     // 外围插件贡献的物料也进目录与物料库，故与官方/宿主物料同列断言。
     'plugin.echarts',
     'base.table',
+    // plugin-datav-materials 贡献的四个大屏物料。
+    'datav.digital-flop',
+    'datav.scroll-board',
+    'datav.water-level',
+    'datav.border-box',
     'harness.react-button',
     'harness.vue-button',
     'harness.dataset-ranking',
@@ -717,7 +723,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
   if (
     rootState.navigationHidden ||
     !rootState.categoriesHidden ||
-    rootState.groups.join(',') !== 'foundation,data,bridges,best-practices' ||
+    rootState.groups.join(',') !== 'foundation,data,datav,bridges,best-practices' ||
     rootState.cards.join(',') !== expectedCards.join(',') ||
     rootState.visual.navigationHeight < 150 ||
     rootState.visual.navigationWidth !== (compact ? 286 : 108) ||
@@ -745,7 +751,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     ![1, 2, 3].includes(rootState.visual.firstRowCardCount) ||
     rootState.visual.panelCountRole !== 'status' ||
     rootState.visual.panelCountLive !== 'polite' ||
-    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a11 \u9879' ||
+    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a15 \u9879' ||
     rootState.visual.searchDescribedBy !== 'designer-left-panel-count'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ROOT_FAILED:${JSON.stringify(rootState)}`);
@@ -862,13 +868,13 @@ async function assertMaterialLibraryGrouping(page, designer) {
     const { designer, materialLibraryGrouping } = window.baseScreenHarness;
     const root = designer.shadowRoot;
     const canvas = root.querySelector('[data-canvas]');
+    // 全量重排（顺序改为 bridges → best-practices → datav → foundation → data）：
+    // 分组校验要求覆盖每个可见物料，漏一组会让赋值整体被拒，测不出重排是否生效。
+    const byId = new Map(materialLibraryGrouping.groups.map((group) => [group.id, group]));
     designer.materialLibraryGrouping = {
-      groups: [
-        materialLibraryGrouping.groups[2],
-        materialLibraryGrouping.groups[0],
-        materialLibraryGrouping.groups[1],
-        materialLibraryGrouping.groups[3],
-      ],
+      groups: ['bridges', 'best-practices', 'datav', 'foundation', 'data'].map((id) =>
+        byId.get(id),
+      ),
     };
     return {
       sameCanvas: root.querySelector('[data-canvas]') === canvas,
@@ -882,9 +888,9 @@ async function assertMaterialLibraryGrouping(page, designer) {
   });
   if (
     !dynamic.sameCanvas ||
-    dynamic.groups.join(',') !== 'bridges,foundation,data,best-practices' ||
+    dynamic.groups.join(',') !== 'bridges,best-practices,datav,foundation,data' ||
     dynamic.cards.join(',') !==
-      'harness.react-button,harness.vue-button,base.text,base.rectangle,base.ellipse,base.image,base.chart,harness.semantic-chart,plugin.echarts,base.table,harness.dataset-ranking'
+      'harness.react-button,harness.vue-button,harness.dataset-ranking,datav.digital-flop,datav.scroll-board,datav.water-level,datav.border-box,base.text,base.rectangle,base.ellipse,base.image,base.chart,harness.semantic-chart,plugin.echarts,base.table'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_UPDATE_FAILED:${JSON.stringify(dynamic)}`);
   }
@@ -952,7 +958,7 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     state.consoleCount !== '1' ||
     (state.consoleWidth ?? 0) < 32 ||
     state.categoryCount !== 0 ||
-    state.groupCount !== 4 ||
+    state.groupCount !== 5 ||
     state.draft !== true ||
     state.unavailable !== true ||
     state.draggable !== false

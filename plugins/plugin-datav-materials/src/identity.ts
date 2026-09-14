@@ -1,0 +1,68 @@
+/**
+ * 大屏组件包的标识与词汇。
+ *
+ * 这些物料对标的是一类真实的业务形态：指挥中心/监控大屏上反复出现的"指标与装饰"
+ * 组件族（翻牌器、轮播列表、水位图、装饰边框）。它们此前只能由宿主自己实现，
+ * 这里作为一个外围插件交付，用来验证插件通道能承载真正的产品内容，而不只是验证用
+ * 的探针物料。
+ *
+ * 与 `plugin-echarts`（渲染类 + 第三方依赖）和 `plugin-metrics`（纯声明、零元素）
+ * 相比，本插件的定位是：**渲染类 + 零第三方依赖**——大屏组件用原生 DOM/SVG 即可
+ * 表达，不需要打包任何图表库，这也是外围插件分区"依赖隔离"之外的一条正面样本。
+ */
+export const PLUGIN_DATAV_ID = 'base-screen.datav-materials';
+
+export const PLUGIN_DATAV_DIGITAL_FLOP_TYPE = 'datav.digital-flop';
+export const PLUGIN_DATAV_DIGITAL_FLOP_TAG_NAME = 'base-screen-datav-digital-flop';
+
+export const PLUGIN_DATAV_SCROLL_BOARD_TYPE = 'datav.scroll-board';
+export const PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME = 'base-screen-datav-scroll-board';
+
+export const PLUGIN_DATAV_WATER_LEVEL_TYPE = 'datav.water-level';
+export const PLUGIN_DATAV_WATER_LEVEL_TAG_NAME = 'base-screen-datav-water-level';
+
+export const PLUGIN_DATAV_BORDER_BOX_TYPE = 'datav.border-box';
+export const PLUGIN_DATAV_BORDER_BOX_TAG_NAME = 'base-screen-datav-border-box';
+
+/** 本插件自己的检查器控件：装饰边框的样式选择器，经 editorDescriptor 的 `control: 'custom'` 授权使用。 */
+export const PLUGIN_DATAV_BORDER_PICKER_ID = 'base-screen.datav.border-style-picker';
+export const PLUGIN_DATAV_BORDER_PICKER_TAG_NAME = 'base-screen-datav-border-picker';
+
+/** 文档事务命令：在选中的装饰边框上轮换样式（走 command.execute，天然可撤销）。 */
+export const PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID = 'base-screen.datav.cycle-border-style';
+
+/**
+ * 装饰边框样式词汇。DataV 以"十几种边框"著称，此处收敛为六种几何上确实互不相同的
+ * 形态：与其凑数，不如让每一种都真的由不同的图元组合构成。
+ */
+export const DATAV_BORDER_STYLES = [
+  'plain',
+  'corner-brackets',
+  'double-line',
+  'dashed',
+  'notch',
+  'glow-corner',
+] as const;
+
+export type DatavBorderStyle = (typeof DATAV_BORDER_STYLES)[number];
+
+export const DATAV_BORDER_STYLE_LABELS: Readonly<Record<DatavBorderStyle, string>> = {
+  plain: '实线',
+  'corner-brackets': '四角括号',
+  'double-line': '双线',
+  dashed: '虚线',
+  notch: '切角',
+  'glow-corner': '发光角',
+};
+
+export function isDatavBorderStyle(value: unknown): value is DatavBorderStyle {
+  return typeof value === 'string' && (DATAV_BORDER_STYLES as readonly string[]).includes(value);
+}
+
+/** 大屏组件共用的默认配色，避免每个 manifest 各写一份十六进制字面量。 */
+export const DATAV_DEFAULT_SURFACE = {
+  backgroundColor: '#0b1a2b',
+  color: '#e6f1ff',
+  accentColor: '#38bdf8',
+  borderColor: '#1e3a5f',
+} as const;

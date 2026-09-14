@@ -18,7 +18,7 @@
 ## 包边界
 
 - 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `scripts/check-packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`react`、`vue`、`sdk` 和 `testing`。
-- 与 `packages/` 平行存在顶层 `plugins/` 外围插件区，承载带受控第三方依赖、独立于固定包清单交付的能力（现有 `plugins/plugin-echarts`）。分区的权威决策见 [ADR-0074](docs/decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)，兼容策略见 [ADR-0075](docs/decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)。`check-packages.mjs` 的固定包清单约束不扩大到 `plugins/`。
+- 与 `packages/` 平行存在顶层 `plugins/` 外围插件区，承载带受控第三方依赖、独立于固定包清单交付的能力（现有 `plugins/plugin-echarts`、`plugins/plugin-metrics`、`plugins/plugin-datav-materials`）。分区的权威决策见 [ADR-0074](docs/decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)，兼容策略见 [ADR-0075](docs/decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)。`check-packages.mjs` 的固定包清单约束不扩大到 `plugins/`。
 - 外围插件依赖方向严格单向：`plugins/*` 可依赖 `packages/*` 的公共导出，`packages/*` 绝不依赖 `plugins/*`（含 dev 与 test）。外围插件无运行时特权，走与宿主插件相同的宿主提供/宿主加载/宿主授权通道，不新增信任通道。
 - 新增包、放宽包清单或改变跨包导出时，必须更新包及边界检查。仅当该变更改变长期架构决策、包依赖/所有权或公共兼容策略时，才新增或更新 ADR；只有跨多个独立交付阶段、需要迁移或回滚方案，或用户明确要求时，才创建 Spec。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API。
 - 文档治理以 `docs/README.md` 为入口、`docs/baseline/` 为当前能力依据。活动 ADR、Spec 与 Plan 必须登记到各自索引；Spec 的 Tasks/Checklist 全部完成或被后继依据取代时，必须在同一交付批次移入 `docs/specs/archive/` 并更新 Baseline、Roadmap 和引用。活动计划完成后同样移入 `docs/plans/archive/`。归档正文保留历史证据，不作为新实现授权。

@@ -135,6 +135,93 @@ async function applyPluginDataResource(designer: BaseScreenDesignerElement): Pro
   await painted();
 }
 
+/** 大屏组件案例：四个 DataV 风格物料一次入场，最后选中装饰边框以露出插件检查器控件。 */
+const DATAV_CASE_COMPONENTS: readonly {
+  readonly id: string;
+  readonly type: string;
+  readonly name: string;
+  readonly position: { readonly x: number; readonly y: number };
+  readonly size: { readonly width: number; readonly height: number };
+  readonly props: Record<string, unknown>;
+  readonly dataSource: unknown;
+}[] = [
+  {
+    id: 'datav-flop-demo',
+    type: 'datav.digital-flop',
+    name: '数字翻牌器',
+    position: { x: 60, y: 380 },
+    size: { width: 260, height: 110 },
+    props: { title: '今日订单', decimals: 0, thousandsSeparator: true },
+    dataSource: { type: 'static', value: 128_430 },
+  },
+  {
+    id: 'datav-water-demo',
+    type: 'datav.water-level',
+    name: '水位图',
+    position: { x: 340, y: 380 },
+    size: { width: 150, height: 170 },
+    props: { title: '资源占用', shape: 'circle', decimals: 1 },
+    dataSource: { type: 'static', value: 68.5 },
+  },
+  {
+    id: 'datav-board-demo',
+    type: 'datav.scroll-board',
+    name: '轮播列表',
+    position: { x: 510, y: 380 },
+    size: { width: 390, height: 170 },
+    props: { title: '实时排行', rowCount: 4, autoScroll: true },
+    dataSource: {
+      type: 'static',
+      value: {
+        fields: [
+          { id: 'name', label: '名称', valueType: 'string', nullable: false },
+          { id: 'value', label: '数值', valueType: 'number', nullable: false },
+        ],
+        rows: [
+          { name: '上海', value: 982 },
+          { name: '深圳', value: 871 },
+          { name: '北京', value: 763 },
+          { name: '杭州', value: 654 },
+          { name: '成都', value: 542 },
+        ],
+      },
+    },
+  },
+  {
+    id: 'datav-border-demo',
+    type: 'datav.border-box',
+    name: '装饰边框',
+    position: { x: 60, y: 30 },
+    size: { width: 520, height: 330 },
+    props: { title: '数据总览', borderStyle: 'corner-brackets', bracketSize: 22, lineWidth: 2 },
+    dataSource: null,
+  },
+];
+
+async function applyPluginDatavMaterials(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  for (const component of DATAV_CASE_COMPONENTS) {
+    if (designer.document?.components.some((item) => item.id === component.id) === true) continue;
+    const result = designer.executeCommand({
+      type: 'add-component',
+      component: {
+        ...component,
+        parentId: null,
+        rotation: 0,
+        zIndex: 60,
+        status: { locked: false, hidden: false },
+        style: {},
+      },
+    });
+    if (!result.ok) return;
+  }
+  await painted();
+  await selectLayer(designer, 'datav-border-demo');
+  clickShadow(designer, '[data-inspector-tab="appearance"]');
+  await painted();
+}
+
 async function applyDataset(designer: BaseScreenDesignerElement): Promise<void> {
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
@@ -180,6 +267,7 @@ const CASE_APPLIERS = {
   'inspector-control': applyInspectorControl,
   'plugin-material': applyPluginMaterial,
   'plugin-data-resource': applyPluginDataResource,
+  'plugin-datav-materials': applyPluginDatavMaterials,
   dataset: applyDataset,
   'semantic-chart': applySemanticChart,
   blueprint: applyBlueprint,

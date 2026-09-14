@@ -1,0 +1,260 @@
+import type { ScreenParseResult } from '@base-screen/contracts';
+import {
+  BASE_SCREEN_MATERIAL_EVENT,
+  type BaseScreenMaterialCatalogEntry,
+  type BaseScreenMaterialConstructor,
+  type BaseScreenMaterialManifest,
+} from '@base-screen/plugin-core';
+import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import { DatavMaterialElement, type DatavMaterialModel } from './datav-element.js';
+import { PLUGIN_DATAV_WATER_LEVEL_TAG_NAME, PLUGIN_DATAV_WATER_LEVEL_TYPE } from './identity.js';
+import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
+
+type WaterLevelShape = 'circle' | 'rect';
+
+/**
+ * 水位图：用一个带波纹的液面表示百分比读数。
+ *
+ * 波纹是唯一需要动效的部分，且只改 transform（横向平移一个宽度 200% 的波浪），
+ * 液面高度由数据决定、用百分比布局表达——两者都不参与彼此的几何计算，因此数值
+ * 变化不会连带波纹重排。设计态保持静止（`interactive` 门控），预览与 Viewer 才播放。
+ */
+export const PLUGIN_DATAV_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
+  type: PLUGIN_DATAV_WATER_LEVEL_TYPE,
+  tagName: PLUGIN_DATAV_WATER_LEVEL_TAG_NAME,
+  name: '水位图',
+  category: '指标',
+  keywords: ['水位', '进度', '百分比', '大屏'],
+  defaultSize: { width: 200, height: 240 },
+  defaultProps: {
+    title: '资源占用',
+    shape: 'circle',
+    decimals: 1,
+    showLabel: true,
+    waveAnimation: true,
+  },
+  defaultData: 68.5,
+  staticData: { kind: 'scalar', valueType: 'number' },
+  defaultStyle: {
+    backgroundColor: '#0b1a2b',
+    color: '#e6f1ff',
+    waterColor: '#1d4ed8',
+    waveColor: '#38bdf8',
+    borderColor: '#1e3a5f',
+    titleColor: '#8aa4c0',
+    fontSize: 22,
+    titleFontSize: 13,
+  },
+  styleSchema: {
+    kind: 'object',
+    properties: {
+      backgroundColor: { kind: 'string' },
+      color: { kind: 'string' },
+      waterColor: { kind: 'string' },
+      waveColor: { kind: 'string' },
+      borderColor: { kind: 'string' },
+      titleColor: { kind: 'string' },
+      fontSize: { kind: 'number', minimum: 10, maximum: 96 },
+      titleFontSize: { kind: 'number', minimum: 8, maximum: 40 },
+    },
+    required: ['backgroundColor', 'color', 'waterColor', 'waveColor', 'borderColor', 'fontSize'],
+  },
+  stylePanel: [
+    { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
+    { style: 'waterColor', label: '水体色', control: 'color' },
+    { style: 'waveColor', label: '波纹色', control: 'color' },
+    { style: 'borderColor', label: '边框色', control: 'color' },
+    { style: 'color', label: '读数色', control: 'color' },
+    { style: 'titleColor', label: '标题色', control: 'color' },
+    { style: 'fontSize', label: '读数字号', control: 'number' },
+    { style: 'titleFontSize', label: '标题字号', control: 'number' },
+  ],
+  propsSchema: {
+    kind: 'object',
+    properties: {
+      title: { kind: 'string', maxLength: 64 },
+      shape: { kind: 'enum', values: ['circle', 'rect'] },
+      decimals: { kind: 'number', minimum: 0, maximum: 3 },
+      showLabel: { kind: 'boolean' },
+      waveAnimation: { kind: 'boolean' },
+    },
+    required: ['shape', 'decimals', 'showLabel', 'waveAnimation'],
+  },
+  propertyPanel: [
+    { prop: 'title', label: '标题', control: 'text' },
+    { prop: 'shape', label: '形状', control: 'select' },
+    { prop: 'decimals', label: '小数位', control: 'number' },
+    { prop: 'showLabel', label: '显示读数', control: 'boolean' },
+    { prop: 'waveAnimation', label: '波纹动画', control: 'boolean' },
+  ],
+  events: ['valueClick'],
+  dataCapabilities: ['static', 'dataset', 'variable'],
+  dataBinding: {
+    roles: [
+      {
+        id: 'value',
+        minFields: 1,
+        maxFields: 1,
+        valueTypes: ['number', 'string'],
+      },
+    ],
+  },
+  designCapabilities: { resize: true, rotate: true, children: false },
+};
+
+export class PluginDatavWaterLevelElement extends DatavMaterialElement {
+  static readonly manifest = PLUGIN_DATAV_WATER_LEVEL_MANIFEST;
+
+  #wave: SVGElement | undefined;
+
+  constructor() {
+    super();
+    this.addEventListener('click', this.#handleClick);
+  }
+
+  protected renderMaterial(): void {
+    const model = this.materialModel;
+    if (model === undefined || !this.isConnected) return;
+
+    this.style.display = 'block';
+    this.style.width = '100%';
+    this.style.height = '100%';
+    this.style.overflow = 'hidden';
+    this.style.boxSizing = 'border-box';
+    this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');
+    this.style.color = styleColor(model.style.color, '#e6f1ff');
+    this.setAttribute('role', 'meter');
+    this.setAttribute('aria-label', readString(model.props.title, '水位图'));
+
+    if (model.dataState.status !== 'ready') {
+      this.#wave = undefined;
+      this.appendDataStatePlaceholder(model.dataState.status);
+      return;
+    }
+    this.#paint(model);
+  }
+
+  #paint(model: DatavMaterialModel): void {
+    const doc = this.ownerDocument;
+    const percent = clampPercent(readDataValue(model));
+    const shape: WaterLevelShape = model.props.shape === 'rect' ? 'rect' : 'circle';
+
+    const root = doc.createElement('div');
+    root.dataset.datavWaterLevel = '';
+    root.style.cssText =
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;height:100%;box-sizing:border-box;padding:8px;';
+
+    const title = readString(model.props.title);
+    if (title !== '') {
+      const heading = doc.createElement('div');
+      heading.dataset.datavWaterTitle = '';
+      heading.textContent = title;
+      heading.style.cssText = `flex:0 0 auto;font:${readNumber(model.style.titleFontSize, 13)}px/1.4 sans-serif;color:${styleColor(model.style.titleColor, '#8aa4c0')};letter-spacing:.08em;`;
+      root.appendChild(heading);
+    }
+
+    const tank = doc.createElement('div');
+    tank.dataset.datavWaterTank = shape;
+    // 圆形罐体固定为正方形（aspect-ratio），否则会在非等比的组件框里被拉成椭圆；
+    // 取 min(宽, 高) 由 flex 的收缩完成，不依赖异步测量。
+    const roundStyle =
+      shape === 'circle'
+        ? 'aspect-ratio:1;border-radius:50%;max-height:100%;'
+        : 'border-radius:6px;width:100%;max-width:100%;';
+    tank.style.cssText = `position:relative;overflow:hidden;flex:1 1 auto;min-height:0;box-sizing:border-box;border:1px solid ${styleColor(model.style.borderColor, '#1e3a5f')};background:${styleColor(model.style.backgroundColor, '#0b1a2b')};${roundStyle}`;
+
+    // 水体：以百分比高度贴底，高度即读数；波纹贴在水体顶边，随水体一起升降。
+    const water = doc.createElement('div');
+    water.dataset.datavWaterFill = '';
+    water.style.cssText = `position:absolute;left:0;right:0;bottom:0;height:${percent}%;background:${styleColor(model.style.waterColor, '#1d4ed8')};transition:height 480ms cubic-bezier(.33,1,.68,1);`;
+
+    const wave = doc.createElement('div');
+    wave.dataset.datavWaterWave = '';
+    // 波浪是宽度 200% 的一条 SVG，向左平移自身一半即回到起点，因此可以无限接续。
+    wave.style.cssText =
+      'position:absolute;left:0;right:0;top:-6px;height:12px;overflow:hidden;pointer-events:none;';
+    wave.innerHTML = `<svg viewBox="0 0 200 12" preserveAspectRatio="none" width="200%" height="12" style="display:block">${wavePath(styleColor(model.style.waveColor, '#38bdf8'))}${wavePath(
+      styleColor(model.style.waveColor, '#38bdf8'),
+      100,
+    )}</svg>`;
+    this.#wave = wave.querySelector('svg') ?? undefined;
+    water.appendChild(wave);
+
+    if (readBoolean(model.props.showLabel, true)) {
+      const label = doc.createElement('div');
+      label.dataset.datavWaterLabel = '';
+      label.textContent = `${percent.toFixed(
+        Math.max(0, Math.min(3, Math.round(readNumber(model.props.decimals, 1)))),
+      )}%`;
+      label.style.cssText = `position:absolute;inset:0;display:grid;place-items:center;font:600 ${readNumber(model.style.fontSize, 22)}px/1 sans-serif;color:${styleColor(model.style.color, '#e6f1ff')};text-shadow:0 1px 2px rgba(0,0,0,.45);font-variant-numeric:tabular-nums;`;
+      tank.appendChild(label);
+    }
+    tank.appendChild(water);
+    root.appendChild(tank);
+    this.replaceChildren(root);
+    this.setAttribute('aria-valuenow', String(percent));
+
+    // 设计态不播放：无限动画只应在用户真正观看的预览/发布态里跑。
+    if (
+      readBoolean(model.props.waveAnimation, true) &&
+      model.interactive &&
+      this.#wave !== undefined
+    ) {
+      this.#wave.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-50%)' }], {
+        duration: 3200,
+        iterations: Number.POSITIVE_INFINITY,
+        easing: 'linear',
+      });
+    }
+  }
+
+  disconnectedCallback(): void {
+    this.#wave = undefined;
+    this.removeEventListener('click', this.#handleClick);
+  }
+
+  readonly #handleClick = (): void => {
+    const model = this.materialModel;
+    if (model?.interactive !== true) return;
+    this.dispatchEvent(
+      new CustomEvent(BASE_SCREEN_MATERIAL_EVENT, {
+        bubbles: true,
+        composed: true,
+        detail: { name: 'valueClick', payload: { value: clampPercent(readDataValue(model)) } },
+      }),
+    );
+  };
+}
+
+/** 读数归一化到 0..100：非法值按 0 处理，超界钳制而不是溢出容器。 */
+export function clampPercent(value: unknown): number {
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))
+        ? Number(value)
+        : 0;
+  // NaN 也是 number，必须先判有限性；否则 Math.min/max 会把它原样传播成 "NaN%"。
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(100, numeric));
+}
+
+/** 只读准备态数据；非 ready 状态没有 value 字段，读取一律回落到 undefined。 */
+function readDataValue(model: DatavMaterialModel): unknown {
+  return model.dataState.status === 'ready' ? model.dataState.value : undefined;
+}
+
+function wavePath(color: string, offset = 0): string {
+  const start = offset;
+  const mid = offset + 50;
+  const end = offset + 100;
+  return `<path d="M${start} 8 Q${mid - 25} 0 ${mid} 7 T${end} 7 L${end} 12 L${start} 12 Z" fill="${color}" opacity=".85"/>`;
+}
+
+export function definePluginDatavWaterLevelMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry> {
+  const definition = createMaterialDefinition({
+    manifest: PLUGIN_DATAV_WATER_LEVEL_MANIFEST,
+    element: PluginDatavWaterLevelElement as BaseScreenMaterialConstructor,
+  });
+  return definition.ok ? definition.value.define() : definition;
+}

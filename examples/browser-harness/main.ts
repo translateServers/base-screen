@@ -55,6 +55,14 @@ import {
 } from '../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../packages/vue/src/index.ts';
 import {
+  createPluginDatavRuntime,
+  PLUGIN_DATAV_BORDER_BOX_TYPE,
+  PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID,
+  PLUGIN_DATAV_ID,
+  PLUGIN_DATAV_WATER_LEVEL_TYPE,
+  registerPluginDatavMaterials,
+} from '../../plugins/plugin-datav-materials/src/index.ts';
+import {
   createPluginEchartsRuntime,
   registerPluginEcharts,
 } from '../../plugins/plugin-echarts/src/index.ts';
@@ -94,6 +102,7 @@ const productElements = defineBaseScreenElements();
 // 面板标签必须在 manager 激活前注册：preflight 会按贡献声明的 tagName 查询宿主 registry。
 defineHarnessPluginPanel();
 registerPluginEcharts();
+registerPluginDatavMaterials();
 defineHarnessInspectorFixtures();
 const officialMaterials = [
   defineBaseScreenTextMaterial(),
@@ -249,10 +258,17 @@ const pluginManager = createBaseScreenPluginManager({
   standaloneMaterialTagNames: officialMaterials
     .filter((definition) => definition.ok)
     .map((definition) => definition.value.manifest.tagName),
-  plugins: [designerAuthoringPlugin, createPluginEchartsRuntime(), createPluginMetricsRuntime()],
+  plugins: [
+    designerAuthoringPlugin,
+    createPluginEchartsRuntime(),
+    createPluginMetricsRuntime(),
+    createPluginDatavRuntime(),
+  ],
   grantedCapabilities: {
     'browser-harness-authoring': designerAuthoringPluginCapabilities,
     'base-screen.echarts': ['command.execute', 'design.read'],
+    // 大屏组件插件要读选区并提交事务，因此同样需要这两个端口能力。
+    [PLUGIN_DATAV_ID]: ['command.execute', 'design.read'],
     // 声明者即批准者只在此处是宿主自营插件；蓝图能力仍需宿主支持表认可才生效。
     [PLUGIN_METRICS_ID]: [PLUGIN_METRICS_BLUEPRINT_CAPABILITY],
   },
@@ -321,6 +337,32 @@ const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
     pluginManager.snapshot.contributions.hasBlueprintCapability(
       PLUGIN_METRICS_BLUEPRINT_CAPABILITY,
     ),
+  ],
+  // 大屏组件插件：四个物料都要进快照，检查器控件要进授权目录（注册≠授权），
+  // 命令要出现在插件记录里——任一项失败都说明插件被 preflight 整体排除。
+  ['datav-plugin-catalogued', pluginManager.snapshot.plugins.get(PLUGIN_DATAV_ID) !== undefined],
+  [
+    'datav-materials-catalogued',
+    [
+      PLUGIN_DATAV_BORDER_BOX_TYPE,
+      PLUGIN_DATAV_WATER_LEVEL_TYPE,
+      'datav.digital-flop',
+      'datav.scroll-board',
+    ].every((type) => pluginManager.snapshot?.materials.has(type) === true),
+  ],
+  [
+    'datav-inspector-control-authorized',
+    ['base-screen-datav-border-picker'].every(
+      (tagName) => pluginManager.snapshot?.inspectorControls.getByTagName(tagName) !== undefined,
+    ),
+  ],
+  [
+    'datav-command-catalogued',
+    pluginManager.snapshot.plugins
+      .get(PLUGIN_DATAV_ID)
+      ?.contributions.some(
+        (item) => item.kind === 'command' && item.id === PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID,
+      ) === true,
   ],
   ['no-activation-failures', pluginManager.snapshot.failures.length === 0],
 ];
@@ -460,6 +502,17 @@ const materialLibraryGrouping = {
       ],
     },
     {
+      id: 'datav',
+      label: '大屏',
+      // 外围插件 plugin-datav-materials 贡献的四个物料；分组必须覆盖目录中每个可见物料。
+      materialTypes: [
+        'datav.digital-flop',
+        'datav.scroll-board',
+        'datav.water-level',
+        'datav.border-box',
+      ],
+    },
+    {
       id: 'bridges',
       label: '桥接',
       materialTypes: ['harness.react-button', 'harness.vue-button'],
@@ -496,6 +549,16 @@ const materialLibraryStressGrouping = {
           label: '一个超长的分组名称用来验证省略号截断效果',
           materialTypes: ['base.table'],
         },
+      ],
+    },
+    {
+      id: 'datav',
+      label: '大屏组件超长分组名称用于截断',
+      materialTypes: [
+        'datav.digital-flop',
+        'datav.scroll-board',
+        'datav.water-level',
+        'datav.border-box',
       ],
     },
     {

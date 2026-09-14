@@ -223,3 +223,312 @@ export async function assertPluginBlueprintCapability(page) {
     );
   }
 }
+
+// 大屏组件插件（plugin-datav-materials）：零第三方依赖的渲染类插件，四个物料 + 自有
+// 检查器控件 + 一条事务命令。这里覆盖三条只有真实插件才成立的性质：
+//   1. 物料真的渲染出各自的 DOM 结构（不是只有自定义元素壳）；
+//   2. 插件自有的检查器控件被授权实例化，且写回可撤销；
+//   3. 插件命令读选区、按现值轮换样式、进 history。
+// 只断言"物料进了目录"会漏掉元素 render 抛异常或渲染成空白这类问题。
+const DATAV_FLOP_TYPE = 'datav.digital-flop';
+const DATAV_BORDER_TYPE = 'datav.border-box';
+const DATAV_FLOP_TAG = 'base-screen-datav-digital-flop';
+const DATAV_BORDER_TAG = 'base-screen-datav-border-box';
+const DATAV_BORDER_PICKER_TAG = 'base-screen-datav-border-picker';
+const DATAV_CYCLE_COMMAND = 'base-screen.datav.cycle-border-style';
+const DATAV_FLOP_POSITION = { x: 60, y: 400 };
+const DATAV_BORDER_POSITION = { x: 60, y: 60 };
+
+// 用公开作者入口插入：`insertComponent` 按 manifest 默认值展开 size/props/style/dataSource，
+// 因此断言不会因手写的 style 与物料 schema 漂移而失败——那本身就是宿主该走的路径。
+async function insertDatavComponent(page, materialType, name, position) {
+  return page.evaluate(
+    (intent) => {
+      const result = window.baseScreenHarness.designer.insertComponent(intent);
+      return { ok: result.ok, diagnostics: result.diagnostics };
+    },
+    { materialType, name, position },
+  );
+}
+
+// 插入后取回新组件的 id（insertComponent 会把它设为唯一选中项）。
+async function readFocusedId(page) {
+  return page.evaluate(() => window.baseScreenHarness.designer.selection.focusedComponentId);
+}
+
+async function removeComponent(page, id) {
+  await page.evaluate(
+    (componentId) =>
+      window.baseScreenHarness.designer.executeCommand({
+        type: 'remove-components',
+        componentIds: [componentId],
+      }),
+    id,
+  );
+}
+
+async function readProps(page, id) {
+  return page.evaluate(
+    (componentId) =>
+      window.baseScreenHarness.designer.document.components.find((item) => item.id === componentId)
+        ?.props ?? null,
+    id,
+  );
+}
+
+/**
+ * 把 borderStyle 设为指定值。
+ *
+ * `update-components` 的 `props` 是整体替换（引擎的检查器写回也是算出一份完整 props 再提交），
+ * 所以这里必须先在当前 props 上覆盖，而不是只给一个 `{ borderStyle }` 的新对象——
+ * 后者会把 schema 必填的 bracketSize/lineWidth/showTitleBar 一起抹掉，事务被拒。
+ */
+async function setBorderStyle(page, id, borderStyle) {
+  return page.evaluate(
+    (value) => {
+      const designer = window.baseScreenHarness.designer;
+      const component = designer.document.components.find((item) => item.id === value.id);
+      const result = designer.executeCommand({
+        type: 'update-components',
+        componentIds: [value.id],
+        patch: { props: { ...component.props, borderStyle: value.borderStyle } },
+      });
+      return { ok: result.ok, diagnostics: result.diagnostics };
+    },
+    { id, borderStyle },
+  );
+}
+
+// 通道一：插件贡献的物料进入目录并渲染出各自的内部结构。
+export async function assertDatavMaterialsRender(designer, page) {
+  await waitForDocument(page);
+
+  const catalogued = await page.evaluate(
+    (types) => types.map((type) => window.baseScreenHarness.catalog.has(type)),
+    [DATAV_FLOP_TYPE, DATAV_BORDER_TYPE],
+  );
+  if (catalogued.some((present) => present !== true)) {
+    throw new Error(`BROWSER_HARNESS_DATAV_NOT_IN_CATALOG:${JSON.stringify(catalogued)}`);
+  }
+
+  const flop = await insertDatavComponent(page, DATAV_FLOP_TYPE, '翻牌器探针', DATAV_FLOP_POSITION);
+  if (!flop.ok) {
+    throw new Error(`BROWSER_HARNESS_DATAV_ADD_FAILED:${JSON.stringify(flop.diagnostics)}`);
+  }
+  const flopId = await readFocusedId(page);
+  if (flopId === null) throw new Error('BROWSER_HARNESS_DATAV_FLOP_NOT_SELECTED');
+
+  const rendered = await page.evaluate(
+    ([id, flopTag]) => {
+      const node = window.baseScreenHarness.designer.shadowRoot.querySelector(
+        `[data-base-screen-component-id=${id}]`,
+      );
+      const element = node !== null && node.matches(flopTag) ? node : null;
+      const digits = element?.querySelectorAll('[data-datav-flop-digit]') ?? [];
+      return {
+        elementPresent: element !== null,
+        // manifest 默认读数 128430 拆成 6 位数字格；只渲染外壳而没走到数字排版时这里是 0。
+        digitCount: digits.length,
+        digitsText: [...digits].map((cell) => cell.textContent).join(''),
+      };
+    },
+    [flopId, DATAV_FLOP_TAG],
+  );
+  if (!rendered.elementPresent || rendered.digitCount !== 6 || rendered.digitsText !== '128430') {
+    throw new Error(`BROWSER_HARNESS_DATAV_NOT_RENDERED:${JSON.stringify(rendered)}`);
+  }
+
+  await removeComponent(page, flopId);
+}
+
+// 通道二：插件为自家物料贡献的检查器控件被授权实例化，写回进 props 事务且可撤销。
+export async function assertDatavInspectorControl(designer, page) {
+  await waitForDocument(page);
+
+  const added = await insertDatavComponent(
+    page,
+    DATAV_BORDER_TYPE,
+    '边框探针',
+    DATAV_BORDER_POSITION,
+  );
+  if (!added.ok) {
+    throw new Error(`BROWSER_HARNESS_DATAV_BORDER_ADD_FAILED:${JSON.stringify(added.diagnostics)}`);
+  }
+  const borderId = await readFocusedId(page);
+  if (borderId === null) throw new Error('BROWSER_HARNESS_DATAV_BORDER_NOT_SELECTED');
+  // 从 manifest 默认值出发：控件当前选中项必须与文档值一致，才谈得上"读到当前值"。
+  const initialProps = await readProps(page, borderId);
+  const initialStyle =
+    typeof initialProps?.borderStyle === 'string' ? initialProps.borderStyle : null;
+  if (initialStyle === null) {
+    throw new Error(`BROWSER_HARNESS_DATAV_BORDER_DEFAULT_MISSING:${JSON.stringify(initialProps)}`);
+  }
+
+  // insertComponent 只按默认值建节点；把边框改成 plain，让后续轮换从确定状态出发。
+  const preset = await setBorderStyle(page, borderId, 'plain');
+  if (!preset.ok) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_BORDER_PRESET_FAILED:${JSON.stringify(preset.diagnostics)}`,
+    );
+  }
+
+  await designer.getByRole('tab', { name: '图层' }).click();
+  await designer.locator(`[data-layer-select=${borderId}]`).click({ force: true });
+  await page.waitForFunction(
+    (id) => window.baseScreenHarness.designer.selection.focusedComponentId === id,
+    borderId,
+  );
+  await designer.locator('[data-inspector-tab="appearance"]').click();
+
+  const readControl = () =>
+    page.evaluate(
+      ([tag, id]) => {
+        const designer = window.baseScreenHarness.designer;
+        const component = designer.document.components.find((item) => item.id === id);
+        const control = designer.shadowRoot.querySelector(tag);
+        return {
+          borderStyle: component?.props?.borderStyle ?? null,
+          controlRendered: control !== null,
+          // 归属只用于诊断：授权来自 inspectorControl 贡献，不是宿主的注册表。
+          owner: control?.dataset?.descriptorCustomOwner ?? null,
+          pressed: control
+            ? [...control.shadowRoot.querySelectorAll('[data-border-choice]')]
+                .filter((button) => button.getAttribute('aria-pressed') === 'true')
+                .map((button) => button.dataset.borderChoice)
+            : [],
+        };
+      },
+      [DATAV_BORDER_PICKER_TAG, borderId],
+    );
+
+  const initial = await readControl();
+  if (
+    !initial.controlRendered ||
+    initial.owner !== 'base-screen.datav-materials' ||
+    initial.pressed.join() !== 'plain'
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATAV_CONTROL_FAILED:${JSON.stringify(initial)}`);
+  }
+
+  await designer.locator(`${DATAV_BORDER_PICKER_TAG} [data-border-choice="notch"]`).click({
+    timeout: 15_000,
+    force: true,
+  });
+  await page.waitForFunction(
+    ([id]) =>
+      window.baseScreenHarness.designer.document.components.find((c) => c.id === id)?.props
+        ?.borderStyle === 'notch',
+    [borderId],
+  );
+  const written = await readControl();
+  if (written.pressed.join() !== 'notch') {
+    throw new Error(`BROWSER_HARNESS_DATAV_CONTROL_WRITE_FAILED:${JSON.stringify(written)}`);
+  }
+  // 边框形态必须真的落到渲染上：样式只写在控件里、没进元素 dataset 的话这里会失败。
+  const frameStyle = await page.evaluate(
+    ([id, tag]) => {
+      const node = window.baseScreenHarness.designer.shadowRoot.querySelector(
+        `[data-base-screen-component-id=${id}]`,
+      );
+      return node !== null && node.matches(tag) ? (node.dataset.datavBorderStyle ?? null) : null;
+    },
+    [borderId, DATAV_BORDER_TAG],
+  );
+  if (frameStyle !== 'notch') {
+    throw new Error(`BROWSER_HARNESS_DATAV_BORDER_NOT_REPAINTED:${frameStyle}`);
+  }
+
+  await page.evaluate(() => window.baseScreenHarness.designer.undo());
+  await page.waitForFunction(
+    ([id]) =>
+      window.baseScreenHarness.designer.document.components.find((c) => c.id === id)?.props
+        ?.borderStyle === 'plain',
+    [borderId],
+  );
+  const undone = await readControl();
+  if (undone.pressed.join() !== 'plain') {
+    throw new Error(`BROWSER_HARNESS_DATAV_CONTROL_UNDO_FAILED:${JSON.stringify(undone)}`);
+  }
+
+  await removeComponent(page, borderId);
+}
+
+// 通道三：插件命令经命令面板触发，读选区、按现值轮换、提交可撤销事务。
+export async function assertDatavCycleCommand(designer, page) {
+  await waitForDocument(page);
+
+  const added = await insertDatavComponent(
+    page,
+    DATAV_BORDER_TYPE,
+    '边框探针',
+    DATAV_BORDER_POSITION,
+  );
+  if (!added.ok) {
+    throw new Error(`BROWSER_HARNESS_DATAV_CYCLE_ADD_FAILED:${JSON.stringify(added.diagnostics)}`);
+  }
+  const borderId = await readFocusedId(page);
+  if (borderId === null) throw new Error('BROWSER_HARNESS_DATAV_CYCLE_NOT_SELECTED');
+  const preset = await setBorderStyle(page, borderId, 'plain');
+  if (!preset.ok) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_CYCLE_PRESET_FAILED:${JSON.stringify(preset.diagnostics)}`,
+    );
+  }
+
+  await designer.getByRole('tab', { name: '图层' }).click();
+  await designer.locator(`[data-layer-select=${borderId}]`).click({ force: true });
+  await page.waitForFunction(
+    (id) => window.baseScreenHarness.designer.selection.focusedComponentId === id,
+    borderId,
+  );
+
+  const borderStyle = () =>
+    page.evaluate(
+      (id) =>
+        window.baseScreenHarness.designer.document.components.find((c) => c.id === id)?.props
+          ?.borderStyle ?? null,
+      borderId,
+    );
+
+  const runCycle = async () => {
+    await designer.locator('[data-command-palette-toggle]').click();
+    await designer.locator('[data-command-palette-search]').fill(DATAV_CYCLE_COMMAND);
+    const entry = designer.locator(
+      `[data-command-palette-result][data-plugin-command="${DATAV_CYCLE_COMMAND}"]`,
+    );
+    if ((await entry.count()) !== 1 || (await entry.isDisabled())) {
+      throw new Error('BROWSER_HARNESS_DATAV_COMMAND_ENTRY_FAILED');
+    }
+    await entry.click();
+  };
+
+  // plain → corner-brackets → double-line（声明顺序）；连跑两次才能证明"按现值轮换"而非写死。
+  await runCycle();
+  await page.waitForFunction(
+    (id) =>
+      window.baseScreenHarness.designer.document.components.find((c) => c.id === id)?.props
+        ?.borderStyle === 'corner-brackets',
+    borderId,
+  );
+  await runCycle();
+  await page.waitForFunction(
+    (id) =>
+      window.baseScreenHarness.designer.document.components.find((c) => c.id === id)?.props
+        ?.borderStyle === 'double-line',
+    borderId,
+  );
+
+  // 两次提交都在 history 里，两次 undo 必须逐次退回 plain。
+  await page.evaluate(() => window.baseScreenHarness.designer.undo());
+  const afterFirstUndo = await borderStyle();
+  if (afterFirstUndo !== 'corner-brackets') {
+    throw new Error(`BROWSER_HARNESS_DATAV_COMMAND_UNDO_STEP_FAILED:${afterFirstUndo}`);
+  }
+  await page.evaluate(() => window.baseScreenHarness.designer.undo());
+  const afterSecondUndo = await borderStyle();
+  if (afterSecondUndo !== 'plain') {
+    throw new Error(`BROWSER_HARNESS_DATAV_COMMAND_UNDO_FAILED:${afterSecondUndo}`);
+  }
+
+  await removeComponent(page, borderId);
+}
