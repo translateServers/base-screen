@@ -133,8 +133,6 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
     if (model === undefined || !this.isConnected) return;
 
     this.style.display = 'block';
-    this.style.width = '100%';
-    this.style.height = '100%';
     this.style.overflow = 'hidden';
     this.style.boxSizing = 'border-box';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');

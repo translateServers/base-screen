@@ -117,8 +117,6 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
     if (model === undefined || !this.isConnected) return;
 
     this.style.display = 'block';
-    this.style.width = '100%';
-    this.style.height = '100%';
     this.style.overflow = 'hidden';
     this.style.boxSizing = 'border-box';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');
@@ -180,16 +178,16 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
     this.#wave = wave.querySelector('svg') ?? undefined;
     water.appendChild(wave);
 
-    if (readBoolean(model.props.showLabel, true)) {
-      const label = doc.createElement('div');
-      label.dataset.datavWaterLabel = '';
-      label.textContent = `${percent.toFixed(
-        Math.max(0, Math.min(3, Math.round(readNumber(model.props.decimals, 1)))),
-      )}%`;
-      label.style.cssText = `position:absolute;inset:0;display:grid;place-items:center;font:600 ${readNumber(model.style.fontSize, 22)}px/1 sans-serif;color:${styleColor(model.style.color, '#e6f1ff')};text-shadow:0 1px 2px rgba(0,0,0,.45);font-variant-numeric:tabular-nums;`;
-      tank.appendChild(label);
-    }
+    const label = doc.createElement('div');
+    label.dataset.datavWaterLabel = '';
+    label.textContent = `${percent.toFixed(
+      Math.max(0, Math.min(3, Math.round(readNumber(model.props.decimals, 1)))),
+    )}%`;
+    // 读数必须压在水体之上：水体与 label 都是绝对定位，append 顺序决定层级。
+    // 所以先把水体放进去，再挂 label（早期版本反了，读数被水体整块盖住）。
+    label.style.cssText = `position:absolute;inset:0;display:grid;place-items:center;font:600 ${readNumber(model.style.fontSize, 22)}px/1 sans-serif;color:${styleColor(model.style.color, '#e6f1ff')};text-shadow:0 1px 3px rgba(0,0,0,.65);font-variant-numeric:tabular-nums;pointer-events:none;z-index:1;`;
     tank.appendChild(water);
+    if (readBoolean(model.props.showLabel, true)) tank.appendChild(label);
     root.appendChild(tank);
     this.replaceChildren(root);
     this.setAttribute('aria-valuenow', String(percent));

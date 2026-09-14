@@ -231,12 +231,15 @@ export async function assertPluginBlueprintCapability(page) {
 //   3. 插件命令读选区、按现值轮换样式、进 history。
 // 只断言"物料进了目录"会漏掉元素 render 抛异常或渲染成空白这类问题。
 const DATAV_FLOP_TYPE = 'datav.digital-flop';
+const DATAV_WATER_LEVEL_TYPE = 'datav.water-level';
 const DATAV_BORDER_TYPE = 'datav.border-box';
 const DATAV_FLOP_TAG = 'base-screen-datav-digital-flop';
+const DATAV_WATER_LEVEL_TAG = 'base-screen-datav-water-level';
 const DATAV_BORDER_TAG = 'base-screen-datav-border-box';
 const DATAV_BORDER_PICKER_TAG = 'base-screen-datav-border-picker';
 const DATAV_CYCLE_COMMAND = 'base-screen.datav.cycle-border-style';
 const DATAV_FLOP_POSITION = { x: 60, y: 400 };
+const DATAV_WATER_POSITION = { x: 400, y: 60 };
 const DATAV_BORDER_POSITION = { x: 60, y: 60 };
 
 // 用公开作者入口插入：`insertComponent` 按 manifest 默认值展开 size/props/style/dataSource，
@@ -305,7 +308,7 @@ export async function assertDatavMaterialsRender(designer, page) {
 
   const catalogued = await page.evaluate(
     (types) => types.map((type) => window.baseScreenHarness.catalog.has(type)),
-    [DATAV_FLOP_TYPE, DATAV_BORDER_TYPE],
+    [DATAV_FLOP_TYPE, DATAV_WATER_LEVEL_TYPE, DATAV_BORDER_TYPE],
   );
   if (catalogued.some((present) => present !== true)) {
     throw new Error(`BROWSER_HARNESS_DATAV_NOT_IN_CATALOG:${JSON.stringify(catalogued)}`);
@@ -320,16 +323,25 @@ export async function assertDatavMaterialsRender(designer, page) {
 
   const rendered = await page.evaluate(
     ([id, flopTag]) => {
-      const node = window.baseScreenHarness.designer.shadowRoot.querySelector(
-        `[data-base-screen-component-id=${id}]`,
-      );
+      const designer = window.baseScreenHarness.designer;
+      const node = designer.shadowRoot.querySelector(`[data-base-screen-component-id=${id}]`);
       const element = node !== null && node.matches(flopTag) ? node : null;
       const digits = element?.querySelectorAll('[data-datav-flop-digit]') ?? [];
+      const component = designer.document.components.find((item) => item.id === id);
+      const rect = element?.getBoundingClientRect();
+      // 位移/缩放都是 1:1，所以渲染盒应当与声明尺寸一致（容许亚像素取整误差）。
+      // 物料若在 renderMaterial 里改写宿主元素 width/height（例如写成 100%），
+      // 就会覆盖渲染器写下的像素尺寸，这里立刻暴露。
+      const canvas = designer.shadowRoot.querySelector('[data-canvas]')?.getBoundingClientRect();
       return {
         elementPresent: element !== null,
         // manifest 默认读数 128430 拆成 6 位数字格；只渲染外壳而没走到数字排版时这里是 0。
         digitCount: digits.length,
         digitsText: [...digits].map((cell) => cell.textContent).join(''),
+        declared:
+          component === undefined ? null : { w: component.size.width, h: component.size.height },
+        rendered: rect === undefined ? null : { w: rect.width, h: rect.height },
+        canvas: canvas === undefined ? null : { w: canvas.width, h: canvas.height },
       };
     },
     [flopId, DATAV_FLOP_TAG],
@@ -337,8 +349,74 @@ export async function assertDatavMaterialsRender(designer, page) {
   if (!rendered.elementPresent || rendered.digitCount !== 6 || rendered.digitsText !== '128430') {
     throw new Error(`BROWSER_HARNESS_DATAV_NOT_RENDERED:${JSON.stringify(rendered)}`);
   }
+  const { declared, rendered: box } = rendered;
+  if (declared === null || box === null) {
+    throw new Error(`BROWSER_HARNESS_DATAV_GEOMETRY_MISSING:${JSON.stringify(rendered)}`);
+  }
+  if (Math.abs(box.w - declared.w) > 1 || Math.abs(box.h - declared.h) > 1) {
+    throw new Error(
+      `BROWSER_HARNESS_DATAV_SIZE_MISMATCH:${JSON.stringify({ declared, box, canvas: rendered.canvas })}`,
+    );
+  }
 
   await removeComponent(page, flopId);
+
+  // 水位图：读数必须真的可见——水体与读数同为绝对定位，append 顺序反了就会被盖住。
+  // 用 elementFromPoint 在中心点取最上层元素，能直接判定"读数被压在下面"这类层级错误。
+  const water = await insertDatavComponent(
+    page,
+    DATAV_WATER_LEVEL_TYPE,
+    '水位图探针',
+    DATAV_WATER_POSITION,
+  );
+  if (!water.ok) {
+    throw new Error(`BROWSER_HARNESS_DATAV_WATER_ADD_FAILED:${JSON.stringify(water.diagnostics)}`);
+  }
+  const waterId = await readFocusedId(page);
+  if (waterId === null) throw new Error('BROWSER_HARNESS_DATAV_WATER_NOT_SELECTED');
+  const waterState = await page.evaluate(
+    ([id, tag]) => {
+      const designer = window.baseScreenHarness.designer;
+      const node = designer.shadowRoot.querySelector(`[data-base-screen-component-id=${id}]`);
+      const element = node !== null && node.matches(tag) ? node : null;
+      const label = element?.querySelector('[data-datav-water-label]') ?? null;
+      const tank = element?.querySelector('[data-datav-water-tank]') ?? null;
+      const fill = element?.querySelector('[data-datav-water-fill]') ?? null;
+      const labelRect = label?.getBoundingClientRect();
+      const topmost =
+        labelRect === undefined
+          ? null
+          : (element?.ownerDocument ?? document)
+              .elementFromPoint(
+                labelRect.left + labelRect.width / 2,
+                labelRect.top + labelRect.height / 2,
+              )
+              ?.closest('[data-datav-water-label], [data-datav-water-fill]')
+              ?.getAttribute('data-datav-water-label') !== null;
+      return {
+        elementPresent: element !== null,
+        tankPresent: tank !== null,
+        fillPresent: fill !== null,
+        labelText: label?.textContent ?? null,
+        // 液面高度是内联百分比样式，直接据此判断读数有没有落进液面。
+        fillHeight: fill instanceof HTMLElement ? fill.style.height : null,
+        labelOnTop: topmost,
+      };
+    },
+    [waterId, DATAV_WATER_LEVEL_TAG],
+  );
+  if (
+    !waterState.elementPresent ||
+    !waterState.tankPresent ||
+    !waterState.fillPresent ||
+    waterState.labelText !== '68.5%'
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATAV_WATER_NOT_RENDERED:${JSON.stringify(waterState)}`);
+  }
+  if (waterState.labelOnTop !== true) {
+    throw new Error(`BROWSER_HARNESS_DATAV_WATER_LABEL_HIDDEN:${JSON.stringify(waterState)}`);
+  }
+  await removeComponent(page, waterId);
 }
 
 // 通道二：插件为自家物料贡献的检查器控件被授权实例化，写回进 props 事务且可撤销。

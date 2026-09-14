@@ -135,89 +135,103 @@ async function applyPluginDataResource(designer: BaseScreenDesignerElement): Pro
   await painted();
 }
 
-/** 大屏组件案例：四个 DataV 风格物料一次入场，最后选中装饰边框以露出插件检查器控件。 */
+/**
+ * 大屏组件案例：四个 DataV 风格物料一次入场，最后选中装饰边框以露出插件检查器控件。
+ *
+ * 用公开 `insertComponent` 建节点、再经 `update-components` 只覆盖布局与 props：
+ * manifest 的 `defaultData`（含 tabular 的 `defaultBinding`）由 `insertComponent` 展开成
+ * 初始数据源，所以这里**不重写 `dataSource`**。此前手搭完整节点、把 `style` 写成 `{}`，
+ * props/styles 不符合物料 schema，事务被拒，case 看起来"打开了但画布上什么都没有"；
+ * 之后又把 `dataSource` 覆盖成不带 binding 的裸数据集，tabular 物料因此拿不到表格数据
+ * （Renderer 需要 binding 才会跑 adapter），轮播列表退化成"数据不可用"。
+ *
+ * 坐标刻意排在左侧约 650×540 的可视区内（画布 960×540，右侧检查器会盖住右缘），
+ * 且装饰边框声明最低 zIndex 充当外框，其余三个摆在框内。`update-components` 同时改
+ * position/size，避免 insertComponent 按默认尺寸做的贴边裁剪把摆位挪走。
+ */
+const DATAV_CASE_FRAME_Z_INDEX = 1;
+const DATAV_CASE_WIDGET_Z_INDEX = 20;
+
 const DATAV_CASE_COMPONENTS: readonly {
-  readonly id: string;
   readonly type: string;
   readonly name: string;
   readonly position: { readonly x: number; readonly y: number };
   readonly size: { readonly width: number; readonly height: number };
+  readonly zIndex: number;
   readonly props: Record<string, unknown>;
-  readonly dataSource: unknown;
 }[] = [
   {
-    id: 'datav-flop-demo',
-    type: 'datav.digital-flop',
-    name: '数字翻牌器',
-    position: { x: 60, y: 380 },
-    size: { width: 260, height: 110 },
-    props: { title: '今日订单', decimals: 0, thousandsSeparator: true },
-    dataSource: { type: 'static', value: 128_430 },
-  },
-  {
-    id: 'datav-water-demo',
-    type: 'datav.water-level',
-    name: '水位图',
-    position: { x: 340, y: 380 },
-    size: { width: 150, height: 170 },
-    props: { title: '资源占用', shape: 'circle', decimals: 1 },
-    dataSource: { type: 'static', value: 68.5 },
-  },
-  {
-    id: 'datav-board-demo',
-    type: 'datav.scroll-board',
-    name: '轮播列表',
-    position: { x: 510, y: 380 },
-    size: { width: 390, height: 170 },
-    props: { title: '实时排行', rowCount: 4, autoScroll: true },
-    dataSource: {
-      type: 'static',
-      value: {
-        fields: [
-          { id: 'name', label: '名称', valueType: 'string', nullable: false },
-          { id: 'value', label: '数值', valueType: 'number', nullable: false },
-        ],
-        rows: [
-          { name: '上海', value: 982 },
-          { name: '深圳', value: 871 },
-          { name: '北京', value: 763 },
-          { name: '杭州', value: 654 },
-          { name: '成都', value: 542 },
-        ],
-      },
-    },
-  },
-  {
-    id: 'datav-border-demo',
     type: 'datav.border-box',
     name: '装饰边框',
-    position: { x: 60, y: 30 },
-    size: { width: 520, height: 330 },
+    position: { x: 12, y: 12 },
+    size: { width: 636, height: 516 },
+    zIndex: DATAV_CASE_FRAME_Z_INDEX,
     props: { title: '数据总览', borderStyle: 'corner-brackets', bracketSize: 22, lineWidth: 2 },
-    dataSource: null,
+  },
+  {
+    type: 'datav.digital-flop',
+    name: '数字翻牌器',
+    position: { x: 36, y: 64 },
+    size: { width: 300, height: 130 },
+    zIndex: DATAV_CASE_WIDGET_Z_INDEX,
+    props: { title: '今日订单', decimals: 0, thousandsSeparator: true },
+  },
+  {
+    type: 'datav.water-level',
+    name: '水位图',
+    position: { x: 364, y: 64 },
+    size: { width: 150, height: 190 },
+    zIndex: DATAV_CASE_WIDGET_Z_INDEX,
+    props: { title: '资源占用', shape: 'circle', decimals: 1 },
+  },
+  {
+    type: 'datav.scroll-board',
+    name: '轮播列表',
+    position: { x: 36, y: 300 },
+    size: { width: 478, height: 200 },
+    zIndex: DATAV_CASE_WIDGET_Z_INDEX,
+    props: { title: '实时排行', rowCount: 4, autoScroll: true },
   },
 ];
 
 async function applyPluginDatavMaterials(designer: BaseScreenDesignerElement): Promise<void> {
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
-  for (const component of DATAV_CASE_COMPONENTS) {
-    if (designer.document?.components.some((item) => item.id === component.id) === true) continue;
-    const result = designer.executeCommand({
-      type: 'add-component',
-      component: {
-        ...component,
-        parentId: null,
-        rotation: 0,
-        zIndex: 60,
-        status: { locked: false, hidden: false },
-        style: {},
+  let borderId: string | undefined;
+  for (const spec of DATAV_CASE_COMPONENTS) {
+    // 重复应用同一 case 时不重复插入：按类型判存在。
+    const existing = designer.document?.components.find((item) => item.type === spec.type);
+    if (existing !== undefined) {
+      if (spec.type === 'datav.border-box') borderId = existing.id;
+      continue;
+    }
+    const inserted = designer.insertComponent({
+      materialType: spec.type,
+      name: spec.name,
+      position: spec.position,
+    });
+    if (!inserted.ok) return;
+    const id = designer.selection.focusedComponentId;
+    if (id === null) return;
+    const manifest = designer.catalog?.get(spec.type)?.manifest;
+    if (manifest === undefined) return;
+    const patched = designer.executeCommand({
+      type: 'update-components',
+      componentIds: [id],
+      patch: {
+        // 位置与尺寸一次改到位：insertComponent 已按默认尺寸做过贴边裁剪。
+        position: spec.position,
+        size: spec.size,
+        zIndex: spec.zIndex,
+        // props 是整体替换：在 manifest 默认值上覆盖，避免漏掉 schema 必填字段。
+        props: { ...manifest.defaultProps, ...spec.props },
       },
     });
-    if (!result.ok) return;
+    if (!patched.ok) return;
+    if (spec.type === 'datav.border-box') borderId = id;
   }
   await painted();
-  await selectLayer(designer, 'datav-border-demo');
+  if (borderId !== undefined) await selectLayer(designer, borderId);
   clickShadow(designer, '[data-inspector-tab="appearance"]');
   await painted();
 }

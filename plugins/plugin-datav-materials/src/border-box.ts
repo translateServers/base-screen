@@ -162,8 +162,6 @@ export class PluginDatavBorderBoxElement extends DatavMaterialElement {
     // 边框不接数据，但仍可能是 dataset 之类的旧文档：一律按"无数据"渲染外观，
     // 不显示数据态占位，否则一个装饰元素会因为宿主给了数据集而变成错误提示。
     this.style.display = 'block';
-    this.style.width = '100%';
-    this.style.height = '100%';
     this.style.boxSizing = 'border-box';
     this.style.overflow = 'hidden';
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');
