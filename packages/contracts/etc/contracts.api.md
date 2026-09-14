@@ -4,6 +4,9 @@
 
 ```ts
 
+// @public (undocumented)
+export const COMPONENT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
+
 // @public
 export function evaluateScreenDatasetParameters(definitions: readonly ScreenDatasetParameterDefinition[], input: unknown): ScreenParseResult<ScreenJsonObject>;
 

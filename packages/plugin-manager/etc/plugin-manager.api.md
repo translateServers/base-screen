@@ -11,8 +11,10 @@ import type { BaseScreenPluginInspectorControlCatalog } from '@base-screen/plugi
 import type { BaseScreenPluginPanelCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
+import type { PluginBlueprintActionRequest } from '@base-screen/plugin-core';
 import type { PluginCommandPort } from '@base-screen/plugin-core';
 import type { PluginCommandRequest } from '@base-screen/plugin-core';
+import type { PluginDataProcessorRequest } from '@base-screen/plugin-core';
 import type { PluginDesignReadPort } from '@base-screen/plugin-core';
 import type { ScreenDiagnostic } from '@base-screen/contracts';
 import type { ScreenJsonValue } from '@base-screen/contracts';
@@ -38,11 +40,13 @@ interface BaseScreenPluginActivationFailure {
 export interface BaseScreenPluginManager {
     // (undocumented)
     activate(): Promise<ScreenParseResult<BaseScreenPluginManagerSnapshot>>;
+    applyDataProcessor(request: PluginDataProcessorRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
     // (undocumented)
     deactivate(): Promise<ScreenParseResult<null>>;
     // (undocumented)
     dispose(): Promise<ScreenParseResult<null>>;
     ensureActive(pluginId: string): Promise<ScreenParseResult<null>>;
+    executeBlueprintAction(request: PluginBlueprintActionRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
     // (undocumented)
     executeContributionCommand(request: PluginCommandRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
     // (undocumented)

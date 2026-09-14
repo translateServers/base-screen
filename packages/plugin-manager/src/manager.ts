@@ -1,7 +1,9 @@
 import type { ScreenDiagnostic, ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts';
 import {
+  type BaseScreenPluginBlueprintActionHandler,
   type BaseScreenPluginCatalogEntry,
   type BaseScreenPluginCommandHandler,
+  type BaseScreenPluginDataProcessorHandler,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
   createBaseScreenPluginInspectorControlCatalog,
@@ -36,6 +38,8 @@ class PluginManager implements BaseScreenPluginManager {
   #active: Array<{ readonly plugin: PlannedPlugin; readonly session: ActivationSession }> = [];
   #disposalOrder: PlannedPlugin[] = [];
   #commands = new Map<string, ContributionCommand>();
+  #blueprintActions = new Map<string, BlueprintActionEntry>();
+  #dataProcessors = new Map<string, DataProcessorEntry>();
   #disposePromise: Promise<ScreenParseResult<null>> | undefined;
   #queue: Promise<void> = Promise.resolve();
   // 懒激活状态：activate() 只完成预检与目录发布；插件钩子推迟到首次使用。
@@ -80,6 +84,18 @@ class PluginManager implements BaseScreenPluginManager {
     request: Parameters<BaseScreenPluginManager['executeContributionCommand']>[0],
   ): Promise<ScreenParseResult<ScreenJsonValue>> {
     return this.enqueue(() => this.performExecuteContributionCommand(request));
+  }
+
+  executeBlueprintAction(
+    request: Parameters<BaseScreenPluginManager['executeBlueprintAction']>[0],
+  ): Promise<ScreenParseResult<ScreenJsonValue>> {
+    return this.enqueue(() => this.performExecuteBlueprintAction(request));
+  }
+
+  applyDataProcessor(
+    request: Parameters<BaseScreenPluginManager['applyDataProcessor']>[0],
+  ): Promise<ScreenParseResult<ScreenJsonValue>> {
+    return this.enqueue(() => this.performApplyDataProcessor(request));
   }
 
   private enqueue<T>(
@@ -171,6 +187,8 @@ class PluginManager implements BaseScreenPluginManager {
     const plugins = createBaseScreenPluginCatalog(pluginEntries);
     this.#active = active;
     this.#commands = collectContributionCommands(active);
+    this.#blueprintActions = collectBlueprintActions(active);
+    this.#dataProcessors = collectDataProcessors(active);
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
       panels: createBaseScreenPluginPanelCatalog(plan.value.panels),
@@ -192,6 +210,8 @@ class PluginManager implements BaseScreenPluginManager {
     this.#status = 'deactivating';
     this.#snapshot = undefined;
     this.#commands = new Map();
+    this.#blueprintActions = new Map();
+    this.#dataProcessors = new Map();
     this.#plan = undefined;
     this.#lazy = false;
     this.#declaredCommands = new Map();
@@ -211,6 +231,8 @@ class PluginManager implements BaseScreenPluginManager {
     this.#status = 'disposing';
     this.#snapshot = undefined;
     this.#commands = new Map();
+    this.#blueprintActions = new Map();
+    this.#dataProcessors = new Map();
     this.#plan = undefined;
     this.#lazy = false;
     this.#declaredCommands = new Map();
@@ -248,6 +270,8 @@ class PluginManager implements BaseScreenPluginManager {
     const plugins = createBaseScreenPluginCatalog(pluginEntries);
     this.#active = [];
     this.#commands = new Map();
+    this.#blueprintActions = new Map();
+    this.#dataProcessors = new Map();
     this.#plan = plan;
     this.#lazy = true;
     this.#lazyFailures = new Map();
@@ -407,6 +431,104 @@ class PluginManager implements BaseScreenPluginManager {
     this.#disposalOrder.push(plugin);
   }
 
+  private async performExecuteBlueprintAction(
+    request: Parameters<BaseScreenPluginManager['executeBlueprintAction']>[0],
+  ): Promise<ScreenParseResult<ScreenJsonValue>> {
+    if (this.#status !== 'active') {
+      return failure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        [],
+        'Plugin manager cannot execute blueprint actions from its current state.',
+      );
+    }
+    const entry = this.#blueprintActions.get(request.actionId);
+    if (entry === undefined) {
+      // ADR-0076：未声明的 actionId 失败关闭，不再落到宿主任意解释。
+      return failure(
+        'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+        ['actionId'],
+        'Blueprint action is not declared by any active plugin.',
+      );
+    }
+    if (!entry.isValid()) {
+      return failure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        [],
+        'Plugin activation session is no longer valid.',
+      );
+    }
+    try {
+      const result = await entry.handler(request.payload);
+      if (result === undefined) return { ok: true, value: null, diagnostics: [] };
+      if (
+        result === null ||
+        typeof result !== 'object' ||
+        typeof (result as { readonly ok?: unknown }).ok !== 'boolean'
+      ) {
+        return failure(
+          'PLUGIN_CORE_COMMAND_RESULT_INVALID',
+          [],
+          'Plugin blueprint action returned an invalid result.',
+        );
+      }
+      return result as ScreenParseResult<ScreenJsonValue>;
+    } catch {
+      return failure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        ['actionId'],
+        'Plugin blueprint action failed.',
+      );
+    }
+  }
+
+  private async performApplyDataProcessor(
+    request: Parameters<BaseScreenPluginManager['applyDataProcessor']>[0],
+  ): Promise<ScreenParseResult<ScreenJsonValue>> {
+    if (this.#status !== 'active') {
+      return failure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        [],
+        'Plugin manager cannot apply data processors from its current state.',
+      );
+    }
+    const entry = this.#dataProcessors.get(request.processorId);
+    if (entry === undefined) {
+      return failure(
+        'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+        ['processorId'],
+        'Data processor is not declared by any active plugin.',
+      );
+    }
+    if (!entry.isValid()) {
+      return failure(
+        'PLUGIN_CORE_SESSION_INVALID',
+        [],
+        'Plugin activation session is no longer valid.',
+      );
+    }
+    try {
+      const result = await entry.handler(request.value, request.config);
+      if (
+        result === null ||
+        typeof result !== 'object' ||
+        typeof (result as { readonly ok?: unknown }).ok !== 'boolean'
+      ) {
+        return failure(
+          'PLUGIN_CORE_COMMAND_RESULT_INVALID',
+          [],
+          'Plugin data processor returned an invalid result.',
+        );
+      }
+      return result as ScreenParseResult<ScreenJsonValue>;
+    } catch {
+      return failure(
+        'PLUGIN_CORE_LIFECYCLE_INVALID',
+        ['processorId'],
+        'Plugin data processor failed.',
+      );
+    }
+  }
+
   private async performExecuteContributionCommand(
     request: Parameters<BaseScreenPluginManager['executeContributionCommand']>[0],
   ): Promise<ScreenParseResult<ScreenJsonValue>> {
@@ -491,6 +613,50 @@ async function deactivateEntries(
     }
   }
   return diagnostics;
+}
+
+type BlueprintActionEntry = {
+  readonly handler: BaseScreenPluginBlueprintActionHandler;
+  readonly isValid: () => boolean;
+};
+
+type DataProcessorEntry = {
+  readonly handler: BaseScreenPluginDataProcessorHandler;
+  readonly isValid: () => boolean;
+};
+
+function collectBlueprintActions(
+  entries: readonly { readonly plugin: PlannedPlugin; readonly session: ActivationSession }[],
+): Map<string, BlueprintActionEntry> {
+  const actions = new Map<string, BlueprintActionEntry>();
+  for (const entry of entries) {
+    for (const [actionId, handler] of entry.plugin.blueprintActions) {
+      const contribution = entry.plugin.manifest.contributions.find(
+        (item) => item.kind === 'blueprintAction' && item.id === actionId,
+      );
+      if (contribution === undefined || contribution.kind !== 'blueprintAction') continue;
+      // 与 command 同一门禁：动作用的 requiredCapability 未获授权即不进入可执行集合。
+      if (!entry.plugin.grantedCapabilities.includes(contribution.requiredCapability)) continue;
+      actions.set(actionId, { handler, isValid: () => entry.session.isValid() });
+    }
+  }
+  return actions;
+}
+
+function collectDataProcessors(
+  entries: readonly { readonly plugin: PlannedPlugin; readonly session: ActivationSession }[],
+): Map<string, DataProcessorEntry> {
+  const processors = new Map<string, DataProcessorEntry>();
+  for (const entry of entries) {
+    for (const [processorId, handler] of entry.plugin.dataProcessors) {
+      const contribution = entry.plugin.manifest.contributions.find(
+        (item) => item.kind === 'dataProcessor' && item.id === processorId,
+      );
+      if (contribution === undefined || contribution.kind !== 'dataProcessor') continue;
+      processors.set(processorId, { handler, isValid: () => entry.session.isValid() });
+    }
+  }
+  return processors;
 }
 
 type ContributionCommand = {

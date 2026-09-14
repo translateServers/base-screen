@@ -16,6 +16,7 @@
 
 | ADR | 状态 | 日期 | 主题 |
 | --- | --- | --- | --- |
+| [ADR-0076](./ADR-0076-plugin-blueprint-actions-and-data-processors.md) | 已接受 | 2026-09-14 | 插件贡献蓝图动作与数据处理器：`blueprintAction` / `dataProcessor` 两类贡献、两个宿主端口，并收紧 `host-action` 与 `processorId` 的解析 |
 | [ADR-0075](./ADR-0075-peripheral-plugin-compatibility-policy.md) | 已接受 | 2026-09-12 | 外围插件兼容性策略：锁步批次交付 + 以 api 基线治理的 plugin-core/plugin-sdk 稳定子集，不引入版本标记 |
 | [ADR-0074](./ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md) | 已接受 | 2026-09-11 | 外围插件承载位置与依赖分区：新增顶层 `plugins/` 分区，核心库依赖白名单与固定包清单不变；外围插件无运行时特权，依赖准入沿用 ADR-0019 |
 | [ADR-0073](./ADR-0073-inspector-custom-form-controls.md) | 已接受 | 2026-09-10 | 属性面板插件自定义表单控件：`control: 'custom'` 与按贡献授权的实例化 |

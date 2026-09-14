@@ -1,4 +1,5 @@
 import {
+  COMPONENT_ID_PATTERN,
   parseScreenJsonValue,
   type ScreenDiagnostic,
   type ScreenJsonObject,
@@ -340,6 +341,79 @@ function validateContribution(
       return typeof contribution.id === 'string'
         ? `dataResourceType:${contribution.id}`
         : undefined;
+    }
+    case 'blueprintAction': {
+      validateExactObject(
+        contribution,
+        new Set(['kind', 'id', 'name', 'payloadSchema', 'requiredCapability']),
+        path,
+        collector,
+      );
+      validateContributionIdentityFields(contribution, path, collector, [
+        'id',
+        'requiredCapability',
+      ]);
+      validateDisplayName(contribution.name, [...path, 'name'], collector);
+      // actionId 会被写进文档 host-action.actionId，必须满足文档契约的组件 id 模式。
+      if (
+        typeof contribution.id === 'string' &&
+        new RegExp(COMPONENT_ID_PATTERN).test(contribution.id) === false
+      ) {
+        collector.add(
+          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          [...path, 'id'],
+          'blueprintAction id must match the screen component id pattern so it can be stored as host-action.actionId.',
+        );
+      }
+      const payloadSchema = validatePropsSchema(
+        contribution.payloadSchema,
+        [...path, 'payloadSchema'],
+        collector,
+        1,
+      );
+      if (payloadSchema?.kind !== 'object') {
+        collector.add(
+          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          [...path, 'payloadSchema'],
+          'Blueprint action payload schema must be an object schema.',
+        );
+      }
+      return typeof contribution.id === 'string' ? `blueprintAction:${contribution.id}` : undefined;
+    }
+    case 'dataProcessor': {
+      validateExactObject(
+        contribution,
+        new Set(['kind', 'id', 'name', 'configSchema']),
+        path,
+        collector,
+      );
+      validateContributionIdentityFields(contribution, path, collector, ['id']);
+      validateDisplayName(contribution.name, [...path, 'name'], collector);
+      // processorId 会被写进文档变量/数据源，同样必须满足变量名模式。
+      if (
+        typeof contribution.id === 'string' &&
+        new RegExp(VARIABLE_NAME_PATTERN).test(contribution.id) === false
+      ) {
+        collector.add(
+          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          [...path, 'id'],
+          'dataProcessor id must match the screen variable name pattern so it can be stored as processorId.',
+        );
+      }
+      const processorSchema = validatePropsSchema(
+        contribution.configSchema,
+        [...path, 'configSchema'],
+        collector,
+        1,
+      );
+      if (processorSchema?.kind !== 'object') {
+        collector.add(
+          'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+          [...path, 'configSchema'],
+          'Data processor config schema must be an object schema.',
+        );
+      }
+      return typeof contribution.id === 'string' ? `dataProcessor:${contribution.id}` : undefined;
     }
     case 'blueprintCapability':
       validateExactObject(contribution, new Set(['kind', 'id', 'name']), path, collector);

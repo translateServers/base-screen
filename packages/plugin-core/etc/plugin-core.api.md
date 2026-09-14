@@ -447,6 +447,23 @@ export interface BaseScreenPluginActivationContext {
     readonly pluginId: string;
 }
 
+// @public
+export interface BaseScreenPluginBlueprintActionContribution {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'blueprintAction';
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly payloadSchema: BaseScreenMaterialObjectSchema;
+    // (undocumented)
+    readonly requiredCapability: string;
+}
+
+// @public
+export type BaseScreenPluginBlueprintActionHandler = (payload: ScreenJsonValue) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
+
 // @public (undocumented)
 export interface BaseScreenPluginCatalog {
     // (undocumented)
@@ -488,7 +505,7 @@ export type BaseScreenPluginContribution = {
     readonly requiredCapability: string;
     readonly menus?: readonly BaseScreenPluginCommandMenu[];
     readonly shortcut?: string;
-} | BaseScreenPluginDataResourceTypeContribution | {
+} | BaseScreenPluginDataResourceTypeContribution | BaseScreenPluginBlueprintActionContribution | BaseScreenPluginDataProcessorContribution | {
     readonly kind: 'blueprintCapability';
     readonly id: string;
     readonly name: string;
@@ -503,6 +520,21 @@ export type BaseScreenPluginContribution = {
     readonly name: string;
     readonly tagName: string;
 };
+
+// @public
+export interface BaseScreenPluginDataProcessorContribution {
+    // (undocumented)
+    readonly configSchema: BaseScreenMaterialObjectSchema;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly kind: 'dataProcessor';
+    // (undocumented)
+    readonly name: string;
+}
+
+// @public
+export type BaseScreenPluginDataProcessorHandler = (value: ScreenJsonValue, config: ScreenJsonValue) => ScreenParseResult<ScreenJsonValue> | Promise<ScreenParseResult<ScreenJsonValue>>;
 
 // @public
 export interface BaseScreenPluginDataResourceTypeContribution {
@@ -644,8 +676,10 @@ export interface BaseScreenPluginPanelElement extends HTMLElement {
 export interface BaseScreenPluginRuntime {
     // (undocumented)
     activate(context: BaseScreenPluginActivationContext): void | Promise<void>;
+    readonly blueprintActions?: Readonly<Record<string, BaseScreenPluginBlueprintActionHandler>>;
     // (undocumented)
     readonly commands?: Readonly<Record<string, BaseScreenPluginCommandHandler>>;
+    readonly dataProcessors?: Readonly<Record<string, BaseScreenPluginDataProcessorHandler>>;
     // (undocumented)
     deactivate(): void | Promise<void>;
     // (undocumented)
@@ -656,10 +690,14 @@ export interface BaseScreenPluginRuntime {
 
 // @public (undocumented)
 export interface BaseScreenRuntimeContributionIndex {
+    getBlueprintAction?(actionId: string): BaseScreenPluginBlueprintActionContribution | undefined;
+    getDataProcessor?(processorId: string): BaseScreenPluginDataProcessorContribution | undefined;
     // (undocumented)
     getResourceType(resourceType: string): BaseScreenPluginDataResourceTypeContribution | undefined;
     // (undocumented)
     hasBlueprintCapability(capability: string): boolean;
+    listBlueprintActions?(): readonly BaseScreenPluginBlueprintActionContribution[];
+    listDataProcessors?(): readonly BaseScreenPluginDataProcessorContribution[];
     listResourceTypes?(): readonly BaseScreenPluginDataResourceTypeContribution[];
 }
 
@@ -749,6 +787,14 @@ export function parseBaseScreenTableData(input: unknown): ScreenParseResult<Base
 // @public (undocumented)
 export function parsePluginCommandRequest(input: unknown): ScreenParseResult<PluginCommandRequest>;
 
+// @public
+export interface PluginBlueprintActionRequest {
+    // (undocumented)
+    readonly actionId: string;
+    // (undocumented)
+    readonly payload: ScreenJsonValue;
+}
+
 // @public (undocumented)
 export interface PluginCommandPort {
     // (undocumented)
@@ -761,6 +807,16 @@ export interface PluginCommandRequest {
     readonly args: ScreenJsonValue;
     // (undocumented)
     readonly commandId: string;
+}
+
+// @public
+export interface PluginDataProcessorRequest {
+    // (undocumented)
+    readonly config: ScreenJsonValue;
+    // (undocumented)
+    readonly processorId: string;
+    // (undocumented)
+    readonly value: ScreenJsonValue;
 }
 
 // @public

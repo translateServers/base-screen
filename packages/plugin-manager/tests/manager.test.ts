@@ -1,3 +1,4 @@
+import type { ScreenJsonValue } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialConstructor,
   type BaseScreenPluginActivationContext,
@@ -1264,5 +1265,132 @@ describe('BaseScreenPluginManager', () => {
         expect(ensured.diagnostics[0]?.code).toBe('PLUGIN_CORE_IDENTITY_INVALID');
       }
     });
+  });
+});
+
+// ADR-0076：运行期贡献（dataProcessor / blueprintAction）的路由与收紧。
+// 这两项都是"宿主→插件"方向，能力不带端口工厂；未声明的 id 必须失败关闭，
+// 而不是静默回落到宿主任意解释——这正是该 ADR 要收紧的松口。
+describe('runtime contribution routing (ADR-0076)', () => {
+  const pipelineManifest = (): BaseScreenPluginManifest => ({
+    id: 'acme.pipeline',
+    dependencies: [],
+    capabilities: ['data.process', 'blueprint.action.execute'],
+    contributions: [
+      {
+        kind: 'dataProcessor',
+        id: 'topBy',
+        name: 'Top N',
+        configSchema: {
+          kind: 'object',
+          properties: { field: { kind: 'string' }, count: { kind: 'number' } },
+          required: ['field'],
+        },
+      },
+      {
+        kind: 'blueprintAction',
+        id: 'acme.pipeline.spotlight',
+        name: 'Spotlight',
+        payloadSchema: { kind: 'object', properties: {}, required: [] },
+        requiredCapability: 'blueprint.action.execute',
+      },
+    ],
+  });
+
+  function pipelineRuntime() {
+    return {
+      manifest: pipelineManifest(),
+      dataProcessors: {
+        topBy: (value: ScreenJsonValue) => ({
+          ok: true as const,
+          value: { processed: value },
+          diagnostics: [],
+        }),
+      },
+      blueprintActions: {
+        'acme.pipeline.spotlight': (payload: ScreenJsonValue) => ({
+          ok: true as const,
+          value: { spotlighted: payload },
+          diagnostics: [],
+        }),
+      },
+      activate: () => undefined,
+      deactivate: () => undefined,
+      dispose: () => undefined,
+    } satisfies BaseScreenPluginRuntime;
+  }
+
+  async function activatedManager() {
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([pipelineRuntime()]),
+      grantedCapabilities: {
+        'acme.pipeline': ['data.process', 'blueprint.action.execute'],
+      },
+    });
+    expect((await manager.activate()).ok).toBe(true);
+    return manager;
+  }
+
+  it('routes a declared processor to the plugin handler', async () => {
+    const manager = await activatedManager();
+    const applied = await manager.applyDataProcessor({
+      processorId: 'topBy',
+      value: [1, 2, 3],
+      config: { field: 'value' },
+    });
+    expect(applied.ok).toBe(true);
+    expect(applied.ok ? applied.value : null).toEqual({ processed: [1, 2, 3] });
+  });
+
+  it('routes a declared blueprint action to the plugin handler', async () => {
+    const manager = await activatedManager();
+    const executed = await manager.executeBlueprintAction({
+      actionId: 'acme.pipeline.spotlight',
+      payload: { color: '#fff' },
+    });
+    expect(executed.ok).toBe(true);
+    expect(executed.ok ? executed.value : null).toEqual({ spotlighted: { color: '#fff' } });
+  });
+
+  it('fails closed on undeclared processor and action ids', async () => {
+    const manager = await activatedManager();
+    const processor = await manager.applyDataProcessor({
+      processorId: 'not-declared',
+      value: null,
+      config: {},
+    });
+    expect(processor.ok).toBe(false);
+    if (!processor.ok)
+      expect(processor.diagnostics[0]?.code).toBe('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
+
+    const action = await manager.executeBlueprintAction({
+      actionId: 'not.declared',
+      payload: null,
+    });
+    expect(action.ok).toBe(false);
+    if (!action.ok) expect(action.diagnostics[0]?.code).toBe('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
+  });
+
+  it('excludes an action whose required capability was not granted', async () => {
+    // 声明了能力但宿主未批准 → 动作不进入可执行集合，作者面与执行面一致不可见。
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([pipelineRuntime()]),
+      grantedCapabilities: { 'acme.pipeline': ['data.process'] },
+    });
+    expect((await manager.activate()).ok).toBe(true);
+    // 未授权能力被剔除，但插件本身仍激活（能力级失败不熔断整个插件）。
+    const executed = await manager.executeBlueprintAction({
+      actionId: 'acme.pipeline.spotlight',
+      payload: {},
+    });
+    expect(executed.ok).toBe(false);
+  });
+
+  it('exposes both runtime surfaces through the contribution index', async () => {
+    const manager = await activatedManager();
+    const index = manager.snapshot!.contributions;
+    expect(index.getDataProcessor?.('topBy')?.name).toBe('Top N');
+    expect(index.listDataProcessors?.().map((item) => item.id)).toEqual(['topBy']);
+    expect(index.getBlueprintAction?.('acme.pipeline.spotlight')?.name).toBe('Spotlight');
   });
 });

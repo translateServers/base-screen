@@ -236,6 +236,36 @@ export interface BaseScreenPluginDataResourceTypeContribution {
   readonly queryScope?: 'resource';
 }
 
+/**
+ * 声明一个蓝图动作（ADR-0076）：文档里 `host-action` 的 `actionId` 引用它。
+ *
+ * `payloadSchema` 约束规则里配的 payload 形状，与 `dataResourceType.configSchema` 同构。
+ * `requiredCapability` 必须是受支持能力表中的 `blueprint.action.*` 项，且同时出现在清单
+ * `capabilities` 里才会生效（声明 ∩ 批准 ∩ 支持）。动作**怎么执行**不由这里决定：
+ * 运行时经宿主端口路由，Engine 只做可用性门禁与作者面呈现。
+ */
+export interface BaseScreenPluginBlueprintActionContribution {
+  readonly kind: 'blueprintAction';
+  readonly id: string;
+  readonly name: string;
+  readonly payloadSchema: BaseScreenMaterialObjectSchema;
+  readonly requiredCapability: string;
+}
+
+/**
+ * 声明一个数据处理器（ADR-0076）：文档里 `processorId` 引用它。
+ *
+ * 此前 `processorId` 只是透传给宿主的字符串，没有任何注册表——文档能写、宿主能收，
+ * 插件却无处声明。本贡献补上供给方：`configSchema` 约束处理器参数，实际执行由宿主经
+ * 端口完成（Base Screen 不因此获得数据加工职责，见 ADR-0027）。
+ */
+export interface BaseScreenPluginDataProcessorContribution {
+  readonly kind: 'dataProcessor';
+  readonly id: string;
+  readonly name: string;
+  readonly configSchema: BaseScreenMaterialObjectSchema;
+}
+
 export type BaseScreenPluginContribution =
   | { readonly kind: 'material'; readonly type: string; readonly tagName: string }
   | {
@@ -249,6 +279,8 @@ export type BaseScreenPluginContribution =
       readonly shortcut?: string;
     }
   | BaseScreenPluginDataResourceTypeContribution
+  | BaseScreenPluginBlueprintActionContribution
+  | BaseScreenPluginDataProcessorContribution
   | { readonly kind: 'blueprintCapability'; readonly id: string; readonly name: string }
   | {
       readonly kind: 'panel';
@@ -271,6 +303,14 @@ export interface BaseScreenRuntimeContributionIndex {
   /** 枚举当前生效的数据资源类型贡献，供作者面生成类型选择器。
    *  可选：宿主自建的最小索引可以只实现按 id 查询，消费方须容忍缺失。 */
   listResourceTypes?(): readonly BaseScreenPluginDataResourceTypeContribution[];
+  /** 按 id 查已声明并被授权的蓝图动作（ADR-0076）；未声明即 undefined，消费方据此失败关闭。 */
+  getBlueprintAction?(actionId: string): BaseScreenPluginBlueprintActionContribution | undefined;
+  /** 枚举生效的蓝图动作，供作者面生成动作选择器。可选，同 listResourceTypes 的兼容约定。 */
+  listBlueprintActions?(): readonly BaseScreenPluginBlueprintActionContribution[];
+  /** 按 id 查已声明的数据处理器（ADR-0076）；未声明即 undefined。 */
+  getDataProcessor?(processorId: string): BaseScreenPluginDataProcessorContribution | undefined;
+  /** 枚举生效的数据处理器，供作者面生成处理器选择器。 */
+  listDataProcessors?(): readonly BaseScreenPluginDataProcessorContribution[];
 }
 
 export interface BaseScreenPluginManifest {
@@ -301,6 +341,27 @@ export interface PluginDesignReadPort {
   read(): Promise<ScreenParseResult<BaseScreenPluginDesignSnapshot>>;
 }
 
+/**
+ * 插件蓝图动作执行请求（ADR-0076）：`actionId` 是文档 `host-action` 里的稳定标识。
+ *
+ * 宿主把这层接到 `ScreenBlueprintHostActionPort`，再路由到 manager；未知 actionId 失败关闭。
+ */
+export interface PluginBlueprintActionRequest {
+  readonly actionId: string;
+  readonly payload: ScreenJsonValue;
+}
+
+/**
+ * 插件数据处理器请求（ADR-0076）：`value` 是上游数据，`config` 是处理器参数。
+ *
+ * 宿主在解析变量/数据源时组合：`processorId` 命中已声明处理器才路由，未命中失败关闭。
+ */
+export interface PluginDataProcessorRequest {
+  readonly processorId: string;
+  readonly value: ScreenJsonValue;
+  readonly config: ScreenJsonValue;
+}
+
 /** 面板派发的动作；`panelId` 用于拒绝某个面板冒充另一个面板。 */
 export interface BaseScreenPluginPanelActionDetail {
   readonly panelId: string;
@@ -323,6 +384,21 @@ export type BaseScreenPluginCommandHandler = (
   args: ScreenJsonValue,
 ) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
 
+/**
+ * 蓝图动作处理器：宿主端口把已声明动作的请求路由到这里，返回值即动作结果。
+ *
+ * `payload` 已由宿主按贡献的 `payloadSchema` 校验；handler 只需处理语义。
+ */
+export type BaseScreenPluginBlueprintActionHandler = (
+  payload: ScreenJsonValue,
+) => void | ScreenParseResult<ScreenJsonValue> | Promise<void | ScreenParseResult<ScreenJsonValue>>;
+
+/** 数据处理器：入参是上游值与处理器参数，返回变换后的值。 */
+export type BaseScreenPluginDataProcessorHandler = (
+  value: ScreenJsonValue,
+  config: ScreenJsonValue,
+) => ScreenParseResult<ScreenJsonValue> | Promise<ScreenParseResult<ScreenJsonValue>>;
+
 export interface BaseScreenPluginActivationContext {
   readonly instanceId: string;
   readonly pluginId: string;
@@ -334,6 +410,10 @@ export interface BaseScreenPluginActivationContext {
 export interface BaseScreenPluginRuntime {
   readonly manifest: BaseScreenPluginManifest;
   readonly commands?: Readonly<Record<string, BaseScreenPluginCommandHandler>>;
+  /** 与 `kind: 'blueprintAction'` 贡献一一对应；缺 handler 时清单校验失败关闭。 */
+  readonly blueprintActions?: Readonly<Record<string, BaseScreenPluginBlueprintActionHandler>>;
+  /** 与 `kind: 'dataProcessor'` 贡献一一对应；缺 handler 时清单校验失败关闭。 */
+  readonly dataProcessors?: Readonly<Record<string, BaseScreenPluginDataProcessorHandler>>;
   activate(context: BaseScreenPluginActivationContext): void | Promise<void>;
   deactivate(): void | Promise<void>;
   dispose(): void | Promise<void>;

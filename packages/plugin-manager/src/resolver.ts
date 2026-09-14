@@ -20,6 +20,11 @@ export interface PluginCapabilityDescriptor {
 export const PLUGIN_CAPABILITY_DESCRIPTORS: readonly PluginCapabilityDescriptor[] = Object.freeze([
   { id: 'command.execute', port: 'command' },
   { id: 'design.read', port: 'design' },
+  // ADR-0076：插件参与文档的运行时语义。这两项都是**宿主→插件**方向（宿主/引擎发起请求，
+  // manager 路由到插件自己的 handler），不要求宿主为插件提供任何端口，因此无工厂——
+  // 它们只标记"该插件声明的处理器/动作可被执行"。
+  { id: 'data.process' },
+  { id: 'blueprint.action.execute' },
   // 蓝图能力 id 的唯一来源在 contracts：engine 需据同一词汇归一化规则能力，
   // 两侧各自硬编码会在漂移时静默授权失败。
   ...SCREEN_BLUEPRINT_CAPABILITY_IDS.map((id) => ({ id, blueprint: true })),
@@ -157,9 +162,12 @@ function hasPortFactory(
   input: ManagerInput,
   port: NonNullable<PluginCapabilityDescriptor['port']>,
 ): boolean {
-  return port === 'command'
-    ? input.createCommandPort !== undefined
-    : input.createDesignReadPort !== undefined;
+  switch (port) {
+    case 'command':
+      return input.createCommandPort !== undefined;
+    case 'design':
+      return input.createDesignReadPort !== undefined;
+  }
 }
 
 function validateContributions(

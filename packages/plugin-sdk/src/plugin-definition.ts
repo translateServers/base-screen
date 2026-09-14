@@ -1,6 +1,5 @@
 import type { ScreenParseResult } from '@base-screen/contracts';
 import {
-  type BaseScreenPluginCommandHandler,
   type BaseScreenPluginRuntime,
   parseBaseScreenPluginManifest,
 } from '@base-screen/plugin-core';
@@ -46,52 +45,76 @@ export function definePlugin(
       'Plugin runtime manifest does not match its canonical manifest.',
     );
   }
-  const commands = readCommandHandlers(readOwnValue(runtime, 'commands'), parsedManifest.value);
+  // 三类 handler 记录规则一致（声明 ↔ handler 一一对应）：command / blueprintAction / dataProcessor。
+  const commands = readHandlerRecord(
+    readOwnValue(runtime, 'commands'),
+    parsedManifest.value,
+    'command',
+    'commands',
+  );
   if (!commands.ok) return commands;
+  const blueprintActions = readHandlerRecord(
+    readOwnValue(runtime, 'blueprintActions'),
+    parsedManifest.value,
+    'blueprintAction',
+    'blueprintActions',
+  );
+  if (!blueprintActions.ok) return blueprintActions;
+  const dataProcessors = readHandlerRecord(
+    readOwnValue(runtime, 'dataProcessors'),
+    parsedManifest.value,
+    'dataProcessor',
+    'dataProcessors',
+  );
+  if (!dataProcessors.ok) return dataProcessors;
   return { ok: true, value: runtime, diagnostics: [] };
 }
 
-function readCommandHandlers(
+function readHandlerRecord(
   value: unknown,
   manifest: BaseScreenPluginRuntime['manifest'],
-): ScreenParseResult<ReadonlyMap<string, BaseScreenPluginCommandHandler>> {
+  kind: 'command' | 'blueprintAction' | 'dataProcessor',
+  field: string,
+): ScreenParseResult<ReadonlyMap<string, (...args: never[]) => unknown>> {
   const declared = manifest.contributions
-    .filter((contribution) => contribution.kind === 'command')
-    .map((contribution) => contribution.id);
+    .filter((contribution) => contribution.kind === kind)
+    .map((contribution) =>
+      contribution.kind === 'material' ? contribution.type : contribution.id,
+    );
   if (value === undefined) {
     if (declared.length === 0) return { ok: true, value: new Map(), diagnostics: [] };
     return failure(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['commands'],
-      'Plugin command contributions require matching command handlers.',
+      [field],
+      `Plugin ${kind} contributions require matching handlers.`,
     );
   }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     return failure(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['commands'],
-      'Plugin command handlers must be an object.',
+      [field],
+      `Plugin ${kind} handlers must be an object.`,
     );
   }
-  const handlers = new Map<string, BaseScreenPluginCommandHandler>();
+  const handlers = new Map<string, (...args: never[]) => unknown>();
   for (const key of Object.getOwnPropertyNames(value)) {
     const handler = readOwnValue(value, key);
     if (typeof handler !== 'function') {
       return failure(
         'PLUGIN_CORE_LIFECYCLE_INVALID',
-        ['commands', key],
-        'Plugin command handler is invalid.',
+        [field, key],
+        `Plugin ${kind} handler is invalid.`,
       );
     }
-    handlers.set(key, handler as BaseScreenPluginCommandHandler);
+    handlers.set(key, handler as (...args: never[]) => unknown);
   }
   const declaredSet = new Set(declared);
   for (const id of declared) {
     if (!handlers.has(id)) {
       return failure(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['commands', id],
-        'Plugin command contribution is missing a handler.',
+        [field, id],
+        `Plugin ${kind} contribution is missing a handler.`,
       );
     }
   }
@@ -99,8 +122,8 @@ function readCommandHandlers(
     if (!declaredSet.has(id)) {
       return failure(
         'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
-        ['commands', id],
-        'Plugin command handler is not declared as a contribution.',
+        [field, id],
+        `Plugin ${kind} handler is not declared as a contribution.`,
       );
     }
   }

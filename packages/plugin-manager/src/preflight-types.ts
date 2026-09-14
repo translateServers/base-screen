@@ -1,6 +1,8 @@
 import type {
   BaseScreenPluginActivationContext,
+  BaseScreenPluginBlueprintActionHandler,
   BaseScreenPluginCommandHandler,
+  BaseScreenPluginDataProcessorHandler,
   BaseScreenPluginManifest,
   BaseScreenPluginRuntime,
 } from '@base-screen/plugin-core';
@@ -26,6 +28,8 @@ export interface Candidate {
   readonly deactivate: BaseScreenPluginRuntime['deactivate'];
   readonly dispose: BaseScreenPluginRuntime['dispose'];
   readonly commands: ReadonlyMap<string, BaseScreenPluginCommandHandler>;
+  readonly blueprintActions: ReadonlyMap<string, BaseScreenPluginBlueprintActionHandler>;
+  readonly dataProcessors: ReadonlyMap<string, BaseScreenPluginDataProcessorHandler>;
 }
 
 export interface ActivationSession {

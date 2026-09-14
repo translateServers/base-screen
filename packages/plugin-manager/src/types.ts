@@ -7,8 +7,10 @@ import type {
   BaseScreenPluginPanelCatalog,
   BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
+  PluginBlueprintActionRequest,
   PluginCommandPort,
   PluginCommandRequest,
+  PluginDataProcessorRequest,
   PluginDesignReadPort,
 } from '@base-screen/plugin-core';
 
@@ -71,5 +73,23 @@ export interface BaseScreenPluginManager {
   ensureActive(pluginId: string): Promise<ScreenParseResult<null>>;
   executeContributionCommand(
     request: PluginCommandRequest,
+  ): Promise<ScreenParseResult<ScreenJsonValue>>;
+  /**
+   * 执行一个插件贡献的蓝图动作（ADR-0076）。
+   *
+   * 宿主把这层接到 `ScreenBlueprintHostActionPort`：Engine 侧只做"该 actionId 是否已声明"
+   * 的门禁，实际执行路由到这里——因此未声明的动作失败关闭，而不是落到宿主任意解释。
+   */
+  executeBlueprintAction(
+    request: PluginBlueprintActionRequest,
+  ): Promise<ScreenParseResult<ScreenJsonValue>>;
+  /**
+   * 对上游值应用一个插件贡献的数据处理器（ADR-0076）。
+   *
+   * 宿主把它组合进自己的变量/数据源解析：`processorId` 命中已声明处理器时路由到这里，
+   * 未命中则失败关闭。处理器是同 realm 受信代码，不代表 Base Screen 获得数据加工职责。
+   */
+  applyDataProcessor(
+    request: PluginDataProcessorRequest,
   ): Promise<ScreenParseResult<ScreenJsonValue>>;
 }

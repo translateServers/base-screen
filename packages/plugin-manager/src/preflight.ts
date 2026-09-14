@@ -1,7 +1,9 @@
 import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
+  type BaseScreenPluginBlueprintActionHandler,
   type BaseScreenPluginCommandHandler,
+  type BaseScreenPluginDataProcessorHandler,
   type BaseScreenPluginInspectorControlCatalogEntry,
   type BaseScreenPluginManifest,
   type BaseScreenPluginPanelCatalogEntry,
@@ -31,6 +33,8 @@ export interface PlannedPlugin {
   readonly deactivate: BaseScreenPluginRuntime['deactivate'];
   readonly dispose: BaseScreenPluginRuntime['dispose'];
   readonly commands: ReadonlyMap<string, BaseScreenPluginCommandHandler>;
+  readonly blueprintActions: ReadonlyMap<string, BaseScreenPluginBlueprintActionHandler>;
+  readonly dataProcessors: ReadonlyMap<string, BaseScreenPluginDataProcessorHandler>;
   createSession(): ActivationSession;
 }
 
@@ -197,6 +201,8 @@ function parsePluginCandidates(
       const deactivate = readOwnValue(runtime, 'deactivate');
       const dispose = readOwnValue(runtime, 'dispose');
       const commandsValue = readOwnValue(runtime, 'commands');
+      const blueprintActionsValue = readOwnValue(runtime, 'blueprintActions');
+      const dataProcessorsValue = readOwnValue(runtime, 'dataProcessors');
       if (
         manifest === undefined ||
         activate === undefined ||
@@ -240,6 +246,20 @@ function parsePluginCandidates(
       identities.set(index, parsed.value.id);
       const commands = readCommandHandlers(commandsValue, parsed.value, index, diagnostics);
       if (commands === undefined) continue;
+      const blueprintActions = readBlueprintActionHandlers(
+        blueprintActionsValue,
+        parsed.value,
+        index,
+        diagnostics,
+      );
+      if (blueprintActions === undefined) continue;
+      const dataProcessors = readDataProcessorHandlers(
+        dataProcessorsValue,
+        parsed.value,
+        index,
+        diagnostics,
+      );
+      if (dataProcessors === undefined) continue;
       candidates.push({
         index,
         runtime: runtime as BaseScreenPluginRuntime,
@@ -248,6 +268,8 @@ function parsePluginCandidates(
         deactivate: deactivate as BaseScreenPluginRuntime['deactivate'],
         dispose: dispose as BaseScreenPluginRuntime['dispose'],
         commands,
+        blueprintActions,
+        dataProcessors,
       });
     } catch {
       diagnostics.add(
@@ -267,54 +289,65 @@ function readOwnValue(value: object, key: string): unknown | undefined {
     : undefined;
 }
 
-function readCommandHandlers(
+/**
+ * 校验"声明 ↔ handler"一一对应并把 handler 收进 Map。
+ *
+ * command / blueprintAction / dataProcessor 三者规则完全相同（缺 handler、多 handler 都失败
+ * 关闭），因此共用一份实现：`kind` 决定从清单里取哪类声明的 id，`field` 是诊断路径用的
+ * runtime 字段名。
+ */
+function readContributionHandlers<K extends string>(
   value: unknown,
   manifest: BaseScreenPluginManifest,
   pluginIndex: number,
   diagnostics: DiagnosticCollector,
-): ReadonlyMap<string, BaseScreenPluginCommandHandler> | undefined {
+  kind: 'command' | 'blueprintAction' | 'dataProcessor',
+  field: K,
+): ReadonlyMap<string, (...args: never[]) => unknown> | undefined {
   const declared = manifest.contributions
-    .filter((contribution) => contribution.kind === 'command')
-    .map((contribution) => contribution.id);
+    .filter((contribution) => contribution.kind === kind)
+    .map((contribution) =>
+      contribution.kind === 'material' ? contribution.type : contribution.id,
+    );
   if (value === undefined) {
     if (declared.length === 0) return new Map();
     diagnostics.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['plugins', pluginIndex, 'commands'],
-      'Plugin command contributions require matching command handlers.',
+      ['plugins', pluginIndex, field],
+      `Plugin ${kind} contributions require matching handlers.`,
     );
     return undefined;
   }
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     diagnostics.add(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['plugins', pluginIndex, 'commands'],
-      'Plugin command handlers must be an object.',
+      ['plugins', pluginIndex, field],
+      `Plugin ${kind} handlers must be an object.`,
     );
     return undefined;
   }
-  const handlers = new Map<string, BaseScreenPluginCommandHandler>();
+  const handlers = new Map<string, (...args: never[]) => unknown>();
   let invalid = false;
   for (const key of Object.getOwnPropertyNames(value)) {
     const handler = readOwnValue(value, key);
     if (typeof handler !== 'function') {
       diagnostics.add(
         'PLUGIN_CORE_LIFECYCLE_INVALID',
-        ['plugins', pluginIndex, 'commands', key],
-        'Plugin command handler is invalid.',
+        ['plugins', pluginIndex, field, key],
+        `Plugin ${kind} handler is invalid.`,
       );
       invalid = true;
       continue;
     }
-    handlers.set(key, handler as BaseScreenPluginCommandHandler);
+    handlers.set(key, handler as (...args: never[]) => unknown);
   }
   const declaredSet = new Set(declared);
   for (const id of declared) {
     if (!handlers.has(id)) {
       diagnostics.add(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['plugins', pluginIndex, 'commands', id],
-        'Plugin command contribution is missing a handler.',
+        ['plugins', pluginIndex, field, id],
+        `Plugin ${kind} contribution is missing a handler.`,
       );
       invalid = true;
     }
@@ -323,13 +356,61 @@ function readCommandHandlers(
     if (!declaredSet.has(id)) {
       diagnostics.add(
         'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
-        ['plugins', pluginIndex, 'commands', id],
-        'Plugin command handler is not declared as a contribution.',
+        ['plugins', pluginIndex, field, id],
+        `Plugin ${kind} handler is not declared as a contribution.`,
       );
       invalid = true;
     }
   }
   return invalid ? undefined : handlers;
+}
+
+function readCommandHandlers(
+  value: unknown,
+  manifest: BaseScreenPluginManifest,
+  pluginIndex: number,
+  diagnostics: DiagnosticCollector,
+): ReadonlyMap<string, BaseScreenPluginCommandHandler> | undefined {
+  return readContributionHandlers(
+    value,
+    manifest,
+    pluginIndex,
+    diagnostics,
+    'command',
+    'commands',
+  ) as ReadonlyMap<string, BaseScreenPluginCommandHandler> | undefined;
+}
+
+function readBlueprintActionHandlers(
+  value: unknown,
+  manifest: BaseScreenPluginManifest,
+  pluginIndex: number,
+  diagnostics: DiagnosticCollector,
+): ReadonlyMap<string, BaseScreenPluginBlueprintActionHandler> | undefined {
+  return readContributionHandlers(
+    value,
+    manifest,
+    pluginIndex,
+    diagnostics,
+    'blueprintAction',
+    'blueprintActions',
+  ) as ReadonlyMap<string, BaseScreenPluginBlueprintActionHandler> | undefined;
+}
+
+function readDataProcessorHandlers(
+  value: unknown,
+  manifest: BaseScreenPluginManifest,
+  pluginIndex: number,
+  diagnostics: DiagnosticCollector,
+): ReadonlyMap<string, BaseScreenPluginDataProcessorHandler> | undefined {
+  return readContributionHandlers(
+    value,
+    manifest,
+    pluginIndex,
+    diagnostics,
+    'dataProcessor',
+    'dataProcessors',
+  ) as ReadonlyMap<string, BaseScreenPluginDataProcessorHandler> | undefined;
 }
 
 function areEqual(left: unknown, right: unknown): boolean {

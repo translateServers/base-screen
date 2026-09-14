@@ -287,6 +287,18 @@ importers:
         specifier: workspace:^
         version: link:../../packages/plugin-sdk
 
+  plugins/plugin-pipeline:
+    dependencies:
+      '@base-screen/contracts':
+        specifier: workspace:^
+        version: link:../../packages/contracts
+      '@base-screen/plugin-core':
+        specifier: workspace:^
+        version: link:../../packages/plugin-core
+      '@base-screen/plugin-sdk':
+        specifier: workspace:^
+        version: link:../../packages/plugin-sdk
+
 packages:
 
   '@andrewbranch/untar.js@1.0.3':
