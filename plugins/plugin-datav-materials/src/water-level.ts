@@ -8,7 +8,7 @@ import {
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { DatavMaterialElement, type DatavMaterialModel } from './datav-element.js';
 import { PLUGIN_DATAV_WATER_LEVEL_TAG_NAME, PLUGIN_DATAV_WATER_LEVEL_TYPE } from './identity.js';
-import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
+import { readBoolean, readNumber, styleColor } from './json-values.js';
 
 type WaterLevelShape = 'circle' | 'rect';
 
@@ -26,8 +26,10 @@ export const PLUGIN_DATAV_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
   category: '指标',
   keywords: ['水位', '进度', '百分比', '大屏'],
   defaultSize: { width: 200, height: 240 },
+  // 原子化：这个物料只画水位，不携带标题/说明文字。需要标题时由文档层另放一个
+  // `base.text` 组合——组件内建说明文字会锁死排版、无法独立换行与配色，也让它无法
+  // 在「只要水位」的场景里被复用。
   defaultProps: {
-    title: '资源占用',
     shape: 'circle',
     decimals: 1,
     showLabel: true,
@@ -41,9 +43,7 @@ export const PLUGIN_DATAV_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
     waterColor: '#1d4ed8',
     waveColor: '#38bdf8',
     borderColor: '#1e3a5f',
-    titleColor: '#8aa4c0',
     fontSize: 22,
-    titleFontSize: 13,
   },
   styleSchema: {
     kind: 'object',
@@ -53,9 +53,7 @@ export const PLUGIN_DATAV_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
       waterColor: { kind: 'string' },
       waveColor: { kind: 'string' },
       borderColor: { kind: 'string' },
-      titleColor: { kind: 'string' },
       fontSize: { kind: 'number', minimum: 10, maximum: 96 },
-      titleFontSize: { kind: 'number', minimum: 8, maximum: 40 },
     },
     required: ['backgroundColor', 'color', 'waterColor', 'waveColor', 'borderColor', 'fontSize'],
   },
@@ -65,14 +63,11 @@ export const PLUGIN_DATAV_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'waveColor', label: '波纹色', control: 'color' },
     { style: 'borderColor', label: '边框色', control: 'color' },
     { style: 'color', label: '读数色', control: 'color' },
-    { style: 'titleColor', label: '标题色', control: 'color' },
     { style: 'fontSize', label: '读数字号', control: 'number' },
-    { style: 'titleFontSize', label: '标题字号', control: 'number' },
   ],
   propsSchema: {
     kind: 'object',
     properties: {
-      title: { kind: 'string', maxLength: 64 },
       shape: { kind: 'enum', values: ['circle', 'rect'] },
       decimals: { kind: 'number', minimum: 0, maximum: 3 },
       showLabel: { kind: 'boolean' },
@@ -81,7 +76,6 @@ export const PLUGIN_DATAV_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
     required: ['shape', 'decimals', 'showLabel', 'waveAnimation'],
   },
   propertyPanel: [
-    { prop: 'title', label: '标题', control: 'text' },
     { prop: 'shape', label: '形状', control: 'select' },
     { prop: 'decimals', label: '小数位', control: 'number' },
     { prop: 'showLabel', label: '显示读数', control: 'boolean' },
@@ -122,7 +116,8 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
     this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');
     this.style.color = styleColor(model.style.color, '#e6f1ff');
     this.setAttribute('role', 'meter');
-    this.setAttribute('aria-label', readString(model.props.title, '水位图'));
+    // a11y 名称取物料清单名，不来自文档：物料不再有标题字段。
+    this.setAttribute('aria-label', PluginDatavWaterLevelElement.manifest.name);
 
     if (model.dataState.status !== 'ready') {
       this.#wave = undefined;
@@ -139,17 +134,10 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
 
     const root = doc.createElement('div');
     root.dataset.datavWaterLevel = '';
+    // 只放罐体：没有标题行，整块空间都给水位。列向 flex + 居中让圆形罐体的
+    // `aspect-ratio:1` 由高度反推宽度并保持居中，矩形则直接占满宽度。
     root.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:100%;height:100%;box-sizing:border-box;padding:8px;';
-
-    const title = readString(model.props.title);
-    if (title !== '') {
-      const heading = doc.createElement('div');
-      heading.dataset.datavWaterTitle = '';
-      heading.textContent = title;
-      heading.style.cssText = `flex:0 0 auto;font:${readNumber(model.style.titleFontSize, 13)}px/1.4 sans-serif;color:${styleColor(model.style.titleColor, '#8aa4c0')};letter-spacing:.08em;`;
-      root.appendChild(heading);
-    }
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;box-sizing:border-box;padding:8px;';
 
     const tank = doc.createElement('div');
     tank.dataset.datavWaterTank = shape;

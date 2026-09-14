@@ -8,7 +8,7 @@ import {
   parseBaseScreenMaterialEditorDescriptor,
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
-import { DatavMaterialElement, type DatavMaterialModel } from './datav-element.js';
+import { DatavMaterialElement } from './datav-element.js';
 import {
   DATAV_BORDER_STYLES,
   DATAV_DEFAULT_SURFACE,
@@ -17,7 +17,7 @@ import {
   PLUGIN_DATAV_BORDER_BOX_TYPE,
   PLUGIN_DATAV_BORDER_PICKER_TAG_NAME,
 } from './identity.js';
-import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
+import { readNumber, styleColor } from './json-values.js';
 
 /**
  * 装饰边框：DataV 最具辨识度的一类组件——本身不承载数据，只为容器提供"指挥中心"观感。
@@ -29,13 +29,11 @@ import { readBoolean, readNumber, readString, styleColor } from './json-values.j
 const BORDER_BOX_PROPS_SCHEMA = {
   kind: 'object',
   properties: {
-    title: { kind: 'string', maxLength: 64 },
     borderStyle: { kind: 'enum', values: [...DATAV_BORDER_STYLES] },
     bracketSize: { kind: 'number', minimum: 4, maximum: 72 },
     lineWidth: { kind: 'number', minimum: 1, maximum: 8 },
-    showTitleBar: { kind: 'boolean' },
   },
-  required: ['borderStyle', 'bracketSize', 'lineWidth', 'showTitleBar'],
+  required: ['borderStyle', 'bracketSize', 'lineWidth'],
 } satisfies BaseScreenMaterialObjectSchema;
 
 export const PLUGIN_DATAV_BORDER_BOX_MANIFEST: BaseScreenMaterialManifest = {
@@ -45,19 +43,18 @@ export const PLUGIN_DATAV_BORDER_BOX_MANIFEST: BaseScreenMaterialManifest = {
   category: '装饰',
   keywords: ['边框', '装饰', '容器', '大屏'],
   defaultSize: { width: 480, height: 300 },
+  // 原子化：只画边框与角标，没有标题栏。它原本最像"容器"（要容纳标题），但
+  // 大屏的标题应由文档层的 `base.text` 组合；边框自己带标题栏会锁死内边距，
+  // 也让它无法当作纯装饰复用。
   defaultProps: {
-    title: '数据总览',
     borderStyle: 'corner-brackets',
     bracketSize: 22,
     lineWidth: 2,
-    showTitleBar: true,
   },
   defaultStyle: {
     backgroundColor: 'rgba(11,26,43,.55)',
     color: DATAV_DEFAULT_SURFACE.color,
     borderColor: DATAV_DEFAULT_SURFACE.accentColor,
-    titleColor: DATAV_DEFAULT_SURFACE.color,
-    fontSize: 15,
   },
   styleSchema: {
     kind: 'object',
@@ -65,24 +62,18 @@ export const PLUGIN_DATAV_BORDER_BOX_MANIFEST: BaseScreenMaterialManifest = {
       backgroundColor: { kind: 'string' },
       color: { kind: 'string' },
       borderColor: { kind: 'string' },
-      titleColor: { kind: 'string' },
-      fontSize: { kind: 'number', minimum: 10, maximum: 40 },
     },
-    required: ['backgroundColor', 'borderColor', 'fontSize'],
+    required: ['backgroundColor', 'borderColor'],
   },
   stylePanel: [
     { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'borderColor', label: '边框色', control: 'color' },
     { style: 'color', label: '文字色', control: 'color' },
-    { style: 'titleColor', label: '标题色', control: 'color' },
-    { style: 'fontSize', label: '标题字号', control: 'number' },
   ],
   propsSchema: BORDER_BOX_PROPS_SCHEMA,
   propertyPanel: [
-    { prop: 'title', label: '标题', control: 'text' },
     { prop: 'bracketSize', label: '角标大小', control: 'number' },
     { prop: 'lineWidth', label: '线宽', control: 'number' },
-    { prop: 'showTitleBar', label: '显示标题栏', control: 'boolean' },
   ],
   events: [],
   // 装饰边框只是容器外观，不接数据：声明 static 会诱导用户在边框上挂数据集。
@@ -125,20 +116,6 @@ function parseBorderBoxEditorDescriptor(): BaseScreenMaterialEditorDescriptor {
             },
           ],
         },
-        {
-          id: 'title',
-          label: '标题',
-          fields: [
-            { id: 'title', target: 'props', path: ['title'], label: '标题', control: 'text' },
-            {
-              id: 'showTitleBar',
-              target: 'props',
-              path: ['showTitleBar'],
-              label: '显示标题栏',
-              control: 'boolean',
-            },
-          ],
-        },
       ],
     },
     BORDER_BOX_PROPS_SCHEMA,
@@ -167,7 +144,8 @@ export class PluginDatavBorderBoxElement extends DatavMaterialElement {
     this.style.backgroundColor = styleColor(model.style.backgroundColor, 'transparent');
     this.style.color = styleColor(model.style.color, DATAV_DEFAULT_SURFACE.color);
     this.setAttribute('role', 'group');
-    this.setAttribute('aria-label', readString(model.props.title, '装饰边框'));
+    // a11y 名称取物料清单名，不来自文档：物料不再有标题字段。
+    this.setAttribute('aria-label', PluginDatavBorderBoxElement.manifest.name);
 
     const style = isDatavBorderStyle(model.props.borderStyle) ? model.props.borderStyle : 'plain';
     this.dataset.datavBorderStyle = style;
@@ -180,30 +158,10 @@ export class PluginDatavBorderBoxElement extends DatavMaterialElement {
     frame.dataset.datavBorderFrame = style;
     frame.style.cssText = `position:relative;width:100%;height:100%;box-sizing:border-box;${borderCss(style, borderColor, lineWidth)}`;
 
-    if (readBoolean(model.props.showTitleBar, true)) {
-      frame.appendChild(this.#titleBar(model, borderColor));
-    }
     for (const corner of cornerGeometry(doc, style, bracketSize, lineWidth, borderColor)) {
       frame.appendChild(corner);
     }
     this.replaceChildren(frame);
-  }
-
-  #titleBar(model: DatavMaterialModel, borderColor: string): HTMLElement {
-    const doc = this.ownerDocument;
-    const bar = doc.createElement('div');
-    bar.dataset.datavBorderTitleBar = '';
-    const fontSize = readNumber(model.style.fontSize, 15);
-    bar.style.cssText = `position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:8px;height:${fontSize + 18}px;padding:0 12px;box-sizing:border-box;font:600 ${fontSize}px/1 sans-serif;color:${styleColor(model.style.titleColor, styleColor(model.style.color, DATAV_DEFAULT_SURFACE.color))};background:linear-gradient(90deg,${hexAlpha(borderColor, 0.22)},transparent);`;
-    const marker = doc.createElement('span');
-    marker.dataset.datavBorderTitleMarker = '';
-    // 标题前的强调块不参与文字排版：绝对尺寸，字号变化不会带着它重排。
-    marker.style.cssText = `flex:0 0 auto;width:3px;height:1em;background:${borderColor};border-radius:2px;`;
-    const text = doc.createElement('span');
-    text.textContent = readString(model.props.title);
-    bar.appendChild(marker);
-    bar.appendChild(text);
-    return bar;
   }
 }
 

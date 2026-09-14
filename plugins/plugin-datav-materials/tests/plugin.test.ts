@@ -86,6 +86,23 @@ describe('plugin-datav-materials manifests', () => {
     expect(schema?.kind === 'enum' ? schema.values : []).toEqual([...DATAV_BORDER_STYLES]);
     expect(PLUGIN_DATAV_BORDER_BOX_MANIFEST.defaultProps.borderStyle).toBe('corner-brackets');
   });
+
+  // 原子化组件约定：每个物料只做一件事，不内建标题/说明文字——需要标题时由文档层
+  // 另放 `base.text` 组合。这条断言把"原子化"变成可执行的约束，而不是口头约定。
+  it('every material is atomic: no built-in title or description props', () => {
+    const forbidden = ['title', 'label', 'caption', 'description', 'name'];
+    for (const manifest of MANIFESTS) {
+      const propKeys = Object.keys(manifest.propsSchema.properties);
+      expect(propKeys.filter((key) => forbidden.includes(key))).toEqual([]);
+      expect(Object.keys(manifest.defaultProps).filter((key) => forbidden.includes(key))).toEqual(
+        [],
+      );
+      // 面板字段同样不得出现标题类字段（否则会重新引入被移除的能力）。
+      expect(
+        manifest.propertyPanel.map((field) => field.prop).filter((key) => forbidden.includes(key)),
+      ).toEqual([]);
+    }
+  });
 });
 
 describe('plugin-datav-materials runtime', () => {
@@ -126,13 +143,7 @@ describe('plugin-datav-materials runtime', () => {
           rotation: 0,
           zIndex: 1,
           status: { locked: false, hidden: false },
-          props: {
-            title: '边框',
-            borderStyle: 'plain',
-            bracketSize: 22,
-            lineWidth: 2,
-            showTitleBar: true,
-          },
+          props: { borderStyle: 'plain', bracketSize: 22, lineWidth: 2 },
           style: {},
           dataSource: null,
         },
@@ -168,15 +179,7 @@ describe('plugin-datav-materials runtime', () => {
       commandId: 'update-components',
       args: {
         componentIds: ['frame-1'],
-        patch: {
-          props: {
-            title: '边框',
-            borderStyle,
-            bracketSize: 22,
-            lineWidth: 2,
-            showTitleBar: true,
-          },
-        },
+        patch: { props: { borderStyle, bracketSize: 22, lineWidth: 2 } },
       },
     });
     expect(executed).toEqual([expected('corner-brackets'), expected('notch')]);

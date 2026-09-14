@@ -284,7 +284,7 @@ async function readProps(page, id) {
  *
  * `update-components` 的 `props` 是整体替换（引擎的检查器写回也是算出一份完整 props 再提交），
  * 所以这里必须先在当前 props 上覆盖，而不是只给一个 `{ borderStyle }` 的新对象——
- * 后者会把 schema 必填的 bracketSize/lineWidth/showTitleBar 一起抹掉，事务被拒。
+ * 后者会把 schema 必填的 bracketSize/lineWidth 一起抹掉，事务被拒。
  */
 async function setBorderStyle(page, id, borderStyle) {
   return page.evaluate(

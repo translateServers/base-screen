@@ -15,7 +15,7 @@ import {
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { DatavMaterialElement, type DatavMaterialModel } from './datav-element.js';
 import { PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME, PLUGIN_DATAV_SCROLL_BOARD_TYPE } from './identity.js';
-import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
+import { readBoolean, readNumber, styleColor } from './json-values.js';
 
 /**
  * 轮播列表：用滚动动画在固定区域内轮流展示多行明细。
@@ -31,8 +31,9 @@ export const PLUGIN_DATAV_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
   category: '指标',
   keywords: ['列表', '轮播', '滚动', '大屏'],
   defaultSize: { width: 420, height: 220 },
+  // 原子化：只做「在固定视口里轮播多行明细」。标题属于说明文字，应由文档层的
+  // `base.text` 组合；表头是数据自身的列名，不是说明文字，故保留。
   defaultProps: {
-    title: '实时排行',
     headerVisible: true,
     rowCount: 5,
     intervalMs: 3000,
@@ -90,7 +91,6 @@ export const PLUGIN_DATAV_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
   propsSchema: {
     kind: 'object',
     properties: {
-      title: { kind: 'string', maxLength: 64 },
       headerVisible: { kind: 'boolean' },
       rowCount: { kind: 'number', minimum: 1, maximum: 50 },
       intervalMs: { kind: 'number', minimum: 200, maximum: 60_000 },
@@ -99,7 +99,6 @@ export const PLUGIN_DATAV_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
     required: ['headerVisible', 'rowCount', 'intervalMs', 'autoScroll'],
   },
   propertyPanel: [
-    { prop: 'title', label: '标题', control: 'text' },
     { prop: 'headerVisible', label: '显示表头', control: 'boolean' },
     { prop: 'rowCount', label: '可见行数', control: 'number' },
     { prop: 'intervalMs', label: '轮播间隔(ms)', control: 'number' },
@@ -138,7 +137,8 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
     this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');
     this.style.color = styleColor(model.style.color, '#e6f1ff');
     this.setAttribute('role', 'table');
-    this.setAttribute('aria-label', readString(model.props.title, '轮播列表'));
+    // a11y 名称取物料清单名，不来自文档：物料不再有标题字段。
+    this.setAttribute('aria-label', PluginDatavScrollBoardElement.manifest.name);
 
     if (model.dataState.status !== 'ready') {
       this.appendDataStatePlaceholder(model.dataState.status);
@@ -163,17 +163,9 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
 
     const root = doc.createElement('div');
     root.dataset.datavScrollBoard = '';
+    // 只有表头 + 视口：没有标题行，整块高度都留给数据行。
     root.style.cssText =
       'display:flex;flex-direction:column;width:100%;height:100%;box-sizing:border-box;padding:6px 10px;';
-
-    const title = readString(model.props.title);
-    if (title !== '') {
-      const heading = doc.createElement('div');
-      heading.dataset.datavBoardTitle = '';
-      heading.textContent = title;
-      heading.style.cssText = `flex:0 0 auto;font:600 ${fontSize + 1}px/1.6 sans-serif;color:${styleColor(model.style.headerColor, '#8aa4c0')};letter-spacing:.06em;`;
-      root.appendChild(heading);
-    }
 
     if (headerVisible) {
       const header = doc.createElement('div');

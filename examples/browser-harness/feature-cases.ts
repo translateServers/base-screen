@@ -166,7 +166,7 @@ const DATAV_CASE_COMPONENTS: readonly {
     position: { x: 12, y: 12 },
     size: { width: 636, height: 516 },
     zIndex: DATAV_CASE_FRAME_Z_INDEX,
-    props: { title: '数据总览', borderStyle: 'corner-brackets', bracketSize: 22, lineWidth: 2 },
+    props: { borderStyle: 'corner-brackets', bracketSize: 22, lineWidth: 2 },
   },
   {
     type: 'datav.digital-flop',
@@ -174,7 +174,7 @@ const DATAV_CASE_COMPONENTS: readonly {
     position: { x: 36, y: 64 },
     size: { width: 300, height: 130 },
     zIndex: DATAV_CASE_WIDGET_Z_INDEX,
-    props: { title: '今日订单', decimals: 0, thousandsSeparator: true },
+    props: { decimals: 0, thousandsSeparator: true },
   },
   {
     type: 'datav.water-level',
@@ -182,7 +182,7 @@ const DATAV_CASE_COMPONENTS: readonly {
     position: { x: 364, y: 64 },
     size: { width: 150, height: 190 },
     zIndex: DATAV_CASE_WIDGET_Z_INDEX,
-    props: { title: '资源占用', shape: 'circle', decimals: 1 },
+    props: { shape: 'circle', decimals: 1 },
   },
   {
     type: 'datav.scroll-board',
@@ -190,7 +190,45 @@ const DATAV_CASE_COMPONENTS: readonly {
     position: { x: 36, y: 300 },
     size: { width: 478, height: 200 },
     zIndex: DATAV_CASE_WIDGET_Z_INDEX,
-    props: { title: '实时排行', rowCount: 4, autoScroll: true },
+    props: { rowCount: 4, autoScroll: true },
+  },
+];
+
+/**
+ * 标题由文档层用官方文本物料组合，而不是内建在指标物料里——这正是原子化组件要演示的用法：
+ * 需要标题就并排放一个 `base.text`，可以独立换行、配色、对齐，不需要时直接删掉。
+ *
+ * 位置对齐各自组件的左缘（并留出组件内 8px padding），让"贴在一起"看起来仍是一组。
+ */
+const DATAV_CASE_TITLES: readonly {
+  readonly text: string;
+  readonly position: { readonly x: number; readonly y: number };
+  readonly size: { readonly width: number; readonly height: number };
+  readonly style: Record<string, unknown>;
+}[] = [
+  {
+    text: '数据总览',
+    position: { x: 28, y: 24 },
+    size: { width: 300, height: 26 },
+    style: { fontSize: 18, fontWeight: '700', textAlign: 'left', color: '#e6f1ff' },
+  },
+  {
+    text: '今日订单',
+    position: { x: 44, y: 64 },
+    size: { width: 284, height: 20 },
+    style: { fontSize: 13, fontWeight: '400', textAlign: 'left', color: '#8aa4c0' },
+  },
+  {
+    text: '资源占用',
+    position: { x: 372, y: 64 },
+    size: { width: 134, height: 20 },
+    style: { fontSize: 13, fontWeight: '400', textAlign: 'left', color: '#8aa4c0' },
+  },
+  {
+    text: '实时排行',
+    position: { x: 44, y: 300 },
+    size: { width: 462, height: 20 },
+    style: { fontSize: 13, fontWeight: '400', textAlign: 'left', color: '#8aa4c0' },
   },
 ];
 
@@ -198,9 +236,34 @@ async function applyPluginDatavMaterials(designer: BaseScreenDesignerElement): P
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
   let borderId: string | undefined;
-  for (const spec of DATAV_CASE_COMPONENTS) {
-    // 重复应用同一 case 时不重复插入：按类型判存在。
-    const existing = designer.document?.components.find((item) => item.type === spec.type);
+  const specs: readonly {
+    readonly type: string;
+    readonly name: string;
+    readonly position: { readonly x: number; readonly y: number };
+    readonly size?: { readonly width: number; readonly height: number };
+    readonly zIndex?: number;
+    readonly props?: Record<string, unknown>;
+    readonly style?: Record<string, unknown>;
+    readonly dataSource?: unknown;
+  }[] = [
+    ...DATAV_CASE_COMPONENTS,
+    ...DATAV_CASE_TITLES.map((entry) => ({
+      type: 'base.text',
+      name: entry.text,
+      position: entry.position,
+      size: entry.size,
+      zIndex: DATAV_CASE_WIDGET_Z_INDEX,
+      props: { autoWidth: false },
+      style: entry.style,
+      // `base.text` 的可见文案来自数据源（不是组件名），所以标题文本得写进 static 数据。
+      dataSource: { type: 'static', value: entry.text },
+    })),
+  ];
+  for (const spec of specs) {
+    // 重复应用同一 case 时不重复插入：按类型 + 名称判存在（标题是 base.text，类型会重名）。
+    const existing = designer.document?.components.find(
+      (item) => item.type === spec.type && item.name === spec.name,
+    );
     if (existing !== undefined) {
       if (spec.type === 'datav.border-box') borderId = existing.id;
       continue;
@@ -221,10 +284,12 @@ async function applyPluginDatavMaterials(designer: BaseScreenDesignerElement): P
       patch: {
         // 位置与尺寸一次改到位：insertComponent 已按默认尺寸做过贴边裁剪。
         position: spec.position,
-        size: spec.size,
-        zIndex: spec.zIndex,
-        // props 是整体替换：在 manifest 默认值上覆盖，避免漏掉 schema 必填字段。
+        ...(spec.size === undefined ? {} : { size: spec.size }),
+        ...(spec.zIndex === undefined ? {} : { zIndex: spec.zIndex }),
+        // props/style 都是整体替换：在 manifest 默认值上覆盖，避免漏掉 schema 必填字段。
         props: { ...manifest.defaultProps, ...spec.props },
+        ...(spec.style === undefined ? {} : { style: { ...manifest.defaultStyle, ...spec.style } }),
+        ...(spec.dataSource === undefined ? {} : { dataSource: spec.dataSource }),
       },
     });
     if (!patched.ok) return;

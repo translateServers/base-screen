@@ -58,6 +58,8 @@
 - **renderer 与 designer 职责边界：** `@base-screen/renderer` 只做纯展示（viewer），不含任何编辑/设计逻辑；designer（`engine/browser`）构建在 renderer 之上，renderer 不得依赖或感知 designer。`sdk` 的 `viewer` 与 `designer` 入口分别对应这两条职责线。
 - **plugin 三层边界：** `plugin-core`（契约与共享类型）是唯一契约层；`plugin-manager`（运行时加载/管理）与 `plugin-sdk`（插件作者面）可依赖 `contracts` 与 `plugin-core`，二者不得互相依赖；`plugin-sdk` 是对 `plugin-core` 的作者友好门面，不承载运行时管理逻辑。
 - **material 与 renderer 边界：** 物料契约、manifest 类型与校验由 `plugin-core` 拥有；`@base-screen/material` 提供官方物料实现及其 manifest/注册；`@base-screen/renderer` 只通过 `plugin-core` 的 catalog 与 material element 契约执行渲染，不依赖具体官方物料。
+- **物料原子化（组件制作约定）：** 一个物料只做一件事，不内建标题、说明或装饰性文案——需要标题时由文档层另放一个 `base.text`（或对应物料）组合。内建文案会把物料的内部排版与内边距锁死在一种形态上，使它无法被独立换行/配色/对齐，也无法在不需要该文案的场景复用。判定：若某个 prop 是"读数本身的构成"（单位、前后缀、表头列名）则保留；若只是"描述这个组件是什么"则移除。`plugin-datav-materials` 的单元测试对 title 类字段做了强制校验。
+- **物料渲染盒不变式：** 物料宿主元素的渲染盒必须等于 canonical `component.size`——渲染器先写像素宽高再赋 `model`，因此物料在 `renderMaterial()` 里写宿主元素 `width`/`height` 会覆盖声明尺寸；画边框的物料必须 `box-sizing: border-box`。唯一例外是 `base.text` 的自适应宽度（其宽度由引擎测量后投影回文档）。由 `pnpm verify:browser` 的目录级断言兜底，新增物料不遵守即失败。
 - **sdk 聚合层边界：** `@base-screen/sdk` 是产品级入口与组合层，可负责公共 API 转发、Custom Element 注册及自动注册编排（auto-register、designer、viewer、material、plugins）；不得实现 contracts、core、renderer、engine、material 或 plugin-manager 所属的领域与运行时逻辑。包内实现仍直接通过各自声明的 `@base-screen/*` 公共导出交互，不得经 sdk 反向耦合。
 
 ## 契约与产物

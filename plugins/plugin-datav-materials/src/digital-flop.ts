@@ -24,8 +24,10 @@ export const PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
   category: '指标',
   keywords: ['数字', '指标', '翻牌', '大屏'],
   defaultSize: { width: 320, height: 120 },
+  // 原子化：这个物料只负责「把一个数按位翻牌显示」。标题属于说明文字，应由文档层
+  // 另放 `base.text` 组合，组件内建会让它无法独立排版、也无法在无标题场景复用。
+  // `prefix`/`suffix` 不是说明文字而是读数本身的构成（货币符号、单位），故保留。
   defaultProps: {
-    title: '今日订单',
     prefix: '',
     suffix: '',
     decimals: 0,
@@ -38,9 +40,7 @@ export const PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
     backgroundColor: '#0b1a2b',
     color: '#e6f1ff',
     accentColor: '#38bdf8',
-    titleColor: '#8aa4c0',
     fontSize: 48,
-    titleFontSize: 14,
   },
   styleSchema: {
     kind: 'object',
@@ -48,9 +48,7 @@ export const PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
       backgroundColor: { kind: 'string' },
       color: { kind: 'string' },
       accentColor: { kind: 'string' },
-      titleColor: { kind: 'string' },
       fontSize: { kind: 'number', minimum: 12, maximum: 200 },
-      titleFontSize: { kind: 'number', minimum: 8, maximum: 64 },
     },
     required: ['backgroundColor', 'color', 'accentColor', 'fontSize'],
   },
@@ -58,24 +56,20 @@ export const PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
     { style: 'backgroundColor', label: '背景色', control: 'color', allowGradient: true },
     { style: 'color', label: '数字色', control: 'color' },
     { style: 'accentColor', label: '格底色', control: 'color' },
-    { style: 'titleColor', label: '标题色', control: 'color' },
     { style: 'fontSize', label: '数字字号', control: 'number' },
-    { style: 'titleFontSize', label: '标题字号', control: 'number' },
   ],
   propsSchema: {
     kind: 'object',
     properties: {
-      title: { kind: 'string', maxLength: 64 },
       prefix: { kind: 'string', maxLength: 16 },
       suffix: { kind: 'string', maxLength: 16 },
       decimals: { kind: 'number', minimum: 0, maximum: 6 },
       thousandsSeparator: { kind: 'boolean' },
       flipAnimation: { kind: 'boolean' },
     },
-    required: ['title', 'decimals', 'thousandsSeparator'],
+    required: ['decimals', 'thousandsSeparator'],
   },
   propertyPanel: [
-    { prop: 'title', label: '标题', control: 'text' },
     { prop: 'prefix', label: '前缀', control: 'text' },
     { prop: 'suffix', label: '后缀', control: 'text' },
     { prop: 'decimals', label: '小数位', control: 'number' },
@@ -116,7 +110,8 @@ export class PluginDatavDigitalFlopElement extends DatavMaterialElement {
     this.style.backgroundColor = styleColor(model.style.backgroundColor, '#0b1a2b');
     this.style.color = styleColor(model.style.color, '#e6f1ff');
     this.setAttribute('role', 'group');
-    this.setAttribute('aria-label', readString(model.props.title, '数字翻牌器'));
+    // a11y 名称取物料清单名，不来自文档：物料不再有标题字段。
+    this.setAttribute('aria-label', PluginDatavDigitalFlopElement.manifest.name);
 
     if (model.dataState.status !== 'ready') {
       this.#lastText = undefined;
@@ -134,17 +129,9 @@ export class PluginDatavDigitalFlopElement extends DatavMaterialElement {
     const doc = this.ownerDocument;
     const container = doc.createElement('div');
     container.dataset.datavDigitalFlop = '';
+    // 只有一排数字格：没有标题行，读数占满整个组件盒。
     container.style.cssText =
-      'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35em;width:100%;height:100%;box-sizing:border-box;padding:8px;';
-
-    const title = readString(model.props.title);
-    if (title !== '') {
-      const heading = doc.createElement('div');
-      heading.dataset.datavFlopTitle = '';
-      heading.textContent = title;
-      heading.style.cssText = `font:${readNumber(model.style.titleFontSize, 14)}px/1.2 sans-serif;color:${styleColor(model.style.titleColor, '#8aa4c0')};letter-spacing:.08em;`;
-      container.appendChild(heading);
-    }
+      'display:flex;align-items:center;justify-content:center;width:100%;height:100%;box-sizing:border-box;padding:8px;';
 
     const row = doc.createElement('div');
     row.style.cssText =
