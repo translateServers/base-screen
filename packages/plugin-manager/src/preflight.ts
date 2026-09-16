@@ -1,14 +1,20 @@
-import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
+import {
+  type ScreenDiagnostic,
+  type ScreenParseResult,
+  sortScreenDiagnostics,
+} from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenPluginBlueprintActionHandler,
   type BaseScreenPluginCommandHandler,
+  type BaseScreenPluginContributionKind,
   type BaseScreenPluginDataProcessorHandler,
   type BaseScreenPluginInspectorControlCatalogEntry,
   type BaseScreenPluginManifest,
   type BaseScreenPluginPanelCatalogEntry,
   type BaseScreenPluginRuntime,
   parseBaseScreenPluginManifest,
+  readContributionHandlerRecord,
 } from '@base-screen/plugin-core';
 import { DiagnosticCollector } from './diagnostics.js';
 import { snapshotManagerInput } from './input.js';
@@ -161,19 +167,7 @@ function sortFailures(failures: readonly PlannedPluginFailure[]): readonly Plann
 }
 
 function sortAll(diagnostics: readonly ScreenDiagnostic[]): readonly ScreenDiagnostic[] {
-  return [...diagnostics].sort((left, right) => {
-    const byPath = comparePathLength(left.path, right.path);
-    if (byPath !== 0) return byPath;
-    if (left.code !== right.code) return left.code < right.code ? -1 : 1;
-    return left.message < right.message ? -1 : 1;
-  });
-}
-
-function comparePathLength(
-  left: readonly (string | number)[],
-  right: readonly (string | number)[],
-): number {
-  return left.length - right.length;
+  return sortScreenDiagnostics(diagnostics);
 }
 
 function parsePluginCandidates(
@@ -301,68 +295,20 @@ function readContributionHandlers<K extends string>(
   manifest: BaseScreenPluginManifest,
   pluginIndex: number,
   diagnostics: DiagnosticCollector,
-  kind: 'command' | 'blueprintAction' | 'dataProcessor',
+  kind: BaseScreenPluginContributionKind,
   field: K,
 ): ReadonlyMap<string, (...args: never[]) => unknown> | undefined {
-  const declared = manifest.contributions
-    .filter((contribution) => contribution.kind === kind)
-    .map((contribution) =>
-      contribution.kind === 'material' ? contribution.type : contribution.id,
-    );
-  if (value === undefined) {
-    if (declared.length === 0) return new Map();
-    diagnostics.add(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['plugins', pluginIndex, field],
-      `Plugin ${kind} contributions require matching handlers.`,
-    );
-    return undefined;
+  const result = readContributionHandlerRecord({
+    kind,
+    manifest,
+    field,
+    value,
+    pathPrefix: ['plugins', pluginIndex],
+  });
+  for (const item of result.diagnostics) {
+    diagnostics.add(item.code, item.path, item.message);
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    diagnostics.add(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      ['plugins', pluginIndex, field],
-      `Plugin ${kind} handlers must be an object.`,
-    );
-    return undefined;
-  }
-  const handlers = new Map<string, (...args: never[]) => unknown>();
-  let invalid = false;
-  for (const key of Object.getOwnPropertyNames(value)) {
-    const handler = readOwnValue(value, key);
-    if (typeof handler !== 'function') {
-      diagnostics.add(
-        'PLUGIN_CORE_LIFECYCLE_INVALID',
-        ['plugins', pluginIndex, field, key],
-        `Plugin ${kind} handler is invalid.`,
-      );
-      invalid = true;
-      continue;
-    }
-    handlers.set(key, handler as (...args: never[]) => unknown);
-  }
-  const declaredSet = new Set(declared);
-  for (const id of declared) {
-    if (!handlers.has(id)) {
-      diagnostics.add(
-        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['plugins', pluginIndex, field, id],
-        `Plugin ${kind} contribution is missing a handler.`,
-      );
-      invalid = true;
-    }
-  }
-  for (const id of handlers.keys()) {
-    if (!declaredSet.has(id)) {
-      diagnostics.add(
-        'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
-        ['plugins', pluginIndex, field, id],
-        `Plugin ${kind} handler is not declared as a contribution.`,
-      );
-      invalid = true;
-    }
-  }
-  return invalid ? undefined : handlers;
+  return result.handlers;
 }
 
 function readCommandHandlers(

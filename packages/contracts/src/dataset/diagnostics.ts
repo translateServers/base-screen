@@ -1,3 +1,4 @@
+import { sortScreenDiagnostics } from '../diagnostics/collector.js';
 import type { ScreenDiagnostic, ScreenParseResult } from '../types/diagnostics.js';
 
 export function diagnostic(
@@ -46,12 +47,9 @@ export function mapDescriptorJsonDiagnostics(
   };
 }
 
+/** 诊断规范序由 collector 独占定义，本模块不再自定义排序。 */
 export function sortDiagnostics(
   diagnostics: readonly ScreenDiagnostic[],
 ): readonly ScreenDiagnostic[] {
-  return [...diagnostics].sort((left, right) => {
-    const a = left.path.join('/');
-    const b = right.path.join('/');
-    return a < b ? -1 : a > b ? 1 : left.code < right.code ? -1 : 1;
-  });
+  return sortScreenDiagnostics(diagnostics);
 }

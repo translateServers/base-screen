@@ -1,4 +1,8 @@
-import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
+import {
+  type ScreenDiagnostic,
+  type ScreenParseResult,
+  sortScreenDiagnostics,
+} from '@base-screen/contracts';
 import type { RenderCandidate } from './renderer-types.js';
 
 export function prefixDiagnostics(
@@ -33,12 +37,9 @@ export function renderFailure(candidate: RenderCandidate, message: string): Scre
   };
 }
 
+/** 诊断规范序由 Contracts 独占定义（compareScreenDiagnostics）。 */
 export function sortDiagnostics(
   diagnostics: readonly ScreenDiagnostic[],
 ): readonly ScreenDiagnostic[] {
-  return [...diagnostics].sort((left, right) => {
-    const leftPath = left.path.join('/');
-    const rightPath = right.path.join('/');
-    return leftPath < rightPath ? -1 : leftPath > rightPath ? 1 : left.code < right.code ? -1 : 1;
-  });
+  return sortScreenDiagnostics(diagnostics);
 }
