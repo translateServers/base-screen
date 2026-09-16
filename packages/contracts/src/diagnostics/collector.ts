@@ -40,7 +40,7 @@ export class DiagnosticCollector {
   }
 
   done(): readonly ScreenDiagnostic[] {
-    const sorted = [...this.#items].sort(compareDiagnostics);
+    const sorted = sortScreenDiagnostics(this.#items);
     if (sorted.length < MAX_DIAGNOSTICS) {
       return sorted;
     }
@@ -79,7 +79,14 @@ function comparePaths(a: ScreenDiagnosticPath, b: ScreenDiagnosticPath): number 
   return a.length - b.length;
 }
 
-function compareDiagnostics(a: ScreenDiagnostic, b: ScreenDiagnostic): number {
+/**
+ * 诊断规范序的唯一实现：先按路径（逐段比较，数字段先于字符串段），再按 code，最后按 message。
+ *
+ * 其它包不得再自定义排序——分歧的历史实现见 renderer 与 dataset 两处（按 path.join('/') 字符串比较，
+ * 会使 ['components',10] 排在 ['components',2] 之前）。排序上限与哨兵不属于本函数职责：
+ * Contracts 的收集器按阶段取路径，Plugin 侧的哨兵路径为 []，两者语义不同，各自保留。
+ */
+export function compareScreenDiagnostics(a: ScreenDiagnostic, b: ScreenDiagnostic): number {
   const byPath = comparePaths(a.path, b.path);
   if (byPath !== 0) {
     return byPath;
@@ -97,4 +104,11 @@ function compareDiagnostics(a: ScreenDiagnostic, b: ScreenDiagnostic): number {
     return 1;
   }
   return 0;
+}
+
+/** 按规范序排序，不做条数上限或哨兵替换。需要上限的调用方自行截断。 */
+export function sortScreenDiagnostics(
+  diagnostics: readonly ScreenDiagnostic[],
+): readonly ScreenDiagnostic[] {
+  return [...diagnostics].sort(compareScreenDiagnostics);
 }

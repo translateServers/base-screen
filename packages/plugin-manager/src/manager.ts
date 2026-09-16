@@ -3,13 +3,18 @@ import {
   type BaseScreenPluginBlueprintActionHandler,
   type BaseScreenPluginCatalogEntry,
   type BaseScreenPluginCommandHandler,
+  type BaseScreenPluginContribution,
+  type BaseScreenPluginContributionKind,
   type BaseScreenPluginDataProcessorHandler,
+  contributionHandlerField,
   createBaseScreenMaterialCatalog,
   createBaseScreenPluginCatalog,
   createBaseScreenPluginInspectorControlCatalog,
   createBaseScreenPluginPanelCatalog,
+  declaredContributionIds,
   parsePluginCommandRequest,
 } from '@base-screen/plugin-core';
+import { CONTRIBUTION_KIND_PLAN } from './contribution-kind-plan.js';
 import { createRuntimeContributionIndex } from './contributions.js';
 import { failure, sortDiagnostics } from './diagnostics.js';
 import {
@@ -37,9 +42,15 @@ class PluginManager implements BaseScreenPluginManager {
   #snapshot: BaseScreenPluginManagerSnapshot | undefined;
   #active: Array<{ readonly plugin: PlannedPlugin; readonly session: ActivationSession }> = [];
   #disposalOrder: PlannedPlugin[] = [];
-  #commands = new Map<string, ContributionCommand>();
-  #blueprintActions = new Map<string, BlueprintActionEntry>();
-  #dataProcessors = new Map<string, DataProcessorEntry>();
+  #commands = new Map<string, ContributionHandlerEntry<BaseScreenPluginCommandHandler>>();
+  #blueprintActions = new Map<
+    string,
+    ContributionHandlerEntry<BaseScreenPluginBlueprintActionHandler>
+  >();
+  #dataProcessors = new Map<
+    string,
+    ContributionHandlerEntry<BaseScreenPluginDataProcessorHandler>
+  >();
   #disposePromise: Promise<ScreenParseResult<null>> | undefined;
   #queue: Promise<void> = Promise.resolve();
   // 懒激活状态：activate() 只完成预检与目录发布；插件钩子推迟到首次使用。
@@ -186,9 +197,19 @@ class PluginManager implements BaseScreenPluginManager {
     }));
     const plugins = createBaseScreenPluginCatalog(pluginEntries);
     this.#active = active;
-    this.#commands = collectContributionCommands(active);
-    this.#blueprintActions = collectBlueprintActions(active);
-    this.#dataProcessors = collectDataProcessors(active);
+    this.#commands = collectContributionHandlerEntries<BaseScreenPluginCommandHandler>(
+      active,
+      'command',
+    );
+    this.#blueprintActions =
+      collectContributionHandlerEntries<BaseScreenPluginBlueprintActionHandler>(
+        active,
+        'blueprintAction',
+      );
+    this.#dataProcessors = collectContributionHandlerEntries<BaseScreenPluginDataProcessorHandler>(
+      active,
+      'dataProcessor',
+    );
     this.#snapshot = {
       materials: createBaseScreenMaterialCatalog(plan.value.materials),
       panels: createBaseScreenPluginPanelCatalog(plan.value.panels),
@@ -390,7 +411,13 @@ class PluginManager implements BaseScreenPluginManager {
       const entry = { plugin, session };
       this.#active.push(entry);
       this.recordActivated(plugin);
-      for (const [commandId, command] of collectContributionCommands([entry])) {
+      // 既有行为：懒激活只合并命令 handler。blueprintAction / dataProcessor 在 lazy 模式下
+      // 从不进入 #blueprintActions / #dataProcessors，因此这两类贡献在懒激活下会按"未声明"
+      // 失败关闭。本批保持该行为不变，只做收敛。
+      for (const [
+        commandId,
+        command,
+      ] of collectContributionHandlerEntries<BaseScreenPluginCommandHandler>([entry], 'command')) {
         this.#commands.set(commandId, command);
       }
       return undefined;
@@ -615,73 +642,56 @@ async function deactivateEntries(
   return diagnostics;
 }
 
-type BlueprintActionEntry = {
-  readonly handler: BaseScreenPluginBlueprintActionHandler;
+type ContributionHandlerEntry<H extends (...args: never[]) => unknown> = {
+  readonly handler: H;
   readonly isValid: () => boolean;
 };
 
-type DataProcessorEntry = {
-  readonly handler: BaseScreenPluginDataProcessorHandler;
-  readonly isValid: () => boolean;
-};
-
-function collectBlueprintActions(
+/**
+ * 从已激活会话里收集一类贡献的 handler，构建可执行集合。
+ *
+ * 三种 handler 承载的 kind（command / blueprintAction / dataProcessor）规则一致，差别只有
+ * 运行时的记录字段名与是否需要授权门，两者分别来自 plugin-core 的贡献类型描述符与 manager
+ * 的计划表，因此只保留一份实现。
+ */
+function collectContributionHandlerEntries<H extends (...args: never[]) => unknown>(
   entries: readonly { readonly plugin: PlannedPlugin; readonly session: ActivationSession }[],
-): Map<string, BlueprintActionEntry> {
-  const actions = new Map<string, BlueprintActionEntry>();
+  kind: BaseScreenPluginContributionKind,
+): Map<string, ContributionHandlerEntry<H>> {
+  const field = contributionHandlerField(kind);
+  if (field === undefined) return new Map();
+  const requiresGrant = CONTRIBUTION_KIND_PLAN[kind].requiresGrant === true;
+  const collected = new Map<string, ContributionHandlerEntry<H>>();
   for (const entry of entries) {
-    for (const [actionId, handler] of entry.plugin.blueprintActions) {
-      const contribution = entry.plugin.manifest.contributions.find(
-        (item) => item.kind === 'blueprintAction' && item.id === actionId,
-      );
-      if (contribution === undefined || contribution.kind !== 'blueprintAction') continue;
-      // 与 command 同一门禁：动作用的 requiredCapability 未获授权即不进入可执行集合。
-      if (!entry.plugin.grantedCapabilities.includes(contribution.requiredCapability)) continue;
-      actions.set(actionId, { handler, isValid: () => entry.session.isValid() });
+    const records = entry.plugin[field] as unknown as ReadonlyMap<string, H>;
+    if (records.size === 0) continue;
+    const declared = new Map<string, BaseScreenPluginContribution>();
+    for (const contribution of entry.plugin.manifest.contributions) {
+      if (contribution.kind !== kind) continue;
+      const id = declaredContributionIds(kind, [contribution])[0];
+      if (id !== undefined) declared.set(id, contribution);
+    }
+    for (const [id, handler] of records) {
+      const contribution = declared.get(id);
+      if (contribution === undefined) continue;
+      // 与 command 同一门禁：声明的能力未获授权即不进入可执行集合。
+      if (requiresGrant && !isContributionGranted(entry.plugin, contribution)) continue;
+      collected.set(id, { handler, isValid: () => entry.session.isValid() });
     }
   }
-  return actions;
+  return collected;
 }
 
-function collectDataProcessors(
-  entries: readonly { readonly plugin: PlannedPlugin; readonly session: ActivationSession }[],
-): Map<string, DataProcessorEntry> {
-  const processors = new Map<string, DataProcessorEntry>();
-  for (const entry of entries) {
-    for (const [processorId, handler] of entry.plugin.dataProcessors) {
-      const contribution = entry.plugin.manifest.contributions.find(
-        (item) => item.kind === 'dataProcessor' && item.id === processorId,
-      );
-      if (contribution === undefined || contribution.kind !== 'dataProcessor') continue;
-      processors.set(processorId, { handler, isValid: () => entry.session.isValid() });
-    }
-  }
-  return processors;
-}
-
-type ContributionCommand = {
-  readonly handler: BaseScreenPluginCommandHandler;
-  readonly isValid: () => boolean;
-};
-
-function collectContributionCommands(
-  entries: readonly { readonly plugin: PlannedPlugin; readonly session: ActivationSession }[],
-): Map<string, ContributionCommand> {
-  const commands = new Map<string, ContributionCommand>();
-  for (const entry of entries) {
-    for (const [commandId, handler] of entry.plugin.commands) {
-      const contribution = entry.plugin.manifest.contributions.find(
-        (item) => item.kind === 'command' && item.id === commandId,
-      );
-      if (contribution === undefined || contribution.kind !== 'command') continue;
-      if (!entry.plugin.grantedCapabilities.includes(contribution.requiredCapability)) continue;
-      commands.set(commandId, {
-        handler,
-        isValid: () => entry.session.isValid(),
-      });
-    }
-  }
-  return commands;
+function isContributionGranted(
+  plugin: PlannedPlugin,
+  contribution: BaseScreenPluginContribution,
+): boolean {
+  const required = (contribution as { readonly requiredCapability?: unknown }).requiredCapability;
+  const capability =
+    typeof required === 'string'
+      ? required
+      : ((contribution as { readonly id?: unknown }).id as string | undefined);
+  return capability !== undefined && plugin.grantedCapabilities.includes(capability);
 }
 
 function diagnostic(

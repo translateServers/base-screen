@@ -2,6 +2,7 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   type BaseScreenPluginRuntime,
   parseBaseScreenPluginManifest,
+  readContributionHandlerRecord,
 } from '@base-screen/plugin-core';
 import { areEqual, failure } from './diagnostics.js';
 
@@ -76,58 +77,12 @@ function readHandlerRecord(
   kind: 'command' | 'blueprintAction' | 'dataProcessor',
   field: string,
 ): ScreenParseResult<ReadonlyMap<string, (...args: never[]) => unknown>> {
-  const declared = manifest.contributions
-    .filter((contribution) => contribution.kind === kind)
-    .map((contribution) =>
-      contribution.kind === 'material' ? contribution.type : contribution.id,
-    );
-  if (value === undefined) {
-    if (declared.length === 0) return { ok: true, value: new Map(), diagnostics: [] };
-    return failure(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      [field],
-      `Plugin ${kind} contributions require matching handlers.`,
-    );
+  const result = readContributionHandlerRecord({ kind, manifest, field, value });
+  const first = result.diagnostics[0];
+  if (first !== undefined) {
+    return { ok: false, diagnostics: [first] };
   }
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    return failure(
-      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-      [field],
-      `Plugin ${kind} handlers must be an object.`,
-    );
-  }
-  const handlers = new Map<string, (...args: never[]) => unknown>();
-  for (const key of Object.getOwnPropertyNames(value)) {
-    const handler = readOwnValue(value, key);
-    if (typeof handler !== 'function') {
-      return failure(
-        'PLUGIN_CORE_LIFECYCLE_INVALID',
-        [field, key],
-        `Plugin ${kind} handler is invalid.`,
-      );
-    }
-    handlers.set(key, handler as (...args: never[]) => unknown);
-  }
-  const declaredSet = new Set(declared);
-  for (const id of declared) {
-    if (!handlers.has(id)) {
-      return failure(
-        'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        [field, id],
-        `Plugin ${kind} contribution is missing a handler.`,
-      );
-    }
-  }
-  for (const id of handlers.keys()) {
-    if (!declaredSet.has(id)) {
-      return failure(
-        'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
-        [field, id],
-        `Plugin ${kind} handler is not declared as a contribution.`,
-      );
-    }
-  }
-  return { ok: true, value: handlers, diagnostics: [] };
+  return { ok: true, value: result.handlers ?? new Map(), diagnostics: [] };
 }
 
 function readOwnValue(value: object, key: string): unknown | undefined {

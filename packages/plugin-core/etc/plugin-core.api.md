@@ -7,6 +7,7 @@
 import type { ScreenDataBinding } from '@base-screen/contracts';
 import { ScreenDatasetField } from '@base-screen/contracts';
 import type { ScreenDatasetValueType } from '@base-screen/contracts';
+import { ScreenDiagnostic } from '@base-screen/contracts';
 import type { ScreenDocument } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
@@ -521,6 +522,12 @@ export type BaseScreenPluginContribution = {
     readonly tagName: string;
 };
 
+// @public (undocumented)
+export type BaseScreenPluginContributionHandlerField = 'commands' | 'blueprintActions' | 'dataProcessors';
+
+// @public (undocumented)
+export type BaseScreenPluginContributionKind = BaseScreenPluginContribution['kind'];
+
 // @public
 export interface BaseScreenPluginDataProcessorContribution {
     // (undocumented)
@@ -719,6 +726,31 @@ export interface BaseScreenTableData {
     readonly totalRowCount?: number;
 }
 
+// @public
+export function contributionHandlerField(kind: BaseScreenPluginContributionKind): BaseScreenPluginContributionHandlerField | undefined;
+
+// @public (undocumented)
+export interface ContributionHandlerRecordInput {
+    readonly field: string;
+    // (undocumented)
+    readonly kind: BaseScreenPluginContributionKind;
+    // (undocumented)
+    readonly manifest: BaseScreenPluginManifest;
+    readonly pathPrefix?: readonly (string | number)[];
+    // (undocumented)
+    readonly value: unknown;
+}
+
+// @public (undocumented)
+export interface ContributionHandlerRecordResult {
+    // (undocumented)
+    readonly diagnostics: readonly ScreenDiagnostic[];
+    readonly handlers: ReadonlyMap<string, (...args: never[]) => unknown> | undefined;
+}
+
+// @public
+export function contributionIdentity(contribution: BaseScreenPluginContribution): string | undefined;
+
 // @public (undocumented)
 export function createBaseScreenMaterialCatalog(entries: readonly BaseScreenMaterialCatalogEntry[]): BaseScreenMaterialCatalog;
 
@@ -732,7 +764,13 @@ export function createBaseScreenPluginInspectorControlCatalog(entries: readonly 
 export function createBaseScreenPluginPanelCatalog(entries: readonly BaseScreenPluginPanelCatalogEntry[]): BaseScreenPluginPanelCatalog;
 
 // @public
+export function declaredContributionIds(kind: BaseScreenPluginContributionKind, contributions: readonly BaseScreenPluginContribution[]): readonly string[];
+
+// @public
 export function isValidCustomElementName(tagName: unknown): boolean;
+
+// @public
+export function listContributionHandlerKinds(): readonly BaseScreenPluginContributionKind[];
 
 // @public (undocumented)
 export const MAX_EDITOR_CONDITION_VALUES = 16;
@@ -824,6 +862,9 @@ export interface PluginDesignReadPort {
     // (undocumented)
     read(): Promise<ScreenParseResult<BaseScreenPluginDesignSnapshot>>;
 }
+
+// @public
+export function readContributionHandlerRecord(input: ContributionHandlerRecordInput): ContributionHandlerRecordResult;
 
 // @public (undocumented)
 export function resolveSchema(path: readonly (string | number)[], schema: BaseScreenMaterialObjectSchema): BaseScreenMaterialPropSchema | undefined;

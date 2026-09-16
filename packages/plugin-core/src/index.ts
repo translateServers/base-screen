@@ -69,6 +69,19 @@ export {
   BASE_SCREEN_PLUGIN_PANEL_ACTION_EVENT,
 } from './contracts.js';
 export type {
+  BaseScreenPluginContributionHandlerField,
+  BaseScreenPluginContributionKind,
+  ContributionHandlerRecordInput,
+  ContributionHandlerRecordResult,
+} from './contribution-kind.js';
+export {
+  contributionHandlerField,
+  contributionIdentity,
+  declaredContributionIds,
+  listContributionHandlerKinds,
+  readContributionHandlerRecord,
+} from './contribution-kind.js';
+export type {
   BaseScreenChartData,
   BaseScreenChartPoint,
   BaseScreenChartSeries,

@@ -1,3 +1,4 @@
+import { isScreenVariableName } from '../document/schema.js';
 import { parseScreenJsonValue } from '../json/parse.js';
 import type { ScreenDiagnostic, ScreenParseResult } from '../types/diagnostics.js';
 import type { ScreenJsonObject } from '../types/json.js';
@@ -10,7 +11,6 @@ import type {
 export const MAX_HOST_VARIABLE_PAGE_ITEMS = 50;
 export const MAX_HOST_VARIABLE_CATALOG_BYTES = 256 * 1024;
 
-const VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u;
 const MAX_VARIABLE_ID_CODE_UNITS = 256;
 const MAX_DESCRIPTION_CODE_POINTS = 4_096;
@@ -148,7 +148,7 @@ function validateSummaryFields(
   if (value.sourceType !== 'data-source' && value.sourceType !== 'url-query') {
     diagnostics.push(diagnostic([...path, 'sourceType'], 'Variable source type is invalid.'));
   }
-  if (typeof value.name !== 'string' || !VARIABLE_NAME_PATTERN.test(value.name)) {
+  if (!isScreenVariableName(value.name)) {
     diagnostics.push(diagnostic([...path, 'name'], 'Host variable name is invalid.'));
   }
   if (

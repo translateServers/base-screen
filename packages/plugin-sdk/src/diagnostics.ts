@@ -1,4 +1,8 @@
-import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
+import {
+  type ScreenDiagnostic,
+  type ScreenParseResult,
+  sortScreenDiagnostics,
+} from '@base-screen/contracts';
 
 export function prefixFailure<T>(
   diagnostics: readonly ScreenDiagnostic[],
@@ -6,7 +10,7 @@ export function prefixFailure<T>(
 ): ScreenParseResult<T> {
   return {
     ok: false,
-    diagnostics: sortDiagnostics(
+    diagnostics: sortScreenDiagnostics(
       diagnostics.map((item) => ({ ...item, path: [...prefix, ...item.path] })),
     ),
   };
@@ -15,31 +19,7 @@ export function prefixFailure<T>(
 export function sortDiagnostics(
   diagnostics: readonly ScreenDiagnostic[],
 ): readonly ScreenDiagnostic[] {
-  return [...diagnostics].sort((left, right) => {
-    const byPath = comparePaths(left.path, right.path);
-    if (byPath !== 0) {
-      return byPath;
-    }
-    if (left.code !== right.code) {
-      return left.code < right.code ? -1 : 1;
-    }
-    return left.message < right.message ? -1 : left.message > right.message ? 1 : 0;
-  });
-}
-
-function comparePaths(left: ScreenDiagnostic['path'], right: ScreenDiagnostic['path']): number {
-  const length = Math.min(left.length, right.length);
-  for (let index = 0; index < length; index++) {
-    const leftSegment = left[index]!;
-    const rightSegment = right[index]!;
-    if (typeof leftSegment !== typeof rightSegment) {
-      return typeof leftSegment === 'number' ? -1 : 1;
-    }
-    if (leftSegment !== rightSegment) {
-      return leftSegment < rightSegment ? -1 : 1;
-    }
-  }
-  return left.length - right.length;
+  return sortScreenDiagnostics(diagnostics);
 }
 
 export function failure<T>(

@@ -1,15 +1,15 @@
 import {
+  isScreenVariableName,
   parseScreenJsonValue,
   type ScreenJsonValue,
   type ScreenVariable,
 } from '@base-screen/contracts';
 import { isVariableNameTaken } from './designer-variable-operations.js';
 
-const VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f-\u009f]/u;
 
 export function isDesignerVariableName(value: string): boolean {
-  return VARIABLE_NAME_PATTERN.test(value);
+  return isScreenVariableName(value);
 }
 
 export function normalizeDesignerVariableDescription(source: string): string | undefined | false {

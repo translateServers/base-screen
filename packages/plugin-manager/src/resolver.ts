@@ -1,5 +1,6 @@
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/contracts';
-import type { BaseScreenPluginContribution } from '@base-screen/plugin-core';
+import { contributionIdentity } from '@base-screen/plugin-core';
+import { planForContribution } from './contribution-kind-plan.js';
 import { DiagnosticCollector } from './diagnostics.js';
 import type { Candidate, ManagerInput } from './preflight-types.js';
 
@@ -176,53 +177,52 @@ function validateContributions(
 ): void {
   const identities = new Set<string>();
   for (const candidate of candidates) {
+    const capabilities = candidate.manifest.capabilities;
     for (let index = 0; index < candidate.manifest.contributions.length; index++) {
       const contribution = candidate.manifest.contributions[index]!;
+      const path = ['plugins', candidate.index, 'manifest', 'contributions', index];
       const identity = contributionIdentity(contribution);
+      if (identity === undefined) continue;
       if (identities.has(identity)) {
         diagnostics.add(
           contribution.kind === 'material'
             ? 'PLUGIN_CORE_IDENTITY_CONFLICT'
             : 'PLUGIN_CORE_CONTRIBUTION_CONFLICT',
-          ['plugins', candidate.index, 'manifest', 'contributions', index],
+          path,
           'Contribution identity conflicts with another plugin.',
         );
       }
       identities.add(identity);
-      if (
-        contribution.kind === 'command' &&
-        !candidate.manifest.capabilities.includes(contribution.requiredCapability)
-      ) {
-        diagnostics.add(
-          'PLUGIN_CORE_CAPABILITY_UNDECLARED',
-          ['plugins', candidate.index, 'manifest', 'contributions', index],
-          'Command contribution requires an undeclared capability.',
-        );
+      const plan = planForContribution(contribution);
+      if (plan.requiresDeclaredCapability === true) {
+        const required = (contribution as { readonly requiredCapability?: unknown })
+          .requiredCapability;
+        if (typeof required === 'string' && !capabilities.includes(required)) {
+          diagnostics.add(
+            'PLUGIN_CORE_CAPABILITY_UNDECLARED',
+            path,
+            'Command contribution requires an undeclared capability.',
+          );
+        }
       }
       if (contribution.kind === 'blueprintCapability') {
         if (CAPABILITY_TABLE.get(contribution.id)?.blueprint !== true) {
           diagnostics.add(
             'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
-            ['plugins', candidate.index, 'manifest', 'contributions', index],
+            path,
             'Blueprint contribution is not supported by this host.',
           );
         }
-        if (!candidate.manifest.capabilities.includes(contribution.id)) {
+        if (!capabilities.includes(contribution.id)) {
           diagnostics.add(
             'PLUGIN_CORE_CAPABILITY_UNDECLARED',
-            ['plugins', candidate.index, 'manifest', 'contributions', index],
+            path,
             'Blueprint contribution requires a declared capability.',
           );
         }
       }
     }
   }
-}
-
-function contributionIdentity(contribution: BaseScreenPluginContribution): string {
-  return contribution.kind === 'material'
-    ? `material:${contribution.type}`
-    : `${contribution.kind}:${contribution.id}`;
 }
 
 function compareCandidates(left: Candidate, right: Candidate): number {

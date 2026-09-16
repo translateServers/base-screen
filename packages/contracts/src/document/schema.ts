@@ -22,6 +22,19 @@ export const VARIABLE_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]{0,127}$';
 export const BLUEPRINT_PATH_SEGMENT_PATTERN =
   '^(?!(?:__proto__|prototype|constructor)$)[A-Za-z_][A-Za-z0-9_]{0,127}$';
 
+const COMPONENT_ID_REGEXP = new RegExp(COMPONENT_ID_PATTERN);
+const VARIABLE_NAME_REGEXP = new RegExp(VARIABLE_NAME_PATTERN);
+
+/** 组件 id 词法的唯一谓词：文档契约中 `ComponentId` 一律经它判定。 */
+export function isScreenComponentId(value: unknown): value is string {
+  return typeof value === 'string' && COMPONENT_ID_REGEXP.test(value);
+}
+
+/** 变量名/资源类型/处理器 id 词法的唯一谓词：文档契约中 `VariableName` 一律经它判定。 */
+export function isScreenVariableName(value: unknown): value is string {
+  return typeof value === 'string' && VARIABLE_NAME_REGEXP.test(value);
+}
+
 const variableDescriptionSchema = z
   .string()
   .refine((value) => [...value].length <= MAX_DESCRIPTION_CODE_POINTS, {

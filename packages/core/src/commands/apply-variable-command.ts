@@ -1,4 +1,8 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import {
+  isScreenComponentId,
+  isScreenVariableName,
+  type ScreenDocument,
+} from '@base-screen/contracts';
 import { isRecord } from './command-input.js';
 import {
   finalizeScreenCommand,
@@ -9,8 +13,6 @@ import {
 } from './command-result.js';
 import type { ScreenCommandResult } from './types.js';
 
-const VARIABLE_NAME_PATTERN = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
-const VARIABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const RENAME_VARIABLE_FIELDS = new Set(['type', 'variableId', 'nextName']);
 
 /**
@@ -33,13 +35,13 @@ export function applyRenameVariableCommand(
       invalidScreenCommand('Rename variable command is invalid.', []),
     );
   }
-  if (!VARIABLE_ID_PATTERN.test(command.variableId)) {
+  if (!isScreenComponentId(command.variableId)) {
     return screenCommandFailure(
       document,
       invalidScreenCommand('Variable id is invalid.', ['variableId']),
     );
   }
-  if (!VARIABLE_NAME_PATTERN.test(command.nextName)) {
+  if (!isScreenVariableName(command.nextName)) {
     return screenCommandFailure(
       document,
       invalidScreenCommand('Next variable name is invalid.', ['nextName']),

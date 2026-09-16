@@ -4,6 +4,9 @@
 
 ```ts
 
+// @public
+export function compareScreenDiagnostics(a: ScreenDiagnostic, b: ScreenDiagnostic): number;
+
 // @public (undocumented)
 export const COMPONENT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
 
@@ -16,6 +19,9 @@ export function isBoundedScreenImageUrl(value: unknown, maxCodePoints?: number):
 // @public (undocumented)
 export function isScreenAuthoringRequest(value: unknown): value is ScreenAuthoringRequest;
 
+// @public
+export function isScreenComponentId(value: unknown): value is string;
+
 // @public (undocumented)
 export function isScreenHostDatasetPort(input: unknown): input is ScreenHostDatasetPort;
 
@@ -24,6 +30,9 @@ export function isScreenMaterialErrorCode(value: unknown): value is ScreenMateri
 
 // @public (undocumented)
 export function isScreenMaterialType(value: unknown): value is string;
+
+// @public
+export function isScreenVariableName(value: unknown): value is string;
 
 // @public (undocumented)
 export function jsonDepth(value: ScreenJsonValue | undefined): number;
@@ -1351,6 +1360,9 @@ export interface ScreenVariableRefreshOptions {
 
 // @public (undocumented)
 export function serializeScreenDocument(document: ScreenDocument): string;
+
+// @public
+export function sortScreenDiagnostics(diagnostics: readonly ScreenDiagnostic[]): readonly ScreenDiagnostic[];
 
 // @public (undocumented)
 export function validateScreenDesignerHostAdapter(input: unknown): ScreenParseResult<ScreenDesignerHostAdapter>;

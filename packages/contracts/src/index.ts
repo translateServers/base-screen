@@ -13,6 +13,10 @@ export {
   MAX_DATASET_ROWS,
   parseScreenTabularDataset,
 } from './dataset/parse.js';
+export {
+  compareScreenDiagnostics,
+  sortScreenDiagnostics,
+} from './diagnostics/collector.js';
 export type {
   NormalizedScreenMaterialError,
   ScreenMaterialErrorCode,
@@ -44,7 +48,12 @@ export {
   parseScreenDocument,
   parseScreenProjectEnvelope,
 } from './document/parse.js';
-export { COMPONENT_ID_PATTERN, VARIABLE_NAME_PATTERN } from './document/schema.js';
+export {
+  COMPONENT_ID_PATTERN,
+  isScreenComponentId,
+  isScreenVariableName,
+  VARIABLE_NAME_PATTERN,
+} from './document/schema.js';
 export {
   ScreenSerializationError,
   serializeScreenDocument,

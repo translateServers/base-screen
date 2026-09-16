@@ -1,4 +1,8 @@
-import type { ScreenDiagnostic, ScreenParseResult } from '@base-screen/contracts';
+import {
+  type ScreenDiagnostic,
+  type ScreenParseResult,
+  sortScreenDiagnostics,
+} from '@base-screen/contracts';
 
 const MAX_DIAGNOSTICS = 100;
 
@@ -35,12 +39,7 @@ export function failure<T>(
 export function sortDiagnostics(
   diagnostics: readonly ScreenDiagnostic[],
 ): readonly ScreenDiagnostic[] {
-  const sorted = [...diagnostics].sort((left, right) => {
-    const byPath = comparePaths(left.path, right.path);
-    if (byPath !== 0) return byPath;
-    if (left.code !== right.code) return left.code < right.code ? -1 : 1;
-    return left.message < right.message ? -1 : left.message > right.message ? 1 : 0;
-  });
+  const sorted = sortScreenDiagnostics(diagnostics);
   return sorted.length < MAX_DIAGNOSTICS
     ? sorted
     : [
@@ -52,17 +51,4 @@ export function sortDiagnostics(
           message: 'Too many validation errors; further diagnostics were suppressed.',
         },
       ];
-}
-
-function comparePaths(
-  left: readonly (string | number)[],
-  right: readonly (string | number)[],
-): number {
-  for (let index = 0; index < Math.min(left.length, right.length); index++) {
-    const leftSegment = left[index]!;
-    const rightSegment = right[index]!;
-    if (typeof leftSegment !== typeof rightSegment) return typeof leftSegment === 'number' ? -1 : 1;
-    if (leftSegment !== rightSegment) return leftSegment < rightSegment ? -1 : 1;
-  }
-  return left.length - right.length;
 }
