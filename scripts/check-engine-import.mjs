@@ -8,6 +8,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const engineSource = join(root, 'packages', 'engine', 'src');
 const commonRoot = join(engineSource, 'common');
 const browserRoot = join(engineSource, 'browser');
+const designerElementRoot = join(engineSource, 'designer-element');
 
 // Environment APIs that exist in both browsers and Node, so they carry no DOM coupling.
 // Anything outside this list that only a DOM lib can satisfy is reported as a violation.
@@ -136,7 +137,9 @@ function assertVendorIsEnvironmentAgnostic() {
   }
 }
 
-// Gate 2: the common/ dependency closure must never reach browser/.
+// Gate 2: a lower layer's dependency closure must never reach a higher layer root.
+// designer-element/ is the composition root above browser/ and common/, so both lower
+// roots are barred from reaching it in either a direct or a transitive relative import.
 function relativeImports(file) {
   const source = readFileSync(file, 'utf8');
   const specifiers = [];
@@ -158,9 +161,9 @@ function resolveSpecifier(fromFile, specifier) {
   return undefined;
 }
 
-function assertCommonNeverReachesBrowser() {
+function assertClosureNeverReaches(rootDir, forbiddenRoot, code) {
   const visited = new Set();
-  const stack = collectTypeScriptFiles(commonRoot).map((file) => [
+  const stack = collectTypeScriptFiles(rootDir).map((file) => [
     file,
     [relative(engineSource, file)],
   ]);
@@ -170,14 +173,28 @@ function assertCommonNeverReachesBrowser() {
     if (visited.has(file)) continue;
     visited.add(file);
 
-    if (file.startsWith(browserRoot)) {
-      fail('ENGINE_COMMON_IMPORTS_BROWSER', path.join(' -> '));
+    if (file.startsWith(forbiddenRoot)) {
+      fail(code, path.join(' -> '));
     }
     for (const specifier of relativeImports(file)) {
       const target = resolveSpecifier(file, specifier);
       if (target !== undefined) stack.push([target, [...path, relative(engineSource, target)]]);
     }
   }
+}
+
+function assertLayerClosuresNeverReachUpward() {
+  assertClosureNeverReaches(commonRoot, browserRoot, 'ENGINE_COMMON_IMPORTS_BROWSER');
+  assertClosureNeverReaches(
+    commonRoot,
+    designerElementRoot,
+    'ENGINE_COMMON_IMPORTS_DESIGNER_ELEMENT',
+  );
+  assertClosureNeverReaches(
+    browserRoot,
+    designerElementRoot,
+    'ENGINE_BROWSER_IMPORTS_DESIGNER_ELEMENT',
+  );
 }
 
 // Gate 3: the published entry must stay free of registration and storage side effects.
@@ -299,9 +316,88 @@ function assertSubLayerDirectionRegression() {
   }
 }
 
+// Gate 5: the designer-element/ composition root has an explicitly registered structure.
+// Root files and sub-layers are enumerated here so that any new file or directory under
+// designer-element/ must consciously update this gate instead of appearing silently.
+const DESIGNER_ELEMENT_ROOT_FILES = new Set([
+  'base-screen-designer-element.ts',
+  'designer-element-public-api.ts',
+]);
+
+// api/ implements the custom element's public methods over common types and runtime-owned
+// state, so it must stay free of browser/ imports — DOM-facing wiring belongs to runtime/.
+// runtime/ orchestrates by calling api/ implementations and owns controller wiring, so it
+// may reach browser/ and common/. api/ and runtime/ are deliberately mutually visible inside
+// the composition root (api reads runtime state; runtime orchestrates api implementations).
+const DESIGNER_ELEMENT_SUBLAYERS = new Map([
+  ['api', [commonRoot, designerElementRoot]],
+  ['runtime', [commonRoot, browserRoot, designerElementRoot]],
+]);
+
+function designerElementSourceKind(file) {
+  const segment = relative(designerElementRoot, file).split(/[\\/]/)[0] ?? '';
+  if (segment.includes('.')) {
+    return DESIGNER_ELEMENT_ROOT_FILES.has(segment) ? 'root' : 'unknown-root-file';
+  }
+  return DESIGNER_ELEMENT_SUBLAYERS.has(segment) ? segment : 'unknown-sublayer';
+}
+
+// Pure structure check over designer-element files and pre-resolved (from, to) import pairs.
+function designerElementLayerViolations(files, pairs) {
+  const violations = [];
+  for (const file of files) {
+    const kind = designerElementSourceKind(file);
+    if (kind === 'unknown-root-file' || kind === 'unknown-sublayer') {
+      violations.push(`${kind}: ${relative(engineSource, file)}`);
+    }
+  }
+  for (const { from, to } of pairs) {
+    if (designerElementSourceKind(from) === 'api' && to.startsWith(browserRoot)) {
+      violations.push(
+        `api-imports-browser: ${relative(engineSource, from)} -> ${relative(engineSource, to)}`,
+      );
+    }
+  }
+  return violations;
+}
+
+function assertDesignerElementLayering() {
+  const files = collectTypeScriptFiles(designerElementRoot);
+  const pairs = [];
+  for (const file of files) {
+    for (const specifier of relativeImports(file)) {
+      const target = resolveSpecifier(file, specifier);
+      if (target !== undefined) pairs.push({ from: file, to: target });
+    }
+  }
+  const violations = designerElementLayerViolations(files, pairs);
+  if (violations.length > 0) {
+    fail('ENGINE_DESIGNER_ELEMENT_LAYER_FORBIDDEN', violations.join(', '));
+  }
+}
+
+// Regression: the gate must positively reject an api -> browser import and an
+// unregistered sub-layer directory.
+function assertDesignerElementLayeringRegression() {
+  const violations = designerElementLayerViolations(
+    [join(designerElementRoot, 'surprise', 'module.ts')],
+    [
+      {
+        from: join(designerElementRoot, 'api', 'sample.ts'),
+        to: join(browserRoot, 'dom', 'sample.ts'),
+      },
+    ],
+  );
+  if (violations.length !== 2) {
+    fail('ENGINE_DESIGNER_ELEMENT_REGRESSION', `expected 2 violations, got ${violations.length}`);
+  }
+}
+
 assertCommonIsEnvironmentAgnostic();
 assertVendorIsEnvironmentAgnostic();
-assertCommonNeverReachesBrowser();
+assertLayerClosuresNeverReachUpward();
 await assertEntryHasNoSideEffects();
 assertSubLayerDirection();
 assertSubLayerDirectionRegression();
+assertDesignerElementLayering();
+assertDesignerElementLayeringRegression();

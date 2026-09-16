@@ -43,19 +43,20 @@
 
 - 每个包 `src/` 只放发布物。所有 `*.test.ts` 与 `__fixtures__/` 放在同包 `tests/`，并镜像 `src/` 子目录；测试用相对路径导入被测模块（如 `../src/index.js`）。`scripts/check-packages.mjs` 会拒绝 `src/` 内的测试/fixture，以及 `dist/` 内的测试/fixture 产物。
 - 每个包 `tsconfig.json` 用 `rootDir: "."` 且 include `src` 与 `tests`，供无 emit 的类型检查；`tsconfig.build.json` 必须覆写 `rootDir: "src"` 且只 include `src`，并排除测试与 fixture，避免测试进入 `dist`。
-- `engine/src` 按环境分层：`common/`（`operations`、`session`、`project`、`tools`、`ui-text`、`events`、`vendor`）是环境无关纯逻辑，`browser/`（`controllers`、`dom`、`viewport`、`styles`、`ui`）承载 DOM。依赖方向单向：`browser/` 可依赖 `common/`，反向禁止，`common/` 也不得引用浏览器全局（以无 DOM lib 编译验证）。`scripts/check-engine-import.mjs` 强制这些约束及下述子层方向。
+- `engine/src` 按环境分三层：`common/`（`operations`、`session`、`project`、`tools`、`ui-text`、`events`、`vendor`）是环境无关纯逻辑；`browser/`（`controllers`、`dom`、`viewport`、`styles`、`ui`）承载 DOM；`designer-element/`（根级 `base-screen-designer-element.ts` 与 `designer-element-public-api.ts`、`api/` 公开方法实现、`runtime/` 控制器装配与状态）是 `<base-screen-designer>` Custom Element 的组合根，仅 `index.ts` 引用。依赖方向单向：`designer-element/` 可依赖 `browser/` 与 `common/`，`browser/` 可依赖 `common/`，反向禁止——`common/` 与 `browser/` 不得触及 `designer-element/`，`designer-element/api/` 不得触及 `browser/`（DOM 装配一律走 `runtime/`）。`common/` 也不得引用浏览器全局（以无 DOM lib 编译验证）。`scripts/check-engine-import.mjs` 强制这些约束及下述子层方向；`designer-element/` 的根级文件与子层在门禁中显式登记，新增文件或子目录必须同步更新登记。
 - engine 的发布入口必须无副作用：导入 `@base-screen/engine` 不得注册 `base-screen-designer` Custom Element 或触碰 localStorage/sessionStorage（`check:engine-import` 会真实 import `dist/index.js` 验证）。`common/vendor/`（moveable 源码）被静态扫描禁止 DOM 全局，且有独立的 `tsconfig.vendor.json`。
 - 纯逻辑需要环境能力时通过构造 options 注入回调（如 `ScreenProjectController` 的 `scheduler`），不要直接访问 DOM/global。
-- 命名前缀承载层级语义，不要删除：`Screen*` 表示 canonical document、事务、项目等领域概念；`Designer*` 表示设计器编排层；`BaseScreen*` 表示 Base Screen 平台命名空间中的跨层契约与公共 API。新增类型按此选择前缀。
+- 命名前缀承载层级语义，不要删除：`Screen*` 表示 canonical document、事务、项目等领域概念；`Designer*` 表示设计器编排层；`BaseScreen*` 表示 Base Screen 平台命名空间中的跨层契约与公共 API。新增类型按此选择前缀。词汇消歧：`designer-element/` 目录与 `BaseScreenDesignerElement` 指 `<base-screen-designer>` Custom Element 本体（组合根）；`common/operations/element/` 与 `DesignerElementOperations*` 指画布元素工具操作——两者是不同概念，勿混淆。
 
 ## 分层与边界
 
-除已定义的包边界与 `engine` 的 `common/`↔`browser/` 单向分层外，各层内部再分子层。子层依赖必须遵循下列允许方向；未明确允许的跨子层依赖默认禁止，避免环与聚合体。
+除已定义的包边界与 `engine` 的 `common/`↔`browser/`↔`designer-element/` 单向分层外，各层内部再分子层。子层依赖必须遵循下列允许方向；未明确允许的跨子层依赖默认禁止，避免环与聚合体。
 
 - **`engine/browser/` 子层依赖方向（自叶到编排）：** `ui`（图标等纯资源）、`styles`（CSS 层）、`viewport`（画布坐标/辅助线）为叶子，不依赖兄弟子层；`dom`（DOM 节点/自定义元素封装）可依赖 `common/` 与 `ui`，但不得依赖 `controllers`。跨层共享类型应下沉至 `common/` 或由消费方定义最小接口，不得反向导入控制器；`controllers`（编排）为顶层，可依赖 `dom`、`viewport` 与 `common/`。
 - **`engine/common/` 子层依赖方向（自叶到会话）：** `ui-text`、`tools`、`project` 与 `events`（键盘 chord 规范化与默认行为策略）是彼此独立的基础子层，不得互相依赖；`operations`（元素/布局/选区/剪贴板/变换/操作注册/蓝图编排）可依赖 `project`、`tools` 及同层 `operations`；`session`（`DesignerSession`）为编排顶层，可依赖 `project` 与 `operations`。
+- **`engine/designer-element/` 组合根：** 根级两个装配文件与 `api/`、`runtime/` 双子层构成 Custom Element 组合根。`api/`（公开方法实现）只依赖 `common/` 与 `runtime/`，不得触及 `browser/`；`runtime/`（控制器装配、状态与生命周期）可依赖 `common/`、`browser/` 与 `api/`；两者双向可见是组合根内部的既定协作形态（api 读 runtime 状态，runtime 编排 api 实现），不是待修复的环。
 - **UI 文案边界：** 用户可见字符串集中到 `common/ui-text/designer-ui-text.ts`，由 `dom`/`controllers` 消费，不得内联硬编码。`check-designer-ui.mjs`（随 engine lint 运行）会扫描整个 `browser/` 树：字符串字面量中出现 CJK 即失败，且禁止引入 `i18n`/`locale`/`language` 等本地化机制。
-- **renderer 与 designer 职责边界：** `@base-screen/renderer` 只做纯展示（viewer），不含任何编辑/设计逻辑；designer（`engine/browser`）构建在 renderer 之上，renderer 不得依赖或感知 designer。`sdk` 的 `viewer` 与 `designer` 入口分别对应这两条职责线。
+- **renderer 与 designer 职责边界：** `@base-screen/renderer` 只做纯展示（viewer），不含任何编辑/设计逻辑；designer（`engine` 的 `browser/` 与 `designer-element/`）构建在 renderer 之上，renderer 不得依赖或感知 designer。`sdk` 的 `viewer` 与 `designer` 入口分别对应这两条职责线。
 - **plugin 三层边界：** `plugin-core`（契约与共享类型）是唯一契约层；`plugin-manager`（运行时加载/管理）与 `plugin-sdk`（插件作者面）可依赖 `contracts` 与 `plugin-core`，二者不得互相依赖；`plugin-sdk` 是对 `plugin-core` 的作者友好门面，不承载运行时管理逻辑。
 - **material 与 renderer 边界：** 物料契约、manifest 类型与校验由 `plugin-core` 拥有；`@base-screen/material` 提供官方物料实现及其 manifest/注册；`@base-screen/renderer` 只通过 `plugin-core` 的 catalog 与 material element 契约执行渲染，不依赖具体官方物料。
 - **物料原子化（组件制作约定）：** 一个物料只做一件事，不内建标题、说明或装饰性文案——需要标题时由文档层另放一个 `base.text`（或对应物料）组合。内建文案会把物料的内部排版与内边距锁死在一种形态上，使它无法被独立换行/配色/对齐，也无法在不需要该文案的场景复用。判定：若某个 prop 是"读数本身的构成"（单位、前后缀、表头列名）则保留；若只是"描述这个组件是什么"则移除。`plugin-datav-materials` 的单元测试对 title 类字段做了强制校验。
