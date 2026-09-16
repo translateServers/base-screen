@@ -1,11 +1,11 @@
 # Canvas Background Image Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16）
-> 依据：[ADR-0043](../../../decisions/ADR-0043-canvas-background-image.md)、
-> [ADR-0045](../../../decisions/ADR-0045-canvas-background-panel-editing.md)（面板编辑增量，部分取代 ADR-0043 非目标 1）、
-> [ADR-0046](../../../decisions/ADR-0046-canvas-background-image-host-button.md)（宿主选择按钮增量）、
-> [ADR-0049](../../../decisions/ADR-0049-canvas-background-button-conditional-rendering.md)（按钮条件渲染与对齐增量）
+> 状态：已归档（历史验收记录；2026-08-16）
+> 依据：ADR-0043、
+> ADR-0045（面板编辑增量，部分取代 ADR-0043 非目标 1）、
+> ADR-0046（宿主选择按钮增量）、
+> ADR-0049（按钮条件渲染与对齐增量）
 > 生效前置：ADR-0043/0045/0046/0047 已接受；本 Spec 为维护期内允许变更 ScreenDocument `canvas` 字段的增量
 
 ## 1. 目标

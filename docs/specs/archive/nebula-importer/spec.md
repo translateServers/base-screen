@@ -1,6 +1,6 @@
 # Nebula Importer Spec
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Phase: M7
 > Provenance: [Nebula Importer Provenance](../../../provenance/nebula-importer.md)
 

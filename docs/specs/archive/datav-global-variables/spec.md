@@ -2,7 +2,7 @@
 
 > 归档：2026-09-03（已完成）
 > 状态：已完成，历史验收记录
-> 依据：[ADR-0068](../../../decisions/ADR-0068-datav-global-variables.md)
+> 依据：ADR-0068
 
 ## Requirements
 

@@ -1,7 +1,7 @@
 # 独立数据集消费
 
 > 状态：生效中
-> 依据：[ADR-0069](../../decisions/ADR-0069-independent-dataset-consumption.md)
+> 依据：[ADR-0082](../../decisions/ADR-0082-dataset-consumption-contract.md)（原 ADR-0069 已由该主线合并记录吸收）
 
 ## Requirements
 

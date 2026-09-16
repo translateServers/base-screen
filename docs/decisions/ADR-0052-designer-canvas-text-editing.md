@@ -3,7 +3,7 @@
 > 状态：已接受
 > 日期：2026-08-16
 > 关联：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、
-> [ADR-0036](./ADR-0036-designer-viewport-native-events-toggle.md)
+> [ADR-0079](./ADR-0079-designer-workbench-shell-and-chrome.md)
 
 ## 1. 背景
 

@@ -1,9 +1,9 @@
 # Color Palette Gradient From Solid Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 日期：2026-08-16
-> 依据：[ADR-0057](../../../decisions/ADR-0057-color-palette-gradient-from-solid.md)
+> 依据：ADR-0057
 
 ## 1. 目标
 

@@ -1,8 +1,8 @@
 # 已归档规格
 
 > 状态：只读历史记录
-> 最近更新：2026-09-03
-> 归档总数：61
+> 最近更新：2026-09-12
+> 归档总数：62
 
 本目录保留已完成或被后继 Spec/ADR 取代的规格、任务和验收快照，用于追溯当时的范围、决策和实施进度。
 
@@ -17,8 +17,8 @@
 | 归档规格 | 后继依据 | 归档日期 |
 | --- | --- | --- |
 | [外围插件分区](./peripheral-plugin-partition/spec.md) | 已完成（2026-09-12，含后续阶段全部任务） | 2026-09-12 |
-| [DataV Global Variables](./datav-global-variables/spec.md) | 已完成；[ADR-0068](../../decisions/ADR-0068-datav-global-variables.md) | 2026-09-03 |
-| [DataV-Inspired Global Variables](./datav-inspired-global-variables/spec.md) | 由 [ADR-0068](../../decisions/ADR-0068-datav-global-variables.md) 取代 | 2026-09-01 |
+| [DataV Global Variables](./datav-global-variables/spec.md) | 已完成；ADR-0068 | 2026-09-03 |
+| [DataV-Inspired Global Variables](./datav-inspired-global-variables/spec.md) | 由 ADR-0068 取代 | 2026-09-01 |
 | [Host Resource Authoring](./host-resource-authoring/spec.md) | 已完成；[ADR-0064](../../decisions/ADR-0064-host-resource-authoring-intent.md) | 2026-08-31 |
 | [Designer Authoring And Project Lifecycle](./designer-authoring-project-lifecycle/spec.md) | [Designer Engine](./designer-engine/spec.md) | 2026-08-04 |
 | [Designer Engine](./designer-engine/spec.md) | 已完成（无后继） | 2026-08-05 |
@@ -43,9 +43,9 @@
 | [Material Library Visibility](./material-library-visibility/spec.md) | 已完成（无后继） | 2026-08-12 |
 | [Official Data Material Contracts](./data-material-contracts/spec.md) | 已完成（无后继） | 2026-08-12 |
 | [Host Dataset Integration](./host-dataset-integration/spec.md) | 已完成（无后继） | 2026-08-12 |
-| [Data Runtime Hardening](./data-runtime-hardening/spec.md) | 已完成（无后继）；覆盖 [ADR-0025](../../decisions/ADR-0025-data-runtime-hardening.md) | 2026-08-12 |
-| [Designer Event Blueprint](./designer-event-blueprint/spec.md) | 已完成（无后继）；依据 [ADR-0026](../../decisions/ADR-0026-designer-event-blueprint-authoring.md) | 2026-08-12 |
-| [Designer Authoring Extension](./designer-authoring-extension/spec.md) | 已完成（无后继）；依据 [ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0028](../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md) | 2026-08-12 |
+| [Data Runtime Hardening](./data-runtime-hardening/spec.md) | 已完成（无后继）；覆盖 ADR-0025 | 2026-08-12 |
+| [Designer Event Blueprint](./designer-event-blueprint/spec.md) | 已完成（无后继）；依据 ADR-0026 | 2026-08-12 |
+| [Designer Authoring Extension](./designer-authoring-extension/spec.md) | 已完成（无后继）；依据 [ADR-0027](../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、ADR-0028 | 2026-08-12 |
 | [Host Screen Skill Generation](./host-screen-skill-generation/spec.md) | 已完成（无后继） | 2026-08-12 |
 | [Host Material Skill Generation](./host-material-skill-generation/spec.md) | 已完成（无后继） | 2026-08-12 |
 | [Host Skill Adoption](./host-skill-adoption/spec.md) | 已完成（无后继） | 2026-08-12 |
@@ -85,4 +85,4 @@
 | [Component Conditional Style Rules](./component-conditional-style-rules/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
 | [Conditional Style Port](./conditional-style-port/spec.md) | 已完成；行为见[能力基线](../../baseline/README.md) | 2026-08-30 |
 | [Document Blueprint Host Bridge](./document-blueprint-host-bridge/spec.md) | 已被 [Designer Blueprint Workbench](./designer-blueprint-workbench/spec.md) 取代 | 2026-08-30 |
-| [Designer Blueprint Workbench](./designer-blueprint-workbench/spec.md) | 已完成；依据 [ADR-0063](../../decisions/ADR-0063-designer-blueprint-workbench-shell.md) | 2026-08-30 |
+| [Designer Blueprint Workbench](./designer-blueprint-workbench/spec.md) | 已完成；依据 ADR-0063 | 2026-08-30 |

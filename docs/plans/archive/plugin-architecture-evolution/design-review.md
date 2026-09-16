@@ -5,7 +5,7 @@
 > 评审结论：2026-09-11 通过方向；实施前仍须有已接受的 ADR 与生效中的 Spec
 > 范围：插件系统的定位、承载面、证据基线、缺口分析与长期演进方向
 > 动机（用户确认）：把更多能力**移出核心库、以插件形态交付**；用插件做物料只是其中一部分功能
-> 关联：[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md)、[ADR-0015](../../../decisions/ADR-0015-runtime-contribution-authority.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md)、[ADR-0070](../../../decisions/ADR-0070-plugin-command-chrome-projection.md)、[ADR-0071](../../../decisions/ADR-0071-plugin-design-context-read-access.md)、[ADR-0072](../../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)、[ADR-0073](../../../decisions/ADR-0073-inspector-custom-form-controls.md)、[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、[ADR-0075](../../../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)
+> 关联：ADR-0004、ADR-0014、ADR-0015、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md)、ADR-0070、ADR-0071、ADR-0072、ADR-0073、[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、[ADR-0075](../../../decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)
 
 本文是**设计评审**，不是实施授权。任何阶段的启动前提都是：先有已接受的 ADR，再有生效中的 Spec，并登记到 [Spec 索引](../../../specs/README.md)。
 
@@ -67,7 +67,7 @@
 
 ### 1.3 驱动二：功能承载面（命令、面板、检查器控件）
 
-核心库已经建好这些承载面，且都有决策记录：命令与 chrome 投影（[ADR-0070](../../../decisions/ADR-0070-plugin-command-chrome-projection.md)）、左栏面板（[ADR-0072](../../../decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)）、属性面板自定义控件（[ADR-0073](../../../decisions/ADR-0073-inspector-custom-form-controls.md)）、设计上下文只读访问（[ADR-0071](../../../decisions/ADR-0071-plugin-design-context-read-access.md)）。
+核心库已经建好这些承载面，且都有决策记录：命令与 chrome 投影（ADR-0070）、左栏面板（ADR-0072）、属性面板自定义控件（ADR-0073）、设计上下文只读访问（ADR-0071）。
 
 它们目前在生产里没有采用者（第 3 节 F1、F3），但**按本定位它们属于目标承载面而非待冻结的投机功能**。第二次修订曾据"零采用者"倾向冻结它们，该判断已撤回。
 
@@ -104,7 +104,7 @@ XJDataHub 经插件清单注入自己的图表物料定义，与其它物料混�
 
 宿主显式提供同 realm 受信模块；Base Screen 不 fetch、不 dynamic import、不发现远程代码。能力是「声明 ∩ 宿主批准 ∩ 宿主支持」的交集；激活上下文不含 Store、路由、DOM 根、凭据或通用服务对象。
 
-要点：**能力系统限制的是集成点，不是 JS 环境权威**（[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) 决策 1 已明确不作恶意代码沙箱承诺）。
+要点：**能力系统限制的是集成点，不是 JS 环境权威**（ADR-0004 决策 1 已明确不作恶意代码沙箱承诺）。
 
 ## 3. 宿主实测证据
 
@@ -232,7 +232,7 @@ P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方�
 
 ### D2 兼容性策略与探索阶段约束的冲突（**需你裁决**）
 
-本项目处于探索阶段，治理规则明令禁止版本标记字段与版本化命名（[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md) 亦有意移除版本语义）。但 Q8 的兼容性问题一旦有独立交付的外围插件就会真实存在：`packages/` 内的包靠 workspace 协议天然同步，外围插件是独立发布物，必须能感知基座契约变化。
+本项目处于探索阶段，治理规则明令禁止版本标记字段与版本化命名（ADR-0014 亦有意移除版本语义）。但 Q8 的兼容性问题一旦有独立交付的外围插件就会真实存在：`packages/` 内的包靠 workspace 协议天然同步，外围插件是独立发布物，必须能感知基座契约变化。
 
 **这两个要求目前互相冲突，且不能靠工程手段绕过——它需要显式批准。** 三个可选方向：
 
@@ -253,9 +253,9 @@ P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方�
 - 不在 Base Screen 内建执行沙箱（F13：沙箱归宿主）。
 - 不导出第三方类型、状态或 document shape 越过物料 ABI（继承 ADR-0019）。
 - 不把完整图表 option 或领域配置编辑器收进基座（AGENTS 既有边界：归宿主）。
-- 不做通用依赖注入或服务定位器（违反 [ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)）。
+- 不做通用依赖注入或服务定位器（违反 ADR-0004）。
 - 不让 Base Screen 侧出现 fetch / dynamic import / 网络客户端 / 存储。
-- 不为菜单引入 `when` 条件表达式语言（[ADR-0070](../../../decisions/ADR-0070-plugin-command-chrome-projection.md) 已推迟）。
+- 不为菜单引入 `when` 条件表达式语言（ADR-0070 已推迟）。
 - 不给插件开放 canonical 文档的可变写入口。
 - 不让 `engine` 依赖 `plugin-manager`。
 
@@ -271,8 +271,8 @@ P0–P6 都需要先有已接受的 ADR 与生效中的 Spec，本表只排方�
 | --- | --- |
 | [ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md) | **扩展，不取代**。初稿判为"需部分取代"，工作结论修正：ADR-0019 约束的是"把依赖装进核心包"，本决策方向相反（把依赖留在核心库之外），二者不冲突。因此采纳其准入规则并保持其完整有效 |
 | [ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md) | 引用。外围插件仍由宿主加载与信任，不新增信任通道 |
-| [ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md) | 引用。外围插件仍是宿主显式提供的同 realm 受信模块，不改变信任边界 |
-| [ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md) | **无冲突**。因 D2 选择不引入版本化设计，ADR-0014 继续完整生效 |
+| ADR-0004 | 引用。外围插件仍是宿主显式提供的同 realm 受信模块，不改变信任边界 |
+| ADR-0014 | **无冲突**。因 D2 选择不引入版本化设计，ADR-0014 继续完整生效 |
 
 ### 11.2 已裁决
 

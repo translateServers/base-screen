@@ -1,7 +1,7 @@
 # Material Library Error Console Test Matrix
 
 > 状态：已完成
-> 依据：[ADR-0035](../../../decisions/ADR-0035-material-library-feedback-workspace-placement.md)
+> 依据：ADR-0035
 
 | Requirement | 场景 | 自动化证据 | 状态 |
 | --- | --- | --- | --- |

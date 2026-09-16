@@ -1,6 +1,6 @@
 # Primitive 提升评估记录
 
-> 状态：生效
+> 状态：已归档（历史记录）
 > 日期：2026-08-10
 > 归属：[Designer Authoring Extension Spec](../../../specs/archive/designer-authoring-extension/spec.md) Task 8 / AE-EC-C04
 

@@ -1,6 +1,6 @@
 # Designer Workbench Control Styles 规格
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-04
 > 阶段：M3 增量
 > 定位：冻结 `@base-screen/engine` 私有工作台的设计 token、基础样式、语义控件和视觉验收边界

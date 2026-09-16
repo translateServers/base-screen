@@ -1,7 +1,7 @@
 # Designer Canvas Text Editing Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16；2026-08-17 缺陷修复增量：overlay 缩放偏移与层级）
+> 状态：已归档（历史验收记录；2026-08-16；2026-08-17 缺陷修复增量：overlay 缩放偏移与层级）
 > 日期：2026-08-16
 > 依据：[ADR-0052](../../../decisions/ADR-0052-designer-canvas-text-editing.md)
 

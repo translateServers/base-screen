@@ -4,13 +4,13 @@
 > 日期：2026-09-12
 > 决策依据：设计评审 D2 三个方向，用户于 2026-09-12 批准启动兼容性设计阶段，按评审"外围插件数量少"的现状选择不引入版本标记的方案
 > 范围：外围插件与基座契约的兼容管理方式；不包含执行隔离、沙箱与插件间组合
-> 关联：[ADR-0014](./ADR-0014-plugin-manifest-identity-only.md)、[ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0074](./ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)
+> 关联：[ADR-0084](./ADR-0084-plugin-contribution-vocabulary-and-trust.md)、[ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0074](./ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)
 
 ## 背景
 
 外围插件是独立交付物，而基座契约持续演进。设计评审（Q8/G5）指出：若兼容无管理手段，
 基座演进会静默破坏已发布的插件。但探索阶段治理规则明令禁止版本标记字段与版本化命名
-（[ADR-0014](./ADR-0014-plugin-manifest-identity-only.md) 亦有意移除版本语义），评审 D2 据此给出三个方向：
+（[ADR-0084](./ADR-0084-plugin-contribution-vocabulary-and-trust.md) 亦有意移除版本语义），评审 D2 据此给出三个方向：
 维持现状（锁步交付）、收紧绑定（稳定子集 + 规范快照）、引入版本化设计（需新 ADR 并退出探索阶段）。
 
 ## 决策

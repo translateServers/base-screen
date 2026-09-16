@@ -1,8 +1,8 @@
 # Host Screen Skill Generation
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-12
-> Authority: [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), [ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md), [ADR-0025](../../../decisions/ADR-0025-data-runtime-hardening.md), [ADR-0028](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
+> Authority: [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), ADR-0023, ADR-0025, ADR-0028
 
 ## Goal
 

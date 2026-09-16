@@ -1,9 +1,9 @@
 # Host Material Library Grouping Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 日期：2026-08-13
-> 依据：[ADR-0033](../../../decisions/ADR-0033-host-controlled-material-library-grouping.md)
+> 依据：ADR-0033
 
 ## 1. 目标
 

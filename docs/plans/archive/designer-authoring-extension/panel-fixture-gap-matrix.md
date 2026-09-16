@@ -1,6 +1,6 @@
 # 作者面板 fixture 与缺口矩阵
 
-> 状态：生效
+> 状态：已归档（历史记录）
 > 日期：2026-08-10
 > 归属：[Designer Authoring Extension Spec](../../../specs/archive/designer-authoring-extension/spec.md) Task 2
 
@@ -77,5 +77,5 @@
 ## 5. 提升规则
 
 - 只有被至少两个独立物料使用并经过 M1-M6 的 primitive 才提升为 Engine 内建控件（记录于
-  `docs/plans/designer-authoring-extension/primitive-promotion.md`，随 Task 8 产出）。
+  `docs/plans/archive/designer-authoring-extension/primitive-promotion.md`，随 Task 8 产出）。
 - 只能通过注入 component/function/DOM/Promise 实现的编辑需求一律归宿主编辑器，不进入提升流程。

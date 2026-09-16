@@ -1,7 +1,7 @@
 # Designer Material Library Visual Refinement Checklist
 
 > 状态：已完成（2026-08-13，`pnpm verify:browser` 与 `pnpm verify:m0` 通过）
-> 依据：[ADR-0034](../../../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)
+> 依据：ADR-0034
 
 ## 目录与状态层级（R1）
 

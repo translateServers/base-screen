@@ -1,8 +1,8 @@
 # Material Library Render Scalability Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16）
-> 依据：[ADR-0042](../../../decisions/ADR-0042-material-library-render-scalability.md)、[ADR-0040](../../../decisions/ADR-0040-material-manifest-cover.md)、[ADR-0041](../../../decisions/ADR-0041-material-cover-adaptive-fit.md)
+> 状态：已归档（历史验收记录；2026-08-16）
+> 依据：ADR-0042、ADR-0040、ADR-0041
 
 ## 1. 目标
 

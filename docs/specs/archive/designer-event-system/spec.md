@@ -1,6 +1,6 @@
 # Designer 事件系统规格
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-06
 > 定位：浏览器默认键盘/鼠标事件行为管控与统一事件通道，零宿主影响
 > 前置：[Designer Engine](../designer-engine/spec.md)、[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)（本地作者内核范围）

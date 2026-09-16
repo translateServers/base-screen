@@ -1,6 +1,6 @@
 # 目录结构与构建产物规则 Spec
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-05
 > 定位：定义 Base Screen 包内目录结构、分层边界、测试外置与构建产物卫生的工程规则
 > 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)

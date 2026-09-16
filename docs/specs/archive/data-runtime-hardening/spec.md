@@ -1,10 +1,10 @@
 # Data Runtime Hardening 规格
 
-> 状态：生效中（Active）。Review Remediation Batch (2026-08-09) 已全部完成并取证（Base
+> 状态：已归档（历史验收记录；Active）。Review Remediation Batch (2026-08-09) 已全部完成并取证（Base
 > RB1-RB3、本仓 RB9 自动化门禁，以及 XJ RB9 远程/临时环境演练，见第 7 节与 XJ 仓库对应产物）；
 > 生产专属项 N/A 表述不变。
 > 最近更新：2026-08-10
-> 依据：[ADR-0025](../../../decisions/ADR-0025-data-runtime-hardening.md)（已接受）、[ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md)、[ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)
+> 依据：ADR-0025（已接受）、ADR-0023、[ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)
 > 计划：[实施计划](../../../plans/archive/data-runtime-hardening/implementation-plan.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)

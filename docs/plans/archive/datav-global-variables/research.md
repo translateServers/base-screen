@@ -2,8 +2,8 @@
 
 > 状态：已完成并归档
 > 日期：2026-09-01
-> 初次结论：[ADR-0067](../../../decisions/ADR-0067-datav-inspired-global-variables.md)（已取代）
-> 复核结论：[ADR-0068](../../../decisions/ADR-0068-datav-global-variables.md)（2026-09-03）
+> 初次结论：ADR-0067（已取代）
+> 复核结论：ADR-0068（2026-09-03）
 
 ## 调研范围
 

@@ -1,7 +1,7 @@
 # Material Library Error Console Checklist
 
 > 状态：已完成
-> 依据：[ADR-0035](../../../decisions/ADR-0035-material-library-feedback-workspace-placement.md)
+> 依据：ADR-0035
 
 ## 控制台与状态（R1、R2）
 

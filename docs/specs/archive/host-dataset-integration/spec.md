@@ -1,8 +1,8 @@
 # Host Dataset Integration Spec
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-08
-> Authority: [ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md)
+> Authority: ADR-0023
 > Related: [Contracts Foundation](../contracts-foundation/spec.md),
 > [Host Resource And Blueprint](../host-resource-blueprint/spec.md),
 > [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)

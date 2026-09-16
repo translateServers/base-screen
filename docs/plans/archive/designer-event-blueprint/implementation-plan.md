@@ -2,7 +2,7 @@
 
 > 状态：已决策（图形延后）；表单与 Core trace 实施待启动
 > 日期：2026-08-10
-> 依据：[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)（已接受）、[专项 Spec](../../../specs/archive/designer-event-blueprint/spec.md)（生效中）、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
+> 依据：ADR-0026（已接受）、[专项 Spec](../../../specs/archive/designer-event-blueprint/spec.md)（已归档）、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
 > 范围依据：[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)；本计划只覆盖轻量作者内核
 
 ## 1. 执行原则

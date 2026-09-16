@@ -3,7 +3,7 @@
 > 归档：2026-08-30（已取代；后继为 Designer Blueprint Workbench）
 > 状态：已取代（detached Blueprint 路径由 [Designer Blueprint Workbench](../designer-blueprint-workbench/spec.md) 取代；本文件仅作历史行为依据）
 > 日期：2026-08-25
-> 依据：[ADR-0061](../../../decisions/ADR-0061-host-constrained-visual-event-blueprint.md)
+> 依据：ADR-0061
 
 ## 1. 目标
 

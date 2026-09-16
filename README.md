@@ -46,7 +46,8 @@ Base Screen 的交付重点是可组合的前端基座。示例中的项目目�
   配合属性检查器、批量样式编辑、调色板及静态文本的画布内直接编辑。
 - **独立 Viewer**：消费文档与物料目录进行展示，不包含设计器编辑逻辑；宿主可单独使用
   `base-screen-viewer` 构建预览页或发布页。
-- **官方物料与分类浏览**：提供文本、矩形、椭圆、图片、容器、图表、ECharts 和表格物料；
+- **官方物料与分类浏览**：核心库提供文本、矩形、椭圆、图片、容器、图表和表格物料（ECharts 等重型
+  图表能力由 `plugins/` 外围插件承载）；
   物料库支持搜索、收藏、最近使用、宿主多级分组、条目封面和窄面板分类浮层。
 - **数据与视觉联动**：支持静态数据、宿主资源与变量；声明数据绑定能力的物料可使用数据集参数、字段映射
   和预览。条件样式与 Blueprint 运行时用于表达组件状态变化和事件联动，实际数据处理由宿主完成。
@@ -162,12 +163,13 @@ flowchart LR
 
 ## 示例
 
-日常只需一个入口：`pnpm dev:browser-harness`。其余两个示例不提供 `dev` 命令。
+日常只需一个入口：`pnpm dev:browser-harness`。其余示例由各自说明或根级验证脚本运行。
 
 | 示例 | 主要用途 | 运行或验证入口 |
 | --- | --- | --- |
 | [browser-harness](./examples/browser-harness) | Viewer、Designer、官方物料、项目适配器和插件管理器组合；导航页 `/cases.html` | `pnpm dev:browser-harness` |
 | [host-quickstart](./examples/host-quickstart/README.md) | 仅使用公开 API 的最小 Vanilla / Vite Viewer 宿主 | 按示例说明接入；由 `pnpm verify:tarball` 验证 |
+| [vue-host](./examples/vue-host/README.md) | 完整的 Vue 外部宿主项目：SFC、物料桥接、宿主插件与命令闭环 | `pnpm verify:tarball`（复制到仓库外、替换为同批次 tarball 后验证） |
 | [material-mcp-server](./examples/material-mcp-server) | 面向上层工具链的物料模板 MCP provider | `node examples/material-mcp-server/server.mjs`；由 `pnpm verify:material-mcp` 验证 |
 
 ## 包结构

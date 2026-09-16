@@ -1,6 +1,6 @@
 # Renderer And Viewer Spec
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Phase: M2
 > ADR: [ADR-0005](../../../decisions/ADR-0005-renderer-dom-shadow-dom-and-product-elements.md)
 

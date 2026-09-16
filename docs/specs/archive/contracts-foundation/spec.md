@@ -1,8 +1,8 @@
 # Contracts Foundation Spec
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-04
-> Authority: [ADR-0002](../../../decisions/ADR-0002-canonical-screen-document.md), [ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md)
+> Authority: [ADR-0002](../../../decisions/ADR-0002-canonical-screen-document.md), ADR-0023
 
 ## Scope
 

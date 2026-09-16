@@ -1,10 +1,10 @@
 # Conditional Style Port Spec
 
 > 归档：2026-08-30（已完成）
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-17
-> Authority: [ADR-0059](../../../decisions/ADR-0059-conditional-style-port.md)
-> Related: [ADR-0058](../../../decisions/ADR-0058-component-conditional-style-rules.md),
+> Authority: ADR-0059
+> Related: ADR-0058,
 > [ADR-0016](../../../decisions/ADR-0016-material-appearance-authoring-contract.md),
 > [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)
 > Tasks: [tasks.md](./tasks.md)

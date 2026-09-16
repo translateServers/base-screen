@@ -1,9 +1,9 @@
 # Plugin Manager Runtime Spec
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-03
 > 定位：冻结 `@base-screen/plugin-manager` 在 P2 的候选预检、依赖解析、能力授权、插件生命周期和实例级只读目录事务
-> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、[ADR-0014](../../../decisions/ADR-0014-plugin-manifest-identity-only.md)（已接受）、[ADR-0015](../../../decisions/ADR-0015-runtime-contribution-authority.md)（已接受）、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)（生效中）
+> 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、ADR-0014（已接受）、ADR-0015（已接受）、[Plugin Core Contract Spec](../plugin-core-contract/spec.md)（生效中）
 
 ## 1. 生效条件
 

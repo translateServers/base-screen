@@ -1,7 +1,7 @@
 # Designer Material Library Visual Refinement Tasks
 
 > 状态：已完成（2026-08-13，`pnpm verify:browser` 与 `pnpm verify:m0` 通过）
-> 依据：[ADR-0034](../../../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)
+> 依据：ADR-0034
 
 - [x] Task 1：冻结 ADR-0034、Spec 四件套并登记 ADR/Spec/路线图索引（R1-R5）。
 - [x] Task 2：审查现有路径、子组、筛选、状态与卡片层级，确定仅限现有 DOM/Token 的视觉策略（R1-R4）。

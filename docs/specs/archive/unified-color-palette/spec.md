@@ -1,10 +1,10 @@
 # Unified Color Palette Control Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16；2026-08-17 增量补充：颜色透明度滑杆 `透明度`；
+> 状态：已归档（历史验收记录；2026-08-16；2026-08-17 增量补充：颜色透明度滑杆 `透明度`；
 > 2026-08-18 增量补充：紧凑布局与模式间状态共享，见第 6 节）
-> 依据：[ADR-0050](../../../decisions/ADR-0050-unified-color-palette-control.md)、
-> [ADR-0051](../../../decisions/ADR-0051-unified-color-palette-replaces-color-input.md)（全面替换 color input，取消字段级门控）
+> 依据：ADR-0050、
+> ADR-0051（全面替换 color input，取消字段级门控）
 
 ## 1. 目标
 

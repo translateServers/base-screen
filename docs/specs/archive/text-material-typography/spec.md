@@ -1,8 +1,8 @@
 # Text Material Typography Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16；2026-08-17 增量补充：绝对行高 `lineHeight`）
-> 依据：[ADR-0047](../../../decisions/ADR-0047-text-material-typography.md)
+> 状态：已归档（历史验收记录；2026-08-16；2026-08-17 增量补充：绝对行高 `lineHeight`）
+> 依据：ADR-0047
 > 生效前置：ADR-0047 已接受；本 Spec 为维护期内允许变更官方文本物料 Manifest 与渲染的增量
 
 ## 1. 目标

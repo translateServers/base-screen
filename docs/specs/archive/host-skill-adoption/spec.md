@@ -1,8 +1,8 @@
 # Host Skill Adoption
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-12
-> Authority: [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), [ADR-0028](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
+> Authority: [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), ADR-0028
 
 ## Goal
 

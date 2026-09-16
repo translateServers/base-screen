@@ -1,9 +1,9 @@
 # Host Material Package Spec
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-11
 > 定位：宿主托管可信物料包的分发、注册与目录集成契约
-> 依据：[ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md)、[ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md)、[ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)
+> 依据：[ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md)、[ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md)、ADR-0004、[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)

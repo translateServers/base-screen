@@ -22,7 +22,7 @@
 ## 产品能力
 
 - [ ] 编辑器、图层、画布、物料、检查器、资产、数据、变量、Blueprint 和项目产品闭环可用。
-- [x] 图形 Blueprint 路径按 [ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md) 延后（2026-08-10 决策）；未来恢复时重新执行 ADR-0019 评估。
+- [x] 图形 Blueprint 路径按 ADR-0026 延后（2026-08-10 决策）；未来恢复时重新执行 ADR-0019 评估。
 - [ ] 键盘表单路径完整编辑同一 canonical rule（[Designer Event Blueprint](../designer-event-blueprint/spec.md) Task 5 证据）。
 - [ ] 保存、发布、预览、资源和恢复的竞态、取消、失败和权限反馈具有中文可访问状态。
 - [x] 宿主数据集目录选择、参数求值、字段绑定、表格/图表预览、变量定向重取和手动刷新满足 [Host Dataset Integration](../host-dataset-integration/checklist.md)。

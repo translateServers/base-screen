@@ -1,9 +1,9 @@
 # Designer Material Library Visual Refinement Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 日期：2026-08-13
-> 依据：[ADR-0034](../../../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)
+> 依据：ADR-0034
 
 ## 1. 目标
 

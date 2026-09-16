@@ -1,6 +1,6 @@
 # Official Data Material Contracts
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-10
 > 依据：[ADR-0022](../../../decisions/ADR-0022-official-data-material-contracts.md)
 

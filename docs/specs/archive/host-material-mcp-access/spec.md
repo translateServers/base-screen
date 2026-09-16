@@ -1,6 +1,6 @@
 # Host Material MCP Access
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-12
 > Authority: [ADR-0030](../../../decisions/ADR-0030-host-material-mcp-access.md)
 

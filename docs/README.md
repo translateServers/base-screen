@@ -9,6 +9,8 @@
 | --- | --- |
 | 在应用中嵌入 Viewer、Designer、物料和宿主能力 | [集成指南](./usage.md) |
 | 创建可直接绑定数据集的自定义组件 | [数据集驱动自定义组件最佳实践](./custom-dataset-material-best-practice.md) |
+| 为物料定制加载中/空态等状态 UI | [公共加载容器](./material-loading.md) |
+| 为宿主配置大屏设计与物料创建 Skill | [宿主 Skill 快速接入](./host-skill-manuals/01-quick-start.md) |
 | 当前能力现状与维护基线 | [当前能力基线](./baseline/README.md) |
 | 下一阶段方向与候选主题 | [后续路线图](./roadmap/README.md) |
 | 查看已接受、已取代和评审中的架构决策 | [架构决策记录](./decisions/README.md) |

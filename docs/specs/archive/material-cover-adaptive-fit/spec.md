@@ -1,8 +1,8 @@
 # Material Cover Adaptive Fit Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16）
-> 依据：[ADR-0041](../../../decisions/ADR-0041-material-cover-adaptive-fit.md)、[ADR-0040](../../../decisions/ADR-0040-material-manifest-cover.md)
+> 状态：已归档（历史验收记录；2026-08-16）
+> 依据：ADR-0041、ADR-0040
 
 ## 1. 目标
 

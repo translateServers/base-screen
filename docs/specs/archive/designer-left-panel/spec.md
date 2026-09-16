@@ -1,9 +1,9 @@
 # Designer Left Panel Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 日期：2026-08-13
-> 依据：[ADR-0032](../../../decisions/ADR-0032-designer-left-panel-refactor.md)
+> 依据：ADR-0032
 > 修订：2026-08-16 —— 非目标第 4 条「Manifest 缩略图字段」项被 [Material Cover Thumbnail](../material-cover-thumbnail/spec.md)
 > （依据 ADR-0040）取代：Manifest 现允许可选 `cover` URL 字段，仅用于物料库卡片封面展示；R2 缩略图由
 > 分类图标/色相确定性派生与可选封面叠加组成，占位与失败回退语义见新 Spec。

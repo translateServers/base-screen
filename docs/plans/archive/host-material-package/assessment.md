@@ -51,5 +51,5 @@
 
 - `createMaterialPackage` 已实现并覆盖 23 个聚焦测试；browser-harness 提供宿主受控 `import()` 动态加载 →
   define → catalog → Viewer 渲染闭环演示，`verify:browser` 含内容渲染断言。
-- ADR-0029 已接受；Host Material Package Spec 生效中，tasks/checklist 全部勾选。
+- ADR-0029 已接受；Host Material Package Spec 已归档（2026-08-12），tasks/checklist 全部勾选。
 - 质量门：`verify:fast`、`verify:browser`、`verify:tarball` 全部通过；contracts/renderer/engine 与文档契约零改动。

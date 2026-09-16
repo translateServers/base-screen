@@ -1,6 +1,6 @@
 # Remote Plugin Sandbox Spec
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Phase: M8
 > ADR: [ADR-0009](../../../decisions/ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)
 

@@ -2,10 +2,10 @@
 
 > 状态：已完成（治理已接受；Review Remediation Batch 于 2026-08-09 闭环）
 > 完成记录：代码评审发现的正确性缺陷与整改证据见第 18 节。
-> 研究输入：[数据模块设计原则深度研究](../研究报告.md)
-> 现有决策：[ADR-0023 Host Dataset Resource Integration](../../../decisions/ADR-0023-host-dataset-resource-integration.md)
-> 新增决策：[ADR-0025 Data Runtime Hardening](../../../decisions/ADR-0025-data-runtime-hardening.md)（已接受，2026-08-09）
-> 活动规格：[Data Runtime Hardening Spec](../../../specs/archive/data-runtime-hardening/spec.md)（生效中，2026-08-09）
+> 研究输入：[数据模块设计原则深度研究](../data-module-design-research.md)
+> 现有决策：ADR-0023
+> 新增决策：ADR-0025（已接受，2026-08-09）
+> 活动规格：[Data Runtime Hardening Spec](../../../specs/archive/data-runtime-hardening/spec.md)（已归档，2026-08-12）
 > 真实宿主：`C:\worker\xjdatahub`
 
 ## 1. 背景

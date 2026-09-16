@@ -1,6 +1,6 @@
 # Designer Theme Tokens 规格
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-07
 > 定位：为 Designer Shadow DOM chrome 提供宿主可配置、边界明确的主题 Token
 > 前置：[ADR-0024](../../../decisions/ADR-0024-designer-public-style-tokens.md)、[ADR-0017](../../../decisions/ADR-0017-designer-product-host-boundaries.md)、[Designer Workbench Control Styles](../designer-workbench-control-styles/spec.md)

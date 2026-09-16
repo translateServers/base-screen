@@ -1,9 +1,9 @@
 # Component Conditional Style Rules Spec
 
 > 归档：2026-08-30（已完成）
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-17
-> Authority: [ADR-0058](../../../decisions/ADR-0058-component-conditional-style-rules.md)
+> Authority: ADR-0058
 > Related: [ADR-0002](../../../decisions/ADR-0002-canonical-screen-document.md),
 > [ADR-0005](../../../decisions/ADR-0005-renderer-dom-shadow-dom-and-product-elements.md),
 > [ADR-0016](../../../decisions/ADR-0016-material-appearance-authoring-contract.md),

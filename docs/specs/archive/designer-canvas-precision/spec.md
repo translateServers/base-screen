@@ -1,6 +1,6 @@
 # Designer Canvas Precision 规格
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-07
 > 定位：以瞬态 `translate` 预览夯实大屏设计器的移动、吸附与坐标精度
 > 前置：[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[Designer Engine](../designer-engine/spec.md)、[ADR-0006](../../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)

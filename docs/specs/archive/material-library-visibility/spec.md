@@ -1,9 +1,9 @@
 # Material Library Visibility 规格
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-07
 > 定位：物料库可见性契约与 Designer 物料库过滤
-> 依据：[ADR-0021](../../../decisions/ADR-0021-material-library-visibility.md)
+> 依据：ADR-0021
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)

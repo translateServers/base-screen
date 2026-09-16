@@ -1,8 +1,8 @@
 # Host Material Skill Generation
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-12
-> Authority: [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), [ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md), [ADR-0004](../../../decisions/ADR-0004-plugin-lifecycle-contributions-and-trust.md), [ADR-0028](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
+> Authority: [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), [ADR-0003](../../../decisions/ADR-0003-web-component-material-abi-and-registration.md), ADR-0004, ADR-0028
 
 ## Goal
 

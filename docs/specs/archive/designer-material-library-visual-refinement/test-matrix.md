@@ -1,7 +1,7 @@
 # Designer Material Library Visual Refinement Test Matrix
 
 > 状态：已完成（2026-08-13）
-> 依据：[ADR-0034](../../../decisions/ADR-0034-designer-material-library-visual-hierarchy.md)
+> 依据：ADR-0034
 
 | Requirement | 场景 | 自动化证据 | 状态 |
 | --- | --- | --- | --- |

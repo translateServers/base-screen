@@ -3,8 +3,8 @@
 > 状态：已归档（未完成范围被 ADR-0027 取代）
 > 最近更新：2026-08-10
 > 定位：完整大屏设计器产品范围的历史实施快照，不再授权新实现
-> 前置：[Designer Product Completion](../designer-product-completion/spec.md)、[Designer Engine](../designer-engine/spec.md)、[ADR-0017](../../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0018](../../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md)、[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
-> 后继：[ADR-0027：轻量设计器基座与宿主重型处理边界](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0028：宿主作者桥与 Material Editor Descriptor](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
+> 前置：[Designer Product Completion](../designer-product-completion/spec.md)、[Designer Engine](../designer-engine/spec.md)、[ADR-0017](../../../decisions/ADR-0017-designer-product-host-boundaries.md)、[ADR-0018](../../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、ADR-0023、ADR-0026
+> 后继：[ADR-0027：轻量设计器基座与宿主重型处理边界](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、ADR-0028
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
@@ -77,7 +77,7 @@ Designer SHALL 支持 static 与 host-backed 变量、授权资源目录、参�
 
 Blueprint SHALL 提供完整键盘表单路径：trigger、condition、action 与递归 value expression 编辑，以及配置、
 模板、编译诊断、问题面板和受限模拟日志，并支持 Core 只读 trace（[Designer Event Blueprint](../designer-event-blueprint/spec.md)）。
-图形路径按 [ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md) 整体延后，表单为唯一作者
+图形路径按 ADR-0026 整体延后，表单为唯一作者
 路径。未来恢复图形路径时须重新执行 [ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)
 依赖评估；图形路径 SHALL 投影 canonical rule/condition/action，不能创建私有执行模型。
 

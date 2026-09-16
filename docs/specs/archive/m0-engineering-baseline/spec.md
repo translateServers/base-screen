@@ -1,6 +1,6 @@
 # M0 工程基线 Spec
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-03
 > 定位：定义 Base Screen Monorepo 初始化、十二包骨架、工具链、边界门禁和私有 tarball 验收
 > 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)

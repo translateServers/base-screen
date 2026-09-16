@@ -2,7 +2,7 @@
 
 > 状态：已归档；2026-08-10 用户决策图形整体延后，本期不引入依赖
 > 评估日期：2026-08-10
-> 依据：[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)、[专项 Spec](../../../specs/archive/designer-event-blueprint/spec.md)
+> 依据：[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、ADR-0026、[专项 Spec](../../../specs/archive/designer-event-blueprint/spec.md)
 > 证据位置：仓库外临时目录 `%TEMP%\opencode\designer-event-blueprint-spike-20260810`
 > （`results/raw-results.json`、`results/raw-browser.json`、`results/raw-bundle.json`、`results/report.txt`，
 > 以及 `rete-own-renderer-correction/` 的纠正 spike 产物）；主仓库 manifest 与 lockfile 全程未修改

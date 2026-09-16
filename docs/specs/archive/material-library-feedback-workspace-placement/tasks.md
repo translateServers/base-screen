@@ -1,7 +1,7 @@
 # Material Library Error Console Tasks
 
 > 状态：已完成
-> 依据：[ADR-0035](../../../decisions/ADR-0035-material-library-feedback-workspace-placement.md)
+> 依据：ADR-0035
 
 - [x] Task 1：冻结 ADR-0035、Spec 四件套并登记 ADR/Spec/路线图索引（R1-R5）。
 - [x] Task 2：将状态 surface 从左侧物料面板移至底部状态栏错误控制台，保留 data-*、动作和卡片状态语义（R1、R2、R4）。

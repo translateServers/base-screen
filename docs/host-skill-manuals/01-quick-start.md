@@ -85,7 +85,8 @@ pnpm base-screen:skills verify
 
 ## 下一步
 
-- 日常刷新与在线更新检查见《宿主 Skill 日常使用与同步指南》。
-- 配置项与导出脚本契约见《宿主 Skill 配置参考》。
-- 遇到问题时见《故障排查》。
-- 需要让 AI 在线查询物料时见《在线物料 MCP 接入指南》；它是可选增强，不影响离线接入。
+- [宿主 Skill 日常使用与同步指南](./02-daily-sync.md)：日常刷新与在线更新检查。
+- [宿主 Skill 配置参考](./03-configuration-reference.md)：配置项与导出脚本契约。
+- [故障排查](./04-troubleshooting.md)：接入或同步失败时先看这里。
+- [XJDataHub 落地方向说明](./05-xj-datahub-landing.md)：把 Skill 接入 XJDataHub 的落地方向。
+- [在线物料 MCP 接入指南](./06-online-material-mcp.md)：让 AI 在线查询物料；可选增强，不影响离线接入。

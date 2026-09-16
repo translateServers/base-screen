@@ -11,7 +11,7 @@
 | R4 画布图层 | 3 | geometry/controller unit、Layers DOM、pointer/keyboard/performance browser cases |
 | R5 物料资产 | 2、4 | Contracts port binding、Material conformance（图片替代文本）、Renderer asset lifecycle/prop、runtime isolation 投影、Inspector DOM（含组选中、多选排列与组几何动作面板） |
 | R6 资源数据 | 2、4、6 | Contracts canonical parser、dataset catalog/descriptor and binding parser、Core parameter evaluation、Renderer variable/resource races、host adapter integration、Designer data panel、browser dataset workflow |
-| R7 Blueprint 表单作者闭环 | 5 | Core compiler/runtime、专项矩阵 EB-R7-C01–C05、`designer-integration-controller.test.ts` 的模板/模拟/键盘路径、keyboard and pointer browser workflows（表单路径）；图形路径延后见 [ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md) |
+| R7 Blueprint 表单作者闭环 | 5 | Core compiler/runtime、专项矩阵 EB-R7-C01–C05、`designer-integration-controller.test.ts` 的模板/模拟/键盘路径、keyboard and pointer browser workflows（表单路径）；图形路径延后见 ADR-0026 |
 | R8 依赖准入 | 5 | 专项矩阵 EB-R8-C01（2026-08-10 spike 证据归档）；本期零新增依赖，无白名单/lockfile/notice 变更 |
 | R9 产品质量 | 1-6 | test matrix reverse mapping, browser, API, boundary, tarball, provenance, verify:m0 |
 

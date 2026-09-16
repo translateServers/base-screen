@@ -1,7 +1,7 @@
 # Designer 事件 Blueprint 任务
 
 > 状态：实施中（宿主作者桥范围，图形路径归宿主）
-> 依据：[spec.md](./spec.md)、[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)、[ADR-0028](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
+> 依据：[spec.md](./spec.md)、ADR-0026、ADR-0028
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
 > 计划：[implementation-plan.md](../../../plans/archive/designer-event-blueprint/implementation-plan.md)

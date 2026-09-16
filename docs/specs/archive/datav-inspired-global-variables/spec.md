@@ -1,8 +1,9 @@
 # DataV-Inspired Global Variables Spec
 
 > 归档：2026-09-01（已完成）
-> 状态：已完成，历史验收记录
-> 依据：[ADR-0067](../../../decisions/ADR-0067-datav-inspired-global-variables.md)
+> 状态：已完成，历史验收记录；已由 ADR-0068 取代（`static | host` 与按名称寻址不再有效）
+> 依据：ADR-0067（已取代）
+> 后继：[DataV Global Variables Spec](../datav-global-variables/spec.md)
 
 ## 范围
 

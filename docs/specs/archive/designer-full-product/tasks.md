@@ -28,7 +28,7 @@
   - [ ] Renderer 渲染时异常隔离：创建、模型赋值、事件回调等首次渲染失败时隔离到该组件，其余组件渲染成功，并上报 `PLUGIN_CORE_RENDER_FAILED` 诊断（对应 Renderer Viewer Spec 增量）。
   - [ ] 覆盖取消、去重、超时、资源替换、删除保护和敏感信息隔离。
 
-- [ ] Task 5：完成事件 Blueprint 表单作者闭环与 Core trace（R7、R9；图形路径按 [ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md) 延后）。专属执行依据为 [Designer Event Blueprint Spec](../designer-event-blueprint/spec.md)。
+- [ ] Task 5：完成事件 Blueprint 表单作者闭环与 Core trace（R7、R9；图形路径按 ADR-0026 延后）。专属执行依据为 [Designer Event Blueprint Spec](../designer-event-blueprint/spec.md)。
   - [x] 完成图形候选评估并归档：X6 预算超限、Rete 自有 renderer 因 postinstall 与无增益拒绝、Dagre 仅布局可选；2026-08-10 决策图形延后、零依赖（[候选评估报告](../../../plans/archive/designer-event-blueprint/dependency-evaluation.md)）。
   - [ ] 实现 Core trace 与共享求值内核（trace/dispatch 等价、detached JSON、错误定位）。
   - [ ] 实现表单/draft/模板/host-action/诊断/搜索/模拟闭环与双实例/cleanup/browser、API、boundary、license、consumer bundle、tarball 和 `pnpm verify:m0` 验收。

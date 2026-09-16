@@ -1,8 +1,8 @@
 # Host Resource And Blueprint Spec
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Phase: M5
-> ADR: [ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md), [ADR-0023](../../../decisions/ADR-0023-host-dataset-resource-integration.md)
+> ADR: [ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md), ADR-0023
 
 ## Requirements
 

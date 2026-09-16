@@ -3,7 +3,7 @@
 > 状态：已完成（2026-09-12 归档）
 > 最近更新：2026-09-12
 > 定位：把「能力由插件承载」落到可执行的分区与承载面上——核心库保持零第三方依赖，第三方依赖只以逐插件显式申报的方式存在于外围插件区
-> 依据：[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)（已接受）、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)（已接受）、[ADR-0073](../../../decisions/ADR-0073-inspector-custom-form-controls.md)（已接受）
+> 依据：[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)（已接受）、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)（已接受）、ADR-0073（已接受）
 
 ## 1. 生效条件
 
@@ -17,7 +17,7 @@
 本 Spec 分阶段交付，阶段之间可独立验收：
 
 - **P0 承载骨架**（已完成）：工作区分区、边界检查分区、首个带第三方依赖的外围插件、核心库手绘图表移出。
-- **后续阶段**（未完成，见 `tasks.md`）：声明与接线收敛、失败爆炸半径与懒激活、UI/命令承载面采纳、条件内核表驱动、兼容性。
+- **后续阶段**（已完成，见 `tasks.md`）：声明与接线收敛、失败爆炸半径与懒激活、UI/命令承载面采纳、条件内核表驱动、兼容性。
 
 阶段边界原则：**本 Spec 只解决依赖分区与承载面，不解决执行隔离。** 依赖隔离（构建/打包期挡住第三方依赖）与执行隔离（运行期防恶意代码）是两件事，后者归宿主。
 

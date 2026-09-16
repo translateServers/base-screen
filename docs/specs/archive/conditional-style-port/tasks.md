@@ -2,7 +2,7 @@
 
 > Status: Completed
 > Updated: 2026-08-17
-> Authority: [ADR-0059](../../../decisions/ADR-0059-conditional-style-port.md)
+> Authority: ADR-0059
 
 - [x] P1: Export `BaseScreenConditionalStyleRequest`/`BaseScreenConditionalStylePort` from
       plugin-core (types only, no runtime).

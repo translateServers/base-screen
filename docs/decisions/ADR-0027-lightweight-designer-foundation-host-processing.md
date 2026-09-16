@@ -3,7 +3,7 @@
 > 状态：已接受
 > 日期：2026-08-10
 > 部分取代：[ADR-0017](./ADR-0017-designer-product-host-boundaries.md)
-> 关联：[ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-runtime.md)、[ADR-0012](./ADR-0012-designer-project-lifecycle.md)、[ADR-0018](./ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0023](./ADR-0023-host-dataset-resource-integration.md)
+> 关联：[ADR-0010](./ADR-0010-host-resource-deadline-and-blueprint-runtime.md)、[ADR-0012](./ADR-0012-designer-project-lifecycle.md)、[ADR-0018](./ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0082](./ADR-0082-dataset-consumption-contract.md)
 > 范围影响：[已归档 Designer Full Product](../specs/archive/designer-full-product/spec.md)
 
 ## 1. 背景

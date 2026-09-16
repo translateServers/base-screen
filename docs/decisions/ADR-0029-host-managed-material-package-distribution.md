@@ -2,7 +2,7 @@
 
 > 状态：已接受
 > 日期：2026-08-11
-> 依据：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0003](./ADR-0003-web-component-material-abi-and-registration.md)、[ADR-0004](./ADR-0004-plugin-lifecycle-contributions-and-trust.md)
+> 依据：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0003](./ADR-0003-web-component-material-abi-and-registration.md)、[ADR-0084](./ADR-0084-plugin-contribution-vocabulary-and-trust.md)
 > 关联：[ADR-0008](./ADR-0008-remote-plugin-sandbox-protocol.md)、[ADR-0009](./ADR-0009-remote-plugin-sandbox-cross-origin-transport.md)
 > 规格：[Host Material Package Spec](../specs/archive/host-material-package/spec.md)
 > 计划：[实施计划](../plans/archive/host-material-package/implementation-plan.md)

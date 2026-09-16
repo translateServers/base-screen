@@ -1,6 +1,6 @@
 # Boundary Hygiene 规格
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-06
 > 定位：将 AGENTS.md「分层与边界」中的高内聚低耦合约定落实到代码与自动化门禁
 > 前置：[ADR-0006](../../../decisions/ADR-0006-designer-engine-dom-interactions-and-history.md)、[ADR-0017](../../../decisions/ADR-0017-designer-product-host-boundaries.md)、[Directory Structure Rules](../directory-structure-rules/spec.md)

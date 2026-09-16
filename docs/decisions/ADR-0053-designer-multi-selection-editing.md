@@ -3,8 +3,8 @@
 > 状态：已接受
 > 日期：2026-08-16
 > 关联：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、
-> [ADR-0050](./ADR-0050-unified-color-palette-control.md)、
-> [ADR-0051](./ADR-0051-unified-color-palette-replaces-color-input.md)
+> [ADR-0077](./ADR-0077-canvas-background-and-color-authoring.md)、
+> [ADR-0077](./ADR-0077-canvas-background-and-color-authoring.md)
 
 ## 1. 背景
 

@@ -3,7 +3,7 @@
 > 归档：2026-08-30（已完成）
 > 状态：实施与验证完成
 > 日期：2026-08-29
-> 依据：[ADR-0063](../../../decisions/ADR-0063-designer-blueprint-workbench-shell.md)
+> 依据：ADR-0063
 > 联合消费者：XJ Data Hub `.agent/specs/base-screen-blueprint-workbench-integration/`
 
 ## 1. 目标

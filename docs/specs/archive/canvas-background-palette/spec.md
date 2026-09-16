@@ -1,8 +1,8 @@
 # Canvas Background Palette Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16）
-> 依据：[ADR-0048](../../../decisions/ADR-0048-canvas-background-palette.md)、[ADR-0043](../../../decisions/ADR-0043-canvas-background-image.md)、[ADR-0045](../../../decisions/ADR-0045-canvas-background-panel-editing.md)
+> 状态：已归档（历史验收记录；2026-08-16）
+> 依据：ADR-0048、ADR-0043、ADR-0045
 
 ## 1. 目标
 

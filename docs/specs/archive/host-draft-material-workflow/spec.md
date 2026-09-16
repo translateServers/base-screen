@@ -1,6 +1,6 @@
 # Host Draft Material Workflow
 
-> Status: Active
+> Status: Archived (historical acceptance record)
 > Updated: 2026-08-12
 > Authority: [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md), [ADR-0029](../../../decisions/ADR-0029-host-managed-material-package-distribution.md)
 

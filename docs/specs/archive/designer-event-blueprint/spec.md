@@ -1,9 +1,9 @@
 # Designer 事件 Blueprint 规格
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-10
 > 定位：轻量设计器基座内的 Blueprint 规范与宿主作者边界（Core 三件套、面板摘要与宿主请求入口）
-> 前置：[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0018](../../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)、[ADR-0028](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
+> 前置：[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0018](../../../decisions/ADR-0018-host-intents-assets-and-graph-blueprint.md)、[ADR-0019](../../../decisions/ADR-0019-designer-specialized-editor-dependencies.md)、ADR-0026、ADR-0028
 > 任务：[tasks.md](./tasks.md)
 > 验收：[checklist.md](./checklist.md)
 > 映射：[test-matrix.md](./test-matrix.md)
@@ -15,9 +15,9 @@
 本规格定义 Designer 事件 Blueprint 的规范与宿主作者边界：Base Screen 继续拥有 canonical Blueprint、严格解析、
 compile、trace、replace command、history、revision guard 与诊断；其内部事件面板只呈现事件摘要、能力状态与
 JSON-safe 宿主作者请求入口。Blueprint 图形布局、编辑器 draft、长期 session 与宿主侧表单/图形编辑器由宿主
-拥有，只提交 canonical Blueprint（[ADR-0028](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)）。
+拥有，只提交 canonical Blueprint（ADR-0028）。
 
-ADR-0026 的图形路径延后与候选评估结论继续有效；[ADR-0028](../../../decisions/ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)
+ADR-0026 的图形路径延后与候选评估结论继续有效；ADR-0028
 部分取代 ADR-0026 的 Engine 内部表单作者 UI 范围：宿主可通过公开作者桥自行实现表单或图形编辑器，Base Screen
 不授权在 Engine 内部继续建设表单/图形作者工作流。
 

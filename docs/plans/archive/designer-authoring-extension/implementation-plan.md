@@ -4,7 +4,7 @@
 > 日期：2026-08-10
 > 定位：在不扩大 Core/Engine 运行时职责的前提下，补齐物料属性面板、宿主编辑器、事件 Blueprint 和复杂图表作者能力
 > 权威边界：[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)
-> 相关：[Material Contract](../../../specs/archive/data-material-contracts/spec.md)、[Host Dataset Integration](../../../specs/archive/host-dataset-integration/spec.md)、[Designer Event Blueprint](../../../specs/archive/designer-event-blueprint/spec.md)、[ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)
+> 相关：[Material Contract](../../../specs/archive/data-material-contracts/spec.md)、[Host Dataset Integration](../../../specs/archive/host-dataset-integration/spec.md)、[Designer Event Blueprint](../../../specs/archive/designer-event-blueprint/spec.md)、ADR-0026
 
 本计划不是新增完整 Designer 产品的路线，也不是把 Monaco、CodeMirror、图形图库或业务编辑器塞进 Base Screen。
 目标是建立一条稳定的作者扩展边界：Base Screen 拥有 canonical 数据、纯校验、Core command、基础面板 primitives
@@ -218,7 +218,7 @@ type ScreenAuthoringRequest =
 交付：
 
 - 新增“宿主作者桥与 Material Editor Descriptor”ADR，明确不注入 UI、不注入源代码、不新增重型 editor package。
-- 重新评估 [ADR-0026](../../../decisions/ADR-0026-designer-event-blueprint-authoring.md)：保留 Core Blueprint contract/runtime，取代 Engine 内部作者 UI 的部分。
+- 重新评估 ADR-0026：保留 Core Blueprint contract/runtime，取代 Engine 内部作者 UI 的部分。
 - 将当前 `designer-event-blueprint` 活动 Spec 拆为“Base runtime/contract”和“Host authoring bridge”两个职责，或归档其不再适用的作者任务。
 - 在 Designer Full Product 归档范围上补充：ECharts、Blueprint editor、code editor 均是宿主集成能力。
 

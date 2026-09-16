@@ -3,9 +3,9 @@
 > 状态：已接受
 > 日期：2026-08-16
 > 关联：[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、
-> [ADR-0028](./ADR-0028-host-authoring-bridge-and-material-editor-descriptor.md)、
-> [ADR-0035](./ADR-0035-material-library-feedback-workspace-placement.md)、
-> [ADR-0038](./ADR-0038-designer-host-preview-handler.md)
+> [ADR-0081](./ADR-0081-event-and-blueprint-authoring-ownership.md)、
+> [ADR-0078](./ADR-0078-material-library-presentation.md)、
+> [ADR-0079](./ADR-0079-designer-workbench-shell-and-chrome.md)
 
 ## 1. 背景
 

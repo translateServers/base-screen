@@ -2,7 +2,7 @@
 
 > Status: Accepted
 > Updated: 2026-08-17
-> Authority: [ADR-0059](../../../decisions/ADR-0059-conditional-style-port.md)
+> Authority: ADR-0059
 
 - [x] 端口类型仅存在于 plugin-core 与运行时配置面；文档、JSON Schema、序列化零变化。
 - [x] 三层合并顺序固定：base → 文档 styleRules → 端口覆盖；同键后写覆盖先写。

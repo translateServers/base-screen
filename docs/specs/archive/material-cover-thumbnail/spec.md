@@ -1,8 +1,8 @@
 # Material Cover Thumbnail Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中（2026-08-16）
-> 依据：[ADR-0040](../../../decisions/ADR-0040-material-manifest-cover.md)
+> 状态：已归档（历史验收记录；2026-08-16）
+> 依据：ADR-0040
 > 生效前置：ADR-0040 已接受；本 Spec 为维护期内首个允许变更 Material Manifest 公共字段的增量
 
 ## 1. 目标

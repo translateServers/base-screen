@@ -4,7 +4,7 @@
 > 日期：2026-09-11
 > 决策依据：设计评审（2026-09-11 通过）后，用户授权架构方按推荐方案决定后续决策，不再逐项评审
 > 范围：核心库之外的能力承载位置、`packages/` 与外围插件的依赖分区、外围插件的信任与依赖准入；不包含执行隔离与沙箱
-> 关联：[ADR-0004](./ADR-0004-plugin-lifecycle-contributions-and-trust.md)、[ADR-0014](./ADR-0014-plugin-manifest-identity-only.md)、[ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](./ADR-0029-host-managed-material-package-distribution.md)
+> 关联：[ADR-0084](./ADR-0084-plugin-contribution-vocabulary-and-trust.md)、[ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md)、[ADR-0027](./ADR-0027-lightweight-designer-foundation-host-processing.md)、[ADR-0029](./ADR-0029-host-managed-material-package-distribution.md)
 
 ## 背景
 
@@ -20,9 +20,9 @@ Base Screen 的能力要能在核心库之外实现与交付，否则两类内�
 1. **新增顶层 `plugins/` 承载外围插件**，与 `packages/` 平行。`packages/` 保持固定 12 个包不变，`scripts/check-packages.mjs` 的约束范围不扩大到 `plugins/`。
 2. **依赖白名单按区维护。** `packages/` 区维持现状（仅 `contracts` 可用 `zod`，React/Vue 仅作各自桥接包的 peer）。`plugins/` 区改为**逐插件显式申报**允许的外部依赖，不接受通配、不接受继承，由 `scripts/check-boundaries.mjs` 分区强制。
 3. **依赖方向单向。** `plugins/*` 可以依赖 `packages/*` 的公共导出；`packages/*` **绝不**依赖 `plugins/*`，包含 dev 与 test 依赖。反向依赖一律失败关闭。
-4. **外围插件不获得任何运行时特权。** 它必须走与宿主插件完全相同的通道：宿主显式提供候选、宿主加载、宿主授权。本决策不新增信任通道，也不改变 [ADR-0004](./ADR-0004-plugin-lifecycle-contributions-and-trust.md) 的同 realm 受信前提与 [ADR-0029](./ADR-0029-host-managed-material-package-distribution.md) 的"宿主负责加载与信任"边界。
+4. **外围插件不获得任何运行时特权。** 它必须走与宿主插件完全相同的通道：宿主显式提供候选、宿主加载、宿主授权。本决策不新增信任通道，也不改变 [ADR-0084](./ADR-0084-plugin-contribution-vocabulary-and-trust.md) 的同 realm 受信前提与 [ADR-0029](./ADR-0029-host-managed-material-package-distribution.md) 的"宿主负责加载与信任"边界。
 5. **依赖准入沿用 [ADR-0019](./ADR-0019-designer-specialized-editor-dependencies.md) 的既有规则**：第三方依赖必须置于私有 adapter 之后；不导出第三方类型、状态或 document shape；adapter 以 canonical state 为唯一提交来源；安装前记录实际打包增量、lockfile 新增数、许可证、漏洞、维护状态、browser matrix 与移除方案。ADR-0019 保持有效——它约束的是"把依赖装进核心包"的路径，本决策走的是相反方向（把依赖留在核心库之外），因此是**扩展其准入规则到新位置，不取代它**。
-6. **不引入版本标记字段与版本化命名。** [ADR-0014](./ADR-0014-plugin-manifest-identity-only.md) 与探索阶段约束继续生效。外围插件只依赖 `@base-screen/plugin-core` 与 `@base-screen/plugin-sdk` 的公共导出，契约偏差通过既有边界检查与规范快照发现，不通过版本协商发现。
+6. **不引入版本标记字段与版本化命名。** [ADR-0084](./ADR-0084-plugin-contribution-vocabulary-and-trust.md) 与探索阶段约束继续生效。外围插件只依赖 `@base-screen/plugin-core` 与 `@base-screen/plugin-sdk` 的公共导出，契约偏差通过既有边界检查与规范快照发现，不通过版本协商发现。
 7. **首批承载范围限于既有承载协议能表达的内容**：渲染类能力与现有 6 类贡献覆盖的功能类能力。本次不新增贡献类型、不新增能力，因此不启动描述符驱动的内核改造。
 8. **`@base-screen/material` 现有手绘图表实现不因本决策自动移除。** 其去留（保留为无依赖降级实现，或整体移出核心库）属后续实施决策，不在本 ADR 范围内。
    > 后续处置（2026-09-11）：已决定**整体移出**。`base.echarts` 从 `packages/material` 删除，公共导出、`./echarts` 子路径、构建入口与自动注册一并移除；其受限 Editor Descriptor 载体以 `harness.semantic-chart` 迁入 `examples/browser-harness`（非发布物，沿用该工程既有的 `harness.*` 演示物料约定），继续承担 Descriptor 的浏览器端验证。核心库此后不再发布任何自称 ECharts 的物料，真实图表能力由外围插件 `plugins/plugin-echarts` 承载。

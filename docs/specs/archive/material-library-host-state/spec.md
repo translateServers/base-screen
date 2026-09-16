@@ -1,9 +1,9 @@
 # Material Library Host State Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 日期：2026-08-12
-> 依据：[ADR-0031](../../../decisions/ADR-0031-material-library-host-state.md)
+> 依据：ADR-0031
 
 ## 1. 目标
 

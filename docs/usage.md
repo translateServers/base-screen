@@ -230,7 +230,7 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 | `staticData` | 可选 | `{ kind: 'scalar', valueType }` 或 `{ kind: 'tabular', defaultBinding }` |
 | `dataBinding` | 可选 | 数据绑定角色声明（宿主数据集字段映射用） |
 | `libraryVisible` | 可选 | 设为 `false` 时不出现在物料库，也不能被程序化插入 |
-| `editorDescriptor` | 可选 | 声明式作者面板描述符（见第 12 节）；自定义控件经此引用 |
+| `editorDescriptor` | 可选 | 声明式作者面板描述符（见第 13 节）；自定义控件经此引用 |
 | `cover` | 可选 | 物料库封面 |
 
 > `propsSchema` / `styleSchema` 中被 `required` 引用的字段在提交时按 schema 校验。常见错误是把
@@ -659,161 +659,6 @@ designer.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, () => {
 按钮默认隐藏。事件会冒泡且 `composed: true`，`detail` 固定为 `{ source: 'topbar' }`。宿主不应
 访问 Designer Shadow DOM，也不需要在设计器外重复渲染返回按钮。
 
-#### 官方文本自适应宽度
-
-选中官方文本组件，在属性面板勾选「自适应宽度」。组件按内容的最长一行撑宽，保留空格与手动
-换行，不自动折行；字号、字重、字间距及动态数据变化会即时更新宽度，高度与位置保持不变。
-超出画布时沿用原有裁剪规则；空文本宽度为最小尺寸 1，最大宽度为 1000000。
-
-配置保存在 `props.autoWidth`，默认 `false`，旧文档缺失该属性时仍使用固定宽度。例如：
-
-```ts
-designer.executeCommand({
-  type: 'update-components',
-  componentIds: [text.id],
-  patch: { props: { ...text.props, autoWidth: true } },
-});
-```
-
-`size.width` 仍保存固定宽度及无法测量时的备用值；属性面板和选择框显示实际宽度。运行时测量
-不改变文档、脏状态或历史，保存、导出、复制和 Viewer 均保留配置并在当前环境重新排版。
-
-在属性面板、`W` 快捷输入或横向拖拽中实际调宽，会同时关闭自适应；多选与编组缩放同样适用。
-只改高度、移动或旋转保持自适应，关闭开关则固定为当前显示宽度。双击静态文本时编辑层也会
-随内容撑宽；Enter 提交、Shift+Enter 换行、Esc 取消，提交仍只有一条历史。
-
-该选项仅适用于 `base.text`，不提供自适应高度、容器填充或自定义物料尺寸协议。架构边界见
-[ADR-0065](./decisions/ADR-0065-text-auto-width-runtime-geometry.md)。
-
-#### 官方图片倍图尺寸
-
-单选官方图片组件 `base.image` 后，几何属性区会显示无状态的 `1x`、`2x`、`3x`、`4x`
-按钮。图片加载完成后，点击按钮会把当前自然尺寸一次性换算为固定宽高：
-`width = naturalWidth / 倍率`、`height = naturalHeight / 倍率`。`1x` 使用原图自然尺寸，
-`2x`、`3x`、`4x` 分别除以对应倍率；结果按统一几何规则保留两位小数，并限制在
-`1..1000000`。
-
-每次实际变化只提交一个 `update-components` 事务，且只修改 `size`；相同尺寸不会新增历史。
-倍率不会写入文档，也没有 `autoSize` 或 `pixelRatio` 字段。换图、重新加载或数据刷新不会继续
-调整宽高，后续拖拽与宽高输入仍按普通固定尺寸工作。结果允许超出画布，Viewer、预览与导出只
-消费已经写入的固定宽高。
-
-图片尚未加载、自然尺寸无效或组件已锁定时不会修改文档，并会产生诊断；多选和非官方图片
-物料不显示这组按钮。图片资产的上传、转码和多规格管理仍由宿主负责。
-
-#### 画布调色板
-
-画布背景支持单色、线性渐变和径向渐变（ADR-0048）。`canvas.background` 是严格的 JSON-safe 判别对象；未声明时，既有 `backgroundColor` 继续表示单色。结构化调色板颜色仅接受十六进制色值或 `transparent`，渐变有 2..8 个位置严格递增的色标。Designer 的「画布」面板提供三种模式，宿主可使用同一事务语义设置或清除：
-
-```ts
-const result = designer.setCanvasBackground({
-  type: 'linear-gradient',
-  angle: 135,
-  stops: [
-    { color: '#0f172a', position: 0 },
-    { color: '#2563eb', position: 100 },
-  ],
-});
-
-// 删除结构化调色板并回退到 canvas.backgroundColor。
-designer.setCanvasBackground(null);
-```
-
-径向渐变使用 `{ type: 'radial-gradient', position: { x, y }, stops }`，其中中心位置为 0..100 的百分比。若同时设置背景图片，图片位于调色板渐变之上，二者均在基础背景色之上；Base Screen 不接受任意 CSS 字符串、不会发起图片网络请求。
-
-#### 物料颜色字段的三段式调色板
-
-属性面板与 Manifest Editor Descriptor 中所有 `control: 'color'` 字段共享同一个三段式调色板（ADR-0050/0051），已全面替换原生单色 input：单色、线性渐变、径向渐变三种模式无条件可用。渐变模式支持添加/删除 2..8 个色标、编辑每个色标的颜色与位置，并设置线性角度或径向中心。控件采用紧凑行内排布：单色的颜色与透明度同行，色标的颜色与位置同行，色标透明度与增删按钮同行。每个颜色控件的无边框 hex 输入支持 `#RGB`、`#RGBA`、`#RRGGBB` 与 `#RRGGBBAA`（也保留 `transparent` token）；失焦/提交时同步 swatch、透明度和色标，未完成或非法输入不会写入文档，输入本身不显示焦点 outline。单色切到渐变仍按既有色系派生；从渐变切回单色时，当前选中色标的颜色（含透明度）成为单色值，`transparent` 色标保持原单色。字段值仍是普通字符串：单色为色值，渐变保存为规范化 CSS 渐变字符串，物料渲染与既有文档无需改动。切换模式不会丢失各模式的编辑草稿；撤销/重做或替换文档会按文档值重新解析。
-
-渐变字符串是否真正生效取决于物料渲染端的消费方式：写 CSS `background` 类属性的字段（如 `backgroundColor`、`fill`）天然生效；官方文本物料（`base.text`）的 `color` 字段经 `background-clip: text` 渲染渐变文字（文字透明、渐变按字形显示）；官方矩形物料（`base.rectangle`）的 `borderColor` 通过组件内遮罩层渲染渐变边框，支持既有 `borderWidth` 与 `borderRadius`，且不改变组件外部尺寸。原生 `border-color`、SVG 图表与图表库 option 内部色等未做专门适配的属性仍不接受 CSS 渐变字符串，这类字段请使用单色。
-
-#### 画布背景图片
-
-宿主可以给画布设置/清除背景图片（ADR-0043）。图片 URL 进入 canonical 文档的
-`canvas.backgroundImage`（可选）与 `canvas.backgroundImageFit`（`cover`/`contain`，缺省按
-`cover` 渲染），随文档持久化，Designer 画布与 Viewer 同一渲染路径一致呈现。Designer 右侧属性
-面板的「画布」区也提供背景图 URL 输入与适配方式下拉（清空输入即清除背景，与 API 语义一致；
-ADR-0045）：
-
-```ts
-// 设置背景图（可选指定适配方式；未传 fit 保留既有 fit，无则按 cover）
-const set = designer.setCanvasBackgroundImage(
-  'https://cdn.example.com/screens/bg.png',
-  'contain',
-);
-if (!set.ok) {
-  showDiagnostics(set.diagnostics); // 非法 URL/fit 失败关闭、零副作用
-  return;
-}
-
-// 清除背景图（同时清除 fit）
-designer.setCanvasBackgroundImage(null);
-```
-
-宿主也可以直接在加载的文档中携带背景字段（`replaceDocument`/`importDocument`/项目加载走同一
-失败关闭校验）：
-
-```ts
-const document = {
-  canvas: {
-    width: 1920,
-    height: 1080,
-    backgroundColor: '#000000',
-    backgroundImage: '/assets/screen-bg.png',
-    backgroundImageFit: 'cover',
-  },
-  components: [],
-  variables: [],
-  blueprint: { rules: [] },
-};
-```
-
-校验边界：`backgroundImage` 必须是非空、1..2048 码点的有界 URL——`http(s)://`、协议相对
-`//`、根相对 `/` 或点相对 `./`、`../` 开头；拒绝 `data:`/`javascript:`/`blob:`/`file:` 等
-scheme、裸相对路径、含空白/控制字符/反斜杠的值。Base Screen 只把校验后的 URL 写入 CSS
-`url()`（转义），不 fetch、不预取、不重试、不代理；图片加载失败只影响画布背景呈现，图片
-资产的上传、存储与鉴权归宿主（ADR-0027）。
-
-#### 宿主可视化选择背景图片
-
-属性面板背景图片输入框旁的「选择图片」按钮是宿主通道（ADR-0046/0049）：**按钮默认隐藏**，宿主在
-`configure()` 中声明 `canvasBackgroundImageButton: true` 后渲染；点击后 Designer 派发 composed 事件
-`base-screen-canvas-background-image-request`，宿主监听后打开自己的图片选择弹出框（资产目录/缩略图/
-搜索/上传归宿主），确认后把选中的 URL 注入回画布：
-
-```ts
-import {
-  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
-  type BaseScreenCanvasBackgroundImageRequestEventDetail,
-} from '@base-screen/engine';
-
-const configured = designer.configure({ catalog, canvasBackgroundImageButton: true });
-
-designer.addEventListener(
-  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
-  async (event) => {
-    const { request } = (event as CustomEvent<BaseScreenCanvasBackgroundImageRequestEventDetail>)
-      .detail;
-    // 打开宿主自己的图片选择弹出框（可视化选择），例如 assetPicker.open(request.current)。
-    const picked = await hostAssetPicker.pick({ current: request.current });
-    if (picked === null) return; // 用户取消：不提交
-    // 会话守护提交（requestId 匹配且未过期；null 清除背景并清 fit）
-    const result = designer.commitCanvasBackgroundImage(
-      request.requestId,
-      picked.url,
-      picked.fit,
-    );
-    if (!result.ok) showDiagnostics(result.diagnostics);
-  },
-);
-```
-
-宿主也可不依赖按钮，直接调用 `designer.requestCanvasBackgroundImage()` 发起请求（有文档返回
-`true` 并派发事件，无文档返回 `false`）；提交也可以改用无会话语义的
-`setCanvasBackgroundImage(url, fit)`。请求事件 detail 只含 JSON-safe 值（requestId、
-instanceId、documentRevision 与当前背景值）；宿主弹出框、资产目录与上传全部归宿主，Base
-Screen 不内嵌选择器。
-
 ### 7.3 程序化插入组件实例
 
 需要由宿主代码（自动化测试、AI 生成大屏、模板实例化）往文档里加组件时，用
@@ -920,7 +765,166 @@ Motion 接受 transition duration/timing-function 序列。Scrollbar Token 只�
 不要依赖或修改私有 `--designer-*` Token、Shadow DOM selector、class、`::part`、内部布局、面板尺寸、
 grid、breakpoint、z-index 或图标几何。不要通过 `cssText` 或注入 Shadow DOM stylesheet 重写工作台。
 
-## 8. 统一接入 Designer 宿主能力
+## 8. Designer 内建作者能力（画布与物料）
+
+以下能力由 Designer 内建，直接文档模式与项目模式同样生效；它们都只经公开配置或公开方法提交 canonical 事务，不改变宿主边界。
+
+### 8.1 官方文本自适应宽度
+
+选中官方文本组件，在属性面板勾选「自适应宽度」。组件按内容的最长一行撑宽，保留空格与手动
+换行，不自动折行；字号、字重、字间距及动态数据变化会即时更新宽度，高度与位置保持不变。
+超出画布时沿用原有裁剪规则；空文本宽度为最小尺寸 1，最大宽度为 1000000。
+
+配置保存在 `props.autoWidth`，默认 `false`，旧文档缺失该属性时仍使用固定宽度。例如：
+
+```ts
+designer.executeCommand({
+  type: 'update-components',
+  componentIds: [text.id],
+  patch: { props: { ...text.props, autoWidth: true } },
+});
+```
+
+`size.width` 仍保存固定宽度及无法测量时的备用值；属性面板和选择框显示实际宽度。运行时测量
+不改变文档、脏状态或历史，保存、导出、复制和 Viewer 均保留配置并在当前环境重新排版。
+
+在属性面板、`W` 快捷输入或横向拖拽中实际调宽，会同时关闭自适应；多选与编组缩放同样适用。
+只改高度、移动或旋转保持自适应，关闭开关则固定为当前显示宽度。双击静态文本时编辑层也会
+随内容撑宽；Enter 提交、Shift+Enter 换行、Esc 取消，提交仍只有一条历史。
+
+该选项仅适用于 `base.text`，不提供自适应高度、容器填充或自定义物料尺寸协议。架构边界见
+[ADR-0085](decisions/ADR-0085-text-and-image-material-authoring.md)。
+
+### 8.2 官方图片倍图尺寸
+
+单选官方图片组件 `base.image` 后，几何属性区会显示无状态的 `1x`、`2x`、`3x`、`4x`
+按钮。图片加载完成后，点击按钮会把当前自然尺寸一次性换算为固定宽高：
+`width = naturalWidth / 倍率`、`height = naturalHeight / 倍率`。`1x` 使用原图自然尺寸，
+`2x`、`3x`、`4x` 分别除以对应倍率；结果按统一几何规则保留两位小数，并限制在
+`1..1000000`。
+
+每次实际变化只提交一个 `update-components` 事务，且只修改 `size`；相同尺寸不会新增历史。
+倍率不会写入文档，也没有 `autoSize` 或 `pixelRatio` 字段。换图、重新加载或数据刷新不会继续
+调整宽高，后续拖拽与宽高输入仍按普通固定尺寸工作。结果允许超出画布，Viewer、预览与导出只
+消费已经写入的固定宽高。
+
+图片尚未加载、自然尺寸无效或组件已锁定时不会修改文档，并会产生诊断；多选和非官方图片
+物料不显示这组按钮。图片资产的上传、转码和多规格管理仍由宿主负责。
+
+### 8.3 画布调色板
+
+画布背景支持单色、线性渐变和径向渐变（ADR-0048）。`canvas.background` 是严格的 JSON-safe 判别对象；未声明时，既有 `backgroundColor` 继续表示单色。结构化调色板颜色仅接受十六进制色值或 `transparent`，渐变有 2..8 个位置严格递增的色标。Designer 的「画布」面板提供三种模式，宿主可使用同一事务语义设置或清除：
+
+```ts
+const result = designer.setCanvasBackground({
+  type: 'linear-gradient',
+  angle: 135,
+  stops: [
+    { color: '#0f172a', position: 0 },
+    { color: '#2563eb', position: 100 },
+  ],
+});
+
+// 删除结构化调色板并回退到 canvas.backgroundColor。
+designer.setCanvasBackground(null);
+```
+
+径向渐变使用 `{ type: 'radial-gradient', position: { x, y }, stops }`，其中中心位置为 0..100 的百分比。若同时设置背景图片，图片位于调色板渐变之上，二者均在基础背景色之上；Base Screen 不接受任意 CSS 字符串、不会发起图片网络请求。
+
+### 8.4 物料颜色字段的三段式调色板
+
+属性面板与 Manifest Editor Descriptor 中所有 `control: 'color'` 字段共享同一个三段式调色板（ADR-0050/0051），已全面替换原生单色 input：单色、线性渐变、径向渐变三种模式无条件可用。渐变模式支持添加/删除 2..8 个色标、编辑每个色标的颜色与位置，并设置线性角度或径向中心。控件采用紧凑行内排布：单色的颜色与透明度同行，色标的颜色与位置同行，色标透明度与增删按钮同行。每个颜色控件的无边框 hex 输入支持 `#RGB`、`#RGBA`、`#RRGGBB` 与 `#RRGGBBAA`（也保留 `transparent` token）；失焦/提交时同步 swatch、透明度和色标，未完成或非法输入不会写入文档，输入本身不显示焦点 outline。单色切到渐变仍按既有色系派生；从渐变切回单色时，当前选中色标的颜色（含透明度）成为单色值，`transparent` 色标保持原单色。字段值仍是普通字符串：单色为色值，渐变保存为规范化 CSS 渐变字符串，物料渲染与既有文档无需改动。切换模式不会丢失各模式的编辑草稿；撤销/重做或替换文档会按文档值重新解析。
+
+渐变字符串是否真正生效取决于物料渲染端的消费方式：写 CSS `background` 类属性的字段（如 `backgroundColor`、`fill`）天然生效；官方文本物料（`base.text`）的 `color` 字段经 `background-clip: text` 渲染渐变文字（文字透明、渐变按字形显示）；官方矩形物料（`base.rectangle`）的 `borderColor` 通过组件内遮罩层渲染渐变边框，支持既有 `borderWidth` 与 `borderRadius`，且不改变组件外部尺寸。原生 `border-color`、SVG 图表与图表库 option 内部色等未做专门适配的属性仍不接受 CSS 渐变字符串，这类字段请使用单色。
+
+### 8.5 画布背景图片
+
+宿主可以给画布设置/清除背景图片（ADR-0043）。图片 URL 进入 canonical 文档的
+`canvas.backgroundImage`（可选）与 `canvas.backgroundImageFit`（`cover`/`contain`，缺省按
+`cover` 渲染），随文档持久化，Designer 画布与 Viewer 同一渲染路径一致呈现。Designer 右侧属性
+面板的「画布」区也提供背景图 URL 输入与适配方式下拉（清空输入即清除背景，与 API 语义一致；
+ADR-0045）：
+
+```ts
+// 设置背景图（可选指定适配方式；未传 fit 保留既有 fit，无则按 cover）
+const set = designer.setCanvasBackgroundImage(
+  'https://cdn.example.com/screens/bg.png',
+  'contain',
+);
+if (!set.ok) {
+  showDiagnostics(set.diagnostics); // 非法 URL/fit 失败关闭、零副作用
+  return;
+}
+
+// 清除背景图（同时清除 fit）
+designer.setCanvasBackgroundImage(null);
+```
+
+宿主也可以直接在加载的文档中携带背景字段（`replaceDocument`/`importDocument`/项目加载走同一
+失败关闭校验）：
+
+```ts
+const document = {
+  canvas: {
+    width: 1920,
+    height: 1080,
+    backgroundColor: '#000000',
+    backgroundImage: '/assets/screen-bg.png',
+    backgroundImageFit: 'cover',
+  },
+  components: [],
+  variables: [],
+  blueprint: { rules: [] },
+};
+```
+
+校验边界：`backgroundImage` 必须是非空、1..2048 码点的有界 URL——`http(s)://`、协议相对
+`//`、根相对 `/` 或点相对 `./`、`../` 开头；拒绝 `data:`/`javascript:`/`blob:`/`file:` 等
+scheme、裸相对路径、含空白/控制字符/反斜杠的值。Base Screen 只把校验后的 URL 写入 CSS
+`url()`（转义），不 fetch、不预取、不重试、不代理；图片加载失败只影响画布背景呈现，图片
+资产的上传、存储与鉴权归宿主（ADR-0027）。
+
+### 8.6 宿主可视化选择背景图片
+
+属性面板背景图片输入框旁的「选择图片」按钮是宿主通道（ADR-0046/0049）：**按钮默认隐藏**，宿主在
+`configure()` 中声明 `canvasBackgroundImageButton: true` 后渲染；点击后 Designer 派发 composed 事件
+`base-screen-canvas-background-image-request`，宿主监听后打开自己的图片选择弹出框（资产目录/缩略图/
+搜索/上传归宿主），确认后把选中的 URL 注入回画布：
+
+```ts
+import {
+  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+  type BaseScreenCanvasBackgroundImageRequestEventDetail,
+} from '@base-screen/engine';
+
+const configured = designer.configure({ catalog, canvasBackgroundImageButton: true });
+
+designer.addEventListener(
+  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
+  async (event) => {
+    const { request } = (event as CustomEvent<BaseScreenCanvasBackgroundImageRequestEventDetail>)
+      .detail;
+    // 打开宿主自己的图片选择弹出框（可视化选择），例如 assetPicker.open(request.current)。
+    const picked = await hostAssetPicker.pick({ current: request.current });
+    if (picked === null) return; // 用户取消：不提交
+    // 会话守护提交（requestId 匹配且未过期；null 清除背景并清 fit）
+    const result = designer.commitCanvasBackgroundImage(
+      request.requestId,
+      picked.url,
+      picked.fit,
+    );
+    if (!result.ok) showDiagnostics(result.diagnostics);
+  },
+);
+```
+
+宿主也可不依赖按钮，直接调用 `designer.requestCanvasBackgroundImage()` 发起请求（有文档返回
+`true` 并派发事件，无文档返回 `false`）；提交也可以改用无会话语义的
+`setCanvasBackgroundImage(url, fit)`。请求事件 detail 只含 JSON-safe 值（requestId、
+instanceId、documentRevision 与当前背景值）；宿主弹出框、资产目录与上传全部归宿主，Base
+Screen 不内嵌选择器。
+
+## 9. 统一接入 Designer 宿主能力
 
 Designer 可以通过一个 `ScreenDesignerHostAdapter` 接入宿主能力。每个 capability 必须与同名
 端口严格匹配：`true` 时必须提供端口，`false` 时不得提供端口。
@@ -934,13 +938,13 @@ const designerHostAdapter: ScreenDesignerHostAdapter = {
     projectPreview: false,
     projectSnapshots: false,
     resources: true,
-    datasetCatalog: true,
+    datasets: true,
     variableCatalog: true,
     variables: true,
     actions: false,
   },
   resources: resourcePort,
-  datasetCatalog: datasetCatalogPort,
+  datasets: datasetPort,
   variableCatalog: variableCatalogPort,
   variables: variablePort,
 };
@@ -960,48 +964,60 @@ const configured = designer.configure({
 | `projectCatalog` | 有界的项目列表、创建、克隆、删除、导入和导出调用 | 项目中心 UI、权限、分页和业务流程 |
 | `projectPreview` | 加载指定 revision 的预览文档 | 预览路由、发布状态和访问控制 |
 | `projectSnapshots` | 列出、创建、恢复和删除快照 | 快照存储、保留策略和审计 |
-| `assets` | 查询资产摘要和删除前检查 | 上传、转码、缩略图、存储和删除 |
 | `resources` | 根据稳定资源标识解析数据 | 查询、凭证、缓存和结果裁剪 |
-| `datasetCatalog` | 为 Designer 提供数据集名称、字段和参数元数据 | 数据目录、搜索和权限 |
+| `datasets` | 提供数据集目录、字段与参数定义，并按需执行数据集查询 | 数据目录、搜索、权限与查询实现 |
 | `variableCatalog` | 为 Designer 提供可选宿主变量摘要与预览声明 | 变量发现、权限、敏感性和真实来源 |
 | `variables` | 解析文档中的宿主变量 | 全局状态、租户上下文和敏感值 |
 | `actions` | 声明 JSON-safe host action 端口 | 业务动作、授权、幂等和审计 |
 
-也可以在 `configure()` 中分别传入 `resourcePort`、`datasetCatalogPort` 等独立端口。不要同时
+也可以在 `configure()` 中分别传入 `resourcePort`、`datasetPort` 等独立端口。不要同时
 使用两种方式表达同一能力；统一 adapter 更适合能力较多的宿主。Designer 设计画布本身不执行
-Blueprint host action，示例因此使用 `actions: false`；Viewer 和发布态按第 10 节设置
+Blueprint host action，示例因此使用 `actions: false`；Viewer 和发布态按第 11 节设置
 `blueprintHostActionPort`。
 
-## 9. 接入宿主数据
+## 10. 接入宿主数据
 
-宿主数据由三部分组成：
+宿主数据由四部分组成：
 
-- `datasetCatalogPort`：Designer 发现数据集并读取字段、参数编辑元数据。
+- `datasetPort`：Designer 发现数据集并读取字段、参数编辑元数据，并执行数据集查询。
 - `resourcePort`：Viewer/Designer 按稳定 `resourceType + resourceId` 查询数据。
 - `variableCatalogPort`：Designer 搜索严格的宿主变量目录并按需读取预览声明。
 - `variablePort`：把文档中的宿主变量 ID 解析为当前运行值。
 
-### 9.1 数据集目录
+### 10.1 数据集目录
 
 ```ts
-import type { ScreenHostDatasetCatalogPort } from '@base-screen/contracts';
+import type { ScreenHostDatasetPort } from '@base-screen/contracts';
+import {
+  parseScreenDatasetDefinition,
+  parseScreenDatasetEntries,
+} from '@base-screen/contracts';
 
-const datasetCatalogPort: ScreenHostDatasetCatalogPort = {
-  async list({ query, cursor, limit, signal }) {
-    return hostDatasetService.list({ query, cursor, limit, signal });
+const datasetPort: ScreenHostDatasetPort = {
+  async list({ query, cursor, limit, groupId, signal }) {
+    return parseScreenDatasetEntries(
+      await hostDatasetService.list({ query, cursor, limit, groupId, signal }),
+    );
   },
 
-  async describe({ resourceType, resourceId, signal }) {
-    return hostDatasetService.describe({ resourceType, resourceId, signal });
+  async describe({ datasetId, signal }) {
+    return parseScreenDatasetDefinition(await hostDatasetService.describe({ datasetId, signal }));
+  },
+
+  async query({ componentId, datasetId, params }, { signal, context }) {
+    return parseScreenTabularDataset(
+      await hostDatasetService.query({ componentId, datasetId, params, signal, context }),
+    );
   },
 };
 ```
 
-`list()` 返回 `ScreenDatasetPage`，`describe()` 返回 `ScreenDatasetDescriptor`。描述只暴露安全的
-名称、字段和参数编辑元数据，不携带连接信息。参数的权威结构和约束来自对应 resource type 的
+`list()` 返回 `ScreenDatasetEntries`（`items` 与可选 `nextCursor`），`describe()` 返回
+`ScreenDatasetDefinition`；可选实现 `groups()` 以提供分组导航。描述只暴露安全的名称、字段和
+参数编辑元数据，不携带连接信息。参数的权威结构和约束来自对应 resource type 的
 `configSchema`。
 
-### 9.2 资源解析
+### 10.2 资源解析
 
 ```ts
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
@@ -1035,7 +1051,7 @@ Base Screen 在安全结果投影阶段处理。表格数据应符合 `ScreenTab
 - 对返回值执行容量限制和字段裁剪；Base Screen 不是无限数据传输通道。
 - 将 `context` 仅用于本次追踪、审计或模式判断，不把它写回 Screen Document。
 
-### 9.3 宿主变量
+### 10.3 宿主变量
 
 ```ts
 import type {
@@ -1123,7 +1139,7 @@ stop?.();
 事件并差量刷新依赖组件。`autoUpdate.intervalSeconds` 会随请求提供给宿主，实际调度仍由宿主调用
 `refreshVariables`，Base Screen 不内建轮询或订阅。
 
-### 9.4 Resource type 和 capability
+### 10.4 Resource type 和 capability
 
 提供 `runtimeContributions` 后，Base Screen 会按 resource type 的 `configSchema` 校验参数，并
 按授权 capability 编译 Blueprint。权威索引通常由宿主已有的插件激活结果提供：
@@ -1140,7 +1156,7 @@ viewer.configure({
 使用 `@base-screen/plugin-manager` 时应采用 `activate()` 成功返回的 snapshot；插件未激活、
 resource type 未贡献或 capability 未授权时保持失败关闭。
 
-### 9.5 插件装配与贡献命令
+### 10.5 插件装配与贡献命令
 
 插件必须由宿主显式导入、审核并交给 Plugin Manager。首期信任模型是同 realm 受信代码：
 capability 限制的是 Base Screen 集成点，不是 JavaScript 环境权限。远程发现、dynamic import
@@ -1335,7 +1351,7 @@ designer.configure({
 三者可以组合：chrome 触发贡献命令，handler 用只读端口取现状，再用 Core 命令端口写回事务（可
 撤销）。`design.read` 被授予但宿主未提供 `createDesignReadPort` 时激活失败关闭。
 
-插件还可以贡献一个面板，这是目前唯一被授权的插件 UI 面（[ADR-0072](./decisions/ADR-0072-plugin-panel-contribution-minimal-loop.md)）：
+插件还可以贡献一个面板，这是目前唯一被授权的插件 UI 面（[ADR-0084](decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)）：
 
 ```ts
 // manifest.contributions 内
@@ -1373,14 +1389,14 @@ designer.configure({
 - 只允许 `target: 'props' | 'style'`；`data` 绑定字段仍只能 `field-selector`，`interaction` 不放开。
 - 无变更订阅：控件要反映外部编辑，只能依赖宿主在重绘时重新赋 `model`。
 
-依据见 [ADR-0073](./decisions/ADR-0073-inspector-custom-form-controls.md)。
+依据见 [ADR-0084](decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)。
 
 `pluginCatalog` / `pluginPanels` / `inspectorControls` / `pluginCommandPort` 与
 `runtimeContributions` 一样，初始化后变更必须先 `unload()`。Viewer 不提供命令面板与插件面板。
 `createPluginPackage({ id, plugin, materials? })` 可把插件与可选物料包组合；package `id` 只用于
 宿主诊断，不进入 Screen Document。
 
-### 9.6 插件贡献运行期行为（数据处理器与蓝图宿主动作）
+### 10.6 插件贡献运行期行为（数据处理器与蓝图宿主动作）
 
 前面几节都是**作者面**贡献：插件加物料、面板、检查器控件，或声明资源类型。若要让插件参与
 **文档的运行时语义**——即 DataV 里"数据过滤器"与"宿主动作"那一类能力——用这两类贡献
@@ -1456,7 +1472,7 @@ designer.designerHostAdapter = {
 完整可运行示例见 [`plugins/plugin-pipeline`](../plugins/plugin-pipeline)——它是首个**只贡献运行期
 行为、零界面元素**的插件；浏览器侧见 `/?designer&case=plugin-runtime`。
 
-## 10. 物料事件、宿主事件和宿主动作
+## 11. 物料事件、宿主事件和宿主动作
 
 Viewer 把物料交互冒泡为 `base-screen-material-event`：
 
@@ -1558,7 +1574,7 @@ fail-closed 隔离——忽略本次覆盖、保留基础+规则样式并上报�
 同一配置（`configure` 或初始化前的守卫 setter），设计态画布与 Viewer 走同一渲染路径预览告警
 效果；未配置端口的实例行为与现状完全一致。
 
-## 11. 配置左侧物料库状态
+## 12. 配置左侧物料库状态
 
 宿主从线上加载并校验可信物料包后，仍然以不可变 `catalog` 配置 Designer。若需要在左侧物料库展示加载、离线、
 部分失败、草稿或更新状态，可以同时传入只读状态投影：
@@ -1590,7 +1606,7 @@ designer.addEventListener(BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT, (event) => 
 物料集合时仍须由宿主处理未保存内容，随后执行 `unload()` 并用新的不可变 catalog 重新配置。Base Screen 不会因
 重试或重新加载按钮自行联网。
 
-### 11.1 宿主控制多级物料分组
+### 12.1 宿主控制多级物料分组
 
 当宿主需要按业务、租户或权限上下文组织同一份 catalog 时，可在 `configure()` 中传入
 `materialLibraryGrouping`，或在 catalog 已配置后更新同名 property：
@@ -1648,7 +1664,7 @@ Enter/Space 选择，右方向键进入分支，左方向键返回上级或一�
 将 `designer.materialLibraryGrouping` 设为 `undefined` 会恢复既有 Manifest `category` 分类 UI。分组不会进入
 Manifest、catalog、ScreenDocument、历史、导出物、Renderer 或 Viewer，也不会触发联网或宿主存储。
 
-### 11.2 宿主扩展左侧分组
+### 12.2 宿主扩展左侧分组
 
 宿主需要把资产、模板或 AI 工具等业务面板纳入左侧 `rail-tabs` 导航时，可配置最多 6 个严格的
 `leftPanelGroups`。描述包含 `id`、`label`、可选内建 `icon` 与可选 `workbenchModes`；真实内容仍由宿主框架
@@ -1704,7 +1720,7 @@ designer.selectLeftPanelGroup('assets');
 `leftPanelGroups` 只是宿主业务 UI 的受限安放与导航能力，不表示 Base Screen 提供资产或资源。资源目录、搜索、
 上传、存储、权限、缩略图及其业务状态必须由宿主实现；不要据此在 Engine 中增加资源 Store 或管理工作流。
 
-### 11.3 宿主资源插入、拖放与替换
+### 12.3 宿主资源插入、拖放与替换
 
 宿主资源面板只能提交 canonical 资源身份；签名 URL、token、header、请求对象和完整组件命令均不得进入载荷：
 
@@ -1743,7 +1759,7 @@ catalog、Manifest capability、runtime resource contribution 与 canonical data
 一次 Core transaction。宿主应把市场/订阅过滤后的 catalog 配置给 Designer；不在该 catalog 中的资源对应
 物料不能插入、拖入或替换。
 
-### 11.4 物料封面
+### 12.4 物料封面
 
 物料作者或宿主可在 Material Manifest 中声明可选 `cover` 字段，为物料库卡片提供真实封面图（替代默认的
 确定性分类图标/色相占位）：
@@ -1764,21 +1780,21 @@ const manifest = {
 展示：缩略图区几何恒定，加载完成淡入、加载失败自动回退确定性占位图标，Base Screen 不重试、不代理、不缓存；
 封面不进入 ScreenDocument、历史、导出物、Renderer 或 Viewer。未声明 `cover` 的物料与既有行为完全一致。
 
-封面加载完成后，Engine 会按「图片自然尺寸 vs 缩略图容器」做一次自适应适配（[ADR-0041](../docs/decisions/ADR-0041-material-cover-adaptive-fit.md)）：
+封面加载完成后，Engine 会按「图片自然尺寸 vs 缩略图容器」做一次自适应适配（[ADR-0078](decisions/ADR-0078-material-library-presentation.md)）：
 放大倍数超过 1.5×（小图）或宽高比偏差超过 0.35（异形图）时自动切换为 `contain` 完整显示、不放大不裁切，
 其余照片类封面保持 `cover` 铺满裁切；封面加载成功后占位层的彩色渐变/网格底色收为中性表面，透明素材不再
 透底。该行为是纯展示启发式，宿主无需任何改造；需要统一裁切出图的宿主应在自己的资产链路上生成缩略图。
 
-### 11.5 物料库渲染可扩展性
+### 12.5 物料库渲染可扩展性
 
 物料库卡片网格项默认启用 `content-visibility: auto` + `contain-intrinsic-size: auto 140px`
-（[ADR-0042](../docs/decisions/ADR-0042-material-library-render-scalability.md)）：屏外卡片跳过渲染，
+（[ADR-0078](decisions/ADR-0078-material-library-presentation.md)）：屏外卡片跳过渲染，
 滚动条高度稳定（`auto` 关键字记住真实渲染尺寸），500~2000 张物料的首帧渲染下降约 40~57%（实测）。
 搜索输入经 120ms 防抖合并渲染。该优化是纯渐进增强：不支持 `content-visibility` 的浏览器
 （Safari < 18、Firefox < 125）静默退回全量渲染，功能与行为不变；宿主无需任何改造，也不应依赖
 卡片是否被跳过渲染（目录、DOM 结构、可访问性与拖拽语义均不变）。
 
-## 12. 接入 Blueprint 工作台与宿主高级编辑器
+## 13. 接入 Blueprint 工作台与宿主高级编辑器
 
 Blueprint 使用 Designer 内的一体化工作台：Base Screen 渲染全局顶部栏、左右语义面板和底部状态，宿主通过
 固定 slot 提供中央图形画布。Blueprint 编辑直接进入当前 `ScreenDocument` 和统一历史，没有“应用蓝图”或
@@ -1859,7 +1875,7 @@ state.active 暂停交互，并在 false → true 时重新测量 Vue Flow 等�
 `base-screen-authoring-request` 继续校验 component identity、revision 和目标 schema。宿主不要访问 Designer
 Shadow DOM、内部 Store 或 `src` 路径；Vue Flow、Dagre 等中央图形依赖也不应加入 Base Screen workspace。
 
-## 13. React、Vue 和自定义物料
+## 14. React、Vue 和自定义物料
 
 React/Vue 应用可以把现有组件包装成 Base Screen 物料。Screen Document 仍只引用稳定的
 material `type`，不保存框架组件名。`@base-screen/react` 要求 `react`、`react-dom` `^19.1.0`；
@@ -1882,6 +1898,10 @@ function defineMaterialEntry(entry: BaseScreenMaterialCatalogEntry): void {
   }
 }
 ```
+
+这段助手只负责把桥接产出的单个 catalog entry 注册成自定义元素。若要同时注册插件、物料包与面板/
+控件元素，改用 `@base-screen/plugin-sdk` 的 `createPluginRegistration`（见第 10.5 节）：它按同一
+冲突规则在第一个 `define()` 之前整体预检，并直接产出 `createBaseScreenPluginManager` 需要的输入。
 
 React：
 
@@ -1919,11 +1939,12 @@ defineMaterialEntry(vueEntry.value);
 
 成功值是 `BaseScreenMaterialCatalogEntry`，可与官方物料 entry 一起传给
 `createBaseScreenMaterialCatalog()`。`type` 和 `tagName` 必须稳定且唯一；不要每次组件渲染时创建
-新的 bridge constructor。桥接组件根元素应使用 `width: 100%; height: 100%` 填满物料几何区域，
-并在宿主卸载时清理自身订阅和定时器。仓库外 React/Vue tarball 消费者会验证类型增强、生产构建、
-事件、模型更新、断开重连和最终卸载。
+新的 bridge constructor。渲染器已经把 `component.size` 写成物料宿主元素的像素宽高，被包装组件
+自身的根元素可以用 `width: 100%; height: 100%` 铺满该区域（不要反过来改写物料宿主元素的宽高，
+见第 4 节的渲染盒不变式），并在宿主卸载时清理自身订阅和定时器。仓库外 React/Vue tarball 消费者
+会验证类型增强、生产构建、事件、模型更新、断开重连和最终卸载。
 
-## 14. 宿主托管外部物料包
+## 15. 宿主托管外部物料包
 
 物料包不是普通的自定义物料集合，它有独立的注册契约。业务团队独立分发物料模块时，宿主负责
 下载、完整性校验、信任审核和加载；Base Screen 不 fetch、不 dynamic import、不发现远程代码。
@@ -1968,7 +1989,7 @@ const hostedCatalog = createBaseScreenMaterialCatalog(defined.value);
 不可信代码需要由宿主使用独立隔离方案；Shadow DOM、manifest 校验和 catalog 不是安全沙箱，
 普通 Material ABI 不提供恶意代码隔离。
 
-### 13.1 外部物料包的标准出口
+### 15.1 外部物料包的标准出口
 
 可发布的外部物料包建议采用与官方物料一致的标准出口，便于宿主按同一路径接入：
 
@@ -2022,7 +2043,7 @@ export async function loadApprovedMaterialCatalog(
 若宿主确实需要 URL 运行时加载，URL allowlist、CSP、完整性校验、鉴权、缓存和 bundler 配置都由宿主
 实现；Base Screen 不提供通用网络加载器。
 
-## 15. 生命周期和清理
+## 16. 生命周期和清理
 
 - 一个页面可以创建多个 Viewer/Designer；每个实例单独配置 catalog、端口和文档。
 - 运行时依赖发生变化时，先调用 `unload()`，再调用新的 `configure()`，最后设置或加载文档。
@@ -2031,7 +2052,7 @@ export async function loadApprovedMaterialCatalog(
 - 不要访问 Shadow DOM、内部 controller、`@base-screen/*/src`、仓库 fixture 或 harness 内部状态。
 - 端口只能返回 JSON-safe 数据和公开契约对象，不能把函数、DOM、Promise、凭据或服务实例写入文档。
 
-## 16. 交付前检查
+## 17. 交付前检查
 
 - 文档进入运行时前通过 `parseScreenDocument()`，项目响应通过
   `parseScreenProjectEnvelope()`。
@@ -2045,7 +2066,7 @@ export async function loadApprovedMaterialCatalog(
 - Screen Document 中没有 URL、SQL、token、header、连接信息、宿主服务对象和业务私有状态。
 - 切换项目、租户、物料包或运行时能力时执行 `unload()`，不会复用旧端口或旧 snapshot。
 
-## 17. 常见问题
+## 18. 常见问题
 
 - **页面没有内容**：确认元素和物料已注册、catalog 包含文档中的 `type`，并检查诊断事件。
 - **独立项目安装 SDK 后提示其他 `@base-screen/*` 包 404**：当前拿到的是不完整制品。改用同一

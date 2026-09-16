@@ -1,9 +1,9 @@
 # Designer Viewport Native Events Spec
 
 > 归档：2026-08-30（已完成）
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 日期：2026-08-14
-> 依据：[ADR-0036](../../../decisions/ADR-0036-designer-viewport-native-events-toggle.md)
+> 依据：ADR-0036
 
 ## 1. 目标
 

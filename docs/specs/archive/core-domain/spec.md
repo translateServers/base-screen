@@ -1,6 +1,6 @@
 # Core Domain Spec
 
-> 状态：生效中
+> 状态：已归档（历史验收记录）
 > 最近更新：2026-08-04
 > 定位：冻结 `@base-screen/core` 首个文档状态、命令、事务、历史、组件树语义和几何纯算法的可验收契约
 > 依据：[ADR-0001](../../../decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md)（已接受）、[ADR-0002](../../../decisions/ADR-0002-canonical-screen-document.md)（已接受）、[ADR-0010](../../../decisions/ADR-0010-host-resource-deadline-and-blueprint-runtime.md)（已接受）、[ADR-0013](../../../decisions/ADR-0013-core-canonical-blueprint-mutation.md)（已接受）
