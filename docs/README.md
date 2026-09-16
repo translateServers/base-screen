@@ -12,6 +12,7 @@
 | 为物料定制加载中/空态等状态 UI | [公共加载容器](./material-loading.md) |
 | 为宿主配置大屏设计与物料创建 Skill | [宿主 Skill 快速接入](./host-skill-manuals/01-quick-start.md) |
 | 当前能力现状与维护基线 | [当前能力基线](./baseline/README.md) |
+| 跨包必须统一理解的领域词汇 | [领域词汇](../CONTEXT.md) |
 | 下一阶段方向与候选主题 | [后续路线图](./roadmap/README.md) |
 | 查看已接受、已取代和评审中的架构决策 | [架构决策记录](./decisions/README.md) |
 | 实施或验收功能 | [功能与工程规格](./specs/README.md) |

@@ -238,6 +238,22 @@
   `command.execute` 拿到的 Core adapter 只能编排已有 `ScreenDocumentCommand`。该入站写入自
   2026-09-09 起由 browser-harness 端到端行使（此前仅有实现与文档，无调用方接线）。
   Renderer contribution index 不增加 command 查询。plugin-sdk 提供 `createPluginPackage`。
+- **诊断规范序与贡献类型词汇单一化**（2026-09-16，整合：对外契约零破坏、纯新增导出）：
+  诊断排序收敛为 `contracts` 独占的 `compareScreenDiagnostics` / `sortScreenDiagnostics`，
+  删除四份逐行复刻的本地实现；同时修掉三处已发生的分歧——renderer 与 `contracts` dataset 模块
+  的 `path.join('/')` 字符串排序（会使 `['components',10]` 排在 `['components',2]` 之前，属可观测
+  顺序变更，已单独登记 changeset）、以及 plugin-manager 预检的「按路径长度优先」第三种规则。
+  诊断的上限哨兵保持各调用方原有语义（Contracts 相位感知、Plugin 侧路径为空），未合并。
+  贡献类型词汇收敛为 `plugin-core` 内的 `ContributionKindDescriptor` 单一实现落点，`validateContribution`
+  由 205 行 switch 改为查表；plugin-manager 新增以 kind 联合类型为键的穷尽式
+  `CONTRIBUTION_KIND_PLAN`（漏项即编译失败），三个近似的 `collect*` 收敛为一个参数化收集器，
+  贡献身份与 handler 对应关系各自只剩一份实现；`plugin-sdk` 的 handler 读取器删除改为委派。
+  对外只新增窄行为接口（kind 联合类型、handler 字段/声明 id/身份查询、共享 handler 读取器）
+  与两个身份词法谓词 `isScreenComponentId` / `isScreenVariableName`，替换三处本地正则字面量。
+  已知并有意保留的两处不对称：`PLUGIN_CORE_CAPABILITY_UNDECLARED` 仍只对 `command` 报告
+  （`blueprintAction` 仅靠授权交集失败关闭、不产诊断）；懒激活仍只合并命令 handler，
+  因此 `blueprintAction` 与 `dataProcessor` 贡献在 `activation: 'lazy'` 下不可达。
+  词汇与边界见 [领域词汇](../../CONTEXT.md)、[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)。
 - **贡献命令 chrome 投影**（[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)）：
   `command` 贡献可选 `menus` / `shortcut`。省略 `menus` 仅命令面板；写出的 `menus` 为完整列表。
   Designer 投影到命令面板、更多→工具与画布右键，菜单项使用 `data-plugin-command`。快捷键不得覆盖
