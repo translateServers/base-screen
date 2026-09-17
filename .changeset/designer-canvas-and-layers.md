@@ -1,6 +1,11 @@
 ---
 '@base-screen/engine': minor
+'@base-screen/renderer': patch
 ---
+
+Consolidated record of five changes to Designer canvas editing and the visual layer tree.
+
+### insert-component-public-api
 
 Add `designer.insertComponent(intent)` so a host can add a component by material type: it
 builds the node from the manifest defaults, drops it at the visible canvas centre when no
@@ -23,3 +28,21 @@ fields plus 6 optional ones), a self-contained minimum custom material example, 
 `insertComponent` contract, and two capability boundaries that previously surfaced as
 apparent host bugs: the property panel has no component `name` field, and custom-element
 registration cannot run under Node/SSR.
+
+### clip-designer-canvas-content
+
+Clip rendered component content to the canonical canvas boundary in Designer, preview, and Viewer surfaces while keeping authoring overlays available for edge editing.
+
+### add-designer-coordinate-entry
+
+Add an X-key, Enter-only coordinate entry popover for atomically editing the canonical position of
+one unlocked Designer component, including group translation, validation, focus restoration, and
+undo.
+
+### add-layer-selection-shortcuts
+
+Add repeatable Alt-bracket shortcuts for selecting adjacent components in the complete visual layer tree without changing the document or history.
+
+### add-layer-step-shortcuts
+
+Add bracket shortcuts for moving the current sibling layer selection one visual step up or down while preserving existing front/back shortcuts and editable-field behavior.
