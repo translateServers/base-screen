@@ -254,6 +254,19 @@
   （`blueprintAction` 仅靠授权交集失败关闭、不产诊断）；懒激活仍只合并命令 handler，
   因此 `blueprintAction` 与 `dataProcessor` 贡献在 `activation: 'lazy'` 下不可达。
   词汇与边界见 [领域词汇](../../CONTEXT.md)、[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)。
+- **共享 JSON 相等、数据源校验入口与层级查询接缝**（2026-09-16，整合：对外仅新增导出）：
+  结构化 JSON 相等收敛为 `contracts` 的 `screenJsonEquals`，删除 core 内部 `equality.ts`、renderer
+  `jsonEquals` 与 plugin-sdk `areEqual` 三份同语义实现（三者逻辑一致，比较结果不变）；
+  plugin-manager 预检的自有数据属性相等**有意保留**——它回答的是「运行时对象是否等于其规范化结果」，
+  只读自有数据属性并纳入不可枚举键，与 JSON 相等是不同问题。数据源校验新增
+  `contracts` 的 `parseScreenDataSource`：engine 两处不再为校验一个字段手工拼装整份
+  `ScreenDocument`（判定仍走同一文档校验路径，诊断相对数据源；信封是** relocate 而非消除**——
+  彻底移除需重做组件级失效关闭诊断，属重设计）。层级接缝加宽：`core` 公开
+  `ComponentIndex` 与 `getRootIds` / `getAncestorIds` / `getAncestorDepth` / `getDescendantIds` /
+  `getDescendantSet`；engine 的 `selectionSubtree`（结果集与文档序不变，另获环保护与索引缓存）
+  与 `groupEditingPath`（根优先名称路径不变，保留悬空祖先即停）已转换；renderer 的隐藏判定含
+  session 覆盖语义、inspector 的后代遍历是广度优先（共享查询为深度优先，转换会改变可观察顺序），
+  故这两处**有意不转换**。见 [领域词汇](../../CONTEXT.md)。
 - **贡献命令 chrome 投影**（[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)）：
   `command` 贡献可选 `menus` / `shortcut`。省略 `menus` 仅命令面板；写出的 `menus` 为完整列表。
   Designer 投影到命令面板、更多→工具与画布右键，菜单项使用 `data-plugin-command`。快捷键不得覆盖

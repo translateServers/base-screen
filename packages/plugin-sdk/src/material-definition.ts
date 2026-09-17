@@ -1,4 +1,4 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import { type ScreenParseResult, screenJsonEquals } from '@base-screen/contracts';
 import {
   type BaseScreenMaterialCatalogEntry,
   type BaseScreenMaterialConstructor,
@@ -8,7 +8,7 @@ import {
   parseBaseScreenMaterialEditorDescriptor,
   parseBaseScreenMaterialManifest,
 } from '@base-screen/plugin-core';
-import { areEqual, failure } from './diagnostics.js';
+import { failure } from './diagnostics.js';
 
 export interface BaseScreenMaterialDefinition {
   readonly manifest: BaseScreenMaterialManifest;
@@ -51,7 +51,7 @@ export function createMaterialDefinition(
   if (!staticManifest.ok) {
     return staticManifest;
   }
-  if (!areEqual(parsedManifest.value, staticManifest.value)) {
+  if (!screenJsonEquals(parsedManifest.value, staticManifest.value)) {
     return failure(
       'PLUGIN_CORE_IDENTITY_CONFLICT',
       ['element', 'manifest'],

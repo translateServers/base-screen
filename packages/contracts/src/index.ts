@@ -45,8 +45,10 @@ export {
   MAX_STYLE_RULES_PER_COMPONENT,
 } from './document/limits.js';
 export {
+  parseScreenDataSource,
   parseScreenDocument,
   parseScreenProjectEnvelope,
+  type ScreenDataSourceParseOptions,
 } from './document/parse.js';
 export {
   COMPONENT_ID_PATTERN,
@@ -58,6 +60,7 @@ export {
   ScreenSerializationError,
   serializeScreenDocument,
 } from './document/serialize.js';
+export { screenJsonEquals } from './json/equality.js';
 export { parseScreenJsonValue, type ScreenJsonParseOptions } from './json/parse.js';
 export type {
   ScreenAuthoringEditorContext,

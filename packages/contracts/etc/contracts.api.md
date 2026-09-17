@@ -121,6 +121,9 @@ export function parseScreenDatasetEntries(input: unknown): ScreenParseResult<Scr
 export function parseScreenDatasetGroups(input: unknown): ScreenParseResult<readonly ScreenDatasetGroup[]>;
 
 // @public
+export function parseScreenDataSource(input: unknown, options?: ScreenDataSourceParseOptions): ScreenParseResult<ScreenComponentDataSource | null>;
+
+// @public
 export function parseScreenDocument(input: unknown, base?: ScreenDocument): ScreenParseResult<ScreenDocument>;
 
 // @public (undocumented)
@@ -701,6 +704,11 @@ export interface ScreenDatasetQueryRequest {
 export type ScreenDatasetValueType = 'string' | 'number' | 'boolean' | 'date';
 
 // @public (undocumented)
+export interface ScreenDataSourceParseOptions {
+    readonly componentType?: string;
+}
+
+// @public (undocumented)
 export interface ScreenDataSourceVariable extends ScreenVariableBase {
     // (undocumented)
     readonly autoUpdate?: ScreenVariableAutoUpdate;
@@ -943,6 +951,9 @@ export interface ScreenHostVariableSummary {
     // (undocumented)
     readonly sourceType: 'data-source' | 'url-query';
 }
+
+// @public
+export function screenJsonEquals(left: unknown, right: unknown): boolean;
 
 // @public (undocumented)
 export type ScreenJsonObject = Readonly<Record<string, ScreenJsonValue>>;

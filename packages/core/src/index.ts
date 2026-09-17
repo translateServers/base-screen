@@ -70,9 +70,15 @@ export type {
   ScreenRect,
   ScreenVector,
 } from './geometry/types.js';
+export type { ComponentIndex } from './hierarchy/hierarchy.js';
 export {
   buildComponentIndex,
+  getAncestorDepth,
+  getAncestorIds,
+  getDescendantIds,
+  getDescendantSet,
   getPainterOrder,
+  getRootIds,
 } from './hierarchy/hierarchy.js';
 export {
   isScreenComponentEffectivelyHidden,

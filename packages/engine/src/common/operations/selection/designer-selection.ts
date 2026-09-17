@@ -1,4 +1,5 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
+import { buildComponentIndex, getDescendantIds } from '@base-screen/core';
 
 // 选中组件（仅包含显式选中的 id，不展开子组件）。
 export function selectedComponents(
@@ -15,24 +16,12 @@ export function selectionSubtree(
   document: ScreenDocument,
   componentIds: readonly string[],
 ): readonly ScreenComponentNode[] {
-  const byParent = new Map<string | null, string[]>();
-  for (const component of document.components) {
-    const children = byParent.get(component.parentId);
-    if (children !== undefined) {
-      children.push(component.id);
-    } else {
-      byParent.set(component.parentId, [component.id]);
+  const index = buildComponentIndex(document);
+  const collected = new Set<string>(componentIds);
+  for (const id of componentIds) {
+    for (const descendantId of getDescendantIds(index, id)) {
+      collected.add(descendantId);
     }
-  }
-  const collected = new Set<string>();
-  const queue = [...componentIds];
-  while (queue.length > 0) {
-    const id = queue.pop()!;
-    if (collected.has(id)) {
-      continue;
-    }
-    collected.add(id);
-    queue.push(...(byParent.get(id) ?? []));
   }
   return document.components.filter((component) => collected.has(component.id));
 }

@@ -5,8 +5,8 @@ import {
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
+  screenJsonEquals,
 } from '@base-screen/contracts';
-import { areEqualJson } from '../internal/equality.js';
 
 export function evaluateExpression(
   expression: ScreenBlueprintValueExpression,
@@ -71,9 +71,9 @@ export function evaluateCondition(
     return failure('BLUEPRINT_CONDITION_INVALID', 'Blueprint condition is invalid.');
   switch (condition.operator) {
     case 'eq':
-      return { ok: true, value: areEqualJson(a, b), diagnostics: [] };
+      return { ok: true, value: screenJsonEquals(a, b), diagnostics: [] };
     case 'neq':
-      return { ok: true, value: !areEqualJson(a, b), diagnostics: [] };
+      return { ok: true, value: !screenJsonEquals(a, b), diagnostics: [] };
     case 'gt':
       return { ok: true, value: (a as number) > (b as number), diagnostics: [] };
     case 'gte':
@@ -88,7 +88,7 @@ export function evaluateCondition(
         value:
           typeof a === 'string'
             ? a.includes(b as string)
-            : (a as ScreenJsonValue[]).some((item) => areEqualJson(item, b)),
+            : (a as ScreenJsonValue[]).some((item) => screenJsonEquals(item, b)),
         diagnostics: [],
       };
     default:

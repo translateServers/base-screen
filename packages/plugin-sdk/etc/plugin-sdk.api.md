@@ -9,7 +9,7 @@ import { BaseScreenMaterialConstructor } from '@base-screen/plugin-core';
 import { BaseScreenMaterialEditorDescriptor } from '@base-screen/plugin-core';
 import { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
-import type { ScreenParseResult } from '@base-screen/contracts';
+import { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
 export interface BaseScreenMaterialDefinition {

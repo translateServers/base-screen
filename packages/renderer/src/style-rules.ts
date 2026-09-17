@@ -1,7 +1,8 @@
-import type {
-  ScreenComponentStyleRule,
-  ScreenJsonObject,
-  ScreenJsonValue,
+import {
+  type ScreenComponentStyleRule,
+  type ScreenJsonObject,
+  type ScreenJsonValue,
+  screenJsonEquals,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 
@@ -33,9 +34,9 @@ function matchesStyleRule(rule: ScreenComponentStyleRule, value: ScreenJsonValue
   const right = rule.when.value;
   switch (rule.when.operator) {
     case 'eq':
-      return jsonEquals(left, right);
+      return screenJsonEquals(left, right);
     case 'neq':
-      return !jsonEquals(left, right);
+      return !screenJsonEquals(left, right);
     case 'gt':
     case 'gte':
     case 'lt':
@@ -47,7 +48,7 @@ function matchesStyleRule(rule: ScreenComponentStyleRule, value: ScreenJsonValue
     }
     case 'contains':
       if (typeof left === 'string') return typeof right === 'string' && left.includes(right);
-      return Array.isArray(left) && left.some((item) => jsonEquals(item, right));
+      return Array.isArray(left) && left.some((item) => screenJsonEquals(item, right));
     default:
       return false;
   }
@@ -79,26 +80,4 @@ function resolveStyleRulePath(
 
 function isFiniteNumber(value: ScreenJsonValue | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
-}
-
-/** 与 Core 蓝图 condition 同语义的结构化 JSON 相等（键序无关）。 */
-function jsonEquals(
-  left: ScreenJsonValue | undefined,
-  right: ScreenJsonValue | undefined,
-): boolean {
-  if (Object.is(left, right)) return true;
-  if (left === null || right === null || left === undefined || right === undefined) return false;
-  if (typeof left !== 'object' || typeof right !== 'object') return false;
-  if (Array.isArray(left) || Array.isArray(right)) {
-    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) return false;
-    return left.every((value, index) => jsonEquals(value, right[index]));
-  }
-  const leftKeys = Object.keys(left).sort();
-  const rightKeys = Object.keys(right).sort();
-  if (leftKeys.length !== rightKeys.length) return false;
-  return leftKeys.every(
-    (key, index) =>
-      key === rightKeys[index] &&
-      jsonEquals((left as ScreenJsonObject)[key], (right as ScreenJsonObject)[key]),
-  );
 }

@@ -1,7 +1,6 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import { type ScreenDocument, screenJsonEquals } from '@base-screen/contracts';
 import { prefixDiagnostic, sortDiagnostics } from '../internal/diagnostics.js';
 import { assertCoreValidDocument } from '../internal/document.js';
-import { areEqual } from '../internal/equality.js';
 import {
   applyAddComponentCommand,
   applyRemoveComponentsCommand,
@@ -152,7 +151,7 @@ function applyCanvas(document: ScreenDocument, patch: unknown): ScreenCommandRes
       canvas[key] = value;
     }
   }
-  if (areEqual(document.canvas, canvas)) {
+  if (screenJsonEquals(document.canvas, canvas)) {
     return screenCommandSuccess(document, []);
   }
   return finalizeScreenCommand(document, { ...document, canvas }, []);
@@ -165,7 +164,7 @@ function applyVariables(document: ScreenDocument, variables: unknown): ScreenCom
       invalidScreenCommand('Variables must be an array.', ['variables']),
     );
   }
-  if (areEqual(document.variables, variables)) {
+  if (screenJsonEquals(document.variables, variables)) {
     return screenCommandSuccess(document, []);
   }
   return finalizeScreenCommand(document, { ...document, variables }, []);
@@ -178,7 +177,7 @@ function applyBlueprint(document: ScreenDocument, blueprint: unknown): ScreenCom
       invalidScreenCommand('Blueprint must be a canonical object.', ['blueprint']),
     );
   }
-  if (areEqual(document.blueprint, blueprint)) return screenCommandSuccess(document, []);
+  if (screenJsonEquals(document.blueprint, blueprint)) return screenCommandSuccess(document, []);
   return finalizeScreenCommand(document, { ...document, blueprint }, []);
 }
 
@@ -188,14 +187,14 @@ function getNetChangedComponentIds(
 ): readonly string[] {
   const afterById = new Map(after.components.map((component) => [component.id, component]));
   const beforeById = new Map(before.components.map((component) => [component.id, component]));
-  // 命令路径结构共享：未变更组件在 before/after 中是同一引用（areEqual(x, x) 恒真）。
+  // 命令路径结构共享：未变更组件在 before/after 中是同一引用（screenJsonEquals(x, x) 恒真）。
   // 先按引用短路，仅对引用变化（真正被命令改写）的少数组件做深比较，
   // 语义与全量深比较完全一致，成本从 O(n×fields) 降为 O(changed×fields)。
   const current = after.components
     .filter(
       (component) =>
         beforeById.get(component.id) !== component &&
-        !areEqual(beforeById.get(component.id), component),
+        !screenJsonEquals(beforeById.get(component.id), component),
     )
     .map(({ id }) => id);
   const removed = before.components

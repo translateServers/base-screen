@@ -1,6 +1,6 @@
 import {
   isScreenMaterialType,
-  parseScreenDocument,
+  parseScreenDataSource,
   parseScreenJsonValue,
   type ScreenComponentNode,
   type ScreenDiagnostic,
@@ -70,7 +70,7 @@ export function parseBaseScreenHostResourceAuthoringIntent(
       'Host resource intent must not contain URLs, tokens, or headers.',
     );
   }
-  const parsed = parseScreenDocument(intentValidationDocument(input));
+  const parsed = parseScreenDataSource(input.dataSource, { componentType: input.materialType });
   if (!parsed.ok) {
     return failure(
       'AUTHORING_PAYLOAD_INVALID',
@@ -78,8 +78,8 @@ export function parseBaseScreenHostResourceAuthoringIntent(
       ['dataSource'],
     );
   }
-  const component = parsed.value.components[0];
-  if (component?.dataSource?.type !== 'host-resource') {
+  const dataSource = parsed.value;
+  if (dataSource?.type !== 'host-resource') {
     return failure(
       'AUTHORING_PAYLOAD_INVALID',
       'Host resource dataSource must use type "host-resource".',
@@ -89,9 +89,9 @@ export function parseBaseScreenHostResourceAuthoringIntent(
   return {
     ok: true,
     value: {
-      materialType: component.type,
-      dataSource: component.dataSource,
-      ...(input.name === undefined ? {} : { name: component.name }),
+      materialType: input.materialType,
+      dataSource,
+      ...(input.name === undefined ? {} : { name: input.name }),
     },
     diagnostics: [],
   };
@@ -186,30 +186,6 @@ export function centeredHostResourcePosition(
     x: center.x - manifest.defaultSize.width / 2,
     y: center.y - manifest.defaultSize.height / 2,
   });
-}
-
-function intentValidationDocument(input: Record<string, unknown>): unknown {
-  return {
-    canvas: { width: 1, height: 1, backgroundColor: '#000000' },
-    components: [
-      {
-        id: 'host-resource-intent',
-        type: input.materialType,
-        name: input.name ?? 'Host resource',
-        parentId: null,
-        position: { x: 0, y: 0 },
-        size: { width: 1, height: 1 },
-        rotation: 0,
-        zIndex: 0,
-        status: { locked: false, hidden: false },
-        props: {},
-        style: {},
-        dataSource: input.dataSource,
-      },
-    ],
-    variables: [],
-    blueprint: { rules: [] },
-  };
 }
 
 function containsForbiddenTransportData(value: unknown): boolean {

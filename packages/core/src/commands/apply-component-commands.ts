@@ -1,11 +1,10 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import { type ScreenDocument, screenJsonEquals } from '@base-screen/contracts';
 import {
   buildComponentIndex,
   getAncestorIds,
   getDescendantIds,
   isEffectiveLocked,
 } from '../hierarchy/hierarchy.js';
-import { areEqual } from '../internal/equality.js';
 import {
   canonicalTargetIds,
   isExactPatch,
@@ -139,7 +138,7 @@ export function applyUpdateComponentsCommand(
   );
   const changed = targets.filter((id) => {
     const entry = index.byId.get(id)!;
-    return !areEqual(entry.component, components[entry.index]);
+    return !screenJsonEquals(entry.component, components[entry.index]);
   });
   if (changed.length === 0) {
     return screenCommandSuccess(document, []);

@@ -1,4 +1,5 @@
 import type { ScreenDiagnostic, ScreenDocument } from '@base-screen/contracts';
+import { buildComponentIndex, getAncestorIds } from '@base-screen/core';
 import type { ScreenProjectPhase } from '../../common/project/project-controller.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
@@ -113,12 +114,12 @@ export function projectPhaseLabel(phase: ScreenProjectPhase): string {
 
 export function groupEditingPath(document: ScreenDocument, groupId: string | null): string | null {
   if (groupId === null) return null;
-  const byId = new Map(document.components.map((component) => [component.id, component]));
+  const index = buildComponentIndex(document);
   const names: string[] = [];
-  let current = byId.get(groupId);
-  while (current !== undefined) {
-    names.unshift(current.name);
-    current = current.parentId === null ? undefined : byId.get(current.parentId);
+  for (const id of [groupId, ...getAncestorIds(index, groupId)]) {
+    const component = index.byId.get(id)?.component;
+    if (component === undefined) break;
+    names.unshift(component.name);
   }
   return names.length === 0 ? null : names.join(' / ');
 }

@@ -1,10 +1,10 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import { type ScreenParseResult, screenJsonEquals } from '@base-screen/contracts';
 import {
   type BaseScreenPluginRuntime,
   parseBaseScreenPluginManifest,
   readContributionHandlerRecord,
 } from '@base-screen/plugin-core';
-import { areEqual, failure } from './diagnostics.js';
+import { failure } from './diagnostics.js';
 
 export function definePlugin(
   runtime: BaseScreenPluginRuntime,
@@ -39,7 +39,7 @@ export function definePlugin(
   if (!parsedManifest.ok) {
     return parsedManifest;
   }
-  if (!areEqual(parsedManifest.value, runtime.manifest)) {
+  if (!screenJsonEquals(parsedManifest.value, runtime.manifest)) {
     return failure(
       'PLUGIN_CORE_IDENTITY_CONFLICT',
       ['manifest'],

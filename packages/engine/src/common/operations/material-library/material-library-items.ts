@@ -4,7 +4,7 @@
 
 import {
   isScreenMaterialType,
-  parseScreenDocument,
+  parseScreenDataSource,
   parseScreenJsonValue,
   type ScreenComponentDataSource,
   type ScreenDiagnostic,
@@ -280,27 +280,7 @@ function validateDefaultDataSource(
   diagnostics: ScreenDiagnostic[],
 ): void {
   if (!Object.hasOwn(item, 'defaultDataSource')) return;
-  const parsed = parseScreenDocument({
-    canvas: { width: 1, height: 1, backgroundColor: '#000000' },
-    components: [
-      {
-        id: 'library-item',
-        type: 'base.placeholder',
-        name: 'Library item',
-        parentId: null,
-        position: { x: 0, y: 0 },
-        size: { width: 1, height: 1 },
-        rotation: 0,
-        zIndex: 0,
-        status: { locked: false, hidden: false },
-        props: {},
-        style: {},
-        dataSource: item.defaultDataSource,
-      },
-    ],
-    variables: [],
-    blueprint: { rules: [] },
-  });
+  const parsed = parseScreenDataSource(item.defaultDataSource);
   if (parsed.ok) return;
   diagnostics.push(
     ...parsed.diagnostics.map((source) => ({

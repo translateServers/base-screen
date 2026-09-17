@@ -25,6 +25,27 @@
   组件 id 与变量名的词法判定只有两个谓词：`isScreenComponentId`、`isScreenVariableName`（`contracts`）。
   不要在新位置重新声明正则字面量，也不要用 `new RegExp(PATTERN)` 重新包裹导出的模式字符串。
 
+- **结构化 JSON 相等（Structural JSON Equality）**  
+  「两个 JSON 值是否相等」的唯一实现是 `contracts` 的 `screenJsonEquals`：键序无关、数组逐元素、
+  `Object.is` 处理原始值。命令前后快照、条件表达式两侧、物料清单镜像等比较一律用它。
+
+- **自有数据属性相等（Own Data-Property Equality）**  
+  与上一条**不同的问题**：「作者写的运行时对象是否逐属性等于其规范化结果」。它只读自有**数据**
+  属性（getter 视为不存在）并纳入不可枚举键，因此 getter 或不可枚举成员不能冒充匹配。
+  唯一实现是 plugin-manager 预检中的同名私有函数，**有意不复用** `screenJsonEquals`。
+
+- **层级查询接缝（Hierarchy Query Seam）**  
+  组件层级遍历的唯一入口是 `@base-screen/core` 的 `ComponentIndex` 与配套查询
+  （`getRootIds` / `getAncestorIds` / `getAncestorDepth` / `getDescendantIds` / `getDescendantSet`）。
+  索引按文档引用缓存且查询自带环保护；消费方不得再自建 `byParent`/`byId` 映射。
+  注意 **`getDescendantIds` 是深度优先**：既有消费方若依赖广度优先顺序，转换前必须确认该顺序
+  不是可观察行为的一部分。
+
+- **数据源校验入口（Data Source Parse Entry）**  
+  校验单个组件 `dataSource` 一律走 `contracts` 的 `parseScreenDataSource`，不要为校验一个字段
+  而手工拼装整份 `ScreenDocument` 信封。该入口内部仍走文档校验路径，因此判定与「写进文档再解析」
+  一致，诊断路径相对数据源本身。
+
 ## 插件贡献词汇
 
 - **贡献类型描述符（Contribution Kind Descriptor）**  

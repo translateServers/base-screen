@@ -359,6 +359,14 @@ function readDataProcessorHandlers(
   ) as ReadonlyMap<string, BaseScreenPluginDataProcessorHandler> | undefined;
 }
 
+/**
+ * 运行时清单与其规范化结果的自有数据属性相等。
+ *
+ * 有意不复用 contracts 的 `screenJsonEquals`：那条是 JSON 结构相等（读 `Object.keys` 可枚举键、
+ * 取值经属性访问会触发 getter），而这里要回答的是"作者写的运行时对象是否逐属性等于规范化结果"。
+ * 因此只读自有**数据**属性（getter 视为不存在）并纳入不可枚举键——getter 或不可枚举成员
+ * 不能冒充匹配。
+ */
 function areEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true;
   if (left === null || right === null || typeof left !== 'object' || typeof right !== 'object')

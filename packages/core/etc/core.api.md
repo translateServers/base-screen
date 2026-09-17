@@ -58,7 +58,7 @@ export function commitScreenHistory(history: ScreenHistoryState, document: Scree
 export function compileScreenBlueprint(document: ScreenDocument, capabilities?: ScreenBlueprintCapabilityIndex): ScreenParseResult<ScreenBlueprintPlan>;
 
 // @public (undocumented)
-interface ComponentIndex {
+export interface ComponentIndex {
     // (undocumented)
     readonly byId: ReadonlyMap<string, {
         readonly component: ScreenComponentNode;
@@ -84,7 +84,22 @@ export function evaluateScreenHostResourceParameters(params: Readonly<Record<str
 export function extractScreenHostResourceVariableDependencies(params: Readonly<Record<string, ScreenHostResourceParameter>>): readonly string[];
 
 // @public (undocumented)
+export function getAncestorDepth(index: ComponentIndex, id: string): number;
+
+// @public (undocumented)
+export function getAncestorIds(index: ComponentIndex, id: string): readonly string[];
+
+// @public (undocumented)
+export function getDescendantIds(index: ComponentIndex, id: string): readonly string[];
+
+// @public (undocumented)
+export function getDescendantSet(index: ComponentIndex, ids: readonly string[]): ReadonlySet<string>;
+
+// @public (undocumented)
 export function getPainterOrder(document: ScreenDocument): readonly string[];
+
+// @public (undocumented)
+export function getRootIds(index: ComponentIndex): readonly string[];
 
 // @public (undocumented)
 export function getScreenComponentBounds(component: ScreenComponentNode): ScreenBounds;
