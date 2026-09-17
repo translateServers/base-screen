@@ -316,7 +316,7 @@ function checksFor(roots, host, task, profile) {
           tool: 'pnpm',
           args:
             check === 'workflow'
-              ? ['exec', 'vitest', 'run', 'tests/integration-workflow.test.ts']
+              ? ['exec', 'vitest', 'run', 'tests/integration-workflow']
               : ['--filter', '@base-screen/' + check, 'test'],
         });
       }

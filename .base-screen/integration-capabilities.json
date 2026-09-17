@@ -155,7 +155,13 @@
       "references": [
         ".agents/skills/base-screen-integration-workflow/SKILL.md",
         ".agents/skills/base-screen-integration-workflow/scripts/workflow.mjs",
-        "tests/integration-workflow.test.ts"
+        "tests/__fixtures__/integration-workflow-suite.ts",
+        "tests/integration-workflow-bootstrap.test.ts",
+        "tests/integration-workflow-sync.test.ts",
+        "tests/integration-workflow-integrity.test.ts",
+        "tests/integration-workflow-verification.test.ts",
+        "tests/integration-workflow-drift.test.ts",
+        "tests/integration-workflow-recovery.test.ts"
       ],
       "checks": ["workflow"]
     }

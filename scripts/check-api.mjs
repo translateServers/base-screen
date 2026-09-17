@@ -36,4 +36,4 @@ for (const directory of Object.keys(PACKAGE_DEFINITIONS)) {
   }
 }
 
-verifyApiReports();
+await verifyApiReports();
