@@ -1,12 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   compareIndexedEntries,
+  countDocumentLines,
   evaluateActiveSpecCompletion,
+  evaluateAdrCitations,
   evaluateAdrIndex,
+  evaluateMachineReadableReferences,
   evaluateMarkdownLinks,
+  evaluateSizeBudgets,
   extractMarkdownLinks,
   findForbiddenVersionMarkers,
   normalizeAdrStatus,
+  SIZE_BUDGET_EXCEPTIONS,
+  SIZE_BUDGETS,
+  sizeBudgetFor,
 } from '../scripts/check-docs.mjs';
 
 describe('document governance checks', () => {
@@ -126,5 +133,118 @@ describe('document governance checks', () => {
     expect(evaluateAdrIndex(files).map(({ code }) => code)).toEqual(
       expect.arrayContaining(['DOC_ADR_FILE_DUPLICATE', 'DOC_ADR_NUMBER_MISMATCH']),
     );
+  });
+
+  it('resolves references declared by machine-readable capability indexes', () => {
+    const indexPath = '.base-screen/integration-capabilities.json';
+    const existing = new Set(['docs/decisions/ADR-0080-conditional-style.md', 'packages/renderer']);
+    const targetExists = (target) => existing.has(target);
+
+    expect(evaluateMachineReadableReferences(indexPath, undefined, targetExists)).toEqual([]);
+    expect(evaluateMachineReadableReferences(indexPath, {}, targetExists)).toEqual([
+      expect.objectContaining({ code: 'DOC_MACHINE_INDEX_INVALID', path: indexPath }),
+    ]);
+
+    const issues = evaluateMachineReadableReferences(
+      indexPath,
+      {
+        capabilities: [
+          {
+            id: 'conditional-style',
+            references: [
+              'docs/decisions/ADR-0080-conditional-style.md',
+              'docs/decisions/ADR-0059-conditional-style-port.md',
+              'packages/renderer',
+            ],
+          },
+          { id: 'host-entrypoints' },
+        ],
+      },
+      targetExists,
+    );
+
+    expect(issues).toEqual([
+      {
+        code: 'DOC_MACHINE_REFERENCE_MISSING',
+        detail: 'conditional-style: docs/decisions/ADR-0059-conditional-style-port.md',
+        line: undefined,
+        path: indexPath,
+      },
+    ]);
+  });
+
+  it('budgets active documents by role and excludes archive, changeset, and generated reports', () => {
+    expect(sizeBudgetFor('docs/decisions/ADR-0099-example.md')).toBe(SIZE_BUDGETS.adr);
+    expect(sizeBudgetFor('docs/specs/example/spec.md')).toBe(SIZE_BUDGETS.delivery);
+    expect(sizeBudgetFor('docs/plans/example/implementation-plan.md')).toBe(SIZE_BUDGETS.delivery);
+    expect(sizeBudgetFor('docs/usage/viewer.md')).toBe(SIZE_BUDGETS.narrative);
+    expect(sizeBudgetFor('README.md')).toBe(SIZE_BUDGETS.narrative);
+    expect(sizeBudgetFor('.agents/skills/example/references/workflow.md')).toBe(
+      SIZE_BUDGETS.narrative,
+    );
+    expect(sizeBudgetFor('docs/specs/archive/example/spec.md')).toBeUndefined();
+    expect(sizeBudgetFor('docs/plans/archive/example/plan.md')).toBeUndefined();
+    expect(sizeBudgetFor('.changeset/example.md')).toBeUndefined();
+    expect(sizeBudgetFor('packages/sdk/etc/sdk.api.md')).toBeUndefined();
+  });
+
+  it('fails a document one line over budget and treats a registered exception as its own ceiling', () => {
+    const doc = (lines: number) => 'x\n'.repeat(lines);
+    expect(countDocumentLines(doc(300))).toBe(300);
+
+    expect(evaluateSizeBudgets([{ path: 'docs/guides/example.md', source: doc(300) }])).toEqual([]);
+    expect(evaluateSizeBudgets([{ path: 'docs/guides/example.md', source: doc(301) }])).toEqual([
+      expect.objectContaining({ code: 'DOC_SIZE_BUDGET_EXCEEDED', detail: '301 > 300' }),
+    ]);
+
+    // 归档正文即使超长也不参与预算：它是历史证据，不为体量改写
+    expect(
+      evaluateSizeBudgets([{ path: 'docs/specs/archive/example/spec.md', source: doc(5000) }]),
+    ).toEqual([]);
+
+    const registered = 'docs/decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md';
+    expect(evaluateSizeBudgets([{ path: registered, source: doc(544) }])).toEqual([]);
+    expect(evaluateSizeBudgets([{ path: registered, source: doc(545) }])).toEqual([
+      expect.objectContaining({ code: 'DOC_SIZE_BUDGET_EXCEEDED', detail: '545 > 544' }),
+    ]);
+  });
+
+  it('pins the exception table so a registered budget cannot be widened silently', () => {
+    // 棘轮规则：豁免值只能下调、条目不得新增。放宽必须同时改这条断言，形成可见摩擦。
+    expect(SIZE_BUDGET_EXCEPTIONS).toEqual({
+      'docs/decisions/ADR-0001-monorepo-toolchain-and-package-boundaries.md': 544,
+    });
+  });
+
+  it('rejects current-authority docs citing an ADR that no longer exists', () => {
+    const files = new Map([
+      // 同时承担两个作用：确立 ADR-0077 存在，以及验证 decisions 路径整体豁免
+      ['docs/decisions/ADR-0077-canvas.md', '# ADR-0077 吸收 ADR-0048、ADR-0057'],
+      [
+        'docs/decisions/README.md',
+        '| [ADR-0077](./ADR-0077-canvas.md) | 已接受 | 2026-09-16 | 主线（吸收 ADR-0048、ADR-0057 共 2 份，已移除） |',
+      ],
+      // 现行依据类：裸编号指向已吸收 ADR，应报出后继主线
+      ['docs/usage/authoring.md', '画布背景支持渐变（ADR-0048）。'],
+      // 无归并记录的编号也要拦住，否则拼错编号会静默通过
+      ['docs/baseline/designer.md', '另见 ADR-9999。'],
+      // 带吸收注记的行是合法历史记录
+      ['docs/usage/migrated.md', '原 ADR-0048 已由主线合并记录吸收。'],
+      // 历史调研按撰写时编号行文，按设计豁免
+      ['docs/plans/research.md', '按撰写时的 ADR-0057 行文。'],
+    ]);
+
+    // evaluateAdrCitations 不排序（排序在 evaluateDocumentGovernance 内），因此按插入顺序断言
+    const issues = evaluateAdrCitations(files);
+
+    expect(issues.map(({ code, detail, line, path }) => [code, path, line, detail])).toEqual([
+      ['DOC_ADR_CITATION_DANGLING', 'docs/usage/authoring.md', 1, 'ADR-0048 -> ADR-0077'],
+      [
+        'DOC_ADR_CITATION_DANGLING',
+        'docs/baseline/designer.md',
+        1,
+        'ADR-9999 has no successor record',
+      ],
+    ]);
   });
 });

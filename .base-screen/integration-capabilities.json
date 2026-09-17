@@ -10,7 +10,8 @@
       "references": [
         "packages/contracts/src/index.ts",
         "packages/core/src/index.ts",
-        "docs/usage.md"
+        "docs/usage/viewer.md",
+        "docs/usage/designer-embedding.md"
       ],
       "checks": ["contracts", "core"]
     },
@@ -24,7 +25,8 @@
       "references": [
         "packages/engine/src/designer-element/base-screen-designer-element.ts",
         "packages/engine/tests/browser/controllers",
-        "docs/usage.md"
+        "docs/usage/designer-embedding.md",
+        "docs/usage/designer-authoring.md"
       ],
       "checks": ["engine"]
     },
@@ -35,7 +37,11 @@
       "availability": "current",
       "boundary": "基座按规范文档渲染；宿主提供资源、变量和容器尺寸。",
       "publicApi": ["@base-screen/sdk/viewer", "BaseScreenViewerElement.configure"],
-      "references": ["packages/renderer/src/index.ts", "packages/renderer/tests", "docs/usage.md"],
+      "references": [
+        "packages/renderer/src/index.ts",
+        "packages/renderer/tests",
+        "docs/usage/viewer.md"
+      ],
       "checks": ["renderer"]
     },
     {
@@ -48,7 +54,8 @@
       "references": [
         "packages/plugin-core/src/index.ts",
         "packages/plugin-manager/src/index.ts",
-        "docs/usage.md"
+        "docs/usage/material-catalog.md",
+        "docs/usage/frameworks-and-packages.md"
       ],
       "checks": ["plugin-core", "plugin-manager"]
     },
@@ -63,7 +70,8 @@
         "packages/contracts/src/types/dataset-port.ts",
         "packages/contracts/src/types/document.ts",
         "packages/renderer/src/resource/dataset-query-port.ts",
-        "docs/specs/independent-dataset-consumption/spec.md"
+        "docs/specs/independent-dataset-consumption/spec.md",
+        "docs/usage/host-data.md"
       ],
       "checks": ["contracts", "core", "renderer", "engine"]
     },
@@ -77,7 +85,7 @@
       "references": [
         "packages/contracts/src/types/host.ts",
         "packages/engine/src/common/operations/designer-variable-operations.ts",
-        "docs/usage.md"
+        "docs/usage/host-data.md"
       ],
       "checks": ["contracts", "engine"]
     },
@@ -89,7 +97,7 @@
       "boundary": "基座拥有语义、工作台面板、统一历史和命令；宿主拥有中央画布、布局算法、手势和业务动作执行。",
       "publicApi": ["base-screen-designer-blueprint-canvas", "@base-screen/sdk"],
       "references": [
-        "docs/usage.md",
+        "docs/usage/blueprint.md",
         "packages/engine/src/designer-element/designer-element-public-api.ts",
         "packages/contracts/src/index.ts"
       ],
@@ -103,9 +111,8 @@
       "boundary": "styleRules 求值和 conditionalStylePort 当前存在；Designer 没有内建规则编辑区。事件驱动替代尚未设计，不视为已废弃。",
       "publicApi": ["ScreenComponentNode.styleRules", "BaseScreenConditionalStylePort"],
       "references": [
-        "docs/decisions/ADR-0066-host-owned-conditional-style-authoring.md",
-        "docs/decisions/ADR-0059-conditional-style-port.md",
-        "docs/usage.md"
+        "docs/decisions/ADR-0080-conditional-style-authoring-ownership.md",
+        "docs/usage/events-and-actions.md"
       ],
       "checks": ["contracts", "renderer"]
     },
@@ -117,7 +124,8 @@
       "boundary": "返回、预览、资源与业务面板通过公开入口组合；路由、上传、发布、截图与长任务由宿主执行。",
       "publicApi": ["base-screen-designer-back-request", "leftPanelGroups", "previewHandler"],
       "references": [
-        "docs/usage.md",
+        "docs/usage/designer-authoring.md",
+        "docs/usage/material-library-state.md",
         "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md",
         "packages/engine/src/designer-element/base-screen-designer-element.ts"
       ],

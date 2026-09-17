@@ -54,33 +54,10 @@ Base Screen 应继承已验证的工作流，不复制这些债务。
 
 ## 3. 仓库布局
 
-```text
-base-screen/
-├── docs/                 # architecture、decisions、specs、conventions
-├── packages/             # 十二个正式 workspace 包
-│   ├── contracts/
-│   ├── core/
-│   ├── renderer/
-│   ├── engine/
-│   ├── material/
-│   ├── plugin-core/
-│   ├── plugin-manager/
-│   ├── plugin-sdk/
-│   ├── react/
-│   ├── vue/
-│   ├── sdk/
-│   └── testing/
-├── examples/   # Vanilla、React、Vue 和 tarball consumer
-├── scripts/              # 边界、包、license、tarball 和发布检查
-├── package.json          # private workspace root
-├── .changeset/
-│   └── config.json
-├── pnpm-workspace.yaml
-├── pnpm-lock.yaml
-├── turbo.json
-├── tsconfig.base.json
-└── biome.json
-```
+顶层布局以工作区实际内容为准，本 ADR 不复制目录树快照，避免与实际布局漂移：`packages/` 的固定包清单由
+[`scripts/check-packages.mjs`](../../scripts/check-packages.mjs) 的 `PACKAGE_DEFINITIONS` 权威声明；
+与 `packages/` 平行的 `plugins/` 外围插件区由 [ADR-0074](./ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)
+确立；跨包依赖白名单由 [`scripts/check-boundaries.mjs`](../../scripts/check-boundaries.mjs) 按区维护。
 
 约束：
 
@@ -262,20 +239,12 @@ engines.node: >=22.20.0
 
 ### 8.1 允许的生产依赖
 
-| 包 | 允许依赖的 workspace 包 |
-| --- | --- |
-| `contracts` | 无 |
-| `core` | `contracts` |
-| `plugin-core` | `contracts` |
-| `plugin-manager` | `contracts`、`plugin-core` |
-| `plugin-sdk` | `contracts`、`plugin-core` |
-| `renderer` | `contracts`、`core`、`plugin-core` |
-| `engine` | `contracts`、`core`、`renderer`、`plugin-core`、`plugin-manager` |
-| `material` | `contracts`、`plugin-core`、`plugin-sdk` |
-| `react` | `contracts`、`plugin-core`、`plugin-sdk`；React/React DOM 为 peer |
-| `vue` | `contracts`、`plugin-core`、`plugin-sdk`；Vue 为 peer |
-| `sdk` | `contracts`、`core`、`renderer`、`engine`、`material`、`plugin-manager`、`plugin-sdk` |
-| `testing` | 可以依赖公共包，仅用于向外提供测试能力 |
+允许的 workspace 依赖边由 [`scripts/check-boundaries.mjs`](../../scripts/check-boundaries.mjs) 的
+`ALLOWED_WORKSPACE_DEPENDENCIES` 唯一权威声明，本 ADR 不复制该白名单，避免出现两份没有门禁比对的副本；
+外围 `plugins/` 区改由同文件的 `PLUGIN_ALLOWED_WORKSPACE_DEPENDENCIES` 与
+`PLUGIN_ALLOWED_EXTERNAL_DEPENDENCIES` 逐插件显式申报，依据见
+[ADR-0074](./ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)。下面只记录不随白名单
+条目变化的附加规则。
 
 附加规则：
 
