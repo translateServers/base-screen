@@ -134,4 +134,41 @@ describe('Plugin Manager preflight', () => {
       ),
     ).toBe(true);
   });
+
+  // 命令与蓝图动作共用同一条声明门：哪些 kind 要求把能力写进清单 `capabilities`，由
+  // plugin-core 的贡献类型描述符回答。蓝图动作曾经只经授权交集失败关闭、不产诊断，
+  // 于是一个引用了未声明能力动作会静默留在清单里却永不执行。
+  it('reports a blueprint action whose required capability was never declared', async () => {
+    const plugin = runtime(
+      manifest({
+        capabilities: ['data.process'],
+        contributions: [
+          {
+            kind: 'blueprintAction',
+            id: 'acme.plugin.spotlight',
+            name: 'Spotlight',
+            payloadSchema: { kind: 'object', properties: {}, required: [] },
+            requiredCapability: 'blueprint.action.execute',
+          },
+        ],
+      }),
+    );
+    Object.defineProperty(plugin, 'blueprintActions', {
+      value: {
+        'acme.plugin.spotlight': () => ({ ok: true as const, value: null, diagnostics: [] }),
+      },
+    });
+
+    const result = await manager([plugin], { 'acme.plugin': ['data.process'] }).activate();
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.failures).toHaveLength(1);
+    expect(result.value.failures[0]).toMatchObject({ pluginId: 'acme.plugin' });
+    expect(
+      result.value.failures[0]?.diagnostics.some(
+        (item) => item.code === 'PLUGIN_CORE_CAPABILITY_UNDECLARED',
+      ),
+    ).toBe(true);
+  });
 });

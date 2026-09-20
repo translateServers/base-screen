@@ -20,7 +20,10 @@ export async function assertAuthoringVariables(page, designer) {
   const variableNamesBefore = await page.evaluate(() =>
     window.baseScreenHarness.designer.document.variables.map((item) => item.name).join(','),
   );
-  if (variableNamesBefore !== 'count,region,metricValue,dataSourceRegion,urlCampaign') {
+  if (
+    variableNamesBefore !==
+    'count,region,metricValue,dataSourceRegion,urlCampaign,harnessTick,scriptFilter'
+  ) {
     throw new Error(`BROWSER_HARNESS_VARIABLES_LIST_FAILED:${variableNamesBefore}`);
   }
   const variableTypesBefore = await page.evaluate(() =>

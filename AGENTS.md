@@ -5,11 +5,14 @@
 - 涉及 xjdatahub 接入、职责划分、包同步或联合验收时，先执行 pnpm integration status，再按能力执行 context；使用 [跨仓工作流 Skill](.agents/skills/base-screen-integration-workflow/SKILL.md)，不全量读取两个仓库的知识库。
 - 同一任务可按已确定职责修改双方相关源码；同步采用任务记录和受管文件保护。上游当前源码与下游实际包分开核验，未同步能力不得视为已接入。
 - 规范唯一维护在 Skill 的 references/workflow.md；提交、推送、部署和生产操作仍遵循用户授权。
+- **仪表盘创建**：宿主需要生成或刷新其专属的大屏设计 Skill（`design-<hostId>-screens`，使其他模型能依据宿主已脱敏的物料、数据、样例与品牌目录产出可导入的 Screen Document）时，使用 [create-base-screen-host-skill](skills/create-base-screen-host-skill/SKILL.md)；生成的子 Skill 不连接宿主端口、不查询实时数据、不存储凭证，也不把 URL、SQL、header、token 或服务对象写入 Screen Document。
+- **物料创建**：宿主需要生成或刷新其专属的物料创作 Skill（`create-<hostId>-material`，覆盖原生、React、Vue 物料的创作、公共 ABI 校验与显式注册）时，使用 [create-base-screen-host-material-skill](skills/create-base-screen-host-material-skill/SKILL.md)；生成的子 Skill 不发布、不提交、不激活生产代码、不安装依赖、不连接实时服务，注册策略缺省为 propose，且不把凭证、URL、SQL、token、DOM 引用、函数或框架实例写入 manifest、编辑器描述符、Screen Document 或宿主快照。
+- **宿主接入与管理运维**：宿主首次接入、例行刷新快照与生成的 Skill、漂移诊断或 CI 验证时，使用 [manage-base-screen-host-skills](skills/manage-base-screen-host-skills/SKILL.md)；它自身不查询宿主 API、绝不修改物料注册文件，生成产物与托管工具链均落在宿主受管目录（`.agents/skills/`、`.base-screen/tooling/`），任一步失败时既有快照与 Skill 保持原状。
 
 ## 环境搭建与验证
 
 - 使用 Node `22.23.2`（见 `.node-version`）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
-- CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`。它依次运行 `format`（会写入文件）、`format:check`、`lint`、`typecheck`、`test`、`build`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
+- CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`，随后运行 `pnpm check:api-changesets`，并以 `git diff --exit-code` 收尾，要求验证未改动任何受跟踪文件。它依次运行 `format:check`、`lint`、`typecheck`、`test`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`；链中没有会写入文件的 `format` 步骤（格式修正先手动运行 `pnpm format`），也没有独立的 `build` 步骤——各包构建由 Turbo 任务依赖间接触发（`test` 依赖 `build`，`lint`/`typecheck` 依赖 `^build`）。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
 - 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/tests/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
 - `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界与文档治理检查；`pnpm check:docs` 可单独检查 Markdown 相对链接、ADR/Spec/Plan 索引、完成 Spec 归档、禁用版本命名、机器可读能力索引的引用可解析性、活动文档单篇体量预算和现行依据类文档的 ADR 编号有效性。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
 - `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。门禁失败排查见 `docs/troubleshooting/verify-m0-troubleshooting.md`。

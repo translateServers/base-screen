@@ -19,3 +19,4 @@ packages/*/LICENSE
 .agents/skills/*
 !.agents/skills/base-screen-integration-workflow/
 .base-screen/local/
+.qoder/

@@ -727,6 +727,9 @@ export interface BaseScreenTableData {
 }
 
 // @public
+export function contributionCapabilityField(kind: BaseScreenPluginContributionKind): string | undefined;
+
+// @public
 export function contributionHandlerField(kind: BaseScreenPluginContributionKind): BaseScreenPluginContributionHandlerField | undefined;
 
 // @public (undocumented)

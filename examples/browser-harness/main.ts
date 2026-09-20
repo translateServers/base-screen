@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { h } from 'vue';
+import type { ScreenJsonObject, ScreenJsonValue } from '../../packages/contracts/src/index.ts';
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '../../packages/contracts/src/index.ts';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
@@ -79,6 +80,14 @@ import {
   PLUGIN_PIPELINE_SPOTLIGHT_EVENT,
   PLUGIN_PIPELINE_TOP_BY_PROCESSOR_ID,
 } from '../../plugins/plugin-pipeline/src/index.ts';
+import {
+  applyHostScriptFilter,
+  createDatavCompositionRuntime,
+  DATAV_COMPOSITION_PLUGIN_ID,
+  DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID,
+  startHostVariableTimer,
+  writeHostVariable,
+} from './datav-composition-fixture.ts';
 import { mountFeatureCases } from './feature-cases.ts';
 import {
   defineHarnessInspectorFixtures,
@@ -271,6 +280,7 @@ const pluginManager = createBaseScreenPluginManager({
     createPluginMetricsRuntime(),
     createPluginDatavRuntime(),
     createPluginPipelineRuntime(),
+    createDatavCompositionRuntime(),
   ],
   grantedCapabilities: {
     'browser-harness-authoring': designerAuthoringPluginCapabilities,
@@ -281,6 +291,8 @@ const pluginManager = createBaseScreenPluginManager({
     [PLUGIN_METRICS_ID]: [PLUGIN_METRICS_BLUEPRINT_CAPABILITY],
     // ADR-0076：运行期插件。动作能力必须显式批准，动作才进入可执行集合。
     [PLUGIN_PIPELINE_ID]: ['data.process', 'blueprint.action.execute'],
+    // 组合路径模板：宿主自营的脚本过滤器处理器。
+    [DATAV_COMPOSITION_PLUGIN_ID]: ['data.process'],
   },
   registry: {
     get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
@@ -819,6 +831,22 @@ const screenDocument = {
       sourceId: 'campaign',
       controlled: false,
     },
+    // 组合路径模板（DataV 差距调研第四节）：计时器触发与推送数据都写这个变量，
+    // 蓝图规则 `variable-trigger-demo` 监听它的 data-updated。值本身没有语义，
+    // 它只是"宿主自有触发源 → 变量 → 蓝图"这条链路的观察点。
+    { type: 'static' as const, id: 'harness-tick', name: 'harnessTick', initialValue: 0 },
+    // 组合路径模板：用户可编写过滤器。文档只存宿主资产标识 `scriptId`，脚本正文留在
+    // 宿主侧；`processorId` 让宿主在解析这个变量时把上游值路由到自己的脚本处理器。
+    {
+      type: 'data-source' as const,
+      id: 'harness-script-filter',
+      name: 'scriptFilter',
+      description: 'Browser Harness 宿主脚本过滤器组合路径',
+      initialValue: null,
+      sourceId: 'harness-script-source',
+      processorId: DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID,
+      controlled: false,
+    },
   ],
   blueprint: {
     rules: [
@@ -851,6 +879,31 @@ const screenDocument = {
               properties: {
                 color: { kind: 'literal' as const, value: '#ffa940' },
                 strokeWidth: { kind: 'literal' as const, value: 3 },
+              },
+            },
+          },
+        ],
+      },
+      {
+        // 组合路径模板（DataV 差距调研 4.1）：宿主定时器/推送写变量 → 本规则触发 → 插件动作。
+        // DataV 上"计时器节点"承载的功能由此闭环，且**不需要** Base Screen 新增触发器节点：
+        // 缺的从来是作者面形态，不是功能。`harnessTick` 初值 0 时规则也会触发一次，
+        // 因此断言观察的是动作事件次数在启动定时器之后的增量。
+        id: 'variable-trigger-demo',
+        trigger: {
+          type: 'variable-event' as const,
+          variableId: 'harness-tick',
+          eventName: 'data-updated',
+        },
+        actions: [
+          {
+            type: 'host-action' as const,
+            actionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
+            payload: {
+              kind: 'object' as const,
+              properties: {
+                color: { kind: 'literal' as const, value: '#39c5bb' },
+                strokeWidth: { kind: 'literal' as const, value: 1 },
               },
             },
           },
@@ -930,6 +983,19 @@ let datasetVersion = 0;
 let datasetRegion = 'north';
 let datasetDelay = false;
 let metricValue = 42;
+// 组合路径模板的宿主侧状态：脚本资产标识、处理器参数与上游数据都由宿主掌握，
+// 文档只存一个不透明的 processorId。
+let harnessScriptId = 'overThreshold';
+let harnessScriptOptions: ScreenJsonObject = { field: 'amount', threshold: 800 };
+let harnessScriptRows: ScreenJsonValue = [
+  { name: '上海', amount: 982 },
+  { name: '深圳', amount: 871 },
+  { name: '北京', amount: 763 },
+];
+// 组合路径模板的调度句柄：定时器只在断言启动后运行，避免常驻后台任务干扰其它断言。
+let hostVariableTimer: ReturnType<typeof startHostVariableTimer> | undefined;
+let hostVariableWrites: Array<{ readonly variableId: string; readonly value: ScreenJsonValue }> =
+  [];
 const datasetRequests: unknown[] = [];
 const variableRequests: Array<{
   readonly variableId: string;
@@ -1105,6 +1171,7 @@ const variablePort = {
     readonly variableId: string;
     readonly sourceId: string;
     readonly sourceType: 'data-source' | 'url-query';
+    readonly processorId?: string;
     readonly purpose: 'runtime' | 'authoring-preview';
   }) {
     variableRequests.push({
@@ -1113,6 +1180,18 @@ const variablePort = {
       sourceType: request.sourceType,
       purpose: request.purpose,
     });
+    // 组合路径模板（DataV 差距调研 4.2）：宿主脚本过滤器。
+    //
+    // 这里的顺序就是宿主该有的顺序：**先取到原始值，再交给处理器**。`processorId` 是文档里
+    // 的不透明标识，宿主要自己知道它对应哪个脚本资产与哪些参数，脚本正文与参数都留在宿主侧
+    // ——换脚本因此不必改文档。
+    if (request.processorId === DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID) {
+      return applyHostScriptFilter(pluginManager, {
+        scriptId: harnessScriptId,
+        value: harnessScriptRows,
+        options: harnessScriptOptions,
+      });
+    }
     if (request.sourceType === 'url-query') {
       return {
         ok: true as const,
@@ -1273,9 +1352,14 @@ designer.designerHostAdapter = {
     async execute(action) {
       // Engine 只做「已声明」门禁后把请求抛给宿主；宿主再路由到 manager 的插件动作路由。
       // 未声明的 actionId 由 manager 失败关闭，不会静默成功。
-      pluginActionRequests.push({ actionId: action.actionId, payload: action.payload });
+      //
+      // 这两个端口的字段名不同，必须显式映射：宿主动作端口给的是 `{ name, payload }`
+      // （name 就是文档里的 `host-action.actionId`），而 manager 要的是 `{ actionId, payload }`。
+      // 直接把整个 action 透传会让 actionId 变成 undefined，于是每次蓝图动作都在 manager
+      // 那一层按"未声明"失败关闭，而宿主这一侧毫无察觉——动作看起来配好了，却从不执行。
+      pluginActionRequests.push({ actionId: action.name, payload: action.payload });
       await pluginManager.executeBlueprintAction({
-        actionId: action.actionId,
+        actionId: action.name,
         payload: action.payload as never,
       });
     },
@@ -1498,6 +1582,43 @@ Object.assign(window, {
     pluginPipelineSpotlightEvent: PLUGIN_PIPELINE_SPOTLIGHT_EVENT,
     pluginPipelineProcessorId: PLUGIN_PIPELINE_TOP_BY_PROCESSOR_ID,
     pluginPipelineActionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
+    // 组合路径模板（DataV 差距调研第四节）的观察与驱动点。
+    datavCompositionPluginId: DATAV_COMPOSITION_PLUGIN_ID,
+    datavScriptProcessorId: DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID,
+    datavVariableWrites: hostVariableWrites,
+    /** 计时器触发：宿主自建定时器 → 写变量 → 蓝图规则。只在断言调用后运行。 */
+    startDatavTick: (intervalMs = 40) => {
+      hostVariableTimer?.stop();
+      let tick = 0;
+      hostVariableTimer = startHostVariableTimer(designer, {
+        variableId: 'harness-tick',
+        intervalMs,
+        produce: () => {
+          tick += 1;
+          return tick;
+        },
+        // 与 pushDatavVariable 记同一份观察数组：两条路径的写入次数必须在同一处可比。
+        onWrite: (value) => hostVariableWrites.push({ variableId: 'harness-tick', value }),
+      });
+    },
+    stopDatavTick: () => {
+      hostVariableTimer?.stop();
+      hostVariableTimer = undefined;
+    },
+    /** 推送数据：外部事件驱动的单次写入，与计时器共用同一条宿主写变量原语。 */
+    pushDatavVariable: (value) => {
+      const result = writeHostVariable(designer, 'harness-tick', value);
+      if (result.ok) hostVariableWrites.push({ variableId: 'harness-tick', value });
+      return result;
+    },
+    /** 脚本过滤器：换脚本只改宿主侧标识与参数，文档里的 processorId 不动。 */
+    setDatavScript: (scriptId, options) => {
+      harnessScriptId = scriptId;
+      harnessScriptOptions = (options ?? {}) as ScreenJsonObject;
+    },
+    setDatavScriptRows: (rows) => {
+      harnessScriptRows = rows as ScreenJsonValue;
+    },
     viewer,
     hostEvents,
     designerNativeEvents,

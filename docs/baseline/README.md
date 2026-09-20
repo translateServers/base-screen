@@ -1,7 +1,7 @@
 # Base Screen 当前能力基线
 
 > 状态：生效（维护期行为依据）
-> 最近更新：2026-09-14（插件运行期贡献：blueprintAction 与 dataProcessor）
+> 最近更新：2026-09-20（插件激活失败归因细化）
 
 本基线描述 Base Screen 在 2026-08-12 阶段封版时已交付并验收的能力现状，以及封版后已生效的增量。它是维护期的行为依据：
 变更依据当前用户需求与适用的已接受决策实施。长期架构、职责或兼容策略变化需要 ADR；
@@ -77,7 +77,35 @@
 
 - **Nebula Importer**：离线 legacy export 转换、审计报告与 provenance。
   依据：[Nebula Importer](../specs/archive/nebula-importer/spec.md)、[ADR-0011](../decisions/ADR-0011-nebula-importer-auditable-migration.md)、
-  [来源记录](../provenance/README.md)。
+  [来源记录](../provenance/README.md)。该工具位于 `scripts/import-nebula.mjs`，由 `pnpm verify:nebula-import`
+  显式调用，**不属于 12 个发布包，也不在 `verify:m0` 内**——它本就在发布面之外，无需另行移出。
+
+## 功能归属裁决
+
+新功能该落在核心、插件还是宿主，按下列标准裁决。判据本身是对已接受 ADR 的归纳，不新增决策；
+来源见[核心与插件职责划分评审](../plans/archive/core-plugin-responsibility-review/review.md)。
+
+**核心必备（满足任一条即不可插件化）**：canonical 所有权（`contracts`）；事务与编辑语义
+（`core`、`engine/common/operations`）；渲染管线与物料 ABI（`renderer`、`plugin-core` 契约）；
+插件平台自身（`plugin-core` / `plugin-manager` / `plugin-sdk`）；公共 API 面（Custom Element、
+authoring bridge、React/Vue 桥接、`sdk` 聚合）；跨物料一致的结构（画布交互原语、检查器框架、
+图层树、主题 Token、UI 文案与无抖动约束）。
+
+**核心承载、插件扩展**：物料、控件、命令、面板、数据类型与蓝图词汇由核心出框架或最小实现，
+长尾走 8 类贡献。两条附带标准在这一档生效：
+
+- **官方物料 = 无外部依赖的契约载体**，不追求视觉竞争力。`base.chart` / `base.table` 留在官方
+  范围的理由是契约需要一个零第三方依赖的官方实现跑通 binding、adapter 与 Editor Descriptor
+  全链路；有竞争力的实现归外围插件（现为 `plugins/plugin-echarts`）。
+- **内建检查器控件集是冻结面**：新增内建控件须过评审，判据是"平台原语"（所有物料的字段编辑
+  都需要）；单物料特化控件走 `inspectorControl` 贡献。冻结的理由是内建集定义了自定义控件要
+  复用的 model/change/value 形状，且渐变色值是文档字段语义的一部分。
+
+**单物料工具不预建贡献类型**：engine 内为特定物料提供的工具（现为 `base.image` 的倍图尺寸）
+短期保留并标注观察；出现第二个同类需求（例如另一类物料要自定义几何工具）时才评估新贡献类型。
+
+**归宿主**：存储、网络、队列、发布、AI 服务等基础设施与业务处理不因插件词汇表而例外
+（[ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)）。
 
 ## 维护规则
 

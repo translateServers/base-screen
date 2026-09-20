@@ -54,9 +54,20 @@ const processed = await manager.applyDataProcessor({
 // 由 Engine 作为宿主动作抛出后转发到 manager。
 designer.designerHostAdapter = {
   capabilities: { /* ...其余为 false */, actions: true },
-  actions: { async execute(action) { await manager.executeBlueprintAction(action); } },
+  actions: {
+    async execute(action) {
+      // 两个端口的字段名不同，必须显式映射：宿主动作端口给的是 { name, payload }，
+      // 其中 name 就是文档里的 host-action.actionId；manager 要的是 { actionId, payload }。
+      // 直接透传 action 会让 actionId 变成 undefined，每次动作都在 manager 层按"未声明"
+      // 失败关闭，而宿主这侧毫无察觉。
+      await manager.executeBlueprintAction({ actionId: action.name, payload: action.payload });
+    },
+  },
 };
 ```
+
+> 宿主动作端口用 `name` 而不是 `actionId` 承载标识，因为它与宿主机事件共用
+> `ScreenBlueprintHostEvent` 形状（`{ name, payload }`）。
 
 > **`designerHostAdapter` 是聚合端口。** 赋值时它会用自身的 `resources` / `variables` /
 > `datasets` / `variableCatalog` 字段**重写**对应的单项端口，未提供的会被清空。若宿主既要单项

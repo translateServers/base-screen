@@ -33,13 +33,6 @@ export interface ContributionKindPlanEntry<K extends BaseScreenPluginContributio
    * blueprintAction 与 blueprintCapability 适用；dataResourceType / dataProcessor 不适用。
    */
   readonly requiresGrant?: boolean;
-  /**
-   * 能力字段必须已在清单 `capabilities` 中声明，否则报 PLUGIN_CORE_CAPABILITY_UNDECLARED。
-   *
-   * 目前只有 command 会报此诊断。blueprintAction 也有 `requiredCapability`，但既有实现
-   * 只经授权交集失败关闭、不产出诊断 —— 本批保持该行为不变，不在此处顺手加诊断。
-   */
-  readonly requiresDeclaredCapability?: boolean;
   /** 写入运行时贡献索引的哪个桶；缺省表示该 kind 不进入索引。 */
   readonly index?: (contribution: ContributionOfKind<K>, buckets: ContributionIndexBuckets) => void;
 }
@@ -50,9 +43,7 @@ export type ContributionKindPlan = {
 
 export const CONTRIBUTION_KIND_PLAN: ContributionKindPlan = {
   material: {},
-  command: {
-    requiresDeclaredCapability: true,
-  },
+  command: {},
   dataResourceType: {
     index(contribution, buckets) {
       buckets.resourceTypes.set(contribution.id, contribution);

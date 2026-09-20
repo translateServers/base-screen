@@ -57,6 +57,11 @@ import {
   assertMaterialLibraryHostState,
 } from './materials/assert-materials.mjs';
 import {
+  assertHostPushComposition,
+  assertHostScriptProcessorComposition,
+  assertHostTimerComposition,
+} from './plugins/assert-datav-composition.mjs';
+import {
   assertDatavCycleCommand,
   assertDatavInspectorControl,
   assertDatavMaterialsRender,
@@ -178,6 +183,11 @@ export async function runBrowserHarness(serverPort) {
         await assertPluginDataProcessor(page);
         await assertPluginBlueprintActionExecutes(page);
         await assertPluginBlueprintActionUndeclaredFailsClosed(page);
+        // DataV 差距调研第四节：宿主组合路径（计时器触发、脚本过滤器、推送数据）。
+        // 这三条把"缺失能力其实可由宿主组合"从调研结论变成可执行证据。
+        await assertHostScriptProcessorComposition(page);
+        await assertHostTimerComposition(page);
+        await assertHostPushComposition(page);
         // 兜底不变式：目录内每个物料的渲染盒必须等于声明尺寸（放最后，避免污染前面的断言）。
         await assertMaterialGeometry(page, authoringDesigner);
         await page.close();

@@ -1,10 +1,10 @@
 # DataV 能力插件承载差距调研
 
-> 状态：调研草稿（未提交，供评审后决策）
-> 日期：2026-09-15
+> 状态：已评审，结论已落地（归档记录）
+> 日期：2026-09-15（2026-09-17 归档）
 > 场景：宿主以自写插件承接长尾需求——DataV-Board 7.0 上尚未对齐的功能，能否都走插件通道
-> 姊妹篇：[核心与插件职责划分评审](./核心与插件职责划分评审.md)（内向审计——核心该留什么）
-> 参考：DataV-Board 7.0 官方用户指南；Base Screen [当前能力基线](../baseline/README.md)、[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)（原 ADR-0070–0076 的插件贡献面已由该主线合并记录吸收）
+> 姊妹篇：[核心与插件职责划分评审](../core-plugin-responsibility-review/review.md)（内向审计——核心该留什么）
+> 参考：DataV-Board 7.0 官方用户指南；Base Screen [当前能力基线](../../../baseline/README.md)、[ADR-0084](../../../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)（原 ADR-0070–0076 的插件贡献面已由该主线合并记录吸收）
 
 ---
 
@@ -15,12 +15,12 @@ Base Screen 的功能点已比较完善，但大屏设计器这类产品的宿�
 
 回答之前先固定两个前置事实：
 
-1. **"宿主自写插件"的通道今天已经存在。** 外围插件分区（[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)）
+1. **"宿主自写插件"的通道今天已经存在。** 外围插件分区（[ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)）
    与 `createPluginRegistration`（plugin-sdk）允许宿主以与官方插件完全相同的
    "声明 ∩ 授权 ∩ 支持"通道注册插件包、物料与控件，无特权也无额外限制。
 2. **插件词汇表现有 8 类贡献**：material、command、dataResourceType、blueprintCapability、
    panel、inspectorControl、blueprintAction、dataProcessor（后两类为
-   [ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md) 新增）。
+   [ADR-0084](../../../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md) 新增）。
 
 因此真正的问题不是"宿主能不能写插件"，而是：**拿着这 8 类贡献和既有公开面，
 DataV 的功能域有多少能落进来，多少落不进来。**
@@ -45,7 +45,7 @@ DataV 的功能域有多少能落进来，多少落不进来。**
 | 组件库（图表 / 地理 / 交互 / 媒体 / 基础） | A | `material`；已有 `plugins/plugin-echarts`、`plugins/plugin-datav-materials` 先例 |
 | 自定义组件开发（脚手架） | A | plugin-sdk + 物料 ABI + 宿主 Skill kit，宿主已有完整作者路径 |
 | 设计资源（图标 / 边框 / 装饰） | A | `material`；物料原子化约定（不内建装饰文案）已有强制校验 |
-| 区块（可复用组件组合） | B | 宿主可用 `panel` 自建区块库面板 + `insertComponent` 公开方法插入组件树；Base Screen 不设"区块"一等实体（与[数据绑定调研](./数据绑定与数据包调研.md)对"数据包"的同型结论：不新增合成实体） |
+| 区块（可复用组件组合） | B | 宿主可用 `panel` 自建区块库面板 + `insertComponent` 公开方法插入组件树；Base Screen 不设"区块"一等实体（与[数据绑定调研](../../数据绑定与数据包调研.md)对"数据包"的同型结论：不新增合成实体） |
 | 数据源（静态 / 数据库 / API 等） | A | `dataResourceType` 声明作者面 + 宿主 `resourcePort` 执行查询；宿主自写插件时声明方与执行方同体，完全自由 |
 | 三维城市构建器 | B/D | 领域编辑器与服务归宿主；宿主可以 `panel` 挂入口、以 `material` 挂呈现。Base Screen 不内建 3D 能力 |
 
@@ -58,14 +58,14 @@ DataV 的功能域有多少能落进来，多少落不进来。**
 | 组件样式与主题 | A | 官方物料 `styleSchema` + 宿主样式 Token；插件物料自带样式 |
 | 组件交互配置（事件 → 条件 → 动作） | A | 蓝图规则：物料事件 → 结构化条件（8 操作符）→ `host-action`（引用 `blueprintAction` 贡献） |
 | 数据驱动的告警样式 | A | 文档 `styleRules`（ADR-0058）+ `conditionalStylePort`（ADR-0059）双通道，已对齐 |
-| 组件级数据绑定（选源 + 映射 + 过滤器） | A | 数据集资源 + `binding.fields` + `processorId`（处理器供给面见 [ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)；[数据绑定调研](./数据绑定与数据包调研.md) 仍为待评审草稿，尚未形成决策） |
+| 组件级数据绑定（选源 + 映射 + 过滤器） | A | 数据集资源 + `binding.fields` + `processorId`（处理器供给面见 [ADR-0084](../../../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)；[数据绑定调研](../../数据绑定与数据包调研.md) 仍为待评审草稿，尚未形成决策） |
 
 ### 3.3 蓝图编辑器
 
 | DataV 功能域 | 档位 | Base Screen 承载方式 / 缺口 |
 | --- | --- | --- |
 | 图层节点 | A | 蓝图投影为基线能力 |
-| 全局变量（静态 / 数据源 / URL 来源、受控、自动更新） | A | [ADR-0083](../decisions/ADR-0083-variable-system.md) 已对齐；调度归宿主 |
+| 全局变量（静态 / 数据源 / URL 来源、受控、自动更新） | A | [ADR-0083](../../../decisions/ADR-0083-variable-system.md) 已对齐；调度归宿主 |
 | 过滤器（预置变换库） | A | `dataProcessor`（ADR-0076），未声明失败关闭 |
 | 过滤器（用户可编写 JS） | B | 见 4.2：宿主组合 `panel`（编辑器 UI）+ 自注册 `dataProcessor`（config 带 `scriptId`）+ 宿主资产服务；执行信任归宿主 |
 | 计时器等触发节点 | B/C | 见 4.1：功能可由"宿主定时器 → 写变量 → `data-updated` 事件 → 蓝图规则"组合；蓝图上作者可编辑的触发器节点形态缺承载面（ADR-0076 明确推迟） |
@@ -77,7 +77,7 @@ DataV 的功能域有多少能落进来，多少落不进来。**
 
 | DataV 功能域 | 档位 | Base Screen 承载方式 / 缺口 |
 | --- | --- | --- |
-| 快照 / 回滚 / 发布 / 分享 / 公开 URL | D | [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) 宿主职责，已定 |
+| 快照 / 回滚 / 发布 / 分享 / 公开 URL | D | [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md) 宿主职责，已定 |
 | AI 设计辅助 / AI 大屏生成 | B/D | AI 服务归宿主；入口可由 `panel` / `command` 挂进设计器 |
 | 数据轮询 / 订阅 | B | 变量 `autoUpdate` 配置 + 宿主调度（`refreshVariables`）；推送型数据走"宿主订阅 → 写变量"（ADR-0068 既定路径） |
 
@@ -101,7 +101,7 @@ DataV 的三个标志性能力，直觉上是缺口，实际上多数场景可�
 - **DataV**：过滤器面板直接写 JS，组件数据流经过滤器。
 - **组合路径**：宿主注册一个 `dataProcessor` 贡献（如 `host-filter`），`configSchema`
   声明 `scriptId` 字段；用 `panel` / `inspectorControl` 提供脚本编辑器 UI
-  （[ADR-0081](../decisions/ADR-0081-event-and-blueprint-authoring-ownership.md)：
+  （[ADR-0081](../../../decisions/ADR-0081-event-and-blueprint-authoring-ownership.md)：
   代码编辑器归宿主）；handler 从宿主资产服务取脚本执行。
 - **信任边界**：插件 handler 是宿主受信同 realm 代码（ADR-0004）。宿主在其中执行自己
   管理的企业内部脚本，属宿主自身的信任决策；Base Screen 不提供沙箱、不背书。
@@ -141,23 +141,27 @@ ADR-0076 推迟——插件词汇表扩展（如 0076 本身）可以做小（�
 5. 宿主自写插件是受信代码，可在 handler 内自行使用网络等宿主能力，但 Base Screen
    不提供、不背书这些原语——信任自担，应在使用文档明示。
 
-## 七、待拍板项
+## 七、待拍板项与落地结果
 
-1. 是否接受 **B 档组合路径**作为 DataV 对应能力的中期答案（尤其 4.1~4.3 三个案例），
-   并先在 `docs/usage.md` 写清推荐组合路径？
-2. C 档四项是否按"2 个以上宿主真实需求"作为触发条件挂入
-   [后续路线图](../roadmap/README.md)？
-3. 是否为"宿主组合实现 DataV 能力"补一组 harness 示例（计时器触发、脚本过滤器、
-   推送变量），作为宿主可复制的模板？
+2026-09-17 评审通过，三项全部落地：
+
+| 待拍板项 | 结果 | 落地位置 |
+| --- | --- | --- |
+| B 档组合路径作为中期答案并写进使用文档 | 接受 | [接入宿主数据](../../../usage/host-data.md)「组合实现长尾能力」 |
+| C 档四项按"2 个以上宿主真实需求"挂路线图 | 接受 | [后续路线图](../../../roadmap/README.md)「蓝图语义扩展（调研 C 档四项）」 |
+| 补一组宿主可复制的 harness 示例 | 接受并已实现 | `examples/browser-harness/datav-composition-fixture.ts`；浏览器断言 `scripts/browser-harness/plugins/assert-datav-composition.mjs`，由 `pnpm verify:browser` 执行 |
+
+补充结论（评审时确认）：C 档四项**全部触碰 canonical 契约**，因此它们的触发条件不能只看需求数量，
+还要先有 canonical Spec；四项均未预建。
 
 ## 八、参考来源
 
 - 阿里云 DataV-Board 7.0 官方帮助中心：核心功能概览、蓝图编辑器界面介绍、逻辑组合配置、
   组件交互配置、全局变量配置与案例。
-- Base Screen：[当前能力基线](../baseline/README.md)、
-  [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、
-  [ADR-0083](../decisions/ADR-0083-variable-system.md)、
-  [ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、
-  [ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)、
-  [数据绑定与数据包调研](./数据绑定与数据包调研.md)、
-  [DataV 全局变量调研（归档）](./archive/datav-global-variables/research.md)。
+- Base Screen：[当前能力基线](../../../baseline/README.md)、
+  [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、
+  [ADR-0083](../../../decisions/ADR-0083-variable-system.md)、
+  [ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、
+  [ADR-0084](../../../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)、
+  [数据绑定与数据包调研](../../数据绑定与数据包调研.md)、
+  [DataV 全局变量调研（归档）](../datav-global-variables/research.md)。

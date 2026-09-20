@@ -75,6 +75,7 @@ export type {
   ContributionHandlerRecordResult,
 } from './contribution-kind.js';
 export {
+  contributionCapabilityField,
   contributionHandlerField,
   contributionIdentity,
   declaredContributionIds,

@@ -165,6 +165,59 @@ stop?.();
 事件并差量刷新依赖组件。`autoUpdate.intervalSeconds` 会随请求提供给宿主，实际调度仍由宿主调用
 `refreshVariables`，Base Screen 不内建轮询或订阅。
 
+## 组合实现长尾能力
+
+有几类常见需求直觉上以为 Base Screen 缺能力，实际都可用上面的公开面组合出来，不需要新端口或
+新贡献类型。可运行模板见 `examples/browser-harness/datav-composition-fixture.ts`，对应断言由
+`pnpm verify:browser` 执行。
+
+**计时器触发。** Base Screen 不内建计时器（[ADR-0083](../decisions/ADR-0083-variable-system.md)）：
+宿主自建调度，把值写进变量，由变量的 `data-updated` 触发 Blueprint 规则与宿主动作。
+
+```ts
+setInterval(() => {
+  designer.getVariable('harness-tick')?.set(Date.now());
+}, 1000);
+```
+
+规则侧用 `{ type: 'variable-event', variableId: 'harness-tick', eventName: 'data-updated' }`
+作为触发器。这条路径缺的从来不是功能，而是"作者可在 Blueprint 上编辑延迟参数"的节点形态；
+那属于 canonical 蓝图语义扩展，触发条件见[后续路线图](../roadmap/README.md)。
+
+**用户可编写过滤器。** 文档里的 `processorId` 是不透明标识，脚本正文留在宿主资产服务：
+
+```ts
+const variablePort: ScreenHostVariablePort = {
+  async resolve(request) {
+    const resolved = await hostVariableService.resolve(request);
+    if (request.processorId === undefined) return resolved;
+    return pluginManager.applyDataProcessor({
+      processorId: request.processorId,
+      value: resolved.ok ? resolved.value : null,
+      config: { scriptId: hostScriptIdFor(request.variableId) },
+    });
+  },
+};
+```
+
+`config` 完全由宿主决定，所以可以只放一个 `scriptId`：换脚本不必改文档，也不必过插件预检。
+过滤器由宿主自营插件以 `dataProcessor` 贡献声明，插件清单里只有 `configSchema`，没有脚本正文。
+处理器是宿主受信同 realm 代码——宿主在其中执行的是自己管理的脚本，属于宿主自身的信任决策；
+Base Screen 不提供用户脚本沙箱，也不为这类执行背书。未知脚本标识应由宿主失败关闭，
+不要静默退回原值，否则作者会以为过滤器生效了。
+
+**推送数据。** `resourcePort` 是请求-响应语义（deadline 与 generation guard），推送不走它：
+
+```ts
+subscription.on('metrics', (value) => {
+  designer.getVariable('metric-value')?.set(value);
+});
+```
+
+宿主在自己的订阅回调里写变量，后续链路与计时器完全一致。需要推送形态时不要在 `resourcePort`
+上造轮询——那会同时破坏宿主与引擎对该端口一次性取数的假设；物料内部自行订阅则是另一条选项
+（组件数据态由物料管理），此时不必经过变量。
+
 ## Resource type 和 capability
 
 提供 `runtimeContributions` 后，Base Screen 会按 resource type 的 `configSchema` 校验参数，并

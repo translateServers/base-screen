@@ -1,6 +1,7 @@
 # 安全与插件运行时
 
 > 返回[当前能力基线](./README.md)。
+> 最近更新：2026-09-20（插件激活失败归因细化）。
 
 
 - **远程插件 Sandbox**：不可信 iframe 插件协议、来源校验、能力缩减与跨 origin transport。
@@ -25,10 +26,20 @@
   贡献身份与 handler 对应关系各自只剩一份实现；`plugin-sdk` 的 handler 读取器删除改为委派。
   对外只新增窄行为接口（kind 联合类型、handler 字段/声明 id/身份查询、共享 handler 读取器）
   与两个身份词法谓词 `isScreenComponentId` / `isScreenVariableName`，替换三处本地正则字面量。
-  已知并有意保留的两处不对称：`PLUGIN_CORE_CAPABILITY_UNDECLARED` 仍只对 `command` 报告
-  （`blueprintAction` 仅靠授权交集失败关闭、不产诊断）；懒激活仍只合并命令 handler，
-  因此 `blueprintAction` 与 `dataProcessor` 贡献在 `activation: 'lazy'` 下不可达。
+  该批次曾留下两处不对称：`PLUGIN_CORE_CAPABILITY_UNDECLARED` 只对 `command` 报告、
+  懒激活只合并命令 handler，两者均已由下面的 2026-09-17 增量关闭。
   词汇与边界见 [领域词汇](../../CONTEXT.md)、[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)。
+- **运行期贡献的懒激活可达性与声明门单一化**（2026-09-17，行为变更：已声明贡献从不可达变为可达）：
+  两类运行期贡献在 `activation: 'lazy'` 下恢复可达。原因不是缺一个 `if`，而是 eager 激活与懒激活
+  各写了一份 handler 合并逻辑：eager 合并 command / blueprintAction / dataProcessor 三类，懒激活
+  只合并 command，于是已声明、已授权、在作者面可见的动作与处理器，执行时按"未声明"失败关闭。
+  现在三个 Map 收进一个 `ContributionHandlerRegistry`，两条激活路径共用同一份合并实现，懒激活
+  索引（贡献 id → 声明插件）与可执行集合读同一份判定，因此"会为它触发懒激活"与"激活后真能执行"
+  不再有两种答案。三类贡献的首次使用（命令、蓝图动作、数据处理器）都会按依赖拓扑序唤醒其插件。
+  同批关闭第二处不对称：`PLUGIN_CORE_CAPABILITY_UNDECLARED` 改为对**所有声明了能力字段的 kind**
+  报告，判据来自 `plugin-core` 贡献类型描述符的 `capabilityField`（经新增窄接口
+  `contributionCapabilityField` 读取），manager 计划表里那份重复的 kind 清单随之删除——
+  `blueprintAction` 的声明校验缺失正是两份清单漂移的产物。对外只新增该一个窄接口。
 - **共享 JSON 相等、数据源校验入口与层级查询接缝**（2026-09-16，整合：对外仅新增导出）：
   结构化 JSON 相等收敛为 `contracts` 的 `screenJsonEquals`，删除 core 内部 `equality.ts`、renderer
   `jsonEquals` 与 plugin-sdk `areEqual` 三份同语义实现（三者逻辑一致，比较结果不变）；
@@ -110,3 +121,10 @@
   插件代码（ADR-0029）。**未修改 screen-document 契约**：两个 id 本就是既有模式下的不透明字符串，
   schema、黄金产物与解析器均未变。插件仍是同 realm 受信代码（ADR-0084），不引入用户脚本执行与沙箱，
   数据加工职责仍归宿主（ADR-0027）。示例见 [`plugins/plugin-pipeline`](../../plugins/plugin-pipeline)。
+- **插件激活失败归因细化**（2026-09-20）：运行期激活失败不再把“会话装配失败”与“插件钩子抛错”
+  收敛到同一条通用文案。两类稳定诊断——`Plugin activation session setup failed.`（宿主端口工厂或
+  管理器的端口校验抛错，插件代码尚未运行）与 `Plugin activation hook failed.`（插件自己的
+  `activate` 抛出或拒绝）——让宿主可直接从 `snapshot.failures` 判断失败发生在环境接线还是插件代码。
+  eager 与懒激活改用同一份尝试实现，归因不会在两条路径间漂移。爆炸半径与最小披露边界均不变：
+  单插件失败仍只排除自身并级联其声明依赖方；被捕获 error 的 message、name、stack 仍不进入诊断、
+  快照与结果。

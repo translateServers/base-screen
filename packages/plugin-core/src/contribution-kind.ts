@@ -37,7 +37,7 @@ export interface ContributionKindDescriptor {
   /** 身份串字段；material 取 `type`，其余取 `id`。 */
   readonly identityField: string;
   readonly identityPrefix: string;
-  /** 该字段的值必须同时出现在清单 `capabilities` 中（声明 ∩ 授权）。 */
+  /** 该字段的值必须同时出现在清单 `capabilities` 中（声明 ∩ 授权）；由 manager 预检读取。 */
   readonly capabilityField?: string;
   /** 运行时 handler 记录字段名；缺省表示该 kind 没有 handler。 */
   readonly handlerField?: BaseScreenPluginContributionHandlerField;
@@ -248,6 +248,20 @@ export function contributionHandlerField(
   kind: BaseScreenPluginContributionKind,
 ): BaseScreenPluginContributionHandlerField | undefined {
   return DESCRIPTORS_BY_KIND.get(kind)?.handlerField;
+}
+
+/**
+ * 该 kind 的能力字段名：字段值必须同时出现在清单 `capabilities` 中（声明 ∩ 授权）。
+ * 返回 undefined 表示该 kind 不把能力写成贡献字段——`blueprintCapability` 以自身 id 作为
+ * 能力，`dataProcessor` 没有能力门槛。
+ *
+ * 消费方是 manager 预检：哪些 kind 必须声明能力这件事只在描述符表里写一次，预检读取它，
+ * 而不是另立一份 kind 清单——两份清单必然漂移，`blueprintAction` 的声明校验曾因此缺失。
+ */
+export function contributionCapabilityField(
+  kind: BaseScreenPluginContributionKind,
+): string | undefined {
+  return DESCRIPTORS_BY_KIND.get(kind)?.capabilityField;
 }
 
 /** 承载 handler 的 kind 列表，顺序即描述符表顺序。 */

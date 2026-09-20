@@ -1,18 +1,23 @@
 # verify:m0 门禁排障记录
 
 > 状态：生效中
-> 最近更新：2026-08-30
+> 最近更新：2026-09-20
 > 定位：记录 `pnpm verify:m0` 各门禁在 P0 实现中实际遇到的问题、根因与修复方法，避免重复排查
 > 关联：[M0 工程基线 Spec](../specs/archive/m0-engineering-baseline/spec.md)、[Contracts Foundation Spec](../specs/archive/contracts-foundation/spec.md)
 
 ## 1. 门禁执行顺序与定位方法
 
-`pnpm verify:m0` 按序执行：
+`pnpm verify:m0` 按序执行（以 `package.json` 脚本为准）：
 
 ```text
-format -> format:check -> lint -> typecheck -> test -> build -> check:packages -> check:api
+format:check -> lint -> typecheck -> test -> check:packages -> check:api
 -> check:engine-import -> verify:tarball
 ```
+
+链中没有会写入格式修正的 `format` 步骤（格式修正须先手动运行 `pnpm format`），也没有独立的 `build`
+步骤——各包构建由 Turbo 任务依赖间接触发（`test` 依赖本包 `build`，`lint`/`typecheck` 依赖 `^build`），
+构建失败会在对应步骤暴露，需要单独隔离构建时可运行 `pnpm build`。CI 在 `pnpm verify:m0` 之后运行
+`pnpm check:api-changesets`，并以 `git diff --exit-code` 收尾，校验整个过程未改动任何受跟踪文件。
 
 定位失败步骤：
 
@@ -22,7 +27,6 @@ pnpm lint *> $null; Write-Output "lint=$LASTEXITCODE"
 pnpm check:docs *> $null; Write-Output "check:docs=$LASTEXITCODE"
 pnpm typecheck *> $null; Write-Output "typecheck=$LASTEXITCODE"
 pnpm test *> $null; Write-Output "test=$LASTEXITCODE"
-pnpm build *> $null; Write-Output "build=$LASTEXITCODE"
 pnpm check:packages *> $null; Write-Output "check:packages=$LASTEXITCODE"
 pnpm check:api *> $null; Write-Output "check:api=$LASTEXITCODE"
 pnpm check:engine-import *> $null; Write-Output "check:engine-import=$LASTEXITCODE"

@@ -286,6 +286,10 @@ describe('BaseScreenPluginManager', () => {
     expect(manager.status).toBe('active');
     expect(result.value.failures).toMatchObject([{ pluginId: 'acme.failing', index: 1 }]);
     expect(result.value.failures[0]?.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    // 归因可定位：失败发生在插件自己的钩子里，而不是会话装配。
+    expect(result.value.failures[0]?.diagnostics[0]?.message).toBe(
+      'Plugin activation hook failed.',
+    );
     expect(result.value.plugins.list().map((entry) => entry.manifest.id)).toEqual(['acme.base']);
     // base 的会话端口保持有效；失败插件的 JSON 凭据不进入任何快照诊断。
     expect(JSON.stringify(result.value.failures)).not.toContain('canary secret must not escape');
@@ -295,6 +299,39 @@ describe('BaseScreenPluginManager', () => {
     const deactivated = await manager.deactivate();
     expect(deactivated.ok).toBe(true);
     expect(log).toEqual(['activate:base', 'deactivate:base']);
+  });
+
+  it('attributes an activation failure to session setup when the host port factory throws', async () => {
+    let hooks = 0;
+    const plugin = runtime(
+      pluginManifest({ id: 'acme.port-factory-fails', capabilities: ['command.execute'] }),
+      {
+        activate: () => {
+          hooks++;
+        },
+      },
+    );
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.port-factory-fails': ['command.execute'] },
+      createCommandPort: () => {
+        throw new Error('canary secret must not escape');
+      },
+    });
+
+    const result = await manager.activate();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    // 会话装配失败发生在插件代码运行之前：钩子零调用，归因指向宿主端口工厂。
+    expect(hooks).toBe(0);
+    expect(result.value.failures).toMatchObject([
+      { pluginId: 'acme.port-factory-fails', index: 0 },
+    ]);
+    expect(result.value.failures[0]?.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    expect(result.value.failures[0]?.diagnostics[0]?.message).toBe(
+      'Plugin activation session setup failed.',
+    );
+    expect(JSON.stringify(result.value.failures)).not.toContain('canary secret must not escape');
   });
 
   it('isolates unknown Blueprint capability contributions', async () => {
@@ -829,6 +866,46 @@ describe('BaseScreenPluginManager', () => {
     }
   });
 
+  it('attributes a throwing contribution command handler to the handler without echoing it', async () => {
+    const plugin = runtime(
+      pluginManifest({
+        id: 'acme.handler-throws',
+        capabilities: ['command.execute'],
+        contributions: [
+          {
+            kind: 'command',
+            id: 'boom',
+            name: 'Boom',
+            requiredCapability: 'command.execute',
+          },
+        ],
+      }),
+    );
+    Object.defineProperty(plugin, 'commands', {
+      value: {
+        boom: () => {
+          throw new Error('canary secret must not escape');
+        },
+      },
+    });
+    const manager = createBaseScreenPluginManager({
+      ...managerOptions([plugin]),
+      grantedCapabilities: { 'acme.handler-throws': ['command.execute'] },
+      createCommandPort: () => ({
+        execute: async () => ({ ok: true as const, value: null, diagnostics: [] }),
+      }),
+    });
+
+    expect((await manager.activate()).ok).toBe(true);
+    const executed = await manager.executeContributionCommand({ commandId: 'boom', args: null });
+    expect(executed.ok).toBe(false);
+    if (executed.ok) return;
+    // 执行期失败归因到具体 handler；原始 message 同样不进入结果诊断。
+    expect(executed.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    expect(executed.diagnostics[0]?.message).toBe('Plugin contribution command failed.');
+    expect(JSON.stringify(executed.diagnostics)).not.toContain('canary secret must not escape');
+  });
+
   it('isolates command handlers that are not declared as contributions', async () => {
     const plugin = runtime(pluginManifest({ id: 'acme.extra-handler' }));
     Object.defineProperty(plugin, 'commands', {
@@ -1175,6 +1252,7 @@ describe('BaseScreenPluginManager', () => {
       expect(first.ok).toBe(false);
       if (!first.ok) {
         expect(first.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+        expect(first.diagnostics[0]?.message).toBe('Plugin activation hook failed.');
       }
       const second = await manager.executeContributionCommand({
         commandId: 'acme.broken.ping',
@@ -1263,6 +1341,112 @@ describe('BaseScreenPluginManager', () => {
       expect(ensured.ok).toBe(false);
       if (!ensured.ok) {
         expect(ensured.diagnostics[0]?.code).toBe('PLUGIN_CORE_IDENTITY_INVALID');
+      }
+    });
+
+    // 懒激活曾经只合并命令 handler，于是已声明、已授权的 blueprintAction / dataProcessor
+    // 在作者面可见，执行时却按"未声明"失败关闭。三类 handler 现在走同一条唤醒路径。
+    it('reaches blueprint actions and data processors declared by a lazily activated plugin', async () => {
+      const calls: string[] = [];
+      const pluginId = 'acme.lazy-runtime';
+      const actionId = 'acme.lazy-runtime.spotlight';
+      const plugin = runtime(
+        pluginManifest({
+          id: pluginId,
+          capabilities: ['data.process', 'blueprint.action.execute'],
+          contributions: [
+            {
+              kind: 'dataProcessor',
+              id: 'lazyTopBy',
+              name: 'Top N',
+              configSchema: {
+                kind: 'object',
+                properties: { field: { kind: 'string' } },
+                required: ['field'],
+              },
+            },
+            {
+              kind: 'blueprintAction',
+              id: actionId,
+              name: 'Spotlight',
+              payloadSchema: { kind: 'object', properties: {}, required: [] },
+              requiredCapability: 'blueprint.action.execute',
+            },
+          ],
+        }),
+        {
+          activate: () => {
+            calls.push(`activate:${pluginId}`);
+          },
+        },
+      );
+      Object.defineProperties(plugin, {
+        dataProcessors: {
+          value: {
+            lazyTopBy: (value: ScreenJsonValue) => ({
+              ok: true as const,
+              value: { processed: value },
+              diagnostics: [],
+            }),
+          },
+        },
+        blueprintActions: {
+          value: {
+            [actionId]: (payload: ScreenJsonValue) => ({
+              ok: true as const,
+              value: { spotlighted: payload },
+              diagnostics: [],
+            }),
+          },
+        },
+      });
+      const manager = lazyManager([plugin], {
+        [pluginId]: ['data.process', 'blueprint.action.execute'],
+      });
+
+      expect((await manager.activate()).ok).toBe(true);
+      expect(calls).toEqual([]);
+
+      const applied = await manager.applyDataProcessor({
+        processorId: 'lazyTopBy',
+        value: [1, 2],
+        config: { field: 'value' },
+      });
+      expect(applied.ok ? applied.value : undefined).toEqual({ processed: [1, 2] });
+      expect(calls).toEqual([`activate:${pluginId}`]);
+
+      const executed = await manager.executeBlueprintAction({
+        actionId,
+        payload: { color: '#fff' },
+      });
+      expect(executed.ok ? executed.value : undefined).toEqual({ spotlighted: { color: '#fff' } });
+      // 第二次使用不再重跑激活钩子。
+      expect(calls).toEqual([`activate:${pluginId}`]);
+    });
+
+    it('fails closed on runtime contributions that no plugin declares', async () => {
+      const manager = lazyManager([pingPlugin('acme.lazy')], {
+        'acme.lazy': ['command.execute'],
+      });
+      expect((await manager.activate()).ok).toBe(true);
+
+      const applied = await manager.applyDataProcessor({
+        processorId: 'not-declared',
+        value: null,
+        config: {},
+      });
+      expect(applied.ok).toBe(false);
+      if (!applied.ok) {
+        expect(applied.diagnostics[0]?.code).toBe('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
+      }
+
+      const executed = await manager.executeBlueprintAction({
+        actionId: 'not.declared',
+        payload: null,
+      });
+      expect(executed.ok).toBe(false);
+      if (!executed.ok) {
+        expect(executed.diagnostics[0]?.code).toBe('PLUGIN_CORE_CONTRIBUTION_UNKNOWN');
       }
     });
   });

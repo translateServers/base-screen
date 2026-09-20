@@ -1,6 +1,5 @@
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/contracts';
-import { contributionIdentity } from '@base-screen/plugin-core';
-import { planForContribution } from './contribution-kind-plan.js';
+import { contributionCapabilityField, contributionIdentity } from '@base-screen/plugin-core';
 import { DiagnosticCollector } from './diagnostics.js';
 import type { Candidate, ManagerInput } from './preflight-types.js';
 
@@ -193,15 +192,16 @@ function validateContributions(
         );
       }
       identities.add(identity);
-      const plan = planForContribution(contribution);
-      if (plan.requiresDeclaredCapability === true) {
-        const required = (contribution as { readonly requiredCapability?: unknown })
-          .requiredCapability;
-        if (typeof required === 'string' && !capabilities.includes(required)) {
+      // 哪些 kind 必须把能力写进清单 `capabilities`，由 plugin-core 的贡献类型描述符回答；
+      // 这里只读取答案。命令与蓝图动作共用同一条声明门，不再各自持有 kind 清单。
+      const capabilityField = contributionCapabilityField(contribution.kind);
+      if (capabilityField !== undefined) {
+        const declared = (contribution as unknown as Record<string, unknown>)[capabilityField];
+        if (typeof declared === 'string' && !capabilities.includes(declared)) {
           diagnostics.add(
             'PLUGIN_CORE_CAPABILITY_UNDECLARED',
             path,
-            'Command contribution requires an undeclared capability.',
+            'Contribution requires an undeclared capability.',
           );
         }
       }

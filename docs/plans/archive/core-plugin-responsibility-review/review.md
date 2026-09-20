@@ -1,12 +1,12 @@
 # 核心与插件职责划分评审
 
-> 状态：评审材料（草稿，供评审后决策；本文不授权任何移动、拆分或下架——实际变更须走 ADR/Spec）
-> 日期：2026-09-16
-> 场景：与[DataV 能力插件承载差距调研](./DataV-能力插件承载差距调研.md)构成双向评审——前篇回答
+> 状态：已评审，结论已落地（归档记录）
+> 日期：2026-09-16（2026-09-17 归档）
+> 场景：与[DataV 能力插件承载差距调研](../datav-capability-plugin-coverage/research.md)构成双向评审——前篇回答
 > "插件能补什么"（外向差距），本篇回答"核心该留什么"（内向审计），**原本 `packages/` 的全部
 > 功能点纳入评审范围**。
-> 参考：[当前能力基线](../baseline/README.md)、[ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、
-> [ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)~[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)
+> 参考：[当前能力基线](../../../baseline/README.md)、[ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、
+> [ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)~[ADR-0084](../../../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)
 
 ---
 
@@ -77,7 +77,7 @@
 
 ### 4.1 官方图表与表格物料（`base.chart` / `base.table`）
 
-- **现状**：官方物料范围内保留，作为 [ADR-0022](../decisions/ADR-0022-official-data-material-contracts.md)
+- **现状**：官方物料范围内保留，作为 [ADR-0022](../../../decisions/ADR-0022-official-data-material-contracts.md)
   最小数据语义契约（dimension/measures、columns）的官方载体；真实图表竞争力已归
   `plugins/plugin-echarts`。
 - **判定**：K2，建议保留。理由：契约需要一个无第三方依赖的官方实现来验证可用性（含
@@ -167,24 +167,28 @@
 宿主的"千奇百怪需求"应先在扩展点上找承载面（前篇四档分类），找不到才进 C 档立项，
 永不进 D 档红线。
 
-## 七、待拍板项
+## 七、待拍板项与落地结果
 
-1. 是否接受第 2.1 节六条判据（C1~C6）作为后续"新功能归属"的默认裁决标准，登记进基线？
-2. Nebula Importer 是否立案移出发布面（需先确认迁移使命完成度）？
-3. "官方物料 = 无外部依赖的契约载体、不追求视觉竞争力"是否固化为官方物料范围标准？
-4. 内建检查器控件集是否确立"冻结面 + 平台原语判据"的门禁？
-5. 图片倍图尺寸类"engine 内特定物料工具"是否按"第二个同类需求出现才立项贡献类型"处理？
+2026-09-17 评审通过，五项全部处置：
+
+| 待拍板项 | 结果 | 落地位置 |
+| --- | --- | --- |
+| C1~C6 六条判据作为"新功能归属"默认裁决标准 | 接受 | [能力基线「功能归属裁决」](../../../baseline/README.md) |
+| Nebula Importer 立案移出发布面 | **无须动作**——复核发现该工具位于 `scripts/import-nebula.mjs`，不属于 12 个发布包、也不在 `verify:m0` 内，本就在发布面之外。本文 4.9 节"位于 `packages/` 内"的前提有误 | [能力基线「历史迁移」](../../../baseline/README.md) |
+| 官方物料 = 无外部依赖的契约载体、不追求视觉竞争力 | 固化为范围标准 | [能力基线「功能归属裁决」](../../../baseline/README.md) |
+| 内建检查器控件集确立"冻结面 + 平台原语判据" | 接受 | 同上 |
+| 倍图尺寸类单物料工具按"第二个同类需求才立项" | 接受，维持观察 | 同上 |
 
 ## 八、参考来源
 
-- Base Screen：[当前能力基线](../baseline/README.md)、
-  [ADR-0011](../decisions/ADR-0011-nebula-importer-auditable-migration.md)、
-  [ADR-0022](../decisions/ADR-0022-official-data-material-contracts.md)、
-  [ADR-0027](../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、
-  [ADR-0081](../decisions/ADR-0081-event-and-blueprint-authoring-ownership.md)、
-  [ADR-0077](../decisions/ADR-0077-canvas-background-and-color-authoring.md)、
-  [ADR-0085](../decisions/ADR-0085-text-and-image-material-authoring.md)、
-  [ADR-0083](../decisions/ADR-0083-variable-system.md)、
-  [ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、
-  [ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)。
-- 姊妹篇：[DataV 能力插件承载差距调研](./DataV-能力插件承载差距调研.md)。
+- Base Screen：[当前能力基线](../../../baseline/README.md)、
+  [ADR-0011](../../../decisions/ADR-0011-nebula-importer-auditable-migration.md)、
+  [ADR-0022](../../../decisions/ADR-0022-official-data-material-contracts.md)、
+  [ADR-0027](../../../decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)、
+  [ADR-0081](../../../decisions/ADR-0081-event-and-blueprint-authoring-ownership.md)、
+  [ADR-0077](../../../decisions/ADR-0077-canvas-background-and-color-authoring.md)、
+  [ADR-0085](../../../decisions/ADR-0085-text-and-image-material-authoring.md)、
+  [ADR-0083](../../../decisions/ADR-0083-variable-system.md)、
+  [ADR-0074](../../../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)、
+  [ADR-0084](../../../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)。
+- 姊妹篇：[DataV 能力插件承载差距调研](../datav-capability-plugin-coverage/research.md)。
