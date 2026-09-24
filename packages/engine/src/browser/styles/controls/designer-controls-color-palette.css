@@ -526,7 +526,7 @@
   height: 16px;
   overflow: visible;
   padding-block: 3px;
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background-clip: content-box;
 }
 
@@ -537,7 +537,7 @@
 .designer-fill-color-alpha-track::after {
   position: absolute;
   inset: 3px 0;
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: linear-gradient(to right, transparent, var(--designer-fill-opaque));
   content: "";
   pointer-events: none;
@@ -562,7 +562,7 @@
   margin: 0;
   appearance: none;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   outline: 0;
   background: transparent;
   cursor: ew-resize;

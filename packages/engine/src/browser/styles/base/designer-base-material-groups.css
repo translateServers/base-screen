@@ -176,7 +176,7 @@
   background: color-mix(in srgb, var(--designer-border-default) 35%, transparent);
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .material-group-popover .material-group-children .material-group-count {

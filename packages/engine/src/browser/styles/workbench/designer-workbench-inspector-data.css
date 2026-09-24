@@ -107,7 +107,7 @@
   display: block;
   overflow: hidden;
   color: var(--designer-text-primary);
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -137,7 +137,7 @@
   gap: 8px;
   margin: 0;
   color: var(--designer-text-secondary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .properties .designer-data-source-type-field > span::before {
@@ -161,7 +161,7 @@
 .properties .designer-datav-data-flow-content .designer-inspector-section-title,
 .properties .designer-datav-data-flow-content h4 {
   color: var(--designer-text-secondary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -193,14 +193,14 @@
   min-height: 120px;
   padding: 10px;
   background: var(--designer-surface-canvas);
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
 }
 
 .properties .designer-data-source-feedback {
   margin-top: 10px;
   padding: 7px 8px;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-surface-workspace);
 }
 
@@ -222,7 +222,7 @@
 .properties[data-inspector-context-kind="canvas"] > .panel-heading .panel-title {
   margin-left: auto;
   color: var(--designer-text-primary);
-  font-size: 13px;
+  font-size: var(--designer-font-size-md);
   font-weight: 500;
 }
 
@@ -259,7 +259,7 @@
   overflow: visible;
   border-bottom: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-secondary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   white-space: normal;
   transition: background-color var(--designer-motion);
 }
@@ -337,7 +337,7 @@
   height: 30px;
   padding-left: 20px;
   color: var(--designer-text-primary);
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
   text-align: right;
 }
 
@@ -355,7 +355,7 @@
   gap: 1px;
   padding: 0;
   border-color: var(--designer-border-default);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-border-default);
 }
 
@@ -364,7 +364,7 @@
   border: 0;
   border-radius: 0;
   background: var(--designer-surface-workspace);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .properties .designer-canvas-scale-option[aria-pressed="true"] {

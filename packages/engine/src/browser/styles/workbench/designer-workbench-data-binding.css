@@ -3,7 +3,7 @@
   gap: var(--designer-space-3);
   padding: var(--designer-space-4);
   border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-panel);
+  border-radius: var(--designer-radius-control);
   background: var(--designer-surface-raised);
 }
 
@@ -129,7 +129,7 @@
 .designer-data-summary-status > span {
   flex: 0 0 auto;
   padding: 2px var(--designer-space-2);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-danger-surface);
   color: var(--designer-danger);
   font: var(--designer-font-small);
@@ -209,7 +209,7 @@
 .designer-dataset-binding-summary-header > span {
   flex: 0 0 auto;
   padding: 1px var(--designer-space-2);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-raised);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
@@ -289,7 +289,7 @@
   max-width: 88px;
   min-width: 0;
   padding: 2px var(--designer-space-2);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

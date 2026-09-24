@@ -215,7 +215,7 @@
   margin: 0;
   padding: 0;
   border: 1px solid var(--designer-border-strong);
-  border-radius: 5px;
+  border-radius: var(--designer-radius-3);
   appearance: none;
   -webkit-appearance: none;
   accent-color: var(--designer-accent);

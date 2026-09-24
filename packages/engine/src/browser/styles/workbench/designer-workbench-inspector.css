@@ -87,7 +87,7 @@
   padding: 0 6px;
   border: 0;
   color: var(--designer-text-muted);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .properties .inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
@@ -141,13 +141,13 @@
 
 .properties .inspector-context-identity strong {
   color: var(--designer-text-primary);
-  font-size: 14px;
+  font-size: var(--designer-font-size-lg);
   font-weight: 600;
 }
 
 .properties .inspector-context-identity span {
   color: var(--designer-text-muted);
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
 }
 
 .properties .inspector-toolbar {
@@ -168,7 +168,7 @@
   width: 28px;
   height: 28px;
   border-color: var(--designer-border-default);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-inspector-control-surface);
   color: var(--designer-text-secondary);
 }
@@ -177,14 +177,14 @@
   height: 28px;
   padding: 1px;
   border-color: var(--designer-border-default);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-inspector-control-surface);
 }
 
 .properties .inspector-density .designer-tab {
   min-height: 24px;
   padding: 0 7px;
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
 }
 
 .properties .inspector-density .designer-tab[aria-pressed="true"] {
@@ -228,7 +228,7 @@
 
 .inspector-search-workspace-header strong {
   overflow: hidden;
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -259,10 +259,10 @@
   height: 30px;
   padding: 0 9px 0 30px;
   border-color: var(--designer-border-subtle);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-surface-control);
   color: var(--designer-text-primary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .inspector-search-instructions {
@@ -271,7 +271,7 @@
   padding: 0 14px 12px;
   border-bottom: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-muted);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 1.55;
 }
 
@@ -311,7 +311,7 @@
 .properties[data-inspector-context-kind="multi-selection"] > .panel-heading .panel-title {
   display: block !important;
   color: var(--designer-text-primary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
   text-align: center;
 }
@@ -386,7 +386,7 @@
 
 .properties .designer-datav-batch-field-row-label {
   color: var(--designer-text-secondary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .properties .designer-datav-batch-field-row-controls {
@@ -443,7 +443,7 @@
   gap: 0;
   overflow: hidden;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
 }
 
 .properties
@@ -461,7 +461,7 @@
 
 .properties .designer-datav-batch-unified-style > .designer-inspector-section-title {
   margin-bottom: 10px;
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   text-transform: none;
 }
 
@@ -500,7 +500,7 @@
   gap: var(--designer-space-3);
   margin-bottom: 10px;
   color: var(--designer-text-secondary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
   letter-spacing: 0;
   text-transform: none;
@@ -516,7 +516,7 @@
 
 .properties .designer-control:not(.panel-collapse) {
   border-color: var(--designer-border-default);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background-color: var(--designer-inspector-control-surface);
 }
 
@@ -541,7 +541,7 @@
   margin: 12px 0 0;
   padding: 8px 10px;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-surface-workspace);
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
@@ -551,7 +551,7 @@
 .properties .designer-input,
 .properties .designer-select {
   height: 32px;
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .properties .designer-datav-geometry-section > .designer-inspector-section-title {
@@ -590,7 +590,7 @@
   color: var(--designer-text-muted);
   content: attr(data-property-symbol);
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 14px;
   pointer-events: none;
 }
@@ -599,12 +599,12 @@
   height: 28px;
   padding-right: 25px;
   color: var(--designer-text-primary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   text-align: left;
 }
 
 .properties .designer-datav-geometry-grid .designer-field-message {
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   white-space: normal;
 }
 
@@ -621,7 +621,7 @@
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--designer-border-default);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-border-default);
 }
 
@@ -632,7 +632,7 @@
   border-radius: 0;
   background: var(--designer-inspector-control-surface);
   color: var(--designer-text-muted);
-  font-size: 14px;
+  font-size: var(--designer-font-size-lg);
 }
 
 .properties .designer-datav-geometry-grid .designer-image-density-field {
@@ -642,7 +642,7 @@
   align-items: center;
   gap: 8px;
   color: var(--designer-text-secondary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .properties .designer-datav-geometry-grid .designer-image-density-actions {
@@ -652,7 +652,7 @@
   gap: 1px;
   overflow: hidden;
   border: 1px solid var(--designer-border-default);
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   background: var(--designer-border-default);
 }
 
@@ -664,7 +664,7 @@
   border-radius: 0;
   background: var(--designer-inspector-control-surface);
   color: var(--designer-text-muted);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .properties .designer-opacity-field {
@@ -674,7 +674,7 @@
   gap: 8px;
   margin: 0;
   color: var(--designer-text-secondary);
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
 }
 
 .properties .designer-opacity-controls {
@@ -743,7 +743,7 @@
 }
 
 .properties summary.designer-inspector-section-title:focus-visible {
-  border-radius: 2px;
+  border-radius: var(--designer-radius-1);
   outline: 2px solid var(--designer-focus-ring);
   outline-offset: 2px;
 }

@@ -38,7 +38,7 @@
 
 .inspector-context-identity strong {
   color: var(--designer-text-primary);
-  font-size: 13px;
+  font-size: var(--designer-font-size-md);
 }
 
 .inspector-context-identity span {
@@ -50,7 +50,7 @@
   flex: none;
   padding: 1px var(--designer-space-2);
   border: 1px solid var(--designer-border-default);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
 }
@@ -69,7 +69,7 @@
   gap: var(--designer-space-1);
   padding: 0 var(--designer-space-2);
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   color: var(--designer-text-secondary);
   cursor: pointer;
   font: var(--designer-font-small);
@@ -105,7 +105,7 @@
   gap: var(--designer-space-2);
   min-width: 0;
   padding: var(--designer-space-2);
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   background: var(--designer-surface-workspace);
 }
 
@@ -248,7 +248,7 @@
 }
 
 .inspector-search-result-copy strong {
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   font-weight: 500;
 }
 
@@ -260,7 +260,7 @@
 .inspector-search-result-badge {
   align-self: center;
   padding: 1px var(--designer-space-2);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-accent-surface);
   color: var(--designer-accent);
   font: var(--designer-font-small);
@@ -342,7 +342,7 @@
   border-color: transparent;
   background: transparent;
   color: var(--designer-text-muted);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   text-overflow: ellipsis;
 }
 

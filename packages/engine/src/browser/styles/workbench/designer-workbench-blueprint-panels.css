@@ -49,7 +49,7 @@
 .blueprint-overview strong {
   color: var(--designer-text-primary);
   font: var(--designer-font-numeric);
-  font-size: 13px;
+  font-size: var(--designer-font-size-md);
 }
 
 .blueprint-overview small {
@@ -120,7 +120,7 @@
 .blueprint-panel-tab em {
   min-width: 16px;
   padding: 0 var(--designer-space-1);
-  border-radius: 8px;
+  border-radius: var(--designer-radius-4);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
@@ -251,7 +251,7 @@
 
 .blueprint-logic-guide small {
   color: var(--designer-text-muted);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 1.45;
 }
 
@@ -345,7 +345,7 @@
   overflow: hidden;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -395,7 +395,7 @@
   width: 32px;
   height: 32px;
   place-items: center;
-  border-radius: 8px;
+  border-radius: var(--designer-radius-4);
   background: var(--designer-accent-surface);
   color: var(--designer-accent);
 }
@@ -506,7 +506,7 @@
 .blueprint-inspector-status li strong {
   color: var(--designer-text-primary);
   font: var(--designer-font-numeric);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .blueprint-inspector-status li small {
@@ -601,7 +601,7 @@
   width: 44px;
   height: 44px;
   place-items: center;
-  border-radius: 12px;
+  border-radius: var(--designer-radius-5);
   background: var(--designer-surface-raised);
 }
 

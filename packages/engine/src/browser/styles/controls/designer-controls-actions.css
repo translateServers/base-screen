@@ -11,12 +11,12 @@
 
 .designer-color::-webkit-color-swatch {
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
 }
 
 .designer-color::-moz-color-swatch {
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
 }
 
 .designer-button {
@@ -207,7 +207,7 @@
   min-width: 0;
   min-height: var(--designer-control-height-compact);
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   background: transparent;
   color: var(--designer-text-muted);
   cursor: pointer;

@@ -55,7 +55,7 @@
   flex: 0 0 28px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--designer-accent) 55%, transparent);
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   background: color-mix(in srgb, var(--designer-accent-surface) 76%, transparent);
   color: var(--designer-accent);
 }
@@ -79,7 +79,7 @@
   margin-left: var(--designer-space-3);
   padding: 2px;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 5px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
 }
 
@@ -146,7 +146,7 @@ button.topbar-mode-button:disabled {
   gap: var(--designer-space-2);
   padding: 0 var(--designer-space-2);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   background: transparent;
   color: var(--designer-text-secondary);
   cursor: pointer;
@@ -203,7 +203,7 @@ button.topbar-mode-button:disabled {
   gap: 1px;
   padding: 2px;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 8px;
+  border-radius: var(--designer-radius-4);
   background: color-mix(
     in srgb,
     var(--designer-surface-workspace) 80%,
@@ -216,7 +216,7 @@ button.topbar-mode-button:disabled {
   width: 28px;
   height: 28px;
   min-height: 28px;
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   border-color: transparent;
   background: transparent;
 }
@@ -239,7 +239,7 @@ button.topbar-mode-button:disabled {
   width: 32px;
   height: 32px;
   min-height: 32px;
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   border-color: transparent;
   background: transparent;
 }
@@ -277,8 +277,8 @@ button.topbar-mode-button:disabled {
   justify-content: center;
   color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
-  font-size: 11px;
-  border-radius: 5px;
+  font-size: var(--designer-font-size-sm);
+  border-radius: var(--designer-radius-3);
   cursor: pointer;
   transition:
     background var(--designer-motion),
@@ -300,7 +300,7 @@ button.topbar-mode-button:disabled {
 .designer-project-name {
   overflow: hidden;
   color: var(--designer-text-primary);
-  font-size: 13px;
+  font-size: var(--designer-font-size-md);
   font-weight: 600;
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
@@ -315,7 +315,7 @@ button.topbar-mode-button:disabled {
   padding: 0;
   border-radius: var(--designer-radius-control);
   color: var(--designer-text-muted);
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
   font-weight: 500;
   transition: background var(--designer-motion);
 }
@@ -334,7 +334,7 @@ button.topbar-mode-button:disabled {
   gap: var(--designer-space-2);
   padding: 0 var(--designer-space-3);
   border: 1px solid var(--designer-border-default);
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   cursor: pointer;

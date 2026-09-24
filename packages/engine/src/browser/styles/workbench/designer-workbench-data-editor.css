@@ -69,12 +69,12 @@
 
 .designer-workbench-header h3 {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--designer-font-size-lg);
 }
 
 .designer-workbench-draft {
   padding: 2px var(--designer-space-3);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-warning-surface);
   color: var(--designer-warning);
   font: var(--designer-font-small);
@@ -370,7 +370,7 @@
   height: 20px;
   place-items: center;
   padding: 0 var(--designer-space-1);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
@@ -442,7 +442,7 @@
 .designer-blueprint-state {
   flex: 0 0 auto;
   padding: 2px var(--designer-space-2);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
@@ -663,7 +663,7 @@
   height: var(--designer-control-height-compact);
   width: auto;
   min-width: 58px;
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
   padding-left: var(--designer-space-2);
   padding-right: 18px;
   background-position:

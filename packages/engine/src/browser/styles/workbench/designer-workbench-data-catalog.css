@@ -325,7 +325,7 @@
 .designer-dataset-binding-heading > span {
   flex: 0 0 auto;
   padding: 1px var(--designer-space-2);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
@@ -376,7 +376,7 @@
   width: 16px;
   height: 16px;
   border: 1px solid var(--designer-border-strong);
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   background: var(--designer-surface-control);
   content: "";
   transform: translateY(-50%);

@@ -90,10 +90,10 @@
   min-height: 18px;
   padding: 0 var(--designer-space-2);
   border: 1px solid var(--designer-border-default);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 16px;
   white-space: nowrap;
 }
@@ -137,7 +137,7 @@
   overflow: hidden;
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -178,7 +178,7 @@
 .variable-row-context-label {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   white-space: nowrap;
 }
 
@@ -187,7 +187,7 @@
   overflow: hidden;
   color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

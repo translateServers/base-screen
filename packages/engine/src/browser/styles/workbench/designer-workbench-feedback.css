@@ -35,7 +35,7 @@
   min-height: 44px;
   padding-bottom: var(--designer-space-4);
   border-bottom: 1px solid var(--designer-border-subtle);
-  font-size: 14px;
+  font-size: var(--designer-font-size-lg);
   font-weight: 600;
   color: var(--designer-text-primary);
 }
@@ -91,7 +91,7 @@
   min-height: 28px;
   padding: 0 var(--designer-space-3);
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--designer-radius-3);
   font: var(--designer-font-small);
   color: var(--designer-text-secondary);
   transition:
@@ -122,7 +122,7 @@
   background: var(--designer-surface-control);
   color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 1.2;
   text-align: center;
 }
@@ -224,7 +224,7 @@
   margin: 0;
   overflow: hidden;
   color: var(--designer-text-primary);
-  font-size: 14px;
+  font-size: var(--designer-font-size-lg);
   text-overflow: ellipsis;
   white-space: nowrap;
 }

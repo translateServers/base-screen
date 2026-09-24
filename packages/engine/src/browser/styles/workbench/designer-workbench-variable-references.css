@@ -108,15 +108,15 @@ button.variable-reference-count[aria-expanded="true"] {
 .variable-reference-copy small {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .variable-reference-kind {
   padding: 1px var(--designer-space-2);
-  border-radius: 999px;
+  border-radius: var(--designer-radius-pill);
   background: var(--designer-surface-panel);
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   white-space: nowrap;
 }

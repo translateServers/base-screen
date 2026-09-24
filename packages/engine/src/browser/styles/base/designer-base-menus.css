@@ -41,7 +41,7 @@
 .direct-preview::-webkit-scrollbar-thumb,
 .project-workspace::-webkit-scrollbar-thumb {
   background: var(--designer-scrollbar-thumb);
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
 }
 
 .designer-menu .designer-submenu::-webkit-scrollbar-thumb:hover,
@@ -140,7 +140,7 @@
   margin-left: auto;
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   opacity: 0.8;
 }
 
@@ -159,7 +159,7 @@
 .designer-menu-submenu-arrow {
   margin-left: auto;
   color: var(--designer-text-muted);
-  font-size: 14px;
+  font-size: var(--designer-font-size-lg);
   line-height: 1;
 }
 

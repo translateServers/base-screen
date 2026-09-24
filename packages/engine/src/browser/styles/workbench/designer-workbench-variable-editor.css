@@ -65,7 +65,7 @@
 .variable-source-option small {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 15px;
   overflow-wrap: anywhere;
 }
@@ -156,7 +156,7 @@
 
 .variable-editor-title code {
   color: var(--designer-text-muted);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .variable-field {
@@ -185,7 +185,7 @@
 .variable-field-hint {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 15px;
   overflow-wrap: anywhere;
 }
@@ -230,7 +230,7 @@
 .variable-checkbox-field small {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
   line-height: 15px;
   overflow-wrap: anywhere;
 }
@@ -359,5 +359,5 @@
 .variable-delete-copy small {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-size: 10px;
+  font-size: var(--designer-font-size-xs);
 }

@@ -41,13 +41,28 @@
   --designer-control-height: 32px;
   --designer-control-height-compact: 28px;
   --designer-icon-size: 16px;
-  --designer-radius-control: 4px;
-  --designer-radius-overlay: 8px;
+  --designer-radius-1: 2px;
+  --designer-radius-2: 4px;
+  --designer-radius-3: 6px;
+  --designer-radius-4: 8px;
+  --designer-radius-5: 12px;
+  --designer-radius-pill: 999px;
+  --designer-radius-control: var(--designer-radius-2);
+  --designer-radius-overlay: var(--designer-radius-4);
+  --designer-font-size-xs: 10px;
+  --designer-font-size-sm: 11px;
+  --designer-font-size-base: 12px;
+  --designer-font-size-md: 13px;
+  --designer-font-size-lg: 14px;
+  --designer-font-size-xl: 16px;
   --designer-font:
-    12px / 1.5 Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    var(--designer-font-size-base) / 1.5 Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei",
+    system-ui, sans-serif;
   --designer-font-small:
-    11px / 1.4 Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
-  --designer-font-numeric: 600 11px / 1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+    var(--designer-font-size-sm) / 1.4 Inter, "SF Pro Text", "PingFang SC", "Microsoft YaHei",
+    system-ui, sans-serif;
+  --designer-font-numeric:
+    600 var(--designer-font-size-sm) / 1 "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   --designer-shadow-overlay: var(
     --base-screen-designer-shadow-overlay,
     0 24px 64px rgb(0 0 0 / 48%)

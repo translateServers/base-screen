@@ -55,7 +55,7 @@
   flex: 0 0 28px;
   place-items: center;
   border: 1px solid color-mix(in srgb, var(--designer-accent) 55%, transparent);
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   background: color-mix(in srgb, var(--designer-accent-surface) 76%, transparent);
   color: var(--designer-accent);
 }
@@ -79,7 +79,7 @@
   margin-left: var(--designer-space-3);
   padding: 2px;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 5px;
+  border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
 }
 
@@ -127,7 +127,7 @@ button.topbar-mode-button:hover {
   gap: 1px;
   padding: 2px;
   border: 1px solid var(--designer-border-subtle);
-  border-radius: 8px;
+  border-radius: var(--designer-radius-4);
   background: color-mix(
     in srgb,
     var(--designer-surface-workspace) 80%,
@@ -140,7 +140,7 @@ button.topbar-mode-button:hover {
   width: 28px;
   height: 28px;
   min-height: 28px;
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   border-color: transparent;
   background: transparent;
 }
@@ -163,7 +163,7 @@ button.topbar-mode-button:hover {
   width: 32px;
   height: 32px;
   min-height: 32px;
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   border-color: transparent;
   background: transparent;
 }
@@ -201,8 +201,8 @@ button.topbar-mode-button:hover {
   justify-content: center;
   color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
-  font-size: 11px;
-  border-radius: 5px;
+  font-size: var(--designer-font-size-sm);
+  border-radius: var(--designer-radius-3);
   cursor: pointer;
   transition:
     background var(--designer-motion),
@@ -224,7 +224,7 @@ button.topbar-mode-button:hover {
 .designer-project-name {
   overflow: hidden;
   color: var(--designer-text-primary);
-  font-size: 13px;
+  font-size: var(--designer-font-size-md);
   font-weight: 600;
   letter-spacing: -0.01em;
   text-overflow: ellipsis;
@@ -239,7 +239,7 @@ button.topbar-mode-button:hover {
   padding: 0;
   border-radius: var(--designer-radius-control);
   color: var(--designer-text-muted);
-  font-size: 11px;
+  font-size: var(--designer-font-size-sm);
   font-weight: 500;
   transition: background var(--designer-motion);
 }
@@ -258,7 +258,7 @@ button.topbar-mode-button:hover {
   gap: var(--designer-space-2);
   padding: 0 var(--designer-space-3);
   border: 1px solid var(--designer-border-default);
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   cursor: pointer;
@@ -356,7 +356,7 @@ button.topbar-mode-button:hover {
   background: transparent;
   box-shadow: none;
   color: var(--designer-text-primary);
-  font-size: 13px;
+  font-size: var(--designer-font-size-md);
 }
 
 .designer-command-palette-search input:focus {
@@ -420,7 +420,7 @@ button.topbar-mode-button:hover {
   width: 28px;
   height: 28px;
   place-items: center;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   background: var(--designer-surface-control);
   color: var(--designer-accent);
 }
@@ -445,7 +445,7 @@ button.topbar-mode-button:hover {
 
 .designer-command-palette-copy strong {
   color: inherit;
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   font-weight: 600;
 }
 
@@ -505,7 +505,7 @@ button.topbar-mode-button:hover {
   align-items: center;
   gap: 1px;
   padding: 2px;
-  border-radius: 8px;
+  border-radius: var(--designer-radius-4);
 }
 
 .designer-menu-trigger {
@@ -513,10 +513,10 @@ button.topbar-mode-button:hover {
   min-height: 28px;
   padding: 0 var(--designer-space-3);
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--designer-radius-3);
   color: var(--designer-text-secondary);
   font-weight: 500;
-  font-size: 12px;
+  font-size: var(--designer-font-size-base);
   transition:
     background var(--designer-motion),
     color var(--designer-motion),
@@ -554,7 +554,7 @@ button.topbar-mode-button:hover {
   gap: 4px;
   padding: 0 8px;
   border: 1px solid transparent;
-  border-radius: 4px;
+  border-radius: var(--designer-radius-2);
   background: transparent;
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
