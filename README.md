@@ -60,7 +60,7 @@ Base Screen 的交付重点是可组合的前端基座。示例中的项目目�
 
 ## 快速体验
 
-本仓库开发环境要求 Node.js `22.23.2`、pnpm `11.18.0`。
+本仓库开发环境要求 Node.js `22`（精确 patch 以 CI 矩阵为准）、pnpm `11.18.0`。
 
 ```bash
 pnpm install --frozen-lockfile

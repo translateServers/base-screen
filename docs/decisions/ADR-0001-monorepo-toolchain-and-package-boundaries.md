@@ -83,7 +83,7 @@ engines.node: >=22.20.0
 
 规则：
 
-- `.node-version` 或等效文件固定最新已验证的 Node 22 patch，保证默认开发环境可复现。
+- `.node-version` 或等效文件只固定 Node major，不固定 patch；精确 patch 的唯一权威是 CI 矩阵，本 ADR 不复述其取值。
 - `engines.node` 表达最低兼容版本。它有意允许更高 major，但只有进入 CI 矩阵的 major 才属于持续验证范围。
 - CI 最低运行 Node 22 与 Node 24 两条线；新增或移除 major 需要记录兼容验证和 CI 矩阵变化。
 - Node 22/24 patch 升级可通过普通 maintenance PR 完成，不需要新 ADR。

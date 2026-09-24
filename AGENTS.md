@@ -11,7 +11,7 @@
 
 ## 环境搭建与验证
 
-- 使用 Node `22.23.2`（见 `.node-version`）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
+- 使用 Node `22`（见 `.node-version`；该文件只固定 major，精确 patch 以 CI 矩阵为准）和 pnpm `11.18.0`（见 `packageManager`）。通过 `pnpm install --frozen-lockfile` 安装；`.npmrc` 有意强制要求严格 peer 依赖，并禁用了自动安装 peer 依赖。
 - CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`，随后运行 `pnpm check:api-changesets`，并以 `git diff --exit-code` 收尾，要求验证未改动任何受跟踪文件。它依次运行 `format:check`、`lint`、`typecheck`、`test`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`；链中没有会写入文件的 `format` 步骤（格式修正先手动运行 `pnpm format`），也没有独立的 `build` 步骤——各包构建由 Turbo 任务依赖间接触发（`test` 依赖 `build`，`lint`/`typecheck` 依赖 `^build`）。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
 - 迭代过程中使用聚焦检查：`pnpm --filter @base-screen/contracts test`、`pnpm exec vitest run packages/contracts/tests/document/document.test.ts` 或 `pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
 - `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界与文档治理检查；`pnpm check:docs` 可单独检查 Markdown 相对链接、ADR/Spec/Plan 索引、完成 Spec 归档、禁用版本命名、机器可读能力索引的引用可解析性、活动文档单篇体量预算和现行依据类文档的 ADR 编号有效性。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
