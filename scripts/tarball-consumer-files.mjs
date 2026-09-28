@@ -221,13 +221,13 @@ base-screen-viewer {
  * 这同时是"宿主最小接入路径"的可执行说明。
  */
 function vanillaConsumerMainSource() {
-  return `import { parseScreenDocument } from '@base-screen/contracts';
+  return `import { parseScreenDocument, type ScreenDiagnostic } from '@base-screen/contracts';
 import {
   defineBaseScreenRectangleMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
 import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
+import { type BaseScreenViewerElement, defineBaseScreenViewer } from '@base-screen/sdk/viewer';
 import './style.css';
 
 const viewerDefinition = defineBaseScreenViewer();
@@ -277,10 +277,10 @@ if (!parsed.ok) {
   throw new Error(\`Screen Document invalid: \${formatDiagnostics(parsed.diagnostics)}\`);
 }
 
-const viewer = document.querySelector('#viewer');
+const viewer = document.querySelector<BaseScreenViewerElement>('#viewer');
 if (viewer === null) throw new Error('Missing base-screen-viewer.');
 viewer.addEventListener('base-screen-diagnostic', (event) => {
-  const detail = event.detail;
+  const detail = (event as CustomEvent<{ diagnostics: readonly ScreenDiagnostic[] }>).detail;
   console.error('Base Screen diagnostic', detail.diagnostics);
 });
 
@@ -294,7 +294,7 @@ if (!configured.ok) {
 }
 viewer.document = parsed.value;
 
-function formatDiagnostics(diagnostics) {
+function formatDiagnostics(diagnostics: readonly ScreenDiagnostic[]): string {
   return diagnostics.map((item) => \`\${item.code}@\${item.path.join('.')}\`).join(', ');
 }
 `;
