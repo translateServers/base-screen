@@ -9,7 +9,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { basename, dirname, join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 import { PACKAGE_DEFINITIONS } from './check-packages.mjs';
 import { writeHostAppVueTarballConsumerFiles } from './host-app-vue-consumer-files.mjs';
 import {
@@ -26,8 +26,22 @@ function run(command, args, cwd) {
   });
 }
 
+// Git Bash 自带的 GNU tar 会把 `C:\...` 形式的路径操作数当成远程 `host:file` 去解析
+// （报 "Cannot connect to C: resolve failed"），Windows 自带的 bsdtar 则按本地文件处理。
+// 交给 tar 的路径一律相对 cwd 传正斜杠，两种 tar 都接受。
+function tarOperand(cwd, target) {
+  return relative(cwd, target).replace(/\\/g, '/');
+}
+
+function listTarballEntries(tarball) {
+  const cwd = dirname(tarball);
+  return execFileSync('tar', ['-tf', tarOperand(cwd, tarball)], { cwd, encoding: 'utf8' })
+    .trim()
+    .split(/\r?\n/);
+}
+
 function assertTarballContents(tarball) {
-  const entries = execFileSync('tar', ['-tf', tarball], { encoding: 'utf8' }).trim().split(/\r?\n/);
+  const entries = listTarballEntries(tarball);
   const illegalEntry = entries.find(
     (entry) =>
       !/^package\/(?:dist\/|LICENSE$|package\.json$|README(?:\.md)?$|NOTICE(?:\.md)?$)/.test(entry),
@@ -38,7 +52,7 @@ function assertTarballContents(tarball) {
 }
 
 function assertContractsSchemaSingularity(tarball) {
-  const entries = execFileSync('tar', ['-tf', tarball], { encoding: 'utf8' }).trim().split(/\r?\n/);
+  const entries = listTarballEntries(tarball);
   const schemaEntries = entries.filter((entry) => entry.endsWith('screen-document.schema.json'));
   if (schemaEntries.length !== 1) {
     throw new Error(
@@ -73,7 +87,9 @@ function patchWorkspaceDependencySpecs(directory, tarball) {
     return tarball;
   }
   const working = mkdtempSync(join(temporaryRoot, `patch-${directory}-`));
-  execFileSync('tar', ['-xzf', tarball, '-C', working]);
+  const tarballDir = dirname(tarball);
+  const args = ['-xzf', tarOperand(tarballDir, tarball), '-C', tarOperand(tarballDir, working)];
+  execFileSync('tar', args, { cwd: tarballDir });
   const manifestPath = join(working, 'package', 'package.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   let changed = false;
@@ -100,7 +116,7 @@ function patchWorkspaceDependencySpecs(directory, tarball) {
   }
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const patched = join(dirname(tarball), `${directory}-patched.tgz`);
-  execFileSync('tar', ['-czf', patched, 'package'], { cwd: working });
+  execFileSync('tar', ['-czf', tarOperand(working, patched), 'package'], { cwd: working });
   return patched;
 }
 
