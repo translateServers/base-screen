@@ -29,7 +29,7 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 表格数据时，目录项还要分别携带包中导出的 `*_TABULAR_DATA_ADAPTER`。文本的 `value` 角色接收
 一个字符串、数值、布尔或日期字段，显示数据集首行对应值；空行或空值投影为空文本。文本原有的
 标量静态数据保持不变；在 Designer 中只暴露「宿主数据集」，不再额外显示通用「宿主资源」选项。
-`examples/browser-harness` 包含完整官方目录。
+`harness/browser-harness` 包含完整官方目录；三个宿主前端示例（`examples/host-app-*`）各演示一个宿主自有物料。
 
 ## 物料 manifest 字段参考
 

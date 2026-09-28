@@ -13,7 +13,13 @@
       "!**/tarballs",
       "!**/.base-screen/local",
       "!**/.workbuddy",
+      "!**/.qoder",
       "!**/*.tsbuildinfo",
+      "!**/.next",
+      "!**/.nuxt",
+      "!**/.output",
+      "!**/generated",
+      "!**/*.db",
       "!packages/engine/src/common/vendor",
       "!pnpm-lock.yaml"
     ]
@@ -26,6 +32,9 @@
     "lineEnding": "lf"
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "quoteStyle": "single",
       "semicolons": "always",

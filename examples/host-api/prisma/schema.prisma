@@ -1,0 +1,24 @@
+// Prisma schema：宿主侧的大屏文档表。
+//
+// 数据库文件在 ../data/screens.db——SQLite 的相对路径按 **schema 所在目录** 解析，
+// 因此这里用 ../data 指回工程根目录下的 data/（该目录随仓库提交 .gitkeep 保留）。
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma-client"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// document 存 canonical Screen Document JSON（由 @base-screen/contracts 拥有 schema），
+/// 后端只做存取与 revision 乐观锁，不理解文档内部结构。
+model Screen {
+  id        String   @id @default(uuid())
+  name      String
+  document  String
+  revision  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

@@ -3,10 +3,10 @@ import { dirname, join, resolve } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createSnapshotMaterialProvider } from '../examples/material-mcp-server/provider.mjs';
 import { createHostMaterialSkill } from '../skills/create-base-screen-host-material-skill/scripts/create-host-material-skill.mjs';
 import { createHostSkill } from '../skills/create-base-screen-host-skill/scripts/create-host-screen-skill.mjs';
 import { canonicalizeSnapshot } from '../skills/manage-base-screen-host-skills/scripts/snapshot-file.mjs';
+import { createSnapshotMaterialProvider } from '../tooling/material-mcp-server/provider.mjs';
 import { makeSnapshot, writeSnapshotFile } from './host-snapshot-fixture';
 
 const temporaryRoots: string[] = [];
@@ -115,7 +115,7 @@ describe('host material MCP contract', () => {
     await writeFile(file, canonical.text);
     const transport = new StdioClientTransport({
       command: process.execPath,
-      args: [resolve('examples/material-mcp-server/server.mjs'), '--snapshot', file],
+      args: [resolve('tooling/material-mcp-server/server.mjs'), '--snapshot', file],
       cwd: resolve('.'),
       stderr: 'pipe',
     });

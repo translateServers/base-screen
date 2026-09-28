@@ -79,10 +79,11 @@ Screen Document 只保存可移植的 canonical 数据。URL、SQL、token、请
 - **高级编辑提交被拒绝**：检查 request ID、expected revision、component ID、schema 和容量限制，
   不要复用旧请求。
 
-仓库中的可运行宿主示例：
+仓库中的可运行宿主示例（详见 [`examples/README.md`](../examples/README.md)）：
 
-- `examples/browser-harness`：项目 adapter、完整官方物料、宿主作者桥和外部物料包；日常唯一 dev 入口（`pnpm dev:browser-harness`）。
-- `examples/host-quickstart`：只导入公开包入口的最小 Viewer；会被复制到仓库外并以 tarball 验证。
-- `examples/material-mcp-server`：面向上层工具链的物料模板 MCP provider。
+- `examples/host-api`：三端共用的全栈后端（NestJS + Prisma/SQLite），提供大屏文档存取与演示指标接口。
+- `examples/host-app-vanilla`、`examples/host-app-react`、`examples/host-app-vue`：功能对等的三个宿主前端（原生 TS / React / Vue），演示文档 CRUD、设计器与查看器嵌入、项目适配器与宿主数据通道。
+- `harness/browser-harness`：基座自身的特性矩阵与 Playwright 断言；日常唯一 dev 入口（`pnpm dev:browser-harness`）。
+- `tooling/material-mcp-server`：面向上层工具链的物料模板 MCP provider。
 
-`browser-harness` 是本仓库的开发/验收 harness，会直接引用 workspace 源码，不应当作独立项目的安装模板。
+`harness/browser-harness` 是本仓库的开发/验收 harness，会直接引用 workspace 源码，不应当作独立项目的安装模板；三个宿主前端只经 `@base-screen/*` 公共入口接入，可作为宿主工程的参考。

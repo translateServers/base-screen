@@ -13,7 +13,7 @@
 - **官方物料范围**（2026-09-11 调整）：核心库官方物料为文本、矩形、椭圆、图片、容器、图表与表格；
   原 `base.echarts` 手绘近似物料已整体移出 `packages/material`（公共导出、`./echarts` 子路径、构建入口
   与自动注册一并移除），其受限 Editor Descriptor 载体以非发布演示物料 `harness.semantic-chart` 保留在
-  `examples/browser-harness`，真实图表能力归外围插件承载，核心库不再发布自称 ECharts 的物料。
+  `harness/browser-harness`，真实图表能力归外围插件承载，核心库不再发布自称 ECharts 的物料。
   依据：[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)。
 - **静态数据作者契约**（2026-08-23 增量）：Manifest 可选 `staticData` scalar/tabular 描述；canonical 静态
   数据源可携带字段角色 binding，tabular 静态数据与宿主数据集复用物料 adapter。Designer 提供标量表单、

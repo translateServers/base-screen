@@ -2,5 +2,13 @@ packages:
   - packages/*
   - plugins/*
   - examples/*
+# 构建脚本白名单（pnpm 11 的 allowBuilds）：只有列出的包允许执行安装脚本。
+# Prisma 需要准备查询引擎二进制并生成客户端，因此放行 prisma、@prisma/engines 与 @prisma/client；
+# @scarf/scarf 是传递依赖带上来的遥测包，明确拒绝，避免构建期外联。
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  '@scarf/scarf': false
+  prisma: true
 minimumReleaseAgeExclude:
   - vue-echarts@8.1.0

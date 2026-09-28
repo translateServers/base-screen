@@ -75,7 +75,8 @@ pnpm add --save-exact @base-screen/contracts@<contracts-version> \
 ### 注册 Custom Element
 
 生产接入优先使用显式 `define*()` API：它能缩小注册范围，并允许宿主记录结构化诊断。最小 Viewer
-示例见[创建物料目录](./material-catalog.md)、[加载文档与嵌入 Viewer](./viewer.md)和 `examples/host-quickstart`。
+示例见[创建物料目录](./material-catalog.md)、[加载文档与嵌入 Viewer](./viewer.md)和
+[`examples/host-app-vanilla`](../../examples/host-app-vanilla/README.md)。
 
 无需处理注册诊断时，也可以在浏览器启动入口使用副作用子路径一次性注册 Viewer、Designer 和
 全部官方物料：
@@ -96,11 +97,13 @@ import '@base-screen/material/auto-register';
 不会被正常 tree-shaking 删除。应保持它们为顶层 import；默认包入口仍无注册副作用。SSR/SSG
 项目只能在浏览器客户端入口导入这些子路径，不能让服务端模块执行 Custom Element 注册。
 
-### 可运行的最小宿主
+### 可运行的宿主工程
 
-[`examples/host-quickstart`](../../examples/host-quickstart/README.md) 是最小 Vanilla/Vite Viewer
-宿主，只导入公开包入口。`pnpm verify:tarball` 会把它复制到仓库外临时项目，安装真实 tarball，
-执行 TypeScript 检查、Vite 生产构建并用 Chromium 验证最终渲染。复制该示例前，先按上文「先确认依赖来源」一节
+[`examples/host-app-vanilla`](../../examples/host-app-vanilla/README.md) 是最小技术栈的完整宿主工程
+（Vite + 原生 TypeScript，只导入公开包入口），与 React / Vue 两版功能对等。它联调共享后端
+[`examples/host-api`](../../examples/host-api/README.md)，覆盖文档 CRUD、设计器与查看器嵌入、
+宿主项目适配器和数据通道——比"只渲染一份文档"更接近真实接入。三端总览与运行命令见
+[`examples/README.md`](../../examples/README.md)。复制示例前，先按上文「先确认依赖来源」一节
 接通宿主自己的依赖来源。
 
 ### 为宿主生成项目级 Skill

@@ -57,29 +57,55 @@ plugin with zero external dependencies and no custom element, so it builds and
 validation runs in any environment. The runtime validates its own manifest through
 `definePlugin`, making it the first end-to-end example of the plugin-sdk author path.
 
-### vue-host-external-consumer
+### full-stack-host-examples-and-vue-external-consumer
 
-Add `examples/vue-host`: a complete modern Vue project that consumes Base Screen as an
-external host. It is the first real consumer of the plugin author surface.
+Restructure `examples/` around a full-stack host case: one shared backend plus three
+feature-equivalent front ends, so the "how a host actually embeds Base Screen" path is
+executable rather than described.
 
-The project uses Vue SFCs, `@vitejs/plugin-vue` and `vue-tsc`, and exercises the whole
-integration path end to end: a host-owned Vue component bridged into a designer material
-via `@base-screen/vue`, a host-owned plugin that declares its own material contribution
-plus a `design.read`/`command.execute` command, and element registration through
-`createPluginRegistration` — the SDK helper that until now was only exercised by its own
-unit tests. The manager snapshot is fed back into the designer verbatim (catalog,
-contribution index, panels, inspector controls) instead of rebuilding a parallel copy, so
-the plugin channel is genuinely used rather than simulated.
+`examples/host-api` (NestJS + Prisma/SQLite) owns storage, retrieval and concurrency
+control: canonical Screen Documents are stored as opaque JSON behind a documented REST
+contract, `PUT` enforces a host-side `revision` optimistic lock, and a deterministic mock
+metrics endpoint feeds the bundled `host-resource` data binding. `examples/host-app-vanilla`,
+`examples/host-app-react` and `examples/host-app-vue` are pure static SPAs that consume only
+public `@base-screen/*` entries and implement the same three pages (list, designer edit with
+debounced autosave, read-only viewer), the same host project adapter, the same host data
+channel, and one host-owned `host-app.kpi-card` material each — written with a native custom
+element, a React bridge and a Vue SFC respectively, all under the same manifest, so one
+canonical document renders identically in all three.
 
-`pnpm verify:tarball` now copies this project outside the repo, swaps every
+All three front ends run the same state machines through **zustand**: a list store
+(`idle → loading → ready` / `loading → error`, with `load` / `create` / `remove`) and a
+per-screen session store (`idle → loading → ready → dirty → saving → saved`, with
+`saving → failed` and `saving → conflict` branches) shared by the editor and viewer pages.
+The store semantics and the user-facing status text are identical across the three stacks;
+only the binding differs — `zustand`'s `create` plus selector subscriptions in React, the
+framework-agnostic `zustand/vanilla` store consumed through a `shallowRef`-based composable
+in Vue and through `subscribe` in the vanilla app.
+
+The infrastructure carriers moved out of `examples/` to make that structure honest:
+`examples/browser-harness` became `harness/browser-harness` (it is the repo's own
+feature matrix and Playwright evidence, not a usage example) and
+`examples/material-mcp-server` became `tooling/material-mcp-server`. Their gates are
+unchanged apart from the paths. The minimal-Vanilla/Viewer consumer used by
+`pnpm verify:tarball` is now generated inline instead of copied from an example directory,
+so the gate no longer depends on the shape of `examples/`.
+
+`pnpm verify:tarball` copies `examples/host-app-vue` outside the repo, swaps every
 `@base-screen/*` dependency for the same-batch tarballs, and runs typecheck, build and a
-browser loop that asserts the plugin is catalogued, its material renders, the plugin
-command round-trips through the document and undoes, and the host project adapter saves.
-That makes it an external-consumer check rather than an in-repo example.
+browser loop asserting registration, material rendering, host-resource data binding, the
+host project adapter's revision increment on save, and the viewer. The backend is stubbed
+through Playwright `page.route` for that gate — it exists to prove the published ABI and the
+host integration path, while backend behavior is covered by the jest unit and e2e suites
+shipped in `examples/host-api`. That makes it an external-consumer check rather than an
+in-repo example.
 
-Building it also surfaced authoring friction worth recording: the designer must be
-connected to the DOM before `configure`/`load` or its canvas stays empty; every ancestor
-in the height chain needs a definite height; `update-components` replaces `props`
-wholesale, so partial patches drop required fields; and `vue-tsc` cannot yet run on the
-repo's TypeScript 7, so the example pins TypeScript 5.9 for its own typecheck. These are
-documented in the project README.
+Building these surfaced authoring friction worth recording: the designer must be connected
+to the DOM before `configure`/`load` or its canvas stays empty; every ancestor in the height
+chain needs a definite height; `update-components` replaces `props` wholesale, so partial
+patches drop required fields; a material's render box is pinned to the canonical
+`component.size`, so materials must not write `width`/`height`; the React bridge does not
+propagate document styles into the designer shadow root (the Vue bridge does), so React
+materials must be self-styled; and `vue-tsc` cannot yet run on the repo's TypeScript 7, so
+the Vue example pins TypeScript 5.9 for its own typecheck. These are documented in the
+example READMEs.

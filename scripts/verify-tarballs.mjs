@@ -11,11 +11,11 @@ import {
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { PACKAGE_DEFINITIONS } from './check-packages.mjs';
+import { writeHostAppVueTarballConsumerFiles } from './host-app-vue-consumer-files.mjs';
 import {
   writeTarballConsumerFiles,
   writeVanillaTarballConsumerFiles,
 } from './tarball-consumer-files.mjs';
-import { writeVueHostTarballConsumerFiles } from './vue-host-consumer-files.mjs';
 
 function run(command, args, cwd) {
   const executable = process.platform === 'win32' && command === 'pnpm' ? 'pnpm.cmd' : command;
@@ -193,7 +193,7 @@ function verifyBridgeTarballConsumer(framework) {
 
 function verifyVanillaTarballConsumer() {
   const consumer = mkdtempSync(join(temporaryRoot, 'vanilla-vite-consumer-'));
-  writeVanillaTarballConsumerFiles(consumer, tarballSpec, root);
+  writeVanillaTarballConsumerFiles(consumer, tarballSpec);
   run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
   assertConsumerIsolation(
     consumer,
@@ -217,27 +217,21 @@ function verifyVanillaTarballConsumer() {
 }
 
 /**
- * 宿主自建 Vue 工程的外部消费者校验：复制 `examples/vue-host`，依赖换成真实 tarball，
- * 跑 typecheck / build / 浏览器闭环。它验证的是"宿主写自己的 Vue 应用来用这套 ABI"，
- * 而不是基座自带的 fixture。
+ * 宿主自建 Vue 工程的外部消费者校验：复制 `examples/host-app-vue` 前端，依赖换成真实
+ * tarball，跑 typecheck / build / 浏览器闭环。它验证的是"宿主写自己的 Vue 应用来用这
+ * 套 ABI"，而不是基座自带的 fixture。
+ *
+ * 后端由 `page.route` 按 REST 契约履约（决策 D6）：该门禁只对包 ABI 与前端接入负责，
+ * 后端真实性由 `examples/host-api` 的 jest e2e 覆盖。
  */
-function verifyVueHostTarballConsumer() {
-  const consumer = mkdtempSync(join(temporaryRoot, 'vue-host-consumer-'));
-  writeVueHostTarballConsumerFiles(consumer, tarballSpec, root);
+function verifyHostAppVueTarballConsumer() {
+  const consumer = mkdtempSync(join(temporaryRoot, 'host-app-vue-consumer-'));
+  writeHostAppVueTarballConsumerFiles(consumer, tarballSpec, root);
   run('pnpm', ['install', '--strict-peer-dependencies'], consumer);
   assertConsumerIsolation(
     consumer,
-    'vue-host',
-    [
-      'contracts',
-      'engine',
-      'material',
-      'plugin-core',
-      'plugin-manager',
-      'plugin-sdk',
-      'sdk',
-      'vue',
-    ],
+    'host-app-vue',
+    ['contracts', 'material', 'plugin-core', 'plugin-sdk', 'sdk', 'vue'],
     ['react', 'react-dom'],
   );
   run('pnpm', ['run', 'typecheck'], consumer);
@@ -472,7 +466,7 @@ if (controller.phase !== 'ready' || controller.dirty) {
   verifyVanillaTarballConsumer();
   verifyBridgeTarballConsumer('react');
   verifyBridgeTarballConsumer('vue');
-  verifyVueHostTarballConsumer();
+  verifyHostAppVueTarballConsumer();
 } finally {
   rmSync(temporaryRoot, { force: true, recursive: true });
 }

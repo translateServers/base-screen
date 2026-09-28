@@ -25,7 +25,7 @@ Base Screen 的能力要能在核心库之外实现与交付，否则两类内�
 6. **不引入版本标记字段与版本化命名。** [ADR-0084](./ADR-0084-plugin-contribution-vocabulary-and-trust.md) 与探索阶段约束继续生效。外围插件只依赖 `@base-screen/plugin-core` 与 `@base-screen/plugin-sdk` 的公共导出，契约偏差通过既有边界检查与规范快照发现，不通过版本协商发现。
 7. **首批承载范围限于既有承载协议能表达的内容**：渲染类能力与现有 6 类贡献覆盖的功能类能力。本次不新增贡献类型、不新增能力，因此不启动描述符驱动的内核改造。
 8. **`@base-screen/material` 现有手绘图表实现不因本决策自动移除。** 其去留（保留为无依赖降级实现，或整体移出核心库）属后续实施决策，不在本 ADR 范围内。
-   > 后续处置（2026-09-11）：已决定**整体移出**。`base.echarts` 从 `packages/material` 删除，公共导出、`./echarts` 子路径、构建入口与自动注册一并移除；其受限 Editor Descriptor 载体以 `harness.semantic-chart` 迁入 `examples/browser-harness`（非发布物，沿用该工程既有的 `harness.*` 演示物料约定），继续承担 Descriptor 的浏览器端验证。核心库此后不再发布任何自称 ECharts 的物料，真实图表能力由外围插件 `plugins/plugin-echarts` 承载。
+   > 后续处置（2026-09-11）：已决定**整体移出**。`base.echarts` 从 `packages/material` 删除，公共导出、`./echarts` 子路径、构建入口与自动注册一并移除；其受限 Editor Descriptor 载体以 `harness.semantic-chart` 迁入基座回归 harness（非发布物，沿用该工程既有的 `harness.*` 演示物料约定），继续承担 Descriptor 的浏览器端验证。核心库此后不再发布任何自称 ECharts 的物料，真实图表能力由外围插件 `plugins/plugin-echarts` 承载。
 
 ## 后果
 

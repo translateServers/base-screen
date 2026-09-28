@@ -168,8 +168,9 @@ stop?.();
 ## 组合实现长尾能力
 
 有几类常见需求直觉上以为 Base Screen 缺能力，实际都可用上面的公开面组合出来，不需要新端口或
-新贡献类型。可运行模板见 `examples/browser-harness/datav-composition-fixture.ts`，对应断言由
-`pnpm verify:browser` 执行。
+新贡献类型。可运行模板见 `harness/browser-harness/datav-composition-fixture.ts`，对应断言由
+`pnpm verify:browser` 执行；三端宿主示例的 `host-data-channel.ts` 演示了 host-resource 到
+真实 HTTP 查询的最小实现。
 
 **计时器触发。** Base Screen 不内建计时器（[ADR-0083](../decisions/ADR-0083-variable-system.md)）：
 宿主自建调度，把值写进变量，由变量的 `data-updated` 触发 Blueprint 规则与宿主动作。

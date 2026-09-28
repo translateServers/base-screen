@@ -23,7 +23,7 @@ pnpm dev:browser-harness
 
 设计器左下角的案例舱用于场景内切换，右上角「目录」回到 `/cases.html`。
 
-另有两个不设 dev 页的示例（导航页不列，供宿主接入与工具链参考）：最小 Vanilla / Vite Viewer 宿主见 `examples/host-quickstart`（由 `pnpm verify:tarball` 验证）；物料模板 MCP provider 见 `examples/material-mcp-server`（由 `pnpm verify:material-mcp` 验证）。
+另有两个不设 dev 页的目录（导航页不列，供宿主接入与工具链参考）：全栈宿主示例群（`examples/host-api` 共享后端 + `examples/host-app-{vanilla,react,vue}` 三个对等前端，见 [`examples/README.md`](../../examples/README.md)）；物料模板 MCP provider 见 `tooling/material-mcp-server`（由 `pnpm verify:material-mcp` 验证）。
 
 ## 改了哪里，看哪条案例
 
@@ -53,7 +53,7 @@ pnpm dev:browser-harness
 
 ## 案例目录
 
-目录文案以 [`examples/browser-harness/feature-case-catalog.ts`](../../examples/browser-harness/feature-case-catalog.ts) 为准；场景跳转在 `feature-cases.ts`。
+目录文案以 [`harness/browser-harness/feature-case-catalog.ts`](../../harness/browser-harness/feature-case-catalog.ts) 为准；场景跳转在 `feature-cases.ts`。
 
 | `case` | 打开后看什么 | 对应断言（域模块） |
 | --- | --- | --- |
@@ -83,7 +83,7 @@ pnpm dev:browser-harness
 3. `packages/engine`：`common/` 纯逻辑，`browser/` DOM
 4. `packages/material` / `plugin-manager` / `plugin-sdk`：物料或插件作者面
 5. `packages/sdk`：只转发公共入口
-6. `examples/browser-harness`：人眼案例（本页的 `?case=`）
+6. `harness/browser-harness`：人眼案例（本页的 `?case=`）
 7. `scripts/browser-harness/assert-*.mjs`：自动证据
 
 日常用表里的 `pnpm --filter` 或单文件 `pnpm exec vitest run <file>`。视觉或交互改完再 `pnpm verify:browser`。影响包、构建产物或公共契约时才跑 `pnpm verify:m0`。

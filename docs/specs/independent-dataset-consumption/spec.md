@@ -36,5 +36,5 @@ Playground 直接使用公开元素类型，不再手写一个错误地声明可
 
 本地已验证画布加载、物料添加、撤销和数据渲染；Playground 浏览器回归及两个示例的 Vite 构建通过。
 同时补齐宿主组件文本编辑、声明式字段选择器对 `dataset` 参数与绑定的读写；字段事务专项 12 项通过。
-最终 `verify:browser`、`verify:m0` 均通过，修复包已通过跨仓工作流同步到 xjdatahub。（Playground 示例此后已从仓库移除，相关回归现由 `examples/browser-harness` 的 `?designer&case=dataset` 场景与 `verify:browser` 覆盖。）
+最终 `verify:browser`、`verify:m0` 均通过，修复包已通过跨仓工作流同步到 xjdatahub。（Playground 示例此后已从仓库移除，相关回归现由 `harness/browser-harness` 的 `?designer&case=dataset` 场景与 `verify:browser` 覆盖。）
 本记录不代表宿主业务数据切换或上述完整交付任务已完成。

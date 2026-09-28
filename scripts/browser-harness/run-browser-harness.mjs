@@ -91,7 +91,7 @@ import {
 export async function runBrowserHarness(serverPort) {
   await withViteBrowser(
     {
-      root: 'examples/browser-harness',
+      root: 'harness/browser-harness',
       optimizeDeps: { force: true },
       server: { port: serverPort },
     },

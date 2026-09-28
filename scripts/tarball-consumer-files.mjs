@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export function writeTarballConsumerFiles(consumer, framework, tarballSpec) {
@@ -88,7 +88,14 @@ export function writeTarballConsumerFiles(consumer, framework, tarballSpec) {
   }
 }
 
-export function writeVanillaTarballConsumerFiles(consumer, tarballSpec, root) {
+/**
+ * 最小 Vanilla / Vite Viewer 消费者：**全部内容内联生成**，不再从 examples/ 复制。
+ *
+ * 早期实现复制了 `examples/host-quickstart` 的源码，但那让门禁与一个示例目录耦合：
+ * 示例被重构/移动时消费者会静默失效。这里把最小 Viewer 工程完整写成模板字符串，
+ * 依赖仍然只声明 contracts / material / plugin-core / sdk，并由下方断言守住这一点。
+ */
+export function writeVanillaTarballConsumerFiles(consumer, tarballSpec) {
   const dependencies = Object.fromEntries(
     ['contracts', 'material', 'plugin-core', 'sdk'].map((directory) => [
       `@base-screen/${directory}`,
@@ -141,9 +148,7 @@ export function writeVanillaTarballConsumerFiles(consumer, tarballSpec, root) {
       2,
     )}\n`,
   );
-  const quickstart = join(root, 'examples', 'host-quickstart');
-  const quickstartSource = readFileSync(join(quickstart, 'src', 'main.ts'));
-  const quickstartText = quickstartSource.toString('utf8');
+  const mainSource = vanillaConsumerMainSource();
   for (const forbiddenImport of [
     '@base-screen/core',
     '@base-screen/engine',
@@ -151,21 +156,148 @@ export function writeVanillaTarballConsumerFiles(consumer, tarballSpec, root) {
     '@base-screen/plugin-sdk',
     '@base-screen/renderer',
   ]) {
-    if (quickstartText.includes(forbiddenImport)) {
+    if (mainSource.includes(forbiddenImport)) {
       throw new Error(`VANILLA_TARBALL_UNDECLARED_IMPORT: ${forbiddenImport}`);
     }
   }
-  writeFileSync(join(consumer, 'index.html'), readFileSync(join(quickstart, 'index.html')));
-  writeFileSync(join(consumer, 'src', 'main.ts'), quickstartSource);
+  writeFileSync(
+    join(consumer, 'index.html'),
+    `<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Base Screen Viewer</title>
+  </head>
+  <body>
+    <main class="screen-stage">
+      <base-screen-viewer id="viewer"></base-screen-viewer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+`,
+  );
+  writeFileSync(join(consumer, 'src', 'main.ts'), mainSource);
   writeFileSync(
     join(consumer, 'src', 'style.css'),
-    readFileSync(join(quickstart, 'src', 'style.css')),
+    `:root {
+  color-scheme: dark;
+  font-family: system-ui, sans-serif;
+}
+
+html,
+body,
+.screen-stage {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+  background: #030712;
+}
+
+.screen-stage {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+base-screen-viewer {
+  display: block;
+  width: 640px;
+  height: 360px;
+}
+`,
   );
-  writeFileSync(
-    join(consumer, 'src', 'vite-env.d.ts'),
-    readFileSync(join(quickstart, 'src', 'vite-env.d.ts')),
-  );
+  writeFileSync(join(consumer, 'src', 'vite-env.d.ts'), '/// <reference types="vite/client" />\n');
   writeFileSync(join(consumer, 'browser.mjs'), vanillaBrowserVerifierSource());
+}
+
+/**
+ * 最小 Viewer 宿主：只导入公开包入口，用一个 640×360 文档验证 Viewer 渲染闭环。
+ * 这同时是"宿主最小接入路径"的可执行说明。
+ */
+function vanillaConsumerMainSource() {
+  return `import { parseScreenDocument } from '@base-screen/contracts';
+import {
+  defineBaseScreenRectangleMaterial,
+  defineBaseScreenTextMaterial,
+} from '@base-screen/material';
+import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
+import './style.css';
+
+const viewerDefinition = defineBaseScreenViewer();
+const textDefinition = defineBaseScreenTextMaterial();
+const rectangleDefinition = defineBaseScreenRectangleMaterial();
+if (!viewerDefinition.ok || !textDefinition.ok || !rectangleDefinition.ok) {
+  throw new Error('Base Screen Custom Element registration failed.');
+}
+
+const catalog = createBaseScreenMaterialCatalog([textDefinition.value, rectangleDefinition.value]);
+const parsed = parseScreenDocument({
+  canvas: { width: 640, height: 360, backgroundColor: '#111827' },
+  components: [
+    {
+      id: 'background',
+      type: 'base.rectangle',
+      name: '背景',
+      parentId: null,
+      position: { x: 24, y: 24 },
+      size: { width: 592, height: 312 },
+      rotation: 0,
+      zIndex: 1,
+      status: { locked: false, hidden: false },
+      props: {},
+      style: { fill: '#1f2937', borderColor: '#39c5bb', borderWidth: 2, opacity: 1 },
+      dataSource: null,
+    },
+    {
+      id: 'title',
+      type: 'base.text',
+      name: '标题',
+      parentId: null,
+      position: { x: 64, y: 142 },
+      size: { width: 512, height: 76 },
+      rotation: 0,
+      zIndex: 2,
+      status: { locked: false, hidden: false },
+      props: {},
+      style: { color: '#f9fafb', fontSize: 32, fontWeight: '700', textAlign: 'center' },
+      dataSource: { type: 'static', value: 'Base Screen Viewer 已就绪' },
+    },
+  ],
+  variables: [],
+  blueprint: { rules: [] },
+});
+if (!parsed.ok) {
+  throw new Error(\`Screen Document invalid: \${formatDiagnostics(parsed.diagnostics)}\`);
+}
+
+const viewer = document.querySelector('#viewer');
+if (viewer === null) throw new Error('Missing base-screen-viewer.');
+viewer.addEventListener('base-screen-diagnostic', (event) => {
+  const detail = event.detail;
+  console.error('Base Screen diagnostic', detail.diagnostics);
+});
+
+const configured = viewer.configure({
+  catalog,
+  instanceId: 'base-screen-vanilla-consumer',
+  mode: 'viewer',
+});
+if (!configured.ok) {
+  throw new Error(\`Viewer configuration failed: \${formatDiagnostics(configured.diagnostics)}\`);
+}
+viewer.document = parsed.value;
+
+function formatDiagnostics(diagnostics) {
+  return diagnostics.map((item) => \`\${item.code}@\${item.path.join('.')}\`).join(', ');
+}
+`;
 }
 
 function writeReactConsumerFiles(consumer, productTag) {

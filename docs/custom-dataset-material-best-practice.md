@@ -7,9 +7,9 @@
 ```
 
 完整可运行源码位于
-[`examples/browser-harness/hosted-material-package.ts`](../examples/browser-harness/hosted-material-package.ts)，
+[`harness/browser-harness/hosted-material-package.ts`](../harness/browser-harness/hosted-material-package.ts)，
 封面位于
-[`examples/browser-harness/public/dataset-ranking-cover.svg`](../examples/browser-harness/public/dataset-ranking-cover.svg)。
+[`harness/browser-harness/public/dataset-ranking-cover.svg`](../harness/browser-harness/public/dataset-ranking-cover.svg)。
 运行 `pnpm dev:browser-harness` 后，设计器的「最佳实践」分组会显示该组件，画布上也有一个已绑定
 「订单数据集」的实例。
 

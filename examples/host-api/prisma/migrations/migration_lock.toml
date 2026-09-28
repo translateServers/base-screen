@@ -1,0 +1,2 @@
+# Prisma migrations 锁文件：声明本目录的迁移由哪个 provider 管理。
+provider = "sqlite"

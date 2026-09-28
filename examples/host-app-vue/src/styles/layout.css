@@ -1,0 +1,98 @@
+/* 应用外壳与舞台布局：高度链 html/body/#app/.shell/.shell__main 全高。
+   设计器容器查询在 <1021px 宽或 <637px 高时会提示空间不足（引擎行为），
+   因此小屏编辑页改用提示视图而非硬塞画布。 */
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  flex: 0 0 auto;
+  padding: var(--spacing-3) var(--spacing-5);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.shell__brand {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.shell__content {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--spacing-5);
+}
+
+.shell__main {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+}
+
+.page {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+/* 设计器/查看器舞台：给全确定高度，画布测量才不失真。 */
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-solid);
+  overflow: hidden;
+}
+
+.stage__toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex: 0 0 auto;
+  margin-bottom: var(--spacing-3);
+}
+
+.stage__status {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage--edit,
+.stage--view {
+  height: 100%;
+}
+
+@media (max-width: 1199px) {
+  .shell__content {
+    padding: var(--spacing-4);
+  }
+}
+
+@media (max-width: 767px) {
+  .shell__content {
+    padding: var(--spacing-3);
+  }
+
+  .shell__brand {
+    font-size: 13px;
+  }
+}

@@ -1,0 +1,1 @@
+# 保留 SQLite 数据目录：Prisma 不会自动创建父目录，数据库文件本身被 .gitignore 忽略。

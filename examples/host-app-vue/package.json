@@ -1,0 +1,33 @@
+{
+  "name": "@base-screen-example/host-app-vue",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "description": "Base Screen 全栈示例的 Vue 前端：Vite + Vue 3 SPA，联调共享 NestJS 后端",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit -p tsconfig.json",
+    "verify": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@base-screen/contracts": "workspace:^",
+    "@base-screen/material": "workspace:^",
+    "@base-screen/plugin-core": "workspace:^",
+    "@base-screen/plugin-sdk": "workspace:^",
+    "@base-screen/sdk": "workspace:^",
+    "@base-screen/vue": "workspace:^",
+    "vue": "3.5.40",
+    "vue-router": "^5.3.1",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@vitejs/plugin-vue": "6.0.8",
+    "typescript": "5.9.3",
+    "vite": "8.2.0",
+    "vue-tsc": "3.3.11"
+  }
+}

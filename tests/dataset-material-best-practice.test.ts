@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   hostedDatasetRankingManifest,
   hostedMaterialPackage,
-} from '../examples/browser-harness/hosted-material-package.ts';
+} from '../harness/browser-harness/hosted-material-package.ts';
 
 describe('dataset material best practice', () => {
   it('ships a complete custom material contract with reusable semantic roles', () => {

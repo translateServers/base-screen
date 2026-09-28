@@ -1,0 +1,227 @@
+/* 组件样式：几何变化只由状态/过渡驱动，不引入 hover 尺寸变化（无抖动）。 */
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: var(--spacing-1) var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.button:hover {
+  border-color: var(--color-accent);
+  background: rgba(57, 197, 187, 0.12);
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.button--primary {
+  border-color: transparent;
+  background: var(--color-accent);
+  color: #06281f;
+  font-weight: 600;
+}
+
+.button--primary:hover {
+  background: #4fd8cd;
+}
+
+.button--danger {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: var(--color-danger);
+}
+
+.button--danger:hover {
+  border-color: var(--color-danger);
+  background: rgba(248, 113, 113, 0.12);
+}
+
+.list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+}
+
+.list-header h1 {
+  font-size: 20px;
+}
+
+.screen-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--spacing-4);
+}
+
+.screen-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.screen-card__name {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen-card__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-2);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.screen-card__meta div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.screen-card__meta dt {
+  color: var(--color-text-muted);
+}
+
+.screen-card__meta dd {
+  margin: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.screen-card__actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.screen-card--skeleton {
+  height: 148px;
+  background: linear-gradient(
+    100deg,
+    var(--color-surface) 30%,
+    rgba(148, 163, 184, 0.08) 50%,
+    var(--color-surface) 70%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1400ms ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 120% 0;
+  }
+
+  to {
+    background-position: -20% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-card--skeleton {
+    animation: none;
+  }
+}
+
+.empty-state {
+  padding: var(--spacing-6) 0;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  min-height: 44px;
+  margin-bottom: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(248, 113, 113, 0.1);
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.error-banner__message {
+  flex: 1 1 auto;
+}
+
+.spinner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  min-height: 44px;
+  color: var(--color-text-muted);
+}
+
+.spinner__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: spinner-pulse 900ms ease-in-out infinite;
+}
+
+.spinner__label {
+  font-size: 13px;
+}
+
+@keyframes spinner-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner__dot {
+    animation: none;
+  }
+}
+
+.toast-host {
+  position: fixed;
+  right: var(--spacing-4);
+  bottom: var(--spacing-4);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.toast {
+  max-width: 320px;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.toast--success {
+  border-color: rgba(57, 197, 187, 0.5);
+}
+
+.toast--error {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: var(--color-danger);
+}
