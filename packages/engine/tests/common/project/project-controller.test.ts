@@ -55,9 +55,11 @@ function controller(
 ) {
   let present = current;
   const changes: boolean[] = [];
+  const replacements: ScreenDocument[] = [];
   const instance = new ScreenProjectController({
     getDocument: () => present,
     replaceDocument: (next) => {
+      replacements.push(next);
       present = next;
       return { ok: true, value: next, diagnostics: [] };
     },
@@ -68,6 +70,7 @@ function controller(
   return {
     instance,
     changes,
+    replacements,
     get present() {
       return present;
     },
@@ -223,6 +226,39 @@ describe('ScreenProjectController', () => {
     expect(session.present.canvas.width).toBe(100);
     expect(session.instance.dirty).toBe(true);
     expect(projectAdapter.save).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the document reference untouched when the saved content matches the snapshot', async () => {
+    const session = controller(adapter());
+    await session.instance.load('project-1');
+    const loaded = session.present;
+    // load 本身就是一次替换：只统计保存之后的。
+    session.replacements.length = 0;
+
+    await expect(session.instance.save()).resolves.toMatchObject({ ok: true });
+
+    // 内容与提交快照一致时不替换文档：替换会连带重渲染并重置选区与历史，自动保存每次都会命中。
+    expect(session.replacements).toEqual([]);
+    expect(session.present).toBe(loaded);
+    expect(session.instance.dirty).toBe(false);
+  });
+
+  it('still adopts a document the adapter normalized differently', async () => {
+    const normalized: ScreenDocument = {
+      ...document(),
+      canvas: { width: 800, height: 600, backgroundColor: '#ffffff' },
+    };
+    const session = controller(
+      adapter({ save: vi.fn(async () => success(envelope('rev-2', normalized))) }),
+    );
+    await session.instance.load('project-1');
+    session.replacements.length = 0;
+
+    await expect(session.instance.save()).resolves.toMatchObject({ ok: true });
+
+    expect(session.replacements).toHaveLength(1);
+    expect(session.present.canvas.width).toBe(800);
+    expect(session.instance.dirty).toBe(false);
   });
 
   it('marks the project clean again when the baseline document reference is restored', async () => {

@@ -161,13 +161,19 @@ function applySaveResult(
   }
   state.project = parsed.value;
   const current = state.options.getDocument();
-  let baselineDocument = parsed.value.document;
-  if (current !== undefined && serializeScreenDocument(current) === snapshot) {
+  // 保存成功后的三种落点，按「本地文档是否还是提交时的那份」和「服务端返回的是否同一内容」区分：
+  // 只有服务端归一化出不同内容时才需要真的替换文档，也只有那条路径会重渲染并重置选区与历史。
+  if (current === undefined || serializeScreenDocument(current) !== snapshot) {
+    // 飞行期间又变了脏：基线钉在服务端文档上，本地继续算脏，由消费方再排一次保存。
+    state.baselineDocument = parsed.value.document;
+  } else if (serializeScreenDocument(parsed.value.document) === snapshot) {
+    // 内容与提交快照逐字节相同：保留当前文档对象引用即可判定干净，不动会话状态。
+    state.baselineDocument = current;
+  } else {
     const replacement = state.options.replaceDocument(parsed.value.document);
     if (!replacement.ok) return finishScreenProjectError(state, pending, replacement);
-    baselineDocument = state.options.getDocument() ?? parsed.value.document;
+    state.baselineDocument = state.options.getDocument() ?? parsed.value.document;
   }
-  state.baselineDocument = baselineDocument;
   state.phase = 'ready';
   updateScreenProjectDirty(state);
   notifyScreenProjectChange(state);

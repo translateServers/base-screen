@@ -1,4 +1,8 @@
-import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
+import type {
+  ScreenDocument,
+  ScreenParseResult,
+  ScreenProjectAdapter,
+} from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import { describe, expect, it } from 'vitest';
 import { DesignerSession } from '../../../src/common/session/designer-session.js';
@@ -60,6 +64,69 @@ describe('DesignerSession', () => {
     expect(session.replaceDocument(document('新文本'))).toMatchObject({ ok: true });
     expect(session.interaction).toEqual({ selectedComponentIds: [], focusedComponentId: null });
     expect(selections.at(-1)).toEqual({ selectedComponentIds: [], focusedComponentId: null });
+  });
+
+  it('keeps selection and undo history across a successful save', async () => {
+    const { session } = createSession(() => ({
+      ok: true,
+      value: undefined,
+      diagnostics: [],
+    }));
+    const projectAdapter: ScreenProjectAdapter = {
+      capabilities: { publish: false },
+      load: async ({ projectId }) => ({
+        ok: true,
+        value: {
+          projectId,
+          revision: 'rev-1',
+          name: 'Project',
+          description: null,
+          document: document(),
+          metadata: {},
+        },
+        diagnostics: [],
+      }),
+      save: async ({ projectId, revision, document: submitted }) => ({
+        ok: true,
+        value: {
+          projectId,
+          revision: `${revision}-next`,
+          name: 'Project',
+          description: null,
+          document: submitted,
+          metadata: {},
+        },
+        diagnostics: [],
+      }),
+    };
+    expect(session.bindProjectAdapter(projectAdapter).ok).toBe(true);
+    await expect(session.load('project-1')).resolves.toMatchObject({ ok: true });
+    session.reduceSelection({
+      type: 'replace-selection',
+      componentIds: ['text-1'],
+      focusedComponentId: 'text-1',
+    });
+    expect(
+      session.executeCommand({
+        type: 'update-components',
+        componentIds: ['text-1'],
+        patch: { name: '改过名' },
+      }).ok,
+    ).toBe(true);
+    const saved = session.document;
+    expect(session.canUndo).toBe(true);
+    expect(session.dirty).toBe(true);
+
+    await expect(session.save()).resolves.toMatchObject({ ok: true });
+
+    // 自动保存落在「内容与提交快照一致」这一支时不得替换文档：替换会清选区、重建物料并重置历史。
+    expect(session.interaction).toEqual({
+      selectedComponentIds: ['text-1'],
+      focusedComponentId: 'text-1',
+    });
+    expect(session.canUndo).toBe(true);
+    expect(session.document).toBe(saved);
+    expect(session.dirty).toBe(false);
   });
 
   it('keeps document, history, and selection unchanged when rendering a transaction fails', () => {
