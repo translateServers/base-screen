@@ -1,4 +1,5 @@
 import { withViteBrowser } from '../browser-verification.mjs';
+import { assertCompositeInsertion } from './authoring/assert-composite-insertion.mjs';
 import {
   assertAuthoringImportAndInspector,
   assertAuthoringPaletteInteractions,
@@ -98,6 +99,7 @@ export async function runBrowserHarness(serverPort) {
     async ({ baseUrl, browser }) => {
       await assertInitialCanvasPointerFocus(browser, baseUrl);
       await assertMaterialGroupNavigation(browser, baseUrl);
+      await assertCompositeInsertion(browser, baseUrl);
       await assertTextAutoWidth(browser, baseUrl);
       await assertImageDensitySize(browser, baseUrl);
       for (const viewport of [

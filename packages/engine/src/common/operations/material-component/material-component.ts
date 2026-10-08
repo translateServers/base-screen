@@ -49,19 +49,50 @@ export function createInitialMaterialDataSource(
       };
 }
 
-/** 生成不与文档现有 id 冲突的组件 id：`<type 归一化>-<序号>`。 */
-export function nextMaterialComponentId(document: ScreenDocument, type: string): string {
+/**
+ * 生成不与文档现有 id 冲突的组件 id：`<type 归一化>-<序号>`。
+ *
+ * `reserved` 供一次提交多个节点的分片插入使用：文档在事务应用前不会变化，只按
+ * `document.components` 去重会让同类型的第二个节点拿到与第一个相同的 id。
+ */
+export function nextMaterialComponentId(
+  document: ScreenDocument,
+  type: string,
+  reserved?: ReadonlySet<string>,
+): string {
   const base = type.replace(/[^A-Za-z0-9]+/g, '-');
   let index = document.components.length + 1;
   const ids = new Set(document.components.map((component) => component.id));
+  if (reserved !== undefined) {
+    for (const id of reserved) ids.add(id);
+  }
   while (ids.has(`${base}-${index}`)) index++;
   return `${base}-${index}`;
+}
+
+/** 文档当前最大 zIndex 的下一层；`reserved` 计入尚未应用的分片节点。 */
+export function nextMaterialComponentZIndex(
+  document: ScreenDocument,
+  reserved?: ReadonlySet<number>,
+): number {
+  const levels = document.components.map((component) => component.zIndex);
+  if (reserved !== undefined) {
+    levels.push(...reserved);
+  }
+  return levels.reduce((maximum, level) => Math.max(maximum, level), -1) + 1;
 }
 
 export interface MaterialComponentPlacement {
   readonly position: ScreenPosition;
   readonly name?: string;
   readonly dataSource?: ScreenComponentDataSource | null;
+  /**
+   * 分片插入用显式层级：省略时按文档现状推导 id 与 zIndex（单节点路径的既有行为）。
+   * 显式给出时由调用方保证唯一，`parentId` 则允许为 null。
+   */
+  readonly id?: string;
+  readonly parentId?: string | null;
+  readonly zIndex?: number;
 }
 
 /**
@@ -74,16 +105,14 @@ export function createMaterialComponent(
   placement: MaterialComponentPlacement,
 ): ScreenComponentNode {
   return {
-    id: nextMaterialComponentId(document, manifest.type),
+    id: placement.id ?? nextMaterialComponentId(document, manifest.type),
     type: manifest.type,
     name: placement.name ?? manifest.name,
-    parentId: null,
+    parentId: placement.parentId ?? null,
     position: placement.position,
     size: manifest.defaultSize,
     rotation: 0,
-    zIndex:
-      document.components.reduce((maximum, component) => Math.max(maximum, component.zIndex), -1) +
-      1,
+    zIndex: placement.zIndex ?? nextMaterialComponentZIndex(document),
     status: { locked: false, hidden: false },
     props: manifest.defaultProps,
     style: manifest.defaultStyle,

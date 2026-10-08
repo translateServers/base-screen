@@ -38,6 +38,7 @@ import {
 } from '../../common/operations/element/designer-layout-operations.js';
 import type { BaseScreenHostResourceAuthoringIntent } from '../../common/operations/host-resource/host-resource-authoring.js';
 import type { BaseScreenComponentInsertionIntent } from '../../common/operations/material-component/material-component.js';
+import type { BaseScreenComponentFragmentInsertionIntent } from '../../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../../common/operations/material-library/material-library-state.js';
@@ -88,6 +89,9 @@ export interface DesignerElementHost extends HTMLElement {
     intent: BaseScreenHostResourceAuthoringIntent,
   ): ScreenParseResult<ScreenDocument>;
   insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument>;
+  insertComponentFragment(
+    intent: BaseScreenComponentFragmentInsertionIntent,
+  ): ScreenParseResult<ScreenDocument>;
   replaceHostResource(
     componentId: string,
     intent: BaseScreenHostResourceAuthoringIntent,

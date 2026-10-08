@@ -1282,15 +1282,16 @@ async function assertLayersAuthoring(designer, page) {
   ) {
     throw new Error('BROWSER_HARNESS_LAYER_LOCK_STATE_FAILED');
   }
-  // 锁定组件不是画布选择目标：左键单击保持既有选择；从锁定组件内部拖出时仍能
-  // 发起框选，且最终选区排除锁定项、保留命中的未锁定项。
+  // 锁定组件不是画布选择目标：左键单击等同点击空白，取消既有选择而不是把锁定项选上，
+  // 也不是保持选中（铺满画布的锁定背景否则会让取消选中永远走不到）；从锁定组件内部拖出
+  // 时仍能发起框选，且最终选区排除锁定项、保留命中的未锁定项。
   const subtitle = tree.locator('[role=treeitem][data-layer-id=subtitle]');
   await subtitle.locator('[data-layer-select=subtitle]').click({ force: true });
   await designer.locator('[data-base-screen-component-id=title]').click({
     position: { x: 6, y: 7 },
   });
   if (
-    (await subtitle.getAttribute('aria-selected')) !== 'true' ||
+    (await subtitle.getAttribute('aria-selected')) !== 'false' ||
     (await title.getAttribute('aria-selected')) !== 'false'
   ) {
     throw new Error('BROWSER_HARNESS_LOCKED_CANVAS_CLICK_SELECTION_FAILED');

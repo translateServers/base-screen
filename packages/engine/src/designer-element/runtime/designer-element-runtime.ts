@@ -69,6 +69,7 @@ import {
   validateHostResourceAuthoringIntent,
 } from '../api/designer-element-host-resource.js';
 import { insertComponent, parseInsertionIntent } from '../api/designer-element-insert-component.js';
+import { insertComponentFragment } from '../api/designer-element-insert-component-fragment.js';
 import {
   readBackButton,
   readCanvasBackgroundImageButton,
@@ -250,6 +251,7 @@ export const designerElementRuntime = {
   executeCommand,
   executeTransaction,
   insertComponent,
+  insertComponentFragment,
   parseInsertionIntent,
   insertHostResource,
   insertHostResourceAt,

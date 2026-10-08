@@ -361,7 +361,12 @@ describe('DesignerGestureController group drag and marquee', () => {
       expect(canvas.canvas.hasPointerCapture(pointerId)).toBe(false);
     }
 
-    expect(reduceSelection).not.toHaveBeenCalled();
+    // 三次点击（含 Ctrl/Cmd）都不得把锁定组件变成选择目标；它们等同点击空白，取消选中。
+    expect(reduceSelection).toHaveBeenCalledTimes(3);
+    for (const call of reduceSelection.mock.calls) {
+      expect(call[0]).toEqual({ type: 'clear-selection' });
+    }
+    reduceSelection.mockClear();
 
     canvas.dispatch('pointerdown', {
       pointerId: 4,

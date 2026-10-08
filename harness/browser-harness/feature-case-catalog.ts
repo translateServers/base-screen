@@ -151,6 +151,18 @@ export const FEATURE_CASE_CATALOG = [
     verify: 'pnpm verify:browser',
     stressGrouping: false,
   },
+  {
+    id: 'composite-insertion',
+    title: '组合插入',
+    summary: '一次 insertComponentFragment 建出容器 + 标题 + 分隔线 + 读数四件套。',
+    lookAt:
+      '右上区域那张卡片：底座是 base.container（shell），标题与读数是 base.text，中间一条 base.rule；' +
+      '四个节点来自同一个可撤销事务，props/style 只给增量、由基座与 manifest 默认值合并。',
+    packages: ['engine', 'core', 'contracts'],
+    focused: 'pnpm --filter @base-screen/engine test',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
 ] as const;
 
 export type FeatureCaseId = (typeof FEATURE_CASE_CATALOG)[number]['id'];

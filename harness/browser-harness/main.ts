@@ -9,6 +9,7 @@ import {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_RULE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
@@ -18,6 +19,7 @@ import {
   BaseScreenEllipseMaterialElement,
   BaseScreenImageMaterialElement,
   BaseScreenRectangleMaterialElement,
+  BaseScreenRuleMaterialElement,
   BaseScreenTableMaterialElement,
   BaseScreenTextMaterialElement,
   defineBaseScreenChartMaterial,
@@ -25,6 +27,7 @@ import {
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenRuleMaterial,
   defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from '../../packages/material/src/index.ts';
@@ -125,6 +128,7 @@ const officialMaterials = [
   defineBaseScreenRectangleMaterial(),
   defineBaseScreenEllipseMaterial(),
   defineBaseScreenImageMaterial(),
+  defineBaseScreenRuleMaterial(),
   defineBaseScreenContainerMaterial(),
   defineBaseScreenChartMaterial(),
   defineHarnessSemanticChartMaterial(),
@@ -320,9 +324,14 @@ const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
   ['snapshot', true],
   [
     'standalone-materials',
-    ['base.text', 'base.rectangle', 'base.ellipse', 'base.image', 'base.container'].every((type) =>
-      pluginManager.snapshot?.materials.has(type),
-    ),
+    [
+      'base.text',
+      'base.rectangle',
+      'base.ellipse',
+      'base.image',
+      'base.rule',
+      'base.container',
+    ].every((type) => pluginManager.snapshot?.materials.has(type)),
   ],
   [
     'authoring-resource-type',
@@ -419,6 +428,10 @@ const catalog = createBaseScreenMaterialCatalog([
     constructor: BaseScreenImageMaterialElement,
   },
   {
+    manifest: BASE_SCREEN_RULE_MATERIAL_MANIFEST,
+    constructor: BaseScreenRuleMaterialElement,
+  },
+  {
     manifest: BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST,
     constructor: BaseScreenContainerMaterialElement,
   },
@@ -507,7 +520,7 @@ const materialLibraryGrouping = {
     {
       id: 'foundation',
       label: '基础',
-      materialTypes: ['base.text', 'base.rectangle', 'base.ellipse', 'base.image'],
+      materialTypes: ['base.text', 'base.rectangle', 'base.ellipse', 'base.image', 'base.rule'],
     },
     {
       id: 'data',
@@ -552,7 +565,11 @@ const materialLibraryGrouping = {
 const materialLibraryStressGrouping = {
   groups: [
     { id: 'foundation', label: '基础', materialTypes: ['base.text'] },
-    { id: 'shapes', label: '图形', materialTypes: ['base.rectangle', 'base.ellipse'] },
+    {
+      id: 'shapes',
+      label: '图形',
+      materialTypes: ['base.rectangle', 'base.ellipse', 'base.rule'],
+    },
     { id: 'media', label: '媒体素材库', materialTypes: ['base.image'] },
     {
       id: 'data',

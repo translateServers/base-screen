@@ -346,6 +346,70 @@ async function applyVariables(designer: BaseScreenDesignerElement): Promise<void
   await painted();
 }
 
+const COMPOSITE_CARD_NAME = '组合底座';
+
+/**
+ * 组合分片案例：一次 `insertComponentFragment` 建出一张卡片。
+ *
+ * 这张卡不是某个"卡片物料"，而是四个原子物料的组合——底座 `base.container` 作 shell，
+ * 标题与读数是 `base.text`，中间一条 `base.rule`。`props`/`style` 只写增量，基座负责与
+ * manifest 默认值合并后过 schema，因此不需要像 `plugin-datav-materials` 那样先 insert
+ * 再整体 patch 一遍。shell 物料 `libraryVisible: false`，不可从物料库插入，但按
+ * `designCapabilities.children` 作为组合外壳是允许的。
+ */
+async function applyCompositeInsertion(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  const already = designer.document?.components.some(
+    (component) => component.name === COMPOSITE_CARD_NAME,
+  );
+  if (already !== true) {
+    designer.insertComponentFragment({
+      anchor: { x: 680, y: 56 },
+      shell: {
+        key: 'shell',
+        materialType: 'base.container',
+        name: COMPOSITE_CARD_NAME,
+        size: { width: 240, height: 120 },
+        style: { fill: '#101a2e', borderColor: '#2b3f5c', borderWidth: 1, opacity: 1 },
+      },
+      nodes: [
+        {
+          key: 'title',
+          materialType: 'base.text',
+          name: '组合标题',
+          offset: { x: 16, y: 12 },
+          size: { width: 208, height: 22 },
+          style: { fontSize: 14, fontWeight: '400', color: '#8aa4c0', textAlign: 'left' },
+          dataSource: { type: 'static', value: '组合读数' },
+        },
+        {
+          key: 'rule',
+          materialType: 'base.rule',
+          name: '组合分隔线',
+          offset: { x: 16, y: 40 },
+          size: { width: 208, height: 2 },
+        },
+        {
+          key: 'value',
+          materialType: 'base.text',
+          name: '组合读数',
+          offset: { x: 16, y: 50 },
+          size: { width: 208, height: 58 },
+          style: { fontSize: 34, fontWeight: '700', color: '#39c5bb', textAlign: 'left' },
+          dataSource: { type: 'static', value: '42.7%' },
+        },
+      ],
+    });
+  }
+  const shell = designer.document?.components.find(
+    (component) => component.name === COMPOSITE_CARD_NAME,
+  );
+  if (shell !== undefined) await selectLayer(designer, shell.id);
+  clickShadow(designer, '[data-inspector-tab="appearance"]');
+  await painted();
+}
+
 const CASE_APPLIERS = {
   canvas: applyCanvas,
   'material-groups': applyMaterialGroups,
@@ -361,6 +425,7 @@ const CASE_APPLIERS = {
   blueprint: applyBlueprint,
   'host-authoring': applyHostAuthoring,
   variables: applyVariables,
+  'composite-insertion': applyCompositeInsertion,
 } as const satisfies Record<FeatureCaseId, FeatureCaseDefinition['apply']>;
 
 export const FEATURE_CASES: readonly FeatureCaseDefinition[] = FEATURE_CASE_CATALOG.map(

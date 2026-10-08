@@ -21,17 +21,20 @@ import {
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
   type BaseScreenCanvasBackgroundImageRequest,
   type BaseScreenCanvasPresentationChangeEventDetail,
+  type BaseScreenComponentFragmentInsertionIntent,
   type BaseScreenComponentInsertionIntent,
   BaseScreenDesignerElement,
   type BaseScreenDesignerLeftPanelGroup,
   type BaseScreenDesignerLeftPanelGroupChangeEventDetail,
   type BaseScreenDesignerSetWorkbenchModeOptions,
   type BaseScreenDesignerWorkbenchMode,
+  type BaseScreenFragmentNode,
   type BaseScreenHostResourceAuthoringIntent,
   type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryItem,
   createBaseScreenCorePluginCommandPort,
   createBaseScreenCorePluginDesignReadPort,
+  parseBaseScreenComponentFragmentInsertionIntent,
   parseBaseScreenComponentInsertionIntent,
   parseBaseScreenDesignerLeftPanelGroups,
   parseBaseScreenHostResourceAuthoringIntent,
@@ -135,6 +138,25 @@ describe('engine public lifecycle API', () => {
     >().returns.toEqualTypeOf<ScreenParseResult<ScreenDocument>>();
     expectTypeOf<BaseScreenComponentInsertionIntent['position']>().toEqualTypeOf<
       ScreenPosition | undefined
+    >();
+  });
+
+  it('exports the component fragment insertion contract', () => {
+    // 组合预设的存储归宿主，基座只负责一次展开：预设 JSON 递给这条入口即得一个可撤销事务。
+    expectTypeOf<typeof parseBaseScreenComponentFragmentInsertionIntent>().returns.toEqualTypeOf<
+      ScreenParseResult<BaseScreenComponentFragmentInsertionIntent>
+    >();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['insertComponentFragment']
+    >().parameters.toEqualTypeOf<[BaseScreenComponentFragmentInsertionIntent]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['insertComponentFragment']
+    >().returns.toEqualTypeOf<ScreenParseResult<ScreenDocument>>();
+    expectTypeOf<BaseScreenComponentFragmentInsertionIntent['anchor']>().toEqualTypeOf<
+      ScreenPosition | undefined
+    >();
+    expectTypeOf<BaseScreenComponentFragmentInsertionIntent['nodes']>().toEqualTypeOf<
+      readonly BaseScreenFragmentNode[]
     >();
   });
 

@@ -47,6 +47,12 @@ export {
   parseBaseScreenComponentInsertionIntent,
 } from '../common/operations/material-component/material-component.js';
 export {
+  type BaseScreenComponentFragmentInsertionIntent,
+  type BaseScreenFragmentNode,
+  type BaseScreenFragmentShell,
+  parseBaseScreenComponentFragmentInsertionIntent,
+} from '../common/operations/material-component/material-component-fragment.js';
+export {
   type BaseScreenMaterialLibraryGroup,
   type BaseScreenMaterialLibraryGrouping,
   parseBaseScreenMaterialLibraryGrouping,

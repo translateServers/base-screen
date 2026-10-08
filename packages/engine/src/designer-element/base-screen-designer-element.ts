@@ -45,6 +45,7 @@ import {
 } from '../common/operations/element/designer-layout-operations.js';
 import type { BaseScreenHostResourceAuthoringIntent } from '../common/operations/host-resource/host-resource-authoring.js';
 import type { BaseScreenComponentInsertionIntent } from '../common/operations/material-component/material-component.js';
+import type { BaseScreenComponentFragmentInsertionIntent } from '../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
 import { type BaseScreenMaterialLibraryItem } from '../common/operations/material-library/material-library-items.js';
 import { type BaseScreenMaterialLibraryState } from '../common/operations/material-library/material-library-state.js';
@@ -331,6 +332,16 @@ export class BaseScreenDesignerElement extends ElementBase {
    */
   insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument> {
     return this.#designerState.runtime.insertComponent(this, intent);
+  }
+
+  /**
+   * 一次插入一整份组合分片（原子物料的组合，可带 shell）。`anchor` 是组合包围盒的左上角，
+   * 节点位置是相对它的偏移；整片只平移不变形。一次事务提交（可撤销），成功后整片成为选中项。
+   */
+  insertComponentFragment(
+    intent: BaseScreenComponentFragmentInsertionIntent,
+  ): ScreenParseResult<ScreenDocument> {
+    return this.#designerState.runtime.insertComponentFragment(this, intent);
   }
 
   insertHostResource(

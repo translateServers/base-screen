@@ -356,11 +356,25 @@ export async function assertAuthoringMaterials(authoringDesigner, page) {
   await image.evaluate((element) => {
     element.model = { ...element.model, dataState: { status: 'loading' } };
   });
+  // \u5171\u4eab loading \u89c6\u56fe\u81ea\u5e26 shadow root\uff1a\u6587\u6848\u5728\u89c6\u56fe\u7684 label part \u5185\uff0c\u4e0d\u5728\u5bbf\u4e3b textContent \u4e0a\u3002
+  const imageLoading = await image.evaluate((element) => {
+    const view = element.querySelector('[data-base-screen-material-loading]');
+    return {
+      present: view !== null,
+      state: view?.getAttribute('data-base-screen-material-state') ?? null,
+      role: view?.getAttribute('role') ?? null,
+      label: view?.shadowRoot?.querySelector('[part="label"]')?.textContent ?? null,
+      busy: element.getAttribute('aria-busy'),
+    };
+  });
   if (
-    (await image.textContent()) !== '\u56fe\u7247\u52a0\u8f7d\u4e2d' ||
-    (await image.getAttribute('aria-busy')) !== 'true'
+    !imageLoading.present ||
+    imageLoading.state !== 'loading' ||
+    imageLoading.role !== 'status' ||
+    imageLoading.label !== '\u56fe\u7247\u52a0\u8f7d\u4e2d' ||
+    imageLoading.busy !== 'true'
   ) {
-    throw new Error('BROWSER_HARNESS_IMAGE_LOADING_STATE_FAILED');
+    throw new Error(`BROWSER_HARNESS_IMAGE_LOADING_STATE_FAILED:${JSON.stringify(imageLoading)}`);
   }
   await image.evaluate((element) => {
     element.model = {
@@ -368,8 +382,20 @@ export async function assertAuthoringMaterials(authoringDesigner, page) {
       dataState: { status: 'error', code: 'HOST_RESOURCE_FAILED', message: 'hidden' },
     };
   });
-  if ((await image.textContent()) !== '\u56fe\u7247\u4e0d\u53ef\u7528') {
-    throw new Error('BROWSER_HARNESS_IMAGE_ERROR_STATE_FAILED');
+  // \u9519\u8bef\u6001\u76f4\u63a5\u5448\u73b0 canonical message\uff08\u4e0d\u6620\u5c04\u9886\u57df\u6587\u6848\uff09\uff0ccode \u843d data-* \u4f9b\u5bbf\u4e3b\u57cb\u70b9\u3002
+  const imageError = await image.evaluate((element) => ({
+    text: element.textContent,
+    code: element
+      .querySelector('[data-base-screen-material-error-code]')
+      ?.getAttribute('data-base-screen-material-error-code'),
+    role: element.querySelector('[data-base-screen-material-error-code]')?.getAttribute('role'),
+  }));
+  if (
+    imageError.text !== 'hidden' ||
+    imageError.code !== 'HOST_RESOURCE_FAILED' ||
+    imageError.role !== 'alert'
+  ) {
+    throw new Error(`BROWSER_HARNESS_IMAGE_ERROR_STATE_FAILED:${JSON.stringify(imageError)}`);
   }
   if ((await authoringDesigner.locator('[data-material-type="base.container"]').count()) !== 0) {
     throw new Error('BROWSER_HARNESS_CONTAINER_LIBRARY_VISIBLE_FAILED');
@@ -880,8 +906,34 @@ export async function assertTextDataStates(authoringDesigner) {
   await selectedText.evaluate((element) => {
     element.model = { ...element.model, dataState: { status: 'loading' } };
   });
-  if ((await selectedText.textContent()) !== '\u52a0\u8f7d\u4e2d') {
-    throw new Error('BROWSER_HARNESS_TEXT_LOADING_STATE_FAILED');
+  // loading \u7528\u5171\u4eab\u89c6\u56fe\uff1a\u81ea\u5e26 shadow root\uff0c\u6587\u6848\u5728 label part \u5185\u800c\u975e\u5bbf\u4e3b textContent\u3002
+  const loading = await selectedText.evaluate((element) => {
+    const view = element.querySelector('[data-base-screen-material-loading]');
+    return {
+      present: view !== null,
+      label: view?.shadowRoot?.querySelector('[part="label"]')?.textContent ?? null,
+      role: view?.getAttribute('role') ?? null,
+      busy: element.getAttribute('aria-busy'),
+    };
+  });
+  if (
+    !loading.present ||
+    loading.label !== '\u52a0\u8f7d\u4e2d' ||
+    loading.role !== 'status' ||
+    loading.busy !== 'true'
+  ) {
+    throw new Error(`BROWSER_HARNESS_TEXT_LOADING_STATE_FAILED:${JSON.stringify(loading)}`);
+  }
+  await selectedText.evaluate((element) => {
+    element.model = { ...element.model, dataState: { status: 'idle' } };
+  });
+  // idle \u5360\u4f4d\u4f46\u4e0d\u7ed9\u6587\u6848\uff1a\u628a\u300c\u8fd8\u6ca1\u53d1\u8d77\u8bf7\u6c42\u300d\u8bf4\u6210\u300c\u6ca1\u6709\u6570\u636e\u300d\u662f\u9519\u7684\u3002
+  const idle = await selectedText.evaluate((element) => ({
+    text: element.textContent,
+    state: element.querySelector('[data-base-screen-material-state="idle"]') !== null,
+  }));
+  if (idle.text !== '' || !idle.state) {
+    throw new Error(`BROWSER_HARNESS_TEXT_IDLE_STATE_FAILED:${JSON.stringify(idle)}`);
   }
   await selectedText.evaluate((element) => {
     element.model = {
@@ -889,8 +941,17 @@ export async function assertTextDataStates(authoringDesigner) {
       dataState: { status: 'error', code: 'HOST_RESOURCE_FAILED', message: 'hidden' },
     };
   });
-  if ((await selectedText.textContent()) !== '\u6570\u636e\u4e0d\u53ef\u7528') {
-    throw new Error('BROWSER_HARNESS_TEXT_ERROR_STATE_FAILED');
+  // \u9519\u8bef\u6001\u76f4\u63a5\u5448\u73b0 canonical message\uff0ccode \u843d data-* \u4f9b\u5bbf\u4e3b\u57cb\u70b9\u8bfb\u53d6\u3002
+  const error = await selectedText.evaluate((element) => {
+    const view = element.querySelector('[data-base-screen-material-error-code]');
+    return {
+      text: element.textContent,
+      code: view?.getAttribute('data-base-screen-material-error-code') ?? null,
+      role: view?.getAttribute('role') ?? null,
+    };
+  });
+  if (error.text !== 'hidden' || error.code !== 'HOST_RESOURCE_FAILED' || error.role !== 'alert') {
+    throw new Error(`BROWSER_HARNESS_TEXT_ERROR_STATE_FAILED:${JSON.stringify(error)}`);
   }
 }
 

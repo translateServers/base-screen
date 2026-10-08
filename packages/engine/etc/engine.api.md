@@ -374,6 +374,13 @@ export interface BaseScreenCanvasPresentationChangeEventDetail {
 export type BaseScreenCanvasScaleMode = 'fill' | 'fit' | 'width' | 'height' | 'original' | 'none';
 
 // @public (undocumented)
+export interface BaseScreenComponentFragmentInsertionIntent {
+    readonly anchor?: ScreenPosition;
+    readonly nodes: readonly BaseScreenFragmentNode[];
+    readonly shell?: BaseScreenFragmentShell;
+}
+
+// @public (undocumented)
 export interface BaseScreenComponentInsertionIntent {
     // (undocumented)
     readonly materialType: string;
@@ -513,6 +520,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     importProject(name: string, document: ScreenDocument): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     insertComponent(intent: BaseScreenComponentInsertionIntent): ScreenParseResult<ScreenDocument>;
+    insertComponentFragment(intent: BaseScreenComponentFragmentInsertionIntent): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     insertHostResource(intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<ScreenDocument>;
     // (undocumented)
@@ -682,6 +690,31 @@ export type BaseScreenDesignerWorkbenchModeChangeReason = 'user' | 'api' | 'fall
 // @public (undocumented)
 type BaseScreenDistribution = 'horizontal' | 'vertical';
 
+// @public
+interface BaseScreenFragmentEntry {
+    // (undocumented)
+    readonly key: string;
+    // (undocumented)
+    readonly materialType: string;
+    // (undocumented)
+    readonly name?: string;
+    // (undocumented)
+    readonly offset?: ScreenPosition;
+    readonly props?: ScreenJsonObject;
+    // (undocumented)
+    readonly size?: ScreenSize;
+    readonly style?: ScreenJsonObject;
+}
+
+// @public (undocumented)
+export interface BaseScreenFragmentNode extends BaseScreenFragmentEntry {
+    readonly dataSource?: ScreenComponentDataSource | null;
+    readonly parent?: string;
+}
+
+// @public
+export type BaseScreenFragmentShell = BaseScreenFragmentEntry;
+
 // @public (undocumented)
 export interface BaseScreenHostResourceAuthoringIntent {
     // (undocumented)
@@ -828,6 +861,9 @@ const ElementBase: {
 
 // @public (undocumented)
 export function parseBaseScreenBlueprintCanvasCommand(input: unknown): ScreenParseResult<BaseScreenBlueprintCanvasCommand>;
+
+// @public
+export function parseBaseScreenComponentFragmentInsertionIntent(input: unknown): ScreenParseResult<BaseScreenComponentFragmentInsertionIntent>;
 
 // @public (undocumented)
 export function parseBaseScreenComponentInsertionIntent(input: unknown): ScreenParseResult<BaseScreenComponentInsertionIntent>;

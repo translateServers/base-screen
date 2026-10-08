@@ -16,6 +16,7 @@ export async function openViewport({ baseUrl, browser, viewport }) {
       ['base.rectangle', 'base-screen-rectangle'],
       ['base.ellipse', 'base-screen-ellipse'],
       ['base.image', 'base-screen-image'],
+      ['base.rule', 'base-screen-rule'],
       ['base.container', 'base-screen-container'],
     ].every(
       ([type, tagName]) =>
