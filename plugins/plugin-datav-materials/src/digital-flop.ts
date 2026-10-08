@@ -115,7 +115,7 @@ export class PluginDatavDigitalFlopElement extends DatavMaterialElement {
 
     if (model.dataState.status !== 'ready') {
       this.#lastText = undefined;
-      this.appendDataStatePlaceholder(model.dataState.status);
+      this.appendDataStatePlaceholder(model.dataState);
       return;
     }
 

@@ -41,6 +41,10 @@
       "types": "./dist/image.d.ts",
       "import": "./dist/image.js"
     },
+    "./rule": {
+      "types": "./dist/rule.d.ts",
+      "import": "./dist/rule.js"
+    },
     "./shapes": {
       "types": "./dist/shapes.d.ts",
       "import": "./dist/shapes.js"

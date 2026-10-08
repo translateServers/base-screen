@@ -418,24 +418,24 @@ export async function assertMaterialGroupUpdates(page, designer) {
   });
   const count = () =>
     designer.locator('[data-material-group-current="library"] .material-group-count').textContent();
-  // 类型数 = 目录中可见类型（15，含 plugin.echarts 与四个 datav 大屏物料）；卡片数 =
-  // 2 条 base.text 条目 + 其余 14 个类型各一条 = 16。
-  if ((await count()) !== '15' || (await designer.locator('[data-material-card]').count()) !== 16)
+  // 分组计数按 canonical 物料类型算，卡片按条目算：两条 base.text 条目只贡献一个类型，
+  // 所以卡片数 = 类型数 + 1。目录新增物料时两处一起加一。
+  if ((await count()) !== '16' || (await designer.locator('[data-material-card]').count()) !== 17)
     throw new Error('MATERIAL_GROUP_TYPE_VS_ITEM_COUNT_FAILED');
   await designer.locator('[data-material-search]').fill('Alpha');
   await designer.locator('[data-material-search-clear]').waitFor({ state: 'visible' });
   if (
     (await designer.locator('[data-material-card]:not([hidden])').count()) !== 1 ||
-    (await count()) !== '15'
+    (await count()) !== '16'
   )
     throw new Error('MATERIAL_GROUP_SEARCH_CHANGED_COUNT');
   await designer.locator('[data-material-favorite="text:one"]').click();
   await designer.locator('[data-material-filter="favorite"]').click();
-  if ((await count()) !== '15') throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
+  if ((await count()) !== '16') throw new Error('MATERIAL_GROUP_FAVORITE_CHANGED_COUNT');
   await designer.locator('[data-material-search-clear]').click();
   await designer.locator('[data-material-filter="recent"]').click();
   const empty = designer.locator('[data-material-search-empty]');
-  if (!(await empty.isVisible()) || (await count()) !== '15')
+  if (!(await empty.isVisible()) || (await count()) !== '16')
     throw new Error('MATERIAL_GROUP_EMPTY_STATE_FAILED');
   const emptyBounds = await empty.boundingBox();
   const resultsBounds = await designer.locator('.material-library-results').boundingBox();
@@ -566,7 +566,7 @@ export async function assertMaterialGroupUsability(page, designer) {
     reset.query !== '' ||
     reset.allGroups !== 'true' ||
     reset.allItems !== 'true' ||
-    reset.visible !== 15 ||
+    reset.visible !== 16 ||
     !reset.emptyHidden
   )
     throw new Error(`MATERIAL_GROUP_EMPTY_RECOVERY_FAILED:${JSON.stringify(reset)}`);
@@ -706,6 +706,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     'base.rectangle',
     'base.ellipse',
     'base.image',
+    'base.rule',
     'base.chart',
     'harness.semantic-chart',
     // 外围插件贡献的物料也进目录与物料库，故与官方/宿主物料同列断言。
@@ -732,7 +733,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     rootState.visual.rootHeight !== 28 ||
     rootState.visual.rootGlyphWidth !== 16 ||
     rootState.visual.rootLabelDisplay !== 'none' ||
-    rootState.visual.rootTitle !== '基础（4 个物料）' ||
+    rootState.visual.rootTitle !== '基础（5 个物料）' ||
     rootState.visual.childrenHeight !== rootState.visual.navigationHeight ||
     rootState.visual.countWidth !== (compact ? 24 : 0) ||
     rootState.visual.groupDisplay !== 'flex' ||
@@ -751,7 +752,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     ![1, 2, 3].includes(rootState.visual.firstRowCardCount) ||
     rootState.visual.panelCountRole !== 'status' ||
     rootState.visual.panelCountLive !== 'polite' ||
-    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a15 \u9879' ||
+    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a16 \u9879' ||
     rootState.visual.searchDescribedBy !== 'designer-left-panel-count'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ROOT_FAILED:${JSON.stringify(rootState)}`);
@@ -890,7 +891,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     !dynamic.sameCanvas ||
     dynamic.groups.join(',') !== 'bridges,best-practices,datav,foundation,data' ||
     dynamic.cards.join(',') !==
-      'harness.react-button,harness.vue-button,harness.dataset-ranking,datav.digital-flop,datav.scroll-board,datav.water-level,datav.border-box,base.text,base.rectangle,base.ellipse,base.image,base.chart,harness.semantic-chart,plugin.echarts,base.table'
+      'harness.react-button,harness.vue-button,harness.dataset-ranking,datav.digital-flop,datav.scroll-board,datav.water-level,datav.border-box,base.text,base.rectangle,base.ellipse,base.image,base.rule,base.chart,harness.semantic-chart,plugin.echarts,base.table'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_UPDATE_FAILED:${JSON.stringify(dynamic)}`);
   }

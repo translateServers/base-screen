@@ -23,6 +23,9 @@ export function defineBaseScreenImageMaterial(): ScreenParseResult<BaseScreenMat
 export function defineBaseScreenRectangleMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
 
 // @public (undocumented)
+export function defineBaseScreenRuleMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
+
+// @public (undocumented)
 export function defineBaseScreenTableMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
 
 // @public (undocumented)

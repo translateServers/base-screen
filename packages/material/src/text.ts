@@ -92,14 +92,14 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
     const { style } = model;
-    const text =
-      model.dataState.status === 'loading'
-        ? '加载中'
-        : model.dataState.status === 'error'
-          ? '数据不可用'
-          : model.dataState.status === 'ready' && typeof model.dataState.value === 'string'
-            ? model.dataState.value
-            : '';
+    if (model.dataState.status !== 'ready') {
+      // 共享状态视图用 replaceChildren 整份换掉子节点，会把垂直对齐的 wrapper 一起摘掉；
+      // 引用不清空的话，回到 ready 时 ensureTextWrapper 会复用那个游离节点，文本再也上不了屏。
+      this.removeTextWrapper();
+      this.renderDataState(model.dataState);
+      return;
+    }
+    const text = typeof model.dataState.value === 'string' ? model.dataState.value : '';
     const color = typeof style.color === 'string' ? style.color : '';
     applyTextColorStyle(this, color);
     this.style.fontSize = typeof style.fontSize === 'number' ? `${style.fontSize}px` : '';

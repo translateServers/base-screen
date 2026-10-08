@@ -141,12 +141,16 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
     this.setAttribute('aria-label', PluginDatavScrollBoardElement.manifest.name);
 
     if (model.dataState.status !== 'ready') {
-      this.appendDataStatePlaceholder(model.dataState.status);
+      this.appendDataStatePlaceholder(model.dataState);
       return;
     }
     const parsed = parseBaseScreenTableData(model.dataState.value);
     if (!parsed.ok) {
-      this.appendDataStatePlaceholder('error');
+      this.appendDataStatePlaceholder({
+        status: 'error',
+        code: 'HOST_DATASET_INVALID',
+        message: '列表数据格式无效',
+      });
       return;
     }
     this.#paint(parsed.value, model);

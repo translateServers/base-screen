@@ -4,6 +4,7 @@ import {
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenRuleMaterial,
   defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from './index.js';
@@ -12,6 +13,7 @@ for (const define of [
   defineBaseScreenTextMaterial,
   defineBaseScreenRectangleMaterial,
   defineBaseScreenEllipseMaterial,
+  defineBaseScreenRuleMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenContainerMaterial,
   defineBaseScreenChartMaterial,
@@ -29,6 +31,7 @@ export {
   defineBaseScreenEllipseMaterial,
   defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenRuleMaterial,
   defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from './index.js';

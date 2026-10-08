@@ -83,7 +83,7 @@ export function createPluginDatavRuntime(): BaseScreenPluginRuntime {
           args: {
             componentIds: [focused.id],
             // `props` 是整体替换：必须带上当前其余字段，否则 schema 必填的
-            // bracketSize/lineWidth/showTitleBar 会被抹掉，事务被拒。
+            // borderStyle/bracketSize/lineWidth 会被抹掉，事务被拒。
             patch: { props: { ...focused.props, borderStyle: next } },
           },
         });

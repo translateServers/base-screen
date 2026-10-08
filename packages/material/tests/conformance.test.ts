@@ -42,7 +42,13 @@ function elementWith(
   element.isConnected = true;
   element.appendChild = () => {};
   element.ownerDocument = {
-    createElement: () => ({ style: {}, textContent: '' }),
+    // 共享状态视图会 setAttribute 并给 loading 视图挂 shadow root，桩要能承接。
+    createElement: () => ({
+      style: {},
+      textContent: '',
+      setAttribute: () => {},
+      attachShadow: () => ({ append: () => {} }),
+    }),
     createElementNS: () => ({
       style: {},
       setAttribute: () => {},

@@ -121,7 +121,7 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
 
     if (model.dataState.status !== 'ready') {
       this.#wave = undefined;
-      this.appendDataStatePlaceholder(model.dataState.status);
+      this.appendDataStatePlaceholder(model.dataState);
       return;
     }
     this.#paint(model);

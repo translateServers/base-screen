@@ -1,4 +1,11 @@
 export {
+  type BaseScreenMaterialLoadingContainer,
+  type BaseScreenMaterialLoadingOptions,
+  type BaseScreenMaterialLoadingState,
+  createBaseScreenMaterialLoadingContainer,
+  createBaseScreenMaterialLoadingElement,
+} from '@base-screen/plugin-sdk';
+export {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
@@ -15,14 +22,10 @@ export {
   defineBaseScreenImageMaterial,
 } from './image.js';
 export {
-  type BaseScreenMaterialLoadingOptions,
-  createBaseScreenMaterialLoadingElement,
-} from './loading.js';
-export {
-  type BaseScreenMaterialLoadingContainer,
-  type BaseScreenMaterialLoadingState,
-  createBaseScreenMaterialLoadingContainer,
-} from './loading-container.js';
+  BASE_SCREEN_RULE_MATERIAL_MANIFEST,
+  BaseScreenRuleMaterialElement,
+  defineBaseScreenRuleMaterial,
+} from './rule.js';
 export {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,

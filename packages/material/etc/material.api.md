@@ -6,9 +6,16 @@
 
 import { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
+import { BaseScreenMaterialLoadingContainer } from '@base-screen/plugin-sdk';
+import { BaseScreenMaterialLoadingOptions } from '@base-screen/plugin-sdk';
+import { BaseScreenMaterialLoadingState } from '@base-screen/plugin-sdk';
 import { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import { BaseScreenMaterialStateViewOptions } from '@base-screen/plugin-sdk';
 import { BaseScreenMaterialTabularDataAdapter } from '@base-screen/plugin-core';
+import { createBaseScreenMaterialLoadingContainer } from '@base-screen/plugin-sdk';
+import { createBaseScreenMaterialLoadingElement } from '@base-screen/plugin-sdk';
+import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
@@ -28,6 +35,9 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest;
 
 // @public (undocumented)
 export const BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest;
+
+// @public (undocumented)
+export const BASE_SCREEN_RULE_MATERIAL_MANIFEST: BaseScreenMaterialManifest;
 
 // @public (undocumented)
 export const BASE_SCREEN_TABLE_MATERIAL_MANIFEST: BaseScreenMaterialManifest;
@@ -73,33 +83,24 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
     protected renderMaterial(): void;
 }
 
-// @public
-export interface BaseScreenMaterialLoadingContainer {
-    dispose(): void;
-    readonly element: HTMLElement;
-    update(state: BaseScreenMaterialLoadingState, options?: BaseScreenMaterialLoadingOptions): void;
-}
+export { BaseScreenMaterialLoadingContainer }
 
-// @public
-export interface BaseScreenMaterialLoadingOptions {
-    readonly label?: string;
-}
+export { BaseScreenMaterialLoadingOptions }
 
-// @public
-export interface BaseScreenMaterialLoadingState {
-    // (undocumented)
-    readonly status: BaseScreenMaterialDataState['status'] | 'empty';
-}
+export { BaseScreenMaterialLoadingState }
 
 // @public (undocumented)
 abstract class BaseScreenOfficialMaterialElement extends ElementBase {
     // (undocumented)
     connectedCallback(): void;
+    protected drawBoxSurface(style: Readonly<Record<string, unknown>>): void;
     // (undocumented)
     protected get materialModel(): BaseScreenMaterialModel | undefined;
     // (undocumented)
     get model(): BaseScreenMaterialModel;
     set model(value: BaseScreenMaterialModel);
+    protected renderDataState(dataState: BaseScreenMaterialDataState, options?: BaseScreenMaterialStateViewOptions): void;
+    protected renderInvalidData(code: ScreenMaterialErrorCode, message: string): void;
     // (undocumented)
     protected abstract renderMaterial(): void;
 }
@@ -108,6 +109,14 @@ abstract class BaseScreenOfficialMaterialElement extends ElementBase {
 export class BaseScreenRectangleMaterialElement extends BaseScreenShapeMaterialElement {
     // (undocumented)
     static readonly manifest: BaseScreenMaterialManifest;
+}
+
+// @public
+export class BaseScreenRuleMaterialElement extends BaseScreenOfficialMaterialElement {
+    // (undocumented)
+    static readonly manifest: BaseScreenMaterialManifest;
+    // (undocumented)
+    protected renderMaterial(): void;
 }
 
 // @public (undocumented)
@@ -136,11 +145,9 @@ export class BaseScreenTextMaterialElement extends BaseScreenOfficialMaterialEle
     protected renderMaterial(): void;
 }
 
-// @public
-export function createBaseScreenMaterialLoadingContainer(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): BaseScreenMaterialLoadingContainer;
+export { createBaseScreenMaterialLoadingContainer }
 
-// @public
-export function createBaseScreenMaterialLoadingElement(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): HTMLElement;
+export { createBaseScreenMaterialLoadingElement }
 
 // @public (undocumented)
 export function defineBaseScreenChartMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
@@ -156,6 +163,9 @@ export function defineBaseScreenImageMaterial(): ScreenParseResult<BaseScreenMat
 
 // @public (undocumented)
 export function defineBaseScreenRectangleMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
+
+// @public (undocumented)
+export function defineBaseScreenRuleMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;
 
 // @public (undocumented)
 export function defineBaseScreenTableMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry>;

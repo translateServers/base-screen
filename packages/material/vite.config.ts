@@ -11,6 +11,7 @@ export default createViteLibraryConfig(packageRoot, {
   container: `${packageRoot}src/container.ts`,
   image: `${packageRoot}src/image.ts`,
   index: `${packageRoot}src/index.ts`,
+  rule: `${packageRoot}src/rule.ts`,
   shapes: `${packageRoot}src/shapes.ts`,
   table: `${packageRoot}src/table.ts`,
   text: `${packageRoot}src/text.ts`,

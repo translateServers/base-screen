@@ -11,7 +11,10 @@ import {
   type BaseScreenTableData,
   parseBaseScreenTableData,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenMaterialEmptyView,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
 import {
   applyBackgroundColorOrGradient,
   BaseScreenOfficialMaterialElement,
@@ -113,25 +116,26 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
     const model = this.materialModel;
     if (model === undefined || !this.isConnected) return;
     this.replaceChildren();
+    this.replaceChildren();
     this.style.display = 'block';
     this.style.overflow = 'auto';
+    // 滚动条出现/消失会改变内容宽度；预留轨道避免数据变化时表格抖动。
+    this.style.scrollbarGutter = 'stable';
     applyBackgroundColorOrGradient(this, stringValue(model.style.backgroundColor));
     this.style.color = stringValue(model.style.color);
     this.setAttribute('role', 'region');
     this.setAttribute('aria-label', '表格');
     if (model.dataState.status !== 'ready') {
-      this.renderMessage(
-        model.dataState.status === 'loading'
-          ? '加载中'
-          : model.dataState.status === 'error'
-            ? '数据不可用'
-            : '暂无数据',
-      );
+      this.renderDataState(model.dataState);
       return;
     }
     const parsed = parseBaseScreenTableData(model.dataState.value);
     if (!parsed.ok) {
-      this.renderMessage('数据格式无效');
+      this.renderInvalidData('HOST_DATASET_INVALID', '表格数据格式无效');
+      return;
+    }
+    if (parsed.value.rows.length === 0) {
+      this.replaceChildren(createBaseScreenMaterialEmptyView(this.ownerDocument));
       return;
     }
     this.renderTable(parsed.value, model);
@@ -143,10 +147,8 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
   ): void {
     const table = this.ownerDocument.createElement('table');
     table.style.cssText = 'border-collapse: collapse; width: 100%; table-layout: auto;';
-    const caption = this.ownerDocument.createElement('caption');
-    caption.textContent = stringValue(model.props.title);
-    caption.style.cssText = 'text-align: left; padding: 10px 12px; font: 600 14px sans-serif;';
-    table.appendChild(caption);
+    // 不渲染 `<caption>`：表格物料没有标题类 prop（propsSchema 为空），需要标题时
+    // 由文档层另放一个 `base.text` 组合（AGENTS.md 物料原子化约定）。
     const head = this.ownerDocument.createElement('thead');
     const headerRow = this.ownerDocument.createElement('tr');
     for (const column of data.columns) {
@@ -176,14 +178,6 @@ export class BaseScreenTableMaterialElement extends BaseScreenOfficialMaterialEl
     });
     table.appendChild(body);
     this.appendChild(table);
-  }
-
-  private renderMessage(message: string): void {
-    const element = this.ownerDocument.createElement('div');
-    element.textContent = message;
-    element.style.cssText =
-      'display: grid; place-items: center; min-height: 100%; opacity: .72; font: 13px sans-serif;';
-    this.appendChild(element);
   }
 
   private emitRowClick(rowIndex: number, row: Readonly<Record<string, unknown>>): void {

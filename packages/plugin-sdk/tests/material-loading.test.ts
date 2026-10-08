@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createBaseScreenMaterialLoadingElement } from '../src/loading.js';
+import { createBaseScreenMaterialLoadingElement } from '../src/material-loading.js';
 import { documentFixture } from './__fixtures__/loading-dom.js';
 
 describe('shared material loading view', () => {

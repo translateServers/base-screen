@@ -1,4 +1,8 @@
-import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import type {
+  BaseScreenMaterialDataState,
+  BaseScreenMaterialModel,
+} from '@base-screen/plugin-core';
+import { createBaseScreenMaterialStateView } from '@base-screen/plugin-sdk';
 import { DatavElementBase } from './element-base.js';
 
 /** 渲染路径上的 model：守卫过后必然存在，用具名别名避免每处都写 NonNullable<...>。 */
@@ -41,19 +45,14 @@ export abstract class DatavMaterialElement extends DatavElementBase {
     return this.#model;
   }
 
-  /** 只读的"数据不可用"提示；loading/error/idle 三态共用，避免各物料各写一份。 */
-  protected appendDataStatePlaceholder(
-    status: BaseScreenMaterialModel['dataState']['status'],
-  ): void {
-    const element = this.ownerDocument.createElement('div');
-    element.className = 'datav-state-placeholder';
-    element.dataset.datavStatePlaceholder = status;
-    element.textContent =
-      status === 'loading' ? '加载中' : status === 'error' ? '数据不可用' : '暂无数据';
-    // 内联样式而非全局样式表：插件不得依赖宿主的 CSS 载入顺序，也不该污染宿主样式。
-    element.style.cssText =
-      'display:grid;place-items:center;width:100%;height:100%;font:13px/1.4 sans-serif;opacity:.72;';
-    this.replaceChildren(element);
+  /**
+   * 非 ready 态统一交给 `@base-screen/plugin-sdk` 的状态视图：chrome 与兜底文案全仓只有一份，
+   * `idle` 表示"还没发起请求"，因此占位但不给文案。视图自带内联样式，插件既不依赖宿主
+   * CSS 载入顺序，也不污染宿主样式。
+   */
+  protected appendDataStatePlaceholder(state: BaseScreenMaterialDataState): void {
+    const view = createBaseScreenMaterialStateView(this.ownerDocument, state);
+    if (view !== undefined) this.replaceChildren(view);
   }
 
   protected abstract renderMaterial(): void;

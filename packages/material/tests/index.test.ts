@@ -13,6 +13,7 @@ import {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_RULE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BASE_SCREEN_TEXT_MATERIAL_MANIFEST,
@@ -22,6 +23,7 @@ import {
   BaseScreenEllipseMaterialElement,
   BaseScreenImageMaterialElement,
   BaseScreenRectangleMaterialElement,
+  BaseScreenRuleMaterialElement,
   BaseScreenTableMaterialElement,
   BaseScreenTextMaterialElement,
 } from '../src/index.js';
@@ -35,6 +37,7 @@ describe('official materials', () => {
       [BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST, BaseScreenRectangleMaterialElement],
       [BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST, BaseScreenEllipseMaterialElement],
       [BASE_SCREEN_IMAGE_MATERIAL_MANIFEST, BaseScreenImageMaterialElement],
+      [BASE_SCREEN_RULE_MATERIAL_MANIFEST, BaseScreenRuleMaterialElement],
       [BASE_SCREEN_CONTAINER_MATERIAL_MANIFEST, BaseScreenContainerMaterialElement],
     ] as const;
 
@@ -85,6 +88,7 @@ describe('official materials', () => {
     expect(BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST.libraryVisible).toBeUndefined();
     expect(BASE_SCREEN_TEXT_MATERIAL_MANIFEST.libraryVisible).toBeUndefined();
     expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.libraryVisible).toBeUndefined();
+    expect(BASE_SCREEN_RULE_MATERIAL_MANIFEST.libraryVisible).toBeUndefined();
   });
 
   it('R3 projects selected tabular fields for official text, table, and chart materials', () => {
@@ -141,6 +145,7 @@ describe('official materials', () => {
       'base-screen-ellipse',
       'base-screen-image',
       'base-screen-rectangle',
+      'base-screen-rule',
       'base-screen-table',
       'base-screen-text',
     ]);

@@ -3,7 +3,7 @@ import {
   type BaseScreenMaterialLoadingOptions,
   createMaterialLoadingView,
   resolveMaterialLoadingLabel,
-} from './loading.js';
+} from './material-loading.js';
 
 /** A read-only presentation status. Empty can be derived by a material from ready data. */
 export interface BaseScreenMaterialLoadingState {

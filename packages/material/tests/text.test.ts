@@ -19,9 +19,12 @@ import {
  */
 
 type StubNode = {
+  tagName: string;
   style: Record<string, string>;
   textContent: string;
   removed: boolean;
+  setAttribute: (name: string, value: string) => void;
+  attachShadow: () => { append: (...nodes: StubNode[]) => void };
   remove: () => void;
 };
 
@@ -38,12 +41,15 @@ type TextElementStub = {
   ownerDocument: { createElement: (tagName: string) => StubNode };
 };
 
-function createStubNode(children: StubNode[]): StubNode {
+function createStubNode(tagName: string, children: StubNode[]): StubNode {
   let node: StubNode;
   node = {
+    tagName,
     style: {},
     textContent: '',
     removed: false,
+    setAttribute: () => {},
+    attachShadow: () => ({ append: () => {} }),
     remove: () => {
       const index = children.indexOf(node);
       if (index !== -1) children.splice(index, 1);
@@ -71,7 +77,9 @@ function mountText(style: BaseScreenMaterialModel['style']): TextElementStub {
     element.children = [];
     element.textContent = '';
   };
-  element.ownerDocument = { createElement: () => createStubNode(element.children) };
+  element.ownerDocument = {
+    createElement: (tagName: string) => createStubNode(tagName, element.children),
+  };
   element.addEventListener = () => {};
   element.removeEventListener = () => {};
   element.model = {
@@ -347,6 +355,31 @@ describe('text material typography (ADR-0047)', () => {
     expect(element.textContent).toBe('');
   });
 
+  it('rebuilds the vertical-align wrapper after a non-ready data state', () => {
+    const element = mountText({ verticalAlign: 'middle' });
+    element.model = {
+      ...modelWithStyle({ verticalAlign: 'middle' }),
+      dataState: { status: 'ready', value: '标题' },
+    };
+    expect(element.children).toHaveLength(1);
+    expect(element.children[0]!.textContent).toBe('标题');
+
+    // 共享状态视图用 replaceChildren 整份换掉子节点，垂直对齐的 wrapper 被一起摘掉。
+    element.model = {
+      ...modelWithStyle({ verticalAlign: 'middle' }),
+      dataState: { status: 'loading' },
+    };
+    expect(element.children).toHaveLength(0);
+
+    element.model = {
+      ...modelWithStyle({ verticalAlign: 'middle' }),
+      dataState: { status: 'ready', value: '标题' },
+    };
+    // 引用没清空时这里会复用游离节点：文本写进去了，画布上仍然什么都不剩。
+    expect(element.children).toHaveLength(1);
+    expect(element.children[0]!.textContent).toBe('标题');
+  });
+
   it('applies letterSpacing as px and clears it when missing', () => {
     expect(mountText({ letterSpacing: 8 }).style.letterSpacing).toBe('8px');
     expect(mountText({ letterSpacing: 0 }).style.letterSpacing).toBe('0px');
@@ -422,15 +455,32 @@ describe('text material typography (ADR-0047)', () => {
       element.children = [];
       element.textContent = '';
     };
-    element.ownerDocument = { createElement: () => createStubNode(element.children) };
+    const created: StubNode[] = [];
+    element.ownerDocument = {
+      createElement: (tagName: string) => {
+        const node = createStubNode(tagName, created);
+        created.push(node);
+        return node;
+      },
+    };
     element.addEventListener = () => {};
     element.removeEventListener = () => {};
+    // 非 ready 态一律交给共享状态视图：宿主自身不再写占位文案。
     element.model = { ...modelWithStyle({}), dataState: { status: 'loading' } };
-    expect(element.textContent).toBe('加载中');
+    expect(element.textContent).toBe('');
+    expect(created.length).toBeGreaterThan(0);
+    created.length = 0;
+    element.model = { ...modelWithStyle({}), dataState: { status: 'idle' } };
+    // idle 是"还没发起请求"：占位但不给任何文案。
+    expect(created.some((node) => node.tagName === 'div' && node.textContent === '')).toBe(true);
+    created.length = 0;
     element.model = {
       ...modelWithStyle({ verticalAlign: 'middle' }),
       dataState: { status: 'error', code: 'HOST_RESOURCE_FAILED', message: 'failed' },
     };
-    expect(element.children[0]!.textContent).toBe('数据不可用');
+    // 错误态直接呈现 contracts 侧已脱敏的 message。
+    expect(created.some((node) => node.tagName === 'div' && node.textContent === 'failed')).toBe(
+      true,
+    );
   });
 });

@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_ELLIPSE_MATERIAL_MANIFEST,
   BASE_SCREEN_RECTANGLE_MATERIAL_MANIFEST,
+  BASE_SCREEN_RULE_MATERIAL_MANIFEST,
   BaseScreenContainerMaterialElement,
   BaseScreenEllipseMaterialElement,
   BaseScreenImageMaterialElement,
   BaseScreenRectangleMaterialElement,
+  BaseScreenRuleMaterialElement,
 } from '../src/index.js';
 
 /** 无 DOM 环境下的最小元素 stub：样式/子节点/事件按浏览器语义模拟。 */
@@ -36,6 +38,15 @@ class StubNode {
   }
 
   setAttribute(): void {}
+
+  /** 共享 loading 视图会挂 shadow root；桩只需接受 append。 */
+  attachShadow(): { append(...nodes: StubNode[]): void } {
+    return {
+      append: (...nodes: StubNode[]) => {
+        this.children.push(...nodes);
+      },
+    };
+  }
 
   remove(): void {
     this.isConnected = false;
@@ -294,6 +305,66 @@ describe('shape material visual capabilities', () => {
   });
 });
 
+describe('rule material', () => {
+  function ruleModel(
+    props: Record<string, ScreenJsonValue>,
+    style: Record<string, ScreenJsonValue>,
+  ): BaseScreenMaterialModel {
+    return {
+      componentId: 'c1',
+      mode: 'viewer',
+      interactive: false,
+      props,
+      style,
+      size: { width: 320, height: 2 },
+      dataState: { status: 'ready', value: null },
+    };
+  }
+
+  function defaultStyle(
+    overrides: Record<string, ScreenJsonValue> = {},
+  ): Record<string, ScreenJsonValue> {
+    return { ...BASE_SCREEN_RULE_MATERIAL_MANIFEST.defaultStyle, ...overrides };
+  }
+
+  it('draws the line on the top edge for the horizontal axis', () => {
+    const { style } = mount(
+      BaseScreenRuleMaterialElement,
+      ruleModel({ axis: 'horizontal' }, defaultStyle()),
+    );
+    expect(style.borderTop).toBe('2px solid #1f2a44');
+    expect(style.borderLeft).toBe('');
+  });
+
+  it('rotates the line to the left edge for the vertical axis', () => {
+    const { style } = mount(
+      BaseScreenRuleMaterialElement,
+      ruleModel({ axis: 'vertical' }, defaultStyle({ thickness: 3, dash: 'dotted' })),
+    );
+    expect(style.borderLeft).toBe('3px dotted #1f2a44');
+    expect(style.borderTop).toBe('');
+  });
+
+  it('keeps the host render box untouched and paints no fill', () => {
+    const { style } = mount(BaseScreenRuleMaterialElement, ruleModel({ axis: 'horizontal' }, {}));
+    // 渲染盒不变式：宽高由渲染器按 canonical component.size 写入，物料不得覆盖。
+    expect(style.width).toBeUndefined();
+    expect(style.height).toBeUndefined();
+    expect(style.boxSizing).toBe('border-box');
+    expect(style.backgroundColor).toBe('transparent');
+    expect(style.backgroundImage).toBe('');
+  });
+
+  it('degrades an undeclared dash value to a solid line', () => {
+    const { style } = mount(
+      BaseScreenRuleMaterialElement,
+      ruleModel({ axis: 'horizontal' }, defaultStyle({ dash: 'wavy', opacity: 0.5 })),
+    );
+    expect(style.borderTop).toBe('2px solid #1f2a44');
+    expect(style.opacity).toBe('0.5');
+  });
+});
+
 describe('image material url validation', () => {
   it('renders an img for bounded URLs', () => {
     const { created } = mount(BaseScreenImageMaterialElement, dataModel('https://host/a.png'));
@@ -311,21 +382,26 @@ describe('image material url validation', () => {
       'relative/path.png',
       'https://host/a\u0000b.png',
     ]) {
-      const { element, created } = mount(BaseScreenImageMaterialElement, dataModel(source));
-      expect(created).toHaveLength(0);
-      expect(element.textContent).toBe('图片地址无效');
+      const { created } = mount(BaseScreenImageMaterialElement, dataModel(source));
+      // 安全属性不变：非法 URL 绝不创建 img；占位文案走统一状态视图。
+      expect(created.filter((node) => node.tagName === 'img')).toHaveLength(0);
+      expect(
+        created.some((node) => node.tagName === 'div' && node.textContent === '图片地址无效'),
+      ).toBe(true);
     }
   });
 
   it('falls back to a placeholder when the image fails to load', () => {
-    const { element, created } = mount(
+    const { created } = mount(
       BaseScreenImageMaterialElement,
       dataModel('https://host/missing.png'),
     );
-    expect(created).toHaveLength(1);
-    const image = created[0]!;
+    expect(created.filter((node) => node.tagName === 'img')).toHaveLength(1);
+    const image = created.find((node) => node.tagName === 'img')!;
     for (const listener of image.listeners.get('error') ?? []) listener();
-    expect(element.textContent).toBe('图片加载失败');
+    expect(
+      created.some((node) => node.tagName === 'div' && node.textContent === '图片加载失败'),
+    ).toBe(true);
     expect(image.isConnected).toBe(false);
   });
 

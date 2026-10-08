@@ -6,9 +6,11 @@
 
 import { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
 import { BaseScreenMaterialConstructor } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import { BaseScreenMaterialEditorDescriptor } from '@base-screen/plugin-core';
 import { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import { BaseScreenPluginRuntime } from '@base-screen/plugin-core';
+import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
@@ -21,6 +23,24 @@ export interface BaseScreenMaterialDefinition {
     readonly manifest: BaseScreenMaterialManifest;
 }
 
+// @public
+export interface BaseScreenMaterialLoadingContainer {
+    dispose(): void;
+    readonly element: HTMLElement;
+    update(state: BaseScreenMaterialLoadingState, options?: BaseScreenMaterialLoadingOptions): void;
+}
+
+// @public
+export interface BaseScreenMaterialLoadingOptions {
+    readonly label?: string;
+}
+
+// @public
+export interface BaseScreenMaterialLoadingState {
+    // (undocumented)
+    readonly status: BaseScreenMaterialDataState['status'] | 'empty';
+}
+
 // @public (undocumented)
 export interface BaseScreenMaterialPackage {
     // (undocumented)
@@ -29,6 +49,12 @@ export interface BaseScreenMaterialPackage {
     readonly id: string;
     // (undocumented)
     readonly materials: readonly BaseScreenMaterialDefinition[];
+}
+
+// @public
+export interface BaseScreenMaterialStateViewOptions {
+    readonly emptyLabel?: string;
+    readonly label?: string;
 }
 
 // @public (undocumented)
@@ -77,6 +103,21 @@ export function createBaseScreenMaterialEditorDescriptor(input: unknown, options
         readonly id: string;
     }[];
 }): ScreenParseResult<BaseScreenMaterialEditorDescriptor>;
+
+// @public
+export function createBaseScreenMaterialEmptyView(ownerDocument: Document, options?: BaseScreenMaterialStateViewOptions): HTMLElement;
+
+// @public
+export function createBaseScreenMaterialErrorView(ownerDocument: Document, code: ScreenMaterialErrorCode, message: string): HTMLElement;
+
+// @public
+export function createBaseScreenMaterialLoadingContainer(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): BaseScreenMaterialLoadingContainer;
+
+// @public
+export function createBaseScreenMaterialLoadingElement(ownerDocument: Document, options?: BaseScreenMaterialLoadingOptions): HTMLElement;
+
+// @public
+export function createBaseScreenMaterialStateView(ownerDocument: Document, dataState: BaseScreenMaterialDataState, options?: BaseScreenMaterialStateViewOptions): HTMLElement | undefined;
 
 // @public (undocumented)
 export function createMaterialDefinition(options: CreateMaterialDefinitionOptions): ScreenParseResult<BaseScreenMaterialDefinition>;

@@ -53,26 +53,20 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
     this.style.display = 'block';
     this.style.overflow = 'hidden';
     this.style.opacity = typeof model.style.opacity === 'number' ? String(model.style.opacity) : '';
-    if (model.dataState.status === 'loading') {
-      this.textContent = '图片加载中';
+    if (model.dataState.status !== 'ready') {
+      this.renderDataState(model.dataState, { label: '图片加载中' });
       return;
     }
-    if (model.dataState.status === 'error') {
-      this.textContent = '图片不可用';
-      return;
-    }
-    const source =
-      model.dataState.status === 'ready' && typeof model.dataState.value === 'string'
-        ? model.dataState.value
-        : '';
+    const source = typeof model.dataState.value === 'string' ? model.dataState.value : '';
+    // 未设置与非法 URL 走同一套错误 chrome，并携带 canonical code。
     if (source.length === 0) {
-      this.textContent = '未设置图片';
+      this.renderInvalidData('HOST_RESOURCE_INVALID', '未设置图片');
       return;
     }
     // 有界 URL 校验（ADR-0056 R1，与画布背景/封面同规则）：非法 URL fail-closed，
     // 不设置 img.src（杜绝 data:/javascript: 等注入面）。
     if (!isBoundedScreenImageUrl(source)) {
-      this.textContent = '图片地址无效';
+      this.renderInvalidData('HOST_RESOURCE_INVALID', '图片地址无效');
       return;
     }
     const image = this.ownerDocument.createElement('img');
@@ -102,7 +96,7 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
       if (renderGeneration !== this.#renderGeneration || !image.isConnected) return;
       this.#clearNaturalSize();
       image.remove();
-      this.textContent = '图片加载失败';
+      this.renderInvalidData('HOST_RESOURCE_FAILED', '图片加载失败');
     });
     image.src = source;
     this.appendChild(image);

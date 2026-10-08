@@ -5,8 +5,11 @@
 ```ts
 
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
+import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialModel } from '@base-screen/plugin-core';
+import { BaseScreenMaterialStateViewOptions } from '@base-screen/plugin-sdk';
+import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 
 // @public (undocumented)
@@ -24,11 +27,14 @@ export class BaseScreenImageMaterialElement extends BaseScreenOfficialMaterialEl
 abstract class BaseScreenOfficialMaterialElement extends ElementBase {
     // (undocumented)
     connectedCallback(): void;
+    protected drawBoxSurface(style: Readonly<Record<string, unknown>>): void;
     // (undocumented)
     protected get materialModel(): BaseScreenMaterialModel | undefined;
     // (undocumented)
     get model(): BaseScreenMaterialModel;
     set model(value: BaseScreenMaterialModel);
+    protected renderDataState(dataState: BaseScreenMaterialDataState, options?: BaseScreenMaterialStateViewOptions): void;
+    protected renderInvalidData(code: ScreenMaterialErrorCode, message: string): void;
     // (undocumented)
     protected abstract renderMaterial(): void;
 }

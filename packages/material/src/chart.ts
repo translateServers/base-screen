@@ -7,7 +7,10 @@ import {
   type BaseScreenMaterialTabularDataAdapter,
   parseBaseScreenChartData,
 } from '@base-screen/plugin-core';
-import { createMaterialDefinition } from '@base-screen/plugin-sdk';
+import {
+  createBaseScreenMaterialEmptyView,
+  createMaterialDefinition,
+} from '@base-screen/plugin-sdk';
 import {
   applyBackgroundColorOrGradient,
   BaseScreenOfficialMaterialElement,
@@ -101,21 +104,16 @@ export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialEl
     this.setAttribute('aria-label', '图表');
 
     if (model.dataState.status !== 'ready') {
-      const state = this.ownerDocument.createElement('div');
-      state.textContent =
-        model.dataState.status === 'loading'
-          ? '加载中'
-          : model.dataState.status === 'error'
-            ? '数据不可用'
-            : '暂无数据';
-      state.style.cssText =
-        'display: grid; place-items: center; height: 100%; color: currentColor; opacity: .72; font: 13px sans-serif;';
-      this.appendChild(state);
+      this.renderDataState(model.dataState);
       return;
     }
     const parsed = parseBaseScreenChartData(model.dataState.value);
     if (!parsed.ok) {
-      this.renderMessage('数据格式无效');
+      this.renderInvalidData('HOST_DATASET_INVALID', '图表数据格式无效');
+      return;
+    }
+    if (parsed.value.series.length === 0) {
+      this.replaceChildren(createBaseScreenMaterialEmptyView(this.ownerDocument));
       return;
     }
     this.renderChart(parsed.value, model);
@@ -175,14 +173,6 @@ export class BaseScreenChartMaterialElement extends BaseScreenOfficialMaterialEl
       }
     });
     this.appendChild(svg);
-  }
-
-  private renderMessage(message: string): void {
-    const element = this.ownerDocument.createElement('div');
-    element.textContent = message;
-    element.style.cssText =
-      'display: grid; place-items: center; height: 100%; opacity: .72; font: 13px sans-serif;';
-    this.appendChild(element);
   }
 
   private emitPointClick(

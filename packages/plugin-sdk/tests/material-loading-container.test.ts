@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { BaseScreenMaterialLoadingOptions } from '../src/loading.js';
+import type { BaseScreenMaterialLoadingOptions } from '../src/material-loading.js';
 import {
   type BaseScreenMaterialLoadingState,
   createBaseScreenMaterialLoadingContainer,
-} from '../src/loading-container.js';
+} from '../src/material-loading-container.js';
 import { documentFixture, LoadingTestNode } from './__fixtures__/loading-dom.js';
 
 function fixture(options: BaseScreenMaterialLoadingOptions = {}) {
