@@ -67,6 +67,11 @@
   使自动保存打断正在编辑或正在输入的作者状态。服务端把文档归一化成不同内容时仍然采纳服务端文档（此时按
   替换语义重置会话），保存飞行期间的再次编辑仍然算脏并由消费方再排一次保存。依据：
   `packages/engine/tests/common/session/designer-session.test.ts` 与 `project-controller.test.ts`。
+- **数据源页签只随物料能力出现**（2026-10-08 行为修复）：单选组件时，检查器的「数据源」页签以该物料
+  `manifest.dataCapabilities` 是否非空为门禁——矩形/椭圆/分隔线/容器声明为空，不该在它们身上留出读不到
+  数据的入口。摘除走 `hidden`，而检查器给页签写了显式 `display`（选择器优先级高于兜底的 `.designer-tab[hidden]`），
+  此前 `hidden` 被覆盖，页签仍留在栏上且点了不切换。由 `pnpm verify:browser` 的
+  `scripts/browser-harness/authoring/assert-inspector-data-tab.mjs` 按真实可见性钉住。
 - **大屏缩略图归宿主**（2026-09-05 边界修复）：Designer 不提供截取、上传或保存大屏缩略图的内建入口；
   截图、上传、来源并发保护、存储和业务列表展示均归宿主。此前画布属性面板中无实现、无能力门禁的
   “截取封面 / 上传”占位入口及不可写的 `thumbnailUrl` 呈现字段已删除。Material Manifest 的 `cover`

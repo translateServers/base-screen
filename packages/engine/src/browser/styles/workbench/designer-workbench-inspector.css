@@ -90,6 +90,11 @@
   font-size: var(--designer-font-size-base);
 }
 
+/* 页签按物料能力用 hidden 摘除，上面的显式 display 会盖掉 UA 的 [hidden]，必须就地压回。 */
+.properties .inspector-tabs .designer-tab[hidden] {
+  display: none;
+}
+
 .properties .inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
   background: var(--designer-surface-raised);
   color: var(--designer-text-secondary);

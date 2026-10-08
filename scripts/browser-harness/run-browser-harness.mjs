@@ -8,6 +8,7 @@ import {
   assertInspectorFormScrollContinuity,
   assertSizeEntry,
 } from './authoring/assert-inspector.mjs';
+import { assertInspectorDataTabCapability } from './authoring/assert-inspector-data-tab.mjs';
 import {
   assertAuthoringMarquee,
   assertAuthoringSelection,
@@ -102,6 +103,7 @@ export async function runBrowserHarness(serverPort) {
       await assertCompositeInsertion(browser, baseUrl);
       await assertTextAutoWidth(browser, baseUrl);
       await assertImageDensitySize(browser, baseUrl);
+      await assertInspectorDataTabCapability(browser, baseUrl);
       for (const viewport of [
         { width: 1024, height: 640 },
         { width: 1366, height: 768 },
