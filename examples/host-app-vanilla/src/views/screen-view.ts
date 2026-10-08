@@ -1,5 +1,5 @@
 import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
-import { createErrorBanner } from '../components/error-banner';
+import { showToast } from '../components/toast';
 import { api } from '../lib/api';
 import { el } from '../lib/dom';
 import { createLogger } from '../lib/logger';
@@ -14,7 +14,7 @@ const logger = createLogger('screen-view');
 export const screenView: ViewModule = {
   async mount(container, route: Route): Promise<() => void> {
     if (route.name !== 'view') {
-      container.append(createErrorBanner('缺少大屏 ID。', () => goToList()));
+      showToast('缺少大屏 ID。', 'error');
       return () => {};
     }
     const screenId = route.id;
@@ -22,29 +22,20 @@ export const screenView: ViewModule = {
     session.begin(screenId);
 
     const catalog = registerHostMaterials();
-    const status = el('p', { class: 'stage__status', text: session.message });
-    const toolbar = el('div', { class: 'stage__toolbar' }, [
+    // 查看器没有自带顶栏，返回入口与状态文案仍归宿主：一条浮在视口右上角的窄条，
+    // 不参与页面布局，因此不会与基座的测量互相影响。
+    const status = el('span', { class: 'embed-bar__status', text: session.message });
+    const bar = el('div', { class: 'embed-bar' }, [
       el('button', { class: 'button', text: '返回列表', on: { click: () => goToList() } }),
-      el('button', {
-        class: 'button button--primary',
-        text: '编辑',
-        on: {
-          click: () => {
-            window.location.hash = `#/screens/${screenId}/edit`;
-          },
-        },
-      }),
       status,
     ]);
-    const stage = el('div', { class: 'stage stage--view' });
-    const banner = el('div', { class: 'stage__banner-host' });
-    container.append(toolbar, banner, stage);
+    // 尺寸交给 .stage / .stage > * 的 CSS（占满视口），宿主不再内联写百分比宽高。
+    const stage = el('div', { class: 'stage' });
+    container.append(stage, bar);
 
-    const unsubscribe = screenSessionStore.subscribe((state) => {
+    const unsubscribe = screenSessionStore.subscribe((state, previous) => {
       status.textContent = state.message;
-      banner.replaceChildren(
-        ...(state.error === null ? [] : [createErrorBanner(state.error, () => goToList())]),
-      );
+      if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
     });
 
     const result = await api.getScreen(screenId);
@@ -56,9 +47,6 @@ export const screenView: ViewModule = {
 
     // 查看器只读播放：configure 只接收目录与数据通道，不接收项目适配器。
     const viewer = document.createElement('base-screen-viewer') as BaseScreenViewerElement;
-    viewer.style.display = 'block';
-    viewer.style.width = '100%';
-    viewer.style.height = '100%';
     stage.append(viewer);
 
     const configured = viewer.configure({
@@ -84,6 +72,7 @@ export const screenView: ViewModule = {
     return () => {
       unsubscribe();
       viewer.remove();
+      bar.remove();
       logger.debug('view released');
     };
   },

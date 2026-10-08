@@ -45,6 +45,9 @@ export function startRouter(container: HTMLElement): void {
   const render = async (): Promise<void> => {
     cleanup?.();
     cleanup = undefined;
+    // 视图各自往容器里追加根节点，换视图前先清空：嵌入页的 .stage 是占满视口的
+    // fixed 层，残留下来会整页拦截点击。
+    container.replaceChildren();
     const route = parseRoute(window.location.hash);
     const view = await resolveView(route);
     const released = await view.mount(container, route);

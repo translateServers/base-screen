@@ -48,7 +48,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 | 路由 | 页面 | 关键行为 |
 | --- | --- | --- |
 | `#/` | 大屏列表 | 卡片列表、新建（POST 后跳编辑）、删除（二次确认）、空态 / 错误态 / 骨架屏 |
-| `#/screens/:id/edit` | 设计器编辑 | 嵌入 `<base-screen-designer>`；宿主 project adapter 载入与保存；1.2s 防抖自动保存；冲突（409）提示重新加载 |
+| `#/screens/:id/edit` | 设计器编辑 | 嵌入 `<base-screen-designer>`；宿主 project adapter 载入与保存；自动保存规格见下 |
 | `#/screens/:id/view` | 只读查看 | 嵌入 `<base-screen-viewer>` 播放 canonical 文档 |
 
 编辑页的两条铁律（三端代码里都有注释）：
@@ -57,6 +57,17 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
    对还没进 DOM 的设计器调用不会报错，但画布会一直是空的。
 2. **设计器是 DOM 节点，不是框架组件**：用 ref 拿占位容器后 `appendChild`，
    不要塞进框架的 vnode / 模板。
+
+### 编辑页自动保存规格（三端逐条一致）
+
+引擎只在脏态 *翻转* 时发 `base-screen-dirty-change`，之后连续编辑不再通知；移除设计器元素会
+取消在飞行的项目请求。三端因此共用同一套宿主侧规则，只有语法不同：
+
+- **防抖**：`dirty → true` 后 `1200ms` 触发 `save()`；同一时刻只允许一次保存在飞行（`saveFlight` 复用）。
+- **飞行期补排**：保存进行中又变了脏时宿主自己记着，落定后再排一次——引擎不会再发事件。
+- **失败退避**：失败按 `5000ms` 起指数退避重试，上限 `60000ms`，成功后回到基准值；文案由 store 生成。
+- **冲突止血**：收到 `base-screen-project-conflict` 后停止自动保存（revision 已过期，重试只会再冲突一次），由用户重载。
+- **返回前落地**：顶栏返回先 `await` 保存再路由；异步清理路径只清定时器，不假装能 flush。
 
 ## REST 契约（由 host-api 实现，三端共用）
 
@@ -105,19 +116,26 @@ pnpm --filter @base-screen-example/host-app-vanilla build   # React / Vue 同理
 pnpm verify:examples        # 依次跑三端冒烟
 ```
 
-三端断言集合一致：种子列表渲染、设计器注册并挂载、KPI 卡经 host-resource
+三端断言集合一致：种子列表渲染、设计器注册并挂载、指标读数经 host-resource
 数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、无未捕获页面错误。
 
 ## 数据绑定演示
 
-起始文档里 `stage-cpu` 组件的 `dataSource` 是 `host-resource`
+起始文档里那张卡片**不是一个物料**，而是四个原子物料按 zIndex 叠出来的：`stage-card-bg`
+（`base.rectangle` 底座与边框）、`stage-card-title`（`base.text`）、`stage-card-rule`
+（`base.rule`）与 `stage-card-value`。四个节点都是根节点——组壳的几何由引擎持有，配置了
+`groupMaterialType` 之后任何一次事务都会把 `base.container` 吸附到其子孙的包围盒并集，拿它当
+父节点会在第一次无关编辑时压平卡片的内缩留白。其中 `stage-card-value` 的 `dataSource` 是 `host-resource`
 （`resourceType: 'demo_metric'`、`resourceId: 'cpu_usage'`）。三端各自的
 `src/screen/host-data-channel.ts` 把它解析成一次 `/api/metrics/series` 查询，
 经物料的 tabular 适配器投影为组件视图模型——这正是宿主接入真实数据源的形态，
 实现依据见[接入宿主数据](../docs/usage/host-data.md)。
 
-物料 `host-app.kpi-card` 在三个前端里各写一遍（React 组件 / Vue SFC / 原生自定义元素），
-但 `type`、`tagName` 与 schema 完全一致，因此**同一份 canonical 文档能在三端渲染**。
+物料 `host-app.metric-value`（只画「数值 + 单位」的原子读数）在三个前端里各写一遍（React 组件 /
+Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一致，因此**同一份 canonical
+文档能在三端渲染**。三端的 `configure` 都带 `groupMaterialType: 'base.container'`，所以多选原子
+物料即可成组整体移动/缩放/旋转；要成套插入同一份组合，用 `insertComponentFragment`（预设 JSON
+由宿主自己存，见 [docs/usage/designer-embedding.md](../docs/usage/designer-embedding.md)）。
 
 ## 分层与职责
 

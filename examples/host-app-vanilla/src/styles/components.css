@@ -109,7 +109,41 @@
 
 .screen-card__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacing-2);
+  /* 删除按钮会切换成「确认删除 + 取消」，固定行高避免卡片高度跳动。 */
+  min-height: 32px;
+}
+
+.screen-card__confirm {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+/* 新建表单：宿主自有页面的内联控件，取代 window.prompt / window.confirm。 */
+.create-screen {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.field {
+  min-width: 180px;
+  min-height: 32px;
+  padding: var(--spacing-1) var(--spacing-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .screen-card--skeleton {

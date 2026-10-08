@@ -33,7 +33,7 @@ export function createHostResourcePort(): ScreenHostResourcePort {
       if (!result.ok) {
         return failure('HOST_RESOURCE_UNAVAILABLE', result.error.message);
       }
-      // text / KPI 类标量绑定只消费最新一个点；序列全量仍可由图表类物料使用。
+      // text / 指标读数类标量绑定只消费最新一个点；序列全量仍可由图表类物料使用。
       const latest = result.data.points[result.data.points.length - 1];
       if (latest === undefined) {
         return failure('HOST_RESOURCE_INVALID', `指标无数据：${resourceId}`);

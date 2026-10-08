@@ -1,5 +1,7 @@
 import {
+  defineBaseScreenContainerMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenRuleMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
 import type {
@@ -9,14 +11,17 @@ import type {
 import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
 import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
-import { KPI_CARD_TAG } from './kpi-card';
-import { createKpiCardMaterial } from './kpi-card-material';
+import { METRIC_VALUE_TAG } from './metric-value';
+import { createMetricValueMaterial } from './metric-value-material';
 
 let cached: BaseScreenMaterialCatalog | undefined;
 
 /**
- * 注册入口（幂等）：设计器 / 查看器自定义元素、官方物料、宿主自有 KPI 卡。
+ * 注册入口（幂等）：设计器 / 查看器自定义元素、官方物料、宿主自有指标读数。
  * 全部走公开入口，不触碰私有 API；返回给 configure 使用的 catalog。
+ *
+ * `base.container` 与 `base.rule` 是组合的组成部分：容器 `libraryVisible: false`，因此不进物料库，
+ * 但编组（`groupMaterialType`）与组合分片的 shell 都要求在 catalog 里能解析到它。
  */
 export function registerHostMaterials(): BaseScreenMaterialCatalog {
   if (cached !== undefined) return cached;
@@ -31,13 +36,24 @@ export function registerHostMaterials(): BaseScreenMaterialCatalog {
   const rectangle = defineBaseScreenRectangleMaterial();
   if (!rectangle.ok)
     throw new Error(`HOST_RECTANGLE_MATERIAL_FAILED:${rectangle.diagnostics[0]?.code}`);
+  const rule = defineBaseScreenRuleMaterial();
+  if (!rule.ok) throw new Error(`HOST_RULE_MATERIAL_FAILED:${rule.diagnostics[0]?.code}`);
+  const container = defineBaseScreenContainerMaterial();
+  if (!container.ok)
+    throw new Error(`HOST_CONTAINER_MATERIAL_FAILED:${container.diagnostics[0]?.code}`);
 
-  const kpi: BaseScreenMaterialCatalogEntry = createKpiCardMaterial();
-  if (customElements.get(KPI_CARD_TAG) === undefined) {
-    customElements.define(KPI_CARD_TAG, kpi.constructor);
+  const metric: BaseScreenMaterialCatalogEntry = createMetricValueMaterial();
+  if (customElements.get(METRIC_VALUE_TAG) === undefined) {
+    customElements.define(METRIC_VALUE_TAG, metric.constructor);
   }
 
-  cached = createBaseScreenMaterialCatalog([text.value, rectangle.value, kpi]);
+  cached = createBaseScreenMaterialCatalog([
+    text.value,
+    rectangle.value,
+    rule.value,
+    container.value,
+    metric,
+  ]);
   return cached;
 }
 

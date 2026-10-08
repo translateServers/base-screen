@@ -24,13 +24,13 @@ src/
 │   ├── logger.ts / format.ts / toast.ts
 ├── screen/
 │   ├── register.ts             # 设计器/查看器/官方物料/自有物料注册（公开入口，幂等）
-│   ├── kpi-card.ts             # 三端共有的「指标卡」manifest
-│   ├── kpi-card-material.ts    # Vue 桥（createVueMaterialDefinition + mapModel + 表格适配）
+│   ├── metric-value.ts             # 三端共有的「指标读数」manifest
+│   ├── metric-value-material.ts    # Vue 桥（createVueMaterialDefinition + mapModel + 表格适配）
 │   ├── project-adapter.ts      # 宿主项目适配器：load/save，宿主维护 revision
 │   └── host-data-channel.ts    # resourcePort：host-resource -> /api/metrics/series
 ├── components/                 # AppShell / ScreenList / ScreenEditor / ScreenViewer /
-│                               # ErrorBanner / SkeletonGrid / KpiCard(SFC 物料)
-└── styles/                     # base（令牌）/ layout（响应式外壳）/ components（含 .kpi-card）
+│                               # ErrorBanner / SkeletonGrid / MetricValue(SFC 物料)
+└── styles/                     # base（令牌）/ layout（响应式外壳）/ components（含 .metric-value）
 ```
 
 ## 技术选型理由
@@ -53,8 +53,9 @@ pnpm dev:host-app-vue                               # 终端 2：本前端 :5175
 ```
 
 - 列表页 `/`：新建 / 编辑 / 查看 / 删除
-- 编辑页 `/screens/:id/edit`：`<base-screen-designer>` 嵌入，1.2s 防抖自动保存，
-  保存走宿主 project adapter（revision 乐观锁，冲突时 toast 提示）
+- 编辑页 `/screens/:id/edit`：`<base-screen-designer>` 嵌入，自动保存走宿主 project adapter
+  （revision 乐观锁，冲突时 toast 提示）；防抖 / 重试 / 返回前落地的逐条规格见
+  [../README.md](../README.md) 的「编辑页自动保存规格」
 - 查看页 `/screens/:id/view`：`<base-screen-viewer>` 只读播放
 
 ## 冒烟
@@ -65,7 +66,7 @@ pnpm --filter @base-screen-example/host-app-vue build
 pnpm --filter @base-screen-example/host-app-vue verify
 ```
 
-断言与 React / Vanilla 两端逐条一致：种子列表、设计器挂载、KPI 卡经
+断言与 React / Vanilla 两端逐条一致：种子列表、设计器挂载、指标读数经
 host-resource 数据通道渲染后端数值、查看器播放、指标确定性、无未捕获页面错误。
 
 ## 横切规格（三端对等）
@@ -73,5 +74,5 @@ host-resource 数据通道渲染后端数值、查看器播放、指标确定性
 - 响应式：≥1200px 完整外壳；768–1199px 紧凑内边距；<768px 单列。
 - 错误处理：`api.ts` Result 风格 + ErrorBanner + 重试；GET 网络失败重试 1 次。
 - 日志：`lib/logger.ts`（scope + 时间戳，debug 仅开发模式）。
-- 性能：路由级代码分割、列表单次拉取、保存防抖 + in-flight 守卫。
+- 性能：视图静态导入（单包一次拉取，不做路由级代码分割）、列表单次拉取、保存防抖 + 单飞复用 + 失败退避重试。
 - 样式稳定：骨架屏尺寸固定；hover 只改边框/背景色，不改几何。

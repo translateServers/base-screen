@@ -3,13 +3,23 @@ import { validateScreenDocumentInput } from './screen-document-guard';
 /**
  * 新建大屏使用的起始文档（canonical Screen Document 形状的普通 JSON）。
  *
- * - `stage-cpu` 演示 host-resource 数据绑定：`resourceType: 'demo_metric'`、
+ * 这张卡片**不是一整个物料**，而是四个原子物料按 zIndex 叠出来的：`base.rectangle` 做底座与
+ * 边框，`base.text` 做标题，`base.rule` 做分隔线，`host-app.metric-value` 只画「数值 + 单位」。
+ * 需要成套搬运这份组合时，宿主用 `insertComponentFragment` 一次插入（见 docs/usage/designer-embedding.md）。
+ *
+ * 四个节点**刻意都是根节点**，不是挂在底座下的父子结构：宿主配置 `groupMaterialType` 之后，
+ * 组壳的几何由引擎持有——任何一次事务都会把 `base.container` 吸附到其子孙的包围盒并集
+ * （auto-width 文本的实测宽度变化不产生事务，只能靠下一次事务顺带同步）。把底座当父节点，
+ * 20px 内缩会在第一次无关编辑时被压平。"整体搬动"是编辑期的**成组**动作，不是文档层的父子关系。
+ *
+ * - `stage-card-value` 演示 host-resource 数据绑定：`resourceType: 'demo_metric'`、
  *   `resourceId: 'cpu_usage'`，参数 `points` 为字面量。该组件使用三个前端各自实现的
- *   同一个宿主自有物料 `host-app.kpi-card`（原生自定义元素 / React 组件 / Vue SFC，
+ *   同一个宿主自有物料 `host-app.metric-value`（原生自定义元素 / React 组件 / Vue SFC，
  *   manifest 完全一致），其 `dataCapabilities` 声明 `host-resource` 并带表格适配器；
  *   前端宿主数据通道（见 docs/usage/host-data.md 的 resourcePort）把 resourceId
- *   解析成一次 mock 指标查询。
- * - `binding.fields` 的键是物料 dataBinding 的角色 id（指标卡的角色为 `value`）。
+ *   解析成一次 mock 指标查询。官方物料里只有 `base.image` 支持宿主资源，所以
+ *   「绑宿主资源的读数」本身就是宿主自有物料的位置。
+ * - `binding.fields` 的键是物料 dataBinding 的角色 id（指标读数的角色为 `value`）。
  *
  * 该形状与 `packages/contracts` 的 canonical schema 一致，但后端不依赖契约包来判断
  * 这一点：只在写入时做有界结构校验，权威校验发生在宿主前端与设计器提交路径上。
@@ -46,16 +56,64 @@ const STARTER_DOCUMENT = {
       dataSource: { type: 'static', value: '销售运营大屏' },
     },
     {
-      id: 'stage-cpu',
-      type: 'host-app.kpi-card',
-      name: 'CPU 指标卡',
+      id: 'stage-card-bg',
+      type: 'base.rectangle',
+      name: '卡片底座',
       parentId: null,
       position: { x: 64, y: 140 },
       size: { width: 260, height: 120 },
       rotation: 0,
       zIndex: 3,
       status: { locked: false, hidden: false },
-      props: { label: 'CPU 使用率', unit: '%' },
+      props: {},
+      style: { fill: '#111a30', borderColor: '#1f2a44', borderWidth: 1, opacity: 1 },
+      dataSource: null,
+    },
+    {
+      id: 'stage-card-title',
+      type: 'base.text',
+      name: '卡片标题',
+      parentId: null,
+      position: { x: 84, y: 152 },
+      size: { width: 220, height: 22 },
+      rotation: 0,
+      zIndex: 4,
+      status: { locked: false, hidden: false },
+      props: {},
+      style: {
+        color: '#93a4c3',
+        fontSize: 14,
+        fontWeight: '400',
+        textAlign: 'left',
+        verticalAlign: 'middle',
+      },
+      dataSource: { type: 'static', value: 'CPU 使用率' },
+    },
+    {
+      id: 'stage-card-rule',
+      type: 'base.rule',
+      name: '卡片分隔线',
+      parentId: null,
+      position: { x: 84, y: 180 },
+      size: { width: 220, height: 2 },
+      rotation: 0,
+      zIndex: 5,
+      status: { locked: false, hidden: false },
+      props: { axis: 'horizontal' },
+      style: { color: '#1f2a44', thickness: 2, dash: 'solid', opacity: 1 },
+      dataSource: null,
+    },
+    {
+      id: 'stage-card-value',
+      type: 'host-app.metric-value',
+      name: 'CPU 读数',
+      parentId: null,
+      position: { x: 84, y: 186 },
+      size: { width: 220, height: 70 },
+      rotation: 0,
+      zIndex: 6,
+      status: { locked: false, hidden: false },
+      props: { unit: '%' },
       style: {},
       dataSource: {
         type: 'host-resource',

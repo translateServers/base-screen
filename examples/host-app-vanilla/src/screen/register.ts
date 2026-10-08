@@ -1,5 +1,7 @@
 import {
+  defineBaseScreenContainerMaterial,
   defineBaseScreenRectangleMaterial,
+  defineBaseScreenRuleMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
 import type {
@@ -10,14 +12,17 @@ import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
 import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
-import { KPI_CARD_MANIFEST } from './kpi-card';
-import { KpiCardElement } from './kpi-card-element';
+import { METRIC_VALUE_MANIFEST } from './metric-value';
+import { MetricValueElement } from './metric-value-element';
 
 let cached: BaseScreenMaterialCatalog | undefined;
 
 /**
- * 注册入口（幂等）：设计器 / 查看器自定义元素、官方物料、宿主自有 KPI 卡。
+ * 注册入口（幂等）：设计器 / 查看器自定义元素、官方物料、宿主自有指标读数。
  * 全部走公开入口，不触碰私有 API；返回给 configure 使用的 catalog。
+ *
+ * `base.container` 与 `base.rule` 是组合的组成部分：容器 `libraryVisible: false`，因此不进物料库，
+ * 但编组（`groupMaterialType`）与组合分片的 shell 都要求在 catalog 里能解析到它。
  */
 export function registerHostMaterials(): BaseScreenMaterialCatalog {
   if (cached !== undefined) return cached;
@@ -32,16 +37,28 @@ export function registerHostMaterials(): BaseScreenMaterialCatalog {
   const rectangle = defineBaseScreenRectangleMaterial();
   if (!rectangle.ok)
     throw new Error(`HOST_RECTANGLE_MATERIAL_FAILED:${rectangle.diagnostics[0]?.code}`);
+  const rule = defineBaseScreenRuleMaterial();
+  if (!rule.ok) throw new Error(`HOST_RULE_MATERIAL_FAILED:${rule.diagnostics[0]?.code}`);
+  const container = defineBaseScreenContainerMaterial();
+  if (!container.ok)
+    throw new Error(`HOST_CONTAINER_MATERIAL_FAILED:${container.diagnostics[0]?.code}`);
 
-  const kpi = createMaterialDefinition({
-    manifest: KPI_CARD_MANIFEST,
-    element: KpiCardElement as unknown as BaseScreenMaterialConstructor,
+  const metric = createMaterialDefinition({
+    manifest: METRIC_VALUE_MANIFEST,
+    element: MetricValueElement as unknown as BaseScreenMaterialConstructor,
   });
-  if (!kpi.ok) throw new Error(`HOST_KPI_MATERIAL_FAILED:${kpi.diagnostics[0]?.code}`);
-  const kpiDefined = kpi.value.define();
-  if (!kpiDefined.ok) throw new Error(`HOST_KPI_DEFINE_FAILED:${kpiDefined.diagnostics[0]?.code}`);
+  if (!metric.ok) throw new Error(`HOST_METRIC_MATERIAL_FAILED:${metric.diagnostics[0]?.code}`);
+  const metricDefined = metric.value.define();
+  if (!metricDefined.ok)
+    throw new Error(`HOST_METRIC_DEFINE_FAILED:${metricDefined.diagnostics[0]?.code}`);
 
-  cached = createBaseScreenMaterialCatalog([text.value, rectangle.value, kpiDefined.value]);
+  cached = createBaseScreenMaterialCatalog([
+    text.value,
+    rectangle.value,
+    rule.value,
+    container.value,
+    metricDefined.value,
+  ]);
   return cached;
 }
 

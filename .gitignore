@@ -17,6 +17,8 @@ packages/*/LICENSE
 *.db-journal
 *.db-wal
 *.db-shm
+# 本地 SQLite 手工快照：`*.db` 匹配不到 `screens.db.bak-<日期>` 这类后缀
+*.db.bak-*
 /examples/host-api/src/generated/
 .env
 !/examples/host-api/.env

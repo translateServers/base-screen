@@ -5,27 +5,34 @@ import { useRoute, useRouter } from 'vue-router';
 import { useScreenSessionStore } from '../composables/use-stores';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
+import { showToast } from '../lib/toast';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { registerHostMaterials } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
-import ErrorBanner from './ErrorBanner.vue';
 
 const route = useRoute();
 const router = useRouter();
 const stage = ref<HTMLDivElement | null>(null);
 const viewer = shallowRef<BaseScreenViewerElement | null>(null);
+// 查看器没有自带顶栏，所以这一页的返回入口和状态文案仍归宿主。
 const session = useScreenSessionStore();
 
 const logger = createLogger('screen-viewer');
+
+let unsubscribeSession: (() => void) | undefined;
 
 onMounted(() => {
   const screenId = route.params.screenId;
   const container = stage.value;
   if (typeof screenId !== 'string' || container === null) {
-    screenSessionStore.getState().failedToLoad('缺少大屏 ID。');
+    showToast('缺少大屏 ID。', 'error');
     return;
   }
   screenSessionStore.getState().begin(screenId);
+  // 窄条只显示状态文案，详细原因仍按 error 变化各提示一次。
+  unsubscribeSession = screenSessionStore.subscribe((state, previous) => {
+    if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
+  });
 
   void (async () => {
     const catalog = registerHostMaterials();
@@ -37,9 +44,6 @@ onMounted(() => {
 
     // 查看器只读播放：configure 只接收目录与数据通道，不接收项目适配器。
     const element = document.createElement('base-screen-viewer') as BaseScreenViewerElement;
-    element.style.display = 'block';
-    element.style.width = '100%';
-    element.style.height = '100%';
     container.append(element);
     viewer.value = element;
 
@@ -65,6 +69,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  unsubscribeSession?.();
   viewer.value?.remove();
   viewer.value = null;
   screenSessionStore.getState().reset();
@@ -73,23 +78,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="page">
-    <div class="stage__toolbar">
-      <button type="button" class="button" @click="router.push('/')">返回列表</button>
-      <button
-        type="button"
-        class="button button--primary"
-        @click="router.push(`/screens/${String(route.params.screenId)}/edit`)"
-      >
-        编辑
-      </button>
-      <span class="stage__status">{{ session.message }}</span>
-    </div>
-    <ErrorBanner
-      v-if="session.error !== null"
-      :message="session.error"
-      @retry="router.push('/')"
-    />
-    <div ref="stage" class="stage stage--view" />
+  <div ref="stage" class="stage" />
+  <div class="embed-bar">
+    <button type="button" class="button" @click="router.push('/')">返回列表</button>
+    <span class="embed-bar__status">{{ session.message }}</span>
   </div>
 </template>

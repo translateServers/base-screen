@@ -84,15 +84,15 @@ const seedDocument = {
     },
     {
       id: 'stage-cpu',
-      type: 'host-app.kpi-card',
-      name: 'CPU 指标卡',
+      type: 'host-app.metric-value',
+      name: 'CPU 读数',
       parentId: null,
       position: { x: 64, y: 140 },
       size: { width: 260, height: 120 },
       rotation: 0,
       zIndex: 3,
       status: { locked: false, hidden: false },
-      props: { label: 'CPU 使用率', unit: '%' },
+      props: { unit: '%' },
       style: {},
       dataSource: {
         type: 'host-resource',
@@ -184,7 +184,10 @@ try {
   // 2) 编辑页：包 ABI 注册的设计器挂载，宿主 adapter 载入文档。
   await page.locator('.screen-card', { hasText: SCREEN_NAME }).getByText('编辑').click();
   await page.waitForFunction(
-    () => document.querySelector('base-screen-designer')?.isConnected === true,
+    () => {
+      const designer = document.querySelector('base-screen-designer');
+      return designer?.isConnected === true && (designer.document?.components.length ?? 0) > 0;
+    },
     undefined,
     { timeout: 30_000 },
   );
@@ -193,7 +196,7 @@ try {
     return {
       registered: customElements.get('base-screen-designer') !== undefined,
       viewerRegistered: customElements.get('base-screen-viewer') !== undefined,
-      materialRegistered: customElements.get('host-app-kpi-card') !== undefined,
+      materialRegistered: customElements.get('host-app-metric-value') !== undefined,
       componentCount: designer?.document?.components.length ?? 0,
       revision: designer?.document === null ? null : true,
     };
@@ -205,13 +208,13 @@ try {
     throw new Error('VUE_HOST_TARBALL_DOCUMENT_FAILED: ' + JSON.stringify(designerState));
   }
 
-  // 3) host-resource 数据通道 + SFC 物料：KPI 卡渲染出存根指标数值。
+  // 3) host-resource 数据通道 + SFC 物料：指标读数渲染出存根指标数值。
   await page.waitForFunction(
     () => {
-      const kpi = document
+      const metric = document
         .querySelector('base-screen-designer')
-        ?.shadowRoot?.querySelector('host-app-kpi-card');
-      const text = kpi?.shadowRoot?.textContent ?? kpi?.textContent ?? '';
+        ?.shadowRoot?.querySelector('host-app-metric-value');
+      const text = metric?.shadowRoot?.textContent ?? metric?.textContent ?? '';
       return text.includes('41.5') || text.includes('47.25');
     },
     undefined,

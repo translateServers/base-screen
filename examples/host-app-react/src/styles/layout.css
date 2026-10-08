@@ -1,6 +1,6 @@
-/* 应用外壳与舞台布局：高度链 html/body/#app/.shell/.shell__main 全高。
-   设计器容器查询在 <1021px 宽或 <637px 高时会提示空间不足（引擎行为），
-   因此小屏编辑页改用提示视图而非硬塞画布。 */
+/* 应用外壳与舞台布局：宿主自有页面（列表）走 html/body/#app 全高链，嵌入基座的页面
+   用 .stage 占满视口。基座设计器的 :host 带 min-width: 1024px / min-height: 640px 下限，
+   窗口窄于它时页面会横向溢出——那是基座行为，宿主不去覆写。 */
 .shell {
   display: flex;
   flex-direction: column;
@@ -49,36 +49,38 @@
   flex-direction: column;
 }
 
-/* 设计器/查看器舞台：给全确定高度，画布测量才不失真。 */
+/* 嵌入面：设计器/查看器占满视口。宿主不给这层加外壳——基座自带顶栏与返回入口，
+   重复一层既抢尺寸链又抢按钮。`position: fixed` 让尺寸绝对确定，不留百分比退化空间。 */
 .stage {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-solid);
-  overflow: hidden;
+  position: fixed;
+  inset: 0;
 }
 
-.stage__toolbar {
+.stage > * {
+  position: absolute;
+  inset: 0;
+}
+
+/* 查看器没有自带顶栏，返回入口与状态文案仍归宿主：一条浮在视口右上角的窄条，
+   不参与页面布局，因此不会与设计器的测量互相影响。 */
+.embed-bar {
+  position: fixed;
+  top: var(--spacing-3);
+  right: var(--spacing-4);
+  z-index: 10;
   display: flex;
   align-items: center;
   gap: var(--spacing-2);
-  flex: 0 0 auto;
-  margin-bottom: var(--spacing-3);
+  padding: var(--spacing-1) var(--spacing-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-solid);
 }
 
-.stage__status {
-  margin-left: auto;
+.embed-bar__status {
   color: var(--color-text-muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-
-.stage--edit,
-.stage--view {
-  height: 100%;
 }
 
 @media (max-width: 1199px) {

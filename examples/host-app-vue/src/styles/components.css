@@ -110,7 +110,41 @@
 
 .screen-card__actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacing-2);
+  /* 删除按钮会切换成「确认删除 + 取消」，固定行高避免卡片高度跳动。 */
+  min-height: 32px;
+}
+
+.screen-card__confirm {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+/* 新建表单：宿主自有页面的内联控件，取代 window.prompt / window.confirm。 */
+.create-screen {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.field {
+  min-width: 180px;
+  min-height: 32px;
+  padding: var(--spacing-1) var(--spacing-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
 }
 
 .screen-card--skeleton {
@@ -195,31 +229,23 @@
   color: var(--color-danger);
 }
 
-/* 宿主 KPI 卡（Vue SFC 物料）：Vue 桥接会把本文件规则传播进设计器 shadow root，
+/* 宿主指标读数（Vue SFC 物料）：Vue 桥接会把本文件规则传播进设计器 shadow root，
    因此物料样式可写在应用样式表里（与 React 端的内联样式形成对照）。
-   盒模型 = canonical component.size，不写 width/height。 */
-.kpi-card {
+   盒模型 = canonical component.size，不写 width/height；原子物料不内建装饰边框，
+   卡片外观由文档层的 `base.container` / 边框物料组合出来。 */
+.metric-value {
   display: flex;
   flex-direction: column;
   justify-content: center;
   height: 100%;
   padding: 14px 16px;
-  border: 1px solid rgba(57, 197, 187, 0.35);
-  border-radius: 12px;
-  background: rgba(15, 23, 42, 0.85);
   color: #e8eefb;
   font: 12px / 1.4 var(--font-family);
   box-sizing: border-box;
   overflow: hidden;
 }
 
-.kpi-card__label {
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.kpi-card__value {
-  margin-top: 6px;
+.metric-value__number {
   font-size: 30px;
   font-weight: 700;
   color: var(--color-accent);

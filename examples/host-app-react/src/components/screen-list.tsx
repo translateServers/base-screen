@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDateTime, formatNumber } from '../lib/format';
 import { useScreensStore } from '../store/screens-store';
@@ -16,17 +16,19 @@ export function ScreenListPage(): React.ReactElement {
   const load = useScreensStore((state) => state.load);
   const create = useScreensStore((state) => state.create);
   const remove = useScreensStore((state) => state.remove);
+  const [newName, setNewName] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  // 新建与删除都走页面内控件：window.prompt / window.confirm 在嵌入式浏览器里会被直接
+  // 抑制并返回 null，那样点按钮就只剩「没有反应」。
   const createScreen = async (): Promise<void> => {
-    const name = window.prompt('新大屏名称', '未命名大屏');
-    if (name === null) return;
-    const trimmed = name.trim();
+    const trimmed = newName.trim();
     if (trimmed.length === 0) {
-      showToast('名称不能为空', 'error');
+      showToast('请先填写大屏名称', 'error');
       return;
     }
     const id = await create(trimmed);
@@ -34,12 +36,13 @@ export function ScreenListPage(): React.ReactElement {
       showToast(`新建失败：${useScreensStore.getState().error ?? '未知错误'}`, 'error');
       return;
     }
+    setNewName('');
     showToast(`已创建「${trimmed}」`, 'success');
     navigate(`/screens/${id}/edit`);
   };
 
   const removeScreen = async (id: string, name: string): Promise<void> => {
-    if (!window.confirm(`确认删除「${name}」？该操作不可撤销。`)) return;
+    setPendingDeleteId(null);
     if (!(await remove(id))) {
       showToast(`删除失败：${useScreensStore.getState().error ?? '未知错误'}`, 'error');
       return;
@@ -51,28 +54,43 @@ export function ScreenListPage(): React.ReactElement {
     <div className="page">
       <header className="list-header">
         <h1>大屏管家</h1>
-        <button
-          type="button"
-          className="button button--primary"
-          onClick={() => void createScreen()}
+        <form
+          className="create-screen"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void createScreen();
+          }}
         >
-          新建大屏
-        </button>
+          <input
+            className="field"
+            type="text"
+            aria-label="新大屏名称"
+            placeholder="新大屏名称"
+            value={newName}
+            onChange={(event) => setNewName(event.target.value)}
+          />
+          <button type="submit" className="button button--primary">
+            新建大屏
+          </button>
+        </form>
       </header>
 
       {status === 'error' ? (
         <ErrorBanner message={error ?? '加载失败'} onRetry={() => void load()} />
       ) : status === 'ready' ? (
         screens.length === 0 ? (
-          <p className="empty-state">还没有大屏，点击右上角「新建大屏」开始。</p>
+          <p className="empty-state">还没有大屏，输入名称后点「新建大屏」开始。</p>
         ) : (
           <div className="screen-grid">
             {screens.map((screen) => (
               <ScreenCard
                 key={screen.id}
                 screen={screen}
+                confirming={pendingDeleteId === screen.id}
                 onEdit={() => navigate(`/screens/${screen.id}/edit`)}
                 onView={() => navigate(`/screens/${screen.id}/view`)}
+                onAskRemove={() => setPendingDeleteId(screen.id)}
+                onCancelRemove={() => setPendingDeleteId(null)}
                 onRemove={() => void removeScreen(screen.id, screen.name)}
               />
             ))}
@@ -87,13 +105,19 @@ export function ScreenListPage(): React.ReactElement {
 
 function ScreenCard({
   screen,
+  confirming,
   onEdit,
   onView,
+  onAskRemove,
+  onCancelRemove,
   onRemove,
 }: {
   readonly screen: ScreenSummaryShape;
+  readonly confirming: boolean;
   readonly onEdit: () => void;
   readonly onView: () => void;
+  readonly onAskRemove: () => void;
+  readonly onCancelRemove: () => void;
   readonly onRemove: () => void;
 }): React.ReactElement {
   return (
@@ -116,9 +140,21 @@ function ScreenCard({
         <button type="button" className="button" onClick={onView}>
           查看
         </button>
-        <button type="button" className="button button--danger" onClick={onRemove}>
-          删除
-        </button>
+        {confirming ? (
+          <>
+            <span className="screen-card__confirm">删除后不可撤销</span>
+            <button type="button" className="button button--danger" onClick={onRemove}>
+              确认删除
+            </button>
+            <button type="button" className="button" onClick={onCancelRemove}>
+              取消
+            </button>
+          </>
+        ) : (
+          <button type="button" className="button button--danger" onClick={onAskRemove}>
+            删除
+          </button>
+        )}
       </footer>
     </article>
   );

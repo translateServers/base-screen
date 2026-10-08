@@ -83,7 +83,7 @@ async function main() {
     page.on('pageerror', (error) => pageErrors.push(error.message));
 
     // 运行时注入后端地址：同一产物切换后端，无需重新构建。
-    await page.addInitScript((apiBase) => {
+    await page.addInitScript((apiBaseUrl) => {
       window.__HOST_APP_CONFIG__ = { apiBaseUrl };
     }, API_BASE);
 
@@ -100,7 +100,11 @@ async function main() {
     // 2) 编辑页：设计器元素注册并挂载，文档已加载。
     await page.locator('.screen-card', { hasText: '默认销售大屏' }).getByText('编辑').click();
     await page.waitForFunction(
-      () => document.querySelector('base-screen-designer') !== null,
+      // 等到文档真的载入再断言：设计器节点出现在 load() 解析之前，只等节点会读到 0 个组件。
+      () => {
+        const designer = document.querySelector('base-screen-designer');
+        return designer !== null && (designer.document?.components.length ?? 0) > 0;
+      },
       undefined,
       { timeout: 20_000 },
     );
@@ -108,24 +112,24 @@ async function main() {
       const designer = document.querySelector('base-screen-designer');
       return {
         defined: customElements.get('base-screen-designer') !== undefined,
-        kpiDefined: customElements.get('host-app-kpi-card') !== undefined,
+        metricDefined: customElements.get('host-app-metric-value') !== undefined,
         connected: designer?.isConnected === true,
         componentCount: designer?.document?.components.length ?? 0,
       };
     });
     if (!designerState.defined || !designerState.connected)
       fail(`设计器未就绪：${JSON.stringify(designerState)}`);
-    if (!designerState.kpiDefined) fail('宿主 KPI 物料未注册');
+    if (!designerState.metricDefined) fail('宿主指标读数物料未注册');
     if (designerState.componentCount < 3)
       fail(`种子文档应有至少 3 个组件，实际 ${designerState.componentCount}`);
 
-    // 3) host-resource 数据绑定端到端：KPI 卡渲染出后端数值（React 桥接组件）。
+    // 3) host-resource 数据绑定端到端：指标读数渲染出后端数值（React 桥接组件）。
     await page.waitForFunction(
       () => {
-        const kpi = document
+        const metric = document
           .querySelector('base-screen-designer')
-          ?.shadowRoot?.querySelector('host-app-kpi-card');
-        const text = kpi?.shadowRoot?.textContent ?? kpi?.textContent ?? '';
+          ?.shadowRoot?.querySelector('host-app-metric-value');
+        const text = metric?.shadowRoot?.textContent ?? metric?.textContent ?? '';
         return /\d/.test(text) && !text.includes('--');
       },
       undefined,
