@@ -46,6 +46,7 @@ pnpm dev:browser-harness
 | 官方物料 Manifest / 面板、语义图表 | `/?designer&case=semantic-chart` | `pnpm --filter @base-screen/material test` | `pnpm verify:browser` |
 | 宿主作者桥、组件文本提交 | `/?designer&case=host-authoring` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
 | 变量目录与刷新 | `/?designer&case=variables` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
+| 组合分片一次插入（`insertComponentFragment`） | `/?designer&case=composite-insertion` | `pnpm --filter @base-screen/engine test` | `pnpm verify:browser` |
 | Vue / React 物料桥 | `/?designer&case=canvas`（含桥接按钮） | `pnpm --filter @base-screen/vue test` | `pnpm verify:browser` |
 | Viewer 纯展示 | `/` 右侧 Viewer | `pnpm --filter @base-screen/renderer test` | `pnpm verify:browser` |
 
@@ -71,6 +72,7 @@ pnpm dev:browser-harness
 | `blueprint` | 交互编排工作台与宿主图形槽 | `blueprint/assert-blueprint.mjs` |
 | `host-authoring` | 右下角宿主作者面板 | `authoring/assert-workbench.mjs` |
 | `variables` | 左侧变量目录 | `variables/assert-variables.mjs` |
+| `composite-insertion` | 右上卡片：容器 shell + 标题 + 分隔线 + 读数，整片一条历史 | `authoring/assert-composite-insertion.mjs` |
 
 `inspector-control` 会往当前项目里加一块演示物料；只用于人眼核对，不影响默认 `/` 与 `?designer` 验收文档。
 

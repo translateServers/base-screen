@@ -25,7 +25,8 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 `define*Material()` 成功值就是可放入 catalog 的 entry，并且重复调用同一 constructor 时幂等。
 不要在多个模块里无条件直接调用 `customElements.define()`。
 
-官方物料还包括椭圆、图片、容器、图表和表格。文本、图表、表格使用宿主
+官方物料范围以 `packages/material/src/auto-register.ts` 与该包 `package.json` 的 `exports` 为权威，
+本文档不复述条目与数量（见 [Materials Baseline](../baseline/materials.md)）。文本、图表、表格使用宿主
 表格数据时，目录项还要分别携带包中导出的 `*_TABULAR_DATA_ADAPTER`。文本的 `value` 角色接收
 一个字符串、数值、布尔或日期字段，显示数据集首行对应值；空行或空值投影为空文本。文本原有的
 标量静态数据保持不变；在 Designer 中只暴露「宿主数据集」，不再额外显示通用「宿主资源」选项。
@@ -56,13 +57,24 @@ const catalog = createBaseScreenMaterialCatalog([text.value, rectangle.value]);
 | `defaultData` | 可选 | 静态默认数据；存在时新组件初值为 `{ type: 'static', value: defaultData }` |
 | `staticData` | 可选 | `{ kind: 'scalar', valueType }` 或 `{ kind: 'tabular', defaultBinding }` |
 | `dataBinding` | 可选 | 数据绑定角色声明（宿主数据集字段映射用） |
-| `libraryVisible` | 可选 | 设为 `false` 时不出现在物料库，也不能被程序化插入 |
+| `libraryVisible` | 可选 | 设为 `false` 时不出现在物料库，也不可经物料库或 `insertComponent` 插入；仍可作为编组壳、层板 reparent 目标与组合分片的 shell |
 | `editorDescriptor` | 可选 | 声明式作者面板描述符（见 [Blueprint 工作台与宿主高级编辑器](./blueprint.md)）；自定义控件经此引用 |
 | `cover` | 可选 | 物料库封面 |
 
 > `propsSchema` / `styleSchema` 中被 `required` 引用的字段在提交时按 schema 校验。常见错误是把
 > 枚举字段写成别的类型：例如枚举约定为 `'400' | '700'` 时传数字 `600`，提交会报
 > `PLUGIN_CORE_MANIFEST_FIELD_INVALID`。
+
+> **物料要原子化**：不要把"描述这个组件是什么"的文案做成 prop（`title`/`caption`/`description`
+> 这类，宿主示例另禁 `label`）——需要标题时在文档层另放一个 `base.text` 组合。读数本身的构成
+> （单位、前后缀、表头列名）可以保留。渲染路径也只能读 manifest 已声明的 `props`/`style` 键。
+> 这条由 `pnpm check:material-atomicity`（随 `pnpm lint` 运行）检查；约定本体见仓库根 `AGENTS.md`
+> 「物料原子化（组件制作约定）」，门禁口径见 [Materials Baseline](../baseline/materials.md)。
+>
+> 组合的形态不在物料层：物料不能渲染另一个物料。一组原子物料在编辑期用成组（`groupMaterialType`）
+> 整体操作，在复用期用 `insertComponentFragment` 一次插入——见
+> [designer-embedding.md 的「组合插入」一节](./designer-embedding.md) 与
+> [ADR-0087](../decisions/ADR-0087-composite-component-fragment-insertion.md)。
 
 ## 宿主自有物料的最小完整示例
 

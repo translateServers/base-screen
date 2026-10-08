@@ -178,6 +178,37 @@ if (!inserted.ok) showDiagnostics(inserted.diagnostics);
 > `{ props: { stock: 9 } }` 会丢掉 schema 里同样必填的其他字段，提交时被
 > `propsSchema` 拒绝。
 
+### 组合插入：`insertComponentFragment`
+
+`insertComponent` 一次只建一个节点，而原子物料约定下的一张卡片是**多个**节点。要成套插入这种组合，
+用 `designer.insertComponentFragment(intent)`：一次调用、一个事务（撤销一次回退整片）、成功后整片选中。
+
+```ts
+const inserted = designer.insertComponentFragment({
+  anchor: { x: 64, y: 140 }, // 组合包围盒的左上角；省略时取可见画布中心
+  shell: { key: 'card', materialType: 'base.container', size: { width: 260, height: 120 } },
+  nodes: [
+    // offset 相对 anchor，不是画布绝对坐标；parent 省略即挂到 shell
+    { key: 'title', materialType: 'base.text', offset: { x: 20, y: 12 }, style: { fontSize: 14 } },
+    { key: 'rule', materialType: 'base.rule', offset: { x: 20, y: 40 } },
+  ],
+});
+if (!inserted.ok) showDiagnostics(inserted.diagnostics);
+```
+
+- **预设的存储归宿主**：基座不持有预设注册表，也不设「区块/模板」一等实体（[ADR-0087](../decisions/ADR-0087-composite-component-fragment-insertion.md)）。
+  宿主保存分片 JSON，入库前可用 `parseBaseScreenComponentFragmentInsertionIntent` 跑同一个失败关闭解析器。
+- **整片只平移**：包围盒左上角对齐 `anchor` 后贴进画布，不逐节点裁剪（那会把组合拉开变形）；分片大于画布时失败关闭而不是缩放。
+- **`props`/`style` 是增量**：与 manifest 默认值顶层浅合并后过 schema，不必自己展开必填字段。仅本入口如此——
+  `insertComponent` 与 `update-components` 仍是整体替换语义（见上面那条警告）。
+- **shell 按 `designCapabilities.children === true` 校验**，所以 `libraryVisible: false` 的 `base.container`
+  可作外壳；普通 `nodes` 仍要求物料库可见。`parent` 只接受 shell 键或更早声明的节点键（声明顺序排除环），
+  键仅用于分片内引用、不持久化，文档 id 与 zIndex 由基座分配。
+  **但组壳几何由引擎持有**：宿主配置 `groupMaterialType` 后，任何一次事务都会把 shell 吸附到其子孙的
+  包围盒并集（auto-width 文本的实测宽度变化不产生事务，靠这次顺带同步）。要一张有内缩留白的卡片，
+  把底座作为平级 `base.rectangle` 节点，不要当 shell。
+- 有界：节点 ≤ 64、intent 序列化 ≤ 64 KiB，超限 `AUTHORING_LIMIT_EXCEEDED`。
+
 ### 组件名的可编辑位置
 
 Designer 的**属性面板不提供组件 `name` 字段**——它只呈现几何属性与物料 manifest 声明

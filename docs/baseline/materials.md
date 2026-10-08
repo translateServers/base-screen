@@ -3,18 +3,29 @@
 > 返回[当前能力基线](./README.md)。
 
 
-- **共享加载展示与容器**：`@base-screen/material` 与 `@base-screen/sdk/material` 提供无注册副作用的
+- **共享加载展示与容器**：加载视图与加载容器由 `@base-screen/plugin-sdk` 拥有，`@base-screen/material`
+  与 `@base-screen/sdk/material` 按原名 re-export，提供无注册副作用的
   `createBaseScreenMaterialLoadingContainer`，观察公共数据态或物料派生的展示状态，统一显隐、inert、
   无障碍与清理，保留内容节点。CSS 变量和公开 part 支持宿主定制并尊重减少动态效果；独立展示工厂
   `createBaseScreenMaterialLoadingElement` 继续可用。查询与业务状态解释仍归宿主/物料，不强制 Renderer
   接管所有物料。用法见[公共加载容器](../material-loading.md)。
+- **非 ready 态统一呈现**（2026-10-03 收敛）：`idle`/`loading`/`error` 与空数据集的 chrome 与兜底文案
+  只有 `@base-screen/plugin-sdk` 状态视图一份；`idle` 占位不给文案，`error` 呈现已脱敏的 `message`
+  并把 `code` 写入 `data-*` 属性，数据形状不合本物料契约时由物料给出 canonical code 与领域文案。
+  依据：[ADR-0086](../decisions/ADR-0086-material-state-and-surface-ownership.md)。
 - **物料契约与 ABI**：manifest 类型、校验、只读 catalog 与同 realm Web Component ABI。
   依据：[Plugin Core Contract](../specs/archive/plugin-core-contract/spec.md)、[ADR-0003](../decisions/ADR-0003-web-component-material-abi-and-registration.md)。
-- **官方物料范围**（2026-09-11 调整）：核心库官方物料为文本、矩形、椭圆、图片、容器、图表与表格；
-  原 `base.echarts` 手绘近似物料已整体移出 `packages/material`（公共导出、`./echarts` 子路径、构建入口
-  与自动注册一并移除），其受限 Editor Descriptor 载体以非发布演示物料 `harness.semantic-chart` 保留在
-  `harness/browser-harness`，真实图表能力归外围插件承载，核心库不再发布自称 ECharts 的物料。
+- **官方物料范围**（2026-09-11 调整）：核心库官方物料的权威清单是 `packages/material/src/auto-register.ts`
+  与该包 `package.json` 的 `exports`，本文档不复述条目与数量；新增物料只经该清单与
+  `scripts/browser-harness` 的目录断言登记。原 `base.echarts` 手绘近似物料已整体移出 `packages/material`
+  （公共导出、`./echarts` 子路径、构建入口与自动注册一并移除），其受限 Editor Descriptor 载体以非发布
+  演示物料 `harness.semantic-chart` 保留在 `harness/browser-harness`，真实图表能力归外围插件承载，
+  核心库不再发布自称 ECharts 的物料。
   依据：[ADR-0074](../decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)。
+- **物料原子化门禁**（2026-10-03 可执行化）：`scripts/check-material-atomicity.mjs`（随 `pnpm lint`
+  运行）禁止物料渲染路径读取 manifest 未声明的 `props`/`style` 键，并禁止描述性文案 prop 出现在
+  官方物料、外围插件物料与宿主示例上；图表类物料的 `title`/`legend`/`axis` 按脚本内的
+  `CHART_FURNITURE_EXEMPTIONS` 显式豁免。约定本体见 `AGENTS.md`「物料原子化」。
 - **静态数据作者契约**（2026-08-23 增量）：Manifest 可选 `staticData` scalar/tabular 描述；canonical 静态
   数据源可携带字段角色 binding，tabular 静态数据与宿主数据集复用物料 adapter。Designer 提供标量表单、
   有界表格网格、列/行/类型/角色编辑、Excel/TSV 粘贴推断与高级 JSON；应用一条事务，取消零副作用，未声明

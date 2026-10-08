@@ -1,7 +1,26 @@
 # 物料公共加载容器
 
-`@base-screen/material` 与 `@base-screen/sdk/material` 提供可选的公共加载容器。它负责默认加载展示、
-显隐、无障碍和内容保留，不发起查询，不修改 Renderer，也不强制其他物料采用相同刷新策略。
+加载视图与加载容器由 `@base-screen/plugin-sdk` 拥有，`@base-screen/material` 与
+`@base-screen/sdk/material` 按原名 re-export（外围插件只能依赖 `contracts`、`plugin-core`、
+`plugin-sdk`，所以归属在 plugin-sdk）。它负责默认加载展示、显隐、无障碍和内容保留，不发起查询，
+不修改 Renderer，也不强制其他物料采用相同刷新策略。
+
+## 非 ready 态的统一呈现
+
+官方物料与宿主物料的非 `ready` 态都交给 `@base-screen/plugin-sdk` 的状态视图，兜底文案只有这一份
+（依据 [ADR-0086](./decisions/ADR-0086-material-state-and-surface-ownership.md)）：
+
+- `createBaseScreenMaterialStateView(ownerDocument, dataState)`：`ready` 返回 `undefined` 由物料画
+  自己的内容；`loading` 用本文件的 loading 视图；`error` 以 `role="alert"` 呈现 contracts 侧已脱敏
+  限长的 `message`，并把 `code` 写进 `data-base-screen-material-error-code`；`idle` 表示"还没发起
+  请求"，占满同一个盒子但**不给任何文案**。
+- `createBaseScreenMaterialEmptyView(ownerDocument)`：数据已 `ready` 但没有行——"查过了，没有结果"，
+  与 `idle` 区分。
+- `createBaseScreenMaterialErrorView(ownerDocument, code, message)`：数据 `ready` 但形状不符合**本物料**
+  契约时使用，文案由物料给出（如"表格数据格式无效"），chrome 与上面完全一致。
+
+四个状态填充同一个盒子，切换不产生位移；视图只在自己的子节点上写 `width/height: 100%`，不写宿主
+宽高、不依赖宿主 `display`（渲染器按可见性强制 `none`/`block`）。
 
 ## 接入
 

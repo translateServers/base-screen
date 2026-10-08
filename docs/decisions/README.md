@@ -124,6 +124,8 @@
 | ADR | 状态 | 日期 | 主题 |
 | --- | --- | --- | --- |
 | [ADR-0085](./ADR-0085-text-and-image-material-authoring.md) | 已接受 | 2026-09-16 | **主线现行决策**：文本排版、自适应宽度与运行时几何、图片 URL 校验与失败回退（吸收 ADR-0047、ADR-0056、ADR-0065 共 3 份，已移除） |
+| [ADR-0086](./ADR-0086-material-state-and-surface-ownership.md) | 已接受 | 2026-10-03 | 物料非 ready 态呈现与盒面样式的单一归属：状态视图落 `plugin-sdk`，`idle` 不给文案，错误态呈现已脱敏 message |
+| [ADR-0087](./ADR-0087-composite-component-fragment-insertion.md) | 已接受 | 2026-10-04 | 组合分片插入入口 `insertComponentFragment`：预设存储归宿主，基座只做一次展开；shell 按 `designCapabilities.children` 校验，`props`/`style` 与 manifest 默认值合并后过 schema |
 
 ### 十六、画布内编辑与几何
 

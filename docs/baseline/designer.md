@@ -6,6 +6,10 @@
 - **画布交互**：单/多选移动、选区吸附、坐标换算与瞬态预览；选中同级图层后，`]` 向上移动一位、`[` 向下移动一位，
   `Ctrl+]` / `Ctrl+[` 仍分别用于置顶/置底；`Alt+]` / `Alt+[` 按完整图层树向上/向下切换单选，跳过有效隐藏组件，
   到达边界后停止。依据：[Designer Canvas Precision](../specs/archive/designer-canvas-precision/spec.md)。
+- **锁定组件不是选择目标**（2026-10-04 行为修复）：点击有效锁定的组件等同点击画布空白——清空当前单选/
+  多选，不再保留对锁定组件的选择；从其上按下仍可发起框选手势。渲染层不对锁定物料做 `pointer-events`
+  处理，铺满画布的锁定背景（大屏常见的「别让我挪到背景」做法）因此必须能取消选中，否则永远退不出选中态。
+  由 `pnpm --filter @base-screen/engine test` 的空白点击与框选用例钉住。
 - **组件坐标快捷输入**（2026-08-28 增量）：单选未锁定组件后按 `X`，在选区左上角外侧以不随画布缩放的
   非模态双输入浮层一次编辑 canonical X/Y（px）；仅 `Enter` 保存，`Esc` 或离开浮层直接丢弃草稿。
   提交复用单条事务，普通组件同时更新两个坐标，组组件沿既有组平移语义移动可变子树，撤销一次恢复两个坐标。
@@ -57,6 +61,12 @@
 - **宿主返回入口**（2026-09-01 增量）：`backButton` 配置让 Base Screen 在 Designer 顶栏渲染返回按钮，
   点击后派发 composed `base-screen-designer-back-request` 事件；业务路由、未保存确认和鉴权仍归宿主，
   宿主无需访问 Shadow DOM 或重复渲染返回按钮。
+- **保存不重置编辑会话**（2026-10-08 行为修复）：`save()` 成功且适配器返回的内容与提交快照一致时，
+  基座只把干净基线钉在当前文档引用上，不替换文档，因此选区、聚焦组件与撤销历史全部保留。此前这一路径
+  走 `replaceDocument`，会整份重渲染物料、清空 `selectedComponentIds`/`focusedComponentId` 并重建历史，
+  使自动保存打断正在编辑或正在输入的作者状态。服务端把文档归一化成不同内容时仍然采纳服务端文档（此时按
+  替换语义重置会话），保存飞行期间的再次编辑仍然算脏并由消费方再排一次保存。依据：
+  `packages/engine/tests/common/session/designer-session.test.ts` 与 `project-controller.test.ts`。
 - **大屏缩略图归宿主**（2026-09-05 边界修复）：Designer 不提供截取、上传或保存大屏缩略图的内建入口；
   截图、上传、来源并发保护、存储和业务列表展示均归宿主。此前画布属性面板中无实现、无能力门禁的
   “截取封面 / 上传”占位入口及不可写的 `thumbnailUrl` 呈现字段已删除。Material Manifest 的 `cover`
@@ -85,3 +95,5 @@
 - **调色板切换模式继承单色色系**（封版后增量，已纳入基线）：三段式调色板从单色切换到线性/径向渐变时，若色标为未定制的内置默认（黑→白），按单色色系派生——起点 = 单色、终点 = 同色系提亮（向白混合 45%，纯白等无区分度时向黑加深 35% 回退），渐变首帧即与单色同色系；已定制的渐变色标在模式往返中原样保留、线性 ↔ 径向互切保留色标与几何；派生仅发生在交互切换路径（文档解析路径不受影响），字段值格式与序列化契约不变、一条历史可 undo，公共契约零变化。依据：[Color Palette Gradient From Solid](../specs/archive/color-palette-gradient-from-solid/spec.md)、[ADR-0077](../decisions/ADR-0077-canvas-background-and-color-authoring.md)。
 - **组件条件样式规则**（封版后增量，已纳入基线）：`ScreenComponentNode` 可选 `styleRules`（≤8 条，严格 JSON-safe、fail-closed 解析）以组件自身 `dataState.value` 为唯一条件源（有界路径 + 与 Blueprint 同集的 8 个操作符，类型不匹配/非 ready 视为不命中），命中规则按数组顺序逐键合并出 effective style；Renderer 在模型应用前求值并逐规则过物料 `styleSchema`（非法规则样式与非法 style 同路径 fail-closed），数据刷新自动重评估且不发新请求，effective style 只存在于运行时、不回写文档/历史；Core `update-components` patch 整体替换（空数组清除，锁定组件既有拦截）；Designer 不再提供内建规则编辑区，既有文档规则仍正常解析与渲染，宿主可经文档或既有公开事务通道配置。依据：[Component Conditional Style Rules](../specs/archive/component-conditional-style-rules/spec.md)、[ADR-0080](../decisions/ADR-0080-conditional-style-authoring-ownership.md)。
 - **宿主条件样式端口**（封版后增量，已纳入基线）：判定与视觉映射都归宿主的告警视觉通道——Viewer/Designer `configure` 可选 `conditionalStylePort`（同步纯函数 `(componentId, dataState) => style overrides | undefined`，并提供与 `resourcePort` 同形的守卫 setter 与只读 getter）；Renderer 在同一 effective style 求值点按 base → 文档 `styleRules` → 端口覆盖的固定顺序合并，端口收到完整 `dataState`（含 idle/loading/error）可自行决定降灰等状态样式；端口覆盖过物料 `styleSchema`（非法覆盖与抛异常均忽略覆盖、保留 base+规则结果并上报诊断，不中断渲染）；effective style 仍只在运行时、不回写文档；无端口实例与现状逐字节一致，文档/Blueprint 契约零变化；设计态画布经同一 Renderer 路径预览宿主告警样式。依据：[Conditional Style Port](../specs/archive/conditional-style-port/spec.md)、[ADR-0080](../decisions/ADR-0080-conditional-style-authoring-ownership.md)。
+
+- **组合分片插入**（2026-10-04 增量，已纳入基线）：`<base-screen-designer>` 公开方法 `insertComponentFragment(intent)` 一次插入一组带相对偏移的原子节点，提交为**单个可撤销事务**并在成功后整片选中。分片以 `anchor` 为包围盒左上角、整片只平移入画布（不逐节点裁剪；整体大于画布时失败关闭），`props`/`style` 与 manifest 默认值顶层浅合并后过 schema，shell 按 `designCapabilities.children === true` 校验（`libraryVisible: false` 的容器可作外壳，普通节点仍要求库可见），`parent` 只接受 shell 键或更早声明的节点键，id 与 zIndex 在分片内本地去重，节点 ≤ 64、intent JSON ≤ 64 KiB。**预设的存储与检索归宿主**：基座不持有预设注册表，也不设「区块/模板」一等实体，另导出 `parseBaseScreenComponentFragmentInsertionIntent` 供宿主入库前校验。诊断码复用既有 `AUTHORING_*`，canonical 文档契约与黄金 schema 不变。依据：[ADR-0087](../decisions/ADR-0087-composite-component-fragment-insertion.md)。
