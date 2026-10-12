@@ -84,3 +84,20 @@ describe('DesignerTopbarController host back button', () => {
     expect(requestBack).not.toHaveBeenCalled();
   });
 });
+
+describe('DesignerTopbarController theme toggle', () => {
+  it('flips the light default to dark and back, mirroring aria-pressed', () => {
+    const { controller, host } = createHarness(false);
+
+    // 缺省即浅色：第一次点击进入黑夜。
+    controller.onClick(host.root.theme as unknown as Element);
+    expect(host.attributes.get('theme')).toBe('dark');
+    controller.render();
+    expect(host.root.theme.ariaPressed).toBe('true');
+
+    controller.onClick(host.root.theme as unknown as Element);
+    expect(host.attributes.get('theme')).toBe('light');
+    controller.render();
+    expect(host.root.theme.ariaPressed).toBe('false');
+  });
+});

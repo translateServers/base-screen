@@ -249,7 +249,7 @@ export async function assertAuthoringVariables(page, designer) {
         pressedColor: pressedStyle.color,
       };
     };
-    designer.removeAttribute('theme');
+    designer.setAttribute('theme', 'dark');
     const dark = sample();
     designer.setAttribute('theme', 'light');
     const lightImmediate = sample();
@@ -829,7 +829,7 @@ export async function assertVariableListThemeQuality(page) {
       );
       return (values[0] + 0.05) / (values[1] + 0.05);
     };
-    designer.removeAttribute('theme');
+    designer.setAttribute('theme', 'dark');
     const dark = sample();
     designer.setAttribute('theme', 'light');
     const immediate = sample();

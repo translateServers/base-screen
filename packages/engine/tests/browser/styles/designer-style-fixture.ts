@@ -94,10 +94,10 @@ export function contrastRatio(first: string, second: string): number | undefined
 }
 
 export function themeBlocks(): Record<'dark' | 'light', string> {
-  const dark = tokensCss.slice(
-    tokensCss.indexOf(':host {'),
-    tokensCss.indexOf(':host([theme="light"])'),
+  const dark = tokensCss.slice(tokensCss.indexOf(':host([theme="dark"])'));
+  const light = tokensCss.slice(
+    tokensCss.indexOf(':host,'),
+    tokensCss.indexOf(':host([theme="dark"])'),
   );
-  const light = tokensCss.slice(tokensCss.indexOf(':host([theme="light"])'));
   return { dark, light };
 }

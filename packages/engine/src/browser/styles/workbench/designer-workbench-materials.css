@@ -120,7 +120,8 @@
     transform var(--designer-motion);
 }
 
-:host([theme="light"]) .material-thumb {
+/* 默认即浅色：`:host(:not([theme="dark"]))` 同时覆盖缺省属性和显式钉浅色的宿主。 */
+:host(:not([theme="dark"])) .material-thumb {
   border-color: color-mix(in srgb, hsl(var(--material-hue, 215) 45% 45%) 30%, transparent);
   background:
     radial-gradient(
@@ -136,7 +137,7 @@
   color: hsl(var(--material-hue, 215) 50% 28%);
 }
 
-:host([theme="light"]) .material-thumb::before {
+:host(:not([theme="dark"])) .material-thumb::before {
   background-image:
     repeating-linear-gradient(
       0deg,

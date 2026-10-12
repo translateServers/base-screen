@@ -1506,7 +1506,7 @@ async function assertDesignerThemeIsolation(page) {
     const second = document.createElement('base-screen-designer');
     second.catalog = catalog;
     second.document = structuredClone(screenDocument);
-    second.setAttribute('theme', 'light');
+    second.setAttribute('theme', 'dark');
     second.style.setProperty('--base-screen-designer-surface-workspace', 'rgb(200, 210, 220)');
     document.body.appendChild(second);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
@@ -1521,10 +1521,10 @@ async function assertDesignerThemeIsolation(page) {
       secondStyleNodes: secondStyleNodes(),
     };
 
-    // 切换第一个实例主题，验证第二个实例的 Token 不变。
-    first.setAttribute('theme', 'light');
+    // 切换第一个实例主题（默认浅色 → 黑夜），验证第二个实例的 Token 不变。
+    first.setAttribute('theme', 'dark');
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    const firstLight = firstWorkspace();
+    const firstDark = firstWorkspace();
     const secondAfterFirstSwitch = secondWorkspace();
     first.removeAttribute('theme');
 
@@ -1551,7 +1551,7 @@ async function assertDesignerThemeIsolation(page) {
     return {
       ok: true,
       before,
-      firstLight,
+      firstDark,
       secondAfterFirstSwitch,
       firstStyleAfterDetach,
       secondStyleAfterReconnect,
@@ -1563,7 +1563,7 @@ async function assertDesignerThemeIsolation(page) {
   if (
     result.ok !== true ||
     result.before.firstWorkspace === result.before.secondWorkspace ||
-    result.before.firstWorkspace === result.firstLight ||
+    result.before.firstWorkspace === result.firstDark ||
     result.before.secondWorkspace !== result.secondAfterFirstSwitch ||
     result.before.firstStyleNodes < 1 ||
     result.before.secondStyleNodes !== result.before.firstStyleNodes ||
@@ -1616,11 +1616,11 @@ async function assertDesignerControlStyles(designer) {
       materialThumbBackground:
         materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundImage,
     };
-    host.setAttribute('theme', 'light');
-    const lightTheme = getComputedStyle(host)
+    host.setAttribute('theme', 'dark');
+    const darkTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
-    const lightMaterialThumbBackground =
+    const darkMaterialThumbBackground =
       materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundImage;
     const hostStyle = document.createElement('style');
     hostStyle.textContent =
@@ -1638,10 +1638,10 @@ async function assertDesignerControlStyles(designer) {
       .getPropertyValue('--designer-surface-workspace')
       .trim();
     hostStyle.remove();
-    const restoredLightTheme = getComputedStyle(host)
+    const restoredDarkTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
-    const lightViewerFont = viewer === null ? undefined : getComputedStyle(viewer).font;
+    const darkViewerFont = viewer === null ? undefined : getComputedStyle(viewer).font;
     host.removeAttribute('theme');
     const restoredTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
@@ -1657,32 +1657,33 @@ async function assertDesignerControlStyles(designer) {
     canary.remove();
     return {
       ...before,
-      lightTheme,
-      lightMaterialThumbBackground,
+      darkTheme,
+      darkMaterialThumbBackground,
       hostStylesheetValue,
       overriddenTheme,
       restoredHostStylesheet,
-      restoredLightTheme,
+      restoredDarkTheme,
       inheritedPanel,
-      lightViewerFont,
+      darkViewerFont,
       restoredTheme,
     };
   });
   if (
     styles === undefined ||
-    styles.toolbarHeight !== 32 ||
-    styles.theme === styles.lightTheme ||
+    // 工作区工具栏按钮随设计值 28px（40px 列头内上下各留 6px）。
+    styles.toolbarHeight !== 28 ||
+    styles.theme === styles.darkTheme ||
     styles.materialThumbBackground === undefined ||
-    styles.materialThumbBackground === styles.lightMaterialThumbBackground ||
+    styles.materialThumbBackground === styles.darkMaterialThumbBackground ||
     styles.hostStylesheetValue !== 'rgb(10, 20, 30)' ||
     styles.overriddenTheme !== 'rgb(1, 2, 3)' ||
     styles.restoredHostStylesheet !== 'rgb(10, 20, 30)' ||
-    styles.restoredLightTheme !== styles.lightTheme ||
+    styles.restoredDarkTheme !== styles.darkTheme ||
     styles.inheritedPanel !== 'rgb(70, 80, 90)' ||
     styles.theme !== styles.restoredTheme ||
     styles.canaryFont === styles.workspaceFont ||
     styles.canaryInputHeight === 30 ||
-    styles.viewerFont !== styles.lightViewerFont
+    styles.viewerFont !== styles.darkViewerFont
   ) {
     throw new Error(`BROWSER_HARNESS_CONTROL_STYLE_FAILED:${JSON.stringify(styles)}`);
   }

@@ -21,7 +21,7 @@ export class DesignerTopbarController {
     }
     if (target.closest('[data-topbar-theme-toggle]') !== null) {
       const host = this.callbacks.getHost();
-      host.setAttribute('theme', host.getAttribute('theme') === 'light' ? 'dark' : 'light');
+      host.setAttribute('theme', host.getAttribute('theme') === 'dark' ? 'light' : 'dark');
       return true;
     }
     if (target.closest('[data-topbar-snapshot]') !== null) {
@@ -38,7 +38,7 @@ export class DesignerTopbarController {
     const back = root.querySelector<HTMLButtonElement>('[data-topbar-back]');
     if (back !== null) back.hidden = !this.callbacks.isBackButtonVisible();
     const theme = root.querySelector<HTMLButtonElement>('[data-topbar-theme-toggle]');
-    if (theme !== null) theme.ariaPressed = String(host.getAttribute('theme') === 'light');
+    if (theme !== null) theme.ariaPressed = String(host.getAttribute('theme') === 'dark');
     const snapshot = root.querySelector<HTMLButtonElement>('[data-topbar-snapshot]');
     if (snapshot === null) return;
     const available = this.callbacks.canCreateSnapshot();
