@@ -55,7 +55,7 @@
   故这两处**有意不转换**。见 [领域词汇](../../CONTEXT.md)。
 - **贡献命令 chrome 投影**（[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)）：
   `command` 贡献可选 `menus` / `shortcut`。省略 `menus` 仅命令面板；写出的 `menus` 为完整列表。
-  Designer 投影到命令面板、更多→工具与画布右键，菜单项使用 `data-plugin-command`。快捷键不得覆盖
+  Designer 投影到命令面板、工具菜单与画布右键，菜单项使用 `data-plugin-command`。快捷键不得覆盖
   内建 chord。不新增 contribution kind，不扩展 ADR-0084 index。
 - **插件设计上下文只读访问**（2026-09-09，[ADR-0084](../decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)）：
   新增 `design.read` 能力；授予且宿主提供 `createDesignReadPort`（可选 manager 入参，缺工厂则失败

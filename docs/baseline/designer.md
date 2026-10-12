@@ -44,7 +44,8 @@
   宿主内容、状态、权限和请求不进入 Engine Store、ScreenDocument 或 Renderer。依据：
   [ADR-0079](../decisions/ADR-0079-designer-workbench-shell-and-chrome.md)。
 - **参考线显示入口**（2026-08-31 增量）：标尺左上角眼睛按钮替代底部状态栏「参考线」开关，
-  图标与视图菜单、`Ctrl+;` 共享显示状态；隐藏保留已有参考线，按钮支持键盘操作且固定为 20 × 20px。
+  图标与视图菜单、`Ctrl+;` 共享显示状态；隐藏保留已有参考线，按钮支持键盘操作，尺寸随标尺令牌
+  `--designer-ruler-size`（当前 22px）。
 - **视窗原生事件开关**（封版后增量，已纳入基线）：状态栏「事件」与「吸附」同形态的 switch 控制设计态画布交互
   模式（默认关闭）；开启后组件原生事件经 `base-screen-material-event` 转发给宿主（与 Viewer 同形），renderer
   以实例级 `setInteractive` 原地重渲染，不重挂载、不重取数。依据：
@@ -79,6 +80,16 @@
 - **顶栏项目标题修复**（封版后缺陷修复增量，已纳入基线）：`renderProjectStatus` 回写加载项目名称，公共契约
   零变化。依据：[Designer Topbar Project Title](../specs/archive/designer-topbar-project-title/spec.md)、
   [ADR-0079](../decisions/ADR-0079-designer-workbench-shell-and-chrome.md)。
+- **工作台视觉基座与顶栏 chrome**（2026-10-12 增量，设计移植批 1）：视觉基座整体替换为设计原型的
+  Vercel 令牌体系（浅色缺省、`theme="dark"` 黑夜覆盖；34 个 `--base-screen-designer-*` 公共 Token
+  名称与覆盖面不变、值为重定义，浅色语义色按引擎对比度契约收档）；顶栏改为顶层菜单栏
+  （文件/编辑/视图/工具，原「更多」子菜单提升，`data-menu-action` 全集不变），工作模式居中分段、
+  发布钮为反转实底 CTA；状态栏指标并入右段，工作区工具栏 40px 列头 + 缩放读数复位与「缩放至适应」，
+  标尺 22px；命令面板快捷键改为 Ctrl/Cmd+K。默认主题翻转与菜单结构属宿主可见变化，按 minor 发布；
+  宿主钉 `theme="dark"` 即恢复旧观感。依据：
+  [ADR-0088](../decisions/ADR-0088-designer-workspace-chrome-and-visual-base.md)、
+  [Designer 工作台设计移植](../specs/designer-workspace-design-port/spec.md)。后续批次（表单控件、面板、
+  引擎独有面）未交付前不在此声明。
 - **画布宿主背景图片**（封版后增量，已纳入基线）：`ScreenCanvas` 可选 `backgroundImage` URL 与
   `backgroundImageFit`（cover/contain，缺省 cover）进入 canonical 文档并随文档持久化；失败关闭校验
   （ADR-0078 URL 规则同形）、`update-canvas` null 删除语义、Renderer/Designer 同路径渲染；宿主经

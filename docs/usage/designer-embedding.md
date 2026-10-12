@@ -226,8 +226,8 @@ Designer 的**属性面板不提供组件 `name` 字段**——它只呈现几�
 Designer 画布中的 Material 与 Viewer 中的同一 Material 都继续使用 document-driven appearance，
 不会被这些 Token 重绘。
 
-缺失 `theme` 或未知值使用内建 dark fallback；设置 `theme="light"` 使用 light fallback。宿主可在
-元素、任意祖先或 author stylesheet 中设置 Token：
+缺失 `theme` 或未知值使用内建浅色 fallback；设置 `theme="dark"` 使用黑夜 fallback，
+`theme="light"` 显式钉回浅色。宿主可在元素、任意祖先或 author stylesheet 中设置 Token：
 
 ```html
 <main class="host-shell">
@@ -264,8 +264,9 @@ designer.style.setProperty('--base-screen-designer-accent', '#1d4ed8');
 designer.style.removeProperty('--base-screen-designer-accent');
 ```
 
-同一 Token 的优先级为：元素 inline style、宿主 author stylesheet、当前 `theme` fallback、dark
-fallback。删除覆盖会恢复下一层有效值。两个 Designer 可设置不同的 `theme` 和 Token，状态互不影响。
+同一 Token 的优先级为：元素 inline style、宿主 author stylesheet、当前主题 fallback——缺省与
+`theme="light"` 走浅色值，`theme="dark"` 走黑夜覆盖值。删除覆盖会恢复下一层有效值。两个 Designer
+可设置不同的 `theme` 和 Token，状态互不影响。
 
 正式公开的 Token 家族如下。每个名称均以 `--base-screen-designer-` 为前缀：
 

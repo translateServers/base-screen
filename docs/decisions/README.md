@@ -118,6 +118,7 @@
 | ADR | 状态 | 日期 | 主题 |
 | --- | --- | --- | --- |
 | [ADR-0079](./ADR-0079-designer-workbench-shell-and-chrome.md) | 已接受 | 2026-09-16 | **主线现行决策**：左栏信息架构、折叠与宽度写回、原生事件开关、`previewHandler`、宿主分组 slot 协议（吸收 ADR-0032、ADR-0036、ADR-0037、ADR-0038、ADR-0039、ADR-0062 共 6 份，已移除） |
+| [ADR-0088](./ADR-0088-designer-workspace-chrome-and-visual-base.md) | 已接受 | 2026-10-12 | 顶层菜单栏与视觉基座整体替换（自设计原型移植第一批）：浅色缺省、公共 Token 覆盖面不变、发布钮反转实底、Ctrl/Cmd+K；ADR-0079 的顶栏/状态栏非目标由本 ADR 取代 |
 
 ### 十五、文本与图片物料作者契约
 

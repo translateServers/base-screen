@@ -182,7 +182,7 @@ designer.configure({
 两条命令方向不要混用：
 
 - **贡献命令**：Manifest 声明 `kind: 'command'`，handler 在 runtime `commands` 上。可选
-  `menus` 把命令投影到命令面板、更多→工具、画布/组件/多选右键；省略 `menus` 时只出现在命令
+  `menus` 把命令投影到命令面板、工具菜单、画布/组件/多选右键；省略 `menus` 时只出现在命令
   面板。可选 `shortcut` 不得覆盖内建操作或工具 chord，冲突时忽略快捷键、命令仍可从菜单调用。
   点击走 `pluginCommandPort`，由 Manager 分发到对应 handler。
 - **Core 命令端口**：仅当授予 `command.execute` 时，插件 `activate(context)` 才能拿到
