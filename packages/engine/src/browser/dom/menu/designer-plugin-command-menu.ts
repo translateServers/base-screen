@@ -5,17 +5,24 @@ export function renderPluginToolsMenu(
   menu: HTMLElement,
   callbacks: DesignerMenuControllerCallbacks,
 ): void {
-  const toolsSubmenu = [...menu.querySelectorAll<HTMLElement>('[data-submenu]')].find(
-    (submenu) => submenu.querySelector('[data-menu-action="toggle-workbench"]') !== null,
+  // 工具菜单是顶层面板：命中 toggle-workbench 的菜单本身就是挂载点；子菜单形态（历史）兼容为就近容器。
+  const toolsAnchor = menu.querySelector(
+    '[data-menu-action="toggle-workbench"], [data-menu-action="show-help"]',
   );
-  if (toolsSubmenu === undefined) return;
-  let host = toolsSubmenu.querySelector<HTMLElement>('[data-plugin-menu="menu.tools"]');
-  if (host === null) {
-    host = toolsSubmenu.ownerDocument.createElement('div');
-    host.dataset.pluginMenu = 'menu.tools';
-    toolsSubmenu.append(host);
+  if (toolsAnchor === null) return;
+  const host =
+    toolsAnchor.closest<HTMLElement>('[data-submenu]') ??
+    toolsAnchor.closest<HTMLElement>('[data-menu]');
+  if (host === null) return;
+  let section = host.querySelector<HTMLElement>('[data-plugin-menu="menu.tools"]');
+  if (section === null) {
+    section = host.ownerDocument.createElement('div');
+    section.dataset.pluginMenu = 'menu.tools';
+    host.append(section);
   }
-  host.innerHTML = pluginCommandMenuSection(callbacks.getPluginCommandItems?.('menu.tools') ?? []);
+  section.innerHTML = pluginCommandMenuSection(
+    callbacks.getPluginCommandItems?.('menu.tools') ?? [],
+  );
 }
 
 export function pluginCommandMenuSection(items: readonly DesignerPluginCommandItem[]): string {

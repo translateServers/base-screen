@@ -1,35 +1,38 @@
+const topMenuIds = {
+  '\u6587\u4ef6': 'file',
+  '\u7f16\u8f91': 'edit',
+  '\u89c6\u56fe': 'view',
+  '\u5de5\u5177': 'tools',
+};
+
 async function componentCount(page) {
   return page.evaluate(() => window.baseScreenHarness.designer.document.components.length);
 }
 
-async function openMoreSubmenu(designer, label) {
-  const moreMenu = designer.locator('.designer-menu[data-menu="more"]');
-  if (await moreMenu.isHidden()) {
-    await designer.locator('[data-menu-toggle="more"]').click();
-  }
-  const trigger = moreMenu
-    .locator(':scope > .designer-menu-submenu-wrap > [data-submenu-toggle]')
-    .filter({ hasText: label });
+// 顶栏菜单栏直开：按顶层触发器展开对应面板，返回面板 locator；可重入。
+async function openTopMenu(designer, label) {
+  const menuId = topMenuIds[label];
+  if (menuId === undefined) throw new Error(`BROWSER_HARNESS_TOP_MENU_UNKNOWN:${label}`);
+  const trigger = designer.locator(`[data-menu-toggle="${menuId}"]`);
   if ((await trigger.getAttribute('aria-expanded')) !== 'true') {
     await trigger.click();
   }
-  return moreMenu;
+  return designer.locator(`.designer-menu[data-menu="${menuId}"]`);
 }
 
-// 顶栏改版后画布辅助操作移入“更多 > 视图”，按真实菜单路径触发。
+// 画布辅助操作在顶层“视图”菜单内，按真实菜单路径触发。
 // 先 Escape 收起可能已展开的菜单，保证 helper 可重入。
 async function openCanvasAidsMenu(designer, page) {
   await page.keyboard.press('Escape');
-  return openMoreSubmenu(designer, '\u89c6\u56fe');
+  return openTopMenu(designer, '\u89c6\u56fe');
 }
 
-// 打开“更多 > <level2Label>”，再沿真实 hover 路径把指针从三级触发行水平移入其浮层，
-// 返回已展开的三级浮层 locator。层级浮层与触发行有 4px 重叠，水平移入保持在同一 wrap 内，
+// 打开顶层 `<level2Label>` 菜单，再沿真实 hover 路径把指针从子菜单触发行水平移入其浮层，
+// 返回已展开的浮层 locator。浮层与触发行有 4px 重叠，水平移入保持在同一 wrap 内，
 // 用于回归“进入内层嵌套后父级被误收起”与“浮层被祖先面板裁剪”两类缺陷。
 async function hoverNestedSubmenu(designer, page, level2Label, level3Label) {
-  const moreMenu = await openMoreSubmenu(designer, level2Label);
-  // 三级 wrap 的判定：直接挂在某个 [data-submenu] 之下（二级 wrap 挂在 [data-menu] 之下）。
-  const nestedWrap = moreMenu
+  const topMenu = await openTopMenu(designer, level2Label);
+  const nestedWrap = topMenu
     .locator('[data-submenu] > .designer-menu-submenu-wrap')
     .filter({ hasText: level3Label });
   const trigger = nestedWrap.locator('[data-submenu-toggle]');
@@ -49,19 +52,19 @@ async function hoverNestedSubmenu(designer, page, level2Label, level3Label) {
 
 async function toggleGridViaMenu(designer, page) {
   const viewMenu = await openCanvasAidsMenu(designer, page);
-  await viewMenu.locator('[data-submenu] [data-menu-action="toggle-grid"]').click();
+  await viewMenu.locator('[data-menu-action="toggle-grid"]').click();
 }
 
-// 视图 > 画布辅助子菜单内按操作 id 触发开关。
+// 视图菜单内按操作 id 触发开关。
 async function toggleCanvasAidViaMenu(designer, page, actionId) {
   const viewMenu = await openCanvasAidsMenu(designer, page);
-  await viewMenu.locator(`[data-submenu] [data-menu-action="${actionId}"]`).click();
+  await viewMenu.locator(`[data-menu-action="${actionId}"]`).click();
 }
 
-// 打开视图 > 画布辅助子菜单，断言指定开关项勾选状态与真实开关状态一致。
+// 打开展开视图菜单，断言指定开关项勾选状态与真实开关状态一致。
 async function assertCanvasAidChecked(designer, page, actionId, expected) {
   const viewMenu = await openCanvasAidsMenu(designer, page);
-  const item = viewMenu.locator(`[data-submenu] [data-menu-action="${actionId}"]`);
+  const item = viewMenu.locator(`[data-menu-action="${actionId}"]`);
   const checked = await item.getAttribute('aria-checked');
   if (checked !== expected) {
     throw new Error(
@@ -75,8 +78,8 @@ async function assertCanvasAidChecked(designer, page, actionId, expected) {
 }
 
 async function zoomResetViaMenu(designer) {
-  const moreMenu = await openMoreSubmenu(designer, '\u89c6\u56fe');
-  await moreMenu.locator('[data-menu-action="zoom-reset"]').click();
+  const viewMenu = await openTopMenu(designer, '\u89c6\u56fe');
+  await viewMenu.locator('[data-menu-action="zoom-reset"]').click();
 }
 
 async function componentPositions(page, ids) {
@@ -108,7 +111,7 @@ export {
   componentCount,
   componentPositions,
   hoverNestedSubmenu,
-  openMoreSubmenu,
+  openTopMenu,
   stableJson,
   toggleCanvasAidViaMenu,
   toggleGridViaMenu,

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DesignerCommandPaletteController,
   type DesignerCommandPaletteEntry,
   filterDesignerCommandPaletteEntries,
   parseDesignerCommandPaletteQuery,
@@ -75,5 +76,28 @@ describe('designer command palette query', () => {
       ['布局', '布局到网格', '自动布局', '整齐排列'],
     );
     expect(filterDesignerCommandPaletteEntries(ranked, '布局', 2)).toHaveLength(2);
+  });
+});
+
+describe('designer command palette shortcut', () => {
+  // 该用例在 node 环境运行：isEditable 用 Element 做 instanceof 判定，这里给一个最小替身。
+  (globalThis as { Element?: unknown }).Element ??= class FakeElement {};
+
+  const createController = (): DesignerCommandPaletteController =>
+    new DesignerCommandPaletteController({
+      getRoot: () => null,
+      getDocument: () => undefined,
+      getWorkbenchMode: () => 'canvas',
+      renderKindIcon: () => '',
+    });
+  const key = (init: Partial<KeyboardEvent>): KeyboardEvent =>
+    ({ target: null, preventDefault: () => {}, ...init }) as unknown as KeyboardEvent;
+
+  it('opens only on Ctrl/Cmd+K, not on bare k or slash', () => {
+    const controller = createController();
+    expect(controller.onKeyDown(key({ key: 'k' }))).toBe(false);
+    expect(controller.onKeyDown(key({ key: '/' }))).toBe(false);
+    expect(controller.onKeyDown(key({ key: 'k', ctrlKey: true }))).toBe(true);
+    expect(controller.onKeyDown(key({ key: 'k', metaKey: true }))).toBe(true);
   });
 });

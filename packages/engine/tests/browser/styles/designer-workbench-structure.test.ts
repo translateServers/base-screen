@@ -12,7 +12,7 @@ describe('designer workbench structure and layout', () => {
     expect(baseCss).toContain('grid-column: 1 / -1;');
     expect(workbenchCss).toContain('grid-template-rows: 20px minmax(0, 1fr);');
     expect(workbenchCss).toContain('grid-row: 3 / 4 !important;');
-    expect(workbenchCss).toContain('padding: 0 var(--designer-space-4);');
+    expect(workbenchCss).toContain('padding: 0 var(--designer-space-5);');
     expect(workbenchCss).toContain('.ruler-horizontal {');
     expect(workbenchCss).toContain('grid-row: 2 / 3 !important;');
     expect(baseCss).toContain('.designer > .designer-topbar {');
@@ -165,7 +165,7 @@ describe('designer workbench structure and layout', () => {
     expect(baseCss).toContain('.designer > .rail {');
     expect(baseCss).toContain('grid-column: 1 / 2;');
     expect(workbenchCss).toContain('.topbar-brand {');
-    expect(workbenchCss).toContain('.topbar-center {');
+    expect(workbenchCss).toContain('.topbar-mode {');
     expect(workbenchCss).toContain('.topbar-actions {');
     expect(workbenchCss).toContain('.designer-menu-triggers {');
     expect(workbenchCss).toContain('.designer-tool-cluster {');

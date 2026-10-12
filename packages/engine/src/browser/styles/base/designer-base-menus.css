@@ -80,12 +80,12 @@
 .designer-menu {
   position: absolute;
   z-index: var(--designer-z-dialog);
-  min-width: 208px;
+  min-width: 210px;
   padding: var(--designer-space-2);
   background: var(--designer-surface-overlay);
-  border: 1px solid var(--designer-border-default);
+  border: 0;
   border-radius: var(--designer-radius-overlay);
-  box-shadow: var(--designer-shadow-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-overlay);
   transform-origin: top center;
   animation: designer-menu-in var(--designer-motion) cubic-bezier(0.25, 1, 0.5, 1);
 }
@@ -95,7 +95,7 @@
 }
 
 .designer-menu {
-  top: calc(var(--designer-topbar-height) - 1px);
+  top: calc(var(--designer-topbar-height) - 6px);
 }
 
 .designer-menu .designer-menu-item {
@@ -106,7 +106,7 @@
   width: 100%;
   min-height: var(--designer-control-height-compact);
   padding: 0 var(--designer-space-5);
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--designer-radius-control);
   background: transparent;
   color: var(--designer-text-primary);
@@ -120,9 +120,11 @@
     color var(--designer-motion);
 }
 
+/* 导航态保持中性：悬停只抬一格底色；蓝色留给编辑与焦点。 */
 .designer-menu .designer-menu-item:hover:not(:disabled),
 .designer-menu .designer-menu-item:focus-visible:not(:disabled) {
-  background: var(--designer-accent-surface);
+  background: var(--designer-surface-control-hover);
+  border-color: var(--designer-border-active);
   color: var(--designer-text-primary);
   outline: none;
 }

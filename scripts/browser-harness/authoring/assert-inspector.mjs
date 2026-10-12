@@ -2,7 +2,7 @@
 // 由 5 个原 assert 模块合并；调用顺序由 run-browser-harness.mjs 编排。
 
 import { readFileSync } from 'node:fs';
-import { openMoreSubmenu, stableJson, zoomResetViaMenu } from '../shared/harness-utils.mjs';
+import { openTopMenu, stableJson, zoomResetViaMenu } from '../shared/harness-utils.mjs';
 import { assertOverlayContained } from '../shared/layout-assertions.mjs';
 
 // ---- 源模块：assert-inspector-coordinate.mjs ----
@@ -493,7 +493,7 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
     () => window.baseScreenHarness.designer.document.components.length,
   );
   const chooserPromise = page.waitForEvent('filechooser');
-  const importMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  const importMenu = await openTopMenu(authoringDesigner, '\u6587\u4ef6');
   await importMenu.locator('[data-menu-action="import"]').click();
   const chooser = await chooserPromise;
   const importDocument = await page.evaluate(() => window.baseScreenHarness.designer.document);
@@ -517,7 +517,7 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
     () => window.baseScreenHarness.designer.document.components.length,
   );
   const invalidChooserPromise = page.waitForEvent('filechooser');
-  const invalidImportMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  const invalidImportMenu = await openTopMenu(authoringDesigner, '\u6587\u4ef6');
   await invalidImportMenu.locator('[data-menu-action="import"]').click();
   const invalidChooser = await invalidChooserPromise;
   await invalidChooser.setFiles({
@@ -558,7 +558,7 @@ export async function assertAuthoringImportAndInspector(authoringDesigner, page)
   }
   // 导出：文件菜单导出触发浏览器下载 .json，内容与当前文档一致并展示成功通知。
   const exportDownloadPromise = page.waitForEvent('download');
-  const exportMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  const exportMenu = await openTopMenu(authoringDesigner, '\u6587\u4ef6');
   await exportMenu.locator('[data-menu-action="export"]').click();
   const exportDownload = await exportDownloadPromise;
   const exportPath = await exportDownload.path();

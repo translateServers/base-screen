@@ -154,9 +154,16 @@ export class DesignerMenuController {
     const onToggle = target.closest('[data-menu-toggle]') !== null;
     if (!inMenu && !onToggle) return false;
 
-    const triggers = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-menu-toggle]'));
-    const currentTrigger = triggers.find((t) => t.ariaExpanded === 'true') ?? triggers[0];
+    // 左右循环限定在同一父容器内的触发器：菜单栏内跨四个菜单，状态栏缩放菜单保持自身。
+    const allTriggers = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-menu-toggle]'));
+    const currentTrigger = allTriggers.find((t) => t.ariaExpanded === 'true') ?? allTriggers[0];
     if (currentTrigger === undefined) return false;
+    const groupSiblings =
+      currentTrigger.parentElement?.querySelectorAll<HTMLButtonElement>('[data-menu-toggle]');
+    const triggers =
+      groupSiblings === undefined || groupSiblings.length === 0
+        ? allTriggers
+        : Array.from(groupSiblings);
     const currentIndex = triggers.indexOf(currentTrigger);
 
     switch (event.key) {

@@ -1,4 +1,5 @@
 import { BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
+import { DESIGNER_OPERATION_TEXT } from '../../../common/operations/designer-operation-registry.js';
 import { DESIGNER_TOOLS, getDesignerToolShortcut } from '../../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon, designerToolGlyph } from '../../ui/designer-icons.js';
@@ -7,11 +8,13 @@ import {
   coordinateEntryField,
   DESIGNER_ZOOM_PRESETS,
   labeledActionButton,
+  menuPanel,
+  menuTriggerButton,
   previewGlyph,
   publishGlyph,
   redoGlyph,
   sizeEntryField,
-  submenuButton,
+  zoomFitGlyph,
   zoomInGlyph,
   zoomOutGlyph,
 } from './designer-workspace-template.js';
@@ -27,7 +30,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <label class="designer-command-palette-search">
           <span aria-hidden="true">${designerIcon('search')}</span>
           <input id="designer-command-palette-input" type="search" class="designer-control designer-input" data-command-palette-search autocomplete="off" spellcheck="false" placeholder="${DESIGNER_UI_TEXT.commandPalette.placeholder}" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" aria-controls="designer-command-palette-results">
-          <kbd>/</kbd>
+          <kbd>Ctrl K</kbd>
         </label>
         <div class="designer-command-palette-results" id="designer-command-palette-results" data-command-palette-results role="listbox" aria-label="${DESIGNER_UI_TEXT.commandPalette.dialog}"></div>
         <p class="designer-command-palette-empty" data-command-palette-empty hidden>${DESIGNER_UI_TEXT.commandPalette.empty}</p>
@@ -118,35 +121,38 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>
             <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
           </span>
+        </div>
+        <nav class="designer-menu-triggers" aria-label="${DESIGNER_UI_TEXT.designerMenu}">
+          ${menuTriggerButton('file', DESIGNER_UI_TEXT.file)}
+          ${menuTriggerButton('edit', DESIGNER_UI_TEXT.edit)}
+          ${menuTriggerButton('view', DESIGNER_UI_TEXT.view)}
+          ${menuTriggerButton('tools', DESIGNER_UI_TEXT.tools)}
+        </nav>
+        <div class="topbar-mode">
           <span class="topbar-mode-switch" role="tablist" aria-label="${DESIGNER_UI_TEXT.interactionWorkspace}">
             <button type="button" class="topbar-mode-button" data-workbench-mode-tab="canvas" data-active="true" role="tab" aria-selected="true" tabindex="0" title="${DESIGNER_UI_TEXT.canvasWorkspace}">${designerIcon('grid')}<span>${DESIGNER_UI_TEXT.canvasWorkspace}</span></button>
             <button type="button" class="topbar-mode-button" data-workbench-mode-tab="blueprint" role="tab" aria-selected="false" tabindex="-1" title="${DESIGNER_UI_TEXT.interactionWorkspaceUnavailable}" aria-label="${DESIGNER_UI_TEXT.interactionWorkspaceUnavailable}" disabled>${designerIcon('variable')}<span>${DESIGNER_UI_TEXT.interactionWorkspace}</span></button>
           </span>
         </div>
-        <div class="topbar-center">
+        <div class="topbar-actions">
+          <button type="button" class="topbar-icon-button" data-panel-collapse="right" aria-controls="designer-right-panel" aria-expanded="true" title="${DESIGNER_UI_TEXT.rightPanel}" aria-label="${DESIGNER_UI_TEXT.rightPanel}">${designerIcon('sliders')}</button>
+          <button type="button" class="topbar-icon-button" data-topbar-snapshot title="${DESIGNER_UI_TEXT.createSnapshot}" aria-label="${DESIGNER_UI_TEXT.createSnapshot}" disabled>${designerIcon('copy')}</button>
+          <button type="button" class="topbar-icon-button" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" title="${DESIGNER_UI_TEXT.errorConsole.openAria}" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}">${designerIcon('terminal')}<span class="topbar-count" data-error-console-count></span></button>
+          <button type="button" class="topbar-icon-button" data-topbar-theme-toggle title="${DESIGNER_UI_TEXT.toggleTheme}" aria-label="${DESIGNER_UI_TEXT.toggleTheme}" aria-pressed="false">${designerIcon('eye')}</button>
           <button type="button" class="topbar-search-trigger" data-command-palette-toggle aria-expanded="false" aria-controls="designer-command-palette-input" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" title="${DESIGNER_UI_TEXT.commandPalette.trigger}">
             ${designerIcon('search')}
             <span data-command-palette-trigger-label>${DESIGNER_UI_TEXT.commandPalette.trigger}</span>
-            <kbd>/</kbd>
+            <kbd>Ctrl K</kbd>
           </button>
-        </div>
-        <div class="topbar-actions">
-          <button type="button" class="topbar-icon-button" data-panel-collapse="right" aria-controls="designer-right-panel" aria-expanded="true" title="${DESIGNER_UI_TEXT.rightPanel}" aria-label="${DESIGNER_UI_TEXT.rightPanel}">${designerIcon('sliders')}</button>
-          <button type="button" class="topbar-icon-button" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" title="${DESIGNER_UI_TEXT.errorConsole.openAria}" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}">${designerIcon('terminal')}<span class="topbar-count" data-error-console-count></span></button>
-          <button type="button" class="topbar-icon-button" data-topbar-theme-toggle title="${DESIGNER_UI_TEXT.toggleTheme}" aria-label="${DESIGNER_UI_TEXT.toggleTheme}" aria-pressed="false">${designerIcon('eye')}</button>
-          <button type="button" class="topbar-icon-button" data-topbar-snapshot title="${DESIGNER_UI_TEXT.createSnapshot}" aria-label="${DESIGNER_UI_TEXT.createSnapshot}" disabled>${designerIcon('copy')}</button>
-          <button type="button" class="topbar-more-button" data-menu-toggle="more" aria-haspopup="menu" aria-expanded="false" title="${DESIGNER_UI_TEXT.more}" aria-label="${DESIGNER_UI_TEXT.more}">${designerIcon('sliders')}<span>${DESIGNER_UI_TEXT.more}</span></button>
           <span class="topbar-divider" aria-hidden="true"></span>
           ${labeledActionButton('preview', previewGlyph())}
           ${labeledActionButton('project-save', designerIcon('save'))}
           ${labeledActionButton('project-publish', publishGlyph(), 'topbar-publish')}
         </div>
-        <div class="designer-menu topbar-more-menu" data-menu="more" hidden role="menu" aria-label="${DESIGNER_UI_TEXT.more}">
-          ${submenuButton(DESIGNER_UI_TEXT.file, ['project-workspace', 'import', 'export', 'separator', 'project-save', 'project-publish', 'project-retry', 'project-cancel'])}
-          ${submenuButton(DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'edit-size', 'separator', 'group', 'ungroup', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
-          ${submenuButton(DESIGNER_UI_TEXT.view, ['zoom-in', 'zoom-out', 'zoom-reset', 'zoom-fit', 'separator', 'toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
-          ${submenuButton(DESIGNER_UI_TEXT.tools, ['toggle-workbench', 'show-help'])}
-        </div>
+        ${menuPanel('file', DESIGNER_UI_TEXT.file, ['project-workspace', 'import', 'export', 'separator', 'project-save', 'project-publish', 'project-retry', 'project-cancel'])}
+        ${menuPanel('edit', DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'edit-size', 'separator', 'group', 'ungroup', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
+        ${menuPanel('view', DESIGNER_UI_TEXT.view, ['zoom-in', 'zoom-out', 'zoom-reset', 'zoom-fit', 'separator', 'toggle-grid', 'toggle-guides', 'toggle-border-guides'])}
+        ${menuPanel('tools', DESIGNER_UI_TEXT.tools, ['toggle-workbench', 'show-help'])}
       </header>
 
       <input type="file" accept="application/json" data-import-document hidden>
@@ -161,8 +167,9 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         </div>
         <div class="topbar-segment topbar-zoom" role="group" aria-label="${DESIGNER_UI_TEXT.zoom}">
           ${actionButton('zoom-out', zoomOutGlyph())}
-          <output class="zoom-value" data-zoom>100%</output>
+          <button type="button" class="zoom-value" data-action="zoom-reset" data-zoom title="${DESIGNER_OPERATION_TEXT['zoom-reset'].tooltip}" aria-label="${DESIGNER_OPERATION_TEXT['zoom-reset'].label}">100%</button>
           ${actionButton('zoom-in', zoomInGlyph())}
+          ${actionButton('zoom-fit', zoomFitGlyph())}
         </div>
       </div>
       <button type="button" class="ruler-corner" data-status-toggle="guides" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.guides}" title="${DESIGNER_UI_TEXT.rulerGuidesToggle}">
@@ -200,7 +207,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       </section>
       <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="${DESIGNER_UI_TEXT.contextMenu}" tabindex="-1"></div>
 
-      <!-- Status bar: left (tool + selection + project state) | center (canvas size) | right (Snap/Native Events toggles + zoom menu). -->
+      <!-- Status bar: left (tool + selection + project state) | right (canvas size + Snap/Native Events toggles + zoom menu). -->
       <footer class="statusbar">
         <div class="statusbar-group statusbar-start">
           <span class="status-tool" data-status-tool>${designerToolGlyph('select')}<span class="status-tool-name">${DESIGNER_TOOLS.find((tool) => tool.id === 'select')?.label ?? ''}</span></span>
@@ -211,10 +218,9 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           <span class="status-revision" data-project-revision></span>
           <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
         </div>
-        <div class="statusbar-group statusbar-center">
-          <span class="status-canvas" data-status-canvas aria-label="${DESIGNER_UI_TEXT.canvasSize}"></span>
-        </div>
         <div class="statusbar-group statusbar-end">
+          <span class="status-canvas" data-status-canvas aria-label="${DESIGNER_UI_TEXT.canvasSize}"></span>
+          <span class="status-divider" aria-hidden="true"></span>
           <button type="button" class="status-toggle" data-status-toggle="snap" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.snap}">
             <span class="status-toggle-dot" aria-hidden="true"></span><span>${DESIGNER_UI_TEXT.snap}</span>
           </button>

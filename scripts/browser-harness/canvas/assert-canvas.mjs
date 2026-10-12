@@ -2,7 +2,7 @@
 // 由 3 个原 assert 模块合并；调用顺序由 run-browser-harness.mjs 编排。
 import {
   assertCanvasAidChecked,
-  openMoreSubmenu,
+  openTopMenu,
   toggleCanvasAidViaMenu,
   toggleGridViaMenu,
   zoomResetViaMenu,
@@ -135,7 +135,7 @@ export async function assertCanvasBasics(designer, page) {
   if ((await snapToggle.getAttribute('aria-checked')) !== 'true') {
     throw new Error('BROWSER_HARNESS_SNAP_TOGGLE_ON_FAILED');
   }
-  const toolsMenu = await openMoreSubmenu(designer, '\u5de5\u5177');
+  const toolsMenu = await openTopMenu(designer, '\u5de5\u5177');
   await toolsMenu.locator('[data-menu-action="show-help"]').click();
   const helpMenu = designer.locator('[data-help-dialog]');
   if (
@@ -656,6 +656,21 @@ async function assertCanvasPrecision(designer, page) {
   if (rulerBefore.length === 0 || JSON.stringify(rulerBefore) === JSON.stringify(rulerAfter)) {
     throw new Error('BROWSER_HARNESS_RULER_ZOOM_UPDATE_FAILED');
   }
+  // 工具栏缩放簇：读数按钮点击即复位，fit 按钮就位（随 40px 列头降到 28px 高）。
+  const zoomReadout = designer.locator('[data-canvas-local-toolbar] [data-zoom]');
+  await designer.locator('[data-canvas-local-toolbar] [data-action="zoom-in"]').click();
+  const zoomedIn = (await zoomReadout.textContent())?.trim();
+  await zoomReadout.click();
+  const zoomResetByReadout = (await zoomReadout.textContent())?.trim();
+  if (
+    zoomedIn === zoomResetByReadout ||
+    zoomResetByReadout !== '100%' ||
+    (await designer.locator('[data-canvas-local-toolbar] [data-action="zoom-fit"]').count()) !== 1
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_TOOLBAR_ZOOM_CONTROLS_FAILED:${JSON.stringify({ zoomedIn, zoomResetByReadout })}`,
+    );
+  }
   const viewport = designer.locator('[data-viewport]');
   await toggleGridViaMenu(designer, page);
   if ((await viewport.getAttribute('data-grid')) !== 'false') {
@@ -666,7 +681,7 @@ async function assertCanvasPrecision(designer, page) {
         await designer.evaluate((host) => {
           const root = host.shadowRoot;
           const viewport = root.querySelector('[data-viewport]');
-          const trigger = root.querySelector('[data-menu-toggle="more"]');
+          const trigger = root.querySelector('[data-menu-toggle="view"]');
           const menus = [...root.querySelectorAll('[data-menu]')].map((menu) => ({
             id: menu.dataset.menu,
             hidden: menu.hidden,

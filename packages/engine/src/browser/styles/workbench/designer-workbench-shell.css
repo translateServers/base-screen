@@ -3,20 +3,20 @@
   display: grid;
   min-height: 0;
   grid-row: 2 / 3 !important;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: var(--designer-ruler-size) minmax(0, 1fr);
 }
 
-/* Nebula 底部状态栏：左（工具+选中信息+项目状态）｜中（画布尺寸）｜右（开关+模式+缩放）。 */
+/* Nebula 底部状态栏：左（工具+选中信息+项目状态）｜右（画布尺寸 + 开关 + 缩放）。 */
 .statusbar {
   display: flex;
   min-width: 0;
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-4);
-  padding: 0 var(--designer-space-4);
+  padding: 0 var(--designer-space-5);
   border-top: 1px solid var(--designer-border-default);
   font: var(--designer-font-small);
-  background: var(--designer-surface-panel);
+  background: var(--designer-surface-raised);
 }
 
 .statusbar-group {
@@ -26,14 +26,13 @@
   gap: var(--designer-space-3);
 }
 
-.statusbar-center {
-  flex: 0 0 auto;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
-}
-
 .statusbar-end {
   flex: 0 0 auto;
+}
+
+.status-canvas {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
 }
 
 .status-tool {

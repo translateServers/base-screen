@@ -5,33 +5,30 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  grid-template-rows: 40px 20px minmax(0, 1fr);
+  grid-template-rows:
+    var(--designer-column-header-height) var(--designer-ruler-size)
+    minmax(0, 1fr);
   background: var(--designer-surface-workspace);
 }
 
+/* 工具栏与左右两条 tab 条共用 40px 列头：同底色、同起点，视觉上是一条连续头部带。 */
 .workspace-local-toolbar {
   box-sizing: border-box;
   grid-row: 1 / 2;
   display: flex;
   min-width: 0;
   align-items: center;
-  justify-content: center;
-  gap: var(--designer-space-3);
-  padding: 3px var(--designer-space-4);
-  overflow: hidden;
-  border-bottom: 1px solid var(--designer-border-default);
-  background: var(--designer-surface-panel);
+  justify-content: flex-start;
+  gap: var(--designer-space-5);
+  padding: 0 var(--designer-space-5);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  background: var(--designer-surface-raised);
+  box-shadow: 0 1px 0 var(--designer-border-subtle);
 }
 
-.workspace-local-toolbar .topbar-segment {
-  height: 32px;
-  padding: 1px;
-}
-
-.workspace-local-toolbar .designer-icon-button {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+.workspace-local-toolbar .topbar-zoom {
+  margin-left: auto;
 }
 
 .canvas-stage {
@@ -39,7 +36,7 @@
   display: grid;
   min-height: 0;
   grid-row: 3 / 4 !important;
-  grid-template-columns: 20px minmax(0, 1fr);
+  grid-template-columns: var(--designer-ruler-size) minmax(0, 1fr);
 }
 
 .designer-blueprint-surface {

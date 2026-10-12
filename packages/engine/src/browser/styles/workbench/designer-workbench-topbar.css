@@ -1,49 +1,43 @@
 .rail,
 .properties,
-.designer-topbar,
-.statusbar {
+.designer-topbar {
   background: var(--designer-surface-panel);
 }
 
 .designer-topbar {
   position: relative;
-  z-index: var(--designer-z-workspace-overlay);
-  display: flex;
+  z-index: var(--designer-z-dialog);
+  display: grid;
   min-width: 0;
+  /* 第一列与左栏同宽（品牌区压在 rail 上方）；左栏折叠到 48px 时保底 200px，项目名不被压碎。 */
+  grid-template-columns: minmax(200px, var(--left-panel-width)) minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--designer-space-4);
-  padding: 0 var(--designer-space-5);
+  gap: 0;
+  padding: 0 var(--designer-space-5) 0 0;
   /* height 含 border：grid 行高 48px 与 .designer-topbar 总高一致，避免 1px 溢出到 ruler 行 */
   box-sizing: border-box;
   height: var(--designer-topbar-height);
   border-bottom: 1px solid var(--designer-border-default);
   background: var(--designer-surface-panel);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  box-shadow:
+    inset 0 -1px 0 var(--designer-border-default),
+    var(--designer-shadow-float);
 }
 
 .topbar-brand,
-.topbar-center,
 .topbar-actions {
   display: flex;
   align-items: center;
 }
 
 .topbar-brand {
-  flex: 0 1 auto;
   min-width: 0;
   gap: var(--designer-space-3);
-}
-
-.topbar-center {
-  min-width: 0;
-  flex: 1 1 auto;
-  justify-content: center;
-  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-5);
 }
 
 .topbar-actions {
-  flex: 0 1 auto;
+  min-width: 0;
   justify-content: flex-end;
   gap: var(--designer-space-2);
 }
@@ -71,33 +65,47 @@
   gap: 1px;
 }
 
+.topbar-mode {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  transform: translate(-50%, -50%);
+}
+
 .topbar-mode-switch {
   display: inline-flex;
-  flex: none;
+  min-height: 32px;
   align-items: center;
-  gap: 1px;
-  margin-left: var(--designer-space-3);
+  gap: 2px;
   padding: 2px;
-  border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-3);
   background: var(--designer-surface-workspace);
+  box-shadow: var(--designer-elev-ring);
 }
 
 .topbar-mode-button {
   box-sizing: border-box;
   display: inline-flex;
   min-width: 0;
-  min-height: 26px;
+  height: 28px;
+  min-height: 28px;
   align-items: center;
   justify-content: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-3);
+  gap: 5px;
+  padding: 0 var(--designer-space-5);
   border: 1px solid transparent;
-  border-radius: 3px;
+  border-radius: calc(var(--designer-radius-3) - 2px);
   background: transparent;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
+  font-weight: 500;
   white-space: nowrap;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion),
+    box-shadow var(--designer-motion);
 }
 
 button.topbar-mode-button {
@@ -110,30 +118,34 @@ button.topbar-mode-button {
 }
 
 .topbar-mode-button[data-active="true"] {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-control);
-  color: var(--designer-accent);
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-active);
+  font-weight: 600;
 }
 
-button.topbar-mode-button:hover {
+button.topbar-mode-button:hover:not([data-active="true"]):not(:disabled) {
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
 }
 
-/* 顶栏圆角分组：工具选择器 / 撤销重做 / 缩放。 */
+button.topbar-mode-button:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+button.topbar-mode-button:disabled {
+  color: var(--designer-text-disabled);
+  cursor: default;
+  opacity: 0.62;
+}
+
+/* 工作区工具栏分组：分组只留 2px 组内间距（与 .rail-tabs 同值），选中态由按钮自己承担。 */
 .topbar-segment {
   display: flex;
   align-items: center;
-  gap: 1px;
-  padding: 2px;
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-4);
-  background: color-mix(
-    in srgb,
-    var(--designer-surface-workspace) 80%,
-    var(--designer-surface-panel)
-  );
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--designer-text-primary) 3%, transparent);
+  gap: 2px;
+  flex: none;
 }
 
 .topbar-segment .designer-icon-button {
@@ -159,10 +171,14 @@ button.topbar-mode-button:hover {
   display: none;
 }
 
+.designer-tool-cluster {
+  flex: none;
+}
+
 .designer-tool-cluster .designer-tool-button {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   border-radius: var(--designer-radius-3);
   border-color: transparent;
   background: transparent;
@@ -176,29 +192,22 @@ button.topbar-mode-button:hover {
 
 .designer-tool-cluster .designer-tool-button[aria-pressed="true"] {
   border-color: transparent;
-  background: var(--designer-accent);
-  color: var(--designer-surface-workspace);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 30%, transparent);
-}
-
-.designer-tool-cluster {
-  flex: none;
-}
-
-.topbar-zoom .designer-icon-button {
-  width: 26px;
-  height: 26px;
-  min-height: 26px;
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-active);
 }
 
 .zoom-value {
   box-sizing: border-box;
-  width: 52px;
-  height: 26px;
-  flex: 0 0 52px;
+  width: 48px;
+  height: 28px;
+  flex: 0 0 48px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
   font-size: var(--designer-font-size-sm);
@@ -216,7 +225,7 @@ button.topbar-mode-button:hover {
 
 .topbar-divider {
   width: 1px;
-  height: 24px;
+  height: 22px;
   background: var(--designer-border-subtle);
   margin: 0 var(--designer-space-1);
 }
@@ -251,26 +260,31 @@ button.topbar-mode-button:hover {
 .topbar-search-trigger {
   box-sizing: border-box;
   display: inline-flex;
-  width: clamp(132px, 16vw, 220px);
+  width: clamp(150px, 15vw, 220px);
   min-width: 0;
   min-height: 30px;
   align-items: center;
   gap: var(--designer-space-2);
   padding: 0 var(--designer-space-3);
-  border: 1px solid var(--designer-border-default);
+  border: 0;
   border-radius: var(--designer-radius-2);
   background: var(--designer-surface-control);
   color: var(--designer-text-muted);
   cursor: pointer;
   font: var(--designer-font-small);
   text-align: left;
+  box-shadow: var(--designer-elev-ring);
+  transition:
+    background var(--designer-motion),
+    color var(--designer-motion),
+    box-shadow var(--designer-motion);
 }
 
 .topbar-search-trigger:hover,
 .topbar-search-trigger[aria-expanded="true"] {
-  border-color: color-mix(in srgb, var(--designer-accent) 60%, var(--designer-border-default));
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-secondary);
+  box-shadow: 0 0 0 1px var(--designer-border-strong);
 }
 
 .topbar-search-trigger svg {
@@ -289,12 +303,113 @@ button.topbar-mode-button:hover {
 
 .topbar-search-trigger kbd {
   flex: none;
-  padding: 1px var(--designer-space-2);
+  padding: 1px 5px;
   border: 1px solid var(--designer-border-default);
   border-radius: 3px;
   background: var(--designer-surface-workspace);
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
+}
+
+.topbar-icon-button {
+  position: relative;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-3);
+  background: transparent;
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  transition:
+    background var(--designer-motion),
+    color var(--designer-motion),
+    transform var(--designer-motion);
+}
+
+.topbar-icon-button:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.topbar-icon-button:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.topbar-icon-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.topbar-icon-button[hidden] {
+  display: none;
+}
+
+.topbar-icon-button:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
+}
+
+.topbar-icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.topbar-count {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 7px;
+  background: var(--designer-danger);
+  color: var(--designer-surface-panel);
+  font: var(--designer-font-numeric);
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.topbar-count:empty {
+  display: none;
+}
+
+@container designer-shell (max-width: 1279px) {
+  .topbar-search-trigger {
+    width: 30px;
+    flex: 0 0 30px;
+    justify-content: center;
+    padding: 0;
+  }
+
+  .topbar-search-trigger > span,
+  .topbar-search-trigger kbd,
+  .topbar-mode-button > span {
+    display: none;
+  }
+
+  .topbar-mode-button {
+    width: 28px;
+    padding: 0;
+  }
+}
+
+@container designer-shell (max-width: 1040px) {
+  .topbar-zoom {
+    display: none;
+  }
+}
+
+@container designer-shell (max-width: 899px) {
+  .designer-menu-triggers {
+    display: none;
+  }
 }
 
 .designer-command-palette {
@@ -502,10 +617,12 @@ button.topbar-mode-button:hover {
 
 .designer-menu-triggers {
   display: flex;
+  min-width: 0;
   align-items: center;
+  justify-content: flex-start;
   gap: 1px;
+  overflow: hidden;
   padding: 2px;
-  border-radius: var(--designer-radius-4);
 }
 
 .designer-menu-trigger {
@@ -514,9 +631,12 @@ button.topbar-mode-button:hover {
   padding: 0 var(--designer-space-3);
   border: 1px solid transparent;
   border-radius: var(--designer-radius-3);
+  background: transparent;
   color: var(--designer-text-secondary);
+  cursor: pointer;
   font-weight: 500;
   font-size: var(--designer-font-size-base);
+  white-space: nowrap;
   transition:
     background var(--designer-motion),
     color var(--designer-motion),
@@ -530,9 +650,14 @@ button.topbar-mode-button:hover {
 }
 
 .designer-menu-trigger[aria-expanded="true"] {
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-  border-color: color-mix(in srgb, var(--designer-accent) 30%, transparent);
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  border-color: var(--designer-border-active);
+}
+
+.designer-menu-trigger:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
 }
 
 /* 右段带文案操作按钮：预览 / 保存 / 发布。独立于 .designer-button（inline-grid）的布局。 */
@@ -626,7 +751,6 @@ button.topbar-mode-button:hover {
 
 /* 预览按钮 - 纯 ghost，无背景无边框 */
 .topbar-text-button[data-action="preview"] {
-  padding: 0 6px;
   color: var(--designer-text-secondary);
 }
 
@@ -634,27 +758,29 @@ button.topbar-mode-button:hover {
   color: var(--designer-text-primary);
 }
 
-/* 保存按钮 - 极淡描边，hover 时轻微浮现 */
+/* 保存按钮 - 极淡描边，hover 只换底色 */
 .topbar-text-button[data-action="project-save"] {
-  border-color: color-mix(in srgb, var(--designer-border-default) 30%, transparent);
-  background: color-mix(in srgb, var(--designer-surface-control) 20%, transparent);
-}
-
-.topbar-text-button[data-action="project-save"]:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--designer-border-default) 60%, transparent);
-  background: color-mix(in srgb, var(--designer-surface-control) 40%, transparent);
+  border-color: color-mix(in srgb, var(--designer-border-default) 40%, transparent);
 }
 
 .topbar-text-button[data-action="project-save"]:active:not(:disabled) {
   transform: translateZ(0) scale(0.96);
 }
 
-/* 发布按钮 - primary CTA 风格，品牌色填充 */
+/* 发布按钮 - 反转实底 CTA（白天黑底白字、黑夜白底黑字），悬停向页面底色混一档 */
 .topbar-publish {
-  border-color: var(--designer-accent);
-  background: var(--designer-accent);
-  color: var(--designer-surface-workspace);
-  box-shadow: 0 1px 4px color-mix(in srgb, var(--designer-accent) 20%, transparent);
+  border-color: transparent;
+  background: var(--designer-text-primary);
+  color: var(--designer-surface-raised);
+  box-shadow: var(--designer-shadow-float);
+}
+
+.topbar-publish:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--designer-text-primary), var(--designer-surface-raised) 10%);
+  color: var(--designer-surface-raised);
+  box-shadow:
+    0 0 0 1px var(--designer-text-secondary),
+    var(--designer-shadow-float);
 }
 
 .topbar-publish:hover:not(:disabled) {

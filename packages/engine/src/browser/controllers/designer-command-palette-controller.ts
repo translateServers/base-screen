@@ -116,13 +116,11 @@ export class DesignerCommandPaletteController {
   onKeyDown(event: KeyboardEvent): boolean {
     const palette = this.palette;
     if (palette === undefined || palette.hidden) {
-      if (
-        event.key !== '/' ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.altKey ||
-        isEditable(event.target)
-      ) {
+      const isPaletteShortcut =
+        (event.key === 'k' || event.key === 'K') &&
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey;
+      if (!isPaletteShortcut || isEditable(event.target)) {
         return false;
       }
       event.preventDefault();

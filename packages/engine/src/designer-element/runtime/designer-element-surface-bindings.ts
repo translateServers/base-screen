@@ -186,7 +186,10 @@ export function initializeDesignerElementSurfaceBindings(
     },
     keyDownCapture: (_target, event) => {
       const keyboardEvent = event as KeyboardEvent;
-      if (keyboardEvent.key === '/' && state.commandPaletteController.onKeyDown(keyboardEvent)) {
+      const isPaletteShortcut =
+        (keyboardEvent.key === 'k' || keyboardEvent.key === 'K') &&
+        (keyboardEvent.ctrlKey || keyboardEvent.metaKey);
+      if (isPaletteShortcut && state.commandPaletteController.onKeyDown(keyboardEvent)) {
         keyboardEvent.stopImmediatePropagation();
         return true;
       }

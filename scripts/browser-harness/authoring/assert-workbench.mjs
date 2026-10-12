@@ -1,7 +1,7 @@
 // 工作台外壳、项目/物料作者流、视窗原生事件与桌面基线几何
 // 由 4 个原 assert 模块合并；调用顺序由 run-browser-harness.mjs 编排。
 import { screenshotDirectory } from '../shared/constants.mjs';
-import { hoverNestedSubmenu, openMoreSubmenu } from '../shared/harness-utils.mjs';
+import { hoverNestedSubmenu, openTopMenu } from '../shared/harness-utils.mjs';
 import {
   assertOverlayContained,
   assertPositiveNonOverlappingRects,
@@ -52,7 +52,7 @@ async function assertCommandPalette(designer, page) {
 
   await page.keyboard.press('Escape');
   await palette.waitFor({ state: 'hidden' });
-  await page.keyboard.press('/');
+  await page.keyboard.press('Control+k');
   await palette.waitFor({ state: 'visible' });
   await input.fill('/ title');
   const layerResult = designer.locator(
@@ -130,7 +130,7 @@ export {
   assertTopbarProjectName,
 };
 
-// 顶栏“更多 > 编辑 > 层级”三级菜单：指针移入三级浮层后，二级/三级都应保持展开且浮层可命中。
+// 顶栏“编辑 > 层级”两级菜单：指针移入浮层后，顶层菜单与浮层都应保持展开且浮层可命中。
 // 回归两类缺陷：进入内层嵌套 wrap 时按“最近 wrap 相等”判定离开而收起父级；浮层被父面板
 // overflow 裁成不可见且 elementFromPoint 落空。
 async function assertNestedMenuFlyout(designer, page) {
@@ -275,7 +275,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
         ?.textContent === '\u64cd\u4f5c\u5931\u8d25 *',
   );
-  const fileMenu = await openMoreSubmenu(authoringDesigner, '\u6587\u4ef6');
+  const fileMenu = await openTopMenu(authoringDesigner, '\u6587\u4ef6');
   const retryAction = fileMenu.locator('[data-menu-action="project-retry"]');
   if (await retryAction.isDisabled()) {
     throw new Error('BROWSER_HARNESS_RETRY_DISABLED');
@@ -856,7 +856,8 @@ export async function assertDesktopBaseline(designer, page, viewport) {
   if (
     geometry.topbar !== 48 ||
     geometry.status !== 30 ||
-    geometry.ruler !== 20 ||
+    // 标尺随设计值 22px（--designer-ruler-size）。
+    geometry.ruler !== 22 ||
     Math.round(geometry.left) !== geometry.defaultLeft ||
     Math.round(geometry.right) !== geometry.defaultRight ||
     geometry.canvasTop === undefined ||

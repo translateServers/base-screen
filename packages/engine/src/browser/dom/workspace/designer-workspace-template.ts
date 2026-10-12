@@ -107,6 +107,20 @@ export function submenuButton(label: string, entries: readonly DesignerMenuEntry
   </div>`;
 }
 
+// 顶层菜单栏触发器与面板：菜单控制器按 data-menu-toggle → data-menu 的 id 配对，
+// 四个面板与触发器同属顶栏（面板保持 absolute 定位，锚点计算不变）。
+export function menuTriggerButton(id: string, label: string): string {
+  return `<button type="button" class="designer-menu-trigger" data-menu-toggle="${id}" aria-haspopup="menu" aria-expanded="false">${label}</button>`;
+}
+
+export function menuPanel(
+  id: string,
+  label: string,
+  entries: readonly DesignerMenuEntry[],
+): string {
+  return `<div class="designer-menu" data-menu="${id}" hidden role="menu" aria-label="${label}">${menuEntriesHtml(entries)}</div>`;
+}
+
 function menuEntriesHtml(entries: readonly DesignerMenuEntry[]): string {
   return entries
     .map((entry) =>
@@ -160,6 +174,12 @@ export function zoomOutGlyph(): string {
 
 export function zoomInGlyph(): string {
   return toolbarIcon('M6 8h4M8 6v4M4 4h8v8H4z');
+}
+
+export function zoomFitGlyph(): string {
+  return toolbarIcon(
+    'M6 3H4.5A1.5 1.5 0 0 0 3 4.5V6M10 3h1.5A1.5 1.5 0 0 1 13 4.5V6M13 10v1.5a1.5 1.5 0 0 1-1.5 1.5H10M6 13H4.5A1.5 1.5 0 0 1 3 11.5V10',
+  );
 }
 
 function toolbarIcon(path: string): string {

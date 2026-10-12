@@ -518,8 +518,8 @@ button.variable-reference-count:focus-visible {
   left: 0;
   z-index: 1;
   display: grid;
-  width: 20px;
-  height: 20px;
+  width: var(--designer-ruler-size);
+  height: var(--designer-ruler-size);
   place-items: center;
   padding: 0;
   border: 0;

@@ -1,33 +1,4 @@
-@container designer-shell (max-width: 1180px) {
-  .topbar-search-trigger {
-    width: 32px;
-    flex: 0 0 32px;
-    justify-content: center;
-    padding: 0;
-  }
-
-  .topbar-search-trigger > span,
-  .topbar-search-trigger kbd,
-  .topbar-mode-button > span {
-    display: none;
-  }
-
-  .topbar-mode-switch {
-    margin-left: var(--designer-space-1);
-  }
-
-  .topbar-mode-button {
-    width: 28px;
-    padding: 0;
-  }
-}
-
-@container designer-shell (max-width: 1040px) {
-  .topbar-zoom {
-    display: none;
-  }
-}
-
+/* 顶栏的响应式收缩规则归 designer-workbench-topbar.css 单点维护。 */
 @media (forced-colors: active) {
   .designer-dataset-field-option[aria-pressed="true"] {
     border-color: Highlight;

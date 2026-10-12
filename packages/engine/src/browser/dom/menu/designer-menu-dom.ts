@@ -127,7 +127,12 @@ export function positionSubmenu(
   const rightSpace = layoutRight - wrapperRight;
   const leftSpace = wrapperRect.left - layoutRect.left;
   const canOpenLeft = leftSpace >= submenuWidth + edgeGap;
-  const prefersLeft = submenu.closest('[data-menu="more"]') !== null;
+  // 顶层菜单靠右半时子菜单向左翻，避免飞出设计器；否则优先向右。
+  const anchorMenu = submenu.closest<HTMLElement>('[data-menu]');
+  const anchorRect = anchorMenu?.getBoundingClientRect();
+  const anchorCenter =
+    anchorRect === undefined ? wrapperRect.left : anchorRect.left + anchorRect.width / 2;
+  const prefersLeft = anchorCenter > layoutRect.left + layoutRect.width / 2;
   const opensLeft = canOpenLeft && (prefersLeft || rightSpace < submenuWidth + edgeGap);
   submenu.dataset.submenuSide = opensLeft ? 'left' : 'right';
   submenu.style.left = opensLeft ? '' : 'calc(100% - 4px)';
