@@ -10,6 +10,7 @@ const propsSchema = {
   properties: {
     title: { kind: 'string' as const, minLength: 1 },
     value: { kind: 'number' as const },
+    size: { kind: 'number' as const, minimum: 8, maximum: 64 },
     visible: { kind: 'boolean' as const },
     align: { kind: 'enum' as const, values: ['left', 'center', 'right'] },
     accent: { kind: 'string' as const },
@@ -211,6 +212,48 @@ describe('parseBaseScreenMaterialEditorDescriptor', () => {
     expect(
       parseBaseScreenMaterialEditorDescriptor(
         invalid,
+        propsSchema,
+        styleSchema,
+        ['valueClick'],
+        roles,
+      ),
+    ).toMatchObject({ ok: false });
+  });
+
+  it('accepts a stepper only on a bounded number field', () => {
+    const valid = descriptor();
+    firstField(valid, 0).control = 'stepper';
+    firstField(valid, 0).path = ['size'];
+    expect(
+      parseBaseScreenMaterialEditorDescriptor(
+        valid,
+        propsSchema,
+        styleSchema,
+        ['valueClick'],
+        roles,
+      ),
+    ).toMatchObject({ ok: true });
+
+    // 无界数字：步进器到不了任何边界，失败关闭。
+    const unbounded = descriptor();
+    firstField(unbounded, 0).control = 'stepper';
+    firstField(unbounded, 0).path = ['value'];
+    expect(
+      parseBaseScreenMaterialEditorDescriptor(
+        unbounded,
+        propsSchema,
+        styleSchema,
+        ['valueClick'],
+        roles,
+      ),
+    ).toMatchObject({ ok: false });
+
+    // 非数字：控件语义与字段类型冲突。
+    const wrongKind = descriptor();
+    firstField(wrongKind, 0).control = 'stepper';
+    expect(
+      parseBaseScreenMaterialEditorDescriptor(
+        wrongKind,
         propsSchema,
         styleSchema,
         ['valueClick'],

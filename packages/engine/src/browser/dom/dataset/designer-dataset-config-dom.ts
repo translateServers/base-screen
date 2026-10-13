@@ -1,6 +1,7 @@
 import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { designerIcon } from '../../ui/designer-icons.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import {
   appendOption,
@@ -131,11 +132,11 @@ function renderBindingSummaryItem(
   const role = ownerDocument.createElement('span');
   role.className = 'designer-dataset-binding-summary-role';
   role.textContent = binding.role;
-  role.title = binding.role;
+  role.setAttribute('data-tip', binding.role);
   const fields = ownerDocument.createElement('span');
   fields.className = 'designer-dataset-binding-summary-value';
   fields.textContent = binding.fields.join('、');
-  fields.title = binding.fields.join('、');
+  fields.setAttribute('data-tip', binding.fields.join('、'));
   preview.append(role, fields);
   disclosure.appendChild(preview);
   disclosure.setAttribute('aria-label', `${binding.role}：${binding.fields.join('、')}`);
@@ -212,7 +213,15 @@ function renderBindings(
     section.appendChild(empty);
   }
   for (const role of options.roles) {
-    section.appendChild(renderBindingRole(ownerDocument, options.descriptor, role, options.draft));
+    section.appendChild(
+      renderBindingRole(
+        ownerDocument,
+        options.descriptor,
+        role,
+        options.draft,
+        options.bindingOpenRoleId ?? null,
+      ),
+    );
   }
   return section;
 }
@@ -222,6 +231,7 @@ function renderBindingRole(
   descriptor: ScreenDatasetDefinition,
   role: ScreenDataBindingRole,
   draft: DesignerDatasetDraftView | undefined,
+  openRoleId: string | null,
 ): HTMLElement {
   const roleSection = ownerDocument.createElement('div');
   roleSection.className = 'designer-dataset-binding-role';
@@ -234,9 +244,6 @@ function renderBindingRole(
   const roleCount = ownerDocument.createElement('span');
   roleCount.textContent = DESIGNER_UI_TEXT.dataset.selectedFields(selected.length);
   roleHeading.append(roleName, roleCount);
-  const hint = ownerDocument.createElement('p');
-  hint.className = 'designer-dataset-binding-hint';
-  hint.textContent = DESIGNER_UI_TEXT.dataset.bindingHint(role.minFields, role.maxFields);
   const fieldList = ownerDocument.createElement('div');
   fieldList.className = 'designer-dataset-field-list';
   fieldList.setAttribute('role', 'group');
@@ -281,9 +288,16 @@ function renderBindingRole(
       ),
     );
     roleHeading.appendChild(actions);
-    for (const field of compatibleFields) {
-      fieldList.appendChild(bindingField(ownerDocument, role.id, field, selected, role.maxFields));
-    }
+    fieldList.appendChild(
+      bindingFieldSelect(
+        ownerDocument,
+        role.id,
+        compatibleFields,
+        selected,
+        role.maxFields,
+        openRoleId === role.id,
+      ),
+    );
   }
   if (compatibleFields.length === 0) {
     const empty = ownerDocument.createElement('p');
@@ -291,8 +305,85 @@ function renderBindingRole(
     empty.textContent = DESIGNER_UI_TEXT.dataset.noCompatibleFields;
     fieldList.appendChild(empty);
   }
-  roleSection.append(roleHeading, hint, fieldList);
+  roleSection.append(roleHeading, fieldList);
   return roleSection;
+}
+
+/** 限额多选：触发器芯片 + 自绘弹层（设计原型 .bind-field）；芯片 ×、选项切换都走既有绑定动作。 */
+function bindingFieldSelect(
+  ownerDocument: Document,
+  roleId: string,
+  fields: readonly ScreenDatasetDefinition['fields'][number][],
+  selected: readonly string[],
+  maxFields: number,
+  open: boolean,
+): HTMLElement {
+  const roleLabel = DESIGNER_UI_TEXT.dataset.bindingRole(roleId);
+  const atLimit = selected.length >= maxFields;
+  const bound = fields.filter((field) => selected.includes(field.id));
+  const wrapper = ownerDocument.createElement('div');
+  wrapper.className = 'designer-bind-field';
+  const trigger = ownerDocument.createElement('button');
+  trigger.type = 'button';
+  trigger.className = 'designer-bind-trigger';
+  trigger.dataset.datasetBindingTrigger = roleId;
+  trigger.setAttribute('aria-haspopup', 'listbox');
+  trigger.setAttribute('aria-expanded', String(open));
+  trigger.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.bindingToggle(roleLabel));
+  const chips = ownerDocument.createElement('span');
+  chips.className = 'designer-bind-chips';
+  if (bound.length === 0) {
+    const placeholder = ownerDocument.createElement('span');
+    placeholder.className = 'designer-bind-placeholder';
+    placeholder.textContent = DESIGNER_UI_TEXT.dataset.bindingPlaceholder;
+    chips.appendChild(placeholder);
+  } else {
+    for (const field of bound) {
+      const chip = ownerDocument.createElement('span');
+      chip.className = 'designer-bind-chip';
+      chip.append(field.label);
+      // 原型同款：触发器是按钮，芯片 × 用非按钮元素并 aria-hidden——键盘移除走触发器 Backspace。
+      const remove = ownerDocument.createElement('span');
+      remove.className = 'designer-bind-chip-x';
+      remove.dataset.datasetBindingChipRole = roleId;
+      remove.dataset.datasetBindingChipField = field.id;
+      remove.setAttribute('aria-hidden', 'true');
+      remove.innerHTML = designerIcon('x');
+      chip.appendChild(remove);
+      chips.appendChild(chip);
+    }
+  }
+  const count = ownerDocument.createElement('span');
+  count.className = 'designer-bind-count';
+  count.dataset.datasetBindingCount = roleId;
+  count.dataset.atLimit = String(atLimit);
+  count.textContent = DESIGNER_UI_TEXT.dataset.bindingCount(selected.length, maxFields);
+  const caret = ownerDocument.createElement('span');
+  caret.className = 'designer-bind-caret';
+  caret.innerHTML = designerIcon('chevron-down');
+  trigger.append(chips, count, caret);
+  const menu = ownerDocument.createElement('div');
+  menu.className = 'designer-bind-menu';
+  menu.dataset.datasetBindingMenu = roleId;
+  menu.hidden = !open;
+  const options = ownerDocument.createElement('div');
+  options.className = 'designer-bind-options';
+  options.setAttribute('role', 'listbox');
+  options.setAttribute('aria-multiselectable', 'true');
+  options.setAttribute('aria-label', roleLabel);
+  for (const field of fields) {
+    options.appendChild(bindingField(ownerDocument, roleId, field, selected, maxFields));
+  }
+  const foot = ownerDocument.createElement('div');
+  foot.className = 'designer-bind-foot';
+  foot.dataset.datasetBindingHint = roleId;
+  foot.dataset.atLimit = String(atLimit);
+  foot.textContent = atLimit
+    ? DESIGNER_UI_TEXT.dataset.bindingAtLimit
+    : DESIGNER_UI_TEXT.dataset.bindingLimitHint(maxFields);
+  menu.append(options, foot);
+  wrapper.append(trigger, menu);
+  return wrapper;
 }
 
 function bindingRoleAction(
@@ -322,16 +413,21 @@ function bindingField(
   const isSelected = selected.includes(field.id);
   const button = ownerDocument.createElement('button');
   button.type = 'button';
-  button.className = 'designer-control designer-dataset-field-option';
+  button.className = 'designer-bind-option';
   button.dataset.datasetBindingRoleId = roleId;
   button.dataset.datasetBindingField = field.id;
-  button.setAttribute('aria-pressed', String(isSelected));
+  button.setAttribute('role', 'option');
+  button.setAttribute('aria-selected', String(isSelected));
   button.disabled = !isSelected && selected.length >= maxFields;
+  const check = ownerDocument.createElement('span');
+  check.className = 'designer-bind-check';
+  check.innerHTML = designerIcon('check');
   const label = ownerDocument.createElement('span');
-  label.className = 'designer-field-label';
+  label.className = 'designer-bind-label';
   label.textContent = field.label;
-  const type = ownerDocument.createElement('small');
+  const type = ownerDocument.createElement('span');
+  type.className = 'designer-bind-type';
   type.textContent = field.valueType;
-  button.append(label, type);
+  button.append(check, label, type);
   return button;
 }

@@ -171,6 +171,222 @@
   min-width: 0;
 }
 
+/* 绑定字段选择器：触发器芯片 + 自绘弹层（设计原型 .bind-field）。
+   芯片、计数、弹层与取色器/日历同一覆盖层语言；达上限时未选项禁用并给出原因。 */
+.designer-bind-field {
+  position: relative;
+  min-width: 0;
+}
+
+.designer-bind-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+  width: 100%;
+  min-height: 34px;
+  padding: var(--designer-space-2) var(--designer-control-padding-inline);
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
+  color: var(--designer-text-primary);
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow var(--designer-motion);
+}
+
+.designer-bind-trigger:hover {
+  box-shadow: 0 0 0 1px var(--designer-border-strong);
+}
+
+.designer-bind-trigger[aria-expanded="true"] {
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-bind-chips {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.designer-bind-chip {
+  display: inline-flex;
+  height: 21px;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-2) 0 7px;
+  border-radius: 4px;
+  background: var(--designer-accent-surface);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--designer-accent) 32%, transparent);
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+}
+
+.designer-bind-chip-x {
+  display: grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-bind-chip-x svg {
+  width: 10px;
+  height: 10px;
+}
+
+.designer-bind-chip-x:hover {
+  background: color-mix(in oklab, var(--designer-accent) 16%, transparent);
+  color: var(--designer-text-primary);
+}
+
+.designer-bind-placeholder {
+  color: var(--designer-text-disabled);
+  font-size: var(--designer-font-size-base);
+}
+
+.designer-bind-count {
+  flex: none;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  letter-spacing: 0.02em;
+}
+
+.designer-bind-count[data-at-limit="true"] {
+  color: var(--designer-text-primary);
+}
+
+.designer-bind-caret {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--designer-text-muted);
+  transition: transform var(--designer-motion);
+}
+
+.designer-bind-caret svg {
+  width: 14px;
+  height: 14px;
+}
+
+.designer-bind-trigger[aria-expanded="true"] .designer-bind-caret {
+  transform: rotate(180deg);
+}
+
+.designer-bind-menu {
+  position: absolute;
+  z-index: var(--designer-z-dialog);
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 100%;
+  padding: var(--designer-space-2);
+  border-radius: var(--designer-radius-4);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-overlay);
+}
+
+.designer-bind-menu[hidden] {
+  display: none;
+}
+
+.designer-bind-options {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-1);
+}
+
+.designer-bind-option {
+  display: flex;
+  min-width: 0;
+  min-height: 30px;
+  align-items: center;
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-4);
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: transparent;
+  color: var(--designer-text-primary);
+  cursor: pointer;
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+  text-align: left;
+}
+
+.designer-bind-option:hover:not(:disabled) {
+  background: var(--designer-accent-surface);
+}
+
+.designer-bind-option:disabled {
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
+}
+
+.designer-bind-check {
+  display: grid;
+  flex: none;
+  width: 14px;
+  place-items: center;
+  color: var(--designer-accent);
+  visibility: hidden;
+}
+
+.designer-bind-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.designer-bind-option[aria-selected="true"] .designer-bind-check {
+  visibility: visible;
+}
+
+.designer-bind-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-bind-type {
+  flex: none;
+  padding: 1px var(--designer-space-3);
+  border-radius: 3px;
+  background: var(--designer-surface-workspace);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+}
+
+.designer-bind-option:disabled .designer-bind-type {
+  color: var(--designer-text-disabled);
+}
+
+.designer-bind-foot {
+  margin-top: var(--designer-space-2);
+  padding: 6px var(--designer-space-4) 2px;
+  box-shadow: inset 0 1px 0 var(--designer-border-subtle);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+}
+
+.designer-bind-foot[data-at-limit="true"] {
+  color: var(--designer-text-secondary);
+}
+
 .designer-dataset-shape {
   width: fit-content;
   padding: 2px var(--designer-space-2);
@@ -364,9 +580,7 @@
 }
 
 .designer-dataset-editor-modes {
-  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--designer-space-2);
 }
 
 .designer-dataset-authoring-actions {
@@ -398,12 +612,6 @@
 .designer-dataset-authoring-icon-action svg {
   width: 12px;
   height: 12px;
-}
-
-.designer-dataset-editor-modes .designer-button[aria-pressed="true"] {
-  border-color: var(--designer-accent);
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
 }
 
 .designer-dataset-authoring-row {

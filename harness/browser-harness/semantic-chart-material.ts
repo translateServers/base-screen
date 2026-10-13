@@ -203,7 +203,7 @@ export const HARNESS_SEMANTIC_CHART_EDITOR_DESCRIPTOR: BaseScreenMaterialEditorD
           target: 'props',
           path: ['title', 'fontSize'],
           label: '字号',
-          control: 'unit-number',
+          control: 'stepper',
           unit: 'px',
           min: 8,
           max: 64,

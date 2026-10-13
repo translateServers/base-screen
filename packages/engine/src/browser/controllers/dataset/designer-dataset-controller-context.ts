@@ -72,6 +72,8 @@ export class DesignerDatasetControllerState {
   previewGeneration = 0;
   focusedComponentId: string | null = null;
   syncedDataSource: ScreenDocument['components'][number]['dataSource'] | undefined;
+  /** 展开绑定字段弹层的角色：面板每次重渲染都从这里恢复开合态。 */
+  bindingOpenRoleId: string | null = null;
   panel: HTMLElement | undefined;
   feedback: HTMLElement | undefined;
 
@@ -96,6 +98,7 @@ export class DesignerDatasetControllerState {
     this.authoring = createDatasetAuthoringView();
     this.focusedComponentId = null;
     this.syncedDataSource = undefined;
+    this.bindingOpenRoleId = null;
   }
 }
 

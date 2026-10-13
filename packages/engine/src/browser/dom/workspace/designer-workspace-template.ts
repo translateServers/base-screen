@@ -71,7 +71,7 @@ export function sizeEntryField(axis: 'width' | 'height'): string {
 export function actionButton(action: keyof typeof DESIGNER_OPERATION_TEXT, glyph: string): string {
   const operation = DESIGNER_OPERATION_TEXT[action];
   const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
-  return `<button type="button" class="designer-control designer-button designer-icon-button toolbar-btn" data-variant="neutral" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}">${glyph}</button>`;
+  return `<button type="button" class="designer-control designer-button designer-icon-button toolbar-btn" data-variant="neutral" data-action="${action}" data-tip="${operation.tooltip}${shortcut}" aria-label="${operation.label}">${glyph}</button>`;
 }
 
 // Nebula 顶栏右段的带文案操作按钮（预览/保存/发布）：图标 + 标签。
@@ -84,7 +84,7 @@ export function labeledActionButton(
 ): string {
   const operation = DESIGNER_OPERATION_TEXT[action];
   const shortcut = 'shortcut' in operation ? ` (${operation.shortcut})` : '';
-  return `<button type="button" class="topbar-text-button ${extraClass}" data-action="${action}" title="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}${spinnerGlyph()}</span><span>${operation.label}</span></button>`;
+  return `<button type="button" class="topbar-text-button ${extraClass}" data-action="${action}" data-tip="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}${spinnerGlyph()}</span><span>${operation.label}</span></button>`;
 }
 
 export function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {

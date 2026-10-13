@@ -15,6 +15,14 @@ import type {
   DesignerDescriptorContext,
   DesignerDescriptorDatasetFields,
 } from './designer-descriptor-model.js';
+import { createDesignerStepper } from './designer-descriptor-stepper-dom.js';
+
+export interface DescriptorControlHandle {
+  /** 挂到字段行里的元素（复合控件时是外壳）。 */
+  readonly element: HTMLElement;
+  /** 承载值、派发 change、被设计器路由识别的元素。 */
+  readonly valueTarget: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+}
 
 export function createDescriptorControl(
   ownerDocument: Document,
@@ -22,34 +30,50 @@ export function createDescriptorControl(
   schema: BaseScreenMaterialPropSchema | undefined,
   value: ScreenJsonValue | undefined,
   datasetFields: readonly DesignerDescriptorDatasetFields[],
-): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
+): DescriptorControlHandle {
   const control = field.control;
+  if (control === 'stepper') {
+    const numeric = typeof value === 'number' && Number.isFinite(value) ? value : Number(value);
+    const minimum = field.min ?? (schema?.kind === 'number' ? schema.minimum : undefined) ?? 0;
+    const maximum = field.max ?? (schema?.kind === 'number' ? schema.maximum : undefined) ?? 100;
+    const stepper = createDesignerStepper(ownerDocument, {
+      value: Number.isFinite(numeric) ? numeric : minimum,
+      min: minimum,
+      max: maximum,
+      ...(field.step === undefined ? {} : { step: field.step }),
+      ariaLabel: field.label,
+    });
+    return { element: stepper.element, valueTarget: stepper.input };
+  }
   if (control === 'boolean') {
-    return createDesignerCheckbox(ownerDocument, { checked: value === true });
+    const checkbox = createDesignerCheckbox(ownerDocument, { checked: value === true });
+    return { element: checkbox, valueTarget: checkbox };
   }
   if (control === 'select' && schema?.kind === 'enum') {
-    return createDesignerSelect(ownerDocument, {
+    const select = createDesignerSelect(ownerDocument, {
       options: schema.values.map((optionValue) => ({
         label: String(optionValue),
         selected: value === optionValue,
         value: String(optionValue),
       })),
     });
+    return { element: select, valueTarget: select };
   }
   if (control === 'color') {
-    return createDesignerInput(ownerDocument, {
+    const input = createDesignerInput(ownerDocument, {
       appearance: 'color',
       value: typeof value === 'string' ? value : '',
     });
+    return { element: input, valueTarget: input };
   }
   if (control === 'json') {
     const input = createDesignerTextarea(ownerDocument);
     input.value = JSON.stringify(value);
-    return input;
+    return { element: input, valueTarget: input };
   }
   if (control === 'field-selector') {
     if (datasetFields.length > 0) {
-      return createDesignerSelect(ownerDocument, {
+      const select = createDesignerSelect(ownerDocument, {
         options: [
           {
             label: DESIGNER_UI_TEXT.descriptor.noField,
@@ -63,19 +87,22 @@ export function createDescriptorControl(
           })),
         ],
       });
+      return { element: select, valueTarget: select };
     }
-    return createDesignerInput(ownerDocument, {
+    const input = createDesignerInput(ownerDocument, {
       value: typeof value === 'string' ? value : '',
     });
+    return { element: input, valueTarget: input };
   }
   const numeric = control === 'number' || control === 'unit-number';
-  return createDesignerInput(ownerDocument, {
+  const input = createDesignerInput(ownerDocument, {
     appearance: numeric ? 'number' : 'text',
     ...(numeric && field.max !== undefined ? { max: field.max } : {}),
     ...(numeric && field.min !== undefined ? { min: field.min } : {}),
     ...(numeric && field.step !== undefined ? { step: field.step } : {}),
     value: String(value ?? ''),
   });
+  return { element: input, valueTarget: input };
 }
 
 export function descriptorFieldSchema(

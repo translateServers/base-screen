@@ -1,0 +1,235 @@
+/* 日期字段：输入框 + 锚定触发器 + 自绘日历弹层（设计原型 .datefield / .cal-popover）。
+   输入框保持 .designer-input 的形态与状态语义，触发器压在它的右缘里。 */
+.designer-date-field {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.designer-date-field-anchor {
+  position: relative;
+  display: block;
+}
+
+.designer-date-field-input {
+  padding-right: 32px;
+  font-family: var(--designer-font-family-mono);
+  font-feature-settings: normal;
+  letter-spacing: 0.02em;
+}
+
+.designer-date-field-trigger {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  bottom: 1px;
+  display: grid;
+  width: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 0 var(--designer-radius-2) var(--designer-radius-2) 0;
+  background: transparent;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-date-field-trigger svg {
+  width: 14px;
+  height: 14px;
+}
+
+.designer-date-field-trigger:hover {
+  background-color: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-date-field[data-open="true"] .designer-date-field-trigger {
+  color: var(--designer-accent-text);
+}
+
+.designer-date-field[data-open="true"] .designer-date-field-input {
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
+}
+
+/* 日历弹层：与下拉菜单、调色板同一覆盖层语言。 */
+.designer-calendar-popover {
+  position: absolute;
+  z-index: var(--designer-z-dialog);
+  top: calc(100% + 6px);
+  left: 0;
+  width: 252px;
+  padding: 10px;
+  border-radius: var(--designer-radius-4);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-overlay);
+}
+
+.designer-calendar-popover[data-side="top"] {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+.designer-calendar-popover[hidden] {
+  display: none;
+}
+
+.designer-calendar-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.designer-calendar-nav {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: transparent;
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-calendar-nav:hover {
+  background-color: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-calendar-nav svg {
+  width: 14px;
+  height: 14px;
+}
+
+.designer-calendar-title {
+  flex: 1;
+  color: var(--designer-text-primary);
+  text-align: center;
+  font-size: var(--designer-font-size-base);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.designer-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+}
+
+.designer-calendar-weekdays span {
+  display: grid;
+  height: 24px;
+  place-items: center;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: 10px;
+}
+
+.designer-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.designer-calendar-day {
+  position: relative;
+  display: grid;
+  height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: transparent;
+  color: var(--designer-text-primary);
+  cursor: pointer;
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-base);
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-calendar-day:hover {
+  background-color: var(--designer-surface-control-hover);
+}
+
+.designer-calendar-day:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: -2px;
+}
+
+.designer-calendar-day[data-outside="true"] {
+  color: var(--designer-text-disabled);
+}
+
+.designer-calendar-day[data-today="true"]::after {
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 50%;
+  background: var(--designer-accent);
+  content: "";
+}
+
+.designer-calendar-day[data-selected="true"] {
+  background: var(--designer-accent);
+  color: var(--designer-text-on-accent);
+}
+
+.designer-calendar-day[data-selected="true"]:hover {
+  background: color-mix(in oklab, var(--designer-accent), black 8%);
+}
+
+.designer-calendar-day[data-selected="true"][data-today="true"]::after {
+  background: var(--designer-text-on-accent);
+}
+
+.designer-calendar-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
+.designer-calendar-action {
+  margin-left: -8px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: transparent;
+  color: var(--designer-accent-text);
+  cursor: pointer;
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-calendar-action:hover {
+  background-color: var(--designer-accent-surface);
+}
+
+.designer-calendar-foot-value {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+}

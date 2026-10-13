@@ -132,7 +132,7 @@ function authoringAction(
   if (action === 'copy-data' || action === 'fullscreen-edit') {
     button.classList.add('designer-icon-button', 'designer-dataset-authoring-icon-action');
     button.dataset.variant = 'ghost';
-    button.title = disabled && disabledHint !== undefined ? disabledHint : label;
+    button.setAttribute('data-tip', disabled && disabledHint !== undefined ? disabledHint : label);
     button.setAttribute(
       'aria-label',
       disabled && disabledHint !== undefined ? `${label} · ${disabledHint}` : label,
@@ -148,7 +148,7 @@ function authoringLabel(ownerDocument: Document, titleText: string, hint: string
   const label = ownerDocument.createElement('span');
   label.className = 'designer-dataset-authoring-label designer-field-label';
   label.textContent = titleText;
-  label.title = hint;
+  label.setAttribute('data-tip', hint);
   return label;
 }
 

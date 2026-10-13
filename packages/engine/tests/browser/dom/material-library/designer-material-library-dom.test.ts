@@ -161,7 +161,7 @@ describe('material library card cover rendering', () => {
     const card = grid.children[0]!.children[0]!;
     const meta = card.children[1]!;
     expect(meta.children[0]!.attributes.title).toBeUndefined();
-    expect(meta.children[1]!.attributes.title).toBe('base.very-long-material-type');
+    expect(meta.children[1]!.attributes['data-tip']).toBe('base.very-long-material-type');
   });
 
   it('renders multiple palette items that share one canonical material type', () => {

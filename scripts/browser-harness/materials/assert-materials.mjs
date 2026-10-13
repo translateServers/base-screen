@@ -123,7 +123,7 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
           glyphWidth: button.querySelector('.material-group-glyph svg').getBoundingClientRect()
             .width,
           height: button.getBoundingClientRect().height,
-          title: button.title,
+          title: button.getAttribute('data-tip'),
           description: button.getAttribute('aria-description'),
           countWidth: button
             .getRootNode()
@@ -253,7 +253,7 @@ function measure(designer) {
       navigation: box('[data-material-groups]'),
       overlayHidden: node('[data-material-group-overlay]').hidden,
       triggerFocused: root.activeElement === trigger,
-      path: trigger.title,
+      path: trigger.getAttribute('data-tip'),
       triggerLabel: node('[data-material-group-toggle-label]').textContent,
       visible: [...root.querySelectorAll('[data-material-card]:not([hidden])')].map(
         (card) => card.dataset.materialCard,
@@ -299,7 +299,7 @@ export async function assertMaterialGroupUpdates(page, designer) {
     await designer.locator(`[data-material-group="level${depth}"]`).click();
   const deep = await designer.locator('[data-material-group="level8"]').evaluate((button) => ({
     label: button.querySelector('.material-group-label').textContent,
-    title: button.title,
+    title: button.getAttribute('data-tip'),
     selected: button.ariaPressed,
     count: button.querySelector('.material-group-count').textContent,
   }));
@@ -523,7 +523,7 @@ export async function assertMaterialGroupUsability(page, designer) {
     backBounds === null ||
     backBounds.height !== 28 ||
     backBounds.width < secondaryBounds.width - 1 ||
-    !(await back.getAttribute('title')).includes('数据可视化')
+    !(await back.getAttribute('data-tip')).includes('数据可视化')
   ) {
     throw new Error('MATERIAL_GROUP_BACK_TARGET_FAILED');
   }
@@ -656,7 +656,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
           rootHeight: group?.getBoundingClientRect().height,
           rootGlyphWidth: glyph?.getBoundingClientRect().width,
           rootLabelDisplay: getComputedStyle(group.querySelector('.material-group-label')).display,
-          rootTitle: group?.title,
+          rootTitle: group?.getAttribute('data-tip'),
           childrenHeight: children?.getBoundingClientRect().height,
           countWidth: count?.getBoundingClientRect().width,
           groupDisplay:
@@ -678,8 +678,8 @@ async function assertMaterialLibraryGrouping(page, designer) {
           gridOverflowY:
             grid === null || grid === undefined ? '' : getComputedStyle(grid).overflowY,
           metaDisplay: meta === null || meta === undefined ? '' : getComputedStyle(meta).display,
-          nameTitle: name?.getAttribute('title'),
-          typeTitle: type?.getAttribute('title'),
+          nameTip: name?.getAttribute('data-tip'),
+          typeTip: type?.getAttribute('data-tip'),
           favoriteWidth:
             favorite === null || favorite === undefined
               ? 0
@@ -739,14 +739,15 @@ async function assertMaterialLibraryGrouping(page, designer) {
     rootState.visual.groupDisplay !== 'flex' ||
     rootState.visual.countDisplay !== (compact ? 'grid' : 'none') ||
     rootState.visual.selectedFilterShadow === 'none' ||
-    rootState.visual.cardMinHeight !== '32px' ||
+    // 卡片继承 .designer-button 的控件高度下限（控件基座 30px）。
+    rootState.visual.cardMinHeight !== '30px' ||
     rootState.visual.thumbAspectRatio !== '16 / 10' ||
     !rootState.visual.thumbBackgroundImage.includes('radial-gradient') ||
     rootState.visual.toolbarDisplay !== 'block' ||
     rootState.visual.gridOverflowY !== 'auto' ||
     rootState.visual.metaDisplay !== 'grid' ||
-    rootState.visual.nameTitle !== null ||
-    rootState.visual.typeTitle !== 'base.text' ||
+    rootState.visual.nameTip !== null ||
+    rootState.visual.typeTip !== 'base.text' ||
     rootState.visual.favoriteWidth !== 28 ||
     // 200–480px 面板中卡片根据分类分栏或浮层模式自适应列数。
     ![1, 2, 3].includes(rootState.visual.firstRowCardCount) ||

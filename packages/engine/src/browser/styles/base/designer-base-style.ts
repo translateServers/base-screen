@@ -3,9 +3,11 @@ import libraryCss from './designer-base-library.css?inline';
 import materialGroupsCss from './designer-base-material-groups.css?inline';
 import menusCss from './designer-base-menus.css?inline';
 import shellCss from './designer-base-shell.css?inline';
+import tooltipCss from './designer-base-tooltip.css?inline';
 
 export const DESIGNER_BASE_CSS = [
   menusCss,
+  tooltipCss,
   libraryCss,
   materialGroupsCss,
   shellCss,

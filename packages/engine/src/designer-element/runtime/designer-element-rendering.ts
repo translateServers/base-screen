@@ -62,6 +62,10 @@ export function initialize(element: DesignerElementHost): void {
   elementState.notificationController.connect(
     shadow.querySelector<HTMLElement>('[data-notifications]')!,
   );
+  elementState.tooltipController.connect(
+    shadow,
+    shadow.querySelector<HTMLElement>('[data-tooltip]')!,
+  );
   elementState.errorConsoleController.connect(
     shadow.querySelector<HTMLElement>('[data-error-console]')!,
     shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]')!,

@@ -63,30 +63,6 @@
   text-transform: uppercase;
 }
 
-.designer-data-source-segmented {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  padding: 2px;
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-control);
-}
-
-.designer-data-source-segmented .designer-button {
-  min-width: 0;
-  padding-inline: var(--designer-space-2);
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-}
-
-.designer-data-source-segmented .designer-button[aria-pressed="true"] {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-raised);
-  color: var(--designer-accent);
-}
-
 .designer-data-source-editor,
 .designer-data-source-empty,
 .designer-host-connection,

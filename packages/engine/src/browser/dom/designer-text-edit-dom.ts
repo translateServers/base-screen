@@ -38,7 +38,7 @@ export function createTextEditOverlay(
   overlay.setAttribute('contenteditable', 'true');
   overlay.setAttribute('role', 'textbox');
   overlay.setAttribute('aria-label', DESIGNER_UI_TEXT.textEditing.hint);
-  overlay.title = DESIGNER_UI_TEXT.textEditing.hint;
+  overlay.setAttribute('data-tip', DESIGNER_UI_TEXT.textEditing.hint);
   overlay.dataset.textEditOverlay = 'true';
   overlay.textContent = initialText;
 

@@ -755,6 +755,12 @@ export const DESIGNER_UI_TEXT = {
     tabularShape: '对象数组',
     bindingSummaryTitle: '绑定摘要',
     bindingNone: '未绑定',
+    bindingPlaceholder: '选择要绑定的字段',
+    bindingAtLimit: '已达绑定上限，取消一个后可继续选择',
+    bindingLimitHint: (max: number) => `最多可绑定 ${max} 项`,
+    bindingCount: (selected: number, max: number) => `${selected} / ${max}`,
+    bindingToggle: (role: string) => `展开${role}字段选择`,
+    bindingRemove: (label: string) => `移除${label}`,
     selected: (name: string) => `已选择：${name}`,
   },
   projectWorkspace: {
@@ -798,6 +804,19 @@ export const DESIGNER_UI_TEXT = {
     addItem: '添加',
     item: (index: number) => `第 ${index} 项`,
     unsupportedControl: (tagName: string) => `控件 ${tagName} 未由宿主注册，无法编辑此字段。`,
+  },
+  stepper: {
+    decrement: (label: string) => `减小${label}`,
+    increment: (label: string) => `增大${label}`,
+  },
+  calendar: {
+    open: (label: string) => `打开${label}日历`,
+    previousMonth: '上个月',
+    nextMonth: '下个月',
+    today: '今天',
+    unset: '未设置',
+    monthTitle: (year: number, month: number) => `${year} 年 ${month} 月`,
+    weekdays: ['一', '二', '三', '四', '五', '六', '日'] as const,
   },
   textEditing: {
     hint: 'Enter 提交，Shift+Enter 换行，Esc 取消',

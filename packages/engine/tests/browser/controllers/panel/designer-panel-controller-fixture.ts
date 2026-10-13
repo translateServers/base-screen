@@ -7,6 +7,7 @@ import type {
 export class FakeElement {
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
+  readonly attributes: Record<string, string> = {};
   checked = false;
   disabled = false;
   focus: unknown = undefined;
@@ -70,7 +71,17 @@ export class FakeElement {
     ) as unknown as T[];
   }
 
-  setAttribute(): void {}
+  setAttribute(name: string, value: string): void {
+    this.attributes[name] = value;
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes[name] ?? null;
+  }
+
+  hasAttribute(name: string): boolean {
+    return this.attributes[name] !== undefined;
+  }
 
   replaceChildren(...children: FakeElement[]): void {
     this.children.splice(0, this.children.length, ...children);

@@ -1,0 +1,66 @@
+/* 单例提示气泡：由 DesignerTooltipController 驱动，替代原生 title。
+   反转色（--designer-text-primary 作底、--designer-surface-raised 作字）在两套主题下自动镜像：
+   白天深泡白字，黑夜浅泡深字，无需第二套样式。 */
+.designer-tooltip {
+  position: fixed;
+  z-index: var(--designer-z-tooltip);
+  left: 0;
+  top: 0;
+  max-width: min(240px, calc(100vw - 20px));
+  padding: 5px 9px;
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-text-primary);
+  color: var(--designer-surface-raised);
+  font: 500 var(--designer-font-size-sm) / 1.45 var(--designer-font-family);
+  text-wrap: pretty;
+  box-shadow: var(--designer-shadow-float);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  translate: 0 3px;
+  transition:
+    opacity var(--designer-motion),
+    translate var(--designer-motion),
+    visibility 0s linear 150ms;
+}
+
+.designer-tooltip[data-side="bottom"] {
+  translate: 0 -3px;
+}
+
+.designer-tooltip.is-open {
+  opacity: 1;
+  visibility: visible;
+  translate: 0 0;
+  transition:
+    opacity var(--designer-motion),
+    translate var(--designer-motion);
+}
+
+/* 箭头：继承泡底色的 45° 方块，位置由控制器的 --designer-tooltip-caret 决定。 */
+.designer-tooltip::before {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.designer-tooltip[data-side="top"]::before {
+  bottom: -4px;
+  left: calc(var(--designer-tooltip-caret, 50%) - 4px);
+}
+
+.designer-tooltip[data-side="bottom"]::before {
+  top: -4px;
+  left: calc(var(--designer-tooltip-caret, 50%) - 4px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .designer-tooltip,
+  .designer-tooltip.is-open {
+    transition: none;
+  }
+}

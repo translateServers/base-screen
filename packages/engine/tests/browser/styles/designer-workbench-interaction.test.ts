@@ -111,7 +111,16 @@ describe('designer workbench interaction and accessibility', () => {
     expect(tokensCss).toContain('--designer-button-primary-hover: color-mix(');
     expect(tokensCss).toContain('--designer-button-primary-active: color-mix(');
     expect(controlsCss).toMatch(/\.designer-button\s*\{[^}]*touch-action: manipulation;/s);
-    expect(controlsCss).toMatch(/\.designer-button\s*\{[^}]*transition: transform/s);
+    // 原型 .btn 契约：描边由 elev-ring 阴影承担、悬停只换底色、按压不缩放。
+    expect(controlsCss).toMatch(
+      /\.designer-button\s*\{[^}]*box-shadow: var\(--designer-elev-ring\);/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-button\s*\{[^}]*background-color var\(--designer-motion\)/s,
+    );
+    expect(controlsCss).toMatch(
+      /\.designer-button\[data-variant="primary"\]\s*\{[^}]*background: var\(--designer-text-primary\);/s,
+    );
     expect(controlsCss).toContain('.designer-button:hover:not(:disabled) {');
     expect(controlsCss).toContain(
       '.designer-button[data-variant="primary"]:hover:not(:disabled) {',
@@ -120,8 +129,11 @@ describe('designer workbench interaction and accessibility', () => {
     expect(controlsCss).toContain('.designer-button[data-variant="ghost"]:hover:not(:disabled) {');
     expect(controlsCss).toContain('.designer-button[aria-pressed="true"]:hover:not(:disabled) {');
     expect(controlsCss).toContain('.designer-button:disabled {');
-    expect(controlsCss).toContain('color: var(--designer-text-on-accent);');
+    expect(controlsCss).toMatch(
+      /\.designer-button:disabled\s*\{[^}]*color: var\(--designer-text-disabled\);/s,
+    );
     expect(controlsCss).not.toContain('transform: scale(0.96);');
+    expect(controlsCss).not.toContain('transform: scale(0.985);');
   });
 
   it('R2 centers the selection outline on the component bounds so snap guides align with it', () => {

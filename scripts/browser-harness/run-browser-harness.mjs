@@ -5,6 +5,7 @@ import {
   assertAuthoringPaletteInteractions,
   assertAuthoringPaletteLayout,
   assertCoordinateEntry,
+  assertDescriptorStepper,
   assertInspectorFormScrollContinuity,
   assertSizeEntry,
 } from './authoring/assert-inspector.mjs';
@@ -14,6 +15,7 @@ import {
   assertAuthoringSelection,
   assertDesignerControlStyles,
   assertDesignerThemeIsolation,
+  assertDesignerTooltip,
   assertEventSystemGuards,
   assertLayersAuthoring,
   assertSnapWorkflow,
@@ -124,6 +126,7 @@ export async function runBrowserHarness(serverPort) {
         await assertMaterialLibraryGrouping(page, designer);
         await assertMaterialLibraryHostState(page, designer, viewport);
         await assertDesignerControlStyles(designer);
+        await assertDesignerTooltip(designer, page);
         await assertLeftPanelMaterials(designer, page);
         await assertLeftPanelLayers(page, viewport);
         await assertHostLeftPanelGroups(designer);
@@ -146,6 +149,7 @@ export async function runBrowserHarness(serverPort) {
         await assertAuthoringMaterials(authoringDesigner, page);
         await assertAuthoringImportAndInspector(authoringDesigner, page);
         await assertInspectorFormScrollContinuity(page, authoringDesigner);
+        await assertDescriptorStepper(page, authoringDesigner);
         await assertCoordinateEntry(page, authoringDesigner);
         await assertSizeEntry(page, authoringDesigner);
         await assertAuthoringSelection(page, authoringDesigner);

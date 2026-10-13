@@ -179,7 +179,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
   if (!(await authoringDesigner.locator('[data-action="project-publish"]').isHidden())) {
     throw new Error('BROWSER_HARNESS_PUBLISH_CAPABILITY_FAILED');
   }
-  await authoringDesigner.getByTitle('\u4fdd\u5b58\u9879\u76ee').click();
+  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
   await page.waitForFunction(() => window.baseScreenHarness.getEnvelope().revision === '2');
   const saved = await page.evaluate(() => ({
     revision: window.baseScreenHarness.getEnvelope().revision,
@@ -207,7 +207,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
     if (!result.ok) throw new Error('BROWSER_HARNESS_LOCAL_EDIT_FAILED');
     failNextSave('PROJECT_CONFLICT');
   });
-  await authoringDesigner.getByTitle('\u4fdd\u5b58\u9879\u76ee').click();
+  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
@@ -233,7 +233,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
     throw new Error('BROWSER_HARNESS_CONFLICT_CONTINUE_FAILED');
   }
   await page.evaluate(() => window.baseScreenHarness.failNextSave('PROJECT_CONFLICT'));
-  await authoringDesigner.getByTitle('\u4fdd\u5b58\u9879\u76ee').click();
+  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
@@ -269,7 +269,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
     if (!result.ok) throw new Error('BROWSER_HARNESS_RETRY_EDIT_FAILED');
     failNextSave('PROJECT_UNAVAILABLE');
   });
-  await authoringDesigner.getByTitle('\u4fdd\u5b58\u9879\u76ee').click();
+  await authoringDesigner.locator('[data-tip^="\u4fdd\u5b58\u9879\u76ee"]').click();
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
@@ -292,7 +292,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
 
 // ---- 源模块：assert-authoring-materials.mjs ----
 export async function assertAuthoringMaterials(authoringDesigner, page) {
-  await authoringDesigner.getByTitle('\u6587\u672c').click();
+  await authoringDesigner.locator('[data-tip^="\u6587\u672c"]').click();
   const canvas = authoringDesigner.locator('[data-canvas]');
   const canvasBox = await canvas.boundingBox();
   if (canvasBox === null) throw new Error('BROWSER_HARNESS_CANVAS_MISSING');
@@ -300,7 +300,7 @@ export async function assertAuthoringMaterials(authoringDesigner, page) {
   await page.waitForFunction(
     () => window.baseScreenHarness.designer.document.components.length === 10,
   );
-  await authoringDesigner.getByTitle('\u77e9\u5f62').click();
+  await authoringDesigner.locator('[data-tip^="\u77e9\u5f62"]').click();
   const activeTool = await authoringDesigner.locator('[data-status-tool]').textContent();
   const rectanglePressed = await authoringDesigner
     .locator('button[data-tool="rectangle"]')
@@ -320,7 +320,7 @@ export async function assertAuthoringMaterials(authoringDesigner, page) {
   ) {
     throw new Error('BROWSER_HARNESS_RECTANGLE_MATERIAL_FAILED');
   }
-  await authoringDesigner.getByTitle('\u692d\u5706').click();
+  await authoringDesigner.locator('[data-tip^="\u692d\u5706"]').click();
   await authoringDesigner.locator('[data-material-type="base.ellipse"] .material-name').click();
   await page.waitForFunction(
     () => window.baseScreenHarness.designer.document.components.at(-1)?.type === 'base.ellipse',
@@ -332,7 +332,7 @@ export async function assertAuthoringMaterials(authoringDesigner, page) {
   ) {
     throw new Error('BROWSER_HARNESS_ELLIPSE_MATERIAL_FAILED');
   }
-  await authoringDesigner.getByTitle('\u56fe\u7247').click();
+  await authoringDesigner.locator('[data-tip^="\u56fe\u7247"]').click();
   await authoringDesigner.locator('[data-material-type="base.image"] .material-name').click();
   const imageType = await page.evaluate(
     () => window.baseScreenHarness.designer.document.components.at(-1)?.type,

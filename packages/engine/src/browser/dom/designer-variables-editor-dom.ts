@@ -256,7 +256,7 @@ function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDra
     const button = createDesignerButton(editor.ownerDocument, {
       className: 'variable-host-catalog-item',
       pressed: item.sourceId === draft.sourceId,
-      title: DESIGNER_UI_TEXT.variables.selectHost(item.name),
+      tip: DESIGNER_UI_TEXT.variables.selectHost(item.name),
       variant: item.sourceId === draft.sourceId ? 'primary' : 'ghost',
     });
     button.dataset.variableAction = 'select-host';
@@ -423,7 +423,7 @@ function appendEditorHeading(
   if (context !== undefined) {
     const code = editor.ownerDocument.createElement('code');
     code.textContent = context;
-    code.title = context;
+    code.setAttribute('data-tip', context);
     copy.appendChild(code);
   }
   heading.appendChild(copy);
@@ -465,7 +465,7 @@ function appendEditorActions(
   actions.appendChild(cancel);
   const confirm = createDesignerButton(editor.ownerDocument, {
     ariaLabel: danger ? DESIGNER_UI_TEXT.variables.delete : DESIGNER_UI_TEXT.variables.confirm,
-    title: DESIGNER_UI_TEXT.variables.editHint,
+    tip: DESIGNER_UI_TEXT.variables.editHint,
     variant: danger ? 'danger' : 'primary',
   });
   confirm.dataset.variableAction = action;

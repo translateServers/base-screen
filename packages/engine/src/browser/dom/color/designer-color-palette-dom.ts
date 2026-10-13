@@ -157,7 +157,7 @@ export function createDesignerColorPalette(
     ] as const) {
       const modeLabel = ownerDocument.createElement('label');
       modeLabel.className = 'designer-color-palette-mode';
-      modeLabel.title = label;
+      modeLabel.setAttribute('data-tip', label);
       const input = ownerDocument.createElement('input');
       input.type = 'radio';
       input.name = groupName;

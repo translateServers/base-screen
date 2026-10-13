@@ -279,23 +279,33 @@ describe('DesignerWorkbenchController instance state', () => {
     const workbench = createWorkbench();
     const { controller } = workbench;
     controller.initialize();
-    expect(workbench.leftCollapseControl.title).toBe(DESIGNER_UI_TEXT.collapseMaterials);
-    expect(workbench.rightCollapseControl.title).toBe(DESIGNER_UI_TEXT.collapseInspector);
+    expect(workbench.leftCollapseControl.attributes['data-tip']).toBe(
+      DESIGNER_UI_TEXT.collapseMaterials,
+    );
+    expect(workbench.rightCollapseControl.attributes['data-tip']).toBe(
+      DESIGNER_UI_TEXT.collapseInspector,
+    );
     expect(workbench.leftCollapseControl.attributes['aria-expanded']).toBe('true');
     expect(workbench.rightCollapseControl.attributes['aria-expanded']).toBe('true');
 
     controller.onClick(clickTarget({ panelCollapse: 'left' }));
-    expect(workbench.leftCollapseControl.title).toBe(DESIGNER_UI_TEXT.expandMaterials);
+    expect(workbench.leftCollapseControl.attributes['data-tip']).toBe(
+      DESIGNER_UI_TEXT.expandMaterials,
+    );
     expect(workbench.leftCollapseControl.attributes['aria-label']).toBe(
       DESIGNER_UI_TEXT.expandMaterials,
     );
     expect(workbench.leftCollapseControl.attributes['aria-expanded']).toBe('false');
     controller.onClick(clickTarget({ panelCollapse: 'left' }));
-    expect(workbench.leftCollapseControl.title).toBe(DESIGNER_UI_TEXT.collapseMaterials);
+    expect(workbench.leftCollapseControl.attributes['data-tip']).toBe(
+      DESIGNER_UI_TEXT.collapseMaterials,
+    );
     expect(workbench.leftCollapseControl.attributes['aria-expanded']).toBe('true');
 
     controller.onClick(clickTarget({ panelCollapse: 'right' }));
-    expect(workbench.rightCollapseControl.title).toBe(DESIGNER_UI_TEXT.expandInspector);
+    expect(workbench.rightCollapseControl.attributes['data-tip']).toBe(
+      DESIGNER_UI_TEXT.expandInspector,
+    );
     expect(workbench.rightCollapseControl.attributes['aria-label']).toBe(
       DESIGNER_UI_TEXT.expandInspector,
     );

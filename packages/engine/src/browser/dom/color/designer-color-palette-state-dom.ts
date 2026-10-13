@@ -55,7 +55,7 @@ export function updateDesignerColorPaletteChrome(palette: HTMLElement, updatePic
       'aria-label',
       DESIGNER_UI_TEXT.propertiesPanel.colorPickerTrigger(serialized),
     );
-    trigger.title = serialized;
+    trigger.setAttribute('data-tip', serialized);
   }
   if (swatch !== null) {
     swatch.setAttribute('style', `--designer-color-palette-value:${serialized}`);

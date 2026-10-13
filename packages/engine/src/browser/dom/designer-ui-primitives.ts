@@ -10,7 +10,8 @@ export interface CreateDesignerButtonOptions {
   readonly disabled?: boolean;
   readonly pressed?: boolean;
   readonly text?: string;
-  readonly title?: string;
+  /** 悬浮提示文案（data-tip）：由 DesignerTooltipController 统一渲染，不再使用原生 title。 */
+  readonly tip?: string;
   readonly variant?: DesignerButtonVariant;
 }
 
@@ -75,7 +76,7 @@ export function createDesignerButton(
   button.type = 'button';
   button.className = designerClassNames('designer-control designer-button', options.className);
   if (options.text !== undefined) button.textContent = options.text;
-  if (options.title !== undefined) button.title = options.title;
+  if (options.tip !== undefined) button.setAttribute('data-tip', options.tip);
   if (options.ariaLabel !== undefined) button.ariaLabel = options.ariaLabel;
   if (options.variant !== undefined) button.dataset.variant = options.variant;
   if (options.disabled !== undefined) button.disabled = options.disabled;
@@ -93,7 +94,7 @@ export function createDesignerIconButton(
     ...buttonOptions,
     ariaLabel: buttonOptions.ariaLabel ?? label,
     className: designerClassNames('designer-icon-button', buttonOptions.className),
-    title: buttonOptions.title ?? label,
+    tip: buttonOptions.tip ?? label,
   });
   button.innerHTML = designerIcon(icon);
   return button;

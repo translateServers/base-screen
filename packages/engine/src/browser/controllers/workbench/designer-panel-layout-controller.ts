@@ -218,7 +218,7 @@ export class DesignerPanelLayoutController {
     const setControl = (side: DesignerPanelSide, label: string, expanded: boolean) => {
       const control = root.querySelector<HTMLElement>(`[data-panel-collapse="${side}"]`);
       if (control === null || control === undefined) return;
-      control.title = label;
+      control.setAttribute('data-tip', label);
       control.setAttribute('aria-label', label);
       control.setAttribute('aria-expanded', String(expanded));
     };
@@ -251,7 +251,7 @@ export class DesignerPanelLayoutController {
         side === 'left'
           ? DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.leftPanel)
           : DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.inspector);
-      handle.title = label;
+      handle.setAttribute('data-tip', label);
       handle.setAttribute('aria-label', label);
       handle.setAttribute('aria-valuemin', String(minimum));
       handle.setAttribute('aria-valuemax', String(maximum));

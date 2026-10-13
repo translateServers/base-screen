@@ -178,27 +178,6 @@
   color: var(--designer-text-secondary);
 }
 
-.properties .inspector-density {
-  height: 28px;
-  padding: 1px;
-  border-color: var(--designer-border-default);
-  border-radius: var(--designer-radius-1);
-  background: var(--designer-inspector-control-surface);
-}
-
-.properties .inspector-density .designer-tab {
-  min-height: 24px;
-  padding: 0 7px;
-  font-size: var(--designer-font-size-sm);
-}
-
-.properties .inspector-density .designer-tab[aria-pressed="true"] {
-  border-color: transparent;
-  border-radius: 1px;
-  background: var(--designer-border-strong);
-  color: var(--designer-text-primary);
-}
-
 .properties[data-inspector-search-open] {
   grid-template-rows: 38px minmax(0, 1fr) !important;
 }
@@ -519,12 +498,6 @@
   content: "";
 }
 
-.properties .designer-control:not(.panel-collapse) {
-  border-color: var(--designer-border-default);
-  border-radius: var(--designer-radius-1);
-  background-color: var(--designer-inspector-control-surface);
-}
-
 .properties .quick-config-colors .designer-quick-config-button {
   border-color: color-mix(in srgb, var(--quick-color) 60%, var(--designer-border-default));
   background-color: var(--quick-color);
@@ -555,7 +528,7 @@
 
 .properties .designer-input,
 .properties .designer-select {
-  height: 32px;
+  height: var(--designer-control-height);
   font-size: var(--designer-font-size-base);
 }
 

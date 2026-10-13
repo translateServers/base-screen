@@ -221,7 +221,7 @@ function createMaterialCard(
   if (cover !== undefined) {
     thumb.appendChild(createMaterialCoverImage(thumb.ownerDocument, cover, thumb));
   }
-  // 名称与类型分层呈现；类型的 title 为窄面板中的完整标识入口，名称沿用卡片可访问名称。
+  // 名称与类型分层呈现；类型的 data-tip 为窄面板中的完整标识入口，名称沿用卡片可访问名称。
   const meta = ownerDocument.createElement('span');
   meta.className = 'material-card-meta';
   const name = ownerDocument.createElement('span');
@@ -230,7 +230,7 @@ function createMaterialCard(
   const type = ownerDocument.createElement('span');
   type.className = 'material-type';
   type.textContent = entry.materialType;
-  type.setAttribute('title', entry.materialType);
+  type.setAttribute('data-tip', entry.materialType);
   meta.append(name, type);
   card.append(thumb, meta);
   const favorite = ownerDocument.createElement('button');

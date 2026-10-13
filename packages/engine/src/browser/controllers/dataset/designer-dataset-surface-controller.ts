@@ -110,6 +110,7 @@ function createDatasetPanelOptions(
     })),
     catalogAvailable: context.callbacks.getCatalogPort() !== undefined,
     resourceAvailable: context.callbacks.getCatalogPort() !== undefined,
+    bindingOpenRoleId: context.state.bindingOpenRoleId,
     feedback: context.state.feedbackText,
     dirty: context.state.draftDirty,
     confirmClose: context.state.confirmClose,

@@ -248,7 +248,7 @@ export const hostedDatasetRankingManifest = {
         maxFields: 1,
         valueTypes: ['string' as const, 'date' as const],
       },
-      { id: 'measures', minFields: 1, maxFields: 1, valueTypes: ['number' as const] },
+      { id: 'measures', minFields: 1, maxFields: 2, valueTypes: ['number' as const] },
     ],
   },
   designCapabilities: { resize: true, rotate: false, children: false },

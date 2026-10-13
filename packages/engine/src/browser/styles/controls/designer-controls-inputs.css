@@ -51,19 +51,22 @@
   display: none;
 }
 
+/* 控件基座：描边即阴影（elev-ring），没有真实 border——与设计原型的 .input/.select-trigger
+   同一形态：悬停加深描边环、聚焦换 2px 强调环、错误/成功换语义色环，几何零位移。
+   禁用走工作区底色 + 弱文本（不用整体透明度），只读走透明底 + 弱描边。 */
 .designer-control {
   box-sizing: border-box;
   min-width: 0;
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
+  border: 0;
+  border-radius: var(--designer-radius-2);
   background-color: var(--designer-surface-control);
   color: var(--designer-text-primary);
   font: inherit;
   caret-color: var(--designer-accent);
+  box-shadow: var(--designer-elev-ring);
   transition:
-    border-color var(--designer-motion),
-    background-color var(--designer-motion),
     box-shadow var(--designer-motion),
+    background-color var(--designer-motion),
     color var(--designer-motion);
 }
 
@@ -71,13 +74,14 @@
 .designer-select {
   width: 100%;
   height: var(--designer-control-height);
-  padding: 0 var(--designer-space-3);
+  padding: 0 var(--designer-control-padding-inline);
 }
 
 .designer-select {
-  padding-right: calc(var(--designer-space-3) + 16px);
+  padding-right: calc(var(--designer-control-padding-inline) + 16px);
   appearance: none;
   cursor: pointer;
+  background-color: var(--designer-surface-control);
   background-image:
     linear-gradient(45deg, transparent 50%, var(--designer-text-muted) 50%),
     linear-gradient(135deg, var(--designer-text-muted) 50%, transparent 50%);
@@ -119,30 +123,19 @@
 }
 
 .designer-control::placeholder {
-  color: var(--designer-text-muted);
+  color: var(--designer-text-disabled);
 }
 
-.designer-control:hover:not(:disabled) {
-  border-color: var(--designer-border-strong);
-  background-color: var(--designer-surface-control-hover);
+.designer-control:hover:not(:disabled):not(:focus) {
+  box-shadow: 0 0 0 1px var(--designer-border-strong);
 }
 
 .designer-input:focus,
 .designer-select:focus,
 .designer-textarea:focus,
 .designer-color:focus {
-  border-color: var(--designer-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--designer-accent) 35%, transparent);
   outline: none;
-  background-color: var(--designer-surface-control);
-}
-
-.designer-input:focus:hover,
-.designer-select:focus:hover,
-.designer-textarea:focus:hover,
-.designer-color:focus:hover {
-  border-color: var(--designer-accent);
-  background-color: var(--designer-surface-control);
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }
 
 .designer-control:focus-visible,
@@ -162,50 +155,37 @@
 .designer-control:disabled {
   cursor: not-allowed;
   color: var(--designer-text-disabled);
-  opacity: 0.65;
+  background-color: var(--designer-surface-workspace);
+  box-shadow: none;
 }
 
 .designer-control[readonly] {
-  background: var(--designer-surface-raised);
+  background-color: transparent;
   color: var(--designer-text-secondary);
+  box-shadow: 0 0 0 1px var(--designer-border-subtle);
 }
 
+/* 混合值：虚线段就地表达「多值」，不改变几何。 */
 .designer-control[data-mixed="true"] {
-  border-style: dashed;
+  outline: 1px dashed var(--designer-border-active);
+  outline-offset: -1px;
   color: var(--designer-text-secondary);
 }
 
 .designer-control[aria-invalid="true"] {
-  border-color: var(--designer-danger);
-  background-color: color-mix(
-    in srgb,
-    var(--designer-danger-surface) 35%,
-    var(--designer-surface-control)
-  );
-}
-
-.designer-control[aria-invalid="true"]:hover:not(:disabled) {
-  border-color: var(--designer-danger);
+  box-shadow: 0 0 0 1px var(--designer-danger);
 }
 
 .designer-control[aria-invalid="true"]:focus {
-  border-color: var(--designer-danger);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--designer-danger) 35%, transparent);
-  outline: none;
-  background-color: color-mix(
-    in srgb,
-    var(--designer-danger-surface) 35%,
-    var(--designer-surface-control)
-  );
+  box-shadow: 0 0 0 2px var(--designer-danger);
 }
 
-.designer-control[aria-invalid="true"]:focus:hover {
-  border-color: var(--designer-danger);
-  background-color: color-mix(
-    in srgb,
-    var(--designer-danger-surface) 35%,
-    var(--designer-surface-control)
-  );
+.designer-control[data-state="success"] {
+  box-shadow: 0 0 0 1px var(--designer-success);
+}
+
+.designer-control[data-state="success"]:focus {
+  box-shadow: 0 0 0 2px var(--designer-success);
 }
 
 .designer-checkbox {
@@ -251,9 +231,113 @@
     center / 11px no-repeat;
 }
 
+.designer-checkbox:indeterminate {
+  border-color: var(--designer-accent);
+  background-color: var(--designer-surface-control);
+}
+
+.designer-checkbox:indeterminate::before {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background-color: var(--designer-accent);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8h7' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 11px no-repeat;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8h7' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 11px no-repeat;
+}
+
+.designer-checkbox[data-mixed="true"] {
+  border-style: dashed;
+  border-color: var(--designer-border-active);
+}
+
 .designer-checkbox:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+
+/* 步进器：− / 值 / + 三段一体（设计原型 .stepper）。值位是可键入的数字输入，
+   控件级描边环挂在整体外壳上，内部各段无边框。 */
+.designer-stepper {
+  display: flex;
+  align-items: stretch;
+  height: var(--designer-control-height);
+  border-radius: var(--designer-radius-2);
+  background-color: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
+  transition: box-shadow var(--designer-motion);
+}
+
+.designer-stepper:hover:not(:focus-within) {
+  box-shadow: 0 0 0 1px var(--designer-border-strong);
+}
+
+.designer-stepper:focus-within {
+  box-shadow: 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-stepper-button {
+  display: grid;
+  width: 34px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--designer-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.designer-stepper-button[data-step="-1"] {
+  border-right: 1px solid var(--designer-border-subtle);
+}
+
+.designer-stepper-button[data-step="1"] {
+  border-left: 1px solid var(--designer-border-subtle);
+}
+
+.designer-stepper-button:hover:not(:disabled) {
+  background-color: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-stepper-button:disabled {
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
+}
+
+.designer-stepper-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.designer-stepper-value {
+  min-width: 0;
+  flex: 1;
+  padding: 0 var(--designer-space-2);
+  border: 0;
+  background: transparent;
+  color: var(--designer-text-primary);
+  font: 500 var(--designer-font-size-base) / 1 var(--designer-font-family-mono);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.designer-stepper-value:focus {
+  outline: none;
+}
+
+.designer-stepper-value::-webkit-outer-spin-button,
+.designer-stepper-value::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
 }
 
 @media (forced-colors: active) {

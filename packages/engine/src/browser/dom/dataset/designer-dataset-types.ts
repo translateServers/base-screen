@@ -82,6 +82,7 @@ export interface DesignerDataSourcePanelOptions {
   readonly variables: readonly Pick<ScreenVariable, 'id' | 'name'>[];
   readonly catalogAvailable: boolean;
   readonly resourceAvailable: boolean;
+  readonly bindingOpenRoleId?: string | null;
   readonly feedback: string;
   readonly dirty: boolean;
   readonly confirmClose: boolean;
@@ -97,4 +98,6 @@ export interface DesignerDatasetConfigurationOptions {
   readonly roles: readonly ScreenDataBindingRole[];
   readonly variables: readonly Pick<ScreenVariable, 'id' | 'name'>[];
   readonly resourceAvailable: boolean;
+  /** 展开字段选择弹层的角色（面板重渲染后据此恢复开合态）。 */
+  readonly bindingOpenRoleId?: string | null;
 }

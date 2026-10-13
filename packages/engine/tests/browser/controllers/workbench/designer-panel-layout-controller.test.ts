@@ -30,6 +30,10 @@ class PanelElement {
     this.attributes[name] = value;
   }
 
+  getAttribute(name: string): string | null {
+    return this.attributes[name] ?? null;
+  }
+
   setPointerCapture(pointerId: number): void {
     this.captures.add(pointerId);
   }
@@ -120,7 +124,7 @@ describe('DesignerPanelLayoutController', () => {
 
     const leftLabel = DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.leftPanel);
     const rightLabel = DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.inspector);
-    expect(panel.leftHandle.title).toBe(leftLabel);
+    expect(panel.leftHandle.getAttribute('data-tip')).toBe(leftLabel);
     expect(panel.leftHandle.attributes).toMatchObject({
       'aria-label': leftLabel,
       'aria-valuemax': '480',

@@ -95,7 +95,7 @@ export function paginationAction(
   const button = action(ownerDocument, value, label);
   button.classList.add('designer-icon-button', 'designer-static-page-button');
   button.setAttribute('aria-label', label);
-  button.title = label;
+  button.setAttribute('data-tip', label);
   button.innerHTML = designerIcon(icon);
   return button;
 }

@@ -71,7 +71,7 @@ export function appendBatchNumberInput(
   }
   input.dataset.multiProperty = multiProperty;
   input.disabled = disabled;
-  input.title = hint;
+  input.setAttribute('data-tip', hint);
   label.appendChild(input);
   appendDesignerFieldMessage(label, input, `multi-property-${multiProperty}`);
   parent.appendChild(label);
@@ -104,7 +104,7 @@ export function appendBatchStyleControl(
     for (const input of palette.controls) {
       input.dataset.multiProperty = `style:${style}`;
       input.disabled = disabled;
-      input.title = hint;
+      input.setAttribute('data-tip', hint);
       if (mixed) input.dataset.mixed = 'true';
     }
     label.appendChild(palette.element);
@@ -113,7 +113,7 @@ export function appendBatchStyleControl(
     const input = createControl(parent.ownerDocument, value, schema, control);
     input.dataset.multiProperty = `style:${style}`;
     input.disabled = disabled;
-    input.title = hint;
+    input.setAttribute('data-tip', hint);
     if (mixed) {
       input.dataset.mixed = 'true';
       if (control === 'boolean' && input instanceof HTMLInputElement) {
@@ -270,7 +270,7 @@ export function appendActionButton(
   button.textContent = label;
   button.disabled = disabled;
   if (disabled) {
-    button.title = unavailableReason;
+    button.setAttribute('data-tip', unavailableReason);
     button.ariaLabel = `${label}：${unavailableReason}`;
   }
   parent.appendChild(button);
@@ -291,7 +291,7 @@ export function appendBatchArrangeButton(
     disabled,
     icon,
     label,
-    title,
+    tip: title,
   });
   button.dataset.action = action;
   parent.appendChild(button);

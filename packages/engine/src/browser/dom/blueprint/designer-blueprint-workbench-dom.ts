@@ -27,12 +27,13 @@ export function renderDesignerBlueprintWorkbenchChrome(
     control.dataset.active = String(active);
     control.setAttribute('aria-selected', String(active));
     control.tabIndex = active ? 0 : -1;
-    control.title = unavailable
+    const controlTip = unavailable
       ? DESIGNER_UI_TEXT.interactionWorkspaceUnavailable
       : controlMode === 'blueprint'
         ? DESIGNER_UI_TEXT.interactionWorkspaceHint
         : DESIGNER_UI_TEXT.canvasWorkspace;
-    control.ariaLabel = control.title;
+    control.setAttribute('data-tip', controlTip);
+    control.ariaLabel = controlTip;
   }
   const searchText =
     mode === 'blueprint'
@@ -43,7 +44,7 @@ export function renderDesignerBlueprintWorkbenchChrome(
   const searchTrigger = root.querySelector<HTMLButtonElement>('[data-command-palette-toggle]');
   if (searchTrigger !== null) {
     searchTrigger.ariaLabel = searchText;
-    searchTrigger.title = searchText;
+    searchTrigger.setAttribute('data-tip', searchText);
   }
   renderBlueprintPanelChrome(root, mode, status.nodes);
   if (mode !== 'blueprint') return;

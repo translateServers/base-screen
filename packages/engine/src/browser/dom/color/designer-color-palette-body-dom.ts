@@ -251,7 +251,7 @@ function colorPaletteActionButton(
     'designer-control designer-button designer-icon-button designer-color-palette-action';
   button.dataset.colorPaletteAction = action;
   button.setAttribute('aria-label', label);
-  button.title = label;
+  button.setAttribute('data-tip', label);
   button.innerHTML = designerIcon(icon);
   return button;
 }

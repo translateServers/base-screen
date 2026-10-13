@@ -357,7 +357,7 @@ describe('designer panel rendering', () => {
       'label-1',
       'label-1',
     ]);
-    expect(densityActions.map((element) => element.title)).toEqual([
+    expect(densityActions.map((element) => element.getAttribute('data-tip'))).toEqual([
       '按原图自然尺寸设置宽高',
       '按 2 倍图设置宽高',
       '按 3 倍图设置宽高',

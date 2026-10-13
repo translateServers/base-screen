@@ -122,7 +122,7 @@ function appendCanvasPresentationControls(
     button.dataset.canvasSetting = 'scaleMode';
     button.dataset.canvasSettingValue = value;
     button.textContent = label;
-    button.title = label;
+    button.setAttribute('data-tip', label);
     button.ariaPressed = String(settings.scaleMode === value);
     scaleControls.appendChild(button);
   }

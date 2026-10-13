@@ -157,7 +157,7 @@ export function validateControlForSchema(
     return;
   }
   const expected =
-    control === 'number' || control === 'unit-number'
+    control === 'number' || control === 'unit-number' || control === 'stepper'
       ? 'number'
       : control === 'boolean'
         ? 'boolean'
@@ -171,6 +171,18 @@ export function validateControlForSchema(
       'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
       diagnosticPath,
       `Editor control requires a ${expected} field.`,
+    );
+  }
+  // 步进器到边界要禁用对应按钮，缺任一边界就没有可用的边界语义，失败关闭。
+  if (
+    control === 'stepper' &&
+    resolved.kind === 'number' &&
+    (resolved.minimum === undefined || resolved.maximum === undefined)
+  ) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      diagnosticPath,
+      'Stepper control requires minimum and maximum bounds.',
     );
   }
 }

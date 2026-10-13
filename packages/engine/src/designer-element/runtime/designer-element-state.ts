@@ -35,6 +35,7 @@ import { DesignerPreviewController } from '../../browser/controllers/designer-pr
 import { DesignerScrollContinuityController } from '../../browser/controllers/designer-scroll-continuity-controller.js';
 import { DesignerSizeEntryController } from '../../browser/controllers/designer-size-entry-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
+import { DesignerTooltipController } from '../../browser/controllers/designer-tooltip-controller.js';
 import { DesignerTopbarController } from '../../browser/controllers/designer-topbar-controller.js';
 import { DesignerVariablesController } from '../../browser/controllers/designer-variables-controller.js';
 import { DesignerViewportController } from '../../browser/controllers/designer-viewport-controller.js';
@@ -127,6 +128,7 @@ export interface DesignerElementState {
   authoringGeneration: number;
   documentGeneration: number;
   leftPanelGroupEvents: DesignerLeftPanelGroupEventController;
+  tooltipController: DesignerTooltipController;
   blueprintWorkbenchController: DesignerBlueprintWorkbenchController;
   notificationController: DesignerNotificationController;
   topbarController: DesignerTopbarController;
@@ -187,6 +189,7 @@ export function createDesignerElementState(
   state.authoringGeneration = 0;
   state.documentGeneration = 0;
   state.leftPanelGroupEvents = new DesignerLeftPanelGroupEventController(element);
+  state.tooltipController = new DesignerTooltipController();
   state.notificationController = new DesignerNotificationController();
   state.errorConsoleController = new DesignerErrorConsoleController();
   state.scrollContinuityController = new DesignerScrollContinuityController();

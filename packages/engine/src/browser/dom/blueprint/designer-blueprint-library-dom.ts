@@ -140,7 +140,7 @@ function componentItem(
       <span><strong>${escapeHtml(name)}</strong><small>${escapeHtml(node.materialType ?? '')} · ${DESIGNER_UI_TEXT.blueprint.componentEventCount(eventCount)}</small></span>
       ${placed ? `<em>${DESIGNER_UI_TEXT.blueprint.placed}</em>` : ''}
     </button>
-    <button type="button" class="blueprint-palette-action" ${action} title="${escapeAttribute(actionLabel)}" aria-label="${escapeAttribute(actionLabel)}">${designerIcon(placed ? 'locate' : 'plus')}</button>
+    <button type="button" class="blueprint-palette-action" ${action} data-tip="${escapeAttribute(actionLabel)}" aria-label="${escapeAttribute(actionLabel)}">${designerIcon(placed ? 'locate' : 'plus')}</button>
   </div>`;
 }
 
@@ -218,7 +218,7 @@ function libraryTab(
         : DESIGNER_UI_TEXT.blueprint.globalVariables;
   const icon: DesignerIconName =
     tab === 'components' ? 'layers' : tab === 'logic' ? 'cube' : 'variable';
-  return `<button type="button" class="designer-tab blueprint-library-rail-tab" id="designer-blueprint-library-${tab}-tab" role="tab" aria-controls="designer-blueprint-library-${tab}-panel" aria-selected="${String(tab === activeTab)}" tabindex="${tab === activeTab ? 0 : -1}" data-blueprint-library-tab="${tab}" title="${label}" aria-label="${label}"><span class="rail-tab-glyph" aria-hidden="true">${designerIcon(icon)}</span><span class="rail-tab-label">${visibleLabel}</span></button>`;
+  return `<button type="button" class="designer-tab blueprint-library-rail-tab" id="designer-blueprint-library-${tab}-tab" role="tab" aria-controls="designer-blueprint-library-${tab}-panel" aria-selected="${String(tab === activeTab)}" tabindex="${tab === activeTab ? 0 : -1}" data-blueprint-library-tab="${tab}" data-tip="${label}" aria-label="${label}"><span class="rail-tab-glyph" aria-hidden="true">${designerIcon(icon)}</span><span class="rail-tab-label">${visibleLabel}</span></button>`;
 }
 
 function hostLibraryTab(
@@ -228,7 +228,7 @@ function hostLibraryTab(
   const active = group.id === activeGroupId;
   const tab = hostLeftPanelTab(group.id);
   const label = escapeAttribute(group.label);
-  return `<button type="button" class="designer-tab blueprint-library-rail-tab" id="${blueprintHostLeftPanelTabId(group.id)}" role="tab" aria-controls="${hostLeftPanelPanelId(group.id)}" aria-selected="${String(active)}" tabindex="${active ? 0 : -1}" data-blueprint-library-tab="${tab}" data-host-left-panel-group="${escapeAttribute(group.id)}" data-host-left-panel-mode="blueprint" title="${label}" aria-label="${label}"><span class="rail-tab-glyph" aria-hidden="true">${designerIcon(group.icon ?? 'shapes')}</span><span class="rail-tab-label">${escapeHtml(group.label)}</span></button>`;
+  return `<button type="button" class="designer-tab blueprint-library-rail-tab" id="${blueprintHostLeftPanelTabId(group.id)}" role="tab" aria-controls="${hostLeftPanelPanelId(group.id)}" aria-selected="${String(active)}" tabindex="${active ? 0 : -1}" data-blueprint-library-tab="${tab}" data-host-left-panel-group="${escapeAttribute(group.id)}" data-host-left-panel-mode="blueprint" data-tip="${label}" aria-label="${label}"><span class="rail-tab-glyph" aria-hidden="true">${designerIcon(group.icon ?? 'shapes')}</span><span class="rail-tab-label">${escapeHtml(group.label)}</span></button>`;
 }
 
 export function isDesignerBlueprintLibraryBuiltinTab(
@@ -258,7 +258,7 @@ function logicItem(
 ): string {
   const actionLabel = DESIGNER_UI_TEXT.blueprint.addLogicNode(label);
   return `<div class="blueprint-palette-item" data-kind="logic" draggable="true" data-blueprint-drag-kind="${kind}" data-blueprint-drag-label="${escapeAttribute(label)}">
-    <button type="button" class="blueprint-palette-primary" data-blueprint-insert="${kind}" title="${escapeAttribute(hint)}" aria-label="${escapeAttribute(actionLabel)}">
+    <button type="button" class="blueprint-palette-primary" data-blueprint-insert="${kind}" data-tip="${escapeAttribute(hint)}" aria-label="${escapeAttribute(actionLabel)}">
       <span class="blueprint-palette-glyph" aria-hidden="true">${designerIcon(kind === 'set-variable' ? 'variable' : 'cube')}</span>
       <span><strong>${label}</strong><small>${hint}</small></span><span class="blueprint-palette-inline-add" aria-hidden="true">${designerIcon('plus')}</span>
     </button>

@@ -21,7 +21,8 @@ describe('dataset material best practice', () => {
       dataBinding: {
         roles: [
           { id: 'dimension', minFields: 1, maxFields: 1 },
-          { id: 'measures', minFields: 1, maxFields: 1 },
+          // measures 为限额多选（触发器 + 弹层的绑定字段选择器验收路径）。
+          { id: 'measures', minFields: 1, maxFields: 2 },
         ],
       },
     });

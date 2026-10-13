@@ -82,7 +82,7 @@ export async function assertCanvasBasics(designer, page) {
   if (after.x === before.x || after.y === before.y) {
     throw new Error('BROWSER_HARNESS_DRAG_FAILED');
   }
-  await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
+  await designer.locator('[data-tip^="\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c"]').click();
   const undone = await page.evaluate(
     () =>
       window.baseScreenHarness.designer.document.components.find((item) => item.id === 'title')
@@ -188,7 +188,7 @@ export async function assertCanvasBasics(designer, page) {
       })}`,
     );
   }
-  await designer.getByTitle('\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c').click();
+  await designer.locator('[data-tip^="\u64a4\u9500\u4e0a\u4e00\u6b65\u64cd\u4f5c"]').click();
 }
 
 // ---- 源模块：assert-canvas-content-clipping.mjs ----
@@ -627,7 +627,7 @@ async function assertCanvasPrecision(designer, page) {
     const canvas = window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-canvas]');
     return canvas?.style.transform === 'translate(0px, 0px) scale(1)';
   });
-  await designer.getByTitle('\u653e\u5927').click();
+  await designer.locator('[data-tip^="\u653e\u5927"]').click();
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot?.querySelector('[data-zoom]')?.textContent ===

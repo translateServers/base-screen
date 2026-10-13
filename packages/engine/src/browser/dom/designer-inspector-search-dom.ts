@@ -157,7 +157,7 @@ function appendSearchResult(
   pathButton.className = 'inspector-search-result-path';
   pathButton.dataset.inspectorSearchTab = tab;
   pathButton.dataset.inspectorSearchTarget = key;
-  pathButton.title = DESIGNER_UI_TEXT.inspectorUi.locateSetting;
+  pathButton.setAttribute('data-tip', DESIGNER_UI_TEXT.inspectorUi.locateSetting);
   const locateIcon = results.ownerDocument.createElement('span');
   locateIcon.className = 'inspector-search-result-locate';
   locateIcon.innerHTML = designerIcon('locate');

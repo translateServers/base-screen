@@ -1,0 +1,62 @@
+/* 分段控件统一形态（设计原型 .segmented）：画布缩放、数据源、检查器密度、数据集编辑器
+   四处自制分段共用同一组几何与状态——轨道 = workspace 底 + elev-ring 描边，选中 = 悬停档底
+   + 强调文字（黑夜用更深一档的 active 底）。上下文只保留列数与尺寸差异，不再各写一套。 */
+.designer-canvas-scale-options,
+.designer-data-source-segmented,
+.designer-dataset-editor-modes,
+.inspector-density {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 1px;
+  padding: 2px;
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-surface-workspace);
+  box-shadow: var(--designer-elev-ring);
+}
+
+.designer-canvas-scale-option,
+.designer-data-source-segmented .designer-button,
+.designer-dataset-editor-modes .designer-button,
+.inspector-density .designer-tab {
+  min-width: 0;
+  min-height: 26px;
+  overflow: hidden;
+  padding: 0 var(--designer-space-3);
+  border: 0;
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-muted);
+  text-overflow: ellipsis;
+}
+
+.designer-canvas-scale-option:hover:not(:disabled):not([aria-pressed="true"]),
+.designer-data-source-segmented .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
+.designer-dataset-editor-modes .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
+.inspector-density .designer-tab:hover:not(:disabled):not([aria-pressed="true"]) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-canvas-scale-option[aria-pressed="true"],
+.designer-data-source-segmented .designer-button[aria-pressed="true"],
+.designer-dataset-editor-modes .designer-button[aria-pressed="true"],
+.inspector-density .designer-tab[aria-pressed="true"] {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-accent-text);
+}
+
+:host([theme="dark"]) .designer-canvas-scale-option[aria-pressed="true"],
+:host([theme="dark"]) .designer-data-source-segmented .designer-button[aria-pressed="true"],
+:host([theme="dark"]) .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
+:host([theme="dark"]) .inspector-density .designer-tab[aria-pressed="true"] {
+  background: var(--designer-surface-control-active);
+}
+
+/* 上下文差异：画布缩放方式有 6 档，按 3 列 2 行排布而不是单行等分。 */
+.designer-canvas-scale-options {
+  grid-auto-flow: row;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}

@@ -29,6 +29,7 @@ export type BaseScreenMaterialEditorControl =
   | 'reorderable-array'
   | 'field-selector'
   | 'unit-number'
+  | 'stepper'
   | 'custom';
 
 export type BaseScreenMaterialEditorConditionOperator =
@@ -120,6 +121,7 @@ export const EDITOR_CONTROLS: ReadonlySet<string> = new Set([
   'reorderable-array',
   'field-selector',
   'unit-number',
+  'stepper',
   // 不进 SCALAR_CONTROLS / ARRAY_CONTROLS：因此不能绑 data，也不能冒充数组容器。
   'custom',
 ]);
@@ -131,6 +133,7 @@ export const SCALAR_CONTROLS: ReadonlySet<string> = new Set([
   'select',
   'color',
   'unit-number',
+  'stepper',
 ]);
 
 export const ARRAY_CONTROLS: ReadonlySet<string> = new Set([

@@ -39,13 +39,13 @@ describe('material group column navigation', () => {
       { icon: 'chart', hidden: false, decorative: 'true' },
     ]);
     const data = view.roots.querySelector<HTMLButtonElement>('[data-material-group="data"]')!;
-    expect(data.title).toBe('Data（4 个物料）');
+    expect(data.getAttribute('data-tip')).toBe('Data（4 个物料）');
     expect(data.ariaLabel).toBe('查看 Data 物料');
-    expect(data.getAttribute('aria-description')).toBe(data.title);
+    expect(data.getAttribute('aria-description')).toBe(data.getAttribute('data-tip'));
     const tables = view.children.querySelector<HTMLButtonElement>(
       '[data-material-group="tables"]',
     )!;
-    expect(tables.title).toBe('Data / Tables（1 个物料）');
+    expect(tables.getAttribute('data-tip')).toBe('Data / Tables（1 个物料）');
     expect(tables.querySelector<HTMLElement>('.material-group-glyph')?.hidden).toBe(true);
   });
 
@@ -66,7 +66,7 @@ describe('material group column navigation', () => {
     expect(custom.querySelector<HTMLElement>('.material-group-glyph')?.innerHTML).not.toContain(
       '<b>',
     );
-    expect(custom.title).toBe('<b>Custom</b>（1 个物料）');
+    expect(custom.getAttribute('data-tip')).toBe('<b>Custom</b>（1 个物料）');
     renderMaterialLibraryGroupNavigation(
       layout,
       parseGrouping({ groups: [{ ...groups[0], label: 'Images' }, groups[1]] }),
@@ -75,7 +75,7 @@ describe('material group column navigation', () => {
     expect(view.roots.querySelector('[data-material-group="named"]')).toBe(named);
     expect(named.querySelector('.material-group-glyph')).toBe(glyph);
     expect(glyph.dataset.icon).toBe('image');
-    expect(named.title).toBe('Images（1 个物料）');
+    expect(named.getAttribute('data-tip')).toBe('Images（1 个物料）');
     expect(named.ariaPressed).toBe('true');
   });
 
@@ -115,14 +115,14 @@ describe('material group column navigation', () => {
     expect(view.back.dataset.materialGroupBreadcrumb).toBe('data');
     expect(view.heading.textContent).toBe('Data');
     expect(view.back.contains(view.heading)).toBe(true);
-    expect(view.back.title).toBe('返回上一级分类：Data');
+    expect(view.back.getAttribute('data-tip')).toBe('返回上一级分类：Data');
     expect(view.children.querySelector('.material-group-count')?.textContent).toBe('3');
     expect(
       [...view.children.querySelectorAll<HTMLElement>('[data-material-group]')].map(
         (button) => button.dataset.materialGroup,
       ),
     ).toEqual(['bars', 'lines']);
-    expect(trigger.title).toBe('全部物料 / Data / Charts');
+    expect(trigger.getAttribute('data-tip')).toBe('全部物料 / Data / Charts');
     expect(trigger.querySelector('[data-material-group-toggle-label]')?.textContent).toBe('Charts');
   });
 
@@ -241,7 +241,7 @@ describe('material group column navigation', () => {
     const leaf = view.children.querySelector<HTMLElement>('[data-material-group="level7"]')!;
     expect(leaf.querySelector('.material-group-label')?.textContent).toBe(validLabel);
     expect(leaf.querySelector('.material-group-count')?.textContent).toBe('512');
-    expect(leaf.title).toContain(validLabel);
+    expect(leaf.getAttribute('data-tip')).toContain(validLabel);
     expect(view.back.dataset.materialGroupBreadcrumb).toBe('level5');
     expect(view.roots.querySelector('.material-group-count')?.textContent).toBe('512');
   });

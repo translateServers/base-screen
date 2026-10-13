@@ -22,7 +22,7 @@ export function appendVariablesToolbar(
     ariaLabel: DESIGNER_UI_TEXT.variables.add,
     className: 'variable-add-button',
     disabled: state.creating,
-    title: DESIGNER_UI_TEXT.variables.add,
+    tip: DESIGNER_UI_TEXT.variables.add,
     variant: 'primary',
   });
   add.dataset.variableAction = 'add';

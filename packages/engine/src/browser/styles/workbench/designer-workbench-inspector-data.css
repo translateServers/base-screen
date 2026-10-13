@@ -350,28 +350,6 @@
   min-height: 66px !important;
 }
 
-.properties .designer-canvas-scale-options {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  padding: 0;
-  border-color: var(--designer-border-default);
-  border-radius: var(--designer-radius-1);
-  background: var(--designer-border-default);
-}
-
-.properties .designer-canvas-scale-option {
-  min-height: 29px;
-  border: 0;
-  border-radius: 0;
-  background: var(--designer-surface-workspace);
-  font-size: var(--designer-font-size-xs);
-}
-
-.properties .designer-canvas-scale-option[aria-pressed="true"] {
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-}
-
 .properties .designer-canvas-setting-checkbox {
   display: flex !important;
   min-height: 38px !important;

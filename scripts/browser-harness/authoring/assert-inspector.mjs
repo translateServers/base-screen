@@ -485,7 +485,81 @@ function coordinateEntryGeometryIsValid(value) {
   return value.placement === 'clamped';
 }
 
-export { assertCoordinateEntry, assertInspectorFormScrollContinuity, assertSizeEntry };
+// 步进器（设计原型 .stepper）：− / 值 / + 三段、边界禁用、点击写回文档。
+async function assertDescriptorStepper(page, designer) {
+  await designer.locator('[data-panel-tab="layers"]').click();
+  await designer.locator('[data-layer-select="semantic-chart-demo"] .layer-name').click();
+  await designer.locator('[data-inspector-tab="appearance"]').click();
+  const field = designer.locator('[data-descriptor-field-id="titleSize"]');
+  await field.scrollIntoViewIfNeeded();
+  const before = await designer.evaluate((host) => {
+    const input = host.shadowRoot.querySelector('[data-descriptor-field-id="titleSize"]');
+    const stepper = input?.closest('.designer-stepper');
+    const buttons =
+      stepper === null || stepper === undefined ? [] : [...stepper.querySelectorAll('[data-step]')];
+    return {
+      tag: input?.tagName,
+      type: input?.type,
+      min: input?.min,
+      max: input?.max,
+      value: Number(input?.value),
+      buttonLabels: buttons.map((button) => button.getAttribute('aria-label')),
+      height: stepper?.getBoundingClientRect().height,
+    };
+  });
+  if (
+    before.tag !== 'INPUT' ||
+    before.type !== 'number' ||
+    before.min !== '8' ||
+    before.max !== '64' ||
+    before.height !== 30 ||
+    before.buttonLabels.join('|') !== '减小字号|增大字号'
+  ) {
+    throw new Error(`BROWSER_HARNESS_DESCRIPTOR_STEPPER_SHELL_FAILED:${JSON.stringify(before)}`);
+  }
+  const plus = field.locator('xpath=..').locator('[data-step="1"]');
+  await plus.click();
+  const stepped = await field.inputValue();
+  if (Number(stepped) !== before.value + 1) {
+    throw new Error(`BROWSER_HARNESS_DESCRIPTOR_STEPPER_STEP_FAILED:${stepped}`);
+  }
+  // 顶到上界：+ 自动禁用，值被夹在上界。
+  await field.fill('63');
+  await field.dispatchEvent('change');
+  await plus.click();
+  const bounded = await designer.evaluate((host) => {
+    const input = host.shadowRoot.querySelector('[data-descriptor-field-id="titleSize"]');
+    const stepper = input.closest('.designer-stepper');
+    const button = (step) => stepper.querySelector(`[data-step="${String(step)}"]`);
+    const component = host.document?.components.find(
+      (candidate) => candidate.id === 'semantic-chart-demo',
+    );
+    return {
+      value: input.value,
+      plusDisabled: button(1).disabled,
+      minusDisabled: button(-1).disabled,
+      documentFontSize: component?.props?.title?.fontSize,
+    };
+  });
+  if (
+    bounded.value !== '64' ||
+    bounded.plusDisabled !== true ||
+    bounded.minusDisabled !== false ||
+    bounded.documentFontSize !== 64
+  ) {
+    throw new Error(`BROWSER_HARNESS_DESCRIPTOR_STEPPER_BOUNDS_FAILED:${JSON.stringify(bounded)}`);
+  }
+  // 还原原值，避免污染后续断言与截图。
+  await field.fill(String(before.value));
+  await field.dispatchEvent('change');
+}
+
+export {
+  assertCoordinateEntry,
+  assertDescriptorStepper,
+  assertInspectorFormScrollContinuity,
+  assertSizeEntry,
+};
 
 // ---- 源模块：assert-authoring-import-inspector.mjs ----
 export async function assertAuthoringImportAndInspector(authoringDesigner, page) {

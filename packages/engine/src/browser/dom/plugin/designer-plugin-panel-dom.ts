@@ -106,7 +106,7 @@ function findTab(root: HTMLElement, panelId: string): HTMLButtonElement | undefi
 
 function syncPanelTab(tab: HTMLButtonElement, entry: BaseScreenPluginPanelCatalogEntry): void {
   tab.dataset.panelLabel = entry.contribution.name;
-  tab.title = entry.contribution.name;
+  tab.setAttribute('data-tip', entry.contribution.name);
   const label = tab.querySelector<HTMLElement>('.rail-tab-label');
   if (label !== null) label.textContent = entry.contribution.name;
 }
@@ -125,7 +125,7 @@ function createPanelTab(
   tab.dataset.panelTab = pluginPanelTab(panelId);
   tab.dataset.panelLabel = entry.contribution.name;
   tab.dataset.pluginPanelTab = panelId;
-  tab.title = entry.contribution.name;
+  tab.setAttribute('data-tip', entry.contribution.name);
   return tab;
 }
 

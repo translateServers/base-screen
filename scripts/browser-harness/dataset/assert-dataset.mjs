@@ -61,16 +61,58 @@ export async function assertDatasetAuthoring(designer, page) {
   const region = dataPanel.locator('[data-dataset-parameter="region"]');
   await region.fill('north');
   await region.dispatchEvent('change');
+  // 日期参数：输入框 + 触发器 + 自绘日历（设计原型 .datefield）；选日写回输入并派发 change。
+  const dateInput = dataPanel.locator('[data-dataset-parameter="rangeStart"]');
+  const dateField = dataPanel.locator(
+    '.designer-date-field:has([data-dataset-parameter="rangeStart"])',
+  );
+  await dateField.locator('.designer-date-field-trigger').click();
+  const calendar = await dateField.evaluate((anchor) => {
+    const popover = anchor.querySelector('.designer-calendar-popover');
+    const days = [...(popover?.querySelectorAll('[data-calendar-day]') ?? [])];
+    return {
+      hidden: popover?.hidden,
+      title: popover?.querySelector('.designer-calendar-title')?.textContent,
+      dayCount: days.length,
+      selected: days.find((day) => day.dataset.selected === 'true')?.dataset.calendarDay,
+      weekdays: [...(popover?.querySelectorAll('.designer-calendar-weekdays span') ?? [])]
+        .map((cell) => cell.textContent)
+        .join(''),
+      side: popover?.dataset.side,
+      triggerLabel: anchor
+        .querySelector('.designer-date-field-trigger')
+        ?.getAttribute('aria-label'),
+    };
+  });
+  if (
+    calendar.hidden !== false ||
+    calendar.title !== '2026 \u5e74 10 \u6708' ||
+    calendar.dayCount !== 42 ||
+    calendar.selected !== '2026-10-01' ||
+    calendar.weekdays !== '\u4e00\u4e8c\u4e09\u56db\u4e94\u516d\u65e5' ||
+    calendar.triggerLabel !== '\u6253\u5f00\u8d77\u59cb\u65e5\u671f\u65e5\u5386'
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATASET_DATE_FIELD_FAILED:${JSON.stringify(calendar)}`);
+  }
+  await dateField.locator('[data-calendar-day="2026-10-15"]').click();
+  const picked = await dateInput.inputValue();
+  if (picked !== '2026-10-15') {
+    throw new Error(`BROWSER_HARNESS_DATASET_DATE_COMMIT_FAILED:${picked}`);
+  }
+  // 还原默认值，保持后续断言与请求预览稳定。
+  await dateInput.fill('2026-10-01');
+  await dateInput.dispatchEvent('change');
   await dataPanel
     .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]')
     .click();
   const mappingSurface = await dataPanel.evaluate((panel) => ({
+    // 2 个角色分区 + 1 个单选 select（measures 改为限额多选后走 bind-field 触发器，不再有 select）。
     bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
     applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
     activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
   }));
   if (
-    mappingSurface.bindingCount !== 4 ||
+    mappingSurface.bindingCount !== 3 ||
     mappingSurface.applyCount !== 1 ||
     mappingSurface.activeStep !== 'mapping'
   ) {
@@ -102,6 +144,74 @@ export async function assertDatasetAuthoring(designer, page) {
     appliedDatasetSource.params.region?.kind !== 'literal'
   ) {
     throw new Error('BROWSER_HARNESS_DATASET_TRANSACTION_FAILED');
+  }
+  // 绑定字段选择器：触发器芯片 + 计数 + 自绘弹层（设计原型 .bind-field）；芯片 × 与选项切换共用绑定动作。
+  const bindShell = await dataPanel.evaluate((panel) => {
+    const trigger = panel.querySelector('[data-dataset-binding-trigger="measures"]');
+    const menu = panel.querySelector('[data-dataset-binding-menu="measures"]');
+    const options = [...(menu?.querySelectorAll('[data-dataset-binding-field]') ?? [])];
+    return {
+      chips: [...(trigger?.querySelectorAll('.designer-bind-chip') ?? [])].map((chip) =>
+        chip.textContent.trim(),
+      ),
+      count: trigger?.querySelector('[data-dataset-binding-count]')?.textContent,
+      expanded: trigger?.getAttribute('aria-expanded'),
+      menuHidden: menu?.hidden,
+      optionTypes: options.map(
+        (option) => option.querySelector('.designer-bind-type')?.textContent,
+      ),
+      optionSelected: options.map((option) => option.getAttribute('aria-selected')),
+      foot: menu?.querySelector('.designer-bind-foot')?.textContent,
+    };
+  });
+  if (
+    bindShell.chips.join('|') !== '\u91d1\u989d' ||
+    bindShell.count !== '1 / 2' ||
+    bindShell.expanded !== 'false' ||
+    bindShell.menuHidden !== true ||
+    bindShell.optionTypes.join('|') !== 'number' ||
+    bindShell.optionSelected.join('|') !== 'true' ||
+    bindShell.foot !== '\u6700\u591a\u53ef\u7ed1\u5b9a 2 \u9879'
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATASET_BIND_FIELD_FAILED:${JSON.stringify(bindShell)}`);
+  }
+  await dataPanel.locator('[data-dataset-binding-trigger="measures"]').click();
+  await dataPanel.locator('.designer-bind-chip-x').click();
+  const bindRemoved = await dataPanel.evaluate((panel) => {
+    const trigger = panel.querySelector('[data-dataset-binding-trigger="measures"]');
+    const menu = panel.querySelector('[data-dataset-binding-menu="measures"]');
+    return {
+      chips: [...(trigger?.querySelectorAll('.designer-bind-chip') ?? [])].length,
+      count: trigger?.querySelector('[data-dataset-binding-count]')?.textContent,
+      open: menu?.hidden === false,
+    };
+  });
+  if (bindRemoved.chips !== 0 || bindRemoved.count !== '0 / 2' || bindRemoved.open !== true) {
+    throw new Error(`BROWSER_HARNESS_DATASET_BIND_REMOVE_FAILED:${JSON.stringify(bindRemoved)}`);
+  }
+  // 还原绑定（草稿回到已应用状态），并验证 Esc 关闭弹层。
+  await dataPanel.locator('[data-dataset-binding-field="amount"]').click();
+  const bindRestored = await dataPanel.evaluate((panel) => {
+    const trigger = panel.querySelector('[data-dataset-binding-trigger="measures"]');
+    return {
+      chips: [...(trigger?.querySelectorAll('.designer-bind-chip') ?? [])].map((chip) =>
+        chip.textContent.trim(),
+      ),
+      count: trigger?.querySelector('[data-dataset-binding-count]')?.textContent,
+    };
+  });
+  if (bindRestored.chips.join('|') !== '\u91d1\u989d' || bindRestored.count !== '1 / 2') {
+    throw new Error(`BROWSER_HARNESS_DATASET_BIND_RESTORE_FAILED:${JSON.stringify(bindRestored)}`);
+  }
+  await page.keyboard.press('Escape');
+  const bindClosed = await dataPanel.evaluate((panel) => ({
+    expanded: panel
+      .querySelector('[data-dataset-binding-trigger="measures"]')
+      ?.getAttribute('aria-expanded'),
+    menuHidden: panel.querySelector('[data-dataset-binding-menu="measures"]')?.hidden,
+  }));
+  if (bindClosed.expanded !== 'false' || bindClosed.menuHidden !== true) {
+    throw new Error(`BROWSER_HARNESS_DATASET_BIND_CLOSE_FAILED:${JSON.stringify(bindClosed)}`);
   }
   const authoringSurface = await dataPanel.evaluate((panel) => ({
     present: panel.querySelector('[data-dataset-authoring]') !== null,
@@ -432,7 +542,7 @@ export async function assertDatasetSurface(designer, page) {
   if (
     descriptorSurface.parameterCount < 2 ||
     descriptorSurface.unlabelledParameterControls !== 0 ||
-    descriptorSurface.bindingCount !== 4 ||
+    descriptorSurface.bindingCount !== 3 ||
     descriptorSurface.bindingSummaryEmpty ||
     descriptorSurface.bindingSummaryItemCount !== 2 ||
     !descriptorSurface.authoringSettingsGroup ||

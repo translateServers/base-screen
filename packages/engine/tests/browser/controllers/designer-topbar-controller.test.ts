@@ -7,8 +7,17 @@ class FakeButton {
   title = '';
   ariaLabel = '';
   ariaPressed = '';
+  readonly attributes = new Map<string, string>();
 
   constructor(readonly selector: string) {}
+
+  setAttribute(name: string, value: string): void {
+    this.attributes.set(name, value);
+  }
+
+  getAttribute(name: string): string | null {
+    return this.attributes.get(name) ?? null;
+  }
 
   closest(selector: string): FakeButton | null {
     return selector === this.selector ? this : null;

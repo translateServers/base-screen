@@ -49,7 +49,8 @@ export function renderMaterialLibraryGroupNavigation(
   view.heading.textContent = parent?.label ?? '';
   view.back.hidden = parent === undefined;
   view.back.dataset.materialGroupBreadcrumb = parent?.id ?? '';
-  view.back.title =
+  view.back.setAttribute(
+    'data-tip',
     parent === undefined
       ? DESIGNER_UI_TEXT.materialGroupBack
       : DESIGNER_UI_TEXT.materialGroupBackTo(
@@ -57,10 +58,11 @@ export function renderMaterialLibraryGroupNavigation(
             .slice(0, -1)
             .map((group) => group.label)
             .join(' / '),
-        );
-  view.back.setAttribute('aria-description', view.back.title);
+        ),
+  );
+  view.back.setAttribute('aria-description', view.back.getAttribute('data-tip') ?? '');
   if (trigger !== null) {
-    trigger.title = pathLabel;
+    trigger.setAttribute('data-tip', pathLabel);
     trigger.setAttribute('aria-label', DESIGNER_UI_TEXT.materialGroupChoose(pathLabel));
     const label = trigger.querySelector<HTMLElement>('[data-material-group-toggle-label]');
     if (label !== null) label.textContent = selected?.label ?? DESIGNER_UI_TEXT.allMaterialGroups;

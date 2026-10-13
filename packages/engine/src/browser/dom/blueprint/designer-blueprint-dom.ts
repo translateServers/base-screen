@@ -72,7 +72,7 @@ export function renderDesignerEventsPanel(
   const open = createButton(panel.ownerDocument, DESIGNER_UI_TEXT.blueprint.editInHost);
   open.dataset.action = 'locate-blueprint';
   open.dataset.variant = 'primary';
-  open.title = DESIGNER_UI_TEXT.blueprint.hostEditorHint;
+  open.setAttribute('data-tip', DESIGNER_UI_TEXT.blueprint.hostEditorHint);
   editorSection.append(editorHint, open);
   if (!capabilityAvailable) {
     const unavailable = panel.ownerDocument.createElement('p');
@@ -319,7 +319,7 @@ function appendSection(parent: HTMLElement, title: string): HTMLElement {
 }
 
 function createButton(ownerDocument: Document, label: string): HTMLButtonElement {
-  return createDesignerButton(ownerDocument, { text: label, title: label });
+  return createDesignerButton(ownerDocument, { text: label, tip: label });
 }
 
 function hasCapability(

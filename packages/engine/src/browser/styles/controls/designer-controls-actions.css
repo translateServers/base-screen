@@ -19,6 +19,9 @@
   border-radius: var(--designer-radius-2);
 }
 
+/* 按钮基座对齐设计原型 .btn：30px 高、6px 圆角、无边框；描边由阴影承担。
+   中性档 = 原型 .btn-secondary（raised 底 + elev-ring），ghost/danger/primary 各自成档。
+   悬停只换底色（不换几何、不加描边），按压不再缩放——与原型一致。 */
 .designer-button {
   box-sizing: border-box;
   display: inline-flex;
@@ -26,40 +29,38 @@
   min-height: var(--designer-control-height);
   align-items: center;
   justify-content: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-3);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
+  gap: var(--designer-space-3);
+  padding: 0 var(--designer-space-5);
+  border: 0;
+  border-radius: var(--designer-radius-2);
   appearance: none;
   background: var(--designer-surface-control);
+  box-shadow: var(--designer-elev-ring);
   color: var(--designer-text-secondary);
   cursor: pointer;
-  font: var(--designer-font-small);
-  font-weight: 600;
+  font-family: inherit;
+  font-size: var(--designer-font-size-base);
+  font-weight: 500;
   line-height: 1;
   text-align: center;
   text-decoration: none;
   white-space: nowrap;
   touch-action: manipulation;
-  transform: translateZ(0);
-  transition: transform var(--designer-motion);
+  transition:
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion),
+    color var(--designer-motion);
   user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
 
 .designer-button:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--designer-accent) 22%, var(--designer-border-strong));
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--designer-text-on-accent) 5%, transparent),
-    0 2px 6px color-mix(in srgb, var(--designer-accent) 10%, transparent);
 }
 
 .designer-button:not(:disabled):active {
-  border-color: color-mix(in srgb, var(--designer-accent) 34%, var(--designer-border-strong));
-  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--designer-surface-workspace) 38%, transparent);
-  transform: scale(0.985);
+  background: var(--designer-surface-control-active);
 }
 
 .designer-button:focus-visible {
@@ -69,72 +70,78 @@
 
 .designer-button[aria-busy="true"] {
   cursor: progress;
-  opacity: 0.84;
 }
 
 .designer-icon-button {
-  width: var(--designer-control-height);
-  height: var(--designer-control-height);
-  min-height: var(--designer-control-height);
+  width: var(--designer-control-height-compact);
+  height: var(--designer-control-height-compact);
+  min-height: var(--designer-control-height-compact);
   padding: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-secondary);
+}
+
+.designer-icon-button:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-icon-button:not(:disabled):active {
+  background: var(--designer-surface-control-active);
 }
 
 .designer-tool-button {
-  width: 38px;
-  height: 38px;
-  min-height: 38px;
+  width: var(--designer-control-height-compact);
+  height: var(--designer-control-height-compact);
+  min-height: var(--designer-control-height-compact);
+}
+
+.designer-button[data-variant="neutral"] {
+  background: var(--designer-surface-raised);
+  box-shadow: var(--designer-elev-ring);
+  color: var(--designer-text-primary);
+}
+
+.designer-button[data-variant="neutral"]:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
 }
 
 .designer-button[data-variant="primary"] {
-  border-color: var(--designer-button-primary-background);
-  background: var(--designer-button-primary-background);
-  color: var(--designer-text-on-accent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--designer-accent) 18%, transparent);
+  background: var(--designer-text-primary);
+  box-shadow: var(--designer-shadow-float);
+  color: var(--designer-surface-raised);
 }
 
 .designer-button[data-variant="primary"]:hover:not(:disabled) {
-  border-color: var(--designer-accent);
-  background: var(--designer-button-primary-hover);
-  color: var(--designer-text-on-accent);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--designer-accent) 24%, transparent);
+  background: color-mix(in oklab, var(--designer-text-primary), var(--designer-surface-raised) 10%);
+  color: var(--designer-surface-raised);
 }
 
 .designer-button[data-variant="primary"]:not(:disabled):active {
-  border-color: var(--designer-button-primary-active);
-  background: var(--designer-button-primary-active);
-  box-shadow: inset 0 1px 2px var(--designer-button-primary-active-shadow);
-  transform: scale(0.985);
+  background: color-mix(in oklab, var(--designer-text-primary), var(--designer-surface-raised) 14%);
 }
 
 .designer-button[data-variant="danger"] {
-  border-color: color-mix(in srgb, var(--designer-danger) 48%, var(--designer-border-default));
-  background: color-mix(
-    in srgb,
-    var(--designer-danger-surface) 84%,
-    var(--designer-surface-control)
-  );
-  color: var(--designer-danger);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--designer-danger-text) 42%, transparent);
+  color: var(--designer-danger-text);
 }
 
 .designer-button[data-variant="danger"]:hover:not(:disabled) {
-  border-color: var(--designer-danger);
   background: var(--designer-danger-surface);
-  color: var(--designer-danger);
-  box-shadow: 0 3px 10px color-mix(in srgb, var(--designer-danger) 14%, transparent);
+  color: var(--designer-danger-text);
 }
 
 .designer-button[data-variant="ghost"] {
-  border-color: transparent;
   background: transparent;
-  color: var(--designer-text-secondary);
   box-shadow: none;
+  color: var(--designer-text-primary);
 }
 
 .designer-button[data-variant="ghost"]:hover:not(:disabled) {
-  border-color: transparent;
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
-  box-shadow: none;
 }
 
 .designer-button[aria-pressed="true"],
@@ -156,16 +163,13 @@
 }
 
 .designer-button:disabled {
-  border-color: var(--designer-border-subtle);
-  background: var(--designer-surface-raised);
-  color: var(--designer-text-disabled);
+  background: var(--designer-surface-control);
   box-shadow: none;
-  opacity: 0.72;
-  transform: none;
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
 }
 
 .designer-button[data-variant="ghost"]:disabled {
-  border-color: transparent;
   background: transparent;
 }
 

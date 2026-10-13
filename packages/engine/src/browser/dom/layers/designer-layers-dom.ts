@@ -143,7 +143,7 @@ function createLayerNode(
   // .layer-select 只覆盖几何与绘制，否则名称会退化为 UA 默认字体与颜色。
   select.className = 'designer-control designer-button layer-select';
   select.disabled = !selectable;
-  select.title = DESIGNER_UI_TEXT.layersPanel.renameHint;
+  select.setAttribute('data-tip', DESIGNER_UI_TEXT.layersPanel.renameHint);
   // 行首类型图标：与物料库同一派生规则，帮助快速区分图层内容形态。
   const glyph = ownerDocument.createElement('span');
   glyph.className = 'layer-glyph';
@@ -158,7 +158,7 @@ function createLayerNode(
     const count = ownerDocument.createElement('span');
     count.className = 'layer-count';
     count.textContent = String(item.childCount);
-    count.title = DESIGNER_UI_TEXT.layersPanel.childCount(item.childCount);
+    count.setAttribute('data-tip', DESIGNER_UI_TEXT.layersPanel.childCount(item.childCount));
     select.appendChild(count);
   }
   row.appendChild(select);

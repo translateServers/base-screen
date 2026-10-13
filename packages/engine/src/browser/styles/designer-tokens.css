@@ -114,8 +114,9 @@
   --designer-radius-pill: 999px;
   --designer-radius-control: var(--designer-radius-2);
   --designer-radius-overlay: var(--designer-radius-4);
-  --designer-control-height: 32px;
+  --designer-control-height: 30px;
   --designer-control-height-compact: 28px;
+  --designer-control-padding-inline: 9px;
   --designer-icon-size: 16px;
   /* 工具栏与左右两条 tab 条共用同一列头高度：同底色、同起点，视觉上是一条连续头部带。 */
   --designer-column-header-height: 40px;
@@ -139,6 +140,8 @@
   --designer-z-workspace-overlay: 10;
   --designer-z-dialog: 20;
   --designer-z-modal: 30;
+  /* 提示气泡必须压在全部弹层之上：菜单/对话框打开时其内部控件仍可悬停出提示。 */
+  --designer-z-tooltip: 40;
   color-scheme: light;
 }
 

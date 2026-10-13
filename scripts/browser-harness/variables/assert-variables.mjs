@@ -269,7 +269,8 @@ export async function assertAuthoringVariables(page, designer) {
       theme.neutralHeight < 28 ||
       theme.ghostWidth < 32 ||
       theme.ghostHeight < 32 ||
-      theme.neutralTransition !== 'transform' ||
+      // 原型 .btn 契约：悬停/按压只改底色与描边，不做缩放。
+      theme.neutralTransition !== 'background-color, box-shadow, color' ||
       theme.primaryBackground === theme.neutralBackground ||
       theme.neutralBackground === theme.ghostBackground ||
       theme.pressedBackground === theme.neutralBackground ||

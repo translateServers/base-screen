@@ -96,8 +96,8 @@ function disableLockedComponentControls(properties: HTMLElement): void {
     const property = control.dataset.property;
     if (property === 'locked' || property === 'hidden') continue;
     control.disabled = true;
-    if (control.title === '') {
-      control.title = DESIGNER_UI_TEXT.propertiesPanel.lockedEditingHint;
+    if (!control.hasAttribute('data-tip')) {
+      control.setAttribute('data-tip', DESIGNER_UI_TEXT.propertiesPanel.lockedEditingHint);
     }
   }
 }
@@ -253,7 +253,7 @@ function appendImageDensityActions(parent: HTMLElement, componentId: string): vo
       ariaLabel: title,
       className: 'designer-image-density-button',
       text: DESIGNER_UI_TEXT.propertiesPanel.imageDensityValue(density),
-      title,
+      tip: title,
     });
     button.dataset.imageDensityAction = String(density);
     button.dataset.imageDensityComponentId = componentId;
@@ -351,7 +351,7 @@ function flipButton(
     className: 'designer-flip-button',
     pressed,
     text: property === 'flipX' ? '↔' : '↕',
-    title: label,
+    tip: label,
   });
   button.dataset.geometryAction = property;
   button.dataset.flipLabel = label;

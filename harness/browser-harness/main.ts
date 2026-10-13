@@ -1109,6 +1109,13 @@ const datasetPort = {
             valueType: 'string' as const,
             required: false,
           },
+          {
+            name: 'rangeStart',
+            label: '起始日期',
+            valueType: 'date' as const,
+            required: false,
+            defaultValue: '2026-10-01',
+          },
         ],
       },
       diagnostics: [],

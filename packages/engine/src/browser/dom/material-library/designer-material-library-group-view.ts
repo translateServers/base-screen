@@ -91,8 +91,11 @@ export function renderMaterialGroupButtons(
       button.dataset.materialGroupCurrent = descriptor.groupId ?? '';
     button.ariaPressed = String(descriptor.selected);
     button.ariaLabel = descriptor.accessibleLabel;
-    button.title = DESIGNER_UI_TEXT.materialGroupTitle(descriptor.path, descriptor.count);
-    button.setAttribute('aria-description', button.title);
+    button.setAttribute(
+      'data-tip',
+      DESIGNER_UI_TEXT.materialGroupTitle(descriptor.path, descriptor.count),
+    );
+    button.setAttribute('aria-description', button.getAttribute('data-tip') ?? '');
     button.tabIndex = descriptor.key === focusKey ? 0 : -1;
     if (button.tabIndex === 0) fallbackFocus = button;
     button.querySelector<HTMLElement>('.material-group-label')!.textContent = descriptor.label;

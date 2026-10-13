@@ -120,8 +120,11 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toMatch(
       /\.designer\[data-left-collapsed="true"\] \.rail \.panel-heading,\s*\.designer\[data-right-collapsed="true"\] \.properties \.panel-heading\s*\{[^}]*background: linear-gradient\(/s,
     );
-    // 属性表单控件的表面规则不得覆盖右侧面板的折叠按钮。
-    expect(workbenchCss).toContain('.properties .designer-control:not(.panel-collapse) {');
+    // 折叠按钮保持自有表面（透明描边槽 + 自有悬停）；属性表单的控件皮肤不再通配覆盖它。
+    expect(workbenchCss).toMatch(
+      /\.panel-collapse\s*\{[^}]*box-shadow: inset 0 0 0 1px transparent;/s,
+    );
+    expect(workbenchCss).not.toContain('.properties .designer-control:not(.panel-collapse) {');
     expect(workbenchCss).not.toContain('.properties .designer-control {');
     expect(workbenchCss).toMatch(
       /\.designer\[data-left-collapsed="true"\] \.rail-tabs\s*\{[^}]*grid-row: 2;[^}]*padding-top: var\(--designer-space-2\);/s,

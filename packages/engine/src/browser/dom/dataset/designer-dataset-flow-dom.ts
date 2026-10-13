@@ -211,6 +211,7 @@ function renderContinuousDataFlow(
     roles: options.roles,
     variables: options.variables,
     resourceAvailable: options.resourceAvailable,
+    bindingOpenRoleId: options.bindingOpenRoleId ?? null,
   });
   const applyActions = configuration.querySelector<HTMLElement>('.designer-dataset-actions');
   applyActions?.querySelector('[data-dataset-action="refresh"]')?.remove();

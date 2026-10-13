@@ -168,5 +168,5 @@ function inspectorTab(
   const label = DESIGNER_UI_TEXT.blueprint.inspectorTabs[tab];
   const icon: DesignerIconName =
     tab === 'configuration' ? 'sliders' : tab === 'problems' ? 'check' : 'terminal';
-  return `<button type="button" class="blueprint-inspector-mode" id="designer-blueprint-inspector-${tab}-tab" role="tab" aria-controls="designer-blueprint-inspector-${tab}-panel" aria-selected="${String(tab === activeTab)}" tabindex="${tab === activeTab ? 0 : -1}" data-blueprint-inspector-tab="${tab}" title="${label}" aria-label="${label}"><span aria-hidden="true">${designerIcon(icon)}</span>${count === 0 ? '' : `<em>${count}</em>`}</button>`;
+  return `<button type="button" class="blueprint-inspector-mode" id="designer-blueprint-inspector-${tab}-tab" role="tab" aria-controls="designer-blueprint-inspector-${tab}-panel" aria-selected="${String(tab === activeTab)}" tabindex="${tab === activeTab ? 0 : -1}" data-blueprint-inspector-tab="${tab}" data-tip="${label}" aria-label="${label}"><span aria-hidden="true">${designerIcon(icon)}</span>${count === 0 ? '' : `<em>${count}</em>`}</button>`;
 }

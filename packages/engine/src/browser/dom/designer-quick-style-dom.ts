@@ -93,8 +93,8 @@ function appendPresetGrid(
     button.className = 'designer-control designer-quick-style';
     button.dataset.quickStyle = String(index);
     button.disabled = !supported;
-    button.title = DESIGNER_UI_TEXT.propertiesPanel.quickStylePreset(index);
-    button.setAttribute('aria-label', button.title);
+    button.setAttribute('data-tip', DESIGNER_UI_TEXT.propertiesPanel.quickStylePreset(index));
+    button.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.quickStylePreset(index));
     button.setAttribute(
       'aria-pressed',
       String(
@@ -184,7 +184,7 @@ function appendQuickConfigRow(
     if (row.kind === 'colors') {
       const accessibleLabel = `${row.label} ${item.value.toUpperCase()}`;
       button.style.setProperty('--quick-color', item.value);
-      button.title = accessibleLabel;
+      button.setAttribute('data-tip', accessibleLabel);
       button.setAttribute('aria-label', accessibleLabel);
     }
     button.textContent = row.kind === 'colors' ? '' : item.label;

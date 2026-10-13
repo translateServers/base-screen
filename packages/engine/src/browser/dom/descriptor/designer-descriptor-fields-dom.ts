@@ -100,16 +100,18 @@ function appendDescriptorField(
   label.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
   if (field.advanced === true) label.dataset.inspectorAdvanced = 'true';
   label.textContent = field.label;
-  const control =
+  const handle =
     palette === undefined
       ? createDescriptorControl(ownerDocument, field, schema, value, context.datasetFields)
-      : palette.controls[0]!;
-  if (palette === undefined) {
-    applyFieldDataset(control, field);
-    label.appendChild(control);
+      : undefined;
+  const control = handle === undefined ? palette!.controls[0]! : handle.valueTarget;
+  if (handle === undefined) {
+    for (const paletteControl of palette!.controls) applyFieldDataset(paletteControl, field);
+    label.appendChild(palette!.element);
   } else {
-    for (const paletteControl of palette.controls) applyFieldDataset(paletteControl, field);
-    label.appendChild(palette.element);
+    // 字段标识只挂在值载体上：步进器的外壳不重复携带，避免选择器命中两个元素。
+    applyFieldDataset(handle.valueTarget, field);
+    label.appendChild(handle.element);
   }
   if (field.help !== undefined) {
     const help = ownerDocument.createElement('span');

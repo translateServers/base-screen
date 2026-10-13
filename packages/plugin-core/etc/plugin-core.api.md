@@ -172,7 +172,7 @@ export interface BaseScreenMaterialEditorCondition {
 export type BaseScreenMaterialEditorConditionOperator = 'eq' | 'neq' | 'exists' | 'not-exists' | 'in' | 'not-in';
 
 // @public (undocumented)
-export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'custom';
+export type BaseScreenMaterialEditorControl = 'text' | 'number' | 'boolean' | 'select' | 'color' | 'json' | 'group' | 'array' | 'repeatable-array' | 'reorderable-array' | 'field-selector' | 'unit-number' | 'stepper' | 'custom';
 
 // @public (undocumented)
 export interface BaseScreenMaterialEditorDescriptor {

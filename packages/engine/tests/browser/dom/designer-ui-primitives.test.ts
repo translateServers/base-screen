@@ -72,7 +72,7 @@ describe('private designer UI primitives', () => {
       disabled: true,
       pressed: false,
       text: 'Save',
-      title: 'Save project',
+      tip: 'Save project',
       variant: 'primary',
     });
 
@@ -80,7 +80,7 @@ describe('private designer UI primitives', () => {
     expect(button.className).toBe('designer-control designer-button project-save');
     expect(button.dataset.variant).toBe('primary');
     expect(button.textContent).toBe('Save');
-    expect(button.title).toBe('Save project');
+    expect(button.getAttribute('data-tip')).toBe('Save project');
     expect(button.ariaLabel).toBe('Save project');
     expect(button.ariaPressed).toBe('false');
     expect(button.ariaBusy).toBe('true');
@@ -98,7 +98,7 @@ describe('private designer UI primitives', () => {
     expect(button.className).toBe(
       'designer-control designer-button designer-icon-button layer-action',
     );
-    expect(button.title).toBe('Open layers');
+    expect(button.getAttribute('data-tip')).toBe('Open layers');
     expect(button.ariaLabel).toBe('Open layers');
     expect(button.innerHTML).toContain('<svg');
     expect(button.innerHTML).toContain('aria-hidden="true"');

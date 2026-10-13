@@ -149,7 +149,7 @@ function appendVariableSummary(
   const name = row.ownerDocument.createElement('code');
   name.className = 'variable-name';
   name.textContent = variable.name;
-  name.title = variable.name;
+  name.setAttribute('data-tip', variable.name);
   identity.appendChild(name);
   header.appendChild(identity);
 
@@ -240,7 +240,10 @@ function createRowContext(ownerDocument: Document, variable: ScreenVariable): HT
     variable.type === 'static'
       ? summarizeValue(formatValue(variable.initialValue))
       : variable.sourceId;
-  value.title = variable.type === 'static' ? formatValue(variable.initialValue) : variable.sourceId;
+  value.setAttribute(
+    'data-tip',
+    variable.type === 'static' ? formatValue(variable.initialValue) : variable.sourceId,
+  );
   context.appendChild(label);
   context.appendChild(value);
   return context;
@@ -320,7 +323,7 @@ function createIconAction(
   const button = createDesignerButton(ownerDocument, {
     ariaLabel: label,
     className: 'variable-icon-action',
-    title: label,
+    tip: label,
     variant: 'ghost',
   });
   button.dataset.variableAction = action;
@@ -337,7 +340,7 @@ function createDescriptionAction(
   const button = createDesignerButton(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.editDescription(variable.name),
     className: 'variable-description-action',
-    title: variable.description ?? DESIGNER_UI_TEXT.variables.addDescription,
+    tip: variable.description ?? DESIGNER_UI_TEXT.variables.addDescription,
     variant: 'ghost',
   });
   button.dataset.variableAction = 'edit-description';
@@ -362,7 +365,7 @@ function createValueDetail(
   const button = createDesignerButton(ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.editValue(variable.name),
     className: 'variable-value-button',
-    title: serialized,
+    tip: serialized,
     variant: 'ghost',
   });
   button.dataset.variableAction = 'edit-value';
@@ -398,13 +401,12 @@ function createDetailLine(ownerDocument: Document, label: string, value: string)
 
 function createCodeDetail(ownerDocument: Document, label: string, value: string): HTMLElement {
   const line = createDetailLine(ownerDocument, label, value);
-  line.lastElementChild?.replaceWith(
-    Object.assign(ownerDocument.createElement('code'), {
-      className: 'variable-host-id',
-      textContent: value,
-      title: value,
-    }),
-  );
+  const hostId = Object.assign(ownerDocument.createElement('code'), {
+    className: 'variable-host-id',
+    textContent: value,
+  });
+  hostId.setAttribute('data-tip', value);
+  line.lastElementChild?.replaceWith(hostId);
   return line;
 }
 

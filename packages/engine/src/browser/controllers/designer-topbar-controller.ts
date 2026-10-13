@@ -43,10 +43,11 @@ export class DesignerTopbarController {
     if (snapshot === null) return;
     const available = this.callbacks.canCreateSnapshot();
     snapshot.disabled = !available;
-    snapshot.title = available
+    const snapshotTip = available
       ? DESIGNER_UI_TEXT.createSnapshot
       : DESIGNER_UI_TEXT.snapshotUnavailable;
-    snapshot.ariaLabel = snapshot.title;
+    snapshot.setAttribute('data-tip', snapshotTip);
+    snapshot.ariaLabel = snapshotTip;
   }
 
   private async createSnapshot(): Promise<void> {

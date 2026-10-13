@@ -55,10 +55,36 @@ export function handleDatasetClick(
     context.catalogController.loadMore();
     return true;
   }
+  // 芯片 × 在触发器内部：必须先于触发器分支裁决，否则会被「展开/收起」吞掉。
+  const bindingChip = target.closest<HTMLButtonElement>('[data-dataset-binding-chip-field]');
+  if (bindingChip !== null) {
+    // 芯片 × 与弹层内取消同义：复用字段切换，但保持弹层开合并把焦点交回该选项。
+    const fieldId = bindingChip.dataset.datasetBindingChipField;
+    const wrapper = bindingChip.closest<HTMLElement>('.designer-bind-field');
+    const option = wrapper?.querySelector<HTMLButtonElement>(
+      `[data-dataset-binding-field="${fieldId}"]`,
+    );
+    if (option !== null && option !== undefined) toggleDatasetBindingField(context, option);
+    return true;
+  }
+  const bindingTrigger = target.closest<HTMLButtonElement>('[data-dataset-binding-trigger]');
+  if (bindingTrigger !== null) {
+    const roleId = bindingTrigger.dataset.datasetBindingTrigger ?? null;
+    context.state.bindingOpenRoleId = context.state.bindingOpenRoleId === roleId ? null : roleId;
+    context.renderSurface();
+    return true;
+  }
   const bindingField = target.closest<HTMLButtonElement>('[data-dataset-binding-field]');
   if (bindingField !== null) {
     toggleDatasetBindingField(context, bindingField);
     return true;
+  }
+  if (context.state.bindingOpenRoleId !== null) {
+    const insideMenu = target.closest('[data-dataset-binding-role]') !== null;
+    if (!insideMenu) {
+      context.state.bindingOpenRoleId = null;
+      context.renderSurface();
+    }
   }
   const bindingAction = target.closest<HTMLButtonElement>('[data-dataset-binding-role-action]');
   if (bindingAction !== null) {
@@ -248,6 +274,34 @@ export function handleDatasetKeyDown(
   context: DesignerDatasetControllerContext,
   event: KeyboardEvent,
 ): boolean {
+  if (event.key === 'Escape' && context.state.bindingOpenRoleId !== null) {
+    event.preventDefault();
+    context.state.bindingOpenRoleId = null;
+    context.renderSurface();
+    return true;
+  }
+  if (event.key === 'Backspace') {
+    const target = event.target;
+    const trigger =
+      target instanceof Element ? target.closest('[data-dataset-binding-trigger]') : null;
+    if (trigger !== null) {
+      // 原型同款：触发器上按 Backspace 移除最后一个已绑芯片。
+      const chips = trigger.querySelectorAll<HTMLButtonElement>(
+        '[data-dataset-binding-chip-field]',
+      );
+      const last = chips[chips.length - 1];
+      if (last !== undefined) {
+        event.preventDefault();
+        const wrapper = last.closest<HTMLElement>('.designer-bind-field');
+        const fieldId = last.dataset.datasetBindingChipField;
+        const option = wrapper?.querySelector<HTMLButtonElement>(
+          `[data-dataset-binding-field="${fieldId}"]`,
+        );
+        if (option !== null && option !== undefined) toggleDatasetBindingField(context, option);
+      }
+      return true;
+    }
+  }
   if (event.key === 'Escape' && context.state.workbenchOpen) {
     event.preventDefault();
     if (context.state.mode === 'dataset' && context.state.draftDirty) {

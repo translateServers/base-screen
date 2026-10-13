@@ -1689,6 +1689,105 @@ async function assertDesignerControlStyles(designer) {
   }
 }
 
+// 悬浮提示：data-tip 单例浮层替代原生 title —— 延迟浮现、Esc 关闭并抑制重弹、键盘聚焦即时。
+async function assertDesignerTooltip(designer, page) {
+  const result = await designer.evaluate(async (host) => {
+    const root = host.shadowRoot;
+    const layer = root?.querySelector('#designer-tooltip');
+    const trigger = root?.querySelector('[data-topbar-theme-toggle]');
+    if (root === null || layer === null || trigger === null)
+      return { ok: false, reason: 'missing' };
+    const legacyTitles = root.querySelectorAll('[title]').length;
+    const rect = trigger.getBoundingClientRect();
+    const hover = () =>
+      trigger.dispatchEvent(
+        new PointerEvent('pointerover', {
+          bubbles: true,
+          composed: true,
+          pointerType: 'mouse',
+          clientX: rect.left + rect.width / 2,
+          clientY: rect.top + rect.height / 2,
+        }),
+      );
+    const leave = () =>
+      trigger.dispatchEvent(
+        new PointerEvent('pointerout', { bubbles: true, composed: true, pointerType: 'mouse' }),
+      );
+    hover();
+    const beforeDelay = layer.classList.contains('is-open');
+    await new Promise((resolve) => setTimeout(resolve, 520));
+    const topic = {
+      legacyTitles,
+      beforeDelay,
+      opened: layer.classList.contains('is-open'),
+      text: layer.textContent,
+      tip: trigger.getAttribute('data-tip'),
+      describedBy: trigger.getAttribute('aria-describedby'),
+      background: getComputedStyle(layer).backgroundColor,
+      foreground: getComputedStyle(layer).color,
+    };
+    const layerRect = layer.getBoundingClientRect();
+    topic.centered =
+      Math.abs(layerRect.left + layerRect.width / 2 - (rect.left + rect.width / 2)) < 40;
+    topic.adjacent = layerRect.bottom <= rect.top || layerRect.top >= rect.bottom;
+    root
+      .querySelector('[data-topbar-theme-toggle]')
+      .dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true }),
+      );
+    topic.closedByEscape = !layer.classList.contains('is-open');
+    topic.describedRestored = trigger.getAttribute('aria-describedby');
+    // Esc 抑制：本次悬停内不再重弹；指针移出后恢复。
+    hover();
+    await new Promise((resolve) => setTimeout(resolve, 520));
+    topic.suppressedAfterEscape = !layer.classList.contains('is-open');
+    leave();
+    hover();
+    await new Promise((resolve) => setTimeout(resolve, 520));
+    topic.reopenedAfterLeave = layer.classList.contains('is-open');
+    leave();
+    return topic;
+  });
+  if (
+    result.ok === false ||
+    // 原生 title 已全部退役为 data-tip；浮层只在延迟后出现，位置贴触发点，Esc 可关并抑制重弹。
+    result.legacyTitles !== 0 ||
+    result.beforeDelay !== false ||
+    result.opened !== true ||
+    result.text !== result.tip ||
+    result.describedBy !== 'designer-tooltip' ||
+    result.background === 'rgba(0, 0, 0, 0)' ||
+    result.background === result.foreground ||
+    result.centered !== true ||
+    result.adjacent !== true ||
+    result.closedByEscape !== true ||
+    result.describedRestored !== null ||
+    result.suppressedAfterEscape !== true ||
+    result.reopenedAfterLeave !== true
+  ) {
+    throw new Error(`BROWSER_HARNESS_TOOLTIP_FAILED:${JSON.stringify(result)}`);
+  }
+  // 键盘聚焦即时显示：脚本聚焦不产生 :focus-visible，用「移出再 Tab 回来」制造真实键盘聚焦。
+  const themeToggle = designer.locator('[data-topbar-theme-toggle]');
+  await themeToggle.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(80);
+  const focusState = await designer.evaluate((host) => {
+    const root = host.shadowRoot;
+    const layer = root.querySelector('#designer-tooltip');
+    const active = root.activeElement;
+    return {
+      open: layer?.classList.contains('is-open'),
+      text: layer?.textContent,
+      tip: active?.getAttribute?.('data-tip') ?? null,
+    };
+  });
+  if (focusState.open !== true || focusState.text !== focusState.tip || focusState.tip === null) {
+    throw new Error(`BROWSER_HARNESS_TOOLTIP_FOCUS_FAILED:${JSON.stringify(focusState)}`);
+  }
+}
+
 // R5：两个 Designer 的 theme/Token/style node 互不影响；disconnect/reconnect 和
 
-export { assertDesignerControlStyles };
+export { assertDesignerControlStyles, assertDesignerTooltip };

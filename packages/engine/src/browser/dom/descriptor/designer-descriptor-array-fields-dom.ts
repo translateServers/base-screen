@@ -148,18 +148,19 @@ function appendDescriptorItemField(
   label.textContent = itemField.label;
   const itemValue = readArrayItemValue(context, arrayField, index, itemField.path);
   const itemSchema = itemFieldSchema(arrayField, itemField, context);
-  const control = createDescriptorControl(
+  const handle = createDescriptorControl(
     ownerDocument,
     itemField,
     itemSchema,
     itemValue,
     context.datasetFields,
   );
+  const control = handle.valueTarget;
   control.dataset.descriptorFieldId = itemField.id;
   control.dataset.descriptorTarget = itemField.target;
   control.dataset.descriptorPath = JSON.stringify([...arrayField.path, index, ...itemField.path]);
   control.dataset.descriptorControl = itemField.control;
-  label.appendChild(control);
+  label.appendChild(handle.element);
   appendDesignerFieldMessage(
     label,
     control,

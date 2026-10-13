@@ -174,7 +174,11 @@ describe('compact palette layout', () => {
     ).toBe(false);
     expect(modes).toHaveLength(3);
     expect(modes.map((mode) => mode.textContent)).toEqual(['', '', '']);
-    expect(modes.map((mode) => mode.title)).toEqual(['单色', '线性渐变', '径向渐变']);
+    expect(modes.map((mode) => mode.attributes.get('data-tip'))).toEqual([
+      '单色',
+      '线性渐变',
+      '径向渐变',
+    ]);
     expect(radios.map((radio) => radio.attributes.get('aria-label'))).toEqual([
       '单色',
       '线性渐变',

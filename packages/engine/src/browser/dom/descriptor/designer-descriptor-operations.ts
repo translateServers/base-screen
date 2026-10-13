@@ -289,7 +289,11 @@ function parseControlValue(
   if (control.control === 'boolean') {
     return (target as HTMLInputElement).checked === true;
   }
-  if (control.control === 'number' || control.control === 'unit-number') {
+  if (
+    control.control === 'number' ||
+    control.control === 'unit-number' ||
+    control.control === 'stepper'
+  ) {
     const value = Number(target.value);
     return Number.isFinite(value) ? value : undefined;
   }

@@ -170,6 +170,7 @@ export function renderDesignerDatasetWorkbench(
       roles: options.roles,
       variables: options.variables,
       resourceAvailable: options.resourceAvailable,
+      bindingOpenRoleId: options.bindingOpenRoleId ?? null,
     });
     configuration.querySelector('.designer-dataset-actions')?.remove();
     editor.appendChild(configuration);

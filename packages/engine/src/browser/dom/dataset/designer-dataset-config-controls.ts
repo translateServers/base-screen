@@ -1,5 +1,6 @@
 import type { ScreenDatasetDefinition, ScreenHostResourceParameter } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { attachDesignerDateField } from '../designer-date-field-dom.js';
 import type { DesignerDatasetConfigurationOptions } from './designer-dataset-types.js';
 
 export function variableControl(
@@ -67,7 +68,7 @@ export function parameterControl(
   descriptor: ScreenDatasetDefinition,
   name: string,
   draft: ScreenHostResourceParameter | undefined,
-): HTMLInputElement | HTMLTextAreaElement {
+): HTMLElement {
   const parameter = descriptor.parameters.find((item) => item.name === name)!;
   const input = ownerDocument.createElement('input');
   input.className = 'designer-control designer-input';
@@ -83,6 +84,10 @@ export function parameterControl(
     if (parameter.minimum !== undefined) input.min = String(parameter.minimum);
     if (parameter.maximum !== undefined) input.max = String(parameter.maximum);
     if (parameter.maxLength !== undefined) input.maxLength = parameter.maxLength;
+  }
+  // 日期参数原样保留输入框为值载体，只把「输入 + 触发器 + 自绘日历」装进同一外壳。
+  if (parameter.valueType === 'date') {
+    return attachDesignerDateField(input, { label: parameter.label }).element;
   }
   return input;
 }

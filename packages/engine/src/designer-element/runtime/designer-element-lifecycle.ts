@@ -37,6 +37,7 @@ export function disconnectSurfaces(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
   elementState.autoWidthController.clear();
+  elementState.tooltipController.disconnect();
   elementState.coordinateEntryController.disconnect();
   elementState.sizeEntryController.disconnect();
   elementState.workbenchController.disconnect();
@@ -105,6 +106,8 @@ export function reconnectSurfaces(element: DesignerElementHost): void {
   elementState.layers = shadow.querySelector<HTMLDivElement>('[data-layers]') ?? undefined;
   const notifications = shadow.querySelector<HTMLElement>('[data-notifications]');
   if (notifications !== null) elementState.notificationController.connect(notifications);
+  const tooltip = shadow.querySelector<HTMLElement>('[data-tooltip]');
+  if (tooltip !== null) elementState.tooltipController.connect(shadow, tooltip);
   const consoleDialog = shadow.querySelector<HTMLElement>('[data-error-console]');
   const consoleTrigger = shadow.querySelector<HTMLButtonElement>('[data-error-console-toggle]');
   if (consoleDialog !== null && consoleTrigger !== null) {

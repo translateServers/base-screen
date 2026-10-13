@@ -6,6 +6,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const source = (file) => readFileSync(resolve(root, file), 'utf8');
 const baseLayers = [
   'packages/engine/src/browser/styles/base/designer-base-menus.css',
+  'packages/engine/src/browser/styles/base/designer-base-tooltip.css',
   'packages/engine/src/browser/styles/base/designer-base-library.css',
   'packages/engine/src/browser/styles/base/designer-base-material-groups.css',
   'packages/engine/src/browser/styles/base/designer-base-shell.css',
@@ -15,6 +16,8 @@ const controlLayers = [
   'packages/engine/src/browser/styles/controls/designer-controls-fields.css',
   'packages/engine/src/browser/styles/controls/designer-controls-color-palette.css',
   'packages/engine/src/browser/styles/controls/designer-controls-inputs.css',
+  'packages/engine/src/browser/styles/controls/designer-controls-date-field.css',
+  'packages/engine/src/browser/styles/controls/designer-controls-segmented.css',
   'packages/engine/src/browser/styles/controls/designer-controls-quick-style.css',
   'packages/engine/src/browser/styles/controls/designer-controls-actions.css',
   'packages/engine/src/browser/styles/controls/designer-controls-descriptor.css',
@@ -42,11 +45,20 @@ const workbenchLayers = [
   'packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-accessibility.css',
 ];
-const baseBindings = ['menusCss', 'libraryCss', 'materialGroupsCss', 'shellCss', 'adaptivityCss'];
+const baseBindings = [
+  'menusCss',
+  'tooltipCss',
+  'libraryCss',
+  'materialGroupsCss',
+  'shellCss',
+  'adaptivityCss',
+];
 const controlBindings = [
   'fieldsCss',
   'colorPaletteCss',
   'inputsCss',
+  'dateFieldCss',
+  'segmentedCss',
   'quickStyleCss',
   'actionsCss',
   'descriptorCss',

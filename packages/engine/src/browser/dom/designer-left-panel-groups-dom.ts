@@ -38,7 +38,7 @@ export function renderDesignerLeftPanelGroups(
       tab.dataset.hostLeftPanelGroup = group.id;
       tab.dataset.hostLeftPanelMode = 'canvas';
       tab.dataset.hostLeftPanelRendered = '';
-      tab.title = group.label;
+      tab.setAttribute('data-tip', group.label);
 
       const glyph = root.ownerDocument.createElement('span');
       glyph.className = 'rail-tab-glyph';
