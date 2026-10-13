@@ -214,8 +214,9 @@ export class DesignerViewportController {
     // 用 data-active-tool 而非 data-tool 存储当前工具：data-tool 是工具栏按钮的
     // 命中选择器（executeToolFromTarget 的 closest('[data-tool]')），同名会被误命中。
     if (dataset !== undefined) dataset.activeTool = this.activeTool;
-    for (const output of root?.querySelectorAll<HTMLOutputElement>('[data-zoom]') ?? []) {
-      output.value = `${Math.round(this.#state.zoom * 100)}%`;
+    // 读数可以是 output 或按钮（点击复位）：写 textContent，两者都能显示。
+    for (const readout of root?.querySelectorAll<HTMLElement>('[data-zoom]') ?? []) {
+      readout.textContent = `${Math.round(this.#state.zoom * 100)}%`;
     }
     const zoomTrigger = root?.querySelector<HTMLElement>('[data-status-zoom]');
     if (zoomTrigger !== null && zoomTrigger !== undefined) {

@@ -957,7 +957,8 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     !state.statusInsideConsole ||
     state.consoleHidden !== true ||
     state.consoleCount !== '1' ||
-    (state.consoleWidth ?? 0) < 32 ||
+    // 顶栏图标按钮随设计值 28px（此前 32px）。
+    (state.consoleWidth ?? 0) < 28 ||
     state.categoryCount !== 0 ||
     state.groupCount !== 5 ||
     state.draft !== true ||

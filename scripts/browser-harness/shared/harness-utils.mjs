@@ -33,7 +33,7 @@ async function openCanvasAidsMenu(designer, page) {
 async function hoverNestedSubmenu(designer, page, level2Label, level3Label) {
   const topMenu = await openTopMenu(designer, level2Label);
   const nestedWrap = topMenu
-    .locator('[data-submenu] > .designer-menu-submenu-wrap')
+    .locator('.designer-menu-submenu-wrap')
     .filter({ hasText: level3Label });
   const trigger = nestedWrap.locator('[data-submenu-toggle]');
   await trigger.waitFor({ state: 'visible' });
