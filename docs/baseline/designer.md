@@ -105,6 +105,16 @@
 - **画布内文本直接编辑**（封版后增量，已纳入基线）：双击可编辑文本组件进入 contenteditable overlay 编辑会话——仅官方文本物料且 dataSource 为 static 字符串（fail-closed，host-resource 数据归宿主）；Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 视觉复制物料样式（WYSIWYG），经既有 `isEditableTarget` 通道放行 IME 与原生编辑键，不侵入物料/Renderer DOM；公共契约零变化。依据：[Designer Canvas Text Editing](../specs/archive/designer-canvas-text-editing/spec.md)、[ADR-0052](../decisions/ADR-0052-designer-canvas-text-editing.md)。
 - **多选批量属性编辑**（封版后增量，已纳入基线）：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑——样式字段取所有选中组件 stylePanel 交集（空交集只显几何），控件复用既有渲染与统一三段式调色板；值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派、单选通道零改动；公共契约零变化。依据：[Designer Multi Selection Editing](../specs/archive/designer-multi-selection-editing/spec.md)、[ADR-0053](../decisions/ADR-0053-designer-multi-selection-editing.md)。
 - **DataV 全局变量**（2026-09-03 增量，已纳入基线）：canonical 变量以稳定 `id` 寻址，来源固定为 `static | data-source | url-query`，并保存名称、描述、初始值、宿主 `sourceId`、过滤器 `processorId`、受控模式与数据源自动更新频次。变量面板按 DataV 字段提供创建、完整配置、响应预览、重命名、复制、删除、使用次数和加入 Blueprint；重命名只改展示名，所有组件数据参数、组件变量数据源、Blueprint 表达式、触发器和动作继续引用稳定 ID。变量作为 Blueprint 一等节点，提供 `data-updated | request-state` 事件、导入变量和请求组件数据动作；文档推导的依赖边锁定，作者规则边可删除。Viewer/Designer 暴露 `getVariable(id).value/.set/.onChange` 和 `refreshVariables`，受控动态变量不使用初始值，解析变化会触发监听与变量事件。实际 URL、API/SQL、凭证、过滤代码和轮询调度仍归宿主，Base Screen 只保存严格配置并发出有界请求。旧 `static | host`、`value` 和按名称引用通过一次性失败关闭脚本迁移，不保留兼容分支。依据：[DataV Global Variables](../specs/archive/datav-global-variables/spec.md)、[ADR-0083](../decisions/ADR-0083-variable-system.md)（含其吸收的早期 DataV 启发方案 ADR-0067）。
+- **面板体系重做**（2026-10-13 增量，口径见设计移植 Spec 批 3）：左栏切换条收敛为 raised 底
+  48px 竖排轨（44×60 tab、选中 = control-active 胶囊 + 收边 + 强调色图标、宿主分组上缘留白与分隔线），
+  列头带 40px 并新增归属标签（`BUILTIN` / `HOST` / `PLUGIN`，随工作模式与分组更新）；素材缩略图改中性底
+  + `canvas-grid-line` 网格纹理（色相渐变退役），卡片圆角 8、悬停中性；图层行 40px 且主选 = 强调色淡底
+  + 强调色收边、次级 = 中性按下档；检查器标签页改左对齐浅胶囊、内容列内边距 8/12/24、分节标题带发丝
+  拖动线；命令面板卡与提示条改阴影描边（提示条语义色只染图标）；枚举控件经 `enhanceDesignerSelect`
+  走自绘下拉（触发器 + 弹层 + 1px 隐藏原生 select 承担取值与 change），覆盖描述符枚举字段、画布背景
+  类型/适配与数据集单选角色。依据：
+  [Designer 工作台设计移植](../specs/designer-workspace-design-port/spec.md)、
+  [ADR-0088](../decisions/ADR-0088-designer-workspace-chrome-and-visual-base.md)。
 - **表单控件体系重做**（2026-10-13 增量，口径见设计移植 Spec 批 2）：原生 `title` 提示全部退役为
   `data-tip` 单例浮层——悬停约 420ms 浮现、持续浏览切换降到 90ms、键盘聚焦即时、Esc 关闭并在本次悬停内
   抑制重弹、禁用控件按坐标扫描兜底、贴边上下翻转与左右夹取、箭头跟随，接口只认 `data-tip`（`title` 零残留
