@@ -105,6 +105,20 @@
 - **画布内文本直接编辑**（封版后增量，已纳入基线）：双击可编辑文本组件进入 contenteditable overlay 编辑会话——仅官方文本物料且 dataSource 为 static 字符串（fail-closed，host-resource 数据归宿主）；Enter 提交 / Shift+Enter 换行 / Esc 取消 / 失焦提交，提交复用 `update-components` patch dataSource（恰一条历史）；overlay 视觉复制物料样式（WYSIWYG），经既有 `isEditableTarget` 通道放行 IME 与原生编辑键，不侵入物料/Renderer DOM；公共契约零变化。依据：[Designer Canvas Text Editing](../specs/archive/designer-canvas-text-editing/spec.md)、[ADR-0052](../decisions/ADR-0052-designer-canvas-text-editing.md)。
 - **多选批量属性编辑**（封版后增量，已纳入基线）：多选检查器新增批量几何（宽/高/旋转）与样式交集编辑——样式字段取所有选中组件 stylePanel 交集（空交集只显几何），控件复用既有渲染与统一三段式调色板；值显示焦点组件、编辑应用到全部选中，一条事务 N 条命令（跳过锁定、逐组件 schema 校验）恰一条历史；`data-multi-property` 独立分派、单选通道零改动；公共契约零变化。依据：[Designer Multi Selection Editing](../specs/archive/designer-multi-selection-editing/spec.md)、[ADR-0053](../decisions/ADR-0053-designer-multi-selection-editing.md)。
 - **DataV 全局变量**（2026-09-03 增量，已纳入基线）：canonical 变量以稳定 `id` 寻址，来源固定为 `static | data-source | url-query`，并保存名称、描述、初始值、宿主 `sourceId`、过滤器 `processorId`、受控模式与数据源自动更新频次。变量面板按 DataV 字段提供创建、完整配置、响应预览、重命名、复制、删除、使用次数和加入 Blueprint；重命名只改展示名，所有组件数据参数、组件变量数据源、Blueprint 表达式、触发器和动作继续引用稳定 ID。变量作为 Blueprint 一等节点，提供 `data-updated | request-state` 事件、导入变量和请求组件数据动作；文档推导的依赖边锁定，作者规则边可删除。Viewer/Designer 暴露 `getVariable(id).value/.set/.onChange` 和 `refreshVariables`，受控动态变量不使用初始值，解析变化会触发监听与变量事件。实际 URL、API/SQL、凭证、过滤代码和轮询调度仍归宿主，Base Screen 只保存严格配置并发出有界请求。旧 `static | host`、`value` 和按名称引用通过一次性失败关闭脚本迁移，不保留兼容分支。依据：[DataV Global Variables](../specs/archive/datav-global-variables/spec.md)、[ADR-0083](../decisions/ADR-0083-variable-system.md)（含其吸收的早期 DataV 启发方案 ADR-0067）。
+- **表单控件体系重做**（2026-10-13 增量，口径见设计移植 Spec 批 2）：原生 `title` 提示全部退役为
+  `data-tip` 单例浮层——悬停约 420ms 浮现、持续浏览切换降到 90ms、键盘聚焦即时、Esc 关闭并在本次悬停内
+  抑制重弹、禁用控件按坐标扫描兜底、贴边上下翻转与左右夹取、箭头跟随，接口只认 `data-tip`（`title` 零残留
+  由 harness 断言钉死）。控件基座按原型重做：控制高度 30px、描边改 `elev-ring` 阴影（悬停深一档、聚焦 2px
+  强调环、错误/成功换语义色环，几何零位移）、禁用走工作区底 + 弱文本（不再整体降透明）、只读透明底、
+  混合值虚线段，复选框补 `:indeterminate` 半选与 `data-mixed`；按钮无边框、悬停只换底色、按压不缩放，
+  主档反转实底、图标按钮 28px。描述符词汇新增 `control: 'stepper'`（− / 可键入值 / +，要求数字 schema
+  双边有界，边界禁用并把焦点交回对侧）与数据集日期参数的 `datefield`（输入框 + 锚定触发器 + 自绘日历：
+  周一起始 6×7、今天/选中/外月三态、方向键/PageUp-Dn/Home-End、今天按钮、贴底翻转、域外点击与 Esc 关闭，
+  选日只写回输入并派发 change，既有事务流水线零改动）。数据工作台限额多选改为「芯片触发器 + 计数 +
+  类型标签弹层」（达上限禁用未选项并给出原因，芯片 × 与选项切换共用绑定动作，弹层开合跨重渲染保持）。
+  分段控件（画布缩放、数据源、检查器密度、数据集编辑器）统一到同一形态。依据：
+  [Designer 工作台设计移植](../specs/designer-workspace-design-port/spec.md)、
+  [ADR-0088](../decisions/ADR-0088-designer-workspace-chrome-and-visual-base.md)。
 - **官方物料视觉能力**（封版后增量，已纳入基线）：形状物料（矩形/椭圆）新增圆角 `borderRadius`（0..512）与阴影 `shadowColor`/`shadowBlur`/`shadowOffsetX`/`shadowOffsetY`（阴影默认关闭，椭圆固定 50% 圆角且面板不暴露 borderRadius）；`fill` 渐变字符串渲染为 background-image（普通色值保持 background-color），容器 `backgroundColor` 同规则；矩形 `borderColor` 支持线性/径向渐变，通过组件内遮罩层绘制在 canonical 边界以内并继承 `borderRadius`，纯色边框保持原生 border 路径；`shadowColor` 渐变时跳过阴影（box-shadow 不接受 `<image>`）；Manifest 能力扩展、旧文档零迁移，公共契约零变化。依据：[Official Material Visual Capabilities](../specs/archive/official-material-visual-capabilities/spec.md)、[ADR-0077](../decisions/ADR-0077-canvas-background-and-color-authoring.md)。
 - **图片物料 URL 校验与失败回退**（封版后增量，已纳入基线）：图片物料静态数据源复用 `isBoundedScreenImageUrl` fail-closed 校验（与画布背景/封面同规则，拒绝 data:/javascript:/blob:/file:/裸相对/控制字符）——非法 URL 不创建 img、显示「图片地址无效」占位；`img` 加载失败移除失效图片并显示「图片加载失败」占位，渲染重建不残留；公共契约零变化。依据：[Image Material URL Validation](../specs/archive/image-material-url-validation/spec.md)、[ADR-0085](../decisions/ADR-0085-text-and-image-material-authoring.md)。
 - **官方图片一次性倍图尺寸**（2026-09-01 增量）：单选 `base.image` 时，Designer 几何区提供无状态 `1x`/`2x`/`3x`/`4x` 操作，按当前物料宿主投影的图片自然宽高除以倍率，并以一条 `update-components` 事务写入两位小数、`1..1000000` 范围内的固定 `size`；相同尺寸不新增历史，锁定或自然尺寸不可用时失败关闭并诊断。自然尺寸元数据在换源、加载中、URL 无效与失败时立即清除，过期 load/error 不能恢复旧值；倍率不持久化、换图不跟随、结果不受画布范围裁决，Viewer 与导出仍只消费 canonical 固定宽高。Image Manifest、Material ABI、ScreenDocument 与公开方法均不变。
