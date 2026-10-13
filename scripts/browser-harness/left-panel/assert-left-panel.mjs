@@ -395,7 +395,8 @@ export async function assertLeftPanelLayers(page, viewport) {
   if (
     selectedState.selected !== 'true' ||
     selectedState.hidden !== 'false' ||
-    selectedState.height !== 36 ||
+    // 行高随原型对齐 40px；选中 = 强调色淡底 + 强调色收边。
+    selectedState.height !== 40 ||
     selectedState.cursor !== 'pointer' ||
     selectedState.backgroundColor === 'rgba(0, 0, 0, 0)' ||
     selectedState.boxShadow === 'none' ||

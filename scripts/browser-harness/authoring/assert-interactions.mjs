@@ -1614,14 +1614,14 @@ async function assertDesignerControlStyles(designer) {
       canaryInputHeight: input.getBoundingClientRect().height,
       viewerFont: viewer === null ? undefined : getComputedStyle(viewer).font,
       materialThumbBackground:
-        materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundImage,
+        materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundColor,
     };
     host.setAttribute('theme', 'dark');
     const darkTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
       .trim();
     const darkMaterialThumbBackground =
-      materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundImage;
+      materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundColor;
     const hostStyle = document.createElement('style');
     hostStyle.textContent =
       'base-screen-designer { --base-screen-designer-surface-workspace: rgb(10, 20, 30); }';

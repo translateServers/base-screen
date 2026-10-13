@@ -102,8 +102,9 @@ export async function assertBlueprintWorkbench(designer, page) {
     collapsedLibrary.headingWidth !== 48 ||
     collapsedLibrary.headingHeight !== 48 ||
     !collapsedLibrary.tabsBelowHeading ||
-    collapsedLibrary.tabWidth !== 36 ||
-    !(collapsedLibrary.tabHeight >= 40) ||
+    // 折叠轨沿用画布左栏的竖排 tab 规格（44×60）。
+    collapsedLibrary.tabWidth !== 44 ||
+    !(collapsedLibrary.tabHeight >= 60) ||
     collapsedLibrary.libraryDisplay !== 'grid' ||
     collapsedLibrary.tabRailDisplay !== 'flex' ||
     collapsedLibrary.labelDisplay !== 'none' ||

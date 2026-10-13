@@ -484,37 +484,56 @@
 
 .designer-notifications {
   position: absolute;
-  right: var(--designer-space-5);
-  bottom: calc(30px + var(--designer-space-5));
+  right: var(--designer-space-6);
+  bottom: calc(30px + var(--designer-space-6));
   z-index: var(--designer-z-dialog);
   display: grid;
-  width: min(360px, calc(100% - 2 * var(--designer-space-5)));
-  gap: var(--designer-space-3);
+  width: min(340px, calc(100% - 2 * var(--designer-space-6)));
+  gap: var(--designer-space-4);
   pointer-events: none;
 }
 
+/* 提示条（原型 .toast）：覆盖层卡片形态，描边由 elev-ring 承担；语义色只染图标，
+   底色保持中性覆盖面。 */
 .designer-notification {
   display: flex;
   align-items: center;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-3) var(--designer-space-4);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-panel);
-  box-shadow: var(--designer-shadow-canvas);
+  gap: var(--designer-space-4);
+  padding: var(--designer-space-4) var(--designer-space-5);
+  border: 0;
+  border-radius: var(--designer-radius-overlay);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-md);
   pointer-events: auto;
 }
 
-.designer-notification[data-notification-tone="error"] {
-  border-color: var(--designer-danger);
+.designer-notification > svg {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  color: var(--designer-accent);
 }
 
-.designer-notification[data-notification-tone="success"] {
-  border-color: var(--designer-accent);
+.designer-notification[data-notification-tone="error"] > svg {
+  color: var(--designer-danger);
+}
+
+.designer-notification[data-notification-tone="success"] > svg {
+  color: var(--designer-success);
 }
 
 .designer-notification-close {
   margin-left: auto;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-muted);
+}
+
+.designer-notification-close:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
 }
 
 .designer-context-menu {

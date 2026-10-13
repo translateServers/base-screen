@@ -3,6 +3,11 @@ import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
 /** Private, stateless DOM primitives for Designer chrome. Never export from the package root. */
 export type DesignerButtonVariant = 'primary' | 'danger' | 'ghost';
 
+/** 提示条语义图标：语义色只落在图标上（原型 .toast）。 */
+export function designerNotificationGlyph(tone: 'error' | 'success'): string {
+  return designerIcon(tone === 'error' ? 'x-circle' : 'check-circle');
+}
+
 export interface CreateDesignerButtonOptions {
   readonly ariaLabel?: string;
   readonly busy?: boolean;

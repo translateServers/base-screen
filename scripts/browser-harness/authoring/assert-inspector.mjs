@@ -24,6 +24,11 @@ async function assertInspectorFormScrollContinuity(page, designer) {
   const results = [];
 
   for (const probe of probes) {
+    // 自绘下拉：几何与命中都看触发器，值仍读原生 select。
+    const boxSelector =
+      probe.kind === 'select'
+        ? `.designer-select-control:has(${probe.selector}) .designer-select-trigger`
+        : probe.selector;
     await designer.evaluate((element, selector) => {
       const root = element.shadowRoot;
       const pane = root.querySelector('[data-inspector-pane="appearance"]');
@@ -41,32 +46,43 @@ async function assertInspectorFormScrollContinuity(page, designer) {
         pane.scrollHeight - pane.clientHeight,
         Math.max(0, Math.ceil(controlContentTop + 4)),
       );
-    }, probe.selector);
+    }, boxSelector);
     await page.waitForTimeout(150);
 
-    const before = await designer.evaluate((element, selector) => {
-      const root = element.shadowRoot;
-      const pane = root.querySelector('[data-inspector-pane="appearance"]');
-      const control = root.querySelector(selector);
-      if (
-        !(pane instanceof HTMLElement) ||
-        !(control instanceof HTMLInputElement || control instanceof HTMLSelectElement)
-      ) {
-        throw new Error(`BROWSER_HARNESS_INSPECTOR_SCROLL_CONTROL_MISSING:${selector}`);
-      }
-      const paneBox = pane.getBoundingClientRect();
-      const controlBox = control.getBoundingClientRect();
-      return {
-        clippedAtTop: controlBox.top < paneBox.top,
-        scrollTop: pane.scrollTop,
-        value:
-          control instanceof HTMLInputElement && control.type === 'checkbox'
-            ? control.checked
-            : control.value,
-      };
-    }, probe.selector);
+    const before = await designer.evaluate(
+      (element, args) => {
+        const root = element.shadowRoot;
+        const pane = root.querySelector('[data-inspector-pane="appearance"]');
+        const control = root.querySelector(args.selector);
+        const boxed = root.querySelector(args.boxSelector);
+        if (
+          !(pane instanceof HTMLElement) ||
+          !(control instanceof HTMLInputElement || control instanceof HTMLSelectElement) ||
+          !(boxed instanceof HTMLElement)
+        ) {
+          throw new Error(`BROWSER_HARNESS_INSPECTOR_SCROLL_CONTROL_MISSING:${args.selector}`);
+        }
+        const paneBox = pane.getBoundingClientRect();
+        const controlBox = boxed.getBoundingClientRect();
+        return {
+          clippedAtTop: controlBox.top < paneBox.top,
+          scrollTop: pane.scrollTop,
+          value:
+            control instanceof HTMLInputElement && control.type === 'checkbox'
+              ? control.checked
+              : control.value,
+        };
+      },
+      { selector: probe.selector, boxSelector },
+    );
 
-    await designer.locator(probe.selector).click();
+    // 点控件本体用显式坐标：locator.click 会在点击前做编程式滚动，检查器滚动守卫会把它
+    // 当作隐式预滚动回滚，指针在 down/up 之间离开控件导致点击落空（真实用户无此交互）。
+    const clickBox = await designer.locator(boxSelector).boundingBox();
+    if (clickBox === null) {
+      throw new Error(`BROWSER_HARNESS_INSPECTOR_SCROLL_CONTROL_MISSING:${boxSelector}`);
+    }
+    await page.mouse.click(clickBox.x + clickBox.width / 2, clickBox.y + clickBox.height / 2);
     if (probe.kind === 'select') {
       await page.keyboard.press('ArrowDown');
       await page.keyboard.press('Enter');

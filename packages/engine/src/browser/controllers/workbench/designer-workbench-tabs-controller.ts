@@ -170,6 +170,15 @@ export class DesignerWorkbenchTabsController {
             ? DESIGNER_UI_TEXT.layers
             : DESIGNER_UI_TEXT.variables.title;
     if (leftTitle !== null) leftTitle.textContent = leftPanelLabel;
+    const leftScope = root.querySelector<HTMLElement>('[data-left-panel-scope]');
+    if (leftScope !== null) {
+      leftScope.textContent =
+        hostGroupId !== undefined
+          ? DESIGNER_UI_TEXT.panelScope.host
+          : dynamicGroupId !== undefined
+            ? DESIGNER_UI_TEXT.panelScope.plugin
+            : DESIGNER_UI_TEXT.panelScope.builtin;
+    }
     if (leftCount !== null && dynamicGroupId !== undefined) {
       leftCount.hidden = true;
       leftCount.textContent = '';

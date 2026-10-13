@@ -5,6 +5,7 @@ import {
   resolveSchema,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   createDesignerCheckbox,
   createDesignerInput,
@@ -57,7 +58,9 @@ export function createDescriptorControl(
         value: String(optionValue),
       })),
     });
-    return { element: select, valueTarget: select };
+    // 自绘下拉：外壳进字段行，原生 select 仍是值载体与 change 源。
+    const enhanced = enhanceDesignerSelect(select);
+    return { element: enhanced.element, valueTarget: select };
   }
   if (control === 'color') {
     const input = createDesignerInput(ownerDocument, {

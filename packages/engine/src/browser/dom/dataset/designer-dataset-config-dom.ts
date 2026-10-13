@@ -2,6 +2,7 @@ import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import {
   appendOption,
@@ -265,7 +266,7 @@ function renderBindingRole(
         selected.includes(field.id),
       );
     }
-    fieldList.appendChild(select);
+    fieldList.appendChild(enhanceDesignerSelect(select).element);
   } else {
     const actions = ownerDocument.createElement('div');
     actions.className = 'designer-dataset-binding-role-actions';

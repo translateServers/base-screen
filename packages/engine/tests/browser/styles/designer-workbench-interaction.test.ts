@@ -337,7 +337,9 @@ describe('designer workbench interaction and accessibility', () => {
     expect(materialCardsCss).toContain('overflow: hidden auto;');
     expect(materialCardsCss).toContain('.material-card-meta {');
     expect(materialCardsCss).toContain('display: grid;');
-    expect(materialCardsCss).toContain('hsl(var(--material-hue, 215)');
+    // 缩略图为中性底 + 网格纹理（原型 .material-thumb）：识别色不再由色相变量驱动。
+    expect(materialCardsCss).toContain('var(--designer-canvas-grid-line)');
+    expect(materialCardsCss).not.toContain('material-hue');
     // 交互只做绘制反馈：图标缩放、边框与阴影变化，禁止位移类变换（防抖）。
     expect(materialCardsCss).not.toContain('translateY(');
   });

@@ -42,6 +42,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <header class="panel-heading">
         <span class="panel-title" id="designer-left-panel-title" data-left-panel-title>${DESIGNER_UI_TEXT.materials}</span>
         <span class="panel-count" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterialCount)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterialCount}">${visibleMaterialCount}</span>
+        <span class="panel-scope" data-left-panel-scope>${DESIGNER_UI_TEXT.panelScope.builtin}</span>
         <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" data-tip="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}" aria-controls="designer-left-panel" aria-expanded="true">
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
         </button>

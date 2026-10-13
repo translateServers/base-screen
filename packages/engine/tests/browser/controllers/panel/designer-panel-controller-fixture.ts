@@ -90,8 +90,20 @@ export class FakeElement {
 }
 
 export class FakeDocument {
+  readonly listeners = new Map<string, Set<EventListener>>();
+
   createElement(tagName: string): FakeElement {
     return new FakeElement(tagName, this);
+  }
+
+  addEventListener(type: string, listener: EventListener): void {
+    const set = this.listeners.get(type) ?? new Set<EventListener>();
+    set.add(listener);
+    this.listeners.set(type, set);
+  }
+
+  removeEventListener(type: string, listener: EventListener): void {
+    this.listeners.get(type)?.delete(listener);
   }
 }
 

@@ -243,10 +243,10 @@
   top: 0;
   z-index: 2;
   display: flex;
-  height: 44px;
+  height: var(--designer-column-header-height);
   align-items: center;
   gap: var(--designer-space-3);
-  padding: 0 var(--designer-space-5);
+  padding: 0 var(--designer-space-4);
   border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
   transition: padding var(--designer-motion);
@@ -298,17 +298,27 @@
 /* 数量徽标：等宽数字药丸，安静呈现规模信息。 */
 .panel-count {
   display: inline-grid;
-  min-width: 20px;
-  height: 18px;
+  min-width: 22px;
+  height: auto;
   align-items: center;
   justify-content: center;
-  padding: 0 6px;
+  padding: 1px var(--designer-space-2);
   border-radius: var(--designer-radius-pill);
-  background: color-mix(in srgb, var(--designer-border-default) 34%, transparent);
+  background: var(--designer-surface-control-active);
   color: var(--designer-text-secondary);
   font: var(--designer-font-numeric);
   font-size: var(--designer-font-size-xs);
   transition: opacity var(--designer-motion);
+}
+
+/* 面板归属：与计数同一条列头带上的静默标签（BUILTIN / HOST / PLUGIN）。 */
+.panel-scope {
+  margin-left: auto;
+  flex: none;
+  color: var(--designer-text-disabled);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  letter-spacing: 0.04em;
 }
 
 /* 折叠状态下的面板样式（ADR-0037：折叠轨 UI 修复） */
@@ -406,6 +416,8 @@
   transform: rotate(180deg);
 }
 
+/* 面板切换条（原型 .rail-tabs）：raised 底与内容面板区分轨与体，48px 列内 44px 竖排 tab。
+   选中 = control-active + 收边 + 图标转强调色；悬停只到 control-hover 一档。 */
 .rail-tabs {
   grid-column: 1;
   grid-row: 1 / -1;
@@ -414,41 +426,70 @@
   flex-direction: column;
   align-items: stretch;
   gap: var(--designer-space-2);
-  padding: var(--designer-space-4) var(--designer-space-3);
-  border-right: 1px solid var(--designer-border-subtle);
-  background: var(--designer-surface-workspace);
+  padding: var(--designer-space-4) var(--designer-space-1);
+  background: var(--designer-surface-raised);
+  box-shadow: inset -1px 0 0 var(--designer-border-subtle);
+  overscroll-behavior: contain;
 }
 
 .rail-tabs .designer-tab {
   position: relative;
   display: flex;
-  min-width: 36px;
-  min-height: 44px;
+  width: 100%;
+  min-width: 44px;
+  min-height: 60px;
   flex: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--designer-space-1);
-  padding: var(--designer-space-2) 0;
+  gap: var(--designer-space-3);
+  padding: var(--designer-space-4) var(--designer-space-1);
   border-color: transparent;
-  border-radius: 3px;
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-xs);
+  border-radius: var(--designer-radius-2);
+  background: transparent;
+  color: var(--designer-text-secondary);
+  font-family: var(--designer-font-family);
+  font-size: var(--designer-font-size-sm);
   font-weight: 500;
-  line-height: 1.2;
+  line-height: 16px;
 }
 
 .rail-tabs .designer-tab:not([aria-selected="true"]):hover {
   background: var(--designer-surface-control-hover);
-  color: var(--designer-text-secondary);
+  color: var(--designer-text-primary);
   transform: none;
 }
 
 .rail-tabs .designer-tab[aria-selected="true"] {
   border-color: transparent;
-  background: color-mix(in srgb, var(--designer-accent-surface) 62%, transparent);
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
+.rail-tabs .designer-tab[aria-selected="true"]:hover {
+  box-shadow: inset 0 0 0 1px var(--designer-border-active);
+}
+
+.rail-tabs .designer-tab[aria-selected="true"] .rail-tab-glyph {
   color: var(--designer-accent);
-  box-shadow: inset 2px 0 0 var(--designer-accent);
+}
+
+/* 宿主分组从第 4 个面板起排在保留项之后：上缘留白 + 分隔线标出「内建 / 宿主」的分界。 */
+.rail-tabs .designer-tab[data-host-left-panel-group] {
+  margin-top: var(--designer-space-6);
+}
+
+.rail-tabs .designer-tab[data-host-left-panel-group]::before {
+  position: absolute;
+  top: -10px;
+  right: 10px;
+  left: 10px;
+  height: 1px;
+  background: var(--designer-border-default);
+  content: "";
+  pointer-events: none;
 }
 
 .rail-tab-glyph {
@@ -456,8 +497,8 @@
 }
 
 .rail-tab-glyph svg {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
   fill: none;
   stroke: currentColor;
 }
@@ -474,10 +515,6 @@
   padding-top: var(--designer-space-2);
 }
 
-.designer[data-left-collapsed="true"] .rail-tabs .designer-tab {
-  min-height: 40px;
-}
-
 .designer[data-left-collapsed="true"] .rail-tab-label {
   display: none;
 }
@@ -487,41 +524,65 @@
   grid-row: 1;
 }
 
+/* 右栏标签页（原型 .inspector-tabs 的浅胶囊版）：左对齐浅胶囊——选中 = 胶囊底 + 收边 + 加粗，
+   悬停只给底色；列头带与左栏同色，只留一条发丝分隔线。 */
 .inspector-tabs {
   z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  padding: 0 var(--designer-space-5);
-  border-bottom: 1px solid var(--designer-border-default);
+  display: flex;
+  height: var(--designer-column-header-height);
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-2) var(--designer-space-3);
   background: var(--designer-surface-panel);
+  box-shadow: 0 1px 0 var(--designer-border-subtle);
 }
 
 .inspector-tabs .designer-tab {
-  min-height: 36px;
+  min-height: 30px;
+  flex: 0 0 auto;
+  padding: 0 var(--designer-space-4);
   border: 0;
-  border-bottom: 2px solid transparent;
-  border-radius: 0;
+  border-radius: var(--designer-radius-2);
   background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-secondary);
+  font-weight: 500;
 }
 
 .inspector-tabs .designer-tab:hover:not([aria-selected="true"]) {
-  background: transparent;
+  background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
+  box-shadow: none;
 }
 
 .inspector-tabs .designer-tab[aria-selected="true"] {
-  border-bottom-color: var(--designer-accent);
-  background: transparent;
-  color: var(--designer-accent);
-  box-shadow: none;
+  border-bottom-color: transparent;
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
+.inspector-tabs .designer-tab[aria-selected="true"]:hover {
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-active);
 }
 
 .rail-view,
 .inspector-pane {
   min-height: 0;
   overflow: hidden auto;
+}
+
+.rail-view {
   padding: var(--designer-space-5);
+}
+
+/* 检查器内容列（原型 .inspector-pane）：上 8 / 左右 12 / 下 24。 */
+.inspector-pane {
+  padding: var(--designer-space-4) var(--designer-space-5) var(--designer-space-7);
 }
 
 .rail-view {

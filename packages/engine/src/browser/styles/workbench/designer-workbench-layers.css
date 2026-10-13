@@ -13,12 +13,12 @@
   display: grid;
   box-sizing: border-box;
   min-width: 0;
-  min-height: 36px;
+  min-height: 40px;
   grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
   gap: var(--designer-space-1);
   margin-bottom: 2px;
-  padding: 2px 6px;
+  padding: 0 var(--designer-space-3);
   border-radius: var(--designer-radius-control);
   background-color: var(--layer-row-surface);
   cursor: default;
@@ -51,32 +51,29 @@
 .layer-row:hover,
 .layer-row:focus-within {
   --layer-row-surface: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
 }
 
-/* 选中反馈与整行命中范围完全重合：低饱和品牌底色 + 2px 左轨 + 1px 内描边。
-   只改变绘制属性，不改变行几何。 */
+/* 选中反馈与整行命中范围完全重合：主选 = 强调色淡底 + 强调色收边（原型 aria-current），
+   次级成员（多选）用中性按下档 + 强收边，强调色只留给主选与焦点。只改绘制，不改几何。 */
 .layer-row[aria-selected="true"] {
-  --layer-row-surface: color-mix(
-    in srgb,
-    var(--designer-accent) 15%,
-    var(--designer-surface-panel)
-  );
-
-  box-shadow:
-    inset 2px 0 0 var(--designer-accent),
-    inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 28%, transparent);
+  --layer-row-surface: var(--designer-accent-surface);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-accent);
 }
 
 .layer-row[aria-selected="true"]:hover {
   --layer-row-surface: color-mix(
     in srgb,
-    var(--designer-accent) 20%,
-    var(--designer-surface-panel)
+    var(--designer-accent-surface) 84%,
+    var(--designer-surface-control-hover)
   );
 }
 
 .layer-row[aria-current="true"]:not([aria-selected="true"]) {
-  box-shadow: inset 2px 0 0 color-mix(in srgb, var(--designer-accent) 72%, transparent);
+  --layer-row-surface: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-strong);
 }
 
 .layer-row[data-drop-target="true"],

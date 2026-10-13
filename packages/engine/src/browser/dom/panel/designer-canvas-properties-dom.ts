@@ -1,5 +1,6 @@
 import type { ScreenCanvasColorStop, ScreenDocument } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { appendDesignerFieldMessage, createDesignerCheckbox } from '../designer-ui-primitives.js';
 import type {
   DesignerCanvasBackgroundDrafts,
@@ -183,7 +184,7 @@ function appendCanvasBackgroundControls(
     select.appendChild(option);
   }
   select.value = drafts.activeType;
-  type.appendChild(select);
+  type.appendChild(enhanceDesignerSelect(select).element);
   appendDesignerFieldMessage(type, select, 'canvas-backgroundType');
   parent.appendChild(type);
 
@@ -290,7 +291,7 @@ function appendCanvasSelect(
     select.appendChild(element);
   }
   select.value = value;
-  label.appendChild(select);
+  label.appendChild(enhanceDesignerSelect(select).element);
   appendDesignerFieldMessage(label, select, `canvas-${property}`);
   parent.appendChild(label);
 }

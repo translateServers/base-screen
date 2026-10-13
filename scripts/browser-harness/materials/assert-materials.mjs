@@ -663,16 +663,25 @@ async function assertMaterialLibraryGrouping(page, designer) {
             group === null || group === undefined ? '' : getComputedStyle(group).display,
           countDisplay:
             count === null || count === undefined ? '' : getComputedStyle(count).display,
-          selectedFilterShadow:
+          // 筛选条与统一分段控件同形：选中 = 底色档（原型 .segmented 不再用投影表达按下）。
+          selectedFilterBackground:
             selectedFilter === null || selectedFilter === undefined
               ? ''
-              : getComputedStyle(selectedFilter).boxShadow,
+              : getComputedStyle(selectedFilter).backgroundColor,
+          unselectedFilterBackground:
+            selectedFilter === null ||
+            selectedFilter === undefined ||
+            selectedFilter.nextElementSibling === null
+              ? ''
+              : getComputedStyle(selectedFilter.nextElementSibling).backgroundColor,
           cardMinHeight:
             card === null || card === undefined ? '' : getComputedStyle(card).minHeight,
           thumbAspectRatio:
             thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).aspectRatio,
-          thumbBackgroundImage:
-            thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).backgroundImage,
+          thumbBackgroundColor:
+            thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).backgroundColor,
+          thumbInsetShadow:
+            thumb === null || thumb === undefined ? '' : getComputedStyle(thumb).boxShadow,
           toolbarDisplay:
             toolbar === null || toolbar === undefined ? '' : getComputedStyle(toolbar).display,
           gridOverflowY:
@@ -738,11 +747,14 @@ async function assertMaterialLibraryGrouping(page, designer) {
     rootState.visual.countWidth !== (compact ? 24 : 0) ||
     rootState.visual.groupDisplay !== 'flex' ||
     rootState.visual.countDisplay !== (compact ? 'grid' : 'none') ||
-    rootState.visual.selectedFilterShadow === 'none' ||
+    rootState.visual.selectedFilterBackground === '' ||
+    rootState.visual.selectedFilterBackground === rootState.visual.unselectedFilterBackground ||
     // 卡片继承 .designer-button 的控件高度下限（控件基座 30px）。
     rootState.visual.cardMinHeight !== '30px' ||
     rootState.visual.thumbAspectRatio !== '16 / 10' ||
-    !rootState.visual.thumbBackgroundImage.includes('radial-gradient') ||
+    // 缩略图为中性底（token 派生）+ inset 收边；色相驱动的渐变已退役。
+    rootState.visual.thumbBackgroundColor === '' ||
+    !rootState.visual.thumbInsetShadow.includes('inset') ||
     rootState.visual.toolbarDisplay !== 'block' ||
     rootState.visual.gridOverflowY !== 'auto' ||
     rootState.visual.metaDisplay !== 'grid' ||

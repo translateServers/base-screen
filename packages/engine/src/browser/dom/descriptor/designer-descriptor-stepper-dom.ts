@@ -52,6 +52,13 @@ export function createDesignerStepper(
     syncButtons();
     if (dispatch) dispatchChange(input);
   };
+  // shadow 树里 document.activeElement 只回宿主，活动元素必须从所在的根取
+  // （ShadowRoot 与 Document 都有 activeElement；DOM 替身缺 getRootNode 时回退宿主文档）。
+  const activeInTree = (): Element | null =>
+    (element.getRootNode?.() as { readonly activeElement?: Element | null } | null)
+      ?.activeElement ??
+    ownerDocument.activeElement ??
+    null;
   const syncButtons = (): void => {
     const current = Number(input.value);
     const value = Number.isFinite(current) ? current : options.min;
@@ -60,10 +67,10 @@ export function createDesignerStepper(
     decrement.disabled = value <= options.min;
     increment.disabled = value >= options.max;
     // 按钮在边界禁用后焦点会落在它身上消失：把焦点交给对侧按钮（原型同款交接）。
-    if (decrement.disabled && !wasDecrementDisabled && ownerDocument.activeElement === decrement) {
+    if (decrement.disabled && !wasDecrementDisabled && activeInTree() === decrement) {
       increment.focus({ preventScroll: true });
     }
-    if (increment.disabled && !wasIncrementDisabled && ownerDocument.activeElement === increment) {
+    if (increment.disabled && !wasIncrementDisabled && activeInTree() === increment) {
       decrement.focus({ preventScroll: true });
     }
   };

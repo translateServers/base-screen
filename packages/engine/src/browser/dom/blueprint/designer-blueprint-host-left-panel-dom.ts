@@ -35,4 +35,9 @@ export function syncDesignerBlueprintHostLeftPanel(
   if (title !== null) {
     title.textContent = group?.label ?? DESIGNER_UI_TEXT.blueprint.library;
   }
+  const scope = root.querySelector<HTMLElement>('[data-left-panel-scope]');
+  if (scope !== null) {
+    scope.textContent =
+      group === undefined ? DESIGNER_UI_TEXT.panelScope.builtin : DESIGNER_UI_TEXT.panelScope.host;
+  }
 }

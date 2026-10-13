@@ -86,20 +86,18 @@
 }
 
 /* 筛选分段控件：内凹轨道 + 悬浮选中胶囊（iOS segmented 语义），几何恒定。 */
+/* 素材筛选（全部/收藏/最近）：与统一分段控件同形（workspace 轨 + elev-ring；选中 = 悬停档底 + 强调文字）。 */
 .material-filters {
   display: flex;
-  height: 32px;
-  gap: var(--designer-space-1);
+  height: 30px;
+  gap: 1px;
   margin: var(--designer-space-3) 0 0;
-  padding: 3px;
+  padding: 2px;
   overflow: hidden;
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: 9px;
-  background: color-mix(
-    in srgb,
-    var(--designer-surface-workspace) 72%,
-    var(--designer-surface-panel)
-  );
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-surface-workspace);
+  box-shadow: var(--designer-elev-ring);
 }
 
 .material-filters .designer-button {
@@ -107,25 +105,24 @@
   min-height: 24px;
   padding: 0 var(--designer-space-2);
   border-color: transparent;
-  border-radius: 7px;
+  border-radius: var(--designer-radius-1);
   background-color: transparent;
+  box-shadow: none;
   color: var(--designer-text-muted);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .material-filters .designer-button:hover:not(:disabled) {
   border-color: transparent;
   background-color: var(--designer-surface-control-hover);
-  color: var(--designer-text-secondary);
+  color: var(--designer-text-primary);
 }
 
 .material-filters .designer-button[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--designer-border-default) 70%, transparent);
-  background-color: var(--designer-surface-raised);
-  color: var(--designer-text-primary);
-  box-shadow:
-    0 1px 3px color-mix(in srgb, var(--designer-text-primary) 10%, transparent),
-    inset 0 1px 0 color-mix(in srgb, var(--designer-text-primary) 5%, transparent);
+  border-color: transparent;
+  background-color: var(--designer-surface-control-hover);
+  color: var(--designer-accent-text);
+  box-shadow: none;
 }
 
 .material-search .material-search-clear:not(:disabled):active,

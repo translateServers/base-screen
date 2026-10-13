@@ -681,6 +681,11 @@ export const DESIGNER_UI_TEXT = {
     blueprintExpressionInvalid: '蓝图表达式无效，未保存修改。',
     blueprintConfigInvalid: '蓝图配置无效，未保存修改。',
   },
+  panelScope: {
+    builtin: 'BUILTIN',
+    host: 'HOST',
+    plugin: 'PLUGIN',
+  },
   notification: {
     close: '关闭',
     closeAria: '关闭通知',

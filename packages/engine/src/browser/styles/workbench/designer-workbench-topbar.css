@@ -434,10 +434,10 @@ button.topbar-mode-button:disabled {
   min-width: 0;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--designer-border-strong);
+  border: 0;
   border-radius: var(--designer-radius-overlay);
   background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-shadow-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-overlay);
 }
 
 .designer-command-palette-search {
@@ -483,13 +483,14 @@ button.topbar-mode-button:disabled {
 .designer-command-palette-search kbd,
 .designer-command-palette-kind {
   flex: none;
-  padding: 2px var(--designer-space-2);
-  border: 1px solid var(--designer-border-default);
+  padding: 1px var(--designer-space-3);
+  border: 0;
   border-radius: 3px;
-  background: var(--designer-surface-control);
+  background: var(--designer-surface-workspace);
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
-  font-size: 9px;
+  font-size: var(--designer-font-size-xs);
 }
 
 .designer-command-palette-results {

@@ -1,4 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+import { designerNotificationGlyph } from '../dom/designer-ui-primitives.js';
 
 export type DesignerNotificationTone = 'error' | 'success';
 
@@ -16,6 +17,8 @@ export class DesignerNotificationController {
     notification.className = 'designer-notification';
     notification.dataset.notificationTone = tone;
     notification.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    // 语义色只落在图标上（原型 .toast）：底色保持中性覆盖面，文字与边框不着色。
+    notification.innerHTML = designerNotificationGlyph(tone);
     const text = container.ownerDocument.createElement('span');
     text.textContent = message;
     const close = container.ownerDocument.createElement('button');

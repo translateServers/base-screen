@@ -374,9 +374,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(104px, 100%), 1fr));
   align-content: start;
-  gap: var(--designer-space-3);
+  /* 原型 --od-gap：卡间 10px（不在 space 令牌列上，保持字面值）。 */
+  gap: 10px;
   margin: 0;
-  padding: var(--designer-space-5) var(--designer-space-2) var(--designer-space-7);
+  padding: var(--designer-space-5) var(--designer-space-3) var(--designer-space-7);
   overflow: hidden auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;

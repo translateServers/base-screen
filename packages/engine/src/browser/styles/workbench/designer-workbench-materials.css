@@ -8,25 +8,24 @@
      否则名称/类型行收缩为内容宽并被居中截断。 */
   align-items: stretch;
   justify-content: flex-start;
-  gap: var(--designer-space-3);
+  gap: var(--designer-space-2);
   margin: 0;
   padding: var(--designer-space-2) var(--designer-space-2) var(--designer-space-3);
   text-align: left;
-  border-color: var(--designer-border-subtle);
-  border-radius: var(--designer-radius-2);
+  border: 0;
+  border-radius: var(--designer-radius-4);
   background: var(--designer-surface-raised);
-  box-shadow: none;
+  box-shadow: var(--designer-elev-ring);
   transition:
     background-color var(--designer-motion),
-    border-color var(--designer-motion),
     box-shadow var(--designer-motion);
 }
 
 .material-card:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--designer-accent) 52%, var(--designer-border-default));
   background-color: var(--designer-surface-control-hover);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 12%, transparent);
-  transform: translateZ(0);
+  box-shadow:
+    0 0 0 1px var(--designer-border-strong),
+    var(--designer-shadow-float);
 }
 
 .material-card:not(:disabled):active {
@@ -37,8 +36,7 @@
   z-index: 1;
 }
 
-/* 缩略图：分类色相驱动（--material-hue 由 DOM 确定性写入）的双色渐变 + 网格纹理，
-   模拟数据大屏的深色画布质感；深浅主题共用同一色相。 */
+/* 缩略图（原型 .material-thumb）：中性底 + 网格纹理，深浅主题共用一套；识别色留给图标。 */
 .material-thumb {
   position: relative;
   display: grid;
@@ -46,37 +44,21 @@
   aspect-ratio: 16 / 10;
   place-items: center;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, hsl(var(--material-hue, 215) 35% 52%) 22%, transparent);
-  border-radius: 3px;
-  background:
-    radial-gradient(
-      120% 90% at 18% 8%,
-      hsl(var(--material-hue, 215) 62% 58% / 22%),
-      transparent 56%
-    ),
-    linear-gradient(
-      158deg,
-      hsl(var(--material-hue, 215) 28% 25%),
-      hsl(var(--material-hue, 215) 32% 12%)
-    );
-  color: hsl(var(--material-hue, 215) 72% 82%);
+  border: 0;
+  border-radius: 4px;
+  background: color-mix(in oklab, var(--designer-surface-raised), var(--designer-text-primary) 4%);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-secondary);
 }
 
 .material-thumb::before {
   position: absolute;
   inset: 0;
   background-image:
-    repeating-linear-gradient(
-      0deg,
-      hsl(var(--material-hue, 215) 80% 85% / 8%) 0 1px,
-      transparent 1px 10px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      hsl(var(--material-hue, 215) 80% 85% / 8%) 0 1px,
-      transparent 1px 10px
-    );
+    repeating-linear-gradient(0deg, var(--designer-canvas-grid-line) 0 1px, transparent 1px 10px),
+    repeating-linear-gradient(90deg, var(--designer-canvas-grid-line) 0 1px, transparent 1px 10px);
   content: "";
+  opacity: 0.4;
   pointer-events: none;
 }
 
@@ -85,7 +67,6 @@
   height: 22px;
   fill: none;
   stroke: currentColor;
-  filter: drop-shadow(0 2px 6px hsl(var(--material-hue, 215) 80% 38% / 34%));
   transition: transform var(--designer-motion);
 }
 
@@ -118,37 +99,6 @@
   transition:
     opacity var(--designer-motion),
     transform var(--designer-motion);
-}
-
-/* 默认即浅色：`:host(:not([theme="dark"]))` 同时覆盖缺省属性和显式钉浅色的宿主。 */
-:host(:not([theme="dark"])) .material-thumb {
-  border-color: color-mix(in srgb, hsl(var(--material-hue, 215) 45% 45%) 30%, transparent);
-  background:
-    radial-gradient(
-      120% 90% at 18% 8%,
-      hsl(var(--material-hue, 215) 85% 92% / 85%),
-      transparent 56%
-    ),
-    linear-gradient(
-      158deg,
-      hsl(var(--material-hue, 215) 62% 76%),
-      hsl(var(--material-hue, 215) 55% 62%)
-    );
-  color: hsl(var(--material-hue, 215) 50% 28%);
-}
-
-:host(:not([theme="dark"])) .material-thumb::before {
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      hsl(var(--material-hue, 215) 45% 35% / 8%) 0 1px,
-      transparent 1px 10px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      hsl(var(--material-hue, 215) 45% 35% / 8%) 0 1px,
-      transparent 1px 10px
-    );
 }
 
 /* 封面加载后占位层收起（ADR-0041）：底色切换为中性表面 Token——半透明素材不再透出彩色渐变/网格；
