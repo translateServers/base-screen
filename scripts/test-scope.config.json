@@ -1,0 +1,47 @@
+{
+  "allowEmptyPackages": ["vue", "plugin-sdk"],
+  "engineFileMapping": {
+    "enabled": true,
+    "package": "engine"
+  },
+  "governanceTriggers": [
+    {
+      "pattern": "skills/**",
+      "reason": "宿主 Skill 资产变更，根级宿主 Skill 测试覆盖其生成器"
+    },
+    {
+      "pattern": ".agents/skills/**",
+      "reason": "跨仓工作流 Skill 变更，根级集成工作流测试覆盖"
+    },
+    {
+      "pattern": "docs/plans/**",
+      "reason": "计划文档变更，文档治理测试覆盖"
+    },
+    {
+      "pattern": "AGENTS.md",
+      "reason": "仓库指南变更，文档治理测试覆盖"
+    },
+    {
+      "pattern": "tests/**",
+      "reason": "根级治理测试自身变更"
+    },
+    {
+      "pattern": "vitest.config.ts",
+      "reason": "根级测试配置变更"
+    },
+    {
+      "pattern": "package.json",
+      "reason": "根清单变更，门禁语义可能受影响"
+    },
+    {
+      "pattern": "turbo.json",
+      "reason": "Turbo 任务图变更，门禁语义可能受影响"
+    }
+  ],
+  "nonGatePrefixes": ["examples/", "harness/", "tooling/", "plugins/"],
+  "auditThresholds": {
+    "noSelectionDays": 90,
+    "duplicateJaccard": 0.85,
+    "longSkipDays": 60
+  }
+}

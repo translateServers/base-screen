@@ -30,7 +30,7 @@
     "build": "pnpm run clean && tsc -p tsconfig.build.json && node ../../scripts/write-schema-artifact.mjs",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
     "lint": "biome check src tests",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   }
 }

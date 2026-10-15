@@ -12,8 +12,9 @@
       "dependsOn": ["^build"]
     },
     "test": {
-      "dependsOn": ["build"],
-      "outputs": []
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", "tests/**", "../../scripts/test-scope.config.json"],
+      "outputs": ["test-report.json"]
     },
     "clean": {
       "cache": false

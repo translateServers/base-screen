@@ -475,16 +475,20 @@ export function findForbiddenVersionMarkers(markdownFiles) {
 }
 
 function discoverMarkdownFiles(root) {
-  return execFileSync(
-    'git',
-    ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.md'],
-    { cwd: root, encoding: 'utf8' },
-  )
-    .split('\0')
-    .filter(Boolean)
-    .map(normalizePath)
-    .filter((path) => existsSync(resolve(root, path)))
-    .map((path) => ({ path, source: readFileSync(resolve(root, path), 'utf8') }));
+  return (
+    execFileSync(
+      'git',
+      ['ls-files', '-z', '--cached', '--others', '--exclude-standard', '--', '*.md'],
+      { cwd: root, encoding: 'utf8' },
+    )
+      .split('\0')
+      .filter(Boolean)
+      .map(normalizePath)
+      .filter((path) => existsSync(resolve(root, path)))
+      // deliverables/ 是方案与需求的过程文档，不属仓库现行文档治理范围（测试治理方案 §2.2 注记）。
+      .filter((path) => !path.startsWith('deliverables/'))
+      .map((path) => ({ path, source: readFileSync(resolve(root, path), 'utf8') }))
+  );
 }
 
 function sortIssues(issues) {
