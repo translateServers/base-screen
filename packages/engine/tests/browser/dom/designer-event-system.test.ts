@@ -123,6 +123,22 @@ describe('DesignerEventSystem', () => {
     expect(stopImmediatePropagation).toHaveBeenCalledOnce();
   });
 
+  it('R1 lets native copy through only when the surface holds a text selection', () => {
+    const withCopy = (hasTextSelection: boolean) =>
+      new DesignerEventSystem({
+        isGestureActive: () => false,
+        findOperation: (chord) => (chord === 'Ctrl+C' ? { repeatable: false } : undefined),
+        hasTextSelection: () => hasTextSelection,
+      });
+    const event = keyEvent({ ctrlKey: true, key: 'c' });
+
+    // 无选区：Ctrl+C 命中"复制选中组件"命令。
+    expect(withCopy(false).resolve(event)).toEqual({ kind: 'command', chord: 'Ctrl+C' });
+    // 有选区：Ctrl+C 归浏览器原生文本复制，命令通道不接管、capture 也不吞。
+    expect(withCopy(true).resolve(event)).toEqual({ kind: 'allow' });
+    expect(withCopy(true).swallow(event)).toBe(false);
+  });
+
   it('R2 resolves commands through the operation lookup', () => {
     expect(system().resolve(keyEvent({ ctrlKey: true, key: 'z' }))).toEqual({
       kind: 'command',

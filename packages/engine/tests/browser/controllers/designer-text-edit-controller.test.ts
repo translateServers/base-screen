@@ -311,9 +311,24 @@ describe('designer text edit controller', () => {
     const { controller, canvas } = harness();
     controller.enter('title');
     const overlay = canvas.children[0]!;
-    expect(overlay.listeners['pointerdown']).toBeDefined();
-    expect(overlay.listeners['selectstart']).toBeDefined();
+    for (const type of ['pointerdown', 'mousedown', 'selectstart', 'dblclick']) {
+      expect(overlay.listeners[type]).toBeDefined();
+    }
     expect(overlay.listeners['keydown']).toBeDefined();
     expect(overlay.listeners['blur']).toBeDefined();
+  });
+
+  it('keeps native text selection alive so edited text stays copyable', () => {
+    const { controller, canvas } = harness();
+    controller.enter('title');
+    const overlay = canvas.children[0]!;
+    // 画布常禁选，编辑层必须显式恢复文本选择。
+    expect(overlay.style.cssText).toContain('user-select: text');
+    // 指针事件只隔离冒泡：一旦 preventDefault，光标定位与鼠标拖选都会失效。
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    overlay.listeners['pointerdown']!({ preventDefault, stopPropagation });
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(stopPropagation).toHaveBeenCalledOnce();
   });
 });

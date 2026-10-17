@@ -18,6 +18,7 @@ import { DesignerProjectFeedbackController } from '../../browser/controllers/pro
 import { DesignerProjectWorkspaceController } from '../../browser/controllers/project/designer-project-workspace-controller.js';
 import { DesignerWorkbenchController } from '../../browser/controllers/workbench/designer-workbench-controller.js';
 import { readDesignerImageNaturalSize } from '../../browser/dom/designer-image-metadata-dom.js';
+import { hasDesignerTextSelection } from '../../browser/dom/designer-text-selection.js';
 import { designerIcon } from '../../browser/ui/designer-icons.js';
 import { insertDesignerBlueprintVariableNode } from '../../common/operations/blueprint/designer-blueprint-model.js';
 import {
@@ -299,6 +300,7 @@ export function initializeDesignerElementControllers(
     getMaterialLibraryItems: () => state.resolvedMaterialLibraryItems,
     getMaterialLibraryGrouping: () => state.materialLibraryGrouping,
     getDocument: () => state.session.document,
+    hasTextSelection: () => hasDesignerTextSelection(element.shadowRoot),
     getGeometryDocument: () => getDesignerGeometryDocument(state),
     getImageNaturalSize: (componentId) => readDesignerImageNaturalSize(state.canvas, componentId),
     getDatasetFields: () => state.datasetController.getFocusedDatasetFields(),

@@ -12,6 +12,8 @@ export type DesignerKeyboardPolicy =
 export interface DesignerKeyboardPolicyContext {
   readonly editable: boolean;
   readonly gestureActive: boolean;
+  /** 设计器表面存在非折叠的文本选区（面板/只读文本被用户选中）。 */
+  readonly textSelection: boolean;
 }
 
 export interface DesignerOperationChordInfo {
@@ -64,6 +66,9 @@ const CONDITIONAL_NON_EDITABLE_BLOCK = blockChords([
 // Firefox 快速查找：非可编辑目标上的 / 与 ' 会进入浏览器内查找。
 const QUICK_FIND_KEYS = new Set(['/', "'"]);
 
+// 非可编辑目标上的原生文本语义 chord：只有存在真实文本选区时才归浏览器。
+const NATIVE_TEXT_SELECTION_CHORDS = blockChords(['Ctrl+C']);
+
 /**
  * 键盘事件策略裁决（三态）：
  *
@@ -72,9 +77,11 @@ const QUICK_FIND_KEYS = new Set(['/', "'"]);
  * 3. 全目标无条件黑名单 → block；
  * 4. 可编辑目标 → 只受全目标条件黑名单约束（如 Ctrl+S 不弹保存网页、Ctrl+0/=/- 不触发
  *    浏览器缩放），其余一律放行原生文本编辑（含 macOS Cocoa 组合与原生 Ctrl+Z/C/V）；
- * 5. 命中注册操作 → 按 repeat 分类裁决 command / block；
- * 6. 全目标条件黑名单 → block（命令未执行的补位）；
- * 7. 非可编辑目标无条件/条件黑名单与快速查找 → block。
+ * 5. 非可编辑目标上已存在文本选区且 chord 属原生文本语义（Ctrl+C）→ 放行，不让"复制
+ *    选中组件"抢占用户刚选中的面板/只读文本；
+ * 6. 命中注册操作 → 按 repeat 分类裁决 command / block；
+ * 7. 全目标条件黑名单 → block（命令未执行的补位）；
+ * 8. 非可编辑目标无条件/条件黑名单与快速查找 → block。
  */
 export function resolveDesignerKeyboardPolicy(
   event: DesignerKeyboardEventShape,
@@ -91,6 +98,9 @@ export function resolveDesignerKeyboardPolicy(
   if (UNCONDITIONAL_ALL_BLOCK.has(normalized)) return { kind: 'block' };
   if (context.editable) {
     if (CONDITIONAL_ALL_BLOCK.has(normalized)) return { kind: 'block' };
+    return { kind: 'allow' };
+  }
+  if (context.textSelection && NATIVE_TEXT_SELECTION_CHORDS.has(normalized)) {
     return { kind: 'allow' };
   }
   const operation = findOperation(chord);

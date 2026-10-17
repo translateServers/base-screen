@@ -26,6 +26,11 @@ export interface DesignerPanelControllerCallbacks {
   readonly getMaterialLibraryItems?: () => readonly BaseScreenResolvedMaterialLibraryItem[];
   readonly getMaterialLibraryGrouping?: () => BaseScreenMaterialLibraryGrouping | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
+  /**
+   * 设计器表面是否存在非折叠文本选区：有选区时复制快捷键必须让位给浏览器原生复制，
+   * 否则面板/只读文本选中后按 Ctrl+C 会被"复制选中组件"吞掉。
+   */
+  readonly hasTextSelection?: () => boolean;
   /** Read-only rendering/geometry input; clipboard and data editing use getDocument. */
   readonly getGeometryDocument?: () => ScreenDocument | undefined;
   /** 当前图片物料宿主投影的内部自然尺寸；仅用于一次性倍图尺寸换算。 */

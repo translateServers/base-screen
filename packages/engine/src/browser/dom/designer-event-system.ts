@@ -8,6 +8,8 @@ import { isEditableTarget } from './designer-surface-router.js';
 export interface DesignerEventSystemCallbacks {
   readonly isGestureActive: () => boolean;
   readonly findOperation: (chord: string) => DesignerOperationChordInfo | undefined;
+  /** 设计器表面是否存在非折叠文本选区（有则 Ctrl+C 归浏览器原生复制）。 */
+  readonly hasTextSelection?: () => boolean;
   /** window blur 时的统一状态复位（手势/空格/菜单/面板 resize/参考线拖拽）。 */
   readonly onWindowBlur?: () => void;
   /**
@@ -43,6 +45,7 @@ export class DesignerEventSystem {
       {
         editable: isEditableTarget(event.target),
         gestureActive: this.callbacks.isGestureActive(),
+        textSelection: this.callbacks.hasTextSelection?.() === true,
       },
       this.callbacks.findOperation,
     );

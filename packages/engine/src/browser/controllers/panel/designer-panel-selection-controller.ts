@@ -270,6 +270,8 @@ export class DesignerPanelSelectionController {
       return false;
     }
     if (event.key.toLowerCase() === 'c') {
+      // 用户已选中面板文本时，Ctrl+C 属于浏览器原生复制；此处必须放行而不是抢占。
+      if (this.callbacks.hasTextSelection?.() === true) return false;
       event.preventDefault();
       this.copy();
       return true;

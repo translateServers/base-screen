@@ -3,6 +3,7 @@ import {
   isEditableTarget,
   isTextAreaDraft,
 } from '../../browser/dom/designer-surface-router.js';
+import { hasDesignerTextSelection } from '../../browser/dom/designer-text-selection.js';
 import type { DesignerElementHost, DesignerElementState } from './designer-element-state.js';
 
 export function initializeDesignerElementSurfaceBindings(
@@ -66,8 +67,10 @@ export function initializeDesignerElementSurfaceBindings(
       return false;
     },
     copy: (target, event) => {
-      // 剪贴板事件旁路（右键/系统组合）：非可编辑目标路由到应用剪贴板操作。
+      // 剪贴板事件旁路（右键/系统组合）：可编辑目标走原生复制；存在真实文本选区时
+      // 同样让位给浏览器，否则"复制选中组件"会吃掉面板/只读文本的复制。
       if (isEditableTarget(target)) return false;
+      if (hasDesignerTextSelection(element.shadowRoot)) return false;
       event.preventDefault();
       state.operations.execute('copy', undefined);
       return true;

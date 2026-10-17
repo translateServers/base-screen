@@ -1,5 +1,6 @@
 import { DesignerEventSystem } from '../../browser/dom/designer-event-system.js';
 import { DesignerSurfaceRouter } from '../../browser/dom/designer-surface-router.js';
+import { hasDesignerTextSelection } from '../../browser/dom/designer-text-selection.js';
 import { DesignerMenuController } from '../../browser/dom/menu/designer-menu.js';
 import { DesignerOperationRegistry } from '../../common/operations/designer-operation-registry.js';
 import {
@@ -114,6 +115,7 @@ export function initializeDesignerElementOperations(
   );
   state.eventSystem = new DesignerEventSystem({
     isGestureActive: () => state.gestureController.active,
+    hasTextSelection: () => hasDesignerTextSelection(element.shadowRoot),
     findOperation: (chord) => {
       const operation = state.operations.findByShortcut(chord);
       if (operation !== undefined) return operation;

@@ -57,6 +57,9 @@ export function createTextEditOverlay(
     'justify-content: inherit',
     'white-space: pre-wrap',
     'overflow: hidden',
+    // 画布常禁选（拖拽表面），编辑层必须显式恢复文本选择，否则编辑中无法拖选/复制。
+    'user-select: text',
+    '-webkit-user-select: text',
     'outline: 1px solid var(--designer-border-strong, rgba(56, 189, 248, 0.9))',
     'outline-offset: -1px',
     'background: transparent',
@@ -121,15 +124,15 @@ export function createTextEditOverlay(
     }
   }
 
-  // 编辑层独占指针与文本选择：阻止事件冒泡到画布手势与 selectstart 拦截，
-  // 避免编辑期间触发拖拽/框选或原生选择被画布吞掉。
-  overlay.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
+  // 编辑层独占指针与文本选择：只阻止冒泡到画布手势与守卫，绝不 preventDefault ——
+  // 取消指针默认行为会同时取消兼容 mouse 事件，光标定位与鼠标拖选都会失效，
+  // 编辑中的文本就再也选不中、复制不出来。
+  const isolate = (event: Event): void => {
     event.stopPropagation();
-  });
-  overlay.addEventListener('selectstart', (event) => {
-    event.stopPropagation();
-  });
+  };
+  for (const type of ['pointerdown', 'mousedown', 'selectstart', 'dblclick']) {
+    overlay.addEventListener(type, isolate);
+  }
 
   canvas.appendChild(overlay);
   return overlay;
