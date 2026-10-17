@@ -17,20 +17,20 @@
 - 测试治理工具链按需使用：`pnpm test:audit` 输出无用/重复/过期测试候选报告（落盘可追溯，不自动删除，清理走人工确认 PR 流程）；`pnpm test:tag` 输出标签打标建议（未打标测试默认 unit 且必跑）；`pnpm test:baseline` 采集效率与覆盖率指标基线。
 - `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界与物料原子化检查（`check:boundaries`、`check:material-atomicity`）。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
 - `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。
-- 手动验证的基座特性矩阵在 `harness/browser-harness`：`pnpm dev:browser-harness` 起 Vite dev server，`pnpm verify:browser` 是对应的 Playwright 验证脚本。改完功能后先打开它的 [`/cases.html`](harness/browser-harness/cases.html) 导航页（按改动面 / 关键词筛选专项案例），再进 `?designer&case=` 场景；不要为此引入 Storybook。默认 `/` 与 `?designer` 保持 Playwright 路径。
-- 全栈示例是「一个共享后端 + 三个对等前端」：`examples/host-api`（NestJS + Prisma/SQLite，`pnpm dev:host-api` 起在 3000），以及 `examples/host-app-{vanilla,react,vue}`（`pnpm dev:host-app-*`，分别占 5173/5174/5175，经 Vite proxy 联调同一后端）。它们演示宿主侧接入——文档 CRUD、`<base-screen-designer>` / `<base-screen-viewer>` 嵌入、宿主 project adapter 与数据通道、宿主自有物料；总览见 `examples/README.md`。示例只声明 `dev`/`build`/`typecheck`（host-api 另有 `test`，进 CI），构建与浏览器级验证不进 `verify:m0`：`pnpm verify:examples` 是手动冒烟且需先各自 build，其中 Vue 前端还随 `verify:tarball` 复制到仓库外、替换为同批次真实 tarball 后验证。
+- 手动验证的基座特性矩阵在 `tooling/verification/browser-harness`：`pnpm dev:browser-harness` 起 Vite dev server，`pnpm verify:browser` 是对应的 Playwright 验证脚本。改完功能后先打开它的 [`/cases.html`](tooling/verification/browser-harness/cases.html) 导航页（按改动面 / 关键词筛选专项案例），再进 `?designer&case=` 场景；不要为此引入 Storybook。默认 `/` 与 `?designer` 保持 Playwright 路径。
+- 全栈示例是「一个共享后端 + 三个对等前端」：`examples/shared-backend`（NestJS + Prisma/SQLite，`pnpm dev:shared-backend` 起在 3000），以及 `examples/{vanilla,react,vue}-host`（`pnpm dev:*-host`，分别占 5173/5174/5175，经 Vite proxy 联调同一后端）。它们演示宿主侧接入——文档 CRUD、`<base-screen-designer>` / `<base-screen-viewer>` 嵌入、宿主 project adapter 与数据通道、宿主自有物料；总览见 `examples/README.md`。示例只声明 `dev`/`build`/`typecheck`（shared-backend 另有 `test`，进 CI），构建与浏览器级验证不进 `verify:m0`：`pnpm verify:examples` 是手动冒烟且需先各自 build，其中 Vue 前端还随 `verify:tarball` 复制到仓库外、替换为同批次真实 tarball 后验证。
 - `tooling/material-mcp-server` 是面向上层工具链的物料模板 MCP provider，由根级测试与 `verify:material-mcp` 验证。
 
 ## 包边界
 
-- 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `scripts/check-packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`react`、`vue`、`sdk` 和 `testing`。
+- 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `tooling/checks/packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`react`、`vue`、`sdk` 和 `testing`。
 - 与 `packages/` 平行存在顶层 `plugins/` 外围插件区，承载带受控第三方依赖、独立于固定包清单交付的能力（现有 `plugins/plugin-echarts`、`plugins/plugin-metrics`、`plugins/plugin-datav-materials`、`plugins/plugin-pipeline`）。分区的权威决策见 ADR-0074（外围插件区与依赖分区），兼容策略见 ADR-0075（外围插件兼容策略）。`check-packages.mjs` 的固定包清单约束不扩大到 `plugins/`。
 - 外围插件依赖方向严格单向：`plugins/*` 可依赖 `packages/*` 的公共导出，`packages/*` 绝不依赖 `plugins/*`（含 dev 与 test）。外围插件无运行时特权，走与宿主插件相同的宿主提供/宿主加载/宿主授权通道，不新增信任通道。
 - 新增包、放宽包清单或改变跨包导出时，必须更新包及边界检查。仅当该变更改变长期架构决策、包依赖/所有权或公共兼容策略时，才新增或更新 ADR；只有跨多个独立交付阶段、需要迁移或回滚方案，或用户明确要求时，才创建 Spec。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API。
-- 派生事实只有一个权威落点，引用而不复制：固定包清单在 `scripts/check-packages.mjs`，依赖白名单在 `scripts/check-boundaries.mjs`，工具版本在 manifest 与 lockfile。散文不得复述可由这些来源推导的数量或清单，避免产生两份没有门禁比对的副本。
+- 派生事实只有一个权威落点，引用而不复制：固定包清单在 `tooling/checks/packages.mjs`，依赖白名单在 `tooling/checks/boundaries.mjs`，工具版本在 manifest 与 lockfile。散文不得复述可由这些来源推导的数量或清单，避免产生两份没有门禁比对的副本。
 - 机器可读索引 `.base-screen/integration-capabilities.json` 的 `references` 必须指向仍然存在的路径：`pnpm integration` 在 peer 仓库存在时校验它们，删除或改名被引用文件时必须同批更新该索引。
-- 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`scripts/check-boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`scripts` 或 Nebula 的导入、被禁止的依赖图边，以及对 `testing` 的生产依赖。
-- 依赖白名单编码在 `scripts/check-boundaries.mjs` 中，**按区维护**：`packages/` 区只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖；`plugins/` 区改为逐插件显式申报允许的外部依赖，不接受通配与继承。新增依赖时，必须同时更新该白名单和对应清单。
+- 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`tooling/checks/boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`tooling` 或 Nebula 的导入、被禁止的依赖图边，以及对 `testing` 的生产依赖。
+- 依赖白名单编码在 `tooling/checks/boundaries.mjs` 中，**按区维护**：`packages/` 区只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖；`plugins/` 区改为逐插件显式申报允许的外部依赖，不接受通配与继承。新增依赖时，必须同时更新该白名单和对应清单。
 - `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。
 - `@base-screen/testing` 消费公共包 API 来提供 fixture 和一致性辅助工具。生产包绝不能导入它。
 
@@ -48,9 +48,9 @@
 
 ## 目录结构与命名
 
-- 每个包 `src/` 只放发布物。所有 `*.test.ts` 与 `__fixtures__/` 放在同包 `tests/`，并镜像 `src/` 子目录；测试用相对路径导入被测模块（如 `../src/index.js`）。`scripts/check-packages.mjs` 会拒绝 `src/` 内的测试/fixture，以及 `dist/` 内的测试/fixture 产物。
+- 每个包 `src/` 只放发布物。所有 `*.test.ts` 与 `__fixtures__/` 放在同包 `tests/`，并镜像 `src/` 子目录；测试用相对路径导入被测模块（如 `../src/index.js`）。`tooling/checks/packages.mjs` 会拒绝 `src/` 内的测试/fixture，以及 `dist/` 内的测试/fixture 产物。
 - 每个包 `tsconfig.json` 用 `rootDir: "."` 且 include `src` 与 `tests`，供无 emit 的类型检查；`tsconfig.build.json` 必须覆写 `rootDir: "src"` 且只 include `src`，并排除测试与 fixture，避免测试进入 `dist`。
-- `engine/src` 按环境分三层：`common/`（`operations`、`session`、`project`、`tools`、`ui-text`、`events`、`vendor`）是环境无关纯逻辑；`browser/`（`controllers`、`dom`、`viewport`、`styles`、`ui`）承载 DOM；`designer-element/`（根级 `base-screen-designer-element.ts` 与 `designer-element-public-api.ts`、`api/` 公开方法实现、`runtime/` 控制器装配与状态）是 `<base-screen-designer>` Custom Element 的组合根，仅 `index.ts` 引用。依赖方向单向：`designer-element/` 可依赖 `browser/` 与 `common/`，`browser/` 可依赖 `common/`，反向禁止——`common/` 与 `browser/` 不得触及 `designer-element/`，`designer-element/api/` 不得触及 `browser/`（DOM 装配一律走 `runtime/`）。`common/` 也不得引用浏览器全局（以无 DOM lib 编译验证）。`scripts/check-engine-import.mjs` 强制这些约束及下述子层方向；`designer-element/` 的根级文件与子层在门禁中显式登记，新增文件或子目录必须同步更新登记。
+- `engine/src` 按环境分三层：`common/`（`operations`、`session`、`project`、`tools`、`ui-text`、`events`、`vendor`）是环境无关纯逻辑；`browser/`（`controllers`、`dom`、`viewport`、`styles`、`ui`）承载 DOM；`designer-element/`（根级 `base-screen-designer-element.ts` 与 `designer-element-public-api.ts`、`api/` 公开方法实现、`runtime/` 控制器装配与状态）是 `<base-screen-designer>` Custom Element 的组合根，仅 `index.ts` 引用。依赖方向单向：`designer-element/` 可依赖 `browser/` 与 `common/`，`browser/` 可依赖 `common/`，反向禁止——`common/` 与 `browser/` 不得触及 `designer-element/`，`designer-element/api/` 不得触及 `browser/`（DOM 装配一律走 `runtime/`）。`common/` 也不得引用浏览器全局（以无 DOM lib 编译验证）。`tooling/checks/engine-import.mjs` 强制这些约束及下述子层方向；`designer-element/` 的根级文件与子层在门禁中显式登记，新增文件或子目录必须同步更新登记。
 - engine 的发布入口必须无副作用：导入 `@base-screen/engine` 不得注册 `base-screen-designer` Custom Element 或触碰 localStorage/sessionStorage（`check:engine-import` 会真实 import `dist/index.js` 验证）。`common/vendor/`（moveable 源码）被静态扫描禁止 DOM 全局，且有独立的 `tsconfig.vendor.json`。
 - 纯逻辑需要环境能力时通过构造 options 注入回调（如 `ScreenProjectController` 的 `scheduler`），不要直接访问 DOM/global。
 - 命名前缀承载层级语义，不要删除：`Screen*` 表示 canonical document、事务、项目等领域概念；`Designer*` 表示设计器编排层；`BaseScreen*` 表示 Base Screen 平台命名空间中的跨层契约与公共 API。新增类型按此选择前缀。词汇消歧：`designer-element/` 目录与 `BaseScreenDesignerElement` 指 `<base-screen-designer>` Custom Element 本体（组合根）；`common/operations/element/` 与 `DesignerElementOperations*` 指画布元素工具操作——两者是不同概念，勿混淆。
@@ -66,7 +66,7 @@
 - **renderer 与 designer 职责边界：** `@base-screen/renderer` 只做纯展示（viewer），不含任何编辑/设计逻辑；designer（`engine` 的 `browser/` 与 `designer-element/`）构建在 renderer 之上，renderer 不得依赖或感知 designer。`sdk` 的 `viewer` 与 `designer` 入口分别对应这两条职责线。
 - **plugin 三层边界：** `plugin-core`（契约与共享类型）是唯一契约层；`plugin-manager`（运行时加载/管理）与 `plugin-sdk`（插件作者面）可依赖 `contracts` 与 `plugin-core`，二者不得互相依赖；`plugin-sdk` 是对 `plugin-core` 的作者友好门面，不承载运行时管理逻辑。
 - **material 与 renderer 边界：** 物料契约、manifest 类型与校验由 `plugin-core` 拥有；`@base-screen/material` 提供官方物料实现及其 manifest/注册；`@base-screen/renderer` 只通过 `plugin-core` 的 catalog 与 material element 契约执行渲染，不依赖具体官方物料。
-- **物料原子化（组件制作约定）：** 一个物料只做一件事，不内建标题、说明或装饰性文案——需要标题时由文档层另放一个 `base.text`（或对应物料）组合。内建文案会把物料的内部排版与内边距锁死在一种形态上，使它无法被独立换行/配色/对齐，也无法在不需要该文案的场景复用。判定：若某个 prop 是"读数本身的构成"（单位、前后缀、表头列名）则保留；若只是"描述这个组件是什么"则移除。`scripts/check-material-atomicity.mjs`（随 `pnpm lint` 运行）把这条变成可执行检查：禁止读取 manifest 未声明的 `props`/`style` 键，并禁止描述性文案 prop 出现在官方物料、外围插件物料与宿主示例上（宿主示例连 `label` 一起禁）。图表类物料的 `title`/`legend`/`axis` 属于图形自身构件，按脚本内的 `CHART_FURNITURE_EXEMPTIONS` 显式豁免，非图表物料一律不豁免。`plugin-datav-materials` 的单元测试对 title 类字段另有一道断言。
+- **物料原子化（组件制作约定）：** 一个物料只做一件事，不内建标题、说明或装饰性文案——需要标题时由文档层另放一个 `base.text`（或对应物料）组合。内建文案会把物料的内部排版与内边距锁死在一种形态上，使它无法被独立换行/配色/对齐，也无法在不需要该文案的场景复用。判定：若某个 prop 是"读数本身的构成"（单位、前后缀、表头列名）则保留；若只是"描述这个组件是什么"则移除。`tooling/checks/material-atomicity.mjs`（随 `pnpm lint` 运行）把这条变成可执行检查：禁止读取 manifest 未声明的 `props`/`style` 键，并禁止描述性文案 prop 出现在官方物料、外围插件物料与宿主示例上（宿主示例连 `label` 一起禁）。图表类物料的 `title`/`legend`/`axis` 属于图形自身构件，按脚本内的 `CHART_FURNITURE_EXEMPTIONS` 显式豁免，非图表物料一律不豁免。`plugin-datav-materials` 的单元测试对 title 类字段另有一道断言。
 - **物料渲染盒不变式：** 物料宿主元素的渲染盒必须等于 canonical `component.size`——渲染器先写像素宽高再赋 `model`，因此物料在 `renderMaterial()` 里写宿主元素 `width`/`height` 会覆盖声明尺寸；画边框的物料必须 `box-sizing: border-box`。唯一例外是 `base.text` 的自适应宽度（其宽度由引擎测量后投影回文档）。由 `pnpm verify:browser` 的目录级断言兜底，新增物料不遵守即失败。
 - **sdk 聚合层边界：** `@base-screen/sdk` 是产品级入口与组合层，可负责公共 API 转发、Custom Element 注册及自动注册编排（auto-register、designer、viewer、material、plugins）；不得实现 contracts、core、renderer、engine、material 或 plugin-manager 所属的领域与运行时逻辑。包内实现仍直接通过各自声明的 `@base-screen/*` 公共导出交互，不得经 sdk 反向耦合。
 
@@ -75,7 +75,7 @@
 - `@base-screen/contracts` 是规范文档类型、解析、诊断、序列化和 JSON Schema 的唯一所有者。不要在其他包中复制或绕过其解析器。
 - 其规范解析器是失败关闭（fail-closed）的：不要添加未知字段剥离、默认值、强制转换或隐式未来版本回退。变更公共文档契约时，必须同步更新解析、schema、测试以及适用的迁移/兼容处理；只有改变兼容性政策、领域边界或长期演进方向时才需要 ADR，复杂或高风险的多阶段变更才需要 Spec。
 - 探索阶段命名规则：不要在文档、物料标识、标签名、清单、fixture、ADR、Spec、计划或公共 API 中引入或保留 `V1`/`V2`/`V3`、`v1`/`v2`/`v3`、`/vN`、`-vN`、诸如 `apiVersion`/`schemaVersion`/`implementationVersion` 的版本标记字段、按版本区分的分支或带版本后缀的公共名称。只使用一个当前形态和一个稳定名称。任何兼容性或版本化设计都必须在项目离开此阶段后，获得用户的明确批准。
-- `packages/contracts/src/screen-document.schema.json` 是一个已提交的黄金产物，由构建后的 schema 通过 `pnpm --filter @base-screen/contracts build` 以及随后的 `node scripts/emit-schema-golden.mjs` 生成。黄金产物更新要与其 schema 变更一起有意识地提交；构建只会把该文件复制进 `dist`。
+- `packages/contracts/src/screen-document.schema.json` 是一个已提交的黄金产物，由构建后的 schema 通过 `pnpm --filter @base-screen/contracts build` 以及随后的 `node tooling/build/emit-schema-golden.mjs` 生成。黄金产物更新要与其 schema 变更一起有意识地提交；构建只会把该文件复制进 `dist`。
 
 ## 代码与测试
 

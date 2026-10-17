@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { defineConfig, mergeConfig } from 'vitest/config';
-import { createViteLibraryConfig } from '../../scripts/create-vite-library-config.ts';
+import { createViteLibraryConfig } from '../../tooling/build/vite-library-config.ts';
 
 const packageRoot = fileURLToPath(new URL('.', import.meta.url));
 

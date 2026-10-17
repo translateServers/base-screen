@@ -79,7 +79,7 @@
 
 - **控制器生命周期登记（Controller Lifecycle Registry）**  
   `<base-screen-designer>` 各控制器的连接顺序与释放责任的唯一声明处。登记表之外不得有手写 teardown；
-  遗漏释放必须是类型错误而非静默。相关约束见 `scripts/check-engine-import.mjs` 对 `designer-element/` 结构的登记。
+  遗漏释放必须是类型错误而非静默。相关约束见 `tooling/checks/engine-import.mjs` 对 `designer-element/` 结构的登记。
 
 ## 物料
 

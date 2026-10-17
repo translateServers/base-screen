@@ -51,7 +51,7 @@ Base Screen 的交付重点是可组合的前端基座。示例中的项目目�
 ```bash
 pnpm install --frozen-lockfile
 pnpm build
-pnpm dev:browser-harness
+pnpm dev:browser-harness  # 浏览器验证矩阵（tooling/verification/browser-harness）
 ```
 
 打开终端输出的本地地址即可查看浏览器组合示例；专项案例导航页是 `/cases.html`，`?designer` 为
@@ -151,19 +151,19 @@ flowchart LR
 项目适配器与数据通道、宿主自有物料）。总览与对等矩阵见 [示例总览](./examples/README.md)。
 
 ```bash
-pnpm dev:host-api          # 终端 1：共享后端 http://127.0.0.1:3000
-pnpm dev:host-app-react    # 终端 2：任选一个前端（vanilla 5173 / react 5174 / vue 5175）
+pnpm dev:shared-backend     # 终端 1：共享后端 http://127.0.0.1:3000
+pnpm dev:react-host         # 终端 2：任选一个前端（vanilla 5173 / react 5174 / vue 5175）
 ```
 
 基座自身的特性矩阵与人眼验收入口仍是 `pnpm dev:browser-harness`。
 
 | 示例 | 主要用途 | 运行或验证入口 |
 | --- | --- | --- |
-| [host-api](./examples/host-api) | 三端共用的全栈后端：NestJS + Prisma/SQLite，文档 CRUD、revision 乐观锁、演示指标接口 | `pnpm dev:host-api`；`pnpm --filter @base-screen-example/host-api test` |
-| [host-app-vanilla](./examples/host-app-vanilla) | 原生 TypeScript 宿主前端：hash 路由、DOM 助手、模块 store | `pnpm dev:host-app-vanilla`；`pnpm verify:examples` |
-| [host-app-react](./examples/host-app-react) | React 宿主前端：react-router、hooks、React 物料桥（样式自包含） | `pnpm dev:host-app-react`；`pnpm verify:examples` |
-| [host-app-vue](./examples/host-app-vue) | Vue 宿主前端：vue-router、SFC 物料桥；同时是 tarball 外部消费者载体 | `pnpm dev:host-app-vue`；`pnpm verify:tarball` |
-| [browser-harness](./harness/browser-harness) | 基座特性矩阵：Viewer、Designer、官方物料、项目适配器与插件管理器组合；导航页 `/cases.html` | `pnpm dev:browser-harness` |
+| [shared-backend](./examples/shared-backend) | 三端共用的全栈后端：NestJS + Prisma/SQLite，文档 CRUD、revision 乐观锁、演示指标接口 | `pnpm dev:shared-backend`；`pnpm --filter @base-screen-example/shared-backend test` |
+| [vanilla-host](./examples/vanilla-host) | 原生 TypeScript 宿主前端：hash 路由、DOM 助手、模块 store | `pnpm dev:vanilla-host`；`pnpm verify:examples` |
+| [react-host](./examples/react-host) | React 宿主前端：react-router、hooks、React 物料桥（样式自包含） | `pnpm dev:react-host`；`pnpm verify:examples` |
+| [vue-host](./examples/vue-host) | Vue 宿主前端：vue-router、SFC 物料桥；同时是 tarball 外部消费者载体 | `pnpm dev:vue-host`；`pnpm verify:tarball` |
+| [browser-harness](./tooling/verification/browser-harness) | 基座特性矩阵：Viewer、Designer、官方物料、项目适配器与插件管理器组合；导航页 `/cases.html` | `pnpm dev:browser-harness` |
 | [material-mcp-server](./tooling/material-mcp-server) | 面向上层工具链的物料模板 MCP provider | `node tooling/material-mcp-server/server.mjs`；由 `pnpm verify:material-mcp` 验证 |
 
 ## 包结构
@@ -194,7 +194,7 @@ pnpm dev:host-app-react    # 终端 2：任选一个前端（vanilla 5173 / reac
 | 环境搭建、分层边界与检查门禁 | [AGENTS.md](./AGENTS.md) |
 | 领域词汇与唯一实现落点 | [CONTEXT.md](./CONTEXT.md) |
 | 可直接运行的宿主工程 | [示例总览](./examples/README.md) |
-| 基座特性矩阵与专项案例 | [browser-harness 导航页](harness/browser-harness/cases.html) |
+| 基座特性矩阵与专项案例 | [browser-harness 导航页](tooling/verification/browser-harness/cases.html) |
 
 ## 参与贡献
 

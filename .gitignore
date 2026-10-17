@@ -19,9 +19,9 @@ packages/*/LICENSE
 *.db-shm
 # 本地 SQLite 手工快照：`*.db` 匹配不到 `screens.db.bak-<日期>` 这类后缀
 *.db.bak-*
-/examples/host-api/src/generated/
+/examples/shared-backend/src/generated/
 .env
-!/examples/host-api/.env
+!/examples/shared-backend/.env
 .workbuddy
 .schema-build/
 .trae
@@ -31,4 +31,5 @@ packages/*/LICENSE
 .agents/skills/*
 !.agents/skills/base-screen-integration-workflow/
 .base-screen/local/
+.local/
 .qoder/

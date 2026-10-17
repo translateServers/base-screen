@@ -28,7 +28,7 @@
   "scripts": {
     "build": "pnpm run clean && tsc -p tsconfig.build.json && node -e \"require('node:fs').rmSync('dist/common/vendor',{force:true,recursive:true})\" && vite build",
     "clean": "node -e \"require('node:fs').rmSync('dist',{force:true,recursive:true})\"",
-    "lint": "biome check src tests && node ../../scripts/check-designer-ui.mjs && node ../../scripts/check-designer-styles.mjs",
+    "lint": "biome check src tests && node ../../tooling/checks/designer-ui.mjs && node ../../tooling/checks/designer-styles.mjs",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.vendor.json"
   }

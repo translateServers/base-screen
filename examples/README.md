@@ -110,8 +110,8 @@ pnpm dev:host-app-vue        # http://127.0.0.1:5175
 冒烟脚本会自己拉起"已构建的后端"与"前端 preview"，因此**必须先构建**：
 
 ```bash
-pnpm --filter @base-screen-example/host-api build
-pnpm --filter @base-screen-example/host-app-vanilla build   # React / Vue 同理
+pnpm --filter @base-screen-example/shared-backend build
+pnpm --filter @base-screen-example/vanilla-host build   # React / Vue 同理
 
 pnpm verify:examples        # 依次跑三端冒烟
 ```

@@ -126,13 +126,13 @@
       "references": [
         ".agents/skills/base-screen-integration-workflow/SKILL.md",
         ".agents/skills/base-screen-integration-workflow/scripts/workflow.mjs",
-        "tests/__fixtures__/integration-workflow-suite.ts",
-        "tests/integration-workflow-bootstrap.test.ts",
-        "tests/integration-workflow-sync.test.ts",
-        "tests/integration-workflow-integrity.test.ts",
-        "tests/integration-workflow-verification.test.ts",
-        "tests/integration-workflow-drift.test.ts",
-        "tests/integration-workflow-recovery.test.ts"
+        "tests/fixtures/__fixtures__/integration-workflow-suite.ts",
+        "tests/integration/integration-workflow-bootstrap.test.ts",
+        "tests/integration/integration-workflow-sync.test.ts",
+        "tests/integration/integration-workflow-integrity.test.ts",
+        "tests/integration/integration-workflow-verification.test.ts",
+        "tests/integration/integration-workflow-drift.test.ts",
+        "tests/integration/integration-workflow-recovery.test.ts"
       ],
       "checks": ["workflow"]
     }

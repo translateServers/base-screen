@@ -13,7 +13,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", "tests/**", "../../scripts/test-scope.config.json"],
+      "inputs": ["$TURBO_DEFAULT$", "tests/**", "../../tooling/testing/test-scope.config.json"],
       "outputs": ["test-report.json"]
     },
     "clean": {
