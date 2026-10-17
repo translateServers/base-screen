@@ -10,13 +10,7 @@ import {
   labeledActionButton,
   menuPanel,
   menuTriggerButton,
-  previewGlyph,
-  publishGlyph,
-  redoGlyph,
   sizeEntryField,
-  zoomFitGlyph,
-  zoomInGlyph,
-  zoomOutGlyph,
 } from './designer-workspace-template.js';
 
 export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
@@ -43,9 +37,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <span class="panel-title" id="designer-left-panel-title" data-left-panel-title>${DESIGNER_UI_TEXT.materials}</span>
         <span class="panel-count" id="designer-left-panel-count" role="status" aria-label="${DESIGNER_UI_TEXT.leftPanelCount(DESIGNER_UI_TEXT.materials, visibleMaterialCount)}" aria-live="polite" aria-atomic="true" data-material-count data-left-panel-count data-material-total="${visibleMaterialCount}">${visibleMaterialCount}</span>
         <span class="panel-scope" data-left-panel-scope>${DESIGNER_UI_TEXT.panelScope.builtin}</span>
-        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="left" data-tip="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}" aria-controls="designer-left-panel" aria-expanded="true">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4"/></svg>
-        </button>
       </header>
       <div class="rail-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.leftPanel}">
         <button type="button" class="designer-tab" id="designer-materials-tab" role="tab" aria-controls="designer-materials-panel" aria-selected="true" data-panel-tab="materials" data-tip="${DESIGNER_UI_TEXT.materials}">
@@ -68,7 +59,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <span class="material-search-glyph" aria-hidden="true">${designerIcon('search')}</span>
             <input type="search" class="designer-control designer-input" data-material-search placeholder="${DESIGNER_UI_TEXT.materialsSearch}" aria-label="${DESIGNER_UI_TEXT.materialsSearch}" aria-describedby="designer-left-panel-count">
             <button type="button" class="designer-control designer-button designer-icon-button material-search-clear" data-variant="ghost" data-material-search-clear data-tip="${DESIGNER_UI_TEXT.clearMaterialSearch}" aria-label="${DESIGNER_UI_TEXT.clearMaterialSearch}" hidden>
-              ${designerIcon('x')}
+              ${designerIcon('close')}
             </button>
           </div>
           <div class="material-filters" role="group" aria-label="${DESIGNER_UI_TEXT.materialFilters}">
@@ -105,19 +96,21 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <section class="material-group-popover" id="designer-material-group-popover" data-material-group-popover role="dialog" aria-label="${DESIGNER_UI_TEXT.materialGroups}">
         <header class="material-group-popover-heading">
           <span>${DESIGNER_UI_TEXT.materialCategories}</span>
-          <button type="button" class="designer-control designer-button designer-icon-button" data-material-group-action="close" aria-label="${DESIGNER_UI_TEXT.materialGroupClose}" data-tip="${DESIGNER_UI_TEXT.materialGroupClose}">${designerIcon('x')}</button>
+          <button type="button" class="designer-control designer-button designer-icon-button" data-material-group-action="close" aria-label="${DESIGNER_UI_TEXT.materialGroupClose}" data-tip="${DESIGNER_UI_TEXT.materialGroupClose}">${designerIcon('close')}</button>
         </header>
         <div class="material-group-popover-content" data-material-group-popover-content></div>
       </section>
     </div>
 
-    <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical" aria-controls="designer-left-panel" aria-label="${DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.leftPanel)}" aria-valuemin="200" aria-valuemax="480" aria-valuenow="336" tabindex="0"></div>
+    <div class="panel-handle" data-panel-handle="left" role="separator" aria-orientation="vertical" aria-controls="designer-left-panel" aria-label="${DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.leftPanel)}" aria-valuemin="200" aria-valuemax="480" aria-valuenow="336" tabindex="0">
+      <button type="button" class="handle-btn" data-panel-collapse="left" data-tip="${DESIGNER_UI_TEXT.collapseMaterials}" aria-label="${DESIGNER_UI_TEXT.collapseMaterials}" aria-controls="designer-left-panel" aria-expanded="true">${designerIcon('chevron-left')}</button>
+    </div>
 
     <main class="workspace">
       <header class="designer-topbar" aria-label="${DESIGNER_UI_TEXT.topbar}">
         <div class="topbar-brand">
           <button type="button" class="topbar-icon-button" data-topbar-back data-tip="${DESIGNER_UI_TEXT.back}" aria-label="${DESIGNER_UI_TEXT.back}" hidden>${designerIcon('chevron-left')}</button>
-          <span class="topbar-product-mark" aria-hidden="true">${designerIcon('shapes')}</span>
+          <span class="topbar-product-mark" aria-hidden="true">${designerIcon('logo')}</span>
           <span class="topbar-project-meta">
             <span class="designer-project-name">${DESIGNER_UI_TEXT.unnamedProject}</span>
             <span class="topbar-save-status" data-topbar-save-status>${DESIGNER_UI_TEXT.directDocument}</span>
@@ -138,17 +131,17 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <div class="topbar-actions">
           <button type="button" class="topbar-icon-button" data-panel-collapse="right" aria-controls="designer-right-panel" aria-expanded="true" data-tip="${DESIGNER_UI_TEXT.rightPanel}" aria-label="${DESIGNER_UI_TEXT.rightPanel}">${designerIcon('sliders')}</button>
           <button type="button" class="topbar-icon-button" data-topbar-snapshot data-tip="${DESIGNER_UI_TEXT.createSnapshot}" aria-label="${DESIGNER_UI_TEXT.createSnapshot}" disabled>${designerIcon('copy')}</button>
-          <button type="button" class="topbar-icon-button" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" data-tip="${DESIGNER_UI_TEXT.errorConsole.openAria}" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}">${designerIcon('terminal')}<span class="topbar-count" data-error-console-count></span></button>
-          <button type="button" class="topbar-icon-button" data-topbar-theme-toggle data-tip="${DESIGNER_UI_TEXT.toggleTheme}" aria-label="${DESIGNER_UI_TEXT.toggleTheme}" aria-pressed="false">${designerIcon('eye')}</button>
+          <button type="button" class="topbar-icon-button" data-error-console-toggle aria-controls="designer-error-console" aria-haspopup="dialog" aria-expanded="false" data-tip="${DESIGNER_UI_TEXT.errorConsole.openAria}" aria-label="${DESIGNER_UI_TEXT.errorConsole.openAria}">${designerIcon('activity')}<span class="topbar-count" data-error-console-count></span></button>
+          <button type="button" class="topbar-icon-button" data-topbar-theme-toggle data-tip="${DESIGNER_UI_TEXT.toggleTheme}" aria-label="${DESIGNER_UI_TEXT.toggleTheme}" aria-pressed="false"><span class="topbar-theme-moon" aria-hidden="true">${designerIcon('moon')}</span><span class="topbar-theme-sun" aria-hidden="true">${designerIcon('sun')}</span></button>
           <button type="button" class="topbar-search-trigger" data-command-palette-toggle aria-expanded="false" aria-controls="designer-command-palette-input" aria-label="${DESIGNER_UI_TEXT.commandPalette.trigger}" data-tip="${DESIGNER_UI_TEXT.commandPalette.trigger}">
             ${designerIcon('search')}
             <span data-command-palette-trigger-label>${DESIGNER_UI_TEXT.commandPalette.trigger}</span>
             <kbd>Ctrl K</kbd>
           </button>
           <span class="topbar-divider" aria-hidden="true"></span>
-          ${labeledActionButton('preview', previewGlyph())}
+          ${labeledActionButton('preview', designerIcon('play'))}
           ${labeledActionButton('project-save', designerIcon('save'))}
-          ${labeledActionButton('project-publish', publishGlyph(), 'topbar-publish')}
+          ${labeledActionButton('project-publish', designerIcon('upload'), 'topbar-publish')}
         </div>
         ${menuPanel('file', DESIGNER_UI_TEXT.file, ['project-workspace', 'import', 'export', 'separator', 'project-save', 'project-publish', 'project-retry', 'project-cancel'])}
         ${menuPanel('edit', DESIGNER_UI_TEXT.edit, ['undo', 'redo', 'separator', 'copy', 'paste', 'duplicate', 'delete', 'edit-position', 'edit-size', 'separator', 'group', 'ungroup', { label: DESIGNER_UI_TEXT.arrange, entries: ['align-left', 'align-center', 'align-right', 'align-top', 'align-middle', 'align-bottom', 'separator', 'distribute-horizontal', 'distribute-vertical'] }, { label: DESIGNER_UI_TEXT.layer, entries: ['select-layer-up', 'select-layer-down', 'separator', 'bring-to-front', 'bring-forward', 'send-backward', 'send-to-back', 'lock', 'unlock', 'hide'] }])}
@@ -164,13 +157,13 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         </div>
         <div class="topbar-segment" role="group" aria-label="${DESIGNER_UI_TEXT.history}">
           ${actionButton('undo', designerIcon('undo'))}
-          ${actionButton('redo', redoGlyph())}
+          ${actionButton('redo', designerIcon('redo'))}
         </div>
         <div class="topbar-segment topbar-zoom" role="group" aria-label="${DESIGNER_UI_TEXT.zoom}">
-          ${actionButton('zoom-out', zoomOutGlyph())}
+          ${actionButton('zoom-out', designerIcon('minus'))}
           <button type="button" class="zoom-value" data-action="zoom-reset" data-zoom data-tip="${DESIGNER_OPERATION_TEXT['zoom-reset'].tooltip}" aria-label="${DESIGNER_OPERATION_TEXT['zoom-reset'].label}">100%</button>
-          ${actionButton('zoom-in', zoomInGlyph())}
-          ${actionButton('zoom-fit', zoomFitGlyph())}
+          ${actionButton('zoom-in', designerIcon('plus'))}
+          ${actionButton('zoom-fit', designerIcon('fit'))}
         </div>
       </div>
       <button type="button" class="ruler-corner" data-status-toggle="guides" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.guides}" data-tip="${DESIGNER_UI_TEXT.rulerGuidesToggle}">
@@ -247,7 +240,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             </div>
             <div class="error-console-actions">
               <button type="button" class="designer-control designer-button error-console-clear" data-error-console-clear>${DESIGNER_UI_TEXT.errorConsole.clear}</button>
-              <button type="button" class="designer-control designer-button designer-icon-button error-console-close" data-variant="ghost" data-error-console-close aria-label="${DESIGNER_UI_TEXT.errorConsole.closeAria}" data-tip="${DESIGNER_UI_TEXT.errorConsole.closeAria}">${designerIcon('x')}</button>
+              <button type="button" class="designer-control designer-button designer-icon-button error-console-close" data-variant="ghost" data-error-console-close aria-label="${DESIGNER_UI_TEXT.errorConsole.closeAria}" data-tip="${DESIGNER_UI_TEXT.errorConsole.closeAria}">${designerIcon('close')}</button>
             </div>
           </header>
           <section class="error-console-current" data-material-library-status aria-label="${DESIGNER_UI_TEXT.materialLibrary.label}" hidden></section>
@@ -260,15 +253,13 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       </section>
     </main>
 
-    <div class="panel-handle" data-panel-handle="right" role="separator" aria-orientation="vertical" aria-controls="designer-right-panel" aria-label="${DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.inspector)}" aria-valuemin="288" aria-valuemax="480" aria-valuenow="336" tabindex="0"></div>
+    <div class="panel-handle" data-panel-handle="right" role="separator" aria-orientation="vertical" aria-controls="designer-right-panel" aria-label="${DESIGNER_UI_TEXT.selection.resizeHandle(DESIGNER_UI_TEXT.inspector)}" aria-valuemin="288" aria-valuemax="480" aria-valuenow="336" tabindex="0">
+      <button type="button" class="handle-btn" data-panel-collapse="right" data-tip="${DESIGNER_UI_TEXT.collapseInspector}" aria-label="${DESIGNER_UI_TEXT.collapseInspector}" aria-controls="designer-right-panel" aria-expanded="true">${designerIcon('chevron-right')}</button>
+    </div>
 
     <aside class="properties" id="designer-right-panel" data-right-panel aria-labelledby="designer-right-panel-title">
       <header class="panel-heading">
         <span class="panel-title" id="designer-right-panel-title" data-right-panel-title>${DESIGNER_UI_TEXT.inspectorUi.canvasConfiguration}</span>
-        <span class="panel-collapsed-label" aria-hidden="true">${DESIGNER_UI_TEXT.inspector}</span>
-        <button type="button" class="designer-control designer-button designer-icon-button panel-collapse" data-variant="ghost" data-panel-collapse="right" data-tip="${DESIGNER_UI_TEXT.collapseInspector}" aria-label="${DESIGNER_UI_TEXT.collapseInspector}" aria-controls="designer-right-panel" aria-expanded="true">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4"/></svg>
-        </button>
       </header>
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
         <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span class="inspector-tab-icon">${designerIcon('sliders')}</span><span>${DESIGNER_UI_TEXT.appearance}</span></button>
@@ -288,7 +279,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <header class="inspector-search-workspace-header">
           <button type="button" class="designer-control designer-button designer-icon-button inspector-search-back" data-variant="ghost" data-inspector-search-close data-tip="${DESIGNER_UI_TEXT.inspectorUi.searchBack}" aria-label="${DESIGNER_UI_TEXT.inspectorUi.searchBack}">${designerIcon('chevron-left')}</button>
           <strong>${DESIGNER_UI_TEXT.inspectorUi.searchLaunch}</strong>
-          <span class="inspector-search-workspace-icon" aria-hidden="true">${designerIcon('copy')}</span>
+          <span class="inspector-search-workspace-icon" aria-hidden="true">${designerIcon('search')}</span>
         </header>
         <label class="inspector-search">
           <span aria-hidden="true">${designerIcon('search')}</span>

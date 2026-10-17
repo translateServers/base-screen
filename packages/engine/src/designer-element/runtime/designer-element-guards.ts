@@ -124,12 +124,9 @@ export function groupEditingPath(document: ScreenDocument, groupId: string | nul
   return names.length === 0 ? null : names.join(' / ');
 }
 
+// 保存状态指示器与图标族同网格：圆弧 spinner 保留自身 CSS 动画与 class。
 export function saveStatusSpinnerGlyph(): string {
-  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 2a6 6 0 1 1-6 6"/></svg>';
-}
-
-export function saveStatusCheckGlyph(): string {
-  return '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" d="M3 8.5 6.5 12 13 4.5"/></svg>';
+  return '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M12 3a9 9 0 1 1-9 9"/></svg>';
 }
 
 export function formatSavedTime(timestamp: number): string {

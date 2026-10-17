@@ -35,8 +35,8 @@ describe('material group column navigation', () => {
       })),
     ).toEqual([
       { icon: 'grid', hidden: false, decorative: 'true' },
-      { icon: 'text', hidden: false, decorative: 'true' },
-      { icon: 'chart', hidden: false, decorative: 'true' },
+      { icon: 'type', hidden: false, decorative: 'true' },
+      { icon: 'chart-bar', hidden: false, decorative: 'true' },
     ]);
     const data = view.roots.querySelector<HTMLButtonElement>('[data-material-group="data"]')!;
     expect(data.getAttribute('data-tip')).toBe('Data（4 个物料）');
@@ -60,9 +60,7 @@ describe('material group column navigation', () => {
     const glyph = named.querySelector<HTMLElement>('.material-group-glyph')!;
     const custom = view.roots.querySelector<HTMLElement>('[data-material-group="custom"]')!;
     expect(glyph.dataset.icon).toBe('shapes');
-    expect(custom.querySelector<HTMLElement>('.material-group-glyph')?.dataset.icon).toBe(
-      'container',
-    );
+    expect(custom.querySelector<HTMLElement>('.material-group-glyph')?.dataset.icon).toBe('rect');
     expect(custom.querySelector<HTMLElement>('.material-group-glyph')?.innerHTML).not.toContain(
       '<b>',
     );

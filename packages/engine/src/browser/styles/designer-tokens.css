@@ -126,11 +126,13 @@
   --designer-button-primary-background: color-mix(in srgb, var(--designer-accent) 82%, black);
   --designer-button-primary-hover: color-mix(in srgb, var(--designer-accent) 86%, black);
   --designer-button-primary-active: color-mix(in srgb, var(--designer-accent) 76%, black);
-  --designer-button-primary-active-shadow: color-mix(in srgb, black 24%, transparent);
 
-  /* ── 画布覆盖层（画布批统一前保持引擎现值）── */
-  --designer-snap-guide: #4af;
-  --designer-measurement-label: #d93838;
+  /* ── 画布覆盖层：参考线与测量是编辑 affordance，按体系「交互与焦点沿用强调蓝」收进
+     强调色族（批 4b）。吸附线取 accent；测量读数取 accent-text——文字需 AA，accent
+     原色压工作区底约 3.6:1 不够，accent-text 在双主题下分别是 5.6:1 / 6.2:1。
+     原值是引擎旧蓝 #4af 与旧红 #d93838，两套主题下都与体系不同源。 ── */
+  --designer-snap-guide: var(--designer-accent);
+  --designer-measurement-label: var(--designer-accent-text);
 
   --designer-z-canvas: 0;
   /* 画布覆盖层必须高于全部组件：组件 z-index 取 Core painter order 索引（0..N-1），
@@ -202,6 +204,5 @@
     0 6px 16px -8px rgb(0 0 0 / 70%)
   );
 
-  --designer-measurement-label: #ff6b6b;
   color-scheme: dark;
 }

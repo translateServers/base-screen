@@ -154,38 +154,7 @@ export function downloadDesignerDocument(
   URL.revokeObjectURL(url);
 }
 
-export function redoGlyph(): string {
-  return toolbarIcon('M12 6H7a3 3 0 0 0-3 3v0M11 5l2 2-2 2');
-}
-
-export function previewGlyph(): string {
-  return toolbarIcon(
-    'M8 5a4 4 0 0 0-5 3 4 4 0 0 0 5 3 4 4 0 0 0 5-3 4 4 0 0 0-5-3zm0 2a1 1 0 1 1 0 2 1 1 0 0 1 0-2z',
-  );
-}
-
-export function publishGlyph(): string {
-  return toolbarIcon('M8 3l4 7H4zM4 12h8');
-}
-
-export function zoomOutGlyph(): string {
-  return toolbarIcon('M6 8h4M4 4h8v8H4z');
-}
-
-export function zoomInGlyph(): string {
-  return toolbarIcon('M6 8h4M8 6v4M4 4h8v8H4z');
-}
-
-export function zoomFitGlyph(): string {
-  return toolbarIcon(
-    'M6 3H4.5A1.5 1.5 0 0 0 3 4.5V6M10 3h1.5A1.5 1.5 0 0 1 13 4.5V6M13 10v1.5a1.5 1.5 0 0 1-1.5 1.5H10M6 13H4.5A1.5 1.5 0 0 1 3 11.5V10',
-  );
-}
-
-function toolbarIcon(path: string): string {
-  return `<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" d="${path}"/></svg>`;
-}
-
+// 顶栏带文案按钮的加载指示器：与图标族同网格的 24 网格圆弧，靠 CSS 动画旋转。
 function spinnerGlyph(): string {
-  return '<svg class="topbar-button-spinner" viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M8 2a6 6 0 1 1-6 6"/></svg>';
+  return '<svg class="topbar-button-spinner" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" d="M12 3a9 9 0 1 1-9 9"/></svg>';
 }

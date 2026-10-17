@@ -40,6 +40,18 @@
   display: none;
 }
 
+/* 数据工作台打开时画布表面一并收起，与蓝图模式同一处理（蓝图侧见
+   designer-workbench-blueprint-surface.css）：浮层自带不透明底色，画布留在
+   浮层下继续绘制既无意义也拖累帧率；display:none 后视口尺寸归零，autoFit
+   由 ResizeObserver 在关闭时自动恢复（与模式切换同一路径）。 */
+.designer[data-data-workbench-open="true"] .workspace-local-toolbar,
+.designer[data-data-workbench-open="true"] .ruler-corner,
+.designer[data-data-workbench-open="true"] .ruler-horizontal,
+.designer[data-data-workbench-open="true"] .ruler-vertical,
+.designer[data-data-workbench-open="true"] .canvas-stage {
+  display: none;
+}
+
 .designer {
   --left-panel-width: 336px;
   --right-panel-width: 336px;

@@ -267,7 +267,8 @@ export async function assertAuthoringVariables(page, designer) {
       theme.primaryContrast < 4.5 ||
       theme.primaryHeight < 28 ||
       theme.neutralHeight < 28 ||
-      theme.ghostWidth < 32 ||
+      // ghost 代表是面板把手上的折叠胶囊钮（原型 .handle-btn：16×34）；只防止被压成 0 宽。
+      theme.ghostWidth < 16 ||
       theme.ghostHeight < 32 ||
       // 原型 .btn 契约：悬停/按压只改底色与描边，不做缩放。
       theme.neutralTransition !== 'background-color, box-shadow, color' ||

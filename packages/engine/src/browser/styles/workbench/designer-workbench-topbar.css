@@ -360,6 +360,12 @@ button.topbar-mode-button:disabled {
   height: 15px;
 }
 
+/* 主题切换：两个图标互斥显示，按下按钮里只存在一个可见字形，几何不变、无抖动。 */
+:host([theme="dark"]) .topbar-theme-moon,
+:host(:not([theme="dark"])) .topbar-theme-sun {
+  display: none;
+}
+
 .topbar-count {
   position: absolute;
   top: -2px;

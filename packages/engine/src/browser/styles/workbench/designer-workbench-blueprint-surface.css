@@ -128,9 +128,10 @@
   visibility: hidden;
 }
 
+/* 折叠态与画布一致：列头退场，蓝图图标 tab 轨直接贯通 48px 列（不留空的 48px 控制槽）。 */
 .designer[data-authoring-mode="blueprint"][data-left-collapsed="true"] .blueprint-library-shell {
   grid-template-columns: 48px 0;
-  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .designer[data-authoring-mode="blueprint"][data-left-collapsed="true"] .blueprint-library-main,

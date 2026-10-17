@@ -74,14 +74,14 @@ export function renderDesignerInspectorContext(
 }
 
 function materialIcon(type: string): DesignerIconName {
-  if (type.includes('echarts') || type.includes('chart')) return 'chart';
+  if (type.includes('echarts') || type.includes('chart')) return 'chart-bar';
   if (type.includes('table')) return 'table';
   if (type.includes('image')) return 'image';
-  if (type.includes('text')) return 'text';
+  if (type.includes('text')) return 'type';
   if (type.includes('rectangle') || type.includes('ellipse') || type.includes('shape')) {
     return 'shapes';
   }
-  if (type.includes('container') || type.includes('group')) return 'container';
+  if (type.includes('container') || type.includes('group')) return 'rect';
   return 'cube';
 }
 

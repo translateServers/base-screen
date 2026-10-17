@@ -91,7 +91,7 @@ export function renderMaterialLibraryGroupNavigation(
         label: group.label,
         accessibleLabel: DESIGNER_UI_TEXT.materialGroupSelect(group.label),
         path: group.label,
-        icon: icon === 'grid' ? 'container' : icon,
+        icon: icon === 'grid' ? 'rect' : icon,
         count: types.length,
         selected: path[0]?.id === group.id,
         hasChildren: group.children !== undefined,

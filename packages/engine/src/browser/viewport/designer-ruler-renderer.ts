@@ -66,8 +66,9 @@ function renderRuler(
   context.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
   context.clearRect(0, 0, canvasRect.width, canvasRect.height);
   const style = canvas.ownerDocument.defaultView?.getComputedStyle(ruler) ?? null;
-  const line = style?.getPropertyValue('--designer-border-default').trim() || '#e4e4e7';
-  const text = style?.getPropertyValue('--designer-text-muted').trim() || '#71717a';
+  // 回退值取设计体系当前值（旧值 #e4e4e7 / #71717a 是移植前的 zinc 灰）。
+  const line = style?.getPropertyValue('--designer-border-default').trim() || 'rgb(23 23 23 / 15%)';
+  const text = style?.getPropertyValue('--designer-text-muted').trim() || '#666666';
   const barSize = axis === 'x' ? canvasRect.height : canvasRect.width;
   renderMarks(context, axis, marks, unit, zoom, barSize, line);
   renderLabels(context, axis, marks, barSize, text);

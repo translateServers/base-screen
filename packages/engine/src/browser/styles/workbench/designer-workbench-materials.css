@@ -75,7 +75,7 @@
 }
 
 /* 宿主封面：绝对铺满缩略图区（几何恒定），加载前透明露出占位图标，load 后 opacity 过渡显现；
-   error 由 DOM 移除图片，恢复占位图标与色相背景。 */
+   error 由 DOM 移除图片，恢复占位图标与缩略图底（色相背景已在批 3c 退役）。 */
 .material-cover {
   position: absolute;
   inset: 0;

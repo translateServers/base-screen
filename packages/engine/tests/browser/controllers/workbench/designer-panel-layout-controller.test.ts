@@ -95,6 +95,10 @@ function createPanelLayout(storage = new Map<string, string>()) {
   const root = {
     ownerDocument,
     querySelector: (selector: string) => elements.get(selector) ?? null,
+    querySelectorAll: (selector: string) => {
+      const element = elements.get(selector);
+      return element === undefined ? [] : [element];
+    },
   } as unknown as ShadowRoot;
   return {
     controller: new DesignerPanelLayoutController({ getRoot: () => root }),

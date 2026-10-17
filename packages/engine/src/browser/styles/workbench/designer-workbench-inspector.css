@@ -39,13 +39,6 @@
 
 .designer:not([data-right-collapsed="true"])
   .properties:not([data-inspector-context-kind="canvas"])
-  > .panel-heading
-  .panel-collapse {
-  margin: 0;
-}
-
-.designer:not([data-right-collapsed="true"])
-  .properties:not([data-inspector-context-kind="canvas"])
   > .inspector-tabs {
   grid-column: 1;
   grid-row: 1;
@@ -298,11 +291,6 @@
   font-size: var(--designer-font-size-base);
   font-weight: 600;
   text-align: center;
-}
-
-.properties[data-inspector-context-kind="multi-selection"] > .panel-heading .panel-collapse {
-  position: absolute;
-  right: 6px;
 }
 
 .properties[data-inspector-context-kind="multi-selection"] > .inspector-tabs,

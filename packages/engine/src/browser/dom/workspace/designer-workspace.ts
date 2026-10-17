@@ -9,7 +9,7 @@ import {
   type DesignerToolMaterialTypes,
 } from '../../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { designerToolGlyph } from '../../ui/designer-icons.js';
+import { designerIcon, designerToolGlyph } from '../../ui/designer-icons.js';
 import { renderDesignerLeftPanelGroups } from '../designer-left-panel-groups-dom.js';
 import {
   populateMaterialLibrary,
@@ -85,7 +85,7 @@ export function createDesignerWorkspace(
           <p>${DESIGNER_UI_TEXT.shortcutHelpIntro}</p>
         </div>
         <button type="button" class="designer-control designer-button designer-icon-button help-close" data-variant="ghost" data-help-close aria-label="${DESIGNER_UI_TEXT.helpClose}">
-          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>
+          ${designerIcon('close')}
         </button>
       </header>
       <div class="help-content">

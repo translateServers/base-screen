@@ -87,7 +87,7 @@ describe('designer workbench structure and layout', () => {
 
   it('keeps the Blueprint icon rail visible when the shared left panel is collapsed', () => {
     expect(workbenchCss).toMatch(
-      /\.designer\[data-authoring-mode="blueprint"\]\[data-left-collapsed="true"\]\s+\.blueprint-library-shell\s*\{[^}]*grid-template-columns: 48px 0;[^}]*grid-template-rows: 48px minmax\(0, 1fr\);/s,
+      /\.designer\[data-authoring-mode="blueprint"\]\[data-left-collapsed="true"\]\s+\.blueprint-library-shell\s*\{[^}]*grid-template-columns: 48px 0;[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
     );
     expect(workbenchCss).toMatch(
       /\.designer\[data-authoring-mode="blueprint"\]\[data-left-collapsed="true"\]\s+\.blueprint-library-main,[^{]*\{[^}]*display: none;/s,
@@ -106,50 +106,43 @@ describe('designer workbench structure and layout', () => {
     expect(paneRule?.[1]).not.toContain('scroll-padding');
   });
 
-  it('R3 renders discoverable collapsed rails with stable controls (ADR-0037)', () => {
-    // 折叠轨：关闭 scrollbar-gutter 占用，左侧按钮使用独立的 48px 顶部控制槽。
+  it('R3 keeps collapse on the panel handle and matches the prototype collapsed rails', () => {
+    // 折叠轨：关闭 scrollbar-gutter 占用，把完整宽度还给图标 Tab。
     expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail,');
     expect(workbenchCss).toContain('.designer[data-right-collapsed="true"] .properties {');
     expect(workbenchCss).toContain('scrollbar-gutter: auto;');
+    // 分隔条是布局把手不是编辑对象：发丝线保持中性，悬停只加深收边（不借强调色）。
     expect(workbenchCss).toMatch(
-      /\.designer\[data-left-collapsed="true"\] \.rail \.panel-heading\s*\{[^}]*position: relative;[^}]*box-sizing: border-box;[^}]*grid-column: 1;[^}]*grid-row: 1;[^}]*width: 48px;[^}]*height: 48px;/s,
-    );
-    expect(workbenchCss).toMatch(
-      /\.designer\[data-right-collapsed="true"\] \.properties \.panel-heading\s*\{[^}]*box-sizing: border-box;[^}]*padding: 8px;/s,
+      /\.panel-handle::before\s*\{[^}]*background: var\(--designer-border-subtle\);[^}]*content: "";/s,
     );
     expect(workbenchCss).toMatch(
-      /\.designer\[data-left-collapsed="true"\] \.rail \.panel-heading,\s*\.designer\[data-right-collapsed="true"\] \.properties \.panel-heading\s*\{[^}]*background: linear-gradient\(/s,
+      /\.panel-handle:hover::before\s*\{[^}]*background: var\(--designer-border-active\);/s,
     );
-    // 折叠按钮保持自有表面（透明描边槽 + 自有悬停）；属性表单的控件皮肤不再通配覆盖它。
+    expect(workbenchCss).not.toMatch(/\.panel-handle:hover::before\s*\{[^}]*accent/s);
+    // 折叠胶囊钮：16×34 垂直居中、默认隐藏（原型 .handle-btn），把手悬停/聚焦时才浮现。
     expect(workbenchCss).toMatch(
-      /\.panel-collapse\s*\{[^}]*box-shadow: inset 0 0 0 1px transparent;/s,
+      /\.panel-handle \.handle-btn\s*\{[^}]*width: 16px;[^}]*height: 34px;[^}]*border-radius: var\(--designer-radius-pill\);[^}]*opacity: 0;/s,
     );
-    expect(workbenchCss).not.toContain('.properties .designer-control:not(.panel-collapse) {');
-    expect(workbenchCss).not.toContain('.properties .designer-control {');
     expect(workbenchCss).toMatch(
-      /\.designer\[data-left-collapsed="true"\] \.rail-tabs\s*\{[^}]*grid-row: 2;[^}]*padding-top: var\(--designer-space-2\);/s,
+      /\.panel-handle:hover \.handle-btn,\s*\.panel-handle:focus-within \.handle-btn\s*\{[^}]*opacity: 1;/s,
     );
-    // 视觉按钮保持紧凑，但命中区达到 44px。
-    expect(workbenchCss).toMatch(/\.panel-collapse::before\s*\{[^}]*inset: -6px;/s);
+    // 折叠后列头整体退场（画布与蓝图一致）、图标 tab 轨贯通整列。
     expect(workbenchCss).toMatch(
-      /\.panel-collapse\s*\{[^}]*transition: transform var\(--designer-motion\);/s,
+      /\.designer\[data-left-collapsed="true"\] \.rail \.panel-heading\s*\{[^}]*display: none;/s,
     );
-    // 右侧折叠轨显示纵向属性上下文，而不是空白轨道；不使用 writing-mode。
     expect(workbenchCss).toMatch(
-      /\.designer\[data-right-collapsed="true"\] \.properties \.panel-collapsed-label\s*\{[^}]*display: block;[^}]*word-break: break-all;/s,
+      /\.designer\[data-left-collapsed="true"\] \.rail-tabs\s*\{[^}]*grid-row: 1 \/ -1;[^}]*padding-top: var\(--designer-space-2\);/s,
     );
-    // 折叠按钮防压扁；分隔线仍保留指针事件，以支持越过阈值后拖拽展开。
-    expect(workbenchCss).toContain('.designer[data-left-collapsed="true"] .rail .panel-collapse,');
-    expect(workbenchCss).toContain('flex: none;');
-    expect(workbenchCss).not.toMatch(
-      /\.designer\[data-(?:left|right)-collapsed="true"\] > \[data-panel-handle[^}]*\{[^}]*pointer-events:\s*none;/s,
+    // 右栏折叠沿用原型取舍：面板内全部内容退场，只留 48px 空轨。
+    expect(workbenchCss).toMatch(
+      /\.designer\[data-right-collapsed="true"\] \.properties > \.panel-heading,[^{]*\{[^}]*display: none;/s,
     );
-    // 左右箭头折叠态旋转 180°。
+    // 折叠态箭头反转 180°，提示展开方向。
     expect(workbenchCss).toContain(
-      '.designer[data-left-collapsed="true"] .rail .panel-collapse svg,',
+      '.designer[data-left-collapsed="true"] [data-panel-handle="left"] .handle-btn svg,',
     );
     expect(workbenchCss).toContain(
-      '.designer[data-right-collapsed="true"] .properties .panel-collapse svg',
+      '.designer[data-right-collapsed="true"] [data-panel-handle="right"] .handle-btn svg',
     );
     expect(workbenchCss).toContain('transform: rotate(180deg);');
   });

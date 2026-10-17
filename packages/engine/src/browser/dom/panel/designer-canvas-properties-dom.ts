@@ -1,7 +1,7 @@
 import type { ScreenCanvasColorStop, ScreenDocument } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
-import { appendDesignerFieldMessage, createDesignerCheckbox } from '../designer-ui-primitives.js';
+import { appendDesignerFieldMessage, createDesignerSwitch } from '../designer-ui-primitives.js';
 import type {
   DesignerCanvasBackgroundDrafts,
   DesignerCanvasPresentationSettings,
@@ -153,7 +153,9 @@ function appendCanvasSettingCheckbox(
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label designer-canvas-setting-checkbox';
   label.textContent = labelText;
-  const input = createDesignerCheckbox(parent.ownerDocument, {
+  // 画布呈现开关（原型 .toggle-row + .switch）：原生 checkbox 承担取值与 change，外观绘成胶囊开关。
+  const input = createDesignerSwitch(parent.ownerDocument, {
+    ariaLabel: labelText,
     checked,
     value: String(checked),
   });

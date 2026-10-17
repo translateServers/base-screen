@@ -210,6 +210,8 @@
   grid-row: 5;
 }
 
+/* 面板把手（原型 .panel-handle）：分隔条是布局把手，不是编辑对象——悬停只加深收边，
+   不把强调色用在 chrome 上；折叠钮是把手中央悬停浮现的胶囊。拖拽改宽能力继续保留。 */
 .panel-handle {
   position: relative;
   z-index: 2;
@@ -221,12 +223,12 @@
   inset: 0;
   width: 1px;
   margin: auto;
-  background: var(--designer-border-default);
+  background: var(--designer-border-subtle);
   content: "";
 }
 
 .panel-handle:hover::before {
-  background: var(--designer-accent);
+  background: var(--designer-border-active);
 }
 
 .panel-handle:focus-visible {
@@ -236,6 +238,53 @@
 .panel-handle:focus-visible::before {
   background: var(--designer-focus-ring);
   box-shadow: 0 0 0 2px var(--designer-accent-surface);
+}
+
+/* 折叠胶囊钮（原型 .panel-handle .handle-btn）：16×34，垂直居中，把手悬停/聚焦时浮现。
+   与原型一致，按钮始终可命中（只是静止时不可见）；拖拽起点由控制器跳过按钮本体。 */
+.panel-handle .handle-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  box-sizing: border-box;
+  width: 16px;
+  height: 34px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-panel);
+  color: var(--designer-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  translate: -50% -50%;
+  transition:
+    opacity var(--designer-motion),
+    color var(--designer-motion),
+    border-color var(--designer-motion);
+}
+
+.panel-handle:hover .handle-btn,
+.panel-handle:focus-within .handle-btn {
+  opacity: 1;
+}
+
+.panel-handle .handle-btn:hover {
+  color: var(--designer-text-primary);
+  border-color: var(--designer-border-strong);
+}
+
+.panel-handle .handle-btn svg {
+  width: 12px;
+  height: 12px;
+  transition: transform var(--designer-motion);
+}
+
+/* 折叠态箭头反转：左面板 ‹→›、右面板 ›→‹，指示展开方向（过渡沿用 --designer-motion）。 */
+.designer[data-left-collapsed="true"] [data-panel-handle="left"] .handle-btn svg,
+.designer[data-right-collapsed="true"] [data-panel-handle="right"] .handle-btn svg {
+  transform: rotate(180deg);
 }
 
 .panel-heading {
@@ -260,39 +309,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: opacity var(--designer-motion);
-}
-
-.panel-collapsed-label {
-  display: none;
-}
-
-.panel-collapse {
-  position: relative;
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
-  margin-left: auto;
-  border-radius: var(--designer-radius-2);
-  color: var(--designer-text-secondary);
-  box-shadow: inset 0 0 0 1px transparent;
-  transition: transform var(--designer-motion);
-}
-
-/* 32px 视觉按钮保留紧凑密度，伪元素把实际点击热区扩到 44px。 */
-.panel-collapse::before {
-  position: absolute;
-  inset: -6px;
-  content: "";
-}
-
-.panel-collapse:hover:not(:disabled) {
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-accent);
-  box-shadow: inset 0 0 0 1px var(--designer-border-strong);
-}
-
-.panel-collapse svg {
-  transition: transform var(--designer-motion);
 }
 
 /* 数量徽标：等宽数字药丸，安静呈现规模信息。 */
@@ -321,99 +337,36 @@
   letter-spacing: 0.04em;
 }
 
-/* 折叠状态下的面板样式（ADR-0037：折叠轨 UI 修复） */
+/* 折叠状态（原型骨架）：左栏收成 48px 图标轨——隐藏列头、隐藏 tab 文字，保留图标 tab
+   仍可切换/展开；右栏收成 48px 空轨（原型 .properties > :not(.panel-collapse-rail) 的取舍）。
+   折叠轨内容很短，关闭 scrollbar-gutter 占用，把完整宽度还给内容。 */
 .designer[data-left-collapsed="true"] .rail,
 .designer[data-right-collapsed="true"] .properties {
-  /* 折叠轨内容很短（标题+图标 Tab），关闭 scrollbar-gutter 占用，把完整宽度还给内容，
-     否则折叠按钮被压缩到不可见（此前 48px 轨只剩约 25px 内容宽度）。 */
   scrollbar-gutter: auto;
 }
 
 .designer[data-left-collapsed="true"] .rail {
   grid-template-columns: 48px 0;
-  grid-template-rows: 48px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
+/* 折叠后列头整体退场（画布与蓝图一致），图标 tab 轨贯通整列顶部。 */
 .designer[data-left-collapsed="true"] .rail .panel-heading {
-  position: relative;
-  top: auto;
-  left: auto;
-  z-index: 3;
-  box-sizing: border-box;
-  grid-column: 1;
-  grid-row: 1;
-  display: flex;
-  width: 48px;
-  height: 48px;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  border: 0;
+  display: none;
+}
+
+.designer[data-left-collapsed="true"] .rail-tabs {
+  grid-row: 1 / -1;
+  padding-top: var(--designer-space-2);
 }
 
 .designer[data-right-collapsed="true"] .properties {
   grid-template-rows: minmax(0, 1fr);
 }
 
-.designer[data-right-collapsed="true"] .properties .panel-heading {
-  box-sizing: border-box;
-  grid-row: 1 / -1;
-  height: 100%;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 8px;
-  border-bottom: 0;
-}
-
-.designer[data-left-collapsed="true"] .rail .panel-heading,
-.designer[data-right-collapsed="true"] .properties .panel-heading {
-  background: linear-gradient(
-    to bottom,
-    color-mix(in srgb, var(--designer-accent-surface) 22%, transparent),
-    transparent 104px
-  );
-}
-
-/* 折叠态动态标题/计数不占 flex 槽位，避免间隙压扁展开按钮。 */
-.designer[data-left-collapsed="true"] .rail .panel-title,
-.designer[data-left-collapsed="true"] .rail .panel-count,
-.designer[data-right-collapsed="true"] .properties .panel-title {
+.designer[data-right-collapsed="true"] .properties > .panel-heading,
+.designer[data-right-collapsed="true"] .properties > .blueprint-inspector {
   display: none;
-}
-
-/* 右侧空轨保留“属性”上下文，逐字换行避免 writing-mode 干扰数据流布局。 */
-.designer[data-right-collapsed="true"] .properties .panel-collapsed-label {
-  order: 2;
-  display: block;
-  width: 1em;
-  margin-top: 2px;
-  color: var(--designer-text-muted);
-  font-size: var(--designer-font-size-sm);
-  font-weight: 500;
-  line-height: 1.45;
-  opacity: 0.9;
-  text-align: center;
-  word-break: break-all;
-}
-
-.designer[data-left-collapsed="true"] .rail .panel-collapse,
-.designer[data-right-collapsed="true"] .properties .panel-collapse {
-  flex: none;
-  margin-left: 0;
-  background: var(--designer-surface-control);
-  color: var(--designer-accent);
-  box-shadow: inset 0 0 0 1px var(--designer-border-default);
-}
-
-.designer[data-right-collapsed="true"] .properties .panel-collapse {
-  order: 1;
-}
-
-/* 折叠态箭头反转：左面板 ‹→›、右面板 ›→‹，指示展开方向（过渡沿用 --designer-motion）。 */
-.designer[data-left-collapsed="true"] .rail .panel-collapse svg,
-.designer[data-right-collapsed="true"] .properties .panel-collapse svg {
-  transform: rotate(180deg);
 }
 
 /* 面板切换条（原型 .rail-tabs）：raised 底与内容面板区分轨与体，48px 列内 44px 竖排 tab。
@@ -508,11 +461,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.designer[data-left-collapsed="true"] .rail-tabs {
-  grid-row: 2;
-  padding-top: var(--designer-space-2);
 }
 
 .designer[data-left-collapsed="true"] .rail-tab-label {

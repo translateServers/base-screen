@@ -358,7 +358,8 @@
   gap: 10px;
 }
 
-.properties .designer-canvas-setting-checkbox .designer-checkbox {
+.properties .designer-canvas-setting-checkbox .designer-checkbox,
+.properties .designer-canvas-setting-checkbox .designer-switch {
   order: 2;
 }
 

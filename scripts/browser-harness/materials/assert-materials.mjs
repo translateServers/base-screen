@@ -220,7 +220,8 @@ async function assertDismissal(page, designer) {
 async function resizePanel(page, designer, width) {
   const layout = await designer.locator('.designer').boundingBox();
   const handle = await designer.locator('[data-panel-handle="left"]').boundingBox();
-  const y = handle.y + handle.height / 2;
+  // 把手中央是悬停浮现的折叠胶囊钮（点击折叠、不启动拖拽）；拖拽从把手其余区域起手。
+  const y = handle.y + handle.height * 0.25;
   await page.mouse.move(handle.x + handle.width / 2, y);
   await page.mouse.down();
   await page.mouse.move(layout.x + 1 + width + 2.5, y, { steps: 4 });

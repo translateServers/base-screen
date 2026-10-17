@@ -6,6 +6,7 @@ import {
   createDesignerIconButton,
   createDesignerInput,
   createDesignerSelect,
+  createDesignerSwitch,
   createDesignerTextarea,
 } from '../../../src/browser/dom/designer-ui-primitives.js';
 
@@ -43,6 +44,8 @@ class FakeElement {
     this.children.push(child);
     return child;
   }
+
+  addEventListener(_type: string, _listener: () => void): void {}
 
   getAttribute(name: string): string | null {
     return this.attributes[name] ?? null;
@@ -133,6 +136,23 @@ describe('private designer UI primitives', () => {
     expect((select.children[0] as HTMLOptionElement).selected).toBe(true);
     expect(textarea.className).toBe('designer-control designer-textarea');
     expect(textarea.value).toBe('{"ok":true}');
+  });
+
+  it('creates a switch on a native checkbox carrier for boolean fields', () => {
+    const document = ownerDocument();
+    const on = createDesignerSwitch(document, { ariaLabel: 'Show grid', checked: true });
+    const off = createDesignerSwitch(document, { checked: false, value: 'false' });
+
+    // 值载体仍是原生 checkbox，描述符读写链路零改动。
+    expect(on.type).toBe('checkbox');
+    expect(on.className).toBe('designer-switch');
+    expect(on.checked).toBe(true);
+    // 语义与引擎既有开关同一套：role=switch + aria-checked。
+    expect(on.getAttribute('role')).toBe('switch');
+    expect(on.getAttribute('aria-checked')).toBe('true');
+    expect(on.ariaLabel).toBe('Show grid');
+    expect(off.getAttribute('aria-checked')).toBe('false');
+    expect(off.value).toBe('false');
   });
 
   it('connects fields, controls, and live validation messages', () => {

@@ -16,17 +16,17 @@ export const BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX =
   'base-screen-designer-left-panel-' as const;
 
 export const BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS = [
-  'chart',
-  'container',
+  'chart-bar',
   'cube',
   'grid',
   'image',
   'map',
+  'rect',
   'shapes',
   'sparkle',
   'table',
   'terminal',
-  'text',
+  'type',
   'variable',
 ] as const;
 

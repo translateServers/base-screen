@@ -73,7 +73,7 @@ export const BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT: 'base-screen-designer-b
 export const BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT: 'base-screen-designer-left-panel-group-change';
 
 // @public (undocumented)
-export const BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS: readonly ['chart', 'container', 'cube', 'grid', 'image', 'map', 'shapes', 'sparkle', 'table', 'terminal', 'text', 'variable'];
+export const BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS: readonly ['chart-bar', 'cube', 'grid', 'image', 'map', 'rect', 'shapes', 'sparkle', 'table', 'terminal', 'type', 'variable'];
 
 // @public (undocumented)
 export const BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX: 'base-screen-designer-left-panel-';

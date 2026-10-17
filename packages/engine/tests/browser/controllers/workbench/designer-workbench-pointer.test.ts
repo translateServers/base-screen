@@ -10,6 +10,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     };
     const root = {
       querySelector: (selector: string) => (selector === '.designer' ? layout : undefined),
+      querySelectorAll: () => [],
     } as unknown as ShadowRoot;
     const controller = new DesignerWorkbenchController({
       getCanvas: () => undefined,
@@ -35,6 +36,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     } as unknown as HTMLDivElement;
     const root = {
       querySelector: (selector: string) => (selector === '.designer' ? layout : undefined),
+      querySelectorAll: () => [],
     } as unknown as ShadowRoot;
     const controller = new DesignerWorkbenchController({
       getCanvas: () => canvas,
@@ -79,6 +81,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     } as unknown as HTMLDivElement;
     const root = {
       querySelector: (selector: string) => (selector === '.designer' ? layout : undefined),
+      querySelectorAll: () => [],
     } as unknown as ShadowRoot;
     const controller = new DesignerWorkbenchController({
       getCanvas: () => canvas,
@@ -119,6 +122,7 @@ describe('DesignerWorkbenchController pointer capture', () => {
     } as unknown as HTMLDivElement;
     const root = {
       querySelector: (selector: string) => (selector === '.designer' ? layout : undefined),
+      querySelectorAll: () => [],
     } as unknown as ShadowRoot;
     const controller = new DesignerWorkbenchController({
       getCanvas: () => canvas,

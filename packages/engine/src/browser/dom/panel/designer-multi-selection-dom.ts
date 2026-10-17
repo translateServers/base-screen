@@ -71,7 +71,7 @@ export function appendMultiSelectionControls(
     arrangeGrid,
     DESIGNER_UI_TEXT.propertiesPanel.distributeHorizontal,
     'distribute-horizontal',
-    'distribute-horizontal',
+    'distribute-h',
     !context.summary.canDistribute,
     DESIGNER_UI_TEXT.propertiesPanel.distributeUnavailableCount,
   );
@@ -79,7 +79,7 @@ export function appendMultiSelectionControls(
     arrangeGrid,
     DESIGNER_UI_TEXT.propertiesPanel.distributeVertical,
     'distribute-vertical',
-    'distribute-vertical',
+    'distribute-v',
     !context.summary.canDistribute,
     DESIGNER_UI_TEXT.propertiesPanel.distributeUnavailableCount,
   );

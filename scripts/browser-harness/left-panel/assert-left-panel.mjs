@@ -749,7 +749,8 @@ export async function assertPanelLayout(designer, page) {
   const dragTo = async (side, targetX) => {
     const box = await designer.locator(`[data-panel-handle="${side}"]`).boundingBox();
     if (box === null) throw new Error('BROWSER_HARNESS_PANEL_HANDLE_MISSING');
-    const startY = box.y + box.height / 2;
+    // 把手中央是悬停浮现的折叠胶囊钮（只切换折叠，不启动拖拽）；拖拽从把手其余区域起手。
+    const startY = box.y + box.height * 0.25;
     const startX = box.x + box.width / 2;
     await page.mouse.move(startX, startY);
     await page.mouse.down();
@@ -780,26 +781,21 @@ export async function assertPanelLayout(designer, page) {
       };
     });
   const collapseEvaluate = async (side) => {
-    await page.evaluate((panelSide) => {
-      const root = window.baseScreenHarness.designer.shadowRoot;
-      const panel = root.querySelector(
-        panelSide === 'left' ? '[data-left-panel]' : '[data-right-panel]',
-      );
-      panel.querySelector(`[data-panel-collapse="${panelSide}"]`).click();
-    }, side);
+    // 折叠入口已迁到面板把手上的胶囊钮（原型 .panel-handle .handle-btn），不在面板内部；
+    // 右向另有顶栏按钮，故按把手作用域取值，避免命中顶栏那一个。
+    const selector = `[data-panel-handle="${side}"] [data-panel-collapse]`;
+    await page.evaluate((query) => {
+      window.baseScreenHarness.designer.shadowRoot.querySelector(query).click();
+    }, selector);
     // 等待折叠过渡（--designer-motion 0.16s）结束后再读箭头 transform。
     await new Promise((resolve) => setTimeout(resolve, 220));
-    return page.evaluate((panelSide) => {
-      const root = window.baseScreenHarness.designer.shadowRoot;
-      const panel = root.querySelector(
-        panelSide === 'left' ? '[data-left-panel]' : '[data-right-panel]',
-      );
-      const button = panel.querySelector(`[data-panel-collapse="${panelSide}"]`);
+    return page.evaluate((query) => {
+      const button = window.baseScreenHarness.designer.shadowRoot.querySelector(query);
       return {
         arrow: getComputedStyle(button.querySelector('svg')).transform,
         buttonWidth: Math.round(button.getBoundingClientRect().width),
       };
-    }, side);
+    }, selector);
   };
 
   const dragged = await readPanel();
@@ -814,7 +810,7 @@ export async function assertPanelLayout(designer, page) {
     collapsedLeft.leftState !== 'true' ||
     collapsedLeft.left !== 48 ||
     collapsedLeft.arrow !== 'matrix(-1, 0, 0, -1, 0, 0)' ||
-    collapsedLeft.buttonWidth < 28
+    collapsedLeft.buttonWidth < 16
   ) {
     throw new Error(
       `BROWSER_HARNESS_PANEL_COLLAPSE_ROUNDTRIP_FAILED:${JSON.stringify({
@@ -834,7 +830,7 @@ export async function assertPanelLayout(designer, page) {
     collapsedRight.rightState !== 'true' ||
     collapsedRight.right !== 48 ||
     collapsedRight.arrow !== 'matrix(-1, 0, 0, -1, 0, 0)' ||
-    collapsedRight.buttonWidth < 28
+    collapsedRight.buttonWidth < 16
   ) {
     throw new Error(
       `BROWSER_HARNESS_PANEL_COLLAPSE_ROUNDTRIP_FAILED:${JSON.stringify({ collapsedRight })}`,

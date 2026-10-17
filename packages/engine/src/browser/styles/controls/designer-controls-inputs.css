@@ -11,6 +11,21 @@
   flex-basis: 100%;
 }
 
+/* Boolean field row (prototype .toggle-row): label left, switch right, 34px row. */
+.designer-field:has(> .designer-switch) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-1) var(--designer-space-3);
+  min-height: 34px;
+  cursor: pointer;
+}
+
+.designer-field:has(> .designer-switch) .designer-field-message {
+  flex-basis: 100%;
+}
+
 .designer-inspector-section {
   padding: var(--designer-space-4) 0;
 }
@@ -138,7 +153,8 @@
 
 .designer-control:focus-visible,
 .designer-tab:focus-visible,
-.designer-checkbox:focus-visible {
+.designer-checkbox:focus-visible,
+.designer-switch:focus-visible {
   outline: 2px solid var(--designer-focus-ring);
   outline-offset: 2px;
 }
@@ -186,10 +202,72 @@
   box-shadow: 0 0 0 2px var(--designer-success);
 }
 
+/* 胶囊开关（原型 .switch）：原生 checkbox 收成 36×20 轨道、::after 是 14px 滑钮。
+   开态是肯定态而不是焦点/编辑动作：用体系主文本色，强调色只留给编辑与焦点。 */
+.designer-switch {
+  position: relative;
+  box-sizing: border-box;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-pill);
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+  cursor: pointer;
+  transition:
+    background-color var(--designer-motion),
+    box-shadow var(--designer-motion);
+}
+
+.designer-switch::after {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--designer-text-muted);
+  content: "";
+  translate: 0 -50%;
+  transition:
+    left var(--designer-motion),
+    background-color var(--designer-motion);
+}
+
+.designer-switch[aria-checked="true"] {
+  background-color: var(--designer-text-primary);
+  box-shadow: none;
+}
+
+.designer-switch[aria-checked="true"]::after {
+  left: 18px;
+  background-color: var(--designer-surface-raised);
+}
+
+.designer-switch:hover:not(:disabled):not([aria-checked="true"]) {
+  background-color: var(--designer-surface-control-hover);
+}
+
+.designer-switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* 开关的多值态：与描述符 control 的虚线段同一语言（不改几何）。 */
+.designer-switch[data-mixed="true"] {
+  outline: 1px dashed var(--designer-border-active);
+  outline-offset: -1px;
+}
+
 .designer-checkbox {
   box-sizing: border-box;
-  width: 16px;
-  height: 16px;
+  width: 15px;
+  height: 15px;
   margin: 0;
   padding: 0;
   border: 1px solid var(--designer-border-strong);
@@ -484,7 +562,8 @@
 }
 
 @media (forced-colors: active) {
-  .designer-checkbox {
+  .designer-checkbox,
+  .designer-switch {
     appearance: auto;
     -webkit-appearance: auto;
   }

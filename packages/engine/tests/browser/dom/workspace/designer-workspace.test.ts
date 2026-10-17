@@ -103,12 +103,15 @@ describe('material library UI', () => {
   });
 
   it('R2 derives stable thumb icons from category keywords with a grid fallback', () => {
-    expect(materialCategoryIcon('图表')).toBe('chart');
+    expect(materialCategoryIcon('图表')).toBe('chart-bar');
+    expect(materialCategoryIcon('折线图')).toBe('chart-line');
+    expect(materialCategoryIcon('视频')).toBe('play');
+    expect(materialCategoryIcon('指标卡')).toBe('activity');
     expect(materialCategoryIcon('地图')).toBe('map');
     expect(materialCategoryIcon('基础')).toBe('shapes');
-    expect(materialCategoryIcon('echarts')).toBe('chart');
+    expect(materialCategoryIcon('echarts')).toBe('chart-bar');
     // 组合串（分类 + type）让未命中分类关键词的物料也能按 type 派生图标。
-    expect(materialCategoryIcon('基础 base.text')).toBe('text');
+    expect(materialCategoryIcon('基础 base.text')).toBe('type');
     expect(materialCategoryIcon('未知分类 unknown.thing')).toBe('grid');
   });
 

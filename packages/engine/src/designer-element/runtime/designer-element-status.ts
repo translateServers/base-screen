@@ -1,5 +1,6 @@
 import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import { downloadDesignerDocument } from '../../browser/dom/workspace/designer-workspace.js';
+import { designerIcon } from '../../browser/ui/designer-icons.js';
 import { selectedComponents } from '../../common/operations/selection/designer-selection.js';
 import { DESIGNER_TOOLS } from '../../common/tools/designer-tools.js';
 import {
@@ -10,7 +11,6 @@ import {
   formatSavedTime,
   groupEditingPath,
   projectPhaseLabel,
-  saveStatusCheckGlyph,
   saveStatusSpinnerGlyph,
 } from './designer-element-guards.js';
 import { type DesignerElementHost, getDesignerElementState } from './designer-element-state.js';
@@ -98,7 +98,7 @@ export function renderTopbarSaveStatus(element: DesignerElementHost): void {
   }
   if (elementState.lastSavedAt !== undefined) {
     badge.dataset.state = 'saved';
-    badge.innerHTML = `${saveStatusCheckGlyph()}<span>${DESIGNER_UI_TEXT.saveStatus.saved(
+    badge.innerHTML = `${designerIcon('check')}<span>${DESIGNER_UI_TEXT.saveStatus.saved(
       formatSavedTime(elementState.lastSavedAt),
     )}</span>`;
     return;

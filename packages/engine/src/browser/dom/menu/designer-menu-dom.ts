@@ -1,3 +1,4 @@
+import { designerIcon } from '../../ui/designer-icons.js';
 import type { DesignerMenuControllerCallbacks } from './designer-menu-model.js';
 import { TOGGLE_MENU_ACTIONS } from './designer-menu-model.js';
 
@@ -45,7 +46,7 @@ export function renderMenuState(
           const check = document.createElement('span');
           check.className = 'menu-item-check';
           check.setAttribute('aria-hidden', 'true');
-          check.innerHTML = checkGlyph();
+          check.innerHTML = designerIcon('check');
           control.prepend(check);
           // Wrap label text
           const label = document.createElement('span');
@@ -199,10 +200,6 @@ export function focusMenuItem(menu: HTMLElement, current: HTMLElement, direction
   const nextIndex =
     currentIndex === -1 ? 0 : (currentIndex + direction + items.length) % items.length;
   items[nextIndex]?.focus();
-}
-
-function checkGlyph(): string {
-  return `<svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14"><path fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" d="M3 8.5l3 3 7-7"/></svg>`;
 }
 
 // 把光标锚点夹紧到 [0, fit]；fit 为负（菜单超出容器）时退化为只保证非负，保持光标锚定。

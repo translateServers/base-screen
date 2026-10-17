@@ -49,6 +49,14 @@ export interface CreateDesignerCheckboxOptions {
   readonly value?: string;
 }
 
+export interface CreateDesignerSwitchOptions {
+  readonly ariaLabel?: string;
+  readonly checked?: boolean;
+  readonly className?: string;
+  readonly disabled?: boolean;
+  readonly value?: string;
+}
+
 export interface DesignerSelectOption {
   readonly disabled?: boolean;
   readonly label: string;
@@ -135,6 +143,33 @@ export function createDesignerCheckbox(
   if (options.value !== undefined) input.value = options.value;
   if (options.ariaLabel !== undefined) input.ariaLabel = options.ariaLabel;
   if (options.disabled !== undefined) input.disabled = options.disabled;
+  return input;
+}
+
+/**
+ * Boolean field switch (design prototype `.switch`): a native checkbox carries the value and the
+ * `change` event, so the existing value pipeline is untouched; `.designer-switch` paints it as a
+ * 36×20 pill with a 14px knob. State is projected through `role="switch"` + `aria-checked`, the
+ * same ARIA contract the workbench already uses for its other switches.
+ */
+export function createDesignerSwitch(
+  ownerDocument: Document,
+  options: CreateDesignerSwitchOptions = {},
+): HTMLInputElement {
+  const input = ownerDocument.createElement('input');
+  input.type = 'checkbox';
+  input.className = designerClassNames('designer-switch', options.className);
+  input.setAttribute('role', 'switch');
+  if (options.checked !== undefined) input.checked = options.checked;
+  if (options.value !== undefined) input.value = options.value;
+  if (options.ariaLabel !== undefined) input.ariaLabel = options.ariaLabel;
+  if (options.disabled !== undefined) input.disabled = options.disabled;
+  input.setAttribute('aria-checked', String(options.checked === true));
+  // Native checkedness is the single source of truth; mirror it so every consumer (AT, tests)
+  // observes the same switch state without a second state source.
+  input.addEventListener('change', () => {
+    input.setAttribute('aria-checked', String(input.checked));
+  });
   return input;
 }
 

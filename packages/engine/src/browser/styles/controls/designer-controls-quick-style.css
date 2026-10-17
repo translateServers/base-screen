@@ -6,10 +6,70 @@
   gap: var(--designer-space-3);
 }
 
+/* 数值滑杆按原型的取值控件语言重做：轨道是 6px 全圆角发丝灰（--designer-range-track），
+   滑钮 14px 深色实心 + 2px 表面色收边。原先借原生外观（appearance: auto）配
+   accent-color 上色——原生轨道与滑钮在两套主题下都跟系统走，与体系其余控件不同源；
+   令牌自批 1 声明后一直悬空，正是这条规则缺位的证据。 */
 .designer-range {
   min-width: 0;
   width: 100%;
-  accent-color: var(--designer-accent);
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-pill);
+  appearance: none;
+  background: var(--designer-range-track);
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.designer-range::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 0;
+  background: transparent;
+}
+
+.designer-range::-moz-range-track {
+  height: 6px;
+  border: 0;
+  background: transparent;
+}
+
+.designer-range::-webkit-slider-thumb {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  margin-top: -4px;
+  appearance: none;
+  border: 2px solid var(--designer-surface-raised);
+  border-radius: 50%;
+  background: var(--designer-text-primary);
+}
+
+.designer-range::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--designer-surface-raised);
+  border-radius: 50%;
+  background: var(--designer-text-primary);
+}
+
+.designer-range:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 4px;
+}
+
+.designer-range:disabled {
+  cursor: not-allowed;
+}
+
+.designer-range:disabled::-webkit-slider-thumb {
+  background: var(--designer-text-muted);
+}
+
+.designer-range:disabled::-moz-range-thumb {
+  background: var(--designer-text-muted);
 }
 
 .designer-flip-field {

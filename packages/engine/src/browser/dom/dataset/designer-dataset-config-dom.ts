@@ -349,7 +349,7 @@ function bindingFieldSelect(
       remove.dataset.datasetBindingChipRole = roleId;
       remove.dataset.datasetBindingChipField = field.id;
       remove.setAttribute('aria-hidden', 'true');
-      remove.innerHTML = designerIcon('x');
+      remove.innerHTML = designerIcon('close');
       chip.appendChild(remove);
       chips.appendChild(chip);
     }

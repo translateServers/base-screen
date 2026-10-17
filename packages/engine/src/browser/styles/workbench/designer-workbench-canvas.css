@@ -139,9 +139,11 @@
   transition: box-shadow var(--designer-motion-emphasis);
 }
 
+/* 悬停是"这块表面可编辑"的提示，走强调色；原用 accent-surface（10% 淡蓝）压在
+   工作区灰底上几乎读不出，悬停等于没有反馈。 */
 .canvas:hover {
   box-shadow:
-    0 0 0 1px var(--designer-accent-surface),
+    0 0 0 1px color-mix(in oklab, var(--designer-accent) 45%, transparent),
     var(--designer-shadow-canvas);
 }
 
@@ -175,9 +177,11 @@
   pointer-events: none;
 }
 
+/* 持久参考线是用户放置的对齐 chrome，与吸附线同族取强调色；原先取 --designer-warning
+   （对比度收档后的橄榄黄）——语义色只表达状态，不该拿来画参考线，两套主题下也都与体系不同源。 */
 .canvas-guide {
   position: absolute;
-  background: var(--designer-warning);
+  background: var(--designer-accent);
 }
 
 .canvas-guide-persistent {
@@ -187,7 +191,7 @@
 
 .canvas-guide-persistent::before {
   position: absolute;
-  background: var(--designer-warning);
+  background: var(--designer-accent);
   content: "";
 }
 
@@ -244,7 +248,7 @@
   opacity: 0.65;
 }
 
-/* 智能对齐线（参考 Moveable/Nebula）：蓝色系，参考线 1px，
+/* 智能对齐线（参考 Moveable/Nebula）：走强调色族（编辑 affordance），参考线 1px，
    吸附目标线（active）2px 更醒目 + 柔和发光，距离标签显示间距；
    仅渲染阈值（1px）内的命中才显示，吸附与渲染分离。 */
 .canvas-guide-snap {
@@ -275,7 +279,7 @@
   height: var(--designer-overlay-active, 2px);
 }
 
-/* 选区对齐轨道上的布局间距：蓝色虚线段 + 红色数字，和吸附线解耦，不会参与命中。 */
+/* 选区对齐轨道上的布局间距：强调蓝虚线段 + 强调蓝读数，和吸附线解耦，不会参与命中。 */
 .canvas-measurement {
   position: absolute;
   box-sizing: border-box;

@@ -7,9 +7,9 @@ import {
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
-  createDesignerCheckbox,
   createDesignerInput,
   createDesignerSelect,
+  createDesignerSwitch,
   createDesignerTextarea,
 } from '../designer-ui-primitives.js';
 import type {
@@ -47,8 +47,13 @@ export function createDescriptorControl(
     return { element: stepper.element, valueTarget: stepper.input };
   }
   if (control === 'boolean') {
-    const checkbox = createDesignerCheckbox(ownerDocument, { checked: value === true });
-    return { element: checkbox, valueTarget: checkbox };
+    // Boolean descriptor fields render as the prototype's pill switch, not a checkbox; the native
+    // checkbox stays the value carrier so the descriptor read/write pipeline is unchanged.
+    const toggle = createDesignerSwitch(ownerDocument, {
+      ariaLabel: field.label,
+      checked: value === true,
+    });
+    return { element: toggle, valueTarget: toggle };
   }
   if (control === 'select' && schema?.kind === 'enum') {
     const select = createDesignerSelect(ownerDocument, {

@@ -137,7 +137,7 @@ function authoringAction(
       'aria-label',
       disabled && disabledHint !== undefined ? `${label} · ${disabledHint}` : label,
     );
-    button.innerHTML = designerIcon(action === 'copy-data' ? 'copy' : 'maximize');
+    button.innerHTML = designerIcon(action === 'copy-data' ? 'copy' : 'fit');
   } else {
     button.textContent = label;
   }

@@ -262,6 +262,9 @@ export class DesignerWorkbenchController {
   onPointerDown(event: PointerEvent): void {
     if (!isPrimaryPointer(event)) return;
     const target = event.target as HTMLElement | null;
+    // 把手上的折叠胶囊钮是按钮不是拖拽面：按下它只触发 click 切换折叠，不能启动拖拽改宽，
+    // 否则点击会被当成 0 位移的 resize（把手其余区域仍可拖拽）。
+    if (target?.closest<HTMLElement>('[data-panel-collapse]') !== null) return;
     const side = target?.closest<HTMLElement>('[data-panel-handle]')?.dataset.panelHandle;
     if (side === 'left' || side === 'right') {
       this.#panelLayout.onPointerDown(event, side);

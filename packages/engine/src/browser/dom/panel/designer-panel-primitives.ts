@@ -10,6 +10,7 @@ import {
   createDesignerIconButton,
   createDesignerInput,
   createDesignerSelect,
+  createDesignerSwitch,
   createDesignerTextarea,
 } from '../designer-ui-primitives.js';
 
@@ -110,7 +111,7 @@ export function appendBatchStyleControl(
     label.appendChild(palette.element);
     appendDesignerFieldMessage(label, palette.controls[0]!, `multi-style-${style}`);
   } else {
-    const input = createControl(parent.ownerDocument, value, schema, control);
+    const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.multiProperty = `style:${style}`;
     input.disabled = disabled;
     input.setAttribute('data-tip', hint);
@@ -146,7 +147,10 @@ export function appendCheckbox(
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label';
   label.textContent = labelText;
+  // 状态段勾选框（原型 .insp-row + `.inspector-pane input[type="checkbox"]`）：原生 checkbox + 强调色，
+  // 显式 aria-label 与原型标记一致（锁定 / 隐藏）。
   const input = createDesignerCheckbox(parent.ownerDocument, {
+    ariaLabel: labelText,
     checked: value,
     value: String(value),
   });
@@ -183,7 +187,7 @@ export function appendPropControl(
     label.appendChild(palette.element);
     appendDesignerFieldMessage(label, palette.controls[0]!, `prop-${prop}`);
   } else {
-    const input = createControl(parent.ownerDocument, value, schema, control);
+    const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.prop = prop;
     label.appendChild(input);
     appendDesignerFieldMessage(label, input, `prop-${prop}`);
@@ -215,7 +219,7 @@ export function appendStyleControl(
     label.appendChild(palette.element);
     appendDesignerFieldMessage(label, palette.controls[0]!, `style-${style}`);
   } else {
-    const input = createControl(parent.ownerDocument, value, schema, control);
+    const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.style = style;
     label.appendChild(input);
     appendDesignerFieldMessage(label, input, `style-${style}`);
@@ -311,9 +315,16 @@ export function createControl(
   value: ScreenJsonValue | undefined,
   schema: BaseScreenMaterialPropSchema,
   control: string,
+  ariaLabel?: string,
 ): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement {
   if (control === 'boolean') {
-    return createDesignerCheckbox(ownerDocument, { checked: value === true });
+    // 元素 boolean 属性（自适应宽度 / 提示框 / 波纹动画…）：原型检查器没有对应行（引擎独有面），
+    // 按设计体系推导为布尔「设置项」——与描述符 boolean 字段、页面配置开关同一形态（.switch），
+    // 而不是状态段勾选框（锁定 / 隐藏）。
+    return createDesignerSwitch(ownerDocument, {
+      ...(ariaLabel === undefined ? {} : { ariaLabel }),
+      checked: value === true,
+    });
   }
   if (control === 'select' && schema.kind === 'enum') {
     return createDesignerSelect(ownerDocument, {

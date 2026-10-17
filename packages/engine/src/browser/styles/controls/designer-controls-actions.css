@@ -252,15 +252,17 @@
   overflow-wrap: anywhere;
 }
 
+/* 对话框与覆盖层族（命令面板 / 菜单 / 提示条）同一收边：阴影即描边，
+   不用真实 1px border——真实描边在深色覆盖层上会读成一道灰线，与其余浮层不同源。 */
 .designer-dialog-surface {
   box-sizing: border-box;
   width: min(340px, 100%);
   max-width: 340px;
   padding: var(--designer-space-6);
-  border: 1px solid var(--designer-border-default);
+  border: 0;
   border-radius: var(--designer-radius-overlay);
   background: var(--designer-surface-overlay);
-  box-shadow: var(--designer-shadow-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-overlay);
   overflow-wrap: anywhere;
 }
 

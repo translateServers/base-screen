@@ -59,12 +59,23 @@ const MATERIAL_CATEGORY_ICON_RULES: readonly {
   readonly icon: DesignerIconName;
 }[] = [
   // 中文关键词以 Unicode 转义书写：browser 树禁止内联 CJK 字面量（check-designer-ui）。
-  { test: /\u56fe[\u8868\u7b7e]|chart|echarts|graph/i, icon: 'chart' },
+  // 折线要与 chart 语境连写才认（如 base.lineChart / 折线图）：聚合分组会把后代 type 拼成一串，
+  // 裸匹配 line 会让「图表 + 表格」这类聚合分组误判成折线图。
+  { test: /\u6298\u7ebf|line[\s._-]*charts?/i, icon: 'chart-line' },
+  {
+    test: /\u67f1\u72b6|\u6761\u5f62|\u56fe[\u8868\u7b7e]|chart|echarts|graph|bar/i,
+    icon: 'chart-bar',
+  },
+  {
+    test: /\u6307\u6807|\u6c34\u6ce2|\u6d41\u5411|stat|metric|liquid|indicator/i,
+    icon: 'activity',
+  },
+  { test: /\u89c6\u9891|video/i, icon: 'play' },
   { test: /\u8868[\u683c\u5355]|table/i, icon: 'table' },
   { test: /\u5730[\u56fe\u7406]|map/i, icon: 'map' },
-  { test: /\u5a92[\u4f53\u8d44]|\u56fe[\u7247\u50cf]|image|video|media|audio/i, icon: 'image' },
-  { test: /\u6587[\u5b57\u672c]|text/i, icon: 'text' },
-  { test: /\u5bb9\u5668|\u7ec4|contain|group/i, icon: 'container' },
+  { test: /\u5a92[\u4f53\u8d44]|\u56fe[\u7247\u50cf]|image|media|audio/i, icon: 'image' },
+  { test: /\u6587[\u5b57\u672c]|text/i, icon: 'type' },
+  { test: /\u5bb9\u5668|\u7ec4|contain|group/i, icon: 'rect' },
   { test: /\u88c5\u9970|decor|sparkle/i, icon: 'sparkle' },
   {
     test: /\u77e9\u5f62|\u692d\u5706|\u56fe\u5f62|\u57fa\u7840|rect|ellipse|shape|basic/i,

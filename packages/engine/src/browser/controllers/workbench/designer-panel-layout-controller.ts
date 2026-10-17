@@ -215,12 +215,13 @@ export class DesignerPanelLayoutController {
   private renderCollapseControls(): void {
     const root = this.callbacks.getRoot();
     if (root === null) return;
+    // 每个方向可能有多处折叠入口（把手胶囊钮 + 顶栏按钮）：同步全部，避免其一读出过期标签。
     const setControl = (side: DesignerPanelSide, label: string, expanded: boolean) => {
-      const control = root.querySelector<HTMLElement>(`[data-panel-collapse="${side}"]`);
-      if (control === null || control === undefined) return;
-      control.setAttribute('data-tip', label);
-      control.setAttribute('aria-label', label);
-      control.setAttribute('aria-expanded', String(expanded));
+      for (const control of root.querySelectorAll<HTMLElement>(`[data-panel-collapse="${side}"]`)) {
+        control.setAttribute('data-tip', label);
+        control.setAttribute('aria-label', label);
+        control.setAttribute('aria-expanded', String(expanded));
+      }
     };
     setControl(
       'left',

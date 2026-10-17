@@ -142,7 +142,7 @@ export function createDesignerColorPalette(
   close.className = 'designer-color-popover-close';
   close.dataset.colorPaletteAction = 'close';
   close.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.colorPickerClose);
-  close.innerHTML = designerIcon('x');
+  close.innerHTML = designerIcon('close');
 
   const modes = ownerDocument.createElement('div');
   modes.className = 'designer-color-palette-modes';

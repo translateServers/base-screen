@@ -161,6 +161,8 @@ export function createWorkbench(
     ownerDocument: { defaultView },
     querySelector: (selector: string) => elements.get(selector) ?? null,
     querySelectorAll: (selector: string) => {
+      if (selector === '[data-panel-collapse="left"]') return [leftCollapseControl];
+      if (selector === '[data-panel-collapse="right"]') return [rightCollapseControl];
       if (selector === '[data-panel-tab]') return leftTabs;
       if (selector === '.host-left-panel-view[data-host-left-panel-group]')
         return hostLeftPanelPanes;

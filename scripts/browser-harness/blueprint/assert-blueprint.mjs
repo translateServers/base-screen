@@ -61,7 +61,8 @@ export async function assertBlueprintWorkbench(designer, page) {
     );
   }
 
-  // 折叠时沿用 Canvas 的 48px 图标轨，只隐藏内容列；点击内建 Tab 会重新展开。
+  // 折叠时沿用 Canvas 的 48px 图标轨：列头整体退场、不留空的 48px 控制槽，图标 tab 轨自顶部贯通；
+  // 点击内建 Tab 会重新展开。
   await designer.locator('[data-panel-collapse="left"]').click();
   await page.waitForFunction(
     () =>
@@ -78,17 +79,17 @@ export async function assertBlueprintWorkbench(designer, page) {
     const label = firstTab?.querySelector('.rail-tab-label');
     const main = library?.querySelector('.blueprint-library-main');
     const railRect = rail?.getBoundingClientRect();
-    const headingRect = heading?.getBoundingClientRect();
     const tabRailRect = tabRail?.getBoundingClientRect();
     const firstTabRect = firstTab?.getBoundingClientRect();
     return {
       railWidth: railRect?.width,
-      headingWidth: headingRect?.width,
-      headingHeight: headingRect?.height,
-      tabsBelowHeading:
-        tabRailRect !== undefined && headingRect !== undefined
-          ? tabRailRect.top >= headingRect.bottom
-          : false,
+      // 列头与画布模式一致地整体退场（display:none）——不再保留空的 48×48 控制槽。
+      headingDisplay: heading === null ? undefined : getComputedStyle(heading).display,
+      // 图标 tab 轨应紧贴折叠轨顶部（旧实现的 48px 空槽会把这里顶到 ~48）。
+      tabRailTopGap:
+        railRect === undefined || tabRailRect === undefined
+          ? undefined
+          : tabRailRect.top - railRect.top,
       tabWidth: firstTabRect?.width,
       tabHeight: firstTabRect?.height,
       libraryDisplay: library === null ? undefined : getComputedStyle(library).display,
@@ -99,9 +100,10 @@ export async function assertBlueprintWorkbench(designer, page) {
   });
   if (
     collapsedLibrary.railWidth !== 48 ||
-    collapsedLibrary.headingWidth !== 48 ||
-    collapsedLibrary.headingHeight !== 48 ||
-    !collapsedLibrary.tabsBelowHeading ||
+    collapsedLibrary.headingDisplay !== 'none' ||
+    collapsedLibrary.tabRailTopGap === undefined ||
+    collapsedLibrary.tabRailTopGap < 0 ||
+    collapsedLibrary.tabRailTopGap > 8 ||
     // 折叠轨沿用画布左栏的竖排 tab 规格（44×60）。
     collapsedLibrary.tabWidth !== 44 ||
     !(collapsedLibrary.tabHeight >= 60) ||
