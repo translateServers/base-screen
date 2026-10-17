@@ -21,13 +21,12 @@ import { gzipSync } from 'node:zlib';
  * 智能体接入就必须先克隆 Base Screen 仓库。这个脚本把工具包摊平为一份自包含目录 + 一个
  * tarball，宿主侧解包后直接运行，不需要仓库其余部分。
  *
- * 与 docs/host-skill-manuals/06 的哲学一致：工具包只做"生成 Skill / 校验快照"，不含运行时
- * 物料加载、不联网。生成器解析 `@base-screen/*` 公开包时**优先从宿主 workspace 解析**，
- * 所以制品本身不内嵌这些包，只要求宿主装了同批次包。
+ * 工具包只做「生成 Skill / 校验快照」，不含运行时物料加载、不联网。生成器解析
+ * `@base-screen/*` 公开包时**优先从宿主 workspace 解析**，所以制品本身不内嵌这些包，
+ * 只要求宿主装了同批次包。
  */
 
 const SOURCE_SKILLS_ROOT = 'skills';
-const SOURCE_MANUALS_ROOT = 'docs/host-skill-manuals';
 const KIT_FILES = [
   'create-base-screen-host-skill',
   'create-base-screen-host-material-skill',
@@ -100,10 +99,6 @@ node <kit>/skills/manage-base-screen-host-skills/scripts/vendor-host-skill-kit.m
 
 The command is idempotent and also refreshes both generated Skills. Afterwards run
 \`pnpm base-screen:skills verify\` in the host repository; it is offline and needs no credentials.
-
-See \`docs/host-skill-manuals/\` in this kit for the exporter contract, the snapshot reference and
-troubleshooting: \`01-quick-start\`, \`02-daily-sync\`, \`03-configuration-reference\`,
-\`04-troubleshooting\`, \`05-xj-datahub-landing\`, \`06-online-material-mcp\`.
 `;
 }
 
@@ -170,12 +165,6 @@ function main() {
     mkdirSync(join(kitRoot, 'skills'), { recursive: true });
     for (const name of KIT_FILES) {
       cpSync(join(SOURCE_SKILLS_ROOT, name), join(kitRoot, 'skills', name), { recursive: true });
-    }
-    // 宿主手册随 kit 分发：外部宿主没有 Base Screen 仓库，README 若只指向 docs/ 就等于没给。
-    // 这 6 份是接入/同步/配置/排障/落地/MCP 的全部消费者文档，体积很小。
-    if (existsSync(SOURCE_MANUALS_ROOT)) {
-      mkdirSync(join(kitRoot, 'docs', 'host-skill-manuals'), { recursive: true });
-      cpSync(SOURCE_MANUALS_ROOT, join(kitRoot, 'docs', 'host-skill-manuals'), { recursive: true });
     }
     const { digest, fileCount } = digestKit(join(kitRoot, 'skills'));
     writeFileSync(

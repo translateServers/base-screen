@@ -5,7 +5,7 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  *
  * 这张卡片**不是一整个物料**，而是四个原子物料按 zIndex 叠出来的：`base.rectangle` 做底座与
  * 边框，`base.text` 做标题，`base.rule` 做分隔线，`host-app.metric-value` 只画「数值 + 单位」。
- * 需要成套搬运这份组合时，宿主用 `insertComponentFragment` 一次插入（见 docs/usage/designer-embedding.md）。
+ * 需要成套搬运这份组合时，宿主用 `insertComponentFragment` 一次插入。
  *
  * 四个节点**刻意都是根节点**，不是挂在底座下的父子结构：宿主配置 `groupMaterialType` 之后，
  * 组壳的几何由引擎持有——任何一次事务都会把 `base.container` 吸附到其子孙的包围盒并集
@@ -16,8 +16,8 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  *   `resourceId: 'cpu_usage'`，参数 `points` 为字面量。该组件使用三个前端各自实现的
  *   同一个宿主自有物料 `host-app.metric-value`（原生自定义元素 / React 组件 / Vue SFC，
  *   manifest 完全一致），其 `dataCapabilities` 声明 `host-resource` 并带表格适配器；
- *   前端宿主数据通道（见 docs/usage/host-data.md 的 resourcePort）把 resourceId
- *   解析成一次 mock 指标查询。官方物料里只有 `base.image` 支持宿主资源，所以
+ *   前端宿主数据通道（resourcePort）把 resourceId 解析成一次 mock 指标查询。
+ *   官方物料里只有 `base.image` 支持宿主资源，所以
  *   「绑宿主资源的读数」本身就是宿主自有物料的位置。
  * - `binding.fields` 的键是物料 dataBinding 的角色 id（指标读数的角色为 `value`）。
  *

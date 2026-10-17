@@ -100,6 +100,5 @@ DTO 只拦"形状不对"（归一为 `INVALID_REQUEST`）——契约里承诺�
 
 起始文档中 `stage-cpu` 组件的 `dataSource` 为 `host-resource`
 （`resourceType: 'demo_metric'`、`resourceId: 'cpu_usage'`）。前端宿主数据通道
-（resourcePort，实现依据 [`docs/usage/host-data.md`](../../docs/usage/host-data.md)）
-把它解析为一次 `/api/metrics/series` 查询并投影为 `ScreenTabularDataset`，
+（resourcePort）把它解析为一次 `/api/metrics/series` 查询并投影为 `ScreenTabularDataset`，
 不发明新协议。

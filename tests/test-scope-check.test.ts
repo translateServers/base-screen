@@ -289,8 +289,8 @@ describe('包依赖闭包图', () => {
   });
 
   it('治理解析：根级测试引用的 scripts 文件变更触发治理', () => {
-    const governance = resolveGovernance(['scripts/check-docs.mjs'], CONFIG, ROOT);
+    const governance = resolveGovernance(['scripts/lib/scope-graph.mjs'], CONFIG, ROOT);
     expect(governance.runRootTests).toBe(true);
-    expect(governance.reasons.join('\n')).toContain('scripts/check-docs.mjs');
+    expect(governance.reasons.join('\n')).toContain('scripts/lib/scope-graph.mjs');
   });
 });

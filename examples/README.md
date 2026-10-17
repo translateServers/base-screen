@@ -128,14 +128,13 @@ pnpm verify:examples        # 依次跑三端冒烟
 父节点会在第一次无关编辑时压平卡片的内缩留白。其中 `stage-card-value` 的 `dataSource` 是 `host-resource`
 （`resourceType: 'demo_metric'`、`resourceId: 'cpu_usage'`）。三端各自的
 `src/screen/host-data-channel.ts` 把它解析成一次 `/api/metrics/series` 查询，
-经物料的 tabular 适配器投影为组件视图模型——这正是宿主接入真实数据源的形态，
-实现依据见[接入宿主数据](../docs/usage/host-data.md)。
+经物料的 tabular 适配器投影为组件视图模型——这正是宿主接入真实数据源的形态。
 
 物料 `host-app.metric-value`（只画「数值 + 单位」的原子读数）在三个前端里各写一遍（React 组件 /
 Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一致，因此**同一份 canonical
 文档能在三端渲染**。三端的 `configure` 都带 `groupMaterialType: 'base.container'`，所以多选原子
-物料即可成组整体移动/缩放/旋转；要成套插入同一份组合，用 `insertComponentFragment`（预设 JSON
-由宿主自己存，见 [docs/usage/designer-embedding.md](../docs/usage/designer-embedding.md)）。
+物料即可成组整体移动/缩放/旋转；要成套插入同一份组合，用 `insertComponentFragment`，预设 JSON
+由宿主自己存。
 
 ## 分层与职责
 
@@ -143,9 +142,8 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 - **前端**负责页面、路由、状态与宿主侧适配器（项目存取、数据通道、宿主物料）。
 - **Base Screen**负责当前实例内的 canonical 文档编辑与渲染——它不碰网络、不实现存储。
 
-## 相关文档
+## 相关入口
 
-- [使用指南](../docs/usage.md) · [接入宿主数据](../docs/usage/host-data.md) ·
-  [创建物料目录](../docs/usage/material-catalog.md)
 - [基座特性矩阵](../harness/browser-harness/cases.html)：人眼逐项验证入口（`pnpm dev:browser-harness`）
 - [物料模板 MCP provider](../tooling/material-mcp-server)：面向上层工具链
+- [仓库分层与检查门禁](../AGENTS.md)：包边界、依赖规则与验证命令

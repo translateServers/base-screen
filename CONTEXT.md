@@ -1,7 +1,7 @@
 # Base Screen 领域词汇
 
 本文件是 Base Screen 的领域词汇表：记录跨包协作时**必须统一理解**的概念，以及它们的唯一实现落点。
-权威行为依据仍是 [当前能力基线](./docs/baseline/README.md)，长期边界以[已接受的 ADR](./docs/decisions/README.md) 为准。
+权威行为依据是各包公共导出与 [AGENTS.md](./AGENTS.md) 中的分层、边界与宿主职责规则。
 
 术语按主题分组，不按引入时间排序。新增术语时，一并写明它的唯一落点与「不得重复实现」的约束。
 
@@ -49,7 +49,7 @@
 ## 插件贡献词汇
 
 - **贡献类型描述符（Contribution Kind Descriptor）**  
-  ADR-0084 贡献词汇在 `@base-screen/plugin-core` 内的唯一实现落点。逐 kind 声明：字段白名单、身份串形态、
+  贡献词汇（ADR-0084）在 `@base-screen/plugin-core` 内的唯一实现落点。逐 kind 声明：字段白名单、身份串形态、
   id 词法、专属校验、运行时 handler 字段。**描述符表本身是包内实现细节**，对外只暴露窄行为接口：
   `BaseScreenPluginContributionKind`、`BaseScreenPluginContributionHandlerField`、
   `contributionHandlerField`、`declaredContributionIds`、`listContributionHandlerKinds`、

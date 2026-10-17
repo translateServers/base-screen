@@ -17,7 +17,7 @@ const MAX_POINTS = 120;
 /**
  * 宿主数据通道（resourcePort）：把文档中的 host-resource dataSource 解析成
  * 对共享后端 `/api/metrics/series` 的查询，并投影为表格数据。
- * 实现依据 docs/usage/host-data.md；只返回安全投影，不泄露连接信息。
+ * 只返回安全投影，不泄露连接信息。
  */
 export function createHostResourcePort(): ScreenHostResourcePort {
   return {
@@ -54,8 +54,7 @@ export function createHostResourcePort(): ScreenHostResourcePort {
 }
 
 /**
- * 端口收到的 `params` 已经把 literal / variable 参数求值成普通 JSON（见
- * docs/usage/host-data.md），因此这里直接读数值并做有界校验。
+ * 端口收到的 `params` 已经把 literal / variable 参数求值成普通 JSON，因此这里直接读数值并做有界校验。
  */
 function readPoints(params: Readonly<Record<string, ScreenJsonValue>>): number {
   const value = Number(params.points);

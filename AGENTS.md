@@ -15,23 +15,20 @@
 - CI 会在 Node 22.23.2 和 24.18.1 上运行 `pnpm verify:m0`，随后运行 `pnpm check:api-changesets`，并以 `git diff --exit-code` 收尾，要求验证未改动任何受跟踪文件。它依次运行 `format:check`、`lint`、`typecheck`、`test`、`check:packages`、`check:api`、`check:engine-import` 和 `verify:tarball`；链中没有会写入文件的 `format` 步骤（格式修正先手动运行 `pnpm format`），也没有独立的 `build` 步骤——各包构建由 Turbo 任务依赖间接触发（`test` 依赖 `^build`，`lint`/`typecheck` 依赖 `^build`）。`pnpm verify:fast` 是同一套门禁减去 `verify:tarball`。
 - 迭代过程中默认使用 `pnpm test:scope` 按需执行受影响测试：`pnpm test:scope --since <ref>` 自动完成变更采集、包依赖闭包、engine 文件级映射与执行；`--dry-run` 只输出计划 JSON，`--json` 供机器读取，计划与报告落盘 `.base-screen/local/scratch/test-scope/`。退出码约定：`0` 全部通过（含「无受影响测试」，计划仍落盘可审计）、`1` 存在测试失败、`2` 参数或环境错误、`3` 闭包计算异常。AI agent 默认按需执行，仅在合并前或门禁场景触发 `verify:fast` / `verify:m0` 全量。其他聚焦检查仍可用：`pnpm --filter @base-screen/contracts test`、`pnpm --filter <package> typecheck`。在交付会影响包、构建产物或公共契约的改动前，先运行 `pnpm verify:m0`。
 - 测试治理工具链按需使用：`pnpm test:audit` 输出无用/重复/过期测试候选报告（落盘可追溯，不自动删除，清理走人工确认 PR 流程）；`pnpm test:tag` 输出标签打标建议（未打标测试默认 unit 且必跑）；`pnpm test:baseline` 采集效率与覆盖率指标基线。
-- `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界、物料原子化与文档治理检查（`check:boundaries`、`check:material-atomicity`、`check:docs`）；`pnpm check:docs` 可单独检查 Markdown 相对链接、ADR/Spec/Plan 索引、完成 Spec 归档、禁用版本命名、机器可读能力索引的引用可解析性、活动文档单篇体量预算和现行依据类文档的 ADR 编号有效性。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
-- `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。门禁失败排查见 `docs/troubleshooting/verify-m0-troubleshooting.md`。
-- 手动验证的基座特性矩阵在 `harness/browser-harness`：`pnpm dev:browser-harness` 起 Vite dev server，`pnpm verify:browser` 是对应的 Playwright 验证脚本。改完功能后先打开它的 [`/cases.html`](harness/browser-harness/cases.html) 导航页（按改动面 / 关键词筛选专项案例），再按 [专项案例怎么看](docs/guides/feature-cases.md) 进 `?designer&case=` 场景；不要为此引入 Storybook。默认 `/` 与 `?designer` 保持 Playwright 路径。
+- `pnpm lint` 先跑各包 lint（engine 包的 lint 还会执行 `check-designer-ui.mjs` 与 `check-designer-styles.mjs`），再运行边界与物料原子化检查（`check:boundaries`、`check:material-atomicity`）。`pnpm test` 会先通过 Turbo 运行各包测试，再运行根级 `tests/`。Turbo 的 `lint` 和 `typecheck` 会先构建依赖。
+- `pnpm check:api` 需要构建好的 `dist/index.d.ts`。`pnpm verify:tarball` 会打包每个包，并把每个 tarball 安装到一个临时消费者工程中跑 publint/ATTW；ATTW 的 Node10/CJS 诊断属于预期噪音，除非命令本身失败。
+- 手动验证的基座特性矩阵在 `harness/browser-harness`：`pnpm dev:browser-harness` 起 Vite dev server，`pnpm verify:browser` 是对应的 Playwright 验证脚本。改完功能后先打开它的 [`/cases.html`](harness/browser-harness/cases.html) 导航页（按改动面 / 关键词筛选专项案例），再进 `?designer&case=` 场景；不要为此引入 Storybook。默认 `/` 与 `?designer` 保持 Playwright 路径。
 - 全栈示例是「一个共享后端 + 三个对等前端」：`examples/host-api`（NestJS + Prisma/SQLite，`pnpm dev:host-api` 起在 3000），以及 `examples/host-app-{vanilla,react,vue}`（`pnpm dev:host-app-*`，分别占 5173/5174/5175，经 Vite proxy 联调同一后端）。它们演示宿主侧接入——文档 CRUD、`<base-screen-designer>` / `<base-screen-viewer>` 嵌入、宿主 project adapter 与数据通道、宿主自有物料；总览见 `examples/README.md`。示例只声明 `dev`/`build`/`typecheck`（host-api 另有 `test`，进 CI），构建与浏览器级验证不进 `verify:m0`：`pnpm verify:examples` 是手动冒烟且需先各自 build，其中 Vue 前端还随 `verify:tarball` 复制到仓库外、替换为同批次真实 tarball 后验证。
 - `tooling/material-mcp-server` 是面向上层工具链的物料模板 MCP provider，由根级测试与 `verify:material-mcp` 验证。
 
 ## 包边界
 
 - 这是一个 pnpm/Turbo 单体仓库。`packages/` 下固定 12 个包，由 `scripts/check-packages.mjs` 强制校验：`contracts`、`core`、`renderer`、`engine`、`material`、`plugin-core`、`plugin-manager`、`plugin-sdk`、`react`、`vue`、`sdk` 和 `testing`。
-- 与 `packages/` 平行存在顶层 `plugins/` 外围插件区，承载带受控第三方依赖、独立于固定包清单交付的能力（现有 `plugins/plugin-echarts`、`plugins/plugin-metrics`、`plugins/plugin-datav-materials`、`plugins/plugin-pipeline`）。分区的权威决策见 [ADR-0074](docs/decisions/ADR-0074-peripheral-plugin-host-and-dependency-partitioning.md)，兼容策略见 [ADR-0075](docs/decisions/ADR-0075-peripheral-plugin-compatibility-policy.md)。`check-packages.mjs` 的固定包清单约束不扩大到 `plugins/`。
+- 与 `packages/` 平行存在顶层 `plugins/` 外围插件区，承载带受控第三方依赖、独立于固定包清单交付的能力（现有 `plugins/plugin-echarts`、`plugins/plugin-metrics`、`plugins/plugin-datav-materials`、`plugins/plugin-pipeline`）。分区的权威决策见 ADR-0074（外围插件区与依赖分区），兼容策略见 ADR-0075（外围插件兼容策略）。`check-packages.mjs` 的固定包清单约束不扩大到 `plugins/`。
 - 外围插件依赖方向严格单向：`plugins/*` 可依赖 `packages/*` 的公共导出，`packages/*` 绝不依赖 `plugins/*`（含 dev 与 test）。外围插件无运行时特权，走与宿主插件相同的宿主提供/宿主加载/宿主授权通道，不新增信任通道。
 - 新增包、放宽包清单或改变跨包导出时，必须更新包及边界检查。仅当该变更改变长期架构决策、包依赖/所有权或公共兼容策略时，才新增或更新 ADR；只有跨多个独立交付阶段、需要迁移或回滚方案，或用户明确要求时，才创建 Spec。所有包都是私有的、仅 ESM、只发布 `dist`，并通过 `exports` 暴露公共 API。
-- 文档治理以 `docs/README.md` 为入口、`docs/baseline/` 为当前能力依据。活动 ADR、Spec 与 Plan 必须登记到各自索引；Spec 的 Tasks/Checklist 全部完成或被后继依据取代时，必须在同一交付批次移入 `docs/specs/archive/` 并更新 Baseline、Roadmap 和引用。活动计划完成后同样移入 `docs/plans/archive/`。归档正文保留历史证据，不作为新实现授权。
-- 活动文档受单篇体量预算约束，由 `scripts/check-docs.mjs` 按角色分档强制：ADR 200 行、活动 Spec 与 Plan 800 行、其余叙述类 300 行；归档正文、`.changeset/` 与生成的 `*.api.md` 不参与。超预算必须在同一批次拆分或删减，不得放宽 `SIZE_BUDGET_EXCEPTIONS` 的登记值——该表只可下调、不可新增条目，并被根级测试钉死。体量大的入口文档（`docs/usage.md`、`docs/baseline/README.md`）保留原路径退化为导航，正文按职责分篇，使既有入链与机器引用不因拆分失效。
-- 派生事实只有一个权威落点，文档引用而不复制：固定包清单在 `scripts/check-packages.mjs`，依赖白名单在 `scripts/check-boundaries.mjs`，工具版本在 manifest 与 lockfile，归档条目在各自索引表。散文不得复述可由这些来源推导的数量或清单，避免产生两份没有门禁比对的副本；带日期的历史批次事实（如「2026-08-12 阶段封版归档 32 个」）属冻结记录，可以保留。
-- 机器可读索引里的文档引用同样受门禁约束：`.base-screen/integration-capabilities.json` 的 `references` 必须可解析，由 `pnpm check:docs` 校验。删除或改名文档时必须同批更新该索引——`pnpm integration` 只在 peer 仓库存在时才校验这些路径，本仓门禁是唯一常态化拦截点。
-- 散文里的裸 ADR 编号也受门禁约束。链接校验只覆盖 Markdown 链接，因此 2026-09-16 移除 48 份碎片 ADR 后，把已吸收编号当现行权威引用的地方无人拦截。现行依据类文档（`docs/usage*`、`docs/baseline/`、`docs/guides/`、`docs/troubleshooting/`、`docs/provenance/`、`docs/roadmap/`、`docs/host-skill-manuals/`、`docs/README.md`、根 `README.md`、`AGENTS.md`、`CONTEXT.md`）只能引用仍然存在的 ADR；被吸收的编号必须改指承载现行表述的主线 ADR，映射以 [ADR 索引](docs/decisions/README.md) 的归并记录为准并由门禁自动推导。`docs/decisions/` 的归并映射、`docs/plans/` 与 `docs/specs/` 的历史分析与需求记录按撰写时编号行文，整体豁免；明确标注吸收/取代/移除的行是合法历史注记。
+- 派生事实只有一个权威落点，引用而不复制：固定包清单在 `scripts/check-packages.mjs`，依赖白名单在 `scripts/check-boundaries.mjs`，工具版本在 manifest 与 lockfile。散文不得复述可由这些来源推导的数量或清单，避免产生两份没有门禁比对的副本。
+- 机器可读索引 `.base-screen/integration-capabilities.json` 的 `references` 必须指向仍然存在的路径：`pnpm integration` 在 peer 仓库存在时校验它们，删除或改名被引用文件时必须同批更新该索引。
 - 跨包导入只能使用声明的 `@base-screen/*` 公共导出。`scripts/check-boundaries.mjs` 会拒绝未声明的依赖、来自 `examples`、`scripts` 或 Nebula 的导入、被禁止的依赖图边，以及对 `testing` 的生产依赖。
 - 依赖白名单编码在 `scripts/check-boundaries.mjs` 中，**按区维护**：`packages/` 区只有 `contracts` 可以使用外部 `zod`，React/Vue 仅作为各自桥接包的 peer 依赖；`plugins/` 区改为逐插件显式申报允许的外部依赖，不接受通配与继承。新增依赖时，必须同时更新该白名单和对应清单。
 - `contracts`、`core`、`plugin-core`、`plugin-manager`、`plugin-sdk` 和 `testing` 使用 `tsc` 构建；它们内部的相对 TypeScript 导入必须使用 `.js` 后缀（`.json` 除外）。浏览器包和桥接包在声明文件生成后使用 Vite。
@@ -39,11 +36,11 @@
 
 ## 产品定位与宿主边界
 
-- Base Screen 是轻量、可嵌入的大屏设计器基座，不是完整业务应用、项目管理产品、数据平台或后端平台。权威决策见 [ADR-0027](docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)。
+- Base Screen 是轻量、可嵌入的大屏设计器基座，不是完整业务应用、项目管理产品、数据平台或后端平台。权威决策见 ADR-0027（轻量设计器基座与宿主处理）。
 - Base Screen 负责 canonical document、严格契约、当前实例内的命令/事务/历史/画布/检查器、Viewer/Designer 渲染、物料 ABI，以及有界请求的取消、deadline、generation guard 和安全结果投影。
 - 宿主负责实际存储与检索、认证授权、业务路由与 Store、数据查询/聚合/缓存/ETL、资产存储与转码、发布部署、公开 URL、截图/视频/批量导出和长任务。Base Screen 只通过 JSON-safe intent、port、method 或 event 请求这些能力。
 - 需要凭证或租户状态、跨项目/跨实例共享、无明确容量上限、后台队列/持久缓存/长任务，或依赖特定业务基础设施的处理默认归宿主；不得在 Engine 中补建后端、通用网络客户端、任务队列或业务降级实现。
-- 物料自定义属性面板使用 JSON-safe、声明式的 Manifest Editor Descriptor，控件为 Base Screen 内建控件或宿主授权的插件贡献控件（`control: 'custom'` + `kind: 'inspectorControl'`，仅绑 `props`/`style`）；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。Engine 只实例化 plugin-manager 解析出的授权目录项，绝不按清单标签 `createElement`——宿主注册过某标签不构成授权，未授权标签渲染为降级提示。依据见 [ADR-0084](docs/decisions/ADR-0084-plugin-contribution-vocabulary-and-trust.md)（检查器自定义控件；原 ADR-0073 已由该主线合并记录吸收）。
+- 物料自定义属性面板使用 JSON-safe、声明式的 Manifest Editor Descriptor，控件为 Base Screen 内建控件或宿主授权的插件贡献控件（`control: 'custom'` + `kind: 'inspectorControl'`，仅绑 `props`/`style`）；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。Engine 只实例化 plugin-manager 解析出的授权目录项，绝不按清单标签 `createElement`——宿主注册过某标签不构成授权，未授权标签渲染为降级提示。依据见 ADR-0084（插件贡献词汇与信任；检查器自定义控件，原 ADR-0073 已由该主线合并记录吸收）。
 - 事件 Blueprint 采用一体化工作台边界：Base Screen 拥有当前实例内的顶部栏、左右面板、语义图投影、canonical 编辑、Core transaction、统一 history/revision guard 与有界 slot 协议；宿主拥有中央图形渲染、布局算法和画布手势。`blueprint.layout` 保存节点位置与视口，其余模式、选择、临时拖动和 trace 高亮只属 session。代码编辑器和复杂 ECharts/领域配置编辑器仍由宿主拥有。
 - 宿主左侧业务分组通过严格 `leftPanelGroups[].workbenchModes` 选择 Canvas、Blueprint 或两者；省略时仅用于 Canvas。同一分组跨模式只复用一份公开命名 slot/tabpanel，宿主 light DOM 不随模式切换重挂载，宿主仍拥有其内容生命周期和业务状态。
 - 宿主作者扩展通过公开 Custom Element method/event 和 JSON-safe authoring bridge 集成；宿主不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的通用 UI 注入逃生口。

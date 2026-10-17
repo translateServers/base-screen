@@ -175,7 +175,7 @@ for (const glob of HOST_MATERIAL_GLOBS) {
 if (failures.length > 0) {
   throw new Error(
     `MATERIAL_ATOMICITY_CHECK_FAILED:\n  ${[...new Set(failures)].join('\n  ')}\n` +
-      '依据：AGENTS.md「物料原子化（组件制作约定）」，门禁口径见 docs/baseline/materials.md。',
+      '依据：AGENTS.md「物料原子化（组件制作约定）」与 plugins/plugin-datav-materials 的 title 断言。',
   );
 }
 

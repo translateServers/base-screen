@@ -14,12 +14,8 @@
       "reason": "跨仓工作流 Skill 变更，根级集成工作流测试覆盖"
     },
     {
-      "pattern": "docs/plans/**",
-      "reason": "计划文档变更，文档治理测试覆盖"
-    },
-    {
       "pattern": "AGENTS.md",
-      "reason": "仓库指南变更，文档治理测试覆盖"
+      "reason": "仓库指南变更，根级治理测试覆盖"
     },
     {
       "pattern": "tests/**",

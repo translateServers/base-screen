@@ -7,12 +7,7 @@
       "availability": "current",
       "boundary": "基座维护严格文档、事务与历史；宿主维护实际存储、权限和业务记录。",
       "publicApi": ["@base-screen/contracts", "@base-screen/core", "ScreenProjectAdapter"],
-      "references": [
-        "packages/contracts/src/index.ts",
-        "packages/core/src/index.ts",
-        "docs/usage/viewer.md",
-        "docs/usage/designer-embedding.md"
-      ],
+      "references": ["packages/contracts/src/index.ts", "packages/core/src/index.ts"],
       "checks": ["contracts", "core"]
     },
     {
@@ -24,9 +19,7 @@
       "publicApi": ["@base-screen/sdk/designer", "BaseScreenDesignerElement.configure"],
       "references": [
         "packages/engine/src/designer-element/base-screen-designer-element.ts",
-        "packages/engine/tests/browser/controllers",
-        "docs/usage/designer-embedding.md",
-        "docs/usage/designer-authoring.md"
+        "packages/engine/tests/browser/controllers"
       ],
       "checks": ["engine"]
     },
@@ -37,11 +30,7 @@
       "availability": "current",
       "boundary": "基座按规范文档渲染；宿主提供资源、变量和容器尺寸。",
       "publicApi": ["@base-screen/sdk/viewer", "BaseScreenViewerElement.configure"],
-      "references": [
-        "packages/renderer/src/index.ts",
-        "packages/renderer/tests",
-        "docs/usage/viewer.md"
-      ],
+      "references": ["packages/renderer/src/index.ts", "packages/renderer/tests"],
       "checks": ["renderer"]
     },
     {
@@ -51,12 +40,7 @@
       "availability": "current",
       "boundary": "基座维护 Manifest、物料 ABI 和有界加载协议；审核、分发、沙箱及业务物料由宿主实现。",
       "publicApi": ["@base-screen/plugin-core", "@base-screen/plugin-manager", "@base-screen/vue"],
-      "references": [
-        "packages/plugin-core/src/index.ts",
-        "packages/plugin-manager/src/index.ts",
-        "docs/usage/material-catalog.md",
-        "docs/usage/frameworks-and-packages.md"
-      ],
+      "references": ["packages/plugin-core/src/index.ts", "packages/plugin-manager/src/index.ts"],
       "checks": ["plugin-core", "plugin-manager"]
     },
     {
@@ -69,9 +53,7 @@
       "references": [
         "packages/contracts/src/types/dataset-port.ts",
         "packages/contracts/src/types/document.ts",
-        "packages/renderer/src/resource/dataset-query-port.ts",
-        "docs/specs/independent-dataset-consumption/spec.md",
-        "docs/usage/host-data.md"
+        "packages/renderer/src/resource/dataset-query-port.ts"
       ],
       "checks": ["contracts", "core", "renderer", "engine"]
     },
@@ -84,8 +66,7 @@
       "publicApi": ["ScreenHostVariablePort", "ScreenHostVariableCatalogPort"],
       "references": [
         "packages/contracts/src/types/host.ts",
-        "packages/engine/src/common/operations/designer-variable-operations.ts",
-        "docs/usage/host-data.md"
+        "packages/engine/src/common/operations/designer-variable-operations.ts"
       ],
       "checks": ["contracts", "engine"]
     },
@@ -97,7 +78,6 @@
       "boundary": "基座拥有语义、工作台面板、统一历史和命令；宿主拥有中央画布、布局算法、手势和业务动作执行。",
       "publicApi": ["base-screen-designer-blueprint-canvas", "@base-screen/sdk"],
       "references": [
-        "docs/usage/blueprint.md",
         "packages/engine/src/designer-element/designer-element-public-api.ts",
         "packages/contracts/src/index.ts"
       ],
@@ -111,8 +91,8 @@
       "boundary": "styleRules 求值和 conditionalStylePort 当前存在；Designer 没有内建规则编辑区。事件驱动替代尚未设计，不视为已废弃。",
       "publicApi": ["ScreenComponentNode.styleRules", "BaseScreenConditionalStylePort"],
       "references": [
-        "docs/decisions/ADR-0080-conditional-style-authoring-ownership.md",
-        "docs/usage/events-and-actions.md"
+        "packages/plugin-core/src/contracts.ts",
+        "packages/contracts/src/document/schema.ts"
       ],
       "checks": ["contracts", "renderer"]
     },
@@ -123,12 +103,7 @@
       "availability": "current",
       "boundary": "返回、预览、资源与业务面板通过公开入口组合；路由、上传、发布、截图与长任务由宿主执行。",
       "publicApi": ["base-screen-designer-back-request", "leftPanelGroups", "previewHandler"],
-      "references": [
-        "docs/usage/designer-authoring.md",
-        "docs/usage/material-library-state.md",
-        "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md",
-        "packages/engine/src/designer-element/base-screen-designer-element.ts"
-      ],
+      "references": ["packages/engine/src/designer-element/base-screen-designer-element.ts"],
       "checks": ["engine"]
     },
     {
@@ -138,11 +113,7 @@
       "availability": "host-owned; no Base Screen authoring UI",
       "boundary": "Base Screen 可提供通用只读 Renderer，但不提供大屏缩略图的截取、上传、存储或业务列表入口；这些能力及其权限、并发和失败策略由宿主统一拥有。",
       "publicApi": [],
-      "references": [
-        "docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md",
-        "docs/baseline/README.md",
-        "docs/usage.md"
-      ],
+      "references": ["packages/renderer/src/viewer/viewer.ts", "packages/renderer/src/index.ts"],
       "checks": ["engine"]
     },
     {

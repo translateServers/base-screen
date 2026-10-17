@@ -13,6 +13,6 @@
 
 - [ ] `pnpm verify:m0` 通过（或日常改动至少 `pnpm verify:fast`）
 - [ ] 影响公共 API 时已运行 `pnpm api:report` 并补充 Changeset
-- [ ] 涉及架构决策 / 包边界 / 多阶段迁移时已登记 ADR / Spec / Plan 索引
-- [ ] 能力变化已同步[能力基线](../docs/baseline/README.md)
+- [ ] 涉及架构决策 / 包边界 / 多阶段迁移时已在变更说明中写明取舍
+- [ ] 能力变化已同步 `.base-screen/integration-capabilities.json`
 - [ ] 已在 browser-harness 中查看受影响的专项案例

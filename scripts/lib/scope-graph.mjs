@@ -388,7 +388,7 @@ export function categorizeSkipped(file, config) {
     if (file.startsWith(prefix))
       return '非门禁分区（examples/harness/tooling/plugins）变更，不进入按需执行链路';
   }
-  if (file.startsWith('docs/')) return '文档变更不触发包测试（docs/plans 治理触发除外）';
+  if (file.startsWith('docs/')) return '文档变更不触发包测试';
   if (file.startsWith('scripts/')) return 'scripts 变更未被根级治理测试直接引用';
   if (file.startsWith('.base-screen/')) return '本地运行时产物，不进入按需执行链路';
   return '变更未命中包映射与治理触发（含包外顶层文件），合并前建议运行全量门禁复核';

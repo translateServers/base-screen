@@ -1,7 +1,3 @@
-<div align="center">
-  <img src="./docs/assets/banner.svg" alt="Base Screen：轻量、可嵌入、跨框架的大屏设计器基座" width="100%">
-</div>
-
 # Base Screen
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
@@ -19,15 +15,7 @@ Base Screen 是一个轻量、可嵌入、跨框架的大屏设计器基座，�
 描述可使用的可视组件。Designer 编辑和 Viewer 展示围绕同一份文档工作；项目、数据、资产、发布和长任务的
 真实处理由宿主负责，Base Screen 提供当前实例内的编辑、渲染与有界宿主端口。
 
-[快速体验](#快速体验) · [在你的应用中使用](#在你的应用中使用) · [集成指南](./docs/usage.md) ·
-[文档索引](./docs/README.md)
-
-## 产品预览
-
-![Base Screen 设计器：物料库、画布与属性检查器](./docs/assets/designer-preview.png)
-
-上图来自仓库自带的浏览器示例：左侧是官方物料库，中央画布混合了文本、按钮、数据列表与图表组件，
-右侧是画布与页面属性检查器。
+[快速体验](#快速体验) · [在你的应用中使用](#在你的应用中使用) · [示例总览](./examples/README.md)
 
 ## 适用场景
 
@@ -56,8 +44,6 @@ Base Screen 的交付重点是可组合的前端基座。示例中的项目目�
 - **物料与宿主扩展**：通过 Manifest 声明属性、样式、事件和编辑控件，支持 React/Vue 物料桥接、
   插件能力授权、主题 Token、公开命名 slot，以及宿主资源插入、拖放和替换。
 
-完整能力、约束与实现依据见[当前能力基线](./docs/baseline/README.md)。
-
 ## 快速体验
 
 本仓库开发环境要求 Node.js `22`（精确 patch 以 CI 矩阵为准）、pnpm `11.18.0`。
@@ -69,8 +55,7 @@ pnpm dev:browser-harness
 ```
 
 打开终端输出的本地地址即可查看浏览器组合示例；专项案例导航页是 `/cases.html`，`?designer` 为
-验收用全屏设计器（即上文截图）。示例自带演示文档与模拟宿主能力，浏览方式见
-[专项案例怎么看](./docs/guides/feature-cases.md)。
+验收用全屏设计器。示例自带演示文档与模拟宿主能力。
 
 ## 在你的应用中使用
 
@@ -123,9 +108,8 @@ viewer.document = parsed.value;
 
 **获取包**：`@base-screen/*` 是私有、仅 ESM 的包，不在公共 npm registry 发布。同一 pnpm workspace
 可直接声明 workspace 依赖；独立仓库使用发布方提供的完整同批次包集（tarball），单个 SDK tarball
-不是可独立安装的交付物。安装、初始化、数据接入与自定义物料的完整流程见
-[集成指南](./docs/usage.md)；可直接运行的宿主工程见
-[示例总览](./examples/README.md)。接入真实业务时，替换示例中的宿主适配器
+不是可独立安装的交付物。可直接运行的宿主工程见[示例总览](./examples/README.md)，其中的配置、
+数据接入与自定义物料代码即为接入参考。接入真实业务时，替换示例中的宿主适配器
 和端口实现，并只使用包的公开导出。
 
 ## 核心模型
@@ -158,8 +142,7 @@ flowchart LR
 | 作者扩展 | 内建编辑控件、Blueprint 语义编辑、公开方法与 slot 协议 | 中央图形画布、代码编辑器和复杂领域配置编辑器 |
 
 文档只保存可移植的数据，不承载访问凭证、数据库连接或宿主服务对象。需要后台队列、持久缓存、跨实例共享
-或长期运行的任务，应通过宿主能力完成。边界依据见
-[ADR-0027：轻量设计器基座与宿主处理](./docs/decisions/ADR-0027-lightweight-designer-foundation-host-processing.md)。
+或长期运行的任务，应通过宿主能力完成。边界依据见 ADR-0027（轻量设计器基座与宿主处理）。
 
 ## 示例
 
@@ -204,27 +187,20 @@ pnpm dev:host-app-react    # 终端 2：任选一个前端（vanilla 5173 / reac
 跨包调用只使用声明的公共导出。物料契约由 `plugin-core` 拥有，`renderer` 不依赖具体官方物料，
 `sdk` 负责组合而不实现各包的领域逻辑。仓库分层与依赖规则见 [AGENTS.md](./AGENTS.md)。
 
-## 文档导航
+## 延伸阅读
 
 | 想了解的内容 | 入口 |
 | --- | --- |
-| 在自己的应用中嵌入 Base Screen | [集成指南](./docs/usage.md) |
-| 已交付能力与已知边界 | [当前能力基线](./docs/baseline/README.md) |
-| 创建数据集驱动的自定义物料 | [自定义组件最佳实践](./docs/custom-dataset-material-best-practice.md) |
-| 为宿主配置大屏设计与物料创建 Skill | [宿主 Skill 快速接入](./docs/host-skill-manuals/01-quick-start.md) |
-| 架构取舍与职责划分 | [架构决策记录](./docs/decisions/README.md) |
-| 后续方向与候选主题 | [路线图](./docs/roadmap/README.md) |
-| 改完后查看专项案例 | [专项案例怎么看](./docs/guides/feature-cases.md) |
-| 验证失败排查 | [开发门禁故障排查](./docs/troubleshooting/verify-m0-troubleshooting.md) |
-
-规格、计划、归档与来源记录统一从[文档索引](./docs/README.md)进入。当前能力以 Baseline 和已接受的 ADR
-为依据，路线图中的候选主题不代表已经实现。
+| 环境搭建、分层边界与检查门禁 | [AGENTS.md](./AGENTS.md) |
+| 领域词汇与唯一实现落点 | [CONTEXT.md](./CONTEXT.md) |
+| 可直接运行的宿主工程 | [示例总览](./examples/README.md) |
+| 基座特性矩阵与专项案例 | [browser-harness 导航页](harness/browser-harness/cases.html) |
 
 ## 参与贡献
 
-欢迎 issue 与 PR。提交信息遵循 Conventional Commits；环境搭建、分层边界、检查门禁与文档治理规则
+欢迎 issue 与 PR。提交信息遵循 Conventional Commits；环境搭建、分层边界与检查门禁规则
 统一见 [AGENTS.md](./AGENTS.md)。
 
 ## 许可证
 
-本项目采用 [MIT License](./LICENSE)。第三方来源、授权与使用边界见[来源记录](./docs/provenance/README.md)。
+本项目采用 [MIT License](./LICENSE)。
