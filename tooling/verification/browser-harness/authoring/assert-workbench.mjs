@@ -211,13 +211,17 @@ export async function assertAuthoringProject(authoringDesigner, page) {
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
-        ?.textContent === '\u51b2\u7a81 *',
+        ?.textContent === '\u51b2\u7a81',
   );
   await authoringDesigner.getByRole('button', { name: '\u7ee7\u7eed\u7f16\u8f91' }).click();
   const continued = await page.evaluate(() => ({
     status:
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
         ?.textContent,
+    // 未保存不再靠文本尾部的 `*`，改为断言状态圆点承载的 data-state。
+    statusState:
+      window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')?.dataset
+        .state,
     saveStatus: window.baseScreenHarness.designer.shadowRoot.querySelector(
       '[data-topbar-save-status]',
     )?.textContent,
@@ -226,7 +230,8 @@ export async function assertAuthoringProject(authoringDesigner, page) {
     )?.name,
   }));
   if (
-    continued.status !== '\u5c31\u7eea *' ||
+    continued.status !== '\u5c31\u7eea' ||
+    continued.statusState !== 'dirty' ||
     continued.saveStatus !== '\u672a\u4fdd\u5b58\u66f4\u6539' ||
     continued.title !== '\u672c\u5730\u6807\u9898'
   ) {
@@ -237,7 +242,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
-        ?.textContent === '\u51b2\u7a81 *',
+        ?.textContent === '\u51b2\u7a81',
   );
   await authoringDesigner
     .getByRole('button', { name: '\u91cd\u65b0\u52a0\u8f7d\u8fdc\u7aef' })
@@ -273,7 +278,7 @@ export async function assertAuthoringProject(authoringDesigner, page) {
   await page.waitForFunction(
     () =>
       window.baseScreenHarness.designer.shadowRoot.querySelector('[data-project-status]')
-        ?.textContent === '\u64cd\u4f5c\u5931\u8d25 *',
+        ?.textContent === '\u64cd\u4f5c\u5931\u8d25',
   );
   const fileMenu = await openTopMenu(authoringDesigner, '\u6587\u4ef6');
   const retryAction = fileMenu.locator('[data-menu-action="project-retry"]');

@@ -180,7 +180,7 @@ describe('material group column navigation', () => {
     expect(view.overlay.hidden).toBe(true);
     expect(view.document.activeElement).toBe(view.trigger);
     expect(view.inline.children).toEqual([navigation]);
-    expect(view.trigger.getAttribute('data-tip')).toBe('全部物料 / Data / Charts / Bars');
+    expect(view.trigger.getAttribute('data-tip')).toBe('全部素材 / Data / Charts / Bars');
 
     view.click('[data-material-group-toggle]');
     expect(view.document.activeElement).toBe(view.button('[data-material-group="bars"]'));

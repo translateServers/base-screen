@@ -2,6 +2,7 @@ import type {
   BaseScreenMaterialEditorField,
   BaseScreenMaterialEditorSection,
 } from '@base-screen/plugin-core';
+import { designerIcon } from '../../ui/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import { appendDescriptorArrayControls } from './designer-descriptor-array-fields-dom.js';
@@ -40,7 +41,12 @@ export function appendDescriptorSection(
   details.open = section.advanced !== true && section.collapsed !== true;
   const summary = ownerDocument.createElement('summary');
   summary.className = 'designer-descriptor-group-summary';
+  // 与内建分段共用同一条“标题 + 发丝线 + 折叠箭头”的段落标题语言。
   summary.textContent = section.label;
+  const disclosure = ownerDocument.createElement('span');
+  disclosure.className = 'designer-datav-section-disclosure';
+  disclosure.innerHTML = designerIcon('chevron-down');
+  summary.appendChild(disclosure);
   details.appendChild(summary);
   if (section.help !== undefined) {
     const help = ownerDocument.createElement('p');
@@ -93,13 +99,19 @@ function appendDescriptorField(
         )
       : undefined;
   // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
+  const stacked = palette !== undefined || field.control === 'json';
   const label = ownerDocument.createElement(palette === undefined ? 'label' : 'span');
-  label.className = 'designer-field designer-field-label';
+  label.className = stacked
+    ? 'designer-field designer-field-label designer-field-stacked'
+    : 'designer-field designer-field-label';
   label.dataset.inspectorSearchKind = 'field';
   label.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
   label.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
   if (field.advanced === true) label.dataset.inspectorAdvanced = 'true';
-  label.textContent = field.label;
+  const labelText = ownerDocument.createElement('span');
+  labelText.className = 'designer-field-label-text';
+  labelText.textContent = field.label;
+  label.appendChild(labelText);
   const handle =
     palette === undefined
       ? createDescriptorControl(ownerDocument, field, schema, value, context.datasetFields)
@@ -107,11 +119,17 @@ function appendDescriptorField(
   const control = handle === undefined ? palette!.controls[0]! : handle.valueTarget;
   if (handle === undefined) {
     for (const paletteControl of palette!.controls) applyFieldDataset(paletteControl, field);
-    label.appendChild(palette!.element);
+    const fieldControl = ownerDocument.createElement('span');
+    fieldControl.className = 'designer-field-control';
+    fieldControl.appendChild(palette!.element);
+    label.appendChild(fieldControl);
   } else {
     // 字段标识只挂在值载体上：步进器的外壳不重复携带，避免选择器命中两个元素。
     applyFieldDataset(handle.valueTarget, field);
-    label.appendChild(handle.element);
+    const fieldControl = ownerDocument.createElement('span');
+    fieldControl.className = 'designer-field-control';
+    fieldControl.appendChild(handle.element);
+    label.appendChild(fieldControl);
   }
   if (field.help !== undefined) {
     const help = ownerDocument.createElement('span');

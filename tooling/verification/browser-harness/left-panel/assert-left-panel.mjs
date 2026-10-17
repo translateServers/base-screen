@@ -317,58 +317,107 @@ export async function assertLeftPanelLayers(page, viewport) {
   await probe.locator('[data-panel-tab="layers"]').click();
   const layerProbe = await probe.evaluate((element) => {
     const root = element.shadowRoot;
+    const panel = root.querySelector('[data-layers]');
     const groupRow = root.querySelector('[data-layer-id="probe-group"]');
     const childRow = root.querySelector('[data-layer-id="probe-a"]');
-    const actions = childRow?.querySelector('.layer-actions');
-    const toolbar = root.querySelector('[data-layer-toolbar]');
-    // 显隐已下沉到按钮级，测量操作按钮本体。
-    const actionButton = childRow?.querySelector(
-      '.layer-actions [data-layer-locate], .layer-actions [data-layer-toggle], .layer-actions [data-layer-move]',
-    );
+    const lock = childRow?.querySelector('[data-layer-toggle="locked"]');
+    const eye = childRow?.querySelector('[data-layer-toggle="hidden"]');
     return {
+      heading: panel?.querySelector(':scope > .list-heading')?.textContent,
       childDepth: childRow?.style.getPropertyValue('--layer-depth'),
       childIndent: childRow?.style.paddingInlineStart,
-      count: groupRow?.querySelector('.layer-count')?.textContent,
       childOrder: [
         ...root.querySelectorAll(
           '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
         ),
       ].map((row) => row.dataset.layerId),
-      toolbarButtons: toolbar?.querySelectorAll('button').length ?? 0,
-      toolbarButtonMinimum: Math.min(
-        ...[...(toolbar?.querySelectorAll('button') ?? [])].map((button) =>
-          Math.min(button.getBoundingClientRect().width, button.getBoundingClientRect().height),
-        ),
-      ),
-      actionButtons:
-        actions === null || actions === undefined
-          ? 0
-          : actions.querySelectorAll('[data-layer-locate], [data-layer-toggle], [data-layer-move]')
-              .length,
-      actionButtonOpacity:
-        actionButton === null || actionButton === undefined
-          ? ''
-          : getComputedStyle(actionButton).opacity,
-      iconButtons: [
-        ...(groupRow?.querySelectorAll(
-          '[data-layer-locate] svg, [data-layer-toggle] svg, [data-layer-move] svg',
-        ) ?? []),
-      ].length,
+      // 行内不再渲染拖拽抓手：整行就是把手。分组行保留折叠箭头。
+      leafGrip: childRow?.querySelector('.layer-grip') === null,
+      rowDraggable: childRow?.getAttribute('draggable'),
+      groupCollapse: groupRow?.querySelector('.layer-collapse') !== null,
+      groupExpanded: groupRow?.querySelector('.layer-collapse')?.getAttribute('aria-expanded'),
+      stateToggleCount: childRow?.querySelectorAll('[data-layer-toggle]').length ?? 0,
+      lockOpacity: lock === null || lock === undefined ? '' : getComputedStyle(lock).opacity,
+      eyeOpacity: eye === null || eye === undefined ? '' : getComputedStyle(eye).opacity,
+      lockIcon: lock?.querySelector('svg') !== null,
+      eyeIcon: eye?.querySelector('svg') !== null,
+      rowHeight: childRow?.offsetHeight ?? 0,
+      // 原型图层列表没有工具栏；搜索作为长文档刚需保留为紧凑单行。
+      hasToolbar: root.querySelector('[data-layer-toolbar]') !== null,
+      hasSearch: root.querySelector('[data-layer-search]') !== null,
     };
   });
   if (
+    layerProbe.heading !== '\u753b\u5e03\u56fe\u5c42 \u00b7 \u4ece\u4e0a\u5230\u4e0b' ||
     layerProbe.childDepth !== '1' ||
     layerProbe.childIndent !== '20px' ||
-    layerProbe.count !== '2' ||
     JSON.stringify(layerProbe.childOrder) !== JSON.stringify(['probe-b', 'probe-a']) ||
-    layerProbe.toolbarButtons !== 6 ||
-    layerProbe.toolbarButtonMinimum < 24 ||
-    layerProbe.actionButtons !== 5 ||
-    layerProbe.actionButtonOpacity !== '0' ||
-    layerProbe.iconButtons !== 5
+    !layerProbe.leafGrip ||
+    layerProbe.rowDraggable !== 'true' ||
+    !layerProbe.groupCollapse ||
+    layerProbe.groupExpanded !== 'true' ||
+    layerProbe.stateToggleCount !== 2 ||
+    layerProbe.lockOpacity !== '0' ||
+    layerProbe.eyeOpacity !== '1' ||
+    !layerProbe.lockIcon ||
+    !layerProbe.eyeIcon ||
+    layerProbe.rowHeight !== 40 ||
+    layerProbe.hasToolbar ||
+    !layerProbe.hasSearch
   ) {
     throw new Error(`BROWSER_HARNESS_LAYER_TREE_DESIGN_FAILED:${JSON.stringify(layerProbe)}`);
   }
+  // 显隐/锁定状态开关直接落在行上：隐藏后保留行并压暗，锁定后开关常驻。
+  const stateEye = probe.locator('[data-layer-id="probe-a"] [data-layer-toggle="hidden"]');
+  await stateEye.click();
+  await page.waitForTimeout(80);
+  const hiddenState = await probe.evaluate((element) => {
+    const row = element.shadowRoot.querySelector('[data-layer-id="probe-a"]');
+    return {
+      hidden: row?.dataset.hidden,
+      pressed: row?.querySelector('[data-layer-toggle="hidden"]')?.getAttribute('aria-pressed'),
+      componentHidden: element.document.components.find((component) => component.id === 'probe-a')
+        ?.status.hidden,
+    };
+  });
+  if (
+    hiddenState.hidden !== 'true' ||
+    hiddenState.pressed !== 'true' ||
+    hiddenState.componentHidden !== true
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_HIDE_FAILED:${JSON.stringify(hiddenState)}`);
+  }
+  await probe.locator('[data-layer-id="probe-a"] [data-layer-toggle="hidden"]').click();
+  await page.waitForTimeout(80);
+  const lockToggle = probe.locator('[data-layer-id="probe-a"] [data-layer-toggle="locked"]');
+  await probe.locator('.layer-row[data-layer-id="probe-a"]').hover();
+  await page.waitForTimeout(220);
+  const hoverLockOpacity = await lockToggle.evaluate((button) => getComputedStyle(button).opacity);
+  await lockToggle.click();
+  await page.waitForTimeout(80);
+  const lockedState = await probe.evaluate((element) => {
+    const row = element.shadowRoot.querySelector('[data-layer-id="probe-a"]');
+    return {
+      locked: row?.dataset.locked,
+      pressed: row?.querySelector('[data-layer-toggle="locked"]')?.getAttribute('aria-pressed'),
+      componentLocked: element.document.components.find((component) => component.id === 'probe-a')
+        ?.status.locked,
+      selectable: row?.querySelector('[data-layer-select]')?.disabled === false,
+    };
+  });
+  if (
+    hoverLockOpacity !== '1' ||
+    lockedState.locked !== 'true' ||
+    lockedState.pressed !== 'true' ||
+    lockedState.componentLocked !== true ||
+    !lockedState.selectable
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_LOCK_FAILED:${JSON.stringify({ hoverLockOpacity, lockedState })}`,
+    );
+  }
+  await probe.locator('[data-layer-id="probe-a"] [data-layer-toggle="locked"]').click();
+  await page.waitForTimeout(80);
   const childRow = probe.locator('.layer-row[data-layer-id="probe-a"]');
   const childHeightBefore = await childRow.evaluate((element) => element.offsetHeight);
   // 高亮整行必须都是有效选择命中区（操作按钮除外）；先点缩进空白，再点名称按钮，
@@ -386,24 +435,21 @@ export async function assertLeftPanelLayers(page, viewport) {
       cursor: style?.cursor,
       backgroundColor: style?.backgroundColor,
       boxShadow: style?.boxShadow,
-      frontDisabled: root.querySelector('[data-layer-arrange="front"]')?.disabled,
-      upDisabled: root.querySelector('[data-layer-arrange="up"]')?.disabled,
-      downDisabled: root.querySelector('[data-layer-arrange="down"]')?.disabled,
-      backDisabled: root.querySelector('[data-layer-arrange="back"]')?.disabled,
+      nameText: row?.querySelector('.layer-name')?.textContent,
+      metaText: row?.querySelector('.layer-meta')?.textContent,
     };
   });
   if (
     selectedState.selected !== 'true' ||
     selectedState.hidden !== 'false' ||
     // 行高随原型对齐 40px；选中 = 强调色淡底 + 强调色收边。
+    // 整行即拖拽把手，所以行光标是 grab（可拖）而不是 pointer；两者都表明整行可命中。
     selectedState.height !== 40 ||
-    selectedState.cursor !== 'pointer' ||
+    selectedState.cursor !== 'grab' ||
     selectedState.backgroundColor === 'rgba(0, 0, 0, 0)' ||
     selectedState.boxShadow === 'none' ||
-    selectedState.frontDisabled !== false ||
-    selectedState.upDisabled !== false ||
-    selectedState.downDisabled !== true ||
-    selectedState.backDisabled !== true
+    selectedState.nameText !== '\u5b50\u9879\u7532' ||
+    selectedState.metaText !== 'base.text \u00b7 80 \u00d7 32'
   ) {
     throw new Error(
       `BROWSER_HARNESS_LAYER_SELECT_HIT_TARGET_FAILED:${JSON.stringify(selectedState)}`,
@@ -463,6 +509,162 @@ export async function assertLeftPanelLayers(page, viewport) {
     JSON.stringify(shortcutDown.selectedIds) !== JSON.stringify(['probe-a'])
   ) {
     throw new Error(`BROWSER_HARNESS_LAYER_SHORTCUT_DOWN_FAILED:${JSON.stringify(shortcutDown)}`);
+  }
+  // 拖拽排序：真实鼠标把底行拖到顶行上缘，中途行上出现落点指示线，松手后按 zIndex 落位。
+  // 覆盖 HTML5 拖拽的两处易错点——dragover 必须 preventDefault（否则拖拽被浏览器中止），
+  // 且拖拽期间不得重渲染图层树（否则拖拽源被替换，同样中止）。
+  const dragSource = await probe.locator('.layer-row[data-layer-id="probe-a"]').boundingBox();
+  const dragTarget = await probe.locator('.layer-row[data-layer-id="probe-b"]').boundingBox();
+  if (dragSource === null || dragTarget === null) {
+    throw new Error('BROWSER_HARNESS_LAYER_DRAG_NO_BOX');
+  }
+  // 拖拽幽灵：dragstart 期间自绘一张不透明的浮起行卡片交给 setDragImage。
+  // 这里在派发前替换 dataTransfer.setDragImage，抓取幽灵的计算样式与排版内容。
+  const dragGhost = await probe.evaluate((element) => {
+    const row = element.shadowRoot.querySelector('.layer-row[data-layer-id="probe-a"]');
+    const dataTransfer = new DataTransfer();
+    let snapshot = null;
+    const original = dataTransfer.setDragImage.bind(dataTransfer);
+    dataTransfer.setDragImage = (image, x, y) => {
+      const style = getComputedStyle(image);
+      snapshot = {
+        className: image.className,
+        opacity: style.opacity,
+        backgroundColor: style.backgroundColor,
+        boxShadow: style.boxShadow,
+        offsetX: x,
+        name: image.querySelector('.layer-name')?.textContent,
+        hasGlyph: image.querySelector('.layer-glyph') !== null,
+        width: Math.round(image.getBoundingClientRect().width),
+      };
+      return original(image, x, y);
+    };
+    row.dispatchEvent(
+      new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer }),
+    );
+    row.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer }));
+    return {
+      snapshot,
+      // dragend 之后幽灵必须移除，否则视口外会一直挂着一个隐藏节点。
+      leftover: element.shadowRoot.querySelector('.layer-drag-image') !== null,
+    };
+  });
+  if (
+    dragGhost.snapshot === null ||
+    dragGhost.snapshot.className !== 'layer-drag-image' ||
+    dragGhost.snapshot.opacity !== '1' ||
+    dragGhost.snapshot.backgroundColor === 'rgba(0, 0, 0, 0)' ||
+    dragGhost.snapshot.boxShadow === 'none' ||
+    dragGhost.snapshot.name !== '\u5b50\u9879\u7532' ||
+    !dragGhost.snapshot.hasGlyph ||
+    dragGhost.snapshot.width <= 0 ||
+    dragGhost.leftover
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_DRAG_GHOST_FAILED:${JSON.stringify(dragGhost)}`);
+  }
+  // 整行即把手：起手点落在行的名称区中部。
+  await page.mouse.move(dragSource.x + 60, dragSource.y + dragSource.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(dragSource.x + 60, dragSource.y + dragSource.height / 2 - 14, { steps: 6 });
+  await page.mouse.move(dragTarget.x + 70, dragTarget.y + 4, { steps: 12 });
+  await page.mouse.move(dragTarget.x + 71, dragTarget.y + 5, { steps: 3 });
+  await page.waitForTimeout(260);
+  const dragIndicator = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    const marked = root.querySelector('.layer-row[data-drop-target]');
+    const dragging = root.querySelector('.layer-row[data-dragging="true"]');
+    const line = marked === null ? null : getComputedStyle(marked, '::after');
+    return {
+      row: marked?.dataset.layerId,
+      edge: marked?.dataset.dropTarget,
+      dragging: dragging?.dataset.layerId,
+      lineHeight: line?.height,
+      lineBackground: line?.backgroundColor,
+    };
+  });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const dragResult = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      childOrder: [
+        ...root.querySelectorAll(
+          '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
+        ),
+      ].map((row) => row.dataset.layerId),
+      zIndexes: Object.fromEntries(
+        element.document.components
+          .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
+          .map((component) => [component.id, component.zIndex]),
+      ),
+      leftoverIndicator: root.querySelector('.layer-row[data-drop-target]') !== null,
+      leftoverDragging: root.querySelector('.layer-row[data-dragging="true"]') !== null,
+    };
+  });
+  if (
+    dragIndicator.row !== 'probe-b' ||
+    dragIndicator.edge !== 'before' ||
+    dragIndicator.dragging !== 'probe-a' ||
+    dragIndicator.lineHeight !== '2px' ||
+    dragIndicator.lineBackground === 'rgba(0, 0, 0, 0)' ||
+    JSON.stringify(dragResult.childOrder) !== JSON.stringify(['probe-a', 'probe-b']) ||
+    dragResult.zIndexes['probe-a'] <= dragResult.zIndexes['probe-b'] ||
+    dragResult.leftoverIndicator ||
+    dragResult.leftoverDragging
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_DRAG_REORDER_FAILED:${JSON.stringify({ dragIndicator, dragResult })}`,
+    );
+  }
+  // 把拖拽造成的层序变化还原，后续断言（快捷键 / 重命名）依赖 probe-a 在前、probe-b 在后。
+  // 还原同样走真实拖拽路径，顺带验证反向落点（下缘 = 插到该行之后）。
+  const restoreSource = await probe.locator('.layer-row[data-layer-id="probe-b"]').boundingBox();
+  const restoreTarget = await probe.locator('.layer-row[data-layer-id="probe-a"]').boundingBox();
+  if (restoreSource === null || restoreTarget === null) {
+    throw new Error('BROWSER_HARNESS_LAYER_DRAG_RESTORE_NO_BOX');
+  }
+  await page.mouse.move(restoreSource.x + 60, restoreSource.y + restoreSource.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(restoreSource.x + 60, restoreSource.y + restoreSource.height / 2 - 14, {
+    steps: 6,
+  });
+  await page.mouse.move(restoreTarget.x + 70, restoreTarget.y + restoreTarget.height * 0.1, {
+    steps: 12,
+  });
+  await page.mouse.move(restoreTarget.x + 71, restoreTarget.y + restoreTarget.height * 0.1 + 1, {
+    steps: 3,
+  });
+  await page.waitForTimeout(300);
+  const restoreIndicator = await probe.evaluate((element) => {
+    const row = element.shadowRoot.querySelector('.layer-row[data-drop-target]');
+    return { row: row?.dataset.layerId, edge: row?.dataset.dropTarget };
+  });
+  await page.mouse.up();
+  await page.waitForTimeout(400);
+  const restored = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    return {
+      childOrder: [
+        ...root.querySelectorAll(
+          '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
+        ),
+      ].map((row) => row.dataset.layerId),
+      zIndexes: Object.fromEntries(
+        element.document.components
+          .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
+          .map((component) => [component.id, component.zIndex]),
+      ),
+    };
+  });
+  if (
+    restoreIndicator.row !== 'probe-a' ||
+    restoreIndicator.edge !== 'before' ||
+    JSON.stringify(restored.childOrder) !== JSON.stringify(['probe-b', 'probe-a']) ||
+    restored.zIndexes['probe-a'] >= restored.zIndexes['probe-b']
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_DRAG_RESTORE_FAILED:${JSON.stringify({ restoreIndicator, restored })}`,
+    );
   }
   // 首次单击会重绘图层树；使用真实鼠标双击验证第二次点击跨新 DOM 行仍进入重命名，
   // 且输入框立即获得焦点并保留原名称，而不是仅直接派发一个不可达的 dblclick。
@@ -527,101 +729,21 @@ export async function assertLeftPanelLayers(page, viewport) {
   ) {
     throw new Error(`BROWSER_HARNESS_LAYER_RENAME_COMMIT_FAILED:${JSON.stringify(renamedLayer)}`);
   }
-  await probe.evaluate((element) => {
-    element.dataset.layerChangeCount = '0';
-    element.dataset.layerDiagnosticCodes = '';
-    element.dataset.layerClickedAction = '';
-    element.addEventListener('base-screen-change', () => {
-      element.dataset.layerChangeCount = String(Number(element.dataset.layerChangeCount) + 1);
-    });
-    element.addEventListener('base-screen-diagnostic', (event) => {
-      element.dataset.layerDiagnosticCodes = (event.detail?.diagnostics ?? [])
-        .map((diagnostic) => diagnostic.code)
-        .join(',');
-    });
-    element.shadowRoot.addEventListener('click', (event) => {
-      element.dataset.layerClickedAction =
-        event.target.closest?.('[data-layer-arrange]')?.dataset.layerArrange ?? '';
-    });
-  });
-  await probe.locator('[data-layer-arrange="up"]').click();
-  await page.waitForTimeout(100);
-  const arrangedState = await probe.evaluate((element) => {
-    const root = element.shadowRoot;
-    return {
-      childOrder: [
-        ...root.querySelectorAll(
-          '.layer-row[data-layer-id="probe-a"], .layer-row[data-layer-id="probe-b"]',
-        ),
-      ].map((row) => row.dataset.layerId),
-      zIndexes: Object.fromEntries(
-        element.document.components
-          .filter((component) => component.id === 'probe-a' || component.id === 'probe-b')
-          .map((component) => [component.id, component.zIndex]),
-      ),
-      changeCount: element.dataset.layerChangeCount,
-      diagnosticCodes: element.dataset.layerDiagnosticCodes,
-      clickedAction: element.dataset.layerClickedAction,
-      selectedIds: [...root.querySelectorAll('.layer-row[aria-selected="true"]')].map(
-        (row) => row.dataset.layerId,
-      ),
-    };
-  });
-  if (
-    JSON.stringify(arrangedState.childOrder) !== JSON.stringify(['probe-a', 'probe-b']) ||
-    arrangedState.zIndexes['probe-a'] <= arrangedState.zIndexes['probe-b'] ||
-    arrangedState.changeCount !== '1' ||
-    arrangedState.diagnosticCodes !== '' ||
-    arrangedState.clickedAction !== 'up' ||
-    JSON.stringify(arrangedState.selectedIds) !== JSON.stringify(['probe-a'])
-  ) {
-    throw new Error(
-      `BROWSER_HARNESS_LAYER_TOOLBAR_ARRANGE_FAILED:${JSON.stringify(arrangedState)}`,
-    );
-  }
-  const canvasTransformBeforeLocate = await probe
-    .locator('[data-canvas]')
-    .evaluate((element) => element.style.transform);
-  await probe.locator('[data-layer-locate="probe-a"]').click();
-  const locateState = await probe.evaluate((element) => {
-    const root = element.shadowRoot;
-    return {
-      transform: root.querySelector('[data-canvas]')?.style.transform ?? '',
-      viewportFocused: root.activeElement === root.querySelector('[data-viewport]'),
-    };
-  });
-  if (locateState.transform === canvasTransformBeforeLocate || !locateState.viewportFocused) {
-    throw new Error(`BROWSER_HARNESS_LAYER_LOCATE_FAILED:${JSON.stringify(locateState)}`);
-  }
+  // 行悬停只让锁按钮浮现，不改变行高；这是图层行唯一的 hover 几何风险。
   await childRow.hover();
   await page.waitForTimeout(250);
-  const childHeightAfter = await childRow.evaluate((element) => element.offsetHeight);
-  const actionsOpacity = await childRow
-    .locator('.layer-actions .designer-button')
-    .first()
-    .evaluate((element) => getComputedStyle(element).opacity);
-  if (actionsOpacity !== '1' || childHeightBefore !== childHeightAfter) {
-    throw new Error(
-      `BROWSER_HARNESS_LAYER_ACTIONS_REVEAL_FAILED:${JSON.stringify({ actionsOpacity, childHeightBefore, childHeightAfter })}`,
-    );
-  }
-  const actionCluster = childRow.locator('.layer-actions');
-  await actionCluster.hover();
-  await page.waitForTimeout(250);
-  const expandedActions = await actionCluster.evaluate((element) => ({
-    width: Math.round(element.getBoundingClientRect().width),
-    visibleButtons: [...element.querySelectorAll('button')].filter(
-      (button) => Number(getComputedStyle(button).opacity) > 0,
-    ).length,
-    rowHeight: element.closest('[data-layer-id]')?.offsetHeight ?? 0,
+  const hoverState = await childRow.evaluate((element) => ({
+    height: element.offsetHeight,
+    lockOpacity: getComputedStyle(element.querySelector('[data-layer-toggle="locked"]')).opacity,
+    eyeOpacity: getComputedStyle(element.querySelector('[data-layer-toggle="hidden"]')).opacity,
   }));
   if (
-    expandedActions.width < 120 ||
-    expandedActions.visibleButtons !== 5 ||
-    expandedActions.rowHeight !== childHeightBefore
+    hoverState.lockOpacity !== '1' ||
+    hoverState.eyeOpacity !== '1' ||
+    hoverState.height !== childHeightBefore
   ) {
     throw new Error(
-      `BROWSER_HARNESS_LAYER_ACTIONS_EXPAND_FAILED:${JSON.stringify(expandedActions)}`,
+      `BROWSER_HARNESS_LAYER_HOVER_REVEAL_FAILED:${JSON.stringify({ hoverState, childHeightBefore })}`,
     );
   }
   // Alt+[] 只切换选区：顺序复用完整图层树，跳过有效隐藏项，但保留锁定项；

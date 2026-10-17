@@ -318,14 +318,10 @@
   outline-offset: 2px;
 }
 
-.designer-canvas-opacity,
-.designer-canvas-scale,
+.designer-canvas-opacity-field,
+.designer-canvas-scale-field,
 .designer-canvas-setting-checkbox {
   min-width: 0;
-}
-
-.designer-canvas-setting-checkbox {
-  justify-content: flex-start;
 }
 
 .rail-view {

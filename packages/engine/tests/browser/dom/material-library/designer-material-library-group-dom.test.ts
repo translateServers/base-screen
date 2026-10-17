@@ -39,13 +39,13 @@ describe('material group column navigation', () => {
       { icon: 'chart-bar', hidden: false, decorative: 'true' },
     ]);
     const data = view.roots.querySelector<HTMLButtonElement>('[data-material-group="data"]')!;
-    expect(data.getAttribute('data-tip')).toBe('Data（4 个物料）');
-    expect(data.ariaLabel).toBe('查看 Data 物料');
+    expect(data.getAttribute('data-tip')).toBe('Data（4 个素材）');
+    expect(data.ariaLabel).toBe('查看 Data 素材');
     expect(data.getAttribute('aria-description')).toBe(data.getAttribute('data-tip'));
     const tables = view.children.querySelector<HTMLButtonElement>(
       '[data-material-group="tables"]',
     )!;
-    expect(tables.getAttribute('data-tip')).toBe('Data / Tables（1 个物料）');
+    expect(tables.getAttribute('data-tip')).toBe('Data / Tables（1 个素材）');
     expect(tables.querySelector<HTMLElement>('.material-group-glyph')?.hidden).toBe(true);
   });
 
@@ -64,7 +64,7 @@ describe('material group column navigation', () => {
     expect(custom.querySelector<HTMLElement>('.material-group-glyph')?.innerHTML).not.toContain(
       '<b>',
     );
-    expect(custom.getAttribute('data-tip')).toBe('<b>Custom</b>（1 个物料）');
+    expect(custom.getAttribute('data-tip')).toBe('<b>Custom</b>（1 个素材）');
     renderMaterialLibraryGroupNavigation(
       layout,
       parseGrouping({ groups: [{ ...groups[0], label: 'Images' }, groups[1]] }),
@@ -73,7 +73,7 @@ describe('material group column navigation', () => {
     expect(view.roots.querySelector('[data-material-group="named"]')).toBe(named);
     expect(named.querySelector('.material-group-glyph')).toBe(glyph);
     expect(glyph.dataset.icon).toBe('image');
-    expect(named.getAttribute('data-tip')).toBe('Images（1 个物料）');
+    expect(named.getAttribute('data-tip')).toBe('Images（1 个素材）');
     expect(named.ariaPressed).toBe('true');
   });
 
@@ -120,7 +120,7 @@ describe('material group column navigation', () => {
         (button) => button.dataset.materialGroup,
       ),
     ).toEqual(['bars', 'lines']);
-    expect(trigger.getAttribute('data-tip')).toBe('全部物料 / Data / Charts');
+    expect(trigger.getAttribute('data-tip')).toBe('全部素材 / Data / Charts');
     expect(trigger.querySelector('[data-material-group-toggle-label]')?.textContent).toBe('Charts');
   });
 

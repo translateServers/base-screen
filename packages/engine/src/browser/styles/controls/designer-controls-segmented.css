@@ -4,7 +4,8 @@
 .designer-canvas-scale-options,
 .designer-data-source-segmented,
 .designer-dataset-editor-modes,
-.inspector-density {
+.inspector-density,
+.designer-segmented {
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: 1fr;
@@ -16,10 +17,28 @@
   box-shadow: var(--designer-elev-ring);
 }
 
+/* 对齐分段：可见按钮只改值，原生 select 作为唯一值载体收进 1px。 */
+.designer-segmented-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.designer-segmented .designer-segmented-option svg {
+  width: 14px;
+  height: 14px;
+}
+
 .designer-canvas-scale-option,
 .designer-data-source-segmented .designer-button,
 .designer-dataset-editor-modes .designer-button,
-.inspector-density .designer-tab {
+.inspector-density .designer-tab,
+.designer-segmented .designer-segmented-option {
   min-width: 0;
   min-height: 26px;
   overflow: hidden;
@@ -35,7 +54,8 @@
 .designer-canvas-scale-option:hover:not(:disabled):not([aria-pressed="true"]),
 .designer-data-source-segmented .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
 .designer-dataset-editor-modes .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
-.inspector-density .designer-tab:hover:not(:disabled):not([aria-pressed="true"]) {
+.inspector-density .designer-tab:hover:not(:disabled):not([aria-pressed="true"]),
+.designer-segmented .designer-segmented-option:hover:not(:disabled):not([aria-pressed="true"]) {
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
 }
@@ -43,7 +63,8 @@
 .designer-canvas-scale-option[aria-pressed="true"],
 .designer-data-source-segmented .designer-button[aria-pressed="true"],
 .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
-.inspector-density .designer-tab[aria-pressed="true"] {
+.inspector-density .designer-tab[aria-pressed="true"],
+.designer-segmented .designer-segmented-option[aria-pressed="true"] {
   background: var(--designer-surface-control-hover);
   color: var(--designer-accent-text);
 }
@@ -51,7 +72,8 @@
 :host([theme="dark"]) .designer-canvas-scale-option[aria-pressed="true"],
 :host([theme="dark"]) .designer-data-source-segmented .designer-button[aria-pressed="true"],
 :host([theme="dark"]) .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
-:host([theme="dark"]) .inspector-density .designer-tab[aria-pressed="true"] {
+:host([theme="dark"]) .inspector-density .designer-tab[aria-pressed="true"],
+:host([theme="dark"]) .designer-segmented .designer-segmented-option[aria-pressed="true"] {
   background: var(--designer-surface-control-active);
 }
 

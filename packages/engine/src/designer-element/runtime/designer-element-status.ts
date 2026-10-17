@@ -2,6 +2,7 @@ import type { ScreenDiagnostic, ScreenDocument, ScreenParseResult } from '@base-
 import { downloadDesignerDocument } from '../../browser/dom/workspace/designer-workspace.js';
 import { designerIcon } from '../../browser/ui/designer-icons.js';
 import { selectedComponents } from '../../common/operations/selection/designer-selection.js';
+import type { ScreenProjectPhase } from '../../common/project/project-controller.js';
 import { DESIGNER_TOOLS } from '../../common/tools/designer-tools.js';
 import {
   DESIGNER_UI_TEXT,
@@ -24,10 +25,13 @@ export function renderProjectStatus(element: DesignerElementHost): void {
   const project = elementState.session.project;
   const status = root.querySelector<HTMLElement>('[data-project-status]');
   if (status !== null) {
-    status.textContent =
-      project === undefined
-        ? DESIGNER_UI_TEXT.directDocument
-        : `${projectPhaseLabel(phase)}${elementState.session.dirty ? ' *' : ''}`;
+    const dirty = elementState.session.dirty;
+    // 未保存改由状态圆点表达，撤掉文本尾部的 `*`：一个状态不打两处标记。
+    const text = project === undefined ? DESIGNER_UI_TEXT.directDocument : projectPhaseLabel(phase);
+    const label = status.querySelector<HTMLElement>('[data-project-status-label]');
+    if (label === null) status.textContent = text;
+    else label.textContent = text;
+    status.dataset.state = projectStatusState(phase, project !== undefined, dirty);
   }
   const revision = root.querySelector<HTMLElement>('[data-project-revision]');
   if (revision !== null) revision.textContent = project?.revision ?? '';
@@ -42,6 +46,19 @@ export function renderProjectStatus(element: DesignerElementHost): void {
   elementState.runtime.renderStatusBar(element);
 }
 
+function projectStatusState(
+  phase: ScreenProjectPhase,
+  hasProject: boolean,
+  dirty: boolean,
+): string {
+  if (!hasProject) return 'direct';
+  if (dirty) return 'dirty';
+  if (phase === 'saving' || phase === 'publishing') return 'busy';
+  if (phase === 'conflict' || phase === 'error') return 'error';
+  if (phase === 'ready') return 'ready';
+  return 'idle';
+}
+
 export function renderStatusBar(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
@@ -50,13 +67,15 @@ export function renderStatusBar(element: DesignerElementHost): void {
   const document = elementState.session.document;
   const componentIds = elementState.session.interaction.selectedComponentIds;
   const count = componentIds.length;
+  const [onlySelected] =
+    count === 1 && document !== undefined ? selectedComponents(document, componentIds) : [];
   const baseSelectionText =
     count === 0
       ? DESIGNER_UI_TEXT.nothingSelected
       : count === 1
-        ? document === undefined
+        ? onlySelected === undefined
           ? DESIGNER_UI_TEXT.selectedSingle
-          : (selectedComponents(document, componentIds)[0]?.name ?? DESIGNER_UI_TEXT.selectedSingle)
+          : DESIGNER_UI_TEXT.selectedComponent(onlySelected.name, onlySelected.type)
         : DESIGNER_UI_TEXT.selectedCount(count);
   const groupPath =
     document === undefined
@@ -71,6 +90,10 @@ export function renderStatusBar(element: DesignerElementHost): void {
   const canvas = root.querySelector<HTMLElement>('[data-status-canvas]');
   if (canvas !== null && document !== undefined) {
     canvas.textContent = `${document.canvas.width} × ${document.canvas.height}`;
+  }
+  const components = root.querySelector<HTMLElement>('[data-status-components]');
+  if (components !== null && document !== undefined) {
+    components.textContent = DESIGNER_UI_TEXT.componentCount(document.components.length);
   }
 }
 

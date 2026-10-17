@@ -8,6 +8,23 @@ export class FakeElement {
   readonly children: FakeElement[] = [];
   readonly dataset: Record<string, string> = {};
   readonly attributes: Record<string, string> = {};
+  /** 最小 classList：只服务「读出当前类名 + 追加类名」，与 className 串保持一致。 */
+  readonly classList = {
+    add: (...tokens: string[]): void => {
+      const current = new Set(this.className.split(/\s+/).filter(Boolean));
+      for (const token of tokens) current.add(token);
+      this.className = [...current].join(' ');
+    },
+    contains: (token: string): boolean =>
+      this.className.split(/\s+/).filter(Boolean).includes(token),
+    remove: (...tokens: string[]): void => {
+      const removing = new Set(tokens);
+      this.className = this.className
+        .split(/\s+/)
+        .filter((token) => token !== '' && !removing.has(token))
+        .join(' ');
+    },
+  };
   checked = false;
   disabled = false;
   focus: unknown = undefined;
@@ -56,6 +73,11 @@ export class FakeElement {
   appendChild(child: FakeElement): FakeElement {
     this.children.push(child);
     return child;
+  }
+
+  /** `<select>` 的 option 集合：分段控件按它派生按钮，与浏览器一致。 */
+  get options(): readonly FakeElement[] {
+    return this.children.filter((child) => child.tagName.toLowerCase() === 'option');
   }
 
   addEventListener(): void {}

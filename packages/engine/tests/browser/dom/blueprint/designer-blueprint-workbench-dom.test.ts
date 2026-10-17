@@ -68,11 +68,11 @@ describe('Designer Blueprint panel DOM', () => {
     const layout = { dataset: {} };
     const library = { hidden: true };
     const inspector = { hidden: true };
-    const leftTitle = { textContent: '物料', dataset: {} };
+    const leftTitle = { textContent: '素材', dataset: {} };
     const leftCount = {
       textContent: '4',
       dataset: {},
-      attributes: new Map([['aria-label', '物料：4 项']]),
+      attributes: new Map([['aria-label', '素材：4 项']]),
       getAttribute(name: string) {
         return this.attributes.get(name) ?? null;
       },
@@ -118,7 +118,7 @@ describe('Designer Blueprint panel DOM', () => {
     });
     expect(library.hidden).toBe(true);
     expect(inspector.hidden).toBe(true);
-    expect(leftTitle.textContent).toBe('物料');
+    expect(leftTitle.textContent).toBe('素材');
     expect(leftCount.textContent).toBe('4');
     expect(rightTitle.textContent).toBe('页面配置');
   });

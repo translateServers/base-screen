@@ -14,19 +14,15 @@ export function appendVariablesToolbar(
 ): void {
   const toolbar = panel.ownerDocument.createElement('div');
   toolbar.className = 'variable-panel-toolbar';
-  const description = panel.ownerDocument.createElement('p');
-  description.className = 'variable-panel-description';
-  description.textContent = DESIGNER_UI_TEXT.variables.managementTitle;
-  toolbar.appendChild(description);
   const add = createDesignerButton(panel.ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.add,
     className: 'variable-add-button',
     disabled: state.creating,
     tip: DESIGNER_UI_TEXT.variables.add,
-    variant: 'primary',
+    variant: 'ghost',
   });
   add.dataset.variableAction = 'add';
-  appendIconLabel(add, 'plus', DESIGNER_UI_TEXT.variables.add);
+  appendIconLabel(add, 'plus', DESIGNER_UI_TEXT.variables.addShort);
   toolbar.appendChild(add);
   panel.appendChild(toolbar);
 }

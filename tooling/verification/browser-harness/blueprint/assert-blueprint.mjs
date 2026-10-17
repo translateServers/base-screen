@@ -539,15 +539,15 @@ export async function assertSemanticChartAuthoring(designer, page) {
           : getComputedStyle(xField.querySelector('[data-property="x"]')).textAlign,
       subtitle: subtitle?.textContent,
       hasMaterialIcon:
-        panel.querySelector('.inspector-context-material-icon svg')?.getAttribute('aria-hidden') ===
-        'true',
+        panel.querySelector('.inspector-context-icon svg')?.getAttribute('aria-hidden') === 'true',
     };
   });
   if (
     datavChrome.searchWidth !== 28 ||
     !datavChrome.toolbarInsideContext ||
-    datavChrome.geometryTopOffset < 127 ||
-    datavChrome.geometryTopOffset > 133 ||
+    // 「几何」标题按原型恢复可见后，首个字段整体下移一个标题行（约 +30px）。
+    datavChrome.geometryTopOffset < 157 ||
+    datavChrome.geometryTopOffset > 166 ||
     datavChrome.geometryControlHeight !== 28 ||
     datavChrome.geometryColumnGap !== 14 ||
     datavChrome.zHiddenInBasic !== true ||

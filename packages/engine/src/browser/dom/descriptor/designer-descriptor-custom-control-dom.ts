@@ -23,7 +23,10 @@ export function appendDescriptorCustomControl(
   label.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
   label.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
   if (field.advanced === true) label.dataset.inspectorAdvanced = 'true';
-  label.textContent = field.label;
+  const labelText = ownerDocument.createElement('span');
+  labelText.className = 'designer-field-label-text';
+  labelText.textContent = field.label;
+  label.appendChild(labelText);
 
   const entry =
     field.tagName === undefined
@@ -36,7 +39,10 @@ export function appendDescriptorCustomControl(
     unsupported.textContent = DESIGNER_UI_TEXT.descriptor.unsupportedControl(
       field.tagName ?? 'unknown',
     );
-    label.appendChild(unsupported);
+    const fieldControl = ownerDocument.createElement('span');
+    fieldControl.className = 'designer-field-control';
+    fieldControl.appendChild(unsupported);
+    label.appendChild(fieldControl);
     parent.appendChild(label);
     return;
   }
@@ -52,7 +58,10 @@ export function appendDescriptorCustomControl(
     target: field.target === 'style' ? 'style' : 'props',
     path: field.path,
   };
-  label.appendChild(element);
+  const fieldControl = ownerDocument.createElement('span');
+  fieldControl.className = 'designer-field-control';
+  fieldControl.appendChild(element);
+  label.appendChild(fieldControl);
   if (field.help !== undefined) {
     const help = ownerDocument.createElement('span');
     help.className = 'designer-descriptor-help';

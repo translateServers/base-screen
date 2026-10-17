@@ -285,7 +285,7 @@ describe('designer layers view', () => {
       interaction: { selectedComponentIds: ['container'], focusedComponentId: 'container' },
       search: '',
       collapsed: new Set(),
-      dropTargetId: 'container',
+      dropIndicator: { rowId: 'container', edge: 'inside' },
       renameDrafts: new Map([['container', '本地草稿']]),
       renamingId: 'container',
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
@@ -293,31 +293,36 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const tree = layers.children[1]!;
+    const tree = layers.children[2]!;
     const row = tree.children[0]!;
     expect(row.ariaSelected).toBe('true');
     expect(row.ariaCurrent).toBe('true');
     expect(row.attributes['aria-description']).toBe('已隐藏，已锁定，已选中，当前焦点，放置目标');
     expect(row.dataset.renaming).toBe('true');
     expect(row.dataset.layerSelectable).toBeUndefined();
+    // 隐藏行不参与拖拽（row.draggable 只在可选中且未锁定时为 true）。
     expect(row.draggable).toBe(false);
+    // 有子项的行首列是折叠按钮；叶子行不再渲染拖拽抓手（整行即把手）。
+    expect(
+      row.children.find((child) => child.className.includes('layer-collapse'))?.dataset
+        .layerCollapse,
+    ).toBe('container');
     // 不渲染可见状态芯片：隐藏/锁定由常驻的警示色开关图标表达（aria-pressed），
     // 完整状态在 aria-description 中（见上方断言）。
     expect(row.children.find((child) => child.className === 'layer-state')).toBeUndefined();
-    const actions = row.children.find((child) => child.className === 'layer-actions');
-    expect(actions?.children.map((control) => control.ariaPressed)).toEqual([
-      '',
+    // 行级状态开关直接落在行网格里（锁 / 眼），不再挂在悬停展开的操作簇上。
+    expect(row.children.find((child) => child.dataset.layerToggle === 'locked')?.ariaPressed).toBe(
       'true',
+    );
+    expect(row.children.find((child) => child.dataset.layerToggle === 'hidden')?.ariaPressed).toBe(
       'true',
-      '',
-      '',
-    ]);
+    );
     expect(row.children.find((child) => child.dataset.layerSelect === 'container')?.disabled).toBe(
       true,
     );
-    const toolbar = layers.children[0]!.children[0]!;
-    expect(toolbar.attributes.role).toBe('toolbar');
-    expect(toolbar.children.filter((child) => child.type === 'button')).toHaveLength(6);
+    expect(layers.children[0]!.className).toBe('list-heading');
+    expect(layers.children[1]!.className).toBe('layer-search');
+    expect(layers.children[1]!.children[1]!.dataset.layerSearch).toBe('true');
     expect(row.children.find((child) => child.dataset.layerRename === 'container')?.value).toBe(
       '本地草稿',
     );
@@ -332,7 +337,7 @@ describe('designer layers view', () => {
       interaction: { selectedComponentIds: [], focusedComponentId: null },
       search: '',
       collapsed: new Set(),
-      dropTargetId: undefined,
+      dropIndicator: undefined,
       renameDrafts: new Map(),
       renamingId: undefined,
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
@@ -340,20 +345,24 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const idleRow = layers.children[1]!.children[0]!;
+    const idleRow = layers.children[2]!.children[0]!;
     expect(idleRow.dataset.renaming).toBeUndefined();
     expect(idleRow.dataset.layerSelectable).toBe('true');
     expect(idleRow.children.find((child) => child.dataset.layerRename)).toBeUndefined();
     const idleSelect = idleRow.children.find((child) => child.dataset.layerSelect !== undefined);
-    expect(
-      idleSelect?.children.find((child) => child.className === 'layer-name')?.textContent,
-    ).toBe('container');
+    const idleCopy = idleSelect?.children.find((child) => child.className === 'layer-copy');
+    expect(idleCopy?.children.find((child) => child.className === 'layer-name')?.textContent).toBe(
+      'container',
+    );
+    expect(idleCopy?.children.find((child) => child.className === 'layer-meta')?.textContent).toBe(
+      'container.material · 10 × 10',
+    );
 
     renderDesignerLayers(layers as unknown as HTMLElement, view, {
       interaction: { selectedComponentIds: [], focusedComponentId: null },
       search: '',
       collapsed: new Set(),
-      dropTargetId: undefined,
+      dropIndicator: undefined,
       renameDrafts: new Map(),
       renamingId: 'container',
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
@@ -361,7 +370,7 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const renamingRow = layers.children[1]!.children[0]!;
+    const renamingRow = layers.children[2]!.children[0]!;
     expect(renamingRow.dataset.renaming).toBe('true');
     expect(
       renamingRow.children.find((child) => child.dataset.layerRename === 'container')?.value,
@@ -381,7 +390,7 @@ describe('designer layers view', () => {
       interaction: { selectedComponentIds: [], focusedComponentId: null },
       search: '',
       collapsed: new Set(),
-      dropTargetId: undefined,
+      dropIndicator: undefined,
       renameDrafts: new Map(),
       renamingId: undefined,
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
@@ -389,8 +398,9 @@ describe('designer layers view', () => {
       canMove: () => false,
     });
 
-    const row = layers.children[1]!.children[0]!;
+    const row = layers.children[2]!.children[0]!;
     const select = row.children.find((child) => child.dataset.layerSelect === 'locked');
+    // 锁定行仍可选中（否则无从解锁），但整行不可拖：锁定项不得被拖动改层级。
     expect(row.dataset.layerSelectable).toBe('true');
     expect(row.draggable).toBe(false);
     expect(select?.disabled).toBe(false);
@@ -412,7 +422,7 @@ describe('designer layers view', () => {
       interaction: { selectedComponentIds: [], focusedComponentId: null },
       search: '',
       collapsed: new Set(),
-      dropTargetId: undefined,
+      dropIndicator: undefined,
       renameDrafts: new Map(),
       renamingId: undefined,
       renderLimit: DESIGNER_LAYER_PAGE_SIZE,
@@ -420,7 +430,7 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const tree = layers.children[1]!;
+    const tree = layers.children[2]!;
     expect(tree.children).toHaveLength(DESIGNER_LAYER_PAGE_SIZE + 1);
     expect(tree.children.at(-1)?.dataset.layerShowMore).toBe('true');
   });

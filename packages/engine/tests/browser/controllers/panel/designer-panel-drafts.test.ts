@@ -4,6 +4,10 @@ import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DesignerPanelController } from '../../../../src/browser/controllers/panel/designer-panel-controller.js';
 import {
+  canvasBackgroundPaletteValue,
+  createCanvasBackgroundPaletteTransaction,
+} from '../../../../src/browser/dom/panel/designer-canvas-transactions.js';
+import {
   catalog,
   document,
   FakeDocument,
@@ -291,46 +295,83 @@ describe('DesignerPanelController canvas background drafts', () => {
     ]);
   });
 
-  it('switches palette modes with retained per-mode drafts', () => {
-    vi.stubGlobal('HTMLInputElement', FakeInput);
-    vi.stubGlobal('HTMLSelectElement', FakeInput);
-    const { controller, transactions } = createCanvasController(() => ({
+  // 画布背景不再自带类型/色标草稿机：整段颜色值由统一颜色控件产出，一次提交为 update-canvas。
+  it('commits the whole canvas background value produced by the shared color control', () => {
+    const transaction = createCanvasBackgroundPaletteTransaction(
+      document(),
+      'linear-gradient(135deg, #000000 0%, #ffffff 100%)',
+    );
+
+    expect(transaction).toEqual({
       ok: true,
-      value: document(),
       diagnostics: [],
-    }));
-
-    controller.onPropertyChange({
-      target: new FakeInput('backgroundType', 'linear-gradient', 'canvasProperty'),
-    } as unknown as Event);
-    controller.onPropertyChange({
-      target: new FakeInput('backgroundLinearAngle', '135', 'canvasProperty'),
-    } as unknown as Event);
-    controller.onPropertyChange({
-      target: new FakeInput('backgroundType', 'radial-gradient', 'canvasProperty'),
-    } as unknown as Event);
-    controller.onPropertyChange({
-      target: new FakeInput('backgroundType', 'linear-gradient', 'canvasProperty'),
-    } as unknown as Event);
-
-    expect(transactions).toHaveLength(4);
-    expect(transactions[3]).toEqual({
-      commands: [
-        {
-          type: 'update-canvas',
-          patch: {
-            background: {
-              type: 'linear-gradient',
-              angle: 135,
-              stops: [
-                { color: '#000000', position: 0 },
-                { color: '#ffffff', position: 100 },
-              ],
+      value: {
+        commands: [
+          {
+            type: 'update-canvas',
+            patch: {
+              background: {
+                type: 'linear-gradient',
+                angle: 135,
+                stops: [
+                  { color: '#000000', position: 0 },
+                  { color: '#ffffff', position: 100 },
+                ],
+              },
             },
           },
-        },
-      ],
+        ],
+      },
     });
+  });
+
+  it('writes both background and the compatibility color for a solid canvas fill', () => {
+    const transaction = createCanvasBackgroundPaletteTransaction(document(), '#112233');
+
+    expect(transaction).toEqual({
+      ok: true,
+      diagnostics: [],
+      value: {
+        commands: [
+          {
+            type: 'update-canvas',
+            patch: {
+              background: { type: 'solid', color: '#112233' },
+              backgroundColor: '#112233',
+            },
+          },
+        ],
+      },
+    });
+  });
+
+  it('rejects an empty or malformed canvas background value', () => {
+    expect(createCanvasBackgroundPaletteTransaction(document(), '   ')).toBeUndefined();
+  });
+
+  it('reads the canvas background back into the palette value the control accepts', () => {
+    const withGradient: ScreenDocument = {
+      ...document(),
+      canvas: {
+        width: 960,
+        height: 540,
+        backgroundColor: '#000000',
+        background: {
+          type: 'linear-gradient',
+          angle: 135,
+          stops: [
+            { color: '#112233', position: 0 },
+            { color: '#abcdef', position: 100 },
+          ],
+        },
+      },
+    };
+
+    expect(canvasBackgroundPaletteValue(withGradient)).toBe(
+      'linear-gradient(135deg, #112233 0%, #abcdef 100%)',
+    );
+    // 只有 `backgroundColor` 时按单色填充读出，保证控件总有一个合法初始值。
+    expect(canvasBackgroundPaletteValue(document())).toBe('#000000');
   });
 
   it('commits a background image URL draft as an update-canvas patch', () => {
@@ -445,5 +486,43 @@ describe('DesignerPanelController canvas background drafts', () => {
     expect(transactions).toHaveLength(1);
     expect(target.ariaInvalid).toBe('true');
     expect(diagnostics).toEqual([failure.diagnostics]);
+  });
+
+  // 画布不透明度在面板里读作 0–100，呈现层仍是 0–1：两处读数必须落在同一条换算上。
+  it('commits canvas opacity as a percentage while the presentation value stays fractional', () => {
+    vi.stubGlobal('HTMLInputElement', FakeInput);
+    const settings: unknown[] = [];
+    const controller = new DesignerPanelController({
+      emitDiagnostics: () => undefined,
+      executeCommand: () => ({ ok: true, value: document(), diagnostics: [] }),
+      executeTransaction: () => ({ ok: true, value: document(), diagnostics: [] }),
+      getCatalog: catalog,
+      getDocument: document,
+      getGroupMaterialType: () => undefined,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      getResourcePort: () => undefined,
+      getRuntimeContributions: () => undefined,
+      getZoom: () => 1,
+      onCanvasPresentationChange: (value) => settings.push(value.opacity),
+      redo: () => ({ ok: true, value: document(), diagnostics: [] }),
+      reduceSelection: () => undefined,
+      setZoom: () => undefined,
+      undo: () => ({ ok: true, value: document(), diagnostics: [] }),
+    });
+    const target = new FakeInput('opacity', '42', 'canvasSetting');
+    (target as unknown as { getRootNode: () => unknown }).getRootNode = () => ({
+      querySelectorAll: () => [],
+    });
+
+    controller.onPropertyChange({ target } as unknown as Event);
+    expect(settings).toEqual([0.42]);
+
+    // 越界读数夹到 0–100 再换算，写入的一定是 0–1 的合法比值。
+    const overflow = new FakeInput('opacity', '140', 'canvasSetting');
+    (overflow as unknown as { getRootNode: () => unknown }).getRootNode = () => ({
+      querySelectorAll: () => [],
+    });
+    controller.onPropertyChange({ target: overflow } as unknown as Event);
+    expect(settings).toEqual([0.42, 1]);
   });
 });

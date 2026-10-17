@@ -170,6 +170,76 @@
   pointer-events: auto;
 }
 
+/* 选区名称标签：压在选中框上沿外侧，不拦截命中测试。 */
+.selection-tag {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  max-width: 320px;
+  overflow: hidden;
+  padding: 2px 6px;
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-accent);
+  color: var(--designer-text-on-accent);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 画布操作提示：视口下沿居中，挂在 .canvas 之外因此不随缩放；
+   本体 pointer-events 关闭以免挡住画布命中，只放开关闭按钮。 */
+.canvas-hint {
+  position: absolute;
+  bottom: var(--designer-space-5);
+  left: 50%;
+  z-index: var(--designer-z-workspace-overlay);
+  display: inline-flex;
+  max-width: min(84%, 480px);
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 5px var(--designer-space-4);
+  border: 1px solid var(--designer-border-subtle);
+  border-radius: var(--designer-radius-pill);
+  background: color-mix(in srgb, var(--designer-surface-overlay) 92%, transparent);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-float);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  pointer-events: none;
+  translate: -50% 0;
+}
+
+.canvas-hint[hidden] {
+  display: none;
+}
+
+.canvas-hint-glyph {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.canvas-hint-glyph svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+}
+
+.canvas-hint-text {
+  min-width: 0;
+}
+
+.canvas-hint-dismiss {
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+
+.canvas-hint-dismiss svg {
+  width: 12px;
+  height: 12px;
+}
+
 .canvas-guides {
   position: absolute;
   inset: 0;
@@ -468,12 +538,51 @@
   white-space: nowrap;
 }
 
+/* 未保存/冲突/进行中由圆点承载（与顶栏保存态同一套语义），文本只留阶段名。 */
 .statusbar [data-project-status] {
+  display: inline-flex;
   flex: 0 1 auto;
   min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-2);
+  color: var(--designer-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.status-project-dot {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 6px;
+  border-radius: 50%;
+  background: var(--designer-text-muted);
+  opacity: 0.45;
+}
+
+.statusbar [data-project-status][data-state="ready"] .status-project-dot {
+  background: var(--designer-success);
+  opacity: 1;
+}
+
+.statusbar [data-project-status][data-state="dirty"] .status-project-dot {
+  background: var(--designer-warning);
+  opacity: 1;
+}
+
+.statusbar [data-project-status][data-state="busy"] .status-project-dot {
+  background: var(--designer-accent);
+  opacity: 1;
+}
+
+.statusbar [data-project-status][data-state="error"] .status-project-dot {
+  background: var(--designer-danger);
+  opacity: 1;
+}
+
+.statusbar [data-project-status][data-state="dirty"],
+.statusbar [data-project-status][data-state="error"] {
+  color: var(--designer-text-secondary);
 }
 
 .statusbar [data-project-revision] {

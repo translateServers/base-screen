@@ -6,7 +6,7 @@
   grid-template-columns: var(--designer-ruler-size) minmax(0, 1fr);
 }
 
-/* Nebula 底部状态栏：左（工具+选中信息+项目状态）｜右（画布尺寸 + 开关 + 缩放）。 */
+/* 底部状态栏：左（工具 + 选中读数 + 项目状态/修订 + 反馈）｜右（组件数 + 画布尺寸 + 开关 + 缩放）。 */
 .statusbar {
   display: flex;
   min-width: 0;
@@ -56,6 +56,14 @@
   color: var(--designer-text-primary);
   font-weight: 600;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 项目状态在 designer-workbench-canvas.css 的 `.statusbar [data-project-status]` 上着色，
+   这里只留右栏读数。 */
+.status-components {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
   white-space: nowrap;
 }
 
@@ -369,8 +377,8 @@
   display: none;
 }
 
-/* 面板切换条（原型 .rail-tabs）：raised 底与内容面板区分轨与体，48px 列内 44px 竖排 tab。
-   选中 = control-active + 收边 + 图标转强调色；悬停只到 control-hover 一档。 */
+/* 面板切换条（原型 .rail-tabs）：压在 panel 之下 2% 作下凹轨道，与浮起的顶栏形成反向层级；
+   48px 列内 44px 竖排 tab。选中 = control-active + 收边 + 图标转强调色；悬停只到 control-hover 一档。 */
 .rail-tabs {
   grid-column: 1;
   grid-row: 1 / -1;
@@ -380,7 +388,7 @@
   align-items: stretch;
   gap: var(--designer-space-2);
   padding: var(--designer-space-4) var(--designer-space-1);
-  background: var(--designer-surface-raised);
+  background: color-mix(in oklch, var(--designer-surface-panel), var(--designer-text-primary) 2%);
   box-shadow: inset -1px 0 0 var(--designer-border-subtle);
   overscroll-behavior: contain;
 }

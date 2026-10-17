@@ -11,13 +11,10 @@ import {
   createDescriptorFieldTransaction,
 } from '../../dom/descriptor/designer-descriptor-operations.js';
 import {
-  createCanvasBackgroundStopTransaction,
   createDataSourceTransaction,
-  createDesignerCanvasBackgroundDrafts,
   createDesignerCanvasPresentationSettings,
   createMultiSelectionTransaction,
   createPropertyTransaction,
-  type DesignerCanvasBackgroundDrafts,
   type DesignerCanvasPresentationSettings,
   renderDesignerDataPanel,
   renderDesignerProperties,
@@ -25,8 +22,6 @@ import {
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 
 export class DesignerPanelPropertyController {
-  readonly #canvasBackgroundDrafts: DesignerCanvasBackgroundDrafts =
-    createDesignerCanvasBackgroundDrafts();
   readonly #canvasPresentation: DesignerCanvasPresentationSettings =
     createDesignerCanvasPresentationSettings();
 
@@ -41,7 +36,6 @@ export class DesignerPanelPropertyController {
         this.callbacks.getCatalog(),
         this.callbacks.getDatasetFields,
         this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
-        this.#canvasBackgroundDrafts,
         this.#canvasPresentation,
         this.callbacks.getInspectorControls?.(),
       );
@@ -58,23 +52,6 @@ export class DesignerPanelPropertyController {
   }
 
   onClick(target: Element): boolean {
-    const paletteStopAction = target.closest<HTMLButtonElement>(
-      '[data-canvas-background-stop-action]',
-    );
-    if (paletteStopAction !== null) {
-      const action = paletteStopAction.dataset.canvasBackgroundStopAction;
-      if (action === 'add' || action === 'remove') {
-        const transaction = createCanvasBackgroundStopTransaction(
-          this.callbacks.getDocument(),
-          this.#canvasBackgroundDrafts,
-          action,
-          Number(paletteStopAction.dataset.canvasBackgroundStopIndex),
-        );
-        if (transaction?.ok) this.report(this.callbacks.executeTransaction(transaction.value));
-        else if (transaction !== undefined) this.callbacks.emitDiagnostics(transaction.diagnostics);
-      }
-      return true;
-    }
     const backgroundImageAction = target.closest<HTMLButtonElement>(
       '[data-canvas-background-image-action]',
     );
@@ -222,15 +199,17 @@ export class DesignerPanelPropertyController {
   private updateCanvasPresentationSetting(target: EventTarget | null, setting: string): void {
     if (!(target instanceof HTMLInputElement)) return;
     if (setting === 'opacity') {
-      const value = Number(target.value);
-      if (!Number.isFinite(value)) return;
-      this.#canvasPresentation.opacity = Math.min(1, Math.max(0, value));
+      // 面板读数是 0–100 的百分比（与组件不透明度同一档），呈现层仍持有 0–1 的比值。
+      const percent = Number(target.value);
+      if (!Number.isFinite(percent)) return;
+      const opacity = Math.round(Math.min(100, Math.max(0, percent))) / 100;
+      this.#canvasPresentation.opacity = opacity;
       this.callbacks.onCanvasPresentationChange?.(this.#canvasPresentation);
       const root = target.getRootNode() as ShadowRoot | Document;
       for (const control of root.querySelectorAll<HTMLInputElement>(
         '[data-canvas-setting="opacity"]',
       )) {
-        control.value = String(this.#canvasPresentation.opacity);
+        control.value = String(Math.round(opacity * 100));
       }
       return;
     }
@@ -289,7 +268,6 @@ export class DesignerPanelPropertyController {
       this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument(),
       this.callbacks.getInteraction(),
       this.callbacks.getCatalog(),
-      this.#canvasBackgroundDrafts,
     );
     if (transaction === undefined) return false;
     if (!transaction.ok) {

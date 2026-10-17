@@ -602,7 +602,7 @@ const materialLibraryStressGrouping = {
     },
     {
       id: 'bridges',
-      label: '跨框架桥接物料',
+      label: '跨框架桥接素材',
       materialTypes: ['harness.react-button', 'harness.vue-button'],
     },
     {
@@ -1586,7 +1586,7 @@ hostShell.addEventListener('click', (event) => {
   }
   if (hostRequestForAction(action ?? '')) {
     setHostStatus(
-      action === 'blueprint' ? '已切换到交互编排工作台。' : '已发起宿主编辑请求，等待编辑器返回。',
+      action === 'blueprint' ? '已切换到蓝图工作台。' : '已发起宿主编辑请求，等待编辑器返回。',
     );
   } else {
     setHostStatus('无法发起宿主编辑请求。', 'error');

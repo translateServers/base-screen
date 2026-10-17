@@ -1,4 +1,5 @@
-/* 变量面板：工具栏固定，列表独立滚动；非滚动外壳不预留第二条 scrollbar gutter。 */
+/* 变量面板（对齐工作台原型）：按来源分组的紧凑列表。
+   行 = 来源图形/色板 · 变量名 · 当前值；展开/操作只在悬停或聚焦时露出，静止态保持一条读数。 */
 .rail-view[data-variables] {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
@@ -11,174 +12,47 @@
   display: none;
 }
 
+/* 工具条只剩一个紧凑的“新建变量”入口，悬浮在内容右上角，不占列头高度。 */
 .variable-panel-toolbar {
-  display: grid;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-5);
-  border-bottom: 1px solid var(--designer-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--designer-space-3) var(--designer-space-3) 0;
   background: var(--designer-surface-panel);
 }
 
-.variable-panel-description {
-  margin: 0;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  line-height: 18px;
-  overflow-wrap: anywhere;
-}
-
-.variable-quick-start {
-  display: grid;
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-3);
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-control);
-  background: color-mix(
-    in srgb,
-    var(--designer-accent-surface) 20%,
-    var(--designer-surface-workspace)
-  );
-}
-
-.variable-quick-start > strong {
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-weight: 650;
-}
-
-.variable-quick-step {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: 18px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--designer-space-2);
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  line-height: 15px;
-}
-
-.variable-quick-step b {
-  display: grid;
-  width: 18px;
-  height: 18px;
-  place-items: center;
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-}
-
-.variable-panel-filters {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 92px;
-  gap: var(--designer-space-2);
-  padding-top: var(--designer-space-1);
-}
-
-.variable-panel-filters .designer-control {
-  min-width: 0;
-  height: 30px;
-}
-
 .designer-button.variable-add-button {
-  display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  width: 100%;
-  min-height: 40px;
+  display: inline-flex;
+  width: auto;
+  min-height: 30px;
   align-items: center;
-  justify-content: stretch;
-  gap: var(--designer-space-3);
-  padding: 4px var(--designer-space-3) 4px 6px;
-  border-color: color-mix(in srgb, var(--designer-accent) 38%, var(--designer-border-default));
-  border-radius: calc(var(--designer-radius-control) + 2px);
-  background: color-mix(
-    in srgb,
-    var(--designer-accent-surface) 58%,
-    var(--designer-surface-control)
-  );
-  color: var(--designer-text-primary);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--designer-text-on-accent) 6%, transparent),
-    0 3px 10px color-mix(in srgb, var(--designer-accent) 10%, transparent);
-  text-align: left;
-}
-
-.variable-add-button .variable-button-glyph {
-  width: 24px;
-  height: 24px;
-  border-radius: calc(var(--designer-radius-control) + 1px);
-  background: var(--designer-button-primary-background);
-  color: var(--designer-text-on-accent);
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--designer-accent) 28%, transparent);
-}
-
-.variable-add-button .variable-button-glyph svg {
-  width: 14px;
-  height: 14px;
-}
-
-.variable-add-button .variable-button-label {
-  min-width: 0;
-  overflow: hidden;
-  color: inherit;
-  font-weight: 650;
-  line-height: 18px;
-  text-overflow: ellipsis;
-}
-
-.variable-add-button:not(:disabled):hover {
-  border-color: color-mix(in srgb, var(--designer-accent) 64%, var(--designer-border-default));
-  background-color: color-mix(
-    in srgb,
-    var(--designer-accent-surface) 76%,
-    var(--designer-surface-control-hover)
-  );
-  color: var(--designer-text-primary);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--designer-text-on-accent) 8%, transparent),
-    0 5px 14px color-mix(in srgb, var(--designer-accent) 16%, transparent);
-}
-
-.variable-add-button:not(:disabled):hover .variable-button-glyph {
-  background: var(--designer-button-primary-hover);
-}
-
-.variable-add-button:not(:disabled):active {
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--designer-text-on-accent) 5%, transparent),
-    0 2px 6px color-mix(in srgb, var(--designer-accent) 12%, transparent);
-  transform: scale(0.985);
-}
-
-.rail-view[data-variables] .variable-add-button:focus-visible {
-  border-color: var(--designer-accent);
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 2px;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--designer-accent) 18%, transparent);
-}
-
-.variable-add-button:disabled {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-control);
-  color: var(--designer-text-disabled);
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-2) 0 var(--designer-space-1);
+  border-color: transparent;
+  border-radius: var(--designer-radius-2);
+  background: transparent;
+  color: var(--designer-text-secondary);
   box-shadow: none;
-  opacity: 1;
-  transform: none;
+  font: var(--designer-font-small);
 }
 
-.variable-add-button:disabled .variable-button-glyph {
-  background: var(--designer-border-default);
-  color: var(--designer-text-disabled);
+.designer-button.variable-add-button:not(:disabled):hover {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
   box-shadow: none;
+}
+
+.designer-button.variable-add-button:disabled {
+  color: var(--designer-text-disabled);
+  background: transparent;
 }
 
 .variable-button-glyph {
   display: inline-grid;
-  width: 14px;
-  height: 14px;
-  flex: 0 0 14px;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
   place-items: center;
 }
 
@@ -193,14 +67,359 @@
 .variable-panel-content {
   min-height: 0;
   overflow: hidden auto;
-  padding: var(--designer-space-4) var(--designer-space-5) var(--designer-space-6);
+  padding: 0 0 var(--designer-space-6);
   scrollbar-gutter: stable;
+}
+
+.variable-group {
+  min-width: 0;
+}
+
+.variable-group > .list-heading {
+  margin: 0;
+  padding: var(--designer-space-4) var(--designer-space-4) var(--designer-space-1);
+  color: var(--designer-text-muted);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .variable-list {
   display: grid;
   min-width: 0;
-  gap: var(--designer-space-3);
+  gap: 2px;
+  margin: 0;
+  padding: 0 var(--designer-space-2);
+}
+
+/* 单行：20px 图形槽 + 名称 + 右侧只读值。 */
+.variable-row {
+  min-width: 0;
+  border-radius: var(--designer-radius-2);
+}
+
+.variable-row-header {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  min-height: 38px;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-2);
+  color: var(--designer-text-secondary);
+  transition: background-color var(--designer-motion);
+}
+
+.variable-row-header:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+/* 展开箭头叠在来源图形上：hover/展开时淡入，静止态只显示来源图形，不留第二列。 */
+.variable-row-toggle {
+  position: relative;
+  display: grid;
+  width: 20px;
+  height: 28px;
+  min-width: 0;
+  min-height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-muted);
+}
+
+.variable-row-toggle:hover:not(:disabled) {
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-primary);
+}
+
+.variable-row-glyph {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  color: var(--designer-text-muted);
+  transition: opacity var(--designer-motion);
+}
+
+.variable-row-glyph svg {
+  width: 14px;
+  height: 14px;
+}
+
+.variable-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px var(--designer-border-default);
+}
+
+.variable-row-chevron {
+  position: absolute;
+  inset: 0;
+  display: inline-grid;
+  place-items: center;
+  color: var(--designer-text-muted);
+  opacity: 0;
+  transition: opacity var(--designer-motion);
+}
+
+.variable-row-chevron svg {
+  width: 12px;
+  height: 12px;
+}
+
+.variable-row-header:hover .variable-row-glyph,
+.variable-row[data-expanded="true"] .variable-row-glyph {
+  opacity: 0;
+}
+
+.variable-row-header:hover .variable-row-chevron,
+.variable-row[data-expanded="true"] .variable-row-chevron {
+  opacity: 1;
+}
+
+.variable-row-identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.variable-name {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 右侧只读值：与原型 .variable-value 同档（等宽 12px、弱文本、右对齐）。 */
+.variable-row-context {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  transition: opacity var(--designer-motion);
+}
+
+.variable-row-context-label {
+  display: none;
+}
+
+.variable-row-context-value {
+  max-width: 140px;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 操作簇与值共位：悬停/聚焦时盖住值，静止态保持单行读数。 */
+.variable-row-actions {
+  position: absolute;
+  top: 50%;
+  right: var(--designer-space-1);
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding-left: var(--designer-space-3);
+  border-radius: var(--designer-radius-2);
+  background: linear-gradient(90deg, transparent, var(--designer-surface-control-hover) 12px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity var(--designer-motion);
+}
+
+.variable-row-header:hover .variable-row-actions,
+.variable-row-header:focus-within .variable-row-actions,
+.variable-row[data-expanded="true"] .variable-row-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.variable-row-header:hover .variable-row-context,
+.variable-row-header:focus-within .variable-row-context,
+.variable-row[data-expanded="true"] .variable-row-context {
+  opacity: 0;
+}
+
+.variable-row-actions .designer-button {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-muted);
+}
+
+.variable-row-actions .designer-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-active);
+  color: var(--designer-text-primary);
+}
+
+.variable-row-actions .designer-button[data-variant="danger"]:hover:not(:disabled) {
+  background: var(--designer-danger-surface);
+  color: var(--designer-danger);
+}
+
+.variable-row-actions .designer-button svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* 展开详情：作为行内的次级块，左缩进对齐名称，不回到卡片形态。 */
+.variable-details {
+  display: grid;
+  min-width: 0;
+  gap: var(--designer-space-2);
+  margin: 0 var(--designer-space-2) var(--designer-space-2)
+    calc(var(--designer-space-2) + 20px + var(--designer-space-2));
+  padding: var(--designer-space-2) 0 0;
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
+.variable-detail-line,
+.variable-usage-line {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-2);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.variable-detail-label {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+}
+
+.variable-detail-copy {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-value-button {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 30px;
+  grid-template-columns: 68px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 0 var(--designer-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-secondary);
+  text-align: left;
+}
+
+.variable-value-button:hover:not(:disabled) {
+  border-color: var(--designer-border-default);
+  background: var(--designer-surface-control-hover);
+}
+
+.variable-value-button:focus-visible {
+  border-color: var(--designer-accent);
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
+}
+
+.variable-description-action {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  grid-template-columns: 68px minmax(0, 1fr);
+  align-items: start;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-2);
+  border-color: transparent;
+  background: transparent;
+  color: var(--designer-text-muted);
+  box-shadow: none;
+  text-align: left;
+}
+
+.variable-description-action:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--designer-text-secondary);
+}
+
+.variable-description-copy {
+  display: -webkit-box;
+  min-width: 0;
+  overflow: hidden;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.variable-value,
+.variable-host-id {
+  color: var(--designer-text-secondary);
+}
+
+.variable-detail-glyph {
+  display: inline-grid;
+  width: 12px;
+  height: 12px;
+  place-items: center;
+  color: var(--designer-text-muted);
+}
+
+.variable-value-button:hover .variable-detail-glyph,
+.variable-value-button:focus-visible .variable-detail-glyph {
+  color: var(--designer-accent);
+}
+
+.variable-reference-count {
+  padding: 1px var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  font-size: var(--designer-font-size-xs);
+  white-space: nowrap;
+}
+
+button.variable-reference-count:hover:not(:disabled) {
+  border-color: var(--designer-border-default);
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-secondary);
+}
+
+button.variable-reference-count:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
 }
 
 .variable-empty-state {
@@ -241,224 +460,6 @@
   height: 17px;
 }
 
-.variable-details {
-  display: grid;
-  min-width: 0;
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-3);
-  border-top: 1px solid var(--designer-border-subtle);
-  background: color-mix(
-    in srgb,
-    var(--designer-surface-workspace) 52%,
-    var(--designer-surface-raised)
-  );
-}
-
-.variable-actions {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-start;
-  flex-wrap: wrap;
-  gap: var(--designer-space-1);
-  padding-top: var(--designer-space-1);
-  border-top: 1px solid var(--designer-border-subtle);
-}
-
-.variable-meta {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--designer-space-2);
-}
-
-.variable-reference-count {
-  padding: 1px var(--designer-space-2);
-  border-radius: var(--designer-radius-pill);
-  background: var(--designer-surface-workspace);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-  white-space: nowrap;
-}
-
-.variable-description {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.variable-actions .designer-button {
-  width: auto;
-  min-height: 28px;
-  padding: 0 var(--designer-space-2);
-  border-color: transparent;
-  background: transparent;
-  color: var(--designer-text-muted);
-  box-shadow: none;
-}
-
-.variable-actions .designer-button:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-}
-
-.variable-actions .designer-button[data-variable-action="delete"] {
-  border-color: transparent;
-  background: transparent;
-  color: var(--designer-text-muted);
-}
-
-.variable-actions .designer-button[data-variable-action="delete"]:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--designer-danger-surface);
-  color: var(--designer-danger);
-}
-
-.variable-actions .designer-button:not(:disabled):active,
-.variable-editor-actions .designer-button:not(:disabled):active {
-  transform: translateZ(0);
-}
-
-.variable-actions .designer-button svg {
-  width: 12px;
-  height: 12px;
-}
-
-.variable-actions .variable-button-label {
-  color: inherit;
-  font: var(--designer-font-small);
-  font-size: var(--designer-font-size-xs);
-}
-
-.variable-value-button,
-.variable-host-detail,
-.variable-detail-line,
-.variable-usage {
-  box-sizing: border-box;
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  min-height: 30px;
-  grid-template-columns: 68px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-2);
-  border: 1px solid transparent;
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-workspace);
-  color: var(--designer-text-secondary);
-  text-align: left;
-}
-
-.variable-value-button {
-  cursor: pointer;
-  font: inherit;
-}
-
-.variable-host-detail,
-.variable-detail-line,
-.variable-usage {
-  grid-template-columns: 68px minmax(0, 1fr);
-}
-
-.variable-description-action {
-  display: grid;
-  width: 100%;
-  min-width: 0;
-  min-height: 48px;
-  grid-template-columns: 68px minmax(0, 1fr);
-  align-items: start;
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-2) var(--designer-space-3);
-  border-color: transparent;
-  background: transparent;
-  color: var(--designer-text-muted);
-  box-shadow: none;
-  text-align: left;
-}
-
-.variable-description-copy {
-  display: -webkit-box;
-  min-width: 0;
-  overflow: hidden;
-  line-height: 16px;
-  overflow-wrap: anywhere;
-  white-space: normal;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-}
-
-.variable-description-action .variable-detail-label {
-  padding-top: 1px;
-}
-
-button.variable-reference-count:hover:not(:disabled) {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-secondary);
-}
-
-button.variable-reference-count:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 1px;
-}
-
-.variable-description-action:hover:not(:disabled) {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-secondary);
-}
-
-.variable-value-button:hover:not(:disabled) {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-control-hover);
-}
-
-.variable-value-button:focus-visible {
-  border-color: var(--designer-accent);
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 1px;
-}
-
-.variable-detail-label {
-  color: var(--designer-text-muted);
-  font: var(--designer-font-small);
-  white-space: nowrap;
-}
-
-.variable-detail-copy {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.variable-value,
-.variable-host-id {
-  color: var(--designer-text-secondary);
-}
-
-.variable-detail-glyph {
-  display: inline-grid;
-  width: 12px;
-  height: 12px;
-  place-items: center;
-  color: var(--designer-text-muted);
-}
-
-.variable-value-button:hover .variable-detail-glyph,
-.variable-value-button:focus-visible .variable-detail-glyph {
-  color: var(--designer-accent);
-}
-
 .variable-readonly {
   display: inline-flex;
   align-items: center;
@@ -478,10 +479,6 @@ button.variable-reference-count:focus-visible {
 .rail-view[data-variables] .designer-control,
 .rail-view[data-variables] .variable-row {
   transition: none;
-}
-
-.rail-view[data-variables] .variable-add-button {
-  transition: transform var(--designer-motion);
 }
 
 .toolbar-btn {

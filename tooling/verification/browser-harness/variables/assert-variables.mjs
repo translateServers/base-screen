@@ -38,8 +38,9 @@ export async function assertAuthoringVariables(page, designer) {
   if (variableTypesBefore !== 'data-source,static,url-query') {
     throw new Error(`BROWSER_HARNESS_VARIABLE_TYPES_FAILED:${variableTypesBefore}`);
   }
-  const variableModule = await designer.locator('[data-variables]').evaluate((panel) => {
+  const variableModule = await designer.locator('[data-variables]').evaluate(async (panel) => {
     const collapsedRow = panel.querySelector('[data-variable-row]');
+    const collapsedHeight = collapsedRow?.getBoundingClientRect().height;
     const collapsedValueHidden =
       collapsedRow?.querySelector('[data-variable-action="edit-value"]') === null;
     const collapsedToggleLabel = collapsedRow
@@ -57,14 +58,13 @@ export async function assertAuthoringVariables(page, designer) {
     const actionSizes = [...(row?.querySelectorAll('.variable-row-actions button') ?? [])].map(
       (button) => button.getBoundingClientRect().width,
     );
-    const identity = row?.querySelector('.variable-row-identity');
     const actions = row?.querySelector('.variable-row-actions');
     const context = row?.querySelector('.variable-row-context');
     const toggle = row?.querySelector('[data-variable-action="toggle-variable"]');
-    const identityRect = identity?.getBoundingClientRect();
-    const actionsRect = actions?.getBoundingClientRect();
     const firstAction = actions?.querySelector('button');
     firstAction?.focus();
+    // 操作簇用 opacity 过渡淡入；等一帧动画结束再读计算值。
+    await new Promise((resolve) => setTimeout(resolve, 250));
     const keyboardActionVisible =
       firstAction === panel.getRootNode().activeElement &&
       getComputedStyle(actions).opacity === '1';
@@ -73,44 +73,29 @@ export async function assertAuthoringVariables(page, designer) {
       panelDisplay: getComputedStyle(panel).display,
       panelOverflow: getComputedStyle(panel).overflow,
       contentOverflowY: content === null ? undefined : getComputedStyle(content).overflowY,
-      duplicateTitle: panel.querySelector('.variable-panel-title') !== null,
-      description: panel.querySelector('.variable-panel-description')?.textContent,
-      quickSteps: panel.querySelectorAll('.variable-quick-step').length,
+      groups: [...panel.querySelectorAll('.variable-group > .list-heading')].map(
+        (heading) => heading.textContent,
+      ),
+      listRoles: [...panel.querySelectorAll('.variable-list')].map((list) =>
+        list.getAttribute('role'),
+      ),
       collapsedValueHidden,
       collapsedToggleLabel,
-      listRole: panel.querySelector('.variable-list')?.getAttribute('role'),
       rowDisplay: row === null ? undefined : getComputedStyle(row).display,
-      rowHeight: row?.getBoundingClientRect().height,
+      rowHeight: collapsedHeight,
+      headerHeight: row?.querySelector('.variable-row-header')?.getBoundingClientRect().height,
       valueTag: value?.tagName,
       addHeight: add?.getBoundingClientRect().height,
       addDisplay: add === null ? undefined : getComputedStyle(add).display,
-      addGridColumns: add === null ? undefined : getComputedStyle(add).gridTemplateColumns,
-      addTextAlign: add === null ? undefined : getComputedStyle(add).textAlign,
+      addText: add?.textContent?.trim(),
       addGlyphWidth: addGlyph?.getBoundingClientRect().width,
       addGlyphHeight: addGlyph?.getBoundingClientRect().height,
-      addGlyphBackground:
-        addGlyph === null || addGlyph === undefined
-          ? undefined
-          : getComputedStyle(addGlyph).backgroundColor,
-      addLabelOverflow:
-        addLabel === null || addLabel === undefined
-          ? undefined
-          : getComputedStyle(addLabel).textOverflow,
       addHasDecorativeSvg: add?.querySelector('svg')?.getAttribute('aria-hidden') === 'true',
       actionSizes,
       actionLabels: [...(row?.querySelectorAll('.variable-row-actions button') ?? [])].map(
         (button) => button.getAttribute('aria-label'),
       ),
-      actionsBelowIdentity:
-        identityRect !== undefined &&
-        actionsRect !== undefined &&
-        actionsRect.top >= identityRect.bottom - 1,
       contextValue: context?.querySelector('code')?.textContent,
-      headerHeight: row?.querySelector('.variable-row-header')?.getBoundingClientRect().height,
-      identityOpacity:
-        identity === null || identity === undefined
-          ? undefined
-          : getComputedStyle(identity).opacity,
       keyboardActionVisible,
       nameWidth: row?.querySelector('.variable-name')?.getBoundingClientRect().width,
       toggleHeight: toggle?.getBoundingClientRect().height,
@@ -127,33 +112,27 @@ export async function assertAuthoringVariables(page, designer) {
     variableModule.panelDisplay !== 'grid' ||
     variableModule.panelOverflow !== 'hidden' ||
     variableModule.contentOverflowY !== 'auto' ||
-    variableModule.duplicateTitle ||
-    variableModule.description !== '全局变量管理' ||
-    variableModule.quickSteps !== 0 ||
+    variableModule.groups.join(',') !== '设计变量,数据集,查询参数' ||
+    variableModule.listRoles.some((role) => role !== 'list') ||
     !variableModule.collapsedValueHidden ||
     !variableModule.collapsedToggleLabel?.includes('展开全局变量 count') ||
-    variableModule.listRole !== 'list' ||
-    variableModule.rowDisplay !== 'grid' ||
-    (variableModule.rowHeight ?? 0) < 60 ||
+    variableModule.rowDisplay !== 'block' ||
+    (variableModule.rowHeight ?? 0) < 38 ||
+    (variableModule.rowHeight ?? 0) > 44 ||
+    variableModule.headerHeight !== variableModule.rowHeight ||
     variableModule.valueTag !== 'BUTTON' ||
-    (variableModule.addHeight ?? 0) < 40 ||
-    variableModule.addDisplay !== 'grid' ||
-    !variableModule.addGridColumns?.startsWith('24px ') ||
-    variableModule.addTextAlign !== 'left' ||
-    variableModule.addGlyphWidth !== 24 ||
-    variableModule.addGlyphHeight !== 24 ||
-    variableModule.addGlyphBackground === 'rgba(0, 0, 0, 0)' ||
-    variableModule.addLabelOverflow !== 'ellipsis' ||
+    (variableModule.addHeight ?? 0) < 28 ||
+    !['flex', 'inline-flex'].includes(variableModule.addDisplay) ||
+    !variableModule.addText?.includes('新建变量') ||
+    variableModule.addGlyphWidth !== 16 ||
+    variableModule.addGlyphHeight !== 16 ||
     !variableModule.addHasDecorativeSvg ||
     variableModule.actionSizes.some((size) => size < 24) ||
     variableModule.actionLabels.some((label) => !label?.includes('count')) ||
-    !variableModule.actionsBelowIdentity ||
     variableModule.contextValue !== '0' ||
-    (variableModule.headerHeight ?? 0) < 72 ||
-    variableModule.identityOpacity !== '1' ||
     !variableModule.keyboardActionVisible ||
     (variableModule.nameWidth ?? 0) < 24 ||
-    variableModule.toggleHeight !== variableModule.headerHeight ||
+    variableModule.toggleHeight !== 28 ||
     variableModule.variableTypes.join(',') !== 'data-source,static,url-query'
   ) {
     throw new Error(
@@ -771,34 +750,33 @@ export async function assertVariableListThemeQuality(page) {
       const nameStyle = getComputedStyle(name);
       const context = row.querySelector('.variable-row-context-value');
       const contextStyle = getComputedStyle(context);
-      const usage = row.querySelector('.variable-reference-count');
-      const usageStyle = getComputedStyle(usage);
       const action = panel.querySelector('[data-variable-id="count"] .variable-icon-action');
       const actionStyle = getComputedStyle(action);
-      const badges = [...panel.querySelectorAll('.variable-badge')].map((badge) => {
-        const style = getComputedStyle(badge);
-        return {
-          background: style.backgroundColor,
-          color: style.color,
-          surface: getComputedStyle(badge.closest('[data-variable-row]')).backgroundColor,
-        };
-      });
+      // 紧凑行/幽灵按钮自身透明：对比度按实际承托面（向上找到第一个不透明祖先）计算，
+      // 而不是把 transparent 当黑色。
+      const effectiveBackground = (element, color) => {
+        if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') return color;
+        let node = element;
+        while (node !== null) {
+          const background = getComputedStyle(node).backgroundColor;
+          if (background !== 'rgba(0, 0, 0, 0)' && background !== 'transparent') return background;
+          node = node.parentElement;
+        }
+        return color;
+      };
       return {
         addColor: addStyle.color,
-        addBackground: addStyle.backgroundColor,
+        addBackground: effectiveBackground(add, addStyle.backgroundColor),
         valueColor: valueStyle.color,
         valueBackground: valueStyle.backgroundColor,
-        rowBackground: rowStyle.backgroundColor,
+        rowBackground: effectiveBackground(row, rowStyle.backgroundColor),
         rowHeight: row.getBoundingClientRect().height,
         nameColor: nameStyle.color,
         nameWidth: name.getBoundingClientRect().width,
         contextColor: contextStyle.color,
         contextTop: context.getBoundingClientRect().top,
-        usageColor: usageStyle.color,
-        usageBackground: usageStyle.backgroundColor,
         actionColor: actionStyle.color,
-        actionBackground: actionStyle.backgroundColor,
-        badges,
+        actionBackground: effectiveBackground(action, actionStyle.backgroundColor),
       };
     };
     const channels = (color) => {
@@ -807,19 +785,6 @@ export async function assertVariableListThemeQuality(page) {
       return color.startsWith('color(srgb')
         ? values.slice(0, 3)
         : values.slice(0, 3).map((value) => value / 255);
-    };
-    const alpha = (color) => {
-      const values = color.match(/[\d.]+/g)?.map(Number) ?? [];
-      return color.startsWith('color(srgb') || color.startsWith('rgba') ? (values[3] ?? 1) : 1;
-    };
-    const composite = (foreground, background) => {
-      const foregroundChannels = channels(foreground);
-      const backgroundChannels = channels(background);
-      const foregroundAlpha = alpha(foreground);
-      return foregroundChannels.map(
-        (value, index) =>
-          value * foregroundAlpha + backgroundChannels[index] * (1 - foregroundAlpha),
-      );
     };
     const luminance = (color) =>
       channels(color)
@@ -841,14 +806,8 @@ export async function assertVariableListThemeQuality(page) {
     const summarizeContrast = (theme) => ({
       action: contrast(theme.actionColor, theme.actionBackground),
       add: contrast(theme.addColor, theme.addBackground),
-      badge: Math.min(
-        ...theme.badges.map((badge) =>
-          contrast(badge.color, composite(badge.background, badge.surface)),
-        ),
-      ),
       context: contrast(theme.contextColor, theme.rowBackground),
       name: contrast(theme.nameColor, theme.rowBackground),
-      usage: contrast(theme.usageColor, theme.usageBackground),
     });
     return {
       atomic: JSON.stringify(immediate) === JSON.stringify(light),
@@ -861,13 +820,7 @@ export async function assertVariableListThemeQuality(page) {
     };
   });
   const contrastFailed = [quality.dark, quality.light].some(
-    (theme) =>
-      theme.action < 3 ||
-      theme.add < 4.5 ||
-      theme.badge < 4.5 ||
-      theme.context < 4.5 ||
-      theme.name < 4.5 ||
-      theme.usage < 4.5,
+    (theme) => theme.action < 3 || theme.add < 4.5 || theme.context < 4.5 || theme.name < 4.5,
   );
   if (!quality.atomic || !quality.geometryStable || contrastFailed) {
     throw new Error(`BROWSER_HARNESS_VARIABLES_THEME_QUALITY_FAILED:${JSON.stringify(quality)}`);

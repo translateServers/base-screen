@@ -22,6 +22,9 @@ export interface DesignerLayerItem {
   readonly missingMaterial: boolean;
   // 行首类型图标：由物料分类关键词确定性派生（与物料库缩略图同一规则），无匹配回退网格。
   readonly icon?: DesignerIconName;
+  // 行副行的尺寸读数：canonical 尺寸，不含缩放。
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface DesignerLayerView {
@@ -61,7 +64,10 @@ export interface DesignerLayersRenderOptions {
   readonly interaction: ScreenInteractionState;
   readonly search: string;
   readonly collapsed: ReadonlySet<string>;
-  readonly dropTargetId: string | null | undefined;
+  /** 拖拽中的图层 id：该行降档，避免看起来还能再被拖一次。 */
+  readonly draggingId?: string | undefined;
+  /** 落点指示：在 rowId 行的 before / after / inside 处画指示线或高亮。 */
+  readonly dropIndicator?: DesignerLayerDropIndicator | undefined;
   readonly renameDrafts: ReadonlyMap<string, string>;
   readonly renamingId: string | null | undefined;
   readonly renderLimit: number;
@@ -72,6 +78,12 @@ export interface DesignerLayersRenderOptions {
     direction: 'up' | 'down',
     siblings: readonly string[],
   ) => boolean;
+}
+
+/** 与拖拽控制器共享的落点描述；渲染层只消费，不解释。 */
+export interface DesignerLayerDropIndicator {
+  readonly rowId: string;
+  readonly edge: 'before' | 'after' | 'inside';
 }
 
 export const DESIGNER_LAYER_PAGE_SIZE = 100;
@@ -157,7 +169,15 @@ function visitLayer(
   parentId: string | null,
   depth: number,
   children: ReadonlyMap<string | null, readonly string[]>,
-  byId: ReadonlyMap<string, { readonly id: string; readonly name: string; readonly type: string }>,
+  byId: ReadonlyMap<
+    string,
+    {
+      readonly id: string;
+      readonly name: string;
+      readonly type: string;
+      readonly size: { readonly width: number; readonly height: number };
+    }
+  >,
   document: ScreenDocument,
   catalog: BaseScreenMaterialCatalog | undefined,
   items: DesignerLayerItem[],
@@ -178,6 +198,8 @@ function visitLayer(
       icon: materialCategoryIcon(
         `${catalog?.get(component.type)?.manifest.category ?? ''} ${component.type}`,
       ),
+      width: component.size.width,
+      height: component.size.height,
     });
     visitLayer(id, depth + 1, children, byId, document, catalog, items);
   }

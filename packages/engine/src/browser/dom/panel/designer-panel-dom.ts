@@ -1,11 +1,10 @@
 export type {
-  DesignerCanvasBackgroundDrafts,
   DesignerCanvasPresentationSettings,
   DesignerCanvasScaleMode,
 } from './designer-canvas-transactions.js';
 export {
-  createCanvasBackgroundStopTransaction,
-  createDesignerCanvasBackgroundDrafts,
+  canvasBackgroundPaletteValue,
+  createCanvasBackgroundPaletteTransaction,
   createDesignerCanvasPresentationSettings,
 } from './designer-canvas-transactions.js';
 export { renderDesignerProperties } from './designer-component-properties-dom.js';

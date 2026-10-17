@@ -29,20 +29,20 @@ describe('designer panel rendering', () => {
       catalog(),
     );
 
-    expect(
-      descendants(properties)
-        .filter((element) => element.tagName === 'input')
-        .map((element) => element.dataset.canvasProperty),
-    ).toEqual([
-      'width',
-      'height',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'backgroundSolidColor',
-      'backgroundImage',
-    ]);
+    // 画布背景由统一颜色控件承载：类型 / 底色 / 色标不再各自暴露零散 input，
+    // 只有尺寸、不透明度与背景图字段留在页面配置自己的控件上。
+    const canvasProperties = descendants(properties)
+      .filter((element) => element.tagName === 'input')
+      .map((element) => element.dataset.canvasProperty);
+    expect(canvasProperties.slice(0, 2)).toEqual(['width', 'height']);
+    expect(canvasProperties.filter((property) => property === 'background')).toHaveLength(
+      descendants(properties).filter(
+        (element) => element.tagName === 'input' && element.dataset.canvasProperty === 'background',
+      ).length,
+    );
+    expect(canvasProperties).not.toContain('backgroundSolidColor');
+    expect(canvasProperties).not.toContain('backgroundType');
+    expect(canvasProperties.at(-1)).toBe('backgroundImage');
     // 宿主选择按钮默认隐藏（ADR-0047）：未配置 canvasBackgroundImageButton 时不渲染。
     expect(
       descendants(properties).some(
@@ -65,14 +65,15 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'option')
         .map((element) => element.value),
-    ).toEqual(['solid', 'linear-gradient', 'radial-gradient', 'cover', 'contain']);
-    expect(
-      descendants(properties).find((element) => element.dataset.canvasField === 'backgroundType')
-        ?.dataset.inspectorAdvanced,
-    ).toBeUndefined();
+    ).toEqual(['cover', 'contain']);
+    // 背景填充段里是与组件检查器同源的调色板控件，页面配置不再自带取色 UI。
+    const backgroundPalette = descendants(properties).filter((element) =>
+      element.className.includes('designer-color-palette'),
+    );
+    expect(backgroundPalette.length).toBeGreaterThan(0);
   });
 
-  it('renders linear and radial palette controls from the active canvas background', () => {
+  it('renders the active canvas background through the shared color palette control', () => {
     const ownerDocument = new FakeDocument();
     const properties = ownerDocument.createElement('div');
     const linearDocument: ScreenDocument = {
@@ -97,28 +98,22 @@ describe('designer panel rendering', () => {
       { selectedComponentIds: [], focusedComponentId: null },
       catalog(),
     );
-    expect(
-      descendants(properties)
-        .filter((element) => element.tagName === 'input')
-        .map((element) => element.dataset.canvasProperty),
-    ).toEqual([
-      'width',
-      'height',
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      'backgroundLinearAngle',
-      'backgroundStopColor',
-      'backgroundStopPosition',
-      'backgroundStopColor',
-      'backgroundStopPosition',
-      'backgroundImage',
-    ]);
-    const type = descendants(properties).find(
-      (element) => element.dataset.canvasProperty === 'backgroundType',
+    const palette = descendants(properties).find((element) =>
+      element.className.includes('designer-color-palette'),
     );
-    expect(type?.value).toBe('linear-gradient');
+    expect(palette?.dataset.colorPaletteMode).toBe('linear-gradient');
+    // 渐变的色标与角度由调色板自身的模式 / 色标字段承载。
+    const fields = descendants(palette!).map((element) => element.dataset.colorPaletteField);
+    expect(fields).toContain('angle');
+    expect(fields).toContain('stop-color');
+    expect(fields).toContain('stop-position');
+    // 整段背景只通过一个值载体提交，不再是每个字段各挂一个 canvasProperty。
+    // 标记挂在调色板根节点上：增删色标会重建内部控件，挂在根节点才在重建后仍可达。
+    expect(palette?.dataset.canvasProperty).toBe('background');
+    const backgroundCarriers = descendants(properties).filter(
+      (element) => element.dataset.canvasProperty === 'background',
+    );
+    expect(backgroundCarriers).toEqual([palette]);
   });
 
   it('renders the host background image picker button only when configured', () => {
@@ -222,7 +217,7 @@ describe('designer panel rendering', () => {
     // （否则会弹出浏览器原生取色器）。
     const colorFieldContainer = descendants(properties).find(
       (element) =>
-        element.className === 'designer-field designer-field-label' &&
+        element.className.includes('designer-field-stacked') &&
         descendants(element).some((candidate) => candidate.dataset.colorPaletteField === 'solid'),
     );
     expect(colorFieldContainer?.tagName).toBe('span');

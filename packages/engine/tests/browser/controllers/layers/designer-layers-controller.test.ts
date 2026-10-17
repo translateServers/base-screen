@@ -159,6 +159,7 @@ function createController(
   return { controller, transactions, document: () => current };
 }
 
+/** 行桩：整行就是拖拽把手，所以拖拽用例把指针落在行上即可。 */
 function layerRow(id: string): FakeElement {
   const row = new FakeElement();
   row.dataset.layerId = id;
@@ -166,8 +167,45 @@ function layerRow(id: string): FakeElement {
   return row;
 }
 
+/**
+ * 带拖拽元数据的行桩：落点换算要读父级、物料类型与行矩形（上缘 / 下缘 / 容器中段）。
+ * `ratio` 表示指针落在行高的哪个比例处，默认 0.25（上缘区带 → 插到该行之前）。
+ */
+function dragRow(
+  id: string,
+  options: {
+    readonly parentId?: string | null;
+    readonly type?: string;
+    readonly ratio?: number;
+    readonly height?: number;
+  } = {},
+): FakeElement & { getBoundingClientRect: () => { top: number; height: number } } {
+  const row = layerRow(id) as FakeElement & {
+    getBoundingClientRect: () => { top: number; height: number };
+  };
+  row.dataset.layerParent = options.parentId ?? '';
+  row.dataset.layerType = options.type ?? 'base.leaf';
+  // 行位于图层树内：落点换算会先确认目标仍在 [data-layer-root] 中。
+  row.matches['[data-layer-root]'] = row;
+  const height = options.height ?? 40;
+  row.getBoundingClientRect = () => ({ top: 0, height });
+  // clientY 由 ratio × height 反推，供 dragRowEvent 使用。
+  (row as unknown as { dropClientY: number }).dropClientY = (options.ratio ?? 0.25) * height;
+  return row;
+}
+
+function dragOver(row: FakeElement, clientY?: number): DragEvent {
+  return {
+    target: row,
+    clientY: clientY ?? (row as unknown as { dropClientY?: number }).dropClientY ?? 0,
+    dataTransfer: null,
+    preventDefault: () => undefined,
+  } as unknown as DragEvent;
+}
+
 function renderedLayerRow(panel: FakePanel, id: string): FakePanel {
-  const row = panel.children[1]!.children.find((item) => item.dataset.layerId === id);
+  // 面板子节点顺序：列表标题、紧凑搜索、图层树。
+  const row = panel.children[2]!.children.find((item) => item.dataset.layerId === id);
   if (row === undefined) throw new Error(`Missing rendered layer row ${id}.`);
   return row;
 }
@@ -727,9 +765,12 @@ describe('DesignerLayersController', () => {
     expect(
       cycle.controller.onDragStart({ target: layerRow('container') } as unknown as DragEvent),
     ).toBe(true);
-    expect(cycle.controller.onDrop({ target: layerRow('child') } as unknown as DragEvent)).toBe(
-      false,
-    );
+    // 拖到自己的后代行上（行中段 = 成为该行的子图层）：形成环，必须拒绝。
+    expect(
+      cycle.controller.onDrop(
+        dragOver(dragRow('child', { parentId: 'container', type: 'base.container', ratio: 0.5 })),
+      ),
+    ).toBe(false);
     expect(cycle.transactions).toEqual([]);
 
     const unavailableParent = createController(
@@ -742,9 +783,9 @@ describe('DesignerLayersController', () => {
       } as unknown as DragEvent),
     ).toBe(true);
     expect(
-      unavailableParent.controller.onDrop({
-        target: layerRow('leaf-parent'),
-      } as unknown as DragEvent),
+      unavailableParent.controller.onDrop(
+        dragOver(dragRow('leaf-parent', { type: 'base.leaf', ratio: 0.5 })),
+      ),
     ).toBe(false);
     expect(unavailableParent.transactions).toEqual([]);
 
@@ -759,9 +800,9 @@ describe('DesignerLayersController', () => {
       hiddenTarget.controller.onDragStart({ target: layerRow('source') } as unknown as DragEvent),
     ).toBe(true);
     expect(
-      hiddenTarget.controller.onDrop({
-        target: layerRow('hidden-container'),
-      } as unknown as DragEvent),
+      hiddenTarget.controller.onDrop(
+        dragOver(dragRow('hidden-container', { type: 'base.container', ratio: 0.5 })),
+      ),
     ).toBe(false);
     expect(hiddenTarget.transactions).toEqual([]);
 
@@ -791,10 +832,140 @@ describe('DesignerLayersController', () => {
       lockedParent.controller.onDragStart({ target: layerRow('source') } as unknown as DragEvent),
     ).toBe(true);
     expect(
-      lockedParent.controller.onDrop({
-        target: layerRow('locked-container'),
-      } as unknown as DragEvent),
+      lockedParent.controller.onDrop(
+        dragOver(dragRow('locked-container', { type: 'base.container', ratio: 0.5 })),
+      ),
     ).toBe(false);
     expect(lockedParent.transactions).toEqual([]);
   });
+
+  it('reorders siblings by drag with the same zIndex rules as the arrange menu', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    // 面板自上而下：top(z=2) / middle(z=1) / bottom(z=0)。
+    const state = createController(
+      createDocument([
+        component('bottom', null, 0),
+        component('middle', null, 1),
+        component('top', null, 2),
+      ]),
+    );
+    expect(
+      state.controller.onDragStart({ target: layerRow('bottom') } as unknown as DragEvent),
+    ).toBe(true);
+    // 拖到底部行…这里把 bottom 丢到 top 行的上缘：插到最前层。
+    expect(state.controller.onDragOver(dragOver(dragRow('top', { ratio: 0.1 })))).toBe(true);
+    expect(state.controller.dropIndicator).toEqual({ rowId: 'top', edge: 'before' });
+    expect(
+      state.controller.onDrop({
+        ...dragOver(dragRow('top', { ratio: 0.1 })),
+        dataTransfer: null,
+      } as unknown as DragEvent),
+    ).toBe(true);
+    expect(state.transactions).toHaveLength(1);
+    expect(orderByZIndex(state.document())).toEqual(['bottom', 'top', 'middle']);
+    expect(state.controller.dropIndicator).toBeUndefined();
+
+    // 上缘落点：把 bottom 丢到 middle 行的上缘 → 插到 top 与 middle 之间。
+    const state2 = createController(
+      createDocument([
+        component('bottom', null, 0),
+        component('middle', null, 1),
+        component('top', null, 2),
+      ]),
+    );
+    state2.controller.onDragStart({ target: layerRow('bottom') } as unknown as DragEvent);
+    expect(state2.controller.onDragOver(dragOver(dragRow('middle', { ratio: 0.1 })))).toBe(true);
+    expect(state2.controller.dropIndicator).toEqual({ rowId: 'middle', edge: 'before' });
+    state2.controller.onDrop(dragOver(dragRow('middle', { ratio: 0.1 })));
+    expect(orderByZIndex(state2.document())).toEqual(['top', 'bottom', 'middle']);
+
+    // 原位落回（落在自己当前所在的间隙）不产生事务，也不给成功反馈。
+    const noop = createController(
+      createDocument([
+        component('bottom', null, 0),
+        component('middle', null, 1),
+        component('top', null, 2),
+      ]),
+    );
+    noop.controller.onDragStart({ target: layerRow('bottom') } as unknown as DragEvent);
+    // dragover 在图层树内一律被接受（HTML5 拖拽要求，否则浏览器中止拖拽），
+    // 但无效落点不画指示线、松手也不产生事务。
+    noop.controller.onDragOver(dragOver(dragRow('middle', { ratio: 0.9 })));
+    expect(noop.controller.dropIndicator).toBeUndefined();
+    expect(noop.controller.onDrop(dragOver(dragRow('middle', { ratio: 0.9 })))).toBe(false);
+    expect(noop.transactions).toEqual([]);
+  });
+
+  it('drops into a container row to reparent, and rejects dropping onto itself', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const state = createController(
+      createDocument([
+        component('container', null, 1, { type: 'base.container' }),
+        component('leaf', null, 0),
+      ]),
+    );
+    state.controller.onDragStart({ target: layerRow('leaf') } as unknown as DragEvent);
+    expect(
+      state.controller.onDragOver(
+        dragOver(dragRow('container', { type: 'base.container', ratio: 0.5 })),
+      ),
+    ).toBe(true);
+    expect(state.controller.dropIndicator).toEqual({ rowId: 'container', edge: 'inside' });
+    expect(
+      state.controller.onDrop(
+        dragOver(dragRow('container', { type: 'base.container', ratio: 0.5 })),
+      ),
+    ).toBe(true);
+    expect(state.document().components.find((item) => item.id === 'leaf')?.parentId).toBe(
+      'container',
+    );
+
+    // 拖到自身行上不是合法落点：不产生事务，也不残留指示。
+    const self = createController(
+      createDocument([component('only', null, 0), component('other', null, 1)]),
+    );
+    self.controller.onDragStart({ target: layerRow('only') } as unknown as DragEvent);
+    self.controller.onDragOver(dragOver(dragRow('only')));
+    expect(self.controller.dropIndicator).toBeUndefined();
+    expect(self.controller.onDrop(dragOver(dragRow('only')))).toBe(false);
+    expect(self.transactions).toEqual([]);
+  });
+
+  it('starts a drag from anywhere on the row except its own controls', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const state = createController(
+      createDocument([component('bottom', null, 0), component('top', null, 1)]),
+    );
+
+    // 行本身（名称区 / 图标 / 缩进留白）就是拖拽把手：整行起手，少一个装饰位。
+    expect(
+      state.controller.onDragStart({ target: layerRow('bottom') } as unknown as DragEvent),
+    ).toBe(true);
+    expect(state.controller.draggedId).toBe('bottom');
+    state.controller.clearDrag();
+    expect(state.controller.draggedId).toBeUndefined();
+
+    // 行内控件各管各的语义：从折叠箭头 / 锁定 / 显隐按钮起手不算拖拽。
+    for (const selector of [
+      '[data-layer-collapse]',
+      '[data-layer-toggle]',
+      '[data-layer-rename]',
+    ]) {
+      const control = layerRow('bottom');
+      control.matches[selector] = control;
+      expect(state.controller.onDragStart({ target: control } as unknown as DragEvent)).toBe(false);
+      expect(state.controller.draggedId).toBeUndefined();
+    }
+  });
 });
+
+function orderByZIndex(document: ScreenDocument): readonly string[] {
+  // 绘制顺序：zIndex 升序 = 后层 → 前层；反转后即面板自上而下的顺序。
+  return [...document.components]
+    .sort((left, right) => left.zIndex - right.zIndex)
+    .map((item) => item.id)
+    .reverse();
+}

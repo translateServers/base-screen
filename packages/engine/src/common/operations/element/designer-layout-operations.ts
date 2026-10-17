@@ -5,8 +5,10 @@ import type {
   ScreenParseResult,
 } from '@base-screen/contracts';
 import {
+  buildComponentIndex,
   calculateScreenAlignment,
   calculateScreenDistribution,
+  getDescendantIds,
   isScreenComponentEffectivelyLocked,
   type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
@@ -63,6 +65,81 @@ export function createReparentTransaction(
   return {
     commands: [{ type: 'reparent-components', componentIds, parentId }],
   };
+}
+
+/**
+ * 图层拖拽落位：把 `componentIds` 放进 `parentId` 的兄弟序列的第 `index` 位。
+ * 序列顺序与图层面板一致（前层 → 后层，即 zIndex 递减）；`index = 0` 表示最前层。
+ * 与「上移 / 下移 / 置顶 / 置底」共用同一套 zIndex 规则，因此拖拽与菜单排列
+ * 产生的文档形态完全一致，历史与撤销也走同一条事务路径。
+ *
+ * 换父级与换层序在同一事务里完成：先 reparent，再按最终顺序重排 zIndex。
+ * 锁定、环、非法父级由 Core 命令再次裁决；这里只排除「拖到自己的后代里」这类
+ * 不可表达的目标，避免生成一个必然失败的事务。
+ */
+export function createLayerDropTransaction(
+  document: ScreenDocument,
+  componentIds: readonly string[],
+  parentId: string | null,
+  index: number,
+): ScreenDocumentTransaction | undefined {
+  const selected = new Set(componentIds);
+  if (selected.size === 0) return undefined;
+  const targets = selectedComponents(document, componentIds);
+  if (targets.length !== selected.size) return undefined;
+  const index0 = buildComponentIndex(document);
+  const descendants = new Set<string>();
+  for (const target of targets) {
+    descendants.add(target.id);
+    for (const descendantId of getDescendantIds(index0, target.id)) {
+      descendants.add(descendantId);
+    }
+  }
+  if (parentId !== null && descendants.has(parentId)) return undefined;
+
+  // 目标父级的原始兄弟序列（前层 → 后层），与图层面板自上而下的顺序一致。
+  const original = document.components
+    .filter((component) => component.parentId === parentId)
+    .sort(
+      (left, right) =>
+        right.zIndex - left.zIndex ||
+        document.components.indexOf(right) - document.components.indexOf(left),
+    )
+    .map((component) => component.id);
+  // 插入点按「移除被拖拽项之后」的序列换算：取原位次或其后的第一个未选中兄弟。
+  const remaining = original.filter((id) => !selected.has(id));
+  let insertAt = remaining.length;
+  for (let position = Math.max(0, index); position < original.length; position += 1) {
+    const candidate = original[position]!;
+    if (selected.has(candidate)) continue;
+    insertAt = remaining.indexOf(candidate);
+    break;
+  }
+  const moved = targets
+    .slice()
+    .sort(
+      (left, right) =>
+        right.zIndex - left.zIndex ||
+        document.components.indexOf(right) - document.components.indexOf(left),
+    )
+    .map((component) => component.id);
+  const ordered = [...remaining.slice(0, insertAt), ...moved, ...remaining.slice(insertAt)];
+
+  const commands: ScreenDocumentCommand[] = [];
+  const reparent = targets
+    .filter((component) => component.parentId !== parentId)
+    .map((component) => component.id);
+  if (reparent.length > 0) {
+    commands.push({ type: 'reparent-components', componentIds: reparent, parentId });
+  }
+  for (const [position, id] of ordered.entries()) {
+    const current = document.components.find((component) => component.id === id);
+    if (current === undefined) continue;
+    const zIndex = ordered.length - position - 1;
+    if (current.zIndex === zIndex) continue;
+    commands.push({ type: 'update-components', componentIds: [id], patch: { zIndex } });
+  }
+  return commands.length === 0 ? undefined : { commands };
 }
 
 export function createZOrderTransaction(

@@ -17,7 +17,7 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
     const materials = await designer.locator('[data-base-screen-component-id]').elementHandles();
     const documentBefore = await designer.evaluate((element) => JSON.stringify(element.document));
     const roots = designer.locator('[data-material-group-list="roots"]');
-    // 压力分组含 7 个根：基础/图形/媒体/数据可视化图表组件超长名称/大屏组件超长分组名称/跨框架桥接物料/宿主数据集最佳实践。
+    // 压力分组含 7 个根：基础/图形/媒体/数据可视化图表组件超长名称/大屏组件超长分组名称/跨框架桥接素材/宿主数据集最佳实践。
     if ((await roots.locator('[data-material-group]').count()) !== 7) {
       throw new Error('MATERIAL_GROUP_STRESS_FIXTURE_INVALID');
     }
@@ -138,7 +138,7 @@ export async function assertMaterialGroupNavigation(browser, baseUrl) {
       accessibility.height !== 28 ||
       // data 分组含子孙：base.chart + plugin.echarts（charts）、
       // harness.semantic-chart（advanced）、base.table（tables），共 4 个。
-      !accessibility.title.endsWith('（4 个物料）') ||
+      !accessibility.title.endsWith('（4 个素材）') ||
       accessibility.description !== accessibility.title ||
       accessibility.countWidth !== 24
     ) {
@@ -743,7 +743,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     rootState.visual.rootHeight !== 28 ||
     rootState.visual.rootGlyphWidth !== 16 ||
     rootState.visual.rootLabelDisplay !== 'none' ||
-    rootState.visual.rootTitle !== '基础（5 个物料）' ||
+    rootState.visual.rootTitle !== '基础（5 个素材）' ||
     rootState.visual.childrenHeight !== rootState.visual.navigationHeight ||
     rootState.visual.countWidth !== (compact ? 24 : 0) ||
     rootState.visual.groupDisplay !== 'flex' ||
@@ -766,7 +766,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
     ![1, 2, 3].includes(rootState.visual.firstRowCardCount) ||
     rootState.visual.panelCountRole !== 'status' ||
     rootState.visual.panelCountLive !== 'polite' ||
-    rootState.visual.panelCountLabel !== '\u7269\u6599\uff1a16 \u9879' ||
+    rootState.visual.panelCountLabel !== '素材：16 项' ||
     rootState.visual.searchDescribedBy !== 'designer-left-panel-count'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_ROOT_FAILED:${JSON.stringify(rootState)}`);
@@ -964,7 +964,7 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
   });
   if (
     state.status !== 'partial' ||
-    !state.text?.includes('1 个物料加载失败') ||
+    !state.text?.includes('1 个素材加载失败') ||
     state.statusHidden !== false ||
     state.statusRole !== 'alert' ||
     state.statusInsideMaterials ||
@@ -1131,8 +1131,8 @@ async function assertMaterialLibraryHostState(page, designer, viewport) {
     ['loading', undefined, null, true, null, 0],
     ['ready', undefined, null, true, null, 0],
     ['offline', '正在使用离线目录', 'status', false, 'offline', 1],
-    ['error', '物料目录加载失败', 'alert', false, 'error', 1],
-    ['update-available', '物料目录有更新', 'status', false, 'update-available', 1],
+    ['error', '素材目录加载失败', 'alert', false, 'error', 1],
+    ['update-available', '素材目录有更新', 'status', false, 'update-available', 1],
   ];
   for (const [status, text, role, hidden, surfaceStatus, actionCount] of expectedStates) {
     const rendered = await page.evaluate((nextStatus) => {

@@ -73,11 +73,11 @@
 
 .properties .inspector-tabs .designer-tab {
   display: inline-flex;
-  min-height: 37px;
+  min-height: 30px;
   align-items: center;
   justify-content: center;
-  gap: 5px;
-  padding: 0 6px;
+  gap: 0;
+  padding: 0 var(--designer-space-4);
   border: 0;
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-base);
@@ -95,33 +95,58 @@
 
 .properties .inspector-tabs .designer-tab[aria-selected="true"] {
   border: 0;
-  background: transparent;
+  background: var(--designer-surface-control-active);
   color: var(--designer-text-primary);
-  box-shadow: none;
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
   font-weight: 600;
 }
 
-.inspector-tab-icon,
-.inspector-tab-icon svg {
-  display: inline-flex;
-  width: 13px;
-  height: 13px;
-  flex: 0 0 13px;
-}
-
 .properties .inspector-context {
+  display: flex;
   min-height: 58px;
   gap: 2px;
-  padding: 13px 132px 10px 20px;
+  padding: 12px 132px 10px 20px;
   border-bottom: 0;
   background: var(--designer-surface-panel);
+}
+
+.properties .inspector-context-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-3);
+}
+
+/* 身份图标（原型 .identity-icon）：30px 中性底块，只承载对象类型，不抢强调色预算。 */
+.properties .inspector-context-icon {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  place-items: center;
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
+  box-shadow: var(--designer-elev-ring);
+}
+
+.properties .inspector-context-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.properties .inspector-context-identity {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 1px;
 }
 
 .properties .inspector-context-title-row {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 5px;
+  gap: var(--designer-space-2);
 }
 
 .properties .inspector-context-material-icon {
@@ -138,14 +163,33 @@
 }
 
 .properties .inspector-context-identity strong {
+  min-width: 0;
+  overflow: hidden;
   color: var(--designer-text-primary);
   font-size: var(--designer-font-size-lg);
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.properties .inspector-context-identity span {
+.properties .inspector-context-subtitle {
+  min-width: 0;
+  overflow: hidden;
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 锁定/隐藏徽标与原型 .badge 同档：胶囊 + 发丝收边，不占强调色。 */
+.properties .inspector-context-badge {
+  flex: none;
+  padding: 1px var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  box-shadow: 0 0 0 1px var(--designer-border-default);
 }
 
 .properties .inspector-toolbar {
@@ -156,7 +200,7 @@
   gap: 7px;
   justify-self: end;
   justify-content: end;
-  margin-top: 24px;
+  margin-top: 14px;
   padding: 0 18px 0 0;
   border-bottom: 0;
   background: transparent;
@@ -277,10 +321,10 @@
   right: auto;
   display: flex;
   width: auto !important;
-  height: 42px;
+  height: 44px;
   grid-row: 1 !important;
-  justify-content: center;
-  padding: 0 36px;
+  justify-content: flex-start;
+  padding: 0 20px;
   border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
@@ -288,9 +332,9 @@
 .properties[data-inspector-context-kind="multi-selection"] > .panel-heading .panel-title {
   display: block !important;
   color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-base);
+  font-size: var(--designer-font-size-lg);
   font-weight: 600;
-  text-align: center;
+  text-align: left;
 }
 
 .properties[data-inspector-context-kind="multi-selection"] > .inspector-tabs,
@@ -312,8 +356,6 @@
   padding: 13px 0;
 }
 
-.properties .designer-datav-batch-arrange > .designer-inspector-section-title,
-.properties .designer-datav-batch-geometry > .designer-inspector-section-title,
 .properties
   .designer-datav-quick-style-section[data-quick-style-variant="batch"]
   .designer-datav-section-summary {
@@ -458,6 +500,147 @@
   background: var(--designer-surface-panel);
 }
 
+/* 字段行（原型 .insp-row / .insp-field）：标签列固定 74px，控件列吃满剩余宽度。
+   连续数值字段（字号/行高…）的滑杆 + 数字、自绘下拉都落在同一控件列。 */
+.properties .inspector-pane .designer-field {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-2);
+  min-height: 34px;
+  margin-bottom: var(--designer-space-2);
+  overflow: visible;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font);
+  white-space: normal;
+}
+
+.properties .inspector-pane .designer-field-label {
+  overflow: visible;
+}
+
+.properties .inspector-pane .designer-field-label-text {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-secondary);
+  font-size: var(--designer-font-size-base);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.properties .inspector-pane .designer-field-control {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.properties .inspector-pane .designer-field-control > .designer-input,
+.properties .inspector-pane .designer-field-control > .designer-select-control,
+.properties .inspector-pane .designer-field-control > .designer-color-palette,
+.properties .inspector-pane .designer-field-control > .designer-textarea {
+  width: 100%;
+}
+
+.properties .inspector-pane .designer-field-message {
+  grid-column: 1 / -1;
+  margin-top: calc(var(--designer-space-1) * -1);
+}
+
+/* 长控件（取色器、文本域）标签在上、控件在下，与原型 .insp-field 同构。 */
+.properties .inspector-pane .designer-field-stacked {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--designer-space-2);
+}
+
+.properties .inspector-pane .designer-descriptor-help {
+  grid-column: 1 / -1;
+  margin-top: calc(var(--designer-space-1) * -1);
+}
+
+/* 开关/勾选框沿用行式布局：标签左、控件右，不被上面的双列网格拆开。 */
+.properties .inspector-pane .designer-field:has(> .designer-switch),
+.properties .inspector-pane .designer-field:has(> .designer-checkbox) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-2);
+}
+
+.properties .inspector-pane .designer-field:has(> .designer-switch) .designer-field-message,
+.properties .inspector-pane .designer-field:has(> .designer-checkbox) .designer-field-message {
+  flex-basis: 100%;
+}
+
+/* 连续数值双控件：滑杆 + 右侧数字（原型 .range-row）。 */
+.properties .inspector-pane .designer-field-range-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  gap: var(--designer-space-3);
+  align-items: center;
+}
+
+.properties .inspector-pane .designer-field-range-value {
+  height: 28px;
+  padding: 0 7px;
+  font: var(--designer-font-numeric);
+  text-align: right;
+}
+
+.properties .inspector-pane .designer-range {
+  width: 100%;
+  height: 6px;
+  margin: 0;
+  appearance: none;
+  border: 0;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-range-track);
+  box-shadow: none;
+}
+
+.properties .inspector-pane .designer-range::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  appearance: none;
+  border: 2px solid var(--designer-surface-raised);
+  border-radius: 50%;
+  background: var(--designer-text-primary);
+  cursor: pointer;
+}
+
+.properties .inspector-pane .designer-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--designer-surface-raised);
+  border-radius: 50%;
+  background: var(--designer-text-primary);
+  cursor: pointer;
+}
+
+.properties .inspector-pane .designer-range:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 4px;
+}
+
+/* 可选数值尚未设置：滑杆退到弱化档，数字框显示“自动”占位，避免把最小值误读成已设值。 */
+.properties .inspector-pane .designer-range[data-empty="true"] {
+  opacity: 0.45;
+}
+
+.properties .inspector-pane .designer-segmented {
+  width: 100%;
+}
+
+.properties .inspector-pane .designer-segmented .designer-segmented-option {
+  color: var(--designer-text-muted);
+}
+
+.properties .inspector-pane .designer-segmented .designer-segmented-option[aria-pressed="true"] {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-accent-text);
+}
+
 .properties .designer-inspector-section {
   padding: 13px 0;
 }
@@ -471,7 +654,7 @@
   align-items: center;
   gap: var(--designer-space-3);
   margin-bottom: 10px;
-  color: var(--designer-text-secondary);
+  color: var(--designer-text-primary);
   font-size: var(--designer-font-size-base);
   font-weight: 600;
   letter-spacing: 0;
@@ -520,12 +703,8 @@
   font-size: var(--designer-font-size-base);
 }
 
-.properties .designer-datav-geometry-section > .designer-inspector-section-title {
-  display: none;
-}
-
 .properties .designer-datav-geometry-section {
-  padding-top: 11px;
+  padding-top: 14px;
 }
 
 .properties .designer-datav-geometry-grid {
@@ -536,9 +715,14 @@
 
 .properties .designer-datav-geometry-grid .designer-field {
   position: relative;
+  display: block;
   min-width: 0;
   min-height: 28px;
   margin: 0;
+}
+
+.properties .designer-datav-geometry-grid .designer-field-label-text {
+  display: none;
 }
 
 .properties .designer-datav-geometry-grid [data-property-symbol] {
@@ -633,34 +817,93 @@
   font-size: var(--designer-font-size-base);
 }
 
-.properties .designer-opacity-field {
+.properties .inspector-pane .designer-opacity-field {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
+  grid-template-columns: 74px minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
+  gap: var(--designer-space-2);
   margin: 0;
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-base);
 }
 
-.properties .designer-opacity-controls {
-  grid-template-columns: minmax(0, 1fr) 64px;
-  gap: 10px;
+.properties .inspector-pane .designer-opacity-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  gap: var(--designer-space-3);
+  align-items: center;
+}
+
+.properties .inspector-pane .designer-opacity-controls .designer-number {
+  height: 28px;
+  padding: 0 7px;
+  font: var(--designer-font-numeric);
+  text-align: right;
 }
 
 .properties .designer-datav-common-section {
-  padding-top: 4px;
-  border-top: 0;
-}
-
-.properties .designer-datav-common-section > .designer-inspector-section-title {
-  display: none;
+  padding-top: 14px;
+  border-top: 1px solid var(--designer-border-subtle);
 }
 
 .properties .designer-datav-section-summary {
   margin: 0 0 10px;
   list-style: none;
   cursor: pointer;
+}
+
+/* 描述符分段（插件 / 宿主物料）与内建分段同一条标题语言：发丝线 + 右侧折叠箭头。 */
+.properties .designer-descriptor-group {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.properties .designer-descriptor-group-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-3);
+  margin: 0 0 10px;
+  color: var(--designer-text-primary);
+  font: inherit;
+  font-size: var(--designer-font-size-base);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.properties .designer-descriptor-group-summary::-webkit-details-marker,
+.properties .designer-descriptor-group-summary::before {
+  display: none;
+}
+
+.properties .designer-descriptor-group-summary::after {
+  display: block;
+  height: 1px;
+  min-width: 16px;
+  flex: 1;
+  order: 1;
+  background: var(--designer-border-subtle);
+  content: "";
+}
+
+.properties .designer-descriptor-group-summary .designer-datav-section-disclosure {
+  order: 2;
+  margin-left: 0;
+}
+
+.properties .designer-descriptor-group:not([open]) > .designer-descriptor-group-summary {
+  margin-bottom: 0;
+}
+
+.properties
+  .designer-descriptor-group:not([open])
+  > .designer-descriptor-group-summary
+  .designer-datav-section-disclosure {
+  transform: rotate(-90deg);
 }
 
 .properties .designer-datav-section-summary::-webkit-details-marker,

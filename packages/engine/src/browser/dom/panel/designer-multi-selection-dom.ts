@@ -24,7 +24,6 @@ export function appendMultiSelectionControls(
 ): void {
   const summary = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionSummary);
   summary.className += ' designer-datav-batch-summary';
-  summary.dataset.inspectorAdvanced = 'true';
   const list = properties.ownerDocument.createElement('ul');
   list.className = 'designer-inspector-summary';
   appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.multiSelect(context.summary.count));

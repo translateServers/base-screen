@@ -177,7 +177,10 @@ describe('designer variables controller', () => {
     const rows = descendants(panel).filter((child) => child.dataset.variableRow !== undefined);
     expect(rows).toHaveLength(2);
     const staticRow = rows[0]!;
-    expect(descendants(staticRow).some((child) => child.textContent === '静态值')).toBe(true);
+    // 摘要行不再渲染类型徽标：来源由行首图形表达，类型说明在展开详情里。
+    expect(descendants(staticRow).some((child) => child.className === 'variable-row-glyph')).toBe(
+      true,
+    );
     expect(descendants(staticRow).some((child) => child.textContent === 'count')).toBe(true);
     expect(staticRow.dataset.expanded).toBe('false');
     expect(descendants(staticRow).some((child) => child.className === 'variable-row-context')).toBe(

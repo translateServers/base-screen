@@ -3,6 +3,7 @@ import { type BaseScreenMaterialEvent, createBaseScreenRenderer } from '@base-sc
 import { renderDesignerInteractionPanel } from '../../browser/dom/designer-interaction-dom.js';
 import { renderDesignerLeftPanelGroups } from '../../browser/dom/designer-left-panel-groups-dom.js';
 import { renderDesignerSelection } from '../../browser/dom/designer-selection-dom.js';
+import { attachDesignerCanvasHint } from '../../browser/dom/workspace/designer-canvas-hint-dom.js';
 import {
   createDesignerWorkspace,
   populateMaterialLibrary,
@@ -46,6 +47,7 @@ export function initialize(element: DesignerElementHost): void {
       elementState.leftPanelGroups,
     ),
   );
+  attachDesignerCanvasHint(shadow, element.ownerDocument);
   elementState.panelController.refreshMaterialLibrary(
     shadow.querySelector<HTMLElement>('.designer'),
   );

@@ -42,8 +42,28 @@ export function renderDesignerSelection(
   selection.style.width = `${bounds.right - bounds.left}px`;
   selection.style.height = `${bounds.bottom - bounds.top}px`;
   selection.replaceChildren();
+  appendSelectionTag(selection, ownerDocument, selected);
   appendSelectionGrab(selection, ownerDocument, covered, bounds);
   appendTransformControls(selection, ownerDocument, document, selected, catalog);
+}
+
+// 选区名称标签贴在包围盒上沿外侧，随画布一起缩放（与变换手柄同一坐标系）；
+// 选中信息已由状态栏承载，这里纯装饰，不进可访问性树。
+function appendSelectionTag(
+  selection: HTMLDivElement,
+  ownerDocument: Document,
+  selected: ReturnType<typeof selectedComponents>,
+): void {
+  const tag = ownerDocument.createElement('div');
+  tag.className = 'selection-tag';
+  tag.dataset.selectionTag = 'true';
+  tag.setAttribute('aria-hidden', 'true');
+  const [only] = selected;
+  tag.textContent =
+    selected.length === 1 && only !== undefined
+      ? DESIGNER_UI_TEXT.selectionTag(only.name, only.type)
+      : DESIGNER_UI_TEXT.selectedCount(selected.length);
+  selection.appendChild(tag);
 }
 
 // 拖拽层覆盖包围盒空白区域（clip-path 挖掉组件区域），组件区域仍可点击；

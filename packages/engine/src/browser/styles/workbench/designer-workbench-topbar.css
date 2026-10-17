@@ -1,6 +1,5 @@
 .rail,
-.properties,
-.designer-topbar {
+.properties {
   background: var(--designer-surface-panel);
 }
 
@@ -18,7 +17,9 @@
   box-sizing: border-box;
   height: var(--designer-topbar-height);
   border-bottom: 1px solid var(--designer-border-default);
-  background: var(--designer-surface-panel);
+  /* 顶栏是头部带，取 raised（最亮一档）与 panel 底的左右栏拉开一级；
+     左栏切换条反向压到 panel 之下，形成「顶栏浮起 / 轨道下凹」的层级。 */
+  background: var(--designer-surface-raised);
   box-shadow:
     inset 0 -1px 0 var(--designer-border-default),
     var(--designer-shadow-float);
@@ -42,16 +43,18 @@
   gap: var(--designer-space-2);
 }
 
+/* 品牌标记消彩色：实心前景方块 + 背景色图形，靠 elev-ring 收边。
+   顶栏其余部分保持中性，唯一的彩色留给强调态。 */
 .topbar-product-mark {
   display: inline-grid;
   width: 28px;
   height: 28px;
   flex: 0 0 28px;
   place-items: center;
-  border: 1px solid color-mix(in srgb, var(--designer-accent) 55%, transparent);
   border-radius: var(--designer-radius-3);
-  background: color-mix(in srgb, var(--designer-accent-surface) 76%, transparent);
-  color: var(--designer-accent);
+  background: var(--designer-text-primary);
+  color: var(--designer-surface-raised);
+  box-shadow: var(--designer-elev-ring);
 }
 
 .topbar-product-mark svg {

@@ -1,11 +1,36 @@
+/* 图层面板（对齐工作台原型）：列头下一行列表标题，行 = 抓手/折叠 · 类型图标 · 双行正文 · 锁 · 眼。
+   行内不再渲染工具栏、搜索框或操作簇：排列/编组在「编辑」菜单与快捷键中，拖拽改层级仍由整行承载。 */
+[data-layers] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+[data-layers] > .list-heading {
+  flex: none;
+  margin: 0;
+  padding: var(--designer-space-4) var(--designer-space-4) var(--designer-space-2);
+  color: var(--designer-text-muted);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+[data-layers] > .layer-search {
+  flex: none;
+  margin: 0 var(--designer-space-3) var(--designer-space-2);
+}
+
 [data-layer-root] {
+  flex: 1 1 auto;
   min-height: 0;
   overflow: hidden auto;
-  padding: 8px 8px 12px;
+  padding: 0 var(--designer-space-2) var(--designer-space-3);
   scrollbar-gutter: stable;
 }
 
-/* 行几何常量：折叠与名称两列始终占位；右侧操作簇绝对定位且不参与行高计算。 */
 .layer-row {
   --layer-row-surface: transparent;
 
@@ -14,12 +39,14 @@
   box-sizing: border-box;
   min-width: 0;
   min-height: 40px;
-  grid-template-columns: 24px minmax(0, 1fr);
+  /* 叶子行没有抓手列：名称列直接占满，行更紧凑也更宽。
+     分组行在下面单独补回 16px 的折叠列。 */
+  grid-template-columns: minmax(0, 1fr) 26px 26px;
   align-items: center;
-  gap: var(--designer-space-1);
+  gap: var(--designer-space-2);
   margin-bottom: 2px;
   padding: 0 var(--designer-space-3);
-  border-radius: var(--designer-radius-control);
+  border-radius: var(--designer-radius-2);
   background-color: var(--layer-row-surface);
   cursor: default;
   transition:
@@ -27,25 +54,12 @@
     box-shadow var(--designer-motion);
 }
 
-.layer-row[data-layer-selectable="true"] {
-  cursor: pointer;
+.layer-row[data-layer-group="true"] {
+  grid-template-columns: 16px minmax(0, 1fr) 26px 26px;
 }
 
-/* 缩进引导线：--layer-depth × 20px 宽度的重复渐变，零逐级 DOM；仅在深层层级可见。
-   left 偏移 = 行左内边距（space-2），使竖线精确穿过父级折叠箭头中心（缩进 20px 的 10px 处）。 */
-.layer-row::before {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: var(--designer-space-2);
-  width: calc(var(--layer-depth, 0) * 20px);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0 9px,
-    var(--designer-border-subtle) 9px 10px
-  );
-  content: "";
-  pointer-events: none;
+.layer-row[data-layer-selectable="true"] {
+  cursor: pointer;
 }
 
 .layer-row:hover,
@@ -76,34 +90,123 @@
   box-shadow: inset 0 0 0 1px var(--designer-border-strong);
 }
 
-.layer-row[data-drop-target="true"],
-[data-layer-root][data-drop-target="true"] {
-  outline: 2px dashed var(--designer-accent);
-  outline-offset: -2px;
+/* 拖拽落点（对齐原型 .layer-drop-line）：插入到行前 / 行后画 2px 强调色指示线，
+   落进容器行则整行画强调色内环。三种提示都只改绘制，不改变行高，避免拖动时抖动。 */
+.layer-row[data-drop-target="before"],
+.layer-row[data-drop-target="after"] {
+  position: relative;
 }
 
-.layer-collapse-spacer {
-  width: 24px;
+.layer-row[data-drop-target="before"]::after,
+.layer-row[data-drop-target="after"]::after {
+  position: absolute;
+  right: var(--designer-space-2);
+  left: var(--designer-space-2);
+  height: 2px;
+  border-radius: 1px;
+  background: var(--designer-accent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--designer-accent) 30%, transparent);
+  content: "";
+  pointer-events: none;
+}
+
+.layer-row[data-drop-target="before"]::after {
+  top: -2px;
+}
+
+.layer-row[data-drop-target="after"]::after {
+  bottom: -1px;
+}
+
+.layer-row[data-drop-target="inside"] {
+  --layer-row-surface: var(--designer-accent-surface);
+
+  box-shadow: inset 0 0 0 2px var(--designer-accent);
+}
+
+/* 被拖起的行降档：提示“这一项正在移动”，不参与落点高亮。 */
+.layer-row[data-dragging="true"] {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+/* 拖拽幽灵：替代原生 drag image 的浮起行卡片。它由 dragstart 时那一瞬间的干净行克隆而来，
+   所以必须是实心浮起表面 + 收边 + 浮起阴影；不透明，否则会重演“半透明灰影糊在列表上”。
+   内部沿用 .layer-glyph / .layer-copy / .layer-name / .layer-meta，排版与列表行一致，
+   不另造一套字体与色阶。放在视口外：浏览器只在 dragstart 期间截取画面，之后节点移除。 */
+.layer-drag-image {
+  position: fixed;
+  top: -1000px;
+  left: -1000px;
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-2) var(--designer-space-3);
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-ring), var(--designer-shadow-overlay);
+  color: var(--designer-text-primary);
+  pointer-events: none;
+}
+
+.layer-drag-image .layer-copy {
+  flex: 0 1 auto;
+}
+
+/* 整行即拖拽把手：行上的名称区、图标与缩进留白都能起手，不额外占一个把手位。
+   抓手光标挂在行上；行内按钮自己的 cursor:pointer 会覆盖它。 */
+.layer-row[draggable="true"] {
+  cursor: grab;
+  touch-action: none;
+}
+
+/* 首列只留给分组行的折叠箭头；叶子行没有第一列，名称从行首开始。 */
+.layer-row > .layer-collapse {
+  display: inline-grid;
+  width: 16px;
   height: 24px;
+  min-width: 0;
+  min-height: 24px;
+  flex: none;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  color: var(--designer-text-disabled);
+  box-shadow: none;
+}
+
+.layer-row > .layer-collapse svg {
+  width: 13px;
+  height: 13px;
+}
+
+.layer-row > .layer-collapse:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
 }
 
 .layer-select {
   display: flex;
+  /* 名称区固定在第二列：分组行第一列是折叠箭头，叶子行第一列就是名称本身。 */
   grid-column: 2;
   min-width: 0;
   min-height: 32px;
   align-self: stretch;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
-  padding: 0 2px;
+  gap: var(--designer-space-2);
+  padding: 0;
   text-align: left;
   border-color: transparent;
   background: transparent;
+  /* .designer-button 的 elev-ring 会在每行画一圈控件收边；图层行的状态只由行底色与
+     行级 inset 表达，这里必须连阴影一起清掉，否则平铺行读成一排独立按钮。 */
+  box-shadow: none;
   transition:
-    border-color var(--designer-motion),
-    background-color var(--designer-motion),
-    box-shadow var(--designer-motion),
     color var(--designer-motion),
     padding-right var(--designer-motion);
 }
@@ -120,99 +223,88 @@
   outline: none;
 }
 
+/* 叶子行没有折叠列，名称从第 1 列直接开始（分组行才占第 2 列）。 */
+.layer-row:not([data-layer-group="true"]) > .layer-select {
+  grid-column: 1;
+}
+
 .layer-row:has(.layer-select:focus-visible) {
   outline: 2px solid var(--designer-focus-ring);
   outline-offset: -2px;
 }
 
-/* 行首类型图标：与物料库同一派生规则；选中行提亮为品牌色，默认保持安静。 */
+/* 行首类型图标：20px 色块，色相由 type 稳定派生；选中行把图标收进强调色，其余保持类型色。 */
 .layer-glyph {
   display: inline-grid;
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
   place-items: center;
-  color: var(--designer-text-muted);
+  border-radius: var(--designer-radius-1);
+  background: color-mix(in oklab, currentColor 9%, transparent);
+  color: oklch(0.56 0.13 var(--layer-hue, 258));
   transition: color var(--designer-motion);
 }
 
 .layer-select .layer-glyph svg {
   width: 12px;
   height: 12px;
-  fill: none;
-  stroke: currentColor;
 }
 
 .layer-row:hover .layer-glyph {
-  color: var(--designer-text-secondary);
+  color: oklch(0.5 0.14 var(--layer-hue, 258));
 }
 
 .layer-row[aria-selected="true"] .layer-glyph {
   color: var(--designer-accent);
 }
 
-.layer-row[aria-selected="true"] .layer-name {
-  color: var(--designer-text-primary);
-}
-
-.layer-name {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  font: var(--designer-font);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.layer-row[data-hidden="true"] .layer-name,
-.layer-row[data-locked="true"] .layer-name {
-  color: var(--designer-text-muted);
-}
-
-.layer-row[data-hidden="true"] .layer-name {
-  opacity: 0.62;
-  text-decoration: line-through;
-}
-
-.layer-count {
-  flex: 0 0 auto;
-  min-width: 16px;
-  min-height: 16px;
-  margin-left: auto;
-  padding: 0 5px;
-  border-radius: var(--designer-radius-pill);
-  background: color-mix(in srgb, var(--designer-border-default) 32%, transparent);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-xs);
-  line-height: 16px;
-  text-align: center;
-}
-
-/* 行内紧凑控件：折叠/操作图标按钮与重命名输入，恒定尺寸避免几何抖动。 */
-.layer-row > .designer-button:not(.layer-select),
-.layer-actions .designer-button {
+/* 28px 的锁/眼按钮：锁在常态隐藏，悬停/聚焦或已锁定时露出；可见性开关常驻。 */
+.layer-row > .layer-lock,
+.layer-row > .layer-eye {
+  display: grid;
   box-sizing: border-box;
-  width: 24px;
-  height: 24px;
-  min-width: 0;
-  min-height: 24px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+  place-items: center;
   padding: 0;
-  border-color: transparent;
+  border: 0;
+  border-radius: var(--designer-radius-2);
   background: transparent;
   color: var(--designer-text-muted);
+  box-shadow: none;
 }
 
-.layer-row > .designer-button:not(.layer-select):hover:not(:disabled),
-.layer-actions .designer-button:hover:not(:disabled) {
-  border-color: transparent;
+.layer-row > .layer-lock {
+  opacity: 0;
+  transition:
+    opacity var(--designer-motion),
+    background-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.layer-row:hover > .layer-lock,
+.layer-row:focus-within > .layer-lock,
+.layer-row[data-locked="true"] > .layer-lock {
+  opacity: 1;
+}
+
+.layer-row > .layer-lock:hover:not(:disabled),
+.layer-row > .layer-eye:hover:not(:disabled) {
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
 }
 
-.layer-actions .designer-button[aria-pressed="true"] {
-  border-color: transparent;
-  background: transparent;
+.layer-row[data-locked="true"] > .layer-lock {
+  color: var(--designer-text-secondary);
+}
+
+.layer-row > .layer-lock svg,
+.layer-row > .layer-eye svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* 行内控件按压不缩放：小尺寸图标按钮的 scale 按压反馈会产生视觉抖动。 */
@@ -220,125 +312,68 @@
   transform: translateZ(0);
 }
 
-.layer-row > .designer-button svg,
-.layer-actions .designer-button svg {
-  width: 13px;
-  height: 13px;
+/* 弹性宽度由两行正文容器承担：副行不得把名称挤到不可读。 */
+.layer-copy {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 1px;
 }
 
-/* 操作图标稍大，与 24px 按钮保持舒展比例。 */
-.layer-actions .designer-button svg {
-  width: 14px;
-  height: 14px;
+.layer-name {
+  min-width: 0;
+  overflow: hidden;
+  font: var(--designer-font);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* 重命名模式：名称按钮隐藏、输入框同位同高替换，行几何不变。 */
+.layer-meta {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 隐藏/锁定靠色阶降档表达，不靠透明度：次级标签仍要能读。 */
+.layer-row[data-hidden="true"] .layer-name,
+.layer-row[data-hidden="true"] .layer-meta,
+.layer-row[data-locked="true"] .layer-name {
+  color: var(--designer-text-muted);
+}
+
+/* 重命名模式：名称按钮隐藏、输入框同位同高替换；输入框横跨正文列并让出右侧状态位。 */
 .layer-row[data-renaming="true"] .layer-select {
   display: none;
 }
 
 .layer-row .designer-input {
-  grid-column: 2 / -1;
+  /* 重命名输入框同时顶掉名称区与两个开关（它们此时都隐藏），占满整行。 */
+  grid-column: 1 / -1;
   height: 26px;
   min-height: 26px;
   padding: 0 var(--designer-space-2);
   font: var(--designer-font-small);
 }
 
-/* 操作簇常态只露出最右侧的定位入口；指针进入该入口或键盘焦点进入操作簇时向左展开。
-   名称按钮保留完整宽度与独立命中区域，操作簇不参与网格布局，因此展开前后行高恒定。 */
-.layer-actions {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  z-index: 1;
-  display: flex;
-  width: 24px;
-  align-items: center;
-  flex-direction: row-reverse;
-  gap: 0;
-  overflow: hidden;
-  pointer-events: none;
-  transform: translateY(-50%);
-  transition: width var(--designer-motion);
-}
-
-.layer-actions .designer-button {
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  min-height: 24px;
-  border-radius: var(--designer-radius-2);
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    border-color var(--designer-motion),
-    background-color var(--designer-motion),
-    box-shadow var(--designer-motion),
-    color var(--designer-motion),
-    opacity var(--designer-motion);
-}
-
-/* 操作图标 hover 用品牌色浅底，比通用灰底更能传达可点性。 */
-.layer-actions .designer-button:hover:not(:disabled) {
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
-}
-
-/* 分组间距：状态开关（隐藏/锁定）与排序（上移/下移）之间拉大空隙，无需分隔线。 */
-.layer-actions .designer-button[data-layer-move="up"] {
-  margin-right: 3px;
-}
-
-.layer-actions:hover,
-.layer-actions:focus-within {
-  width: 123px;
-}
-
-.layer-row:hover .layer-actions,
-.layer-row:focus-within .layer-actions,
-.layer-row[aria-selected="true"] .layer-actions {
-  background: linear-gradient(90deg, transparent, var(--layer-row-surface) 12px);
-}
-
-/* 逐图标浮现：hover/focus-within/选中行显示整组；已激活的隐藏/锁定开关常驻可见可点，
-   作为行级状态指示（替代文字芯片），其余时刻行右侧保持干净。 */
-.layer-row:hover .layer-actions .designer-button,
-.layer-row:focus-within .layer-actions .designer-button,
-.layer-row[aria-selected="true"] .layer-actions .designer-button,
-.layer-actions .designer-button[aria-pressed="true"] {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* 排序按钮到达边界禁用：浮现时压暗（优先级高于浮现规则），常态随整组隐藏。 */
-.layer-row:hover .layer-actions .designer-button:disabled,
-.layer-row:focus-within .layer-actions .designer-button:disabled,
-.layer-row[aria-selected="true"] .layer-actions .designer-button:disabled {
-  opacity: 0.32;
-}
-
-/* 选中行内操作图标提亮一档，与行首 accent 图标、加粗名称的强调层级一致。 */
-.layer-row[aria-selected="true"] .layer-actions .designer-button:not([aria-pressed="true"]) {
-  color: var(--designer-text-secondary);
-}
-
-/* 激活的隐藏/锁定开关以警示色常驻提示（hover 时保持警示色，不被品牌色覆盖）。 */
-.layer-actions .designer-button[aria-pressed="true"],
-.layer-actions .designer-button[aria-pressed="true"]:hover:not(:disabled) {
-  color: var(--designer-warning);
-}
-
-/* 重命名模式：操作图标完全让位（输入框横跨整行；display 兜底压过常驻开关的显隐规则）。 */
-.layer-row[data-renaming="true"] .layer-actions {
+.layer-row[data-renaming="true"] > .layer-lock,
+.layer-row[data-renaming="true"] > .layer-eye {
   display: none;
 }
 
-/* 诊断行：与名称文本左对齐（折叠列 20px + gap + 按钮边框 + 内边距）。 */
+/* 诊断行：与名称文本左对齐（图标 20 + gap）。叶子行没有折叠列，缩进比分组行少 16px。 */
 .layer-diagnostic {
   grid-column: 1 / -1;
-  padding-inline-start: 27px;
+  padding-inline-start: calc(20px + var(--designer-space-2));
   color: var(--designer-warning);
+}
+
+.layer-row[data-layer-group="true"] .layer-diagnostic {
+  padding-inline-start: calc(16px + var(--designer-space-2) + 20px + var(--designer-space-2));
 }
 
 /* 分页“显示更多”：整行幽灵按钮，恒定高度，悬停仅改背景色。 */

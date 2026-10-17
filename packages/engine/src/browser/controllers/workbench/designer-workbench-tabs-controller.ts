@@ -168,7 +168,7 @@ export class DesignerWorkbenchTabsController {
           ? DESIGNER_UI_TEXT.materials
           : this.#leftTab === 'layers'
             ? DESIGNER_UI_TEXT.layers
-            : DESIGNER_UI_TEXT.variables.title;
+            : DESIGNER_UI_TEXT.variables.shortTitle;
     if (leftTitle !== null) leftTitle.textContent = leftPanelLabel;
     const leftScope = root.querySelector<HTMLElement>('[data-left-panel-scope]');
     if (leftScope !== null) {

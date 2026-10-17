@@ -213,17 +213,17 @@
 .properties[data-inspector-context-kind="canvas"] > .panel-heading {
   grid-row: 1;
   height: 44px;
-  justify-content: center;
-  padding: 0 12px;
+  justify-content: flex-start;
+  padding: 0 20px;
   border-bottom-color: var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
 
 .properties[data-inspector-context-kind="canvas"] > .panel-heading .panel-title {
-  margin-left: auto;
+  margin-left: 0;
   color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-md);
-  font-weight: 500;
+  font-size: var(--designer-font-size-lg);
+  font-weight: 600;
 }
 
 .properties[data-inspector-context-kind="canvas"] > .inspector-tabs,
@@ -238,155 +238,150 @@
   padding: 0 20px 24px;
 }
 
-.properties .designer-datav-canvas-section {
-  display: flex;
-  flex-direction: column;
-  padding-top: 15px;
-}
-
-.properties .designer-datav-canvas-section > .designer-inspector-section-title {
-  display: none;
-}
-
-.properties .designer-datav-canvas-section > .designer-field,
-.properties .designer-datav-canvas-section > .designer-canvas-size {
+/* 页面配置用可折叠分节承载内容（原型 .insp-section）：段标题带发丝线，段间只留留白、
+   不逐行画通栏分隔线——行线会把一组设置切成表单条纹，且随字段增删抖动。 */
+.properties[data-inspector-context-kind="canvas"] .designer-canvas-section,
+.properties[data-inspector-context-kind="canvas"] .designer-canvas-background-section,
+.properties[data-inspector-context-kind="canvas"] .designer-canvas-image-section {
   display: grid;
-  min-height: 38px;
-  grid-template-columns: 90px minmax(0, 1fr);
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  overflow: visible;
-  border-bottom: 1px solid var(--designer-border-subtle);
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-base);
-  white-space: normal;
-  transition: background-color var(--designer-motion);
+  gap: 8px;
+  padding: 16px 0;
+  border-top: 0;
 }
 
-.properties .designer-datav-canvas-section > .designer-field:hover,
-.properties .designer-datav-canvas-section > .designer-canvas-size:hover {
-  background: color-mix(in srgb, var(--designer-surface-control-hover) 42%, transparent);
+.properties[data-inspector-context-kind="canvas"] .designer-canvas-section {
+  padding-top: 6px;
 }
 
-.properties .designer-canvas-size {
-  order: 1;
+.properties[data-inspector-context-kind="canvas"]
+  .designer-canvas-section
+  > .designer-inspector-section-title,
+.properties[data-inspector-context-kind="canvas"]
+  .designer-canvas-background-section
+  > .designer-inspector-section-title,
+.properties[data-inspector-context-kind="canvas"]
+  .designer-canvas-image-section
+  > .designer-inspector-section-title {
+  margin-bottom: 4px;
 }
 
-.properties .designer-canvas-opacity {
-  order: 2;
+/* 段内字段沿用组件检查器的行骨架（74px 标签列 + 控件列），底部不再补 margin；
+   行距由段自身的 grid gap 承担，字段显隐不会牵动其余行的位置。 */
+.properties[data-inspector-context-kind="canvas"] .inspector-pane .designer-field {
+  margin-bottom: 0;
 }
 
-.properties .designer-datav-canvas-section [data-canvas-field="backgroundType"],
-.properties .designer-datav-canvas-section [data-canvas-field="backgroundSolidColor"] {
-  order: 3;
-}
-
-.properties .designer-canvas-scale {
-  order: 4;
-}
-
-.properties .designer-canvas-setting-checkbox:has([data-canvas-setting="backgroundAutoFill"]) {
-  order: 5;
-}
-
-.properties .designer-canvas-setting-checkbox:has([data-canvas-setting="disableComponentLoading"]) {
-  order: 6;
-}
-
-.properties .designer-datav-canvas-section [data-canvas-field="backgroundImage"] {
-  order: 7;
-}
-
-.properties .designer-datav-canvas-section [data-canvas-field="backgroundImageFit"] {
-  order: 8;
-}
-
-.properties .designer-canvas-size-controls {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.properties .designer-canvas-size-controls .designer-field {
+/* 数字字段：符号内嵌右缘（与组件几何网格同一形态），标签列留给字段名。 */
+.designer-geo-field {
   position: relative;
   display: block;
-  margin: 0;
-  overflow: visible;
-  color: transparent;
-  font-size: 0;
+  min-width: 0;
+  padding: 0;
 }
 
-.properties .designer-canvas-size-controls .designer-field::before {
+.designer-geo-field::before {
   position: absolute;
-  top: 8px;
-  left: 7px;
+  top: 50%;
+  right: 8px;
   z-index: 1;
   color: var(--designer-text-muted);
-  content: "W";
-  font-size: 9px;
+  content: attr(data-symbol);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1;
   pointer-events: none;
+  translate: 0 -50%;
 }
 
-.properties .designer-canvas-size-controls .designer-field:nth-child(2)::before {
-  content: "H";
+/* 画布尺寸：W / H 一对输入等分控件列。 */
+.properties .designer-canvas-size-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--designer-space-3);
 }
 
-.properties .designer-canvas-size-controls .designer-input {
-  height: 30px;
-  padding-left: 20px;
-  color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-sm);
+/* 不透明度：滑杆吃满剩余宽度，右侧百分比读数固定一档（原型 .range-row dual）。
+   读数用内嵌 % 符号，读作「100%」而不是裸数字。 */
+.properties .designer-canvas-opacity-field .designer-field-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 62px;
+  gap: var(--designer-space-3);
+  align-items: center;
+}
+
+.properties .designer-canvas-opacity-value {
+  height: var(--designer-control-height-compact);
+  padding: 0 18px 0 6px;
   text-align: right;
 }
 
-.properties .designer-canvas-opacity .designer-opacity-controls {
-  grid-template-columns: minmax(0, 1fr) 46px;
-  gap: 7px;
+/* 缩放方式是六档分段控件：标签在上、整行等分（原型 .insp-field + .segmented）。 */
+.properties .designer-canvas-scale-field {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--designer-space-3);
 }
 
-.properties .designer-canvas-scale {
-  min-height: 66px !important;
+.properties .designer-canvas-scale-field .designer-field-control,
+.properties .designer-canvas-scale-options {
+  width: 100%;
 }
 
+.properties .designer-canvas-scale-options {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.properties .designer-canvas-scale-option {
+  padding: 0 var(--designer-space-2);
+  font-size: var(--designer-font-size-sm);
+  white-space: nowrap;
+}
+
+/* 开关行：标签左、开关右，长标签换行时开关仍贴右缘。 */
 .properties .designer-canvas-setting-checkbox {
-  display: flex !important;
-  min-height: 38px !important;
+  display: flex;
+  min-height: 32px;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: var(--designer-space-4);
+  grid-template-columns: none;
 }
 
-.properties .designer-canvas-setting-checkbox .designer-checkbox,
-.properties .designer-canvas-setting-checkbox .designer-switch {
-  order: 2;
+.properties .designer-canvas-setting-checkbox .designer-field-label-text {
+  min-width: 0;
+  white-space: normal;
 }
 
-.designer-project-section {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+.properties .designer-canvas-setting-checkbox .designer-switch,
+.properties .designer-canvas-setting-checkbox .designer-field-message {
+  flex: none;
+}
+
+/* 背景填充复用检查器的统一颜色控件：标签在上、控件整行（与组件检查器 color 字段同构），
+   三种模式 / 色标 / 角度中心 / 透明度全部由该控件自带的弹层与色标条承担。 */
+.properties .designer-canvas-background-field {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   gap: var(--designer-space-3);
-  padding: var(--designer-space-4);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-panel);
 }
 
-.designer-project-section h3 {
-  flex-basis: 100%;
-  font: var(--designer-font-small);
-}
-
-.designer-project-item {
-  display: flex;
+.properties .designer-canvas-background-field .designer-field-control,
+.properties .designer-canvas-background-field .designer-color-palette {
   width: 100%;
-  align-items: center;
-  gap: var(--designer-space-3);
-  overflow-wrap: anywhere;
 }
 
-.designer-project-item .designer-button:first-of-type {
-  margin-left: auto;
+/* 背景图片：URL 输入 + 宿主选择按钮同一行（按钮仅在宿主配置后出现）。 */
+.properties .designer-canvas-image-field .designer-field-control {
+  display: flex;
+  gap: var(--designer-space-2);
+}
+
+.properties .designer-canvas-image-field .designer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.properties .designer-canvas-image-picker {
+  flex: none;
+  white-space: nowrap;
 }

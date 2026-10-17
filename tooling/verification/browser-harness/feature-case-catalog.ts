@@ -12,7 +12,7 @@ export interface FeatureCaseCatalogEntry {
 export const FEATURE_CASE_CATALOG = [
   {
     id: 'canvas',
-    title: '画布与官方物料',
+    title: '画布与官方素材',
     summary: '默认设计器文档：文本、桥接按钮、语义图表与数据集排行卡。',
     lookAt: '画布标题/副标题、React/Vue 桥接、右侧图表与排行卡。',
     packages: ['engine', 'material', 'renderer', 'sdk'],
@@ -22,9 +22,9 @@ export const FEATURE_CASE_CATALOG = [
   },
   {
     id: 'material-groups',
-    title: '物料分组压力',
+    title: '素材分组压力',
     summary: '多级分类、超长名称与窄面板浮层。',
-    lookAt: '左侧物料库分组标签截断、钻取与分类浮层。',
+    lookAt: '左侧素材库分组标签截断、钻取与分类浮层。',
     packages: ['engine'],
     focused: 'pnpm --filter @base-screen/engine test',
     verify: 'pnpm verify:browser',
@@ -62,8 +62,8 @@ export const FEATURE_CASE_CATALOG = [
   },
   {
     id: 'plugin-material',
-    title: '插件物料渲染',
-    summary: '外围插件贡献的物料进入目录并真的渲染出第三方图表。',
+    title: '插件素材渲染',
+    summary: '外围插件贡献的素材进入目录并真的渲染出第三方图表。',
     lookAt: '画布上的插件 ECharts 图表——它由 plugins/plugin-echarts 声明并带 echarts 依赖。',
     packages: ['plugin-core', 'plugin-manager', 'engine', 'plugin-sdk'],
     focused: 'pnpm --filter @base-screen/plugin-echarts test',
@@ -83,7 +83,7 @@ export const FEATURE_CASE_CATALOG = [
   {
     id: 'plugin-datav-materials',
     title: '插件大屏组件包',
-    summary: '零第三方依赖的渲染类插件：四个大屏物料 + 自有检查器控件 + 事务命令。',
+    summary: '零第三方依赖的渲染类插件：四个大屏素材 + 自有检查器控件 + 事务命令。',
     lookAt: '画布上的翻牌器/水位图/轮播列表/装饰边框，以及选中边框后的插件样式选择器。',
     packages: ['plugin-core', 'plugin-manager', 'engine', 'plugin-sdk'],
     focused: 'pnpm --filter @base-screen/plugin-datav-materials test',
@@ -114,7 +114,7 @@ export const FEATURE_CASE_CATALOG = [
   {
     id: 'semantic-chart',
     title: '语义图表配置',
-    summary: 'harness 语义图表演示物料的分组、字段与高级折叠。',
+    summary: 'harness 语义图表演示素材的分组、字段与高级折叠。',
     lookAt: '选中「语义图表」后的右侧外观/数据分区。',
     packages: ['material', 'engine'],
     focused: 'pnpm --filter @base-screen/material test',
@@ -124,8 +124,8 @@ export const FEATURE_CASE_CATALOG = [
   {
     id: 'blueprint',
     title: 'Blueprint 工作台',
-    summary: '画布/交互编排切换；中央图形槽仍归宿主。',
-    lookAt: '顶部「交互」工作台与中央 Harness 图形画布的节点摘要。',
+    summary: '设计/蓝图切换；中央图形槽仍归宿主。',
+    lookAt: '顶部「蓝图」工作台与中央 Harness 图形画布的节点摘要。',
     packages: ['engine', 'core', 'sdk'],
     focused: 'pnpm --filter @base-screen/engine test',
     verify: 'pnpm verify:browser',

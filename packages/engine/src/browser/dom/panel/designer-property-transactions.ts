@@ -33,8 +33,8 @@ import {
 import { createDesignerStyleFieldPatch } from '../../../common/operations/style/designer-style-field.js';
 import { readDesignerColorPaletteValue } from '../color/designer-color-palette-dom.js';
 import {
+  createCanvasBackgroundPaletteTransaction,
   createCanvasTransaction,
-  type DesignerCanvasBackgroundDrafts,
 } from './designer-canvas-transactions.js';
 import { parseJsonDraft } from './designer-data-source-model.js';
 import { isControl, success, update } from './designer-panel-transaction-utils.js';
@@ -45,12 +45,28 @@ export interface DesignerPanelInput {
   readonly type?: string;
 }
 
+/**
+ * 祖先查询能力探测：DOM 元素具备 `closest`，而只带 `dataset` / `value` 的合成控件没有
+ * （非 DOM 环境下直接构造的控件候选）。面板事务按控件候选契约取目标，不假设它一定是 Element，
+ * 否则合成控件会在祖先链查询处抛错，连同其数据集语义一起失效。
+ */
+function canQueryAncestors(value: unknown): value is { closest(selector: string): Element | null } {
+  return typeof (value as { closest?: unknown } | null)?.closest === 'function';
+}
+
+/** 事件目标落在画布背景调色板内，或其祖先链上有该标记（色标重建后仍可命中）。 */
+function isCanvasBackgroundPaletteTarget(target: EventTarget | null): boolean {
+  if (!canQueryAncestors(target)) return false;
+  const palette = target.closest('[data-designer-color-palette]');
+  if (palette === null || !canQueryAncestors(palette)) return false;
+  return palette.closest('[data-canvas-property="background"]') !== null;
+}
+
 export function createPropertyTransaction(
   target: EventTarget | null,
   document: ScreenDocument | undefined,
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
-  canvasBackgroundDrafts?: DesignerCanvasBackgroundDrafts,
 ): ScreenParseResult<ScreenDocumentTransaction> | undefined {
   if (!isControl(target)) return undefined;
   const geometryAction = target.dataset.geometryAction;
@@ -70,7 +86,15 @@ export function createPropertyTransaction(
   }
   const context = getDesignerInspectorContext(document, interaction, catalog);
   if (context.kind !== 'single-material' && context.kind !== 'single-group') {
-    return createCanvasTransaction(document, target, canvasBackgroundDrafts);
+    // 画布背景由统一颜色控件承载：整段颜色值一次提交，不与目标节点上的零散字段混用。
+    // 值从调色板自身状态重新序列化——增删色标会重建内部控件，读重建后的状态才不丢改动。
+    // 取值入口自行从目标向上定位调色板，这里不再重复查询祖先链。
+    if (isCanvasBackgroundPaletteTarget(target)) {
+      const value = readDesignerColorPaletteValue(target);
+      if (value === undefined) return undefined;
+      return createCanvasBackgroundPaletteTransaction(document, value);
+    }
+    return createCanvasTransaction(document, target);
   }
   const component = context.component;
   const property = target.dataset.property;

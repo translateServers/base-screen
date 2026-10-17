@@ -33,6 +33,11 @@ export function renderDesignerInspectorContext(
   if (panel !== null) panel.dataset.inspectorContextKind = context.kind;
   const heading = container.ownerDocument.createElement('div');
   heading.className = 'inspector-context-heading';
+  // 身份块 = 30px 图标 + 名称/类型两行（原型 .identity）：图标是对象身份的锚点，
+  // 不再是标题后面的小装饰。
+  const icon = container.ownerDocument.createElement('span');
+  icon.className = 'inspector-context-icon';
+  icon.setAttribute('aria-hidden', 'true');
   const identity = container.ownerDocument.createElement('div');
   identity.className = 'inspector-context-identity';
   const titleRow = container.ownerDocument.createElement('div');
@@ -43,19 +48,21 @@ export function renderDesignerInspectorContext(
   subtitle.className = 'inspector-context-subtitle';
   titleRow.appendChild(title);
   identity.append(titleRow, subtitle);
-  heading.appendChild(identity);
+  heading.append(icon, identity);
 
   if (context.kind === 'canvas') {
     title.textContent = DESIGNER_UI_TEXT.inspectorUi.canvas;
     subtitle.textContent =
       document === undefined ? '' : `${document.canvas.width} × ${document.canvas.height}`;
+    icon.innerHTML = designerIcon('rect');
     container.appendChild(heading);
     return;
   }
   if (context.kind === 'multi-selection') {
     title.textContent = DESIGNER_UI_TEXT.inspectorUi.batchConfiguration;
     subtitle.textContent = DESIGNER_UI_TEXT.inspectorUi.multiple(context.summary.count);
-    appendBadge(heading, context.summary.hasLocked, DESIGNER_UI_TEXT.inspectorUi.locked);
+    icon.innerHTML = designerIcon('layers');
+    appendBadge(titleRow, context.summary.hasLocked, DESIGNER_UI_TEXT.inspectorUi.locked);
     container.appendChild(heading);
     return;
   }
@@ -65,11 +72,13 @@ export function renderDesignerInspectorContext(
     context.manifest === undefined
       ? context.component.type
       : DESIGNER_UI_TEXT.inspectorUi.componentMeta(context.component.type, context.manifest.name);
-  const icon = container.ownerDocument.createElement('span');
-  icon.className = 'inspector-context-material-icon';
-  icon.setAttribute('aria-hidden', 'true');
   icon.innerHTML = designerIcon(materialIcon(context.component.type));
-  titleRow.appendChild(icon);
+  const badge = context.component.status.locked
+    ? DESIGNER_UI_TEXT.inspectorUi.locked
+    : context.component.status.hidden
+      ? DESIGNER_UI_TEXT.inspectorUi.hidden
+      : undefined;
+  appendBadge(titleRow, badge !== undefined, badge ?? '');
   container.appendChild(heading);
 }
 

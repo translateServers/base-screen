@@ -15,6 +15,7 @@ import {
 import {
   createDesignerLayerView,
   DESIGNER_LAYER_PAGE_SIZE,
+  type DesignerLayerDropIndicator,
   type DesignerLayerSelectionDirection,
   getDesignerLayerSelectionTarget,
   renderDesignerLayers,
@@ -53,7 +54,8 @@ export class DesignerLayersController {
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {
     this.#drag = new DesignerLayerDragController({
       ...callbacks,
-      onDropTargetChange: () => this.render(this.#layers),
+      // 拖拽期间只就地改行属性：重渲染会替换拖拽源节点并中止浏览器的拖拽流程。
+      getLayers: () => this.#layers,
     });
     this.#rename = new DesignerLayerRenameController({
       ...callbacks,
@@ -84,7 +86,8 @@ export class DesignerLayersController {
       interaction: this.callbacks.getInteraction(),
       search: this.#search,
       collapsed: this.#collapsed,
-      dropTargetId: this.#drag.dropTargetId,
+      draggingId: this.#drag.draggedId,
+      dropIndicator: this.#drag.dropIndicator,
       renameDrafts: this.#rename.drafts,
       renamingId: this.#rename.renamingId,
       renderLimit: this.#renderLimit,
@@ -281,6 +284,16 @@ export class DesignerLayersController {
 
   clearDrag(): void {
     this.#drag.clear();
+  }
+
+  /** 当前拖拽落点（行 + 方位）；无拖拽时为 undefined。 */
+  get dropIndicator(): DesignerLayerDropIndicator | undefined {
+    return this.#drag.dropIndicator;
+  }
+
+  /** 拖拽中的图层 id；无拖拽时为 undefined。 */
+  get draggedId(): string | undefined {
+    return this.#drag.draggedId;
   }
 
   clearSessionState(): void {

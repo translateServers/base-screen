@@ -180,6 +180,11 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
             <div class="marquee" data-marquee></div>
             <div class="canvas-guides" data-canvas-guides></div>
           </div>
+          <div class="canvas-hint" data-canvas-hint>
+            <span class="canvas-hint-glyph" aria-hidden="true">${designerIcon('pointer')}</span>
+            <span class="canvas-hint-text">${DESIGNER_UI_TEXT.canvasHint}</span>
+            <button type="button" class="designer-control designer-button designer-icon-button canvas-hint-dismiss" data-variant="ghost" data-canvas-hint-dismiss data-tip="${DESIGNER_UI_TEXT.canvasHintDismiss}" aria-label="${DESIGNER_UI_TEXT.canvasHintDismiss}">${designerIcon('close')}</button>
+          </div>
           <form class="designer-coordinate-entry" data-coordinate-entry role="dialog" aria-modal="false" aria-label="${DESIGNER_UI_TEXT.coordinateEntry.title}" autocomplete="off" novalidate hidden>
             ${coordinateEntryField('x')}
             ${coordinateEntryField('y')}
@@ -208,11 +213,13 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           <span class="status-divider" aria-hidden="true"></span>
           <span class="status-selection" data-status-selection>${DESIGNER_UI_TEXT.nothingSelected}</span>
           <span class="status-divider" aria-hidden="true"></span>
-          <span class="status-project" data-project-status>${DESIGNER_UI_TEXT.directDocument}</span>
+          <span class="status-project" data-project-status data-state="direct"><span class="status-project-dot" aria-hidden="true"></span><span data-project-status-label>${DESIGNER_UI_TEXT.directDocument}</span></span>
           <span class="status-revision" data-project-revision></span>
           <span class="status-feedback" data-status-feedback role="status" aria-live="polite"></span>
         </div>
         <div class="statusbar-group statusbar-end">
+          <span class="status-components" data-status-components></span>
+          <span class="status-divider" aria-hidden="true"></span>
           <span class="status-canvas" data-status-canvas aria-label="${DESIGNER_UI_TEXT.canvasSize}"></span>
           <span class="status-divider" aria-hidden="true"></span>
           <button type="button" class="status-toggle" data-status-toggle="snap" role="switch" aria-checked="true" aria-label="${DESIGNER_UI_TEXT.snap}">
@@ -262,9 +269,9 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <span class="panel-title" id="designer-right-panel-title" data-right-panel-title>${DESIGNER_UI_TEXT.inspectorUi.canvasConfiguration}</span>
       </header>
       <div class="inspector-tabs" role="tablist" aria-label="${DESIGNER_UI_TEXT.inspector}">
-        <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span class="inspector-tab-icon">${designerIcon('sliders')}</span><span>${DESIGNER_UI_TEXT.appearance}</span></button>
-        <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span class="inspector-tab-icon">${designerIcon('grid')}</span><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>
-        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span class="inspector-tab-icon">${designerIcon('cube')}</span><span>${DESIGNER_UI_TEXT.inspectorUi.advanced}</span></button>
+        <button type="button" class="designer-tab" id="designer-appearance-tab" role="tab" aria-controls="designer-appearance-panel" aria-selected="true" data-inspector-tab="appearance"><span>${DESIGNER_UI_TEXT.appearance}</span></button>
+        <button type="button" class="designer-tab" id="designer-data-tab" role="tab" aria-controls="designer-data-panel" aria-selected="false" data-inspector-tab="data"><span>${DESIGNER_UI_TEXT.inspectorUi.dataSource}</span></button>
+        <button type="button" class="designer-tab" id="designer-interaction-tab" role="tab" aria-controls="designer-interaction-panel" aria-selected="false" data-inspector-tab="interaction"><span>${DESIGNER_UI_TEXT.inspectorUi.advanced}</span></button>
       </div>
       <div class="blueprint-inspector" data-blueprint-inspector hidden></div>
       <div class="inspector-context" data-inspector-context></div>

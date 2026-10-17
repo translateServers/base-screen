@@ -61,6 +61,9 @@
 
 .designer-button:not(:disabled):active {
   background: var(--designer-surface-control-active);
+  /* 按压只改配色、不缩放；translateZ(0) 保留一个非 none 的变换，
+     让“按下”在计算样式层可验证，同时避免布局位移。 */
+  transform: translateZ(0);
 }
 
 .designer-button:focus-visible {

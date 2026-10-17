@@ -16,11 +16,7 @@ import { renderDesignerDescriptorZone } from '../descriptor/designer-descriptor-
 import { appendDesignerQuickStyle } from '../designer-quick-style-dom.js';
 import { appendDesignerFieldMessage, createDesignerButton } from '../designer-ui-primitives.js';
 import { appendCanvasControls } from './designer-canvas-properties-dom.js';
-import {
-  createDesignerCanvasBackgroundDrafts,
-  createDesignerCanvasPresentationSettings,
-  syncCanvasBackgroundDrafts,
-} from './designer-canvas-transactions.js';
+import { createDesignerCanvasPresentationSettings } from './designer-canvas-transactions.js';
 import { appendMultiSelectionControls } from './designer-multi-selection-dom.js';
 import {
   appendActionButton,
@@ -40,7 +36,6 @@ export function renderDesignerProperties(
   catalog: BaseScreenMaterialCatalog | undefined,
   getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
   canvasBackgroundImageButtonVisible = false,
-  canvasBackgroundDrafts = createDesignerCanvasBackgroundDrafts(document),
   canvasPresentation = createDesignerCanvasPresentationSettings(),
   inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined,
 ): void {
@@ -48,12 +43,10 @@ export function renderDesignerProperties(
   const context = getDesignerInspectorContext(document, interaction, catalog);
   if (context.kind === 'canvas') {
     if (document !== undefined) {
-      syncCanvasBackgroundDrafts(canvasBackgroundDrafts, document);
       appendCanvasControls(
         properties,
         document,
         canvasBackgroundImageButtonVisible,
-        canvasBackgroundDrafts,
         canvasPresentation,
       );
     }
@@ -274,7 +267,10 @@ function appendCommonOpacityControl(
   section.className += ' designer-datav-common-section';
   const field = properties.ownerDocument.createElement('span');
   field.className = 'designer-field designer-field-label designer-opacity-field';
-  field.textContent = DESIGNER_UI_TEXT.propertiesPanel.opacity;
+  const label = properties.ownerDocument.createElement('span');
+  label.className = 'designer-field-label-text';
+  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.opacity;
+  field.appendChild(label);
   const controls = properties.ownerDocument.createElement('span');
   controls.className = 'designer-opacity-controls';
   const range = properties.ownerDocument.createElement('input');
@@ -291,10 +287,12 @@ function appendCommonOpacityControl(
   number.type = 'number';
   number.className = 'designer-control designer-input designer-number';
   number.min = '0';
-  number.max = '1';
-  number.step = '0.01';
-  number.value = String(component.style.opacity ?? 1);
+  number.max = '100';
+  number.step = '1';
+  // 面板读数统一按百分比（原型 .range-row 的 0–100），事务侧仍写 0–1 的 canonical 值。
+  number.value = String(Math.round(Number(component.style.opacity ?? 1) * 100));
   number.dataset.style = 'opacity';
+  number.dataset.opacityPercent = 'true';
   number.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.opacity);
   controls.appendChild(range);
   controls.appendChild(number);

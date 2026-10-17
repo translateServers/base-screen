@@ -32,7 +32,8 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toContain('grid-template-rows: 40px auto auto minmax(0, 1fr);');
     expect(workbenchCss).toContain('.designer-datav-section-summary');
     expect(workbenchCss).toContain('right: 8px;');
-    expect(workbenchCss).toContain('calc(var(--layer-depth, 0) * 20px);');
+    // 图层行改为原型式的「抓手 · 名称 · 锁 · 眼」四列网格，缩进由行内 padding 承担。
+    expect(workbenchCss).toContain('grid-template-columns: 16px minmax(0, 1fr) 26px 26px;');
     expect(workbenchCss).toContain('.statusbar [data-project-status]');
     expect(workbenchCss).toContain('flex: 0 1 auto;');
     expect(workbenchCss).toContain('.statusbar [data-project-revision]');
