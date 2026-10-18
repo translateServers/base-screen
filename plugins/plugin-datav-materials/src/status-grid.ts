@@ -149,7 +149,9 @@ export const PLUGIN_DATAV_STATUS_GRID_MANIFEST: BaseScreenMaterialManifest = {
     roles: [
       {
         id: 'items',
-        minFields: 1,
+        // 位置语义要求"标签 + 状态"两列，因此 minFields=2：只绑 1 列在基座 binding 校验
+        // 阶段就该被拒（设计器里立刻看到诊断），而不是先通过校验、再在 adapter 里变成错误态。
+        minFields: 2,
         maxFields: 3,
         // 必须同时含 string 与 number：name/status 是字符串，load 是数字。
         valueTypes: ['string', 'number'],

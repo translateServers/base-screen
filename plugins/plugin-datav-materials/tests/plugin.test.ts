@@ -199,7 +199,7 @@ describe('plugin-datav-materials runtime', () => {
   it('binds the two new materials by role with string+number value types', () => {
     // 角色声明错（例如漏掉 number）会让 dataset 绑定被 validateScreenHostResourceBinding 拒绝。
     expect(PLUGIN_DATAV_STATUS_GRID_MANIFEST.dataBinding?.roles).toEqual([
-      { id: 'items', minFields: 1, maxFields: 3, valueTypes: ['string', 'number'] },
+      { id: 'items', minFields: 2, maxFields: 3, valueTypes: ['string', 'number'] },
     ]);
     expect(PLUGIN_DATAV_PIPELINE_MANIFEST.dataBinding?.roles).toEqual([
       { id: 'stages', minFields: 2, maxFields: 3, valueTypes: ['string', 'number'] },
