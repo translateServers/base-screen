@@ -26,6 +26,8 @@ interface HostObserver {
     readonly failures: number;
     readonly lastCode: string | undefined;
     readonly pending: readonly string[];
+    /** 当前处于失败态的组件（排序稳定），供 chip tooltip 与 smoke 断言。 */
+    readonly failedComponents: readonly string[];
   };
   isPending(componentId: string): boolean;
   lastFailureAt(): number | undefined;
@@ -33,28 +35,37 @@ interface HostObserver {
 }
 
 /**
- * 请求观察者：把渲染器的资源生命周期事件汇总成"计数 + 在飞行集合"。
+ * 请求观察者：把渲染器的资源生命周期事件汇总成"计数 + 在飞行集合 + 每组件结果"。
  *
- * 两个来自渲染器实现（`renderer-state.ts`）的硬事实决定了这里的写法：
+ * 三个来自实现的硬事实决定了这里的写法：
  * 1. `shared` 与 `aborted` 事件的 `requestId` 是**合成值**（`componentId:key:cancel`），
- *    与 `started`/`succeeded` 的真实 id 不相等——按 id 配对会留下永远清不掉的 pending，
- *    该组件随后会被轮询永久跳过。
+ *    与 `started`/`succeeded` 的真实 requestId 不相等——按 id 配对会留下永远清不掉的
+ *    pending，该组件随后会被轮询永久跳过。
  * 2. 一次成功会连发 `succeeded` + `adapted` 两个终态事件。
- *
- * 因此 pending 用**每组件计数器**：started/shared +1，任何终态 −1（下限 0）。
+ * 3. **在线/离线必须按组件判定**：用"连续失败次数"这种全局单值，任何别的组件成功就会
+ *    把它清零。2 秒节拍的告警流水失败、5 秒节拍的 KPI 随后成功时，顶栏会一直显示
+ *    "在线"——这是 QA 抓到的 B1。改为每组件记录 `ok`/`fail`，**只要有一个组件处于
+ *    `fail` 就算离线**（没有任何结果时视为在线）。
  */
 function createHostObserver(): HostObserver {
   let requests = 0;
   let failures = 0;
-  let consecutiveFailures = 0;
   let lastCode: string | undefined;
   let lastFailureAt: number | undefined;
   const pendingCount = new Map<string, number>();
+  const outcomeByComponent = new Map<string, 'ok' | 'fail'>();
 
   function release(componentId: string): void {
     const next = (pendingCount.get(componentId) ?? 1) - 1;
     if (next <= 0) pendingCount.delete(componentId);
     else pendingCount.set(componentId, next);
+  }
+
+  function failedComponents(): readonly string[] {
+    return [...outcomeByComponent.entries()]
+      .filter(([, outcome]) => outcome === 'fail')
+      .map(([componentId]) => componentId)
+      .sort();
   }
 
   const observer: ScreenResourceObserver = (event) => {
@@ -65,22 +76,23 @@ function createHostObserver(): HostObserver {
         pendingCount.set(event.componentId, (pendingCount.get(event.componentId) ?? 0) + 1);
         return;
       }
-      case 'succeeded': {
+      case 'succeeded':
+      case 'adapted': {
         release(event.componentId);
-        consecutiveFailures = 0;
+        outcomeByComponent.set(event.componentId, 'ok');
         return;
       }
       case 'failed':
       case 'timed-out': {
         release(event.componentId);
         failures += 1;
-        consecutiveFailures += 1;
+        outcomeByComponent.set(event.componentId, 'fail');
         lastCode = event.code;
         lastFailureAt = Date.now();
         return;
       }
       default: {
-        // aborted / adapted：取消不算失败；adapted 是成功的收尾。
+        // aborted：取消不是失败，也不改变该组件上一次的结论。
         release(event.componentId);
       }
     }
@@ -88,10 +100,16 @@ function createHostObserver(): HostObserver {
 
   return {
     observer,
-    status: () => ({ requests, failures, lastCode, pending: [...pendingCount.keys()] }),
+    status: () => ({
+      requests,
+      failures,
+      lastCode,
+      pending: [...pendingCount.keys()],
+      failedComponents: failedComponents(),
+    }),
     isPending: (componentId) => (pendingCount.get(componentId) ?? 0) > 0,
     lastFailureAt: () => lastFailureAt,
-    isOnline: () => consecutiveFailures === 0,
+    isOnline: () => failedComponents().length === 0,
   };
 }
 
@@ -236,12 +254,17 @@ export const screenView: ViewModule = {
     let viewerStatus: HostObserver | undefined;
     const paintStatus = (): void => {
       if (viewerStatus === undefined) return;
+      const status = viewerStatus.status();
       const online = viewerStatus.isOnline();
-      const failures = viewerStatus.status().failures;
-      const nextText = online ? '数据源在线' : `数据源离线 · ${failures} 次失败`;
+      const nextText = online ? '数据源在线' : `数据源离线 · ${status.failures} 次失败`;
       if (statusChip.textContent !== nextText) statusChip.textContent = nextText;
       const nextState = online ? 'online' : 'offline';
       if (statusChip.dataset.state !== nextState) statusChip.dataset.state = nextState;
+      // tooltip 列出离线组件：chip 只有两态，排障要能一眼看出是谁没拿到数据。
+      const nextTitle = online
+        ? '数据源在线'
+        : `离线组件：${status.failedComponents.join('、')}（累计 ${status.failures} 次失败）`;
+      if (statusChip.title !== nextTitle) statusChip.title = nextTitle;
     };
     const clockTimer = window.setInterval(() => {
       clockLabel.textContent = formatClock(new Date());

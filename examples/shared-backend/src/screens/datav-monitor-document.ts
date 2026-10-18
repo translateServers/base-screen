@@ -146,12 +146,12 @@ function frame(id: string, name: string, box: Box): void {
   });
 }
 
-function metricSource(resourceId: string): unknown {
+function metricSource(resourceId: string, points = 24): unknown {
   return {
     type: 'host-resource',
     resourceType: 'demo_metric',
     resourceId,
-    params: { points: { kind: 'literal', value: 24 } },
+    params: { points: { kind: 'literal', value: points } },
     binding: { fields: { value: ['value'] } },
   };
 }
@@ -500,7 +500,7 @@ text('trend-title', '趋势标题', [652, 262, 320, 20], '产量趋势（最近 
 });
 chart('trend-output', '产量趋势', [644, 288, 644, 412], 'area', seriesSource('output_count'));
 
-text('rank-title', '排行标题', [1312, 262, 320, 20], '产线负载排行', {
+text('rank-title', '排行标题', [1312, 262, 320, 18], '产线负载排行', {
   color: '#a8d4ea',
   fontSize: 14,
   fontWeight: '700',
@@ -508,11 +508,63 @@ text('rank-title', '排行标题', [1312, 262, 320, 20], '产线负载排行', {
 chart(
   'rank-line',
   '产线负载排行',
-  [1304, 288, 592, 412],
+  [1304, 284, 592, 190],
   'bar',
   rankingSource('line', 3),
   '#22d3ee',
 );
+
+// 主区右列纵向拆三段：排行（上）＋ 主轴负载水位 ／ 能耗达成胶囊（下并排）。
+// 这两块是 PRD 的 C16 / C17——补齐前种子里只有 KPI 那一个胶囊、没有水位图。
+text('load-water-label', '主轴负载标签', [1304, 478, 288, 16], '主轴负载（%）', {
+  color: '#7fa6c4',
+  fontSize: 12,
+});
+push({
+  id: 'load-water',
+  type: 'datav.water-level',
+  name: '主轴负载水位',
+  parentId: null,
+  position: { x: 1304, y: 496 },
+  size: { width: 288, height: 180 },
+  rotation: 0,
+  status: { locked: false, hidden: false },
+  props: { shape: 'rect', decimals: 1, showLabel: true, waveAnimation: true },
+  style: {
+    backgroundColor: 'transparent',
+    color: '#e6f1ff',
+    waterColor: '#1d4ed8',
+    waveColor: '#38bdf8',
+    borderColor: '#12405f',
+    fontSize: 24,
+  },
+  // `line_load` 走 15s 节拍（负载变化慢），points 取 12 让读数落在最近窗口。
+  dataSource: metricSource('line_load', 12),
+});
+
+text('energy-capsule-label', '能耗达成标签', [1608, 478, 288, 16], '能耗达成', {
+  color: '#7fa6c4',
+  fontSize: 12,
+});
+push({
+  id: 'energy-capsule',
+  type: 'datav.capsule-progress',
+  name: '能耗达成',
+  parentId: null,
+  position: { x: 1608, y: 496 },
+  size: { width: 288, height: 180 },
+  rotation: 0,
+  status: { locked: false, hidden: false },
+  props: { segments: 20, showValue: true, decimals: 1, glow: true },
+  style: {
+    backgroundColor: 'transparent',
+    color: '#cfe9ff',
+    trackColor: '#12304d',
+    fillColor: '#22d3ee',
+    fontSize: 18,
+  },
+  dataSource: metricSource('energy_ratio', 12),
+});
 
 // ── 副区：告警流水 / 工序链 / 班组绩效 ────────────────────────────────────
 frame('sub-frame', '副区边框', [16, 708, 1888, 216]);

@@ -124,7 +124,7 @@ pnpm verify:examples        # 依次跑三端冒烟
 
 ## 成品屏与 DataV 风格种子
 
-两张 1920×1080 的成品文档，打开即可播放：
+三张 1920×1080 的成品文档，打开即可播放（默认销售 / 生产监控 / 系统监控）：
 
 **「默认销售大屏」**——DataV 风格，顶栏 + 4 张 KPI 翻牌卡 + 渠道环形图 + 24h 面积趋势 +
 目标水位 + 区域订单柱图 + 轮播排行 + 3 条胶囊进度 + 底部滚动字幕，共 50+ 个原子组件。
@@ -202,9 +202,12 @@ pnpm verify:examples        # 依次跑三端冒烟
 | --- | --- |
 | `monitor.alarms` | 3s |
 | `monitor.devices`、`demo_metric` 的 oee / online_rate / output_count / alarm_open | 5s |
-| `monitor.pipeline`、`demo_metric` 的 line_load | 15s |
+| `monitor.pipeline`、`demo_metric` 的 line_load | 15s（负载变化慢，取 15s；与 PRD 的 5s 不同属有意取舍） |
 | `demo_metric` 的 energy_ratio、`demo_series`、`demo_ranking` | 60s |
-| 其它 | 30s |
+| 其它（含 `variable` 数据源组件） | 30s |
+
+> `variable` 数据源组件**不产生网络请求**（值来自 `variablePort`），但它仍参与 30s 节拍：
+> 到点会重新求值一次，用来刷新 `production.clock` / `production.status` 这类宿主状态文案。
 
 - **一个 250ms 心跳扫到期表**，不是每组件一个定时器；在飞行中的组件跳过（不叠加）。
 - **后台标签页不累积欠账**：`hidden` 时停心跳且不记 `nextDue`；恢复 `visible` 立刻全量补
@@ -228,7 +231,7 @@ pnpm verify:examples        # 依次跑三端冒烟
 | `?severity=all\|critical\|warning\|info` | 播种 `severity` |
 | `?poll=0` | 关闭轮询（`tickNow` 也随之不可用） |
 | `?poll=<ms>` | 所有组件用同一天花板间隔（测试用） |
-| `?fail=500` | 每次 dataset query 追加 `fail=500`（首帧即失败时只有占位 + 离线 chip，没有角标——没有上一帧可保留） |
+| `?fail=500` | 每次 dataset query 追加 `fail=500`（**仅在设置 `DATASET_FAIL_INJECTION=1` 的环境生效**；未开启时该参数按未声明参数拒成 400。首帧即失败时只有占位 + 离线 chip，没有角标——没有上一帧可保留） |
 | `?smoke=1` | 挂 `window.__baseScreenHost`：只有 `tickNow()` / `refreshNow()` / `status()` 三个入口 |
 
 
@@ -259,6 +262,34 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 
 三种类型同时由宿主自有插件声明为 `dataResourceType` 贡献——这不是可选装饰：一旦
 `runtimeContributions` 传给渲染器，未声明的类型会被拒绝，表现为「文档有组件、画布空白」。
+
+## 验收项追溯（PRD A1–A20）
+
+只列**实际有断言**的覆盖点。「三端 smoke」指三个 `scripts/smoke.mjs` 里同构的段落；
+「根测试」指 `tests/examples/*.test.ts` 与后端 jest。
+
+| PRD | 覆盖位置 | 断言要点 |
+| --- | --- | --- |
+| A1 | 后端 `datasets.service.spec` + e2e | `?query=告警` 只命中 `monitor.alarms`，`groups` 长度 1 |
+| A2 | 后端 `datasets.service.spec` + e2e | `describe` 5 字段 / 2 参数 / 3 个 allowedValues |
+| A3 | 后端 `datasets.service.spec` + 根测试 | `describe.fields` 与 `query.fields` 逐字段相同；绑定字段是数据集字段的子序列 |
+| A4 / A5b | 三端 smoke（B 段） | dataset query 串含 `line=LINE-B`，无 `[object Object]` |
+| A5 | 三端 smoke（A 段） | 三个 `dataset` 组件各 1 次 query；`production.*` 变量不产生网络请求 |
+| A6 | 三端 smoke（C 段） | 点选择器 → 该数据集出现新的 `line=LINE-B` query |
+| A7 | 三端 smoke（A 段） | `demo_*` 请求数在首屏稳定（不被新链路挤掉） |
+| A8 | 三端 smoke（A/B 段） | 告警 query 串同时含 `line`/`window`/`level` 三个参数 |
+| A9 | 三端 smoke（`tickNow`） | `tickNow()` 后请求数增加（读数变化由 `clock` 变量承载） |
+| A10 | 三端 smoke（F 段） | hidden 期间 `tickNow()` 不发请求；恢复 visible 后补一次 |
+| A11 | 未覆盖 | 需要 Playwright 挂起请求 + 并发去重，属人眼/后续专项 |
+| A12 | 三端 smoke（C/E 段）+ 根测试 | 屏上联动走蓝图；HTTP 层 400 由后端 e2e 断言 |
+| A13 | 三端 smoke（E 段） | 成功后注入 500：保留上一帧 + 角标 + 离线 chip（连续两次采样） |
+| A14 | 三端 smoke（D 段） | LINE-C：0 格 + 空文案 + 无角标 + 仍在线 |
+| A15 / A16 / A17 | 根测试（`datav-monitor-document.test.ts`） | 四种 dataSource 全覆盖；非法绑定 → `HOST_DATASET_BINDING_INVALID` |
+| A18 | 根测试 | 每条蓝图规则的 componentId / variableId / eventName 都存在 |
+| A19 | 根测试 + 后端 `screens.service.spec` | 三条种子；四种 dataSource 各 ≥1；6 个变量 |
+| A20 | `pnpm verify:examples` | 三端各自跑同一组断言（tile/节点/行数/请求串一致） |
+
+> 未列出的子项（配色对比度、字号、动画节奏等纯视觉项）由人眼验收，不进自动化。
 
 ## 分层与职责
 

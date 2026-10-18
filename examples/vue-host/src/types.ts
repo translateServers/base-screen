@@ -105,6 +105,7 @@ declare global {
             readonly failures: number;
             readonly lastCode: string | undefined;
             readonly pending: readonly string[];
+            readonly failedComponents: readonly string[];
           };
         }
       | undefined;

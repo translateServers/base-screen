@@ -2,3 +2,5 @@
 // 路径相对 prisma/ 解析（SQLite 相对路径以 schema 所在目录为基准）。
 // 必须在任何模块导入前执行（jest setupFiles 的语义），Prisma Client 实例化时才读得到。
 process.env.DATABASE_URL = 'file:../data/test.db';
+// 故障注入默认关闭，只有显式开关才生效；e2e 的 `?fail=500` 用例需要它。
+process.env.DATASET_FAIL_INJECTION = '1';

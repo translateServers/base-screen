@@ -30,6 +30,7 @@ declare global {
             readonly failures: number;
             readonly lastCode: string | undefined;
             readonly pending: readonly string[];
+            readonly failedComponents: readonly string[];
           };
         }
       | undefined;
@@ -44,10 +45,11 @@ interface FrameState {
   readonly y: number;
 }
 
-/** 顶栏数据状态 chip 的投影（在线 = 最近一次成功之后没有新的失败）。 */
+/** 顶栏数据状态 chip 的投影（在线 = 没有任何组件处于失败态）。 */
 interface DataStatusState {
   readonly online: boolean;
   readonly failures: number;
+  readonly failedComponents: readonly string[];
 }
 
 interface HostObserver {
@@ -57,6 +59,8 @@ interface HostObserver {
     readonly failures: number;
     readonly lastCode: string | undefined;
     readonly pending: readonly string[];
+    /** 当前处于失败态的组件（排序稳定），供 chip tooltip 与 smoke 断言。 */
+    readonly failedComponents: readonly string[];
   };
   isPending(componentId: string): boolean;
   lastFailureAt(): number | undefined;
@@ -64,23 +68,25 @@ interface HostObserver {
 }
 
 /**
- * 请求观察者：把渲染器的资源生命周期事件汇总成"计数 + 在飞行集合"。
+ * 请求观察者：把渲染器的资源生命周期事件汇总成"计数 + 在飞行集合 + 每组件结果"。
  *
- * 两个来自渲染器实现（`renderer-state.ts`）的硬事实决定了这里的写法：
+ * 三个来自实现的硬事实决定了这里的写法：
  * 1. `shared` 与 `aborted` 事件的 `requestId` 是**合成值**（`componentId:key:cancel`），
  *    与 `started`/`succeeded` 的真实 requestId 不相等——所以不能按 `requestId` 配对，
  *    否则每次"请求被新一轮刷新取消"都会留下一个永远清不掉的 pending。
  * 2. 一次成功会连发 `succeeded` + `adapted` 两个终态事件。
- *
- * 因此 pending 用**每组件计数器**：started/shared +1，任何终态 −1（下限 0）。
+ * 3. **在线/离线必须按组件判定**：用"连续失败次数"这种全局单值，任何别的组件成功
+ *    就会把它清零。2 秒节拍的告警流水失败、5 秒节拍的 KPI 随后成功时，顶栏会一直
+ *    显示"在线"——这正是本轮 QA 抓到的 B1。改为每组件记录 `ok`/`fail`，
+ *    **只要有一个组件处于 `fail` 就算离线**（没有任何结果时视为在线）。
  */
 function createHostObserver(): HostObserver {
   let requests = 0;
   let failures = 0;
-  let consecutiveFailures = 0;
   let lastCode: string | undefined;
   let lastFailureAt: number | undefined;
   const pendingCount = new Map<string, number>();
+  const outcomeByComponent = new Map<string, 'ok' | 'fail'>();
 
   const observer: ScreenResourceObserver = (event) => {
     switch (event.type) {
@@ -92,20 +98,27 @@ function createHostObserver(): HostObserver {
       }
       case 'succeeded': {
         release(event.componentId);
-        consecutiveFailures = 0;
+        // `adapted` 紧随其后，两者都是"这次拿到了可用数据"。
+        outcomeByComponent.set(event.componentId, 'ok');
         return;
       }
       case 'failed':
       case 'timed-out': {
         release(event.componentId);
         failures += 1;
-        consecutiveFailures += 1;
+        outcomeByComponent.set(event.componentId, 'fail');
         lastCode = event.code;
         lastFailureAt = Date.now();
         return;
       }
+      case 'adapted': {
+        release(event.componentId);
+        outcomeByComponent.set(event.componentId, 'ok');
+        return;
+      }
       default: {
-        // aborted / adapted：取消不算失败；adapted 是成功的收尾。
+        // aborted：取消不是失败，也不改变该组件上一次的结论（切变量时新旧请求交替，
+        // 改状态会让 chip 在两帧之间闪一下）。
         release(event.componentId);
       }
     }
@@ -117,6 +130,13 @@ function createHostObserver(): HostObserver {
     else pendingCount.set(componentId, next);
   }
 
+  function failedComponents(): readonly string[] {
+    return [...outcomeByComponent.entries()]
+      .filter(([, outcome]) => outcome === 'fail')
+      .map(([componentId]) => componentId)
+      .sort();
+  }
+
   return {
     observer,
     status: () => ({
@@ -124,10 +144,11 @@ function createHostObserver(): HostObserver {
       failures,
       lastCode,
       pending: [...pendingCount.keys()],
+      failedComponents: failedComponents(),
     }),
     isPending: (componentId) => (pendingCount.get(componentId) ?? 0) > 0,
     lastFailureAt: () => lastFailureAt,
-    isOnline: () => consecutiveFailures === 0,
+    isOnline: () => failedComponents().length === 0,
   };
 }
 
@@ -158,6 +179,7 @@ export function ScreenViewerPage(): React.ReactElement {
   const [dataStatus, setDataStatus] = useState<DataStatusState>({
     online: true,
     failures: 0,
+    failedComponents: [],
   });
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -294,10 +316,13 @@ export function ScreenViewerPage(): React.ReactElement {
       // 顶栏 chip 由 1s 的时钟节拍顺带刷新：不在 observer 回调里 setState，避免渲染期写入。
       frameTimer = window.setInterval(() => {
         const status = host.status();
+        const online = host.isOnline();
         setDataStatus((previous) =>
-          previous.online === host.isOnline() && previous.failures === status.failures
+          previous.online === online &&
+          previous.failures === status.failures &&
+          previous.failedComponents.join(',') === status.failedComponents.join(',')
             ? previous
-            : { online: host.isOnline(), failures: status.failures },
+            : { online, failures: status.failures, failedComponents: status.failedComponents },
         );
       }, 1000);
 
@@ -361,7 +386,11 @@ export function ScreenViewerPage(): React.ReactElement {
           className="viewer-bar__status"
           data-viewer-status=""
           data-state={dataStatus.online ? 'online' : 'offline'}
-          title={dataStatus.failures === 0 ? '数据源在线' : `已失败 ${dataStatus.failures} 次`}
+          title={
+            dataStatus.online
+              ? '数据源在线'
+              : `离线组件：${dataStatus.failedComponents.join('、')}（累计 ${dataStatus.failures} 次失败）`
+          }
         >
           {dataStatus.online ? '数据源在线' : `数据源离线 · ${dataStatus.failures} 次失败`}
         </span>

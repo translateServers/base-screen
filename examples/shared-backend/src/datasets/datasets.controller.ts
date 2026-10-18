@@ -9,7 +9,7 @@ import {
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { DatasetCatalog, DatasetDefinitionShape, DatasetTabular } from './datasets.service';
 import { DatasetsService } from './datasets.service';
-import { ListDatasetsDto, QueryDatasetDto } from './dto/dataset.dto';
+import { DescribeDatasetDto, ListDatasetsDto, QueryDatasetDto } from './dto/dataset.dto';
 
 /**
  * 数据集接口（PRD §6.1）：`list` / `describe` / `query` 三条，形状与
@@ -54,23 +54,33 @@ export class DatasetsController {
   @ApiOperation({ summary: '数据集描述：字段（顺序即绑定默认顺序）与参数（含枚举/区间/默认值）' })
   @ApiParam({ name: 'datasetId', example: 'monitor.devices' })
   @ApiResponse({ status: 404, description: 'UNKNOWN_DATASET' })
-  describe(@Param('datasetId') datasetId: string): DatasetDefinitionShape {
+  @ApiResponse({ status: 400, description: 'INVALID_REQUEST：未声明的 query 参数' })
+  describe(
+    @Param('datasetId') datasetId: string,
+    // 空 DTO 的唯一作用：让 ValidationPipe 的 whitelist / forbidNonWhitelisted 对这条路由
+    // 也生效。没有 `@Query()` 时未知参数会被静默忽略（`?bogus=1` 仍 200），
+    // 而 `?fail=500` 也会被"忽略"成一次正常 describe——故障注入就漏到了面板路径上。
+    @Query() _query: DescribeDatasetDto,
+  ): DatasetDefinitionShape {
     return this.datasets.describe(datasetId);
   }
 }
 
 /**
  * 故障注入（PRD §12）：只加在 query 上，不加在 list/describe——否则数据面板会整体空白，
- * 断言的就不是「查询失败」而是「面板坏了」。
+ * 断言的就不是"查询失败"而是"面板坏了"。
  *
- * 生产环境不生效：非 production 之外一律按未声明参数处理，避免把调试入口带进生产。
+ * **只认显式开关** `DATASET_FAIL_INJECTION=1`：早先按 `NODE_ENV !== 'production'` 判断，
+ * 漏设 NODE_ENV 的部署（很多 PaaS 默认不设）就等于生产环境可注入，这是不可接受的面子。
+ * 开关关闭时 `fail` 参数按未声明参数处理（400），不静默忽略——静默忽略会让冒烟以为
+ * 自己注入了故障，实际测的是正常路径。
  */
 function assertNoInjectedFailure(fail: string | undefined): void {
   if (fail === undefined || fail === '') return;
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.DATASET_FAIL_INJECTION !== '1') {
     throw new BadRequestException({
       error: 'INVALID_REQUEST',
-      message: 'Unsupported parameter: fail',
+      message: 'Unsupported parameter: fail (set DATASET_FAIL_INJECTION=1 to enable)',
     });
   }
   if (fail === '500') {

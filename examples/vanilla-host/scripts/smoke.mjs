@@ -94,7 +94,13 @@ async function main() {
 
   const backend = spawn(process.execPath, [BACKEND_ENTRY], {
     cwd: BACKEND_DIR,
-    env: { ...process.env, PORT: String(BACKEND_PORT), DATABASE_URL: SMOKE_DATABASE_URL },
+    env: {
+      ...process.env,
+      PORT: String(BACKEND_PORT),
+      DATABASE_URL: SMOKE_DATABASE_URL,
+      // 故障注入默认关闭（见 datasets.controller.ts）：冒烟显式打开，E 段才有 500 可注入。
+      DATASET_FAIL_INJECTION: '1',
+    },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   const backendLogs = [];
@@ -382,7 +388,9 @@ async function main() {
     }
     await emptyPage.close();
 
-    // E. 失败保留上一帧：成功之后把 query 打成 500，再 tick 一次
+    // E. 失败保留上一帧：成功之后把 query 打成 500，再 tick 一次。
+    // 断言写成**稳定态**而不是"某一瞬间出现离线"：chip 由 1s 节拍刷新，B1 修好后
+    // 只要仍有组件失败就一直是离线；连续两次采样都为离线才算成立（避免抓瞬时窗口）。
     const tilesBeforeFailure = (await readMonitorDom(clickPage)).tiles;
     await clickPage.route('**/api/datasets/*/query*', (route) =>
       route.fulfill({
@@ -400,20 +408,33 @@ async function main() {
       undefined,
       { timeout: 20_000 },
     );
+    const chipSamples = [];
+    // chip 由 1s 节拍刷新：先等它反映失败（最多 5s），再连续两次采样确认不是瞬时闪现。
     await clickPage.waitForFunction(
       () => (document.querySelector('[data-viewer-status]')?.textContent ?? '').includes('离线'),
       undefined,
-      { timeout: 20_000 },
+      { timeout: 5000 },
     );
+    for (let index = 0; index < 2; index += 1) {
+      chipSamples.push(
+        await clickPage.evaluate(
+          () => document.querySelector('[data-viewer-status]')?.textContent ?? '',
+        ),
+      );
+      await clickPage.waitForTimeout(300);
+    }
     const failedState = await readMonitorDom(clickPage);
+    if (chipSamples.some((sample) => !sample.includes('离线'))) {
+      fail(`失败态 chip 两次采样都应显示离线：${JSON.stringify(chipSamples)}`);
+    }
     if (failedState.tiles !== tilesBeforeFailure) {
       fail(`降级后应保留上一帧 ${tilesBeforeFailure} 格，实际 ${failedState.tiles}`);
     }
     if (failedState.badges < 1) fail('降级后未出现角标');
-    if (!failedState.chip.includes('离线')) fail(`降级后 chip 应显示离线：${failedState.chip}`);
-    if (failedState.host === null || failedState.host.failures < 1) {
-      fail('降级后 status().failures 应 > 0');
+    if (failedState.host === null || failedState.host.failedComponents.length < 1) {
+      fail(`status().failedComponents 应 ≥1：${JSON.stringify(failedState.host)}`);
     }
+    if (failedState.host.failures < 1) fail('降级后 status().failures 应 > 0');
     await clickPage.close();
 
     // F. 后台暂停：hidden 时 tick 不发请求，恢复 visible 后补一次

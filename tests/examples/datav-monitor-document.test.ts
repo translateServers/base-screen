@@ -20,6 +20,7 @@ import { PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST } from '../../plugins/plugin-datav-m
 import { PLUGIN_DATAV_PIPELINE_MANIFEST } from '../../plugins/plugin-datav-materials/src/pipeline.js';
 import { PLUGIN_DATAV_SCROLL_BOARD_MANIFEST } from '../../plugins/plugin-datav-materials/src/scroll-board.js';
 import { PLUGIN_DATAV_STATUS_GRID_MANIFEST } from '../../plugins/plugin-datav-materials/src/status-grid.js';
+import { PLUGIN_DATAV_WATER_LEVEL_MANIFEST } from '../../plugins/plugin-datav-materials/src/water-level.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../../plugins/plugin-echarts/src/manifest.js';
 
 /**
@@ -37,6 +38,7 @@ const MANIFESTS = [
   PLUGIN_DATAV_BORDER_BOX_MANIFEST,
   PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST,
   PLUGIN_DATAV_CAPSULE_PROGRESS_MANIFEST,
+  PLUGIN_DATAV_WATER_LEVEL_MANIFEST,
   PLUGIN_DATAV_SCROLL_BOARD_MANIFEST,
   PLUGIN_DATAV_STATUS_GRID_MANIFEST,
   PLUGIN_DATAV_PIPELINE_MANIFEST,
@@ -75,7 +77,31 @@ describe('production monitor document', () => {
     }
     expect(parsed.value.canvas).toMatchObject({ width: 1920, height: 1080 });
     expect(parsed.value.canvas.backgroundColor).toBe('#06101c');
-    expect(parsed.value.components.length).toBeGreaterThan(40);
+    // 53 个根节点。QA 复核时是 49，本轮补 C16/C17 新增 4 个（`rank-line` 是改尺寸不是新增）：
+    // 主轴负载标签 + 水位图 + 能耗标签 + 能耗胶囊。
+    expect(parsed.value.components.length).toBe(53);
+  });
+
+  it('contains the C16 / C17 blocks with their own metrics', () => {
+    if (!parsed.ok) throw new Error('document did not parse');
+    const water = parsed.value.components.find((component) => component.id === 'load-water');
+    expect(water?.type).toBe('datav.water-level');
+    if (water?.dataSource?.type !== 'host-resource') {
+      throw new Error('load-water 必须绑 host-resource');
+    }
+    expect(water.dataSource.resourceId).toBe('line_load');
+
+    // 第二个胶囊（KPI 里的 kpi-target 之外）：能耗达成。
+    const capsules = parsed.value.components.filter(
+      (component) => component.type === 'datav.capsule-progress',
+    );
+    expect(capsules).toHaveLength(2);
+    const energy = capsules.find((component) => component.id === 'energy-capsule');
+    expect(energy).toBeDefined();
+    if (energy?.dataSource?.type !== 'host-resource') {
+      throw new Error('energy-capsule 必须绑 host-resource');
+    }
+    expect(energy.dataSource.resourceId).toBe('energy_ratio');
   });
 
   it('keeps every component as a root node', () => {
@@ -225,8 +251,8 @@ describe('production monitor document', () => {
         );
       }
     }
-    // 5 张 KPI + 趋势 1 + 排行 1 = 7。
-    expect(hostResourceCount).toBe(7);
+    // 5 张 KPI + 趋势 1 + 排行 1 + 主轴负载水位 1 + 能耗胶囊 1 = 9。
+    expect(hostResourceCount).toBe(9);
   });
 
   it('keeps every static table binding aligned with its own fields', () => {

@@ -36,6 +36,16 @@ export class ListDatasetsDto {
   limit?: number;
 }
 
+/**
+ * 空 DTO：`GET /api/datasets/:datasetId` 不接受任何 query 参数。
+ *
+ * 类里一个属性都不声明，唯一目的是让全局 ValidationPipe 的
+ * `whitelist + forbidNonWhitelisted` 对这条路由生效——没有 `@Query()` 时 Nest 不会跑校验，
+ * `?bogus=1` 会被静默忽略成 200。有了它：未知参数 → 400 `INVALID_REQUEST`，
+ * 且 `?fail=500` 这条只属于 query 路由的开关不会漏到 describe 上（数据面板整体空白）。
+ */
+export class DescribeDatasetDto {}
+
 export class QueryDatasetDto {
   @ApiProperty({ required: false, description: '产线（LINE-A / LINE-B / LINE-C）' })
   @IsOptional()

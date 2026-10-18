@@ -293,6 +293,32 @@ describe('host api (e2e)', () => {
   });
 
   /**
+   * `describe` 也必须拒绝未声明的 query 参数（B3）：没有 `@Query()` 时 Nest 不跑
+   * ValidationPipe，`?bogus=1` 会被静默忽略成 200，`?fail=500` 甚至会"漏"到面板路径上。
+   */
+  it('rejects undeclared parameters on the definition route', async () => {
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices')
+      .query({ bogus: '1' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+      });
+
+    // 故障注入只属于 query 路由：即使开关打开，describe 上的 `?fail=500` 也是 400。
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices')
+      .query({ fail: '500' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+      });
+
+    // 不带任何参数时仍然 200。
+    await request(app.getHttpServer()).get('/api/datasets/monitor.devices').expect(200);
+  });
+
+  /**
    * 取值域（`limit` 区间）刻意**不**放进 DTO，否则越界会退化成笼统的 `INVALID_REQUEST`，
    * 而契约承诺的是 `INVALID_LIMIT`。DTO 只做形状校验（是不是整数），区间由 service
    * 失败关闭地判定。
