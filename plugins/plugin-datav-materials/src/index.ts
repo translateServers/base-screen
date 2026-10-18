@@ -9,6 +9,16 @@ export {
   PLUGIN_DATAV_CAPSULE_PROGRESS_MANIFEST,
   PluginDatavCapsuleProgressElement,
 } from './capsule-progress.js';
+export {
+  appendDegradedBadge,
+  clearDegradedBadge,
+  DATAV_DEGRADATION_FALLBACK,
+  DATAV_DEGRADATION_TEXT,
+  DATAV_DEGRADED_ATTRIBUTE,
+  DATAV_DEGRADED_BADGE_ATTRIBUTE,
+  degradationText,
+  shouldKeepFrame,
+} from './datav-degradation.js';
 export { DatavMaterialElement } from './datav-element.js';
 export {
   definePluginDatavDigitalFlopMaterial,
@@ -17,10 +27,16 @@ export {
   PluginDatavDigitalFlopElement,
 } from './digital-flop.js';
 export {
+  DATAV_ALARM_LEVEL_COLORS,
   DATAV_BORDER_STYLE_LABELS,
   DATAV_BORDER_STYLES,
   DATAV_DEFAULT_SURFACE,
+  DATAV_DEGRADED_COLOR,
+  DATAV_SECONDARY_COLOR,
+  DATAV_STATUS_COLORS,
+  type DatavAlarmLevelKey,
   type DatavBorderStyle,
+  type DatavStatusKey,
   isDatavBorderStyle,
   PLUGIN_DATAV_BORDER_BOX_TAG_NAME,
   PLUGIN_DATAV_BORDER_BOX_TYPE,
@@ -56,6 +72,7 @@ export {
   PLUGIN_DATAV_SCROLL_BOARD_TABULAR_DATA_ADAPTER,
   PluginDatavScrollBoardElement,
 } from './scroll-board.js';
+export { createDatavColumnsAdapter } from './tabular-columns-adapter.js';
 export {
   clampPercent,
   definePluginDatavWaterLevelMaterial,

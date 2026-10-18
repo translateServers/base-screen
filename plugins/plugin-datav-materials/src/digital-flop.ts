@@ -147,7 +147,8 @@ export class PluginDatavDigitalFlopElement extends DatavMaterialElement {
     if (suffix !== '') row.appendChild(this.#affix(suffix, model));
 
     container.appendChild(row);
-    this.replaceChildren(container);
+    // 收尾统一走 `commit()`：它就位画面、标记「已成功渲染过」，并清掉降级角标。
+    this.commit(container);
   }
 
   /** 非数字字符（千分位、小数点、负号）不入格：它们不需要翻牌，也不该占格底。 */

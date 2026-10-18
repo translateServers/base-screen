@@ -178,7 +178,8 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
     tank.appendChild(water);
     if (readBoolean(model.props.showLabel, true)) tank.appendChild(label);
     root.appendChild(tank);
-    this.replaceChildren(root);
+    // 收尾统一走 `commit()`：它就位画面、标记「已成功渲染过」，并清掉降级角标。
+    this.commit(root);
     this.setAttribute('aria-valuenow', String(percent));
 
     // 设计态不播放：无限动画只应在用户真正观看的预览/发布态里跑。

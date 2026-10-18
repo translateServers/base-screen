@@ -29,6 +29,7 @@ import { PLUGIN_DATAV_MARQUEE_MANIFEST } from '../src/marquee.js';
 import { createPluginDatavRuntime } from '../src/plugin.js';
 import { DATAV_SCALAR_VALUE_ADAPTER, DATAV_TEXT_VALUE_ADAPTER } from '../src/scalar-adapter.js';
 import { PLUGIN_DATAV_SCROLL_BOARD_MANIFEST } from '../src/scroll-board.js';
+import { createDatavColumnsAdapter } from '../src/tabular-columns-adapter.js';
 import { PLUGIN_DATAV_WATER_LEVEL_MANIFEST } from '../src/water-level.js';
 
 const MANIFESTS = [
@@ -113,6 +114,42 @@ describe('plugin-datav-materials manifests', () => {
         manifest.propertyPanel.map((field) => field.prop).filter((key) => forbidden.includes(key)),
       ).toEqual([]);
     }
+  });
+
+  // scroll-board 的等级色列：两个新 prop 必须**非必填**——一旦进 required，现有销售
+  // 大屏种子与三端冒烟的 props 校验会立刻失败（旧文档里没有这两个键）。
+  it('keeps the scroll board status props optional, declared and panel-editable', () => {
+    const manifest = PLUGIN_DATAV_SCROLL_BOARD_MANIFEST;
+    const required = manifest.propsSchema.required;
+    expect(required).not.toContain('statusColumn');
+    expect(required).not.toContain('statusPalette');
+
+    const properties = manifest.propsSchema.properties;
+    expect(properties.statusColumn?.kind).toBe('string');
+    const palette = properties.statusPalette;
+    expect(palette?.kind).toBe('object');
+    if (palette?.kind !== 'object') throw new Error('statusPalette must be an object schema');
+    // 只允许 4 个固定键：等级色板是枚举语义，不是自由字典（schema 不支持子字段控件）。
+    expect(Object.keys(palette.properties)).toEqual(['critical', 'warning', 'info', 'default']);
+    expect(palette.required).toEqual([]);
+
+    // 原子化门禁的另一半：渲染路径读取的键必须同时出现在 propsSchema 与面板里。
+    const panelProps = manifest.propertyPanel.map((field) => field.prop);
+    expect(panelProps).toContain('statusColumn');
+    expect(panelProps).toContain('statusPalette');
+    expect(panelProps.filter((prop) => prop === 'statusPalette')).toHaveLength(1);
+    expect(manifest.propertyPanel.find((field) => field.prop === 'statusPalette')?.control).toBe(
+      'json',
+    );
+
+    // 旧文档的 props（只有原来 4 个键）依然覆盖 schema 的全部必填项 ⇒ manifest 校验通过。
+    const legacyProps = { headerVisible: true, rowCount: 5, intervalMs: 3000, autoScroll: true };
+    expect(required).toHaveLength(4);
+    expect(required.every((key) => Object.hasOwn(legacyProps, key))).toBe(true);
+
+    // 默认值必须是「不启用」：这是「不传两个 prop 时 DOM 与扩展前逐字一致」的前提。
+    expect(manifest.defaultProps.statusColumn).toBe('');
+    expect(manifest.defaultProps.statusPalette).toEqual({});
   });
 });
 
@@ -291,5 +328,46 @@ describe('datav tabular adapters', () => {
       fields: { value: [nameField] },
     });
     expect(result.ok ? result.value : undefined).toBe('华东 · 华南');
+  });
+
+  // 共用列投影工厂：scroll-board / status-grid / pipeline 都走它。
+  it('projects tabular roles through the shared columns adapter', () => {
+    const nameField = { id: 'name', label: '名称', valueType: 'string' as const };
+    const statusField = { id: 'status', label: '状态', valueType: 'string' as const };
+    const loadField = { id: 'load', label: '负载', valueType: 'number' as const };
+    const adapter = createDatavColumnsAdapter('items');
+
+    const result = adapter.adapt({
+      dataset: {
+        // dataset 的字段顺序与绑定顺序不同：列顺序必须按绑定顺序，不能按 dataset 顺序。
+        fields: [statusField, nameField, loadField],
+        rows: [{ name: '冲压-01', status: 'running', load: 72, extra: 'ignored' }],
+        totalRowCount: 9,
+      },
+      fields: { items: [nameField, statusField, loadField] },
+    });
+
+    if (!result.ok) throw new Error('the adapter must accept a valid binding');
+    const value = result.value as unknown as {
+      readonly columns: readonly { readonly id: string; readonly valueType: string }[];
+      readonly rows: readonly Record<string, unknown>[];
+      readonly totalRowCount?: number;
+    };
+    expect(value.columns.map((column) => column.id)).toEqual(['name', 'status', 'load']);
+    expect(value.columns.map((column) => column.valueType)).toEqual(['string', 'string', 'number']);
+    // 未绑定字段不得漏进视图模型，缺失字段补 null。
+    expect(Object.keys(value.rows[0] ?? {})).toEqual(['name', 'status', 'load']);
+    expect(value.totalRowCount).toBe(9);
+  });
+
+  it('fails closed when the bound role has no fields', () => {
+    const result = createDatavColumnsAdapter('items').adapt({
+      dataset: { fields: [], rows: [] },
+      fields: {},
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false ? result.diagnostics[0]?.code : undefined).toBe(
+      'HOST_DATASET_BINDING_INVALID',
+    );
   });
 });

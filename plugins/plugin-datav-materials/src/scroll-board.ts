@@ -1,8 +1,4 @@
-import type {
-  ScreenDatasetField,
-  ScreenParseResult,
-  ScreenTabularDataset,
-} from '@base-screen/contracts';
+import type { ScreenParseResult } from '@base-screen/contracts';
 import {
   BASE_SCREEN_MATERIAL_EVENT,
   type BaseScreenMaterialCatalogEntry,
@@ -14,8 +10,14 @@ import {
 } from '@base-screen/plugin-core';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { DatavMaterialElement, type DatavMaterialModel } from './datav-element.js';
-import { PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME, PLUGIN_DATAV_SCROLL_BOARD_TYPE } from './identity.js';
-import { readBoolean, readNumber, styleColor } from './json-values.js';
+import {
+  DATAV_ALARM_LEVEL_COLORS,
+  type DatavAlarmLevelKey,
+  PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME,
+  PLUGIN_DATAV_SCROLL_BOARD_TYPE,
+} from './identity.js';
+import { readBoolean, readNumber, readRecord, readString, styleColor } from './json-values.js';
+import { createDatavColumnsAdapter } from './tabular-columns-adapter.js';
 
 /**
  * 轮播列表：用滚动动画在固定区域内轮流展示多行明细。
@@ -38,6 +40,9 @@ export const PLUGIN_DATAV_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
     rowCount: 5,
     intervalMs: 3000,
     autoScroll: true,
+    // 等级色列默认关闭：不传即与扩展前的 DOM 逐字一致（旧种子与三端冒烟零改动）。
+    statusColumn: '',
+    statusPalette: {},
   },
   defaultData: {
     fields: [
@@ -95,7 +100,22 @@ export const PLUGIN_DATAV_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
       rowCount: { kind: 'number', minimum: 1, maximum: 50 },
       intervalMs: { kind: 'number', minimum: 200, maximum: 60_000 },
       autoScroll: { kind: 'boolean' },
+      // 列 id（不是字段标签）。指向 `columns` 绑定里的某一列；不在绑定里时按「未启用」处理。
+      statusColumn: { kind: 'string', maxLength: 64 },
+      // 值→色的覆盖：只允许 4 个固定键（等级色板是枚举语义，不是自由字典）。
+      statusPalette: {
+        kind: 'object',
+        properties: {
+          critical: { kind: 'string' },
+          warning: { kind: 'string' },
+          info: { kind: 'string' },
+          default: { kind: 'string' },
+        },
+        required: [],
+      },
     },
+    // 两个新键**不得**进 required：旧文档的 props 里没有它们，进 required 会让现有
+    // 销售大屏种子与三端冒烟立刻 props 校验失败。
     required: ['headerVisible', 'rowCount', 'intervalMs', 'autoScroll'],
   },
   propertyPanel: [
@@ -103,6 +123,10 @@ export const PLUGIN_DATAV_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
     { prop: 'rowCount', label: '可见行数', control: 'number' },
     { prop: 'intervalMs', label: '轮播间隔(ms)', control: 'number' },
     { prop: 'autoScroll', label: '自动轮播', control: 'boolean' },
+    { prop: 'statusColumn', label: '状态色列(列 id)', control: 'text' },
+    // manifest 无法为 4 个键各生成一个取色器（propertyPanel 只有 prop/label/control），
+    // 因此用 json 控件，值形如 {"critical":"#f5222d"}；留空即用共用等级调色板。
+    { prop: 'statusPalette', label: '等级色覆盖(json)', control: 'json' },
   ],
   events: ['rowClick'],
   dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
@@ -164,6 +188,11 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
     const fontSize = readNumber(model.style.fontSize, 14);
     const borderColor = styleColor(model.style.borderColor, '#1e3a5f');
     this.#rows = data.rows;
+    // 等级色列：列 id 不在绑定里时一律按「未启用」处理（列 id 是配置，不是契约，不报错）。
+    const statusColumnId = readString(model.props.statusColumn, '');
+    const statusColumnIndex =
+      statusColumnId === '' ? -1 : data.columns.findIndex((column) => column.id === statusColumnId);
+    const palette = readStatusPalette(model.props.statusPalette);
 
     const root = doc.createElement('div');
     root.dataset.datavScrollBoard = '';
@@ -175,6 +204,8 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
       const header = doc.createElement('div');
       header.dataset.datavBoardHeader = '';
       header.style.cssText = `flex:0 0 auto;display:flex;height:${rowHeight}px;align-items:center;border-bottom:1px solid ${borderColor};color:${styleColor(model.style.headerColor, '#8aa4c0')};font:600 ${fontSize}px/1 sans-serif;`;
+      // 启用等级色条时表头补一个等宽占位，否则表头与数据列会错开 4 px + 间距。
+      if (statusColumnIndex >= 0) header.appendChild(this.#statusBar('transparent'));
       for (const column of data.columns) header.appendChild(this.#cell(column.label, 1, fontSize));
       root.appendChild(header);
     }
@@ -191,6 +222,16 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
       const line = doc.createElement('div');
       line.dataset.datavBoardRow = String(rowIndex);
       line.style.cssText = `display:flex;height:${rowHeight}px;align-items:center;border-bottom:1px solid ${borderColor};font:${fontSize}px/1 sans-serif;`;
+      let statusColor: string | undefined;
+      if (statusColumnIndex >= 0) {
+        const statusColumn = data.columns[statusColumnIndex];
+        const raw = statusColumn === undefined ? undefined : row[statusColumn.id];
+        const level = typeof raw === 'string' ? raw : '';
+        statusColor = alarmLevelColor(palette, level);
+        // 行级属性便于断言与样式钩子；色条不是唯一编码，行内等级文字仍然保留。
+        line.dataset.datavRowStatus = level === '' ? 'unknown' : level;
+        line.appendChild(this.#statusBar(statusColor));
+      }
       data.columns.forEach((column, columnIndex) => {
         const value = row[column.id];
         line.appendChild(
@@ -199,6 +240,7 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
             columnIndex,
             fontSize,
             columnIndex === data.columns.length - 1,
+            columnIndex === statusColumnIndex ? statusColor : undefined,
           ),
         );
       });
@@ -207,7 +249,7 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
     });
     viewport.appendChild(track);
     root.appendChild(viewport);
-    this.replaceChildren(root);
+    this.commit(root);
 
     // 只有真正容纳不下的数据才轮播；一屏能放下时保持静止（也就不会无谓地消耗定时器）。
     if (readBoolean(model.props.autoScroll, true) && data.rows.length > visibleCount) {
@@ -215,11 +257,26 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
     }
   }
 
-  #cell(text: string, columnIndex: number, fontSize: number, alignEnd = false): HTMLElement {
+  /** 行左 4 px 状态色条：与文字并存，因此色盲也能读出行等级。 */
+  #statusBar(color: string): HTMLElement {
+    const bar = this.ownerDocument.createElement('span');
+    bar.dataset.datavStatusBar = '';
+    bar.style.cssText = `flex:0 0 4px;align-self:stretch;background:${color};margin-right:6px;border-radius:2px;`;
+    return bar;
+  }
+
+  #cell(
+    text: string,
+    columnIndex: number,
+    fontSize: number,
+    alignEnd = false,
+    color?: string,
+  ): HTMLElement {
     const cell = this.ownerDocument.createElement('span');
     cell.dataset.datavBoardCell = String(columnIndex);
     cell.textContent = text;
-    cell.style.cssText = `flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:${fontSize}px;${alignEnd ? 'text-align:right;font-variant-numeric:tabular-nums;' : ''}`;
+    const colorStyle = color === undefined ? '' : `color:${color};`;
+    cell.style.cssText = `flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:${fontSize}px;${colorStyle}${alignEnd ? 'text-align:right;font-variant-numeric:tabular-nums;' : ''}`;
     return cell;
   }
 
@@ -275,48 +332,45 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
   }
 }
 
+/**
+ * 列投影走共用工厂（`createDatavColumnsAdapter`）：`scroll-board` / `status-grid` /
+ * `pipeline` 的「表格 → 视图模型」只有一份实现。导出名保持不变（外部按名字引用）。
+ */
 export const PLUGIN_DATAV_SCROLL_BOARD_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDataAdapter =
-  {
-    adapt({
-      dataset,
-      fields,
-    }: {
-      readonly dataset: ScreenTabularDataset;
-      readonly fields: Readonly<Record<string, readonly ScreenDatasetField[]>>;
-    }) {
-      const columns = fields.columns;
-      if (columns === undefined || columns.length === 0) {
-        return {
-          ok: false,
-          diagnostics: [
-            {
-              severity: 'error',
-              code: 'HOST_DATASET_BINDING_INVALID',
-              path: [],
-              message: 'Scroll board dataset binding is invalid.',
-            },
-          ],
-        };
-      }
-      return {
-        ok: true,
-        value: {
-          columns: columns.map((field) => ({
-            id: field.id,
-            label: field.label,
-            valueType: field.valueType,
-            sortable: false,
-            filterable: false,
-          })),
-          rows: dataset.rows.map((row) =>
-            Object.fromEntries(columns.map((field) => [field.id, row[field.id] ?? null])),
-          ),
-          ...(dataset.totalRowCount === undefined ? {} : { totalRowCount: dataset.totalRowCount }),
-        },
-        diagnostics: [],
-      };
-    },
-  };
+  createDatavColumnsAdapter('columns');
+
+/** 等级色板的可用键：与 manifest 的 `statusPalette` schema 一致（4 个固定键）。 */
+const STATUS_PALETTE_KEYS = ['critical', 'warning', 'info', 'default'] as const;
+
+/**
+ * 读 `statusPalette`：只接受 4 个固定键的字符串值，其余键与非法值一律忽略。
+ * 空对象（默认值）= 完全回落到共用等级调色板。
+ */
+function readStatusPalette(value: unknown): Readonly<Record<string, string>> {
+  const record = readRecord(value);
+  const palette: Record<string, string> = {};
+  if (record === undefined) return palette;
+  for (const key of STATUS_PALETTE_KEYS) {
+    const color = record[key];
+    if (typeof color === 'string' && color.length > 0) palette[key] = color;
+  }
+  return palette;
+}
+
+function isAlarmLevelKey(value: string): value is DatavAlarmLevelKey {
+  return Object.hasOwn(DATAV_ALARM_LEVEL_COLORS, value);
+}
+
+/**
+ * 等级 → 颜色，优先级：`statusPalette[level]` → 共用等级调色板 → `statusPalette.default`
+ * → 中性 `unknown`。未知等级不报错、不进失败计数（等级是数据内容，不是配置错误）。
+ */
+function alarmLevelColor(palette: Readonly<Record<string, string>>, level: string): string {
+  const override = palette[level];
+  if (override !== undefined) return override;
+  if (isAlarmLevelKey(level)) return DATAV_ALARM_LEVEL_COLORS[level];
+  return palette.default ?? DATAV_ALARM_LEVEL_COLORS.unknown;
+}
 
 Object.defineProperty(PluginDatavScrollBoardElement, 'tabularDataAdapter', {
   value: PLUGIN_DATAV_SCROLL_BOARD_TABULAR_DATA_ADAPTER,

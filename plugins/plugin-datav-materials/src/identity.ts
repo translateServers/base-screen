@@ -72,3 +72,38 @@ export const DATAV_DEFAULT_SURFACE = {
   accentColor: '#38bdf8',
   borderColor: '#1e3a5f',
 } as const;
+
+/**
+ * 设备/工序五态色——**唯一来源**（PRD §10.1）。
+ *
+ * 任何物料（现状 `scroll-board`，后续 `status-grid` / `pipeline`）与降级角标都从这里
+ * 取色，不得再写十六进制字面量；否则同一个「故障红」会在三个物料里出现三个近似值，
+ * 值班员就无法用颜色做跨区块对照。
+ *
+ * 颜色**不是唯一编码**：每处用色都必须同时有文字（`fault` 旁边要有「故障」）。
+ */
+export const DATAV_STATUS_COLORS = {
+  running: '#52c41a',
+  standby: '#fa8c16',
+  fault: '#f5222d',
+  offline: '#6b7d8f',
+  unknown: '#6b7d8f',
+} as const;
+
+export type DatavStatusKey = keyof typeof DATAV_STATUS_COLORS;
+
+/** 告警等级三色（+ 兜底）：与设备五态是两套语义，故单列一张表。 */
+export const DATAV_ALARM_LEVEL_COLORS = {
+  critical: '#f5222d',
+  warning: '#fa8c16',
+  info: '#1677ff',
+  unknown: '#6b7d8f',
+} as const;
+
+export type DatavAlarmLevelKey = keyof typeof DATAV_ALARM_LEVEL_COLORS;
+
+/** 降级角标色：橙、只用一处，避免「错误态红色铺底」（红是告警语义专用）。 */
+export const DATAV_DEGRADED_COLOR = '#fa8c16';
+
+/** 默认表头/次级文本色（与各 manifest 的 `headerColor` 默认值同源）。 */
+export const DATAV_SECONDARY_COLOR = '#8aa4c0';

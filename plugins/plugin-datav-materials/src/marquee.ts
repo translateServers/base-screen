@@ -131,7 +131,8 @@ export class PluginDatavMarqueeElement extends DatavMaterialElement {
       );
     }
 
-    this.replaceChildren(track);
+    // 收尾统一走 `commit()`：它就位画面、标记「已成功渲染过」，并清掉降级角标。
+    this.commit(track);
   }
 
   #copy(text: string, gap: number): HTMLElement {
