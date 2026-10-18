@@ -34,10 +34,13 @@ export {
   DATAV_DEGRADED_COLOR,
   DATAV_SECONDARY_COLOR,
   DATAV_STATUS_COLORS,
+  DATAV_STATUS_LABELS,
   type DatavAlarmLevelKey,
   type DatavBorderStyle,
   type DatavStatusKey,
   isDatavBorderStyle,
+  isDatavStatusKey,
+  normalizeDatavStatus,
   PLUGIN_DATAV_BORDER_BOX_TAG_NAME,
   PLUGIN_DATAV_BORDER_BOX_TYPE,
   PLUGIN_DATAV_BORDER_PICKER_ID,
@@ -50,16 +53,30 @@ export {
   PLUGIN_DATAV_ID,
   PLUGIN_DATAV_MARQUEE_TAG_NAME,
   PLUGIN_DATAV_MARQUEE_TYPE,
+  PLUGIN_DATAV_PIPELINE_TAG_NAME,
+  PLUGIN_DATAV_PIPELINE_TYPE,
   PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME,
   PLUGIN_DATAV_SCROLL_BOARD_TYPE,
+  PLUGIN_DATAV_STATUS_GRID_TAG_NAME,
+  PLUGIN_DATAV_STATUS_GRID_TYPE,
   PLUGIN_DATAV_WATER_LEVEL_TAG_NAME,
   PLUGIN_DATAV_WATER_LEVEL_TYPE,
+  statusColorMap,
 } from './identity.js';
 export {
   definePluginDatavMarqueeMaterial,
   PLUGIN_DATAV_MARQUEE_MANIFEST,
   PluginDatavMarqueeElement,
 } from './marquee.js';
+export {
+  definePluginDatavPipelineMaterial,
+  layoutPipelineStages,
+  PIPELINE_MIN_NODE_WIDTH,
+  PIPELINE_NODE_GAP,
+  PIPELINE_PADDING,
+  PLUGIN_DATAV_PIPELINE_MANIFEST,
+  PluginDatavPipelineElement,
+} from './pipeline.js';
 export { createPluginDatavRuntime } from './plugin.js';
 export { registerPluginDatavMaterials } from './register.js';
 export {
@@ -72,7 +89,22 @@ export {
   PLUGIN_DATAV_SCROLL_BOARD_TABULAR_DATA_ADAPTER,
   PluginDatavScrollBoardElement,
 } from './scroll-board.js';
-export { createDatavColumnsAdapter } from './tabular-columns-adapter.js';
+export {
+  buildStatusLegend,
+  computeStatusGridLayout,
+  definePluginDatavStatusGridMaterial,
+  PLUGIN_DATAV_STATUS_GRID_MANIFEST,
+  PluginDatavStatusGridElement,
+  STATUS_GRID_LEGEND_ORDER,
+  STATUS_GRID_MAX_COLUMNS,
+  STATUS_GRID_MIN_TILE_SIZE,
+} from './status-grid.js';
+export {
+  createDatavColumnsAdapter,
+  createDatavStateAdapter,
+  type DatavStateRow,
+  readDatavStateRows,
+} from './tabular-columns-adapter.js';
 export {
   clampPercent,
   definePluginDatavWaterLevelMaterial,

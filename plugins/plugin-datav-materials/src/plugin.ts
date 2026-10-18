@@ -16,7 +16,9 @@ import {
   PLUGIN_DATAV_DIGITAL_FLOP_TYPE,
   PLUGIN_DATAV_ID,
   PLUGIN_DATAV_MARQUEE_TYPE,
+  PLUGIN_DATAV_PIPELINE_TYPE,
   PLUGIN_DATAV_SCROLL_BOARD_TYPE,
+  PLUGIN_DATAV_STATUS_GRID_TYPE,
   PLUGIN_DATAV_WATER_LEVEL_TYPE,
 } from './identity.js';
 
@@ -146,6 +148,16 @@ function materialContributions() {
       kind: 'material' as const,
       type: PLUGIN_DATAV_MARQUEE_TYPE,
       tagName: 'base-screen-datav-marquee',
+    },
+    {
+      kind: 'material' as const,
+      type: PLUGIN_DATAV_STATUS_GRID_TYPE,
+      tagName: 'base-screen-datav-status-grid',
+    },
+    {
+      kind: 'material' as const,
+      type: PLUGIN_DATAV_PIPELINE_TYPE,
+      tagName: 'base-screen-datav-pipeline',
     },
   ];
 }

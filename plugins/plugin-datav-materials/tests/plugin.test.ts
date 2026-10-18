@@ -8,6 +8,7 @@ import { PLUGIN_DATAV_CAPSULE_PROGRESS_MANIFEST } from '../src/capsule-progress.
 import { PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST } from '../src/digital-flop.js';
 import {
   DATAV_BORDER_STYLES,
+  DATAV_STATUS_COLORS,
   PLUGIN_DATAV_BORDER_BOX_TAG_NAME,
   PLUGIN_DATAV_BORDER_BOX_TYPE,
   PLUGIN_DATAV_BORDER_PICKER_ID,
@@ -20,15 +21,21 @@ import {
   PLUGIN_DATAV_ID,
   PLUGIN_DATAV_MARQUEE_TAG_NAME,
   PLUGIN_DATAV_MARQUEE_TYPE,
+  PLUGIN_DATAV_PIPELINE_TAG_NAME,
+  PLUGIN_DATAV_PIPELINE_TYPE,
   PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME,
   PLUGIN_DATAV_SCROLL_BOARD_TYPE,
+  PLUGIN_DATAV_STATUS_GRID_TAG_NAME,
+  PLUGIN_DATAV_STATUS_GRID_TYPE,
   PLUGIN_DATAV_WATER_LEVEL_TAG_NAME,
   PLUGIN_DATAV_WATER_LEVEL_TYPE,
 } from '../src/identity.js';
 import { PLUGIN_DATAV_MARQUEE_MANIFEST } from '../src/marquee.js';
+import { PLUGIN_DATAV_PIPELINE_MANIFEST } from '../src/pipeline.js';
 import { createPluginDatavRuntime } from '../src/plugin.js';
 import { DATAV_SCALAR_VALUE_ADAPTER, DATAV_TEXT_VALUE_ADAPTER } from '../src/scalar-adapter.js';
 import { PLUGIN_DATAV_SCROLL_BOARD_MANIFEST } from '../src/scroll-board.js';
+import { PLUGIN_DATAV_STATUS_GRID_MANIFEST } from '../src/status-grid.js';
 import { createDatavColumnsAdapter } from '../src/tabular-columns-adapter.js';
 import { PLUGIN_DATAV_WATER_LEVEL_MANIFEST } from '../src/water-level.js';
 
@@ -39,6 +46,8 @@ const MANIFESTS = [
   PLUGIN_DATAV_BORDER_BOX_MANIFEST,
   PLUGIN_DATAV_CAPSULE_PROGRESS_MANIFEST,
   PLUGIN_DATAV_MARQUEE_MANIFEST,
+  PLUGIN_DATAV_STATUS_GRID_MANIFEST,
+  PLUGIN_DATAV_PIPELINE_MANIFEST,
 ];
 
 describe('plugin-datav-materials manifests', () => {
@@ -62,6 +71,8 @@ describe('plugin-datav-materials manifests', () => {
       [PLUGIN_DATAV_BORDER_BOX_TYPE, PLUGIN_DATAV_BORDER_BOX_TAG_NAME],
       [PLUGIN_DATAV_CAPSULE_PROGRESS_TYPE, PLUGIN_DATAV_CAPSULE_PROGRESS_TAG_NAME],
       [PLUGIN_DATAV_MARQUEE_TYPE, PLUGIN_DATAV_MARQUEE_TAG_NAME],
+      [PLUGIN_DATAV_STATUS_GRID_TYPE, PLUGIN_DATAV_STATUS_GRID_TAG_NAME],
+      [PLUGIN_DATAV_PIPELINE_TYPE, PLUGIN_DATAV_PIPELINE_TAG_NAME],
     ];
     expect(MANIFESTS.map((manifest) => [manifest.type, manifest.tagName])).toEqual(expected);
   });
@@ -160,9 +171,11 @@ describe('plugin-datav-materials runtime', () => {
     expect(runtime.manifest.id).toBe(PLUGIN_DATAV_ID);
   });
 
-  it('declares six materials, one inspector control and one command', () => {
+  it('declares eight materials, one inspector control and one command', () => {
     const runtime = createPluginDatavRuntime();
     expect(runtime.manifest.contributions.map((item) => item.kind)).toEqual([
+      'material',
+      'material',
       'material',
       'material',
       'material',
@@ -174,6 +187,54 @@ describe('plugin-datav-materials runtime', () => {
     ]);
     expect(runtime.manifest.capabilities).toEqual(['command.execute', 'design.read']);
     expect(Object.keys(runtime.commands ?? {})).toEqual([PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID]);
+    // 两个新物料必须在 contributions 里：漏了会在宿主 preflight 阶段
+    // 直接 HOST_PLUGIN_PREFLIGHT_FAILED（清单声明与元素注册不一致）。
+    const materialTypes = runtime.manifest.contributions
+      .filter((item) => item.kind === 'material')
+      .map((item) => (item.kind === 'material' ? item.type : ''));
+    expect(materialTypes).toContain(PLUGIN_DATAV_STATUS_GRID_TYPE);
+    expect(materialTypes).toContain(PLUGIN_DATAV_PIPELINE_TYPE);
+  });
+
+  it('binds the two new materials by role with string+number value types', () => {
+    // 角色声明错（例如漏掉 number）会让 dataset 绑定被 validateScreenHostResourceBinding 拒绝。
+    expect(PLUGIN_DATAV_STATUS_GRID_MANIFEST.dataBinding?.roles).toEqual([
+      { id: 'items', minFields: 1, maxFields: 3, valueTypes: ['string', 'number'] },
+    ]);
+    expect(PLUGIN_DATAV_PIPELINE_MANIFEST.dataBinding?.roles).toEqual([
+      { id: 'stages', minFields: 2, maxFields: 3, valueTypes: ['string', 'number'] },
+    ]);
+    // 静态数据与数据集共用同一 adapter：defaultBinding 必须与角色 id 对齐。
+    expect(PLUGIN_DATAV_STATUS_GRID_MANIFEST.staticData).toEqual({
+      kind: 'tabular',
+      defaultBinding: { fields: { items: ['name', 'status', 'load'] } },
+    });
+    expect(PLUGIN_DATAV_PIPELINE_MANIFEST.staticData).toEqual({
+      kind: 'tabular',
+      defaultBinding: { fields: { stages: ['name', 'status', 'throughput'] } },
+    });
+    // 本轮不给事件：tileClick / nodeClick 是 P1/P2，声明了却没有通道等于空承诺。
+    expect(PLUGIN_DATAV_STATUS_GRID_MANIFEST.events).toEqual([]);
+    expect(PLUGIN_DATAV_PIPELINE_MANIFEST.events).toEqual([]);
+  });
+
+  it('gives the two new materials flat status palette keys with palette defaults', () => {
+    const paletteKeys: ReadonlyArray<readonly [string, keyof typeof DATAV_STATUS_COLORS]> = [
+      ['runningColor', 'running'],
+      ['standbyColor', 'standby'],
+      ['faultColor', 'fault'],
+      ['offlineColor', 'offline'],
+      ['unknownColor', 'unknown'],
+    ];
+    for (const manifest of [PLUGIN_DATAV_STATUS_GRID_MANIFEST, PLUGIN_DATAV_PIPELINE_MANIFEST]) {
+      for (const [styleKey, statusKey] of paletteKeys) {
+        // 五态色默认值必须来自 identity.ts 的唯一来源，不能各写一份十六进制字面量。
+        expect(manifest.defaultStyle[styleKey]).toBe(DATAV_STATUS_COLORS[statusKey]);
+        expect(manifest.styleSchema.properties[styleKey]?.kind).toBe('string');
+        expect(manifest.styleSchema.required).toContain(styleKey);
+        expect(manifest.stylePanel.map((field) => field.style)).toContain(styleKey);
+      }
+    }
   });
 
   it('cycles the focused border box through every declared style and stays undoable', async () => {

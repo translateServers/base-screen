@@ -1,3 +1,5 @@
+import { styleColor } from './json-values.js';
+
 /**
  * 大屏组件包的标识与词汇。
  *
@@ -29,6 +31,12 @@ export const PLUGIN_DATAV_CAPSULE_PROGRESS_TAG_NAME = 'base-screen-datav-capsule
 
 export const PLUGIN_DATAV_MARQUEE_TYPE = 'datav.marquee';
 export const PLUGIN_DATAV_MARQUEE_TAG_NAME = 'base-screen-datav-marquee';
+
+export const PLUGIN_DATAV_STATUS_GRID_TYPE = 'datav.status-grid';
+export const PLUGIN_DATAV_STATUS_GRID_TAG_NAME = 'base-screen-datav-status-grid';
+
+export const PLUGIN_DATAV_PIPELINE_TYPE = 'datav.pipeline';
+export const PLUGIN_DATAV_PIPELINE_TAG_NAME = 'base-screen-datav-pipeline';
 
 /** 本插件自己的检查器控件：装饰边框的样式选择器，经 editorDescriptor 的 `control: 'custom'` 授权使用。 */
 export const PLUGIN_DATAV_BORDER_PICKER_ID = 'base-screen.datav.border-style-picker';
@@ -91,6 +99,48 @@ export const DATAV_STATUS_COLORS = {
 } as const;
 
 export type DatavStatusKey = keyof typeof DATAV_STATUS_COLORS;
+
+/**
+ * 状态词汇（中文展示名）。颜色**不是唯一编码**：每处用色都必须能同时给出这段文字，
+ * 否则色盲用户与打印稿都无法读出状态。
+ */
+export const DATAV_STATUS_LABELS: Readonly<Record<DatavStatusKey, string>> = {
+  running: '运行',
+  standby: '待机',
+  fault: '故障',
+  offline: '离线',
+  unknown: '未知',
+};
+
+/** 五态词汇的位置也在这里：状态归一只有一处实现，物料不得各写一份字符串比较。 */
+export function isDatavStatusKey(value: unknown): value is DatavStatusKey {
+  return typeof value === 'string' && Object.hasOwn(DATAV_STATUS_COLORS, value);
+}
+
+/** 任何不在五态内的字符串（含空串、数字、null）一律归 `unknown`，不抛错。 */
+export function normalizeDatavStatus(value: unknown): DatavStatusKey {
+  return isDatavStatusKey(value) ? value : 'unknown';
+}
+
+/**
+ * 从 style 里读出五态色（带 override 语义）：`runningColor` 等扁平键优先，
+ * 缺省回落到 `DATAV_STATUS_COLORS`。
+ *
+ * 为什么不用嵌套 `statusColors` 对象：manifest 的 styleSchema/propertyPanel 对嵌套
+ * 字典支持不好（面板无法为子字段各生成一个取色器），扁平键才能让 5 个色都能被编辑。
+ * 扁平键也让「五态色的唯一来源」这条约定可被 lint 看见：默认值直接引用本文件的常量。
+ */
+export function statusColorMap(
+  style: Readonly<Record<string, unknown>>,
+): Readonly<Record<DatavStatusKey, string>> {
+  return {
+    running: styleColor(style.runningColor, DATAV_STATUS_COLORS.running),
+    standby: styleColor(style.standbyColor, DATAV_STATUS_COLORS.standby),
+    fault: styleColor(style.faultColor, DATAV_STATUS_COLORS.fault),
+    offline: styleColor(style.offlineColor, DATAV_STATUS_COLORS.offline),
+    unknown: styleColor(style.unknownColor, DATAV_STATUS_COLORS.unknown),
+  };
+}
 
 /** 告警等级三色（+ 兜底）：与设备五态是两套语义，故单列一张表。 */
 export const DATAV_ALARM_LEVEL_COLORS = {
