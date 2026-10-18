@@ -52,14 +52,14 @@
 .designer-data-source-panel h3 {
   color: var(--designer-text-primary);
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: normal;
 }
 
 .designer-data-source-panel h4 {
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+  letter-spacing: normal;
   text-transform: uppercase;
 }
 
@@ -295,7 +295,7 @@
   min-width: 0;
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .designer-dataset-binding-heading > span {

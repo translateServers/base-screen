@@ -55,7 +55,7 @@
   border-radius: 50%;
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .designer-data-summary-step[data-state="ready"] .designer-data-summary-step-marker {
@@ -86,7 +86,7 @@
 .designer-data-summary-step-copy strong {
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .designer-data-summary-step-copy small,
@@ -262,7 +262,7 @@
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
   font-size: var(--designer-font-size-xs);
-  letter-spacing: 0.02em;
+  letter-spacing: normal;
 }
 
 .designer-bind-count[data-at-limit="true"] {
@@ -419,7 +419,7 @@
   margin: 0;
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .designer-dataset-binding-summary-header > span {
@@ -576,7 +576,7 @@
   margin: 0;
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .designer-dataset-editor-modes {

@@ -1,0 +1,46 @@
+/* 左栏列表的选中态：图层树与蓝图库共用这一份绘制。
+   两边的行结构不同（图层行是 40px 平铺行，蓝图行是 44px 卡片），但「这一项被选中」
+   是同一件事，所以画法只留这一处；面板自己的 CSS 只管几何（行高、圆角、多选连段的圆角），
+   不再各自画一遍选中。
+
+   画法：Vercel 式中性选中 —— 一档更深的灰底 + 1px 中性收边，全篇不用强调色。
+   - 强调色在这个工作台里是「可执行的主操作」与「画布选框」的信号。列表里选中只是
+     定位坐标，用同一个蓝会把两类语义搅在一起，也让密集列表变成一片彩色。
+   - 底色取 control-active 再往 text-primary 压 7%：hover 是 control-hover，只差一档时
+     划过和选中几乎同色；压深一步才拉开「划过 < 选中」的两级。
+   - 行内文字统一回到中性档（名称 primary、副行 secondary），类型色块保留原本的色相：
+     选中不该抹掉「这是哪一类」。
+   - 内收边而不是外描边：行与行严丝合缝，外描边会画到邻居身上。 */
+
+.layer-row[aria-selected="true"],
+.blueprint-palette-item[data-selected="true"] {
+  background-color: color-mix(
+    in oklab,
+    var(--designer-surface-control-active),
+    var(--designer-text-primary) 7%
+  );
+  color: var(--designer-text-primary);
+  box-shadow: inset 0 0 0 1px var(--designer-border-default);
+}
+
+/* ── 图层行 ─────────────────────────────────────────────────────────────────── */
+
+/* 名称按钮是行内唯一带控件基色的节点（.designer-button 自带 text-primary），
+   这里显式点回来，避免它被行底色变化带偏。 */
+.layer-row[aria-selected="true"] .layer-select {
+  color: var(--designer-text-primary);
+}
+
+/* 副行（类型 · 尺寸）从 muted 提一档到 secondary：灰底上 muted 会掉到 3:1 以下，
+   而它承载尺寸读数，不能只当装饰。 */
+.layer-row[aria-selected="true"] .layer-meta,
+.layer-row[aria-selected="true"] .layer-size {
+  color: var(--designer-text-secondary);
+}
+
+/* ── 蓝图库行 ───────────────────────────────────────────────────────────────── */
+
+/* 蓝图行首图标是通用层叠图标（不承载类型色相），选中时跟名称一起提到 primary。 */
+.blueprint-palette-item[data-selected="true"] .blueprint-palette-glyph {
+  color: var(--designer-text-primary);
+}

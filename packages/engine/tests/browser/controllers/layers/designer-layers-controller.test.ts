@@ -204,8 +204,10 @@ function dragOver(row: FakeElement, clientY?: number): DragEvent {
 }
 
 function renderedLayerRow(panel: FakePanel, id: string): FakePanel {
-  // 面板子节点顺序：列表标题、紧凑搜索、图层树。
-  const row = panel.children[2]!.children.find((item) => item.dataset.layerId === id);
+  // 外壳顺序：列表标题、层级操作条、紧凑搜索、图层树；按标记取树，不受外壳增减影响。
+  const tree = panel.children.find((item) => item.dataset.layerRoot === 'true');
+  if (tree === undefined) throw new Error('Missing rendered layer tree.');
+  const row = tree.children.find((item) => item.dataset.layerId === id);
   if (row === undefined) throw new Error(`Missing rendered layer row ${id}.`);
   return row;
 }

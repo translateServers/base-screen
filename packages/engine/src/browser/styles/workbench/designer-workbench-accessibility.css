@@ -22,6 +22,7 @@
   .layer-row[aria-selected="true"],
   .layer-row[aria-current="true"],
   .layer-row[data-drop-target="true"],
+  .blueprint-palette-item[data-selected="true"],
   [data-layer-root][data-drop-target="true"] {
     outline: 2px solid Highlight;
     outline-offset: -2px;

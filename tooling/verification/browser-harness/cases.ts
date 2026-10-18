@@ -21,6 +21,11 @@ const BASELINES: readonly BaselineEntry[] = [
     summary: 'Playwright 设计器布局，无案例舱。',
     href: './?designer',
   },
+  {
+    title: '设计系统清单',
+    summary: '令牌、状态矩阵与组件原语铺在一页；浅深主题可切换。样式评审从这里开始。',
+    href: './system.html',
+  },
 ];
 
 const ALL_PACKAGES = '全部';

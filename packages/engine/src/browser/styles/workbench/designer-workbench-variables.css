@@ -80,7 +80,7 @@
   padding: var(--designer-space-4) var(--designer-space-4) var(--designer-space-1);
   color: var(--designer-text-muted);
   font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
-  letter-spacing: 0.08em;
+  letter-spacing: normal;
   text-transform: uppercase;
 }
 
@@ -436,7 +436,7 @@ button.variable-reference-count:focus-visible {
 .variable-empty-state > strong {
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .variable-empty-state > span:not(.variable-empty-glyph) {

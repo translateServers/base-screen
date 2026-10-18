@@ -343,8 +343,28 @@ export async function assertLeftPanelLayers(page, viewport) {
       lockIcon: lock?.querySelector('svg') !== null,
       eyeIcon: eye?.querySelector('svg') !== null,
       rowHeight: childRow?.offsetHeight ?? 0,
-      // 原型图层列表没有工具栏；搜索作为长文档刚需保留为紧凑单行。
-      hasToolbar: root.querySelector('[data-layer-toolbar]') !== null,
+      // 层级操作条常驻在标题与搜索之间：置顶/上移/下移/置底 + 成组/解组，顺序固定。
+      toolbar: (() => {
+        const toolbar = root.querySelector('[data-layer-toolbar]');
+        if (toolbar === null) return null;
+        const search = root.querySelector('[data-layer-search]');
+        return {
+          role: toolbar.getAttribute('role'),
+          groups: panel?.querySelector(':scope > .layer-toolbar') === toolbar,
+          beforeSearch:
+            search !== null &&
+            (toolbar.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
+          arrange: [...toolbar.querySelectorAll('[data-layer-arrange]')].map(
+            (button) => button.dataset.layerArrange,
+          ),
+          groupActions: [...toolbar.querySelectorAll('[data-layer-group-action]')].map(
+            (button) => button.dataset.layerGroupAction,
+          ),
+          labels: [...toolbar.querySelectorAll('button')].map(
+            (button) => button.getAttribute('aria-label') ?? '',
+          ),
+        };
+      })(),
       hasSearch: root.querySelector('[data-layer-search]') !== null,
     };
   });
@@ -364,10 +384,23 @@ export async function assertLeftPanelLayers(page, viewport) {
     !layerProbe.lockIcon ||
     !layerProbe.eyeIcon ||
     layerProbe.rowHeight !== 40 ||
-    layerProbe.hasToolbar ||
     !layerProbe.hasSearch
   ) {
     throw new Error(`BROWSER_HARNESS_LAYER_TREE_DESIGN_FAILED:${JSON.stringify(layerProbe)}`);
+  }
+  // 层级操作条回到面板顶部（标题与搜索之间）：四个层级动作 + 成组/解组，全部带可读名称。
+  const layerToolbar = layerProbe.toolbar;
+  if (
+    layerToolbar === null ||
+    layerToolbar.role !== 'toolbar' ||
+    !layerToolbar.groups ||
+    !layerToolbar.beforeSearch ||
+    JSON.stringify(layerToolbar.arrange) !== JSON.stringify(['front', 'up', 'down', 'back']) ||
+    JSON.stringify(layerToolbar.groupActions) !== JSON.stringify(['group', 'ungroup']) ||
+    layerToolbar.labels.length !== 6 ||
+    layerToolbar.labels.some((label) => label.trim() === '')
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_TOOLBAR_FAILED:${JSON.stringify(layerProbe)}`);
   }
   // 显隐/锁定状态开关直接落在行上：隐藏后保留行并压暗，锁定后开关常驻。
   const stateEye = probe.locator('[data-layer-id="probe-a"] [data-layer-toggle="hidden"]');
@@ -426,17 +459,56 @@ export async function assertLeftPanelLayers(page, viewport) {
   // 两条路径都不得误触隐藏/锁定或改变 36px 紧凑行高。
   await childRow.click({ position: { x: 1, y: childHeightBefore / 2 } });
   await childRow.locator('[data-layer-select="probe-a"]').click();
+  // 指针离开行再读色：悬停档会向文字色偏一档，读到的就不是基准强调色了。
+  await page.mouse.move(600, 400);
+  await page.waitForTimeout(80);
   const selectedState = await probe.evaluate((element) => {
     const root = element.shadowRoot;
     const row = root.querySelector('[data-layer-id="probe-a"]');
     const style = row === null ? undefined : getComputedStyle(row);
+    // 选中色是中性令牌算出来的：把令牌值折成 rgb 再比对，主题切换也不会让断言失配。
+    const asColor = (value) => {
+      const swatch = document.createElement('span');
+      swatch.style.color = value;
+      document.body.appendChild(swatch);
+      const resolved = getComputedStyle(swatch).color;
+      swatch.remove();
+      return resolved;
+    };
+    // 选中块与面板底的距离必须大于划过档与面板底的距离 —— 浅色主题变深、深色主题变浅，
+    // 所以不能写死"比 hover 更深"，只能写"离面板底更远"。
+    const luminance = (value) => {
+      const channels = (value.match(/[\d.]+/g) ?? []).slice(0, 3).map(Number);
+      const [r = 0, g = 0, b = 0] = channels.map((channel) => {
+        const scaled = channel / 255;
+        return scaled <= 0.03928 ? scaled / 12.92 : ((scaled + 0.055) / 1.055) ** 2.4;
+      });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    };
+    const gaps = (value, panel) => Math.abs(luminance(value) - luminance(panel));
+    const hoverSurface =
+      style === undefined
+        ? ''
+        : asColor(style.getPropertyValue('--designer-surface-control-hover'));
+    const panelSurface =
+      style === undefined ? '' : asColor(style.getPropertyValue('--designer-surface-panel'));
     return {
       selected: row?.getAttribute('aria-selected'),
       hidden: row?.dataset.hidden ?? 'false',
       height: row?.offsetHeight ?? 0,
       cursor: style?.cursor,
       backgroundColor: style?.backgroundColor,
-      boxShadow: style?.boxShadow,
+      color: style?.color,
+      shadow: style?.boxShadow,
+      accent: style === undefined ? '' : asColor(style.getPropertyValue('--designer-accent')),
+      primaryText:
+        style === undefined ? '' : asColor(style.getPropertyValue('--designer-text-primary')),
+      border:
+        style === undefined ? '' : asColor(style.getPropertyValue('--designer-border-default')),
+      panelSurface,
+      standsOutFromHover:
+        style !== undefined &&
+        gaps(style.backgroundColor, panelSurface) > gaps(hoverSurface, panelSurface),
       nameText: row?.querySelector('.layer-name')?.textContent,
       metaText: row?.querySelector('.layer-meta')?.textContent,
     };
@@ -444,12 +516,22 @@ export async function assertLeftPanelLayers(page, viewport) {
   if (
     selectedState.selected !== 'true' ||
     selectedState.hidden !== 'false' ||
-    // 行高随原型对齐 40px；选中 = 强调色淡底 + 强调色收边。
+    // 行高随原型对齐 40px；选中 = 比划过更实的中性灰块 + 1px 中性收边（与蓝图库共用同一份配方）。
     // 整行即拖拽把手，所以行光标是 grab（可拖）而不是 pointer；两者都表明整行可命中。
     selectedState.height !== 40 ||
     selectedState.cursor !== 'grab' ||
+    selectedState.panelSurface === '' ||
+    selectedState.primaryText === '' ||
+    selectedState.border === '' ||
+    // 中性块：不着强调色（禁止出现 accent），文字回到 primary 档。
     selectedState.backgroundColor === 'rgba(0, 0, 0, 0)' ||
-    selectedState.boxShadow === 'none' ||
+    selectedState.backgroundColor === selectedState.accent ||
+    selectedState.color !== selectedState.primaryText ||
+    // 选中必须比划过更"实"：离面板底的距离严格大于 hover 档，否则两态在列表里分不开。
+    !selectedState.standsOutFromHover ||
+    !selectedState.shadow.includes('inset') ||
+    !selectedState.shadow.includes(selectedState.border) ||
+    selectedState.shadow.includes(selectedState.accent) ||
     selectedState.nameText !== '\u5b50\u9879\u7532' ||
     // 副行用物料清单的可读名称（文本）而不是技术 id（base.text），尺寸读数单独成段。
     selectedState.metaText !== '\u6587\u672c \u00b7 80 \u00d7 32'
@@ -458,8 +540,8 @@ export async function assertLeftPanelLayers(page, viewport) {
       `BROWSER_HARNESS_LAYER_SELECT_HIT_TARGET_FAILED:${JSON.stringify(selectedState)}`,
     );
   }
-  // 相邻多选连成一块：连续选中的行只保留最上/最下的外圆角，块内无行距、共用同一条
-  // 左侧强调条，视觉上是一个整体而不是几个并排的方块。
+  // 相邻多选连成一块：连续选中的行只保留最上/最下的外圆角、外轮廓只描整块边界，
+  // 块内无行距、内部不画线，视觉上是一个整体而不是几个并排的方块。
   // 前面的两次连续点击可能被识别为双击而进入重命名：先点分区标签让焦点离开输入框，
   // 否则 Ctrl+点击会被重渲染打断（行节点在 click 之前就被替换）。
   await probe.locator('.list-heading').click();
@@ -479,6 +561,8 @@ export async function assertLeftPanelLayers(page, viewport) {
         endRadius: style.borderEndStartRadius,
         marginBottom: style.marginBottom,
         shadow: style.boxShadow,
+        // 连段只在整块外轮廓画线：首行有上边、末行有下边，中间行两侧各一条。
+        edgeCount: (style.boxShadow.match(/inset/g) ?? []).length,
         top: Math.round(rect.top),
         bottom: Math.round(rect.bottom),
       };
@@ -494,7 +578,9 @@ export async function assertLeftPanelLayers(page, viewport) {
     adjacentRun.last.endRadius !== '6px' ||
     adjacentRun.first.marginBottom !== '0px' ||
     adjacentRun.first.bottom !== adjacentRun.last?.top ||
-    adjacentRun.first.shadow !== adjacentRun.last?.shadow
+    // 首行三条边（上 + 左右），末行三条边（左右 + 下）：内部不重复描线。
+    adjacentRun.first.edgeCount !== 3 ||
+    adjacentRun.last.edgeCount !== 3
   ) {
     throw new Error(`BROWSER_HARNESS_LAYER_SELECTED_RUN_FAILED:${JSON.stringify(adjacentRun)}`);
   }

@@ -155,6 +155,8 @@
   cursor: grabbing;
 }
 
+/* 「已放置」不铺底：它由行尾的定位图标与「已添加」芯片表达，一旦铺灰底就会和
+   中性选中块撞形。选中着色由 designer-workbench-selection.css 统一接管。 */
 .blueprint-palette-item[data-kind="logic"],
 .blueprint-palette-item[data-kind="variable"] {
   grid-template-columns: minmax(0, 1fr);
@@ -163,28 +165,6 @@
 .blueprint-palette-item:hover:not([data-disabled="true"]),
 .blueprint-palette-item:focus-within {
   --blueprint-palette-row-surface: var(--designer-surface-control-hover);
-}
-
-.blueprint-palette-item[data-placed="true"],
-.blueprint-palette-item[data-selected="true"] {
-  --blueprint-palette-row-surface: color-mix(
-    in srgb,
-    var(--designer-accent) 15%,
-    var(--designer-surface-panel)
-  );
-
-  box-shadow:
-    inset 2px 0 0 var(--designer-accent),
-    inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 28%, transparent);
-}
-
-.blueprint-palette-item[data-placed="true"]:hover,
-.blueprint-palette-item[data-selected="true"]:hover {
-  --blueprint-palette-row-surface: color-mix(
-    in srgb,
-    var(--designer-accent) 20%,
-    var(--designer-surface-panel)
-  );
 }
 
 .blueprint-palette-item[data-disabled="true"] {
@@ -282,8 +262,7 @@
   color: var(--designer-text-secondary);
 }
 
-.blueprint-palette-item[data-placed="true"] .blueprint-palette-glyph,
-.blueprint-palette-item[data-selected="true"] .blueprint-palette-glyph {
+.blueprint-palette-item[data-placed="true"] .blueprint-palette-glyph {
   color: var(--designer-accent);
 }
 

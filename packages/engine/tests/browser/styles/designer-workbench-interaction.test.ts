@@ -78,9 +78,30 @@ describe('designer workbench interaction and accessibility', () => {
     expect(workbenchCss).toContain('.layer-row[data-layer-selectable="true"] {');
     expect(workbenchCss).toContain('.layer-row:has(.layer-select:focus-visible) {');
     expect(workbenchCss).toContain('--layer-row-surface:');
-    expect(workbenchCss).toContain('inset 2px 0 0 var(--designer-accent)');
     expect(workbenchCss).toContain('position: absolute;');
     expect(workbenchCss).not.toContain('.layer-select small {');
+  });
+
+  it('paints list selection once for both the layer tree and the blueprint palette', () => {
+    // 选中是跨面板的同一件事：图层树与蓝图库必须命中同一条规则，而不是各画一份。
+    // 画法是 Vercel 式中性块：一档比 hover 更深的灰底 + 1px 中性收边，不用强调色。
+    expect(workbenchCss).toMatch(
+      /\.layer-row\[aria-selected="true"\],\s*\.blueprint-palette-item\[data-selected="true"\]\s*\{[^}]*background-color: color-mix\(\s*in oklab,\s*var\(--designer-surface-control-active\),\s*var\(--designer-text-primary\) 7%\s*\);[^}]*color: var\(--designer-text-primary\);[^}]*box-shadow: inset 0 0 0 1px var\(--designer-border-default\);/s,
+    );
+    // 面板文件不再自己画选中：淡底 + 左侧竖条、实心块、空心蓝描边三版语言都已移除。
+    expect(workbenchCss).not.toMatch(
+      /\.layer-row\[aria-selected="true"\]\s*\{[^}]*--layer-row-surface: var\(--designer-accent-surface\)/s,
+    );
+    expect(workbenchCss).not.toMatch(
+      /\.blueprint-palette-item\[data-placed="true"\],\s*\.blueprint-palette-item\[data-selected="true"\]/s,
+    );
+    expect(workbenchCss).not.toMatch(
+      /\.layer-row\[aria-selected="true"\]\s*\.layer-glyph\s*\{[^}]*var\(--designer-accent\)/s,
+    );
+    // 连段只在整块外轮廓上收边：内部两侧不再各画一条，否则行间会出现 2px 双线。
+    expect(workbenchCss).toMatch(
+      /\.layer-row\[aria-selected="true"\]\[data-layer-selected-run="middle"\]\s*\{[^}]*box-shadow:\s*inset 1px 0 0 var\(--designer-border-default\),\s*inset -1px 0 0 var\(--designer-border-default\);/s,
+    );
   });
 
   it('R3 presents shortcut help as a scannable, responsive modal', () => {

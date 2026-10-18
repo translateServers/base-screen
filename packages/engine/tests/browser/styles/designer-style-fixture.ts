@@ -47,6 +47,7 @@ const workbenchCssFiles = [
   '../../../src/browser/styles/workbench/designer-workbench-canvas.css',
   '../../../src/browser/styles/workbench/designer-workbench-inspector.css',
   '../../../src/browser/styles/workbench/designer-workbench-inspector-data.css',
+  '../../../src/browser/styles/workbench/designer-workbench-selection.css',
   '../../../src/browser/styles/workbench/designer-workbench-accessibility.css',
 ] as const;
 

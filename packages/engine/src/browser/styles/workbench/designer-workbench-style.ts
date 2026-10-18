@@ -13,6 +13,7 @@ import inspectorDataCss from './designer-workbench-inspector-data.css?inline';
 import layersCss from './designer-workbench-layers.css?inline';
 import materialsCss from './designer-workbench-materials.css?inline';
 import panelsCss from './designer-workbench-panels.css?inline';
+import selectionCss from './designer-workbench-selection.css?inline';
 import shellCss from './designer-workbench-shell.css?inline';
 import topbarCss from './designer-workbench-topbar.css?inline';
 import variableEditorCss from './designer-workbench-variable-editor.css?inline';
@@ -22,6 +23,8 @@ import variablesCss from './designer-workbench-variables.css?inline';
 
 // Feature files are concatenated in cascade order. Keep responsive and accessibility
 // overrides last so splitting the source never changes the original CSS behavior.
+// The selection layer is the one cross-panel recipe (layer tree + blueprint palette), so it
+// sits after every panel file to win same-specificity ties; accessibility still comes last.
 export const DESIGNER_WORKBENCH_CSS = [
   topbarCss,
   blueprintToolbarCss,
@@ -43,5 +46,6 @@ export const DESIGNER_WORKBENCH_CSS = [
   canvasCss,
   inspectorCss,
   inspectorDataCss,
+  selectionCss,
   accessibilityCss,
 ].join('\n');

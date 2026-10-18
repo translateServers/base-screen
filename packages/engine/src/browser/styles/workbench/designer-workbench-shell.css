@@ -313,7 +313,7 @@
   overflow: hidden;
   font-size: var(--designer-font-size-md);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: var(--designer-tracking-ui);
   text-overflow: ellipsis;
   white-space: nowrap;
   transition: opacity var(--designer-motion);
@@ -342,7 +342,7 @@
   color: var(--designer-text-disabled);
   font: var(--designer-font-numeric);
   font-size: var(--designer-font-size-xs);
-  letter-spacing: 0.04em;
+  letter-spacing: normal;
 }
 
 /* 折叠状态（原型骨架）：左栏收成 48px 图标轨——隐藏列头、隐藏 tab 文字，保留图标 tab

@@ -54,6 +54,17 @@ class FakeDocument {
   }
 }
 
+/** 外壳顺序固定为「标题 → 层级操作条 → 搜索 → 树」；按标记取，避免测试跟着下标漂移。 */
+function layerChrome(layers: FakeElement, find: (element: FakeElement) => boolean): FakeElement {
+  const found = layers.children.find(find);
+  if (found === undefined) throw new Error('layer chrome child missing');
+  return found;
+}
+
+function layerTree(layers: FakeElement): FakeElement {
+  return layerChrome(layers, (element) => element.dataset.layerRoot === 'true');
+}
+
 function component(
   id: string,
   parentId: string | null,
@@ -293,7 +304,7 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const tree = layers.children[2]!;
+    const tree = layerTree(layers);
     const row = tree.children[0]!;
     expect(row.ariaSelected).toBe('true');
     expect(row.ariaCurrent).toBe('true');
@@ -320,9 +331,30 @@ describe('designer layers view', () => {
     expect(row.children.find((child) => child.dataset.layerSelect === 'container')?.disabled).toBe(
       true,
     );
+    // 外壳：标题（分区说明）→ 层级操作条 → 搜索 → 树。操作条常驻，不随选中态重建。
     expect(layers.children[0]!.className).toBe('list-heading');
-    expect(layers.children[1]!.className).toBe('layer-search');
-    expect(layers.children[1]!.children[1]!.dataset.layerSearch).toBe('true');
+    const toolbar = layerChrome(layers, (element) => element.dataset.layerToolbar === 'true');
+    expect(toolbar.attributes['role']).toBe('toolbar');
+    const arrange = toolbar.children.filter((child) => child.dataset.layerArrange !== undefined);
+    expect(arrange.map((control) => control.dataset.layerArrange)).toEqual([
+      'front',
+      'up',
+      'down',
+      'back',
+    ]);
+    // 无选中项时四个层级操作全部不可执行：按钮留在原位，只压暗。
+    expect(arrange.every((control) => control.disabled)).toBe(true);
+    const groupActions = toolbar.children.filter(
+      (child) => child.dataset.layerGroupAction !== undefined,
+    );
+    expect(groupActions.map((control) => control.dataset.layerGroupAction)).toEqual([
+      'group',
+      'ungroup',
+    ]);
+    expect(
+      layerChrome(layers, (element) => element.className === 'layer-search').children[1]!.dataset
+        .layerSearch,
+    ).toBe('true');
     expect(row.children.find((child) => child.dataset.layerRename === 'container')?.value).toBe(
       '本地草稿',
     );
@@ -345,7 +377,7 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const idleRow = layers.children[2]!.children[0]!;
+    const idleRow = layerTree(layers).children[0]!;
     expect(idleRow.dataset.renaming).toBeUndefined();
     expect(idleRow.dataset.layerSelectable).toBe('true');
     expect(idleRow.children.find((child) => child.dataset.layerRename)).toBeUndefined();
@@ -378,7 +410,7 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const renamingRow = layers.children[2]!.children[0]!;
+    const renamingRow = layerTree(layers).children[0]!;
     expect(renamingRow.dataset.renaming).toBe('true');
     expect(
       renamingRow.children.find((child) => child.dataset.layerRename === 'container')?.value,
@@ -406,7 +438,7 @@ describe('designer layers view', () => {
       canMove: () => false,
     });
 
-    const row = layers.children[2]!.children[0]!;
+    const row = layerTree(layers).children[0]!;
     const select = row.children.find((child) => child.dataset.layerSelect === 'locked');
     // 锁定行仍可选中（否则无从解锁），但整行不可拖：锁定项不得被拖动改层级。
     expect(row.dataset.layerSelectable).toBe('true');
@@ -438,8 +470,54 @@ describe('designer layers view', () => {
       canMove: () => true,
     });
 
-    const tree = layers.children[2]!;
+    const tree = layerTree(layers);
     expect(tree.children).toHaveLength(DESIGNER_LAYER_PAGE_SIZE + 1);
     expect(tree.children.at(-1)?.dataset.layerShowMore).toBe('true');
+  });
+
+  it('keeps one resident toolbar node and only flips its availability', () => {
+    const ownerDocument = new FakeDocument();
+    const layers = new FakeElement(ownerDocument);
+    const view = createDesignerLayerView(
+      document([component('back', null, 0), component('front', null, 1)]),
+      undefined,
+    );
+    const render = (
+      selectedComponentIds: readonly string[],
+      arrange: { front: boolean; up: boolean; down: boolean; back: boolean },
+      group: boolean,
+    ): void => {
+      renderDesignerLayers(layers as unknown as HTMLElement, view, {
+        interaction: { selectedComponentIds, focusedComponentId: selectedComponentIds[0] ?? null },
+        search: '',
+        collapsed: new Set(),
+        dropIndicator: undefined,
+        renameDrafts: new Map(),
+        renamingId: undefined,
+        renderLimit: DESIGNER_LAYER_PAGE_SIZE,
+        toolbarState: { arrange, group, ungroup: false },
+        canMove: () => true,
+      });
+    };
+    const control = (toolbar: FakeElement, action: string): FakeElement | undefined =>
+      toolbar.children.find((child) => child.dataset.layerArrange === action);
+
+    render(['front'], { front: true, up: true, down: false, back: true }, true);
+    const toolbar = layerChrome(layers, (element) => element.dataset.layerToolbar === 'true');
+    expect(control(toolbar, 'up')?.disabled).toBe(false);
+    expect(control(toolbar, 'down')?.disabled).toBe(true);
+    expect(
+      toolbar.children.find((child) => child.dataset.layerGroupAction === 'group')?.disabled,
+    ).toBe(false);
+
+    // 再次渲染沿用同一个操作条节点：按钮不会在点击后消失，焦点与悬停态得以保住。
+    render([], { front: false, up: false, down: false, back: false }, false);
+    expect(layerChrome(layers, (element) => element.dataset.layerToolbar === 'true')).toBe(toolbar);
+    expect(control(toolbar, 'up')?.disabled).toBe(true);
+    expect(
+      toolbar.children.find((child) => child.dataset.layerGroupAction === 'group')?.disabled,
+    ).toBe(true);
+    // 外形不随可用性变化：按钮数量恒定（4 个层级操作 + 2 个成组操作 + 1 条分隔线）。
+    expect(toolbar.children).toHaveLength(7);
   });
 });

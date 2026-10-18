@@ -7,6 +7,11 @@ import {
   type DesignerLayerView,
   filterDesignerLayerItems,
 } from './designer-layers-model.js';
+import {
+  applyDesignerLayerToolbarState,
+  createDesignerLayerToolbar,
+  type DesignerLayerToolbarState,
+} from './designer-layers-toolbar-dom.js';
 
 export * from './designer-layers-model.js';
 
@@ -15,8 +20,9 @@ export function renderDesignerLayers(
   view: DesignerLayerView,
   options: DesignerLayersRenderOptions,
 ): void {
-  // 标题与搜索框是常驻外壳：每次重渲染只替换树，搜索输入不因过滤结果重建而丢焦点/丢光标。
-  const chrome = ensureLayerChrome(layers);
+  // 标题、层级操作、搜索是常驻外壳：每次重渲染只替换树，搜索输入不因过滤结果重建而丢焦点/丢光标。
+  const chrome = ensureLayerChrome(layers, options.toolbarState);
+  applyDesignerLayerToolbarState(chrome.toolbar, options.toolbarState);
   if (chrome.input.value !== options.search) chrome.input.value = options.search;
   chrome.clear.hidden = options.search === '';
 
@@ -59,6 +65,7 @@ export function renderDesignerLayers(
 
 interface DesignerLayerChrome {
   readonly header: HTMLElement;
+  readonly toolbar: HTMLElement;
   readonly search: HTMLElement;
   readonly input: HTMLInputElement;
   readonly clear: HTMLButtonElement;
@@ -66,7 +73,10 @@ interface DesignerLayerChrome {
 }
 
 /** 面板外壳只在首次渲染时创建；后续渲染复用它，保证搜索输入与滚动位置连续。 */
-function ensureLayerChrome(layers: HTMLElement): DesignerLayerChrome {
+function ensureLayerChrome(
+  layers: HTMLElement,
+  toolbarState: DesignerLayerToolbarState,
+): DesignerLayerChrome {
   const ownerDocument = layers.ownerDocument;
   const existing = Array.from(layers.children ?? []) as HTMLElement[];
   const isClass = (element: HTMLElement, name: string): boolean =>
@@ -82,6 +92,10 @@ function ensureLayerChrome(layers: HTMLElement): DesignerLayerChrome {
         return heading;
       })(),
     );
+  // 层级操作条排在搜索之上：选中后先改层级、再找图层，与画布上的对象操作顺序一致。
+  const toolbar =
+    existing.find((element) => element.dataset.layerToolbar === 'true') ??
+    append(layers, createDesignerLayerToolbar(ownerDocument, toolbarState));
   const search =
     existing.find((element) => isClass(element, 'layer-search')) ??
     append(layers, createSearchControl(ownerDocument));
@@ -90,7 +104,7 @@ function ensureLayerChrome(layers: HTMLElement): DesignerLayerChrome {
     append(layers, createTreeRoot(ownerDocument));
   const input = search.children[1] as HTMLInputElement;
   const clear = search.children[2] as HTMLButtonElement;
-  return { header, search, input, clear, tree };
+  return { header, toolbar, search, input, clear, tree };
 }
 
 function append<T extends HTMLElement>(parent: HTMLElement, child: T): T {

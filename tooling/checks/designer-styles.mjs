@@ -44,6 +44,7 @@ const workbenchLayers = [
   'packages/engine/src/browser/styles/workbench/designer-workbench-canvas.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-inspector.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-inspector-data.css',
+  'packages/engine/src/browser/styles/workbench/designer-workbench-selection.css',
   'packages/engine/src/browser/styles/workbench/designer-workbench-accessibility.css',
 ];
 const baseBindings = [
@@ -85,6 +86,7 @@ const workbenchBindings = [
   'canvasCss',
   'inspectorCss',
   'inspectorDataCss',
+  'selectionCss',
   'accessibilityCss',
 ];
 const layers = [

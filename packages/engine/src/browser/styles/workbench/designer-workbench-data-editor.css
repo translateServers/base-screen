@@ -458,7 +458,7 @@
 .designer-blueprint-event header strong {
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .designer-blueprint-variable-row small,
@@ -511,7 +511,7 @@
 .designer-blueprint-actions > strong {
   color: var(--designer-text-secondary);
   font: var(--designer-font-small);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .designer-blueprint-rule-facts {
@@ -566,7 +566,7 @@
 
 .designer-blueprint-action-row strong {
   color: var(--designer-text-primary);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .designer-blueprint-editor-hint + .designer-button {
@@ -720,7 +720,7 @@
 }
 
 .rail-view[data-layers]:not([hidden]) {
-  /* 图层面板现在是「列头 + 紧凑搜索 + 可滚动图层树」的三段列布局。 */
+  /* 图层面板现在是「列头 + 层级操作条 + 紧凑搜索 + 可滚动图层树」的列布局。 */
   display: flex;
   flex-direction: column;
   padding: 0;
@@ -737,48 +737,6 @@
   border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
   box-shadow: 0 5px 14px color-mix(in srgb, var(--designer-surface-workspace) 30%, transparent);
-}
-
-.layer-toolbar {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: repeat(4, minmax(28px, 1fr)) 1px repeat(2, minmax(28px, 1fr));
-  align-items: center;
-  gap: 5px;
-}
-
-.layer-toolbar-button {
-  width: 100%;
-  height: 30px;
-  min-width: 28px;
-  min-height: 30px;
-  padding: 0;
-  border-color: transparent;
-  background: transparent;
-  color: var(--designer-text-muted);
-}
-
-.layer-toolbar-button:hover:not(:disabled),
-.layer-toolbar-button:focus-visible {
-  border-color: var(--designer-border-default);
-  background: var(--designer-surface-control-hover);
-  color: var(--designer-text-primary);
-}
-
-.layer-toolbar-button:disabled {
-  opacity: 0.48;
-}
-
-.layer-toolbar-button svg {
-  width: 15px;
-  height: 15px;
-}
-
-.layer-toolbar-separator {
-  width: 1px;
-  height: 18px;
-  justify-self: center;
-  background: var(--designer-border-default);
 }
 
 .layer-search {

@@ -86,3 +86,61 @@
 - **物料状态容器（Material Loading Container）**  
   官方物料共享的加载/空态容器（`@base-screen/material` 的 `createBaseScreenMaterialLoadingContainer`）。
   物料只提供「读数本身的构成」（单位、前后缀、表头列名），不提供描述性文案；状态展示与无障碍由容器统一负责。
+
+## 设计系统
+
+工作台的设计语言按四层组织：令牌 → 状态 → 原语 → 面板。下面的术语各有唯一落点，面板文件只消费，不复制。
+
+- **设计令牌（Design Token）**  
+  颜色、字号、间距、圆角、动效的唯一声明处是 `packages/engine/src/browser/styles/designer-tokens.css`，
+  浅色与深色是同一个文件里的两个块。面板样式只写 `var(--designer-*)`：色值必须走令牌
+  （`tooling/checks/designer-styles.mjs` 对 raw color 做棘轮），主题分支不得出现在面板文件里。
+  字号 6 档、间距 7 档（2/4/6/8/12/16/24）、圆角 5 档 —— 缺档时先在令牌里补，不在调用处写字面量。
+
+- **表面阶梯（Surface Ladder）**  
+  从 `surface-workspace` 到 `surface-scrim` 的 8 级表面 + 4 级文本 + 3 档边框。层级靠表面亮度差与
+  alpha 收边表达，不靠阴影浓度；阴影只用于真正浮起的层（overlay / canvas / float）。
+
+- **列表选中（List Selection）**  
+  唯一落点 `designer-workbench-selection.css`：图层树与蓝图库命中同一条规则，面板只负责挂
+  `aria-selected="true"` / `data-selected="true"`，**不得自写选中底色**。画法是「比悬停更实的中性灰块
+  + 1px 中性收边」，不使用强调色；相邻多选连成一块时的圆角与收边由 `[data-layer-selected-run]`
+  的三态（first / middle / last）负责，内部两侧不画线。
+
+- **交互四态（Interaction States）**  
+  划过 = `surface-control-hover`，按下 = `surface-control-active`，选中 = 上一条，禁用 = `text-disabled`
+  且保留原几何。禁用不叠透明度（叠一层会把图标压成幽灵），也不改尺寸；选中与划过的色阶必须拉开
+  两步以上，否则密集列表里分不清「选中」和「鼠标停在这」。
+
+- **强调色语义（Accent Meaning）**  
+  强调色只表示三件事：主操作（primary 按钮）、焦点/选框（focus ring、画布选框）、当前定位（定位跳转）。
+  它**不表示「被选中」** —— 列表里选中是定位坐标，与「可以执行」是两种语义，混用会让密集列表变成彩色。
+
+- **焦点环（Focus Ring）**  
+  键盘焦点统一用 `--designer-focus-ring`，并投影到与指针命中范围一致的整行或整个控件
+  （`outline-offset: -2px`），避免内外两个命中范围。控件不得自造 focus 样式。
+
+- **控件原语（Control Primitives）**  
+  单个控件（按钮/输入/勾选/开关/下拉/文本域/图标按钮）的唯一落点是
+  `packages/engine/src/browser/dom/designer-ui-primitives.ts`；字段行骨架（标签列 + 控件列、堆叠变体）
+  的唯一落点是 `designer-field-primitives.ts`。裸 `createElement('input'|'select'|'textarea')` 与手拼
+  `designer-field designer-field-label` 由 `tooling/checks/designer-ui.mjs` 拒绝（存量按名字登记为债务）。
+
+- **面板件（Panel Chrome）**  
+  面板头、分区标签、工具条、空状态、状态芯片目前仍是各面板手拼（`list-heading` 在 12 处重复），
+  这是已知债务，收敛方向是列表原语。新增面板先复用现有类名，不得再造一套结构。
+
+- **设计系统清单（Design System Inventory）**  
+  唯一落点是 `tooling/verification/browser-harness/system.html`：令牌、状态矩阵与组件铺在一页，
+  浅深主题可切换，挂在真实 `<base-screen-designer>` 的 shadow root 里跑产品同一份样式表。
+  样式评审以这一页为准；不引入 Storybook，也不在产品包里携带示例样式。
+
+- **Geist 对齐（Geist Alignment）**  
+  令牌体系对齐 Vercel 的 Geist 规范，三条硬规则不可破：① 交互面用**阴影当边框**
+  （`--designer-elev-ring` = `0 0 0 1px rgb(0 0 0 / 8%)`），只有真正的分隔线才用 `border`；
+  ② 字重只有 400 / 500 / 600 三档，正文不上 700；③ 字距随字号收紧（`--designer-tracking-*`），
+  正文一律 normal，任何地方都不用正字距。卡片高度用三层栈 `--designer-elev-card`
+  （描边 + 2px 微抬 + 8px 远距 + 内侧高光），不用单层重阴影。
+  三处有意偏离，理由写在清单页的对照表里：字号阶梯压到 11–18px（密度优先）、间距保留 24 一档
+  （规范在 16 之后直接跳 32，密集面板需要中间档）、圆角阶梯缺 4px 且第 2/3 档重复
+  （改动面 50 处，单独一批收敛）。

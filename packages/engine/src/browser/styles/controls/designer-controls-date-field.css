@@ -15,7 +15,7 @@
   padding-right: 32px;
   font-family: var(--designer-font-family-mono);
   font-feature-settings: normal;
-  letter-spacing: 0.02em;
+  letter-spacing: normal;
 }
 
 .designer-date-field-trigger {
@@ -117,7 +117,7 @@
   text-align: center;
   font-size: var(--designer-font-size-base);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: normal;
   font-variant-numeric: tabular-nums;
 }
 

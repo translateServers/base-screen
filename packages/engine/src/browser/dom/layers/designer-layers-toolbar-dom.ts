@@ -66,6 +66,27 @@ export function createDesignerLayerToolbar(
   return toolbar;
 }
 
+/**
+ * 工具栏是常驻外壳：可用性随选中态变化，只同步 disabled，不重建按钮。
+ * 重建会让点击后的焦点/悬停态跟着节点一起消失，连续调整层级时手要重新找按钮。
+ */
+export function applyDesignerLayerToolbarState(
+  toolbar: HTMLElement,
+  state: DesignerLayerToolbarState,
+): void {
+  for (const control of Array.from(toolbar.children ?? []) as HTMLElement[]) {
+    const arrange = control.dataset.layerArrange as DesignerLayerArrangeAction | undefined;
+    const groupAction = control.dataset.layerGroupAction as DesignerLayerGroupAction | undefined;
+    const enabled =
+      arrange !== undefined
+        ? state.arrange[arrange]
+        : groupAction !== undefined
+          ? state[groupAction]
+          : undefined;
+    if (enabled !== undefined) (control as HTMLButtonElement).disabled = !enabled;
+  }
+}
+
 function iconButton(
   ownerDocument: Document,
   icon: DesignerIconName,

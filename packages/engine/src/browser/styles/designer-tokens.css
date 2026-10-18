@@ -35,7 +35,14 @@
   --designer-border-strong: var(--base-screen-designer-border-strong, rgb(23 23 23 / 16%));
   --designer-border-active: rgb(23 23 23 / 26%);
   --designer-focus-ring: var(--base-screen-designer-focus-ring, #0070f3);
+  /* 阴影当边框（Geist 的标志手法）：0 偏移、0 模糊、1px 扩展的阴影 —— 视觉上是一条 1px 线，
+     但不占盒模型、不裁圆角、可与浮起阴影叠在同一条声明里。交互面（按钮/输入/卡片/分段轨）
+     用它收边，只有真正的分隔线（面板分区、列表隔离）才用 border。 */
   --designer-elev-ring: 0 0 0 1px rgb(0 0 0 / 8%);
+  /* 卡片三层栈：描边 + 2px 微抬 + 8px 远距 + 内侧浅色高光（Geist 的「从内部发光」）。 */
+  --designer-elev-card:
+    0 0 0 1px rgb(0 0 0 / 8%), 0 2px 2px rgb(0 0 0 / 4%), 0 8px 8px -8px rgb(0 0 0 / 4%),
+    inset 0 0 0 1px var(--designer-surface-control);
 
   /* ── 强调色与语义色 ── */
   --designer-accent: var(--base-screen-designer-accent, #0070f3);
@@ -98,6 +105,15 @@
   --designer-font-small: var(--designer-font-size-sm) / 1.4 var(--designer-font-family);
   --designer-font-numeric: 500 var(--designer-font-size-sm) / 1 var(--designer-font-family-mono);
 
+  /* 字距阶梯（Geist 的压缩感）：字距随字号收紧，字号越小越接近 normal。
+     规范给的是绝对值（48px/-2.4px、32px/-1.28px、24px/-0.96px、14px/normal），
+     这里是按同样比例折成 em 的紧凑档，因为工作台的字号只有 11–18px。
+     规则：只在大字号上用负值，正文一律 normal；任何地方都不用正值（大写微型标签靠字号区分）。 */
+  --designer-tracking-display: -0.022em;
+  --designer-tracking-heading: -0.016em;
+  --designer-tracking-ui: -0.01em;
+  --designer-tracking-base: normal;
+
   /* ── 间距 / 圆角 / 控件几何 ── */
   --designer-space-1: 2px;
   --designer-space-2: 4px;
@@ -105,7 +121,10 @@
   --designer-space-4: 8px;
   --designer-space-5: 12px;
   --designer-space-6: 16px;
+  /* 工作台比规范多留一档 24：规范的间距在 16 之后直接跳到 32（营销页的分区节奏），
+     而密集面板的分区间距需要中间档，否则不是挤在一起就是被撑开。32 作为大区块间距保留。 */
   --designer-space-7: 24px;
+  --designer-space-8: 32px;
   --designer-radius-1: 2px;
   --designer-radius-2: 6px;
   --designer-radius-3: 6px;
@@ -174,6 +193,10 @@
   --designer-border-active: rgb(245 245 245 / 26%);
   --designer-focus-ring: var(--base-screen-designer-focus-ring, #5297fc);
   --designer-elev-ring: 0 0 0 1px rgb(245 245 245 / 15%);
+  /* 黑夜的卡片栈把「内侧高光」换成比卡片底亮一档的 control 底，暗面上才看得出内圈。 */
+  --designer-elev-card:
+    0 0 0 1px rgb(245 245 245 / 15%), 0 2px 2px rgb(0 0 0 / 40%), 0 8px 8px -8px rgb(0 0 0 / 45%),
+    inset 0 0 0 1px var(--designer-surface-control);
 
   --designer-accent: var(--base-screen-designer-accent, #5297fc);
   --designer-accent-surface: var(--base-screen-designer-accent-surface, #161d27);
