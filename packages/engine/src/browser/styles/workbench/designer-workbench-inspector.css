@@ -581,7 +581,18 @@
   align-items: center;
 }
 
+/* 滑杆 + 数字读数：全检查器只有这一套几何（组件不透明度 / 画布不透明度 / 字号 / 字间距 /
+   行高 / 行间距 共用）。三者此前各有一套容器网格（58px / 62px / flex 撑满），
+   于是同一个复合控件的读数宽度从 58 到 114 不等；现在统一：滑杆吃剩余，读数定宽 58px。 */
+.properties .inspector-pane .designer-field-control:has(> .designer-range) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  gap: var(--designer-space-3);
+  align-items: center;
+}
+
 .properties .inspector-pane .designer-field-range-value {
+  width: 58px;
   height: 28px;
   padding: 0 7px;
   font: var(--designer-font-numeric);
@@ -825,20 +836,6 @@
   margin: 0;
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-base);
-}
-
-.properties .inspector-pane .designer-opacity-controls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px;
-  gap: var(--designer-space-3);
-  align-items: center;
-}
-
-.properties .inspector-pane .designer-opacity-controls .designer-number {
-  height: 28px;
-  padding: 0 7px;
-  font: var(--designer-font-numeric);
-  text-align: right;
 }
 
 .properties .designer-datav-common-section {

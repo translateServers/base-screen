@@ -1,8 +1,9 @@
 import type { ScreenTabularDataset } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
+import { createDesignerInput, createDesignerSelect } from '../designer-ui-primitives.js';
 import {
   action,
-  appendOption,
   indexedAction,
   paginationAction,
   roleAction,
@@ -44,20 +45,25 @@ export function renderBindings(
     fieldList.setAttribute('role', 'group');
     fieldList.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.bindingRole(role.id));
     if (role.maxFields === 1) {
-      const select = ownerDocument.createElement('select');
-      select.className = 'designer-control designer-select designer-dataset-binding-select';
+      const select = createDesignerSelect(ownerDocument, {
+        ariaLabel: DESIGNER_UI_TEXT.dataset.bindingRole(role.id),
+        className: 'designer-dataset-binding-select',
+        options: [
+          {
+            label: DESIGNER_UI_TEXT.dataset.selectField,
+            selected: selected.length === 0,
+            value: '',
+          },
+          ...compatible.map((field) => ({
+            label: `${field.label} · ${field.valueType}`,
+            selected: selected.includes(field.id),
+            value: field.id,
+          })),
+        ],
+        value: selected[0] ?? '',
+      });
       select.dataset.staticBindingRole = role.id;
-      select.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.bindingRole(role.id));
-      appendOption(select, '', DESIGNER_UI_TEXT.dataset.selectField, selected.length === 0);
-      for (const field of compatible) {
-        appendOption(
-          select,
-          field.id,
-          `${field.label} · ${field.valueType}`,
-          selected.includes(field.id),
-        );
-      }
-      fieldList.appendChild(select);
+      fieldList.appendChild(enhanceDesignerSelect(select).element);
     } else {
       const actions = ownerDocument.createElement('div');
       actions.className = 'designer-dataset-binding-role-actions';
@@ -153,12 +159,11 @@ export function renderRows(
     const tr = ownerDocument.createElement('tr');
     dataset.fields.forEach((field) => {
       const td = ownerDocument.createElement('td');
-      const input = ownerDocument.createElement('input');
-      input.className = 'designer-control designer-input';
+      const input = createDesignerInput(ownerDocument, {
+        value: row[field.id] === null || row[field.id] === undefined ? '' : String(row[field.id]),
+      });
       input.dataset.staticCellRow = String(rowIndex);
       input.dataset.staticCellField = field.id;
-      input.value =
-        row[field.id] === null || row[field.id] === undefined ? '' : String(row[field.id]);
       td.appendChild(input);
       tr.appendChild(td);
     });
@@ -180,18 +185,18 @@ export function renderRows(
   const pagination = ownerDocument.createElement('nav');
   pagination.className = 'designer-static-pagination';
   pagination.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticPagination);
-  const pageSizeSelect = ownerDocument.createElement('select');
-  pageSizeSelect.className = 'designer-control designer-select';
+  // 行数选择器是分页条里的紧凑控件：保持原生外观（自绘触发器会占满整格），
+  // 但仍走统一原语产出的 class 与选项构造。
+  const pageSizeSelect = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataSource.staticRowsPerPage,
+    options: DESIGNER_STATIC_PAGE_SIZE_OPTIONS.map((option) => ({
+      label: DESIGNER_UI_TEXT.dataSource.staticRowsPerPageOption(option),
+      selected: option === paginationState.pageSize,
+      value: String(option),
+    })),
+    value: String(paginationState.pageSize),
+  });
   pageSizeSelect.dataset.staticPageSize = 'true';
-  pageSizeSelect.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticRowsPerPage);
-  for (const option of DESIGNER_STATIC_PAGE_SIZE_OPTIONS) {
-    appendOption(
-      pageSizeSelect,
-      String(option),
-      DESIGNER_UI_TEXT.dataSource.staticRowsPerPageOption(option),
-      option === paginationState.pageSize,
-    );
-  }
   const pageText = ownerDocument.createElement('span');
   pageText.className = 'designer-static-page-status';
   pageText.textContent = DESIGNER_UI_TEXT.dataSource.staticPage(

@@ -354,8 +354,16 @@ describe('designer layers view', () => {
     expect(idleCopy?.children.find((child) => child.className === 'layer-name')?.textContent).toBe(
       'container',
     );
-    expect(idleCopy?.children.find((child) => child.className === 'layer-meta')?.textContent).toBe(
-      'container.material · 10 × 10',
+    // 副行拆成「类型 · 尺寸」两段：类型可截断，尺寸读数始终保持完整。
+    const idleMeta = idleCopy?.children.find((child) => child.className === 'layer-meta');
+    expect(
+      idleMeta?.children
+        .map((child) => child.textContent)
+        .join('')
+        .trim(),
+    ).toBe('container.material · 10 × 10');
+    expect(idleMeta?.children.find((child) => child.className === 'layer-size')?.textContent).toBe(
+      '10 × 10',
     );
 
     renderDesignerLayers(layers as unknown as HTMLElement, view, {

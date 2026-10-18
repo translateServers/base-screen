@@ -4,6 +4,12 @@ import type { DesignerInspectorContext } from '../../../common/operations/style/
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../../ui/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
+import {
+  appendDesignerRangeField,
+  createDesignerFieldElement,
+  createDesignerFieldRow,
+  type DesignerFieldRow,
+} from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   appendDesignerFieldMessage,
@@ -15,27 +21,6 @@ import {
   createDesignerSwitch,
   createDesignerTextarea,
 } from '../designer-ui-primitives.js';
-
-/** 字段行正文 `label` 的文本节点：控件列与标签列分离后，纯文本节点无法参与网格布局。 */
-function appendFieldLabelText(label: HTMLElement, text: string): void {
-  const span = label.ownerDocument.createElement('span');
-  span.className = 'designer-field-label-text';
-  span.textContent = text;
-  label.appendChild(span);
-}
-
-/** 控件列：相对标签独立占第二列，range/自绘下拉等复合控件共享同一落点。 */
-function createFieldControl(ownerDocument: Document, className?: string): HTMLElement {
-  const control = ownerDocument.createElement('span');
-  control.className =
-    className === undefined ? 'designer-field-control' : `designer-field-control ${className}`;
-  return control;
-}
-
-/** 自绘下拉：外壳进控件列，隐藏的原生 select 继续承担取值与 change。 */
-function appendSelectControl(control: HTMLElement, select: HTMLSelectElement): void {
-  control.appendChild(enhanceDesignerSelect(select).element);
-}
 
 function isSelectLike(
   input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
@@ -52,6 +37,27 @@ function isRangeEligible(
   return schema.maximum - schema.minimum <= 1000;
 }
 
+/**
+ * 控件落位：开关 / 勾选框直接挂在字段行上（`:has(> .designer-switch)` 行式布局），
+ * 自绘下拉与其余控件进控件列。
+ */
+function placeFieldControl(
+  field: HTMLElement,
+  control: HTMLElement,
+  input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  inline: boolean,
+): void {
+  if (inline) {
+    field.appendChild(input);
+    return;
+  }
+  if (isSelectLike(input)) {
+    control.appendChild(enhanceDesignerSelect(input).element);
+  } else {
+    control.appendChild(input);
+  }
+}
+
 export function appendInput(
   parent: HTMLElement,
   labelText: string,
@@ -59,22 +65,20 @@ export function appendInput(
   value: string | number,
   type = 'text',
   min?: string,
-): HTMLLabelElement {
-  const label = parent.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label';
-  appendFieldLabelText(label, labelText);
+): HTMLElement {
+  const field = createDesignerFieldElement(parent.ownerDocument, { label: labelText });
   const symbol = geometryPropertySymbol(property);
-  if (symbol !== undefined) label.dataset.propertySymbol = symbol;
-  const input = parent.ownerDocument.createElement('input');
-  input.type = type;
-  input.className = `designer-control designer-input${type === 'number' ? ' designer-number' : ''}`;
-  input.value = String(value);
+  if (symbol !== undefined) field.dataset.propertySymbol = symbol;
+  const input = createDesignerInput(parent.ownerDocument, {
+    appearance: type === 'number' ? 'number' : 'text',
+    value: String(value),
+    ...(min === undefined ? {} : { min }),
+  });
   input.dataset.property = property;
-  if (min !== undefined) input.min = min;
-  label.appendChild(input);
-  appendDesignerFieldMessage(label, input, `property-${property}`);
-  parent.appendChild(label);
-  return label;
+  field.appendChild(input);
+  appendDesignerFieldMessage(field, input, `property-${property}`);
+  parent.appendChild(field);
+  return field;
 }
 
 function geometryPropertySymbol(property: string): string | undefined {
@@ -96,25 +100,23 @@ export function appendBatchNumberInput(
   mixed: boolean,
   disabled: boolean,
   hint: string,
-): HTMLLabelElement {
-  const label = parent.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label';
-  appendFieldLabelText(label, labelText);
-  const input = parent.ownerDocument.createElement('input');
-  input.type = 'number';
-  input.className = 'designer-control designer-input designer-number';
-  input.value = mixed ? '' : String(value);
+): HTMLElement {
+  const field = createDesignerFieldElement(parent.ownerDocument, { label: labelText });
+  const input = createDesignerInput(parent.ownerDocument, {
+    appearance: 'number',
+    disabled,
+    value: mixed ? '' : String(value),
+  });
   if (mixed) {
     input.placeholder = DESIGNER_UI_TEXT.inspectorUi.mixed;
     input.dataset.mixed = 'true';
   }
   input.dataset.multiProperty = multiProperty;
-  input.disabled = disabled;
   input.setAttribute('data-tip', hint);
-  label.appendChild(input);
-  appendDesignerFieldMessage(label, input, `multi-property-${multiProperty}`);
-  parent.appendChild(label);
-  return label;
+  field.appendChild(input);
+  appendDesignerFieldMessage(field, input, `multi-property-${multiProperty}`);
+  parent.appendChild(field);
+  return field;
 }
 
 /** 批量样式控件（ADR-0053）：复用单选控件渲染，color 字段走统一三段式调色板。 */
@@ -130,13 +132,12 @@ export function appendBatchStyleControl(
   disabled: boolean,
   hint: string,
 ): void {
-  const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
-  label.className =
-    control === 'color'
-      ? 'designer-field designer-field-label designer-field-stacked'
-      : 'designer-field designer-field-label';
-  appendFieldLabelText(label, labelText);
-  if (control === 'color') {
+  const isColor = control === 'color';
+  const row = createDesignerFieldRow(parent.ownerDocument, {
+    label: labelText,
+    ...(isColor ? { tagName: 'span', stacked: true } : {}),
+  });
+  if (isColor) {
     const palette = createDesignerColorPalette(
       parent.ownerDocument,
       typeof value === 'string' ? value : undefined,
@@ -149,10 +150,8 @@ export function appendBatchStyleControl(
       input.setAttribute('data-tip', hint);
       if (mixed) input.dataset.mixed = 'true';
     }
-    const fieldControl = createFieldControl(parent.ownerDocument);
-    fieldControl.appendChild(palette.element);
-    label.appendChild(fieldControl);
-    appendDesignerFieldMessage(label, palette.controls[0]!, `multi-style-${style}`);
+    row.control.appendChild(palette.element);
+    appendDesignerFieldMessage(row.field, palette.controls[0]!, `multi-style-${style}`);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.multiProperty = `style:${style}`;
@@ -163,7 +162,7 @@ export function appendBatchStyleControl(
       if (control === 'boolean' && input instanceof HTMLInputElement) {
         input.checked = false;
         input.indeterminate = true;
-      } else if (control === 'select' && input instanceof HTMLSelectElement) {
+      } else if (control === 'select' && isSelectLike(input)) {
         const option = parent.ownerDocument.createElement('option');
         option.value = '';
         option.textContent = DESIGNER_UI_TEXT.inspectorUi.mixed;
@@ -175,20 +174,10 @@ export function appendBatchStyleControl(
           DESIGNER_UI_TEXT.inspectorUi.mixed;
       }
     }
-    if (control === 'boolean') {
-      label.appendChild(input);
-    } else if (isSelectLike(input)) {
-      const fieldControl = createFieldControl(parent.ownerDocument);
-      appendSelectControl(fieldControl, input);
-      label.appendChild(fieldControl);
-    } else {
-      const fieldControl = createFieldControl(parent.ownerDocument);
-      fieldControl.appendChild(input);
-      label.appendChild(fieldControl);
-    }
-    appendDesignerFieldMessage(label, input, `multi-style-${style}`);
+    placeFieldControl(row.field, row.control, input, control === 'boolean');
+    appendDesignerFieldMessage(row.field, input, `multi-style-${style}`);
   }
-  parent.appendChild(label);
+  parent.appendChild(row.field);
 }
 
 export function appendCheckbox(
@@ -197,9 +186,7 @@ export function appendCheckbox(
   property: string,
   value: boolean,
 ): void {
-  const label = parent.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label';
-  appendFieldLabelText(label, labelText);
+  const field = createDesignerFieldElement(parent.ownerDocument, { label: labelText });
   // 状态段勾选框（原型 .insp-row + `.inspector-pane input[type="checkbox"]`）：原生 checkbox + 强调色，
   // 显式 aria-label 与原型标记一致（锁定 / 隐藏）。
   const input = createDesignerCheckbox(parent.ownerDocument, {
@@ -211,9 +198,9 @@ export function appendCheckbox(
   input.addEventListener('change', () => {
     input.value = String(input.checked);
   });
-  label.appendChild(input);
-  appendDesignerFieldMessage(label, input, `property-${property}`);
-  parent.appendChild(label);
+  field.appendChild(input);
+  appendDesignerFieldMessage(field, input, `property-${property}`);
+  parent.appendChild(field);
 }
 
 export function appendPropControl(
@@ -226,13 +213,13 @@ export function appendPropControl(
   paletteKey: string,
   allowGradient: boolean,
 ): void {
-  const stacked = control === 'color' || control === 'json';
-  const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
-  label.className = stacked
-    ? 'designer-field designer-field-label designer-field-stacked'
-    : 'designer-field designer-field-label';
-  appendFieldLabelText(label, labelText);
-  if (control === 'color') {
+  const isColor = control === 'color';
+  const row = createDesignerFieldRow(parent.ownerDocument, {
+    label: labelText,
+    ...(isColor ? { tagName: 'span' } : {}),
+    ...(isColor || control === 'json' ? { stacked: true } : {}),
+  });
+  if (isColor) {
     const palette = createDesignerColorPalette(
       parent.ownerDocument,
       typeof value === 'string' ? value : undefined,
@@ -240,27 +227,15 @@ export function appendPropControl(
       { allowGradient },
     );
     for (const input of palette.controls) input.dataset.prop = prop;
-    const fieldControl = createFieldControl(parent.ownerDocument);
-    fieldControl.appendChild(palette.element);
-    label.appendChild(fieldControl);
-    appendDesignerFieldMessage(label, palette.controls[0]!, `prop-${prop}`);
+    row.control.appendChild(palette.element);
+    appendDesignerFieldMessage(row.field, palette.controls[0]!, `prop-${prop}`);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.prop = prop;
-    if (control === 'boolean') {
-      label.appendChild(input);
-    } else if (isSelectLike(input)) {
-      const fieldControl = createFieldControl(parent.ownerDocument);
-      appendSelectControl(fieldControl, input);
-      label.appendChild(fieldControl);
-    } else {
-      const fieldControl = createFieldControl(parent.ownerDocument);
-      fieldControl.appendChild(input);
-      label.appendChild(fieldControl);
-    }
-    appendDesignerFieldMessage(label, input, `prop-${prop}`);
+    placeFieldControl(row.field, row.control, input, control === 'boolean');
+    appendDesignerFieldMessage(row.field, input, `prop-${prop}`);
   }
-  parent.appendChild(label);
+  parent.appendChild(row.field);
 }
 
 export function appendStyleControl(
@@ -273,13 +248,12 @@ export function appendStyleControl(
   paletteKey: string,
   allowGradient: boolean,
 ): void {
-  const stacked = control === 'color';
-  const label = parent.ownerDocument.createElement(control === 'color' ? 'span' : 'label');
-  label.className = stacked
-    ? 'designer-field designer-field-label designer-field-stacked'
-    : 'designer-field designer-field-label';
-  appendFieldLabelText(label, labelText);
-  if (control === 'color') {
+  const isColor = control === 'color';
+  const row = createDesignerFieldRow(parent.ownerDocument, {
+    label: labelText,
+    ...(isColor ? { tagName: 'span', stacked: true } : {}),
+  });
+  if (isColor) {
     const palette = createDesignerColorPalette(
       parent.ownerDocument,
       typeof value === 'string' ? value : undefined,
@@ -287,31 +261,19 @@ export function appendStyleControl(
       { allowGradient },
     );
     for (const input of palette.controls) input.dataset.style = style;
-    const fieldControl = createFieldControl(parent.ownerDocument);
-    fieldControl.appendChild(palette.element);
-    label.appendChild(fieldControl);
-    appendDesignerFieldMessage(label, palette.controls[0]!, `style-${style}`);
+    row.control.appendChild(palette.element);
+    appendDesignerFieldMessage(row.field, palette.controls[0]!, `style-${style}`);
   } else if (control === 'number' && isRangeEligible(schema)) {
-    appendStyleRangeControl(label, labelText, style, value, schema);
+    appendStyleRangeControl(row, labelText, style, value, schema);
   } else if (control === 'select' && isAlignmentEnum(schema)) {
-    appendStyleSegmentedControl(label, labelText, style, value, schema);
+    appendStyleSegmentedControl(row, labelText, style, value, schema);
   } else {
     const input = createControl(parent.ownerDocument, value, schema, control, labelText);
     input.dataset.style = style;
-    if (control === 'boolean') {
-      label.appendChild(input);
-    } else if (isSelectLike(input)) {
-      const fieldControl = createFieldControl(parent.ownerDocument);
-      appendSelectControl(fieldControl, input);
-      label.appendChild(fieldControl);
-    } else {
-      const fieldControl = createFieldControl(parent.ownerDocument);
-      fieldControl.appendChild(input);
-      label.appendChild(fieldControl);
-    }
-    appendDesignerFieldMessage(label, input, `style-${style}`);
+    placeFieldControl(row.field, row.control, input, control === 'boolean');
+    appendDesignerFieldMessage(row.field, input, `style-${style}`);
   }
-  parent.appendChild(label);
+  parent.appendChild(row.field);
 }
 
 /**
@@ -320,7 +282,7 @@ export function appendStyleControl(
  * 出现两个同属性控件，也让查询/自动化始终命中同一个值载体。
  */
 function appendStyleRangeControl(
-  label: HTMLElement,
+  row: DesignerFieldRow,
   labelText: string,
   style: string,
   value: ScreenJsonValue | undefined,
@@ -330,47 +292,24 @@ function appendStyleRangeControl(
   const maximum = schema.maximum ?? 100;
   const current = typeof value === 'number' && Number.isFinite(value) ? value : minimum;
   const step = Number.isInteger(minimum) && Number.isInteger(maximum) ? 1 : 0.01;
-  const fieldControl = createFieldControl(label.ownerDocument, 'designer-field-range-control');
-  const range = createDesignerInput(label.ownerDocument, {
-    appearance: 'range',
+  const rangeField = appendDesignerRangeField(row.control, {
     ariaLabel: labelText,
-    max: maximum,
     min: minimum,
-    step,
-    value: String(current),
-  });
-  range.dataset.styleRange = style;
-  const number = createDesignerInput(label.ownerDocument, {
-    appearance: 'number',
-    ariaLabel: labelText,
-    className: 'designer-field-range-value',
     max: maximum,
-    min: minimum,
     step,
     // 可选数值未设置时保持空输入（与普通 number 控件一致），滑杆停在最小值；
     // 一旦用户拖动滑杆，数字读数立即补上并成为提交值。
     value: value === undefined ? '' : String(current),
+    rangeValue: String(current),
+    numberClassName: 'designer-field-range-value',
+    ...(value === undefined
+      ? { placeholder: DESIGNER_UI_TEXT.inspectorUi.autoValue, empty: true }
+      : {}),
+    forwardRangeChange: true,
   });
-  number.dataset.style = style;
-  if (value === undefined) {
-    number.placeholder = DESIGNER_UI_TEXT.inspectorUi.autoValue;
-    range.dataset.empty = 'true';
-  }
-  // 滑杆拖动时先同步数字读数（可见值实时跟随），松手（change）再走一次统一的值提交。
-  range.addEventListener('input', () => {
-    number.value = range.value;
-    delete range.dataset.empty;
-  });
-  range.addEventListener('change', () => {
-    number.value = range.value;
-    number.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-  });
-  number.addEventListener('input', () => {
-    range.value = number.value;
-  });
-  fieldControl.append(range, number);
-  label.appendChild(fieldControl);
-  appendDesignerFieldMessage(label, number, `style-${style}`);
+  rangeField.range.dataset.styleRange = style;
+  rangeField.number.dataset.style = style;
+  appendDesignerFieldMessage(row.field, rangeField.number, `style-${style}`);
 }
 
 /** 三档水平对齐（left / center / right）在原型里是图标分段控件。 */
@@ -387,13 +326,13 @@ function isAlignmentEnum(
  * 可见按钮只负责改值并派发 change，键盘与既有事务管线保持不变。
  */
 function appendStyleSegmentedControl(
-  label: HTMLElement,
+  row: DesignerFieldRow,
   labelText: string,
   style: string,
   value: ScreenJsonValue | undefined,
   schema: Extract<BaseScreenMaterialPropSchema, { readonly kind: 'enum' }>,
 ): void {
-  const ownerDocument = label.ownerDocument;
+  const ownerDocument = row.field.ownerDocument;
   const current = typeof value === 'string' ? value : String(schema.values[0]);
   const segmented = ownerDocument.createElement('span');
   segmented.className = 'designer-segmented';
@@ -436,10 +375,8 @@ function appendStyleSegmentedControl(
     });
     segmented.appendChild(option);
   }
-  const fieldControl = createFieldControl(ownerDocument);
-  fieldControl.append(segmented, select);
-  label.appendChild(fieldControl);
-  appendDesignerFieldMessage(label, select, `style-${style}`);
+  row.control.append(segmented, select);
+  appendDesignerFieldMessage(row.field, select, `style-${style}`);
 }
 
 export function appendSection(parent: HTMLElement, title: string, advanced = false): HTMLElement {

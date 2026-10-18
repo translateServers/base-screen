@@ -100,6 +100,10 @@ export async function runBrowserHarness(serverPort) {
       server: { port: serverPort },
     },
     async ({ baseUrl, browser }) => {
+      // 依赖预构建（optimizeDeps.force）完成时 vite 会整页刷新一次，正好可能落在第一个
+      // 断言的中途，表现为 `Execution context was destroyed` 或 `baseScreenHarness undefined`。
+      // 先用一个一次性页面吃掉这次刷新，再进入正式断言。
+      await warmUpHarness(browser, baseUrl);
       await assertInitialCanvasPointerFocus(browser, baseUrl);
       await assertMaterialGroupNavigation(browser, baseUrl);
       await assertCompositeInsertion(browser, baseUrl);
@@ -202,4 +206,19 @@ export async function runBrowserHarness(serverPort) {
       }
     },
   );
+}
+
+/**
+ * 一次性预热：等 harness 全局真正就绪（而不是只等自定义元素注册），
+ * 让依赖预构建引发的那次整页刷新落在丢弃页面上，不打断后续断言的执行上下文。
+ */
+async function warmUpHarness(browser, baseUrl) {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await page.goto(`${baseUrl}/?campaign=browser-harness`, { waitUntil: 'networkidle' });
+  await page.waitForFunction(() => window.baseScreenHarness?.designer !== undefined, undefined, {
+    timeout: 30_000,
+  });
+  // 留出一帧以上的余量：刷新会在预构建完成后的下一次事件循环里发生。
+  await page.waitForTimeout(500);
+  await page.close();
 }

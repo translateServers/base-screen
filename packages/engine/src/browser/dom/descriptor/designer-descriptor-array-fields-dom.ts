@@ -5,6 +5,7 @@ import {
   resolveSchema,
 } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerFieldElement } from '../designer-field-primitives.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import {
   createDescriptorControl,
@@ -31,9 +32,7 @@ export function appendDescriptorArrayControls(
   const ownerDocument = parent.ownerDocument;
   const container = ownerDocument.createElement('div');
   container.className = 'designer-descriptor-array';
-  const label = ownerDocument.createElement('span');
-  label.className = 'designer-field designer-field-label';
-  label.textContent = field.label;
+  const label = createDesignerFieldElement(ownerDocument, { label: field.label, tagName: 'span' });
   container.appendChild(label);
   const list = ownerDocument.createElement('ol');
   list.className = 'designer-descriptor-array-list';
@@ -143,9 +142,10 @@ function appendDescriptorItemField(
 ): void {
   const ownerDocument = parent.ownerDocument;
   // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
-  const label = ownerDocument.createElement(itemField.control === 'color' ? 'span' : 'label');
-  label.className = 'designer-field designer-field-label';
-  label.textContent = itemField.label;
+  const label = createDesignerFieldElement(ownerDocument, {
+    label: itemField.label,
+    ...(itemField.control === 'color' ? { tagName: 'span' } : {}),
+  });
   const itemValue = readArrayItemValue(context, arrayField, index, itemField.path);
   const itemSchema = itemFieldSchema(arrayField, itemField, context);
   const handle = createDescriptorControl(

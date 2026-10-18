@@ -32,8 +32,9 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toContain('grid-template-rows: 40px auto auto minmax(0, 1fr);');
     expect(workbenchCss).toContain('.designer-datav-section-summary');
     expect(workbenchCss).toContain('right: 8px;');
-    // 图层行改为原型式的「抓手 · 名称 · 锁 · 眼」四列网格，缩进由行内 padding 承担。
-    expect(workbenchCss).toContain('grid-template-columns: 16px minmax(0, 1fr) 26px 26px;');
+    // 图层行统一为「名称 · 锁 · 眼」三列网格：折叠箭头绝对定位在本级折叠位，
+    // 缩进由行内 padding 承担，叶子行与分组行的图标因此落在同一条竖线上。
+    expect(workbenchCss).toContain('grid-template-columns: minmax(0, 1fr) 24px 24px;');
     expect(workbenchCss).toContain('.statusbar [data-project-status]');
     expect(workbenchCss).toContain('flex: 0 1 auto;');
     expect(workbenchCss).toContain('.statusbar [data-project-revision]');

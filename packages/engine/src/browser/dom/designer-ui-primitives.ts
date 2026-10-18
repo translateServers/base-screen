@@ -246,6 +246,6 @@ function inputClassNameForAppearance(appearance: DesignerInputAppearance): strin
   }
 }
 
-function designerClassNames(base: string, extra: string | undefined): string {
+export function designerClassNames(base: string, extra: string | undefined): string {
   return Array.from(new Set(`${base} ${extra ?? ''}`.trim().split(/\s+/))).join(' ');
 }

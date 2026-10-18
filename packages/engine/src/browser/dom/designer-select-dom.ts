@@ -27,6 +27,9 @@ export function enhanceDesignerSelect(select: HTMLSelectElement): DesignerSelect
   trigger.className = 'designer-select-trigger';
   trigger.setAttribute('aria-haspopup', 'listbox');
   trigger.setAttribute('aria-expanded', 'false');
+  // 原生 select 被视觉收进 1px，用户看到的是这个触发器：禁用状态必须一起传导，
+  // 否则 `select.disabled = true` 只挡住了键盘/取值，指针仍能展开并选值。
+  trigger.disabled = select.disabled;
   const label = select.getAttribute('aria-label');
   if (label !== null) trigger.setAttribute('aria-label', label);
   const value = ownerDocument.createElement('span');

@@ -124,6 +124,11 @@ export class DesignerLayersController {
       this.render(showMore.closest<HTMLElement>('[data-layers]') ?? this.#layers);
       return true;
     }
+    // 搜索清除：空结果页与搜索框内的清除按钮共用一条路径，清空后焦点回到搜索框。
+    if (target.closest('[data-layer-search-clear]') !== null) {
+      this.clearSearch(target.closest<HTMLElement>('[data-layers]') ?? this.#layers);
+      return true;
+    }
     const arrange = target.closest<HTMLElement>('[data-layer-arrange]')?.dataset.layerArrange as
       | DesignerLayerArrangeAction
       | undefined;
@@ -207,6 +212,14 @@ export class DesignerLayersController {
     const target = event.target;
     if (isLayerSelectButton(target)) {
       return this.navigateTree(target, event);
+    }
+    // 搜索框：Escape 清空查询并保持焦点（与素材搜索一致），不让用户为了看清全部图层
+    // 手动退格或先点清除按钮。
+    if (target instanceof HTMLInputElement && target.dataset.layerSearch !== undefined) {
+      if (event.key !== 'Escape' || this.#search === '') return false;
+      event.preventDefault();
+      this.clearSearch(target.closest<HTMLElement>('[data-layers]') ?? undefined);
+      return true;
     }
     if (!(target instanceof HTMLInputElement) || target.dataset.layerRename === undefined)
       return false;
@@ -305,6 +318,14 @@ export class DesignerLayersController {
     this.render(this.#layers);
     // 释放面板引用：断开场景不再牵住 detached 节点；下一次 render(layers) 会重新注入。
     this.#layers = undefined;
+  }
+
+  /** 清空图层搜索并把焦点交还搜索框：过滤是即时重渲染，焦点不能跟着树一起消失。 */
+  private clearSearch(panel: HTMLElement | undefined): void {
+    this.#search = '';
+    this.#renderLimit = DESIGNER_LAYER_PAGE_SIZE;
+    this.render(panel);
+    panel?.querySelector<HTMLInputElement>('[data-layer-search]')?.focus();
   }
 
   private toggle(componentId: string, property: string): void {

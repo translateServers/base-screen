@@ -1,5 +1,11 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
+import {
+  createDesignerCheckbox,
+  createDesignerInput,
+  createDesignerSelect,
+} from '../designer-ui-primitives.js';
 import type {
   DesignerDataSourcePanelOptions,
   DesignerDatasetAuthoringAction,
@@ -160,11 +166,11 @@ function authoringCheckbox(
 ): HTMLLabelElement {
   const label = options.panel.ownerDocument.createElement('label');
   label.className = 'designer-dataset-authoring-checkbox';
-  const input = options.panel.ownerDocument.createElement('input');
-  input.type = 'checkbox';
-  input.className = 'designer-checkbox';
-  input.checked = checked;
-  input.value = String(checked);
+  const input = createDesignerCheckbox(options.panel.ownerDocument, {
+    ariaLabel: labelText,
+    checked,
+    value: String(checked),
+  });
   input.dataset.datasetAuthoringSetting = setting;
   const text = options.panel.ownerDocument.createElement('span');
   text.className = 'designer-dataset-authoring-setting-label';
@@ -184,22 +190,23 @@ function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTML
   const strategyLabel = ownerDocument.createElement('span');
   strategyLabel.className = 'designer-dataset-authoring-setting-label';
   strategyLabel.textContent = DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel;
-  const select = ownerDocument.createElement('select');
-  select.className = 'designer-control designer-select';
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel,
+    options: (
+      [
+        ['once', DESIGNER_UI_TEXT.dataSource.refreshOnce],
+        ['manual', DESIGNER_UI_TEXT.dataSource.manualRefresh],
+        ['auto', DESIGNER_UI_TEXT.dataSource.refreshAuto],
+      ] as const satisfies readonly [DesignerDatasetRefreshStrategy, string][]
+    ).map(([value, label]) => ({
+      label,
+      selected: options.authoring.refreshStrategy === value,
+      value,
+    })),
+    value: options.authoring.refreshStrategy,
+  });
   select.dataset.datasetAuthoringSetting = 'refreshStrategy';
-  select.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.refreshStrategyLabel);
-  for (const [value, label] of [
-    ['once', DESIGNER_UI_TEXT.dataSource.refreshOnce],
-    ['manual', DESIGNER_UI_TEXT.dataSource.manualRefresh],
-    ['auto', DESIGNER_UI_TEXT.dataSource.refreshAuto],
-  ] as const satisfies readonly [DesignerDatasetRefreshStrategy, string][]) {
-    const option = ownerDocument.createElement('option');
-    option.value = value;
-    option.textContent = label;
-    option.selected = options.authoring.refreshStrategy === value;
-    select.appendChild(option);
-  }
-  strategy.append(strategyLabel, select);
+  strategy.append(strategyLabel, enhanceDesignerSelect(select).element);
   const intervalRow = ownerDocument.createElement('label');
   intervalRow.className = 'designer-dataset-authoring-setting-row';
   intervalRow.dataset.disabled = String(options.authoring.refreshStrategy !== 'auto');
@@ -208,19 +215,17 @@ function authoringRefreshControls(options: DesignerDataSourcePanelOptions): HTML
   intervalLabel.textContent = DESIGNER_UI_TEXT.dataSource.refreshIntervalLabel;
   const intervalControl = ownerDocument.createElement('span');
   intervalControl.className = 'designer-dataset-refresh-interval-control';
-  const interval = ownerDocument.createElement('input');
-  interval.type = 'number';
-  interval.className = 'designer-control designer-number-input';
-  interval.min = '1';
-  interval.max = '3600';
-  interval.step = '1';
-  interval.value = String(options.authoring.refreshInterval);
-  interval.disabled = options.authoring.refreshStrategy !== 'auto';
+  const interval = createDesignerInput(ownerDocument, {
+    appearance: 'number',
+    ariaLabel: `${DESIGNER_UI_TEXT.dataSource.refreshIntervalLabel} · ${DESIGNER_UI_TEXT.dataSource.refreshInterval}`,
+    className: 'designer-number-input',
+    disabled: options.authoring.refreshStrategy !== 'auto',
+    max: 3600,
+    min: 1,
+    step: 1,
+    value: String(options.authoring.refreshInterval),
+  });
   interval.dataset.datasetAuthoringSetting = 'refreshInterval';
-  interval.setAttribute(
-    'aria-label',
-    `${DESIGNER_UI_TEXT.dataSource.refreshIntervalLabel} · ${DESIGNER_UI_TEXT.dataSource.refreshInterval}`,
-  );
   const unit = ownerDocument.createElement('span');
   unit.textContent = DESIGNER_UI_TEXT.dataSource.refreshInterval;
   unit.setAttribute('aria-hidden', 'true');

@@ -9,7 +9,14 @@ import {
   type DesignerDescriptorDatasetFields,
   renderDesignerDescriptorZone,
 } from '../descriptor/designer-descriptor-dom.js';
-import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
+import { createDesignerFieldRow } from '../designer-field-primitives.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
+import {
+  appendDesignerFieldMessage,
+  createDesignerInput,
+  createDesignerSelect,
+  createDesignerTextarea,
+} from '../designer-ui-primitives.js';
 import { dataCapabilities, listDataResourceTypes } from './designer-data-source-model.js';
 
 export function renderDesignerDataPanel(
@@ -36,24 +43,7 @@ export function renderDesignerDataPanel(
   }
   const source = component.dataSource;
   const type = source?.type ?? 'none';
-  const label = panel.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label';
-  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.dataSource;
-  const select = panel.ownerDocument.createElement('select');
-  select.className = 'designer-control designer-select';
-  select.dataset.dataSourceType = 'true';
-  for (const value of ['none', ...capabilities]) {
-    const option = panel.ownerDocument.createElement('option');
-    option.value = value;
-    option.textContent =
-      value === 'none'
-        ? DESIGNER_UI_TEXT.propertiesPanel.none
-        : DESIGNER_UI_TEXT.dataSource.mode(value);
-    option.selected = value === type;
-    select.appendChild(option);
-  }
-  label.appendChild(select);
-  panel.appendChild(label);
+  appendDataSourceTypeField(panel, type, capabilities);
   if (capabilities.includes('static')) {
     appendDataInput(
       panel,
@@ -78,25 +68,7 @@ export function renderDesignerDataPanel(
     );
   }
   if (capabilities.includes('variable')) {
-    const variableLabel = panel.ownerDocument.createElement('label');
-    variableLabel.className = 'designer-field designer-field-label';
-    variableLabel.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
-    const variableSelect = panel.ownerDocument.createElement('select');
-    variableSelect.className = 'designer-control designer-select';
-    variableSelect.dataset.dataSourceField = 'variableId';
-    const empty = panel.ownerDocument.createElement('option');
-    empty.value = '';
-    empty.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
-    variableSelect.appendChild(empty);
-    for (const variable of document?.variables ?? []) {
-      const option = panel.ownerDocument.createElement('option');
-      option.value = variable.id;
-      option.textContent = variable.name;
-      option.selected = source?.type === 'variable' && source.variableId === variable.id;
-      variableSelect.appendChild(option);
-    }
-    variableLabel.appendChild(variableSelect);
-    panel.appendChild(variableLabel);
+    appendVariableField(panel, source, document);
   }
   const manifest = component === undefined ? undefined : catalog?.get(component.type)?.manifest;
   renderDesignerDescriptorZone(panel, manifest?.editorDescriptor?.data, {
@@ -105,6 +77,66 @@ export function renderDesignerDataPanel(
     catalog,
     getDatasetFields,
   });
+}
+
+/**
+ * 数据源面板的字段统一走检查器的字段行原语（标签列 + 控件列 + 自绘下拉）。
+ * 此前这里手写 `label.designer-field` + 裸 `<select>`：原生下拉的外观/高度与其余面板不一致，
+ * 也没有控件列，长标签（如“数据源类型”）被 74px 标签列挤成两行。
+ */
+function appendDataSourceTypeField(
+  parent: HTMLElement,
+  type: string,
+  capabilities: readonly string[],
+): void {
+  const ownerDocument = parent.ownerDocument;
+  const { field, control } = createDesignerFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.dataSource,
+  });
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.dataSource,
+    options: ['none', ...capabilities].map((value) => ({
+      label:
+        value === 'none'
+          ? DESIGNER_UI_TEXT.propertiesPanel.none
+          : DESIGNER_UI_TEXT.dataSource.mode(value),
+      selected: value === type,
+      value,
+    })),
+    value: type,
+  });
+  select.dataset.dataSourceType = 'true';
+  control.appendChild(enhanceDesignerSelect(select).element);
+  appendDesignerFieldMessage(field, select, 'data-source-type');
+  parent.appendChild(field);
+}
+
+function appendVariableField(
+  parent: HTMLElement,
+  source: ScreenComponentNode['dataSource'],
+  document: ScreenDocument | undefined,
+): void {
+  const ownerDocument = parent.ownerDocument;
+  const { field, control } = createDesignerFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.dataset.selectVariable,
+  });
+  const current = source?.type === 'variable' ? source.variableId : '';
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.selectVariable,
+    options: [
+      { label: DESIGNER_UI_TEXT.dataset.selectVariable, selected: current === '', value: '' },
+      ...(document?.variables ?? []).map((variable) => ({
+        label: variable.name,
+        selected: variable.id === current,
+        value: variable.id,
+      })),
+    ],
+    value: current,
+  });
+  select.dataset.dataSourceField = 'variableId';
+  control.appendChild(enhanceDesignerSelect(select).element);
+  appendDesignerFieldMessage(field, select, 'data-variableId');
+  parent.appendChild(field);
 }
 
 function appendResourceTypeField(
@@ -118,26 +150,30 @@ function appendResourceTypeField(
     appendDataInput(parent, DESIGNER_UI_TEXT.propertiesPanel.resourceType, 'resourceType', value);
     return;
   }
-  const label = parent.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label';
-  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.resourceType;
-  const select = parent.ownerDocument.createElement('select');
-  select.className = 'designer-control designer-select';
+  const ownerDocument = parent.ownerDocument;
+  const { field, control } = createDesignerFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.resourceType,
+  });
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.resourceType,
+    options: [
+      {
+        label: DESIGNER_UI_TEXT.propertiesPanel.resourceTypePlaceholder,
+        selected: value === '',
+        value: '',
+      },
+      ...resourceTypes.map((resourceType) => ({
+        label: resourceType.name,
+        selected: resourceType.id === value,
+        value: resourceType.id,
+      })),
+    ],
+    value,
+  });
   select.dataset.dataSourceField = 'resourceType';
-  const placeholder = parent.ownerDocument.createElement('option');
-  placeholder.value = '';
-  placeholder.textContent = DESIGNER_UI_TEXT.propertiesPanel.resourceTypePlaceholder;
-  select.appendChild(placeholder);
-  for (const resourceType of resourceTypes) {
-    const option = parent.ownerDocument.createElement('option');
-    option.value = resourceType.id;
-    option.textContent = resourceType.name;
-    option.selected = resourceType.id === value;
-    select.appendChild(option);
-  }
-  label.appendChild(select);
-  appendDesignerFieldMessage(label, select, 'data-resourceType');
-  parent.appendChild(label);
+  control.appendChild(enhanceDesignerSelect(select).element);
+  appendDesignerFieldMessage(field, select, 'data-resourceType');
+  parent.appendChild(field);
 }
 
 function appendDataInput(
@@ -146,20 +182,19 @@ function appendDataInput(
   field: string,
   value: string,
 ): void {
-  const label = parent.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label';
-  label.textContent = labelText;
-  const input =
-    field === 'static' || field === 'params'
-      ? parent.ownerDocument.createElement('textarea')
-      : parent.ownerDocument.createElement('input');
-  input.value = value;
-  input.className =
-    field === 'static' || field === 'params'
-      ? 'designer-control designer-textarea'
-      : 'designer-control designer-input';
+  const ownerDocument = parent.ownerDocument;
+  const multiline = field === 'static' || field === 'params';
+  // 多行文本（静态值 / 参数 JSON）用「标签在上、控件占满整行」的堆叠行，
+  // 与检查器里的文本域同一形态：72px 高的输入框不该被塞进 74px 标签列旁边。
+  const { field: row, control } = createDesignerFieldRow(ownerDocument, {
+    label: labelText,
+    ...(multiline ? { tagName: 'span' as const, stacked: true } : {}),
+  });
+  const input = multiline
+    ? createDesignerTextarea(ownerDocument, { ariaLabel: labelText, value })
+    : createDesignerInput(ownerDocument, { ariaLabel: labelText, value });
   input.dataset.dataSourceField = field;
-  label.appendChild(input);
-  appendDesignerFieldMessage(label, input, `data-${field}`);
-  parent.appendChild(label);
+  control.appendChild(input);
+  appendDesignerFieldMessage(row, input, `data-${field}`);
+  parent.appendChild(row);
 }

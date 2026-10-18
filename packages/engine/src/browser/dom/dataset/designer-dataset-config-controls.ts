@@ -1,6 +1,7 @@
 import type { ScreenDatasetDefinition, ScreenHostResourceParameter } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { attachDesignerDateField } from '../designer-date-field-dom.js';
+import { createDesignerInput, createDesignerSelect } from '../designer-ui-primitives.js';
 import type { DesignerDatasetConfigurationOptions } from './designer-dataset-types.js';
 
 export function variableControl(
@@ -10,17 +11,23 @@ export function variableControl(
   draft: Extract<ScreenHostResourceParameter, { readonly kind: 'variable' }>,
   options: DesignerDatasetConfigurationOptions,
 ): HTMLSelectElement {
-  const variable = ownerDocument.createElement('select');
-  variable.className = 'designer-control designer-select';
+  const variable = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameterLabel),
+    options: [
+      {
+        label: DESIGNER_UI_TEXT.dataset.selectVariable,
+        selected: draft.variableId === '',
+        value: '',
+      },
+      ...options.variables.map((item) => ({
+        label: item.name,
+        selected: draft.variableId === item.id,
+        value: item.id,
+      })),
+    ],
+    value: draft.variableId,
+  });
   variable.dataset.datasetParameter = parameterName;
-  variable.setAttribute(
-    'aria-label',
-    DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameterLabel),
-  );
-  appendOption(variable, '', DESIGNER_UI_TEXT.dataset.selectVariable, draft.variableId === '');
-  for (const item of options.variables) {
-    appendOption(variable, item.id, item.name, draft.variableId === item.id);
-  }
   return variable;
 }
 
@@ -70,21 +77,20 @@ export function parameterControl(
   draft: ScreenHostResourceParameter | undefined,
 ): HTMLElement {
   const parameter = descriptor.parameters.find((item) => item.name === name)!;
-  const input = ownerDocument.createElement('input');
-  input.className = 'designer-control designer-input';
+  const input = createDesignerInput(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label),
+    appearance: parameter.valueType === 'number' ? 'number' : 'text',
+    ...(parameter.valueType === 'boolean' ? { type: 'checkbox' } : {}),
+    ...(parameter.valueType === 'date'
+      ? { placeholder: DESIGNER_UI_TEXT.dataset.parameterDatePlaceholder }
+      : {}),
+    ...(parameter.minimum === undefined ? {} : { min: parameter.minimum }),
+    ...(parameter.maximum === undefined ? {} : { max: parameter.maximum }),
+  });
   input.dataset.datasetParameter = parameter.name;
-  input.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label));
   setParameterControlValue(input, parameter, draft);
-  if (input instanceof HTMLInputElement) {
-    if (parameter.valueType === 'number') input.type = 'number';
-    if (parameter.valueType === 'boolean') input.type = 'checkbox';
-    if (parameter.valueType === 'date')
-      input.placeholder = DESIGNER_UI_TEXT.dataset.parameterDatePlaceholder;
-    input.required = parameter.required;
-    if (parameter.minimum !== undefined) input.min = String(parameter.minimum);
-    if (parameter.maximum !== undefined) input.max = String(parameter.maximum);
-    if (parameter.maxLength !== undefined) input.maxLength = parameter.maxLength;
-  }
+  input.required = parameter.required;
+  if (parameter.maxLength !== undefined) input.maxLength = parameter.maxLength;
   // 日期参数原样保留输入框为值载体，只把「输入 + 触发器 + 自绘日历」装进同一外壳。
   if (parameter.valueType === 'date') {
     return attachDesignerDateField(input, { label: parameter.label }).element;

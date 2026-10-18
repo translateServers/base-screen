@@ -132,15 +132,21 @@
   display: none;
 }
 
-.properties .designer-data-source-type-field {
+.properties .inspector-pane .designer-data-source-type-field {
   position: relative;
+  /* 这一行的标签带 4px 强调条 + 7px 间距，74px 标签列只剩 ~59px 文字宽度，
+     “数据源类型”会被省略号截掉；单独为这行把标签列加宽到 88px。
+     选择器要带 .inspector-pane，才压得过 .designer-field 的 74px 列定义。 */
+  grid-template-columns: 88px minmax(0, 1fr);
   gap: 8px;
   margin: 0;
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-base);
 }
 
-.properties .designer-data-source-type-field > span::before {
+/* 强调条只挂在标签文字上：字段行里控件列也是 span，用裸 `> span` 会在下拉左侧
+   再画一条（同一行两条竖线）。 */
+.properties .inspector-pane .designer-data-source-type-field > .designer-field-label-text::before {
   display: inline-block;
   width: 4px;
   height: 11px;
@@ -265,10 +271,12 @@
   margin-bottom: 4px;
 }
 
-/* 段内字段沿用组件检查器的行骨架（74px 标签列 + 控件列），底部不再补 margin；
-   行距由段自身的 grid gap 承担，字段显隐不会牵动其余行的位置。 */
+/* 段内字段沿用组件检查器的行骨架（74px 标签列 + 控件列）。
+   行距必须由字段行自己承担：`<details>` 的非 summary 内容在 Chromium 里被包进
+   `::details-content`，字段行不再是段容器的直接 grid 子项，段上的 `gap` 落不到行之间，
+   只作用在「标题 → 内容」这一层；此前把 margin 归零，两行字段就直接贴在一起了。 */
 .properties[data-inspector-context-kind="canvas"] .inspector-pane .designer-field {
-  margin-bottom: 0;
+  margin-bottom: var(--designer-space-2);
 }
 
 /* 数字字段：符号内嵌右缘（与组件几何网格同一形态），标签列留给字段名。 */
@@ -300,19 +308,11 @@
   gap: var(--designer-space-3);
 }
 
-/* 不透明度：滑杆吃满剩余宽度，右侧百分比读数固定一档（原型 .range-row dual）。
-   读数用内嵌 % 符号，读作「100%」而不是裸数字。 */
-.properties .designer-canvas-opacity-field .designer-field-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 62px;
-  gap: var(--designer-space-3);
-  align-items: center;
-}
-
-.properties .designer-canvas-opacity-value {
-  height: var(--designer-control-height-compact);
-  padding: 0 18px 0 6px;
-  text-align: right;
+/* 不透明度：几何沿用滑杆字段的公共规则（`.designer-field-control:has(> .designer-range)`），
+   这里只补“读数内嵌 % 符号”需要让出的右内边距。读数读作「100%」而不是裸数字。
+   特异性要压过公共读数规则（`.designer-field-range-value` 的 padding），否则 % 会压住数字。 */
+.properties .inspector-pane .designer-canvas-opacity-value {
+  padding-right: 18px;
 }
 
 /* 缩放方式是六档分段控件：标签在上、整行等分（原型 .insp-field + .segmented）。 */

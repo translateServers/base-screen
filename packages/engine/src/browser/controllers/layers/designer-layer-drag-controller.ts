@@ -160,16 +160,17 @@ export class DesignerLayerDragController {
     const layers = this.callbacks.getLayers();
     const row = layers?.querySelector<HTMLElement>(`.layer-row[data-layer-id="${rowId}"]`);
     if (row === null || row === undefined) return;
-    const dragImage = createDesignerLayerDragImage(row);
+    const dragImage = createDesignerLayerDragImage(row, this.draggedSelection().length);
     if (dragImage === undefined) return;
     this.#dragImage = dragImage;
     const dataTransfer = event.dataTransfer;
     if (dataTransfer === null || dataTransfer === undefined) return;
-    // 光标落在幽灵左侧中部：与原型“抓住行本身”的手感一致，也不会让卡片盖住落点行。
+    // 光标落在幽灵图标的中部：与原型“抓住行本身”的手感一致，也不会让卡片盖住落点行。
+    const rect = dragImage.image.getBoundingClientRect();
     dataTransfer.setDragImage(
       dragImage.image,
-      Math.min(24, dragImage.image.getBoundingClientRect().width / 2),
-      Math.max(1, dragImage.image.getBoundingClientRect().height / 2),
+      Math.min(18, Math.max(4, rect.width / 2)),
+      Math.max(1, rect.height / 2),
     );
   }
 

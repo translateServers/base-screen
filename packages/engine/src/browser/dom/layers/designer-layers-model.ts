@@ -20,6 +20,8 @@ export interface DesignerLayerItem {
   readonly hidden: boolean;
   readonly locked: boolean;
   readonly missingMaterial: boolean;
+  // 副行的类型读数：物料清单的可读名称（回退 type 原文），不把技术 id 当正文展示。
+  readonly typeLabel: string;
   // 行首类型图标：由物料分类关键词确定性派生（与物料库缩略图同一规则），无匹配回退网格。
   readonly icon?: DesignerIconName;
   // 行副行的尺寸读数：canonical 尺寸，不含缩放。
@@ -195,6 +197,7 @@ function visitLayer(
       hidden: isScreenComponentEffectivelyHidden(document, component.id),
       locked: isScreenComponentEffectivelyLocked(document, component.id),
       missingMaterial: catalog?.get(component.type) === undefined,
+      typeLabel: catalog?.get(component.type)?.manifest.name ?? component.type,
       icon: materialCategoryIcon(
         `${catalog?.get(component.type)?.manifest.category ?? ''} ${component.type}`,
       ),

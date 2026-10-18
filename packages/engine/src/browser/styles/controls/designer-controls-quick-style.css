@@ -1,10 +1,6 @@
-.designer-opacity-controls {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(0, 1fr) 64px;
-  align-items: center;
-  gap: var(--designer-space-3);
-}
+/* 滑杆字段的几何只有一处定义（workbench-inspector.css 的
+   `.designer-field-control:has(> .designer-range)`）：滑杆吃满剩余宽度、读数定宽 58px。
+   这里不再给不透明度单独一套网格。 */
 
 /* 数值滑杆按原型的取值控件语言重做：轨道是 6px 全圆角发丝灰（--designer-range-track），
    滑钮 14px 深色实心 + 2px 表面色收边。原先借原生外观（appearance: auto）配

@@ -13,6 +13,11 @@ import {
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDescriptorDatasetFields } from '../descriptor/designer-descriptor-dom.js';
 import { renderDesignerDescriptorZone } from '../descriptor/designer-descriptor-dom.js';
+import {
+  appendDesignerRangeField,
+  createDesignerFieldElement,
+  createDesignerFieldRow,
+} from '../designer-field-primitives.js';
 import { appendDesignerQuickStyle } from '../designer-quick-style-dom.js';
 import { appendDesignerFieldMessage, createDesignerButton } from '../designer-ui-primitives.js';
 import { appendCanvasControls } from './designer-canvas-properties-dom.js';
@@ -235,9 +240,11 @@ function appendComponentControls(
 }
 
 function appendImageDensityActions(parent: HTMLElement, componentId: string): void {
-  const field = parent.ownerDocument.createElement('div');
-  field.className = 'designer-field designer-field-label designer-image-density-field';
-  field.textContent = DESIGNER_UI_TEXT.propertiesPanel.imageDensity;
+  const field = createDesignerFieldElement(parent.ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.imageDensity,
+    tagName: 'div',
+    className: 'designer-image-density-field',
+  });
   const actions = parent.ownerDocument.createElement('span');
   actions.className = 'designer-image-density-actions';
   for (const density of [1, 2, 3, 4] as const) {
@@ -265,38 +272,25 @@ function appendCommonOpacityControl(
   if (schema?.kind !== 'number') return;
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.commonStyle);
   section.className += ' designer-datav-common-section';
-  const field = properties.ownerDocument.createElement('span');
-  field.className = 'designer-field designer-field-label designer-opacity-field';
-  const label = properties.ownerDocument.createElement('span');
-  label.className = 'designer-field-label-text';
-  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.opacity;
-  field.appendChild(label);
-  const controls = properties.ownerDocument.createElement('span');
-  controls.className = 'designer-opacity-controls';
-  const range = properties.ownerDocument.createElement('input');
-  range.type = 'range';
-  range.className = 'designer-control designer-range';
-  range.min = '0';
-  range.max = '100';
-  range.step = '1';
-  range.value = String(Math.round(Number(component.style.opacity ?? 1) * 100));
-  range.dataset.style = 'opacity';
-  range.dataset.opacityPercent = 'true';
-  range.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.opacity);
-  const number = properties.ownerDocument.createElement('input');
-  number.type = 'number';
-  number.className = 'designer-control designer-input designer-number';
-  number.min = '0';
-  number.max = '100';
-  number.step = '1';
+  const { field, control } = createDesignerFieldRow(properties.ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.opacity,
+    tagName: 'span',
+    className: 'designer-opacity-field',
+  });
   // 面板读数统一按百分比（原型 .range-row 的 0–100），事务侧仍写 0–1 的 canonical 值。
-  number.value = String(Math.round(Number(component.style.opacity ?? 1) * 100));
-  number.dataset.style = 'opacity';
-  number.dataset.opacityPercent = 'true';
-  number.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.opacity);
-  controls.appendChild(range);
-  controls.appendChild(number);
-  field.appendChild(controls);
+  const percent = Math.round(Number(component.style.opacity ?? 1) * 100);
+  const { range, number } = appendDesignerRangeField(control, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.opacity,
+    min: 0,
+    max: 100,
+    step: 1,
+    value: String(percent),
+    numberClassName: 'designer-field-range-value',
+  });
+  for (const target of [range, number]) {
+    target.dataset.style = 'opacity';
+    target.dataset.opacityPercent = 'true';
+  }
   appendDesignerFieldMessage(field, number, 'style-opacity');
   section.appendChild(field);
 }
@@ -309,9 +303,11 @@ function appendFlipActions(
   const supportsHorizontal = manifest.styleSchema.properties.flipX?.kind === 'boolean';
   const supportsVertical = manifest.styleSchema.properties.flipY?.kind === 'boolean';
   if (!supportsHorizontal && !supportsVertical) return;
-  const field = parent.ownerDocument.createElement('div');
-  field.className = 'designer-field designer-field-label designer-flip-field';
-  field.textContent = DESIGNER_UI_TEXT.propertiesPanel.flipHorizontal;
+  const field = createDesignerFieldElement(parent.ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.flipHorizontal,
+    tagName: 'div',
+    className: 'designer-flip-field',
+  });
   const actions = parent.ownerDocument.createElement('span');
   actions.className = 'designer-flip-actions';
   if (supportsHorizontal) {

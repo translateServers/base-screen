@@ -15,57 +15,36 @@ export function renderDesignerLayers(
   view: DesignerLayerView,
   options: DesignerLayersRenderOptions,
 ): void {
-  layers.replaceChildren();
-  const heading = layers.ownerDocument.createElement('p');
-  heading.className = 'list-heading';
-  heading.textContent = DESIGNER_UI_TEXT.layersPanel.heading;
-  layers.appendChild(heading);
+  // 标题与搜索框是常驻外壳：每次重渲染只替换树，搜索输入不因过滤结果重建而丢焦点/丢光标。
+  const chrome = ensureLayerChrome(layers);
+  if (chrome.input.value !== options.search) chrome.input.value = options.search;
+  chrome.clear.hidden = options.search === '';
 
-  // 搜索是长文档的刚需；保留为紧凑单行，不恢复原型的工具栏/操作簇。
-  const searchControl = layers.ownerDocument.createElement('label');
-  searchControl.className = 'layer-search';
-  const searchGlyph = layers.ownerDocument.createElement('span');
-  searchGlyph.className = 'layer-search-glyph';
-  searchGlyph.setAttribute('aria-hidden', 'true');
-  searchGlyph.innerHTML = designerIcon('search');
-  searchControl.appendChild(searchGlyph);
-  const searchInput = layers.ownerDocument.createElement('input');
-  searchInput.type = 'search';
-  searchInput.className = 'designer-control designer-input';
-  searchInput.value = options.search;
-  searchInput.placeholder = DESIGNER_UI_TEXT.layersPanel.searchPlaceholder;
-  searchInput.ariaLabel = DESIGNER_UI_TEXT.layersPanel.searchLabel;
-  searchInput.dataset.layerSearch = 'true';
-  searchControl.appendChild(searchInput);
-  layers.appendChild(searchControl);
-
-  const tree = layers.ownerDocument.createElement('div');
-  tree.setAttribute('role', 'tree');
-  tree.ariaLabel = DESIGNER_UI_TEXT.layersPanel.aria;
-  tree.dataset.layerRoot = 'true';
+  const tree = chrome.tree;
+  tree.replaceChildren();
   const visible = filterDesignerLayerItems(view.items, options.search, options.collapsed);
+  const rendered = visible.slice(0, options.renderLimit);
+  const selectedIds = new Set(options.interaction.selectedComponentIds);
   const indicator = options.dropIndicator;
-  for (const item of visible.slice(0, options.renderLimit)) {
+  for (const [index, item] of rendered.entries()) {
+    const selected = selectedIds.has(item.id);
     tree.appendChild(
-      createLayerNode(
-        layers.ownerDocument,
-        item,
-        options.interaction.selectedComponentIds.includes(item.id),
-        item.id === options.interaction.focusedComponentId,
-        options.collapsed.has(item.id),
-        item.id === indicator?.rowId ? indicator.edge : undefined,
-        item.id === options.draggingId,
-        item.id === options.renamingId,
-        options.renameDrafts.get(item.id),
-      ),
+      createLayerNode(layers.ownerDocument, item, {
+        selected,
+        // 相邻多选合并成一段：连续被选中的行只保留最上/最下的圆角，中间无缝相接。
+        selectedRun: selected ? selectedRunAt(rendered, index, selectedIds) : undefined,
+        focused: item.id === options.interaction.focusedComponentId,
+        collapsed: options.collapsed.has(item.id),
+        dropEdge: item.id === indicator?.rowId ? indicator.edge : undefined,
+        dragging: item.id === options.draggingId,
+        renaming: item.id === options.renamingId,
+        renameDraft: options.renameDrafts.get(item.id),
+        search: options.search,
+      }),
     );
   }
   if (visible.length === 0) {
-    const empty = layers.ownerDocument.createElement('p');
-    empty.className = 'designer-empty-state';
-    empty.setAttribute('role', 'status');
-    empty.textContent = DESIGNER_UI_TEXT.layersPanel.empty;
-    tree.appendChild(empty);
+    tree.appendChild(createLayerEmptyState(layers.ownerDocument, options.search));
   } else if (visible.length > options.renderLimit) {
     const more = button(
       layers.ownerDocument,
@@ -76,26 +55,172 @@ export function renderDesignerLayers(
     more.dataset.layerShowMore = 'true';
     tree.appendChild(more);
   }
-  layers.appendChild(tree);
+}
+
+interface DesignerLayerChrome {
+  readonly header: HTMLElement;
+  readonly search: HTMLElement;
+  readonly input: HTMLInputElement;
+  readonly clear: HTMLButtonElement;
+  readonly tree: HTMLElement;
+}
+
+/** 面板外壳只在首次渲染时创建；后续渲染复用它，保证搜索输入与滚动位置连续。 */
+function ensureLayerChrome(layers: HTMLElement): DesignerLayerChrome {
+  const ownerDocument = layers.ownerDocument;
+  const existing = Array.from(layers.children ?? []) as HTMLElement[];
+  const isClass = (element: HTMLElement, name: string): boolean =>
+    typeof element.className === 'string' && element.className.split(' ').includes(name);
+  const header =
+    existing.find((element) => isClass(element, 'list-heading')) ??
+    append(
+      layers,
+      (() => {
+        const heading = ownerDocument.createElement('p');
+        heading.className = 'list-heading';
+        heading.textContent = DESIGNER_UI_TEXT.layersPanel.heading;
+        return heading;
+      })(),
+    );
+  const search =
+    existing.find((element) => isClass(element, 'layer-search')) ??
+    append(layers, createSearchControl(ownerDocument));
+  const tree =
+    existing.find((element) => element.dataset.layerRoot === 'true') ??
+    append(layers, createTreeRoot(ownerDocument));
+  const input = search.children[1] as HTMLInputElement;
+  const clear = search.children[2] as HTMLButtonElement;
+  return { header, search, input, clear, tree };
+}
+
+function append<T extends HTMLElement>(parent: HTMLElement, child: T): T {
+  parent.appendChild(child);
+  return child;
+}
+
+function createSearchControl(ownerDocument: Document): HTMLElement {
+  const searchControl = ownerDocument.createElement('div');
+  searchControl.className = 'layer-search';
+  const searchGlyph = ownerDocument.createElement('span');
+  searchGlyph.className = 'layer-search-glyph';
+  searchGlyph.setAttribute('aria-hidden', 'true');
+  searchGlyph.innerHTML = designerIcon('search');
+  searchControl.appendChild(searchGlyph);
+  const searchInput = ownerDocument.createElement('input');
+  searchInput.type = 'search';
+  searchInput.className = 'designer-control designer-input';
+  searchInput.placeholder = DESIGNER_UI_TEXT.layersPanel.searchPlaceholder;
+  searchInput.ariaLabel = DESIGNER_UI_TEXT.layersPanel.searchLabel;
+  searchInput.dataset.layerSearch = 'true';
+  searchControl.appendChild(searchInput);
+  const clear = createDesignerButton(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.layersPanel.clearSearch,
+    className: 'designer-icon-button layer-search-clear',
+    variant: 'ghost',
+  });
+  clear.dataset.layerSearchClear = 'true';
+  clear.hidden = true;
+  clear.innerHTML = designerIcon('close');
+  searchControl.appendChild(clear);
+  return searchControl;
+}
+
+function createTreeRoot(ownerDocument: Document): HTMLElement {
+  const tree = ownerDocument.createElement('div');
+  tree.setAttribute('role', 'tree');
+  tree.ariaLabel = DESIGNER_UI_TEXT.layersPanel.aria;
+  tree.dataset.layerRoot = 'true';
+  return tree;
+}
+
+function createLayerEmptyState(ownerDocument: Document, search: string): HTMLElement {
+  const query = search.trim();
+  const empty = ownerDocument.createElement('div');
+  empty.className = 'designer-empty-state layer-empty';
+  empty.setAttribute('role', 'status');
+  const glyph = ownerDocument.createElement('span');
+  glyph.className = 'layer-empty-glyph';
+  glyph.setAttribute('aria-hidden', 'true');
+  glyph.innerHTML = designerIcon(query === '' ? 'layers' : 'search');
+  const title = ownerDocument.createElement('p');
+  title.className = 'layer-empty-title';
+  title.textContent =
+    query === ''
+      ? DESIGNER_UI_TEXT.layersPanel.empty
+      : DESIGNER_UI_TEXT.layersPanel.emptySearch(query);
+  const hint = ownerDocument.createElement('p');
+  hint.className = 'layer-empty-hint';
+  hint.textContent =
+    query === ''
+      ? DESIGNER_UI_TEXT.layersPanel.emptyHint
+      : DESIGNER_UI_TEXT.layersPanel.emptySearchHint;
+  empty.appendChild(glyph);
+  empty.appendChild(title);
+  empty.appendChild(hint);
+  if (query !== '') {
+    const reset = button(
+      ownerDocument,
+      DESIGNER_UI_TEXT.layersPanel.clearSearch,
+      DESIGNER_UI_TEXT.layersPanel.clearSearch,
+    );
+    reset.className += ' layer-empty-reset';
+    reset.dataset.layerSearchClear = 'true';
+    empty.appendChild(reset);
+  }
+  return empty;
+}
+
+interface DesignerLayerNodeState {
+  readonly selected: boolean;
+  /** 相邻多选连段中的位置：undefined = 孤立选中（四角全圆），首/中/尾各自只保留一端圆角。 */
+  readonly selectedRun: 'first' | 'middle' | 'last' | undefined;
+  readonly focused: boolean;
+  readonly collapsed: boolean;
+  readonly dropEdge: 'before' | 'after' | 'inside' | undefined;
+  readonly dragging: boolean;
+  readonly renaming: boolean;
+  readonly renameDraft: string | undefined;
+  readonly search: string;
+}
+
+/** 选中连段判定只看屏幕上的相邻行：跨父级的相邻选中同样连成一块，与指针所见一致。 */
+function selectedRunAt(
+  items: readonly DesignerLayerItem[],
+  index: number,
+  selectedIds: ReadonlySet<string>,
+): 'first' | 'middle' | 'last' | undefined {
+  const previous = index > 0 && selectedIds.has(items[index - 1]!.id);
+  const next = index + 1 < items.length && selectedIds.has(items[index + 1]!.id);
+  if (previous && next) return 'middle';
+  if (next) return 'first';
+  if (previous) return 'last';
+  return undefined;
 }
 
 function createLayerNode(
   ownerDocument: Document,
   item: DesignerLayerItem,
-  selected: boolean,
-  focused: boolean,
-  collapsed: boolean,
-  dropEdge: 'before' | 'after' | 'inside' | undefined,
-  dragging: boolean,
-  renaming: boolean,
-  renameDraft: string | undefined,
+  state: DesignerLayerNodeState,
 ): HTMLElement {
+  const {
+    selected,
+    selectedRun,
+    focused,
+    collapsed,
+    dropEdge,
+    dragging,
+    renaming,
+    renameDraft,
+    search,
+  } = state;
   const row = ownerDocument.createElement('div');
   row.className = 'layer-row';
-  // 20px 缩进单位：padding 与引导线（CSS --layer-depth 驱动）共享同一基准。
-  row.style.paddingInlineStart = `${item.depth * 20}px`;
+  // 缩进模型：所有行都留出 18px 折叠位（叶子行留空），此后每级 16px。
+  // 这样同一级的图标永远落在同一条竖线上，分组行不会比同级叶子行右移一格。
+  row.style.paddingInlineStart = `${18 + item.depth * 16}px`;
   row.style.setProperty('--layer-depth', String(item.depth));
   row.style.setProperty('--layer-hue', String(layerHue(item.type)));
+  if (item.depth > 0) row.dataset.layerNested = 'true';
   row.setAttribute('role', 'treeitem');
   row.ariaLevel = String(item.depth + 1);
   row.ariaSelected = String(selected);
@@ -115,6 +240,7 @@ function createLayerNode(
   if (dropEdge !== undefined) row.dataset.dropTarget = dropEdge;
   if (dragging) row.dataset.dragging = 'true';
   if (renaming) row.dataset.renaming = 'true';
+  if (selectedRun !== undefined) row.dataset.layerSelectedRun = selectedRun;
 
   // 状态不渲染可见芯片：隐藏/锁定由常驻的警示色开关图标（aria-pressed）与名称压暗表达，
   // 选中/焦点/放置目标由行背景、左侧 accent 条与指示线表达；完整状态保留于 aria-description。
@@ -146,24 +272,39 @@ function createLayerNode(
   // .layer-select 只覆盖几何与绘制，否则名称会退化为 UA 默认字体与颜色。
   select.className = 'designer-control designer-button layer-select';
   select.disabled = !selectable;
-  select.setAttribute('data-tip', DESIGNER_UI_TEXT.layersPanel.renameHint);
   // 行首类型图标：与物料库同一派生规则，并沿用素材表色相，库与图层同色。
   const glyph = ownerDocument.createElement('span');
   glyph.className = 'layer-glyph';
   glyph.setAttribute('aria-hidden', 'true');
   glyph.innerHTML = designerIcon(item.icon ?? 'grid');
   select.appendChild(glyph);
-  // 双行正文：名称在上，`类型 · 宽 × 高` 读数在下（对齐工作台原型的 layer-copy）。
-  // 按钮已有显式 aria-label，副行文本不进入可访问名称。
+  // 双行正文：名称在上，`类型 · 宽 × 高` 读数在下。类型用物料清单的可读名称而不是
+  // 技术 id；尺寸单独成段，空间不足时先压缩类型、保住尺寸读数。
   const copy = ownerDocument.createElement('span');
   copy.className = 'layer-copy';
   const name = ownerDocument.createElement('span');
   name.className = 'layer-name';
-  name.textContent = item.name;
+  appendSearchHighlight(ownerDocument, name, item.name, search);
   const meta = ownerDocument.createElement('span');
   meta.className = 'layer-meta';
   meta.setAttribute('aria-hidden', 'true');
-  meta.textContent = `${item.type} · ${item.width} × ${item.height}`;
+  // 类型名与图层名相同时只说尺寸：重复一遍同一个词不增加信息，只增加噪音。
+  const showType = item.typeLabel.trim() !== item.name.trim();
+  if (showType) {
+    const type = ownerDocument.createElement('span');
+    type.className = 'layer-type';
+    type.textContent = item.typeLabel;
+    const separator = ownerDocument.createElement('span');
+    separator.className = 'layer-separator';
+    // 空格留在文本里：副行是纯文本读数（测试与读屏都按 `类型 · 宽 × 高` 读），不靠 CSS gap 拼。
+    separator.textContent = ' · ';
+    meta.appendChild(type);
+    meta.appendChild(separator);
+  }
+  const size = ownerDocument.createElement('span');
+  size.className = 'layer-size';
+  size.textContent = `${item.width} × ${item.height}`;
+  meta.appendChild(size);
   copy.appendChild(name);
   copy.appendChild(meta);
   select.appendChild(copy);
@@ -209,6 +350,40 @@ function layerStateLabels(
       ? [{ key: 'dropTarget', label: DESIGNER_UI_TEXT.layersPanel.dropTarget }]
       : []),
   ];
+}
+
+/** 命中片段高亮：把查询词从名称里切出来包 <mark>，让用户在长列表里直接看到为何命中。 */
+function appendSearchHighlight(
+  ownerDocument: Document,
+  target: HTMLElement,
+  text: string,
+  search: string,
+): void {
+  const needle = search.trim().toLowerCase();
+  if (needle === '') {
+    target.textContent = text;
+    return;
+  }
+  const haystack = text.toLowerCase();
+  let cursor = 0;
+  let index = haystack.indexOf(needle);
+  while (index >= 0) {
+    if (index > cursor) appendText(ownerDocument, target, text.slice(cursor, index));
+    const mark = ownerDocument.createElement('mark');
+    mark.className = 'layer-hit';
+    mark.textContent = text.slice(index, index + needle.length);
+    target.appendChild(mark);
+    cursor = index + needle.length;
+    index = haystack.indexOf(needle, cursor);
+  }
+  if (cursor < text.length) appendText(ownerDocument, target, text.slice(cursor));
+}
+
+function appendText(ownerDocument: Document, target: HTMLElement, text: string): void {
+  if (text === '') return;
+  const span = ownerDocument.createElement('span');
+  span.textContent = text;
+  target.appendChild(span);
 }
 
 /**

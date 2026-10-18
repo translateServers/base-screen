@@ -457,6 +457,18 @@
   box-shadow: 0 0 0 1px var(--designer-border-strong);
 }
 
+/* 禁用：与 .designer-control:disabled 同一套语言（工作区底色 + 弱文本，不用整体透明度）。 */
+.designer-select-trigger:disabled {
+  background: var(--designer-surface-workspace);
+  box-shadow: var(--designer-elev-ring);
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
+}
+
+.designer-select-trigger:disabled:hover {
+  box-shadow: var(--designer-elev-ring);
+}
+
 .designer-select-trigger[aria-expanded="true"] {
   box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }

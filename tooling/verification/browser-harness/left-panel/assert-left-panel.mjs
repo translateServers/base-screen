@@ -338,6 +338,7 @@ export async function assertLeftPanelLayers(page, viewport) {
       groupExpanded: groupRow?.querySelector('.layer-collapse')?.getAttribute('aria-expanded'),
       stateToggleCount: childRow?.querySelectorAll('[data-layer-toggle]').length ?? 0,
       lockOpacity: lock === null || lock === undefined ? '' : getComputedStyle(lock).opacity,
+      // 显隐/锁定开关常态收起（可见是默认态，常驻只是每行一道灰点），只为隐藏/锁定项常驻。
       eyeOpacity: eye === null || eye === undefined ? '' : getComputedStyle(eye).opacity,
       lockIcon: lock?.querySelector('svg') !== null,
       eyeIcon: eye?.querySelector('svg') !== null,
@@ -349,8 +350,9 @@ export async function assertLeftPanelLayers(page, viewport) {
   });
   if (
     layerProbe.heading !== '\u753b\u5e03\u56fe\u5c42 \u00b7 \u4ece\u4e0a\u5230\u4e0b' ||
+    // 缩进模型：18px 折叠位 + 每级 16px（箭头绝对定位在折叠位内，叶子/分组图标因此对齐）。
     layerProbe.childDepth !== '1' ||
-    layerProbe.childIndent !== '20px' ||
+    layerProbe.childIndent !== '34px' ||
     JSON.stringify(layerProbe.childOrder) !== JSON.stringify(['probe-b', 'probe-a']) ||
     !layerProbe.leafGrip ||
     layerProbe.rowDraggable !== 'true' ||
@@ -358,7 +360,7 @@ export async function assertLeftPanelLayers(page, viewport) {
     layerProbe.groupExpanded !== 'true' ||
     layerProbe.stateToggleCount !== 2 ||
     layerProbe.lockOpacity !== '0' ||
-    layerProbe.eyeOpacity !== '1' ||
+    layerProbe.eyeOpacity !== '0' ||
     !layerProbe.lockIcon ||
     !layerProbe.eyeIcon ||
     layerProbe.rowHeight !== 40 ||
@@ -449,10 +451,72 @@ export async function assertLeftPanelLayers(page, viewport) {
     selectedState.backgroundColor === 'rgba(0, 0, 0, 0)' ||
     selectedState.boxShadow === 'none' ||
     selectedState.nameText !== '\u5b50\u9879\u7532' ||
-    selectedState.metaText !== 'base.text \u00b7 80 \u00d7 32'
+    // 副行用物料清单的可读名称（文本）而不是技术 id（base.text），尺寸读数单独成段。
+    selectedState.metaText !== '\u6587\u672c \u00b7 80 \u00d7 32'
   ) {
     throw new Error(
       `BROWSER_HARNESS_LAYER_SELECT_HIT_TARGET_FAILED:${JSON.stringify(selectedState)}`,
+    );
+  }
+  // 相邻多选连成一块：连续选中的行只保留最上/最下的外圆角，块内无行距、共用同一条
+  // 左侧强调条，视觉上是一个整体而不是几个并排的方块。
+  // 前面的两次连续点击可能被识别为双击而进入重命名：先点分区标签让焦点离开输入框，
+  // 否则 Ctrl+点击会被重渲染打断（行节点在 click 之前就被替换）。
+  await probe.locator('.list-heading').click();
+  await page.waitForTimeout(120);
+  await probe.locator('[data-layer-select="probe-a"]').click();
+  await page.waitForTimeout(120);
+  await probe.locator('[data-layer-select="probe-b"]').click({ modifiers: ['Control'] });
+  const adjacentRun = await probe.evaluate((element) => {
+    const read = (id) => {
+      const row = element.shadowRoot.querySelector(`.layer-row[data-layer-id="${id}"]`);
+      if (row === null) return null;
+      const style = getComputedStyle(row);
+      const rect = row.getBoundingClientRect();
+      return {
+        run: row.dataset.layerSelectedRun ?? null,
+        startRadius: style.borderStartStartRadius,
+        endRadius: style.borderEndStartRadius,
+        marginBottom: style.marginBottom,
+        shadow: style.boxShadow,
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+      };
+    };
+    return { first: read('probe-b'), last: read('probe-a') };
+  });
+  if (
+    adjacentRun.first?.run !== 'first' ||
+    adjacentRun.last?.run !== 'last' ||
+    adjacentRun.first.startRadius !== '6px' ||
+    adjacentRun.first.endRadius !== '0px' ||
+    adjacentRun.last.startRadius !== '0px' ||
+    adjacentRun.last.endRadius !== '6px' ||
+    adjacentRun.first.marginBottom !== '0px' ||
+    adjacentRun.first.bottom !== adjacentRun.last?.top ||
+    adjacentRun.first.shadow !== adjacentRun.last?.shadow
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_SELECTED_RUN_FAILED:${JSON.stringify(adjacentRun)}`);
+  }
+  // 取消其中一项后回到孤立选中：四角恢复圆角，不再伪装成连段。
+  await probe.locator('[data-layer-select="probe-b"]').click({ modifiers: ['Control'] });
+  const isolatedSelection = await probe.evaluate((element) => {
+    const row = element.shadowRoot.querySelector('.layer-row[data-layer-id="probe-a"]');
+    if (row === null) return null;
+    const style = getComputedStyle(row);
+    return {
+      run: row.dataset.layerSelectedRun ?? null,
+      radius: style.borderRadius,
+      selected: row.getAttribute('aria-selected'),
+    };
+  });
+  if (
+    isolatedSelection?.run !== null ||
+    isolatedSelection.radius !== '6px' ||
+    isolatedSelection.selected !== 'true'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_LAYER_SELECTED_ISOLATED_FAILED:${JSON.stringify(isolatedSelection)}`,
     );
   }
   await probe.locator('[data-viewport]').focus();
@@ -849,6 +913,50 @@ export async function assertLeftPanelLayers(page, viewport) {
       `BROWSER_HARNESS_LAYER_SELECTION_BOUNDARY_FAILED:${JSON.stringify(boundarySelection)}`,
     );
   }
+  // 搜索是即时重渲染：外壳（标题/输入框）必须复用，逐字输入时焦点与已输入内容都不能丢。
+  const layerSearch = probe.locator('[data-layer-search]');
+  await layerSearch.click();
+  await page.keyboard.type('\u5b50\u9879', { delay: 70 });
+  const typedSearch = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    const input = root.querySelector('[data-layer-search]');
+    return {
+      value: input?.value ?? '',
+      focused: root.activeElement === input,
+      clearVisible: root.querySelector('.layer-search-clear')?.hidden === false,
+      rows: root.querySelectorAll('.layer-row').length,
+    };
+  });
+  if (
+    typedSearch.value !== '\u5b50\u9879' ||
+    !typedSearch.focused ||
+    !typedSearch.clearVisible ||
+    typedSearch.rows < 1
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_SEARCH_TYPING_FAILED:${JSON.stringify(typedSearch)}`);
+  }
+  // Escape 清空查询并保持焦点；清除按钮与空结果页的“清除搜索”共用同一条路径。
+  await page.keyboard.press('Escape');
+  const escapedSearch = await probe.evaluate((element) => {
+    const root = element.shadowRoot;
+    const input = root.querySelector('[data-layer-search]');
+    return {
+      value: input?.value ?? '',
+      focused: root.activeElement === input,
+      clearHidden: root.querySelector('.layer-search-clear')?.hidden === true,
+      rows: root.querySelectorAll('.layer-row').length,
+    };
+  });
+  if (
+    escapedSearch.value !== '' ||
+    !escapedSearch.focused ||
+    !escapedSearch.clearHidden ||
+    escapedSearch.rows < 1
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_SEARCH_ESCAPE_FAILED:${JSON.stringify(escapedSearch)}`);
+  }
+  // 截图前让焦点离开搜索框：产物快照要呈现常态图层列表，而不是聚焦态输入框。
+  await probe.locator('.list-heading').click();
   await page.mouse.move(viewport.width - 8, 8);
   await page.waitForTimeout(200);
   await probe.locator('[data-left-panel]').screenshot({

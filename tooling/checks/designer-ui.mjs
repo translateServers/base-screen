@@ -31,6 +31,13 @@ function collectTypeScriptFiles(dir) {
   return files;
 }
 
+function relativeFromBrowser(file) {
+  return file
+    .slice(browserRoot.length + 1)
+    .split('\\')
+    .join('/');
+}
+
 // Strip line, block and JSDoc comments so CJK inside comments is not treated as
 // inline UI text. Remaining CJK in `browser/` code therefore lives in string
 // literals, which is forbidden: user-visible text must live in
@@ -59,5 +66,65 @@ for (const file of [...browserFiles, ...monitoredFiles]) {
   const source = readFileSync(file, 'utf8');
   if (forbiddenLocalization.test(source)) {
     throw new Error(`DESIGNER_UI_LOCALIZATION_FORBIDDEN: ${file}`);
+  }
+}
+
+// 表单行与表单控件各只有一个来源：`designer-field-primitives`（行骨架 / 复合控件）与
+// `designer-ui-primitives`（单个控件）。手工拼行骨架或直接 createElement 表单元素，会让类名、
+// ARIA 与校验消息连接在多处各自演化——`designer-number-input` 就是绕开原语后单独补 CSS 的产物。
+//
+// 下面的名单是存量债务，不是许可：自绘控件（取色器 / 色标 / 渐变条 / 步进器 / 表格单元格）
+// 或仍持有独立表单语汇的模块，逐个列名而不用通配。新文件默认不允许，每迁移完一个删一行，只减不增。
+const formPrimitiveDebt = new Set([
+  // 自绘控件：类名与结构都不走设计体系控件。
+  'controllers/project/designer-project-workspace-controller.ts',
+  'dom/color/designer-color-palette-dom.ts',
+  'dom/color/designer-color-palette-value-dom.ts',
+  'dom/color/designer-fill-color-picker-dom.ts',
+  'dom/descriptor/designer-descriptor-stepper-dom.ts',
+  'dom/layers/designer-layers-dom.ts',
+  'dom/static-data/designer-static-data-controls.ts',
+  'dom/static-data/designer-static-data-table-dom.ts',
+  // 独立表单语汇（`variable-field`）或尚未迁移行结构的绑定面板。
+  'dom/blueprint/designer-blueprint-library-dom.ts',
+  'dom/dataset/designer-dataset-authoring-dom.ts',
+  'dom/dataset/designer-dataset-catalog-dom.ts',
+  'dom/dataset/designer-dataset-config-controls.ts',
+  'dom/dataset/designer-dataset-config-dom.ts',
+  'dom/dataset/designer-dataset-flow-dom.ts',
+  'dom/designer-variables-editor-dom.ts',
+  'dom/panel/designer-data-panel-dom.ts',
+  'dom/panel/designer-multi-selection-dom.ts',
+]);
+
+// 两个来源模块本身是唯一合法的产出点。
+const formPrimitiveOrigins = new Set([
+  'dom/designer-field-primitives.ts',
+  'dom/designer-ui-primitives.ts',
+]);
+
+const formPrimitiveRules = [
+  {
+    id: 'RAW_FORM_CONTROL',
+    pattern: /createElement\(\s*(['"])(?:input|select|textarea)\1\s*\)/,
+    hint: 'use designer-ui-primitives',
+  },
+  {
+    id: 'HAND_BUILT_FIELD_ROW',
+    pattern: /['"]designer-field designer-field-label/,
+    hint: 'use createDesignerFieldRow / createDesignerFieldElement',
+  },
+];
+
+for (const rule of formPrimitiveRules) {
+  const violations = browserFiles
+    .filter((file) => {
+      const relative = relativeFromBrowser(file);
+      return !formPrimitiveOrigins.has(relative) && !formPrimitiveDebt.has(relative);
+    })
+    .filter((file) => rule.pattern.test(readFileSync(file, 'utf8')))
+    .map(relativeFromBrowser);
+  if (violations.length > 0) {
+    throw new Error(`DESIGNER_UI_${rule.id}_FORBIDDEN: ${violations.join(', ')} (${rule.hint})`);
   }
 }

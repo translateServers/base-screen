@@ -1,4 +1,7 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerFieldRow } from '../designer-field-primitives.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
+import { createDesignerSelect } from '../designer-ui-primitives.js';
 import {
   type DesignerStaticDataView,
   renderDesignerStaticData,
@@ -16,30 +19,32 @@ import type {
 } from './designer-dataset-types.js';
 
 function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement {
-  const section = options.panel.ownerDocument.createElement('section');
+  const ownerDocument = options.panel.ownerDocument;
+  const section = ownerDocument.createElement('section');
   section.className = 'designer-data-source-type';
   section.dataset.workbenchSection = 'source';
   section.tabIndex = -1;
-  const heading = options.panel.ownerDocument.createElement('h3');
+  const heading = ownerDocument.createElement('h3');
   heading.className = 'designer-inspector-section-title';
   heading.textContent = DESIGNER_UI_TEXT.dataSource.title;
-  const field = options.panel.ownerDocument.createElement('label');
-  field.className = 'designer-field designer-field-label designer-data-source-type-field';
-  const caption = options.panel.ownerDocument.createElement('span');
-  caption.textContent = DESIGNER_UI_TEXT.dataSource.type;
-  const select = options.panel.ownerDocument.createElement('select');
-  select.className = 'designer-control designer-select';
+  // 与检查器其余字段同一套行骨架（标签列 + 控件列 + 自绘下拉）：
+  // 手写 label + 裸 select 会让这里的下拉长得和别处不一样，长标签也会撑成两行。
+  const row = createDesignerFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.dataSource.type,
+  });
+  row.field.classList.add('designer-data-source-type-field');
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataSource.type,
+    options: options.availableModes.map((mode) => ({
+      label: DESIGNER_UI_TEXT.dataSource.mode(mode),
+      selected: options.mode === mode,
+      value: mode,
+    })),
+    value: options.mode,
+  });
   select.dataset.dataSourceModeSelect = 'true';
-  select.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.type);
-  for (const mode of options.availableModes) {
-    const option = options.panel.ownerDocument.createElement('option');
-    option.value = mode;
-    option.selected = options.mode === mode;
-    option.textContent = DESIGNER_UI_TEXT.dataSource.mode(mode);
-    select.appendChild(option);
-  }
-  field.append(caption, select);
-  section.append(heading, field);
+  row.control.appendChild(enhanceDesignerSelect(select).element);
+  section.append(heading, row.field);
   return section;
 }
 
@@ -60,26 +65,28 @@ function renderVariableSource(options: DesignerDataSourcePanelOptions): HTMLElem
   const ownerDocument = options.panel.ownerDocument;
   const section = ownerDocument.createElement('section');
   section.className = 'designer-data-source-variable';
-  const field = ownerDocument.createElement('label');
-  field.className = 'designer-field designer-field-label';
-  const caption = ownerDocument.createElement('span');
-  caption.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
-  const select = ownerDocument.createElement('select');
-  select.className = 'designer-control designer-select';
+  const row = createDesignerFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.dataset.selectVariable,
+  });
+  const select = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.selectVariable,
+    options: [
+      {
+        label: DESIGNER_UI_TEXT.dataset.selectVariable,
+        selected: options.variableSourceId === undefined,
+        value: '',
+      },
+      ...options.variables.map((variable) => ({
+        label: variable.name,
+        selected: variable.id === options.variableSourceId,
+        value: variable.id,
+      })),
+    ],
+    value: options.variableSourceId ?? '',
+  });
   select.dataset.dataVariableSource = 'true';
-  const empty = ownerDocument.createElement('option');
-  empty.value = '';
-  empty.textContent = DESIGNER_UI_TEXT.dataset.selectVariable;
-  select.appendChild(empty);
-  for (const variable of options.variables) {
-    const option = ownerDocument.createElement('option');
-    option.value = variable.id;
-    option.textContent = variable.name;
-    option.selected = variable.id === options.variableSourceId;
-    select.appendChild(option);
-  }
-  field.append(caption, select);
-  section.append(field, renderApplyAction(ownerDocument, 'variable'));
+  row.control.appendChild(enhanceDesignerSelect(select).element);
+  section.append(row.field, renderApplyAction(ownerDocument, 'variable'));
   return section;
 }
 

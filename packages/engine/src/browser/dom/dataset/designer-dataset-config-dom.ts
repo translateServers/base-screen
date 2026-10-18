@@ -3,9 +3,9 @@ import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
+import { createDesignerSelect } from '../designer-ui-primitives.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import {
-  appendOption,
   configSection,
   parameterControl,
   renderActions,
@@ -180,16 +180,29 @@ function renderParameters(
     labelText.textContent = parameter.label;
     const controls = ownerDocument.createElement('span');
     controls.className = 'designer-dataset-parameter-controls';
-    const mode = ownerDocument.createElement('select');
-    mode.className = 'designer-control designer-select';
+    const mode = createDesignerSelect(ownerDocument, {
+      ariaLabel: DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label),
+      options: [
+        {
+          label: DESIGNER_UI_TEXT.dataset.literal,
+          selected: draft?.kind !== 'variable',
+          value: 'literal',
+        },
+        {
+          label: DESIGNER_UI_TEXT.dataset.variable,
+          selected: draft?.kind === 'variable',
+          value: 'variable',
+        },
+      ],
+      value: draft?.kind === 'variable' ? 'variable' : 'literal',
+    });
     mode.dataset.datasetParameterMode = parameter.name;
-    mode.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label));
-    appendOption(mode, 'literal', DESIGNER_UI_TEXT.dataset.literal, draft?.kind !== 'variable');
-    appendOption(mode, 'variable', DESIGNER_UI_TEXT.dataset.variable, draft?.kind === 'variable');
-    controls.appendChild(mode);
+    controls.appendChild(enhanceDesignerSelect(mode).element);
     if (draft?.kind === 'variable') {
       controls.appendChild(
-        variableControl(ownerDocument, parameter.name, parameter.label, draft, options),
+        enhanceDesignerSelect(
+          variableControl(ownerDocument, parameter.name, parameter.label, draft, options),
+        ).element,
       );
     } else {
       controls.appendChild(
@@ -253,19 +266,24 @@ function renderBindingRole(
     role.valueTypes.includes(field.valueType),
   );
   if (role.maxFields === 1) {
-    const select = ownerDocument.createElement('select');
-    select.className = 'designer-control designer-select designer-dataset-binding-select';
+    const select = createDesignerSelect(ownerDocument, {
+      ariaLabel: DESIGNER_UI_TEXT.dataset.bindingRole(role.id),
+      className: 'designer-dataset-binding-select',
+      options: [
+        {
+          label: DESIGNER_UI_TEXT.dataset.selectField,
+          selected: selected.length === 0,
+          value: '',
+        },
+        ...compatibleFields.map((field) => ({
+          label: `${field.label} · ${field.valueType}`,
+          selected: selected.includes(field.id),
+          value: field.id,
+        })),
+      ],
+      value: selected[0] ?? '',
+    });
     select.dataset.datasetBindingRole = role.id;
-    select.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.bindingRole(role.id));
-    appendOption(select, '', DESIGNER_UI_TEXT.dataset.selectField, selected.length === 0);
-    for (const field of compatibleFields) {
-      appendOption(
-        select,
-        field.id,
-        `${field.label} · ${field.valueType}`,
-        selected.includes(field.id),
-      );
-    }
     fieldList.appendChild(enhanceDesignerSelect(select).element);
   } else {
     const actions = ownerDocument.createElement('div');

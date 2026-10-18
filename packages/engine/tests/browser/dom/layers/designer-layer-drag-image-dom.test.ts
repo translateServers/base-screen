@@ -70,13 +70,40 @@ describe('layer drag image', () => {
     expect(root.appendChild).toHaveBeenCalledWith(image);
     expect(image.className).toBe('layer-drag-image');
     expect(image.attributes['aria-hidden']).toBe('true');
-    expect(image.style.width).toBe('264px');
+    // 宽度按内容收缩，行宽只作上限：拖着一张整行宽的卡片会盖住它要飞向的落点。
+    expect(image.style.maxWidth).toBe('264px');
+    expect(image.style.width).toBeUndefined();
     expect(image.children).toHaveLength(2);
 
     dragImage!.dispose();
     expect(image.removed).toBe(true);
     // 重复处置无副作用（dragend 与 drop 都会走到这里）。
     expect(() => dragImage!.dispose()).not.toThrow();
+  });
+
+  it('badges the ghost with the dragged layer count for multi-selection', () => {
+    const doc = { createElement: () => fakeNode() };
+    const select = fakeNode('button');
+    select.className = 'designer-control designer-button layer-select';
+    const root = { appendChild: vi.fn((child: unknown) => child) };
+    const row = {
+      ownerDocument: doc,
+      getRootNode: () => root,
+      getBoundingClientRect: () => ({ width: 264, height: 40 }),
+      querySelector: (selector: string) => (selector === '.layer-select' ? select : null),
+      textContent: '标题',
+    };
+
+    const single = createDesignerLayerDragImage(row as never, 1)!;
+    expect((single.image as unknown as ReturnType<typeof fakeNode>).children).toHaveLength(0);
+    single.dispose();
+
+    const multi = createDesignerLayerDragImage(row as never, 3)!;
+    const image = multi.image as unknown as ReturnType<typeof fakeNode>;
+    const badge = image.children.at(-1) as ReturnType<typeof fakeNode>;
+    expect(badge.className).toBe('layer-drag-count');
+    expect(badge.textContent).toBe('3');
+    multi.dispose();
   });
 
   it('falls back to the row text when the row has no select button', () => {

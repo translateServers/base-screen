@@ -1,5 +1,6 @@
 import type { BaseScreenMaterialEditorField } from '@base-screen/plugin-core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerFieldElement } from '../designer-field-primitives.js';
 import { applyFieldDataset } from './designer-descriptor-control-dom.js';
 import {
   type DesignerDescriptorContext,
@@ -17,16 +18,14 @@ export function appendDescriptorCustomControl(
   context: DesignerDescriptorContext,
 ): void {
   const ownerDocument = parent.ownerDocument;
-  const label = ownerDocument.createElement('span');
-  label.className = 'designer-field designer-field-label';
+  const label = createDesignerFieldElement(ownerDocument, {
+    label: field.label,
+    tagName: 'span',
+  });
   label.dataset.inspectorSearchKind = 'field';
   label.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
   label.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
   if (field.advanced === true) label.dataset.inspectorAdvanced = 'true';
-  const labelText = ownerDocument.createElement('span');
-  labelText.className = 'designer-field-label-text';
-  labelText.textContent = field.label;
-  label.appendChild(labelText);
 
   const entry =
     field.tagName === undefined

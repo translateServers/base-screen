@@ -4,6 +4,7 @@ import type {
 } from '@base-screen/plugin-core';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
+import { createDesignerFieldRow } from '../designer-field-primitives.js';
 import { appendDesignerFieldMessage } from '../designer-ui-primitives.js';
 import { appendDescriptorArrayControls } from './designer-descriptor-array-fields-dom.js';
 import {
@@ -100,18 +101,15 @@ function appendDescriptorField(
       : undefined;
   // color 控件用 span 容器：label 点击会激活 color input 弹出原生取色器。
   const stacked = palette !== undefined || field.control === 'json';
-  const label = ownerDocument.createElement(palette === undefined ? 'label' : 'span');
-  label.className = stacked
-    ? 'designer-field designer-field-label designer-field-stacked'
-    : 'designer-field designer-field-label';
-  label.dataset.inspectorSearchKind = 'field';
-  label.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
-  label.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
-  if (field.advanced === true) label.dataset.inspectorAdvanced = 'true';
-  const labelText = ownerDocument.createElement('span');
-  labelText.className = 'designer-field-label-text';
-  labelText.textContent = field.label;
-  label.appendChild(labelText);
+  const { field: row, control: fieldControl } = createDesignerFieldRow(ownerDocument, {
+    label: field.label,
+    tagName: palette === undefined ? 'label' : 'span',
+    stacked,
+  });
+  row.dataset.inspectorSearchKind = 'field';
+  row.dataset.inspectorSearchKey = `descriptor-field-${field.id}`;
+  row.dataset.inspectorSearchText = `${field.label} ${field.help ?? ''} ${field.keywords?.join(' ') ?? ''}`;
+  if (field.advanced === true) row.dataset.inspectorAdvanced = 'true';
   const handle =
     palette === undefined
       ? createDescriptorControl(ownerDocument, field, schema, value, context.datasetFields)
@@ -119,26 +117,20 @@ function appendDescriptorField(
   const control = handle === undefined ? palette!.controls[0]! : handle.valueTarget;
   if (handle === undefined) {
     for (const paletteControl of palette!.controls) applyFieldDataset(paletteControl, field);
-    const fieldControl = ownerDocument.createElement('span');
-    fieldControl.className = 'designer-field-control';
     fieldControl.appendChild(palette!.element);
-    label.appendChild(fieldControl);
   } else {
     // 字段标识只挂在值载体上：步进器的外壳不重复携带，避免选择器命中两个元素。
     applyFieldDataset(handle.valueTarget, field);
-    const fieldControl = ownerDocument.createElement('span');
-    fieldControl.className = 'designer-field-control';
     fieldControl.appendChild(handle.element);
-    label.appendChild(fieldControl);
   }
   if (field.help !== undefined) {
     const help = ownerDocument.createElement('span');
     help.className = 'designer-descriptor-help';
     help.textContent = field.help;
-    label.appendChild(help);
+    row.appendChild(help);
   }
-  appendDesignerFieldMessage(label, control, `descriptor-${field.id}`);
-  parent.appendChild(label);
+  appendDesignerFieldMessage(row, control, `descriptor-${field.id}`);
+  parent.appendChild(row);
 }
 
 function appendDescriptorGroup(

@@ -1,19 +1,27 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
+import {
+  appendDesignerRangeField,
+  createDesignerFieldElement,
+  createDesignerFieldRow,
+  type DesignerFieldRow,
+  type DesignerFieldRowOptions,
+} from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
-import { appendDesignerFieldMessage, createDesignerSwitch } from '../designer-ui-primitives.js';
+import {
+  appendDesignerFieldMessage,
+  createDesignerButton,
+  createDesignerInput,
+  createDesignerSelect,
+  createDesignerSwitch,
+} from '../designer-ui-primitives.js';
 import {
   canvasBackgroundPaletteValue,
   type DesignerCanvasPresentationSettings,
   type DesignerCanvasScaleMode,
 } from './designer-canvas-transactions.js';
 import { appendSection } from './designer-panel-primitives.js';
-
-interface CanvasField {
-  readonly field: HTMLElement;
-  readonly control: HTMLElement;
-}
 
 /**
  * 页面配置沿用组件检查器的字段行骨架（标签列 + 控件列，见 `.designer-field`），
@@ -56,23 +64,6 @@ export function appendCanvasControls(
   appendCanvasBackgroundImageControls(imageSection, document, canvasBackgroundImageButtonVisible);
 }
 
-function createCanvasField(
-  ownerDocument: Document,
-  labelText: string,
-  className = '',
-): CanvasField {
-  const field = ownerDocument.createElement('div');
-  field.className = `designer-field designer-field-label${className}`;
-  const label = ownerDocument.createElement('span');
-  label.className = 'designer-field-label-text';
-  label.textContent = labelText;
-  field.appendChild(label);
-  const control = ownerDocument.createElement('span');
-  control.className = 'designer-field-control';
-  field.appendChild(control);
-  return { field, control };
-}
-
 /** 几何输入：符号内嵌在输入框右缘（与组件几何网格同形），免去 W / H 这类前置小标题。 */
 function createCanvasGeoInput(
   parent: HTMLElement,
@@ -86,27 +77,37 @@ function createCanvasGeoInput(
   const field = ownerDocument.createElement('label');
   field.className = 'designer-geo-field';
   field.dataset.symbol = symbol;
-  const input = ownerDocument.createElement('input');
-  input.type = 'number';
-  input.className = 'designer-control designer-input designer-number';
-  input.value = String(value);
+  const input = createDesignerInput(ownerDocument, {
+    appearance: 'number',
+    ariaLabel,
+    value: String(value),
+    ...(options.max === undefined ? {} : { max: options.max }),
+    ...(options.min === undefined ? {} : { min: options.min }),
+    ...(options.step === undefined ? {} : { step: options.step }),
+  });
   input.dataset.canvasProperty = property;
-  input.setAttribute('aria-label', ariaLabel);
-  if (options.min !== undefined) input.min = String(options.min);
-  if (options.max !== undefined) input.max = String(options.max);
-  if (options.step !== undefined) input.step = String(options.step);
   field.appendChild(input);
   parent.appendChild(field);
   return input;
 }
 
+/**
+ * 页面配置行：沿用检查器的字段行骨架，但容器固定为 `div`——这些行里会出现按钮
+ * （缩放档位、背景图片选择），用 `label` 会把点击转发给行内第一个可标注控件。
+ */
+function createCanvasFieldRow(
+  ownerDocument: Document,
+  options: Omit<DesignerFieldRowOptions, 'tagName'>,
+): DesignerFieldRow {
+  return createDesignerFieldRow(ownerDocument, { ...options, tagName: 'div' });
+}
+
 function appendCanvasSizeField(parent: HTMLElement, document: ScreenDocument): void {
-  const { field, control } = createCanvasField(
-    parent.ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.canvasDimensions,
-    ' designer-canvas-size-field',
-  );
-  control.classList.add('designer-canvas-size-controls');
+  const { field, control } = createCanvasFieldRow(parent.ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.canvasDimensions,
+    className: 'designer-canvas-size-field',
+    controlClassName: 'designer-canvas-size-controls',
+  });
   createCanvasGeoInput(
     control,
     'W',
@@ -132,51 +133,25 @@ function appendCanvasOpacityField(
   parent: HTMLElement,
   settings: DesignerCanvasPresentationSettings,
 ): void {
-  const ownerDocument = parent.ownerDocument;
   const percent = Math.round(settings.opacity * 100);
-  const { field, control } = createCanvasField(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity,
-    ' designer-canvas-opacity-field',
-  );
-  control.classList.add('designer-opacity-controls');
-  const range = ownerDocument.createElement('input');
-  range.type = 'range';
-  range.className = 'designer-control designer-range';
-  range.min = '0';
-  range.max = '100';
-  range.step = '1';
-  range.value = String(percent);
-  range.dataset.canvasSetting = 'opacity';
-  range.dataset.opacityPercent = 'true';
-  range.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity);
-  const numberField = ownerDocument.createElement('label');
-  numberField.className = 'designer-geo-field';
-  numberField.dataset.symbol = '%';
-  const number = ownerDocument.createElement('input');
-  number.type = 'number';
-  number.className =
-    'designer-control designer-input designer-number designer-canvas-opacity-value';
-  number.min = '0';
-  number.max = '100';
-  number.step = '1';
-  number.value = String(percent);
-  number.dataset.canvasSetting = 'opacity';
-  number.dataset.opacityPercent = 'true';
-  number.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity);
-  numberField.appendChild(number);
-  range.addEventListener('input', () => {
-    number.value = range.value;
+  const { field, control } = createCanvasFieldRow(parent.ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity,
+    className: 'designer-canvas-opacity-field',
   });
-  // 松手（change）由面板统一提交；可见读数在拖动过程中先跟上。
-  range.addEventListener('change', () => {
-    number.value = range.value;
+  // 松手（change）由面板统一提交：滑杆自身的 change 冒泡即可，不需要再转发一次。
+  const { range, number } = appendDesignerRangeField(control, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.canvasOpacity,
+    min: 0,
+    max: 100,
+    step: 1,
+    value: String(percent),
+    numberClassName: 'designer-field-range-value designer-canvas-opacity-value',
+    numberSymbol: '%',
   });
-  number.addEventListener('input', () => {
-    range.value = number.value;
-  });
-  control.appendChild(range);
-  control.appendChild(numberField);
+  for (const target of [range, number]) {
+    target.dataset.canvasSetting = 'opacity';
+    target.dataset.opacityPercent = 'true';
+  }
   appendDesignerFieldMessage(field, number, 'canvas-opacity');
   parent.appendChild(field);
 }
@@ -187,11 +162,11 @@ function appendCanvasScaleField(
   settings: DesignerCanvasPresentationSettings,
 ): void {
   const ownerDocument = parent.ownerDocument;
-  const { field, control } = createCanvasField(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
-    ' designer-field-stacked designer-canvas-scale-field',
-  );
+  const { field, control } = createCanvasFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
+    stacked: true,
+    className: 'designer-canvas-scale-field',
+  });
   const options = ownerDocument.createElement('span');
   options.className = 'designer-canvas-scale-options';
   options.setAttribute('role', 'group');
@@ -205,14 +180,14 @@ function appendCanvasScaleField(
     ['none', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleNone],
   ];
   for (const [value, label] of scaleOptions) {
-    const button = ownerDocument.createElement('button');
-    button.type = 'button';
-    button.className = 'designer-control designer-button designer-canvas-scale-option';
+    const button = createDesignerButton(ownerDocument, {
+      className: 'designer-canvas-scale-option',
+      text: label,
+      tip: label,
+      pressed: settings.scaleMode === value,
+    });
     button.dataset.canvasSetting = 'scaleMode';
     button.dataset.canvasSettingValue = value;
-    button.textContent = label;
-    button.setAttribute('data-tip', label);
-    button.ariaPressed = String(settings.scaleMode === value);
     options.appendChild(button);
   }
   control.appendChild(options);
@@ -227,12 +202,10 @@ function appendCanvasSwitchField(
 ): void {
   const ownerDocument = parent.ownerDocument;
   // 开关行：标签左、开关右（原型 .toggle-row），长标签换行时开关仍贴右缘。
-  const field = ownerDocument.createElement('label');
-  field.className = 'designer-field designer-field-label designer-canvas-setting-checkbox';
-  const label = ownerDocument.createElement('span');
-  label.className = 'designer-field-label-text';
-  label.textContent = labelText;
-  field.appendChild(label);
+  const field = createDesignerFieldElement(ownerDocument, {
+    label: labelText,
+    className: 'designer-canvas-setting-checkbox',
+  });
   const input = createDesignerSwitch(ownerDocument, {
     ariaLabel: labelText,
     checked,
@@ -251,18 +224,14 @@ function appendCanvasSwitchField(
  * 页面配置因此不再有第二套颜色 UI，开关外观与组件检查器的颜色字段完全一致。
  */
 function appendCanvasBackgroundField(parent: HTMLElement, document: ScreenDocument): void {
-  const ownerDocument = parent.ownerDocument;
-  const field = ownerDocument.createElement('span');
-  field.className =
-    'designer-field designer-field-label designer-field-stacked designer-canvas-background-field';
-  const label = ownerDocument.createElement('span');
-  label.className = 'designer-field-label-text';
-  label.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasBackground;
-  field.appendChild(label);
-  const control = ownerDocument.createElement('span');
-  control.className = 'designer-field-control';
+  const { field, control } = createDesignerFieldRow(parent.ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.canvasBackground,
+    tagName: 'span',
+    stacked: true,
+    className: 'designer-canvas-background-field',
+  });
   const palette = createDesignerColorPalette(
-    ownerDocument,
+    parent.ownerDocument,
     canvasBackgroundPaletteValue(document),
     'canvas:background',
     { allowGradient: true },
@@ -271,7 +240,6 @@ function appendCanvasBackgroundField(parent: HTMLElement, document: ScreenDocume
   // 挂在外层才在重建后仍然可达，读值也统一从调色板状态重新序列化。
   palette.element.dataset.canvasProperty = 'background';
   control.appendChild(palette.element);
-  field.appendChild(control);
   appendDesignerFieldMessage(field, palette.controls[0]!, 'canvas-background');
   parent.appendChild(field);
 }
@@ -282,52 +250,48 @@ function appendCanvasBackgroundImageControls(
   pickerVisible: boolean,
 ): void {
   const ownerDocument = parent.ownerDocument;
-  const { field, control } = createCanvasField(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.canvasImageUrl,
-    ' designer-canvas-image-field',
-  );
-  const input = ownerDocument.createElement('input');
-  input.type = 'text';
-  input.className = 'designer-control designer-input';
-  input.value = document.canvas.backgroundImage ?? '';
+  const { field, control } = createCanvasFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.canvasImageUrl,
+    className: 'designer-canvas-image-field',
+  });
+  const input = createDesignerInput(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.backgroundImage,
+    placeholder: DESIGNER_UI_TEXT.propertiesPanel.canvasImageUrlPlaceholder,
+    value: document.canvas.backgroundImage ?? '',
+  });
   input.dataset.canvasProperty = 'backgroundImage';
-  input.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.backgroundImage);
   input.setAttribute('autocomplete', 'off');
   input.setAttribute('spellcheck', 'false');
+  // 清空即删除背景图（事务层把空串翻译成 backgroundImage: null），把这条语义写进描述。
+  input.ariaDescription = DESIGNER_UI_TEXT.propertiesPanel.canvasImageUrlHint;
   control.appendChild(input);
   appendDesignerFieldMessage(field, input, 'canvas-backgroundImage');
   if (pickerVisible) {
     // 背景图片：宿主选择按钮（ADR-0046）默认隐藏，仅宿主配置后渲染；
     // 点击派发请求事件，宿主自开弹出框可视化选择。
-    const pickerButton = ownerDocument.createElement('button');
-    pickerButton.type = 'button';
-    pickerButton.className = 'designer-control designer-button designer-canvas-image-picker';
+    const pickerButton = createDesignerButton(ownerDocument, {
+      className: 'designer-canvas-image-picker',
+      text: DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundImageAction,
+    });
     pickerButton.dataset.canvasBackgroundImageAction = '';
-    pickerButton.textContent = DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundImageAction;
     control.appendChild(pickerButton);
   }
   parent.appendChild(field);
 
-  const fitField = createCanvasField(
-    ownerDocument,
-    DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFit,
-    ' designer-canvas-image-fit-field',
-  );
-  const select = ownerDocument.createElement('select');
-  select.className = 'designer-control designer-select';
-  select.disabled = document.canvas.backgroundImage === undefined;
+  const fitField = createCanvasFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFit,
+    className: 'designer-canvas-image-fit-field',
+  });
+  const select = createDesignerSelect(ownerDocument, {
+    // 没有背景图时适配方式无意义：canonical 用 null 表示“未设置”，与 undefined 同样要禁用。
+    disabled: document.canvas.backgroundImage == null,
+    options: [
+      { label: DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFitCover, value: 'cover' },
+      { label: DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFitContain, value: 'contain' },
+    ],
+    value: document.canvas.backgroundImageFit ?? 'cover',
+  });
   select.dataset.canvasProperty = 'backgroundImageFit';
-  for (const [option, label] of [
-    ['cover', DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFitCover],
-    ['contain', DESIGNER_UI_TEXT.propertiesPanel.backgroundImageFitContain],
-  ] as const) {
-    const element = ownerDocument.createElement('option');
-    element.value = option;
-    element.textContent = label;
-    select.appendChild(element);
-  }
-  select.value = document.canvas.backgroundImageFit ?? 'cover';
   fitField.control.appendChild(enhanceDesignerSelect(select).element);
   appendDesignerFieldMessage(fitField.field, select, 'canvas-backgroundImageFit');
   parent.appendChild(fitField.field);

@@ -1,5 +1,7 @@
 import type { ScreenDatasetEntry } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { enhanceDesignerSelect } from '../designer-select-dom.js';
+import { createDesignerInput, createDesignerSelect } from '../designer-ui-primitives.js';
 import type { DesignerDataSourcePanelOptions } from './designer-dataset-types.js';
 
 export function renderHostConnection(options: DesignerDataSourcePanelOptions): HTMLElement {
@@ -56,13 +58,13 @@ export function renderDatasetCatalog(options: DesignerDataSourcePanelOptions): H
   ].join(' ');
   const heading = options.panel.ownerDocument.createElement('h4');
   heading.textContent = DESIGNER_UI_TEXT.dataset.select;
-  const search = options.panel.ownerDocument.createElement('input');
-  search.type = 'search';
-  search.className = 'designer-control designer-input';
+  const search = createDesignerInput(options.panel.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.search,
+    placeholder: DESIGNER_UI_TEXT.dataset.search,
+    type: 'search',
+    value: options.query,
+  });
   search.dataset.datasetQuery = 'true';
-  search.placeholder = DESIGNER_UI_TEXT.dataset.search;
-  search.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.search);
-  search.value = options.query;
   const results = options.panel.ownerDocument.createElement('div');
   results.className = 'designer-dataset-list';
   results.dataset.datasetResults = 'true';
@@ -85,18 +87,21 @@ export function renderDatasetCatalog(options: DesignerDataSourcePanelOptions): H
   }
   browser.append(heading);
   if (options.groups !== undefined && options.groups.length > 0) {
-    const groups = options.panel.ownerDocument.createElement('select');
-    groups.className = 'designer-control designer-select';
+    const currentGroup = options.groupId ?? '';
+    const groups = createDesignerSelect(options.panel.ownerDocument, {
+      ariaLabel: DESIGNER_UI_TEXT.dataset.group,
+      options: [
+        { label: DESIGNER_UI_TEXT.dataset.allGroups, selected: currentGroup === '', value: '' },
+        ...options.groups.map((group) => ({
+          label: group.name,
+          selected: group.id === currentGroup,
+          value: group.id,
+        })),
+      ],
+      value: currentGroup,
+    });
     groups.dataset.datasetGroup = 'true';
-    groups.setAttribute('aria-label', DESIGNER_UI_TEXT.dataset.group);
-    for (const group of [{ id: '', name: DESIGNER_UI_TEXT.dataset.allGroups }, ...options.groups]) {
-      const option = options.panel.ownerDocument.createElement('option');
-      option.value = group.id;
-      option.textContent = group.name;
-      option.selected = group.id === (options.groupId ?? '');
-      groups.appendChild(option);
-    }
-    browser.appendChild(groups);
+    browser.appendChild(enhanceDesignerSelect(groups).element);
   }
   browser.append(search, results);
   return browser;

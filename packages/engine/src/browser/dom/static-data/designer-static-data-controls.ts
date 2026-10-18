@@ -1,54 +1,71 @@
 import type { ScreenTabularDataset } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
+import {
+  createDesignerFieldElement,
+  createDesignerFieldRow,
+} from '../designer-field-primitives.js';
+import {
+  createDesignerCheckbox,
+  createDesignerInput,
+  createDesignerTextarea,
+} from '../designer-ui-primitives.js';
 import type { DesignerStaticDataView } from './designer-static-data-view.js';
 
 export function renderScalar(ownerDocument: Document, view: DesignerStaticDataView): HTMLElement {
-  const label = ownerDocument.createElement('label');
-  label.className = 'designer-field';
-  const caption = ownerDocument.createElement('span');
-  caption.className = 'designer-field-label';
   const descriptor = view.descriptor;
-  if (descriptor?.kind !== 'scalar') return label;
-  caption.textContent =
+  if (descriptor?.kind !== 'scalar') {
+    return createDesignerFieldRow(ownerDocument, { label: '' }).field;
+  }
+  const caption =
     descriptor.valueType === 'string'
       ? DESIGNER_UI_TEXT.dataSource.staticScalarString
       : descriptor.valueType === 'number'
         ? DESIGNER_UI_TEXT.dataSource.staticScalarNumber
         : DESIGNER_UI_TEXT.dataSource.staticScalarBoolean;
-  const input =
-    descriptor.valueType === 'string' && descriptor.multiline === true
-      ? ownerDocument.createElement('textarea')
-      : ownerDocument.createElement('input');
-  input.className =
-    input instanceof HTMLTextAreaElement
-      ? 'designer-control designer-textarea'
-      : 'designer-control designer-input';
-  input.dataset.staticScalar = descriptor.valueType;
-  if (input instanceof HTMLInputElement && descriptor.valueType === 'number') input.type = 'number';
-  if (input instanceof HTMLInputElement && descriptor.valueType === 'boolean') {
-    input.type = 'checkbox';
-    input.checked = view.value === true;
-  } else {
-    input.value = String(view.value ?? '');
+  // 勾选框按检查器约定直接挂在字段行上（命中 :has(> .designer-checkbox) 的行式布局）；
+  // 文本域走「标签在上、控件整行」，与检查器里的多行文本同一形态。
+  if (descriptor.valueType === 'boolean') {
+    const field = createDesignerFieldElement(ownerDocument, { label: caption });
+    const checkbox = createDesignerCheckbox(ownerDocument, {
+      ariaLabel: caption,
+      checked: view.value === true,
+    });
+    checkbox.dataset.staticScalar = descriptor.valueType;
+    field.appendChild(checkbox);
+    return field;
   }
-  label.append(caption, input);
-  return label;
+  const multiline = descriptor.valueType === 'string' && descriptor.multiline === true;
+  const row = createDesignerFieldRow(ownerDocument, {
+    label: caption,
+    ...(multiline ? { tagName: 'span' as const, stacked: true } : {}),
+  });
+  const input = multiline
+    ? createDesignerTextarea(ownerDocument, { ariaLabel: caption, value: String(view.value ?? '') })
+    : createDesignerInput(ownerDocument, {
+        ariaLabel: caption,
+        type: descriptor.valueType === 'number' ? 'number' : 'text',
+        value: String(view.value ?? ''),
+      });
+  input.dataset.staticScalar = descriptor.valueType;
+  row.control.appendChild(input);
+  return row.field;
 }
 
 export function renderAdvancedInput(ownerDocument: Document, value: string): HTMLElement {
-  const label = ownerDocument.createElement('label');
-  label.className = 'designer-field designer-data-source-static';
-  const caption = ownerDocument.createElement('span');
-  caption.className = 'designer-field-label';
-  caption.textContent = DESIGNER_UI_TEXT.dataSource.staticValue;
-  const textarea = ownerDocument.createElement('textarea');
-  textarea.className = 'designer-control designer-textarea';
+  const row = createDesignerFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.dataSource.staticValue,
+    tagName: 'span',
+    stacked: true,
+    className: 'designer-data-source-static',
+  });
+  const textarea = createDesignerTextarea(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataSource.staticValue,
+    value,
+  });
   textarea.dataset.dataSourceStatic = 'true';
-  textarea.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.staticValue);
-  textarea.value = value;
-  label.append(caption, textarea);
-  return label;
+  row.control.appendChild(textarea);
+  return row.field;
 }
 
 export function renderApply(ownerDocument: Document): HTMLElement {
