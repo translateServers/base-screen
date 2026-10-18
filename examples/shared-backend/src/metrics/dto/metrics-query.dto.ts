@@ -20,6 +20,13 @@ export const METRIC_IDS = [
   'target_completion',
   'service_satisfaction',
   'member_repurchase',
+  // 生产监控屏新增（PRD §6.5）：只做追加，前 10 个 id 与形状保持不变。
+  'oee',
+  'device_online_rate',
+  'output_count',
+  'alarm_open',
+  'line_load',
+  'energy_ratio',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
@@ -27,7 +34,8 @@ export type MetricId = (typeof METRIC_IDS)[number];
 export const MAX_SERIES_POINTS = 120;
 export const DEFAULT_SERIES_POINTS = 24;
 
-export const RANKING_DIMENSIONS = ['region', 'channel'] as const;
+/** 排行维度：`line` 是生产监控新增的固定表（名次即 LINE-A/B/C 的固定顺序）。 */
+export const RANKING_DIMENSIONS = ['region', 'channel', 'line'] as const;
 
 export type RankingDimension = (typeof RANKING_DIMENSIONS)[number];
 

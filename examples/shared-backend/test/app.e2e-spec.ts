@@ -140,4 +140,133 @@ describe('host api (e2e)', () => {
     await request(app.getHttpServer()).post('/api/screens').send({}).expect(400);
     await request(app.getHttpServer()).post('/api/screens').send({ name: '' }).expect(400);
   });
+
+  /**
+   * 数据集接口的 HTTP 层断言（PRD §6.1 / §6.3）：形状、错误码映射与 `?fail=500` 注入
+   * 只有走真实管道（ValidationPipe + AllExceptionsFilter）才验证得到。
+   */
+  it('serves the dataset catalog with query / groupId / limit', async () => {
+    const all = await request(app.getHttpServer()).get('/api/datasets').expect(200);
+    expect((all.body.items as unknown[]).length).toBe(4);
+    expect((all.body.groups as { id: string }[]).map((group) => group.id)).toEqual([
+      'production',
+      'alarm',
+    ]);
+
+    const filtered = await request(app.getHttpServer())
+      .get('/api/datasets')
+      .query({ query: '告警' })
+      .expect(200);
+    expect((filtered.body.items as { datasetId: string }[]).map((item) => item.datasetId)).toEqual([
+      'monitor.alarms',
+    ]);
+    expect((filtered.body.groups as { id: string }[]).map((group) => group.id)).toEqual(['alarm']);
+  });
+
+  it('serves the dataset definition and a deterministic query', async () => {
+    const described = await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices')
+      .expect(200);
+    expect((described.body.fields as unknown[]).length).toBe(5);
+    expect((described.body.parameters as unknown[]).length).toBe(2);
+    expect(
+      (described.body.parameters as { allowedValues?: readonly unknown[] }[])[0]?.allowedValues,
+    ).toEqual(['LINE-A', 'LINE-B', 'LINE-C']);
+
+    const first = await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A', limit: 48 })
+      .expect(200);
+    const second = await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A', limit: 48 })
+      .expect(200);
+
+    // 同参数两次响应必须字节级一致（例外只有 ?fail= 注入）。
+    expect(second.text).toBe(first.text);
+    expect((first.body.fields as unknown[]).length).toBe(5);
+    expect(first.body.fields).toEqual(described.body.fields);
+    expect((first.body.rows as unknown[]).length).toBe(48);
+    expect(first.body.totalRowCount).toBe(48);
+    expect(
+      (first.body.rows as { status: string }[]).filter((row) => row.status === 'fault'),
+    ).toHaveLength(3);
+
+    // 合法空集：200 且 rows 为空，不是错误。
+    const empty = await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-C' })
+      .expect(200);
+    expect(empty.body.rows).toEqual([]);
+    expect(empty.body.totalRowCount).toBe(0);
+  });
+
+  it('maps illegal dataset parameters to stable error codes', async () => {
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-Z' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'UNKNOWN_LINE' });
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.alarms/query')
+      .query({ line: 'LINE-A', window: 0 })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_WINDOW' });
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.alarms/query')
+      .query({ line: 'LINE-A', level: 'fatal' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'UNKNOWN_LEVEL' });
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.pipeline/query')
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'MISSING_PARAMETER' });
+      });
+
+    // 未声明的参数被 forbidNonWhitelisted 拒绝（端口不下发 componentId）。
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A', componentId: 'c-1' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+      });
+
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.nope')
+      .expect(404)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'UNKNOWN_DATASET' });
+      });
+  });
+
+  it('injects a 500 through the dataset query only outside production', async () => {
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A', fail: '500' })
+      .expect(500)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INJECTED_FAILURE' });
+        expect(typeof response.body.message).toBe('string');
+      });
+
+    // 未知的注入模式按未声明参数处理，不会静默成功。
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A', fail: 'nope' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+      });
+  });
 });

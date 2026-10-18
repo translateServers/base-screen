@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { LINE_IDS, type LineId } from '../datasets/dataset-definitions';
 import {
   DEFAULT_RANKING_LIMIT,
   DEFAULT_SERIES_POINTS,
@@ -25,6 +26,20 @@ const METRIC_DEFINITIONS: Readonly<Record<MetricId, MetricDefinition>> = {
   target_completion: { unit: '%', base: 72.4, amplitude: 9.6 },
   service_satisfaction: { unit: '%', base: 96.2, amplitude: 2.4 },
   member_repurchase: { unit: '%', base: 48.6, amplitude: 8.2 },
+  // 生产监控（PRD §5.2 C8/C9/C10/C11/C14/C16/C17）：车间级实时快照，口径与告警流水不同。
+  oee: { unit: '%', base: 82.6, amplitude: 6.4 },
+  device_online_rate: { unit: '%', base: 94.8, amplitude: 3.2 },
+  output_count: { unit: '件', base: 1284, amplitude: 186 },
+  alarm_open: { unit: '条', base: 7, amplitude: 3 },
+  line_load: { unit: '%', base: 72.4, amplitude: 12.6 },
+  energy_ratio: { unit: '%', base: 88.2, amplitude: 5.4 },
+};
+
+/** 产线排行的固定取值：名次与数值都不随请求漂移（PRD §6.4 的确定性要求）。 */
+const LINE_RANKING_VALUES: Readonly<Record<LineId, number>> = {
+  'LINE-A': 1284,
+  'LINE-B': 962,
+  'LINE-C': 431,
 };
 
 /** 排行数据是固定表：大屏需要稳定的名次，不适合按指标序列再算一遍。 */
@@ -50,6 +65,12 @@ const RANKING_DATASETS: Readonly<
       { name: '电商', value: 19 },
       { name: '门店', value: 11 },
     ],
+  },
+  // 产线负载排行（PRD §5.2 C14）：顺序固定为 LINE-A → LINE-B → LINE-C。
+  // 名字来自 `LINE_IDS`，避免与数据集参数的 allowedValues 各写一份而漂移。
+  line: {
+    unit: '件',
+    items: LINE_IDS.map((lineId) => ({ name: lineId, value: lineRankingValue(lineId) })),
   },
 };
 
@@ -146,6 +167,10 @@ export class MetricsService {
       items: dataset.items.slice(0, resolvedLimit),
     };
   }
+}
+
+function lineRankingValue(lineId: LineId): number {
+  return LINE_RANKING_VALUES[lineId];
 }
 
 function mulberry32(seed: number): () => number {

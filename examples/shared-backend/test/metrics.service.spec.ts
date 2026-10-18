@@ -80,4 +80,51 @@ describe('MetricsService', () => {
     expect(() => service.ranking('nope', 3)).toThrow(BadRequestException);
     expect(() => service.ranking('region', 0)).toThrow(BadRequestException);
   });
+
+  // 生产监控新增的 6 个指标（PRD §6.5）：只追加，不改动原 10 个 id 的名字与取值。
+  it('serves the production metric ids deterministically with their units', async () => {
+    const service = await createService();
+
+    const expected: ReadonlyArray<readonly [string, string]> = [
+      ['oee', '%'],
+      ['device_online_rate', '%'],
+      ['output_count', '件'],
+      ['alarm_open', '条'],
+      ['line_load', '%'],
+      ['energy_ratio', '%'],
+    ];
+
+    for (const [metric, unit] of expected) {
+      const first = service.series(metric, 12);
+      const second = service.series(metric, 12);
+      expect(first.unit).toBe(unit);
+      expect(first.points).toHaveLength(12);
+      expect(second).toEqual(first);
+      expect(first.points.every((point) => Number.isFinite(point.value))).toBe(true);
+      // 每个新指标都有自己的基准值与前缀，不能退化成旧指标的同一曲线。
+      expect(first.points).not.toEqual(service.series('cpu_usage', 12).points);
+    }
+  });
+
+  it('keeps the legacy metric ids and values untouched', async () => {
+    const service = await createService();
+
+    expect(service.series('cpu_usage', 24).unit).toBe('%');
+    expect(service.series('request_rate', 24).unit).toBe('req/s');
+    expect(service.series('sales_total', 24).unit).toBe('万元');
+    expect(service.ranking('region', 6).items[0]).toEqual({ name: '华东', value: 1284 });
+    expect(service.ranking('channel', 4).unit).toBe('%');
+  });
+
+  it('serves the fixed line ranking in LINE-A/B/C order', async () => {
+    const service = await createService();
+
+    const ranking = service.ranking('line', 3);
+
+    expect(ranking.dimension).toBe('line');
+    expect(ranking.unit).toBe('件');
+    expect(ranking.items.map((item) => item.name)).toEqual(['LINE-A', 'LINE-B', 'LINE-C']);
+    expect(ranking.items.map((item) => item.value)).toEqual([1284, 962, 431]);
+    expect(service.ranking('line', 2).items).toHaveLength(2);
+  });
 });
