@@ -1,14 +1,40 @@
+import type {
+  ScreenDocument,
+  ScreenJsonValue,
+  ScreenResourceObserver,
+} from '@base-screen/contracts';
 import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 import { createHostResourcePort } from '../screen/host-data-channel';
+import { createHostDatasetPort } from '../screen/host-dataset-port';
+import { createHostRefreshController } from '../screen/host-refresh-controller';
 import { loadHostRuntime } from '../screen/host-runtime';
+import { createHostVariablePort } from '../screen/host-variable-port';
 import { useScreenSessionStore } from '../store/screen-session-store';
 import { showToast } from './toast';
 
 const logger = createLogger('screen-viewer');
+
+/** `?smoke=1` 时的调试面：只有三个入口，不含端口/文档/URL。 */
+declare global {
+  interface Window {
+    __baseScreenHost?:
+      | {
+          tickNow(): void;
+          refreshNow(): void;
+          status(): {
+            readonly requests: number;
+            readonly failures: number;
+            readonly lastCode: string | undefined;
+            readonly pending: readonly string[];
+          };
+        }
+      | undefined;
+  }
+}
 
 interface FrameState {
   readonly width: number;
@@ -18,10 +44,101 @@ interface FrameState {
   readonly y: number;
 }
 
+/** 顶栏数据状态 chip 的投影（在线 = 最近一次成功之后没有新的失败）。 */
+interface DataStatusState {
+  readonly online: boolean;
+  readonly failures: number;
+}
+
+interface HostObserver {
+  readonly observer: ScreenResourceObserver;
+  status(): {
+    readonly requests: number;
+    readonly failures: number;
+    readonly lastCode: string | undefined;
+    readonly pending: readonly string[];
+  };
+  isPending(componentId: string): boolean;
+  lastFailureAt(): number | undefined;
+  isOnline(): boolean;
+}
+
+/**
+ * 请求观察者：把渲染器的资源生命周期事件汇总成"计数 + 在飞行集合"。
+ *
+ * 两个来自渲染器实现（`renderer-state.ts`）的硬事实决定了这里的写法：
+ * 1. `shared` 与 `aborted` 事件的 `requestId` 是**合成值**（`componentId:key:cancel`），
+ *    与 `started`/`succeeded` 的真实 requestId 不相等——所以不能按 `requestId` 配对，
+ *    否则每次"请求被新一轮刷新取消"都会留下一个永远清不掉的 pending。
+ * 2. 一次成功会连发 `succeeded` + `adapted` 两个终态事件。
+ *
+ * 因此 pending 用**每组件计数器**：started/shared +1，任何终态 −1（下限 0）。
+ */
+function createHostObserver(): HostObserver {
+  let requests = 0;
+  let failures = 0;
+  let consecutiveFailures = 0;
+  let lastCode: string | undefined;
+  let lastFailureAt: number | undefined;
+  const pendingCount = new Map<string, number>();
+
+  const observer: ScreenResourceObserver = (event) => {
+    switch (event.type) {
+      case 'started':
+      case 'shared': {
+        requests += 1;
+        pendingCount.set(event.componentId, (pendingCount.get(event.componentId) ?? 0) + 1);
+        return;
+      }
+      case 'succeeded': {
+        release(event.componentId);
+        consecutiveFailures = 0;
+        return;
+      }
+      case 'failed':
+      case 'timed-out': {
+        release(event.componentId);
+        failures += 1;
+        consecutiveFailures += 1;
+        lastCode = event.code;
+        lastFailureAt = Date.now();
+        return;
+      }
+      default: {
+        // aborted / adapted：取消不算失败；adapted 是成功的收尾。
+        release(event.componentId);
+      }
+    }
+  };
+
+  function release(componentId: string): void {
+    const next = (pendingCount.get(componentId) ?? 1) - 1;
+    if (next <= 0) pendingCount.delete(componentId);
+    else pendingCount.set(componentId, next);
+  }
+
+  return {
+    observer,
+    status: () => ({
+      requests,
+      failures,
+      lastCode,
+      pending: [...pendingCount.keys()],
+    }),
+    isPending: (componentId) => (pendingCount.get(componentId) ?? 0) > 0,
+    lastFailureAt: () => lastFailureAt,
+    isOnline: () => consecutiveFailures === 0,
+  };
+}
+
 /**
  * 查看器嵌入页：只读播放，按 canonical 画布尺寸等比缩放适配视口。
- * 查看器没有自带顶栏，因此屏名、时钟、全屏与返回入口由宿主浮层提供；
+ * 查看器没有自带顶栏，因此屏名、时钟、数据状态、全屏与返回入口由宿主浮层提供；
  * 浮层与缩放后的 frame 平级，不会被一起放大。
+ *
+ * 数据链路：`datasetPort` / `variablePort` / `observer` 必须在 `configure` 内提交——
+ * 渲染器在 configure 时建立，之后再赋端口会被按"初始化后不可更换端口"拒绝。
+ * 轮询由宿主的 refresh controller 驱动（设计器不装轮询，见 screen-editor）。
  */
 export function ScreenViewerPage(): React.ReactElement {
   const { screenId } = useParams<{ screenId: string }>();
@@ -38,6 +155,10 @@ export function ScreenViewerPage(): React.ReactElement {
   });
   const [screenName, setScreenName] = useState('');
   const [clock, setClock] = useState(() => formatClock(new Date()));
+  const [dataStatus, setDataStatus] = useState<DataStatusState>({
+    online: true,
+    failures: 0,
+  });
   const [fullscreen, setFullscreen] = useState(false);
 
   const updateFit = useCallback(() => {
@@ -86,6 +207,8 @@ export function ScreenViewerPage(): React.ReactElement {
     });
 
     let viewer: BaseScreenViewerElement | undefined;
+    let controller: ReturnType<typeof createHostRefreshController> | undefined;
+    let frameTimer: number | undefined;
     let disposed = false;
 
     void (async () => {
@@ -105,6 +228,25 @@ export function ScreenViewerPage(): React.ReactElement {
       setScreenName(result.data.screen.name);
       updateFit();
 
+      const params = readUrlParams();
+      const host = createHostObserver();
+      // 端口是页面级单例：数据集分组缓存与告警缓存都在端口里，重建会丢缓存。
+      const datasetPort = createHostDatasetPort({
+        api,
+        logger,
+        ...(params.get('fail') === '500' ? { failCode: () => '500' } : {}),
+      });
+      const variablePort = createHostVariablePort({
+        clock: () => new Date(),
+        noticeSource: () => datasetPort.snapshot().alarms,
+        statusSource: () => ({
+          online: host.isOnline(),
+          failures: host.status().failures,
+          lastFailureAt: host.lastFailureAt(),
+        }),
+        logger,
+      });
+
       const element = document.createElement('base-screen-viewer') as BaseScreenViewerElement;
       stage.append(element);
       viewer = element;
@@ -115,6 +257,9 @@ export function ScreenViewerPage(): React.ReactElement {
         instanceId: `host-app-react:${screenId}`,
         mode: 'viewer',
         resourcePort: createHostResourcePort(),
+        datasetPort,
+        variablePort,
+        observer: host.observer,
       });
       if (!configured.ok) {
         logger.error('viewer configure failed', configured.diagnostics);
@@ -123,11 +268,47 @@ export function ScreenViewerPage(): React.ReactElement {
         return;
       }
 
-      element.document = result.data.screen.document;
+      element.document = applyUrlSeeds(result.data.screen.document, params);
       useScreenSessionStore
         .getState()
         .loaded(result.data.screen.name, String(result.data.screen.revision));
       requestAnimationFrame(() => updateFit());
+
+      const pollParam = params.get('poll');
+      if (pollParam !== '0') {
+        const override = pollParam === null ? undefined : Number(pollParam);
+        controller = createHostRefreshController({
+          element,
+          logger,
+          document: window.document,
+          isPending: host.isPending,
+          ...(override !== undefined && Number.isFinite(override) && override > 0
+            ? { overrideIntervalMs: override }
+            : {}),
+        });
+        controller.start();
+        // 播种变量已经触发过一轮刷新，把到期时间整体推后，避免刚加载就再刷一次。
+        controller.rebuild();
+      }
+
+      // 顶栏 chip 由 1s 的时钟节拍顺带刷新：不在 observer 回调里 setState，避免渲染期写入。
+      frameTimer = window.setInterval(() => {
+        const status = host.status();
+        setDataStatus((previous) =>
+          previous.online === host.isOnline() && previous.failures === status.failures
+            ? previous
+            : { online: host.isOnline(), failures: status.failures },
+        );
+      }, 1000);
+
+      if (params.get('smoke') === '1') {
+        window.__baseScreenHost = {
+          tickNow: () => controller?.tickNow(),
+          refreshNow: () => element.refreshData(),
+          status: () => host.status(),
+        };
+      }
+
       logger.info('viewer mounted', { screenId, revision: result.data.screen.revision });
     })().catch((error: unknown) => {
       if (disposed) return;
@@ -137,6 +318,9 @@ export function ScreenViewerPage(): React.ReactElement {
 
     return () => {
       disposed = true;
+      window.clearInterval(frameTimer);
+      controller?.dispose();
+      window.__baseScreenHost = undefined;
       unsubscribeSession();
       viewer?.remove();
       useScreenSessionStore.getState().reset();
@@ -173,6 +357,13 @@ export function ScreenViewerPage(): React.ReactElement {
       </div>
       <div className="viewer-bar">
         <span className="viewer-bar__name">{screenName || '数据大屏'}</span>
+        <span
+          className="viewer-bar__status"
+          data-state={dataStatus.online ? 'online' : 'offline'}
+          title={dataStatus.failures === 0 ? '数据源在线' : `已失败 ${dataStatus.failures} 次`}
+        >
+          {dataStatus.online ? '数据源在线' : `数据源离线 · ${dataStatus.failures} 次失败`}
+        </span>
         <span className="viewer-bar__clock">{clock}</span>
         <button type="button" className="button" onClick={toggleFullscreen}>
           {fullscreen ? '退出全屏' : '全屏'}
@@ -183,6 +374,76 @@ export function ScreenViewerPage(): React.ReactElement {
       </div>
     </div>
   );
+}
+
+/**
+ * 读取 URL 参数。**HashRouter 下查询串在 hash 里**（`#/screens/1/view?line=LINE-B`），
+ * `window.location.search` 是空的——只看 search 会让 `?line=`/`?smoke=1` 全部失效。
+ * 两处都读，hash 优先，这样换 Router 形态也不用改这里。
+ */
+function readUrlParams(): URLSearchParams {
+  const merged = new URLSearchParams(window.location.search);
+  const hash = window.location.hash;
+  const queryIndex = hash.indexOf('?');
+  if (queryIndex >= 0) {
+    for (const [key, value] of new URLSearchParams(hash.slice(queryIndex + 1))) {
+      merged.set(key, value);
+    }
+  }
+  return merged;
+}
+
+interface SeedRule {
+  readonly variableId: string;
+  readonly accept: (raw: string) => ScreenJsonValue | undefined;
+}
+
+/** 允许播种的变量与取值域：非法值一律忽略（不是失败，不该让整屏降级）。 */
+const SEED_RULES: readonly SeedRule[] = [
+  {
+    variableId: 'line',
+    accept: (raw) => (['LINE-A', 'LINE-B', 'LINE-C'].includes(raw) ? raw : undefined),
+  },
+  {
+    variableId: 'severity',
+    accept: (raw) => (['all', 'critical', 'warning', 'info'].includes(raw) ? raw : undefined),
+  },
+  {
+    variableId: 'window',
+    accept: (raw) => {
+      const numeric = Number(raw);
+      return [60, 240, 1440].includes(numeric) ? numeric : undefined;
+    },
+  },
+];
+
+/**
+ * URL 播种（`?line=` / `?window=` / `?severity=`）。
+ *
+ * **为什么不走 `getVariable(id).set()`**：`set()` 依赖渲染器已完成过一次成功渲染
+ * （`previous` 变量表在首帧之前是 undefined，会直接被拒），而文档刚赋值时首次渲染
+ * 还在等待动态变量解析——此刻 `set()` 必然失败，播种会静默不生效（实测如此）。
+ * 静态变量的 `initialValue` 是文档里声明的初值，改写它才是"开机即生效"的路径，
+ * 也没有竞态：渲染器第一次渲染读到的就是播种后的值。
+ * 只在查看页做：编辑页会保存文档，改写初值会被写回后端。
+ */
+function applyUrlSeeds(document: ScreenDocument, params: URLSearchParams): ScreenDocument {
+  let changed = false;
+  const variables = document.variables.map((variable) => {
+    if (variable.type !== 'static') return variable;
+    const rule = SEED_RULES.find((item) => item.variableId === variable.id);
+    if (rule === undefined) return variable;
+    const raw = params.get(rule.variableId);
+    if (raw === null) return variable;
+    const value = rule.accept(raw);
+    if (value === undefined) {
+      logger.warn('ignored illegal variable seed', { variableId: rule.variableId, raw });
+      return variable;
+    }
+    changed = true;
+    return { ...variable, initialValue: value };
+  });
+  return changed ? { ...document, variables } : document;
 }
 
 function formatClock(date: Date): string {

@@ -1,4 +1,12 @@
-import type { MetricRanking, MetricSeries, ScreenShape, ScreenSummaryShape } from '../types';
+import type {
+  DatasetCatalog,
+  DatasetDefinition,
+  MetricRanking,
+  MetricSeries,
+  ScreenShape,
+  ScreenSummaryShape,
+  TabularDataset,
+} from '../types';
 import { resolveApiBase } from './api-base';
 
 export interface ApiError {
@@ -62,6 +70,26 @@ function toApiError(payload: unknown, status: number): ApiError {
   return { code: `HTTP_${status}`, message: `请求失败（${status}）。`, status };
 }
 
+/** query string 构造：`undefined` 与空串不落进 URL（后端 `forbidNonWhitelisted` 对空值也会校验）。 */
+function toSearch(params: Readonly<Record<string, string | number | undefined>>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === '') continue;
+    search.set(key, String(value));
+  }
+  const text = search.toString();
+  return text === '' ? '' : `?${text}`;
+}
+
+export interface DatasetListQuery {
+  readonly query?: string;
+  readonly groupId?: string;
+  readonly limit?: number;
+}
+
+/** 数据集 query 参数：键是 `doGetParameters` 求值后的纯值（字符串/数字），由调用方拼。 */
+export type DatasetQueryParams = Readonly<Record<string, string | number | undefined>>;
+
 export const api = {
   health: (): Promise<ApiResult<{ status: string }>> => request('/health'),
   listScreens: (): Promise<ApiResult<{ screens: ScreenSummaryShape[] }>> => request('/screens'),
@@ -81,4 +109,27 @@ export const api = {
     request(`/metrics/series?metric=${encodeURIComponent(metric)}&points=${points}`),
   metricRanking: (dimension: string, limit: number): Promise<ApiResult<MetricRanking>> =>
     request(`/metrics/ranking?dimension=${encodeURIComponent(dimension)}&limit=${limit}`),
+  /** 数据集目录：分组与条目一次返回（宿主不复用这份分组做第二次请求）。 */
+  listDatasets: (
+    query: DatasetListQuery,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<DatasetCatalog>> =>
+    request(
+      `/datasets${toSearch({ query: query.query, groupId: query.groupId, limit: query.limit })}`,
+      signal === undefined ? {} : { signal },
+    ),
+  describeDataset: (
+    datasetId: string,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<DatasetDefinition>> =>
+    request(`/datasets/${encodeURIComponent(datasetId)}`, signal === undefined ? {} : { signal }),
+  queryDataset: (
+    datasetId: string,
+    params: DatasetQueryParams,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<TabularDataset>> =>
+    request(
+      `/datasets/${encodeURIComponent(datasetId)}/query${toSearch(params)}`,
+      signal === undefined ? {} : { signal },
+    ),
 };

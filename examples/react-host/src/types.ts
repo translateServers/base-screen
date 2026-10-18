@@ -38,3 +38,57 @@ export interface MetricRanking {
   readonly unit: string;
   readonly items: readonly RankingItem[];
 }
+
+/** 数据集字段（与后端 `dataset-definitions.ts` 的定义逐字段对齐）。 */
+export interface DatasetField {
+  readonly id: string;
+  readonly label: string;
+  readonly valueType: 'string' | 'number' | 'boolean' | 'date';
+  readonly nullable?: boolean;
+  readonly unit?: string;
+  readonly format?: string;
+}
+
+/** 数据集参数：`allowedValues` 是设计器下拉的取值域，`minimum/maximum` 是数值区间。 */
+export interface DatasetParameter {
+  readonly name: string;
+  readonly label: string;
+  readonly valueType: 'string' | 'number' | 'boolean' | 'date';
+  readonly required: boolean;
+  readonly defaultValue?: string | number | boolean;
+  readonly minimum?: number;
+  readonly maximum?: number;
+  readonly maxLength?: number;
+  readonly allowedValues?: readonly (string | number | boolean)[];
+}
+
+export interface DatasetGroup {
+  readonly id: string;
+  readonly name: string;
+}
+
+export interface DatasetEntry {
+  readonly datasetId: string;
+  readonly name: string;
+  readonly description: string | null;
+  readonly groupId?: string;
+}
+
+/** `GET /api/datasets`：分组与条目一次返回（渲染器只要 `items`，`groups` 由宿主自己消费）。 */
+export interface DatasetCatalog {
+  readonly groups: readonly DatasetGroup[];
+  readonly items: readonly DatasetEntry[];
+}
+
+/** `GET /api/datasets/:id`：字段顺序即绑定默认顺序。 */
+export interface DatasetDefinition extends DatasetEntry {
+  readonly fields: readonly DatasetField[];
+  readonly parameters: readonly DatasetParameter[];
+}
+
+/** `GET /api/datasets/:id/query`：`totalRowCount` 是过滤后的总数，`rows` 已被 limit 截断。 */
+export interface TabularDataset {
+  readonly fields: readonly DatasetField[];
+  readonly rows: readonly Readonly<Record<string, unknown>>[];
+  readonly totalRowCount?: number;
+}
