@@ -3,6 +3,7 @@ import {
   applyScreenDocumentTransaction,
   isScreenComponentEffectivelyLocked,
   type ScreenDocumentTransaction,
+  type ScreenInteractionAction,
 } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -278,13 +279,14 @@ describe('DesignerLayersController', () => {
     target.matches['[data-layer-select]'] = target;
 
     controller.onClick({ target } as unknown as MouseEvent);
+    // 没有渲染过的行序时 Shift 落不出一段区间，退化为单选（Windows 里没有锚点也是单选）。
     controller.onClick({ target, shiftKey: true } as unknown as MouseEvent);
     controller.onClick({ target, ctrlKey: true } as unknown as MouseEvent);
     controller.onClick({ target, metaKey: true } as unknown as MouseEvent);
 
     expect(actions).toEqual([
       { type: 'replace-selection', componentIds: ['layer-1'], focusedComponentId: 'layer-1' },
-      { type: 'toggle-selection', componentId: 'layer-1' },
+      { type: 'replace-selection', componentIds: ['layer-1'], focusedComponentId: 'layer-1' },
       { type: 'toggle-selection', componentId: 'layer-1' },
       { type: 'toggle-selection', componentId: 'layer-1' },
     ]);
@@ -314,7 +316,85 @@ describe('DesignerLayersController', () => {
     expect(controller.onClick({ target: actionGap } as unknown as MouseEvent)).toBe(true);
     expect(actions).toEqual([
       { type: 'replace-selection', componentIds: ['layer-1'], focusedComponentId: 'layer-1' },
-      { type: 'toggle-selection', componentId: 'layer-1' },
+      { type: 'replace-selection', componentIds: ['layer-1'], focusedComponentId: 'layer-1' },
+    ]);
+  });
+
+  it('R7 extends the selection with Shift from a fixed anchor, the way a Windows list does', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const actions: ScreenInteractionAction[] = [];
+    let selected: readonly string[] = [];
+    const apply = (action: ScreenInteractionAction): void => {
+      actions.push(action);
+      if (action.type === 'replace-selection') {
+        selected = [...action.componentIds];
+        return;
+      }
+      if (action.type === 'toggle-selection') {
+        selected = selected.includes(action.componentId)
+          ? selected.filter((id) => id !== action.componentId)
+          : [...selected, action.componentId];
+      }
+    };
+    // 从上到下的行序 = zIndex 降序：a b c d。
+    const controller = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: document, diagnostics: [] }),
+      getCatalog: () => undefined,
+      getDocument: () =>
+        createDocument([
+          component('a', null, 3),
+          component('b', null, 2),
+          component('c', null, 1),
+          component('d', null, 0),
+        ]),
+      getInteraction: () => ({
+        selectedComponentIds: selected,
+        focusedComponentId: selected.at(-1) ?? null,
+      }),
+      reduceSelection: apply,
+    });
+    controller.render(new FakePanel() as unknown as HTMLElement);
+
+    const row = (id: string): FakeElement => {
+      const element = new FakeElement();
+      element.dataset.layerSelect = id;
+      element.matches['[data-layer-select]'] = element;
+      return element;
+    };
+    const click = (id: string, modifiers: MouseEventInit = {}): void => {
+      controller.onClick({ target: row(id), ...modifiers } as unknown as MouseEvent);
+    };
+
+    // 单击 a 建立锚点，Shift 点 c 选中 a..c 一整段。
+    click('a');
+    click('c', { shiftKey: true });
+    expect(selected).toEqual(['a', 'b', 'c']);
+    // 锚点还在 a：再 Shift 点 b 是收窄，不是从 c 继续吞一段。
+    click('b', { shiftKey: true });
+    expect(selected).toEqual(['a', 'b']);
+    // 无 Shift 点 c 重新锚定，随后 Shift 点 a 是向上的区间。
+    click('c');
+    click('a', { shiftKey: true });
+    expect(selected).toEqual(['a', 'b', 'c']);
+    // Ctrl + Shift 把区间并入已有选区（从 c 到 d 只有 d 是新的）。
+    click('b');
+    click('d', { ctrlKey: true, shiftKey: true });
+    expect(selected).toEqual(['b', 'c', 'd']);
+
+    expect(actions).toEqual([
+      { type: 'replace-selection', componentIds: ['a'], focusedComponentId: 'a' },
+      { type: 'replace-selection', componentIds: ['a', 'b', 'c'], focusedComponentId: 'c' },
+      { type: 'replace-selection', componentIds: ['a', 'b'], focusedComponentId: 'b' },
+      { type: 'replace-selection', componentIds: ['c'], focusedComponentId: 'c' },
+      { type: 'replace-selection', componentIds: ['a', 'b', 'c'], focusedComponentId: 'a' },
+      { type: 'replace-selection', componentIds: ['b'], focusedComponentId: 'b' },
+      {
+        type: 'replace-selection',
+        componentIds: ['b', 'c', 'd'],
+        focusedComponentId: 'd',
+      },
     ]);
   });
 

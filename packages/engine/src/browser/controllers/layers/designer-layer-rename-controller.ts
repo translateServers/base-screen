@@ -3,7 +3,6 @@ import {
   isScreenComponentEffectivelyHidden,
   isScreenComponentEffectivelyLocked,
   type ScreenDocumentTransaction,
-  type ScreenInteractionAction,
 } from '@base-screen/core';
 
 interface DesignerLayerRenameControllerCallbacks {
@@ -13,8 +12,9 @@ interface DesignerLayerRenameControllerCallbacks {
   ) => ScreenParseResult<ScreenDocument>;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getLayers: () => HTMLElement | undefined;
-  readonly reduceSelection: (action: ScreenInteractionAction) => void;
   readonly render: () => void;
+  /** 单击的选区语义（含 Shift 连选锚点）不属于重命名流程，交回图层控制器统一处理。 */
+  readonly selectComponent: (componentId: string, event: Event) => void;
 }
 
 // 图层单击会同步重绘树节点，浏览器因此可能无法在第二个新节点上合成原生 dblclick。
@@ -68,7 +68,7 @@ export class DesignerLayerRenameController {
       event.preventDefault();
       return;
     }
-    this.select(componentId, event);
+    this.callbacks.selectComponent(componentId, event);
   }
 
   begin(componentId: string): boolean {
@@ -142,19 +142,6 @@ export class DesignerLayerRenameController {
     this.#drafts.clear();
     this.#renamingId = undefined;
     this.#lastLayerClick = undefined;
-  }
-
-  select(componentId: string, event: Event): void {
-    const modifiers = event as MouseEvent;
-    if (modifiers.shiftKey || modifiers.ctrlKey || modifiers.metaKey) {
-      this.callbacks.reduceSelection({ type: 'toggle-selection', componentId });
-      return;
-    }
-    this.callbacks.reduceSelection({
-      type: 'replace-selection',
-      componentIds: [componentId],
-      focusedComponentId: componentId,
-    });
   }
 
   // 无条件退出并重绘：事务路径会同步触发一次携带旧 renamingId 快照的面板渲染，

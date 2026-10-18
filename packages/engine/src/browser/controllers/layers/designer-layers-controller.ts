@@ -17,6 +17,7 @@ import {
   DESIGNER_LAYER_PAGE_SIZE,
   type DesignerLayerDropIndicator,
   type DesignerLayerSelectionDirection,
+  filterDesignerLayerItems,
   getDesignerLayerSelectionTarget,
   renderDesignerLayers,
 } from '../../dom/layers/designer-layers-dom.js';
@@ -44,12 +45,16 @@ export interface DesignerLayersControllerCallbacks {
 }
 
 export class DesignerLayersController {
+  /** Shift 连选的锚点：最近一次「无 Shift」点击的行，连选期间保持不变（Windows 列表语义）。 */
+  #anchor: string | undefined;
   #search = '';
   #collapsed = new Set<string>();
   readonly #drag: DesignerLayerDragController;
   #layers: HTMLElement | undefined;
   readonly #rename: DesignerLayerRenameController;
   #renderLimit = DESIGNER_LAYER_PAGE_SIZE;
+  /** 最近一次渲染出的行序（含搜索过滤、折叠与分页）：Shift 连选只能落在看得见的行上。 */
+  #visibleIds: readonly string[] = [];
 
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {
     this.#drag = new DesignerLayerDragController({
@@ -61,6 +66,7 @@ export class DesignerLayersController {
       ...callbacks,
       getLayers: () => this.#layers,
       render: () => this.render(this.#layers),
+      selectComponent: (componentId, event) => this.selectLayer(componentId, event),
     });
   }
 
@@ -71,6 +77,7 @@ export class DesignerLayersController {
   stepSelection(direction: DesignerLayerSelectionDirection): void {
     const componentId = this.selectionStepTarget(direction);
     if (componentId === undefined) return;
+    this.#anchor = componentId;
     this.callbacks.reduceSelection({
       type: 'replace-selection',
       componentIds: [componentId],
@@ -78,10 +85,73 @@ export class DesignerLayersController {
     });
   }
 
+  /**
+   * 行的选中语义，对齐 Windows 资源管理器：
+   * - 单击：只选这一行，并把连选锚点移到这里；
+   * - Ctrl / Cmd 单击：切换这一行，锚点也移到这里（资源管理器会重新锚定）；
+   * - Shift 单击：从锚点到这一行整段选中并覆盖原选区；按住 Ctrl 时并入原选区。
+   * 锚点在连选期间不动，所以反复 Shift 点击是以同一起点伸缩，而不是每点一次再吞掉一段。
+   */
+  private selectLayer(componentId: string, event: Event): void {
+    const { shiftKey, ctrlKey, metaKey } = event as MouseEvent;
+    const additive = ctrlKey === true || metaKey === true;
+    if (shiftKey === true) {
+      this.callbacks.reduceSelection({
+        type: 'replace-selection',
+        componentIds: this.rangeTo(componentId, additive),
+        focusedComponentId: componentId,
+      });
+      return;
+    }
+    this.#anchor = componentId;
+    if (additive) {
+      this.callbacks.reduceSelection({ type: 'toggle-selection', componentId });
+      return;
+    }
+    this.callbacks.reduceSelection({
+      type: 'replace-selection',
+      componentIds: [componentId],
+      focusedComponentId: componentId,
+    });
+  }
+
+  /** 锚点到目标的连续区间（按屏幕上看得见的行序）。锚点无效时退化为单行选中。 */
+  private rangeTo(componentId: string, additive: boolean): readonly string[] {
+    const target = this.#visibleIds.indexOf(componentId);
+    if (target === -1) return [componentId];
+    const anchor = this.resolveAnchor(componentId);
+    const index = this.#visibleIds.indexOf(anchor);
+    if (index === -1) return [componentId];
+    const [start, end] = index <= target ? [index, target] : [target, index];
+    const range = this.#visibleIds.slice(start, end + 1);
+    if (!additive) return range;
+    return [...new Set([...this.callbacks.getInteraction().selectedComponentIds, ...range])];
+  }
+
+  /**
+   * 锚点优先取上一次无 Shift 点击；没有锚点时退回当前焦点行（先在画布选中、再到面板里
+   * Shift 连选），并把它固化下来 —— 否则连选会一路跟着焦点漂移，变成逐段吞并。
+   */
+  private resolveAnchor(componentId: string): string {
+    if (this.#anchor !== undefined && this.#visibleIds.includes(this.#anchor)) return this.#anchor;
+    const focused = this.callbacks.getInteraction().focusedComponentId;
+    if (focused !== null && this.#visibleIds.includes(focused)) {
+      this.#anchor = focused;
+      return focused;
+    }
+    return componentId;
+  }
+
   render(layers: HTMLElement | undefined): void {
     if (layers === undefined) return;
     this.#layers = layers;
     const view = createDesignerLayerView(this.callbacks.getDocument(), this.callbacks.getCatalog());
+    // 行序与面板实际渲染的那一屏保持一致：搜索过滤、折叠与分页都会改变可见区间，
+    // Shift 连选必须按用户看到的顺序取区间，而不是按文档顺序。
+    this.#visibleIds = filterDesignerLayerItems(view.items, this.#search, this.#collapsed)
+      .slice(0, this.#renderLimit)
+      .map((item) => item.id);
+    const focusedRowId = activeLayerSelectId(layers);
     renderDesignerLayers(layers, view, {
       interaction: this.callbacks.getInteraction(),
       search: this.#search,
@@ -103,6 +173,15 @@ export class DesignerLayersController {
       },
       canMove: (id, direction, siblings) => this.canMove(id, direction, siblings),
     });
+    // 重渲染会把聚焦按钮连同节点一起换掉，焦点随之掉到空处 —— 那样单击之后
+    // Shift+方向键就接不上了。只在「刚才焦点在行上、渲染后掉了」时接回来：
+    // 若焦点已被别处接管（点击画布、切到重命名输入框），这里不抢。
+    if (focusedRowId !== undefined && activeElementIn(layers) === null) {
+      const next = [...layers.querySelectorAll<HTMLElement>('[data-layer-select]')].find(
+        (button) => button.dataset.layerSelect === focusedRowId,
+      );
+      next?.focus({ preventScroll: true });
+    }
     if (view.diagnostics.length > 0) this.callbacks.emitDiagnostics(view.diagnostics);
   }
 
@@ -279,7 +358,7 @@ export class DesignerLayersController {
     if (next === undefined) return true;
     event.preventDefault();
     next.focus();
-    this.#rename.select(next.dataset.layerSelect!, event);
+    this.selectLayer(next.dataset.layerSelect!, event);
     return true;
   }
 
@@ -415,6 +494,19 @@ export class DesignerLayersController {
   private report(result: ScreenParseResult<ScreenDocument>): void {
     if (!result.ok) this.callbacks.emitDiagnostics(result.diagnostics);
   }
+}
+
+/** 面板可能挂在 shadow root 里（产品）也挂过普通文档（测试），两边的 activeElement 都要能取。 */
+function activeElementIn(layers: HTMLElement): Element | null {
+  const root = typeof layers.getRootNode === 'function' ? layers.getRootNode() : null;
+  const active = (root as { readonly activeElement?: Element | null } | null)?.activeElement;
+  return active ?? null;
+}
+
+function activeLayerSelectId(layers: HTMLElement): string | undefined {
+  const active = activeElementIn(layers);
+  const button = (active as HTMLElement | null)?.closest?.<HTMLElement>('[data-layer-select]');
+  return button?.dataset.layerSelect;
 }
 
 function isLayerSelectButton(target: EventTarget | null): target is HTMLButtonElement {
