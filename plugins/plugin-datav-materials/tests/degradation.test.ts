@@ -43,14 +43,23 @@ describe('degradationText', () => {
   it('keeps the documented grouping of codes', () => {
     // 同一个原因的不同码给同一句话：屏上文案不该暴露基座内部的分码细节。
     expect(degradationText('HOST_RESOURCE_UNAVAILABLE')).toBe('数据源不可用');
-    expect(degradationText('HOST_RESOURCE_TIMEOUT')).toBe('数据源不可用');
-    expect(degradationText('HOST_RESOURCE_FAILED')).toBe('数据源不可用');
+    expect(degradationText('HOST_RESOURCE_TIMEOUT')).toBe('数据更新超时');
     expect(degradationText('HOST_DATASET_UNAVAILABLE')).toBe('数据集不可用');
     expect(degradationText('HOST_DATASET_PARAMETER_INVALID')).toBe('参数无效');
     expect(degradationText('HOST_DATASET_INVALID')).toBe('数据格式异常');
     expect(degradationText('HOST_DATASET_BINDING_INVALID')).toBe('绑定无效');
     expect(degradationText('HOST_DATASET_ADAPTER_FAILED')).toBe('投影失败');
     expect(degradationText('HOST_DATASET_VARIABLE_INVALID')).toBe('变量不可用');
+  });
+
+  // 冻结集里 `HOST_RESOURCE_FAILED` 同时覆盖「参数非法 / 数据集 404 / 宿主请求失败」
+  // （渲染器先归一，物料看不到细分码）。因此它**不能**说成「数据源不可用」——那会让
+  // 值班员以为断网。精确原因由宿主的 status 变量承载。
+  it('does not blame the network for the collapsed failure code', () => {
+    expect(degradationText('HOST_RESOURCE_FAILED')).toBe('数据更新失败');
+    expect(degradationText('HOST_RESOURCE_FAILED')).not.toBe(
+      degradationText('HOST_RESOURCE_UNAVAILABLE'),
+    );
   });
 
   it('falls back to a generic label for unknown or empty codes', () => {

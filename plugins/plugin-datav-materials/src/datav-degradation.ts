@@ -11,14 +11,34 @@ import { DATAV_DEGRADED_COLOR } from './identity.js';
  * 分工：文案映射在这里（物料只负责「拿到错误码后怎么画」），**重试节拍与宿主级错误
  * 计数不在这里**——那属于宿主的轮询控制器。
  *
+ * ## 码表边界（重要，别当成漏映射）
+ *
+ * 物料侧能收到的错误码是**冻结集**（`packages/contracts/src/diagnostics/material-error.ts`
+ * 的 `SCREEN_MATERIAL_ERROR_CODES`，8 个）。更细的宿主码在渲染器边界就被归一了
+ * （`packages/renderer/src/renderer/renderer-host-resource.ts` 的
+ * `normalizeScreenMaterialError`）：
+ *
+ * - `HOST_DATASET_PARAMETER_INVALID`（本地参数求值失败）→ **`HOST_RESOURCE_FAILED`**
+ * - `HOST_DATASET_UNAVAILABLE`（404）→ **`HOST_RESOURCE_FAILED`**
+ * - `HOST_DATASET_VARIABLE_INVALID` → **`HOST_RESOURCE_FAILED`**
+ *
+ * 因此本表把 `HOST_RESOURCE_FAILED` 写成「数据更新失败」而不是「数据源不可用」：
+ * 它实际覆盖「参数错了 / 数据集不存在 / 宿主请求失败」三类原因，「数据源不可用」会
+ * 误导值班员以为是断网。**精确原因由宿主承载**（宿主知道自己发出的请求错在哪，见
+ * `production.status` 变量的文案），物料角标只表达「这块数据不新鲜了」。
+ *
+ * 表里保留那些当前不可达的码不是死代码：冻结集一旦扩展（新增数据集细化码），文案
+ * 立刻生效，不需要回来改物料。
+ *
  * 文案纪律：只用错误码的短文案，不显示 `model.dataState.message`——后者是英文
  * （`'Host dataset request failed.'`），且非冻结 code 的消息已被基座丢弃。
  */
 export const DATAV_DEGRADATION_TEXT: Readonly<Record<string, string>> = {
   HOST_RESOURCE_ACCESS_DENIED: '无访问权限',
   HOST_RESOURCE_UNAVAILABLE: '数据源不可用',
-  HOST_RESOURCE_TIMEOUT: '数据源不可用',
-  HOST_RESOURCE_FAILED: '数据源不可用',
+  HOST_RESOURCE_TIMEOUT: '数据更新超时',
+  // 冻结集里的兜底码：涵盖本地参数非法、数据集 404 与宿主请求失败，故不写成"数据源"。
+  HOST_RESOURCE_FAILED: '数据更新失败',
   HOST_RESOURCE_INVALID: '数据格式异常',
   HOST_DATASET_CATALOG_FAILED: '数据集目录不可用',
   HOST_DATASET_DESCRIPTOR_INVALID: '数据格式异常',
