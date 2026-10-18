@@ -5,10 +5,14 @@ import {
 } from '@base-screen/sdk/designer';
 import { onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
 import { createHostResourcePort } from '../screen/host-data-channel';
+import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { type HostRuntime, loadHostRuntime } from '../screen/host-runtime';
+import { createHostVariableCatalog } from '../screen/host-variable-catalog';
+import { createHostVariablePort } from '../screen/host-variable-port';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
@@ -114,6 +118,8 @@ onMounted(() => {
 
     // 宿主数据通道必须在 configure 内提交：renderer 在 configure 时建立，
     // 之后再赋 `resourcePort` 会被按「初始化后不可更换端口」拒绝。
+    // 三条数据集/变量通道同理一并提交，否则设计器的数据源面板与变量面板会退化。
+    const datasetPort = createHostDatasetPort({ api, logger });
     const configured = element.configure({
       catalog: host.catalog,
       pluginCatalog: host.pluginCatalog,
@@ -124,6 +130,13 @@ onMounted(() => {
       projectAdapter: createRestProjectAdapter(screenId),
       toolMaterialTypes: TOOL_MATERIAL_TYPES,
       resourcePort: createHostResourcePort(),
+      datasetPort,
+      variablePort: createHostVariablePort({
+        clock: () => new Date(),
+        noticeSource: () => datasetPort.snapshot().alarms,
+        logger,
+      }),
+      variableCatalogPort: createHostVariableCatalog(),
       // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。缺了这行，顶栏「编辑 → 成组」
       // 与图层面板的成组按钮都不可用。
       groupMaterialType: 'base.container',

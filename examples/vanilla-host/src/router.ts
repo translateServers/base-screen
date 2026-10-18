@@ -8,10 +8,15 @@ const EDIT_PATTERN = /^#\/screens\/([^/]+)\/edit$/;
 const VIEW_PATTERN = /^#\/screens\/([^/]+)\/view$/;
 
 export function parseRoute(hash: string): Route {
-  if (hash === '' || hash === '#/' || hash === '#') return { name: 'list' };
-  const edit = EDIT_PATTERN.exec(hash);
+  // hash 里可以带查询串（`#/screens/1/view?line=LINE-B`）：先切掉再匹配路由，
+  // 否则查看页的 `?line=` / `?smoke=1` 会把整条路由打成 not-found。
+  // 查询串本身由视图用 `readUrlParams()` 读取（React/Vue 两端同形）。
+  const queryIndex = hash.indexOf('?');
+  const path = queryIndex >= 0 ? hash.slice(0, queryIndex) : hash;
+  if (path === '' || path === '#/' || path === '#') return { name: 'list' };
+  const edit = EDIT_PATTERN.exec(path);
   if (edit?.[1] !== undefined) return { name: 'edit', id: decodeURIComponent(edit[1]) };
-  const view = VIEW_PATTERN.exec(hash);
+  const view = VIEW_PATTERN.exec(path);
   if (view?.[1] !== undefined) return { name: 'view', id: decodeURIComponent(view[1]) };
   return { name: 'not-found' };
 }

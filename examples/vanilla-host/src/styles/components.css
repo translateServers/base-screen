@@ -352,3 +352,24 @@
     animation: none;
   }
 }
+
+/* 查看页顶栏的数据状态 chip：在线=绿、离线=橙。颜色只是辅助，文字本身已带「在线/离线」，
+   因此色觉障碍用户也能读到状态（与屏内 production.status 文案同一套语义）。 */
+.viewer-bar__status {
+  padding: 2px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.viewer-bar__status[data-state="online"] {
+  border-color: rgba(82, 196, 26, 0.45);
+  color: #52c41a;
+}
+
+.viewer-bar__status[data-state="offline"] {
+  border-color: rgba(250, 140, 22, 0.5);
+  color: #fa8c16;
+}
