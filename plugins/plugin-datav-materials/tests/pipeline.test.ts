@@ -70,6 +70,27 @@ describe('layoutPipelineStages', () => {
     const many = layoutPipelineStages({ ...geometry, width: 604, count: 20 });
     expect(many.visible).toBeLessThanOrEqual(few.visible);
   });
+
+  /**
+   * 算法自己的「保槽」不变量：`hidden > 0` 时它按 `visible + 1` 个槽位算节点宽度，
+   * 多出来的那一个槽位就是 `…+N` 收口位。这条断言把该约定钉死——否则一旦有人改成
+   * 按 `visible` 个槽位计算，收口标签就会把最后一个节点挤出画布（`overflow:hidden`
+   * 会让它静默消失，视觉上等于少一道工序）。
+   */
+  it('reserves one node-width slot for the overflow chip when it collapses', () => {
+    for (const [width, count] of [
+      [604 - 16, 12],
+      [800, 12],
+      [1000, 40],
+      [200, 6],
+    ] as const) {
+      const layout = layoutPipelineStages({ ...geometry, width, count });
+      if (layout.hidden === 0) continue;
+
+      const reserved = layout.nodeWidth * (layout.visible + 1) + PIPELINE_NODE_GAP * layout.visible;
+      expect(reserved, `width=${width} count=${count}`).toBeLessThanOrEqual(width);
+    }
+  });
 });
 
 describe('pipeline adapter', () => {

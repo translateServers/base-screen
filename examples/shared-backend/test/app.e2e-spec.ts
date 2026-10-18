@@ -269,4 +269,50 @@ describe('host api (e2e)', () => {
         expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
       });
   });
+
+  /**
+   * 故障注入**只挂在 query 上**（架构 §4.5）：`list` / `describe` 没有 `fail` 字段，
+   * 因此 `?fail=500` 在这两条路由上必须被 `forbidNonWhitelisted` 拒成 400，而不是
+   * 悄悄生效。若将来有人把 `fail` 加进 `ListDatasetsDto`，数据面板会整体空白，
+   * 断言的就不再是「查询失败」而是「面板坏了」——这条断言就是那道护栏。
+   */
+  it('keeps the failure injection off the catalog and definition routes', async () => {
+    await request(app.getHttpServer())
+      .get('/api/datasets')
+      .query({ fail: '500' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+      });
+
+    // 不带开关时同一条 query 必须成功：500 只在 `?fail=500` 下出现。
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A' })
+      .expect(200);
+  });
+
+  /**
+   * 取值域（`limit` 区间）刻意**不**放进 DTO，否则越界会退化成笼统的 `INVALID_REQUEST`，
+   * 而契约承诺的是 `INVALID_LIMIT`。DTO 只做形状校验（是不是整数），区间由 service
+   * 失败关闭地判定。
+   */
+  it('reports out-of-range limits with the domain code, not the shape code', async () => {
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A', limit: 999 })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_LIMIT' });
+      });
+
+    // 形状非法（不是整数）才走 DTO 的 INVALID_REQUEST。
+    await request(app.getHttpServer())
+      .get('/api/datasets/monitor.devices/query')
+      .query({ line: 'LINE-A', limit: 'forty-eight' })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+      });
+  });
 });

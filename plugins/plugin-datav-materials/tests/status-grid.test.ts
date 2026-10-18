@@ -77,6 +77,36 @@ describe('computeStatusGridLayout', () => {
     expect(layout.visible).toBe(layout.capacity);
     expect(layout.visible + layout.hidden).toBe(1000);
   });
+
+  /**
+   * 容量可能被**高度**限住，而不只是宽度：`columns=1` 时 48 台设备排不出 48 行，
+   * 于是出现 `+N`。这条断言守住「一台设备都不能凭空消失」——可见数 + 收口数必须
+   * 恒等于收到条数，否则灯阵会静默漏报设备（比报错更危险）。
+   */
+  it('accounts for every row when the height, not the width, caps the capacity', () => {
+    const narrow = computeStatusGridLayout({ ...base, columns: 1, total: 48 });
+
+    expect(narrow.columns).toBe(1);
+    expect(narrow.capacity).toBeLessThan(48);
+    expect(narrow.visible).toBe(narrow.capacity);
+    expect(narrow.hidden).toBe(48 - narrow.capacity);
+    expect(narrow.visible + narrow.hidden).toBe(48);
+  });
+
+  it('never loses or duplicates rows across the total × columns matrix', () => {
+    for (const total of [0, 1, 47, 48, 49, 70, 500]) {
+      for (const columns of [1, 2, 8, 24]) {
+        const layout = computeStatusGridLayout({ ...base, total, columns });
+
+        expect(layout.visible + layout.hidden, `total=${total} columns=${columns}`).toBe(total);
+        expect(layout.visible).toBe(Math.min(total, layout.capacity));
+        expect(layout.hidden).toBe(Math.max(0, total - layout.capacity));
+        expect(layout.capacity).toBe(layout.columns * layout.rows);
+        // 空表也要有骨架容量（否则空态与有数据态的几何不一致）。
+        expect(layout.capacity).toBeGreaterThanOrEqual(1);
+      }
+    }
+  });
 });
 
 describe('buildStatusLegend', () => {
