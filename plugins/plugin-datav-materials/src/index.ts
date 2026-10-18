@@ -108,6 +108,7 @@ export {
 export {
   clampPercent,
   definePluginDatavWaterLevelMaterial,
+  formatWaterLevelLabel,
   PLUGIN_DATAV_WATER_LEVEL_MANIFEST,
   PluginDatavWaterLevelElement,
 } from './water-level.js';

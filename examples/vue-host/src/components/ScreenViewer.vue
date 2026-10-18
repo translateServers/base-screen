@@ -31,6 +31,8 @@ interface HostObserver {
   isPending(componentId: string): boolean;
   lastFailureAt(): number | undefined;
   isOnline(): boolean;
+  /** 丢弃已不在文档里的组件状态：否则运行期删组件会让顶栏永久停在离线。 */
+  prune(componentIds: Iterable<string>): void;
 }
 
 /**
@@ -109,6 +111,12 @@ function createHostObserver(): HostObserver {
     isPending: (componentId) => (pendingCount.get(componentId) ?? 0) > 0,
     lastFailureAt: () => lastFailureAt,
     isOnline: () => failedComponents().length === 0,
+    prune: (componentIds) => {
+      const alive = new Set(componentIds);
+      for (const componentId of [...outcomeByComponent.keys()]) {
+        if (!alive.has(componentId)) outcomeByComponent.delete(componentId);
+      }
+    },
   };
 }
 
@@ -234,6 +242,8 @@ function onFullscreenChange(): void {
 function tickClock(): void {
   clock.value = formatClock(new Date());
   if (hostObserver === undefined) return;
+  // 与 nextDue 的 prune 同义：文档里已经没有的组件不该继续影响在线判定。
+  if (viewer.value !== null) hostObserver.prune(componentIdsOf(viewer.value));
   const status = hostObserver.status();
   const online = hostObserver.isOnline();
   if (dataOnline.value !== online) dataOnline.value = online;
@@ -375,7 +385,12 @@ onMounted(() => {
 
     if (params.get('smoke') === '1') {
       window.__baseScreenHost = {
-        tickNow: () => controller?.tickNow(),
+        tickNow: () => {
+          controller?.tickNow();
+          if (viewer.value !== null && hostObserver !== undefined) {
+            hostObserver.prune(componentIdsOf(viewer.value));
+          }
+        },
         refreshNow: () => element.refreshData(),
         status: () => tracker.status(),
       };
@@ -403,6 +418,11 @@ onBeforeUnmount(() => {
   screenSessionStore.getState().reset();
   logger.debug('view released');
 });
+
+/** 文档当前组件 id 集合：用于清理 observer 里已消失组件的状态。 */
+function componentIdsOf(element: BaseScreenViewerElement): readonly string[] {
+  return element.document?.components.map((component) => component.id) ?? [];
+}
 
 function formatClock(date: Date): string {
   const pad = (value: number): string => String(value).padStart(2, '0');

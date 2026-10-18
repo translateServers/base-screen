@@ -65,6 +65,8 @@ interface HostObserver {
   isPending(componentId: string): boolean;
   lastFailureAt(): number | undefined;
   isOnline(): boolean;
+  /** 丢弃已不在文档里的组件状态：否则运行期删组件会让顶栏永久停在离线。 */
+  prune(componentIds: Iterable<string>): void;
 }
 
 /**
@@ -149,6 +151,12 @@ function createHostObserver(): HostObserver {
     isPending: (componentId) => (pendingCount.get(componentId) ?? 0) > 0,
     lastFailureAt: () => lastFailureAt,
     isOnline: () => failedComponents().length === 0,
+    prune: (componentIds) => {
+      const alive = new Set(componentIds);
+      for (const componentId of [...outcomeByComponent.keys()]) {
+        if (!alive.has(componentId)) outcomeByComponent.delete(componentId);
+      }
+    },
   };
 }
 
@@ -315,6 +323,8 @@ export function ScreenViewerPage(): React.ReactElement {
 
       // 顶栏 chip 由 1s 的时钟节拍顺带刷新：不在 observer 回调里 setState，避免渲染期写入。
       frameTimer = window.setInterval(() => {
+        // 与 nextDue 的 prune 同义：文档里已经没有的组件不该继续影响在线判定。
+        host.prune(componentIdsOf(element));
         const status = host.status();
         const online = host.isOnline();
         setDataStatus((previous) =>
@@ -328,7 +338,10 @@ export function ScreenViewerPage(): React.ReactElement {
 
       if (params.get('smoke') === '1') {
         window.__baseScreenHost = {
-          tickNow: () => controller?.tickNow(),
+          tickNow: () => {
+            controller?.tickNow();
+            host.prune(componentIdsOf(element));
+          },
           refreshNow: () => element.refreshData(),
           status: () => host.status(),
         };
@@ -474,6 +487,11 @@ function applyUrlSeeds(document: ScreenDocument, params: URLSearchParams): Scree
     return { ...variable, initialValue: value };
   });
   return changed ? { ...document, variables } : document;
+}
+
+/** 文档当前组件 id 集合：用于清理 observer 里已消失组件的状态。 */
+function componentIdsOf(element: BaseScreenViewerElement): readonly string[] {
+  return element.document?.components.map((component) => component.id) ?? [];
 }
 
 function formatClock(date: Date): string {

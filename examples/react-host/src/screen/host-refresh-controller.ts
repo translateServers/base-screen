@@ -73,7 +73,6 @@ export const DEFAULT_REFRESH_INTERVALS: Readonly<Record<string, number>> = {
   'metric.line_load': 15_000,
   'metric.energy_ratio': 60_000,
   'metric.*': 30_000,
-  'resource.demo_metric': 30_000,
   'resource.demo_series': 60_000,
   'resource.demo_ranking': 60_000,
   'resource.*': 30_000,

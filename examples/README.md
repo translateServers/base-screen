@@ -284,10 +284,13 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 | A12 | 三端 smoke（C/E 段）+ 根测试 | 屏上联动走蓝图；HTTP 层 400 由后端 e2e 断言 |
 | A13 | 三端 smoke（E 段） | 成功后注入 500：保留上一帧 + 角标 + 离线 chip（连续两次采样） |
 | A14 | 三端 smoke（D 段） | LINE-C：0 格 + 空文案 + 无角标 + 仍在线 |
-| A15 / A16 / A17 | 根测试（`datav-monitor-document.test.ts`） | 四种 dataSource 全覆盖；非法绑定 → `HOST_DATASET_BINDING_INVALID` |
-| A18 | 根测试 | 每条蓝图规则的 componentId / variableId / eventName 都存在 |
-| A19 | 根测试 + 后端 `screens.service.spec` | 三条种子；四种 dataSource 各 ≥1；6 个变量 |
-| A20 | `pnpm verify:examples` | 三端各自跑同一组断言（tile/节点/行数/请求串一致） |
+| A15 | `plugins/plugin-datav-materials/tests/values.test.ts` | 越界读数不改数：`clampPercent(120)=100`（液面）但对 `formatWaterLevelLabel(120,1)` 断言文本 `120.0%`。PRD 原写 `gauge`，本轮 `gauge` 未实现，由 `water-level` 承载同一条规则 |
+| A15b | `tests/examples/host-variable-port.test.ts` | 单个/多个变量源抛错时逐项回落 `initialValue`，不 reject（整批 `Promise.all` 不因此变 undefined，整屏照常渲染） |
+| A16 / A17 | `plugins/plugin-datav-materials/tests/{status-grid,pipeline}.test.ts` + `tests/best-practices/dataset-material-best-practice.test.ts` | 字段不存在、角色不存在、字段数越界 → `HOST_DATASET_BINDING_INVALID`；根测试只做**正向**校验，负例在物料测试与 best-practices 里 |
+| A18 | `tests/best-practices/dataset-material-best-practice.test.ts`（`dataset binding value type gate`） | 角色 `valueTypes` 不含字段实际类型 → 拒绝：把 `stages` 的 `throughput`(number) 换成 date 字段必须失败，换回 number 必须通过（对照组排除"因别的原因失败"） |
+| A19 | 根测试 `tests/examples/datav-monitor-document.test.ts` + 后端 `screens.service.spec` | 四种 dataSource 各 ≥1（含 6 个 `variable` 组件）、6 个变量、3 条种子 |
+| A20 | `pnpm verify:examples` | 三端各自跑同一组断言，且 tile/节点/行数/请求串完全一致 |
+| （A5/A6 的下游）蓝图规则静态校验 | `tests/examples/datav-monitor-document.test.ts` | 每条规则的 `componentId` / `variableId` / `eventName` 都存在，`eventName` ∈ 该物料 manifest 的 events |
 
 > 未列出的子项（配色对比度、字号、动画节奏等纯视觉项）由人眼验收，不进自动化。
 

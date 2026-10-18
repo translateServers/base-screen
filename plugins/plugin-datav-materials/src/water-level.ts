@@ -130,7 +130,10 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
 
   #paint(model: DatavMaterialModel): void {
     const doc = this.ownerDocument;
-    const percent = clampPercent(readDataValue(model));
+    // 几何用钳制值（液面不能溢出罐体），文本用**原值**（120 就显示 120.0%）：
+    // 越界是"读数超出量程"，不是"读数不存在"——与 status-grid / pipeline 同一约定。
+    const raw = readDataValue(model);
+    const percent = clampPercent(raw);
     const shape: WaterLevelShape = model.props.shape === 'rect' ? 'rect' : 'circle';
 
     const root = doc.createElement('div');
@@ -169,9 +172,7 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
 
     const label = doc.createElement('div');
     label.dataset.datavWaterLabel = '';
-    label.textContent = `${percent.toFixed(
-      Math.max(0, Math.min(3, Math.round(readNumber(model.props.decimals, 1)))),
-    )}%`;
+    label.textContent = formatWaterLevelLabel(raw, readNumber(model.props.decimals, 1));
     // 读数必须压在水体之上：水体与 label 都是绝对定位，append 顺序决定层级。
     // 所以先把水体放进去，再挂 label（早期版本反了，读数被水体整块盖住）。
     label.style.cssText = `position:absolute;inset:0;display:grid;place-items:center;font:600 ${readNumber(model.style.fontSize, 22)}px/1 sans-serif;color:${styleColor(model.style.color, '#e6f1ff')};text-shadow:0 1px 3px rgba(0,0,0,.65);font-variant-numeric:tabular-nums;pointer-events:none;z-index:1;`;
@@ -216,15 +217,29 @@ export class PluginDatavWaterLevelElement extends DatavMaterialElement {
 
 /** 读数归一化到 0..100：非法值按 0 处理，超界钳制而不是溢出容器。 */
 export function clampPercent(value: unknown): number {
+  return Math.max(0, Math.min(100, toFiniteNumber(value)));
+}
+
+/**
+ * 读数文本：**保留原值**（120 → `120.0%`），越界只钳液面、不改读数。
+ *
+ * 为什么与几何分开：`aria-valuenow` 与水体高度必须落在 0..100（meter 语义、容器高度），
+ * 而屏上读数一旦被悄悄改成 100，值班员会以为设备真的跑到上限，反而看不出异常。
+ */
+export function formatWaterLevelLabel(raw: unknown, decimals: number): string {
+  const digits = Math.max(0, Math.min(3, Math.round(decimals)));
+  return `${toFiniteNumber(raw).toFixed(digits)}%`;
+}
+
+/** 读数解析唯一入口：数字或可转成有限数字的字符串，其它一律 0（NaN 是 number，必须判有限性）。 */
+function toFiniteNumber(value: unknown): number {
   const numeric =
     typeof value === 'number'
       ? value
       : typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))
         ? Number(value)
         : 0;
-  // NaN 也是 number，必须先判有限性；否则 Math.min/max 会把它原样传播成 "NaN%"。
-  if (!Number.isFinite(numeric)) return 0;
-  return Math.max(0, Math.min(100, numeric));
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 /** 只读准备态数据；非 ready 状态没有 value 字段，读取一律回落到 undefined。 */

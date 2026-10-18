@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import type { ScreenDatasetField } from '../../packages/contracts/src/index.js';
+import { validateScreenHostResourceBinding } from '../../packages/core/src/index.js';
+import { PLUGIN_DATAV_PIPELINE_MANIFEST } from '../../plugins/plugin-datav-materials/src/pipeline.js';
 import {
   hostedDatasetRankingManifest,
   hostedMaterialPackage,
@@ -88,5 +91,46 @@ describe('dataset material best practice', () => {
       ok: false,
       diagnostics: [{ code: 'HOST_DATASET_BINDING_INVALID' }],
     });
+  });
+});
+
+/**
+ * 角色声明的 `valueTypes` 是一道**类型闸门**，不只是文档字段。
+ *
+ * 真实的坑：工序链把 `throughput`（number）误绑到一个 date 字段上，序列化、canonical 解析、
+ * 静态表校验全部通过——只有基座的 binding 校验能拦住。若这道闸门失效，物料会在 adapter 里
+ * 拿到一个日期字符串当吞吐量，屏上出现"NaN"且没有任何诊断。
+ */
+describe('dataset binding value type gate', () => {
+  const stagesRoles = PLUGIN_DATAV_PIPELINE_MANIFEST.dataBinding?.roles ?? [];
+
+  it('rejects a bound field whose value type is outside the role declaration', () => {
+    const fields: readonly ScreenDatasetField[] = [
+      { id: 'name', label: '工序', valueType: 'string' },
+      { id: 'status', label: '状态', valueType: 'string' },
+      // throughput 位置放一个 date 字段：不在 stages 的 ['string','number'] 里。
+      { id: 'throughput', label: '完成时间', valueType: 'date' },
+    ];
+
+    const rejected = validateScreenHostResourceBinding(
+      { fields: { stages: ['name', 'status', 'throughput'] } },
+      fields,
+      stagesRoles,
+    );
+    expect(rejected.ok).toBe(false);
+    expect(rejected.ok === false ? rejected.diagnostics[0]?.code : undefined).toBe(
+      'HOST_DATASET_BINDING_INVALID',
+    );
+
+    // 对照组：同样的绑定、把类型换回 number 就必须通过（证明拒绝来自类型而不是别的规则）。
+    const compatible = fields.map((field) =>
+      field.id === 'throughput' ? { ...field, valueType: 'number' as const } : field,
+    );
+    const accepted = validateScreenHostResourceBinding(
+      { fields: { stages: ['name', 'status', 'throughput'] } },
+      compatible,
+      stagesRoles,
+    );
+    expect(accepted.ok).toBe(true);
   });
 });

@@ -32,6 +32,8 @@ interface HostObserver {
   isPending(componentId: string): boolean;
   lastFailureAt(): number | undefined;
   isOnline(): boolean;
+  /** 丢弃已不在文档里的组件状态：否则运行期删组件会让顶栏永久停在离线。 */
+  prune(componentIds: Iterable<string>): void;
 }
 
 /**
@@ -110,6 +112,12 @@ function createHostObserver(): HostObserver {
     isPending: (componentId) => (pendingCount.get(componentId) ?? 0) > 0,
     lastFailureAt: () => lastFailureAt,
     isOnline: () => failedComponents().length === 0,
+    prune: (componentIds) => {
+      const alive = new Set(componentIds);
+      for (const componentId of [...outcomeByComponent.keys()]) {
+        if (!alive.has(componentId)) outcomeByComponent.delete(componentId);
+      }
+    },
   };
 }
 
@@ -268,6 +276,8 @@ export const screenView: ViewModule = {
     };
     const clockTimer = window.setInterval(() => {
       clockLabel.textContent = formatClock(new Date());
+      // 与 nextDue 的 prune 同义：文档里已经没有的组件不该继续影响在线判定。
+      if (viewer !== undefined) viewerStatus?.prune(componentIdsOf(viewer));
       paintStatus();
     }, 1000);
     updateFit();
@@ -393,7 +403,10 @@ export const screenView: ViewModule = {
 
     if (params.get('smoke') === '1') {
       window.__baseScreenHost = {
-        tickNow: () => controller?.tickNow(),
+        tickNow: () => {
+          controller?.tickNow();
+          if (viewer !== undefined) hostObserver.prune(componentIdsOf(viewer));
+        },
         refreshNow: () => element.refreshData(),
         status: () => hostObserver.status(),
       };
@@ -403,6 +416,11 @@ export const screenView: ViewModule = {
     return cleanup;
   },
 };
+
+/** 文档当前组件 id 集合：用于清理 observer 里已消失组件的状态。 */
+function componentIdsOf(element: BaseScreenViewerElement): readonly string[] {
+  return element.document?.components.map((component) => component.id) ?? [];
+}
 
 function formatClock(date: Date): string {
   const pad = (value: number): string => String(value).padStart(2, '0');
