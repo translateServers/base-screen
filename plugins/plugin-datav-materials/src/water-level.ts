@@ -9,6 +9,7 @@ import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { DatavMaterialElement, type DatavMaterialModel } from './datav-element.js';
 import { PLUGIN_DATAV_WATER_LEVEL_TAG_NAME, PLUGIN_DATAV_WATER_LEVEL_TYPE } from './identity.js';
 import { readBoolean, readNumber, styleColor } from './json-values.js';
+import { DATAV_SCALAR_VALUE_ADAPTER } from './scalar-adapter.js';
 
 type WaterLevelShape = 'circle' | 'rect';
 
@@ -82,7 +83,7 @@ export const PLUGIN_DATAV_WATER_LEVEL_MANIFEST: BaseScreenMaterialManifest = {
     { prop: 'waveAnimation', label: '波纹动画', control: 'boolean' },
   ],
   events: ['valueClick'],
-  dataCapabilities: ['static', 'dataset', 'variable'],
+  dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
     roles: [
       {
@@ -236,6 +237,10 @@ function wavePath(color: string, offset = 0): string {
   const end = offset + 100;
   return `<path d="M${start} 8 Q${mid - 25} 0 ${mid} 7 T${end} 7 L${end} 12 L${start} 12 Z" fill="${color}" opacity=".85"/>`;
 }
+
+Object.defineProperty(PluginDatavWaterLevelElement, 'tabularDataAdapter', {
+  value: DATAV_SCALAR_VALUE_ADAPTER,
+});
 
 export function definePluginDatavWaterLevelMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry> {
   const definition = createMaterialDefinition({

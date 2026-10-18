@@ -1,4 +1,28 @@
-import * as echarts from 'echarts';
+import { BarChart, LineChart, PieChart } from 'echarts/charts';
+import {
+  GridComponent,
+  LegendComponent,
+  TitleComponent,
+  TooltipComponent,
+} from 'echarts/components';
+import * as echarts from 'echarts/core';
+import { CanvasRenderer } from 'echarts/renderers';
+
+/**
+ * 按需注册而不是 `import * from 'echarts'`：示例只需要四种图型与基础交互，
+ * 整包会把地图、关系图、3D 等全部打进宿主产物。tree-shaken 后只保留
+ * line/bar/pie + grid/legend/title/tooltip + canvas 渲染器。
+ */
+echarts.use([
+  LineChart,
+  BarChart,
+  PieChart,
+  GridComponent,
+  LegendComponent,
+  TitleComponent,
+  TooltipComponent,
+  CanvasRenderer,
+]);
 
 // 第三方类型只出现在本文件内部：对外只暴露 handle 接口与 JSON-safe 载荷。
 type ChartOption = Parameters<ReturnType<typeof echarts.init>['setOption']>[0];

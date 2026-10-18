@@ -55,10 +55,18 @@ host-api/
 | `PUT /api/screens/:id` | `{ document, revision }` | `{ screen: Screen }`（revision+1） | `404 NOT_FOUND` / `409 REVISION_CONFLICT` / `400 DOCUMENT_INVALID` |
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
 | `GET /api/metrics/series?metric=cpu_usage&points=24` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
+| `GET /api/metrics/ranking?dimension=region&limit=6` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
 
 `Screen = { id, name, revision, document, createdAt, updatedAt }`（时间为 ISO 字符串）。
 错误体统一 `{ error, message }`。指标目录：`cpu_usage`（%）、`memory_usage`（%）、
-`request_rate`（req/s）；`points` 为 1..120 的整数，默认 24。
+`request_rate`（req/s），以及 DataV 种子使用的 `sales_total`（万元）、`order_count`（单）、
+`visitor_count`（人）、`conversion_rate`（%）、`target_completion`（%）、
+`service_satisfaction`（%）、`member_repurchase`（%）；`points` 为 1..120 的整数，默认 24。
+排行固定为 `region`（6 个区域）与 `channel`（4 个渠道），`limit` 为 1..20，默认 6。
+
+空库播种两条记录：「默认销售大屏」是 50+ 组件的 DataV 风格成品文档，「系统监控大屏」保留
+原来的最小卡片文档（覆盖宿主自有物料路径）。种子只在空库执行；本地想重新播种时删除
+`data/screens.db` 后重启，或直接跑冒烟脚本（它使用独立库并自动迁移）。
 
 `GET /api/docs` 提供 OpenAPI 文档（Swagger UI）。
 

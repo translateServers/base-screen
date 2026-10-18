@@ -1,25 +1,15 @@
 import type React from 'react';
-import { useNavigate } from 'react-router-dom';
 
-/** 应用外壳：顶栏（品牌 + 返回列表）+ 主区域。高度链由 CSS 保证。 */
+/** 应用外壳：顶栏（品牌 + 运行环境标记）+ 主区域。高度链由 CSS 保证。
+ *  列表页已经是根路由，「返回列表」在这里没有去处，因此不放按钮。 */
 export function AppShell({ children }: { readonly children: React.ReactNode }): React.ReactElement {
-  const navigate = useNavigate();
   return (
     <div className="shell">
       <header className="shell__header">
-        <a
-          className="shell__brand"
-          href="#/"
-          onClick={(event) => {
-            event.preventDefault();
-            navigate('/');
-          }}
-        >
-          大屏管家 · React
+        <a className="shell__brand" href="#/">
+          BASE SCREEN <span className="shell__brand-mark">/</span> 数据可视化
         </a>
-        <button type="button" className="button" onClick={() => navigate('/')}>
-          返回列表
-        </button>
+        <span className="shell__meta">REACT 19 · ENGINE EMBEDDED</span>
       </header>
       <main className="shell__content">
         <div className="shell__main">{children}</div>

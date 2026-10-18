@@ -11,7 +11,7 @@ import type { Screen } from '../generated/prisma-client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { ScreenShape, ScreenSummaryShape } from './screen.types';
 import { validateScreenDocumentInput } from './screen-document-guard';
-import { SEED_SCREEN_NAMES, serializeStarterDocument } from './starter-document';
+import { SEED_SCREENS, serializeStarterDocument } from './starter-document';
 
 @Injectable()
 export class ScreensService implements OnModuleInit {
@@ -26,7 +26,10 @@ export class ScreensService implements OnModuleInit {
     const count = await this.prisma.screen.count();
     if (count > 0) return;
     await this.prisma.screen.createMany({
-      data: SEED_SCREEN_NAMES.map((name) => ({ name, document: serializeStarterDocument() })),
+      data: SEED_SCREENS.map((screen) => ({
+        name: screen.name,
+        document: screen.serialize(),
+      })),
     });
   }
 

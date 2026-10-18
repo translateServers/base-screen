@@ -23,14 +23,16 @@ src/
 │   ├── api.ts                  # Result 风格 fetch 封装：统一错误体、GET 幂等重试、AbortSignal
 │   ├── logger.ts / format.ts / toast.ts
 ├── screen/
-│   ├── register.ts             # 设计器/查看器/官方物料/自有物料注册（公开入口，幂等）
+│   ├── register.ts             # 同步元素注册：设计器/查看器/官方全量物料/自有物料/插件元素
+│   ├── host-runtime.ts         # 插件 manager 激活 + catalog 合并 + 插件命令端口
+│   ├── host-resource-plugin.ts # 三个 dataResourceType 贡献（demo_metric/series/ranking）
 │   ├── metric-value.ts             # 三端共有的「指标读数」manifest
 │   ├── metric-value-material.ts    # Vue 桥（createVueMaterialDefinition + mapModel + 表格适配）
 │   ├── project-adapter.ts      # 宿主项目适配器：load/save，宿主维护 revision
-│   └── host-data-channel.ts    # resourcePort：host-resource -> /api/metrics/series
+│   └── host-data-channel.ts    # resourcePort：标量/时序/排行三种投影
 ├── components/                 # AppShell / ScreenList / ScreenEditor / ScreenViewer /
 │                               # ErrorBanner / SkeletonGrid / MetricValue(SFC 物料)
-└── styles/                     # base（令牌）/ layout（响应式外壳）/ components（含 .metric-value）
+└── styles/                     # base（令牌）/ layout（响应式外壳 + 查看器缩放）/ components
 ```
 
 ## 技术选型理由
@@ -42,14 +44,15 @@ src/
 | zustand（`zustand/vanilla`）+ composable 桥接 | store 不依赖 Vue，与另两端同源同一套迁移语义；composable 用 `shallowRef` 同步快照，组件照常模板消费 |
 | `shallowRef` 持有设计器 | 自定义元素内部状态无需 Vue 响应式代理（引擎内部持有自己的状态，代理只会增加开销） |
 | 物料样式写在应用样式表 | Vue 桥接会把文档全局样式规则传播进设计器 shadow root，SFC 物料样式随 `src/styles/components.css` 生效（React 桥接无此能力，故那边用内联样式） |
+| 外围插件作为物料来源 | DataV 四件套 / 胶囊进度 / 滚动字幕来自 `plugin-datav-materials`，图表来自 `plugin-echarts`；宿主只注册元素并合并 manager 的 snapshot，不在示例里重写一套图表与动效 |
 | vue-tsc + TypeScript 5.9.3 | SFC 类型检查；版本与仓库其余工程及工具链对齐（根仓 TS 7 尚未被该工具链支持） |
 
 ## 运行
 
 ```bash
 pnpm install                                        # 仓库根（首次）
-pnpm dev:host-api                                   # 终端 1：共享后端 :3000
-pnpm dev:host-app-vue                               # 终端 2：本前端 :5175（/api 代理到后端）
+pnpm dev:shared-backend                             # 终端 1：共享后端 :3000
+pnpm dev:vue-host                                   # 终端 2：本前端 :5175（/api 代理到后端）
 ```
 
 - 列表页 `/`：新建 / 编辑 / 查看 / 删除

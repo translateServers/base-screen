@@ -24,6 +24,12 @@ export const PLUGIN_DATAV_WATER_LEVEL_TAG_NAME = 'base-screen-datav-water-level'
 export const PLUGIN_DATAV_BORDER_BOX_TYPE = 'datav.border-box';
 export const PLUGIN_DATAV_BORDER_BOX_TAG_NAME = 'base-screen-datav-border-box';
 
+export const PLUGIN_DATAV_CAPSULE_PROGRESS_TYPE = 'datav.capsule-progress';
+export const PLUGIN_DATAV_CAPSULE_PROGRESS_TAG_NAME = 'base-screen-datav-capsule-progress';
+
+export const PLUGIN_DATAV_MARQUEE_TYPE = 'datav.marquee';
+export const PLUGIN_DATAV_MARQUEE_TAG_NAME = 'base-screen-datav-marquee';
+
 /** 本插件自己的检查器控件：装饰边框的样式选择器，经 editorDescriptor 的 `control: 'custom'` 授权使用。 */
 export const PLUGIN_DATAV_BORDER_PICKER_ID = 'base-screen.datav.border-style-picker';
 export const PLUGIN_DATAV_BORDER_PICKER_TAG_NAME = 'base-screen-datav-border-picker';

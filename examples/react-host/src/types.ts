@@ -27,3 +27,14 @@ export interface MetricSeries {
   readonly unit: string;
   readonly points: readonly MetricPoint[];
 }
+
+export interface RankingItem {
+  readonly name: string;
+  readonly value: number;
+}
+
+export interface MetricRanking {
+  readonly dimension: string;
+  readonly unit: string;
+  readonly items: readonly RankingItem[];
+}

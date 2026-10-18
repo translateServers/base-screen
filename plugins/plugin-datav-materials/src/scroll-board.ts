@@ -105,7 +105,7 @@ export const PLUGIN_DATAV_SCROLL_BOARD_MANIFEST: BaseScreenMaterialManifest = {
     { prop: 'autoScroll', label: '自动轮播', control: 'boolean' },
   ],
   events: ['rowClick'],
-  dataCapabilities: ['static', 'dataset', 'variable'],
+  dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
     roles: [
       {
@@ -275,47 +275,48 @@ export class PluginDatavScrollBoardElement extends DatavMaterialElement {
   }
 }
 
-const PLUGIN_DATAV_SCROLL_BOARD_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDataAdapter = {
-  adapt({
-    dataset,
-    fields,
-  }: {
-    readonly dataset: ScreenTabularDataset;
-    readonly fields: Readonly<Record<string, readonly ScreenDatasetField[]>>;
-  }) {
-    const columns = fields.columns;
-    if (columns === undefined || columns.length === 0) {
+export const PLUGIN_DATAV_SCROLL_BOARD_TABULAR_DATA_ADAPTER: BaseScreenMaterialTabularDataAdapter =
+  {
+    adapt({
+      dataset,
+      fields,
+    }: {
+      readonly dataset: ScreenTabularDataset;
+      readonly fields: Readonly<Record<string, readonly ScreenDatasetField[]>>;
+    }) {
+      const columns = fields.columns;
+      if (columns === undefined || columns.length === 0) {
+        return {
+          ok: false,
+          diagnostics: [
+            {
+              severity: 'error',
+              code: 'HOST_DATASET_BINDING_INVALID',
+              path: [],
+              message: 'Scroll board dataset binding is invalid.',
+            },
+          ],
+        };
+      }
       return {
-        ok: false,
-        diagnostics: [
-          {
-            severity: 'error',
-            code: 'HOST_DATASET_BINDING_INVALID',
-            path: [],
-            message: 'Scroll board dataset binding is invalid.',
-          },
-        ],
+        ok: true,
+        value: {
+          columns: columns.map((field) => ({
+            id: field.id,
+            label: field.label,
+            valueType: field.valueType,
+            sortable: false,
+            filterable: false,
+          })),
+          rows: dataset.rows.map((row) =>
+            Object.fromEntries(columns.map((field) => [field.id, row[field.id] ?? null])),
+          ),
+          ...(dataset.totalRowCount === undefined ? {} : { totalRowCount: dataset.totalRowCount }),
+        },
+        diagnostics: [],
       };
-    }
-    return {
-      ok: true,
-      value: {
-        columns: columns.map((field) => ({
-          id: field.id,
-          label: field.label,
-          valueType: field.valueType,
-          sortable: false,
-          filterable: false,
-        })),
-        rows: dataset.rows.map((row) =>
-          Object.fromEntries(columns.map((field) => [field.id, row[field.id] ?? null])),
-        ),
-        ...(dataset.totalRowCount === undefined ? {} : { totalRowCount: dataset.totalRowCount }),
-      },
-      diagnostics: [],
-    };
-  },
-};
+    },
+  };
 
 Object.defineProperty(PluginDatavScrollBoardElement, 'tabularDataAdapter', {
   value: PLUGIN_DATAV_SCROLL_BOARD_TABULAR_DATA_ADAPTER,

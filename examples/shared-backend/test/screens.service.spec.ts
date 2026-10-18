@@ -72,7 +72,21 @@ describe('ScreensService', () => {
     const argument = prisma.screen.createMany.mock.calls[0]?.[0];
     const seeded = (argument?.data ?? []) as { name: string; document: string }[];
     expect(seeded.map((item) => item.name)).toEqual(['默认销售大屏', '系统监控大屏']);
-    expect(JSON.parse(seeded[0]!.document)).toMatchObject({ canvas: { width: 1920 } });
+    const demo = JSON.parse(seeded[0]!.document) as {
+      canvas: { width: number; height: number };
+      components: Array<{ type: string }>;
+    };
+    const starter = JSON.parse(seeded[1]!.document) as {
+      components: Array<{ type: string }>;
+    };
+    expect(demo.canvas).toMatchObject({ width: 1920, height: 1080 });
+    // 成品文档是 DataV 版式：约 50 个组件，含四类插件物料与宿主读数。
+    expect(demo.components.length).toBeGreaterThan(40);
+    expect(demo.components.filter((item) => item.type === 'datav.digital-flop')).toHaveLength(4);
+    expect(demo.components.some((item) => item.type === 'plugin.echarts')).toBe(true);
+    expect(demo.components.some((item) => item.type === 'datav.scroll-board')).toBe(true);
+    // 第二个种子保留最小卡片文档，继续覆盖宿主自有物料这条路径。
+    expect(starter.components.some((item) => item.type === 'host-app.metric-value')).toBe(true);
   });
 
   it('does not seed when the database already has rows', async () => {

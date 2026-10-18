@@ -8,6 +8,7 @@ import {
   type EchartsChartHandle,
   type EchartsSeriesClickPayload,
 } from './chart-adapter.js';
+import { PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER } from './chart-data-adapter.js';
 import { buildPluginEchartsOption } from './chart-option.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from './manifest.js';
 
@@ -16,6 +17,7 @@ export class PluginEchartsElement extends HTMLElement {
 
   #model: BaseScreenMaterialModel | undefined;
   #handle: EchartsChartHandle | undefined;
+  #resizeObserver: ResizeObserver | undefined;
 
   get model(): BaseScreenMaterialModel {
     if (this.#model === undefined) {
@@ -34,6 +36,8 @@ export class PluginEchartsElement extends HTMLElement {
   }
 
   disconnectedCallback(): void {
+    this.#resizeObserver?.disconnect();
+    this.#resizeObserver = undefined;
     this.#handle?.dispose();
     this.#handle = undefined;
   }
@@ -65,6 +69,7 @@ export class PluginEchartsElement extends HTMLElement {
         seriesType: readString(model.props.seriesType, 'line'),
         textColor: readString(model.style.color, '#f9fafb'),
         gridColor: readString(model.style.gridColor, '#374151'),
+        seriesColor: readString(model.style.seriesColor, '#38bdf8'),
       }),
     );
   }
@@ -80,6 +85,12 @@ export class PluginEchartsElement extends HTMLElement {
     const handle = createEchartsChartHandle(host);
     handle.onSeriesClick((payload) => this.#emitSeriesClick(payload));
     this.#handle = handle;
+    // 设计器里改尺寸只改宿主盒，canvas 不会自己跟着变；观察自身尺寸后显式 resize。
+    const ResizeObserverCtor = this.ownerDocument.defaultView?.ResizeObserver;
+    if (ResizeObserverCtor !== undefined) {
+      this.#resizeObserver = new ResizeObserverCtor(() => this.#handle?.resize());
+      this.#resizeObserver.observe(this);
+    }
     return handle;
   }
 
@@ -109,3 +120,9 @@ export class PluginEchartsElement extends HTMLElement {
 function readString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
+
+// 管理器按 tagName 反查构造函数时会读取这个静态属性；没有它，图表物料在
+// host-resource / dataset 绑定下会在候选阶段被拒（adapter 根本轮不到执行）。
+Object.defineProperty(PluginEchartsElement, 'tabularDataAdapter', {
+  value: PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER,
+});

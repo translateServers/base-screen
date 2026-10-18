@@ -4,6 +4,7 @@ import {
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { PLUGIN_DATAV_BORDER_BOX_MANIFEST } from '../src/border-box.js';
+import { PLUGIN_DATAV_CAPSULE_PROGRESS_MANIFEST } from '../src/capsule-progress.js';
 import { PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST } from '../src/digital-flop.js';
 import {
   DATAV_BORDER_STYLES,
@@ -11,16 +12,22 @@ import {
   PLUGIN_DATAV_BORDER_BOX_TYPE,
   PLUGIN_DATAV_BORDER_PICKER_ID,
   PLUGIN_DATAV_BORDER_PICKER_TAG_NAME,
+  PLUGIN_DATAV_CAPSULE_PROGRESS_TAG_NAME,
+  PLUGIN_DATAV_CAPSULE_PROGRESS_TYPE,
   PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID,
   PLUGIN_DATAV_DIGITAL_FLOP_TAG_NAME,
   PLUGIN_DATAV_DIGITAL_FLOP_TYPE,
   PLUGIN_DATAV_ID,
+  PLUGIN_DATAV_MARQUEE_TAG_NAME,
+  PLUGIN_DATAV_MARQUEE_TYPE,
   PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME,
   PLUGIN_DATAV_SCROLL_BOARD_TYPE,
   PLUGIN_DATAV_WATER_LEVEL_TAG_NAME,
   PLUGIN_DATAV_WATER_LEVEL_TYPE,
 } from '../src/identity.js';
+import { PLUGIN_DATAV_MARQUEE_MANIFEST } from '../src/marquee.js';
 import { createPluginDatavRuntime } from '../src/plugin.js';
+import { DATAV_SCALAR_VALUE_ADAPTER, DATAV_TEXT_VALUE_ADAPTER } from '../src/scalar-adapter.js';
 import { PLUGIN_DATAV_SCROLL_BOARD_MANIFEST } from '../src/scroll-board.js';
 import { PLUGIN_DATAV_WATER_LEVEL_MANIFEST } from '../src/water-level.js';
 
@@ -29,6 +36,8 @@ const MANIFESTS = [
   PLUGIN_DATAV_SCROLL_BOARD_MANIFEST,
   PLUGIN_DATAV_WATER_LEVEL_MANIFEST,
   PLUGIN_DATAV_BORDER_BOX_MANIFEST,
+  PLUGIN_DATAV_CAPSULE_PROGRESS_MANIFEST,
+  PLUGIN_DATAV_MARQUEE_MANIFEST,
 ];
 
 describe('plugin-datav-materials manifests', () => {
@@ -50,6 +59,8 @@ describe('plugin-datav-materials manifests', () => {
       [PLUGIN_DATAV_SCROLL_BOARD_TYPE, PLUGIN_DATAV_SCROLL_BOARD_TAG_NAME],
       [PLUGIN_DATAV_WATER_LEVEL_TYPE, PLUGIN_DATAV_WATER_LEVEL_TAG_NAME],
       [PLUGIN_DATAV_BORDER_BOX_TYPE, PLUGIN_DATAV_BORDER_BOX_TAG_NAME],
+      [PLUGIN_DATAV_CAPSULE_PROGRESS_TYPE, PLUGIN_DATAV_CAPSULE_PROGRESS_TAG_NAME],
+      [PLUGIN_DATAV_MARQUEE_TYPE, PLUGIN_DATAV_MARQUEE_TAG_NAME],
     ];
     expect(MANIFESTS.map((manifest) => [manifest.type, manifest.tagName])).toEqual(expected);
   });
@@ -112,9 +123,11 @@ describe('plugin-datav-materials runtime', () => {
     expect(runtime.manifest.id).toBe(PLUGIN_DATAV_ID);
   });
 
-  it('declares four materials, one inspector control and one command', () => {
+  it('declares six materials, one inspector control and one command', () => {
     const runtime = createPluginDatavRuntime();
     expect(runtime.manifest.contributions.map((item) => item.kind)).toEqual([
+      'material',
+      'material',
       'material',
       'material',
       'material',
@@ -234,5 +247,49 @@ describe('plugin-datav-materials runtime', () => {
     expect(result?.ok === false ? result.diagnostics[0]?.code : undefined).toBe(
       'PLUGIN_CORE_COMMAND_ARGUMENT_INVALID',
     );
+  });
+});
+
+describe('datav tabular adapters', () => {
+  const numberField = { id: 'value', label: '当前值', valueType: 'number' as const };
+
+  it('projects the first row into a scalar number', () => {
+    const result = DATAV_SCALAR_VALUE_ADAPTER.adapt({
+      dataset: { fields: [numberField], rows: [{ value: 42.5 }, { value: 7 }] },
+      fields: { value: [numberField] },
+    });
+    expect(result.ok).toBe(true);
+    // 标量物料直接读 dataState.value，因此投影必须是数字本身，不能再包一层。
+    expect(result.ok ? result.value : undefined).toBe(42.5);
+  });
+
+  it('accepts numeric strings and rejects non-numeric values', () => {
+    const stringField = { id: 'value', label: '当前值', valueType: 'string' as const };
+    const accepted = DATAV_SCALAR_VALUE_ADAPTER.adapt({
+      dataset: { fields: [stringField], rows: [{ value: '88.5' }] },
+      fields: { value: [stringField] },
+    });
+    expect(accepted.ok ? accepted.value : undefined).toBe(88.5);
+
+    const rejected = DATAV_SCALAR_VALUE_ADAPTER.adapt({
+      dataset: { fields: [stringField], rows: [{ value: 'n/a' }] },
+      fields: { value: [stringField] },
+    });
+    expect(rejected.ok).toBe(false);
+    expect(rejected.ok === false ? rejected.diagnostics[0]?.code : undefined).toBe(
+      'HOST_DATASET_BINDING_INVALID',
+    );
+  });
+
+  it('joins every row for text materials such as the marquee', () => {
+    const nameField = { id: 'name', label: '区域', valueType: 'string' as const };
+    const result = DATAV_TEXT_VALUE_ADAPTER.adapt({
+      dataset: {
+        fields: [nameField],
+        rows: [{ name: '华东' }, { name: '华南' }, { name: null }],
+      },
+      fields: { value: [nameField] },
+    });
+    expect(result.ok ? result.value : undefined).toBe('华东 · 华南');
   });
 });

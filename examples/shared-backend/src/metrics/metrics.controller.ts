@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { MetricsQueryDto } from './dto/metrics-query.dto';
-import type { MetricSeries } from './metrics.service';
+import { MetricsQueryDto, RankingQueryDto } from './dto/metrics-query.dto';
+import type { MetricRanking, MetricSeries } from './metrics.service';
 import { MetricsService } from './metrics.service';
 
 @ApiTags('metrics')
@@ -13,5 +13,11 @@ export class MetricsController {
   @ApiOperation({ summary: '确定性 mock 指标时序（同参数同结果）' })
   series(@Query() query: MetricsQueryDto): MetricSeries {
     return this.metrics.series(query.metric, query.points);
+  }
+
+  @Get('ranking')
+  @ApiOperation({ summary: '确定性区域/渠道排行（供图表与轮播列表消费）' })
+  ranking(@Query() query: RankingQueryDto): MetricRanking {
+    return this.metrics.ranking(query.dimension, query.limit);
   }
 }

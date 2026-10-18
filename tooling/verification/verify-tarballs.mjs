@@ -13,6 +13,7 @@ import { basename, dirname, join, relative } from 'node:path';
 import { PACKAGE_DEFINITIONS } from '../checks/packages.mjs';
 import { writeHostAppVueTarballConsumerFiles } from '../consumer-files/host-app-vue-consumer-files.mjs';
 import {
+  writeHoistedInstallConfig,
   writeTarballConsumerFiles,
   writeVanillaTarballConsumerFiles,
 } from '../consumer-files/tarball-consumer-files.mjs';
@@ -70,8 +71,8 @@ function packageDirectoryByName(name) {
   )?.[0];
 }
 
-function workspaceDependencyDirectories(directory) {
-  const manifest = JSON.parse(readFileSync(join('packages', directory, 'package.json'), 'utf8'));
+function readWorkspaceDependencyDirectories(manifestPath) {
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   return Object.keys({
     ...manifest.dependencies,
     ...manifest.peerDependencies,
@@ -81,8 +82,16 @@ function workspaceDependencyDirectories(directory) {
     .filter((candidate) => candidate !== undefined);
 }
 
-function patchWorkspaceDependencySpecs(directory, tarball) {
-  const dependencies = workspaceDependencyDirectories(directory);
+function workspaceDependencyDirectories(directory) {
+  return readWorkspaceDependencyDirectories(join('packages', directory, 'package.json'));
+}
+
+function patchWorkspaceDependencySpecs(
+  directory,
+  tarball,
+  manifestFile = join('packages', directory, 'package.json'),
+) {
+  const dependencies = readWorkspaceDependencyDirectories(manifestFile);
   if (dependencies.length === 0) {
     return tarball;
   }
@@ -247,7 +256,17 @@ function verifyHostAppVueTarballConsumer() {
   assertConsumerIsolation(
     consumer,
     'vue-host',
-    ['contracts', 'material', 'plugin-core', 'plugin-sdk', 'sdk', 'vue'],
+    [
+      'contracts',
+      'material',
+      'plugin-core',
+      'plugin-sdk',
+      'plugin-datav-materials',
+      'plugin-echarts',
+      'plugin-manager',
+      'sdk',
+      'vue',
+    ],
     ['react', 'react-dom'],
   );
   run('pnpm', ['run', 'typecheck'], consumer);
@@ -258,6 +277,9 @@ function verifyHostAppVueTarballConsumer() {
 const root = process.cwd();
 const temporaryRoot = mkdtempSync(join(tmpdir(), 'base-screen-tarballs-'));
 const packedTarballs = new Map();
+// 外围插件不在 packages 固定清单里，但 Vue 宿主会消费它们；外部消费者改写
+// `@base-screen/plugin-*` 依赖时必须能解析到同批次 tarball。
+const PLUGIN_TARBALL_DIRECTORIES = ['plugin-datav-materials', 'plugin-echarts'];
 
 try {
   for (const directory of packageBuildOrder()) {
@@ -282,6 +304,7 @@ try {
     const installTarball = patchWorkspaceDependencySpecs(directory, tarball);
     packedTarballs.set(directory, installTarball);
     const consumer = mkdtempSync(join(temporaryRoot, `${directory}-consumer-`));
+    writeHoistedInstallConfig(consumer);
     writeFileSync(
       join(consumer, 'package.json'),
       `${JSON.stringify(
@@ -479,6 +502,26 @@ if (controller.phase !== 'ready' || controller.dirty) {
     await import(`node:fs/promises`).then(({ writeFile }) => writeFile(smoke, smokeSource, 'utf8'));
     run('node', [smoke], consumer);
   }
+
+  for (const directory of PLUGIN_TARBALL_DIRECTORIES) {
+    const pluginDirectory = join(root, 'plugins', directory);
+    const packageTarballs = join(temporaryRoot, directory);
+    mkdirSync(packageTarballs, { recursive: true });
+    run('pnpm', ['pack', '--pack-destination', packageTarballs], pluginDirectory);
+    const tarballName = readdirSync(packageTarballs).find((name) => name.endsWith('.tgz'));
+    if (!tarballName) {
+      throw new Error(`TARBALL_MISSING: ${directory}`);
+    }
+    const tarball = join(packageTarballs, tarballName);
+    assertTarballContents(tarball);
+    const installTarball = patchWorkspaceDependencySpecs(
+      directory,
+      tarball,
+      join(pluginDirectory, 'package.json'),
+    );
+    packedTarballs.set(directory, installTarball);
+  }
+
   verifyVanillaTarballConsumer();
   verifyBridgeTarballConsumer('react');
   verifyBridgeTarballConsumer('vue');

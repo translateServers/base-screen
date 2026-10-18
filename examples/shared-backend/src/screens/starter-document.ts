@@ -1,3 +1,4 @@
+import { serializeDatavDemoDocument } from './datav-demo-document';
 import { validateScreenDocumentInput } from './screen-document-guard';
 
 /**
@@ -128,8 +129,20 @@ const STARTER_DOCUMENT = {
   blueprint: { rules: [] },
 } as const;
 
-/** 空库播种的初始大屏名称。 */
-export const SEED_SCREEN_NAMES: readonly string[] = ['默认销售大屏', '系统监控大屏'];
+/**
+ * 空库播种的两条记录：
+ * - 「默认销售大屏」是 DataV 风格的成品文档，打开即可看到完整大屏；
+ * - 「系统监控大屏」保留轻量卡片文档，用于演示最小宿主物料与旧文档兼容。
+ *
+ * `create()` 仍只发轻量卡片：新建大屏从一张空白画布开始，成品只作为种子。
+ */
+export const SEED_SCREENS: readonly {
+  readonly name: string;
+  readonly serialize: () => string;
+}[] = [
+  { name: '默认销售大屏', serialize: serializeDatavDemoDocument },
+  { name: '系统监控大屏', serialize: serializeStarterDocument },
+];
 
 /**
  * 起始文档的序列化文本。启动期即执行结构校验：起始文档写错时立刻失败，

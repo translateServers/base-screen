@@ -9,12 +9,30 @@ import { IsInt, IsNotEmpty, IsOptional, IsString } from 'class-validator';
  * `UNKNOWN_METRIC` 与 `INVALID_POINTS`，由 Service 失败关闭地抛出；DTO 只负责
  * "是不是字符串/整数"这类形状问题（那类问题归一为 INVALID_REQUEST）。
  */
-export const METRIC_IDS = ['cpu_usage', 'memory_usage', 'request_rate'] as const;
+export const METRIC_IDS = [
+  'cpu_usage',
+  'memory_usage',
+  'request_rate',
+  'sales_total',
+  'order_count',
+  'visitor_count',
+  'conversion_rate',
+  'target_completion',
+  'service_satisfaction',
+  'member_repurchase',
+] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];
 
 export const MAX_SERIES_POINTS = 120;
 export const DEFAULT_SERIES_POINTS = 24;
+
+export const RANKING_DIMENSIONS = ['region', 'channel'] as const;
+
+export type RankingDimension = (typeof RANKING_DIMENSIONS)[number];
+
+export const MAX_RANKING_LIMIT = 20;
+export const DEFAULT_RANKING_LIMIT = 6;
 
 export class MetricsQueryDto {
   @ApiProperty({ enum: METRIC_IDS, description: '指标 ID' })
@@ -33,4 +51,23 @@ export class MetricsQueryDto {
   @Type(() => Number)
   @IsInt()
   points?: number;
+}
+
+export class RankingQueryDto {
+  @ApiProperty({ enum: RANKING_DIMENSIONS, description: '排行维度' })
+  @IsString()
+  @IsNotEmpty()
+  dimension!: string;
+
+  @ApiProperty({
+    required: false,
+    default: DEFAULT_RANKING_LIMIT,
+    minimum: 1,
+    maximum: MAX_RANKING_LIMIT,
+    description: '返回条数，省略时取默认值',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  limit?: number;
 }

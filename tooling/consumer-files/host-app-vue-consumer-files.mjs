@@ -16,6 +16,8 @@ import { join } from 'node:path';
  * "包 ABI 或前端接入"上。
  */
 export function writeHostAppVueTarballConsumerFiles(consumer, tarballSpec, root) {
+  // 与 bridge/vanilla 消费者同一原因：Windows 无符号链接权限时 isolated 布局会静默失败。
+  writeFileSync(join(consumer, 'pnpm-workspace.yaml'), 'nodeLinker: hoisted\n');
   const example = join(root, 'examples', 'vue-host');
   // 复制除安装/构建产物外的全部工程文件（含 SFC、vite 配置、样式）。
   cpSync(example, consumer, {

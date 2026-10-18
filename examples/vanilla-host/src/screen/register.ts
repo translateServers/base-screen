@@ -1,65 +1,76 @@
+import type { ScreenParseResult } from '@base-screen/contracts';
 import {
+  defineBaseScreenChartMaterial,
   defineBaseScreenContainerMaterial,
+  defineBaseScreenEllipseMaterial,
+  defineBaseScreenImageMaterial,
   defineBaseScreenRectangleMaterial,
   defineBaseScreenRuleMaterial,
+  defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
 import type {
-  BaseScreenMaterialCatalog,
+  BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
 } from '@base-screen/plugin-core';
-import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import { registerPluginDatavMaterials } from '@base-screen/plugin-datav-materials';
+import { registerPluginEcharts } from '@base-screen/plugin-echarts';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
 import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
 import { METRIC_VALUE_MANIFEST } from './metric-value';
 import { MetricValueElement } from './metric-value-element';
 
-let cached: BaseScreenMaterialCatalog | undefined;
+let cached: readonly BaseScreenMaterialCatalogEntry[] | undefined;
 
 /**
- * 注册入口（幂等）：设计器 / 查看器自定义元素、官方物料、宿主自有指标读数。
- * 全部走公开入口，不触碰私有 API；返回给 configure 使用的 catalog。
- *
- * `base.container` 与 `base.rule` 是组合的组成部分：容器 `libraryVisible: false`，因此不进物料库，
- * 但编组（`groupMaterialType`）与组合分片的 shell 都要求在 catalog 里能解析到它。
+ * 同步注册入口（幂等）：设计器 / 查看器自定义元素、官方全量物料、宿主自有指标读数、
+ * 两个外围插件物料。必须先于 `loadHostRuntime()`：manager preflight 会按 tagName
+ * 从 `customElements` 反查构造函数。
  */
-export function registerHostMaterials(): BaseScreenMaterialCatalog {
+export function registerHostMaterials(): readonly BaseScreenMaterialCatalogEntry[] {
   if (cached !== undefined) return cached;
 
-  const designer = defineBaseScreenDesigner();
-  if (!designer.ok)
-    throw new Error(`HOST_DESIGNER_DEFINITION_FAILED:${designer.diagnostics[0]?.code}`);
-  const viewer = defineBaseScreenViewer();
-  if (!viewer.ok) throw new Error(`HOST_VIEWER_DEFINITION_FAILED:${viewer.diagnostics[0]?.code}`);
-  const text = defineBaseScreenTextMaterial();
-  if (!text.ok) throw new Error(`HOST_TEXT_MATERIAL_FAILED:${text.diagnostics[0]?.code}`);
-  const rectangle = defineBaseScreenRectangleMaterial();
-  if (!rectangle.ok)
-    throw new Error(`HOST_RECTANGLE_MATERIAL_FAILED:${rectangle.diagnostics[0]?.code}`);
-  const rule = defineBaseScreenRuleMaterial();
-  if (!rule.ok) throw new Error(`HOST_RULE_MATERIAL_FAILED:${rule.diagnostics[0]?.code}`);
-  const container = defineBaseScreenContainerMaterial();
-  if (!container.ok)
-    throw new Error(`HOST_CONTAINER_MATERIAL_FAILED:${container.diagnostics[0]?.code}`);
+  requireDefinition('HOST_DESIGNER_DEFINITION_FAILED', defineBaseScreenDesigner());
+  requireDefinition('HOST_VIEWER_DEFINITION_FAILED', defineBaseScreenViewer());
+
+  const official = [
+    defineBaseScreenTextMaterial(),
+    defineBaseScreenRectangleMaterial(),
+    defineBaseScreenEllipseMaterial(),
+    defineBaseScreenImageMaterial(),
+    defineBaseScreenRuleMaterial(),
+    defineBaseScreenContainerMaterial(),
+    defineBaseScreenChartMaterial(),
+    defineBaseScreenTableMaterial(),
+  ].map((definition, index) =>
+    requireDefinition(`HOST_OFFICIAL_MATERIAL_${index}_FAILED`, definition),
+  );
 
   const metric = createMaterialDefinition({
     manifest: METRIC_VALUE_MANIFEST,
     element: MetricValueElement as unknown as BaseScreenMaterialConstructor,
   });
-  if (!metric.ok) throw new Error(`HOST_METRIC_MATERIAL_FAILED:${metric.diagnostics[0]?.code}`);
+  if (!metric.ok) {
+    throw new Error(`HOST_METRIC_MATERIAL_FAILED:${metric.diagnostics[0]?.code}`);
+  }
   const metricDefined = metric.value.define();
-  if (!metricDefined.ok)
+  if (!metricDefined.ok) {
     throw new Error(`HOST_METRIC_DEFINE_FAILED:${metricDefined.diagnostics[0]?.code}`);
+  }
 
-  cached = createBaseScreenMaterialCatalog([
-    text.value,
-    rectangle.value,
-    rule.value,
-    container.value,
-    metricDefined.value,
-  ]);
+  registerPluginDatavMaterials();
+  registerPluginEcharts();
+
+  cached = Object.freeze([...official, metricDefined.value]);
   return cached;
+}
+
+function requireDefinition<T>(code: string, result: ScreenParseResult<T>): T {
+  if (!result.ok) {
+    throw new Error(`${code}:${result.diagnostics[0]?.code ?? 'UNKNOWN'}`);
+  }
+  return result.value;
 }
 
 /** 设计器工具条映射的官方物料类型。 */

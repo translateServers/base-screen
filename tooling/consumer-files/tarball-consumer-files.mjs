@@ -1,7 +1,19 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+/**
+ * 让临时消费者使用 hoisted 链接。
+ *
+ * pnpm 11 的 isolated 布局依赖符号链接；Windows 未开 Developer Mode（或受限环境）时
+ * 链接会被静默跳过，安装日志显示成功、node 却解析不到包，门禁因此假失败。
+ * hoisted 用真实目录展开依赖，不改变「从 tarball 安装」这一被验证的语义。
+ */
+export function writeHoistedInstallConfig(consumer) {
+  writeFileSync(join(consumer, 'pnpm-workspace.yaml'), 'nodeLinker: hoisted\n');
+}
+
 export function writeTarballConsumerFiles(consumer, framework, tarballSpec) {
+  writeHoistedInstallConfig(consumer);
   const isReact = framework === 'react';
   const productTag = `base-screen-${framework}-product`;
   const workspaceDependencies = [
@@ -96,6 +108,7 @@ export function writeTarballConsumerFiles(consumer, framework, tarballSpec) {
  * 依赖仍然只声明 contracts / material / plugin-core / sdk，并由下方断言守住这一点。
  */
 export function writeVanillaTarballConsumerFiles(consumer, tarballSpec) {
+  writeHoistedInstallConfig(consumer);
   const dependencies = Object.fromEntries(
     ['contracts', 'material', 'plugin-core', 'sdk'].map((directory) => [
       `@base-screen/${directory}`,

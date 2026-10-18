@@ -8,8 +8,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
 import { createHostResourcePort } from '../screen/host-data-channel';
+import { type HostRuntime, loadHostRuntime } from '../screen/host-runtime';
 import { createRestProjectAdapter } from '../screen/project-adapter';
-import { registerHostMaterials, TOOL_MATERIAL_TYPES } from '../screen/register';
+import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
 
 const AUTOSAVE_DEBOUNCE_MS = 1200;
@@ -35,6 +36,9 @@ let onBack: (() => void) | undefined;
 let onConflict: (() => void) | undefined;
 let onDirtyChange: ((event: Event) => void) | undefined;
 let unsubscribeSession: (() => void) | undefined;
+let runtime: HostRuntime | undefined;
+// 运行时的激活是异步的；await 期间路由可能已经切走，configure 必须能被取消。
+let disposed = false;
 
 function clearSaveTimer(): void {
   window.clearTimeout(saveTimer);
@@ -94,71 +98,82 @@ onMounted(() => {
     if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
   });
 
-  const catalog = registerHostMaterials();
-  // 设计器是 DOM 节点而非 Vue 组件：创建后 appendChild，再 configure / load。
-  // 顺序不可颠倒——画布与渲染器在元素 connected 时才建立。尺寸交给 .stage 与 .stage > *
-  // 的 CSS（占满视口），宿主不再内联写百分比宽高。
-  const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
-  container.append(element);
-  designer.value = element;
+  void (async () => {
+    // 插件元素注册与 manager 激活都在这条 Promise 里；失败时清缓存供下次重试。
+    const host = await loadHostRuntime();
+    if (disposed) return;
+    runtime = host;
 
-  // 宿主数据通道必须在 configure 内提交：renderer 在 configure 时建立，
-  // 之后再赋 `resourcePort` 会被按「初始化后不可更换端口」拒绝。
-  const configured = element.configure({
-    catalog,
-    projectAdapter: createRestProjectAdapter(screenId),
-    toolMaterialTypes: TOOL_MATERIAL_TYPES,
-    resourcePort: createHostResourcePort(),
-    // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。缺了这行，顶栏「编辑 → 成组」
-    // 与图层面板的成组按钮都不可用。
-    groupMaterialType: 'base.container',
-    // 返回按钮由基座顶栏渲染，宿主只负责点击后跳回自己的路由。
-    backButton: true,
-  });
-  if (!configured.ok) {
-    logger.error('designer configure failed', configured.diagnostics);
-    screenSessionStore.getState().failedToLoad('设计器配置失败，请查看控制台日志。');
-    element.remove();
-    designer.value = null;
-    unsubscribeSession();
-    unsubscribeSession = undefined;
-    return;
-  }
+    // 设计器是 DOM 节点而非 Vue 组件：创建后 appendChild，再 configure / load。
+    // 顺序不可颠倒——画布与渲染器在元素 connected 时才建立。尺寸交给 .stage 与 .stage > *
+    // 的 CSS（占满视口），宿主不再内联写百分比宽高。
+    const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
+    container.append(element);
+    designer.value = element;
+    host.bindDesigner(element);
 
-  onBack = (): void => {
-    leaving = true;
-    clearSaveTimer();
-    void (async () => {
-      // 移除元素会取消在飞行的项目请求，因此必须先落地再路由。
-      await runSave();
-      if (dirty && !conflicted) await runSave();
-      router.push('/');
-    })();
-  };
-  element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
-
-  // 冲突意味着 revision 已过期，自动重试只会再冲突一次；停掉自动保存，由用户重载。
-  onConflict = (): void => {
-    conflicted = true;
-    clearSaveTimer();
-    screenSessionStore.getState().conflicted();
-  };
-  element.addEventListener('base-screen-project-conflict', onConflict);
-
-  onDirtyChange = (event: Event): void => {
-    const detail = (event as CustomEvent<{ dirty: boolean }>).detail;
-    dirty = detail.dirty;
-    if (!detail.dirty) {
-      // 撤销回基线也会走到这里：未触发的退避延时要归零，否则下次失败从上一次的高度起跳。
-      retryDelayMs = AUTOSAVE_RETRY_MS;
+    // 宿主数据通道必须在 configure 内提交：renderer 在 configure 时建立，
+    // 之后再赋 `resourcePort` 会被按「初始化后不可更换端口」拒绝。
+    const configured = element.configure({
+      catalog: host.catalog,
+      pluginCatalog: host.pluginCatalog,
+      pluginPanels: host.pluginPanels,
+      inspectorControls: host.inspectorControls,
+      runtimeContributions: host.runtimeContributions,
+      pluginCommandPort: host.pluginCommandPort,
+      projectAdapter: createRestProjectAdapter(screenId),
+      toolMaterialTypes: TOOL_MATERIAL_TYPES,
+      resourcePort: createHostResourcePort(),
+      // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。缺了这行，顶栏「编辑 → 成组」
+      // 与图层面板的成组按钮都不可用。
+      groupMaterialType: 'base.container',
+      // 返回按钮由基座顶栏渲染，宿主只负责点击后跳回自己的路由。
+      backButton: true,
+    });
+    if (!configured.ok) {
+      logger.error('designer configure failed', configured.diagnostics);
+      screenSessionStore.getState().failedToLoad('设计器配置失败，请查看控制台日志。');
+      element.remove();
+      designer.value = null;
+      host.bindDesigner(null);
+      unsubscribeSession?.();
+      unsubscribeSession = undefined;
       return;
     }
-    screenSessionStore.getState().dirty();
-    scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-  };
-  element.addEventListener('base-screen-dirty-change', onDirtyChange);
 
-  void (async () => {
+    onBack = (): void => {
+      leaving = true;
+      clearSaveTimer();
+      void (async () => {
+        // 移除元素会取消在飞行的项目请求，因此必须先落地再路由。
+        await runSave();
+        if (dirty && !conflicted) await runSave();
+        router.push('/');
+      })();
+    };
+    element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
+
+    // 冲突意味着 revision 已过期，自动重试只会再冲突一次；停掉自动保存，由用户重载。
+    onConflict = (): void => {
+      conflicted = true;
+      clearSaveTimer();
+      screenSessionStore.getState().conflicted();
+    };
+    element.addEventListener('base-screen-project-conflict', onConflict);
+
+    onDirtyChange = (event: Event): void => {
+      const detail = (event as CustomEvent<{ dirty: boolean }>).detail;
+      dirty = detail.dirty;
+      if (!detail.dirty) {
+        // 撤销回基线也会走到这里：未触发的退避延时要归零，否则下次失败从上一次的高度起跳。
+        retryDelayMs = AUTOSAVE_RETRY_MS;
+        return;
+      }
+      screenSessionStore.getState().dirty();
+      scheduleSave(AUTOSAVE_DEBOUNCE_MS);
+    };
+    element.addEventListener('base-screen-dirty-change', onDirtyChange);
+
     const loaded = await element.load(screenId);
     if (!loaded.ok) {
       logger.error('designer load failed', loaded.diagnostics);
@@ -166,10 +181,15 @@ onMounted(() => {
       return;
     }
     screenSessionStore.getState().loaded(loaded.value.name, loaded.value.revision);
-  })();
+  })().catch((error: unknown) => {
+    if (disposed) return;
+    logger.error('editor bootstrap failed', error);
+    screenSessionStore.getState().failedToLoad('设计器初始化失败，请返回列表重试。');
+  });
 });
 
 onBeforeUnmount(() => {
+  disposed = true;
   const element = designer.value;
   if (element !== null && onBack !== undefined) {
     element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
@@ -184,6 +204,7 @@ onBeforeUnmount(() => {
   clearSaveTimer();
   element?.remove();
   designer.value = null;
+  runtime?.bindDesigner(null);
   screenSessionStore.getState().reset();
   logger.debug('edit view released');
 });

@@ -53,7 +53,10 @@ export function ScreenListPage(): React.ReactElement {
   return (
     <div className="page">
       <header className="list-header">
-        <h1>大屏管家</h1>
+        <div className="list-header__title">
+          <h1>数据可视化工作台</h1>
+          <p className="list-header__subtitle">BASE SCREEN · DATAV 风格示例</p>
+        </div>
         <form
           className="create-screen"
           onSubmit={(event) => {
@@ -122,40 +125,46 @@ function ScreenCard({
 }): React.ReactElement {
   return (
     <article className="screen-card">
-      <h2 className="screen-card__name">{screen.name}</h2>
-      <dl className="screen-card__meta">
-        <div>
-          <dt>版本</dt>
-          <dd>{formatNumber(screen.revision)}</dd>
-        </div>
-        <div>
-          <dt>更新于</dt>
-          <dd>{formatDateTime(screen.updatedAt)}</dd>
-        </div>
-      </dl>
-      <footer className="screen-card__actions">
-        <button type="button" className="button" onClick={onEdit}>
-          编辑
-        </button>
-        <button type="button" className="button" onClick={onView}>
-          查看
-        </button>
-        {confirming ? (
-          <>
-            <span className="screen-card__confirm">删除后不可撤销</span>
-            <button type="button" className="button button--danger" onClick={onRemove}>
-              确认删除
-            </button>
-            <button type="button" className="button" onClick={onCancelRemove}>
-              取消
-            </button>
-          </>
-        ) : (
-          <button type="button" className="button button--danger" onClick={onAskRemove}>
-            删除
+      <div className="screen-cover">
+        <span className="screen-cover__mark">DATA SCREEN</span>
+        <span className="screen-cover__badge">1920 × 1080</span>
+        <h2 className="screen-card__name">{screen.name}</h2>
+      </div>
+      <div className="screen-card__body">
+        <dl className="screen-card__meta">
+          <div>
+            <dt>版本</dt>
+            <dd>{formatNumber(screen.revision)}</dd>
+          </div>
+          <div>
+            <dt>更新于</dt>
+            <dd>{formatDateTime(screen.updatedAt)}</dd>
+          </div>
+        </dl>
+        <footer className="screen-card__actions">
+          <button type="button" className="button" onClick={onEdit}>
+            编辑
           </button>
-        )}
-      </footer>
+          <button type="button" className="button" onClick={onView}>
+            查看
+          </button>
+          {confirming ? (
+            <>
+              <span className="screen-card__confirm">删除后不可撤销</span>
+              <button type="button" className="button button--danger" onClick={onRemove}>
+                确认删除
+              </button>
+              <button type="button" className="button" onClick={onCancelRemove}>
+                取消
+              </button>
+            </>
+          ) : (
+            <button type="button" className="button button--danger" onClick={onAskRemove}>
+              删除
+            </button>
+          )}
+        </footer>
+      </div>
     </article>
   );
 }

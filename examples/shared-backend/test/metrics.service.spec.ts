@@ -47,4 +47,37 @@ describe('MetricsService', () => {
 
     expect(latest).toBe(series.points[11]?.value);
   });
+
+  it('serves deterministic rankings in descending order', async () => {
+    const service = await createService();
+
+    const first = service.ranking('region', 6);
+    const second = service.ranking('region', 6);
+
+    expect(second).toEqual(first);
+    expect(first.dimension).toBe('region');
+    expect(first.unit).toBe('单');
+    expect(first.items).toHaveLength(6);
+    expect(first.items.map((item) => item.name)).toEqual([
+      '华东',
+      '华南',
+      '华北',
+      '西南',
+      '华中',
+      '东北',
+    ]);
+    expect(
+      first.items.every(
+        (item, index) => index === 0 || item.value <= first.items[index - 1]!.value,
+      ),
+    ).toBe(true);
+  });
+
+  it('honours the ranking limit and rejects unknown dimensions', async () => {
+    const service = await createService();
+
+    expect(service.ranking('channel', 3).items).toHaveLength(3);
+    expect(() => service.ranking('nope', 3)).toThrow(BadRequestException);
+    expect(() => service.ranking('region', 0)).toThrow(BadRequestException);
+  });
 });

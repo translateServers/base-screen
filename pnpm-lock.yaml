@@ -77,6 +77,15 @@ importers:
       '@base-screen/plugin-core':
         specifier: workspace:^
         version: link:../../packages/plugin-core
+      '@base-screen/plugin-datav-materials':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-datav-materials
+      '@base-screen/plugin-echarts':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-echarts
+      '@base-screen/plugin-manager':
+        specifier: workspace:^
+        version: link:../../packages/plugin-manager
       '@base-screen/plugin-sdk':
         specifier: workspace:^
         version: link:../../packages/plugin-sdk
@@ -199,6 +208,15 @@ importers:
       '@base-screen/plugin-core':
         specifier: workspace:^
         version: link:../../packages/plugin-core
+      '@base-screen/plugin-datav-materials':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-datav-materials
+      '@base-screen/plugin-echarts':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-echarts
+      '@base-screen/plugin-manager':
+        specifier: workspace:^
+        version: link:../../packages/plugin-manager
       '@base-screen/plugin-sdk':
         specifier: workspace:^
         version: link:../../packages/plugin-sdk
@@ -230,6 +248,15 @@ importers:
       '@base-screen/plugin-core':
         specifier: workspace:^
         version: link:../../packages/plugin-core
+      '@base-screen/plugin-datav-materials':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-datav-materials
+      '@base-screen/plugin-echarts':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-echarts
+      '@base-screen/plugin-manager':
+        specifier: workspace:^
+        version: link:../../packages/plugin-manager
       '@base-screen/plugin-sdk':
         specifier: workspace:^
         version: link:../../packages/plugin-sdk

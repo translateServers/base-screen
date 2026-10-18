@@ -63,10 +63,10 @@ export class PluginEchartsPanelElement extends HTMLElement implements BaseScreen
     if (!isChart) {
       summary.textContent = '选中一个 ECharts 图表组件后可查看与切换其系列类型。';
     } else {
-      summary.textContent = `当前系列类型：${seriesType === 'bar' ? '柱状' : '折线'}。`;
+      summary.textContent = `当前系列类型：${seriesLabel(seriesType)}。`;
     }
     const button = document.createElement('button');
-    button.textContent = '切换折线/柱状';
+    button.textContent = '切换图型';
     button.disabled = !isChart;
     button.addEventListener('click', () => {
       this.dispatchEvent(
@@ -82,5 +82,18 @@ export class PluginEchartsPanelElement extends HTMLElement implements BaseScreen
       );
     });
     root.append(style, heading, summary, button);
+  }
+}
+
+function seriesLabel(value: string | undefined): string {
+  switch (value) {
+    case 'bar':
+      return '柱状';
+    case 'area':
+      return '面积';
+    case 'pie':
+      return '环形';
+    default:
+      return '折线';
   }
 }

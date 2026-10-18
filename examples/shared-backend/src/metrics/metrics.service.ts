@@ -1,5 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { DEFAULT_SERIES_POINTS, MAX_SERIES_POINTS, type MetricId } from './dto/metrics-query.dto';
+import {
+  DEFAULT_RANKING_LIMIT,
+  DEFAULT_SERIES_POINTS,
+  MAX_RANKING_LIMIT,
+  MAX_SERIES_POINTS,
+  type MetricId,
+  type RankingDimension,
+} from './dto/metrics-query.dto';
 
 interface MetricDefinition {
   readonly unit: string;
@@ -11,6 +18,39 @@ const METRIC_DEFINITIONS: Readonly<Record<MetricId, MetricDefinition>> = {
   cpu_usage: { unit: '%', base: 42, amplitude: 18 },
   memory_usage: { unit: '%', base: 63, amplitude: 12 },
   request_rate: { unit: 'req/s', base: 820, amplitude: 240 },
+  sales_total: { unit: '万元', base: 386.4, amplitude: 92.6 },
+  order_count: { unit: '单', base: 5240, amplitude: 1180 },
+  visitor_count: { unit: '人', base: 18_620, amplitude: 4200 },
+  conversion_rate: { unit: '%', base: 3.86, amplitude: 1.2 },
+  target_completion: { unit: '%', base: 72.4, amplitude: 9.6 },
+  service_satisfaction: { unit: '%', base: 96.2, amplitude: 2.4 },
+  member_repurchase: { unit: '%', base: 48.6, amplitude: 8.2 },
+};
+
+/** 排行数据是固定表：大屏需要稳定的名次，不适合按指标序列再算一遍。 */
+const RANKING_DATASETS: Readonly<
+  Record<RankingDimension, { readonly unit: string; readonly items: readonly RankingItem[] }>
+> = {
+  region: {
+    unit: '单',
+    items: [
+      { name: '华东', value: 1284 },
+      { name: '华南', value: 1102 },
+      { name: '华北', value: 968 },
+      { name: '西南', value: 764 },
+      { name: '华中', value: 682 },
+      { name: '东北', value: 521 },
+    ],
+  },
+  channel: {
+    unit: '%',
+    items: [
+      { name: '直营', value: 42 },
+      { name: '分销', value: 28 },
+      { name: '电商', value: 19 },
+      { name: '门店', value: 11 },
+    ],
+  },
 };
 
 /** 固定基准时间：保证同参数的序列完全确定，冒烟与前端可以对值做断言。 */
@@ -25,6 +65,17 @@ export interface MetricSeries {
   readonly metric: string;
   readonly unit: string;
   readonly points: readonly MetricPoint[];
+}
+
+export interface RankingItem {
+  readonly name: string;
+  readonly value: number;
+}
+
+export interface MetricRanking {
+  readonly dimension: string;
+  readonly unit: string;
+  readonly items: readonly RankingItem[];
 }
 
 @Injectable()
@@ -67,6 +118,33 @@ export class MetricsService {
   latestValue(metric: string, points?: number): number {
     const series = this.series(metric, points);
     return series.points[series.points.length - 1]?.value ?? 0;
+  }
+
+  /** 固定排行表：同参数同结果，名次不随请求漂移。 */
+  ranking(dimension: string, limit?: number): MetricRanking {
+    const dataset = RANKING_DATASETS[dimension as RankingDimension];
+    if (dataset === undefined) {
+      throw new BadRequestException({
+        error: 'UNKNOWN_DIMENSION',
+        message: `Unknown ranking dimension: ${dimension}`,
+      });
+    }
+    const resolvedLimit = limit ?? DEFAULT_RANKING_LIMIT;
+    if (
+      !Number.isInteger(resolvedLimit) ||
+      resolvedLimit < 1 ||
+      resolvedLimit > MAX_RANKING_LIMIT
+    ) {
+      throw new BadRequestException({
+        error: 'INVALID_LIMIT',
+        message: `limit must be within 1..${MAX_RANKING_LIMIT}`,
+      });
+    }
+    return {
+      dimension,
+      unit: dataset.unit,
+      items: dataset.items.slice(0, resolvedLimit),
+    };
   }
 }
 

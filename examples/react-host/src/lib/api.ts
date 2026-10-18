@@ -1,4 +1,4 @@
-import type { MetricSeries, ScreenShape, ScreenSummaryShape } from '../types';
+import type { MetricRanking, MetricSeries, ScreenShape, ScreenSummaryShape } from '../types';
 import { resolveApiBase } from './api-base';
 
 export interface ApiError {
@@ -79,4 +79,6 @@ export const api = {
     request(`/screens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   metricSeries: (metric: string, points: number): Promise<ApiResult<MetricSeries>> =>
     request(`/metrics/series?metric=${encodeURIComponent(metric)}&points=${points}`),
+  metricRanking: (dimension: string, limit: number): Promise<ApiResult<MetricRanking>> =>
+    request(`/metrics/ranking?dimension=${encodeURIComponent(dimension)}&limit=${limit}`),
 };

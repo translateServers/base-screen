@@ -4,6 +4,7 @@ import {
   parseBaseScreenPluginManifest,
 } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
+import { PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER } from '../src/chart-data-adapter.js';
 import { buildPluginEchartsOption } from '../src/chart-option.js';
 import { PLUGIN_ECHARTS_MATERIAL_MANIFEST } from '../src/manifest.js';
 import { createPluginEchartsRuntime, PLUGIN_ECHARTS_ID } from '../src/plugin.js';
@@ -21,6 +22,12 @@ const chartData: BaseScreenChartData = {
   ],
 };
 
+const OPTION_BASE = {
+  textColor: '#ffffff',
+  gridColor: '#374151',
+  seriesColor: '#38bdf8',
+} as const;
+
 describe('plugin-echarts material manifest', () => {
   it('parses as a canonical material manifest', () => {
     expect(parseBaseScreenMaterialManifest(PLUGIN_ECHARTS_MATERIAL_MANIFEST).ok).toBe(true);
@@ -28,6 +35,12 @@ describe('plugin-echarts material manifest', () => {
 
   it('does not collide with the core library material type', () => {
     expect(PLUGIN_ECHARTS_MATERIAL_MANIFEST.type).not.toBe('base.echarts');
+  });
+
+  it('accepts every chart type the option builder implements', () => {
+    const schema = PLUGIN_ECHARTS_MATERIAL_MANIFEST.propsSchema.properties.seriesType;
+    expect(schema?.kind).toBe('enum');
+    expect(schema?.kind === 'enum' ? schema.values : []).toEqual(['line', 'bar', 'area', 'pie']);
   });
 });
 
@@ -105,45 +118,138 @@ describe('plugin-echarts runtime', () => {
     const result = await handler!('ignored' as never);
     expect(typeof result === 'object' && result !== null && result.ok === true).toBe(true);
     expect(executed).toHaveLength(1);
+    // props 整体替换：必须带齐必填字段，否则 schema 会拒绝这条事务。
     expect(executed[0]).toMatchObject({
       commandId: 'update-components',
       args: {
         componentIds: ['chart-1'],
-        patch: { props: { seriesType: 'bar' } },
+        patch: {
+          props: { titleText: '', showTooltip: true, seriesType: 'bar' },
+        },
       },
     });
   });
 });
 
 describe('buildPluginEchartsOption', () => {
-  it('maps canonical chart data to a plain option object', () => {
+  it('maps bar data with axis and gradient bars', () => {
     const option = buildPluginEchartsOption({
       data: chartData,
       titleText: '',
       showTooltip: true,
       seriesType: 'bar',
-      textColor: '#ffffff',
-      gridColor: '#374151',
+      ...OPTION_BASE,
     });
-    expect(option.xAxis).toEqual({
+    expect(option.xAxis).toMatchObject({
       type: 'category',
       data: ['a', 'b'],
-      splitLine: { show: true, lineStyle: { color: '#374151' } },
+      boundaryGap: true,
     });
-    expect(option.series).toEqual([{ name: 'north', type: 'bar', data: [1, 2] }]);
+    expect(option.yAxis).toMatchObject({ type: 'value' });
+    expect(option.series).toMatchObject([
+      { name: 'north', type: 'bar', data: [1, 2], barMaxWidth: 28 },
+    ]);
     expect(option.title).toBeUndefined();
+    expect(option.animation).toBe(false);
   });
 
-  it('adds a title only when the text is non-empty', () => {
+  it('renders an area series with a gradient fill and no symbols', () => {
     const option = buildPluginEchartsOption({
       data: chartData,
-      titleText: 'T',
+      titleText: '',
+      showTooltip: true,
+      seriesType: 'area',
+      ...OPTION_BASE,
+    });
+    const series = (option.series as Array<Record<string, unknown>>)[0];
+    expect(series).toMatchObject({ type: 'line', smooth: true, showSymbol: false });
+    expect(series?.areaStyle).toBeDefined();
+  });
+
+  it('drops the cartesian frame for a pie and maps points to slices', () => {
+    const option = buildPluginEchartsOption({
+      data: chartData,
+      titleText: '占比',
+      showTooltip: true,
+      seriesType: 'pie',
+      ...OPTION_BASE,
+    });
+    expect(option.xAxis).toBeUndefined();
+    expect(option.yAxis).toBeUndefined();
+    expect(option.grid).toBeUndefined();
+    const series = (option.series as Array<Record<string, unknown>>)[0];
+    expect(series).toMatchObject({
+      type: 'pie',
+      radius: ['48%', '68%'],
+      data: [
+        { name: 'a', value: 1 },
+        { name: 'b', value: 2 },
+      ],
+    });
+    expect(option.title).toMatchObject({ text: '占比' });
+  });
+
+  it('compresses ISO timestamps to HH:mm on the category axis', () => {
+    const option = buildPluginEchartsOption({
+      data: {
+        series: [
+          {
+            id: 'value',
+            label: 'value',
+            points: [
+              { x: '2026-01-01T08:30:00.000Z', y: 1 },
+              { x: '2026-01-01T09:30:00.000Z', y: 2 },
+            ],
+          },
+        ],
+      },
+      titleText: '',
       showTooltip: false,
       seriesType: 'line',
-      textColor: '#ffffff',
-      gridColor: '#374151',
+      ...OPTION_BASE,
     });
-    expect(option.title).toEqual({ text: 'T', textStyle: { color: '#ffffff' } });
-    expect(option.tooltip).toEqual({ show: false, trigger: 'axis' });
+    expect((option.xAxis as { data: string[] }).data).toEqual(['08:30', '09:30']);
+    expect(option.tooltip).toMatchObject({ show: false, trigger: 'axis' });
+  });
+});
+
+describe('plugin-echarts tabular adapter', () => {
+  it('projects dimension and measures into chart series', () => {
+    const dimension = { id: 't', label: '时间', valueType: 'string' as const };
+    const measure = { id: 'value', label: '订单量', valueType: 'number' as const };
+    const result = PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER.adapt({
+      dataset: {
+        fields: [dimension, measure],
+        rows: [
+          { t: '08:00', value: 12 },
+          { t: '09:00', value: 18 },
+        ],
+      },
+      fields: { dimension: [dimension], measures: [measure] },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.ok ? result.value : undefined).toEqual({
+      series: [
+        {
+          id: 'value',
+          label: '订单量',
+          points: [
+            { x: '08:00', y: 12 },
+            { x: '09:00', y: 18 },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('fails closed when the binding has no measures', () => {
+    const result = PLUGIN_ECHARTS_TABULAR_DATA_ADAPTER.adapt({
+      dataset: { fields: [], rows: [] },
+      fields: {},
+    });
+    expect(result.ok).toBe(false);
+    expect(result.ok === false ? result.diagnostics[0]?.code : undefined).toBe(
+      'HOST_DATASET_BINDING_INVALID',
+    );
   });
 });

@@ -18,7 +18,7 @@
 
 .button:hover {
   border-color: var(--color-accent);
-  background: rgba(57, 197, 187, 0.12);
+  background: rgba(56, 189, 248, 0.12);
 }
 
 .button:focus-visible {
@@ -29,12 +29,12 @@
 .button--primary {
   border-color: transparent;
   background: var(--color-accent);
-  color: #06281f;
+  color: #04182a;
   font-weight: 600;
 }
 
 .button--primary:hover {
-  background: #4fd8cd;
+  background: #7dd3fc;
 }
 
 .button--danger {
@@ -49,37 +49,130 @@
 
 .list-header {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
   gap: var(--spacing-3);
-  margin-bottom: var(--spacing-4);
+  flex: 0 0 auto;
+  margin-bottom: var(--spacing-5);
+}
+
+.list-header__title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .list-header h1 {
-  font-size: 20px;
+  font-size: 22px;
+  letter-spacing: 0.02em;
+}
+
+.list-header__subtitle {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.22em;
 }
 
 .screen-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--spacing-4);
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-5);
 }
 
 .screen-card {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
-  padding: var(--spacing-4);
+  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: var(--color-surface);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.screen-card:hover {
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.12),
+    0 12px 32px rgba(2, 12, 24, 0.55);
+}
+
+/* 封面：网格 + 径向光晕，模拟 DataV 缩略图的科技底。纯 CSS，不额外拉预览实例。 */
+.screen-cover {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background:
+    radial-gradient(120% 100% at 18% 0%, rgba(14, 116, 144, 0.55) 0%, transparent 58%),
+    linear-gradient(160deg, #0a2a47 0%, #061426 55%, #040b16 100%);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.screen-cover::before {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.12) 1px, transparent 1px);
+  background-size: 28px 28px;
+  content: "";
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.85), transparent 85%);
+}
+
+.screen-cover::after {
+  position: absolute;
+  right: -12%;
+  bottom: -40%;
+  width: 70%;
+  height: 90%;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 50%;
+  content: "";
+}
+
+.screen-cover__mark {
+  position: absolute;
+  top: 12px;
+  left: 14px;
+  z-index: 1;
+  color: #4c8bb5;
+  font-size: 10px;
+  letter-spacing: 0.24em;
+}
+
+.screen-cover__badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  padding: 2px 7px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 999px;
+  color: #7fc4e8;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .screen-card__name {
+  position: absolute;
+  right: 14px;
+  bottom: 12px;
+  left: 14px;
+  z-index: 1;
   overflow: hidden;
-  font-size: 15px;
+  color: #eaf6ff;
+  font-size: 17px;
+  font-weight: 600;
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.screen-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4) var(--spacing-4);
 }
 
 .screen-card__meta {
@@ -198,6 +291,36 @@
   flex: 1 1 auto;
 }
 
+.toast-host {
+  position: fixed;
+  right: var(--spacing-4);
+  bottom: var(--spacing-4);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.toast {
+  max-width: 320px;
+  padding: var(--spacing-2) var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.toast--success {
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+.toast--error {
+  border-color: rgba(248, 113, 113, 0.5);
+  color: var(--color-danger);
+}
+
 .spinner {
   display: flex;
   align-items: center;
@@ -228,34 +351,4 @@
   .spinner__dot {
     animation: none;
   }
-}
-
-.toast-host {
-  position: fixed;
-  right: var(--spacing-4);
-  bottom: var(--spacing-4);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-2);
-}
-
-.toast {
-  max-width: 320px;
-  padding: var(--spacing-2) var(--spacing-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-solid);
-  color: var(--color-text);
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.toast--success {
-  border-color: rgba(57, 197, 187, 0.5);
-}
-
-.toast--error {
-  border-color: rgba(248, 113, 113, 0.5);
-  color: var(--color-danger);
 }

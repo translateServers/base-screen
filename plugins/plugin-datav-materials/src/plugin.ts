@@ -11,15 +11,17 @@ import {
   PLUGIN_DATAV_BORDER_BOX_TYPE,
   PLUGIN_DATAV_BORDER_PICKER_ID,
   PLUGIN_DATAV_BORDER_PICKER_TAG_NAME,
+  PLUGIN_DATAV_CAPSULE_PROGRESS_TYPE,
   PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID,
   PLUGIN_DATAV_DIGITAL_FLOP_TYPE,
   PLUGIN_DATAV_ID,
+  PLUGIN_DATAV_MARQUEE_TYPE,
   PLUGIN_DATAV_SCROLL_BOARD_TYPE,
   PLUGIN_DATAV_WATER_LEVEL_TYPE,
 } from './identity.js';
 
 /**
- * 大屏组件插件的 runtime：四个物料 + 一个检查器控件 + 一条文档事务命令。
+ * 大屏组件插件的 runtime：六个物料 + 一个检查器控件 + 一条文档事务命令。
  *
  * 与 `plugin-echarts`（渲染类 + 第三方依赖 + 手写裸 runtime）互补，本插件用 SDK 的
  * `definePlugin` 在构造点自校验清单，用来证明"零第三方依赖的渲染类插件也能走完整
@@ -134,6 +136,16 @@ function materialContributions() {
       kind: 'material' as const,
       type: PLUGIN_DATAV_BORDER_BOX_TYPE,
       tagName: 'base-screen-datav-border-box',
+    },
+    {
+      kind: 'material' as const,
+      type: PLUGIN_DATAV_CAPSULE_PROGRESS_TYPE,
+      tagName: 'base-screen-datav-capsule-progress',
+    },
+    {
+      kind: 'material' as const,
+      type: PLUGIN_DATAV_MARQUEE_TYPE,
+      tagName: 'base-screen-datav-marquee',
     },
   ];
 }

@@ -1,12 +1,15 @@
-/* 设计令牌与基础样式：三个前端共用同一套令牌定义，保证视觉对等。 */
+/* 设计令牌与基础样式：三个前端共用同一套令牌定义，保证视觉对等。
+   DataV 风格：深海军蓝底 + 青蓝强调色，强调色只表示「可执行主操作 / 数据高亮」。 */
 :root {
-  --color-bg: #0b1020;
-  --color-surface: rgba(15, 23, 42, 0.85);
-  --color-surface-solid: #131c31;
-  --color-border: rgba(148, 163, 184, 0.22);
-  --color-text: #e8eefb;
-  --color-text-muted: #8ea3bd;
-  --color-accent: #39c5bb;
+  --color-bg: #050d1a;
+  --color-surface: rgba(8, 26, 46, 0.82);
+  --color-surface-solid: #0a1a2e;
+  --color-border: rgba(56, 189, 248, 0.18);
+  --color-text: #e6f1ff;
+  --color-text-muted: #7fa6c4;
+  --color-accent: #38bdf8;
+  --color-accent-strong: #0ea5e9;
+  --color-success: #34d399;
   --color-danger: #f87171;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -31,7 +34,9 @@ body {
 }
 
 body {
-  background: var(--color-bg);
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(14, 116, 144, 0.16) 0%, transparent 60%),
+    var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-family);
   font-size: 14px;

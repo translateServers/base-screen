@@ -80,6 +80,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 | `PUT /api/screens/:id` | `{ document, revision }` | `{ screen: Screen }`（revision+1） | `404` / `409 REVISION_CONFLICT` / `400 DOCUMENT_INVALID` |
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
 | `GET /api/metrics/series?metric=&points=` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
+| `GET /api/metrics/ranking?dimension=&limit=` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
 
 `Screen = { id, name, revision, document, createdAt, updatedAt }`；错误体统一
 `{ error, message }`。`document` 是 canonical Screen Document JSON——后端只存取，
@@ -94,12 +95,12 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 pnpm install                 # 仓库根（首次）
 
 # 终端 1：共享后端（必须先起，三端都连它）
-pnpm dev:host-api            # http://127.0.0.1:3000 ，接口文档 /api/docs
+pnpm dev:shared-backend     # http://127.0.0.1:3000 ，接口文档 /api/docs
 
 # 终端 2：任选一个前端
-pnpm dev:host-app-vanilla    # http://127.0.0.1:5173
-pnpm dev:host-app-react      # http://127.0.0.1:5174
-pnpm dev:host-app-vue        # http://127.0.0.1:5175
+pnpm dev:vanilla-host       # http://127.0.0.1:5173
+pnpm dev:react-host         # http://127.0.0.1:5174
+pnpm dev:vue-host           # http://127.0.0.1:5175
 ```
 
 前端 dev server 通过 Vite `proxy` 把 `/api` 转发到 `3000`，因此**前后端可以分开启停**；
@@ -119,6 +120,26 @@ pnpm verify:examples        # 依次跑三端冒烟
 三端断言集合一致：种子列表渲染、设计器注册并挂载、指标读数经 host-resource
 数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、无未捕获页面错误。
 
+## DataV 风格成品种子
+
+「默认销售大屏」不是一张空卡片，而是一份 1920×1080 的 DataV 风格成品文档：
+顶栏 + 4 张 KPI 翻牌卡 + 渠道环形图 + 24h 面积趋势 + 目标水位 + 区域订单柱图 +
+轮播排行 + 3 条胶囊进度 + 底部滚动字幕，共 50+ 个原子组件。它同时演示三件事：
+
+1. **外围插件就是物料来源**：DataV 四件套（`datav.border-box` / `digital-flop` /
+   `scroll-board` / `water-level`）与两个新物料（`datav.capsule-progress` /
+   `datav.marquee`）来自 `@base-screen/plugin-datav-materials`；图表来自
+   `@base-screen/plugin-echarts`（line / bar / area / pie）。宿主只做两件事：
+   注册元素、把 manager 的 snapshot 合进 catalog。
+2. **插件贡献必须被授权**：三个 `dataResourceType`（`demo_metric` / `demo_series` /
+   `demo_ranking`）由宿主自有插件声明，`runtimeContributions` 同时交给设计器与
+   查看器；漏掉声明时 host-resource 组件会被渲染器直接丢弃（画布空白）。
+3. **查看态等比缩放**：查看器按文档 `canvas` 尺寸计算 `min(vw/cw, vh/ch)`，用
+   `translate + scale` 居中；工具栏与舞台平级，不随大屏放大。
+
+「系统监控大屏」保留原来的轻量卡片文档，用来覆盖宿主自有物料
+`host-app.metric-value` 这条最小路径，也证明旧文档没有被新种子破坏。
+
 ## 数据绑定演示
 
 起始文档里那张卡片**不是一个物料**，而是四个原子物料按 zIndex 叠出来的：`stage-card-bg`
@@ -135,6 +156,17 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 文档能在三端渲染**。三端的 `configure` 都带 `groupMaterialType: 'base.container'`，所以多选原子
 物料即可成组整体移动/缩放/旋转；要成套插入同一份组合，用 `insertComponentFragment`，预设 JSON
 由宿主自己存。
+
+三端的数据通道都支持三种宿主资源类型，投影形状与绑定角色一一对应：
+
+| resourceType | resourceId | 返回表格 | 消费物料与绑定角色 |
+| --- | --- | --- | --- |
+| `demo_metric` | 指标名 | `value`（最新点） | 翻牌器 / 水位图 / 胶囊进度：`value` |
+| `demo_series` | 指标名 | `t` + `value`（全量序列） | ECharts 折线/面积/柱状：`dimension` + `measures` |
+| `demo_ranking` | `region` / `channel` | `name` + `value` | 环形图 / 柱状图：`dimension` + `measures`；轮播列表：`columns` |
+
+三种类型同时由宿主自有插件声明为 `dataResourceType` 贡献——这不是可选装饰：一旦
+`runtimeContributions` 传给渲染器，未声明的类型会被拒绝，表现为「文档有组件、画布空白」。
 
 ## 分层与职责
 

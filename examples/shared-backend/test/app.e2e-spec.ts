@@ -116,6 +116,26 @@ describe('host api (e2e)', () => {
       });
   });
 
+  it('serves deterministic rankings and fails closed on unknown dimensions', async () => {
+    const first = await request(app.getHttpServer())
+      .get('/api/metrics/ranking?dimension=region&limit=4')
+      .expect(200);
+    const second = await request(app.getHttpServer())
+      .get('/api/metrics/ranking?dimension=region&limit=4')
+      .expect(200);
+
+    expect(second.body).toEqual(first.body);
+    expect(first.body.items).toHaveLength(4);
+    expect(first.body.items[0]).toMatchObject({ name: '华东', value: 1284 });
+
+    await request(app.getHttpServer())
+      .get('/api/metrics/ranking?dimension=nope')
+      .expect(400)
+      .expect((response) => {
+        expect(response.body.error).toBe('UNKNOWN_DIMENSION');
+      });
+  });
+
   it('normalizes validation failures', async () => {
     await request(app.getHttpServer()).post('/api/screens').send({}).expect(400);
     await request(app.getHttpServer()).post('/api/screens').send({ name: '' }).expect(400);

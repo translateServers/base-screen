@@ -25,7 +25,10 @@ export const screenListView: ViewModule = {
       attrs: { type: 'text', placeholder: '新大屏名称', 'aria-label': '新大屏名称' },
     });
     const header = el('header', { class: 'list-header' }, [
-      el('h1', { text: '大屏管家' }),
+      el('div', { class: 'list-header__title' }, [
+        el('h1', { text: '数据可视化工作台' }),
+        el('p', { class: 'list-header__subtitle', text: 'BASE SCREEN · DATAV 风格示例' }),
+      ]),
       el(
         'form',
         {
@@ -167,18 +170,24 @@ function renderCard(screen: ScreenSummaryShape, handlers: ListHandlers): HTMLEle
   }
 
   return el('article', { class: 'screen-card' }, [
-    el('h2', { class: 'screen-card__name', text: screen.name }),
-    el('dl', { class: 'screen-card__meta' }, [
-      el('div', {}, [
-        el('dt', { text: '版本' }),
-        el('dd', { text: formatNumber(screen.revision) }),
-      ]),
-      el('div', {}, [
-        el('dt', { text: '更新于' }),
-        el('dd', { text: formatDateTime(screen.updatedAt) }),
-      ]),
+    el('div', { class: 'screen-cover' }, [
+      el('span', { class: 'screen-cover__mark', text: 'DATA SCREEN' }),
+      el('span', { class: 'screen-cover__badge', text: '1920 × 1080' }),
+      el('h2', { class: 'screen-card__name', text: screen.name }),
     ]),
-    actions,
+    el('div', { class: 'screen-card__body' }, [
+      el('dl', { class: 'screen-card__meta' }, [
+        el('div', {}, [
+          el('dt', { text: '版本' }),
+          el('dd', { text: formatNumber(screen.revision) }),
+        ]),
+        el('div', {}, [
+          el('dt', { text: '更新于' }),
+          el('dd', { text: formatDateTime(screen.updatedAt) }),
+        ]),
+      ]),
+      actions,
+    ]),
   ]);
 }
 

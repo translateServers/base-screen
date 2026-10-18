@@ -42,7 +42,7 @@ export function createPluginEchartsRuntime(): BaseScreenPluginRuntime {
         {
           kind: 'command',
           id: PLUGIN_ECHARTS_TOGGLE_COMMAND_ID,
-          name: '切换折线/柱状',
+          name: '切换图型',
           requiredCapability: 'command.execute',
           menus: ['context.component'],
         },
@@ -94,12 +94,14 @@ export function createPluginEchartsRuntime(): BaseScreenPluginRuntime {
           };
         }
         const current = (focused.props as { seriesType?: unknown }).seriesType;
-        const next = current === 'bar' ? 'line' : 'bar';
+        const next = nextSeriesType(current);
         return commandPort.execute({
           commandId: 'update-components',
           args: {
             componentIds: [focused.id],
-            patch: { props: { seriesType: next } },
+            // props 是整体替换：必须带上当前其余字段，否则 schema 必填的
+            // titleText/showTooltip 会被这条命令抹掉，事务被拒。
+            patch: { props: { ...focused.props, seriesType: next } },
           },
         });
       },
@@ -117,4 +119,12 @@ export function createPluginEchartsRuntime(): BaseScreenPluginRuntime {
       designReadPort = undefined;
     },
   };
+}
+
+const SERIES_CYCLE = ['line', 'bar', 'area', 'pie'] as const;
+
+/** 命令按固定顺序轮换，保证同一次点击在三端得到同一个下一档。 */
+function nextSeriesType(current: unknown): (typeof SERIES_CYCLE)[number] {
+  const index = SERIES_CYCLE.findIndex((value) => value === current);
+  return SERIES_CYCLE[(index + 1) % SERIES_CYCLE.length] ?? 'line';
 }

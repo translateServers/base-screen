@@ -13,7 +13,7 @@ const PLUGIN_ECHARTS_PROPS_SCHEMA = {
   properties: {
     titleText: { kind: 'string' },
     showTooltip: { kind: 'boolean' },
-    seriesType: { kind: 'enum', values: ['line', 'bar'] },
+    seriesType: { kind: 'enum', values: ['line', 'bar', 'area', 'pie'] },
   },
   required: ['titleText', 'showTooltip', 'seriesType'],
 } satisfies BaseScreenMaterialObjectSchema;
@@ -23,17 +23,36 @@ export const PLUGIN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   tagName: 'base-screen-plugin-echarts',
   name: 'ECharts 图表',
   category: '数据',
-  keywords: ['图表', 'ECharts', '折线', '柱状'],
+  keywords: ['图表', 'ECharts', '折线', '面积', '柱状', '环形'],
   defaultSize: { width: 480, height: 280 },
   defaultProps: {
     titleText: '',
     showTooltip: true,
     seriesType: 'line',
   },
+  defaultData: {
+    fields: [
+      { id: 'category', label: '分类', valueType: 'string', nullable: false },
+      { id: 'value', label: '数值', valueType: 'number', nullable: false },
+    ],
+    rows: [
+      { category: '00:00', value: 320 },
+      { category: '04:00', value: 268 },
+      { category: '08:00', value: 512 },
+      { category: '12:00', value: 684 },
+      { category: '16:00', value: 596 },
+      { category: '20:00', value: 742 },
+    ],
+  },
+  staticData: {
+    kind: 'tabular',
+    defaultBinding: { fields: { dimension: ['category'], measures: ['value'] } },
+  },
   defaultStyle: {
     backgroundColor: '#111827',
     color: '#f9fafb',
     gridColor: '#374151',
+    seriesColor: '#38bdf8',
     opacity: 1,
   },
   styleSchema: {
@@ -42,14 +61,16 @@ export const PLUGIN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
       backgroundColor: { kind: 'string' },
       color: { kind: 'string' },
       gridColor: { kind: 'string' },
+      seriesColor: { kind: 'string' },
       opacity: { kind: 'number', minimum: 0, maximum: 1 },
     },
-    required: ['backgroundColor', 'color', 'gridColor'],
+    required: ['backgroundColor', 'color', 'gridColor', 'seriesColor'],
   },
   stylePanel: [
     { style: 'backgroundColor', label: '背景色', control: 'color' },
     { style: 'color', label: '文字色', control: 'color' },
     { style: 'gridColor', label: '网格色', control: 'color' },
+    { style: 'seriesColor', label: '图形色', control: 'color' },
   ],
   propsSchema: PLUGIN_ECHARTS_PROPS_SCHEMA,
   propertyPanel: [
@@ -58,7 +79,18 @@ export const PLUGIN_ECHARTS_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   ],
   events: ['seriesClick'],
   editorDescriptor: parseEchartsEditorDescriptor(),
-  dataCapabilities: ['static', 'dataset', 'variable'],
+  dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
+  dataBinding: {
+    roles: [
+      {
+        id: 'dimension',
+        minFields: 1,
+        maxFields: 1,
+        valueTypes: ['string', 'number', 'boolean', 'date'],
+      },
+      { id: 'measures', minFields: 1, maxFields: 8, valueTypes: ['number'] },
+    ],
+  },
   designCapabilities: { resize: true, rotate: true, children: false },
 };
 

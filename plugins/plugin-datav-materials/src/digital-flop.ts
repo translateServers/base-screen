@@ -9,6 +9,7 @@ import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { DatavMaterialElement, type DatavMaterialModel } from './datav-element.js';
 import { PLUGIN_DATAV_DIGITAL_FLOP_TAG_NAME, PLUGIN_DATAV_DIGITAL_FLOP_TYPE } from './identity.js';
 import { readBoolean, readNumber, readString, styleColor } from './json-values.js';
+import { DATAV_SCALAR_VALUE_ADAPTER } from './scalar-adapter.js';
 
 /**
  * 数字翻牌器：大屏上最典型的"指标读数"组件。
@@ -77,7 +78,7 @@ export const PLUGIN_DATAV_DIGITAL_FLOP_MANIFEST: BaseScreenMaterialManifest = {
     { prop: 'flipAnimation', label: '翻牌动画', control: 'boolean' },
   ],
   events: ['valueClick'],
-  dataCapabilities: ['static', 'dataset', 'variable'],
+  dataCapabilities: ['static', 'dataset', 'variable', 'host-resource'],
   dataBinding: {
     roles: [
       {
@@ -229,6 +230,12 @@ export function formatNumericText(model: {
   const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return fraction === undefined ? grouped : `${grouped}.${fraction}`;
 }
+
+// 绑定宿主资源时，渲染器先从表格投影出标量再赋给 dataState.value；没有这个
+// 静态属性，翻牌器只接受 static 数据，绑定会以 HOST_DATASET_BINDING_INVALID 失败。
+Object.defineProperty(PluginDatavDigitalFlopElement, 'tabularDataAdapter', {
+  value: DATAV_SCALAR_VALUE_ADAPTER,
+});
 
 export function definePluginDatavDigitalFlopMaterial(): ScreenParseResult<BaseScreenMaterialCatalogEntry> {
   const definition = createMaterialDefinition({
