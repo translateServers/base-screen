@@ -283,6 +283,12 @@ export function createHostRefreshController(options: RefreshControllerOptions): 
     },
 
     tickNow() {
+      // 与心跳同一条语义：隐藏期间"到点"不算数——否则 tick 会绕过暂停发出请求，
+      // 后台标签页的静默承诺就被调试入口破坏了。
+      if (visibility() === 'hidden') {
+        emit();
+        return;
+      }
       const timestamp = now();
       const seen = new Set<string>();
       for (const component of components()) {

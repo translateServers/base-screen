@@ -258,9 +258,206 @@ async function main() {
     }, API_BASE);
     if (!deterministic) fail('指标/排行接口不满足确定性');
 
+    // 7) 生产监控大屏：数据层六条断言（三端同构，口径见 examples/README.md「数据层接入」）。
+    const monitorList = await fetch(`${API_BASE}/screens`).then((response) => response.json());
+    const monitorScreen = monitorList.screens.find((item) => item.name === '生产监控大屏');
+    if (monitorScreen === undefined) fail('种子列表里没有「生产监控大屏」');
+
+    const datasetQueries = [];
+    const openMonitor = async (query) => {
+      const target = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+      target.on('pageerror', (error) => pageErrors.push(`monitor:${query}: ${error.message}`));
+      target.on('request', (request) => {
+        const requestUrl = request.url();
+        if (requestUrl.includes('/api/datasets/') && requestUrl.includes('/query')) {
+          datasetQueries.push(requestUrl);
+        }
+      });
+      await target.addInitScript((apiBaseUrl) => {
+        window.__HOST_APP_CONFIG__ = { apiBaseUrl };
+      }, API_BASE);
+      await target.goto(`${url}#/screens/${monitorScreen.id}/view?${query}`, {
+        waitUntil: 'domcontentloaded',
+      });
+      return target;
+    };
+    const readMonitorDom = (target) =>
+      target.evaluate(() => {
+        const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
+        const legend = root?.querySelector('[data-datav-status-legend] [data-state="fault"]');
+        const board = root?.querySelector('[data-datav-board-viewport]');
+        return {
+          tiles: root?.querySelectorAll('[data-datav-status-tile]').length ?? 0,
+          faultLegend: legend?.getAttribute('data-count') ?? null,
+          nodes: root?.querySelectorAll('[data-datav-pipeline-node]').length ?? 0,
+          connectors: root?.querySelectorAll('[data-datav-pipeline-connector]').length ?? 0,
+          boardRows: root?.querySelectorAll('[data-datav-board-row]').length ?? 0,
+          visibleRows: board?.getAttribute('data-datav-board-visible-rows') ?? null,
+          emptyNodes: root?.querySelectorAll('[data-datav-status-empty]').length ?? 0,
+          badges: root?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0,
+          chip: document.querySelector('[data-viewer-status]')?.textContent ?? '',
+          host: window.__baseScreenHost?.status() ?? null,
+        };
+      });
+    const waitTiles = (target, count) =>
+      target.waitForFunction(
+        (expected) =>
+          (document
+            .querySelector('base-screen-viewer')
+            ?.shadowRoot?.querySelectorAll('[data-datav-status-tile]').length ?? 0) === expected,
+        count,
+        { timeout: 30_000 },
+      );
+
+    // A. 首屏：48 格 / 图例故障 3 / 工序 6 节点 5 连线 / 告警可见 8 行 / 在线
+    const first = await openMonitor('smoke=1');
+    await waitTiles(first, 48);
+    await first.waitForTimeout(1200);
+    const firstState = await readMonitorDom(first);
+    if (firstState.tiles !== 48) fail(`首屏灯阵应 48 格，实际 ${firstState.tiles}`);
+    if (firstState.faultLegend !== '3') fail(`图例故障数应 3，实际 ${firstState.faultLegend}`);
+    if (firstState.nodes !== 6) fail(`工序节点应 6，实际 ${firstState.nodes}`);
+    if (firstState.connectors !== 5) fail(`连接线应 5，实际 ${firstState.connectors}`);
+    if (firstState.visibleRows !== '8') fail(`告警可见行应 8，实际 ${firstState.visibleRows}`);
+    if (firstState.boardRows < 8) fail(`告警行数应 ≥8，实际 ${firstState.boardRows}`);
+    if (!firstState.chip.includes('在线')) fail(`首屏 chip 不是在线：${firstState.chip}`);
+    if (firstState.badges !== 0) fail(`首屏不应出现降级角标，实际 ${firstState.badges}`);
+    if (firstState.host === null || firstState.host.failures !== 0) {
+      fail(`首屏 status().failures 应为 0：${JSON.stringify(firstState.host)}`);
+    }
+    await first.close();
+
+    // B. URL 播种：?line=LINE-B → 36 格 / 1 台故障，且数据集 query 串带 line=LINE-B
+    const seededFrom = datasetQueries.length;
+    const seededPage = await openMonitor('line=LINE-B&smoke=1');
+    await waitTiles(seededPage, 36);
+    await seededPage.waitForTimeout(1200);
+    const seededState = await readMonitorDom(seededPage);
+    const seededQueries = datasetQueries.slice(seededFrom);
+    if (seededState.tiles !== 36) fail(`LINE-B 灯阵应 36 格，实际 ${seededState.tiles}`);
+    if (seededState.faultLegend !== '1') fail(`LINE-B 故障数应 1，实际 ${seededState.faultLegend}`);
+    const seededLineQueries = seededQueries.filter((item) => item.includes('line=LINE-B'));
+    if (seededLineQueries.length < 3) {
+      fail(
+        `LINE-B 应产生 ≥3 条带 line=LINE-B 的 query，实际 ${seededLineQueries.length}/${seededQueries.length}`,
+      );
+    }
+    await seededPage.close();
+
+    // C. 变量联动：点产线选择器第 2 行 → 蓝图 set-variable(line) → 灯阵变 36 格
+    const clickFrom = datasetQueries.length;
+    const clickPage = await openMonitor('smoke=1');
+    await waitTiles(clickPage, 48);
+    await clickPage
+      .locator('base-screen-datav-scroll-board', { hasText: 'B 线·焊装' })
+      .locator('[data-datav-board-row]', { hasText: 'B 线·焊装' })
+      .click();
+    await waitTiles(clickPage, 36);
+    await clickPage.waitForTimeout(1200);
+    const clickQueries = datasetQueries
+      .slice(clickFrom)
+      .filter((item) => item.includes('line=LINE-B'));
+    if (clickQueries.length === 0) {
+      fail('点击产线选择器后没有出现带 line=LINE-B 的新 query（蓝图链路未生效）');
+    }
+
+    // D. 空结果不是失败：LINE-C → 0 格 + 空文案 + 无角标 + 仍在线
+    const emptyPage = await openMonitor('line=LINE-C&smoke=1');
+    await emptyPage.waitForFunction(
+      () =>
+        (document
+          .querySelector('base-screen-viewer')
+          ?.shadowRoot?.querySelectorAll('[data-datav-status-empty]').length ?? 0) === 1,
+      undefined,
+      { timeout: 30_000 },
+    );
+    await emptyPage.waitForTimeout(1200);
+    const emptyState = await readMonitorDom(emptyPage);
+    if (emptyState.tiles !== 0) fail(`LINE-C 应 0 格，实际 ${emptyState.tiles}`);
+    if (emptyState.emptyNodes !== 1) fail('LINE-C 应出现空数据文案节点');
+    if (emptyState.badges !== 0) fail(`LINE-C 不应有降级角标，实际 ${emptyState.badges}`);
+    if (!emptyState.chip.includes('在线')) fail(`LINE-C chip 应仍在线：${emptyState.chip}`);
+    if (emptyState.host === null || emptyState.host.failures !== 0) {
+      fail('LINE-C 不应计入失败');
+    }
+    await emptyPage.close();
+
+    // E. 失败保留上一帧：成功之后把 query 打成 500，再 tick 一次
+    const tilesBeforeFailure = (await readMonitorDom(clickPage)).tiles;
+    await clickPage.route('**/api/datasets/*/query*', (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'INJECTED_FAILURE', message: 'injected' }),
+      }),
+    );
+    await clickPage.evaluate(() => window.__baseScreenHost?.tickNow());
+    await clickPage.waitForFunction(
+      () =>
+        (document
+          .querySelector('base-screen-viewer')
+          ?.shadowRoot?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0) >= 1,
+      undefined,
+      { timeout: 20_000 },
+    );
+    await clickPage.waitForFunction(
+      () => (document.querySelector('[data-viewer-status]')?.textContent ?? '').includes('离线'),
+      undefined,
+      { timeout: 20_000 },
+    );
+    const failedState = await readMonitorDom(clickPage);
+    if (failedState.tiles !== tilesBeforeFailure) {
+      fail(`降级后应保留上一帧 ${tilesBeforeFailure} 格，实际 ${failedState.tiles}`);
+    }
+    if (failedState.badges < 1) fail('降级后未出现角标');
+    if (!failedState.chip.includes('离线')) fail(`降级后 chip 应显示离线：${failedState.chip}`);
+    if (failedState.host === null || failedState.host.failures < 1) {
+      fail('降级后 status().failures 应 > 0');
+    }
+    await clickPage.close();
+
+    // F. 后台暂停：hidden 时 tick 不发请求，恢复 visible 后补一次
+    const visibilityPage = await openMonitor('smoke=1');
+    await waitTiles(visibilityPage, 48);
+    const hiddenBefore = await visibilityPage.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'hidden',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+      return window.__baseScreenHost.status().requests;
+    });
+    await visibilityPage.evaluate(() => {
+      window.__baseScreenHost.tickNow();
+      window.__baseScreenHost.tickNow();
+      window.__baseScreenHost.tickNow();
+    });
+    await visibilityPage.waitForTimeout(900);
+    const hiddenAfter = await visibilityPage.evaluate(
+      () => window.__baseScreenHost.status().requests,
+    );
+    if (hiddenAfter !== hiddenBefore) {
+      fail(`hidden 期间 tick 不应产生请求（${hiddenBefore} → ${hiddenAfter}）`);
+    }
+    await visibilityPage.evaluate(() => {
+      Object.defineProperty(document, 'visibilityState', {
+        configurable: true,
+        get: () => 'visible',
+      });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    await visibilityPage.waitForTimeout(1200);
+    const visibleAfter = await visibilityPage.evaluate(
+      () => window.__baseScreenHost.status().requests,
+    );
+    if (!(visibleAfter > hiddenAfter)) {
+      fail(`恢复 visible 后应补一次刷新（${hiddenAfter} → ${visibleAfter}）`);
+    }
+    await visibilityPage.close();
+
     if (pageErrors.length > 0) fail(`页面存在未捕获错误：${JSON.stringify(pageErrors)}`);
     console.log(
-      'Vanilla 前端冒烟通过：列表 / DataV 编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性。',
+      'Vanilla 前端冒烟通过：列表 / DataV 编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）。',
     );
   } finally {
     await browser.close();

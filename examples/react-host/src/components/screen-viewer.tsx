@@ -359,6 +359,7 @@ export function ScreenViewerPage(): React.ReactElement {
         <span className="viewer-bar__name">{screenName || '数据大屏'}</span>
         <span
           className="viewer-bar__status"
+          data-viewer-status=""
           data-state={dataStatus.online ? 'online' : 'offline'}
           title={dataStatus.failures === 0 ? '数据源在线' : `已失败 ${dataStatus.failures} 次`}
         >

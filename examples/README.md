@@ -118,13 +118,17 @@ pnpm verify:examples        # 依次跑三端冒烟
 ```
 
 三端断言集合一致：种子列表渲染、设计器注册并挂载、指标读数经 host-resource
-数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、无未捕获页面错误。
+数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、**生产监控大屏的数据层六条**
+（首屏灯阵/工序链/告警流水、URL 播种、变量联动、空结果、失败保留上一帧、后台暂停），
+以及无未捕获页面错误。数据层断言的详细口径见下文「数据层接入」。
 
-## DataV 风格成品种子
+## 成品屏与 DataV 风格种子
 
-「默认销售大屏」不是一张空卡片，而是一份 1920×1080 的 DataV 风格成品文档：
-顶栏 + 4 张 KPI 翻牌卡 + 渠道环形图 + 24h 面积趋势 + 目标水位 + 区域订单柱图 +
-轮播排行 + 3 条胶囊进度 + 底部滚动字幕，共 50+ 个原子组件。它同时演示三件事：
+两张 1920×1080 的成品文档，打开即可播放：
+
+**「默认销售大屏」**——DataV 风格，顶栏 + 4 张 KPI 翻牌卡 + 渠道环形图 + 24h 面积趋势 +
+目标水位 + 区域订单柱图 + 轮播排行 + 3 条胶囊进度 + 底部滚动字幕，共 50+ 个原子组件。
+它演示三件事：
 
 1. **外围插件就是物料来源**：DataV 四件套（`datav.border-box` / `digital-flop` /
    `scroll-board` / `water-level`）与两个新物料（`datav.capsule-progress` /
@@ -137,8 +141,96 @@ pnpm verify:examples        # 依次跑三端冒烟
 3. **查看态等比缩放**：查看器按文档 `canvas` 尺寸计算 `min(vw/cw, vh/ch)`，用
    `translate + scale` 居中；工具栏与舞台平级，不随大屏放大。
 
+**「生产监控大屏」**——数据层成品，**四种 dataSource 全覆盖**：
+
+| dataSource | 组件 | 数据来自 |
+| --- | --- | --- |
+| `dataset` | 设备状态灯阵 / 告警流水 / 产线工序链 | `monitor.devices` / `monitor.alarms` / `monitor.pipeline`（`/api/datasets`） |
+| `variable` | 当前产线 / 时间窗 / 数据源状态 / 告警播报 / 时钟 / 更新时间 | 3 个 `static` 变量（可交互）+ 3 个 `production.*` 宿主只读变量 |
+| `host-resource` | 5 张 KPI（OEE / 在线率 / 产量 / 目标达成 / 未处理告警）+ 产量趋势 + 产线负载排行 | `demo_metric` / `demo_series` / `demo_ranking`（`/api/metrics`） |
+| `static` | 标题、标签、班组绩效表、三个选择器 | 文档内字面量 |
+
+它同时是「物料形状 × 数据形状」的对照样本：`datav.status-grid` 承载多实体灯阵（48 台设备
+一眼扫完），`datav.pipeline` 承载保序工序链（哪道卡住），`datav.scroll-board` 承载带等级色条
+的告警流水（逐条读），三者消费的是同一个后端的三张表。
+
 「系统监控大屏」保留原来的轻量卡片文档，用来覆盖宿主自有物料
 `host-app.metric-value` 这条最小路径，也证明旧文档没有被新种子破坏。
+
+## 数据层接入
+
+三个端口在 `configure` 时成对提交（渲染器创建时捕获，**之后再赋值会被拒绝**）：
+
+| 端口 | 实现文件（三端同名） | 职责 |
+| --- | --- | --- |
+| `datasetPort` | `src/screen/host-dataset-port.ts` | `list` / `describe` / `query` → `/api/datasets*`；声明 `queryScope: 'dataset'` 开启同参数并发合并 |
+| `variablePort` | `src/screen/host-variable-port.ts` | 解析 `data-source` 变量（`production.clock` / `notice` / `status`），宿主只读 |
+| `variableCatalogPort` | `src/screen/host-variable-catalog.ts` | 设计器变量面板的目录（`list` / `describe`，`previewable: true`） |
+
+轮询由 `src/screen/host-refresh-controller.ts` 驱动（**只有查看页装，设计态不轮询**）。
+
+### datasetPort 的四条硬规矩
+
+1. **`list` 必须剥掉 `groups`**：`ScreenDatasetEntries` 是 strictObject，多一个键 contracts
+   解析就失败；分组由 `groups()` 单独取，且复用 `list({limit:1})` 的 `groups` 字段缓存 60s。
+2. **`query` 的 abort signal 在第二个参数**（`ScreenDatasetQueryRequest` 里没有 signal）；
+   被取消时返回 `{ ok: false, diagnostics: [] }`——空诊断表示"取消"，不是失败。
+3. **不下发 `componentId`**：后端 `forbidNonWhitelisted` 会 400；`params` 已由基座按
+   `describe().parameters` 校验求值，端口只负责拼 query string。
+4. **错误映射**：404 / `UNKNOWN_DATASET` → `HOST_DATASET_UNAVAILABLE`；400 / 422 →
+   `HOST_DATASET_PARAMETER_INVALID`；网络失败 / 5xx → `HOST_DATASET_UNAVAILABLE`；
+   响应形状不对 → `HOST_DATASET_INVALID`。
+
+> 注意：渲染器在物料边界会把非冻结码归一成 `HOST_RESOURCE_FAILED`（冻结集只有 8 个码）。
+> 因此屏上角标对「参数非法」与「数据集 404」都显示「数据更新失败」——**精确原因由宿主的
+> `production.status` 变量承载**，物料角标只表达"这块数据不新鲜了"。
+
+### 变量分层
+
+- `static`（`line` / `window` / `severity`）：文档内可变，URL 播种与蓝图 `set-variable`
+  写的都是它。查看页的 `?line=` 播种**改写文档副本里的 `initialValue`** 而不是调
+  `getVariable().set()`——后者依赖首次成功渲染后才会写入的变量表，首帧前必然失败且静默。
+- `data-source`（`production.clock` / `notice` / `status`）：宿主只读，每次由
+  `variablePort.resolve` 求值。任何异常都回落 `initialValue`：`resolveHostVariableBatch`
+  是 `Promise.all`，一个变量抛错会让整批 undefined → **整屏不渲染**。
+
+### 轮询与降级
+
+节拍按**数据源身份**而不是物料 type 决定（同一份数据画成灯阵还是表格，刷新频率一致）：
+
+| 数据源 | 间隔 |
+| --- | --- |
+| `monitor.alarms` | 3s |
+| `monitor.devices`、`demo_metric` 的 oee / online_rate / output_count / alarm_open | 5s |
+| `monitor.pipeline`、`demo_metric` 的 line_load | 15s |
+| `demo_metric` 的 energy_ratio、`demo_series`、`demo_ranking` | 60s |
+| 其它 | 30s |
+
+- **一个 250ms 心跳扫到期表**，不是每组件一个定时器；在飞行中的组件跳过（不叠加）。
+- **后台标签页不累积欠账**：`hidden` 时停心跳且不记 `nextDue`；恢复 `visible` 立刻全量补
+  一次并把节拍整体推后。
+- **失败降级**：已经画过一帧的组件在 `error` 时**保留上次画面**，只在右上角加 12px 角标
+  （无动画、不改变几何）；从未成功过才显示 SDK 占位。`loading` 从不清楚屏（否则轮询会闪）。
+- **状态 chip**：查看页顶栏 `[data-viewer-status]`，在线=绿、离线=橙，文本与屏内
+  `production.status` 同一套语义。
+
+> 角标计数请用 **`[data-datav-degraded-badge]`**。角标节点同时带 `data-datav-degraded`，
+> 宿主元素也同步该属性（样式钩子），因此 `[data-datav-degraded]` 会命中两个节点。
+
+### URL 参数
+
+三端都是 HashRouter，**查询串写在 hash 里**：`#/screens/<id>/view?line=LINE-B`。
+
+| 参数 | 语义 |
+| --- | --- |
+| `?line=LINE-A\|LINE-B\|LINE-C` | 播种 `line`（非法值忽略并 warn） |
+| `?window=60\|240\|1440` | 播种 `window`（分钟） |
+| `?severity=all\|critical\|warning\|info` | 播种 `severity` |
+| `?poll=0` | 关闭轮询（`tickNow` 也随之不可用） |
+| `?poll=<ms>` | 所有组件用同一天花板间隔（测试用） |
+| `?fail=500` | 每次 dataset query 追加 `fail=500`（首帧即失败时只有占位 + 离线 chip，没有角标——没有上一帧可保留） |
+| `?smoke=1` | 挂 `window.__baseScreenHost`：只有 `tickNow()` / `refreshNow()` / `status()` 三个入口 |
+
 
 ## 数据绑定演示
 
