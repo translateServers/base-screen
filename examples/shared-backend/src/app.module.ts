@@ -4,6 +4,7 @@ import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { DatasetsModule } from './datasets/datasets.module';
+import { DemoModule } from './demo/demo.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -16,6 +17,8 @@ import { ScreensModule } from './screens/screens.module';
     ScreensModule,
     MetricsModule,
     DatasetsModule,
+    // 演示端点（`/api/demo/press|roster`）：给「新建 REST 数据源」一个开箱可用的目标。
+    DemoModule,
     HealthModule,
   ],
   providers: [

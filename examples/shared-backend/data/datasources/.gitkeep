@@ -1,0 +1,8 @@
+# 受管数据源目录（PRD §8.7）：数据源管理页只能从这里挑选 `.db` 文件。
+#
+# 为什么必须是一个独立子目录而不是 `data/` 本身：`data/` 里放着宿主自己的库
+# （`screens.db` / `test.db` / `smoke-*.db`），一旦把 `data/` 当受管目录，用户就能把
+# `Screen` 表（含全部大屏文档）SELECT 出来当数据源。
+#
+# 目录里的 `*.db` 被根 `.gitignore` 忽略（库里放二进制不可读、也不可 diff）；
+# `workshop.db` 也不随仓库提交，由后端启动时的幂等种子（WorkshopSeedService）生成。

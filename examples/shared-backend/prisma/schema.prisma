@@ -22,3 +22,31 @@ model Screen {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/// 数据源台账（PRD §8.1）。内置 4 个数据集**不入表**：它们由
+/// `src/datasets/dataset-definitions.ts` 的代码常量提供，落表会产生两份会漂移的真理。
+model DataSource {
+  id          String   @id @default(uuid())
+  /// 对外的稳定标识：`custom.<slug>`，创建后不可改（大屏文档里存的就是它）
+  datasetId   String   @unique
+  name        String
+  /// 空说明必须落 null：契约里 `description` 是 `string | null`，空串非法（text.min(1)）
+  description String?
+  /// sqlite | rest | static（builtin 不入表）
+  type        String
+  /// 版本化 JSON：`{"v":1, ...}`，三种形状见 `src/datasources/datasource.types.ts`
+  config      String
+  /// draft | ready | error
+  status      String   @default("draft")
+  /// JSON: `{at,ok,code?,message?,durationMs?,rowCount?,truncated?}`
+  lastTest    String?
+  /// JSON: `DatasetFieldDefinition[]`（最近一次成功取数的字段）
+  /// 落库理由：`describe` 必须在不执行查询的前提下返回字段，且要与 `query` 逐字段一致——
+  /// 落库后 `query` 用这份字段**投影**结果，一致性由构造保证而不是靠两次推断恰好相同。
+  fields      String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+}
