@@ -29,7 +29,8 @@ import { RestDatasourceExecutor } from './rest-datasource-executor';
  * 因此「describe 的字段」与「query 的字段」不可能漂移——它们出自同一个 `fields` 数组。
  *
  * 失败一律返回 `{ok:false, code, message}`，不抛 HttpException：这一层不知道 HTTP
- * （管理侧把它映射成 200/400/422，契约侧把它映射成 4xx/5xx），文案与错误码表见架构 §4.6。
+ * （管理侧的 test/preview 映射成 200/4xx，契约侧运行时失败映射成 4xx/5xx），
+ * 文案与错误码表见架构 §4.6 与 `datasource-errors.ts`。
  */
 
 export interface RuntimeRequest {

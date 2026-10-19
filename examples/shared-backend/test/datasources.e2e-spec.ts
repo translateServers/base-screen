@@ -856,7 +856,7 @@ describe('A23 · 超时的 HTTP 映射', () => {
   const runaway =
     'WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c) SELECT count(*) FROM c';
 
-  it('reports QUERY_TIMEOUT on preview (200) and on the contract path (422)', async () => {
+  it('reports QUERY_TIMEOUT on preview (200) and on the contract path (500)', async () => {
     const preview = await request(app.getHttpServer())
       .post('/api/datasources/preview')
       .send({ type: 'sqlite', config: sqlConfig(runaway) })
@@ -864,8 +864,9 @@ describe('A23 · 超时的 HTTP 映射', () => {
     expect(preview.body).toMatchObject({ ok: false, code: 'QUERY_TIMEOUT' });
     expect(String((preview.body as { message: string }).message)).toContain('查询超时');
 
-    // 契约路径必须是 422（宿主据此映射 HOST_DATASET_UNAVAILABLE 并保留上一帧），
-    // 不能是 400（"你填错了"）也不能是 500（"后端挂了"）。
+    // 契约路径必须是 **500**：宿主把 400/422 映射成 HOST_DATASET_PARAMETER_INVALID、
+    // 5xx 映射成 HOST_DATASET_UNAVAILABLE。超时若给 422，屏上会显示「参数错误」，
+    // 把值班员引去改参数；500 才走「保留上一帧 + 角标 + 离线」这条诚实降级。
     await prisma.dataSource.create({
       data: {
         datasetId: 'custom.runaway',
@@ -880,9 +881,17 @@ describe('A23 · 超时的 HTTP 映射', () => {
     });
     const contract = await request(app.getHttpServer())
       .get('/api/datasets/custom.runaway/query')
-      .expect(422);
+      .expect(500);
     expect(contract.body).toMatchObject({ error: 'QUERY_TIMEOUT' });
     expect(String((contract.body as { message: string }).message)).toContain('查询超时');
+
+    // 三条路由的口径（PRD 修订）：
+    //   契约 `/datasets/:id/query` → 500；`/datasources/preview` → 200 + ok:false；
+    //   `/datasources/:id/test`（已存配置）→ 200 + ok:false
+    const storedTest = await request(app.getHttpServer())
+      .post('/api/datasources/custom.runaway/test')
+      .expect(200);
+    expect(storedTest.body).toMatchObject({ ok: false, code: 'QUERY_TIMEOUT' });
 
     // 超时没有污染连接：同进程随后的普通预览仍然成功
     const after = await request(app.getHttpServer())

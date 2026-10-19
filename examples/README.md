@@ -354,6 +354,7 @@ cp my-data.db examples/shared-backend/data/datasources/
 | --- | --- | --- |
 | 配置 / 安全类 | **4xx**（`{error,message}`） | `PATH_NOT_ALLOWED`、`READONLY_VIOLATION`、`MULTI_STATEMENT`、`UNDECLARED_PARAMETER`、`MISSING_PARAMETER`、`TABLE_NOT_FOUND`、`UNKNOWN_COLUMN`、`DUPLICATE_COLUMN`、`INVALID_REQUEST`、`TOO_LARGE` |
 | 连通性 / 上游类 | **200 + `ok:false`** | `UNREACHABLE`、`UNAUTHORIZED`、`UPSTREAM_ERROR`、`INVALID_SHAPE`、`QUERY_TIMEOUT` |
+| 契约路由 `/api/datasets/:id/query`（对照组） | 运行时失败按 **5xx**，**`QUERY_TIMEOUT` 为 500** | 宿主把 400/422 映射成 `HOST_DATASET_PARAMETER_INVALID`、5xx 映射成 `HOST_DATASET_UNAVAILABLE`；超时给 422 会让屏上显示「参数错误」，把人引去改参数 |
 
 > 早先两类都是 200，前端只能靠 `code` 猜"是表单错了还是接口没通"；而且 A17 明确要求越权路径
 > 给 400。现在「你提交了不允许的配置」是 4xx，「这一次没测通」仍是 200。

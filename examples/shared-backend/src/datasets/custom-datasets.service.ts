@@ -122,6 +122,7 @@ export class CustomDatasetsService {
       throw datasourceFailureToHttp(
         'INVALID_SHAPE',
         '该数据源的配置无法解析，请在管理页重新保存。',
+        'contract',
       );
     }
     // 未知参数 → UNDECLARED_PARAMETER（A4 只要求 400，这里给更具体的码）
@@ -131,7 +132,7 @@ export class CustomDatasetsService {
       'UNDECLARED_PARAMETER',
     );
     if (resolved.ok === false) {
-      throw datasourceFailureToHttp(resolved.code, resolved.message);
+      throw datasourceFailureToHttp(resolved.code, resolved.message, 'contract');
     }
     // requireRows=false：设计器侧 0 行是合法空结果（与内置数据集一致），
     // 「0 行不算成功」只属于保存/测试时的字段推断。
@@ -142,7 +143,7 @@ export class CustomDatasetsService {
       requireRows: false,
     });
     if (result.ok === false) {
-      throw datasourceFailureToHttp(result.code, result.message);
+      throw datasourceFailureToHttp(result.code, result.message, 'contract');
     }
     const rows = projectRows(result.rows, fields);
     return { fields, rows, totalRowCount: rows.length };
