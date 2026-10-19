@@ -1,6 +1,8 @@
 // 独立测试库：本 spec 会大量建/删 DataSource 行，与 app.e2e-spec 共用 test.db 会让
 // 它的「目录恰好 4 条内置」断言偶发失败（jest 并行跑文件）。迁移由 global-setup 预置。
 process.env.DATABASE_URL = 'file:../data/test.ds-api.db';
+// A23 用注入阈值：300 ms 足以让「超时→SIGKILL→重建」跑完，又不让 CI 真等 3 s
+process.env.SQLITE_TIMEOUT_MS = '300';
 
 import { createHash } from 'node:crypto';
 import { readFileSync, statSync } from 'node:fs';
@@ -819,6 +821,47 @@ describe('A21 · 单语句与注释', () => {
     expect(response.body).toMatchObject({ ok: false, code: 'INVALID_SHAPE' });
     expect(String((response.body as { message: string }).message)).toContain('注释');
   }, 20_000);
+});
+
+describe('A23 · 超时的 HTTP 映射', () => {
+  const runaway =
+    'WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c) SELECT count(*) FROM c';
+
+  it('reports QUERY_TIMEOUT on preview (200) and on the contract path (422)', async () => {
+    const preview = await request(app.getHttpServer())
+      .post('/api/datasources/preview')
+      .send({ type: 'sqlite', config: sqlConfig(runaway) })
+      .expect(200);
+    expect(preview.body).toMatchObject({ ok: false, code: 'QUERY_TIMEOUT' });
+    expect(String((preview.body as { message: string }).message)).toContain('查询超时');
+
+    // 契约路径必须是 422（宿主据此映射 HOST_DATASET_UNAVAILABLE 并保留上一帧），
+    // 不能是 400（"你填错了"）也不能是 500（"后端挂了"）。
+    await prisma.dataSource.create({
+      data: {
+        datasetId: 'custom.runaway',
+        name: 'A23 超时',
+        description: null,
+        type: 'sqlite',
+        config: JSON.stringify(sqlConfig(runaway)),
+        status: 'ready',
+        lastTest: null,
+        fields: JSON.stringify([{ id: 'n', label: 'n', valueType: 'number', nullable: true }]),
+      },
+    });
+    const contract = await request(app.getHttpServer())
+      .get('/api/datasets/custom.runaway/query')
+      .expect(422);
+    expect(contract.body).toMatchObject({ error: 'QUERY_TIMEOUT' });
+    expect(String((contract.body as { message: string }).message)).toContain('查询超时');
+
+    // 超时没有污染连接：同进程随后的普通预览仍然成功
+    const after = await request(app.getHttpServer())
+      .post('/api/datasources/preview')
+      .send({ type: 'sqlite', config: sqlConfig('SELECT count(*) AS total FROM devices') })
+      .expect(200);
+    expect((after.body as { ok: boolean }).ok).toBe(true);
+  }, 30_000);
 });
 
 describe('A22 · 截断（管理与契约两条路径）', () => {
