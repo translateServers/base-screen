@@ -299,3 +299,16 @@ describe('P0-15 · 示例数据源播种', () => {
     await expect(seed.ensureSeed()).resolves.toBe(0);
   }, 20_000);
 });
+
+describe('Q2 · 设计器目录上限', () => {
+  it('caps catalogVisibleCount at 46 while total still counts every row', async () => {
+    for (let index = 0; index < 47; index += 1) {
+      await service.create(staticBody(`Q2 Cap ${index}`));
+    }
+    const list = await service.list('all', 'Q2 Cap', 200, 0);
+    // total = 当前筛选下的条目数（分页用），不能拿它猜目录可见性
+    expect(list.total).toBe(47);
+    // 目录上限 = 契约 items 50 - 内置 4；超出部分只在管理页可见
+    expect(list.catalogVisibleCount).toBe(46);
+  }, 120_000);
+});

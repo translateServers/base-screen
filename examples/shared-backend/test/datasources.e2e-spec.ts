@@ -37,6 +37,9 @@ const PRESS_ROWS = Array.from({ length: 12 }, (_unused, index) => ({
 /** 上游按 pathname 分派；`hits` 用于断言「空 URL 不发请求」（A5）。 */
 const hits = new Map<string, number>();
 
+/** 上游最后一次收到的请求头（按 pathname）。用于断言 header 注入没有真的发出去。 */
+const seenHeaders = new Map<string, import('node:http').IncomingHttpHeaders>();
+
 function bump(pathname: string): void {
   hits.set(pathname, (hits.get(pathname) ?? 0) + 1);
 }
@@ -110,6 +113,7 @@ beforeAll(async () => {
   upstream = createServer((incoming, response) => {
     const pathname = (incoming.url ?? '/').split('?')[0] ?? '/';
     bump(pathname);
+    seenHeaders.set(pathname, incoming.headers);
     switch (pathname) {
       case '/ok':
       case '/never':
@@ -894,4 +898,47 @@ describe('A22 · 截断（管理与契约两条路径）', () => {
       'totalRowCount',
     ]);
   }, 30_000);
+});
+
+describe('S5 附加 · header 注入（PRD 未写，按失败关闭评估）', () => {
+  it('rejects CRLF in a header name as INVALID_REQUEST without calling upstream', async () => {
+    const before = hitsOf('/ok');
+    const response = await request(app.getHttpServer())
+      .post('/api/datasources/test')
+      .send({
+        type: 'rest',
+        config: {
+          v: 1,
+          url: `${upstreamBase}/ok`,
+          headers: [{ name: 'X-Bad\r\nInjected', value: 'v' }],
+          params: [],
+        },
+      })
+      .expect(400);
+    expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+    // 表单不合法 → 不发请求
+    expect(hitsOf('/ok')).toBe(before);
+  });
+
+  it('fails closed on CRLF in a header value and never forwards the injected header', async () => {
+    const before = hitsOf('/ok');
+    const response = await request(app.getHttpServer())
+      .post('/api/datasources/test')
+      .send({
+        type: 'rest',
+        config: {
+          v: 1,
+          url: `${upstreamBase}/ok`,
+          headers: [{ name: 'X-Custom', value: 'v\r\nX-Injected: 1' }],
+          params: [],
+        },
+      })
+      .expect(200);
+    // 现在的实现是「fetch 层拒绝 → 归类为 UNREACHABLE」：虽然分类不够准，但必须失败关闭。
+    expect(response.body).toMatchObject({ ok: false });
+    expect(String((response.body as { message?: string }).message)).not.toContain('X-Injected');
+    // 关键不变量：注入头一个字节都不能到上游（请求在发出前就被拒）
+    expect(seenHeaders.get('/ok')?.['x-injected']).toBeUndefined();
+    expect(hitsOf('/ok')).toBe(before);
+  });
 });
