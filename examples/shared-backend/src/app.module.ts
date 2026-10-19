@@ -9,6 +9,7 @@ import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ScreensModule } from './screens/screens.module';
+import { SqliteModule } from './sqlite/sqlite.module';
 
 @Module({
   imports: [
@@ -19,6 +20,9 @@ import { ScreensModule } from './screens/screens.module';
     DatasetsModule,
     // 演示端点（`/api/demo/press|roster`）：给「新建 REST 数据源」一个开箱可用的目标。
     DemoModule,
+    // SQLite 执行层：providers 里的 WorkshopSeedService 在启动时幂等生成演示库，
+    // 因此 `dev` / `start` / `node dist/main.js` 四条入口都自动具备 workshop.db，无需手工脚本。
+    SqliteModule,
     HealthModule,
   ],
   providers: [
