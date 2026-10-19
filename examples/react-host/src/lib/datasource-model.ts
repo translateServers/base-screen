@@ -708,6 +708,31 @@ export function testResultLabel(
   return `${prefix}${suffix}：${message}`;
 }
 
+/**
+ * 保存「已引用数据源」时是否需要字段变化二次确认（PRD §9.5 / A36）。
+ *
+ * 判定：被引用（`refCount > 0`）+ 表单改过 + 字段集合可能变化。
+ * - 表模式：字段就是勾选列，可以精确比较（顺序也算：顺序变了绑定顺序会变）；
+ * - 其它类型（SQL/REST/静态）：本地算不出字段，配置改了就可能变，**保守提示**
+ *   ——少提示一次的代价是用户到屏里才发现绑定失效，多提示一次只是多点一下。
+ *
+ * 只是改名/改说明（配置没动）不会提示。
+ */
+export function fieldChangeImpact(
+  detail: DatasourceDetail,
+  draft: DatasourceDraft,
+  baseline: string,
+): boolean {
+  if (detail.refCount === 0) return false;
+  if (draftSignature(draft) === baseline) return false;
+  if (draft.type === 'sqlite' && draft.sqliteMode === 'table') {
+    const before = detail.fields.map((field) => field.id);
+    if (before.length !== draft.columns.length) return true;
+    return before.some((id, index) => id !== draft.columns[index]);
+  }
+  return true;
+}
+
 /** 是否可写（内置只读）。 */
 export function isWritableType(type: DatasourceType): boolean {
   return type !== 'builtin';

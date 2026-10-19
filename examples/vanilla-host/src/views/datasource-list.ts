@@ -275,12 +275,19 @@ export const datasourceListView: ViewModule = {
           }),
         );
       } else {
+        // 内置只读：没有编辑/删除，但「测试连接」要能点（A34）
         actions.append(
           el('button', {
             class: 'button ds-action',
             text: DATASOURCE_TEXT.view,
             attrs: { 'data-ds-action': 'view' },
             on: { click: () => openDrawer({ datasetId: item.datasetId }) },
+          }),
+          el('button', {
+            class: 'button ds-action',
+            text: DATASOURCE_TEXT.test,
+            attrs: { 'data-ds-action': 'test' },
+            on: { click: () => void testStored(item) },
           }),
         );
       }

@@ -476,9 +476,609 @@ async function main() {
     }
     await visibilityPage.close();
 
+    // ===================== G–L：数据源后台管理（A25–A36） =====================
+    //
+    // 纪律：**用 API 造数据、用 UI 断言**。深层数据源面板（设计器里的树）不进 smoke，
+    // 那部分由根测试 A37/A39 用真实响应样例覆盖；这里只走"人真的会点的那几步"。
+    // 每个断言都带段号，失败信息写清期望与实际。
+
+    const dsFetch = async (path, init = {}) => {
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...init,
+        ...(init.body === undefined ? {} : { headers: { 'content-type': 'application/json' } }),
+      });
+      const body = await response.json().catch(() => null);
+      return { status: response.status, body };
+    };
+
+    // 以「生产监控大屏」为模板：它的文档 53 个组件全部可渲染。手工拼"最小文档"会被
+    // canonical 解析器拒掉（实测 viewer 渲染 0 组件），所以克隆后只改数据源绑定。
+    const dsTemplates = (await dsFetch('/screens')).body.screens;
+    const dsTemplate = dsTemplates.find((item) => item.name === '生产监控大屏');
+    if (dsTemplate === undefined) fail('G: 缺少「生产监控大屏」模板屏');
+    const dsTemplateDocument = (await dsFetch(`/screens/${dsTemplate.id}`)).body.screen.document;
+
+    /** 把模板里的状态灯阵改绑到指定数据源（模板里恰好有 1 个）。 */
+    const dsPatchGrid = (document, datasetId, fields, params) => {
+      let patched = 0;
+      for (const component of document.components) {
+        if (component.dataSource?.datasetId !== 'monitor.devices') continue;
+        component.dataSource = {
+          type: 'dataset',
+          datasetId,
+          params,
+          binding: { fields: { items: fields } },
+        };
+        patched += 1;
+      }
+      if (patched !== 1) fail(`模板里应恰好 1 个状态灯阵，实际 ${patched}`);
+    };
+
+    const dsScreens = [];
+    const dsMakeScreen = async (name, patch) => {
+      const created = await dsFetch('/screens', { method: 'POST', body: JSON.stringify({ name }) });
+      if (created.status !== 201) fail(`造屏失败（${name}）：HTTP ${created.status}`);
+      const screen = created.body.screen;
+      dsScreens.push(screen.id);
+      const document = JSON.parse(JSON.stringify(dsTemplateDocument));
+      patch(document);
+      const updated = await dsFetch(`/screens/${screen.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ document, revision: screen.revision }),
+      });
+      if (updated.status !== 200) {
+        fail(`写屏失败（${name}）：HTTP ${updated.status} ${JSON.stringify(updated.body)}`);
+      }
+      return screen.id;
+    };
+
+    const dsOpenView = async (screenId) => {
+      const target = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
+      target.on('pageerror', (error) => pageErrors.push(`ds-view:${screenId}: ${error.message}`));
+      await target.addInitScript((apiBaseUrl) => {
+        window.__HOST_APP_CONFIG__ = { apiBaseUrl };
+      }, API_BASE);
+      await target.goto(`${url}#/screens/${screenId}/view`, { waitUntil: 'domcontentloaded' });
+      return target;
+    };
+    const dsReadViewer = (target) =>
+      target.evaluate(() => {
+        const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
+        return {
+          tiles: root?.querySelectorAll('[data-datav-status-tile]').length ?? 0,
+          badges: root?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0,
+          empty: root?.querySelectorAll('[data-datav-status-empty]').length ?? 0,
+          text: root?.textContent ?? '',
+        };
+      });
+    const dsWaitTiles = (target, count) =>
+      target.waitForFunction(
+        (expected) =>
+          (document
+            .querySelector('base-screen-viewer')
+            ?.shadowRoot?.querySelectorAll('[data-datav-status-tile]').length ?? 0) === expected,
+        count,
+        { timeout: 30_000 },
+      );
+
+    const dsGotoList = async () => {
+      await page.evaluate(() => {
+        window.location.hash = '#/datasources';
+      });
+      await page.waitForSelector('[data-ds-row]', { timeout: 25_000 });
+      // 已经在列表页时改 hash 不会触发重渲染（三端都是 hash 路由）：显式点一次「刷新」，
+      // 否则"用 API 造完数据再看列表"会一直看到旧快照。
+      const refresh = page.locator('.ds-toolbar button', { hasText: '刷新' });
+      if ((await refresh.count()) > 0) {
+        await refresh.first().click();
+        await page.waitForTimeout(400);
+      }
+    };
+    /** 等列表行数；超时时把实际行数与页面文案带进错误，便于定位（不要只报 timeout）。 */
+    const dsWaitRows = async (count) => {
+      try {
+        await page.waitForFunction(
+          (expected) => document.querySelectorAll('[data-ds-row]').length === expected,
+          count,
+          { timeout: 20_000 },
+        );
+      } catch {
+        const actual = await page.locator('[data-ds-row]').count();
+        const text = await page.evaluate(() => document.body.innerText.slice(0, 160));
+        fail(`列表应有 ${count} 行，实际 ${actual}；页面文案：${text.replace(/\s+/g, ' ')}`);
+      }
+    };
+    /** 等抽屉里的预览表格出现；超时时把抽屉内的错误文案带进消息（不要只报 timeout）。 */
+    const dsWaitPreviewRows = async (expectedRowCount, label) => {
+      try {
+        await page.waitForSelector('[data-ds-preview] table tbody tr', { timeout: 25_000 });
+        const actual = await page.locator('[data-ds-preview] table tbody tr').count();
+        if (expectedRowCount !== undefined && actual !== expectedRowCount) {
+          fail(`${label}: 预览应 ${expectedRowCount} 行，实际 ${actual}`);
+        }
+        return actual;
+      } catch (error) {
+        const errorText = await page
+          .locator('[data-ds-form-error], [data-ds-preview]')
+          .first()
+          .innerText()
+          .catch(() => '(读不到)');
+        fail(
+          `${label}: 预览没有出表；抽屉内文案：${String(errorText).replace(/\s+/g, ' ').slice(0, 160)}`,
+        );
+      }
+    };
+
+    const dsRow = (datasetId) => page.locator(`[data-ds-row][data-dataset-id="${datasetId}"]`);
+    const dsOpenDrawer = async (datasetId, action = 'edit') => {
+      await dsRow(datasetId).locator(`[data-ds-action="${action}"]`).click();
+      await page.waitForSelector('[data-ds-form]', { timeout: 15_000 });
+      await page.waitForSelector('[data-ds-field="name"]', { timeout: 20_000 });
+    };
+    const dsCloseDrawer = async () => {
+      const form = page.locator('[data-ds-form]');
+      if ((await form.count()) === 0) return;
+      await form.locator('button', { hasText: '关闭' }).first().click();
+      await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 15_000 });
+    };
+
+    // ---------- G. 台账列表与筛选（A25 / A26 / A27 / A34） ----------
+    await page.evaluate(() => {
+      window.location.hash = '#/';
+    });
+    await page.waitForSelector('.shell__tab', { timeout: 20_000 });
+    await page.locator('.shell__tab', { hasText: '数据源' }).click();
+    await page.waitForFunction(() => window.location.hash === '#/datasources', undefined, {
+      timeout: 10_000,
+    });
+    await page.waitForSelector('[data-ds-row]', { timeout: 25_000 });
+    const activeTab = (await page.locator('.shell__tab[aria-current="page"]').innerText()).trim();
+    if (activeTab !== '数据源') fail(`G: 顶栏高亮应为「数据源」，实际「${activeTab}」`);
+
+    await page.locator('.shell__tab', { hasText: '大屏' }).click();
+    await page.waitForFunction(() => window.location.hash === '#/', undefined, { timeout: 10_000 });
+    // 等列表页真的渲染完再跳走：连续两次导航会让 hash 路由出现并发渲染
+    await page.waitForSelector('.screen-card', { timeout: 25_000 });
+    // 直接访问可达（不经过点击）
+    await page.goto(`${url}#/datasources`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('[data-ds-row]', { timeout: 25_000 });
+    await dsWaitRows(6);
+    const dsColumns = await page.locator('.ds-table thead th').count();
+    if (dsColumns !== 7) fail(`G: 表头应 7 列，实际 ${dsColumns}`);
+
+    const pressSeed = dsRow('custom.example-press');
+    const pressSeedStatus = await pressSeed.getAttribute('data-status');
+    if (pressSeedStatus !== 'draft') {
+      fail(`G: 播种 REST 状态应为 draft，实际 ${pressSeedStatus}`);
+    }
+    const pressSeedBadge = (await pressSeed.locator('.ds-badge').innerText()).trim();
+    if (pressSeedBadge !== '草稿') fail(`G: 播种 REST 徽标应为「草稿」，实际「${pressSeedBadge}」`);
+    const rosterSeedStatus = await dsRow('custom.example-roster').getAttribute('data-status');
+    if (rosterSeedStatus !== 'ready') {
+      fail(`G: 播种静态状态应为 ready，实际 ${rosterSeedStatus}`);
+    }
+
+    const types = await page
+      .locator('[data-ds-row]')
+      .evaluateAll((list) => list.map((row) => row.getAttribute('data-type')));
+    const builtinTypes = types.filter((item) => item === 'builtin').length;
+    if (builtinTypes !== 4) fail(`G: 内置应 4 行，实际 ${builtinTypes}`);
+    if (types.slice(-4).some((item) => item !== 'builtin')) {
+      fail(`G: 内置应排在末尾，实际顺序 ${types.join(',')}`);
+    }
+    for (const builtinId of ['monitor.devices', 'monitor.alarms']) {
+      const builtinRow = dsRow(builtinId);
+      for (const action of ['edit', 'delete']) {
+        const count = await builtinRow.locator(`[data-ds-action="${action}"]`).count();
+        if (count !== 0) fail(`G: 内置行 ${builtinId} 不应有 ${action} 按钮`);
+      }
+    }
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    if (overflow > 0) fail(`G: 页面横向溢出 ${overflow}px`);
+
+    await page.locator('[data-ds-search]').fill('示例');
+    await dsWaitRows(2);
+    await page.locator('[data-ds-search]').fill('');
+    await page.locator('[data-ds-filter="builtin"]').click();
+    await dsWaitRows(4);
+    await page.locator('[data-ds-filter="sqlite"]').click();
+    await page.locator('[data-ds-search]').fill('不存在');
+    await page.waitForSelector('[data-ds-empty]', { timeout: 15_000 });
+    await page.locator('[data-ds-empty] button', { hasText: '清空筛选' }).click();
+    await dsWaitRows(6);
+
+    // A34：内置行「测试连接」→ 内置数据集，无需连接
+    await dsRow('monitor.devices').locator('[data-ds-action="test"]').click();
+    await page.waitForSelector('[data-ds-result="ok"]', { timeout: 20_000 });
+    const builtinTestText = await page.locator('[data-ds-result]').first().innerText();
+    if (!builtinTestText.includes('内置数据集，无需连接')) {
+      fail(`G: 内置测试文案不对：${builtinTestText}`);
+    }
+
+    // ---------- H. REST 闭环（A28） ----------
+    await page.locator('[data-ds-create]').click();
+    await page.waitForSelector('[data-ds-form]', { timeout: 15_000 });
+    await page.locator('[data-ds-field="name"]').fill('冒烟 REST');
+    await page.locator('[data-ds-form] input[name="ds-type"][value="rest"]').check();
+    await page.locator('[data-ds-field="url"]').fill(`${API_BASE}/demo/press`);
+    await page.locator('[data-ds-test-run]').click();
+    await page.waitForSelector('[data-ds-form] [data-ds-result="ok"]', { timeout: 25_000 });
+    const restTestText = await page.locator('[data-ds-form] [data-ds-result]').innerText();
+    if (!restTestText.includes('12 行')) fail(`H: REST 测试应 12 行：${restTestText}`);
+    await page.locator('[data-ds-save]').click();
+    await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
+    await dsWaitRows(7);
+
+    const restList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 REST')}`);
+    const restItem = restList.body.items.find((item) => item.name === '冒烟 REST');
+    if (restItem === undefined) fail('H: 台账里没有「冒烟 REST」');
+    if (restItem.status !== 'ready') fail(`H: 保存后应为 ready，实际 ${restItem.status}`);
+    const restDetail = await dsFetch(`/datasources/${encodeURIComponent(restItem.datasetId)}`);
+    const restFields = restDetail.body.fields.map((field) => field.id);
+    if (restFields.join(',') !== 't,device,value') {
+      fail(`H: REST 字段应为 t,device,value，实际 ${restFields.join(',')}`);
+    }
+    if (restDetail.body.fields.find((field) => field.id === 'value')?.valueType !== 'number') {
+      fail('H: value 字段应为 number');
+    }
+    const catalogForRest = await dsFetch(`/datasets?query=${encodeURIComponent('冒烟')}`);
+    if (catalogForRest.body.items.some((item) => item.datasetId === restItem.datasetId) === false) {
+      fail('H: 设计器目录里没有「冒烟 REST」');
+    }
+    // A28 后半句的替代验证：用 API 造一张绑定了该数据源的屏，查看页断言真出数（12 行 = 12 格）
+    const restScreenId = await dsMakeScreen('冒烟屏 · REST', (document) => {
+      dsPatchGrid(document, restItem.datasetId, ['device', 'value'], {});
+    });
+    const restView = await dsOpenView(restScreenId);
+    await dsWaitTiles(restView, 12);
+    const restViewDom = await dsReadViewer(restView);
+    if (!restViewDom.text.includes('生产监控')) fail('H: 查看页标题不可见');
+    await restView.close();
+
+    // ---------- I. SQLite 表模式 + SQL 模式（A29 / A30） ----------
+    await dsGotoList();
+    await page.locator('[data-ds-create]').click();
+    await page.waitForSelector('[data-ds-form]', { timeout: 15_000 });
+    await page.locator('[data-ds-field="name"]').fill('冒烟 SQLite');
+    await page
+      .locator('[data-ds-field="file"] option[value="workshop.db"]')
+      .waitFor({ state: 'attached', timeout: 25_000 });
+    await page.locator('[data-ds-field="file"]').selectOption('workshop.db');
+    await page
+      .locator('[data-ds-field="table"] option[value="devices"]')
+      .waitFor({ state: 'attached', timeout: 25_000 });
+    await page.locator('[data-ds-field="table"]').selectOption('devices');
+    await page.waitForSelector('[data-ds-columns]', { timeout: 15_000 });
+    for (const column of ['id', 'name', 'status']) {
+      await page.locator(`[data-ds-column="${column}"]`).check();
+    }
+    await page.locator('[data-ds-preview-run]').click();
+    await dsWaitPreviewRows(20, 'I: 表模式预览');
+    await page.locator('[data-ds-save]').click();
+    await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
+    await dsWaitRows(8);
+    const sqliteList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 SQLite')}`);
+    const sqliteItem = sqliteList.body.items.find((item) => item.name === '冒烟 SQLite');
+    if (sqliteItem === undefined) fail('I: 台账里没有「冒烟 SQLite」');
+    if (sqliteItem.status !== 'ready') fail(`I: 表模式保存后应为 ready，实际 ${sqliteItem.status}`);
+    if (sqliteItem.configSummary !== 'workshop.db · devices') {
+      fail(`I: 摘要应为 workshop.db · devices，实际「${sqliteItem.configSummary}」`);
+    }
+    const catalogForSqlite = await dsFetch(`/datasets?query=${encodeURIComponent('冒烟 SQLite')}`);
+    const sqliteCatalogItem = catalogForSqlite.body.items.find(
+      (item) => item.datasetId === sqliteItem.datasetId,
+    );
+    if (sqliteCatalogItem === undefined || sqliteCatalogItem.groupId !== 'custom') {
+      fail(`I: 目录条目缺失或 groupId 不是 custom：${JSON.stringify(sqliteCatalogItem)}`);
+    }
+    const sqliteQuery = await dsFetch(
+      `/datasets/${encodeURIComponent(sqliteItem.datasetId)}/query`,
+    );
+    if (sqliteQuery.status !== 200) fail(`I: 契约查询失败 HTTP ${sqliteQuery.status}`);
+    if (String(sqliteQuery.body.rows[0]?.id ?? '') === '') fail('I: 首行 id 为空');
+    const sqliteScreenId = await dsMakeScreen('冒烟屏 · SQLite', (document) => {
+      dsPatchGrid(document, sqliteItem.datasetId, ['name', 'status'], {});
+    });
+    const sqliteView = await dsOpenView(sqliteScreenId);
+    await dsWaitTiles(sqliteView, 24);
+    await sqliteView.close();
+
+    // A30：SQL 模式 + :status 参数
+    await page.locator('[data-ds-create]').click();
+    await page.waitForSelector('[data-ds-form]', { timeout: 15_000 });
+    await page.locator('[data-ds-field="name"]').fill('冒烟 SQL');
+    await page
+      .locator('[data-ds-field="file"] option[value="workshop.db"]')
+      .waitFor({ state: 'attached', timeout: 25_000 });
+    await page.locator('[data-ds-field="file"]').selectOption('workshop.db');
+    await page.locator('[data-ds-mode="sql"]').click();
+    await page
+      .locator('[data-ds-field="sql"]')
+      .fill('SELECT id, name, status FROM devices WHERE status = :status');
+    await page.locator('[data-ds-add-param]').click();
+    await page.waitForSelector('[data-ds-param-row]', { timeout: 10_000 });
+    const paramRow = page.locator('[data-ds-param-row]').first();
+    await paramRow.locator('input').nth(0).fill('status');
+    await paramRow.locator('input').nth(1).fill('状态');
+    await paramRow.locator('input[type="checkbox"]').check();
+    await paramRow.locator('input').last().fill('fault');
+    await page.locator('[data-ds-preview-run]').click();
+    await dsWaitPreviewRows(6, 'I: SQL 预览（:status=fault）');
+    const sqlPreviewStatuses = await page
+      .locator('[data-ds-preview] table tbody tr')
+      .evaluateAll((rows) => rows.map((row) => row.querySelectorAll('td')[2]?.textContent ?? ''));
+    if (sqlPreviewStatuses.some((status) => status.trim() !== 'fault')) {
+      fail(`I: SQL 预览应全为 fault，实际 ${sqlPreviewStatuses.join(',')}`);
+    }
+    await page.locator('[data-ds-save]').click();
+    await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
+    await dsWaitRows(9);
+    const sqlList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 SQL')}`);
+    const sqlItem = sqlList.body.items.find((item) => item.name === '冒烟 SQL');
+    if (sqlItem === undefined) fail('I: 台账里没有「冒烟 SQL」');
+    const literalScreenId = await dsMakeScreen('冒烟屏 · 固定值', (document) => {
+      dsPatchGrid(document, sqlItem.datasetId, ['id', 'status'], {
+        status: { kind: 'literal', value: 'running' },
+      });
+    });
+    const literalView = await dsOpenView(literalScreenId);
+    await dsWaitTiles(literalView, 12);
+    await literalView.close();
+    const variableScreenId = await dsMakeScreen('冒烟屏 · 变量', (document) => {
+      document.variables.push({
+        id: 'dsStatus',
+        name: 'dsStatus',
+        description: '状态参数',
+        type: 'static',
+        initialValue: 'fault',
+      });
+      dsPatchGrid(document, sqlItem.datasetId, ['id', 'status'], {
+        status: { kind: 'variable', variableId: 'dsStatus' },
+      });
+    });
+    const variableView = await dsOpenView(variableScreenId);
+    await dsWaitTiles(variableView, 6);
+    await variableView.close();
+    const runningQuery = await dsFetch(
+      `/datasets/${encodeURIComponent(sqlItem.datasetId)}/query?status=running`,
+    );
+    if (runningQuery.status !== 200) fail(`I: 固定值查询失败 HTTP ${runningQuery.status}`);
+    if (runningQuery.body.rows.every((row) => row.status === 'running') === false) {
+      fail('I: 固定值 running 的查询结果混入了其它状态');
+    }
+
+    // ---------- J. 失败态与预览截断（A31 / A32） ----------
+    await dsGotoList();
+    await page.locator('[data-ds-create]').click();
+    await page.waitForSelector('[data-ds-form]', { timeout: 15_000 });
+    await page.locator('[data-ds-field="name"]').fill('冒烟 不可达');
+    await page.locator('[data-ds-form] input[name="ds-type"][value="rest"]').check();
+    await page.locator('[data-ds-field="url"]').fill('http://127.0.0.1:9/none');
+    await page.locator('[data-ds-test-run]').click();
+    await page.waitForSelector('[data-ds-form] [data-ds-result="error"]', { timeout: 25_000 });
+    const unreachableText = await page.locator('[data-ds-form] [data-ds-result]').innerText();
+    if (!unreachableText.includes('地址不可达') || !unreachableText.includes('检查 URL')) {
+      fail(`J: 不可达文案不含行动提示：${unreachableText}`);
+    }
+    await page.locator('[data-ds-save]').click();
+    await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
+    await dsWaitRows(10);
+    const unreachableList = await dsFetch(
+      `/datasources?query=${encodeURIComponent('冒烟 不可达')}`,
+    );
+    const unreachableItem = unreachableList.body.items.find((item) => item.name === '冒烟 不可达');
+    if (unreachableItem?.status !== 'error') {
+      fail(`J: 不可达保存后应为 error，实际 ${unreachableItem?.status}`);
+    }
+    const unreachableRow = dsRow(unreachableItem.datasetId);
+    if ((await unreachableRow.getAttribute('data-status')) !== 'error') {
+      fail('J: 列表里未显示「失败」行');
+    }
+
+    // A32a：静态 30 行（API 造数据，UI 断言预览 20 行 + 「共 30 行」）
+    const staticRows = Array.from({ length: 30 }, (_unused, index) => [`crew-${index}`, index]);
+    const staticCreated = await dsFetch('/datasources', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: '冒烟 静态三十',
+        description: null,
+        type: 'static',
+        config: { v: 1, columns: ['crew', 'output'], rows: staticRows },
+      }),
+    });
+    if (staticCreated.status !== 201) fail(`J: 静态数据源创建失败 HTTP ${staticCreated.status}`);
+    await dsGotoList();
+    await dsWaitRows(11);
+    await dsOpenDrawer(staticCreated.body.datasetId, 'preview');
+    await dsWaitPreviewRows(20, 'J: 静态预览');
+    const staticPreviewText = await page.locator('[data-ds-preview]').innerText();
+    if (!staticPreviewText.includes('共 30 行')) {
+      fail(`J: 静态预览应显示「共 30 行」：${staticPreviewText.slice(0, 80)}`);
+    }
+    await dsCloseDrawer();
+
+    // A32b：work_logs 600 行 → 已截断至 500 行
+    const logsCreated = await dsFetch('/datasources', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: '冒烟 工作日志',
+        description: null,
+        type: 'sqlite',
+        config: {
+          v: 1,
+          mode: 'table',
+          file: 'workshop.db',
+          table: 'work_logs',
+          columns: [
+            { name: 'id', declaredType: 'TEXT' },
+            { name: 'throughput', declaredType: 'INTEGER' },
+          ],
+          params: [],
+        },
+      }),
+    });
+    if (logsCreated.status !== 201) fail(`J: 工作日志数据源创建失败 HTTP ${logsCreated.status}`);
+    await dsGotoList();
+    await dsWaitRows(12);
+    await dsOpenDrawer(logsCreated.body.datasetId, 'preview');
+    await dsWaitPreviewRows(undefined, 'J: 工作日志预览');
+    const logsPreviewText = await page.locator('[data-ds-preview]').innerText();
+    if (!logsPreviewText.includes('已截断至 500 行')) {
+      fail(`J: 工作日志预览应显示截断提示：${logsPreviewText.slice(0, 80)}`);
+    }
+    await dsCloseDrawer();
+
+    // ---------- K. 删除保护（A33） ----------
+    await dsGotoList();
+    await dsRow(sqliteItem.datasetId).locator('[data-ds-action="delete"]').click();
+    await page.waitForSelector('[data-ds-dialog="delete-blocked"]', { timeout: 20_000 });
+    const blockedText = await page.locator('[data-ds-dialog="delete-blocked"]').innerText();
+    if (!blockedText.includes('无法删除')) fail(`K: 弹层标题不对：${blockedText.slice(0, 40)}`);
+    if (!blockedText.includes('冒烟屏 · SQLite')) {
+      fail(`K: 弹层未列出引用屏：${blockedText.slice(0, 120)}`);
+    }
+    await page.locator('[data-ds-ref-list] a').first().click();
+    await page.waitForFunction(
+      (screenId) => window.location.hash === `#/screens/${screenId}/edit`,
+      sqliteScreenId,
+      { timeout: 20_000 },
+    );
+    await page.waitForFunction(
+      () => {
+        const designer = document.querySelector('base-screen-designer');
+        return designer !== null && (designer.document?.components.length ?? 0) > 0;
+      },
+      undefined,
+      { timeout: 25_000 },
+    );
+    // 先关弹层再回列表：Vanilla 的弹层挂在 document.body 上，换视图不会销毁它，
+    // 留着会挡住列表上的点击（Playwright 报 "ds-overlay intercepts pointer events"）。
+    if ((await page.locator('[data-ds-dialog="delete-blocked"]').count()) > 0) {
+      await page.locator('[data-ds-confirm="ok"]').click();
+      await page.waitForSelector('[data-ds-dialog="delete-blocked"]', { state: 'detached' });
+    }
+    await dsGotoList();
+    if ((await dsRow(sqliteItem.datasetId).count()) !== 1) {
+      fail('K: 被引用的数据源不应被删除');
+    }
+
+    // ---------- L. 掩码与字段变化（A35 / A36） ----------
+    await dsGotoList();
+    await page.locator('[data-ds-create]').click();
+    await page.waitForSelector('[data-ds-form]', { timeout: 15_000 });
+    await page.locator('[data-ds-field="name"]').fill('冒烟 Header');
+    await page.locator('[data-ds-form] input[name="ds-type"][value="rest"]').check();
+    await page.locator('[data-ds-field="url"]').fill(`${API_BASE}/demo/press`);
+    await page.locator('[data-ds-add-header]').click();
+    await page.waitForSelector('[data-ds-header-row]', { timeout: 10_000 });
+    const headerRow = page.locator('[data-ds-header-row]').first();
+    await headerRow.locator('input').nth(0).fill('X-API-Key');
+    await headerRow.locator('input').nth(1).fill('super-secret-token-123');
+    await page.locator('[data-ds-save]').click();
+    await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
+    await dsWaitRows(13);
+    const bodyText = await page.evaluate(() => document.body.innerText);
+    if (bodyText.includes('super-secret-token-123')) fail('L: 页面文本泄露了 header 明文');
+    const headerList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 Header')}`);
+    const headerItem = headerList.body.items.find((item) => item.name === '冒烟 Header');
+    if (headerItem === undefined) fail('L: 台账里没有「冒烟 Header」');
+    await dsOpenDrawer(headerItem.datasetId, 'edit');
+    await page.waitForSelector('[data-ds-header-row]', { timeout: 20_000 });
+    const maskedHeader = page.locator('[data-ds-header-row]').first();
+    const maskedValue = await maskedHeader.locator('input').nth(1).inputValue();
+    const maskedPlaceholder = await maskedHeader
+      .locator('input')
+      .nth(1)
+      .getAttribute('placeholder');
+    if (maskedValue !== '') fail(`L: 编辑态 header 值应留空，实际「${maskedValue}」`);
+    if (maskedPlaceholder !== '••••••••') {
+      fail(`L: 编辑态 header 应显示掩码占位，实际「${maskedPlaceholder}」`);
+    }
+    await dsCloseDrawer();
+    const sqliteRowSummary = await dsRow(sqliteItem.datasetId).locator('.ds-summary').innerText();
+    if (sqliteRowSummary.includes('data/') || /[A-Za-z]:\\/.test(sqliteRowSummary)) {
+      fail(`L: SQLite 摘要泄露了路径：${sqliteRowSummary}`);
+    }
+
+    // A36：改被引用数据源的勾选（去掉 status）→ 字段变化确认 → 仍然保存 → 屏不白屏
+    await dsOpenDrawer(sqliteItem.datasetId, 'edit');
+    await page.locator('[data-ds-column="status"]').uncheck();
+    await page.locator('[data-ds-save]').click();
+    await page.waitForSelector('[data-ds-dialog="fields"]', { timeout: 20_000 });
+    const fieldsText = await page.locator('[data-ds-dialog="fields"]').innerText();
+    if (!fieldsText.includes('字段变化会影响')) {
+      fail(`L: 字段变化弹层标题不对：${fieldsText.slice(0, 40)}`);
+    }
+    if (!fieldsText.includes('冒烟屏 · SQLite')) {
+      fail('L: 字段变化弹层没列出受影响的大屏');
+    }
+    await page.locator('[data-ds-confirm="fields"]').click();
+    await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
+
+    const degradedView = await dsOpenView(sqliteScreenId);
+    // 绑定失效后灯阵不该再画格子（新开的页面没有"上一帧"可保留）
+    await degradedView.waitForFunction(
+      () =>
+        (document
+          .querySelector('base-screen-viewer')
+          ?.shadowRoot?.querySelectorAll('[data-datav-status-tile]').length ?? 0) === 0,
+      undefined,
+      { timeout: 30_000 },
+    );
+    await degradedView.waitForTimeout(1500);
+    const degradedDom = await degradedView.evaluate(() => {
+      const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
+      const host = window.__baseScreenHost?.status() ?? null;
+      return {
+        tiles: root?.querySelectorAll('[data-datav-status-tile]').length ?? 0,
+        badges: root?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0,
+        empty: root?.querySelectorAll('[data-datav-status-empty]').length ?? 0,
+        text: root?.textContent ?? '',
+        failures: host?.failures ?? 0,
+        failedComponents: host?.failedComponents?.length ?? 0,
+      };
+    });
+    // 不白屏：模板屏的标题仍在
+    if (!degradedDom.text.includes('生产监控')) {
+      fail('L: 字段变化后查看页标题不可见（疑似白屏）');
+    }
+    if (degradedDom.tiles !== 0) {
+      fail(`L: 绑定失效后不应继续画 ${degradedDom.tiles} 格`);
+    }
+    // 降级信号：引擎在组件内打出 "Host dataset binding is invalid."（实测落点），
+    // 或者角标 / 空态文案 / 宿主失败计数——任一即可，避免把实现细节焊死在断言里。
+    const bindingHint = /binding is invalid/i.test(degradedDom.text);
+    if (
+      bindingHint === false &&
+      degradedDom.badges === 0 &&
+      degradedDom.empty === 0 &&
+      degradedDom.failures + degradedDom.failedComponents === 0
+    ) {
+      fail(`L: 绑定失效后没有任何降级信号：${JSON.stringify(degradedDom).slice(0, 200)}`);
+    }
+    await degradedView.close();
+
+    // 清理：删掉本次 smoke 造的屏与数据源（保持可重复；库本身每次重建）
+    for (const screenId of dsScreens) {
+      await dsFetch(`/screens/${screenId}`, { method: 'DELETE' });
+    }
+    for (const item of [restItem, sqliteItem, sqlItem, headerItem]) {
+      await dsFetch(`/datasources/${encodeURIComponent(item.datasetId)}`, { method: 'DELETE' });
+    }
+    for (const datasetId of [
+      unreachableItem.datasetId,
+      staticCreated.body.datasetId,
+      logsCreated.body.datasetId,
+    ]) {
+      await dsFetch(`/datasources/${encodeURIComponent(datasetId)}`, { method: 'DELETE' });
+    }
+
     if (pageErrors.length > 0) fail(`页面存在未捕获错误：${JSON.stringify(pageErrors)}`);
     console.log(
-      'React 前端冒烟通过：列表 / DataV 编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）。',
+      'React 前端冒烟通过：列表 / DataV 编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）/ 数据源管理（台账·筛选·REST 闭环·SQLite 表与 SQL 模式·引用保护·掩码·字段变化）。',
     );
   } finally {
     await browser.close();

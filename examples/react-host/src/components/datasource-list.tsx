@@ -329,16 +329,31 @@ export function DatasourceListPage(): React.ReactElement {
                         </button>
                       </>
                     ) : (
-                      <button
-                        type="button"
-                        className="button ds-action"
-                        data-ds-action="view"
-                        onClick={() =>
-                          setDrawer({ mode: 'edit', datasetId: item.datasetId, autoPreview: false })
-                        }
-                      >
-                        {DATASOURCE_TEXT.view}
-                      </button>
+                      <>
+                        {/* 内置只读：没有编辑/删除，但「测试连接」要能点（A34） */}
+                        <button
+                          type="button"
+                          className="button ds-action"
+                          data-ds-action="view"
+                          onClick={() =>
+                            setDrawer({
+                              mode: 'edit',
+                              datasetId: item.datasetId,
+                              autoPreview: false,
+                            })
+                          }
+                        >
+                          {DATASOURCE_TEXT.view}
+                        </button>
+                        <button
+                          type="button"
+                          className="button ds-action"
+                          data-ds-action="test"
+                          onClick={() => void testStored(item)}
+                        >
+                          {DATASOURCE_TEXT.test}
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>

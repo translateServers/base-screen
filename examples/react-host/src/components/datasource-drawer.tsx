@@ -16,6 +16,7 @@ import {
   emptyFilterDraft,
   emptyHeaderDraft,
   emptyParamDraft,
+  fieldChangeImpact,
   formatBytes,
   isColumnSelectable,
   MASKED_SECRET,
@@ -29,7 +30,7 @@ import {
   validateDraft,
 } from '../lib/datasource-model';
 import { formatDateTime } from '../lib/format';
-import { DiscardDialog } from './datasource-dialogs';
+import { DiscardDialog, FieldChangeDialog } from './datasource-dialogs';
 import { showToast } from './toast';
 
 /**
@@ -68,6 +69,7 @@ export function DatasourceDrawer({
   const [formError, setFormError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const [askDiscard, setAskDiscard] = useState(false);
+  const [askFieldChange, setAskFieldChange] = useState(false);
   const autoPreviewDone = useRef(false);
   /** 自动预览用的最新 runPreview（避免把它放进 effect 依赖导致每次渲染重跑）。 */
   const runPreviewRef = useRef<() => Promise<void>>(async () => {});
@@ -221,8 +223,14 @@ export function DatasourceDrawer({
     void runPreviewRef.current();
   }, [autoPreview, detail, schema, draft.type, draft.file]);
 
-  const save = async (): Promise<void> => {
+  const save = async (force = false): Promise<void> => {
     if (guard() === false) return;
+    // A36：已引用的数据源改字段前二次确认（允许保存，但要说清谁受影响）
+    if (force === false && detail !== null && fieldChangeImpact(detail, draft, baseline)) {
+      setAskFieldChange(true);
+      return;
+    }
+    setAskFieldChange(false);
     setBusy('save');
     setConflict(null);
     const body = {
@@ -430,6 +438,13 @@ export function DatasourceDrawer({
           </footer>
         </section>
       </div>
+      {askFieldChange && detail !== null ? (
+        <FieldChangeDialog
+          refScreens={detail.refScreens}
+          onCancel={() => setAskFieldChange(false)}
+          onConfirm={() => void save(true)}
+        />
+      ) : null}
       {askDiscard ? (
         <DiscardDialog
           onCancel={() => setAskDiscard(false)}

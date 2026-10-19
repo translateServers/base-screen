@@ -11,7 +11,7 @@ import { formatDateTime } from '../lib/format';
  * 「点了没反应」。三态用 `kind` 区分，主按钮统一带 `data-ds-confirm`。
  */
 const props = defineProps<{
-  readonly kind: 'none' | 'confirm-delete' | 'delete-blocked' | 'discard';
+  readonly kind: 'none' | 'confirm-delete' | 'delete-blocked' | 'discard' | 'fields';
   readonly name?: string;
   readonly refScreens?: readonly DatasourceRefScreen[];
 }>();
@@ -29,6 +29,8 @@ const title = computed((): string => {
       return `无法删除：「${props.name ?? ''}」`;
     case 'discard':
       return DATASOURCE_TEXT.discardTitle;
+    case 'fields':
+      return DATASOURCE_TEXT.fieldChangesTitle;
     default:
       return '';
   }
@@ -81,6 +83,33 @@ const title = computed((): string => {
         <footer class="ds-dialog__actions">
           <button type="button" class="button button--primary" data-ds-confirm="ok" @click="emit('cancel')">
             {{ DATASOURCE_TEXT.known }}
+          </button>
+        </footer>
+      </template>
+
+      <template v-else-if="kind === 'fields'">
+        <p class="ds-dialog__body">
+          保存后绑定到「将消失字段」的组件会显示「绑定无效」并保留上次值，需要到大屏里重新绑定。
+        </p>
+        <ul class="ds-ref-list" data-ds-ref-list="">
+          <li v-for="screen in props.refScreens ?? []" :key="screen.id" class="ds-ref-list__item">
+            <span class="ds-ref-list__name">{{ screen.name }}</span>
+            <a class="button ds-ref-list__link" :href="screenEditHref(screen.id)">
+              {{ DATASOURCE_TEXT.goUnbind }}
+            </a>
+          </li>
+        </ul>
+        <footer class="ds-dialog__actions">
+          <button type="button" class="button" @click="emit('cancel')">
+            {{ DATASOURCE_TEXT.cancel }}
+          </button>
+          <button
+            type="button"
+            class="button button--primary"
+            data-ds-confirm="fields"
+            @click="emit('confirm')"
+          >
+            仍然保存
           </button>
         </footer>
       </template>

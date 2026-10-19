@@ -306,15 +306,25 @@ watch([type, query], async () => {
                   {{ DATASOURCE_TEXT.remove }}
                 </button>
               </template>
-              <button
-                v-else
-                type="button"
-                class="button ds-action"
-                data-ds-action="view"
-                @click="drawer = { mode: 'edit', datasetId: item.datasetId, autoPreview: false }"
-              >
-                {{ DATASOURCE_TEXT.view }}
-              </button>
+              <template v-else>
+                <!-- 内置只读：没有编辑/删除，但「测试连接」要能点（A34） -->
+                <button
+                  type="button"
+                  class="button ds-action"
+                  data-ds-action="view"
+                  @click="drawer = { mode: 'edit', datasetId: item.datasetId, autoPreview: false }"
+                >
+                  {{ DATASOURCE_TEXT.view }}
+                </button>
+                <button
+                  type="button"
+                  class="button ds-action"
+                  data-ds-action="test"
+                  @click="testStored(item)"
+                >
+                  {{ DATASOURCE_TEXT.test }}
+                </button>
+              </template>
             </td>
           </tr>
         </tbody>

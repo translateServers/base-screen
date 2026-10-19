@@ -110,6 +110,56 @@ export function openDeleteBlocked(
   return dialog.close;
 }
 
+/** 字段变化二次确认（PRD §9.5 / A36）：允许保存，但要说清谁受影响。 */
+export function openFieldChange(
+  refScreens: readonly DatasourceRefScreen[],
+  onConfirm: () => void,
+): () => void {
+  const list = el('ul', { class: 'ds-ref-list', attrs: { 'data-ds-ref-list': '' } });
+  for (const screen of refScreens) {
+    list.append(
+      el('li', { class: 'ds-ref-list__item' }, [
+        el('span', { class: 'ds-ref-list__name', text: screen.name }),
+        el('a', {
+          class: 'button ds-ref-list__link',
+          text: DATASOURCE_TEXT.goUnbind,
+          attrs: { href: screenEditHref(screen.id) },
+        }),
+      ]),
+    );
+  }
+  const dialog = mountDialog('fields', DATASOURCE_TEXT.fieldChangesTitle, [
+    el('h2', {
+      class: 'ds-dialog__title',
+      text: `${DATASOURCE_TEXT.fieldChangesTitle}（${refScreens.length} 张）`,
+    }),
+    el('p', {
+      class: 'ds-dialog__body',
+      text: '保存后绑定到「将消失字段」的组件会显示「绑定无效」并保留上次值，需要到大屏里重新绑定。',
+    }),
+    list,
+    el('footer', { class: 'ds-dialog__actions' }, [
+      el('button', {
+        class: 'button',
+        text: DATASOURCE_TEXT.cancel,
+        on: { click: () => dialog.close() },
+      }),
+      el('button', {
+        class: 'button button--primary',
+        text: '仍然保存',
+        attrs: { 'data-ds-confirm': 'fields' },
+        on: {
+          click: () => {
+            dialog.close();
+            onConfirm();
+          },
+        },
+      }),
+    ]),
+  ]);
+  return dialog.close;
+}
+
 /** 有未保存改动时关闭抽屉的二次确认。 */
 export function openDiscard(onDiscard: () => void): () => void {
   const dialog = mountDialog('discard', DATASOURCE_TEXT.discardTitle, [

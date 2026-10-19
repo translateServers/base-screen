@@ -16,6 +16,7 @@ import {
   emptyFilterDraft,
   emptyHeaderDraft,
   emptyParamDraft,
+  fieldChangeImpact,
   formatBytes,
   isColumnSelectable,
   MASKED_SECRET,
@@ -30,7 +31,7 @@ import {
 } from '../lib/datasource-model';
 import { el } from '../lib/dom';
 import { formatDateTime } from '../lib/format';
-import { openDiscard } from './datasource-dialogs';
+import { openDiscard, openFieldChange } from './datasource-dialogs';
 
 /**
  * 数据源抽屉（PRD §10.3 / A28–A32、A34）。与 React / Vue 两端同构。
@@ -431,11 +432,17 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
       ]);
       columnSelect.value = filter.column;
       columnSelect.addEventListener('change', () => {
-        state.draft.filters[index] = { ...filter, column: columnSelect.value };
+        state.draft.filters[index] = {
+          ...(state.draft.filters[index] ?? filter),
+          column: columnSelect.value,
+        };
       });
       const paramInput = el('input', { class: 'field', attrs: { value: filter.param } });
       paramInput.addEventListener('input', () => {
-        state.draft.filters[index] = { ...filter, param: paramInput.value };
+        state.draft.filters[index] = {
+          ...(state.draft.filters[index] ?? filter),
+          param: paramInput.value,
+        };
       });
       return el('tr', { attrs: { 'data-ds-filter-row': '' } }, [
         el('td', {}, [columnSelect]),
@@ -535,7 +542,10 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     const rows = state.draft.headers.map((header, index) => {
       const nameInput = el('input', { class: 'field', attrs: { value: header.name } });
       nameInput.addEventListener('input', () => {
-        state.draft.headers[index] = { ...header, name: nameInput.value };
+        state.draft.headers[index] = {
+          ...(state.draft.headers[index] ?? header),
+          name: nameInput.value,
+        };
       });
       const valueInput = el('input', {
         class: 'field',
@@ -547,7 +557,10 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
         },
       });
       valueInput.addEventListener('input', () => {
-        state.draft.headers[index] = { ...header, value: valueInput.value };
+        state.draft.headers[index] = {
+          ...(state.draft.headers[index] ?? header),
+          value: valueInput.value,
+        };
       });
       return el('tr', { attrs: { 'data-ds-header-row': '' } }, [
         el('td', {}, [nameInput]),
@@ -710,11 +723,17 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     const rows = state.draft.params.map((parameter, index) => {
       const nameInput = el('input', { class: 'field', attrs: { value: parameter.name } });
       nameInput.addEventListener('input', () => {
-        state.draft.params[index] = { ...parameter, name: nameInput.value };
+        state.draft.params[index] = {
+          ...(state.draft.params[index] ?? parameter),
+          name: nameInput.value,
+        };
       });
       const labelInput = el('input', { class: 'field', attrs: { value: parameter.label } });
       labelInput.addEventListener('input', () => {
-        state.draft.params[index] = { ...parameter, label: labelInput.value };
+        state.draft.params[index] = {
+          ...(state.draft.params[index] ?? parameter),
+          label: labelInput.value,
+        };
       });
       const typeSelect = el('select', { class: 'field' }, [
         el('option', { text: 'string', attrs: { value: 'string' } }),
@@ -723,21 +742,27 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
       typeSelect.value = parameter.valueType;
       typeSelect.addEventListener('change', () => {
         state.draft.params[index] = {
-          ...parameter,
+          ...(state.draft.params[index] ?? parameter),
           valueType: typeSelect.value === 'number' ? 'number' : 'string',
         };
       });
       const requiredInput = el('input', { attrs: { type: 'checkbox' } });
       requiredInput.checked = parameter.required;
       requiredInput.addEventListener('change', () => {
-        state.draft.params[index] = { ...parameter, required: requiredInput.checked };
+        state.draft.params[index] = {
+          ...(state.draft.params[index] ?? parameter),
+          required: requiredInput.checked,
+        };
       });
       const defaultInput = el('input', {
         class: 'field',
         attrs: { value: parameter.defaultValue },
       });
       defaultInput.addEventListener('input', () => {
-        state.draft.params[index] = { ...parameter, defaultValue: defaultInput.value };
+        state.draft.params[index] = {
+          ...(state.draft.params[index] ?? parameter),
+          defaultValue: defaultInput.value,
+        };
       });
       return el('tr', { attrs: { 'data-ds-param-row': '' } }, [
         el('td', {}, [nameInput]),
@@ -979,8 +1004,19 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
     render();
   }
 
-  async function save(): Promise<void> {
+  async function save(force = false): Promise<void> {
     if (guard() === false) return;
+    // A36：已引用的数据源改字段前二次确认
+    if (
+      force === false &&
+      state.detail !== null &&
+      fieldChangeImpact(state.detail, state.draft, state.baseline)
+    ) {
+      openFieldChange(state.detail.refScreens, () => {
+        void save(true);
+      });
+      return;
+    }
     state.busy = 'save';
     state.conflict = null;
     render();
@@ -1022,9 +1058,11 @@ export function openDatasourceDrawer(options: DrawerOptions): () => void {
   render();
   void (async () => {
     await loadDetail();
-    if (state.draft.type !== 'sqlite') return;
-    await loadFiles();
-    await loadSchema();
+    // 只有 SQLite 需要文件清单与表结构；但「预览」行内动作对三种类型都该自动跑一次
+    if (state.draft.type === 'sqlite') {
+      await loadFiles();
+      await loadSchema();
+    }
     if (options.autoPreview === true) await runPreview();
   })();
 

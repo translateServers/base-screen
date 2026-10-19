@@ -81,6 +81,54 @@ export function DeleteBlockedDialog({
   );
 }
 
+/** 字段变化二次确认（PRD §9.5 / A36）：允许保存，但要让人知道谁会受影响。 */
+export function FieldChangeDialog({
+  refScreens,
+  onCancel,
+  onConfirm,
+}: {
+  readonly refScreens: readonly DatasourceRefScreen[];
+  readonly onCancel: () => void;
+  readonly onConfirm: () => void;
+}): React.ReactElement {
+  return (
+    <Overlay kind="fields" label={DATASOURCE_TEXT.fieldChangesTitle}>
+      <h2 className="ds-dialog__title">
+        {DATASOURCE_TEXT.fieldChangesTitle}（{refScreens.length} 张）
+      </h2>
+      <p className="ds-dialog__body">
+        保存后绑定到「将消失字段」的组件会显示「绑定无效」并保留上次值，需要到大屏里重新绑定。
+      </p>
+      <ul className="ds-ref-list" data-ds-ref-list="">
+        {refScreens.map((screen) => (
+          <li key={screen.id} className="ds-ref-list__item">
+            <span className="ds-ref-list__name">{screen.name}</span>
+            {screen.updatedAt === '' ? null : (
+              <span className="ds-ref-list__time">{formatDateTime(screen.updatedAt)}</span>
+            )}
+            <a className="ds-ref-list__link button" href={screenEditHref(screen.id)}>
+              {DATASOURCE_TEXT.goUnbind}
+            </a>
+          </li>
+        ))}
+      </ul>
+      <footer className="ds-dialog__actions">
+        <button type="button" className="button" onClick={onCancel}>
+          {DATASOURCE_TEXT.cancel}
+        </button>
+        <button
+          type="button"
+          className="button button--primary"
+          data-ds-confirm="fields"
+          onClick={onConfirm}
+        >
+          仍然保存
+        </button>
+      </footer>
+    </Overlay>
+  );
+}
+
 export function DiscardDialog({
   onCancel,
   onConfirm,

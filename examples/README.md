@@ -122,6 +122,12 @@ pnpm verify:examples        # 依次跑三端冒烟
 （首屏灯阵/工序链/告警流水、URL 播种、变量联动、空结果、失败保留上一帧、后台暂停），
 以及无未捕获页面错误。数据层断言的详细口径见下文「数据层接入」。
 
+G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构）：台账列表与筛选、REST 新建→
+测试→保存→设计器目录可见、SQLite 表模式与 SQL 模式（固定值 / 变量两种参数绑定）、
+失败态与预览截断、删除被引用时的 409 保护、header 掩码与字段变化二次确认。
+冒烟**不点设计器内的深层数据源面板**：那几层用 API 克隆「生产监控大屏」的文档并改绑数据源，
+再在查看页断言真的出数（选中模板屏是因为手工拼的最小文档会被 canonical 解析器拒掉）。
+
 ## 成品屏与 DataV 风格种子
 
 三张 1920×1080 的成品文档，打开即可播放（默认销售 / 生产监控 / 系统监控）：
@@ -263,6 +269,98 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 三种类型同时由宿主自有插件声明为 `dataResourceType` 贡献——这不是可选装饰：一旦
 `runtimeContributions` 传给渲染器，未声明的类型会被拒绝，表现为「文档有组件、画布空白」。
 
+## 数据源后台管理
+
+入口：顶栏「数据源」tab 或直接访问 `#/datasources`（三端一致）。数据源是**资产**：
+类型 → 连接配置 → 测试连通性 → 预览数据 → 被引用情况，最后在设计器的数据源面板里被绑定。
+
+### 四类数据源
+
+| 类型 | 用户填什么 | 取数方式 |
+| --- | --- | --- |
+| `sqlite` | 受管目录里的 `.db` 文件名 + 表模式（表/列/等值过滤）或 SQL 模式（单条 `SELECT`/`WITH`） | 只读连接 + 命名参数绑定 |
+| `rest` | 完整 URL + 0..10 个 header + 0..10 个查询参数声明 | 服务端 `GET`，响应必须是对象数组或 `{rows:[...]}` |
+| `static` | 列定义 + 行数据（≤200 行 / 64 KiB，单元格只允许标量） | 直接返回 |
+| `builtin` | —— | 4 个内置数据集的代码常量（只读，不可增删改） |
+
+### 状态语义
+
+| 状态 | 含义 | 进设计器目录？ | `describe` / `query` |
+| --- | --- | --- | --- |
+| `ready` | 最近一次测试成功且字段非空 | ✅ | 200 |
+| `draft` | 创建后从未测试成功（含保存时必填参数没有值） | ❌ | 404 `DATASET_NOT_READY` |
+| `error` | 最近一次测试失败（`lastTest.code` 给分类） | ❌ | 404 `DATASET_NOT_READY` |
+| `builtin` | 内置（`ready` 的只读特例，合成状态，不入库） | ✅ | 200 |
+
+> **为什么未就绪是 404 而不是 200 + 空字段**：空字段列表会被渲染器当成「0 列/无数据」，
+> 值班员看到的是「这张屏没数据」——这是误导。404 走的是已经建好的降级路径（保留上一帧 +
+> 角标 + 状态转离线），这是诚实。目录本来就过滤未就绪的数据源，正常流程绑不到 `draft`；
+> 只有手改文档才会撞上，这种时候报错比空表有用。
+>
+> `ready` 之后**运行时**失败（库被删、SQL 报错、上游 500）**不会**被改写成 `NOT_READY`：
+> 它按原错误码返回，由宿主映射 `HOST_DATASET_UNAVAILABLE` 并保留上一帧——否则会把人误导去
+> 管理页重测。
+
+### 安全边界（SQLite）
+
+| 边界 | 行为 |
+| --- | --- |
+| 只读 | 首 token 必须是 `SELECT`/`WITH`；`INSERT/UPDATE/DELETE/REPLACE/CREATE/DROP/ALTER/VACUUM/REINDEX/ATTACH/DETACH/PRAGMA` 整词拒绝 → 400 `READONLY_VIOLATION`。连接本身也是 `readOnly:true`，写操作被驱动二次拒绝（执行后文件 SHA-256 与 mtime 不变） |
+| 单语句 | 只有词法 `normal` 态的分号才是分隔符：`SELECT ';'`、`SELECT 1 -- ; DROP` 都合法；第二条语句 → 400 `MULTI_STATEMENT` |
+| 行数与体积 | 未写 `LIMIT` 也最多 500 行；结果 ≤1 MiB；超限只标 `truncated`，不报错 |
+| 超时 | 单次 3 s，超时 `SIGKILL` 执行子进程 → 422 `QUERY_TIMEOUT`；主进程与其它查询不受影响 |
+| 路径 | 只能选受管目录内的 `.db` 文件名：`^[\w.-]+\.db$` + `realpath` 父目录比较（挡符号链接）+ 宿主库 basename 黑名单（`screens.db`/`test.db`/`smoke-*.db`）。错误与响应里不含任何绝对路径 |
+| 受管目录 | `examples/shared-backend/data/datasources/`。**必须是独立子目录**：`data/` 里放着宿主自己的库，把 `data/` 当受管目录等于把 `Screen` 表（含全部大屏文档）暴露成可选数据源；启动时会断言「受管目录 ≠ `data/`」 |
+| 二进制列 | `BLOB` 列在表结构接口里标 `supported:false`、UI 不可勾选；SQL 模式结果里出现二进制列 → 400 `INVALID_SHAPE` |
+
+REST 侧：只允许 `http:`/`https:`（含重定向目标）、8 s 预算、最多 3 跳重定向、响应体 1 MiB，
+错误五分类 `UNREACHABLE` / `UNAUTHORIZED` / `UPSTREAM_ERROR` / `INVALID_SHAPE` / `INVALID_REQUEST`。
+
+### 放一个自己的库进去
+
+```bash
+cp my-data.db examples/shared-backend/data/datasources/
+# 回到管理页 → 新建 → SQLite → 点「刷新」→ 下拉里出现 my-data.db
+```
+
+`workshop.db` 是**启动时幂等生成**的演示库（`devices` 24 行 / `work_logs` 600 行 /
+`device_photos` 含 BLOB / 视图 `v_fault_devices`），随服务启动出现在下拉里；
+它不进 Git（`*.db` 被忽略），文件已存在则跳过生成，所以你在里面加的表不会被覆盖。
+
+### 接口
+
+| # | 方法与路径 | 说明 |
+| --- | --- | --- |
+| 1 | `GET /api/datasources?type=&query=&limit=&offset=` | `{items,total,catalogVisibleCount}`；内置 + 自建，自建在前（`updatedAt` desc）、内置置底 |
+| 2 | `GET /api/datasources/:datasetId` | 详情；header 只给 `{name, valueMasked:'••••••••', hasValue}`，SQLite 只给文件名 |
+| 3 | `POST /api/datasources` | 201；**保存即取数一次**，成功且字段非空 → `ready`，失败 → `error`（不阻塞保存） |
+| 4 | `PUT /api/datasources/:datasetId` | 同上；`type` 不可改；header 传空串/掩码 = 保留原值 |
+| 5 | `DELETE /api/datasources/:datasetId` | 被引用 → 409 `DATASOURCE_IN_USE` + `refScreens`（不级联、不改别人的文档） |
+| 6 | `POST /api/datasources/test` | 草稿配置，不落库；**失败也 200**（`ok:false` + 分类码） |
+| 7 | `POST /api/datasources/:datasetId/test` | 用库里的配置（含真实 header 原值）测试并落状态 |
+| 8 | `POST /api/datasources/preview` | 草稿预览：`rows` ≤20、`rowCount` ≤500（真实行数） |
+| 9 | `GET /api/datasources/database-files` | 受管目录内的 `.db`（排除宿主库） |
+| 10 | `GET /api/datasources/database-files/:name/tables` | 表/视图 + 列（`supported:false` = BLOB） |
+
+绑定侧（设计器/查看器走这条）：
+
+- `GET /api/datasets` 的目录 = 4 个内置 + 只含 `ready` 的自建（`groupId: 'custom'`，分组名
+  「自定义数据源」）；上限 50 条（内置 4 + 最近 46 个自建，超出部分只影响设计器可见性，
+  管理页仍能看到全部）。
+- `catalogVisibleCount` = 实际进目录的自建条数（≤46）。管理页用它与 `total` 比较后提示
+  「设计器面板仅显示最近 46 个自建数据源」——`total` 含内置与草稿，拿它猜不准。
+- `GET /api/datasets/:id` 与 `/:id/query`：未就绪 404 `DATASET_NOT_READY`；`query` 接受该数据源
+  **声明的参数名**，响应键集严格为 `{fields, rows, totalRowCount}`。
+
+### 已知限制
+
+- 页面上**不提供上传** `.db`（要手工放进 `data/datasources/` 再点刷新）；P1。
+- 只接 SQLite：MySQL/Postgres/ClickHouse 等外部驱动需要连接串、凭据与连接池，本轮不做。
+- REST 源在「表单未改动 + header 是掩码」时，**预览**拿不到明文 header（`/preview` 只吃草稿
+  配置）——这类源请用「测试连接」（`#7` 用库内原值）。抽屉里对未改动的表单会自动选这条路径。
+- 编辑被引用的数据源时若字段集合变化，会先弹二次确认；保存**不阻止**，运行时按
+  `HOST_DATASET_BINDING_INVALID` 降级（保留上次值 + 角标），需要到大屏里重新绑定。
+
 ## 验收项追溯（PRD A1–A20）
 
 只列**实际有断言**的覆盖点。「三端 smoke」指三个 `scripts/smoke.mjs` 里同构的段落；
@@ -291,6 +389,26 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 | A19 | 根测试 `tests/examples/datav-monitor-document.test.ts` + 后端 `screens.service.spec` | 四种 dataSource 各 ≥1（含 6 个 `variable` 组件）、6 个变量、3 条种子 |
 | A20 | `pnpm verify:examples` | 三端各自跑同一组断言，且 tile/节点/行数/请求串完全一致 |
 | （A5/A6 的下游）蓝图规则静态校验 | `tests/examples/datav-monitor-document.test.ts` | 每条规则的 `componentId` / `variableId` / `eventName` 都存在，`eventName` ∈ 该物料 manifest 的 events |
+
+### 数据源后台管理（PRD A25–A39）
+
+| PRD | 覆盖位置 | 断言要点 |
+| --- | --- | --- |
+| A25 | 三端 smoke（G 段） | 顶栏「数据源」→ `#/datasources`、tab `aria-current=page`、点「大屏」回 `#/`、直接访问可达 |
+| A26 | 三端 smoke（G 段） | 6 行（4 内置 + 2 播种）、表头 7 列、播种 REST 徽标「草稿」/ 播种静态「就绪」、内置 4 行在末尾且无编辑/删除、`scrollWidth <= clientWidth` |
+| A27 | 三端 smoke（G 段） | 搜索「示例」=2、筛选「内置」=4、SQLite + 不存在的关键词 → 空态 + 「清空筛选」→ 回 6 行 |
+| A28 | 三端 smoke（H 段） | 新建 REST（地址用脚本的 `API_BASE`，不硬编码 3000）→ 测试 `rowCount=12`、字段恰 `t/device/value` 且 `value` 为 number → 保存「就绪」→ 目录命中；**编辑器绑定**用 API 克隆监控屏文档改绑后，查看页出 12 格 |
+| A29 | 三端 smoke（I 段） | 表模式 `workshop.db`/`devices`/勾 `id,name,status` → 预览 20 行 → 保存「就绪」+ `configSummary='workshop.db · devices'` → 目录 `groupId=custom` → 改绑后查看页 24 格、契约查询首行 `id` 非空 |
+| A30 | 三端 smoke（I 段） | SQL 模式 + `:status`（默认 `fault`）→ 预览全 `fault`；保存后固定值 `running` 的屏 12 格、变量（`dsStatus` 初值 `fault`）的屏 6 格，且 `?status=running` 查询结果全 `running` |
+| A31 | 三端 smoke（J 段） | 地址 `http://127.0.0.1:9/none` → 测试文案含「地址不可达」+「检查 URL」→ 保存仍成功、列表为「失败」行 |
+| A32 | 三端 smoke（J 段） | 静态 30 行 → 预览表 20 行 + 「共 30 行」；`work_logs` 600 行 → 「已截断至 500 行」 |
+| A33 | 三端 smoke（K 段） | 删除被引用 → 「无法删除」+ 引用屏名 → 「去解绑」→ `#/screens/<id>/edit` 且编辑器加载 → 返回列表该行仍在 → 「知道了」关闭 |
+| A34 | 三端 smoke（G 段） | 内置行点「测试连接」→ 「内置数据集，无需连接」 |
+| A35 | 三端 smoke（L 段） | 带 `X-API-Key` 新建后页面文本不含明文；编辑抽屉值留空且占位 `••••••••`；SQLite 摘要不含 `data/` 或盘符 |
+| A36 | 三端 smoke（L 段）+ 根测试 | 取消勾选 `status` 保存 → 「字段变化会影响 N 张大屏」+ 屏名 → 「仍然保存」→ 查看页标题仍在（不白屏）、灯阵 0 格 + `Host dataset binding is invalid.`；根测试用物料真实 role 断言 `HOST_DATASET_BINDING_INVALID` 的正反例 |
+| A37 | 根测试 `tests/examples/datasource-contract.test.ts` | 内置条目取自 `DATASET_DEFINITIONS`、自建参数取自 `parametersToDefinitions` → 过 Entries/Definition/Tabular 三个解析器；`description:null` 合法、空串非法、tabular 多一个键非法 |
+| A38 | 根测试 `tests/examples/vanilla-datasource-route.test.ts` | `#/datasources` 与 `?type=sqlite` 命中；`#/datasources/x` not-found；`#/screens/:id/edit`、`?line=` 行为不变 |
+| A39 | 根测试 `tests/examples/datasource-binding.test.ts` | `custom.*` 文档通过 `parseScreenDocument`；绑定字段都在 `fields` 内 → 通过，缺字段/角色不足 → `HOST_DATASET_BINDING_INVALID`（角色取自 `PLUGIN_DATAV_STATUS_GRID_MANIFEST`，不手抄） |
 
 > 未列出的子项（配色对比度、字号、动画节奏等纯视觉项）由人眼验收，不进自动化。
 

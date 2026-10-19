@@ -17,6 +17,7 @@ import {
   emptyFilterDraft,
   emptyHeaderDraft,
   emptyParamDraft,
+  fieldChangeImpact,
   formatBytes,
   isColumnSelectable,
   MASKED_SECRET,
@@ -67,6 +68,7 @@ const preview = ref<DatasourcePreviewResponse | null>(null);
 const formError = ref<string | null>(null);
 const conflict = ref<string | null>(null);
 const askDiscard = ref(false);
+const askFieldChange = ref(false);
 let autoPreviewDone = false;
 
 const readOnly = computed((): boolean => detail.value?.type === 'builtin');
@@ -188,8 +190,18 @@ async function runPreview(): Promise<void> {
       : response.data;
 }
 
-async function save(): Promise<void> {
+async function save(force = false): Promise<void> {
   if (guard() === false) return;
+  // A36：已引用的数据源改字段前二次确认
+  if (
+    force === false &&
+    detail.value !== null &&
+    fieldChangeImpact(detail.value, draft.value, baseline.value)
+  ) {
+    askFieldChange.value = true;
+    return;
+  }
+  askFieldChange.value = false;
   busy.value = 'save';
   conflict.value = null;
   const body = {
@@ -935,7 +947,7 @@ watch(
             class="button button--primary"
             data-ds-save=""
             :disabled="busy !== null"
-            @click="save"
+            @click="() => void save()"
           >
             {{ busy === 'save' ? '保存中…' : DATASOURCE_TEXT.save }}
           </button>
@@ -945,10 +957,20 @@ watch(
   </div>
 
   <DatasourceDialogs
-    :kind="askDiscard ? 'discard' : 'none'"
-    @cancel="askDiscard = false"
+    :kind="askFieldChange ? 'fields' : askDiscard ? 'discard' : 'none'"
+    :ref-screens="askFieldChange && detail !== null ? detail.refScreens : []"
+    @cancel="
+      () => {
+        askFieldChange = false;
+        askDiscard = false;
+      }
+    "
     @confirm="
       () => {
+        if (askFieldChange) {
+          void save(true);
+          return;
+        }
         askDiscard = false;
         emit('close');
       }

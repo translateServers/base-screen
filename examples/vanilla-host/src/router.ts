@@ -51,8 +51,13 @@ async function resolveView(route: Route): Promise<ViewModule> {
 
 export function startRouter(container: HTMLElement): void {
   let cleanup: (() => void) | undefined;
+  /** 渲染令牌：连续两次 hashchange 会让两个 render 并行（中间隔着 await import），
+   *  后一次必须让前一次作废，否则容器里会挂两份视图（表现为列表行数翻倍）。 */
+  let renderToken = 0;
 
   const render = async (): Promise<void> => {
+    renderToken += 1;
+    const token = renderToken;
     cleanup?.();
     cleanup = undefined;
     // 视图各自往容器里追加根节点，换视图前先清空：嵌入页的 .stage 是占满视口的
@@ -60,7 +65,12 @@ export function startRouter(container: HTMLElement): void {
     container.replaceChildren();
     const route = parseRoute(window.location.hash);
     const view = await resolveView(route);
+    if (token !== renderToken) return;
     const released = await view.mount(container, route);
+    if (token !== renderToken) {
+      released();
+      return;
+    }
     cleanup = released;
   };
 
