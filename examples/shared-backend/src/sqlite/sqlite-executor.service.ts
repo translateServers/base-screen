@@ -151,10 +151,18 @@ interface InFlightRequest {
   readonly timer: NodeJS.Timeout;
 }
 
-/** 池里的一个槽位：一个子进程 + 是否在跑请求。 */
+/** 池里的一个槽位：一个子进程 + 是否在跑请求 + 是否已预热完成。 */
 class RunnerSlot {
   readonly child: ChildProcess;
   busy = false;
+  /**
+   * 预热握手（`op:'ping'`）是否已完成。
+   *
+   * 只有 ready 的槽位才会被分配请求：子进程冷启动约 150 ms，如果从"派发"就开始计 3 s
+   * 超时，一次冷启动就吃掉大半预算（并行跑测试时足以把一次普通查询判成超时）。
+   * 预热用控制超时（15 s），不计入任何查询的预算。
+   */
+  ready = false;
 
   constructor(child: ChildProcess) {
     this.child = child;
@@ -297,13 +305,16 @@ export class SqliteExecutorService implements OnModuleInit, OnModuleDestroy {
   }
 
   private acquireSlot(): RunnerSlot | null {
-    const free = this.slots.find((slot) => slot.busy === false);
+    const free = this.slots.find((slot) => slot.busy === false && slot.ready);
     if (free !== undefined) return free;
+    // 有槽位在预热：等它（预热结束时 handshake 会重新 pump），不要塞给它
+    if (this.slots.some((slot) => slot.ready === false)) return null;
     if (this.slots.length >= this.poolSize) return null;
-    return this.spawnSlot();
+    this.spawnSlot();
+    return null;
   }
 
-  private spawnSlot(): RunnerSlot | null {
+  private spawnSlot(): void {
     try {
       const child = fork(this.runnerPath, [], {
         env: { ...process.env, NODE_NO_WARNINGS: '1' },
@@ -325,9 +336,47 @@ export class SqliteExecutorService implements OnModuleInit, OnModuleDestroy {
         // runner 只会在真正出问题时写 stderr（ExperimentalWarning 已被 NODE_NO_WARNINGS 消掉）
         this.logger.debug(`sqlite-runner: ${chunk.toString().trim()}`);
       });
-      return slot;
+      this.handshake(slot);
     } catch {
-      return null;
+      /* fork 失败：请求会在超时后被拒绝，日志由 exit/error 事件给出 */
+    }
+  }
+
+  /**
+   * 预热握手：子进程起来后先跑一次 `op:'ping'`，成功才把它标记为 ready。
+   *
+   * 失败（`node:sqlite` 缺失、API 面不完整、进程起不来）→ 失败关闭：把当前队列全部
+   * 拒绝，而不是重启-失败-再重启地空转。
+   */
+  private handshake(slot: RunnerSlot): void {
+    const id = this.nextRequestId;
+    this.nextRequestId += 1;
+    slot.busy = true;
+    const timer = setTimeout(() => {
+      this.handleTimeout(id);
+    }, CONTROL_TIMEOUT_MS);
+    timer.unref();
+    this.inFlight.set(id, {
+      slot,
+      timeoutMs: CONTROL_TIMEOUT_MS,
+      resolve: () => {
+        slot.ready = true;
+        this.pump();
+      },
+      reject: (error: Error) => {
+        this.retireSlot(slot);
+        this.logger.warn(`SQLite 执行器预热失败：${error.message}`);
+        for (const queued of this.queue.splice(0)) queued.reject(error);
+      },
+      timer,
+    });
+    try {
+      slot.child.send({ id, op: 'ping' });
+    } catch {
+      this.inFlight.delete(id);
+      clearTimeout(timer);
+      slot.busy = false;
+      this.retireSlot(slot);
     }
   }
 

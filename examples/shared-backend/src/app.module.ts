@@ -4,6 +4,7 @@ import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { DatasetsModule } from './datasets/datasets.module';
+import { DatasourcesModule } from './datasources/datasources.module';
 import { DemoModule } from './demo/demo.module';
 import { HealthModule } from './health/health.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -17,6 +18,9 @@ import { SqliteModule } from './sqlite/sqlite.module';
     PrismaModule,
     ScreensModule,
     MetricsModule,
+    // 数据源管理（台账 / 测试 / 预览 / 受管目录）。必须排在 DatasetsModule 之前：
+    // 后者依赖它导出的 DatasourceRuntime（test/preview 与设计器查询共用同一份取数实现）。
+    DatasourcesModule,
     DatasetsModule,
     // 演示端点（`/api/demo/press|roster`）：给「新建 REST 数据源」一个开箱可用的目标。
     DemoModule,

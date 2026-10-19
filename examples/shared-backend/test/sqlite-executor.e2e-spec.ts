@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '@nestjs/config';
 import type { DatasetValueType } from '../src/datasets/dataset-definitions';
@@ -11,6 +10,11 @@ import {
   SqliteExecutorService,
 } from '../src/sqlite/sqlite-executor.service';
 import { inspectSql } from '../src/sqlite/sqlite-sql-guard';
+import {
+  makeTempDatasourceDir,
+  removeTempDatasourceDir,
+  waitForRunnerExit,
+} from './support/temp-dir';
 
 /**
  * 执行器的 e2e：真起子进程、真打开库文件（A20–A23）。
@@ -64,7 +68,7 @@ beforeAll(async () => {
   for (const key of ['DATASOURCE_DIR', 'SQLITE_TIMEOUT_MS', 'SQLITE_RUNNER_POOL']) {
     envBackup.set(key, process.env[key]);
   }
-  directory = mkdtempSync(join(tmpdir(), 'base-screen-sqlite-'));
+  directory = makeTempDatasourceDir('base-screen-sqlite-');
   process.env.DATASOURCE_DIR = directory;
   process.env.SQLITE_TIMEOUT_MS = '300';
   process.env.SQLITE_RUNNER_POOL = '1';
@@ -78,6 +82,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await executor.onModuleDestroy();
+  // SIGKILL 之后句柄释放不是同步的：等一拍再删目录，否则 Windows 会 EBUSY
+  await waitForRunnerExit();
   for (const [key, value] of envBackup) {
     if (value === undefined) {
       delete process.env[key];
@@ -85,7 +91,7 @@ afterAll(async () => {
     }
     process.env[key] = value;
   }
-  rmSync(directory, { recursive: true, force: true });
+  removeTempDatasourceDir(directory);
 });
 
 describe('ping（启动自检）', () => {

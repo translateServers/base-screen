@@ -104,4 +104,15 @@ export class DraftDatasourceDto {
   @IsOptional()
   @IsObject()
   config?: Record<string, unknown>;
+
+  /**
+   * 预览/测试时给参数填的值（键 = 参数名）。
+   *
+   * 不传就用声明的默认值；必填参数既没值也没默认值 → `MISSING_PARAMETER`。
+   * 这条通道让「SQL 模式 + :status」的预览能换值试算，而不用先保存一条数据源。
+   */
+  @ApiProperty({ required: false, description: '参数名 → 值（仅本次预览/测试使用）' })
+  @IsOptional()
+  @IsObject()
+  values?: Record<string, unknown>;
 }

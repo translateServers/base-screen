@@ -1,34 +1,40 @@
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  InternalServerErrorException,
-  Param,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { DatasetCatalog, DatasetDefinitionShape, DatasetTabular } from './datasets.service';
-import { DatasetsService } from './datasets.service';
-import { DescribeDatasetDto, ListDatasetsDto, QueryDatasetDto } from './dto/dataset.dto';
+import type {
+  CatalogDefinitionShape,
+  CatalogShape,
+  CatalogTabularShape,
+} from './dataset-catalog.service';
+import { DatasetCatalogService } from './dataset-catalog.service';
+import { DescribeDatasetDto, ListDatasetsDto } from './dto/dataset.dto';
 
 /**
- * 数据集接口（PRD §6.1）：`list` / `describe` / `query` 三条，形状与
+ * 数据集接口（PRD §6.1 / §5）：`list` / `describe` / `query` 三条，形状与
  * `ScreenHostDatasetPort` 的三个方法一一对应。
  *
- * 错误体统一 `{ error, message }`，由全局 `AllExceptionsFilter` 透传：
- * 404 `UNKNOWN_DATASET`、400 `UNKNOWN_LINE` / `UNKNOWN_LEVEL` / `INVALID_LIMIT` /
- * `INVALID_WINDOW` / `MISSING_PARAMETER`、500 `INTERNAL_ERROR`。**非法参数不 500、
- * 不返回空数组冒充成功。**
+ * 本控制器在 T03 被改成**转发层**：真正的合并（内置 4 + ready 自建）与参数分发
+ * 在 `DatasetCatalogService` 里。控制器只保留两件必须留在框架层的事：
+ * 1. 路由形状与声明顺序（两段路由比一段先声明）；
+ * 2. `ListDatasetsDto` / `DescribeDatasetDto` 的存在，让全局 `ValidationPipe` 的
+ *    `whitelist + forbidNonWhitelisted` 继续对 list / describe 生效（旧 e2e 依赖它：
+ *    `?bogus=1` 与 `?fail=500` 在 describe 上必须 400）。
+ *
+ * `query` 的参数改成 `Record<string, unknown>`（**故意不挂 DTO**）：自建数据源的参数是
+ * 动态声明，若用 `forbidNonWhitelisted` 会一律 400（PRD F4）。`monitor.*` 的 DTO 校验
+ * 由 `DatasetCatalogService` 用同一个 `QueryDatasetDto` + 同一份管道选项手工补回来，
+ * 因此旧行为逐字不变。
+ *
+ * 错误体统一 `{error, message}`，由全局 `AllExceptionsFilter` 透传。
  */
 @ApiTags('datasets')
 @Controller('datasets')
 export class DatasetsController {
-  constructor(private readonly datasets: DatasetsService) {}
+  constructor(private readonly catalog: DatasetCatalogService) {}
 
   @Get()
-  @ApiOperation({ summary: '数据集目录：一次返回分组与条目（供设计器数据面板消费）' })
-  list(@Query() query: ListDatasetsDto): DatasetCatalog {
-    return this.datasets.list(query.query, query.groupId, query.limit);
+  @ApiOperation({ summary: '数据集目录：内置 + 已就绪的自建（含分组）' })
+  list(@Query() query: ListDatasetsDto): Promise<CatalogShape> {
+    return this.catalog.list(query.query, query.groupId, query.limit);
   }
 
   /**
@@ -39,21 +45,19 @@ export class DatasetsController {
   @ApiOperation({ summary: '数据集查询：fields 必须与 describe 逐字段一致' })
   @ApiParam({ name: 'datasetId', example: 'monitor.devices' })
   @ApiResponse({ status: 400, description: '参数非法（UNKNOWN_LINE / INVALID_WINDOW 等）' })
-  @ApiResponse({ status: 404, description: 'UNKNOWN_DATASET' })
-  query(@Param('datasetId') datasetId: string, @Query() query: QueryDatasetDto): DatasetTabular {
-    assertNoInjectedFailure(query.fail);
-    return this.datasets.query(datasetId, {
-      line: query.line,
-      window: query.window,
-      level: query.level,
-      limit: query.limit,
-    });
+  @ApiResponse({ status: 404, description: 'UNKNOWN_DATASET / DATASET_NOT_READY' })
+  query(
+    @Param('datasetId') datasetId: string,
+    // 无 DTO 的意图见类注释：动态参数不能走 whitelist，校验在 catalog 里按数据类型分派
+    @Query() raw: Record<string, unknown>,
+  ): Promise<CatalogTabularShape> {
+    return this.catalog.query(datasetId, raw);
   }
 
   @Get(':datasetId')
   @ApiOperation({ summary: '数据集描述：字段（顺序即绑定默认顺序）与参数（含枚举/区间/默认值）' })
   @ApiParam({ name: 'datasetId', example: 'monitor.devices' })
-  @ApiResponse({ status: 404, description: 'UNKNOWN_DATASET' })
+  @ApiResponse({ status: 404, description: 'UNKNOWN_DATASET / DATASET_NOT_READY' })
   @ApiResponse({ status: 400, description: 'INVALID_REQUEST：未声明的 query 参数' })
   describe(
     @Param('datasetId') datasetId: string,
@@ -61,36 +65,7 @@ export class DatasetsController {
     // 也生效。没有 `@Query()` 时未知参数会被静默忽略（`?bogus=1` 仍 200），
     // 而 `?fail=500` 也会被"忽略"成一次正常 describe——故障注入就漏到了面板路径上。
     @Query() _query: DescribeDatasetDto,
-  ): DatasetDefinitionShape {
-    return this.datasets.describe(datasetId);
+  ): Promise<CatalogDefinitionShape> {
+    return this.catalog.describe(datasetId);
   }
-}
-
-/**
- * 故障注入（PRD §12）：只加在 query 上，不加在 list/describe——否则数据面板会整体空白，
- * 断言的就不是"查询失败"而是"面板坏了"。
- *
- * **只认显式开关** `DATASET_FAIL_INJECTION=1`：早先按 `NODE_ENV !== 'production'` 判断，
- * 漏设 NODE_ENV 的部署（很多 PaaS 默认不设）就等于生产环境可注入，这是不可接受的面子。
- * 开关关闭时 `fail` 参数按未声明参数处理（400），不静默忽略——静默忽略会让冒烟以为
- * 自己注入了故障，实际测的是正常路径。
- */
-function assertNoInjectedFailure(fail: string | undefined): void {
-  if (fail === undefined || fail === '') return;
-  if (process.env.DATASET_FAIL_INJECTION !== '1') {
-    throw new BadRequestException({
-      error: 'INVALID_REQUEST',
-      message: 'Unsupported parameter: fail (set DATASET_FAIL_INJECTION=1 to enable)',
-    });
-  }
-  if (fail === '500') {
-    throw new InternalServerErrorException({
-      error: 'INJECTED_FAILURE',
-      message: 'Injected dataset failure for smoke testing.',
-    });
-  }
-  throw new BadRequestException({
-    error: 'INVALID_REQUEST',
-    message: `Unsupported fail mode: ${fail}`,
-  });
 }
