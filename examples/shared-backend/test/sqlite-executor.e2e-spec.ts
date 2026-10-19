@@ -347,6 +347,34 @@ describe('A20 · 只读（两条路径）', () => {
   });
 });
 
+describe('生命周期（Info-1：优雅关闭不留孤儿进程）', () => {
+  it('kills every runner on destroy and refuses further work', async () => {
+    const spare = new SqliteExecutorService(new ConfigService());
+    await spare.onModuleInit();
+    const warmed = await spare.query({
+      file: databaseFile,
+      sql: 'SELECT count(*) AS total FROM devices',
+    });
+    expect(warmed.rows[0]?.total).toBe(24);
+    expect(spare.poolUsage).toBe(1);
+
+    // `main.ts` 的 `app.enableShutdownHooks()` 让 SIGTERM/SIGINT 走到这里同一条路径
+    await spare.onModuleDestroy();
+    expect(spare.poolUsage).toBe(0);
+
+    let caught: unknown = null;
+    try {
+      await spare.query({ file: databaseFile, sql: 'SELECT 1 AS one' });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SqliteExecutionError);
+    if (caught instanceof SqliteExecutionError) {
+      expect(caught.message).toContain('已关闭');
+    }
+  }, 30_000);
+});
+
 describe('A23 · 硬超时与进程健康', () => {
   it('kills a runaway query and keeps serving afterwards', async () => {
     expect(executor.timeoutMs).toBe(300);

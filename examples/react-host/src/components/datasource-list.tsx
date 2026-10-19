@@ -261,9 +261,16 @@ export function DatasourceListPage(): React.ReactElement {
                 >
                   <td>
                     <span className="ds-name">{item.name}</span>
-                    <code className="ds-id" title={item.datasetId}>
+                    {/* A26 的 7 列不变：datasetId 收在名称列里，点一下即可复制 */}
+                    <button
+                      type="button"
+                      className="ds-id"
+                      data-ds-copy={item.datasetId}
+                      title={`${item.datasetId}（点击复制）`}
+                      onClick={(event) => void copyDatasetId(event.currentTarget, item.datasetId)}
+                    >
                       {displayDatasetId(item.datasetId, 32)}
-                    </code>
+                    </button>
                     {item.description === null ? null : (
                       <span className="ds-desc">{item.description}</span>
                     )}
@@ -392,6 +399,20 @@ export function DatasourceListPage(): React.ReactElement {
       ) : null}
     </div>
   );
+}
+
+/** 点击 datasetId 复制到剪贴板；剪贴板不可用（非安全上下文/无权限）时退化为选中文本。 */
+async function copyDatasetId(element: HTMLElement, datasetId: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(datasetId);
+    showToast('已复制', 'success');
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
 }
 
 /** 409 的 `refScreens` 来自错误体（`AllExceptionsFilter` 透传的附加字段）。 */

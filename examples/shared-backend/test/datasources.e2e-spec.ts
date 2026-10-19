@@ -664,9 +664,10 @@ describe('A18 · 表模式', () => {
         type: 'sqlite',
         config: { ...tableConfig([{ name: 'id' }]), table: 'nope' },
       })
-      .expect(200)
+      // 配置类错误（表不存在）一律 4xx：与「测试没通」区分开（Minor-7）
+      .expect(400)
       .expect((response) => {
-        expect(response.body).toMatchObject({ ok: false, code: 'TABLE_NOT_FOUND' });
+        expect(response.body).toMatchObject({ error: 'TABLE_NOT_FOUND' });
       });
 
     await request(app.getHttpServer())
@@ -715,18 +716,18 @@ describe('A19 · SQL 模式的错误分类', () => {
   it('reports MISSING_PARAMETER for a required parameter without a value', async () => {
     const response = await previewSql('SELECT id FROM devices WHERE status = :status', [
       statusParam,
-    ]).expect(200);
-    expect(response.body).toMatchObject({ ok: false, code: 'MISSING_PARAMETER' });
+    ]).expect(400);
+    expect(response.body).toMatchObject({ error: 'MISSING_PARAMETER' });
     expect(String((response.body as { message: string }).message)).toContain(':status');
   }, 20_000);
 
   it('reports UNDECLARED_PARAMETER, DUPLICATE_COLUMN, empty result and BLOB results', async () => {
-    const undeclared = await previewSql('SELECT id FROM devices WHERE status = :nope').expect(200);
-    expect(undeclared.body).toMatchObject({ ok: false, code: 'UNDECLARED_PARAMETER' });
+    const undeclared = await previewSql('SELECT id FROM devices WHERE status = :nope').expect(400);
+    expect(undeclared.body).toMatchObject({ error: 'UNDECLARED_PARAMETER' });
     expect(String((undeclared.body as { message: string }).message)).toContain(':nope');
 
-    const duplicated = await previewSql('SELECT id, id FROM devices').expect(200);
-    expect(duplicated.body).toMatchObject({ ok: false, code: 'DUPLICATE_COLUMN' });
+    const duplicated = await previewSql('SELECT id, id FROM devices').expect(400);
+    expect(duplicated.body).toMatchObject({ error: 'DUPLICATE_COLUMN' });
 
     const empty = await previewSql("SELECT id FROM devices WHERE status = 'nope'").expect(200);
     expect(empty.body).toMatchObject({ ok: false, code: 'INVALID_SHAPE' });
@@ -741,6 +742,29 @@ describe('A19 · SQL 模式的错误分类', () => {
     const devices = await previewSql('SELECT * FROM devices').expect(200);
     expect((devices.body as { ok: boolean }).ok).toBe(true);
   }, 30_000);
+});
+
+describe('参数值类型（Minor-4）', () => {
+  it('rejects object/array parameter values instead of stringifying them', async () => {
+    const config = sqlConfig('SELECT id FROM devices WHERE status = :status', [
+      { name: 'status', label: '状态', valueType: 'string', required: true },
+    ]);
+    for (const bad of [{ nested: 1 }, [1, 2]]) {
+      await request(app.getHttpServer())
+        .post('/api/datasources/preview')
+        .send({ type: 'sqlite', config, values: { status: bad } })
+        .expect(400)
+        .expect((response) => {
+          expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+          expect(String(response.body.message)).toContain(':status');
+        });
+    }
+    // 对照组：标量照常通过（否则上面的 400 可能是别的原因）
+    await request(app.getHttpServer())
+      .post('/api/datasources/preview')
+      .send({ type: 'sqlite', config, values: { status: 'fault' } })
+      .expect(200);
+  }, 20_000);
 });
 
 describe('A20 · 只读（HTTP 两条路径 + 文件不变）', () => {
@@ -760,8 +784,9 @@ describe('A20 · 只读（HTTP 两条路径 + 文件不变）', () => {
       const response = await request(app.getHttpServer())
         .post('/api/datasources/preview')
         .send({ type: 'sqlite', config: sqlConfig(sql) })
-        .expect(200);
-      expect(response.body).toMatchObject({ ok: false, code: 'READONLY_VIOLATION' });
+        // 安全类错误一律 4xx（A17/A20 的「越权路径给 400」）
+        .expect(400);
+      expect(response.body).toMatchObject({ error: 'READONLY_VIOLATION' });
     }
     expect(snapshot(file)).toEqual(before);
   }, 30_000);
@@ -809,8 +834,8 @@ describe('A21 · 单语句与注释', () => {
   }
 
   it('rejects a second statement', async () => {
-    const response = await previewSql('SELECT 1; DROP TABLE devices').expect(200);
-    expect(response.body).toMatchObject({ ok: false, code: 'MULTI_STATEMENT' });
+    const response = await previewSql('SELECT 1; DROP TABLE devices').expect(400);
+    expect(response.body).toMatchObject({ error: 'MULTI_STATEMENT' });
   }, 20_000);
 
   it('accepts semicolons inside literals and comments, and a single trailing semicolon', async () => {
@@ -933,9 +958,10 @@ describe('S5 附加 · header 注入（PRD 未写，按失败关闭评估）', (
           params: [],
         },
       })
-      .expect(200);
-    // 现在的实现是「fetch 层拒绝 → 归类为 UNREACHABLE」：虽然分类不够准，但必须失败关闭。
-    expect(response.body).toMatchObject({ ok: false });
+      // 修好之后：CRLF 在表单校验阶段就被拒（400 INVALID_REQUEST），不再落到 fetch 层
+      // 被误分类成 UNREACHABLE。
+      .expect(400);
+    expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
     expect(String((response.body as { message?: string }).message)).not.toContain('X-Injected');
     // 关键不变量：注入头一个字节都不能到上游（请求在发出前就被拒）
     expect(seenHeaders.get('/ok')?.['x-injected']).toBeUndefined();

@@ -20,6 +20,9 @@ import type { DatabaseFileInfo } from './datasource.types';
 /** 受管目录内的合法文件名：只有 basename，只有 `.db`，字符集不含路径分隔符。 */
 export const DATABASE_FILE_PATTERN: RegExp = /^[\w.-]+\.db$/;
 
+/** 文件名长度上限（与 UI 的输入上限一致）：超长一定是构造出来的，不是人起的名字。 */
+export const MAX_DATABASE_FILE_NAME_LENGTH = 128;
+
 /** 演示库文件名（`WorkshopSeedService` 生成，`GET /database-files` 会列出来）。 */
 export const WORKSHOP_DATABASE_FILE = 'workshop.db';
 
@@ -119,6 +122,11 @@ export function resolveDatabaseFile(
 ): DatabasePathResult {
   const raw = typeof name === 'string' ? name.trim() : '';
   if (raw === '' || raw !== basename(raw) || DATABASE_FILE_PATTERN.test(raw) === false) {
+    return { ok: false, code: 'PATH_NOT_ALLOWED', message: PATH_MESSAGES.notAllowed };
+  }
+  // 长度/控制字符也属于"路径不合法"：早先 297 字符会落到 existsSync → INVALID_SHAPE，
+  // 而 A17 期望越权路径一律 400 PATH_NOT_ALLOWED（把非法路径和"文件不存在"分开）
+  if (raw.length > MAX_DATABASE_FILE_NAME_LENGTH || /[\u0000-\u001f\u007f]/.test(raw)) {
     return { ok: false, code: 'PATH_NOT_ALLOWED', message: PATH_MESSAGES.notAllowed };
   }
   if (isHostDatabase(raw)) {

@@ -279,6 +279,10 @@ function readParameters(value: unknown): ConfigResult<readonly ParameterDeclarat
 /** header 名：RFC 7230 token（不含空格、冒号与控制字符）。 */
 const HEADER_NAME_PATTERN = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 
+/** header 名/值的长度上限：够长（JWT/签名都在 4 KiB 内），又不至于把请求体撑爆。 */
+const MAX_HEADER_NAME_LENGTH = 128;
+const MAX_HEADER_VALUE_LENGTH = 4096;
+
 function readRestConfig(record: Record<string, unknown>): ConfigResult<RestConfig> {
   const url = readString(record.url);
   if (url === null || url.trim() === '') {
@@ -328,11 +332,26 @@ function readHeaders(value: unknown): ConfigResult<readonly RestHeader[]> {
         `header 名 \`${name ?? ''}\` 不合法：不能包含空格、冒号或中文。`,
       );
     }
+    if (name.length > MAX_HEADER_NAME_LENGTH) {
+      return failure('INVALID_REQUEST', `header 名最多 ${MAX_HEADER_NAME_LENGTH} 字符。`);
+    }
     const lowered = name.toLowerCase();
     if (seen.has(lowered)) return failure('INVALID_REQUEST', `header \`${name}\` 重复。`);
     seen.add(lowered);
     const rawValue = record === null ? null : readString(record.value);
-    headers.push({ name, value: rawValue === null ? '' : rawValue });
+    const headerValue = rawValue === null ? '' : rawValue;
+    // CRLF 注入：必须在进 undici 之前拦下。否则 fetch 会抛 TypeError，被我们归类成
+    // 「地址不可达」，把一个"你填错了"的配置问题说成网络问题。
+    if (/[\r\n]/.test(headerValue)) {
+      return failure('INVALID_REQUEST', `header \`${name}\` 的值不能包含换行符。`);
+    }
+    if (headerValue.length > MAX_HEADER_VALUE_LENGTH) {
+      return failure(
+        'INVALID_REQUEST',
+        `header \`${name}\` 的值最多 ${MAX_HEADER_VALUE_LENGTH} 字符。`,
+      );
+    }
+    headers.push({ name, value: headerValue });
   }
   return { ok: true, config: headers };
 }

@@ -117,16 +117,23 @@ export function openFieldChange(
 ): () => void {
   const list = el('ul', { class: 'ds-ref-list', attrs: { 'data-ds-ref-list': '' } });
   for (const screen of refScreens) {
-    list.append(
-      el('li', { class: 'ds-ref-list__item' }, [
-        el('span', { class: 'ds-ref-list__name', text: screen.name }),
-        el('a', {
-          class: 'button ds-ref-list__link',
-          text: DATASOURCE_TEXT.goUnbind,
-          attrs: { href: screenEditHref(screen.id) },
-        }),
-      ]),
+    const item = el('li', { class: 'ds-ref-list__item' }, [
+      el('span', { class: 'ds-ref-list__name', text: screen.name }),
+    ]);
+    // 与 React / Vue 对齐：受影响的大屏带更新时间
+    if (screen.updatedAt !== '') {
+      item.append(
+        el('span', { class: 'ds-ref-list__time', text: formatDateTime(screen.updatedAt) }),
+      );
+    }
+    item.append(
+      el('a', {
+        class: 'button ds-ref-list__link',
+        text: DATASOURCE_TEXT.goUnbind,
+        attrs: { href: screenEditHref(screen.id) },
+      }),
     );
+    list.append(item);
   }
   const dialog = mountDialog('fields', DATASOURCE_TEXT.fieldChangesTitle, [
     el('h2', {

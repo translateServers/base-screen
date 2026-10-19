@@ -271,7 +271,9 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 
 ## 数据源后台管理
 
-入口：顶栏「数据源」tab 或直接访问 `#/datasources`（三端一致）。数据源是**资产**：
+入口：顶栏「数据源」tab 或直接访问 `#/datasources`（三端一致）。列表的**名称列**下方是
+datasetId，**点一下即复制**（`navigator.clipboard`；剪贴板不可用时退化为选中文本）。
+数据源是**资产**：
 类型 → 连接配置 → 测试连通性 → 预览数据 → 被引用情况，最后在设计器的数据源面板里被绑定。
 
 ### 四类数据源
@@ -289,7 +291,7 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 | --- | --- | --- | --- |
 | `ready` | 最近一次测试成功且字段非空 | ✅ | 200 |
 | `draft` | 创建后从未测试成功（含保存时必填参数没有值） | ❌ | 404 `DATASET_NOT_READY` |
-| `error` | 最近一次测试失败（`lastTest.code` 给分类） | ❌ | 404 `DATASET_NOT_READY` |
+| `error`（列表徽标「异常」） | 最近一次测试失败（`lastTest.code` 给分类） | ❌ | 404 `DATASET_NOT_READY` |
 | `builtin` | 内置（`ready` 的只读特例，合成状态，不入库） | ✅ | 200 |
 
 > **为什么未就绪是 404 而不是 200 + 空字段**：空字段列表会被渲染器当成「0 列/无数据」，
@@ -316,6 +318,10 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 REST 侧：只允许 `http:`/`https:`（含重定向目标）、8 s 预算、最多 3 跳重定向、响应体 1 MiB，
 错误五分类 `UNREACHABLE` / `UNAUTHORIZED` / `UPSTREAM_ERROR` / `INVALID_SHAPE` / `INVALID_REQUEST`。
 
+header 的校验（在**发请求之前**，失败一律 400 `INVALID_REQUEST`，不会落到 fetch 层被误判成
+`UNREACHABLE`）：名字必须匹配 RFC 7230 token（≤128 字符）；**值里不允许出现 `\r` / `\n`**
+（CRLF 注入）；值长度 ≤4096 字符。
+
 ### 放一个自己的库进去
 
 ```bash
@@ -336,11 +342,21 @@ cp my-data.db examples/shared-backend/data/datasources/
 | 3 | `POST /api/datasources` | 201；**保存即取数一次**，成功且字段非空 → `ready`，失败 → `error`（不阻塞保存） |
 | 4 | `PUT /api/datasources/:datasetId` | 同上；`type` 不可改；header 传空串/掩码 = 保留原值 |
 | 5 | `DELETE /api/datasources/:datasetId` | 被引用 → 409 `DATASOURCE_IN_USE` + `refScreens`（不级联、不改别人的文档） |
-| 6 | `POST /api/datasources/test` | 草稿配置，不落库；**失败也 200**（`ok:false` + 分类码） |
+| 6 | `POST /api/datasources/test` | 草稿配置，不落库；**配置/安全类错误 4xx**、**连通性错误 200 + `ok:false`**（见下方分界说明） |
 | 7 | `POST /api/datasources/:datasetId/test` | 用库里的配置（含真实 header 原值）测试并落状态 |
-| 8 | `POST /api/datasources/preview` | 草稿预览：`rows` ≤20、`rowCount` ≤500（真实行数） |
+| 8 | `POST /api/datasources/preview` | 草稿预览：`rows` ≤20、`rowCount` ≤500（真实行数）；错误分界同 #6 |
 | 9 | `GET /api/datasources/database-files` | 受管目录内的 `.db`（排除宿主库） |
 | 10 | `GET /api/datasources/database-files/:name/tables` | 表/视图 + 列（`supported:false` = BLOB） |
+
+`/test` 与 `/preview` 的**失败分两类**（前端据此决定"改表单"还是"再试一次"）：
+
+| 类别 | HTTP | 错误码 |
+| --- | --- | --- |
+| 配置 / 安全类 | **4xx**（`{error,message}`） | `PATH_NOT_ALLOWED`、`READONLY_VIOLATION`、`MULTI_STATEMENT`、`UNDECLARED_PARAMETER`、`MISSING_PARAMETER`、`TABLE_NOT_FOUND`、`UNKNOWN_COLUMN`、`DUPLICATE_COLUMN`、`INVALID_REQUEST`、`TOO_LARGE` |
+| 连通性 / 上游类 | **200 + `ok:false`** | `UNREACHABLE`、`UNAUTHORIZED`、`UPSTREAM_ERROR`、`INVALID_SHAPE`、`QUERY_TIMEOUT` |
+
+> 早先两类都是 200，前端只能靠 `code` 猜"是表单错了还是接口没通"；而且 A17 明确要求越权路径
+> 给 400。现在「你提交了不允许的配置」是 4xx，「这一次没测通」仍是 200。
 
 绑定侧（设计器/查看器走这条）：
 
@@ -400,7 +416,7 @@ cp my-data.db examples/shared-backend/data/datasources/
 | A28 | 三端 smoke（H 段） | 新建 REST（地址用脚本的 `API_BASE`，不硬编码 3000）→ 测试 `rowCount=12`、字段恰 `t/device/value` 且 `value` 为 number → 保存「就绪」→ 目录命中；**编辑器绑定**用 API 克隆监控屏文档改绑后，查看页出 12 格 |
 | A29 | 三端 smoke（I 段） | 表模式 `workshop.db`/`devices`/勾 `id,name,status` → 预览 20 行 → 保存「就绪」+ `configSummary='workshop.db · devices'` → 目录 `groupId=custom` → 改绑后查看页 24 格、契约查询首行 `id` 非空 |
 | A30 | 三端 smoke（I 段） | SQL 模式 + `:status`（默认 `fault`）→ 预览全 `fault`；保存后固定值 `running` 的屏 12 格、变量（`dsStatus` 初值 `fault`）的屏 6 格，且 `?status=running` 查询结果全 `running` |
-| A31 | 三端 smoke（J 段） | 地址 `http://127.0.0.1:9/none` → 测试文案含「地址不可达」+「检查 URL」→ 保存仍成功、列表为「失败」行 |
+| A31 | 三端 smoke（J 段） | 地址 `http://127.0.0.1:9/none` → 测试文案含「地址不可达」+「检查 URL」→ 保存仍成功、列表徽标为「异常」 |
 | A32 | 三端 smoke（J 段） | 静态 30 行 → 预览表 20 行 + 「共 30 行」；`work_logs` 600 行 → 「已截断至 500 行」 |
 | A33 | 三端 smoke（K 段） | 删除被引用 → 「无法删除」+ 引用屏名 → 「去解绑」→ `#/screens/<id>/edit` 且编辑器加载 → 返回列表该行仍在 → 「知道了」关闭 |
 | A34 | 三端 smoke（G 段） | 内置行点「测试连接」→ 「内置数据集，无需连接」 |

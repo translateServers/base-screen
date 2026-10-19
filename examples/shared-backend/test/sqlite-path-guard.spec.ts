@@ -77,6 +77,17 @@ describe('resolveDatabaseFile · 拒绝越界', () => {
     }
   });
 
+  it('rejects an over-long or control-character basename as PATH_NOT_ALLOWED (A17)', () => {
+    // 长度 > 128 与含控制字符都属于「路径不合法」，不能落到 existsSync 之后变成 INVALID_SHAPE
+    for (const name of [`${'a'.repeat(297)}.db`, 'bad\u0000name.db', 'tab\tname.db']) {
+      const result = resolveDatabaseFile(name, directory);
+      expect(result.ok).toBe(false);
+      if (result.ok) continue;
+      expect(result.code).toBe('PATH_NOT_ALLOWED');
+      expect(result.message).toBe('只能选择受管目录内的数据库文件。');
+    }
+  });
+
   it('rejects an absolute path that points inside the managed directory', () => {
     const absolute = join(directory, 'workshop.db');
     writeFileSync(absolute, 'placeholder');

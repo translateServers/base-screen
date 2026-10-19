@@ -494,9 +494,20 @@
 .ds-id {
   display: block;
   margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--color-text-muted);
+  cursor: pointer;
+  text-align: left;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
+}
+
+.ds-id:hover,
+.ds-id:focus-visible {
+  color: var(--color-accent);
+  text-decoration: underline;
 }
 
 .ds-desc {

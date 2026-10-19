@@ -154,6 +154,22 @@ async function confirmDelete(): Promise<void> {
   await load();
 }
 
+async function copyDatasetId(datasetId: string, event: MouseEvent): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(datasetId);
+    showToast('已复制', 'success');
+  } catch {
+    const target = event.currentTarget;
+    if (target instanceof HTMLElement) {
+      const range = document.createRange();
+      range.selectNodeContents(target);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    }
+  }
+}
+
 function clearFilters(): void {
   query.value = '';
   type.value = 'all';
@@ -264,7 +280,16 @@ watch([type, query], async () => {
           >
             <td>
               <span class="ds-name">{{ item.name }}</span>
-              <code class="ds-id" :title="item.datasetId">{{ displayDatasetId(item.datasetId, 32) }}</code>
+              <!-- A26 的 7 列不变：datasetId 收在名称列里，点一下即可复制 -->
+              <button
+                type="button"
+                class="ds-id"
+                :data-ds-copy="item.datasetId"
+                :title="`${item.datasetId}（点击复制）`"
+                @click="copyDatasetId(item.datasetId, $event)"
+              >
+                {{ displayDatasetId(item.datasetId, 32) }}
+              </button>
               <span v-if="item.description !== null" class="ds-desc">{{ item.description }}</span>
             </td>
             <td>{{ typeLabel(item.type) }}</td>

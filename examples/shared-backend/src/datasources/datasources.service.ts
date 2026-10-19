@@ -72,6 +72,30 @@ const BUILTIN_TIMESTAMP = '2026-01-01T00:00:00.000Z';
 /** 设计器目录里自建条目的名额：契约 items 上限 50 - 内置 4（PRD Q2）。 */
 const CATALOG_CUSTOM_LIMIT = 46;
 
+/**
+ * 「配置/安全类」错误码（PRD 修订后的 `/test` 与 `/preview` 状态语义）。
+ *
+ * 这两条接口的失败分两类：
+ * - **配置/安全类** → **4xx**（`{error,message}`）：你提交了一份不允许的配置，改配置才能过；
+ * - **连通性/上游类** → **200 + ok:false**（`UNREACHABLE`/`UNAUTHORIZED`/`UPSTREAM_ERROR`/
+ *   `INVALID_SHAPE`/`QUERY_TIMEOUT`）：配置没错，是"这一次没测通"。
+ *
+ * 之所以要分开：早先全部 200，前端只能靠 `code` 猜"是表单错了还是接口挂了"，
+ * 而 A17 明确要求越权路径给 400。
+ */
+const CONFIG_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'PATH_NOT_ALLOWED',
+  'READONLY_VIOLATION',
+  'MULTI_STATEMENT',
+  'UNDECLARED_PARAMETER',
+  'MISSING_PARAMETER',
+  'TABLE_NOT_FOUND',
+  'UNKNOWN_COLUMN',
+  'DUPLICATE_COLUMN',
+  'INVALID_REQUEST',
+  'TOO_LARGE',
+]);
+
 export interface DatasourceRefScreenShape {
   readonly id: string;
   readonly name: string;
@@ -322,12 +346,18 @@ export class DatasourcesService {
   // 测试与预览（#6 / #7 / #8）
   // -------------------------------------------------------------------------
 
-  /** `POST /api/datasources/test`：草稿配置，不落库；**失败也 200**。 */
+  /**
+   * `POST /api/datasources/test`：草稿配置，不落库。
+   *
+   * 连通性失败 → 200 + `ok:false`；配置/安全类失败 → 4xx（见 `CONFIG_FAILURE_CODES`）。
+   */
   async testDraft(dto: DraftDatasourceDto): Promise<DatasourceTestShape> {
     if (dto.type === 'builtin') return builtinNoConnection();
     const type = requireStoredType(dto.type);
     const config = readParsedConfig(type, dto.config);
-    return toTestShape(await this.evaluateDraft(type, config, dto.values));
+    const result = await this.evaluateDraft(type, config, dto.values);
+    assertNotConfigFailure(result);
+    return toTestShape(result);
   }
 
   /** `POST /api/datasources/preview`：草稿配置，前 20 行（`rowCount` 仍是真实行数）。 */
@@ -341,6 +371,7 @@ export class DatasourcesService {
     const type = requireStoredType(dto.type);
     const config = readParsedConfig(type, dto.config);
     const result = await this.evaluateDraft(type, config, dto.values);
+    assertNotConfigFailure(result);
     if (result.ok === false) {
       return {
         ok: false,
@@ -800,6 +831,13 @@ export function parseFields(value: string | null): readonly DatasetFieldDefiniti
     });
   }
   return fields;
+}
+
+/** 配置/安全类失败一律升级成 4xx（连通性失败保持 200 + ok:false）。 */
+function assertNotConfigFailure(result: RuntimeResult): void {
+  if (result.ok === false && CONFIG_FAILURE_CODES.has(result.code)) {
+    throw datasourceFailureToHttp(result.code, result.message);
+  }
 }
 
 function toTestShape(result: RuntimeResult): DatasourceTestShape {

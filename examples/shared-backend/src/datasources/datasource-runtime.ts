@@ -108,6 +108,21 @@ export function resolveParameterValues(
   const values: Record<string, string | number> = {};
   for (const declaration of declarations) {
     const submitted = raw[declaration.name];
+    // 只接受标量：对象/数组/函数一律拒绝。别静默 `String()` 成 `[object Object]` 再去
+    // 绑定——那会把"参数类型错了"变成"查不到数据"，排查成本高得多。
+    if (
+      submitted !== undefined &&
+      submitted !== null &&
+      typeof submitted !== 'string' &&
+      typeof submitted !== 'number' &&
+      typeof submitted !== 'boolean'
+    ) {
+      return {
+        ok: false,
+        code: 'INVALID_REQUEST',
+        message: `参数 \`:${declaration.name}\` 的值必须是字符串、数字或布尔。`,
+      };
+    }
     const hasSubmitted =
       submitted !== undefined && submitted !== null && String(submitted).trim() !== '';
     if (hasSubmitted) {

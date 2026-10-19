@@ -292,14 +292,20 @@ export const datasourceListView: ViewModule = {
         );
       }
 
-      const nameCell = el('td', {}, [
-        el('span', { class: 'ds-name', text: item.name }),
-        el('code', {
-          class: 'ds-id',
-          text: displayDatasetId(item.datasetId, 32),
-          attrs: { title: item.datasetId },
-        }),
-      ]);
+      // A26 的 7 列不变：datasetId 收在名称列里，点一下即可复制
+      const idButton = el('button', {
+        class: 'ds-id',
+        text: displayDatasetId(item.datasetId, 32),
+        attrs: {
+          type: 'button',
+          title: `${item.datasetId}（点击复制）`,
+          'data-ds-copy': item.datasetId,
+        },
+      });
+      idButton.addEventListener('click', () => {
+        void copyDatasetId(idButton, item.datasetId);
+      });
+      const nameCell = el('td', {}, [el('span', { class: 'ds-name', text: item.name }), idButton]);
       if (item.description !== null) {
         nameCell.append(el('span', { class: 'ds-desc', text: item.description }));
       }
@@ -436,6 +442,20 @@ export const datasourceListView: ViewModule = {
     };
   },
 };
+
+/** 点击 datasetId 复制到剪贴板；剪贴板不可用（非安全上下文/无权限）时退化为选中文本。 */
+async function copyDatasetId(element: HTMLElement, datasetId: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(datasetId);
+    showToast('已复制', 'success');
+  } catch {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  }
+}
 
 /** 409 的 `refScreens` 来自错误体（过滤器透传的附加字段）。 */
 function readRefScreens(

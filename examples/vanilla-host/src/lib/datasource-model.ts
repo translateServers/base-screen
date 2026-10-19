@@ -141,7 +141,7 @@ export function statusLabel(status: DatasourceStatusView): string {
     case 'ready':
       return '就绪';
     case 'error':
-      return '失败';
+      return '异常';
     case 'draft':
       return '草稿';
     case 'builtin':

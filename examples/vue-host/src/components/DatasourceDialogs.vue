@@ -30,7 +30,8 @@ const title = computed((): string => {
     case 'discard':
       return DATASOURCE_TEXT.discardTitle;
     case 'fields':
-      return DATASOURCE_TEXT.fieldChangesTitle;
+      // 与 React / Vanilla 对齐：标题带受影响条数（N 张）
+      return `${DATASOURCE_TEXT.fieldChangesTitle}（${props.refScreens?.length ?? 0} 张）`;
     default:
       return '';
   }
@@ -94,6 +95,9 @@ const title = computed((): string => {
         <ul class="ds-ref-list" data-ds-ref-list="">
           <li v-for="screen in props.refScreens ?? []" :key="screen.id" class="ds-ref-list__item">
             <span class="ds-ref-list__name">{{ screen.name }}</span>
+            <span v-if="screen.updatedAt !== ''" class="ds-ref-list__time">
+              {{ formatDateTime(screen.updatedAt) }}
+            </span>
             <a class="button ds-ref-list__link" :href="screenEditHref(screen.id)">
               {{ DATASOURCE_TEXT.goUnbind }}
             </a>

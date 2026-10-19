@@ -875,7 +875,12 @@ async function main() {
     }
     const unreachableRow = dsRow(unreachableItem.datasetId);
     if ((await unreachableRow.getAttribute('data-status')) !== 'error') {
-      fail('J: 列表里未显示「失败」行');
+      fail('J: 列表里未显示「异常」行');
+    }
+    // PRD §10.2 / A31 的文案是「异常」：徽标文字也要一起断言，避免口径回退
+    const unreachableBadge = (await unreachableRow.locator('.ds-badge').innerText()).trim();
+    if (unreachableBadge !== '异常') {
+      fail(`J: 状态徽标应为「异常」，实际「${unreachableBadge}」`);
     }
 
     // A32a：静态 30 行（API 造数据，UI 断言预览 20 行 + 「共 30 行」）
@@ -1014,6 +1019,9 @@ async function main() {
     }
     if (!fieldsText.includes('冒烟屏 · SQLite')) {
       fail('L: 字段变化弹层没列出受影响的大屏');
+    }
+    if (/\d{4}\/\d{1,2}\/\d{1,2}|\d{4}-\d{1,2}-\d{1,2}/.test(fieldsText) === false) {
+      fail(`L: 字段变化弹层应显示受影响大屏的更新时间：${fieldsText.slice(0, 160)}`);
     }
     await page.locator('[data-ds-confirm="fields"]').click();
     await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
