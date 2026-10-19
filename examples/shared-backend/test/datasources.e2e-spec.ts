@@ -1016,3 +1016,32 @@ describe('S5 附加 · header 注入（PRD 未写，按失败关闭评估）', (
     expect(hitsOf('/ok')).toBe(before);
   });
 });
+
+describe('S5 附加 · 参数值只接受标量', () => {
+  it('rejects object / array parameter values as INVALID_REQUEST instead of stringifying them', async () => {
+    const config = {
+      v: 1,
+      mode: 'sql',
+      file: 'workshop.db',
+      sql: 'SELECT id FROM devices WHERE status = :status',
+      params: [{ name: 'status', label: '状态', valueType: 'string', required: true }],
+    };
+    for (const value of [{ evil: 1 }, ['fault', 'running']]) {
+      const response = await request(app.getHttpServer())
+        .post('/api/datasources/preview')
+        .send({ type: 'sqlite', config, values: { status: value } })
+        .expect(400);
+      expect(response.body).toMatchObject({ error: 'INVALID_REQUEST' });
+      // 不能把对象静默 `String()` 成 [object Object] 再去绑定
+      expect(response.text).not.toContain('[object Object]');
+    }
+
+    // 标量仍然可用（对照组）
+    const ok = await request(app.getHttpServer())
+      .post('/api/datasources/preview')
+      .send({ type: 'sqlite', config, values: { status: 'fault' } })
+      .expect(200);
+    expect(ok.body).toMatchObject({ ok: true });
+    expect((ok.body as { rows: unknown[] }).rows.length).toBeGreaterThan(0);
+  });
+});

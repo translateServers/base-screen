@@ -199,6 +199,31 @@ describe('readConfig · REST', () => {
       }).ok,
     ).toBe(false);
   });
+
+  it('caps header name at 128 and value at 4096, and rejects CRLF in values', () => {
+    const withHeader = (name: string, value: string) =>
+      readConfig('rest', { v: 1, url: 'http://x/y', headers: [{ name, value }], params: [] });
+
+    // 边界内通过（值 4096 / 名 128 都是"够用的上限"，不能把它们误杀）
+    expect(withHeader('X-Custom', 'a'.repeat(4096)).ok).toBe(true);
+    expect(withHeader(`X-${'a'.repeat(126)}`, 'v').ok).toBe(true);
+
+    // 越界即拒：值多 1 个字符、名多 1 个字符
+    const longValue = withHeader('X-Custom', 'a'.repeat(4097));
+    expect(longValue.ok).toBe(false);
+    if (longValue.ok === false) expect(longValue.code).toBe('INVALID_REQUEST');
+    const longName = withHeader(`X-${'a'.repeat(127)}`, 'v');
+    expect(longName.ok).toBe(false);
+    if (longName.ok === false) expect(longName.code).toBe('INVALID_REQUEST');
+
+    // CRLF 注入：必须在进 undici 之前拦下（否则会被归类成"地址不可达"）
+    const crlf = withHeader('X-Custom', 'v\r\nX-Injected: 1');
+    expect(crlf.ok).toBe(false);
+    if (crlf.ok === false) {
+      expect(crlf.code).toBe('INVALID_REQUEST');
+      expect(crlf.message).toContain('换行符');
+    }
+  });
 });
 
 describe('readConfig · 静态 JSON（A15）', () => {

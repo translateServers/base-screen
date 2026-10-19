@@ -57,6 +57,27 @@ describe('resolveDatabaseFile · 拒绝越界', () => {
     expect(result.message).toBe('只能选择受管目录内的数据库文件。');
   });
 
+  it('rejects an over-long basename and control characters as PATH_NOT_ALLOWED', () => {
+    // 129 字符：早先会走到 existsSync 变成 INVALID_SHAPE，A17 要求越权路径一律 PATH_NOT_ALLOWED
+    const tooLong = `${'a'.repeat(126)}.db`;
+    expect(tooLong).toHaveLength(129);
+    const longResult = resolveDatabaseFile(tooLong, directory);
+    expect(longResult.ok).toBe(false);
+    if (longResult.ok === false) expect(longResult.code).toBe('PATH_NOT_ALLOWED');
+
+    const controlResult = resolveDatabaseFile('bad\u0001name.db', directory);
+    expect(controlResult.ok).toBe(false);
+    if (controlResult.ok === false) expect(controlResult.code).toBe('PATH_NOT_ALLOWED');
+  });
+
+  it('accepts a 128-character basename as a path (fails later as missing, not PATH_NOT_ALLOWED)', () => {
+    const boundary = `${'a'.repeat(125)}.db`;
+    expect(boundary).toHaveLength(128);
+    const result = resolveDatabaseFile(boundary, directory);
+    expect(result.ok).toBe(false);
+    if (result.ok === false) expect(result.code).toBe('INVALID_SHAPE');
+  });
+
   it('rejects host database names even when they are valid file names (A16/A17)', () => {
     writeFileSync(join(directory, 'screens.db'), 'placeholder');
     try {
