@@ -129,17 +129,17 @@ describe('inspectSql · 单语句（A21）', () => {
     expect(inspectSql({ sql: 'SELECT [;] FROM devices' }).ok).toBe(true);
   });
 
-  it('reports unclosed comments and quotes as INVALID_SHAPE', () => {
+  it('reports unclosed comments and quotes as INVALID_SQL（语法类，与结果形态分开）', () => {
     const comment = inspectSql({ sql: 'SELECT 1 /* unclosed' });
     expect(comment.ok).toBe(false);
     if (comment.ok === false) {
-      expect(comment.code).toBe('INVALID_SHAPE');
+      expect(comment.code).toBe('INVALID_SQL');
       expect(comment.message).toBe(SQL_GUARD_MESSAGES.unclosedComment);
     }
     const quote = inspectSql({ sql: "SELECT 'abc" });
     expect(quote.ok).toBe(false);
     if (quote.ok === false) {
-      expect(quote.code).toBe('INVALID_SHAPE');
+      expect(quote.code).toBe('INVALID_SQL');
       expect(quote.message).toBe(SQL_GUARD_MESSAGES.unclosedQuote);
     }
   });
@@ -149,7 +149,7 @@ describe('inspectSql · 单语句（A21）', () => {
       const result = inspectSql({ sql });
       expect(result.ok).toBe(false);
       if (result.ok) continue;
-      expect(result.code).toBe('INVALID_SHAPE');
+      expect(result.code).toBe('INVALID_SQL');
     }
   });
 });

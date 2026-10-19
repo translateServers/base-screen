@@ -1069,6 +1069,37 @@ async function main() {
     }
     await degradedView.close();
 
+    // L2（Minor-7 前端侧）：已存配置测试现在可能返回 4xx——列表行内「测试」必须把
+    // 错误体 `{error,message}` 也渲染进结果条，而不是只在 200 分支里读 `body.ok`。
+    const brokenCreated = await dsFetch('/datasources', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: 'Smoke Broken Sql',
+        description: null,
+        type: 'sqlite',
+        // 指向不存在的表：保存能过（SQL 模式只做词法校验），随后行内「测试」会得到 4xx
+        config: {
+          v: 1,
+          mode: 'sql',
+          file: 'workshop.db',
+          sql: 'SELECT id FROM not_a_table',
+          params: [],
+        },
+      }),
+    });
+    if (brokenCreated.status !== 201) {
+      fail(`L2: 坏 SQL 数据源创建失败 HTTP ${brokenCreated.status}`);
+    }
+    await dsGotoList();
+    await dsWaitRows(14);
+    await dsRow(brokenCreated.body.datasetId).locator('[data-ds-action="test"]').click();
+    // 结果条上一条是 J 段的「地址不可达」，这里等文案真的换成"表不存在"
+    await page.waitForFunction(
+      () => (document.querySelector('[data-ds-result]')?.textContent ?? '').includes('不存在'),
+      undefined,
+      { timeout: 20_000 },
+    );
+
     // 清理：删掉本次 smoke 造的屏与数据源（保持可重复；库本身每次重建）
     for (const screenId of dsScreens) {
       await dsFetch(`/screens/${screenId}`, { method: 'DELETE' });

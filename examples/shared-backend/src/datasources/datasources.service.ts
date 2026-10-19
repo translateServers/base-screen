@@ -94,6 +94,8 @@ const CONFIG_FAILURE_CODES: ReadonlySet<string> = new Set([
   'DUPLICATE_COLUMN',
   'INVALID_REQUEST',
   'TOO_LARGE',
+  // 纯词法/语法错误（注释未闭合等）：责任在提交表单的人，和"这次查不出"不是一类
+  'INVALID_SQL',
 ]);
 
 export interface DatasourceRefScreenShape {
@@ -413,6 +415,7 @@ export class DatasourcesService {
       });
     }
     const evaluation = await this.evaluateWithDefaults(type, config);
+    // 先落状态再判错：配置坏了也该让台账显示「异常」（用户点开就能看到 lastTest.code）
     await this.prisma.dataSource.update({
       where: { datasetId },
       data: {
@@ -421,6 +424,8 @@ export class DatasourcesService {
         fields: JSON.stringify(evaluation.fields),
       },
     });
+    // 与 `/test` 同语义：配置/安全类错误 4xx，连通/上游类仍 200 + ok:false
+    assertNotConfigFailure(evaluation.result);
     return toTestShape(evaluation.result);
   }
 

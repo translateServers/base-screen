@@ -744,6 +744,45 @@ describe('A19 · SQL 模式的错误分类', () => {
   }, 30_000);
 });
 
+describe('已存配置测试（`POST /:id/test`）的状态码', () => {
+  it('returns 4xx for config errors and still records the error status', async () => {
+    // 直接写库模拟"表被删了"的存量源（正常保存路径过不了表校验）
+    await prisma.dataSource.create({
+      data: {
+        datasetId: 'custom.missing-table',
+        name: '表已被删',
+        description: null,
+        type: 'sqlite',
+        config: JSON.stringify({
+          v: 1,
+          mode: 'table',
+          file: 'workshop.db',
+          table: 'not_a_table',
+          columns: [{ name: 'id', declaredType: 'TEXT' }],
+          params: [],
+        }),
+        status: 'ready',
+        lastTest: null,
+        fields: JSON.stringify([{ id: 'id', label: 'id', valueType: 'string', nullable: true }]),
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post('/api/datasources/custom.missing-table/test')
+      .expect(400)
+      .expect((response) => {
+        expect(response.body).toMatchObject({ error: 'TABLE_NOT_FOUND' });
+      });
+
+    // 先落状态再判错：台账要能看到「异常」
+    const detail = await request(app.getHttpServer())
+      .get('/api/datasources/custom.missing-table')
+      .expect(200);
+    expect(detail.body).toMatchObject({ status: 'error' });
+    expect((detail.body.lastTest as { code: string }).code).toBe('TABLE_NOT_FOUND');
+  }, 30_000);
+});
+
 describe('参数值类型（Minor-4）', () => {
   it('rejects object/array parameter values instead of stringifying them', async () => {
     const config = sqlConfig('SELECT id FROM devices WHERE status = :status', [
@@ -845,9 +884,9 @@ describe('A21 · 单语句与注释', () => {
     }
   }, 20_000);
 
-  it('reports an unclosed comment as INVALID_SHAPE', async () => {
-    const response = await previewSql('SELECT 1 /* 未闭合').expect(200);
-    expect(response.body).toMatchObject({ ok: false, code: 'INVALID_SHAPE' });
+  it('reports an unclosed comment as INVALID_SQL (400, not 200)', async () => {
+    const response = await previewSql('SELECT 1 /* 未闭合').expect(400);
+    expect(response.body).toMatchObject({ error: 'INVALID_SQL' });
     expect(String((response.body as { message: string }).message)).toContain('注释');
   }, 20_000);
 });

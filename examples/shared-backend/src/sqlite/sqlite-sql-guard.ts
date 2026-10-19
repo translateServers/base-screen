@@ -20,7 +20,14 @@ export type SqlGuardErrorCode =
   | 'READONLY_VIOLATION'
   | 'MULTI_STATEMENT'
   | 'UNDECLARED_PARAMETER'
-  | 'INVALID_SHAPE';
+  /**
+   * 纯词法/语法问题（注释未闭合、引号未闭合、语句为空）。
+   *
+   * 与 `INVALID_SHAPE` 分开：后者表示"这次查询的结果形态不支持"（0 行、含 BLOB 列），
+   * 属于**业务结果**；而注释未闭合是**表单写错了**，要能对它单独给 400。
+   * `?/$x/@x` 这类占位符写法不算语法错误，沿用语义更贴的 `UNDECLARED_PARAMETER`。
+   */
+  | 'INVALID_SQL';
 
 export interface SqlGuardRequest {
   readonly sql: string;
@@ -128,7 +135,7 @@ export function inspectSql(request: SqlGuardRequest): SqlGuardResult {
   }
 
   const trimmedHead = head.trim();
-  if (trimmedHead === '') return failure('INVALID_SHAPE', SQL_GUARD_MESSAGES.empty);
+  if (trimmedHead === '') return failure('INVALID_SQL', SQL_GUARD_MESSAGES.empty);
 
   const firstToken = readFirstToken(trimmedHead);
   if (firstToken === null) return failure('READONLY_VIOLATION', SQL_GUARD_MESSAGES.readonly);
@@ -251,10 +258,10 @@ function maskSql(sql: string): MaskSuccess | SqlGuardFailure {
     }
   }
   if (state === 'blockComment') {
-    return failure('INVALID_SHAPE', SQL_GUARD_MESSAGES.unclosedComment);
+    return failure('INVALID_SQL', SQL_GUARD_MESSAGES.unclosedComment);
   }
   if (state === 'single' || state === 'double' || state === 'backtick' || state === 'bracket') {
-    return failure('INVALID_SHAPE', SQL_GUARD_MESSAGES.unclosedQuote);
+    return failure('INVALID_SQL', SQL_GUARD_MESSAGES.unclosedQuote);
   }
   return { ok: true, masked: chars.join('') };
 }

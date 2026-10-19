@@ -313,7 +313,8 @@ datasetId，**点一下即复制**（`navigator.clipboard`；剪贴板不可用�
 | 超时 | 单次 3 s，超时 `SIGKILL` 执行子进程 → 422 `QUERY_TIMEOUT`；主进程与其它查询不受影响 |
 | 路径 | 只能选受管目录内的 `.db` 文件名：`^[\w.-]+\.db$` + `realpath` 父目录比较（挡符号链接）+ 宿主库 basename 黑名单（`screens.db`/`test.db`/`smoke-*.db`）。错误与响应里不含任何绝对路径 |
 | 受管目录 | `examples/shared-backend/data/datasources/`。**必须是独立子目录**：`data/` 里放着宿主自己的库，把 `data/` 当受管目录等于把 `Screen` 表（含全部大屏文档）暴露成可选数据源；启动时会断言「受管目录 ≠ `data/`」 |
-| 二进制列 | `BLOB` 列在表结构接口里标 `supported:false`、UI 不可勾选；SQL 模式结果里出现二进制列 → 400 `INVALID_SHAPE` |
+| 语法 | 注释未闭合、引号未闭合、空语句 → **400 `INVALID_SQL`**（责任在提交表单的人，与"这次查不出"分开）；`?`/`$x`/`@x` 占位符 → 400 `UNDECLARED_PARAMETER`（只支持 `:name`） |
+| 二进制列 | `BLOB` 列在表结构接口里标 `supported:false`、UI 不可勾选；SQL 模式结果里出现二进制列 → `INVALID_SHAPE`（预览/测试是 200 + `ok:false`，保存则落 `error`） |
 
 REST 侧：只允许 `http:`/`https:`（含重定向目标）、8 s 预算、最多 3 跳重定向、响应体 1 MiB，
 错误五分类 `UNREACHABLE` / `UNAUTHORIZED` / `UPSTREAM_ERROR` / `INVALID_SHAPE` / `INVALID_REQUEST`。
@@ -352,12 +353,14 @@ cp my-data.db examples/shared-backend/data/datasources/
 
 | 类别 | HTTP | 错误码 |
 | --- | --- | --- |
-| 配置 / 安全类 | **4xx**（`{error,message}`） | `PATH_NOT_ALLOWED`、`READONLY_VIOLATION`、`MULTI_STATEMENT`、`UNDECLARED_PARAMETER`、`MISSING_PARAMETER`、`TABLE_NOT_FOUND`、`UNKNOWN_COLUMN`、`DUPLICATE_COLUMN`、`INVALID_REQUEST`、`TOO_LARGE` |
+| 配置 / 安全类 | **4xx**（`{error,message}`） | `PATH_NOT_ALLOWED`、`READONLY_VIOLATION`、`MULTI_STATEMENT`、`UNDECLARED_PARAMETER`、`MISSING_PARAMETER`、`TABLE_NOT_FOUND`、`UNKNOWN_COLUMN`、`DUPLICATE_COLUMN`、`INVALID_REQUEST`、`TOO_LARGE`、`INVALID_SQL` |
 | 连通性 / 上游类 | **200 + `ok:false`** | `UNREACHABLE`、`UNAUTHORIZED`、`UPSTREAM_ERROR`、`INVALID_SHAPE`、`QUERY_TIMEOUT` |
 | 契约路由 `/api/datasets/:id/query`（对照组） | 运行时失败按 **5xx**，**`QUERY_TIMEOUT` 为 500** | 宿主把 400/422 映射成 `HOST_DATASET_PARAMETER_INVALID`、5xx 映射成 `HOST_DATASET_UNAVAILABLE`；超时给 422 会让屏上显示「参数错误」，把人引去改参数 |
 
 > 早先两类都是 200，前端只能靠 `code` 猜"是表单错了还是接口没通"；而且 A17 明确要求越权路径
 > 给 400。现在「你提交了不允许的配置」是 4xx，「这一次没测通」仍是 200。
+> `POST /api/datasources/:datasetId/test`（用**已存配置**测试）与 `/test` **同一套口径**：
+> 它只是配置来源不同（库内 vs 请求体），语义都是"执行一次探测"。
 
 绑定侧（设计器/查看器走这条）：
 
