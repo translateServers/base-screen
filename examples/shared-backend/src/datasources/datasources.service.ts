@@ -69,6 +69,9 @@ import type { DraftDatasourceDto, SaveDatasourceDto } from './dto/datasource.dto
 /** 内置条目的固定时间戳：虚拟投影没有真实创建时间，固定值让列表稳定可比。 */
 const BUILTIN_TIMESTAMP = '2026-01-01T00:00:00.000Z';
 
+/** 设计器目录里自建条目的名额：契约 items 上限 50 - 内置 4（PRD Q2）。 */
+const CATALOG_CUSTOM_LIMIT = 46;
+
 export interface DatasourceRefScreenShape {
   readonly id: string;
   readonly name: string;
@@ -99,6 +102,13 @@ export interface DatasourceDetailShape extends DatasourceItemShape {
 export interface DatasourceListShape {
   readonly items: readonly DatasourceItemShape[];
   readonly total: number;
+  /**
+   * 进设计器目录的自建条数（上限 46 = 契约 items 上限 50 - 内置 4）。
+   *
+   * 管理页要用它判断「是否发生了目录截断」并提示「设计器面板仅显示最近 46 个自建数据源」。
+   * 不能拿 `total` 猜：`total` 包含内置与未就绪的草稿，两回事。
+   */
+  readonly catalogVisibleCount: number;
 }
 
 export interface DatasourceTestShape {
@@ -205,7 +215,25 @@ export class DatasourcesService {
     return {
       items: matched.slice(resolvedOffset, resolvedOffset + resolvedLimit),
       total: matched.length,
+      catalogVisibleCount: await this.countCatalogVisible(),
     };
+  }
+
+  /** 目录可见的自建条数：ready + 字段非空，封顶 46（Q2：内置 4 条占掉名额）。 */
+  private async countCatalogVisible(): Promise<number> {
+    const rows = await this.prisma.dataSource.findMany({
+      where: { status: 'ready' },
+      orderBy: { updatedAt: 'desc' },
+      select: { fields: true },
+      take: CATALOG_CUSTOM_LIMIT + 1,
+    });
+    let count = 0;
+    for (const row of rows) {
+      if (count >= CATALOG_CUSTOM_LIMIT) break;
+      if (parseFields(row.fields).length === 0) continue;
+      count += 1;
+    }
+    return count;
   }
 
   async detail(datasetId: string): Promise<DatasourceDetailShape> {

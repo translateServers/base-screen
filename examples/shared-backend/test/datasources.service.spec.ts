@@ -123,6 +123,9 @@ describe('A9 · 引用统计', () => {
     // 列表也带引用数（A1 要求列表含 refCount/refScreens）
     const list = await service.list('all', 'A9 Ref', 10, 0);
     expect(list.items[0]).toMatchObject({ datasetId: created.datasetId, refCount: 2 });
+    // catalogVisibleCount 只数「ready 且字段非空」的自建，与 total 不是一回事
+    expect(list.catalogVisibleCount).toBeGreaterThanOrEqual(1);
+    expect(list.catalogVisibleCount).toBeLessThanOrEqual(46);
   }, 20_000);
 
   it('ignores variable parameters and non-dataset sources', async () => {

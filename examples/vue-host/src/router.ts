@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
+import DatasourceList from './components/DatasourceList.vue';
 import ScreenEditor from './components/ScreenEditor.vue';
 import ScreenList from './components/ScreenList.vue';
 import ScreenViewer from './components/ScreenViewer.vue';
@@ -11,6 +12,12 @@ export const router = createRouter({
   history: createWebHashHistory(),
   routes: [
     { path: '/', name: 'list', component: ScreenList, meta: { hostShell: true } },
+    {
+      path: '/datasources',
+      name: 'datasources',
+      component: DatasourceList,
+      meta: { hostShell: true },
+    },
     { path: '/screens/:screenId/edit', name: 'edit', component: ScreenEditor },
     { path: '/screens/:screenId/view', name: 'view', component: ScreenViewer },
     { path: '/:pathMatch(.*)*', redirect: '/' },

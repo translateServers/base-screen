@@ -1,5 +1,6 @@
 export type Route =
   | { readonly name: 'list' }
+  | { readonly name: 'datasources' }
   | { readonly name: 'edit'; readonly id: string }
   | { readonly name: 'view'; readonly id: string }
   | { readonly name: 'not-found' };
@@ -14,6 +15,8 @@ export function parseRoute(hash: string): Route {
   const queryIndex = hash.indexOf('?');
   const path = queryIndex >= 0 ? hash.slice(0, queryIndex) : hash;
   if (path === '' || path === '#/' || path === '#') return { name: 'list' };
+  // 数据源页：查询串已在上面切掉，因此 `#/datasources?type=sqlite` 也命中这一条
+  if (path === '#/datasources') return { name: 'datasources' };
   const edit = EDIT_PATTERN.exec(path);
   if (edit?.[1] !== undefined) return { name: 'edit', id: decodeURIComponent(edit[1]) };
   const view = VIEW_PATTERN.exec(path);
@@ -35,6 +38,8 @@ async function resolveView(route: Route): Promise<ViewModule> {
   switch (route.name) {
     case 'list':
       return (await import('./views/screen-list.js')).screenListView;
+    case 'datasources':
+      return (await import('./views/datasource-list.js')).datasourceListView;
     case 'edit':
       return (await import('./views/screen-edit.js')).screenEditView;
     case 'view':

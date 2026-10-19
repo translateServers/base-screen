@@ -8,11 +8,28 @@ import type {
   TabularDataset,
 } from '../types';
 import { resolveApiBase } from './api-base';
+import type {
+  DatabaseFileShape,
+  DatabaseSchemaShape,
+  DatasourceDetail,
+  DatasourceListResponse,
+  DatasourcePreviewResponse,
+  DatasourceTestResponse,
+  DatasourceType,
+  StoredDatasourceType,
+} from './datasource-model';
 
 export interface ApiError {
   readonly code: string;
   readonly message: string;
   readonly status: number;
+  /**
+   * 错误体的原始附加字段（`suggestedId` / `refScreens` / `fields` …）。
+   *
+   * `AllExceptionsFilter` 会把业务异常里的额外顶层字段平铺进响应，UI 需要它们：
+   * 409 冲突要显示建议名、删除保护要列出引用它的大屏。丢掉就只能猜。
+   */
+  readonly payload?: Readonly<Record<string, unknown>>;
 }
 
 export type ApiResult<T> =
@@ -64,7 +81,7 @@ function toApiError(payload: unknown, status: number): ApiError {
   if (payload !== null && typeof payload === 'object') {
     const record = payload as Record<string, unknown>;
     if (typeof record.error === 'string' && typeof record.message === 'string') {
-      return { code: record.error, message: record.message, status };
+      return { code: record.error, message: record.message, status, payload: record };
     }
   }
   return { code: `HTTP_${status}`, message: `请求失败（${status}）。`, status };
@@ -89,6 +106,29 @@ export interface DatasetListQuery {
 
 /** 数据集 query 参数：键是基座求值后的纯值（字符串/数字），由调用方拼。 */
 export type DatasetQueryParams = Readonly<Record<string, string | number | undefined>>;
+
+/** 列表筛选（`type` 缺省=all）。 */
+export interface DatasourceListQuery {
+  readonly type?: DatasourceType | 'all';
+  readonly query?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+/** 新建/编辑的请求体（`description` 空必须传 null：契约 `text.min(1)` 不接受空串）。 */
+export interface DatasourceSaveBody {
+  readonly name: string;
+  readonly description: string | null;
+  readonly type: StoredDatasourceType;
+  readonly config: Record<string, unknown>;
+}
+
+/** 测试/预览的草稿请求体（不落库）。 */
+export interface DatasourceDraftBody {
+  readonly type: StoredDatasourceType;
+  readonly config: Record<string, unknown>;
+  readonly values?: Readonly<Record<string, string | number>>;
+}
 
 export const api = {
   health: (): Promise<ApiResult<{ status: string }>> => request('/health'),
@@ -130,6 +170,56 @@ export const api = {
   ): Promise<ApiResult<TabularDataset>> =>
     request(
       `/datasets/${encodeURIComponent(datasetId)}/query${toSearch(params)}`,
+      signal === undefined ? {} : { signal },
+    ),
+
+  // ---- 数据源管理（PRD §9.1 #1–#10） ----
+  //
+  // 注意：`testDatasourceDraft` / `testDatasourceStored` / `previewDatasource` 的成功响应是
+  // **200 + body.ok**，`ok:false` 表示"测试没通过"而不是"接口挂了"——调用方必须看 body.ok，
+  // 不能用 `ApiResult.ok` 判业务成败（后者只表示 HTTP/网络层成功）。
+  listDatasources: (
+    query: DatasourceListQuery,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<DatasourceListResponse>> =>
+    request(
+      `/datasources${toSearch({
+        type: query.type,
+        query: query.query,
+        limit: query.limit,
+        offset: query.offset,
+      })}`,
+      signal === undefined ? {} : { signal },
+    ),
+  getDatasource: (datasetId: string, signal?: AbortSignal): Promise<ApiResult<DatasourceDetail>> =>
+    request(
+      `/datasources/${encodeURIComponent(datasetId)}`,
+      signal === undefined ? {} : { signal },
+    ),
+  createDatasource: (body: DatasourceSaveBody): Promise<ApiResult<DatasourceDetail>> =>
+    request('/datasources', { method: 'POST', body }),
+  updateDatasource: (
+    datasetId: string,
+    body: DatasourceSaveBody,
+  ): Promise<ApiResult<DatasourceDetail>> =>
+    request(`/datasources/${encodeURIComponent(datasetId)}`, { method: 'PUT', body }),
+  deleteDatasource: (datasetId: string): Promise<ApiResult<{ deleted: true; datasetId: string }>> =>
+    request(`/datasources/${encodeURIComponent(datasetId)}`, { method: 'DELETE' }),
+  testDatasourceDraft: (body: DatasourceDraftBody): Promise<ApiResult<DatasourceTestResponse>> =>
+    request('/datasources/test', { method: 'POST', body }),
+  /** 用**库里已存的配置**（含真实 header 原值）测试：掩码不影响连通性验证。 */
+  testDatasourceStored: (datasetId: string): Promise<ApiResult<DatasourceTestResponse>> =>
+    request(`/datasources/${encodeURIComponent(datasetId)}/test`, { method: 'POST' }),
+  previewDatasource: (body: DatasourceDraftBody): Promise<ApiResult<DatasourcePreviewResponse>> =>
+    request('/datasources/preview', { method: 'POST', body }),
+  listDatabaseFiles: (signal?: AbortSignal): Promise<ApiResult<{ files: DatabaseFileShape[] }>> =>
+    request('/datasources/database-files', signal === undefined ? {} : { signal }),
+  describeDatabaseFile: (
+    name: string,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<DatabaseSchemaShape>> =>
+    request(
+      `/datasources/database-files/${encodeURIComponent(name)}/tables`,
       signal === undefined ? {} : { signal },
     ),
 };
