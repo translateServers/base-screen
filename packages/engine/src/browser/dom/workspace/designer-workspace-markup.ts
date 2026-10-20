@@ -204,7 +204,6 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       <section class="designer-data-workbench" data-data-workbench hidden aria-label="${DESIGNER_UI_TEXT.dataSource.workbench}">
         <div data-data-workbench-content></div>
       </section>
-      <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="${DESIGNER_UI_TEXT.contextMenu}" tabindex="-1"></div>
 
       <!-- Status bar: left (tool + selection + project state) | right (canvas size + Snap/Native Events toggles + zoom menu). -->
       <footer class="statusbar">
@@ -319,5 +318,9 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
         <button type="button" class="designer-control designer-button" data-variant="neutral" data-action="continue-editing">${DESIGNER_UI_TEXT.continueEditing}</button>
         <button type="button" class="designer-control designer-button" data-variant="danger" data-action="reload-remote">${DESIGNER_UI_TEXT.reloadRemote}</button>
       </div>
-    </section>`;
+    </section>
+
+    <!-- Context menu: lives on the .designer root, not inside .workspace, so the layers panel and the
+         canvas share one layer; .workspace overflow:hidden would otherwise clip panel-spawned menus. -->
+    <div class="designer-context-menu" data-context-menu hidden role="menu" aria-label="${DESIGNER_UI_TEXT.contextMenu}" tabindex="-1"></div>`;
 }

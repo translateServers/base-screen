@@ -48,6 +48,7 @@ import { assertDatasetAuthoring, assertDatasetSurface } from './dataset/assert-d
 import {
   assertBlueprintHostLeftPanelGroups,
   assertHostLeftPanelGroups,
+  assertLeftPanelContextMenu,
   assertLeftPanelLayers,
   assertLeftPanelMaterials,
 } from './left-panel/assert-left-panel.mjs';
@@ -133,6 +134,7 @@ export async function runBrowserHarness(serverPort) {
         await assertDesignerTooltip(designer, page);
         await assertLeftPanelMaterials(designer, page);
         await assertLeftPanelLayers(page, viewport);
+        await assertLeftPanelContextMenu(page);
         await assertHostLeftPanelGroups(designer);
         await assertBlueprintHostLeftPanelGroups(designer);
         await designer.locator('[data-left-panel]').screenshot({

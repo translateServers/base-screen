@@ -28,6 +28,9 @@ import type {
 import { DesignerLayerDragController } from './designer-layer-drag-controller.js';
 import { DesignerLayerRenameController } from './designer-layer-rename-controller.js';
 
+/** 图层右键的菜单归属，供表面路由决定弹哪张菜单（见 onContextMenu）。 */
+export type DesignerLayerContextMenuTarget = 'row' | 'blank' | 'ignore';
+
 export interface DesignerLayersControllerCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
@@ -303,6 +306,36 @@ export class DesignerLayersController {
     if (!(target instanceof HTMLInputElement) || target.dataset.layerRename === undefined)
       return false;
     return this.#rename.onKeyDown(target, event);
+  }
+
+  /**
+   * 右键图层行的选区语义（菜单本身由 DesignerMenuController 弹出，与画布共用一套）：
+   * 行不在选区里就先把选区换成这一行，菜单随后按单组件解析；行已在多选里则原样保留，
+   * 菜单升级为多选菜单，动作仍然落在整段选区上 —— 与右键画布上的已选组件一致。
+   *
+   * 返回值说明菜单归属：`row` = 命中可选行；`blank` = 图层树空白区（回落画布菜单）；
+   * `ignore` = 不归对象菜单管 —— 隐藏行不可选（core 的选择归约会剔除有效隐藏组件，
+   * 认领它只会让菜单动作落到上一次选择上），重命名输入框则交还文本编辑。
+   */
+  onContextMenu(event: MouseEvent): DesignerLayerContextMenuTarget {
+    const target = event.target;
+    if (!(target instanceof Element)) return 'ignore';
+    if (target.closest('[data-layer-rename]') !== null) return 'ignore';
+    const row = target.closest<HTMLElement>('[data-layer-selectable="true"]');
+    const componentId = row?.dataset.layerId;
+    if (row === null || componentId === undefined) {
+      return target.closest('[data-layer-id]') === null ? 'blank' : 'ignore';
+    }
+    const selected = this.callbacks.getInteraction().selectedComponentIds;
+    if (selected.includes(componentId)) return 'row';
+    // 右键同时重新锚定：之后的 Shift 连选从这一行开始，与单击后的行为一致。
+    this.#anchor = componentId;
+    this.callbacks.reduceSelection({
+      type: 'replace-selection',
+      componentIds: [componentId],
+      focusedComponentId: componentId,
+    });
+    return 'row';
   }
 
   // 双击图层名称进入重命名：重命名输入框只在编辑期存在，名称行保持单行展示。

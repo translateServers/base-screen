@@ -54,7 +54,23 @@ export function initializeDesignerElementSurfaceBindings(
         state.menuController.openContextMenu(event as MouseEvent);
         return true;
       }
-      // 全 shadow 表面阻止浏览器默认菜单；面板不新增菜单（R4）。
+      // 图层面板：行命中时先把选区落到该行（多选内的行保持选区），再弹出与画布同一张菜单；
+      // 树的空白区没有命中行，菜单按画布上下文解析（与右键画布空白一致）。
+      if (targetElement.closest('[data-layer-root]')) {
+        event.preventDefault();
+        // 行 id 必须在 onContextMenu 之前取：同步选区会重渲染图层树，之后行节点已脱离
+        // 文档，closest 再也走不回 [data-layer-root]。
+        const row = targetElement.closest<HTMLElement>('[data-layer-root] [data-layer-id]');
+        const hit = state.layersController.onContextMenu(event as MouseEvent);
+        if (hit !== 'ignore') {
+          state.menuController.openContextMenu(event as MouseEvent, {
+            componentId: hit === 'row' ? row?.dataset.layerId : undefined,
+            fromPanel: true,
+          });
+        }
+        return true;
+      }
+      // 其余面板维持既有的「只阻止浏览器菜单、不新增菜单」行为。
       event.preventDefault();
       return true;
     },

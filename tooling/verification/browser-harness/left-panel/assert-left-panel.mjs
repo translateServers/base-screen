@@ -1053,6 +1053,123 @@ export async function assertLeftPanelLayers(page, viewport) {
   );
 }
 
+// ---- 源模块：assert-left-panel-context-menu.mjs ----
+// 图层行右键复用画布同一张菜单：菜单项一致、选区按行同步、浮层能盖到面板上（不被工作区裁剪）。
+export async function assertLeftPanelContextMenu(page) {
+  await page.evaluate(() => {
+    const { catalog, materialManifests } = window.baseScreenHarness;
+    const textManifest = materialManifests.text;
+    const probe = document.createElement('base-screen-designer');
+    probe.setAttribute('data-layer-context-probe', 'true');
+    probe.catalog = catalog;
+    probe.document = {
+      canvas: { width: 960, height: 540, backgroundColor: '#17212b' },
+      components: [
+        {
+          id: 'menu-a',
+          type: 'base.text',
+          name: '\u53f3\u952e\u7532',
+          parentId: null,
+          position: { x: 0, y: 0 },
+          size: { width: 160, height: 32 },
+          rotation: 0,
+          zIndex: 0,
+          status: { locked: false, hidden: false },
+          props: structuredClone(textManifest.defaultProps),
+          style: structuredClone(textManifest.defaultStyle),
+          dataSource: null,
+        },
+        {
+          id: 'menu-b',
+          type: 'base.text',
+          name: '\u53f3\u952e\u4e59',
+          parentId: null,
+          position: { x: 0, y: 60 },
+          size: { width: 160, height: 32 },
+          rotation: 0,
+          zIndex: 1,
+          status: { locked: false, hidden: false },
+          props: structuredClone(textManifest.defaultProps),
+          style: structuredClone(textManifest.defaultStyle),
+          dataSource: null,
+        },
+      ],
+      variables: [],
+      blueprint: { rules: [] },
+    };
+    probe.style.cssText = 'position:fixed;inset:0;z-index:99;width:1024px;height:640px;';
+    document.body.appendChild(probe);
+  });
+  const probe = page.locator('base-screen-designer[data-layer-context-probe]');
+  await probe.locator('[data-panel-tab="layers"]').click();
+  const readMenu = () =>
+    probe.evaluate((host) => {
+      const root = host.shadowRoot;
+      const menu = root.querySelector('[data-context-menu]');
+      const layout = root.querySelector('.designer').getBoundingClientRect();
+      const rail = root.querySelector('[data-left-panel]').getBoundingClientRect();
+      const box = menu.getBoundingClientRect();
+      return {
+        hidden: menu.hidden,
+        actions: [...menu.querySelectorAll('[data-menu-action]')].map(
+          (item) => item.dataset.menuAction,
+        ),
+        selected: [...root.querySelectorAll('[data-layer-selectable="true"]')]
+          .filter((row) => row.ariaSelected === 'true')
+          .map((row) => row.dataset.layerId),
+        // 菜单要么整体落在设计器内（不被裁切），要么就是被裁了——这里两种都如实记录。
+        insideLayout:
+          box.left >= layout.left - 0.5 &&
+          box.right <= layout.right + 0.5 &&
+          box.top >= layout.top - 0.5 &&
+          box.bottom <= layout.bottom + 0.5,
+        overPanel: box.left < rail.right && box.width > 0,
+      };
+    });
+
+  // 单行右键：菜单与画布单组件菜单同源，且右键先把选区落到这一行。
+  await probe.locator('.layer-row[data-layer-id="menu-b"]').click({ button: 'right' });
+  const single = await readMenu();
+  if (
+    single.hidden ||
+    !single.actions.includes('copy') ||
+    !single.actions.includes('delete') ||
+    single.actions.includes('align-left') ||
+    single.actions.includes('select-all') ||
+    !single.selected.includes('menu-b') ||
+    !single.insideLayout ||
+    !single.overPanel
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_CONTEXT_MENU_FAILED:${JSON.stringify(single)}`);
+  }
+
+  // 多选内的行右键：菜单升级为多选菜单，选区保持不变。
+  await page.keyboard.press('Escape');
+  await probe
+    .locator('.layer-row[data-layer-id="menu-a"] [data-layer-select]')
+    .click({ modifiers: ['Control'] });
+  await probe.locator('.layer-row[data-layer-id="menu-b"]').click({ button: 'right' });
+  const multi = await readMenu();
+  if (
+    multi.hidden ||
+    !multi.actions.includes('align-left') ||
+    !multi.actions.includes('distribute-horizontal') ||
+    multi.actions.includes('select-all') ||
+    multi.selected.length !== 2 ||
+    !multi.insideLayout ||
+    !multi.overPanel
+  ) {
+    throw new Error(`BROWSER_HARNESS_LAYER_CONTEXT_MENU_MULTI_FAILED:${JSON.stringify(multi)}`);
+  }
+  await page.keyboard.press('Escape');
+  if (!(await readMenu()).hidden) {
+    throw new Error('BROWSER_HARNESS_LAYER_CONTEXT_MENU_ESCAPE_FAILED');
+  }
+  await page.evaluate(() =>
+    document.querySelector('base-screen-designer[data-layer-context-probe]')?.remove(),
+  );
+}
+
 // ---- 源模块：assert-panel-layout.mjs ----
 export async function assertPanelLayout(designer, page) {
   // ADR-0037：真实鼠标拖宽后折叠必须收敛到 48px 图标轨，展开恢复拖拽宽度；折叠态箭头 180°

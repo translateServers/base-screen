@@ -72,8 +72,10 @@ class FakeMenu extends FakeElement {
 }
 class FakeRoot {
   constructor(private readonly workspace: { getBoundingClientRect(): DOMRectLike }) {}
+  // 菜单的定位基准是 .designer（面板与画布共用一个浮层），夹紧范围另取 .workspace；
+  // 桩里两者同矩形，夹紧偏移为 0，位置断言与改动前逐值一致。
   querySelector(selector: string): { getBoundingClientRect(): DOMRectLike } | null {
-    return selector === '.workspace' ? this.workspace : null;
+    return selector === '.workspace' || selector === '.designer' ? this.workspace : null;
   }
 }
 interface DOMRectLike {
@@ -109,12 +111,16 @@ function openAt(
   target: FakeElement,
   clientX = 120,
   clientY = 80,
+  source: { readonly componentId?: string; readonly fromPanel?: boolean } = {},
 ): void {
-  controller.openContextMenu({
-    target,
-    clientX,
-    clientY,
-  } as unknown as MouseEvent);
+  controller.openContextMenu(
+    {
+      target,
+      clientX,
+      clientY,
+    } as unknown as MouseEvent,
+    source,
+  );
 }
 
 describe('DesignerMenuController submenu collapse behavior', () => {
@@ -384,6 +390,42 @@ describe('DesignerMenuController context menu resolution', () => {
 
     expect(menu.innerHTML).toContain('data-menu-action="select-all"');
     expect(menu.innerHTML).toContain('data-menu-action="zoom-in"');
+    expect(menu.innerHTML).not.toContain('data-menu-action="copy"');
+  });
+
+  it('renders the same single-component menu for a layer row resolved by the caller', () => {
+    const menu = new FakeMenu();
+    const controller = createController(['rectangle-1'], menu, workspace);
+    // 图层行在同步选区后会脱离文档，id 只能由事件源头传入而不是事后按 DOM 反查。
+    openAt(controller, new FakeElement([]), 120, 80, {
+      componentId: 'rectangle-1',
+      fromPanel: true,
+    });
+
+    expect(menu.innerHTML).toContain('data-menu-action="copy"');
+    expect(menu.innerHTML).toContain('data-menu-action="bring-to-front"');
+    expect(menu.innerHTML).not.toContain('data-menu-action="align-left"');
+    expect(menu.innerHTML).not.toContain('data-menu-action="zoom-in"');
+  });
+
+  it('renders the multi menu when the layer row is part of the selection', () => {
+    const menu = new FakeMenu();
+    const controller = createController(['rectangle-1', 'rectangle-2'], menu, workspace);
+    openAt(controller, new FakeElement([]), 120, 80, {
+      componentId: 'rectangle-2',
+      fromPanel: true,
+    });
+
+    expect(menu.innerHTML).toContain('data-menu-action="align-left"');
+    expect(menu.innerHTML).toContain('data-menu-action="distribute-horizontal"');
+  });
+
+  it('keeps the canvas menu when a panel right-click resolves no component', () => {
+    const menu = new FakeMenu();
+    const controller = createController(['rectangle-1'], menu, workspace);
+    openAt(controller, new FakeElement(['[data-layer-root]']), 120, 80, { fromPanel: true });
+
+    expect(menu.innerHTML).toContain('data-menu-action="select-all"');
     expect(menu.innerHTML).not.toContain('data-menu-action="copy"');
   });
 

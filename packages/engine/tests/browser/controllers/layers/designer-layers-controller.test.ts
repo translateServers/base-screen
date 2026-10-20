@@ -1042,6 +1042,84 @@ describe('DesignerLayersController', () => {
       expect(state.controller.draggedId).toBeUndefined();
     }
   });
+
+  it('selects the right-clicked row unless it is already part of the selection', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const selectableRow = (id: string): FakeElement => {
+      const row = layerRow(id);
+      row.dataset.layerSelectable = 'true';
+      row.matches['[data-layer-selectable="true"]'] = row;
+      return row;
+    };
+
+    // 行不在选区里：右键先把选区换成这一行（菜单随后按单组件解析）。
+    const actions: unknown[] = [];
+    const single = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: document, diagnostics: [] }),
+      getCatalog: () => undefined,
+      getDocument: () => createDocument([component('layer-1', null, 0)]),
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      reduceSelection: (action) => actions.push(action),
+    });
+    expect(
+      single.onContextMenu({ target: selectableRow('layer-1') } as unknown as MouseEvent),
+    ).toBe('row');
+    expect(actions).toEqual([
+      { type: 'replace-selection', componentIds: ['layer-1'], focusedComponentId: 'layer-1' },
+    ]);
+
+    // 行已在多选里：保留选区，菜单升级为多选菜单，动作仍落在整段选区上。
+    const kept: unknown[] = [];
+    const multi = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: document, diagnostics: [] }),
+      getCatalog: () => undefined,
+      getDocument: () => createDocument([component('layer-1', null, 0)]),
+      getInteraction: () => ({
+        selectedComponentIds: ['layer-1', 'layer-2'],
+        focusedComponentId: 'layer-2',
+      }),
+      reduceSelection: (action) => kept.push(action),
+    });
+    expect(multi.onContextMenu({ target: selectableRow('layer-2') } as unknown as MouseEvent)).toBe(
+      'row',
+    );
+    expect(kept).toEqual([]);
+  });
+
+  it('leaves hidden rows and the rename input without an object menu', () => {
+    vi.stubGlobal('HTMLElement', FakeElement);
+    vi.stubGlobal('Element', FakeElement);
+    const actions: unknown[] = [];
+    const controller = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: document, diagnostics: [] }),
+      getCatalog: () => undefined,
+      getDocument: () => createDocument([component('layer-1', null, 0, { hidden: true })]),
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      reduceSelection: (action) => actions.push(action),
+    });
+
+    // 隐藏行没有 data-layer-selectable：core 的选择归约会剔除有效隐藏组件，
+    // 右键认领它只会让菜单动作落到上一次选择上。
+    expect(controller.onContextMenu({ target: layerRow('layer-1') } as unknown as MouseEvent)).toBe(
+      'ignore',
+    );
+
+    const renaming = layerRow('layer-1');
+    renaming.dataset.layerSelectable = 'true';
+    renaming.matches['[data-layer-selectable="true"]'] = renaming;
+    renaming.matches['[data-layer-rename]'] = renaming;
+    expect(controller.onContextMenu({ target: renaming } as unknown as MouseEvent)).toBe('ignore');
+    expect(actions).toEqual([]);
+
+    // 树空白区没有行可认领：回落画布菜单，由调用方不传 componentId 打开。
+    expect(controller.onContextMenu({ target: new FakeElement() } as unknown as MouseEvent)).toBe(
+      'blank',
+    );
+  });
 });
 
 function orderByZIndex(document: ScreenDocument): readonly string[] {

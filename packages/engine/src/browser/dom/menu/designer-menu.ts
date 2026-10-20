@@ -21,6 +21,15 @@ export type {
   DesignerOperationStateShape,
 } from './designer-menu-model.js';
 
+/**
+ * 把锚点换算到从 `offset` 起算的区域内：先转成区域本地坐标，夹到
+ * [0, 区域尺寸 - 菜单尺寸]，再转回容器坐标。区域比菜单还小时保持光标锚定
+ * （沿用 clampToFit 的既有语义），返回值不是负数，菜单不会被压回容器原点。
+ */
+function placeWithin(anchor: number, offset: number, extent: number, size: number): number {
+  return clampToFit(anchor - offset, extent - size) + offset;
+}
+
 export class DesignerMenuController {
   #helpReturnFocus: HTMLElement | undefined;
 
@@ -294,38 +303,70 @@ export class DesignerMenuController {
     return closed;
   }
 
-  openContextMenu(event: MouseEvent): void {
+  /**
+   * 打开右键菜单。`source` 是调用方已解析好的命中信息：
+   * - `componentId`：图层行在同步选区后会随面板重渲染脱离文档，之后再按 DOM 反查
+   *   `closest('[data-layer-id]')` 只会拿到 null，必须由事件源头先捕获再传进来；
+   * - `fromPanel`：夹紧范围随之放宽到整个设计器，菜单才能盖到面板上方。
+   */
+  openContextMenu(
+    event: MouseEvent,
+    source: { readonly componentId?: string | undefined; readonly fromPanel?: boolean } = {},
+  ): void {
     const menu = this.callbacks.getContextMenu();
     if (menu === undefined) return;
-    const workspace = this.callbacks.getRoot()?.querySelector<HTMLElement>('.workspace');
-    if (workspace === null || workspace === undefined) return;
+    const root = this.callbacks.getRoot();
+    // 菜单是 .designer 的直接子节点（面板与画布共用一个浮层），定位基准也随之取 .designer。
+    const layout = root?.querySelector<HTMLElement>('.designer');
+    if (layout === null || layout === undefined) return;
     const target = event.target;
     const targetElement = target instanceof Element ? target : null;
-    const component =
-      targetElement?.closest<HTMLElement>('[data-base-screen-component-id]') ?? null;
+    // 画布组件与图层面板行同属一份上下文：都按「命中的组件 + 当前选区」解析菜单，
+    // 面板因此不需要第二套菜单项，也不会有两处需要同步的文案与可用性状态。
+    const componentId =
+      source.componentId ??
+      targetElement?.closest<HTMLElement>('[data-base-screen-component-id]')?.dataset
+        .baseScreenComponentId;
     const selectedIds = this.callbacks.getSelectedComponentIds();
-    const onSelectedComponent =
-      component !== null &&
-      component.dataset.baseScreenComponentId !== undefined &&
-      selectedIds.includes(component.dataset.baseScreenComponentId);
+    const onSelectedComponent = componentId !== undefined && selectedIds.includes(componentId);
     // 右键命中选区框（拖拽空白区/变换手柄/旋转控制，含多选包围盒内的间隙）时按当前选择解析菜单；
     // 未命中选区的组件与空白画布保持单组件/画布菜单。
     const inSelectionBox = targetElement?.closest('[data-selection]') !== null;
     const kind =
       selectedIds.length > 1 && (onSelectedComponent || inSelectionBox)
         ? 'multi'
-        : component !== null || (inSelectionBox && selectedIds.length === 1)
+        : componentId !== undefined || (inSelectionBox && selectedIds.length === 1)
           ? 'component'
           : 'canvas';
     const pluginItems = this.callbacks.getPluginCommandItems?.(`context.${kind}`) ?? [];
     menu.innerHTML = `${contextMenuHtml(DESIGNER_CONTEXT_MENU[kind])}${pluginCommandMenuSection(pluginItems)}`;
     this.renderContextMenuState();
     menu.hidden = false;
-    const bounds = workspace.getBoundingClientRect();
-    // 菜单（如多选菜单）超出工作区大小时保持光标锚定，不把负的夹紧边界压回 (0,0)；
+    const bounds = layout.getBoundingClientRect();
+    // 夹紧范围按来源区分：画布右键仍收在工作区内，菜单不会盖住右侧检查器；面板右键
+    // 允许跨到画布上方（面板本身在工作区左侧，只夹在设计器内就已经贴住指针）。
+    const clampArea =
+      source.fromPanel === true || root === null
+        ? bounds
+        : (root.querySelector<HTMLElement>('.workspace')?.getBoundingClientRect() ?? bounds);
+    // 菜单（如多选菜单）超出夹紧范围时保持光标锚定，不把负的夹紧边界压回 (0,0)；
     // 高度受限时由 .designer-context-menu 的 max-height/overflow 滚动承接。
-    const left = clampToFit(event.clientX - bounds.left, bounds.width - menu.offsetWidth);
-    const top = clampToFit(event.clientY - bounds.top, bounds.height - menu.offsetHeight);
+    // 绝对定位的坐标原点是容纳块的 padding box：.designer 带 1px 外框，必须补上 clientLeft/Top，
+    // 否则菜单会整体偏出边框那一像素，贴边时视觉上压过检查器/状态栏。
+    const originLeft = bounds.left + (layout.clientLeft || 0);
+    const originTop = bounds.top + (layout.clientTop || 0);
+    const left = placeWithin(
+      event.clientX,
+      clampArea.left - originLeft,
+      clampArea.width,
+      menu.offsetWidth,
+    );
+    const top = placeWithin(
+      event.clientY,
+      clampArea.top - originTop,
+      clampArea.height,
+      menu.offsetHeight,
+    );
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
     menu.focus();
