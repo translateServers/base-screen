@@ -175,11 +175,21 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).not.toContain('.status-item');
   });
 
-  it('R3 renders nested menus as side flyouts instead of inline rows', () => {
-    expect(baseCss).toContain('.designer-menu .designer-submenu {');
+  it('R3 renders nested menus as side flyouts and shares one menu surface', () => {
+    expect(baseCss).toContain('.designer-menu .designer-submenu,');
+    expect(baseCss).toContain('.designer-context-menu .designer-submenu {');
     expect(baseCss).toContain('position: absolute;');
     expect(baseCss).toContain('left: calc(100% - 4px);');
-    expect(workbenchCss).toContain('.designer-context-menu .designer-submenu {');
+    // 下拉菜单与右键菜单是同一个组件：壳、项、分隔线、子菜单都只在 base-menus 里定义一次。
+    // 任何一边重新长出一套自有外观（描边/悬停/尺寸分叉）都会在这里被挡住。
+    expect(baseCss).toContain('.designer-menu,\n.designer-context-menu {');
+    expect(baseCss).toContain(
+      '.designer-menu .designer-menu-item,\n.designer-context-menu .designer-menu-item {',
+    );
+    expect(baseCss).toContain(
+      '.designer-menu .designer-menu-separator,\n.designer-context-menu .designer-menu-separator {',
+    );
+    expect(workbenchCss).not.toContain('.designer-context-menu');
   });
 
   it('R8 keeps canvas grid and overlay layers driven by theme tokens', () => {

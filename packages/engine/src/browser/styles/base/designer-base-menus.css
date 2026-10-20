@@ -77,28 +77,57 @@
   background: var(--designer-scrollbar-corner);
 }
 
-.designer-menu {
+/* ── 菜单浮层 ──────────────────────────────────────────────────────────────
+   顶栏下拉（.designer-menu）与画布/图层面板右键（.designer-context-menu）是同一个
+   组件：外观只在这里定义一次，调用方只决定位置与动画原点。此前两处各维护一套，
+   结果是根菜单描边一边用 elev-ring、一边用真边框（浅色下 8% 与 15%），悬停一边抬
+   灰底、一边染蓝底，右键菜单的分隔线还因为规则只挂在 .designer-menu 下而高度塌成 0。 */
+
+.designer-menu,
+.designer-context-menu {
   position: absolute;
   z-index: var(--designer-z-dialog);
   min-width: 210px;
   padding: var(--designer-space-2);
-  background: var(--designer-surface-overlay);
-  border: 0;
+  /* 浮层描边用真 1px：压在画布图像与面板上比阴影 ring 更稳，也与子菜单同源。
+     ring 留给按钮/输入/卡片这类没有外阴影的交互面。 */
+  border: 1px solid var(--designer-border-default);
   border-radius: var(--designer-radius-overlay);
-  box-shadow: var(--designer-elev-ring), var(--designer-shadow-overlay);
-  transform-origin: top center;
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-shadow-overlay);
   animation: designer-menu-in var(--designer-motion) cubic-bezier(0.25, 1, 0.5, 1);
 }
 
-.designer-menu[hidden] {
+.designer-menu[hidden],
+.designer-context-menu[hidden] {
   display: none;
 }
 
+/* 顶栏下拉：从触发器下方展开，向下生长。 */
 .designer-menu {
   top: calc(var(--designer-topbar-height) - 6px);
+  transform-origin: top center;
 }
 
-.designer-menu .designer-menu-item {
+/* 右键菜单：贴光标展开，向右下生长。 */
+.designer-context-menu {
+  /* 子菜单需要溢出到右侧；当前菜单已按上下文裁剪为短菜单。 */
+  max-height: none;
+  overflow: visible;
+  transform-origin: top left;
+}
+
+/* 容器仅用于捕获焦点，聚焦时不绘制浏览器默认焦点框（菜单项自带 focus-visible 环）。 */
+.designer-context-menu:focus {
+  outline: none;
+}
+
+/* 菜单项：两套菜单共用同一几何。1px 透明边框让悬停描边不改变行高。
+   同时撤掉 .designer-button 自带的 elev-ring：菜单已经有外框，行内再套一圈 15% 描边，
+   与分组线的 10% 发丝线只隔 4px，远看会糊成一道三四像素的浅带。
+   悬停改由 border-active 收边，焦点由 inset 焦点环表达，层级信息不丢。 */
+.designer-menu .designer-menu-item,
+.designer-context-menu .designer-menu-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -109,6 +138,7 @@
   border: 1px solid transparent;
   border-radius: var(--designer-radius-control);
   background: transparent;
+  box-shadow: none;
   color: var(--designer-text-primary);
   font: var(--designer-font-small);
   font-weight: 500;
@@ -117,33 +147,72 @@
   text-align: left;
   transition:
     background var(--designer-motion),
+    border-color var(--designer-motion),
     color var(--designer-motion);
 }
 
 /* 导航态保持中性：悬停只抬一格底色；蓝色留给编辑与焦点。 */
 .designer-menu .designer-menu-item:hover:not(:disabled),
-.designer-menu .designer-menu-item:focus-visible:not(:disabled) {
+.designer-menu .designer-menu-item:focus-visible:not(:disabled),
+.designer-context-menu .designer-menu-item:hover:not(:disabled),
+.designer-context-menu .designer-menu-item:focus-visible:not(:disabled) {
   background: var(--designer-surface-control-hover);
   border-color: var(--designer-border-active);
   color: var(--designer-text-primary);
   outline: none;
 }
 
-.designer-menu .designer-menu-item:focus-visible {
+.designer-menu .designer-menu-item:focus-visible,
+.designer-context-menu .designer-menu-item:focus-visible {
   box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
 }
 
-.designer-menu .designer-menu-item:disabled {
+.designer-menu .designer-menu-item:disabled,
+.designer-context-menu .designer-menu-item:disabled {
   color: var(--designer-text-disabled);
   cursor: default;
 }
 
-.designer-menu .designer-menu-item kbd {
+.designer-menu .designer-menu-item kbd,
+.designer-context-menu .designer-menu-item kbd {
   margin-left: auto;
   color: var(--designer-text-muted);
   font: var(--designer-font-numeric);
   font-size: var(--designer-font-size-xs);
   opacity: 0.8;
+}
+
+.designer-menu .designer-menu-item .menu-item-check,
+.designer-context-menu .designer-menu-item .menu-item-check {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--designer-accent);
+  opacity: 0;
+}
+
+.designer-menu .designer-menu-item[aria-checked="true"] .menu-item-check,
+.designer-context-menu .designer-menu-item[aria-checked="true"] .menu-item-check {
+  opacity: 1;
+}
+
+.designer-menu .designer-menu-item .menu-item-label,
+.designer-context-menu .designer-menu-item .menu-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 分组线：两套菜单同一条发丝线。 */
+.designer-menu .designer-menu-separator,
+.designer-context-menu .designer-menu-separator {
+  height: 1px;
+  margin: var(--designer-space-2) var(--designer-space-3);
+  background: var(--designer-border-subtle);
 }
 
 .designer-menu-submenu-wrap {
@@ -154,7 +223,8 @@
   display: none;
 }
 
-.designer-menu .designer-menu-submenu-trigger {
+.designer-menu .designer-menu-submenu-trigger,
+.designer-context-menu .designer-menu-submenu-trigger {
   cursor: default;
 }
 
@@ -165,7 +235,8 @@
   line-height: 1;
 }
 
-.designer-menu .designer-submenu {
+.designer-menu .designer-submenu,
+.designer-context-menu .designer-submenu {
   position: absolute;
   top: -1px;
   left: calc(100% - 4px);
@@ -180,50 +251,26 @@
   z-index: calc(var(--designer-z-dialog) + 1);
 }
 
-.designer-menu .designer-submenu .designer-menu-item {
+.designer-menu .designer-submenu .designer-menu-item,
+.designer-context-menu .designer-submenu .designer-menu-item {
   padding-left: var(--designer-space-5);
 }
 
 /* 内含“已展开”嵌套子菜单的面板必须允许溢出：三级及更深的浮层相对当前行定位、会伸出
-   父面板，父面板的 overflow 会把浮层裁成不可见且不可命中。与 .designer-context-menu 根
-   菜单同理，此时同时解除 positionSubmenu 写入的行内 max-height，避免出现“盒高被夹紧
-   但内容溢出”的错位。未展开嵌套时保留滚动，继续承接超长面板。 */
-.designer-menu .designer-submenu:has(> .designer-menu-submenu-wrap > [data-submenu]:not([hidden])) {
+   父面板，父面板的 overflow 会把浮层裁成不可见且不可命中。根菜单同理，此时同时解除
+   positionSubmenu 写入的行内 max-height，避免出现“盒高被夹紧但内容溢出”的错位。
+   未展开嵌套时保留滚动，继续承接超长面板。 */
+.designer-menu .designer-submenu:has(> .designer-menu-submenu-wrap > [data-submenu]:not([hidden])),
+.designer-context-menu
+  .designer-submenu:has(> .designer-menu-submenu-wrap > [data-submenu]:not([hidden])) {
   overflow: visible;
   max-height: none !important;
 }
 
-.designer-menu .designer-submenu[data-submenu-side="left"] {
+.designer-menu .designer-submenu[data-submenu-side="left"],
+.designer-context-menu .designer-submenu[data-submenu-side="left"] {
   left: auto;
   right: calc(100% - 4px);
-}
-
-.designer-menu .designer-menu-item .menu-item-check {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--designer-accent);
-  opacity: 0;
-}
-
-.designer-menu .designer-menu-item[aria-checked="true"] .menu-item-check {
-  opacity: 1;
-}
-
-.designer-menu .designer-menu-item .menu-item-label {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.designer-menu .designer-menu-separator {
-  height: 1px;
-  margin: var(--designer-space-2) var(--designer-space-3);
-  background: var(--designer-border-subtle);
 }
 
 .material-search {
