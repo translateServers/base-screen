@@ -21,19 +21,22 @@ export function renderDesignerDatasetConfiguration(
 ): HTMLElement {
   const details = options.panel.ownerDocument.createElement('div');
   details.dataset.datasetDescriptor = 'true';
+  details.dataset.dsSection = 'config';
   details.className = 'designer-dataset-descriptor';
   details.appendChild(
     renderDatasetSummary(details.ownerDocument, options.descriptor, options.roles, options.draft),
   );
   details.appendChild(renderParameters(details.ownerDocument, options));
   details.appendChild(renderBindings(details.ownerDocument, options));
-  details.appendChild(
-    renderActions(
-      details.ownerDocument,
-      !options.resourceAvailable,
-      isDesignerDatasetBindingValid(options.descriptor, options.draft, options.roles),
-    ),
-  );
+  if (options.includeActions !== false) {
+    details.appendChild(
+      renderActions(
+        details.ownerDocument,
+        !options.resourceAvailable,
+        isDesignerDatasetBindingValid(options.descriptor, options.draft, options.roles),
+      ),
+    );
+  }
   return details;
 }
 

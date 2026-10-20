@@ -18,6 +18,21 @@ export interface DesignerDatasetDraftView {
 
 export type DesignerDatasetPreviewTab = 'response' | 'consumer' | 'request';
 
+/** 宿主通道状态：未接入 / 已接入 / 请求中 / 失败（失败带诊断码或说明）。 */
+export type DesignerHostLinkStatus = 'unavailable' | 'ready' | 'loading' | 'error';
+
+export interface DesignerHostLinkChannel {
+  readonly status: DesignerHostLinkStatus;
+  readonly detail?: string;
+}
+
+/** 三条通道分开报告：目录、查询、变量解析各自可能接上或没接上，不能共用一颗状态灯。 */
+export interface DesignerHostLinkView {
+  readonly catalog: DesignerHostLinkChannel;
+  readonly query: DesignerHostLinkChannel;
+  readonly variables: DesignerHostLinkChannel;
+}
+
 export type DesignerDatasetWorkbenchStep =
   | 'source'
   | 'mapping'
@@ -82,6 +97,7 @@ export interface DesignerDataSourcePanelOptions {
   readonly variables: readonly Pick<ScreenVariable, 'id' | 'name'>[];
   readonly catalogAvailable: boolean;
   readonly resourceAvailable: boolean;
+  readonly link: DesignerHostLinkView;
   readonly bindingOpenRoleId?: string | null;
   readonly feedback: string;
   readonly dirty: boolean;
@@ -100,4 +116,6 @@ export interface DesignerDatasetConfigurationOptions {
   readonly resourceAvailable: boolean;
   /** 展开字段选择弹层的角色（面板重渲染后据此恢复开合态）。 */
   readonly bindingOpenRoleId?: string | null;
+  /** 是否在配置区尾部渲染动作条；两个挂载点各自在容器层放动作，默认渲染以保持单测兼容。 */
+  readonly includeActions?: boolean;
 }

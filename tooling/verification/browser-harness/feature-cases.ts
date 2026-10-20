@@ -317,6 +317,14 @@ async function applyDataset(designer: BaseScreenDesignerElement): Promise<void> 
   await painted();
 }
 
+async function applyDataPanel(designer: BaseScreenDesignerElement): Promise<void> {
+  setHostShellVisible(false);
+  designer.setWorkbenchMode('canvas');
+  await selectLayer(designer, 'dataset-ranking-demo');
+  clickShadow(designer, '[data-inspector-tab="data"]');
+  await painted();
+}
+
 async function applySemanticChart(designer: BaseScreenDesignerElement): Promise<void> {
   setHostShellVisible(false);
   designer.setWorkbenchMode('canvas');
@@ -421,6 +429,7 @@ const CASE_APPLIERS = {
   'plugin-datav-materials': applyPluginDatavMaterials,
   'plugin-runtime': applyPluginRuntime,
   dataset: applyDataset,
+  'data-panel': applyDataPanel,
   'semantic-chart': applySemanticChart,
   blueprint: applyBlueprint,
   'host-authoring': applyHostAuthoring,

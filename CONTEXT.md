@@ -81,6 +81,21 @@
   `<base-screen-designer>` 各控制器的连接顺序与释放责任的唯一声明处。登记表之外不得有手写 teardown；
   遗漏释放必须是类型错误而非静默。相关约束见 `tooling/checks/engine-import.mjs` 对 `designer-element/` 结构的登记。
 
+## 数据面板
+
+- **数据面板（Data Panel）**  
+  右侧检查器的「数据源」页只由 `DesignerDatasetController` 一条路径渲染。宿主是否提供 `datasetPort`
+  只决定 `dataset` 这个选项可不可用，不决定用哪套面板；`none` / `static` / `variable` / `dataset` /
+  `host-resource` 是同一面板的五个 mode。旧的按端口二选一的四字段面板已移除。
+- **面板段（Data Section）**  
+  面板内容按 `data-ds-section` 切成可独立重建的段：`mode` / `host-link` / `catalog` / `config` /
+  `preview` / `authoring`。段的构造只有 `designer-dataset-sections.ts` 一处；内联面板与全屏工作台
+  消费同一批段，只决定摆在哪一列。状态变化用 `patchDatasetSections` 只换受影响的段，
+  整块 `replaceChildren` 只留给结构真的变了的情形（切 mode、选数据集、开关工作台、提交）。
+- **宿主通道状态（Host Link Channel）**  
+  目录、查询、变量解析三条通道各自报告 `unavailable` / `ready` / `loading` / `error`，
+  `error` 带诊断码并可重试。三条通道不允许共用一个布尔。
+
 ## 物料
 
 - **物料状态容器（Material Loading Container）**  

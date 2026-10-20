@@ -7,6 +7,7 @@ import type {
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import {
   describeDataset,
+  restoreDatasetControlFocus,
   setSourceMode,
   toggleDatasetBindingField,
   updateDatasetBindingRole,
@@ -15,7 +16,11 @@ import {
   updateDatasetParameterValue,
 } from './designer-dataset-draft-controller.js';
 import { setDatasetPreviewTab } from './designer-dataset-preview-controller.js';
-import { isDatasetWorkbenchStep } from './designer-dataset-surface-controller.js';
+import {
+  isDatasetWorkbenchStep,
+  patchDatasetSections,
+  retryDatasetLink,
+} from './designer-dataset-surface-controller.js';
 import {
   handleStaticChange,
   handleStaticClick,
@@ -71,7 +76,15 @@ export function handleDatasetClick(
   if (bindingTrigger !== null) {
     const roleId = bindingTrigger.dataset.datasetBindingTrigger ?? null;
     context.state.bindingOpenRoleId = context.state.bindingOpenRoleId === roleId ? null : roleId;
-    context.renderSurface();
+    // 弹层就在配置段内部：只换这一段，并把焦点交回同一个角色的新触发器。
+    patchDatasetSections(context, ['config'], () =>
+      restoreDatasetControlFocus(
+        context,
+        roleId === null
+          ? '[data-dataset-binding-trigger]'
+          : `[data-dataset-binding-trigger="${roleId}"]`,
+      ),
+    );
     return true;
   }
   const bindingField = target.closest<HTMLButtonElement>('[data-dataset-binding-field]');
@@ -83,7 +96,7 @@ export function handleDatasetClick(
     const insideMenu = target.closest('[data-dataset-binding-role]') !== null;
     if (!insideMenu) {
       context.state.bindingOpenRoleId = null;
-      context.renderSurface();
+      patchDatasetSections(context, ['config']);
     }
   }
   const bindingAction = target.closest<HTMLButtonElement>('[data-dataset-binding-role-action]');
@@ -108,7 +121,8 @@ export function handleDatasetClick(
   if (editorMode === 'visual' || editorMode === 'code') {
     context.state.authoring = { ...context.state.authoring, editorMode };
     if (editorMode === 'code') context.callbacks.requestAuthoringAction?.('open-code-editor');
-    context.renderSurface();
+    // 编辑器模式只改变高级设置段自身的选择态。
+    patchDatasetSections(context, ['authoring']);
     return true;
   }
   const authoringAction = target.closest<HTMLButtonElement>('[data-dataset-authoring-action]')
@@ -175,6 +189,10 @@ function handleDatasetAction(context: DesignerDatasetControllerContext, target: 
   }
   if (action === 'test') {
     void context.testDatasetDraft();
+    return true;
+  }
+  if (action === 'retry-link') {
+    retryDatasetLink(context);
     return true;
   }
   if (action === 'refresh') {
@@ -277,7 +295,7 @@ export function handleDatasetKeyDown(
   if (event.key === 'Escape' && context.state.bindingOpenRoleId !== null) {
     event.preventDefault();
     context.state.bindingOpenRoleId = null;
-    context.renderSurface();
+    patchDatasetSections(context, ['config']);
     return true;
   }
   if (event.key === 'Backspace') {

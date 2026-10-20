@@ -248,12 +248,11 @@ export function renderProperties(element: DesignerElementHost): void {
   const elementState = getDesignerElementState(element);
 
   elementState.scrollContinuityController.preserve(element.shadowRoot, () => {
-    elementState.panelController.render(
-      elementState.properties,
-      elementState.datasetPort === undefined ? elementState.dataPanel : undefined,
-    );
-    if (elementState.datasetPort !== undefined)
-      elementState.datasetController.render(elementState.dataPanel);
+    // 数据面板只有一条渲染路径：宿主接不接 datasetPort 只决定 dataset 这个 mode 可不可用，
+    // 不再决定「用哪套面板」。属性面板与数据面板各渲染自己的 DOM 区；
+    // dataPanel 只作为滚动守护的挂载线索传下去，不参与渲染决策。
+    elementState.panelController.render(elementState.properties, elementState.dataPanel);
+    elementState.datasetController.render(elementState.dataPanel);
   });
 }
 

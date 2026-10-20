@@ -45,6 +45,7 @@ import {
   assertInitialCanvasPointerFocus,
 } from './canvas/assert-canvas.mjs';
 import { assertDatasetAuthoring, assertDatasetSurface } from './dataset/assert-dataset.mjs';
+import { assertDatasetPanelInteraction } from './dataset/assert-dataset-panel.mjs';
 import {
   assertBlueprintHostLeftPanelGroups,
   assertHostLeftPanelGroups,
@@ -168,6 +169,8 @@ export async function runBrowserHarness(serverPort) {
         await assertCanvasPrecision(authoringDesigner, page);
         await assertDatasetSurface(authoringDesigner, page);
         const hostEventCount = await assertDatasetAuthoring(authoringDesigner, page);
+        // 这条断言会开合并放弃一次工作台草稿，放在数据集主链之后，避免把脏状态带给后续断言。
+        await assertDatasetPanelInteraction(authoringDesigner, page);
         await assertBlueprintWorkbench(authoringDesigner, page);
         await assertComponentTextAuthoring(authoringDesigner, page, hostEventCount);
         await assertSemanticChartAuthoring(authoringDesigner, page);

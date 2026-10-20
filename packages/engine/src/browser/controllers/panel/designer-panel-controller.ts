@@ -101,9 +101,10 @@ export class DesignerPanelController {
     return this.#selection.distribute(distribution);
   }
 
-  render(properties: HTMLElement | undefined, dataPanel?: HTMLElement): void {
-    this.#inspector.prepareRender(properties, dataPanel);
-    this.#properties.render(properties, dataPanel);
+  /** `dataPane` 不参与渲染，只用来把数据面板的滚动容器登记给滚动守护。 */
+  render(properties: HTMLElement | undefined, dataPane?: HTMLElement): void {
+    this.#inspector.prepareRender(properties, dataPane);
+    this.#properties.render(properties);
   }
 
   captureInspectorGroupPreferences(root: ShadowRoot | HTMLElement | null): void {

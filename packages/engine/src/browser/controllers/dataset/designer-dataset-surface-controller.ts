@@ -1,13 +1,22 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { renderDatasetCatalogResults } from '../../dom/dataset/designer-dataset-catalog-dom.js';
 import {
   type DesignerDataSourcePanelOptions,
   type DesignerDatasetWorkbenchStep,
   renderDesignerDataSourcePanel,
   renderDesignerDatasetWorkbench,
 } from '../../dom/dataset/designer-dataset-dom.js';
+import {
+  createDatasetSection,
+  type DesignerDataSectionKey,
+} from '../../dom/dataset/designer-dataset-sections.js';
+import type { DesignerHostLinkView } from '../../dom/dataset/designer-dataset-types.js';
 import { renderDesignerDescriptorZone } from '../../dom/descriptor/designer-descriptor-dom.js';
 import { designerDataSourceModes } from './designer-data-source-authoring.js';
-import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
+import {
+  type DesignerDatasetControllerContext,
+  emptyDatasetPreview,
+} from './designer-dataset-controller-context.js';
 
 export function renderDatasetSurface(context: DesignerDatasetControllerContext): void {
   const preserve = context.callbacks.preserveScrollContinuity;
@@ -25,20 +34,84 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   const surface = renderDesignerDataSourcePanel(options);
   context.state.feedback = surface.feedback;
   const manifest = context.currentEntry()?.manifest;
+  // 物料自有的数据字段（editorDescriptor.data）属于「这个组件怎么读数据」，与数据源走哪条通道无关，
+  // 也不该被藏在某个步骤后面：统一追加在数据源 section 之后。
   const descriptorHost =
-    options.activeStep === 'mapping'
-      ? (panel.querySelector<HTMLElement>('.designer-datav-data-flow-content') ?? panel)
-      : undefined;
-  if (descriptorHost !== undefined) {
-    renderDesignerDescriptorZone(descriptorHost, manifest?.editorDescriptor?.data, {
-      document: context.callbacks.getDocument(),
-      interaction: context.callbacks.getInteraction(),
-      catalog: context.callbacks.getCatalog(),
-      getDatasetFields: () => getFocusedDatasetFields(context),
-    });
-  }
+    panel.querySelector<HTMLElement>('.designer-datav-data-flow-content') ?? panel;
+  renderDesignerDescriptorZone(descriptorHost, manifest?.editorDescriptor?.data, {
+    document: context.callbacks.getDocument(),
+    interaction: context.callbacks.getInteraction(),
+    catalog: context.callbacks.getCatalog(),
+    getDatasetFields: () => getFocusedDatasetFields(context),
+  });
   renderDataWorkbench(context, options);
   context.dataFlowScrollSync.bind(panel);
+}
+
+/**
+ * 只重画指定 section。
+ *
+ * 参数输入、字段绑定、预览页签切换、刷新策略这类「同一段内的状态变化」只换这一段，
+ * 段外的搜索框、目录列表、已展开的弹层保持节点身份（焦点、光标、滚动都不动）。
+ * 段在哪个挂载点存在就换哪个：内联面板与全屏工作台共用同一批 section 标记。
+ *
+ * 段不存在于任何挂载点时退回整块重绘——那说明结构已经变了，单段替换表达不了。
+ */
+export function patchDatasetSections(
+  context: DesignerDatasetControllerContext,
+  sections: readonly DesignerDataSectionKey[],
+  restoreFocus?: () => void,
+): void {
+  const panel = context.state.panel;
+  if (panel === undefined) return;
+  const options = createDatasetPanelOptions(context, panel);
+  let patched = 0;
+  for (const root of [panel, context.callbacks.getWorkbenchHost?.()]) {
+    if (root === undefined) continue;
+    for (const key of sections) {
+      const current = root.querySelector<HTMLElement>(`[data-ds-section="${key}"]`);
+      if (current === null) continue;
+      const next = createDatasetSection(key, options);
+      if (next === undefined) continue;
+      current.replaceWith(next);
+      patched += 1;
+    }
+  }
+  if (patched === 0) {
+    context.renderSurface();
+    return;
+  }
+  restoreFocus?.();
+}
+
+/**
+ * 宿主目录回包只重画结果区。
+ *
+ * 面板/工作台里的搜索框、分组下拉和已展开的绑定弹层都是用户正在操作的对象，
+ * 为一次结果回包整块重渲染会把焦点、光标位置和输入法组合态一起丢掉。
+ * 内联面板与全屏工作台是同一份数据的两个投影，两处都按节点就地替换。
+ */
+export function updateDatasetCatalogResults(context: DesignerDatasetControllerContext): void {
+  const panel = context.state.panel;
+  if (panel === undefined) return;
+  const options = createDatasetPanelOptions(context, panel);
+  for (const root of [panel, context.callbacks.getWorkbenchHost?.()]) {
+    for (const results of root?.querySelectorAll<HTMLElement>('[data-dataset-results]') ?? []) {
+      results.replaceWith(renderDatasetCatalogResults(options));
+    }
+  }
+  // 目录请求同时决定宿主连接段的状态灯，两段一起就地更新。
+  patchDatasetSections(context, ['host-link']);
+  // 结果区不在屏上（目录收起、看的是参数或预览）时无处可画：
+  // 控制器已持有最新条目，下一次结构性渲染自会读到，不做整块重绘。
+}
+
+/** 宿主通道失败后重试：清掉上一次测试的失败态，再按当前查询重取目录。 */
+export function retryDatasetLink(context: DesignerDatasetControllerContext): void {
+  context.cancelPreview();
+  context.state.preview = emptyDatasetPreview(context.state.preview.open);
+  patchDatasetSections(context, ['preview']);
+  context.catalogController.retry();
 }
 
 export function syncDataFlowProgress(
@@ -110,6 +183,7 @@ function createDatasetPanelOptions(
     })),
     catalogAvailable: context.callbacks.getCatalogPort() !== undefined,
     resourceAvailable: context.callbacks.getCatalogPort() !== undefined,
+    link: hostLinkView(context),
     bindingOpenRoleId: context.state.bindingOpenRoleId,
     feedback: context.state.feedbackText,
     dirty: context.state.draftDirty,
@@ -204,6 +278,37 @@ export function restoreBindingFieldFocus(
       return;
     }
   }
+}
+
+/**
+ * 三条宿主通道分开报告。目录状态来自目录控制器的真实请求结果；
+ * 查询状态取自最近一次测试数据；变量通道只看宿主有没有接 variable 端口。
+ */
+function hostLinkView(context: DesignerDatasetControllerContext): DesignerHostLinkView {
+  const datasetPort = context.callbacks.getCatalogPort();
+  const preview = context.state.preview;
+  const catalogError = context.catalogController.error;
+  return {
+    catalog:
+      datasetPort === undefined
+        ? { status: 'unavailable' }
+        : {
+            status: context.catalogController.status,
+            ...(catalogError === undefined ? {} : { detail: catalogError }),
+          },
+    query:
+      datasetPort === undefined
+        ? { status: 'unavailable' }
+        : preview.status === 'loading'
+          ? { status: 'loading' }
+          : preview.status === 'error'
+            ? { status: 'error', detail: preview.message }
+            : { status: 'ready' },
+    variables:
+      context.callbacks.getVariablePort?.() === undefined
+        ? { status: 'unavailable' }
+        : { status: 'ready' },
+  };
 }
 
 function availableModes(context: DesignerDatasetControllerContext) {

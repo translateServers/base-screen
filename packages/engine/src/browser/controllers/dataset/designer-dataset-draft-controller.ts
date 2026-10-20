@@ -2,6 +2,7 @@ import type { ScreenParseResult } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDataSourceMode } from '../../dom/dataset/designer-dataset-dom.js';
+import type { DesignerDataSectionKey } from '../../dom/dataset/designer-dataset-sections.js';
 import {
   createDatasetDataSourceTransaction,
   createDesignerDatasetDraft,
@@ -18,6 +19,7 @@ import {
   createDatasetAuthoringView,
   emptyDatasetPreview,
 } from './designer-dataset-controller-context.js';
+import { patchDatasetSections } from './designer-dataset-surface-controller.js';
 
 export function setSourceMode(
   context: DesignerDatasetControllerContext,
@@ -179,15 +181,15 @@ export function syncDraftToFocusedComponent(
     return;
   }
   if (source?.type === 'dataset') {
-    if (!availableModes(context).includes('dataset')) {
-      context.state.mode = 'host-resource';
-      context.state.descriptor = undefined;
-      context.state.draft = undefined;
-      context.state.catalogOpen = false;
-      return;
-    }
+    // 即使宿主当前没接目录端口，也不能把 dataset 数据源谎报成 host-resource：
+    // 面板要如实显示「这条数据源指向某数据集，但本实例拿不到目录/查询通道」。
     context.state.mode = 'dataset';
     context.state.catalogOpen = false;
+    if (!availableModes(context).includes('dataset')) {
+      context.state.descriptor = undefined;
+      context.state.draft = undefined;
+      return;
+    }
     if (context.state.descriptor?.datasetId === source.datasetId) {
       context.state.draft = createDesignerDatasetDraft(
         context.state.descriptor,
@@ -228,8 +230,9 @@ export function toggleDatasetBindingField(
   const fieldId = button.dataset.datasetBindingField;
   if (context.state.draft === undefined || role === undefined || fieldId === undefined) return;
   context.state.draft = toggleDesignerDatasetBindingField(context.state.draft, role, fieldId);
-  markDatasetDraftChanged(context);
-  context.restoreBindingFieldFocus('dataset', role.id, fieldId);
+  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+    context.restoreBindingFieldFocus('dataset', role.id, fieldId),
+  );
 }
 
 export function updateDatasetBindingRole(
@@ -278,7 +281,10 @@ export function updateDatasetParameterMode(
     ...context.state.draft,
     params: { ...context.state.draft.params, [name]: value },
   };
-  markDatasetDraftChanged(context);
+  // 切模式会把这个参数的控件整个换掉（输入框 ↔ 变量下拉），焦点要落到新控件上。
+  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+    restoreDatasetControlFocus(context, `[data-dataset-parameter="${name}"]`),
+  );
 }
 
 export function updateDatasetParameterValue(
@@ -298,7 +304,9 @@ export function updateDatasetParameterValue(
     name,
     target,
   );
-  markDatasetDraftChanged(context);
+  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+    restoreDatasetControlFocus(context, `[data-dataset-parameter="${name}"]`, 'caret-end'),
+  );
 }
 
 export function updateDatasetBindingSelect(
@@ -315,17 +323,50 @@ export function updateDatasetBindingSelect(
       [roleId]: selectedValue === '' ? [] : [selectedValue],
     },
   };
-  markDatasetDraftChanged(context);
+  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+    restoreDatasetControlFocus(context, `[data-dataset-binding-role="${roleId}"]`),
+  );
 }
 
-export function markDatasetDraftChanged(context: DesignerDatasetControllerContext): void {
+export function markDatasetDraftChanged(
+  context: DesignerDatasetControllerContext,
+  sections: readonly DesignerDataSectionKey[] = ['config', 'preview'],
+  restoreFocus?: () => void,
+): void {
   context.state.draftDirty = isDatasetDraftDirty(context);
   context.state.confirmClose = false;
+  // 草稿一改，上一次测试结果就作废，因此预览段必须一起换。
   context.state.preview = {
     ...emptyDatasetPreview(context.state.preview.open),
     tab: context.state.preview.tab,
   };
-  context.renderSurface();
+  patchDatasetSections(context, sections, restoreFocus);
+}
+
+/**
+ * 段换完之后把焦点还给同一个控件。工作台打开时以工作台那份为准，避免把焦点打进模态框背后。
+ * 数字输入框不支持 setSelectionRange（会抛 InvalidStateError），只有文本类才挪光标。
+ */
+export function restoreDatasetControlFocus(
+  context: DesignerDatasetControllerContext,
+  selector: string,
+  caret: 'keep' | 'caret-end' = 'keep',
+): void {
+  const root = context.state.workbenchOpen
+    ? context.callbacks.getWorkbenchHost?.()
+    : context.state.panel;
+  const control = root?.querySelector<HTMLElement>(selector);
+  if (control === null || control === undefined) return;
+  // 自绘下拉把原生 select 收成 1px 且 tabIndex=-1：焦点要交给可见的触发器，
+  // 否则焦点落在不可见元素上，键盘用户看不到任何落点提示。
+  const trigger = control
+    .closest('.designer-select-control')
+    ?.querySelector<HTMLElement>('.designer-select-trigger');
+  (trigger ?? control).focus({ preventScroll: true });
+  if (caret !== 'caret-end' || !(control instanceof HTMLInputElement)) return;
+  if (control.type === 'number') return;
+  const end = control.value.length;
+  control.setSelectionRange(end, end);
 }
 
 function isDatasetDraftDirty(context: DesignerDatasetControllerContext): boolean {
@@ -361,7 +402,10 @@ export function restoreDatasetDraft(context: DesignerDatasetControllerContext): 
 export function availableModes(
   context: DesignerDatasetControllerContext,
 ): readonly DesignerDataSourceMode[] {
-  return designerDataSourceModes(context.currentEntry());
+  // dataset 是唯一需要宿主通道的 mode：没有目录端口时它不是「换一套面板」，而是这个选项不可用。
+  return designerDataSourceModes(context.currentEntry()).filter(
+    (mode) => mode !== 'dataset' || context.callbacks.getCatalogPort() !== undefined,
+  );
 }
 
 function sameJsonValue(left: unknown, right: unknown): boolean {

@@ -15,13 +15,15 @@ import type {
 } from '../../dom/dataset/designer-dataset-dom.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import { emptyDatasetPreview } from './designer-dataset-controller-context.js';
+import { patchDatasetSections } from './designer-dataset-surface-controller.js';
 
 export function setDatasetPreviewTab(
   context: DesignerDatasetControllerContext,
   tab: DesignerDatasetPreviewTab,
 ): void {
   context.state.preview = { ...context.state.preview, tab };
-  context.renderSurface();
+  // 页签切换只换预览段；测试结果与参数区都不受影响。
+  patchDatasetSections(context, ['preview']);
 }
 
 export async function testDatasetDraft(context: DesignerDatasetControllerContext): Promise<void> {

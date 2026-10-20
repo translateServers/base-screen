@@ -1,18 +1,13 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  renderDesignerDataPanel,
-  renderDesignerProperties,
-} from '../../../../src/browser/dom/panel/designer-panel-dom.js';
+import { renderDesignerProperties } from '../../../../src/browser/dom/panel/designer-panel-dom.js';
 import {
   catalog,
   descendants,
   document,
-  enumerableResourceAuthority,
   FakeDocument,
   groupCatalog,
   imageCatalog,
-  resourceAuthority,
 } from './designer-panel-controller-fixture.js';
 
 afterEach(() => vi.unstubAllGlobals());
@@ -477,89 +472,5 @@ describe('designer panel rendering', () => {
       );
       expect(disclosure).toBeDefined();
     }
-  });
-
-  it('R9 keeps static sources available and requires host support plus contribution authority', () => {
-    const ownerDocument = new FakeDocument();
-    const withoutHost = ownerDocument.createElement('div');
-    const withHost = ownerDocument.createElement('div');
-    const staticDocument = document({ type: 'static', value: { status: 'ready' } });
-
-    renderDesignerDataPanel(
-      withoutHost as unknown as HTMLElement,
-      staticDocument,
-      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
-      catalog(),
-      false,
-      undefined,
-    );
-    renderDesignerDataPanel(
-      withHost as unknown as HTMLElement,
-      staticDocument,
-      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
-      catalog(),
-      true,
-      resourceAuthority(),
-    );
-
-    expect(
-      descendants(withoutHost)
-        .filter((element) => element.tagName === 'option')
-        .map((element) => element.value),
-    ).toEqual(['none', 'static']);
-    expect(
-      descendants(withoutHost).some((element) => element.dataset.dataSourceField === 'static'),
-    ).toBe(true);
-    expect(
-      descendants(withHost)
-        .filter((element) => element.tagName === 'option')
-        .map((element) => element.value),
-    ).toEqual(['none', 'static', 'host-resource']);
-  });
-
-  it('R9 renders a resource type picker from enumerated contributions and falls back to text input', () => {
-    const ownerDocument = new FakeDocument();
-    const withPicker = ownerDocument.createElement('div');
-    const withFallback = ownerDocument.createElement('div');
-    const hostResourceDocument = document({
-      type: 'host-resource',
-      resourceType: 'asset',
-      resourceId: 'product-42',
-      params: {},
-      binding: null,
-    });
-
-    renderDesignerDataPanel(
-      withPicker as unknown as HTMLElement,
-      hostResourceDocument,
-      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
-      catalog(),
-      true,
-      enumerableResourceAuthority(),
-    );
-    renderDesignerDataPanel(
-      withFallback as unknown as HTMLElement,
-      hostResourceDocument,
-      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
-      catalog(),
-      true,
-      resourceAuthority(),
-    );
-
-    const picker = descendants(withPicker).find(
-      (element) => element.dataset.dataSourceField === 'resourceType',
-    );
-    expect(picker?.tagName).toBe('select');
-    const options = picker?.children ?? [];
-    expect(options.map((option) => option.value)).toEqual(['', 'asset']);
-    expect(options[0]?.textContent).toBe('选择资源类型');
-    expect(options[1]?.textContent).toBe('资源');
-    expect(options[1]?.selected).toBe(true);
-
-    const fallback = descendants(withFallback).find(
-      (element) => element.dataset.dataSourceField === 'resourceType',
-    );
-    expect(fallback?.tagName).toBe('input');
-    expect(fallback?.value).toBe('asset');
   });
 });

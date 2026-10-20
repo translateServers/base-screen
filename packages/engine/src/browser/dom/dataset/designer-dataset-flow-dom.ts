@@ -1,3 +1,4 @@
+import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerFieldRow } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
@@ -8,11 +9,13 @@ import {
   renderDesignerStaticDataMapping,
   renderDesignerStaticDataPreview,
 } from '../static-data/designer-static-data-dom.js';
-import { renderDatasetAuthoring } from './designer-dataset-authoring-dom.js';
-import { renderDatasetCatalog, renderHostConnection } from './designer-dataset-catalog-dom.js';
-import { renderDesignerDatasetConfiguration } from './designer-dataset-config-dom.js';
-import { renderDatasetPreview } from './designer-dataset-preview-dom.js';
+import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import { datasetAction, renderApplyAction } from './designer-dataset-primitives.js';
+import {
+  createDatasetSection,
+  type DesignerDataSectionKey,
+  renderDatasetApplyAction,
+} from './designer-dataset-sections.js';
 import type {
   DesignerDataSourcePanelOptions,
   DesignerDatasetWorkbenchStep,
@@ -23,6 +26,7 @@ function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement 
   const section = ownerDocument.createElement('section');
   section.className = 'designer-data-source-type';
   section.dataset.workbenchSection = 'source';
+  section.dataset.dsSection = 'mode';
   section.tabIndex = -1;
   const heading = ownerDocument.createElement('h3');
   heading.className = 'designer-inspector-section-title';
@@ -207,23 +211,22 @@ function renderContinuousDataFlow(
     content.appendChild(renderVariableSource(options));
     return;
   }
-  if (options.catalogOpen || options.descriptor === undefined) {
-    content.append(renderHostConnection(options), renderDatasetCatalog(options));
-    return;
-  }
-  const configuration = renderDesignerDatasetConfiguration({
-    panel: options.panel,
-    descriptor: options.descriptor,
-    draft: options.draft,
-    roles: options.roles,
-    variables: options.variables,
-    resourceAvailable: options.resourceAvailable,
-    bindingOpenRoleId: options.bindingOpenRoleId ?? null,
-  });
-  const applyActions = configuration.querySelector<HTMLElement>('.designer-dataset-actions');
-  applyActions?.querySelector('[data-dataset-action="refresh"]')?.remove();
-  applyActions?.remove();
-  const advanced = renderDatasetAuthoring(options);
+  // 段一律从工厂取：内联面板与工作台渲染同一批节点，拼装顺序只在这里和挂载层决定。
+  content.append(
+    section('host-link', options),
+    ...(options.catalogOpen || options.descriptor === undefined
+      ? [section('catalog', options)]
+      : datasetModeSections(content.ownerDocument, options, options.descriptor)),
+  );
+}
+
+function datasetModeSections(
+  ownerDocument: Document,
+  options: DesignerDataSourcePanelOptions,
+  descriptor: ScreenDatasetDefinition,
+): readonly HTMLElement[] {
+  const configuration = section('config', options);
+  const advanced = section('authoring', options);
   advanced.classList.add('designer-datav-advanced-settings');
   advanced.dataset.workbenchSection = 'refresh';
   advanced.tabIndex = -1;
@@ -231,13 +234,26 @@ function renderContinuousDataFlow(
   if (advancedHeading !== null) {
     advancedHeading.textContent = DESIGNER_UI_TEXT.dataSource.advancedSettings;
   }
-  content.append(
+  return [
     configuration,
-    renderDatasetPreviewActions(content.ownerDocument, options),
-    renderDatasetPreview(content.ownerDocument, options),
+    renderDatasetPreviewActions(ownerDocument, options),
+    section('preview', options),
     advanced,
-  );
-  if (applyActions !== null) content.appendChild(applyActions);
+    renderDatasetApplyAction(
+      ownerDocument,
+      !options.resourceAvailable ||
+        !isDesignerDatasetBindingValid(descriptor, options.draft, options.roles),
+    ),
+  ];
+}
+
+function section(
+  key: DesignerDataSectionKey,
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement {
+  const element = createDatasetSection(key, options);
+  if (element === undefined) throw new Error(`DATASET_SECTION_UNAVAILABLE:${key}`);
+  return element;
 }
 
 function renderContinuousStaticDataFlow(
@@ -245,18 +261,11 @@ function renderContinuousStaticDataFlow(
   options: DesignerDataSourcePanelOptions,
 ): void {
   const view = staticDataView(options);
-  const source = renderStaticSource(options);
-  for (const actions of source.querySelectorAll<HTMLElement>('.designer-dataset-actions')) {
-    actions.remove();
-  }
-  content.appendChild(source);
+  content.appendChild(renderStaticSource(options));
   if (options.staticDescriptor?.kind === 'tabular') {
     const mapping = renderDesignerStaticDataMapping(view);
     mapping.dataset.workbenchSection = 'mapping';
     mapping.tabIndex = -1;
-    for (const actions of mapping.querySelectorAll<HTMLElement>('.designer-dataset-actions')) {
-      actions.remove();
-    }
     const preview = renderDesignerStaticDataPreview(view);
     preview.tabIndex = -1;
     content.append(mapping, preview);

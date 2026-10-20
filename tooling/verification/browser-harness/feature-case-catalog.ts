@@ -112,6 +112,17 @@ export const FEATURE_CASE_CATALOG = [
     stressGrouping: false,
   },
   {
+    id: 'data-panel',
+    title: '数据面板交互',
+    summary: '单一路径的数据源面板：目录搜索去抖、段级重绘、三条宿主通道状态。',
+    lookAt:
+      '选中「排行卡」打开数据源页：搜索框连续输入不失焦，绑定弹层开合焦点跟随，宿主连接显示目录/查询/变量三颗状态灯。',
+    packages: ['contracts', 'engine', 'plugin-core'],
+    focused: 'pnpm --filter @base-screen/engine test',
+    verify: 'pnpm verify:browser',
+    stressGrouping: false,
+  },
+  {
     id: 'semantic-chart',
     title: '语义图表配置',
     summary: 'harness 语义图表演示素材的分组、字段与高级折叠。',

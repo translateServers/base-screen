@@ -9,6 +9,7 @@ export function renderDatasetPreview(
   preview.className = 'designer-data-workbench-preview';
   preview.dataset.designerScrollScope = `data-workbench-preview:${options.scrollScope}:${options.preview.tab}`;
   preview.dataset.workbenchSection = 'preview';
+  preview.dataset.dsSection = 'preview';
   preview.dataset.inspectorSearchSection = 'true';
   preview.dataset.inspectorSearchText = [
     DESIGNER_UI_TEXT.dataSource.responseTitle,

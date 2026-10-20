@@ -1,6 +1,9 @@
 import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import type { DesignerDatasetAuthoringView } from '../../dom/dataset/designer-dataset-dom.js';
+import type {
+  DesignerDataSourceMode,
+  DesignerDatasetAuthoringView,
+} from '../../dom/dataset/designer-dataset-dom.js';
 import { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
 import { designerDataSourceModes } from './designer-data-source-authoring.js';
 import { DesignerDatasetCatalogController } from './designer-dataset-catalog-controller.js';
@@ -35,6 +38,7 @@ import {
   restoreFullscreenActionFocus,
   setDatasetFeedback,
   syncDataFlowProgress,
+  updateDatasetCatalogResults,
 } from './designer-dataset-surface-controller.js';
 import { restoreStaticExample } from './designer-static-table-controller.js';
 
@@ -54,6 +58,7 @@ export class DesignerDatasetController {
       report: callbacks.report,
       setFeedback: (message) => setDatasetFeedback(this.#context, message),
       render: () => this.renderSurface(),
+      renderResults: () => updateDatasetCatalogResults(this.#context),
     });
     this.#context = {
       callbacks,
@@ -137,6 +142,11 @@ export class DesignerDatasetController {
 
   get descriptor(): ScreenDatasetDefinition | undefined {
     return this.#state.descriptor;
+  }
+
+  /** 当前面板所处的数据源模式（含宿主未接入 dataset 通道时仍然保留的 'dataset'）。 */
+  get mode(): DesignerDataSourceMode {
+    return this.#state.mode;
   }
 
   get authoring(): DesignerDatasetAuthoringView {

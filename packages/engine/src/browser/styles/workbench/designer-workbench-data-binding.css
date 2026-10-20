@@ -713,7 +713,10 @@
   color: var(--designer-text-muted);
 }
 
-.designer-dataset-authoring-setting-row .designer-select {
+.designer-dataset-authoring-setting-row .designer-select,
+/* 自绘下拉占格子的是外壳，原生 select 已被收成 1px：宽度必须落在外壳上，
+   否则栅格按 92px 排、触发器按 112px 撑，整行横向溢出。 */
+.designer-dataset-authoring-setting-row .designer-select-control {
   width: 112px;
   min-width: 0;
 }

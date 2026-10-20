@@ -11,12 +11,10 @@ import {
   createDescriptorFieldTransaction,
 } from '../../dom/descriptor/designer-descriptor-operations.js';
 import {
-  createDataSourceTransaction,
   createDesignerCanvasPresentationSettings,
   createMultiSelectionTransaction,
   createPropertyTransaction,
   type DesignerCanvasPresentationSettings,
-  renderDesignerDataPanel,
   renderDesignerProperties,
 } from '../../dom/panel/designer-panel-dom.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
@@ -27,27 +25,17 @@ export class DesignerPanelPropertyController {
 
   constructor(private readonly callbacks: DesignerPanelControllerCallbacks) {}
 
-  render(properties: HTMLElement | undefined, dataPanel?: HTMLElement): void {
-    if (properties !== undefined) {
-      renderDesignerProperties(
-        properties,
-        this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument(),
-        this.callbacks.getInteraction(),
-        this.callbacks.getCatalog(),
-        this.callbacks.getDatasetFields,
-        this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
-        this.#canvasPresentation,
-        this.callbacks.getInspectorControls?.(),
-      );
-    }
-    renderDesignerDataPanel(
-      dataPanel,
-      this.callbacks.getDocument(),
+  render(properties: HTMLElement | undefined): void {
+    if (properties === undefined) return;
+    renderDesignerProperties(
+      properties,
+      this.callbacks.getGeometryDocument?.() ?? this.callbacks.getDocument(),
       this.callbacks.getInteraction(),
       this.callbacks.getCatalog(),
-      this.callbacks.getResourcePort() !== undefined,
-      this.callbacks.getRuntimeContributions(),
       this.callbacks.getDatasetFields,
+      this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
+      this.#canvasPresentation,
+      this.callbacks.getInspectorControls?.(),
     );
   }
 
@@ -140,18 +128,6 @@ export class DesignerPanelPropertyController {
     );
     if (descriptorTransaction !== undefined) {
       this.executeDraftTransaction(target, descriptorTransaction);
-      return;
-    }
-    const dataTransaction = createDataSourceTransaction(
-      target,
-      this.callbacks.getDocument(),
-      this.callbacks.getInteraction(),
-      this.callbacks.getCatalog(),
-      this.callbacks.getResourcePort() !== undefined,
-      this.callbacks.getRuntimeContributions(),
-    );
-    if (dataTransaction !== undefined) {
-      this.executeDraftTransaction(target, dataTransaction);
       return;
     }
     if (this.commitPropertyControl(target)) return;
@@ -331,8 +307,6 @@ function isDesignerDraft(target: EventTarget | null): boolean {
       dataset.style !== undefined ||
       dataset.canvasProperty !== undefined ||
       dataset.canvasSetting !== undefined ||
-      dataset.dataSourceType !== undefined ||
-      dataset.dataSourceField !== undefined ||
       dataset.multiProperty !== undefined)
   );
 }

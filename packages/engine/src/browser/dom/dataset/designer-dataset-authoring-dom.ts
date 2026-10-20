@@ -21,6 +21,7 @@ export function renderDatasetAuthoring(
   const section = options.panel.ownerDocument.createElement('section');
   section.className = 'designer-dataset-authoring';
   section.dataset.datasetAuthoring = 'true';
+  section.dataset.dsSection = 'authoring';
   section.dataset.authoringPart = part;
   section.dataset.inspectorSearchSection = 'true';
   const heading = options.panel.ownerDocument.createElement('h4');

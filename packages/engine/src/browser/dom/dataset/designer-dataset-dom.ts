@@ -1,10 +1,8 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { refreshStrategyNotice, renderDatasetAuthoring } from './designer-dataset-authoring-dom.js';
-import { renderDatasetCatalog, renderHostConnection } from './designer-dataset-catalog-dom.js';
-import { renderDesignerDatasetConfiguration } from './designer-dataset-config-dom.js';
+import { refreshStrategyNotice } from './designer-dataset-authoring-dom.js';
 import { renderDataSourceFlow } from './designer-dataset-flow-dom.js';
-import { renderDatasetPreview } from './designer-dataset-preview-dom.js';
 import { datasetAction } from './designer-dataset-primitives.js';
+import { createDatasetSection } from './designer-dataset-sections.js';
 import type { DesignerDataSourcePanelOptions } from './designer-dataset-types.js';
 
 export type {
@@ -43,10 +41,7 @@ export function renderDesignerDataSourcePanel(
   feedback.setAttribute('aria-live', 'polite');
   feedback.textContent = options.feedback;
   const content = flow.querySelector<HTMLElement>('.designer-datav-data-flow-content');
-  const host = content ?? section;
-  host.appendChild(feedback);
-  const actions = host.querySelector<HTMLElement>('.designer-dataset-actions');
-  if (actions !== null) host.appendChild(actions);
+  (content ?? section).appendChild(feedback);
   panel.appendChild(section);
   return { feedback };
 }
@@ -159,23 +154,14 @@ export function renderDesignerDatasetWorkbench(
   const editor = ownerDocument.createElement('main');
   editor.className = 'designer-static-data-content';
   editor.dataset.designerScrollScope = `data-workbench-editor:${options.scrollScope}`;
-  editor.appendChild(renderHostConnection(options));
+  // 工作台与内联面板吃同一批 section 节点（工厂产出），这里只决定摆在第几列。
+  editor.appendChild(requireSection('host-link', options));
   if (options.catalogOpen || options.descriptor === undefined) {
-    editor.appendChild(renderDatasetCatalog(options));
+    editor.appendChild(requireSection('catalog', options));
   } else {
-    const configuration = renderDesignerDatasetConfiguration({
-      panel: options.panel,
-      descriptor: options.descriptor,
-      draft: options.draft,
-      roles: options.roles,
-      variables: options.variables,
-      resourceAvailable: options.resourceAvailable,
-      bindingOpenRoleId: options.bindingOpenRoleId ?? null,
-    });
-    configuration.querySelector('.designer-dataset-actions')?.remove();
-    editor.appendChild(configuration);
+    editor.appendChild(requireSection('config', options));
     editor.append(
-      renderDatasetAuthoring(options),
+      requireSection('authoring', options),
       renderWorkbenchNotice(
         ownerDocument,
         'transform',
@@ -191,7 +177,7 @@ export function renderDesignerDatasetWorkbench(
     );
   }
 
-  const preview = renderDatasetPreview(ownerDocument, options);
+  const preview = requireSection('preview', options);
   const body = ownerDocument.createElement('div');
   body.className = 'designer-data-workbench-grid';
   body.append(steps, editor, preview);
@@ -200,6 +186,15 @@ export function renderDesignerDatasetWorkbench(
   workbench.dataset.inspectorPane = 'data';
   workbench.append(header, closeConfirm, body);
   return workbench;
+}
+
+function requireSection(
+  key: Parameters<typeof createDatasetSection>[0],
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement {
+  const element = createDatasetSection(key, options);
+  if (element === undefined) throw new Error(`DATASET_SECTION_UNAVAILABLE:${key}`);
+  return element;
 }
 
 function renderCloseConfirmation(ownerDocument: Document, visible: boolean): HTMLElement {

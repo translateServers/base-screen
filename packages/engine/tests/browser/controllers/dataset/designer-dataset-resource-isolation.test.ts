@@ -112,6 +112,15 @@ function setup(initial: ScreenDocument, describeResource?: ScreenHostDatasetPort
   };
 }
 
+/** 数据面板的假根：renderSurface 已被 spy 掉，这里只提供控制器实际会碰到的两个方法。 */
+function fakePanel(): HTMLElement {
+  return {
+    replaceChildren: () => undefined,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+  } as unknown as HTMLElement;
+}
+
 describe('host resources are not implicitly dataset catalog entries', () => {
   it.each([
     ['base.image', 'xj_asset'],
@@ -120,9 +129,9 @@ describe('host resources are not implicitly dataset catalog entries', () => {
   ])('does not list or describe %s on selection or replacement', async (type, resourceType) => {
     const harness = setup(document(type, resourceType, '7'));
     expect(designerDataSourceModes(entry())).toEqual(['none', 'static', 'host-resource']);
-    harness.controller.render({} as HTMLElement);
+    harness.controller.render(fakePanel());
     harness.setDocument(document(type, resourceType, '8'));
-    harness.controller.render({} as HTMLElement);
+    harness.controller.render(fakePanel());
     await Promise.resolve();
     expect(harness.list).not.toHaveBeenCalled();
     expect(harness.describeHost).not.toHaveBeenCalled();
@@ -134,7 +143,7 @@ describe('host resources are not implicitly dataset catalog entries', () => {
   it('retains catalog authoring for materials with declared field bindings', async () => {
     const harness = setup(document('table', 'dataset', 'orders'));
     expect(designerDataSourceModes(entry(true))).toEqual(['none', 'static', 'dataset']);
-    harness.controller.render({} as HTMLElement);
+    harness.controller.render(fakePanel());
     await vi.waitFor(() => expect(harness.controller.descriptor).toEqual(descriptor));
     expect(harness.list).toHaveBeenCalledOnce();
     expect(harness.describeHost).toHaveBeenCalledOnce();
@@ -171,10 +180,10 @@ describe('host resources are not implicitly dataset catalog entries', () => {
         finish = resolve;
       });
     });
-    harness.controller.render({} as HTMLElement);
+    harness.controller.render(fakePanel());
     expect(signal?.aborted).toBe(false);
     harness.setDocument(document('base.image', 'xj_asset', '7'));
-    harness.controller.render({} as HTMLElement);
+    harness.controller.render(fakePanel());
     expect(signal?.aborted).toBe(true);
     finish?.(success(descriptor));
     await Promise.resolve();
