@@ -24,12 +24,27 @@ export type DesignerDataPanelModel = DesignerDataSourcePanelOptions;
 export function requiredDataSections(
   model: DesignerDataPanelModel,
 ): readonly DesignerDataSectionId[] {
-  const keys: DesignerDataSectionId[] = ['value'];
-  if (model.mode !== 'dataset') return keys;
-  keys.push('host-link');
-  if (model.catalogOpen || model.descriptor === undefined) keys.push('source');
-  else keys.push('source', 'preview', 'authoring');
+  const value = model.dataValue;
+  // 「未配置」是一票否决：取值引用为空时只留取值段。首屏的唯一任务是「选数据来源」，
+  // 物料数据编辑属于「已选之后」的编辑态——两套结构混在一起，用户分不清现在该干嘛。
+  if (value === null) return ['value'];
+  // 固定值 / 变量：值本身就是全部内容（编辑区由流程渲染器直接摆，不是段）。
+  if (value.kind !== 'data-source-field') return ['value'];
+
+  const keys: DesignerDataSectionId[] = ['value', 'source'];
+  // `host-link` **有意分叉**：检查器只在通道异常时出现（正常时通道状态是噪声），
+  // 工作台恒出现（右列承担通道诊断）。改动前先确认两个分支都被同步修改。
+  if (model.surface === 'workbench' || channelDegraded(model)) keys.push('host-link');
+  // `preview` 恒存在（引用实例时）：它的可见性由取值形态决定，不由「用户是否展开过」决定，
+  // 否则一次折叠就会变成段的增删，焦点与节点身份全部失效。
+  keys.push('preview', 'authoring');
   return keys;
+}
+
+/** 三条通道里任意一条不是 `ready` 就算降级（`loading` 也算：此时状态灯正要被看见）。 */
+function channelDegraded(model: DesignerDataPanelModel): boolean {
+  const channels = [model.link.catalog, model.link.query, model.link.variables];
+  return channels.some((channel) => channel.status !== 'ready');
 }
 
 /**

@@ -282,22 +282,17 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
 
-  // 3) 宿主连接：三条通道各自一颗状态灯，不再共用一个布尔。
-  const link = await dataPanel.evaluate((panel) => {
-    const section = panel.querySelector('[data-ds-section="host-link"]');
-    return [...(section?.querySelectorAll('[data-link-status]') ?? [])].map((node) => ({
-      status: node.dataset.linkStatus,
-      text: node.textContent ?? '',
-    }));
-  });
-  if (
-    link.length !== 3 ||
-    link.some((channel) => channel.status !== 'ready') ||
-    !link[0]?.text.includes('数据集目录') ||
-    !link[1]?.text.includes('数据查询') ||
-    !link[2]?.text.includes('变量解析')
-  ) {
-    throw new Error(`BROWSER_HARNESS_DATASET_HOST_LINK_FAILED:${JSON.stringify(link)}`);
+  // 3) 宿主连接：**检查器里三通道全 ready 时不出现**（PRD §6.2：通道正常时是噪声），
+  //    工作台才恒常驻并承担诊断。这条是反向判据，与下面工作台的正向判据成对存在——
+  //    只断一边就会允许「把 host-link 又塞回检查器」或「工作台把诊断列删了」。
+  const inspectorLink = await dataPanel.evaluate((panel) => ({
+    hostLinkSections: panel.querySelectorAll('[data-ds-section="host-link"]').length,
+    linkStatuses: panel.querySelectorAll('[data-link-status]').length,
+  }));
+  if (inspectorLink.hostLinkSections !== 0 || inspectorLink.linkStatuses !== 0) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_HOST_LINK_INSPECTOR_NOISE_FAILED:${JSON.stringify(inspectorLink)}`,
+    );
   }
 
   // 4) 全屏工作台吃同一批段：段标记一致，配置段里不再夹带动作条，动作只在头部出现一次。
@@ -308,6 +303,11 @@ export async function assertDatasetPanelInteraction(designer, page) {
     sections: [...node.querySelectorAll('[data-ds-section]')].map(
       (section) => section.dataset.dsSection,
     ),
+    // 工作台承担通道诊断：三条状态灯必须常驻（检查器那边是 0，两者成对）。
+    link: [...(node.querySelectorAll('[data-link-status]') ?? [])].map((status) => ({
+      status: status.dataset.linkStatus,
+      text: status.textContent ?? '',
+    })),
     configActions: node.querySelectorAll('.designer-dataset-descriptor .designer-dataset-actions')
       .length,
     headerApply: node.querySelectorAll('[data-dataset-action="apply"]').length,
@@ -317,12 +317,18 @@ export async function assertDatasetPanelInteraction(designer, page) {
   const allowedSections = new Set(['value', 'source', 'host-link', 'preview', 'authoring']);
   const requiredWorkbenchSections = ['source', 'host-link', 'authoring', 'preview'];
   const sectionKeys = workbenchSurface.sections;
+  const workbenchLink = workbenchSurface.link;
   if (
     !sectionKeys.every((key) => allowedSections.has(key)) ||
     new Set(sectionKeys).size !== sectionKeys.length ||
     !requiredWorkbenchSections.every((key) => sectionKeys.includes(key)) ||
     workbenchSurface.configActions !== 0 ||
-    workbenchSurface.headerApply !== 1
+    workbenchSurface.headerApply !== 1 ||
+    workbenchLink.length !== 3 ||
+    workbenchLink.some((channel) => channel.status !== 'ready') ||
+    !workbenchLink[0]?.text.includes('数据集目录') ||
+    !workbenchLink[1]?.text.includes('数据查询') ||
+    !workbenchLink[2]?.text.includes('变量解析')
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_WORKBENCH_SECTIONS_FAILED:${JSON.stringify(workbenchSurface)}`,

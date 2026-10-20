@@ -1,4 +1,5 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
+import { derivedDataSourceId } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { syncDataPanelNotice } from '../../dom/dataset/designer-data-panel-notice.js';
 import {
@@ -254,6 +255,34 @@ export function syncDataFlowProgress(
   }
 }
 
+/**
+ * 未应用的草稿取值：**输入只有一个来源**（取值方式 + 草稿内容），段集合与跳转都读它。
+ *
+ * 草稿实例的 id 必须走契约的 `derivedDataSourceId`：自行拼 `data-source-<组件 id>` 会与派生视图
+ * 漂移，而漂移不会让类型检查报错——它表现成「引用已失效」（全屏）或请求键变化。
+ */
+function draftSelectionOf(context: DesignerDatasetControllerContext): DesignerDataDraftSelection {
+  const state = context.state;
+  if (state.mode === 'static') {
+    return { valueRef: { kind: 'inline', value: state.staticValue } };
+  }
+  if (state.mode === 'variable') {
+    return { valueRef: { kind: 'variable', variableId: state.variableSourceId } };
+  }
+  if (state.mode !== 'dataset') return { valueRef: null };
+  const component = context.currentComponent();
+  if (component === undefined) return { valueRef: null };
+  const id = derivedDataSourceId(component.id);
+  return {
+    valueRef: { kind: 'data-source-field', dataSourceId: id, path: [] },
+    // 只选到数据集、还没应用：实例尚未落库，但 id 已经确定 ⇒ 渲染 `pending` 而不是 `missing`。
+    instance:
+      state.descriptor === undefined
+        ? undefined
+        : { id, name: state.descriptor.name, sourceKind: 'dataset' },
+  };
+}
+
 /** 挂载点 → 表面。`root === panel` 只对检查器成立，其余都是工作台宿主。 */
 function surfaceOf(root: HTMLElement, panel: HTMLElement): DesignerDataSurface {
   return root === panel ? 'inspector' : 'workbench';
@@ -266,9 +295,7 @@ function createDatasetPanelOptions(
 ): DesignerDataSourcePanelOptions {
   const source = context.currentComponent()?.dataSource;
   const component = context.currentComponent();
-  // 草稿取值在 B1b-1 恒为空 ⇒ 结果与改造前逐字节相同（接入是行为中性的）。
-  // B1b-2 起由「取值方式 + 草稿输入」合成后填入；那时段集合、七态、跳转三处共享这一份结果。
-  const draftSelection: DesignerDataDraftSelection = { valueRef: null };
+  const draftSelection = draftSelectionOf(context);
   const dataValue = readDesignerEffectiveValueRef(component, draftSelection);
   return {
     panel,

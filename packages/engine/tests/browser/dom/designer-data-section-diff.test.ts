@@ -16,6 +16,10 @@ function model(
   return {
     panel: {} as HTMLElement,
     surface: 'inspector',
+    /** 默认未配置：段集合只由 effective value 决定，`mode` 不再参与判定。 */
+    dataValue: null,
+    instance: undefined,
+    groupOpenOverrides: new Map<string, boolean>(),
     scrollScope: 'scope',
     mode: 'dataset',
     availableModes: ['none', 'static', 'dataset'],
@@ -66,32 +70,60 @@ function model(
   } as DesignerDataSourcePanelOptions;
 }
 
-describe('requiredDataSections', () => {
-  it('未配置：只有取值段', () => {
-    expect(requiredDataSections(model({ mode: 'none' }))).toEqual(['value']);
+describe('requiredDataSections（输入是 effective value）', () => {
+  const dataSourceField = {
+    kind: 'data-source-field' as const,
+    dataSourceId: 'ds-orders',
+    path: [],
+  };
+
+  it('未配置（effective value 为 null）：只有取值段', () => {
+    expect(requiredDataSections(model({ dataValue: null }))).toEqual(['value']);
   });
 
-  it('有 descriptor 且目录收起：host-link + source/preview/authoring', () => {
-    expect(requiredDataSections(model())).toEqual([
+  it('固定值 / 变量：只有取值段（编辑区由流程渲染器摆，不是段）', () => {
+    expect(requiredDataSections(model({ dataValue: { kind: 'inline', value: 1 } }))).toEqual([
       'value',
-      'host-link',
+    ]);
+    expect(
+      requiredDataSections(model({ dataValue: { kind: 'variable', variableId: 'v' } })),
+    ).toEqual(['value']);
+  });
+
+  it('引用实例且通道全就绪：检查器**不含** host-link（正常时是噪声）', () => {
+    expect(requiredDataSections(model({ dataValue: dataSourceField }))).toEqual([
+      'value',
       'source',
       'preview',
       'authoring',
     ]);
   });
 
-  it('目录展开（或还没有 descriptor）：catalog 取代 config 组', () => {
-    expect(requiredDataSections(model({ catalogOpen: true }))).toEqual([
-      'value',
-      'host-link',
-      'source',
-    ]);
-    expect(requiredDataSections(model({ descriptor: undefined }))).toEqual([
-      'value',
-      'host-link',
-      'source',
-    ]);
+  it('通道异常：检查器补上 host-link（与工作台成对）', () => {
+    expect(
+      requiredDataSections(
+        model({
+          dataValue: dataSourceField,
+          link: {
+            catalog: { status: 'unavailable' },
+            query: { status: 'ready' },
+            variables: { status: 'ready' },
+          },
+        }),
+      ),
+    ).toEqual(['value', 'source', 'host-link', 'preview', 'authoring']);
+  });
+
+  it('工作台：host-link 恒在（右列承担通道诊断）', () => {
+    expect(
+      requiredDataSections(model({ dataValue: dataSourceField, surface: 'workbench' })),
+    ).toEqual(['value', 'source', 'host-link', 'preview', 'authoring']);
+  });
+
+  it('目录展开不再改变段集合（目录是 source 段的内容，不是独立段）', () => {
+    expect(requiredDataSections(model({ dataValue: dataSourceField, catalogOpen: true }))).toEqual(
+      requiredDataSections(model({ dataValue: dataSourceField })),
+    );
   });
 });
 

@@ -725,6 +725,32 @@ export async function assertDatasetSurface(designer, page) {
   await datasetItem.waitFor();
   await datasetItem.click();
   await dataPanel.locator('[data-dataset-descriptor]').waitFor();
+  // 实例三态的**负向**判据：夹具里这个组件已经有派生实例（文档里查得到），所以跳转必须是
+  // 可点的 `document` 态——既不能误标 `pending`（会禁用掉一个其实可用的入口），也不能误标
+  // `missing`（会显示"引用已失效"）。`pending` 的正向判据在单测里（草稿实例那一组），
+  // 因为本夹具的组件从一开始就有文档引用，构造不出"纯草稿"状态。
+  const resolvedInstance = await dataPanel.evaluate((panel) => {
+    const jump = panel.querySelector('[data-edit-in-workbench]');
+    return {
+      count: panel.querySelectorAll('[data-edit-in-workbench]').length,
+      pending: jump?.getAttribute('data-instance-pending'),
+      missing: jump?.getAttribute('data-instance-missing'),
+      disabled: jump instanceof HTMLButtonElement ? jump.disabled : null,
+      instanceId: jump?.getAttribute('data-instance-id'),
+    };
+  });
+  if (
+    resolvedInstance.count !== 1 ||
+    resolvedInstance.pending !== null ||
+    resolvedInstance.missing !== null ||
+    resolvedInstance.disabled !== false ||
+    typeof resolvedInstance.instanceId !== 'string' ||
+    resolvedInstance.instanceId.length === 0
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_INSTANCE_STATE_FAILED:${JSON.stringify(resolvedInstance)}`,
+    );
+  }
   const descriptorSurface = await dataPanel.evaluate((panel) => {
     const layout = panel.closest('.designer');
     const properties = panel.closest('.properties');
