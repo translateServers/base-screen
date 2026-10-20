@@ -1514,6 +1514,8 @@ async function assertDesignerThemeIsolation(page) {
       getComputedStyle(second).getPropertyValue('--designer-surface-workspace').trim();
     const secondStyleNodes = () => second.shadowRoot?.querySelectorAll('style').length ?? 0;
 
+    // 默认黑夜：先显式切到浅色作为对照基线，才能验证「切主题只影响本实例」。
+    first.setAttribute('theme', 'light');
     const before = {
       firstWorkspace: firstWorkspace(),
       secondWorkspace: secondWorkspace(),
@@ -1521,12 +1523,14 @@ async function assertDesignerThemeIsolation(page) {
       secondStyleNodes: secondStyleNodes(),
     };
 
-    // 切换第一个实例主题（默认浅色 → 黑夜），验证第二个实例的 Token 不变。
+    // 切换第一个实例主题（浅色 → 黑夜），验证第二个实例的 Token 不变。
     first.setAttribute('theme', 'dark');
     await new Promise((resolve) => requestAnimationFrame(resolve));
     const firstDark = firstWorkspace();
     const secondAfterFirstSwitch = secondWorkspace();
+    // 移除属性回到默认黑夜，等价于显式 dark。
     first.removeAttribute('theme');
+    const firstDefault = firstWorkspace();
 
     // disconnect/reconnect：style node 数量保持唯一，Token 不跨实例遗留。
     second.remove();
@@ -1552,6 +1556,7 @@ async function assertDesignerThemeIsolation(page) {
       ok: true,
       before,
       firstDark,
+      firstDefault,
       secondAfterFirstSwitch,
       firstStyleAfterDetach,
       secondStyleAfterReconnect,
@@ -1564,6 +1569,8 @@ async function assertDesignerThemeIsolation(page) {
     result.ok !== true ||
     result.before.firstWorkspace === result.before.secondWorkspace ||
     result.before.firstWorkspace === result.firstDark ||
+    // 缺省（无 theme 属性）必须落在黑夜，与显式 dark 同值。
+    result.firstDefault !== result.firstDark ||
     result.before.secondWorkspace !== result.secondAfterFirstSwitch ||
     result.before.firstStyleNodes < 1 ||
     result.before.secondStyleNodes !== result.before.firstStyleNodes ||
@@ -1606,6 +1613,7 @@ async function assertDesignerControlStyles(designer) {
     const toolbar = root.querySelector('[data-canvas-local-toolbar] [data-action="undo"]');
     const viewer = document.querySelector('base-screen-viewer');
     const materialThumb = root.querySelector('.material-thumb');
+    // 缺省即黑夜：before 采到的是默认主题，浅色需要显式进入。
     const before = {
       theme: getComputedStyle(host).getPropertyValue('--designer-surface-workspace').trim(),
       toolbarHeight: toolbar?.getBoundingClientRect().height,
@@ -1616,6 +1624,12 @@ async function assertDesignerControlStyles(designer) {
       materialThumbBackground:
         materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundColor,
     };
+    host.setAttribute('theme', 'light');
+    const lightTheme = getComputedStyle(host)
+      .getPropertyValue('--designer-surface-workspace')
+      .trim();
+    const lightMaterialThumbBackground =
+      materialThumb === null ? undefined : getComputedStyle(materialThumb).backgroundColor;
     host.setAttribute('theme', 'dark');
     const darkTheme = getComputedStyle(host)
       .getPropertyValue('--designer-surface-workspace')
@@ -1657,6 +1671,8 @@ async function assertDesignerControlStyles(designer) {
     canary.remove();
     return {
       ...before,
+      lightTheme,
+      lightMaterialThumbBackground,
       darkTheme,
       darkMaterialThumbBackground,
       hostStylesheetValue,
@@ -1672,9 +1688,12 @@ async function assertDesignerControlStyles(designer) {
     styles === undefined ||
     // 工作区工具栏按钮随设计值 28px（40px 列头内上下各留 6px）。
     styles.toolbarHeight !== 28 ||
-    styles.theme === styles.darkTheme ||
+    // 缺省主题即黑夜：与显式 dark 同值、与显式 light 必然不同；材质缩略图跟随同一套表面色。
+    styles.theme !== styles.darkTheme ||
+    styles.theme === styles.lightTheme ||
     styles.materialThumbBackground === undefined ||
-    styles.materialThumbBackground === styles.darkMaterialThumbBackground ||
+    styles.materialThumbBackground !== styles.darkMaterialThumbBackground ||
+    styles.materialThumbBackground === styles.lightMaterialThumbBackground ||
     styles.hostStylesheetValue !== 'rgb(10, 20, 30)' ||
     styles.overriddenTheme !== 'rgb(1, 2, 3)' ||
     styles.restoredHostStylesheet !== 'rgb(10, 20, 30)' ||

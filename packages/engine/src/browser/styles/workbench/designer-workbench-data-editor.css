@@ -131,7 +131,7 @@
   color: var(--designer-accent-text);
 }
 
-:host([theme="dark"]) .designer-static-data-tabs .designer-button[aria-pressed="true"] {
+:host(:not([theme="light"])) .designer-static-data-tabs .designer-button[aria-pressed="true"] {
   background: var(--designer-surface-control-active);
 }
 

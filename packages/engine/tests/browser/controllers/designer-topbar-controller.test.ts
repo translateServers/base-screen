@@ -95,18 +95,23 @@ describe('DesignerTopbarController host back button', () => {
 });
 
 describe('DesignerTopbarController theme toggle', () => {
-  it('flips the light default to dark and back, mirroring aria-pressed', () => {
+  it('treats the missing attribute as dark and flips to light and back', () => {
     const { controller, host } = createHarness(false);
 
-    // 缺省即浅色：第一次点击进入黑夜。
-    controller.onClick(host.root.theme as unknown as Element);
-    expect(host.attributes.get('theme')).toBe('dark');
+    // 缺省即黑夜：未写 theme 属性时 aria-pressed 已为 true。
     controller.render();
     expect(host.root.theme.ariaPressed).toBe('true');
 
+    // 第一次点击进入浅色。
     controller.onClick(host.root.theme as unknown as Element);
     expect(host.attributes.get('theme')).toBe('light');
     controller.render();
     expect(host.root.theme.ariaPressed).toBe('false');
+
+    // 再点回黑夜（显式写 dark）。
+    controller.onClick(host.root.theme as unknown as Element);
+    expect(host.attributes.get('theme')).toBe('dark');
+    controller.render();
+    expect(host.root.theme.ariaPressed).toBe('true');
   });
 });

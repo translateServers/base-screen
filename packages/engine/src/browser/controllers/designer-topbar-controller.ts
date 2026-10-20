@@ -21,7 +21,8 @@ export class DesignerTopbarController {
     }
     if (target.closest('[data-topbar-theme-toggle]') !== null) {
       const host = this.callbacks.getHost();
-      host.setAttribute('theme', host.getAttribute('theme') === 'dark' ? 'light' : 'dark');
+      // 黑夜是默认主题：只有显式 theme="light" 才是浅色，其余（含缺省）都按黑夜翻回。
+      host.setAttribute('theme', host.getAttribute('theme') === 'light' ? 'dark' : 'light');
       return true;
     }
     if (target.closest('[data-topbar-snapshot]') !== null) {
@@ -38,7 +39,8 @@ export class DesignerTopbarController {
     const back = root.querySelector<HTMLButtonElement>('[data-topbar-back]');
     if (back !== null) back.hidden = !this.callbacks.isBackButtonVisible();
     const theme = root.querySelector<HTMLButtonElement>('[data-topbar-theme-toggle]');
-    if (theme !== null) theme.ariaPressed = String(host.getAttribute('theme') === 'dark');
+    // aria-pressed 表达的是「黑夜已生效」，缺省（无 theme 属性）同样算黑夜。
+    if (theme !== null) theme.ariaPressed = String(host.getAttribute('theme') !== 'light');
     const snapshot = root.querySelector<HTMLButtonElement>('[data-topbar-snapshot]');
     if (snapshot === null) return;
     const available = this.callbacks.canCreateSnapshot();

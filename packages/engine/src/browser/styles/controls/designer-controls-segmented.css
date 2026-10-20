@@ -69,11 +69,11 @@
   color: var(--designer-accent-text);
 }
 
-:host([theme="dark"]) .designer-canvas-scale-option[aria-pressed="true"],
-:host([theme="dark"]) .designer-data-source-segmented .designer-button[aria-pressed="true"],
-:host([theme="dark"]) .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
-:host([theme="dark"]) .inspector-density .designer-tab[aria-pressed="true"],
-:host([theme="dark"]) .designer-segmented .designer-segmented-option[aria-pressed="true"] {
+:host(:not([theme="light"])) .designer-canvas-scale-option[aria-pressed="true"],
+:host(:not([theme="light"])) .designer-data-source-segmented .designer-button[aria-pressed="true"],
+:host(:not([theme="light"])) .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
+:host(:not([theme="light"])) .inspector-density .designer-tab[aria-pressed="true"],
+:host(:not([theme="light"])) .designer-segmented .designer-segmented-option[aria-pressed="true"] {
   background: var(--designer-surface-control-active);
 }
 

@@ -1,76 +1,16 @@
 /* 设计基座：Vercel 令牌体系（自 OpenDesign 工作台原型移植，原型 index.html 的 :root 别名层）。
-   默认浅色、dark 主题属性覆盖黑夜；公共令牌保留 `--base-screen-designer-*`
+   默认黑夜、light 主题属性显式切回浅色；公共令牌保留 `--base-screen-designer-*`
    覆盖位，宿主换单值即可调色。对比度契约（tests/browser/styles 的 R2 用例）消费的令牌
    必须以可解析字面量收尾，故把原型 color-mix/oklch 的解析值直接烘焙进来，而不是链式派生。
 
    两处对原型原值的偏离，均由引擎的对比度契约（语义色与其低强调 surface ≥ 3:1）逼出，
    配方沿用设计要求自身的做法（danger-text/accent-text 即「语义色向 --fg 收一档」）：
    - 浅色 success #16a34a 向 --fg 收 8% → #1d9746（12% 淡底上 2.81→3.20）；
-   - 浅色 warning #eab308 亮黄在浅底上即便纯白也只有 1.87，收到 30% → #a48025（3.15）。 */
-:host,
-:host([theme="light"]) {
-  /* ── 表面：白天由白到灰的层级（顶栏/侧栏 → 工作区 → 画布）── */
-  --designer-surface-workspace: var(--base-screen-designer-surface-workspace, #f4f4f4);
-  --designer-surface-panel: var(--base-screen-designer-surface-panel, #fcfcfc);
-  --designer-surface-raised: var(--base-screen-designer-surface-raised, #ffffff);
-  --designer-surface-control: var(--base-screen-designer-surface-control, #f7f7f7);
-  --designer-surface-control-hover: var(--base-screen-designer-surface-control-hover, #ececec);
-  --designer-surface-control-active: #e7e7e7;
-  --designer-surface-overlay: var(--base-screen-designer-surface-overlay, #ffffff);
-  --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #efefef);
-  --designer-surface-scrim: var(--base-screen-designer-surface-scrim, rgb(23 23 23 / 45%));
-  --designer-canvas-grid-line: var(--base-screen-designer-canvas-grid-line, rgb(23 23 23 / 8%));
-  --designer-range-track: rgb(23 23 23 / 16%);
+   - 浅色 warning #eab308 亮黄在浅底上即便纯白也只有 1.87，收到 30% → #a48025（3.15）。
 
-  /* ── 文本四级灰阶 ── */
-  --designer-text-primary: var(--base-screen-designer-text-primary, #171717);
-  --designer-text-secondary: var(--base-screen-designer-text-secondary, #4d4d4d);
-  --designer-text-muted: var(--base-screen-designer-text-muted, #666666);
-  --designer-text-disabled: var(--base-screen-designer-text-disabled, #808080);
-  --designer-text-on-accent: #ffffff;
-
-  /* ── 边框与焦点：alpha 收边，压在任何表面上都成立 ── */
-  --designer-border-subtle: var(--base-screen-designer-border-subtle, rgb(23 23 23 / 10%));
-  --designer-border-default: var(--base-screen-designer-border-default, rgb(23 23 23 / 15%));
-  --designer-border-strong: var(--base-screen-designer-border-strong, rgb(23 23 23 / 16%));
-  --designer-border-active: rgb(23 23 23 / 26%);
-  --designer-focus-ring: var(--base-screen-designer-focus-ring, #0070f3);
-  /* 阴影当边框（Geist 的标志手法）：0 偏移、0 模糊、1px 扩展的阴影 —— 视觉上是一条 1px 线，
-     但不占盒模型、不裁圆角、可与浮起阴影叠在同一条声明里。交互面（按钮/输入/卡片/分段轨）
-     用它收边，只有真正的分隔线（面板分区、列表隔离）才用 border。 */
-  --designer-elev-ring: 0 0 0 1px rgb(0 0 0 / 8%);
-  /* 卡片三层栈：描边 + 2px 微抬 + 8px 远距 + 内侧浅色高光（Geist 的「从内部发光」）。 */
-  --designer-elev-card:
-    0 0 0 1px rgb(0 0 0 / 8%), 0 2px 2px rgb(0 0 0 / 4%), 0 8px 8px -8px rgb(0 0 0 / 4%),
-    inset 0 0 0 1px var(--designer-surface-control);
-
-  /* ── 强调色与语义色 ── */
-  --designer-accent: var(--base-screen-designer-accent, #0070f3);
-  --designer-accent-surface: var(--base-screen-designer-accent-surface, #e3eefb);
-  --designer-accent-text: #145ec2;
-  --designer-success: var(--base-screen-designer-success, #1d9746);
-  --designer-success-surface: var(--base-screen-designer-success-surface, #e1f0e6);
-  --designer-warning: var(--base-screen-designer-warning, #a48025);
-  --designer-warning-surface: var(--base-screen-designer-warning-surface, #f1ede2);
-  --designer-danger: var(--base-screen-designer-danger, #dc2626);
-  --designer-danger-surface: var(--base-screen-designer-danger-surface, #f8e2e2);
-  --designer-danger-text: #b52a26;
-
-  /* ── 高度与描边：耳语级阴影靠距离做层级，不靠浓度 ── */
-  --designer-shadow-overlay: var(
-    --base-screen-designer-shadow-overlay,
-    0 12px 32px -12px rgb(23 23 23 / 10%)
-  );
-  --designer-shadow-canvas: var(
-    --base-screen-designer-shadow-canvas,
-    0 2px 6px -2px rgb(23 23 23 / 16%),
-    0 24px 48px -24px rgb(23 23 23 / 14%)
-  );
-  --designer-shadow-float: var(
-    --base-screen-designer-shadow-float,
-    0 6px 16px -8px rgb(23 23 23 / 8%)
-  );
-
+   两套主题共享的排版/间距/圆角/几何/动效/层级令牌放在裸 `:host` 里：它们与配色无关，
+   若留在某个主题块内，另一个主题就会缺这些令牌（自定义属性无继承源时整条声明失效）。 */
+:host {
   /* ── 动效 ── */
   --designer-motion: var(--base-screen-designer-motion, 150ms cubic-bezier(0.2, 0, 0, 1));
   --designer-motion-emphasis: var(
@@ -141,11 +81,6 @@
   --designer-column-header-height: 40px;
   --designer-ruler-size: 22px;
 
-  /* ── 按钮强调档：从 --designer-accent 派生，两套主题自动跟随 ── */
-  --designer-button-primary-background: color-mix(in srgb, var(--designer-accent) 82%, black);
-  --designer-button-primary-hover: color-mix(in srgb, var(--designer-accent) 86%, black);
-  --designer-button-primary-active: color-mix(in srgb, var(--designer-accent) 76%, black);
-
   /* ── 画布覆盖层：参考线与测量是编辑 affordance，按体系「交互与焦点沿用强调蓝」收进
      强调色族（批 4b）。吸附线取 accent；测量读数取 accent-text——文字需 AA，accent
      原色压工作区底约 3.6:1 不够，accent-text 在双主题下分别是 5.6:1 / 6.2:1。
@@ -163,10 +98,84 @@
   --designer-z-modal: 30;
   /* 提示气泡必须压在全部弹层之上：菜单/对话框打开时其内部控件仍可悬停出提示。 */
   --designer-z-tooltip: 40;
+}
+
+/* 浅色：宿主显式写 theme="light" 才生效。 */
+:host([theme="light"]) {
+  /* ── 表面：白天由白到灰的层级（顶栏/侧栏 → 工作区 → 画布）── */
+  --designer-surface-workspace: var(--base-screen-designer-surface-workspace, #f4f4f4);
+  --designer-surface-panel: var(--base-screen-designer-surface-panel, #fcfcfc);
+  --designer-surface-raised: var(--base-screen-designer-surface-raised, #ffffff);
+  --designer-surface-control: var(--base-screen-designer-surface-control, #f7f7f7);
+  --designer-surface-control-hover: var(--base-screen-designer-surface-control-hover, #ececec);
+  --designer-surface-control-active: #e7e7e7;
+  --designer-surface-overlay: var(--base-screen-designer-surface-overlay, #ffffff);
+  --designer-surface-canvas: var(--base-screen-designer-surface-canvas, #efefef);
+  --designer-surface-scrim: var(--base-screen-designer-surface-scrim, rgb(23 23 23 / 45%));
+  --designer-canvas-grid-line: var(--base-screen-designer-canvas-grid-line, rgb(23 23 23 / 8%));
+  --designer-range-track: rgb(23 23 23 / 16%);
+
+  /* ── 文本四级灰阶 ── */
+  --designer-text-primary: var(--base-screen-designer-text-primary, #171717);
+  --designer-text-secondary: var(--base-screen-designer-text-secondary, #4d4d4d);
+  --designer-text-muted: var(--base-screen-designer-text-muted, #666666);
+  --designer-text-disabled: var(--base-screen-designer-text-disabled, #808080);
+  --designer-text-on-accent: #ffffff;
+
+  /* ── 边框与焦点：alpha 收边，压在任何表面上都成立 ── */
+  --designer-border-subtle: var(--base-screen-designer-border-subtle, rgb(23 23 23 / 10%));
+  --designer-border-default: var(--base-screen-designer-border-default, rgb(23 23 23 / 15%));
+  --designer-border-strong: var(--base-screen-designer-border-strong, rgb(23 23 23 / 16%));
+  --designer-border-active: rgb(23 23 23 / 26%);
+  --designer-focus-ring: var(--base-screen-designer-focus-ring, #0070f3);
+  /* 阴影当边框（Geist 的标志手法）：0 偏移、0 模糊、1px 扩展的阴影 —— 视觉上是一条 1px 线，
+     但不占盒模型、不裁圆角、可与浮起阴影叠在同一条声明里。交互面（按钮/输入/卡片/分段轨）
+     用它收边，只有真正的分隔线（面板分区、列表隔离）才用 border。 */
+  --designer-elev-ring: 0 0 0 1px rgb(0 0 0 / 8%);
+  /* 卡片三层栈：描边 + 2px 微抬 + 8px 远距 + 内侧浅色高光（Geist 的「从内部发光」）。 */
+  --designer-elev-card:
+    0 0 0 1px rgb(0 0 0 / 8%), 0 2px 2px rgb(0 0 0 / 4%), 0 8px 8px -8px rgb(0 0 0 / 4%),
+    inset 0 0 0 1px var(--designer-surface-control);
+
+  /* ── 强调色与语义色 ── */
+  --designer-accent: var(--base-screen-designer-accent, #0070f3);
+  --designer-accent-surface: var(--base-screen-designer-accent-surface, #e3eefb);
+  --designer-accent-text: #145ec2;
+  --designer-success: var(--base-screen-designer-success, #1d9746);
+  --designer-success-surface: var(--base-screen-designer-success-surface, #e1f0e6);
+  --designer-warning: var(--base-screen-designer-warning, #a48025);
+  --designer-warning-surface: var(--base-screen-designer-warning-surface, #f1ede2);
+  --designer-danger: var(--base-screen-designer-danger, #dc2626);
+  --designer-danger-surface: var(--base-screen-designer-danger-surface, #f8e2e2);
+  --designer-danger-text: #b52a26;
+
+  /* ── 高度与描边：耳语级阴影靠距离做层级，不靠浓度 ── */
+  --designer-shadow-overlay: var(
+    --base-screen-designer-shadow-overlay,
+    0 12px 32px -12px rgb(23 23 23 / 10%)
+  );
+  --designer-shadow-canvas: var(
+    --base-screen-designer-shadow-canvas,
+    0 2px 6px -2px rgb(23 23 23 / 16%),
+    0 24px 48px -24px rgb(23 23 23 / 14%)
+  );
+  --designer-shadow-float: var(
+    --base-screen-designer-shadow-float,
+    0 6px 16px -8px rgb(23 23 23 / 8%)
+  );
+
+  /* ── 按钮强调档：从 --designer-accent 派生，两套主题自动跟随 ── */
+  --designer-button-primary-background: color-mix(in srgb, var(--designer-accent) 82%, black);
+  --designer-button-primary-hover: color-mix(in srgb, var(--designer-accent) 86%, black);
+  --designer-button-primary-active: color-mix(in srgb, var(--designer-accent) 76%, black);
+
   color-scheme: light;
 }
 
-/* 黑夜：中性暗阶（无蓝偏），语义色与强调色上移到暗底可辨的档位。 */
+/* 黑夜（默认）：中性暗阶（无蓝偏），语义色与强调色上移到暗底可辨的档位。
+   裸 `:host` 与显式 dark 同组，宿主不写 theme 属性时即落在黑夜；浅色块在前，
+   但 `:host([theme="light"])` 的特异性更高，显式浅色仍能压住这里的裸 `:host`。 */
+:host,
 :host([theme="dark"]) {
   --designer-surface-workspace: var(--base-screen-designer-surface-workspace, #1e1e1e);
   --designer-surface-panel: var(--base-screen-designer-surface-panel, #0f0f0f);

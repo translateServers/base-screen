@@ -195,6 +195,11 @@ for (const selector of ['button', 'input', 'select', 'textarea', 'label', 'svg']
   }
 }
 if (!css.includes(':host([theme="light"])')) throw new Error('DESIGNER_STYLE_LIGHT_THEME_MISSING');
+// 默认主题是黑夜：暗色块必须与裸 `:host` 同组，浅色只能由 theme="light" 显式进入。
+// 宿主不写 theme 属性是最常见用法，默认值一旦滑回浅色，只有肉眼才能发现。
+if (!/^:host,\s*:host\(\[theme="dark"\]\)\s*\{/m.test(tokensCss)) {
+  throw new Error('DESIGNER_STYLE_DEFAULT_THEME_NOT_DARK');
+}
 
 const stylesPrefix = 'packages/engine/src/browser/styles/';
 const nonTokenLayers = [...baseLayers, ...controlLayers, ...workbenchLayers];

@@ -699,14 +699,15 @@ async function mount(): Promise<void> {
   mountPanels(mountPoint('panels'), ownerDocument);
   mountBlueprint(mountPoint('blueprint'), ownerDocument);
 
-  // 主题开关：清单要在两套主题下都成立，否则只是一套配色的说明书。
-  const toggle = createDesignerButton(ownerDocument, { text: '切换深色', variant: 'ghost' });
+  // 主题开关：清单要在两套主题下都成立，否则只是一套配色的说明书。缺省即黑夜。
+  const toggle = createDesignerButton(ownerDocument, { text: '切换浅色', variant: 'ghost' });
   toggle.className += ' sg-theme';
   toggle.addEventListener('click', () => {
-    const dark = host.getAttribute('theme') === 'dark';
-    if (dark) host.removeAttribute('theme');
-    else host.setAttribute('theme', 'dark');
-    toggle.textContent = dark ? '切换深色' : '切换浅色';
+    // 浅色是显式 opt-in：回到缺省（无属性）就是黑夜，顺带证明默认值没被改坏。
+    const light = host.getAttribute('theme') === 'light';
+    if (light) host.removeAttribute('theme');
+    else host.setAttribute('theme', 'light');
+    toggle.textContent = light ? '切换浅色' : '切换黑夜';
   });
   gallery.append(toggle);
 }

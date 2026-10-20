@@ -94,11 +94,12 @@ export function contrastRatio(first: string, second: string): number | undefined
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+// 黑夜是默认主题，所以暗色块与裸 `:host` 同组（`:host,\n:host([theme="dark"])`），
+// 浅色块必须由 `:host([theme="light"])` 显式进入。按选择器切片而不是按固定顺序：
+// 暗色块起点取 dark 选择器之前最近的 `:host,`，浅色块止于该点。
 export function themeBlocks(): Record<'dark' | 'light', string> {
-  const dark = tokensCss.slice(tokensCss.indexOf(':host([theme="dark"])'));
-  const light = tokensCss.slice(
-    tokensCss.indexOf(':host,'),
-    tokensCss.indexOf(':host([theme="dark"])'),
-  );
-  return { dark, light };
+  const darkSelector = tokensCss.indexOf(':host([theme="dark"])');
+  const darkStart = tokensCss.lastIndexOf(':host,', darkSelector);
+  const lightStart = tokensCss.indexOf(':host([theme="light"])');
+  return { dark: tokensCss.slice(darkStart), light: tokensCss.slice(lightStart, darkStart) };
 }

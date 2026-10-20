@@ -363,9 +363,10 @@ button.topbar-mode-button:disabled {
   height: 15px;
 }
 
-/* 主题切换：两个图标互斥显示，按下按钮里只存在一个可见字形，几何不变、无抖动。 */
-:host([theme="dark"]) .topbar-theme-moon,
-:host(:not([theme="dark"])) .topbar-theme-sun {
+/* 主题切换：两个图标互斥显示，按下按钮里只存在一个可见字形，几何不变、无抖动。
+   图标显示的是「点下去会去哪」：缺省黑夜时给出太阳（切浅色），浅色时给出月亮（切黑夜）。 */
+:host(:not([theme="light"])) .topbar-theme-moon,
+:host([theme="light"]) .topbar-theme-sun {
   display: none;
 }
 
