@@ -1,5 +1,4 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
-import { readScreenComponentValueRef } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { syncDataPanelNotice } from '../../dom/dataset/designer-data-panel-notice.js';
 import {
@@ -32,7 +31,11 @@ import {
   type DesignerDatasetControllerState,
   emptyDatasetPreview,
 } from './designer-dataset-controller-context.js';
-import { readDesignerDataSourceInstanceView } from './designer-dataset-instance-view.js';
+import {
+  type DesignerDataDraftSelection,
+  readDesignerEffectiveInstanceView,
+  readDesignerEffectiveValueRef,
+} from './designer-dataset-effective-value.js';
 
 export function renderDatasetSurface(context: DesignerDatasetControllerContext): void {
   const preserve = context.callbacks.preserveScrollContinuity;
@@ -263,12 +266,19 @@ function createDatasetPanelOptions(
 ): DesignerDataSourcePanelOptions {
   const source = context.currentComponent()?.dataSource;
   const component = context.currentComponent();
-  const dataValue = component === undefined ? null : readScreenComponentValueRef(component);
+  // 草稿取值在 B1b-1 恒为空 ⇒ 结果与改造前逐字节相同（接入是行为中性的）。
+  // B1b-2 起由「取值方式 + 草稿输入」合成后填入；那时段集合、七态、跳转三处共享这一份结果。
+  const draftSelection: DesignerDataDraftSelection = { valueRef: null };
+  const dataValue = readDesignerEffectiveValueRef(component, draftSelection);
   return {
     panel,
     surface,
     dataValue,
-    instance: readDesignerDataSourceInstanceView(context.callbacks.getDocument(), dataValue),
+    instance: readDesignerEffectiveInstanceView(
+      context.callbacks.getDocument(),
+      dataValue,
+      draftSelection,
+    ),
     groupOpenOverrides: context.state.groupOpenOverrides,
     onToggleGroup: (section, group, open) => {
       context.state.groupOpenOverrides.set(`${section}:${group}`, open);
