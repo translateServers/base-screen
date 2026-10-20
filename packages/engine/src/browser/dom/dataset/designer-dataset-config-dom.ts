@@ -73,10 +73,7 @@ function renderDatasetSummary(
     description.textContent = descriptor.description;
     summary.appendChild(description);
   }
-  const shape = ownerDocument.createElement('span');
-  shape.className = 'designer-dataset-shape';
-  shape.textContent = DESIGNER_UI_TEXT.dataset.tabularShape;
-  summary.appendChild(shape);
+  // 「对象数组」常量 chip 已删除：tabular 数据集恒为对象数组，零信息量却占 20px + 一条边框。
   const bindingSummary = ownerDocument.createElement('div');
   bindingSummary.className = 'designer-dataset-binding-summary';
   const bindingHeader = ownerDocument.createElement('div');
@@ -111,15 +108,8 @@ function renderDatasetSummary(
     bindingSummary.appendChild(renderBindingSummaryItem(ownerDocument, binding));
   }
   summary.appendChild(bindingSummary);
-  const schema = ownerDocument.createElement('ul');
-  schema.className = 'designer-dataset-schema';
-  for (const field of descriptor.fields) {
-    const item = ownerDocument.createElement('li');
-    item.className = 'designer-field-label';
-    item.textContent = field.label;
-    schema.appendChild(item);
-  }
-  summary.appendChild(schema);
+  // 字段清单不再平铺成 chips：字段映射段里的选择器已经表达同一件事，
+  // 同屏两处重复值会让人以为 chips 是可编辑的第三个入口。
   return summary;
 }
 

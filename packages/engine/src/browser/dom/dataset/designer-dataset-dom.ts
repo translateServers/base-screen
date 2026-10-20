@@ -1,5 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { renderDataStateBadge } from './designer-data-state-badge.js';
+import { renderDataPanelNoticeSlot } from './designer-data-panel-notice.js';
 import { refreshStrategyNotice } from './designer-dataset-authoring-dom.js';
 import { renderDataSourceFlow } from './designer-dataset-flow-dom.js';
 import { datasetAction } from './designer-dataset-primitives.js';
@@ -32,7 +32,7 @@ export function renderDesignerDataSourcePanel(
   section.className = 'designer-data-source-panel';
   section.dataset.dataSourcePanel = 'true';
   section.dataset.inspectorSearchSection = 'true';
-  section.appendChild(renderPanelHeader(panel.ownerDocument, options));
+  section.appendChild(renderDataPanelNoticeSlot(panel.ownerDocument, options.dataState));
   const flow = renderDataSourceFlow(options);
   section.appendChild(flow);
 
@@ -46,23 +46,6 @@ export function renderDesignerDataSourcePanel(
   (content ?? section).appendChild(feedback);
   panel.appendChild(section);
   return { feedback };
-}
-
-/**
- * 面板头部：只放七态徽标。
- *
- * 面板上方已经是「数据源」页签，再写一遍标题只是重复；用户真正需要的是**这块数据现在什么状态**，
- * 所以头部做成一条右对齐的状态条，徽标文本与色调全部由 `deriveDesignerDataState` 决定。
- */
-function renderPanelHeader(
-  ownerDocument: Document,
-  options: DesignerDataSourcePanelOptions,
-): HTMLElement {
-  const header = ownerDocument.createElement('header');
-  header.className = 'designer-data-panel-header';
-  header.dataset.dataPanelHeader = 'true';
-  header.appendChild(renderDataStateBadge(ownerDocument, options.dataState));
-  return header;
 }
 
 export function renderDesignerDatasetWorkbench(
@@ -97,8 +80,8 @@ export function renderDesignerDatasetWorkbench(
   draft.textContent = options.dirty
     ? DESIGNER_UI_TEXT.dataSource.draft
     : DESIGNER_UI_TEXT.dataSource.synced;
-  // 工作台与内联面板是同一份数据的两个投影，状态徽标也必须一致（同一个派生结果）。
-  identity.append(title, draft, renderDataStateBadge(ownerDocument, options.dataState));
+  // 工作台与内联面板是同一份数据的两个投影：脏标记来自同一个 `options.dirty`。
+  identity.append(title, draft);
   heading.appendChild(identity);
   const headerActions = ownerDocument.createElement('div');
   headerActions.className = 'designer-workbench-actions';

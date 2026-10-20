@@ -68,15 +68,6 @@ export function renderAdvancedInput(ownerDocument: Document, value: string): HTM
   return row.field;
 }
 
-export function renderApply(ownerDocument: Document): HTMLElement {
-  const actions = ownerDocument.createElement('div');
-  actions.className = 'designer-dataset-actions';
-  actions.appendChild(
-    action(ownerDocument, 'apply', DESIGNER_UI_TEXT.dataSource.apply('static'), 'primary'),
-  );
-  return actions;
-}
-
 export function tab(
   ownerDocument: Document,
   value: string,

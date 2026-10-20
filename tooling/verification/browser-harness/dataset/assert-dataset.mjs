@@ -2,19 +2,66 @@
 // 由 2 个原 assert 模块合并；调用顺序由 run-browser-harness.mjs 编排。
 import { screenshotDirectory } from '../shared/constants.mjs';
 
+/**
+ * 内联面板的"导航到某一段"由滚动表达（三步条已删除：它与顶部「数据源」页签构成双层导航，
+ * 且 detail 被 CSS 藏成了 0 信息）。滚到段首即等价于原「点第 N 步」。
+ *
+ * 重试是必须的：段内控件 `focus()` 恢复会带着浏览器把内容滚回该控件，
+ * 一次滚动可能被紧随其后的重绘/焦点恢复覆盖。收敛判据是"`data-active-step` 落到该段"，
+ * 而不是"滚动指令发出去了"——后者证明不了导航真的到位。
+ */
+async function scrollDataPanelTo(dataPanel, page, section, step) {
+  let last;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    await dataPanel.evaluate((panel, name) => {
+      const content = panel.querySelector('.designer-datav-data-flow-content');
+      const target = panel.querySelector(`[data-workbench-section="${name}"]`);
+      if (!(content instanceof HTMLElement) || !(target instanceof HTMLElement)) return;
+      content.scrollTop +=
+        target.getBoundingClientRect().top - content.getBoundingClientRect().top;
+    }, section);
+    await page.waitForTimeout(250);
+    last = await readInlineNavigation(dataPanel, section);
+    if (last.activeStep === step && (step === 'source' || last.scrollTop > 0)) return last;
+  }
+  throw new Error(
+    `BROWSER_HARNESS_DATASET_SCROLL_NAVIGATION_FAILED:${section}:${JSON.stringify(last)}`,
+  );
+}
+
+/** 一次读全内联导航的可观测面：当前步骤、是否还有步骤条、目标段是否在视口内。 */
+async function readInlineNavigation(dataPanel, section) {
+  return dataPanel.evaluate((panel, name) => {
+    const flow = panel.querySelector('.designer-datav-data-flow');
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const contentBox = content?.getBoundingClientRect();
+    const target =
+      name === undefined ? null : panel.querySelector(`[data-workbench-section="${name}"]`);
+    const targetBox = target?.getBoundingClientRect();
+    return {
+      activeStep: flow?.dataset.activeStep,
+      progressBars: panel.querySelectorAll('.designer-datav-data-flow-progress').length,
+      stepButtons: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
+      stepTargets: panel.querySelectorAll('[data-dataset-workbench-target]').length,
+      stepMarkers: panel.querySelectorAll('.designer-data-summary-step-marker').length,
+      scrollTop: content?.scrollTop ?? 0,
+      sectionVisible:
+        contentBox === undefined || targetBox === undefined
+          ? undefined
+          : targetBox.top >= contentBox.top - 1 && targetBox.top < contentBox.bottom,
+    };
+  }, section);
+}
+
 // ---- 源模块：assert-dataset-authoring.mjs ----
 export async function assertDatasetAuthoring(designer, page) {
   const dataPanel = designer.locator('[data-inspector-pane=data]');
-  await dataPanel
-    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="source"]')
-    .click();
+  await scrollDataPanelTo(dataPanel, page, 'source', 'source');
   const notificationSurface = designer.locator('[data-notifications]');
   await notificationSurface.evaluate((surface) => {
     surface.style.display = 'none';
   });
-  await dataPanel
-    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="preview"]')
-    .click();
+  await scrollDataPanelTo(dataPanel, page, 'preview', 'preview');
   await dataPanel.locator('[data-dataset-action="test"]').click();
   await dataPanel.locator('[data-workbench-section="preview"] [data-status="ready"]').waitFor();
   const responsePreview = await dataPanel.evaluate((panel) => ({
@@ -55,9 +102,7 @@ export async function assertDatasetAuthoring(designer, page) {
   await notificationSurface.evaluate((surface) => {
     surface.style.removeProperty('display');
   });
-  await dataPanel
-    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="source"]')
-    .click();
+  await scrollDataPanelTo(dataPanel, page, 'source', 'source');
   const region = dataPanel.locator('[data-dataset-parameter="region"]');
   await region.fill('north');
   await region.dispatchEvent('change');
@@ -102,9 +147,7 @@ export async function assertDatasetAuthoring(designer, page) {
   // 还原默认值，保持后续断言与请求预览稳定。
   await dateInput.fill('2026-10-01');
   await dateInput.dispatchEvent('change');
-  await dataPanel
-    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]')
-    .click();
+  await scrollDataPanelTo(dataPanel, page, 'mapping', 'mapping');
   const mappingSurface = await dataPanel.evaluate((panel) => ({
     // 2 个角色分区 + 1 个单选 select（measures 改为限额多选后走 bind-field 触发器，不再有 select）。
     bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
@@ -462,10 +505,6 @@ export async function assertDatasetSurface(designer, page) {
     const properties = panel.closest('.properties');
     const flow = panel.querySelector('.designer-datav-data-flow');
     const content = panel.querySelector('.designer-datav-data-flow-content');
-    const sourceStep = panel.querySelector('[data-dataset-workbench-target="source"]');
-    const mappingStep = panel.querySelector('[data-dataset-workbench-target="mapping"]');
-    const previewStep = panel.querySelector('[data-dataset-workbench-target="preview"]');
-    const progress = panel.querySelector('.designer-datav-data-flow-progress');
     const sourceSection = panel.querySelector('[data-workbench-section="source"]');
     const mappingSection = panel.querySelector('[data-workbench-section="mapping"]');
     const previewSection = panel.querySelector('[data-workbench-section="preview"]');
@@ -475,9 +514,6 @@ export async function assertDatasetSurface(designer, page) {
     const workbench = layout?.querySelector('[data-data-workbench]');
     const flowBox = flow?.getBoundingClientRect();
     const contentBox = content?.getBoundingClientRect();
-    const sourceBox = sourceStep?.getBoundingClientRect();
-    const mappingBox = mappingStep?.getBoundingClientRect();
-    const previewBox = previewStep?.getBoundingClientRect();
     const sourceSectionBox = sourceSection?.getBoundingClientRect();
     const mappingSectionBox = mappingSection?.getBoundingClientRect();
     const previewSectionBox = previewSection?.getBoundingClientRect();
@@ -506,15 +542,16 @@ export async function assertDatasetSurface(designer, page) {
       copyActionDisabled:
         panel.querySelector('[data-dataset-authoring-action="copy-data"]')?.disabled === true,
       sourceEntry: {
-        checked: panel
-          .querySelector('[data-data-entry="source"]')
-          ?.getAttribute('aria-checked'),
+        checked: panel.querySelector('[data-data-entry="source"]')?.getAttribute('aria-checked'),
         mode: panel.querySelector('[data-data-entry="source"]')?.dataset.datasetMode,
         cardCount: panel.querySelectorAll('[data-data-entry]').length,
       },
       activeStep: flow?.dataset.activeStep,
       layout: flow?.dataset.dataFlowLayout,
-      stepCount: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
+      // 内联面板不再有三步条：这三项必须为 0（导航只保留顶部一层）。
+      progressBars: panel.querySelectorAll('.designer-datav-data-flow-progress').length,
+      stepButtons: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
+      stepTargets: panel.querySelectorAll('[data-dataset-workbench-target]').length,
       applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
       workbenchVisible:
         workbench !== null && !workbench.hidden && getComputedStyle(workbench).display !== 'none',
@@ -524,15 +561,9 @@ export async function assertDatasetSurface(designer, page) {
         properties.clientWidth > 0,
       panelInlineGutter: panel.offsetWidth - panel.clientWidth,
       horizontalOverflow: panel.scrollWidth > panel.clientWidth + 1,
-      continuous:
-        progress !== null &&
+      contentFillsFlow:
         flowBox !== undefined &&
         contentBox !== undefined &&
-        sourceBox !== undefined &&
-        mappingBox !== undefined &&
-        previewBox !== undefined &&
-        Math.abs(sourceBox.top - mappingBox.top) <= 1 &&
-        Math.abs(mappingBox.top - previewBox.top) <= 1 &&
         Math.abs(contentBox.width - flowBox.width) <= 1,
       ordered:
         sourceSectionBox !== undefined &&
@@ -562,13 +593,15 @@ export async function assertDatasetSurface(designer, page) {
     descriptorSurface.sourceEntry.cardCount !== 3 ||
     descriptorSurface.activeStep !== 'source' ||
     descriptorSurface.layout !== 'continuous' ||
-    descriptorSurface.stepCount !== 3 ||
+    descriptorSurface.progressBars !== 0 ||
+    descriptorSurface.stepButtons !== 0 ||
+    descriptorSurface.stepTargets !== 0 ||
     descriptorSurface.applyCount !== 1 ||
     descriptorSurface.workbenchVisible ||
     !descriptorSurface.propertiesVisible ||
     descriptorSurface.panelInlineGutter !== 0 ||
     descriptorSurface.horizontalOverflow ||
-    !descriptorSurface.continuous ||
+    !descriptorSurface.contentFillsFlow ||
     !descriptorSurface.ordered ||
     !descriptorSurface.fullscreenAction
   ) {
@@ -606,135 +639,50 @@ export async function assertDatasetSurface(designer, page) {
       `BROWSER_HARNESS_DATASET_FORM_SCROLL_CONTINUITY_FAILED:${JSON.stringify(scrollContinuity)}`,
     );
   }
-  await dataPanel
-    .locator('[data-dataset-action="select-step"][data-dataset-workbench-target="mapping"]')
-    .click();
-  await page.waitForTimeout(400);
-  const stepNavigation = await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-datav-data-flow-content');
-    const mapping = panel.querySelector('[data-workbench-section="mapping"]');
-    const contentBox = content?.getBoundingClientRect();
-    const mappingBox = mapping?.getBoundingClientRect();
-    const markerBackgrounds = Object.fromEntries(
-      [...panel.querySelectorAll('[data-dataset-workbench-target]')].map((button) => [
-        button.dataset.datasetWorkbenchTarget,
-        getComputedStyle(button.querySelector('.designer-data-summary-step-marker'))
-          .backgroundColor,
-      ]),
-    );
-    return {
-      activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
-      markerBackgrounds,
-      scrollTop: content?.scrollTop,
-      mappingVisible:
-        contentBox !== undefined &&
-        mappingBox !== undefined &&
-        mappingBox.top >= contentBox.top - 1 &&
-        mappingBox.top < contentBox.bottom,
-    };
-  });
+  // 内联面板的「步骤导航」：三步条已删除（它与顶部「数据源」页签构成双层导航，
+  // 且 detail 被 CSS 藏成 0 信息、静态态下 2/3 是死链接）。现在导航由**滚动**表达，
+  // `data-active-step` 由滚动位置派生，工作台的 5 步导航单独在抽屉里保留。
+  const inlineNavigation = await readInlineNavigation(dataPanel, 'mapping');
   if (
-    stepNavigation.activeStep !== 'mapping' ||
-    stepNavigation.markerBackgrounds.mapping === stepNavigation.markerBackgrounds.source ||
-    stepNavigation.markerBackgrounds.mapping === stepNavigation.markerBackgrounds.preview ||
-    stepNavigation.markerBackgrounds.source !== stepNavigation.markerBackgrounds.preview ||
-    stepNavigation.scrollTop <= 0 ||
-    !stepNavigation.mappingVisible
+    inlineNavigation.progressBars !== 0 ||
+    inlineNavigation.stepButtons !== 0 ||
+    inlineNavigation.stepTargets !== 0 ||
+    inlineNavigation.stepMarkers !== 0
   ) {
     throw new Error(
-      `BROWSER_HARNESS_DATASET_STEP_NAVIGATION_FAILED:${JSON.stringify(stepNavigation)}`,
+      `BROWSER_HARNESS_DATASET_INLINE_STEP_BAR_FAILED:${JSON.stringify(inlineNavigation)}`,
     );
   }
-  await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-datav-data-flow-content');
-    if (content instanceof HTMLElement) content.scrollTop = 0;
-  });
-  await dataPanel
-    .locator(
-      '[data-dataset-action="select-step"][data-dataset-workbench-target="source"][aria-current="step"]',
-    )
-    .waitFor({ timeout: 5_000 });
-  const scrollSyncedSourceBeforePreview = await dataPanel.evaluate((panel) => ({
-    markerBackgrounds: Object.fromEntries(
-      [...panel.querySelectorAll('[data-dataset-workbench-target]')].map((button) => [
-        button.dataset.datasetWorkbenchTarget,
-        getComputedStyle(button.querySelector('.designer-data-summary-step-marker'))
-          .backgroundColor,
-      ]),
-    ),
-  }));
+  const scrolledToMapping = await scrollDataPanelTo(dataPanel, page, 'mapping', 'mapping');
   if (
-    scrollSyncedSourceBeforePreview.markerBackgrounds.source ===
-      scrollSyncedSourceBeforePreview.markerBackgrounds.mapping ||
-    scrollSyncedSourceBeforePreview.markerBackgrounds.source ===
-      scrollSyncedSourceBeforePreview.markerBackgrounds.preview ||
-    scrollSyncedSourceBeforePreview.markerBackgrounds.mapping !==
-      scrollSyncedSourceBeforePreview.markerBackgrounds.preview
+    scrolledToMapping.activeStep !== 'mapping' ||
+    scrolledToMapping.scrollTop <= 0 ||
+    scrolledToMapping.sectionVisible !== true
   ) {
     throw new Error(
-      `BROWSER_HARNESS_DATASET_SCROLL_SYNC_SOURCE_MARKER_FAILED:${JSON.stringify(scrollSyncedSourceBeforePreview)}`,
+      `BROWSER_HARNESS_DATASET_SCROLL_STEP_MAPPING_FAILED:${JSON.stringify(scrolledToMapping)}`,
     );
   }
   await dataPanel.evaluate((panel) => {
     const content = panel.querySelector('.designer-datav-data-flow-content');
     if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;
   });
-  await dataPanel
-    .locator(
-      '[data-dataset-action="select-step"][data-dataset-workbench-target="preview"][aria-current="step"]',
-    )
-    .waitFor({ timeout: 5_000 });
-  const scrollSyncedPreview = await dataPanel.evaluate((panel) => ({
-    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
-    currentTargets: [
-      ...panel.querySelectorAll('[data-dataset-action="select-step"][aria-current="step"]'),
-    ].map((button) => button.dataset.datasetWorkbenchTarget),
-    overwrittenStates: [
-      ...panel.querySelectorAll('[data-dataset-action="select-step"][data-state="current"]'),
-    ].map((button) => button.dataset.datasetWorkbenchTarget),
-    markerBackgrounds: Object.fromEntries(
-      [...panel.querySelectorAll('[data-dataset-workbench-target]')].map((button) => [
-        button.dataset.datasetWorkbenchTarget,
-        getComputedStyle(button.querySelector('.designer-data-summary-step-marker'))
-          .backgroundColor,
-      ]),
-    ),
-  }));
-  if (
-    scrollSyncedPreview.activeStep !== 'preview' ||
-    scrollSyncedPreview.currentTargets.join(',') !== 'preview' ||
-    scrollSyncedPreview.overwrittenStates.length !== 0 ||
-    scrollSyncedPreview.markerBackgrounds.preview ===
-      scrollSyncedPreview.markerBackgrounds.source ||
-    scrollSyncedPreview.markerBackgrounds.preview ===
-      scrollSyncedPreview.markerBackgrounds.mapping ||
-    scrollSyncedPreview.markerBackgrounds.source !== scrollSyncedPreview.markerBackgrounds.mapping
-  ) {
+  await page.waitForTimeout(300);
+  const scrolledToPreview = await readInlineNavigation(dataPanel, 'preview');
+  if (scrolledToPreview.activeStep !== 'preview' || scrolledToPreview.sectionVisible !== true) {
     throw new Error(
-      `BROWSER_HARNESS_DATASET_SCROLL_SYNC_PREVIEW_FAILED:${JSON.stringify(scrollSyncedPreview)}`,
+      `BROWSER_HARNESS_DATASET_SCROLL_STEP_PREVIEW_FAILED:${JSON.stringify(scrolledToPreview)}`,
     );
   }
   await dataPanel.evaluate((panel) => {
     const content = panel.querySelector('.designer-datav-data-flow-content');
     if (content instanceof HTMLElement) content.scrollTop = 0;
   });
-  await dataPanel
-    .locator(
-      '[data-dataset-action="select-step"][data-dataset-workbench-target="source"][aria-current="step"]',
-    )
-    .waitFor({ timeout: 5_000 });
-  const scrollSyncedSource = await dataPanel.evaluate((panel) => ({
-    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
-    currentTargets: [
-      ...panel.querySelectorAll('[data-dataset-action="select-step"][aria-current="step"]'),
-    ].map((button) => button.dataset.datasetWorkbenchTarget),
-  }));
-  if (
-    scrollSyncedSource.activeStep !== 'source' ||
-    scrollSyncedSource.currentTargets.join(',') !== 'source'
-  ) {
+  await page.waitForTimeout(300);
+  const scrolledToSource = await readInlineNavigation(dataPanel, 'source');
+  if (scrolledToSource.activeStep !== 'source' || scrolledToSource.scrollTop !== 0) {
     throw new Error(
-      `BROWSER_HARNESS_DATASET_SCROLL_SYNC_SOURCE_FAILED:${JSON.stringify(scrollSyncedSource)}`,
+      `BROWSER_HARNESS_DATASET_SCROLL_STEP_SOURCE_FAILED:${JSON.stringify(scrolledToSource)}`,
     );
   }
 }

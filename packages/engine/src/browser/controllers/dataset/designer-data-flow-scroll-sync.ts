@@ -6,7 +6,13 @@ const TRACKED_SECTION_SELECTOR = [
   '[data-workbench-section="preview"]',
 ].join(', ');
 
-/** Keeps the compact data-flow progress navigation aligned with its scroll container. */
+/**
+ * 把滚动位置映射成"当前在看哪一段"。
+ *
+ * 内联面板的三步条已经删掉（它与顶部页签构成双层导航，且 detail 被 CSS 藏成 0 信息），
+ * 但滚动派生的 `data-active-step` 仍然有用：它让"滚到哪一段"这件事继续可被观察，
+ * 也是工作台步骤导航复用同一套状态的前提。因此**进度条不再是必要条件**。
+ */
 export class DesignerDataFlowScrollSync {
   #content: HTMLElement | undefined;
   #scrollHandler: (() => void) | undefined;
@@ -17,9 +23,8 @@ export class DesignerDataFlowScrollSync {
 
   bind(panel: HTMLElement): void {
     const content = panel.querySelector<HTMLElement>('.designer-datav-data-flow-content');
-    const progress = panel.querySelector<HTMLElement>('.designer-datav-data-flow-progress');
     const flow = panel.querySelector<HTMLElement>('.designer-datav-data-flow');
-    if (content === null || progress === null || flow === null) {
+    if (content === null || flow === null) {
       this.clear();
       return;
     }

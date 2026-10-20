@@ -262,17 +262,12 @@ describe('designer workbench structure and layout', () => {
 
   it('R6 keeps the DataV-inspired data flow in one continuous inspector column', () => {
     expect(workbenchCss).toMatch(
-      /\.properties \.designer-datav-data-flow\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*grid-template-rows: auto minmax\(0, 1fr\);/s,
+      /\.properties \.designer-datav-data-flow\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
     );
-    expect(workbenchCss).toMatch(
-      /\.properties \.designer-datav-data-flow-progress\s*\{[^}]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\);/s,
-    );
-    expect(workbenchCss).toMatch(
-      /\.properties\s+\.designer-data-summary-step\[aria-current="step"\]\s+\.designer-data-summary-step-marker\s*\{[^}]*border-color: var\(--designer-accent\);[^}]*background: var\(--designer-accent\);[^}]*color: var\(--designer-text-on-accent\);/s,
-    );
-    expect(workbenchCss).toMatch(
-      /\.properties\s+\.designer-datav-data-flow-progress\s+\.designer-data-summary-step-marker\s*\{[^}]*border-color: var\(--designer-border-strong\);[^}]*background: var\(--designer-surface-control\);[^}]*color: var\(--designer-text-muted\);/s,
-    );
+    // 内联三步条与顶部「数据源」页签构成双层导航，且它的 detail 被 CSS 藏成了 0 信息：
+    // 内联面板删除整条（工作台的 5 步导航保留，样式在 data-editor.css）。
+    expect(workbenchCss).not.toContain('.designer-datav-data-flow-progress');
+    expect(workbenchCss).not.toContain('.designer-data-summary-step');
     expect(workbenchCss).toMatch(
       /\.properties \.designer-data-workbench-preview\s*\{\s*display: block;/s,
     );

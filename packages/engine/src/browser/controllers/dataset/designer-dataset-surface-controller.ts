@@ -1,5 +1,6 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { syncDataPanelNotice } from '../../dom/dataset/designer-data-panel-notice.js';
 import {
   stampDataSectionKeys,
   syncDatasetSections,
@@ -9,7 +10,6 @@ import {
   type DesignerDataStateInput,
   deriveDesignerDataState,
 } from '../../dom/dataset/designer-data-state.js';
-import { syncDataStateBadge } from '../../dom/dataset/designer-data-state-badge.js';
 import { renderDatasetCatalogResults } from '../../dom/dataset/designer-dataset-catalog-dom.js';
 import {
   type DesignerDataSourcePanelOptions,
@@ -17,6 +17,8 @@ import {
   renderDesignerDataSourcePanel,
   renderDesignerDatasetWorkbench,
 } from '../../dom/dataset/designer-dataset-dom.js';
+import { dataPanelApplyView } from '../../dom/dataset/designer-dataset-flow-dom.js';
+import { syncDataPanelActions } from '../../dom/dataset/designer-dataset-primitives.js';
 import type { DesignerHostLinkView } from '../../dom/dataset/designer-dataset-types.js';
 import { renderDesignerDescriptorZone } from '../../dom/descriptor/designer-descriptor-dom.js';
 import { designerDataSourceModes } from './designer-data-source-authoring.js';
@@ -62,14 +64,27 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   const workbenchHost = context.callbacks.getWorkbenchHost?.();
   if (workbenchHost !== undefined) stampDataSectionKeys(workbenchHost, options);
   context.dataFlowScrollSync.bind(panel);
-  // 七态派生：面板任何时刻只有一个主状态；徽标文本/色调与根节点 `data-state` 同一份真值。
+  // 七态派生仍然继续算（根节点 `data-state` + 顶部行内提示条读同一份结果），
+  // 但不再压成一个常驻徽标：就绪/加载/无数据不占任何常驻元素。
   applyDesignerDataState(panel, options.dataState);
-  syncDataStateBadge(panel, options.dataState);
+  syncDataPanelNotice(panel, options.dataState);
   if (focusedEntry !== undefined) {
     panel
       .querySelector<HTMLElement>(`[data-data-entry="${focusedEntry}"]`)
       ?.focus({ preventScroll: true });
   }
+}
+
+/**
+ * 只刷新主操作条。
+ *
+ * 固定值/变量的编辑走"只改状态、不整块重绘"的路径（保住输入框节点身份与光标），
+ * 所以「未应用」标记与按钮档位要单独就地更新一次。
+ */
+export function syncDataPanelApplyBar(context: DesignerDatasetControllerContext): void {
+  const panel = context.state.panel;
+  if (panel === undefined) return;
+  syncDataPanelActions(panel, dataPanelApplyView(createDatasetPanelOptions(context, panel)));
 }
 
 /** 面板所在可聚焦根里，当前聚焦的取值入口（没有就是 undefined）。 */
@@ -163,8 +178,9 @@ export function syncDatasetSurface(
   for (const root of [panel, workbenchHost]) {
     if (root === undefined) continue;
     syncDatasetSections(root, options);
-    // 徽标不属于任何段：段级 diff 不会碰它，随模型就地刷新（文本 + 色调 + data-state）。
-    syncDataStateBadge(root, options.dataState);
+    // 提示条与主操作条都不属于任何段：段级 diff 不会碰它们，随模型就地刷新。
+    syncDataPanelNotice(root, options.dataState);
+    syncDataPanelActions(root, dataPanelApplyView(options));
   }
   applyDesignerDataState(panel, options.dataState);
   restoreFocus?.();
@@ -273,12 +289,43 @@ function createDatasetPanelOptions(
     link: hostLinkView(context),
     bindingOpenRoleId: context.state.bindingOpenRoleId,
     feedback: context.state.feedbackText,
-    dirty: context.state.draftDirty,
+    dirty: panelDirty(context, source ?? null),
     confirmClose: context.state.confirmClose,
     preview: context.state.preview,
     activeStep: context.state.activeStep,
     authoring: context.state.authoring,
   };
+}
+
+/**
+ * "有没有可应用的草稿"——三种取值方式共用一条判据。
+ *
+ * 数据源模式本来就有 draft（`state.draftDirty` 是它的既有语义，工作台关闭确认也在用，不能改）；
+ * 固定值 / 变量模式以前没有脏标记，只能靠"应用按钮永远可点"掩盖过去。这里只读地比一次
+ * 当前编辑值与应用后的文档值，不动 `state.draftDirty`：
+ * - 比不出差异（false）时按钮变「已应用」禁用；
+ * - 比出差异（true）时按钮是强调实心。
+ * 宁可多判脏（例如 JSON 文本格式不同但值相同），也不要少判：少判会让用户改完点不动应用。
+ */
+function panelDirty(
+  context: DesignerDatasetControllerContext,
+  source: ScreenComponentNode['dataSource'],
+): boolean {
+  const mode = context.state.mode;
+  if (mode === 'dataset') return context.state.draftDirty;
+  if (mode === 'static') {
+    if (source?.type !== 'static') return true;
+    return (
+      JSON.stringify(source.value) !== JSON.stringify(context.state.staticValue) ||
+      JSON.stringify(source.binding ?? null) !==
+        JSON.stringify(context.state.staticBinding ?? null) ||
+      context.state.staticDraft !== JSON.stringify(context.state.staticValue, null, 2)
+    );
+  }
+  if (mode === 'variable') {
+    return source?.type !== 'variable' || source.variableId !== context.state.variableSourceId;
+  }
+  return false;
 }
 
 function renderDataWorkbench(

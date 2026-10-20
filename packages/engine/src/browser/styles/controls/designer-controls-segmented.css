@@ -55,7 +55,10 @@
 .designer-data-source-segmented .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
 .designer-dataset-editor-modes .designer-button:hover:not(:disabled):not([aria-pressed="true"]),
 .inspector-density .designer-tab:hover:not(:disabled):not([aria-pressed="true"]),
-.designer-segmented .designer-segmented-option:hover:not(:disabled):not([aria-pressed="true"]) {
+.designer-segmented
+  .designer-segmented-option:hover:not(:disabled):not([aria-pressed="true"]):not(
+    [aria-checked="true"]
+  ) {
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
 }
@@ -64,7 +67,10 @@
 .designer-data-source-segmented .designer-button[aria-pressed="true"],
 .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
 .inspector-density .designer-tab[aria-pressed="true"],
-.designer-segmented .designer-segmented-option[aria-pressed="true"] {
+/* 语义是 radio 的分段（数据面板取值方式）用 aria-checked 表达选中：
+   分段控件允许两种"选中"语汇，几何与状态档共用同一处定义。 */
+.designer-segmented .designer-segmented-option[aria-pressed="true"],
+.designer-segmented .designer-segmented-option[aria-checked="true"] {
   background: var(--designer-surface-control-hover);
   color: var(--designer-accent-text);
 }
@@ -73,8 +79,19 @@
 :host(:not([theme="light"])) .designer-data-source-segmented .designer-button[aria-pressed="true"],
 :host(:not([theme="light"])) .designer-dataset-editor-modes .designer-button[aria-pressed="true"],
 :host(:not([theme="light"])) .inspector-density .designer-tab[aria-pressed="true"],
-:host(:not([theme="light"])) .designer-segmented .designer-segmented-option[aria-pressed="true"] {
+:host(:not([theme="light"])) .designer-segmented .designer-segmented-option[aria-pressed="true"],
+:host(:not([theme="light"])) .designer-segmented .designer-segmented-option[aria-checked="true"] {
   background: var(--designer-surface-control-active);
+}
+
+/* 分段项禁用：换色不换透明度（R2 对比度契约）。 */
+.designer-segmented .designer-segmented-option:disabled {
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
+}
+
+.designer-segmented .designer-segmented-option:disabled:hover {
+  background: transparent;
 }
 
 /* 上下文差异：画布缩放方式有 6 档，按 3 列 2 行排布而不是单行等分。 */

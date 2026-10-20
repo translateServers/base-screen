@@ -141,6 +141,34 @@ export async function assertDatasetPanelInteraction(designer, page) {
       `BROWSER_HARNESS_DATASET_WORKBENCH_SECTIONS_FAILED:${JSON.stringify(workbenchSurface)}`,
     );
   }
+  // 4b) 工作台的 5 步导航保留并可导航：内联面板删掉的只是它自己那条三步条
+  //     （与顶部页签构成双层导航），抽屉里的分步作业是真的分步，保留。
+  const workbenchSteps = await workbench.evaluate((node) => {
+    const steps = [...node.querySelectorAll('[data-workbench-step]')];
+    return {
+      keys: steps.map((step) => step.dataset.workbenchStep),
+      enabled: steps.filter((step) => !step.disabled).length,
+    };
+  });
+  if (
+    workbenchSteps.keys.join(',') !== 'source,mapping,transform,preview,refresh' ||
+    workbenchSteps.enabled < 4
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_WORKBENCH_STEPS_FAILED:${JSON.stringify(workbenchSteps)}`,
+    );
+  }
+  await workbench.locator('[data-workbench-step="mapping"]').click();
+  await workbench.locator('[data-workbench-step="mapping"][aria-current="step"]').waitFor();
+  const workbenchNavigation = await workbench.evaluate((node) => ({
+    active: node.querySelector('[data-workbench-step][aria-current="step"]')?.dataset.workbenchStep,
+    mappingSection: node.querySelector('[data-workbench-section="mapping"]') !== null,
+  }));
+  if (workbenchNavigation.active !== 'mapping' || !workbenchNavigation.mappingSection) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_WORKBENCH_NAVIGATION_FAILED:${JSON.stringify(workbenchNavigation)}`,
+    );
+  }
   await workbench.locator('[data-dataset-action="close-workbench"]').click();
   const discard = workbench.locator('[data-dataset-action="discard-workbench"]');
   if ((await discard.count()) > 0) await discard.click();

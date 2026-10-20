@@ -12,8 +12,9 @@ export const DESIGNER_UI_TEXT = {
   // 与上面的页签标题 `data` 分开成组：`data` 是页签名（术语表里被断言钉死），不承载面板文案。
   dataEntry: {
     legend: '取值方式',
+    // `title` 是**全称**：空态引导行（第一次认识这个入口）与分段控件的 title / aria-label 都用它。
     static: {
-      title: '固定值',
+      title: '输入固定值',
       description: '手填一份数据，不依赖数据源。',
       badge: '手填',
       disabled: '当前组件不支持固定值。',
@@ -31,6 +32,13 @@ export const DESIGNER_UI_TEXT = {
       disabled: '当前组件不支持接数据源。',
       portMissing: '宿主未提供数据集接口',
     },
+    // 短名只给配置态分段用（横向一段约 95px）。两组必须在同一处定义：
+    // 分段可见文本取 compact、无障碍名取 title，缺任何一组都会让 aria-label 取错来源。
+    compact: {
+      static: '固定值',
+      variable: '变量',
+      source: '数据源',
+    },
   },
   dataState: {
     unconfigured: '未配置',
@@ -41,6 +49,24 @@ export const DESIGNER_UI_TEXT = {
     empty: '无数据',
     ready: '已就绪',
     aria: (label: string) => `数据状态：${label}`,
+  },
+  // 数据配置页（右侧属性面板的数据源页）：空态引导、取值方式分段、主操作与行内提示条。
+  dataPanel: {
+    emptyTitle: '选择数据来源',
+    emptyHint: '选择后在此面板配置数据。',
+    apply: '应用',
+    applied: '已应用',
+    dirty: '未应用',
+    notice: {
+      readonly: '当前组件只读，数据配置不可修改。',
+      failed: '数据请求失败，请检查数据源、参数或权限。',
+      retry: '重试',
+      unavailable: {
+        portMissing: '宿主未提供数据接口。',
+        instanceMissing: '所选数据集不存在或未发布。',
+        denied: '宿主拒绝访问数据接口。',
+      },
+    },
   },
   interaction: '交互',
   events: '事件',
@@ -328,7 +354,6 @@ export const DESIGNER_UI_TEXT = {
     hostResourceManaged: '请通过宿主资源面板添加或替换资源。',
     hostResourceSummary: (resourceType: string, resourceId: string) =>
       `当前资源：${resourceType} / ${resourceId}。请通过宿主资源面板替换。`,
-    noneSelected: '当前组件不使用数据。',
     staticTitle: '静态数据',
     staticValue: 'JSON 数据',
     staticInvalid: '静态数据不是有效的 JSON，未保存修改。',
@@ -829,7 +854,6 @@ export const DESIGNER_UI_TEXT = {
     bindingSelectAll: '全选',
     bindingSelectMaximum: '选至上限',
     bindingClear: '清空',
-    tabularShape: '对象数组',
     bindingSummaryTitle: '绑定摘要',
     bindingNone: '未绑定',
     bindingPlaceholder: '选择要绑定的字段',

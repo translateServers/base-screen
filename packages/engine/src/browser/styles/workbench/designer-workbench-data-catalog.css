@@ -243,28 +243,6 @@
   line-height: 1.55;
 }
 
-.designer-dataset-schema {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--designer-space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.designer-dataset-schema li {
-  max-width: 100%;
-  padding: 3px var(--designer-space-2);
-  overflow: hidden;
-  border: 1px solid var(--designer-border-subtle);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-control);
-  color: var(--designer-text-secondary);
-  font: var(--designer-font-small);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .designer-dataset-config-section {
   display: grid;
   gap: var(--designer-space-3);
@@ -417,9 +395,14 @@
 
 .designer-dataset-field-option:disabled:not([aria-pressed="true"]) {
   cursor: not-allowed;
-  opacity: 0.48;
+  /* 换色不换透明度：opacity 会把文字对比度压到 R2 契约线以下。 */
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-workspace);
+  color: var(--designer-text-disabled);
 }
 
+/* 底部操作条：sticky 但不抢注意力——无大阴影、按钮 auto 宽。
+   侧栏里的主操作不该用页面级 CTA 档（全宽反色），档位由 `[data-variant="apply"]` 单独给。 */
 .designer-dataset-actions {
   position: sticky;
   bottom: 0;
@@ -429,16 +412,10 @@
   max-width: 100%;
   gap: var(--designer-space-2);
   padding: var(--designer-space-4) 0;
-  border-top: 1px solid var(--designer-border-default);
+  border-top: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
-  box-shadow: 0 -10px 24px color-mix(in srgb, var(--designer-surface-workspace) 72%, transparent);
 }
 
 .designer-dataset-actions .designer-button {
   min-width: 0;
-}
-
-.designer-dataset-actions .designer-button[data-variant="primary"] {
-  min-width: 0;
-  flex: 1 1 auto;
 }

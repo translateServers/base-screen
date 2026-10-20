@@ -1,4 +1,3 @@
-import type { ScreenDatasetDefinition } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerFieldRow } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
@@ -10,27 +9,36 @@ import {
   renderDesignerStaticDataPreview,
 } from '../static-data/designer-static-data-dom.js';
 import {
+  dataEntryLayout,
   dataEntrySearchText,
   designerDataEntryItems,
-  renderDataEntryGroup,
+  renderDataEntryGuide,
+  renderDataEntrySegmented,
 } from './designer-data-entry-dom.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
-import { datasetAction, renderApplyAction } from './designer-dataset-primitives.js';
 import {
-  createDatasetSection,
-  type DesignerDataSectionKey,
-  renderDatasetApplyAction,
-} from './designer-dataset-sections.js';
+  type DataPanelActionView,
+  dataPanelActionView,
+  datasetAction,
+  renderDataPanelActions,
+} from './designer-dataset-primitives.js';
+import { createDatasetSection, type DesignerDataSectionKey } from './designer-dataset-sections.js';
 import type {
   DesignerDataSourcePanelOptions,
   DesignerDatasetWorkbenchStep,
 } from './designer-dataset-types.js';
 
 /**
- * 「取值方式」段：三张入口卡片取代原来的裸下拉。
+ * 「取值方式」段：**两套形态**，不是同一套加/减。
  *
- * 段 key 仍是 `mode`（改名随下一单的取值段一起做），段节点仍由外层流程渲染器持有：
- * 卡片只是把 `setSourceMode` 的四个模式收敛成三入口，模式本身没有变化。
+ * - 空态（`mode === 'none'`）：一个组标题 + 三行 48px 引导行。空态的唯一任务是让人选一个入口，
+ *   所以描述必须可读、三行必须等高对齐。
+ * - 配置态：30px 分段控件一行，无组标题、无描述、无徽标。
+ *
+ * 为什么不做常驻三列卡片：内容宽约 303px 时每列只有 98px，中文标题 + 徽标必然换行参差，
+ * 三卡高度不等是宽度约束下的死结（不是配色问题），改回来之前请先看这条。
+ *
+ * 段 key 仍是 `mode`，节点仍由外层流程渲染器持有：入口只是把 `setSourceMode` 收敛成三项。
  */
 function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement {
   const ownerDocument = options.panel.ownerDocument;
@@ -46,20 +54,20 @@ function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement 
   });
   section.dataset.inspectorSearchSection = 'true';
   section.dataset.inspectorSearchText = dataEntrySearchText(items);
-  const heading = ownerDocument.createElement('h3');
-  heading.className = 'designer-inspector-section-title';
-  heading.textContent = DESIGNER_UI_TEXT.dataEntry.legend;
-  section.append(heading, renderDataEntryGroup(ownerDocument, items));
+  const layout = dataEntryLayout(options.mode);
+  section.dataset.dataEntryLayout = layout;
+  if (layout === 'empty') {
+    const heading = ownerDocument.createElement('h3');
+    heading.className = 'designer-inspector-section-title';
+    heading.textContent = DESIGNER_UI_TEXT.dataPanel.emptyTitle;
+    const hint = ownerDocument.createElement('p');
+    hint.className = 'designer-data-entry-hint';
+    hint.textContent = DESIGNER_UI_TEXT.dataPanel.emptyHint;
+    section.append(heading, renderDataEntryGuide(ownerDocument, items), hint);
+    return section;
+  }
+  section.appendChild(renderDataEntrySegmented(ownerDocument, items));
   return section;
-}
-
-function renderEmptySource(ownerDocument: Document): HTMLElement {
-  const empty = ownerDocument.createElement('div');
-  empty.className = 'designer-data-source-empty';
-  const text = ownerDocument.createElement('p');
-  text.textContent = DESIGNER_UI_TEXT.dataSource.noneSelected;
-  empty.appendChild(text);
-  return empty;
 }
 
 function renderStaticSource(options: DesignerDataSourcePanelOptions): HTMLElement {
@@ -91,7 +99,7 @@ function renderVariableSource(options: DesignerDataSourcePanelOptions): HTMLElem
   });
   select.dataset.dataVariableSource = 'true';
   row.control.appendChild(enhanceDesignerSelect(select).element);
-  section.append(row.field, renderApplyAction(ownerDocument, 'variable'));
+  section.appendChild(row.field);
   return section;
 }
 
@@ -110,6 +118,17 @@ function staticDataView(options: DesignerDataSourcePanelOptions): DesignerStatic
   };
 }
 
+/**
+ * 数据流：**只有一层导航**（面板顶部的「数据源」页签）。
+ *
+ * 内联面板里原本还有一条 44px 的三格步骤条，它有两个致命问题：
+ * 1. 与顶部页签构成双层导航；
+ * 2. 它的 detail（数据集名 / 已映射字段数 / 响应状态）被 CSS 藏掉了，44px 只剩下"1/2/3"，
+ *    而"第几步"本来就由滚动位置表达；静态值态下第 2、3 步还是死链接。
+ *
+ * 因此内联面板删掉整条；`data-active-step` 仍继续写入（由滚动位置派生），
+ * 工作台抽屉里的 5 步导航不受影响。
+ */
 export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): HTMLElement {
   const ownerDocument = options.panel.ownerDocument;
   const section = ownerDocument.createElement('section');
@@ -135,60 +154,14 @@ export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): H
     section.appendChild(content);
     return section;
   }
-  const activeStep = inlineWorkbenchStep(options.activeStep);
-  section.dataset.activeStep = activeStep;
-  const mappedFields = Object.values(options.draft?.fields ?? {}).flat().length;
-  const staticMappedFields = Object.values(options.staticBinding?.fields ?? {}).flat().length;
-  const sourceState =
-    options.mode === 'none'
-      ? 'pending'
-      : options.mode === 'dataset' && !options.resourceAvailable
-        ? 'error'
-        : 'ready';
-  const mappingCount = options.mode === 'static' ? staticMappedFields : mappedFields;
-  const source = renderDatasetSummaryStep(
-    options,
-    1,
-    DESIGNER_UI_TEXT.dataSource.setupSourceStep,
-    sourceStepDetail(options),
-    'source',
-    sourceState,
-  );
-  source.dataset.dataStepDock = 'source';
-  const mapping = renderDatasetSummaryStep(
-    options,
-    2,
-    DESIGNER_UI_TEXT.dataSource.mappingStep,
-    DESIGNER_UI_TEXT.dataSource.mappingSummary(mappingCount),
-    'mapping',
-    mappingCount > 0 ? 'ready' : 'pending',
-  );
-  mapping.dataset.dataStepDock = 'mapping';
-  const response = renderDatasetSummaryStep(
-    options,
-    3,
-    DESIGNER_UI_TEXT.dataSource.responseTitle,
-    options.preview.message || DESIGNER_UI_TEXT.dataSource.responseUnavailable,
-    'preview',
-    options.preview.status === 'ready'
-      ? 'ready'
-      : options.preview.status === 'error'
-        ? 'error'
-        : 'pending',
-  );
-  response.dataset.dataStepDock = 'preview';
-
-  const progress = ownerDocument.createElement('nav');
-  progress.className = 'designer-datav-data-flow-progress';
-  progress.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.configurationFlow);
-  progress.append(source, mapping, response);
+  section.dataset.activeStep = inlineWorkbenchStep(options.activeStep);
 
   const content = ownerDocument.createElement('div');
   content.className = 'designer-datav-data-flow-content';
   content.dataset.designerScrollScope = `data-source:${options.scrollScope}`;
   renderContinuousDataFlow(content, options);
 
-  section.append(progress, content);
+  section.appendChild(content);
   return section;
 }
 
@@ -197,19 +170,16 @@ function renderContinuousDataFlow(
   options: DesignerDataSourcePanelOptions,
 ): void {
   content.appendChild(renderSourceMode(options));
-  if (options.mode === 'none') {
-    content.append(
-      renderEmptySource(content.ownerDocument),
-      renderApplyAction(content.ownerDocument, 'none'),
-    );
-    return;
-  }
+  // 空态只有一组引导行：没有可应用的草稿（不放操作条），也不再补「当前组件不使用数据。」
+  // 这类物料数据段的占位文案——上面刚让人"选择数据来源"，下面再说"不使用数据"是自相矛盾。
+  if (options.mode === 'none') return;
   if (options.mode === 'static') {
     renderContinuousStaticDataFlow(content, options);
     return;
   }
   if (options.mode === 'variable') {
     content.appendChild(renderVariableSource(options));
+    content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
     return;
   }
   // 段一律从工厂取：内联面板与工作台渲染同一批节点，拼装顺序只在这里和挂载层决定。
@@ -217,14 +187,13 @@ function renderContinuousDataFlow(
     section('host-link', options),
     ...(options.catalogOpen || options.descriptor === undefined
       ? [section('catalog', options)]
-      : datasetModeSections(content.ownerDocument, options, options.descriptor)),
+      : datasetModeSections(content.ownerDocument, options)),
   );
 }
 
 function datasetModeSections(
   ownerDocument: Document,
   options: DesignerDataSourcePanelOptions,
-  descriptor: ScreenDatasetDefinition,
 ): readonly HTMLElement[] {
   const configuration = section('config', options);
   const advanced = section('authoring', options);
@@ -240,12 +209,23 @@ function datasetModeSections(
     renderDatasetPreviewActions(ownerDocument, options),
     section('preview', options),
     advanced,
-    renderDatasetApplyAction(
-      ownerDocument,
-      !options.resourceAvailable ||
-        !isDesignerDatasetBindingValid(descriptor, options.draft, options.roles),
-    ),
+    renderDataPanelActions(ownerDocument, dataPanelApplyView(options)),
   ];
+}
+
+/**
+ * 主操作条的唯一 view 计算：**渲染**与**就地刷新**都读它，两处不会各判一套。
+ *
+ * 数据源模式：有草稿可应用，但端口没接或绑定不完整时只禁用、不改文案。
+ */
+export function dataPanelApplyView(options: DesignerDataSourcePanelOptions): DataPanelActionView {
+  const descriptor = options.descriptor;
+  const blocked =
+    options.mode === 'dataset' && descriptor !== undefined
+      ? !options.resourceAvailable ||
+        !isDesignerDatasetBindingValid(descriptor, options.draft, options.roles)
+      : false;
+  return dataPanelActionView({ dirty: options.dirty, blocked });
 }
 
 function section(
@@ -271,7 +251,9 @@ function renderContinuousStaticDataFlow(
     preview.tabIndex = -1;
     content.append(mapping, preview);
   }
-  content.appendChild(renderApplyAction(content.ownerDocument, 'static'));
+  // 固定值态以前有三份「应用」（编辑器内 / 映射段内 / 流程尾），三者都 `sticky bottom:0`
+  // 叠在同一位置，只看得见最后一份。现在只有流程尾这一份。
+  content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
 }
 
 function renderDatasetPreviewActions(
@@ -297,50 +279,6 @@ function renderDatasetPreviewActions(
   return actions;
 }
 
-function sourceStepDetail(options: DesignerDataSourcePanelOptions): string {
-  if (options.mode === 'dataset') {
-    return options.descriptor?.name ?? DESIGNER_UI_TEXT.dataSource.notConfigured;
-  }
-  return DESIGNER_UI_TEXT.dataSource.mode(options.mode);
-}
-
 function inlineWorkbenchStep(step: DesignerDatasetWorkbenchStep): 'source' | 'mapping' | 'preview' {
   return step === 'mapping' || step === 'preview' ? step : 'source';
-}
-
-function renderDatasetSummaryStep(
-  options: DesignerDataSourcePanelOptions,
-  index: number,
-  titleText: string,
-  detailText: string,
-  step: DesignerDatasetWorkbenchStep,
-  state: 'ready' | 'pending' | 'error',
-): HTMLButtonElement {
-  const button = options.panel.ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-data-summary-step';
-  button.dataset.datasetAction = 'select-step';
-  button.dataset.datasetWorkbenchTarget = step;
-  button.setAttribute('aria-current', options.activeStep === step ? 'step' : 'false');
-  button.dataset.state = state;
-  button.setAttribute(
-    'aria-label',
-    `${DESIGNER_UI_TEXT.dataSource.summaryStep(index, titleText)} · ${detailText}`,
-  );
-  const marker = options.panel.ownerDocument.createElement('span');
-  marker.className = 'designer-data-summary-step-marker';
-  marker.textContent = String(index);
-  const copy = options.panel.ownerDocument.createElement('span');
-  copy.className = 'designer-data-summary-step-copy';
-  const title = options.panel.ownerDocument.createElement('strong');
-  title.textContent = titleText;
-  const detail = options.panel.ownerDocument.createElement('small');
-  detail.textContent = detailText;
-  copy.append(title, detail);
-  const disclosure = options.panel.ownerDocument.createElement('span');
-  disclosure.className = 'designer-data-summary-step-disclosure';
-  disclosure.setAttribute('aria-hidden', 'true');
-  disclosure.textContent = '›';
-  button.append(marker, copy, disclosure);
-  return button;
 }

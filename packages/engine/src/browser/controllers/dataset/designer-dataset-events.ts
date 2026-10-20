@@ -19,6 +19,7 @@ import { setDatasetPreviewTab } from './designer-dataset-preview-controller.js';
 import {
   isDatasetWorkbenchStep,
   retryDatasetLink,
+  syncDataPanelApplyBar,
   syncDatasetSurface,
 } from './designer-dataset-surface-controller.js';
 import {
@@ -33,7 +34,11 @@ export function handleDatasetInput(
 ): boolean {
   if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement))
     return false;
-  if (handleStaticInput(context, target)) return true;
+  if (handleStaticInput(context, target)) {
+    // 固定值编辑不整块重绘：只把「未应用 / 应用」这颗按钮与脏标记就地更新。
+    syncDataPanelApplyBar(context);
+    return true;
+  }
   if (target.dataset.datasetQuery === undefined) return false;
   context.catalogController.updateQuery(target.value);
   return true;
@@ -309,7 +314,10 @@ export function handleDatasetChange(
     context.renderSurface();
     return true;
   }
-  if (handleStaticChange(context, target)) return true;
+  if (handleStaticChange(context, target)) {
+    syncDataPanelApplyBar(context);
+    return true;
+  }
   if (target.dataset.datasetAuthoringSetting !== undefined) {
     updateAuthoringSetting(context, target.dataset.datasetAuthoringSetting, target);
     return true;

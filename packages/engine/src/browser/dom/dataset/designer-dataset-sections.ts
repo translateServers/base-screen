@@ -1,4 +1,3 @@
-import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { renderDatasetAuthoring } from './designer-dataset-authoring-dom.js';
 import { renderDatasetCatalog, renderHostConnection } from './designer-dataset-catalog-dom.js';
 import { renderDesignerDatasetConfiguration } from './designer-dataset-config-dom.js';
@@ -48,19 +47,4 @@ export function createDatasetSection(
   return configuration === undefined
     ? undefined
     : renderDesignerDatasetConfiguration(configuration);
-}
-
-/** 数据集模式下的主动作条：应用属于提交动作，放在两处挂载点的容器层。 */
-export function renderDatasetApplyAction(ownerDocument: Document, disabled: boolean): HTMLElement {
-  const actions = ownerDocument.createElement('div');
-  actions.className = 'designer-dataset-actions';
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-control designer-button';
-  button.dataset.datasetAction = 'apply';
-  button.dataset.variant = 'primary';
-  button.textContent = DESIGNER_UI_TEXT.dataSource.apply('dataset');
-  button.disabled = disabled;
-  actions.appendChild(button);
-  return actions;
 }

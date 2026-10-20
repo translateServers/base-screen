@@ -3,7 +3,6 @@ import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
   bindingSummary,
   renderAdvancedInput,
-  renderApply,
   renderScalar,
   tab,
 } from './designer-static-data-controls.js';
@@ -22,11 +21,13 @@ export function renderDesignerStaticData(view: DesignerStaticDataView): HTMLElem
   heading.textContent = DESIGNER_UI_TEXT.dataSource.staticTitle;
   section.appendChild(heading);
   if (view.descriptor?.kind === 'scalar') {
-    section.append(renderScalar(ownerDocument, view), renderApply(ownerDocument));
+    // 应用按钮只在流程尾渲染一份（见 designer-dataset-flow-dom 的 renderContinuousStaticDataFlow）：
+    // 三份 sticky 动作叠在同一位置时只看得见最后一份，点击区还互相遮挡。
+    section.appendChild(renderScalar(ownerDocument, view));
     return section;
   }
   if (view.descriptor?.kind !== 'tabular') {
-    section.append(renderAdvancedInput(ownerDocument, view.jsonDraft), renderApply(ownerDocument));
+    section.appendChild(renderAdvancedInput(ownerDocument, view.jsonDraft));
     return section;
   }
   const parsed = parseScreenTabularDataset(view.value);
@@ -60,7 +61,6 @@ export function renderDesignerStaticData(view: DesignerStaticDataView): HTMLElem
       renderRows(ownerDocument, parsed.value, view.page, view.pageSize, view.scrollScope),
     );
   }
-  section.appendChild(renderApply(ownerDocument));
   return section;
 }
 
@@ -80,10 +80,7 @@ export function renderDesignerStaticDataMapping(view: DesignerStaticDataView): H
     section.appendChild(empty);
     return section;
   }
-  section.append(
-    renderBindings(view.ownerDocument, view, parsed.value),
-    renderApply(view.ownerDocument),
-  );
+  section.appendChild(renderBindings(view.ownerDocument, view, parsed.value));
   return section;
 }
 
