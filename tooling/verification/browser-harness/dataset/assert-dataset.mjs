@@ -367,10 +367,30 @@ export async function assertDatasetAuthoring(designer, page) {
   // 参数一改，`source` 段的内容键就变 → 整段 `replaceWith` → 组节点换新。此时若没有
   // 「构造即重放」，组会被默认规则收回（QA 注入后实测 `afterToggle:true, afterEdit:false`），
   // 而**任何既有断言都不会红**：编辑照样成功，只是组被收起、用户看不到刚改的那一行。
+  // **自足前置**：不依赖本函数前面用例的残留状态——自己把组件与数据源配好。
+  // 这样 `ONLY=authoring` 单独跑时这条断言依然成立，QA 的注入才打得到它
+  // （否则注入只会先崩在别的用例上，看起来像"够不到"）。
+  await designer.locator('[data-panel-tab="layers"]').click();
+  await designer.locator('[data-layer-select="dataset-ranking-demo"] .layer-name').click();
+  await designer.getByRole('tab', { name: '\u6570\u636e\u6e90', exact: true }).click();
+  await dataPanel.locator('[data-dataset-descriptor]').waitFor();
   const parametersGroup = dataPanel.locator('details[data-details-group="parameters"]').first();
+  if (!(await parametersGroup.count())) {
+    // 参数组不存在（该数据集没有参数）时这条断言无从谈起：显式失败，而不是静默跳过。
+    throw new Error('BROWSER_HARNESS_DATASET_GROUP_REPLAY_FAILED:no-parameters-group');
+  }
   const summary = parametersGroup.locator('summary').first();
-  if ((await parametersGroup.getAttribute('open')) !== null) await summary.click();
+  // 先关再"用户点开"：展开态必须来自一次真实点击。
+  if ((await parametersGroup.getAttribute('open')) !== null) {
+    await summary.click();
+    await dataPanel
+      .locator('details[data-details-group="parameters"]:not([open])')
+      .waitFor({ state: 'attached' });
+  }
   await summary.click();
+  await dataPanel.locator('details[data-details-group="parameters"][open]').waitFor();
+  // 竞态护栏：`toggle` 是排队事件，覆盖表要等它跑完；否则"点开→立刻改值"的重建会早于写入。
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => resolve(null))));
   await parametersGroup.evaluate((node) => {
     node.dataset.probeGroup = 'before-edit';
   });
@@ -378,6 +398,9 @@ export async function assertDatasetAuthoring(designer, page) {
   const regionForReplay = dataPanel.locator('[data-value-ref-inline="parameter:region"]');
   await regionForReplay.fill('south');
   await regionForReplay.dispatchEvent('change');
+  // 确定性收尾：用「应用」当**唯一被 await 的重建触发点**，读它之后的状态。
+  await dataPanel.locator('[data-dataset-action="apply"]').click();
+  await dataPanel.locator('details[data-details-group="parameters"]').first().waitFor();
   const replay = await dataPanel.evaluate((panel) => {
     const group = panel.querySelector('details[data-details-group="parameters"]');
     return {
@@ -390,9 +413,6 @@ export async function assertDatasetAuthoring(designer, page) {
   if (replayBefore === null || !replay.open || !replay.rebuilt || replay.section !== 'source') {
     throw new Error(`BROWSER_HARNESS_DATASET_GROUP_REPLAY_FAILED:${JSON.stringify(replay)}`);
   }
-  // 上面那次编辑会让草稿变脏；后面的工作台关闭流程会因此弹「放弃草稿」确认，
-  // 所以这里把它应用掉，恢复成干净状态（顺带再验一次重放：应用也会重建段）。
-  await dataPanel.locator('[data-dataset-action="apply"]').click();
   // 绑定字段选择器：触发器芯片 + 计数 + 自绘弹层（设计原型 .bind-field）；芯片 × 与选项切换共用绑定动作。
   const bindShell = await dataPanel.evaluate((panel) => {
     const trigger = panel.querySelector('[data-dataset-binding-trigger="measures"]');
