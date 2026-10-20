@@ -62,6 +62,7 @@ export {
   type ScreenDataSourceParseOptions,
 } from './document/parse.js';
 export {
+  derivedDataSourceId,
   readScreenComponentDataBinding,
   readScreenComponentValueRef,
   readScreenDocumentDataSources,

@@ -11,6 +11,9 @@ export function compareScreenDiagnostics(a: ScreenDiagnostic, b: ScreenDiagnosti
 export const COMPONENT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
 
 // @public
+export function derivedDataSourceId(ownerId: string): string;
+
+// @public
 export function diagnoseDataSourceCycles(document: ScreenDocument): readonly ScreenDiagnostic[];
 
 // @public

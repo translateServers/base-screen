@@ -24,8 +24,20 @@ import type {
 const DERIVED_ID_PREFIX = 'data-source-';
 const MAX_COMPONENT_ID_LENGTH = 128;
 
-/** 派生实例 id：`data-source-<ownerId>`，超长时截断到组件 id 词法上限。 */
-function derivedDataSourceId(ownerId: string): string {
+/**
+ * 派生实例 id：`data-source-<ownerId>`，超长时截断到组件 id 词法上限。
+ *
+ * **这是派生 id 的唯一权威**。引擎（或任何消费者）**不得自行拼接**同样的字符串：
+ * 一旦两边规则漂移，引用 id 就会与派生视图的 id 不再相等，而这类漂移不会让任何类型检查报错——
+ * 它表现为「引用指向一个不存在的实例」（全屏"引用已失效"）或请求键变化。
+ *
+ * 注意派生 id 只由 **owner** 决定，与数据集/资源本身无关：这正是「更换数据集必须新建实例 +
+ * 改引用」的原因——原地改 `source` 不会改 id，所有引用方会静默跟着换。
+ *
+ * @param ownerId 组件 id（或变量 id）：派生视图的宿主。
+ * @returns 稳定的实例 id。
+ */
+export function derivedDataSourceId(ownerId: string): string {
   const candidate = `${DERIVED_ID_PREFIX}${ownerId}`;
   return candidate.length <= MAX_COMPONENT_ID_LENGTH
     ? candidate
