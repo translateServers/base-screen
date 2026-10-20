@@ -206,12 +206,25 @@ function renderContinuousDataFlow(
 function fitActionBarGutter(content: HTMLElement): void {
   const bar = content.querySelector<HTMLElement>('.designer-dataset-actions');
   if (bar === null) return;
-  const apply = (): void => {
-    content.style.paddingBottom = `${Math.ceil(bar.getBoundingClientRect().height) + 8}px`;
+  const apply = (): boolean => {
+    const height = bar.getBoundingClientRect().height;
+    // **首帧量不到**：段是先组装后挂载的，挂载前 sticky 操作条高度为 0，此时写回 `0 + 8 = 8px`
+    // 等于没让位（实测最后一行被压住 92px）。所以高度为 0 时**不写**，继续等下一帧。
+    if (height <= 0) return false;
+    content.style.paddingBottom = `${Math.ceil(height) + 8}px`;
+    return true;
   };
-  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(apply);
+  // 有界轮询：最多 20 帧（≈300ms）拿到真实高度就停；挂载完成前的帧都是 0。
+  let frames = 0;
+  const tick = (): void => {
+    if (apply()) return;
+    frames += 1;
+    if (frames < 20 && typeof requestAnimationFrame === 'function') requestAnimationFrame(tick);
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(tick);
   else apply();
   if (typeof ResizeObserver === 'function') {
+    // 文案变化（`测试` → `应用`）会改高度：持续跟随，并在操作条离开文档时断开。
     const observer = new ResizeObserver(() => apply());
     observer.observe(bar);
     bar.addEventListener('DOMNodeRemovedFromDocument', () => observer.disconnect(), { once: true });

@@ -283,6 +283,31 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await page.keyboard.press('Escape');
   await page.waitForTimeout(150);
 
+  // 2.5) 操作条让位：**不等式判据**（不看截图）——滚到底时最后一段的底边不得越过操作条顶边。
+  // 「最后一段」用 `[data-ds-section]` 而不取任意后代：toast / 通知会干扰。
+  await dataPanel.evaluate((panel) => {
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;
+  });
+  await page.waitForTimeout(120);
+  const gutter = await dataPanel.evaluate((panel) => {
+    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const sections = [...(content?.querySelectorAll('[data-ds-section]') ?? [])];
+    const last = sections[sections.length - 1];
+    const bar = content?.querySelector('.designer-dataset-actions');
+    return {
+      lastBottom: Math.round(last?.getBoundingClientRect().bottom ?? -1),
+      barTop: Math.round(bar?.getBoundingClientRect().top ?? -1),
+      paddingBottom: content === null ? null : getComputedStyle(content).paddingBottom,
+      barHeight: Math.round(bar?.getBoundingClientRect().height ?? -1),
+    };
+  });
+  if (gutter.lastBottom < 0 || gutter.barTop < 0 || gutter.lastBottom > gutter.barTop) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_ACTION_BAR_OVERLAP_FAILED:${JSON.stringify(gutter)}`,
+    );
+  }
+
   // 3) 宿主连接：**检查器里三通道全 ready 时不出现**（PRD §6.2：通道正常时是噪声），
   //    工作台才恒常驻并承担诊断。这条是反向判据，与下面工作台的正向判据成对存在——
   //    只断一边就会允许「把 host-link 又塞回检查器」或「工作台把诊断列删了」。
