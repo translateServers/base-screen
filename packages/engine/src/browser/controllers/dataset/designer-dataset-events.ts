@@ -18,8 +18,8 @@ import {
 import { setDatasetPreviewTab } from './designer-dataset-preview-controller.js';
 import {
   isDatasetWorkbenchStep,
-  patchDatasetSections,
   retryDatasetLink,
+  syncDatasetSurface,
 } from './designer-dataset-surface-controller.js';
 import {
   handleStaticChange,
@@ -77,7 +77,7 @@ export function handleDatasetClick(
     const roleId = bindingTrigger.dataset.datasetBindingTrigger ?? null;
     context.state.bindingOpenRoleId = context.state.bindingOpenRoleId === roleId ? null : roleId;
     // 弹层就在配置段内部：只换这一段，并把焦点交回同一个角色的新触发器。
-    patchDatasetSections(context, ['config'], () =>
+    syncDatasetSurface(context, () =>
       restoreDatasetControlFocus(
         context,
         roleId === null
@@ -96,7 +96,7 @@ export function handleDatasetClick(
     const insideMenu = target.closest('[data-dataset-binding-role]') !== null;
     if (!insideMenu) {
       context.state.bindingOpenRoleId = null;
-      patchDatasetSections(context, ['config']);
+      syncDatasetSurface(context);
     }
   }
   const bindingAction = target.closest<HTMLButtonElement>('[data-dataset-binding-role-action]');
@@ -122,7 +122,7 @@ export function handleDatasetClick(
     context.state.authoring = { ...context.state.authoring, editorMode };
     if (editorMode === 'code') context.callbacks.requestAuthoringAction?.('open-code-editor');
     // 编辑器模式只改变高级设置段自身的选择态。
-    patchDatasetSections(context, ['authoring']);
+    syncDatasetSurface(context);
     return true;
   }
   const authoringAction = target.closest<HTMLButtonElement>('[data-dataset-authoring-action]')
@@ -295,7 +295,7 @@ export function handleDatasetKeyDown(
   if (event.key === 'Escape' && context.state.bindingOpenRoleId !== null) {
     event.preventDefault();
     context.state.bindingOpenRoleId = null;
-    patchDatasetSections(context, ['config']);
+    syncDatasetSurface(context);
     return true;
   }
   if (event.key === 'Backspace') {

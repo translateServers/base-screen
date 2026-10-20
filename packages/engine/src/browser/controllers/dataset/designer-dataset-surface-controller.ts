@@ -1,6 +1,10 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import {
+  stampDataSectionKeys,
+  syncDatasetSections,
+} from '../../dom/dataset/designer-data-section-diff.js';
+import {
   applyDesignerDataState,
   type DesignerDataStateInput,
   deriveDesignerDataState,
@@ -12,10 +16,6 @@ import {
   renderDesignerDataSourcePanel,
   renderDesignerDatasetWorkbench,
 } from '../../dom/dataset/designer-dataset-dom.js';
-import {
-  createDatasetSection,
-  type DesignerDataSectionKey,
-} from '../../dom/dataset/designer-dataset-sections.js';
 import type { DesignerHostLinkView } from '../../dom/dataset/designer-dataset-types.js';
 import { renderDesignerDescriptorZone } from '../../dom/descriptor/designer-descriptor-dom.js';
 import { designerDataSourceModes } from './designer-data-source-authoring.js';
@@ -52,6 +52,10 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
     getDatasetFields: () => getFocusedDatasetFields(context),
   });
   renderDataWorkbench(context, options);
+  // 首次渲染补内容键 + 可聚焦标记：否则第一次 patch 会把整批段判成「内容变化」重建。
+  stampDataSectionKeys(panel, options);
+  const workbenchHost = context.callbacks.getWorkbenchHost?.();
+  if (workbenchHost !== undefined) stampDataSectionKeys(workbenchHost, options);
   context.dataFlowScrollSync.bind(panel);
   // 七态派生：面板任何时刻只有一个主状态（本轮只写 data 属性，视觉留给下一轮）。
   applyDesignerDataState(panel, deriveDesignerDataState(dataStateInput(context)));
@@ -124,37 +128,22 @@ function isEmptyPreview(preview: DesignerDatasetControllerState['preview']): boo
 }
 
 /**
- * 只重画指定 section。
+ * 按段集合 diff 同步面板（取代原先的「按 key 立即替换」）。
  *
- * 参数输入、字段绑定、预览页签切换、刷新策略这类「同一段内的状态变化」只换这一段，
- * 段外的搜索框、目录列表、已展开的弹层保持节点身份（焦点、光标、滚动都不动）。
- * 段在哪个挂载点存在就换哪个：内联面板与全屏工作台共用同一批 section 标记。
- *
- * 段不存在于任何挂载点时退回整块重绘——那说明结构已经变了，单段替换表达不了。
+ * 调用点不再决定「换哪几段」：它们把最新模型交出来，由 `sectionContentKey` 判断哪些段
+ * 真的变了。内容键没变的段**完全不碰**，因此输入框节点身份、光标、IME 组合态都保住。
  */
-export function patchDatasetSections(
+export function syncDatasetSurface(
   context: DesignerDatasetControllerContext,
-  sections: readonly DesignerDataSectionKey[],
   restoreFocus?: () => void,
 ): void {
   const panel = context.state.panel;
   if (panel === undefined) return;
   const options = createDatasetPanelOptions(context, panel);
-  let patched = 0;
-  for (const root of [panel, context.callbacks.getWorkbenchHost?.()]) {
+  const workbenchHost = context.callbacks.getWorkbenchHost?.();
+  for (const root of [panel, workbenchHost]) {
     if (root === undefined) continue;
-    for (const key of sections) {
-      const current = root.querySelector<HTMLElement>(`[data-ds-section="${key}"]`);
-      if (current === null) continue;
-      const next = createDatasetSection(key, options);
-      if (next === undefined) continue;
-      current.replaceWith(next);
-      patched += 1;
-    }
-  }
-  if (patched === 0) {
-    context.renderSurface();
-    return;
+    syncDatasetSections(root, options);
   }
   restoreFocus?.();
 }
@@ -175,8 +164,8 @@ export function updateDatasetCatalogResults(context: DesignerDatasetControllerCo
       results.replaceWith(renderDatasetCatalogResults(options));
     }
   }
-  // 目录请求同时决定宿主连接段的状态灯，两段一起就地更新。
-  patchDatasetSections(context, ['host-link']);
+  // 目录请求同时决定宿主连接段的状态灯：交回模型让 diff 决定（通常只有 host-link 变）。
+  syncDatasetSurface(context);
   // 结果区不在屏上（目录收起、看的是参数或预览）时无处可画：
   // 控制器已持有最新条目，下一次结构性渲染自会读到，不做整块重绘。
 }
@@ -185,7 +174,7 @@ export function updateDatasetCatalogResults(context: DesignerDatasetControllerCo
 export function retryDatasetLink(context: DesignerDatasetControllerContext): void {
   context.cancelPreview();
   context.state.preview = emptyDatasetPreview(context.state.preview.open);
-  patchDatasetSections(context, ['preview']);
+  syncDatasetSurface(context);
   context.catalogController.retry();
 }
 

@@ -19,7 +19,7 @@ import {
   createDatasetAuthoringView,
   emptyDatasetPreview,
 } from './designer-dataset-controller-context.js';
-import { patchDatasetSections } from './designer-dataset-surface-controller.js';
+import { syncDatasetSurface } from './designer-dataset-surface-controller.js';
 
 export function setSourceMode(
   context: DesignerDatasetControllerContext,
@@ -330,7 +330,7 @@ export function updateDatasetBindingSelect(
 
 export function markDatasetDraftChanged(
   context: DesignerDatasetControllerContext,
-  sections: readonly DesignerDataSectionKey[] = ['config', 'preview'],
+  _sections: readonly DesignerDataSectionKey[] = ['config', 'preview'],
   restoreFocus?: () => void,
 ): void {
   context.state.draftDirty = isDatasetDraftDirty(context);
@@ -340,7 +340,7 @@ export function markDatasetDraftChanged(
     ...emptyDatasetPreview(context.state.preview.open),
     tab: context.state.preview.tab,
   };
-  patchDatasetSections(context, sections, restoreFocus);
+  syncDatasetSurface(context, restoreFocus);
 }
 
 /**
