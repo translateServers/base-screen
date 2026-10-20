@@ -127,7 +127,14 @@ export function renderDatasetAuthoring(
               section: 'authoring',
               group: 'refresh',
               title: DESIGNER_UI_TEXT.data.groups.refresh,
-              summary: refreshPolicyText(options),
+              // 组头是纯文本：`<summary>` 里塞按钮会被 toggle 抢走 click（无效交互），
+              // 而收起态的摘要如果只写「手动」，读起来像"这里是可改的设置项"。
+              // 用「手动 · 在工作台修改」把"只读、要改去别处"说清楚，真正的按钮留在组内。
+              summary:
+                options.surface === 'inspector'
+                  ? `${refreshPolicyText(options)} \u00b7 ${DESIGNER_UI_TEXT.data.groups.editInWorkbench}`
+                  : refreshPolicyText(options),
+              readonlyHint: options.surface === 'inspector',
               defaultOpen: false,
               overrides: options.groupOpenOverrides ?? new Map<string, boolean>(),
               onToggle: options.onToggleGroup,

@@ -200,13 +200,18 @@
   gap: var(--designer-space-4);
 }
 
+/*
+ * 视觉层次：组头是这一屏的骨架，卡片只是组内的一块内容。
+ * 之前卡片的边框比组头（只靠一条细线分隔）更重，视觉重心落在卡上、组反而看不出来。
+ * 这里把卡片降成"可选容器"：弱边框 + 无底色。
+ */
 .designer-dataset-summary {
   display: grid;
   gap: var(--designer-space-3);
-  padding: var(--designer-space-3);
-  border: 1px solid var(--designer-border-default);
-  border-radius: var(--designer-radius-control);
-  background: var(--designer-surface-raised);
+  padding: var(--designer-space-2) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
 }
 
 .designer-dataset-summary-header {
@@ -256,6 +261,12 @@
  */
 .designer-data-group {
   border-top: 1px solid var(--designer-border-default);
+}
+
+/* 组头是骨架：标题吃主色 + 半粗，摘要退到次要色；两者都比组内卡片更"亮"。 */
+.designer-data-group-title {
+  color: var(--designer-text-primary);
+  font-weight: 600;
 }
 
 /* host-link 段紧跟 source 段：视觉合组只在这里做，不许改 DOM 结构。 */
@@ -579,6 +590,15 @@
 
 /* 底部操作条：sticky 但不抢注意力——无大阴影、按钮 auto 宽。
    侧栏里的主操作不该用页面级 CTA 档（全宽反色），档位由 `[data-variant="apply"]` 单独给。 */
+/*
+ * 操作条是 sticky，会盖住滚动区最后一行（"请求参数"的最后一个输入框被切在边缘）。
+ * 让位不能靠给操作条加背景色——那只是把遮住这件事藏起来；正确做法是让**内容区**预留
+ * 出操作条的高度，滚到底时最后一行仍然完整可点。
+ */
+.designer-datav-data-flow-content:has(> .designer-dataset-actions) {
+  padding-bottom: calc(var(--designer-control-height) + var(--designer-space-4) * 2);
+}
+
 .designer-dataset-actions {
   position: sticky;
   bottom: 0;

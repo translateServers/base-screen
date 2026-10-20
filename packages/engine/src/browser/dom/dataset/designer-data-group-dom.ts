@@ -39,6 +39,8 @@ export interface DesignerDataGroupOptions {
    * 且没有任何单测会红。
    */
   readonly onToggle: ((section: string, group: string, open: boolean) => void) | undefined;
+  /** 只读分组的标记：收起态也要能看出「这里改不了、要去别处」。 */
+  readonly readonlyHint?: boolean;
 }
 
 /** 覆盖表键：段与组共同定位，避免两个段里同名的组互相串味。 */
@@ -68,6 +70,7 @@ export function createDataGroup(
   details.className = 'designer-data-group';
   details.dataset.detailsGroup = options.group;
   details.dataset.dsGroupSection = options.section;
+  if (options.readonlyHint === true) details.dataset.readonlyHint = 'true';
   const resolved = resolveGroupOpen(
     options.overrides,
     options.section,
