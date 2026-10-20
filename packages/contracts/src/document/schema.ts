@@ -8,12 +8,18 @@ import {
   MAX_BLUEPRINT_LAYOUT_NODES,
   MAX_BLUEPRINT_RULES,
   MAX_COMPONENTS,
+  MAX_DATA_SOURCE_NAME_CODE_POINTS,
+  MAX_DATA_SOURCE_PARAMS,
+  MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
+  MAX_DATA_SOURCES,
   MAX_DESCRIPTION_CODE_POINTS,
   MAX_STYLE_RULE_ID_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENTS,
   MAX_STYLE_RULES_PER_COMPONENT,
+  MAX_VALUE_REF_PATH_SEGMENTS,
   MAX_VARIABLES,
+  MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
 } from './limits.js';
 
 export const COMPONENT_ID_PATTERN = '^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$';
@@ -21,9 +27,13 @@ export const MATERIAL_TYPE_PATTERN = SCREEN_MATERIAL_TYPE_PATTERN;
 export const VARIABLE_NAME_PATTERN = '^[A-Za-z_][A-Za-z0-9_]{0,127}$';
 export const BLUEPRINT_PATH_SEGMENT_PATTERN =
   '^(?!(?:__proto__|prototype|constructor)$)[A-Za-z_][A-Za-z0-9_]{0,127}$';
+/** 取值引用 `path` 段与 Blueprint 表达式路径段同一词法（同样排除原型链键）。 */
+export const VALUE_REF_PATH_SEGMENT_PATTERN = BLUEPRINT_PATH_SEGMENT_PATTERN;
 
 const COMPONENT_ID_REGEXP = new RegExp(COMPONENT_ID_PATTERN);
 const VARIABLE_NAME_REGEXP = new RegExp(VARIABLE_NAME_PATTERN);
+const VALUE_REF_PATH_SEGMENT_REGEXP = new RegExp(VALUE_REF_PATH_SEGMENT_PATTERN);
+const CONTROL_CHARACTER_REGEXP = /[\u0000-\u001f\u007f-\u009f]/u;
 
 /** 组件 id 词法的唯一谓词：文档契约中 `ComponentId` 一律经它判定。 */
 export function isScreenComponentId(value: unknown): value is string {
@@ -137,8 +147,96 @@ const styleRuleSchema = z.strictObject({
   style: z.record(z.string(), z.any()),
 });
 
-const dataBindingSchema = z.strictObject({
+export const dataBindingSchema = z.strictObject({
   fields: z.record(z.string().min(1).max(128), z.array(z.string().min(1).max(256)).min(1).max(256)),
+});
+
+const identifierCodeSchema = z
+  .string()
+  .min(1)
+  .max(256)
+  .refine((value) => !CONTROL_CHARACTER_REGEXP.test(value), {
+    message: 'Identifier must not contain control characters.',
+  });
+
+/** 取值引用的三个 kind：判别键固定为 `kind`，每个分支字段白名单独立。 */
+export const valueRefSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('inline'), value: z.any() }),
+  z.strictObject({
+    kind: z.literal('variable'),
+    variableId: z.string().regex(COMPONENT_ID_REGEXP),
+  }),
+  z.strictObject({
+    kind: z.literal('data-source-field'),
+    dataSourceId: z.string().regex(COMPONENT_ID_REGEXP),
+    path: z.array(z.string().regex(VALUE_REF_PATH_SEGMENT_REGEXP)).max(MAX_VALUE_REF_PATH_SEGMENTS),
+  }),
+]);
+
+/** 数据源来源四分支；`sourceId` 的命名空间由宿主所有，文档不解释其含义。 */
+export const dataSourceSourceSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('dataset'), datasetId: identifierCodeSchema }),
+  z.strictObject({
+    kind: z.literal('host-resource'),
+    resourceType: z.string().regex(VARIABLE_NAME_REGEXP),
+    resourceId: identifierCodeSchema,
+  }),
+  z.strictObject({ kind: z.literal('url-query'), sourceId: identifierCodeSchema }),
+  z.strictObject({ kind: z.literal('host-catalog'), sourceId: identifierCodeSchema }),
+]);
+
+/**
+ * 刷新策略。交叉约束（`auto` 必带 `intervalSeconds`，其余模式禁止带）由
+ * `superRefine` 表达，JSON Schema 侧的等价 `allOf` 补丁见 `json-schema.ts`。
+ */
+export const updatePolicySchema = z
+  .strictObject({
+    mode: z.enum(['once', 'manual', 'auto']),
+    intervalSeconds: z
+      .number()
+      .int()
+      .min(MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
+      .max(MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS)
+      .optional(),
+  })
+  .superRefine((policy, context) => {
+    if (policy.mode === 'auto' && policy.intervalSeconds === undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Auto update policy requires intervalSeconds.',
+        path: ['intervalSeconds'],
+      });
+    }
+    if (policy.mode !== 'auto' && policy.intervalSeconds !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Only auto update policy may define intervalSeconds.',
+        path: ['intervalSeconds'],
+      });
+    }
+  });
+
+export const dataSourceSchema = z.strictObject({
+  id: z.string().regex(COMPONENT_ID_REGEXP),
+  name: z.string().min(1).max(MAX_DATA_SOURCE_NAME_CODE_POINTS),
+  source: dataSourceSourceSchema,
+  params: z
+    .record(z.string().min(1).max(128), valueRefSchema)
+    .refine((params) => Object.keys(params).length <= MAX_DATA_SOURCE_PARAMS, {
+      message: `A data source may define at most ${MAX_DATA_SOURCE_PARAMS} params.`,
+    }),
+  updatePolicy: updatePolicySchema.optional(),
+  processorId: z.string().min(1).max(256).optional(),
+  readOnly: z.boolean().optional(),
+});
+
+export const variableRecordSchema = z.strictObject({
+  id: z.string().regex(COMPONENT_ID_REGEXP),
+  name: z.string().regex(VARIABLE_NAME_REGEXP),
+  description: variableDescriptionSchema.optional(),
+  initialValue: z.any(),
+  value: valueRefSchema,
+  controlled: z.boolean(),
 });
 
 export const staticDataSourceSchema = z.strictObject({
@@ -202,6 +300,8 @@ export const componentSchema = z.strictObject({
     variableDataSourceSchema,
     z.null(),
   ]),
+  dataValue: z.union([valueRefSchema, z.null()]).optional(),
+  dataBinding: z.union([dataBindingSchema, z.null()]).optional(),
 });
 
 export const staticVariableSchema = z.strictObject({
@@ -375,8 +475,16 @@ export const blueprintSchema = z.strictObject({
 export const documentSchema = z.strictObject({
   canvas: canvasSchema,
   components: z.array(componentSchema).max(MAX_COMPONENTS),
+  dataSources: z.array(dataSourceSchema).max(MAX_DATA_SOURCES).optional(),
   variables: z
-    .array(z.union([staticVariableSchema, dataSourceVariableSchema, urlQueryVariableSchema]))
+    .array(
+      z.union([
+        staticVariableSchema,
+        dataSourceVariableSchema,
+        urlQueryVariableSchema,
+        variableRecordSchema,
+      ]),
+    )
     .max(MAX_VARIABLES),
   blueprint: blueprintSchema,
 });

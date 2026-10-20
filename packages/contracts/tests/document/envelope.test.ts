@@ -10,6 +10,7 @@ function envelope(overrides: Record<string, unknown> = {}): Record<string, unkno
     document: {
       canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
       components: [],
+      dataSources: [],
       variables: [],
       blueprint: { rules: [] },
     },

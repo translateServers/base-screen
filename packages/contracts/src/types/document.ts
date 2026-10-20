@@ -90,6 +90,58 @@ export type ScreenComponentDataSource =
   | ScreenHostResourceDataSource
   | ScreenVariableDataSource;
 
+/**
+ * 取值引用：全文档唯一的「接值」表述，JSON-safe。
+ *
+ * - `inline`：常量值，已由解析器校验为 canonical JSON。
+ * - `variable`：读一个变量的当前值；变量自身的 `value` 不得为 `variable`（禁止别名链）。
+ * - `data-source-field`：读一个数据源实例结果的字段投影；`path` 为空表示取整个结果。
+ */
+export type ScreenValueRef =
+  | { readonly kind: 'inline'; readonly value: ScreenJsonValue }
+  | { readonly kind: 'variable'; readonly variableId: string }
+  | {
+      readonly kind: 'data-source-field';
+      readonly dataSourceId: string;
+      readonly path: readonly string[];
+    };
+
+export type ScreenValueRefKind = ScreenValueRef['kind'];
+
+/** 数据源来源：四选一，宿主按 kind 分派到对应端口。 */
+export type ScreenDataSourceSource =
+  | { readonly kind: 'dataset'; readonly datasetId: string }
+  | {
+      readonly kind: 'host-resource';
+      readonly resourceType: string;
+      readonly resourceId: string;
+    }
+  | { readonly kind: 'url-query'; readonly sourceId: string }
+  | { readonly kind: 'host-catalog'; readonly sourceId: string };
+
+export type ScreenDataSourceSourceKind = ScreenDataSourceSource['kind'];
+
+export type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto';
+
+/** 刷新策略：`auto` 必须带 `intervalSeconds`，其余模式禁止带。 */
+export interface ScreenUpdatePolicy {
+  readonly mode: ScreenUpdatePolicyMode;
+  /** 仅 `mode: 'auto'` 允许出现；1..86400 的整数（秒）。 */
+  readonly intervalSeconds?: number;
+}
+
+/** 文档级命名取数管道：请求身份与刷新策略的唯一落点。JSON-safe。 */
+export interface ScreenDataSource {
+  readonly id: string;
+  readonly name: string;
+  readonly source: ScreenDataSourceSource;
+  readonly params: Readonly<Record<string, ScreenValueRef>>;
+  readonly updatePolicy?: ScreenUpdatePolicy;
+  readonly processorId?: string;
+  /** 宿主在文档写入路径（导入/生成）中声明的只读；Engine 只读不写。 */
+  readonly readOnly?: boolean;
+}
+
 export type ScreenComponentStyleRuleOperator =
   | 'eq'
   | 'neq'
@@ -125,7 +177,12 @@ export interface ScreenComponentNode {
   readonly props: ScreenJsonObject;
   readonly style: ScreenJsonObject;
   readonly styleRules?: readonly ScreenComponentStyleRule[];
+  /** 旧形态：组件自带的数据源配置。与 `dataValue` 互斥，解析期 fail-closed。 */
   readonly dataSource: ScreenComponentDataSource | null;
+  /** 取值引用；`null` = 不取值。与 `dataSource` 同一位置只能有一个写入口。 */
+  readonly dataValue?: ScreenValueRef | null;
+  /** 仅当 `dataValue.kind === 'data-source-field'` 且物料声明数据角色时有意义。 */
+  readonly dataBinding?: ScreenDataBinding | null;
 }
 
 export interface ScreenVariableBase {
@@ -161,6 +218,26 @@ export interface ScreenUrlQueryVariable extends ScreenVariableBase {
 export type ScreenDynamicVariable = ScreenDataSourceVariable | ScreenUrlQueryVariable;
 
 export type ScreenVariable = ScreenStaticVariable | ScreenDynamicVariable;
+
+/**
+ * 变量的单形态：值是取值引用，`controlled` 声明是否接受外部写入。
+ *
+ * 变量值只允许 `inline` 与 `data-source-field` —— 变量之间不能互相别名。
+ */
+export interface ScreenVariableRecord {
+  readonly id: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly initialValue: ScreenJsonValue;
+  readonly value: ScreenValueRef;
+  readonly controlled: boolean;
+}
+
+/**
+ * 文档 `variables` 的元素：过渡容器，同时容纳旧三形态与单形态记录。
+ * 消费者统一经 `readScreenVariableRecord` 读，不直接判别成员形态。
+ */
+export type ScreenVariableEntry = ScreenVariable | ScreenVariableRecord;
 
 export interface ScreenBlueprintMaterialEventTrigger {
   readonly type: 'material-event';
@@ -286,6 +363,8 @@ export interface ScreenBlueprint {
 export interface ScreenDocument {
   readonly canvas: ScreenCanvas;
   readonly components: readonly ScreenComponentNode[];
-  readonly variables: readonly ScreenVariable[];
+  /** 文档级数据源实例；缺省视为空集（解析器会补 `[]`）。 */
+  readonly dataSources?: readonly ScreenDataSource[];
+  readonly variables: readonly ScreenVariableEntry[];
   readonly blueprint: ScreenBlueprint;
 }

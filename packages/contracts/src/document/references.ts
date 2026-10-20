@@ -3,7 +3,12 @@ import {
   type DiagnosticPhase,
   type DiagnosticSegment,
 } from '../diagnostics/collector.js';
-import type { ScreenBlueprintValueExpression, ScreenDocument } from '../types/document.js';
+import type {
+  ScreenBlueprintValueExpression,
+  ScreenDocument,
+  ScreenValueRef,
+} from '../types/document.js';
+import { diagnoseDataSourceCycles } from './data-source-order.js';
 
 export function validateReferences(
   document: ScreenDocument,
@@ -79,6 +84,25 @@ export function validateReferences(
       names.add(variable.name);
     }
   });
+  const dataSourceIds = new Set<string>();
+  (document.dataSources ?? []).forEach((instance, index) => {
+    if (dataSourceIds.has(instance.id)) {
+      collector.add(
+        'DATA_SOURCE_ID_DUPLICATE',
+        at(['dataSources', index, 'id']),
+        phase,
+        `Duplicate data source id "${truncateKey(instance.id)}".`,
+      );
+      clean = false;
+    } else {
+      dataSourceIds.add(instance.id);
+    }
+  });
+  if (
+    !validateDataSourceParamReferences(document, variableIds, dataSourceIds, at, collector, phase)
+  ) {
+    clean = false;
+  }
   document.components.forEach((component, componentIndex) => {
     const source = component.dataSource;
     if (source?.type === 'variable' && !variableIds.has(source.variableId)) {
@@ -101,6 +125,44 @@ export function validateReferences(
         );
         clean = false;
       }
+    }
+  });
+  for (const diagnostic of diagnoseDataSourceCycles(document)) {
+    collector.add(diagnostic.code, at([...diagnostic.path]), phase, diagnostic.message);
+    clean = false;
+  }
+  document.components.forEach((component, componentIndex) => {
+    if (component.dataValue === undefined || component.dataValue === null) return;
+    const valueBase: DiagnosticSegment[] = ['components', componentIndex, 'dataValue'];
+    if (
+      !validateValueRefTarget(
+        component.dataValue,
+        valueBase,
+        variableIds,
+        dataSourceIds,
+        at,
+        collector,
+        phase,
+      )
+    ) {
+      clean = false;
+    }
+  });
+  document.variables.forEach((entry, index) => {
+    if ('type' in entry) return;
+    const valueBase: DiagnosticSegment[] = ['variables', index, 'value'];
+    if (
+      !validateValueRefTarget(
+        entry.value,
+        valueBase,
+        variableIds,
+        dataSourceIds,
+        at,
+        collector,
+        phase,
+      )
+    ) {
+      clean = false;
     }
   });
   const ruleIds = new Set<string>();
@@ -208,6 +270,94 @@ export function validateReferences(
     });
   });
   return clean;
+}
+
+/**
+ * 数据源实例参数的目标判定：缺失目标、自引用。
+ *
+ * 自引用先判，避免它同时被当成「长度为 1 的环」重复报告；跨实例成环由
+ * `diagnoseDataSourceCycles` 单独产出，路径口径见该函数的注释。
+ */
+function validateDataSourceParamReferences(
+  document: ScreenDocument,
+  variableIds: ReadonlySet<string>,
+  dataSourceIds: ReadonlySet<string>,
+  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  let clean = true;
+  (document.dataSources ?? []).forEach((instance, index) => {
+    for (const [parameterName, parameter] of Object.entries(instance.params)) {
+      if (parameter.kind === 'variable') {
+        if (!variableIds.has(parameter.variableId)) {
+          collector.add(
+            'VALUE_REF_TARGET_MISSING',
+            at(['dataSources', index, 'params', parameterName, 'variableId']),
+            phase,
+            `Data source parameter references unknown variable id "${truncateKey(parameter.variableId)}".`,
+          );
+          clean = false;
+        }
+        continue;
+      }
+      if (parameter.kind !== 'data-source-field') continue;
+      if (parameter.dataSourceId === instance.id) {
+        collector.add(
+          'DATA_SOURCE_PARAM_SELF_REFERENCE',
+          at(['dataSources', index, 'params', parameterName, 'dataSourceId']),
+          phase,
+          'Data source parameter must not reference its own data source.',
+        );
+        clean = false;
+        continue;
+      }
+      if (!dataSourceIds.has(parameter.dataSourceId)) {
+        collector.add(
+          'VALUE_REF_TARGET_MISSING',
+          at(['dataSources', index, 'params', parameterName, 'dataSourceId']),
+          phase,
+          `Data source parameter references unknown data source id "${truncateKey(parameter.dataSourceId)}".`,
+        );
+        clean = false;
+      }
+    }
+  });
+  return clean;
+}
+
+/** 取值引用的目标存在性判定（形状已由 `validateValueRef` 保证）。 */
+function validateValueRefTarget(
+  ref: ScreenValueRef,
+  base: DiagnosticSegment[],
+  variableIds: ReadonlySet<string>,
+  dataSourceIds: ReadonlySet<string>,
+  at: (path: DiagnosticSegment[]) => DiagnosticSegment[],
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  switch (ref.kind) {
+    case 'inline':
+      return true;
+    case 'variable':
+      if (variableIds.has(ref.variableId)) return true;
+      collector.add(
+        'VALUE_REF_TARGET_MISSING',
+        at([...base, 'variableId']),
+        phase,
+        `Value reference points at unknown variable id "${truncateKey(ref.variableId)}".`,
+      );
+      return false;
+    default:
+      if (dataSourceIds.has(ref.dataSourceId)) return true;
+      collector.add(
+        'VALUE_REF_TARGET_MISSING',
+        at([...base, 'dataSourceId']),
+        phase,
+        `Value reference points at unknown data source id "${truncateKey(ref.dataSourceId)}".`,
+      );
+      return false;
+  }
 }
 
 function validateExpressionVariables(

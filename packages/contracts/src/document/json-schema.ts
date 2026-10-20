@@ -31,6 +31,17 @@ export function generateScreenDocumentJsonSchema(): ScreenJsonObject {
       else: { required: ['value'] },
     },
   ];
+  // 数据源实例的刷新策略交叉约束：auto 必须带 intervalSeconds，其余模式禁止带。
+  const updatePolicy = getObject(
+    getObject(getObject(getObject(properties.dataSources).items).properties).updatePolicy,
+  );
+  updatePolicy.allOf = [
+    {
+      if: { properties: { mode: { const: 'auto' } }, required: ['mode'] },
+      then: { required: ['intervalSeconds'] },
+      else: { not: { required: ['intervalSeconds'] } },
+    },
+  ];
   const blueprint = getObject(properties.blueprint);
   const rules = getObject(getObject(blueprint.properties).rules);
   const rule = getObject(rules.items);

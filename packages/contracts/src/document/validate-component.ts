@@ -12,13 +12,14 @@ import {
   MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
   MAX_STYLE_RULE_VALUE_BYTES,
 } from './limits.js';
-import { componentSchema } from './schema.js';
+import { componentSchema, dataBindingSchema } from './schema.js';
 import { checkStrictObjectKeys, isJsonObject } from './strict-object.js';
 import {
   addZodIssues,
   componentFieldCode,
   type DocumentDiagnosticPath,
 } from './validate-support.js';
+import { ALL_VALUE_REF_KINDS, validateValueRef } from './validate-value-ref.js';
 
 const COMPONENT_FIELDS = new Set([
   'id',
@@ -34,7 +35,11 @@ const COMPONENT_FIELDS = new Set([
   'style',
   'styleRules',
   'dataSource',
+  'dataValue',
+  'dataBinding',
 ]);
+/** 组件位上经手工校验的字段：zod 只负责其余字段，避免同一字段两套口径。 */
+const MANUALLY_VALIDATED_COMPONENT_FIELDS = new Set(['dataValue', 'dataBinding']);
 const POSITION_FIELDS = new Set(['x', 'y']);
 const SIZE_FIELDS = new Set(['width', 'height']);
 const STATUS_FIELDS = new Set(['locked', 'hidden']);
@@ -81,15 +86,47 @@ export function validateComponent(
   ) {
     return false;
   }
+  if (
+    'dataValue' in component &&
+    component.dataSource !== null &&
+    component.dataSource !== undefined
+  ) {
+    collector.add(
+      'DOCUMENT_UNKNOWN_FIELD',
+      at([...baseSegments, 'dataValue']),
+      phase,
+      'Component must not declare dataSource together with dataValue.',
+    );
+    return false;
+  }
   if (!validateComponentStrictNestedKeys(component, baseSegments, at, collector, phase)) {
     return false;
   }
+  // 手工校验的字段先跑：zod 的对应 issue 被过滤掉，若反过来先跑 zod 就可能出现「拒绝但无诊断」。
+  let clean = true;
+  if (!validateComponentDataValue(component.dataValue, baseSegments, at, collector, phase)) {
+    clean = false;
+  }
+  if (!validateComponentDataBinding(component.dataBinding, baseSegments, at, collector, phase)) {
+    clean = false;
+  }
   const result = componentSchema.safeParse(component);
   if (!result.success) {
-    addZodIssues(result.error.issues, baseSegments, componentFieldCode, at, collector, phase);
+    addZodIssues(
+      result.error.issues.filter(
+        (issue) => !MANUALLY_VALIDATED_COMPONENT_FIELDS.has(String(issue.path[0])),
+      ),
+      baseSegments,
+      componentFieldCode,
+      at,
+      collector,
+      phase,
+    );
     return false;
   }
-  let clean = validateComponentName(component.name as string, baseSegments, at, collector, phase);
+  if (!validateComponentName(component.name as string, baseSegments, at, collector, phase)) {
+    clean = false;
+  }
   if (!validateComponentStyleRules(component.styleRules, baseSegments, at, collector, phase)) {
     clean = false;
   }
@@ -242,6 +279,75 @@ function validateDataSourceStrictKeys(
       phase,
     )
   ) {
+    return false;
+  }
+  return true;
+}
+
+function validateComponentDataValue(
+  dataValue: unknown,
+  base: DiagnosticSegment[],
+  at: DocumentDiagnosticPath,
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  if (dataValue === undefined || dataValue === null) return true;
+  const valueBase = [...base, 'dataValue'];
+  if (!validateValueRef(dataValue, valueBase, at, collector, phase, ALL_VALUE_REF_KINDS)) {
+    return false;
+  }
+  if (
+    isJsonObject(dataValue) &&
+    dataValue.kind === 'inline' &&
+    canonicalByteLength(dataValue.value as ScreenJsonValue) > MAX_DATA_SOURCE_VALUE_BYTES
+  ) {
+    collector.add(
+      'DOCUMENT_LIMIT_EXCEEDED',
+      at([...valueBase, 'value']),
+      phase,
+      `Static component value exceeds ${MAX_DATA_SOURCE_VALUE_BYTES} UTF-8 bytes.`,
+    );
+    return false;
+  }
+  return true;
+}
+
+function validateComponentDataBinding(
+  dataBinding: unknown,
+  base: DiagnosticSegment[],
+  at: DocumentDiagnosticPath,
+  collector: DiagnosticCollector,
+  phase: DiagnosticPhase,
+): boolean {
+  if (dataBinding === undefined || dataBinding === null) return true;
+  const bindingBase = [...base, 'dataBinding'];
+  if (!isJsonObject(dataBinding)) {
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at(bindingBase),
+      phase,
+      'Component dataBinding must be an object or null.',
+    );
+    return false;
+  }
+  if (
+    !checkStrictObjectKeys(
+      dataBinding,
+      HOST_RESOURCE_BINDING_FIELDS,
+      at(bindingBase),
+      collector,
+      phase,
+    )
+  ) {
+    return false;
+  }
+  if (!dataBindingSchema.safeParse(dataBinding).success) {
+    collector.add(
+      'DOCUMENT_FIELD_INVALID',
+      at([...bindingBase, 'fields']),
+      phase,
+      'Component dataBinding must map role names to non-empty field path arrays.',
+    );
     return false;
   }
   return true;

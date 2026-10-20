@@ -41,6 +41,7 @@ describe('SCREEN_DOCUMENT_JSON_SCHEMA', () => {
     expect(Object.keys(propertiesOf(schema))).toEqual([
       'canvas',
       'components',
+      'dataSources',
       'variables',
       'blueprint',
     ]);

@@ -34,15 +34,25 @@ export {
   SCREEN_BLUEPRINT_MATERIAL_EVENT_CAPABILITY,
   type ScreenBlueprintCapabilityId,
 } from './document/blueprint-capabilities.js';
+export {
+  diagnoseDataSourceCycles,
+  screenDataSourceOrder,
+} from './document/data-source-order.js';
 export { isScreenMaterialType } from './document/identity.js';
 export { isBoundedScreenImageUrl } from './document/image-url.js';
 export { SCREEN_DOCUMENT_JSON_SCHEMA } from './document/json-schema.js';
 export {
+  MAX_DATA_SOURCE_NAME_CODE_POINTS,
+  MAX_DATA_SOURCE_PARAMS,
+  MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
+  MAX_DATA_SOURCES,
   MAX_STYLE_RULE_ID_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENT_CODE_POINTS,
   MAX_STYLE_RULE_PATH_SEGMENTS,
   MAX_STYLE_RULE_VALUE_BYTES,
   MAX_STYLE_RULES_PER_COMPONENT,
+  MAX_VALUE_REF_PATH_SEGMENTS,
+  MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS,
 } from './document/limits.js';
 export {
   parseScreenDataSource,
@@ -51,9 +61,16 @@ export {
   type ScreenDataSourceParseOptions,
 } from './document/parse.js';
 export {
+  readScreenComponentDataBinding,
+  readScreenComponentValueRef,
+  readScreenDocumentDataSources,
+  readScreenVariableRecord,
+} from './document/read-data-value.js';
+export {
   COMPONENT_ID_PATTERN,
   isScreenComponentId,
   isScreenVariableName,
+  VALUE_REF_PATH_SEGMENT_PATTERN,
   VARIABLE_NAME_PATTERN,
 } from './document/schema.js';
 export {
@@ -62,6 +79,11 @@ export {
 } from './document/serialize.js';
 export { screenJsonEquals } from './json/equality.js';
 export { parseScreenJsonValue, type ScreenJsonParseOptions } from './json/parse.js';
+export {
+  migrateScreenDocument,
+  type ScreenMigrationDecision,
+  type ScreenMigrationResult,
+} from './migration/migrate-document.js';
 export type {
   ScreenAuthoringEditorContext,
   ScreenAuthoringEditorLimits,
@@ -141,6 +163,9 @@ export type {
   ScreenComponentStyleRuleCondition,
   ScreenComponentStyleRuleOperator,
   ScreenDataBinding,
+  ScreenDataSource,
+  ScreenDataSourceSource,
+  ScreenDataSourceSourceKind,
   ScreenDataSourceVariable,
   ScreenDatasetDataSource,
   ScreenDocument,
@@ -152,11 +177,17 @@ export type {
   ScreenSize,
   ScreenStaticDataSource,
   ScreenStaticVariable,
+  ScreenUpdatePolicy,
+  ScreenUpdatePolicyMode,
   ScreenUrlQueryVariable,
+  ScreenValueRef,
+  ScreenValueRefKind,
   ScreenVariable,
   ScreenVariableAutoUpdate,
   ScreenVariableBase,
   ScreenVariableDataSource,
+  ScreenVariableEntry,
+  ScreenVariableRecord,
 } from './types/document.js';
 export type { ScreenProjectEnvelope } from './types/envelope.js';
 export type {

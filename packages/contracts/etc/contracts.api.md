@@ -11,6 +11,9 @@ export function compareScreenDiagnostics(a: ScreenDiagnostic, b: ScreenDiagnosti
 export const COMPONENT_ID_PATTERN = "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$";
 
 // @public
+export function diagnoseDataSourceCycles(document: ScreenDocument): readonly ScreenDiagnostic[];
+
+// @public
 export function evaluateScreenDatasetParameters(definitions: readonly ScreenDatasetParameterDefinition[], input: unknown): ScreenParseResult<ScreenJsonObject>;
 
 // @public (undocumented)
@@ -53,6 +56,18 @@ export const MAX_AUTHORING_REQUEST_ID_LENGTH = 128;
 export const MAX_AUTHORING_SOURCE_BYTES: number;
 
 // @public (undocumented)
+export const MAX_DATA_SOURCE_NAME_CODE_POINTS = 256;
+
+// @public (undocumented)
+export const MAX_DATA_SOURCE_PARAMS = 64;
+
+// @public (undocumented)
+export const MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS = 86400;
+
+// @public (undocumented)
+export const MAX_DATA_SOURCES = 1000;
+
+// @public (undocumented)
 export const MAX_DATASET_BYTES: number;
 
 // @public (undocumented)
@@ -93,6 +108,15 @@ export const MAX_STYLE_RULE_VALUE_BYTES: number;
 
 // @public (undocumented)
 export const MAX_STYLE_RULES_PER_COMPONENT = 8;
+
+// @public (undocumented)
+export const MAX_VALUE_REF_PATH_SEGMENTS = 8;
+
+// @public
+export function migrateScreenDocument(input: unknown): ScreenMigrationResult;
+
+// @public (undocumented)
+export const MIN_DATA_SOURCE_UPDATE_INTERVAL_SECONDS = 1;
 
 // @public (undocumented)
 export interface NormalizedScreenMaterialError {
@@ -140,6 +164,18 @@ export function parseScreenProjectEnvelope(input: unknown): ScreenParseResult<Sc
 
 // @public (undocumented)
 export function parseScreenTabularDataset(input: unknown): ScreenParseResult<ScreenTabularDataset>;
+
+// @public
+export function readScreenComponentDataBinding(component: ScreenComponentNode): ScreenDataBinding | null;
+
+// @public
+export function readScreenComponentValueRef(component: ScreenComponentNode): ScreenValueRef | null;
+
+// @public
+export function readScreenDocumentDataSources(document: ScreenDocument): readonly ScreenDataSource[];
+
+// @public
+export function readScreenVariableRecord(entry: ScreenVariableEntry): ScreenVariableRecord;
 
 // @public (undocumented)
 export const SCREEN_AUTHORING_REQUEST_EVENT: 'base-screen-authoring-request';
@@ -497,8 +533,9 @@ export type ScreenComponentDataSource = ScreenStaticDataSource | ScreenDatasetDa
 
 // @public (undocumented)
 export interface ScreenComponentNode {
-    // (undocumented)
+    readonly dataBinding?: ScreenDataBinding | null;
     readonly dataSource: ScreenComponentDataSource | null;
+    readonly dataValue?: ScreenValueRef | null;
     // (undocumented)
     readonly id: string;
     // (undocumented)
@@ -703,10 +740,49 @@ export interface ScreenDatasetQueryRequest {
 // @public (undocumented)
 export type ScreenDatasetValueType = 'string' | 'number' | 'boolean' | 'date';
 
+// @public
+export interface ScreenDataSource {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly params: Readonly<Record<string, ScreenValueRef>>;
+    // (undocumented)
+    readonly processorId?: string;
+    readonly readOnly?: boolean;
+    // (undocumented)
+    readonly source: ScreenDataSourceSource;
+    // (undocumented)
+    readonly updatePolicy?: ScreenUpdatePolicy;
+}
+
+// @public
+export function screenDataSourceOrder(document: ScreenDocument): readonly string[];
+
 // @public (undocumented)
 export interface ScreenDataSourceParseOptions {
     readonly componentType?: string;
 }
+
+// @public
+export type ScreenDataSourceSource = {
+    readonly kind: 'dataset';
+    readonly datasetId: string;
+} | {
+    readonly kind: 'host-resource';
+    readonly resourceType: string;
+    readonly resourceId: string;
+} | {
+    readonly kind: 'url-query';
+    readonly sourceId: string;
+} | {
+    readonly kind: 'host-catalog';
+    readonly sourceId: string;
+};
+
+// @public (undocumented)
+export type ScreenDataSourceSourceKind = ScreenDataSourceSource['kind'];
 
 // @public (undocumented)
 export interface ScreenDataSourceVariable extends ScreenVariableBase {
@@ -777,7 +853,7 @@ export interface ScreenDiagnostic {
 }
 
 // @public (undocumented)
-export type ScreenDiagnosticCode = 'DOCUMENT_NOT_OBJECT' | 'DOCUMENT_UNKNOWN_FIELD' | 'DOCUMENT_FIELD_INVALID' | 'DOCUMENT_LIMIT_EXCEEDED' | 'JSON_VALUE_INVALID' | 'JSON_LIMIT_EXCEEDED' | 'JSON_NUMBER_NON_FINITE' | 'JSON_CYCLE' | 'JSON_PROTOTYPE_INVALID' | 'JSON_DANGEROUS_KEY' | 'COMPONENT_ID_DUPLICATE' | 'COMPONENT_PARENT_MISSING' | 'COMPONENT_PARENT_SELF' | 'COMPONENT_PARENT_CYCLE' | 'COMPONENT_TYPE_INVALID' | 'COMPONENT_GEOMETRY_INVALID' | 'VARIABLE_NAME_INVALID' | 'VARIABLE_NAME_DUPLICATE' | 'ENVELOPE_INVALID' | 'ENVELOPE_UNKNOWN_FIELD' | 'DIAGNOSTIC_LIMIT_REACHED' | 'CORE_COMMAND_INVALID' | 'CORE_COMMAND_TARGET_MISSING' | 'CORE_COMMAND_TARGET_LOCKED' | 'CORE_COMMAND_TARGET_HIDDEN' | 'CORE_COMMAND_PARENT_INVALID' | 'CORE_COMMAND_LIMIT_EXCEEDED' | 'CORE_GEOMETRY_INVALID' | 'CORE_INVARIANT_VIOLATION' | 'PLUGIN_CORE_MANIFEST_NOT_OBJECT' | 'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD' | 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' | 'PLUGIN_CORE_LIMIT_EXCEEDED' | 'PLUGIN_CORE_IDENTITY_INVALID' | 'PLUGIN_CORE_TAG_NAME_INVALID' | 'PLUGIN_CORE_IDENTITY_CONFLICT' | 'PLUGIN_CORE_DEPENDENCY_MISSING' | 'PLUGIN_CORE_DEPENDENCY_CYCLE' | 'PLUGIN_CORE_CAPABILITY_UNDECLARED' | 'PLUGIN_CORE_CAPABILITY_UNAUTHORIZED' | 'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE' | 'PLUGIN_CORE_CONTRIBUTION_DUPLICATE' | 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN' | 'PLUGIN_CORE_CONTRIBUTION_CONFLICT' | 'PLUGIN_CORE_EVENT_INVALID' | 'PLUGIN_CORE_EVENT_PAYLOAD_INVALID' | 'PLUGIN_CORE_COMMAND_UNAUTHORIZED' | 'PLUGIN_CORE_COMMAND_ARGUMENT_INVALID' | 'PLUGIN_CORE_COMMAND_RESULT_INVALID' | 'PLUGIN_CORE_SESSION_INVALID' | 'PLUGIN_CORE_LIFECYCLE_INVALID' | 'PLUGIN_CORE_RENDER_FAILED' | 'PLUGIN_CORE_DATA_CONTRACT_INVALID' | 'REMOTE_PLUGIN_PROTOCOL_INVALID' | 'REMOTE_PLUGIN_ORIGIN_INVALID' | 'REMOTE_PLUGIN_TIMEOUT' | 'REMOTE_PLUGIN_DISPOSED' | 'PROJECT_ADAPTER_INVALID' | 'PROJECT_UNAVAILABLE' | 'PROJECT_CONFLICT' | 'PROJECT_ABORTED' | 'PROJECT_DIRTY' | 'PROJECT_PUBLISH_UNAVAILABLE' | 'HOST_RESOURCE_ACCESS_DENIED' | 'HOST_RESOURCE_UNAVAILABLE' | 'HOST_RESOURCE_TIMEOUT' | 'HOST_RESOURCE_FAILED' | 'HOST_RESOURCE_INVALID' | 'HOST_DATASET_CATALOG_FAILED' | 'HOST_DATASET_DESCRIPTOR_INVALID' | 'HOST_DATASET_INVALID' | 'HOST_DATASET_PARAMETER_INVALID' | 'HOST_DATASET_BINDING_INVALID' | 'HOST_DATASET_ADAPTER_FAILED' | 'HOST_DATASET_UNAVAILABLE' | 'HOST_DATASET_VARIABLE_INVALID' | 'HOST_VARIABLE_CATALOG_FAILED' | 'HOST_VARIABLE_DESCRIPTOR_INVALID' | 'BLUEPRINT_CAPABILITY_UNAVAILABLE' | 'BLUEPRINT_EXPRESSION_INVALID' | 'BLUEPRINT_CONDITION_INVALID' | 'AUTHORING_REQUEST_INVALID' | 'AUTHORING_STALE_REVISION' | 'AUTHORING_COMPONENT_MISSING' | 'AUTHORING_INSTANCE_MISMATCH' | 'AUTHORING_EXPIRED' | 'AUTHORING_LIMIT_EXCEEDED' | 'AUTHORING_SOURCE_INVALID' | 'AUTHORING_PAYLOAD_INVALID';
+export type ScreenDiagnosticCode = 'DOCUMENT_NOT_OBJECT' | 'DOCUMENT_UNKNOWN_FIELD' | 'DOCUMENT_FIELD_INVALID' | 'DOCUMENT_LIMIT_EXCEEDED' | 'JSON_VALUE_INVALID' | 'JSON_LIMIT_EXCEEDED' | 'JSON_NUMBER_NON_FINITE' | 'JSON_CYCLE' | 'JSON_PROTOTYPE_INVALID' | 'JSON_DANGEROUS_KEY' | 'COMPONENT_ID_DUPLICATE' | 'COMPONENT_PARENT_MISSING' | 'COMPONENT_PARENT_SELF' | 'COMPONENT_PARENT_CYCLE' | 'COMPONENT_TYPE_INVALID' | 'COMPONENT_GEOMETRY_INVALID' | 'DOCUMENT_VALUE_REF_INVALID' | 'VALUE_REF_TARGET_MISSING' | 'DATA_SOURCE_ID_DUPLICATE' | 'DATA_SOURCE_SOURCE_INVALID' | 'DATA_SOURCE_UPDATE_POLICY_INVALID' | 'DATA_SOURCE_PARAM_SELF_REFERENCE' | 'DATA_SOURCE_PARAM_CYCLE' | 'VARIABLE_VALUE_REF_INVALID' | 'VARIABLE_NAME_INVALID' | 'VARIABLE_NAME_DUPLICATE' | 'ENVELOPE_INVALID' | 'ENVELOPE_UNKNOWN_FIELD' | 'DIAGNOSTIC_LIMIT_REACHED' | 'CORE_COMMAND_INVALID' | 'CORE_COMMAND_TARGET_MISSING' | 'CORE_COMMAND_TARGET_LOCKED' | 'CORE_COMMAND_TARGET_HIDDEN' | 'CORE_COMMAND_PARENT_INVALID' | 'CORE_COMMAND_LIMIT_EXCEEDED' | 'CORE_GEOMETRY_INVALID' | 'CORE_INVARIANT_VIOLATION' | 'PLUGIN_CORE_MANIFEST_NOT_OBJECT' | 'PLUGIN_CORE_MANIFEST_UNKNOWN_FIELD' | 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' | 'PLUGIN_CORE_LIMIT_EXCEEDED' | 'PLUGIN_CORE_IDENTITY_INVALID' | 'PLUGIN_CORE_TAG_NAME_INVALID' | 'PLUGIN_CORE_IDENTITY_CONFLICT' | 'PLUGIN_CORE_DEPENDENCY_MISSING' | 'PLUGIN_CORE_DEPENDENCY_CYCLE' | 'PLUGIN_CORE_CAPABILITY_UNDECLARED' | 'PLUGIN_CORE_CAPABILITY_UNAUTHORIZED' | 'PLUGIN_CORE_CAPABILITY_INCOMPATIBLE' | 'PLUGIN_CORE_CONTRIBUTION_DUPLICATE' | 'PLUGIN_CORE_CONTRIBUTION_UNKNOWN' | 'PLUGIN_CORE_CONTRIBUTION_CONFLICT' | 'PLUGIN_CORE_EVENT_INVALID' | 'PLUGIN_CORE_EVENT_PAYLOAD_INVALID' | 'PLUGIN_CORE_COMMAND_UNAUTHORIZED' | 'PLUGIN_CORE_COMMAND_ARGUMENT_INVALID' | 'PLUGIN_CORE_COMMAND_RESULT_INVALID' | 'PLUGIN_CORE_SESSION_INVALID' | 'PLUGIN_CORE_LIFECYCLE_INVALID' | 'PLUGIN_CORE_RENDER_FAILED' | 'PLUGIN_CORE_DATA_CONTRACT_INVALID' | 'REMOTE_PLUGIN_PROTOCOL_INVALID' | 'REMOTE_PLUGIN_ORIGIN_INVALID' | 'REMOTE_PLUGIN_TIMEOUT' | 'REMOTE_PLUGIN_DISPOSED' | 'PROJECT_ADAPTER_INVALID' | 'PROJECT_UNAVAILABLE' | 'PROJECT_CONFLICT' | 'PROJECT_ABORTED' | 'PROJECT_DIRTY' | 'PROJECT_PUBLISH_UNAVAILABLE' | 'HOST_RESOURCE_ACCESS_DENIED' | 'HOST_RESOURCE_UNAVAILABLE' | 'HOST_RESOURCE_TIMEOUT' | 'HOST_RESOURCE_FAILED' | 'HOST_RESOURCE_INVALID' | 'HOST_DATASET_CATALOG_FAILED' | 'HOST_DATASET_DESCRIPTOR_INVALID' | 'HOST_DATASET_INVALID' | 'HOST_DATASET_PARAMETER_INVALID' | 'HOST_DATASET_BINDING_INVALID' | 'HOST_DATASET_ADAPTER_FAILED' | 'HOST_DATASET_UNAVAILABLE' | 'HOST_DATASET_VARIABLE_INVALID' | 'HOST_VARIABLE_CATALOG_FAILED' | 'HOST_VARIABLE_DESCRIPTOR_INVALID' | 'BLUEPRINT_CAPABILITY_UNAVAILABLE' | 'BLUEPRINT_EXPRESSION_INVALID' | 'BLUEPRINT_CONDITION_INVALID' | 'AUTHORING_REQUEST_INVALID' | 'AUTHORING_STALE_REVISION' | 'AUTHORING_COMPONENT_MISSING' | 'AUTHORING_INSTANCE_MISMATCH' | 'AUTHORING_EXPIRED' | 'AUTHORING_LIMIT_EXCEEDED' | 'AUTHORING_SOURCE_INVALID' | 'AUTHORING_PAYLOAD_INVALID';
 
 // @public (undocumented)
 export type ScreenDiagnosticPath = readonly (string | number)[];
@@ -793,8 +869,9 @@ export interface ScreenDocument {
     readonly canvas: ScreenCanvas;
     // (undocumented)
     readonly components: readonly ScreenComponentNode[];
+    readonly dataSources?: readonly ScreenDataSource[];
     // (undocumented)
-    readonly variables: readonly ScreenVariable[];
+    readonly variables: readonly ScreenVariableEntry[];
 }
 
 // @public (undocumented)
@@ -979,6 +1056,31 @@ export type ScreenJsonValue = null | boolean | number | string | readonly Screen
 
 // @public (undocumented)
 export type ScreenMaterialErrorCode = (typeof SCREEN_MATERIAL_ERROR_CODES)[number];
+
+// @public
+export interface ScreenMigrationDecision {
+    // (undocumented)
+    readonly action: 'mapped' | 'renamed' | 'rejected';
+    // (undocumented)
+    readonly createdDataSourceId?: string;
+    readonly detail: string;
+    // (undocumented)
+    readonly kind: 'component-value' | 'component-binding' | 'variable' | 'parameter';
+    readonly path: readonly (string | number)[];
+}
+
+// @public
+export type ScreenMigrationResult = {
+    readonly ok: true;
+    readonly document: ScreenDocument;
+    readonly decisions: readonly ScreenMigrationDecision[];
+    readonly diagnostics: readonly ScreenDiagnostic[];
+} | {
+    readonly ok: false;
+    readonly document: undefined;
+    readonly decisions: readonly ScreenMigrationDecision[];
+    readonly diagnostics: readonly ScreenDiagnostic[];
+};
 
 // @public (undocumented)
 export type ScreenParseResult<T> = {
@@ -1305,6 +1407,16 @@ export interface ScreenTabularDataset {
     readonly totalRowCount?: number;
 }
 
+// @public
+export interface ScreenUpdatePolicy {
+    readonly intervalSeconds?: number;
+    // (undocumented)
+    readonly mode: ScreenUpdatePolicyMode;
+}
+
+// @public (undocumented)
+export type ScreenUpdatePolicyMode = 'once' | 'manual' | 'auto';
+
 // @public (undocumented)
 export interface ScreenUrlQueryVariable extends ScreenVariableBase {
     // (undocumented)
@@ -1316,6 +1428,22 @@ export interface ScreenUrlQueryVariable extends ScreenVariableBase {
     // (undocumented)
     readonly type: 'url-query';
 }
+
+// @public
+export type ScreenValueRef = {
+    readonly kind: 'inline';
+    readonly value: ScreenJsonValue;
+} | {
+    readonly kind: 'variable';
+    readonly variableId: string;
+} | {
+    readonly kind: 'data-source-field';
+    readonly dataSourceId: string;
+    readonly path: readonly string[];
+};
+
+// @public (undocumented)
+export type ScreenValueRefKind = ScreenValueRef['kind'];
 
 // @public (undocumented)
 export type ScreenVariable = ScreenStaticVariable | ScreenDynamicVariable;
@@ -1350,6 +1478,9 @@ export interface ScreenVariableDataSource {
     readonly variableId: string;
 }
 
+// @public
+export type ScreenVariableEntry = ScreenVariable | ScreenVariableRecord;
+
 // @public (undocumented)
 export interface ScreenVariableHandle {
     // (undocumented)
@@ -1360,6 +1491,22 @@ export interface ScreenVariableHandle {
     set(value: ScreenJsonValue): ScreenParseResult<null>;
     // (undocumented)
     readonly value: ScreenJsonValue;
+}
+
+// @public
+export interface ScreenVariableRecord {
+    // (undocumented)
+    readonly controlled: boolean;
+    // (undocumented)
+    readonly description?: string;
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly initialValue: ScreenJsonValue;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly value: ScreenValueRef;
 }
 
 // @public (undocumented)
@@ -1377,6 +1524,9 @@ export function sortScreenDiagnostics(diagnostics: readonly ScreenDiagnostic[]):
 
 // @public (undocumented)
 export function validateScreenDesignerHostAdapter(input: unknown): ScreenParseResult<ScreenDesignerHostAdapter>;
+
+// @public
+export const VALUE_REF_PATH_SEGMENT_PATTERN = "^(?!(?:__proto__|prototype|constructor)$)[A-Za-z_][A-Za-z0-9_]{0,127}$";
 
 // @public (undocumented)
 export const VARIABLE_NAME_PATTERN = "^[A-Za-z_][A-Za-z0-9_]{0,127}$";
