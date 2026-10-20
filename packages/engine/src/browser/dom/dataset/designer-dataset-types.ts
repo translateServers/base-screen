@@ -12,6 +12,14 @@ import type { DesignerDataStateView } from './designer-data-state.js';
 export type DesignerDataSourceMode = 'none' | 'static' | 'variable' | 'dataset' | 'host-resource';
 
 /**
+ * 面板的挂载表面。
+ *
+ * 同一批段构造器、两个挂载点：检查器里实例级字段只读，工作台里可编辑。授权模型不同 ⇒
+ * 渲染结果不同 ⇒ `authoring` 段的内容键必须计入 surface（架构 §5.2.5）。
+ */
+export type DesignerDataSurface = 'inspector' | 'workbench';
+
+/**
  * 数据集配置草稿。
  *
  * `params` 是**取值引用**（`ScreenValueRef`），不是旧文档形态：参数位从本轮起是一个「选什么
@@ -82,6 +90,8 @@ export interface DesignerDatasetAuthoringView {
 
 export interface DesignerDataSourcePanelOptions {
   readonly panel: HTMLElement;
+  /** 挂载表面；`authoring` 段的内容与内容键都按它分叉。 */
+  readonly surface: DesignerDataSurface;
   readonly scrollScope: string;
   readonly mode: DesignerDataSourceMode;
   readonly availableModes: readonly DesignerDataSourceMode[];

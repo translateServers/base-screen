@@ -99,7 +99,9 @@ function linkStatusText(status: DesignerHostLinkStatus): string {
 export function renderDatasetCatalog(options: DesignerDataSourcePanelOptions): HTMLElement {
   const browser = options.panel.ownerDocument.createElement('section');
   browser.className = 'designer-dataset-browser';
-  browser.dataset.dsSection = 'catalog';
+  // 目录与配置共用一个 `source` 段（两者互斥）：段 key 是 `source`，不是 `catalog`。
+  // 写成 `catalog` 会让 `findSection('source')` 找不到节点 → 每次同步都新建 ← 搜索框被换掉。
+  browser.dataset.dsSection = 'source';
   browser.dataset.inspectorSearchSection = 'true';
   browser.dataset.inspectorSearchText = [
     DESIGNER_UI_TEXT.dataset.select,

@@ -15,6 +15,7 @@ function model(
 ): DesignerDataSourcePanelOptions {
   return {
     panel: {} as HTMLElement,
+    surface: 'inspector',
     scrollScope: 'scope',
     mode: 'dataset',
     availableModes: ['none', 'static', 'dataset'],
@@ -66,15 +67,15 @@ function model(
 }
 
 describe('requiredDataSections', () => {
-  it('未配置：只有模式段', () => {
-    expect(requiredDataSections(model({ mode: 'none' }))).toEqual(['mode']);
+  it('未配置：只有取值段', () => {
+    expect(requiredDataSections(model({ mode: 'none' }))).toEqual(['value']);
   });
 
-  it('有 descriptor 且目录收起：host-link + config/preview/authoring', () => {
+  it('有 descriptor 且目录收起：host-link + source/preview/authoring', () => {
     expect(requiredDataSections(model())).toEqual([
-      'mode',
+      'value',
       'host-link',
-      'config',
+      'source',
       'preview',
       'authoring',
     ]);
@@ -82,28 +83,47 @@ describe('requiredDataSections', () => {
 
   it('目录展开（或还没有 descriptor）：catalog 取代 config 组', () => {
     expect(requiredDataSections(model({ catalogOpen: true }))).toEqual([
-      'mode',
+      'value',
       'host-link',
-      'catalog',
+      'source',
     ]);
     expect(requiredDataSections(model({ descriptor: undefined }))).toEqual([
-      'mode',
+      'value',
       'host-link',
-      'catalog',
+      'source',
     ]);
+  });
+});
+
+describe('surface 守卫（QA 注入点：删掉 sectionContentKey 里的 surface 之后，这条必须红）', () => {
+  it('同一 model、不同 surface ⇒ authoring 内容键不同', () => {
+    // 两个表面的授权模型不同（检查器只读 / 工作台可编辑），渲染结果不同 ⇒ 内容键必须不同。
+    // 漏掉 surface 的症状是「切到工作台看到的还是只读摘要」，而没有任何断言会红——
+    // 这条是本单唯一一条「漏做不会红」的判据，所以必须单测钉住。
+    expect(sectionContentKey('authoring', model({ surface: 'inspector' }))).not.toBe(
+      sectionContentKey('authoring', model({ surface: 'workbench' })),
+    );
+  });
+
+  it('surface 只进 authoring 键，不污染其它段（避免无谓重建）', () => {
+    for (const key of ['value', 'source', 'preview', 'host-link'] as const) {
+      expect(sectionContentKey(key, model({ surface: 'inspector' }))).toBe(
+        sectionContentKey(key, model({ surface: 'workbench' })),
+      );
+    }
   });
 });
 
 describe('sectionContentKey', () => {
   it('同一输入永远同一键', () => {
-    expect(sectionContentKey('config', model())).toBe(sectionContentKey('config', model()));
+    expect(sectionContentKey('source', model())).toBe(sectionContentKey('source', model()));
     expect(sectionContentKey('preview', model())).toBe(sectionContentKey('preview', model()));
   });
 
-  it('catalog 键不随目录条目变化（结果区由另一个通道 patch）', () => {
-    const before = sectionContentKey('catalog', model({ catalogOpen: true }));
+  it('source 键不随目录条目变化（结果区由另一个通道 patch）', () => {
+    const before = sectionContentKey('source', model({ catalogOpen: true }));
     const after = sectionContentKey(
-      'catalog',
+      'source',
       model({
         catalogOpen: true,
         items: [
@@ -122,24 +142,24 @@ describe('sectionContentKey', () => {
     expect(after).toBe(before);
   });
 
-  it('catalog 键不随查询词变化（输入框自己持有游标与 IME 状态）', () => {
-    const base = sectionContentKey('catalog', model({ catalogOpen: true }));
-    expect(sectionContentKey('catalog', model({ catalogOpen: true, query: 'ord' }))).toBe(base);
+  it('目录内容不由 source 键承载：查询词变化不重建（输入框自己持有游标与 IME 状态）（输入框自己持有游标与 IME 状态）', () => {
+    const base = sectionContentKey('source', model({ catalogOpen: true }));
+    expect(sectionContentKey('source', model({ catalogOpen: true, query: 'ord' }))).toBe(base);
   });
 
-  it('catalog 键随分组 / 分组选择 / 开合变化', () => {
-    const base = sectionContentKey('catalog', model({ catalogOpen: true }));
+  it('source 键随分组 / 分组选择 / 开合变化', () => {
+    const base = sectionContentKey('source', model({ catalogOpen: true }));
     expect(
-      sectionContentKey('catalog', model({ catalogOpen: true, groups: [{ id: 'g', name: 'G' }] })),
+      sectionContentKey('source', model({ catalogOpen: true, groups: [{ id: 'g', name: 'G' }] })),
     ).not.toBe(base);
-    expect(sectionContentKey('catalog', model({ catalogOpen: true, groupId: 'g' }))).not.toBe(base);
+    expect(sectionContentKey('source', model({ catalogOpen: true, groupId: 'g' }))).not.toBe(base);
   });
 
-  it('config 键随草稿 / descriptor / 展开角色变化', () => {
-    const base = sectionContentKey('config', model());
+  it('source 键随草稿 / descriptor / 展开角色变化', () => {
+    const base = sectionContentKey('source', model());
     expect(
       sectionContentKey(
-        'config',
+        'source',
         model({
           draft: {
             datasetId: 'orders',
@@ -149,10 +169,10 @@ describe('sectionContentKey', () => {
         }),
       ),
     ).not.toBe(base);
-    expect(sectionContentKey('config', model({ bindingOpenRoleId: 'columns' }))).not.toBe(base);
+    expect(sectionContentKey('source', model({ bindingOpenRoleId: 'columns' }))).not.toBe(base);
     expect(
       sectionContentKey(
-        'config',
+        'source',
         model({
           descriptor: {
             datasetId: 'tenants',

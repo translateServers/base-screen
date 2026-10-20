@@ -162,10 +162,10 @@ export function renderDesignerDatasetWorkbench(
   editor.dataset.designerScrollScope = `data-workbench-editor:${options.scrollScope}`;
   // 工作台与内联面板吃同一批 section 节点（工厂产出），这里只决定摆在第几列。
   editor.appendChild(requireSection('host-link', options));
-  if (options.catalogOpen || options.descriptor === undefined) {
-    editor.appendChild(requireSection('catalog', options));
-  } else {
-    editor.appendChild(requireSection('config', options));
+  // 工作台不渲染 `value` 段：它的取值方式由顶部 5 步导航表达（`[data-workbench-step]`）。
+  // 目录与配置共用一个 `source` 段（两者互斥），与检查器完全同源。
+  editor.appendChild(requireSection('source', options));
+  if (options.descriptor !== undefined) {
     editor.append(
       requireSection('authoring', options),
       renderWorkbenchNotice(

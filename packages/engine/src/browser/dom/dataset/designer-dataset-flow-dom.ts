@@ -15,6 +15,7 @@ import {
   renderDataEntryGuide,
   renderDataEntrySegmented,
 } from './designer-data-entry-dom.js';
+import { requiredDataSections } from './designer-data-section-diff.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import {
   type DataPanelActionView,
@@ -38,14 +39,15 @@ import type {
  * 为什么不做常驻三列卡片：内容宽约 303px 时每列只有 98px，中文标题 + 徽标必然换行参差，
  * 三卡高度不等是宽度约束下的死结（不是配色问题），改回来之前请先看这条。
  *
- * 段 key 仍是 `mode`，节点仍由外层流程渲染器持有：入口只是把 `setSourceMode` 收敛成三项。
+ * 段 key 是 `value`，节点由外层流程渲染器持有（不在工厂里创建），`syncDatasetSections`
+ * 对它只盖内容键、永不重建——见 `designer-data-section-diff.ts` 的特例分支。
  */
-function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement {
+function renderValueSection(options: DesignerDataSourcePanelOptions): HTMLElement {
   const ownerDocument = options.panel.ownerDocument;
   const section = ownerDocument.createElement('section');
   section.className = 'designer-data-source-type';
   section.dataset.workbenchSection = 'source';
-  section.dataset.dsSection = 'mode';
+  section.dataset.dsSection = 'value';
   section.tabIndex = -1;
   const items = designerDataEntryItems({
     mode: options.mode,
@@ -150,7 +152,7 @@ export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): H
             options.hostResource.resourceType,
             options.hostResource.resourceId,
           );
-    content.append(renderSourceMode(options), summary);
+    content.append(renderValueSection(options), summary);
     section.appendChild(content);
     return section;
   }
@@ -169,7 +171,7 @@ function renderContinuousDataFlow(
   content: HTMLElement,
   options: DesignerDataSourcePanelOptions,
 ): void {
-  content.appendChild(renderSourceMode(options));
+  content.appendChild(renderValueSection(options));
   // 空态只有一组引导行：没有可应用的草稿（不放操作条），也不再补「当前组件不使用数据。」
   // 这类物料数据段的占位文案——上面刚让人"选择数据来源"，下面再说"不使用数据"是自相矛盾。
   if (options.mode === 'none') return;
@@ -182,35 +184,37 @@ function renderContinuousDataFlow(
     content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
     return;
   }
-  // 段一律从工厂取：内联面板与工作台渲染同一批节点，拼装顺序只在这里和挂载层决定。
-  content.append(
-    section('host-link', options),
-    ...(options.catalogOpen || options.descriptor === undefined
-      ? [section('catalog', options)]
-      : datasetModeSections(content.ownerDocument, options)),
-  );
+  // 段一律从工厂取：内联面板与工作台渲染同一批节点，**顺序由 `requiredDataSections` 决定**。
+  // 段集合只在一处定义，这里不再自己推「先目录还是先配置」——那段判断已经收进 `source` 段。
+  for (const key of requiredDataSections(options)) {
+    if (key === 'value') continue;
+    // 预览动作条（测试/刷新）挂在预览段之前，不进任何段：它不属于段内容。
+    if (key === 'preview')
+      content.appendChild(renderDatasetPreviewActions(content.ownerDocument, options));
+    content.appendChild(dataSection(key, options));
+  }
+  content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
 }
 
-function datasetModeSections(
-  ownerDocument: Document,
+/**
+ * 取一个段并按挂载需要补上工作台锚点。
+ *
+ * `authoring` 段额外承担「高级设置」的位置语义（`data-workbench-section="refresh"`），
+ * 这是既有锚点，工作台步骤导航仍按它滚动，不能因为改了段 key 就丢。
+ */
+function dataSection(
+  key: Exclude<DesignerDataSectionKey, 'value'>,
   options: DesignerDataSourcePanelOptions,
-): readonly HTMLElement[] {
-  const configuration = section('config', options);
-  const advanced = section('authoring', options);
-  advanced.classList.add('designer-datav-advanced-settings');
-  advanced.dataset.workbenchSection = 'refresh';
-  advanced.tabIndex = -1;
-  const advancedHeading = advanced.querySelector<HTMLElement>('.designer-inspector-section-title');
-  if (advancedHeading !== null) {
-    advancedHeading.textContent = DESIGNER_UI_TEXT.dataSource.advancedSettings;
+): HTMLElement {
+  const element = section(key, options);
+  if (key === 'authoring') {
+    element.classList.add('designer-datav-advanced-settings');
+    element.dataset.workbenchSection = 'refresh';
+    element.tabIndex = -1;
+    const heading = element.querySelector<HTMLElement>('.designer-inspector-section-title');
+    if (heading !== null) heading.textContent = DESIGNER_UI_TEXT.dataSource.advancedSettings;
   }
-  return [
-    configuration,
-    renderDatasetPreviewActions(ownerDocument, options),
-    section('preview', options),
-    advanced,
-    renderDataPanelActions(ownerDocument, dataPanelApplyView(options)),
-  ];
+  return element;
 }
 
 /**

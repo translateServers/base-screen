@@ -20,7 +20,10 @@ import {
 } from '../../dom/dataset/designer-dataset-dom.js';
 import { dataPanelApplyView } from '../../dom/dataset/designer-dataset-flow-dom.js';
 import { syncDataPanelActions } from '../../dom/dataset/designer-dataset-primitives.js';
-import type { DesignerHostLinkView } from '../../dom/dataset/designer-dataset-types.js';
+import type {
+  DesignerDataSurface,
+  DesignerHostLinkView,
+} from '../../dom/dataset/designer-dataset-types.js';
 import { renderDesignerDescriptorZone } from '../../dom/descriptor/designer-descriptor-dom.js';
 import { designerDataSourceModes } from './designer-data-source-authoring.js';
 import {
@@ -45,7 +48,7 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   // 切到「接数据源」会触发目录分组/结果回包这类异步重绘，不还原就等于用一次方向键
   // 把键盘用户丢到 body 上（radiogroup 的方向键从此失效）。
   const focusedEntry = focusedDataEntry(panel);
-  const options = createDatasetPanelOptions(context, panel);
+  const options = createDatasetPanelOptions(context, panel, 'inspector');
   const surface = renderDesignerDataSourcePanel(options);
   context.state.feedback = surface.feedback;
   const manifest = context.currentEntry()?.manifest;
@@ -59,11 +62,13 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
     catalog: context.callbacks.getCatalog(),
     getDatasetFields: () => getFocusedDatasetFields(context),
   });
-  renderDataWorkbench(context, options);
+  renderDataWorkbench(context, createDatasetPanelOptions(context, panel, 'workbench'));
   // 首次渲染补内容键 + 可聚焦标记：否则第一次 patch 会把整批段判成「内容变化」重建。
   stampDataSectionKeys(panel, options);
   const workbenchHost = context.callbacks.getWorkbenchHost?.();
-  if (workbenchHost !== undefined) stampDataSectionKeys(workbenchHost, options);
+  if (workbenchHost !== undefined) {
+    stampDataSectionKeys(workbenchHost, createDatasetPanelOptions(context, panel, 'workbench'));
+  }
   context.dataFlowScrollSync.bind(panel);
   // 七态派生仍然继续算（根节点 `data-state` + 顶部行内提示条读同一份结果），
   // 但不再压成一个常驻徽标：就绪/加载/无数据不占任何常驻元素。
@@ -85,7 +90,10 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
 export function syncDataPanelApplyBar(context: DesignerDatasetControllerContext): void {
   const panel = context.state.panel;
   if (panel === undefined) return;
-  syncDataPanelActions(panel, dataPanelApplyView(createDatasetPanelOptions(context, panel)));
+  syncDataPanelActions(
+    panel,
+    dataPanelApplyView(createDatasetPanelOptions(context, panel, 'inspector')),
+  );
 }
 
 /** 面板所在可聚焦根里，当前聚焦的取值入口（没有就是 undefined）。 */
@@ -174,16 +182,18 @@ export function syncDatasetSurface(
 ): void {
   const panel = context.state.panel;
   if (panel === undefined) return;
-  const options = createDatasetPanelOptions(context, panel);
   const workbenchHost = context.callbacks.getWorkbenchHost?.();
+  // 两个挂载点**各拿一份 options**：`authoring` 段的内容与内容键都按 surface 分叉，
+  // 共用一份会让「切到工作台」被判成「内容没变」而拒绝重建（症状：工作台里仍是只读摘要）。
   for (const root of [panel, workbenchHost]) {
     if (root === undefined) continue;
+    const options = createDatasetPanelOptions(context, panel, surfaceOf(root, panel));
     syncDatasetSections(root, options);
     // 提示条与主操作条都不属于任何段：段级 diff 不会碰它们，随模型就地刷新。
     syncDataPanelNotice(root, options.dataState);
     syncDataPanelActions(root, dataPanelApplyView(options));
   }
-  applyDesignerDataState(panel, options.dataState);
+  applyDesignerDataState(panel, createDatasetPanelOptions(context, panel, 'inspector').dataState);
   restoreFocus?.();
 }
 
@@ -197,7 +207,7 @@ export function syncDatasetSurface(
 export function updateDatasetCatalogResults(context: DesignerDatasetControllerContext): void {
   const panel = context.state.panel;
   if (panel === undefined) return;
-  const options = createDatasetPanelOptions(context, panel);
+  const options = createDatasetPanelOptions(context, panel, 'inspector');
   for (const root of [panel, context.callbacks.getWorkbenchHost?.()]) {
     for (const results of root?.querySelectorAll<HTMLElement>('[data-dataset-results]') ?? []) {
       results.replaceWith(renderDatasetCatalogResults(options));
@@ -239,13 +249,20 @@ export function syncDataFlowProgress(
   }
 }
 
+/** 挂载点 → 表面。`root === panel` 只对检查器成立，其余都是工作台宿主。 */
+function surfaceOf(root: HTMLElement, panel: HTMLElement): DesignerDataSurface {
+  return root === panel ? 'inspector' : 'workbench';
+}
+
 function createDatasetPanelOptions(
   context: DesignerDatasetControllerContext,
   panel: HTMLElement,
+  surface: DesignerDataSurface,
 ): DesignerDataSourcePanelOptions {
   const source = context.currentComponent()?.dataSource;
   return {
     panel,
+    surface,
     scrollScope: JSON.stringify([
       context.state.focusedComponentId,
       context.state.mode,

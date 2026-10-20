@@ -312,8 +312,15 @@ export async function assertDatasetPanelInteraction(designer, page) {
       .length,
     headerApply: node.querySelectorAll('[data-dataset-action="apply"]').length,
   }));
+  // 段集合用「集合形态」判据，不是顺序敏感字符串：它想守的是「集合正确」，
+  // 而不是「顺序永远不变」——后者会在下次调整分组顺序时假红。
+  const allowedSections = new Set(['value', 'source', 'host-link', 'preview', 'authoring']);
+  const requiredWorkbenchSections = ['source', 'host-link', 'authoring', 'preview'];
+  const sectionKeys = workbenchSurface.sections;
   if (
-    workbenchSurface.sections.join(',') !== 'host-link,config,authoring,preview' ||
+    !sectionKeys.every((key) => allowedSections.has(key)) ||
+    new Set(sectionKeys).size !== sectionKeys.length ||
+    !requiredWorkbenchSections.every((key) => sectionKeys.includes(key)) ||
     workbenchSurface.configActions !== 0 ||
     workbenchSurface.headerApply !== 1
   ) {

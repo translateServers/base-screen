@@ -237,7 +237,7 @@ export function toggleDatasetBindingField(
   const fieldId = button.dataset.datasetBindingField;
   if (context.state.draft === undefined || role === undefined || fieldId === undefined) return;
   context.state.draft = toggleDesignerDatasetBindingField(context.state.draft, role, fieldId);
-  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+  markDatasetDraftChanged(context, ['source', 'preview'], () =>
     context.restoreBindingFieldFocus('dataset', role.id, fieldId),
   );
 }
@@ -291,7 +291,7 @@ export function setDatasetParameterValueRef(
   const current = context.state.draft.params[name];
   if (sameRef(current, next)) return;
   context.state.draft = setDesignerDatasetParameter(context.state.draft, name, next);
-  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+  markDatasetDraftChanged(context, ['source', 'preview'], () =>
     restoreDatasetControlFocus(context, `[data-value-ref-trigger="parameter:${name}"]`),
   );
 }
@@ -318,7 +318,7 @@ export function updateDatasetParameterValue(
     kind: 'inline',
     value,
   });
-  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+  markDatasetDraftChanged(context, ['source', 'preview'], () =>
     restoreDatasetControlFocus(context, `[data-value-ref-inline="${controlKey}"]`, 'caret-end'),
   );
 }
@@ -343,14 +343,14 @@ export function updateDatasetBindingSelect(
       [roleId]: selectedValue === '' ? [] : [selectedValue],
     },
   };
-  markDatasetDraftChanged(context, ['config', 'preview'], () =>
+  markDatasetDraftChanged(context, ['source', 'preview'], () =>
     restoreDatasetControlFocus(context, `[data-dataset-binding-role="${roleId}"]`),
   );
 }
 
 export function markDatasetDraftChanged(
   context: DesignerDatasetControllerContext,
-  _sections: readonly DesignerDataSectionKey[] = ['config', 'preview'],
+  _sections: readonly DesignerDataSectionKey[] = ['source', 'preview'],
   restoreFocus?: () => void,
 ): void {
   context.state.draftDirty = isDatasetDraftDirty(context);

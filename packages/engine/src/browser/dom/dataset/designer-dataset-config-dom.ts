@@ -54,7 +54,7 @@ export function renderDesignerDatasetConfiguration(
 ): HTMLElement {
   const details = options.panel.ownerDocument.createElement('div');
   details.dataset.datasetDescriptor = 'true';
-  details.dataset.dsSection = 'config';
+  details.dataset.dsSection = 'source';
   details.className = 'designer-dataset-descriptor';
   details.appendChild(
     renderDatasetSummary(details.ownerDocument, options.descriptor, options.roles, options.draft),

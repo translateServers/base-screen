@@ -548,11 +548,22 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_AUTHORING_ACTION_FAILED:${JSON.stringify(authoringActions)}`,
     );
   }
+  // 通知断言自带种子：这条错误通知原本依赖**更早用例**留下的残留，单跑或换顺序就会
+  // `BROWSER_HARNESS_NOTIFICATION_FAILED` 假红，而红点与被测改动毫无关系（排查方向会直接跑偏）。
+  // 这里自己造一条同类通知，让断言与用例顺序解耦。
+  await designer.evaluate((element) => {
+    const invalid = element.shadowRoot.querySelector('[data-property="width"]');
+    if (invalid === null) return;
+    invalid.value = 'abc';
+    invalid.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  });
   const notifications = designer.locator('[data-notification-tone="error"]');
   const notificationCount = await notifications.count();
   const notification = notifications.last();
   if (notificationCount === 0 || (await notification.getAttribute('role')) !== 'alert') {
-    throw new Error('BROWSER_HARNESS_NOTIFICATION_FAILED');
+    throw new Error(
+      'BROWSER_HARNESS_NOTIFICATION_FAILED:precondition=至少一条错误通知（本用例已尝试自种子：非法宽度值）',
+    );
   }
   await notification.getByRole('button', { name: '\u5173\u95ed\u901a\u77e5' }).click();
   if ((await notifications.count()) !== notificationCount - 1) {

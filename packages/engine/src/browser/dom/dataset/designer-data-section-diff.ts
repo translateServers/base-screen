@@ -2,10 +2,13 @@ import { disposeDatasetSection } from './designer-dataset-config-dom.js';
 import { createDatasetSection, type DesignerDataSectionKey } from './designer-dataset-sections.js';
 
 /**
- * 段标识。`mode` 是唯一一个由外层流程渲染器拥有的段（它总是存在，且不在工厂里创建），
- * 其余段都由 `createDatasetSection` 构造。
+ * 段标识 = 冻结的 5 个段 key。
+ *
+ * `value` 段**由外层流程渲染器拥有**（它总是存在，且不在工厂里创建），其余段都由
+ * `createDatasetSection` 构造。这条所有权差异在 `syncDatasetSections` 里有对应特例分支，
+ * 见那里的注释——它保护的是「切换取值方式时不丢焦点」。
  */
-export type DesignerDataSectionId = DesignerDataSectionKey | 'mode';
+export type DesignerDataSectionId = DesignerDataSectionKey;
 
 import type { DesignerDataSourcePanelOptions } from './designer-dataset-types.js';
 
@@ -15,17 +18,17 @@ export type DesignerDataPanelModel = DesignerDataSourcePanelOptions;
 /**
  * 当前状态下应当出现的段，顺序即 DOM 顺序。
  *
- * 本轮**完全沿用现有出现规则**（`host-link` 恒显示、`config` 需要 descriptor、
- * `catalog` 与 `config` 互斥）；出现规则的调整单独一轮做，避免和 diff 机制一起改。
+ * `source` 段承担两种互斥内容：未选数据集/目录展开时是**目录列表**，选完之后是**参数与映射
+ * 配置**。它们共用一个段 key，因为二者不会同时出现；拆成两个 key 会让段总数超出冻结的 5 个。
  */
 export function requiredDataSections(
   model: DesignerDataPanelModel,
 ): readonly DesignerDataSectionId[] {
-  const keys: DesignerDataSectionId[] = ['mode'];
+  const keys: DesignerDataSectionId[] = ['value'];
   if (model.mode !== 'dataset') return keys;
   keys.push('host-link');
-  if (model.catalogOpen || model.descriptor === undefined) keys.push('catalog');
-  else keys.push('config', 'preview', 'authoring');
+  if (model.catalogOpen || model.descriptor === undefined) keys.push('source');
+  else keys.push('source', 'preview', 'authoring');
   return keys;
 }
 
@@ -33,33 +36,33 @@ export function requiredDataSections(
  * 每段的**内容键**：只有键变了才替换这一段。
  *
  * 粒度取舍（保住上一轮「输入框节点身份」的成果）：
- * - `catalog` 只含 shell 的结构状态（分组、分组选择、开合），**不含 items/cursor，也不含
- *   查询词**：目录结果是另一个 patch 通道；查询词由输入框自己持有（浏览器探针已证明把它
- *   写进键会让搜索框每次按键都被重建、丢焦点与 IME 组合态）；
+ * - `value` 只含取值方式的可见面（模式、可用模式、端口能力）：它与入口的禁用/选中同源；
+ * - `source` 同时含**目录壳**与**配置**两侧的输入（两者互斥，同一段替换）：目录侧不含
+ *   items/cursor 与查询词（查询词由输入框自己持有，写进键会让搜索框每次按键都被重建、
+ *   丢焦点与 IME 组合态）；配置侧含 descriptor id、草稿、展开的绑定角色与角色声明；
  * - `preview` 只含状态/页签/开合与结果摘要，不塞完整 rows（大结果集会让键比较变贵）；
- * - `config` 含 descriptor id、草稿、展开的绑定角色与角色声明：这些任何一项变化都必须重建。
+ * - `authoring` 含 `surface`：两个表面授权模型不同、渲染结果不同（检查器只读 / 工作台可
+ *   编辑）。**这不是冗余维度**——不计入的话两个挂载点会互相判定「内容没变」并拒绝重建，
+ *   症状是「切到工作台看到的还是只读摘要」，而没有任何断言会红。
  */
 export function sectionContentKey(
   key: DesignerDataSectionId,
   model: DesignerDataPanelModel,
 ): string {
   switch (key) {
-    case 'mode':
+    case 'value':
       return stableKey([
         model.mode,
         model.availableModes,
         model.resourceAvailable,
         model.catalogAvailable,
       ]);
-    case 'catalog':
+    case 'source':
       return stableKey([
         (model.groups ?? []).map((group) => [group.id, group.name]),
         model.groupId ?? null,
         model.catalogOpen,
         model.catalogAvailable,
-      ]);
-    case 'config':
-      return stableKey([
         model.descriptor?.datasetId ?? null,
         model.draft ?? null,
         model.bindingOpenRoleId ?? null,
@@ -75,7 +78,7 @@ export function sectionContentKey(
         previewSummary(model),
       ]);
     case 'authoring':
-      return stableKey([model.authoring, model.dirty]);
+      return stableKey([model.authoring, model.dirty, model.surface]);
     default:
       return stableKey([
         model.link.catalog.status,
@@ -109,8 +112,11 @@ export function syncDatasetSections(root: HTMLElement, model: DesignerDataPanelM
     const key = keys[index]!;
     const existing = findSection(root, key);
     const nextKey = sectionContentKey(key, model);
-    if (key === 'mode') {
-      // 模式段的节点由外层流程渲染器持有：只补内容键，不重建（与旧 patch 行为一致）。
+    if (key === 'value') {
+      // `value` 段的节点由外层流程渲染器持有：**只补内容键，永不重建**。
+      // 并进工厂（`createDatasetSection`）会让 diff 开始 replaceWith 它，症状是「方向键/点击
+      // 切换取值方式后焦点丢失、输入法组合态断掉」——而且没有任何断言覆盖这一点，
+      // 只有手写 focus 探针能发现。改这条之前先把那条探针变成断言。
       if (existing !== null) {
         existing.dataset.dsContentKey = nextKey;
         markFocusable(existing);
