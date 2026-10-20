@@ -410,7 +410,17 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
         component('b', hostSource('products', { page: { kind: 'variable', variableId: 'page' } })),
         component('trigger'),
       ],
-      [hostVariable('region', 'region'), hostVariable('page', 'page')],
+      [
+        // region 由蓝图写入 ⇒ inline（派生变量拒写）；page 仍是宿主派生值。
+        {
+          id: 'region',
+          name: 'region',
+          initialValue: 'north',
+          controlled: false,
+          value: { kind: 'inline' as const, value: 'north' },
+        },
+        hostVariable('page', 'page'),
+      ],
       {
         rules: [
           {

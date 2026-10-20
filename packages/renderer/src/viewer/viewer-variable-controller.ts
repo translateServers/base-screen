@@ -329,7 +329,11 @@ export class ViewerVariableController {
       values[record.id] =
         evaluated.kind === 'value' && evaluated.value !== undefined
           ? evaluated.value
-          : record.initialValue;
+          : // 未就绪的种子值：`controlled` 只在这里起作用——受控变量的初始值让位给外部，
+            // 等待期间先种 null；非受控变量用文档声明的 initialValue（与旧 runtime-compile 一致）。
+            record.controlled
+            ? null
+            : record.initialValue;
       const list = instanceVariables.get(ref.dataSourceId);
       if (list === undefined) instanceVariables.set(ref.dataSourceId, [record.id]);
       else list.push(record.id);

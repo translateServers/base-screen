@@ -8,8 +8,9 @@ import type {
   ScreenHostResourceRequest,
   ScreenJsonValue,
   ScreenParseResult,
-  ScreenVariable,
+  ScreenVariableEntry,
 } from '@base-screen/contracts';
+import { readScreenVariableRecord } from '@base-screen/contracts';
 import type {
   BaseScreenDataCapability,
   BaseScreenMaterialCatalog,
@@ -201,7 +202,7 @@ export function hostSource(
   } as ScreenComponentNode['dataSource'];
 }
 
-export function hostVariable(name: string, variableId: string): ScreenVariable {
+export function hostVariable(name: string, variableId: string): ScreenVariableEntry {
   return {
     type: 'data-source',
     id: name,
@@ -214,7 +215,7 @@ export function hostVariable(name: string, variableId: string): ScreenVariable {
 
 export function document(
   components: readonly ScreenComponentNode[],
-  variables: readonly ScreenVariable[] = [],
+  variables: readonly ScreenVariableEntry[] = [],
   blueprint: ScreenDocument['blueprint'] = { rules: [] },
 ): ScreenDocument {
   return {
@@ -224,21 +225,26 @@ export function document(
     // 旧形态的动态变量在读取时会合成 `data-source-<variableId>` 实例；这里把它显式声明
     // 出来，让「变量 → 实例 → 宿主目录端口」这条链在测试里真实成立（T02c-2 之后变量不再
     // 由宿主批量解析，而是派生自实例结果）。
-    dataSources: variables.flatMap((variable) =>
-      variable.type === 'static'
-        ? []
-        : [
-            {
-              id: `data-source-${variable.id}`,
-              name: variable.name,
-              source:
-                variable.type === 'url-query'
-                  ? { kind: 'url-query' as const, sourceId: variable.sourceId }
-                  : { kind: 'host-catalog' as const, sourceId: variable.sourceId },
-              params: {},
-            },
-          ],
-    ),
+    // 只有「旧形态的动态变量」需要补实例：新形态记录（`type` 缺失）由用例自己声明
+    // `dataSources`，否则会把 inline 记录也错配成一个目录实例。
+    dataSources: variables.flatMap((variable) => {
+      if (!('type' in variable) || variable.type === 'static') return [];
+      const record = readScreenVariableRecord(variable);
+      return [
+        {
+          id:
+            record.value.kind === 'data-source-field'
+              ? record.value.dataSourceId
+              : `data-source-${record.id}`,
+          name: record.name,
+          source:
+            variable.type === 'url-query'
+              ? { kind: 'url-query' as const, sourceId: variable.sourceId }
+              : { kind: 'host-catalog' as const, sourceId: variable.sourceId },
+          params: {},
+        },
+      ];
+    }),
     blueprint,
   };
 }

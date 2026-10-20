@@ -37,6 +37,7 @@ import { ViewerDataSourceScheduler } from './viewer-data-source-scheduler.js';
 import { lifecycleFailure } from './viewer-lifecycle.js';
 import { ViewerVariableController } from './viewer-variable-controller.js';
 import {
+  applyVariableWriteGuard,
   checkViewerVariableWritable,
   ViewerVariableHandles,
   viewerVariableValuesEqual,
@@ -383,15 +384,21 @@ export class BaseScreenViewerElement extends ElementBase {
       this.emitLifecycleDiagnostic('Blueprint event payload is invalid.');
       return;
     }
-    const changedVariables = this.writeBlueprintVariables(result.value.variables, false);
     const renderer = this.#renderer;
     const document = this.#document;
+    // 派生变量的写入在这里统一回滚：蓝图分发不做权限判断（它不知道文档），
+    // 落地前把不可写变量的改动还原，避免「先写进去、下次刷新再丢掉」。
+    const guarded = {
+      ...result.value,
+      variables: applyVariableWriteGuard(document, previousVariables, result.value.variables),
+    };
+    const changedVariables = this.writeBlueprintVariables(guarded.variables, false);
     if (renderer !== undefined && document !== undefined) {
       const diagnostics = applyBlueprintDispatchToRenderer(
         renderer,
         document,
         previousVariables,
-        result.value,
+        guarded,
       );
       if (diagnostics.length > 0) this.emitDiagnostics(diagnostics);
     }

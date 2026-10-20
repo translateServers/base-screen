@@ -45,6 +45,19 @@ class FakeRenderer implements BaseScreenRenderer {
     this.refreshes.push(componentId);
   }
 
+  // 数据源实例接口（T02c-2）：设计器画布运行时不走这条路径，桩实现即可。
+  prepareDataSources(): void {}
+  refreshDataSource(): void {}
+  readDataSourceValue(): undefined {
+    return undefined;
+  }
+  isDataSourceSettled(): boolean {
+    return false;
+  }
+  evaluateValueRef(): never {
+    throw new Error('FakeRenderer does not evaluate value references.');
+  }
+
   setInteractive(): ScreenParseResult<null> {
     return { ok: true, value: null, diagnostics: [] };
   }

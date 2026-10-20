@@ -18,8 +18,13 @@ export interface ViewerVariableHandlesHost {
 /**
  * 变量写入的唯一校验入口（宿主 `handle.set` 与蓝图 `set-variable` 共用）。
  *
- * `controlled: false` 表示该变量由文档/数据源拥有，不接受外部写入；两条写入路径都必须
- * 先过这里，避免「句柄拒绝、蓝图照写」这种双口径。
+ * 判据是**值是否派生**，不是 `controlled`：
+ * - `inline` 值由文档/宿主拥有 ⇒ 恒可写（迁移后的静态变量、计数器都靠这条）。
+ * - `data-source-field` 值每次实例刷新都会被重算覆盖 ⇒ 拒写，否则写进去的值会在下一次
+ *   刷新时静默丢失。
+ *
+ * `controlled` 与写权限无关（历史语义：它只决定「值未就绪时初始值是否让位给外部值」，
+ * 见 `blueprint/runtime-compile.ts` 与旧 `set-variable` 分发——两处都不做写权限判断）。
  *
  * @returns 不可写时返回失败结果；可写返回 `undefined`。
  */
@@ -27,7 +32,7 @@ export function checkViewerVariableWritable(
   entry: ScreenVariableEntry,
 ): ScreenParseResult<null> | undefined {
   const record = readScreenVariableRecord(entry);
-  if (record.controlled) return undefined;
+  if (record.value.kind !== 'data-source-field') return undefined;
   return {
     ok: false,
     diagnostics: [
@@ -35,10 +40,38 @@ export function checkViewerVariableWritable(
         severity: 'error',
         code: 'VARIABLE_WRITE_FORBIDDEN',
         path: ['variables', record.id],
-        message: 'Variable is not writable: it is owned by its data source.',
+        message: 'Derived variable values are overwritten by the next data source refresh.',
       },
     ],
   };
+}
+
+/**
+ * 应用一次「变量写入」的守卫：派生变量被蓝图改写时回滚为原值。
+ *
+ * 蓝图分发是纯函数、会一次性算出所有 `set-variable` 的结果；写入权限只能在**落地**
+ * 这一层统一裁决（否则句柄拒绝、蓝图照写的双口径又回来了）。
+ *
+ * @param document 用于查每条变量的取值引用形态。
+ * @param previous 写入前的变量快照。
+ * @param next 分发算出的新快照。
+ * @returns 已把不可写变量的改动回滚掉的快照。
+ */
+export function applyVariableWriteGuard(
+  document: ScreenDocument | undefined,
+  previous: ScreenJsonObject,
+  next: ScreenJsonObject,
+): ScreenJsonObject {
+  if (document === undefined) return next;
+  let guarded: Record<string, ScreenJsonValue> | undefined;
+  for (const entry of document.variables) {
+    const record = readScreenVariableRecord(entry);
+    if (viewerVariableValuesEqual(previous[record.id], next[record.id])) continue;
+    if (checkViewerVariableWritable(entry) === undefined) continue;
+    guarded ??= { ...next };
+    guarded[record.id] = previous[record.id] ?? null;
+  }
+  return guarded ?? next;
 }
 
 export class ViewerVariableHandles {

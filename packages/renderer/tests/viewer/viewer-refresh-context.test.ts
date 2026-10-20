@@ -8,7 +8,6 @@ import {
   document,
   flush,
   hostSource,
-  hostVariable,
   resolveAll,
 } from './__fixtures__/viewer-test-harness.js';
 
@@ -19,7 +18,6 @@ afterEach(() => {
 
 describe('BaseScreenViewerElement refresh execution context', () => {
   it('derives initial / document-change / variable triggers for the matching operations (RB2)', async () => {
-    const variables = createVariablePort({ region: 'north' });
     const resources = createDeferredResourcePort();
     const catalog = createHostResourceCatalog(['change']);
     const initial = document(
@@ -30,7 +28,15 @@ describe('BaseScreenViewerElement refresh execution context', () => {
         ),
         component('trigger'),
       ],
-      [hostVariable('region', 'region')],
+      [
+        {
+          id: 'region',
+          name: 'region',
+          initialValue: 'north',
+          controlled: false,
+          value: { kind: 'inline' as const, value: 'north' },
+        },
+      ],
       {
         rules: [
           {
@@ -51,7 +57,6 @@ describe('BaseScreenViewerElement refresh execution context', () => {
       catalog,
       document: initial,
       resourcePort: resources.port,
-      variablePort: variables.port,
     });
     await flush();
 
@@ -68,7 +73,15 @@ describe('BaseScreenViewerElement refresh execution context', () => {
         ),
         component('trigger'),
       ],
-      [hostVariable('region', 'region')],
+      [
+        {
+          id: 'region',
+          name: 'region',
+          initialValue: 'east',
+          controlled: false,
+          value: { kind: 'inline' as const, value: 'east' },
+        },
+      ],
       {
         rules: [
           {
@@ -87,6 +100,7 @@ describe('BaseScreenViewerElement refresh execution context', () => {
     );
     viewer.document = replacement;
     await flush();
+    // 新文档的变量值变了 ⇒ 组件参数变化 ⇒ 一次 document-change 取数。
     expect(
       resources.requests.filter((request) => request.context?.trigger === 'document-change'),
     ).toHaveLength(1);
@@ -109,8 +123,8 @@ describe('BaseScreenViewerElement refresh execution context', () => {
   });
 
   it('forwards projectId and documentRevision into every resolve context when configured (RB2)', async () => {
-    const variables = createVariablePort({ region: 'north' });
     const resources = createDeferredResourcePort();
+    const variables = createVariablePort({});
     const catalog = createHostResourceCatalog();
     const screen = document([
       component('a', hostSource('orders')),

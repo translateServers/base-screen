@@ -175,24 +175,29 @@ describe('变量派生（T02c-2）', () => {
     viewer.unload();
   });
 
-  it('controlled:false 变量写入被拒；controlled:true 可写且只通知一次', async () => {
+  it('inline 变量恒可写（含 controlled:false 的迁移静态变量）；派生变量拒写', async () => {
+    const catalogPort = createVariablePort({}, true);
     const screen = documentWith(
-      [],
-      [inlineVariable('locked', 'x'), inlineVariable('open', 'x', true)],
+      [component('a', hostSource('orders'))],
+      [
+        // 迁移后的静态变量：inline + controlled:false（旧实现同样可写）。
+        { ...inlineVariable('legacy', 'x'), controlled: false },
+        inlineVariable('open', 'x', true),
+        derivedVariable('derived', 'derived-instance'),
+      ],
+      [instance('derived-instance')],
     );
     const { viewer } = await createViewerHarness({
       catalog: createHostResourceCatalog(),
       document: screen,
       resourcePort: createImmediateResourcePort().port,
+      variablePort: catalogPort.port,
     });
     await flush();
 
-    const lockedResult = viewer.getVariable('locked')?.set('y');
-    expect(lockedResult).toMatchObject({
-      ok: false,
-      diagnostics: [{ code: 'VARIABLE_WRITE_FORBIDDEN' }],
-    });
-    expect(viewer.getVariable('locked')?.value).toBe('x');
+    // 迁移静态变量可写：旧实现里 handled.set / 蓝图都直接写。
+    expect(viewer.getVariable('legacy')?.set('y').ok).toBe(true);
+    expect(viewer.getVariable('legacy')?.value).toBe('y');
 
     const changes: ScreenJsonValue[] = [];
     const handle: ScreenVariableHandle | undefined = viewer.getVariable('open');
@@ -201,40 +206,80 @@ describe('变量派生（T02c-2）', () => {
     expect(handle?.value).toBe('y');
     expect(changes).toEqual(['y']);
     stop?.();
+
+    // 派生值：写入会被下一次刷新覆盖，因此拒写且值不变。
+    const derived = viewer.getVariable('derived');
+    expect(derived?.value).toBeNull();
+    expect(derived?.set('y')).toMatchObject({
+      ok: false,
+      diagnostics: [{ code: 'VARIABLE_WRITE_FORBIDDEN' }],
+    });
+    expect(viewer.getVariable('derived')?.value).toBeNull();
     viewer.unload();
   });
 
-  it('蓝图 set-variable 写 controlled:false 变量同样被拒', async () => {
-    const screen = documentWith([], [inlineVariable('locked', 'x')]);
-    const withRule: ScreenDocument = {
+  it('蓝图 set-variable：inline（含 controlled:false）可写，派生变量被拒', async () => {
+    const screen = documentWith(
+      [component('trigger')],
+      [
+        { ...inlineVariable('legacy', 'x'), controlled: false },
+        derivedVariable('derived', 'derived-instance'),
+      ],
+      [instance('derived-instance')],
+    );
+    const rule = (variableId: string) => ({
+      id: `set-${variableId}`,
+      trigger: { type: 'material-event' as const, componentId: 'trigger', eventName: 'change' },
+      actions: [
+        {
+          type: 'set-variable' as const,
+          variableId,
+          value: { kind: 'literal' as const, value: 'written' },
+        },
+      ],
+    });
+    const withRules: ScreenDocument = {
       ...screen,
-      blueprint: {
-        rules: [
-          {
-            id: 'set-locked',
-            trigger: { type: 'material-event', componentId: 'trigger', eventName: 'change' },
-            actions: [
-              {
-                type: 'set-variable',
-                variableId: 'locked',
-                value: { kind: 'literal', value: 'written' },
-              },
-            ],
-          },
-        ],
-      },
+      blueprint: { rules: [rule('legacy'), rule('derived')] },
     };
     const { viewer, mount } = await createViewerHarness({
-      catalog: createHostResourceCatalog([], ['variable']),
-      document: withRule,
+      catalog: createHostResourceCatalog(['change'], ['variable']),
+      document: withRules,
       resourcePort: createImmediateResourcePort().port,
+      variablePort: createVariablePort({}).port,
     });
     await flush();
 
     mount.children[0]?.fire({ name: 'change', payload: {} });
     await flush();
 
-    expect(viewer.getVariable('locked')?.value).toBe('x');
+    // 迁移静态变量照常被蓝图写入；派生变量保持不变（不会被静默覆盖）。
+    expect(viewer.getVariable('legacy')?.value).toBe('written');
+    expect(viewer.getVariable('derived')?.value).toBeNull();
+    viewer.unload();
+  });
+
+  it('controlled 只决定初始种子：受控派生变量未就绪种 null，非受控种 initialValue', async () => {
+    const catalogPort = createVariablePort({}, true);
+    const screen = documentWith(
+      [],
+      [
+        derivedVariable('controlled', 'a-instance', 'seed', true),
+        derivedVariable('plain', 'b-instance', 'seed', false),
+      ],
+      [instance('a-instance'), instance('b-instance')],
+    );
+    const { viewer } = await createViewerHarness({
+      catalog: createHostResourceCatalog([], ['variable']),
+      document: screen,
+      resourcePort: createImmediateResourcePort().port,
+      variablePort: catalogPort.port,
+    });
+    await flush();
+
+    // 实例都还在途：受控变量等外部值（null），非受控用文档 initialValue。
+    expect(viewer.getVariable('controlled')?.value).toBeNull();
+    expect(viewer.getVariable('plain')?.value).toBe('seed');
     viewer.unload();
   });
 
