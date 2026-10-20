@@ -13,7 +13,7 @@ import type { ScreenBlueprintRuntimePort } from '@base-screen/contracts';
 import { ScreenBlueprintVisibilityEffect } from '@base-screen/core';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
-import type { ScreenHostCatalogPort } from '@base-screen/contracts';
+import { ScreenHostCatalogPort } from '@base-screen/contracts';
 import { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourcePort } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
@@ -159,6 +159,7 @@ export interface CreateBaseScreenRendererOptions {
     readonly documentRevision?: string;
     // (undocumented)
     readonly executionMode?: ScreenResourceExecutionMode;
+    readonly hostCatalogPort?: ScreenHostCatalogPort;
     // (undocumented)
     readonly instanceId?: string;
     // (undocumented)

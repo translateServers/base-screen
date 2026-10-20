@@ -157,14 +157,16 @@ describe('Renderer instance isolation (DRH-R3)', () => {
 
     await Promise.resolve();
     await Promise.resolve();
-    expect(firstCalls.count).toBe(1);
-    expect(secondCalls.count).toBe(1);
+    // 旧形态的两个组件各自合成一个实例（`data-source-<componentId>`），因此每个
+    // renderer 各发 2 次；关键断言是两份计数互不影响——跨实例绝不共享槽位或缓存。
+    expect(firstCalls.count).toBe(2);
+    expect(secondCalls.count).toBe(2);
     expect(first.children[0]?.model?.dataState).toMatchObject({ status: 'ready' });
     expect(second.children[0]?.model?.dataState).toMatchObject({ status: 'ready' });
 
     firstRenderer.dispose();
     await Promise.resolve();
-    expect(secondCalls.count).toBe(1);
+    expect(secondCalls.count).toBe(2);
     secondRenderer.dispose();
   });
 });

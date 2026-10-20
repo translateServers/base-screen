@@ -1,5 +1,6 @@
 import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
 import type {
+  BaseScreenDataCapability,
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
   BaseScreenMaterialDataBindingRole,
@@ -29,9 +30,12 @@ export class FakeRoot {
   }
 }
 
-export function createCatalog(): BaseScreenMaterialCatalog {
+export function createCatalog(
+  type = 'base.test',
+  dataCapabilities: readonly BaseScreenDataCapability[] = ['host-resource'],
+): BaseScreenMaterialCatalog {
   const manifest: BaseScreenMaterialManifest = {
-    type: 'base.test',
+    type,
     tagName: 'base-screen-test',
     name: 'Test',
     category: 'Test',
@@ -52,7 +56,7 @@ export function createCatalog(): BaseScreenMaterialCatalog {
     propsSchema: { kind: 'object', properties: {}, required: [] },
     propertyPanel: [],
     events: [],
-    dataCapabilities: ['host-resource'],
+    dataCapabilities,
     designCapabilities: { resize: true, rotate: true, children: true },
   };
   const entry = {

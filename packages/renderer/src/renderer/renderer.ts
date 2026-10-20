@@ -1,8 +1,10 @@
 import {
   parseScreenDocument,
   parseScreenJsonValue,
+  readScreenComponentValueRef,
   type ScreenDiagnostic,
   type ScreenDocument,
+  type ScreenHostCatalogPort,
   type ScreenHostDatasetPort,
   type ScreenHostResourcePort,
   type ScreenJsonObject,
@@ -21,14 +23,21 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { applyCanvasBackground } from '../canvas-background.js';
-import { cancelResourceState, createMountedResourceState } from '../resource/resource-state.js';
-import { prepareCandidates } from './renderer-candidates.js';
+import { createMountedProjectionState } from '../resource/resource-state.js';
+import {
+  type ComponentDataResolution,
+  prepareCandidates,
+  readComponentData,
+} from './renderer-candidates.js';
 import { failure, renderFailure } from './renderer-diagnostics.js';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
-import { resolveHostResource } from './renderer-host-resource.js';
 import { applyMaterial } from './renderer-material-dom.js';
-import { handleMaterialEvent, reconcileMountedMaterial } from './renderer-mounted-material.js';
-import { cancelHostResource, createRendererState, type RendererState } from './renderer-state.js';
+import {
+  applyMountedModel,
+  handleMaterialEvent,
+  reconcileMountedMaterial,
+} from './renderer-mounted-material.js';
+import { createRendererState, type RendererState } from './renderer-state.js';
 import type { MountedMaterial, RenderCandidate } from './renderer-types.js';
 
 export interface BaseScreenMaterialEvent {
@@ -47,6 +56,8 @@ export interface CreateBaseScreenRendererOptions {
   readonly onDiagnostic?: (diagnostic: ScreenDiagnostic) => void;
   readonly resourcePort: ScreenHostResourcePort | undefined;
   readonly datasetPort?: ScreenHostDatasetPort;
+  /** 来源目录端口（`host-catalog` / `url-query` 来源）。 */
+  readonly hostCatalogPort?: ScreenHostCatalogPort;
   /** ADR-0059 宿主条件样式端口：缺省时与既有渲染路径逐字节一致。 */
   readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly resourceTimeoutMs?: number;
@@ -74,7 +85,7 @@ export interface BaseScreenRenderer {
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
   /**
-   * 切换实例级 interactive 状态：已渲染过文档时原地重渲染（复用已挂载物料与资源请求状态），
+   * 切换实例级 interactive 状态：已渲染过文档时原地重渲染（复用已挂载物料与数据源请求状态），
    * 未渲染时只记录状态供下一次 render 使用。Viewer 与 Designer 共用该入口。
    */
   setInteractive(enabled: boolean): ScreenParseResult<null>;
@@ -94,9 +105,12 @@ export function createBaseScreenRenderer(
 
 class Renderer implements BaseScreenRenderer {
   readonly #state: RendererState;
+  /** 实例 → 读它的组件（文档顺序）：结果落地时只重投影这些组件。 */
+  #readers = new Map<string, readonly string[]>();
 
   constructor(options: CreateBaseScreenRendererOptions) {
     this.#state = createRendererState(options);
+    this.#state.onDataSourceChanged = (dataSourceId) => this.#handleDataSourceChanged(dataSourceId);
   }
 
   render(
@@ -113,14 +127,21 @@ class Renderer implements BaseScreenRenderer {
     if (!parsedDocument.ok) {
       return parsedDocument;
     }
+    const renderContext: ResolveContext = {
+      trigger: context?.trigger ?? 'manual',
+      traceId: context?.traceId ?? '',
+    };
+    // 先确保实例状态与请求：候选投影要从实例运行时读结果，所以这一步必须在
+    // prepareCandidates 之前。请求本身是异步的，首帧材料先落 loading。
+    this.#state.dataSources.ensure(parsedDocument.value, this.#state.variables, renderContext);
+    this.#readers = collectReaders(parsedDocument.value);
     const prepared = prepareCandidates(
       parsedDocument.value,
       this.#state.options.catalog,
       this.#state.options.mode,
       this.#state.interactive,
       this.#state.options.contributionIndex,
-      this.#state.variables,
-      this.#state.dataSuspended,
+      this.#state.dataSources,
       this.#state.validationCache,
     );
     if (!prepared.ok) {
@@ -135,25 +156,12 @@ class Renderer implements BaseScreenRenderer {
     );
     const next = new Map<string, MountedMaterial>();
     const runtimeDiagnostics: ScreenDiagnostic[] = [];
-    // First resolves for newly mounted components (and for existing mounts that
-    // change raw identity) are deferred until #mounted/#candidates/#document are
-    // committed below. Starting them earlier would let a synchronous terminal
-    // path (missing resource port or a synchronously throwing resolve) be
-    // rejected by applyResourceResult's mount-identity guard, leaving the
-    // material stuck in loading with a live timer until timeout.
-    const pendingResolves: {
-      readonly candidate: RenderCandidate;
-      readonly mounted: MountedMaterial;
-    }[] = [];
     for (const candidate of candidates) {
       const stackOrder = painterIndex.get(candidate.component.id)!;
       const existing = this.#state.mounted.get(candidate.component.id);
       if (existing !== undefined && existing.type === candidate.component.type) {
         try {
-          const toResolve = reconcileMountedMaterial(this.#state, candidate, existing, stackOrder);
-          if (toResolve !== undefined) {
-            pendingResolves.push({ candidate: toResolve, mounted: existing });
-          }
+          reconcileMountedMaterial(this.#state, candidate, existing, stackOrder);
         } catch {
           runtimeDiagnostics.push(
             renderFailure(candidate, 'Material model update raised an exception.'),
@@ -163,10 +171,7 @@ class Renderer implements BaseScreenRenderer {
         continue;
       }
       if (existing !== undefined) {
-        // Material type replacement on the same component id: tear down the
-        // previous mount exactly once (cancel, detach listener, remove element)
-        // so no resource or DOM for the old type leaks behind the new one.
-        cancelHostResource(this.#state, existing, candidate.component.id);
+        // 同 id 换物料类型：先拆掉旧挂载（解绑事件、移除元素），不残留旧类型的 DOM。
         existing.element.removeEventListener('base-screen-material-event', existing.onEvent);
         existing.element.remove();
       }
@@ -198,17 +203,15 @@ class Renderer implements BaseScreenRenderer {
         type: candidate.component.type,
         element,
         onEvent,
-        resource: createMountedResourceState(),
+        projection: createMountedProjectionState(),
+        stackOrder,
       };
-      mounted.resource.dataState = candidate.model.dataState;
+      mounted.projection.dataState = candidate.model.dataState;
+      mounted.projection.projectionKey = candidate.dataSource?.projectionKey;
       next.set(candidate.component.id, mounted);
-      if (candidate.resource !== undefined) {
-        pendingResolves.push({ candidate, mounted });
-      }
     }
     for (const [componentId, mounted] of this.#state.mounted) {
       if (!next.has(componentId)) {
-        cancelHostResource(this.#state, mounted, componentId);
         mounted.element.removeEventListener('base-screen-material-event', mounted.onEvent);
         mounted.element.remove();
       }
@@ -230,15 +233,7 @@ class Renderer implements BaseScreenRenderer {
       candidates.map((candidate) => [candidate.component.id, candidate]),
     );
     this.#state.document = parsedDocument.value;
-    // 整次 render 共享同一份按操作派生的上下文（RB2）：resolve 与它的全部
-    // observer 事件使用同一 context 对象数据，且不被其他组件消费/重置。
-    const renderContext: ResolveContext = {
-      trigger: context?.trigger ?? 'manual',
-      traceId: context?.traceId ?? '',
-    };
-    for (const { candidate, mounted } of pendingResolves) {
-      void resolveHostResource(this.#state, candidate, mounted, renderContext);
-    }
+    this.#state.lastValidatedInput = document;
     if (runtimeDiagnostics.length > 0) {
       for (const diagnostic of runtimeDiagnostics) {
         this.#state.options.onDiagnostic?.(diagnostic);
@@ -273,8 +268,8 @@ class Renderer implements BaseScreenRenderer {
     if (this.#state.document === undefined) {
       return { ok: true, value: null, diagnostics: [] };
     }
-    // 原地重渲染：同 type 同 id 的挂载按 reconcile 路径复用元素与资源请求状态，
-    // 仅更新模型（interactive 字段），不重挂载、不重取数、不闪烁。
+    // 原地重渲染：同 type 同 id 的挂载按 reconcile 路径复用元素；数据源按实例复用
+    // 已就绪的结果，因此不会重取数、不闪烁。
     return this.render(this.#state.document);
   }
 
@@ -294,43 +289,42 @@ class Renderer implements BaseScreenRenderer {
   suspendData(): void {
     this.#state.dataSuspended = true;
     this.#state.coordinator?.abortAll();
+    this.#state.dataSources.suspend();
     for (const [componentId, mounted] of this.#state.mounted) {
-      const resource = mounted.resource;
-      cancelResourceState(resource);
-      resource.resourceKey = undefined;
-      resource.projectionKey = undefined;
-      resource.rawValue = undefined;
-      resource.requestSlotId = undefined;
-      resource.dataState = { status: 'loading' };
+      mounted.projection.projectionKey = undefined;
+      mounted.projection.dataState = { status: 'loading' };
       const candidate = this.#state.candidates.get(componentId);
-      if (candidate !== undefined && candidate.resource !== undefined) {
+      if (candidate !== undefined && candidate.dataSource !== undefined) {
         mounted.element.model = { ...candidate.model, dataState: { status: 'loading' } };
       }
     }
   }
 
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void {
-    // 每次 refresh 操作派生一份上下文，逐组件传给 resolve（RB2）：全量刷新中
-    // 任一组件都不会消费/重置其他组件的 trigger 或 trace。
+    // 每次 refresh 操作派生一份上下文，逐实例传下去（RB2）：全量刷新中任一实例都
+    // 不会消费/重置其他实例的 trigger 或 trace。
     const refreshContext: ResolveContext = {
       trigger: trigger === 'polling' ? 'polling' : 'manual',
       traceId: traceId ?? '',
     };
-    for (const [id, candidate] of this.#state.candidates) {
-      if (componentId !== undefined && componentId !== id) continue;
-      const mounted = this.#state.mounted.get(id);
-      if (mounted !== undefined && candidate.resource !== undefined) {
-        void resolveHostResource(this.#state, candidate, mounted, refreshContext, true);
-      }
+    if (componentId === undefined) {
+      this.#state.dataSources.refresh(undefined, refreshContext);
+      return;
     }
+    const candidate = this.#state.candidates.get(componentId);
+    if (candidate === undefined) return;
+    const ref = readScreenComponentValueRef(candidate.component);
+    if (ref?.kind !== 'data-source-field') return;
+    this.#state.dataSources.refresh(ref.dataSourceId, refreshContext);
   }
 
   clear(): void {
     this.resetBlueprintVisibility();
     this.#state.coordinator?.abortAll();
-    this.#state.datasetQueries.clear();
+    this.#state.sourceQueries.clear();
+    this.#state.dataSources.clear();
+    this.#readers = new Map();
     for (const mounted of this.#state.mounted.values()) {
-      cancelResourceState(mounted.resource);
       mounted.element.removeEventListener('base-screen-material-event', mounted.onEvent);
       mounted.element.remove();
     }
@@ -347,4 +341,58 @@ class Renderer implements BaseScreenRenderer {
       this.#state.disposed = true;
     }
   }
+
+  /**
+   * 实例结果变化（settle/失败/取消）后就地重投影读它的组件。
+   *
+   * 只碰组件投影，不重挂载、不发请求：值在实例上，投影在组件上，两件事分开。
+   */
+  #handleDataSourceChanged(dataSourceId: string): void {
+    const document = this.#state.document;
+    if (document === undefined || this.#state.disposed) return;
+    for (const componentId of this.#readers.get(dataSourceId) ?? []) {
+      const component = document.components.find((item) => item.id === componentId);
+      const candidate = this.#state.candidates.get(componentId);
+      const mounted = this.#state.mounted.get(componentId);
+      if (component === undefined || candidate === undefined || mounted === undefined) continue;
+      const resolved: ComponentDataResolution = readComponentData(
+        this.#state.dataSources,
+        component,
+        candidate.entry,
+        this.#state.options.contributionIndex,
+        ['components', componentId],
+        (item) => this.#state.options.onDiagnostic?.(item),
+      );
+      if ('diagnostic' in resolved) continue;
+      const nextCandidate: RenderCandidate = {
+        ...candidate,
+        model: { ...candidate.model, dataState: resolved.dataState },
+        dataSource: resolved.dataSource,
+      };
+      this.#state.candidates.set(componentId, nextCandidate);
+      if (resolved.dataState.status === 'ready') {
+        this.#state.dataSources.reportProjection(
+          dataSourceId,
+          componentId,
+          resolved.dataState.value,
+        );
+      }
+      mounted.projection.dataState = resolved.dataState;
+      mounted.projection.projectionKey = resolved.dataSource?.projectionKey;
+      applyMountedModel(this.#state, nextCandidate, mounted, mounted.stackOrder);
+    }
+  }
+}
+
+/** 实例 → 读它的组件 id（文档顺序）。只经取值引用读取，不碰旧 `dataSource` 形态。 */
+function collectReaders(document: ScreenDocument): Map<string, readonly string[]> {
+  const readers = new Map<string, string[]>();
+  for (const component of document.components) {
+    const ref = readScreenComponentValueRef(component);
+    if (ref?.kind !== 'data-source-field') continue;
+    const list = readers.get(ref.dataSourceId);
+    if (list === undefined) readers.set(ref.dataSourceId, [component.id]);
+    else list.push(component.id);
+  }
+  return readers;
 }

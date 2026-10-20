@@ -1,57 +1,25 @@
 import { parseBaseScreenMaterialEventDetail } from '@base-screen/plugin-core';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
-import { adaptResourceResult } from './renderer-host-resource.js';
 import { applyMaterial } from './renderer-material-dom.js';
-import { cancelHostResource, type RendererState } from './renderer-state.js';
+import type { RendererState } from './renderer-state.js';
 import type { MountedMaterial, RenderCandidate } from './renderer-types.js';
 
 /**
- * Reconciles an already-mounted material. Returns the candidate whose first
- * resolve must be started after the render commit (new raw identity), or
- * undefined when no resolve should start. Starting the resolve here would run
- * before `#mounted`/`#candidates` are committed, so a synchronous terminal
- * path could never apply to the current mount.
+ * 复用已挂载物料：只更新模型与投影状态。
+ *
+ * 请求与缓存已在 `DataSourceRuntime` 上按实例共享，所以这里没有「首次 resolve」要推迟；
+ * 数据状态由候选（读运行时）决定，映射变化只重跑本地投影，不碰任何请求。
  */
 export function reconcileMountedMaterial(
   state: RendererState,
   candidate: RenderCandidate,
   mounted: MountedMaterial,
   stackOrder: number,
-): RenderCandidate | undefined {
-  const resource = candidate.resource;
-  const resourceState = mounted.resource;
-  if (resource === undefined) {
-    // Data source removed (or parameters became unevaluable): cancel the old
-    // generation exactly once, clear the raw/projection keys and retained raw
-    // value, and let the candidate dataState (idle/static/error) win.
-    cancelHostResource(state, mounted, candidate.component.id);
-    resourceState.resourceKey = undefined;
-    resourceState.projectionKey = undefined;
-    resourceState.rawValue = undefined;
-    resourceState.requestSlotId = undefined;
-    resourceState.dataState = candidate.model.dataState;
-    applyMountedModel(state, candidate, mounted, stackOrder);
-    return undefined;
-  }
-  if (resourceState.resourceKey !== resource.key) {
-    // New raw identity: the render loop starts the resolve after the commit.
-    resourceState.rawValue = undefined;
-    resourceState.dataState = { status: 'loading' };
-    applyMountedModel(state, candidate, mounted, stackOrder);
-    return candidate;
-  }
-  // Same raw identity: preserve the in-flight request, controller, timer,
-  // generation, retained raw value and current dataState. Unrelated edits must
-  // neither abort nor re-fetch. A projection/binding-only change re-validates
-  // and re-adapts locally from the retained raw value with zero host resolves.
-  if (resourceState.projectionKey !== resource.projectionKey) {
-    if (resourceState.rawValue !== undefined) {
-      resourceState.dataState = adaptResourceResult(state, candidate, resourceState.rawValue);
-    }
-    resourceState.projectionKey = resource.projectionKey;
-  }
+): void {
+  mounted.stackOrder = stackOrder;
+  mounted.projection.projectionKey = candidate.dataSource?.projectionKey;
+  mounted.projection.dataState = candidate.model.dataState;
   applyMountedModel(state, candidate, mounted, stackOrder);
-  return undefined;
 }
 
 export function applyMountedModel(
@@ -63,7 +31,7 @@ export function applyMountedModel(
   applyMaterial(
     mounted.element,
     candidate.component,
-    resolveEffectiveModel(state, candidate, mounted.resource.dataState),
+    resolveEffectiveModel(state, candidate, candidate.model.dataState),
     state.visibility.isHidden(candidate.component.id),
     stackOrder,
   );

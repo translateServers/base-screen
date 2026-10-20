@@ -7,6 +7,7 @@
 import type { ScreenDataBinding } from '@base-screen/contracts';
 import { ScreenDatasetField } from '@base-screen/contracts';
 import type { ScreenDatasetValueType } from '@base-screen/contracts';
+import type { ScreenDataSourceSource } from '@base-screen/contracts';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import type { ScreenDocument } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
@@ -15,6 +16,7 @@ import type { ScreenMaterialErrorCode } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 import type { ScreenSize } from '@base-screen/contracts';
 import { ScreenTabularDataset } from '@base-screen/contracts';
+import type { ScreenValueRef } from '@base-screen/contracts';
 
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_EVENT: 'base-screen-material-event';
@@ -62,6 +64,9 @@ export interface BaseScreenConditionalStyleRequest {
     // (undocumented)
     readonly dataState: BaseScreenMaterialDataState;
 }
+
+// @public
+export type BaseScreenDataCapability = 'static' | 'dataset' | 'host-resource' | 'variable';
 
 // @public (undocumented)
 export interface BaseScreenDataField {
@@ -871,6 +876,9 @@ export function readContributionHandlerRecord(input: ContributionHandlerRecordIn
 
 // @public (undocumented)
 export function resolveSchema(path: readonly (string | number)[], schema: BaseScreenMaterialObjectSchema): BaseScreenMaterialPropSchema | undefined;
+
+// @public
+export function screenValueRefAccepted(capabilities: readonly BaseScreenDataCapability[], ref: ScreenValueRef, source: ScreenDataSourceSource | undefined): boolean;
 
 // @public (undocumented)
 export function validateBaseScreenMaterialIdentity(type: unknown, tagName: unknown): ScreenParseResult<null>;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalJsonString } from '../../src/canonical-json.js';
-import { getHostResourceKey } from '../../src/resource/resource-state.js';
-import { component, hostSource } from './__fixtures__/resource-state-machine-harness.js';
+import { requestKeyOf } from '../../src/resource/data-source-runtime.js';
+import { getProjectionKey } from '../../src/resource/resource-state.js';
 
 describe('canonical resource identity', () => {
   it('serializes equal parameter objects identically regardless of insertion order', () => {
@@ -17,32 +17,34 @@ describe('canonical resource identity', () => {
     );
   });
 
-  it('excludes the field binding and the component id from the raw query key', () => {
-    const sourceA = hostSource(
-      'orders',
-      'dataset',
-      { limit: { kind: 'literal', value: 5 } },
-      {
-        fields: { columns: ['name'] },
-      },
+  const source = { kind: 'dataset' as const, datasetId: 'orders' };
+
+  it('keys the request by instance id, source and evaluated parameters', () => {
+    expect(requestKeyOf('orders', source, { limit: 5, region: 'north' })).toBe(
+      requestKeyOf('orders', source, { region: 'north', limit: 5 }),
     );
-    const sourceB = hostSource(
-      'orders',
-      'dataset',
-      { limit: { kind: 'literal', value: 5 } },
-      {
-        fields: { columns: ['amount'] },
-      },
+    // 同一参数、不同实例 = 两次请求（不自动合并两个实例，PRD 明确）。
+    expect(requestKeyOf('orders', source, { limit: 5 })).not.toBe(
+      requestKeyOf('orders-2', source, { limit: 5 }),
     );
-    const bindingless = hostSource('orders', 'dataset');
-    const componentA = component('a', 0, null, sourceA);
-    const componentB = component('b', 0, null, sourceB);
-    const componentC = component('c', 0, null, bindingless);
-    expect(getHostResourceKey(componentA, { limit: 5 })).toBe(
-      getHostResourceKey(componentB, { limit: 5 }),
+    // 参数变化 = 新请求。
+    expect(requestKeyOf('orders', source, { limit: 5 })).not.toBe(
+      requestKeyOf('orders', source, { limit: 6 }),
     );
-    expect(getHostResourceKey(componentA, { limit: 5 })).toBe(
-      getHostResourceKey(componentC, { limit: 5 }),
+    // 来源改写（实例 id 不变）= 新请求。
+    expect(requestKeyOf('orders', source, { limit: 5 })).not.toBe(
+      requestKeyOf('orders', { kind: 'dataset', datasetId: 'tenants' }, { limit: 5 }),
     );
+  });
+
+  it('keeps the projection identity out of the request key', () => {
+    const left = getProjectionKey({ fields: { columns: ['name'] } });
+    const right = getProjectionKey({ fields: { columns: ['amount'] } });
+    expect(left).not.toBe(right);
+    // 映射不同不影响请求键：同一实例同一参数只发一次请求。
+    expect(requestKeyOf('orders', source, { limit: 5 })).toBe(
+      requestKeyOf('orders', source, { limit: 5 }),
+    );
+    expect(getProjectionKey(null)).not.toBe(left);
   });
 });

@@ -114,6 +114,29 @@ function component(id: string): ScreenComponentNode {
   };
 }
 
+/** 两个组件读同一个实例（新形态）：请求身份是实例，不是组件。 */
+function sharedInstanceDocument(componentIds: readonly string[]): ScreenDocument {
+  return {
+    canvas: { width: 960, height: 540, backgroundColor: '#000000' },
+    components: componentIds.map((id) => ({
+      ...component(id),
+      // 新形态只写 dataValue：旧 dataSource 与它互斥（解析器 fail-closed）。
+      dataSource: null,
+      dataValue: { kind: 'data-source-field' as const, dataSourceId: 'orders', path: [] },
+    })),
+    dataSources: [
+      {
+        id: 'orders',
+        name: 'orders',
+        source: { kind: 'host-resource' as const, resourceType: 'dataset', resourceId: 'orders' },
+        params: {},
+      },
+    ],
+    variables: [],
+    blueprint: { rules: [] },
+  };
+}
+
 function document(components: readonly ScreenComponentNode[]): ScreenDocument {
   return {
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
@@ -196,7 +219,7 @@ describe('Renderer observer events (DRH-R8)', () => {
     expect(events.find((event) => event.type === 'succeeded')?.fieldCount).toBe(1);
   });
 
-  it('emits shared for a second consumer of the same shareable request', async () => {
+  it('issues one request for one instance read by two components and reports one adapted per component', async () => {
     const events: ScreenResourceObserverEvent[] = [];
     const root = new FakeRoot();
     const { port, requests } = createDeferredPort();
@@ -213,12 +236,16 @@ describe('Renderer observer events (DRH-R8)', () => {
       resourcePort: port,
     });
 
-    expect(renderer.render(document([component('a'), component('b')])).ok).toBe(true);
+    // 一个实例被两个组件读：宿主只被调用一次，没有「第二个消费者合并」这种事件——
+    // 请求本来就是实例级的，不再按消费者合并。
+    expect(renderer.render(sharedInstanceDocument(['a', 'b'])).ok).toBe(true);
     expect(events.filter((event) => event.type === 'started')).toHaveLength(1);
-    expect(events.filter((event) => event.type === 'shared')).toHaveLength(1);
-    expect(events.find((event) => event.type === 'shared')?.componentId).toBe('b');
+    expect(events.filter((event) => event.type === 'shared')).toHaveLength(0);
+    expect(requests).toHaveLength(1);
     requests[0]!.resolveRequest({ ok: true, value: { ready: true }, diagnostics: [] });
     await flush();
+    const adapted = events.filter((event) => event.type === 'adapted');
+    expect(adapted.map((event) => event.componentId).sort()).toEqual(['a', 'b']);
     renderer.dispose();
   });
 

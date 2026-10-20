@@ -1,6 +1,7 @@
 import type {
   ScreenAbortSignal,
   ScreenComponentNode,
+  ScreenDataSource,
   ScreenDocument,
   ScreenHostResourceBinding,
   ScreenHostResourceParameter,
@@ -125,6 +126,53 @@ function document(components: readonly ScreenComponentNode[]): ScreenDocument {
   };
 }
 
+/** 新形态：文档级实例 + 组件 `dataValue`（T02c 起请求身份是实例）。 */
+function instance(id: string, overrides: Partial<ScreenDataSource> = {}): ScreenDataSource {
+  return {
+    id,
+    name: id,
+    source: { kind: 'host-resource', resourceType: 'dataset', resourceId: 'orders' },
+    params: {},
+    ...overrides,
+  };
+}
+
+function reader(
+  id: string,
+  dataSourceId: string,
+  path: readonly string[] = [],
+): ScreenComponentNode {
+  return {
+    ...component(id),
+    dataValue: { kind: 'data-source-field', dataSourceId, path },
+  };
+}
+
+function dataSourceDocument(
+  components: readonly ScreenComponentNode[],
+  dataSources: readonly ScreenDataSource[],
+): ScreenDocument {
+  return { ...document(components), dataSources };
+}
+
+function createRenderer(
+  root: FakeRoot,
+  port: ScreenHostResourcePort,
+  index: BaseScreenRuntimeContributionIndex = contributionIndex(true),
+  resourceTimeoutMs?: number,
+) {
+  return createBaseScreenRenderer({
+    root: root as unknown as HTMLElement,
+    catalog: createCatalog(),
+    contributionIndex: index,
+    mode: 'viewer',
+    interactive: false,
+    onMaterialEvent: undefined,
+    resourcePort: port,
+    ...(resourceTimeoutMs === undefined ? {} : { resourceTimeoutMs }),
+  });
+}
+
 function hostSource(
   resourceId: string,
   params: Readonly<Record<string, ScreenHostResourceParameter>> = {},
@@ -184,21 +232,16 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
   it('shares one in-flight host resolve for identical shareable raw keys', async () => {
     const root = new FakeRoot();
     const { port, requests } = createDeferredPort();
-    const renderer = createBaseScreenRenderer({
-      root: root as unknown as HTMLElement,
-      catalog: createCatalog(),
-      contributionIndex: contributionIndex(true),
-      mode: 'viewer',
-      interactive: false,
-      onMaterialEvent: undefined,
-      resourcePort: port,
-    });
-    const source = hostSource('orders', { limit: { kind: 'literal', value: 5 } });
-
-    expect(renderer.render(document([component('a', source), component('b', source)])).ok).toBe(
-      true,
+    const renderer = createRenderer(root, port);
+    // 两个组件引用同一实例、同参数：宿主只该被调用一次（R1）。
+    const screen = dataSourceDocument(
+      [reader('a', 'orders'), reader('b', 'orders')],
+      [instance('orders')],
     );
+
+    expect(renderer.render(screen).ok).toBe(true);
     expect(requests).toHaveLength(1);
+    expect(requests[0]!.request.dataSourceId).toBe('orders');
 
     requests[0]!.resolveRequest({ ok: true, value: { ready: true }, diagnostics: [] });
     await flush();
@@ -341,29 +384,24 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     renderer.dispose();
   });
 
-  it('a consumer leaving removes only its subscription; the last consumer abort aborts the host request', async () => {
+  it('keeps the instance request while any component reads it, and aborts only when the instance leaves', async () => {
     const root = new FakeRoot();
     const { port, requests } = createDeferredPort();
-    const renderer = createBaseScreenRenderer({
-      root: root as unknown as HTMLElement,
-      catalog: createCatalog(),
-      contributionIndex: contributionIndex(true),
-      mode: 'viewer',
-      interactive: false,
-      onMaterialEvent: undefined,
-      resourcePort: port,
-    });
-    const source = hostSource('orders');
+    const renderer = createRenderer(root, port);
+    const orders = instance('orders');
 
-    expect(renderer.render(document([component('a', source), component('b', source)])).ok).toBe(
-      true,
-    );
+    expect(
+      renderer.render(dataSourceDocument([reader('a', 'orders'), reader('b', 'orders')], [orders]))
+        .ok,
+    ).toBe(true);
     expect(requests).toHaveLength(1);
 
-    expect(renderer.render(document([component('b', source)])).ok).toBe(true);
+    // 一个组件卸载不影响实例请求：另一个读者还在，缓存与在途请求都留在实例上。
+    expect(renderer.render(dataSourceDocument([reader('b', 'orders')], [orders])).ok).toBe(true);
     expect(requests[0]!.aborted).toBe(false);
 
-    expect(renderer.render(document([])).ok).toBe(true);
+    // 实例离开文档 = 请求作废（文档是唯一真相）。
+    expect(renderer.render(dataSourceDocument([], [])).ok).toBe(true);
     expect(requests[0]!.aborted).toBe(true);
     renderer.dispose();
   });
@@ -395,20 +433,14 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
   it('distributes one consistent failure terminal state to every current consumer', async () => {
     const root = new FakeRoot();
     const { port, requests } = createDeferredPort();
-    const renderer = createBaseScreenRenderer({
-      root: root as unknown as HTMLElement,
-      catalog: createCatalog(),
-      contributionIndex: contributionIndex(true),
-      mode: 'viewer',
-      interactive: false,
-      onMaterialEvent: undefined,
-      resourcePort: port,
-    });
-    const source = hostSource('orders');
+    const renderer = createRenderer(root, port);
 
-    expect(renderer.render(document([component('a', source), component('b', source)])).ok).toBe(
-      true,
-    );
+    expect(
+      renderer.render(
+        dataSourceDocument([reader('a', 'orders'), reader('b', 'orders')], [instance('orders')]),
+      ).ok,
+    ).toBe(true);
+    expect(requests).toHaveLength(1);
     requests[0]!.resolveRequest({
       ok: false,
       diagnostics: [
@@ -431,21 +463,13 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     vi.useFakeTimers();
     const root = new FakeRoot();
     const { port, requests } = createDeferredPort();
-    const renderer = createBaseScreenRenderer({
-      root: root as unknown as HTMLElement,
-      catalog: createCatalog(),
-      contributionIndex: contributionIndex(true),
-      mode: 'viewer',
-      interactive: false,
-      onMaterialEvent: undefined,
-      resourcePort: port,
-      resourceTimeoutMs: 100,
-    });
-    const source = hostSource('orders');
+    const renderer = createRenderer(root, port, contributionIndex(true), 100);
 
-    expect(renderer.render(document([component('a', source), component('b', source)])).ok).toBe(
-      true,
-    );
+    expect(
+      renderer.render(
+        dataSourceDocument([reader('a', 'orders'), reader('b', 'orders')], [instance('orders')]),
+      ).ok,
+    ).toBe(true);
     expect(requests).toHaveLength(1);
 
     await vi.advanceTimersByTimeAsync(500);
@@ -556,29 +580,17 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     const rootA = new FakeRoot();
     const rootB = new FakeRoot();
     const { port, requests } = createDeferredPort();
-    const createRenderer = (root: FakeRoot) =>
-      createBaseScreenRenderer({
-        root: root as unknown as HTMLElement,
-        catalog: createCatalog(),
-        contributionIndex: contributionIndex(true),
-        mode: 'viewer',
-        interactive: false,
-        onMaterialEvent: undefined,
-        resourcePort: port,
-      });
-    const rendererA = createRenderer(rootA);
-    const rendererB = createRenderer(rootB);
-    const source = hostSource('orders');
+    const rendererA = createRenderer(rootA, port);
+    const rendererB = createRenderer(rootB, port);
+    const screen = dataSourceDocument([reader('a', 'orders')], [instance('orders')]);
 
-    expect(rendererA.render(document([component('a', source), component('b', source)])).ok).toBe(
-      true,
-    );
+    expect(rendererA.render(screen).ok).toBe(true);
     expect(requests).toHaveLength(1);
 
-    // 第二个实例即使共享同一 raw key，也不与第一个实例的 in-flight 槽位合并。
-    expect(rendererB.render(document([component('c', source)])).ok).toBe(true);
+    // 第二个实例有自己的一份缓存与槽位：同实例 id 也不与第一个实例的 in-flight 合并。
+    expect(rendererB.render(screen).ok).toBe(true);
     expect(requests).toHaveLength(2);
-    expect(requests[1]!.request.dataSourceId).toBe('data-source-c');
+    expect(requests[1]!.request.dataSourceId).toBe('orders');
     expect(requests[0]!.aborted).toBe(false);
     rendererA.dispose();
     rendererB.dispose();

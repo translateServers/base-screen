@@ -1,6 +1,6 @@
 import type {
-  ScreenHostResourcePort,
   ScreenHostResourceRequest,
+  ScreenHostResourceResolveOptions,
   ScreenJsonValue,
   ScreenParseResult,
   ScreenResourceExecutionContext,
@@ -41,12 +41,17 @@ export type CoordinatorRequestResult = {
   readonly slotId: string;
 };
 
-export class ResourceRequestCoordinator {
+export class ResourceRequestCoordinator<TRequest = ScreenHostResourceRequest> {
   #requests = new Map<string, SharedRequest>();
   #nextSlotId = 0;
 
   constructor(
-    private readonly resourcePort: ScreenHostResourcePort,
+    private readonly resourcePort: {
+      resolve(
+        request: TRequest,
+        options: ScreenHostResourceResolveOptions,
+      ): Promise<ScreenParseResult<ScreenJsonValue>>;
+    },
     private readonly isShareable: (resourceType: string) => boolean,
     private readonly timeoutMs: number,
     private readonly onShared?: (
@@ -60,7 +65,7 @@ export class ResourceRequestCoordinator {
     key: string,
     resourceType: string,
     componentId: string,
-    request: ScreenHostResourceRequest,
+    request: TRequest,
     context?: ScreenResourceExecutionContext,
   ): CoordinatorRequestResult {
     if (this.isShareable(resourceType)) {
@@ -109,7 +114,7 @@ export class ResourceRequestCoordinator {
     key: string,
     resourceType: string,
     componentId: string,
-    request: ScreenHostResourceRequest,
+    request: TRequest,
     context: ScreenResourceExecutionContext | undefined,
   ): Promise<SharedResolution> {
     const controller = new AbortController();
@@ -134,7 +139,7 @@ export class ResourceRequestCoordinator {
     }, this.timeoutMs);
     this.#requests.set(slotId, entry);
 
-    let resultPromise: ReturnType<ScreenHostResourcePort['resolve']>;
+    let resultPromise: Promise<ScreenParseResult<ScreenJsonValue>>;
     try {
       resultPromise = this.resourcePort.resolve(request, {
         signal: controller.signal,

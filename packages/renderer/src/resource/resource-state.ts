@@ -1,87 +1,28 @@
-import type {
-  ScreenComponentNode,
-  ScreenDatasetDataSource,
-  ScreenHostResourceDataSource,
-  ScreenJsonObject,
-  ScreenJsonValue,
-  ScreenResourceExecutionContext,
-} from '@base-screen/contracts';
+import type { ScreenDataBinding, ScreenJsonValue } from '@base-screen/contracts';
 import type { BaseScreenMaterialDataState } from '@base-screen/plugin-core';
 import { canonicalJsonString } from '../canonical-json.js';
-import { DATASET_QUERY_KIND } from './dataset-query-port.js';
 
 /**
- * Per-mounted-component resource lifecycle state. The renderer models each
- * mounted host-resource component with exactly this record so reconciliation
- * can retain the in-flight request, generation, raw query identity, projection
- * identity, the last validated raw host value, and the material-facing data
- * state across unrelated component/document edits. Host request cancellation
- * and deadline are owned by the ResourceRequestCoordinator.
+ * 挂载物料的**投影**状态。请求与缓存已上移到数据源实例（`DataSourceRuntime`）：
+ * 这里只剩「这个组件怎么把实例结果投影成自己的 dataState」，不再持有 raw identity、
+ * 原始值或请求槽位——同一实例被多个组件引用时，那些东西必须是共享的一份。
  */
-export type MountedResourceState = {
-  /** Raw query identity: resourceType + resourceId + canonical evaluated params. */
-  resourceKey: string | undefined;
-  /** Projection identity derived from the field binding; re-adaptation trigger. */
+export type MountedProjectionState = {
+  /** 投影身份：由组件字段映射派生（`path` + `dataBinding`），只影响本地重投影。 */
   projectionKey: string | undefined;
-  /** Material-facing data state (idle/loading/ready/error). */
+  /** Material-facing data state（idle/loading/ready/error）。 */
   dataState: BaseScreenMaterialDataState;
-  /** Last validated raw host value retained for local re-adaptation. */
-  rawValue: ScreenJsonValue | undefined;
-  /** Generation guard; every cancel bumps it so late results are suppressed. */
-  resourceGeneration: number;
-  /**
-   * 不透明请求槽位 ID（RB1）：由协调器按次请求签发，释放/超时/进行中合并按它
-   * 定位，绝不与 raw key 混用。未声明共享的相同 raw key 因此获得独立槽位。
-   */
-  requestSlotId: string | undefined;
-  /** 最近一次 resolve 的执行上下文（RB2）：abort 等生命周期事件复用同一上下文。 */
-  executionContext: ScreenResourceExecutionContext | undefined;
 };
 
-export function createMountedResourceState(): MountedResourceState {
-  return {
-    resourceKey: undefined,
-    projectionKey: undefined,
-    dataState: { status: 'idle' },
-    rawValue: undefined,
-    resourceGeneration: 0,
-    requestSlotId: undefined,
-    executionContext: undefined,
-  };
+export function createMountedProjectionState(): MountedProjectionState {
+  return { projectionKey: undefined, dataState: { status: 'idle' } };
 }
 
 /**
- * Cancels the current resource lifecycle exactly once: bumps the generation so
- * any in-flight promise, timeout callback, or late resolve/reject for the old
- * generation is rejected. The host request abort itself is owned by the
- * coordinator (last consumer leaves / key change / suspend / dispose).
+ * 投影身份：字段映射的规范序列化。
+ *
+ * 与请求键分开是硬约束：映射变化只重跑本地投影，绝不重新发请求。
  */
-export function cancelResourceState(state: MountedResourceState): void {
-  state.resourceGeneration++;
-}
-
-/**
- * Canonical raw query identity. The field binding is deliberately excluded:
- * binding changes only re-run the local projection and must not re-issue a host
- * query. Evaluated params use the deterministic canonical representation so the
- * key does not depend on parameter object insertion order.
- */
-export function getHostResourceKey(
-  component: ScreenComponentNode,
-  params: ScreenJsonObject,
-): string {
-  const source = component.dataSource;
-  if (source?.type === 'dataset')
-    return `${DATASET_QUERY_KIND}\u0000${source.datasetId}\u0000${canonicalJsonString(params)}`;
-  if (source === null || source.type !== 'host-resource') {
-    throw new Error('Host resource key requires a host-resource source.');
-  }
-  return `${source.resourceType}\u0000${source.resourceId}\u0000${canonicalJsonString(params)}`;
-}
-
-/** Projection identity derived from the field binding (or the literal null). */
-export function getProjectionKey(
-  source: ScreenHostResourceDataSource | ScreenDatasetDataSource,
-): string {
-  return canonicalJsonString(source.binding as unknown as ScreenJsonValue);
+export function getProjectionKey(binding: ScreenDataBinding | null): string {
+  return canonicalJsonString(binding as unknown as ScreenJsonValue);
 }

@@ -1,18 +1,13 @@
 import {
-  parseScreenJsonValue,
-  parseScreenTabularDataset,
+  readScreenComponentDataBinding,
+  readScreenComponentValueRef,
   type ScreenComponentNode,
   type ScreenDataBinding,
   type ScreenDiagnostic,
   type ScreenDocument,
   type ScreenJsonObject,
-  type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
-import {
-  evaluateScreenHostResourceParameters,
-  validateScreenHostResourceBinding,
-} from '@base-screen/core';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialCatalogEntry,
@@ -21,17 +16,28 @@ import type {
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import {
+  screenValueRefAccepted,
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
-import { getHostResourceKey, getProjectionKey } from '../resource/resource-state.js';
+import type { DataSourceRuntime } from '../resource/data-source-runtime.js';
+import { getProjectionKey } from '../resource/resource-state.js';
+import { projectDataSourceResult, projectStaticValue } from './renderer-data-source.js';
 import { diagnostic, prefixDiagnostics, sortDiagnostics } from './renderer-diagnostics.js';
 import type {
   CachedComponentValidation,
   ComponentValidationCache,
   RenderCandidate,
-  ResolvedHostResource,
+  ResolvedDataSource,
 } from './renderer-types.js';
+
+/** 组件数据解析结果：要么给出状态，要么给出让本次渲染失败关闭的诊断。 */
+export type ComponentDataResolution =
+  | {
+      readonly dataState: BaseScreenMaterialDataState;
+      readonly dataSource: ResolvedDataSource | undefined;
+    }
+  | { readonly diagnostic: ScreenDiagnostic };
 
 export function prepareCandidates(
   document: ScreenDocument,
@@ -39,8 +45,7 @@ export function prepareCandidates(
   mode: BaseScreenMaterialMode,
   interactive: boolean,
   contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
-  variables: ScreenJsonObject,
-  dataSuspended: boolean,
+  dataSources: DataSourceRuntime,
   validationCache: ComponentValidationCache,
 ): ScreenParseResult<readonly RenderCandidate[]> {
   const candidates: RenderCandidate[] = [];
@@ -121,16 +126,12 @@ export function prepareCandidates(
       style = validatedStyle.value;
       nextEntries.set(component, { entry, props, style });
     }
-    const data = getDataState(
-      component,
-      entry,
+    const resolved = readComponentData(dataSources, component, entry, contributionIndex, [
+      'components',
       index,
-      diagnostics,
-      contributionIndex,
-      variables,
-      dataSuspended,
-    );
-    if (data === undefined) {
+    ]);
+    if ('diagnostic' in resolved) {
+      diagnostics.push(resolved.diagnostic);
       continue;
     }
     candidates.push({
@@ -143,9 +144,9 @@ export function prepareCandidates(
         props,
         style,
         size: { width: component.size.width, height: component.size.height },
-        dataState: data.dataState,
+        dataState: resolved.dataState,
       },
-      resource: data.resource,
+      dataSource: resolved.dataSource,
     });
   }
   validationCache.entries = nextEntries;
@@ -154,212 +155,174 @@ export function prepareCandidates(
     : { ok: false, diagnostics: sortDiagnostics(diagnostics) };
 }
 
-function getDataState(
+/**
+ * 读一个组件当前的数据状态。
+ *
+ * 数据源一律经 T01 的读取适配窗口 `readScreenComponentValueRef`（旧 `dataSource` 四形态
+ * 由它推导等价引用），因此这里不再有第二套形态判别；求值与 `path` 下钻交给 core 的
+ * `evaluateScreenValueRef`，物料能力门控交给 `screenValueRefAccepted`。
+ *
+ * 渲染首帧与「实例结果变化后就地重投影」共用这一个入口，状态不会两处口径。
+ *
+ * @param dataSources 实例运行时（状态与缓存的唯一来源）。
+ * @param component 组件节点。
+ * @param entry 物料 catalog 条目。
+ * @param contributionIndex 插件贡献索引（`host-resource` 类型门控）。
+ * @param path 诊断路径（首帧用 `['components', index]`，重投影用组件 id）。
+ */
+export function readComponentData(
+  dataSources: DataSourceRuntime,
   component: ScreenComponentNode,
   entry: BaseScreenMaterialCatalogEntry,
-  index: number,
-  diagnostics: ScreenDiagnostic[],
   contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
-  variables: ScreenJsonObject,
-  dataSuspended: boolean,
-):
-  | {
-      readonly dataState: BaseScreenMaterialDataState;
-      readonly resource: ResolvedHostResource | undefined;
+  path: readonly (string | number)[],
+  onDiagnostic?: (item: ScreenDiagnostic) => void,
+): ComponentDataResolution {
+  const ref = readScreenComponentValueRef(component);
+  const binding = readScreenComponentDataBinding(component);
+  if (ref === null) {
+    if (binding !== null) {
+      // 不取值却声明了字段映射：映射无从校验，按旧路径当作没有默认数据。
+      return { dataState: { status: 'idle' }, dataSource: undefined };
     }
-  | undefined {
-  if (component.dataSource === null) {
     if (entry.manifest.defaultData === undefined) {
-      return { dataState: { status: 'idle' }, resource: undefined };
+      return { dataState: { status: 'idle' }, dataSource: undefined };
     }
     return {
-      dataState: adaptStaticData(
+      dataState: projectStaticValue(
         entry,
         entry.manifest.defaultData,
         entry.manifest.staticData?.kind === 'tabular'
           ? entry.manifest.staticData.defaultBinding
-          : undefined,
+          : null,
       ),
-      resource: undefined,
+      dataSource: undefined,
     };
   }
-  if (!entry.manifest.dataCapabilities.includes(component.dataSource.type)) {
-    diagnostics.push(
-      diagnostic(
+  const dataSourceEntry =
+    ref.kind === 'data-source-field' ? dataSources.read(ref.dataSourceId) : undefined;
+  const source = dataSourceEntry?.source;
+  if (!screenValueRefAccepted(entry.manifest.dataCapabilities, ref, source)) {
+    return {
+      diagnostic: diagnostic(
         'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
-        ['components', index, 'dataSource'],
+        [...path, 'dataValue'],
         'Material does not accept the configured data source.',
       ),
-    );
-    return undefined;
-  }
-  if (component.dataSource.type === 'host-resource' || component.dataSource.type === 'dataset') {
-    if (dataSuspended) {
-      return { dataState: { status: 'loading' }, resource: undefined };
-    }
-    const evaluated = evaluateScreenHostResourceParameters(component.dataSource.params, variables);
-    if (!evaluated.ok) {
-      return {
-        dataState: {
-          status: 'error',
-          code: 'HOST_RESOURCE_FAILED',
-          message: 'Host resource request failed.',
-        },
-        resource: undefined,
-      };
-    }
-    const resourceType =
-      component.dataSource.type === 'host-resource'
-        ? contributionIndex?.getResourceType(component.dataSource.resourceType)
-        : undefined;
-    if (
-      component.dataSource.type === 'host-resource' &&
-      contributionIndex !== undefined &&
-      resourceType === undefined
-    ) {
-      diagnostics.push(
-        diagnostic(
-          'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
-          ['components', index, 'dataSource', 'resourceType'],
-          'Host resource type is not enabled by an active plugin contribution.',
-        ),
-      );
-      return undefined;
-    }
-    if (resourceType !== undefined) {
-      const params = validateBaseScreenMaterialProps(
-        evaluated.value.params,
-        resourceType.configSchema,
-      );
-      if (!params.ok) {
-        return {
-          dataState: {
-            status: 'error',
-            code: 'HOST_RESOURCE_FAILED',
-            message: 'Host resource request failed.',
-          },
-          resource: undefined,
-        };
-      }
-    }
-    if (
-      component.dataSource.binding !== null &&
-      (entry.manifest.dataBinding === undefined || entry.tabularDataAdapter === undefined)
-    ) {
-      return {
-        dataState: {
-          status: 'error',
-          code: 'HOST_DATASET_BINDING_INVALID',
-          message: 'Host dataset binding is invalid.',
-        },
-        resource: undefined,
-      };
-    }
-    return {
-      dataState: { status: 'loading' },
-      resource: {
-        params: evaluated.value.params,
-        key: getHostResourceKey(component, evaluated.value.params),
-        projectionKey: getProjectionKey(component.dataSource),
-      },
     };
   }
-  if (component.dataSource.type === 'variable') {
-    const value = variables[component.dataSource.variableId];
-    if (value === undefined) {
-      return {
-        dataState: {
+  if (ref.kind !== 'data-source-field') {
+    const evaluated = dataSources.evaluate(ref);
+    return { dataState: toDataState(evaluated, entry, binding), dataSource: undefined };
+  }
+  if (source === undefined || dataSourceEntry === undefined) {
+    // 引用指向的实例不存在（悬空引用）：解析器已拦，这里按不可用处理。
+    return {
+      dataState: {
+        status: 'error',
+        code: 'HOST_RESOURCE_UNAVAILABLE',
+        message: 'Host data source is unavailable.',
+      },
+      dataSource: undefined,
+    };
+  }
+  const contributionDiagnostic = validateHostResourceContribution(
+    source.kind === 'host-resource' ? source.resourceType : undefined,
+    contributionIndex,
+    path,
+  );
+  if (contributionDiagnostic !== undefined) {
+    return { diagnostic: contributionDiagnostic };
+  }
+  const dataSource = {
+    dataSourceId: ref.dataSourceId,
+    projectionKey: getProjectionKey(binding),
+  };
+  // 物料没有声明字段映射能力却给了绑定：这是静态的材料/文档错配，先于实例状态判定，
+  // 否则会先报成端口不可用。
+  if (
+    binding !== null &&
+    (entry.manifest.dataBinding === undefined || entry.tabularDataAdapter === undefined)
+  ) {
+    return {
+      dataState: {
+        status: 'error',
+        code: 'HOST_DATASET_BINDING_INVALID',
+        message: 'Host dataset binding is invalid.',
+      },
+      dataSource,
+    };
+  }
+  // 实例已失败：直接用实例级状态（归一化只做一次，不在这里重算）。
+  if (dataSourceEntry.dataState.status === 'error') {
+    return { dataState: dataSourceEntry.dataState, dataSource };
+  }
+  // 有 `path` 就先按字段路径下钻，再交给物料投影：同一实例的两个组件可以各取不同字段。
+  const evaluated = dataSources.evaluate(ref);
+  if (dataSourceEntry.dataState.status === 'ready') {
+    if (evaluated.kind !== 'value')
+      return { dataState: toDataState(evaluated, entry, binding), dataSource };
+    if (evaluated.value === undefined) return { dataState: { status: 'idle' }, dataSource };
+    return {
+      dataState: projectDataSourceResult(
+        entry,
+        evaluated.value,
+        binding,
+        component.id,
+        onDiagnostic,
+      ),
+      dataSource,
+    };
+  }
+  return { dataState: toDataState(evaluated, entry, binding), dataSource };
+}
+
+function toDataState(
+  evaluated: ReturnType<DataSourceRuntime['evaluate']>,
+  entry: BaseScreenMaterialCatalogEntry,
+  binding: ScreenDataBinding | null,
+): BaseScreenMaterialDataState {
+  switch (evaluated.kind) {
+    case 'pending':
+      return { status: 'loading' };
+    case 'failed':
+      if (evaluated.reason === 'variable-missing') {
+        return {
           status: 'error',
           code: 'HOST_DATASET_INVALID',
           message: 'Variable data is unavailable.',
-        },
-        resource: undefined,
-      };
-    }
-    const parsed = parseScreenJsonValue(value, { maxBytes: 1024 * 1024 });
-    if (!parsed.ok) {
-      diagnostics.push(
-        ...prefixDiagnostics(parsed.diagnostics, ['components', index, 'dataSource', 'variableId']),
-      );
-      return undefined;
-    }
-    return {
-      dataState: adaptStaticData(entry, parsed.value, component.dataSource.binding),
-      resource: undefined,
-    };
-  }
-  const parsed = parseScreenJsonValue(component.dataSource.value, { maxBytes: 1024 * 1024 });
-  if (!parsed.ok) {
-    diagnostics.push(
-      ...prefixDiagnostics(parsed.diagnostics, ['components', index, 'dataSource', 'value']),
-    );
-    return undefined;
-  }
-  return {
-    dataState: adaptStaticData(entry, parsed.value, component.dataSource.binding),
-    resource: undefined,
-  };
-}
-
-function adaptStaticData(
-  entry: BaseScreenMaterialCatalogEntry,
-  value: ScreenJsonValue,
-  binding: ScreenDataBinding | undefined,
-): BaseScreenMaterialDataState {
-  if (entry.manifest.staticData?.kind !== 'tabular') {
-    return { status: 'ready', value };
-  }
-  const dataset = parseScreenTabularDataset(value);
-  if (!dataset.ok) {
-    return {
-      status: 'error',
-      code: 'HOST_DATASET_INVALID',
-      message: 'Static dataset is invalid.',
-    };
-  }
-  const declaration = entry.manifest.dataBinding;
-  const adapter = entry.tabularDataAdapter;
-  if (binding === undefined || declaration === undefined || adapter === undefined) {
-    return {
-      status: 'error',
-      code: 'HOST_DATASET_BINDING_INVALID',
-      message: 'Static dataset binding is invalid.',
-    };
-  }
-  const validated = validateScreenHostResourceBinding(
-    binding,
-    dataset.value.fields,
-    declaration.roles,
-  );
-  if (!validated.ok) {
-    return {
-      status: 'error',
-      code: 'HOST_DATASET_BINDING_INVALID',
-      message: 'Static dataset binding is invalid.',
-    };
-  }
-  try {
-    const adapted = adapter.adapt({ dataset: dataset.value, fields: validated.value.fields });
-    if (!adapted.ok) {
+        };
+      }
+      if (evaluated.reason === 'value-invalid') {
+        return {
+          status: 'error',
+          code: 'HOST_RESOURCE_INVALID',
+          message: 'Host resource returned an invalid value.',
+        };
+      }
+      // 实例失败状态已在上游直接返回；这里只兜底。
       return {
         status: 'error',
-        code: 'HOST_DATASET_ADAPTER_FAILED',
-        message: 'Static dataset adapter failed.',
+        code: 'HOST_RESOURCE_FAILED',
+        message: 'Host resource request failed.',
       };
-    }
-    const parsed = parseScreenJsonValue(adapted.value, { maxBytes: 1024 * 1024 });
-    return parsed.ok
-      ? { status: 'ready', value: parsed.value }
-      : {
-          status: 'error',
-          code: 'HOST_DATASET_ADAPTER_FAILED',
-          message: 'Static dataset adapter failed.',
-        };
-  } catch {
-    return {
-      status: 'error',
-      code: 'HOST_DATASET_ADAPTER_FAILED',
-      message: 'Static dataset adapter failed.',
-    };
+    default:
+      // 字段缺失（`path` 这一轮没有数据）不是错误，也不假装有值。
+      if (evaluated.value === undefined) return { status: 'idle' };
+      return projectStaticValue(entry, evaluated.value, binding);
   }
+}
+
+function validateHostResourceContribution(
+  resourceType: string | undefined,
+  contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
+  path: readonly (string | number)[],
+): ScreenDiagnostic | undefined {
+  if (resourceType === undefined || contributionIndex === undefined) return undefined;
+  if (contributionIndex.getResourceType(resourceType) !== undefined) return undefined;
+  return diagnostic(
+    'PLUGIN_CORE_CONTRIBUTION_UNKNOWN',
+    [...path, 'dataSource', 'resourceType'],
+    'Host resource type is not enabled by an active plugin contribution.',
+  );
 }

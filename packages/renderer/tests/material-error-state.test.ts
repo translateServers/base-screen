@@ -483,7 +483,7 @@ describe('Renderer material error state protocol', () => {
       {
         severity: 'error',
         code: 'PLUGIN_CORE_RENDER_FAILED',
-        path: ['components', 'dataset', 'dataSource', 'binding'],
+        path: ['components', 'dataset', 'dataBinding'],
         message: 'Material dataset adapter raised an exception.',
       },
     ]);

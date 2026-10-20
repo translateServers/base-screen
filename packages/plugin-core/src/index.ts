@@ -82,6 +82,7 @@ export {
   listContributionHandlerKinds,
   readContributionHandlerRecord,
 } from './contribution-kind.js';
+export { type BaseScreenDataCapability, screenValueRefAccepted } from './data-capabilities.js';
 export type {
   BaseScreenChartData,
   BaseScreenChartPoint,

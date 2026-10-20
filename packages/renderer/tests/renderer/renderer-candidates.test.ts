@@ -1,9 +1,27 @@
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
 import { prepareCandidates } from '../../src/renderer/renderer-candidates.js';
+import { DataSourceRuntime } from '../../src/resource/data-source-runtime.js';
+import { SourceQueryPort } from '../../src/resource/source-query-port.js';
 import { component, createCatalog, document } from './__fixtures__/renderer-test-harness.js';
 
 const emptyCache = { entries: new Map() };
+
+function runtime(): DataSourceRuntime {
+  return new DataSourceRuntime({
+    sourcePort: new SourceQueryPort(undefined, undefined, undefined),
+    coordinator: undefined,
+    isSuspended: () => false,
+    createExecutionContext: () => ({
+      instanceId: 'test',
+      mode: 'viewer',
+      trigger: 'manual',
+      traceId: '',
+    }),
+    emit: () => {},
+    onChanged: () => {},
+  });
+}
 
 function contributionIndex(options: {
   resourceTypes?: readonly string[];
@@ -32,37 +50,23 @@ describe('renderer candidate contribution gating', () => {
       params: {},
       binding: null,
     });
+    const prepared = (index: BaseScreenRuntimeContributionIndex | undefined) => {
+      const dataSources = runtime();
+      dataSources.ensure(document([hostResource]), {}, { trigger: 'manual', traceId: '' });
+      return prepareCandidates(
+        document([hostResource]),
+        createCatalog(),
+        'design',
+        false,
+        index,
+        dataSources,
+        emptyCache,
+      );
+    };
 
-    const unknown = prepareCandidates(
-      document([hostResource]),
-      createCatalog(),
-      'design',
-      false,
-      contributionIndex({ resourceTypes: [] }),
-      {},
-      false,
-      emptyCache,
-    );
-    const admitted = prepareCandidates(
-      document([hostResource]),
-      createCatalog(),
-      'design',
-      false,
-      contributionIndex({ resourceTypes: ['dataset'] }),
-      {},
-      false,
-      emptyCache,
-    );
-    const ungated = prepareCandidates(
-      document([hostResource]),
-      createCatalog(),
-      'design',
-      false,
-      undefined,
-      {},
-      false,
-      emptyCache,
-    );
+    const unknown = prepared(contributionIndex({ resourceTypes: [] }));
+    const admitted = prepared(contributionIndex({ resourceTypes: ['dataset'] }));
+    const ungated = prepared(undefined);
 
     expect(unknown.ok).toBe(false);
     if (!unknown.ok) {

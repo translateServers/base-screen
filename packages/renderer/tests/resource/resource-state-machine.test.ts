@@ -388,16 +388,12 @@ describe('Renderer resource state machine', () => {
     expect(root.children).toHaveLength(1);
     expect(root.children[0]).not.toBe(oldElement);
     expect(oldElement?.removed).toBe(true);
-    expect(requests[0]!.aborted).toBe(true);
-    expect(requests).toHaveLength(2);
-
-    requests[0]!.resolveRequest({ ok: true, value: { stale: true }, diagnostics: [] });
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    // 只换了物料类型：数据源实例没变，请求与缓存都留在实例上，因此不取消、不重发。
+    expect(requests[0]!.aborted).toBe(false);
+    expect(requests).toHaveLength(1);
     expect(root.children[0]?.model?.dataState.status).toBe('loading');
 
-    requests[1]!.resolveRequest({ ok: true, value: { fresh: true }, diagnostics: [] });
+    requests[0]!.resolveRequest({ ok: true, value: { fresh: true }, diagnostics: [] });
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
