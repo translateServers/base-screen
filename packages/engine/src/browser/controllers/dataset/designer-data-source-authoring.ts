@@ -9,6 +9,7 @@ import {
   type ScreenHostResourceParameter,
   type ScreenJsonValue,
   type ScreenParseResult,
+  type ScreenValueRef,
 } from '@base-screen/contracts';
 import {
   type ScreenDataBindingRole,
@@ -31,6 +32,34 @@ interface DesignerDatasetTransactionOptions {
   readonly descriptor: ScreenDatasetDefinition;
   readonly draft: DesignerDatasetDraftView;
   readonly roles: readonly ScreenDataBindingRole[];
+}
+
+/**
+ * 草稿参数已统一为取值引用（`ScreenValueRef`），但数据源事务本轮仍产出旧形态
+ * （`component.dataSource.params`）。这里是两者**唯一**的映射点。
+ *
+ * 读（旧 → 新）：`literal` → `inline`、`variable` → `variable`；其它形态无法用旧文档表达，
+ * 一律 fail-closed 成 `inline: null`，由调用方按必填校验报诊断（不静默丢参数）。
+ *
+ * 写（新 → 旧）：`inline` → `literal`、`variable` → `variable`；`data-source-field` 等
+ * 旧形态表达不了的引用返回 `undefined`，调用方必须报 `HOST_DATASET_PARAMETER_INVALID`。
+ * 这条限制在 T03b（事务切到 `replace-data-sources` + `dataValue`）后解除。
+ */
+export function hostResourceParameterToValueRef(
+  parameter: ScreenHostResourceParameter,
+): ScreenValueRef {
+  if (parameter.kind === 'variable') {
+    return { kind: 'variable', variableId: parameter.variableId };
+  }
+  return { kind: 'inline', value: parameter.value };
+}
+
+export function valueRefToHostResourceParameter(
+  ref: ScreenValueRef,
+): ScreenHostResourceParameter | undefined {
+  if (ref.kind === 'variable') return { kind: 'variable', variableId: ref.variableId };
+  if (ref.kind === 'inline') return { kind: 'literal', value: ref.value };
+  return undefined;
 }
 
 export function createDesignerDatasetDraft(
