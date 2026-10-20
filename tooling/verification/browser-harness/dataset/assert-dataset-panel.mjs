@@ -177,4 +177,98 @@ export async function assertDatasetPanelInteraction(designer, page) {
   // 后续断言期望的是「固定值」输入框，这里显式还原。
   await dataPanel.locator('[data-dataset-parameter-mode="region"]').selectOption('literal');
   await dataPanel.locator('[data-dataset-parameter="region"]').waitFor();
+
+  // 5) 空态（未配置数据来源）：文案与版式一律由 DOM 判定。
+  //    这三件事——逐字标题、禁用原因是否独立成行、描述有没有被裁——在 300px 宽的截图里
+  //    "看起来差不多"，人眼判不了；只有 DOM 能判。上一轮正是靠看图放过了一次漏改。
+  const sourceBackup = await designer.evaluate(() =>
+    JSON.stringify(
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'dataset-ranking-demo',
+      )?.dataSource ?? null,
+    ),
+  );
+  await designer.evaluate(() => {
+    window.baseScreenHarness.designer.executeTransaction({
+      commands: [
+        {
+          type: 'update-components',
+          componentIds: ['dataset-ranking-demo'],
+          patch: { dataSource: null },
+        },
+      ],
+    });
+  });
+  await page.waitForTimeout(400);
+  const emptyState = await dataPanel.evaluate((panel) => {
+    const rows = [...panel.querySelectorAll('[data-data-entry]')].map((row) => {
+      const description = row.querySelector('.designer-data-entry-guide-description');
+      const reason = row.querySelector('.designer-data-entry-guide-reason');
+      return {
+        entry: row.dataset.dataEntry,
+        title: row.querySelector('.designer-data-entry-guide-title')?.textContent ?? null,
+        descriptionClipped:
+          description === null ? null : description.scrollHeight > description.clientHeight + 1,
+        descriptionBottom:
+          description === null ? null : Math.round(description.getBoundingClientRect().bottom),
+        reasonText: reason?.textContent ?? null,
+        reasonTop: reason === null ? null : Math.round(reason.getBoundingClientRect().top),
+        chevron: row.querySelector('.designer-data-entry-guide-disclosure') !== null,
+      };
+    });
+    return {
+      rows,
+      applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
+      detailsGroups: panel.querySelectorAll('details[data-details-group]').length,
+      text: panel.textContent ?? '',
+    };
+  });
+  const variableRow = emptyState.rows.find((row) => row.entry === 'variable');
+  if (
+    // 1) 三行标题逐字等于全称（不是 includes）
+    JSON.stringify(emptyState.rows.map((row) => [row.entry, row.title])) !==
+      JSON.stringify([
+        ['static', '\u8f93\u5165\u56fa\u5b9a\u503c'],
+        ['variable', '\u7528\u53d8\u91cf'],
+        ['source', '\u63a5\u6570\u636e\u6e90'],
+      ]) ||
+    // 2) 禁用原因独占一行：原因顶边不低于描述底边
+    variableRow?.reasonText === null ||
+    variableRow?.reasonText === undefined ||
+    variableRow.reasonTop === null ||
+    variableRow.descriptionBottom === null ||
+    variableRow.reasonTop < variableRow.descriptionBottom ||
+    // 3) 描述没有被裁切
+    emptyState.rows.some((row) => row.descriptionClipped !== false) ||
+    // 4) 空态没有 apply，也没有「当前组件不使用数据。」
+    emptyState.applyCount !== 0 ||
+    emptyState.text.includes('\u5f53\u524d\u7ec4\u4ef6\u4e0d\u4f7f\u7528\u6570\u636e') ||
+    // 5) 空态不是折叠分组结构
+    emptyState.detailsGroups !== 0
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATASET_EMPTY_STATE_FAILED:${JSON.stringify(emptyState)}`);
+  }
+  // 还原数据源：空态断言不能把文档留给后续用例。
+  // 注意 locator.evaluate 的第一个参数是**元素**本身，备份值必须从第二个参数进来。
+  await designer.evaluate((_element, json) => {
+    window.baseScreenHarness.designer.executeTransaction({
+      commands: [
+        {
+          type: 'update-components',
+          componentIds: ['dataset-ranking-demo'],
+          patch: { dataSource: JSON.parse(json) },
+        },
+      ],
+    });
+  }, sourceBackup);
+  await page.waitForTimeout(400);
+  const restored = await dataPanel.evaluate((panel) => ({
+    entryCount: panel.querySelectorAll('[data-data-entry]').length,
+    segmented: panel.querySelectorAll('.designer-data-entry-segmented').length,
+  }));
+  if (restored.segmented !== 1 || restored.entryCount !== 3) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_EMPTY_STATE_RESTORE_FAILED:${JSON.stringify(restored)}`,
+    );
+  }
 }

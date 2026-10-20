@@ -7,7 +7,7 @@ describe('designer fixed Chinese terminology', () => {
       materials: '素材',
       layers: '图层',
       appearance: '样式',
-      data: '数据',
+      data: expect.objectContaining({ title: '数据' }),
       interaction: '交互',
       events: '事件',
       canvasWorkspace: '设计',

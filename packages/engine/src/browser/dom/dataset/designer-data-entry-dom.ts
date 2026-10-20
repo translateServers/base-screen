@@ -84,7 +84,7 @@ function sourceItem(
 ): DesignerDataEntryItem {
   const datasetSupported = options.availableModes.includes('dataset');
   const hostResourceSupported = options.availableModes.includes('host-resource');
-  const text = DESIGNER_UI_TEXT.dataEntry.source;
+  const text = DESIGNER_UI_TEXT.data.entry.source;
   if (!datasetSupported && !hostResourceSupported) {
     return {
       entry: 'source',
@@ -106,16 +106,16 @@ function sourceItem(
 }
 
 function entryText(entry: DesignerDataEntry) {
-  if (entry === 'static') return DESIGNER_UI_TEXT.dataEntry.static;
-  if (entry === 'variable') return DESIGNER_UI_TEXT.dataEntry.variable;
-  return DESIGNER_UI_TEXT.dataEntry.source;
+  if (entry === 'static') return DESIGNER_UI_TEXT.data.entry.static;
+  if (entry === 'variable') return DESIGNER_UI_TEXT.data.entry.variable;
+  return DESIGNER_UI_TEXT.data.entry.source;
 }
 
 /** 检查器搜索用的整段文本：三个入口的标题、描述与原因都参与匹配。 */
 export function dataEntrySearchText(items: readonly DesignerDataEntryItem[]): string {
   return [
-    DESIGNER_UI_TEXT.dataEntry.legend,
-    DESIGNER_UI_TEXT.dataPanel.emptyTitle,
+    DESIGNER_UI_TEXT.data.entry.legend,
+    DESIGNER_UI_TEXT.data.panel.emptyTitle,
     ...items.map((item) => {
       const text = entryText(item.entry);
       return `${text.title} ${text.description} ${item.reason ?? text.disabled}`;
@@ -146,7 +146,7 @@ export function renderDataEntryGuide(
   group.dataset.dataEntryGroup = 'true';
   group.dataset.dataEntryLayout = 'empty';
   group.setAttribute('role', 'radiogroup');
-  group.setAttribute('aria-label', DESIGNER_UI_TEXT.dataPanel.emptyTitle);
+  group.setAttribute('aria-label', DESIGNER_UI_TEXT.data.panel.emptyTitle);
   for (const item of items) {
     group.appendChild(renderGuideRow(ownerDocument, item));
   }
@@ -220,7 +220,7 @@ export function renderDataEntrySegmented(
   group.dataset.dataEntryGroup = 'true';
   group.dataset.dataEntryLayout = 'configured';
   group.setAttribute('role', 'radiogroup');
-  group.setAttribute('aria-label', DESIGNER_UI_TEXT.dataEntry.legend);
+  group.setAttribute('aria-label', DESIGNER_UI_TEXT.data.entry.legend);
   const tabbable = tabbableEntry(items);
   for (const item of items) {
     group.appendChild(renderSegmentedOption(ownerDocument, item, item.entry === tabbable));
@@ -250,7 +250,7 @@ function renderSegmentedOption(
   option.tabIndex = item.disabled || !tabbable ? -1 : 0;
   // 可见文本用短名（固定值 / 变量 / 数据源，一段约 95px）；
   // `title` 与 `aria-label` 一律取**全称**：读屏不该听到"数据源"这种脱离上下文的碎片。
-  option.textContent = DESIGNER_UI_TEXT.dataEntry.compact[item.entry];
+  option.textContent = DESIGNER_UI_TEXT.data.entry.compact[item.entry];
   option.setAttribute('aria-label', entryText(item.entry).title);
   option.setAttribute('title', entryText(item.entry).title);
   if (item.selected) option.dataset.datasetMode = item.mode;

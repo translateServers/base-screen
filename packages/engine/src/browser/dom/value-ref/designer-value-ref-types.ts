@@ -13,22 +13,22 @@ export const VALUE_REF_SEARCH_DEBOUNCE_MS = 180;
  * 对象：否则下一轮加键时某个调用点会静默用旧的键集合，症状是「新文案不生效但不报错」。
  */
 export interface DesignerValueRefText {
-  readonly dialogLabel: string;
-  readonly noSelection: string;
-  readonly tabInline: string;
-  readonly tabVariable: string;
-  readonly tabField: string;
+  readonly tab: {
+    readonly inline: string;
+    readonly variable: string;
+    readonly field: string;
+  };
+  readonly placeholder: string;
   readonly search: string;
+  readonly emptyVariables: string;
   readonly emptySearch: string;
   readonly clearSearch: string;
-  readonly emptyItems: string;
-  readonly createVariable: string;
-  readonly createVariableHint: string;
   readonly manage: string;
-  readonly selected: (label: string) => string;
-  readonly badgeInline: string;
-  readonly badgeVariable: string;
-  readonly badgeField: string;
+  readonly selected: (name: string) => string;
+  readonly stale: string;
+  readonly staleHint: string;
+  /** 空态里的「新建变量」动作标签（PRD §6.6 未单列，随选择器一并引入）。 */
+  readonly createVariable: string;
 }
 
 /** 列表里的一项。`id` 必须稳定（`aria-activedescendant` 用它指路）。 */
@@ -97,9 +97,9 @@ export interface DesignerValueRefSummary {
 }
 
 export function badgeOf(kind: DesignerValueRefKind, text: DesignerValueRefText): string {
-  if (kind === 'inline') return text.badgeInline;
-  if (kind === 'variable') return text.badgeVariable;
-  return text.badgeField;
+  if (kind === 'inline') return text.tab.inline;
+  if (kind === 'variable') return text.tab.variable;
+  return text.tab.field;
 }
 
 /**
@@ -113,19 +113,19 @@ export function summarizeValueRef(
   input: DesignerValueRefPickerInput,
   text: DesignerValueRefText,
 ): DesignerValueRefSummary {
-  if (ref === null) return { badge: '', label: text.noSelection };
+  if (ref === null) return { badge: '', label: text.placeholder };
   if (ref.kind === 'variable') {
     const variable = input.variables.find((item) => item.id === ref.variableId);
-    return { badge: text.badgeVariable, label: variable?.name ?? ref.variableId };
+    return { badge: text.tab.variable, label: variable?.name ?? ref.variableId };
   }
   if (ref.kind === 'data-source-field') {
     const field = input.fields?.find(
       (item) => item.dataSourceId === ref.dataSourceId && samePath(item.path, ref.path),
     );
-    return { badge: text.badgeField, label: field?.label ?? ref.dataSourceId };
+    return { badge: text.tab.field, label: field?.label ?? ref.dataSourceId };
   }
   const inline = input.inlineViews?.find((item) => item.value === ref.value);
-  return { badge: text.badgeInline, label: inline?.label ?? previewInline(ref.value) };
+  return { badge: text.tab.inline, label: inline?.label ?? previewInline(ref.value) };
 }
 
 /** 把当前可选项展开成列表项（分段顺序固定：常量 → 变量 → 数据源输出）。 */
@@ -144,7 +144,7 @@ export function buildValueRefOptions(
         id: 'inline:current',
         kind: 'inline',
         label: previewInline(value),
-        badge: text.badgeInline,
+        badge: text.tab.inline,
         value: { kind: 'inline', value },
       });
     }
@@ -153,7 +153,7 @@ export function buildValueRefOptions(
         id: `inline:${view.id}`,
         kind: 'inline',
         label: view.label,
-        badge: text.badgeInline,
+        badge: text.tab.inline,
         value: { kind: 'inline', value: view.value },
       });
     }
@@ -164,7 +164,7 @@ export function buildValueRefOptions(
         id: `variable:${variable.id}`,
         kind: 'variable',
         label: variable.name,
-        badge: text.badgeVariable,
+        badge: text.tab.variable,
         value: { kind: 'variable', variableId: variable.id },
       });
     }
@@ -177,7 +177,7 @@ export function buildValueRefOptions(
         id: `field:${field.dataSourceId}:${field.path.join('.')}`,
         kind: 'data-source-field',
         label: field.label,
-        badge: text.badgeField,
+        badge: text.tab.field,
         value: {
           kind: 'data-source-field',
           dataSourceId: field.dataSourceId,

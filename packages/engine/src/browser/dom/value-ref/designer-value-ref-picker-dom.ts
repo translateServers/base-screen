@@ -144,7 +144,7 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
     dialog.className = 'designer-value-ref-popover';
     dialog.dataset.valueRefPopover = 'true';
     dialog.setAttribute('role', 'dialog');
-    dialog.setAttribute('aria-label', text.dialogLabel);
+    dialog.setAttribute('aria-label', text.placeholder);
     dialog.setAttribute('aria-modal', 'false');
 
     const kinds = options.input.allowedKinds;
@@ -213,9 +213,9 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
   }
 
   function tabLabel(kind: DesignerValueRefKind): string {
-    if (kind === 'inline') return text.tabInline;
-    if (kind === 'variable') return text.tabVariable;
-    return text.tabField;
+    if (kind === 'inline') return text.tab.inline;
+    if (kind === 'variable') return text.tab.variable;
+    return text.tab.field;
   }
 
   function renderList(): void {
@@ -243,14 +243,14 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
         empty.appendChild(clear);
       } else {
         empty.dataset.valueRefEmpty = 'items';
-        empty.textContent = text.emptyItems;
+        empty.textContent = text.emptyVariables;
         if (options.allowCreateVariable === true) {
           const create = document.createElement('button');
           create.type = 'button';
           create.className = 'designer-control designer-button';
           create.dataset.valueRefCreate = 'true';
           create.textContent = text.createVariable;
-          create.title = text.createVariableHint;
+          create.title = text.emptyVariables;
           create.addEventListener('click', () => {
             options.onCreateVariable?.();
             close(true);

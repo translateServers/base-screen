@@ -1,36 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
-  badgeOf,
-  buildValueRefOptions,
-  filterValueRefOptions,
-  summarizeValueRef,
-  VALUE_REF_SEARCH_DEBOUNCE_MS,
-  type DesignerValueRefPickerInput,
-  type DesignerValueRefText,
-} from '../../../src/browser/dom/value-ref/designer-value-ref-types.js';
-import {
   datasetParameterPickerInput,
   valueRefEquals,
 } from '../../../src/browser/controllers/value-ref/designer-value-ref-picker-controller.js';
+import {
+  badgeOf,
+  buildValueRefOptions,
+  type DesignerValueRefPickerInput,
+  type DesignerValueRefText,
+  filterValueRefOptions,
+  summarizeValueRef,
+  VALUE_REF_SEARCH_DEBOUNCE_MS,
+} from '../../../src/browser/dom/value-ref/designer-value-ref-types.js';
+import { DESIGNER_UI_TEXT } from '../../../src/common/ui-text/designer-ui-text.js';
 
-const text: DesignerValueRefText = {
-  dialogLabel: '选择取值',
-  noSelection: '选择取值',
-  tabInline: '常量',
-  tabVariable: '变量',
-  tabField: '数据源输出',
-  search: '搜索',
-  emptySearch: '没有匹配项',
-  clearSearch: '清除搜索',
-  emptyItems: '还没有可用项',
-  createVariable: '新建变量',
-  createVariableHint: '在工作台新建变量',
-  manage: '在工作台管理',
-  selected: (label: string) => `已选择 ${label}`,
-  badgeInline: '常量',
-  badgeVariable: '变量',
-  badgeField: '数据源',
-};
+const text: DesignerValueRefText = DESIGNER_UI_TEXT.data.ref;
 
 const input: DesignerValueRefPickerInput = {
   allowedKinds: ['inline', 'variable'],
@@ -61,7 +45,7 @@ describe('取值选择器 · 纯逻辑', () => {
   it('徽标按形态取文案', () => {
     expect(badgeOf('inline', text)).toBe('常量');
     expect(badgeOf('variable', text)).toBe('变量');
-    expect(badgeOf('data-source-field', text)).toBe('数据源');
+    expect(badgeOf('data-source-field', text)).toBe('数据源输出');
   });
 
   it('候选项按「常量 → 变量 → 数据源输出」分段顺序展开，且只含允许的形态', () => {
@@ -72,10 +56,7 @@ describe('取值选择器 · 纯逻辑', () => {
   });
 
   it('没有预设候选时，常量项携带当前内联值（供内联编辑器接管）', () => {
-    const options = buildValueRefOptions(
-      { ...input, current: { kind: 'inline', value: 7 } },
-      text,
-    );
+    const options = buildValueRefOptions({ ...input, current: { kind: 'inline', value: 7 } }, text);
     expect(options[0]).toMatchObject({ kind: 'inline', value: { kind: 'inline', value: 7 } });
   });
 
@@ -117,10 +98,7 @@ describe('取值选择器 · 纯逻辑', () => {
     expect(valueRefEquals({ kind: 'inline', value: 1 }, { kind: 'inline', value: 1 })).toBe(true);
     expect(valueRefEquals({ kind: 'inline', value: 1 }, { kind: 'inline', value: 2 })).toBe(false);
     expect(
-      valueRefEquals(
-        { kind: 'variable', variableId: 'a' },
-        { kind: 'variable', variableId: 'b' },
-      ),
+      valueRefEquals({ kind: 'variable', variableId: 'a' }, { kind: 'variable', variableId: 'b' }),
     ).toBe(false);
     expect(
       valueRefEquals(

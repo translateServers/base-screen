@@ -85,7 +85,7 @@ function dirtyDot(ownerDocument: Document): HTMLElement {
 
 function dirtyText(ownerDocument: Document): HTMLElement {
   const text = ownerDocument.createElement('span');
-  text.textContent = DESIGNER_UI_TEXT.dataPanel.dirty;
+  text.textContent = DESIGNER_UI_TEXT.data.panel.dirty;
   return text;
 }
 
@@ -113,7 +113,7 @@ export function dataPanelActionView(options: {
 }): DataPanelActionView {
   const dirty = options.dirty;
   return {
-    label: dirty ? DESIGNER_UI_TEXT.dataPanel.apply : DESIGNER_UI_TEXT.dataPanel.applied,
+    label: dirty ? DESIGNER_UI_TEXT.data.panel.apply : DESIGNER_UI_TEXT.data.panel.applied,
     disabled: !dirty || options.blocked,
     dirty,
   };

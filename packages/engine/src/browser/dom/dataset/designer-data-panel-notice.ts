@@ -24,7 +24,7 @@ export function dataPanelNotice(view: DesignerDataStateView): DataPanelNoticeVie
   if (view.state === 'failed') {
     return {
       tone: 'danger',
-      text: DESIGNER_UI_TEXT.dataPanel.notice.failed,
+      text: DESIGNER_UI_TEXT.data.notice.failed,
       icon: 'x-circle',
       retry: true,
     };
@@ -32,13 +32,13 @@ export function dataPanelNotice(view: DesignerDataStateView): DataPanelNoticeVie
   if (view.state === 'readonly') {
     return {
       tone: 'neutral',
-      text: DESIGNER_UI_TEXT.dataPanel.notice.readonly,
+      text: DESIGNER_UI_TEXT.data.notice.readonly,
       icon: 'lock-open',
       retry: false,
     };
   }
   if (view.state === 'unavailable') {
-    const reasons = DESIGNER_UI_TEXT.dataPanel.notice.unavailable;
+    const reasons = DESIGNER_UI_TEXT.data.notice.unavailable;
     const text =
       view.reason === 'port-missing'
         ? reasons.portMissing
@@ -105,7 +105,7 @@ function writeNotice(
     retry.type = 'button';
     retry.className = 'designer-control designer-button designer-data-notice-retry';
     retry.dataset.datasetAction = 'retry-link';
-    retry.textContent = DESIGNER_UI_TEXT.dataPanel.notice.retry;
+    retry.textContent = DESIGNER_UI_TEXT.data.notice.retry;
     bar.appendChild(retry);
   }
   slot.appendChild(bar);

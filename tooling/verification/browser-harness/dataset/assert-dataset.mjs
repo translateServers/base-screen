@@ -17,8 +17,7 @@ async function scrollDataPanelTo(dataPanel, page, section, step) {
       const content = panel.querySelector('.designer-datav-data-flow-content');
       const target = panel.querySelector(`[data-workbench-section="${name}"]`);
       if (!(content instanceof HTMLElement) || !(target instanceof HTMLElement)) return;
-      content.scrollTop +=
-        target.getBoundingClientRect().top - content.getBoundingClientRect().top;
+      content.scrollTop += target.getBoundingClientRect().top - content.getBoundingClientRect().top;
     }, section);
     await page.waitForTimeout(250);
     last = await readInlineNavigation(dataPanel, section);

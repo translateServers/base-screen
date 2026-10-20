@@ -308,6 +308,6 @@ function directLabel(field: HTMLElement): string {
 
 function tabLabel(tab: 'appearance' | 'data' | 'interaction'): string {
   if (tab === 'appearance') return DESIGNER_UI_TEXT.appearance;
-  if (tab === 'data') return DESIGNER_UI_TEXT.data;
+  if (tab === 'data') return DESIGNER_UI_TEXT.data.title;
   return DESIGNER_UI_TEXT.inspectorUi.advanced;
 }

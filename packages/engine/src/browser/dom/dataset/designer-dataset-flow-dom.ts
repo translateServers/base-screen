@@ -59,10 +59,10 @@ function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement 
   if (layout === 'empty') {
     const heading = ownerDocument.createElement('h3');
     heading.className = 'designer-inspector-section-title';
-    heading.textContent = DESIGNER_UI_TEXT.dataPanel.emptyTitle;
+    heading.textContent = DESIGNER_UI_TEXT.data.panel.emptyTitle;
     const hint = ownerDocument.createElement('p');
     hint.className = 'designer-data-entry-hint';
-    hint.textContent = DESIGNER_UI_TEXT.dataPanel.emptyHint;
+    hint.textContent = DESIGNER_UI_TEXT.data.panel.emptyHint;
     section.append(heading, renderDataEntryGuide(ownerDocument, items), hint);
     return section;
   }
