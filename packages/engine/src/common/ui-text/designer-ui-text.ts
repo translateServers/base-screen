@@ -7,56 +7,58 @@ export const DESIGNER_UI_TEXT = {
   materials: '素材',
   layers: '图层',
   appearance: '样式',
-  data: '数据',
-  // 数据面板的两个可见面：「取值方式」三入口卡片（`dataEntry`）与七态状态徽标（`dataState`）。
-  // 与上面的页签标题 `data` 分开成组：`data` 是页签名（术语表里被断言钉死），不承载面板文案。
-  dataEntry: {
-    legend: '取值方式',
-    // `title` 是**全称**：空态引导行（第一次认识这个入口）与分段控件的 title / aria-label 都用它。
-    static: {
-      title: '输入固定值',
-      description: '手填一份数据，不依赖数据源。',
-      badge: '手填',
-      disabled: '当前组件不支持固定值。',
+  data: {
+    // `data: '数据'` 只服务检查器搜索面包屑的路径段（designer-inspector-search-dom.ts:311）；
+    // 页签按钮的文案来自 inspectorUi.dataSource，与本键无关。
+    title: '数据',
+    entry: {
+      legend: '取值方式',
+      // `title` 是**全称**：空态引导行（第一次认识这个入口）与分段控件的 title / aria-label 都用它。
+      static: {
+        title: '输入固定值',
+        description: '手填一份数据，不依赖数据源。',
+        badge: '手填',
+        disabled: '当前组件不支持固定值。',
+      },
+      variable: {
+        title: '用变量',
+        description: '取全局变量当前的值。',
+        badge: '引用',
+        disabled: '当前组件不支持变量。',
+      },
+      source: {
+        title: '接数据源',
+        description: '绑定数据集或宿主资源。',
+        badge: '接入',
+        disabled: '当前组件不支持接数据源。',
+        portMissing: '宿主未提供数据集接口',
+      },
+      // 短名只给配置态分段用（横向一段约 95px）。两组必须在同一处定义：
+      // 分段可见文本取 compact、无障碍名取 title，缺任何一组都会让 aria-label 取错来源。
+      compact: {
+        static: '固定值',
+        variable: '变量',
+        source: '数据源',
+      },
     },
-    variable: {
-      title: '用变量',
-      description: '取全局变量当前的值。',
-      badge: '引用',
-      disabled: '当前组件不支持变量。',
+    state: {
+      unconfigured: '未配置',
+      unavailable: '不可用',
+      readonly: '只读',
+      loading: '加载中',
+      failed: '失败',
+      empty: '无数据',
+      ready: '已就绪',
+      aria: (label: string) => `数据状态：${label}`,
     },
-    source: {
-      title: '接数据源',
-      description: '绑定数据集或宿主资源。',
-      badge: '接入',
-      disabled: '当前组件不支持接数据源。',
-      portMissing: '宿主未提供数据集接口',
+    // 数据配置页（右侧属性面板的数据源页）：空态引导、主操作与行内提示条。
+    panel: {
+      emptyTitle: '选择数据来源',
+      emptyHint: '选择后在此面板配置数据。',
+      apply: '应用',
+      applied: '已应用',
+      dirty: '未应用',
     },
-    // 短名只给配置态分段用（横向一段约 95px）。两组必须在同一处定义：
-    // 分段可见文本取 compact、无障碍名取 title，缺任何一组都会让 aria-label 取错来源。
-    compact: {
-      static: '固定值',
-      variable: '变量',
-      source: '数据源',
-    },
-  },
-  dataState: {
-    unconfigured: '未配置',
-    unavailable: '不可用',
-    readonly: '只读',
-    loading: '加载中',
-    failed: '失败',
-    empty: '无数据',
-    ready: '已就绪',
-    aria: (label: string) => `数据状态：${label}`,
-  },
-  // 数据配置页（右侧属性面板的数据源页）：空态引导、取值方式分段、主操作与行内提示条。
-  dataPanel: {
-    emptyTitle: '选择数据来源',
-    emptyHint: '选择后在此面板配置数据。',
-    apply: '应用',
-    applied: '已应用',
-    dirty: '未应用',
     notice: {
       readonly: '当前组件只读，数据配置不可修改。',
       failed: '数据请求失败，请检查数据源、参数或权限。',
@@ -66,6 +68,21 @@ export const DESIGNER_UI_TEXT = {
         instanceMissing: '所选数据集不存在或未发布。',
         denied: '宿主拒绝访问数据接口。',
       },
+    },
+    // 取值引用选择器：文案整包传给 picker（`text: DESIGNER_UI_TEXT.data.ref`），
+    // 禁止调用点挑键拼对象——否则新增键时某些调用点会静默沿用旧键集合。
+    ref: {
+      tab: { inline: '常量', variable: '变量', field: '数据源输出' },
+      placeholder: '选择取值',
+      search: '搜索变量与数据源',
+      emptyVariables: '还没有变量。新建一个后，可在任意取值位复用。',
+      emptySearch: '没有匹配项。',
+      clearSearch: '清除搜索',
+      manage: '在工作台管理',
+      createVariable: '新建变量',
+      selected: (name: string) => `已选择 ${name}`,
+      stale: '引用已失效',
+      staleHint: '被引用的对象已被删除，请重新选择。',
     },
   },
   interaction: '交互',

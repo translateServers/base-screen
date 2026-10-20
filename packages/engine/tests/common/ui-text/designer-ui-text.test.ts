@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DESIGNER_UI_TEXT } from '../../../src/common/ui-text/designer-ui-text.js';
+import { inspectorSearchTabLabel } from '../../../src/browser/dom/designer-inspector-search-dom.js';
 
 describe('designer fixed Chinese terminology', () => {
   it('keeps the workbench tabs and project feedback in one fixed vocabulary', () => {
@@ -25,5 +26,10 @@ describe('designer fixed Chinese terminology', () => {
     expect(DESIGNER_UI_TEXT.inspectorUi.componentMeta('base.chart', '图表')).toBe(
       'base.chart ｜ 图表',
     );
+  });
+  it('搜索面包屑的数据页签段是纯文本而不是对象的字符串化', () => {
+    const label = inspectorSearchTabLabel('data');
+    expect(label).toBe('数据');
+    expect(label).not.toContain('[object Object]');
   });
 });

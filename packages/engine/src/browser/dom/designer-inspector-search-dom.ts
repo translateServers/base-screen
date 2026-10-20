@@ -164,7 +164,11 @@ function appendSearchResult(
   const copy = results.ownerDocument.createElement('span');
   copy.className = 'inspector-search-result-copy';
   const path = results.ownerDocument.createElement('small');
-  path.textContent = DESIGNER_UI_TEXT.inspectorUi.searchPath(tabLabel(tab), sectionTitle, '');
+  path.textContent = DESIGNER_UI_TEXT.inspectorUi.searchPath(
+    inspectorSearchTabLabel(tab),
+    sectionTitle,
+    '',
+  );
   const label = results.ownerDocument.createElement('strong');
   label.textContent = labelText;
   copy.append(path, label);
@@ -306,7 +310,8 @@ function directLabel(field: HTMLElement): string {
   return field.dataset.inspectorSearchText ?? '';
 }
 
-function tabLabel(tab: 'appearance' | 'data' | 'interaction'): string {
+/** 搜索面包屑的页签段文本（导出以便断言「对象被塞进模板串」这类渲染事故）。 */
+export function inspectorSearchTabLabel(tab: 'appearance' | 'data' | 'interaction'): string {
   if (tab === 'appearance') return DESIGNER_UI_TEXT.appearance;
   if (tab === 'data') return DESIGNER_UI_TEXT.data.title;
   return DESIGNER_UI_TEXT.inspectorUi.advanced;
