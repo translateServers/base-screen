@@ -362,6 +362,37 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_PARAMETER_INLINE_APPLY_FAILED:${JSON.stringify(afterInlineApply)}`,
     );
   }
+
+  // ---- 折叠组重放：用户手动展开的状态必须跨「段重建」存活 ----
+  // 参数一改，`source` 段的内容键就变 → 整段 `replaceWith` → 组节点换新。此时若没有
+  // 「构造即重放」，组会被默认规则收回（QA 注入后实测 `afterToggle:true, afterEdit:false`），
+  // 而**任何既有断言都不会红**：编辑照样成功，只是组被收起、用户看不到刚改的那一行。
+  const parametersGroup = dataPanel.locator('details[data-details-group="parameters"]').first();
+  const summary = parametersGroup.locator('summary').first();
+  if ((await parametersGroup.getAttribute('open')) !== null) await summary.click();
+  await summary.click();
+  await parametersGroup.evaluate((node) => {
+    node.dataset.probeGroup = 'before-edit';
+  });
+  const replayBefore = await parametersGroup.getAttribute('open');
+  const regionForReplay = dataPanel.locator('[data-value-ref-inline="parameter:region"]');
+  await regionForReplay.fill('south');
+  await regionForReplay.dispatchEvent('change');
+  const replay = await dataPanel.evaluate((panel) => {
+    const group = panel.querySelector('details[data-details-group="parameters"]');
+    return {
+      open: group?.open ?? null,
+      // 节点必须是新的：否则这条断言会在"根本没重建"时假绿。
+      rebuilt: group?.dataset.probeGroup !== 'before-edit',
+      section: group?.dataset.dsGroupSection ?? null,
+    };
+  });
+  if (replayBefore === null || !replay.open || !replay.rebuilt || replay.section !== 'source') {
+    throw new Error(`BROWSER_HARNESS_DATASET_GROUP_REPLAY_FAILED:${JSON.stringify(replay)}`);
+  }
+  // 上面那次编辑会让草稿变脏；后面的工作台关闭流程会因此弹「放弃草稿」确认，
+  // 所以这里把它应用掉，恢复成干净状态（顺带再验一次重放：应用也会重建段）。
+  await dataPanel.locator('[data-dataset-action="apply"]').click();
   // 绑定字段选择器：触发器芯片 + 计数 + 自绘弹层（设计原型 .bind-field）；芯片 × 与选项切换共用绑定动作。
   const bindShell = await dataPanel.evaluate((panel) => {
     const trigger = panel.querySelector('[data-dataset-binding-trigger="measures"]');
@@ -519,7 +550,9 @@ export async function assertDatasetAuthoring(designer, page) {
   }
   // `surface` 必须真的分叉：检查器只读（无就地控件 + 有跳转），工作台可编辑（有就地控件）。
   //
-  // **本断言不覆盖 `sectionContentKey` 的组成**：它只能证明「渲染读了 surface」；
+  // **本断言守的是「渲染读了 surface」，不是 `sectionContentKey` 的组成**——命名据此改为
+  // `SURFACE_FORK_FAILED`。键组成由单测 `designer-data-section-diff.test.ts`（'不同 surface
+  // ⇒ authoring 内容键不同'）钉死；两处各守一件事，互相不能替代。
   // 「surface 是否进内容键」在 patch 路径上 DOM 不可观测，那条由单测
   // `designer-data-section-diff.test.ts:99` 钉。两处各守一件事，不要拿本断言的结果去
   // 判断「surface 没进键」——那样会得出"无守卫"的错误结论。
@@ -544,7 +577,7 @@ export async function assertDatasetAuthoring(designer, page) {
     // 工作台里已经是"编辑现场"：它渲染可编辑控件，不再渲染「去工作台修改」的跳转。
     surfaceGuard.workbench.editInWorkbench !== 0
   ) {
-    throw new Error(`BROWSER_HARNESS_DATASET_SURFACE_KEY_FAILED:${JSON.stringify(surfaceGuard)}`);
+    throw new Error(`BROWSER_HARNESS_DATASET_SURFACE_FORK_FAILED:${JSON.stringify(surfaceGuard)}`);
   }
   await datasetWorkbench.screenshot({
     path: `${screenshotDirectory}/data-workbench-${page.viewportSize()?.width ?? 'desktop'}.png`,
@@ -663,6 +696,30 @@ export async function assertDatasetAuthoring(designer, page) {
   await designer.locator('[data-base-screen-component-id=title]').click({
     position: { x: 6, y: 7 },
   });
+  // 条件渲染的**假一侧**：`title` 是 inline（固定值）组件，没有引用任何实例 —— 所以
+  // 「去工作台修改」的跳转与 `refresh` 组都必须为 0。只测真一侧（data-source-field 组件）
+  // 等于把条件删掉也照样绿：注入「无条件渲染跳转」不会触发任何断言。
+  const inlineSide = await designer.evaluate((element) => {
+    const panel = [...element.shadowRoot.querySelectorAll('[data-inspector-pane=data]')].find(
+      (node) => node.closest('[data-data-workbench]') === null,
+    );
+    return {
+      editInWorkbench: panel?.querySelectorAll('[data-edit-in-workbench]').length ?? -1,
+      refreshGroups: panel?.querySelectorAll('details[data-details-group="refresh"]').length ?? -1,
+      authoringSections: panel?.querySelectorAll('[data-ds-section="authoring"]').length ?? -1,
+      sections: [...(panel?.querySelectorAll('[data-ds-section]') ?? [])].map(
+        (node) => node.dataset.dsSection,
+      ),
+    };
+  });
+  if (
+    inlineSide.editInWorkbench !== 0 ||
+    inlineSide.refreshGroups !== 0 ||
+    inlineSide.authoringSections !== 0 ||
+    JSON.stringify(inlineSide.sections) !== JSON.stringify(['value'])
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATASET_INLINE_JUMP_FAILED:${JSON.stringify(inlineSide)}`);
+  }
   const hostEventCount = await page.evaluate(() => window.baseScreenHarness.hostEvents.length);
   return hostEventCount;
 }

@@ -75,10 +75,15 @@ export function createDataGroup(
     options.defaultOpen,
   );
   details.open = resolved;
-  // `toggle` 不冒泡（不能事件委托），且程序化改 `open` 也会触发一次：只在"用户把它改成与
-  // 当前生效值不同"时写表，否则会把默认值固化成覆盖，结构重绘时再也回不到默认。
+  // `toggle` 不冒泡（不能事件委托），且**程序化改 `open` 也会触发一次**。判据是「与上一次
+  // 已知状态不同」而不是「与构造时的默认值不同」：后者是快照，用户来回切两次之后就会过期
+  // ——实际后果是第二次 toggle 不写表，段一重建就把用户刚展开的组收回（浏览器实测：
+  // `open:false` after edit）。`last` 跟着每次真实变化走，才既有「忽略程序化赋值」，
+  // 又不会漏记用户的第二次操作。
+  let last = resolved;
   details.addEventListener('toggle', () => {
-    if (details.open === resolved) return;
+    if (details.open === last) return;
+    last = details.open;
     options.onToggle?.(options.section, options.group, details.open);
   });
 
