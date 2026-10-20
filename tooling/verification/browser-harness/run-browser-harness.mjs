@@ -98,7 +98,12 @@ export async function runBrowserHarness(serverPort) {
   await withViteBrowser(
     {
       root: 'tooling/verification/browser-harness',
-      optimizeDeps: { force: true },
+      // `optimizeDeps.force` 每次启动都重建预构建产物；第二次启动时 vite 会删除上一次留下的
+      // `node_modules/.vite/deps_temp_*`（实测 56 个条目），而本仓库的运行环境带 safe-delete
+      // 守卫（>50 条目需确认）→ **进程直接崩，且不产生任何断言错误**。表现就是"同 HEAD 连跑
+      // 时第一次绿、第二次无声退出"，逼人养成"红了重跑"的坏习惯。
+      // 连跑验证（同一脚本连跑 3 次）时设 BASE_SCREEN_HARNESS_FORCE_DEPS=0。
+      optimizeDeps: { force: process.env.BASE_SCREEN_HARNESS_FORCE_DEPS !== '0' },
       server: { port: serverPort },
     },
     async ({ baseUrl, browser }) => {
@@ -217,7 +222,14 @@ export async function runBrowserHarness(serverPort) {
  * 一次性预热：等 harness 全局真正就绪（而不是只等自定义元素注册），
  * 让依赖预构建引发的那次整页刷新落在丢弃页面上，不打断后续断言的执行上下文。
  */
-async function warmUpHarness(browser, baseUrl) {
+/**
+ * 吃掉 `optimizeDeps.force` 的整页刷新（导出以便任何探针脚本复用）。
+ *
+ * 不 warm 的后果不是"慢"，而是**同一脚本连跑时随机失败**：预构建完成后的整页刷新会落在
+ * 第一条断言中途，表现成超时或 `baseScreenHarness undefined`，重跑一次又好了——这正是
+ * "红了重跑一次试试"的来源。任何自建探针都应先调它，再做断言。
+ */
+export async function warmUpHarness(browser, baseUrl) {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await page.goto(`${baseUrl}/?campaign=browser-harness`, { waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.baseScreenHarness?.designer !== undefined, undefined, {
