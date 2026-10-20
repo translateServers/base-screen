@@ -25,21 +25,10 @@ export function isScreenHostResourcePort(value: unknown): boolean {
   );
 }
 
-export function isScreenHostVariablePort(value: unknown): boolean {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    typeof (value as Record<string, unknown>).resolve === 'function'
-  );
-}
-
-export function isScreenHostVariableCatalogPort(value: unknown): boolean {
-  return (
-    value !== null &&
-    typeof value === 'object' &&
-    typeof (value as Record<string, unknown>).list === 'function' &&
-    typeof (value as Record<string, unknown>).describe === 'function'
-  );
+export function isScreenHostCatalogPort(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  return ['list', 'describe', 'resolve'].every((name) => typeof record[name] === 'function');
 }
 
 export function isBaseScreenConditionalStylePort(value: unknown): boolean {

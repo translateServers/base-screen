@@ -241,7 +241,7 @@ describe('BaseScreenRenderer data runtime', () => {
     await Promise.resolve();
     expect(requests).toEqual([
       {
-        componentId: 'dataset',
+        dataSourceId: 'data-source-dataset',
         resourceType: 'dataset',
         resourceId: 'orders',
         params: { limit: 5 },

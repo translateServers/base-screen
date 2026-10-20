@@ -1,8 +1,4 @@
-import type {
-  ScreenDocument,
-  ScreenHostVariableCatalogPort,
-  ScreenHostVariablePort,
-} from '@base-screen/contracts';
+import type { ScreenDocument, ScreenHostCatalogPort } from '@base-screen/contracts';
 import { applyScreenDocumentCommand } from '@base-screen/core';
 import { describe, expect, it, vi } from 'vitest';
 import { DesignerVariablesController } from '../../../src/browser/controllers/designer-variables-controller.js';
@@ -118,8 +114,7 @@ function document(variables: ScreenDocument['variables']): ScreenDocument {
 function harness(
   variables: ScreenDocument['variables'],
   ports: {
-    readonly catalog?: ScreenHostVariableCatalogPort;
-    readonly variable?: ScreenHostVariablePort;
+    readonly catalog?: ScreenHostCatalogPort;
   } = {},
 ) {
   const commands: unknown[] = [];
@@ -128,8 +123,7 @@ function harness(
   const panel = ownerDocument.createElement('div');
   const controller = new DesignerVariablesController({
     getDocument: () => document(variables),
-    getCatalogPort: () => ports.catalog,
-    getVariablePort: () => ports.variable,
+    getHostCatalogPort: () => ports.catalog,
     executeCommand: (command) => {
       commands.push(command);
       return { ok: true, value: document(variables), diagnostics: [] };
@@ -532,7 +526,7 @@ describe('designer variables controller', () => {
   });
 
   it('creates data-source variables only after selecting a strict catalog descriptor', async () => {
-    const catalog: ScreenHostVariableCatalogPort = {
+    const catalog: ScreenHostCatalogPort = {
       async list() {
         return {
           ok: true,
@@ -540,7 +534,6 @@ describe('designer variables controller', () => {
             items: [
               {
                 sourceId: 'region-id',
-                sourceType: 'data-source',
                 name: 'region',
                 description: 'Host region',
               },
@@ -554,13 +547,16 @@ describe('designer variables controller', () => {
           ok: true,
           value: {
             sourceId,
-            sourceType: 'data-source',
             name: 'region',
             description: 'Host region',
+            parameters: [],
             previewable: true,
           },
           diagnostics: [],
         };
+      },
+      async resolve() {
+        return { ok: true, value: null, diagnostics: [] };
       },
     };
     const { controller, panel, commands } = harness([], { catalog });

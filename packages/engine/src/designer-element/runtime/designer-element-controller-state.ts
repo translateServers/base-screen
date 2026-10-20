@@ -47,7 +47,7 @@ export function initializeDesignerElementControllers(
   };
   state.canvasRuntimeController = new DesignerCanvasRuntimeController({
     getRenderer: () => state.renderer,
-    getVariablePort: () => state.variablePort,
+    getHostCatalogPort: () => state.hostCatalogPort,
     getRuntimeContributions: () => state.runtimeContributions,
     getBlueprintHostActionPort: () => state.designerHostAdapter?.actions,
     emitBlueprintHostEvent: (event) =>
@@ -174,8 +174,7 @@ export function initializeDesignerElementControllers(
   });
   state.variablesController = new DesignerVariablesController({
     getDocument: () => state.session.document,
-    getCatalogPort: () => state.variableCatalogPort,
-    getVariablePort: () => state.variablePort,
+    getHostCatalogPort: () => state.hostCatalogPort,
     executeCommand: (command) => element.executeCommand(command),
     addToBlueprint: (variableId) => {
       const document = state.session.document;
@@ -233,7 +232,7 @@ export function initializeDesignerElementControllers(
     getCatalog: () => state.catalog,
     getDocument: () => state.session.document,
     getResourcePort: () => state.resourcePort,
-    getVariablePort: () => state.variablePort,
+    getHostCatalogPort: () => state.hostCatalogPort,
     getRuntimeContributions: () => state.runtimeContributions,
     isViewerRegistered: () =>
       element.ownerDocument.defaultView?.customElements.get('base-screen-viewer') !== undefined,
@@ -256,7 +255,7 @@ export function initializeDesignerElementControllers(
     getInteraction: () => state.session.interaction,
     getCatalog: () => state.catalog,
     getResourcePort: () => state.resourcePort,
-    getVariablePort: () => state.variablePort,
+    getHostCatalogPort: () => state.hostCatalogPort,
     getRuntimeContributions: () => state.runtimeContributions,
     executeTransaction: (transaction) =>
       state.runtime.executeDesignerTransaction(element, transaction),

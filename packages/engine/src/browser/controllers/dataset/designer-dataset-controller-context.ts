@@ -3,9 +3,9 @@ import type {
   ScreenDatasetDefinition,
   ScreenDiagnostic,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariablePort,
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
@@ -33,7 +33,7 @@ export interface DesignerDatasetControllerCallbacks {
   readonly getInteraction: () => ScreenInteractionState;
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
-  readonly getVariablePort?: () => ScreenHostVariablePort | undefined;
+  readonly getHostCatalogPort?: () => ScreenHostCatalogPort | undefined;
   readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly executeTransaction: (
     transaction: ScreenDocumentTransaction,

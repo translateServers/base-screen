@@ -1,7 +1,7 @@
 import type {
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostResourcePort,
-  ScreenHostVariablePort,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import { describe, expect, it } from 'vitest';
@@ -84,8 +84,12 @@ function resourcePort(): ScreenHostResourcePort {
   return { resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }) };
 }
 
-function variablePort(): ScreenHostVariablePort {
-  return { resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }) };
+function variablePort(): ScreenHostCatalogPort {
+  return {
+    list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
+    describe: async () => ({ ok: false as const, diagnostics: [] }),
+    resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }),
+  };
 }
 
 function documentValue(): ScreenDocument {
@@ -106,7 +110,7 @@ function createHarness(options: {
   getCatalog: () => BaseScreenMaterialCatalog | undefined;
   getDocument?: () => ScreenDocument | undefined;
   getResourcePort?: () => ScreenHostResourcePort | undefined;
-  getVariablePort?: () => ScreenHostVariablePort | undefined;
+  getHostCatalogPort?: () => ScreenHostCatalogPort | undefined;
 }): {
   controller: DesignerPreviewController;
   viewer: FakeElement;
@@ -121,7 +125,7 @@ function createHarness(options: {
     getCatalog: options.getCatalog,
     getDocument: options.getDocument ?? (() => documentValue()),
     getResourcePort: options.getResourcePort ?? (() => stableResourcePort),
-    getVariablePort: options.getVariablePort ?? (() => stableVariablePort),
+    getHostCatalogPort: options.getHostCatalogPort ?? (() => stableVariablePort),
     getRuntimeContributions: () => undefined,
     isViewerRegistered: () => true,
   });
@@ -147,11 +151,11 @@ describe('DesignerPreviewController nested viewer configure (RB3)', () => {
     const configuration = viewer.configureCalls[0]![0] as {
       catalog: unknown;
       resourcePort: unknown;
-      variablePort: unknown;
+      hostCatalogPort: unknown;
     };
     expect(configuration.catalog).toBe(stableCatalog);
     expect(configuration.resourcePort).toBe(stableResourcePort);
-    expect(configuration.variablePort).toBe(stableVariablePort);
+    expect(configuration.hostCatalogPort).toBe(stableVariablePort);
     expect(viewer.documentValue).toBeDefined();
     expect(preview.hidden).toBe(false);
     expect(viewer.unloadCalls).toBe(0);
@@ -193,7 +197,7 @@ describe('DesignerPreviewController nested viewer configure (RB3)', () => {
     const { controller, viewer } = createHarness({
       getCatalog: () => stableCatalog,
       getResourcePort: () => undefined,
-      getVariablePort: () => undefined,
+      getHostCatalogPort: () => undefined,
     });
 
     expect(controller.toggle()).toBe(true);
@@ -201,22 +205,22 @@ describe('DesignerPreviewController nested viewer configure (RB3)', () => {
     const configuration = viewer.configureCalls[0]![0] as {
       catalog: unknown;
       resourcePort?: unknown;
-      variablePort?: unknown;
+      hostCatalogPort?: unknown;
     };
     expect(configuration.catalog).toBe(stableCatalog);
     expect(configuration.resourcePort).toBeUndefined();
-    expect(configuration.variablePort).toBeUndefined();
+    expect(configuration.hostCatalogPort).toBeUndefined();
     expect(viewer.documentValue).toBeDefined();
     expect(viewer.unloadCalls).toBe(0);
   });
 
   it('reconfigures a previously static preview when optional ports become available', () => {
     let resourcePort: ScreenHostResourcePort | undefined;
-    let variablePort: ScreenHostVariablePort | undefined;
+    let variablePort: ScreenHostCatalogPort | undefined;
     const { controller, viewer } = createHarness({
       getCatalog: () => stableCatalog,
       getResourcePort: () => resourcePort,
-      getVariablePort: () => variablePort,
+      getHostCatalogPort: () => variablePort,
     });
 
     expect(controller.toggle()).toBe(true);
@@ -230,10 +234,10 @@ describe('DesignerPreviewController nested viewer configure (RB3)', () => {
     expect(viewer.configureCalls).toHaveLength(2);
     const configuration = viewer.configureCalls[1]![0] as {
       resourcePort?: unknown;
-      variablePort?: unknown;
+      hostCatalogPort?: unknown;
     };
     expect(configuration.resourcePort).toBe(stableResourcePort);
-    expect(configuration.variablePort).toBe(stableVariablePort);
+    expect(configuration.hostCatalogPort).toBe(stableVariablePort);
   });
 
   it('refreshData forwards to the nested viewer', () => {

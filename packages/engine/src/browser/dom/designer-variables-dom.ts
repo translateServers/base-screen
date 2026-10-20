@@ -1,7 +1,7 @@
 import type {
   ScreenDocument,
-  ScreenHostVariableDescriptor,
-  ScreenHostVariableSummary,
+  ScreenHostCatalogDescriptor,
+  ScreenHostCatalogSummary,
   ScreenJsonValue,
   ScreenVariable,
 } from '@base-screen/contracts';
@@ -52,10 +52,10 @@ export interface DesignerVariablesDraft {
 
 export interface DesignerVariableCatalogView {
   readonly query: string;
-  readonly items: readonly ScreenHostVariableSummary[];
+  readonly items: readonly ScreenHostCatalogSummary[];
   readonly nextCursor: string | undefined;
   readonly feedback: string;
-  readonly selected: ScreenHostVariableDescriptor | undefined;
+  readonly selected: ScreenHostCatalogDescriptor | undefined;
   readonly previewVariableId: string | undefined;
   readonly previewStatus: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error';
   readonly previewSummary: string | undefined;

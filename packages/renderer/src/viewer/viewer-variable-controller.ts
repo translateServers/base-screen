@@ -1,7 +1,7 @@
 import type {
   ScreenDiagnostic,
   ScreenDocument,
-  ScreenHostVariablePort,
+  ScreenHostCatalogPort,
   ScreenJsonObject,
   ScreenJsonValue,
   ScreenResourceExecutionTrigger,
@@ -20,7 +20,7 @@ export interface ViewerVariableControllerHost {
   readonly readBlueprintPlan: () => ScreenBlueprintPlan | undefined;
   readonly readBlueprintVariables: () => ScreenJsonObject | undefined;
   readonly writeBlueprintVariables: (variables: ScreenJsonObject) => void;
-  readonly readVariablePort: () => ScreenHostVariablePort | undefined;
+  readonly readHostCatalogPort: () => ScreenHostCatalogPort | undefined;
   readonly emitDiagnostic: (code: ScreenDiagnostic['code']) => void;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
 }
@@ -204,12 +204,12 @@ export class ViewerVariableController {
     };
     const dynamicVariables = hostResolvedVariables(document);
     if (dynamicVariables.length > 0) {
-      const variablePort = this.#host.readVariablePort();
-      if (variablePort === undefined) {
+      const hostCatalogPort = this.#host.readHostCatalogPort();
+      if (hostCatalogPort === undefined) {
         this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
         return false;
       }
-      const values = await resolveHostVariableBatch(document, variablePort, controller);
+      const values = await resolveHostVariableBatch(document, hostCatalogPort, controller);
       if (values === undefined) {
         if (!controller.signal.aborted) this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
         return false;
@@ -273,7 +273,7 @@ export class ViewerVariableController {
       (variable) => requestedIds === undefined || requestedIds.includes(variable.id),
     );
     if (dynamicVariables.length === 0) return true;
-    const port = this.#host.readVariablePort();
+    const port = this.#host.readHostCatalogPort();
     if (port === undefined) {
       this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
       return false;

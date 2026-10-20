@@ -1,11 +1,10 @@
 import {
-  parseScreenHostVariableDescriptor,
-  parseScreenHostVariablePage,
+  parseScreenHostCatalogDescriptor,
+  parseScreenHostCatalogPage,
   parseScreenJsonValue,
   type ScreenDiagnostic,
-  type ScreenHostVariableCatalogPort,
-  type ScreenHostVariableDescriptor,
-  type ScreenHostVariablePort,
+  type ScreenHostCatalogDescriptor,
+  type ScreenHostCatalogPort,
 } from '@base-screen/contracts';
 import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
@@ -16,21 +15,25 @@ const PREVIEW_SUMMARY_BYTES = 8 * 1024;
 const PREVIEW_TIMEOUT_MS = 15_000;
 
 interface DesignerVariableCatalogCallbacks {
-  readonly getCatalogPort: () => ScreenHostVariableCatalogPort | undefined;
-  readonly getVariablePort: () => ScreenHostVariablePort | undefined;
+  readonly getHostCatalogPort: () => ScreenHostCatalogPort | undefined;
   readonly report: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly render: () => void;
 }
 
-/** Isolates paged host catalog and value-preview requests from document history. */
+/**
+ * 来源目录：分页 list、按 sourceId describe、按来源解析当前值。
+ *
+ * `host-catalog` 与 `url-query` 共用同一个端口，宿主拥有 `sourceId` 的命名空间，
+ * 因此这里不再按旧的三桶枚举过滤目录项。
+ */
 export class DesignerVariableCatalogController {
   #listController: AbortController | undefined;
   #detailController: AbortController | undefined;
   #listGeneration = 0;
   #detailGeneration = 0;
-  #sourceType: 'data-source' | 'url-query' | undefined;
+  #listed = false;
   #view: DesignerVariableCatalogView = emptyView();
-  readonly #descriptors = new Map<string, ScreenHostVariableDescriptor>();
+  readonly #descriptors = new Map<string, ScreenHostCatalogDescriptor>();
 
   constructor(private readonly callbacks: DesignerVariableCatalogCallbacks) {}
 
@@ -38,25 +41,22 @@ export class DesignerVariableCatalogController {
     return this.#view;
   }
 
-  ensureList(sourceType: 'data-source' | 'url-query'): void {
-    if (this.#sourceType !== sourceType) {
-      this.#sourceType = sourceType;
-      this.#view = emptyView();
-    }
+  ensureList(): void {
+    this.#listed = true;
     if (this.#view.items.length === 0) void this.#list(undefined);
   }
 
   updateQuery(query: string): void {
     if (query === this.#view.query) return;
     this.#view = { ...emptyView(), query };
-    if (this.#sourceType !== undefined) void this.#list(undefined);
+    if (this.#listed) void this.#list(undefined);
   }
 
   loadMore(): void {
     if (this.#view.nextCursor !== undefined) void this.#list(this.#view.nextCursor);
   }
 
-  async select(sourceId: string): Promise<ScreenHostVariableDescriptor | undefined> {
+  async select(sourceId: string): Promise<ScreenHostCatalogDescriptor | undefined> {
     const descriptor = await this.#describe(sourceId);
     if (descriptor === undefined) return undefined;
     this.#view = { ...this.#view, selected: descriptor };
@@ -80,7 +80,7 @@ export class DesignerVariableCatalogController {
       this.callbacks.render();
       return;
     }
-    const port = this.callbacks.getVariablePort();
+    const port = this.callbacks.getHostCatalogPort();
     if (port === undefined) {
       this.#setPreviewFailure(variableId);
       return;
@@ -106,13 +106,8 @@ export class DesignerVariableCatalogController {
       });
       const settled = await Promise.race([
         port.resolve({
-          variableId,
           sourceId: variable.sourceId,
-          sourceType: variable.type === 'url-query' ? 'url-query' : 'data-source',
-          initialValue: variable.initialValue,
-          controlled: variable.controlled,
-          ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
-          ...(variable.autoUpdate === undefined ? {} : { autoUpdate: variable.autoUpdate }),
+          params: {},
           purpose: 'authoring-preview',
           signal: controller.signal,
         }),
@@ -155,7 +150,7 @@ export class DesignerVariableCatalogController {
     this.#listGeneration++;
     this.#detailGeneration++;
     this.#descriptors.clear();
-    this.#sourceType = undefined;
+    this.#listed = false;
     this.#view = emptyView();
   }
 
@@ -170,9 +165,8 @@ export class DesignerVariableCatalogController {
   }
 
   async #list(cursor: string | undefined): Promise<void> {
-    const port = this.callbacks.getCatalogPort();
-    const sourceType = this.#sourceType;
-    if (port === undefined || sourceType === undefined) {
+    const port = this.callbacks.getHostCatalogPort();
+    if (port === undefined || !this.#listed) {
       this.#view = { ...this.#view, feedback: DESIGNER_UI_TEXT.variables.catalogUnavailable };
       this.callbacks.render();
       return;
@@ -186,7 +180,6 @@ export class DesignerVariableCatalogController {
     try {
       const result = await port.list({
         query: this.#view.query,
-        sourceType,
         ...(cursor === undefined ? {} : { cursor }),
         limit: 50,
         signal: controller.signal,
@@ -199,7 +192,7 @@ export class DesignerVariableCatalogController {
         this.callbacks.render();
         return;
       }
-      const parsed = parseScreenHostVariablePage(result.value);
+      const parsed = parseScreenHostCatalogPage(result.value);
       if (!parsed.ok) {
         this.callbacks.report(parsed.diagnostics);
         this.#view = { ...this.#view, feedback: DESIGNER_UI_TEXT.variables.catalogFailed };
@@ -208,11 +201,8 @@ export class DesignerVariableCatalogController {
       }
       const items =
         cursor === undefined ? parsed.value.items : [...this.#view.items, ...parsed.value.items];
-      if (
-        items.some((item) => item.sourceType !== sourceType) ||
-        new Set(items.map(({ sourceId }) => sourceId)).size !== items.length
-      ) {
-        this.callbacks.report([catalogDiagnostic('Host variable page repeats an existing id.')]);
+      if (new Set(items.map(({ sourceId }) => sourceId)).size !== items.length) {
+        this.callbacks.report([catalogDiagnostic('Host catalog page repeats an existing id.')]);
         this.#view = { ...this.#view, feedback: DESIGNER_UI_TEXT.variables.catalogFailed };
         this.callbacks.render();
         return;
@@ -236,10 +226,10 @@ export class DesignerVariableCatalogController {
     }
   }
 
-  async #describe(sourceId: string): Promise<ScreenHostVariableDescriptor | undefined> {
+  async #describe(sourceId: string): Promise<ScreenHostCatalogDescriptor | undefined> {
     const cached = this.#descriptors.get(sourceId);
     if (cached !== undefined) return cached;
-    const port = this.callbacks.getCatalogPort();
+    const port = this.callbacks.getHostCatalogPort();
     if (port === undefined) return undefined;
     this.#detailController?.abort();
     const controller = new AbortController();
@@ -253,11 +243,11 @@ export class DesignerVariableCatalogController {
         this.callbacks.report(result.diagnostics);
         return undefined;
       }
-      const parsed = parseScreenHostVariableDescriptor(result.value);
+      const parsed = parseScreenHostCatalogDescriptor(result.value);
       if (!parsed.ok || parsed.value.sourceId !== sourceId) {
         this.callbacks.report(
           parsed.ok
-            ? [catalogDiagnostic('Host variable descriptor id does not match the request.')]
+            ? [catalogDiagnostic('Host catalog descriptor id does not match the request.')]
             : parsed.diagnostics,
         );
         return undefined;

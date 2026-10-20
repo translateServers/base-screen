@@ -4,52 +4,44 @@ import {
   type ScreenDataSource,
   type ScreenDataSourceSource,
   type ScreenDocument,
-  type ScreenHostVariableRequest,
+  type ScreenHostCatalogResolveRequest,
   type ScreenVariableEntry,
 } from '@base-screen/contracts';
 
 /**
- * 变量条目的宿主解析入参（旧变量端口的形状）。
+ * 变量条目的宿主解析入参。
  *
- * 文档 `variables` 现在是过渡容器（旧三形态 + 单形态记录），条目本身不再携带
- * `sourceId`/`controlled` 之外的来源信息；运行时所需的来源标识由「条目 → 取值引用 →
- * 文档级数据源实例」读出。本模块只做读，不改写文档，也不缓存派生结果。
+ * 文档 `variables` 是过渡容器（旧三形态 + 单形态记录），条目本身只声明「值取自哪个数据源
+ * 实例的输出」；发给宿主的 `sourceId` 由「条目 → 取值引用 → 文档级实例」读出。本模块只做
+ * 读，不改写文档，也不缓存派生结果。
+ *
+ * 本轮（T02a）参数位仍为空：实例参数求值属 T02c 的 `DataSourceRuntime`。
  */
 
-/** 变量条目的值是否取自某个数据源实例的输出（= 需要向宿主解析）。 */
+/** 变量条目的值是否取自某个数据源实例的输出（= 需要向来源目录解析）。 */
 export function isHostResolvedVariable(entry: ScreenVariableEntry): boolean {
   return readScreenVariableRecord(entry).value.kind === 'data-source-field';
 }
 
-/** 读文档里所有需要向宿主解析的变量条目。 */
+/** 读文档里所有需要向来源目录解析的变量条目。 */
 export function hostResolvedVariables(document: ScreenDocument): readonly ScreenVariableEntry[] {
   return document.variables.filter((entry) => isHostResolvedVariable(entry));
 }
 
-/**
- * 构造旧变量端口的解析请求；条目的值不是数据源输出时返回 `undefined`。
- */
-export function readHostVariableRequest(
+/** 构造来源目录解析请求；条目的值不是数据源输出时返回 `undefined`。 */
+export function readHostCatalogResolveRequest(
   document: ScreenDocument,
   entry: ScreenVariableEntry,
-  purpose: ScreenHostVariableRequest['purpose'],
-  signal: ScreenHostVariableRequest['signal'],
-): ScreenHostVariableRequest | undefined {
-  const record = readScreenVariableRecord(entry);
-  const ref = record.value;
+  purpose: ScreenHostCatalogResolveRequest['purpose'],
+  signal: ScreenHostCatalogResolveRequest['signal'],
+): ScreenHostCatalogResolveRequest | undefined {
+  const ref = readScreenVariableRecord(entry).value;
   if (ref.kind !== 'data-source-field') return undefined;
   const instance = readDataSourceInstance(document, ref.dataSourceId);
-  const source = instance?.source;
-  if (source === undefined) return undefined;
-  const autoUpdate = readAutoUpdate(instance);
+  if (instance === undefined) return undefined;
   return {
-    variableId: record.id,
-    sourceId: readSourceIdentifier(source),
-    sourceType: source.kind === 'url-query' ? 'url-query' : 'data-source',
-    initialValue: record.initialValue,
-    controlled: record.controlled,
-    ...(instance?.processorId === undefined ? {} : { processorId: instance.processorId }),
-    ...(autoUpdate === undefined ? {} : { autoUpdate }),
+    sourceId: readSourceIdentifier(instance.source),
+    params: {},
     purpose,
     signal,
   };
@@ -71,13 +63,4 @@ function readSourceIdentifier(source: ScreenDataSourceSource): string {
     default:
       return source.sourceId;
   }
-}
-
-function readAutoUpdate(
-  instance: ScreenDataSource | undefined,
-): { readonly intervalSeconds: number } | undefined {
-  const policy = instance?.updatePolicy;
-  if (policy?.mode !== 'auto') return undefined;
-  const intervalSeconds = policy.intervalSeconds;
-  return intervalSeconds === undefined ? undefined : { intervalSeconds };
 }

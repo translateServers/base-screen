@@ -68,7 +68,7 @@ export class DatasetQueryPort implements ScreenHostResourcePort {
     if (!params.ok) return params;
     if (!active()) return cancelled();
     const response = await this.datasets.query(
-      { datasetId: request.resourceId, componentId: request.componentId, params: params.value },
+      { datasetId: request.resourceId, dataSourceId: request.dataSourceId, params: params.value },
       options,
     );
     if (!active()) return cancelled();

@@ -29,6 +29,7 @@ import { ScreenSize } from '@base-screen/contracts';
 import { ScreenStaticDataSource } from '@base-screen/contracts';
 import { ScreenStaticVariable } from '@base-screen/contracts';
 import { ScreenVariable } from '@base-screen/contracts';
+import type { ScreenVariableEntry } from '@base-screen/contracts';
 
 // @public (undocumented)
 export function applyScreenDocumentCommand(document: ScreenDocument, command: ScreenDocumentCommand): ScreenCommandResult;
@@ -444,7 +445,7 @@ export type ScreenDocumentCommand = {
     readonly blueprint: ScreenBlueprint;
 } | {
     readonly type: 'replace-variables';
-    readonly variables: readonly ScreenVariable[];
+    readonly variables: readonly ScreenVariableEntry[];
 } | {
     readonly type: 'rename-variable';
     readonly variableId: string;

@@ -3,6 +3,8 @@ import {
   parseScreenDatasetDefinition,
   parseScreenJsonValue,
   parseScreenTabularDataset,
+  readScreenComponentValueRef,
+  type ScreenComponentNode,
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
@@ -111,7 +113,7 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
     const result = await Promise.race([
       port.query(
         {
-          componentId: component.id,
+          dataSourceId: dataSourceIdOf(component),
           datasetId: draft.datasetId,
           params: validatedParams.value,
         },
@@ -186,7 +188,7 @@ async function resolvePreviewParameters(
     hostVariables.set(name, variable);
   }
   if (hostVariables.size === 0) return params;
-  const port = context.callbacks.getVariablePort?.();
+  const port = context.callbacks.getHostCatalogPort?.();
   if (port === undefined) return undefined;
   const variables = [
     ...new Map([...hostVariables.values()].map((variable) => [variable.id, variable])).values(),
@@ -203,13 +205,8 @@ async function resolvePreviewParameters(
       variables.map(async (variable) => ({
         variable,
         result: await port.resolve({
-          variableId: variable.id,
           sourceId: variable.sourceId,
-          sourceType: variable.type === 'url-query' ? 'url-query' : 'data-source',
-          initialValue: variable.initialValue,
-          controlled: variable.controlled,
-          ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
-          ...(variable.autoUpdate === undefined ? {} : { autoUpdate: variable.autoUpdate }),
+          params: {},
           purpose: 'authoring-preview',
           signal: controller.signal,
         }),
@@ -312,6 +309,17 @@ export async function copyPreviewData(context: DesignerDatasetControllerContext)
       ? DESIGNER_UI_TEXT.dataSource.copyDataSuccess
       : DESIGNER_UI_TEXT.dataSource.copyDataFailed,
   );
+}
+
+/**
+ * 宿主请求身份：文档级数据源实例 id。
+ *
+ * 过渡桥：草稿还没有绑定实例时退回组件 id，行为与改造前一致。
+ * T03 换成文档级实例 id 后删除此函数。
+ */
+function dataSourceIdOf(component: ScreenComponentNode): string {
+  const ref = readScreenComponentValueRef(component);
+  return ref?.kind === 'data-source-field' ? ref.dataSourceId : component.id;
 }
 
 function datasetRecordCount(value: ScreenJsonValue): number {

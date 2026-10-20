@@ -2,6 +2,7 @@ import {
   normalizeScreenMaterialError,
   parseScreenJsonValue,
   parseScreenTabularDataset,
+  readScreenComponentValueRef,
   type ScreenJsonValue,
   type ScreenResourceExecutionContext,
 } from '@base-screen/contracts';
@@ -14,6 +15,17 @@ import { diagnostic } from './renderer-diagnostics.js';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
 import { emitObserver, type RendererState } from './renderer-state.js';
 import type { MountedMaterial, RenderCandidate } from './renderer-types.js';
+
+/**
+ * 宿主请求身份：文档级数据源实例 id。
+ *
+ * 过渡桥：组件还没绑定实例时（旧四形态文档）退回组件 id，行为与改造前一致。
+ * T03 换成文档级实例 id 后删除此函数。
+ */
+function dataSourceIdOf(candidate: RenderCandidate): string {
+  const ref = readScreenComponentValueRef(candidate.component);
+  return ref?.kind === 'data-source-field' ? ref.dataSourceId : candidate.component.id;
+}
 
 export async function resolveHostResource(
   state: RendererState,
@@ -109,7 +121,7 @@ export async function resolveHostResource(
       source.type === 'dataset' ? DATASET_QUERY_KIND : source.resourceType,
       candidate.component.id,
       {
-        componentId: candidate.component.id,
+        dataSourceId: dataSourceIdOf(candidate),
         resourceType: source.type === 'dataset' ? DATASET_QUERY_KIND : source.resourceType,
         resourceId: source.type === 'dataset' ? source.datasetId : source.resourceId,
         params: resource.params,

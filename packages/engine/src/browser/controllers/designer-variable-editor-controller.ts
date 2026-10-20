@@ -108,7 +108,7 @@ export class DesignerVariableEditorController {
     this.#creating = true;
     this.#createType = type;
     this.callbacks.getCatalog().clear();
-    if (type !== 'static') this.callbacks.getCatalog().ensureList(type);
+    if (type !== 'static') this.callbacks.getCatalog().ensureList();
     this.callbacks.renderAndFocus('[data-variable-create-name]');
   }
 
@@ -116,7 +116,7 @@ export class DesignerVariableEditorController {
     this.captureCreateInputs();
     if (type !== this.#createType) this.#selectedSourceId = undefined;
     this.#createType = type;
-    if (type !== 'static') this.callbacks.getCatalog().ensureList(type);
+    if (type !== 'static') this.callbacks.getCatalog().ensureList();
     this.callbacks.renderAndFocus(
       type === 'static' ? '[data-variable-create-name]' : '[data-variable-catalog-search]',
     );
@@ -142,7 +142,7 @@ export class DesignerVariableEditorController {
         this.#createAutoUpdate = true;
         this.#createAutoUpdateInterval = String(variable.autoUpdate.intervalSeconds);
       }
-      this.callbacks.getCatalog().ensureList(variable.type);
+      this.callbacks.getCatalog().ensureList();
     }
     this.callbacks.renderAndFocus('[data-variable-create-name]');
   }
@@ -187,14 +187,7 @@ export class DesignerVariableEditorController {
   async selectHost(sourceId: string): Promise<void> {
     if (sourceId === '') return;
     const descriptor = await this.callbacks.getCatalog().select(sourceId);
-    if (
-      descriptor === undefined ||
-      !this.#creating ||
-      this.#createType === 'static' ||
-      descriptor.sourceType !== this.#createType
-    ) {
-      return;
-    }
+    if (descriptor === undefined || !this.#creating || this.#createType === 'static') return;
     const document = this.callbacks.getDocument();
     this.#selectedSourceId = descriptor.sourceId;
     if (document !== undefined && this.#configuringIndex === undefined) {

@@ -1,7 +1,6 @@
 import type {
-  ScreenHostVariableCatalogPort,
-  ScreenHostVariablePage,
-  ScreenHostVariablePort,
+  ScreenHostCatalogPage,
+  ScreenHostCatalogPort,
   ScreenJsonValue,
   ScreenParseResult,
   ScreenVariable,
@@ -15,19 +14,19 @@ import {
 
 describe('DesignerVariableCatalogController', () => {
   it('cancels superseded searches and ignores their late results', async () => {
-    const pending: Array<Deferred<ScreenParseResult<ScreenHostVariablePage>>> = [];
+    const pending: Array<Deferred<ScreenParseResult<ScreenHostCatalogPage>>> = [];
     const signals: Array<{ readonly aborted: boolean }> = [];
     const catalog = catalogPort({
       list: (request) => {
         signals.push(request.signal);
-        const result = deferred<ScreenParseResult<ScreenHostVariablePage>>();
+        const result = deferred<ScreenParseResult<ScreenHostCatalogPage>>();
         pending.push(result);
         return result.promise;
       },
     });
     const controller = createController(catalog);
 
-    controller.ensureList('data-source');
+    controller.ensureList();
     controller.updateQuery('first');
     controller.updateQuery('second');
     expect(signals[1]?.aborted).toBe(true);
@@ -51,7 +50,7 @@ describe('DesignerVariableCatalogController', () => {
       }),
     );
 
-    controller.ensureList('data-source');
+    controller.ensureList();
     await settle();
     controller.loadMore();
     await settle();
@@ -68,13 +67,14 @@ describe('DesignerVariableCatalogController', () => {
       value: { secret: 'x'.repeat(16_000) },
       diagnostics: [],
     };
-    const variablePort: ScreenHostVariablePort = {
-      async resolve(request) {
-        purposes.push(request.purpose);
-        return resolution;
-      },
-    };
-    const controller = createController(catalogPort(), variablePort);
+    const controller = createController(
+      catalogPort({
+        async resolve(request) {
+          purposes.push(request.purpose);
+          return resolution;
+        },
+      }),
+    );
 
     await controller.preview(dynamicVariable('previewable'));
     expect(purposes).toEqual(['authoring-preview']);
@@ -101,12 +101,14 @@ describe('DesignerVariableCatalogController', () => {
 
   it('does not resolve descriptors that disallow authoring preview', async () => {
     let resolves = 0;
-    const controller = createController(catalogPort(), {
-      async resolve() {
-        resolves++;
-        return { ok: true, value: 'hidden', diagnostics: [] };
-      },
-    });
+    const controller = createController(
+      catalogPort({
+        async resolve() {
+          resolves++;
+          return { ok: true, value: 'hidden', diagnostics: [] };
+        },
+      }),
+    );
 
     await controller.preview(dynamicVariable('private'));
 
@@ -116,21 +118,15 @@ describe('DesignerVariableCatalogController', () => {
   });
 });
 
-function createController(
-  catalog: ScreenHostVariableCatalogPort,
-  variable?: ScreenHostVariablePort,
-): DesignerVariableCatalogController {
+function createController(catalog: ScreenHostCatalogPort): DesignerVariableCatalogController {
   return new DesignerVariableCatalogController({
-    getCatalogPort: () => catalog,
-    getVariablePort: () => variable,
+    getHostCatalogPort: () => catalog,
     report: () => undefined,
     render: () => undefined,
   });
 }
 
-function catalogPort(
-  overrides: Partial<ScreenHostVariableCatalogPort> = {},
-): ScreenHostVariableCatalogPort {
+function catalogPort(overrides: Partial<ScreenHostCatalogPort> = {}): ScreenHostCatalogPort {
   return {
     list:
       overrides.list ??
@@ -141,24 +137,25 @@ function catalogPort(
         ok: true,
         value: {
           sourceId,
-          sourceType: 'data-source',
           name: 'catalogVariable',
           description: null,
+          parameters: [],
           previewable: sourceId !== 'private',
         },
         diagnostics: [],
       })),
+    resolve:
+      overrides.resolve ?? (async () => ({ ok: true as const, value: null, diagnostics: [] })),
   };
 }
 
-function page(sourceId: string, nextCursor?: string): ScreenParseResult<ScreenHostVariablePage> {
+function page(sourceId: string, nextCursor?: string): ScreenParseResult<ScreenHostCatalogPage> {
   return {
     ok: true,
     value: {
       items: [
         {
           sourceId,
-          sourceType: 'data-source',
           name: 'catalogVariable',
           description: null,
         },

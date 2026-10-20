@@ -6,10 +6,9 @@ import type {
   ScreenComponentTextTarget,
   ScreenDesignerHostAdapter,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariableCatalogPort,
-  ScreenHostVariablePort,
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
@@ -63,8 +62,7 @@ export interface DesignerElementHost extends HTMLElement {
   groupMaterialType: string | undefined;
   resourcePort: ScreenHostResourcePort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
-  variablePort: ScreenHostVariablePort | undefined;
-  variableCatalogPort: ScreenHostVariableCatalogPort | undefined;
+  hostCatalogPort: ScreenHostCatalogPort | undefined;
   conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   datasetPort: ScreenHostDatasetPort | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;

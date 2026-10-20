@@ -3,7 +3,7 @@ import type {
   ScreenBlueprintHostEvent,
   ScreenDiagnostic,
   ScreenDocument,
-  ScreenHostVariablePort,
+  ScreenHostCatalogPort,
   ScreenJsonObject,
   ScreenParseResult,
 } from '@base-screen/contracts';
@@ -86,7 +86,7 @@ function deferred<T>(): {
 }
 
 function createHarness(
-  variablePort?: ScreenHostVariablePort,
+  variablePort?: ScreenHostCatalogPort,
   options: {
     readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
     readonly hostActionPort?: ScreenBlueprintHostActionPort;
@@ -102,13 +102,22 @@ function createHarness(
   const hostEvents: ScreenBlueprintHostEvent[] = [];
   const controller = new DesignerCanvasRuntimeController({
     getRenderer: () => renderer,
-    getVariablePort: () => variablePort,
+    getHostCatalogPort: () => variablePort,
     getRuntimeContributions: () => options.runtimeContributions,
     getBlueprintHostActionPort: () => options.hostActionPort,
     emitBlueprintHostEvent: (event) => hostEvents.push(event),
     emitDiagnostics: (items) => diagnostics.push([...items]),
   });
   return { controller, renderer, diagnostics, hostEvents };
+}
+
+/** 只关心 resolve 的测试端口：list/describe 用不到，给最小实现。 */
+function catalogPort(resolve: ScreenHostCatalogPort['resolve']): ScreenHostCatalogPort {
+  return {
+    list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
+    describe: async () => ({ ok: false as const, diagnostics: [] }),
+    resolve,
+  };
 }
 
 describe('DesignerCanvasRuntimeController', () => {
@@ -133,7 +142,7 @@ describe('DesignerCanvasRuntimeController', () => {
       value: sourceId === 'tenant-region' ? 'north' : null,
       diagnostics: [],
     }));
-    const { controller, renderer, diagnostics } = createHarness({ resolve });
+    const { controller, renderer, diagnostics } = createHarness(catalogPort(resolve));
 
     const result = controller.render(
       documentWith([
@@ -155,11 +164,8 @@ describe('DesignerCanvasRuntimeController', () => {
       expect(renderer.calls).toEqual(['suspend', 'render', 'variables', 'render']),
     );
     expect(resolve).toHaveBeenCalledWith({
-      variableId: 'region',
       sourceId: 'tenant-region',
-      sourceType: 'data-source',
-      initialValue: null,
-      controlled: true,
+      params: {},
       purpose: 'runtime',
       signal: expect.any(AbortSignal),
     });
@@ -194,7 +200,7 @@ describe('DesignerCanvasRuntimeController', () => {
       readonly value: string;
       readonly diagnostics: readonly [];
     }>();
-    const { controller, renderer } = createHarness({ resolve: () => pending.promise });
+    const { controller, renderer } = createHarness(catalogPort(() => pending.promise));
 
     controller.render(
       documentWith([
@@ -224,9 +230,9 @@ describe('DesignerCanvasRuntimeController', () => {
 
   it('re-resolves host variables before full and targeted refreshes', async () => {
     let region = 'north';
-    const { controller, renderer } = createHarness({
-      resolve: async () => ({ ok: true, value: region, diagnostics: [] }),
-    });
+    const { controller, renderer } = createHarness(
+      catalogPort(async () => ({ ok: true, value: region, diagnostics: [] })),
+    );
     const document = documentWith([
       {
         type: 'data-source',
@@ -256,13 +262,13 @@ describe('DesignerCanvasRuntimeController', () => {
 
   it('refreshes stable variable ids independently and skips unchanged renders', async () => {
     let value = 'north';
-    const requests: Array<{ readonly variableId: string; readonly purpose: string }> = [];
-    const { controller, renderer } = createHarness({
-      resolve: async (request) => {
+    const requests: Array<{ readonly sourceId: string; readonly purpose: string }> = [];
+    const { controller, renderer } = createHarness(
+      catalogPort(async (request) => {
         requests.push(request);
         return { ok: true, value, diagnostics: [] };
-      },
-    });
+      }),
+    );
     controller.render(
       documentWith([
         {
@@ -286,7 +292,8 @@ describe('DesignerCanvasRuntimeController', () => {
     await vi.waitFor(() => expect(renderer.variables).toHaveLength(1));
 
     expect(requests).toHaveLength(2);
-    expect(requests.map((request) => request.variableId)).toEqual(['region', 'regionAlias']);
+    // 合并端口后宿主只看到来源标识；两个变量共用同一来源，两次请求同形。
+    expect(requests.map((request) => request.sourceId)).toEqual(['shared-region', 'shared-region']);
     expect(renderer.variables[0]).toEqual({ region: 'north', regionAlias: 'north' });
 
     value = 'south';
@@ -307,8 +314,8 @@ describe('DesignerCanvasRuntimeController', () => {
 
   it('keeps the last successful snapshot when any variable in a refresh batch fails', async () => {
     let refresh = false;
-    const { controller, renderer, diagnostics } = createHarness({
-      resolve: async ({ sourceId }) =>
+    const { controller, renderer, diagnostics } = createHarness(
+      catalogPort(async ({ sourceId }) =>
         refresh && sourceId === 'page-id'
           ? {
               ok: false,
@@ -326,7 +333,8 @@ describe('DesignerCanvasRuntimeController', () => {
               value: sourceId === 'region-id' ? (refresh ? 'south' : 'north') : 1,
               diagnostics: [],
             },
-    });
+      ),
+    );
     controller.render(
       documentWith([
         {

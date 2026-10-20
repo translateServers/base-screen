@@ -2,10 +2,9 @@ import type {
   ScreenComponentTextTarget,
   ScreenDesignerHostAdapter,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariableCatalogPort,
-  ScreenHostVariablePort,
   ScreenProjectCatalogPort,
   ScreenProjectPreviewPort,
   ScreenProjectSnapshotPort,
@@ -91,8 +90,7 @@ export interface DesignerElementState {
   inspectorControls: BaseScreenPluginInspectorControlCatalog | undefined;
   pluginCommandPort: PluginCommandPort | undefined;
   resourcePort: ScreenHostResourcePort | undefined;
-  variablePort: ScreenHostVariablePort | undefined;
-  variableCatalogPort: ScreenHostVariableCatalogPort | undefined;
+  hostCatalogPort: ScreenHostCatalogPort | undefined;
   conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   datasetPort: ScreenHostDatasetPort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;

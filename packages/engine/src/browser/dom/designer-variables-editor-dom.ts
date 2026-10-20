@@ -1,4 +1,4 @@
-import type { ScreenHostVariableSummary, ScreenVariable } from '@base-screen/contracts';
+import type { ScreenHostCatalogSummary, ScreenVariable } from '@base-screen/contracts';
 import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
@@ -15,7 +15,7 @@ export interface DesignerVariableCreateDraft {
   readonly autoUpdate: boolean;
   readonly autoUpdateInterval: string;
   readonly catalogQuery: string;
-  readonly catalogItems: readonly ScreenHostVariableSummary[];
+  readonly catalogItems: readonly ScreenHostCatalogSummary[];
   readonly catalogCursor: string | undefined;
   readonly catalogFeedback: string;
   readonly previewStatus: 'idle' | 'loading' | 'ready' | 'unavailable' | 'error';

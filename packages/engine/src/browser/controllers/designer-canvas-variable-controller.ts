@@ -2,7 +2,7 @@ import {
   parseScreenJsonValue,
   type ScreenDiagnostic,
   type ScreenDocument,
-  type ScreenHostVariablePort,
+  type ScreenHostCatalogPort,
   type ScreenJsonObject,
   type ScreenJsonValue,
   type ScreenParseResult,
@@ -22,7 +22,7 @@ interface DesignerCanvasVariableCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getVariables: () => ScreenJsonObject | undefined;
   readonly setVariables: (variables: ScreenJsonObject) => void;
-  readonly getVariablePort: () => ScreenHostVariablePort | undefined;
+  readonly getHostCatalogPort: () => ScreenHostCatalogPort | undefined;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
 }
 
@@ -180,7 +180,7 @@ export class DesignerCanvasVariableController {
     controller: AbortController,
     requestedIds?: readonly string[],
   ): Promise<ReadonlyMap<string, ScreenJsonValue> | undefined> {
-    const port = this.callbacks.getVariablePort();
+    const port = this.callbacks.getHostCatalogPort();
     if (port === undefined) return undefined;
     const available = new Map(hostVariablesOf(document).map((variable) => [variable.id, variable]));
     const ids = new Set(
@@ -202,13 +202,8 @@ export class DesignerCanvasVariableController {
           return {
             variableId,
             result: await port.resolve({
-              variableId,
               sourceId: variable.sourceId,
-              sourceType: variable.type === 'url-query' ? 'url-query' : 'data-source',
-              initialValue: variable.initialValue,
-              controlled: variable.controlled,
-              ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
-              ...(variable.autoUpdate === undefined ? {} : { autoUpdate: variable.autoUpdate }),
+              params: {},
               purpose: 'runtime',
               signal: controller.signal,
             }),

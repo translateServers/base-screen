@@ -1,7 +1,6 @@
 import type {
+  ScreenHostCatalogPort,
   ScreenHostResourcePort,
-  ScreenHostVariableCatalogPort,
-  ScreenHostVariablePort,
   ScreenProjectAdapter,
 } from '@base-screen/contracts';
 import {
@@ -69,24 +68,21 @@ function resourcePort(): ScreenHostResourcePort {
   return { resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }) };
 }
 
-function variablePort(): ScreenHostVariablePort {
-  return { resolve: async () => ({ ok: true as const, value: null, diagnostics: [] }) };
-}
-
-function variableCatalogPort(): ScreenHostVariableCatalogPort {
+function hostCatalogPort(): ScreenHostCatalogPort {
   return {
     list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
     describe: async ({ sourceId }) => ({
       ok: true as const,
       value: {
         sourceId,
-        sourceType: 'data-source' as const,
-        name: 'hostVariable',
+        name: 'hostCatalog',
         description: null,
+        parameters: [],
         previewable: false,
       },
       diagnostics: [],
     }),
+    resolve: async () => ({ ok: true as const, value: null, diagnostics: [] }),
   };
 }
 
@@ -215,8 +211,7 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
           projectSnapshots: false,
           resources: false,
           datasets: false,
-          variableCatalog: false,
-          variables: false,
+          hostCatalog: false,
           actions: false,
         },
       },
@@ -236,36 +231,16 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(designer.catalog).toBeDefined();
   });
 
-  it('pairs a direct host variable catalog with its resolver before committing', () => {
-    const rejected = new BaseScreenDesignerElement();
-    const catalogPort = variableCatalogPort();
-    expect(rejected.configure({ catalog: catalog(), variableCatalogPort: catalogPort }).ok).toBe(
-      false,
-    );
-    expect(rejected.variableCatalogPort).toBeUndefined();
-
+  it('accepts a single direct host catalog port', () => {
     const accepted = new BaseScreenDesignerElement();
-    const resolver = variablePort();
-    expect(
-      accepted.configure({
-        catalog: catalog(),
-        variablePort: resolver,
-        variableCatalogPort: catalogPort,
-      }).ok,
-    ).toBe(true);
-    expect(accepted.variablePort).toBe(resolver);
-    expect(accepted.variableCatalogPort).toBe(catalogPort);
-
-    const propertyConfigured = new BaseScreenDesignerElement();
-    Object.defineProperty(propertyConfigured, 'dispatchEvent', { value: vi.fn(() => true) });
-    propertyConfigured.variableCatalogPort = catalogPort;
-    expect(propertyConfigured.variableCatalogPort).toBeUndefined();
+    const port = hostCatalogPort();
+    expect(accepted.configure({ catalog: catalog(), hostCatalogPort: port }).ok).toBe(true);
+    expect(accepted.hostCatalogPort).toBe(port);
   });
 
-  it('maps an enabled host adapter variable catalog and resolver together', () => {
+  it('maps an enabled host adapter catalog port', () => {
     const designer = new BaseScreenDesignerElement();
-    const resolver = variablePort();
-    const catalogPort = variableCatalogPort();
+    const port = hostCatalogPort();
     const result = designer.configure({
       catalog: catalog(),
       designerHostAdapter: {
@@ -275,17 +250,14 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
           projectSnapshots: false,
           resources: false,
           datasets: false,
-          variableCatalog: true,
-          variables: true,
+          hostCatalog: true,
           actions: false,
         },
-        variableCatalog: catalogPort,
-        variables: resolver,
+        hostCatalog: port,
       },
     });
     expect(result.ok).toBe(true);
-    expect(designer.variableCatalogPort).toBe(catalogPort);
-    expect(designer.variablePort).toBe(resolver);
+    expect(designer.hostCatalogPort).toBe(port);
   });
 
   it('rejects an invalid catalog before committing any field (RB3 validate before mutate)', () => {
@@ -318,10 +290,10 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     const badVariable = new BaseScreenDesignerElement();
     const variableResult = badVariable.configure({
       catalog: catalog(),
-      variablePort: { nope: 1 } as unknown as ScreenHostVariablePort,
+      hostCatalogPort: { nope: 1 } as unknown as ScreenHostCatalogPort,
     });
     expect(variableResult.ok).toBe(false);
-    expect(badVariable.variablePort).toBeUndefined();
+    expect(badVariable.hostCatalogPort).toBeUndefined();
 
     const badContributions = new BaseScreenDesignerElement();
     const contributionsResult = badContributions.configure({

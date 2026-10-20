@@ -79,12 +79,11 @@ describe('BaseScreenViewerElement host variable refresh', () => {
     await flush();
 
     expect(variables.requests).toHaveLength(2);
-    expect(variables.requests).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ variableId: 'first', sourceId: 'shared', purpose: 'runtime' }),
-        expect.objectContaining({ variableId: 'second', sourceId: 'shared', purpose: 'runtime' }),
-      ]),
-    );
+    // 合并端口后宿主只看到来源标识：两个变量共用一个来源，因此两次请求同形。
+    expect(variables.requests).toEqual([
+      expect.objectContaining({ sourceId: 'shared', purpose: 'runtime' }),
+      expect.objectContaining({ sourceId: 'shared', purpose: 'runtime' }),
+    ]);
     expect(resources.requests.map((request) => request.request.params)).toEqual([
       { value: 'north' },
       { value: 'north' },
@@ -119,13 +118,12 @@ describe('BaseScreenViewerElement host variable refresh', () => {
 
     expect(variables.requests).toHaveLength(3);
     expect(variables.requests[2]).toMatchObject({
-      variableId: 'region',
       sourceId: 'region-id',
       purpose: 'runtime',
     });
     expect(resources.requests).toHaveLength(3);
     expect(resources.requests[2]).toMatchObject({
-      request: { componentId: 'a', params: { region: 'south' } },
+      request: { dataSourceId: 'data-source-a', params: { region: 'south' } },
       context: { trigger: 'variable', traceId: 'var-trace' },
     });
 
@@ -156,14 +154,14 @@ describe('BaseScreenViewerElement host variable refresh', () => {
       variablePort: variables.port,
     });
     variables.requests
-      .find((request) => request.variableId === 'region')!
+      .find((request) => request.sourceId === 'region-id')!
       .resolveRequest({
         ok: true,
         value: 'north',
         diagnostics: [],
       });
     variables.requests
-      .find((request) => request.variableId === 'page')!
+      .find((request) => request.sourceId === 'page-id')!
       .resolveRequest({
         ok: true,
         value: 1,
@@ -219,9 +217,9 @@ describe('BaseScreenViewerElement host variable refresh', () => {
     expect(
       variables.requests
         .slice(3)
-        .map(({ variableId }) => variableId)
+        .map(({ sourceId }) => sourceId)
         .sort(),
-    ).toEqual(['page', 'region']);
+    ).toEqual(['page-id', 'region-id']);
     variables.requests[3]!.resolveRequest({ ok: true, value: 'north', diagnostics: [] });
     variables.requests[4]!.resolveRequest({ ok: true, value: 1, diagnostics: [] });
     await flush();

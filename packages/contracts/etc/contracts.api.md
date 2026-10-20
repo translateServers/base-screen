@@ -86,10 +86,10 @@ export const MAX_DATASET_PAGE_ITEMS = 50;
 export const MAX_DATASET_ROWS = 10000;
 
 // @public (undocumented)
-export const MAX_HOST_VARIABLE_CATALOG_BYTES: number;
+export const MAX_HOST_CATALOG_BYTES: number;
 
 // @public (undocumented)
-export const MAX_HOST_VARIABLE_PAGE_ITEMS = 50;
+export const MAX_HOST_CATALOG_PAGE_ITEMS = 50;
 
 // @public
 export const MAX_SCREEN_MATERIAL_ERROR_MESSAGE_LENGTH = 256;
@@ -151,10 +151,10 @@ export function parseScreenDataSource(input: unknown, options?: ScreenDataSource
 export function parseScreenDocument(input: unknown, base?: ScreenDocument): ScreenParseResult<ScreenDocument>;
 
 // @public (undocumented)
-export function parseScreenHostVariableDescriptor(input: unknown): ScreenParseResult<ScreenHostVariableDescriptor>;
+export function parseScreenHostCatalogDescriptor(input: unknown): ScreenParseResult<ScreenHostCatalogDescriptor>;
 
 // @public (undocumented)
-export function parseScreenHostVariablePage(input: unknown): ScreenParseResult<ScreenHostVariablePage>;
+export function parseScreenHostCatalogPage(input: unknown): ScreenParseResult<ScreenHostCatalogPage>;
 
 // @public (undocumented)
 export function parseScreenJsonValue(input: unknown, options?: ScreenJsonParseOptions): ScreenParseResult<ScreenJsonValue>;
@@ -730,9 +730,8 @@ export type ScreenDatasetParameterValue = string | number | boolean;
 // @public (undocumented)
 export interface ScreenDatasetQueryRequest {
     // (undocumented)
-    readonly componentId: string;
-    // (undocumented)
     readonly datasetId: string;
+    readonly dataSourceId: string;
     // (undocumented)
     readonly params: ScreenJsonObject;
 }
@@ -807,6 +806,8 @@ export interface ScreenDesignerHostAdapter {
     // (undocumented)
     readonly datasets?: ScreenHostDatasetPort;
     // (undocumented)
+    readonly hostCatalog?: ScreenHostCatalogPort;
+    // (undocumented)
     readonly projectCatalog?: ScreenProjectCatalogPort;
     // (undocumented)
     readonly projectPreview?: ScreenProjectPreviewPort;
@@ -814,10 +815,6 @@ export interface ScreenDesignerHostAdapter {
     readonly projectSnapshots?: ScreenProjectSnapshotPort;
     // (undocumented)
     readonly resources?: ScreenHostResourcePort;
-    // (undocumented)
-    readonly variableCatalog?: ScreenHostVariableCatalogPort;
-    // (undocumented)
-    readonly variables?: ScreenHostVariablePort;
 }
 
 // @public (undocumented)
@@ -826,6 +823,7 @@ export interface ScreenDesignerHostCapabilities {
     readonly actions: boolean;
     // (undocumented)
     readonly datasets: boolean;
+    readonly hostCatalog: boolean;
     // (undocumented)
     readonly projectCatalog: boolean;
     // (undocumented)
@@ -834,10 +832,6 @@ export interface ScreenDesignerHostCapabilities {
     readonly projectSnapshots: boolean;
     // (undocumented)
     readonly resources: boolean;
-    // (undocumented)
-    readonly variableCatalog: boolean;
-    // (undocumented)
-    readonly variables: boolean;
 }
 
 // @public (undocumented)
@@ -876,6 +870,74 @@ export interface ScreenDocument {
 
 // @public (undocumented)
 export type ScreenDynamicVariable = ScreenDataSourceVariable | ScreenUrlQueryVariable;
+
+// @public (undocumented)
+export interface ScreenHostCatalogDescribeRequest {
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+    // (undocumented)
+    readonly sourceId: string;
+}
+
+// @public
+export interface ScreenHostCatalogDescriptor extends ScreenHostCatalogSummary {
+    readonly parameters: readonly ScreenDatasetParameterDefinition[];
+    // (undocumented)
+    readonly previewable: boolean;
+    readonly readOnly?: boolean;
+}
+
+// @public (undocumented)
+export interface ScreenHostCatalogListRequest {
+    // (undocumented)
+    readonly cursor?: string;
+    // (undocumented)
+    readonly limit: number;
+    // (undocumented)
+    readonly query: string;
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+}
+
+// @public (undocumented)
+export interface ScreenHostCatalogPage {
+    // (undocumented)
+    readonly items: readonly ScreenHostCatalogSummary[];
+    // (undocumented)
+    readonly nextCursor?: string;
+}
+
+// @public
+export interface ScreenHostCatalogPort {
+    // (undocumented)
+    describe(request: ScreenHostCatalogDescribeRequest): Promise<ScreenParseResult<ScreenHostCatalogDescriptor>>;
+    // (undocumented)
+    list(request: ScreenHostCatalogListRequest): Promise<ScreenParseResult<ScreenHostCatalogPage>>;
+    // (undocumented)
+    resolve(request: ScreenHostCatalogResolveRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
+}
+
+// @public
+export interface ScreenHostCatalogResolveRequest {
+    // (undocumented)
+    readonly params: Readonly<Record<string, ScreenJsonValue>>;
+    // (undocumented)
+    readonly purpose: 'runtime' | 'authoring-preview';
+    // (undocumented)
+    readonly signal: ScreenAbortSignal;
+    // (undocumented)
+    readonly sourceId: string;
+}
+
+// @public
+export interface ScreenHostCatalogSummary {
+    // (undocumented)
+    readonly description: string | null;
+    // (undocumented)
+    readonly name: string;
+    // (undocumented)
+    readonly sourceId: string;
+}
 
 // @public
 export interface ScreenHostDatasetPort {
@@ -926,8 +988,7 @@ export interface ScreenHostResourcePort {
 
 // @public (undocumented)
 export interface ScreenHostResourceRequest {
-    // (undocumented)
-    readonly componentId: string;
+    readonly dataSourceId: string;
     // (undocumented)
     readonly params: Readonly<Record<string, ScreenJsonValue>>;
     // (undocumented)
@@ -941,92 +1002,6 @@ export interface ScreenHostResourceResolveOptions {
     readonly context?: ScreenResourceExecutionContext;
     // (undocumented)
     readonly signal: ScreenAbortSignal;
-}
-
-// @public (undocumented)
-export interface ScreenHostVariableCatalogListRequest {
-    // (undocumented)
-    readonly cursor?: string;
-    // (undocumented)
-    readonly limit: number;
-    // (undocumented)
-    readonly query: string;
-    // (undocumented)
-    readonly signal: ScreenAbortSignal;
-    // (undocumented)
-    readonly sourceType: 'data-source' | 'url-query';
-}
-
-// @public (undocumented)
-export interface ScreenHostVariableCatalogPort {
-    // (undocumented)
-    describe(request: ScreenHostVariableDescribeRequest): Promise<ScreenParseResult<ScreenHostVariableDescriptor>>;
-    // (undocumented)
-    list(request: ScreenHostVariableCatalogListRequest): Promise<ScreenParseResult<ScreenHostVariablePage>>;
-}
-
-// @public (undocumented)
-export interface ScreenHostVariableDescribeRequest {
-    // (undocumented)
-    readonly signal: ScreenAbortSignal;
-    // (undocumented)
-    readonly sourceId: string;
-}
-
-// @public (undocumented)
-export interface ScreenHostVariableDescriptor extends ScreenHostVariableSummary {
-    // (undocumented)
-    readonly previewable: boolean;
-}
-
-// @public (undocumented)
-export interface ScreenHostVariablePage {
-    // (undocumented)
-    readonly items: readonly ScreenHostVariableSummary[];
-    // (undocumented)
-    readonly nextCursor?: string;
-}
-
-// @public (undocumented)
-export interface ScreenHostVariablePort {
-    // (undocumented)
-    resolve(request: ScreenHostVariableRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
-}
-
-// @public (undocumented)
-export interface ScreenHostVariableRequest {
-    // (undocumented)
-    readonly autoUpdate?: {
-        readonly intervalSeconds: number;
-    };
-    // (undocumented)
-    readonly controlled: boolean;
-    // (undocumented)
-    readonly initialValue: ScreenJsonValue;
-    // (undocumented)
-    readonly processorId?: string;
-    // (undocumented)
-    readonly purpose: 'runtime' | 'authoring-preview';
-    // (undocumented)
-    readonly signal: ScreenAbortSignal;
-    // (undocumented)
-    readonly sourceId: string;
-    // (undocumented)
-    readonly sourceType: 'data-source' | 'url-query';
-    // (undocumented)
-    readonly variableId: string;
-}
-
-// @public (undocumented)
-export interface ScreenHostVariableSummary {
-    // (undocumented)
-    readonly description: string | null;
-    // (undocumented)
-    readonly name: string;
-    // (undocumented)
-    readonly sourceId: string;
-    // (undocumented)
-    readonly sourceType: 'data-source' | 'url-query';
 }
 
 // @public

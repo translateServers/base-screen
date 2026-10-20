@@ -1190,33 +1190,35 @@ const datasetPort = {
     };
   },
 };
-const variablePort = {
+/** 宿主自己知道哪些 sourceId 属于 URL 查询来源：合并端口后 Engine 不再传枚举。 */
+function harnessSourceType(sourceId: string): 'data-source' | 'url-query' {
+  return sourceId === 'campaign' ? 'url-query' : 'data-source';
+}
+
+const hostCatalogPort = {
   async resolve(request: {
-    readonly variableId: string;
     readonly sourceId: string;
-    readonly sourceType: 'data-source' | 'url-query';
-    readonly processorId?: string;
+    readonly params: Readonly<Record<string, unknown>>;
     readonly purpose: 'runtime' | 'authoring-preview';
   }) {
     variableRequests.push({
-      variableId: request.variableId,
       sourceId: request.sourceId,
-      sourceType: request.sourceType,
+      sourceType: harnessSourceType(request.sourceId),
       purpose: request.purpose,
     });
     // 组合路径模板（DataV 差距调研 4.2）：宿主脚本过滤器。
     //
-    // 这里的顺序就是宿主该有的顺序：**先取到原始值，再交给处理器**。`processorId` 是文档里
-    // 的不透明标识，宿主要自己知道它对应哪个脚本资产与哪些参数，脚本正文与参数都留在宿主侧
-    // ——换脚本因此不必改文档。
-    if (request.processorId === DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID) {
+    // 顺序就是宿主该有的顺序：**先取到原始值，再交给处理器**。脚本资产与参数都留在宿主侧，
+    // 因此宿主按自己的 `sourceId` 命名空间决定要不要路由到脚本处理器（Engine 不再传
+    // `processorId` 这类文档内标识）。
+    if (request.sourceId === 'harness-script-source') {
       return applyHostScriptFilter(pluginManager, {
         scriptId: harnessScriptId,
         value: harnessScriptRows,
         options: harnessScriptOptions,
       });
     }
-    if (request.sourceType === 'url-query') {
+    if (harnessSourceType(request.sourceId) === 'url-query') {
       return {
         ok: true as const,
         value: new URLSearchParams(window.location.search).get(request.sourceId) ?? 'organic',
@@ -1255,85 +1257,42 @@ const variablePort = {
     return { ok: true as const, value: datasetRegion, diagnostics: [] };
   },
 };
-const variableCatalog = {
-  async list({
-    query,
-    sourceType,
-  }: {
-    readonly query: string;
-    readonly sourceType: 'data-source' | 'url-query';
-  }) {
+const hostCatalogEntries = [
+  {
+    sourceId: 'browser-region',
+    name: 'dataSourceRegion',
+    description: 'Browser Harness 数据源变量案例',
+  },
+  {
+    sourceId: 'tenant-region',
+    name: 'tenantRegion',
+    description: '当前租户区域',
+  },
+  {
+    sourceId: 'private-token',
+    name: 'privateToken',
+    description: '无权预览的敏感变量',
+  },
+  {
+    sourceId: 'campaign',
+    name: 'urlCampaign',
+    description: 'Browser Harness URL 查询参数变量案例',
+  },
+];
+
+const hostCatalog = {
+  async list({ query }: { readonly query: string }) {
     const normalized = query.trim().toLocaleLowerCase();
-    const items = [
-      {
-        sourceId: 'browser-region',
-        sourceType: 'data-source' as const,
-        name: 'dataSourceRegion',
-        description: 'Browser Harness 数据源变量案例',
-      },
-      {
-        sourceId: 'tenant-region',
-        sourceType: 'data-source' as const,
-        name: 'tenantRegion',
-        description: '当前租户区域',
-      },
-      {
-        sourceId: 'private-token',
-        sourceType: 'data-source' as const,
-        name: 'privateToken',
-        description: '无权预览的敏感变量',
-      },
-      {
-        sourceId: 'campaign',
-        sourceType: 'url-query' as const,
-        name: 'urlCampaign',
-        description: 'Browser Harness URL 查询参数变量案例',
-      },
-    ].filter(
-      (item) =>
-        item.sourceType === sourceType &&
-        [item.sourceId, item.name, item.description].some((value) =>
-          value.toLocaleLowerCase().includes(normalized),
-        ),
+    const items = hostCatalogEntries.filter((item) =>
+      [item.sourceId, item.name, item.description].some((value) =>
+        value.toLocaleLowerCase().includes(normalized),
+      ),
     );
     return { ok: true as const, value: { items }, diagnostics: [] };
   },
   async describe({ sourceId }: { readonly sourceId: string }) {
-    const descriptor =
-      sourceId === 'browser-region'
-        ? {
-            sourceId,
-            sourceType: 'data-source' as const,
-            name: 'dataSourceRegion',
-            description: 'Browser Harness 数据源变量案例',
-            previewable: true,
-          }
-        : sourceId === 'tenant-region'
-          ? {
-              sourceId,
-              sourceType: 'data-source' as const,
-              name: 'tenantRegion',
-              description: '当前租户区域',
-              previewable: true,
-            }
-          : sourceId === 'private-token'
-            ? {
-                sourceId,
-                sourceType: 'data-source' as const,
-                name: 'privateToken',
-                description: '无权预览的敏感变量',
-                previewable: true,
-              }
-            : sourceId === 'campaign'
-              ? {
-                  sourceId,
-                  sourceType: 'url-query' as const,
-                  name: 'urlCampaign',
-                  description: 'Browser Harness URL 查询参数变量案例',
-                  previewable: true,
-                }
-              : undefined;
-    return descriptor === undefined
+    const entry = hostCatalogEntries.find((item) => item.sourceId === sourceId);
+    return entry === undefined
       ? {
           ok: false as const,
           diagnostics: [
@@ -1341,21 +1300,25 @@ const variableCatalog = {
               severity: 'error' as const,
               code: 'HOST_VARIABLE_CATALOG_FAILED' as const,
               path: [],
-              message: 'Harness variable descriptor was not found.',
+              message: 'Harness catalog descriptor was not found.',
             },
           ],
         }
-      : { ok: true as const, value: descriptor, diagnostics: [] };
+      : {
+          ok: true as const,
+          value: { ...entry, parameters: [], previewable: true },
+          diagnostics: [],
+        };
   },
+  resolve: hostCatalogPort.resolve,
 };
 designer.resourcePort = resourcePort;
-designer.variablePort = variablePort;
-designer.variableCatalogPort = variableCatalog;
+designer.hostCatalogPort = hostCatalog;
 designer.datasetPort = datasetPort;
 designer.runtimeContributions = pluginManager.snapshot.contributions;
 // ADR-0076：宿主把蓝图宿主动作接到 manager 的插件动作路由。designerHostAdapter 是**聚合**
 // 端口，赋值时会用它自己的字段重写各单项端口，因此这里把宿主已有的端口对象原样透传，
-// 否则会把上面刚设好的 resourcePort/variablePort/datasetPort 一并清空。
+// 否则会把上面刚设好的 resourcePort/hostCatalogPort/datasetPort 一并清空。
 const pluginActionRequests: Array<{ readonly actionId: string; readonly payload: unknown }> = [];
 designer.designerHostAdapter = {
   capabilities: {
@@ -1364,14 +1327,12 @@ designer.designerHostAdapter = {
     projectSnapshots: false,
     resources: true,
     datasets: true,
-    variableCatalog: true,
-    variables: true,
+    hostCatalog: true,
     actions: true,
   },
   resources: resourcePort,
   datasets: datasetPort,
-  variableCatalog,
-  variables: variablePort,
+  hostCatalog,
   actions: {
     async execute(action) {
       // Engine 只做「已声明」门禁后把请求抛给宿主；宿主再路由到 manager 的插件动作路由。
@@ -1434,7 +1395,7 @@ const viewerConfigured = viewer.configure({
   catalog: designerCatalog,
   resourcePort,
   datasetPort,
-  variablePort,
+  hostCatalogPort: hostCatalog,
   conditionalStylePort,
   runtimeContributions,
   blueprintRuntimePort: {
@@ -1657,7 +1618,7 @@ Object.assign(window, {
     },
     datasetPort,
     datasetRequests,
-    variableCatalog,
+    hostCatalog,
     variableRequests,
     materialLibraryActions,
     materialLibraryGrouping: activeMaterialLibraryGrouping,
@@ -1687,7 +1648,7 @@ Object.assign(window, {
         catalog: bridgeCatalog,
         resourcePort,
         datasetPort,
-        variablePort,
+        hostCatalogPort: hostCatalog,
         resourceTimeoutMs: 100,
         runtimeContributions,
       });

@@ -27,11 +27,10 @@ import type { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
 import { ScreenDocumentCommand } from '@base-screen/core';
 import { ScreenDocumentTransaction } from '@base-screen/core';
+import type { ScreenHostCatalogPort } from '@base-screen/contracts';
 import type { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourceDataSource } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
-import type { ScreenHostVariableCatalogPort } from '@base-screen/contracts';
-import type { ScreenHostVariablePort } from '@base-screen/contracts';
 import { ScreenInteractionState } from '@base-screen/core';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
@@ -408,6 +407,8 @@ export interface BaseScreenDesignerConfiguration {
     // (undocumented)
     readonly groupMaterialType?: string;
     // (undocumented)
+    readonly hostCatalogPort?: ScreenHostCatalogPort;
+    // (undocumented)
     readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
     // (undocumented)
     readonly inspectorControls?: BaseScreenPluginInspectorControlCatalog;
@@ -439,10 +440,6 @@ export interface BaseScreenDesignerConfiguration {
     readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
     // (undocumented)
     readonly toolMaterialTypes?: DesignerToolMaterialTypes;
-    // (undocumented)
-    readonly variableCatalogPort?: ScreenHostVariableCatalogPort;
-    // (undocumented)
-    readonly variablePort?: ScreenHostVariablePort;
 }
 
 // @public (undocumented)
@@ -515,6 +512,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get groupMaterialType(): string | undefined;
     set groupMaterialType(value: string | undefined);
+    // (undocumented)
+    get hostCatalogPort(): ScreenHostCatalogPort | undefined;
+    set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
     // (undocumented)
     importDocument(document: unknown): ScreenParseResult<ScreenDocument>;
     // (undocumented)
@@ -625,12 +625,6 @@ export class BaseScreenDesignerElement extends ElementBase {
     ungroup(): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     unload(): void;
-    // (undocumented)
-    get variableCatalogPort(): ScreenHostVariableCatalogPort | undefined;
-    set variableCatalogPort(value: ScreenHostVariableCatalogPort | undefined);
-    // (undocumented)
-    get variablePort(): ScreenHostVariablePort | undefined;
-    set variablePort(value: ScreenHostVariablePort | undefined);
     // (undocumented)
     get workbenchMode(): BaseScreenDesignerWorkbenchMode;
 }

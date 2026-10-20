@@ -305,7 +305,7 @@ function hostLinkView(context: DesignerDatasetControllerContext): DesignerHostLi
             ? { status: 'error', detail: preview.message }
             : { status: 'ready' },
     variables:
-      context.callbacks.getVariablePort?.() === undefined
+      context.callbacks.getHostCatalogPort?.() === undefined
         ? { status: 'unavailable' }
         : { status: 'ready' },
   };

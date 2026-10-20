@@ -22,7 +22,7 @@ const rows: ScreenTabularDataset = { fields, rows: [{ value: 4 }] };
 const request: ScreenHostResourceRequest = {
   resourceType: DATASET_QUERY_KIND,
   resourceId: definition.datasetId,
-  componentId: 'a',
+  dataSourceId: 'a',
   params: { region: 'north' },
 };
 const success = <T>(value: T): ScreenParseResult<T> => ({ ok: true, value, diagnostics: [] });
@@ -97,7 +97,7 @@ describe('dataset metadata and query lifecycle', () => {
     const first = coordinator.request('same', DATASET_QUERY_KIND, 'a', request);
     const second = coordinator.request('same', DATASET_QUERY_KIND, 'b', {
       ...request,
-      componentId: 'b',
+      dataSourceId: 'b',
     });
     expect(second.shared).toBe(true);
     await vi.advanceTimersByTimeAsync(0);

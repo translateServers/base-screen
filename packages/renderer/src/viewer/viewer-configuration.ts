@@ -1,9 +1,9 @@
 import type {
   ScreenBlueprintHostActionPort,
   ScreenBlueprintRuntimePort,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariablePort,
   ScreenParseResult,
   ScreenResourceExecutionMode,
   ScreenResourceObserver,
@@ -20,8 +20,8 @@ import {
   isBaseScreenRuntimeContributionIndex,
   isScreenBlueprintHostActionPort,
   isScreenBlueprintRuntimePort,
+  isScreenHostCatalogPort,
   isScreenHostResourcePort,
-  isScreenHostVariablePort,
 } from './viewer-configuration-guards.js';
 import { lifecycleFailure } from './viewer-lifecycle.js';
 
@@ -29,7 +29,8 @@ export interface BaseScreenViewerConfiguration {
   readonly catalog: BaseScreenMaterialCatalog;
   readonly resourcePort?: ScreenHostResourcePort;
   readonly datasetPort?: ScreenHostDatasetPort;
-  readonly variablePort?: ScreenHostVariablePort;
+  /** 来源目录端口：`host-catalog` 与 `url-query` 两种来源共用。 */
+  readonly hostCatalogPort?: ScreenHostCatalogPort;
   /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，无独立 setter）。 */
   readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
@@ -84,10 +85,10 @@ export function parseBaseScreenViewerConfiguration(
     return lifecycleFailure('Viewer resource port 必须是含 resolve 的对象。');
   }
   if (
-    configuration.variablePort !== undefined &&
-    !isScreenHostVariablePort(configuration.variablePort)
+    configuration.hostCatalogPort !== undefined &&
+    !isScreenHostCatalogPort(configuration.hostCatalogPort)
   ) {
-    return lifecycleFailure('Viewer variable port 必须是含 resolve 的对象。');
+    return lifecycleFailure('Viewer host catalog port 必须同时提供 list、describe 与 resolve。');
   }
   if (
     configuration.conditionalStylePort !== undefined &&

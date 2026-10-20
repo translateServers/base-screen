@@ -4,7 +4,7 @@ import type { ScreenDocument } from './document.js';
 import type { ScreenProjectEnvelope } from './envelope.js';
 import type { ScreenResourceExecutionContext } from './execution.js';
 import type { ScreenJsonValue } from './json.js';
-import type { ScreenHostVariableDescriptor, ScreenHostVariablePage } from './variable.js';
+import type { ScreenHostCatalogDescriptor, ScreenHostCatalogPage } from './variable.js';
 
 export interface ScreenProjectLoadRequest {
   readonly projectId: string;
@@ -37,8 +37,8 @@ export interface ScreenDesignerHostCapabilities {
   readonly projectSnapshots: boolean;
   readonly resources: boolean;
   readonly datasets: boolean;
-  readonly variableCatalog: boolean;
-  readonly variables: boolean;
+  /** 来源目录：`host-catalog` 与 `url-query` 两种来源共用这一个端口。 */
+  readonly hostCatalog: boolean;
   readonly actions: boolean;
 }
 
@@ -49,8 +49,7 @@ export interface ScreenDesignerHostAdapter {
   readonly projectSnapshots?: ScreenProjectSnapshotPort;
   readonly resources?: ScreenHostResourcePort;
   readonly datasets?: ScreenHostDatasetPort;
-  readonly variableCatalog?: ScreenHostVariableCatalogPort;
-  readonly variables?: ScreenHostVariablePort;
+  readonly hostCatalog?: ScreenHostCatalogPort;
   readonly actions?: ScreenBlueprintHostActionPort;
 }
 
@@ -159,7 +158,8 @@ export interface ScreenProjectSnapshotPort {
 }
 
 export interface ScreenHostResourceRequest {
-  readonly componentId: string;
+  /** 请求身份：文档级数据源实例 id。 */
+  readonly dataSourceId: string;
   readonly resourceType: string;
   readonly resourceId: string;
   readonly params: Readonly<Record<string, import('./json.js').ScreenJsonValue>>;
@@ -187,42 +187,33 @@ export interface ScreenHostResourcePort {
   ): Promise<ScreenParseResult<ScreenJsonValue>>;
 }
 
-export interface ScreenHostVariableRequest {
-  readonly variableId: string;
-  readonly sourceId: string;
-  readonly sourceType: 'data-source' | 'url-query';
-  readonly initialValue: ScreenJsonValue;
-  readonly controlled: boolean;
-  readonly processorId?: string;
-  readonly autoUpdate?: { readonly intervalSeconds: number };
-  readonly purpose: 'runtime' | 'authoring-preview';
-  readonly signal: ScreenAbortSignal;
-}
-
-export interface ScreenHostVariablePort {
-  resolve(request: ScreenHostVariableRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
-}
-
-export interface ScreenHostVariableCatalogListRequest {
+export interface ScreenHostCatalogListRequest {
   readonly query: string;
-  readonly sourceType: 'data-source' | 'url-query';
   readonly cursor?: string;
   readonly limit: number;
   readonly signal: ScreenAbortSignal;
 }
 
-export interface ScreenHostVariableDescribeRequest {
+export interface ScreenHostCatalogDescribeRequest {
   readonly sourceId: string;
   readonly signal: ScreenAbortSignal;
 }
 
-export interface ScreenHostVariableCatalogPort {
-  list(
-    request: ScreenHostVariableCatalogListRequest,
-  ): Promise<ScreenParseResult<ScreenHostVariablePage>>;
+/** 按来源目录项解析当前值；参数与运行时一致，由文档级实例提供。 */
+export interface ScreenHostCatalogResolveRequest {
+  readonly sourceId: string;
+  readonly params: Readonly<Record<string, ScreenJsonValue>>;
+  readonly purpose: 'runtime' | 'authoring-preview';
+  readonly signal: ScreenAbortSignal;
+}
+
+/** 来源目录：`host-catalog` 与 `url-query` 的唯一致值通道。 */
+export interface ScreenHostCatalogPort {
+  list(request: ScreenHostCatalogListRequest): Promise<ScreenParseResult<ScreenHostCatalogPage>>;
   describe(
-    request: ScreenHostVariableDescribeRequest,
-  ): Promise<ScreenParseResult<ScreenHostVariableDescriptor>>;
+    request: ScreenHostCatalogDescribeRequest,
+  ): Promise<ScreenParseResult<ScreenHostCatalogDescriptor>>;
+  resolve(request: ScreenHostCatalogResolveRequest): Promise<ScreenParseResult<ScreenJsonValue>>;
 }
 
 export interface ScreenBlueprintHostEvent {
@@ -256,8 +247,7 @@ export function validateScreenDesignerHostAdapter(
     ['projectSnapshots', 'projectSnapshots', ['list', 'create', 'restore', 'delete']],
     ['resources', 'resources', ['resolve']],
     ['datasets', 'datasets', ['list', 'describe', 'query']],
-    ['variableCatalog', 'variableCatalog', ['list', 'describe']],
-    ['variables', 'variables', ['resolve']],
+    ['hostCatalog', 'hostCatalog', ['list', 'describe', 'resolve']],
     ['actions', 'actions', ['execute']],
   ] as const;
   for (const [capability, port, methods] of checks) {
@@ -281,11 +271,6 @@ export function validateScreenDesignerHostAdapter(
         `Designer host capability "${capability}" does not match its port.`,
       );
     }
-  }
-  if (capabilityRecord.variableCatalog === true && capabilityRecord.variables !== true) {
-    return invalidDesignerHostAdapter(
-      'Designer host variable catalog requires the variables capability.',
-    );
   }
   return { ok: true, value: adapter as unknown as ScreenDesignerHostAdapter, diagnostics: [] };
 }

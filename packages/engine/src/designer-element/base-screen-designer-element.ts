@@ -6,10 +6,9 @@ import type {
   ScreenComponentTextTarget,
   ScreenDesignerHostAdapter,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariableCatalogPort,
-  ScreenHostVariablePort,
   ScreenParseResult,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
@@ -234,19 +233,12 @@ export class BaseScreenDesignerElement extends ElementBase {
     this.#designerState.runtime.writeResourcePort(this, value);
   }
 
-  get variablePort(): ScreenHostVariablePort | undefined {
-    return this.#designerState.runtime.readVariablePort(this);
+  get hostCatalogPort(): ScreenHostCatalogPort | undefined {
+    return this.#designerState.runtime.readHostCatalogPort(this);
   }
 
-  set variablePort(value: ScreenHostVariablePort | undefined) {
-    this.#designerState.runtime.writeVariablePort(this, value);
-  }
-
-  get variableCatalogPort(): ScreenHostVariableCatalogPort | undefined {
-    return this.#designerState.runtime.readVariableCatalogPort(this);
-  }
-  set variableCatalogPort(value: ScreenHostVariableCatalogPort | undefined) {
-    this.#designerState.runtime.writeVariableCatalogPort(this, value);
+  set hostCatalogPort(value: ScreenHostCatalogPort | undefined) {
+    this.#designerState.runtime.writeHostCatalogPort(this, value);
   }
 
   get conditionalStylePort(): BaseScreenConditionalStylePort | undefined {

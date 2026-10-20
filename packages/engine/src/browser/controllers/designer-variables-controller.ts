@@ -1,7 +1,6 @@
 import {
   type ScreenDocument,
-  type ScreenHostVariableCatalogPort,
-  type ScreenHostVariablePort,
+  type ScreenHostCatalogPort,
   type ScreenParseResult,
   type ScreenVariable,
 } from '@base-screen/contracts';
@@ -17,8 +16,7 @@ import { DesignerVariableEditorController } from './designer-variable-editor-con
 
 export interface DesignerVariablesCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
-  readonly getCatalogPort?: () => ScreenHostVariableCatalogPort | undefined;
-  readonly getVariablePort?: () => ScreenHostVariablePort | undefined;
+  readonly getHostCatalogPort?: () => ScreenHostCatalogPort | undefined;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
   readonly addToBlueprint?: (variableId: string) => void;
   readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
@@ -37,8 +35,7 @@ export class DesignerVariablesController {
 
   constructor(private readonly callbacks: DesignerVariablesCallbacks) {
     this.#catalog = new DesignerVariableCatalogController({
-      getCatalogPort: () => callbacks.getCatalogPort?.(),
-      getVariablePort: () => callbacks.getVariablePort?.(),
+      getHostCatalogPort: () => callbacks.getHostCatalogPort?.(),
       report: (diagnostics) => callbacks.report({ ok: false, diagnostics }),
       render: () => this.render(),
     });

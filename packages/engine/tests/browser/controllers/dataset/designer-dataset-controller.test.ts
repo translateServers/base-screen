@@ -1,9 +1,9 @@
 import type {
   ScreenDatasetDefinition,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariablePort,
   ScreenJsonValue,
   ScreenParseResult,
 } from '@base-screen/contracts';
@@ -160,7 +160,7 @@ describe('DesignerDatasetController', () => {
 
     await vi.waitFor(() => expect(resolve).toHaveBeenCalledOnce());
     expect(resolve.mock.calls[0]?.[0]).toMatchObject({
-      componentId: 'text-1',
+      dataSourceId: 'text-1',
 
       datasetId: 'orders',
       params: { limit: 2, region: 'north' },
@@ -170,7 +170,7 @@ describe('DesignerDatasetController', () => {
 
   it('resolves host variable parameters for authoring preview and blocks requests on denial', async () => {
     const resourceResolve = vi.fn<ScreenHostResourcePort['resolve']>(async () => success({}));
-    const variableResolve = vi.fn<ScreenHostVariablePort['resolve']>(async () => success('north'));
+    const variableResolve = vi.fn<ScreenHostCatalogPort['resolve']>(async () => success('north'));
     const hostDocument: ScreenDocument = {
       ...baseDocument,
       variables: [
@@ -206,11 +206,8 @@ describe('DesignerDatasetController', () => {
 
     await vi.waitFor(() => expect(resourceResolve).toHaveBeenCalledOnce());
     expect(variableResolve).toHaveBeenCalledWith({
-      variableId: 'tenantRegion',
       sourceId: 'tenant-region',
-      sourceType: 'data-source',
-      initialValue: null,
-      controlled: true,
+      params: {},
       purpose: 'authoring-preview',
       signal: expect.any(AbortSignal),
     });
@@ -612,7 +609,7 @@ function createController(overrides: {
   readonly report?: (diagnostics: readonly unknown[]) => void;
   readonly getDocument?: () => ScreenDocument;
   readonly resolve?: ScreenHostResourcePort['resolve'];
-  readonly resolveVariable?: ScreenHostVariablePort['resolve'];
+  readonly resolveVariable?: ScreenHostCatalogPort['resolve'];
   readonly defaultData?: ScreenJsonValue;
   readonly staticData?: {
     readonly kind: 'tabular';
@@ -679,8 +676,24 @@ function createController(overrides: {
     getResourcePort: () => ({
       resolve: overrides.resolve ?? (async () => success({} as ScreenJsonValue)),
     }),
-    getVariablePort: () =>
-      overrides.resolveVariable === undefined ? undefined : { resolve: overrides.resolveVariable },
+    getHostCatalogPort: () =>
+      overrides.resolveVariable === undefined
+        ? undefined
+        : {
+            list: async () => success({ items: [] }),
+            describe: async () => ({
+              ok: false as const,
+              diagnostics: [
+                {
+                  severity: 'error' as const,
+                  code: 'HOST_VARIABLE_DESCRIPTOR_INVALID' as const,
+                  path: [],
+                  message: 'Host catalog describe is not used by this harness.',
+                },
+              ],
+            }),
+            resolve: overrides.resolveVariable,
+          },
     getRuntimeContributions: () => runtime,
     executeTransaction: overrides.executeTransaction ?? (() => success(baseDocument)),
     report: overrides.report ?? (() => undefined),

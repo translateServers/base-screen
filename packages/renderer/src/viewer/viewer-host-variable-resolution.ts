@@ -1,17 +1,17 @@
 import {
   parseScreenJsonValue,
   type ScreenDocument,
-  type ScreenHostVariablePort,
+  type ScreenHostCatalogPort,
   type ScreenJsonValue,
 } from '@base-screen/contracts';
-import { hostResolvedVariables, readHostVariableRequest } from './viewer-variable-request.js';
+import { hostResolvedVariables, readHostCatalogResolveRequest } from './viewer-variable-request.js';
 
 const HOST_VARIABLE_TIMEOUT_MS = 15_000;
 const HOST_VARIABLE_VALUE_BYTES = 1024 * 1024;
 
 export async function resolveHostVariableBatch(
   document: ScreenDocument,
-  port: ScreenHostVariablePort,
+  port: ScreenHostCatalogPort,
   controller: AbortController,
   requestedIds?: readonly string[],
 ): Promise<ReadonlyMap<string, ScreenJsonValue> | undefined> {
@@ -38,7 +38,7 @@ export async function resolveHostVariableBatch(
         const request =
           entry === undefined
             ? undefined
-            : readHostVariableRequest(document, entry, 'runtime', controller.signal);
+            : readHostCatalogResolveRequest(document, entry, 'runtime', controller.signal);
         return {
           variableId,
           result: request === undefined ? undefined : await port.resolve(request),

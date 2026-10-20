@@ -3,9 +3,9 @@ import type {
   ScreenBlueprintRuntimePort,
   ScreenDiagnostic,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariablePort,
   ScreenJsonObject,
   ScreenJsonValue,
   ScreenParseResult,
@@ -50,7 +50,7 @@ export class BaseScreenViewerElement extends ElementBase {
   #catalog: BaseScreenMaterialCatalog | undefined;
   #resourcePort: ScreenHostResourcePort | undefined;
   #datasetPort: ScreenHostDatasetPort | undefined;
-  #variablePort: ScreenHostVariablePort | undefined;
+  #hostCatalogPort: ScreenHostCatalogPort | undefined;
   #conditionalStylePort: BaseScreenConditionalStylePort | undefined;
   #contributionIndex: BaseScreenRuntimeContributionIndex | undefined;
   #blueprintRuntimePort: ScreenBlueprintRuntimePort | undefined;
@@ -80,7 +80,7 @@ export class BaseScreenViewerElement extends ElementBase {
     writeBlueprintVariables: (variables) => {
       this.writeBlueprintVariables(variables, true);
     },
-    readVariablePort: () => this.#variablePort,
+    readHostCatalogPort: () => this.#hostCatalogPort,
     emitDiagnostic: (code) => this.emitDiagnostic(code),
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
   });
@@ -101,7 +101,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#catalog = value.catalog;
     this.#resourcePort = value.resourcePort;
     this.#datasetPort = value.datasetPort;
-    this.#variablePort = value.variablePort;
+    this.#hostCatalogPort = value.hostCatalogPort;
     this.#conditionalStylePort = value.conditionalStylePort;
     this.#contributionIndex = value.runtimeContributions;
     this.#blueprintRuntimePort = value.blueprintRuntimePort;
@@ -143,8 +143,8 @@ export class BaseScreenViewerElement extends ElementBase {
     return this.#resourcePort;
   }
 
-  get variablePort(): ScreenHostVariablePort | undefined {
-    return this.#variablePort;
+  get hostCatalogPort(): ScreenHostCatalogPort | undefined {
+    return this.#hostCatalogPort;
   }
 
   /** ADR-0059：只读回读；配置入口是 configure 或初始化前的守卫 setter。 */
@@ -180,14 +180,14 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#resourceTimeoutMs = value;
   }
 
-  set variablePort(value: ScreenHostVariablePort | undefined) {
-    if (this.#renderer !== undefined && value !== this.#variablePort) {
+  set hostCatalogPort(value: ScreenHostCatalogPort | undefined) {
+    if (this.#renderer !== undefined && value !== this.#hostCatalogPort) {
       this.emitLifecycleDiagnostic(
-        'Variable port cannot change after initialization. Call unload first.',
+        'Host catalog port cannot change after initialization. Call unload first.',
       );
       return;
     }
-    this.#variablePort = value;
+    this.#hostCatalogPort = value;
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {

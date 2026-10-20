@@ -59,7 +59,8 @@ export interface ScreenDatasetDescribeRequest {
 
 export interface ScreenDatasetQueryRequest {
   readonly datasetId: string;
-  readonly componentId: string;
+  /** 请求身份：文档级数据源实例 id。 */
+  readonly dataSourceId: string;
   readonly params: ScreenJsonObject;
 }
 

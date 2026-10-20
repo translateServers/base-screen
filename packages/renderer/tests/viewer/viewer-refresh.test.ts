@@ -55,12 +55,13 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     // Both resources start, exactly one resolve per component, with the
     // evaluated variable value baked into the request params.
     expect(resources.requests).toHaveLength(2);
-    expect(resources.requests.map((request) => request.request.componentId).sort()).toEqual([
-      'a',
-      'b',
+    expect(resources.requests.map((request) => request.request.dataSourceId).sort()).toEqual([
+      'data-source-a',
+      'data-source-b',
     ]);
     expect(
-      resources.requests.find((request) => request.request.componentId === 'a')?.request.params,
+      resources.requests.find((request) => request.request.dataSourceId === 'data-source-a')
+        ?.request.params,
     ).toEqual({ region: 'north' });
   });
 
@@ -136,7 +137,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       (element) => element.dataset.baseScreenComponentId === 'b',
     )!;
     const bRequestCount = resources.requests.filter(
-      (request) => request.request.componentId === 'b',
+      (request) => request.request.dataSourceId === 'data-source-b',
     ).length;
 
     viewer.refreshData('a');
@@ -145,13 +146,13 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     // Only the target component gets a new resolve; the sibling keeps its
     // ready state, is never aborted, and never calls resourcePort again.
     const afterRefresh = resources.requests.slice(2);
-    expect(afterRefresh.map((request) => request.request.componentId)).toEqual(['a']);
+    expect(afterRefresh.map((request) => request.request.dataSourceId)).toEqual(['data-source-a']);
     expect(
-      resources.requests.filter((request) => request.request.componentId === 'b'),
+      resources.requests.filter((request) => request.request.dataSourceId === 'data-source-b'),
     ).toHaveLength(bRequestCount);
     expect(
       resources.requests
-        .filter((request) => request.request.componentId === 'b')
+        .filter((request) => request.request.dataSourceId === 'data-source-b')
         .every((request) => !request.aborted),
     ).toBe(true);
     expect(elementB.model?.dataState.status).toBe('ready');
@@ -319,14 +320,17 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     viewer.refreshData({ componentId: 'a', trigger: 'polling', traceId: 'trace-1' });
     await flush();
     const afterRefresh = resources.requests.slice(2);
-    expect(afterRefresh.map((request) => request.request.componentId)).toEqual(['a']);
+    expect(afterRefresh.map((request) => request.request.dataSourceId)).toEqual(['data-source-a']);
     resolveAll(resources.requests.slice(2));
     await flush();
 
     viewer.refreshData({});
     await flush();
     const fullRefresh = resources.requests.slice(3);
-    expect(fullRefresh.map((request) => request.request.componentId).sort()).toEqual(['a', 'b']);
+    expect(fullRefresh.map((request) => request.request.dataSourceId).sort()).toEqual([
+      'data-source-a',
+      'data-source-b',
+    ]);
 
     viewer.refreshData({ componentId: 'ghost', trigger: 'polling', traceId: 'trace-2' });
     await flush();
@@ -423,8 +427,12 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     await flush();
 
     expect(resources.requests).toHaveLength(2);
-    const aRequest = resources.requests.find((request) => request.request.componentId === 'a')!;
-    const bRequest = resources.requests.find((request) => request.request.componentId === 'b')!;
+    const aRequest = resources.requests.find(
+      (request) => request.request.dataSourceId === 'data-source-a',
+    )!;
+    const bRequest = resources.requests.find(
+      (request) => request.request.dataSourceId === 'data-source-b',
+    )!;
     // Keep 'a' in flight so the identity change aborts its generation; settle
     // 'b' so it reaches ready.
     bRequest.resolveRequest({ ok: true, value: { ready: true }, diagnostics: [] });
@@ -445,12 +453,12 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
 
     const newRequests = resources.requests.slice(2);
     expect(newRequests).toHaveLength(1);
-    expect(newRequests[0]!.request.componentId).toBe('a');
+    expect(newRequests[0]!.request.dataSourceId).toBe('data-source-a');
     expect(newRequests[0]!.request.params).toEqual({ region: 'south' });
     expect(aRequest.aborted).toBe(true);
     expect(bRequest.aborted).toBe(false);
     expect(
-      resources.requests.filter((request) => request.request.componentId === 'b'),
+      resources.requests.filter((request) => request.request.dataSourceId === 'data-source-b'),
     ).toHaveLength(1);
     expect(elementB.model?.dataState.status).toBe('ready');
   });
@@ -524,7 +532,7 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     });
     await flush();
     expect(resources.requests).toHaveLength(2);
-    expect(resources.requests[1]!.request.componentId).toBe('new');
+    expect(resources.requests[1]!.request.dataSourceId).toBe('data-source-new');
     expect(resources.requests[1]!.request.params).toEqual({ region: 'north' });
     expect(resources.requests[1]!.aborted).toBe(false);
     expect(mount.children).toHaveLength(1);
@@ -606,7 +614,10 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     // 全量轮询刷新：每个组件的 resolve 上下文都是 polling 且共享同一 traceId，
     // 任一组件都不消费/重置其他组件的 trigger/trace。
     const after = resources.requests.slice(2);
-    expect(after.map((request) => request.request.componentId).sort()).toEqual(['a', 'b']);
+    expect(after.map((request) => request.request.dataSourceId).sort()).toEqual([
+      'data-source-a',
+      'data-source-b',
+    ]);
     for (const request of after) {
       expect(request.context?.trigger).toBe('polling');
       expect(request.context?.traceId).toBe('poll-trace-1');
@@ -638,7 +649,10 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
 
     // 手动刷新同样携带 traceId（RB2）：manual trigger 下的 trace 不得被吞掉。
     const after = resources.requests.slice(2);
-    expect(after.map((request) => request.request.componentId).sort()).toEqual(['a', 'b']);
+    expect(after.map((request) => request.request.dataSourceId).sort()).toEqual([
+      'data-source-a',
+      'data-source-b',
+    ]);
     for (const request of after) {
       expect(request.context?.trigger).toBe('manual');
       expect(request.context?.traceId).toBe('manual-trace-1');
@@ -694,7 +708,12 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     // The manual refresh re-issues every component with its own context; the
     // queued polling refresh is then replayed with the queued trigger/trace.
     const after = resources.requests.slice(2);
-    expect(after.map((request) => request.request.componentId)).toEqual(['a', 'b', 'a', 'b']);
+    expect(after.map((request) => request.request.dataSourceId)).toEqual([
+      'data-source-a',
+      'data-source-b',
+      'data-source-a',
+      'data-source-b',
+    ]);
     const manual = after.slice(0, 2);
     const queued = after.slice(2);
     for (const request of manual) {

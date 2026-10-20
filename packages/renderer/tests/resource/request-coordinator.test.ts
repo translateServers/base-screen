@@ -270,7 +270,7 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     renderer.refreshData('a');
     await flush();
     expect(requests).toHaveLength(3);
-    expect(requests[2]!.request.componentId).toBe('a');
+    expect(requests[2]!.request.dataSourceId).toBe('data-source-a');
     expect(requests[2]!.aborted).toBe(false);
     renderer.dispose();
   });
@@ -310,7 +310,7 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     renderer.refreshData('a');
     await flush();
     expect(requests).toHaveLength(3);
-    expect(requests[2]!.request.componentId).toBe('a');
+    expect(requests[2]!.request.dataSourceId).toBe('data-source-a');
     expect(requests[1]!.aborted).toBe(false);
     renderer.dispose();
   });
@@ -501,7 +501,7 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     renderer.refreshData('a');
     await flush();
     expect(requests).toHaveLength(3);
-    expect(requests[2]!.request.componentId).toBe('a');
+    expect(requests[2]!.request.dataSourceId).toBe('data-source-a');
     expect(requests[2]!.aborted).toBe(false);
     renderer.dispose();
     vi.useRealTimers();
@@ -536,7 +536,7 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     expect(requests).toHaveLength(3);
     expect(aRequest.aborted).toBe(true);
     expect(bRequest.aborted).toBe(false);
-    expect(requests[2]!.request.componentId).toBe('a');
+    expect(requests[2]!.request.dataSourceId).toBe('data-source-a');
 
     // 旧槽位的迟到结果被丢弃：a 保持新请求 loading，b 的独立槽位不受影响。
     aRequest.resolveRequest({ ok: true, value: { stale: true }, diagnostics: [] });
@@ -578,7 +578,7 @@ describe('Renderer request coordination (DRH-R2/R3)', () => {
     // 第二个实例即使共享同一 raw key，也不与第一个实例的 in-flight 槽位合并。
     expect(rendererB.render(document([component('c', source)])).ok).toBe(true);
     expect(requests).toHaveLength(2);
-    expect(requests[1]!.request.componentId).toBe('c');
+    expect(requests[1]!.request.dataSourceId).toBe('data-source-c');
     expect(requests[0]!.aborted).toBe(false);
     rendererA.dispose();
     rendererB.dispose();

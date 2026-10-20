@@ -2,10 +2,10 @@ import type {
   ScreenAbortSignal,
   ScreenComponentNode,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostResourceParameter,
   ScreenHostResourcePort,
   ScreenHostResourceRequest,
-  ScreenHostVariablePort,
   ScreenJsonValue,
   ScreenParseResult,
   ScreenVariable,
@@ -275,7 +275,6 @@ export function createImmediateResourcePort(): {
 }
 
 export type PendingVariableRequest = {
-  readonly variableId: string;
   readonly sourceId: string;
   readonly purpose: 'runtime' | 'authoring-preview';
   readonly signal: ScreenAbortSignal;
@@ -287,15 +286,26 @@ export function createVariablePort(
   values: Record<string, ScreenJsonValue>,
   deferred = false,
 ): {
-  port: ScreenHostVariablePort;
+  port: ScreenHostCatalogPort;
   requests: PendingVariableRequest[];
   values: Record<string, ScreenJsonValue>;
 } {
   const requests: PendingVariableRequest[] = [];
-  const port: ScreenHostVariablePort = {
+  const port: ScreenHostCatalogPort = {
+    list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
+    describe: async () => ({
+      ok: false as const,
+      diagnostics: [
+        {
+          severity: 'error' as const,
+          code: 'HOST_VARIABLE_DESCRIPTOR_INVALID' as const,
+          path: [],
+          message: 'Host catalog describe is not used by this harness.',
+        },
+      ],
+    }),
     resolve: (request) => {
       const pending: PendingVariableRequest = {
-        variableId: request.variableId,
         sourceId: request.sourceId,
         purpose: request.purpose,
         signal: request.signal,
@@ -334,7 +344,7 @@ export async function createViewerHarness(options: {
   catalog: BaseScreenMaterialCatalog;
   document: ScreenDocument;
   resourcePort: ScreenHostResourcePort;
-  variablePort: ScreenHostVariablePort;
+  variablePort?: ScreenHostCatalogPort;
   resourceTimeoutMs?: number;
   projectId?: string;
   documentRevision?: string;
@@ -358,7 +368,7 @@ export async function createViewerHarness(options: {
     const configured = viewer.configure({
       catalog: options.catalog,
       resourcePort: options.resourcePort,
-      variablePort: options.variablePort,
+      ...(options.variablePort === undefined ? {} : { hostCatalogPort: options.variablePort }),
       ...(options.resourceTimeoutMs === undefined
         ? {}
         : { resourceTimeoutMs: options.resourceTimeoutMs }),
@@ -376,7 +386,7 @@ export async function createViewerHarness(options: {
     }
   } else {
     viewer.resourcePort = options.resourcePort;
-    viewer.variablePort = options.variablePort;
+    viewer.hostCatalogPort = options.variablePort;
     if (options.resourceTimeoutMs !== undefined) {
       viewer.resourceTimeoutMs = options.resourceTimeoutMs;
     }

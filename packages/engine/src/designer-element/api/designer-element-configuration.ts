@@ -27,9 +27,8 @@ import {
   isBaseScreenPluginPanelCatalog,
   isBaseScreenRuntimeContributionIndex,
   isPluginCommandPort,
+  isScreenHostCatalogPort,
   isScreenHostResourcePort,
-  isScreenHostVariableCatalogPort,
-  isScreenHostVariablePort,
   lifecycleDiagnostic,
 } from '../runtime/designer-element-guards.js';
 import {
@@ -137,31 +136,14 @@ export function configure(
     };
   }
   if (
-    configuration.variablePort !== undefined &&
-    !isScreenHostVariablePort(configuration.variablePort)
+    configuration.hostCatalogPort !== undefined &&
+    !isScreenHostCatalogPort(configuration.hostCatalogPort)
   ) {
     return {
       ok: false,
-      diagnostics: [lifecycleDiagnostic('Designer variable port 必须是含 resolve 的对象。')],
-    };
-  }
-  if (
-    configuration.variableCatalogPort !== undefined &&
-    !isScreenHostVariableCatalogPort(configuration.variableCatalogPort)
-  ) {
-    return {
-      ok: false,
-      diagnostics: [lifecycleDiagnostic('Designer variable catalog port 必须包含 list/describe。')],
-    };
-  }
-  if (
-    configuration.designerHostAdapter === undefined &&
-    configuration.variableCatalogPort !== undefined &&
-    configuration.variablePort === undefined
-  ) {
-    return {
-      ok: false,
-      diagnostics: [lifecycleDiagnostic('Designer variable catalog requires variablePort.')],
+      diagnostics: [
+        lifecycleDiagnostic('Designer host catalog port 必须包含 list/describe/resolve。'),
+      ],
     };
   }
   if (
@@ -248,8 +230,7 @@ export function configure(
     elementState.projectPreviewPort = adapter.projectPreview;
     elementState.projectSnapshotPort = adapter.projectSnapshots;
     elementState.resourcePort = adapter.resources;
-    elementState.variablePort = adapter.variables;
-    elementState.variableCatalogPort = adapter.variableCatalog;
+    elementState.hostCatalogPort = adapter.hostCatalog;
     elementState.datasetPort = adapter.datasets;
   } else {
     elementState.designerHostAdapter = undefined;
@@ -257,8 +238,7 @@ export function configure(
     elementState.projectPreviewPort = configuration.projectPreviewPort;
     elementState.projectSnapshotPort = configuration.projectSnapshotPort;
     elementState.resourcePort = configuration.resourcePort;
-    elementState.variablePort = configuration.variablePort;
-    elementState.variableCatalogPort = configuration.variableCatalogPort;
+    elementState.hostCatalogPort = configuration.hostCatalogPort;
     elementState.datasetPort = configuration.datasetPort;
   }
   elementState.conditionalStylePort = configuration.conditionalStylePort;

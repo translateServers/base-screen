@@ -1,10 +1,9 @@
 import type {
   ScreenDesignerHostAdapter,
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostDatasetPort,
   ScreenHostResourcePort,
-  ScreenHostVariableCatalogPort,
-  ScreenHostVariablePort,
   ScreenProjectAdapter,
   ScreenProjectCatalogPort,
   ScreenProjectPreviewPort,
@@ -44,8 +43,7 @@ export interface BaseScreenDesignerConfiguration {
   readonly groupMaterialType?: string;
   readonly designerHostAdapter?: ScreenDesignerHostAdapter;
   readonly resourcePort?: ScreenHostResourcePort;
-  readonly variablePort?: ScreenHostVariablePort;
-  readonly variableCatalogPort?: ScreenHostVariableCatalogPort;
+  readonly hostCatalogPort?: ScreenHostCatalogPort;
   /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，设计态画布同路径预览）。 */
   readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly datasetPort?: ScreenHostDatasetPort;

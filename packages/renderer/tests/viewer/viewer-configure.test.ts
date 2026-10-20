@@ -1,7 +1,7 @@
 import type {
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostResourcePort,
-  ScreenHostVariablePort,
 } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
@@ -42,8 +42,12 @@ function resourcePort(): ScreenHostResourcePort {
   return { resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }) };
 }
 
-function variablePort(): ScreenHostVariablePort {
-  return { resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }) };
+function variablePort(): ScreenHostCatalogPort {
+  return {
+    list: async () => ({ ok: true as const, value: { items: [] }, diagnostics: [] }),
+    describe: async () => ({ ok: false as const, diagnostics: [] }),
+    resolve: async () => ({ ok: true as const, value: {}, diagnostics: [] }),
+  };
 }
 
 async function createViewer(): Promise<
@@ -126,10 +130,10 @@ describe('BaseScreenViewerElement configure validation (RB3)', () => {
     const badVariablePort = await createViewer();
     const variableResult = badVariablePort.configure({
       catalog: catalog(),
-      variablePort: { nope: 1 } as unknown as ScreenHostVariablePort,
+      hostCatalogPort: { nope: 1 } as unknown as ScreenHostCatalogPort,
     });
     expect(variableResult.ok).toBe(false);
-    expect(badVariablePort.variablePort).toBeUndefined();
+    expect(badVariablePort.hostCatalogPort).toBeUndefined();
 
     const badContributions = await createViewer();
     const contributionsResult = badContributions.configure({
@@ -194,7 +198,7 @@ describe('BaseScreenViewerElement configure validation (RB3)', () => {
     const valid = viewer.configure({
       catalog: catalog(),
       resourcePort: resourcePort(),
-      variablePort: variablePort(),
+      hostCatalogPort: variablePort(),
     });
     expect(valid).toEqual({ ok: true, value: null, diagnostics: [] });
     expect(viewer.shadowRoot).not.toBeNull();
@@ -205,7 +209,7 @@ describe('BaseScreenViewerElement configure validation (RB3)', () => {
     const result = viewer.configure({ catalog: catalog() });
     expect(result).toEqual({ ok: true, value: null, diagnostics: [] });
     expect(viewer.resourcePort).toBeUndefined();
-    expect(viewer.variablePort).toBeUndefined();
+    expect(viewer.hostCatalogPort).toBeUndefined();
     // 未提供端口也允许完成初始化（静态渲染路径）。
     expect(viewer.shadowRoot).not.toBeNull();
   });
@@ -322,7 +326,7 @@ describe('BaseScreenViewerElement resourceTimeoutMs legacy setter (RB3)', () => 
     expect(viewer.resourceTimeoutMs).toBe(60_000);
     viewer.catalog = catalog();
     viewer.resourcePort = resourcePort();
-    viewer.variablePort = variablePort();
+    viewer.hostCatalogPort = variablePort();
     viewer.document = documentFixture;
     expect(viewer.shadowRoot).not.toBeNull();
   });
@@ -331,7 +335,7 @@ describe('BaseScreenViewerElement resourceTimeoutMs legacy setter (RB3)', () => 
     const { viewer, dispatched } = await createViewerWithEvents();
     viewer.catalog = catalog();
     viewer.resourcePort = resourcePort();
-    viewer.variablePort = variablePort();
+    viewer.hostCatalogPort = variablePort();
     viewer.document = documentFixture;
     expect(viewer.shadowRoot).not.toBeNull();
     const committed = viewer.resourceTimeoutMs;

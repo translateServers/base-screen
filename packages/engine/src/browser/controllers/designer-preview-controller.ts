@@ -1,7 +1,7 @@
 import type {
   ScreenDocument,
+  ScreenHostCatalogPort,
   ScreenHostResourcePort,
-  ScreenHostVariablePort,
   ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import type {
@@ -15,7 +15,7 @@ export interface DesignerPreviewCallbacks {
   readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
-  readonly getVariablePort: () => ScreenHostVariablePort | undefined;
+  readonly getHostCatalogPort: () => ScreenHostCatalogPort | undefined;
   readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly isViewerRegistered: () => boolean;
 }
@@ -87,25 +87,25 @@ export class DesignerPreviewController {
     if (!this.#open || document === undefined) return;
     const viewer = this.viewer();
     if (viewer === null || viewer === undefined) return;
-    // BaseScreenViewerConfiguration 只要求 catalog：resource/variable 端口是可选
-    // 运行时依赖。静态预览（无宿主资源/变量端口）也必须能 configure 并渲染，
+    // BaseScreenViewerConfiguration 只要求 catalog：resource/来源目录端口是可选
+    // 运行时依赖。静态预览（无宿主资源/来源目录端口）也必须能 configure 并渲染，
     // 不能因为迁移到 configure() 而把可选端口变成必填。
     const catalog = this.callbacks.getCatalog();
     if (catalog === undefined) return;
     const resourcePort = this.callbacks.getResourcePort();
-    const variablePort = this.callbacks.getVariablePort();
+    const hostCatalogPort = this.callbacks.getHostCatalogPort();
     const runtimeContributions = this.callbacks.getRuntimeContributions();
     const configuration: BaseScreenViewerConfiguration = {
       catalog,
       ...(resourcePort === undefined ? {} : { resourcePort }),
-      ...(variablePort === undefined ? {} : { variablePort }),
+      ...(hostCatalogPort === undefined ? {} : { hostCatalogPort }),
       ...(runtimeContributions === undefined ? {} : { runtimeContributions }),
     };
     const configChanged =
       this.#lastConfiguration === undefined ||
       this.#lastConfiguration.catalog !== configuration.catalog ||
       this.#lastConfiguration.resourcePort !== configuration.resourcePort ||
-      this.#lastConfiguration.variablePort !== configuration.variablePort ||
+      this.#lastConfiguration.hostCatalogPort !== configuration.hostCatalogPort ||
       this.#lastConfiguration.runtimeContributions !== configuration.runtimeContributions;
     if (configChanged) {
       // 重新配置前先 unload（configure 拒绝在已初始化实例上二次调用），

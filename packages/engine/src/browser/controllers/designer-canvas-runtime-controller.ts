@@ -3,7 +3,7 @@ import type {
   ScreenBlueprintHostEvent,
   ScreenDiagnostic,
   ScreenDocument,
-  ScreenHostVariablePort,
+  ScreenHostCatalogPort,
   ScreenJsonObject,
   ScreenJsonValue,
   ScreenParseResult,
@@ -25,7 +25,7 @@ import { DesignerCanvasVariableController } from './designer-canvas-variable-con
 
 export interface DesignerCanvasRuntimeControllerCallbacks {
   readonly getRenderer: () => BaseScreenRenderer | undefined;
-  readonly getVariablePort: () => ScreenHostVariablePort | undefined;
+  readonly getHostCatalogPort: () => ScreenHostCatalogPort | undefined;
   readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly getBlueprintHostActionPort: () => ScreenBlueprintHostActionPort | undefined;
   readonly emitBlueprintHostEvent: (event: ScreenBlueprintHostEvent) => void;
@@ -46,7 +46,7 @@ export class DesignerCanvasRuntimeController {
       getDocument: () => this.#document,
       getVariables: () => this.#blueprintVariables,
       setVariables: (variables) => this.writeBlueprintVariables(variables),
-      getVariablePort: callbacks.getVariablePort,
+      getHostCatalogPort: callbacks.getHostCatalogPort,
       emitDiagnostics: callbacks.emitDiagnostics,
     });
   }

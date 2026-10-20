@@ -13,9 +13,9 @@ import type { ScreenBlueprintRuntimePort } from '@base-screen/contracts';
 import { ScreenBlueprintVisibilityEffect } from '@base-screen/core';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenHostCatalogPort } from '@base-screen/contracts';
 import { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourcePort } from '@base-screen/contracts';
-import type { ScreenHostVariablePort } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
 import { ScreenJsonValue } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
@@ -74,6 +74,7 @@ export interface BaseScreenViewerConfiguration {
     readonly datasetPort?: ScreenHostDatasetPort;
     // (undocumented)
     readonly documentRevision?: string;
+    readonly hostCatalogPort?: ScreenHostCatalogPort;
     // (undocumented)
     readonly instanceId?: string;
     // (undocumented)
@@ -87,8 +88,6 @@ export interface BaseScreenViewerConfiguration {
     readonly resourceTimeoutMs?: number;
     // (undocumented)
     readonly runtimeContributions?: BaseScreenRuntimeContributionIndex;
-    // (undocumented)
-    readonly variablePort?: ScreenHostVariablePort;
 }
 
 // @public (undocumented)
@@ -117,6 +116,9 @@ export class BaseScreenViewerElement extends ElementBase {
     // (undocumented)
     getVariable(id: string): ScreenVariableHandle | undefined;
     // (undocumented)
+    get hostCatalogPort(): ScreenHostCatalogPort | undefined;
+    set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
+    // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)
     refreshData(options: BaseScreenViewerRefreshOptions): void;
@@ -132,9 +134,6 @@ export class BaseScreenViewerElement extends ElementBase {
     set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined);
     // (undocumented)
     unload(): void;
-    // (undocumented)
-    get variablePort(): ScreenHostVariablePort | undefined;
-    set variablePort(value: ScreenHostVariablePort | undefined);
 }
 
 // @public (undocumented)
