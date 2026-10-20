@@ -348,9 +348,13 @@ export async function assertDatasetPanelInteraction(designer, page) {
   if ((await discard.count()) > 0) await discard.click();
   await workbench.waitFor({ state: 'hidden' });
   // 放弃草稿会把参数重置回文档里的原始形态（区域是变量参数）：
-  // 后续断言期望的是「固定值」输入框，这里显式还原。
-  await dataPanel.locator('[data-dataset-parameter-mode="region"]').selectOption('literal');
-  await dataPanel.locator('[data-dataset-parameter="region"]').waitFor();
+  // 后续断言期望的是「常量」内联编辑器，这里用取值选择器显式还原（旧的模式下拉已删除）。
+  // `selectOption` 是同步的，浮层列表是打开后才渲染出来的——必须等列表项出现再点，
+  // 否则会在还没渲染的列表上点空气。
+  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
+  await designer.locator('[data-value-ref-option^="inline:"]').first().waitFor();
+  await designer.locator('[data-value-ref-option^="inline:"]').first().click();
+  await dataPanel.locator('[data-value-ref-inline="parameter:region"]').waitFor();
 
   // 5) 空态（未配置数据来源）：文案与版式一律由 DOM 判定。
   //    这三件事——逐字标题、禁用原因是否独立成行、描述有没有被裁——在 300px 宽的截图里
