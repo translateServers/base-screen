@@ -125,7 +125,7 @@ export function renderDesignerDatasetConfiguration(
         overrides,
         onToggle: options.onToggleGroup,
       },
-      [renderDatasetSummary(ownerDocument, options.descriptor, options.roles, options.draft)],
+      [renderDatasetSummary(ownerDocument, options.descriptor)],
     ),
     createDataGroup(
       {
@@ -176,8 +176,6 @@ export function renderDesignerDatasetConfiguration(
 function renderDatasetSummary(
   ownerDocument: Document,
   descriptor: ScreenDatasetDefinition,
-  roles: readonly ScreenDataBindingRole[],
-  draft: DesignerDatasetDraftView | undefined,
 ): HTMLElement {
   const summary = ownerDocument.createElement('section');
   summary.className = 'designer-dataset-summary';
@@ -206,80 +204,9 @@ function renderDatasetSummary(
     description.textContent = descriptor.description;
     summary.appendChild(description);
   }
-  // 「对象数组」常量 chip 已删除：tabular 数据集恒为对象数组，零信息量却占 20px + 一条边框。
-  const bindingSummary = ownerDocument.createElement('div');
-  bindingSummary.className = 'designer-dataset-binding-summary';
-  const bindingHeader = ownerDocument.createElement('div');
-  bindingHeader.className = 'designer-dataset-binding-summary-header';
-  const bindingTitle = ownerDocument.createElement('strong');
-  bindingTitle.textContent = DESIGNER_UI_TEXT.dataset.bindingSummaryTitle;
-  const bindings = roles.flatMap((role) => {
-    const selected = draft?.fields[role.id] ?? [];
-    if (selected.length === 0) return [];
-    return [
-      {
-        role: DESIGNER_UI_TEXT.dataset.bindingRole(role.id),
-        fields: selected.map(
-          (id) => descriptor.fields.find((field) => field.id === id)?.label ?? id,
-        ),
-      },
-    ];
-  });
-  const bindingCount = ownerDocument.createElement('span');
-  bindingCount.textContent = DESIGNER_UI_TEXT.dataset.selectedFields(
-    bindings.reduce((count, binding) => count + binding.fields.length, 0),
-  );
-  bindingHeader.append(bindingTitle, bindingCount);
-  bindingSummary.appendChild(bindingHeader);
-  if (bindings.length === 0) {
-    const empty = ownerDocument.createElement('p');
-    empty.className = 'designer-dataset-binding-summary-empty';
-    empty.textContent = DESIGNER_UI_TEXT.dataset.bindingNone;
-    bindingSummary.appendChild(empty);
-  }
-  for (const binding of bindings) {
-    bindingSummary.appendChild(renderBindingSummaryItem(ownerDocument, binding));
-  }
-  summary.appendChild(bindingSummary);
-  // 字段清单不再平铺成 chips：字段映射段里的选择器已经表达同一件事，
-  // 同屏两处重复值会让人以为 chips 是可编辑的第三个入口。
+  // 绑定摘要已搬到 `mapping` 组内的「输出字段」一行：它原先嵌在这张卡片里，既与
+  // 「字段映射」组内容重复（同义），又形成"卡片套卡片"。信息等价，只是换了位置。
   return summary;
-}
-
-function renderBindingSummaryItem(
-  ownerDocument: Document,
-  binding: { readonly role: string; readonly fields: readonly string[] },
-): HTMLDetailsElement {
-  const details = ownerDocument.createElement('details');
-  details.className = 'designer-dataset-binding-summary-item';
-  const disclosure = ownerDocument.createElement('summary');
-  disclosure.className = 'designer-dataset-binding-summary-disclosure';
-  const preview = ownerDocument.createElement('span');
-  preview.className = 'designer-dataset-binding-summary-preview';
-  const role = ownerDocument.createElement('span');
-  role.className = 'designer-dataset-binding-summary-role';
-  role.textContent = binding.role;
-  role.setAttribute('data-tip', binding.role);
-  const fields = ownerDocument.createElement('span');
-  fields.className = 'designer-dataset-binding-summary-value';
-  fields.textContent = binding.fields.join('、');
-  fields.setAttribute('data-tip', binding.fields.join('、'));
-  preview.append(role, fields);
-  disclosure.appendChild(preview);
-  disclosure.setAttribute('aria-label', `${binding.role}：${binding.fields.join('、')}`);
-
-  const expanded = ownerDocument.createElement('div');
-  expanded.className = 'designer-dataset-binding-summary-expanded';
-  const fieldList = ownerDocument.createElement('ul');
-  fieldList.className = 'designer-dataset-binding-summary-fields';
-  for (const field of binding.fields) {
-    const label = ownerDocument.createElement('li');
-    label.textContent = field;
-    fieldList.appendChild(label);
-  }
-  expanded.appendChild(fieldList);
-  details.append(disclosure, expanded);
-  return details;
 }
 
 /**

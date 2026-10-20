@@ -822,7 +822,6 @@ export async function assertDatasetSurface(designer, page) {
     const mappingSection = panel.querySelector('[data-workbench-section="mapping"]');
     const previewSection = panel.querySelector('[data-workbench-section="preview"]');
     const advancedSection = panel.querySelector('.designer-datav-advanced-settings');
-    const bindingSummary = panel.querySelector('.designer-dataset-binding-summary');
     const authoringSettings = panel.querySelector('.designer-dataset-authoring-settings');
     const workbench = layout?.querySelector('[data-data-workbench]');
     const flowBox = flow?.getBoundingClientRect();
@@ -845,11 +844,15 @@ export async function assertDatasetSurface(designer, page) {
         ),
       ].filter((control) => control.getAttribute('aria-label') === null).length,
       bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
-      bindingSummaryEmpty:
-        bindingSummary?.querySelector('.designer-dataset-binding-summary-empty') !== null,
-      bindingSummaryItemCount: bindingSummary?.querySelectorAll(
-        '.designer-dataset-binding-summary-item',
-      ).length,
+      // 绑定摘要已从「当前数据集」卡片搬到 `mapping` 组内的「输出字段」一行：
+      // 旧锚点（`-empty` / `-item`）随块一起删除，新锚点在这里。搬家后必须有人确认
+      // "输出字段这行真的渲染了、且摘要不是裸数字"，否则这次搬动只能靠人眼看截图。
+      outputFieldsText:
+        panel.querySelector('[data-details-group="mapping"] [data-dataset-output-fields]')
+          ?.textContent ?? '',
+      mappingSummaryText:
+        panel.querySelector('[data-details-group="mapping"] [data-details-group-summary]')
+          ?.textContent ?? '',
       authoringSettingsGroup: authoringSettings?.getAttribute('role') === 'group',
       editInWorkbenchCount: panel.querySelectorAll('[data-edit-in-workbench]').length,
       editInWorkbenchInstanceId: panel
@@ -920,8 +923,11 @@ export async function assertDatasetSurface(designer, page) {
     descriptorSurface.legacyParameterModeCount !== 0 ||
     descriptorSurface.unlabelledParameterControls !== 0 ||
     descriptorSurface.bindingCount !== 3 ||
-    descriptorSurface.bindingSummaryEmpty ||
-    descriptorSurface.bindingSummaryItemCount !== 2 ||
+    descriptorSurface.outputFieldsText.length === 0 ||
+    !descriptorSurface.outputFieldsText.includes('输出字段') ||
+    descriptorSurface.mappingSummaryText.length === 0 ||
+    // 摘要必须是内容摘要（角色 + 字段名），不是裸数字。
+    /^\d+$/.test(descriptorSurface.mappingSummaryText.trim()) ||
     !descriptorSurface.authoringSettingsGroup ||
     // 检查器里实例级设置只读：就地控件 0/0。只断 0 无法区分「正确降级」与「整段没渲染」，
     // 所以再断跳转（有目标）与组头摘要（有内容）。
