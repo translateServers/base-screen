@@ -1,4 +1,5 @@
 import { type ScreenDocument, screenJsonEquals } from '@base-screen/contracts';
+import { componentsReferencingDataSources } from '../data/data-source-dependents.js';
 import { prefixDiagnostic, sortDiagnostics } from '../internal/diagnostics.js';
 import { assertCoreValidDocument } from '../internal/document.js';
 import {
@@ -7,6 +8,10 @@ import {
   applyReparentComponentsCommand,
   applyUpdateComponentsCommand,
 } from './apply-component-commands.js';
+import {
+  applyReplaceDataSourcesCommand,
+  changedDataSourceIds,
+} from './apply-data-source-command.js';
 import { applyRenameVariableCommand } from './apply-variable-command.js';
 import { isExactPatch, isRecord } from './command-input.js';
 import {
@@ -120,6 +125,8 @@ function applyValidatedCommand(
       return applyReparentComponentsCommand(document, command.componentIds, command.parentId);
     case 'replace-blueprint':
       return applyBlueprint(document, command.blueprint);
+    case 'replace-data-sources':
+      return applyReplaceDataSourcesCommand(document, command.dataSources);
     case 'replace-variables':
       return applyVariables(document, command.variables);
     case 'rename-variable':
@@ -200,5 +207,13 @@ function getNetChangedComponentIds(
   const removed = before.components
     .filter((component) => !afterById.has(component.id))
     .map(({ id }) => id);
-  return [...current, ...removed];
+  // 实例结果变化时，读它的组件也必须重投影：值在「实例 + 取值引用」这条链上，
+  // 而不是挂在组件上，因此「组件被 patch」不是唯一的重绘判据。
+  const changed = new Set([...current, ...removed]);
+  const affected = componentsReferencingDataSources(
+    after,
+    changedDataSourceIds(before.dataSources ?? [], after.dataSources ?? []),
+  );
+  const dependents = affected.filter((id) => !changed.has(id));
+  return dependents.length === 0 ? [...changed] : [...changed, ...dependents];
 }

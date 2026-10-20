@@ -15,19 +15,21 @@ import type { ScreenComponentDataSource } from '@base-screen/contracts';
 import { ScreenComponentNode } from '@base-screen/contracts';
 import { ScreenComponentStatus } from '@base-screen/contracts';
 import type { ScreenComponentStyleRule } from '@base-screen/contracts';
+import { ScreenDataBinding } from '@base-screen/contracts';
 import { ScreenDatasetField } from '@base-screen/contracts';
 import { ScreenDatasetValueType } from '@base-screen/contracts';
+import type { ScreenDataSource } from '@base-screen/contracts';
 import { ScreenDiagnostic } from '@base-screen/contracts';
 import { ScreenDocument } from '@base-screen/contracts';
-import { ScreenHostResourceBinding } from '@base-screen/contracts';
 import { ScreenHostResourceParameter } from '@base-screen/contracts';
 import { ScreenJsonObject } from '@base-screen/contracts';
-import type { ScreenJsonValue } from '@base-screen/contracts';
+import { ScreenJsonValue } from '@base-screen/contracts';
 import { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenPosition } from '@base-screen/contracts';
 import { ScreenSize } from '@base-screen/contracts';
 import { ScreenStaticDataSource } from '@base-screen/contracts';
 import { ScreenStaticVariable } from '@base-screen/contracts';
+import { ScreenValueRef } from '@base-screen/contracts';
 import { ScreenVariable } from '@base-screen/contracts';
 import type { ScreenVariableEntry } from '@base-screen/contracts';
 
@@ -52,6 +54,9 @@ export function canvasPointToViewport(point: ScreenPoint, viewport: ScreenViewpo
 // @public (undocumented)
 export function chooseScreenSnapCandidate(candidates: readonly ScreenSnapCandidate[], threshold: number): ScreenSnapCandidate | null;
 
+// @public
+export function collectScreenValueRefDependencies(refs: ScreenValueRef | null | undefined | Readonly<Record<string, ScreenValueRef>>): ScreenValueRefDependencies;
+
 // @public (undocumented)
 export function commitScreenHistory(history: ScreenHistoryState, document: ScreenDocument, limit?: number): ScreenHistoryState;
 
@@ -69,6 +74,9 @@ export interface ComponentIndex {
     readonly childrenByParent: ReadonlyMap<string | null, readonly string[]>;
 }
 
+// @public
+export function componentsReferencingDataSources(document: ScreenDocument, dataSourceIds: Iterable<string>): readonly string[];
+
 // @public (undocumented)
 export function createScreenHistory(document: ScreenDocument): ScreenHistoryState;
 
@@ -80,6 +88,9 @@ export function dispatchScreenBlueprintEvent(plan: ScreenBlueprintPlan, state: S
 
 // @public (undocumented)
 export function evaluateScreenHostResourceParameters(params: Readonly<Record<string, ScreenHostResourceParameter>>, variables: ScreenJsonObject): ScreenParseResult<ScreenHostResourceParameterEvaluation>;
+
+// @public
+export function evaluateScreenValueRef(ref: ScreenValueRef, environment: ScreenValueRefEnvironment, maxBytes?: number): ScreenValueRefEvaluation;
 
 // @public (undocumented)
 export function extractScreenHostResourceVariableDependencies(params: Readonly<Record<string, ScreenHostResourceParameter>>): readonly string[];
@@ -374,8 +385,10 @@ export { ScreenComponentNode }
 
 // @public (undocumented)
 export interface ScreenComponentPatch {
+    readonly dataBinding?: ScreenDataBinding | null;
     // (undocumented)
     readonly dataSource?: ScreenComponentDataSource | null;
+    readonly dataValue?: ScreenValueRef | null;
     // (undocumented)
     readonly name?: string;
     // (undocumented)
@@ -406,7 +419,7 @@ export class ScreenCoreInvariantError extends Error {
     readonly name: 'ScreenCoreInvariantError';
 }
 
-// @public (undocumented)
+// @public
 export interface ScreenDataBindingRole {
     // (undocumented)
     readonly id: string;
@@ -417,6 +430,14 @@ export interface ScreenDataBindingRole {
     // (undocumented)
     readonly valueTypes: readonly ScreenDatasetValueType[];
 }
+
+// @public
+interface ScreenDataBindingValidation {
+    // (undocumented)
+    readonly fields: Readonly<Record<string, readonly ScreenDatasetField[]>>;
+}
+export { ScreenDataBindingValidation }
+export { ScreenDataBindingValidation as ScreenHostResourceBindingValidation }
 
 export { ScreenDiagnostic }
 
@@ -443,6 +464,9 @@ export type ScreenDocumentCommand = {
 } | {
     readonly type: 'replace-blueprint';
     readonly blueprint: ScreenBlueprint;
+} | {
+    readonly type: 'replace-data-sources';
+    readonly dataSources: readonly ScreenDataSource[];
 } | {
     readonly type: 'replace-variables';
     readonly variables: readonly ScreenVariableEntry[];
@@ -476,13 +500,7 @@ export interface ScreenHistoryState {
     readonly present: ScreenDocument;
 }
 
-// @public (undocumented)
-export interface ScreenHostResourceBindingValidation {
-    // (undocumented)
-    readonly fields: Readonly<Record<string, readonly ScreenDatasetField[]>>;
-}
-
-// @public (undocumented)
+// @public
 export interface ScreenHostResourceParameterEvaluation {
     // (undocumented)
     readonly dependencies: readonly string[];
@@ -583,6 +601,40 @@ export interface ScreenTransactionSuccess {
     readonly ok: true;
 }
 
+// @public
+export interface ScreenValueRefDependencies {
+    // (undocumented)
+    readonly dataSourceIds: readonly string[];
+    // (undocumented)
+    readonly variableIds: readonly string[];
+}
+
+// @public
+export interface ScreenValueRefEnvironment {
+    // (undocumented)
+    readonly dataSourceErrors: ReadonlyMap<string, ScreenDiagnostic>;
+    // (undocumented)
+    readonly dataSourceValues: ReadonlyMap<string, ScreenJsonValue>;
+    // (undocumented)
+    readonly variableValues: Readonly<Record<string, ScreenJsonValue>>;
+}
+
+// @public
+export type ScreenValueRefEvaluation = {
+    readonly kind: 'value';
+    readonly value: ScreenJsonValue | undefined;
+} | {
+    readonly kind: 'pending';
+    readonly dataSourceId: string;
+} | {
+    readonly kind: 'failed';
+    readonly dataSourceId: string | null;
+    readonly reason: ScreenValueRefFailureReason;
+};
+
+// @public
+export type ScreenValueRefFailureReason = 'variable-missing' | 'data-source-error' | 'value-invalid';
+
 export { ScreenVariable }
 
 // @public (undocumented)
@@ -628,11 +680,13 @@ export function traceScreenBlueprintEvent(plan: ScreenBlueprintPlan, state: Scre
 // @public (undocumented)
 export function undoScreenHistory(history: ScreenHistoryState): ScreenHistoryState;
 
-// @public (undocumented)
-export function validateScreenDocumentSemantics(document: ScreenDocument): readonly ScreenDiagnostic[];
+// @public
+function validateScreenDataBinding(binding: ScreenDataBinding | null, fields: readonly ScreenDatasetField[], roles: readonly ScreenDataBindingRole[]): ScreenParseResult<ScreenDataBindingValidation>;
+export { validateScreenDataBinding }
+export { validateScreenDataBinding as validateScreenHostResourceBinding }
 
 // @public (undocumented)
-export function validateScreenHostResourceBinding(binding: ScreenHostResourceBinding | null, fields: readonly ScreenDatasetField[], roles: readonly ScreenDataBindingRole[]): ScreenParseResult<ScreenHostResourceBindingValidation>;
+export function validateScreenDocumentSemantics(document: ScreenDocument): readonly ScreenDiagnostic[];
 
 // @public (undocumented)
 export function viewportPointToCanvas(point: ScreenPoint, viewport: ScreenViewportState): ScreenPoint;

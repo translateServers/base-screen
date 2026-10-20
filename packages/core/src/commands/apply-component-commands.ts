@@ -33,6 +33,8 @@ const COMPONENT_PATCH_FIELDS = new Set([
   'style',
   'styleRules',
   'dataSource',
+  'dataValue',
+  'dataBinding',
 ]);
 
 export function applyAddComponentCommand(

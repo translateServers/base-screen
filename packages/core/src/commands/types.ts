@@ -6,11 +6,14 @@ import type {
   ScreenComponentNode,
   ScreenComponentStatus,
   ScreenComponentStyleRule,
+  ScreenDataBinding,
+  ScreenDataSource,
   ScreenDiagnostic,
   ScreenDocument,
   ScreenJsonObject,
   ScreenPosition,
   ScreenSize,
+  ScreenValueRef,
   ScreenVariableEntry,
 } from '@base-screen/contracts';
 
@@ -42,6 +45,10 @@ export type ScreenDocumentCommand =
       readonly parentId: string | null;
     }
   | { readonly type: 'replace-blueprint'; readonly blueprint: ScreenBlueprint }
+  | {
+      readonly type: 'replace-data-sources';
+      readonly dataSources: readonly ScreenDataSource[];
+    }
   | { readonly type: 'replace-variables'; readonly variables: readonly ScreenVariableEntry[] }
   | {
       readonly type: 'rename-variable';
@@ -61,6 +68,10 @@ export interface ScreenComponentPatch {
   /** 条件样式规则整体替换（ADR-0058）：传完整新数组，空数组清除全部规则。 */
   readonly styleRules?: readonly ScreenComponentStyleRule[];
   readonly dataSource?: ScreenComponentDataSource | null;
+  /** 取值引用；`null` = 不取值。 */
+  readonly dataValue?: ScreenValueRef | null;
+  /** 字段映射；`null` = 不做字段映射。 */
+  readonly dataBinding?: ScreenDataBinding | null;
 }
 
 export type ScreenCommandResult =

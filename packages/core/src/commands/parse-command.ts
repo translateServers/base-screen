@@ -10,6 +10,7 @@ const COMMAND_TYPES = new Set([
   'remove-components',
   'reparent-components',
   'replace-blueprint',
+  'replace-data-sources',
   'replace-variables',
   'rename-variable',
 ]);
@@ -21,6 +22,7 @@ const COMMAND_FIELDS: Readonly<Record<string, ReadonlySet<string>>> = {
   'remove-components': new Set(['type', 'componentIds']),
   'reparent-components': new Set(['type', 'componentIds', 'parentId']),
   'replace-blueprint': new Set(['type', 'blueprint']),
+  'replace-data-sources': new Set(['type', 'dataSources']),
   'replace-variables': new Set(['type', 'variables']),
   'rename-variable': new Set(['type', 'variableId', 'nextName']),
 };

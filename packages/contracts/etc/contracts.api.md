@@ -65,6 +65,9 @@ export const MAX_DATA_SOURCE_PARAMS = 64;
 export const MAX_DATA_SOURCE_UPDATE_INTERVAL_SECONDS = 86400;
 
 // @public (undocumented)
+export const MAX_DATA_SOURCE_VALUE_BYTES: number;
+
+// @public (undocumented)
 export const MAX_DATA_SOURCES = 1000;
 
 // @public (undocumented)

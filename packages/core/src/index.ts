@@ -41,16 +41,29 @@ export type {
   ScreenTransactionResult,
   ScreenTransactionSuccess,
 } from './commands/types.js';
+export { componentsReferencingDataSources } from './data/data-source-dependents.js';
 export type {
   ScreenDataBindingRole,
+  ScreenDataBindingValidation,
   ScreenHostResourceBindingValidation,
   ScreenHostResourceParameterEvaluation,
 } from './data/host-dataset.js';
 export {
   evaluateScreenHostResourceParameters,
   extractScreenHostResourceVariableDependencies,
+  validateScreenDataBinding,
   validateScreenHostResourceBinding,
 } from './data/host-dataset.js';
+export type {
+  ScreenValueRefDependencies,
+  ScreenValueRefEnvironment,
+  ScreenValueRefEvaluation,
+  ScreenValueRefFailureReason,
+} from './data/value-ref.js';
+export {
+  collectScreenValueRefDependencies,
+  evaluateScreenValueRef,
+} from './data/value-ref.js';
 export type { ScreenAlignmentDelta, ScreenSnapCandidate } from './geometry/geometry.js';
 export {
   calculateScreenAlignment,
