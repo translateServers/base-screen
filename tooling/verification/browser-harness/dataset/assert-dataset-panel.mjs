@@ -46,16 +46,10 @@ export async function assertDatasetPanelInteraction(designer, page) {
       })),
     };
   });
-  const shortLabels = {
-    static: '\u56fa\u5b9a\u503c',
-    variable: '\u53d8\u91cf',
-    source: '\u6570\u636e\u6e90',
-  };
-  const fullLabels = {
-    static: '\u8f93\u5165\u56fa\u5b9a\u503c',
-    variable: '\u7528\u53d8\u91cf',
-    source: '\u63a5\u6570\u636e\u6e90',
-  };
+  // 文案用字面量而不是 \u 转义：这是验收时要逐字核对的字符串，
+  // 转义形式会让 `grep 输入固定值` 落空（真的发生过）。
+  const shortLabels = { static: '固定值', variable: '变量', source: '数据源' };
+  const fullLabels = { static: '输入固定值', variable: '用变量', source: '接数据源' };
   if (
     segmentedSurface.count !== 3 ||
     segmentedSurface.options.some(
@@ -245,16 +239,19 @@ export async function assertDatasetPanelInteraction(designer, page) {
     const rows = [...panel.querySelectorAll('[data-data-entry]')].map((row) => {
       const description = row.querySelector('.designer-data-entry-guide-description');
       const reason = row.querySelector('.designer-data-entry-guide-reason');
+      const descriptionRect = description?.getBoundingClientRect();
+      const reasonRect = reason?.getBoundingClientRect();
       return {
         entry: row.dataset.dataEntry,
         disabled: row.disabled,
         title: row.querySelector('.designer-data-entry-guide-title')?.textContent ?? null,
+        // 3) 描述没被裁切：内容高度不超过可视高度
         descriptionClipped:
           description === null ? null : description.scrollHeight > description.clientHeight + 1,
-        descriptionBottom:
-          description === null ? null : Math.round(description.getBoundingClientRect().bottom),
+        // 2) 原因在描述**下方**：原因 rect.top 必须 >= 描述 rect.bottom
+        descriptionRectBottom: descriptionRect === undefined ? null : descriptionRect.bottom,
         reasonText: reason?.textContent ?? null,
-        reasonTop: reason === null ? null : Math.round(reason.getBoundingClientRect().top),
+        reasonRectTop: reasonRect === undefined ? null : reasonRect.top,
         chevron: row.querySelector('.designer-data-entry-guide-disclosure') !== null,
       };
     });
@@ -267,30 +264,30 @@ export async function assertDatasetPanelInteraction(designer, page) {
   });
   const variableRow = emptyState.rows.find((row) => row.entry === 'variable');
   if (
-    // 1) 三行标题逐字等于全称（不是 includes）
+    // 1) 三行标题逐字等于全称（=== 语义，不是 includes）
     JSON.stringify(emptyState.rows.map((row) => [row.entry, row.title])) !==
       JSON.stringify([
-        ['static', '\u8f93\u5165\u56fa\u5b9a\u503c'],
-        ['variable', '\u7528\u53d8\u91cf'],
-        ['source', '\u63a5\u6570\u636e\u6e90'],
+        ['static', '输入固定值'],
+        ['variable', '用变量'],
+        ['source', '接数据源'],
       ]) ||
-    // 2) 禁用行：原因存在、独占一行（顶边不低于描述底边）、且右侧不画 chevron；
+    // 2) 禁用行：原因存在、独占一行（原因 rect.top >= 描述 rect.bottom）、右侧不画 chevron；
     //    可用行反过来：没有原因、有 chevron。
     emptyState.rows.some((row) =>
       row.disabled
         ? row.reasonText === null || row.chevron !== false
         : row.reasonText !== null || row.chevron !== true,
     ) ||
-    variableRow?.reasonTop === null ||
-    variableRow?.reasonTop === undefined ||
-    variableRow.descriptionBottom === null ||
-    variableRow.descriptionBottom === undefined ||
-    variableRow.reasonTop < variableRow.descriptionBottom ||
+    variableRow?.reasonRectTop === null ||
+    variableRow?.reasonRectTop === undefined ||
+    variableRow.descriptionRectBottom === null ||
+    variableRow.descriptionRectBottom === undefined ||
+    variableRow.reasonRectTop < variableRow.descriptionRectBottom ||
     // 3) 描述没有被裁切
     emptyState.rows.some((row) => row.descriptionClipped !== false) ||
-    // 4) 空态没有 apply，也没有「当前组件不使用数据。」
+    // 4) 空态没有 apply，也没有 `noneSelected` 那句「当前组件不使用数据。」
     emptyState.applyCount !== 0 ||
-    emptyState.text.includes('\u5f53\u524d\u7ec4\u4ef6\u4e0d\u4f7f\u7528\u6570\u636e') ||
+    emptyState.text.includes('当前组件不使用数据') ||
     // 5) 空态不是折叠分组结构
     emptyState.detailsGroups !== 0
   ) {
