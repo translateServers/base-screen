@@ -64,3 +64,16 @@
     transition: none;
   }
 }
+
+/* 设计器顶层 overlay 宿主：挂在 `.designer` 之内（设计令牌生效）、shadow root 顶层，
+   给取值选择器等浮层使用。宿主自身不吃事件，只有子元素吃；z-index 高于工作台模态。 */
+.designer-overlay-host {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: var(--designer-z-popover);
+}
+
+.designer-overlay-host > * {
+  pointer-events: auto;
+}

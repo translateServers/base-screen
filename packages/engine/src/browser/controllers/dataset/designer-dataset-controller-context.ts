@@ -46,6 +46,12 @@ export interface DesignerDatasetControllerCallbacks {
   ) => void;
   readonly copyText?: (value: string) => Promise<boolean>;
   readonly getWorkbenchHost?: () => HTMLElement | undefined;
+  /**
+   * 设计器顶层 overlay 宿主（`.designer` 之内的 shadow root 顶层容器，`z-index` 高于
+   * 工作台模态）。取值选择器的浮层挂在这里，避免被模态或段 diff 裁剪/重建。
+   * 缺省时 picker 退化到触发器所在的 `.designer` 子树，不抛错。
+   */
+  readonly getOverlayHost?: () => HTMLElement | undefined;
   readonly preserveScrollContinuity?: (render: () => void) => void;
 }
 

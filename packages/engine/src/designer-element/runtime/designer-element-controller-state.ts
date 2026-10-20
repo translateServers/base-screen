@@ -286,6 +286,18 @@ export function initializeDesignerElementControllers(
     },
     getWorkbenchHost: () =>
       element.shadowRoot?.querySelector<HTMLElement>('[data-data-workbench]') ?? undefined,
+    // 顶层 overlay：惰性建在 `.designer` 内、shadow root 顶层，供取值选择器等浮层复用。
+    getOverlayHost: () => {
+      const root = element.shadowRoot?.querySelector<HTMLElement>('.designer');
+      if (root === null || root === undefined) return undefined;
+      const existing = root.querySelector<HTMLElement>('[data-designer-overlay-host]');
+      if (existing !== null) return existing;
+      const host = element.ownerDocument.createElement('div');
+      host.className = 'designer-overlay-host';
+      host.dataset.designerOverlayHost = 'true';
+      root.appendChild(host);
+      return host;
+    },
     preserveScrollContinuity: (render) =>
       state.scrollContinuityController.preserve(element.shadowRoot, render),
   });

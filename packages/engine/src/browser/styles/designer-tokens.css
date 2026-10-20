@@ -97,6 +97,7 @@
   --designer-z-dialog: 20;
   --designer-z-modal: 30;
   /* 提示气泡必须压在全部弹层之上：菜单/对话框打开时其内部控件仍可悬停出提示。 */
+  --designer-z-popover: 35;
   --designer-z-tooltip: 40;
 }
 
