@@ -8,6 +8,7 @@ import {
 import { designerIcon } from '../../ui/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { createDesignerSelect } from '../designer-ui-primitives.js';
+import { createDataGroup } from './designer-data-group-dom.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import {
   configSection,
@@ -49,18 +50,84 @@ function registerSectionDisposer(section: HTMLElement, dispose: () => void): voi
   else existing.push(dispose);
 }
 
+/** 组内不再重复标题：组头已写「字段映射 / 请求参数」。容器保留（`data-workbench-section` 是锚点）。 */
+function withoutSectionHeading(section: HTMLElement): HTMLElement {
+  section.querySelector('.designer-inspector-section-title')?.remove();
+  return section;
+}
+
+/** 字段映射组头摘要：已映射字段总数。 */
+function mappingSummary(options: DesignerDatasetConfigurationOptions): string {
+  const count = options.roles.reduce(
+    (total, role) => total + (options.draft?.fields[role.id]?.length ?? 0),
+    0,
+  );
+  return count === 0 ? DESIGNER_UI_TEXT.data.groups.mappingEmpty : String(count);
+}
+
+/** 有必填参数未填时展开参数组：让"还差什么"在收起态就可见并可直接进入。 */
+function hasUnfilledRequiredParameter(options: DesignerDatasetConfigurationOptions): boolean {
+  return options.descriptor.parameters.some(
+    (parameter) => parameter.required && options.draft?.params[parameter.name] === undefined,
+  );
+}
+
 export function renderDesignerDatasetConfiguration(
   options: DesignerDatasetConfigurationOptions,
 ): HTMLElement {
-  const details = options.panel.ownerDocument.createElement('div');
+  const ownerDocument = options.panel.ownerDocument;
+  const details = ownerDocument.createElement('div');
   details.dataset.datasetDescriptor = 'true';
   details.dataset.dsSection = 'source';
   details.className = 'designer-dataset-descriptor';
-  details.appendChild(
-    renderDatasetSummary(details.ownerDocument, options.descriptor, options.roles, options.draft),
+  // `source` 段内是 3 个折叠组（数据源 / 字段映射 / 请求参数）。组头摘要只取文档与草稿里的
+  // 既有值；目录态不走这里（目录不是折叠组）。
+  const overrides = options.groupOpenOverrides ?? new Map<string, boolean>();
+  details.append(
+    createDataGroup(
+      {
+        ownerDocument,
+        section: 'source',
+        group: 'source',
+        title: DESIGNER_UI_TEXT.data.groups.source,
+        summary: options.instance?.name ?? options.descriptor.name,
+        defaultOpen: true,
+        overrides,
+        onToggle: options.onToggleGroup,
+      },
+      [renderDatasetSummary(ownerDocument, options.descriptor, options.roles, options.draft)],
+    ),
+    createDataGroup(
+      {
+        ownerDocument,
+        section: 'source',
+        group: 'mapping',
+        title: DESIGNER_UI_TEXT.data.groups.mapping,
+        summary: mappingSummary(options),
+        defaultOpen: true,
+        overrides,
+        onToggle: options.onToggleGroup,
+      },
+      [withoutSectionHeading(renderBindings(ownerDocument, options))],
+    ),
+    createDataGroup(
+      {
+        ownerDocument,
+        section: 'source',
+        group: 'parameters',
+        title: DESIGNER_UI_TEXT.data.groups.parameters,
+        summary: DESIGNER_UI_TEXT.data.groups.parametersCount(options.descriptor.parameters.length),
+        defaultOpen: hasUnfilledRequiredParameter(options),
+        overrides,
+        onToggle: options.onToggleGroup,
+      },
+      [withoutSectionHeading(renderParameters(ownerDocument, options))],
+    ),
   );
-  details.appendChild(renderParameters(details.ownerDocument, options));
-  details.appendChild(renderBindings(details.ownerDocument, options));
+  // 没有参数时整组不渲染（不出空标题）。
+  if (options.descriptor.parameters.length === 0) {
+    details.querySelector('[data-details-group="parameters"]')?.remove();
+  }
   if (options.includeActions !== false) {
     details.appendChild(
       renderActions(

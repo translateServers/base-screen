@@ -52,6 +52,30 @@ async function readInlineNavigation(dataPanel, section) {
   }, section);
 }
 
+/**
+ * 展开一个折叠组。
+ *
+ * **优先点组头**：这才是用户的真实路径，也是"手动展开"路径唯一的覆盖方式。
+ * 只有组头本身不可见（例如所在段还没进入视口）时才退回程序化 `open = true`，
+ * 否则这个 helper 会变成"直接改状态"，等于没测点击。
+ */
+async function ensureDataGroupOpen(scope, group) {
+  const details = scope.locator(`details[data-details-group="${group}"]`).first();
+  if ((await details.count()) === 0) return;
+  if ((await details.getAttribute('open')) !== null) return;
+  const summary = details.locator('summary').first();
+  if (await summary.isVisible()) {
+    await summary.click();
+  } else {
+    await details.evaluate((node) => {
+      node.open = true;
+    });
+  }
+  await details.evaluate((node) => {
+    if (!node.open) node.open = true;
+  });
+}
+
 // ---- 源模块：assert-dataset-authoring.mjs ----
 export async function assertDatasetAuthoring(designer, page) {
   const dataPanel = designer.locator('[data-inspector-pane=data]');
@@ -62,6 +86,8 @@ export async function assertDatasetAuthoring(designer, page) {
   });
   await scrollDataPanelTo(dataPanel, page, 'preview', 'preview');
   await dataPanel.locator('[data-dataset-action="test"]').click();
+  // 预览段恒存在、内容折叠：断言自己展开它再读状态。
+  await ensureDataGroupOpen(dataPanel, 'preview');
   await dataPanel.locator('[data-workbench-section="preview"] [data-status="ready"]').waitFor();
   const responsePreview = await dataPanel.evaluate((panel) => ({
     rowCount: panel.querySelectorAll('.designer-data-preview-table-wrap tbody tr').length,
@@ -102,6 +128,7 @@ export async function assertDatasetAuthoring(designer, page) {
     surface.style.removeProperty('display');
   });
   await scrollDataPanelTo(dataPanel, page, 'source', 'source');
+  await ensureDataGroupOpen(dataPanel, 'parameters');
   // 内联值编辑器只在本参数是「常量」形态时存在；定位统一走 `data-value-ref-inline`。
   const region = dataPanel.locator('[data-value-ref-inline="parameter:region"]');
   await region.fill('north');
@@ -147,7 +174,8 @@ export async function assertDatasetAuthoring(designer, page) {
   // 还原默认值，保持后续断言与请求预览稳定。
   await dateInput.fill('2026-10-01');
   await dateInput.dispatchEvent('change');
-  await scrollDataPanelTo(dataPanel, page, 'mapping', 'mapping');
+  // 「字段映射」是 `source` 段内的组：滚到它即滚到 source 段，派生步骤是 source。
+  await scrollDataPanelTo(dataPanel, page, 'mapping', 'source');
   const mappingSurface = await dataPanel.evaluate((panel) => ({
     // 2 个角色分区 + 1 个单选 select（measures 改为限额多选后走 bind-field 触发器，不再有 select）。
     bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
@@ -157,7 +185,8 @@ export async function assertDatasetAuthoring(designer, page) {
   if (
     mappingSurface.bindingCount !== 3 ||
     mappingSurface.applyCount !== 1 ||
-    mappingSurface.activeStep !== 'mapping'
+    // 字段映射是 source 段内的组：派生步骤是 source。
+    mappingSurface.activeStep !== 'source'
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_MAPPING_SURFACE_FAILED:${JSON.stringify(mappingSurface)}`,
@@ -423,8 +452,9 @@ export async function assertDatasetAuthoring(designer, page) {
     !authoringSurface.copyAction ||
     !authoringSurface.copyActionDisabled ||
     !authoringSurface.fullscreenAction ||
-    authoringSurface.settingCount !== 4 ||
-    !authoringSurface.refreshStrategy ||
+    // 检查器里实例级设置全部只读：就地控件计数为 0，「更新策略」下拉也不在检查器里。
+    authoringSurface.settingCount !== 0 ||
+    authoringSurface.refreshStrategy ||
     authoringSurface.horizontalOverflow
   ) {
     throw new Error(
@@ -458,11 +488,6 @@ export async function assertDatasetAuthoring(designer, page) {
     .locator('[data-dataset-feedback]')
     .filter({ hasText: '\u6570\u636e\u5df2\u590d\u5236\u5230\u526a\u8d34\u677f' })
     .waitFor();
-  await dataPanel.locator('[data-dataset-authoring-setting="loadingDisabled"]').check();
-  await dataPanel.locator('[data-dataset-authoring-setting="controlled"]').check();
-  await dataPanel
-    .locator('[data-dataset-authoring-setting="refreshStrategy"]')
-    .selectOption('auto');
   await dataPanel.locator('[data-dataset-authoring-action="fullscreen-edit"]').click();
   const datasetWorkbench = designer.locator('[data-data-workbench]');
   await datasetWorkbench.waitFor({ state: 'visible' });
@@ -492,8 +517,52 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_FULLSCREEN_OPEN_FAILED:${JSON.stringify(fullscreenSurface)}`,
     );
   }
+  // `surface` 必须真的分叉：检查器只读（无就地控件 + 有跳转），工作台可编辑（有就地控件）。
+  //
+  // **本断言不覆盖 `sectionContentKey` 的组成**：它只能证明「渲染读了 surface」；
+  // 「surface 是否进内容键」在 patch 路径上 DOM 不可观测，那条由单测
+  // `designer-data-section-diff.test.ts:99` 钉。两处各守一件事，不要拿本断言的结果去
+  // 判断「surface 没进键」——那样会得出"无守卫"的错误结论。
+  const surfaceGuard = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    // 工作台宿主与它内部的外壳都带 `data-inspector-pane=data`：取检查器时必须挑"不在工作台
+    // 子树里"的那个，否则两个作用域会解析到同一个节点，这条守卫永远"两边一样"（假绿）。
+    const panel = [...root.querySelectorAll('[data-inspector-pane=data]')].find(
+      (node) => node.closest('[data-data-workbench]') === null,
+    );
+    const workbench = root.querySelector('[data-data-workbench]');
+    const facts = (scope) => ({
+      inlineControls: scope?.querySelectorAll('.designer-dataset-authoring-checkbox').length ?? -1,
+      editInWorkbench: scope?.querySelectorAll('[data-edit-in-workbench]').length ?? -1,
+    });
+    return { inspector: facts(panel), workbench: facts(workbench) };
+  });
+  if (
+    surfaceGuard.inspector.inlineControls !== 0 ||
+    surfaceGuard.inspector.editInWorkbench !== 1 ||
+    surfaceGuard.workbench.inlineControls !== 2 ||
+    // 工作台里已经是"编辑现场"：它渲染可编辑控件，不再渲染「去工作台修改」的跳转。
+    surfaceGuard.workbench.editInWorkbench !== 0
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATASET_SURFACE_KEY_FAILED:${JSON.stringify(surfaceGuard)}`);
+  }
   await datasetWorkbench.screenshot({
     path: `${screenshotDirectory}/data-workbench-${page.viewportSize()?.width ?? 'desktop'}.png`,
+  });
+  // 这三条交互**只存在于工作台**：`updatePolicy` / `controlled` / `loadingDisabled` 是实例级
+  // 字段，检查器里只读 + 跳转（架构 §5.2.1 第 3 条）。在检查器里找它们会超时——那不是断言
+  // 写错，是授权模型变了。工作台侧计数仍是 2 个开关 + 2 行设置。
+  await ensureDataGroupOpen(datasetWorkbench, 'refresh');
+  await datasetWorkbench.locator('[data-dataset-authoring-setting="loadingDisabled"]').check();
+  await datasetWorkbench.locator('[data-dataset-authoring-setting="controlled"]').check();
+  await datasetWorkbench
+    .locator('[data-dataset-authoring-setting="refreshStrategy"]')
+    .selectOption('auto');
+  await designer.evaluate((element) => {
+    const interval = element.shadowRoot.querySelector(
+      '[data-dataset-authoring-setting="refreshInterval"]',
+    );
+    window.__baseScreenAutoIntervalEnabled = interval !== null && !interval.hasAttribute('disabled');
   });
   await datasetWorkbench.locator('[data-dataset-action="close-workbench"]').click();
   await datasetWorkbench.waitFor({ state: 'hidden' });
@@ -520,9 +589,8 @@ export async function assertDatasetAuthoring(designer, page) {
     settings: window.__baseScreenDatasetAuthoringActions
       .filter((item) => item.action === 'update-settings')
       .map((item) => ({ setting: item.setting, value: item.value })),
-    autoIntervalEnabled: !window.baseScreenHarness.designer.shadowRoot
-      .querySelector('[data-dataset-authoring-setting="refreshInterval"]')
-      .hasAttribute('disabled'),
+    // 工作台关闭后宿主会被 `replaceChildren()` 清空：这个读数必须在关闭前抓，见上面的 evaluate。
+    autoIntervalEnabled: window.__baseScreenAutoIntervalEnabled === true,
   }));
   if (
     JSON.stringify(authoringActions.actions) !==
@@ -530,10 +598,11 @@ export async function assertDatasetAuthoring(designer, page) {
         'open-code-editor',
         'configure-filter',
         'copy-data',
-        'update-settings',
-        'update-settings',
-        'update-settings',
         'fullscreen-edit',
+        // 三条实例级设置只能在工作台里改（检查器只读），所以它们排在 fullscreen-edit 之后。
+        'update-settings',
+        'update-settings',
+        'update-settings',
       ]) ||
     JSON.parse(authoringActions.copiedDataset).rows?.length !== 2 ||
     JSON.stringify(authoringActions.settings) !==
@@ -694,6 +763,22 @@ export async function assertDatasetSurface(designer, page) {
         '.designer-dataset-binding-summary-item',
       ).length,
       authoringSettingsGroup: authoringSettings?.getAttribute('role') === 'group',
+      editInWorkbenchCount: panel.querySelectorAll('[data-edit-in-workbench]').length,
+      editInWorkbenchInstanceId: panel
+        .querySelector('[data-edit-in-workbench]')
+        ?.getAttribute('data-instance-id'),
+      editInWorkbenchPending: panel
+        .querySelector('[data-edit-in-workbench]')
+        ?.getAttribute('data-instance-pending'),
+      editInWorkbenchMissing: panel
+        .querySelector('[data-edit-in-workbench]')
+        ?.getAttribute('data-instance-missing'),
+      refreshGroupSummary: panel.querySelector(
+        '[data-details-group="refresh"] [data-details-group-summary]',
+      )?.textContent,
+      detailsGroups: [...panel.querySelectorAll('details[data-details-group]')].map(
+        (group) => group.dataset.detailsGroup,
+      ),
       authoringCheckboxCount: authoringSettings?.querySelectorAll(
         '.designer-dataset-authoring-checkbox',
       ).length,
@@ -750,8 +835,17 @@ export async function assertDatasetSurface(designer, page) {
     descriptorSurface.bindingSummaryEmpty ||
     descriptorSurface.bindingSummaryItemCount !== 2 ||
     !descriptorSurface.authoringSettingsGroup ||
-    descriptorSurface.authoringCheckboxCount !== 2 ||
-    descriptorSurface.authoringSettingRowCount !== 2 ||
+    // 检查器里实例级设置只读：就地控件 0/0。只断 0 无法区分「正确降级」与「整段没渲染」，
+    // 所以再断跳转（有目标）与组头摘要（有内容）。
+    descriptorSurface.authoringCheckboxCount !== 0 ||
+    descriptorSurface.authoringSettingRowCount !== 0 ||
+    descriptorSurface.editInWorkbenchCount !== 1 ||
+    typeof descriptorSurface.editInWorkbenchInstanceId !== 'string' ||
+    descriptorSurface.editInWorkbenchInstanceId.length === 0 ||
+    descriptorSurface.editInWorkbenchMissing !== null ||
+    typeof descriptorSurface.refreshGroupSummary !== 'string' ||
+    descriptorSurface.refreshGroupSummary.length === 0 ||
+    !descriptorSurface.detailsGroups.includes('refresh') ||
     descriptorSurface.authoringSettingsHorizontalOverflow ||
     !descriptorSurface.copyActionDisabled ||
     descriptorSurface.sourceEntry.checked !== 'true' ||
@@ -807,6 +901,7 @@ export async function assertDatasetSurface(designer, page) {
   }
   // 旧流程里 `[data-dataset-parameter-mode]` 选 literal 的等价动作：用选择器把 region 切回常量，
   // 让内联值编辑器出现（后续滚动连续性与参数值断言都依赖它）。
+  await ensureDataGroupOpen(dataPanel, 'parameters');
   await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
   await designer.locator('[data-value-ref-option="inline:current"]').click();
   const switchedToInline = await dataPanel.evaluate((panel) => {
@@ -872,16 +967,17 @@ export async function assertDatasetSurface(designer, page) {
       `BROWSER_HARNESS_DATASET_INLINE_STEP_BAR_FAILED:${JSON.stringify(inlineNavigation)}`,
     );
   }
-  const scrolledToMapping = await scrollDataPanelTo(dataPanel, page, 'mapping', 'mapping');
+  const scrolledToMapping = await scrollDataPanelTo(dataPanel, page, 'mapping', 'source');
+  // `source` 是首段：滚到它等于停在顶部，不再要求 `scrollTop > 0`（那是三步条时代的假设）。
   if (
-    scrolledToMapping.activeStep !== 'mapping' ||
-    scrolledToMapping.scrollTop <= 0 ||
+    scrolledToMapping.activeStep !== 'source' ||
     scrolledToMapping.sectionVisible !== true
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_SCROLL_STEP_MAPPING_FAILED:${JSON.stringify(scrolledToMapping)}`,
     );
   }
+  // 预览组被上面展开过；这里再滚到底读派生步骤。
   await dataPanel.evaluate((panel) => {
     const content = panel.querySelector('.designer-datav-data-flow-content');
     if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;

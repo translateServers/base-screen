@@ -44,6 +44,9 @@ export function datasetConfigurationOptions(
     includeActions: false,
     overlayHost: options.overlayHost,
     onSelectParameter: options.onSelectParameter,
+    instance: options.instance,
+    groupOpenOverrides: options.groupOpenOverrides,
+    onToggleGroup: options.onToggleGroup,
   };
 }
 

@@ -81,6 +81,13 @@ export class DesignerDatasetControllerState {
   syncedDataSource: ScreenDocument['components'][number]['dataSource'] | undefined;
   /** 展开绑定字段弹层的角色：面板每次重渲染都从这里恢复开合态。 */
   bindingOpenRoleId: string | null = null;
+  /**
+   * 折叠分组的手动开合覆盖：`<section>:<group>` → open。
+   *
+   * 只在**结构重绘**（切取值方式 / 换实例 / 提交）时清空，回到默认规则；
+   * 参数输入这类同结构重绘必须保留——否则用户手动展开的组会被一次打字弹回去。
+   */
+  groupOpenOverrides = new Map<string, boolean>();
   panel: HTMLElement | undefined;
   feedback: HTMLElement | undefined;
 
@@ -106,6 +113,7 @@ export class DesignerDatasetControllerState {
     this.focusedComponentId = null;
     this.syncedDataSource = undefined;
     this.bindingOpenRoleId = null;
+    this.groupOpenOverrides.clear();
   }
 }
 

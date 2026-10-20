@@ -250,6 +250,74 @@
   border-top: 1px solid var(--designer-border-default);
 }
 
+/*
+ * 折叠分组：6 个 DOM 组 / 5 个视觉组（「数据源 + 宿主连接」靠 border-top: 0 + 统一 padding 合组）。
+ * 组头 = 标题 + 摘要：收起时也要能判断"这一组是什么、是否正常"。
+ */
+.designer-data-group {
+  border-top: 1px solid var(--designer-border-default);
+}
+
+/* host-link 段紧跟 source 段：视觉合组只在这里做，不许改 DOM 结构。 */
+.designer-host-connection .designer-data-group {
+  border-top: 0;
+}
+
+.designer-data-group-summary {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: var(--designer-space-1) 0;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  cursor: pointer;
+}
+
+.designer-data-group-title {
+  flex: 0 0 auto;
+  color: var(--designer-text-primary);
+  font-weight: 600;
+}
+
+.designer-data-group-summary-text {
+  overflow: hidden;
+  flex: 1 1 auto;
+  color: var(--designer-text-muted);
+  text-align: end;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-data-group-content {
+  display: grid;
+  gap: var(--designer-space-3);
+  padding-bottom: var(--designer-space-3);
+}
+
+/* 检查器里的实例级只读事实：与可编辑控件刻意用不同类名（计数断言的作用域隔离）。 */
+.designer-dataset-instance-facts {
+  display: grid;
+  gap: var(--designer-space-2);
+}
+
+.designer-dataset-instance-fact {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-2);
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+}
+
+.designer-dataset-instance-fact-value {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .designer-dataset-parameter {
   gap: var(--designer-space-2);
   margin: 0;

@@ -4,7 +4,7 @@ import { DesignerDataFlowScrollSync } from '../../../../src/browser/controllers/
 afterEach(() => vi.useRealTimers());
 
 describe('DesignerDataFlowScrollSync', () => {
-  it('tracks the nearest section and the scroll boundaries', () => {
+  it('tracks the section container and the scroll boundaries', () => {
     const steps: string[] = [];
     const surface = createSurface();
     const sync = new DesignerDataFlowScrollSync((step) => steps.push(step));
@@ -12,12 +12,11 @@ describe('DesignerDataFlowScrollSync', () => {
     sync.bind(surface.panel);
     expect(steps).toEqual(['source']);
 
+    // 派生的锚点是**段容器**（`[data-ds-section]`），不是段内内容：折叠后内容 rect 全 0，
+    // 但容器顶边稳定。「字段映射」不再有独立段——它是 `source` 段内的组，所以这一步是 source。
     surface.content.scrollTop = 200;
-    surface.sections.source.top = -180;
-    surface.sections.mapping.top = 40;
-    surface.sections.preview.top = 520;
     surface.content.dispatchScroll();
-    expect(steps.at(-1)).toBe('mapping');
+    expect(steps.at(-1)).toBe('source');
 
     surface.content.scrollTop = 600;
     surface.content.dispatchScroll();
@@ -32,21 +31,19 @@ describe('DesignerDataFlowScrollSync', () => {
     const sync = new DesignerDataFlowScrollSync((step) => steps.push(step));
 
     sync.bind(initial.panel);
-    sync.beginProgrammaticScroll('mapping');
+    sync.beginProgrammaticScroll('source');
     replacement.content.scrollTop = 600;
     sync.bind(replacement.panel);
     expect(steps).toEqual(['source']);
 
+    // 程序化目标期间，实际位置派生出别的步骤会被压住（这里位置本身就是 source）。
     replacement.content.scrollTop = 200;
-    replacement.sections.source.top = -180;
-    replacement.sections.mapping.top = 40;
-    replacement.sections.preview.top = 520;
     replacement.content.dispatchScroll();
-    expect(steps.at(-1)).toBe('mapping');
+    expect(steps.at(-1)).toBe('source');
 
     replacement.content.scrollTop = 600;
     replacement.content.dispatchScroll();
-    expect(steps.at(-1)).toBe('mapping');
+    expect(steps.at(-1)).toBe('source');
 
     vi.advanceTimersByTime(700);
     expect(steps.at(-1)).toBe('preview');
@@ -56,11 +53,13 @@ describe('DesignerDataFlowScrollSync', () => {
 function createSurface(): {
   readonly panel: HTMLElement;
   readonly content: FakeContent;
-  readonly sections: Readonly<Record<'source' | 'mapping' | 'preview', FakeSection>>;
+  readonly sections: Readonly<Record<'value' | 'source' | 'host-link' | 'preview', FakeSection>>;
 } {
+  // 五个段 key 冻结；这里只造派生会用到的四个（authoring 在预览之后，不影响断言）。
   const sections = {
-    source: new FakeSection('source', 0),
-    mapping: new FakeSection('mapping', 260),
+    value: new FakeSection('value', 0),
+    source: new FakeSection('source', 260),
+    'host-link': new FakeSection('host-link', 400),
     preview: new FakeSection('preview', 720),
   };
   const content = new FakeContent(Object.values(sections));
@@ -106,15 +105,11 @@ class FakeContent {
 
 class FakeSection {
   readonly dataset: DOMStringMap;
+  /** 段容器顶边：折叠不会让它失真，所以派生只读它（不读内容 rect）。 */
+  readonly offsetTop: number;
 
-  constructor(
-    step: 'source' | 'mapping' | 'preview',
-    public top: number,
-  ) {
-    this.dataset = { workbenchSection: step };
-  }
-
-  getBoundingClientRect(): Pick<DOMRect, 'top'> {
-    return { top: this.top };
+  constructor(key: 'value' | 'source' | 'host-link' | 'preview', top: number) {
+    this.dataset = { dsSection: key };
+    this.offsetTop = top;
   }
 }

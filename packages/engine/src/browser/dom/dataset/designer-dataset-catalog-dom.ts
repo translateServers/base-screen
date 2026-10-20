@@ -2,6 +2,7 @@ import type { ScreenDatasetEntry } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { createDesignerInput, createDesignerSelect } from '../designer-ui-primitives.js';
+import { createDataGroup } from './designer-data-group-dom.js';
 import type {
   DesignerDataSourcePanelOptions,
   DesignerHostLinkChannel,
@@ -21,8 +22,6 @@ export function renderHostConnection(options: DesignerDataSourcePanelOptions): H
     DESIGNER_UI_TEXT.dataSource.dataQuery,
     DESIGNER_UI_TEXT.dataSource.variablesChannel,
   ].join(' ');
-  const heading = ownerDocument.createElement('h4');
-  heading.textContent = DESIGNER_UI_TEXT.dataSource.hostConnection;
   const statuses = ownerDocument.createElement('div');
   statuses.className = 'designer-host-connection-statuses';
   statuses.append(
@@ -38,7 +37,24 @@ export function renderHostConnection(options: DesignerDataSourcePanelOptions): H
       options.link.variables,
     ),
   );
-  connection.append(heading, statuses);
+  // 段根保留 `data-ds-section="host-link"`，折叠组是段内一层：本段是 `source` 段的**兄弟**，
+  // 视觉合组只允许 CSS（`border-top: 0`）。把 details 挪进 source 段会让两块内容落进同一个
+  // 替换单元，段边界就没了。
+  connection.appendChild(
+    createDataGroup(
+      {
+        ownerDocument,
+        section: 'host-link',
+        group: 'host-link',
+        title: DESIGNER_UI_TEXT.data.groups.hostLink,
+        summary: linkSummary(options),
+        defaultOpen: hasUnavailableLink(options.link) || hasFailedLink(options.link),
+        overrides: options.groupOpenOverrides,
+        onToggle: options.onToggleGroup,
+      },
+      [statuses],
+    ),
+  );
   // 三条通道都没接上时给出接入方式，而不是只留三个灰点让人猜。
   if (hasUnavailableLink(options.link)) {
     const hint = ownerDocument.createElement('p');
@@ -55,6 +71,13 @@ export function renderHostConnection(options: DesignerDataSourcePanelOptions): H
     connection.appendChild(retry);
   }
   return connection;
+}
+
+/** 组头摘要：已接入通道计数（`total` 恒为 3）——收起时也能看出接上了几条。 */
+function linkSummary(options: DesignerDataSourcePanelOptions): string {
+  const channels = [options.link.catalog, options.link.query, options.link.variables];
+  const ready = channels.filter((channel) => channel.status === 'ready').length;
+  return DESIGNER_UI_TEXT.data.groups.channelsReady(ready, channels.length);
 }
 
 function hasUnavailableLink(link: DesignerHostLinkView): boolean {

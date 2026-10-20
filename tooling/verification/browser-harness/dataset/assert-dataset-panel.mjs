@@ -364,6 +364,11 @@ export async function assertDatasetPanelInteraction(designer, page) {
   // 后续断言期望的是「常量」内联编辑器，这里用取值选择器显式还原（旧的模式下拉已删除）。
   // `selectOption` 是同步的，浮层列表是打开后才渲染出来的——必须等列表项出现再点，
   // 否则会在还没渲染的列表上点空气。
+  // 参数组默认收起（夹具参数都不是必填）：先点组头展开（真实用户路径），再操作。
+  const parametersGroup = dataPanel.locator('details[data-details-group="parameters"]').first();
+  if ((await parametersGroup.count()) > 0 && (await parametersGroup.getAttribute('open')) === null) {
+    await parametersGroup.locator('summary').first().click();
+  }
   await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
   await designer.locator('[data-value-ref-option^="inline:"]').first().waitFor();
   await designer.locator('[data-value-ref-option^="inline:"]').first().click();

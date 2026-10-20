@@ -1,10 +1,27 @@
 import type { DesignerDatasetWorkbenchStep } from '../../dom/dataset/designer-dataset-types.js';
 
-const TRACKED_SECTION_SELECTOR = [
-  '[data-workbench-section="source"]',
-  '[data-workbench-section="mapping"]',
-  '[data-workbench-section="preview"]',
-].join(', ');
+/**
+ * 派生锚点用**段容器**（`[data-ds-section]`），不是段内内容。
+ *
+ * 折叠分组之后，段内内容在收起时 rect 全 0，且内容总高变短会让「滚到底」提前发生——
+ * 按内容矩形派生会把 activeStep 判错（症状：滚到「字段映射」却报 preview）。
+ * 段容器本身永远有高度（组头摘要就是它的可见部分），`offsetTop` 在收起时也稳定。
+ */
+const TRACKED_SECTION_SELECTOR = '[data-ds-section]';
+
+/**
+ * 段 → 导航步骤的**唯一映射表**。
+ *
+ * 只此一处：判据（本文件）与实现（段构造）都不许各自再推一遍——「两处独立推导」正是
+ * 今天踩过的同类风险（改一处、另一处静默错）。
+ */
+const SECTION_STEP = {
+  value: 'source',
+  source: 'source',
+  'host-link': 'source',
+  preview: 'preview',
+  authoring: 'preview',
+} as const satisfies Readonly<Record<string, DesignerDatasetWorkbenchStep>>;
 
 /**
  * 把滚动位置映射成"当前在看哪一段"。
@@ -66,28 +83,20 @@ export class DesignerDataFlowScrollSync {
     if (content === undefined) return;
     const sections = [...content.querySelectorAll<HTMLElement>(TRACKED_SECTION_SELECTOR)];
     if (sections.length === 0) return;
-    if (content.scrollTop <= 10) {
-      this.emitStep('source');
-      return;
-    }
-    if (content.scrollTop + content.clientHeight >= content.scrollHeight - 10) {
-      const lastStep = trackedStep(sections[sections.length - 1]);
-      if (lastStep !== undefined) this.emitStep(lastStep);
-      return;
-    }
-    const contentBox = content.getBoundingClientRect();
-    const activationLine = contentBox.top + Math.min(contentBox.height * 0.25, 80);
-    let bestSection: HTMLElement | undefined;
-    let minDistance = Number.POSITIVE_INFINITY;
+    // 两条规则，都只看段容器的 `offsetTop`：
+    // 1) 滚到底：取最后一个「顶边进入视口」的段（用户此刻看到的是尾部几个组）；
+    // 2) 否则：取最后一个「顶边已越过激活线」的段。
+    const atBottom = content.scrollTop + content.clientHeight >= content.scrollHeight - 10;
+    const line = atBottom
+      ? content.scrollTop + content.clientHeight
+      : content.scrollTop + Math.min(content.clientHeight * 0.25, 80);
+    let step: DesignerDatasetWorkbenchStep = 'source';
     for (const section of sections) {
-      const distance = Math.abs(section.getBoundingClientRect().top - activationLine);
-      if (distance < minDistance) {
-        minDistance = distance;
-        bestSection = section;
-      }
+      if (section.offsetTop > line) break;
+      const mapped = SECTION_STEP[section.dataset.dsSection as keyof typeof SECTION_STEP];
+      if (mapped !== undefined) step = mapped;
     }
-    const step = trackedStep(bestSection);
-    if (step !== undefined) this.emitStep(step);
+    this.emitStep(step);
   }
 
   private emitStep(step: DesignerDatasetWorkbenchStep): void {
@@ -104,9 +113,4 @@ export class DesignerDataFlowScrollSync {
     this.#scrollHandler = undefined;
     this.#content = undefined;
   }
-}
-
-function trackedStep(element: HTMLElement | undefined): DesignerDatasetWorkbenchStep | undefined {
-  const step = element?.dataset.workbenchSection;
-  return step === 'source' || step === 'mapping' || step === 'preview' ? step : undefined;
 }

@@ -1,4 +1,5 @@
 import type {
+  ScreenDataSourceSourceKind,
   ScreenDatasetDefinition,
   ScreenDatasetEntry,
   ScreenHostResourceDataSource,
@@ -18,6 +19,29 @@ export type DesignerDataSourceMode = 'none' | 'static' | 'variable' | 'dataset' 
  * 渲染结果不同 ⇒ `authoring` 段的内容键必须计入 surface（架构 §5.2.5）。
  */
 export type DesignerDataSurface = 'inspector' | 'workbench';
+
+/** 实例视图三态：文档里确有 / 草稿待应用 / 悬空引用。 */
+export type DesignerDataSourceInstanceStatus = 'document' | 'pending' | 'missing';
+
+/**
+ * 组件引用实例的**只读视图**（实例级字段只读的唯一判据来源）。
+ *
+ * 三态必须分开：`pending`（草稿实例）与 `missing`（悬空）都有 id，但前者"马上就会存在"、
+ * 后者"再也没有了"。把 pending 标成 missing 会把用户正在配置的东西说成坏了；
+ * 把 pending 当成已存在则会让 `data-instance-id` 等值校验给出假绿。
+ */
+export interface DesignerDataSourceInstanceView {
+  readonly id: string;
+  readonly name: string;
+  /** `ScreenDataSourceSource.kind` 原值透传，不做「能取到什么数据」的推断。 */
+  readonly sourceKind: ScreenDataSourceSourceKind | undefined;
+  /** 派生实例没有实例级策略时为 undefined（摘要走「手动」兜底）。 */
+  readonly updatePolicy:
+    | { readonly mode: 'once' | 'manual' | 'auto'; readonly intervalSeconds?: number }
+    | undefined;
+  readonly processorId: string | undefined;
+  readonly status: DesignerDataSourceInstanceStatus;
+}
 
 /**
  * 数据集配置草稿。
@@ -95,6 +119,14 @@ export interface DesignerDataSourcePanelOptions {
   readonly scrollScope: string;
   readonly mode: DesignerDataSourceMode;
   readonly availableModes: readonly DesignerDataSourceMode[];
+  /** 组件当前取值引用（B1a 只读文档；B1b 换成 effective value）。 */
+  readonly dataValue: ScreenValueRef | null;
+  /** `data-source-field` 时的实例只读视图（含 pending / missing）。 */
+  readonly instance: DesignerDataSourceInstanceView | undefined;
+  /** 折叠组开合覆盖表；段重建时由 `createDataGroup` 唯一重放。 */
+  readonly groupOpenOverrides: ReadonlyMap<string, boolean>;
+  /** 用户手动开合折叠组（写覆盖表，不重绘）。 */
+  readonly onToggleGroup?: ((section: string, group: string, open: boolean) => void) | undefined;
   /** 七态派生结果：面板头部徽标与根节点 `data-state` 共用这一份，不再各自推导。 */
   readonly dataState: DesignerDataStateView;
   readonly hostResource?: Pick<ScreenHostResourceDataSource, 'resourceType' | 'resourceId'>;
@@ -155,4 +187,9 @@ export interface DesignerDatasetConfigurationOptions {
   readonly includeActions?: boolean;
   readonly overlayHost?: HTMLElement | undefined;
   readonly onSelectParameter?: ((name: string, ref: ScreenValueRef) => void) | undefined;
+  /** 引用实例的只读视图（组头摘要取实例名）；未引用实例时为 undefined。 */
+  readonly instance?: DesignerDataSourceInstanceView | undefined;
+  /** 折叠组开合覆盖表（组构造时唯一重放）。 */
+  readonly groupOpenOverrides?: ReadonlyMap<string, boolean> | undefined;
+  readonly onToggleGroup?: ((section: string, group: string, open: boolean) => void) | undefined;
 }

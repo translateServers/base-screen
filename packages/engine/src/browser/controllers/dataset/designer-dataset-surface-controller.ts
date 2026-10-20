@@ -1,4 +1,5 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
+import { readScreenComponentValueRef } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { syncDataPanelNotice } from '../../dom/dataset/designer-data-panel-notice.js';
 import {
@@ -31,6 +32,7 @@ import {
   type DesignerDatasetControllerState,
   emptyDatasetPreview,
 } from './designer-dataset-controller-context.js';
+import { readDesignerDataSourceInstanceView } from './designer-dataset-instance-view.js';
 
 export function renderDatasetSurface(context: DesignerDatasetControllerContext): void {
   const preserve = context.callbacks.preserveScrollContinuity;
@@ -260,9 +262,17 @@ function createDatasetPanelOptions(
   surface: DesignerDataSurface,
 ): DesignerDataSourcePanelOptions {
   const source = context.currentComponent()?.dataSource;
+  const component = context.currentComponent();
+  const dataValue = component === undefined ? null : readScreenComponentValueRef(component);
   return {
     panel,
     surface,
+    dataValue,
+    instance: readDesignerDataSourceInstanceView(context.callbacks.getDocument(), dataValue),
+    groupOpenOverrides: context.state.groupOpenOverrides,
+    onToggleGroup: (section, group, open) => {
+      context.state.groupOpenOverrides.set(`${section}:${group}`, open);
+    },
     scrollScope: JSON.stringify([
       context.state.focusedComponentId,
       context.state.mode,

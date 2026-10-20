@@ -1,4 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDataGroup } from './designer-data-group-dom.js';
 import type { DesignerDataSourcePanelOptions } from './designer-dataset-types.js';
 
 export function renderDatasetPreview(
@@ -75,8 +76,38 @@ export function renderDatasetPreview(
           ),
     );
   }
-  preview.append(header, tabs, content);
+  // `preview` 段**恒存在**（引用实例时），内容折叠：段的可见性由取值形态决定，不由
+  // 「用户是否展开过」决定——后者会让一次折叠变成段的增删，焦点与节点身份全丢。
+  preview.appendChild(
+    createDataGroup(
+      {
+        ownerDocument,
+        section: 'preview',
+        group: 'preview',
+        title: DESIGNER_UI_TEXT.data.groups.preview,
+        summary: previewGroupSummary(options),
+        defaultOpen: false,
+        overrides: options.groupOpenOverrides,
+        onToggle: options.onToggleGroup,
+      },
+      [header, tabs, content],
+    ),
+  );
   return preview;
+}
+
+/** 组头摘要：结果条数 / 失败 / 未请求（只取预览视图的既有值）。 */
+function previewGroupSummary(options: DesignerDataSourcePanelOptions): string {
+  if (options.preview.status === 'error') return DESIGNER_UI_TEXT.data.groups.previewFailed;
+  if (options.preview.status !== 'ready') return DESIGNER_UI_TEXT.data.groups.previewIdle;
+  const value = options.preview.rawValue;
+  const rows =
+    value !== null && typeof value === 'object' && !Array.isArray(value)
+      ? (value as { readonly rows?: unknown }).rows
+      : undefined;
+  return Array.isArray(rows)
+    ? DESIGNER_UI_TEXT.data.groups.previewRows(rows.length)
+    : DESIGNER_UI_TEXT.data.groups.previewIdle;
 }
 
 function previewStatusText(options: DesignerDataSourcePanelOptions): string {

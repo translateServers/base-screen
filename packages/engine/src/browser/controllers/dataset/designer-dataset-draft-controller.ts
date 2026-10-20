@@ -34,6 +34,8 @@ export function setSourceMode(
 ): void {
   if (!availableModes(context).includes(mode)) return;
   context.state.mode = mode;
+  // 切取值方式属于**结构重绘**：折叠组回到默认规则（手动展开不该跨结构存活）。
+  context.state.groupOpenOverrides.clear();
   context.state.activeStep = 'source';
   context.state.workbenchOpen = false;
   context.state.feedbackText = '';

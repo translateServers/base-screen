@@ -69,6 +69,32 @@ export const DESIGNER_UI_TEXT = {
         denied: '宿主拒绝访问数据接口。',
       },
     },
+    // 折叠分组：6 个 DOM 组 / 5 个视觉组（架构 §5.2.4 B-3）。组头摘要只取文档/宿主回包的既有值。
+    groups: {
+      source: '数据源',
+      hostLink: '宿主连接',
+      mapping: '字段映射',
+      parameters: '请求参数',
+      preview: '结果预览',
+      refresh: '更新策略',
+      sourceEmpty: '未选择数据源',
+      mappingEmpty: '未映射字段',
+      previewIdle: '未请求',
+      previewFailed: '请求失败',
+      /** 派生实例没有实例级策略：按「手动」展示是诚实表达（没有自动刷新）。 */
+      refreshManual: '手动',
+      refreshOnce: '只请求一次',
+      refreshEvery: (seconds: number) => `每 ${seconds} 秒`,
+      /** 实例级字段只读：检查器里唯一的编辑入口是工作台。 */
+      editInWorkbench: '在工作台修改',
+      /** 草稿实例还没落库：跳转不可用（不是"引用已失效"）。 */
+      pendingApply: '应用后可修改',
+      parametersCount: (count: number) => `${count} 个参数`,
+      previewRows: (count: number) => `${count} 条`,
+      channelsReady: (ready: number, total: number) => `${ready} / ${total} 已接入`,
+      instanceMissing: '引用已失效',
+      instanceMissingHint: '该数据源已不存在，请重新选择或在工作台修复。',
+    },
     // 取值引用选择器：文案整包传给 picker（`text: DESIGNER_UI_TEXT.data.ref`），
     // 禁止调用点挑键拼对象——否则新增键时某些调用点会静默沿用旧键集合。
     ref: {
