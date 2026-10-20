@@ -668,9 +668,12 @@ export async function assertDatasetSurface(designer, page) {
       parameterPickerCount: panel.querySelectorAll('[data-value-ref-trigger^="parameter:"]').length,
       parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
       legacyParameterModeCount: panel.querySelectorAll('[data-dataset-parameter-mode]').length,
+      // 统计范围必须覆盖**新控件那一支**：参数行现在是「取值触发器 + （常量时）内联编辑器」，
+      // 只留旧选择器会让新控件完全落在统计之外——那样这条断言会「改完更绿」，
+      // 新触发器忘了 aria-label 也没人发现。
       unlabelledParameterControls: [
         ...panel.querySelectorAll(
-          '[data-dataset-parameter], [data-value-ref-trigger], [data-dataset-parameter-mode]',
+          '[data-value-ref-trigger^="parameter:"], [data-dataset-parameter]',
         ),
       ].filter((control) => control.getAttribute('aria-label') === null).length,
       bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,

@@ -128,6 +128,12 @@ function assertEmptyStateJudge() {
     ['none-selected', { ...goodEmptyState(), text: '当前组件不使用数据。' }, ['none-selected']],
     ['details-group', { ...goodEmptyState(), detailsGroups: 2 }, ['details-group']],
   ];
+  // case 数量漂移守卫：删掉一个 case 时自检**不会失败**（剩余 case 仍然全过），
+  // 唯一的变化是返回数字变小，而这只有人盯着输出才能发现。把数字钉死在这里：
+  // 删 case、加 case 忘了同步数字，都会当场炸，且错误码说明"问题在判据集合，不在判据本身"。
+  if (cases.length !== 10) {
+    throw new Error(`BROWSER_HARNESS_EMPTY_STATE_JUDGE_CASE_COUNT_DRIFT:${cases.length}`);
+  }
   for (const [name, fixture, expected] of cases) {
     const actual = emptyStateViolations(fixture);
     if (JSON.stringify(actual) !== JSON.stringify(expected)) {

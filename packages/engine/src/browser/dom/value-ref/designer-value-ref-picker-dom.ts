@@ -302,10 +302,14 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
   }
 
   function choose(option: DesignerValueRefOption): void {
-    options.onSelect(option.value);
     const summary = summarize(option);
-    live.textContent = text.selected(summary);
+    // 顺序是硬要求：**先关闭并交还焦点，再通知调用点**。
+    // 触发器住在会被重建的段里，调用点一收到选择就会重建那个段（草稿变了），
+    // 反过来的话 `close(true)` 里的 `trigger.focus()` 会落在一个已经脱离文档的旧按钮上，
+    // 焦点随之掉给 body，而节点身份、内容断言全都照旧通过——只有键盘用户能感觉到。
     close(true);
+    live.textContent = text.selected(summary);
+    options.onSelect(option.value);
   }
 
   function summarize(option: DesignerValueRefOption): string {

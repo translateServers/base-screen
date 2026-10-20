@@ -205,7 +205,7 @@ function renderParameters(
     section.appendChild(empty);
   }
   for (const parameter of options.descriptor.parameters) {
-    const current = currentParameterRef(options.draft, parameter);
+    const current = currentParameterRef(options.draft, parameter.name);
     const label = ownerDocument.createElement('label');
     label.className = 'designer-field designer-dataset-parameter';
     const labelText = ownerDocument.createElement('span');
@@ -224,7 +224,7 @@ function renderParameters(
     });
     registerSectionDisposer(section, picker.dispose);
     controls.appendChild(picker.element);
-    if (current.kind === 'inline') {
+    if (current !== null && current.kind === 'inline') {
       controls.appendChild(
         parameterControl(ownerDocument, options.descriptor, parameter.name, current),
       );
@@ -236,16 +236,21 @@ function renderParameters(
 }
 
 /**
- * 参数当前生效的取值引用。
+ * 参数当前生效的取值引用；`null` = 这个参数还没有任何取值。
  *
- * 草稿里没有这个参数时（刚选中数据集、参数还没被写过）按「常量 + 定义默认值」呈现：
- * 内联编辑器必须有值可编辑，而空着会让用户以为参数缺失。
+ * 什么时候会是 `null`：参数既没有旧文档值、也没有 `defaultValue`（`createDesignerDatasetDraft`
+ * 只给有默认值的参数建条目）。这时**不能**替用户编一个内联值：
+ * - 触发器显示「选择取值」（picker 的空态文案），提示这里还没选；
+ * - 内联编辑器不渲染（没有值可编辑）；
+ * - 必填参数会被事务的必填校验拦下并报 `HOST_DATASET_PARAMETER_INVALID`，所以「应用」按不动。
+ *
+ * 这是既有行为，不是缺陷：把空值悄悄补成默认值/空串，会让「必填参数没填」这件事从界面上消失。
  */
 function currentParameterRef(
   draft: DesignerDatasetDraftView | undefined,
-  parameter: ScreenDatasetDefinition['parameters'][number],
-): ScreenValueRef {
-  return draft?.params[parameter.name] ?? { kind: 'inline', value: parameter.defaultValue ?? null };
+  name: string,
+): ScreenValueRef | null {
+  return draft?.params[name] ?? null;
 }
 
 function renderBindings(
