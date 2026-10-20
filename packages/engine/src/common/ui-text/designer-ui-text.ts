@@ -897,7 +897,7 @@ export const DESIGNER_UI_TEXT = {
     bindingSelectAll: '全选',
     bindingSelectMaximum: '选至上限',
     bindingClear: '清空',
-    bindingSummaryTitle: '绑定摘要',
+    bindingSummaryTitle: '输出字段',
     bindingNone: '未绑定',
     bindingPlaceholder: '选择要绑定的字段',
     bindingAtLimit: '已达绑定上限，取消一个后可继续选择',

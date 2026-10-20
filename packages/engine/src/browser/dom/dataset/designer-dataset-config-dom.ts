@@ -57,12 +57,42 @@ function withoutSectionHeading(section: HTMLElement): HTMLElement {
 }
 
 /** 字段映射组头摘要：已映射字段总数。 */
+/**
+ * 「输出字段」的**唯一**文案来源：`维度 分类 · 指标 金额`。组头与组内那一行都读它。
+ * 两处各自拼字符串就会出现旧问题：组头只有裸数字（与组名「字段映射」重复），
+ * 组内又列一遍同样的角色与字段名。一个函数同时解决这两件事。
+ */
 function mappingSummary(options: DesignerDatasetConfigurationOptions): string {
-  const count = options.roles.reduce(
-    (total, role) => total + (options.draft?.fields[role.id]?.length ?? 0),
-    0,
-  );
-  return count === 0 ? DESIGNER_UI_TEXT.data.groups.mappingEmpty : String(count);
+  const parts = options.roles.flatMap((role) => {
+    const selected = options.draft?.fields[role.id] ?? [];
+    if (selected.length === 0) return [];
+    const labels = selected.map(
+      (id) => options.descriptor.fields.find((field) => field.id === id)?.label ?? id,
+    );
+    return [`${DESIGNER_UI_TEXT.dataset.bindingRole(role.id)} ${labels.join('\u3001')}`];
+  });
+  return parts.length === 0 ? DESIGNER_UI_TEXT.data.groups.mappingEmpty : parts.join(' \u00b7 ');
+}
+
+/**
+ * 映射组内的「输出字段」一行：把原先嵌在「当前数据集」卡片里的绑定摘要降到这里。
+ * `data-dataset-output-fields` 是断言锚点——搬家后至少要有断言确认这行真的渲染了。
+ */
+function outputFieldLine(
+  ownerDocument: Document,
+  options: DesignerDatasetConfigurationOptions,
+): HTMLElement {
+  const line = ownerDocument.createElement('p');
+  line.className = 'designer-dataset-output-fields';
+  line.dataset.datasetOutputFields = 'true';
+  const label = ownerDocument.createElement('span');
+  label.className = 'designer-dataset-output-fields-label';
+  label.textContent = DESIGNER_UI_TEXT.dataset.bindingSummaryTitle;
+  const value = ownerDocument.createElement('span');
+  value.className = 'designer-dataset-output-fields-value';
+  value.textContent = mappingSummary(options);
+  line.append(label, value);
+  return line;
 }
 
 /** 有必填参数未填时展开参数组：让"还差什么"在收起态就可见并可直接进入。 */
@@ -108,7 +138,10 @@ export function renderDesignerDatasetConfiguration(
         overrides,
         onToggle: options.onToggleGroup,
       },
-      [withoutSectionHeading(renderBindings(ownerDocument, options))],
+      [
+        outputFieldLine(ownerDocument, options),
+        withoutSectionHeading(renderBindings(ownerDocument, options)),
+      ],
     ),
     createDataGroup(
       {
