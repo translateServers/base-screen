@@ -7,6 +7,141 @@
 
 const DATA_PANEL = '[data-inspector-pane=data]';
 
+/** 空态三行标题的全称（图文案逐字核对，容不得 includes 式的模糊匹配）。 */
+const EMPTY_STATE_TITLES = [
+  ['static', '输入固定值'],
+  ['variable', '用变量'],
+  ['source', '接数据源'],
+];
+
+/**
+ * 空态判据（**纯函数**）：入参是一次 DOM 探针快照，出参是违例码列表。
+ *
+ * 判据与探针分离，是为了让"断言真的会咬"这件事可以被 fixture 验证：
+ * 负向测试只需要构造一份坏快照，**不用改产品源码**——此前为了做负向测试去
+ * 临时改源码再 `git checkout --` 还原，把同事未提交的改动一起回退了。
+ */
+function emptyStateViolations(state) {
+  const violations = [];
+  // 1) 三行标题逐字等于全称（=== 语义，不是 includes）
+  if (
+    JSON.stringify(state.rows.map((row) => [row.entry, row.title])) !==
+    JSON.stringify(EMPTY_STATE_TITLES)
+  ) {
+    violations.push('title');
+  }
+  for (const row of state.rows) {
+    // 2) 禁用行：原因存在且右侧不画 chevron；可用行反过来。
+    if (row.disabled) {
+      if (row.reasonText === null || row.chevron !== false) {
+        violations.push(`disabled-row:${row.entry}`);
+      }
+    } else if (row.reasonText !== null || row.chevron !== true) {
+      violations.push(`enabled-row:${row.entry}`);
+    }
+    // 3) 描述没有被裁切
+    if (row.descriptionClipped !== false) violations.push(`description-clipped:${row.entry}`);
+  }
+  // 2') 几何：原因 rect.top 必须 >= 描述 rect.bottom（证明独立成行，不是同行右浮）
+  const variableRow = state.rows.find((row) => row.entry === 'variable');
+  if (variableRow !== undefined) {
+    if (variableRow.reasonRectTop === null || variableRow.descriptionRectBottom === null) {
+      violations.push('reason-metrics');
+    } else if (variableRow.reasonRectTop < variableRow.descriptionRectBottom) {
+      violations.push('reason-inline');
+    }
+  }
+  // 4) 空态没有 apply，也没有 `noneSelected` 那句「当前组件不使用数据。」
+  if (state.applyCount !== 0) violations.push('apply-count');
+  if (state.text.includes('当前组件不使用数据')) violations.push('none-selected');
+  // 5) 空态不是折叠分组结构
+  if (state.detailsGroups !== 0) violations.push('details-group');
+  return violations;
+}
+
+/** 一份"应该通过"的空态快照：其余 fixture 由它派生，保证每次只坏一处。 */
+function goodEmptyState() {
+  return {
+    rows: [
+      {
+        entry: 'static',
+        disabled: false,
+        title: '输入固定值',
+        descriptionClipped: false,
+        descriptionRectBottom: 100,
+        reasonText: null,
+        reasonRectTop: null,
+        chevron: true,
+      },
+      {
+        entry: 'variable',
+        disabled: true,
+        title: '用变量',
+        descriptionClipped: false,
+        descriptionRectBottom: 100,
+        reasonText: '当前组件不支持变量。',
+        reasonRectTop: 104,
+        chevron: false,
+      },
+      {
+        entry: 'source',
+        disabled: false,
+        title: '接数据源',
+        descriptionClipped: false,
+        descriptionRectBottom: 100,
+        reasonText: null,
+        reasonRectTop: null,
+        chevron: true,
+      },
+    ],
+    applyCount: 0,
+    detailsGroups: 0,
+    text: '选择数据来源 选择后在此面板配置数据。',
+  };
+}
+
+/**
+ * 判据自检：每次 harness 运行都跑一遍。
+ *
+ * 每个 fixture 只坏一处，且期望的违例码必须**完全相等**——这样任何一条判据退化成
+ * "永远为真"（空壳断言）都会在自检里立刻暴露，而不是等到线上漏改。
+ */
+function assertEmptyStateJudge() {
+  const withRow = (entry, patch) => {
+    const fixture = goodEmptyState();
+    fixture.rows = fixture.rows.map((row) => (row.entry === entry ? { ...row, ...patch } : row));
+    return fixture;
+  };
+  const cases = [
+    ['ok', goodEmptyState(), []],
+    ['short-title', withRow('variable', { title: '变量' }), ['title']],
+    ['reason-inline', withRow('variable', { reasonRectTop: 96 }), ['reason-inline']],
+    ['reason-missing-metrics', withRow('variable', { reasonRectTop: null }), ['reason-metrics']],
+    [
+      'description-clipped',
+      withRow('static', { descriptionClipped: true }),
+      ['description-clipped:static'],
+    ],
+    ['disabled-row-chevron', withRow('variable', { chevron: true }), ['disabled-row:variable']],
+    ['enabled-row-reason', withRow('static', { reasonText: '不该有原因' }), ['enabled-row:static']],
+    ['apply-present', { ...goodEmptyState(), applyCount: 1 }, ['apply-count']],
+    ['none-selected', { ...goodEmptyState(), text: '当前组件不使用数据。' }, ['none-selected']],
+    ['details-group', { ...goodEmptyState(), detailsGroups: 2 }, ['details-group']],
+  ];
+  for (const [name, fixture, expected] of cases) {
+    const actual = emptyStateViolations(fixture);
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error(
+        `BROWSER_HARNESS_DATASET_EMPTY_STATE_JUDGE_SELFTEST_FAILED:${name}:${JSON.stringify({
+          expected,
+          actual,
+        })}`,
+      );
+    }
+  }
+  return cases.length;
+}
+
 async function openDataset(designer, page) {
   const dataPanel = designer.locator(DATA_PANEL);
   // 取值方式是三入口卡片：`接数据源` 卡片等价于原来的「选 dataset」下拉项；
@@ -24,6 +159,10 @@ async function openDataset(designer, page) {
 }
 
 export async function assertDatasetPanelInteraction(designer, page) {
+  // 判据自检先于任何浏览器操作：它证明"空态五条"在坏输入下会逐条报错，
+  // 而不是在真实 DOM 上碰巧通过。失败码带 case 名，定位到具体判据。
+  const judgeCases = assertEmptyStateJudge();
+  console.log('EMPTY_STATE_JUDGE_SELFTEST_OK', judgeCases);
   await designer.locator('[data-tool="select"]').click();
   await designer
     .locator('[data-base-screen-component-id=dataset-ranking-demo]')
@@ -262,36 +401,14 @@ export async function assertDatasetPanelInteraction(designer, page) {
       text: panel.textContent ?? '',
     };
   });
-  const variableRow = emptyState.rows.find((row) => row.entry === 'variable');
-  if (
-    // 1) 三行标题逐字等于全称（=== 语义，不是 includes）
-    JSON.stringify(emptyState.rows.map((row) => [row.entry, row.title])) !==
-      JSON.stringify([
-        ['static', '输入固定值'],
-        ['variable', '用变量'],
-        ['source', '接数据源'],
-      ]) ||
-    // 2) 禁用行：原因存在、独占一行（原因 rect.top >= 描述 rect.bottom）、右侧不画 chevron；
-    //    可用行反过来：没有原因、有 chevron。
-    emptyState.rows.some((row) =>
-      row.disabled
-        ? row.reasonText === null || row.chevron !== false
-        : row.reasonText !== null || row.chevron !== true,
-    ) ||
-    variableRow?.reasonRectTop === null ||
-    variableRow?.reasonRectTop === undefined ||
-    variableRow.descriptionRectBottom === null ||
-    variableRow.descriptionRectBottom === undefined ||
-    variableRow.reasonRectTop < variableRow.descriptionRectBottom ||
-    // 3) 描述没有被裁切
-    emptyState.rows.some((row) => row.descriptionClipped !== false) ||
-    // 4) 空态没有 apply，也没有 `noneSelected` 那句「当前组件不使用数据。」
-    emptyState.applyCount !== 0 ||
-    emptyState.text.includes('当前组件不使用数据') ||
-    // 5) 空态不是折叠分组结构
-    emptyState.detailsGroups !== 0
-  ) {
-    throw new Error(`BROWSER_HARNESS_DATASET_EMPTY_STATE_FAILED:${JSON.stringify(emptyState)}`);
+  const emptyStateViolationsFound = emptyStateViolations(emptyState);
+  if (emptyStateViolationsFound.length > 0) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_EMPTY_STATE_FAILED:${JSON.stringify({
+        violations: emptyStateViolationsFound,
+        emptyState,
+      })}`,
+    );
   }
   // 还原数据源：空态断言不能把文档留给后续用例。
   // 注意 locator.evaluate 的第一个参数是**元素**本身，备份值必须从第二个参数进来。
