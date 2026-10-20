@@ -713,39 +713,18 @@ export async function assertDatasetAuthoring(designer, page) {
   await designer.locator('[data-inspector-pane=interaction]').screenshot({
     path: `${screenshotDirectory}/interaction-summary-${page.viewportSize()?.width ?? 'desktop'}.png`,
   });
-  // 确定性选中：先切图层面板再点行。**不用画布坐标点**——坐标会点到遮挡在上层的组件
-  // （实测：点了 title 的坐标，面板却停在别的组件上，断言于是在相邻状态上采数）。
-  await designer.locator('[data-panel-tab="layers"]').click();
-  await designer.locator('[data-layer-select="title"] .layer-name').click();
-  // **到位凭据**：先等面板真的停在这个固定值组件上。用 `attached` 而非 `visible`：
-  // 面板可能已滚走，凭据要的是"它被选中"这个事实，不是"此刻在视口里"。
-  await dataPanel
-    .locator('[data-data-entry="inline"][aria-checked="true"]')
-    .waitFor({ state: 'attached' });
-  // 条件渲染的**假一侧**：`title` 是 inline（固定值）组件，没有引用任何实例 —— 所以
-  // 「去工作台修改」的跳转与 `refresh` 组都必须为 0。只测真一侧（data-source-field 组件）
-  // 等于把条件删掉也照样绿：注入「无条件渲染跳转」不会触发任何断言。
-  const inlineSide = await designer.evaluate((element) => {
-    const panel = [...element.shadowRoot.querySelectorAll('[data-inspector-pane=data]')].find(
-      (node) => node.closest('[data-data-workbench]') === null,
-    );
-    return {
-      editInWorkbench: panel?.querySelectorAll('[data-edit-in-workbench]').length ?? -1,
-      refreshGroups: panel?.querySelectorAll('details[data-details-group="refresh"]').length ?? -1,
-      authoringSections: panel?.querySelectorAll('[data-ds-section="authoring"]').length ?? -1,
-      sections: [...(panel?.querySelectorAll('[data-ds-section]') ?? [])].map(
-        (node) => node.dataset.dsSection,
-      ),
-    };
-  });
-  if (
-    inlineSide.editInWorkbench !== 0 ||
-    inlineSide.refreshGroups !== 0 ||
-    inlineSide.authoringSections !== 0 ||
-    JSON.stringify(inlineSide.sections) !== JSON.stringify(['value'])
-  ) {
-    throw new Error(`BROWSER_HARNESS_DATASET_INLINE_JUMP_FAILED:${JSON.stringify(inlineSide)}`);
-  }
+  // ---- 「非数据源组件只有 `{value}`」这条规则**不由浏览器守**，由单测守 ----
+  // 曾经这里有一条 `INLINE_JUMP_FAILED`：选中固定值组件 → 断言跳转/refresh 组/authoring 段都为 0。
+  // 两次注入（无条件渲染跳转、固定值也渲染 authoring 段）都是**绿的**，说明它采不到被注入的状态：
+  // 根因是"到位凭据"不可靠——`[data-data-entry="inline"][aria-checked="true"]` 只证明
+  // "DOM 里有一个被选中的 inline 入口"，不证明"数据面板正停在该组件上"。
+  // 而 0/0/0 在固定值组件上本来就是**结构保证**（`requiredDataSections()` 只返回 `{value}`，
+  // authoring 段根本不渲染），不是那条 `kind` 条件保证的。
+  //
+  // 结论：删掉这条 DOM 断言——**一条不能咬的断言比没有更糟**（它占着 ✅ 位，让人跳过真正该看的）。
+  // 该规则现由 `designer-data-section-diff.test.ts` 的 6 条 `requiredDataSections` 单测覆盖
+  // （inline/variable/降级/workbench/目录展开不改变段集合），QA 已验过单测会咬（指名用例红）。
+  // 如需 DOM 层守卫，先解决"如何确定面板停在该组件上"，不要为了保住断言去堆凭据。
   const hostEventCount = await page.evaluate(() => window.baseScreenHarness.hostEvents.length);
   return hostEventCount;
 }
