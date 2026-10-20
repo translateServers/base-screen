@@ -1,4 +1,4 @@
-import type { ScreenDatasetDefinition } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition, ScreenValueRef } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type {
   DesignerDataSourceMode,
@@ -16,6 +16,7 @@ import {
   applyDatasetDraft,
   describeDataset,
   restoreDatasetDraft,
+  setDatasetParameterValueRef,
   syncDraftToFocusedComponent,
 } from './designer-dataset-draft-controller.js';
 import {
@@ -80,6 +81,7 @@ export class DesignerDatasetController {
       restoreStaticExample: (render) => restoreStaticExample(this.#context, render),
       apply: () => applyDatasetDraft(this.#context),
       restoreDatasetDraft: () => restoreDatasetDraft(this.#context),
+      setParameterValueRef: (name, ref) => setDatasetParameterValueRef(this.#context, name, ref),
       focusWorkbenchSection: (step) => focusWorkbenchSection(this.#context, step),
       testDatasetDraft: () => testDatasetDraft(this.#context),
       copyPreviewData: () => copyPreviewData(this.#context),
@@ -138,6 +140,16 @@ export class DesignerDatasetController {
 
   onKeyDown(event: KeyboardEvent): boolean {
     return handleDatasetKeyDown(this.#context, event);
+  }
+
+  /**
+   * 参数位选中一个取值引用（常量 / 变量）。
+   *
+   * 取值选择器的浮层挂在段外，选中回调要跨过 DOM 层回到草稿模型；同时这也是宿主/自动化
+   * 唯一可以不经鼠标就设置参数的入口（`name` 是参数名，不是控件地址）。
+   */
+  setParameterValueRef(name: string, ref: ScreenValueRef): void {
+    setDatasetParameterValueRef(this.#context, name, ref);
   }
 
   get descriptor(): ScreenDatasetDefinition | undefined {

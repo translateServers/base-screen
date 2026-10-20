@@ -1,3 +1,4 @@
+import { disposeDatasetSection } from './designer-dataset-config-dom.js';
 import { createDatasetSection, type DesignerDataSectionKey } from './designer-dataset-sections.js';
 
 /**
@@ -132,6 +133,8 @@ export function syncDatasetSections(root: HTMLElement, model: DesignerDataPanelM
       if (next !== undefined) {
         next.dataset.dsContentKey = nextKey;
         markFocusable(next);
+        // 段内的取值选择器把浮层挂在段之外：先销毁，再换节点，否则浮层会留在 overlay 宿主上。
+        disposeDatasetSection(existing);
         existing.replaceWith(next);
         reference = next;
         continue;
@@ -143,6 +146,7 @@ export function syncDatasetSections(root: HTMLElement, model: DesignerDataPanelM
   for (const stale of [...root.querySelectorAll<HTMLElement>('[data-ds-section]')]) {
     const key = stale.dataset.dsSection;
     if (key !== undefined && (keys as readonly string[]).includes(key)) continue;
+    disposeDatasetSection(stale);
     stale.remove();
   }
   restoreFocus(root, focus, keys);

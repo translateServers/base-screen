@@ -8,6 +8,7 @@ import type {
   ScreenHostResourcePort,
   ScreenJsonValue,
   ScreenParseResult,
+  ScreenValueRef,
 } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import type {
@@ -121,6 +122,13 @@ export interface DesignerDatasetControllerContext {
   readonly restoreStaticExample: (render?: boolean) => void;
   readonly apply: () => void;
   readonly restoreDatasetDraft: () => void;
+  /**
+   * 参数位选中一个取值引用（常量 / 变量）。
+   *
+   * 挂在上下文而不是让 DOM 层回连控制器：浮层的 `onSelect` 是段渲染时闭包捕获的，
+   * 真正改草稿的仍然是控制器这一处（`setDesignerDatasetParameter` + 段同步）。
+   */
+  readonly setParameterValueRef: (name: string, ref: ScreenValueRef) => void;
   readonly focusWorkbenchSection: (step: DesignerDatasetWorkbenchStep) => void;
   readonly testDatasetDraft: () => Promise<void>;
   readonly copyPreviewData: () => Promise<void>;

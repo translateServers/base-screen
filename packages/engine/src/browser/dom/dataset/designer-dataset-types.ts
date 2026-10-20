@@ -2,7 +2,7 @@ import type {
   ScreenDatasetDefinition,
   ScreenDatasetEntry,
   ScreenHostResourceDataSource,
-  ScreenHostResourceParameter,
+  ScreenValueRef,
   ScreenVariable,
 } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
@@ -11,9 +11,17 @@ import type { DesignerDataStateView } from './designer-data-state.js';
 
 export type DesignerDataSourceMode = 'none' | 'static' | 'variable' | 'dataset' | 'host-resource';
 
+/**
+ * 数据集配置草稿。
+ *
+ * `params` 是**取值引用**（`ScreenValueRef`），不是旧文档形态：参数位从本轮起是一个「选什么
+ * 取值」的位置（常量 / 变量 / 将来的数据源输出），草稿必须与这个模型同形。落库时统一由
+ * `createDatasetDataSourceTransaction` 经 `valueRefToHostResourceParameter` 翻译成
+ * `component.dataSource.params` 的旧形态。
+ */
 export interface DesignerDatasetDraftView {
   readonly datasetId: string;
-  readonly params: Readonly<Record<string, ScreenHostResourceParameter>>;
+  readonly params: Readonly<Record<string, ScreenValueRef>>;
   readonly fields: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -108,6 +116,20 @@ export interface DesignerDataSourcePanelOptions {
   readonly preview: DesignerDatasetPreviewView;
   readonly activeStep: DesignerDatasetWorkbenchStep;
   readonly authoring: DesignerDatasetAuthoringView;
+  /**
+   * 取值浮层的宿主（段之外的顶层 overlay 容器）。
+   *
+   * 浮层不能挂在段里：段按内容键重建，浮层会被一起换掉，用户刚打开的列表会凭空消失。
+   * 缺省时 picker 退化到触发器所在的 `.designer` 子树，不抛错。
+   */
+  readonly overlayHost?: HTMLElement | undefined;
+  /**
+   * 参数位选中一个取值引用。
+   *
+   * 只交出「哪个参数、选了什么」，由控制器决定草稿怎么变：DOM 层不持有草稿状态，
+   * 也不做 `ScreenValueRef` → 旧形态的翻译（那是事务层唯一的职责）。
+   */
+  readonly onSelectParameter?: ((name: string, ref: ScreenValueRef) => void) | undefined;
 }
 
 export interface DesignerDatasetConfigurationOptions {
@@ -121,4 +143,6 @@ export interface DesignerDatasetConfigurationOptions {
   readonly bindingOpenRoleId?: string | null;
   /** 是否在配置区尾部渲染动作条；两个挂载点各自在容器层放动作，默认渲染以保持单测兼容。 */
   readonly includeActions?: boolean;
+  readonly overlayHost?: HTMLElement | undefined;
+  readonly onSelectParameter?: ((name: string, ref: ScreenValueRef) => void) | undefined;
 }

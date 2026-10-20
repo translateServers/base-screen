@@ -1,34 +1,42 @@
-import type { ScreenDatasetDefinition, ScreenHostResourceParameter } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition, ScreenValueRef } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { attachDesignerDateField } from '../designer-date-field-dom.js';
-import { createDesignerInput, createDesignerSelect } from '../designer-ui-primitives.js';
-import type { DesignerDatasetConfigurationOptions } from './designer-dataset-types.js';
+import { createDesignerInput } from '../designer-ui-primitives.js';
 
-export function variableControl(
+/**
+ * 参数位的内联值编辑器。
+ *
+ * 只在参数当前形态是**常量**（`inline`）时出现：形态本身由取值选择器的触发器表达，
+ * 这里只负责「这个常量的值是多少」。因此控件要带 `data-value-ref-inline`——它既是事件
+ * 分发的地址，也是浏览器断言的定位点；`data-dataset-parameter` 保留为同一节点上的旧定位别名。
+ */
+export function parameterControl(
   ownerDocument: Document,
-  parameterName: string,
-  parameterLabel: string,
-  draft: Extract<ScreenHostResourceParameter, { readonly kind: 'variable' }>,
-  options: DesignerDatasetConfigurationOptions,
-): HTMLSelectElement {
-  const variable = createDesignerSelect(ownerDocument, {
-    ariaLabel: DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameterLabel),
-    options: [
-      {
-        label: DESIGNER_UI_TEXT.dataset.selectVariable,
-        selected: draft.variableId === '',
-        value: '',
-      },
-      ...options.variables.map((item) => ({
-        label: item.name,
-        selected: draft.variableId === item.id,
-        value: item.id,
-      })),
-    ],
-    value: draft.variableId,
+  descriptor: ScreenDatasetDefinition,
+  name: string,
+  current: ScreenValueRef | undefined,
+): HTMLElement {
+  const parameter = descriptor.parameters.find((item) => item.name === name)!;
+  const input = createDesignerInput(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label),
+    appearance: parameter.valueType === 'number' ? 'number' : 'text',
+    ...(parameter.valueType === 'boolean' ? { type: 'checkbox' } : {}),
+    ...(parameter.valueType === 'date'
+      ? { placeholder: DESIGNER_UI_TEXT.dataset.parameterDatePlaceholder }
+      : {}),
+    ...(parameter.minimum === undefined ? {} : { min: parameter.minimum }),
+    ...(parameter.maximum === undefined ? {} : { max: parameter.maximum }),
   });
-  variable.dataset.datasetParameter = parameterName;
-  return variable;
+  input.dataset.valueRefInline = `parameter:${parameter.name}`;
+  input.dataset.datasetParameter = parameter.name;
+  setParameterControlValue(input, parameter, current);
+  input.required = parameter.required;
+  if (parameter.maxLength !== undefined) input.maxLength = parameter.maxLength;
+  // 日期参数原样保留输入框为值载体，只把「输入 + 触发器 + 自绘日历」装进同一外壳。
+  if (parameter.valueType === 'date') {
+    return attachDesignerDateField(input, { label: parameter.label }).element;
+  }
+  return input;
 }
 
 export function configSection(ownerDocument: Document, title: string, step?: string): HTMLElement {
@@ -70,34 +78,6 @@ export function renderActions(
   return actions;
 }
 
-export function parameterControl(
-  ownerDocument: Document,
-  descriptor: ScreenDatasetDefinition,
-  name: string,
-  draft: ScreenHostResourceParameter | undefined,
-): HTMLElement {
-  const parameter = descriptor.parameters.find((item) => item.name === name)!;
-  const input = createDesignerInput(ownerDocument, {
-    ariaLabel: DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label),
-    appearance: parameter.valueType === 'number' ? 'number' : 'text',
-    ...(parameter.valueType === 'boolean' ? { type: 'checkbox' } : {}),
-    ...(parameter.valueType === 'date'
-      ? { placeholder: DESIGNER_UI_TEXT.dataset.parameterDatePlaceholder }
-      : {}),
-    ...(parameter.minimum === undefined ? {} : { min: parameter.minimum }),
-    ...(parameter.maximum === undefined ? {} : { max: parameter.maximum }),
-  });
-  input.dataset.datasetParameter = parameter.name;
-  setParameterControlValue(input, parameter, draft);
-  input.required = parameter.required;
-  if (parameter.maxLength !== undefined) input.maxLength = parameter.maxLength;
-  // 日期参数原样保留输入框为值载体，只把「输入 + 触发器 + 自绘日历」装进同一外壳。
-  if (parameter.valueType === 'date') {
-    return attachDesignerDateField(input, { label: parameter.label }).element;
-  }
-  return input;
-}
-
 function actionButton(
   ownerDocument: Document,
   action: string,
@@ -115,25 +95,19 @@ function actionButton(
   return button;
 }
 
-export function appendOption(
-  select: HTMLSelectElement,
-  value: string,
-  text: string,
-  selected: boolean,
-): void {
-  const option = select.ownerDocument.createElement('option');
-  option.value = value;
-  option.textContent = text;
-  option.selected = selected;
-  select.appendChild(option);
-}
-
+/**
+ * 内联编辑器的初值。
+ *
+ * 草稿里有这个参数就以草稿为准（哪怕值是 `null`——那是用户显式清空的结果，不能被定义里的
+ * 默认值悄悄盖回去）；草稿里没有（刚选中数据集、或该参数还没被写过）才退到定义默认值。
+ */
 function setParameterControlValue(
   input: HTMLInputElement | HTMLTextAreaElement,
   parameter: ScreenDatasetDefinition['parameters'][number],
-  draft: ScreenHostResourceParameter | undefined,
+  current: ScreenValueRef | undefined,
 ): void {
-  const value = draft?.kind === 'literal' ? draft.value : parameter.defaultValue;
+  const value =
+    current !== undefined && current.kind === 'inline' ? current.value : parameter.defaultValue;
   if (input instanceof HTMLInputElement && parameter.valueType === 'boolean') {
     input.checked = value === true;
     input.value = String(input.checked);

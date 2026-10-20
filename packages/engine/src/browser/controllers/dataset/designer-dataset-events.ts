@@ -12,7 +12,6 @@ import {
   toggleDatasetBindingField,
   updateDatasetBindingRole,
   updateDatasetBindingSelect,
-  updateDatasetParameterMode,
   updateDatasetParameterValue,
 } from './designer-dataset-draft-controller.js';
 import { setDatasetPreviewTab } from './designer-dataset-preview-controller.js';
@@ -322,12 +321,12 @@ export function handleDatasetChange(
     updateAuthoringSetting(context, target.dataset.datasetAuthoringSetting, target);
     return true;
   }
-  if (target.dataset.datasetParameterMode !== undefined) {
-    updateDatasetParameterMode(context, target);
-    return true;
-  }
-  if (target.dataset.datasetParameter !== undefined) {
-    updateDatasetParameterValue(context, target);
+  // 参数位只有两条写入路径：取值选择器的触发器（点击 → 浮层 → onSelect）与内联值编辑器
+  // （`data-value-ref-inline`，change）。旧形态的「模式下拉」已经删除，不再有第二个入口。
+  if (target.dataset.valueRefInline !== undefined) {
+    if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+      updateDatasetParameterValue(context, target);
+    }
     return true;
   }
   if (target.dataset.datasetBindingRole !== undefined && target instanceof HTMLSelectElement) {
@@ -421,7 +420,7 @@ export function handleDatasetKeyDown(
   const target = event.target;
   if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return false;
   if (
-    target.dataset.datasetParameter !== undefined ||
+    target.dataset.valueRefInline !== undefined ||
     target.dataset.datasetBindingRole !== undefined
   ) {
     event.preventDefault();

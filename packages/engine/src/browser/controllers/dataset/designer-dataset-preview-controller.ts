@@ -171,10 +171,13 @@ async function resolvePreviewParameters(
   const document = context.callbacks.getDocument();
   const hostVariables = new Map<string, DesignerVariableView>();
   for (const [name, parameter] of Object.entries(draft.params)) {
-    if (parameter.kind === 'literal') {
+    if (parameter.kind === 'inline') {
       params[name] = parameter.value;
       continue;
     }
+    // 本轮参数位只允许常量与变量：其它形态还没有可解析的运行时来源，按 fail-closed 处理，
+    // 不让预览拿一个猜出来的值发请求。
+    if (parameter.kind !== 'variable') return undefined;
     const entry = document?.variables.find((item) => item.id === parameter.variableId);
     const variable =
       document === undefined || entry === undefined

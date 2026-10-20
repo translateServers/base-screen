@@ -102,13 +102,14 @@ export async function assertDatasetAuthoring(designer, page) {
     surface.style.removeProperty('display');
   });
   await scrollDataPanelTo(dataPanel, page, 'source', 'source');
-  const region = dataPanel.locator('[data-dataset-parameter="region"]');
+  // 内联值编辑器只在本参数是「常量」形态时存在；定位统一走 `data-value-ref-inline`。
+  const region = dataPanel.locator('[data-value-ref-inline="parameter:region"]');
   await region.fill('north');
   await region.dispatchEvent('change');
   // 日期参数：输入框 + 触发器 + 自绘日历（设计原型 .datefield）；选日写回输入并派发 change。
-  const dateInput = dataPanel.locator('[data-dataset-parameter="rangeStart"]');
+  const dateInput = dataPanel.locator('[data-value-ref-inline="parameter:rangeStart"]');
   const dateField = dataPanel.locator(
-    '.designer-date-field:has([data-dataset-parameter="rangeStart"])',
+    '.designer-date-field:has([data-value-ref-inline="parameter:rangeStart"])',
   );
   await dateField.locator('.designer-date-field-trigger').click();
   const calendar = await dateField.evaluate((anchor) => {
@@ -186,6 +187,151 @@ export async function assertDatasetAuthoring(designer, page) {
     appliedDatasetSource.params.region?.kind !== 'literal'
   ) {
     throw new Error('BROWSER_HARNESS_DATASET_TRANSACTION_FAILED');
+  }
+  // ---- 参数位的取值选择器：形态切换 → 草稿 → 应用后文档 params ----
+  // 原语义（旧 `[data-dataset-parameter-mode]` 下拉）：切成变量后草稿变化、应用后文档 params 跟着变。
+  // 新语义（选择器）：同一件事，但每一跳都断到可核对的值——触发器徽标形态、内联编辑器在否、
+  // 应用后文档里 params.region 的 kind/variableId/值。比原先更强：原来的「变量」分支只断了
+  // 「有参数变了」，这里直接断「变量引用真的落库成 variable」。
+  const regionTrigger = dataPanel.locator('[data-value-ref-trigger="parameter:region"]');
+  await regionTrigger.click();
+  const pickerOpen = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const host = root.querySelector('[data-designer-overlay-host]');
+    const popover = root.querySelector('[data-value-ref-popover]');
+    const panel = root.querySelector('[data-inspector-pane=data]');
+    return {
+      inOverlayHost: host !== null && popover !== null && host.contains(popover),
+      insidePanel: panel?.contains(popover) ?? null,
+      role: popover?.getAttribute('role'),
+      searchFocused: root.activeElement?.dataset.valueRefSearch === 'true',
+      optionKinds: [...(popover?.querySelectorAll('[data-value-ref-option]') ?? [])].map(
+        (option) => option.dataset.valueRefOption.split(':')[0],
+      ),
+      expanded: panel?.querySelector('[data-value-ref-trigger="parameter:region"]')?.getAttribute(
+        'aria-expanded',
+      ),
+    };
+  });
+  if (
+    !pickerOpen.inOverlayHost ||
+    pickerOpen.insidePanel !== false ||
+    pickerOpen.role !== 'dialog' ||
+    !pickerOpen.searchFocused ||
+    !pickerOpen.optionKinds.includes('variable') ||
+    pickerOpen.expanded !== 'true'
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATASET_PARAMETER_PICKER_FAILED:${JSON.stringify(pickerOpen)}`);
+  }
+  await page.keyboard.press('Escape');
+  const pickerClosed = await designer.evaluate((element) => {
+    const root = element.shadowRoot;
+    const panel = root.querySelector('[data-inspector-pane=data]');
+    return {
+      popoverGone: root.querySelector('[data-value-ref-popover]') === null,
+      expanded: panel
+        ?.querySelector('[data-value-ref-trigger="parameter:region"]')
+        ?.getAttribute('aria-expanded'),
+      focusReturned:
+        root.activeElement?.dataset.valueRefTrigger === 'parameter:region',
+    };
+  });
+  if (
+    !pickerClosed.popoverGone ||
+    pickerClosed.expanded !== 'false' ||
+    !pickerClosed.focusReturned
+  ) {
+    throw new Error(`BROWSER_HARNESS_DATASET_PARAMETER_PICKER_CLOSE_FAILED:${JSON.stringify(pickerClosed)}`);
+  }
+  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
+  await designer.locator('[data-value-ref-option="variable:region"]').click();
+  const pickedVariable = await dataPanel.evaluate((panel) => ({
+    badge: panel
+      .querySelector('[data-value-ref-trigger="parameter:region"] [data-value-ref-badge]')
+      ?.getAttribute('data-value-ref-badge'),
+    label: panel.querySelector('[data-value-ref-trigger="parameter:region"] .designer-value-ref-label')
+      ?.textContent,
+    inlineEditors: panel.querySelectorAll('[data-value-ref-inline="parameter:region"]').length,
+    popoverGone: panel.closest('.designer')?.querySelector('[data-value-ref-popover]') === null,
+    applyEnabled: panel.querySelector('[data-dataset-action="apply"]')?.disabled === false,
+  }));
+  if (
+    pickedVariable.badge !== 'variable' ||
+    pickedVariable.label !== 'region' ||
+    pickedVariable.inlineEditors !== 0 ||
+    !pickedVariable.popoverGone ||
+    !pickedVariable.applyEnabled
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_VARIABLE_DRAFT_FAILED:${JSON.stringify(pickedVariable)}`,
+    );
+  }
+  await dataPanel.locator('[data-dataset-action="apply"]').click();
+  const afterVariableApply = await page.evaluate(() => {
+    const source = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'dataset-ranking-demo',
+    )?.dataSource;
+    return source?.type === 'dataset' ? source.params.region : null;
+  });
+  if (afterVariableApply?.kind !== 'variable' || afterVariableApply.variableId !== 'region') {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_VARIABLE_APPLY_FAILED:${JSON.stringify(afterVariableApply)}`,
+    );
+  }
+  // 再选回「常量」：内联编辑器回来且可输入；段外节点（面板外壳 / 操作条 / 反馈条）身份不变，
+  // 说明改参数只换了配置段，没有整块重绘。
+  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
+  await designer.locator('[data-value-ref-option="inline:current"]').click();
+  const backToInline = await dataPanel.evaluate((panel) => {
+    const shell = panel.querySelector('[data-data-source-panel]');
+    if (shell !== null) shell.__probeId = 'panel-shell';
+    // 操作条容器（不是里面的按钮：按钮随「未应用/已应用」就地重画，容器才是稳定性证据）。
+    const applyBar = panel.querySelector('[data-dataset-apply-bar]');
+    if (applyBar !== null) applyBar.__probeId = 'apply-bar';
+    const feedback = panel.querySelector('[data-dataset-feedback]');
+    if (feedback !== null) feedback.__probeId = 'feedback-bar';
+    const inline = panel.querySelector('[data-value-ref-inline="parameter:region"]');
+    return {
+      badge: panel
+        .querySelector('[data-value-ref-trigger="parameter:region"] [data-value-ref-badge]')
+        ?.getAttribute('data-value-ref-badge'),
+      inlineEditable: inline === null ? null : inline instanceof HTMLInputElement,
+      inlineValue: inline instanceof HTMLInputElement ? inline.value : null,
+    };
+  });
+  if (backToInline.badge !== 'inline' || backToInline.inlineEditable !== true) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_INLINE_DRAFT_FAILED:${JSON.stringify(backToInline)}`,
+    );
+  }
+  const regionAgain = dataPanel.locator('[data-value-ref-inline="parameter:region"]');
+  await regionAgain.fill('north');
+  await regionAgain.dispatchEvent('change');
+  const stableNodes = await dataPanel.evaluate((panel) => ({
+    shell: panel.querySelector('[data-data-source-panel]')?.__probeId,
+    applyBar: panel.querySelector('[data-dataset-apply-bar]')?.__probeId,
+    feedback: panel.querySelector('[data-dataset-feedback]')?.__probeId,
+  }));
+  if (
+    stableNodes.shell !== 'panel-shell' ||
+    stableNodes.applyBar !== 'apply-bar' ||
+    stableNodes.feedback !== 'feedback-bar'
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_RERENDER_FAILED:${JSON.stringify(stableNodes)}`,
+    );
+  }
+  await dataPanel.locator('[data-dataset-action="apply"]').click();
+  const afterInlineApply = await page.evaluate(() => {
+    const source = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'dataset-ranking-demo',
+    )?.dataSource;
+    return source?.type === 'dataset' ? source.params.region : null;
+  });
+  if (afterInlineApply?.kind !== 'literal' || afterInlineApply.value !== 'north') {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_INLINE_APPLY_FAILED:${JSON.stringify(afterInlineApply)}`,
+    );
   }
   // 绑定字段选择器：触发器芯片 + 计数 + 自绘弹层（设计原型 .bind-field）；芯片 × 与选项切换共用绑定动作。
   const bindShell = await dataPanel.evaluate((panel) => {
@@ -518,9 +664,14 @@ export async function assertDatasetSurface(designer, page) {
     const previewSectionBox = previewSection?.getBoundingClientRect();
     const advancedSectionBox = advancedSection?.getBoundingClientRect();
     return {
+      // 参数段的两个可观测面：每行一个取值触发器（形态），常量形态下另有内联值编辑器（值）。
+      parameterPickerCount: panel.querySelectorAll('[data-value-ref-trigger^="parameter:"]').length,
       parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
+      legacyParameterModeCount: panel.querySelectorAll('[data-dataset-parameter-mode]').length,
       unlabelledParameterControls: [
-        ...panel.querySelectorAll('[data-dataset-parameter], [data-dataset-parameter-mode]'),
+        ...panel.querySelectorAll(
+          '[data-dataset-parameter], [data-value-ref-trigger], [data-dataset-parameter-mode]',
+        ),
       ].filter((control) => control.getAttribute('aria-label') === null).length,
       bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
       bindingSummaryEmpty:
@@ -577,7 +728,9 @@ export async function assertDatasetSurface(designer, page) {
     };
   });
   if (
+    descriptorSurface.parameterPickerCount !== 3 ||
     descriptorSurface.parameterCount < 2 ||
+    descriptorSurface.legacyParameterModeCount !== 0 ||
     descriptorSurface.unlabelledParameterControls !== 0 ||
     descriptorSurface.bindingCount !== 3 ||
     descriptorSurface.bindingSummaryEmpty ||
@@ -608,10 +761,63 @@ export async function assertDatasetSurface(designer, page) {
       `BROWSER_HARNESS_DATASET_DESCRIPTOR_SURFACE_FAILED:${JSON.stringify(descriptorSurface)}`,
     );
   }
-  await dataPanel.locator('[data-dataset-parameter-mode="region"]').selectOption('literal');
+  // 参数位的形态改由取值选择器表达（原 `[data-dataset-parameter-mode]` 下拉已删除）。
+  // 夹具里这个组件 region 就是「变量」形态：触发器必须如实反映，且此时**不该**有内联编辑器。
+  const parameterSurface = await dataPanel.evaluate((panel) => {
+    const trigger = panel.querySelector('[data-value-ref-trigger="parameter:region"]');
+    return {
+      triggerTag: trigger?.tagName,
+      triggerRole: trigger?.getAttribute('aria-haspopup'),
+      triggerExpanded: trigger?.getAttribute('aria-expanded'),
+      triggerLabel: trigger?.getAttribute('aria-label'),
+      triggerBadgeKind: trigger?.querySelector('[data-value-ref-badge]')?.dataset.valueRefBadge,
+      inlineEditors: panel.querySelectorAll('[data-value-ref-inline="parameter:region"]').length,
+      legacyModeSelects: panel.querySelectorAll('[data-dataset-parameter-mode]').length,
+      inlineEditableForInlineParams:
+        panel.querySelector('[data-value-ref-inline="parameter:limit"]') instanceof HTMLInputElement,
+    };
+  });
+  if (
+    parameterSurface.triggerTag !== 'BUTTON' ||
+    parameterSurface.triggerRole !== 'dialog' ||
+    parameterSurface.triggerExpanded !== 'false' ||
+    parameterSurface.triggerLabel !== '\u533a\u57df \u53c2\u6570\u6a21\u5f0f' ||
+    parameterSurface.triggerBadgeKind !== 'variable' ||
+    parameterSurface.inlineEditors !== 0 ||
+    parameterSurface.legacyModeSelects !== 0 ||
+    !parameterSurface.inlineEditableForInlineParams
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_SURFACE_FAILED:${JSON.stringify(parameterSurface)}`,
+    );
+  }
+  // 旧流程里 `[data-dataset-parameter-mode]` 选 literal 的等价动作：用选择器把 region 切回常量，
+  // 让内联值编辑器出现（后续滚动连续性与参数值断言都依赖它）。
+  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
+  await designer.locator('[data-value-ref-option="inline:current"]').click();
+  const switchedToInline = await dataPanel.evaluate((panel) => {
+    const trigger = panel.querySelector('[data-value-ref-trigger="parameter:region"]');
+    const inline = panel.querySelector('[data-value-ref-inline="parameter:region"]');
+    return {
+      badge: trigger?.querySelector('[data-value-ref-badge]')?.dataset.valueRefBadge,
+      inlineEditable: inline instanceof HTMLInputElement,
+      legacyAliasOnSameControl: panel.querySelector('[data-dataset-parameter="region"]') === inline,
+      popoverGone: panel.closest('.designer')?.querySelector('[data-value-ref-popover]') === null,
+    };
+  });
+  if (
+    switchedToInline.badge !== 'inline' ||
+    !switchedToInline.inlineEditable ||
+    !switchedToInline.legacyAliasOnSameControl ||
+    !switchedToInline.popoverGone
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_INLINE_SWITCH_FAILED:${JSON.stringify(switchedToInline)}`,
+    );
+  }
   const scrollContinuity = await dataPanel.evaluate((panel) => {
     const content = panel.querySelector('.designer-datav-data-flow-content');
-    const parameter = panel.querySelector('[data-dataset-parameter="region"]');
+    const parameter = panel.querySelector('[data-value-ref-inline="parameter:region"]');
     if (!(content instanceof HTMLElement) || !(parameter instanceof HTMLInputElement)) {
       return { available: false, after: 0, before: 0, max: 0 };
     }

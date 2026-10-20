@@ -1,6 +1,7 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { renderDataPanelNoticeSlot } from './designer-data-panel-notice.js';
 import { refreshStrategyNotice } from './designer-dataset-authoring-dom.js';
+import { disposeDatasetSections } from './designer-dataset-config-dom.js';
 import { renderDataSourceFlow } from './designer-dataset-flow-dom.js';
 import { datasetAction } from './designer-dataset-primitives.js';
 import { createDatasetSection } from './designer-dataset-sections.js';
@@ -27,6 +28,8 @@ export function renderDesignerDataSourcePanel(
   options: DesignerDataSourcePanelOptions,
 ): DesignerDataSourcePanelSurface {
   const { panel } = options;
+  // 整块重绘前先销毁段内挂载的取值选择器：浮层挂在段之外，不销毁就会留在 overlay 宿主上。
+  disposeDatasetSections(panel);
   panel.replaceChildren();
   const section = panel.ownerDocument.createElement('section');
   section.className = 'designer-data-source-panel';

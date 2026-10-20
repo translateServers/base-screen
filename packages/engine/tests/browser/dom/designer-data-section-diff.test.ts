@@ -143,7 +143,7 @@ describe('sectionContentKey', () => {
         model({
           draft: {
             datasetId: 'orders',
-            params: { region: { kind: 'literal', value: 'north' } },
+            params: { region: { kind: 'inline', value: 'north' } },
             fields: {},
           },
         }),

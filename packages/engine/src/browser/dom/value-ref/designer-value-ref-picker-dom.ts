@@ -74,14 +74,18 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
       return;
     }
     popover = buildPopover();
+    const opened = popover;
     const host = resolvePopoverHost();
     host.appendChild(popover);
     positionPopover();
     trigger.setAttribute('aria-expanded', 'true');
     const onPointerDown = (event: Event): void => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (popover?.contains(target) === true || trigger.contains(target)) return;
+      // 监听在 document 上，而设计器整棵树在 shadow root 里：到达 document 时 `event.target`
+      // 已被重定向成宿主元素（`base-screen-designer`），拿它判断「是否点在浮层里」永远为假，
+      // 结果是「点选项」被当成「点浮层外面」——浮层在 click 之前就被关掉，选不中任何东西。
+      // 判据必须走 `composedPath()`：它保留了穿过 shadow 边界的真实祖先链。
+      const path = event.composedPath();
+      if (path.includes(opened) || path.includes(trigger)) return;
       close(false);
     };
     const onReflow = (): void => positionPopover();

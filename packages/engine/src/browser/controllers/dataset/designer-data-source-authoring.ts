@@ -68,12 +68,16 @@ export function createDesignerDatasetDraft(
   roles: readonly ScreenDataBindingRole[] = [],
 ): DesignerDatasetDraftView {
   const sameResource = source?.type === 'dataset' && source.datasetId === descriptor.datasetId;
-  const params: Record<string, ScreenHostResourceParameter> = {};
+  const params: Record<string, ScreenValueRef> = {};
   for (const parameter of descriptor.parameters) {
     const existing = sameResource ? source.params[parameter.name] : undefined;
-    if (existing !== undefined) params[parameter.name] = existing;
-    else if (parameter.defaultValue !== undefined) {
-      params[parameter.name] = { kind: 'literal', value: parameter.defaultValue };
+    if (existing !== undefined) {
+      // 旧文档读入只有一个翻译点。翻译不出可编辑形态的引用会退化成 `inline: null`：
+      // 这是 fail-closed——不静默补默认值，应用时由必填/类型校验报
+      // `HOST_DATASET_PARAMETER_INVALID`，用户能看到「这个参数需要重新选」。
+      params[parameter.name] = hostResourceParameterToValueRef(existing);
+    } else if (parameter.defaultValue !== undefined) {
+      params[parameter.name] = { kind: 'inline', value: parameter.defaultValue };
     }
   }
   const fields: Record<string, readonly string[]> = sameResource
@@ -138,24 +142,20 @@ export function designerDataSourceModes(
   ];
 }
 
-export function updateDesignerDatasetParameter(
+/**
+ * 参数位唯一的状态变更入口：把一个参数整体换成「选中的取值」。
+ *
+ * 不再根据控件类型猜形态——旧实现（`updateDesignerDatasetParameter`）见到 `select` 就当变量、
+ * 见到输入框就当场量，同一个参数有两套写入路径，且变量下拉一改值就把变量引用覆盖成字面量。
+ * 现在形态由调用点显式给出（选择器的 `onSelect`、内联编辑器的 change），这里只做赋值。
+ */
+export function setDesignerDatasetParameter(
   draft: DesignerDatasetDraftView,
-  descriptor: ScreenDatasetDefinition,
   name: string,
-  target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  ref: ScreenValueRef,
 ): DesignerDatasetDraftView {
-  if (target instanceof HTMLSelectElement) {
-    return {
-      ...draft,
-      params: { ...draft.params, [name]: { kind: 'variable', variableId: target.value } },
-    };
-  }
-  const parameter = descriptor.parameters.find((item) => item.name === name);
-  if (parameter === undefined) return draft;
-  const value = readDesignerDatasetParameter(target, parameter);
-  return value === undefined
-    ? draft
-    : { ...draft, params: { ...draft.params, [name]: { kind: 'literal', value } } };
+  if (name === '') return draft;
+  return { ...draft, params: { ...draft.params, [name]: ref } };
 }
 
 export function toggleDesignerDatasetBindingField(
@@ -213,34 +213,34 @@ export function createDatasetDataSourceTransaction(
 ): ScreenParseResult<ScreenDocumentTransaction> {
   for (const parameter of options.descriptor.parameters) {
     const value = options.draft.params[parameter.name];
-    if (
-      (value === undefined && parameter.required) ||
-      (value?.kind === 'variable' &&
-        !options.document.variables.some((item) => item.id === value.variableId))
-    ) {
+    if (value === undefined && parameter.required) {
       return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
+    }
+    if (value?.kind === 'variable') {
+      const exists = options.document.variables.some((item) => item.id === value.variableId);
+      if (!exists) {
+        return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
+      }
     }
   }
 
-  const literalValues: Record<string, ScreenJsonValue> = {};
-  for (const [name, parameter] of Object.entries(options.draft.params)) {
+  const params: Record<string, ScreenHostResourceParameter> = {};
+  // 旧形态表达不了的参数（例如常量与变量之外的取值引用）没有内联值可评估，
+  // 只能用定义里的兜底值参与「参数能否通过类型校验」这一步，落库形态仍然 fail-closed。
+  const evaluated: Record<string, ScreenJsonValue> = {};
+  for (const [name, ref] of Object.entries(options.draft.params)) {
     const definition = options.descriptor.parameters.find((item) => item.name === name);
-    if (definition === undefined)
+    if (definition === undefined) {
       return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
-    literalValues[name] =
-      parameter.kind === 'literal'
-        ? parameter.value
-        : (definition.allowedValues?.[0] ??
-          definition.defaultValue ??
-          (definition.valueType === 'number'
-            ? (definition.minimum ?? 0)
-            : definition.valueType === 'boolean'
-              ? false
-              : definition.valueType === 'date'
-                ? '2000-01-01'
-                : ''));
+    }
+    const legacy = valueRefToHostResourceParameter(ref);
+    if (legacy === undefined) {
+      return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
+    }
+    params[name] = legacy;
+    evaluated[name] = ref.kind === 'inline' ? ref.value : fallbackParameterValue(definition);
   }
-  const validated = evaluateScreenDatasetParameters(options.descriptor.parameters, literalValues);
+  const validated = evaluateScreenDatasetParameters(options.descriptor.parameters, evaluated);
   if (!validated.ok) return validated;
 
   const binding: ScreenHostResourceBinding | null =
@@ -256,9 +256,26 @@ export function createDatasetDataSourceTransaction(
     updateDataSource(options.componentId, {
       type: 'dataset',
       datasetId: options.descriptor.datasetId,
-      params: options.draft.params,
+      params,
       binding,
     }),
+  );
+}
+
+/** 变量引用在评估阶段没有具体值：用定义里的合法兜底值占位，只为让类型校验不误报。 */
+function fallbackParameterValue(
+  definition: ScreenDatasetDefinition['parameters'][number],
+): ScreenJsonValue {
+  return (
+    definition.allowedValues?.[0] ??
+    definition.defaultValue ??
+    (definition.valueType === 'number'
+      ? (definition.minimum ?? 0)
+      : definition.valueType === 'boolean'
+        ? false
+        : definition.valueType === 'date'
+          ? '2000-01-01'
+          : '')
   );
 }
 

@@ -11,6 +11,7 @@ import {
   deriveDesignerDataState,
 } from '../../dom/dataset/designer-data-state.js';
 import { renderDatasetCatalogResults } from '../../dom/dataset/designer-dataset-catalog-dom.js';
+import { disposeDatasetSections } from '../../dom/dataset/designer-dataset-config-dom.js';
 import {
   type DesignerDataSourcePanelOptions,
   type DesignerDatasetWorkbenchStep,
@@ -294,6 +295,23 @@ function createDatasetPanelOptions(
     preview: context.state.preview,
     activeStep: context.state.activeStep,
     authoring: context.state.authoring,
+    ...overlayOptions(context),
+  };
+}
+
+/**
+ * 取值浮层所需的两个外部输入。
+ *
+ * `overlayHost` 缺省时 picker 自己退化到触发器所在的 `.designer` 子树（不抛错），
+ * 所以这里保持可选；`onSelectParameter` 是参数位唯一的写入入口，交回控制器。
+ */
+function overlayOptions(
+  context: DesignerDatasetControllerContext,
+): Pick<DesignerDataSourcePanelOptions, 'overlayHost' | 'onSelectParameter'> {
+  const overlayHost = context.callbacks.getOverlayHost?.();
+  return {
+    ...(overlayHost === undefined ? {} : { overlayHost }),
+    onSelectParameter: (name, ref) => context.setParameterValueRef(name, ref),
   };
 }
 
@@ -335,6 +353,8 @@ function renderDataWorkbench(
   const host = context.callbacks.getWorkbenchHost?.();
   if (host === undefined) return;
   const layout = host.closest<HTMLElement>('.designer');
+  // 工作台与内联面板是同一份数据的两个投影：挂在工作台里的取值选择器同样要显式销毁。
+  disposeDatasetSections(host);
   host.replaceChildren();
   if (
     !context.state.workbenchOpen ||
@@ -460,6 +480,7 @@ export function clearDatasetSurface(context: DesignerDatasetControllerContext): 
   const host = context.callbacks.getWorkbenchHost?.();
   if (host !== undefined) {
     host.hidden = true;
+    disposeDatasetSections(host);
     host.replaceChildren();
     const layout = host.closest<HTMLElement>('.designer');
     if (layout !== null) delete layout.dataset.dataWorkbenchOpen;

@@ -1,4 +1,8 @@
-import type { ScreenParseResult } from '@base-screen/contracts';
+import type {
+  ScreenHostResourceParameter,
+  ScreenParseResult,
+  ScreenValueRef,
+} from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDataSourceMode } from '../../dom/dataset/designer-dataset-dom.js';
@@ -11,8 +15,11 @@ import {
   createVariableDataSourceTransaction,
   defaultDatasetParameterValue,
   designerDataSourceModes,
+  hostResourceParameterToValueRef,
+  readDesignerDatasetParameter,
+  setDesignerDatasetParameter,
   toggleDesignerDatasetBindingField,
-  updateDesignerDatasetParameter,
+  valueRefToHostResourceParameter,
 } from './designer-data-source-authoring.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import {
@@ -264,49 +271,62 @@ export function updateDatasetBindingRole(
   markDatasetDraftChanged(context);
 }
 
-export function updateDatasetParameterMode(
+/**
+ * 参数位选中了一个取值引用（常量 / 变量）。
+ *
+ * 取代旧的「先切模式下拉、再按控件类型猜形态」：形态由选择器给出，这里只负责落草稿、
+ * 标脏、并把这个参数的触发器焦点交回来。选「常量」时沿用旧的取值回退口径
+ * （定义默认值），避免用户从变量切回来看到一个空输入框。
+ */
+export function setDatasetParameterValueRef(
   context: DesignerDatasetControllerContext,
-  target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  name: string,
+  ref: ScreenValueRef,
 ): void {
-  const name = target.dataset.datasetParameterMode;
-  if (name === undefined || context.state.draft === undefined) return;
-  const value =
-    target.value === 'variable'
-      ? { kind: 'variable' as const, variableId: '' }
-      : {
-          kind: 'literal' as const,
-          value: defaultDatasetParameterValue(context.state.descriptor, name),
-        };
-  context.state.draft = {
-    ...context.state.draft,
-    params: { ...context.state.draft.params, [name]: value },
-  };
-  // 切模式会把这个参数的控件整个换掉（输入框 ↔ 变量下拉），焦点要落到新控件上。
+  if (name === '' || context.state.draft === undefined) return;
+  const next: ScreenValueRef =
+    ref.kind === 'inline' && ref.value === null
+      ? { kind: 'inline', value: defaultDatasetParameterValue(context.state.descriptor, name) }
+      : ref;
+  const current = context.state.draft.params[name];
+  if (sameRef(current, next)) return;
+  context.state.draft = setDesignerDatasetParameter(context.state.draft, name, next);
   markDatasetDraftChanged(context, ['config', 'preview'], () =>
-    restoreDatasetControlFocus(context, `[data-dataset-parameter="${name}"]`),
+    restoreDatasetControlFocus(context, `[data-value-ref-trigger="parameter:${name}"]`),
   );
 }
 
 export function updateDatasetParameterValue(
   context: DesignerDatasetControllerContext,
-  target: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement,
+  target: HTMLInputElement | HTMLTextAreaElement,
 ): void {
-  const name = target.dataset.datasetParameter;
+  const controlKey = target.dataset.valueRefInline;
   if (
-    name === undefined ||
+    controlKey === undefined ||
     context.state.draft === undefined ||
     context.state.descriptor === undefined
   )
     return;
-  context.state.draft = updateDesignerDatasetParameter(
-    context.state.draft,
-    context.state.descriptor,
-    name,
-    target,
-  );
+  const name = parameterNameOf(controlKey);
+  const parameter = context.state.descriptor.parameters.find((item) => item.name === name);
+  if (parameter === undefined) return;
+  const value = readDesignerDatasetParameter(target, parameter);
+  // 读不出合法值（数字框里是空串/非数字）时保持草稿不变：不能把「正在输入的中间态」
+  // 当成用户清空了参数，否则每敲一个字符都会写一次非法值。
+  if (value === undefined) return;
+  context.state.draft = setDesignerDatasetParameter(context.state.draft, name, {
+    kind: 'inline',
+    value,
+  });
   markDatasetDraftChanged(context, ['config', 'preview'], () =>
-    restoreDatasetControlFocus(context, `[data-dataset-parameter="${name}"]`, 'caret-end'),
+    restoreDatasetControlFocus(context, `[data-value-ref-inline="${controlKey}"]`, 'caret-end'),
   );
+}
+
+/** `parameter:<name>` → `<name>`（控件逻辑地址 → 参数名）。 */
+function parameterNameOf(controlKey: string): string {
+  const prefix = 'parameter:';
+  return controlKey.startsWith(prefix) ? controlKey.slice(prefix.length) : controlKey;
 }
 
 export function updateDatasetBindingSelect(
@@ -379,9 +399,44 @@ function isDatasetDraftDirty(context: DesignerDatasetControllerContext): boolean
   const roles = context.currentEntry()?.manifest.dataBinding?.roles ?? [];
   const binding = roles.length === 0 ? null : { fields: draft.fields };
   return (
-    JSON.stringify(source.params) !== JSON.stringify(draft.params) ||
+    documentParamsKey(source.params) !== draftParamsKey(draft.params) ||
     JSON.stringify(source.binding) !== JSON.stringify(binding)
   );
+}
+
+/**
+ * 两边的参数不能直接 `JSON.stringify` 比较：文档里是旧形态（`literal`），草稿里是取值引用
+ * （`inline`）。各自先归一到「旧形态」这一个坐标系再比，否则草稿永远被判脏、应用按钮永远可点。
+ *
+ * 键按名字排序：对象字面量顺序不同不代表值不同，排序后比较不会误判脏。
+ */
+function documentParamsKey(params: Readonly<Record<string, ScreenHostResourceParameter>>): string {
+  const entries = Object.keys(params)
+    .sort()
+    .map((name) => [
+      name,
+      valueRefToHostResourceParameter(hostResourceParameterToValueRef(params[name]!)) ?? null,
+    ]);
+  return JSON.stringify(entries);
+}
+
+function draftParamsKey(params: Readonly<Record<string, ScreenValueRef>>): string {
+  const entries = Object.keys(params)
+    .sort()
+    .map((name) => [name, valueRefToHostResourceParameter(params[name]!) ?? null]);
+  return JSON.stringify(entries);
+}
+
+/** 同一个引用的判据：形态相同、目标相同、内联值按 JSON 深比较。 */
+function sameRef(left: ScreenValueRef | undefined, right: ScreenValueRef): boolean {
+  if (left === undefined || left.kind !== right.kind) return false;
+  if (left.kind === 'variable' && right.kind === 'variable') {
+    return left.variableId === right.variableId;
+  }
+  if (left.kind === 'inline' && right.kind === 'inline') {
+    return JSON.stringify(left.value) === JSON.stringify(right.value);
+  }
+  return false;
 }
 
 export function restoreDatasetDraft(context: DesignerDatasetControllerContext): void {

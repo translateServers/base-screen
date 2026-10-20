@@ -29,6 +29,8 @@ export function datasetConfigurationOptions(
     bindingOpenRoleId: options.bindingOpenRoleId ?? null,
     // 动作条由各挂载点在容器层统一摆放（面板底部 / 工作台头部），配置区自己不再夹带一份。
     includeActions: false,
+    overlayHost: options.overlayHost,
+    onSelectParameter: options.onSelectParameter,
   };
 }
 

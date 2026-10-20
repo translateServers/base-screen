@@ -1,6 +1,10 @@
-import type { ScreenDatasetDefinition } from '@base-screen/contracts';
+import type { ScreenDatasetDefinition, ScreenValueRef } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import {
+  datasetParameterPickerInput,
+  mountValueRefPicker,
+} from '../../controllers/value-ref/designer-value-ref-picker-controller.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { createDesignerSelect } from '../designer-ui-primitives.js';
@@ -9,12 +13,41 @@ import {
   configSection,
   parameterControl,
   renderActions,
-  variableControl,
 } from './designer-dataset-config-controls.js';
 import type {
   DesignerDatasetConfigurationOptions,
   DesignerDatasetDraftView,
 } from './designer-dataset-types.js';
+
+/**
+ * 段内挂载的取值选择器清理函数，按段元素登记。
+ *
+ * 选择器把浮层挂在段**之外**的 overlay 宿主上：段被替换或整块重绘时浮层不会跟着走，
+ * 于是必须显式销毁，否则「段重建 + 浮层还开着」会留下一层没人能关掉的浮层。
+ * 用 WeakMap 而不是往元素上挂属性：段元素一被丢弃，登记表自己就回收了。
+ */
+const sectionPickerDisposers = new WeakMap<HTMLElement, (() => void)[]>();
+
+/** 销毁某段内挂载的取值选择器（段被替换 / 面板重绘前调用；无登记时是空操作）。 */
+export function disposeDatasetSection(section: HTMLElement): void {
+  const disposers = sectionPickerDisposers.get(section);
+  if (disposers === undefined) return;
+  for (const dispose of disposers) dispose();
+  sectionPickerDisposers.delete(section);
+}
+
+/** 销毁 root 子树内所有已登记的取值选择器。 */
+export function disposeDatasetSections(root: HTMLElement): void {
+  for (const section of root.querySelectorAll<HTMLElement>('[data-ds-section]')) {
+    disposeDatasetSection(section);
+  }
+}
+
+function registerSectionDisposer(section: HTMLElement, dispose: () => void): void {
+  const existing = sectionPickerDisposers.get(section);
+  if (existing === undefined) sectionPickerDisposers.set(section, [dispose]);
+  else existing.push(dispose);
+}
 
 export function renderDesignerDatasetConfiguration(
   options: DesignerDatasetConfigurationOptions,
@@ -149,6 +182,13 @@ function renderBindingSummaryItem(
   return details;
 }
 
+/**
+ * 参数段：每行 = 取值选择器触发器 + （仅当取值是常量时）内联值编辑器。
+ *
+ * 形态与值分开表达，是这次重构的核心：以前「固定值 / 变量」是一个下拉，选完再把值控件整块换掉，
+ * 于是变量下拉一改值就把引用覆盖成字面量；现在触发器只回答「这个参数取什么」，
+ * 常量形态下才把值编辑器并排放出来，引用与值不会互相踩。
+ */
 function renderParameters(
   ownerDocument: Document,
   options: DesignerDatasetConfigurationOptions,
@@ -165,7 +205,7 @@ function renderParameters(
     section.appendChild(empty);
   }
   for (const parameter of options.descriptor.parameters) {
-    const draft = options.draft?.params[parameter.name];
+    const current = currentParameterRef(options.draft, parameter);
     const label = ownerDocument.createElement('label');
     label.className = 'designer-field designer-dataset-parameter';
     const labelText = ownerDocument.createElement('span');
@@ -173,39 +213,39 @@ function renderParameters(
     labelText.textContent = parameter.label;
     const controls = ownerDocument.createElement('span');
     controls.className = 'designer-dataset-parameter-controls';
-    const mode = createDesignerSelect(ownerDocument, {
+    const picker = mountValueRefPicker({
+      ownerDocument,
+      text: DESIGNER_UI_TEXT.data.ref,
+      input: datasetParameterPickerInput(current, options.variables),
+      controlKey: `parameter:${parameter.name}`,
       ariaLabel: DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label),
-      options: [
-        {
-          label: DESIGNER_UI_TEXT.dataset.literal,
-          selected: draft?.kind !== 'variable',
-          value: 'literal',
-        },
-        {
-          label: DESIGNER_UI_TEXT.dataset.variable,
-          selected: draft?.kind === 'variable',
-          value: 'variable',
-        },
-      ],
-      value: draft?.kind === 'variable' ? 'variable' : 'literal',
+      popoverHost: options.overlayHost,
+      onSelect: (ref) => options.onSelectParameter?.(parameter.name, ref),
     });
-    mode.dataset.datasetParameterMode = parameter.name;
-    controls.appendChild(enhanceDesignerSelect(mode).element);
-    if (draft?.kind === 'variable') {
+    registerSectionDisposer(section, picker.dispose);
+    controls.appendChild(picker.element);
+    if (current.kind === 'inline') {
       controls.appendChild(
-        enhanceDesignerSelect(
-          variableControl(ownerDocument, parameter.name, parameter.label, draft, options),
-        ).element,
-      );
-    } else {
-      controls.appendChild(
-        parameterControl(ownerDocument, options.descriptor, parameter.name, draft),
+        parameterControl(ownerDocument, options.descriptor, parameter.name, current),
       );
     }
     label.append(labelText, controls);
     section.appendChild(label);
   }
   return section;
+}
+
+/**
+ * 参数当前生效的取值引用。
+ *
+ * 草稿里没有这个参数时（刚选中数据集、参数还没被写过）按「常量 + 定义默认值」呈现：
+ * 内联编辑器必须有值可编辑，而空着会让用户以为参数缺失。
+ */
+function currentParameterRef(
+  draft: DesignerDatasetDraftView | undefined,
+  parameter: ScreenDatasetDefinition['parameters'][number],
+): ScreenValueRef {
+  return draft?.params[parameter.name] ?? { kind: 'inline', value: parameter.defaultValue ?? null };
 }
 
 function renderBindings(

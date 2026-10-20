@@ -90,7 +90,7 @@ describe('DesignerDatasetController', () => {
     expect(controller.descriptor?.datasetId).toBe('orders');
 
     controller.onChange(
-      new FakeInput('north', { datasetParameter: 'region' }) as unknown as EventTarget,
+      new FakeInput('north', { valueRefInline: 'parameter:region' }) as unknown as EventTarget,
     );
     controller.onClick(actionTarget('apply') as unknown as Element);
 
@@ -154,7 +154,7 @@ describe('DesignerDatasetController', () => {
     controller.onClick(resourceTarget('orders') as unknown as Element);
     await waitForDescriptor(controller);
     controller.onChange(
-      new FakeInput('north', { datasetParameter: 'region' }) as unknown as EventTarget,
+      new FakeInput('north', { valueRefInline: 'parameter:region' }) as unknown as EventTarget,
     );
     controller.onClick(actionTarget('test') as unknown as Element);
 
@@ -196,12 +196,8 @@ describe('DesignerDatasetController', () => {
 
     controller.onClick(resourceTarget('orders') as unknown as Element);
     await waitForDescriptor(controller);
-    controller.onChange(
-      new FakeInput('variable', { datasetParameterMode: 'region' }) as unknown as EventTarget,
-    );
-    controller.onChange(
-      new FakeSelect({ datasetParameter: 'region' }, ['tenantRegion']) as unknown as EventTarget,
-    );
+    // 取值选择器的 onSelect 会走到控制器这一处：变量引用直接进草稿，草稿不再靠控件类型猜形态。
+    controller.setParameterValueRef('region', { kind: 'variable', variableId: 'tenantRegion' });
     controller.onClick(actionTarget('test') as unknown as Element);
 
     await vi.waitFor(() => expect(resourceResolve).toHaveBeenCalledOnce());
@@ -234,12 +230,7 @@ describe('DesignerDatasetController', () => {
     });
     denied.onClick(resourceTarget('orders') as unknown as Element);
     await waitForDescriptor(denied);
-    denied.onChange(
-      new FakeInput('variable', { datasetParameterMode: 'region' }) as unknown as EventTarget,
-    );
-    denied.onChange(
-      new FakeSelect({ datasetParameter: 'region' }, ['tenantRegion']) as unknown as EventTarget,
-    );
+    denied.setParameterValueRef('region', { kind: 'variable', variableId: 'tenantRegion' });
     denied.onClick(actionTarget('test') as unknown as Element);
     await new Promise((resolvePending) => setTimeout(resolvePending, 0));
     expect(deniedResource).not.toHaveBeenCalled();
@@ -533,7 +524,7 @@ describe('DesignerDatasetController', () => {
     await waitForDescriptor(controller);
     controller.onClick(editorModeTarget('code') as unknown as Element);
     controller.onChange(
-      new FakeInput('north', { datasetParameter: 'region' }) as unknown as EventTarget,
+      new FakeInput('north', { valueRefInline: 'parameter:region' }) as unknown as EventTarget,
     );
 
     currentDocument = JSON.parse(JSON.stringify(currentDocument)) as ScreenDocument;
