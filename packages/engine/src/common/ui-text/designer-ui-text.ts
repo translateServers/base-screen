@@ -600,6 +600,8 @@ export const DESIGNER_UI_TEXT = {
     typeHost: '宿主提供',
     typeDataSource: '数据源请求',
     typeUrlQuery: 'URL 查询条件',
+    valueSourceConstant: '常量',
+    valueSourceSourceOutput: '来源输出',
     expandVariable: (name: string) => `展开全局变量 ${name}`,
     collapseVariable: (name: string) => `收起全局变量 ${name}`,
     sourceStatic: '手动设置',

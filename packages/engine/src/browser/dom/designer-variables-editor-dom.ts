@@ -1,4 +1,5 @@
 import type { ScreenHostVariableSummary, ScreenVariable } from '@base-screen/contracts';
+import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
 import { createDesignerButton, createDesignerInput } from './designer-ui-primitives.js';
@@ -126,7 +127,7 @@ export function appendCreateEditor(
 
 export function appendRenameEditor(
   row: HTMLElement,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
 ): void {
   appendEditorHeading(row, DESIGNER_UI_TEXT.variables.renameTitle, variable.name, variable.type);
@@ -145,7 +146,7 @@ export function appendRenameEditor(
 
 export function appendDescriptionEditor(
   row: HTMLElement,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
 ): void {
   appendEditorHeading(
@@ -167,7 +168,11 @@ export function appendDescriptionEditor(
   appendEditorActions(row, 'confirm-description', index, DESIGNER_UI_TEXT.variables.save);
 }
 
-export function appendValueEditor(row: HTMLElement, variable: ScreenVariable, index: number): void {
+export function appendValueEditor(
+  row: HTMLElement,
+  variable: DesignerVariableView,
+  index: number,
+): void {
   appendEditorHeading(row, DESIGNER_UI_TEXT.variables.editValueTitle, variable.name, variable.type);
   const errorId = `designer-variable-value-error-${index}`;
   const input = appendEditorField(row, {

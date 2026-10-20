@@ -1,7 +1,6 @@
 import type {
   ScreenDiagnostic,
   ScreenDocument,
-  ScreenDynamicVariable,
   ScreenHostVariablePort,
   ScreenJsonObject,
   ScreenJsonValue,
@@ -13,6 +12,7 @@ import { canonicalJsonString } from '../canonical-json.js';
 import type { BaseScreenRenderer } from '../renderer/renderer.js';
 import type { BaseScreenViewerRefreshOptions } from './viewer-configuration.js';
 import { resolveHostVariableBatch } from './viewer-host-variable-resolution.js';
+import { hostResolvedVariables } from './viewer-variable-request.js';
 
 export interface ViewerVariableControllerHost {
   readonly readRenderer: () => BaseScreenRenderer | undefined;
@@ -63,11 +63,7 @@ export class ViewerVariableController {
   refreshVariables(options: ScreenVariableRefreshOptions = {}): void {
     const document = this.#host.readDocument();
     if (document === undefined) return;
-    const availableIds = new Set(
-      document.variables
-        .filter((variable) => variable.type !== 'static')
-        .map((variable) => variable.id),
-    );
+    const availableIds = new Set(hostResolvedVariables(document).map((entry) => entry.id));
     const requested =
       options.variableIds === undefined
         ? undefined
@@ -206,7 +202,7 @@ export class ViewerVariableController {
       ...plan.initialVariables,
       ...this.#host.readBlueprintVariables(),
     };
-    const dynamicVariables = document.variables.filter((variable) => variable.type !== 'static');
+    const dynamicVariables = hostResolvedVariables(document);
     if (dynamicVariables.length > 0) {
       const variablePort = this.#host.readVariablePort();
       if (variablePort === undefined) {
@@ -273,10 +269,8 @@ export class ViewerVariableController {
     const document = this.#host.readDocument();
     const previous = this.#host.readBlueprintVariables();
     if (renderer === undefined || document === undefined || previous === undefined) return false;
-    const dynamicVariables = document.variables.filter(
-      (variable): variable is ScreenDynamicVariable =>
-        variable.type !== 'static' &&
-        (requestedIds === undefined || requestedIds.includes(variable.id)),
+    const dynamicVariables = hostResolvedVariables(document).filter(
+      (variable) => requestedIds === undefined || requestedIds.includes(variable.id),
     );
     if (dynamicVariables.length === 0) return true;
     const port = this.#host.readVariablePort();

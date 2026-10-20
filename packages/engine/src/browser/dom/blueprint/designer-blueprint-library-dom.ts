@@ -1,9 +1,13 @@
-import type { ScreenDocument, ScreenVariable } from '@base-screen/contracts';
+import type { ScreenDocument } from '@base-screen/contracts';
 import type {
   BaseScreenBlueprintCanvasGraph,
   BaseScreenBlueprintCanvasNode,
   BaseScreenBlueprintCanvasSelection,
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
+import {
+  type DesignerVariableView,
+  readDesignerVariableViews,
+} from '../../../common/operations/designer-variable-view.js';
 import {
   type BaseScreenDesignerLeftPanelGroup,
   baseScreenDesignerLeftPanelGroupSupportsMode,
@@ -186,7 +190,7 @@ function variablePane(
   const placed = new Set(
     graph.nodes.filter((node) => node.kind === 'variable').map((node) => node.id),
   );
-  const variables = (document?.variables ?? []).filter((variable) =>
+  const variables = readDesignerVariableViews(document).filter((variable) =>
     `${variable.name} ${variable.type} ${variable.type === 'static' ? JSON.stringify(variable.initialValue) : variable.sourceId}`
       .toLocaleLowerCase()
       .includes(query),
@@ -265,7 +269,7 @@ function logicItem(
   </div>`;
 }
 
-function variableItem(variable: ScreenVariable, placed: boolean, selected: boolean): string {
+function variableItem(variable: DesignerVariableView, placed: boolean, selected: boolean): string {
   const detail =
     variable.type === 'static' ? JSON.stringify(variable.initialValue) : variable.sourceId;
   const action = placed

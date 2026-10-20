@@ -1,10 +1,10 @@
 import {
   parseScreenJsonValue,
   type ScreenDocument,
-  type ScreenDynamicVariable,
   type ScreenHostVariablePort,
   type ScreenJsonValue,
 } from '@base-screen/contracts';
+import { hostResolvedVariables, readHostVariableRequest } from './viewer-variable-request.js';
 
 const HOST_VARIABLE_TIMEOUT_MS = 15_000;
 const HOST_VARIABLE_VALUE_BYTES = 1024 * 1024;
@@ -15,11 +15,8 @@ export async function resolveHostVariableBatch(
   controller: AbortController,
   requestedIds?: readonly string[],
 ): Promise<ReadonlyMap<string, ScreenJsonValue> | undefined> {
-  const availableIds = new Set(
-    document.variables
-      .filter((variable): variable is ScreenDynamicVariable => variable.type !== 'static')
-      .map((variable) => variable.id),
-  );
+  const available = hostResolvedVariables(document);
+  const availableIds = new Set(available.map((entry) => entry.id));
   const ids = new Set(
     requestedIds === undefined
       ? availableIds
@@ -37,25 +34,14 @@ export async function resolveHostVariableBatch(
   try {
     const requests = Promise.all(
       [...ids].map(async (variableId) => {
-        const variable = document.variables.find(
-          (candidate): candidate is ScreenDynamicVariable =>
-            candidate.id === variableId && candidate.type !== 'static',
-        )!;
+        const entry = available.find((candidate) => candidate.id === variableId);
+        const request =
+          entry === undefined
+            ? undefined
+            : readHostVariableRequest(document, entry, 'runtime', controller.signal);
         return {
           variableId,
-          result: await port.resolve({
-            variableId: variable.id,
-            sourceId: variable.sourceId,
-            sourceType: variable.type,
-            initialValue: variable.initialValue,
-            controlled: variable.controlled,
-            ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
-            ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
-              ? { autoUpdate: variable.autoUpdate }
-              : {}),
-            purpose: 'runtime',
-            signal: controller.signal,
-          }),
+          result: request === undefined ? undefined : await port.resolve(request),
         };
       }),
     );
@@ -63,7 +49,7 @@ export async function resolveHostVariableBatch(
     if (settled === undefined || controller.signal.aborted) return undefined;
     const values = new Map<string, ScreenJsonValue>();
     for (const { variableId, result } of settled) {
-      if (!result.ok) return undefined;
+      if (result === undefined || !result.ok) return undefined;
       const parsed = parseScreenJsonValue(result.value, { maxBytes: HOST_VARIABLE_VALUE_BYTES });
       if (!parsed.ok) return undefined;
       values.set(variableId, parsed.value);

@@ -39,6 +39,7 @@ function document(components = [component()]): ScreenDocument {
   return {
     canvas: { width: 1920, height: 1080, backgroundColor: '#000000' },
     components,
+    dataSources: [],
     variables: [],
     blueprint: { rules: [] },
   };

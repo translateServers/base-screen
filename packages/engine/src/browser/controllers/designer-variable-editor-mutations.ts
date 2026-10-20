@@ -2,6 +2,7 @@ import {
   type ScreenDocument,
   type ScreenParseResult,
   type ScreenVariable,
+  type ScreenVariableEntry,
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
 import {
@@ -17,8 +18,8 @@ import {
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerVariableBuildDraft {
-  readonly variables: readonly ScreenVariable[];
-  readonly current: ScreenVariable | undefined;
+  readonly variables: readonly ScreenVariableEntry[];
+  readonly current: ScreenVariableEntry | undefined;
   readonly type: ScreenVariable['type'];
   readonly name: string;
   readonly description: string | undefined;
@@ -40,7 +41,7 @@ export interface DesignerVariableEditorMutationContext {
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
   readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
   readonly reportFieldFailure: (selector: string, message: string) => void;
-  readonly commit: (variables: readonly ScreenVariable[]) => boolean;
+  readonly commit: (variables: readonly ScreenVariableEntry[]) => boolean;
 }
 
 export function buildDesignerVariable(
@@ -86,7 +87,7 @@ export function buildDesignerVariable(
 }
 
 export function validateDesignerVariableEditorName(
-  variables: readonly ScreenVariable[],
+  variables: readonly ScreenVariableEntry[],
   name: string,
   exceptIndex: number,
   selector: string,
@@ -153,7 +154,7 @@ export function confirmDesignerVariableDescription(
   const next = { ...variable } as Record<string, unknown>;
   if (description === undefined) delete next.description;
   else next.description = description;
-  variables[index] = next as unknown as ScreenVariable;
+  variables[index] = next as unknown as ScreenVariableEntry;
   return context.commit(variables);
 }
 

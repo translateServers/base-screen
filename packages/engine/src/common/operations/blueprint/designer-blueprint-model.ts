@@ -8,6 +8,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import { readDesignerVariableViews } from '../designer-variable-view.js';
 import { hasDesignerBlueprintCapability } from './designer-blueprint-capabilities.js';
 import type { DesignerBlueprintEventOption } from './designer-blueprint-model-types.js';
 import {
@@ -111,7 +112,7 @@ export function buildDesignerBlueprintVariableLibrary(
   document: ScreenDocument,
 ): readonly BaseScreenBlueprintCanvasNode[] {
   const saved = new Map(document.blueprint.layout?.nodes.map((node) => [node.id, node] as const));
-  return document.variables.map((variable, index) =>
+  return readDesignerVariableViews(document).map((variable, index) =>
     withSavedPosition(
       {
         id: variableBlueprintNodeId(variable.id),

@@ -7,6 +7,7 @@ import {
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
 import { collectVariableReferences } from '../../common/operations/designer-variable-operations.js';
+import { readDesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import {
   type DesignerVariablesDraft,
   renderDesignerVariables,
@@ -205,9 +206,11 @@ export class DesignerVariablesController {
         this.#editor.requestDelete(index);
         return true;
       case 'preview': {
-        const variable =
-          this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
-        if (variable !== undefined) void this.#catalog.preview(variable);
+        const document = this.#lastDocument ?? this.callbacks.getDocument();
+        const entry = document?.variables[index];
+        if (document !== undefined && entry !== undefined) {
+          void this.#catalog.preview(readDesignerVariableView(document, entry));
+        }
         return true;
       }
       case 'add-to-blueprint': {

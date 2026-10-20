@@ -8,6 +8,10 @@ import type {
 } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
 import { DesignerVariableCatalogController } from '../../../src/browser/controllers/designer-variable-catalog-controller.js';
+import {
+  type DesignerVariableView,
+  readDesignerVariableView,
+} from '../../../src/common/operations/designer-variable-view.js';
 
 describe('DesignerVariableCatalogController', () => {
   it('cancels superseded searches and ignores their late results', async () => {
@@ -165,8 +169,8 @@ function page(sourceId: string, nextCursor?: string): ScreenParseResult<ScreenHo
   };
 }
 
-function dynamicVariable(sourceId: string): ScreenVariable {
-  return {
+function dynamicVariable(sourceId: string): DesignerVariableView {
+  const variable: ScreenVariable = {
     type: 'data-source',
     id: `variable-${sourceId}`,
     name: sourceId,
@@ -174,6 +178,7 @@ function dynamicVariable(sourceId: string): ScreenVariable {
     sourceId,
     controlled: true,
   };
+  return readDesignerVariableView(undefined, variable);
 }
 
 interface Deferred<T> {

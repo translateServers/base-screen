@@ -6,8 +6,8 @@ import {
   type ScreenHostVariableCatalogPort,
   type ScreenHostVariableDescriptor,
   type ScreenHostVariablePort,
-  type ScreenVariable,
 } from '@base-screen/contracts';
+import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import type { DesignerVariableCatalogView } from '../dom/designer-variables-dom.js';
 
@@ -64,7 +64,7 @@ export class DesignerVariableCatalogController {
     return descriptor;
   }
 
-  async preview(variable: ScreenVariable): Promise<void> {
+  async preview(variable: DesignerVariableView): Promise<void> {
     if (variable.type === 'static') return;
     const variableId = variable.id;
     const descriptor =
@@ -108,13 +108,11 @@ export class DesignerVariableCatalogController {
         port.resolve({
           variableId,
           sourceId: variable.sourceId,
-          sourceType: variable.type,
+          sourceType: variable.type === 'url-query' ? 'url-query' : 'data-source',
           initialValue: variable.initialValue,
           controlled: variable.controlled,
           ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
-          ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
-            ? { autoUpdate: variable.autoUpdate }
-            : {}),
+          ...(variable.autoUpdate === undefined ? {} : { autoUpdate: variable.autoUpdate }),
           purpose: 'authoring-preview',
           signal: controller.signal,
         }),

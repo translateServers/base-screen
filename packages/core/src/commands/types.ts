@@ -11,7 +11,7 @@ import type {
   ScreenJsonObject,
   ScreenPosition,
   ScreenSize,
-  ScreenVariable,
+  ScreenVariableEntry,
 } from '@base-screen/contracts';
 
 /**
@@ -42,7 +42,7 @@ export type ScreenDocumentCommand =
       readonly parentId: string | null;
     }
   | { readonly type: 'replace-blueprint'; readonly blueprint: ScreenBlueprint }
-  | { readonly type: 'replace-variables'; readonly variables: readonly ScreenVariable[] }
+  | { readonly type: 'replace-variables'; readonly variables: readonly ScreenVariableEntry[] }
   | {
       readonly type: 'rename-variable';
       readonly variableId: string;

@@ -3,11 +3,14 @@ import {
   parseScreenDatasetDefinition,
   parseScreenJsonValue,
   parseScreenTabularDataset,
-  type ScreenDynamicVariable,
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
 import { validateScreenHostResourceBinding } from '@base-screen/core';
+import {
+  type DesignerVariableView,
+  readDesignerVariableView,
+} from '../../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type {
   DesignerDatasetDraftView,
@@ -164,13 +167,17 @@ async function resolvePreviewParameters(
 ): Promise<Readonly<Record<string, ScreenJsonValue>> | undefined> {
   const params: Record<string, ScreenJsonValue> = {};
   const document = context.callbacks.getDocument();
-  const hostVariables = new Map<string, ScreenDynamicVariable>();
+  const hostVariables = new Map<string, DesignerVariableView>();
   for (const [name, parameter] of Object.entries(draft.params)) {
     if (parameter.kind === 'literal') {
       params[name] = parameter.value;
       continue;
     }
-    const variable = document?.variables.find((item) => item.id === parameter.variableId);
+    const entry = document?.variables.find((item) => item.id === parameter.variableId);
+    const variable =
+      document === undefined || entry === undefined
+        ? undefined
+        : readDesignerVariableView(document, entry);
     if (variable?.type === 'static') {
       params[name] = variable.initialValue;
       continue;
@@ -198,13 +205,11 @@ async function resolvePreviewParameters(
         result: await port.resolve({
           variableId: variable.id,
           sourceId: variable.sourceId,
-          sourceType: variable.type,
+          sourceType: variable.type === 'url-query' ? 'url-query' : 'data-source',
           initialValue: variable.initialValue,
           controlled: variable.controlled,
           ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
-          ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
-            ? { autoUpdate: variable.autoUpdate }
-            : {}),
+          ...(variable.autoUpdate === undefined ? {} : { autoUpdate: variable.autoUpdate }),
           purpose: 'authoring-preview',
           signal: controller.signal,
         }),

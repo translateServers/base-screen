@@ -20,6 +20,7 @@ const document: ScreenDocument = {
       dataSource: { type: 'static', value: '导入' },
     },
   ],
+  dataSources: [],
   variables: [],
   blueprint: { rules: [] },
 };

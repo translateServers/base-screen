@@ -2,7 +2,7 @@ import {
   isScreenVariableName,
   parseScreenJsonValue,
   type ScreenJsonValue,
-  type ScreenVariable,
+  type ScreenVariableEntry,
 } from '@base-screen/contracts';
 import { isVariableNameTaken } from './designer-variable-operations.js';
 
@@ -35,13 +35,13 @@ export function parseDesignerStaticVariableValue(source: string): ScreenJsonValu
 }
 
 export function nextDesignerVariableCopyName(
-  variables: readonly ScreenVariable[],
+  variables: readonly ScreenVariableEntry[],
   name: string,
 ): string {
   return nextDesignerVariableName(variables, `${name.slice(0, 123)}Copy`);
 }
 
-export function nextDesignerVariableId(variables: readonly ScreenVariable[]): string {
+export function nextDesignerVariableId(variables: readonly ScreenVariableEntry[]): string {
   const ids = new Set(variables.map((variable) => variable.id));
   for (let index = 1; index <= 10_000; index++) {
     const id = `variable-${index}`;
@@ -51,7 +51,7 @@ export function nextDesignerVariableId(variables: readonly ScreenVariable[]): st
 }
 
 export function nextDesignerVariableName(
-  variables: readonly ScreenVariable[],
+  variables: readonly ScreenVariableEntry[],
   preferred: string,
 ): string {
   const safePreferred = isDesignerVariableName(preferred) ? preferred : 'globalVariable';

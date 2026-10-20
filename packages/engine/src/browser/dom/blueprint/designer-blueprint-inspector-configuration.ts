@@ -16,6 +16,7 @@ import {
   designerBlueprintEventFieldPaths,
   designerBlueprintSetVariableSource,
 } from '../../../common/operations/blueprint/designer-blueprint-value-sources.js';
+import { readDesignerVariableView } from '../../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { escapeAttribute, escapeHtml } from './designer-blueprint-dom-helpers.js';
@@ -116,8 +117,9 @@ function variableConfiguration(
   document: ScreenDocument,
   node: BaseScreenBlueprintCanvasNode,
 ): string {
-  const variable = document.variables.find((candidate) => candidate.id === node.variableId);
-  if (variable === undefined) return emptyInspector();
+  const entry = document.variables.find((candidate) => candidate.id === node.variableId);
+  if (entry === undefined) return emptyInspector();
+  const variable = readDesignerVariableView(document, entry);
   const related = document.blueprint.rules.filter(
     (rule) =>
       (rule.trigger.type === 'variable-event' && rule.trigger.variableId === variable.id) ||

@@ -2,6 +2,7 @@ import {
   type ScreenDocument,
   type ScreenParseResult,
   type ScreenVariable,
+  type ScreenVariableEntry,
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
 import {
@@ -10,6 +11,7 @@ import {
   normalizeDesignerVariableDescription,
 } from '../../common/operations/designer-variable-editing.js';
 import { buildReplaceVariablesCommand } from '../../common/operations/designer-variable-operations.js';
+import { readDesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import type { DesignerVariableCatalogController } from './designer-variable-catalog-controller.js';
 import {
@@ -121,8 +123,10 @@ export class DesignerVariableEditorController {
   }
 
   beginConfiguration(index: number): void {
-    const variable = this.callbacks.getDocument()?.variables[index];
-    if (variable === undefined) return;
+    const document = this.callbacks.getDocument();
+    const entry = document?.variables[index];
+    if (document === undefined || entry === undefined) return;
+    const variable = readDesignerVariableView(document, entry);
     this.reset();
     this.#creating = true;
     this.#configuringIndex = index;
@@ -160,8 +164,9 @@ export class DesignerVariableEditorController {
 
   duplicateVariable(index: number): void {
     const document = this.callbacks.getDocument();
-    const variable = document?.variables[index];
-    if (document === undefined || variable === undefined) return;
+    const entry = document?.variables[index];
+    if (document === undefined || entry === undefined) return;
+    const variable = readDesignerVariableView(document, entry);
     this.reset();
     this.#creating = true;
     this.#createType = variable.type;
@@ -348,7 +353,7 @@ export class DesignerVariableEditorController {
   }
 
   private createVariable(description: string | undefined): ScreenVariable | undefined {
-    const variables = this.callbacks.getDocument()?.variables ?? [];
+    const variables: readonly ScreenVariableEntry[] = this.callbacks.getDocument()?.variables ?? [];
     const current =
       this.#configuringIndex === undefined ? undefined : variables[this.#configuringIndex];
     const result = buildDesignerVariable({
@@ -384,7 +389,7 @@ export class DesignerVariableEditorController {
     input?.focus();
   }
 
-  private commit(variables: readonly ScreenVariable[]): boolean {
+  private commit(variables: readonly ScreenVariableEntry[]): boolean {
     const result = buildReplaceVariablesCommand(variables);
     if (!result.ok) {
       this.callbacks.report(result);

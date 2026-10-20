@@ -1,4 +1,5 @@
 import {
+  readScreenVariableRecord,
   SCREEN_BLUEPRINT_COMPONENT_VISIBILITY_CAPABILITY,
   type ScreenDocument,
   type ScreenJsonValue,
@@ -29,8 +30,10 @@ export function compileScreenBlueprint(
   }
   const initialVariables: Record<string, ScreenJsonValue> = {};
   for (const variable of document.variables) {
-    initialVariables[variable.id] = cloneValue(
-      variable.type !== 'static' && variable.controlled ? null : variable.initialValue,
+    const record = readScreenVariableRecord(variable);
+    // 值取自数据源输出且受控的变量：运行时的初值以宿主响应为准，这里给 `null` 占位。
+    initialVariables[record.id] = cloneValue(
+      record.controlled && record.value.kind === 'data-source-field' ? null : record.initialValue,
     );
   }
   return {

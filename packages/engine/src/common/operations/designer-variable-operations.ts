@@ -2,7 +2,7 @@ import type {
   ScreenBlueprintValueExpression,
   ScreenDocument,
   ScreenParseResult,
-  ScreenVariable,
+  ScreenVariableEntry,
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
 
@@ -197,7 +197,7 @@ export function isVariableReferenced(document: ScreenDocument, variableId: strin
  * （被编辑的变量自身不算冲突）。
  */
 export function isVariableNameTaken(
-  variables: readonly ScreenVariable[],
+  variables: readonly ScreenVariableEntry[],
   name: string,
   exceptIndex = -1,
 ): boolean {
@@ -206,7 +206,7 @@ export function isVariableNameTaken(
 
 /** 构建 `replace-variables` 命令（整组替换，core fail-closed 校验）。 */
 export function buildReplaceVariablesCommand(
-  variables: readonly ScreenVariable[],
+  variables: readonly ScreenVariableEntry[],
 ): ScreenParseResult<ScreenDocumentCommand> {
   if (variables.length > 1000) {
     return {

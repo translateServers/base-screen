@@ -1,11 +1,11 @@
-import type { ScreenVariable } from '@base-screen/contracts';
 import type { DesignerVariableReference } from '../../common/operations/designer-variable-operations.js';
+import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
 
 export function createVariableReferenceCount(
   ownerDocument: Document,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
   count: number,
   expanded: boolean,
@@ -30,7 +30,7 @@ export function createVariableReferenceCount(
 
 export function appendVariableReferenceList(
   row: HTMLElement,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
   references: readonly DesignerVariableReference[],
 ): void {

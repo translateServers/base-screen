@@ -2,7 +2,6 @@ import {
   parseScreenJsonValue,
   type ScreenDiagnostic,
   type ScreenDocument,
-  type ScreenDynamicVariable,
   type ScreenHostVariablePort,
   type ScreenJsonObject,
   type ScreenJsonValue,
@@ -10,6 +9,10 @@ import {
   type ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import type { BaseScreenRenderer } from '@base-screen/renderer';
+import {
+  type DesignerVariableView,
+  readDesignerVariableViews,
+} from '../../common/operations/designer-variable-view.js';
 
 const HOST_VARIABLE_TIMEOUT_MS = 15_000;
 const HOST_VARIABLE_VALUE_BYTES = 1024 * 1024;
@@ -201,13 +204,11 @@ export class DesignerCanvasVariableController {
             result: await port.resolve({
               variableId,
               sourceId: variable.sourceId,
-              sourceType: variable.type,
+              sourceType: variable.type === 'url-query' ? 'url-query' : 'data-source',
               initialValue: variable.initialValue,
               controlled: variable.controlled,
               ...(variable.processorId === undefined ? {} : { processorId: variable.processorId }),
-              ...(variable.type === 'data-source' && variable.autoUpdate !== undefined
-                ? { autoUpdate: variable.autoUpdate }
-                : {}),
+              ...(variable.autoUpdate === undefined ? {} : { autoUpdate: variable.autoUpdate }),
               purpose: 'runtime',
               signal: controller.signal,
             }),
@@ -288,10 +289,8 @@ export class DesignerCanvasVariableController {
   }
 }
 
-function hostVariablesOf(document: ScreenDocument): readonly ScreenDynamicVariable[] {
-  return document.variables.filter(
-    (variable): variable is ScreenDynamicVariable => variable.type !== 'static',
-  );
+function hostVariablesOf(document: ScreenDocument): readonly DesignerVariableView[] {
+  return readDesignerVariableViews(document).filter((variable) => variable.type !== 'static');
 }
 
 function jsonEqual(left: ScreenJsonValue, right: ScreenJsonValue): boolean {

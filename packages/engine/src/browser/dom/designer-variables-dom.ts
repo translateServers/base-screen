@@ -2,9 +2,14 @@ import type {
   ScreenDocument,
   ScreenHostVariableDescriptor,
   ScreenHostVariableSummary,
+  ScreenJsonValue,
   ScreenVariable,
 } from '@base-screen/contracts';
 import type { DesignerVariableReference } from '../../common/operations/designer-variable-operations.js';
+import {
+  type DesignerVariableView,
+  readDesignerVariableViews,
+} from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../ui/designer-icons.js';
 import { createDesignerButton } from './designer-ui-primitives.js';
@@ -64,7 +69,7 @@ export function renderDesignerVariables(
   draft: DesignerVariablesDraft,
 ): void {
   panel.replaceChildren();
-  const variables = document?.variables ?? [];
+  const variables = readDesignerVariableViews(document);
   panel.dataset.variableCount = String(variables.length);
   appendVariablesToolbar(panel, draft, variables.length);
 
@@ -106,10 +111,10 @@ export function renderDesignerVariables(
 interface VariableGroup {
   readonly label: string;
   readonly types: readonly ScreenVariable['type'][];
-  readonly entries: readonly { readonly index: number; readonly variable: ScreenVariable }[];
+  readonly entries: readonly { readonly index: number; readonly variable: DesignerVariableView }[];
 }
 
-function variableGroups(variables: readonly ScreenVariable[]): readonly VariableGroup[] {
+function variableGroups(variables: readonly DesignerVariableView[]): readonly VariableGroup[] {
   const entries = variables.map((variable, index) => ({ index, variable }));
   return [
     {
@@ -132,7 +137,7 @@ function variableGroups(variables: readonly ScreenVariable[]): readonly Variable
 
 function appendVariableRow(
   list: HTMLElement,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
   draft: DesignerVariablesDraft,
 ): void {
@@ -162,7 +167,7 @@ function appendVariableRow(
 
 function appendVariableSummary(
   row: HTMLElement,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
   draft: DesignerVariablesDraft,
 ): void {
@@ -221,7 +226,7 @@ function appendVariableSummary(
     createDetailLine(
       row.ownerDocument,
       DESIGNER_UI_TEXT.variables.source,
-      sourceLabel(variable.type),
+      variableSourceLabel(variable),
     ),
   );
   details.appendChild(createValueDetail(row.ownerDocument, variable, index));
@@ -275,7 +280,7 @@ function appendVariableSummary(
  * 行首 14px 图形：静态颜色值显示为色板（与原型设计变量同形），其余按来源取图标。
  * 展开箭头复用同一 20px 槽位、叠在图形上，避免 hover 时行几何变化。
  */
-function createVariableGlyph(ownerDocument: Document, variable: ScreenVariable): HTMLElement {
+function createVariableGlyph(ownerDocument: Document, variable: DesignerVariableView): HTMLElement {
   const glyph = ownerDocument.createElement('span');
   glyph.className = 'variable-row-glyph';
   const color = variable.type === 'static' ? colorValue(variable.initialValue) : undefined;
@@ -297,7 +302,7 @@ function createVariableGlyph(ownerDocument: Document, variable: ScreenVariable):
   return glyph;
 }
 
-function colorValue(value: ScreenVariable['initialValue']): string | undefined {
+function colorValue(value: ScreenJsonValue): string | undefined {
   if (typeof value !== 'string') return undefined;
   const trimmed = value.trim();
   if (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/iu.test(trimmed)) return trimmed;
@@ -317,7 +322,7 @@ function createUsageLine(ownerDocument: Document, usage: HTMLElement): HTMLEleme
   return line;
 }
 
-function createRowContext(ownerDocument: Document, variable: ScreenVariable): HTMLElement {
+function createRowContext(ownerDocument: Document, variable: DesignerVariableView): HTMLElement {
   const context = ownerDocument.createElement('div');
   context.className = 'variable-row-context';
   const label = ownerDocument.createElement('span');
@@ -341,7 +346,11 @@ function createRowContext(ownerDocument: Document, variable: ScreenVariable): HT
   return context;
 }
 
-function appendCompactActions(header: HTMLElement, variable: ScreenVariable, index: number): void {
+function appendCompactActions(
+  header: HTMLElement,
+  variable: DesignerVariableView,
+  index: number,
+): void {
   const actions = header.ownerDocument.createElement('div');
   actions.className = 'variable-row-actions';
   actions.setAttribute('role', 'group');
@@ -426,7 +435,7 @@ function createIconAction(
 
 function createDescriptionAction(
   ownerDocument: Document,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
 ): HTMLElement {
   const button = createDesignerButton(ownerDocument, {
@@ -450,7 +459,7 @@ function createDescriptionAction(
 
 function createValueDetail(
   ownerDocument: Document,
-  variable: ScreenVariable,
+  variable: DesignerVariableView,
   index: number,
 ): HTMLElement {
   const serialized = formatValue(variable.initialValue);
@@ -529,6 +538,19 @@ function appendPreview(
   row.appendChild(preview);
 }
 
+/** 来源文案：旧三形态沿用三桶文案，单形态记录用「常量 / 来源输出」。 */
+function variableSourceLabel(variable: DesignerVariableView): string {
+  switch (variable.valueRefKind) {
+    case 'inline':
+      return DESIGNER_UI_TEXT.variables.valueSourceConstant;
+    case 'data-source-field':
+      return DESIGNER_UI_TEXT.variables.valueSourceSourceOutput;
+    default:
+      // 旧三形态（`valueRefKind === undefined`）沿用三桶文案。
+      return sourceLabel(variable.type);
+  }
+}
+
 function sourceLabel(type: ScreenVariable['type']): string {
   return type === 'static'
     ? DESIGNER_UI_TEXT.variables.typeStatic
@@ -537,7 +559,7 @@ function sourceLabel(type: ScreenVariable['type']): string {
       : DESIGNER_UI_TEXT.variables.typeUrlQuery;
 }
 
-function formatValue(value: ScreenVariable['initialValue']): string {
+function formatValue(value: ScreenJsonValue): string {
   return typeof value === 'string' && value !== '' ? value : JSON.stringify(value);
 }
 
