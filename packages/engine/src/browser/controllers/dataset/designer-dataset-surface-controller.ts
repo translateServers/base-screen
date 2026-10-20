@@ -1,4 +1,10 @@
+import type { ScreenComponentNode } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import {
+  applyDesignerDataState,
+  type DesignerDataStateInput,
+  deriveDesignerDataState,
+} from '../../dom/dataset/designer-data-state.js';
 import { renderDatasetCatalogResults } from '../../dom/dataset/designer-dataset-catalog-dom.js';
 import {
   type DesignerDataSourcePanelOptions,
@@ -15,6 +21,7 @@ import { renderDesignerDescriptorZone } from '../../dom/descriptor/designer-desc
 import { designerDataSourceModes } from './designer-data-source-authoring.js';
 import {
   type DesignerDatasetControllerContext,
+  type DesignerDatasetControllerState,
   emptyDatasetPreview,
 } from './designer-dataset-controller-context.js';
 
@@ -46,6 +53,74 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   });
   renderDataWorkbench(context, options);
   context.dataFlowScrollSync.bind(panel);
+  // 七态派生：面板任何时刻只有一个主状态（本轮只写 data 属性，视觉留给下一轮）。
+  applyDesignerDataState(panel, deriveDesignerDataState(dataStateInput(context)));
+}
+
+/**
+ * 从控制器上下文收集七态输入。
+ *
+ * 只收集**可观测**信号：端口在不在、实例解析出来没有、组件是否锁定、请求是否在途、
+ * 最近一次失败、结果是否为空。状态判定本身在 `deriveDesignerDataState` 里，保持单一入口。
+ */
+function dataStateInput(context: DesignerDatasetControllerContext): DesignerDataStateInput {
+  const source = context.currentComponent()?.dataSource ?? null;
+  const configured = source !== null || context.state.mode !== 'none';
+  if (!configured) return { configured: false };
+  const unavailable = unavailableReason(context, source);
+  const readonly: DesignerDataStateInput['readonly'] =
+    context.currentComponent()?.status.locked === true ? 'locked' : undefined;
+  const loading =
+    context.catalogController.status === 'loading' || context.state.preview.status === 'loading';
+  const failure = panelFailure(context);
+  const empty = isEmptyPreview(context.state.preview);
+  return {
+    configured,
+    ...(unavailable === undefined ? {} : { unavailable }),
+    ...(readonly === undefined ? {} : { readonly }),
+    ...(loading ? { loading } : {}),
+    ...(failure === undefined ? {} : { failure }),
+    ...(empty ? { empty } : {}),
+  };
+}
+
+function unavailableReason(
+  context: DesignerDatasetControllerContext,
+  source: ScreenComponentNode['dataSource'],
+): DesignerDataStateInput['unavailable'] {
+  const mode = context.state.mode;
+  // 用布尔量先归一，避免 `a || b` 里的类型收窄互相干扰。
+  const configuredAsDataset = source?.type === 'dataset' || mode === 'dataset';
+  const configuredAsVariable = source?.type === 'variable' || mode === 'variable';
+  const configuredAsHostResource = source?.type === 'host-resource' || mode === 'host-resource';
+  if (configuredAsDataset) {
+    if (context.callbacks.getCatalogPort() === undefined) return 'port-missing';
+    // 选了数据集但描述拿不回来：实例不存在（被删/未发布），不是端口问题。
+    return context.state.draft !== undefined && context.state.descriptor === undefined
+      ? 'instance-missing'
+      : undefined;
+  }
+  if (configuredAsVariable) {
+    return context.callbacks.getHostCatalogPort?.() === undefined ? 'port-missing' : undefined;
+  }
+  if (configuredAsHostResource) {
+    return context.callbacks.getResourcePort() === undefined ? 'port-missing' : undefined;
+  }
+  return undefined;
+}
+
+function panelFailure(context: DesignerDatasetControllerContext): string | undefined {
+  if (context.state.preview.status === 'error') return context.state.preview.message;
+  if (context.catalogController.status === 'error') return 'catalog';
+  return undefined;
+}
+
+function isEmptyPreview(preview: DesignerDatasetControllerState['preview']): boolean {
+  if (preview.status !== 'ready' || preview.rawValue === undefined) return false;
+  const value = preview.rawValue;
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
+  const rows = (value as { readonly rows?: unknown }).rows;
+  return Array.isArray(rows) && rows.length === 0;
 }
 
 /**
