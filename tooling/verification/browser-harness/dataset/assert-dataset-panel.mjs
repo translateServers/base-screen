@@ -31,6 +31,47 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await designer.getByRole('tab', { name: '数据源', exact: true }).click();
   const dataPanel = await openDataset(designer, page);
 
+  // 2') 配置态取值方式：可见文本是短名，无障碍名（title / aria-label）必须是全称。
+  //     这两件事错配时"可见文本非空、aria-label 也非空"，人眼与截图都看不出来，只有 DOM 能判。
+  const segmentedSurface = await dataPanel.evaluate((panel) => {
+    const options = [...panel.querySelectorAll('.designer-data-entry-segmented [data-data-entry]')];
+    return {
+      count: options.length,
+      options: options.map((option) => ({
+        entry: option.dataset.dataEntry,
+        text: option.textContent,
+        title: option.getAttribute('title'),
+        ariaLabel: option.getAttribute('aria-label'),
+        checked: option.getAttribute('aria-checked'),
+      })),
+    };
+  });
+  const shortLabels = {
+    static: '\u56fa\u5b9a\u503c',
+    variable: '\u53d8\u91cf',
+    source: '\u6570\u636e\u6e90',
+  };
+  const fullLabels = {
+    static: '\u8f93\u5165\u56fa\u5b9a\u503c',
+    variable: '\u7528\u53d8\u91cf',
+    source: '\u63a5\u6570\u636e\u6e90',
+  };
+  if (
+    segmentedSurface.count !== 3 ||
+    segmentedSurface.options.some(
+      (option) =>
+        option.text !== shortLabels[option.entry] ||
+        option.ariaLabel !== fullLabels[option.entry] ||
+        // 禁用段位的 title 会叠上原因，所以只要求以全称开头。
+        !(option.title ?? '').startsWith(fullLabels[option.entry]) ||
+        option.checked !== String(option.entry === 'source'),
+    )
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_SEGMENTED_LABELS_FAILED:${JSON.stringify(segmentedSurface)}`,
+    );
+  }
+
   // 1) 目录搜索：去抖后的回包只换结果区，搜索框保持同一节点、焦点与输入都还在。
   await dataPanel.locator('[data-dataset-change]').click();
   const query = dataPanel.locator('[data-dataset-query]');
@@ -206,6 +247,7 @@ export async function assertDatasetPanelInteraction(designer, page) {
       const reason = row.querySelector('.designer-data-entry-guide-reason');
       return {
         entry: row.dataset.dataEntry,
+        disabled: row.disabled,
         title: row.querySelector('.designer-data-entry-guide-title')?.textContent ?? null,
         descriptionClipped:
           description === null ? null : description.scrollHeight > description.clientHeight + 1,
@@ -232,11 +274,17 @@ export async function assertDatasetPanelInteraction(designer, page) {
         ['variable', '\u7528\u53d8\u91cf'],
         ['source', '\u63a5\u6570\u636e\u6e90'],
       ]) ||
-    // 2) 禁用原因独占一行：原因顶边不低于描述底边
-    variableRow?.reasonText === null ||
-    variableRow?.reasonText === undefined ||
-    variableRow.reasonTop === null ||
+    // 2) 禁用行：原因存在、独占一行（顶边不低于描述底边）、且右侧不画 chevron；
+    //    可用行反过来：没有原因、有 chevron。
+    emptyState.rows.some((row) =>
+      row.disabled
+        ? row.reasonText === null || row.chevron !== false
+        : row.reasonText !== null || row.chevron !== true,
+    ) ||
+    variableRow?.reasonTop === null ||
+    variableRow?.reasonTop === undefined ||
     variableRow.descriptionBottom === null ||
+    variableRow.descriptionBottom === undefined ||
     variableRow.reasonTop < variableRow.descriptionBottom ||
     // 3) 描述没有被裁切
     emptyState.rows.some((row) => row.descriptionClipped !== false) ||
