@@ -33,9 +33,14 @@ import {
   type BaseScreenViewerRefreshOptions,
   parseBaseScreenViewerConfiguration,
 } from './viewer-configuration.js';
+import { ViewerDataSourceScheduler } from './viewer-data-source-scheduler.js';
 import { lifecycleFailure } from './viewer-lifecycle.js';
 import { ViewerVariableController } from './viewer-variable-controller.js';
-import { ViewerVariableHandles, viewerVariableValuesEqual } from './viewer-variable-handles.js';
+import {
+  checkViewerVariableWritable,
+  ViewerVariableHandles,
+  viewerVariableValuesEqual,
+} from './viewer-variable-handles.js';
 
 const ElementBase =
   (globalThis as { readonly HTMLElement?: typeof HTMLElement }).HTMLElement ??
@@ -80,9 +85,11 @@ export class BaseScreenViewerElement extends ElementBase {
     writeBlueprintVariables: (variables) => {
       this.writeBlueprintVariables(variables, true);
     },
-    readHostCatalogPort: () => this.#hostCatalogPort,
-    emitDiagnostic: (code) => this.emitDiagnostic(code),
     emitDiagnostics: (diagnostics) => this.emitDiagnostics(diagnostics),
+  });
+  readonly #scheduler = new ViewerDataSourceScheduler({
+    readRenderer: () => this.#renderer,
+    readDocument: () => this.#document,
   });
 
   /**
@@ -114,6 +121,7 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#documentRevision = value.documentRevision;
     this.initialize();
     this.#variableRuntime.start(undefined, false, true);
+    this.#scheduler.sync(this.#document);
     return { ok: true, value: null, diagnostics: [] };
   }
 
@@ -232,24 +240,30 @@ export class BaseScreenViewerElement extends ElementBase {
 
   set document(value: ScreenDocument | undefined) {
     this.#variableRuntime.cancel();
+    this.#scheduler.suspend();
     this.#renderer?.resetBlueprintVisibility();
     this.#document = value;
     this.compileBlueprint();
     this.initialize();
     this.#variableRuntime.start(undefined, false, true);
+    // 新文档的策略集合：resume 会清掉挂起标记并按当前文档重建定时器。
+    this.#scheduler.resume();
   }
 
   connectedCallback(): void {
     this.initialize();
     this.#variableRuntime.start(undefined, false, true);
+    this.#scheduler.resume();
   }
 
   disconnectedCallback(): void {
+    this.#scheduler.suspend();
     this.#variableRuntime.cancel();
     this.#renderer?.clear();
   }
 
   unload(): void {
+    this.#scheduler.dispose();
     this.#variableRuntime.reset();
     this.#variableHandles.clear();
     this.disposeRenderer();
@@ -295,6 +309,9 @@ export class BaseScreenViewerElement extends ElementBase {
       },
       resourcePort: this.#resourcePort,
       ...(this.#datasetPort === undefined ? {} : { datasetPort: this.#datasetPort }),
+      ...(this.#hostCatalogPort === undefined ? {} : { hostCatalogPort: this.#hostCatalogPort }),
+      onDataSourceSettled: (dataSourceId) =>
+        this.#variableRuntime.handleDataSourceSettled(dataSourceId),
       ...(this.#conditionalStylePort === undefined
         ? {}
         : { conditionalStylePort: this.#conditionalStylePort }),
@@ -423,14 +440,18 @@ export class BaseScreenViewerElement extends ElementBase {
     const renderer = this.#renderer;
     const document = this.#document;
     const previous = this.#blueprintVariables;
+    const entry = document?.variables.find((variable) => variable.id === id);
     if (
       renderer === undefined ||
       document === undefined ||
       previous === undefined ||
-      !document.variables.some((variable) => variable.id === id)
+      entry === undefined
     ) {
       return lifecycleFailure('Viewer variable is unavailable.');
     }
+    // 与 `handle.set` 同一道校验：受控变量不接受外部写入，蓝图动作也不例外。
+    const forbidden = checkViewerVariableWritable(entry);
+    if (forbidden !== undefined) return forbidden;
     if (viewerVariableValuesEqual(previous[id], parsed.value)) {
       return { ok: true, value: null, diagnostics: [] };
     }
@@ -471,12 +492,6 @@ export class BaseScreenViewerElement extends ElementBase {
       }
     }
     return changed;
-  }
-
-  private emitDiagnostic(code: ScreenDiagnostic['code']): void {
-    this.emitDiagnostics([
-      { severity: 'error', code, path: [], message: 'Host dataset state is unavailable.' },
-    ]);
   }
 
   private emitDiagnostics(diagnostics: readonly ScreenDiagnostic[]): void {

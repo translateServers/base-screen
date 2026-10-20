@@ -6,7 +6,6 @@ import {
   createImmediateResourcePort,
   createVariablePort,
   createViewerHarness,
-  diagnosticCodes,
   document,
   flush,
   hostSource,
@@ -362,8 +361,8 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     viewer.unload();
   });
 
-  it('a failing or missing host variable blocks every resource query', async () => {
-    const variables = createVariablePort({});
+  it('a failing host variable falls back to initialValue instead of blocking the screen', async () => {
+    const variables = createVariablePort({}, true);
     const resources = createDeferredResourcePort();
     const catalog = createHostResourceCatalog();
     const screen = document(
@@ -375,17 +374,27 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       ],
       [hostVariable('region', 'region')],
     );
-    const { dispatched } = await createViewerHarness({
+    const { viewer } = await createViewerHarness({
       catalog,
       document: screen,
       resourcePort: resources.port,
       variablePort: variables.port,
     });
     await flush();
-
-    expect(resources.requests).toHaveLength(0);
-    expect(diagnosticCodes(dispatched)).toContain('HOST_DATASET_VARIABLE_INVALID');
     expect(variables.requests).toHaveLength(1);
+
+    // 变量实例失败：变量回落 initialValue（不是 undefined），组件照常取数。
+    variables.requests[0]!.resolveRequest({
+      ok: false,
+      diagnostics: [
+        { severity: 'error', code: 'HOST_RESOURCE_UNAVAILABLE', path: [], message: 'down' },
+      ],
+    });
+    await flush();
+
+    expect(viewer.getVariable('region')?.value).toBeNull();
+    expect(resources.requests).toHaveLength(1);
+    expect(resources.requests[0]!.request.params).toEqual({ region: null });
   });
 
   it('a variable change only re-queries the components whose params depend on it', async () => {
@@ -508,38 +517,27 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
     );
     viewer.document = newDocument;
     await flush();
-    expect(variables.requests).toHaveLength(2);
+    // 同变量、同来源 ⇒ 同一实例：切换文档命中实例缓存，不重复向宿主解析变量。
+    expect(variables.requests).toHaveLength(1);
     expect(oldRequest.aborted).toBe(true);
     expect(oldRequest.signal.aborted).toBe(true);
 
-    // The old material is suspended into loading; a late result for the old
-    // request is rejected and can never reach the material.
-    const oldElement = mount.children.find(
-      (element) => element.dataset.baseScreenComponentId === 'old',
-    )!;
-    expect(oldElement.model?.dataState.status).toBe('loading');
+    // 新文档立刻渲染（变量命中实例缓存）：旧挂载被拆掉，只剩新组件。
+    expect(mount.children).toHaveLength(1);
+    const elementNew = mount.children[0]!;
+    expect(elementNew.dataset.baseScreenComponentId).toBe('new');
+    expect(elementNew.model?.dataState.status).toBe('loading');
+
+    // 旧请求的晚到结果被丢弃：既不能再挂到任何材料上，也不改写新结果。
     oldRequest.resolveRequest({ ok: true, value: { stale: true }, diagnostics: [] });
     await flush();
-    expect(oldElement.model?.dataState.status).toBe('loading');
+    expect(elementNew.model?.dataState.status).toBe('loading');
 
-    // Once the new document's variable resolves, the old mount is torn down
-    // and only the new document's resource starts, with the freshly evaluated
-    // params.
-    variables.requests[1]!.resolveRequest({
-      ok: true,
-      value: 'north',
-      diagnostics: [],
-    });
-    await flush();
+    // 新组件的请求按新参数取值。
     expect(resources.requests).toHaveLength(2);
     expect(resources.requests[1]!.request.dataSourceId).toBe('data-source-new');
     expect(resources.requests[1]!.request.params).toEqual({ region: 'north' });
     expect(resources.requests[1]!.aborted).toBe(false);
-    expect(mount.children).toHaveLength(1);
-    const elementNew = mount.children[0]!;
-    expect(elementNew.dataset.baseScreenComponentId).toBe('new');
-    // The stale value never applied; the new resource is still pending.
-    expect(elementNew.model?.dataState.status).toBe('loading');
   });
 
   it('two viewer instances keep their resource and variable ports isolated', async () => {
@@ -688,43 +686,28 @@ describe('BaseScreenViewerElement refresh and variable behavior', () => {
       true,
     );
 
-    // A manual refresh starts a fresh variable resolution; while that variable
-    // is pending a polling refresh is queued with its own traceId. The queued
-    // intent must survive the completing manual refresh instead of being reset
-    // before the completion callback consumes it.
+    // 一次手动刷新：数据源实例按 manual + 自己的 traceId 重新取数。
     viewer.refreshData({ trigger: 'manual', traceId: 'manual-trace-1' });
     expect(variables.requests).toHaveLength(2);
-    viewer.refreshData({ trigger: 'polling', traceId: 'poll-trace-2' });
-    expect(variables.requests).toHaveLength(2);
-    expect(resources.requests).toHaveLength(2);
-
-    variables.requests[1]!.resolveRequest({
-      ok: true,
-      value: 'north',
-      diagnostics: [],
-    });
+    await flush();
+    const manual = resources.requests.slice(2);
+    expect(manual).toHaveLength(2);
+    expect(manual.every((request) => request.context?.trigger === 'manual')).toBe(true);
+    expect(manual.every((request) => request.context?.traceId === 'manual-trace-1')).toBe(true);
+    for (const request of manual) {
+      request.resolveRequest({ ok: true, value: { ready: true }, diagnostics: [] });
+    }
     await flush();
 
-    // The manual refresh re-issues every component with its own context; the
-    // queued polling refresh is then replayed with the queued trigger/trace.
-    const after = resources.requests.slice(2);
-    expect(after.map((request) => request.request.dataSourceId)).toEqual([
-      'data-source-a',
-      'data-source-b',
-      'data-source-a',
-      'data-source-b',
-    ]);
-    const manual = after.slice(0, 2);
-    const queued = after.slice(2);
-    for (const request of manual) {
-      expect(request.context?.trigger).toBe('manual');
-      expect(request.context?.traceId).toBe('manual-trace-1');
-    }
-    for (const request of queued) {
-      expect(request.context?.trigger).toBe('polling');
-      expect(request.context?.traceId).toBe('poll-trace-2');
-    }
-    expect(resources.requests.filter((request) => request.aborted)).toHaveLength(0);
+    // 随后的 polling 刷新带自己的 trigger/trace：每次调用独立派生上下文，
+    // 不再有「排队等上一轮变量解析」的窗口。
+    const baseline = resources.requests.length;
+    viewer.refreshData({ trigger: 'polling', traceId: 'poll-trace-2' });
+    await flush();
+    const polling = resources.requests.slice(baseline);
+    expect(polling).toHaveLength(2);
+    expect(polling.every((request) => request.context?.trigger === 'polling')).toBe(true);
+    expect(polling.every((request) => request.context?.traceId === 'poll-trace-2')).toBe(true);
     viewer.unload();
   });
 });

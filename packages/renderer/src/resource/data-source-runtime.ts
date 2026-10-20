@@ -117,6 +117,7 @@ export class DataSourceRuntime {
     document: ScreenDocument,
     variables: ScreenJsonObject,
     context: { readonly trigger: string; readonly traceId: string },
+    options: { readonly startOnly?: ReadonlySet<string> } = {},
   ): void {
     this.#document = document;
     this.#variables = variables;
@@ -129,7 +130,7 @@ export class DataSourceRuntime {
     for (const instance of instances) {
       const entry = this.#entry(instance.id);
       entry.source = instance.source;
-      this.#ensureInstance(entry, instance, environment, context);
+      this.#ensureInstance(entry, instance, environment, context, options.startOnly);
     }
     // 文档里已经不存在的实例：取消在途请求并丢弃条目（文档是唯一真相）。
     const live = new Set(instances.map((instance) => instance.id));
@@ -279,6 +280,7 @@ export class DataSourceRuntime {
     instance: ScreenDataSource,
     environment: MutableEnvironment,
     context: { readonly trigger: string; readonly traceId: string },
+    startOnly: ReadonlySet<string> | undefined,
   ): void {
     const params = this.#evaluateParams(instance.params, environment);
     if (params.kind === 'pending') {
@@ -317,6 +319,7 @@ export class DataSourceRuntime {
       );
       return;
     }
+    if (startOnly !== undefined && !startOnly.has(entry.dataSourceId)) return;
     this.#startRequest(entry, context);
   }
 

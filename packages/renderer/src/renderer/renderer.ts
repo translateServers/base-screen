@@ -13,7 +13,9 @@ import {
   type ScreenResourceExecutionMode,
   type ScreenResourceExecutionTrigger,
   type ScreenResourceObserver,
+  type ScreenValueRef,
 } from '@base-screen/contracts';
+import type { ScreenValueRefEvaluation } from '@base-screen/core';
 import { getPainterOrder, type ScreenBlueprintVisibilityEffect } from '@base-screen/core';
 import type {
   BaseScreenConditionalStylePort,
@@ -68,6 +70,13 @@ export interface CreateBaseScreenRendererOptions {
   /** 非持久化执行上下文附加信息（RB2）：提供时流入每次 resolve 与 observer 事件。 */
   readonly projectId?: string;
   readonly documentRevision?: string;
+  /**
+   * 数据源实例 settle（ready / error）后回调。
+   *
+   * Viewer 用它把「实例结果 → 派生变量」重算一次；重算完只推 `setVariables` + render，
+   * 不重复发请求（实例缓存已在运行时里）。
+   */
+  readonly onDataSourceSettled?: (dataSourceId: string) => void;
 }
 
 /** 单次解析的执行上下文（trigger/traceId 由调用方按操作派生，不复用可变全局状态）。 */
@@ -84,6 +93,32 @@ export interface BaseScreenRenderer {
   suspendData(): void;
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
+  /**
+   * 只确保数据源实例（启动请求），不挂载任何物料。
+   *
+   * Viewer 用它先拿到「派生变量依赖的实例」的结果，再一次渲染：避免先用 initialValue
+   * 取一轮数、变量落定后再取一轮。
+   */
+  prepareDataSources(
+    document: ScreenDocument,
+    variables: ScreenJsonObject,
+    context?: { readonly trigger?: ScreenResourceExecutionTrigger; readonly traceId?: string },
+    startOnly?: ReadonlySet<string>,
+  ): void;
+  /** 按数据源实例刷新（变量派生、定时刷新用；组件级刷新走 `refreshData(componentId)`）。 */
+  refreshDataSource(
+    dataSourceId: string,
+    options?: {
+      readonly trigger?: ScreenResourceExecutionTrigger;
+      readonly traceId?: string;
+    },
+  ): void;
+  /** 读实例已就绪的原始结果；未就绪/失败时返回 `undefined`。 */
+  readDataSourceValue(dataSourceId: string): ScreenJsonValue | undefined;
+  /** 实例是否已落定（ready / error）；未请求或在途时为 false。 */
+  isDataSourceSettled(dataSourceId: string): boolean;
+  /** 用实例运行时求值一个取值引用（派生变量用；`path` 与体积上限由 core 统一处理）。 */
+  evaluateValueRef(ref: ScreenValueRef): ScreenValueRefEvaluation;
   /**
    * 切换实例级 interactive 状态：已渲染过文档时原地重渲染（复用已挂载物料与数据源请求状态），
    * 未渲染时只记录状态供下一次 render 使用。Viewer 与 Designer 共用该入口。
@@ -318,6 +353,52 @@ class Renderer implements BaseScreenRenderer {
     this.#state.dataSources.refresh(ref.dataSourceId, refreshContext);
   }
 
+  prepareDataSources(
+    document: ScreenDocument,
+    variables: ScreenJsonObject,
+    context?: { readonly trigger?: ScreenResourceExecutionTrigger; readonly traceId?: string },
+    startOnly?: ReadonlySet<string>,
+  ): void {
+    if (this.#state.disposed) return;
+    const parsed = parseScreenDocument(document, this.#state.lastValidatedInput);
+    if (!parsed.ok) return;
+    this.#state.dataSources.ensure(
+      parsed.value,
+      variables,
+      { trigger: context?.trigger ?? 'manual', traceId: context?.traceId ?? '' },
+      startOnly === undefined ? {} : { startOnly },
+    );
+    this.#readers = collectReaders(parsed.value);
+  }
+
+  refreshDataSource(
+    dataSourceId: string,
+    options?: {
+      readonly trigger?: ScreenResourceExecutionTrigger;
+      readonly traceId?: string;
+    },
+  ): void {
+    this.#state.dataSources.refresh(dataSourceId, {
+      trigger: options?.trigger ?? 'manual',
+      traceId: options?.traceId ?? '',
+    });
+  }
+
+  readDataSourceValue(dataSourceId: string): ScreenJsonValue | undefined {
+    const entry = this.#state.dataSources.read(dataSourceId);
+    if (entry === undefined || entry.dataState.status !== 'ready') return undefined;
+    return entry.rawValue;
+  }
+
+  isDataSourceSettled(dataSourceId: string): boolean {
+    const entry = this.#state.dataSources.read(dataSourceId);
+    return entry !== undefined && entry.dataState.status !== 'loading';
+  }
+
+  evaluateValueRef(ref: ScreenValueRef): ScreenValueRefEvaluation {
+    return this.#state.dataSources.evaluate(ref);
+  }
+
   clear(): void {
     this.resetBlueprintVisibility();
     this.#state.coordinator?.abortAll();
@@ -349,7 +430,17 @@ class Renderer implements BaseScreenRenderer {
    */
   #handleDataSourceChanged(dataSourceId: string): void {
     const document = this.#state.document;
-    if (document === undefined || this.#state.disposed) return;
+    if (!this.#state.disposed && document !== undefined) {
+      this.#reprojectReaders(dataSourceId, document);
+    }
+    // 结果落定（ready / error）后通知宿主：Viewer 用它重算派生变量 / 触发首次渲染。
+    const entry = this.#state.dataSources.read(dataSourceId);
+    if (entry !== undefined && entry.dataState.status !== 'loading') {
+      this.#state.options.onDataSourceSettled?.(dataSourceId);
+    }
+  }
+
+  #reprojectReaders(dataSourceId: string, document: ScreenDocument): void {
     for (const componentId of this.#readers.get(dataSourceId) ?? []) {
       const component = document.components.find((item) => item.id === componentId);
       const candidate = this.#state.candidates.get(componentId);

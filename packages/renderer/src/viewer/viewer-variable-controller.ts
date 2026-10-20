@@ -1,18 +1,16 @@
-import type {
-  ScreenDiagnostic,
-  ScreenDocument,
-  ScreenHostCatalogPort,
-  ScreenJsonObject,
-  ScreenJsonValue,
-  ScreenResourceExecutionTrigger,
-  ScreenVariableRefreshOptions,
+import {
+  readScreenVariableRecord,
+  type ScreenDiagnostic,
+  type ScreenDocument,
+  type ScreenJsonObject,
+  type ScreenJsonValue,
+  type ScreenResourceExecutionTrigger,
+  type ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
-import type { ScreenBlueprintPlan } from '@base-screen/core';
+import { collectScreenValueRefDependencies, type ScreenBlueprintPlan } from '@base-screen/core';
 import { canonicalJsonString } from '../canonical-json.js';
 import type { BaseScreenRenderer } from '../renderer/renderer.js';
 import type { BaseScreenViewerRefreshOptions } from './viewer-configuration.js';
-import { resolveHostVariableBatch } from './viewer-host-variable-resolution.js';
-import { hostResolvedVariables } from './viewer-variable-request.js';
 
 export interface ViewerVariableControllerHost {
   readonly readRenderer: () => BaseScreenRenderer | undefined;
@@ -20,21 +18,35 @@ export interface ViewerVariableControllerHost {
   readonly readBlueprintPlan: () => ScreenBlueprintPlan | undefined;
   readonly readBlueprintVariables: () => ScreenJsonObject | undefined;
   readonly writeBlueprintVariables: (variables: ScreenJsonObject) => void;
-  readonly readHostCatalogPort: () => ScreenHostCatalogPort | undefined;
-  readonly emitDiagnostic: (code: ScreenDiagnostic['code']) => void;
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
 }
 
+/**
+ * 变量值 = 文档里的取值引用在当前实例结果上的求值。
+ *
+ * 变量不再向宿主「批量解析」：`data-source-field` 的值来自 `DataSourceRuntime` 里该实例
+ * 已落定的结果（`renderer.evaluateValueRef` 复用 core 的同一套 `path`/体积语义），实例
+ * 未落定时沿用 `initialValue`——绝不把「未就绪」写成 `undefined`，否则下游会把空值当真。
+ *
+ * 值只在这里算一次并推给 `renderer.setVariables`；实例落定后只重算**依赖该实例**的变量，
+ * 且只有值真的变了才再次 `setVariables` + render（代际保护，避免 render 风暴）。
+ */
 export class ViewerVariableController {
   readonly #host: ViewerVariableControllerHost;
-  #variableController: AbortController | undefined;
-  #variableGeneration = 0;
-  #variableRefresh: Promise<boolean> | undefined;
-  #pendingRefreshAll = false;
-  readonly #pendingRefreshComponents = new Set<string>();
-  #pendingVariableRefreshAll = false;
-  readonly #pendingVariableIds = new Set<string>();
-  #pendingVariableTraceId: string | undefined;
+  /** 实例 → 派生它的变量 id（每次渲染按文档重建）。 */
+  #instanceVariables = new Map<string, readonly string[]>();
+  #generation = 0;
+  #rendering = false;
+  #pendingRecompute = false;
+  /** 等待「派生变量依赖的实例」落定后要执行的首次/替换渲染。 */
+  #deferred:
+    | {
+        readonly document: ScreenDocument;
+        readonly componentId: string | undefined;
+        readonly trigger: ScreenResourceExecutionTrigger;
+        readonly traceId: string | undefined;
+      }
+    | undefined;
   #nextTrigger: ScreenResourceExecutionTrigger = 'manual';
   #nextTraceId: string | undefined;
   #hasRenderedDocument = false;
@@ -48,293 +60,108 @@ export class ViewerVariableController {
       typeof componentIdOrOptions === 'string'
         ? { componentId: componentIdOrOptions }
         : (componentIdOrOptions ?? {});
-    const componentId = options.componentId;
-    if (componentId !== undefined && !this.#hasComponent(componentId)) return;
-    this.#nextTrigger = options.trigger === 'polling' ? 'polling' : 'manual';
-    this.#nextTraceId = options.traceId;
-    if (this.#variableRefresh !== undefined) {
-      if (componentId === undefined) this.#pendingRefreshAll = true;
-      else if (!this.#pendingRefreshAll) this.#pendingRefreshComponents.add(componentId);
+    const renderer = this.#host.readRenderer();
+    if (renderer === undefined) return;
+    if (options.componentId !== undefined && !this.#hasComponent(options.componentId)) return;
+    const trigger = options.trigger === 'polling' ? 'polling' : 'manual';
+    const traceId = options.traceId;
+    if (options.componentId !== undefined) {
+      // 组件刷新同样要刷新「它依赖的变量」的实例：变量值可能来自上游数据源，
+      // 只刷组件会让参数停在旧值上。
+      this.refreshVariables(traceId === undefined ? {} : { traceId });
+      renderer.refreshData(options.componentId, trigger, traceId);
       return;
     }
-    this.start(componentId, true);
+    renderer.refreshData(undefined, trigger, traceId);
   }
 
+  /**
+   * 刷新被派生变量依赖的数据源实例。
+   *
+   * `variableIds` 缺省 ⇒ 刷新全部派生变量依赖的实例；指定 ids ⇒ 只刷新这些变量依赖的实例；
+   * 纯 `inline` 变量没有任何实例依赖，因此是 no-op（不会产生宿主调用）。
+   */
   refreshVariables(options: ScreenVariableRefreshOptions = {}): void {
     const document = this.#host.readDocument();
-    if (document === undefined) return;
-    const availableIds = new Set(hostResolvedVariables(document).map((entry) => entry.id));
-    const requested =
-      options.variableIds === undefined
-        ? undefined
-        : [...new Set(options.variableIds)].filter((variableId) => availableIds.has(variableId));
-    if ((requested?.length ?? availableIds.size) === 0) return;
-    if (this.#variableRefresh !== undefined) {
-      this.#queueVariableRefresh(requested, options.traceId);
-      return;
-    }
-    this.#startVariableRefresh(requested, options.traceId);
-  }
-
-  #hasComponent(componentId: string): boolean {
-    return (
-      this.#host.readDocument()?.components.some((component) => component.id === componentId) ??
-      false
-    );
-  }
-
-  start(componentId?: string, forceRefresh = false, restart = false): void {
-    if (this.#variableRefresh !== undefined) {
-      if (!restart) return;
-      this.cancel();
-    }
-    const task = this.#resolveVariablesAndRender(componentId, forceRefresh);
-    this.#variableRefresh = task;
-    void task.then((ready) => {
-      if (this.#variableRefresh !== task) return;
-      this.#variableRefresh = undefined;
-      if (!ready) {
-        this.#pendingRefreshAll = false;
-        this.#pendingRefreshComponents.clear();
-        this.#nextTrigger = 'manual';
-        this.#nextTraceId = undefined;
-        this.#drainVariableRefresh();
-        return;
-      }
-      // 进行中 refresh 队列完成后补发刷新：携带排队期间记录的 trigger/trace
-      // intent（RB2），避免 polling/trace 在全量刷新中被吞掉。排队意图必须
-      // 在此处消费后才复位，否则 resolveVariablesAndRender 的完成路径会先
-      // 重置它们，导致队列中的 trigger/trace 丢失。
-      const trigger = this.#nextTrigger === 'polling' ? 'polling' : 'manual';
-      const traceId = this.#nextTraceId;
-      if (this.#pendingRefreshAll)
-        this.#host.readRenderer()?.refreshData(undefined, trigger, traceId);
-      else {
-        for (const id of this.#pendingRefreshComponents) {
-          this.#host.readRenderer()?.refreshData(id, trigger, traceId);
-        }
-      }
-      this.#nextTrigger = 'manual';
-      this.#nextTraceId = undefined;
-      this.#pendingRefreshAll = false;
-      this.#pendingRefreshComponents.clear();
-      this.#drainVariableRefresh();
-    });
-  }
-
-  #startVariableRefresh(requestedIds: readonly string[] | undefined, traceId?: string): void {
-    const task = this.#resolveVariablesOnly(requestedIds, traceId);
-    this.#variableRefresh = task;
-    void task.then(() => {
-      if (this.#variableRefresh !== task) return;
-      this.#variableRefresh = undefined;
-      if (this.#pendingRefreshAll || this.#pendingRefreshComponents.size > 0) {
-        const componentId =
-          !this.#pendingRefreshAll && this.#pendingRefreshComponents.size === 1
-            ? [...this.#pendingRefreshComponents][0]
-            : undefined;
-        this.#pendingRefreshAll = false;
-        this.#pendingRefreshComponents.clear();
-        this.start(componentId, true);
-        return;
-      }
-      this.#drainVariableRefresh();
-    });
-  }
-
-  #queueVariableRefresh(requestedIds: readonly string[] | undefined, traceId?: string): void {
-    if (requestedIds === undefined) {
-      this.#pendingVariableRefreshAll = true;
-      this.#pendingVariableIds.clear();
-    } else if (!this.#pendingVariableRefreshAll) {
-      for (const variableId of requestedIds) this.#pendingVariableIds.add(variableId);
-    }
-    this.#pendingVariableTraceId = traceId;
-  }
-
-  #drainVariableRefresh(): void {
-    if (
-      this.#variableRefresh !== undefined ||
-      (!this.#pendingVariableRefreshAll && this.#pendingVariableIds.size === 0)
-    ) {
-      return;
-    }
-    const requestedIds = this.#pendingVariableRefreshAll
-      ? undefined
-      : [...this.#pendingVariableIds];
-    const traceId = this.#pendingVariableTraceId;
-    this.#pendingVariableRefreshAll = false;
-    this.#pendingVariableIds.clear();
-    this.#pendingVariableTraceId = undefined;
-    this.#startVariableRefresh(requestedIds, traceId);
-  }
-
-  async #resolveVariablesAndRender(
-    componentId: string | undefined,
-    forceRefresh: boolean,
-  ): Promise<boolean> {
     const renderer = this.#host.readRenderer();
-    const document = this.#host.readDocument();
-    const plan = this.#host.readBlueprintPlan();
-    if (renderer === undefined || document === undefined || plan === undefined) return false;
-    // 按本次操作派生执行上下文（RB2）：显式刷新使用 manual/polling 与提供的
-    // traceId；初始加载使用 initial；文档替换使用 document-change。每次派生
-    // 独立传入，任何组件都不会消费/重置其他组件的 trigger/trace。
+    if (document === undefined || renderer === undefined) return;
+    const requested = options.variableIds === undefined ? undefined : new Set(options.variableIds);
+    const instanceIds = new Set<string>();
+    for (const entry of document.variables) {
+      const record = readScreenVariableRecord(entry);
+      if (requested !== undefined && !requested.has(record.id)) continue;
+      for (const dataSourceId of collectScreenValueRefDependencies(record.value).dataSourceIds) {
+        instanceIds.add(dataSourceId);
+      }
+    }
+    for (const dataSourceId of instanceIds) {
+      renderer.refreshDataSource(dataSourceId, {
+        trigger: 'variable',
+        ...(options.traceId === undefined ? {} : { traceId: options.traceId }),
+      });
+    }
+  }
+
+  /** 实例落定：若有等待中的渲染且变量已就绪则补渲染；否则只重算依赖它的变量。 */
+  handleDataSourceSettled(dataSourceId: string): void {
+    const deferred = this.#deferred;
+    if (deferred !== undefined) {
+      const plan = this.#host.readBlueprintPlan();
+      const renderer = this.#host.readRenderer();
+      if (
+        plan !== undefined &&
+        renderer !== undefined &&
+        this.#variablesReady(deferred.document, renderer)
+      ) {
+        this.#deferred = undefined;
+        this.#renderDocument(
+          deferred.document,
+          deferred.componentId,
+          deferred.trigger,
+          deferred.traceId,
+          plan,
+        );
+        return;
+      }
+    }
+    if (!this.#instanceVariables.has(dataSourceId)) return;
+    if (this.#rendering) {
+      // 本轮 render 期间落定的实例：等本轮结束后补算一次（合并）。
+      this.#pendingRecompute = true;
+      return;
+    }
+    this.#recomputeIfChanged('variable');
+  }
+
+  /**
+   * 渲染当前文档（重新计算变量 → setVariables → render）。
+   *
+   * @param componentId 组件级刷新目标（仅用于把 trigger/trace 透传给该组件的数据源）。
+   * @param forceRefresh 显式刷新（manual/polling）而非初次/文档替换。
+   * @param restart 取消当前进行中的渲染再开始（文档替换/configure）。
+   */
+  start(componentId?: string, forceRefresh = false, restart = false): void {
+    if (this.#rendering) {
+      // 渲染中又收到落定回调：合并成一次，等本轮结束后补算。
+      this.#pendingRecompute = true;
+      return;
+    }
+    if (restart) this.#generation++;
     const trigger: ScreenResourceExecutionTrigger = forceRefresh
       ? this.#nextTrigger
       : this.#hasRenderedDocument
         ? 'document-change'
         : 'initial';
     const traceId = forceRefresh ? this.#nextTraceId : undefined;
-    const generation = ++this.#variableGeneration;
-    const controller = new AbortController();
-    this.#variableController = controller;
-    // Initial/document-change runs (no component target, no manual force) must
-    // cancel and clear the previously mounted resource work before resolving
-    // the new document's host variables; otherwise the old resources stay
-    // active and could resolve stale data under the new document. Manual
-    // refreshData() / refreshData(componentId) must never suspend globally:
-    // a full or targeted refresh must keep unrelated material state intact.
-    if (componentId === undefined && !forceRefresh) {
-      renderer.suspendData();
-    }
-    const variables: Record<string, ScreenJsonValue> = {
-      ...plan.initialVariables,
-      ...this.#host.readBlueprintVariables(),
-    };
-    const dynamicVariables = hostResolvedVariables(document);
-    if (dynamicVariables.length > 0) {
-      const hostCatalogPort = this.#host.readHostCatalogPort();
-      if (hostCatalogPort === undefined) {
-        this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
-        return false;
-      }
-      const values = await resolveHostVariableBatch(document, hostCatalogPort, controller);
-      if (values === undefined) {
-        if (!controller.signal.aborted) this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
-        return false;
-      }
-      for (const variable of dynamicVariables) {
-        const value = values.get(variable.id);
-        if (value !== undefined) variables[variable.id] = value;
-      }
-    }
-    if (
-      controller.signal.aborted ||
-      generation !== this.#variableGeneration ||
-      this.#host.readRenderer() !== renderer ||
-      this.#host.readDocument() !== document
-    ) {
-      return false;
-    }
-    const applied = renderer.setVariables(variables);
-    if (!applied.ok) {
-      this.#host.emitDiagnostics(applied.diagnostics);
-      return false;
-    }
-    const rendered = renderer.render(document, { trigger, traceId: traceId ?? '' });
-    if (!rendered.ok || rendered.diagnostics.length > 0) {
-      this.#host.emitDiagnostics(rendered.diagnostics);
-      return false;
-    }
-    this.#host.writeBlueprintVariables(variables);
-    if (!forceRefresh) {
-      // 首次成功渲染标记完成，后续文档替换使用 document-change 触发。
-      this.#hasRenderedDocument = true;
-    }
-    // `render()` already starts the first resolve for every newly mounted or
-    // identity-changed resource once variables are ready, so a variable change
-    // only re-queries the components whose evaluated params depend on it. The
-    // explicit refresh below guarantees that all current resources start
-    // exactly once on the initial/document load (it coalesces with those first
-    // resolves) and drives the manual full or targeted refresh. The derived
-    // traceId is forwarded for both polling and manual refreshes so a manual
-    // refresh with a trace never loses it. `#nextTrigger`/`#nextTraceId` are
-    // intentionally NOT reset here: a refresh queued while this run was
-    // in-flight already stored its own intent, and the completion callback
-    // consumes (and then resets) it after this run settles.
-    renderer.refreshData(
-      forceRefresh ? componentId : undefined,
-      trigger === 'polling' ? 'polling' : 'manual',
-      traceId,
-    );
-    return true;
-  }
-
-  async #resolveVariablesOnly(
-    requestedIds: readonly string[] | undefined,
-    traceId: string | undefined,
-  ): Promise<boolean> {
-    const renderer = this.#host.readRenderer();
-    const document = this.#host.readDocument();
-    const previous = this.#host.readBlueprintVariables();
-    if (renderer === undefined || document === undefined || previous === undefined) return false;
-    const dynamicVariables = hostResolvedVariables(document).filter(
-      (variable) => requestedIds === undefined || requestedIds.includes(variable.id),
-    );
-    if (dynamicVariables.length === 0) return true;
-    const port = this.#host.readHostCatalogPort();
-    if (port === undefined) {
-      this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
-      return false;
-    }
-    const generation = ++this.#variableGeneration;
-    const controller = new AbortController();
-    this.#variableController = controller;
-    const values = await resolveHostVariableBatch(document, port, controller, requestedIds);
-    if (values === undefined) {
-      if (!controller.signal.aborted) this.#host.emitDiagnostic('HOST_DATASET_VARIABLE_INVALID');
-      return false;
-    }
-    if (
-      controller.signal.aborted ||
-      generation !== this.#variableGeneration ||
-      this.#host.readRenderer() !== renderer ||
-      this.#host.readDocument() !== document ||
-      this.#host.readBlueprintVariables() !== previous
-    ) {
-      return false;
-    }
-    const variables: Record<string, ScreenJsonValue> = { ...previous };
-    let changed = false;
-    for (const variable of dynamicVariables) {
-      const value = values.get(variable.id);
-      if (value === undefined) continue;
-      const previousValue = variables[variable.id];
-      if (
-        previousValue === undefined ||
-        canonicalJsonString(previousValue) !== canonicalJsonString(value)
-      ) {
-        changed = true;
-      }
-      variables[variable.id] = value;
-    }
-    if (!changed) return true;
-    const applied = renderer.setVariables(variables);
-    if (!applied.ok) {
-      this.#host.emitDiagnostics(applied.diagnostics);
-      return false;
-    }
-    const rendered = renderer.render(document, { trigger: 'variable', traceId: traceId ?? '' });
-    if (!rendered.ok || rendered.diagnostics.length > 0) {
-      renderer.setVariables(previous);
-      this.#host.emitDiagnostics(rendered.diagnostics);
-      return false;
-    }
-    this.#host.writeBlueprintVariables(variables);
-    return true;
+    this.#applyDocument(componentId, forceRefresh, trigger, traceId);
   }
 
   cancel(): void {
-    this.#variableGeneration++;
-    this.#variableController?.abort();
-    this.#variableController = undefined;
-    this.#variableRefresh = undefined;
-    this.#pendingRefreshAll = false;
-    this.#pendingRefreshComponents.clear();
-    this.#pendingVariableRefreshAll = false;
-    this.#pendingVariableIds.clear();
-    this.#pendingVariableTraceId = undefined;
+    this.#generation++;
+    this.#rendering = false;
+    this.#pendingRecompute = false;
+    this.#instanceVariables.clear();
+    this.#deferred = undefined;
   }
 
   reset(): void {
@@ -342,5 +169,179 @@ export class ViewerVariableController {
     this.#hasRenderedDocument = false;
     this.#nextTrigger = 'manual';
     this.#nextTraceId = undefined;
+  }
+
+  #applyDocument(
+    componentId: string | undefined,
+    forceRefresh: boolean,
+    trigger: ScreenResourceExecutionTrigger,
+    traceId: string | undefined,
+  ): void {
+    const renderer = this.#host.readRenderer();
+    const document = this.#host.readDocument();
+    const plan = this.#host.readBlueprintPlan();
+    if (renderer === undefined || document === undefined || plan === undefined) return;
+    if (!forceRefresh && componentId === undefined) {
+      // 初次/文档替换：先让实例层接管（旧文档的实例会在 ensure 时被剪掉并取消请求）。
+      const current = this.#host.readBlueprintVariables() ?? plan.initialVariables;
+      // 只先启动「变量依赖的实例」：组件自己的取数必须等变量就绪后再发，否则会先用
+      // initialValue 打一轮请求。
+      const startOnly = new Set<string>();
+      for (const entry of document.variables) {
+        const record = readScreenVariableRecord(entry);
+        for (const id of collectScreenValueRefDependencies(record.value).dataSourceIds) {
+          startOnly.add(id);
+        }
+      }
+      renderer.prepareDataSources(
+        document,
+        current,
+        { trigger, traceId: traceId ?? '' },
+        startOnly,
+      );
+      if (!this.#variablesReady(document, renderer)) {
+        // 派生变量还没就绪：等实例落定后再渲染，避免先用 initialValue 取一整轮数据。
+        this.#deferred = { document, componentId, trigger, traceId };
+        return;
+      }
+    }
+    this.#deferred = undefined;
+    this.#renderDocument(document, componentId, trigger, traceId, plan, forceRefresh);
+  }
+
+  /**
+   * 变量依赖的实例是否都已落定。
+   *
+   * ready 与 error 都算落定（失败回落 `initialValue`，由材料侧进入错误态区分）；
+   * 只有仍在途的实例才需要等。
+   */
+  #variablesReady(document: ScreenDocument, renderer: BaseScreenRenderer): boolean {
+    for (const entry of document.variables) {
+      const record = readScreenVariableRecord(entry);
+      if (record.value.kind !== 'data-source-field') continue;
+      // 就绪判据只在运行时：实例已 ready/error 即算落定（error 回落 initialValue）。
+      if (!renderer.isDataSourceSettled(record.value.dataSourceId)) return false;
+    }
+    return true;
+  }
+
+  #renderDocument(
+    document: ScreenDocument,
+    componentId: string | undefined,
+    trigger: ScreenResourceExecutionTrigger,
+    traceId: string | undefined,
+    plan: ScreenBlueprintPlan,
+    forceRefresh = false,
+  ): void {
+    const renderer = this.#host.readRenderer();
+    if (renderer === undefined) return;
+    const generation = ++this.#generation;
+    const variables = this.#computeVariables(document, plan, renderer);
+    if (generation !== this.#generation) return;
+    this.#rendering = true;
+    try {
+      const applied = renderer.setVariables(variables);
+      if (!applied.ok) {
+        this.#host.emitDiagnostics(applied.diagnostics);
+        return;
+      }
+      const rendered = renderer.render(document, { trigger, traceId: traceId ?? '' });
+      if (!rendered.ok || rendered.diagnostics.length > 0) {
+        this.#host.emitDiagnostics(rendered.diagnostics);
+        return;
+      }
+      this.#host.writeBlueprintVariables(variables);
+      if (!forceRefresh) this.#hasRenderedDocument = true;
+      if (forceRefresh) {
+        renderer.refreshData(componentId, trigger === 'polling' ? 'polling' : 'manual', traceId);
+      }
+    } finally {
+      this.#rendering = false;
+    }
+    if (this.#pendingRecompute) {
+      this.#pendingRecompute = false;
+      this.#recomputeIfChanged('variable');
+    }
+  }
+
+  /** 实例落定后的补算：只重算变量，值有变化才推。 */
+  #recomputeIfChanged(trigger: ScreenResourceExecutionTrigger): void {
+    const renderer = this.#host.readRenderer();
+    const document = this.#host.readDocument();
+    const plan = this.#host.readBlueprintPlan();
+    if (renderer === undefined || document === undefined || plan === undefined) return;
+    const variables = this.#computeVariables(document, plan, renderer);
+    const previous = this.#host.readBlueprintVariables();
+    if (
+      previous !== undefined &&
+      canonicalJsonString(previous as ScreenJsonValue) ===
+        canonicalJsonString(variables as ScreenJsonValue)
+    ) {
+      return;
+    }
+    const generation = ++this.#generation;
+    this.#rendering = true;
+    try {
+      const applied = renderer.setVariables(variables);
+      if (!applied.ok) {
+        this.#host.emitDiagnostics(applied.diagnostics);
+        return;
+      }
+      const rendered = renderer.render(document, { trigger, traceId: '' });
+      if (!rendered.ok || rendered.diagnostics.length > 0) {
+        this.#host.emitDiagnostics(rendered.diagnostics);
+        return;
+      }
+      if (generation !== this.#generation) return;
+      this.#host.writeBlueprintVariables(variables);
+    } finally {
+      this.#rendering = false;
+    }
+  }
+
+  /**
+   * 计算全部变量值并重建「实例 → 变量」索引。
+   *
+   * - `inline`：文档值，除非运行期已有值（可写变量写入后不得被文档值覆盖）。
+   * - `data-source-field`：实例已就绪取实例结果（经 `path` 下钻），否则回落 `initialValue`。
+   * - 其它（变量别名等非法形态）：`initialValue`。
+   */
+  #computeVariables(
+    document: ScreenDocument,
+    plan: ScreenBlueprintPlan,
+    renderer: BaseScreenRenderer,
+  ): ScreenJsonObject {
+    const current = this.#host.readBlueprintVariables() ?? plan.initialVariables;
+    const values: Record<string, ScreenJsonValue> = {};
+    const instanceVariables = new Map<string, string[]>();
+    for (const entry of document.variables) {
+      const record = readScreenVariableRecord(entry);
+      const ref = record.value;
+      if (ref.kind === 'inline') {
+        values[record.id] = current[record.id] ?? ref.value;
+        continue;
+      }
+      if (ref.kind !== 'data-source-field') {
+        values[record.id] = record.initialValue;
+        continue;
+      }
+      const evaluated = renderer.evaluateValueRef(ref);
+      values[record.id] =
+        evaluated.kind === 'value' && evaluated.value !== undefined
+          ? evaluated.value
+          : record.initialValue;
+      const list = instanceVariables.get(ref.dataSourceId);
+      if (list === undefined) instanceVariables.set(ref.dataSourceId, [record.id]);
+      else list.push(record.id);
+    }
+    this.#instanceVariables = instanceVariables;
+    return values;
+  }
+
+  #hasComponent(componentId: string): boolean {
+    return (
+      this.#host.readDocument()?.components.some((component) => component.id === componentId) ??
+      false
+    );
   }
 }

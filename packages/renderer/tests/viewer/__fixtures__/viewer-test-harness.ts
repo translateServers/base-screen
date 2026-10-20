@@ -11,6 +11,7 @@ import type {
   ScreenVariable,
 } from '@base-screen/contracts';
 import type {
+  BaseScreenDataCapability,
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
   BaseScreenMaterialManifest,
@@ -85,10 +86,23 @@ export class FakeCustomEvent {
   ) {}
 }
 
+/** 每次模型赋值 = 一次渲染落地：用来断言「一次结果只触发一次重渲染」。 */
+export const renderAssignments = { count: 0 };
+
 export class FakeMaterialElement {
   readonly dataset: Record<string, string> = {};
   readonly style = {} as CSSStyleDeclaration;
-  model: BaseScreenMaterialModel | undefined;
+  #model: BaseScreenMaterialModel | undefined;
+
+  get model(): BaseScreenMaterialModel | undefined {
+    return this.#model;
+  }
+
+  set model(value: BaseScreenMaterialModel | undefined) {
+    renderAssignments.count++;
+    this.#model = value;
+  }
+
   removed = false;
   parent: FakeMount | undefined;
   readonly handlers: Record<string, ((event: unknown) => void) | undefined> = {};
@@ -122,6 +136,7 @@ export class FakeMaterialElement {
 
 export function createHostResourceCatalog(
   events: readonly string[] = [],
+  dataCapabilities: readonly BaseScreenDataCapability[] = ['host-resource'],
 ): BaseScreenMaterialCatalog {
   const manifest: BaseScreenMaterialManifest = {
     type: 'base.test',
@@ -137,7 +152,7 @@ export function createHostResourceCatalog(
     propsSchema: { kind: 'object', properties: {}, required: [] },
     propertyPanel: [],
     events,
-    dataCapabilities: ['host-resource'],
+    dataCapabilities,
     designCapabilities: { resize: true, rotate: true, children: true },
   };
   const entry = {
@@ -206,6 +221,24 @@ export function document(
     canvas: { width: 960, height: 540, backgroundColor: '#000000' },
     components,
     variables,
+    // 旧形态的动态变量在读取时会合成 `data-source-<variableId>` 实例；这里把它显式声明
+    // 出来，让「变量 → 实例 → 宿主目录端口」这条链在测试里真实成立（T02c-2 之后变量不再
+    // 由宿主批量解析，而是派生自实例结果）。
+    dataSources: variables.flatMap((variable) =>
+      variable.type === 'static'
+        ? []
+        : [
+            {
+              id: `data-source-${variable.id}`,
+              name: variable.name,
+              source:
+                variable.type === 'url-query'
+                  ? { kind: 'url-query' as const, sourceId: variable.sourceId }
+                  : { kind: 'host-catalog' as const, sourceId: variable.sourceId },
+              params: {},
+            },
+          ],
+    ),
     blueprint,
   };
 }

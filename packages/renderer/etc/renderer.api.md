@@ -22,6 +22,8 @@ import { ScreenParseResult } from '@base-screen/contracts';
 import { ScreenResourceExecutionMode } from '@base-screen/contracts';
 import { ScreenResourceExecutionTrigger } from '@base-screen/contracts';
 import { ScreenResourceObserver } from '@base-screen/contracts';
+import { ScreenValueRef } from '@base-screen/contracts';
+import type { ScreenValueRefEvaluation } from '@base-screen/core';
 import type { ScreenVariableHandle } from '@base-screen/contracts';
 import type { ScreenVariableRefreshOptions } from '@base-screen/contracts';
 
@@ -45,8 +47,19 @@ export interface BaseScreenRenderer {
     clear(): void;
     // (undocumented)
     dispose(): void;
+    evaluateValueRef(ref: ScreenValueRef): ScreenValueRefEvaluation;
+    isDataSourceSettled(dataSourceId: string): boolean;
+    prepareDataSources(document: ScreenDocument, variables: ScreenJsonObject, context?: {
+        readonly trigger?: ScreenResourceExecutionTrigger;
+        readonly traceId?: string;
+    }, startOnly?: ReadonlySet<string>): void;
+    readDataSourceValue(dataSourceId: string): ScreenJsonValue | undefined;
     // (undocumented)
     refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
+    refreshDataSource(dataSourceId: string, options?: {
+        readonly trigger?: ScreenResourceExecutionTrigger;
+        readonly traceId?: string;
+    }): void;
     // (undocumented)
     render(document: ScreenDocument, context?: {
         readonly trigger?: ScreenResourceExecutionTrigger;
@@ -168,6 +181,7 @@ export interface CreateBaseScreenRendererOptions {
     readonly mode: BaseScreenMaterialMode;
     // (undocumented)
     readonly observer?: ScreenResourceObserver;
+    readonly onDataSourceSettled?: (dataSourceId: string) => void;
     // (undocumented)
     readonly onDiagnostic?: (diagnostic: ScreenDiagnostic) => void;
     // (undocumented)
