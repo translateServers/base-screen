@@ -285,6 +285,31 @@
   cursor: pointer;
 }
 
+/*
+ * 可点暗示：`<summary>` 的默认 marker 在样式重置里被去掉了，收起态和展开态看起来一模一样，
+ * 用户不知道能点。这里用**旋转的三角**（真实元素 `[data-group-caret]`，可被断言），
+ * 而不是伪元素——伪元素删了没人发现。
+ */
+.designer-data-group-caret {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-right: 1.5px solid currentcolor;
+  border-bottom: 1.5px solid currentcolor;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.designer-data-group[open] > .designer-data-group-summary .designer-data-group-caret {
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .designer-data-group-caret {
+    transition: none;
+  }
+}
+
 .designer-data-group-title {
   flex: 0 0 auto;
   color: var(--designer-text-primary);

@@ -194,6 +194,29 @@ function renderContinuousDataFlow(
     content.appendChild(dataSection(key, options));
   }
   content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
+  fitActionBarGutter(content);
+}
+
+/**
+ * 让滚动区底部留出**操作条实际高度**（含 8px 呼吸）。
+ *
+ * 固定 `padding-bottom` 迟早压住最后一行：操作条的文案会变（`测试` / `应用` / `未应用`），
+ * 高度跟着变。这里量真实高度写回 inline style，并用 `ResizeObserver` 跟上后续文案变化。
+ */
+function fitActionBarGutter(content: HTMLElement): void {
+  const bar = content.querySelector<HTMLElement>('.designer-dataset-actions');
+  if (bar === null) return;
+  const apply = (): void => {
+    content.style.paddingBottom = `${Math.ceil(bar.getBoundingClientRect().height) + 8}px`;
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(apply);
+  else apply();
+  if (typeof ResizeObserver === 'function') {
+    const observer = new ResizeObserver(() => apply());
+    observer.observe(bar);
+    bar.addEventListener('DOMNodeRemovedFromDocument', () => observer.disconnect(), { once: true });
+    if (!bar.isConnected) observer.disconnect();
+  }
 }
 
 /**

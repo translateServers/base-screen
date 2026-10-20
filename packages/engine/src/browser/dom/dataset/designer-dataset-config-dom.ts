@@ -75,24 +75,49 @@ function mappingSummary(options: DesignerDatasetConfigurationOptions): string {
 }
 
 /**
- * 映射组内的「输出字段」一行：把原先嵌在「当前数据集」卡片里的绑定摘要降到这里。
- * `data-dataset-output-fields` 是断言锚点——搬家后至少要有断言确认这行真的渲染了。
+ * 映射组内的「输出字段」：**逐项列表**（`维度：分类` / `指标：金额` 各一行）。
+ *
+ * 刻意不与组头摘要同一形态：组头是"一句话概览"，组内是"可看细节"的地方——两处一字不差
+ * 就是新的同义重复（上一版就踩过）。`data-dataset-output-fields` 是断言锚点。
  */
 function outputFieldLine(
   ownerDocument: Document,
   options: DesignerDatasetConfigurationOptions,
 ): HTMLElement {
-  const line = ownerDocument.createElement('p');
-  line.className = 'designer-dataset-output-fields';
-  line.dataset.datasetOutputFields = 'true';
+  const block = ownerDocument.createElement('div');
+  block.className = 'designer-dataset-output-fields';
+  block.dataset.datasetOutputFields = 'true';
   const label = ownerDocument.createElement('span');
   label.className = 'designer-dataset-output-fields-label';
   label.textContent = DESIGNER_UI_TEXT.dataset.bindingSummaryTitle;
-  const value = ownerDocument.createElement('span');
-  value.className = 'designer-dataset-output-fields-value';
-  value.textContent = mappingSummary(options);
-  line.append(label, value);
-  return line;
+  block.appendChild(label);
+  const list = ownerDocument.createElement('ul');
+  list.className = 'designer-dataset-output-fields-list';
+  for (const role of options.roles) {
+    const selected = options.draft?.fields[role.id] ?? [];
+    if (selected.length === 0) continue;
+    const row = ownerDocument.createElement('li');
+    row.className = 'designer-dataset-output-fields-row';
+    const name = ownerDocument.createElement('span');
+    name.className = 'designer-dataset-output-fields-role';
+    name.textContent = DESIGNER_UI_TEXT.dataset.bindingRole(role.id);
+    const values = ownerDocument.createElement('span');
+    values.className = 'designer-dataset-output-fields-value';
+    values.textContent = selected
+      .map((id) => options.descriptor.fields.find((field) => field.id === id)?.label ?? id)
+      .join('、');
+    row.append(name, values);
+    list.appendChild(row);
+  }
+  if (list.childElementCount === 0) {
+    const empty = ownerDocument.createElement('p');
+    empty.className = 'designer-dataset-output-fields-empty';
+    empty.textContent = DESIGNER_UI_TEXT.data.groups.mappingEmpty;
+    block.appendChild(empty);
+  } else {
+    block.appendChild(list);
+  }
+  return block;
 }
 
 /** 有必填参数未填时展开参数组：让"还差什么"在收起态就可见并可直接进入。 */

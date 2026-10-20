@@ -92,6 +92,12 @@ export function createDataGroup(
 
   const summary = document.createElement('summary');
   summary.className = 'designer-data-group-summary';
+  // 可点暗示：`<summary>` 的默认 marker 在样式重置里被去掉了，这里补一个**真实元素**
+  // （不是伪元素）——伪元素没法被断言，下次调样式被删掉也不会有人发现。
+  const caret = document.createElement('span');
+  caret.className = 'designer-data-group-caret';
+  caret.dataset.groupCaret = 'true';
+  caret.setAttribute('aria-hidden', 'true');
   const title = document.createElement('span');
   title.className = 'designer-data-group-title';
   title.textContent = options.title;
@@ -99,7 +105,7 @@ export function createDataGroup(
   text.className = 'designer-data-group-summary-text';
   text.dataset.detailsGroupSummary = options.group;
   text.textContent = options.summary;
-  summary.append(title, text);
+  summary.append(caret, title, text);
   // 类名不能叫 `*-body`：`designer-styles.mjs` 用 `css.includes('body')` 拦裸选择器，
   // 任何含该子串的类名都会让检查误报为「裸 body 选择器」。
   const content = document.createElement('div');

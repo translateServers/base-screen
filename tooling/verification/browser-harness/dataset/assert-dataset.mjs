@@ -853,6 +853,20 @@ export async function assertDatasetSurface(designer, page) {
       mappingSummaryText:
         panel.querySelector('[data-details-group="mapping"] [data-details-group-summary]')
           ?.textContent ?? '',
+      // 收起态必须有可点暗示：`<summary>` 的默认 marker 被样式重置去掉了，指示器是**真实元素**
+      // （`[data-group-caret]`）才能被断言。这条守的是"下次有人调样式别把它删了"。
+      collapsedWithoutCaret: [
+        ...panel.querySelectorAll('details[data-details-group]:not([open])'),
+      ].filter((group) => group.querySelector(':scope > summary [data-group-caret]') === null)
+        .length,
+      // 组头摘要与组内「输出字段」不再一字不差（那是新的同义重复）。
+      summaryDuplicatesOutputFields:
+        panel
+          .querySelector('[data-details-group="mapping"] [data-details-group-summary]')
+          ?.textContent?.trim() ===
+        panel
+          .querySelector('[data-details-group="mapping"] [data-dataset-output-fields]')
+          ?.textContent?.trim(),
       authoringSettingsGroup: authoringSettings?.getAttribute('role') === 'group',
       editInWorkbenchCount: panel.querySelectorAll('[data-edit-in-workbench]').length,
       editInWorkbenchInstanceId: panel
@@ -928,6 +942,8 @@ export async function assertDatasetSurface(designer, page) {
     descriptorSurface.mappingSummaryText.length === 0 ||
     // 摘要必须是内容摘要（角色 + 字段名），不是裸数字。
     /^\d+$/.test(descriptorSurface.mappingSummaryText.trim()) ||
+    descriptorSurface.collapsedWithoutCaret !== 0 ||
+    descriptorSurface.summaryDuplicatesOutputFields === true ||
     !descriptorSurface.authoringSettingsGroup ||
     // 检查器里实例级设置只读：就地控件 0/0。只断 0 无法区分「正确降级」与「整段没渲染」，
     // 所以再断跳转（有目标）与组头摘要（有内容）。
