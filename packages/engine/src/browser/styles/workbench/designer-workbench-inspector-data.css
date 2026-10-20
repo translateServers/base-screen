@@ -123,37 +123,9 @@
 }
 
 .properties .designer-data-source-type {
-  gap: 9px;
-  padding-bottom: 14px;
+  gap: var(--designer-space-3);
+  padding-bottom: var(--designer-space-5);
   border-bottom: 1px solid var(--designer-border-subtle);
-}
-
-.properties .designer-data-source-type > h3 {
-  display: none;
-}
-
-.properties .inspector-pane .designer-data-source-type-field {
-  position: relative;
-  /* 这一行的标签带 4px 强调条 + 7px 间距，74px 标签列只剩 ~59px 文字宽度，
-     “数据源类型”会被省略号截掉；单独为这行把标签列加宽到 88px。
-     选择器要带 .inspector-pane，才压得过 .designer-field 的 74px 列定义。 */
-  grid-template-columns: 88px minmax(0, 1fr);
-  gap: 8px;
-  margin: 0;
-  color: var(--designer-text-secondary);
-  font-size: var(--designer-font-size-base);
-}
-
-/* 强调条只挂在标签文字上：字段行里控件列也是 span，用裸 `> span` 会在下拉左侧
-   再画一条（同一行两条竖线）。 */
-.properties .inspector-pane .designer-data-source-type-field > .designer-field-label-text::before {
-  display: inline-block;
-  width: 4px;
-  height: 11px;
-  margin-right: 7px;
-  background: var(--designer-accent);
-  content: "";
-  vertical-align: -1px;
 }
 
 .properties .designer-datav-data-flow-content .designer-data-source-editor,
@@ -208,6 +180,196 @@
   border: 1px solid var(--designer-border-subtle);
   border-radius: var(--designer-radius-1);
   background: var(--designer-surface-workspace);
+}
+
+/* ---- 数据面板头部：七态状态徽标 ---- */
+
+/* 面板只有两行：头部状态条 + 数据流。数据流自己吃剩余高度并负责滚动，
+   头部因此用 auto 行而不是 fixed 高度（徽标字号随主题/密度变化时不至于被裁）。 */
+.properties .designer-data-source-panel {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.properties .designer-data-panel-header {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  /* 与数据流内容区同一内缩（16px），徽标右缘对齐卡片右缘。 */
+  padding: var(--designer-space-3) var(--designer-space-6) 0;
+}
+
+.designer-data-state-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  padding: 1px var(--designer-space-3);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  white-space: nowrap;
+}
+
+/* 圆点用 currentcolor：四档色调只需要改 color，不必给每档再写一遍背景点。 */
+.designer-data-state-badge::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: var(--designer-radius-pill);
+  background: currentcolor;
+  content: "";
+}
+
+.designer-data-state-badge[data-data-state-tone="success"] {
+  background: var(--designer-success-surface);
+  color: var(--designer-success);
+}
+
+.designer-data-state-badge[data-data-state-tone="warning"] {
+  background: var(--designer-warning-surface);
+  color: var(--designer-warning);
+}
+
+.designer-data-state-badge[data-data-state-tone="danger"] {
+  background: var(--designer-danger-surface);
+  color: var(--designer-danger);
+}
+
+.designer-data-state-badge[data-data-state-tone="neutral"] {
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+}
+
+/* ---- 取值方式：三入口卡片 ---- */
+
+.properties .designer-data-source-type > .designer-inspector-section-title {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  margin: 0;
+}
+
+/* 强调条与检查器其余段标题同一形态（4px 竖条 + 7px 间距）。 */
+.properties .designer-data-source-type > .designer-inspector-section-title::before {
+  display: inline-block;
+  width: 4px;
+  height: 11px;
+  flex: 0 0 auto;
+  background: var(--designer-accent);
+  content: "";
+}
+
+.properties .designer-data-entry-group {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--designer-space-2);
+}
+
+.properties .designer-data-entry-card {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--designer-space-1);
+  padding: var(--designer-space-3) var(--designer-space-2);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  cursor: pointer;
+  font: var(--designer-font-small);
+  text-align: left;
+  transition:
+    background var(--designer-motion),
+    border-color var(--designer-motion),
+    color var(--designer-motion);
+}
+
+.properties .designer-data-entry-card:hover:not(:disabled) {
+  border-color: var(--designer-border-strong);
+  background: var(--designer-surface-control-hover);
+}
+
+/* 选中态用强调色**边框 + 底色**双通道：单靠底色在深色主题里和 hover 太接近。 */
+.properties .designer-data-entry-card[aria-checked="true"] {
+  border-color: var(--designer-accent);
+  background: var(--designer-accent-surface);
+  box-shadow: inset 0 0 0 1px var(--designer-accent);
+}
+
+.properties .designer-data-entry-card:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 1px;
+}
+
+/* 不可用：虚线边框 + 降低对比度。原因小字仍是正常对比度，禁用不等于失联。 */
+.properties .designer-data-entry-card:disabled {
+  border-style: dashed;
+  border-color: var(--designer-border-subtle);
+  background: var(--designer-surface-workspace);
+  cursor: not-allowed;
+}
+
+.properties .designer-data-entry-card-head {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--designer-space-1);
+}
+
+.properties .designer-data-entry-card-title {
+  min-width: 0;
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.properties .designer-data-entry-card[aria-checked="true"] .designer-data-entry-card-title {
+  color: var(--designer-accent-text);
+}
+
+.properties .designer-data-entry-card:disabled .designer-data-entry-card-title {
+  color: var(--designer-text-disabled);
+}
+
+/* 类型徽标：入口属于哪种取值方式（手填 / 引用 / 接入）。 */
+.properties .designer-data-entry-card-badge {
+  flex: 0 0 auto;
+  padding: 0 var(--designer-space-2);
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1.5;
+}
+
+.properties .designer-data-entry-card[aria-checked="true"] .designer-data-entry-card-badge {
+  background: var(--designer-accent);
+  color: var(--designer-text-on-accent);
+}
+
+.properties .designer-data-entry-card-description,
+.properties .designer-data-entry-card-reason {
+  display: block;
+  min-width: 0;
+  font-size: var(--designer-font-size-xs);
+  line-height: 1.45;
+}
+
+.properties .designer-data-entry-card-description {
+  color: var(--designer-text-muted);
+}
+
+/* 禁用原因：看得见的一行小字（禁用按钮不弹 title，这行是主要说明通道）。 */
+.properties .designer-data-entry-card-reason {
+  color: var(--designer-warning);
+}
+
+.properties .designer-data-entry-card:disabled .designer-data-entry-card-description {
+  color: var(--designer-text-disabled);
 }
 
 /* Page configuration uses DataV's compact label/control rows and intentionally omits component

@@ -44,6 +44,11 @@ export function handleDatasetClick(
   target: Element,
 ): boolean {
   if (handleStaticClick(context, target)) return true;
+  const entryCard = target.closest<HTMLButtonElement>('[data-data-entry]');
+  if (entryCard !== null) {
+    selectDataEntry(context, entryCard);
+    return true;
+  }
   const sourceMode = target.closest<HTMLButtonElement>('[data-data-source-mode]')?.dataset
     .dataSourceMode as DesignerDataSourceMode | undefined;
   if (sourceMode !== undefined) {
@@ -139,6 +144,68 @@ export function handleDatasetClick(
     return true;
   }
   return handleDatasetAction(context, target);
+}
+
+/**
+ * 选中一张取值入口卡片。
+ *
+ * 入口只是模式的可见面：仍然走 `setSourceMode`，不新增取值模型分支。
+ * 切换会整块重渲染（模式变了段集合也变了），所以选完必须把焦点交回**同一张卡**，
+ * 否则键盘/读屏用户会被丢回文档根节点。已选中的卡不重复提交，避免无意义重绘。
+ */
+function selectDataEntry(context: DesignerDatasetControllerContext, card: HTMLButtonElement): void {
+  const entry = card.dataset.dataEntry;
+  const mode = card.dataset.dataEntryMode as DesignerDataSourceMode | undefined;
+  if (entry === undefined || mode === undefined) return;
+  if (!card.disabled && card.getAttribute('aria-checked') !== 'true') setSourceMode(context, mode);
+  focusDataEntryCard(context, entry);
+}
+
+function focusDataEntryCard(context: DesignerDatasetControllerContext, entry: string): void {
+  context.state.panel
+    ?.querySelector<HTMLElement>(`[data-data-entry="${entry}"]`)
+    ?.focus({ preventScroll: true });
+}
+
+type DataEntryMove = 'next' | 'previous' | 'first' | 'last';
+
+function dataEntryMove(key: string): DataEntryMove | undefined {
+  if (key === 'ArrowRight' || key === 'ArrowDown') return 'next';
+  if (key === 'ArrowLeft' || key === 'ArrowUp') return 'previous';
+  if (key === 'Home') return 'first';
+  if (key === 'End') return 'last';
+  return undefined;
+}
+
+/**
+ * 方向键在三个入口之间移动并即时选中（radiogroup 语义），`Home/End` 到首尾。
+ *
+ * 只在可选项之间移动：禁用卡不是合法停点，跳过它比停在上面按不动更符合预期。
+ */
+function moveDataEntry(
+  context: DesignerDatasetControllerContext,
+  card: HTMLButtonElement,
+  move: DataEntryMove,
+): void {
+  const cards = [
+    ...(card
+      .closest('[data-data-entry-group]')
+      ?.querySelectorAll<HTMLButtonElement>('[data-data-entry]') ?? []),
+  ].filter((item) => !item.disabled);
+  const current = cards.indexOf(card);
+  if (current === -1 || cards.length === 0) return;
+  const index =
+    move === 'first'
+      ? 0
+      : move === 'last'
+        ? cards.length - 1
+        : (current + (move === 'next' ? 1 : -1) + cards.length) % cards.length;
+  const next = cards[Math.min(Math.max(index, 0), cards.length - 1)];
+  if (next === undefined || next === card) {
+    focusDataEntryCard(context, card.dataset.dataEntry ?? '');
+    return;
+  }
+  selectDataEntry(context, next);
 }
 
 function handleDatasetAction(context: DesignerDatasetControllerContext, target: Element): boolean {
@@ -327,6 +394,20 @@ export function handleDatasetKeyDown(
       context.renderSurface();
     } else closeWorkbench(context);
     return true;
+  }
+  // 取值入口是 radiogroup：方向键移动并选中，Home/End 到首尾。Enter/Space 由按钮原生行为
+  // 触发 click（同一条 `selectDataEntry` 路径），这里不重复处理。
+  const move = dataEntryMove(event.key);
+  if (move !== undefined) {
+    const entryCard =
+      event.target instanceof Element
+        ? event.target.closest<HTMLButtonElement>('[data-data-entry]')
+        : null;
+    if (entryCard !== null) {
+      event.preventDefault();
+      moveDataEntry(context, entryCard, move);
+      return true;
+    }
   }
   if (event.key !== 'Enter' || event.isComposing) return false;
   const target = event.target;

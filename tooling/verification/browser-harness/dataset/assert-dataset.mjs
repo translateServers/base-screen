@@ -441,8 +441,9 @@ export async function assertDatasetSurface(designer, page) {
   }
   await designer.getByRole('tab', { name: '\u6570\u636e\u6e90', exact: true }).click();
   const dataPanel = designer.locator('[data-inspector-pane=data]');
-  const sourceMode = dataPanel.locator('[data-data-source-mode-select]');
-  await sourceMode.selectOption('dataset');
+  // 取值方式是三入口卡片（`接数据源` = 原来的 dataset 选项），不再有 `[data-data-source-mode-select]`。
+  await dataPanel.locator('[data-data-entry="source"]').click();
+  await dataPanel.locator('[data-data-entry="source"][aria-checked="true"]').waitFor();
   const datasetQuery = dataPanel.locator('[data-dataset-query]');
   const datasetItem = dataPanel.locator('[data-dataset-resource-id="tabular-orders"]');
   if ((await datasetQuery.count()) === 0) {
@@ -504,7 +505,13 @@ export async function assertDatasetSurface(designer, page) {
         authoringSettings.scrollWidth > authoringSettings.clientWidth + 1,
       copyActionDisabled:
         panel.querySelector('[data-dataset-authoring-action="copy-data"]')?.disabled === true,
-      sourceMode: panel.querySelector('[data-data-source-mode-select]')?.value,
+      sourceEntry: {
+        checked: panel
+          .querySelector('[data-data-entry="source"]')
+          ?.getAttribute('aria-checked'),
+        mode: panel.querySelector('[data-data-entry="source"]')?.dataset.datasetMode,
+        cardCount: panel.querySelectorAll('[data-data-entry]').length,
+      },
       activeStep: flow?.dataset.activeStep,
       layout: flow?.dataset.dataFlowLayout,
       stepCount: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
@@ -550,7 +557,9 @@ export async function assertDatasetSurface(designer, page) {
     descriptorSurface.authoringSettingRowCount !== 2 ||
     descriptorSurface.authoringSettingsHorizontalOverflow ||
     !descriptorSurface.copyActionDisabled ||
-    descriptorSurface.sourceMode !== 'dataset' ||
+    descriptorSurface.sourceEntry.checked !== 'true' ||
+    descriptorSurface.sourceEntry.mode !== 'dataset' ||
+    descriptorSurface.sourceEntry.cardCount !== 3 ||
     descriptorSurface.activeStep !== 'source' ||
     descriptorSurface.layout !== 'continuous' ||
     descriptorSurface.stepCount !== 3 ||

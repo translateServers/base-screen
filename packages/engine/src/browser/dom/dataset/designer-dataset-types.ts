@@ -7,6 +7,7 @@ import type {
 } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import type { BaseScreenMaterialStaticDataDescriptor } from '@base-screen/plugin-core';
+import type { DesignerDataStateView } from './designer-data-state.js';
 
 export type DesignerDataSourceMode = 'none' | 'static' | 'variable' | 'dataset' | 'host-resource';
 
@@ -76,6 +77,8 @@ export interface DesignerDataSourcePanelOptions {
   readonly scrollScope: string;
   readonly mode: DesignerDataSourceMode;
   readonly availableModes: readonly DesignerDataSourceMode[];
+  /** 七态派生结果：面板头部徽标与根节点 `data-state` 共用这一份，不再各自推导。 */
+  readonly dataState: DesignerDataStateView;
   readonly hostResource?: Pick<ScreenHostResourceDataSource, 'resourceType' | 'resourceId'>;
   readonly variableSourceId: string;
   readonly staticDraft: string;

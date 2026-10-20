@@ -61,11 +61,15 @@ export function deriveDesignerDataState(input: DesignerDataStateInput): Designer
 /**
  * 把派生状态写到面板根节点。
  *
- * 只写 `data-state` / `data-state-reason` 两个属性：本轮不改变任何既有视觉，
- * 徽标样式在下一轮接入（T03b）。
+ * 写 `data-state` / `data-state-reason` 两个属性；徽标的文本与色调由
+ * `designer-data-state-badge` 读同一个派生结果渲染，两处永远同值。
  */
 export function applyDesignerDataState(node: HTMLElement, view: DesignerDataStateView): void {
-  node.dataset.state = view.state;
-  if (view.reason === undefined) delete node.dataset.stateReason;
-  else node.dataset.stateReason = view.reason;
+  // 单测会用「只实现 replaceChildren/querySelector/querySelectorAll」的占位面板替换重绘，
+  // 那种对象没有 `dataset`：派生状态是渲染结果而不是渲染前提，这里跳过即可。
+  const attributes: DOMStringMap | undefined = (node as { dataset?: DOMStringMap }).dataset;
+  if (attributes === undefined) return;
+  attributes.state = view.state;
+  if (view.reason === undefined) delete attributes.stateReason;
+  else attributes.stateReason = view.reason;
 }

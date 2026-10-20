@@ -18,6 +18,7 @@ function model(
     scrollScope: 'scope',
     mode: 'dataset',
     availableModes: ['none', 'static', 'dataset'],
+    dataState: { state: 'ready' },
     variableSourceId: '',
     staticDraft: 'null',
     staticDescriptor: undefined,

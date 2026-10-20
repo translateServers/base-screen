@@ -8,6 +8,40 @@ export const DESIGNER_UI_TEXT = {
   layers: '图层',
   appearance: '样式',
   data: '数据',
+  // 数据面板的两个可见面：「取值方式」三入口卡片（`dataEntry`）与七态状态徽标（`dataState`）。
+  // 与上面的页签标题 `data` 分开成组：`data` 是页签名（术语表里被断言钉死），不承载面板文案。
+  dataEntry: {
+    legend: '取值方式',
+    static: {
+      title: '固定值',
+      description: '手填一份数据，不依赖数据源。',
+      badge: '手填',
+      disabled: '当前组件不支持固定值。',
+    },
+    variable: {
+      title: '用变量',
+      description: '取全局变量当前的值。',
+      badge: '引用',
+      disabled: '当前组件不支持变量。',
+    },
+    source: {
+      title: '接数据源',
+      description: '绑定数据集或宿主资源。',
+      badge: '接入',
+      disabled: '当前组件不支持接数据源。',
+      portMissing: '宿主未提供数据集接口',
+    },
+  },
+  dataState: {
+    unconfigured: '未配置',
+    unavailable: '不可用',
+    readonly: '只读',
+    loading: '加载中',
+    failed: '失败',
+    empty: '无数据',
+    ready: '已就绪',
+    aria: (label: string) => `数据状态：${label}`,
+  },
   interaction: '交互',
   events: '事件',
   inspector: '属性',

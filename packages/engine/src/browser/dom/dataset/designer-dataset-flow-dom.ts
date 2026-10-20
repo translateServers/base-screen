@@ -9,6 +9,11 @@ import {
   renderDesignerStaticDataMapping,
   renderDesignerStaticDataPreview,
 } from '../static-data/designer-static-data-dom.js';
+import {
+  dataEntrySearchText,
+  designerDataEntryItems,
+  renderDataEntryGroup,
+} from './designer-data-entry-dom.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import { datasetAction, renderApplyAction } from './designer-dataset-primitives.js';
 import {
@@ -21,6 +26,12 @@ import type {
   DesignerDatasetWorkbenchStep,
 } from './designer-dataset-types.js';
 
+/**
+ * 「取值方式」段：三张入口卡片取代原来的裸下拉。
+ *
+ * 段 key 仍是 `mode`（改名随下一单的取值段一起做），段节点仍由外层流程渲染器持有：
+ * 卡片只是把 `setSourceMode` 的四个模式收敛成三入口，模式本身没有变化。
+ */
 function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement {
   const ownerDocument = options.panel.ownerDocument;
   const section = ownerDocument.createElement('section');
@@ -28,27 +39,17 @@ function renderSourceMode(options: DesignerDataSourcePanelOptions): HTMLElement 
   section.dataset.workbenchSection = 'source';
   section.dataset.dsSection = 'mode';
   section.tabIndex = -1;
+  const items = designerDataEntryItems({
+    mode: options.mode,
+    availableModes: options.availableModes,
+    resourceAvailable: options.resourceAvailable,
+  });
+  section.dataset.inspectorSearchSection = 'true';
+  section.dataset.inspectorSearchText = dataEntrySearchText(items);
   const heading = ownerDocument.createElement('h3');
   heading.className = 'designer-inspector-section-title';
-  heading.textContent = DESIGNER_UI_TEXT.dataSource.title;
-  // 与检查器其余字段同一套行骨架（标签列 + 控件列 + 自绘下拉）：
-  // 手写 label + 裸 select 会让这里的下拉长得和别处不一样，长标签也会撑成两行。
-  const row = createDesignerFieldRow(ownerDocument, {
-    label: DESIGNER_UI_TEXT.dataSource.type,
-  });
-  row.field.classList.add('designer-data-source-type-field');
-  const select = createDesignerSelect(ownerDocument, {
-    ariaLabel: DESIGNER_UI_TEXT.dataSource.type,
-    options: options.availableModes.map((mode) => ({
-      label: DESIGNER_UI_TEXT.dataSource.mode(mode),
-      selected: options.mode === mode,
-      value: mode,
-    })),
-    value: options.mode,
-  });
-  select.dataset.dataSourceModeSelect = 'true';
-  row.control.appendChild(enhanceDesignerSelect(select).element);
-  section.append(heading, row.field);
+  heading.textContent = DESIGNER_UI_TEXT.dataEntry.legend;
+  section.append(heading, renderDataEntryGroup(ownerDocument, items));
   return section;
 }
 

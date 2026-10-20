@@ -9,6 +9,7 @@ import {
   type DesignerDataStateInput,
   deriveDesignerDataState,
 } from '../../dom/dataset/designer-data-state.js';
+import { syncDataStateBadge } from '../../dom/dataset/designer-data-state-badge.js';
 import { renderDatasetCatalogResults } from '../../dom/dataset/designer-dataset-catalog-dom.js';
 import {
   type DesignerDataSourcePanelOptions,
@@ -37,6 +38,10 @@ export function renderDatasetSurface(context: DesignerDatasetControllerContext):
 function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   const panel = context.state.panel;
   if (panel === undefined) return;
+  // 整块重渲染会换掉取值入口卡片节点。先记下「哪张卡正聚焦」，渲染完再交回去：
+  // 切到「接数据源」会触发目录分组/结果回包这类异步重绘，不还原就等于用一次方向键
+  // 把键盘用户丢到 body 上（radiogroup 的方向键从此失效）。
+  const focusedEntry = focusedDataEntry(panel);
   const options = createDatasetPanelOptions(context, panel);
   const surface = renderDesignerDataSourcePanel(options);
   context.state.feedback = surface.feedback;
@@ -57,8 +62,22 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   const workbenchHost = context.callbacks.getWorkbenchHost?.();
   if (workbenchHost !== undefined) stampDataSectionKeys(workbenchHost, options);
   context.dataFlowScrollSync.bind(panel);
-  // 七态派生：面板任何时刻只有一个主状态（本轮只写 data 属性，视觉留给下一轮）。
-  applyDesignerDataState(panel, deriveDesignerDataState(dataStateInput(context)));
+  // 七态派生：面板任何时刻只有一个主状态；徽标文本/色调与根节点 `data-state` 同一份真值。
+  applyDesignerDataState(panel, options.dataState);
+  syncDataStateBadge(panel, options.dataState);
+  if (focusedEntry !== undefined) {
+    panel
+      .querySelector<HTMLElement>(`[data-data-entry="${focusedEntry}"]`)
+      ?.focus({ preventScroll: true });
+  }
+}
+
+/** 面板所在可聚焦根里，当前聚焦的取值入口（没有就是 undefined）。 */
+function focusedDataEntry(panel: HTMLElement): string | undefined {
+  const root = panel.getRootNode() as Document | ShadowRoot | undefined;
+  const active = root?.activeElement as HTMLElement | null | undefined;
+  if (active == null || active === panel) return undefined;
+  return active.closest<HTMLElement>('[data-data-entry]')?.dataset.dataEntry;
 }
 
 /**
@@ -144,7 +163,10 @@ export function syncDatasetSurface(
   for (const root of [panel, workbenchHost]) {
     if (root === undefined) continue;
     syncDatasetSections(root, options);
+    // 徽标不属于任何段：段级 diff 不会碰它，随模型就地刷新（文本 + 色调 + data-state）。
+    syncDataStateBadge(root, options.dataState);
   }
+  applyDesignerDataState(panel, options.dataState);
   restoreFocus?.();
 }
 
@@ -218,6 +240,7 @@ function createDatasetPanelOptions(
     ]),
     mode: context.state.mode,
     availableModes: availableModes(context),
+    dataState: deriveDesignerDataState(dataStateInput(context)),
     ...(source?.type === 'host-resource'
       ? { hostResource: { resourceType: source.resourceType, resourceId: source.resourceId } }
       : {}),

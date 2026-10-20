@@ -9,7 +9,10 @@ const DATA_PANEL = '[data-inspector-pane=data]';
 
 async function openDataset(designer, page) {
   const dataPanel = designer.locator(DATA_PANEL);
-  await dataPanel.locator('[data-data-source-mode-select]').selectOption('dataset');
+  // 取值方式是三入口卡片：`接数据源` 卡片等价于原来的「选 dataset」下拉项；
+  // 再等 `aria-checked` 落位，比原来只断言「下拉值 = dataset」更强（单选态真的画出来了）。
+  await dataPanel.locator('[data-data-entry="source"]').click();
+  await dataPanel.locator('[data-data-entry="source"][aria-checked="true"]').waitFor();
   if ((await dataPanel.locator('[data-dataset-query]').count()) === 0) {
     await dataPanel.locator('[data-dataset-change]').click();
   }
