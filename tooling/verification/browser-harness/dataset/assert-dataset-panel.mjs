@@ -9,7 +9,7 @@ const DATA_PANEL = '[data-inspector-pane=data]';
 
 /** 空态三行标题的全称（图文案逐字核对，容不得 includes 式的模糊匹配）。 */
 const EMPTY_STATE_TITLES = [
-  ['static', '输入固定值'],
+  ['inline', '输入固定值'],
   ['variable', '用变量'],
   ['source', '接数据源'],
 ];
@@ -64,7 +64,7 @@ function goodEmptyState() {
   return {
     rows: [
       {
-        entry: 'static',
+        entry: 'inline',
         disabled: false,
         title: '输入固定值',
         descriptionClipped: false,
@@ -119,11 +119,11 @@ function assertEmptyStateJudge() {
     ['reason-missing-metrics', withRow('variable', { reasonRectTop: null }), ['reason-metrics']],
     [
       'description-clipped',
-      withRow('static', { descriptionClipped: true }),
-      ['description-clipped:static'],
+      withRow('inline', { descriptionClipped: true }),
+      ['description-clipped:inline'],
     ],
     ['disabled-row-chevron', withRow('variable', { chevron: true }), ['disabled-row:variable']],
-    ['enabled-row-reason', withRow('static', { reasonText: '不该有原因' }), ['enabled-row:static']],
+    ['enabled-row-reason', withRow('inline', { reasonText: '不该有原因' }), ['enabled-row:inline']],
     ['apply-present', { ...goodEmptyState(), applyCount: 1 }, ['apply-count']],
     ['none-selected', { ...goodEmptyState(), text: '当前组件不使用数据。' }, ['none-selected']],
     ['details-group', { ...goodEmptyState(), detailsGroups: 2 }, ['details-group']],
@@ -193,8 +193,9 @@ export async function assertDatasetPanelInteraction(designer, page) {
   });
   // 文案用字面量而不是 \u 转义：这是验收时要逐字核对的字符串，
   // 转义形式会让 `grep 输入固定值` 落空（真的发生过）。
-  const shortLabels = { static: '固定值', variable: '变量', source: '数据源' };
-  const fullLabels = { static: '输入固定值', variable: '用变量', source: '接数据源' };
+  // 键来自 `data-data-entry`（取值模型类别：`inline | variable | source`），不是旧 5 模式。
+  const shortLabels = { inline: '固定值', variable: '变量', source: '数据源' };
+  const fullLabels = { inline: '输入固定值', variable: '用变量', source: '接数据源' };
   if (
     segmentedSurface.count !== 3 ||
     segmentedSurface.options.some(

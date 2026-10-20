@@ -117,6 +117,12 @@ export function renderDatasetAuthoring(
   }
   if (part !== 'footer') section.append(heading, editor, filter, actions);
   if (part !== 'editor') {
+    // **为什么现在不可达**：固定值/变量组件在 `requiredDataSections()` 就只返回 `{value}`，
+    // `authoring` 段根本不会进 DOM，所以下面这个 `if` 的 false 分支在浏览器里走不到。
+    // 保留它是因为「dataset 模式 + 非 data-source-field 取值」这种组合将来可能出现；
+    // **不要为了让它可达去造假夹具**——为当前不存在的状态造数据，是给未来埋伏。
+    // 「非数据源组件不出现 authoring 段」这条规则由段集合断言兜住（见 harness）。
+    //
     // `refresh` 组只在组件**引用了实例**时存在：`inline` / `variable` 没有可指向的实例，
     // 渲染出来就是一条必然跳到空处的死链接。段存在与组存在是两个条件，不要合并判断。
     section.appendChild(

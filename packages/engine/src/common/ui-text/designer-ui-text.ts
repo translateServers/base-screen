@@ -14,7 +14,7 @@ export const DESIGNER_UI_TEXT = {
     entry: {
       legend: '取值方式',
       // `title` 是**全称**：空态引导行（第一次认识这个入口）与分段控件的 title / aria-label 都用它。
-      static: {
+      inline: {
         title: '输入固定值',
         description: '手填一份数据，不依赖数据源。',
         badge: '手填',
@@ -36,7 +36,7 @@ export const DESIGNER_UI_TEXT = {
       // 短名只给配置态分段用（横向一段约 95px）。两组必须在同一处定义：
       // 分段可见文本取 compact、无障碍名取 title，缺任何一组都会让 aria-label 取错来源。
       compact: {
-        static: '固定值',
+        inline: '固定值',
         variable: '变量',
         source: '数据源',
       },

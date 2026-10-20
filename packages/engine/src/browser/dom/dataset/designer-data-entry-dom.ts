@@ -5,15 +5,19 @@ import type { DesignerDataSourceMode } from './designer-dataset-types.js';
 /**
  * 「取值方式」三入口（L0）。
  *
- * 取值模型仍是原来的 `static / variable / dataset / host-resource` 四种模式，
- * 这一层只把它们收敛成用户能判断的三个入口：
- * - `static`   固定值：不接数据源，手填；
+ * `data-data-entry` 是**取值模型的类别**（与契约 `ScreenValueRef.kind` 同级），不是旧 5 模式的
+ * 别名：`inline / variable / source` 分别对应「常量 / 变量 / 数据源输出」。它历史上的名字
+ * 叫过 `static`——与旧模式同名会把"取值形态"和"配置模式"混为一谈，故统一为 `inline`。
+ * （`mode` 侧仍保留 `'static'`：那是面板的模式枚举，与入口取值不是同一层。）
+ *
+ * 三个入口：
+ * - `inline`   固定值：不接数据源，手填；
  * - `variable` 用变量：取全局变量的当前值；
  * - `source`   接数据源：绑定数据集或宿主资源（两种模式共用一个入口）。
  *
  * 入口只是**模式的可见面**：点击仍然是 `setSourceMode(mode)`，不改取值模型。
  */
-export type DesignerDataEntry = 'static' | 'variable' | 'source';
+export type DesignerDataEntry = 'inline' | 'variable' | 'source';
 
 /** 卡片携带的目标模式：`source` 入口按组件声明的能力落到 dataset 或 host-resource。 */
 export interface DesignerDataEntryItem {
@@ -34,7 +38,8 @@ export interface DesignerDataEntryOptions {
 
 /** 当前模式落在哪个入口：`none` 不属于任何入口（未配置 = 三个入口都没选中）。 */
 export function dataEntryOfMode(mode: DesignerDataSourceMode): DesignerDataEntry | undefined {
-  if (mode === 'static' || mode === 'variable') return mode;
+  if (mode === 'static') return 'inline';
+  if (mode === 'variable') return 'variable';
   if (mode === 'dataset' || mode === 'host-resource') return 'source';
   return undefined;
 }
@@ -51,7 +56,7 @@ export function designerDataEntryItems(
 ): readonly DesignerDataEntryItem[] {
   const selectedEntry = dataEntryOfMode(options.mode);
   return [
-    entryItem(options, 'static', 'static', selectedEntry),
+    entryItem(options, 'inline', 'static', selectedEntry),
     entryItem(options, 'variable', 'variable', selectedEntry),
     sourceItem(options, selectedEntry),
   ];
@@ -106,7 +111,7 @@ function sourceItem(
 }
 
 function entryText(entry: DesignerDataEntry) {
-  if (entry === 'static') return DESIGNER_UI_TEXT.data.entry.static;
+  if (entry === 'inline') return DESIGNER_UI_TEXT.data.entry.inline;
   if (entry === 'variable') return DESIGNER_UI_TEXT.data.entry.variable;
   return DESIGNER_UI_TEXT.data.entry.source;
 }

@@ -713,9 +713,15 @@ export async function assertDatasetAuthoring(designer, page) {
   await designer.locator('[data-inspector-pane=interaction]').screenshot({
     path: `${screenshotDirectory}/interaction-summary-${page.viewportSize()?.width ?? 'desktop'}.png`,
   });
-  await designer.locator('[data-base-screen-component-id=title]').click({
-    position: { x: 6, y: 7 },
-  });
+  // 确定性选中：先切图层面板再点行。**不用画布坐标点**——坐标会点到遮挡在上层的组件
+  // （实测：点了 title 的坐标，面板却停在别的组件上，断言于是在相邻状态上采数）。
+  await designer.locator('[data-panel-tab="layers"]').click();
+  await designer.locator('[data-layer-select="title"] .layer-name').click();
+  // **到位凭据**：先等面板真的停在这个固定值组件上。用 `attached` 而非 `visible`：
+  // 面板可能已滚走，凭据要的是"它被选中"这个事实，不是"此刻在视口里"。
+  await dataPanel
+    .locator('[data-data-entry="inline"][aria-checked="true"]')
+    .waitFor({ state: 'attached' });
   // 条件渲染的**假一侧**：`title` 是 inline（固定值）组件，没有引用任何实例 —— 所以
   // 「去工作台修改」的跳转与 `refresh` 组都必须为 0。只测真一侧（data-source-field 组件）
   // 等于把条件删掉也照样绿：注入「无条件渲染跳转」不会触发任何断言。
