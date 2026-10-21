@@ -48,7 +48,10 @@ export function valueRefEquals(left: ScreenValueRef | null, right: ScreenValueRe
 }
 
 /**
- * 参数位的 picker 入参：本轮只开放 `inline | variable`。
+ * 参数位的 picker 入参：只开放 `variable`。
+ *
+ * 固定值/变量的切换由参数行自己的两段开关承担，编辑器常驻；picker 只负责「选哪个变量」，
+ * 所以列表里不该再出现一次「固定值」选项——那会让同一件事有两个入口。
  *
  * `excludedDataSourceIds` 现在就传（当前实例 id），是为 T03b 打开 `data-source-field` 时
  * 直接生效——那时只需把 `'data-source-field'` 加进 `allowedKinds`，其余不用改。
@@ -59,7 +62,7 @@ export function datasetParameterPickerInput(
   excludedDataSourceIds: readonly string[] = [],
 ): DesignerValueRefPickerInput {
   return {
-    allowedKinds: ['inline', 'variable'],
+    allowedKinds: ['variable'],
     current,
     variables,
     excludedDataSourceIds,

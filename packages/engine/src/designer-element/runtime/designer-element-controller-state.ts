@@ -261,6 +261,10 @@ export function initializeDesignerElementControllers(
       state.runtime.executeDesignerTransaction(element, transaction),
     report: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
     refresh: (componentId) => element.refreshData(componentId),
+    canUndo: () => state.session.canUndo,
+    undo: () => {
+      state.session.undo();
+    },
     copyText: async (value) => {
       const clipboard = element.ownerDocument.defaultView?.navigator.clipboard;
       if (clipboard === undefined) return false;

@@ -82,6 +82,8 @@ export interface DesignerValueRefPickerOptions {
   /** 控件逻辑地址：写进 `data-value-ref-trigger`，段 diff 的焦点回落靠它认人。 */
   readonly controlKey: string;
   readonly ariaLabel: string;
+  /** 浮层的对齐与最小宽度参照；缺省用触发器自身（图标型触发器会因此收得过窄）。 */
+  readonly anchor?: HTMLElement;
   /** 浮层宿主（段之外）。缺省时退化到触发器最近的 `.designer` 后代。 */
   readonly popoverHost: HTMLElement | undefined;
   readonly allowCreateVariable?: boolean;

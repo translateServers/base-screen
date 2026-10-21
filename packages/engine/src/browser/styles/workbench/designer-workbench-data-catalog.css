@@ -291,17 +291,25 @@
  * 而不是伪元素——伪元素删了没人发现。
  */
 .designer-data-group-caret {
+  display: inline-flex;
   flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
-  border-right: 1.5px solid currentcolor;
-  border-bottom: 1.5px solid currentcolor;
-  transform: rotate(-45deg);
-  transition: transform 120ms ease;
+  color: var(--designer-text-muted);
+  transition:
+    transform 120ms ease,
+    color 120ms ease;
+}
+
+.designer-data-group-caret svg {
+  width: 10px;
+  height: 10px;
+}
+
+.designer-data-group-summary:hover .designer-data-group-caret {
+  color: var(--designer-text-primary);
 }
 
 .designer-data-group[open] > .designer-data-group-summary .designer-data-group-caret {
-  transform: rotate(45deg);
+  transform: rotate(90deg);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -354,27 +362,20 @@
   white-space: nowrap;
 }
 
-.designer-dataset-parameter {
-  gap: var(--designer-space-2);
-  margin: 0;
-  overflow: visible;
-  white-space: normal;
+/* 单形态浮层（参数位只选变量）：列表不再逐行重复同一种徽标，改用 `{ }` 字形提示引用类型。 */
+.designer-value-ref-popover[data-value-ref-kinds="variable"] .designer-value-ref-badge {
+  display: none;
 }
 
-.designer-dataset-parameter-controls {
-  display: grid;
-  min-width: 0;
-  grid-template-columns: minmax(84px, 0.7fr) minmax(0, 1fr);
+.designer-value-ref-popover[data-value-ref-kinds="variable"] .designer-value-ref-option {
   gap: var(--designer-space-2);
 }
 
-.designer-dataset-parameter-controls > .designer-checkbox {
-  align-self: center;
-}
-
-/* 单个控件（变量形态没有内联编辑器）时占满整行，避免触发器被压进 84px 的窄列。 */
-.designer-dataset-parameter-controls > :only-child {
-  grid-column: 1 / -1;
+.designer-value-ref-popover[data-value-ref-kinds="variable"] .designer-value-ref-option::before {
+  flex: 0 0 auto;
+  color: var(--designer-text-muted);
+  content: "{ }";
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-family-mono);
 }
 
 /*

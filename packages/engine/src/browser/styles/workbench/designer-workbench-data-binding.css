@@ -90,8 +90,8 @@
   align-items: center;
   gap: var(--designer-space-3);
   width: 100%;
-  min-height: 34px;
-  padding: var(--designer-space-2) var(--designer-control-padding-inline);
+  min-height: var(--designer-control-height);
+  padding: 0 var(--designer-control-padding-inline);
   border: 0;
   border-radius: var(--designer-radius-2);
   background: var(--designer-surface-control);

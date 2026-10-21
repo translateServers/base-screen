@@ -46,7 +46,9 @@ export function renderDesignerDataSourcePanel(
   feedback.setAttribute('aria-live', 'polite');
   feedback.textContent = options.feedback;
   const content = flow.querySelector<HTMLElement>('.designer-datav-data-flow-content');
-  (content ?? section).appendChild(feedback);
+  const actionBar = content?.querySelector<HTMLElement>('.designer-dataset-actions');
+  if (actionBar !== null && actionBar !== undefined) actionBar.before(feedback);
+  else (content ?? section).appendChild(feedback);
   panel.appendChild(section);
   return { feedback };
 }

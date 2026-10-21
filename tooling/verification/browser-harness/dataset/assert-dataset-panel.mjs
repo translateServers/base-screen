@@ -150,10 +150,13 @@ function assertEmptyStateJudge() {
 
 async function openDataset(designer, page) {
   const dataPanel = designer.locator(DATA_PANEL);
-  // 取值方式是三入口卡片：`接数据源` 卡片等价于原来的「选 dataset」下拉项；
-  // 再等 `aria-checked` 落位，比原来只断言「下拉值 = dataset」更强（单选态真的画出来了）。
+  // 绑定方式收进「更换来源」选择器：先展开三入口，再点「接数据源」。
+  await dataPanel.locator('[data-data-source-picker]').click();
+  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'visible' });
   await dataPanel.locator('[data-data-entry="source"]').click();
-  await dataPanel.locator('[data-data-entry="source"][aria-checked="true"]').waitFor();
+  await dataPanel
+    .locator('[data-data-entry="source"][aria-checked="true"]')
+    .waitFor({ state: 'attached' });
   if ((await dataPanel.locator('[data-dataset-query]').count()) === 0) {
     await dataPanel.locator('[data-dataset-change]').click();
   }
@@ -176,41 +179,33 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await designer.getByRole('tab', { name: '数据源', exact: true }).click();
   const dataPanel = await openDataset(designer, page);
 
-  // 2') 配置态取值方式：可见文本是短名，无障碍名（title / aria-label）必须是全称。
-  //     这两件事错配时"可见文本非空、aria-label 也非空"，人眼与截图都看不出来，只有 DOM 能判。
-  const segmentedSurface = await dataPanel.evaluate((panel) => {
-    const options = [...panel.querySelectorAll('.designer-data-entry-segmented [data-data-entry]')];
+  // 2') 配置态的绑定方式：不再常驻三段式，入口是「更换来源」；展开后三行必须是
+  //     输入固定值 / 用变量 / 接数据源，且当前数据源行被选中。
+  await dataPanel.locator('[data-data-source-picker]').click();
+  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'visible' });
+  const pickerSurface = await dataPanel.evaluate((panel) => {
+    const rows = [...panel.querySelectorAll('[data-data-source-picker-panel] [data-data-entry]')];
     return {
-      count: options.length,
-      options: options.map((option) => ({
-        entry: option.dataset.dataEntry,
-        text: option.textContent,
-        title: option.getAttribute('title'),
-        ariaLabel: option.getAttribute('aria-label'),
-        checked: option.getAttribute('aria-checked'),
+      count: rows.length,
+      rows: rows.map((row) => ({
+        entry: row.dataset.dataEntry,
+        title: row.querySelector('.designer-data-entry-guide-title')?.textContent ?? '',
+        checked: row.getAttribute('aria-checked'),
+        disabled: row.disabled,
       })),
     };
   });
-  // 文案用字面量而不是 \u 转义：这是验收时要逐字核对的字符串，
-  // 转义形式会让 `grep 输入固定值` 落空（真的发生过）。
-  // 键来自 `data-data-entry`（取值模型类别：`inline | variable | source`），不是旧 5 模式。
-  const shortLabels = { inline: '固定值', variable: '变量', source: '数据源' };
-  const fullLabels = { inline: '输入固定值', variable: '用变量', source: '接数据源' };
   if (
-    segmentedSurface.count !== 3 ||
-    segmentedSurface.options.some(
-      (option) =>
-        option.text !== shortLabels[option.entry] ||
-        option.ariaLabel !== fullLabels[option.entry] ||
-        // 禁用段位的 title 会叠上原因，所以只要求以全称开头。
-        !(option.title ?? '').startsWith(fullLabels[option.entry]) ||
-        option.checked !== String(option.entry === 'source'),
-    )
+    pickerSurface.count !== 3 ||
+    pickerSurface.rows.map((row) => row.title).join('|') !== '输入固定值|用变量|接数据源' ||
+    pickerSurface.rows.find((row) => row.entry === 'source')?.checked !== 'true'
   ) {
     throw new Error(
-      `BROWSER_HARNESS_DATASET_SEGMENTED_LABELS_FAILED:${JSON.stringify(segmentedSurface)}`,
+      `BROWSER_HARNESS_DATASET_SOURCE_PICKER_FAILED:${JSON.stringify(pickerSurface)}`,
     );
   }
+  await dataPanel.locator('[data-data-source-picker]').click();
+  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'hidden' });
 
   // 1) 目录搜索：去抖后的回包只换结果区，搜索框保持同一节点、焦点与输入都还在。
   await dataPanel.locator('[data-dataset-change]').click();
@@ -303,9 +298,7 @@ export async function assertDatasetPanelInteraction(designer, page) {
     };
   });
   if (gutter.lastBottom < 0 || gutter.barTop < 0 || gutter.lastBottom > gutter.barTop) {
-    throw new Error(
-      `BROWSER_HARNESS_DATASET_ACTION_BAR_OVERLAP_FAILED:${JSON.stringify(gutter)}`,
-    );
+    throw new Error(`BROWSER_HARNESS_DATASET_ACTION_BAR_OVERLAP_FAILED:${JSON.stringify(gutter)}`);
   }
 
   // 3) 宿主连接：**检查器里三通道全 ready 时不出现**（PRD §6.2：通道正常时是噪声），
@@ -393,17 +386,18 @@ export async function assertDatasetPanelInteraction(designer, page) {
   if ((await discard.count()) > 0) await discard.click();
   await workbench.waitFor({ state: 'hidden' });
   // 放弃草稿会把参数重置回文档里的原始形态（区域是变量参数）：
-  // 后续断言期望的是「常量」内联编辑器，这里用取值选择器显式还原（旧的模式下拉已删除）。
-  // `selectOption` 是同步的，浮层列表是打开后才渲染出来的——必须等列表项出现再点，
-  // 否则会在还没渲染的列表上点空气。
+  // 后续断言期望的是「常量」内联编辑器，用参数行的「固定值」段位显式还原。
   // 参数组默认收起（夹具参数都不是必填）：先点组头展开（真实用户路径），再操作。
   const parametersGroup = dataPanel.locator('details[data-details-group="parameters"]').first();
-  if ((await parametersGroup.count()) > 0 && (await parametersGroup.getAttribute('open')) === null) {
+  if (
+    (await parametersGroup.count()) > 0 &&
+    (await parametersGroup.getAttribute('open')) === null
+  ) {
     await parametersGroup.locator('summary').first().click();
   }
-  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
-  await designer.locator('[data-value-ref-option^="inline:"]').first().waitFor();
-  await designer.locator('[data-value-ref-option^="inline:"]').first().click();
+  await dataPanel
+    .locator('[data-dataset-parameter-row="region"] [data-dataset-parameter-mode="inline"]')
+    .click();
   await dataPanel.locator('[data-value-ref-inline="parameter:region"]').waitFor();
 
   // 5) 空态（未配置数据来源）：文案与版式一律由 DOM 判定。
@@ -480,9 +474,9 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await page.waitForTimeout(400);
   const restored = await dataPanel.evaluate((panel) => ({
     entryCount: panel.querySelectorAll('[data-data-entry]').length,
-    segmented: panel.querySelectorAll('.designer-data-entry-segmented').length,
+    pickerHidden: panel.querySelector('[data-data-source-picker-panel]')?.hidden ?? null,
   }));
-  if (restored.segmented !== 1 || restored.entryCount !== 3) {
+  if (restored.pickerHidden !== true || restored.entryCount !== 3) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_EMPTY_STATE_RESTORE_FAILED:${JSON.stringify(restored)}`,
     );

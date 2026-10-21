@@ -82,15 +82,17 @@ describe('取值选择器 · 纯逻辑', () => {
     expect(filterValueRefOptions(options, 'VARI')).toHaveLength(0);
   });
 
-  it('参数位入参阶段性只开 inline/variable，且带排除列表', () => {
+  it('参数位选择器只列变量：固定值/变量由参数行自己的开关承担', () => {
     const parameterInput = datasetParameterPickerInput(
       { kind: 'inline', value: 1 },
       [{ id: 'region', name: '区域' }],
       ['self'],
     );
-    expect(parameterInput.allowedKinds).toEqual(['inline', 'variable']);
+    expect(parameterInput.allowedKinds).toEqual(['variable']);
     expect(parameterInput.excludedDataSourceIds).toEqual(['self']);
-    expect(parameterInput.allowedKinds).not.toContain('data-source-field');
+    expect(
+      buildValueRefOptions(parameterInput, text).every((option) => option.kind === 'variable'),
+    ).toBe(true);
   });
 
   it('valueRefEquals 按形态逐一比较', () => {

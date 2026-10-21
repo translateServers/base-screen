@@ -15,9 +15,10 @@ import {
   parameterControl,
   renderActions,
 } from './designer-dataset-config-controls.js';
-import type {
-  DesignerDatasetConfigurationOptions,
-  DesignerDatasetDraftView,
+import {
+  countUnfilledRequiredParameters,
+  type DesignerDatasetConfigurationOptions,
+  type DesignerDatasetDraftView,
 } from './designer-dataset-types.js';
 
 /**
@@ -74,58 +75,11 @@ function mappingSummary(options: DesignerDatasetConfigurationOptions): string {
   return parts.length === 0 ? DESIGNER_UI_TEXT.data.groups.mappingEmpty : parts.join(' \u00b7 ');
 }
 
-/**
- * 映射组内的「输出字段」：**逐项列表**（`维度：分类` / `指标：金额` 各一行）。
- *
- * 刻意不与组头摘要同一形态：组头是"一句话概览"，组内是"可看细节"的地方——两处一字不差
- * 就是新的同义重复（上一版就踩过）。`data-dataset-output-fields` 是断言锚点。
- */
-function outputFieldLine(
-  ownerDocument: Document,
-  options: DesignerDatasetConfigurationOptions,
-): HTMLElement {
-  const block = ownerDocument.createElement('div');
-  block.className = 'designer-dataset-output-fields';
-  block.dataset.datasetOutputFields = 'true';
-  const label = ownerDocument.createElement('span');
-  label.className = 'designer-dataset-output-fields-label';
-  label.textContent = DESIGNER_UI_TEXT.dataset.bindingSummaryTitle;
-  block.appendChild(label);
-  const list = ownerDocument.createElement('ul');
-  list.className = 'designer-dataset-output-fields-list';
-  for (const role of options.roles) {
-    const selected = options.draft?.fields[role.id] ?? [];
-    if (selected.length === 0) continue;
-    const row = ownerDocument.createElement('li');
-    row.className = 'designer-dataset-output-fields-row';
-    const name = ownerDocument.createElement('span');
-    name.className = 'designer-dataset-output-fields-role';
-    name.textContent = DESIGNER_UI_TEXT.dataset.bindingRole(role.id);
-    const values = ownerDocument.createElement('span');
-    values.className = 'designer-dataset-output-fields-value';
-    values.textContent = selected
-      .map((id) => options.descriptor.fields.find((field) => field.id === id)?.label ?? id)
-      .join('、');
-    row.append(name, values);
-    list.appendChild(row);
-  }
-  if (list.childElementCount === 0) {
-    const empty = ownerDocument.createElement('p');
-    empty.className = 'designer-dataset-output-fields-empty';
-    empty.textContent = DESIGNER_UI_TEXT.data.groups.mappingEmpty;
-    block.appendChild(empty);
-  } else {
-    block.appendChild(list);
-  }
-  return block;
-}
-
-/** 有必填参数未填时展开参数组：让"还差什么"在收起态就可见并可直接进入。 */
-function hasUnfilledRequiredParameter(options: DesignerDatasetConfigurationOptions): boolean {
-  return options.descriptor.parameters.some(
-    (parameter) => parameter.required && options.draft?.params[parameter.name] === undefined,
-  );
-}
+/** 参数位的取值文案用设计稿的「固定值」，与数据集/变量术语区分。 */
+const PARAMETER_REF_TEXT = {
+  ...DESIGNER_UI_TEXT.data.ref,
+  tab: { ...DESIGNER_UI_TEXT.data.ref.tab, inline: DESIGNER_UI_TEXT.dataset.literal },
+};
 
 export function renderDesignerDatasetConfiguration(
   options: DesignerDatasetConfigurationOptions,
@@ -138,6 +92,7 @@ export function renderDesignerDatasetConfiguration(
   // `source` 段内是 3 个折叠组（数据源 / 字段映射 / 请求参数）。组头摘要只取文档与草稿里的
   // 既有值；目录态不走这里（目录不是折叠组）。
   const overrides = options.groupOpenOverrides ?? new Map<string, boolean>();
+  const unfilledParameters = countUnfilledRequiredParameters(options.descriptor, options.draft);
   details.append(
     createDataGroup(
       {
@@ -145,7 +100,7 @@ export function renderDesignerDatasetConfiguration(
         section: 'source',
         group: 'source',
         title: DESIGNER_UI_TEXT.data.groups.source,
-        summary: options.instance?.name ?? options.descriptor.name,
+        summary: options.descriptor.name,
         defaultOpen: true,
         overrides,
         onToggle: options.onToggleGroup,
@@ -163,10 +118,7 @@ export function renderDesignerDatasetConfiguration(
         overrides,
         onToggle: options.onToggleGroup,
       },
-      [
-        outputFieldLine(ownerDocument, options),
-        withoutSectionHeading(renderBindings(ownerDocument, options)),
-      ],
+      [withoutSectionHeading(renderBindings(ownerDocument, options))],
     ),
     createDataGroup(
       {
@@ -174,8 +126,14 @@ export function renderDesignerDatasetConfiguration(
         section: 'source',
         group: 'parameters',
         title: DESIGNER_UI_TEXT.data.groups.parameters,
-        summary: DESIGNER_UI_TEXT.data.groups.parametersCount(options.descriptor.parameters.length),
-        defaultOpen: hasUnfilledRequiredParameter(options),
+        summary:
+          unfilledParameters > 0
+            ? DESIGNER_UI_TEXT.dataSource.parametersSummary(
+                options.descriptor.parameters.length,
+                unfilledParameters,
+              )
+            : DESIGNER_UI_TEXT.dataSource.parametersFilled(options.descriptor.parameters.length),
+        defaultOpen: unfilledParameters > 0,
         overrides,
         onToggle: options.onToggleGroup,
       },
@@ -211,11 +169,9 @@ function renderDatasetSummary(
   header.className = 'designer-dataset-summary-header';
   const title = ownerDocument.createElement('span');
   title.className = 'designer-dataset-summary-title';
-  const eyebrow = ownerDocument.createElement('small');
-  eyebrow.textContent = DESIGNER_UI_TEXT.dataset.currentDataset;
   const name = ownerDocument.createElement('strong');
   name.textContent = descriptor.name;
-  title.append(eyebrow, name);
+  title.append(name);
   const change = ownerDocument.createElement('button');
   change.type = 'button';
   change.className = 'designer-control designer-button';
@@ -235,11 +191,11 @@ function renderDatasetSummary(
 }
 
 /**
- * 参数段：每行 = 取值选择器触发器 + （仅当取值是常量时）内联值编辑器。
+ * 参数段：每行 = 标签 + 取值方式两段开关 + 一整行取值控件。
  *
- * 形态与值分开表达，是这次重构的核心：以前「固定值 / 变量」是一个下拉，选完再把值控件整块换掉，
- * 于是变量下拉一改值就把引用覆盖成字面量；现在触发器只回答「这个参数取什么」，
- * 常量形态下才把值编辑器并排放出来，引用与值不会互相踩。
+ * 形态只由开关表达（固定值 / 变量），picker 不再兼任形态下拉：固定值时行内是值编辑器，
+ * 右侧 `{ }` 是「改绑变量」的入口；变量时整行是一枚可点击的变量芯片 + 清除。这样
+ * 「这个参数是常量还是变量」和「常量是多少 / 变量叫什么」各自只有一个可见答案。
  */
 function renderParameters(
   ownerDocument: Document,
@@ -258,33 +214,142 @@ function renderParameters(
   }
   for (const parameter of options.descriptor.parameters) {
     const current = currentParameterRef(options.draft, parameter.name);
-    const label = ownerDocument.createElement('label');
-    label.className = 'designer-field designer-dataset-parameter';
+    const mode = current !== null && current.kind === 'variable' ? 'variable' : 'inline';
+    const errorText =
+      parameter.required && current === null
+        ? DESIGNER_UI_TEXT.dataSource.parameterRequired(parameter.label)
+        : '';
+    const field = ownerDocument.createElement('div');
+    field.className = 'designer-field designer-dataset-parameter';
+    field.dataset.datasetParameterRow = parameter.name;
+
+    const head = ownerDocument.createElement('div');
+    head.className = 'designer-dataset-parameter-head';
     const labelText = ownerDocument.createElement('span');
-    labelText.className = 'designer-field-label';
+    labelText.className = 'designer-field-label designer-dataset-parameter-label';
     labelText.textContent = parameter.label;
-    const controls = ownerDocument.createElement('span');
-    controls.className = 'designer-dataset-parameter-controls';
+    if (parameter.required) {
+      const required = ownerDocument.createElement('span');
+      required.className = 'designer-field-required';
+      required.setAttribute('aria-hidden', 'true');
+      required.textContent = '*';
+      labelText.appendChild(required);
+    }
+    const modeGroup = ownerDocument.createElement('div');
+    modeGroup.className = 'designer-segmented designer-dataset-parameter-mode';
+    modeGroup.setAttribute('role', 'group');
+    modeGroup.setAttribute(
+      'aria-label',
+      DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label),
+    );
+    const fixedButton = parameterModeButton(
+      ownerDocument,
+      'inline',
+      DESIGNER_UI_TEXT.dataset.literal,
+      mode === 'inline',
+    );
+    const variableButton = parameterModeButton(
+      ownerDocument,
+      'variable',
+      DESIGNER_UI_TEXT.dataset.variable,
+      mode === 'variable',
+    );
+    modeGroup.append(fixedButton, variableButton);
+    head.append(labelText, modeGroup);
+
+    const control = ownerDocument.createElement('div');
+    control.className = 'designer-dataset-parameter-control';
+    control.dataset.datasetParameterControl = parameter.name;
+    control.dataset.mode = mode;
+    if (errorText !== '') control.dataset.invalid = 'true';
+
     const picker = mountValueRefPicker({
       ownerDocument,
-      text: DESIGNER_UI_TEXT.data.ref,
+      text: PARAMETER_REF_TEXT,
       input: datasetParameterPickerInput(current, options.variables),
       controlKey: `parameter:${parameter.name}`,
-      ariaLabel: DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label),
+      ariaLabel: DESIGNER_UI_TEXT.dataset.parameterVariableLabel(parameter.label),
+      anchor: control,
       popoverHost: options.overlayHost,
       onSelect: (ref) => options.onSelectParameter?.(parameter.name, ref),
     });
     registerSectionDisposer(section, picker.dispose);
-    controls.appendChild(picker.element);
-    if (current !== null && current.kind === 'inline') {
-      controls.appendChild(
-        parameterControl(ownerDocument, options.descriptor, parameter.name, current),
+
+    if (mode === 'inline') {
+      const editor = parameterControl(
+        ownerDocument,
+        options.descriptor,
+        parameter.name,
+        current ?? undefined,
       );
+      if (parameter.required) {
+        editor
+          .querySelector<HTMLElement>('input, select, textarea')
+          ?.setAttribute('aria-required', 'true');
+      }
+      control.appendChild(editor);
     }
-    label.append(labelText, controls);
-    section.appendChild(label);
+    control.appendChild(picker.element);
+    if (mode === 'variable') {
+      const clear = ownerDocument.createElement('button');
+      clear.type = 'button';
+      clear.className = 'designer-dataset-parameter-clear';
+      clear.dataset.datasetParameterClear = parameter.name;
+      clear.setAttribute(
+        'aria-label',
+        DESIGNER_UI_TEXT.dataset.parameterClearVariable(parameter.label),
+      );
+      clear.innerHTML = designerIcon('close');
+      clear.addEventListener('click', () => {
+        options.onSelectParameter?.(parameter.name, { kind: 'inline', value: null });
+      });
+      control.appendChild(clear);
+    }
+    field.append(head, control);
+
+    if (errorText !== '') {
+      const error = ownerDocument.createElement('span');
+      error.className = 'designer-field-message designer-dataset-parameter-error';
+      error.id = `designer-dataset-parameter-error-${parameter.name.replace(/[^A-Za-z0-9_-]/g, '-')}`;
+      error.dataset.datasetParameterError = 'true';
+      error.setAttribute('role', 'alert');
+      error.textContent = errorText;
+      const editorControl = control.querySelector<HTMLElement>('input, select, textarea');
+      if (editorControl !== null) {
+        editorControl.setAttribute('aria-invalid', 'true');
+        editorControl.setAttribute('aria-describedby', error.id);
+      }
+      field.appendChild(error);
+    }
+
+    fixedButton.addEventListener('click', () => {
+      if (mode === 'inline') return;
+      options.onSelectParameter?.(parameter.name, { kind: 'inline', value: null });
+    });
+    // 变量方式只有「选中一个变量」这一种落地：按钮与行内 `{ }` 打开的是同一个只列变量的浮层。
+    // 走真实点击（而不是直接 picker.open）是为了让面板事件层照常取消未触发的自动应用。
+    variableButton.addEventListener('click', () => {
+      picker.element.querySelector<HTMLButtonElement>('[data-value-ref-trigger]')?.click();
+    });
+
+    section.appendChild(field);
   }
   return section;
+}
+
+function parameterModeButton(
+  ownerDocument: Document,
+  mode: 'inline' | 'variable',
+  label: string,
+  pressed: boolean,
+): HTMLButtonElement {
+  const button = ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-segmented-option designer-dataset-parameter-mode-option';
+  button.dataset.datasetParameterMode = mode;
+  button.setAttribute('aria-pressed', String(pressed));
+  button.textContent = label;
+  return button;
 }
 
 /**
@@ -490,7 +555,27 @@ function bindingFieldSelect(
   foot.textContent = atLimit
     ? DESIGNER_UI_TEXT.dataset.bindingAtLimit
     : DESIGNER_UI_TEXT.dataset.bindingLimitHint(maxFields);
-  menu.append(options, foot);
+  const actions = ownerDocument.createElement('div');
+  actions.className = 'designer-bind-actions';
+  actions.append(
+    bindingRoleAction(
+      ownerDocument,
+      roleId,
+      'select-all',
+      fields.length > maxFields
+        ? DESIGNER_UI_TEXT.dataset.bindingSelectMaximum
+        : DESIGNER_UI_TEXT.dataset.bindingSelectAll,
+      selected.length === Math.min(fields.length, maxFields),
+    ),
+    bindingRoleAction(
+      ownerDocument,
+      roleId,
+      'clear',
+      DESIGNER_UI_TEXT.dataset.bindingClear,
+      selected.length === 0,
+    ),
+  );
+  menu.append(options, actions, foot);
   wrapper.append(trigger, menu);
   return wrapper;
 }

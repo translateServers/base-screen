@@ -17,6 +17,83 @@ export function datasetAction(
   return button;
 }
 
+/** 内联数据集面板的状态条：不再有 Apply，只剩请求动作与撤销。 */
+export interface InlineDataPanelStatusView {
+  readonly state: 'synced' | 'dirty' | 'invalid' | 'idle' | 'loading' | 'ready' | 'error';
+  readonly text: string;
+  readonly actionLabel: string;
+  readonly actionDisabled: boolean;
+  readonly action: 'test' | 'sync' | 'apply';
+  readonly canUndo: boolean;
+}
+
+export function renderInlineDataPanelActions(
+  ownerDocument: Document,
+  view: InlineDataPanelStatusView,
+): HTMLElement {
+  const actions = ownerDocument.createElement('div');
+  actions.className = 'designer-dataset-actions designer-dataset-status-bar';
+  actions.dataset.datasetStatusBar = 'true';
+  const status = ownerDocument.createElement('span');
+  status.className = 'designer-dataset-status';
+  status.dataset.datasetStatus = 'true';
+  status.dataset.state = view.state;
+  status.setAttribute('role', 'status');
+  status.setAttribute('aria-live', 'polite');
+  const dot = ownerDocument.createElement('i');
+  dot.className = 'designer-dataset-status-dot';
+  dot.dataset.state = view.state;
+  dot.setAttribute('aria-hidden', 'true');
+  const text = ownerDocument.createElement('span');
+  text.dataset.datasetStatusText = 'true';
+  text.textContent = view.text;
+  status.append(dot, text);
+  const undo = ownerDocument.createElement('button');
+  undo.type = 'button';
+  undo.className = 'designer-control designer-button designer-dataset-undo';
+  undo.dataset.datasetAction = 'undo';
+  undo.textContent = DESIGNER_UI_TEXT.dataSource.undo;
+  undo.hidden = !view.canUndo;
+  undo.disabled = !view.canUndo;
+  const action = ownerDocument.createElement('button');
+  action.type = 'button';
+  action.className = 'designer-control designer-button';
+  action.dataset.datasetAction = view.action;
+  action.dataset.variant = 'request';
+  action.textContent = view.actionLabel;
+  action.disabled = view.actionDisabled;
+  actions.append(status, undo, action);
+  return actions;
+}
+
+/** 就地刷新状态条：映射/参数改变后不重建节点，保住输入框焦点。 */
+export function syncInlineDataPanelActions(
+  root: ParentNode,
+  view: InlineDataPanelStatusView,
+): void {
+  for (const bar of root.querySelectorAll<HTMLElement>('[data-dataset-status-bar]')) {
+    const status = bar.querySelector<HTMLElement>('[data-dataset-status]');
+    if (status !== null) status.dataset.state = view.state;
+    const dot = bar.querySelector<HTMLElement>('.designer-dataset-status-dot');
+    if (dot !== null) dot.dataset.state = view.state;
+    const text = bar.querySelector<HTMLElement>('[data-dataset-status-text]');
+    if (text !== null) text.textContent = view.text;
+    const undo = bar.querySelector<HTMLButtonElement>('[data-dataset-action="undo"]');
+    if (undo !== null) {
+      undo.hidden = !view.canUndo;
+      undo.disabled = !view.canUndo;
+    }
+    const action = bar.querySelector<HTMLButtonElement>(
+      '[data-dataset-action="test"], [data-dataset-action="sync"], [data-dataset-action="apply"]',
+    );
+    if (action !== null) {
+      action.dataset.datasetAction = view.action;
+      action.textContent = view.actionLabel;
+      action.disabled = view.actionDisabled;
+    }
+  }
+}
+
 /** 底部操作条的输入：只描述"现在能不能应用"，不描述摆在哪。 */
 export interface DataPanelActionView {
   /** `应用` / `已应用`：同一颗按钮，靠 dirty 换文案与档位。 */

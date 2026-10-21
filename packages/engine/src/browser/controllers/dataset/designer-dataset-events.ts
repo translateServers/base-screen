@@ -48,6 +48,25 @@ export function handleDatasetClick(
   target: Element,
 ): boolean {
   if (handleStaticClick(context, target)) return true;
+  // 打开取值/绑定浮层时取消尚未触发的自动应用：否则 300ms 后的整段重绘会把刚打开的
+  // 浮层连同触发器节点一起换掉（表现是弹层闪一下就关）。草稿保留，底部状态条给「同步」。
+  if (
+    target.closest('[data-value-ref-trigger]') !== null ||
+    target.closest('[data-dataset-binding-trigger]') !== null
+  ) {
+    context.state.clearAutoApply();
+  }
+  const pickerToggle = target.closest<HTMLButtonElement>('[data-data-source-picker]');
+  if (pickerToggle !== null) {
+    const section = pickerToggle.closest<HTMLElement>('.designer-data-source-type');
+    const picker = section?.querySelector<HTMLElement>('[data-data-source-picker-panel]');
+    if (picker !== null && picker !== undefined) {
+      const open = picker.hidden;
+      picker.hidden = !open;
+      pickerToggle.setAttribute('aria-expanded', String(open));
+    }
+    return true;
+  }
   const entryCard = target.closest<HTMLButtonElement>('[data-data-entry]');
   if (entryCard !== null) {
     selectDataEntry(context, entryCard);
@@ -254,12 +273,16 @@ function handleDatasetAction(context: DesignerDatasetControllerContext, target: 
     context.renderSurface();
     return true;
   }
-  if (action === 'apply') {
+  if (action === 'apply' || action === 'sync') {
     context.apply();
     return true;
   }
   if (action === 'test') {
     void context.testDatasetDraft();
+    return true;
+  }
+  if (action === 'undo') {
+    context.callbacks.undo?.();
     return true;
   }
   if (action === 'retry-link') {
@@ -281,7 +304,7 @@ function handleDatasetAction(context: DesignerDatasetControllerContext, target: 
   }
   const item = target.closest<HTMLElement>('[data-dataset-resource-id]');
   if (item?.dataset.datasetResourceId === undefined) return false;
-  void describeDataset(context, item.dataset.datasetResourceId);
+  void describeDataset(context, item.dataset.datasetResourceId, { autoApply: true });
   return true;
 }
 

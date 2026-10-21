@@ -642,7 +642,7 @@
 
 .designer-static-rows {
   overflow-x: auto;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 
 .designer-static-rows table {

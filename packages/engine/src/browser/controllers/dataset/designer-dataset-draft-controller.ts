@@ -7,6 +7,7 @@ import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerDataSourceMode } from '../../dom/dataset/designer-dataset-dom.js';
 import type { DesignerDataSectionKey } from '../../dom/dataset/designer-dataset-sections.js';
+import { countUnfilledRequiredParameters as countUnfilledRequired } from '../../dom/dataset/designer-dataset-types.js';
 import {
   createDatasetDataSourceTransaction,
   createDesignerDatasetDraft,
@@ -28,14 +29,39 @@ import {
 } from './designer-dataset-controller-context.js';
 import { syncDatasetSurface } from './designer-dataset-surface-controller.js';
 
+const AUTO_APPLY_DELAY_MS = 300;
+
+export function countUnfilledRequiredParameters(context: DesignerDatasetControllerContext): number {
+  return countUnfilledRequired(context.state.descriptor, context.state.draft);
+}
+
+/**
+ * 字段映射/参数改动后的自动应用。
+ *
+ * 300ms 防抖：连续拨动芯片或多选字段只落一次事务；有必填参数未填时不提交，
+ * 让错误留在草稿里由参数行和状态条表达。
+ */
+export function scheduleDatasetAutoApply(context: DesignerDatasetControllerContext): void {
+  if (context.state.mode !== 'dataset') return;
+  context.state.clearAutoApply();
+  context.state.autoApplyTimer = setTimeout(() => {
+    context.state.autoApplyTimer = undefined;
+    if (context.state.mode !== 'dataset' || !context.state.draftDirty) return;
+    if (countUnfilledRequiredParameters(context) > 0) return;
+    applyDatasetDraft(context, { auto: true });
+  }, AUTO_APPLY_DELAY_MS);
+}
+
 export function setSourceMode(
   context: DesignerDatasetControllerContext,
   mode: DesignerDataSourceMode,
 ): void {
   if (!availableModes(context).includes(mode)) return;
+  context.state.clearAutoApply();
   context.state.mode = mode;
   // 切取值方式属于**结构重绘**：折叠组回到默认规则（手动展开不该跨结构存活）。
   context.state.groupOpenOverrides.clear();
+  context.state.parameterInlineMemory.clear();
   context.state.activeStep = 'source';
   context.state.workbenchOpen = false;
   context.state.feedbackText = '';
@@ -52,7 +78,7 @@ export function setSourceMode(
   if (source?.type === 'dataset' && context.state.descriptor?.datasetId !== source.datasetId) {
     context.state.catalogOpen = false;
     context.renderSurface();
-    void describeDataset(context, source.datasetId);
+    void describeDataset(context, source.datasetId, { autoApply: true });
   } else {
     context.state.catalogOpen = context.state.descriptor === undefined;
     context.renderSurface();
@@ -63,6 +89,7 @@ export function setSourceMode(
 export async function describeDataset(
   context: DesignerDatasetControllerContext,
   datasetId: string,
+  options: { readonly autoApply?: boolean } = {},
 ): Promise<void> {
   if (!availableModes(context).includes('dataset')) return;
   const focusedId = context.currentComponent()?.id;
@@ -79,18 +106,25 @@ export async function describeDataset(
     context.currentComponent()?.dataSource ?? null,
     context.currentEntry()?.manifest.dataBinding?.roles ?? [],
   );
+  context.state.parameterInlineMemory.clear();
   context.state.mode = 'dataset';
   context.state.catalogOpen = false;
   context.state.draftDirty = isDatasetDraftDirty(context);
   context.state.preview = emptyDatasetPreview();
   context.state.activeStep = 'source';
-  context.state.feedbackText = DESIGNER_UI_TEXT.dataset.selected(descriptor.name);
+  context.state.feedbackText = '';
   context.renderSurface();
+  // 用户主动选数据集时才自动落库；首屏描述当前数据源不能偷偷改文档。
+  if (options.autoApply === true && context.state.draftDirty) scheduleDatasetAutoApply(context);
 }
 
-export function applyDatasetDraft(context: DesignerDatasetControllerContext): void {
+export function applyDatasetDraft(
+  context: DesignerDatasetControllerContext,
+  options: { readonly auto?: boolean } = {},
+): void {
   // Opaque resource identity is authored only through the public host-resource intent methods.
   if (context.state.mode === 'host-resource') return;
+  context.state.clearAutoApply();
   const component = context.currentComponent();
   const document = context.callbacks.getDocument();
   if (component === undefined || document === undefined) return;
@@ -136,7 +170,8 @@ export function applyDatasetDraft(context: DesignerDatasetControllerContext): vo
     context.callbacks.report(result.diagnostics);
     return;
   }
-  context.setFeedback(DESIGNER_UI_TEXT.dataSource.applied);
+  // 成功状态由状态条/工作台头部表达，不再另塞一条「数据源已应用」，避免同义重复。
+  if (options.auto !== true) context.setFeedback('');
   context.state.draftDirty = false;
   context.state.confirmClose = false;
   context.state.activeStep = 'source';
@@ -162,6 +197,7 @@ export function syncDraftToFocusedComponent(
   const activeStep = sameFocusedComponent ? context.state.activeStep : 'source';
   const authoring = sameFocusedComponent ? context.state.authoring : createDatasetAuthoringView();
   context.state.focusedComponentId = focusedId;
+  context.state.clearAutoApply();
   context.state.syncedDataSource = source;
   context.state.feedbackText = '';
   context.state.draftDirty = false;
@@ -286,15 +322,31 @@ export function setDatasetParameterValueRef(
   ref: ScreenValueRef,
 ): void {
   if (name === '' || context.state.draft === undefined) return;
+  const current = context.state.draft.params[name];
+  // 切走前记住最后一个常量，切回来时原样恢复（与设计稿的 lastFixed 一致）。
+  if (current?.kind === 'inline') context.state.parameterInlineMemory.set(name, current.value);
+  const remembered = context.state.parameterInlineMemory.get(name);
   const next: ScreenValueRef =
     ref.kind === 'inline' && ref.value === null
-      ? { kind: 'inline', value: defaultDatasetParameterValue(context.state.descriptor, name) }
+      ? {
+          kind: 'inline',
+          value:
+            remembered !== undefined
+              ? remembered
+              : defaultDatasetParameterValue(context.state.descriptor, name),
+        }
       : ref;
-  const current = context.state.draft.params[name];
   if (sameRef(current, next)) return;
   context.state.draft = setDesignerDatasetParameter(context.state.draft, name, next);
   markDatasetDraftChanged(context, ['source', 'preview'], () =>
-    restoreDatasetControlFocus(context, `[data-value-ref-trigger="parameter:${name}"]`),
+    // 切回固定值后光标应落在值编辑器里（与设计稿一致）；变量形态则回到变量芯片。
+    restoreDatasetControlFocus(
+      context,
+      next.kind === 'inline'
+        ? `[data-value-ref-inline="parameter:${name}"]`
+        : `[data-value-ref-trigger="parameter:${name}"]`,
+      next.kind === 'inline' ? 'caret-end' : 'keep',
+    ),
   );
 }
 
@@ -363,6 +415,7 @@ export function markDatasetDraftChanged(
     tab: context.state.preview.tab,
   };
   syncDatasetSurface(context, restoreFocus);
+  if (context.state.mode === 'dataset') scheduleDatasetAutoApply(context);
 }
 
 /**
@@ -442,6 +495,7 @@ function sameRef(left: ScreenValueRef | undefined, right: ScreenValueRef): boole
 }
 
 export function restoreDatasetDraft(context: DesignerDatasetControllerContext): void {
+  context.state.clearAutoApply();
   const source = context.currentComponent()?.dataSource;
   const descriptor = context.state.descriptor;
   if (source?.type === 'dataset' && descriptor !== undefined) {
@@ -452,6 +506,7 @@ export function restoreDatasetDraft(context: DesignerDatasetControllerContext): 
     );
   }
   context.state.draftDirty = false;
+  context.state.parameterInlineMemory.clear();
   context.cancelPreview();
   context.state.preview = emptyDatasetPreview();
 }

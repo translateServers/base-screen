@@ -21,7 +21,12 @@ async function scrollDataPanelTo(dataPanel, page, section, step) {
     }, section);
     await page.waitForTimeout(250);
     last = await readInlineNavigation(dataPanel, section);
-    if (last.activeStep === step && (step === 'source' || last.scrollTop > 0)) return last;
+    // 表单收得更紧之后，内容可能在「对齐到 mapping」之前就见底了：此时实际停在尾部段
+    // （activeStep=preview），但 mapping 段确实已进入视口。判据以「段可见」为准，
+    // 段派生步骤只用于尾部断言。
+    if (last.sectionVisible === true && (last.activeStep === step || last.atBottom === true)) {
+      return last;
+    }
   }
   throw new Error(
     `BROWSER_HARNESS_DATASET_SCROLL_NAVIGATION_FAILED:${section}:${JSON.stringify(last)}`,
@@ -44,6 +49,10 @@ async function readInlineNavigation(dataPanel, section) {
       stepTargets: panel.querySelectorAll('[data-dataset-workbench-target]').length,
       stepMarkers: panel.querySelectorAll('.designer-data-summary-step-marker').length,
       scrollTop: content?.scrollTop ?? 0,
+      atBottom:
+        content === undefined
+          ? false
+          : content.scrollTop + content.clientHeight >= content.scrollHeight - 10,
       sectionVisible:
         contentBox === undefined || targetBox === undefined
           ? undefined
@@ -88,11 +97,13 @@ export async function assertDatasetAuthoring(designer, page) {
   await dataPanel.locator('[data-dataset-action="test"]').click();
   // 预览段恒存在、内容折叠：断言自己展开它再读状态。
   await ensureDataGroupOpen(dataPanel, 'preview');
-  await dataPanel.locator('[data-workbench-section="preview"] [data-status="ready"]').waitFor();
+  await dataPanel.locator('[data-workbench-section="preview"][data-status="ready"]').waitFor();
   const responsePreview = await dataPanel.evaluate((panel) => ({
     rowCount: panel.querySelectorAll('.designer-data-preview-table-wrap tbody tr').length,
     columnCount: panel.querySelectorAll('.designer-data-preview-table-wrap thead th').length,
-    status: panel.querySelector('[data-workbench-section="preview"] [data-status]')?.textContent,
+    status:
+      panel.querySelector('[data-workbench-section="preview"] .designer-data-group-summary-text')
+        ?.textContent ?? '',
     paneScrollTop: panel.scrollTop,
     workbenchVisible: !panel.closest('.designer')?.querySelector('[data-data-workbench]')?.hidden,
   }));
@@ -179,20 +190,23 @@ export async function assertDatasetAuthoring(designer, page) {
   const mappingSurface = await dataPanel.evaluate((panel) => ({
     // 2 个角色分区 + 1 个单选 select（measures 改为限额多选后走 bind-field 触发器，不再有 select）。
     bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
+    statusBarCount: panel.querySelectorAll('[data-dataset-status-bar]').length,
     applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
-    activeStep: panel.querySelector('.designer-datav-data-flow')?.dataset.activeStep,
+    requestActionCount: panel.querySelectorAll(
+      '[data-dataset-status-bar] [data-dataset-action="test"], [data-dataset-status-bar] [data-dataset-action="sync"]',
+    ).length,
   }));
   if (
     mappingSurface.bindingCount !== 3 ||
-    mappingSurface.applyCount !== 1 ||
-    // 字段映射是 source 段内的组：派生步骤是 source。
-    mappingSurface.activeStep !== 'source'
+    mappingSurface.statusBarCount !== 1 ||
+    mappingSurface.applyCount !== 0 ||
+    mappingSurface.requestActionCount !== 1
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_MAPPING_SURFACE_FAILED:${JSON.stringify(mappingSurface)}`,
     );
   }
-  await dataPanel.locator('[data-dataset-action="apply"]').click();
+  // v7 无 Apply：参数改动失焦/change 后自动提交，等待文档落库即可。
   await page.waitForFunction(() => {
     const source = window.baseScreenHarness.designer.document.components.find(
       (component) => component.id === 'dataset-ranking-demo',
@@ -218,10 +232,8 @@ export async function assertDatasetAuthoring(designer, page) {
     throw new Error('BROWSER_HARNESS_DATASET_TRANSACTION_FAILED');
   }
   // ---- 参数位的取值选择器：形态切换 → 草稿 → 应用后文档 params ----
-  // 原语义（旧 `[data-dataset-parameter-mode]` 下拉）：切成变量后草稿变化、应用后文档 params 跟着变。
-  // 新语义（选择器）：同一件事，但每一跳都断到可核对的值——触发器徽标形态、内联编辑器在否、
-  // 应用后文档里 params.region 的 kind/variableId/值。比原先更强：原来的「变量」分支只断了
-  // 「有参数变了」，这里直接断「变量引用真的落库成 variable」。
+  // 形态由行内「固定值 / 变量」两段开关表达；picker 只列变量。每一跳都断到可核对的值：
+  // 变量芯片形态、内联编辑器在否、应用后文档里 params.region 的 kind/variableId/值。
   const regionTrigger = dataPanel.locator('[data-value-ref-trigger="parameter:region"]');
   await regionTrigger.click();
   const pickerOpen = await designer.evaluate((element) => {
@@ -237,9 +249,9 @@ export async function assertDatasetAuthoring(designer, page) {
       optionKinds: [...(popover?.querySelectorAll('[data-value-ref-option]') ?? [])].map(
         (option) => option.dataset.valueRefOption.split(':')[0],
       ),
-      expanded: panel?.querySelector('[data-value-ref-trigger="parameter:region"]')?.getAttribute(
-        'aria-expanded',
-      ),
+      expanded: panel
+        ?.querySelector('[data-value-ref-trigger="parameter:region"]')
+        ?.getAttribute('aria-expanded'),
     };
   });
   if (
@@ -250,7 +262,9 @@ export async function assertDatasetAuthoring(designer, page) {
     !pickerOpen.optionKinds.includes('variable') ||
     pickerOpen.expanded !== 'true'
   ) {
-    throw new Error(`BROWSER_HARNESS_DATASET_PARAMETER_PICKER_FAILED:${JSON.stringify(pickerOpen)}`);
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_PICKER_FAILED:${JSON.stringify(pickerOpen)}`,
+    );
   }
   await page.keyboard.press('Escape');
   const pickerClosed = await designer.evaluate((element) => {
@@ -261,8 +275,7 @@ export async function assertDatasetAuthoring(designer, page) {
       expanded: panel
         ?.querySelector('[data-value-ref-trigger="parameter:region"]')
         ?.getAttribute('aria-expanded'),
-      focusReturned:
-        root.activeElement?.dataset.valueRefTrigger === 'parameter:region',
+      focusReturned: root.activeElement?.dataset.valueRefTrigger === 'parameter:region',
     };
   });
   if (
@@ -270,7 +283,9 @@ export async function assertDatasetAuthoring(designer, page) {
     pickerClosed.expanded !== 'false' ||
     !pickerClosed.focusReturned
   ) {
-    throw new Error(`BROWSER_HARNESS_DATASET_PARAMETER_PICKER_CLOSE_FAILED:${JSON.stringify(pickerClosed)}`);
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_PARAMETER_PICKER_CLOSE_FAILED:${JSON.stringify(pickerClosed)}`,
+    );
   }
   await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
   await designer.locator('[data-value-ref-option="variable:region"]').click();
@@ -278,24 +293,37 @@ export async function assertDatasetAuthoring(designer, page) {
     badge: panel
       .querySelector('[data-value-ref-trigger="parameter:region"] [data-value-ref-badge]')
       ?.getAttribute('data-value-ref-badge'),
-    label: panel.querySelector('[data-value-ref-trigger="parameter:region"] .designer-value-ref-label')
-      ?.textContent,
+    label: panel.querySelector(
+      '[data-value-ref-trigger="parameter:region"] .designer-value-ref-label',
+    )?.textContent,
     inlineEditors: panel.querySelectorAll('[data-value-ref-inline="parameter:region"]').length,
     popoverGone: panel.closest('.designer')?.querySelector('[data-value-ref-popover]') === null,
-    applyEnabled: panel.querySelector('[data-dataset-action="apply"]')?.disabled === false,
+    actionEnabled:
+      panel.querySelector(
+        '[data-dataset-status-bar] [data-dataset-action="test"], [data-dataset-status-bar] [data-dataset-action="sync"]',
+      )?.disabled === false,
   }));
   if (
     pickedVariable.badge !== 'variable' ||
     pickedVariable.label !== 'region' ||
     pickedVariable.inlineEditors !== 0 ||
     !pickedVariable.popoverGone ||
-    !pickedVariable.applyEnabled
+    !pickedVariable.actionEnabled
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_PARAMETER_VARIABLE_DRAFT_FAILED:${JSON.stringify(pickedVariable)}`,
     );
   }
-  await dataPanel.locator('[data-dataset-action="apply"]').click();
+  await page.waitForFunction(() => {
+    const source = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'dataset-ranking-demo',
+    )?.dataSource;
+    return (
+      source?.type === 'dataset' &&
+      source.params.region?.kind === 'variable' &&
+      source.params.region.variableId === 'region'
+    );
+  });
   const afterVariableApply = await page.evaluate(() => {
     const source = window.baseScreenHarness.designer.document.components.find(
       (component) => component.id === 'dataset-ranking-demo',
@@ -307,15 +335,18 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_PARAMETER_VARIABLE_APPLY_FAILED:${JSON.stringify(afterVariableApply)}`,
     );
   }
-  // 再选回「常量」：内联编辑器回来且可输入；段外节点（面板外壳 / 操作条 / 反馈条）身份不变，
-  // 说明改参数只换了配置段，没有整块重绘。
-  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
-  await designer.locator('[data-value-ref-option="inline:current"]').click();
+  // 再选回「常量」：点参数行的「固定值」段位，内联编辑器回来且可输入；段外节点
+  // （面板外壳 / 操作条 / 反馈条）身份不变，说明改参数只换了配置段，没有整块重绘。
+  await dataPanel
+    .locator('[data-dataset-parameter-row="region"] [data-dataset-parameter-mode="inline"]')
+    .click();
+  await dataPanel.locator('[data-value-ref-inline="parameter:region"]').waitFor();
+  await page.waitForTimeout(120);
   const backToInline = await dataPanel.evaluate((panel) => {
     const shell = panel.querySelector('[data-data-source-panel]');
     if (shell !== null) shell.__probeId = 'panel-shell';
-    // 操作条容器（不是里面的按钮：按钮随「未应用/已应用」就地重画，容器才是稳定性证据）。
-    const applyBar = panel.querySelector('[data-dataset-apply-bar]');
+    // 状态条容器（不是里面的按钮：按钮随「同步/测试/撤销」就地更新，容器才是稳定性证据）。
+    const applyBar = panel.querySelector('[data-dataset-status-bar]');
     if (applyBar !== null) applyBar.__probeId = 'apply-bar';
     const feedback = panel.querySelector('[data-dataset-feedback]');
     if (feedback !== null) feedback.__probeId = 'feedback-bar';
@@ -326,9 +357,16 @@ export async function assertDatasetAuthoring(designer, page) {
         ?.getAttribute('data-value-ref-badge'),
       inlineEditable: inline === null ? null : inline instanceof HTMLInputElement,
       inlineValue: inline instanceof HTMLInputElement ? inline.value : null,
+      focusOnInline: inline !== null && (panel.getRootNode()?.activeElement ?? null) === inline,
     };
   });
-  if (backToInline.badge !== 'inline' || backToInline.inlineEditable !== true) {
+  if (
+    backToInline.badge !== 'inline' ||
+    backToInline.inlineEditable !== true ||
+    // 切回固定值时恢复切走前的常量，而不是退回默认值；焦点直接落在输入框里。
+    backToInline.inlineValue !== 'north' ||
+    !backToInline.focusOnInline
+  ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_PARAMETER_INLINE_DRAFT_FAILED:${JSON.stringify(backToInline)}`,
     );
@@ -338,7 +376,7 @@ export async function assertDatasetAuthoring(designer, page) {
   await regionAgain.dispatchEvent('change');
   const stableNodes = await dataPanel.evaluate((panel) => ({
     shell: panel.querySelector('[data-data-source-panel]')?.__probeId,
-    applyBar: panel.querySelector('[data-dataset-apply-bar]')?.__probeId,
+    applyBar: panel.querySelector('[data-dataset-status-bar]')?.__probeId,
     feedback: panel.querySelector('[data-dataset-feedback]')?.__probeId,
   }));
   if (
@@ -350,7 +388,16 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_PARAMETER_RERENDER_FAILED:${JSON.stringify(stableNodes)}`,
     );
   }
-  await dataPanel.locator('[data-dataset-action="apply"]').click();
+  await page.waitForFunction(() => {
+    const source = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'dataset-ranking-demo',
+    )?.dataSource;
+    return (
+      source?.type === 'dataset' &&
+      source.params.region?.kind === 'literal' &&
+      source.params.region.value === 'north'
+    );
+  });
   const afterInlineApply = await page.evaluate(() => {
     const source = window.baseScreenHarness.designer.document.components.find(
       (component) => component.id === 'dataset-ranking-demo',
@@ -362,7 +409,6 @@ export async function assertDatasetAuthoring(designer, page) {
       `BROWSER_HARNESS_DATASET_PARAMETER_INLINE_APPLY_FAILED:${JSON.stringify(afterInlineApply)}`,
     );
   }
-
   // ---- 折叠组重放：用户手动展开的状态必须跨「段重建」存活 ----
   // 参数一改，`source` 段的内容键就变 → 整段 `replaceWith` → 组节点换新。此时若没有
   // 「构造即重放」，组会被默认规则收回（QA 注入后实测 `afterToggle:true, afterEdit:false`），
@@ -398,9 +444,20 @@ export async function assertDatasetAuthoring(designer, page) {
   const regionForReplay = dataPanel.locator('[data-value-ref-inline="parameter:region"]');
   await regionForReplay.fill('south');
   await regionForReplay.dispatchEvent('change');
-  // 确定性收尾：用「应用」当**唯一被 await 的重建触发点**，读它之后的状态。
-  await dataPanel.locator('[data-dataset-action="apply"]').click();
-  await dataPanel.locator('details[data-details-group="parameters"]').first().waitFor();
+  // 自动应用是唯一的重建触发点：先等文档落库，再等参数组节点真的被替换。
+  await page.waitForFunction(() => {
+    const source = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'dataset-ranking-demo',
+    )?.dataSource;
+    return source?.type === 'dataset' && source.params.region?.value === 'south';
+  });
+  await page.waitForFunction(() => {
+    const panel = document
+      .querySelector('base-screen-designer')
+      ?.shadowRoot?.querySelector('[data-inspector-pane=data]');
+    const group = panel?.querySelector('details[data-details-group="parameters"]');
+    return group?.dataset.probeGroup !== 'before-edit';
+  });
   const replay = await dataPanel.evaluate((panel) => {
     const group = panel.querySelector('details[data-details-group="parameters"]');
     return {
@@ -513,6 +570,14 @@ export async function assertDatasetAuthoring(designer, page) {
     );
   }
   await dataPanel.locator('[data-dataset-action="test"]').click();
+  // v7 把整段「高级设置」收成折叠组；先展开再操作复制/全屏等作者动作。
+  const authoringGroup = dataPanel.locator('details[data-ds-group-section="authoring"]').first();
+  if ((await authoringGroup.count()) > 0 && !(await authoringGroup.evaluate((node) => node.open))) {
+    await authoringGroup.locator('summary').first().click();
+    await dataPanel
+      .locator('details[data-ds-group-section="authoring"][open]')
+      .waitFor({ state: 'attached' });
+  }
   await dataPanel.locator('[data-dataset-authoring-action="copy-data"]:not(:disabled)').waitFor();
   await designer.locator('button[data-inspector-density="all"]').click();
   await page.evaluate(() => {
@@ -615,7 +680,8 @@ export async function assertDatasetAuthoring(designer, page) {
     const interval = element.shadowRoot.querySelector(
       '[data-dataset-authoring-setting="refreshInterval"]',
     );
-    window.__baseScreenAutoIntervalEnabled = interval !== null && !interval.hasAttribute('disabled');
+    window.__baseScreenAutoIntervalEnabled =
+      interval !== null && !interval.hasAttribute('disabled');
   });
   await datasetWorkbench.locator('[data-dataset-action="close-workbench"]').click();
   await datasetWorkbench.waitFor({ state: 'hidden' });
@@ -771,9 +837,13 @@ export async function assertDatasetSurface(designer, page) {
   }
   await designer.getByRole('tab', { name: '\u6570\u636e\u6e90', exact: true }).click();
   const dataPanel = designer.locator('[data-inspector-pane=data]');
-  // 取值方式是三入口卡片（`接数据源` = 原来的 dataset 选项），不再有 `[data-data-source-mode-select]`。
+  // 绑定方式收进「更换来源」选择器；先展开三入口，再点「接数据源」。
+  await dataPanel.locator('[data-data-source-picker]').click();
+  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'visible' });
   await dataPanel.locator('[data-data-entry="source"]').click();
-  await dataPanel.locator('[data-data-entry="source"][aria-checked="true"]').waitFor();
+  await dataPanel
+    .locator('[data-data-entry="source"][aria-checked="true"]')
+    .waitFor({ state: 'attached' });
   const datasetQuery = dataPanel.locator('[data-dataset-query]');
   const datasetItem = dataPanel.locator('[data-dataset-resource-id="tabular-orders"]');
   if ((await datasetQuery.count()) === 0) {
@@ -831,10 +901,11 @@ export async function assertDatasetSurface(designer, page) {
     const previewSectionBox = previewSection?.getBoundingClientRect();
     const advancedSectionBox = advancedSection?.getBoundingClientRect();
     return {
-      // 参数段的两个可观测面：每行一个取值触发器（形态），常量形态下另有内联值编辑器（值）。
+      // 参数段可观测面：每行一个取值触发器（变量入口）+ 两个段位（固定值 / 变量）。
       parameterPickerCount: panel.querySelectorAll('[data-value-ref-trigger^="parameter:"]').length,
+      parameterRowCount: panel.querySelectorAll('[data-dataset-parameter-row]').length,
       parameterCount: panel.querySelectorAll('[data-dataset-parameter]').length,
-      legacyParameterModeCount: panel.querySelectorAll('[data-dataset-parameter-mode]').length,
+      parameterModeOptionCount: panel.querySelectorAll('[data-dataset-parameter-mode]').length,
       // 统计范围必须覆盖**新控件那一支**：参数行现在是「取值触发器 + （常量时）内联编辑器」，
       // 只留旧选择器会让新控件完全落在统计之外——那样这条断言会「改完更绿」，
       // 新触发器忘了 aria-label 也没人发现。
@@ -844,12 +915,7 @@ export async function assertDatasetSurface(designer, page) {
         ),
       ].filter((control) => control.getAttribute('aria-label') === null).length,
       bindingCount: panel.querySelectorAll('[data-dataset-binding-role]').length,
-      // 绑定摘要已从「当前数据集」卡片搬到 `mapping` 组内的「输出字段」一行：
-      // 旧锚点（`-empty` / `-item`）随块一起删除，新锚点在这里。搬家后必须有人确认
-      // "输出字段这行真的渲染了、且摘要不是裸数字"，否则这次搬动只能靠人眼看截图。
-      outputFieldsText:
-        panel.querySelector('[data-details-group="mapping"] [data-dataset-output-fields]')
-          ?.textContent ?? '',
+      // v7 起映射组头就是唯一的输出摘要（维度/指标 + 字段名）；组内不再重复一行。
       mappingSummaryText:
         panel.querySelector('[data-details-group="mapping"] [data-details-group-summary]')
           ?.textContent ?? '',
@@ -859,14 +925,6 @@ export async function assertDatasetSurface(designer, page) {
         ...panel.querySelectorAll('details[data-details-group]:not([open])'),
       ].filter((group) => group.querySelector(':scope > summary [data-group-caret]') === null)
         .length,
-      // 组头摘要与组内「输出字段」不再一字不差（那是新的同义重复）。
-      summaryDuplicatesOutputFields:
-        panel
-          .querySelector('[data-details-group="mapping"] [data-details-group-summary]')
-          ?.textContent?.trim() ===
-        panel
-          .querySelector('[data-details-group="mapping"] [data-dataset-output-fields]')
-          ?.textContent?.trim(),
       authoringSettingsGroup: authoringSettings?.getAttribute('role') === 'group',
       editInWorkbenchCount: panel.querySelectorAll('[data-edit-in-workbench]').length,
       editInWorkbenchInstanceId: panel
@@ -907,6 +965,10 @@ export async function assertDatasetSurface(designer, page) {
       stepButtons: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
       stepTargets: panel.querySelectorAll('[data-dataset-workbench-target]').length,
       applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
+      statusBarCount: panel.querySelectorAll('[data-dataset-status-bar]').length,
+      requestActionCount: panel.querySelectorAll(
+        '[data-dataset-status-bar] [data-dataset-action="test"], [data-dataset-status-bar] [data-dataset-action="sync"]',
+      ).length,
       workbenchVisible:
         workbench !== null && !workbench.hidden && getComputedStyle(workbench).display !== 'none',
       propertiesVisible:
@@ -933,17 +995,15 @@ export async function assertDatasetSurface(designer, page) {
   });
   if (
     descriptorSurface.parameterPickerCount !== 3 ||
+    descriptorSurface.parameterRowCount !== 3 ||
     descriptorSurface.parameterCount < 2 ||
-    descriptorSurface.legacyParameterModeCount !== 0 ||
+    descriptorSurface.parameterModeOptionCount !== descriptorSurface.parameterRowCount * 2 ||
     descriptorSurface.unlabelledParameterControls !== 0 ||
     descriptorSurface.bindingCount !== 3 ||
-    descriptorSurface.outputFieldsText.length === 0 ||
-    !descriptorSurface.outputFieldsText.includes('输出字段') ||
     descriptorSurface.mappingSummaryText.length === 0 ||
     // 摘要必须是内容摘要（角色 + 字段名），不是裸数字。
     /^\d+$/.test(descriptorSurface.mappingSummaryText.trim()) ||
     descriptorSurface.collapsedWithoutCaret !== 0 ||
-    descriptorSurface.summaryDuplicatesOutputFields === true ||
     !descriptorSurface.authoringSettingsGroup ||
     // 检查器里实例级设置只读：就地控件 0/0。只断 0 无法区分「正确降级」与「整段没渲染」，
     // 所以再断跳转（有目标）与组头摘要（有内容）。
@@ -961,12 +1021,13 @@ export async function assertDatasetSurface(designer, page) {
     descriptorSurface.sourceEntry.checked !== 'true' ||
     descriptorSurface.sourceEntry.mode !== 'dataset' ||
     descriptorSurface.sourceEntry.cardCount !== 3 ||
-    descriptorSurface.activeStep !== 'source' ||
     descriptorSurface.layout !== 'continuous' ||
     descriptorSurface.progressBars !== 0 ||
     descriptorSurface.stepButtons !== 0 ||
     descriptorSurface.stepTargets !== 0 ||
-    descriptorSurface.applyCount !== 1 ||
+    descriptorSurface.applyCount !== 0 ||
+    descriptorSurface.statusBarCount !== 1 ||
+    descriptorSurface.requestActionCount !== 1 ||
     descriptorSurface.workbenchVisible ||
     !descriptorSurface.propertiesVisible ||
     descriptorSurface.panelInlineGutter !== 0 ||
@@ -979,10 +1040,11 @@ export async function assertDatasetSurface(designer, page) {
       `BROWSER_HARNESS_DATASET_DESCRIPTOR_SURFACE_FAILED:${JSON.stringify(descriptorSurface)}`,
     );
   }
-  // 参数位的形态改由取值选择器表达（原 `[data-dataset-parameter-mode]` 下拉已删除）。
-  // 夹具里这个组件 region 就是「变量」形态：触发器必须如实反映，且此时**不该**有内联编辑器。
+  // 参数位的形态由行内两段开关表达，picker 只负责选变量。
+  // 夹具里这个组件 region 就是「变量」形态：开关必须如实反映，且此时**不该**有内联编辑器。
   const parameterSurface = await dataPanel.evaluate((panel) => {
     const trigger = panel.querySelector('[data-value-ref-trigger="parameter:region"]');
+    const row = panel.querySelector('[data-dataset-parameter-row="region"]');
     return {
       triggerTag: trigger?.tagName,
       triggerRole: trigger?.getAttribute('aria-haspopup'),
@@ -990,30 +1052,41 @@ export async function assertDatasetSurface(designer, page) {
       triggerLabel: trigger?.getAttribute('aria-label'),
       triggerBadgeKind: trigger?.querySelector('[data-value-ref-badge]')?.dataset.valueRefBadge,
       inlineEditors: panel.querySelectorAll('[data-value-ref-inline="parameter:region"]').length,
-      legacyModeSelects: panel.querySelectorAll('[data-dataset-parameter-mode]').length,
+      modeOptions: [...(row?.querySelectorAll('[data-dataset-parameter-mode]') ?? [])].map(
+        (option) => ({
+          mode: option.dataset.datasetParameterMode,
+          pressed: option.getAttribute('aria-pressed'),
+        }),
+      ),
       inlineEditableForInlineParams:
-        panel.querySelector('[data-value-ref-inline="parameter:limit"]') instanceof HTMLInputElement,
+        panel.querySelector('[data-value-ref-inline="parameter:limit"]') instanceof
+        HTMLInputElement,
     };
   });
   if (
     parameterSurface.triggerTag !== 'BUTTON' ||
     parameterSurface.triggerRole !== 'dialog' ||
     parameterSurface.triggerExpanded !== 'false' ||
-    parameterSurface.triggerLabel !== '\u533a\u57df \u53c2\u6570\u6a21\u5f0f' ||
+    parameterSurface.triggerLabel !== '\u533a\u57df \u53d8\u91cf' ||
     parameterSurface.triggerBadgeKind !== 'variable' ||
     parameterSurface.inlineEditors !== 0 ||
-    parameterSurface.legacyModeSelects !== 0 ||
+    parameterSurface.modeOptions.length !== 2 ||
+    parameterSurface.modeOptions[0]?.mode !== 'inline' ||
+    parameterSurface.modeOptions[0]?.pressed !== 'false' ||
+    parameterSurface.modeOptions[1]?.mode !== 'variable' ||
+    parameterSurface.modeOptions[1]?.pressed !== 'true' ||
     !parameterSurface.inlineEditableForInlineParams
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_PARAMETER_SURFACE_FAILED:${JSON.stringify(parameterSurface)}`,
     );
   }
-  // 旧流程里 `[data-dataset-parameter-mode]` 选 literal 的等价动作：用选择器把 region 切回常量，
-  // 让内联值编辑器出现（后续滚动连续性与参数值断言都依赖它）。
+  // 把 region 切回常量：点「固定值」段位，内联值编辑器出现（后续滚动连续性与参数值断言都依赖它）。
   await ensureDataGroupOpen(dataPanel, 'parameters');
-  await dataPanel.locator('[data-value-ref-trigger="parameter:region"]').click();
-  await designer.locator('[data-value-ref-option="inline:current"]').click();
+  await dataPanel
+    .locator('[data-dataset-parameter-row="region"] [data-dataset-parameter-mode="inline"]')
+    .click();
+  await dataPanel.locator('[data-value-ref-inline="parameter:region"]').waitFor();
   const switchedToInline = await dataPanel.evaluate((panel) => {
     const trigger = panel.querySelector('[data-value-ref-trigger="parameter:region"]');
     const inline = panel.querySelector('[data-value-ref-inline="parameter:region"]');
@@ -1079,8 +1152,9 @@ export async function assertDatasetSurface(designer, page) {
   }
   const scrolledToMapping = await scrollDataPanelTo(dataPanel, page, 'mapping', 'source');
   // `source` 是首段：滚到它等于停在顶部，不再要求 `scrollTop > 0`（那是三步条时代的假设）。
+  // 内容变短时可能先见底（派生步骤变成 preview），此时只要求 mapping 段可见。
   if (
-    scrolledToMapping.activeStep !== 'source' ||
+    (scrolledToMapping.activeStep !== 'source' && scrolledToMapping.atBottom !== true) ||
     scrolledToMapping.sectionVisible !== true
   ) {
     throw new Error(

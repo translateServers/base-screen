@@ -82,6 +82,7 @@ export function createDescriptorControl(
   if (control === 'field-selector') {
     if (datasetFields.length > 0) {
       const select = createDesignerSelect(ownerDocument, {
+        ariaLabel: field.label,
         options: [
           {
             label: DESIGNER_UI_TEXT.descriptor.noField,
@@ -95,7 +96,9 @@ export function createDescriptorControl(
           })),
         ],
       });
-      return { element: select, valueTarget: select };
+      // 与字段映射同一套自绘下拉：原生 select 继续承担取值与 change。
+      const enhanced = enhanceDesignerSelect(select);
+      return { element: enhanced.element, valueTarget: select };
     }
     const input = createDesignerInput(ownerDocument, {
       value: typeof value === 'string' ? value : '',

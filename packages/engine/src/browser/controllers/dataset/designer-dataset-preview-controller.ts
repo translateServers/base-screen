@@ -110,6 +110,7 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
       setPreviewError(context);
       return;
     }
+    const queryStartedAt = Date.now();
     const result = await Promise.race([
       port.query(
         {
@@ -146,11 +147,15 @@ export async function testDatasetDraft(context: DesignerDatasetControllerContext
       tab: context.state.preview.tab,
       rawValue: raw.value,
       consumerValue: consumer.value,
-      message: DESIGNER_UI_TEXT.dataSource.testReady(datasetRecordCount(raw.value)),
+      message: DESIGNER_UI_TEXT.dataSource.testReadyWithDuration(
+        datasetRecordCount(raw.value),
+        Math.max(0, Date.now() - queryStartedAt),
+      ),
       testedAt: new Date().toLocaleTimeString(),
       open: true,
     };
-    context.state.feedbackText = context.state.preview.message;
+    // 成功信息只留在响应组头（行数 + 耗时）；再复制一条反馈条就是把同一状态说两遍。
+    context.state.feedbackText = '';
     context.renderSurface();
   } catch {
     if (!controller.signal.aborted && generation === context.state.previewGeneration) {

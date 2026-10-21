@@ -54,6 +54,10 @@ export interface DesignerDatasetControllerCallbacks {
    */
   readonly getOverlayHost?: () => HTMLElement | undefined;
   readonly preserveScrollContinuity?: (render: () => void) => void;
+  /** 数据面板「撤销」：走会话历史；由组合根注入，DOM 层不直接碰 session。 */
+  readonly undo?: () => void;
+  /** 会话是否还有可撤销步骤；用于状态条上的撤销入口。 */
+  readonly canUndo?: () => boolean;
 }
 
 export class DesignerDatasetControllerState {
@@ -77,10 +81,17 @@ export class DesignerDatasetControllerState {
   authoring = createDatasetAuthoringView();
   previewController: AbortController | undefined;
   previewGeneration = 0;
+  /** 字段映射/参数改动后的防抖自动应用；结构重绘/切换模式时必须清掉。 */
+  autoApplyTimer: ReturnType<typeof setTimeout> | undefined;
   focusedComponentId: string | null = null;
   syncedDataSource: ScreenDocument['components'][number]['dataSource'] | undefined;
   /** 展开绑定字段弹层的角色：面板每次重渲染都从这里恢复开合态。 */
   bindingOpenRoleId: string | null = null;
+  /**
+   * 参数从常量切到变量时记下最后一个常量值：切回「固定值」时恢复它，
+   * 而不是退回数据集默认值（v7 的 lastFixed 行为）。
+   */
+  parameterInlineMemory = new Map<string, ScreenJsonValue>();
   /**
    * 折叠分组的手动开合覆盖：`<section>:<group>` → open。
    *
@@ -108,12 +119,20 @@ export class DesignerDatasetControllerState {
     this.draftDirty = false;
     this.confirmClose = false;
     this.preview = emptyDatasetPreview();
+    this.clearAutoApply();
     this.activeStep = 'source';
     this.authoring = createDatasetAuthoringView();
     this.focusedComponentId = null;
     this.syncedDataSource = undefined;
     this.bindingOpenRoleId = null;
+    this.parameterInlineMemory.clear();
     this.groupOpenOverrides.clear();
+  }
+
+  clearAutoApply(): void {
+    if (this.autoApplyTimer === undefined) return;
+    clearTimeout(this.autoApplyTimer);
+    this.autoApplyTimer = undefined;
   }
 }
 

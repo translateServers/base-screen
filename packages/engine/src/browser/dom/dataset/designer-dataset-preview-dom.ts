@@ -1,6 +1,9 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDataGroup } from './designer-data-group-dom.js';
-import type { DesignerDataSourcePanelOptions } from './designer-dataset-types.js';
+import {
+  countUnfilledRequiredParameters,
+  type DesignerDataSourcePanelOptions,
+} from './designer-dataset-types.js';
 
 export function renderDatasetPreview(
   ownerDocument: Document,
@@ -20,13 +23,7 @@ export function renderDatasetPreview(
   ].join(' ');
   preview.tabIndex = -1;
   preview.dataset.open = String(options.preview.open);
-  const header = ownerDocument.createElement('header');
-  const title = ownerDocument.createElement('h4');
-  title.textContent = DESIGNER_UI_TEXT.dataSource.responseTitle;
-  const status = ownerDocument.createElement('span');
-  status.dataset.status = options.preview.status;
-  status.textContent = previewStatusText(options);
-  header.append(title, status);
+  preview.dataset.status = options.preview.status;
   const tabs = ownerDocument.createElement('div');
   tabs.className = 'designer-data-preview-tabs';
   tabs.setAttribute('role', 'tablist');
@@ -42,6 +39,15 @@ export function renderDatasetPreview(
     button.setAttribute('aria-selected', String(options.preview.tab === tab));
     button.textContent = label;
     tabs.appendChild(button);
+  }
+  const toolbar = ownerDocument.createElement('div');
+  toolbar.className = 'designer-data-preview-toolbar';
+  toolbar.appendChild(tabs);
+  if (options.preview.testedAt !== undefined) {
+    const testedAt = ownerDocument.createElement('span');
+    testedAt.className = 'designer-data-preview-time';
+    testedAt.textContent = DESIGNER_UI_TEXT.dataSource.previewUpdatedAt(options.preview.testedAt);
+    toolbar.appendChild(testedAt);
   }
   const content = ownerDocument.createElement('div');
   content.className = 'designer-data-preview-content';
@@ -76,6 +82,19 @@ export function renderDatasetPreview(
           ),
     );
   }
+  const unfilled = countUnfilledRequiredParameters(options.descriptor, options.draft);
+  const warning =
+    unfilled > 0 && options.preview.status === 'ready'
+      ? (() => {
+          const element = ownerDocument.createElement('p');
+          element.className = 'designer-data-response-warning';
+          element.setAttribute('role', 'status');
+          element.textContent = DESIGNER_UI_TEXT.dataSource.responseWarning(unfilled);
+          return element;
+        })()
+      : undefined;
+  const groupChildren: Node[] =
+    warning === undefined ? [toolbar, content] : [warning, toolbar, content];
   // `preview` 段**恒存在**（引用实例时），内容折叠：段的可见性由取值形态决定，不由
   // 「用户是否展开过」决定——后者会让一次折叠变成段的增删，焦点与节点身份全丢。
   preview.appendChild(
@@ -84,42 +103,26 @@ export function renderDatasetPreview(
         ownerDocument,
         section: 'preview',
         group: 'preview',
-        title: DESIGNER_UI_TEXT.data.groups.preview,
+        title: DESIGNER_UI_TEXT.dataSource.responseTitle,
         summary: previewGroupSummary(options),
-        defaultOpen: false,
+        defaultOpen: options.surface === 'inspector',
         overrides: options.groupOpenOverrides,
         onToggle: options.onToggleGroup,
       },
-      [header, tabs, content],
+      groupChildren,
     ),
   );
   return preview;
 }
 
-/** 组头摘要：结果条数 / 失败 / 未请求（只取预览视图的既有值）。 */
+/** 组头摘要：加载 / 失败 / 成功行数 / 未请求（只取预览视图的既有值）。 */
 function previewGroupSummary(options: DesignerDataSourcePanelOptions): string {
-  if (options.preview.status === 'error') return DESIGNER_UI_TEXT.data.groups.previewFailed;
-  if (options.preview.status !== 'ready') return DESIGNER_UI_TEXT.data.groups.previewIdle;
-  const value = options.preview.rawValue;
-  const rows =
-    value !== null && typeof value === 'object' && !Array.isArray(value)
-      ? (value as { readonly rows?: unknown }).rows
-      : undefined;
-  return Array.isArray(rows)
-    ? DESIGNER_UI_TEXT.data.groups.previewRows(rows.length)
-    : DESIGNER_UI_TEXT.data.groups.previewIdle;
-}
-
-function previewStatusText(options: DesignerDataSourcePanelOptions): string {
   if (options.preview.status === 'loading') return DESIGNER_UI_TEXT.dataSource.testing;
-  if (options.preview.message !== '') {
-    return options.preview.testedAt === undefined
-      ? options.preview.message
-      : `${options.preview.message} · ${options.preview.testedAt}`;
+  if (options.preview.status === 'error') return DESIGNER_UI_TEXT.dataSource.responseFailed;
+  if (options.preview.status === 'ready') {
+    return options.preview.message || DESIGNER_UI_TEXT.dataSource.responseIdle;
   }
-  return options.descriptor
-    ? `${options.descriptor.fields.length} ${DESIGNER_UI_TEXT.dataset.fields}`
-    : DESIGNER_UI_TEXT.dataSource.notConfigured;
+  return DESIGNER_UI_TEXT.dataSource.responseIdle;
 }
 
 function previewMessage(ownerDocument: Document, message: string): HTMLElement {

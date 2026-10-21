@@ -1,7 +1,7 @@
 import type { ScreenDatasetDefinition, ScreenValueRef } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { attachDesignerDateField } from '../designer-date-field-dom.js';
-import { createDesignerInput } from '../designer-ui-primitives.js';
+import { createDesignerInput, createDesignerSwitch } from '../designer-ui-primitives.js';
 
 /**
  * 参数位的内联值编辑器。
@@ -17,16 +17,21 @@ export function parameterControl(
   current: ScreenValueRef | undefined,
 ): HTMLElement {
   const parameter = descriptor.parameters.find((item) => item.name === name)!;
-  const input = createDesignerInput(ownerDocument, {
-    ariaLabel: DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label),
-    appearance: parameter.valueType === 'number' ? 'number' : 'text',
-    ...(parameter.valueType === 'boolean' ? { type: 'checkbox' } : {}),
-    ...(parameter.valueType === 'date'
-      ? { placeholder: DESIGNER_UI_TEXT.dataset.parameterDatePlaceholder }
-      : {}),
-    ...(parameter.minimum === undefined ? {} : { min: parameter.minimum }),
-    ...(parameter.maximum === undefined ? {} : { max: parameter.maximum }),
-  });
+  // 布尔参数用检查器同款开关，而不是把裸复选框塞进 30px 控件槽里。
+  const input =
+    parameter.valueType === 'boolean'
+      ? createDesignerSwitch(ownerDocument, {
+          ariaLabel: DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label),
+        })
+      : createDesignerInput(ownerDocument, {
+          ariaLabel: DESIGNER_UI_TEXT.dataset.parameterValueLabel(parameter.label),
+          appearance: parameter.valueType === 'number' ? 'number' : 'text',
+          ...(parameter.valueType === 'date'
+            ? { placeholder: DESIGNER_UI_TEXT.dataset.parameterDatePlaceholder }
+            : {}),
+          ...(parameter.minimum === undefined ? {} : { min: parameter.minimum }),
+          ...(parameter.maximum === undefined ? {} : { max: parameter.maximum }),
+        });
   input.dataset.valueRefInline = `parameter:${parameter.name}`;
   input.dataset.datasetParameter = parameter.name;
   setParameterControlValue(input, parameter, current);

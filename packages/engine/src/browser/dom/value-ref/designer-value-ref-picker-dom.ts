@@ -135,11 +135,12 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
 
   function positionPopover(): void {
     if (popover === undefined) return;
-    const anchor = trigger.getBoundingClientRect();
+    const anchor = (options.anchor ?? trigger).getBoundingClientRect();
     popover.style.position = 'fixed';
     popover.style.left = `${Math.round(anchor.left)}px`;
     popover.style.top = `${Math.round(anchor.bottom + 4)}px`;
-    popover.style.minWidth = `${Math.round(anchor.width)}px`;
+    // 工作台里的控件有 650px 宽；列表跟着拉满会让每行只剩变量名和一大片空白。
+    popover.style.minWidth = `${Math.round(Math.min(anchor.width, 360))}px`;
     popover.style.pointerEvents = 'auto';
   }
 
@@ -152,6 +153,8 @@ export function createValueRefPicker(options: DesignerValueRefPickerOptions): {
     dialog.setAttribute('aria-modal', 'false');
 
     const kinds = options.input.allowedKinds;
+    // 只开一种形态时列表内不再重复徽标；`variable` 单形态改用原型里的 `{ }` 字形。
+    dialog.dataset.valueRefKinds = kinds.join(' ');
     if (kinds.length > 1) {
       const tabs = document.createElement('div');
       tabs.className = 'designer-value-ref-tabs';

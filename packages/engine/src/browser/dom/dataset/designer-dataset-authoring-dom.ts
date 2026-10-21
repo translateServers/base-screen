@@ -115,6 +115,27 @@ export function renderDatasetAuthoring(
       ),
     );
   }
+  if (options.surface === 'inspector' && part === 'all') {
+    // 检查器里整段「高级设置」是一个折叠组：默认收起，避免编辑器/过滤器/只读事实把
+    // 面板撑长到 sticky 状态条下面；展开后仍在同一滚动流里。
+    section.appendChild(
+      createDataGroup(
+        {
+          ownerDocument: options.panel.ownerDocument,
+          section: 'authoring',
+          group: 'refresh',
+          title: DESIGNER_UI_TEXT.dataSource.advancedSettings,
+          summary: `${refreshPolicyText(options)} \u00b7 ${DESIGNER_UI_TEXT.data.groups.editInWorkbench}`,
+          readonlyHint: true,
+          defaultOpen: false,
+          overrides: options.groupOpenOverrides ?? new Map<string, boolean>(),
+          onToggle: options.onToggleGroup,
+        },
+        [editor, filter, actions, settings],
+      ),
+    );
+    return section;
+  }
   if (part !== 'footer') section.append(heading, editor, filter, actions);
   if (part !== 'editor') {
     // **为什么现在不可达**：固定值/变量组件在 `requiredDataSections()` 就只返回 `{value}`，

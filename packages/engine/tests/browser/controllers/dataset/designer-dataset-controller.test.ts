@@ -72,6 +72,13 @@ const success = <T>(value: T): ScreenParseResult<T> => ({
 afterEach(() => vi.unstubAllGlobals());
 
 describe('DesignerDatasetController', () => {
+  it('routes the inline status-bar undo action to the injected history callback', () => {
+    const undo = vi.fn();
+    const controller = createController({ descriptor, undo });
+    controller.onClick(actionTarget('undo') as unknown as Element);
+    expect(undo).toHaveBeenCalledOnce();
+  });
+
   it('R5 describes a selected dataset and applies typed parameters transactionally', async () => {
     const transactions: ScreenDocumentTransaction[] = [];
     const controller = createController({
@@ -611,6 +618,7 @@ function createController(overrides: {
     action: string,
     detail?: Readonly<Record<string, string | number | boolean>>,
   ) => void;
+  readonly undo?: () => void;
 }): DesignerDatasetController {
   const entry = {
     manifest: {
@@ -689,6 +697,7 @@ function createController(overrides: {
     executeTransaction: overrides.executeTransaction ?? (() => success(baseDocument)),
     report: overrides.report ?? (() => undefined),
     refresh: () => undefined,
+    ...(overrides.undo === undefined ? {} : { undo: overrides.undo }),
   };
   const callbacksWithClipboard =
     overrides.copyText === undefined ? callbacks : { ...callbacks, copyText: overrides.copyText };

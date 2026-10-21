@@ -21,9 +21,6 @@ export function renderBindings(
 ): HTMLElement {
   const section = ownerDocument.createElement('section');
   section.className = 'designer-static-bindings';
-  const heading = ownerDocument.createElement('h4');
-  heading.textContent = DESIGNER_UI_TEXT.dataset.binding;
-  section.appendChild(heading);
   for (const role of view.roles) {
     const roleSection = ownerDocument.createElement('div');
     roleSection.className = 'designer-dataset-binding-role';

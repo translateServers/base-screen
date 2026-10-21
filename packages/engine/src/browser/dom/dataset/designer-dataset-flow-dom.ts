@@ -13,20 +13,20 @@ import {
   dataEntrySearchText,
   designerDataEntryItems,
   renderDataEntryGuide,
-  renderDataEntrySegmented,
 } from './designer-data-entry-dom.js';
 import { requiredDataSections } from './designer-data-section-diff.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import {
   type DataPanelActionView,
   dataPanelActionView,
-  datasetAction,
-  renderDataPanelActions,
+  type InlineDataPanelStatusView,
+  renderInlineDataPanelActions,
 } from './designer-dataset-primitives.js';
 import { createDatasetSection, type DesignerDataSectionKey } from './designer-dataset-sections.js';
-import type {
-  DesignerDataSourcePanelOptions,
-  DesignerDatasetWorkbenchStep,
+import {
+  countUnfilledRequiredParameters,
+  type DesignerDataSourcePanelOptions,
+  type DesignerDatasetWorkbenchStep,
 } from './designer-dataset-types.js';
 
 /**
@@ -68,8 +68,41 @@ function renderValueSection(options: DesignerDataSourcePanelOptions): HTMLElemen
     section.append(heading, renderDataEntryGuide(ownerDocument, items), hint);
     return section;
   }
-  section.appendChild(renderDataEntrySegmented(ownerDocument, items));
+  section.appendChild(renderSourceBindingRow(ownerDocument, options));
+  // 绑定类型切换收进「更换来源」行；三入口沿用空态那套引导行，不再常驻分段控件。
+  // 该行展开只做就地显隐，避免重绘 value 段（该段由流程渲染器持有，重建会丢焦点）。
+  if (options.mode !== 'host-resource') {
+    const picker = renderDataEntryGuide(ownerDocument, items);
+    picker.hidden = true;
+    picker.dataset.dataSourcePickerPanel = 'true';
+    section.appendChild(picker);
+  }
   return section;
+}
+
+function renderSourceBindingRow(
+  ownerDocument: Document,
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement {
+  const row = ownerDocument.createElement('div');
+  row.className = 'designer-dataset-source-binding';
+  const label = ownerDocument.createElement('span');
+  label.className = 'designer-dataset-source-binding-label';
+  label.textContent = DESIGNER_UI_TEXT.dataSource.sourceBinding;
+  const value = ownerDocument.createElement('span');
+  value.className = 'designer-dataset-source-binding-value';
+  value.textContent = DESIGNER_UI_TEXT.dataSource.sourceKind(options.mode);
+  row.append(label, value);
+  if (options.mode !== 'host-resource') {
+    const change = ownerDocument.createElement('button');
+    change.type = 'button';
+    change.className = 'designer-control designer-button designer-dataset-source-change';
+    change.dataset.dataSourcePicker = 'true';
+    change.setAttribute('aria-expanded', 'false');
+    change.textContent = DESIGNER_UI_TEXT.dataSource.sourceChange;
+    row.appendChild(change);
+  }
+  return row;
 }
 
 function renderStaticSource(options: DesignerDataSourcePanelOptions): HTMLElement {
@@ -181,29 +214,108 @@ function renderContinuousDataFlow(
   }
   if (options.mode === 'variable') {
     content.appendChild(renderVariableSource(options));
-    content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
+    content.appendChild(
+      renderInlineDataPanelActions(content.ownerDocument, dataPanelStatusView(options)),
+    );
+    fitDataPanelActionGutter(content);
     return;
   }
   // 段一律从工厂取：内联面板与工作台渲染同一批节点，**顺序由 `requiredDataSections` 决定**。
   // 段集合只在一处定义，这里不再自己推「先目录还是先配置」——那段判断已经收进 `source` 段。
   for (const key of requiredDataSections(options)) {
     if (key === 'value') continue;
-    // 预览动作条（测试/刷新）挂在预览段之前，不进任何段：它不属于段内容。
-    if (key === 'preview')
-      content.appendChild(renderDatasetPreviewActions(content.ownerDocument, options));
     content.appendChild(dataSection(key, options));
   }
-  content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
-  fitActionBarGutter(content);
+  // 三种取值方式共用同一条状态条；动作随模式变化（数据集请求 / 固定值与变量应用）。
+  content.appendChild(
+    renderInlineDataPanelActions(content.ownerDocument, dataPanelStatusView(options)),
+  );
+  fitDataPanelActionGutter(content);
+}
+
+/** 响应值里的行数：数组 / `{ rows }` / 单值三种既有形态。 */
+function previewRowCount(
+  value: import('@base-screen/contracts').ScreenJsonValue | undefined,
+): number {
+  if (value === undefined) return 0;
+  if (Array.isArray(value)) return value.length;
+  if (value !== null && typeof value === 'object') {
+    const rows = (value as { readonly rows?: unknown }).rows;
+    if (Array.isArray(rows)) return rows.length;
+  }
+  return value === null ? 0 : 1;
+}
+
+/** 内联数据集状态条的唯一视图计算：渲染与就地刷新都读它。 */
+export function dataPanelStatusView(
+  options: DesignerDataSourcePanelOptions,
+): InlineDataPanelStatusView {
+  // 固定值 / 变量没有被请求流程：状态条只表达草稿是否已落库，动作是「应用 / 已应用」。
+  if (options.mode !== 'dataset') {
+    return {
+      state: options.dirty ? 'dirty' : 'synced',
+      text: options.dirty ? DESIGNER_UI_TEXT.dataSource.draft : DESIGNER_UI_TEXT.dataSource.synced,
+      action: 'apply',
+      actionLabel: options.dirty
+        ? DESIGNER_UI_TEXT.data.panel.apply
+        : DESIGNER_UI_TEXT.data.panel.applied,
+      actionDisabled: !options.dirty,
+      canUndo: options.canUndo === true,
+    };
+  }
+  const unfilled = countUnfilledRequiredParameters(options.descriptor, options.draft);
+  const loading = options.preview.status === 'loading';
+  const ready = options.preview.status === 'ready';
+  const failed = options.preview.status === 'error';
+  const actionDisabled =
+    loading || unfilled > 0 || options.descriptor === undefined || !options.resourceAvailable;
+  let state: InlineDataPanelStatusView['state'];
+  let text: string;
+  let actionLabel: string;
+  let action: InlineDataPanelStatusView['action'] = 'test';
+  if (loading) {
+    state = 'loading';
+    text = DESIGNER_UI_TEXT.dataSource.testing;
+    actionLabel = DESIGNER_UI_TEXT.dataSource.testing;
+  } else if (unfilled > 0) {
+    state = 'invalid';
+    text = DESIGNER_UI_TEXT.dataSource.parametersUnfilled(unfilled);
+    actionLabel = DESIGNER_UI_TEXT.dataSource.test;
+  } else if (failed) {
+    state = 'error';
+    text = DESIGNER_UI_TEXT.dataSource.responseFailed;
+    actionLabel = DESIGNER_UI_TEXT.dataSource.retry;
+  } else if (ready) {
+    state = 'ready';
+    text = DESIGNER_UI_TEXT.dataSource.syncedRows(previewRowCount(options.preview.rawValue));
+    actionLabel = DESIGNER_UI_TEXT.dataset.refresh;
+  } else if (options.dirty) {
+    state = 'dirty';
+    text = DESIGNER_UI_TEXT.dataSource.draft;
+    action = 'sync';
+    actionLabel = DESIGNER_UI_TEXT.dataSource.sync;
+  } else {
+    state = 'synced';
+    text = DESIGNER_UI_TEXT.dataSource.synced;
+    actionLabel = DESIGNER_UI_TEXT.dataSource.test;
+  }
+  return {
+    state,
+    text,
+    actionLabel,
+    actionDisabled,
+    action,
+    canUndo: options.canUndo === true,
+  };
 }
 
 /**
- * 让滚动区底部留出**操作条实际高度**（含 8px 呼吸）。
+ * 让滚动区底部留出**状态条实际高度**：用内容流里的占位块，不用容器 padding。
  *
- * 固定 `padding-bottom` 迟早压住最后一行：操作条的文案会变（`测试` / `应用` / `未应用`），
- * 高度跟着变。这里量真实高度写回 inline style，并用 `ResizeObserver` 跟上后续文案变化。
+ * 操作条的文案/高度会变；`ResizeObserver` 跟随。外部追加了物料数据表单后也要重跑一次，
+ * 否则新增内容可能落进状态条下面。
  */
-function fitActionBarGutter(content: HTMLElement): void {
+export function fitDataPanelActionGutter(content: HTMLElement): void {
   const bar = content.querySelector<HTMLElement>('.designer-dataset-actions');
   if (bar === null) return;
   const apply = (): boolean => {
@@ -211,7 +323,17 @@ function fitActionBarGutter(content: HTMLElement): void {
     // **首帧量不到**：段是先组装后挂载的，挂载前 sticky 操作条高度为 0，此时写回 `0 + 8 = 8px`
     // 等于没让位（实测最后一行被压住 92px）。所以高度为 0 时**不写**，继续等下一帧。
     if (height <= 0) return false;
-    content.style.paddingBottom = `${Math.ceil(height) + 8}px`;
+    content.style.paddingBottom = '0';
+    // 让位用**内容流里的占位块**而不是容器 padding：padding 会把 sticky 条一起顶起来，
+    // 内容可滚动时面板底部会留出一条空白。占位块跟在条后面，条仍贴面板底。
+    content.querySelector('.designer-dataset-actions-spacer')?.remove();
+    if (content.scrollHeight > content.clientHeight + 1) {
+      const spacer = content.ownerDocument.createElement('div');
+      spacer.className = 'designer-dataset-actions-spacer';
+      spacer.style.height = `${Math.ceil(height)}px`;
+      spacer.setAttribute('aria-hidden', 'true');
+      bar.after(spacer);
+    }
     return true;
   };
   // 有界轮询：最多 20 帧（≈300ms）拿到真实高度就停；挂载完成前的帧都是 0。
@@ -291,32 +413,11 @@ function renderContinuousStaticDataFlow(
     preview.tabIndex = -1;
     content.append(mapping, preview);
   }
-  // 固定值态以前有三份「应用」（编辑器内 / 映射段内 / 流程尾），三者都 `sticky bottom:0`
-  // 叠在同一位置，只看得见最后一份。现在只有流程尾这一份。
-  content.appendChild(renderDataPanelActions(content.ownerDocument, dataPanelApplyView(options)));
-}
-
-function renderDatasetPreviewActions(
-  ownerDocument: Document,
-  options: DesignerDataSourcePanelOptions,
-): HTMLElement {
-  const actions = ownerDocument.createElement('div');
-  actions.className = 'designer-datav-preview-actions';
-  actions.append(
-    datasetAction(
-      ownerDocument,
-      'test',
-      options.preview.status === 'loading'
-        ? DESIGNER_UI_TEXT.dataSource.testing
-        : DESIGNER_UI_TEXT.dataSource.test,
-      'primary',
-      options.descriptor === undefined ||
-        !options.resourceAvailable ||
-        options.preview.status === 'loading',
-    ),
-    datasetAction(ownerDocument, 'refresh', DESIGNER_UI_TEXT.dataset.refresh),
+  // 固定值态与数据集共用同一条状态条，动作是「应用」；仍只有流程尾这一份。
+  content.appendChild(
+    renderInlineDataPanelActions(content.ownerDocument, dataPanelStatusView(options)),
   );
-  return actions;
+  fitDataPanelActionGutter(content);
 }
 
 function inlineWorkbenchStep(step: DesignerDatasetWorkbenchStep): 'source' | 'mapping' | 'preview' {

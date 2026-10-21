@@ -59,6 +59,17 @@ export interface DesignerDatasetDraftView {
 
 export type DesignerDatasetPreviewTab = 'response' | 'consumer' | 'request';
 
+/** 必填参数还差几项；DOM 与控制器共用这一个判据。 */
+export function countUnfilledRequiredParameters(
+  descriptor: ScreenDatasetDefinition | undefined,
+  draft: DesignerDatasetDraftView | undefined,
+): number {
+  if (descriptor === undefined || draft === undefined) return 0;
+  return descriptor.parameters.filter(
+    (parameter) => parameter.required && draft.params[parameter.name] === undefined,
+  ).length;
+}
+
 /** 宿主通道状态：未接入 / 已接入 / 请求中 / 失败（失败带诊断码或说明）。 */
 export type DesignerHostLinkStatus = 'unavailable' | 'ready' | 'loading' | 'error';
 
@@ -154,6 +165,8 @@ export interface DesignerDataSourcePanelOptions {
   readonly bindingOpenRoleId?: string | null;
   readonly feedback: string;
   readonly dirty: boolean;
+  /** 会话历史里还有一步可撤销；数据集内联状态条据此显示「撤销」。 */
+  readonly canUndo?: boolean;
   readonly confirmClose: boolean;
   readonly preview: DesignerDatasetPreviewView;
   readonly activeStep: DesignerDatasetWorkbenchStep;

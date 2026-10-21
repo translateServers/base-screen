@@ -19,8 +19,15 @@ import {
   renderDesignerDataSourcePanel,
   renderDesignerDatasetWorkbench,
 } from '../../dom/dataset/designer-dataset-dom.js';
-import { dataPanelApplyView } from '../../dom/dataset/designer-dataset-flow-dom.js';
-import { syncDataPanelActions } from '../../dom/dataset/designer-dataset-primitives.js';
+import {
+  dataPanelApplyView,
+  dataPanelStatusView,
+  fitDataPanelActionGutter,
+} from '../../dom/dataset/designer-dataset-flow-dom.js';
+import {
+  syncDataPanelActions,
+  syncInlineDataPanelActions,
+} from '../../dom/dataset/designer-dataset-primitives.js';
 import type {
   DesignerDataSurface,
   DesignerHostLinkView,
@@ -62,12 +69,28 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   // 也不该被藏在某个步骤后面：统一追加在数据源 section 之后。
   const descriptorHost =
     panel.querySelector<HTMLElement>('.designer-datav-data-flow-content') ?? panel;
-  renderDesignerDescriptorZone(descriptorHost, manifest?.editorDescriptor?.data, {
+  // 物料数据表单属于数据源表单的一部分，必须排在 sticky 状态条之前；
+  // 先渲染到临时容器，再插到状态条前面，最后重算让位占位块。
+  const descriptorZone = panel.ownerDocument.createElement('div');
+  renderDesignerDescriptorZone(descriptorZone, manifest?.editorDescriptor?.data, {
     document: context.callbacks.getDocument(),
     interaction: context.callbacks.getInteraction(),
     catalog: context.callbacks.getCatalog(),
     getDatasetFields: () => getFocusedDatasetFields(context),
   });
+  const descriptorBar = descriptorHost.querySelector<HTMLElement>('.designer-dataset-actions');
+  // 物料数据绑定属于「怎么读这份数据」，排在数据源配置之后、响应之前；
+  // 之前放在高级设置后面，用户要先翻过响应和高级设置才能找到它。
+  const descriptorAnchor =
+    descriptorHost.querySelector<HTMLElement>('[data-ds-section="preview"]') ?? descriptorBar;
+  if (descriptorAnchor !== null) {
+    while (descriptorZone.firstChild !== null) descriptorAnchor.before(descriptorZone.firstChild);
+    fitDataPanelActionGutter(descriptorHost);
+  } else {
+    while (descriptorZone.firstChild !== null) {
+      descriptorHost.appendChild(descriptorZone.firstChild);
+    }
+  }
   renderDataWorkbench(context, createDatasetPanelOptions(context, panel, 'workbench'));
   // 首次渲染补内容键 + 可聚焦标记：否则第一次 patch 会把整批段判成「内容变化」重建。
   stampDataSectionKeys(panel, options);
@@ -96,10 +119,9 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
 export function syncDataPanelApplyBar(context: DesignerDatasetControllerContext): void {
   const panel = context.state.panel;
   if (panel === undefined) return;
-  syncDataPanelActions(
-    panel,
-    dataPanelApplyView(createDatasetPanelOptions(context, panel, 'inspector')),
-  );
+  const options = createDatasetPanelOptions(context, panel, 'inspector');
+  syncDataPanelActions(panel, dataPanelApplyView(options));
+  syncInlineDataPanelActions(panel, dataPanelStatusView(options));
 }
 
 /** 面板所在可聚焦根里，当前聚焦的取值入口（没有就是 undefined）。 */
@@ -198,6 +220,7 @@ export function syncDatasetSurface(
     // 提示条与主操作条都不属于任何段：段级 diff 不会碰它们，随模型就地刷新。
     syncDataPanelNotice(root, options.dataState);
     syncDataPanelActions(root, dataPanelApplyView(options));
+    syncInlineDataPanelActions(root, dataPanelStatusView(options));
   }
   applyDesignerDataState(panel, createDatasetPanelOptions(context, panel, 'inspector').dataState);
   restoreFocus?.();
@@ -355,6 +378,7 @@ function createDatasetPanelOptions(
     bindingOpenRoleId: context.state.bindingOpenRoleId,
     feedback: context.state.feedbackText,
     dirty: panelDirty(context, source ?? null),
+    canUndo: context.callbacks.canUndo?.() ?? false,
     confirmClose: context.state.confirmClose,
     preview: context.state.preview,
     activeStep: context.state.activeStep,
