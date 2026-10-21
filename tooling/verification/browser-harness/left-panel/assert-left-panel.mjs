@@ -1114,6 +1114,8 @@ export async function assertLeftPanelContextMenu(page) {
         actions: [...menu.querySelectorAll('[data-menu-action]')].map(
           (item) => item.dataset.menuAction,
         ),
+        heading: menu.querySelector('[data-context-menu-heading]')?.textContent?.trim() ?? null,
+        iconCount: menu.querySelectorAll('[data-menu-action] .menu-item-icon').length,
         selected: [...root.querySelectorAll('[data-layer-selectable="true"]')]
           .filter((row) => row.ariaSelected === 'true')
           .map((row) => row.dataset.layerId),
@@ -1136,6 +1138,8 @@ export async function assertLeftPanelContextMenu(page) {
     !single.actions.includes('delete') ||
     single.actions.includes('align-left') ||
     single.actions.includes('select-all') ||
+    single.heading !== null ||
+    single.iconCount !== single.actions.length ||
     !single.selected.includes('menu-b') ||
     !single.insideLayout ||
     !single.overPanel
@@ -1155,6 +1159,8 @@ export async function assertLeftPanelContextMenu(page) {
     !multi.actions.includes('align-left') ||
     !multi.actions.includes('distribute-horizontal') ||
     multi.actions.includes('select-all') ||
+    multi.heading !== '已选 2 个组件' ||
+    multi.iconCount !== multi.actions.length ||
     multi.selected.length !== 2 ||
     !multi.insideLayout ||
     !multi.overPanel

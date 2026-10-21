@@ -341,6 +341,8 @@ describe('DesignerMenuController context menu resolution', () => {
     expect(menu.innerHTML).toContain('data-submenu-toggle');
     expect(menu.innerHTML).not.toContain('data-menu-action="select-all"');
     expect(menu.innerHTML).not.toContain('data-menu-action="zoom-in"');
+    expect(menu.innerHTML).toContain('data-context-menu-heading');
+    expect(menu.innerHTML).toContain('已选 2 个组件');
   });
 
   it('renders nested menu entries as accessible submenu controls', () => {
@@ -355,6 +357,18 @@ describe('DesignerMenuController context menu resolution', () => {
     expect(html).toContain('data-submenu');
     expect(html).toContain('data-menu-action="align-left"');
     expect(html).toContain('data-menu-action="distribute-horizontal"');
+    // 右键菜单的扫描路径：图标槽 + 标签 + 快捷键；子菜单用 chevron 图标而不是文本箭头。
+    expect(html).toContain('menu-item-icon');
+    expect(html).toContain('menu-item-label');
+    expect(html).toContain('designer-menu-submenu-arrow');
+    expect(html).toContain('<svg');
+  });
+
+  it('marks danger and toggle actions in the context menu markup', () => {
+    const html = contextMenuHtml(['delete', 'toggle-grid']);
+    expect(html).toContain('data-menu-tone="danger"');
+    expect(html).toContain('data-menu-action="toggle-grid"');
+    expect(html).toContain('menu-item-check');
   });
 
   it('shows the multi-selection menu when right-clicking the selection box gap', () => {

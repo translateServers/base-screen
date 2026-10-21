@@ -99,9 +99,32 @@ export async function assertCanvasBasics(designer, page) {
   const contextMenuState = {
     hidden: await contextMenu.isHidden(),
     items: await contextMenu.getByRole('menuitem').count(),
+    pluginLabel: await contextMenu.locator('.designer-menu-section-label').first().textContent(),
+    iconCount: await contextMenu.locator('[data-menu-action] .menu-item-icon').count(),
   };
-  if (contextMenuState.hidden || contextMenuState.items < 5) {
+  if (
+    contextMenuState.hidden ||
+    contextMenuState.items < 5 ||
+    contextMenuState.pluginLabel !== '插件' ||
+    contextMenuState.iconCount < 5
+  ) {
     throw new Error(`BROWSER_HARNESS_CONTEXT_MENU_FAILED:${JSON.stringify(contextMenuState)}`);
+  }
+  // 键盘进入：根菜单聚焦后方向键必须落到第一个可用项，而不是停在容器上。
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(120);
+  const contextMenuFocus = await designer.evaluate((host) => {
+    const active = host.shadowRoot?.activeElement;
+    return {
+      tag: active?.tagName,
+      action:
+        active?.getAttribute('data-menu-action') ?? active?.getAttribute('data-plugin-command'),
+    };
+  });
+  if (contextMenuFocus.tag !== 'BUTTON' || contextMenuFocus.action === null) {
+    throw new Error(
+      `BROWSER_HARNESS_CONTEXT_MENU_KEYBOARD_FAILED:${JSON.stringify(contextMenuFocus)}`,
+    );
   }
   const canvasAidsToggle = contextMenu.locator('[data-submenu-toggle]').first();
   await canvasAidsToggle.click();

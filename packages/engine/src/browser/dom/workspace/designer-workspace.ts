@@ -136,5 +136,6 @@ export type {
 } from './designer-workspace-template.js';
 export {
   contextMenuHtml,
+  contextMenuSummaryHtml,
   downloadDesignerDocument,
 } from './designer-workspace-template.js';

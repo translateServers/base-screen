@@ -1,4 +1,5 @@
 import type { DesignerPluginCommandItem } from '../../../common/operations/plugin/designer-plugin-commands.js';
+import { designerIcon } from '../../ui/designer-icons.js';
 import type { DesignerMenuControllerCallbacks } from './designer-menu-model.js';
 
 export function renderPluginToolsMenu(
@@ -25,22 +26,40 @@ export function renderPluginToolsMenu(
   );
 }
 
-export function pluginCommandMenuSection(items: readonly DesignerPluginCommandItem[]): string {
+export function pluginCommandMenuSection(
+  items: readonly DesignerPluginCommandItem[],
+  options: { readonly label?: string; readonly context?: boolean } = {},
+): string {
   if (items.length === 0) return '';
-  return `<div class="designer-menu-separator" data-menu-separator role="separator"></div>${items
-    .map((item) => pluginCommandMenuButton(item))
+  const label =
+    options.label === undefined
+      ? ''
+      : `<div class="designer-menu-section-label" role="presentation">${escapeMenuText(options.label)}</div>`;
+  return `<div class="designer-menu-separator" data-menu-separator role="separator"></div>${label}${items
+    .map((item) => pluginCommandMenuButton(item, options))
     .join('')}`;
 }
 
-export function pluginCommandMenuButton(item: DesignerPluginCommandItem): string {
+export function pluginCommandMenuButton(
+  item: DesignerPluginCommandItem,
+  options: { readonly context?: boolean } = {},
+): string {
   const shortcut = item.shortcut === undefined ? '' : `<kbd>${escapeMenuText(item.shortcut)}</kbd>`;
   const disabled = item.disabled ? ' disabled' : '';
   const id = escapeMenuText(item.id);
   const name = escapeMenuText(item.name);
+  const icon =
+    options.context === true
+      ? `<span class="menu-item-icon" aria-hidden="true"><span class="menu-item-glyph">${designerIcon('sparkle')}</span></span>`
+      : '';
+  const label =
+    options.context === true
+      ? `<span class="menu-item-label">${name}</span>`
+      : `<span>${name}</span>`;
   return (
     `<button type="button" class="designer-control designer-button designer-menu-item"` +
     ` data-plugin-command="${id}" role="menuitem"${disabled}>` +
-    `<span>${name}</span>${shortcut}</button>`
+    `${icon}${label}${shortcut}</button>`
   );
 }
 

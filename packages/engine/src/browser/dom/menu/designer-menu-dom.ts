@@ -191,7 +191,7 @@ export function switchToMenu(
 export function getMenuItems(menu: HTMLElement): HTMLButtonElement[] {
   return Array.from(
     menu.querySelectorAll<HTMLButtonElement>('.designer-menu-item:not(:disabled):not([hidden])'),
-  );
+  ).filter((item) => item.closest('[data-submenu][hidden]') === null);
 }
 
 export function focusMenuItem(menu: HTMLElement, current: HTMLElement, direction: 1 | -1): void {

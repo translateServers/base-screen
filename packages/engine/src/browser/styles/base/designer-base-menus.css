@@ -273,6 +273,213 @@
   right: calc(100% - 4px);
 }
 
+/* ── 右键菜单：图标 + 标签 + 快捷键三列 ────────────────────────────────────
+   顶栏下拉保持纯文字行；右键菜单动作更多、层级更深，用固定图标列建立扫描路径。
+   勾选动作不额外加列：图标槽在 aria-checked=true 时换成 check，文字位置不变。 */
+.designer-context-menu {
+  min-width: 248px;
+  padding: 6px;
+  border-radius: var(--designer-radius-5);
+  animation-duration: 120ms;
+}
+
+.designer-context-menu .designer-submenu {
+  border-radius: var(--designer-radius-5);
+}
+
+.designer-context-menu .designer-menu-item {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--designer-space-4);
+  min-height: 30px;
+  padding: 0 var(--designer-space-4);
+  border: 0;
+  border-radius: var(--designer-radius-2);
+  font-size: var(--designer-font-size-sm);
+  line-height: 1.4;
+}
+
+.designer-context-menu .designer-menu-item:hover:not(:disabled),
+.designer-context-menu .designer-menu-item:focus-visible:not(:disabled) {
+  border-color: transparent;
+  background: var(--designer-surface-control-hover);
+}
+
+.designer-context-menu .designer-menu-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-context-menu .designer-menu-item:disabled,
+.designer-context-menu .designer-menu-item:disabled .menu-item-icon {
+  color: var(--designer-text-disabled);
+}
+
+/* 菜单项不是可提交控件：禁用态不能再套 `.designer-control:disabled` 的实底与描边。 */
+.designer-context-menu .designer-menu-item:disabled {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.designer-context-menu .menu-item-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  color: var(--designer-text-muted);
+}
+
+.designer-context-menu .menu-item-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.designer-context-menu .menu-item-glyph,
+.designer-context-menu .menu-item-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.designer-context-menu .menu-item-check {
+  display: none;
+  color: var(--designer-accent);
+}
+
+.designer-context-menu .designer-menu-item[aria-checked="true"] .menu-item-glyph {
+  display: none;
+}
+
+.designer-context-menu .designer-menu-item[aria-checked="true"] .menu-item-check {
+  display: inline-flex;
+}
+
+.designer-context-menu .designer-menu-item:hover:not(:disabled) .menu-item-icon,
+.designer-context-menu .designer-menu-item:focus-visible .menu-item-icon {
+  color: var(--designer-text-secondary);
+}
+
+.designer-context-menu .designer-menu-item[aria-checked="true"] .menu-item-check {
+  color: var(--designer-accent);
+}
+
+.designer-context-menu .designer-menu-item kbd {
+  margin-left: 0;
+  justify-self: end;
+  opacity: 1;
+  line-height: 1;
+}
+
+.designer-context-menu .designer-menu-item[data-menu-tone="danger"],
+.designer-context-menu .designer-menu-item[data-menu-tone="danger"] .menu-item-icon {
+  color: var(--designer-danger-text);
+}
+
+.designer-context-menu .designer-menu-item[data-menu-tone="danger"]:disabled,
+.designer-context-menu .designer-menu-item[data-menu-tone="danger"]:disabled .menu-item-icon {
+  color: var(--designer-text-disabled);
+}
+
+.designer-context-menu .designer-context-menu-heading {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: var(--designer-space-4);
+  margin: 0 0 var(--designer-space-2);
+  padding: var(--designer-space-1) var(--designer-space-4) var(--designer-space-3);
+  border-bottom: 1px solid var(--designer-border-subtle);
+}
+
+.designer-context-menu .designer-context-menu-heading-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  color: var(--designer-text-muted);
+}
+
+.designer-context-menu .designer-context-menu-heading-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+.designer-context-menu .designer-context-menu-heading-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-context-menu .designer-context-menu-heading-actions {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.designer-context-menu .designer-context-menu-icon-action {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  color: var(--designer-text-muted);
+}
+
+.designer-context-menu .designer-context-menu-icon-action:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-context-menu .designer-context-menu-icon-action:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--designer-focus-ring);
+}
+
+.designer-context-menu .designer-context-menu-icon-action:disabled {
+  color: var(--designer-text-disabled);
+}
+
+.designer-context-menu .designer-menu-section-label {
+  padding: var(--designer-space-3) var(--designer-space-4) var(--designer-space-1);
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+}
+
+.designer-context-menu .designer-menu-submenu-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0;
+  font-size: 0;
+  color: var(--designer-text-muted);
+}
+
+.designer-context-menu .designer-menu-submenu-arrow svg {
+  width: 14px;
+  height: 14px;
+}
+
+.designer-context-menu .designer-submenu {
+  min-width: 220px;
+  padding: 6px;
+}
+
 .material-search {
   position: relative;
 }

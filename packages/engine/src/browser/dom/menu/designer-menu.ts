@@ -1,4 +1,5 @@
-import { contextMenuHtml } from '../workspace/designer-workspace.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { contextMenuHtml, contextMenuSummaryHtml } from '../workspace/designer-workspace.js';
 import {
   clampToFit,
   closeSiblingSubmenus,
@@ -147,21 +148,23 @@ export class DesignerMenuController {
     const root = this.callbacks.getRoot();
     if (root === null) return false;
 
+    const menuSelector = '[data-menu], [data-submenu], [data-context-menu]';
     const target = event.target;
     const currentMenu =
-      target instanceof HTMLElement
-        ? target.closest<HTMLElement>('[data-menu], [data-submenu]')
-        : null;
+      target instanceof HTMLElement ? target.closest<HTMLElement>(menuSelector) : null;
     const openMenu =
       currentMenu ??
-      Array.from(root.querySelectorAll<HTMLElement>('[data-menu]')).find((m) => !m.hidden);
+      Array.from(root.querySelectorAll<HTMLElement>('[data-menu], [data-context-menu]')).find(
+        (m) => !m.hidden,
+      );
     if (openMenu === undefined) return false;
 
     if (!(target instanceof HTMLElement)) return false;
 
-    const inMenu = target.closest('[data-menu], [data-submenu]') !== null;
+    const inMenu = target.closest(menuSelector) !== null;
     const onToggle = target.closest('[data-menu-toggle]') !== null;
     if (!inMenu && !onToggle) return false;
+    const isContextMenu = openMenu.hasAttribute('data-context-menu');
 
     // 左右循环限定在同一父容器内的触发器：菜单栏内跨四个菜单，状态栏缩放菜单保持自身。
     const allTriggers = Array.from(root.querySelectorAll<HTMLButtonElement>('[data-menu-toggle]'));
@@ -209,6 +212,8 @@ export class DesignerMenuController {
             }
             return true;
           }
+          // 右键菜单没有菜单栏兄弟，左右键不应跳到顶栏第一颗触发器。
+          if (isContextMenu) return true;
         }
         const prevIndex = (currentIndex - 1 + triggers.length) % triggers.length;
         const prevTrigger = triggers[prevIndex];
@@ -226,7 +231,7 @@ export class DesignerMenuController {
           this.toggleSubmenu(submenuToggle);
           return true;
         }
-        if (openMenu.dataset.submenu !== undefined) return true;
+        if (openMenu.dataset.submenu !== undefined || isContextMenu) return true;
         const nextIndex = (currentIndex + 1) % triggers.length;
         const nextTrigger = triggers[nextIndex];
         if (nextTrigger !== undefined) {
@@ -339,7 +344,11 @@ export class DesignerMenuController {
           ? 'component'
           : 'canvas';
     const pluginItems = this.callbacks.getPluginCommandItems?.(`context.${kind}`) ?? [];
-    menu.innerHTML = `${contextMenuHtml(DESIGNER_CONTEXT_MENU[kind])}${pluginCommandMenuSection(pluginItems)}`;
+    const heading = kind === 'multi' ? contextMenuSummaryHtml(selectedIds.length) : '';
+    menu.innerHTML = `${heading}${contextMenuHtml(DESIGNER_CONTEXT_MENU[kind])}${pluginCommandMenuSection(
+      pluginItems,
+      { label: DESIGNER_UI_TEXT.contextMenuPlugin, context: true },
+    )}`;
     this.renderContextMenuState();
     menu.hidden = false;
     const bounds = layout.getBoundingClientRect();

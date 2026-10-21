@@ -68,9 +68,6 @@ export const DESIGNER_CONTEXT_MENU = {
     },
   ] as const satisfies ReadonlyArray<DesignerContextMenuAction>,
   multi: [
-    'undo',
-    'redo',
-    'separator',
     'copy',
     'paste',
     'delete',

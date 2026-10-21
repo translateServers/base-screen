@@ -30,6 +30,17 @@ const ICONS = {
   'chevron-down': '<path d="m6 9 6 6 6-6"/>',
   'chevron-right': '<path d="m9 6 6 6-6 6"/>',
   'chevron-left': '<path d="m15 6-6 6 6 6"/>',
+  'select-all':
+    '<path d="M8 4H6a2 2 0 0 0-2 2v2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M9 9h6v6H9z"/>',
+  selection: '<rect x="4" y="4" width="11" height="11" rx="2"/><path d="M9 20h9a2 2 0 0 0 2-2V9"/>',
+  paste:
+    '<path d="M9 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1.2"/>',
+  'zoom-in': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M8.5 11h5M11 8.5v5"/>',
+  'zoom-out': '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.2-3.2M8.5 11h5"/>',
+  reset: '<path d="M4 10a8 8 0 1 1 2.4 6.7"/><path d="M4 4v6h6"/>',
+  guides: '<path d="M12 3v18M3 12h18"/><path d="M8.5 8.5h7v7h-7z"/>',
+  'border-guides':
+    '<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 3"/><path d="M9 4v16M15 4v16M4 9h16M4 15h16" stroke-dasharray="2 3"/>',
   check: '<path d="m5 12 4.5 4.5L19 7"/>',
   close: '<path d="M6 6l12 12M18 6 6 18"/>',
   trash:
