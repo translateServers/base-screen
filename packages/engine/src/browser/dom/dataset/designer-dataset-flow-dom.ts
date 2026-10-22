@@ -99,7 +99,7 @@ function renderSourceBindingRow(
     change.className = 'designer-control designer-button designer-dataset-source-change';
     change.dataset.dataSourcePicker = 'true';
     change.setAttribute('aria-expanded', 'false');
-    change.textContent = DESIGNER_UI_TEXT.dataSource.sourceChange;
+    change.textContent = DESIGNER_UI_TEXT.dataSource.sourceKindChange;
     row.appendChild(change);
   }
   return row;

@@ -399,6 +399,9 @@ export const DESIGNER_UI_TEXT = {
     requestTitle: '请求参数',
     sourceBinding: '绑定方式',
     sourceChange: '更换来源',
+    /** 顶部那行的入口改的是**绑定类型**（数据集 / 固定值 / 变量），与卡片里的「更换来源」
+     *  （换数据集）不是同一件事。两个按钮长一样、做不一样的事，是比多一行更糟的问题。 */
+    sourceKindChange: '更换绑定方式',
     parametersFilled: (total: number) => `${total} 项 · 已填`,
     parametersSummary: (total: number, unfilled: number) => `${total} 项 · ${unfilled} 项未填`,
     parametersUnfilled: (unfilled: number) => `参数未填 · ${unfilled} 项`,
@@ -898,6 +901,7 @@ export const DESIGNER_UI_TEXT = {
     fields: '可用字段',
     parameters: '参数',
     binding: '字段绑定',
+    autoMatch: '自动匹配',
     literal: '固定值',
     variable: '变量',
     selectVariable: '选择变量',
@@ -913,7 +917,8 @@ export const DESIGNER_UI_TEXT = {
     bindingRole: (role: string) =>
       ({ columns: '表格列', dimension: '维度', measures: '指标', value: '值' })[role] ?? role,
     currentDataset: '当前数据集',
-    change: '更换',
+    /** 当前来源卡片的类型徽标：数据集按表格消费，宿主资源才走自定义形态。 */
+    kindBadge: 'TABLE',
     use: '使用',
     apply: '应用数据源',
     refresh: '刷新数据',

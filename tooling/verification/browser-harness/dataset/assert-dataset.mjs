@@ -101,6 +101,14 @@ export async function assertDatasetAuthoring(designer, page) {
   const responsePreview = await dataPanel.evaluate((panel) => ({
     rowCount: panel.querySelectorAll('.designer-data-preview-table-wrap tbody tr').length,
     columnCount: panel.querySelectorAll('.designer-data-preview-table-wrap thead th').length,
+    // 表头读**文案**而不是只数个数：序号列（`#`）与字段 label（`分类`/`金额`）
+    // 是两种不同的东西，数量对得上但把 label 写回原始 key 时，只数个数不会红。
+    heads: [...panel.querySelectorAll('.designer-data-preview-table-wrap thead th')].map(
+      (cell) => cell.textContent,
+    ),
+    numericAligned: [
+      ...panel.querySelectorAll('.designer-data-preview-table-wrap td.designer-data-preview-num'),
+    ].every((cell) => getComputedStyle(cell).textAlign === 'right'),
     status:
       panel.querySelector('[data-workbench-section="preview"] .designer-data-group-summary-text')
         ?.textContent ?? '',
@@ -109,7 +117,11 @@ export async function assertDatasetAuthoring(designer, page) {
   }));
   if (
     responsePreview.rowCount !== 2 ||
-    responsePreview.columnCount !== 2 ||
+    responsePreview.columnCount !== 3 ||
+    responsePreview.heads?.[0] !== '#' ||
+    !responsePreview.heads?.includes('分类') ||
+    !responsePreview.heads?.includes('金额') ||
+    !responsePreview.numericAligned ||
     !responsePreview.status?.includes('\u8bf7\u6c42\u6210\u529f') ||
     responsePreview.paneScrollTop !== 0 ||
     responsePreview.workbenchVisible
@@ -537,6 +549,41 @@ export async function assertDatasetAuthoring(designer, page) {
   }));
   if (bindClosed.expanded !== 'false' || bindClosed.menuHidden !== true) {
     throw new Error(`BROWSER_HARNESS_DATASET_BIND_CLOSE_FAILED:${JSON.stringify(bindClosed)}`);
+  }
+  // ---- 组头「自动匹配」：清空后一键恢复默认映射 ----
+  // 判据三层，缺一层都会漏：① 组摘要先真的丢掉「金额」（前置条件不是靠假定）；
+  // ② 点完按钮文档里的绑定落库为 amount（不是只改了草稿）；③ 组**没被点收起来**
+  //    ——按钮在 `<summary>` 里，冒泡没处理干净时症状正是「点一下内容没了」。
+  await dataPanel.locator('[data-dataset-binding-trigger="measures"]').click();
+  await dataPanel
+    .locator('[data-details-group="mapping"] [data-dataset-binding-role-action="clear"]')
+    .click();
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => {
+    const panel = document
+      .querySelector('base-screen-designer')
+      ?.shadowRoot?.querySelector('[data-inspector-pane=data]');
+    const summaryText =
+      panel?.querySelector('[data-details-group="mapping"] [data-details-group-summary]')
+        ?.textContent ?? '';
+    return !summaryText.includes('金额');
+  });
+  await dataPanel.locator('[data-dataset-auto-match]').click();
+  await page.waitForFunction(() => {
+    const source = window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'dataset-ranking-demo',
+    )?.dataSource;
+    return source?.type === 'dataset' && source.binding?.fields.measures?.[0] === 'amount';
+  });
+  const autoMatched = await dataPanel.evaluate((panel) => {
+    const group = panel.querySelector('details[data-details-group="mapping"]');
+    return {
+      summaryText: group?.querySelector('[data-details-group-summary]')?.textContent ?? '',
+      groupOpen: group?.open === true,
+    };
+  });
+  if (!autoMatched.summaryText.includes('金额') || !autoMatched.groupOpen) {
+    throw new Error(`BROWSER_HARNESS_DATASET_AUTO_MATCH_FAILED:${JSON.stringify(autoMatched)}`);
   }
   const authoringSurface = await dataPanel.evaluate((panel) => ({
     present: panel.querySelector('[data-dataset-authoring]') !== null,

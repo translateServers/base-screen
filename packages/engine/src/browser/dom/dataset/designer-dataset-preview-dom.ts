@@ -79,6 +79,7 @@ export function renderDatasetPreview(
             ownerDocument,
             value,
             `data-workbench-preview-value:${options.scrollScope}:${options.preview.tab}`,
+            options.descriptor,
           ),
     );
   }
@@ -136,6 +137,7 @@ function renderPreviewValue(
   ownerDocument: Document,
   value: import('@base-screen/contracts').ScreenJsonValue,
   scrollScope: string,
+  descriptor: DesignerDataSourcePanelOptions['descriptor'],
 ): HTMLElement {
   const rows = previewRows(value);
   if (rows === undefined) return renderJsonPreview(ownerDocument, value, scrollScope);
@@ -144,22 +146,43 @@ function renderPreviewValue(
   wrap.dataset.designerScrollScope = scrollScope;
   const table = ownerDocument.createElement('table');
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))].slice(0, 12);
+  const sample = rows.slice(0, 20);
   const head = ownerDocument.createElement('thead');
   const headRow = ownerDocument.createElement('tr');
+  // 序号列：设计稿靠它把「第几行」从数据里分离出来；没有它，第一列字段值会被读成行号。
+  const indexHead = ownerDocument.createElement('th');
+  indexHead.className = 'designer-data-preview-index';
+  indexHead.scope = 'col';
+  indexHead.textContent = '#';
+  headRow.appendChild(indexHead);
   for (const column of columns) {
     const cell = ownerDocument.createElement('th');
-    cell.textContent = column;
+    // 表头用字段 label（`分类`）而不是原始 key（`category`）：面板其它位置已经全部用 label，
+    // 只有结果表露出宿主字段名会让同一份数据在两个名字之间跳。
+    cell.scope = 'col';
+    cell.textContent = previewColumnLabel(descriptor, column);
+    if (isPreviewNumericColumn(descriptor, column, sample)) {
+      cell.className = 'designer-data-preview-num';
+    }
     headRow.appendChild(cell);
   }
   head.appendChild(headRow);
   const body = ownerDocument.createElement('tbody');
-  for (const row of rows.slice(0, 20)) {
+  for (const [index, row] of sample.entries()) {
     const tableRow = ownerDocument.createElement('tr');
+    const indexCell = ownerDocument.createElement('td');
+    indexCell.className = 'designer-data-preview-index';
+    indexCell.textContent = String(index + 1).padStart(2, '0');
+    tableRow.appendChild(indexCell);
     for (const column of columns) {
       const cell = ownerDocument.createElement('td');
       const cellValue = row[column];
-      cell.textContent =
-        typeof cellValue === 'string' ? cellValue : JSON.stringify(cellValue ?? null);
+      cell.textContent = previewCellText(cellValue);
+      const text = cell.textContent;
+      if (text !== '—') cell.title = text;
+      if (isPreviewNumericColumn(descriptor, column, sample)) {
+        cell.className = 'designer-data-preview-num';
+      }
       tableRow.appendChild(cell);
     }
     body.appendChild(tableRow);
@@ -167,6 +190,42 @@ function renderPreviewValue(
   table.append(head, body);
   wrap.appendChild(table);
   return wrap;
+}
+
+/** 字段 key → 展示文案：命中描述符就用 label，未描述的列退回 key（不静默隐藏）。 */
+function previewColumnLabel(
+  descriptor: DesignerDataSourcePanelOptions['descriptor'],
+  column: string,
+): string {
+  return descriptor?.fields.find((field) => field.id === column)?.label ?? column;
+}
+
+/** 数字列：描述符声明了 `number`，或整列采样值都是数字（宿主可能不给描述符）。 */
+function isPreviewNumericColumn(
+  descriptor: DesignerDataSourcePanelOptions['descriptor'],
+  column: string,
+  rows: readonly Readonly<Record<string, import('@base-screen/contracts').ScreenJsonValue>>[],
+): boolean {
+  const field = descriptor?.fields.find((item) => item.id === column);
+  if (field !== undefined) return field.valueType === 'number';
+  const values = rows.map((row) => row[column]).filter((item) => item !== undefined);
+  return values.length > 0 && values.every((item) => typeof item === 'number');
+}
+
+/** 单元格文案：空值统一 `—`，数字走千分位，其它原样（对象仍序列化，避免 [object Object]）。 */
+function previewCellText(
+  value: import('@base-screen/contracts').ScreenJsonValue | undefined,
+): string {
+  if (value === undefined || value === null || value === '') return '\u2014';
+  if (typeof value === 'number') return previewNumber(value);
+  if (typeof value === 'string') return value;
+  return JSON.stringify(value);
+}
+
+function previewNumber(value: number): string {
+  const [integer = '', fraction] = String(value).split('.');
+  const grouped = integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return fraction === undefined ? grouped : `${grouped}.${fraction}`;
 }
 
 function previewRows(

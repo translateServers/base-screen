@@ -43,6 +43,13 @@ export interface DesignerDataGroupOptions {
   readonly onToggle: ((section: string, group: string, open: boolean) => void) | undefined;
   /** 只读分组的标记：收起态也要能看出「这里改不了、要去别处」。 */
   readonly readonlyHint?: boolean;
+  /**
+   * 组头右侧的动作（如「字段映射 · 自动匹配」）。
+   *
+   * 动作放在 `<summary>` 里是唯一不新增一层壳的写法，但必须自己吞掉冒泡与默认行为，
+   * 否则点动作会顺手把组收起来——用户看到的是「点了一下，内容没了」。
+   */
+  readonly action?: HTMLElement;
 }
 
 /** 覆盖表键：段与组共同定位，避免两个段里同名的组互相串味。 */
@@ -109,6 +116,14 @@ export function createDataGroup(
   text.dataset.detailsGroupSummary = options.group;
   text.textContent = options.summary;
   summary.append(caret, title, text);
+  if (options.action !== undefined) {
+    const action = options.action;
+    action.classList.add('designer-data-group-action');
+    // 只取消**默认行为**（summary 的开合），不阻断冒泡：面板的点击委托挂在更外层，
+    // `stopPropagation()` 会把动作本身也一起丢掉（症状：按钮完全没反应，且不报错）。
+    action.addEventListener('click', (event) => event.preventDefault());
+    summary.appendChild(action);
+  }
   // 类名不能叫 `*-body`：`designer-styles.mjs` 用 `css.includes('body')` 拦裸选择器，
   // 任何含该子串的类名都会让检查误报为「裸 body 选择器」。
   const content = document.createElement('div');

@@ -117,6 +117,7 @@ export function renderDesignerDatasetConfiguration(
         defaultOpen: true,
         overrides,
         onToggle: options.onToggleGroup,
+        action: autoMatchAction(ownerDocument, options),
       },
       [withoutSectionHeading(renderBindings(ownerDocument, options))],
     ),
@@ -156,6 +157,20 @@ export function renderDesignerDatasetConfiguration(
   return details;
 }
 
+/** 组头「自动匹配」：只在有角色、有字段时可点（否则点了什么也不会发生）。 */
+function autoMatchAction(
+  ownerDocument: Document,
+  options: DesignerDatasetConfigurationOptions,
+): HTMLButtonElement {
+  const button = ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-control designer-button designer-dataset-auto-match';
+  button.dataset.datasetAutoMatch = 'true';
+  button.textContent = DESIGNER_UI_TEXT.dataset.autoMatch;
+  button.disabled = options.roles.length === 0 || options.descriptor.fields.length === 0;
+  return button;
+}
+
 function renderDatasetSummary(
   ownerDocument: Document,
   descriptor: ScreenDatasetDefinition,
@@ -167,17 +182,35 @@ function renderDatasetSummary(
   summary.tabIndex = -1;
   const header = ownerDocument.createElement('div');
   header.className = 'designer-dataset-summary-header';
-  const title = ownerDocument.createElement('span');
-  title.className = 'designer-dataset-summary-title';
+  // 设计稿的标识块：图标 → 名称 + 类型徽标 → key。三行的信息量比「只有名字 + 更换」多，
+  // 但占的是同一块高度（图标列与右侧动作列夹住中间两行文案）。
+  const mark = ownerDocument.createElement('span');
+  mark.className = 'designer-dataset-summary-mark';
+  mark.setAttribute('aria-hidden', 'true');
+  mark.innerHTML = designerIcon('table');
+  const copy = ownerDocument.createElement('div');
+  copy.className = 'designer-dataset-summary-copy';
+  const nameLine = ownerDocument.createElement('div');
+  nameLine.className = 'designer-dataset-summary-name-line';
   const name = ownerDocument.createElement('strong');
+  name.className = 'designer-dataset-summary-title';
   name.textContent = descriptor.name;
-  title.append(name);
+  const badge = ownerDocument.createElement('span');
+  badge.className = 'designer-dataset-summary-kind';
+  badge.textContent = DESIGNER_UI_TEXT.dataset.kindBadge;
+  nameLine.append(name, badge);
+  const key = ownerDocument.createElement('span');
+  key.className = 'designer-dataset-summary-key';
+  key.dataset.datasetSourceKey = 'true';
+  key.textContent = descriptor.datasetId;
+  key.title = descriptor.datasetId;
+  copy.append(nameLine, key);
   const change = ownerDocument.createElement('button');
   change.type = 'button';
   change.className = 'designer-control designer-button';
   change.dataset.datasetChange = 'true';
-  change.textContent = DESIGNER_UI_TEXT.dataset.change;
-  header.append(title, change);
+  change.textContent = DESIGNER_UI_TEXT.dataSource.sourceChange;
+  header.append(mark, copy, change);
   summary.appendChild(header);
   if (descriptor.description !== null && descriptor.description.length > 0) {
     const description = ownerDocument.createElement('p');
@@ -391,14 +424,13 @@ function renderBindingRole(
   const roleSection = ownerDocument.createElement('div');
   roleSection.className = 'designer-dataset-binding-role';
   roleSection.dataset.datasetBindingRole = role.id;
-  const roleHeading = ownerDocument.createElement('div');
-  roleHeading.className = 'designer-dataset-binding-heading';
+  // 设计稿的映射行是**一行**：左侧角色名，右侧字段触发器。旧形态把角色名与「已选 n 项」
+  // 摊成一行、触发器再占一行，两行说的是同一件事——组头摘要已经写了映射结果，
+  // 行内再报一次计数只是噪声，还把三段映射撑成 200px 高。
   const roleName = ownerDocument.createElement('strong');
+  roleName.className = 'designer-dataset-binding-label';
   roleName.textContent = DESIGNER_UI_TEXT.dataset.bindingRole(role.id);
   const selected = draft?.fields[role.id] ?? [];
-  const roleCount = ownerDocument.createElement('span');
-  roleCount.textContent = DESIGNER_UI_TEXT.dataset.selectedFields(selected.length);
-  roleHeading.append(roleName, roleCount);
   const fieldList = ownerDocument.createElement('div');
   fieldList.className = 'designer-dataset-field-list';
   fieldList.setAttribute('role', 'group');
@@ -427,27 +459,8 @@ function renderBindingRole(
     select.dataset.datasetBindingRole = role.id;
     fieldList.appendChild(enhanceDesignerSelect(select).element);
   } else {
-    const actions = ownerDocument.createElement('div');
-    actions.className = 'designer-dataset-binding-role-actions';
-    actions.append(
-      bindingRoleAction(
-        ownerDocument,
-        role.id,
-        'select-all',
-        compatibleFields.length > role.maxFields
-          ? DESIGNER_UI_TEXT.dataset.bindingSelectMaximum
-          : DESIGNER_UI_TEXT.dataset.bindingSelectAll,
-        selected.length === Math.min(compatibleFields.length, role.maxFields),
-      ),
-      bindingRoleAction(
-        ownerDocument,
-        role.id,
-        'clear',
-        DESIGNER_UI_TEXT.dataset.bindingClear,
-        selected.length === 0,
-      ),
-    );
-    roleHeading.appendChild(actions);
+    // 全选 / 清空只留在弹层里（弹层本来就是「挑字段」的现场）；行内再放一份会让每行
+    // 右侧多两颗按钮，把一行映射挤成 24px + 32px 的两层。
     fieldList.appendChild(
       bindingFieldSelect(
         ownerDocument,
@@ -465,7 +478,7 @@ function renderBindingRole(
     empty.textContent = DESIGNER_UI_TEXT.dataset.noCompatibleFields;
     fieldList.appendChild(empty);
   }
-  roleSection.append(roleHeading, fieldList);
+  roleSection.append(roleName, fieldList);
   return roleSection;
 }
 

@@ -322,6 +322,77 @@
   color: var(--designer-text-primary);
 }
 
+/* 当前来源卡片：图标列 / 文案列 / 动作列。文案列里是「名称 + 类型徽标」与 key 两行，
+   图标与动作各自贴边，所以三列用 grid 而不是 flex——flex 下文案列宽度由内容决定，
+   长数据集名会把「更换来源」挤出卡片。 */
+.properties .designer-dataset-summary-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--designer-space-2);
+}
+
+.properties .designer-dataset-summary-mark {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-secondary);
+}
+
+.properties .designer-dataset-summary-mark svg {
+  width: 14px;
+  height: 14px;
+}
+
+.properties .designer-dataset-summary-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.properties .designer-dataset-summary-name-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
+.properties .designer-dataset-summary-name-line .designer-dataset-summary-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 类型徽标：等宽小字 + 大写。它是「这份来源是什么」的常量信息，不参与层级。 */
+.properties .designer-dataset-summary-kind {
+  flex: none;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
+  font-family: var(--designer-font-family-mono);
+  font-size: 8px;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.properties .designer-dataset-summary-key {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- 底部操作条：右对齐、auto 宽、accent 实心（dirty）/ 幽灵（clean） ---- */
 
 .properties .designer-datav-data-flow-content .designer-dataset-actions {
@@ -1153,6 +1224,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 序号列：等宽、弱化，宽度锁死——它只是坐标轴，不是数据。 */
+.properties .designer-data-preview-table-wrap th.designer-data-preview-index,
+.properties .designer-data-preview-table-wrap td.designer-data-preview-index {
+  width: 1%;
+  padding-right: var(--designer-space-3);
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* 数字列右对齐：表格里唯一的对齐语义就是「同列可比」，左对齐的金额读不出大小。 */
+.properties .designer-data-preview-table-wrap th.designer-data-preview-num,
+.properties .designer-data-preview-table-wrap td.designer-data-preview-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 /* 底部状态条：左侧状态，右侧撤销 + 唯一请求动作。 */
 .properties .designer-datav-data-flow-content .designer-dataset-status-bar {
   justify-content: flex-start;
@@ -1325,6 +1415,17 @@
   min-width: 0;
 }
 
+/* 角色名是**列头**而不是表单标签：11px、次要色，与右侧控件里的值形成主次。
+   之前它是 12px 白字加粗，读起来像「这一行的标题」，每行都抢一次注意力。 */
+.properties .designer-data-group[data-details-group="mapping"] .designer-dataset-binding-label {
+  overflow: hidden;
+  color: var(--designer-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* 映射弹层底部的全选/清空：不抢芯片和选项的层级。 */
 .designer-bind-actions {
   display: flex;
@@ -1386,6 +1487,35 @@
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
   letter-spacing: normal;
+}
+
+/* 映射组头是「标题 + 摘要 + 动作」三段：摘要紧跟标题（左对齐），动作贴右。
+   摘要若沿用全局的 `text-align: end`，它会挤到动作旁边，读起来像按钮的标签。 */
+.properties .designer-data-group[data-details-group="mapping"] .designer-data-group-summary-text {
+  flex: 0 1 auto;
+  text-align: start;
+}
+
+/* 组头动作（字段映射 · 自动匹配）：与摘要同一行的次级文字动作，不参与组头层级。
+   高度压到 20px——它是 summary 内的元素，撑高会改变整条组头的高度节奏。 */
+.properties .designer-data-group-action {
+  flex: 0 0 auto;
+  min-height: 20px;
+  margin-left: auto;
+  padding: 0 var(--designer-space-1);
+  background: transparent;
+  box-shadow: none;
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-xs);
+}
+
+.properties .designer-data-group-action:hover:not(:disabled) {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.properties .designer-data-group-action:disabled {
+  color: var(--designer-text-disabled);
 }
 
 .properties

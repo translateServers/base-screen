@@ -9,6 +9,7 @@ import type { DesignerDataSourceMode } from '../../dom/dataset/designer-dataset-
 import type { DesignerDataSectionKey } from '../../dom/dataset/designer-dataset-sections.js';
 import { countUnfilledRequiredParameters as countUnfilledRequired } from '../../dom/dataset/designer-dataset-types.js';
 import {
+  autoMatchDatasetFields,
   createDatasetDataSourceTransaction,
   createDesignerDatasetDraft,
   createEmptyDataSourceTransaction,
@@ -306,6 +307,22 @@ export function updateDatasetBindingRole(
       [role.id]: button.dataset.datasetBindingRoleAction === 'clear' ? [] : compatible,
     },
   };
+  markDatasetDraftChanged(context);
+}
+
+/**
+ * 组头「自动匹配」：把字段映射恢复成**首次选中数据集时**的默认结果。
+ *
+ * 只在映射区操作，不动参数：参数有必填项和用户填过的值，重算等于替用户改请求。
+ * 结果与 `createDesignerDatasetDraft` 同源（`autoMatchDatasetFields`），所以「点一下
+ * 自动匹配」与「重新选一次同一个数据集」得到的映射一致——不一致时用户会以为按钮坏了。
+ */
+export function autoMatchDatasetBindings(context: DesignerDatasetControllerContext): void {
+  const descriptor = context.state.descriptor;
+  if (context.state.draft === undefined || descriptor === undefined) return;
+  const roles = context.currentEntry()?.manifest.dataBinding?.roles ?? [];
+  const fields = autoMatchDatasetFields(descriptor, roles);
+  context.state.draft = { ...context.state.draft, fields };
   markDatasetDraftChanged(context);
 }
 

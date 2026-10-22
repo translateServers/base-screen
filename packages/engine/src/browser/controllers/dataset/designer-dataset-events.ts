@@ -6,6 +6,7 @@ import type {
 } from '../../dom/dataset/designer-dataset-dom.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import {
+  autoMatchDatasetBindings,
   describeDataset,
   restoreDatasetControlFocus,
   setSourceMode,
@@ -76,6 +77,10 @@ export function handleDatasetClick(
     .dataSourceMode as DesignerDataSourceMode | undefined;
   if (sourceMode !== undefined) {
     setSourceMode(context, sourceMode);
+    return true;
+  }
+  if (target.closest('[data-dataset-auto-match]') !== null) {
+    autoMatchDatasetBindings(context);
     return true;
   }
   if (target.closest('[data-dataset-change]') !== null) {

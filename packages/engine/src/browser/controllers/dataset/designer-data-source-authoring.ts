@@ -85,35 +85,51 @@ export function createDesignerDatasetDraft(
         Object.entries(source.binding?.fields ?? {}).map(([key, value]) => [key, [...value]]),
       )
     : {};
-  if (!sameResource) {
-    const used = new Set<string>();
-    for (const role of roles) {
-      const compatible = descriptor.fields.filter((field) =>
-        role.valueTypes.includes(field.valueType),
-      );
-      let selected: readonly string[] = [];
-      if (role.maxFields === 1) {
-        const field = compatible.find((item) => !used.has(item.id)) ?? compatible[0];
-        if (field !== undefined) selected = [field.id];
-      } else if (role.id === 'columns') {
-        selected = compatible.slice(0, role.maxFields).map((field) => field.id);
-      } else {
-        selected = compatible
-          .filter((field) => !used.has(field.id))
-          .slice(0, role.minFields)
-          .map((field) => field.id);
-      }
-      if (selected.length >= role.minFields) {
-        fields[role.id] = selected;
-        selected.forEach((id) => used.add(id));
-      }
-    }
-  }
+  if (!sameResource) Object.assign(fields, autoMatchDatasetFields(descriptor, roles));
   return {
     datasetId: descriptor.datasetId,
     params,
     fields,
   };
+}
+
+/**
+ * 默认字段匹配：角色顺序决定优先级，**同一字段不重复占用**（`used` 集合）。
+ *
+ * 单一来源：新建草稿与组头的「自动匹配」都读这一个函数。两处各写一遍的话，
+ * 「自动匹配」的结果会跟首次选中数据集时不一样，而用户默认它们应该一样。
+ *
+ * 单字段角色取第一个未占用且类型兼容的字段（都被占用时退回第一个兼容字段，避免空着）；
+ * `columns` 这类「展示型多选」直接铺满上限；其余多选只铺到下限（最小值即"够用"）。
+ */
+export function autoMatchDatasetFields(
+  descriptor: ScreenDatasetDefinition,
+  roles: readonly ScreenDataBindingRole[],
+): Record<string, readonly string[]> {
+  const fields: Record<string, readonly string[]> = {};
+  const used = new Set<string>();
+  for (const role of roles) {
+    const compatible = descriptor.fields.filter((field) =>
+      role.valueTypes.includes(field.valueType),
+    );
+    let selected: readonly string[] = [];
+    if (role.maxFields === 1) {
+      const field = compatible.find((item) => !used.has(item.id)) ?? compatible[0];
+      if (field !== undefined) selected = [field.id];
+    } else if (role.id === 'columns') {
+      selected = compatible.slice(0, role.maxFields).map((field) => field.id);
+    } else {
+      selected = compatible
+        .filter((field) => !used.has(field.id))
+        .slice(0, role.minFields)
+        .map((field) => field.id);
+    }
+    if (selected.length >= role.minFields) {
+      fields[role.id] = selected;
+      for (const id of selected) used.add(id);
+    }
+  }
+  return fields;
 }
 
 export function readDesignerDatasetParameter(
