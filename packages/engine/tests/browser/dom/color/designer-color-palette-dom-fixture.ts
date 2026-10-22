@@ -21,6 +21,15 @@ export class FakeElement {
   readonly listeners = new Map<string, EventListenerOrEventListenerObject[]>();
   readonly attributes = new Map<string, string>();
 
+  get ariaLabel(): string | null {
+    return this.attributes.get('aria-label') ?? null;
+  }
+
+  set ariaLabel(value: string | null) {
+    if (value === null) this.attributes.delete('aria-label');
+    else this.attributes.set('aria-label', value);
+  }
+
   constructor(
     readonly tagName: string,
     readonly ownerDocument: FakeDocument,

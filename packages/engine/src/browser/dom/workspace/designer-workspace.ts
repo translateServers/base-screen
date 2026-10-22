@@ -10,6 +10,7 @@ import {
 } from '../../../common/tools/designer-tools.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon, designerToolGlyph } from '../../ui/designer-icons.js';
+import { adoptDesignerFormControls } from '../designer-form-controls-dom.js';
 import { renderDesignerLeftPanelGroups } from '../designer-left-panel-groups-dom.js';
 import {
   populateMaterialLibrary,
@@ -116,6 +117,8 @@ export function createDesignerWorkspace(
     const control = layout.querySelector<HTMLButtonElement>(`[data-tool="${tool.id}"]`)!;
     control.disabled = tool.materialKey !== undefined && toolMaterialTypes?.[tool.id] === undefined;
   }
+  // 静态模板里的裸输入同样收口到共享原语；控制器在此之后才连接，引用仍按 data-* 查找。
+  adoptDesignerFormControls(layout);
   return layout;
 }
 

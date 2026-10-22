@@ -5,6 +5,7 @@ import { commonStyleFields } from '../../../common/operations/selection/designer
 import type { DesignerInspectorContext } from '../../../common/operations/style/designer-inspector.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { appendDesignerQuickStyle } from '../designer-quick-style-dom.js';
+import { createDesignerInput } from '../designer-ui-primitives.js';
 import {
   appendActionButton,
   appendBatchArrangeButton,
@@ -243,15 +244,11 @@ function appendBatchReadOnlyInput(parent: HTMLElement, labelText: string): void 
   const label = parent.ownerDocument.createElement('label');
   label.className = 'designer-field designer-field-label designer-datav-batch-readonly';
   label.textContent = labelText;
-  const input = parent.ownerDocument.createElement('input');
-  input.type = 'text';
-  input.className = 'designer-control designer-input';
-  input.placeholder = DESIGNER_UI_TEXT.propertiesPanel.multipleValues;
-  input.disabled = true;
-  input.setAttribute(
-    'aria-label',
-    `${labelText}：${DESIGNER_UI_TEXT.propertiesPanel.multipleValues}`,
-  );
+  const input = createDesignerInput(parent.ownerDocument, {
+    placeholder: DESIGNER_UI_TEXT.propertiesPanel.multipleValues,
+    ariaLabel: `${labelText}：${DESIGNER_UI_TEXT.propertiesPanel.multipleValues}`,
+    disabled: true,
+  });
   label.appendChild(input);
   parent.appendChild(label);
 }

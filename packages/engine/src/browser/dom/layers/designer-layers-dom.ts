@@ -1,6 +1,6 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
-import { createDesignerButton } from '../designer-ui-primitives.js';
+import { createDesignerButton, createDesignerInput } from '../designer-ui-primitives.js';
 import {
   type DesignerLayerItem,
   type DesignerLayersRenderOptions,
@@ -120,11 +120,11 @@ function createSearchControl(ownerDocument: Document): HTMLElement {
   searchGlyph.setAttribute('aria-hidden', 'true');
   searchGlyph.innerHTML = designerIcon('search');
   searchControl.appendChild(searchGlyph);
-  const searchInput = ownerDocument.createElement('input');
-  searchInput.type = 'search';
-  searchInput.className = 'designer-control designer-input';
-  searchInput.placeholder = DESIGNER_UI_TEXT.layersPanel.searchPlaceholder;
-  searchInput.ariaLabel = DESIGNER_UI_TEXT.layersPanel.searchLabel;
+  const searchInput = createDesignerInput(ownerDocument, {
+    type: 'search',
+    placeholder: DESIGNER_UI_TEXT.layersPanel.searchPlaceholder,
+    ariaLabel: DESIGNER_UI_TEXT.layersPanel.searchLabel,
+  });
   searchInput.dataset.layerSearch = 'true';
   searchControl.appendChild(searchInput);
   const clear = createDesignerButton(ownerDocument, {
@@ -325,13 +325,12 @@ function createLayerNode(
   row.appendChild(select);
 
   if (renaming) {
-    const rename = ownerDocument.createElement('input');
-    rename.type = 'text';
-    rename.className = 'designer-control designer-input';
-    rename.value = renameDraft ?? item.name;
+    const rename = createDesignerInput(ownerDocument, {
+      value: renameDraft ?? item.name,
+      ariaLabel: DESIGNER_UI_TEXT.layersPanel.rename(item.name),
+      disabled: item.locked,
+    });
     rename.dataset.layerRename = item.id;
-    rename.ariaLabel = DESIGNER_UI_TEXT.layersPanel.rename(item.name);
-    rename.disabled = item.locked;
     row.appendChild(rename);
   }
 

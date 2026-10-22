@@ -3,9 +3,7 @@ function colorInput(
   value: string,
   field: 'solid' | 'stop-color',
 ): HTMLInputElement {
-  const input = ownerDocument.createElement('input');
-  input.type = 'color';
-  input.className = 'designer-control designer-color';
+  const input = createDesignerInput(ownerDocument, { appearance: 'color' });
   // 原生 color input 只接受 #rrggbb；完整色值（alpha/transparent）由 dataset 保留。
   applyColorPaletteColorInputValue(input, value);
   input.dataset.colorPaletteField = field;
@@ -133,15 +131,16 @@ export function colorAlphaControl(
   const label = ownerDocument.createElement('span');
   label.className = 'designer-color-palette-alpha-label';
   label.textContent = DESIGNER_UI_TEXT.propertiesPanel.gradientStopOpacity;
-  const input = ownerDocument.createElement('input');
-  input.type = 'range';
-  input.className = 'designer-control designer-range designer-color-palette-alpha-input';
-  input.min = '0';
-  input.max = '100';
-  input.step = '1';
-  input.value = String(colorAlphaPercent(value));
+  const input = createDesignerInput(ownerDocument, {
+    appearance: 'range',
+    className: 'designer-color-palette-alpha-input',
+    min: 0,
+    max: 100,
+    step: 1,
+    value: String(colorAlphaPercent(value)),
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.gradientStopOpacity,
+  });
   input.dataset.colorPaletteField = field;
-  input.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.gradientStopOpacity);
   const valueText = ownerDocument.createElement('span');
   valueText.className = 'designer-color-palette-alpha-value';
   valueText.textContent = `${input.value}%`;
@@ -161,13 +160,13 @@ function numberInput(
   min: number,
   max: number,
 ): HTMLInputElement {
-  const input = ownerDocument.createElement('input');
-  input.type = 'number';
-  input.className = 'designer-control designer-input designer-number';
-  input.min = String(min);
-  input.max = String(max);
-  input.step = '1';
-  input.value = String(value);
+  const input = createDesignerInput(ownerDocument, {
+    appearance: 'number',
+    min,
+    max,
+    step: 1,
+    value: String(value),
+  });
   input.dataset.colorPaletteField = field;
   return input;
 }
@@ -200,6 +199,7 @@ export function inlineNumberField(
 }
 
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerInput } from '../designer-ui-primitives.js';
 import {
   type ColorPaletteManualValueField,
   type ColorPaletteState,

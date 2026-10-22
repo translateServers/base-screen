@@ -1,4 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { createDesignerInput } from '../designer-ui-primitives.js';
 import {
   clampDesignerFillColor,
   designerFillRgbaToHsva,
@@ -88,11 +89,11 @@ export function createDesignerFillColorPicker(
   for (const channel of ['hex', 'r', 'g', 'b', 'a'] as const) {
     const label = ownerDocument.createElement('label');
     label.className = `designer-fill-color-channel designer-fill-color-channel-${channel}`;
-    const input = ownerDocument.createElement('input');
-    input.type = channel === 'hex' ? 'text' : 'number';
-    input.className = 'designer-control designer-input';
+    const input = createDesignerInput(ownerDocument, {
+      type: channel === 'hex' ? 'text' : 'number',
+      ariaLabel: channel === 'hex' ? 'Hex' : channel.toUpperCase(),
+    });
     input.dataset.fillColorChannel = channel;
-    input.setAttribute('aria-label', channel === 'hex' ? 'Hex' : channel.toUpperCase());
     if (channel === 'hex') {
       input.setAttribute('autocomplete', 'off');
       input.setAttribute('spellcheck', 'false');
