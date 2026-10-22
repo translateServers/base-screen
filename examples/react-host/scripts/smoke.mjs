@@ -6,7 +6,7 @@ import { preview } from 'vite';
 
 /**
  * React 前端冒烟：起已构建的共享后端 + 本前端产物，走真实浏览器断言。
- * 断言集合与 React / Vanilla 两端一致（见 examples/README.md 的对等矩阵）。
+ * 断言集合与 Vue / Vanilla 两端一致（见 examples/README.md 的对等矩阵）。
  *
  * 前置（需先构建）：
  *   pnpm --filter @base-screen-example/shared-backend build

@@ -23,7 +23,7 @@ import {
 import { createHostResourceRuntime } from './host-resource-plugin';
 import { registerHostMaterials } from './register';
 
-const INSTANCE_ID = 'host-app-vue';
+const INSTANCE_ID = 'vue-host';
 
 export interface HostRuntime {
   readonly catalog: BaseScreenMaterialCatalog;

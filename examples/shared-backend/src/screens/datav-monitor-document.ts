@@ -811,7 +811,7 @@ export const DATAV_MONITOR_DOCUMENT = {
       type: 'static' as const,
       initialValue: 'all',
     },
-    // data-source：宿主只读，由 `variablePort.resolve` 每次求值。
+    // data-source：宿主只读，由宿主的 `hostCatalogPort.resolve` 每次求值。
     {
       id: 'clock',
       name: 'clock',

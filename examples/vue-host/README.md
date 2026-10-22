@@ -1,7 +1,7 @@
 # Host App · Vue
 
 Base Screen 全栈示例群的 **Vue 前端**：Vite + Vue 3 SPA，
-联调共享后端 [`examples/shared-backend`](../host-api)（NestJS + Prisma/SQLite）。
+联调共享后端 [`examples/shared-backend`](../shared-backend)（NestJS + Prisma/SQLite）。
 React / Vue / Vanilla 三个前端功能完全对等。
 
 本工程同时是 `pnpm verify:tarball` 的**外部消费者**载体：CI 会把它复制到仓库外、

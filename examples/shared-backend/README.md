@@ -1,13 +1,13 @@
 # Host API
 
 Base Screen 全栈示例群的**共享后端**：NestJS REST API + Prisma/SQLite。
-React、Vue、Vanilla 三个前端（`examples/host-app-*`）联调的都是这一个后端，
+React、Vue、Vanilla 三个前端（`examples/*-host`）联调的都是这一个后端，
 契约完全一致（见下方 REST 契约表）。
 
 ## 架构
 
 ```
-host-api/
+shared-backend/
 ├── prisma/
 │   ├── schema.prisma        # 数据模型（唯一 schema 源）
 │   └── migrations/          # 提交式迁移（含 migration_lock.toml）
@@ -64,8 +64,9 @@ host-api/
 `service_satisfaction`（%）、`member_repurchase`（%）；`points` 为 1..120 的整数，默认 24。
 排行固定为 `region`（6 个区域）与 `channel`（4 个渠道），`limit` 为 1..20，默认 6。
 
-空库播种两条记录：「默认销售大屏」是 50+ 组件的 DataV 风格成品文档，「系统监控大屏」保留
-原来的最小卡片文档（覆盖宿主自有物料路径）。种子只在空库执行；本地想重新播种时删除
+空库播种三条记录：「默认销售大屏」是 50+ 组件的 DataV 风格成品文档，「系统监控大屏」保留
+原来的最小卡片文档（覆盖宿主自有物料路径），「生产监控大屏」是覆盖四种 dataSource 的数据层
+成品文档。种子只在空库执行；本地想重新播种时删除
 `data/screens.db` 后重启，或直接跑冒烟脚本（它使用独立库并自动迁移）。
 
 `GET /api/docs` 提供 OpenAPI 文档（Swagger UI）。
@@ -85,8 +86,8 @@ pnpm --filter @base-screen-example/shared-backend dev # 开发：migrate deploy 
 - schema 变更：`pnpm --filter @base-screen-example/shared-backend exec prisma migrate dev --name <描述>`，
   产物（`prisma/migrations/`）随提交进仓库。
 - `dev` / `start` 前自动 `prisma migrate deploy`，无需手动同步 schema。
-- 空库首次启动由 `ScreensService.onModuleInit` 幂等播种两条演示大屏
-  （`默认销售大屏`、`系统监控大屏`），dev / start / e2e 行为一致。
+- 空库首次启动由 `ScreensService.onModuleInit` 幂等播种三条演示大屏
+  （`默认销售大屏`、`系统监控大屏`、`生产监控大屏`），dev / start / e2e 行为一致。
 - 数据库文件：`data/screens.db`（gitignore）；连接信息见 `.env`（非机密默认值）。
 
 ## 测试

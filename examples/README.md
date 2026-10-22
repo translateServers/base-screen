@@ -4,13 +4,13 @@ Base Screen 的示例群：**一个共享后端 + 三个对等前端**，外加�
 
 ```text
 examples/
-├── host-api/           NestJS + Prisma/SQLite 共享后端（唯一后端，三端共用）
-├── host-app-react/     Vite + React 19 SPA
-├── host-app-vue/       Vite + Vue 3 SPA（同时是 verify:tarball 的外部消费者载体）
-└── host-app-vanilla/   Vite + 原生 TypeScript SPA
+├── shared-backend/     NestJS + Prisma/SQLite 共享后端（唯一后端，三端共用）
+├── react-host/         Vite + React 19 SPA
+├── vue-host/           Vite + Vue 3 SPA（同时是 verify:tarball 的外部消费者载体）
+└── vanilla-host/       Vite + 原生 TypeScript SPA
 
-../harness/browser-harness/   基座自身特性矩阵 + Playwright 断言（pnpm verify:browser）
-../tooling/material-mcp-server/  面向上层工具链的物料模板 MCP provider
+../tooling/verification/browser-harness/   基座自身特性矩阵 + Playwright 断言（pnpm verify:browser）
+../tooling/material-mcp-server/            面向上层工具链的物料模板 MCP provider
 ```
 
 三个前端是"宿主应用"的三种写法：都是纯静态 SPA，经 HTTP 联调同一个后端，
@@ -69,7 +69,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 - **冲突止血**：收到 `base-screen-project-conflict` 后停止自动保存（revision 已过期，重试只会再冲突一次），由用户重载。
 - **返回前落地**：顶栏返回先 `await` 保存再路由；异步清理路径只清定时器，不假装能 flush。
 
-## REST 契约（由 host-api 实现，三端共用）
+## REST 契约（由 shared-backend 实现，三端共用）
 
 | 方法与路径 | 请求 | 成功响应 | 失败响应 |
 | --- | --- | --- | --- |
@@ -165,13 +165,12 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 
 ## 数据层接入
 
-三个端口在 `configure` 时成对提交（渲染器创建时捕获，**之后再赋值会被拒绝**）：
+两个端口在 `configure` 时提交（渲染器创建时捕获，**之后再赋值会被拒绝**）：
 
 | 端口 | 实现文件（三端同名） | 职责 |
 | --- | --- | --- |
 | `datasetPort` | `src/screen/host-dataset-port.ts` | `list` / `describe` / `query` → `/api/datasets*`；声明 `queryScope: 'dataset'` 开启同参数并发合并 |
-| `variablePort` | `src/screen/host-variable-port.ts` | 解析 `data-source` 变量（`production.clock` / `notice` / `status`），宿主只读 |
-| `variableCatalogPort` | `src/screen/host-variable-catalog.ts` | 设计器变量面板的目录（`list` / `describe`，`previewable: true`） |
+| `hostCatalogPort` | `src/screen/host-catalog-port.ts` | 来源目录与取值：`list` / `describe` 供设计器变量面板列出宿主来源（`previewable: true`），`resolve` 求值 `data-source` 变量（`production.clock` / `notice` / `status`，`readOnly: true`） |
 
 轮询由 `src/screen/host-refresh-controller.ts` 驱动（**只有查看页装，设计态不轮询**）。
 
@@ -194,11 +193,11 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 ### 变量分层
 
 - `static`（`line` / `window` / `severity`）：文档内可变，URL 播种与蓝图 `set-variable`
-  写的都是它。查看页的 `?line=` 播种**改写文档副本里的 `initialValue`** 而不是调
+  写的都是它。查看页的 `?line=` 播种**改写文档副本里的 `initialValue` 与内联取值**而不是调
   `getVariable().set()`——后者依赖首次成功渲染后才会写入的变量表，首帧前必然失败且静默。
-- `data-source`（`production.clock` / `notice` / `status`）：宿主只读，每次由
-  `variablePort.resolve` 求值。任何异常都回落 `initialValue`：`resolveHostVariableBatch`
-  是 `Promise.all`，一个变量抛错会让整批 undefined → **整屏不渲染**。
+- `data-source`（`production.clock` / `notice` / `status`）：宿主只读，由
+  `hostCatalogPort.resolve` 求值。端口不向运行时抛异常：来源失败时返回失败诊断，
+  渲染器把实例记为 error，变量沿用 `initialValue`——单个来源失败不会让**整屏不渲染**。
 
 ### 轮询与降级
 
@@ -212,7 +211,7 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 | `demo_metric` 的 energy_ratio、`demo_series`、`demo_ranking` | 60s |
 | 其它（含 `variable` 数据源组件） | 30s |
 
-> `variable` 数据源组件**不产生网络请求**（值来自 `variablePort`），但它仍参与 30s 节拍：
+> `variable` 数据源组件**不产生网络请求**（值来自宿主的 `hostCatalogPort.resolve`），但它仍参与 30s 节拍：
 > 到点会重新求值一次，用来刷新 `production.clock` / `production.status` 这类宿主状态文案。
 
 - **一个 250ms 心跳扫到期表**，不是每组件一个定时器；在飞行中的组件跳过（不叠加）。
@@ -403,7 +402,7 @@ cp my-data.db examples/shared-backend/data/datasources/
 | A13 | 三端 smoke（E 段） | 成功后注入 500：保留上一帧 + 角标 + 离线 chip（连续两次采样） |
 | A14 | 三端 smoke（D 段） | LINE-C：0 格 + 空文案 + 无角标 + 仍在线 |
 | A15 | `plugins/plugin-datav-materials/tests/values.test.ts` | 越界读数不改数：`clampPercent(120)=100`（液面）但对 `formatWaterLevelLabel(120,1)` 断言文本 `120.0%`。PRD 原写 `gauge`，本轮 `gauge` 未实现，由 `water-level` 承载同一条规则 |
-| A15b | `tests/examples/host-variable-port.test.ts` | 单个/多个变量源抛错时逐项回落 `initialValue`，不 reject（整批 `Promise.all` 不因此变 undefined，整屏照常渲染） |
+| A15b | `tests/examples/host-catalog-port.test.ts` | 来源求值抛错时端口返回失败诊断而非 reject；渲染器把实例记为 error、变量沿用 `initialValue`，整屏照常渲染 |
 | A16 / A17 | `plugins/plugin-datav-materials/tests/{status-grid,pipeline}.test.ts` + `tests/best-practices/dataset-material-best-practice.test.ts` | 字段不存在、角色不存在、字段数越界 → `HOST_DATASET_BINDING_INVALID`；根测试只做**正向**校验，负例在物料测试与 best-practices 里 |
 | A18 | `tests/best-practices/dataset-material-best-practice.test.ts`（`dataset binding value type gate`） | 角色 `valueTypes` 不含字段实际类型 → 拒绝：把 `stages` 的 `throughput`(number) 换成 date 字段必须失败，换回 number 必须通过（对照组排除"因别的原因失败"） |
 | A19 | 根测试 `tests/examples/datav-monitor-document.test.ts` + 后端 `screens.service.spec` | 四种 dataSource 各 ≥1（含 6 个 `variable` 组件）、6 个变量、3 条种子 |
@@ -440,6 +439,6 @@ cp my-data.db examples/shared-backend/data/datasources/
 
 ## 相关入口
 
-- [基座特性矩阵](../harness/browser-harness/cases.html)：人眼逐项验证入口（`pnpm dev:browser-harness`）
+- [基座特性矩阵](../tooling/verification/browser-harness/cases.html)：人眼逐项验证入口（`pnpm dev:browser-harness`）
 - [物料模板 MCP provider](../tooling/material-mcp-server)：面向上层工具链
 - [仓库分层与检查门禁](../AGENTS.md)：包边界、依赖规则与验证命令

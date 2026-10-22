@@ -1,7 +1,7 @@
 # Host App · React
 
 Base Screen 全栈示例群的 **React 前端**：Vite + React 19 SPA，
-联调共享后端 [`examples/shared-backend`](../host-api)（NestJS + Prisma/SQLite）。
+联调共享后端 [`examples/shared-backend`](../shared-backend)（NestJS + Prisma/SQLite）。
 React / Vue / Vanilla 三个前端功能完全对等。
 
 ## 架构
@@ -42,8 +42,8 @@ src/
 
 ```bash
 pnpm install                                        # 仓库根（首次）
-pnpm dev:host-api                                   # 终端 1：共享后端 :3000
-pnpm dev:host-app-react                             # 终端 2：本前端 :5174（/api 代理到后端）
+pnpm dev:shared-backend                             # 终端 1：共享后端 :3000
+pnpm dev:react-host                                 # 终端 2：本前端 :5174（/api 代理到后端）
 ```
 
 - 列表页 `/`：新建 / 编辑 / 查看 / 删除

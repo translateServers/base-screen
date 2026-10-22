@@ -1,6 +1,6 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 
-/** 与 host-api REST 契约逐字节对齐的投影类型（document 以 canonical 文档视之）。 */
+/** 与 shared-backend REST 契约逐字节对齐的投影类型（document 以 canonical 文档视之）。 */
 export interface ScreenShape {
   readonly id: string;
   readonly name: string;

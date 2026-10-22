@@ -8,11 +8,10 @@ import { el } from '../lib/dom';
 import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
+import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { loadHostRuntime } from '../screen/host-runtime';
-import { createHostVariableCatalog } from '../screen/host-variable-catalog';
-import { createHostVariablePort } from '../screen/host-variable-port';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
@@ -65,7 +64,7 @@ export const screenEditView: ViewModule = {
       runtime.bindDesigner(element);
 
       // 2) 挂载后再 configure / load；数据通道必须在 configure 内提交。
-      // 三条数据集/变量通道同理一并提交，否则设计器的数据源面板与变量面板会退化。
+      // 数据集与来源目录通道同理一并提交，否则设计器的数据源面板与变量面板会退化。
       const datasetPort = createHostDatasetPort({ api, logger });
       const configured = element.configure({
         catalog: runtime.catalog,
@@ -78,12 +77,11 @@ export const screenEditView: ViewModule = {
         toolMaterialTypes: TOOL_MATERIAL_TYPES,
         resourcePort: createHostResourcePort(),
         datasetPort,
-        variablePort: createHostVariablePort({
+        hostCatalogPort: createHostCatalogPort({
           clock: () => new Date(),
           noticeSource: () => datasetPort.snapshot().alarms,
           logger,
         }),
-        variableCatalogPort: createHostVariableCatalog(),
         // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。
         groupMaterialType: 'base.container',
         backButton: true,

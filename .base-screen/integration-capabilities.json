@@ -63,7 +63,7 @@
       "owner": "base-screen + host",
       "availability": "current",
       "boundary": "基座维护稳定变量身份与规范引用；宿主提供数据源和当前查询参数，执行实际求值。",
-      "publicApi": ["ScreenHostVariablePort", "ScreenHostVariableCatalogPort"],
+      "publicApi": ["ScreenHostCatalogPort"],
       "references": [
         "packages/contracts/src/types/host.ts",
         "packages/engine/src/common/operations/designer-variable-operations.ts"

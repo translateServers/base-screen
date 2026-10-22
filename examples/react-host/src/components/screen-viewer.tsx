@@ -1,18 +1,19 @@
-import type {
-  ScreenDocument,
-  ScreenJsonValue,
-  ScreenResourceObserver,
+import {
+  readScreenVariableRecord,
+  type ScreenDocument,
+  type ScreenJsonValue,
+  type ScreenResourceObserver,
 } from '@base-screen/contracts';
 import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
+import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostRefreshController } from '../screen/host-refresh-controller';
 import { loadHostRuntime } from '../screen/host-runtime';
-import { createHostVariablePort } from '../screen/host-variable-port';
 import { useScreenSessionStore } from '../store/screen-session-store';
 import { showToast } from './toast';
 
@@ -165,7 +166,7 @@ function createHostObserver(): HostObserver {
  * 查看器没有自带顶栏，因此屏名、时钟、数据状态、全屏与返回入口由宿主浮层提供；
  * 浮层与缩放后的 frame 平级，不会被一起放大。
  *
- * 数据链路：`datasetPort` / `variablePort` / `observer` 必须在 `configure` 内提交——
+ * 数据链路：`datasetPort` / `hostCatalogPort` / `observer` 必须在 `configure` 内提交——
  * 渲染器在 configure 时建立，之后再赋端口会被按"初始化后不可更换端口"拒绝。
  * 轮询由宿主的 refresh controller 驱动（设计器不装轮询，见 screen-editor）。
  */
@@ -266,7 +267,7 @@ export function ScreenViewerPage(): React.ReactElement {
         logger,
         ...(params.get('fail') === '500' ? { failCode: () => '500' } : {}),
       });
-      const variablePort = createHostVariablePort({
+      const hostCatalogPort = createHostCatalogPort({
         clock: () => new Date(),
         noticeSource: () => datasetPort.snapshot().alarms,
         statusSource: () => ({
@@ -284,11 +285,11 @@ export function ScreenViewerPage(): React.ReactElement {
       const configured = element.configure({
         catalog: runtime.catalog,
         runtimeContributions: runtime.runtimeContributions,
-        instanceId: `host-app-react:${screenId}`,
+        instanceId: `react-host:${screenId}`,
         mode: 'viewer',
         resourcePort: createHostResourcePort(),
         datasetPort,
-        variablePort,
+        hostCatalogPort,
         observer: host.observer,
       });
       if (!configured.ok) {
@@ -466,15 +467,16 @@ const SEED_RULES: readonly SeedRule[] = [
  * **为什么不走 `getVariable(id).set()`**：`set()` 依赖渲染器已完成过一次成功渲染
  * （`previous` 变量表在首帧之前是 undefined，会直接被拒），而文档刚赋值时首次渲染
  * 还在等待动态变量解析——此刻 `set()` 必然失败，播种会静默不生效（实测如此）。
- * 静态变量的 `initialValue` 是文档里声明的初值，改写它才是"开机即生效"的路径，
+ * 静态变量的 `initialValue` 与内联取值是文档里声明的初值，改写它们才是"开机即生效"的路径，
  * 也没有竞态：渲染器第一次渲染读到的就是播种后的值。
  * 只在查看页做：编辑页会保存文档，改写初值会被写回后端。
  */
 function applyUrlSeeds(document: ScreenDocument, params: URLSearchParams): ScreenDocument {
   let changed = false;
   const variables = document.variables.map((variable) => {
-    if (variable.type !== 'static') return variable;
-    const rule = SEED_RULES.find((item) => item.variableId === variable.id);
+    const record = readScreenVariableRecord(variable);
+    if (record.value.kind !== 'inline') return variable;
+    const rule = SEED_RULES.find((item) => item.variableId === record.id);
     if (rule === undefined) return variable;
     const raw = params.get(rule.variableId);
     if (raw === null) return variable;
@@ -484,7 +486,11 @@ function applyUrlSeeds(document: ScreenDocument, params: URLSearchParams): Scree
       return variable;
     }
     changed = true;
-    return { ...variable, initialValue: value };
+    return {
+      ...record,
+      initialValue: value,
+      value: { kind: 'inline' as const, value },
+    };
   });
   return changed ? { ...document, variables } : document;
 }

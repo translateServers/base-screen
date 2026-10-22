@@ -23,7 +23,7 @@ import {
 import { createHostResourceRuntime } from './host-resource-plugin';
 import { registerHostMaterials } from './register';
 
-const INSTANCE_ID = 'host-app-react';
+const INSTANCE_ID = 'react-host';
 
 export interface HostRuntime {
   readonly catalog: BaseScreenMaterialCatalog;

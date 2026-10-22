@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type {
-  ScreenDocument,
-  ScreenJsonValue,
-  ScreenResourceObserver,
+import {
+  readScreenVariableRecord,
+  type ScreenDocument,
+  type ScreenJsonValue,
+  type ScreenResourceObserver,
 } from '@base-screen/contracts';
 import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
@@ -11,11 +12,11 @@ import { useScreenSessionStore } from '../composables/use-stores';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
+import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
 import { createHostRefreshController } from '../screen/host-refresh-controller';
 import { loadHostRuntime } from '../screen/host-runtime';
-import { createHostVariablePort } from '../screen/host-variable-port';
 import { screenSessionStore } from '../store/screen-session-store';
 
 interface HostObserver {
@@ -259,15 +260,16 @@ function tickClock(): void {
  *
  * **为什么不走 `getVariable(id).set()`**：`set()` 依赖渲染器已完成过一次成功渲染
  * （`previous` 变量表在首帧之前是 undefined，会直接被拒），而文档刚赋值时首次渲染
- * 还在等待动态变量解析——此刻 `set()` 必然失败且静默。静态变量的 `initialValue` 是
- * 文档里声明的初值，改写它才是"开机即生效"的路径，也没有竞态。
+ * 还在等待动态变量解析——此刻 `set()` 必然失败且静默。静态变量的 `initialValue` 与
+ * 内联取值是文档里声明的初值，改写它们才是"开机即生效"的路径，也没有竞态。
  * 只在查看页做：编辑页会保存文档，改写初值会被写回后端。
  */
 function applyUrlSeeds(document: ScreenDocument, params: URLSearchParams): ScreenDocument {
   let changed = false;
   const variables = document.variables.map((variable) => {
-    if (variable.type !== 'static') return variable;
-    const rule = SEED_RULES.find((item) => item.variableId === variable.id);
+    const record = readScreenVariableRecord(variable);
+    if (record.value.kind !== 'inline') return variable;
+    const rule = SEED_RULES.find((item) => item.variableId === record.id);
     if (rule === undefined) return variable;
     const raw = params.get(rule.variableId);
     if (raw === null) return variable;
@@ -277,7 +279,11 @@ function applyUrlSeeds(document: ScreenDocument, params: URLSearchParams): Scree
       return variable;
     }
     changed = true;
-    return { ...variable, initialValue: value };
+    return {
+      ...record,
+      initialValue: value,
+      value: { kind: 'inline' as const, value },
+    };
   });
   return changed ? { ...document, variables } : document;
 }
@@ -326,7 +332,7 @@ onMounted(() => {
       logger,
       ...(params.get('fail') === '500' ? { failCode: () => '500' } : {}),
     });
-    const variablePort = createHostVariablePort({
+    const hostCatalogPort = createHostCatalogPort({
       clock: () => new Date(),
       noticeSource: () => datasetPort.snapshot().alarms,
       statusSource: () => ({
@@ -345,11 +351,11 @@ onMounted(() => {
     const configured = element.configure({
       catalog: runtime.catalog,
       runtimeContributions: runtime.runtimeContributions,
-      instanceId: `host-app-vue:${screenId}`,
+      instanceId: `vue-host:${screenId}`,
       mode: 'viewer',
       resourcePort: createHostResourcePort(),
       datasetPort,
-      variablePort,
+      hostCatalogPort,
       observer: tracker.observer,
     });
     if (!configured.ok) {

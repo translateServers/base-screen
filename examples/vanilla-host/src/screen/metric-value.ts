@@ -3,7 +3,7 @@ import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 /**
  * 三端共有的宿主自有物料「指标读数」manifest：React / Vue / Vanilla 三个前端
  * 各自用自己的技术栈实现元素，但 type / tagName / schema 完全一致——种子文档
- * （host-api）因此可以在三个前端里渲染同一份 canonical 文档。
+ * （shared-backend）因此可以在三个前端里渲染同一份 canonical 文档。
  *
  * dataCapabilities 声明 `host-resource`：物料经宿主数据通道消费后端
  * `/api/metrics/series` 的 mock 数据；`staticData` 让作者在未绑定数据时也能看到示例值。

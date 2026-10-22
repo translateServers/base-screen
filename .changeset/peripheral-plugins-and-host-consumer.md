@@ -63,11 +63,11 @@ Restructure `examples/` around a full-stack host case: one shared backend plus t
 feature-equivalent front ends, so the "how a host actually embeds Base Screen" path is
 executable rather than described.
 
-`examples/host-api` (NestJS + Prisma/SQLite) owns storage, retrieval and concurrency
+`examples/shared-backend` (NestJS + Prisma/SQLite) owns storage, retrieval and concurrency
 control: canonical Screen Documents are stored as opaque JSON behind a documented REST
 contract, `PUT` enforces a host-side `revision` optimistic lock, and a deterministic mock
-metrics endpoint feeds the bundled `host-resource` data binding. `examples/host-app-vanilla`,
-`examples/host-app-react` and `examples/host-app-vue` are pure static SPAs that consume only
+metrics endpoint feeds the bundled `host-resource` data binding. `examples/vanilla-host`,
+`examples/react-host` and `examples/vue-host` are pure static SPAs that consume only
 public `@base-screen/*` entries and implement the same three pages (list, designer edit with
 debounced autosave, read-only viewer), the same host project adapter, the same host data
 channel, and one host-owned `host-app.kpi-card` material each — written with a native custom
@@ -84,20 +84,20 @@ framework-agnostic `zustand/vanilla` store consumed through a `shallowRef`-based
 in Vue and through `subscribe` in the vanilla app.
 
 The infrastructure carriers moved out of `examples/` to make that structure honest:
-`examples/browser-harness` became `harness/browser-harness` (it is the repo's own
-feature matrix and Playwright evidence, not a usage example) and
+`examples/browser-harness` became `tooling/verification/browser-harness` (it is the repo's
+own feature matrix and Playwright evidence, not a usage example) and
 `examples/material-mcp-server` became `tooling/material-mcp-server`. Their gates are
 unchanged apart from the paths. The minimal-Vanilla/Viewer consumer used by
 `pnpm verify:tarball` is now generated inline instead of copied from an example directory,
 so the gate no longer depends on the shape of `examples/`.
 
-`pnpm verify:tarball` copies `examples/host-app-vue` outside the repo, swaps every
+`pnpm verify:tarball` copies `examples/vue-host` outside the repo, swaps every
 `@base-screen/*` dependency for the same-batch tarballs, and runs typecheck, build and a
 browser loop asserting registration, material rendering, host-resource data binding, the
 host project adapter's revision increment on save, and the viewer. The backend is stubbed
 through Playwright `page.route` for that gate — it exists to prove the published ABI and the
 host integration path, while backend behavior is covered by the jest unit and e2e suites
-shipped in `examples/host-api`. That makes it an external-consumer check rather than an
+shipped in `examples/shared-backend`. That makes it an external-consumer check rather than an
 in-repo example.
 
 Building these surfaced authoring friction worth recording: the designer must be connected
