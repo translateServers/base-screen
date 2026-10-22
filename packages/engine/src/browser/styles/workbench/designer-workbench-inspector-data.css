@@ -1435,10 +1435,10 @@
 
 /* ---- v7 样式细节：更安静的层级与更紧的映射表 ---- */
 
-/* 内容左右 14px（设计稿面板主体 `padding: 2px 14px 20px` 的横向值）；
-   顶部 12px 代替设计稿的「外层 2 + 分块 11」，底部留给状态条自己贴合面板。 */
+/* 与设计稿面板主体一致：外层只留 2px，首个分块自己带 11px（合起来 13px 到组头），
+   左右 14px，底部 0——状态条在流内 sticky，多给 padding 会让它悬空。 */
 .properties .designer-datav-data-flow-content {
-  padding: var(--designer-space-5) 14px 0;
+  padding: var(--designer-space-1) 14px 0;
 }
 
 /* 绑定行与「当前来源」之间只留一条发丝线。 */
@@ -2580,4 +2580,41 @@
 /* 配置态的取值段没有内容（类型切换已收进来源浮层）：不留空盒子占位。 */
 .properties .designer-data-source-type[data-data-entry-layout="configured"]:empty {
   display: none;
+}
+
+/* ---- 分块节奏（v7 `.block`）：间距由「组自身」承担，容器不再加 gap ----
+ *
+ * 之前组的间距靠容器 gap（同一段 8px、跨段 0 或 29px），折叠态下会出现
+ * 「请求参数」与「数据响应」贴死、而「数据响应」与「高级设置」隔 29px 的错位。
+ * 设计稿的模型是每个分块 `padding: 12px 0 13px` + 顶部一条发丝线：
+ * 折叠态组头之间是 12+13+1=26px，展开态是 组头 24 + 8 + 内容 + 13。 */
+.properties .designer-data-group {
+  padding: 12px 0 13px;
+  border-top: 1px solid var(--designer-border-subtle);
+}
+
+/* 首组：段本身已经划了分隔，不再叠一条线，顶部按设计稿收 11px。 */
+.properties .designer-dataset-descriptor > .designer-data-group:first-child {
+  padding-top: 11px;
+  border-top: 0;
+}
+
+/* 组头与内容之间 8px（设计稿组内容容器的 padding-top）。 */
+.properties .designer-data-group-content {
+  padding-top: var(--designer-space-4);
+  padding-bottom: 0;
+}
+
+/* 容器不再负责间距：描述符网格的 gap、段自带的 padding/border 全部归零。 */
+.properties .designer-datav-data-flow-content .designer-dataset-descriptor {
+  gap: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.properties .designer-dataset-authoring[data-ds-section="authoring"] {
+  gap: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
