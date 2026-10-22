@@ -1,26 +1,14 @@
-import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
-import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
   createDesignerSizeEntryTransaction,
   type DesignerSizeAxis,
   getDesignerSizeEntryTarget,
   parseDesignerSizeEntry,
-} from '../../common/operations/element/designer-coordinate-entry.js';
-import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+} from '../../../common/operations/element/designer-coordinate-entry.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import type { DesignerEntryHostCallbacks } from './designer-entry-host-callbacks.js';
 import { DesignerPairEntryController } from './designer-pair-entry-controller.js';
 
-export interface DesignerSizeEntryControllerCallbacks {
-  readonly getRoot: () => ShadowRoot | null;
-  readonly getDocument: () => ScreenDocument | undefined;
-  readonly getInteraction: () => ScreenInteractionState;
-  readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
-  readonly executeTransaction: (
-    transaction: ScreenDocumentTransaction,
-  ) => ScreenParseResult<ScreenDocument>;
-  readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
-  readonly focusViewport: () => void;
-}
+export type DesignerSizeEntryControllerCallbacks = DesignerEntryHostCallbacks;
 
 export class DesignerSizeEntryController extends DesignerPairEntryController<
   DesignerSizeAxis,

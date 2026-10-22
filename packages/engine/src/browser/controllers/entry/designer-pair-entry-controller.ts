@@ -1,6 +1,7 @@
-import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
+import type { ScreenDocument } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import type { DesignerEntryHostCallbacks } from './designer-entry-host-callbacks.js';
 
 export interface DesignerPairEntryTarget<Axis extends string> {
   readonly id: string;
@@ -11,16 +12,8 @@ export type DesignerPairEntryParseResult<Axis extends string, Value> =
   | { readonly ok: true; readonly value: Value }
   | { readonly ok: false; readonly invalidAxes: readonly Axis[] };
 
-export interface DesignerPairEntryControllerCallbacks<Axis extends string, Value> {
-  readonly getRoot: () => ShadowRoot | null;
-  readonly getDocument: () => ScreenDocument | undefined;
-  readonly getInteraction: () => ScreenInteractionState;
-  readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
-  readonly executeTransaction: (
-    transaction: ScreenDocumentTransaction,
-  ) => ScreenParseResult<ScreenDocument>;
-  readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
-  readonly focusViewport: () => void;
+export interface DesignerPairEntryControllerCallbacks<Axis extends string, Value>
+  extends DesignerEntryHostCallbacks {
   readonly getTarget: (
     document: ScreenDocument | undefined,
     interaction: ScreenInteractionState,

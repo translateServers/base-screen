@@ -6,9 +6,9 @@ import {
   type ScreenHostCatalogDescriptor,
   type ScreenHostCatalogPort,
 } from '@base-screen/contracts';
-import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
-import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
-import type { DesignerVariableCatalogView } from '../dom/designer-variables-dom.js';
+import type { DesignerVariableView } from '../../../common/operations/designer-variable-view.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import type { DesignerVariableCatalogView } from '../../dom/designer-variables-dom.js';
 
 const PREVIEW_VALUE_BYTES = 1024 * 1024;
 const PREVIEW_SUMMARY_BYTES = 8 * 1024;

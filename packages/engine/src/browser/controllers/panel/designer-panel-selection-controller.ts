@@ -21,6 +21,7 @@ import {
 import { nextMaterialComponentId } from '../../../common/operations/material-component/material-component.js';
 import { removeComponentCommands } from '../../../common/operations/selection/designer-remove-operations.js';
 import { selectedComponents } from '../../../common/operations/selection/designer-selection.js';
+import { isEditableTarget } from '../../dom/designer-editable-target.js';
 import { createInitialDataSource } from '../../dom/panel/designer-panel-dom.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
 
@@ -265,7 +266,7 @@ export class DesignerPanelSelectionController {
       event.altKey ||
       event.isComposing ||
       !(event.ctrlKey || event.metaKey) ||
-      isEditable(event.target)
+      isEditableTarget(event.target)
     ) {
       return false;
     }
@@ -346,13 +347,4 @@ function failure(message: string): ScreenParseResult<ScreenDocument> {
     ok: false,
     diagnostics: [{ severity: 'error', code: 'PLUGIN_CORE_LIFECYCLE_INVALID', path: [], message }],
   };
-}
-
-function isEditable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLSelectElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
 }

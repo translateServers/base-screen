@@ -9,10 +9,10 @@ import {
   nextDesignerVariableCopyName,
   nextDesignerVariableName,
   normalizeDesignerVariableDescription,
-} from '../../common/operations/designer-variable-editing.js';
-import { buildReplaceVariablesCommand } from '../../common/operations/designer-variable-operations.js';
-import { readDesignerVariableView } from '../../common/operations/designer-variable-view.js';
-import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+} from '../../../common/operations/designer-variable-editing.js';
+import { buildReplaceVariablesCommand } from '../../../common/operations/designer-variable-operations.js';
+import { readDesignerVariableView } from '../../../common/operations/designer-variable-view.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerVariableCatalogController } from './designer-variable-catalog-controller.js';
 import {
   buildDesignerVariable,

@@ -1,10 +1,10 @@
 import type { ScreenValueRef } from '@base-screen/contracts';
-import { createValueRefPicker } from '../../dom/value-ref/designer-value-ref-picker-dom.js';
+import { createValueRefPicker } from './designer-value-ref-picker-dom.js';
 import type {
   DesignerValueRefPickerInput,
   DesignerValueRefPickerOptions,
   DesignerValueRefText,
-} from '../../dom/value-ref/designer-value-ref-types.js';
+} from './designer-value-ref-types.js';
 
 /**
  * 取值选择器的挂载层。

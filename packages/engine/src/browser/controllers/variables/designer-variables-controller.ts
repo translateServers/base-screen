@@ -5,12 +5,12 @@ import {
   type ScreenVariable,
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
-import { collectVariableReferences } from '../../common/operations/designer-variable-operations.js';
-import { readDesignerVariableView } from '../../common/operations/designer-variable-view.js';
+import { collectVariableReferences } from '../../../common/operations/designer-variable-operations.js';
+import { readDesignerVariableView } from '../../../common/operations/designer-variable-view.js';
 import {
   type DesignerVariablesDraft,
   renderDesignerVariables,
-} from '../dom/designer-variables-dom.js';
+} from '../../dom/designer-variables-dom.js';
 import { DesignerVariableCatalogController } from './designer-variable-catalog-controller.js';
 import { DesignerVariableEditorController } from './designer-variable-editor-controller.js';
 

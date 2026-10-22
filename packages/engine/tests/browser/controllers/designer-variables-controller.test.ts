@@ -1,7 +1,7 @@
 import type { ScreenDocument, ScreenHostCatalogPort } from '@base-screen/contracts';
 import { applyScreenDocumentCommand } from '@base-screen/core';
 import { describe, expect, it, vi } from 'vitest';
-import { DesignerVariablesController } from '../../../src/browser/controllers/designer-variables-controller.js';
+import { DesignerVariablesController } from '../../../src/browser/controllers/variables/designer-variables-controller.js';
 import { renderDesignerVariables } from '../../../src/browser/dom/designer-variables-dom.js';
 
 class FakeElement {

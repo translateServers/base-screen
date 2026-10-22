@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   datasetParameterPickerInput,
   valueRefEquals,
-} from '../../../src/browser/controllers/value-ref/designer-value-ref-picker-controller.js';
+} from '../../../src/browser/dom/value-ref/designer-value-ref-picker-mount.js';
 import {
   badgeOf,
   buildValueRefOptions,

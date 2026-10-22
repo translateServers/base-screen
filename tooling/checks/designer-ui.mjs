@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -82,18 +82,8 @@ const formPrimitiveDebt = new Set([
   'dom/color/designer-color-palette-value-dom.ts',
   'dom/color/designer-fill-color-picker-dom.ts',
   'dom/descriptor/designer-descriptor-stepper-dom.ts',
-  'dom/layers/designer-layers-dom.ts',
-  'dom/static-data/designer-static-data-controls.ts',
-  'dom/static-data/designer-static-data-table-dom.ts',
   // 独立表单语汇（`variable-field`）或尚未迁移行结构的绑定面板。
   'dom/blueprint/designer-blueprint-library-dom.ts',
-  'dom/dataset/designer-dataset-authoring-dom.ts',
-  'dom/dataset/designer-dataset-catalog-dom.ts',
-  'dom/dataset/designer-dataset-config-controls.ts',
-  'dom/dataset/designer-dataset-config-dom.ts',
-  'dom/dataset/designer-dataset-flow-dom.ts',
-  'dom/designer-variables-editor-dom.ts',
-  'dom/panel/designer-data-panel-dom.ts',
   'dom/panel/designer-multi-selection-dom.ts',
 ]);
 
@@ -127,4 +117,22 @@ for (const rule of formPrimitiveRules) {
   if (violations.length > 0) {
     throw new Error(`DESIGNER_UI_${rule.id}_FORBIDDEN: ${violations.join(', ')} (${rule.hint})`);
   }
+}
+
+// 债务清单本身必须跟着收缩：某条已不再命中任何规则（或文件已删除）却继续留着，
+// 这道门禁就对「新增」失去敏感度——它只会证明历史，不再约束现在。条目只在迁移
+// 完成时删除，不允许长期挂空。
+const staleFormPrimitiveDebt = [...formPrimitiveDebt].filter((relative) => {
+  const file = join(browserRoot, relative);
+  if (!existsSync(file)) {
+    return true;
+  }
+  const source = readFileSync(file, 'utf8');
+  return !formPrimitiveRules.some((rule) => rule.pattern.test(source));
+});
+
+if (staleFormPrimitiveDebt.length > 0) {
+  throw new Error(
+    `DESIGNER_UI_FORM_PRIMITIVE_DEBT_STALE: ${staleFormPrimitiveDebt.join(', ')} (迁移完成后请从 formPrimitiveDebt 删除对应行)`,
+  );
 }

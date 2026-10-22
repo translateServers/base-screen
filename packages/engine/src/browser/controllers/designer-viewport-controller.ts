@@ -5,6 +5,7 @@ import {
   type ScreenViewportState,
 } from '@base-screen/core';
 import { DESIGNER_TOOLS, type DesignerToolId } from '../../common/tools/designer-tools.js';
+import { isEditableTarget } from '../dom/designer-editable-target.js';
 import { designerToolGlyph } from '../dom/workspace/designer-workspace.js';
 import {
   clientPointToDesignerCanvasPoint,
@@ -250,7 +251,7 @@ export class DesignerViewportController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
-    if (isEditable(event.target)) return false;
+    if (isEditableTarget(event.target)) return false;
     if (event.code === 'Space') {
       // 即使是按住空格重复触发（连续平移），也必须阻止浏览器默认滚动，
       // 否则焦点容器上的空格会滚动页面，干扰快捷键平移。
@@ -275,7 +276,7 @@ export class DesignerViewportController {
    * 可编辑目标（输入框/内容可编辑）保留原生空格输入。
    */
   onWindowKeyDown(event: KeyboardEvent): boolean {
-    if (event.code !== 'Space' || !this.#hovered || isEditable(event.target)) return false;
+    if (event.code !== 'Space' || !this.#hovered || isEditableTarget(event.target)) return false;
     event.preventDefault();
     this.#spacePressed = true;
     this.render();
@@ -307,13 +308,4 @@ export class DesignerViewportController {
 function getParentNode(element: Element | undefined): ParentNode | null {
   const root = element?.getRootNode();
   return root instanceof Document || root instanceof DocumentFragment ? root : null;
-}
-
-function isEditable(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLSelectElement ||
-    target instanceof HTMLTextAreaElement ||
-    (target instanceof HTMLElement && target.isContentEditable)
-  );
 }

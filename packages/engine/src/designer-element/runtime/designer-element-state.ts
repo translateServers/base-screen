@@ -24,7 +24,6 @@ import { DesignerDatasetController } from '../../browser/controllers/dataset/des
 import type { DesignerAutoWidthController } from '../../browser/controllers/designer-auto-width-controller.js';
 import { DesignerCanvasRuntimeController } from '../../browser/controllers/designer-canvas-runtime-controller.js';
 import { DesignerCommandPaletteController } from '../../browser/controllers/designer-command-palette-controller.js';
-import { DesignerCoordinateEntryController } from '../../browser/controllers/designer-coordinate-entry-controller.js';
 import { DesignerErrorConsoleController } from '../../browser/controllers/designer-error-console-controller.js';
 import { DesignerImportController } from '../../browser/controllers/designer-import-controller.js';
 import { DesignerIntegrationController } from '../../browser/controllers/designer-integration-controller.js';
@@ -32,17 +31,18 @@ import { DesignerLeftPanelGroupEventController } from '../../browser/controllers
 import { DesignerNotificationController } from '../../browser/controllers/designer-notification-controller.js';
 import { DesignerPreviewController } from '../../browser/controllers/designer-preview-controller.js';
 import { DesignerScrollContinuityController } from '../../browser/controllers/designer-scroll-continuity-controller.js';
-import { DesignerSizeEntryController } from '../../browser/controllers/designer-size-entry-controller.js';
 import { DesignerTextEditController } from '../../browser/controllers/designer-text-edit-controller.js';
 import { DesignerTooltipController } from '../../browser/controllers/designer-tooltip-controller.js';
 import { DesignerTopbarController } from '../../browser/controllers/designer-topbar-controller.js';
-import { DesignerVariablesController } from '../../browser/controllers/designer-variables-controller.js';
 import { DesignerViewportController } from '../../browser/controllers/designer-viewport-controller.js';
+import { DesignerCoordinateEntryController } from '../../browser/controllers/entry/designer-coordinate-entry-controller.js';
+import { DesignerSizeEntryController } from '../../browser/controllers/entry/designer-size-entry-controller.js';
 import { DesignerGestureController } from '../../browser/controllers/gesture/designer-gesture-controller.js';
 import { DesignerLayersController } from '../../browser/controllers/layers/designer-layers-controller.js';
 import { DesignerPanelController } from '../../browser/controllers/panel/designer-panel-controller.js';
 import { DesignerProjectFeedbackController } from '../../browser/controllers/project/designer-project-feedback-controller.js';
 import { DesignerProjectWorkspaceController } from '../../browser/controllers/project/designer-project-workspace-controller.js';
+import { DesignerVariablesController } from '../../browser/controllers/variables/designer-variables-controller.js';
 import { DesignerWorkbenchController } from '../../browser/controllers/workbench/designer-workbench-controller.js';
 import { DesignerEventSystem } from '../../browser/dom/designer-event-system.js';
 import {

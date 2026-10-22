@@ -17,6 +17,7 @@ import {
   validateBaseScreenMaterialProps,
   validateBaseScreenMaterialStyle,
 } from '@base-screen/plugin-core';
+import { isBoundedName } from '../designer-name-validation.js';
 import { roundScreenGeometry } from '../element/designer-geometry.js';
 import {
   createMaterialComponent,
@@ -423,7 +424,10 @@ function parseFragmentEntry(
       [...path, 'materialType'],
     );
   }
-  if (candidate.name !== undefined && !isBoundedName(candidate.name)) {
+  if (
+    candidate.name !== undefined &&
+    !isBoundedName(candidate.name, MAX_FRAGMENT_NAME_CODE_POINTS)
+  ) {
     return failure(
       'AUTHORING_PAYLOAD_INVALID',
       `Fragment entry name must contain 1 to ${MAX_FRAGMENT_NAME_CODE_POINTS} code points without control characters.`,
@@ -531,15 +535,6 @@ function clamp(value: number, minimum: number, maximum: number): number {
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isBoundedName(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /\S/.test(value) &&
-    !/[\u0000-\u001f\u007f-\u009f]/u.test(value) &&
-    [...value].length <= MAX_FRAGMENT_NAME_CODE_POINTS
-  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

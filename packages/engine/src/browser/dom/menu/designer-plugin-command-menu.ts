@@ -1,5 +1,6 @@
 import type { DesignerPluginCommandItem } from '../../../common/operations/plugin/designer-plugin-commands.js';
 import { designerIcon } from '../../ui/designer-icons.js';
+import { escapeHtml } from '../designer-html-escape.js';
 import type { DesignerMenuControllerCallbacks } from './designer-menu-model.js';
 
 export function renderPluginToolsMenu(
@@ -34,7 +35,7 @@ export function pluginCommandMenuSection(
   const label =
     options.label === undefined
       ? ''
-      : `<div class="designer-menu-section-label" role="presentation">${escapeMenuText(options.label)}</div>`;
+      : `<div class="designer-menu-section-label" role="presentation">${escapeHtml(options.label)}</div>`;
   return `<div class="designer-menu-separator" data-menu-separator role="separator"></div>${label}${items
     .map((item) => pluginCommandMenuButton(item, options))
     .join('')}`;
@@ -44,10 +45,10 @@ export function pluginCommandMenuButton(
   item: DesignerPluginCommandItem,
   options: { readonly context?: boolean } = {},
 ): string {
-  const shortcut = item.shortcut === undefined ? '' : `<kbd>${escapeMenuText(item.shortcut)}</kbd>`;
+  const shortcut = item.shortcut === undefined ? '' : `<kbd>${escapeHtml(item.shortcut)}</kbd>`;
   const disabled = item.disabled ? ' disabled' : '';
-  const id = escapeMenuText(item.id);
-  const name = escapeMenuText(item.name);
+  const id = escapeHtml(item.id);
+  const name = escapeHtml(item.name);
   const icon =
     options.context === true
       ? `<span class="menu-item-icon" aria-hidden="true"><span class="menu-item-glyph">${designerIcon('sparkle')}</span></span>`
@@ -61,13 +62,4 @@ export function pluginCommandMenuButton(
     ` data-plugin-command="${id}" role="menuitem"${disabled}>` +
     `${icon}${label}${shortcut}</button>`
   );
-}
-
-function escapeMenuText(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
 }

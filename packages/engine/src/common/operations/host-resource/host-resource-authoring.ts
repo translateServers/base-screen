@@ -11,6 +11,7 @@ import {
   type ScreenPosition,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
+import { isBoundedName } from '../designer-name-validation.js';
 import {
   clipMaterialPositionToCanvas,
   createMaterialComponent,
@@ -57,7 +58,7 @@ export function parseBaseScreenHostResourceAuthoringIntent(
       ['materialType'],
     );
   }
-  if (input.name !== undefined && !isBoundedName(input.name)) {
+  if (input.name !== undefined && !isBoundedName(input.name, MAX_HOST_RESOURCE_NAME_CODE_POINTS)) {
     return failure(
       'AUTHORING_PAYLOAD_INVALID',
       `Host resource name must contain 1 to ${MAX_HOST_RESOURCE_NAME_CODE_POINTS} code points without control characters.`,
@@ -194,15 +195,6 @@ function containsForbiddenTransportData(value: unknown): boolean {
   if (!isRecord(value)) return false;
   return Object.entries(value).some(
     ([key, child]) => FORBIDDEN_TRANSPORT_FIELD.test(key) || containsForbiddenTransportData(child),
-  );
-}
-
-function isBoundedName(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /\S/.test(value) &&
-    !/[\u0000-\u001f\u007f-\u009f]/u.test(value) &&
-    [...value].length <= MAX_HOST_RESOURCE_NAME_CODE_POINTS
   );
 }
 

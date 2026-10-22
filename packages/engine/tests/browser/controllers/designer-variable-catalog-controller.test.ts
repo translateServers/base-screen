@@ -6,7 +6,7 @@ import type {
   ScreenVariable,
 } from '@base-screen/contracts';
 import { describe, expect, it } from 'vitest';
-import { DesignerVariableCatalogController } from '../../../src/browser/controllers/designer-variable-catalog-controller.js';
+import { DesignerVariableCatalogController } from '../../../src/browser/controllers/variables/designer-variable-catalog-controller.js';
 import {
   type DesignerVariableView,
   readDesignerVariableView,

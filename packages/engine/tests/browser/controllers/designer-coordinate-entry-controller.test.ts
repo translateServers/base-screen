@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DesignerCoordinateEntryController,
   placeDesignerCoordinateEntry,
-} from '../../../src/browser/controllers/designer-coordinate-entry-controller.js';
-import { DesignerSizeEntryController } from '../../../src/browser/controllers/designer-size-entry-controller.js';
+} from '../../../src/browser/controllers/entry/designer-coordinate-entry-controller.js';
+import { DesignerSizeEntryController } from '../../../src/browser/controllers/entry/designer-size-entry-controller.js';
 
 interface TestRect {
   readonly left: number;

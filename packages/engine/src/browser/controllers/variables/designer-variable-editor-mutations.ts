@@ -10,12 +10,12 @@ import {
   nextDesignerVariableId,
   normalizeDesignerVariableDescription,
   parseDesignerStaticVariableValue,
-} from '../../common/operations/designer-variable-editing.js';
+} from '../../../common/operations/designer-variable-editing.js';
 import {
   isVariableNameTaken,
   isVariableReferenced,
-} from '../../common/operations/designer-variable-operations.js';
-import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+} from '../../../common/operations/designer-variable-operations.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 
 export interface DesignerVariableBuildDraft {
   readonly variables: readonly ScreenVariableEntry[];

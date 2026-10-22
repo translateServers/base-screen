@@ -12,6 +12,7 @@ import type {
   BaseScreenMaterialEventDescriptor,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import { hasDesignerBlueprintCapability } from '../../../common/operations/blueprint/designer-blueprint-capabilities.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { createDesignerButton } from '../designer-ui-primitives.js';
 
@@ -52,7 +53,7 @@ export function renderDesignerEventsPanel(
   const preferenceContext = document?.components.find((item) => item.id === focused)?.type;
   const events = getDesignerFocusedMaterialEvents(document, interaction, catalog);
   const descriptors = getDesignerFocusedEventDescriptors(document, interaction, catalog);
-  const capabilityAvailable = hasCapability(
+  const capabilityAvailable = hasDesignerBlueprintCapability(
     runtimeContributions,
     SCREEN_BLUEPRINT_CAPABILITIES.materialEvent,
   );
@@ -124,7 +125,10 @@ function appendInteractionEventGroup(
     header.append(identity, state);
     event.appendChild(header);
     if (descriptor?.requiredCapability !== undefined) {
-      const required = hasCapability(runtimeContributions, descriptor.requiredCapability);
+      const required = hasDesignerBlueprintCapability(
+        runtimeContributions,
+        descriptor.requiredCapability,
+      );
       const status = panel.ownerDocument.createElement('p');
       status.className = required ? 'designer-capability-ok' : 'designer-capability-missing';
       status.textContent = required
@@ -320,15 +324,4 @@ function appendSection(parent: HTMLElement, title: string): HTMLElement {
 
 function createButton(ownerDocument: Document, label: string): HTMLButtonElement {
   return createDesignerButton(ownerDocument, { text: label, tip: label });
-}
-
-function hasCapability(
-  runtimeContributions: BaseScreenRuntimeContributionIndex | undefined,
-  capability: string,
-): boolean {
-  try {
-    return runtimeContributions?.hasBlueprintCapability(capability) === true;
-  } catch {
-    return false;
-  }
 }

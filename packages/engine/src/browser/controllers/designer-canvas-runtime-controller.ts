@@ -21,7 +21,7 @@ import {
 import type { BaseScreenRuntimeContributionIndex } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialEvent, BaseScreenRenderer } from '@base-screen/renderer';
 import { readDesignerVariableViews } from '../../common/operations/designer-variable-view.js';
-import { DesignerCanvasVariableController } from './designer-canvas-variable-controller.js';
+import { DesignerCanvasVariableController } from './variables/designer-canvas-variable-controller.js';
 
 export interface DesignerCanvasRuntimeControllerCallbacks {
   readonly getRenderer: () => BaseScreenRenderer | undefined;

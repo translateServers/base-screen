@@ -8,6 +8,7 @@ import {
   type ScreenPosition,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
+import { isBoundedName } from '../designer-name-validation.js';
 import { roundScreenGeometry } from '../element/designer-geometry.js';
 
 /**
@@ -161,7 +162,7 @@ export function parseBaseScreenComponentInsertionIntent(
       ['materialType'],
     );
   }
-  if (input.name !== undefined && !isBoundedName(input.name)) {
+  if (input.name !== undefined && !isBoundedName(input.name, MAX_INSERTION_NAME_CODE_POINTS)) {
     return failure(
       'AUTHORING_PAYLOAD_INVALID',
       `Component name must contain 1 to ${MAX_INSERTION_NAME_CODE_POINTS} code points without control characters.`,
@@ -225,15 +226,6 @@ export function validateInsertableMaterial(
 
 function isFiniteCoordinate(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isBoundedName(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /\S/.test(value) &&
-    !/[\u0000-\u001f\u007f-\u009f]/u.test(value) &&
-    [...value].length <= MAX_INSERTION_NAME_CODE_POINTS
-  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

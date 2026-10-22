@@ -12,7 +12,7 @@ import type { BaseScreenRenderer } from '@base-screen/renderer';
 import {
   type DesignerVariableView,
   readDesignerVariableViews,
-} from '../../common/operations/designer-variable-view.js';
+} from '../../../common/operations/designer-variable-view.js';
 
 const HOST_VARIABLE_TIMEOUT_MS = 15_000;
 const HOST_VARIABLE_VALUE_BYTES = 1024 * 1024;

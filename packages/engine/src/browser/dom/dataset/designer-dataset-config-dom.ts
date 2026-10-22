@@ -1,13 +1,13 @@
 import type { ScreenDatasetDefinition, ScreenValueRef } from '@base-screen/contracts';
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import {
-  datasetParameterPickerInput,
-  mountValueRefPicker,
-} from '../../controllers/value-ref/designer-value-ref-picker-controller.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { createDesignerSegmented, createDesignerSelect } from '../designer-ui-primitives.js';
+import {
+  datasetParameterPickerInput,
+  mountValueRefPicker,
+} from '../value-ref/designer-value-ref-picker-mount.js';
 import { createDataGroup } from './designer-data-group-dom.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import { renderHostHealth } from './designer-dataset-catalog-dom.js';

@@ -1,29 +1,17 @@
-import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
-import type { ScreenDocumentTransaction, ScreenInteractionState } from '@base-screen/core';
-import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import {
   createDesignerCoordinateEntryTransaction,
   type DesignerCoordinateAxis,
   getDesignerCoordinateEntryTarget,
   parseDesignerCoordinateEntry,
-} from '../../common/operations/element/designer-coordinate-entry.js';
-import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
+} from '../../../common/operations/element/designer-coordinate-entry.js';
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import type { DesignerEntryHostCallbacks } from './designer-entry-host-callbacks.js';
 import {
   DesignerPairEntryController,
   type DesignerPairEntryPlacement,
 } from './designer-pair-entry-controller.js';
 
-export interface DesignerCoordinateEntryControllerCallbacks {
-  readonly getRoot: () => ShadowRoot | null;
-  readonly getDocument: () => ScreenDocument | undefined;
-  readonly getInteraction: () => ScreenInteractionState;
-  readonly getCatalog: () => BaseScreenMaterialCatalog | undefined;
-  readonly executeTransaction: (
-    transaction: ScreenDocumentTransaction,
-  ) => ScreenParseResult<ScreenDocument>;
-  readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
-  readonly focusViewport: () => void;
-}
+export type DesignerCoordinateEntryControllerCallbacks = DesignerEntryHostCallbacks;
 
 export type DesignerCoordinateEntryPlacement = DesignerPairEntryPlacement;
 

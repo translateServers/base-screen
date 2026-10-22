@@ -212,8 +212,6 @@ const importantBaseline = {
   'base/designer-base-menus.css': 1,
   'workbench/designer-workbench-accessibility.css': 1,
   'workbench/designer-workbench-blueprint-surface.css': 1,
-  'workbench/designer-workbench-canvas.css': 1,
-  'workbench/designer-workbench-inspector-data.css': 3,
   'workbench/designer-workbench-inspector.css': 7,
   'workbench/designer-workbench-panels.css': 2,
   'workbench/designer-workbench-shell.css': 1,

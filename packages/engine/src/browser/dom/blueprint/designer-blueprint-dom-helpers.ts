@@ -1,12 +1,3 @@
-export function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
-
-export function escapeAttribute(value: string): string {
-  return escapeHtml(value);
-}
+// 转义实现的真实来源在 `../designer-html-escape.js`；这里保留导出路径是因为
+// blueprint 域的三个模块都从本文件导入，改指向属于无收益的翻动。
+export { escapeAttribute, escapeHtml } from '../designer-html-escape.js';
