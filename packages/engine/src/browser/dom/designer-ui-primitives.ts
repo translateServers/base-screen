@@ -81,6 +81,91 @@ export interface CreateDesignerTextareaOptions {
   readonly value?: string;
 }
 
+export interface DesignerSegmentedOption {
+  readonly value: string;
+  /** 可见文本；仅图标时作为可访问名称的兜底。 */
+  readonly label: string;
+  readonly ariaLabel?: string;
+  readonly title?: string;
+  /** 设计器统一 tooltip（data-tip）；与原生 title 分开，避免两套悬浮提示。 */
+  readonly tip?: string;
+  readonly className?: string;
+  readonly dataset?: Readonly<Record<string, string>>;
+  readonly disabled?: boolean;
+  readonly icon?: DesignerIconName;
+}
+
+export interface CreateDesignerSegmentedOptions {
+  readonly ariaLabel: string;
+  readonly className?: string;
+  readonly options: readonly DesignerSegmentedOption[];
+  readonly selected: string | undefined;
+  /** `pressed`：单选按钮组（aria-pressed）；`radio`：radiogroup + 漫游 tabindex。 */
+  readonly selection?: 'pressed' | 'radio';
+}
+
+export interface DesignerSegmentedHandle {
+  readonly element: HTMLSpanElement;
+  readonly buttons: ReadonlyMap<string, HTMLButtonElement>;
+}
+
+/**
+ * 分段控件（原型 .segmented）：轨道 + 选项按钮，选中态用 aria 表达。
+ *
+ * 只负责结构与状态投影，不接管点击：调用方照旧用事件委托或按钮引用接线，
+ * 因此既有 `data-*` 命令管线不受影响。radio 语义自动做 roving tabindex
+ * （选中项优先，否则第一个可用项），pressed 语义保持全部可 Tab。
+ */
+export function createDesignerSegmented(
+  ownerDocument: Document,
+  options: CreateDesignerSegmentedOptions,
+): DesignerSegmentedHandle {
+  const selection = options.selection ?? 'pressed';
+  const element = ownerDocument.createElement('span');
+  element.className = designerClassNames('designer-segmented', options.className);
+  element.setAttribute('role', selection === 'radio' ? 'radiogroup' : 'group');
+  element.setAttribute('aria-label', options.ariaLabel);
+  const enabled = options.options.filter((option) => option.disabled !== true);
+  const tabbable =
+    selection === 'radio'
+      ? (enabled.find((option) => option.value === options.selected) ?? enabled[0])?.value
+      : undefined;
+  const buttons = new Map<string, HTMLButtonElement>();
+  for (const option of options.options) {
+    const button = ownerDocument.createElement('button');
+    button.type = 'button';
+    button.className = designerClassNames('designer-segmented-option', option.className);
+    if (option.icon === undefined) {
+      button.textContent = option.label;
+    } else {
+      button.innerHTML = designerIcon(option.icon);
+      button.setAttribute('aria-label', option.ariaLabel ?? option.label);
+    }
+    if (option.title !== undefined) button.title = option.title;
+    if (option.tip !== undefined) button.setAttribute('data-tip', option.tip);
+    if (option.icon === undefined && option.ariaLabel !== undefined) {
+      button.setAttribute('aria-label', option.ariaLabel);
+    }
+    for (const [key, value] of Object.entries(option.dataset ?? {})) {
+      button.dataset[key] = value;
+    }
+    if (option.disabled === true) {
+      button.disabled = true;
+      button.setAttribute('aria-disabled', 'true');
+    }
+    if (selection === 'radio') {
+      button.setAttribute('role', 'radio');
+      button.setAttribute('aria-checked', String(option.value === options.selected));
+      button.tabIndex = option.value === tabbable ? 0 : -1;
+    } else {
+      button.setAttribute('aria-pressed', String(option.value === options.selected));
+    }
+    element.appendChild(button);
+    buttons.set(option.value, button);
+  }
+  return { element, buttons };
+}
+
 export function createDesignerButton(
   ownerDocument: Document,
   options: CreateDesignerButtonOptions = {},

@@ -7,7 +7,7 @@ import {
 } from '../../controllers/value-ref/designer-value-ref-picker-controller.js';
 import { designerIcon } from '../../ui/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
-import { createDesignerSelect } from '../designer-ui-primitives.js';
+import { createDesignerSegmented, createDesignerSelect } from '../designer-ui-primitives.js';
 import { createDataGroup } from './designer-data-group-dom.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
 import {
@@ -235,26 +235,27 @@ function renderParameters(
       required.textContent = '*';
       labelText.appendChild(required);
     }
-    const modeGroup = ownerDocument.createElement('div');
-    modeGroup.className = 'designer-segmented designer-dataset-parameter-mode';
-    modeGroup.setAttribute('role', 'group');
-    modeGroup.setAttribute(
-      'aria-label',
-      DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label),
-    );
-    const fixedButton = parameterModeButton(
-      ownerDocument,
-      'inline',
-      DESIGNER_UI_TEXT.dataset.literal,
-      mode === 'inline',
-    );
-    const variableButton = parameterModeButton(
-      ownerDocument,
-      'variable',
-      DESIGNER_UI_TEXT.dataset.variable,
-      mode === 'variable',
-    );
-    modeGroup.append(fixedButton, variableButton);
+    const { element: modeGroup, buttons: modeButtons } = createDesignerSegmented(ownerDocument, {
+      ariaLabel: DESIGNER_UI_TEXT.dataset.parameterModeLabel(parameter.label),
+      className: 'designer-dataset-parameter-mode',
+      selected: mode,
+      options: [
+        {
+          value: 'inline',
+          label: DESIGNER_UI_TEXT.dataset.literal,
+          className: 'designer-dataset-parameter-mode-option',
+          dataset: { datasetParameterMode: 'inline' },
+        },
+        {
+          value: 'variable',
+          label: DESIGNER_UI_TEXT.dataset.variable,
+          className: 'designer-dataset-parameter-mode-option',
+          dataset: { datasetParameterMode: 'variable' },
+        },
+      ],
+    });
+    const fixedButton = modeButtons.get('inline')!;
+    const variableButton = modeButtons.get('variable')!;
     head.append(labelText, modeGroup);
 
     const control = ownerDocument.createElement('div');
@@ -335,21 +336,6 @@ function renderParameters(
     section.appendChild(field);
   }
   return section;
-}
-
-function parameterModeButton(
-  ownerDocument: Document,
-  mode: 'inline' | 'variable',
-  label: string,
-  pressed: boolean,
-): HTMLButtonElement {
-  const button = ownerDocument.createElement('button');
-  button.type = 'button';
-  button.className = 'designer-segmented-option designer-dataset-parameter-mode-option';
-  button.dataset.datasetParameterMode = mode;
-  button.setAttribute('aria-pressed', String(pressed));
-  button.textContent = label;
-  return button;
 }
 
 /**

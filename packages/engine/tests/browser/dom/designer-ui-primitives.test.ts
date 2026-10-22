@@ -5,6 +5,7 @@ import {
   createDesignerCheckbox,
   createDesignerIconButton,
   createDesignerInput,
+  createDesignerSegmented,
   createDesignerSelect,
   createDesignerSwitch,
   createDesignerTextarea,
@@ -153,6 +154,77 @@ describe('private designer UI primitives', () => {
     expect(on.ariaLabel).toBe('Show grid');
     expect(off.getAttribute('aria-checked')).toBe('false');
     expect(off.value).toBe('false');
+  });
+
+  it('builds pressed segmented groups with tooltip and dataset hooks', () => {
+    const document = ownerDocument();
+    const { element, buttons } = createDesignerSegmented(document, {
+      ariaLabel: '水平对齐',
+      className: 'align-group',
+      selected: 'left',
+      options: [
+        {
+          value: 'left',
+          label: '左对齐',
+          className: 'designer-control designer-button',
+          dataset: { segmentedValue: 'left' },
+          tip: '左对齐',
+        },
+        { value: 'center', label: '居中', dataset: { segmentedValue: 'center' } },
+      ],
+    });
+
+    expect(element.tagName).toBe('span');
+    expect(element.className).toBe('designer-segmented align-group');
+    expect(element.getAttribute('role')).toBe('group');
+    expect(element.getAttribute('aria-label')).toBe('水平对齐');
+    expect(buttons.get('left')?.getAttribute('aria-pressed')).toBe('true');
+    expect(buttons.get('center')?.getAttribute('aria-pressed')).toBe('false');
+    expect(buttons.get('left')?.dataset.segmentedValue).toBe('left');
+    expect(buttons.get('left')?.getAttribute('data-tip')).toBe('左对齐');
+    expect(buttons.get('left')?.className).toBe(
+      'designer-segmented-option designer-control designer-button',
+    );
+  });
+
+  it('builds radio segmented groups with one roving tab stop', () => {
+    const document = ownerDocument();
+    const { element, buttons } = createDesignerSegmented(document, {
+      ariaLabel: '数据来源',
+      selection: 'radio',
+      selected: 'variable',
+      options: [
+        { value: 'inline', label: '固定值' },
+        { value: 'variable', label: '变量' },
+        { value: 'source', label: '数据源', disabled: true },
+      ],
+    });
+
+    expect(element.getAttribute('role')).toBe('radiogroup');
+    expect(buttons.get('inline')?.getAttribute('role')).toBe('radio');
+    expect(buttons.get('variable')?.getAttribute('aria-checked')).toBe('true');
+    expect(buttons.get('variable')?.tabIndex).toBe(0);
+    expect(buttons.get('inline')?.tabIndex).toBe(-1);
+    expect(buttons.get('source')?.disabled).toBe(true);
+    expect(buttons.get('source')?.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('falls back to the first enabled radio option and supports icon-only options', () => {
+    const document = ownerDocument();
+    const { buttons } = createDesignerSegmented(document, {
+      ariaLabel: '对齐',
+      selection: 'radio',
+      selected: 'missing',
+      options: [
+        { value: 'first', label: '第一' },
+        { value: 'icon', label: '居中', ariaLabel: '居中', icon: 'align-center' },
+      ],
+    });
+
+    expect(buttons.get('first')?.tabIndex).toBe(0);
+    expect(buttons.get('icon')?.tabIndex).toBe(-1);
+    expect(buttons.get('icon')?.innerHTML).toContain('<svg');
+    expect(buttons.get('icon')?.getAttribute('aria-label')).toBe('居中');
   });
 
   it('connects fields, controls, and live validation messages', () => {

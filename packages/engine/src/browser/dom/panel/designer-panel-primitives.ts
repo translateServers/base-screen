@@ -13,10 +13,10 @@ import {
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import {
   appendDesignerFieldMessage,
-  createDesignerButton,
   createDesignerCheckbox,
   createDesignerIconButton,
   createDesignerInput,
+  createDesignerSegmented,
   createDesignerSelect,
   createDesignerSwitch,
   createDesignerTextarea,
@@ -334,10 +334,6 @@ function appendStyleSegmentedControl(
 ): void {
   const ownerDocument = row.field.ownerDocument;
   const current = typeof value === 'string' ? value : String(schema.values[0]);
-  const segmented = ownerDocument.createElement('span');
-  segmented.className = 'designer-segmented';
-  segmented.setAttribute('role', 'group');
-  segmented.setAttribute('aria-label', labelText);
   const select = createDesignerSelect(ownerDocument, {
     ariaLabel: labelText,
     options: schema.values.map((option) => ({
@@ -354,26 +350,25 @@ function appendStyleSegmentedControl(
     center: 'align-center',
     right: 'align-right',
   };
-  for (const optionValue of schema.values.map(String)) {
-    const option = createDesignerButton(ownerDocument, {
+  const { element: segmented, buttons } = createDesignerSegmented(ownerDocument, {
+    ariaLabel: labelText,
+    selected: current,
+    options: schema.values.map(String).map((optionValue) => ({
+      value: optionValue,
+      label: optionValue,
       ariaLabel: optionValue,
-      className: 'designer-segmented-option',
-      pressed: optionValue === current,
-      variant: 'ghost',
-    });
-    option.dataset.segmentedValue = optionValue;
-    option.innerHTML = designerIcon(icons[optionValue] ?? 'align-left');
+      icon: icons[optionValue] ?? 'align-left',
+      className: 'designer-control designer-button',
+      dataset: { variant: 'ghost', segmentedValue: optionValue },
+    })),
+  });
+  for (const [optionValue, option] of buttons) {
     option.addEventListener('click', () => {
       if (select.value === optionValue) return;
       select.value = optionValue;
-      for (const candidate of segmented.querySelectorAll<HTMLButtonElement>(
-        '.designer-segmented-option',
-      )) {
-        candidate.ariaPressed = String(candidate.dataset.segmentedValue === optionValue);
-      }
+      for (const [key, candidate] of buttons) candidate.ariaPressed = String(key === optionValue);
       select.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
     });
-    segmented.appendChild(option);
   }
   row.control.append(segmented, select);
   appendDesignerFieldMessage(row.field, select, `style-${style}`);

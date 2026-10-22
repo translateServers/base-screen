@@ -13,6 +13,7 @@ import {
   appendDesignerFieldMessage,
   createDesignerButton,
   createDesignerInput,
+  createDesignerSegmented,
   createDesignerSelect,
   createDesignerSwitch,
 } from '../designer-ui-primitives.js';
@@ -167,10 +168,6 @@ function appendCanvasScaleField(
     stacked: true,
     className: 'designer-canvas-scale-field',
   });
-  const options = ownerDocument.createElement('span');
-  options.className = 'designer-canvas-scale-options';
-  options.setAttribute('role', 'group');
-  options.setAttribute('aria-label', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode);
   const scaleOptions: readonly [DesignerCanvasScaleMode, string][] = [
     ['fill', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleFill],
     ['fit', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleFit],
@@ -179,17 +176,18 @@ function appendCanvasScaleField(
     ['original', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleOriginal],
     ['none', DESIGNER_UI_TEXT.propertiesPanel.canvasScaleNone],
   ];
-  for (const [value, label] of scaleOptions) {
-    const button = createDesignerButton(ownerDocument, {
-      className: 'designer-canvas-scale-option',
-      text: label,
+  const { element: options } = createDesignerSegmented(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.canvasScaleMode,
+    className: 'designer-canvas-scale-options',
+    selected: settings.scaleMode,
+    options: scaleOptions.map(([value, label]) => ({
+      value,
+      label,
       tip: label,
-      pressed: settings.scaleMode === value,
-    });
-    button.dataset.canvasSetting = 'scaleMode';
-    button.dataset.canvasSettingValue = value;
-    options.appendChild(button);
-  }
+      className: 'designer-control designer-button designer-canvas-scale-option',
+      dataset: { canvasSetting: 'scaleMode', canvasSettingValue: value },
+    })),
+  });
   control.appendChild(options);
   parent.appendChild(field);
 }

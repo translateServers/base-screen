@@ -304,18 +304,6 @@
   line-height: 1.5;
 }
 
-/* 配置态：30px 分段（轨道 2px + 段位 26px），三段等分。
-   几何与选中档都来自共享的 `.designer-segmented`，这里只补"不换行不省略"。 */
-.properties .designer-data-entry-segmented {
-  min-width: 0;
-}
-
-.properties .designer-data-entry-option {
-  padding: 0 var(--designer-space-2);
-  font-size: var(--designer-font-size-sm);
-  white-space: nowrap;
-}
-
 /* 「更换」是数据集卡片里的次级动作：24px 文字按钮（无填充、hover 才出底），
    实心块按钮会跟底部主操作抢同一档视觉重量。 */
 .properties .designer-dataset-summary-header .designer-button[data-dataset-change] {
