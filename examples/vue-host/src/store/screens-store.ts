@@ -46,6 +46,7 @@ export const screensStore = createStore<ScreensState>()((set, get) => ({
       set({ error: result.error.message });
       return null;
     }
+    // 新建成功后不整表重拉：把新项插入本地列表，再交给后端顺序保证。
     set((state) => ({
       screens: [toSummary(result.data.screen), ...state.screens],
       status: 'ready',

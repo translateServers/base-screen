@@ -104,7 +104,7 @@ export interface DatasetListQuery {
   readonly limit?: number;
 }
 
-/** 数据集 query 参数：键是 `doGetParameters` 求值后的纯值（字符串/数字），由调用方拼。 */
+/** 数据集 query 参数：键是基座求值后的纯值（字符串/数字），由调用方拼。 */
 export type DatasetQueryParams = Readonly<Record<string, string | number | undefined>>;
 
 /** 列表筛选（`type` 缺省=all）。 */

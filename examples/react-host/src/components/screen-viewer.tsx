@@ -19,25 +19,6 @@ import { showToast } from './toast';
 
 const logger = createLogger('screen-viewer');
 
-/** `?smoke=1` 时的调试面：只有三个入口，不含端口/文档/URL。 */
-declare global {
-  interface Window {
-    __baseScreenHost?:
-      | {
-          tickNow(): void;
-          refreshNow(): void;
-          status(): {
-            readonly requests: number;
-            readonly failures: number;
-            readonly lastCode: string | undefined;
-            readonly pending: readonly string[];
-            readonly failedComponents: readonly string[];
-          };
-        }
-      | undefined;
-  }
-}
-
 interface FrameState {
   readonly width: number;
   readonly height: number;

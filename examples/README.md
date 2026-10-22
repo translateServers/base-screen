@@ -43,6 +43,30 @@ Vue / Vanilla 用框架无关的 `zustand/vanilla`，分别经 composable 的 `s
 
 Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状态。
 
+### 共享层的「必须逐字一致」与允许差异
+
+三端逐字复制、**改动必须同批落地**的宿主侧逻辑（否则同一用例在不同端结果不同）：
+
+```text
+lib/api-base.ts  lib/api.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
+screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
+screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
+screen/metric-value.ts  screen/project-adapter.ts
+store/screen-session-store.ts  store/screens-store.ts  types.ts
+```
+
+允许的差异只有三类：
+
+- **框架绑定**：React 用 `zustand` 的 `create` + selector，Vue / Vanilla 用 `zustand/vanilla`；
+- **实例标识**：`host-runtime.ts` 的 `INSTANCE_ID`（`vanilla-host` / `react-host` / `vue-host`），供观测区分来源；
+- **框架专有文件**：`lib/dom.ts` 与 `lib/navigation.ts`（Vanilla 自实现路由/助手）、
+  `screen/register.*`、`screen/metric-value-element.ts`（Vanilla 自定义元素）与
+  `metric-value-material.tsx` / `.ts`（React / Vue 物料定义）。
+
+渲染层（`components/` `views/`）按各栈习惯编写，但**对外行为与 DOM 契约必须一致**：三端
+`scripts/smoke.mjs` 是同一份断言集合（逐行同构，只有名称/端口/数据库文件不同），哪一端的
+DOM 契约发生漂移，都会在冒烟里当场失败。
+
 ## 页面与流程（三端一致）
 
 | 路由 | 页面 | 关键行为 |
