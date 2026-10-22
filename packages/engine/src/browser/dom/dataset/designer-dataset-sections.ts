@@ -1,5 +1,9 @@
 import { renderDatasetAuthoring } from './designer-dataset-authoring-dom.js';
-import { renderDatasetCatalog, renderHostConnection } from './designer-dataset-catalog-dom.js';
+import {
+  renderDatasetCatalog,
+  renderDatasetPickerPlaceholder,
+  renderHostConnection,
+} from './designer-dataset-catalog-dom.js';
 import { renderDesignerDatasetConfiguration } from './designer-dataset-config-dom.js';
 import { renderDatasetPreview } from './designer-dataset-preview-dom.js';
 import type {
@@ -44,6 +48,8 @@ export function datasetConfigurationOptions(
     includeActions: false,
     overlayHost: options.overlayHost,
     onSelectParameter: options.onSelectParameter,
+    link: options.link,
+    surface: options.surface,
     instance: options.instance,
     groupOpenOverrides: options.groupOpenOverrides,
     onToggleGroup: options.onToggleGroup,
@@ -66,7 +72,15 @@ export function createDatasetSection(
   if (key === 'preview') return renderDatasetPreview(options.panel.ownerDocument, options);
   if (key === 'authoring') return renderDatasetAuthoring(options);
   // `source`：未选数据集/目录展开时是目录，选完之后是配置。两者互斥、同一段替换。
-  if (options.catalogOpen || options.descriptor === undefined) return renderDatasetCatalog(options);
+  //
+  // 检查器里 `catalogOpen` 只表示**来源浮层开着**（目录列表在浮层里），面板本身仍然渲染配置：
+  // 浮层盖住的是一份已经配置好的面板，关掉就回到原处。工作台没有浮层，仍沿用「目录/配置
+  // 二选一」的老语义。
+  if (options.surface === 'inspector') {
+    if (options.descriptor === undefined) return renderDatasetPickerPlaceholder(options);
+  } else if (options.catalogOpen || options.descriptor === undefined) {
+    return renderDatasetCatalog(options);
+  }
   const configuration = datasetConfigurationOptions(options);
   return configuration === undefined
     ? undefined

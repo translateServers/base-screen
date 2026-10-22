@@ -10,6 +10,7 @@ import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { createDesignerSegmented, createDesignerSelect } from '../designer-ui-primitives.js';
 import { createDataGroup } from './designer-data-group-dom.js';
 import { isDesignerDatasetBindingValid } from './designer-dataset-binding.js';
+import { renderHostHealth } from './designer-dataset-catalog-dom.js';
 import {
   configSection,
   parameterControl,
@@ -105,7 +106,7 @@ export function renderDesignerDatasetConfiguration(
         overrides,
         onToggle: options.onToggleGroup,
       },
-      [renderDatasetSummary(ownerDocument, options.descriptor)],
+      [renderDatasetSummary(ownerDocument, options)],
     ),
     createDataGroup(
       {
@@ -173,8 +174,9 @@ function autoMatchAction(
 
 function renderDatasetSummary(
   ownerDocument: Document,
-  descriptor: ScreenDatasetDefinition,
+  options: DesignerDatasetConfigurationOptions,
 ): HTMLElement {
+  const descriptor = options.descriptor;
   const summary = ownerDocument.createElement('section');
   summary.className = 'designer-dataset-summary';
   summary.dataset.workbenchSection = 'source';
@@ -217,6 +219,11 @@ function renderDatasetSummary(
     description.className = 'designer-dataset-description';
     description.textContent = descriptor.description;
     summary.appendChild(description);
+  }
+  // 检查器把三颗灯放在卡片里（设计稿 `.health`）：它就是「这份来源现在通不通」的答案，
+  // 与卡片内的名称/描述属于同一块信息。工作台另有诊断列（带失败诊断码），这里不再重复。
+  if (options.surface === 'inspector') {
+    summary.appendChild(renderHostHealth(ownerDocument, options.link));
   }
   // 绑定摘要已搬到 `mapping` 组内的「输出字段」一行：它原先嵌在这张卡片里，既与
   // 「字段映射」组内容重复（同义），又形成"卡片套卡片"。信息等价，只是换了位置。

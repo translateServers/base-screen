@@ -83,6 +83,14 @@ export function sectionContentKey(
         model.bindingOpenRoleId ?? null,
         model.roles.map((role) => [role.id, role.minFields, role.maxFields, role.valueTypes]),
         model.variables.map((variable) => [variable.id, variable.name]),
+        // 检查器把三颗通道灯画在来源卡里：状态变了而键不变，灯就会停在旧状态上。
+        // **目录态必须排除**：目录搜索本身就会让 `catalog` 在 loading/ready 之间跳，
+        // 计入键 = 每次按键都整段重建 = 搜索框丢焦点与 IME 组合态（实测见
+        // `BROWSER_HARNESS_DATASET_SEARCH_CONTINUITY_FAILED`）。目录态里卡片不可见，
+        // 灯也不需要跟着变。
+        model.catalogOpen
+          ? 'catalog'
+          : [model.link.catalog.status, model.link.query.status, model.link.variables.status],
       ]);
     case 'preview':
       return stableKey([

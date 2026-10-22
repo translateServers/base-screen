@@ -393,6 +393,62 @@
   white-space: nowrap;
 }
 
+/* 三颗通道灯（目录 / 查询 / 变量）：等宽小字 + 5px 圆点。
+   它回答的是「这份来源现在通不通」，所以只给状态不给诊断码（诊断码在工作台那一列）。 */
+.properties .designer-dataset-health {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px var(--designer-space-3);
+  margin-top: var(--designer-space-2);
+}
+
+.properties .designer-dataset-health-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.properties .designer-dataset-health-item i {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: var(--designer-radius-pill);
+  background: var(--designer-text-muted);
+}
+
+.properties .designer-dataset-health-item[data-link-status="ready"] i {
+  background: var(--designer-success);
+}
+
+.properties .designer-dataset-health-item[data-link-status="loading"] i {
+  background: var(--designer-warning);
+  animation: designer-dataset-health-pulse 1s ease-in-out infinite;
+}
+
+.properties .designer-dataset-health-item[data-link-status="error"] {
+  color: var(--designer-danger);
+}
+
+.properties .designer-dataset-health-item[data-link-status="error"] i {
+  background: var(--designer-danger);
+}
+
+.properties .designer-dataset-health-item[data-link-status="unavailable"] i {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--designer-text-muted);
+}
+
+@keyframes designer-dataset-health-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
 /* ---- 底部操作条：右对齐、auto 宽、accent 实心（dirty）/ 幽灵（clean） ---- */
 
 .properties .designer-datav-data-flow-content .designer-dataset-actions {
@@ -1945,4 +2001,441 @@
 .properties .designer-datav-data-flow-content .designer-static-rows th,
 .properties .designer-datav-data-flow-content .designer-static-rows td {
   min-width: 0;
+}
+
+/* ---- 来源选择浮层（v7 设计稿 .modal-layer / .source-sheet） ---- */
+
+.properties > .designer-source-sheet-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--designer-z-dialog);
+  display: flex;
+  align-items: flex-end;
+  background: var(--designer-surface-scrim);
+}
+
+.designer-source-sheet {
+  display: flex;
+  width: 100%;
+  max-height: min(92%, 620px);
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--designer-radius-overlay) var(--designer-radius-overlay) 0 0;
+  background: var(--designer-surface-panel);
+  box-shadow: var(--designer-shadow-overlay);
+  outline: none;
+}
+
+.designer-source-sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--designer-space-3);
+  padding: 13px 14px 9px;
+}
+
+.designer-source-sheet-head h2 {
+  margin: 0;
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-md);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.designer-source-sheet-close {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--designer-text-muted);
+  cursor: pointer;
+}
+
+.designer-source-sheet-close:hover {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+}
+
+.designer-source-sheet-close svg {
+  width: 12px;
+  height: 12px;
+}
+
+.designer-source-sheet-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--designer-border-subtle);
+}
+
+.designer-source-sheet-tabs button {
+  height: 32px;
+  margin-bottom: -1px;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: transparent;
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-sm);
+  cursor: pointer;
+}
+
+.designer-source-sheet-tabs button:hover {
+  color: var(--designer-text-primary);
+}
+
+.designer-source-sheet-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--designer-text-primary);
+  color: var(--designer-text-primary);
+  font-weight: 500;
+}
+
+.designer-source-sheet-tools {
+  padding: 9px 14px 7px;
+}
+
+.designer-source-sheet-tools[hidden] {
+  display: none;
+}
+
+.designer-source-sheet-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.designer-source-sheet-search-glyph {
+  position: absolute;
+  left: 9px;
+  display: inline-flex;
+  color: var(--designer-text-muted);
+  pointer-events: none;
+}
+
+.designer-source-sheet-search-glyph svg {
+  width: 12px;
+  height: 12px;
+}
+
+.designer-source-sheet-search-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 9px 0 28px;
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-sm);
+  outline: none;
+}
+
+.designer-source-sheet-search-input:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--designer-accent);
+}
+
+.designer-source-sheet-scroll {
+  min-height: 170px;
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 10px 12px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.designer-source-sheet-list {
+  display: grid;
+  gap: 1px;
+}
+
+.designer-source-sheet-item {
+  display: flex;
+  min-height: 46px;
+  align-items: flex-start;
+  gap: var(--designer-space-2);
+  padding: 7px;
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  color: var(--designer-text-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.designer-source-sheet-item:hover {
+  background: var(--designer-surface-control-hover);
+}
+
+.designer-source-sheet-item[aria-pressed="true"] {
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+}
+
+.designer-source-sheet-item-glyph {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: none;
+  place-items: center;
+  margin-top: 1px;
+  border-radius: 4px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
+}
+
+.designer-source-sheet-item-glyph svg {
+  width: 12px;
+  height: 12px;
+}
+
+.designer-source-sheet-item-copy {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.designer-source-sheet-item-copy strong {
+  overflow: hidden;
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-source-sheet-item-copy small {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-source-sheet-empty {
+  padding: 28px 12px;
+  color: var(--designer-text-muted);
+  font-size: var(--designer-font-size-sm);
+  text-align: center;
+}
+
+/* 固定值页签：JSON 文本域占满剩余高度，错误写在域下方（不挤走输入）。 */
+.designer-source-sheet-fixed {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--designer-space-2);
+  padding: 11px 14px 0;
+}
+
+.designer-source-sheet-fixed-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-3);
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 8.5px;
+}
+
+.designer-source-sheet-fixed-area {
+  width: 100%;
+  min-height: 168px;
+  flex: 1;
+  padding: 8px 9px;
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-secondary);
+  font-family: var(--designer-font-family-mono);
+  font-size: 9.5px;
+  line-height: 1.65;
+  outline: none;
+  resize: vertical;
+  tab-size: 2;
+  white-space: pre;
+}
+
+.designer-source-sheet-fixed-area:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--designer-accent);
+}
+
+.designer-source-sheet-foot {
+  display: flex;
+  min-height: 46px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--designer-space-3);
+  padding: 8px 14px;
+  border-top: 1px solid var(--designer-border-subtle);
+  background: var(--designer-surface-panel);
+}
+
+.designer-source-sheet-note {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 8.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-source-sheet-note[data-tone="ok"] {
+  color: var(--designer-success);
+}
+
+.designer-source-sheet-note[data-tone="error"] {
+  color: var(--designer-danger);
+}
+
+.designer-source-sheet-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--designer-space-2);
+}
+
+.designer-source-sheet-link {
+  min-height: 24px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--designer-text-secondary);
+  font-size: 9.5px;
+  cursor: pointer;
+}
+
+.designer-source-sheet-link:hover {
+  color: var(--designer-text-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.designer-source-sheet-primary {
+  min-height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--designer-radius-control);
+  background: var(--designer-button-primary-background);
+  color: var(--designer-text-on-accent);
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.designer-source-sheet-primary:hover:not(:disabled) {
+  background: var(--designer-button-primary-hover);
+}
+
+.designer-source-sheet-primary:disabled {
+  background: var(--designer-surface-control);
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
+}
+
+/* 目录项（设计稿 .catalog-item）：图标列 + 名称/ key / 描述 + 右侧动作。 */
+.properties .designer-dataset-list .designer-dataset-item {
+  display: flex;
+  min-height: 46px;
+  align-items: flex-start;
+  gap: var(--designer-space-2);
+  padding: 7px;
+  border-radius: var(--designer-radius-control);
+  background: transparent;
+  box-shadow: none;
+  text-align: left;
+}
+
+.properties .designer-dataset-list .designer-dataset-item:hover {
+  background: var(--designer-surface-control-hover);
+}
+
+.properties .designer-dataset-list .designer-dataset-item[aria-pressed="true"] {
+  background: var(--designer-surface-control);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+}
+
+.designer-dataset-item-glyph {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: none;
+  place-items: center;
+  margin-top: 1px;
+  border-radius: 4px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-secondary);
+}
+
+.designer-dataset-item-glyph svg {
+  width: 12px;
+  height: 12px;
+}
+
+.designer-dataset-item-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1;
+  gap: 1px;
+}
+
+.designer-dataset-item-name-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.designer-dataset-item-name-line strong {
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-dataset-item-current {
+  flex: none;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 7.5px;
+}
+
+.designer-dataset-item-key,
+.designer-dataset-item-description {
+  overflow: hidden;
+  color: var(--designer-text-muted);
+  font-size: 9.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.designer-dataset-item-key {
+  font-family: var(--designer-font-family-mono);
+  font-size: 8px;
+}
+
+.properties .designer-dataset-list .designer-dataset-item-action {
+  flex: none;
+  margin-top: 4px;
+  color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
+  font-size: 8px;
+}
+
+/* 配置态的取值段没有内容（类型切换已收进来源浮层）：不留空盒子占位。 */
+.properties .designer-data-source-type[data-data-entry-layout="configured"]:empty {
+  display: none;
 }

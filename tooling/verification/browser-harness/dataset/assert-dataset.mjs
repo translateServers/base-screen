@@ -884,26 +884,26 @@ export async function assertDatasetSurface(designer, page) {
   }
   await designer.getByRole('tab', { name: '\u6570\u636e\u6e90', exact: true }).click();
   const dataPanel = designer.locator('[data-inspector-pane=data]');
-  // 绑定方式收进「更换来源」选择器；先展开三入口，再点「接数据源」。
-  await dataPanel.locator('[data-data-source-picker]').click();
-  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'visible' });
-  await dataPanel.locator('[data-data-entry="source"]').click();
-  await dataPanel
-    .locator('[data-data-entry="source"][aria-checked="true"]')
-    .waitFor({ state: 'attached' });
-  const datasetQuery = dataPanel.locator('[data-dataset-query]');
-  const datasetItem = dataPanel.locator('[data-dataset-resource-id="tabular-orders"]');
-  if ((await datasetQuery.count()) === 0) {
-    await dataPanel.locator('[data-dataset-change]').click();
+  // 绑定方式收进来源浮层（v7）：浮层在 `.properties` 上，不在数据 pane 里。
+  const sheet = designer.locator('[data-source-sheet]');
+  await dataPanel.locator('[data-dataset-change]').click();
+  await sheet.waitFor({ state: 'visible' });
+  const datasetTab = sheet.locator('[data-source-sheet-tab="dataset"]');
+  if ((await datasetTab.getAttribute('aria-selected')) !== 'true') {
+    await datasetTab.click();
+    await sheet
+      .locator('[data-source-sheet-tab="dataset"][aria-selected="true"]')
+      .waitFor({ state: 'visible' });
   }
+  const datasetQuery = sheet.locator('[data-dataset-query]');
   if ((await datasetQuery.count()) !== 1) {
-    throw new Error(
-      `BROWSER_HARNESS_DATASET_SEARCH_SURFACE_FAILED:${await dataPanel.textContent()}`,
-    );
+    throw new Error(`BROWSER_HARNESS_DATASET_SEARCH_SURFACE_FAILED:${await sheet.textContent()}`);
   }
+  const datasetItem = sheet.locator('[data-dataset-resource-id="tabular-orders"]');
   await datasetItem.waitFor();
   await datasetItem.click();
   await dataPanel.locator('[data-dataset-descriptor]').waitFor();
+  await sheet.waitFor({ state: 'detached' });
   // 实例三态的**负向**判据：夹具里这个组件已经有派生实例（文档里查得到），所以跳转必须是
   // 可点的 `document` 态——既不能误标 `pending`（会禁用掉一个其实可用的入口），也不能误标
   // `missing`（会显示"引用已失效"）。`pending` 的正向判据在单测里（草稿实例那一组），
@@ -1000,10 +1000,14 @@ export async function assertDatasetSurface(designer, page) {
         authoringSettings.scrollWidth > authoringSettings.clientWidth + 1,
       copyActionDisabled:
         panel.querySelector('[data-dataset-authoring-action="copy-data"]')?.disabled === true,
-      sourceEntry: {
-        checked: panel.querySelector('[data-data-entry="source"]')?.getAttribute('aria-checked'),
-        mode: panel.querySelector('[data-data-entry="source"]')?.dataset.datasetMode,
-        cardCount: panel.querySelectorAll('[data-data-entry]').length,
+      // 来源卡（v7）：名称 / 类型徽标 / 数据集 key 三件套在同一个卡片里。
+      // 旧的「三入口卡片」在配置态已经收进来源浮层，这里不再有 `[data-data-entry]`。
+      sourceCard: {
+        name: panel.querySelector('.designer-dataset-summary-title')?.textContent ?? '',
+        kind: panel.querySelector('.designer-dataset-summary-kind')?.textContent ?? '',
+        key: panel.querySelector('[data-dataset-source-key]')?.textContent ?? '',
+        changeLabel: panel.querySelector('[data-dataset-change]')?.textContent?.trim() ?? '',
+        entryCards: panel.querySelectorAll('[data-data-entry]').length,
       },
       activeStep: flow?.dataset.activeStep,
       layout: flow?.dataset.dataFlowLayout,
@@ -1065,9 +1069,11 @@ export async function assertDatasetSurface(designer, page) {
     !descriptorSurface.detailsGroups.includes('refresh') ||
     descriptorSurface.authoringSettingsHorizontalOverflow ||
     !descriptorSurface.copyActionDisabled ||
-    descriptorSurface.sourceEntry.checked !== 'true' ||
-    descriptorSurface.sourceEntry.mode !== 'dataset' ||
-    descriptorSurface.sourceEntry.cardCount !== 3 ||
+    descriptorSurface.sourceCard.name.length === 0 ||
+    descriptorSurface.sourceCard.kind !== 'TABLE' ||
+    descriptorSurface.sourceCard.key !== 'tabular-orders' ||
+    descriptorSurface.sourceCard.changeLabel !== '更换来源' ||
+    descriptorSurface.sourceCard.entryCards !== 0 ||
     descriptorSurface.layout !== 'continuous' ||
     descriptorSurface.progressBars !== 0 ||
     descriptorSurface.stepButtons !== 0 ||

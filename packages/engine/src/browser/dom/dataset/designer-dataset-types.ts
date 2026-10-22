@@ -10,6 +10,9 @@ import type { ScreenDataBindingRole } from '@base-screen/core';
 import type { BaseScreenMaterialStaticDataDescriptor } from '@base-screen/plugin-core';
 import type { DesignerDataStateView } from './designer-data-state.js';
 
+/** 来源选择浮层的三个页签（v7 设计稿）：数据集 / 变量 / 固定值。 */
+export type DesignerSourcePickerTab = 'dataset' | 'variable' | 'fixed';
+
 export type DesignerDataSourceMode = 'none' | 'static' | 'variable' | 'dataset' | 'host-resource';
 
 /**
@@ -153,6 +156,10 @@ export interface DesignerDataSourcePanelOptions {
   readonly groups?: readonly import('@base-screen/contracts').ScreenDatasetGroup[];
   readonly groupId?: string;
   readonly catalogOpen: boolean;
+  /** 来源选择浮层的当前页签（数据集 / 变量 / 固定值）；`catalogOpen` 为 false 时不渲染。 */
+  readonly sourcePickerTab: DesignerSourcePickerTab;
+  /** 变量页的搜索词。与数据集的查询词分开存：两个页签各自保留自己的过滤条件。 */
+  readonly variableQuery: string;
   readonly items: readonly ScreenDatasetEntry[];
   readonly cursor: string | undefined;
   readonly descriptor: ScreenDatasetDefinition | undefined;
@@ -200,6 +207,10 @@ export interface DesignerDatasetConfigurationOptions {
   readonly includeActions?: boolean;
   readonly overlayHost?: HTMLElement | undefined;
   readonly onSelectParameter?: ((name: string, ref: ScreenValueRef) => void) | undefined;
+  /** 三条宿主通道的状态：检查器把三颗灯画在来源卡里，工作台画在诊断列。 */
+  readonly link: DesignerHostLinkView;
+  /** 挂载表面：决定三颗灯与「只读事实」落在哪一侧。 */
+  readonly surface: DesignerDataSurface;
   /** 引用实例的只读视图（组头摘要取实例名）；未引用实例时为 undefined。 */
   readonly instance?: DesignerDataSourceInstanceView | undefined;
   /** 折叠组开合覆盖表（组构造时唯一重放）。 */

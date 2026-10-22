@@ -237,7 +237,15 @@ export function updateDatasetCatalogResults(context: DesignerDatasetControllerCo
   const panel = context.state.panel;
   if (panel === undefined) return;
   const options = createDatasetPanelOptions(context, panel, 'inspector');
-  for (const root of [panel, context.callbacks.getWorkbenchHost?.()]) {
+  // 结果区可能在来源浮层里（浮层挂在 `.properties`，不是 pane 的子节点）：
+  // 以 `.properties` 为搜索起点，浮层与面板两处都被覆盖。工作台是另一个宿主，单独列。
+  // `panel` 在单测里是鸭子类型替身（没有 `closest`）：取根节点要防御。
+  const panelHost =
+    typeof panel.closest === 'function'
+      ? (panel.closest<HTMLElement>('.properties') ?? panel)
+      : panel;
+  const roots = [panelHost, context.callbacks.getWorkbenchHost?.()];
+  for (const root of roots) {
     for (const results of root?.querySelectorAll<HTMLElement>('[data-dataset-results]') ?? []) {
       results.replaceWith(renderDatasetCatalogResults(options));
     }
@@ -363,6 +371,8 @@ function createDatasetPanelOptions(
       ? {}
       : { groupId: context.catalogController.groupId }),
     catalogOpen: context.state.catalogOpen,
+    sourcePickerTab: context.state.sourcePickerTab,
+    variableQuery: context.state.variableQuery,
     items: context.catalogController.items,
     cursor: context.catalogController.cursor,
     descriptor: context.state.descriptor,

@@ -46,7 +46,6 @@ function renderValueSection(options: DesignerDataSourcePanelOptions): HTMLElemen
   const ownerDocument = options.panel.ownerDocument;
   const section = ownerDocument.createElement('section');
   section.className = 'designer-data-source-type';
-  section.dataset.workbenchSection = 'source';
   section.dataset.dsSection = 'value';
   section.tabIndex = -1;
   const items = designerDataEntryItems({
@@ -59,6 +58,10 @@ function renderValueSection(options: DesignerDataSourcePanelOptions): HTMLElemen
   const layout = dataEntryLayout(options.mode);
   section.dataset.dataEntryLayout = layout;
   if (layout === 'empty') {
+    // 空态这一段**就是**「来源」这一步：工作台步骤导航按 `data-workbench-section` 找滚动目标。
+    // 配置态不给这个标记——它此时是空的（`display:none`），会变成一个 0 尺寸的滚动目标，
+    // 让「滚到 source 段」永远滚不到（实测 `DATASET_SCROLL_NAVIGATION_FAILED`）。
+    section.dataset.workbenchSection = 'source';
     const heading = ownerDocument.createElement('h3');
     heading.className = 'designer-inspector-section-title';
     heading.textContent = DESIGNER_UI_TEXT.data.panel.emptyTitle;
@@ -68,41 +71,11 @@ function renderValueSection(options: DesignerDataSourcePanelOptions): HTMLElemen
     section.append(heading, renderDataEntryGuide(ownerDocument, items), hint);
     return section;
   }
-  section.appendChild(renderSourceBindingRow(ownerDocument, options));
-  // 绑定类型切换收进「更换来源」行；三入口沿用空态那套引导行，不再常驻分段控件。
-  // 该行展开只做就地显隐，避免重绘 value 段（该段由流程渲染器持有，重建会丢焦点）。
-  if (options.mode !== 'host-resource') {
-    const picker = renderDataEntryGuide(ownerDocument, items);
-    picker.hidden = true;
-    picker.dataset.dataSourcePickerPanel = 'true';
-    section.appendChild(picker);
-  }
+  // 配置态：这一段的**唯一**职责（顶部「绑定方式」行与三入口就地展开）已经收进来源浮层。
+  // 段仍然存在——段集合是冻结的，节点身份也被 diff 依赖——但内容为空，
+  // 由样式 `:empty` 折叠成 0 高（见 `.designer-data-source-type:empty`）。
+  section.dataset.inspectorSearchText = '';
   return section;
-}
-
-function renderSourceBindingRow(
-  ownerDocument: Document,
-  options: DesignerDataSourcePanelOptions,
-): HTMLElement {
-  const row = ownerDocument.createElement('div');
-  row.className = 'designer-dataset-source-binding';
-  const label = ownerDocument.createElement('span');
-  label.className = 'designer-dataset-source-binding-label';
-  label.textContent = DESIGNER_UI_TEXT.dataSource.sourceBinding;
-  const value = ownerDocument.createElement('span');
-  value.className = 'designer-dataset-source-binding-value';
-  value.textContent = DESIGNER_UI_TEXT.dataSource.sourceKind(options.mode);
-  row.append(label, value);
-  if (options.mode !== 'host-resource') {
-    const change = ownerDocument.createElement('button');
-    change.type = 'button';
-    change.className = 'designer-control designer-button designer-dataset-source-change';
-    change.dataset.dataSourcePicker = 'true';
-    change.setAttribute('aria-expanded', 'false');
-    change.textContent = DESIGNER_UI_TEXT.dataSource.sourceKindChange;
-    row.appendChild(change);
-  }
-  return row;
 }
 
 function renderStaticSource(options: DesignerDataSourcePanelOptions): HTMLElement {

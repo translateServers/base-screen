@@ -6,6 +6,7 @@ import { renderDataSourceFlow } from './designer-dataset-flow-dom.js';
 import { datasetAction } from './designer-dataset-primitives.js';
 import { createDatasetSection } from './designer-dataset-sections.js';
 import type { DesignerDataSourcePanelOptions } from './designer-dataset-types.js';
+import { renderSourceSheet } from './designer-source-sheet-dom.js';
 
 export type {
   DesignerDataSourceMode,
@@ -18,6 +19,7 @@ export type {
   DesignerDatasetPreviewView,
   DesignerDatasetRefreshStrategy,
   DesignerDatasetWorkbenchStep,
+  DesignerSourcePickerTab,
 } from './designer-dataset-types.js';
 
 export interface DesignerDataSourcePanelSurface {
@@ -50,6 +52,14 @@ export function renderDesignerDataSourcePanel(
   if (actionBar !== null && actionBar !== undefined) actionBar.before(feedback);
   else (content ?? section).appendChild(feedback);
   panel.appendChild(section);
+  // 来源浮层挂在 `.properties` 上而不是 pane 里：它要盖住底部状态条与整页内边距，
+  // 而 pane 是 grid 的一行（盖不住）。pane 每次整块重建，浮层是它的**兄弟**，
+  // 所以每次渲染先清掉上一份，避免「关掉浮层后还留着一层透明的点击遮罩」。
+  const layerHost = panel.closest<HTMLElement>('.properties') ?? panel;
+  for (const stale of layerHost.querySelectorAll('[data-source-sheet]')) stale.remove();
+  if (options.catalogOpen && options.surface === 'inspector') {
+    layerHost.appendChild(renderSourceSheet(options));
+  }
   return { feedback };
 }
 

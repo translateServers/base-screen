@@ -399,6 +399,34 @@ export const DESIGNER_UI_TEXT = {
     requestTitle: '请求参数',
     sourceBinding: '绑定方式',
     sourceChange: '更换来源',
+    /** 来源选择浮层（v7 设计稿 `.source-sheet`）：标题、三页签、搜索与底部动作。 */
+    pickerTitle: '更换数据来源',
+    pickerClose: '关闭来源选择器',
+    pickerCloseAction: '关闭',
+    pickerTabsLabel: '绑定类型',
+    pickerTab: (tab: string) =>
+      ({ dataset: '数据集', variable: '变量', fixed: '固定值' })[tab] ?? tab,
+    pickerSearchDataset: '搜索数据集、字段',
+    pickerSearchVariable: '搜索变量',
+    pickerNoVariables: '宿主还没有提供变量。',
+    pickerNoVariableMatch: '没有匹配的变量。',
+    pickerDatasetCount: (count: number) => `选择后立即应用 · ${count} 个数据集`,
+    pickerVariableCount: (count: number) => `选择后立即应用 · ${count} 个变量`,
+    pickerFixedFormat: 'JSON · 数组',
+    pickerFixedFormatAction: '格式化',
+    pickerFixedAria: '固定值 JSON',
+    pickerFixedIdle: '填写记录数组后应用',
+    pickerFixedApply: '应用固定值',
+    pickerFixedInvalid: 'JSON 语法无效，请检查逗号与括号。',
+    pickerFixedEmpty: '固定值不能为空。',
+    pickerFixedNeedArray: '固定值需为非空记录数组。',
+    pickerFixedNeedRecords: '数组中的每一项都必须是记录对象。',
+    pickerFixedNoFields: '没有可识别的字段。',
+    pickerFixedValid: (rows: number, fields: number) => `JSON 有效 · ${rows} 行 · ${fields} 个字段`,
+    pickerFixedScalar: (type: string) => `固定值需为 ${type} 类型。`,
+    pickerFixedAny: 'JSON 有效',
+    /** 浮层已关闭但还没选来源时，面板背后的占位。 */
+    pickerPlaceholder: '尚未选择数据来源。',
     /** 顶部那行的入口改的是**绑定类型**（数据集 / 固定值 / 变量），与卡片里的「更换来源」
      *  （换数据集）不是同一件事。两个按钮长一样、做不一样的事，是比多一行更糟的问题。 */
     sourceKindChange: '更换绑定方式',
@@ -450,6 +478,10 @@ export const DESIGNER_UI_TEXT = {
     datasetCatalog: '数据集目录',
     dataQuery: '数据查询',
     variablesChannel: '变量解析',
+    /** 来源卡里那排小灯用短名：三个全称在 335px 卡里会折成两行，短名一行放得下。 */
+    datasetCatalogShort: '目录',
+    dataQueryShort: '查询',
+    variablesChannelShort: '变量',
     linkReady: '已接入',
     linkLoading: '连接中…',
     linkError: '连接失败',
@@ -917,6 +949,8 @@ export const DESIGNER_UI_TEXT = {
     bindingRole: (role: string) =>
       ({ columns: '表格列', dimension: '维度', measures: '指标', value: '值' })[role] ?? role,
     currentDataset: '当前数据集',
+    /** 目录项上的「当前」小标（设计稿 .current-tag）。 */
+    currentTag: '当前',
     /** 当前来源卡片的类型徽标：数据集按表格消费，宿主资源才走自定义形态。 */
     kindBadge: 'TABLE',
     use: '使用',

@@ -41,6 +41,8 @@ function options(
     staticPageSize: 10,
     query: '',
     catalogOpen: false,
+    sourcePickerTab: 'dataset',
+    variableQuery: '',
     items: [],
     cursor: undefined,
     descriptor,

@@ -23,6 +23,7 @@ import type {
   DesignerDatasetDraftView,
   DesignerDatasetPreviewView,
   DesignerDatasetWorkbenchStep,
+  DesignerSourcePickerTab,
 } from '../../dom/dataset/designer-dataset-dom.js';
 import { DESIGNER_STATIC_DEFAULT_PAGE_SIZE } from '../../dom/static-data/designer-static-data-pagination.js';
 import type { DesignerDataFlowScrollSync } from './designer-data-flow-scroll-sync.js';
@@ -73,6 +74,10 @@ export class DesignerDatasetControllerState {
   staticPageSize = DESIGNER_STATIC_DEFAULT_PAGE_SIZE;
   workbenchOpen = false;
   catalogOpen = false;
+  /** 来源浮层的当前页签；`catalogOpen` 为 false 时不影响渲染。 */
+  sourcePickerTab: DesignerSourcePickerTab = 'dataset';
+  /** 变量页的搜索词（与数据集查询词分开，两个页签各自保留过滤条件）。 */
+  variableQuery = '';
   feedbackText = '';
   draftDirty = false;
   confirmClose = false;
@@ -115,6 +120,8 @@ export class DesignerDatasetControllerState {
     this.staticPageSize = DESIGNER_STATIC_DEFAULT_PAGE_SIZE;
     this.workbenchOpen = false;
     this.catalogOpen = false;
+    this.sourcePickerTab = 'dataset';
+    this.variableQuery = '';
     this.feedbackText = '';
     this.draftDirty = false;
     this.confirmClose = false;

@@ -1,5 +1,6 @@
 import type { ScreenDatasetEntry } from '@base-screen/contracts';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { designerIcon } from '../../ui/designer-icons.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { createDesignerInput, createDesignerSelect } from '../designer-ui-primitives.js';
 import { createDataGroup } from './designer-data-group-dom.js';
@@ -24,22 +25,14 @@ export function renderHostConnection(options: DesignerDataSourcePanelOptions): H
   ].join(' ');
   const statuses = ownerDocument.createElement('div');
   statuses.className = 'designer-host-connection-statuses';
-  statuses.append(
-    connectionStatus(
-      ownerDocument,
-      DESIGNER_UI_TEXT.dataSource.datasetCatalog,
-      options.link.catalog,
-    ),
-    connectionStatus(ownerDocument, DESIGNER_UI_TEXT.dataSource.dataQuery, options.link.query),
-    connectionStatus(
-      ownerDocument,
-      DESIGNER_UI_TEXT.dataSource.variablesChannel,
-      options.link.variables,
-    ),
-  );
+  statuses.append(...hostConnectionStatuses(ownerDocument, options.link));
   // 段根保留 `data-ds-section="host-link"`，折叠组是段内一层：本段是 `source` 段的**兄弟**，
   // 视觉合组只允许 CSS（`border-top: 0`）。把 details 挪进 source 段会让两块内容落进同一个
   // 替换单元，段边界就没了。
+  //
+  // 检查器里的三颗灯已经画在来源卡里（`renderHostHealth`）：这一段只负责「没接上怎么办」的
+  // 诊断（指引与重试），再画一遍灯就是同一份状态两处显示，收起时还会互相矛盾。
+  const children = options.surface === 'workbench' ? [statuses] : [];
   connection.appendChild(
     createDataGroup(
       {
@@ -52,7 +45,7 @@ export function renderHostConnection(options: DesignerDataSourcePanelOptions): H
         overrides: options.groupOpenOverrides,
         onToggle: options.onToggleGroup,
       },
-      [statuses],
+      children,
     ),
   );
   // 三条通道都没接上时给出接入方式，而不是只留三个灰点让人猜。
@@ -90,6 +83,58 @@ function hasFailedLink(link: DesignerHostLinkView): boolean {
   return [link.catalog, link.query, link.variables].some((channel) => channel.status === 'error');
 }
 
+/** 三通道状态灯：工作台的诊断列与来源卡共用同一组顺序与文案。 */
+function hostConnectionStatuses(
+  ownerDocument: Document,
+  link: DesignerHostLinkView,
+): HTMLElement[] {
+  return [
+    connectionStatus(ownerDocument, DESIGNER_UI_TEXT.dataSource.datasetCatalog, link.catalog),
+    connectionStatus(ownerDocument, DESIGNER_UI_TEXT.dataSource.dataQuery, link.query),
+    connectionStatus(ownerDocument, DESIGNER_UI_TEXT.dataSource.variablesChannel, link.variables),
+  ];
+}
+
+/**
+ * 来源卡里的三颗灯（设计稿 `.health`）：只表达「通没通」。
+ *
+ * 与工作台诊断列的区别是有意的：诊断列要带失败诊断码（宿主排查靠它），来源卡里那行
+ * 只有 60px 高，塞诊断码会把三个通道挤成省略号。完整文案仍挂在 `title`/`aria-label`。
+ */
+export function renderHostHealth(ownerDocument: Document, link: DesignerHostLinkView): HTMLElement {
+  const health = ownerDocument.createElement('div');
+  health.className = 'designer-dataset-health';
+  health.dataset.datasetHealth = 'true';
+  health.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.hostConnection);
+  for (const [label, channel] of [
+    [DESIGNER_UI_TEXT.dataSource.datasetCatalogShort, link.catalog],
+    [DESIGNER_UI_TEXT.dataSource.dataQueryShort, link.query],
+    [DESIGNER_UI_TEXT.dataSource.variablesChannelShort, link.variables],
+  ] as const) {
+    const item = ownerDocument.createElement('span');
+    item.className = 'designer-dataset-health-item';
+    item.dataset.linkStatus = channel.status;
+    item.dataset.state =
+      channel.status === 'ready'
+        ? 'ready'
+        : channel.status === 'loading'
+          ? 'loading'
+          : channel.status === 'error'
+            ? 'error'
+            : 'na';
+    const detail =
+      channel.detail === undefined || channel.detail === '' ? '' : ` · ${channel.detail}`;
+    const text = `${label} · ${linkStatusText(channel.status)}${detail}`;
+    item.title = text;
+    item.setAttribute('aria-label', text);
+    const dot = ownerDocument.createElement('i');
+    dot.setAttribute('aria-hidden', 'true');
+    item.append(dot, label);
+    health.appendChild(item);
+  }
+  return health;
+}
+
 function connectionStatus(
   ownerDocument: Document,
   label: string,
@@ -119,6 +164,34 @@ function linkStatusText(status: DesignerHostLinkStatus): string {
   return DESIGNER_UI_TEXT.dataSource.linkUnavailable;
 }
 
+/**
+ * 检查器里浮层开着、但还没选中数据集时，面板背后的占位。
+ *
+ * 不能沿用「目录列表」：目录已经在浮层里，面板再渲染一份就是同一个列表出现两次。
+ * 这里只留一句结论 + 一个重新打开浮层的入口（浮层被 Esc 关掉后不至于无路可走）。
+ */
+export function renderDatasetPickerPlaceholder(
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement {
+  const ownerDocument = options.panel.ownerDocument;
+  const placeholder = ownerDocument.createElement('section');
+  placeholder.className = 'designer-dataset-browser designer-dataset-picker-placeholder';
+  placeholder.dataset.dsSection = 'source';
+  placeholder.dataset.datasetPickerPlaceholder = 'true';
+  placeholder.dataset.inspectorSearchSection = 'true';
+  placeholder.dataset.inspectorSearchText = DESIGNER_UI_TEXT.dataset.select;
+  const empty = ownerDocument.createElement('p');
+  empty.className = 'designer-empty-state';
+  empty.textContent = DESIGNER_UI_TEXT.dataSource.pickerPlaceholder;
+  const open = ownerDocument.createElement('button');
+  open.type = 'button';
+  open.className = 'designer-control designer-button';
+  open.dataset.datasetChange = 'true';
+  open.textContent = DESIGNER_UI_TEXT.dataSource.sourceChange;
+  placeholder.append(empty, open);
+  return placeholder;
+}
+
 export function renderDatasetCatalog(options: DesignerDataSourcePanelOptions): HTMLElement {
   const browser = options.panel.ownerDocument.createElement('section');
   browser.className = 'designer-dataset-browser';
@@ -141,25 +214,37 @@ export function renderDatasetCatalog(options: DesignerDataSourcePanelOptions): H
   });
   search.dataset.datasetQuery = 'true';
   browser.append(heading);
-  if (options.groups !== undefined && options.groups.length > 0) {
-    const currentGroup = options.groupId ?? '';
-    const groups = createDesignerSelect(options.panel.ownerDocument, {
-      ariaLabel: DESIGNER_UI_TEXT.dataset.group,
-      options: [
-        { label: DESIGNER_UI_TEXT.dataset.allGroups, selected: currentGroup === '', value: '' },
-        ...options.groups.map((group) => ({
-          label: group.name,
-          selected: group.id === currentGroup,
-          value: group.id,
-        })),
-      ],
-      value: currentGroup,
-    });
-    groups.dataset.datasetGroup = 'true';
-    browser.appendChild(enhanceDesignerSelect(groups).element);
-  }
+  const groupSelect = renderDatasetGroupSelect(options);
+  if (groupSelect !== undefined) browser.appendChild(groupSelect);
   browser.append(search, renderDatasetCatalogResults(options));
   return browser;
+}
+
+/**
+ * 宿主分组过滤：两处目录（工作台内联列表 / 检查器来源浮层）共用一份构造。
+ * 宿主没有分组时不渲染——空下拉比没有下拉更让人困惑。
+ */
+export function renderDatasetGroupSelect(
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement | undefined {
+  if (options.groups === undefined || options.groups.length === 0) return undefined;
+  const ownerDocument = options.panel.ownerDocument;
+  const currentGroup = options.groupId ?? '';
+  const groups = createDesignerSelect(ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.dataset.group,
+    className: 'designer-source-sheet-group',
+    options: [
+      { label: DESIGNER_UI_TEXT.dataset.allGroups, selected: currentGroup === '', value: '' },
+      ...options.groups.map((group) => ({
+        label: group.name,
+        selected: group.id === currentGroup,
+        value: group.id,
+      })),
+    ],
+    value: currentGroup,
+  });
+  groups.dataset.datasetGroup = 'true';
+  return enhanceDesignerSelect(groups).element;
 }
 
 /**
@@ -226,20 +311,44 @@ function datasetItem(
   button.type = 'button';
   button.className = 'designer-control designer-button designer-dataset-item';
   button.dataset.datasetResourceId = item.datasetId;
-  button.setAttribute('aria-pressed', String(selected?.datasetId === item.datasetId));
+  const current = selected?.datasetId === item.datasetId;
+  button.setAttribute('aria-pressed', String(current));
   button.setAttribute(
     'aria-label',
     item.description === null ? item.name : item.name + '：' + item.description,
   );
+  // 设计稿 .catalog-item：图标列 + 三行文案（名称 / key / 描述）+ 右侧动作。
+  // 名称行带「当前」标记是必要的：列表里点过项之后，光看高亮分不清是 hover 还是已绑定。
+  const glyph = ownerDocument.createElement('span');
+  glyph.className = 'designer-dataset-item-glyph';
+  glyph.setAttribute('aria-hidden', 'true');
+  glyph.innerHTML = designerIcon('table');
   const content = ownerDocument.createElement('span');
+  content.className = 'designer-dataset-item-copy';
+  const nameLine = ownerDocument.createElement('span');
+  nameLine.className = 'designer-dataset-item-name-line';
   const name = ownerDocument.createElement('strong');
   name.textContent = item.name;
-  const summary = ownerDocument.createElement('small');
-  summary.textContent = item.description ?? '';
-  content.append(name, summary);
-  const select = ownerDocument.createElement('span');
-  select.className = 'designer-dataset-item-action';
-  select.textContent = DESIGNER_UI_TEXT.dataset.use;
-  button.append(content, select);
+  nameLine.appendChild(name);
+  if (current) {
+    const tag = ownerDocument.createElement('span');
+    tag.className = 'designer-dataset-item-current';
+    tag.textContent = DESIGNER_UI_TEXT.dataset.currentTag;
+    nameLine.appendChild(tag);
+  }
+  const key = ownerDocument.createElement('small');
+  key.className = 'designer-dataset-item-key';
+  key.textContent = item.datasetId;
+  content.append(nameLine, key);
+  if (item.description !== null && item.description.length > 0) {
+    const description = ownerDocument.createElement('small');
+    description.className = 'designer-dataset-item-description';
+    description.textContent = item.description;
+    content.appendChild(description);
+  }
+  const action = ownerDocument.createElement('span');
+  action.className = 'designer-dataset-item-action';
+  action.textContent = current ? '' : DESIGNER_UI_TEXT.dataset.use;
+  button.append(glyph, content, action);
   return button;
 }

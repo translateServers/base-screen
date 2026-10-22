@@ -148,22 +148,29 @@ function assertEmptyStateJudge() {
   return cases.length;
 }
 
+/** 打开来源浮层并停在数据集页签（v7：绑定方式收进浮层，面板里不再有入口行）。 */
+export async function openSourceSheet(designer, dataPanel) {
+  await dataPanel.locator('[data-dataset-change]').first().click();
+  const sheet = designer.locator('[data-source-sheet]');
+  await sheet.waitFor({ state: 'visible' });
+  const datasetTab = sheet.locator('[data-source-sheet-tab="dataset"]');
+  if ((await datasetTab.getAttribute('aria-selected')) !== 'true') {
+    await datasetTab.click();
+    await sheet
+      .locator('[data-source-sheet-tab="dataset"][aria-selected="true"]')
+      .waitFor({ state: 'visible' });
+  }
+  return sheet;
+}
+
 async function openDataset(designer, page) {
   const dataPanel = designer.locator(DATA_PANEL);
-  // 绑定方式收进「更换来源」选择器：先展开三入口，再点「接数据源」。
-  await dataPanel.locator('[data-data-source-picker]').click();
-  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'visible' });
-  await dataPanel.locator('[data-data-entry="source"]').click();
-  await dataPanel
-    .locator('[data-data-entry="source"][aria-checked="true"]')
-    .waitFor({ state: 'attached' });
-  if ((await dataPanel.locator('[data-dataset-query]').count()) === 0) {
-    await dataPanel.locator('[data-dataset-change]').click();
-  }
-  const item = dataPanel.locator('[data-dataset-resource-id="tabular-orders"]');
+  const sheet = await openSourceSheet(designer, dataPanel);
+  const item = sheet.locator('[data-dataset-resource-id="tabular-orders"]');
   await item.waitFor();
   await item.click();
   await dataPanel.locator('[data-dataset-descriptor]').waitFor();
+  await sheet.waitFor({ state: 'detached' });
   return dataPanel;
 }
 
@@ -179,37 +186,35 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await designer.getByRole('tab', { name: '数据源', exact: true }).click();
   const dataPanel = await openDataset(designer, page);
 
-  // 2') 配置态的绑定方式：不再常驻三段式，入口是「更换来源」；展开后三行必须是
-  //     输入固定值 / 用变量 / 接数据源，且当前数据源行被选中。
-  await dataPanel.locator('[data-data-source-picker]').click();
-  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'visible' });
-  const pickerSurface = await dataPanel.evaluate((panel) => {
-    const rows = [...panel.querySelectorAll('[data-data-source-picker-panel] [data-data-entry]')];
+  // 2') 配置态的绑定方式：面板里不再有入口行，切换收进来源浮层的三个页签；
+  //     打开时落在「当前来源」那一类页签上（这里是数据集）。
+  const sheet = await openSourceSheet(designer, dataPanel);
+  const pickerSurface = await sheet.evaluate((node) => {
+    const tabs = [...node.querySelectorAll('[data-source-sheet-tab]')].map((tab) => ({
+      key: tab.dataset.sourceSheetTab,
+      label: tab.textContent ?? '',
+      selected: tab.getAttribute('aria-selected'),
+    }));
     return {
-      count: rows.length,
-      rows: rows.map((row) => ({
-        entry: row.dataset.dataEntry,
-        title: row.querySelector('.designer-data-entry-guide-title')?.textContent ?? '',
-        checked: row.getAttribute('aria-checked'),
-        disabled: row.disabled,
-      })),
+      tabs,
+      title: node.querySelector('.designer-source-sheet-head h2')?.textContent ?? '',
+      note: node.querySelector('[data-source-sheet-note]')?.textContent ?? '',
+      scrim: getComputedStyle(node).backgroundColor,
     };
   });
   if (
-    pickerSurface.count !== 3 ||
-    pickerSurface.rows.map((row) => row.title).join('|') !== '输入固定值|用变量|接数据源' ||
-    pickerSurface.rows.find((row) => row.entry === 'source')?.checked !== 'true'
+    pickerSurface.tabs.map((tab) => tab.label).join('|') !== '数据集|变量|固定值' ||
+    pickerSurface.tabs.filter((tab) => tab.selected === 'true').length !== 1 ||
+    pickerSurface.tabs.find((tab) => tab.key === 'dataset')?.selected !== 'true' ||
+    pickerSurface.title !== '更换数据来源'
   ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_SOURCE_PICKER_FAILED:${JSON.stringify(pickerSurface)}`,
     );
   }
-  await dataPanel.locator('[data-data-source-picker]').click();
-  await dataPanel.locator('[data-data-source-picker-panel]').waitFor({ state: 'hidden' });
 
   // 1) 目录搜索：去抖后的回包只换结果区，搜索框保持同一节点、焦点与输入都还在。
-  await dataPanel.locator('[data-dataset-change]').click();
-  const query = dataPanel.locator('[data-dataset-query]');
+  const query = sheet.locator('[data-dataset-query]');
   await query.waitFor();
   await query.click();
   await query.evaluate((node) => {
@@ -217,19 +222,20 @@ export async function assertDatasetPanelInteraction(designer, page) {
   });
   await page.keyboard.type('订单', { delay: 60 });
   await page.waitForTimeout(600);
-  const search = await dataPanel.evaluate((panel) => {
-    const input = panel.querySelector('[data-dataset-query]');
+  const search = await sheet.evaluate((node) => {
+    const input = node.querySelector('[data-dataset-query]');
     return {
       sameNode: input?.dataset.probeNode === 'query',
-      focusKept: panel.getRootNode().activeElement === input,
+      focusKept: node.getRootNode().activeElement === input,
       value: input?.value,
     };
   });
   if (!search.sameNode || !search.focusKept || search.value !== '订单') {
     throw new Error(`BROWSER_HARNESS_DATASET_SEARCH_CONTINUITY_FAILED:${JSON.stringify(search)}`);
   }
-  await dataPanel.locator('[data-dataset-resource-id="tabular-orders"]').click();
+  await sheet.locator('[data-dataset-resource-id="tabular-orders"]').click();
   await dataPanel.locator('[data-dataset-descriptor]').waitFor();
+  await sheet.waitFor({ state: 'detached' });
 
   // 2) 绑定弹层开合与字段切换：只换配置段，焦点跟着回到同一个触发器 / 同一个字段按钮。
   const trigger = dataPanel.locator('[data-dataset-binding-trigger]').first();
@@ -301,14 +307,24 @@ export async function assertDatasetPanelInteraction(designer, page) {
     throw new Error(`BROWSER_HARNESS_DATASET_ACTION_BAR_OVERLAP_FAILED:${JSON.stringify(gutter)}`);
   }
 
-  // 3) 宿主连接：**检查器里三通道全 ready 时不出现**（PRD §6.2：通道正常时是噪声），
-  //    工作台才恒常驻并承担诊断。这条是反向判据，与下面工作台的正向判据成对存在——
-  //    只断一边就会允许「把 host-link 又塞回检查器」或「工作台把诊断列删了」。
+  // 3) 宿主连接：检查器里三通道全 ready 时**没有独立的 host-link 段**（PRD §6.2：通道正常时
+  //    不必占一整段），但三颗灯必须画在来源卡里（设计稿 `.health`）。这两条成对：
+  //    只断「没有段」会允许灯整个消失；只断「有灯」会允许又把整段塞回检查器。
+  //    工作台那一侧是另一组判据（见下方 workbenchSurface）。
   const inspectorLink = await dataPanel.evaluate((panel) => ({
     hostLinkSections: panel.querySelectorAll('[data-ds-section="host-link"]').length,
-    linkStatuses: panel.querySelectorAll('[data-link-status]').length,
+    cardHealth: [...panel.querySelectorAll('[data-details-group="source"] [data-link-status]')].map(
+      (status) => status.dataset.linkStatus,
+    ),
+    strayStatuses: [...panel.querySelectorAll('[data-link-status]')].filter(
+      (status) => status.closest('[data-details-group="source"]') === null,
+    ).length,
   }));
-  if (inspectorLink.hostLinkSections !== 0 || inspectorLink.linkStatuses !== 0) {
+  if (
+    inspectorLink.hostLinkSections !== 0 ||
+    inspectorLink.cardHealth.join('|') !== 'ready|ready|ready' ||
+    inspectorLink.strayStatuses !== 0
+  ) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_HOST_LINK_INSPECTOR_NOISE_FAILED:${JSON.stringify(inspectorLink)}`,
     );
@@ -474,9 +490,11 @@ export async function assertDatasetPanelInteraction(designer, page) {
   await page.waitForTimeout(400);
   const restored = await dataPanel.evaluate((panel) => ({
     entryCount: panel.querySelectorAll('[data-data-entry]').length,
-    pickerHidden: panel.querySelector('[data-data-source-picker-panel]')?.hidden ?? null,
+    hasCard: panel.querySelector('[data-dataset-descriptor]') !== null,
   }));
-  if (restored.pickerHidden !== true || restored.entryCount !== 3) {
+  // 成对判据：空态是 3 行入口、0 张配置卡；配置态反过来。只断一边的话，
+  // 「整个数据页没渲染」也会以 0/0 通过。
+  if (!restored.hasCard || restored.entryCount !== 0) {
     throw new Error(
       `BROWSER_HARNESS_DATASET_EMPTY_STATE_RESTORE_FAILED:${JSON.stringify(restored)}`,
     );

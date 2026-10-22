@@ -1,11 +1,15 @@
+import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type {
   DesignerDataSourceMode,
   DesignerDatasetAuthoringAction,
   DesignerDatasetAuthoringView,
   DesignerDatasetRefreshStrategy,
+  DesignerSourcePickerTab,
 } from '../../dom/dataset/designer-dataset-dom.js';
+import { validateFixedDraft } from '../../dom/dataset/designer-source-sheet-dom.js';
 import type { DesignerDatasetControllerContext } from './designer-dataset-controller-context.js';
 import {
+  applyDatasetDraft,
   autoMatchDatasetBindings,
   describeDataset,
   restoreDatasetControlFocus,
@@ -39,6 +43,18 @@ export function handleDatasetInput(
     syncDataPanelApplyBar(context);
     return true;
   }
+  // 浮层里的两处输入：变量搜索就地过滤（不重建浮层，否则每按一键都丢焦点与 IME 组合态）；
+  // 固定值文本域只写草稿（同样不重绘）。
+  if (target.dataset.datasetVariableQuery !== undefined) {
+    context.state.variableQuery = target.value;
+    filterSourceSheetVariables(context);
+    return true;
+  }
+  if (target.dataset.sourceSheetFixed !== undefined) {
+    context.state.staticDraft = target.value;
+    syncSourceSheetFixed(context, target.value);
+    return true;
+  }
   if (target.dataset.datasetQuery === undefined) return false;
   context.catalogController.updateQuery(target.value);
   return true;
@@ -57,17 +73,6 @@ export function handleDatasetClick(
   ) {
     context.state.clearAutoApply();
   }
-  const pickerToggle = target.closest<HTMLButtonElement>('[data-data-source-picker]');
-  if (pickerToggle !== null) {
-    const section = pickerToggle.closest<HTMLElement>('.designer-data-source-type');
-    const picker = section?.querySelector<HTMLElement>('[data-data-source-picker-panel]');
-    if (picker !== null && picker !== undefined) {
-      const open = picker.hidden;
-      picker.hidden = !open;
-      pickerToggle.setAttribute('aria-expanded', String(open));
-    }
-    return true;
-  }
   const entryCard = target.closest<HTMLButtonElement>('[data-data-entry]');
   if (entryCard !== null) {
     selectDataEntry(context, entryCard);
@@ -83,10 +88,52 @@ export function handleDatasetClick(
     autoMatchDatasetBindings(context);
     return true;
   }
+  // ---- 来源浮层（v7 .source-sheet）：页签 / 关闭 / 选变量 / 固定值 ----
+  const sheetTab = target.closest<HTMLButtonElement>('[data-source-sheet-tab]');
+  if (sheetTab !== null) {
+    const tab = sheetTab.dataset.sourceSheetTab as DesignerSourcePickerTab | undefined;
+    if (tab !== undefined && tab !== context.state.sourcePickerTab) {
+      context.state.sourcePickerTab = tab;
+      context.state.catalogOpen = true;
+      context.renderSurface();
+      focusSourceSheetTab(context, tab);
+    }
+    return true;
+  }
+  if (
+    target.closest('[data-source-sheet-close]') !== null ||
+    // 点遮罩本身才关（点浮层内部不关）。不用 `instanceof Element`：单测把点击目标
+    // 传成鸭子类型的替身，Node 环境里没有 `Element` 全局。
+    target.classList?.contains('designer-source-sheet-layer') === true
+  ) {
+    closeSourceSheet(context);
+    return true;
+  }
+  const sheetVariable = target.closest<HTMLElement>('[data-source-sheet-variable]');
+  if (sheetVariable?.dataset.sourceSheetVariable !== undefined) {
+    pickSourceSheetVariable(context, sheetVariable.dataset.sourceSheetVariable);
+    return true;
+  }
+  if (target.closest('[data-source-sheet-apply-fixed]') !== null) {
+    applySourceSheetFixed(context);
+    return true;
+  }
+  if (target.closest('[data-source-sheet-format]') !== null) {
+    formatSourceSheetFixed(context);
+    return true;
+  }
   if (target.closest('[data-dataset-change]') !== null) {
     context.state.catalogOpen = true;
+    // 打开时落在「当前来源是哪一类」的页签上：已经在用变量的人不该先看到数据集列表。
+    context.state.sourcePickerTab =
+      context.state.mode === 'variable'
+        ? 'variable'
+        : context.state.mode === 'static'
+          ? 'fixed'
+          : 'dataset';
     context.renderSurface();
     context.catalogController.ensureList();
+    focusSourceSheet(context);
     return true;
   }
   if (target.closest('[data-dataset-load-more]') !== null) {
@@ -313,6 +360,147 @@ function handleDatasetAction(context: DesignerDatasetControllerContext, target: 
   return true;
 }
 
+/** 浮层在 `.properties` 里（不是 pane 子节点），焦点找回要走同一棵 shadow root。 */
+function sourceSheetOf(context: DesignerDatasetControllerContext): HTMLElement | null {
+  const root = context.state.panel?.getRootNode?.();
+  // `ShadowRoot` 在 Node 单测环境里不存在：先判全局，再判类型。
+  if (typeof ShadowRoot === 'undefined' || !(root instanceof ShadowRoot)) return null;
+  return root.querySelector<HTMLElement>('[data-source-sheet]');
+}
+
+function focusSourceSheetTab(
+  context: DesignerDatasetControllerContext,
+  tab: DesignerSourcePickerTab,
+): void {
+  sourceSheetOf(context)
+    ?.querySelector<HTMLElement>(`[data-source-sheet-tab="${tab}"]`)
+    ?.focus({ preventScroll: true });
+}
+
+/** 打开浮层后把焦点交给当前页签：Esc / Tab 从这里开始走，不落回面板。 */
+export function focusSourceSheet(context: DesignerDatasetControllerContext): void {
+  focusSourceSheetTab(context, context.state.sourcePickerTab);
+}
+
+function closeSourceSheet(context: DesignerDatasetControllerContext): void {
+  if (!context.state.catalogOpen) return;
+  context.state.catalogOpen = false;
+  context.renderSurface();
+  // 浮层已随重绘消失：焦点交回打开它的那颗「更换来源」，不落回 body。
+  context.state.panel
+    ?.querySelector<HTMLElement>('[data-dataset-change]')
+    ?.focus({ preventScroll: true });
+}
+
+/**
+ * 变量页签选中一枚变量：**选完立即落库**（设计稿「选择后立即应用」）。
+ *
+ * 落库仍走同一条 `applyDatasetDraft`：这里只把模式与选中项摆好，事务构造与校验不在这里复制。
+ */
+function pickSourceSheetVariable(context: DesignerDatasetControllerContext, id: string): void {
+  if (context.state.mode !== 'variable') setSourceMode(context, 'variable');
+  context.state.variableSourceId = id;
+  context.state.draftDirty = true;
+  context.state.catalogOpen = false;
+  applyDatasetDraft(context);
+}
+
+function sheetFixedArea(context: DesignerDatasetControllerContext): HTMLTextAreaElement | null {
+  const area = sourceSheetOf(context)?.querySelector<HTMLTextAreaElement>(
+    '[data-source-sheet-fixed]',
+  );
+  return area ?? null;
+}
+
+/** 固定值脚注 + 主按钮：一处写、两处读（初始渲染与每次输入都走同一个判据）。 */
+function syncSourceSheetFixed(context: DesignerDatasetControllerContext, text: string): void {
+  const sheet = sourceSheetOf(context);
+  if (sheet === null) return;
+  const checked = validateFixedDraft(text, context.currentEntry()?.manifest.staticData);
+  const note = sheet.querySelector<HTMLElement>('[data-source-sheet-note]');
+  if (note !== null) {
+    note.textContent = checked.note;
+    note.dataset.tone = checked.ok ? 'ok' : 'error';
+  }
+  const apply = sheet.querySelector<HTMLButtonElement>('[data-source-sheet-apply-fixed]');
+  if (apply !== null) apply.disabled = !checked.ok;
+}
+
+/**
+ * 固定值页签的「应用固定值」：切到固定值模式 + 用文本域里的 JSON 落库。
+ *
+ * 失败时**不关浮层**：把诊断写在浮层里，输入还留在文本域（关掉浮层等于把用户刚粘的
+ * 一大段 JSON 扔了）。成功才关，面板换成固定值编辑器。
+ */
+function applySourceSheetFixed(context: DesignerDatasetControllerContext): void {
+  const area = sheetFixedArea(context);
+  if (area === null) return;
+  if (!validateFixedDraft(area.value, context.currentEntry()?.manifest.staticData).ok) {
+    syncSourceSheetFixed(context, area.value);
+    return;
+  }
+  const previousMode = context.state.mode;
+  const staticDescriptor = context.currentEntry()?.manifest.staticData;
+  context.state.staticDraft = area.value;
+  // 固定值落库要带**字段绑定**（表格型）：从浮层进来时没有手工绑定面板，先用物料的默认绑定。
+  // 没有默认绑定时留空——事务会报「绑定不完整」，用户在固定值编辑器里补，而不是静默猜一个。
+  if (
+    context.state.staticBinding === undefined &&
+    staticDescriptor?.kind === 'tabular' &&
+    staticDescriptor.defaultBinding !== undefined
+  ) {
+    context.state.staticBinding = staticDescriptor.defaultBinding;
+  }
+  context.state.mode = 'static';
+  applyDatasetDraft(context);
+  const applied = context.currentComponent()?.dataSource?.type === 'static';
+  if (applied) {
+    context.state.catalogOpen = false;
+    context.renderSurface();
+    return;
+  }
+  context.state.mode = previousMode;
+  const note = sourceSheetOf(context)?.querySelector<HTMLElement>('[data-source-sheet-note]');
+  if (note !== null && note !== undefined) {
+    note.textContent = context.state.feedbackText || DESIGNER_UI_TEXT.dataSource.staticInvalid;
+    note.dataset.tone = 'error';
+  }
+  context.renderSurface();
+}
+
+function formatSourceSheetFixed(context: DesignerDatasetControllerContext): void {
+  const area = sheetFixedArea(context);
+  if (area === null) return;
+  try {
+    area.value = JSON.stringify(JSON.parse(area.value), null, 2);
+    context.state.staticDraft = area.value;
+    syncSourceSheetFixed(context, area.value);
+  } catch {
+    syncSourceSheetFixed(context, area.value);
+  }
+}
+
+/**
+ * 变量页签的搜索：**就地隐藏不匹配的行**，不重建列表。
+ *
+ * 重建的代价是焦点与输入法组合态（同目录搜索的老问题），而变量列表最多几十行，
+ * 逐行改 `hidden` 的成本可以忽略。空结果靠「全部隐藏后翻出空态」表达。
+ */
+function filterSourceSheetVariables(context: DesignerDatasetControllerContext): void {
+  const sheet = sourceSheetOf(context);
+  if (sheet === null) return;
+  const query = context.state.variableQuery.trim().toLowerCase();
+  let visible = 0;
+  for (const item of sheet.querySelectorAll<HTMLElement>('[data-source-sheet-variable]')) {
+    const name = item.querySelector('strong')?.textContent ?? '';
+    const matched = query === '' || name.toLowerCase().includes(query);
+    item.hidden = !matched;
+    if (matched) visible += 1;
+  }
+  const empty = sheet.querySelector<HTMLElement>('[data-source-sheet-variable-empty]');
+  if (empty !== null) empty.hidden = visible > 0;
+}
+
 function closeWorkbench(context: DesignerDatasetControllerContext): true {
   if (context.state.mode === 'dataset' && context.state.draftDirty) {
     context.state.confirmClose = true;
@@ -403,6 +591,12 @@ export function handleDatasetKeyDown(
   context: DesignerDatasetControllerContext,
   event: KeyboardEvent,
 ): boolean {
+  // 浮层优先吃掉 Esc：它是模态，底下的绑定弹层/工作台都不该先响应。
+  if (event.key === 'Escape' && context.state.catalogOpen) {
+    event.preventDefault();
+    closeSourceSheet(context);
+    return true;
+  }
   if (event.key === 'Escape' && context.state.bindingOpenRoleId !== null) {
     event.preventDefault();
     context.state.bindingOpenRoleId = null;
