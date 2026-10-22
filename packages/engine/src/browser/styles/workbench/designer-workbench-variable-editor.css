@@ -176,6 +176,12 @@
   font: var(--designer-font-small);
 }
 
+/* 自绘下拉：原生 select 已收成 1px，高度与字号落在触发器上。 */
+.variable-source-select .designer-select-trigger {
+  height: 30px;
+  font: var(--designer-font-small);
+}
+
 .variable-edit-input[data-variable-create-value],
 .variable-edit-input[data-variable-value] {
   font: var(--designer-font-numeric);
@@ -193,7 +199,7 @@
 .variable-checkbox-field {
   display: grid;
   min-width: 0;
-  grid-template-columns: 16px minmax(0, 1fr);
+  grid-template-columns: 15px minmax(0, 1fr);
   align-items: start;
   gap: var(--designer-space-3);
   padding: var(--designer-space-3);
@@ -203,16 +209,9 @@
   cursor: pointer;
 }
 
-.variable-checkbox-field > input {
-  width: 16px;
-  height: 16px;
-  margin: 1px 0 0;
-  accent-color: var(--designer-accent);
-}
-
-.variable-checkbox-field > input:focus-visible {
-  outline: 2px solid var(--designer-focus-ring);
-  outline-offset: 2px;
+/* 勾选框本体由共享原语绘制（15px 自绘方框）；这里只负责与首行文字对齐。 */
+.variable-checkbox-field > .designer-checkbox {
+  margin-top: 1px;
 }
 
 .variable-checkbox-field > span {

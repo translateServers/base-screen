@@ -36,6 +36,7 @@ import {
   type DesignerBlueprintLibraryTab,
   renderDesignerBlueprintLibrary,
 } from '../../dom/blueprint/designer-blueprint-library-dom.js';
+import { adoptDesignerFormControls } from '../../dom/designer-form-controls-dom.js';
 import {
   hostLeftPanelGroupId,
   hostLeftPanelTab,
@@ -134,6 +135,10 @@ export class DesignerBlueprintPanelsController {
       this.callbacks.getTrace(),
       this.callbacks.getCatalog(),
     );
+    // 面板外壳是 HTML 字符串：渲染后把裸控件收口到共享原语（含下拉增强），
+    // 值仍由原生元素承载，change 继续冒泡给既有命令管线。
+    if (this.#library !== undefined) adoptDesignerFormControls(this.#library);
+    if (this.#inspector !== undefined) adoptDesignerFormControls(this.#inspector);
     if (this.callbacks.getMode() === 'blueprint' && this.#library !== undefined) {
       syncDesignerBlueprintHostLeftPanel(
         this.#library.getRootNode() as ShadowRoot,

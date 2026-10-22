@@ -488,7 +488,12 @@ async function assertReferenceNavigation(page, designer) {
 
 async function createHostVariable(page, designer, variableId, expectedName) {
   await designer.locator('[data-variable-action="add"]').click();
-  await designer.locator('select[data-variable-create-type]').selectOption('data-source');
+  // 来源是自绘下拉：点触发器展开，原生 select 仍承担取值与 change。
+  const sourceSelect = designer.locator(
+    '.designer-select-control:has(select[data-variable-create-type])',
+  );
+  await sourceSelect.locator('.designer-select-trigger').click();
+  await sourceSelect.locator('.designer-select-option[data-value="data-source"]').click();
   const option = designer.locator(
     `[data-variable-action="select-host"][data-source-id="${variableId}"]`,
   );
@@ -915,10 +920,22 @@ export async function assertVariableBlueprintSource(designer, page) {
       `BROWSER_HARNESS_VARIABLE_BLUEPRINT_SOURCE_CONTROL_FAILED:${JSON.stringify(sourceControl)}`,
     );
   }
-  await source.selectOption('event-field');
+  // 检查器里的原生 select 在渲染后会被增强成自绘下拉；交互走可见触发器。
+  const sourceField = designer.locator(
+    '.designer-select-control:has([data-blueprint-action-value-source])',
+  );
+  await sourceField.locator('.designer-select-trigger').click();
+  await sourceField.locator('.designer-select-option[data-value="event-field"]').click();
   const eventField = designer.locator('[data-blueprint-action-event-path]');
   await eventField.waitFor();
-  await eventField.selectOption('["seriesName"]');
+  const eventFieldControl = designer.locator(
+    '.designer-select-control:has([data-blueprint-action-event-path])',
+  );
+  await eventFieldControl.locator('.designer-select-trigger').click();
+  await eventFieldControl
+    .locator('.designer-select-option')
+    .filter({ hasText: 'seriesName' })
+    .click();
   await page.waitForFunction(({ ruleId, actionIndex }) => {
     const rule = window.baseScreenHarness.designer.document.blueprint.rules.find(
       (candidate) => candidate.id === ruleId,

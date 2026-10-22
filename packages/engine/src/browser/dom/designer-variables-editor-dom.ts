@@ -2,7 +2,13 @@ import type { ScreenHostCatalogSummary, ScreenVariable } from '@base-screen/cont
 import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
-import { createDesignerButton, createDesignerInput } from './designer-ui-primitives.js';
+import { enhanceDesignerSelect } from './designer-select-dom.js';
+import {
+  createDesignerButton,
+  createDesignerCheckbox,
+  createDesignerInput,
+  createDesignerSelect,
+} from './designer-ui-primitives.js';
 
 export interface DesignerVariableCreateDraft {
   readonly type: ScreenVariable['type'];
@@ -226,18 +232,20 @@ function appendCreateTypeChooser(editor: HTMLElement, selected: ScreenVariable['
   label.className = 'variable-field-label';
   label.textContent = DESIGNER_UI_TEXT.variables.source;
   field.appendChild(label);
-  const select = editor.ownerDocument.createElement('select');
-  select.className = 'variable-edit-input';
+  const select = createDesignerSelect(editor.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.source,
+    className: 'variable-edit-input',
+    options: (['static', 'data-source', 'url-query'] as const).map((type) => ({
+      label: sourceTypeLabel(type),
+      selected: type === selected,
+      value: type,
+    })),
+    value: selected,
+  });
   select.dataset.variableCreateType = 'true';
-  select.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.source);
-  for (const type of ['static', 'data-source', 'url-query'] as const) {
-    const option = editor.ownerDocument.createElement('option');
-    option.value = type;
-    option.textContent = sourceTypeLabel(type);
-    option.selected = type === selected;
-    select.appendChild(option);
-  }
-  field.appendChild(select);
+  const control = enhanceDesignerSelect(select);
+  control.element.classList.add('variable-source-select');
+  field.appendChild(control.element);
   editor.appendChild(field);
 }
 
@@ -306,9 +314,10 @@ function appendCheckboxField(
 ): void {
   const field = editor.ownerDocument.createElement('label');
   field.className = 'variable-checkbox-field';
-  const input = editor.ownerDocument.createElement('input');
-  input.type = 'checkbox';
-  input.checked = checked;
+  const input = createDesignerCheckbox(editor.ownerDocument, {
+    ariaLabel: label,
+    checked,
+  });
   input.dataset[dataKey] = 'true';
   const copy = editor.ownerDocument.createElement('span');
   const title = editor.ownerDocument.createElement('strong');

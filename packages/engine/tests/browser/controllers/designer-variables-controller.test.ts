@@ -9,6 +9,7 @@ class FakeElement {
   readonly dataset: Record<string, string> = {};
   readonly attributes: Record<string, string> = {};
   readonly style: Record<string, string> = {};
+  readonly classList = { add: (): void => {} };
   value = '';
   checked = false;
   hidden = false;
@@ -79,6 +80,11 @@ class FakeDocument {
   createElement(tagName: string): FakeElement {
     return new FakeElement(tagName, this);
   }
+
+  // 自绘下拉在 document 上挂域外点击监听（增强出的菜单负责关闭），替身只需吸收。
+  addEventListener(): void {}
+
+  removeEventListener(): void {}
 }
 
 function document(variables: ScreenDocument['variables']): ScreenDocument {
