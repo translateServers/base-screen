@@ -2219,6 +2219,16 @@
   font-weight: 500;
 }
 
+/* 物料没这项能力时页签不可点：视觉必须与可点页签不同，否则用户会一直点它。 */
+.designer-source-sheet-tabs button:disabled {
+  color: var(--designer-text-disabled);
+  cursor: not-allowed;
+}
+
+.designer-source-sheet-tabs button:disabled:hover {
+  color: var(--designer-text-disabled);
+}
+
 .designer-source-sheet-tools {
   padding: 9px 14px 7px;
 }
