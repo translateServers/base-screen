@@ -1,4 +1,5 @@
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import { designerIcon } from '../../ui/designer-icons.js';
 import { createDataGroup } from './designer-data-group-dom.js';
 import {
   countUnfilledRequiredParameters,
@@ -53,7 +54,14 @@ export function renderDatasetPreview(
   content.className = 'designer-data-preview-content';
   content.setAttribute('role', 'tabpanel');
   if (options.preview.status === 'loading') {
-    content.appendChild(previewMessage(ownerDocument, DESIGNER_UI_TEXT.dataSource.previewLoading));
+    content.appendChild(previewSkeleton(ownerDocument));
+  } else if (options.preview.status === 'error') {
+    content.appendChild(
+      previewError(
+        ownerDocument,
+        options.preview.message || DESIGNER_UI_TEXT.dataSource.responseFailed,
+      ),
+    );
   } else if (options.preview.tab === 'request') {
     content.appendChild(
       renderJsonPreview(
@@ -71,10 +79,7 @@ export function renderDatasetPreview(
       options.preview.tab === 'response' ? options.preview.rawValue : options.preview.consumerValue;
     content.appendChild(
       value === undefined
-        ? previewMessage(
-            ownerDocument,
-            options.preview.message || DESIGNER_UI_TEXT.dataSource.previewIdle,
-          )
+        ? previewEmpty(ownerDocument, options)
         : renderPreviewValue(
             ownerDocument,
             value,
@@ -126,11 +131,90 @@ function previewGroupSummary(options: DesignerDataSourcePanelOptions): string {
   return DESIGNER_UI_TEXT.dataSource.responseIdle;
 }
 
-function previewMessage(ownerDocument: Document, message: string): HTMLElement {
-  const empty = ownerDocument.createElement('p');
+/** 空态（尚未请求）：图标 + 结论 + 一句说明 + 当前参数摘要。 */
+function previewEmpty(
+  ownerDocument: Document,
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement {
+  const empty = ownerDocument.createElement('div');
   empty.className = 'designer-data-preview-empty';
-  empty.textContent = message;
+  const body = ownerDocument.createElement('div');
+  const icon = ownerDocument.createElement('span');
+  icon.className = 'designer-data-preview-empty-icon';
+  icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = designerIcon('table');
+  const title = ownerDocument.createElement('strong');
+  title.textContent = DESIGNER_UI_TEXT.dataSource.previewIdle;
+  const detail = ownerDocument.createElement('p');
+  detail.textContent = DESIGNER_UI_TEXT.dataSource.previewIdleHint;
+  body.append(icon, title, detail);
+  const summary = previewParamSummary(options);
+  if (summary !== '') {
+    const chip = ownerDocument.createElement('span');
+    chip.className = 'designer-data-preview-empty-params';
+    chip.dataset.datasetParamSummary = 'true';
+    chip.textContent = summary;
+    chip.title = summary;
+    body.appendChild(chip);
+  }
+  empty.appendChild(body);
   return empty;
+}
+
+/**
+ * 当前参数摘要（空态用）：固定值直接给值，变量给名字，没填就是「未填」。
+ * 它让「尚未请求」变成可核对的结论——用户能先确认参数对不对，再决定要不要发请求。
+ */
+function previewParamSummary(options: DesignerDataSourcePanelOptions): string {
+  const descriptor = options.descriptor;
+  const draft = options.draft;
+  if (descriptor === undefined || draft === undefined) return '';
+  return descriptor.parameters
+    .map((parameter) => {
+      const ref = draft.params[parameter.name];
+      if (ref === undefined) return DESIGNER_UI_TEXT.dataSource.parameterUnfilledShort;
+      if (ref.kind === 'variable') {
+        return (
+          options.variables.find((variable) => variable.id === ref.variableId)?.name ??
+          DESIGNER_UI_TEXT.dataSource.parameterUnfilledShort
+        );
+      }
+      if (ref.kind === 'inline') return String(ref.value ?? '');
+      return parameter.label;
+    })
+    .join(' \u00b7 ');
+}
+
+/** 请求中：骨架行，不遮挡面板（设计稿 .skeleton-list）。 */
+function previewSkeleton(ownerDocument: Document): HTMLElement {
+  const list = ownerDocument.createElement('div');
+  list.className = 'designer-data-preview-skeleton';
+  list.setAttribute('aria-label', DESIGNER_UI_TEXT.dataSource.previewLoading);
+  for (let index = 0; index < 5; index += 1) {
+    const row = ownerDocument.createElement('div');
+    row.className = 'designer-data-preview-skeleton-row';
+    for (const width of ['1.35fr', '0.8fr', '0.55fr']) {
+      const bar = ownerDocument.createElement('span');
+      bar.style.gridColumn = width;
+      row.appendChild(bar);
+    }
+    list.appendChild(row);
+  }
+  return list;
+}
+
+/** 失败：一块带标题的卡片，错误信息可读、可复制，不用悬停才看得到。 */
+function previewError(ownerDocument: Document, message: string): HTMLElement {
+  const card = ownerDocument.createElement('div');
+  card.className = 'designer-data-preview-error';
+  card.setAttribute('role', 'alert');
+  card.dataset.datasetPreviewError = 'true';
+  const head = ownerDocument.createElement('strong');
+  head.textContent = DESIGNER_UI_TEXT.dataSource.responseFailed;
+  const detail = ownerDocument.createElement('p');
+  detail.textContent = message;
+  card.append(head, detail);
+  return card;
 }
 
 function renderPreviewValue(

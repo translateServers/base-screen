@@ -382,6 +382,40 @@ export function focusSourceSheet(context: DesignerDatasetControllerContext): voi
   focusSourceSheetTab(context, context.state.sourcePickerTab);
 }
 
+/**
+ * Tab 焦点循环：只有「在最后一项按 Tab」与「在第一项按 Shift+Tab」才需要改写，
+ * 其余交给浏览器原生顺序——自己重排一遍顺序等于和浏览器抢活。
+ */
+function trapSourceSheetFocus(
+  context: DesignerDatasetControllerContext,
+  event: KeyboardEvent,
+): boolean {
+  const sheet = sourceSheetOf(context)?.querySelector<HTMLElement>('[data-source-sheet]');
+  if (sheet === null || sheet === undefined) return false;
+  const focusable = [
+    ...sheet.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input, textarea, select, [tabindex]:not([tabindex="-1"])',
+    ),
+  ].filter((node) => node.getClientRects().length > 0);
+  if (focusable.length === 0) return false;
+  const first = focusable[0]!;
+  const last = focusable[focusable.length - 1]!;
+  const root = sheet.getRootNode() as Document | ShadowRoot;
+  const active = root.activeElement as HTMLElement | null;
+  const inside = active !== null && sheet.contains(active);
+  if (event.shiftKey && (!inside || active === first)) {
+    event.preventDefault();
+    last.focus();
+    return true;
+  }
+  if (!event.shiftKey && (!inside || active === last)) {
+    event.preventDefault();
+    first.focus();
+    return true;
+  }
+  return false;
+}
+
 function closeSourceSheet(context: DesignerDatasetControllerContext): void {
   if (!context.state.catalogOpen) return;
   context.state.catalogOpen = false;
@@ -595,6 +629,10 @@ export function handleDatasetKeyDown(
   if (event.key === 'Escape' && context.state.catalogOpen) {
     event.preventDefault();
     closeSourceSheet(context);
+    return true;
+  }
+  // `aria-modal="true"` 就必须有焦点陷阱：Tab 在浮层内循环，不落到背后的面板上。
+  if (event.key === 'Tab' && context.state.catalogOpen && trapSourceSheetFocus(context, event)) {
     return true;
   }
   if (event.key === 'Escape' && context.state.bindingOpenRoleId !== null) {

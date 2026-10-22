@@ -213,6 +213,52 @@ export async function assertDatasetPanelInteraction(designer, page) {
     );
   }
 
+  // 2'') 页签按能力启用：本夹具的物料没有「用变量」能力，该页签必须禁用并说明原因；
+  //      固定值页签的脚注与主按钮要跟着 JSON 有效性走（无效 → 红字 + 禁用；有效 → 绿字 + 可点）。
+  const tabGating = await sheet.evaluate((node) => ({
+    variableDisabled: node.querySelector('[data-source-sheet-tab="variable"]')?.disabled === true,
+    variableReason:
+      node.querySelector('[data-source-sheet-tab="variable"]')?.getAttribute('title') ?? '',
+  }));
+  if (!tabGating.variableDisabled || tabGating.variableReason.length === 0) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_SOURCE_TAB_GATING_FAILED:${JSON.stringify(tabGating)}`,
+    );
+  }
+  await sheet.locator('[data-source-sheet-tab="fixed"]').click();
+  await sheet.locator('[data-source-sheet-fixed]').waitFor();
+  const fixedInvalid = await sheet.evaluate((node) => ({
+    tone: node.querySelector('[data-source-sheet-note]')?.dataset.tone,
+    disabled: node.querySelector('[data-source-sheet-apply-fixed]')?.disabled,
+  }));
+  await sheet.locator('[data-source-sheet-fixed]').fill(
+    JSON.stringify({
+      fields: [
+        { id: 'category', label: '分类', valueType: 'string' },
+        { id: 'amount', label: '金额', valueType: 'number' },
+      ],
+      rows: [{ category: 'A', amount: 1 }],
+    }),
+  );
+  const fixedValid = await sheet.evaluate((node) => ({
+    tone: node.querySelector('[data-source-sheet-note]')?.dataset.tone,
+    note: node.querySelector('[data-source-sheet-note]')?.textContent ?? '',
+    disabled: node.querySelector('[data-source-sheet-apply-fixed]')?.disabled,
+  }));
+  if (
+    fixedInvalid.tone !== 'error' ||
+    fixedInvalid.disabled !== true ||
+    fixedValid.tone !== 'ok' ||
+    fixedValid.disabled !== false ||
+    !fixedValid.note.includes('2 个字段')
+  ) {
+    throw new Error(
+      `BROWSER_HARNESS_DATASET_SOURCE_FIXED_CHECK_FAILED:${JSON.stringify({ fixedInvalid, fixedValid })}`,
+    );
+  }
+  await sheet.locator('[data-source-sheet-tab="dataset"]').click();
+  await sheet.locator('[data-dataset-query]').waitFor();
+
   // 1) 目录搜索：去抖后的回包只换结果区，搜索框保持同一节点、焦点与输入都还在。
   const query = sheet.locator('[data-dataset-query]');
   await query.waitFor();
