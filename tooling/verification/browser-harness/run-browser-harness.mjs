@@ -46,6 +46,7 @@ import {
 } from './canvas/assert-canvas.mjs';
 import { assertDatasetAuthoring, assertDatasetSurface } from './dataset/assert-dataset.mjs';
 import { assertDatasetPanelInteraction } from './dataset/assert-dataset-panel.mjs';
+import { assertStaticSourceSwitch } from './dataset/assert-source-switch.mjs';
 import {
   assertBlueprintHostLeftPanelGroups,
   assertHostLeftPanelGroups,
@@ -117,6 +118,8 @@ export async function runBrowserHarness(serverPort) {
       await assertTextAutoWidth(browser, baseUrl);
       await assertImageDensitySize(browser, baseUrl);
       await assertInspectorDataTabCapability(browser, baseUrl);
+      // 固定值 / 变量配置态回到来源浮层的那一行：没有它，这两类形态再也接不上数据集。
+      await assertStaticSourceSwitch(browser, baseUrl);
       for (const viewport of [
         { width: 1024, height: 640 },
         { width: 1366, height: 768 },

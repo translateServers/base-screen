@@ -123,17 +123,13 @@ export function handleDatasetClick(
     return true;
   }
   if (target.closest('[data-dataset-change]') !== null) {
-    context.state.catalogOpen = true;
-    // 打开时落在「当前来源是哪一类」的页签上：已经在用变量的人不该先看到数据集列表。
-    context.state.sourcePickerTab =
-      context.state.mode === 'variable'
-        ? 'variable'
-        : context.state.mode === 'static'
-          ? 'fixed'
-          : 'dataset';
-    context.renderSurface();
-    context.catalogController.ensureList();
-    focusSourceSheet(context);
+    openSourceSheet(context);
+    return true;
+  }
+  // 固定值 / 变量配置态的「更换绑定方式」：同一层浮层，初始页签落在当前形态上。
+  // 与来源卡的「更换来源」是两个入口、同一件事的两个半程，动作不各写一套。
+  if (target.closest('[data-source-kind-change]') !== null) {
+    openSourceSheet(context);
     return true;
   }
   if (target.closest('[data-dataset-load-more]') !== null) {
@@ -420,10 +416,34 @@ function closeSourceSheet(context: DesignerDatasetControllerContext): void {
   if (!context.state.catalogOpen) return;
   context.state.catalogOpen = false;
   context.renderSurface();
-  // 浮层已随重绘消失：焦点交回打开它的那颗「更换来源」，不落回 body。
-  context.state.panel
-    ?.querySelector<HTMLElement>('[data-dataset-change]')
-    ?.focus({ preventScroll: true });
+  // 浮层已随重绘消失：焦点交回打开它的那颗按钮，不落回 body。
+  // 两个入口在不同模式下互斥出现（配置态固定值/变量只有「更换绑定方式」，
+  // 数据集只有来源卡上的「更换来源」），所以按当前形态取对应那颗即可。
+  const opener =
+    context.state.mode === 'static' || context.state.mode === 'variable'
+      ? '[data-source-kind-change]'
+      : '[data-dataset-change]';
+  context.state.panel?.querySelector<HTMLElement>(opener)?.focus({ preventScroll: true });
+}
+
+/**
+ * 打开来源浮层（数据集 / 变量 / 固定值三页签）。
+ *
+ * 初始页签跟着**当前形态**走：已经在用固定值的人不该先看到数据集列表。
+ * 两个入口（来源卡的「更换来源」、固定值/变量的「更换绑定方式」）都从这里进来，
+ * 所以「落在哪个页签」只有这一处判定。
+ */
+function openSourceSheet(context: DesignerDatasetControllerContext): void {
+  context.state.catalogOpen = true;
+  context.state.sourcePickerTab =
+    context.state.mode === 'variable'
+      ? 'variable'
+      : context.state.mode === 'static'
+        ? 'fixed'
+        : 'dataset';
+  context.renderSurface();
+  context.catalogController.ensureList();
+  focusSourceSheet(context);
 }
 
 /**

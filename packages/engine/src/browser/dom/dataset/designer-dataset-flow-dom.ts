@@ -25,6 +25,7 @@ import {
 import { createDatasetSection, type DesignerDataSectionKey } from './designer-dataset-sections.js';
 import {
   countUnfilledRequiredParameters,
+  type DesignerDataSourceMode,
   type DesignerDataSourcePanelOptions,
   type DesignerDatasetWorkbenchStep,
 } from './designer-dataset-types.js';
@@ -71,11 +72,75 @@ function renderValueSection(options: DesignerDataSourcePanelOptions): HTMLElemen
     section.append(heading, renderDataEntryGuide(ownerDocument, items), hint);
     return section;
   }
-  // 配置态：这一段的**唯一**职责（顶部「绑定方式」行与三入口就地展开）已经收进来源浮层。
-  // 段仍然存在——段集合是冻结的，节点身份也被 diff 依赖——但内容为空，
-  // 由样式 `:empty` 折叠成 0 高（见 `.designer-data-source-type:empty`）。
-  section.dataset.inspectorSearchText = '';
+  // 配置态的数据集不需要这一段：来源卡上的「更换来源」已经能回到来源浮层。
+  // 固定值 / 变量没有来源卡（它们的编辑区就是内容本身），少了这一行「绑定方式」就
+  // 再也回不到数据集——唯一出路是把数据源清空（撤销 / 删组件），那是死路。
+  const kindRow = renderSourceKindRow(ownerDocument, options);
+  if (kindRow === null) {
+    // 段仍然存在——段集合是冻结的，节点身份也被 diff 依赖——但内容为空，
+    // 由样式 `:empty` 折叠成 0 高（见 `.designer-data-source-type:empty`）。
+    section.dataset.inspectorSearchText = '';
+    return section;
+  }
+  section.dataset.inspectorSearchText = [
+    DESIGNER_UI_TEXT.dataSource.sourceBinding,
+    DESIGNER_UI_TEXT.dataSource.sourceKind(options.mode),
+    DESIGNER_UI_TEXT.dataSource.sourceKindChange,
+  ].join(' ');
+  section.appendChild(kindRow);
   return section;
+}
+
+/**
+ * 只在**固定值 / 变量**的配置态出现的一行：「绑定方式 固定值 ⋯ 更换绑定方式」。
+ *
+ * 三种形态各有一条回到来源浮层的路径，谁也别重复谁：
+ * - 数据集 → 来源卡上的「更换来源」（换哪个数据集，浮层落在数据集页签）；
+ * - 固定值 / 变量 → 本行（换哪一类取值，浮层落在当前形态的页签）；
+ * - 宿主资源 → 宿主自己的资源面板（Engine 不提供自由文本编辑器）。
+ *
+ * 只有一种可落库形态时不渲染：`none` 之外的切换目标至少要有两个，否则按钮点了
+ * 也只是回到同一形态。
+ */
+function renderSourceKindRow(
+  ownerDocument: Document,
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement | null {
+  if (options.mode !== 'static' && options.mode !== 'variable') return null;
+  if (switchableSourceModes(options.availableModes).length < 2) return null;
+  const row = ownerDocument.createElement('div');
+  row.className = 'designer-dataset-source-binding';
+  row.dataset.sourceKindRow = 'true';
+  const label = ownerDocument.createElement('span');
+  label.className = 'designer-dataset-source-binding-label';
+  label.textContent = DESIGNER_UI_TEXT.dataSource.sourceBinding;
+  const value = ownerDocument.createElement('span');
+  value.className = 'designer-dataset-source-binding-value';
+  value.textContent = DESIGNER_UI_TEXT.dataSource.sourceKind(options.mode);
+  const change = ownerDocument.createElement('button');
+  change.type = 'button';
+  change.className = 'designer-control designer-button designer-dataset-source-change';
+  change.dataset.sourceKindChange = 'true';
+  change.textContent = DESIGNER_UI_TEXT.dataSource.sourceKindChange;
+  row.append(label, value, change);
+  return row;
+}
+
+/**
+ * 能在数据面板里落库的形态（来源浮层的三页签）。
+ *
+ * `host-resource` 不在此列：它由宿主 intent 创建，浮层里没有对应页签。
+ */
+const SWITCHABLE_SOURCE_MODES: readonly DesignerDataSourceMode[] = [
+  'static',
+  'variable',
+  'dataset',
+];
+
+function switchableSourceModes(
+  availableModes: readonly DesignerDataSourceMode[],
+): readonly DesignerDataSourceMode[] {
+  return SWITCHABLE_SOURCE_MODES.filter((mode) => availableModes.includes(mode));
 }
 
 function renderStaticSource(options: DesignerDataSourcePanelOptions): HTMLElement {
