@@ -329,7 +329,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
-  gap: var(--designer-space-2);
+  gap: var(--designer-space-4);
 }
 
 .properties .designer-dataset-summary-mark {
@@ -399,8 +399,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px var(--designer-space-3);
-  margin-top: var(--designer-space-2);
+  gap: 5px var(--designer-space-5);
+  margin-top: var(--designer-space-4);
 }
 
 .properties .designer-dataset-health-item {
@@ -752,9 +752,8 @@
   border-top: 0;
 }
 
+/* 映射行的几何只在 v7 那一份里定义（见「映射行：列宽 62」）；这里保留发丝线与底色复位。 */
 .properties .designer-data-group[data-details-group="mapping"] .designer-dataset-binding-role {
-  gap: var(--designer-space-2);
-  padding: var(--designer-space-3) 0;
   border: 0;
   border-top: 1px solid var(--designer-border-subtle);
   border-radius: 0;
@@ -764,7 +763,6 @@
 .properties
   .designer-data-group[data-details-group="mapping"]
   .designer-dataset-binding-role:first-child {
-  padding-top: 0;
   border-top: 0;
 }
 
@@ -786,10 +784,12 @@
   font-size: var(--designer-font-size-xs);
 }
 
-/* 字段与组标题对齐：组头的 chevron 占 16px 挂耳，组内容缩进同样距离。
-   否则每个表单都比自己的标题向左伸出 16px，整页的表单边缘读起来是锯齿。 */
+/* v7：组内容**不缩进**。设计稿的组内容容器左缘与 chevron 对齐（标题在 chevron 右侧），
+   卡片/表格/输入框因此比标题向左多出 16px——这是设计稿刻意的"内容宽、标题窄"，
+   与 v6 的"内容对齐标题"相反。改回来会少 16px 可用宽度（335 面板里是 5%）。 */
 .properties .designer-data-group-content {
-  padding-left: var(--designer-space-6);
+  padding-bottom: var(--designer-space-5);
+  padding-left: 0;
 }
 
 /* 物料数据表单与静态/变量数据表单不是折叠组：整段缩进到与组标题同一条竖线。 */
@@ -808,7 +808,7 @@
   grid-template-columns: minmax(0, 1fr);
   gap: var(--designer-space-2);
   margin: 0;
-  padding: var(--designer-space-3) 0;
+  padding: 8px 0 9px;
   white-space: normal;
 }
 
@@ -1217,9 +1217,10 @@
 }
 
 .properties .designer-data-preview-tabs button {
-  min-height: 28px;
-  padding: 0 0 var(--designer-space-2);
-  margin-right: var(--designer-space-4);
+  /* 设计稿 .subtab：高 30、页签间距 14、下划线紧贴文字块底部（不再留 8px 空档）。 */
+  min-height: 30px;
+  padding: 0;
+  margin-right: 14px;
   border-radius: 0;
   background: transparent;
   color: var(--designer-text-muted);
@@ -1279,9 +1280,19 @@
 
 .properties .designer-data-preview-table-wrap th,
 .properties .designer-data-preview-table-wrap td {
-  padding: var(--designer-space-2) var(--designer-space-1);
+  padding: 6px 5px;
   border-right: 0;
   border-bottom: 1px solid var(--designer-border-subtle);
+}
+
+.properties .designer-data-preview-table-wrap th:first-child,
+.properties .designer-data-preview-table-wrap td:first-child {
+  padding-left: 0;
+}
+
+.properties .designer-data-preview-table-wrap th:last-child,
+.properties .designer-data-preview-table-wrap td:last-child {
+  padding-right: 0;
 }
 
 .properties .designer-data-preview-table-wrap th {
@@ -1424,9 +1435,10 @@
 
 /* ---- v7 样式细节：更安静的层级与更紧的映射表 ---- */
 
-/* 内容四周给 12px 呼吸；底部由状态条自己贴合面板。 */
+/* 内容左右 14px（设计稿面板主体 `padding: 2px 14px 20px` 的横向值）；
+   顶部 12px 代替设计稿的「外层 2 + 分块 11」，底部留给状态条自己贴合面板。 */
 .properties .designer-datav-data-flow-content {
-  padding: var(--designer-space-5) var(--designer-space-5) 0;
+  padding: var(--designer-space-5) 14px 0;
 }
 
 /* 绑定行与「当前来源」之间只留一条发丝线。 */
@@ -1451,18 +1463,14 @@
 }
 
 /* 字段映射压成「角色列 + 控件列」的两列表格；全选/清空收进弹层。 */
+/* 映射行：列宽 62 / 间距 8 / 行高 40 / 上下 5——设计稿 `.mapping-row` 的四个值。
+   行高必须给死（min-height），否则单选行（30px 控件）与多选行（芯片更高）会一高一矮。 */
 .properties .designer-data-group[data-details-group="mapping"] .designer-dataset-binding-role {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: 62px minmax(0, 1fr);
   align-items: center;
-  gap: var(--designer-space-3);
-  padding: var(--designer-space-3) 0;
-}
-
-.properties
-  .designer-data-group[data-details-group="mapping"]
-  .designer-dataset-binding-role:first-child {
-  padding-top: 0;
+  gap: var(--designer-space-4);
+  padding: 5px 0;
 }
 
 .properties .designer-data-group[data-details-group="mapping"] .designer-dataset-binding-heading {
