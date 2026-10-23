@@ -170,3 +170,31 @@
     font-size: 13px;
   }
 }
+
+/* 编辑页浮动的数据源入口：设计器占满视口，入口不参与其布局。
+   放在 .stage 的兄弟节点上，避免命中 `.stage > *` 的绝对定位规则。 */
+.editor-datasource-link {
+  position: fixed;
+  right: var(--spacing-4);
+  bottom: var(--spacing-4);
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  font-size: 12px;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.editor-datasource-link:hover {
+  border-color: var(--color-accent);
+}
+
+.ds-return-link {
+  white-space: nowrap;
+}

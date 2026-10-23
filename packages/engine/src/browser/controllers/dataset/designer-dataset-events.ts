@@ -13,6 +13,7 @@ import {
   autoMatchDatasetBindings,
   describeDataset,
   restoreDatasetControlFocus,
+  selectDatasetInstance,
   setSourceMode,
   toggleDatasetBindingField,
   updateDatasetBindingRole,
@@ -602,6 +603,10 @@ export function handleDatasetChange(
   }
   // 参数位只有两条写入路径：取值选择器的触发器（点击 → 浮层 → onSelect）与内联值编辑器
   // （`data-value-ref-inline`，change）。旧形态的「模式下拉」已经删除，不再有第二个入口。
+  if (target.dataset.datasetInstanceSelect !== undefined && target instanceof HTMLSelectElement) {
+    selectDatasetInstance(context, target.value === '' ? null : target.value);
+    return true;
+  }
   if (target.dataset.valueRefInline !== undefined) {
     if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
       updateDatasetParameterValue(context, target);

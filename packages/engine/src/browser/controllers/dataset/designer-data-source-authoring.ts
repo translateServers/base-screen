@@ -2,6 +2,13 @@ import {
   evaluateScreenDatasetParameters,
   parseScreenJsonValue,
   parseScreenTabularDataset,
+  readScreenComponentDataBinding,
+  readScreenComponentValueRef,
+  readScreenDocumentDataSources,
+  readScreenVariableRecord,
+  type ScreenComponentDataSource,
+  type ScreenDataBinding,
+  type ScreenDataSource,
   type ScreenDatasetDefinition,
   type ScreenDiagnostic,
   type ScreenDocument,
@@ -13,6 +20,7 @@ import {
 } from '@base-screen/contracts';
 import {
   type ScreenDataBindingRole,
+  type ScreenDocumentCommand,
   type ScreenDocumentTransaction,
   validateScreenHostResourceBinding,
 } from '@base-screen/core';
@@ -32,6 +40,75 @@ interface DesignerDatasetTransactionOptions {
   readonly descriptor: ScreenDatasetDefinition;
   readonly draft: DesignerDatasetDraftView;
   readonly roles: readonly ScreenDataBindingRole[];
+}
+
+/** 数据面板读取用的数据集来源：legacy 组件没有实例，新形态组件带文档级实例。 */
+export interface AuthoringDatasetSource {
+  readonly source: Extract<ScreenComponentDataSource, { readonly type: 'dataset' }>;
+  readonly instanceId: string | undefined;
+  readonly instance: ScreenDataSource | undefined;
+}
+
+/**
+ * 把组件当前的 dataset 绑定投影成数据面板可读的 legacy 形状。
+ *
+ * 新形态（dataValue + document.dataSources）只在这里翻译成旧形状给现有草稿/预览逻辑用；
+ * 任何写回都必须走 `createDatasetBindingTransaction` 的新形态事务。
+ */
+export function readAuthoringDatasetSource(
+  document: ScreenDocument | undefined,
+  component: ScreenDocument['components'][number] | undefined,
+): AuthoringDatasetSource | null {
+  if (component === undefined) return null;
+  if (component.dataSource?.type === 'dataset') {
+    return { source: component.dataSource, instanceId: undefined, instance: undefined };
+  }
+  const value = readScreenComponentValueRef(component);
+  if (value === null || value.kind !== 'data-source-field' || document === undefined) return null;
+  const instance = readScreenDocumentDataSources(document).find(
+    (candidate) => candidate.id === value.dataSourceId,
+  );
+  if (instance === undefined || instance.source.kind !== 'dataset') return null;
+  const params: Record<string, ScreenHostResourceParameter> = {};
+  for (const [name, ref] of Object.entries(instance.params)) {
+    const legacy = valueRefToHostResourceParameter(ref);
+    if (legacy !== undefined) params[name] = legacy;
+  }
+  return {
+    source: {
+      type: 'dataset',
+      datasetId: instance.source.datasetId,
+      params,
+      binding: readScreenComponentDataBinding(component),
+    },
+    instanceId: instance.id,
+    instance,
+  };
+}
+
+/** 从文档级实例直接生成草稿：参数已经是 ScreenValueRef，不再做旧形态翻译。 */
+export function createDesignerDatasetDraftFromInstance(
+  descriptor: ScreenDatasetDefinition,
+  instance: ScreenDataSource,
+  binding: ScreenDataBinding | null | undefined,
+  roles: readonly ScreenDataBindingRole[] = [],
+): DesignerDatasetDraftView {
+  const params: Record<string, ScreenValueRef> = {};
+  for (const parameter of descriptor.parameters) {
+    const existing = instance.params[parameter.name];
+    if (existing !== undefined) {
+      params[parameter.name] = existing;
+    } else if (parameter.defaultValue !== undefined) {
+      params[parameter.name] = { kind: 'inline', value: parameter.defaultValue };
+    }
+  }
+  const fields =
+    binding === null || binding === undefined
+      ? autoMatchDatasetFields(descriptor, roles)
+      : Object.fromEntries(
+          Object.entries(binding.fields).map(([role, values]) => [role, [...values]]),
+        );
+  return { datasetId: descriptor.datasetId, params, fields };
 }
 
 /**
@@ -278,6 +355,172 @@ export function createDatasetDataSourceTransaction(
   );
 }
 
+export interface DesignerDatasetBindingOptions extends DesignerDatasetTransactionOptions {
+  /** 文档里已有的实例 id：来自 dataValue 或用户的共享实例选择。 */
+  readonly preferredInstanceId?: string | undefined;
+}
+
+/**
+ * 新形态 dataset 绑定事务：先 upsert 文档级实例，再写组件 dataValue/dataBinding。
+ *
+ * 实例复用规则：显式 preferred 优先；否则复用同 dataset 且参数完全相同的现有实例；
+ * 都没有才新建 `data-source-<componentId>`。preferred 指向的实例若换了 dataset，
+ * 不原地改它的来源（会波及所有共享读者），而是按新 dataset 重新匹配/新建。
+ */
+export function createDatasetBindingTransaction(
+  options: DesignerDatasetBindingOptions,
+): ScreenParseResult<ScreenDocumentTransaction> {
+  const draftValidated = validateDatasetBindingDraft(
+    options.document,
+    options.descriptor,
+    options.draft,
+  );
+  if (!draftValidated.ok) return draftValidated;
+  const binding: ScreenDataBinding | null =
+    options.roles.length === 0 ? null : { fields: options.draft.fields };
+  const checked = validateScreenHostResourceBinding(
+    binding,
+    options.descriptor.fields,
+    options.roles,
+  );
+  if (!checked.ok) return checked;
+
+  const existing = options.document.dataSources ?? [];
+  const preferred =
+    options.preferredInstanceId === undefined
+      ? undefined
+      : existing.find((instance) => instance.id === options.preferredInstanceId);
+  const reusable =
+    preferred !== undefined &&
+    preferred.source.kind === 'dataset' &&
+    preferred.source.datasetId === options.descriptor.datasetId
+      ? preferred
+      : existing.find(
+          (instance) =>
+            instance.source.kind === 'dataset' &&
+            instance.source.datasetId === options.descriptor.datasetId &&
+            sameDatasetParams(instance.params, options.draft.params),
+        );
+  const instanceId = reusable?.id ?? nextInstanceId(existing, options.componentId);
+  const instance: ScreenDataSource = {
+    ...(reusable ?? { id: instanceId, name: options.descriptor.name }),
+    id: instanceId,
+    name: reusable?.name ?? options.descriptor.name,
+    source: { kind: 'dataset', datasetId: options.descriptor.datasetId },
+    params: options.draft.params,
+  };
+  const dataSources =
+    reusable === undefined
+      ? [...existing, instance]
+      : existing.map((candidate) => (candidate.id === instanceId ? instance : candidate));
+  const component = options.document.components.find(
+    (candidate) => candidate.id === options.componentId,
+  );
+  const previousValue = component === undefined ? null : readScreenComponentValueRef(component);
+  const previousInstanceId =
+    previousValue?.kind === 'data-source-field' ? previousValue.dataSourceId : undefined;
+  const commands: ScreenDocumentCommand[] = [
+    { type: 'replace-data-sources', dataSources },
+    {
+      type: 'update-components',
+      componentIds: [options.componentId],
+      patch: {
+        dataSource: null,
+        dataValue: { kind: 'data-source-field', dataSourceId: instanceId, path: [] },
+        dataBinding: binding,
+      },
+    },
+  ];
+  // 改绑后旧实例已经没人引用时清掉它（先写新引用，再删实例，满足 replace-data-sources 的顺序约束）。
+  if (
+    previousInstanceId !== undefined &&
+    previousInstanceId !== instanceId &&
+    existing.some((candidate) => candidate.id === previousInstanceId) &&
+    !instanceReferencedByOthers(options.document, options.componentId, previousInstanceId)
+  ) {
+    commands.push({
+      type: 'replace-data-sources',
+      dataSources: dataSources.filter((candidate) => candidate.id !== previousInstanceId),
+    });
+  }
+  return success({ commands });
+}
+
+function validateDatasetBindingDraft(
+  document: ScreenDocument,
+  descriptor: ScreenDatasetDefinition,
+  draft: DesignerDatasetDraftView,
+): ScreenParseResult<null> {
+  for (const parameter of descriptor.parameters) {
+    const value = draft.params[parameter.name];
+    if (value === undefined && parameter.required) {
+      return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
+    }
+    if (
+      value?.kind === 'variable' &&
+      !document.variables.some((variable) => variable.id === value.variableId)
+    ) {
+      return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
+    }
+  }
+  const evaluated: Record<string, ScreenJsonValue> = {};
+  for (const [name, ref] of Object.entries(draft.params)) {
+    const definition = descriptor.parameters.find((parameter) => parameter.name === name);
+    if (definition === undefined) {
+      return invalid('HOST_DATASET_PARAMETER_INVALID', DESIGNER_UI_TEXT.dataset.incomplete);
+    }
+    evaluated[name] = ref.kind === 'inline' ? ref.value : fallbackParameterValue(definition);
+  }
+  const result = evaluateScreenDatasetParameters(descriptor.parameters, evaluated);
+  return result.ok ? success(null) : result;
+}
+
+function instanceReferencedByOthers(
+  document: ScreenDocument,
+  componentId: string,
+  instanceId: string,
+): boolean {
+  for (const candidate of document.components) {
+    if (candidate.id === componentId) continue;
+    const ref = readScreenComponentValueRef(candidate);
+    if (ref?.kind === 'data-source-field' && ref.dataSourceId === instanceId) return true;
+  }
+  for (const variable of document.variables) {
+    const ref = readScreenVariableRecord(variable).value;
+    if (ref.kind === 'data-source-field' && ref.dataSourceId === instanceId) return true;
+  }
+  return false;
+}
+
+function sameDatasetParams(
+  left: Readonly<Record<string, ScreenValueRef>>,
+  right: Readonly<Record<string, ScreenValueRef>>,
+): boolean {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
+  for (const key of keys) {
+    if (valueRefKey(left[key]) !== valueRefKey(right[key])) return false;
+  }
+  return true;
+}
+
+function valueRefKey(ref: ScreenValueRef | undefined): string {
+  if (ref === undefined) return 'missing';
+  if (ref.kind === 'inline') return `inline:${JSON.stringify(ref.value)}`;
+  if (ref.kind === 'variable') return `variable:${ref.variableId}`;
+  return `field:${ref.dataSourceId}:${ref.path.join('.')}`;
+}
+
+function nextInstanceId(existing: readonly ScreenDataSource[], componentId: string): string {
+  const base = `data-source-${componentId}`;
+  const ids = new Set(existing.map((instance) => instance.id));
+  if (!ids.has(base)) return base;
+  for (let index = 2; index < 1_000; index += 1) {
+    const candidate = `${base}-${index}`;
+    if (!ids.has(candidate)) return candidate;
+  }
+  return `${base}-${Date.now()}`;
+}
+
 /** 变量引用在评估阶段没有具体值：用定义里的合法兜底值占位，只为让类型校验不误报。 */
 function fallbackParameterValue(
   definition: ScreenDatasetDefinition['parameters'][number],
@@ -296,9 +539,38 @@ function fallbackParameterValue(
 }
 
 export function createEmptyDataSourceTransaction(
+  document: ScreenDocument,
   componentId: string,
 ): ScreenParseResult<ScreenDocumentTransaction> {
-  return success(updateDataSource(componentId, null));
+  const component = document.components.find((candidate) => candidate.id === componentId);
+  const commands: ScreenDocumentCommand[] = [
+    {
+      type: 'update-components',
+      componentIds: [componentId],
+      patch: { dataSource: null, dataValue: null, dataBinding: null },
+    },
+  ];
+  const value = component === undefined ? null : readScreenComponentValueRef(component);
+  if (value?.kind === 'data-source-field') {
+    const instanceId = value.dataSourceId;
+    const usedByComponent = document.components.some((candidate) => {
+      if (candidate.id === componentId) return false;
+      const ref = readScreenComponentValueRef(candidate);
+      return ref?.kind === 'data-source-field' && ref.dataSourceId === instanceId;
+    });
+    const usedByVariable = document.variables.some((variable) => {
+      const record = readScreenVariableRecord(variable);
+      return record.value.kind === 'data-source-field' && record.value.dataSourceId === instanceId;
+    });
+    const instances = document.dataSources ?? [];
+    if (!usedByComponent && !usedByVariable && instances.some((item) => item.id === instanceId)) {
+      commands.push({
+        type: 'replace-data-sources',
+        dataSources: instances.filter((item) => item.id !== instanceId),
+      });
+    }
+  }
+  return success({ commands });
 }
 
 export function createVariableDataSourceTransaction(

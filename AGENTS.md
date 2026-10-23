@@ -43,6 +43,7 @@
 - 物料自定义属性面板使用 JSON-safe、声明式的 Manifest Editor Descriptor，控件为 Base Screen 内建控件或宿主授权的插件贡献控件（`control: 'custom'` + `kind: 'inspectorControl'`，仅绑 `props`/`style`）；不得注入 React/Vue component、render function、DOM Node、Promise 或宿主服务对象。Engine 只实例化 plugin-manager 解析出的授权目录项，绝不按清单标签 `createElement`——宿主注册过某标签不构成授权，未授权标签渲染为降级提示。依据见 ADR-0084（插件贡献词汇与信任；检查器自定义控件，原 ADR-0073 已由该主线合并记录吸收）。
 - 右侧「数据源」页只有一条渲染路径（`DesignerDatasetController`）：宿主是否提供 `datasetPort` 只决定 `dataset` 选项是否可用，不得再用它决定渲染哪套面板；面板内容按 `data-ds-section` 分段，状态变化只换受影响的段。`host-resource` 数据源由宿主经公开的 host-resource authoring intent（`insertHostResource` 等）创建，Engine 不再提供 resourceType/resourceId 的自由文本编辑器，也不按清单标签推断授权。
 - 事件 Blueprint 采用一体化工作台边界：Base Screen 拥有当前实例内的顶部栏、左右面板、语义图投影、canonical 编辑、Core transaction、统一 history/revision guard 与有界 slot 协议；宿主拥有中央图形渲染、布局算法和画布手势。`blueprint.layout` 保存节点位置与视口，其余模式、选择、临时拖动和 trace 高亮只属 session。代码编辑器和复杂 ECharts/领域配置编辑器仍由宿主拥有。
+- 宿主启用事件工作台时必须通过 `blueprintCapability` 贡献声明所支持的能力（`SCREEN_BLUEPRINT_CAPABILITY_IDS`）；未经授权的物料事件在作者面不可用，编译也按能力缺失失败关闭。示例宿主的中央画布在 `examples/*/src/screen/blueprint-canvas.ts` 逐字共享，只消费公开 state/command 事件。
 - 宿主左侧业务分组通过严格 `leftPanelGroups[].workbenchModes` 选择 Canvas、Blueprint 或两者；省略时仅用于 Canvas。同一分组跨模式只复用一份公开命名 slot/tabpanel，宿主 light DOM 不随模式切换重挂载，宿主仍拥有其内容生命周期和业务状态。
 - 宿主作者扩展通过公开 Custom Element method/event 和 JSON-safe authoring bridge 集成；宿主不得依赖 Engine 私有 Shadow DOM、内部 Store、`src` 路径或未声明的通用 UI 注入逃生口。
 - 新增功能若能通过既有宿主边界完成，不得新增 Base Screen 内部工作流、package 或传输配置。只有改变产品定位、宿主/Engine 职责划分，或引入长期维护承诺的范围扩展才需要 ADR；此类改动仅在实施跨多个阶段、涉及迁移或用户明确要求时再创建 Spec。

@@ -137,6 +137,10 @@ export interface DesignerDataSourcePanelOptions {
   readonly dataValue: ScreenValueRef | null;
   /** `data-source-field` 时的实例只读视图（含 pending / missing）。 */
   readonly instance: DesignerDataSourceInstanceView | undefined;
+  /** 当前数据集可复用的文档级实例（共享实例选择器）。 */
+  readonly datasetInstances?: readonly DesignerDataSourceInstanceView[];
+  /** 草稿当前选中的共享实例；`null` 表示按相同参数自动复用/新建。 */
+  readonly selectedDatasetInstanceId?: string | null;
   /** 折叠组开合覆盖表；段重建时由 `createDataGroup` 唯一重放。 */
   readonly groupOpenOverrides: ReadonlyMap<string, boolean>;
   /** 用户手动开合折叠组（写覆盖表，不重绘）。 */
@@ -213,6 +217,8 @@ export interface DesignerDatasetConfigurationOptions {
   readonly surface: DesignerDataSurface;
   /** 引用实例的只读视图（组头摘要取实例名）；未引用实例时为 undefined。 */
   readonly instance?: DesignerDataSourceInstanceView | undefined;
+  readonly instances?: readonly DesignerDataSourceInstanceView[] | undefined;
+  readonly selectedInstanceId?: string | null | undefined;
   /** 折叠组开合覆盖表（组构造时唯一重放）。 */
   readonly groupOpenOverrides?: ReadonlyMap<string, boolean> | undefined;
   readonly onToggleGroup?: ((section: string, group: string, open: boolean) => void) | undefined;

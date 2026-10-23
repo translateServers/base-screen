@@ -1,10 +1,12 @@
 import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
+import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenPluginPanelCatalog,
+  BaseScreenPluginRuntime,
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
 } from '@base-screen/plugin-core';
@@ -24,6 +26,31 @@ import { createHostResourceRuntime } from './host-resource-plugin';
 import { registerHostMaterials } from './register';
 
 const INSTANCE_ID = 'vue-host';
+
+/**
+ * 蓝图能力由插件贡献进入 `runtimeContributions`：没有这份授权，设计器会把物料事件
+ * 标成不可用、编译也会按能力缺失失败关闭。能力词汇只从 contracts 取，宿主不另抄一份。
+ */
+const HOST_AUTHORING_PLUGIN_ID = `${INSTANCE_ID}-authoring`;
+const HOST_AUTHORING_CAPABILITIES = [...SCREEN_BLUEPRINT_CAPABILITY_IDS];
+
+function createHostAuthoringRuntime(): BaseScreenPluginRuntime {
+  return {
+    manifest: {
+      id: HOST_AUTHORING_PLUGIN_ID,
+      dependencies: [],
+      capabilities: HOST_AUTHORING_CAPABILITIES,
+      contributions: HOST_AUTHORING_CAPABILITIES.map((id) => ({
+        kind: 'blueprintCapability' as const,
+        id,
+        name: id,
+      })),
+    },
+    activate() {},
+    deactivate() {},
+    dispose() {},
+  };
+}
 
 export interface HostRuntime {
   readonly catalog: BaseScreenMaterialCatalog;
@@ -63,11 +90,13 @@ async function createHostRuntime(): Promise<HostRuntime> {
     // 官方物料由宿主自己的 catalog 承载；manager 只负责插件贡献的物料。
     standaloneMaterialTagNames: [],
     plugins: [
+      createHostAuthoringRuntime(),
       createPluginDatavRuntime(),
       createPluginEchartsRuntime(),
       createHostResourceRuntime(),
     ],
     grantedCapabilities: {
+      [HOST_AUTHORING_PLUGIN_ID]: HOST_AUTHORING_CAPABILITIES,
       [PLUGIN_DATAV_ID]: ['command.execute', 'design.read'],
       [PLUGIN_ECHARTS_ID]: ['command.execute', 'design.read'],
     },

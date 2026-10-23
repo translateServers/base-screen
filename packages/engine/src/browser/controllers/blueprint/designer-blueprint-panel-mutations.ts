@@ -6,7 +6,10 @@ import {
   type ScreenParseResult,
 } from '@base-screen/contracts';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { designerBlueprintEventFieldPaths } from '../../../common/operations/blueprint/designer-blueprint-value-sources.js';
+import {
+  designerBlueprintEventFieldPaths,
+  parseDesignerBlueprintEventFieldPath,
+} from '../../../common/operations/blueprint/designer-blueprint-value-sources.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 
 const CONDITION_OPERATORS = new Set<ScreenBlueprintCondition['operator']>([
@@ -89,21 +92,10 @@ export function updateDesignerBlueprintActionFromTarget(
   }
   if (target.matches('[data-blueprint-action-event-path]')) {
     if (action.type !== 'set-variable') return success(null);
-    const ruleId = (target as HTMLElement).dataset.ruleId;
-    const paths =
-      ruleId === undefined ? [] : designerBlueprintEventFieldPaths(document, ruleId, catalog);
-    try {
-      const candidate = JSON.parse((target as HTMLSelectElement).value) as unknown;
-      const path =
-        Array.isArray(candidate) && candidate.every((item) => typeof item === 'string')
-          ? candidate
-          : undefined;
-      return path !== undefined && paths.some((item) => samePath(item, path))
-        ? success({ ...action, value: { kind: 'event-payload', path } })
-        : failure();
-    } catch {
-      return failure();
-    }
+    const path = parseDesignerBlueprintEventFieldPath((target as HTMLInputElement).value);
+    return path === null
+      ? failureMessage(DESIGNER_UI_TEXT.blueprint.eventFieldInvalid)
+      : success({ ...action, value: { kind: 'event-payload', path } });
   }
   if (target.matches('[data-blueprint-action-source-variable]')) {
     if (action.type !== 'set-variable') return success(null);
@@ -140,13 +132,17 @@ function updateValueSource(
     return success({ ...action, value: { kind: 'event-payload', path: [] } });
   }
   if (source === 'event-field') {
+    if (action.value.kind === 'event-payload' && action.value.path.length > 0) {
+      return success({ ...action, value: action.value });
+    }
     const path =
       ruleId === undefined
         ? undefined
         : designerBlueprintEventFieldPaths(document, ruleId, catalog)[0];
-    return path === undefined
-      ? failure()
-      : success({ ...action, value: { kind: 'event-payload', path } });
+    return success({
+      ...action,
+      value: { kind: 'event-payload', path: path ?? ['row'] },
+    });
   }
   if (source === 'variable') {
     const variable = document.variables.find((candidate) => candidate.id !== action.variableId);
@@ -155,10 +151,6 @@ function updateValueSource(
       : success({ ...action, value: { kind: 'variable', variableId: variable.id } });
   }
   return failure();
-}
-
-function samePath(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }
 
 function success<T>(value: T): ScreenParseResult<T> {
@@ -176,6 +168,20 @@ function failure<T>(
         code,
         path: [],
         message: DESIGNER_UI_TEXT.blueprint.invalidCommand,
+      },
+    ],
+  };
+}
+
+function failureMessage<T>(message: string): ScreenParseResult<T> {
+  return {
+    ok: false,
+    diagnostics: [
+      {
+        severity: 'error',
+        code: 'AUTHORING_REQUEST_INVALID',
+        path: [],
+        message,
       },
     ],
   };

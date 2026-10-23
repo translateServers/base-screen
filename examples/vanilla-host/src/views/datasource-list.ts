@@ -21,6 +21,7 @@ import { el } from '../lib/dom';
 import { formatDateTime } from '../lib/format';
 import { createLogger } from '../lib/logger';
 import type { Route, ViewModule } from '../router';
+import { clearDatasourceReturn, readDatasourceReturn } from '../screen/datasource-return';
 
 /**
  * 数据源管理页（PRD §10.2 / A25–A27、A33）。
@@ -97,12 +98,23 @@ export const datasourceListView: ViewModule = {
       }),
     );
 
+    const returnTarget = readDatasourceReturn();
     const header = el('header', { class: 'list-header' }, [
       el('div', { class: 'list-header__title' }, [
         el('h1', { text: DATASOURCE_TEXT.pageTitle }),
         el('p', { class: 'list-header__subtitle', text: DATASOURCE_TEXT.pageDescription }),
       ]),
       el('div', { class: 'ds-toolbar' }, [
+        ...(returnTarget === null
+          ? []
+          : [
+              el('a', {
+                class: 'button ds-return-link',
+                text: '返回大屏',
+                attrs: { href: returnTarget.href, 'data-ds-return-screen': '' },
+                on: { click: () => clearDatasourceReturn() },
+              }),
+            ]),
         searchInput,
         filters,
         el('button', {

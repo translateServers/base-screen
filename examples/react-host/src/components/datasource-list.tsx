@@ -15,6 +15,7 @@ import {
   typeLabel,
 } from '../lib/datasource-model';
 import { formatDateTime } from '../lib/format';
+import { clearDatasourceReturn, readDatasourceReturn } from '../screen/datasource-return';
 import { ConfirmDeleteDialog, DeleteBlockedDialog } from './datasource-dialogs';
 import { DatasourceDrawer } from './datasource-drawer';
 import { ErrorBanner } from './error-banner';
@@ -146,6 +147,8 @@ export function DatasourceListPage(): React.ReactElement {
   };
 
   const hint = catalogHint(total, visibleCount);
+  const returnTarget = readDatasourceReturn();
+
   const resultItem =
     result === null ? null : (items.find((item) => item.datasetId === result.datasetId) ?? null);
 
@@ -157,6 +160,16 @@ export function DatasourceListPage(): React.ReactElement {
           <p className="list-header__subtitle">{DATASOURCE_TEXT.pageDescription}</p>
         </div>
         <div className="ds-toolbar">
+          {returnTarget === null ? null : (
+            <a
+              className="button ds-return-link"
+              href={returnTarget.href}
+              data-ds-return-screen=""
+              onClick={() => clearDatasourceReturn()}
+            >
+              返回大屏
+            </a>
+          )}
           <input
             className="field ds-toolbar__search"
             type="search"

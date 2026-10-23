@@ -51,6 +51,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 lib/api-base.ts  lib/api.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
 lib/render-diagnostics.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
+screen/blueprint-canvas.ts  screen/datasource-return.ts
 screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
 screen/metric-value.ts  screen/project-adapter.ts
 store/screen-session-store.ts  store/screens-store.ts  types.ts
@@ -322,6 +323,43 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 | `?fail=500` | 每次 dataset query 追加 `fail=500`（**仅在设置 `DATASET_FAIL_INJECTION=1` 的环境生效**；未开启时该参数按未声明参数拒成 400。首帧即失败时只有占位 + 离线 chip，没有角标——没有上一帧可保留） |
 | `?smoke=1` | 挂 `window.__baseScreenHost`：只有 `tickNow()` / `refreshNow()` / `status()` 三个入口 |
 
+
+## 在页面上配置一张数据大屏
+
+以「空气质量监测大屏」为验收样本：新建数据源 → 打开种子屏编辑 → 绑定共享数据实例 →
+建变量 → 配事件 → 配条件样式 → 保存/查看，全程不手写 JSON。
+
+### 数据面板与共享实例
+
+- 右侧「数据源」只读投影组件当前绑定：旧 `component.dataSource` 与新的
+  `dataValue + document.dataSources` 都会显示成同一套来源/参数/字段映射面板。
+- 首次修改旧组件会把它转换成文档级共享实例（`data-source-<componentId>`），并清掉旧
+  `dataSource`，绝不会同时写两种形态；之后可在「更换来源」里选中同 `datasetId` 的现有实例，
+  让多个组件共享一次查询。
+- 参数位支持固定值与变量两种取值；切换不会丢另一形态。字段映射、参数与来源的修改在
+  300ms 防抖后整体提交，面板用「已同步/未应用草稿」表达状态。
+- 数据源资产仍归 `#/datasources` 管理页：编辑页右下角的「数据源」入口先落地保存，再跳转；
+  数据源页顶部出现「返回大屏」，返回后设计器重新拉取数据集目录。
+
+### Blueprint 事件
+
+- 编辑页的宿主编排画布是 `src/screen/blueprint-canvas.ts`（三端逐字一致）：消费
+  `base-screen-blueprint-canvas-state`、发 `base-screen-blueprint-canvas-command`，只负责
+  中央图形、拖动、连线、缩放/平移与试运行；语义图、规则与历史仍归引擎。
+- 蓝图能力由宿主的 authoring 插件贡献（`host-runtime.ts` 的 `createHostAuthoringRuntime`），
+  没有这份授权时物料事件会显示为不可用。
+- 典型操作：左侧「逻辑」插入设置变量 → 从组件的事件端口连到动作输入端 → 检查器选择变量和
+  赋值来源。事件字段可直接填写 `row.city`：声明过的 payload 字段只是建议，物料没声明
+  `payloadSchema` 也能用。
+
+### 条件样式
+
+- 「样式」页签底部的「条件样式」按组件数据值判定：路径留空表示数据值本身；操作符支持
+  `eq / neq / gt / gte / lt / lte / contains / exists`；命中后覆盖物料 stylePanel 里的颜色键。
+- 规则可新增、删除、上下移动，最多 8 条；提交走 `update-components` 的 `styleRules` 整体替换，
+  合并后的完整 style 会过一次物料 `styleSchema`，不认识的颜色键不会写进文档。
+- 空气质量种子里的 `hero-level`（6 条等级色）、`hero-ratio` / `hero-good`（阈值色）都能在
+  这个面板里直接改；查看页切城市时颜色随数据值变化。
 
 ## 数据绑定演示
 

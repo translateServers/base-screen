@@ -1,7 +1,8 @@
-import type {
-  ScreenHostResourceParameter,
-  ScreenParseResult,
-  ScreenValueRef,
+import {
+  readScreenComponentValueRef,
+  type ScreenHostResourceParameter,
+  type ScreenParseResult,
+  type ScreenValueRef,
 } from '@base-screen/contracts';
 import type { ScreenDocumentTransaction } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
@@ -10,14 +11,16 @@ import type { DesignerDataSectionKey } from '../../dom/dataset/designer-dataset-
 import { countUnfilledRequiredParameters as countUnfilledRequired } from '../../dom/dataset/designer-dataset-types.js';
 import {
   autoMatchDatasetFields,
-  createDatasetDataSourceTransaction,
+  createDatasetBindingTransaction,
   createDesignerDatasetDraft,
+  createDesignerDatasetDraftFromInstance,
   createEmptyDataSourceTransaction,
   createStaticDataSourceTransaction,
   createVariableDataSourceTransaction,
   defaultDatasetParameterValue,
   designerDataSourceModes,
   hostResourceParameterToValueRef,
+  readAuthoringDatasetSource,
   readDesignerDatasetParameter,
   setDesignerDatasetParameter,
   toggleDesignerDatasetBindingField,
@@ -94,6 +97,8 @@ export async function describeDataset(
 ): Promise<void> {
   if (!availableModes(context).includes('dataset')) return;
   const focusedId = context.currentComponent()?.id;
+  const component = context.currentComponent();
+  const authoring = readAuthoringDatasetSource(context.callbacks.getDocument(), component);
   const descriptor = await context.catalogController.describe(datasetId);
   if (
     descriptor === undefined ||
@@ -101,12 +106,19 @@ export async function describeDataset(
     !availableModes(context).includes('dataset')
   )
     return;
+  const roles = context.currentEntry()?.manifest.dataBinding?.roles ?? [];
+  const sameDataset = authoring?.source.datasetId === datasetId;
+  const instance = sameDataset ? authoring?.instance : undefined;
   context.state.descriptor = descriptor;
-  context.state.draft = createDesignerDatasetDraft(
-    descriptor,
-    context.currentComponent()?.dataSource ?? null,
-    context.currentEntry()?.manifest.dataBinding?.roles ?? [],
-  );
+  context.state.datasetInstanceId = sameDataset ? (authoring?.instanceId ?? null) : null;
+  context.state.draft =
+    instance !== undefined && instance.source.kind === 'dataset'
+      ? createDesignerDatasetDraftFromInstance(descriptor, instance, component?.dataBinding, roles)
+      : createDesignerDatasetDraft(
+          descriptor,
+          sameDataset ? (authoring?.source ?? null) : null,
+          roles,
+        );
   context.state.parameterInlineMemory.clear();
   context.state.mode = 'dataset';
   context.state.catalogOpen = false;
@@ -117,6 +129,39 @@ export async function describeDataset(
   context.renderSurface();
   // 用户主动选数据集时才自动落库；首屏描述当前数据源不能偷偷改文档。
   if (options.autoApply === true && context.state.draftDirty) scheduleDatasetAutoApply(context);
+}
+
+/**
+ * 共享实例选择：把组件改绑到同 dataset 的现有文档级实例。
+ *
+ * 选中实例会把它的参数原样带进草稿，然后**立即应用**——即使参数没变，也要写一次
+ * `dataValue.dataSourceId`，否则组件仍指着旧实例。`null` 表示交回自动策略。
+ */
+export function selectDatasetInstance(
+  context: DesignerDatasetControllerContext,
+  instanceId: string | null,
+): void {
+  const document = context.callbacks.getDocument();
+  const descriptor = context.state.descriptor;
+  const draft = context.state.draft;
+  if (document === undefined || descriptor === undefined || draft === undefined) return;
+  if (instanceId === null) {
+    context.state.datasetInstanceId = null;
+  } else {
+    const instance = (document.dataSources ?? []).find(
+      (candidate) =>
+        candidate.id === instanceId &&
+        candidate.source.kind === 'dataset' &&
+        candidate.source.datasetId === descriptor.datasetId,
+    );
+    if (instance === undefined) return;
+    context.state.datasetInstanceId = instance.id;
+    context.state.draft = { ...draft, params: { ...instance.params } };
+  }
+  context.state.feedbackText = '';
+  context.state.draftDirty = isDatasetDraftDirty(context);
+  context.renderSurface();
+  applyDatasetDraft(context);
 }
 
 export function applyDatasetDraft(
@@ -130,7 +175,8 @@ export function applyDatasetDraft(
   const document = context.callbacks.getDocument();
   if (component === undefined || document === undefined) return;
   let transaction: ScreenParseResult<ScreenDocumentTransaction>;
-  if (context.state.mode === 'none') transaction = createEmptyDataSourceTransaction(component.id);
+  if (context.state.mode === 'none')
+    transaction = createEmptyDataSourceTransaction(document, component.id);
   else if (context.state.mode === 'static') {
     const entry = context.currentEntry();
     transaction = createStaticDataSourceTransaction(
@@ -153,12 +199,15 @@ export function applyDatasetDraft(
       context.setFeedback(DESIGNER_UI_TEXT.dataset.incomplete);
       return;
     }
-    transaction = createDatasetDataSourceTransaction({
+    transaction = createDatasetBindingTransaction({
       document,
       componentId: component.id,
       descriptor,
       draft,
       roles: context.currentEntry()?.manifest.dataBinding?.roles ?? [],
+      ...(context.state.datasetInstanceId === null
+        ? {}
+        : { preferredInstanceId: context.state.datasetInstanceId }),
     });
   }
   if (!transaction.ok) {
@@ -171,6 +220,13 @@ export function applyDatasetDraft(
     context.callbacks.report(result.diagnostics);
     return;
   }
+  const updatedComponent = result.value.components.find(
+    (candidate) => candidate.id === component.id,
+  );
+  const updatedRef =
+    updatedComponent === undefined ? null : readScreenComponentValueRef(updatedComponent);
+  context.state.datasetInstanceId =
+    updatedRef?.kind === 'data-source-field' ? updatedRef.dataSourceId : null;
   // 成功状态由状态条/工作台头部表达，不再另塞一条「数据源已应用」，避免同义重复。
   if (options.auto !== true) context.setFeedback('');
   context.state.draftDirty = false;
@@ -184,14 +240,20 @@ export function syncDraftToFocusedComponent(
 ): { readonly datasetId: string } | undefined {
   const component = context.currentComponent();
   const focusedId = component?.id ?? null;
-  const source = component?.dataSource;
+  const document = context.callbacks.getDocument();
+  const authoringSource = readAuthoringDatasetSource(document, component);
+  const source = authoringSource?.source ?? component?.dataSource;
+  const instanceId = authoringSource?.instanceId ?? null;
   if (
     focusedId === context.state.focusedComponentId &&
-    sameJsonValue(source, context.state.syncedDataSource)
+    sameJsonValue(source, context.state.syncedDataSource) &&
+    instanceId === context.state.syncedInstanceId
   ) {
     // Session commits replace the document graph even when this component's data source did not
     // change. Keep authoring drafts, preview state, and host settings alive across such commits.
     context.state.syncedDataSource = source;
+    context.state.syncedInstanceId = instanceId;
+    context.state.datasetInstanceId = instanceId;
     return;
   }
   const sameFocusedComponent = focusedId === context.state.focusedComponentId;
@@ -200,6 +262,8 @@ export function syncDraftToFocusedComponent(
   context.state.focusedComponentId = focusedId;
   context.state.clearAutoApply();
   context.state.syncedDataSource = source;
+  context.state.syncedInstanceId = instanceId;
+  context.state.datasetInstanceId = instanceId;
   context.state.feedbackText = '';
   context.state.draftDirty = false;
   context.state.confirmClose = false;
@@ -237,11 +301,17 @@ export function syncDraftToFocusedComponent(
       return;
     }
     if (context.state.descriptor?.datasetId === source.datasetId) {
-      context.state.draft = createDesignerDatasetDraft(
-        context.state.descriptor,
-        source,
-        context.currentEntry()?.manifest.dataBinding?.roles ?? [],
-      );
+      const roles = context.currentEntry()?.manifest.dataBinding?.roles ?? [];
+      context.state.draft =
+        authoringSource?.instance !== undefined &&
+        authoringSource.instance.source.kind === 'dataset'
+          ? createDesignerDatasetDraftFromInstance(
+              context.state.descriptor,
+              authoringSource.instance,
+              component?.dataBinding,
+              roles,
+            )
+          : createDesignerDatasetDraft(context.state.descriptor, source, roles);
       return;
     }
     context.state.descriptor = undefined;
@@ -462,7 +532,9 @@ export function restoreDatasetControlFocus(
 }
 
 function isDatasetDraftDirty(context: DesignerDatasetControllerContext): boolean {
-  const source = context.currentComponent()?.dataSource;
+  const component = context.currentComponent();
+  const authoring = readAuthoringDatasetSource(context.callbacks.getDocument(), component);
+  const source = authoring?.source ?? component?.dataSource;
   const draft = context.state.draft;
   if (source?.type !== 'dataset' || draft === undefined) return draft !== undefined;
   if (source.datasetId !== draft.datasetId) {
@@ -470,9 +542,21 @@ function isDatasetDraftDirty(context: DesignerDatasetControllerContext): boolean
   }
   const roles = context.currentEntry()?.manifest.dataBinding?.roles ?? [];
   const binding = roles.length === 0 ? null : { fields: draft.fields };
+  const paramsEqual =
+    authoring?.instance === undefined
+      ? documentParamsKey(source.params) === draftParamsKey(draft.params)
+      : refParamsKey(authoring.instance.params) === refParamsKey(draft.params);
   return (
-    documentParamsKey(source.params) !== draftParamsKey(draft.params) ||
-    JSON.stringify(source.binding) !== JSON.stringify(binding)
+    !paramsEqual ||
+    JSON.stringify(component?.dataBinding ?? source.binding) !== JSON.stringify(binding)
+  );
+}
+
+function refParamsKey(params: Readonly<Record<string, ScreenValueRef>>): string {
+  return JSON.stringify(
+    Object.keys(params)
+      .sort()
+      .map((name) => [name, params[name]]),
   );
 }
 

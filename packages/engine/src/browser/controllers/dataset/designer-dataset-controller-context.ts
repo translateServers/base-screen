@@ -90,6 +90,9 @@ export class DesignerDatasetControllerState {
   autoApplyTimer: ReturnType<typeof setTimeout> | undefined;
   focusedComponentId: string | null = null;
   syncedDataSource: ScreenDocument['components'][number]['dataSource'] | undefined;
+  /** 当前编辑的文档级数据实例；legacy 组件 / 新建绑定尚未落库时为 null。 */
+  datasetInstanceId: string | null = null;
+  syncedInstanceId: string | null = null;
   /** 展开绑定字段弹层的角色：面板每次重渲染都从这里恢复开合态。 */
   bindingOpenRoleId: string | null = null;
   /**
@@ -131,6 +134,8 @@ export class DesignerDatasetControllerState {
     this.authoring = createDatasetAuthoringView();
     this.focusedComponentId = null;
     this.syncedDataSource = undefined;
+    this.datasetInstanceId = null;
+    this.syncedInstanceId = null;
     this.bindingOpenRoleId = null;
     this.parameterInlineMemory.clear();
     this.groupOpenOverrides.clear();

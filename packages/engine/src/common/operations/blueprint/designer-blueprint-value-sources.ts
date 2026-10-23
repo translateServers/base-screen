@@ -1,4 +1,8 @@
 import type { ScreenBlueprintValueExpression, ScreenDocument } from '@base-screen/contracts';
+import {
+  MAX_VALUE_REF_PATH_SEGMENTS,
+  VALUE_REF_PATH_SEGMENT_PATTERN,
+} from '@base-screen/contracts';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialObjectSchema,
@@ -10,6 +14,33 @@ export type DesignerBlueprintSetVariableSource =
   | 'event-field'
   | 'variable'
   | 'advanced';
+
+const EVENT_FIELD_SEGMENT = new RegExp(VALUE_REF_PATH_SEGMENT_PATTERN);
+
+/** 触发事件能否提供事件字段：只要不是变量事件，字段路径就由用户自由填写。 */
+export function designerBlueprintTriggerSupportsEventField(
+  document: ScreenDocument,
+  ruleId: string,
+): boolean {
+  const rule = document.blueprint.rules.find((candidate) => candidate.id === ruleId);
+  return rule?.trigger.type === 'material-event';
+}
+
+/**
+ * 事件字段路径的输入词法：点号分隔，每段与文档取值引用同词法，最多 8 段。
+ * 声明字段只是建议，物料没写 payloadSchema 时也允许手填 `row.city`。
+ */
+export function parseDesignerBlueprintEventFieldPath(input: string): readonly string[] | null {
+  const segments = input.split('.').map((segment) => segment.trim());
+  if (
+    segments.length === 0 ||
+    segments.length > MAX_VALUE_REF_PATH_SEGMENTS ||
+    segments.some((segment) => segment === '' || !EVENT_FIELD_SEGMENT.test(segment))
+  ) {
+    return null;
+  }
+  return segments;
+}
 
 export function designerBlueprintSetVariableSource(
   expression: ScreenBlueprintValueExpression,

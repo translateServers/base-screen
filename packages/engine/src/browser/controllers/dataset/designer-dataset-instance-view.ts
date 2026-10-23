@@ -44,6 +44,25 @@ export function readDesignerDataSourceInstanceView(
   };
 }
 
+/** 同数据集的文档级实例（共享实例选择器的唯一数据源；不把派生实例当成可复用对象）。 */
+export function readDesignerDatasetInstances(
+  document: ScreenDocument | undefined,
+  datasetId: string,
+): readonly DesignerDataSourceInstanceView[] {
+  return (document?.dataSources ?? [])
+    .filter(
+      (instance) => instance.source.kind === 'dataset' && instance.source.datasetId === datasetId,
+    )
+    .map((instance) => ({
+      id: instance.id,
+      name: instance.name,
+      sourceKind: instance.source.kind,
+      updatePolicy: instance.updatePolicy,
+      processorId: instance.processorId,
+      status: 'document' as const,
+    }));
+}
+
 /** 文档缺失时的空壳：只为让 `find` 走同一条路径，不制造第二种分支。 */
 function emptyDocument(): ScreenDocument {
   return {

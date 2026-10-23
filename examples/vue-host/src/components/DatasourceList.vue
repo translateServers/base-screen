@@ -17,6 +17,7 @@ import {
 } from '../lib/datasource-model';
 import { formatDateTime } from '../lib/format';
 import { showToast } from '../lib/toast';
+import { clearDatasourceReturn, readDatasourceReturn } from '../screen/datasource-return';
 import DatasourceDialogs from './DatasourceDialogs.vue';
 import DatasourceDrawer from './DatasourceDrawer.vue';
 import ErrorBanner from './ErrorBanner.vue';
@@ -56,6 +57,7 @@ const dialog = ref<
 >({ kind: 'none' });
 
 const hint = computed((): string | null => catalogHint(total.value, visibleCount.value));
+const returnTarget = readDatasourceReturn();
 
 async function load(): Promise<void> {
   if (status.value !== 'ready') status.value = 'loading';
@@ -192,6 +194,15 @@ watch([type, query], async () => {
         <p class="list-header__subtitle">{{ DATASOURCE_TEXT.pageDescription }}</p>
       </div>
       <div class="ds-toolbar">
+        <a
+          v-if="returnTarget"
+          class="button ds-return-link"
+          :href="returnTarget.href"
+          data-ds-return-screen=""
+          @click="clearDatasourceReturn"
+        >
+          返回大屏
+        </a>
         <input
           v-model="query"
           class="field ds-toolbar__search"

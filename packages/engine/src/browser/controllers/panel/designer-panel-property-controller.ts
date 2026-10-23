@@ -18,6 +18,10 @@ import {
   renderDesignerProperties,
 } from '../../dom/panel/designer-panel-dom.js';
 import type { DesignerPanelControllerCallbacks } from './designer-panel-controller-callbacks.js';
+import {
+  handleDesignerStyleRuleChange,
+  handleDesignerStyleRuleClick,
+} from './designer-style-rules-controller.js';
 
 export class DesignerPanelPropertyController {
   readonly #canvasPresentation: DesignerCanvasPresentationSettings =
@@ -40,6 +44,7 @@ export class DesignerPanelPropertyController {
   }
 
   onClick(target: Element): boolean {
+    if (handleDesignerStyleRuleClick(target, this.callbacks)) return true;
     const backgroundImageAction = target.closest<HTMLButtonElement>(
       '[data-canvas-background-image-action]',
     );
@@ -90,6 +95,13 @@ export class DesignerPanelPropertyController {
 
   onPropertyChange(event: Event): void {
     const target = event.target;
+    if (
+      target !== null &&
+      typeof (target as { readonly closest?: unknown }).closest === 'function' &&
+      handleDesignerStyleRuleChange(target as Element, this.callbacks)
+    ) {
+      return;
+    }
     const canvasSetting = (target as { readonly dataset?: DOMStringMap } | null)?.dataset
       ?.canvasSetting;
     if (canvasSetting !== undefined) {
@@ -138,6 +150,18 @@ export class DesignerPanelPropertyController {
   }
 
   onKeyDown(event: KeyboardEvent): boolean {
+    const target = event.target;
+    if (
+      event.key === 'Enter' &&
+      !event.isComposing &&
+      target !== null &&
+      typeof (target as { readonly matches?: unknown }).matches === 'function' &&
+      (target as Element).matches('[data-style-rule-path], [data-style-rule-value]')
+    ) {
+      event.preventDefault();
+      this.onPropertyChange(event);
+      return true;
+    }
     if (
       event.key !== 'Enter' ||
       event.isComposing ||

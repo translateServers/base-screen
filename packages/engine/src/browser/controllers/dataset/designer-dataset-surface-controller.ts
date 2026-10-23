@@ -44,6 +44,7 @@ import {
   readDesignerEffectiveInstanceView,
   readDesignerEffectiveValueRef,
 } from './designer-dataset-effective-value.js';
+import { readDesignerDatasetInstances } from './designer-dataset-instance-view.js';
 
 export function renderDatasetSurface(context: DesignerDatasetControllerContext): void {
   const preserve = context.callbacks.preserveScrollContinuity;
@@ -337,6 +338,14 @@ function createDatasetPanelOptions(
       dataValue,
       draftSelection,
     ),
+    datasetInstances:
+      context.state.descriptor === undefined
+        ? []
+        : readDesignerDatasetInstances(
+            context.callbacks.getDocument(),
+            context.state.descriptor.datasetId,
+          ),
+    selectedDatasetInstanceId: context.state.datasetInstanceId,
     groupOpenOverrides: context.state.groupOpenOverrides,
     onToggleGroup: (section, group, open) => {
       context.state.groupOpenOverrides.set(`${section}:${group}`, open);

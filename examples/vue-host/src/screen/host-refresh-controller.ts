@@ -1,9 +1,20 @@
-import type { ScreenComponentNode, ScreenJsonValue } from '@base-screen/contracts';
+import {
+  readScreenComponentValueRef,
+  type ScreenComponentNode,
+  type ScreenDataSource,
+  type ScreenDataSourceSource,
+  type ScreenJsonValue,
+} from '@base-screen/contracts';
 import type { Logger } from '../lib/logger';
 
 /** 控制器只要求元素提供这三样能力（便于用假元素做手动 tick 测试）。 */
 export interface RefreshableElement {
-  readonly document: { readonly components: readonly ScreenComponentNode[] } | undefined;
+  readonly document:
+    | {
+        readonly components: readonly ScreenComponentNode[];
+        readonly dataSources?: readonly ScreenDataSource[];
+      }
+    | undefined;
   refreshData(): void;
   refreshData(options: { readonly componentId: string; readonly trigger: 'polling' }): void;
   getVariable(id: string):
@@ -123,11 +134,13 @@ export function createHostRefreshController(options: RefreshControllerOptions): 
 
   const components = (): readonly ScreenComponentNode[] =>
     options.element.document?.components ?? [];
+  const dataSources = (): readonly ScreenDataSource[] =>
+    options.element.document?.dataSources ?? [];
+  const groups = (): readonly RefreshGroup[] => collectRefreshGroups(components(), dataSources());
 
-  const intervalOf = (component: ScreenComponentNode): number => {
+  const intervalOf = (group: RefreshGroup): number => {
     if (options.overrideIntervalMs !== undefined) return options.overrideIntervalMs;
-    const key = intervalKeyOf(component);
-    if (key === undefined) return intervals['*'] ?? 30_000;
+    const key = group.intervalKey;
     const direct = intervals[key];
     if (direct !== undefined) return direct;
     const namespace = `${key.split('.')[0] ?? ''}.*`;
@@ -153,9 +166,8 @@ export function createHostRefreshController(options: RefreshControllerOptions): 
 
   const resetDue = (from: number): void => {
     const next = new Map<string, number>();
-    for (const component of components()) {
-      if (intervalKeyOf(component) === undefined) continue;
-      next.set(component.id, from + intervalOf(component));
+    for (const group of groups()) {
+      next.set(group.key, from + intervalOf(group));
     }
     nextDue = next;
   };
@@ -202,18 +214,16 @@ export function createHostRefreshController(options: RefreshControllerOptions): 
       return;
     }
     const timestamp = now();
-    for (const component of components()) {
-      const key = intervalKeyOf(component);
-      if (key === undefined) continue;
-      const due = nextDue.get(component.id);
+    for (const group of groups()) {
+      const due = nextDue.get(group.key);
       if (due === undefined) {
-        nextDue.set(component.id, timestamp + intervalOf(component));
+        nextDue.set(group.key, timestamp + intervalOf(group));
         continue;
       }
       if (due > timestamp) continue;
-      if (options.isPending?.(component.id) === true) continue;
-      refreshOne(component.id);
-      nextDue.set(component.id, timestamp + intervalOf(component));
+      if (options.isPending?.(group.componentId) === true) continue;
+      refreshOne(group.componentId);
+      nextDue.set(group.key, timestamp + intervalOf(group));
     }
     scheduleHeartbeat();
   };
@@ -228,9 +238,8 @@ export function createHostRefreshController(options: RefreshControllerOptions): 
         handle.onChange(() => {
           // 变量变化已经触发过一轮刷新，把到期时间整体推后，避免紧接着又刷一次。
           const timestamp = now();
-          for (const component of components()) {
-            if (intervalKeyOf(component) === undefined) continue;
-            nextDue.set(component.id, timestamp + intervalOf(component));
+          for (const group of groups()) {
+            nextDue.set(group.key, timestamp + intervalOf(group));
           }
         }),
       );
@@ -290,14 +299,13 @@ export function createHostRefreshController(options: RefreshControllerOptions): 
       }
       const timestamp = now();
       const seen = new Set<string>();
-      for (const component of components()) {
-        if (intervalKeyOf(component) === undefined) continue;
-        seen.add(component.id);
-        if (options.isPending?.(component.id) === true) continue;
-        refreshOne(component.id);
-        nextDue.set(component.id, timestamp + intervalOf(component));
+      for (const group of groups()) {
+        seen.add(group.key);
+        if (options.isPending?.(group.componentId) === true) continue;
+        refreshOne(group.componentId);
+        nextDue.set(group.key, timestamp + intervalOf(group));
       }
-      // 文档里已删除的组件不再占用到期表。
+      // 文档里已删除的组件 / 实例不再占用到期表。
       for (const id of [...nextDue.keys()]) {
         if (!seen.has(id)) nextDue.delete(id);
       }
@@ -315,6 +323,64 @@ export function createHostRefreshController(options: RefreshControllerOptions): 
       nextDue = new Map();
     },
   };
+}
+
+interface RefreshGroup {
+  /** 文档级实例 id；legacy 组件使用组件 id（一组件一实例）。 */
+  readonly key: string;
+  /** 刷新动作的代表组件：文档顺序里第一个读该实例的组件。 */
+  readonly componentId: string;
+  readonly intervalKey: string;
+}
+
+/**
+ * 按数据源实例分组：14 个组件共享 live 实例时只排一次期、只调一次 refreshData。
+ * 代表组件与运行时 `DataSourceRuntime.#consumerOf` 一致（文档顺序第一个读者）。
+ */
+function collectRefreshGroups(
+  components: readonly ScreenComponentNode[],
+  dataSources: readonly ScreenDataSource[],
+): readonly RefreshGroup[] {
+  const groups = new Map<string, RefreshGroup>();
+  for (const component of components) {
+    // 旧形态优先：readScreenComponentValueRef 会为 legacy dataset 合成一个派生 ref，
+    // 先按 component.dataSource 分组，才不会把它误当成文档级实例。
+    if (component.dataSource !== null) {
+      const intervalKey = intervalKeyOf(component);
+      if (intervalKey === undefined) continue;
+      groups.set(component.id, {
+        key: component.id,
+        componentId: component.id,
+        intervalKey,
+      });
+      continue;
+    }
+    const ref = readScreenComponentValueRef(component);
+    if (ref?.kind !== 'data-source-field') continue;
+    const instance = dataSources.find((candidate) => candidate.id === ref.dataSourceId);
+    if (instance === undefined) continue;
+    const intervalKey = intervalKeyOfSource(instance.source);
+    if (intervalKey === undefined) continue;
+    if (!groups.has(instance.id)) {
+      groups.set(instance.id, {
+        key: instance.id,
+        componentId: component.id,
+        intervalKey,
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
+function intervalKeyOfSource(source: ScreenDataSourceSource): string | undefined {
+  if (source.kind === 'dataset') return `dataset.${source.datasetId}`;
+  if (source.kind === 'host-resource') {
+    return source.resourceType === 'demo_metric'
+      ? `metric.${source.resourceId}`
+      : `resource.${source.resourceType}`;
+  }
+  if (source.kind === 'host-catalog' || source.kind === 'url-query') return 'variable.*';
+  return undefined;
 }
 
 /** 组件 → 节拍键；`static`/`null` 数据源不需要轮询。 */

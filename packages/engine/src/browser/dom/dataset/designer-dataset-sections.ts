@@ -51,6 +51,8 @@ export function datasetConfigurationOptions(
     link: options.link,
     surface: options.surface,
     instance: options.instance,
+    instances: options.datasetInstances,
+    selectedInstanceId: options.selectedDatasetInstanceId,
     groupOpenOverrides: options.groupOpenOverrides,
     onToggleGroup: options.onToggleGroup,
   };

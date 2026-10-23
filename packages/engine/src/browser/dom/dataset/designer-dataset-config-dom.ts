@@ -2,6 +2,7 @@ import type { ScreenDatasetDefinition, ScreenValueRef } from '@base-screen/contr
 import type { ScreenDataBindingRole } from '@base-screen/core';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
+import { createDesignerFieldRow } from '../designer-field-primitives.js';
 import { enhanceDesignerSelect } from '../designer-select-dom.js';
 import { createDesignerSegmented, createDesignerSelect } from '../designer-ui-primitives.js';
 import {
@@ -220,6 +221,7 @@ function renderDatasetSummary(
     description.textContent = descriptor.description;
     summary.appendChild(description);
   }
+  appendInstancePicker(ownerDocument, summary, options);
   // 检查器把三颗灯放在卡片里（设计稿 `.health`）：它就是「这份来源现在通不通」的答案，
   // 与卡片内的名称/描述属于同一块信息。工作台另有诊断列（带失败诊断码），这里不再重复。
   if (options.surface === 'inspector') {
@@ -228,6 +230,46 @@ function renderDatasetSummary(
   // 绑定摘要已搬到 `mapping` 组内的「输出字段」一行：它原先嵌在这张卡片里，既与
   // 「字段映射」组内容重复（同义），又形成"卡片套卡片"。信息等价，只是换了位置。
   return summary;
+}
+
+/**
+ * 共享实例选择：同 dataset 的文档级实例可被多个组件复用。
+ * 选中已有实例会把它的参数带入草稿并立即改绑；「自动」保持当前参数，由事务按同参数复用/新建。
+ */
+function appendInstancePicker(
+  ownerDocument: Document,
+  summary: HTMLElement,
+  options: DesignerDatasetConfigurationOptions,
+): void {
+  const instances = options.instances ?? [];
+  const selected = options.selectedInstanceId ?? null;
+  if (instances.length === 0 && selected === null) return;
+  const row = createDesignerFieldRow(ownerDocument, {
+    label: DESIGNER_UI_TEXT.dataset.instance,
+    className: 'designer-dataset-instance',
+    controlClassName: 'designer-dataset-instance-control',
+  });
+  const select = createDesignerSelect(ownerDocument, {
+    options: [
+      {
+        value: '',
+        label: DESIGNER_UI_TEXT.dataset.instanceAuto,
+        selected: selected === null,
+      },
+      ...instances.map((instance) => ({
+        value: instance.id,
+        label: instance.name === instance.id ? instance.id : `${instance.name} · ${instance.id}`,
+        selected: instance.id === selected,
+      })),
+    ],
+  });
+  select.dataset.datasetInstanceSelect = '';
+  row.control.appendChild(enhanceDesignerSelect(select).element);
+  const hint = ownerDocument.createElement('p');
+  hint.className = 'designer-dataset-instance-hint';
+  hint.textContent = DESIGNER_UI_TEXT.dataset.instanceHint;
+  row.field.appendChild(hint);
+  summary.appendChild(row.field);
 }
 
 /**

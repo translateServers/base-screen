@@ -41,20 +41,34 @@ export function extractDatasetIds(document: string): readonly string[] {
     return [];
   }
   if (parsed === null || typeof parsed !== 'object') return [];
-  const components = (parsed as { components?: unknown }).components;
-  if (Array.isArray(components) === false) return [];
-  const ids: string[] = [];
-  for (const component of components) {
-    if (component === null || typeof component !== 'object') continue;
-    const dataSource = (component as { dataSource?: unknown }).dataSource;
-    if (dataSource === null || typeof dataSource !== 'object') continue;
-    const record = dataSource as { type?: unknown; datasetId?: unknown };
-    if (record.type !== 'dataset') continue;
-    if (typeof record.datasetId !== 'string' || record.datasetId === '') continue;
-    if (ids.includes(record.datasetId)) continue;
-    ids.push(record.datasetId);
+  const ids = new Set<string>();
+  const add = (datasetId: unknown): void => {
+    if (typeof datasetId === 'string' && datasetId !== '') ids.add(datasetId);
+  };
+  // 文档级共享实例：空气屏等新形态的 dataset 引用在这里，不在 component.dataSource。
+  const dataSources = (parsed as { dataSources?: unknown }).dataSources;
+  if (Array.isArray(dataSources)) {
+    for (const instance of dataSources) {
+      if (instance === null || typeof instance !== 'object') continue;
+      const source = (instance as { source?: unknown }).source;
+      if (source === null || typeof source !== 'object') continue;
+      const record = source as { kind?: unknown; datasetId?: unknown };
+      if (record.kind !== 'dataset') continue;
+      add(record.datasetId);
+    }
   }
-  return ids;
+  const components = (parsed as { components?: unknown }).components;
+  if (Array.isArray(components)) {
+    for (const component of components) {
+      if (component === null || typeof component !== 'object') continue;
+      const dataSource = (component as { dataSource?: unknown }).dataSource;
+      if (dataSource === null || typeof dataSource !== 'object') continue;
+      const record = dataSource as { type?: unknown; datasetId?: unknown };
+      if (record.type !== 'dataset') continue;
+      add(record.datasetId);
+    }
+  }
+  return [...ids];
 }
 
 @Injectable()

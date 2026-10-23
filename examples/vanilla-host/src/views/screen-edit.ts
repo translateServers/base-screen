@@ -8,6 +8,8 @@ import { el } from '../lib/dom';
 import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
+import { createBlueprintCanvas } from '../screen/blueprint-canvas';
+import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -42,7 +44,12 @@ export const screenEditView: ViewModule = {
     });
 
     const stage = el('div', { class: 'stage' });
-    container.append(stage);
+    const datasourcesButton = el('button', {
+      class: 'button editor-datasource-link',
+      text: '数据源',
+      attrs: { type: 'button', 'data-editor-datasources': '' },
+    });
+    container.append(stage, datasourcesButton);
 
     let designer: BaseScreenDesignerElement | undefined;
     let detach: (() => void) | undefined;
@@ -59,6 +66,8 @@ export const screenEditView: ViewModule = {
 
       // 1) 先创建并挂载设计器：画布与渲染器在元素 connected 时才建立。
       const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
+      // 宿主编排画布作为设计器的 light DOM 子节点，经公开 slot 进入蓝图工作台。
+      element.append(createBlueprintCanvas());
       stage.append(element);
       designer = element;
       runtime.bindDesigner(element);
@@ -148,6 +157,18 @@ export const screenEditView: ViewModule = {
       };
       element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
 
+      const onDatasources = (): void => {
+        leaving = true;
+        clearSaveTimer();
+        void (async () => {
+          await runSave();
+          if (dirty && !conflicted) await runSave();
+          rememberDatasourceReturn(`#/screens/${screenId}/edit`);
+          window.location.hash = '#/datasources';
+        })();
+      };
+      datasourcesButton.addEventListener('click', onDatasources);
+
       const onConflict = (): void => {
         conflicted = true;
         clearSaveTimer();
@@ -168,6 +189,7 @@ export const screenEditView: ViewModule = {
       element.addEventListener('base-screen-dirty-change', onDirtyChange);
 
       detach = (): void => {
+        datasourcesButton.removeEventListener('click', onDatasources);
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
         element.removeEventListener('base-screen-dirty-change', onDirtyChange);
@@ -195,6 +217,7 @@ export const screenEditView: ViewModule = {
       clearSaveTimer();
       designer?.remove();
       designer = undefined;
+      datasourcesButton.remove();
       stage.remove();
       screenSessionStore.getState().reset();
       logger.debug('edit view released');

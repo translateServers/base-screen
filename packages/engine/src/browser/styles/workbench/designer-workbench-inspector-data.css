@@ -2618,3 +2618,15 @@
   padding-top: 0;
   border-top: 0;
 }
+
+/* 共享实例选择：与请求参数同列，提示行落在字段下方，不挤压来源卡片高度。 */
+.designer-dataset-summary .designer-dataset-instance {
+  margin-top: 8px;
+}
+
+.designer-dataset-instance-hint {
+  margin: 4px 0 0;
+  color: var(--designer-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}

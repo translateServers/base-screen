@@ -6,6 +6,8 @@ import { useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
+import { createBlueprintCanvas } from '../screen/blueprint-canvas';
+import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -33,6 +35,7 @@ export function ScreenEditorPage(): React.ReactElement {
   const { screenId } = useParams<{ screenId: string }>();
   const navigate = useNavigate();
   const stageRef = useRef<HTMLDivElement>(null);
+  const datasourcesRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -60,6 +63,8 @@ export function ScreenEditorPage(): React.ReactElement {
 
       // 尺寸交给 .stage / .stage > * 的 CSS（占满视口），宿主不再内联写百分比宽高。
       const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
+      // 宿主编排画布作为设计器的 light DOM 子节点，经公开 slot 进入蓝图工作台。
+      element.append(createBlueprintCanvas());
       stage.append(element);
       designer = element;
       runtime.bindDesigner(element);
@@ -123,6 +128,17 @@ export function ScreenEditorPage(): React.ReactElement {
         });
         saveFlight = flight;
         return flight;
+      };
+
+      datasourcesRef.current = (): void => {
+        leaving = true;
+        clearSaveTimer();
+        void (async () => {
+          await runSave();
+          if (dirty && !conflicted) await runSave();
+          rememberDatasourceReturn(`#/screens/${screenId}/edit`);
+          navigate('/datasources');
+        })();
       };
 
       /** 把当前文档 PUT 到宿主；返回是否已无未保存改动。 */
@@ -202,6 +218,7 @@ export function ScreenEditorPage(): React.ReactElement {
 
     return () => {
       disposed = true;
+      datasourcesRef.current = () => {};
       detach?.();
       unsubscribeSession();
       clearSaveTimer();
@@ -212,5 +229,17 @@ export function ScreenEditorPage(): React.ReactElement {
     };
   }, [screenId, navigate]);
 
-  return <div className="stage" ref={stageRef} />;
+  return (
+    <>
+      <div className="stage" ref={stageRef} />
+      <button
+        type="button"
+        className="button editor-datasource-link"
+        data-editor-datasources=""
+        onClick={() => datasourcesRef.current()}
+      >
+        数据源
+      </button>
+    </>
+  );
 }

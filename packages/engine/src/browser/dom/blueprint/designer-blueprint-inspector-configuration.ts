@@ -15,6 +15,7 @@ import {
   type DesignerBlueprintSetVariableSource,
   designerBlueprintEventFieldPaths,
   designerBlueprintSetVariableSource,
+  designerBlueprintTriggerSupportsEventField,
 } from '../../../common/operations/blueprint/designer-blueprint-value-sources.js';
 import { readDesignerVariableView } from '../../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
@@ -298,6 +299,7 @@ function actionFields(
     const sourceVariables = document.variables.filter(
       (variable) => variable.id !== action.variableId,
     );
+    const eventFieldAvailable = designerBlueprintTriggerSupportsEventField(document, ruleId);
     return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.variableId}</span>
       <select class="designer-control designer-select" data-blueprint-action-variable ${data}>
         ${document.variables.map((variable) => `<option value="${escapeAttribute(variable.id)}"${variable.id === action.variableId ? ' selected' : ''}>${escapeHtml(variable.name)}</option>`).join('')}
@@ -305,7 +307,7 @@ function actionFields(
     </label>
     <label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.valueSource}</span>
       <select class="designer-control designer-select" data-blueprint-action-value-source ${data}>
-        ${valueSourceOptions(source, eventFields.length > 0, sourceVariables.length > 0)}
+        ${valueSourceOptions(source, eventFieldAvailable, sourceVariables.length > 0)}
       </select>
     </label>
     ${valueSourceField(action.value, source, eventFields, sourceVariables, data)}`;
@@ -369,7 +371,7 @@ function expressionJson(expression: ScreenBlueprintValueExpression): string {
 
 function valueSourceOptions(
   selected: DesignerBlueprintSetVariableSource,
-  hasEventFields: boolean,
+  eventFieldAvailable: boolean,
   hasVariables: boolean,
 ): string {
   const options: readonly {
@@ -382,7 +384,7 @@ function valueSourceOptions(
     {
       value: 'event-field',
       label: DESIGNER_UI_TEXT.blueprint.valueSources.eventField,
-      disabled: !hasEventFields,
+      disabled: !eventFieldAvailable,
     },
     {
       value: 'variable',
@@ -420,14 +422,18 @@ function valueSourceField(
     </label>`;
   }
   if (source === 'event-field') {
-    if (eventFields.length === 0)
-      return `<p>${DESIGNER_UI_TEXT.blueprint.noDeclaredEventFields}</p>`;
     const current = expression.kind === 'event-payload' ? expression.path : [];
+    const suggestions = eventFields.map((path) => path.join('.'));
+    const listId = `blueprint-event-field-${data.replace(/[^A-Za-z0-9]+/g, '-')}`;
     return `<label class="blueprint-inspector-field"><span>${DESIGNER_UI_TEXT.blueprint.eventField}</span>
-      <select class="designer-control designer-select" data-blueprint-action-event-path ${data}>
-        ${eventFields.map((path) => `<option value="${escapeAttribute(JSON.stringify(path))}"${samePath(path, current) ? ' selected' : ''}>${escapeHtml(path.join('.'))}</option>`).join('')}
-      </select>
-    </label>`;
+      <input type="text" class="designer-control designer-input" value="${escapeAttribute(current.join('.'))}" placeholder="row.city" list="${escapeAttribute(listId)}" spellcheck="false" data-blueprint-action-event-path ${data}>
+      <small>${DESIGNER_UI_TEXT.blueprint.eventFieldCustomHint}</small>
+      <datalist id="${escapeAttribute(listId)}">${suggestions
+        .map((path) => `<option value="${escapeAttribute(path)}"></option>`)
+        .join('')}</datalist>
+    </label>${
+      eventFields.length === 0 ? `<p>${DESIGNER_UI_TEXT.blueprint.eventFieldNoSchemaHint}</p>` : ''
+    }`;
   }
   if (source === 'variable') {
     if (variables.length === 0) return `<p>${DESIGNER_UI_TEXT.blueprint.noSourceVariables}</p>`;
@@ -439,10 +445,6 @@ function valueSourceField(
     </label>`;
   }
   return '';
-}
-
-function samePath(left: readonly string[], right: readonly (string | number)[]): boolean {
-  return left.length === right.length && left.every((segment, index) => segment === right[index]);
 }
 
 function visibilityLabel(operation: 'show' | 'hide' | 'toggle'): string {

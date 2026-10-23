@@ -80,7 +80,7 @@ describe('Designer Blueprint set-variable value sources', () => {
       diagnostics: [],
       value: { ...action, value: { kind: 'event-payload', path: ['row'] } },
     });
-    expect(change('[data-blueprint-action-event-path]', '["row","id"]')).toEqual({
+    expect(change('[data-blueprint-action-event-path]', 'row.id')).toEqual({
       ok: true,
       diagnostics: [],
       value: { ...action, value: { kind: 'event-payload', path: ['row', 'id'] } },
@@ -92,15 +92,49 @@ describe('Designer Blueprint set-variable value sources', () => {
     });
   });
 
-  it('rejects undeclared field paths and self-variable sources', () => {
-    expect(change('[data-blueprint-action-event-path]', '["secret"]')).toMatchObject({ ok: false });
+  it('accepts custom event-field paths beyond the declared payload schema', () => {
+    expect(change('[data-blueprint-action-event-path]', 'meta.city')).toEqual({
+      ok: true,
+      diagnostics: [],
+      value: { ...action, value: { kind: 'event-payload', path: ['meta', 'city'] } },
+    });
+    expect(change('[data-blueprint-action-event-path]', 'row.deep.city')).toMatchObject({
+      ok: true,
+    });
+  });
+
+  it('allows event fields when the material declares no payload schema', () => {
+    expect(change('[data-blueprint-action-value-source]', 'event-field', undefined)).toEqual({
+      ok: true,
+      diagnostics: [],
+      value: { ...action, value: { kind: 'event-payload', path: ['row'] } },
+    });
+    expect(change('[data-blueprint-action-event-path]', 'row.city', undefined)).toEqual({
+      ok: true,
+      diagnostics: [],
+      value: { ...action, value: { kind: 'event-payload', path: ['row', 'city'] } },
+    });
+  });
+
+  it('rejects unsafe or over-long event-field paths and self-variable sources', () => {
+    expect(change('[data-blueprint-action-event-path]', 'secret.__proto__')).toMatchObject({
+      ok: false,
+    });
+    expect(change('[data-blueprint-action-event-path]', 'row..id')).toMatchObject({ ok: false });
+    expect(change('[data-blueprint-action-event-path]', 'a.b.c.d.e.f.g.h.i')).toMatchObject({
+      ok: false,
+    });
     expect(change('[data-blueprint-action-source-variable]', 'selected')).toMatchObject({
       ok: false,
     });
   });
 });
 
-function change(selector: string, value: string) {
+function change(
+  selector: string,
+  value: string,
+  catalogOverride: BaseScreenMaterialCatalog | undefined = catalog,
+) {
   const target = {
     value,
     dataset: { ruleId: 'rule-1', actionIndex: '0' },
@@ -108,5 +142,5 @@ function change(selector: string, value: string) {
       return candidate === selector;
     },
   } as unknown as Element;
-  return updateDesignerBlueprintActionFromTarget(target, document, action, catalog);
+  return updateDesignerBlueprintActionFromTarget(target, document, action, catalogOverride);
 }

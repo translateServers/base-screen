@@ -105,19 +105,30 @@ describe('DesignerDatasetController', () => {
     expect(transactions[0]).toEqual({
       commands: [
         {
+          type: 'replace-data-sources',
+          dataSources: [
+            {
+              id: 'data-source-text-1',
+              name: '订单',
+              source: { kind: 'dataset', datasetId: 'orders' },
+              params: {
+                limit: { kind: 'inline', value: 2 },
+                region: { kind: 'inline', value: 'north' },
+              },
+            },
+          ],
+        },
+        {
           type: 'update-components',
           componentIds: ['text-1'],
           patch: {
-            dataSource: {
-              type: 'dataset',
-
-              datasetId: 'orders',
-              params: {
-                limit: { kind: 'literal', value: 2 },
-                region: { kind: 'literal', value: 'north' },
-              },
-              binding: { fields: { columns: ['amount'] } },
+            dataSource: null,
+            dataValue: {
+              kind: 'data-source-field',
+              dataSourceId: 'data-source-text-1',
+              path: [],
             },
+            dataBinding: { fields: { columns: ['amount'] } },
           },
         },
       ],
@@ -363,11 +374,11 @@ describe('DesignerDatasetController', () => {
     expect(transactions).toHaveLength(1);
     expect(transactions[0]).toMatchObject({
       commands: [
+        { type: 'replace-data-sources' },
         {
           patch: {
-            dataSource: {
-              binding: { fields: { measures: ['amount'] } },
-            },
+            dataSource: null,
+            dataBinding: { fields: { measures: ['amount'] } },
           },
         },
       ],
@@ -396,9 +407,11 @@ describe('DesignerDatasetController', () => {
 
     expect(transactions[0]).toMatchObject({
       commands: [
+        { type: 'replace-data-sources' },
         {
           patch: {
-            dataSource: { binding: { fields: { measures: ['amount'] } } },
+            dataSource: null,
+            dataBinding: { fields: { measures: ['amount'] } },
           },
         },
       ],

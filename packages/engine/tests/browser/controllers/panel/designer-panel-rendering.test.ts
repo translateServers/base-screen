@@ -220,13 +220,13 @@ describe('designer panel rendering', () => {
       descendants(properties)
         .filter((element) => element.tagName === 'summary')
         .map((element) => element.textContent),
-    ).toEqual(['几何', '状态', '内容', '样式']);
+    ).toEqual(['几何', '状态', '内容', '样式', '条件样式']);
     expect(descendants(properties).find((element) => element.dataset.prop === 'title')?.value).toBe(
       'Status',
     );
   });
 
-  it('does not expose an editor for existing document conditional style rules', () => {
+  it('renders the conditional style editor for existing document rules', () => {
     const ownerDocument = new FakeDocument();
     const properties = ownerDocument.createElement('div');
     const base = document();
@@ -252,18 +252,30 @@ describe('designer panel rendering', () => {
     );
 
     const all = descendants(properties);
-    expect(all.some((element) => element.textContent === '条件样式')).toBe(false);
+    const section = all.find((element) =>
+      element.className.includes('designer-conditional-style-section'),
+    );
+    expect(section).toBeDefined();
+    const rule = descendants(section!).find((element) => element.dataset.styleRuleId === 'warn');
+    expect(rule).toBeDefined();
+    const path = descendants(rule!).find((element) => element.dataset.styleRulePath !== undefined);
+    expect(path?.value).toBe('level');
+    const operator = descendants(rule!).find(
+      (element) => element.dataset.styleRuleOperator !== undefined,
+    );
+    expect(operator?.options.find((option) => option.selected)?.value).toBe('eq');
+    const value = descendants(rule!).find(
+      (element) => element.dataset.styleRuleValue !== undefined,
+    );
+    expect(value?.value).toBe('warn');
     expect(
-      all.every(
-        (element) =>
-          element.dataset.styleRuleAdd === undefined &&
-          element.dataset.styleRuleRemove === undefined &&
-          element.dataset.styleRulePath === undefined &&
-          element.dataset.styleRuleOperator === undefined &&
-          element.dataset.styleRuleValue === undefined &&
-          element.dataset.styleRuleStyle === undefined,
-      ),
-    ).toBe(true);
+      descendants(rule!)
+        .filter((element) => element.dataset.styleRuleColor !== undefined)
+        .map((element) => element.value),
+    ).toContain('#ff4d4f');
+    expect(descendants(section!).some((element) => element.dataset.styleRuleAction === 'add')).toBe(
+      true,
+    );
   });
 
   it('disables editable controls while preserving locked and hidden status toggles', () => {

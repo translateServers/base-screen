@@ -8,6 +8,8 @@ import { useRoute, useRouter } from 'vue-router';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
+import { createBlueprintCanvas } from '../screen/blueprint-canvas';
+import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -64,6 +66,18 @@ function runSave(): Promise<boolean> {
   return flight;
 }
 
+function goDatasources(): void {
+  leaving = true;
+  clearSaveTimer();
+  void (async () => {
+    await runSave();
+    if (dirty && !conflicted) await runSave();
+    const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
+    rememberDatasourceReturn(`#/screens/${screenId}/edit`);
+    void router.push('/datasources');
+  })();
+}
+
 /** 把当前文档 PUT 到宿主；返回是否已无未保存改动。 */
 async function persist(): Promise<boolean> {
   const instance = designer.value;
@@ -111,6 +125,8 @@ onMounted(() => {
     // 顺序不可颠倒——画布与渲染器在元素 connected 时才建立。尺寸交给 .stage 与 .stage > *
     // 的 CSS（占满视口），宿主不再内联写百分比宽高。
     const element = document.createElement('base-screen-designer') as BaseScreenDesignerElement;
+    // 宿主编排画布作为设计器的 light DOM 子节点，经公开 slot 进入蓝图工作台。
+    element.append(createBlueprintCanvas());
     container.append(element);
     designer.value = element;
     host.bindDesigner(element);
@@ -223,4 +239,12 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="stage" class="stage" />
+  <button
+    type="button"
+    class="button editor-datasource-link"
+    data-editor-datasources=""
+    @click="goDatasources"
+  >
+    数据源
+  </button>
 </template>
