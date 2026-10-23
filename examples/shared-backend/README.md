@@ -64,10 +64,16 @@ shared-backend/
 `service_satisfaction`（%）、`member_repurchase`（%）；`points` 为 1..120 的整数，默认 24。
 排行固定为 `region`（6 个区域）与 `channel`（4 个渠道），`limit` 为 1..20，默认 6。
 
-空库播种三条记录：「默认销售大屏」是 50+ 组件的 DataV 风格成品文档，「系统监控大屏」保留
+空库播种四条记录：「默认销售大屏」是 50+ 组件的 DataV 风格成品文档，「系统监控大屏」保留
 原来的最小卡片文档（覆盖宿主自有物料路径），「生产监控大屏」是覆盖四种 dataSource 的数据层
-成品文档。种子只在空库执行；本地想重新播种时删除
+成品文档，「空气质量监测大屏」是三个自建 SQLite 数据源 + 真实快照（Open-Meteo CAMS）的
+城市空气质量案例。种子只在空库执行；本地想重新播种时删除
 `data/screens.db` 后重启，或直接跑冒烟脚本（它使用独立库并自动迁移）。
+
+数据源侧同时幂等生成 `data/datasources/city-air.db` 并播种三条只读 SQLite 源
+（`custom.air-live` / `custom.air-trend` / `custom.air-rank`）。它们与用户自建数据源共用
+同一套路径守卫、只读执行器、测试/预览/目录投影；快照来源与 AQI 口径见
+`src/datasets/air-quality-snapshot.ts` 文件头。
 
 `GET /api/docs` 提供 OpenAPI 文档（Swagger UI）。
 
@@ -86,8 +92,9 @@ pnpm --filter @base-screen-example/shared-backend dev # 开发：migrate deploy 
 - schema 变更：`pnpm --filter @base-screen-example/shared-backend exec prisma migrate dev --name <描述>`，
   产物（`prisma/migrations/`）随提交进仓库。
 - `dev` / `start` 前自动 `prisma migrate deploy`，无需手动同步 schema。
-- 空库首次启动由 `ScreensService.onModuleInit` 幂等播种三条演示大屏
-  （`默认销售大屏`、`系统监控大屏`、`生产监控大屏`），dev / start / e2e 行为一致。
+- 空库首次启动由 `ScreensService.onModuleInit` 幂等播种四条演示大屏
+  （`默认销售大屏`、`系统监控大屏`、`生产监控大屏`、`空气质量监测大屏`），dev / start / e2e
+  行为一致；数据源播种由 `DatasourceSeedService` 负责（含 `city-air.db` 的幂等生成）。
 - 数据库文件：`data/screens.db`（gitignore）；连接信息见 `.env`（非机密默认值）。
 
 ## 测试

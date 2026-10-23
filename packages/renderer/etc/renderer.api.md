@@ -156,6 +156,9 @@ export type BaseScreenViewerRefreshOptions = {
     readonly traceId?: string;
 };
 
+// @public
+type ComponentFailurePolicy = 'fail' | 'skip';
+
 // @public (undocumented)
 export function createBaseScreenRenderer(options: CreateBaseScreenRendererOptions): BaseScreenRenderer;
 
@@ -163,6 +166,7 @@ export function createBaseScreenRenderer(options: CreateBaseScreenRendererOption
 export interface CreateBaseScreenRendererOptions {
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
+    readonly componentFailurePolicy?: ComponentFailurePolicy;
     readonly conditionalStylePort?: BaseScreenConditionalStylePort;
     // (undocumented)
     readonly contributionIndex?: BaseScreenRuntimeContributionIndex;

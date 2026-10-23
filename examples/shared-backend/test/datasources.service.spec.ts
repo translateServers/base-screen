@@ -271,9 +271,9 @@ describe('A1 · 列表排序与内置投影', () => {
 });
 
 describe('P0-15 · 示例数据源播种', () => {
-  it('seeds two examples once, with the REST one staying draft', async () => {
+  it('seeds two examples and three air-quality sources once', async () => {
     const created = await seed.ensureSeed();
-    expect(created).toBe(2);
+    expect(created).toBe(5);
 
     const press = await service.detail('custom.example-press');
     expect(press).toMatchObject({ type: 'rest', status: 'draft', name: '示例 · 压力接口' });
@@ -295,9 +295,36 @@ describe('P0-15 · 示例数据源播种', () => {
       'date',
     ]);
 
+    // 三条真实快照数据源：库文件已生成、配置经过一次真实查询才变成 ready。
+    const live = await service.detail('custom.air-live');
+    expect(live).toMatchObject({
+      type: 'sqlite',
+      status: 'ready',
+      name: '空气质量 · 城市实时',
+    });
+    expect(live.fields.map((field) => field.id)).toContain('AQI');
+    expect(live.fields.map((field) => field.id)).toContain('PM2.5');
+    // `YYYY-MM-DD HH:MM` 会被推断成 date，但契约只接受严格 ISO；SQL 末尾补 CST
+    // 把该列落成 string（否则整份 tabular 会被宿主判 HOST_DATASET_INVALID）。
+    expect(live.fields.find((field) => field.id === '更新时间')?.valueType).toBe('string');
+    expect(live.fields.map((field) => field.id)).toContain('PM2.5显示');
+    expect(live.fields.map((field) => field.id)).toContain('PM2.5状态');
+    const trend = await service.detail('custom.air-trend');
+    expect(trend).toMatchObject({ type: 'sqlite', status: 'ready' });
+    expect(trend.fields.map((field) => field.id)).toEqual(['时间', 'AQI', 'PM2.5', 'PM10', 'O3']);
+    const rank = await service.detail('custom.air-rank');
+    expect(rank).toMatchObject({ type: 'sqlite', status: 'ready' });
+    expect(rank.fields.map((field) => field.id)).toEqual([
+      'rank',
+      'city',
+      'AQI',
+      'level',
+      'primary',
+    ]);
+
     // 幂等：第二次什么都不建
     await expect(seed.ensureSeed()).resolves.toBe(0);
-  }, 20_000);
+  }, 30_000);
 });
 
 describe('Q2 · 设计器目录上限', () => {

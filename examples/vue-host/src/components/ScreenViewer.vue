@@ -11,6 +11,10 @@ import { useRoute, useRouter } from 'vue-router';
 import { useScreenSessionStore } from '../composables/use-stores';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
+import {
+  attachRenderDiagnostics,
+  type RenderDiagnosticsHandle,
+} from '../lib/render-diagnostics';
 import { showToast } from '../lib/toast';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
@@ -177,6 +181,7 @@ const scale = ref(1);
 const offsetX = ref(0);
 const offsetY = ref(0);
 const fullscreen = ref(false);
+const renderFailed = ref(false);
 /** 顶栏数据状态：由 1s 节拍读 observer 快照，不在 observer 回调里写 ref。 */
 const dataOnline = ref(true);
 const dataFailures = ref(0);
@@ -190,14 +195,20 @@ const frameStyle = computed(() => ({
 }));
 
 const statusText = computed(() =>
-  dataOnline.value ? '数据源在线' : `数据源离线 · ${dataFailures.value} 次失败`,
+  renderFailed.value
+    ? '渲染异常'
+    : dataOnline.value
+      ? '数据源在线'
+      : `数据源离线 · ${dataFailures.value} 次失败`,
 );
 
 /** tooltip 列出离线组件：chip 只有两态，排障要能一眼看出是谁没拿到数据。 */
 const statusTitle = computed(() =>
-  dataOnline.value
-    ? '数据源在线'
-    : `离线组件：${dataFailedComponents.value.join('、')}（累计 ${dataFailures.value} 次失败）`,
+  renderFailed.value
+    ? '渲染诊断：组件未通过校验或运行时失败，详情见左上角诊断面板。'
+    : dataOnline.value
+      ? '数据源在线'
+      : `离线组件：${dataFailedComponents.value.join('、')}（累计 ${dataFailures.value} 次失败）`,
 );
 
 const logger = createLogger('screen-viewer');
@@ -207,6 +218,7 @@ let resizeObserver: ResizeObserver | undefined;
 let clockTimer: number | undefined;
 let controller: ReturnType<typeof createHostRefreshController> | undefined;
 let hostObserver: HostObserver | undefined;
+let renderDiagnostics: RenderDiagnosticsHandle | undefined;
 let disposed = false;
 
 function updateFit(): void {
@@ -347,6 +359,14 @@ onMounted(() => {
     const element = document.createElement('base-screen-viewer') as BaseScreenViewerElement;
     container.append(element);
     viewer.value = element;
+    renderDiagnostics = attachRenderDiagnostics({
+      viewer: element,
+      container: host.value ?? container,
+      logger,
+      onActiveChange: (active) => {
+        renderFailed.value = active;
+      },
+    });
 
     const configured = element.configure({
       catalog: runtime.catalog,
@@ -416,6 +436,8 @@ onBeforeUnmount(() => {
   resizeObserver?.disconnect();
   document.removeEventListener('fullscreenchange', onFullscreenChange);
   window.clearInterval(clockTimer);
+  renderDiagnostics?.dispose();
+  renderDiagnostics = undefined;
   controller?.dispose();
   controller = undefined;
   window.__baseScreenHost = undefined;
@@ -448,7 +470,7 @@ function formatClock(date: Date): string {
       <span
         class="viewer-bar__status"
         data-viewer-status
-        :data-state="dataOnline ? 'online' : 'offline'"
+        :data-state="renderFailed ? 'error' : dataOnline ? 'online' : 'offline'"
         :title="statusTitle"
       >{{ statusText }}</span>
       <span class="viewer-bar__clock">{{ clock }}</span>

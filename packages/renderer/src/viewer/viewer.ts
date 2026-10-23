@@ -298,6 +298,9 @@ export class BaseScreenViewerElement extends ElementBase {
       catalog: this.#catalog,
       mode: 'viewer',
       interactive: true,
+      // 查看器是最终展示面：单个组件的 schema/binding 错误不应让整屏空白。
+      // 坏组件被跳过，诊断随 render 结果返回并经 base-screen-diagnostic 交给宿主。
+      componentFailurePolicy: 'skip',
       onMaterialEvent: (event) => {
         this.handleMaterialEvent(event);
         this.dispatchEvent(

@@ -10,6 +10,7 @@ import { api } from '../lib/api';
 import { el } from '../lib/dom';
 import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
+import { attachRenderDiagnostics, type RenderDiagnosticsHandle } from '../lib/render-diagnostics';
 import type { Route, ViewModule } from '../router';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
@@ -266,7 +267,15 @@ export const screenView: ViewModule = {
 
     // 顶栏 chip 由 1s 时钟节拍顺带刷新：不在 observer 回调里改 DOM，避免渲染期写入。
     let viewerStatus: HostObserver | undefined;
+    let renderFailure = false;
     const paintStatus = (): void => {
+      if (renderFailure) {
+        if (statusChip.textContent !== '渲染异常') statusChip.textContent = '渲染异常';
+        if (statusChip.dataset.state !== 'error') statusChip.dataset.state = 'error';
+        const title = '渲染诊断：组件未通过校验或运行时失败，详情见左上角诊断面板。';
+        if (statusChip.title !== title) statusChip.title = title;
+        return;
+      }
       if (viewerStatus === undefined) return;
       const status = viewerStatus.status();
       const online = viewerStatus.isOnline();
@@ -306,10 +315,13 @@ export const screenView: ViewModule = {
     });
 
     let viewer: BaseScreenViewerElement | undefined;
+    let renderDiagnostics: RenderDiagnosticsHandle | undefined;
     let controller: ReturnType<typeof createHostRefreshController> | undefined;
     const cleanup = (): void => {
       unsubscribe();
       observer.disconnect();
+      renderDiagnostics?.dispose();
+      renderDiagnostics = undefined;
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       window.clearInterval(clockTimer);
       controller?.dispose();
@@ -366,6 +378,15 @@ export const screenView: ViewModule = {
     const element = document.createElement('base-screen-viewer') as BaseScreenViewerElement;
     stage.append(element);
     viewer = element;
+    renderDiagnostics = attachRenderDiagnostics({
+      viewer: element,
+      container: host,
+      logger,
+      onActiveChange: (active) => {
+        renderFailure = active;
+        paintStatus();
+      },
+    });
 
     const configured = element.configure({
       catalog: runtime.catalog,

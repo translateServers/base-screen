@@ -642,7 +642,7 @@ async function main() {
     // 直接访问可达（不经过点击）
     await page.goto(`${url}#/datasources`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-ds-row]', { timeout: 25_000 });
-    await dsWaitRows(6);
+    await dsWaitRows(9);
     const dsColumns = await page.locator('.ds-table thead th').count();
     if (dsColumns !== 7) fail(`G: 表头应 7 列，实际 ${dsColumns}`);
 
@@ -688,7 +688,7 @@ async function main() {
     await page.locator('[data-ds-search]').fill('不存在');
     await page.waitForSelector('[data-ds-empty]', { timeout: 15_000 });
     await page.locator('[data-ds-empty] button', { hasText: '清空筛选' }).click();
-    await dsWaitRows(6);
+    await dsWaitRows(9);
 
     // A34：内置行「测试连接」→ 内置数据集，无需连接
     await dsRow('monitor.devices').locator('[data-ds-action="test"]').click();
@@ -710,7 +710,7 @@ async function main() {
     if (!restTestText.includes('12 行')) fail(`H: REST 测试应 12 行：${restTestText}`);
     await page.locator('[data-ds-save]').click();
     await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
-    await dsWaitRows(7);
+    await dsWaitRows(10);
 
     const restList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 REST')}`);
     const restItem = restList.body.items.find((item) => item.name === '冒烟 REST');
@@ -759,7 +759,7 @@ async function main() {
     await dsWaitPreviewRows(20, 'I: 表模式预览');
     await page.locator('[data-ds-save]').click();
     await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
-    await dsWaitRows(8);
+    await dsWaitRows(11);
     const sqliteList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 SQLite')}`);
     const sqliteItem = sqliteList.body.items.find((item) => item.name === '冒烟 SQLite');
     if (sqliteItem === undefined) fail('I: 台账里没有「冒烟 SQLite」');
@@ -815,7 +815,7 @@ async function main() {
     }
     await page.locator('[data-ds-save]').click();
     await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
-    await dsWaitRows(9);
+    await dsWaitRows(12);
     const sqlList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 SQL')}`);
     const sqlItem = sqlList.body.items.find((item) => item.name === '冒烟 SQL');
     if (sqlItem === undefined) fail('I: 台账里没有「冒烟 SQL」');
@@ -865,7 +865,7 @@ async function main() {
     }
     await page.locator('[data-ds-save]').click();
     await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
-    await dsWaitRows(10);
+    await dsWaitRows(13);
     const unreachableList = await dsFetch(
       `/datasources?query=${encodeURIComponent('冒烟 不可达')}`,
     );
@@ -896,7 +896,7 @@ async function main() {
     });
     if (staticCreated.status !== 201) fail(`J: 静态数据源创建失败 HTTP ${staticCreated.status}`);
     await dsGotoList();
-    await dsWaitRows(11);
+    await dsWaitRows(14);
     await dsOpenDrawer(staticCreated.body.datasetId, 'preview');
     await dsWaitPreviewRows(20, 'J: 静态预览');
     const staticPreviewText = await page.locator('[data-ds-preview]').innerText();
@@ -927,7 +927,7 @@ async function main() {
     });
     if (logsCreated.status !== 201) fail(`J: 工作日志数据源创建失败 HTTP ${logsCreated.status}`);
     await dsGotoList();
-    await dsWaitRows(12);
+    await dsWaitRows(15);
     await dsOpenDrawer(logsCreated.body.datasetId, 'preview');
     await dsWaitPreviewRows(undefined, 'J: 工作日志预览');
     const logsPreviewText = await page.locator('[data-ds-preview]').innerText();
@@ -984,7 +984,7 @@ async function main() {
     await headerRow.locator('input').nth(1).fill('super-secret-token-123');
     await page.locator('[data-ds-save]').click();
     await page.waitForSelector('[data-ds-form]', { state: 'detached', timeout: 25_000 });
-    await dsWaitRows(13);
+    await dsWaitRows(16);
     const bodyText = await page.evaluate(() => document.body.innerText);
     if (bodyText.includes('super-secret-token-123')) fail('L: 页面文本泄露了 header 明文');
     const headerList = await dsFetch(`/datasources?query=${encodeURIComponent('冒烟 Header')}`);
@@ -1091,7 +1091,7 @@ async function main() {
       fail(`L2: 坏 SQL 数据源创建失败 HTTP ${brokenCreated.status}`);
     }
     await dsGotoList();
-    await dsWaitRows(14);
+    await dsWaitRows(17);
     await dsRow(brokenCreated.body.datasetId).locator('[data-ds-action="test"]').click();
     // 结果条上一条是 J 段的「地址不可达」，这里等文案真的换成"表不存在"
     await page.waitForFunction(

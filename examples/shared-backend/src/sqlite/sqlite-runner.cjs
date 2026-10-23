@@ -17,7 +17,7 @@
  * `readOnly: true` 打开，任何写操作被 SQLite 自身拒绝，文件 SHA-256 与 mtime 不变。
  *
  * 协议：JSON over `process.send` / `process.on('message')`
- *   req  { id, op:'ping'|'describe'|'query'|'seedWorkshop', file?, sql?, params?, maxRows?, maxBytes?, fieldTypes? }
+ *   req  { id, op:'ping'|'describe'|'query'|'seedWorkshop'|'seedAirQuality', file?, sql?, params?, maxRows?, maxBytes?, fieldTypes?, hourly?, latest? }
  *   res  { id, ok:true, ... }
  *      | { id, ok:false, code, message }
  */
@@ -524,6 +524,102 @@ function describeFile(request) {
 }
 
 // ---------------------------------------------------------------------------
+// 真实空气质量快照库 city-air.db（数据源播种时幂等生成）
+// ---------------------------------------------------------------------------
+
+/**
+ * 表结构对应 `src/datasets/air-quality-snapshot.ts` 的两份数组。
+ *
+ * `city_hourly` 存每个城市最近 48 个完整小时（趋势图 + 城市切换），
+ * `city_latest` 存当前快照（KPI + 排名 + 健康提示）。两者都由快照一次性写入，
+ * 之后本库只读；数据新鲜度由启动时是否重建决定（文件存在即跳过）。
+ */
+const AIR_QUALITY_DDL = [
+  `CREATE TABLE city_hourly (
+    city TEXT NOT NULL,
+    time TEXT NOT NULL,
+    aqi INTEGER NOT NULL,
+    pm2_5 REAL NOT NULL,
+    pm10 REAL NOT NULL,
+    ozone REAL NOT NULL,
+    no2 REAL NOT NULL,
+    so2 REAL NOT NULL,
+    co REAL NOT NULL,
+    level TEXT NOT NULL,
+    "primary" TEXT NOT NULL,
+    PRIMARY KEY (city, time)
+  )`,
+  `CREATE TABLE city_latest (
+    city TEXT PRIMARY KEY,
+    province TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    aqi INTEGER NOT NULL,
+    level TEXT NOT NULL,
+    "primary" TEXT NOT NULL,
+    pm2_5 REAL NOT NULL,
+    pm10 REAL NOT NULL,
+    ozone REAL NOT NULL,
+    no2 REAL NOT NULL,
+    so2 REAL NOT NULL,
+    co REAL NOT NULL,
+    good_ratio REAL NOT NULL,
+    pm25_ratio REAL NOT NULL,
+    advice TEXT NOT NULL
+  )`,
+];
+
+function seedAirQuality(request) {
+  const file = request.file;
+  if (typeof file !== 'string' || file === '') {
+    throw new RunnerError('INVALID_SHAPE', MESSAGES.OPEN_FAILED);
+  }
+  const hourly = request.hourly;
+  const latest = request.latest;
+  if (
+    !Array.isArray(hourly) ||
+    hourly.length === 0 ||
+    !Array.isArray(latest) ||
+    latest.length === 0
+  ) {
+    throw new RunnerError('INVALID_SHAPE', MESSAGES.INVALID_SHAPE);
+  }
+  if (fs.existsSync(file)) return { created: false, tables: [] };
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const { DatabaseSync } = loadSqlite();
+  const db = new DatabaseSync(file);
+  try {
+    db.exec('BEGIN');
+    for (const statement of AIR_QUALITY_DDL) db.exec(statement);
+    const insertHourly = db.prepare(
+      'INSERT INTO city_hourly (city, time, aqi, pm2_5, pm10, ozone, no2, so2, co, level, "primary") VALUES (:city, :time, :aqi, :pm2_5, :pm10, :ozone, :no2, :so2, :co, :level, :primary)',
+    );
+    for (const row of hourly) insertHourly.run(row);
+    const insertLatest = db.prepare(
+      'INSERT INTO city_latest (city, province, updated_at, aqi, level, "primary", pm2_5, pm10, ozone, no2, so2, co, good_ratio, pm25_ratio, advice) VALUES (:city, :province, :updated_at, :aqi, :level, :primary, :pm2_5, :pm10, :ozone, :no2, :so2, :co, :good_ratio, :pm25_ratio, :advice)',
+    );
+    for (const row of latest) insertLatest.run(row);
+    db.exec('COMMIT');
+    return {
+      created: true,
+      tables: allRows(
+        db.prepare(
+          "SELECT name, type FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name",
+        ),
+      ).map((row) => ({ name: String(row.name), kind: row.type === 'view' ? 'view' : 'table' })),
+    };
+  } catch (error) {
+    try {
+      db.exec('ROLLBACK');
+    } catch {
+      /* 事务可能已自动回滚 */
+    }
+    throw error;
+  } finally {
+    db.close();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 演示库 workshop.db（启动时幂等生成）
 // ---------------------------------------------------------------------------
 
@@ -635,7 +731,8 @@ function insertDevicePhotos(db) {
 /**
  * 幂等生成演示库：文件存在就**什么都不做**（用户可能改过，不覆盖、不校验内容）。
  *
- * 这是全仓唯一以写模式打开 SQLite 的地方，且只在「文件缺失 + 启动时」发生一次。
+ * 这是两个以写模式打开 SQLite 的种子函数之一（另一个是 `seedAirQuality`），且只在
+ * 「文件缺失 + 启动时」发生一次。
  * 故意用默认 journal 模式（DELETE）而**不是 WAL**：只读打开 WAL 库在缺 `-shm` 时
  * 可能失败（R3），演示库不该自带这个坑。
  */
@@ -743,6 +840,8 @@ function dispatch(message) {
       return describeFile(message);
     case 'seedWorkshop':
       return seedWorkshop(message);
+    case 'seedAirQuality':
+      return seedAirQuality(message);
     default:
       throw new RunnerError('INVALID_SHAPE', MESSAGES.UNKNOWN_OP);
   }

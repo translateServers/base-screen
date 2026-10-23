@@ -1,3 +1,4 @@
+import { serializeDatavAirQualityDocument } from './datav-air-quality-document';
 import { serializeDatavDemoDocument } from './datav-demo-document';
 import { serializeDatavMonitorDocument } from './datav-monitor-document';
 import { validateScreenDocumentInput } from './screen-document-guard';
@@ -134,7 +135,9 @@ const STARTER_DOCUMENT = {
  * 空库播种的三条记录：
  * - 「默认销售大屏」是 DataV 风格的成品文档，打开即可看到完整大屏；
  * - 「系统监控大屏」保留轻量卡片文档，用于演示最小宿主物料与旧文档兼容；
- * - 「生产监控大屏」是数据层成品：四种 dataSource 全覆盖（见 datav-monitor-document.ts）。
+ * - 「生产监控大屏」是数据层成品：四种 dataSource 全覆盖（见 datav-monitor-document.ts）；
+ * - 「空气质量监测大屏」是真实数据案例：三个自建 SQLite 数据源 + 城市/时间窗联动
+ *   （见 datav-air-quality-document.ts）。
  *
  * `create()` 仍只发轻量卡片：新建大屏从一张空白画布开始，成品只作为种子。
  */
@@ -145,6 +148,7 @@ export const SEED_SCREENS: readonly {
   { name: '默认销售大屏', serialize: serializeDatavDemoDocument },
   { name: '系统监控大屏', serialize: serializeStarterDocument },
   { name: '生产监控大屏', serialize: serializeDatavMonitorDocument },
+  { name: '空气质量监测大屏', serialize: serializeDatavAirQualityDocument },
 ];
 
 /**

@@ -31,6 +31,15 @@ import type {
   ResolvedDataSource,
 } from './renderer-types.js';
 
+/**
+ * 候选校验失败的处置策略。
+ *
+ * - `fail`：任何诊断都让整次渲染失败（设计器保持失败关闭）；
+ * - `skip`：跳过未通过校验的组件、继续渲染其余组件，并把诊断随成功结果上报
+ *   （查看器使用；单个坏组件不应让整块监控屏空白）。
+ */
+export type ComponentFailurePolicy = 'fail' | 'skip';
+
 /** 组件数据解析结果：要么给出状态，要么给出让本次渲染失败关闭的诊断。 */
 export type ComponentDataResolution =
   | {
@@ -47,6 +56,7 @@ export function prepareCandidates(
   contributionIndex: BaseScreenRuntimeContributionIndex | undefined,
   dataSources: DataSourceRuntime,
   validationCache: ComponentValidationCache,
+  failurePolicy: ComponentFailurePolicy = 'fail',
 ): ScreenParseResult<readonly RenderCandidate[]> {
   const candidates: RenderCandidate[] = [];
   const diagnostics: ScreenDiagnostic[] = [];
@@ -150,9 +160,14 @@ export function prepareCandidates(
     });
   }
   validationCache.entries = nextEntries;
-  return diagnostics.length === 0
-    ? { ok: true, value: candidates, diagnostics: [] }
-    : { ok: false, diagnostics: sortDiagnostics(diagnostics) };
+  if (diagnostics.length === 0) {
+    return { ok: true, value: candidates, diagnostics: [] };
+  }
+  const sorted = sortDiagnostics(diagnostics);
+  if (failurePolicy === 'skip') {
+    return { ok: true, value: candidates, diagnostics: sorted };
+  }
+  return { ok: false, diagnostics: sorted };
 }
 
 /**

@@ -49,6 +49,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 
 ```text
 lib/api-base.ts  lib/api.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
+lib/render-diagnostics.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
 screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
 screen/metric-value.ts  screen/project-adapter.ts
@@ -154,7 +155,7 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 
 ## 成品屏与 DataV 风格种子
 
-三张 1920×1080 的成品文档，打开即可播放（默认销售 / 生产监控 / 系统监控）：
+四张 1920×1080 的成品文档，打开即可播放（默认销售 / 系统监控 / 生产监控 / 空气质量）：
 
 **「默认销售大屏」**——DataV 风格，顶栏 + 4 张 KPI 翻牌卡 + 渠道环形图 + 24h 面积趋势 +
 目标水位 + 区域订单柱图 + 轮播排行 + 3 条胶囊进度 + 底部滚动字幕，共 50+ 个原子组件。
@@ -184,6 +185,50 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 一眼扫完），`datav.pipeline` 承载保序工序链（哪道卡住），`datav.scroll-board` 承载带等级色条
 的告警流水（逐条读），三者消费的是同一个后端的三张表。
 
+**「空气质量监测大屏」**——真实数据案例，**三个自建 SQLite 数据源**：
+
+| 数据源 | 组件 | 数据来自 |
+| --- | --- | --- |
+| `custom.air-live` | 当前城市主视觉、六项污染物、健康提示 | 所选城市最新快照（1 行） |
+| `custom.air-trend` | AQI 面积图 + 颗粒物折线图 | 所选城市最近 24/48 小时（24/48 行） |
+| `custom.air-rank` | 左栏城市榜（排名兼城市选择器） | 8 城按 AQI 降序（8 行） |
+
+这 14 个 live 组件引用**同一个** `dataSources.live` 实例；两张趋势图共享 `trend`，榜单共用
+`rank`。共享实例由文档级 `dataSources` 声明，组件用 `dataValue` 引用。
+
+数据是 8 个重点城市 × 最近 48 个完整小时的**真实快照**（Open-Meteo Air Quality /
+CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取时间与派生口径写在
+`src/datasets/air-quality-snapshot.ts` 文件头。启动时 `DatasourceSeedService` 幂等生成
+`data/datasources/city-air.db` 并播种三条只读数据源，因此管理页的测试连接 / 预览 /
+被引用、设计器目录与查看页走的是与用户自建数据源**完全相同**的链路。
+
+交互只有两条：点城市榜任意行 → 蓝图 `rowClick` 写 `city`；点 24/48 小时按钮 →
+`valueClick` 写 `hours`，两张趋势图同步切换。城市榜同时承担排名与城市选择，时间窗显式
+可见；默认城市为上海（AQI 36，优），北京仍固定排在榜单第 1 行，风险不被隐藏。
+等级/超标着色走 canonical `styleRules`（ADR-0058），不注入宿主 CSS。
+
+**案例复盘：真实数据链路暴露的边界（本轮已修诊断可见性与共享实例，其余记录如下）**
+
+- **同一 dataset 多组件绑定（已修复）**：请求身份是数据源实例；逐组件写 `dataSource` 时
+  14 个 live 组件各合成一个实例，切城市会发 14 次相同查询。已改为文档级 `dataSources`
+  的三个共享实例：首屏 3 次查询，切城市 1 次 live + 1 次 trend，榜单不重发。
+- **自建数据源的日期推断比契约宽**：`YYYY-MM-DD HH:MM` 被
+  `inferValueTypeFromValue` 判为 `date`，但契约 `validDate` 只接受严格 ISO
+  （`T` + 秒 + 时区），整份数据集会在宿主编排层被判 `HOST_DATASET_INVALID`。本案例在
+  SQL 里补 ` CST` 让该列落为 string；根治需要统一两侧的日期口径。
+- **表格类物料的列 id 必须是 ASCII**：`scroll-board`/`base.table` 的列 id 走
+  `PLUGIN_CORE_DATA_CONTRACT_INVALID` 的标识符校验；中文列别名能用于标量与图表，
+  但不能直接做表格列。本案例用 ASCII 排名列 + 文档层表头解释列义。
+- **scroll-board 不能逐行着色，也没有选中行样式**：`statusPalette` 只有四个固定键，
+  中文等级值只能落到 default 色；榜单的行内等级色因此是统一的青色。当前城市由主视觉
+  与榜单标题表达；主视觉的等级/标准比/达标状态/优良率用 `styleRules` 条件着色。
+- **ECharts 物料不暴露轴范围**：评审稿的固定量程（AQI 0–160 / 颗粒物 0–120）无法在
+  文档层设置，双趋势图使用自适应量程；固定刻度需要给图表物料增加轴 props。
+- **时间窗按钮没有选中态**：`base.text` 没有 selected/active 样式；文档层用「当前
+  24/48 小时」数值指示当前窗口，按钮本身只承担触发。
+- **成品种子只在空库播种**：已有开发库不会自动补种第四张屏；本机验证库通过 API 写入了
+  新屏，其他旧库需删除 `data/screens.db` 后重启（或通过 API 导入文档）。
+
 「系统监控大屏」保留原来的轻量卡片文档，用来覆盖宿主自有物料
 `host-app.metric-value` 这条最小路径，也证明旧文档没有被新种子破坏。
 
@@ -197,6 +242,20 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 | `hostCatalogPort` | `src/screen/host-catalog-port.ts` | 来源目录与取值：`list` / `describe` 供设计器变量面板列出宿主来源（`previewable: true`），`resolve` 求值 `data-source` 变量（`production.clock` / `notice` / `status`，`readOnly: true`） |
 
 轮询由 `src/screen/host-refresh-controller.ts` 驱动（**只有查看页装，设计态不轮询**）。
+
+> 同一 dataset 被多个组件读取时，**用文档级 `dataSources` 共享一个实例**，组件用
+> `dataValue` 引用它；逐组件写 `dataSource` 会各合成一个实例（请求身份=实例），
+> `queryScope` 不会跨实例合并。
+
+### 查看器诊断与坏组件隔离（本轮新增）
+
+- 查看器以 `componentFailurePolicy: 'skip'` 创建 renderer：单个组件的 props/style/binding
+  不合法时只跳过该组件，其余组件继续渲染；设计器仍保持失败关闭。
+- 诊断经 `base-screen-diagnostic` 事件交给宿主；三端新增 `lib/render-diagnostics.ts`，
+  在未缩放的 viewer-stage 左上角显示 code / path / message，并把顶栏 chip 改为「渲染异常」。
+- 实测：把 `city-board.style.rowHeight` 改成 10（低于物料 20 的下限）→ 榜单消失，主视觉与
+  两张趋势照常渲染，面板显示 `PLUGIN_CORE_MANIFEST_FIELD_INVALID @ components/16/style`；
+  恢复文档后 chip 回到「数据源在线」。
 
 ### datasetPort 的四条硬规矩
 
@@ -438,7 +497,7 @@ cp my-data.db examples/shared-backend/data/datasources/
 | PRD | 覆盖位置 | 断言要点 |
 | --- | --- | --- |
 | A25 | 三端 smoke（G 段） | 顶栏「数据源」→ `#/datasources`、tab `aria-current=page`、点「大屏」回 `#/`、直接访问可达 |
-| A26 | 三端 smoke（G 段） | 6 行（4 内置 + 2 播种）、表头 7 列、播种 REST 徽标「草稿」/ 播种静态「就绪」、内置 4 行在末尾且无编辑/删除、`scrollWidth <= clientWidth` |
+| A26 | 三端 smoke（G 段） | 9 行（4 内置 + 2 基础示例 + 3 空气质量）、表头 7 列、播种 REST 徽标「草稿」/ 播种静态「就绪」、内置 4 行在末尾且无编辑/删除、`scrollWidth <= clientWidth` |
 | A27 | 三端 smoke（G 段） | 搜索「示例」=2、筛选「内置」=4、SQLite + 不存在的关键词 → 空态 + 「清空筛选」→ 回 6 行 |
 | A28 | 三端 smoke（H 段） | 新建 REST（地址用脚本的 `API_BASE`，不硬编码 3000）→ 测试 `rowCount=12`、字段恰 `t/device/value` 且 `value` 为 number → 保存「就绪」→ 目录命中；**编辑器绑定**用 API 克隆监控屏文档改绑后，查看页出 12 格 |
 | A29 | 三端 smoke（I 段） | 表模式 `workshop.db`/`devices`/勾 `id,name,status` → 预览 20 行 → 保存「就绪」+ `configSummary='workshop.db · devices'` → 目录 `groupId=custom` → 改绑后查看页 24 格、契约查询首行 `id` 非空 |

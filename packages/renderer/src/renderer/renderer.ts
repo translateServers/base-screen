@@ -28,6 +28,7 @@ import { applyCanvasBackground } from '../canvas-background.js';
 import { createMountedProjectionState } from '../resource/resource-state.js';
 import {
   type ComponentDataResolution,
+  type ComponentFailurePolicy,
   prepareCandidates,
   readComponentData,
 } from './renderer-candidates.js';
@@ -63,6 +64,11 @@ export interface CreateBaseScreenRendererOptions {
   /** ADR-0059 宿主条件样式端口：缺省时与既有渲染路径逐字节一致。 */
   readonly conditionalStylePort?: BaseScreenConditionalStylePort;
   readonly resourceTimeoutMs?: number;
+  /**
+   * 候选校验失败策略：缺省 `fail`（设计器失败关闭）。
+   * Viewer 传 `skip`：跳过坏组件、渲染其余内容，诊断随成功结果返回给宿主。
+   */
+  readonly componentFailurePolicy?: ComponentFailurePolicy;
   readonly contributionIndex?: BaseScreenRuntimeContributionIndex;
   readonly observer?: ScreenResourceObserver;
   readonly instanceId?: string;
@@ -178,6 +184,7 @@ class Renderer implements BaseScreenRenderer {
       this.#state.options.contributionIndex,
       this.#state.dataSources,
       this.#state.validationCache,
+      this.#state.options.componentFailurePolicy ?? 'fail',
     );
     if (!prepared.ok) {
       return prepared;
@@ -274,7 +281,11 @@ class Renderer implements BaseScreenRenderer {
         this.#state.options.onDiagnostic?.(diagnostic);
       }
     }
-    return { ok: true, value: null, diagnostics: runtimeDiagnostics };
+    return {
+      ok: true,
+      value: null,
+      diagnostics: [...prepared.diagnostics, ...runtimeDiagnostics],
+    };
   }
 
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null> {

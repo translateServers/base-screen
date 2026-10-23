@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
 import { createLogger } from '../lib/logger';
+import { attachRenderDiagnostics, type RenderDiagnosticsHandle } from '../lib/render-diagnostics';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -172,6 +173,7 @@ export function ScreenViewerPage(): React.ReactElement {
     failedComponents: [],
   });
   const [fullscreen, setFullscreen] = useState(false);
+  const [renderFailed, setRenderFailed] = useState(false);
 
   const updateFit = useCallback(() => {
     const host = hostRef.current;
@@ -219,6 +221,7 @@ export function ScreenViewerPage(): React.ReactElement {
     });
 
     let viewer: BaseScreenViewerElement | undefined;
+    let renderDiagnostics: RenderDiagnosticsHandle | undefined;
     let controller: ReturnType<typeof createHostRefreshController> | undefined;
     let frameTimer: number | undefined;
     let disposed = false;
@@ -262,6 +265,12 @@ export function ScreenViewerPage(): React.ReactElement {
       const element = document.createElement('base-screen-viewer') as BaseScreenViewerElement;
       stage.append(element);
       viewer = element;
+      renderDiagnostics = attachRenderDiagnostics({
+        viewer: element,
+        container: hostRef.current ?? stage,
+        logger,
+        onActiveChange: (active) => setRenderFailed(active),
+      });
 
       const configured = element.configure({
         catalog: runtime.catalog,
@@ -339,6 +348,8 @@ export function ScreenViewerPage(): React.ReactElement {
     return () => {
       disposed = true;
       window.clearInterval(frameTimer);
+      renderDiagnostics?.dispose();
+      renderDiagnostics = undefined;
       controller?.dispose();
       window.__baseScreenHost = undefined;
       unsubscribeSession();
@@ -380,14 +391,20 @@ export function ScreenViewerPage(): React.ReactElement {
         <span
           className="viewer-bar__status"
           data-viewer-status=""
-          data-state={dataStatus.online ? 'online' : 'offline'}
+          data-state={renderFailed ? 'error' : dataStatus.online ? 'online' : 'offline'}
           title={
-            dataStatus.online
-              ? '数据源在线'
-              : `离线组件：${dataStatus.failedComponents.join('、')}（累计 ${dataStatus.failures} 次失败）`
+            renderFailed
+              ? '渲染诊断：组件未通过校验或运行时失败，详情见左上角诊断面板。'
+              : dataStatus.online
+                ? '数据源在线'
+                : `离线组件：${dataStatus.failedComponents.join('、')}（累计 ${dataStatus.failures} 次失败）`
           }
         >
-          {dataStatus.online ? '数据源在线' : `数据源离线 · ${dataStatus.failures} 次失败`}
+          {renderFailed
+            ? '渲染异常'
+            : dataStatus.online
+              ? '数据源在线'
+              : `数据源离线 · ${dataStatus.failures} 次失败`}
         </span>
         <span className="viewer-bar__clock">{clock}</span>
         <button type="button" className="button" onClick={toggleFullscreen}>

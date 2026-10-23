@@ -26,6 +26,9 @@ export const MAX_DATABASE_FILE_NAME_LENGTH = 128;
 /** 演示库文件名（`WorkshopSeedService` 生成，`GET /database-files` 会列出来）。 */
 export const WORKSHOP_DATABASE_FILE = 'workshop.db';
 
+/** 真实空气质量快照库（数据源播种时幂等生成，见 `air-quality-seed.ts`）。 */
+export const AIR_QUALITY_DATABASE_FILE = 'city-air.db';
+
 /**
  * 宿主自己的库文件：即使它们出现在受管目录里也不列、不可选。
  *

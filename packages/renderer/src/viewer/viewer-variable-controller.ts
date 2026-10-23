@@ -246,10 +246,11 @@ export class ViewerVariableController {
         return;
       }
       const rendered = renderer.render(document, { trigger, traceId: traceId ?? '' });
-      if (!rendered.ok || rendered.diagnostics.length > 0) {
+      if (!rendered.ok) {
         this.#host.emitDiagnostics(rendered.diagnostics);
         return;
       }
+      if (rendered.diagnostics.length > 0) this.#host.emitDiagnostics(rendered.diagnostics);
       this.#host.writeBlueprintVariables(variables);
       if (!forceRefresh) this.#hasRenderedDocument = true;
       if (forceRefresh) {
@@ -288,10 +289,11 @@ export class ViewerVariableController {
         return;
       }
       const rendered = renderer.render(document, { trigger, traceId: '' });
-      if (!rendered.ok || rendered.diagnostics.length > 0) {
+      if (!rendered.ok) {
         this.#host.emitDiagnostics(rendered.diagnostics);
         return;
       }
+      if (rendered.diagnostics.length > 0) this.#host.emitDiagnostics(rendered.diagnostics);
       if (generation !== this.#generation) return;
       this.#host.writeBlueprintVariables(variables);
     } finally {

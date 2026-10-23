@@ -60,10 +60,10 @@ async function createService(prisma: ReturnType<typeof createPrismaMock>): Promi
 }
 
 describe('ScreensService', () => {
-  it('seeds three starter screens on an empty database', async () => {
+  it('seeds four starter screens on an empty database', async () => {
     const prisma = createPrismaMock();
     prisma.screen.count.mockResolvedValue(0);
-    prisma.screen.createMany.mockResolvedValue({ count: 3 });
+    prisma.screen.createMany.mockResolvedValue({ count: 4 });
     const service = await createService(prisma);
 
     await service.ensureSeed();
@@ -75,6 +75,7 @@ describe('ScreensService', () => {
       '默认销售大屏',
       '系统监控大屏',
       '生产监控大屏',
+      '空气质量监测大屏',
     ]);
     const demo = JSON.parse(seeded[0]!.document) as {
       canvas: { width: number; height: number };
@@ -115,6 +116,56 @@ describe('ScreensService', () => {
       'clock',
       'notice',
       'status',
+    ]);
+    // 第四个种子是真实数据案例：三个共享 SQLite 实例 + 三处蓝图联动。
+    const air = JSON.parse(seeded[3]!.document) as {
+      canvas: { width: number; height: number };
+      components: Array<{
+        type: string;
+        dataSource: { type: string } | null;
+        dataValue?: { kind: string; dataSourceId?: string };
+      }>;
+      dataSources?: Array<{
+        id: string;
+        source: { kind: string; datasetId?: string };
+        params: Record<string, unknown>;
+      }>;
+      variables: Array<{ id: string }>;
+      blueprint: { rules: Array<{ trigger: { componentId: string } }> };
+    };
+    expect(air.canvas).toMatchObject({ width: 1920, height: 1080 });
+    expect(air.components.length).toBeGreaterThan(40);
+    expect(air.components.some((item) => item.type === 'datav.scroll-board')).toBe(true);
+    expect(air.components.some((item) => item.type === 'datav.digital-flop')).toBe(true);
+    expect(air.components.some((item) => item.type === 'datav.capsule-progress')).toBe(true);
+    expect(air.components.some((item) => item.type === 'plugin.echarts')).toBe(true);
+    expect(
+      new Set(
+        air.components
+          .map((item) => item.dataSource?.type)
+          .filter((type): type is string => type !== undefined),
+      ),
+    ).toEqual(new Set(['static', 'variable']));
+    expect(air.dataSources?.map((item) => item.source.datasetId)).toEqual([
+      'custom.air-live',
+      'custom.air-trend',
+      'custom.air-rank',
+    ]);
+    expect(
+      new Set(
+        air.components
+          .map((item) => item.dataValue?.dataSourceId)
+          .filter((id): id is string => id !== undefined),
+      ),
+    ).toEqual(new Set(['live', 'trend', 'rank']));
+    expect(
+      air.components.filter((item) => item.dataValue?.kind === 'data-source-field').length,
+    ).toBeGreaterThanOrEqual(15);
+    expect(air.variables.map((item) => item.id)).toEqual(['city', 'hours']);
+    expect(air.blueprint.rules.map((rule) => rule.trigger.componentId)).toEqual([
+      'city-board',
+      'window-24-text',
+      'window-48-text',
     ]);
   });
 

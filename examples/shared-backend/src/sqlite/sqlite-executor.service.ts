@@ -2,6 +2,7 @@ import { type ChildProcess, fork } from 'node:child_process';
 import { join } from 'node:path';
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { AirQualityHourlyRow, AirQualityLatestRow } from '../datasets/air-quality-snapshot';
 import type { DatasetValueType } from '../datasets/dataset-definitions';
 import {
   type CellScalar,
@@ -273,6 +274,21 @@ export class SqliteExecutorService implements OnModuleInit, OnModuleDestroy {
   /** 幂等生成演示库（文件存在即跳过）。 */
   async seedWorkshop(file: string): Promise<SqliteSeedResult> {
     const payload = await this.request({ op: 'seedWorkshop', file }, CONTROL_TIMEOUT_MS);
+    return { created: payload.created === true, tables: readTables(payload.tables) };
+  }
+
+  /** 幂等生成真实空气质量快照库（文件存在即跳过）。 */
+  async seedAirQuality(
+    file: string,
+    content: {
+      readonly hourly: readonly AirQualityHourlyRow[];
+      readonly latest: readonly AirQualityLatestRow[];
+    },
+  ): Promise<SqliteSeedResult> {
+    const payload = await this.request(
+      { op: 'seedAirQuality', file, hourly: content.hourly, latest: content.latest },
+      CONTROL_TIMEOUT_MS,
+    );
     return { created: payload.created === true, tables: readTables(payload.tables) };
   }
 

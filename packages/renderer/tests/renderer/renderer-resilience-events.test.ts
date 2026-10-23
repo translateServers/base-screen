@@ -38,6 +38,30 @@ describe('BaseScreenRenderer resilience', () => {
     expect(root.children).toEqual([]);
   });
 
+  it('R4b skips an invalid component when the viewer opts into partial rendering', () => {
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      componentFailurePolicy: 'skip',
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+    const valid = component('valid', 0);
+    const invalid = { ...component('invalid-style', 1), style: { color: 42 } };
+
+    const result = renderer.render(document([valid, invalid]));
+
+    expect(result.ok).toBe(true);
+    expect(root.children.map((element) => element.dataset.baseScreenComponentId)).toEqual([
+      'valid',
+    ]);
+    expect(result.diagnostics.length).toBeGreaterThan(0);
+    expect(result.diagnostics[0]?.path.slice(0, 2)).toEqual(['components', 1]);
+  });
+
   it('R3 updates a mounted Material model without replacing its element', () => {
     const root = new FakeRoot();
     const renderer = createBaseScreenRenderer({
