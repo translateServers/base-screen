@@ -42,6 +42,7 @@
     "dev:react-host": "pnpm --filter @base-screen-example/react-host dev",
     "dev:vue-host": "pnpm --filter @base-screen-example/vue-host dev",
     "dev:vanilla-host": "pnpm --filter @base-screen-example/vanilla-host dev",
+    "sync:examples": "node tooling/verification/sync-examples.mjs",
     "verify:examples": "pnpm --filter @base-screen-example/vanilla-host verify && pnpm --filter @base-screen-example/react-host verify && pnpm --filter @base-screen-example/vue-host verify",
     "check:packages": "node tooling/checks/packages.mjs",
     "check:boundaries": "node tooling/checks/boundaries.mjs",
