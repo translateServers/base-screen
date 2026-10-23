@@ -87,14 +87,22 @@
       "id": "conditional-style",
       "title": "条件样式与宿主视觉策略",
       "owner": "base-screen + host",
-      "availability": "current; event-driven replacement requires design",
-      "boundary": "styleRules 求值和 conditionalStylePort 当前存在；Designer 没有内建规则编辑区。事件驱动替代尚未设计，不视为已废弃。",
-      "publicApi": ["ScreenComponentNode.styleRules", "BaseScreenConditionalStylePort"],
+      "availability": "current; host-driven realtime styling via refreshConditionalStyles; no base alarm contract or transport",
+      "boundary": "styleRules 求值与 conditionalStylePort 当前存在；Designer 已有内建条件样式编辑区（748e133）。告警绑定、当前快照、SSE/WebSocket 传输、阈值与告警生命周期归宿主/告警平台；屏幕文档零告警知识。宿主在快照变化后调用 refreshConditionalStyles() 只重算样式，不取数、不写文档、不进历史。完整事件驱动告警模型仍未内建。",
+      "publicApi": [
+        "ScreenComponentNode.styleRules",
+        "BaseScreenConditionalStylePort",
+        "BaseScreenViewerElement.refreshConditionalStyles",
+        "BaseScreenDesignerElement.refreshConditionalStyles"
+      ],
       "references": [
         "packages/plugin-core/src/contracts.ts",
-        "packages/contracts/src/document/schema.ts"
+        "packages/contracts/src/document/schema.ts",
+        "packages/renderer/src/renderer/renderer.ts",
+        "packages/renderer/src/viewer/viewer.ts",
+        "packages/engine/src/designer-element/api/designer-element-project.ts"
       ],
-      "checks": ["contracts", "renderer"]
+      "checks": ["contracts", "renderer", "engine"]
     },
     {
       "id": "host-entrypoints",

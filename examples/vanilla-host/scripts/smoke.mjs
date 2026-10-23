@@ -316,7 +316,7 @@ async function main() {
       );
 
     // A. 首屏：48 格 / 图例故障 3 / 工序 6 节点 5 连线 / 告警可见 8 行 / 在线
-    const first = await openMonitor('smoke=1');
+    const first = await openMonitor('smoke=1&poll=0');
     await waitTiles(first, 48);
     await first.waitForTimeout(1200);
     const firstState = await readMonitorDom(first);
@@ -331,6 +331,85 @@ async function main() {
     if (firstState.host === null || firstState.host.failures !== 0) {
       fail(`首屏 status().failures 应为 0：${JSON.stringify(firstState.host)}`);
     }
+
+    // A2. 实时告警：SSE 推送 → conditionalStylePort + refreshConditionalStyles。
+    //     poll=0 关闭数据轮询，确保样式变化期间 datasetQueries 不增长。
+    const readAlarmStyles = (target) =>
+      target.evaluate(() => {
+        const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
+        const alarm = root?.querySelector('[data-base-screen-component-id="kpi-alarm-value"]');
+        const notice = root?.querySelector('[data-base-screen-component-id="top-notice"]');
+        const component = document
+          .querySelector('base-screen-viewer')
+          ?.document?.components.find((item) => item.id === 'kpi-alarm-value');
+        return {
+          alarmColor: alarm?.model?.style?.color,
+          noticeColor: notice?.model?.style?.color,
+          noticeWeight: notice?.model?.style?.fontWeight,
+          chip: document.querySelector('[data-alarm-status]')?.dataset.alarmStatus ?? null,
+          documentStyle: JSON.stringify(component?.style ?? null),
+          host: window.__baseScreenHost?.alarmStatus() ?? null,
+        };
+      });
+    const waitAlarmColor = (target, color) =>
+      target.waitForFunction(
+        (expected) =>
+          document
+            .querySelector('base-screen-viewer')
+            ?.shadowRoot?.querySelector('[data-base-screen-component-id="kpi-alarm-value"]')?.model
+            ?.style?.color === expected,
+        color,
+        { timeout: 20_000 },
+      );
+    const postAlarm = async (action, body) => {
+      const response = await fetch(`${API_BASE}/demo/alarms/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) fail(`告警端点 ${action} 返回 ${response.status}`);
+      return response.json();
+    };
+
+    await postAlarm('reset', {});
+    await first.waitForFunction(
+      () => document.querySelector('[data-alarm-status]')?.dataset.alarmStatus === 'live',
+      undefined,
+      { timeout: 20_000 },
+    );
+    await waitAlarmColor(first, '#fa8c16');
+    const alarmWarning = await readAlarmStyles(first);
+    if (alarmWarning.noticeColor !== '#fa8c16' || alarmWarning.noticeWeight !== '700') {
+      fail(`告警 warning 样式未命中：${JSON.stringify(alarmWarning)}`);
+    }
+
+    const queriesBeforeAlarmPush = datasetQueries.length;
+    await postAlarm('raise', { key: 'alarm.open', level: 'critical', message: '冒烟告警' });
+    await waitAlarmColor(first, '#f5222d');
+    const alarmCritical = await readAlarmStyles(first);
+    if (alarmCritical.noticeColor !== '#f5222d' || alarmCritical.noticeWeight !== '700') {
+      fail(`告警 critical 样式未命中：${JSON.stringify(alarmCritical)}`);
+    }
+    if (alarmCritical.documentStyle !== alarmWarning.documentStyle) {
+      fail('告警样式写入了 canonical 文档');
+    }
+    if (datasetQueries.length !== queriesBeforeAlarmPush) {
+      fail(`告警推送不应重新取数：${queriesBeforeAlarmPush} -> ${datasetQueries.length}`);
+    }
+    if (alarmCritical.host?.activeCount !== 1) {
+      fail(`alarmStatus().activeCount 应为 1：${JSON.stringify(alarmCritical.host)}`);
+    }
+
+    await postAlarm('clear', { key: 'alarm.open' });
+    await waitAlarmColor(first, '#7ff0ff');
+    const alarmCleared = await readAlarmStyles(first);
+    if (alarmCleared.noticeColor !== '#ffd591') {
+      fail(`告警解除后 top-notice 未恢复基础样式：${JSON.stringify(alarmCleared)}`);
+    }
+    if (alarmCleared.documentStyle !== alarmWarning.documentStyle) {
+      fail('告警解除写入了 canonical 文档');
+    }
+    await postAlarm('reset', {});
     await first.close();
 
     // B. URL 播种：?line=LINE-B → 36 格 / 1 台故障，且数据集 query 串带 line=LINE-B

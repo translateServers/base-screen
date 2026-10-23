@@ -12,6 +12,7 @@ import type {
 } from '@base-screen/contracts';
 import { readScreenVariableRecord } from '@base-screen/contracts';
 import type {
+  BaseScreenConditionalStylePort,
   BaseScreenDataCapability,
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
@@ -389,6 +390,7 @@ export async function createViewerHarness(options: {
   documentRevision?: string;
   observer?: import('@base-screen/contracts').ScreenResourceObserver;
   runtimeContributions?: BaseScreenRuntimeContributionIndex;
+  conditionalStylePort?: BaseScreenConditionalStylePort;
 }): Promise<{
   viewer: InstanceType<typeof import('../../../src/viewer/viewer.js')['BaseScreenViewerElement']>;
   mount: FakeMount;
@@ -402,7 +404,8 @@ export async function createViewerHarness(options: {
     options.projectId !== undefined ||
     options.documentRevision !== undefined ||
     options.observer !== undefined ||
-    options.runtimeContributions !== undefined
+    options.runtimeContributions !== undefined ||
+    options.conditionalStylePort !== undefined
   ) {
     const configured = viewer.configure({
       catalog: options.catalog,
@@ -419,6 +422,9 @@ export async function createViewerHarness(options: {
       ...(options.runtimeContributions === undefined
         ? {}
         : { runtimeContributions: options.runtimeContributions }),
+      ...(options.conditionalStylePort === undefined
+        ? {}
+        : { conditionalStylePort: options.conditionalStylePort }),
     });
     if (!configured.ok) {
       throw new Error('Viewer harness configure failed.');
@@ -426,6 +432,9 @@ export async function createViewerHarness(options: {
   } else {
     viewer.resourcePort = options.resourcePort;
     viewer.hostCatalogPort = options.variablePort;
+    if (options.conditionalStylePort !== undefined) {
+      viewer.conditionalStylePort = options.conditionalStylePort;
+    }
     if (options.resourceTimeoutMs !== undefined) {
       viewer.resourceTimeoutMs = options.resourceTimeoutMs;
     }

@@ -54,6 +54,7 @@ export interface BaseScreenRenderer {
         readonly traceId?: string;
     }, startOnly?: ReadonlySet<string>): void;
     readDataSourceValue(dataSourceId: string): ScreenJsonValue | undefined;
+    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
     refreshDataSource(dataSourceId: string, options?: {
@@ -131,6 +132,7 @@ export class BaseScreenViewerElement extends ElementBase {
     // (undocumented)
     get hostCatalogPort(): ScreenHostCatalogPort | undefined;
     set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
+    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)

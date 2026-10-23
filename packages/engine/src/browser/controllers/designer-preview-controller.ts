@@ -5,6 +5,7 @@ import type {
   ScreenVariableRefreshOptions,
 } from '@base-screen/contracts';
 import type {
+  BaseScreenConditionalStylePort,
   BaseScreenMaterialCatalog,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
@@ -16,6 +17,7 @@ export interface DesignerPreviewCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;
   readonly getHostCatalogPort: () => ScreenHostCatalogPort | undefined;
+  readonly getConditionalStylePort: () => BaseScreenConditionalStylePort | undefined;
   readonly getRuntimeContributions: () => BaseScreenRuntimeContributionIndex | undefined;
   readonly isViewerRegistered: () => boolean;
 }
@@ -28,6 +30,7 @@ type PreviewViewer = HTMLElement & {
   unload?: () => void;
   refreshData?: (componentId?: string) => void;
   refreshVariables?: (options?: ScreenVariableRefreshOptions) => void;
+  refreshConditionalStyles?: (componentIds?: readonly string[]) => void;
   document?: ScreenDocument;
 };
 
@@ -72,6 +75,10 @@ export class DesignerPreviewController {
     this.viewer()?.refreshVariables?.(options);
   }
 
+  refreshConditionalStyles(componentIds?: readonly string[]): void {
+    this.viewer()?.refreshConditionalStyles?.(componentIds);
+  }
+
   sync(document?: ScreenDocument): void {
     this.render(document);
   }
@@ -94,11 +101,13 @@ export class DesignerPreviewController {
     if (catalog === undefined) return;
     const resourcePort = this.callbacks.getResourcePort();
     const hostCatalogPort = this.callbacks.getHostCatalogPort();
+    const conditionalStylePort = this.callbacks.getConditionalStylePort();
     const runtimeContributions = this.callbacks.getRuntimeContributions();
     const configuration: BaseScreenViewerConfiguration = {
       catalog,
       ...(resourcePort === undefined ? {} : { resourcePort }),
       ...(hostCatalogPort === undefined ? {} : { hostCatalogPort }),
+      ...(conditionalStylePort === undefined ? {} : { conditionalStylePort }),
       ...(runtimeContributions === undefined ? {} : { runtimeContributions }),
     };
     const configChanged =
@@ -106,6 +115,7 @@ export class DesignerPreviewController {
       this.#lastConfiguration.catalog !== configuration.catalog ||
       this.#lastConfiguration.resourcePort !== configuration.resourcePort ||
       this.#lastConfiguration.hostCatalogPort !== configuration.hostCatalogPort ||
+      this.#lastConfiguration.conditionalStylePort !== configuration.conditionalStylePort ||
       this.#lastConfiguration.runtimeContributions !== configuration.runtimeContributions;
     if (configChanged) {
       // 重新配置前先 unload（configure 拒绝在已初始化实例上二次调用），

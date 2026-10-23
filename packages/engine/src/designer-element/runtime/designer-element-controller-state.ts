@@ -233,6 +233,7 @@ export function initializeDesignerElementControllers(
     getDocument: () => state.session.document,
     getResourcePort: () => state.resourcePort,
     getHostCatalogPort: () => state.hostCatalogPort,
+    getConditionalStylePort: () => state.conditionalStylePort,
     getRuntimeContributions: () => state.runtimeContributions,
     isViewerRegistered: () =>
       element.ownerDocument.defaultView?.customElements.get('base-screen-viewer') !== undefined,

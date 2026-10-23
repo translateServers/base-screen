@@ -8,8 +8,14 @@ import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../lib/api';
+import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
 import { attachRenderDiagnostics, type RenderDiagnosticsHandle } from '../lib/render-diagnostics';
+import { DEMO_ALARM_BINDINGS } from '../screen/host-alarm-bindings';
+import {
+  createHostAlarmController,
+  type HostAlarmStatusSnapshot,
+} from '../screen/host-alarm-controller';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -174,6 +180,7 @@ export function ScreenViewerPage(): React.ReactElement {
   });
   const [fullscreen, setFullscreen] = useState(false);
   const [renderFailed, setRenderFailed] = useState(false);
+  const [alarmStatus, setAlarmStatus] = useState<HostAlarmStatusSnapshot | null>(null);
 
   const updateFit = useCallback(() => {
     const host = hostRef.current;
@@ -223,6 +230,7 @@ export function ScreenViewerPage(): React.ReactElement {
     let viewer: BaseScreenViewerElement | undefined;
     let renderDiagnostics: RenderDiagnosticsHandle | undefined;
     let controller: ReturnType<typeof createHostRefreshController> | undefined;
+    let alarms: ReturnType<typeof createHostAlarmController> | undefined;
     let frameTimer: number | undefined;
     let disposed = false;
 
@@ -272,6 +280,16 @@ export function ScreenViewerPage(): React.ReactElement {
         onActiveChange: (active) => setRenderFailed(active),
       });
 
+      // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染，
+      // 快照到达后由失效 API 补齐，不阻塞页面。
+      alarms = createHostAlarmController({
+        apiBase: resolveApiBase(),
+        bindings: DEMO_ALARM_BINDINGS,
+        onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
+      });
+      await alarms.ready(800);
+      if (disposed) return;
+
       const configured = element.configure({
         catalog: runtime.catalog,
         runtimeContributions: runtime.runtimeContributions,
@@ -281,6 +299,7 @@ export function ScreenViewerPage(): React.ReactElement {
         datasetPort,
         hostCatalogPort,
         observer: host.observer,
+        conditionalStylePort: alarms.port,
       });
       if (!configured.ok) {
         logger.error('viewer configure failed', configured.diagnostics);
@@ -325,6 +344,16 @@ export function ScreenViewerPage(): React.ReactElement {
             ? previous
             : { online, failures: status.failures, failedComponents: status.failedComponents },
         );
+        const nextAlarm = alarms?.status();
+        if (nextAlarm !== undefined) {
+          setAlarmStatus((previous) =>
+            previous?.status === nextAlarm.status &&
+            previous.revision === nextAlarm.revision &&
+            previous.activeCount === nextAlarm.activeCount
+              ? previous
+              : nextAlarm,
+          );
+        }
       }, 1000);
 
       if (params.get('smoke') === '1') {
@@ -335,6 +364,7 @@ export function ScreenViewerPage(): React.ReactElement {
           },
           refreshNow: () => element.refreshData(),
           status: () => host.status(),
+          alarmStatus: () => alarms?.status(),
         };
       }
 
@@ -350,6 +380,8 @@ export function ScreenViewerPage(): React.ReactElement {
       window.clearInterval(frameTimer);
       renderDiagnostics?.dispose();
       renderDiagnostics = undefined;
+      alarms?.stop();
+      alarms = undefined;
       controller?.dispose();
       window.__baseScreenHost = undefined;
       unsubscribeSession();
@@ -358,6 +390,22 @@ export function ScreenViewerPage(): React.ReactElement {
       logger.debug('view released');
     };
   }, [screenId, updateFit]);
+
+  const postDemoAlarm = (action: 'raise' | 'clear'): void => {
+    const body =
+      action === 'raise'
+        ? { key: 'alarm.open', level: 'critical', message: '演示告警' }
+        : { key: 'alarm.open' };
+    void fetch(`${resolveApiBase()}/demo/alarms/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+      .then((response) => {
+        if (!response.ok) showToast('告警操作失败', 'error');
+      })
+      .catch(() => showToast('告警操作失败', 'error'));
+  };
 
   const toggleFullscreen = (): void => {
     void (async () => {
@@ -373,6 +421,16 @@ export function ScreenViewerPage(): React.ReactElement {
       }
     })();
   };
+
+  const alarmState = alarmStatus?.status ?? 'connecting';
+  const alarmLabel =
+    alarmState === 'live'
+      ? `告警在线 · ${alarmStatus?.activeCount ?? 0}`
+      : alarmState === 'offline'
+        ? '告警离线'
+        : alarmState === 'reconnecting'
+          ? '告警重连中'
+          : '告警连接中';
 
   return (
     <div className="viewer-stage" ref={hostRef}>
@@ -406,6 +464,22 @@ export function ScreenViewerPage(): React.ReactElement {
               ? '数据源在线'
               : `数据源离线 · ${dataStatus.failures} 次失败`}
         </span>
+        <span
+          className="viewer-bar__status"
+          data-alarm-status={alarmState}
+          data-state={
+            alarmState === 'live' ? 'online' : alarmState === 'offline' ? 'error' : 'offline'
+          }
+          title="外部告警系统推送状态（演示绑定：生产监控大屏的 kpi-alarm-value / top-notice）"
+        >
+          {alarmLabel}
+        </span>
+        <button type="button" className="button" onClick={() => postDemoAlarm('raise')}>
+          模拟告警
+        </button>
+        <button type="button" className="button" onClick={() => postDemoAlarm('clear')}>
+          解除告警
+        </button>
         <span className="viewer-bar__clock">{clock}</span>
         <button type="button" className="button" onClick={toggleFullscreen}>
           {fullscreen ? '退出全屏' : '全屏'}

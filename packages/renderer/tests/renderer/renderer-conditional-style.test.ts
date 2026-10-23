@@ -13,8 +13,10 @@ import { createBaseScreenRenderer } from '../../src/renderer/renderer.js';
 import {
   component,
   document,
+  ExplodingModelMaterialElement,
   FakeMaterialElement,
   FakeRoot,
+  modelExplosionState,
 } from './__fixtures__/renderer-test-harness.js';
 
 describe('conditional style rules', () => {
@@ -488,5 +490,214 @@ describe('conditional style port (ADR-0059)', () => {
     };
 
     expect(render()).toBe(render({ conditionalStylePort: { resolve: () => undefined } }));
+  });
+});
+
+describe('conditional style refresh (host push)', () => {
+  function createRefreshCatalog(
+    constructor: BaseScreenMaterialConstructor = FakeMaterialElement as unknown as BaseScreenMaterialConstructor,
+  ): BaseScreenMaterialCatalog {
+    const manifest: BaseScreenMaterialManifest = {
+      type: 'base.test',
+      tagName: 'base-screen-test',
+      name: 'Test',
+      category: 'Test',
+      keywords: [],
+      defaultSize: { width: 100, height: 40 },
+      defaultProps: {},
+      defaultStyle: { color: '#ffffff' },
+      styleSchema: {
+        kind: 'object',
+        properties: { color: { kind: 'string' }, fontWeight: { kind: 'string' } },
+        required: ['color'],
+      },
+      stylePanel: [],
+      propsSchema: { kind: 'object', properties: {}, required: [] },
+      propertyPanel: [],
+      events: [],
+      dataCapabilities: ['static'],
+      designCapabilities: { resize: true, rotate: true, children: true },
+    };
+    const entry = { manifest, constructor };
+    return {
+      get: (type) => (type === manifest.type ? entry : undefined),
+      has: (type) => type === manifest.type,
+      list: () => [entry],
+    };
+  }
+
+  function target(id = 'metric'): ScreenComponentNode {
+    return {
+      ...component(id, 0, null, { type: 'static', value: 120 }),
+      style: { color: '#ffffff', fontWeight: '400' },
+    };
+  }
+
+  it('CSR-R01 re-evaluates the port without fetching data or touching geometry', () => {
+    const root = new FakeRoot();
+    let hostColor: string | undefined;
+    let resourceCalls = 0;
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createRefreshCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: {
+        resolve: async () => {
+          resourceCalls++;
+          return { ok: true as const, value: {}, diagnostics: [] };
+        },
+      },
+      conditionalStylePort: {
+        resolve: () => {
+          const color = hostColor;
+          return color === undefined ? undefined : { color };
+        },
+      },
+    });
+
+    expect(renderer.render(document([target()])).ok).toBe(true);
+    expect(root.children[0]?.model?.style).toEqual({
+      color: '#ffffff',
+      fontWeight: '400',
+    });
+    expect(root.children[0]?.model?.dataState).toEqual({ status: 'ready', value: 120 });
+    const transformBefore = root.children[0]?.style.transform;
+    root.children[0]!.style.transform = 'rotate(33deg)';
+
+    hostColor = '#ff4d4f';
+    renderer.refreshConditionalStyles();
+
+    expect(root.children[0]?.model?.style).toEqual({
+      color: '#ff4d4f',
+      fontWeight: '400',
+    });
+    expect(root.children[0]?.model?.dataState).toEqual({ status: 'ready', value: 120 });
+    expect(root.children[0]?.style.transform).toBe('rotate(33deg)');
+    expect(transformBefore).toBe('rotate(0deg)');
+    expect(resourceCalls).toBe(0);
+
+    hostColor = undefined;
+    renderer.refreshConditionalStyles();
+    expect(root.children[0]?.model?.style).toEqual({
+      color: '#ffffff',
+      fontWeight: '400',
+    });
+    expect(resourceCalls).toBe(0);
+  });
+
+  it('CSR-R02 scopes the refresh and ignores unknown or empty component ids', () => {
+    const root = new FakeRoot();
+    let hostColor: string | undefined;
+    const resolved: string[] = [];
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createRefreshCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+      conditionalStylePort: {
+        resolve: ({ componentId }) => {
+          resolved.push(componentId);
+          const color = hostColor;
+          return color === undefined ? undefined : { color };
+        },
+      },
+    });
+
+    expect(renderer.render(document([target('a'), target('b')])).ok).toBe(true);
+    resolved.length = 0;
+    hostColor = '#fa8c16';
+
+    renderer.refreshConditionalStyles(['a']);
+
+    expect(resolved).toEqual(['a']);
+    expect(root.children[0]?.model?.style.color).toBe('#fa8c16');
+    expect(root.children[1]?.model?.style.color).toBe('#ffffff');
+
+    resolved.length = 0;
+    renderer.refreshConditionalStyles(['missing', 'a', 'a']);
+    expect(resolved).toEqual(['a']);
+    renderer.refreshConditionalStyles([]);
+    expect(resolved).toEqual(['a']);
+  });
+
+  it('CSR-R03 is a no-op without a port, before render, and after dispose', () => {
+    const root = new FakeRoot();
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createRefreshCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+    });
+
+    expect(() => renderer.refreshConditionalStyles()).not.toThrow();
+    expect(renderer.render(document([target()])).ok).toBe(true);
+    const styleBefore = { ...root.children[0]?.model?.style };
+    expect(() => renderer.refreshConditionalStyles()).not.toThrow();
+    expect(root.children[0]?.model?.style).toEqual(styleBefore);
+
+    renderer.dispose();
+    expect(() => renderer.refreshConditionalStyles()).not.toThrow();
+  });
+
+  it('CSR-R04 isolates a material model write failure and reports one diagnostic', () => {
+    const root = new FakeRoot();
+    const diagnostics: unknown[] = [];
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createRefreshCatalog(
+        ExplodingModelMaterialElement as unknown as BaseScreenMaterialConstructor,
+      ),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+      onDiagnostic: (item) => diagnostics.push(item),
+      conditionalStylePort: { resolve: () => ({ color: '#ff4d4f' }) },
+    });
+
+    expect(renderer.render(document([target()])).ok).toBe(true);
+    modelExplosionState.enabled = true;
+    try {
+      expect(() => renderer.refreshConditionalStyles()).not.toThrow();
+    } finally {
+      modelExplosionState.enabled = false;
+    }
+    expect(diagnostics).toEqual([
+      {
+        severity: 'error',
+        code: 'PLUGIN_CORE_RENDER_FAILED',
+        path: ['components', 'metric', 'conditionalStyle'],
+        message: 'Conditional style refresh failed for material.',
+      },
+    ]);
+  });
+
+  it('CSR-R05 is idempotent across repeated refreshes', () => {
+    const root = new FakeRoot();
+    let hostColor = '#00ff00';
+    const renderer = createBaseScreenRenderer({
+      root: root as unknown as HTMLElement,
+      catalog: createRefreshCatalog(),
+      mode: 'viewer',
+      interactive: false,
+      onMaterialEvent: undefined,
+      resourcePort: undefined,
+      conditionalStylePort: {
+        resolve: () => ({ color: hostColor }),
+      },
+    });
+
+    expect(renderer.render(document([target()])).ok).toBe(true);
+    renderer.refreshConditionalStyles();
+    const first = { ...root.children[0]?.model?.style };
+    hostColor = '#00ff00';
+    renderer.refreshConditionalStyles();
+    expect(root.children[0]?.model?.style).toEqual(first);
   });
 });

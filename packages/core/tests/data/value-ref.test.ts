@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   collectScreenValueRefDependencies,
   evaluateScreenValueRef,
-  validateScreenDataBinding,
   type ScreenValueRefEnvironment,
+  validateScreenDataBinding,
 } from '../../src/index.js';
 
 const diagnostic = {

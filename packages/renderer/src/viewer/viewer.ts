@@ -282,6 +282,11 @@ export class BaseScreenViewerElement extends ElementBase {
     this.#variableRuntime.refreshVariables(options);
   }
 
+  /** 宿主告警/视觉状态变化后只重算条件样式，不重新取数、不改文档。 */
+  refreshConditionalStyles(componentIds?: readonly string[]): void {
+    this.#renderer?.refreshConditionalStyles(componentIds);
+  }
+
   getVariable(id: string): ScreenVariableHandle | undefined {
     return this.#variableHandles.get(id);
   }

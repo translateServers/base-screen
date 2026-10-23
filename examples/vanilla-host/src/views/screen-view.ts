@@ -7,11 +7,14 @@ import {
 import type { BaseScreenViewerElement } from '@base-screen/sdk/viewer';
 import { showToast } from '../components/toast';
 import { api } from '../lib/api';
+import { resolveApiBase } from '../lib/api-base';
 import { el } from '../lib/dom';
 import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import { attachRenderDiagnostics, type RenderDiagnosticsHandle } from '../lib/render-diagnostics';
 import type { Route, ViewModule } from '../router';
+import { DEMO_ALARM_BINDINGS } from '../screen/host-alarm-bindings';
+import { createHostAlarmController } from '../screen/host-alarm-controller';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -225,6 +228,21 @@ export const screenView: ViewModule = {
       attrs: { 'data-viewer-status': '', 'data-state': 'online' },
       text: '数据源在线',
     });
+    const alarmChip = el('span', {
+      class: 'viewer-bar__status',
+      attrs: { 'data-alarm-status': 'connecting', 'data-state': 'offline' },
+      text: '告警连接中',
+    });
+    const raiseAlarmButton = el('button', {
+      class: 'button',
+      text: '模拟告警',
+      on: { click: () => void postDemoAlarm('raise') },
+    });
+    const clearAlarmButton = el('button', {
+      class: 'button',
+      text: '解除告警',
+      on: { click: () => void postDemoAlarm('clear') },
+    });
     const clockLabel = el('span', { class: 'viewer-bar__clock', text: formatClock(new Date()) });
     const fullscreenButton = el('button', {
       class: 'button',
@@ -239,6 +257,9 @@ export const screenView: ViewModule = {
     const bar = el('div', { class: 'viewer-bar' }, [
       nameLabel,
       statusChip,
+      alarmChip,
+      raiseAlarmButton,
+      clearAlarmButton,
       clockLabel,
       fullscreenButton,
       backButton,
@@ -289,13 +310,50 @@ export const screenView: ViewModule = {
         : `离线组件：${status.failedComponents.join('、')}（累计 ${status.failures} 次失败）`;
       if (statusChip.title !== nextTitle) statusChip.title = nextTitle;
     };
+    const paintAlarmStatus = (): void => {
+      const status = alarms?.status();
+      if (status === undefined) return;
+      const nextText =
+        status.status === 'live'
+          ? `告警在线 · ${status.activeCount}`
+          : status.status === 'reconnecting'
+            ? '告警重连中'
+            : status.status === 'offline'
+              ? '告警离线'
+              : '告警连接中';
+      if (alarmChip.textContent !== nextText) alarmChip.textContent = nextText;
+      if (alarmChip.dataset.alarmStatus !== status.status) {
+        alarmChip.dataset.alarmStatus = status.status;
+      }
+      const nextState =
+        status.status === 'live' ? 'online' : status.status === 'offline' ? 'error' : 'offline';
+      if (alarmChip.dataset.state !== nextState) alarmChip.dataset.state = nextState;
+    };
     const clockTimer = window.setInterval(() => {
       clockLabel.textContent = formatClock(new Date());
       // 与 nextDue 的 prune 同义：文档里已经没有的组件不该继续影响在线判定。
       if (viewer !== undefined) viewerStatus?.prune(componentIdsOf(viewer));
       paintStatus();
+      paintAlarmStatus();
     }, 1000);
     updateFit();
+
+    const postDemoAlarm = async (action: 'raise' | 'clear'): Promise<void> => {
+      const body =
+        action === 'raise'
+          ? { key: 'alarm.open', level: 'critical', message: '演示告警' }
+          : { key: 'alarm.open' };
+      try {
+        const response = await fetch(`${resolveApiBase()}/demo/alarms/${action}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!response.ok) showToast('告警操作失败', 'error');
+      } catch {
+        showToast('告警操作失败', 'error');
+      }
+    };
 
     const toggleFullscreen = async (): Promise<void> => {
       try {
@@ -317,6 +375,7 @@ export const screenView: ViewModule = {
     let viewer: BaseScreenViewerElement | undefined;
     let renderDiagnostics: RenderDiagnosticsHandle | undefined;
     let controller: ReturnType<typeof createHostRefreshController> | undefined;
+    let alarms: ReturnType<typeof createHostAlarmController> | undefined;
     const cleanup = (): void => {
       unsubscribe();
       observer.disconnect();
@@ -324,6 +383,8 @@ export const screenView: ViewModule = {
       renderDiagnostics = undefined;
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       window.clearInterval(clockTimer);
+      alarms?.stop();
+      alarms = undefined;
       controller?.dispose();
       controller = undefined;
       window.__baseScreenHost = undefined;
@@ -388,6 +449,18 @@ export const screenView: ViewModule = {
       },
     });
 
+    // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染。
+    alarms = createHostAlarmController({
+      apiBase: resolveApiBase(),
+      bindings: DEMO_ALARM_BINDINGS,
+      onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
+    });
+    await alarms.ready(800);
+    if (!host.isConnected) {
+      cleanup();
+      return () => {};
+    }
+
     const configured = element.configure({
       catalog: runtime.catalog,
       runtimeContributions: runtime.runtimeContributions,
@@ -397,6 +470,7 @@ export const screenView: ViewModule = {
       datasetPort,
       hostCatalogPort,
       observer: hostObserver.observer,
+      conditionalStylePort: alarms.port,
     });
     if (!configured.ok) {
       logger.error('viewer configure failed', configured.diagnostics);
@@ -436,6 +510,7 @@ export const screenView: ViewModule = {
         },
         refreshNow: () => element.refreshData(),
         status: () => hostObserver.status(),
+        alarmStatus: () => alarms?.status(),
       };
     }
 

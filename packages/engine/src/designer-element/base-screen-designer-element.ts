@@ -521,6 +521,11 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.refreshVariables(this, options);
   }
 
+  /** 宿主告警/视觉状态变化后只重算条件样式（画布与预览），不重新取数、不改文档。 */
+  refreshConditionalStyles(componentIds?: readonly string[]): void {
+    return this.#designerState.runtime.refreshConditionalStyles(this, componentIds);
+  }
+
   getVariable(id: string): ScreenVariableHandle | undefined {
     return this.#designerState.canvasRuntimeController.getVariable(id);
   }

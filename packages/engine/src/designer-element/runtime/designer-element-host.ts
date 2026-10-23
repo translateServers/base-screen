@@ -145,6 +145,7 @@ export interface DesignerElementHost extends HTMLElement {
   restoreSnapshot(snapshotId: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   refreshData(componentId?: string): void;
   refreshVariables(options?: ScreenVariableRefreshOptions): void;
+  refreshConditionalStyles(componentIds?: readonly string[]): void;
   getVariable(id: string): import('@base-screen/contracts').ScreenVariableHandle | undefined;
   save(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
   publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;

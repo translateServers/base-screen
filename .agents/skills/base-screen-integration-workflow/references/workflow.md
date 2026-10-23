@@ -69,6 +69,9 @@ focused 使用能力对应检查；delivery 执行适用的上游 verify:m0、�
 
 ## 当前待设计方向
 
-event-driven-alarm-style 提案追踪事件驱动告警样式替代。
-styleRules 与 conditionalStylePort 仍存在，Designer 内建条件样式编辑区已移除。
-后续独立设计事件视觉状态、初始恢复、幂等/乱序、告警解除及旧文档处理；本工作流不授权删除契约。
+event-driven-alarm-style 已由「宿主告警快照 + `conditionalStylePort` + `refreshConditionalStyles()`」支持：
+styleRules 与 conditionalStylePort 继续存在，Designer 内建条件样式编辑区已于 748e133 恢复。
+告警传输、初始快照、幂等/乱序、告警解除与告警生命周期归宿主/告警平台；基座不新增告警契约、
+传输配置或后端实现。旧文档 styleRules 继续有效。
+
+仍待设计：把告警生命周期本身纳入基座契约（当前不授权），以及更多宿主侧的告警平台适配器。

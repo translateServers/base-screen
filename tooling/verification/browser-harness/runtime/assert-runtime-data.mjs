@@ -162,6 +162,57 @@ export async function assertRuntimeData(page, viewer) {
   ) {
     throw new Error('BROWSER_HARNESS_STYLE_PORT_RESTORE_FAILED');
   }
+  // 宿主推送告警：数据值与请求都不变，只调用 refreshConditionalStyles 重算样式。
+  const requestCountBeforePush = await page.evaluate(
+    () => window.baseScreenHarness.datasetRequests.length,
+  );
+  const documentStyleBeforePush = await page.evaluate(
+    () =>
+      window.baseScreenHarness.designer.document.components.find(
+        (component) => component.id === 'port-warning',
+      ).style,
+  );
+  await page.evaluate(() => window.baseScreenHarness.setHostAlarm(true));
+  await page.waitForFunction(() =>
+    [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
+      (element) =>
+        element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')?.model
+          .style.color === '#f5222d',
+    ),
+  );
+  const portPushed = await portStyle();
+  const designerPortPushed = await designerPortStyle();
+  if (
+    portPushed.color !== '#f5222d' ||
+    portPushed.fontWeight !== '700' ||
+    designerPortPushed.color !== '#f5222d' ||
+    designerPortPushed.fontWeight !== '700'
+  ) {
+    throw new Error('BROWSER_HARNESS_STYLE_PORT_PUSH_FAILED');
+  }
+  const pushedState = await page.evaluate(() => ({
+    value: window.baseScreenHarness.viewer.shadowRoot.querySelector(
+      '[data-base-screen-component-id=port-warning]',
+    )?.model.dataState.value,
+    requests: window.baseScreenHarness.datasetRequests.length,
+    style: window.baseScreenHarness.designer.document.components.find(
+      (component) => component.id === 'port-warning',
+    ).style,
+  }));
+  if (pushedState.value !== 20 || pushedState.requests !== requestCountBeforePush) {
+    throw new Error('BROWSER_HARNESS_STYLE_PORT_PUSH_MUTATED_DATA_FAILED');
+  }
+  if (JSON.stringify(pushedState.style) !== JSON.stringify(documentStyleBeforePush)) {
+    throw new Error('BROWSER_HARNESS_STYLE_PORT_PUSH_MUTATED_DOCUMENT_FAILED');
+  }
+  await page.evaluate(() => window.baseScreenHarness.setHostAlarm(false));
+  await page.waitForFunction(() =>
+    [window.baseScreenHarness.viewer, window.baseScreenHarness.designer].every(
+      (element) =>
+        element.shadowRoot.querySelector('[data-base-screen-component-id=port-warning]')?.model
+          .style.color === '#9fb1c9',
+    ),
+  );
   await page.evaluate(() => window.baseScreenHarness.createDatasetDemo());
   const datasetDemo = page.locator('base-screen-viewer[data-dataset-demo]');
   await datasetDemo.locator('[data-base-screen-component-id=table-demo]').waitFor();

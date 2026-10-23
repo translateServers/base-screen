@@ -32,10 +32,11 @@ import {
   prepareCandidates,
   readComponentData,
 } from './renderer-candidates.js';
-import { failure, renderFailure } from './renderer-diagnostics.js';
+import { diagnostic, failure, renderFailure } from './renderer-diagnostics.js';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
 import { applyMaterial } from './renderer-material-dom.js';
 import {
+  applyMountedConditionalStyle,
   applyMountedModel,
   handleMaterialEvent,
   reconcileMountedMaterial,
@@ -99,6 +100,13 @@ export interface BaseScreenRenderer {
   suspendData(): void;
   setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
   refreshData(componentId?: string, trigger?: 'manual' | 'polling', traceId?: string): void;
+  /**
+   * 宿主条件样式状态变化后的样式-only 重算：不取数、不改文档、不进历史。
+   *
+   * 仅重写已挂载物料的 effective model；未提供端口时 no-op（文档规则不会脱离数据变化）。
+   * `componentIds` 缺省时处理全部已挂载组件，否则只处理给定组件。
+   */
+  refreshConditionalStyles(componentIds?: readonly string[]): void;
   /**
    * 只确保数据源实例（启动请求），不挂载任何物料。
    *
@@ -362,6 +370,28 @@ class Renderer implements BaseScreenRenderer {
     const ref = readScreenComponentValueRef(candidate.component);
     if (ref?.kind !== 'data-source-field') return;
     this.#state.dataSources.refresh(ref.dataSourceId, refreshContext);
+  }
+
+  refreshConditionalStyles(componentIds?: readonly string[]): void {
+    if (this.#state.disposed || this.#state.options.conditionalStylePort === undefined) return;
+    const ids =
+      componentIds === undefined ? [...this.#state.mounted.keys()] : [...new Set(componentIds)];
+    for (const componentId of ids) {
+      const candidate = this.#state.candidates.get(componentId);
+      const mounted = this.#state.mounted.get(componentId);
+      if (candidate === undefined || mounted === undefined) continue;
+      try {
+        applyMountedConditionalStyle(this.#state, candidate, mounted);
+      } catch {
+        this.#state.options.onDiagnostic?.(
+          diagnostic(
+            'PLUGIN_CORE_RENDER_FAILED',
+            ['components', componentId, 'conditionalStyle'],
+            'Conditional style refresh failed for material.',
+          ),
+        );
+      }
+    }
   }
 
   prepareDataSources(

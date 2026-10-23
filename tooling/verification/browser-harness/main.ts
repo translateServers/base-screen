@@ -1350,6 +1350,7 @@ designer.designerHostAdapter = {
     },
   },
 };
+let hostAlarmActive = false;
 const conditionalStylePort = {
   resolve({
     componentId,
@@ -1359,6 +1360,9 @@ const conditionalStylePort = {
     readonly dataState: { readonly status: string; readonly value?: unknown };
   }) {
     if (componentId !== 'port-warning' || dataState.status !== 'ready') return undefined;
+    // 宿主告警快照优先于数据阈值：推送到达后只调用 refreshConditionalStyles，
+    // dataState 与请求都不变。
+    if (hostAlarmActive) return { color: '#f5222d', fontWeight: '700' };
     return typeof dataState.value === 'number' && dataState.value > 100
       ? { color: '#ffa940', fontWeight: '700' }
       : undefined;
@@ -1640,6 +1644,12 @@ Object.assign(window, {
       metricValue = value;
       designer.getVariable('metric-value')?.set(value);
       viewer.getVariable('metric-value')?.set(value);
+    },
+    /** 模拟宿主告警推送：只改端口背后的快照，再显式失效样式。 */
+    setHostAlarm: (active: boolean) => {
+      hostAlarmActive = active;
+      designer.refreshConditionalStyles();
+      viewer.refreshConditionalStyles();
     },
     createDatasetDemo: () => {
       const demo = document.createElement('base-screen-viewer') as typeof viewer;

@@ -93,7 +93,7 @@ export interface TabularDataset {
   readonly totalRowCount?: number;
 }
 
-/** `?smoke=1` 的调试面：只有三个入口，不含端口/文档/URL。 */
+/** `?smoke=1` 的调试面：只暴露状态与手动刷新入口，不含端口/文档/URL。 */
 declare global {
   interface Window {
     __baseScreenHost?:
@@ -107,6 +107,9 @@ declare global {
             readonly pending: readonly string[];
             readonly failedComponents: readonly string[];
           };
+          alarmStatus():
+            | import('./screen/host-alarm-controller').HostAlarmStatusSnapshot
+            | undefined;
         }
       | undefined;
   }

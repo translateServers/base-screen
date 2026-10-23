@@ -43,7 +43,9 @@ export interface BaseScreenConditionalStyleRequest {
 }
 
 /**
- * ADR-0059 宿主条件样式端口：渲染期同步纯函数，相同 (componentId, dataState) 返回相同结果。
+ * ADR-0059 宿主条件样式端口：同步、无副作用、不发起 I/O。宿主当前已发布的告警/视觉快照
+ * 不变时，相同 (componentId, dataState) 必须返回等价覆盖；快照变化后结果可变，但宿主必须
+ * 先提交快照，再调用 refreshConditionalStyles() 让已挂载视觉与快照对齐。
  * 返回样式覆盖键值（merge 语义，同 styleRules 的 style），undefined 表示无覆盖；
  * 非法覆盖与抛异常由 Renderer 同路径 fail-closed 隔离。
  */

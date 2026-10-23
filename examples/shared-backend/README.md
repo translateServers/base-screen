@@ -56,6 +56,13 @@ shared-backend/
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
 | `GET /api/metrics/series?metric=cpu_usage&points=24` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
 | `GET /api/metrics/ranking?dimension=region&limit=6` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
+| `GET /api/demo/alarms` | — | `{ revision, alarms: Alarm[] }` | — |
+| `GET /api/demo/alarms/stream` | — | SSE：先 snapshot，随后 raise / clear / ack / suppress / heartbeat | — |
+| `POST /api/demo/alarms/raise` | `{ key, level?, message? }` | `201 { alarm: Alarm }` | `400` |
+| `POST /api/demo/alarms/clear` | `{ key }` | `201 { changed }` | `400` |
+| `POST /api/demo/alarms/ack` | `{ key }` | `201 { changed }` | `400` |
+| `POST /api/demo/alarms/suppress` | `{ key, suppressed }` | `201 { changed }` | `400` |
+| `POST /api/demo/alarms/reset` | — | `201 { revision, alarms }` | — |
 
 `Screen = { id, name, revision, document, createdAt, updatedAt }`（时间为 ISO 字符串）。
 错误体统一 `{ error, message }`。指标目录：`cpu_usage`（%）、`memory_usage`（%）、
@@ -63,6 +70,10 @@ shared-backend/
 `visitor_count`（人）、`conversion_rate`（%）、`target_completion`（%）、
 `service_satisfaction`（%）、`member_repurchase`（%）；`points` 为 1..120 的整数，默认 24。
 排行固定为 `region`（6 个区域）与 `channel`（4 个渠道），`limit` 为 1..20，默认 6。
+
+`Alarm = { id, key, level: 'warning' | 'critical' | 'info', message, raisedAt, acknowledged, suppressed }`。
+告警状态在内存中，进程重启即回到初始 warning；`reset` 恢复初始快照。真实告警平台的持久化、
+确认/屏蔽生命周期与传输凭证由宿主接入，本示例只演示宿主适配层与 SSE 推送。
 
 空库播种四条记录：「默认销售大屏」是 50+ 组件的 DataV 风格成品文档，「系统监控大屏」保留
 原来的最小卡片文档（覆盖宿主自有物料路径），「生产监控大屏」是覆盖四种 dataSource 的数据层

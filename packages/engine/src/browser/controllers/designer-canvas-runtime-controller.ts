@@ -66,6 +66,10 @@ export class DesignerCanvasRuntimeController {
     this.#variables.refreshVariables(options);
   }
 
+  refreshConditionalStyles(componentIds?: readonly string[]): void {
+    this.callbacks.getRenderer()?.refreshConditionalStyles(componentIds);
+  }
+
   getVariable(id: string): ScreenVariableHandle | undefined {
     if (!this.#document?.variables.some((variable) => variable.id === id)) return undefined;
     const runtime = this;

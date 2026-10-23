@@ -4,12 +4,15 @@ import {
 } from '@base-screen/sdk/designer';
 import { showToast } from '../components/toast';
 import { api } from '../lib/api';
+import { resolveApiBase } from '../lib/api-base';
 import { el } from '../lib/dom';
 import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import type { Route, ViewModule } from '../router';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
 import { rememberDatasourceReturn } from '../screen/datasource-return';
+import { DEMO_ALARM_BINDINGS } from '../screen/host-alarm-bindings';
+import { createHostAlarmController } from '../screen/host-alarm-controller';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -52,6 +55,7 @@ export const screenEditView: ViewModule = {
     container.append(stage, datasourcesButton);
 
     let designer: BaseScreenDesignerElement | undefined;
+    let alarms: ReturnType<typeof createHostAlarmController> | undefined;
     let detach: (() => void) | undefined;
     let disposed = false;
     let saveTimer: number | undefined;
@@ -72,6 +76,15 @@ export const screenEditView: ViewModule = {
       designer = element;
       runtime.bindDesigner(element);
 
+      // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染。
+      alarms = createHostAlarmController({
+        apiBase: resolveApiBase(),
+        bindings: DEMO_ALARM_BINDINGS,
+        onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
+      });
+      await alarms.ready(800);
+      if (disposed) return;
+
       // 2) 挂载后再 configure / load；数据通道必须在 configure 内提交。
       // 数据集与来源目录通道同理一并提交，否则设计器的数据源面板与变量面板会退化。
       const datasetPort = createHostDatasetPort({ api, logger });
@@ -91,6 +104,7 @@ export const screenEditView: ViewModule = {
           noticeSource: () => datasetPort.snapshot().alarms,
           logger,
         }),
+        conditionalStylePort: alarms.port,
         // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。
         groupMaterialType: 'base.container',
         backButton: true,
@@ -215,6 +229,8 @@ export const screenEditView: ViewModule = {
       detach?.();
       unsubscribe();
       clearSaveTimer();
+      alarms?.stop();
+      alarms = undefined;
       designer?.remove();
       designer = undefined;
       datasourcesButton.remove();

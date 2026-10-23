@@ -50,6 +50,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 ```text
 lib/api-base.ts  lib/api.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
 lib/render-diagnostics.ts
+screen/host-alarm-controller.ts  screen/host-alarm-bindings.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
 screen/blueprint-canvas.ts  screen/datasource-return.ts
 screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
@@ -107,6 +108,13 @@ DOM 契约发生漂移，都会在冒烟里当场失败。
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
 | `GET /api/metrics/series?metric=&points=` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
 | `GET /api/metrics/ranking?dimension=&limit=` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
+| `GET /api/demo/alarms` | — | `{ revision, alarms: [{ id, key, level, message, raisedAt, acknowledged, suppressed }] }` | — |
+| `GET /api/demo/alarms/stream` | — | SSE：订阅先发 snapshot，随后 raise / clear / ack / suppress / heartbeat | — |
+| `POST /api/demo/alarms/raise` | `{ key, level?, message? }` | `{ alarm }` | `400` |
+| `POST /api/demo/alarms/clear` | `{ key }` | `{ changed }` | `400` |
+| `POST /api/demo/alarms/ack` | `{ key }` | `{ changed }` | `400` |
+| `POST /api/demo/alarms/suppress` | `{ key, suppressed }` | `{ changed }` | `400` |
+| `POST /api/demo/alarms/reset` | — | `{ revision, alarms }` | — |
 
 `Screen = { id, name, revision, document, createdAt, updatedAt }`；错误体统一
 `{ error, message }`。`document` 是 canonical Screen Document JSON——后端只存取，
@@ -145,8 +153,10 @@ pnpm verify:examples        # 依次跑三端冒烟
 
 三端断言集合一致：种子列表渲染、设计器注册并挂载、指标读数经 host-resource
 数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、**生产监控大屏的数据层六条**
-（首屏灯阵/工序链/告警流水、URL 播种、变量联动、空结果、失败保留上一帧、后台暂停），
-以及无未捕获页面错误。数据层断言的详细口径见下文「数据层接入」。
+（首屏灯阵/工序链/告警流水、URL 播种、变量联动、空结果、失败保留上一帧、后台暂停）、
+**实时告警样式**（SSE snapshot → warning；raise critical → 变色；clear → 恢复；期间
+dataset query 数与 canonical 文档不变），以及无未捕获页面错误。数据层断言的详细口径见下文
+「数据层接入」。
 
 G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构）：台账列表与筛选、REST 新建→
 测试→保存→设计器目录可见、SQLite 表模式与 SQL 模式（固定值 / 变量两种参数绑定）、
@@ -308,6 +318,31 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 
 > 角标计数请用 **`[data-datav-degraded-badge]`**。角标节点同时带 `data-datav-degraded`，
 > 宿主元素也同步该属性（样式钩子），因此 `[data-datav-degraded]` 会命中两个节点。
+
+### 实时告警（宿主推送）
+
+外部告警系统拥有条件样式的判定与视觉映射，并通过 SSE 推送当前告警。Base Screen **不连接**
+告警系统，也不保存告警状态：
+
+```text
+告警系统 --SSE--> 宿主 host-alarm-controller
+                     ├─ 维护当前快照（revision、Map、重连重同步、乱序丢弃）
+                     ├─ conditionalStylePort.resolve(componentId) → 样式覆盖
+                     └─ element.refreshConditionalStyles(componentIds)
+```
+
+- **端口必须在 `configure` 前提交**；三端在配置前 `await alarms.ready(800)`，首快照未到时
+  先按基础样式渲染，到达后由失效 API 补齐。
+- **绑定在宿主侧**：`src/screen/host-alarm-bindings.ts` 把 `alarm.open` 映射到
+  「生产监控大屏」的 `kpi-alarm-value`（datav.digital-flop，只用 `color`）与
+  `top-notice`（base.text，额外用 `fontWeight`）。文档里没有告警 key、阈值或样式规则。
+- **合并与优先级**：同一组件命中多条告警时取 `critical > warning > info`，同级按 alarm id
+  字典序；`acknowledged` / `suppressed` 不参与样式。
+- **一帧一次**：控制器按 `requestAnimationFrame` 合并事件，只失效受影响的组件；`stop()` 后
+  不再回调。事件 revision 重复/倒序丢弃，缺口触发重连并以 snapshot 全量替换。
+- **验证**：查看页顶栏有 `[data-alarm-status]` chip 与「模拟告警 / 解除告警」按钮。冒烟以
+  `poll=0` 打开「生产监控大屏」，先 `POST reset` 等待 warning，再 `POST raise` 断言 critical，
+  `POST clear` 断言恢复；同时断言 dataset query 数与 canonical 文档未变化。
 
 ### URL 参数
 

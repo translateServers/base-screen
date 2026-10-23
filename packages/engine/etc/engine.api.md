@@ -579,6 +579,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
     redo(): ScreenParseResult<ScreenDocument>;
+    refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;
     // (undocumented)

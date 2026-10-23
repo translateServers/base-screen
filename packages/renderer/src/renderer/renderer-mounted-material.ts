@@ -37,6 +37,18 @@ export function applyMountedModel(
   );
 }
 
+/**
+ * 宿主告警状态变化后的样式-only 重算：只重写 effective model，不碰几何、transform、
+ * display 与 zIndex，因此不会打断画布手势或造成布局抖动。
+ */
+export function applyMountedConditionalStyle(
+  state: RendererState,
+  candidate: RenderCandidate,
+  mounted: MountedMaterial,
+): void {
+  mounted.element.model = resolveEffectiveModel(state, candidate, candidate.model.dataState);
+}
+
 export function handleMaterialEvent(
   state: RendererState,
   candidate: RenderCandidate,

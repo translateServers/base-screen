@@ -10,12 +10,15 @@ import { computed, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useScreenSessionStore } from '../composables/use-stores';
 import { api } from '../lib/api';
+import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
-import {
-  attachRenderDiagnostics,
-  type RenderDiagnosticsHandle,
-} from '../lib/render-diagnostics';
+import { attachRenderDiagnostics, type RenderDiagnosticsHandle } from '../lib/render-diagnostics';
 import { showToast } from '../lib/toast';
+import { DEMO_ALARM_BINDINGS } from '../screen/host-alarm-bindings';
+import {
+  createHostAlarmController,
+  type HostAlarmStatusSnapshot,
+} from '../screen/host-alarm-controller';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -182,6 +185,8 @@ const offsetX = ref(0);
 const offsetY = ref(0);
 const fullscreen = ref(false);
 const renderFailed = ref(false);
+const alarmState = ref<HostAlarmStatusSnapshot['status']>('connecting');
+const alarmActiveCount = ref(0);
 /** 顶栏数据状态：由 1s 节拍读 observer 快照，不在 observer 回调里写 ref。 */
 const dataOnline = ref(true);
 const dataFailures = ref(0);
@@ -211,12 +216,26 @@ const statusTitle = computed(() =>
       : `离线组件：${dataFailedComponents.value.join('、')}（累计 ${dataFailures.value} 次失败）`,
 );
 
+const alarmText = computed(() =>
+  alarmState.value === 'live'
+    ? `告警在线 · ${alarmActiveCount.value}`
+    : alarmState.value === 'offline'
+      ? '告警离线'
+      : alarmState.value === 'reconnecting'
+        ? '告警重连中'
+        : '告警连接中',
+);
+const alarmDataState = computed(() =>
+  alarmState.value === 'live' ? 'online' : alarmState.value === 'offline' ? 'error' : 'offline',
+);
+
 const logger = createLogger('screen-viewer');
 
 let unsubscribeSession: (() => void) | undefined;
 let resizeObserver: ResizeObserver | undefined;
 let clockTimer: number | undefined;
 let controller: ReturnType<typeof createHostRefreshController> | undefined;
+let alarms: ReturnType<typeof createHostAlarmController> | undefined;
 let hostObserver: HostObserver | undefined;
 let renderDiagnostics: RenderDiagnosticsHandle | undefined;
 let disposed = false;
@@ -264,6 +283,30 @@ function tickClock(): void {
   const failedKey = status.failedComponents.join(',');
   if (dataFailedComponents.value.join(',') !== failedKey) {
     dataFailedComponents.value = status.failedComponents;
+  }
+  const nextAlarm = alarms?.status();
+  if (nextAlarm !== undefined) {
+    if (alarmState.value !== nextAlarm.status) alarmState.value = nextAlarm.status;
+    if (alarmActiveCount.value !== nextAlarm.activeCount) {
+      alarmActiveCount.value = nextAlarm.activeCount;
+    }
+  }
+}
+
+async function postDemoAlarm(action: 'raise' | 'clear'): Promise<void> {
+  const body =
+    action === 'raise'
+      ? { key: 'alarm.open', level: 'critical', message: '演示告警' }
+      : { key: 'alarm.open' };
+  try {
+    const response = await fetch(`${resolveApiBase()}/demo/alarms/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) showToast('告警操作失败', 'error');
+  } catch {
+    showToast('告警操作失败', 'error');
   }
 }
 
@@ -368,6 +411,15 @@ onMounted(() => {
       },
     });
 
+    // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染。
+    alarms = createHostAlarmController({
+      apiBase: resolveApiBase(),
+      bindings: DEMO_ALARM_BINDINGS,
+      onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
+    });
+    await alarms.ready(800);
+    if (disposed) return;
+
     const configured = element.configure({
       catalog: runtime.catalog,
       runtimeContributions: runtime.runtimeContributions,
@@ -377,6 +429,7 @@ onMounted(() => {
       datasetPort,
       hostCatalogPort,
       observer: tracker.observer,
+      conditionalStylePort: alarms.port,
     });
     if (!configured.ok) {
       logger.error('viewer configure failed', configured.diagnostics);
@@ -419,6 +472,7 @@ onMounted(() => {
         },
         refreshNow: () => element.refreshData(),
         status: () => tracker.status(),
+        alarmStatus: () => alarms?.status(),
       };
     }
 
@@ -438,6 +492,8 @@ onBeforeUnmount(() => {
   window.clearInterval(clockTimer);
   renderDiagnostics?.dispose();
   renderDiagnostics = undefined;
+  alarms?.stop();
+  alarms = undefined;
   controller?.dispose();
   controller = undefined;
   window.__baseScreenHost = undefined;
@@ -473,6 +529,14 @@ function formatClock(date: Date): string {
         :data-state="renderFailed ? 'error' : dataOnline ? 'online' : 'offline'"
         :title="statusTitle"
       >{{ statusText }}</span>
+      <span
+        class="viewer-bar__status"
+        :data-alarm-status="alarmState"
+        :data-state="alarmDataState"
+        title="外部告警系统推送状态（演示绑定：生产监控大屏的 kpi-alarm-value / top-notice）"
+      >{{ alarmText }}</span>
+      <button type="button" class="button" @click="postDemoAlarm('raise')">模拟告警</button>
+      <button type="button" class="button" @click="postDemoAlarm('clear')">解除告警</button>
       <span class="viewer-bar__clock">{{ clock }}</span>
       <button type="button" class="button" @click="toggleFullscreen">
         {{ fullscreen ? '退出全屏' : '全屏' }}

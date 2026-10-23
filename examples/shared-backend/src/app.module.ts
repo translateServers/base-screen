@@ -1,6 +1,7 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
+import { AlarmsModule } from './alarms/alarms.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { DatasetsModule } from './datasets/datasets.module';
@@ -24,6 +25,8 @@ import { SqliteModule } from './sqlite/sqlite.module';
     DatasetsModule,
     // 演示端点（`/api/demo/press|roster`）：给「新建 REST 数据源」一个开箱可用的目标。
     DemoModule,
+    // 实时告警演示（`/api/demo/alarms/stream`）：宿主适配层的参考实现，内存状态、无持久化。
+    AlarmsModule,
     // SQLite 执行层：providers 里的 WorkshopSeedService 在启动时幂等生成演示库，
     // 因此 `dev` / `start` / `node dist/main.js` 四条入口都自动具备 workshop.db，无需手工脚本。
     SqliteModule,
