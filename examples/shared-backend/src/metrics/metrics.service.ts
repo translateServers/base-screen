@@ -33,6 +33,11 @@ const METRIC_DEFINITIONS: Readonly<Record<MetricId, MetricDefinition>> = {
   alarm_open: { unit: '条', base: 7, amplitude: 3 },
   line_load: { unit: '%', base: 72.4, amplitude: 12.6 },
   energy_ratio: { unit: '%', base: 88.2, amplitude: 5.4 },
+  // 告警演示屏（PRD §5.2 C10 的等级细分）：口径是「近 1 小时新增」，
+  // 与 `alarm_open`（当前未处理快照）不是同一统计窗，因此三档之和不等于它。
+  alarm_critical: { unit: '条', base: 2, amplitude: 1 },
+  alarm_warning: { unit: '条', base: 4, amplitude: 2 },
+  alarm_info: { unit: '条', base: 6, amplitude: 2 },
 };
 
 /** 产线排行的固定取值：名次与数值都不随请求漂移（PRD §6.4 的确定性要求）。 */

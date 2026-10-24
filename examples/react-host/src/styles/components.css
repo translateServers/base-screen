@@ -100,7 +100,7 @@
     0 12px 32px rgba(2, 12, 24, 0.55);
 }
 
-/* 封面：网格 + 径向光晕，模拟 DataV 缩略图的科技底。纯 CSS，不额外拉预览实例。 */
+/* 封面：网格 + 径向光晕，模拟成品大屏缩略图的科技底。纯 CSS，不额外拉预览实例。 */
 .screen-cover {
   position: relative;
   aspect-ratio: 16 / 9;

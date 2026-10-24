@@ -17,16 +17,31 @@ import { SEED_SCREENS, serializeStarterDocument } from './starter-document';
 export class ScreensService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** 空库时幂等播种：dev / start / 测试三种入口行为一致。 */
+  /** 启动期补种：dev / start / 测试三种入口行为一致。 */
   async onModuleInit(): Promise<void> {
     await this.ensureSeed();
   }
 
+  /**
+   * 按 **名字** 幂等补种：只插入库里还没有的种子，已有行一律不碰。
+   *
+   * 之前的实现是「空库才播种」（`count() > 0` 直接返回），于是新增一张成品种子时，
+   * 所有已经跑起来的开发库都永远看不到它——本地表现为「案例项目里没有新大屏」，
+   * jest e2e 也会因为旧 `test.db` 里只有四张而假失败。改成按名字补齐后：
+   * - 老库重启即补上新种子，不需要删 `data/screens.db`；
+   * - 用户改过的种子（同名）原样保留，不会被新文档覆盖；
+   * - 代价是被手动删掉的种子会随下次重启回来（示例库可以接受，README 已写明）。
+   *
+   * `name` 没有唯一约束，两实例同时启动仍有重复插入的窗口；示例库不做互斥，
+   * 真实宿主应给种子加幂等键或唯一索引。
+   */
   async ensureSeed(): Promise<void> {
-    const count = await this.prisma.screen.count();
-    if (count > 0) return;
+    const existing = await this.prisma.screen.findMany({ select: { name: true } });
+    const existingNames = new Set(existing.map((row) => row.name));
+    const missing = SEED_SCREENS.filter((screen) => !existingNames.has(screen.name));
+    if (missing.length === 0) return;
     await this.prisma.screen.createMany({
-      data: SEED_SCREENS.map((screen) => ({
+      data: missing.map((screen) => ({
         name: screen.name,
         document: screen.serialize(),
       })),

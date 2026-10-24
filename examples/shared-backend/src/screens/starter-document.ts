@@ -1,6 +1,7 @@
-import { serializeDatavAirQualityDocument } from './datav-air-quality-document';
-import { serializeDatavDemoDocument } from './datav-demo-document';
-import { serializeDatavMonitorDocument } from './datav-monitor-document';
+import { serializeBoardAirQualityDocument } from './board-air-quality-document';
+import { serializeBoardAlarmDocument } from './board-alarm-document';
+import { serializeBoardDemoDocument } from './board-demo-document';
+import { serializeBoardMonitorDocument } from './board-monitor-document';
 import { validateScreenDocumentInput } from './screen-document-guard';
 
 /**
@@ -132,12 +133,14 @@ const STARTER_DOCUMENT = {
 } as const;
 
 /**
- * 空库播种的三条记录：
- * - 「默认销售大屏」是 DataV 风格的成品文档，打开即可看到完整大屏；
+ * 启动期补种的五条记录（按**名字**补齐：库里缺哪张就插哪张，已有行不覆盖）：
+ * - 「默认销售大屏」是成品风格的完整文档，打开即可看到完整大屏；
  * - 「系统监控大屏」保留轻量卡片文档，用于演示最小宿主物料与旧文档兼容；
- * - 「生产监控大屏」是数据层成品：四种 dataSource 全覆盖（见 datav-monitor-document.ts）；
+ * - 「生产监控大屏」是数据层成品：四种 dataSource 全覆盖（见 board-monitor-document.ts）；
+ * - 「实时告警演示大屏」是告警链路专用屏：流水 + KPI + 等级色块，组件 id 对齐宿主的
+ *   `alarm.open` 演示绑定（见 board-alarm-document.ts）；
  * - 「空气质量监测大屏」是真实数据案例：三个自建 SQLite 数据源 + 城市/时间窗联动
- *   （见 datav-air-quality-document.ts）。
+ *   （见 board-air-quality-document.ts）。
  *
  * `create()` 仍只发轻量卡片：新建大屏从一张空白画布开始，成品只作为种子。
  */
@@ -145,10 +148,11 @@ export const SEED_SCREENS: readonly {
   readonly name: string;
   readonly serialize: () => string;
 }[] = [
-  { name: '默认销售大屏', serialize: serializeDatavDemoDocument },
+  { name: '默认销售大屏', serialize: serializeBoardDemoDocument },
   { name: '系统监控大屏', serialize: serializeStarterDocument },
-  { name: '生产监控大屏', serialize: serializeDatavMonitorDocument },
-  { name: '空气质量监测大屏', serialize: serializeDatavAirQualityDocument },
+  { name: '生产监控大屏', serialize: serializeBoardMonitorDocument },
+  { name: '实时告警演示大屏', serialize: serializeBoardAlarmDocument },
+  { name: '空气质量监测大屏', serialize: serializeBoardAirQualityDocument },
 ];
 
 /**

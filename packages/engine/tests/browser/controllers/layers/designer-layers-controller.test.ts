@@ -398,7 +398,7 @@ describe('DesignerLayersController', () => {
     ]);
   });
 
-  it('runs DataV toolbar arrange, group, and locate actions through functional callbacks', () => {
+  it('runs layer toolbar arrange, group, and locate actions through functional callbacks', () => {
     vi.stubGlobal('HTMLElement', FakeElement);
     vi.stubGlobal('Element', FakeElement);
     const arranged = createController(

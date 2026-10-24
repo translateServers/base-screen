@@ -501,7 +501,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     throw new Error('BROWSER_HARNESS_INSPECTOR_CONTEXT_ACTIONS_FAILED');
   }
   await designer.locator('[data-inspector-density="basic"]').click();
-  const datavChrome = await designer.locator('[data-right-panel]').evaluate((panel) => {
+  const boardChrome = await designer.locator('[data-right-panel]').evaluate((panel) => {
     const search = panel.querySelector('[data-inspector-search-launch]');
     const density = panel.querySelector('.inspector-density');
     const quickStyle = panel.querySelector('[data-quick-style-section]');
@@ -543,34 +543,34 @@ export async function assertSemanticChartAuthoring(designer, page) {
     };
   });
   if (
-    datavChrome.searchWidth !== 28 ||
-    !datavChrome.toolbarInsideContext ||
+    boardChrome.searchWidth !== 28 ||
+    !boardChrome.toolbarInsideContext ||
     // 「几何」标题按原型恢复可见后，首个字段整体下移一个标题行（约 +30px）。
-    datavChrome.geometryTopOffset < 157 ||
-    datavChrome.geometryTopOffset > 166 ||
-    datavChrome.geometryControlHeight !== 28 ||
-    datavChrome.geometryColumnGap !== 14 ||
-    datavChrome.zHiddenInBasic !== true ||
-    datavChrome.hasNameProperty ||
-    datavChrome.densityDisplay === 'none' ||
-    datavChrome.quickStyleSections !== 1 ||
-    datavChrome.quickStyleOpen !== true ||
-    !datavChrome.quickStyleHasPresets ||
-    !datavChrome.quickStyleHasConfig ||
-    datavChrome.xSymbolRight !== '8px' ||
-    datavChrome.xInputAlign !== 'left' ||
-    !datavChrome.subtitle?.includes('harness.semantic-chart') ||
-    !datavChrome.hasMaterialIcon
+    boardChrome.geometryTopOffset < 157 ||
+    boardChrome.geometryTopOffset > 166 ||
+    boardChrome.geometryControlHeight !== 28 ||
+    boardChrome.geometryColumnGap !== 14 ||
+    boardChrome.zHiddenInBasic !== true ||
+    boardChrome.hasNameProperty ||
+    boardChrome.densityDisplay === 'none' ||
+    boardChrome.quickStyleSections !== 1 ||
+    boardChrome.quickStyleOpen !== true ||
+    !boardChrome.quickStyleHasPresets ||
+    !boardChrome.quickStyleHasConfig ||
+    boardChrome.xSymbolRight !== '8px' ||
+    boardChrome.xInputAlign !== 'left' ||
+    !boardChrome.subtitle?.includes('harness.semantic-chart') ||
+    !boardChrome.hasMaterialIcon
   ) {
-    throw new Error(`BROWSER_HARNESS_DATAV_INSPECTOR_CHROME_FAILED:${JSON.stringify(datavChrome)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_INSPECTOR_CHROME_FAILED:${JSON.stringify(boardChrome)}`);
   }
   await designer.locator('[data-inspector-density="all"]').click();
   if (!(await appearance.locator('[data-property="zIndex"]').isVisible())) {
-    throw new Error('BROWSER_HARNESS_DATAV_FULL_GEOMETRY_FAILED');
+    throw new Error('BROWSER_HARNESS_BOARD_FULL_GEOMETRY_FAILED');
   }
   await designer.locator('[data-inspector-density="basic"]').click();
   if (await appearance.locator('[data-property="zIndex"]').isVisible()) {
-    throw new Error('BROWSER_HARNESS_DATAV_BASIC_GEOMETRY_FAILED');
+    throw new Error('BROWSER_HARNESS_BOARD_BASIC_GEOMETRY_FAILED');
   }
   const flipLabels = await appearance
     .locator('[data-geometry-action]')
@@ -579,7 +579,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     JSON.stringify(flipLabels) !==
     JSON.stringify(['\u6c34\u5e73\u7ffb\u8f6c', '\u5782\u76f4\u7ffb\u8f6c'])
   ) {
-    throw new Error(`BROWSER_HARNESS_DATAV_FLIP_LABELS_FAILED:${JSON.stringify(flipLabels)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_FLIP_LABELS_FAILED:${JSON.stringify(flipLabels)}`);
   }
   const quickPresets = appearance.locator('[data-quick-style]');
   const colorCapabilities = await appearance.evaluate((panel) => ({
@@ -644,7 +644,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     presetStates.some((state, index) => index !== 1 && state === 'true')
   ) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_QUICK_PRESET_STATE_FAILED:${JSON.stringify(presetStates)}`,
+      `BROWSER_HARNESS_BOARD_QUICK_PRESET_STATE_FAILED:${JSON.stringify(presetStates)}`,
     );
   }
   const quickColors = appearance.locator('[data-quick-config="colors"]');
@@ -663,7 +663,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     ])
   ) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_QUICK_COLOR_LABELS_FAILED:${JSON.stringify(quickColorLabels)}`,
+      `BROWSER_HARNESS_BOARD_QUICK_COLOR_LABELS_FAILED:${JSON.stringify(quickColorLabels)}`,
     );
   }
   const quickColorPresentation = await quickColors.evaluateAll((buttons) =>
@@ -682,7 +682,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
   ];
   if (JSON.stringify(quickColorPresentation) !== JSON.stringify(expectedQuickColorPresentation)) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_QUICK_COLOR_PRESENTATION_FAILED:${JSON.stringify(quickColorPresentation)}`,
+      `BROWSER_HARNESS_BOARD_QUICK_COLOR_PRESENTATION_FAILED:${JSON.stringify(quickColorPresentation)}`,
     );
   }
   await quickColors.nth(1).click();
@@ -704,7 +704,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     quickColorStates.some((state, index) => index !== 1 && state === 'true')
   ) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_QUICK_COLOR_STATE_FAILED:${JSON.stringify(quickColorStates)}`,
+      `BROWSER_HARNESS_BOARD_QUICK_COLOR_STATE_FAILED:${JSON.stringify(quickColorStates)}`,
     );
   }
   const sectionNames = await appearance
@@ -746,7 +746,7 @@ export async function assertSemanticChartAuthoring(designer, page) {
     !expandedSearch.open
   ) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_INSPECTOR_SEARCH_EXPANSION_FAILED:${JSON.stringify(expandedSearch)}`,
+      `BROWSER_HARNESS_BOARD_INSPECTOR_SEARCH_EXPANSION_FAILED:${JSON.stringify(expandedSearch)}`,
     );
   }
   await inspectorSearch.fill('\u6807\u7b7e\u65cb\u8f6c');

@@ -253,7 +253,7 @@ export async function assertLeftPanelMaterials(designer, page) {
 
 // ---- 源模块：assert-left-panel-layers.mjs ----
 export async function assertLeftPanelLayers(page, viewport) {
-  // R5：图层树增强（嵌套文档独立实例验证：DataV 前置图层顺序、六项工具栏、
+  // R5：图层树增强（嵌套文档独立实例验证：前置图层顺序、六项工具栏、
   // 引导线变量、子项计数、定位入口与 hover/focus 展开操作簇）。
   await page.evaluate(() => {
     const { catalog } = window.baseScreenHarness;

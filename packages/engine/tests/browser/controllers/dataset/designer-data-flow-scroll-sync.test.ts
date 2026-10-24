@@ -65,9 +65,9 @@ function createSurface(): {
   const content = new FakeContent(Object.values(sections));
   const panel = {
     querySelector: (selector: string) => {
-      if (selector === '.designer-datav-data-flow-content') return content;
-      if (selector === '.designer-datav-data-flow-progress') return {};
-      if (selector === '.designer-datav-data-flow') return {};
+      if (selector === '.designer-inspector-data-flow-content') return content;
+      if (selector === '.designer-inspector-data-flow-progress') return {};
+      if (selector === '.designer-inspector-data-flow') return {};
       return null;
     },
   } as unknown as HTMLElement;

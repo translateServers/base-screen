@@ -478,9 +478,9 @@ describe('designer panel rendering', () => {
       const summary = section.children[0];
       expect(summary?.tagName).toBe('summary');
       expect(summary?.className).toContain('designer-inspector-section-title');
-      expect(summary?.className).toContain('designer-datav-section-summary');
+      expect(summary?.className).toContain('designer-inspector-section-summary');
       const disclosure = summary?.children.find((child) =>
-        child.className.includes('designer-datav-section-disclosure'),
+        child.className.includes('designer-inspector-section-disclosure'),
       );
       expect(disclosure).toBeDefined();
     }

@@ -1,5 +1,6 @@
 import type { ScreenDocument, ScreenParseResult } from '@base-screen/contracts';
 import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/contracts';
+import { createPluginBoardRuntime, PLUGIN_BOARD_ID } from '@base-screen/plugin-board-materials';
 import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialConstructor,
@@ -11,7 +12,6 @@ import type {
   PluginCommandPort,
 } from '@base-screen/plugin-core';
 import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
-import { createPluginDatavRuntime, PLUGIN_DATAV_ID } from '@base-screen/plugin-datav-materials';
 import { createPluginEchartsRuntime, PLUGIN_ECHARTS_ID } from '@base-screen/plugin-echarts';
 import {
   createBaseScreenPluginContributionCommandPort,
@@ -91,13 +91,13 @@ async function createHostRuntime(): Promise<HostRuntime> {
     standaloneMaterialTagNames: [],
     plugins: [
       createHostAuthoringRuntime(),
-      createPluginDatavRuntime(),
+      createPluginBoardRuntime(),
       createPluginEchartsRuntime(),
       createHostResourceRuntime(),
     ],
     grantedCapabilities: {
       [HOST_AUTHORING_PLUGIN_ID]: HOST_AUTHORING_CAPABILITIES,
-      [PLUGIN_DATAV_ID]: ['command.execute', 'design.read'],
+      [PLUGIN_BOARD_ID]: ['command.execute', 'design.read'],
       [PLUGIN_ECHARTS_ID]: ['command.execute', 'design.read'],
     },
     registry: {

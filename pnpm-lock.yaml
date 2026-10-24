@@ -74,12 +74,12 @@ importers:
       '@base-screen/material':
         specifier: workspace:^
         version: link:../../packages/material
+      '@base-screen/plugin-board-materials':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-board-materials
       '@base-screen/plugin-core':
         specifier: workspace:^
         version: link:../../packages/plugin-core
-      '@base-screen/plugin-datav-materials':
-        specifier: workspace:^
-        version: link:../../plugins/plugin-datav-materials
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts
@@ -205,12 +205,12 @@ importers:
       '@base-screen/material':
         specifier: workspace:^
         version: link:../../packages/material
+      '@base-screen/plugin-board-materials':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-board-materials
       '@base-screen/plugin-core':
         specifier: workspace:^
         version: link:../../packages/plugin-core
-      '@base-screen/plugin-datav-materials':
-        specifier: workspace:^
-        version: link:../../plugins/plugin-datav-materials
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts
@@ -245,12 +245,12 @@ importers:
       '@base-screen/material':
         specifier: workspace:^
         version: link:../../packages/material
+      '@base-screen/plugin-board-materials':
+        specifier: workspace:^
+        version: link:../../plugins/plugin-board-materials
       '@base-screen/plugin-core':
         specifier: workspace:^
         version: link:../../packages/plugin-core
-      '@base-screen/plugin-datav-materials':
-        specifier: workspace:^
-        version: link:../../plugins/plugin-datav-materials
       '@base-screen/plugin-echarts':
         specifier: workspace:^
         version: link:../../plugins/plugin-echarts
@@ -434,7 +434,7 @@ importers:
         specifier: ^3.5.0
         version: 3.5.40(typescript@7.0.2)
 
-  plugins/plugin-datav-materials:
+  plugins/plugin-board-materials:
     dependencies:
       '@base-screen/contracts':
         specifier: workspace:^

@@ -39,8 +39,8 @@ export class DesignerDataFlowScrollSync {
   constructor(private readonly onStepChange: (step: DesignerDatasetWorkbenchStep) => void) {}
 
   bind(panel: HTMLElement): void {
-    const content = panel.querySelector<HTMLElement>('.designer-datav-data-flow-content');
-    const flow = panel.querySelector<HTMLElement>('.designer-datav-data-flow');
+    const content = panel.querySelector<HTMLElement>('.designer-inspector-data-flow-content');
+    const flow = panel.querySelector<HTMLElement>('.designer-inspector-data-flow');
     if (content === null || flow === null) {
       this.clear();
       return;

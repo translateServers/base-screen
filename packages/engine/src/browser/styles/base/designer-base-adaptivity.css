@@ -67,7 +67,7 @@
   .designer-help-dialog,
   .designer-error-console,
   .designer-context-menu,
-  .designer-datav-section-disclosure,
+  .designer-inspector-section-disclosure,
   .topbar-text-button {
     transition-duration: 0s !important;
     animation-duration: 0s !important;

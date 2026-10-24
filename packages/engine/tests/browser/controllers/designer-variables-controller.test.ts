@@ -234,7 +234,7 @@ describe('designer variables controller', () => {
     });
   });
 
-  it('edits DataV filter, controlled mode, and automatic update fields inline', () => {
+  it('edits script filter, controlled mode, and automatic update fields inline', () => {
     const variable = {
       type: 'data-source' as const,
       id: 'region',

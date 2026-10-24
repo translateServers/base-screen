@@ -24,7 +24,7 @@ export function appendMultiSelectionControls(
   catalog: BaseScreenMaterialCatalog | undefined,
 ): void {
   const summary = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionSummary);
-  summary.className += ' designer-datav-batch-summary';
+  summary.className += ' designer-inspector-batch-summary';
   const list = properties.ownerDocument.createElement('ul');
   list.className = 'designer-inspector-summary';
   appendListItem(list, DESIGNER_UI_TEXT.propertiesPanel.multiSelect(context.summary.count));
@@ -47,9 +47,9 @@ export function appendMultiSelectionControls(
   }
   summary.appendChild(list);
   const arrange = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.arrangeActions);
-  arrange.className += ' designer-datav-batch-arrange';
+  arrange.className += ' designer-inspector-batch-arrange';
   const arrangeGrid = properties.ownerDocument.createElement('div');
-  arrangeGrid.className = 'designer-datav-batch-arrange-grid';
+  arrangeGrid.className = 'designer-inspector-batch-arrange-grid';
   for (const [action, label, icon] of [
     ['align-left', DESIGNER_UI_TEXT.propertiesPanel.alignLeft, 'align-left'],
     ['align-center', DESIGNER_UI_TEXT.propertiesPanel.alignCenter, 'align-center'],
@@ -88,7 +88,7 @@ export function appendMultiSelectionControls(
   appendBatchQuickConfiguration(properties, context, interaction, catalog);
   appendBatchStyleControls(properties, context, document, interaction, catalog);
   const actions = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.groupActions);
-  actions.className += ' designer-datav-batch-secondary-actions';
+  actions.className += ' designer-inspector-batch-secondary-actions';
   actions.dataset.inspectorAdvanced = 'true';
   appendActionButton(
     actions,
@@ -109,7 +109,7 @@ function appendMultiSelectionStateActions(
   context: Extract<DesignerInspectorContext, { readonly kind: 'multi-selection' }>,
 ): void {
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.selectionActions);
-  section.className += ' designer-datav-batch-secondary-actions';
+  section.className += ' designer-inspector-batch-secondary-actions';
   section.dataset.inspectorAdvanced = 'true';
   const allLocked = context.components.every((component) => component.status.locked);
   const allHidden = context.components.every((component) => component.status.hidden);
@@ -162,7 +162,7 @@ function appendBatchGeometryControls(
     ? DESIGNER_UI_TEXT.propertiesPanel.batchAllLocked
     : DESIGNER_UI_TEXT.propertiesPanel.batchActionsHint(context.summary.count);
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
-  geometry.className += ' designer-datav-batch-geometry';
+  geometry.className += ' designer-inspector-batch-geometry';
   const position = appendBatchFieldRow(
     geometry,
     DESIGNER_UI_TEXT.propertiesPanel.batchObjectPosition,
@@ -228,12 +228,12 @@ function appendBatchQuickConfiguration(
 
 function appendBatchFieldRow(parent: HTMLElement, labelText: string): HTMLElement {
   const row = parent.ownerDocument.createElement('div');
-  row.className = 'designer-datav-batch-field-row';
+  row.className = 'designer-inspector-batch-field-row';
   const label = parent.ownerDocument.createElement('span');
-  label.className = 'designer-datav-batch-field-row-label';
+  label.className = 'designer-inspector-batch-field-row-label';
   label.textContent = labelText;
   const controls = parent.ownerDocument.createElement('div');
-  controls.className = 'designer-datav-batch-field-row-controls';
+  controls.className = 'designer-inspector-batch-field-row-controls';
   row.appendChild(label);
   row.appendChild(controls);
   parent.appendChild(row);
@@ -242,7 +242,7 @@ function appendBatchFieldRow(parent: HTMLElement, labelText: string): HTMLElemen
 
 function appendBatchReadOnlyInput(parent: HTMLElement, labelText: string): void {
   const label = parent.ownerDocument.createElement('label');
-  label.className = 'designer-field designer-field-label designer-datav-batch-readonly';
+  label.className = 'designer-field designer-field-label designer-inspector-batch-readonly';
   label.textContent = labelText;
   const input = createDesignerInput(parent.ownerDocument, {
     placeholder: DESIGNER_UI_TEXT.propertiesPanel.multipleValues,
@@ -282,7 +282,7 @@ function appendBatchStyleControls(
     ? DESIGNER_UI_TEXT.propertiesPanel.batchAllLocked
     : DESIGNER_UI_TEXT.propertiesPanel.batchActionsHint(context.summary.count);
   const style = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.unifiedStyle);
-  style.className += ' designer-datav-batch-unified-style';
+  style.className += ' designer-inspector-batch-unified-style';
   for (const field of fields) {
     const schema = manifest.styleSchema?.properties?.[field];
     const panelField = (manifest.stylePanel ?? []).find((item) => item.style === field);
@@ -310,10 +310,10 @@ function appendBatchStyleControls(
 
 function appendBatchUnifiedStyleEmpty(properties: HTMLElement): void {
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.unifiedStyle);
-  section.className += ' designer-datav-batch-unified-style';
+  section.className += ' designer-inspector-batch-unified-style';
   const empty = properties.ownerDocument.createElement('button');
   empty.type = 'button';
-  empty.className = 'designer-control designer-button designer-datav-batch-unified-empty';
+  empty.className = 'designer-control designer-button designer-inspector-batch-unified-empty';
   empty.disabled = true;
   empty.textContent = DESIGNER_UI_TEXT.propertiesPanel.noUnifiedStyle;
   section.appendChild(empty);

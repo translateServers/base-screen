@@ -95,7 +95,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 查看态：DataV 式等比缩放。frame 保持 canonical 像素尺寸，由 transform 适配视口；
+/* 查看态：等比缩放。frame 保持 canonical 像素尺寸，由 transform 适配视口；
    工具栏与 frame 平级，因此不会被一起缩小。 */
 .viewer-stage {
   position: fixed;

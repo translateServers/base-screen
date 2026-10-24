@@ -207,7 +207,7 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
     ).toHaveLength(0);
   });
 
-  it('projects DataV-style conditions and actions without the deprecated association module', () => {
+  it('projects conditional styles and actions without the deprecated association module', () => {
     const panel = panelElement();
     const configured: ScreenDocument = {
       ...document,

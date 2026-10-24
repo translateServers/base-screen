@@ -383,10 +383,10 @@ export function appendSection(parent: HTMLElement, title: string, advanced = fal
   section.open = true;
   if (advanced) section.dataset.inspectorAdvanced = 'true';
   const summary = parent.ownerDocument.createElement('summary');
-  summary.className = 'designer-inspector-section-title designer-datav-section-summary';
+  summary.className = 'designer-inspector-section-title designer-inspector-section-summary';
   summary.textContent = title;
   const disclosure = parent.ownerDocument.createElement('span');
-  disclosure.className = 'designer-datav-section-disclosure';
+  disclosure.className = 'designer-inspector-section-disclosure';
   disclosure.innerHTML = designerIcon('chevron-down');
   summary.appendChild(disclosure);
   section.appendChild(summary);
@@ -438,7 +438,7 @@ export function appendBatchArrangeButton(
   const title = disabled ? `${label}：${unavailableReason}` : label;
   const button = createDesignerIconButton(parent.ownerDocument, {
     ariaLabel: title,
-    className: 'designer-datav-batch-arrange-button',
+    className: 'designer-inspector-batch-arrange-button',
     disabled,
     icon,
     label,

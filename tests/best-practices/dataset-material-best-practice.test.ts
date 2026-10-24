@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ScreenDatasetField } from '../../packages/contracts/src/index.js';
 import { validateScreenHostResourceBinding } from '../../packages/core/src/index.js';
-import { PLUGIN_DATAV_PIPELINE_MANIFEST } from '../../plugins/plugin-datav-materials/src/pipeline.js';
+import { PLUGIN_BOARD_PIPELINE_MANIFEST } from '../../plugins/plugin-board-materials/src/pipeline.js';
 import {
   hostedDatasetRankingManifest,
   hostedMaterialPackage,
@@ -102,7 +102,7 @@ describe('dataset material best practice', () => {
  * 拿到一个日期字符串当吞吐量，屏上出现"NaN"且没有任何诊断。
  */
 describe('dataset binding value type gate', () => {
-  const stagesRoles = PLUGIN_DATAV_PIPELINE_MANIFEST.dataBinding?.roles ?? [];
+  const stagesRoles = PLUGIN_BOARD_PIPELINE_MANIFEST.dataBinding?.roles ?? [];
 
   it('rejects a bound field whose value type is outside the role declaration', () => {
     const fields: readonly ScreenDatasetField[] = [

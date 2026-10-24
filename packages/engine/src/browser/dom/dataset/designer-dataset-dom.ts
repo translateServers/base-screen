@@ -47,7 +47,7 @@ export function renderDesignerDataSourcePanel(
   feedback.setAttribute('role', 'status');
   feedback.setAttribute('aria-live', 'polite');
   feedback.textContent = options.feedback;
-  const content = flow.querySelector<HTMLElement>('.designer-datav-data-flow-content');
+  const content = flow.querySelector<HTMLElement>('.designer-inspector-data-flow-content');
   const actionBar = content?.querySelector<HTMLElement>('.designer-dataset-actions');
   if (actionBar !== null && actionBar !== undefined) actionBar.before(feedback);
   else (content ?? section).appendChild(feedback);

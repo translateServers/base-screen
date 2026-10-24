@@ -3,7 +3,7 @@ import type { ScreenJsonValue, ScreenParseResult } from '@base-screen/contracts'
 /**
  * `topBy` 处理器：按指定字段降序取前 N 条。
  *
- * 对应 DataV 的"数据过滤器"这一类能力，但**实现位置不同**：过滤逻辑是同 realm 受信插件代码
+ * 对应成熟大屏产品的"数据过滤器"这一类能力，但**实现位置不同**：过滤逻辑是同 realm 受信插件代码
  * （ADR-0004），由宿主在解析变量/数据源时经 manager 调用，而不是用户在设计器里现写的脚本。
  * Base Screen 因此不获得数据加工职责——它只多了一条"这个处理器存在且被授权"的记录。
  *

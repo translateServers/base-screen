@@ -12,8 +12,8 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
  * `harness.dataset-ranking`、inspector 控件样例）本就带 `title`/`caption` props，
  * 用来演示复合作者面。把它们改名规避清单等于把门禁变成摆设，而直接打破 harness 又不是
  * 本门禁的职权。因此描述性文案 prop 的禁令分三层：官方物料与插件物料由本脚本 R2 把守，
- * 宿主示例由 R3 把守（连 `label` 一起禁），DataV 插件另有
- * `plugins/plugin-datav-materials/tests/plugin.test.ts` 的清单断言。
+ * 宿主示例由 R3 把守（连 `label` 一起禁），大屏组件插件另有
+ * `plugins/plugin-board-materials/tests/plugin.test.ts` 的清单断言。
  */
 
 /** 只描述"这个组件是什么"的 prop 名：需要标题时由文档层另放一个 `base.text` 组合。 */
@@ -41,7 +41,7 @@ const HOST_FORBIDDEN_TEXT_PROPS = [...FORBIDDEN_TEXT_PROPS, 'label'];
  *
  * 图表类物料的 `title`/`legend`/`axis` 是图形自身的构件（ECharts option 的组成部分，
  * 与 `series`、`grid` 同级），不是贴在控件外面的一行说明标签；把它们拆成独立物料会让
- * 图表无法自洽。非图表物料一律不豁免——DataV 的 `border-box` 就是按这条把原本的标题栏
+ * 图表无法自洽。非图表物料一律不豁免——`board.border-box` 就是按这条把原本的标题栏
  * 删掉的。
  */
 const CHART_FURNITURE_EXEMPTIONS = [
@@ -175,7 +175,7 @@ for (const glob of HOST_MATERIAL_GLOBS) {
 if (failures.length > 0) {
   throw new Error(
     `MATERIAL_ATOMICITY_CHECK_FAILED:\n  ${[...new Set(failures)].join('\n  ')}\n` +
-      '依据：AGENTS.md「物料原子化（组件制作约定）」与 plugins/plugin-datav-materials 的 title 断言。',
+      '依据：AGENTS.md「物料原子化（组件制作约定）」与 plugins/plugin-board-materials 的 title 断言。',
   );
 }
 

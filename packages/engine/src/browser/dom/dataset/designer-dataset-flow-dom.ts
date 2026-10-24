@@ -205,13 +205,13 @@ function staticDataView(options: DesignerDataSourcePanelOptions): DesignerStatic
 export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): HTMLElement {
   const ownerDocument = options.panel.ownerDocument;
   const section = ownerDocument.createElement('section');
-  section.className = 'designer-dataset-section designer-datav-data-flow';
+  section.className = 'designer-dataset-section designer-inspector-data-flow';
   section.dataset.datasetSection = 'true';
   section.dataset.dataFlowLayout = 'continuous';
   section.dataset.inspectorSearchSection = 'true';
   if (options.mode === 'host-resource') {
     const content = ownerDocument.createElement('div');
-    content.className = 'designer-datav-data-flow-content';
+    content.className = 'designer-inspector-data-flow-content';
     content.dataset.designerScrollScope = `data-source:${options.scrollScope}`;
     const summary = ownerDocument.createElement('p');
     summary.className = 'designer-data-source-empty';
@@ -230,7 +230,7 @@ export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): H
   section.dataset.activeStep = inlineWorkbenchStep(options.activeStep);
 
   const content = ownerDocument.createElement('div');
-  content.className = 'designer-datav-data-flow-content';
+  content.className = 'designer-inspector-data-flow-content';
   content.dataset.designerScrollScope = `data-source:${options.scrollScope}`;
   renderContinuousDataFlow(content, options);
 
@@ -404,7 +404,7 @@ function dataSection(
 ): HTMLElement {
   const element = section(key, options);
   if (key === 'authoring') {
-    element.classList.add('designer-datav-advanced-settings');
+    element.classList.add('designer-inspector-advanced-settings');
     element.dataset.workbenchSection = 'refresh';
     element.tabIndex = -1;
     const heading = element.querySelector<HTMLElement>('.designer-inspector-section-title');

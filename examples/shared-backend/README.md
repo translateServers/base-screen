@@ -16,7 +16,7 @@ shared-backend/
 │   ├── main.ts              # 引导：CORS、全局前缀 api、Swagger
 │   ├── app.module.ts        # 组合根：全局 ValidationPipe / 异常过滤器 / 日志拦截器
 │   ├── prisma/              # PrismaModule（global）+ PrismaService 单例
-│   ├── screens/             # 大屏文档 CRUD + revision 乐观锁 + 空库播种
+│   ├── screens/             # 大屏文档 CRUD + revision 乐观锁 + 启动期按名字补种
 │   ├── metrics/             # 确定性 mock 指标时序（mulberry32 + 固定 seed）
 │   ├── health/              # 存活探针
 │   └── common/              # AllExceptionsFilter（统一错误体）、LoggingInterceptor
@@ -66,20 +66,24 @@ shared-backend/
 
 `Screen = { id, name, revision, document, createdAt, updatedAt }`（时间为 ISO 字符串）。
 错误体统一 `{ error, message }`。指标目录：`cpu_usage`（%）、`memory_usage`（%）、
-`request_rate`（req/s），以及 DataV 种子使用的 `sales_total`（万元）、`order_count`（单）、
+`request_rate`（req/s），以及成品种子使用的 `sales_total`（万元）、`order_count`（单）、
 `visitor_count`（人）、`conversion_rate`（%）、`target_completion`（%）、
-`service_satisfaction`（%）、`member_repurchase`（%）；`points` 为 1..120 的整数，默认 24。
+`service_satisfaction`（%）、`member_repurchase`（%）；生产监控屏另有 `oee`（%）、
+`device_online_rate`（%）、`output_count`（件）、`alarm_open`（条）、`line_load`（%）、
+`energy_ratio`（%），实时告警演示屏再追加 `alarm_critical` / `alarm_warning` / `alarm_info`
+（条，口径是近 1 小时新增）；`points` 为 1..120 的整数，默认 24。
 排行固定为 `region`（6 个区域）与 `channel`（4 个渠道），`limit` 为 1..20，默认 6。
 
 `Alarm = { id, key, level: 'warning' | 'critical' | 'info', message, raisedAt, acknowledged, suppressed }`。
 告警状态在内存中，进程重启即回到初始 warning；`reset` 恢复初始快照。真实告警平台的持久化、
 确认/屏蔽生命周期与传输凭证由宿主接入，本示例只演示宿主适配层与 SSE 推送。
 
-空库播种四条记录：「默认销售大屏」是 50+ 组件的 DataV 风格成品文档，「系统监控大屏」保留
+启动期补种五条记录（按名字补齐：缺哪张插哪张，已有行不覆盖）：「默认销售大屏」是 50+ 组件的成品风格文档，「系统监控大屏」保留
 原来的最小卡片文档（覆盖宿主自有物料路径），「生产监控大屏」是覆盖四种 dataSource 的数据层
-成品文档，「空气质量监测大屏」是三个自建 SQLite 数据源 + 真实快照（Open-Meteo CAMS）的
-城市空气质量案例。种子只在空库执行；本地想重新播种时删除
-`data/screens.db` 后重启，或直接跑冒烟脚本（它使用独立库并自动迁移）。
+成品文档，「实时告警演示大屏」是告警链路专用屏（流水 + KPI + 等级色块，组件 id 对齐宿主
+`alarm.open` 绑定），「空气质量监测大屏」是三个自建 SQLite 数据源 + 真实快照（Open-Meteo CAMS）
+的城市空气质量案例。新增种子在旧库重启后自动补上；想彻底重置成出厂状态才需要删
+`data/screens.db`，或直接跑冒烟脚本（它使用独立库并自动迁移）。
 
 数据源侧同时幂等生成 `data/datasources/city-air.db` 并播种三条只读 SQLite 源
 （`custom.air-live` / `custom.air-trend` / `custom.air-rank`）。它们与用户自建数据源共用
@@ -103,9 +107,10 @@ pnpm --filter @base-screen-example/shared-backend dev # 开发：migrate deploy 
 - schema 变更：`pnpm --filter @base-screen-example/shared-backend exec prisma migrate dev --name <描述>`，
   产物（`prisma/migrations/`）随提交进仓库。
 - `dev` / `start` 前自动 `prisma migrate deploy`，无需手动同步 schema。
-- 空库首次启动由 `ScreensService.onModuleInit` 幂等播种四条演示大屏
-  （`默认销售大屏`、`系统监控大屏`、`生产监控大屏`、`空气质量监测大屏`），dev / start / e2e
-  行为一致；数据源播种由 `DatasourceSeedService` 负责（含 `city-air.db` 的幂等生成）。
+- 启动时由 `ScreensService.onModuleInit` 按名字幂等补种五条演示大屏（只插缺失的，不覆盖已有行）
+  （`默认销售大屏`、`系统监控大屏`、`生产监控大屏`、`实时告警演示大屏`、`空气质量监测大屏`），
+  dev / start / e2e 行为一致；数据源播种由 `DatasourceSeedService` 负责（含 `city-air.db`
+  的幂等生成）。
 - 数据库文件：`data/screens.db`（gitignore）；连接信息见 `.env`（非机密默认值）。
 
 ## 测试

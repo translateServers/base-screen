@@ -154,9 +154,10 @@ pnpm verify:examples        # 依次跑三端冒烟
 三端断言集合一致：种子列表渲染、设计器注册并挂载、指标读数经 host-resource
 数据通道渲染出后端数值、查看器播放种子文档、指标接口确定性、**生产监控大屏的数据层六条**
 （首屏灯阵/工序链/告警流水、URL 播种、变量联动、空结果、失败保留上一帧、后台暂停）、
-**实时告警样式**（SSE snapshot → warning；raise critical → 变色；clear → 恢复；期间
-dataset query 数与 canonical 文档不变），以及无未捕获页面错误。数据层断言的详细口径见下文
-「数据层接入」。
+**实时告警演示大屏**（流水 14 行 / critical 2 条 / 等级色块与 statusPalette 同色 / 4 个 KPI
+出数），以及**实时告警样式**（在该屏上 `poll=0` 打开：SSE snapshot → warning；raise critical →
+变色；clear → 恢复；期间 dataset query 数与 canonical 文档不变），最后是无未捕获页面错误。
+数据层断言的详细口径见下文「数据层接入」。
 
 G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构）：台账列表与筛选、REST 新建→
 测试→保存→设计器目录可见、SQLite 表模式与 SQL 模式（固定值 / 变量两种参数绑定）、
@@ -164,17 +165,18 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 冒烟**不点设计器内的深层数据源面板**：那几层用 API 克隆「生产监控大屏」的文档并改绑数据源，
 再在查看页断言真的出数（选中模板屏是因为手工拼的最小文档会被 canonical 解析器拒掉）。
 
-## 成品屏与 DataV 风格种子
+## 成品屏种子
 
-四张 1920×1080 的成品文档，打开即可播放（默认销售 / 系统监控 / 生产监控 / 空气质量）：
+五张 1920×1080 的成品文档，打开即可播放（默认销售 / 系统监控 / 生产监控 / 实时告警演示 /
+空气质量）：
 
-**「默认销售大屏」**——DataV 风格，顶栏 + 4 张 KPI 翻牌卡 + 渠道环形图 + 24h 面积趋势 +
+**「默认销售大屏」**——成品大屏版式，顶栏 + 4 张 KPI 翻牌卡 + 渠道环形图 + 24h 面积趋势 +
 目标水位 + 区域订单柱图 + 轮播排行 + 3 条胶囊进度 + 底部滚动字幕，共 50+ 个原子组件。
 它演示三件事：
 
-1. **外围插件就是物料来源**：DataV 四件套（`datav.border-box` / `digital-flop` /
-   `scroll-board` / `water-level`）与两个新物料（`datav.capsule-progress` /
-   `datav.marquee`）来自 `@base-screen/plugin-datav-materials`；图表来自
+1. **外围插件就是物料来源**：大屏四件套（`board.border-box` / `digital-flop` /
+   `scroll-board` / `water-level`）与两个新物料（`board.capsule-progress` /
+   `board.marquee`）来自 `@base-screen/plugin-board-materials`；图表来自
    `@base-screen/plugin-echarts`（line / bar / area / pie）。宿主只做两件事：
    注册元素、把 manager 的 snapshot 合进 catalog。
 2. **插件贡献必须被授权**：三个 `dataResourceType`（`demo_metric` / `demo_series` /
@@ -192,9 +194,24 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 | `host-resource` | 5 张 KPI（OEE / 在线率 / 产量 / 目标达成 / 未处理告警）+ 产量趋势 + 产线负载排行 | `demo_metric` / `demo_series` / `demo_ranking`（`/api/metrics`） |
 | `static` | 标题、标签、班组绩效表、三个选择器 | 文档内字面量 |
 
-它同时是「物料形状 × 数据形状」的对照样本：`datav.status-grid` 承载多实体灯阵（48 台设备
-一眼扫完），`datav.pipeline` 承载保序工序链（哪道卡住），`datav.scroll-board` 承载带等级色条
+它同时是「物料形状 × 数据形状」的对照样本：`board.status-grid` 承载多实体灯阵（48 台设备
+一眼扫完），`board.pipeline` 承载保序工序链（哪道卡住），`board.scroll-board` 承载带等级色条
 的告警流水（逐条读），三者消费的是同一个后端的三张表。
+
+**「实时告警演示大屏」**——告警链路的专用屏，三块共用同一套等级语义：
+
+| 区块 | 组件 | 数据来自 |
+| --- | --- | --- |
+| 告警流水 | 1 个 `board.scroll-board`（13 行可见、等级色列） | `monitor.alarms`（`line` / `window` / `level` 三个参数走变量槽位） |
+| KPI 读数 | `kpi-alarm-value` 翻牌 ← `alarm_open` | `demo_metric`（`/api/metrics`） |
+| 等级色块 | 3 组「矩形色块 + 色条 + 翻牌」 | `alarm_critical` / `alarm_warning` / `alarm_info` |
+
+这张屏的存在理由是**把演示 key 落到具体组件上**：宿主的 `host-alarm-bindings.ts` 用组件 id
+（`kpi-alarm-value`、`top-notice`）绑定 `alarm.open`，所以这里刻意沿用与生产监控屏相同的
+两个 id 与基础色，宿主侧一行都不用改；文档本身仍然没有告警 key、阈值或样式规则。
+等级色块的三条实色条与流水的 `statusPalette` 同源（`#f5222d` / `#fa8c16` / `#1677ff`），
+根测试按 `BOARD_ALARM_LEVEL_COLORS` 逐色比对，避免"同一等级两种红"。
+冒烟的实时告警断言就从这张屏做（`?poll=0` 打开，断言样式变化期间不重新取数）。
 
 **「空气质量监测大屏」**——真实数据案例，**三个自建 SQLite 数据源**：
 
@@ -237,8 +254,9 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
   文档层设置，双趋势图使用自适应量程；固定刻度需要给图表物料增加轴 props。
 - **时间窗按钮没有选中态**：`base.text` 没有 selected/active 样式；文档层用「当前
   24/48 小时」数值指示当前窗口，按钮本身只承担触发。
-- **成品种子只在空库播种**：已有开发库不会自动补种第四张屏；本机验证库通过 API 写入了
-  新屏，其他旧库需删除 `data/screens.db` 后重启（或通过 API 导入文档）。
+- **成品种子按名字补种**：启动时 `ScreensService.ensureSeed()` 只插入库里缺的那几张，
+  已有行（哪怕是用户改过的同名屏）不会被覆盖，所以新增种子在旧开发库重启后即可见；
+  想彻底重置成出厂状态才需要删 `data/screens.db`。代价是被手动删掉的种子会随下次重启回来。
 
 「系统监控大屏」保留原来的轻量卡片文档，用来覆盖宿主自有物料
 `host-app.metric-value` 这条最小路径，也证明旧文档没有被新种子破坏。
@@ -316,8 +334,8 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 - **状态 chip**：查看页顶栏 `[data-viewer-status]`，在线=绿、离线=橙，文本与屏内
   `production.status` 同一套语义。
 
-> 角标计数请用 **`[data-datav-degraded-badge]`**。角标节点同时带 `data-datav-degraded`，
-> 宿主元素也同步该属性（样式钩子），因此 `[data-datav-degraded]` 会命中两个节点。
+> 角标计数请用 **`[data-board-degraded-badge]`**。角标节点同时带 `data-board-degraded`，
+> 宿主元素也同步该属性（样式钩子），因此 `[data-board-degraded]` 会命中两个节点。
 
 ### 实时告警（宿主推送）
 
@@ -333,16 +351,17 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 
 - **端口必须在 `configure` 前提交**；三端在配置前 `await alarms.ready(800)`，首快照未到时
   先按基础样式渲染，到达后由失效 API 补齐。
-- **绑定在宿主侧**：`src/screen/host-alarm-bindings.ts` 把 `alarm.open` 映射到
-  「生产监控大屏」的 `kpi-alarm-value`（datav.digital-flop，只用 `color`）与
-  `top-notice`（base.text，额外用 `fontWeight`）。文档里没有告警 key、阈值或样式规则。
+- **绑定在宿主侧**：`src/screen/host-alarm-bindings.ts` 把 `alarm.open` 映射到组件 id
+  `kpi-alarm-value`（board.digital-flop，只用 `color`）与 `top-notice`（base.text，额外用
+  `fontWeight`）。id 是全屏无关的，所以「生产监控大屏」与「实时告警演示大屏」都有落点；
+  文档里没有告警 key、阈值或样式规则。
 - **合并与优先级**：同一组件命中多条告警时取 `critical > warning > info`，同级按 alarm id
   字典序；`acknowledged` / `suppressed` 不参与样式。
 - **一帧一次**：控制器按 `requestAnimationFrame` 合并事件，只失效受影响的组件；`stop()` 后
   不再回调。事件 revision 重复/倒序丢弃，缺口触发重连并以 snapshot 全量替换。
 - **验证**：查看页顶栏有 `[data-alarm-status]` chip 与「模拟告警 / 解除告警」按钮。冒烟以
-  `poll=0` 打开「生产监控大屏」，先 `POST reset` 等待 warning，再 `POST raise` 断言 critical，
-  `POST clear` 断言恢复；同时断言 dataset query 数与 canonical 文档未变化。
+  `poll=0` 打开**「实时告警演示大屏」**，先 `POST reset` 等待 warning，再 `POST raise` 断言
+  critical，`POST clear` 断言恢复；同时断言 dataset query 数与 canonical 文档未变化。
 
 ### URL 参数
 
@@ -557,13 +576,13 @@ cp my-data.db examples/shared-backend/data/datasources/
 | A12 | 三端 smoke（C/E 段）+ 根测试 | 屏上联动走蓝图；HTTP 层 400 由后端 e2e 断言 |
 | A13 | 三端 smoke（E 段） | 成功后注入 500：保留上一帧 + 角标 + 离线 chip（连续两次采样） |
 | A14 | 三端 smoke（D 段） | LINE-C：0 格 + 空文案 + 无角标 + 仍在线 |
-| A15 | `plugins/plugin-datav-materials/tests/values.test.ts` | 越界读数不改数：`clampPercent(120)=100`（液面）但对 `formatWaterLevelLabel(120,1)` 断言文本 `120.0%`。PRD 原写 `gauge`，本轮 `gauge` 未实现，由 `water-level` 承载同一条规则 |
+| A15 | `plugins/plugin-board-materials/tests/values.test.ts` | 越界读数不改数：`clampPercent(120)=100`（液面）但对 `formatWaterLevelLabel(120,1)` 断言文本 `120.0%`。PRD 原写 `gauge`，本轮 `gauge` 未实现，由 `water-level` 承载同一条规则 |
 | A15b | `tests/examples/host-catalog-port.test.ts` | 来源求值抛错时端口返回失败诊断而非 reject；渲染器把实例记为 error、变量沿用 `initialValue`，整屏照常渲染 |
-| A16 / A17 | `plugins/plugin-datav-materials/tests/{status-grid,pipeline}.test.ts` + `tests/best-practices/dataset-material-best-practice.test.ts` | 字段不存在、角色不存在、字段数越界 → `HOST_DATASET_BINDING_INVALID`；根测试只做**正向**校验，负例在物料测试与 best-practices 里 |
+| A16 / A17 | `plugins/plugin-board-materials/tests/{status-grid,pipeline}.test.ts` + `tests/best-practices/dataset-material-best-practice.test.ts` | 字段不存在、角色不存在、字段数越界 → `HOST_DATASET_BINDING_INVALID`；根测试只做**正向**校验，负例在物料测试与 best-practices 里 |
 | A18 | `tests/best-practices/dataset-material-best-practice.test.ts`（`dataset binding value type gate`） | 角色 `valueTypes` 不含字段实际类型 → 拒绝：把 `stages` 的 `throughput`(number) 换成 date 字段必须失败，换回 number 必须通过（对照组排除"因别的原因失败"） |
-| A19 | 根测试 `tests/examples/datav-monitor-document.test.ts` + 后端 `screens.service.spec` | 四种 dataSource 各 ≥1（含 6 个 `variable` 组件）、6 个变量、3 条种子 |
+| A19 | 根测试 `tests/examples/board-monitor-document.test.ts` + 后端 `screens.service.spec` | 四种 dataSource 各 ≥1（含 6 个 `variable` 组件）、6 个变量、3 条种子 |
 | A20 | `pnpm verify:examples` | 三端各自跑同一组断言，且 tile/节点/行数/请求串完全一致 |
-| （A5/A6 的下游）蓝图规则静态校验 | `tests/examples/datav-monitor-document.test.ts` | 每条规则的 `componentId` / `variableId` / `eventName` 都存在，`eventName` ∈ 该物料 manifest 的 events |
+| （A5/A6 的下游）蓝图规则静态校验 | `tests/examples/board-monitor-document.test.ts` | 每条规则的 `componentId` / `variableId` / `eventName` 都存在，`eventName` ∈ 该物料 manifest 的 events |
 
 ### 数据源后台管理（PRD A25–A39）
 
@@ -583,7 +602,7 @@ cp my-data.db examples/shared-backend/data/datasources/
 | A36 | 三端 smoke（L 段）+ 根测试 | 取消勾选 `status` 保存 → 「字段变化会影响 N 张大屏」+ 屏名 → 「仍然保存」→ 查看页标题仍在（不白屏）、灯阵 0 格 + `Host dataset binding is invalid.`；根测试用物料真实 role 断言 `HOST_DATASET_BINDING_INVALID` 的正反例 |
 | A37 | 根测试 `tests/examples/datasource-contract.test.ts` | 内置条目取自 `DATASET_DEFINITIONS`、自建参数取自 `parametersToDefinitions` → 过 Entries/Definition/Tabular 三个解析器；`description:null` 合法、空串非法、tabular 多一个键非法 |
 | A38 | 根测试 `tests/examples/vanilla-datasource-route.test.ts` | `#/datasources` 与 `?type=sqlite` 命中；`#/datasources/x` not-found；`#/screens/:id/edit`、`?line=` 行为不变 |
-| A39 | 根测试 `tests/examples/datasource-binding.test.ts` | `custom.*` 文档通过 `parseScreenDocument`；绑定字段都在 `fields` 内 → 通过，缺字段/角色不足 → `HOST_DATASET_BINDING_INVALID`（角色取自 `PLUGIN_DATAV_STATUS_GRID_MANIFEST`，不手抄） |
+| A39 | 根测试 `tests/examples/datasource-binding.test.ts` | `custom.*` 文档通过 `parseScreenDocument`；绑定字段都在 `fields` 内 → 通过，缺字段/角色不足 → `HOST_DATASET_BINDING_INVALID`（角色取自 `PLUGIN_BOARD_STATUS_GRID_MANIFEST`，不手抄） |
 
 > 未列出的子项（配色对比度、字号、动画节奏等纯视觉项）由人眼验收，不进自动化。
 

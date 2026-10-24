@@ -53,7 +53,7 @@ function appendQuickStyleSection(
   options: DesignerQuickStyleOptions,
 ): HTMLElement {
   const section = properties.ownerDocument.createElement('section');
-  section.className = 'designer-inspector-section designer-datav-quick-style-section';
+  section.className = 'designer-inspector-section designer-inspector-quick-style-section';
   section.dataset.inspectorSearchKey = 'quick-style';
   section.dataset.inspectorPreferenceContext = options.preferenceContext ?? materialType;
   section.dataset.quickStyleSection = 'true';
@@ -62,14 +62,14 @@ function appendQuickStyleSection(
   details.open = true;
   const summary = properties.ownerDocument.createElement('summary');
   summary.className =
-    'designer-inspector-section-title designer-descriptor-group-summary designer-datav-section-summary';
+    'designer-inspector-section-title designer-descriptor-group-summary designer-inspector-section-summary';
   summary.textContent = options.title ?? DESIGNER_UI_TEXT.propertiesPanel.quickStyle;
   const disclosure = properties.ownerDocument.createElement('span');
-  disclosure.className = 'designer-datav-section-disclosure';
+  disclosure.className = 'designer-inspector-section-disclosure';
   disclosure.innerHTML = designerIcon('chevron-down');
   summary.appendChild(disclosure);
   const content = properties.ownerDocument.createElement('div');
-  content.className = 'designer-datav-section-content';
+  content.className = 'designer-inspector-section-content';
   details.append(summary, content);
   section.appendChild(details);
   properties.appendChild(section);

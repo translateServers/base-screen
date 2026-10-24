@@ -67,11 +67,11 @@ import {
   assertHostPushComposition,
   assertHostScriptProcessorComposition,
   assertHostTimerComposition,
-} from './plugins/assert-datav-composition.mjs';
+} from './plugins/assert-board-composition.mjs';
 import {
-  assertDatavCycleCommand,
-  assertDatavInspectorControl,
-  assertDatavMaterialsRender,
+  assertBoardCycleCommand,
+  assertBoardInspectorControl,
+  assertBoardMaterialsRender,
   assertPluginBlueprintCapability,
   assertPluginMaterialRenders,
   assertPluginResourceTypeSelectable,
@@ -201,14 +201,14 @@ export async function runBrowserHarness(serverPort) {
         await assertPluginResourceTypeSelectable(authoringDesigner, page);
         await assertPluginBlueprintCapability(page);
         // 大屏组件插件：元素内部结构、自有检查器控件、事务命令三条承载面。
-        await assertDatavMaterialsRender(authoringDesigner, page);
-        await assertDatavInspectorControl(authoringDesigner, page);
-        await assertDatavCycleCommand(authoringDesigner, page);
+        await assertBoardMaterialsRender(authoringDesigner, page);
+        await assertBoardInspectorControl(authoringDesigner, page);
+        await assertBoardCycleCommand(authoringDesigner, page);
         // ADR-0076：插件运行期贡献（处理器变换、动作执行、未声明失败关闭）。
         await assertPluginDataProcessor(page);
         await assertPluginBlueprintActionExecutes(page);
         await assertPluginBlueprintActionUndeclaredFailsClosed(page);
-        // DataV 差距调研第四节：宿主组合路径（计时器触发、脚本过滤器、推送数据）。
+        // 宿主组合路径模板：计时器触发、脚本过滤器、推送数据。
         // 这三条把"缺失能力其实可由宿主组合"从调研结论变成可执行证据。
         await assertHostScriptProcessorComposition(page);
         await assertHostTimerComposition(page);

@@ -9,11 +9,11 @@ import {
   defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
+import { registerPluginBoardMaterials } from '@base-screen/plugin-board-materials';
 import type {
   BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
 } from '@base-screen/plugin-core';
-import { registerPluginDatavMaterials } from '@base-screen/plugin-datav-materials';
 import { registerPluginEcharts } from '@base-screen/plugin-echarts';
 import { createMaterialDefinition } from '@base-screen/plugin-sdk';
 import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
@@ -59,7 +59,7 @@ export function registerHostMaterials(): readonly BaseScreenMaterialCatalogEntry
     throw new Error(`HOST_METRIC_DEFINE_FAILED:${metricDefined.diagnostics[0]?.code}`);
   }
 
-  registerPluginDatavMaterials();
+  registerPluginBoardMaterials();
   registerPluginEcharts();
 
   cached = Object.freeze([...official, metricDefined.value]);

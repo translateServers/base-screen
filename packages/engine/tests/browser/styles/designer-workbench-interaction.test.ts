@@ -64,7 +64,7 @@ describe('designer workbench interaction and accessibility', () => {
     );
   });
 
-  it('keeps the DataV-style layer toolbar and tree geometry stable', () => {
+  it('keeps the layer toolbar and tree geometry stable', () => {
     expect(workbenchCss).toContain('.rail-view[data-layers]:not([hidden]) {');
     expect(workbenchCss).toContain('grid-template-rows: auto minmax(0, 1fr);');
     expect(workbenchCss).toContain('.layer-toolbar {');

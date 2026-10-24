@@ -53,7 +53,7 @@ function displayOrder(
     .map((item) => item.id);
 }
 
-describe('DataV-style layer reorder transactions', () => {
+describe('layer reorder transactions', () => {
   it('moves a layer up toward the visual top and down toward the visual bottom', () => {
     const source = document([
       component('back', 0),

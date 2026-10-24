@@ -382,9 +382,10 @@ export async function assertAuthoringMarquee(page, designer) {
   });
   const batchChrome = await designer.locator('[data-right-panel]').evaluate((panel) => ({
     title: panel.querySelector('[data-right-panel-title]')?.textContent,
-    arrangeButtons: panel.querySelectorAll('.designer-datav-batch-arrange-button').length,
-    positionValues: panel.querySelectorAll('.designer-datav-batch-readonly input:disabled').length,
-    hasUnifiedStyle: panel.querySelector('.designer-datav-batch-unified-style') !== null,
+    arrangeButtons: panel.querySelectorAll('.designer-inspector-batch-arrange-button').length,
+    positionValues: panel.querySelectorAll('.designer-inspector-batch-readonly input:disabled')
+      .length,
+    hasUnifiedStyle: panel.querySelector('.designer-inspector-batch-unified-style') !== null,
     tabsDisplay: getComputedStyle(panel.querySelector('.inspector-tabs')).display,
   }));
   if (
@@ -394,7 +395,7 @@ export async function assertAuthoringMarquee(page, designer) {
     !batchChrome.hasUnifiedStyle ||
     batchChrome.tabsDisplay !== 'none'
   ) {
-    throw new Error(`BROWSER_HARNESS_DATAV_BATCH_CHROME_FAILED:${JSON.stringify(batchChrome)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_BATCH_CHROME_FAILED:${JSON.stringify(batchChrome)}`);
   }
   const batchWidthControl = designer.locator('[data-multi-property="width"]');
   const batchWidthCount = await batchWidthControl.count();

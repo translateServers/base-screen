@@ -533,7 +533,7 @@ function formatClock(date: Date): string {
         class="viewer-bar__status"
         :data-alarm-status="alarmState"
         :data-state="alarmDataState"
-        title="外部告警系统推送状态（演示绑定：生产监控大屏的 kpi-alarm-value / top-notice）"
+        title="外部告警系统推送状态（演示绑定：实时告警演示大屏 / 生产监控大屏的 kpi-alarm-value / top-notice）"
       >{{ alarmText }}</span>
       <button type="button" class="button" @click="postDemoAlarm('raise')">模拟告警</button>
       <button type="button" class="button" @click="postDemoAlarm('clear')">解除告警</button>

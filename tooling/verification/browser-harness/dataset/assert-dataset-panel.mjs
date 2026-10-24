@@ -333,12 +333,12 @@ export async function assertDatasetPanelInteraction(designer, page) {
   // 2.5) 操作条让位：**不等式判据**（不看截图）——滚到底时最后一段的底边不得越过操作条顶边。
   // 「最后一段」用 `[data-ds-section]` 而不取任意后代：toast / 通知会干扰。
   await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const content = panel.querySelector('.designer-inspector-data-flow-content');
     if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;
   });
   await page.waitForTimeout(120);
   const gutter = await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const content = panel.querySelector('.designer-inspector-data-flow-content');
     const sections = [...(content?.querySelectorAll('[data-ds-section]') ?? [])];
     const last = sections[sections.length - 1];
     const bar = content?.querySelector('.designer-dataset-actions');

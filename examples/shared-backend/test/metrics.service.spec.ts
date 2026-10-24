@@ -106,6 +106,24 @@ describe('MetricsService', () => {
     }
   });
 
+  // 实时告警演示屏新增的 3 个等级指标：口径是「近 1 小时新增」，与 alarm_open 独立。
+  it('serves the alarm level metric ids deterministically', async () => {
+    const service = await createService();
+
+    for (const metric of ['alarm_critical', 'alarm_warning', 'alarm_info']) {
+      const first = service.series(metric, 12);
+      const second = service.series(metric, 12);
+      expect(first.unit).toBe('条');
+      expect(second).toEqual(first);
+      // 三条曲线互不相同，否则三个等级色块会显示同一个数。
+      expect(first.points).not.toEqual(service.series('alarm_open', 12).points);
+    }
+
+    expect(service.series('alarm_critical', 12).points).not.toEqual(
+      service.series('alarm_warning', 12).points,
+    );
+  });
+
   it('keeps the legacy metric ids and values untouched', async () => {
     const service = await createService();
 

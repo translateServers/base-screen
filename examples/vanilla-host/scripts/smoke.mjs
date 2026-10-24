@@ -142,9 +142,9 @@ async function main() {
     const cards = await page.locator('.screen-card').count();
     if (cards < 2) fail(`列表至少应渲染 2 条种子大屏，实际 ${cards}`);
 
-    // 2) DataV 成品大屏：插件元素全部注册，文档含 40+ 组件。
+    // 2) 成品大屏：插件元素全部注册，文档含 40+ 组件。
     await openEditor(page, '默认销售大屏');
-    const dataVState = await page.evaluate(() => {
+    const seedState = await page.evaluate(() => {
       const designer = document.querySelector('base-screen-designer');
       const root = designer?.shadowRoot ?? null;
       const tag = (name) => customElements.get(name) !== undefined;
@@ -152,32 +152,30 @@ async function main() {
         components: designer?.document?.components.length ?? 0,
         tags: {
           designer: tag('base-screen-designer'),
-          borderBox: tag('base-screen-datav-border-box'),
-          digitalFlop: tag('base-screen-datav-digital-flop'),
-          waterLevel: tag('base-screen-datav-water-level'),
-          scrollBoard: tag('base-screen-datav-scroll-board'),
-          capsule: tag('base-screen-datav-capsule-progress'),
-          marquee: tag('base-screen-datav-marquee'),
+          borderBox: tag('base-screen-board-border-box'),
+          digitalFlop: tag('base-screen-board-digital-flop'),
+          waterLevel: tag('base-screen-board-water-level'),
+          scrollBoard: tag('base-screen-board-scroll-board'),
+          capsule: tag('base-screen-board-capsule-progress'),
+          marquee: tag('base-screen-board-marquee'),
           echarts: tag('base-screen-plugin-echarts'),
         },
         rendered: {
-          flops: root?.querySelectorAll('base-screen-datav-digital-flop').length ?? 0,
+          flops: root?.querySelectorAll('base-screen-board-digital-flop').length ?? 0,
           charts: root?.querySelectorAll('base-screen-plugin-echarts').length ?? 0,
-          capsules: root?.querySelectorAll('base-screen-datav-capsule-progress').length ?? 0,
+          capsules: root?.querySelectorAll('base-screen-board-capsule-progress').length ?? 0,
         },
       };
     });
-    if (dataVState.components < 40) {
-      fail(`DataV 种子应有 40+ 组件，实际 ${dataVState.components}`);
+    if (seedState.components < 40) {
+      fail(`成品种子应有 40+ 组件，实际 ${seedState.components}`);
     }
-    const missingTag = Object.entries(dataVState.tags).find(([, defined]) => !defined);
+    const missingTag = Object.entries(seedState.tags).find(([, defined]) => !defined);
     if (missingTag !== undefined) fail(`插件/设计器元素未注册：${missingTag[0]}`);
-    if (dataVState.rendered.flops !== 4)
-      fail(`应渲染 4 个翻牌器，实际 ${dataVState.rendered.flops}`);
-    if (dataVState.rendered.charts !== 3)
-      fail(`应渲染 3 个图表，实际 ${dataVState.rendered.charts}`);
-    if (dataVState.rendered.capsules !== 3) {
-      fail(`应渲染 3 个胶囊进度，实际 ${dataVState.rendered.capsules}`);
+    if (seedState.rendered.flops !== 4) fail(`应渲染 4 个翻牌器，实际 ${seedState.rendered.flops}`);
+    if (seedState.rendered.charts !== 3) fail(`应渲染 3 个图表，实际 ${seedState.rendered.charts}`);
+    if (seedState.rendered.capsules !== 3) {
+      fail(`应渲染 3 个胶囊进度，实际 ${seedState.rendered.capsules}`);
     }
 
     // 3) 数据绑定端到端：翻牌器拿到后端数值，ECharts 在 shadow 内画出 canvas。
@@ -185,7 +183,7 @@ async function main() {
       () => {
         const designer = document.querySelector('base-screen-designer');
         const root = designer?.shadowRoot ?? null;
-        const flops = [...(root?.querySelectorAll('base-screen-datav-digital-flop') ?? [])];
+        const flops = [...(root?.querySelectorAll('base-screen-board-digital-flop') ?? [])];
         return flops.length === 4 && flops.every((item) => /\d/.test(item.textContent ?? ''));
       },
       undefined,
@@ -216,7 +214,7 @@ async function main() {
       { timeout: 20_000 },
     );
 
-    // 5) 查看页：DataV 文档完整渲染，frame 按视口等比缩放且不溢出。
+    // 5) 查看页：成品文档完整渲染，frame 按视口等比缩放且不溢出。
     await page.evaluate(() => {
       window.location.hash = '#/';
     });
@@ -242,7 +240,7 @@ async function main() {
         boards:
           document
             .querySelector('base-screen-viewer')
-            ?.shadowRoot?.querySelectorAll('base-screen-datav-scroll-board').length ?? 0,
+            ?.shadowRoot?.querySelectorAll('base-screen-board-scroll-board').length ?? 0,
       };
     });
     if (!fit.transform.includes('scale(')) fail(`查看器未应用缩放：${fit.transform}`);
@@ -264,15 +262,22 @@ async function main() {
     }, API_BASE);
     if (!deterministic) fail('指标/排行接口不满足确定性');
 
-    // 7) 生产监控大屏：数据层六条断言（三端同构，口径见 examples/README.md「数据层接入」）。
+    // 7) 生产监控大屏：数据层六条断言；实时告警演示大屏：告警流水 / KPI / 等级色块 + SSE 着色
+    //    （三端同构，口径见 examples/README.md「数据层接入」「实时告警」）。
     const monitorList = await fetch(`${API_BASE}/screens`).then((response) => response.json());
     const monitorScreen = monitorList.screens.find((item) => item.name === '生产监控大屏');
     if (monitorScreen === undefined) fail('种子列表里没有「生产监控大屏」');
 
+    // 告警演示屏是独立种子：两个组件 id 与宿主 `alarm.open` 绑定对齐，告警样式断言在它上面做。
+    const alarmScreen = monitorList.screens.find((item) => item.name === '实时告警演示大屏');
+    if (alarmScreen === undefined) fail('种子列表里没有「实时告警演示大屏」');
+
     const datasetQueries = [];
-    const openMonitor = async (query) => {
+    const openScreen = async (screenId, query) => {
       const target = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
-      target.on('pageerror', (error) => pageErrors.push(`monitor:${query}: ${error.message}`));
+      target.on('pageerror', (error) =>
+        pageErrors.push(`view:${screenId}:${query}: ${error.message}`),
+      );
       target.on('request', (request) => {
         const requestUrl = request.url();
         if (requestUrl.includes('/api/datasets/') && requestUrl.includes('/query')) {
@@ -282,25 +287,26 @@ async function main() {
       await target.addInitScript((apiBaseUrl) => {
         window.__HOST_APP_CONFIG__ = { apiBaseUrl };
       }, API_BASE);
-      await target.goto(`${url}#/screens/${monitorScreen.id}/view?${query}`, {
+      await target.goto(`${url}#/screens/${screenId}/view?${query}`, {
         waitUntil: 'domcontentloaded',
       });
       return target;
     };
+    const openMonitor = (query) => openScreen(monitorScreen.id, query);
     const readMonitorDom = (target) =>
       target.evaluate(() => {
         const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
-        const legend = root?.querySelector('[data-datav-status-legend] [data-state="fault"]');
-        const board = root?.querySelector('[data-datav-board-viewport]');
+        const legend = root?.querySelector('[data-board-status-legend] [data-state="fault"]');
+        const board = root?.querySelector('[data-board--viewport]');
         return {
-          tiles: root?.querySelectorAll('[data-datav-status-tile]').length ?? 0,
+          tiles: root?.querySelectorAll('[data-board-status-tile]').length ?? 0,
           faultLegend: legend?.getAttribute('data-count') ?? null,
-          nodes: root?.querySelectorAll('[data-datav-pipeline-node]').length ?? 0,
-          connectors: root?.querySelectorAll('[data-datav-pipeline-connector]').length ?? 0,
-          boardRows: root?.querySelectorAll('[data-datav-board-row]').length ?? 0,
-          visibleRows: board?.getAttribute('data-datav-board-visible-rows') ?? null,
-          emptyNodes: root?.querySelectorAll('[data-datav-status-empty]').length ?? 0,
-          badges: root?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0,
+          nodes: root?.querySelectorAll('[data-board-pipeline-node]').length ?? 0,
+          connectors: root?.querySelectorAll('[data-board-pipeline-connector]').length ?? 0,
+          boardRows: root?.querySelectorAll('[data-board--row]').length ?? 0,
+          visibleRows: board?.getAttribute('data-board--visible-rows') ?? null,
+          emptyNodes: root?.querySelectorAll('[data-board-status-empty]').length ?? 0,
+          badges: root?.querySelectorAll('[data-board-degraded-badge]').length ?? 0,
           chip: document.querySelector('[data-viewer-status]')?.textContent ?? '',
           host: window.__baseScreenHost?.status() ?? null,
         };
@@ -310,7 +316,7 @@ async function main() {
         (expected) =>
           (document
             .querySelector('base-screen-viewer')
-            ?.shadowRoot?.querySelectorAll('[data-datav-status-tile]').length ?? 0) === expected,
+            ?.shadowRoot?.querySelectorAll('[data-board-status-tile]').length ?? 0) === expected,
         count,
         { timeout: 30_000 },
       );
@@ -332,8 +338,104 @@ async function main() {
       fail(`首屏 status().failures 应为 0：${JSON.stringify(firstState.host)}`);
     }
 
-    // A2. 实时告警：SSE 推送 → conditionalStylePort + refreshConditionalStyles。
+    await first.close();
+
+    // A2. 实时告警演示大屏：告警流水 + KPI 读数 + 等级色块，以及 SSE 推送 → 条件样式。
+    //     这张屏是告警专用种子（组件 id 对齐宿主 `alarm.open` 绑定）：
+    //     流水 14 行（LINE-A 近 60 分钟定值，critical 2 条）、4 个读数走 demo_metric
+    //     （alarm_open + 三个等级）、三块等级色块与流水的 statusPalette 同源。
     //     poll=0 关闭数据轮询，确保样式变化期间 datasetQueries 不增长。
+    const readingIds = [
+      'kpi-alarm-value',
+      'kpi-level-critical-value',
+      'kpi-level-warning-value',
+      'kpi-level-info-value',
+    ];
+    const alarmDemo = await openScreen(alarmScreen.id, 'smoke=1&poll=0');
+    await alarmDemo.waitForFunction(
+      (ids) => {
+        const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
+        // 视口不足时 scroll-board 会补空行，`[data-board--row]` 数不等于数据条数；
+        // 只有真实数据行带 `data-board-row-status`（等级色列启用时）。
+        const dataRows = [...(root?.querySelectorAll('[data-board--row]') ?? [])].filter(
+          (row) => row.dataset.boardRowStatus !== undefined,
+        ).length;
+        const readingsReady = ids.every((id) => {
+          const node = root?.querySelector(`[data-base-screen-component-id="${id}"]`);
+          return /\d/.test(node?.textContent ?? '');
+        });
+        return dataRows === 14 && readingsReady;
+      },
+      readingIds,
+      { timeout: 30_000 },
+    );
+    await alarmDemo.waitForTimeout(800);
+    const alarmDemoState = await alarmDemo.evaluate((ids) => {
+      const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
+      const modelOf = (id) =>
+        root?.querySelector(`[data-base-screen-component-id="${id}"]`)?.model ?? null;
+      const textOf = (id) =>
+        root?.querySelector(`[data-base-screen-component-id="${id}"]`)?.textContent ?? '';
+      const rows = [...(root?.querySelectorAll('[data-board--row]') ?? [])];
+      const dataRows = rows.filter((row) => row.dataset.boardRowStatus !== undefined);
+      const countLevel = (level) =>
+        dataRows.filter((row) => row.dataset.boardRowStatus === level).length;
+      const stream = document
+        .querySelector('base-screen-viewer')
+        ?.document?.components.find((item) => item.id === 'alarm-stream');
+      return {
+        rows: rows.length,
+        dataRows: dataRows.length,
+        visibleRows:
+          root?.querySelector('[data-board--viewport]')?.getAttribute('data-board--visible-rows') ??
+          null,
+        critical: countLevel('critical'),
+        warning: countLevel('warning'),
+        info: countLevel('info'),
+        bars: ['critical', 'warning', 'info'].map(
+          (level) => modelOf(`level-${level}-bar`)?.style?.fill ?? null,
+        ),
+        palette: stream?.props?.statusPalette ?? null,
+        readings: ids.map((id) => textOf(id)),
+        chip: document.querySelector('[data-viewer-status]')?.textContent ?? '',
+      };
+    }, readingIds);
+    if (alarmDemoState.dataRows !== 14) {
+      fail(`告警演示屏流水应 14 行，实际 ${alarmDemoState.dataRows}`);
+    }
+    if (alarmDemoState.rows < alarmDemoState.dataRows) {
+      fail(`告警行渲染不全：总行 ${alarmDemoState.rows} < 数据行 ${alarmDemoState.dataRows}`);
+    }
+    if (alarmDemoState.visibleRows !== '13') {
+      fail(`告警可见行应 13，实际 ${alarmDemoState.visibleRows}`);
+    }
+    if (alarmDemoState.critical !== 2) {
+      fail(`critical 行应 2，实际 ${alarmDemoState.critical}`);
+    }
+    if (alarmDemoState.critical + alarmDemoState.warning + alarmDemoState.info !== 14) {
+      fail(
+        `行等级着色不完整：critical ${alarmDemoState.critical} / warning ${alarmDemoState.warning} / info ${alarmDemoState.info}`,
+      );
+    }
+    if (alarmDemoState.bars.join(',') !== '#f5222d,#fa8c16,#1677ff') {
+      fail(`等级色块颜色应与 critical/warning/info 色板一致：${alarmDemoState.bars.join(',')}`);
+    }
+    const palette = alarmDemoState.palette ?? {};
+    if (
+      palette.critical !== '#f5222d' ||
+      palette.warning !== '#fa8c16' ||
+      palette.info !== '#1677ff' ||
+      palette.default !== '#6b7d8f'
+    ) {
+      fail(`流水 statusPalette 应与色块同源：${JSON.stringify(palette)}`);
+    }
+    if (alarmDemoState.readings.some((text) => !/\d/.test(text))) {
+      fail(`4 个 KPI 读数都应出数：${JSON.stringify(alarmDemoState.readings)}`);
+    }
+    if (!alarmDemoState.chip.includes('在线')) {
+      fail(`告警演示屏 chip 不是在线：${alarmDemoState.chip}`);
+    }
+
     const readAlarmStyles = (target) =>
       target.evaluate(() => {
         const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
@@ -372,21 +474,21 @@ async function main() {
     };
 
     await postAlarm('reset', {});
-    await first.waitForFunction(
+    await alarmDemo.waitForFunction(
       () => document.querySelector('[data-alarm-status]')?.dataset.alarmStatus === 'live',
       undefined,
       { timeout: 20_000 },
     );
-    await waitAlarmColor(first, '#fa8c16');
-    const alarmWarning = await readAlarmStyles(first);
+    await waitAlarmColor(alarmDemo, '#fa8c16');
+    const alarmWarning = await readAlarmStyles(alarmDemo);
     if (alarmWarning.noticeColor !== '#fa8c16' || alarmWarning.noticeWeight !== '700') {
       fail(`告警 warning 样式未命中：${JSON.stringify(alarmWarning)}`);
     }
 
     const queriesBeforeAlarmPush = datasetQueries.length;
     await postAlarm('raise', { key: 'alarm.open', level: 'critical', message: '冒烟告警' });
-    await waitAlarmColor(first, '#f5222d');
-    const alarmCritical = await readAlarmStyles(first);
+    await waitAlarmColor(alarmDemo, '#f5222d');
+    const alarmCritical = await readAlarmStyles(alarmDemo);
     if (alarmCritical.noticeColor !== '#f5222d' || alarmCritical.noticeWeight !== '700') {
       fail(`告警 critical 样式未命中：${JSON.stringify(alarmCritical)}`);
     }
@@ -401,8 +503,8 @@ async function main() {
     }
 
     await postAlarm('clear', { key: 'alarm.open' });
-    await waitAlarmColor(first, '#7ff0ff');
-    const alarmCleared = await readAlarmStyles(first);
+    await waitAlarmColor(alarmDemo, '#7ff0ff');
+    const alarmCleared = await readAlarmStyles(alarmDemo);
     if (alarmCleared.noticeColor !== '#ffd591') {
       fail(`告警解除后 top-notice 未恢复基础样式：${JSON.stringify(alarmCleared)}`);
     }
@@ -410,7 +512,7 @@ async function main() {
       fail('告警解除写入了 canonical 文档');
     }
     await postAlarm('reset', {});
-    await first.close();
+    await alarmDemo.close();
 
     // B. URL 播种：?line=LINE-B → 36 格 / 1 台故障，且数据集 query 串带 line=LINE-B
     const seededFrom = datasetQueries.length;
@@ -434,8 +536,8 @@ async function main() {
     const clickPage = await openMonitor('smoke=1');
     await waitTiles(clickPage, 48);
     await clickPage
-      .locator('base-screen-datav-scroll-board', { hasText: 'B 线·焊装' })
-      .locator('[data-datav-board-row]', { hasText: 'B 线·焊装' })
+      .locator('base-screen-board-scroll-board', { hasText: 'B 线·焊装' })
+      .locator('[data-board--row]', { hasText: 'B 线·焊装' })
       .click();
     await waitTiles(clickPage, 36);
     await clickPage.waitForTimeout(1200);
@@ -452,7 +554,7 @@ async function main() {
       () =>
         (document
           .querySelector('base-screen-viewer')
-          ?.shadowRoot?.querySelectorAll('[data-datav-status-empty]').length ?? 0) === 1,
+          ?.shadowRoot?.querySelectorAll('[data-board-status-empty]').length ?? 0) === 1,
       undefined,
       { timeout: 30_000 },
     );
@@ -483,7 +585,7 @@ async function main() {
       () =>
         (document
           .querySelector('base-screen-viewer')
-          ?.shadowRoot?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0) >= 1,
+          ?.shadowRoot?.querySelectorAll('[data-board-degraded-badge]').length ?? 0) >= 1,
       undefined,
       { timeout: 20_000 },
     );
@@ -624,9 +726,9 @@ async function main() {
       target.evaluate(() => {
         const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
         return {
-          tiles: root?.querySelectorAll('[data-datav-status-tile]').length ?? 0,
-          badges: root?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0,
-          empty: root?.querySelectorAll('[data-datav-status-empty]').length ?? 0,
+          tiles: root?.querySelectorAll('[data-board-status-tile]').length ?? 0,
+          badges: root?.querySelectorAll('[data-board-degraded-badge]').length ?? 0,
+          empty: root?.querySelectorAll('[data-board-status-empty]').length ?? 0,
           text: root?.textContent ?? '',
         };
       });
@@ -635,7 +737,7 @@ async function main() {
         (expected) =>
           (document
             .querySelector('base-screen-viewer')
-            ?.shadowRoot?.querySelectorAll('[data-datav-status-tile]').length ?? 0) === expected,
+            ?.shadowRoot?.querySelectorAll('[data-board-status-tile]').length ?? 0) === expected,
         count,
         { timeout: 30_000 },
       );
@@ -1111,7 +1213,7 @@ async function main() {
       () =>
         (document
           .querySelector('base-screen-viewer')
-          ?.shadowRoot?.querySelectorAll('[data-datav-status-tile]').length ?? 0) === 0,
+          ?.shadowRoot?.querySelectorAll('[data-board-status-tile]').length ?? 0) === 0,
       undefined,
       { timeout: 30_000 },
     );
@@ -1120,9 +1222,9 @@ async function main() {
       const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
       const host = window.__baseScreenHost?.status() ?? null;
       return {
-        tiles: root?.querySelectorAll('[data-datav-status-tile]').length ?? 0,
-        badges: root?.querySelectorAll('[data-datav-degraded-badge]').length ?? 0,
-        empty: root?.querySelectorAll('[data-datav-status-empty]').length ?? 0,
+        tiles: root?.querySelectorAll('[data-board-status-tile]').length ?? 0,
+        badges: root?.querySelectorAll('[data-board-degraded-badge]').length ?? 0,
+        empty: root?.querySelectorAll('[data-board-status-empty]').length ?? 0,
         text: root?.textContent ?? '',
         failures: host?.failures ?? 0,
         failedComponents: host?.failedComponents?.length ?? 0,
@@ -1196,7 +1298,7 @@ async function main() {
 
     if (pageErrors.length > 0) fail(`页面存在未捕获错误：${JSON.stringify(pageErrors)}`);
     console.log(
-      'Vanilla 前端冒烟通过：列表 / DataV 编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）/ 数据源管理（台账·筛选·REST 闭环·SQLite 表与 SQL 模式·引用保护·掩码·字段变化）。',
+      'Vanilla 前端冒烟通过：列表 / 成品屏编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）/ 实时告警演示屏（流水·KPI·等级色块·SSE 着色）/ 数据源管理（台账·筛选·REST 闭环·SQLite 表与 SQL 模式·引用保护·掩码·字段变化）。',
     );
   } finally {
     await browser.close();

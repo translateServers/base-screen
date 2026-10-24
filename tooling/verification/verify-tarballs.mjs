@@ -261,7 +261,7 @@ function verifyHostAppVueTarballConsumer() {
       'material',
       'plugin-core',
       'plugin-sdk',
-      'plugin-datav-materials',
+      'plugin-board-materials',
       'plugin-echarts',
       'plugin-manager',
       'sdk',
@@ -279,7 +279,7 @@ const temporaryRoot = mkdtempSync(join(tmpdir(), 'base-screen-tarballs-'));
 const packedTarballs = new Map();
 // 外围插件不在 packages 固定清单里，但 Vue 宿主会消费它们；外部消费者改写
 // `@base-screen/plugin-*` 依赖时必须能解析到同批次 tarball。
-const PLUGIN_TARBALL_DIRECTORIES = ['plugin-datav-materials', 'plugin-echarts'];
+const PLUGIN_TARBALL_DIRECTORIES = ['plugin-board-materials', 'plugin-echarts'];
 
 try {
   for (const directory of packageBuildOrder()) {

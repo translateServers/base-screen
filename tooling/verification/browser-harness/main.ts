@@ -59,13 +59,13 @@ import {
 } from '../../../packages/sdk/src/index.ts';
 import { createVueMaterialDefinition } from '../../../packages/vue/src/index.ts';
 import {
-  createPluginDatavRuntime,
-  PLUGIN_DATAV_BORDER_BOX_TYPE,
-  PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID,
-  PLUGIN_DATAV_ID,
-  PLUGIN_DATAV_WATER_LEVEL_TYPE,
-  registerPluginDatavMaterials,
-} from '../../../plugins/plugin-datav-materials/src/index.ts';
+  createPluginBoardRuntime,
+  PLUGIN_BOARD_BORDER_BOX_TYPE,
+  PLUGIN_BOARD_CYCLE_BORDER_COMMAND_ID,
+  PLUGIN_BOARD_ID,
+  PLUGIN_BOARD_WATER_LEVEL_TYPE,
+  registerPluginBoardMaterials,
+} from '../../../plugins/plugin-board-materials/src/index.ts';
 import {
   createPluginEchartsRuntime,
   registerPluginEcharts,
@@ -85,12 +85,12 @@ import {
 } from '../../../plugins/plugin-pipeline/src/index.ts';
 import {
   applyHostScriptFilter,
-  createDatavCompositionRuntime,
-  DATAV_COMPOSITION_PLUGIN_ID,
-  DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID,
+  BOARD_COMPOSITION_PLUGIN_ID,
+  BOARD_COMPOSITION_SCRIPT_PROCESSOR_ID,
+  createBoardCompositionRuntime,
   startHostVariableTimer,
   writeHostVariable,
-} from './datav-composition-fixture.ts';
+} from './board-composition-fixture.ts';
 import { mountFeatureCases } from './feature-cases.ts';
 import {
   defineHarnessInspectorFixtures,
@@ -121,7 +121,7 @@ const productElements = defineBaseScreenElements();
 // 面板标签必须在 manager 激活前注册：preflight 会按贡献声明的 tagName 查询宿主 registry。
 defineHarnessPluginPanel();
 registerPluginEcharts();
-registerPluginDatavMaterials();
+registerPluginBoardMaterials();
 defineHarnessInspectorFixtures();
 const officialMaterials = [
   defineBaseScreenTextMaterial(),
@@ -282,21 +282,21 @@ const pluginManager = createBaseScreenPluginManager({
     designerAuthoringPlugin,
     createPluginEchartsRuntime(),
     createPluginMetricsRuntime(),
-    createPluginDatavRuntime(),
+    createPluginBoardRuntime(),
     createPluginPipelineRuntime(),
-    createDatavCompositionRuntime(),
+    createBoardCompositionRuntime(),
   ],
   grantedCapabilities: {
     'browser-harness-authoring': designerAuthoringPluginCapabilities,
     'base-screen.echarts': ['command.execute', 'design.read'],
     // 大屏组件插件要读选区并提交事务，因此同样需要这两个端口能力。
-    [PLUGIN_DATAV_ID]: ['command.execute', 'design.read'],
+    [PLUGIN_BOARD_ID]: ['command.execute', 'design.read'],
     // 声明者即批准者只在此处是宿主自营插件；蓝图能力仍需宿主支持表认可才生效。
     [PLUGIN_METRICS_ID]: [PLUGIN_METRICS_BLUEPRINT_CAPABILITY],
     // ADR-0076：运行期插件。动作能力必须显式批准，动作才进入可执行集合。
     [PLUGIN_PIPELINE_ID]: ['data.process', 'blueprint.action.execute'],
     // 组合路径模板：宿主自营的脚本过滤器处理器。
-    [DATAV_COMPOSITION_PLUGIN_ID]: ['data.process'],
+    [BOARD_COMPOSITION_PLUGIN_ID]: ['data.process'],
   },
   registry: {
     get: (tagName) => customElements.get(tagName) as BaseScreenMaterialConstructor | undefined,
@@ -371,28 +371,28 @@ const pluginChecks: ReadonlyArray<readonly [string, boolean]> = [
   ],
   // 大屏组件插件：四个物料都要进快照，检查器控件要进授权目录（注册≠授权），
   // 命令要出现在插件记录里——任一项失败都说明插件被 preflight 整体排除。
-  ['datav-plugin-catalogued', pluginManager.snapshot.plugins.get(PLUGIN_DATAV_ID) !== undefined],
+  ['board-plugin-catalogued', pluginManager.snapshot.plugins.get(PLUGIN_BOARD_ID) !== undefined],
   [
-    'datav-materials-catalogued',
+    'board-materials-catalogued',
     [
-      PLUGIN_DATAV_BORDER_BOX_TYPE,
-      PLUGIN_DATAV_WATER_LEVEL_TYPE,
-      'datav.digital-flop',
-      'datav.scroll-board',
+      PLUGIN_BOARD_BORDER_BOX_TYPE,
+      PLUGIN_BOARD_WATER_LEVEL_TYPE,
+      'board.digital-flop',
+      'board.scroll-board',
     ].every((type) => pluginManager.snapshot?.materials.has(type) === true),
   ],
   [
-    'datav-inspector-control-authorized',
-    ['base-screen-datav-border-picker'].every(
+    'board-inspector-control-authorized',
+    ['base-screen-board-border-picker'].every(
       (tagName) => pluginManager.snapshot?.inspectorControls.getByTagName(tagName) !== undefined,
     ),
   ],
   [
-    'datav-command-catalogued',
+    'board-command-catalogued',
     pluginManager.snapshot.plugins
-      .get(PLUGIN_DATAV_ID)
+      .get(PLUGIN_BOARD_ID)
       ?.contributions.some(
-        (item) => item.kind === 'command' && item.id === PLUGIN_DATAV_CYCLE_BORDER_COMMAND_ID,
+        (item) => item.kind === 'command' && item.id === PLUGIN_BOARD_CYCLE_BORDER_COMMAND_ID,
       ) === true,
   ],
   ['no-activation-failures', pluginManager.snapshot.failures.length === 0],
@@ -537,14 +537,14 @@ const materialLibraryGrouping = {
       ],
     },
     {
-      id: 'datav',
+      id: 'board',
       label: '大屏',
-      // 外围插件 plugin-datav-materials 贡献的四个物料；分组必须覆盖目录中每个可见物料。
+      // 外围插件 plugin-board-materials 贡献的四个物料；分组必须覆盖目录中每个可见物料。
       materialTypes: [
-        'datav.digital-flop',
-        'datav.scroll-board',
-        'datav.water-level',
-        'datav.border-box',
+        'board.digital-flop',
+        'board.scroll-board',
+        'board.water-level',
+        'board.border-box',
       ],
     },
     {
@@ -591,13 +591,13 @@ const materialLibraryStressGrouping = {
       ],
     },
     {
-      id: 'datav',
+      id: 'board',
       label: '大屏组件超长分组名称用于截断',
       materialTypes: [
-        'datav.digital-flop',
-        'datav.scroll-board',
-        'datav.water-level',
-        'datav.border-box',
+        'board.digital-flop',
+        'board.scroll-board',
+        'board.water-level',
+        'board.border-box',
       ],
     },
     {
@@ -848,7 +848,7 @@ const screenDocument = {
       sourceId: 'campaign',
       controlled: false,
     },
-    // 组合路径模板（DataV 差距调研第四节）：计时器触发与推送数据都写这个变量，
+    // 组合路径模板：计时器触发与推送数据都写这个变量，
     // 蓝图规则 `variable-trigger-demo` 监听它的 data-updated。值本身没有语义，
     // 它只是"宿主自有触发源 → 变量 → 蓝图"这条链路的观察点。
     { type: 'static' as const, id: 'harness-tick', name: 'harnessTick', initialValue: 0 },
@@ -861,7 +861,7 @@ const screenDocument = {
       description: 'Browser Harness 宿主脚本过滤器组合路径',
       initialValue: null,
       sourceId: 'harness-script-source',
-      processorId: DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID,
+      processorId: BOARD_COMPOSITION_SCRIPT_PROCESSOR_ID,
       controlled: false,
     },
   ],
@@ -902,8 +902,8 @@ const screenDocument = {
         ],
       },
       {
-        // 组合路径模板（DataV 差距调研 4.1）：宿主定时器/推送写变量 → 本规则触发 → 插件动作。
-        // DataV 上"计时器节点"承载的功能由此闭环，且**不需要** Base Screen 新增触发器节点：
+        // 组合路径模板·计时器触发：宿主定时器/推送写变量 → 本规则触发 → 插件动作。
+        // 成熟大屏产品上"计时器节点"承载的功能由此闭环，且**不需要** Base Screen 新增触发器节点：
         // 缺的从来是作者面形态，不是功能。`harnessTick` 初值 0 时规则也会触发一次，
         // 因此断言观察的是动作事件次数在启动定时器之后的增量。
         id: 'variable-trigger-demo',
@@ -1206,7 +1206,7 @@ const hostCatalogPort = {
       sourceType: harnessSourceType(request.sourceId),
       purpose: request.purpose,
     });
-    // 组合路径模板（DataV 差距调研 4.2）：宿主脚本过滤器。
+    // 组合路径模板·脚本过滤器：宿主脚本过滤器。
     //
     // 顺序就是宿主该有的顺序：**先取到原始值，再交给处理器**。脚本资产与参数都留在宿主侧，
     // 因此宿主按自己的 `sourceId` 命名空间决定要不要路由到脚本处理器（Engine 不再传
@@ -1571,12 +1571,12 @@ Object.assign(window, {
     pluginPipelineSpotlightEvent: PLUGIN_PIPELINE_SPOTLIGHT_EVENT,
     pluginPipelineProcessorId: PLUGIN_PIPELINE_TOP_BY_PROCESSOR_ID,
     pluginPipelineActionId: PLUGIN_PIPELINE_SPOTLIGHT_ACTION_ID,
-    // 组合路径模板（DataV 差距调研第四节）的观察与驱动点。
-    datavCompositionPluginId: DATAV_COMPOSITION_PLUGIN_ID,
-    datavScriptProcessorId: DATAV_COMPOSITION_SCRIPT_PROCESSOR_ID,
-    datavVariableWrites: hostVariableWrites,
+    // 组合路径模板的观察与驱动点。
+    boardCompositionPluginId: BOARD_COMPOSITION_PLUGIN_ID,
+    boardScriptProcessorId: BOARD_COMPOSITION_SCRIPT_PROCESSOR_ID,
+    boardVariableWrites: hostVariableWrites,
     /** 计时器触发：宿主自建定时器 → 写变量 → 蓝图规则。只在断言调用后运行。 */
-    startDatavTick: (intervalMs = 40) => {
+    startBoardTick: (intervalMs = 40) => {
       hostVariableTimer?.stop();
       let tick = 0;
       hostVariableTimer = startHostVariableTimer(designer, {
@@ -1586,26 +1586,26 @@ Object.assign(window, {
           tick += 1;
           return tick;
         },
-        // 与 pushDatavVariable 记同一份观察数组：两条路径的写入次数必须在同一处可比。
+        // 与 pushBoardVariable 记同一份观察数组：两条路径的写入次数必须在同一处可比。
         onWrite: (value) => hostVariableWrites.push({ variableId: 'harness-tick', value }),
       });
     },
-    stopDatavTick: () => {
+    stopBoardTick: () => {
       hostVariableTimer?.stop();
       hostVariableTimer = undefined;
     },
     /** 推送数据：外部事件驱动的单次写入，与计时器共用同一条宿主写变量原语。 */
-    pushDatavVariable: (value) => {
+    pushBoardVariable: (value) => {
       const result = writeHostVariable(designer, 'harness-tick', value);
       if (result.ok) hostVariableWrites.push({ variableId: 'harness-tick', value });
       return result;
     },
     /** 脚本过滤器：换脚本只改宿主侧标识与参数，文档里的 processorId 不动。 */
-    setDatavScript: (scriptId, options) => {
+    setBoardScript: (scriptId, options) => {
       harnessScriptId = scriptId;
       harnessScriptOptions = (options ?? {}) as ScreenJsonObject;
     },
-    setDatavScriptRows: (rows) => {
+    setBoardScriptRows: (rows) => {
       harnessScriptRows = rows as ScreenJsonValue;
     },
     viewer,

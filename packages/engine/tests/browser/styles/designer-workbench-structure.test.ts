@@ -30,7 +30,7 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toContain('.properties[data-inspector-search-open]');
     expect(workbenchCss).toContain('.inspector-search-workspace-header');
     expect(workbenchCss).toContain('grid-template-rows: 40px auto auto minmax(0, 1fr);');
-    expect(workbenchCss).toContain('.designer-datav-section-summary');
+    expect(workbenchCss).toContain('.designer-inspector-section-summary');
     expect(workbenchCss).toContain('right: 8px;');
     // 图层行统一为「名称 · 锁 · 眼」三列网格：折叠箭头绝对定位在本级折叠位，
     // 缩进由行内 padding 承担，叶子行与分组行的图标因此落在同一条竖线上。
@@ -48,7 +48,7 @@ describe('designer workbench structure and layout', () => {
     );
     expect(workbenchCss).toMatch(/\.material-grid\s*\{[^}]*scrollbar-gutter: stable;/s);
     expect(workbenchCss).toMatch(
-      /\.properties \.designer-datav-data-flow-content\s*\{[^}]*scrollbar-gutter: stable;/s,
+      /\.properties \.designer-inspector-data-flow-content\s*\{[^}]*scrollbar-gutter: stable;/s,
     );
   });
 
@@ -255,18 +255,18 @@ describe('designer workbench structure and layout', () => {
       /\.designer-dataset-actions \{\s*position: sticky;\s*bottom: 0;\s*z-index: 1;/s,
     );
     expect(workbenchCss).toMatch(
-      /\.properties \.designer-datav-data-flow-content:has\(\.designer-dataset-actions\)\s*\{[^}]*padding-bottom: 0;/s,
+      /\.properties \.designer-inspector-data-flow-content:has\(\.designer-dataset-actions\)\s*\{[^}]*padding-bottom: 0;/s,
     );
     expect(workbenchCss).not.toContain('margin: 0 calc(var(--designer-space-5) * -1);');
   });
 
-  it('R6 keeps the DataV-inspired data flow in one continuous inspector column', () => {
+  it('R6 keeps the data flow in one continuous inspector column', () => {
     expect(workbenchCss).toMatch(
-      /\.properties \.designer-datav-data-flow\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
+      /\.properties \.designer-inspector-data-flow\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\);[^}]*grid-template-rows: minmax\(0, 1fr\);/s,
     );
     // 内联三步条与顶部「数据源」页签构成双层导航，且它的 detail 被 CSS 藏成了 0 信息：
     // 内联面板删除整条（工作台的 5 步导航保留，样式在 data-editor.css）。
-    expect(workbenchCss).not.toContain('.designer-datav-data-flow-progress');
+    expect(workbenchCss).not.toContain('.designer-inspector-data-flow-progress');
     expect(workbenchCss).not.toContain('.designer-data-summary-step');
     expect(workbenchCss).toMatch(
       /\.properties \.designer-data-workbench-preview\s*\{\s*display: block;/s,
@@ -336,7 +336,7 @@ describe('designer workbench structure and layout', () => {
       /\.properties \.quick-config-colors \.designer-quick-config-button\[aria-pressed="true"\]\s*\{[^}]*border-color: var\(--designer-accent\);[^}]*box-shadow: 0 0 0 2px var\(--designer-accent-surface\);/s,
     );
     expect(workbenchCss).toMatch(
-      /\.designer-datav-quick-style-section\[data-quick-style-variant="batch"\][^{]*\.quick-config-colors[^{]*\.designer-quick-config-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow: inset 0 0 0 2px var\(--designer-text-primary\);/s,
+      /\.designer-inspector-quick-style-section\[data-quick-style-variant="batch"\][^{]*\.quick-config-colors[^{]*\.designer-quick-config-button\[aria-pressed="true"\]\s*\{[^}]*box-shadow: inset 0 0 0 2px var\(--designer-text-primary\);/s,
     );
   });
 });

@@ -256,7 +256,7 @@ export class DesignerLayersController {
     // 操作簇的空隙属于操作区，不应穿透为行选择；重命名输入由自身编辑流程接管。
     if (target.closest('.layer-actions') !== null) return true;
     if (target.closest('[data-layer-rename]') !== null) return false;
-    // DataV 风格整行命中：除折叠与独立操作按钮外，高亮到哪里就可以点到哪里。
+    // 整行命中：除折叠与独立操作按钮外，高亮到哪里就可以点到哪里。
     const row = target.closest<HTMLElement>('[data-layer-selectable="true"]');
     if (row?.dataset.layerId !== undefined) {
       this.#rename.selectFromLayerClick(row.dataset.layerId, event as MouseEvent);

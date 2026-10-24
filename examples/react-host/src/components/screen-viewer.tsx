@@ -470,7 +470,7 @@ export function ScreenViewerPage(): React.ReactElement {
           data-state={
             alarmState === 'live' ? 'online' : alarmState === 'offline' ? 'error' : 'offline'
           }
-          title="外部告警系统推送状态（演示绑定：生产监控大屏的 kpi-alarm-value / top-notice）"
+          title="外部告警系统推送状态（演示绑定：实时告警演示大屏 / 生产监控大屏的 kpi-alarm-value / top-notice）"
         >
           {alarmLabel}
         </span>

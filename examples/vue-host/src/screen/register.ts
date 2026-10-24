@@ -9,8 +9,8 @@ import {
   defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
+import { registerPluginBoardMaterials } from '@base-screen/plugin-board-materials';
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
-import { registerPluginDatavMaterials } from '@base-screen/plugin-datav-materials';
 import { registerPluginEcharts } from '@base-screen/plugin-echarts';
 import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
 import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
@@ -54,7 +54,7 @@ export function registerHostMaterials(): readonly BaseScreenMaterialCatalogEntry
   }
 
   // 插件元素必须先于 manager.activate() 注册；两者都自行幂等。
-  registerPluginDatavMaterials();
+  registerPluginBoardMaterials();
   registerPluginEcharts();
 
   cached = Object.freeze([...official, metric]);

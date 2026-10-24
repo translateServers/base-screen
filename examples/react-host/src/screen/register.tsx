@@ -9,8 +9,8 @@ import {
   defineBaseScreenTableMaterial,
   defineBaseScreenTextMaterial,
 } from '@base-screen/material';
+import { registerPluginBoardMaterials } from '@base-screen/plugin-board-materials';
 import type { BaseScreenMaterialCatalogEntry } from '@base-screen/plugin-core';
-import { registerPluginDatavMaterials } from '@base-screen/plugin-datav-materials';
 import { registerPluginEcharts } from '@base-screen/plugin-echarts';
 import { defineBaseScreenDesigner } from '@base-screen/sdk/designer';
 import { defineBaseScreenViewer } from '@base-screen/sdk/viewer';
@@ -48,7 +48,7 @@ export function registerHostMaterials(): readonly BaseScreenMaterialCatalogEntry
     customElements.define(METRIC_VALUE_TAG, metric.constructor);
   }
 
-  registerPluginDatavMaterials();
+  registerPluginBoardMaterials();
   registerPluginEcharts();
 
   cached = Object.freeze([...official, metric]);

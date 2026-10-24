@@ -722,11 +722,11 @@ async function assertMaterialLibraryGrouping(page, designer) {
     // 外围插件贡献的物料也进目录与物料库，故与官方/宿主物料同列断言。
     'plugin.echarts',
     'base.table',
-    // plugin-datav-materials 贡献的四个大屏物料。
-    'datav.digital-flop',
-    'datav.scroll-board',
-    'datav.water-level',
-    'datav.border-box',
+    // plugin-board-materials 贡献的四个大屏物料。
+    'board.digital-flop',
+    'board.scroll-board',
+    'board.water-level',
+    'board.border-box',
     'harness.react-button',
     'harness.vue-button',
     'harness.dataset-ranking',
@@ -734,7 +734,7 @@ async function assertMaterialLibraryGrouping(page, designer) {
   if (
     rootState.navigationHidden ||
     !rootState.categoriesHidden ||
-    rootState.groups.join(',') !== 'foundation,data,datav,bridges,best-practices' ||
+    rootState.groups.join(',') !== 'foundation,data,board,bridges,best-practices' ||
     rootState.cards.join(',') !== expectedCards.join(',') ||
     rootState.visual.navigationHeight < 150 ||
     rootState.visual.navigationWidth !== (compact ? 286 : 108) ||
@@ -883,11 +883,11 @@ async function assertMaterialLibraryGrouping(page, designer) {
     const { designer, materialLibraryGrouping } = window.baseScreenHarness;
     const root = designer.shadowRoot;
     const canvas = root.querySelector('[data-canvas]');
-    // 全量重排（顺序改为 bridges → best-practices → datav → foundation → data）：
+    // 全量重排（顺序改为 bridges → best-practices → board → foundation → data）：
     // 分组校验要求覆盖每个可见物料，漏一组会让赋值整体被拒，测不出重排是否生效。
     const byId = new Map(materialLibraryGrouping.groups.map((group) => [group.id, group]));
     designer.materialLibraryGrouping = {
-      groups: ['bridges', 'best-practices', 'datav', 'foundation', 'data'].map((id) =>
+      groups: ['bridges', 'best-practices', 'board', 'foundation', 'data'].map((id) =>
         byId.get(id),
       ),
     };
@@ -903,9 +903,9 @@ async function assertMaterialLibraryGrouping(page, designer) {
   });
   if (
     !dynamic.sameCanvas ||
-    dynamic.groups.join(',') !== 'bridges,best-practices,datav,foundation,data' ||
+    dynamic.groups.join(',') !== 'bridges,best-practices,board,foundation,data' ||
     dynamic.cards.join(',') !==
-      'harness.react-button,harness.vue-button,harness.dataset-ranking,datav.digital-flop,datav.scroll-board,datav.water-level,datav.border-box,base.text,base.rectangle,base.ellipse,base.image,base.rule,base.chart,harness.semantic-chart,plugin.echarts,base.table'
+      'harness.react-button,harness.vue-button,harness.dataset-ranking,board.digital-flop,board.scroll-board,board.water-level,board.border-box,base.text,base.rectangle,base.ellipse,base.image,base.rule,base.chart,harness.semantic-chart,plugin.echarts,base.table'
   ) {
     throw new Error(`BROWSER_HARNESS_MATERIAL_GROUPING_UPDATE_FAILED:${JSON.stringify(dynamic)}`);
   }
@@ -1700,7 +1700,7 @@ export async function assertAuthoringMaterialVisuals(page, designer) {
  * 投影回文档，物料写 `max-content` 只是让浏览器可测量（该控制器读的就是物料元素自身的
  * computed width）。除此之外，物料在 `renderMaterial()` 里写宿主元素的 `width`/`height`
  * 都会覆盖渲染器写入的像素尺寸——最常见的 `100%/100%` 会让组件撑满整个画布。这个 bug 已在
- * `plugin-echarts` 与 `plugin-datav-materials` 的四个物料上各出现一次，所以由这条覆盖全目录
+ * `plugin-echarts` 与 `plugin-board-materials` 的四个物料上各出现一次，所以由这条覆盖全目录
  * 的断言兜底，而不是逐个物料写断言：新增物料不遵守就在这里失败。
  *
  * 覆盖所有 catalog 条目（含 `libraryVisible: false` 的容器类物料），并把全部违规一次性报出，

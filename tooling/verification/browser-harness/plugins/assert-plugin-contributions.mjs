@@ -224,27 +224,27 @@ export async function assertPluginBlueprintCapability(page) {
   }
 }
 
-// 大屏组件插件（plugin-datav-materials）：零第三方依赖的渲染类插件，四个物料 + 自有
+// 大屏组件插件（plugin-board-materials）：零第三方依赖的渲染类插件，四个物料 + 自有
 // 检查器控件 + 一条事务命令。这里覆盖三条只有真实插件才成立的性质：
 //   1. 物料真的渲染出各自的 DOM 结构（不是只有自定义元素壳）；
 //   2. 插件自有的检查器控件被授权实例化，且写回可撤销；
 //   3. 插件命令读选区、按现值轮换样式、进 history。
 // 只断言"物料进了目录"会漏掉元素 render 抛异常或渲染成空白这类问题。
-const DATAV_FLOP_TYPE = 'datav.digital-flop';
-const DATAV_WATER_LEVEL_TYPE = 'datav.water-level';
-const DATAV_BORDER_TYPE = 'datav.border-box';
-const DATAV_FLOP_TAG = 'base-screen-datav-digital-flop';
-const DATAV_WATER_LEVEL_TAG = 'base-screen-datav-water-level';
-const DATAV_BORDER_TAG = 'base-screen-datav-border-box';
-const DATAV_BORDER_PICKER_TAG = 'base-screen-datav-border-picker';
-const DATAV_CYCLE_COMMAND = 'base-screen.datav.cycle-border-style';
-const DATAV_FLOP_POSITION = { x: 60, y: 400 };
-const DATAV_WATER_POSITION = { x: 400, y: 60 };
-const DATAV_BORDER_POSITION = { x: 60, y: 60 };
+const BOARD_FLOP_TYPE = 'board.digital-flop';
+const BOARD_WATER_LEVEL_TYPE = 'board.water-level';
+const BOARD_BORDER_TYPE = 'board.border-box';
+const BOARD_FLOP_TAG = 'base-screen-board-digital-flop';
+const BOARD_WATER_LEVEL_TAG = 'base-screen-board-water-level';
+const BOARD_BORDER_TAG = 'base-screen-board-border-box';
+const BOARD_BORDER_PICKER_TAG = 'base-screen-board-border-picker';
+const BOARD_CYCLE_COMMAND = 'base-screen.board.cycle-border-style';
+const BOARD_FLOP_POSITION = { x: 60, y: 400 };
+const BOARD_WATER_POSITION = { x: 400, y: 60 };
+const BOARD_BORDER_POSITION = { x: 60, y: 60 };
 
 // 用公开作者入口插入：`insertComponent` 按 manifest 默认值展开 size/props/style/dataSource，
 // 因此断言不会因手写的 style 与物料 schema 漂移而失败——那本身就是宿主该走的路径。
-async function insertDatavComponent(page, materialType, name, position) {
+async function insertBoardComponent(page, materialType, name, position) {
   return page.evaluate(
     (intent) => {
       const result = window.baseScreenHarness.designer.insertComponent(intent);
@@ -303,30 +303,30 @@ async function setBorderStyle(page, id, borderStyle) {
 }
 
 // 通道一：插件贡献的物料进入目录并渲染出各自的内部结构。
-export async function assertDatavMaterialsRender(designer, page) {
+export async function assertBoardMaterialsRender(designer, page) {
   await waitForDocument(page);
 
   const catalogued = await page.evaluate(
     (types) => types.map((type) => window.baseScreenHarness.catalog.has(type)),
-    [DATAV_FLOP_TYPE, DATAV_WATER_LEVEL_TYPE, DATAV_BORDER_TYPE],
+    [BOARD_FLOP_TYPE, BOARD_WATER_LEVEL_TYPE, BOARD_BORDER_TYPE],
   );
   if (catalogued.some((present) => present !== true)) {
-    throw new Error(`BROWSER_HARNESS_DATAV_NOT_IN_CATALOG:${JSON.stringify(catalogued)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_NOT_IN_CATALOG:${JSON.stringify(catalogued)}`);
   }
 
-  const flop = await insertDatavComponent(page, DATAV_FLOP_TYPE, '翻牌器探针', DATAV_FLOP_POSITION);
+  const flop = await insertBoardComponent(page, BOARD_FLOP_TYPE, '翻牌器探针', BOARD_FLOP_POSITION);
   if (!flop.ok) {
-    throw new Error(`BROWSER_HARNESS_DATAV_ADD_FAILED:${JSON.stringify(flop.diagnostics)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_ADD_FAILED:${JSON.stringify(flop.diagnostics)}`);
   }
   const flopId = await readFocusedId(page);
-  if (flopId === null) throw new Error('BROWSER_HARNESS_DATAV_FLOP_NOT_SELECTED');
+  if (flopId === null) throw new Error('BROWSER_HARNESS_BOARD_FLOP_NOT_SELECTED');
 
   const rendered = await page.evaluate(
     ([id, flopTag]) => {
       const designer = window.baseScreenHarness.designer;
       const node = designer.shadowRoot.querySelector(`[data-base-screen-component-id=${id}]`);
       const element = node !== null && node.matches(flopTag) ? node : null;
-      const digits = element?.querySelectorAll('[data-datav-flop-digit]') ?? [];
+      const digits = element?.querySelectorAll('[data-board-flop-digit]') ?? [];
       const component = designer.document.components.find((item) => item.id === id);
       const rect = element?.getBoundingClientRect();
       // 位移/缩放都是 1:1，所以渲染盒应当与声明尺寸一致（容许亚像素取整误差）。
@@ -344,18 +344,18 @@ export async function assertDatavMaterialsRender(designer, page) {
         canvas: canvas === undefined ? null : { w: canvas.width, h: canvas.height },
       };
     },
-    [flopId, DATAV_FLOP_TAG],
+    [flopId, BOARD_FLOP_TAG],
   );
   if (!rendered.elementPresent || rendered.digitCount !== 6 || rendered.digitsText !== '128430') {
-    throw new Error(`BROWSER_HARNESS_DATAV_NOT_RENDERED:${JSON.stringify(rendered)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_NOT_RENDERED:${JSON.stringify(rendered)}`);
   }
   const { declared, rendered: box } = rendered;
   if (declared === null || box === null) {
-    throw new Error(`BROWSER_HARNESS_DATAV_GEOMETRY_MISSING:${JSON.stringify(rendered)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_GEOMETRY_MISSING:${JSON.stringify(rendered)}`);
   }
   if (Math.abs(box.w - declared.w) > 1 || Math.abs(box.h - declared.h) > 1) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_SIZE_MISMATCH:${JSON.stringify({ declared, box, canvas: rendered.canvas })}`,
+      `BROWSER_HARNESS_BOARD_SIZE_MISMATCH:${JSON.stringify({ declared, box, canvas: rendered.canvas })}`,
     );
   }
 
@@ -363,25 +363,25 @@ export async function assertDatavMaterialsRender(designer, page) {
 
   // 水位图：读数必须真的可见——水体与读数同为绝对定位，append 顺序反了就会被盖住。
   // 用 elementFromPoint 在中心点取最上层元素，能直接判定"读数被压在下面"这类层级错误。
-  const water = await insertDatavComponent(
+  const water = await insertBoardComponent(
     page,
-    DATAV_WATER_LEVEL_TYPE,
+    BOARD_WATER_LEVEL_TYPE,
     '水位图探针',
-    DATAV_WATER_POSITION,
+    BOARD_WATER_POSITION,
   );
   if (!water.ok) {
-    throw new Error(`BROWSER_HARNESS_DATAV_WATER_ADD_FAILED:${JSON.stringify(water.diagnostics)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_WATER_ADD_FAILED:${JSON.stringify(water.diagnostics)}`);
   }
   const waterId = await readFocusedId(page);
-  if (waterId === null) throw new Error('BROWSER_HARNESS_DATAV_WATER_NOT_SELECTED');
+  if (waterId === null) throw new Error('BROWSER_HARNESS_BOARD_WATER_NOT_SELECTED');
   const waterState = await page.evaluate(
     ([id, tag]) => {
       const designer = window.baseScreenHarness.designer;
       const node = designer.shadowRoot.querySelector(`[data-base-screen-component-id=${id}]`);
       const element = node !== null && node.matches(tag) ? node : null;
-      const label = element?.querySelector('[data-datav-water-label]') ?? null;
-      const tank = element?.querySelector('[data-datav-water-tank]') ?? null;
-      const fill = element?.querySelector('[data-datav-water-fill]') ?? null;
+      const label = element?.querySelector('[data-board-water-label]') ?? null;
+      const tank = element?.querySelector('[data-board-water-tank]') ?? null;
+      const fill = element?.querySelector('[data-board-water-fill]') ?? null;
       const labelRect = label?.getBoundingClientRect();
       const topmost =
         labelRect === undefined
@@ -391,8 +391,8 @@ export async function assertDatavMaterialsRender(designer, page) {
                 labelRect.left + labelRect.width / 2,
                 labelRect.top + labelRect.height / 2,
               )
-              ?.closest('[data-datav-water-label], [data-datav-water-fill]')
-              ?.getAttribute('data-datav-water-label') !== null;
+              ?.closest('[data-board-water-label], [data-board-water-fill]')
+              ?.getAttribute('data-board-water-label') !== null;
       return {
         elementPresent: element !== null,
         tankPresent: tank !== null,
@@ -403,7 +403,7 @@ export async function assertDatavMaterialsRender(designer, page) {
         labelOnTop: topmost,
       };
     },
-    [waterId, DATAV_WATER_LEVEL_TAG],
+    [waterId, BOARD_WATER_LEVEL_TAG],
   );
   if (
     !waterState.elementPresent ||
@@ -411,42 +411,42 @@ export async function assertDatavMaterialsRender(designer, page) {
     !waterState.fillPresent ||
     waterState.labelText !== '68.5%'
   ) {
-    throw new Error(`BROWSER_HARNESS_DATAV_WATER_NOT_RENDERED:${JSON.stringify(waterState)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_WATER_NOT_RENDERED:${JSON.stringify(waterState)}`);
   }
   if (waterState.labelOnTop !== true) {
-    throw new Error(`BROWSER_HARNESS_DATAV_WATER_LABEL_HIDDEN:${JSON.stringify(waterState)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_WATER_LABEL_HIDDEN:${JSON.stringify(waterState)}`);
   }
   await removeComponent(page, waterId);
 }
 
 // 通道二：插件为自家物料贡献的检查器控件被授权实例化，写回进 props 事务且可撤销。
-export async function assertDatavInspectorControl(designer, page) {
+export async function assertBoardInspectorControl(designer, page) {
   await waitForDocument(page);
 
-  const added = await insertDatavComponent(
+  const added = await insertBoardComponent(
     page,
-    DATAV_BORDER_TYPE,
+    BOARD_BORDER_TYPE,
     '边框探针',
-    DATAV_BORDER_POSITION,
+    BOARD_BORDER_POSITION,
   );
   if (!added.ok) {
-    throw new Error(`BROWSER_HARNESS_DATAV_BORDER_ADD_FAILED:${JSON.stringify(added.diagnostics)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_BORDER_ADD_FAILED:${JSON.stringify(added.diagnostics)}`);
   }
   const borderId = await readFocusedId(page);
-  if (borderId === null) throw new Error('BROWSER_HARNESS_DATAV_BORDER_NOT_SELECTED');
+  if (borderId === null) throw new Error('BROWSER_HARNESS_BOARD_BORDER_NOT_SELECTED');
   // 从 manifest 默认值出发：控件当前选中项必须与文档值一致，才谈得上"读到当前值"。
   const initialProps = await readProps(page, borderId);
   const initialStyle =
     typeof initialProps?.borderStyle === 'string' ? initialProps.borderStyle : null;
   if (initialStyle === null) {
-    throw new Error(`BROWSER_HARNESS_DATAV_BORDER_DEFAULT_MISSING:${JSON.stringify(initialProps)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_BORDER_DEFAULT_MISSING:${JSON.stringify(initialProps)}`);
   }
 
   // insertComponent 只按默认值建节点；把边框改成 plain，让后续轮换从确定状态出发。
   const preset = await setBorderStyle(page, borderId, 'plain');
   if (!preset.ok) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_BORDER_PRESET_FAILED:${JSON.stringify(preset.diagnostics)}`,
+      `BROWSER_HARNESS_BOARD_BORDER_PRESET_FAILED:${JSON.stringify(preset.diagnostics)}`,
     );
   }
 
@@ -476,19 +476,19 @@ export async function assertDatavInspectorControl(designer, page) {
             : [],
         };
       },
-      [DATAV_BORDER_PICKER_TAG, borderId],
+      [BOARD_BORDER_PICKER_TAG, borderId],
     );
 
   const initial = await readControl();
   if (
     !initial.controlRendered ||
-    initial.owner !== 'base-screen.datav-materials' ||
+    initial.owner !== 'base-screen.board-materials' ||
     initial.pressed.join() !== 'plain'
   ) {
-    throw new Error(`BROWSER_HARNESS_DATAV_CONTROL_FAILED:${JSON.stringify(initial)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_CONTROL_FAILED:${JSON.stringify(initial)}`);
   }
 
-  await designer.locator(`${DATAV_BORDER_PICKER_TAG} [data-border-choice="notch"]`).click({
+  await designer.locator(`${BOARD_BORDER_PICKER_TAG} [data-border-choice="notch"]`).click({
     timeout: 15_000,
     force: true,
   });
@@ -500,7 +500,7 @@ export async function assertDatavInspectorControl(designer, page) {
   );
   const written = await readControl();
   if (written.pressed.join() !== 'notch') {
-    throw new Error(`BROWSER_HARNESS_DATAV_CONTROL_WRITE_FAILED:${JSON.stringify(written)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_CONTROL_WRITE_FAILED:${JSON.stringify(written)}`);
   }
   // 边框形态必须真的落到渲染上：样式只写在控件里、没进元素 dataset 的话这里会失败。
   const frameStyle = await page.evaluate(
@@ -508,12 +508,12 @@ export async function assertDatavInspectorControl(designer, page) {
       const node = window.baseScreenHarness.designer.shadowRoot.querySelector(
         `[data-base-screen-component-id=${id}]`,
       );
-      return node !== null && node.matches(tag) ? (node.dataset.datavBorderStyle ?? null) : null;
+      return node !== null && node.matches(tag) ? (node.dataset.boardBorderStyle ?? null) : null;
     },
-    [borderId, DATAV_BORDER_TAG],
+    [borderId, BOARD_BORDER_TAG],
   );
   if (frameStyle !== 'notch') {
-    throw new Error(`BROWSER_HARNESS_DATAV_BORDER_NOT_REPAINTED:${frameStyle}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_BORDER_NOT_REPAINTED:${frameStyle}`);
   }
 
   await page.evaluate(() => window.baseScreenHarness.designer.undo());
@@ -525,31 +525,31 @@ export async function assertDatavInspectorControl(designer, page) {
   );
   const undone = await readControl();
   if (undone.pressed.join() !== 'plain') {
-    throw new Error(`BROWSER_HARNESS_DATAV_CONTROL_UNDO_FAILED:${JSON.stringify(undone)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_CONTROL_UNDO_FAILED:${JSON.stringify(undone)}`);
   }
 
   await removeComponent(page, borderId);
 }
 
 // 通道三：插件命令经命令面板触发，读选区、按现值轮换、提交可撤销事务。
-export async function assertDatavCycleCommand(designer, page) {
+export async function assertBoardCycleCommand(designer, page) {
   await waitForDocument(page);
 
-  const added = await insertDatavComponent(
+  const added = await insertBoardComponent(
     page,
-    DATAV_BORDER_TYPE,
+    BOARD_BORDER_TYPE,
     '边框探针',
-    DATAV_BORDER_POSITION,
+    BOARD_BORDER_POSITION,
   );
   if (!added.ok) {
-    throw new Error(`BROWSER_HARNESS_DATAV_CYCLE_ADD_FAILED:${JSON.stringify(added.diagnostics)}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_CYCLE_ADD_FAILED:${JSON.stringify(added.diagnostics)}`);
   }
   const borderId = await readFocusedId(page);
-  if (borderId === null) throw new Error('BROWSER_HARNESS_DATAV_CYCLE_NOT_SELECTED');
+  if (borderId === null) throw new Error('BROWSER_HARNESS_BOARD_CYCLE_NOT_SELECTED');
   const preset = await setBorderStyle(page, borderId, 'plain');
   if (!preset.ok) {
     throw new Error(
-      `BROWSER_HARNESS_DATAV_CYCLE_PRESET_FAILED:${JSON.stringify(preset.diagnostics)}`,
+      `BROWSER_HARNESS_BOARD_CYCLE_PRESET_FAILED:${JSON.stringify(preset.diagnostics)}`,
     );
   }
 
@@ -570,12 +570,12 @@ export async function assertDatavCycleCommand(designer, page) {
 
   const runCycle = async () => {
     await designer.locator('[data-command-palette-toggle]').click();
-    await designer.locator('[data-command-palette-search]').fill(DATAV_CYCLE_COMMAND);
+    await designer.locator('[data-command-palette-search]').fill(BOARD_CYCLE_COMMAND);
     const entry = designer.locator(
-      `[data-command-palette-result][data-plugin-command="${DATAV_CYCLE_COMMAND}"]`,
+      `[data-command-palette-result][data-plugin-command="${BOARD_CYCLE_COMMAND}"]`,
     );
     if ((await entry.count()) !== 1 || (await entry.isDisabled())) {
-      throw new Error('BROWSER_HARNESS_DATAV_COMMAND_ENTRY_FAILED');
+      throw new Error('BROWSER_HARNESS_BOARD_COMMAND_ENTRY_FAILED');
     }
     await entry.click();
   };
@@ -600,12 +600,12 @@ export async function assertDatavCycleCommand(designer, page) {
   await page.evaluate(() => window.baseScreenHarness.designer.undo());
   const afterFirstUndo = await borderStyle();
   if (afterFirstUndo !== 'corner-brackets') {
-    throw new Error(`BROWSER_HARNESS_DATAV_COMMAND_UNDO_STEP_FAILED:${afterFirstUndo}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_COMMAND_UNDO_STEP_FAILED:${afterFirstUndo}`);
   }
   await page.evaluate(() => window.baseScreenHarness.designer.undo());
   const afterSecondUndo = await borderStyle();
   if (afterSecondUndo !== 'plain') {
-    throw new Error(`BROWSER_HARNESS_DATAV_COMMAND_UNDO_FAILED:${afterSecondUndo}`);
+    throw new Error(`BROWSER_HARNESS_BOARD_COMMAND_UNDO_FAILED:${afterSecondUndo}`);
   }
 
   await removeComponent(page, borderId);

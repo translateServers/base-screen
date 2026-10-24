@@ -201,7 +201,7 @@ function applyUrlSeeds(document: ScreenDocument, params: URLSearchParams): Scree
 }
 
 /**
- * 查看页：DataV 式等比缩放。frame 保持 canonical 像素尺寸，由 transform 适配视口；
+ * 查看页：等比缩放。frame 保持 canonical 像素尺寸，由 transform 适配视口；
  * 工具栏与 frame 平级，不随大屏一起放大。
  *
  * 数据链路：`datasetPort` / `hostCatalogPort` / `observer` 必须在 `configure` 内提交——

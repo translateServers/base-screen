@@ -41,6 +41,7 @@ describe('host api (e2e)', () => {
     const names = (response.body.screens as { name: string }[]).map((item) => item.name);
     expect(names).toContain('默认销售大屏');
     expect(names).toContain('系统监控大屏');
+    expect(names).toContain('实时告警演示大屏');
     expect(names).toContain('空气质量监测大屏');
   });
 

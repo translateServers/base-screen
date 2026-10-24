@@ -315,7 +315,7 @@ function resolveContainer(root: HTMLElement, keys: readonly DesignerDataSectionI
     const existing = findSection(root, key);
     if (existing?.parentElement != null) return existing.parentElement;
   }
-  return root.querySelector<HTMLElement>('.designer-datav-data-flow-content') ?? root;
+  return root.querySelector<HTMLElement>('.designer-inspector-data-flow-content') ?? root;
 }
 
 function previewSummary(model: DesignerDataPanelModel): string {

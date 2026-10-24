@@ -19,7 +19,8 @@ import type { DesignerPanelControllerCallbacks } from './designer-panel-controll
 const INSPECTOR_DENSITY_STORAGE_KEY = 'base-screen.designer.inspector-density';
 const INSPECTOR_GROUPS_STORAGE_KEY = 'base-screen.designer.inspector-groups';
 const MAX_INSPECTOR_GROUP_PREFERENCES = 200;
-const INSPECTOR_SCROLL_CONTAINER_SELECTOR = '.inspector-pane, .designer-datav-data-flow-content';
+const INSPECTOR_SCROLL_CONTAINER_SELECTOR =
+  '.inspector-pane, .designer-inspector-data-flow-content';
 
 /** Owns Inspector chrome, search preferences, and scroll continuity. */
 export class DesignerPanelInspectorController {
@@ -44,7 +45,7 @@ export class DesignerPanelInspectorController {
       this.#scrollGuard.ensureListeners(propertiesPane);
     }
     const dataFlowContent = dataPanel?.querySelector<HTMLElement>(
-      '.designer-datav-data-flow-content',
+      '.designer-inspector-data-flow-content',
     );
     if (dataFlowContent !== null && dataFlowContent !== undefined) {
       this.#scrollGuard.ensureListeners(dataFlowContent);

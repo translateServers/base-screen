@@ -17,7 +17,7 @@ publication identities, dataset-owned parameter constraints, host-defined catalo
 dedicated `dataset` document source. Designer and Viewer now share the same bounded metadata and query
 lifecycle. Host resource types remain available for non-tabular resources.
 
-### datav-global-variables
+### stable-global-variables
 
 Expand global variable authoring with strict host catalogs, authoring previews, atomic renames,
 explicit runtime refresh, and structured Blueprint value sources while keeping dynamic data

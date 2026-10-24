@@ -1,4 +1,4 @@
-/* Data source: DataV keeps one step expanded in the side panel and docks the remaining steps. */
+/* Data source: keep one step expanded in the side panel and dock the remaining steps. */
 .properties .inspector-pane[data-inspector-pane="data"] {
   overflow: hidden;
   padding: 0;
@@ -14,7 +14,7 @@
 
 /* 数据流只有一行：三步条已删除（与顶部「数据源」页签构成双层导航，且 detail 被藏掉）。
    内容区独占剩余高度并负责滚动；工作台抽屉里的 5 步导航不受此影响。 */
-.properties .designer-datav-data-flow {
+.properties .designer-inspector-data-flow {
   display: grid;
   height: 100%;
   min-height: 0;
@@ -25,7 +25,7 @@
   background: var(--designer-surface-workspace);
 }
 
-.properties .designer-datav-data-flow-content {
+.properties .designer-inspector-data-flow-content {
   min-width: 0;
   min-height: 0;
   overflow: hidden auto;
@@ -36,15 +36,15 @@
 
 /* Sticky actions are constrained to the content box. Parent padding-bottom would
    otherwise leave an 18px window where scrolled content peeks under the bar. */
-.properties .designer-datav-data-flow-content:has(.designer-dataset-actions) {
+.properties .designer-inspector-data-flow-content:has(.designer-dataset-actions) {
   padding-bottom: 0;
 }
 
-.properties .designer-datav-data-flow-content .designer-dataset-actions {
+.properties .designer-inspector-data-flow-content .designer-dataset-actions {
   padding-bottom: 18px;
 }
 
-.properties .designer-datav-data-flow-content [data-workbench-section] {
+.properties .designer-inspector-data-flow-content [data-workbench-section] {
   scroll-margin-top: 12px;
 }
 
@@ -54,16 +54,16 @@
   border-bottom: 1px solid var(--designer-border-subtle);
 }
 
-.properties .designer-datav-data-flow-content .designer-data-source-editor,
-.properties .designer-datav-data-flow-content .designer-host-connection,
-.properties .designer-datav-data-flow-content .designer-dataset-browser,
-.properties .designer-datav-data-flow-content .designer-dataset-descriptor {
+.properties .designer-inspector-data-flow-content .designer-data-source-editor,
+.properties .designer-inspector-data-flow-content .designer-host-connection,
+.properties .designer-inspector-data-flow-content .designer-dataset-browser,
+.properties .designer-inspector-data-flow-content .designer-dataset-descriptor {
   padding-top: 13px;
   border-top-color: var(--designer-border-subtle);
 }
 
-.properties .designer-datav-data-flow-content .designer-inspector-section-title,
-.properties .designer-datav-data-flow-content h4 {
+.properties .designer-inspector-data-flow-content .designer-inspector-section-title,
+.properties .designer-inspector-data-flow-content h4 {
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-base);
   font-weight: 600;
@@ -72,13 +72,13 @@
 }
 
 .properties .designer-dataset-authoring[data-authoring-part="editor"],
-.properties .designer-datav-advanced-settings {
+.properties .designer-inspector-advanced-settings {
   margin-top: 14px;
   padding-top: 14px;
   border-top-color: var(--designer-border-subtle);
 }
 
-.properties .designer-datav-preview-actions {
+.properties .designer-inspector-preview-actions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
@@ -451,7 +451,7 @@
 
 /* ---- 底部操作条：右对齐、auto 宽、accent 实心（dirty）/ 幽灵（clean） ---- */
 
-.properties .designer-datav-data-flow-content .designer-dataset-actions {
+.properties .designer-inspector-data-flow-content .designer-dataset-actions {
   justify-content: flex-end;
   align-items: center;
   gap: var(--designer-space-3);
@@ -500,7 +500,7 @@
   color: var(--designer-text-disabled);
 }
 
-/* Page configuration uses DataV's compact label/control rows and intentionally omits component
+/* Page configuration uses compact label/control rows and intentionally omits component
    context, search and tab chrome. */
 .designer:not([data-right-collapsed="true"]) .properties[data-inspector-context-kind="canvas"] {
   grid-template-rows: 44px minmax(0, 1fr);
@@ -679,7 +679,7 @@
 /* ---- v7 Live inspector：内联数据集面板 ---- */
 
 /* 内容两侧从 24 收到 16：336px 面板里 24 的左右留白把控件压得太窄。 */
-.properties .designer-datav-data-flow-content {
+.properties .designer-inspector-data-flow-content {
   padding: var(--designer-space-4);
 }
 
@@ -793,9 +793,9 @@
 }
 
 /* 物料数据表单与静态/变量数据表单不是折叠组：整段缩进到与组标题同一条竖线。 */
-.properties .designer-datav-data-flow-content > .designer-inspector-section,
-.properties .designer-datav-data-flow-content > .designer-data-source-editor,
-.properties .designer-datav-data-flow-content > .designer-data-source-variable {
+.properties .designer-inspector-data-flow-content > .designer-inspector-section,
+.properties .designer-inspector-data-flow-content > .designer-data-source-editor,
+.properties .designer-inspector-data-flow-content > .designer-data-source-variable {
   padding-left: var(--designer-space-6);
 }
 
@@ -1327,7 +1327,7 @@
 }
 
 /* 底部状态条：左侧状态，右侧撤销 + 唯一请求动作。 */
-.properties .designer-datav-data-flow-content .designer-dataset-status-bar {
+.properties .designer-inspector-data-flow-content .designer-dataset-status-bar {
   justify-content: flex-start;
   gap: var(--designer-space-2);
   border-top: 1px solid var(--designer-border-subtle);
@@ -1420,16 +1420,16 @@
 }
 
 /* 内容短时把状态条推到底部；内容长时 sticky 仍然把它钉在可视区底部。 */
-.properties .designer-datav-data-flow-content {
+.properties .designer-inspector-data-flow-content {
   display: flex;
   flex-direction: column;
 }
 
-.properties .designer-datav-data-flow-content > * {
+.properties .designer-inspector-data-flow-content > * {
   flex: 0 0 auto;
 }
 
-.properties .designer-datav-data-flow-content > .designer-dataset-actions {
+.properties .designer-inspector-data-flow-content > .designer-dataset-actions {
   margin-top: auto;
 }
 
@@ -1437,7 +1437,7 @@
 
 /* 与设计稿面板主体一致：外层只留 2px，首个分块自己带 11px（合起来 13px 到组头），
    左右 14px，底部 0——状态条在流内 sticky，多给 padding 会让它悬空。 */
-.properties .designer-datav-data-flow-content {
+.properties .designer-inspector-data-flow-content {
   padding: var(--designer-space-1) 14px 0;
 }
 
@@ -1446,7 +1446,7 @@
   padding-bottom: var(--designer-space-4);
 }
 
-.properties .designer-datav-data-flow-content .designer-dataset-descriptor {
+.properties .designer-inspector-data-flow-content .designer-dataset-descriptor {
   padding-top: 0;
   border-top: 0;
 }
@@ -1713,36 +1713,36 @@
 }
 
 /* 固定值/变量与物料数据表单：沿用同一套组头与字段排版，不再出现带横线的旧标题。 */
-.properties .designer-datav-data-flow-content > .designer-inspector-section {
+.properties .designer-inspector-data-flow-content > .designer-inspector-section {
   padding-top: var(--designer-space-4);
   border-top: 1px solid var(--designer-border-subtle);
 }
 
-.properties .designer-datav-data-flow-content .designer-data-source-editor {
+.properties .designer-inspector-data-flow-content .designer-data-source-editor {
   padding-top: 0;
   border-top: 0;
 }
 
-.properties .designer-datav-data-flow-content .designer-inspector-section-title {
+.properties .designer-inspector-data-flow-content .designer-inspector-section-title {
   margin-bottom: var(--designer-space-3);
   font-size: var(--designer-font-size-sm);
   letter-spacing: -0.01em;
 }
 
-.properties .designer-datav-data-flow-content .designer-inspector-section-title::after {
+.properties .designer-inspector-data-flow-content .designer-inspector-section-title::after {
   display: none;
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-data-source-variable
   .designer-field-label-text,
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-data-source-editor
   .designer-field-label-text,
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   > .designer-inspector-section
   .designer-field-label-text {
   color: var(--designer-text-secondary);
@@ -1750,18 +1750,18 @@
 }
 
 /* 物料自有数据表单：与数据源组头同一套无横线标题和 12px 字段标签。 */
-.properties .designer-datav-data-flow-content .designer-descriptor-group-summary {
+.properties .designer-inspector-data-flow-content .designer-descriptor-group-summary {
   margin-bottom: var(--designer-space-3);
   font-size: var(--designer-font-size-sm);
   letter-spacing: -0.01em;
 }
 
-.properties .designer-datav-data-flow-content .designer-descriptor-group-summary::after {
+.properties .designer-inspector-data-flow-content .designer-descriptor-group-summary::after {
   display: none;
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-descriptor-fields
   .designer-field-label-text {
   color: var(--designer-text-secondary);
@@ -1858,9 +1858,11 @@
   padding-left: var(--designer-space-6);
 }
 
-.designer-data-workbench-shell .designer-datav-data-flow-content > .designer-inspector-section,
-.designer-data-workbench-shell .designer-datav-data-flow-content > .designer-data-source-editor,
-.designer-data-workbench-shell .designer-datav-data-flow-content > .designer-data-source-variable {
+.designer-data-workbench-shell .designer-inspector-data-flow-content > .designer-inspector-section,
+.designer-data-workbench-shell .designer-inspector-data-flow-content > .designer-data-source-editor,
+.designer-data-workbench-shell
+  .designer-inspector-data-flow-content
+  > .designer-data-source-variable {
   padding-left: var(--designer-space-6);
 }
 
@@ -1872,13 +1874,13 @@
 
 /* ---- 固定值表格：tabs/摘要/数据行/绑定统一到数据源表单语言 ---- */
 
-.properties .designer-datav-data-flow-content .designer-static-data-tabs {
+.properties .designer-inspector-data-flow-content .designer-static-data-tabs {
   gap: var(--designer-space-5);
   padding: 0 0 var(--designer-space-2);
   border-bottom: 1px solid var(--designer-border-subtle);
 }
 
-.properties .designer-datav-data-flow-content .designer-static-data-tabs .designer-button {
+.properties .designer-inspector-data-flow-content .designer-static-data-tabs .designer-button {
   min-height: 26px;
   padding: 0 0 var(--designer-space-2);
   border: 0;
@@ -1890,7 +1892,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-data-tabs
   .designer-button:hover:not([aria-pressed="true"]) {
   background: transparent;
@@ -1898,7 +1900,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-data-tabs
   .designer-button[aria-pressed="true"] {
   background: transparent;
@@ -1906,7 +1908,7 @@
   color: var(--designer-text-primary);
 }
 
-.properties .designer-datav-data-flow-content .designer-static-tabular-summary {
+.properties .designer-inspector-data-flow-content .designer-static-tabular-summary {
   display: flex;
   min-width: 0;
   align-items: baseline;
@@ -1917,39 +1919,39 @@
   background: transparent;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-tabular-summary strong {
+.properties .designer-inspector-data-flow-content .designer-static-tabular-summary strong {
   font-size: var(--designer-font-size-sm);
   font-weight: 600;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-tabular-summary small {
+.properties .designer-inspector-data-flow-content .designer-static-tabular-summary small {
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows > h4,
-.properties .designer-datav-data-flow-content .designer-static-bindings > h4 {
+.properties .designer-inspector-data-flow-content .designer-static-rows > h4,
+.properties .designer-inspector-data-flow-content .designer-static-bindings > h4 {
   margin: 0;
   font-size: var(--designer-font-size-sm);
   font-weight: 600;
   letter-spacing: -0.01em;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows th,
-.properties .designer-datav-data-flow-content .designer-static-rows td {
+.properties .designer-inspector-data-flow-content .designer-static-rows th,
+.properties .designer-inspector-data-flow-content .designer-static-rows td {
   min-width: 110px;
   padding: 3px 4px;
   border-color: var(--designer-border-subtle);
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows th {
+.properties .designer-inspector-data-flow-content .designer-static-rows th {
   background: transparent;
   color: var(--designer-text-muted);
   font-size: var(--designer-font-size-xs);
   font-weight: 500;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows td .designer-input {
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input {
   min-height: 28px;
   padding: 0 6px;
   border-radius: var(--designer-radius-1);
@@ -1959,25 +1961,25 @@
 }
 
 /* 单元格自己就是表格的编辑面：常态不画第二层描边，悬停/聚焦才出环。 */
-.properties .designer-datav-data-flow-content .designer-static-rows td .designer-input:hover {
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input:hover {
   background: var(--designer-surface-control);
   box-shadow: inset 0 0 0 1px var(--designer-border-default);
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows td .designer-input:focus {
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input:focus {
   outline: none;
   background: var(--designer-surface-control);
   box-shadow: 0 0 0 2px var(--designer-focus-ring);
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows td .designer-button {
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-button {
   min-height: 28px;
   padding: 0 6px;
   font-size: var(--designer-font-size-xs);
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-rows
   .designer-static-rows-footer
   > .designer-button {
@@ -1990,7 +1992,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-binding-role {
   gap: var(--designer-space-2);
@@ -2002,7 +2004,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-binding-role:first-of-type {
   padding-top: 0;
@@ -2010,7 +2012,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-binding-hint {
   color: var(--designer-text-muted);
@@ -2018,7 +2020,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-binding-role-action {
   min-height: 24px;
@@ -2030,7 +2032,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-field-option {
   min-height: 30px;
@@ -2042,7 +2044,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-field-option[aria-pressed="true"] {
   border-radius: 0;
@@ -2051,7 +2053,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-field-option
   .designer-field-label {
@@ -2061,7 +2063,7 @@
 
 /* 字段选择是复选框而不是单选圆点：去掉外层光晕，收成 14px 方形。 */
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-field-option::before {
   width: 14px;
@@ -2070,38 +2072,38 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-field-option::after {
   right: calc(var(--designer-space-3) + 7px);
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-bindings
   .designer-dataset-field-option[aria-pressed="true"]::before {
   box-shadow: none;
 }
 
 /* 静态表格在 296px 内容宽度内收成三列 + 一个紧凑删除动作，避免横向裁切。 */
-.properties .designer-datav-data-flow-content .designer-static-rows th,
-.properties .designer-datav-data-flow-content .designer-static-rows td {
+.properties .designer-inspector-data-flow-content .designer-static-rows th,
+.properties .designer-inspector-data-flow-content .designer-static-rows td {
   min-width: 78px;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows th:last-child,
-.properties .designer-datav-data-flow-content .designer-static-rows td:last-child {
+.properties .designer-inspector-data-flow-content .designer-static-rows th:last-child,
+.properties .designer-inspector-data-flow-content .designer-static-rows td:last-child {
   width: 26px;
   min-width: 26px;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows td .designer-input {
+.properties .designer-inspector-data-flow-content .designer-static-rows td .designer-input {
   width: 100%;
   min-width: 0;
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-rows
   td
   button[data-static-action="row-remove"] {
@@ -2115,7 +2117,7 @@
 }
 
 .properties
-  .designer-datav-data-flow-content
+  .designer-inspector-data-flow-content
   .designer-static-rows
   td
   button[data-static-action="row-remove"]::before {
@@ -2124,14 +2126,14 @@
   line-height: 1;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows table {
+.properties .designer-inspector-data-flow-content .designer-static-rows table {
   width: 100%;
   min-width: 0;
   table-layout: fixed;
 }
 
-.properties .designer-datav-data-flow-content .designer-static-rows th,
-.properties .designer-datav-data-flow-content .designer-static-rows td {
+.properties .designer-inspector-data-flow-content .designer-static-rows th,
+.properties .designer-inspector-data-flow-content .designer-static-rows td {
   min-width: 0;
 }
 
@@ -2606,7 +2608,7 @@
 }
 
 /* 容器不再负责间距：描述符网格的 gap、段自带的 padding/border 全部归零。 */
-.properties .designer-datav-data-flow-content .designer-dataset-descriptor {
+.properties .designer-inspector-data-flow-content .designer-dataset-descriptor {
   gap: 0;
   padding-top: 0;
   border-top: 0;

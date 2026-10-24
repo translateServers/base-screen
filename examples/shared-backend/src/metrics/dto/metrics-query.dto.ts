@@ -27,6 +27,10 @@ export const METRIC_IDS = [
   'alarm_open',
   'line_load',
   'energy_ratio',
+  // 实时告警演示屏新增：三个等级的近 1 小时新增条数（与 alarm_open 独立口径）。
+  'alarm_critical',
+  'alarm_warning',
+  'alarm_info',
 ] as const;
 
 export type MetricId = (typeof METRIC_IDS)[number];

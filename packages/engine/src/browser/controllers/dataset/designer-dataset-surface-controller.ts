@@ -69,7 +69,7 @@ function renderSurfaceContent(context: DesignerDatasetControllerContext): void {
   // 物料自有的数据字段（editorDescriptor.data）属于「这个组件怎么读数据」，与数据源走哪条通道无关，
   // 也不该被藏在某个步骤后面：统一追加在数据源 section 之后。
   const descriptorHost =
-    panel.querySelector<HTMLElement>('.designer-datav-data-flow-content') ?? panel;
+    panel.querySelector<HTMLElement>('.designer-inspector-data-flow-content') ?? panel;
   // 物料数据表单属于数据源表单的一部分，必须排在 sticky 状态条之前；
   // 先渲染到临时容器，再插到状态条前面，最后重算让位占位块。
   const descriptorZone = panel.ownerDocument.createElement('div');
@@ -272,10 +272,10 @@ export function syncDataFlowProgress(
   const normalized = step === 'mapping' || step === 'preview' ? step : 'source';
   if (normalized === context.state.activeStep) return;
   context.state.activeStep = normalized;
-  const flow = context.state.panel?.querySelector<HTMLElement>('.designer-datav-data-flow');
+  const flow = context.state.panel?.querySelector<HTMLElement>('.designer-inspector-data-flow');
   if (flow) flow.dataset.activeStep = normalized;
   const progress = context.state.panel?.querySelector<HTMLElement>(
-    '.designer-datav-data-flow-progress',
+    '.designer-inspector-data-flow-progress',
   );
   if (!progress) return;
   for (const btn of progress.querySelectorAll<HTMLButtonElement>(

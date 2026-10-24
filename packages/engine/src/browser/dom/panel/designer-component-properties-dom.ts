@@ -123,9 +123,9 @@ function appendComponentControls(
 ): void {
   const { component, manifest } = context;
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
-  geometry.className += ' designer-datav-geometry-section';
+  geometry.className += ' designer-inspector-geometry-section';
   const geometryGrid = appendFieldGrid(geometry);
-  geometryGrid.className += ' designer-datav-geometry-grid';
+  geometryGrid.className += ' designer-inspector-geometry-grid';
   appendInput(
     geometryGrid,
     DESIGNER_UI_TEXT.propertiesPanel.x,
@@ -466,7 +466,7 @@ function appendCommonOpacityControl(
   const schema = manifest.styleSchema.properties.opacity;
   if (schema?.kind !== 'number') return;
   const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.commonStyle);
-  section.className += ' designer-datav-common-section';
+  section.className += ' designer-inspector-common-section';
   const { field, control } = createDesignerFieldRow(properties.ownerDocument, {
     label: DESIGNER_UI_TEXT.propertiesPanel.opacity,
     tagName: 'span',

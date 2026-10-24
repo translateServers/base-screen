@@ -5,7 +5,7 @@ import {
   intervalKeyOf,
   type RefreshableElement,
 } from '../../examples/react-host/src/screen/host-refresh-controller';
-import { DATAV_MONITOR_DOCUMENT } from '../../examples/shared-backend/src/screens/datav-monitor-document';
+import { BOARD_MONITOR_DOCUMENT } from '../../examples/shared-backend/src/screens/board-monitor-document';
 
 /**
  * 轮询节拍表是「屏上数据新不新鲜」的唯一口径，但它此前零覆盖：三端 smoke 只验证
@@ -20,7 +20,7 @@ import { DATAV_MONITOR_DOCUMENT } from '../../examples/shared-backend/src/screen
  * 2. README 声明 `variable` 组件参与 30s 节拍；这条断言把它固定下来。
  */
 
-const components = (DATAV_MONITOR_DOCUMENT as unknown as { components: readonly never[] })
+const components = (BOARD_MONITOR_DOCUMENT as unknown as { components: readonly never[] })
   .components;
 
 interface RefreshRecord {

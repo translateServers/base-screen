@@ -14,7 +14,7 @@ async function scrollDataPanelTo(dataPanel, page, section, step) {
   let last;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     await dataPanel.evaluate((panel, name) => {
-      const content = panel.querySelector('.designer-datav-data-flow-content');
+      const content = panel.querySelector('.designer-inspector-data-flow-content');
       const target = panel.querySelector(`[data-workbench-section="${name}"]`);
       if (!(content instanceof HTMLElement) || !(target instanceof HTMLElement)) return;
       content.scrollTop += target.getBoundingClientRect().top - content.getBoundingClientRect().top;
@@ -36,15 +36,15 @@ async function scrollDataPanelTo(dataPanel, page, section, step) {
 /** 一次读全内联导航的可观测面：当前步骤、是否还有步骤条、目标段是否在视口内。 */
 async function readInlineNavigation(dataPanel, section) {
   return dataPanel.evaluate((panel, name) => {
-    const flow = panel.querySelector('.designer-datav-data-flow');
-    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const flow = panel.querySelector('.designer-inspector-data-flow');
+    const content = panel.querySelector('.designer-inspector-data-flow-content');
     const contentBox = content?.getBoundingClientRect();
     const target =
       name === undefined ? null : panel.querySelector(`[data-workbench-section="${name}"]`);
     const targetBox = target?.getBoundingClientRect();
     return {
       activeStep: flow?.dataset.activeStep,
-      progressBars: panel.querySelectorAll('.designer-datav-data-flow-progress').length,
+      progressBars: panel.querySelectorAll('.designer-inspector-data-flow-progress').length,
       stepButtons: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
       stepTargets: panel.querySelectorAll('[data-dataset-workbench-target]').length,
       stepMarkers: panel.querySelectorAll('.designer-data-summary-step-marker').length,
@@ -933,12 +933,12 @@ export async function assertDatasetSurface(designer, page) {
   const descriptorSurface = await dataPanel.evaluate((panel) => {
     const layout = panel.closest('.designer');
     const properties = panel.closest('.properties');
-    const flow = panel.querySelector('.designer-datav-data-flow');
-    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const flow = panel.querySelector('.designer-inspector-data-flow');
+    const content = panel.querySelector('.designer-inspector-data-flow-content');
     const sourceSection = panel.querySelector('[data-workbench-section="source"]');
     const mappingSection = panel.querySelector('[data-workbench-section="mapping"]');
     const previewSection = panel.querySelector('[data-workbench-section="preview"]');
-    const advancedSection = panel.querySelector('.designer-datav-advanced-settings');
+    const advancedSection = panel.querySelector('.designer-inspector-advanced-settings');
     const authoringSettings = panel.querySelector('.designer-dataset-authoring-settings');
     const workbench = layout?.querySelector('[data-data-workbench]');
     const flowBox = flow?.getBoundingClientRect();
@@ -1012,7 +1012,7 @@ export async function assertDatasetSurface(designer, page) {
       activeStep: flow?.dataset.activeStep,
       layout: flow?.dataset.dataFlowLayout,
       // 内联面板不再有三步条：这三项必须为 0（导航只保留顶部一层）。
-      progressBars: panel.querySelectorAll('.designer-datav-data-flow-progress').length,
+      progressBars: panel.querySelectorAll('.designer-inspector-data-flow-progress').length,
       stepButtons: panel.querySelectorAll('[data-dataset-action="select-step"]').length,
       stepTargets: panel.querySelectorAll('[data-dataset-workbench-target]').length,
       applyCount: panel.querySelectorAll('[data-dataset-action="apply"]').length,
@@ -1161,7 +1161,7 @@ export async function assertDatasetSurface(designer, page) {
     );
   }
   const scrollContinuity = await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const content = panel.querySelector('.designer-inspector-data-flow-content');
     const parameter = panel.querySelector('[data-value-ref-inline="parameter:region"]');
     if (!(content instanceof HTMLElement) || !(parameter instanceof HTMLInputElement)) {
       return { available: false, after: 0, before: 0, max: 0 };
@@ -1171,7 +1171,7 @@ export async function assertDatasetSurface(designer, page) {
     const before = content.scrollTop;
     parameter.value = 'scroll-probe';
     parameter.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-    const replacement = panel.querySelector('.designer-datav-data-flow-content');
+    const replacement = panel.querySelector('.designer-inspector-data-flow-content');
     return {
       available: replacement instanceof HTMLElement,
       after: replacement instanceof HTMLElement ? replacement.scrollTop : 0,
@@ -1216,7 +1216,7 @@ export async function assertDatasetSurface(designer, page) {
   }
   // 预览组被上面展开过；这里再滚到底读派生步骤。
   await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const content = panel.querySelector('.designer-inspector-data-flow-content');
     if (content instanceof HTMLElement) content.scrollTop = content.scrollHeight;
   });
   await page.waitForTimeout(300);
@@ -1227,7 +1227,7 @@ export async function assertDatasetSurface(designer, page) {
     );
   }
   await dataPanel.evaluate((panel) => {
-    const content = panel.querySelector('.designer-datav-data-flow-content');
+    const content = panel.querySelector('.designer-inspector-data-flow-content');
     if (content instanceof HTMLElement) content.scrollTop = 0;
   });
   await page.waitForTimeout(300);

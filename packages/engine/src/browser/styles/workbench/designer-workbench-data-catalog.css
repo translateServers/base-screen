@@ -621,7 +621,7 @@
  * 让位不能靠给操作条加背景色——那只是把遮住这件事藏起来；正确做法是让**内容区**预留
  * 出操作条的高度，滚到底时最后一行仍然完整可点。
  */
-.designer-datav-data-flow-content:has(> .designer-dataset-actions) {
+.designer-inspector-data-flow-content:has(> .designer-dataset-actions) {
   padding-bottom: calc(var(--designer-control-height) + var(--designer-space-4) * 2);
 }
 

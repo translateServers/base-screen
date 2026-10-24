@@ -7,7 +7,7 @@ import type {
 /**
  * 插件标识与两类运行期贡献的词汇（ADR-0076）。
  *
- * 这个插件的定位与前三个互补：echarts 出物料、metrics 出资源类型、datav-materials 出
+ * 这个插件的定位与前三个互补：echarts 出物料、metrics 出资源类型、board-materials 出
  * 渲染类物料族——它们都停在**作者面**。本插件第一次让插件参与**文档的运行时语义**：
  * 一个数据处理器被 `processorId` 引用，一个蓝图动作被 `host-action.actionId` 引用。
  */

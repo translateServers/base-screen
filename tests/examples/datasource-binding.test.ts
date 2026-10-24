@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseScreenDocument } from '../../packages/contracts/src/index.js';
 import { validateScreenHostResourceBinding } from '../../packages/core/src/index.js';
-import { PLUGIN_DATAV_STATUS_GRID_MANIFEST } from '../../plugins/plugin-datav-materials/src/status-grid.js';
+import { PLUGIN_BOARD_STATUS_GRID_MANIFEST } from '../../plugins/plugin-board-materials/src/status-grid.js';
 
 /**
  * A39：`custom.*` 数据源能被文档与绑定校验接受。
@@ -11,10 +11,10 @@ import { PLUGIN_DATAV_STATUS_GRID_MANIFEST } from '../../plugins/plugin-datav-ma
  *    ——基座 schema 对 `datasetId` 只要求 1..256 字，不限定前缀，因此自建 id 不需要改基座；
  * 2. **绑定层**：`binding.fields` 里的字段都在数据源 `fields` 内时不报
  *    `HOST_DATASET_BINDING_INVALID`；缺字段/类型不符时报——角色取**物料清单里的真实声明**
- *    （`PLUGIN_DATAV_STATUS_GRID_MANIFEST`），不手抄 minFields/valueTypes。
+ *    （`PLUGIN_BOARD_STATUS_GRID_MANIFEST`），不手抄 minFields/valueTypes。
  */
 
-const ROLES = PLUGIN_DATAV_STATUS_GRID_MANIFEST.dataBinding.roles;
+const ROLES = PLUGIN_BOARD_STATUS_GRID_MANIFEST.dataBinding.roles;
 
 const DATASOURCE_FIELDS = [
   { id: 'id', label: 'id', valueType: 'string' as const, nullable: true },
@@ -28,7 +28,7 @@ function documentWith(datasetId: string, bindingFields: readonly string[]): unkn
     components: [
       {
         id: 'ds-grid',
-        type: 'datav.status-grid',
+        type: 'board.status-grid',
         name: '状态灯阵',
         parentId: null,
         position: { x: 24, y: 24 },

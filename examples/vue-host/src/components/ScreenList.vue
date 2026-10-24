@@ -50,7 +50,7 @@ onMounted(() => {
     <header class="list-header">
       <div class="list-header__title">
         <h1>数据可视化工作台</h1>
-        <p class="list-header__subtitle">BASE SCREEN · DATAV 风格示例</p>
+        <p class="list-header__subtitle">BASE SCREEN · 成品大屏示例</p>
       </div>
       <!-- 新建与删除都走页面内控件：window.prompt / window.confirm 在嵌入式浏览器里会被
            直接抑制并返回 null，那样点按钮就只剩「没有反应」。 -->

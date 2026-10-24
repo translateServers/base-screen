@@ -55,7 +55,7 @@ export function ScreenListPage(): React.ReactElement {
       <header className="list-header">
         <div className="list-header__title">
           <h1>数据可视化工作台</h1>
-          <p className="list-header__subtitle">BASE SCREEN · DATAV 风格示例</p>
+          <p className="list-header__subtitle">BASE SCREEN · 成品大屏示例</p>
         </div>
         <form
           className="create-screen"

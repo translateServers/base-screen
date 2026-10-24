@@ -27,7 +27,7 @@ export const screenListView: ViewModule = {
     const header = el('header', { class: 'list-header' }, [
       el('div', { class: 'list-header__title' }, [
         el('h1', { text: '数据可视化工作台' }),
-        el('p', { class: 'list-header__subtitle', text: 'BASE SCREEN · DATAV 风格示例' }),
+        el('p', { class: 'list-header__subtitle', text: 'BASE SCREEN · 成品大屏示例' }),
       ]),
       el(
         'form',
