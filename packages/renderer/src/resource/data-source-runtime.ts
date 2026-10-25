@@ -104,8 +104,17 @@ export class DataSourceRuntime {
   readonly #entries = new Map<string, InternalEntry>();
   #document: ScreenDocument | undefined;
   #variables: ScreenJsonObject = {};
+  #variablesKey = canonicalJsonString({});
 
   constructor(private readonly options: DataSourceRuntimeOptions) {}
+
+  /**
+   * 变量对象的规范化键：结构相等即同键。渲染守卫用它判定「非实例取值
+   * （variable/inline 参数求值）的数据输入是否与上次相同」。
+   */
+  get variablesKey(): string {
+    return this.#variablesKey;
+  }
 
   /**
    * 按拓扑序确保所有实例的状态与请求。
@@ -120,7 +129,10 @@ export class DataSourceRuntime {
     options: { readonly startOnly?: ReadonlySet<string> } = {},
   ): void {
     this.#document = document;
-    this.#variables = variables;
+    if (variables !== this.#variables) {
+      this.#variables = variables;
+      this.#variablesKey = canonicalJsonString(variables);
+    }
     const environment: MutableEnvironment = {
       variableValues: variables,
       dataSourceValues: new Map(),
@@ -252,6 +264,7 @@ export class DataSourceRuntime {
     this.#entries.clear();
     this.#document = undefined;
     this.#variables = {};
+    this.#variablesKey = canonicalJsonString({});
   }
 
   #entry(dataSourceId: string): InternalEntry {

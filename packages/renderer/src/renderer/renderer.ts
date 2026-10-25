@@ -22,6 +22,7 @@ import type {
   BaseScreenMaterialCatalog,
   BaseScreenMaterialElement,
   BaseScreenMaterialMode,
+  BaseScreenMaterialModel,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
 import { applyCanvasBackground } from '../canvas-background.js';
@@ -36,6 +37,7 @@ import { diagnostic, failure, renderFailure } from './renderer-diagnostics.js';
 import { resolveEffectiveModel } from './renderer-effective-style.js';
 import { applyMaterial } from './renderer-material-dom.js';
 import {
+  appliedModelKeyOf,
   applyMountedConditionalStyle,
   applyMountedModel,
   handleMaterialEvent,
@@ -236,11 +238,13 @@ class Renderer implements BaseScreenRenderer {
       }
       const onEvent = (event: Event): void => handleMaterialEvent(this.#state, candidate, event);
       element.addEventListener('base-screen-material-event', onEvent);
+      let mountedModel: BaseScreenMaterialModel;
       try {
+        mountedModel = resolveEffectiveModel(this.#state, candidate, candidate.model.dataState);
         applyMaterial(
           element,
           candidate.component,
-          resolveEffectiveModel(this.#state, candidate, candidate.model.dataState),
+          mountedModel,
           this.#state.visibility.isHidden(candidate.component.id),
           stackOrder,
         );
@@ -255,6 +259,8 @@ class Renderer implements BaseScreenRenderer {
         onEvent,
         projection: createMountedProjectionState(),
         stackOrder,
+        applied: appliedModelKeyOf(this.#state, candidate, stackOrder),
+        appliedModel: mountedModel,
       };
       mounted.projection.dataState = candidate.model.dataState;
       mounted.projection.projectionKey = candidate.dataSource?.projectionKey;
@@ -349,7 +355,12 @@ class Renderer implements BaseScreenRenderer {
       mounted.projection.dataState = { status: 'loading' };
       const candidate = this.#state.candidates.get(componentId);
       if (candidate !== undefined && candidate.dataSource !== undefined) {
-        mounted.element.model = { ...candidate.model, dataState: { status: 'loading' } };
+        const model: BaseScreenMaterialModel = {
+          ...candidate.model,
+          dataState: { status: 'loading' },
+        };
+        mounted.element.model = model;
+        mounted.appliedModel = model;
       }
     }
   }
@@ -482,8 +493,9 @@ class Renderer implements BaseScreenRenderer {
   }
 
   #reprojectReaders(dataSourceId: string, document: ScreenDocument): void {
+    const componentsById = new Map(document.components.map((item) => [item.id, item]));
     for (const componentId of this.#readers.get(dataSourceId) ?? []) {
-      const component = document.components.find((item) => item.id === componentId);
+      const component = componentsById.get(componentId);
       const candidate = this.#state.candidates.get(componentId);
       const mounted = this.#state.mounted.get(componentId);
       if (component === undefined || candidate === undefined || mounted === undefined) continue;
@@ -500,6 +512,7 @@ class Renderer implements BaseScreenRenderer {
         ...candidate,
         model: { ...candidate.model, dataState: resolved.dataState },
         dataSource: resolved.dataSource,
+        dataEpoch: resolved.epoch,
       };
       this.#state.candidates.set(componentId, nextCandidate);
       if (resolved.dataState.status === 'ready') {

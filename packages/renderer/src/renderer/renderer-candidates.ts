@@ -45,6 +45,12 @@ export type ComponentDataResolution =
   | {
       readonly dataState: BaseScreenMaterialDataState;
       readonly dataSource: ResolvedDataSource | undefined;
+      /**
+       * 数据纪元：实例取值用实例 `entry.dataState` 的对象引用（settle/suspend/
+       * 换请求键都会替换该对象），非实例取值用变量规范化键，无数据为 `undefined`。
+       * 挂载守卫据此判定「数据输入是否与上次写入 model 时相同」。
+       */
+      readonly epoch: unknown;
     }
   | { readonly diagnostic: ScreenDiagnostic };
 
@@ -157,6 +163,7 @@ export function prepareCandidates(
         dataState: resolved.dataState,
       },
       dataSource: resolved.dataSource,
+      dataEpoch: resolved.epoch,
     });
   }
   validationCache.entries = nextEntries;
@@ -198,10 +205,10 @@ export function readComponentData(
   if (ref === null) {
     if (binding !== null) {
       // 不取值却声明了字段映射：映射无从校验，按旧路径当作没有默认数据。
-      return { dataState: { status: 'idle' }, dataSource: undefined };
+      return { dataState: { status: 'idle' }, dataSource: undefined, epoch: undefined };
     }
     if (entry.manifest.defaultData === undefined) {
-      return { dataState: { status: 'idle' }, dataSource: undefined };
+      return { dataState: { status: 'idle' }, dataSource: undefined, epoch: undefined };
     }
     return {
       dataState: projectStaticValue(
@@ -212,6 +219,7 @@ export function readComponentData(
           : null,
       ),
       dataSource: undefined,
+      epoch: undefined,
     };
   }
   const dataSourceEntry =
@@ -228,7 +236,11 @@ export function readComponentData(
   }
   if (ref.kind !== 'data-source-field') {
     const evaluated = dataSources.evaluate(ref);
-    return { dataState: toDataState(evaluated, entry, binding), dataSource: undefined };
+    return {
+      dataState: toDataState(evaluated, entry, binding),
+      dataSource: undefined,
+      epoch: dataSources.variablesKey,
+    };
   }
   if (source === undefined || dataSourceEntry === undefined) {
     // 引用指向的实例不存在（悬空引用）：解析器已拦，这里按不可用处理。
@@ -239,6 +251,7 @@ export function readComponentData(
         message: 'Host data source is unavailable.',
       },
       dataSource: undefined,
+      epoch: undefined,
     };
   }
   const contributionDiagnostic = validateHostResourceContribution(
@@ -266,18 +279,24 @@ export function readComponentData(
         message: 'Host dataset binding is invalid.',
       },
       dataSource,
+      epoch: dataSourceEntry.dataState,
     };
   }
   // 实例已失败：直接用实例级状态（归一化只做一次，不在这里重算）。
   if (dataSourceEntry.dataState.status === 'error') {
-    return { dataState: dataSourceEntry.dataState, dataSource };
+    return { dataState: dataSourceEntry.dataState, dataSource, epoch: dataSourceEntry.dataState };
   }
   // 有 `path` 就先按字段路径下钻，再交给物料投影：同一实例的两个组件可以各取不同字段。
   const evaluated = dataSources.evaluate(ref);
   if (dataSourceEntry.dataState.status === 'ready') {
     if (evaluated.kind !== 'value')
-      return { dataState: toDataState(evaluated, entry, binding), dataSource };
-    if (evaluated.value === undefined) return { dataState: { status: 'idle' }, dataSource };
+      return {
+        dataState: toDataState(evaluated, entry, binding),
+        dataSource,
+        epoch: dataSourceEntry.dataState,
+      };
+    if (evaluated.value === undefined)
+      return { dataState: { status: 'idle' }, dataSource, epoch: dataSourceEntry.dataState };
     return {
       dataState: projectDataSourceResult(
         entry,
@@ -287,9 +306,14 @@ export function readComponentData(
         onDiagnostic,
       ),
       dataSource,
+      epoch: dataSourceEntry.dataState,
     };
   }
-  return { dataState: toDataState(evaluated, entry, binding), dataSource };
+  return {
+    dataState: toDataState(evaluated, entry, binding),
+    dataSource,
+    epoch: dataSourceEntry.dataState,
+  };
 }
 
 function toDataState(

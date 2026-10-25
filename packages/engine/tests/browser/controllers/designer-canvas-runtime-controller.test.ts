@@ -200,6 +200,95 @@ describe('DesignerCanvasRuntimeController', () => {
     expect(diagnostics).toEqual([]);
   });
 
+  it('reuses the resolved snapshot for commits that keep host variable declarations', async () => {
+    const resolve = vi.fn(async () => ({ ok: true as const, value: 'north', diagnostics: [] }));
+    const { controller, renderer } = createHarness(catalogPort(resolve));
+    const variables: ScreenDocument['variables'] = [
+      { type: 'static', id: 'count', name: 'count', initialValue: 2 },
+      {
+        type: 'data-source',
+        id: 'region',
+        name: 'region',
+        initialValue: null,
+        sourceId: 'tenant-region',
+        controlled: true,
+      },
+    ];
+    expect(controller.render(documentWith(variables)).ok).toBe(true);
+    await vi.waitFor(() =>
+      expect(renderer.calls).toEqual(['suspend', 'render', 'variables', 'render']),
+    );
+
+    // 与变量声明无关的提交（画布/组件变更）：不挂起、不重解析，直接用会话快照渲染。
+    expect(controller.render(documentWith(variables, '#111111')).ok).toBe(true);
+    expect(renderer.calls).toEqual([
+      'suspend',
+      'render',
+      'variables',
+      'render',
+      'variables',
+      'render',
+    ]);
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(renderer.variables).toEqual([
+      { count: 2, region: 'north' },
+      { count: 2, region: 'north' },
+    ]);
+  });
+
+  it('re-suspends and re-resolves when host variable declarations change', async () => {
+    let value = 'north';
+    const { controller, renderer } = createHarness(
+      catalogPort(async () => ({ ok: true, value, diagnostics: [] })),
+    );
+    expect(
+      controller.render(
+        documentWith([
+          {
+            type: 'data-source',
+            id: 'region',
+            name: 'region',
+            initialValue: null,
+            sourceId: 'tenant-region',
+            controlled: true,
+          },
+        ]),
+      ).ok,
+    ).toBe(true);
+    await vi.waitFor(() =>
+      expect(renderer.calls).toEqual(['suspend', 'render', 'variables', 'render']),
+    );
+
+    value = 'south';
+    expect(
+      controller.render(
+        documentWith([
+          {
+            type: 'data-source',
+            id: 'region',
+            name: 'region',
+            initialValue: null,
+            sourceId: 'tenant-region-2',
+            controlled: true,
+          },
+        ]),
+      ).ok,
+    ).toBe(true);
+    await vi.waitFor(() =>
+      expect(renderer.calls).toEqual([
+        'suspend',
+        'render',
+        'variables',
+        'render',
+        'suspend',
+        'render',
+        'variables',
+        'render',
+      ]),
+    );
+    expect(renderer.variables).toEqual([{ region: 'north' }, { region: 'south' }]);
+  });
+
   it('blocks resource refresh and reports a stable diagnostic when a host variable is unavailable', async () => {
     const { controller, renderer, diagnostics } = createHarness();
 

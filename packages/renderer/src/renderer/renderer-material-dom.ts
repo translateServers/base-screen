@@ -8,9 +8,23 @@ export function applyMaterial(
   effectivelyHidden: boolean,
   stackOrder: number,
 ): void {
+  applyMaterialFrame(element, component, model, stackOrder);
+  element.model = model;
+  applyMaterialDisplay(element, effectivelyHidden);
+}
+
+/**
+ * 几何帧：position、size、zIndex、transform、opacity 的写入。每次 reconcile 都要
+ * 跑，但全部走同值守卫——先读后写，未变更属性的写次数为 0，不触发 CSSOM 写入。
+ * 不含 display：display 必须在 model 赋值之后收尾（见 `applyMaterialDisplay`）。
+ */
+export function applyMaterialFrame(
+  element: BaseScreenMaterialElement,
+  component: ScreenComponentNode,
+  model: BaseScreenMaterialModel,
+  stackOrder: number,
+): void {
   const position = component.position;
-  // 同值守卫：reconcile 路径每次 render 都会重写全部几何样式；先读后写把
-  // 未变更属性的写次数降为 0，避免无关变更（如选区变化）触发全量 CSSOM 写入。
   const style = element.style;
   if (style.position !== 'absolute') style.position = 'absolute';
   const left = `${position.x}px`;
@@ -39,7 +53,17 @@ export function applyMaterial(
       ? String(Math.min(1, Math.max(0, model.style.opacity)))
       : '';
   if (style.opacity !== opacity) style.opacity = opacity;
-  element.model = model;
+}
+
+/**
+ * display 收尾：必须在 `element.model = model` 之后写——物料的 model setter 可能
+ * 覆盖宿主元素 display，隐藏裁剪要留在最后生效。守卫命中（跳过 model 重赋值）
+ * 时同样要跑，蓝图可见性在渲染之外改写的 display 由此恢复。
+ */
+export function applyMaterialDisplay(
+  element: BaseScreenMaterialElement,
+  effectivelyHidden: boolean,
+): void {
   const display = effectivelyHidden ? 'none' : 'block';
-  if (style.display !== display) style.display = display;
+  if (element.style.display !== display) element.style.display = display;
 }

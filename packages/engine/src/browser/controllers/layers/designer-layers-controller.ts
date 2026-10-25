@@ -17,6 +17,7 @@ import {
   DESIGNER_LAYER_PAGE_SIZE,
   type DesignerLayerDropIndicator,
   type DesignerLayerSelectionDirection,
+  type DesignerLayerView,
   filterDesignerLayerItems,
   getDesignerLayerSelectionTarget,
   renderDesignerLayers,
@@ -58,6 +59,8 @@ export class DesignerLayersController {
   #renderLimit = DESIGNER_LAYER_PAGE_SIZE;
   /** 最近一次渲染出的行序（含搜索过滤、折叠与分页）：Shift 连选只能落在看得见的行上。 */
   #visibleIds: readonly string[] = [];
+  /** 最近一次树渲染的内容签名：再次渲染输入全同时跳过整树重建。 */
+  #renderedSignature: string | undefined;
 
   constructor(private readonly callbacks: DesignerLayersControllerCallbacks) {
     this.#drag = new DesignerLayerDragController({
@@ -154,9 +157,28 @@ export class DesignerLayersController {
     this.#visibleIds = filterDesignerLayerItems(view.items, this.#search, this.#collapsed)
       .slice(0, this.#renderLimit)
       .map((item) => item.id);
+    const interaction = this.callbacks.getInteraction();
+    const signature = layerRenderSignature(view, interaction, {
+      search: this.#search,
+      collapsed: this.#collapsed,
+      renderLimit: this.#renderLimit,
+      draggingId: this.#drag.draggedId,
+      dropIndicator: this.#drag.dropIndicator,
+      renamingId: this.#rename.renamingId,
+      renameDraft:
+        this.#rename.renamingId === undefined
+          ? undefined
+          : this.#rename.drafts.get(this.#rename.renamingId),
+    });
+    if (signature === this.#renderedSignature) {
+      // 输入全同：树、外壳、工具条状态与诊断都不会变。几何/样式/数据类提交不再
+      // 重建图层面板，也不重复上报同一份诊断。
+      return;
+    }
+    this.#renderedSignature = signature;
     const focusedRowId = activeLayerSelectId(layers);
     renderDesignerLayers(layers, view, {
-      interaction: this.callbacks.getInteraction(),
+      interaction,
       search: this.#search,
       collapsed: this.#collapsed,
       draggingId: this.#drag.draggedId,
@@ -534,6 +556,46 @@ function activeElementIn(layers: HTMLElement): Element | null {
   const root = typeof layers.getRootNode === 'function' ? layers.getRootNode() : null;
   const active = (root as { readonly activeElement?: Element | null } | null)?.activeElement;
   return active ?? null;
+}
+
+/**
+ * 树渲染的内容签名：视图逐行字段（顺序即层级/绘制序）+ 选区/焦点 + 面板状态
+ * （搜索、折叠、分页、拖拽、重命名）+ 诊断计数。全同则树、外壳、工具条与
+ * 诊断输出都不会变，可跳过整树重建。工具条可用性由选区与行的 locked/顺序派生，
+ * 已被签名覆盖。
+ */
+function layerRenderSignature(
+  view: DesignerLayerView,
+  interaction: ScreenInteractionState,
+  state: {
+    readonly search: string;
+    readonly collapsed: ReadonlySet<string>;
+    readonly renderLimit: number;
+    readonly draggingId: string | undefined;
+    readonly dropIndicator: DesignerLayerDropIndicator | undefined;
+    readonly renamingId: string | null | undefined;
+    readonly renameDraft: string | undefined;
+  },
+): string {
+  const head = [
+    state.search,
+    String(state.renderLimit),
+    [...state.collapsed].join(','),
+    interaction.selectedComponentIds.join(','),
+    interaction.focusedComponentId ?? '',
+    state.draggingId ?? '',
+    state.dropIndicator === undefined
+      ? ''
+      : `${state.dropIndicator.rowId}:${state.dropIndicator.edge}`,
+    state.renamingId ?? '',
+    state.renameDraft ?? '',
+    String(view.diagnostics.length),
+  ];
+  const rows = view.items.map(
+    (item) =>
+      `${item.id}|${item.parentId ?? ''}|${item.name}|${item.type}|${item.depth}|${item.childCount}|${item.hidden}|${item.locked}|${item.missingMaterial}|${item.typeLabel}|${item.icon ?? ''}|${item.width}|${item.height}`,
+  );
+  return `${head.join('\u0001')}\u0002${rows.join('\u0002')}`;
 }
 
 function activeLayerSelectId(layers: HTMLElement): string | undefined {

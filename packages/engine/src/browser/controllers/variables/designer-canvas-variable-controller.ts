@@ -33,6 +33,13 @@ export class DesignerCanvasVariableController {
   #pendingAll = false;
   readonly #pendingIds = new Set<string>();
   #pendingTraceId: string | undefined;
+  /** 最近一次成功应用的宿主变量声明签名（id + sourceId，按文档顺序）。 */
+  #resolvedDeclarations: string | undefined;
+  /**
+   * 最近一次成功解析的宿主变量值（id → value）。由本控制器持有：画布运行时的
+   * 会话变量快照在每次渲染会被蓝图编译重置回初值，不能作为复用来源。
+   */
+  #resolvedValues = new Map<string, ScreenJsonValue>();
 
   constructor(private readonly callbacks: DesignerCanvasVariableCallbacks) {}
 
@@ -46,10 +53,48 @@ export class DesignerCanvasVariableController {
       if (rendered.ok) this.callbacks.setVariables(initialVariables);
       return rendered;
     }
+    const reused = this.#reusableSnapshot(hostVariables, initialVariables);
+    if (reused !== undefined) {
+      // 宿主变量声明与上次成功解析一致：直接用会话快照渲染，不挂起、不重解析。
+      // 实例请求键不变时 renderer 不重发请求，数据组件不进 loading；声明变化或
+      // 首次渲染仍走挂起解析路径（值的新鲜度由 refreshVariables/refreshData 负责）。
+      const rendered = applyVariablesAndRender(renderer, document, reused);
+      if (rendered.ok) this.callbacks.setVariables(reused);
+      return rendered;
+    }
     renderer.suspendData();
     const mounted = toVoidResult(renderer.render(document));
     if (mounted.ok) this.#startFullResolution(renderer, document, initialVariables);
     return mounted;
+  }
+
+  /** 声明未变且已有每个宿主变量的解析值时，给出可直接渲染的合并快照；否则走挂起解析。 */
+  #reusableSnapshot(
+    hostVariables: readonly DesignerVariableView[],
+    initialVariables: ScreenJsonObject,
+  ): ScreenJsonObject | undefined {
+    if (this.#resolvedDeclarations !== hostDeclarationsKey(hostVariables)) return undefined;
+    const merged: Record<string, ScreenJsonValue> = { ...initialVariables };
+    for (const variable of hostVariables) {
+      const value = this.#resolvedValues.get(variable.id);
+      if (value === undefined) return undefined;
+      merged[variable.id] = value;
+    }
+    return merged;
+  }
+
+  /** 记录一轮成功应用的解析值；`ids` 缺省时全量记录（全量解析路径）。 */
+  #recordResolvedValues(
+    hostVariables: readonly DesignerVariableView[],
+    variables: ScreenJsonObject,
+    requestedIds?: readonly string[],
+  ): void {
+    for (const variable of hostVariables) {
+      if (requestedIds !== undefined && !requestedIds.includes(variable.id)) continue;
+      if (Object.hasOwn(variables, variable.id)) {
+        this.#resolvedValues.set(variable.id, variables[variable.id]!);
+      }
+    }
   }
 
   refreshData(componentId?: string): void {
@@ -85,6 +130,8 @@ export class DesignerCanvasVariableController {
 
   clear(): void {
     this.cancel();
+    this.#resolvedDeclarations = undefined;
+    this.#resolvedValues = new Map();
   }
 
   #startFullResolution(
@@ -117,6 +164,8 @@ export class DesignerCanvasVariableController {
         return;
       }
       this.callbacks.setVariables(variables);
+      this.#resolvedDeclarations = hostDeclarationsKey(hostVariablesOf(document));
+      this.#recordResolvedValues(hostVariablesOf(document), variables);
       if (refreshAfterRender) renderer.refreshData(refreshComponentId);
       this.#drain();
     });
@@ -171,6 +220,7 @@ export class DesignerCanvasVariableController {
         return;
       }
       this.callbacks.setVariables(variables);
+      this.#recordResolvedValues(hostVariablesOf(document), variables, requestedIds);
       this.#drain();
     });
   }
@@ -286,6 +336,14 @@ export class DesignerCanvasVariableController {
 
 function hostVariablesOf(document: ScreenDocument): readonly DesignerVariableView[] {
   return readDesignerVariableViews(document).filter((variable) => variable.type !== 'static');
+}
+
+/**
+ * 宿主变量声明签名：resolve 的输入只有 id 与 sourceId（params 恒为空），按文档
+ * 顺序拼接。签名一致时上一轮解析值仍然有效，可跳过挂起与重解析。
+ */
+function hostDeclarationsKey(hostVariables: readonly DesignerVariableView[]): string {
+  return hostVariables.map((variable) => `${variable.id}=${variable.sourceId}`).join('\u0000');
 }
 
 function jsonEqual(left: ScreenJsonValue, right: ScreenJsonValue): boolean {

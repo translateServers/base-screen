@@ -1120,6 +1120,47 @@ describe('DesignerLayersController', () => {
       'blank',
     );
   });
+
+  it('skips rebuilding the tree when no layer-visible input changed', () => {
+    const panel = new FakePanel();
+    const base = createDocument([component('a', null, 0), component('b', null, 1)]);
+    let current = base;
+    const controller = new DesignerLayersController({
+      emitDiagnostics: () => undefined,
+      executeTransaction: () => ({ ok: true, value: current, diagnostics: [] }),
+      getCatalog: catalog,
+      getDocument: () => current,
+      getInteraction: () => ({ selectedComponentIds: [], focusedComponentId: null }),
+      reduceSelection: () => undefined,
+    });
+
+    controller.render(panel as unknown as HTMLElement);
+    const tree = panel.children.find((child) => child.dataset.layerRoot === 'true')!;
+    const firstRows = [...tree.children];
+    expect(firstRows.length).toBe(2);
+
+    // 与图层行无关的提交（改几何）：文档对象变了，但行内容不变 → 不重建树。
+    current = {
+      ...base,
+      components: base.components.map((item) => ({
+        ...item,
+        position: { x: 99, y: 0 },
+      })),
+    };
+    controller.render(panel as unknown as HTMLElement);
+    expect([...tree.children]).toEqual(firstRows);
+
+    // 名称是行内容：重命名提交 → 重建树。
+    current = {
+      ...base,
+      components: base.components.map((item) =>
+        item.id === 'a' ? { ...item, name: 'renamed' } : item,
+      ),
+    };
+    controller.render(panel as unknown as HTMLElement);
+    expect([...tree.children].length).toBe(2);
+    expect([...tree.children]).not.toEqual(firstRows);
+  });
 });
 
 function orderByZIndex(document: ScreenDocument): readonly string[] {

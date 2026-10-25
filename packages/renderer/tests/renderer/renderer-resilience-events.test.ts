@@ -270,8 +270,11 @@ describe('BaseScreenRenderer resilience', () => {
     expect(root.children).toHaveLength(1);
     const mounted = root.children[0];
 
+    // 未变组件不再重赋 model，抛异常路径由「变更后的组件」触发。
     modelExplosionState.enabled = true;
-    const result = renderer.render(initial);
+    const result = renderer.render(
+      document([{ ...initial.components[0]!, name: 'volatile-renamed' }]),
+    );
     modelExplosionState.enabled = false;
 
     expect(result.ok).toBe(true);
