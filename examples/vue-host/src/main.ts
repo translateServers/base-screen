@@ -5,6 +5,8 @@ import { registerHostMaterials } from './screen/register';
 import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
+import './styles/asset-library.css';
+import './styles/online-materials.css';
 
 // 1) 注册设计器/查看器/物料（公开入口，幂等）。
 registerHostMaterials();

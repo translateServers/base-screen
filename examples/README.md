@@ -52,10 +52,11 @@ lib/api-base.ts  lib/api.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.
 lib/render-diagnostics.ts
 screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
-screen/blueprint-canvas.ts  screen/datasource-return.ts
+screen/asset-library.ts  screen/blueprint-canvas.ts  screen/datasource-return.ts
 screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
-screen/metric-value.ts  screen/project-adapter.ts
+screen/metric-value.ts  screen/online-materials.ts  screen/project-adapter.ts
 store/screen-session-store.ts  store/screens-store.ts  types.ts
+styles/asset-library.css  styles/online-materials.css
 ```
 
 允许的差异只有三类：
@@ -106,6 +107,15 @@ DOM 契约发生漂移，都会在冒烟里当场失败。
 | `GET /api/screens/:id` | — | `{ screen: Screen }` | `404 NOT_FOUND` |
 | `PUT /api/screens/:id` | `{ document, revision }` | `{ screen: Screen }`（revision+1） | `404` / `409 REVISION_CONFLICT` / `400 DOCUMENT_INVALID` |
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
+| `GET /api/assets` | — | `{ assets: [{ id, name, mimeType, byteSize, contentPath, referenceCount, createdAt }] }` | — |
+| `POST /api/assets` | multipart `file` | `201 { asset }` | `400 ASSET_TYPE_UNSUPPORTED` / `ASSET_CONTENT_INVALID`；超过 5 MB 为 `413` |
+| `GET /api/assets/:id/content` | — | 图片二进制 | `404 ASSET_NOT_FOUND` |
+| `DELETE /api/assets/:id` | — | `{ deleted: true, id }` | `404` / `409 ASSET_IN_USE` + `refScreens` |
+| `GET /api/material-packages` | — | `{ packages: [{ id, type, name, code, manifest, revision, ... }] }` | — |
+| `POST /api/material-packages` | `{ type, name, manifest, code }` | `201 { package }` | `400` / `409 MATERIAL_TYPE_EXISTS` |
+| `PUT /api/material-packages/:id` | `{ type, name, manifest, code, revision }` | `{ package }`（revision+1） | `400` / `409 REVISION_CONFLICT` |
+| `PATCH /api/material-packages/:id/visibility` | `{ visible }` | `{ package }`（只改 `libraryVisible`） | `404` |
+| `DELETE /api/material-packages/:id` | — | `{ deleted: true, id }` | `404` / `409 MATERIAL_IN_USE` + `refScreens` |
 | `GET /api/metrics/series?metric=&points=` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
 | `GET /api/metrics/ranking?dimension=&limit=` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
 | `GET /api/demo/alarms` | — | `{ revision, alarms: [{ id, key, level, message, raisedAt, acknowledged, suppressed }] }` | — |
@@ -442,16 +452,50 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 物料即可成组整体移动/缩放/旋转；要成套插入同一份组合，用 `insertComponentFragment`，预设 JSON
 由宿主自己存。
 
-三端的数据通道都支持三种宿主资源类型，投影形状与绑定角色一一对应：
+三端的数据通道都支持四种宿主资源类型，投影形状与绑定角色一一对应：
 
-| resourceType | resourceId | 返回表格 | 消费物料与绑定角色 |
+| resourceType | resourceId | 返回 | 消费物料与绑定角色 |
 | --- | --- | --- | --- |
-| `demo_metric` | 指标名 | `value`（最新点） | 翻牌器 / 水位图 / 胶囊进度：`value` |
-| `demo_series` | 指标名 | `t` + `value`（全量序列） | ECharts 折线/面积/柱状：`dimension` + `measures` |
-| `demo_ranking` | `region` / `channel` | `name` + `value` | 环形图 / 柱状图：`dimension` + `measures`；轮播列表：`columns` |
+| `demo_metric` | 指标名 | `value`（最新点，表格） | 翻牌器 / 水位图 / 胶囊进度：`value` |
+| `demo_series` | 指标名 | `t` + `value`（全量序列，表格） | ECharts 折线/面积/柱状：`dimension` + `measures` |
+| `demo_ranking` | `region` / `channel` | `name` + `value`（表格） | 环形图 / 柱状图：`dimension` + `measures`；轮播列表：`columns` |
+| `host_image` | 素材 id | 稳定内容 URL（标量字符串） | `base.image`：`static` 标量 |
 
-三种类型同时由宿主自有插件声明为 `dataResourceType` 贡献——这不是可选装饰：一旦
+四种类型同时由宿主自有插件声明为 `dataResourceType` 贡献——这不是可选装饰：一旦
 `runtimeContributions` 传给渲染器，未声明的类型会被拒绝，表现为「文档有组件、画布空白」。
+
+### 宿主素材库与图片选择（ADR-0089）
+
+编辑页左栏多一个宿主分组「素材库」（`leftPanelGroups` + 公开命名 slot），内容由三端逐字共享的
+`src/screen/asset-library.ts` 渲染：上传、搜索、素材网格、插入/替换/设为背景、删除保护。
+组件图片只写入 `host-resource` 身份（`resourceType: 'host_image'` + 素材 id），文档不保存 URL；
+`host-data-channel.ts` 按当前 API Base 把它解析成稳定内容 URL，查看页复用同一条解析。
+
+检查器的「选择素材」与画布背景的「选择图片」共用统一选择桥：Engine 派发
+`base-screen-host-resource-selection-request`，宿主打开同一个素材选择器后调用
+`commitHostResourceSelection`；画布背景提交 `url` 变体并把 fit 落到 `cover`，组件提交
+`host-resource` 身份。组件目标要求没有 `dataValue` 键（契约禁止两种取值写法并存）。
+
+素材后端在 `examples/shared-backend/src/assets/`：空表时生成六张演示 PNG，上传只接受
+PNG / JPEG / WebP / GIF 并校验文件头；删除前扫描已保存文档中的 `host_image` 引用与画布背景的
+内容 URL，被引用时返回 `409 ASSET_IN_USE` 与 `refScreens`。
+
+### 在线物料与自定义组件（ADR-0090）
+
+编辑页右下角的「在线物料」是宿主自有的管理员入口（示例不做鉴权，生产必须由宿主接管权限）。
+表单生成 ESM 与 Manifest，宿主在发布前 `import()` 校验、发布后 `import()` + `define()` 新
+Custom Element，重建 catalog 并调用 `refreshCatalog`——**不刷新页面**：
+
+- **发布代码**：同 `type`、新 build token / tagName / constructor，现有同型组件重挂载；
+- **仅更新清单**：保留 constructor 与已挂载节点，只更新名称等 Manifest 字段（演示 manifest-only 分支）；
+- **下架/上架**：只改 `libraryVisible`，物料库隐藏但现有组件继续渲染；
+- **删除**：被大屏引用时后端返回 `409 MATERIAL_IN_USE` 与 `refScreens`；
+- **代码预览**：生成的 ESM 与 Manifest 可在面板里展开查看；后端只持久化，不执行代码。
+
+物料 `type` 使用 `host.online.*` 命名空间（稳定文档身份），`tagName` 是构建产物（每次发布代码
+生成新值）。示例的组件模板是宿主生成的最小 KPI 卡；同一套 `refreshCatalog` 也适用于宿主自己
+构建的 React / Vue / 原生 ESM 包。发布后包会持久化在 `MaterialPackage` 表，刷新页面或三个前端
+之间切换都会重新加载。
 
 ## 数据源后台管理
 

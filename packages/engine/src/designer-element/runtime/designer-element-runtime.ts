@@ -7,6 +7,7 @@ import {
   invalidateAuthoringRequests,
   requestComponentTextEdit,
 } from '../api/designer-element-authoring.js';
+import { refreshCatalog } from '../api/designer-element-catalog.js';
 import {
   configure,
   readCatalog,
@@ -15,14 +16,12 @@ import {
   writeLeftPanelGroups,
 } from '../api/designer-element-configuration.js';
 import {
-  commitCanvasBackgroundImage,
   executeCommand,
   executeTransaction,
   getDocument,
   getSelection,
   readInstanceId,
   replaceDocument,
-  requestCanvasBackgroundImage,
   setCanvasBackground,
   setCanvasBackgroundImage,
 } from '../api/designer-element-document.js';
@@ -68,12 +67,16 @@ import {
   replaceHostResource,
   validateHostResourceAuthoringIntent,
 } from '../api/designer-element-host-resource.js';
+import {
+  commitHostResourceSelection,
+  requestHostResourceSelection,
+} from '../api/designer-element-host-resource-selection.js';
 import { insertComponent, parseInsertionIntent } from '../api/designer-element-insert-component.js';
 import { insertComponentFragment } from '../api/designer-element-insert-component-fragment.js';
 import {
   readBackButton,
-  readCanvasBackgroundImageButton,
   readGroupMaterialType,
+  readHostResourceSelectionButton,
   readInspectorControls,
   readMaterialLibraryGrouping,
   readMaterialLibraryItems,
@@ -191,6 +194,7 @@ export const designerElementRuntime = {
   readWorkbenchMode,
   setWorkbenchMode,
   configure,
+  refreshCatalog,
   writeCatalog,
   readLeftPanelGroups,
   writeLeftPanelGroups,
@@ -212,7 +216,7 @@ export const designerElementRuntime = {
   writeInspectorControls,
   readPreviewHandler,
   readBackButton,
-  readCanvasBackgroundImageButton,
+  readHostResourceSelectionButton,
   writeRuntimeContributions,
   readProjectAdapter,
   writeProjectAdapter,
@@ -260,8 +264,8 @@ export const designerElementRuntime = {
   validateHostResourceAuthoringIntent,
   setCanvasBackground,
   setCanvasBackgroundImage,
-  requestCanvasBackgroundImage,
-  commitCanvasBackgroundImage,
+  requestHostResourceSelection,
+  commitHostResourceSelection,
   readInstanceId,
   getAuthoringEditorContext,
   requestComponentTextEdit,

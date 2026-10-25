@@ -338,6 +338,13 @@ function handleDatasetAction(context: DesignerDatasetControllerContext, target: 
     retryDatasetLink(context);
     return true;
   }
+  if (action === 'select-host-resource') {
+    const component = context.currentComponent();
+    if (component !== undefined) {
+      context.callbacks.requestHostResourceSelection?.(component.id, component.type);
+    }
+    return true;
+  }
   if (action === 'open-instance') {
     // 检查器里实例级字段只读：唯一编辑入口是工作台。这里只把用户送过去，不做就地修改
     // （那会改变所有引用同一实例的组件）。

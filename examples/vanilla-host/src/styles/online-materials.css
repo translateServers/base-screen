@@ -1,0 +1,309 @@
+/* 宿主在线物料面板（ADR-0090）：三端共用的浮层入口与编辑对话框。 */
+
+.editor-online-materials {
+  position: fixed;
+  right: var(--spacing-4);
+  bottom: calc(var(--spacing-4) + 84px);
+  z-index: 41;
+}
+
+.editor-online-toggle {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.online-materials-dialog {
+  width: min(1040px, 94vw);
+  height: min(680px, 88vh);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  overflow: hidden;
+}
+
+.online-materials-dialog::backdrop {
+  background: rgba(1, 6, 14, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.online-materials-dialog[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.online-materials-head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  padding: 16px var(--spacing-5);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.online-materials-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.online-materials-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.online-materials-subtitle {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.online-materials-body {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.online-materials-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  min-height: 0;
+  padding: var(--spacing-4);
+  border-right: 1px solid var(--color-border);
+  background: rgba(5, 13, 26, 0.45);
+}
+
+.online-materials-list-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.online-materials-list-title {
+  flex: 1;
+  color: var(--color-text-muted);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.online-materials-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.online-material-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: rgba(8, 26, 46, 0.6);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.online-material-item:hover {
+  background: rgba(14, 45, 74, 0.8);
+}
+
+.online-material-item.is-selected {
+  border-color: var(--color-accent);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.online-material-name {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.online-material-type,
+.online-material-meta {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 9px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.online-material-empty {
+  margin: 0;
+  padding: var(--spacing-4) var(--spacing-2);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.online-materials-errors {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: var(--radius-sm);
+  color: #fecaca;
+  font-size: 10px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.online-materials-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  min-height: 0;
+  padding: var(--spacing-4) var(--spacing-5);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.online-materials-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--spacing-3);
+}
+
+.online-material-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.online-material-input {
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(5, 13, 26, 0.65);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.online-material-input[readonly] {
+  color: var(--color-text-muted);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 10px;
+}
+
+.online-material-input:focus {
+  outline: 2px solid rgba(56, 189, 248, 0.45);
+  outline-offset: 1px;
+}
+
+.online-materials-preview {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(5, 13, 26, 0.4);
+}
+
+.online-materials-preview summary {
+  padding: 9px 12px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.online-materials-preview-body {
+  max-height: 230px;
+  padding: 0 12px 12px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.online-materials-preview-title {
+  margin: 8px 0 4px;
+  color: var(--color-accent);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.online-materials-preview pre {
+  margin: 0;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.28);
+  color: #c7d8e8;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 9px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.online-materials-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.online-materials-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.online-materials-actions .button {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 26, 46, 0.8);
+  color: var(--color-text);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.online-materials-actions .button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.online-materials-actions .button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.online-materials-status {
+  min-height: 16px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.online-materials-status[data-tone="error"] {
+  color: #fecaca;
+}
+
+@media (max-width: 860px) {
+  .online-materials-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .online-materials-list {
+    max-height: 180px;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .online-materials-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -32,11 +32,16 @@ import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
   BaseScreenDesignerWorkbenchMode,
 } from '../../common/operations/blueprint/designer-blueprint-protocol.js';
+import type { BaseScreenMaterialCatalogRefreshResult } from '../../common/operations/catalog/designer-catalog-refresh.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
 } from '../../common/operations/element/designer-layout-operations.js';
 import type { BaseScreenHostResourceAuthoringIntent } from '../../common/operations/host-resource/host-resource-authoring.js';
+import type {
+  BaseScreenHostResourceSelectionCommit,
+  BaseScreenHostResourceSelectionTarget,
+} from '../../common/operations/host-resource/host-resource-selection.js';
 import type { BaseScreenComponentInsertionIntent } from '../../common/operations/material-component/material-component.js';
 import type { BaseScreenComponentFragmentInsertionIntent } from '../../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../../common/operations/material-library/material-library-grouping.js';
@@ -57,7 +62,7 @@ export interface DesignerElementHost extends HTMLElement {
   pluginCommandPort: PluginCommandPort | undefined;
   readonly previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   readonly backButton: boolean;
-  readonly canvasBackgroundImageButton: boolean;
+  readonly hostResourceSelectionButton: boolean;
   projectAdapter: ScreenProjectAdapter | undefined;
   toolMaterialTypes: DesignerToolMaterialTypes | undefined;
   groupMaterialType: string | undefined;
@@ -74,6 +79,9 @@ export interface DesignerElementHost extends HTMLElement {
   readonly instanceId: string;
   readonly workbenchMode: BaseScreenDesignerWorkbenchMode;
   configure(configuration: BaseScreenDesignerConfiguration): ScreenParseResult<null>;
+  refreshCatalog(
+    catalog: BaseScreenMaterialCatalog,
+  ): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
   setWorkbenchMode(
     mode: BaseScreenDesignerWorkbenchMode,
     options?: BaseScreenDesignerSetWorkbenchModeOptions,
@@ -101,11 +109,9 @@ export interface DesignerElementHost extends HTMLElement {
     backgroundImage: string | null,
     fit?: ScreenCanvasBackgroundImageFit,
   ): ScreenParseResult<ScreenDocument>;
-  requestCanvasBackgroundImage(): boolean;
-  commitCanvasBackgroundImage(
-    requestId: string,
-    backgroundImage: string | null,
-    fit?: ScreenCanvasBackgroundImageFit,
+  requestHostResourceSelection(target: BaseScreenHostResourceSelectionTarget): boolean;
+  commitHostResourceSelection(
+    commit: BaseScreenHostResourceSelectionCommit,
   ): ScreenParseResult<ScreenDocument>;
   getAuthoringEditorContext(): ScreenAuthoringEditorContext;
   requestComponentTextEdit(target: ScreenComponentTextTarget): string | null;

@@ -26,15 +26,11 @@ export {
   parseBaseScreenBlueprintCanvasCommand,
 } from '../common/operations/blueprint/designer-blueprint-protocol.js';
 export {
-  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
-  type BaseScreenCanvasBackgroundImageRequest,
-  type BaseScreenCanvasBackgroundImageRequestEventDetail,
-} from '../common/operations/canvas/canvas-background-image.js';
-export {
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   type BaseScreenCanvasPresentationChangeEventDetail,
   type BaseScreenCanvasScaleMode,
 } from '../common/operations/canvas/canvas-presentation.js';
+export type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
 export {
   BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
   type BaseScreenHostResourceAuthoringIntent,
@@ -42,6 +38,15 @@ export {
   parseBaseScreenHostResourceAuthoringIntent,
   writeBaseScreenHostResourceDragData,
 } from '../common/operations/host-resource/host-resource-authoring.js';
+export {
+  BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
+  type BaseScreenHostResourceSelection,
+  type BaseScreenHostResourceSelectionCommit,
+  type BaseScreenHostResourceSelectionCurrent,
+  type BaseScreenHostResourceSelectionRequest,
+  type BaseScreenHostResourceSelectionRequestEventDetail,
+  type BaseScreenHostResourceSelectionTarget,
+} from '../common/operations/host-resource/host-resource-selection.js';
 export {
   type BaseScreenComponentInsertionIntent,
   parseBaseScreenComponentInsertionIntent,

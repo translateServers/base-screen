@@ -65,7 +65,7 @@ export function parseBaseScreenHostResourceAuthoringIntent(
       ['name'],
     );
   }
-  if (containsForbiddenTransportData(input)) {
+  if (containsForbiddenHostResourceTransportData(input)) {
     return failure(
       'AUTHORING_SOURCE_INVALID',
       'Host resource intent must not contain URLs, tokens, or headers.',
@@ -189,12 +189,13 @@ export function centeredHostResourcePosition(
   });
 }
 
-function containsForbiddenTransportData(value: unknown): boolean {
+export function containsForbiddenHostResourceTransportData(value: unknown): boolean {
   if (typeof value === 'string') return FORBIDDEN_TRANSPORT_VALUE.test(value);
-  if (Array.isArray(value)) return value.some(containsForbiddenTransportData);
+  if (Array.isArray(value)) return value.some(containsForbiddenHostResourceTransportData);
   if (!isRecord(value)) return false;
   return Object.entries(value).some(
-    ([key, child]) => FORBIDDEN_TRANSPORT_FIELD.test(key) || containsForbiddenTransportData(child),
+    ([key, child]) =>
+      FORBIDDEN_TRANSPORT_FIELD.test(key) || containsForbiddenHostResourceTransportData(child),
   );
 }
 

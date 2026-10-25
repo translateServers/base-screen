@@ -9,14 +9,6 @@ import {
   type ScreenDocumentTransaction,
   type ScreenInteractionState,
 } from '@base-screen/core';
-import {
-  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
-  type BaseScreenCanvasBackgroundImageRequestEventDetail,
-  buildCanvasBackgroundImagePatch,
-  buildCanvasBackgroundImageRequest,
-  validateCanvasBackgroundImageCommitGuards,
-} from '../../common/operations/canvas/canvas-background-image.js';
-import { createScreenAuthoringRequestId } from '../../common/operations/designer-authoring-bridge.js';
 import { withDerivedDesignerGroupBounds } from '../../common/operations/selection/designer-group.js';
 import {
   type DesignerElementHost,
@@ -99,68 +91,6 @@ export function setCanvasBackgroundImage(
     if (fit !== undefined) patch.backgroundImageFit = fit;
   }
   return element.executeTransaction({ commands: [{ type: 'update-canvas', patch }] });
-}
-
-export function requestCanvasBackgroundImage(element: DesignerElementHost): boolean {
-  const elementState = getDesignerElementState(element);
-
-  const document = elementState.session.document;
-  if (document === undefined) return false;
-  const requestId = createScreenAuthoringRequestId();
-  elementState.pendingAuthoringRequests.set(requestId, {
-    kind: 'canvas-background-image',
-    generation: elementState.authoringGeneration,
-  });
-  element.dispatchEvent(
-    new CustomEvent<BaseScreenCanvasBackgroundImageRequestEventDetail>(
-      BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
-      {
-        detail: {
-          request: buildCanvasBackgroundImageRequest(
-            document.canvas,
-            elementState.instanceId,
-            requestId,
-            elementState.session.project?.revision ?? null,
-          ),
-        },
-        bubbles: true,
-        composed: true,
-      },
-    ),
-  );
-  return true;
-}
-
-export function commitCanvasBackgroundImage(
-  element: DesignerElementHost,
-  requestId: string,
-  backgroundImage: string | null,
-  fit?: ScreenCanvasBackgroundImageFit,
-): ScreenParseResult<ScreenDocument> {
-  const elementState = getDesignerElementState(element);
-
-  const pending = elementState.pendingAuthoringRequests.get(requestId);
-  const guards = validateCanvasBackgroundImageCommitGuards({
-    pendingKind: pending?.kind,
-    disposed: pending !== undefined && pending.generation !== elementState.authoringGeneration,
-  });
-  if (!guards.ok) {
-    elementState.pendingAuthoringRequests.delete(requestId);
-    return elementState.runtime.commitGuardFailure(
-      element,
-      guards.diagnostics[0]?.code ?? 'AUTHORING_REQUEST_INVALID',
-    );
-  }
-  const result = element.executeTransaction({
-    commands: [
-      {
-        type: 'update-canvas',
-        patch: buildCanvasBackgroundImagePatch(backgroundImage, fit),
-      },
-    ],
-  });
-  if (result.ok) elementState.pendingAuthoringRequests.delete(requestId);
-  return result;
 }
 
 export function readInstanceId(element: DesignerElementHost): string {

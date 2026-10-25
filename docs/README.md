@@ -1,13 +1,18 @@
 # Base Screen 文档
 
-## 目录结构
+本目录只保留设计与决策记录，不承担规范性治理。现行契约以 [AGENTS.md](../AGENTS.md)、
+[CONTEXT.md](../CONTEXT.md) 与各包公共导出为准；历史 ADR 正文只存在于 git 历史。
 
-- `architecture/` - 架构设计文档与 ADR
-- `guides/` - 使用指南与最佳实践  
-- `api/` - API 文档
+## 决策记录
 
-## 快速链接
+- [ADR-0089：宿主拥有图片资产与统一资源选择桥](./decisions/ADR-0089-host-owned-image-assets-and-unified-resource-selection.md)
+  （已接受，2026-10-25）
+- [ADR-0090：宿主在线物料包与 catalog 热刷新](./decisions/ADR-0090-online-material-packages-and-catalog-hot-refresh.md)
+  （已接受，2026-10-25）
 
-- [项目概述](../README.md)
-- [AI 协作指南](../AGENTS.md)
-- [项目上下文](../CONTEXT.md)
+## 设计说明
+
+- [宿主图片资产与在线物料：端到端设计](./design/host-assets-and-online-materials.md)
+- [宿主素材库与图片选择器 · OpenDesign Brief](./design/host-asset-library-opendesign-brief.md)
+
+ADR-0089 与 ADR-0090 的引擎公共 API、示例后端与三端宿主实现均已落地；后续批次按各 ADR 的“实施切片”继续补充。

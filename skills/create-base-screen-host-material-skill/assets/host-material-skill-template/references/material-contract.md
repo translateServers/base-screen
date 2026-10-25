@@ -26,6 +26,15 @@ Events must be listed in `events`; dispatch only a JSON-bounded `CustomEvent` na
 `base-screen-material-event` with `{ name, payload }` detail. If an editor descriptor declares event
 metadata, every name must also appear in the manifest event list.
 
+## Identity and hot refresh
+
+Screen Documents persist only material `type`; keep `type` stable across revisions. `tagName` is
+stable for catalogs that are loaded once and reloaded with the page. For online hot-refresh packages,
+publish a new `tagName` + constructor per build using a content hash or build token; do not use `vN`
+or version fields. The old Custom Element definition remains registered, and the host rebuilds the
+catalog after loading the new package. Manifests must not contain URL, source, version, or executable
+fields.
+
 ## Authoring boundary
 
 Use `createMaterialDefinition` for native elements, `createReactMaterialDefinition` for React

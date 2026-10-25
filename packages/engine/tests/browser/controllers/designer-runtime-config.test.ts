@@ -421,26 +421,26 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(invalid.hostConditionalStyleAuthoring).toBeUndefined();
   });
 
-  it('accepts the canvas background image button flag and exposes it via getter (ADR-0047)', () => {
+  it('accepts the host resource selection button flag and exposes it via getter (ADR-0089)', () => {
     const designer = new BaseScreenDesignerElement();
-    expect(designer.canvasBackgroundImageButton).toBe(false); // 默认隐藏
+    expect(designer.hostResourceSelectionButton).toBe(false); // 默认隐藏
 
     const configured = designer.configure({
       catalog: catalog(),
-      canvasBackgroundImageButton: true,
+      hostResourceSelectionButton: true,
     });
     expect(configured.ok).toBe(true);
-    expect(designer.canvasBackgroundImageButton).toBe(true);
+    expect(designer.hostResourceSelectionButton).toBe(true);
   });
 
-  it('rejects a non-boolean canvas background image button flag before committing (RB3)', () => {
+  it('rejects a non-boolean host resource selection button flag before committing (RB3)', () => {
     const designer = new BaseScreenDesignerElement();
     const firstCatalog = catalog();
     expect(designer.configure({ catalog: firstCatalog }).ok).toBe(true);
 
     const result = designer.configure({
       catalog: catalog(),
-      canvasBackgroundImageButton: 'yes' as unknown as boolean,
+      hostResourceSelectionButton: 'yes' as unknown as boolean,
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -448,7 +448,7 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     }
     // 失败配置零副作用：既有字段保持原样，按钮保持默认隐藏。
     expect(designer.catalog).toBe(firstCatalog);
-    expect(designer.canvasBackgroundImageButton).toBe(false);
+    expect(designer.hostResourceSelectionButton).toBe(false);
   });
 
   it('accepts the host back button flag and exposes it via getter', () => {
@@ -581,17 +581,22 @@ describe('BaseScreenDesignerElement canvas background setters', () => {
     }
   });
 
-  it('does not dispatch a background image request without a document (ADR-0046)', () => {
+  it('does not dispatch a host resource selection request without a document (ADR-0089)', () => {
     const designer = new BaseScreenDesignerElement();
-    expect(designer.requestCanvasBackgroundImage()).toBe(false);
+    expect(
+      designer.requestHostResourceSelection({
+        kind: 'canvas-background',
+        backgroundImageFit: null,
+      }),
+    ).toBe(false);
   });
 
-  it('rejects a background image commit without a current session (ADR-0046)', () => {
+  it('rejects a host resource selection commit without a current session (ADR-0089)', () => {
     const designer = new BaseScreenDesignerElement();
-    const result = designer.commitCanvasBackgroundImage(
-      'authoring-unknown',
-      'https://cdn.x/bg.png',
-    );
+    const result = designer.commitHostResourceSelection({
+      requestId: 'authoring-unknown',
+      selection: { kind: 'url', url: 'https://cdn.x/bg.png' },
+    });
 
     expect(result.ok).toBe(false);
     if (!result.ok) {

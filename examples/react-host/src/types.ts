@@ -93,6 +93,29 @@ export interface TabularDataset {
   readonly totalRowCount?: number;
 }
 
+/** 宿主素材库元数据（ADR-0089）：文档只存 `host_image` 身份，不存 contentPath。 */
+export interface HostAssetShape {
+  readonly id: string;
+  readonly name: string;
+  readonly mimeType: string;
+  readonly byteSize: number;
+  readonly contentPath: string;
+  readonly referenceCount: number;
+  readonly createdAt: string;
+}
+
+/** 在线物料包（ADR-0090）：宿主审核并导入的 ESM 代码 + Manifest。 */
+export interface OnlineMaterialPackageShape {
+  readonly id: string;
+  readonly type: string;
+  readonly name: string;
+  readonly code: string;
+  readonly manifest: Record<string, unknown>;
+  readonly revision: number;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
 /** `?smoke=1` 的调试面：只暴露状态与手动刷新入口，不含端口/文档/URL。 */
 declare global {
   interface Window {

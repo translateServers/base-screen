@@ -64,7 +64,11 @@ export {
   collectScreenValueRefDependencies,
   evaluateScreenValueRef,
 } from './data/value-ref.js';
-export type { ScreenAlignmentDelta, ScreenSnapCandidate } from './geometry/geometry.js';
+export type {
+  ScreenAlignmentDelta,
+  ScreenHitTestOptions,
+  ScreenSnapCandidate,
+} from './geometry/geometry.js';
 export {
   calculateScreenAlignment,
   calculateScreenDistribution,

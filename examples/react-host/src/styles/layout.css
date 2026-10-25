@@ -212,6 +212,10 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
+.editor-resource-panel[hidden] {
+  display: none;
+}
+
 .editor-resource-panel {
   position: absolute;
   right: 0;

@@ -147,6 +147,19 @@ export interface BaseScreenMaterialCatalog {
     list(): readonly BaseScreenMaterialCatalogEntry[];
 }
 
+// @public
+export interface BaseScreenMaterialCatalogDiff {
+    // (undocumented)
+    readonly added: readonly string[];
+    // (undocumented)
+    readonly changed: readonly string[];
+    readonly implementationChanged: readonly string[];
+    // (undocumented)
+    readonly removed: readonly string[];
+    // (undocumented)
+    readonly unchanged: readonly string[];
+}
+
 // @public (undocumented)
 export interface BaseScreenMaterialCatalogEntry {
     // (undocumented)
@@ -812,6 +825,9 @@ export function createBaseScreenPluginPanelCatalog(entries: readonly BaseScreenP
 // @public
 export function declaredContributionIds(kind: BaseScreenPluginContributionKind, contributions: readonly BaseScreenPluginContribution[]): readonly string[];
 
+// @public (undocumented)
+export function diffBaseScreenMaterialCatalogs(before: BaseScreenMaterialCatalog, after: BaseScreenMaterialCatalog): BaseScreenMaterialCatalogDiff;
+
 // @public
 export function isValidCustomElementName(tagName: unknown): boolean;
 
@@ -914,6 +930,9 @@ export function readContributionHandlerRecord(input: ContributionHandlerRecordIn
 
 // @public (undocumented)
 export function resolveSchema(path: readonly (string | number)[], schema: BaseScreenMaterialObjectSchema): BaseScreenMaterialPropSchema | undefined;
+
+// @public
+export function sameBaseScreenMaterialDefinition(left: BaseScreenMaterialCatalogEntry, right: BaseScreenMaterialCatalogEntry): boolean;
 
 // @public
 export function screenValueRefAccepted(capabilities: readonly BaseScreenDataCapability[], ref: ScreenValueRef, source: ScreenDataSourceSource | undefined): boolean;

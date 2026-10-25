@@ -22,6 +22,7 @@ Design with the host catalog and guidelines in this Skill. The output is a compl
 - Use only material `type` values from `materials.json`, dataset identities from `datasets.json`, and parameters declared by the selected dataset definition.
 - Keep every resource parameter literal in this scope. Keep `variables: []` and `blueprint: { "rules": [] }` unless the host Skill is regenerated with a broader contract.
 - Use `dataSource.type: "dataset"` for tabular datasets and set binding roles only with declared field IDs and compatible value types. Use `host-resource` only for non-tabular host resources.
+- For image sources, prefer `host-resource` identity. A stable external URL is allowed only for `base.image` static data or `canvas.backgroundImage`; never write signed/temporary URLs or credentials.
 - Do not invent URLs, SQL, credentials, host actions, variables, event rules, material types, resource IDs, fields, or undocumented props. If the formal catalog and an explicitly supplied draft catalog do not contain a required material type, stop and write a validated `material-request.json` with `requestId`, `hostId`, `screenDraftId`, purpose, framework, size, data fields, and events; the helper `node scripts/create-material-request.mjs` can create it after the host supplies those values. Do not fabricate a manifest.
 
 ## Validate and deliver

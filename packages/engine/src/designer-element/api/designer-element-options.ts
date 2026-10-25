@@ -179,10 +179,10 @@ export function readBackButton(element: DesignerElementHost): boolean {
   return elementState.backButton;
 }
 
-export function readCanvasBackgroundImageButton(element: DesignerElementHost): boolean {
+export function readHostResourceSelectionButton(element: DesignerElementHost): boolean {
   const elementState = getDesignerElementState(element);
 
-  return elementState.canvasBackgroundImageButton;
+  return elementState.hostResourceSelectionButton;
 }
 
 export function writeRuntimeContributions(

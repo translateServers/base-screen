@@ -5,6 +5,7 @@ import type {
   ScreenParseResult,
 } from '@base-screen/contracts';
 import { api } from '../lib/api';
+import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
 
 const logger = createLogger('host-data-channel');
@@ -21,7 +22,8 @@ const logger = createLogger('host-data-channel');
 const DEMO_METRIC = 'demo_metric';
 const DEMO_SERIES = 'demo_series';
 const DEMO_RANKING = 'demo_ranking';
-const AUTHORIZED_RESOURCE_TYPES = new Set([DEMO_METRIC, DEMO_SERIES, DEMO_RANKING]);
+const HOST_IMAGE = 'host_image';
+const AUTHORIZED_RESOURCE_TYPES = new Set([DEMO_METRIC, DEMO_SERIES, DEMO_RANKING, HOST_IMAGE]);
 const DEFAULT_POINTS = 24;
 const MAX_POINTS = 120;
 const DEFAULT_LIMIT = 6;
@@ -40,6 +42,15 @@ export function createHostResourcePort(): ScreenHostResourcePort {
     }): Promise<ScreenParseResult<ScreenJsonValue>> {
       if (!AUTHORIZED_RESOURCE_TYPES.has(resourceType)) {
         return failure('HOST_RESOURCE_ACCESS_DENIED', `未授权的资源类型：${resourceType}`);
+      }
+
+      if (resourceType === HOST_IMAGE) {
+        // 文档只存素材 id；稳定内容 URL 由宿主按当前 API Base 解析，不写进文档。
+        return {
+          ok: true,
+          value: `${resolveApiBase()}/assets/${encodeURIComponent(resourceId)}/content`,
+          diagnostics: [],
+        };
       }
 
       if (resourceType === DEMO_METRIC) {

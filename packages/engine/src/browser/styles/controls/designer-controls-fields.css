@@ -12,7 +12,7 @@
   white-space: nowrap;
 }
 
-/* 画布背景图片行（ADR-0046）：URL 输入占满剩余宽度，宿主选择按钮固定右侧；
+/* 画布背景图片行（ADR-0089）：URL 输入占满剩余宽度，宿主选择按钮固定右侧；
    行的外边距承接 field 间距，避免行高超过输入框导致按钮与输入垂直错位。 */
 .designer-canvas-background-row {
   display: flex;

@@ -42,6 +42,8 @@ export interface DesignerDatasetControllerCallbacks {
   ) => ScreenParseResult<ScreenDocument>;
   readonly report: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly refresh: (componentId?: string) => void;
+  readonly isHostResourceSelectionButtonVisible?: () => boolean;
+  readonly requestHostResourceSelection?: (componentId: string, materialType: string) => boolean;
   readonly requestAuthoringAction?: (
     action: DesignerDatasetAuthoringAction,
     detail?: Readonly<Record<string, string | number | boolean>>,

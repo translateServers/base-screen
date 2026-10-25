@@ -26,7 +26,7 @@ The child Skill must instruct the model to:
 - Run the generated validator until it reports no errors, then return the document path and a concise design summary.
 - Fail closed on unknown material types, resource identities, parameters, fields, unsupported data capabilities, invalid props/style, or invalid parent relationships.
 
-The generated Skill never connects to a host port, queries live data, stores credentials, or places URLs, SQL, headers, tokens, or service objects in a Screen Document.
+The generated Skill never connects to a host port, queries live data, or stores credentials, SQL, headers, tokens, or service objects in a Screen Document. Image sources prefer `host-resource` identities; never write signed or temporary URLs. A stable external image URL is allowed only for `base.image` static data or `canvas.backgroundImage` (ADR-0089).
 
 ## Resources
 

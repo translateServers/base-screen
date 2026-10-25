@@ -1,0 +1,515 @@
+/* 宿主素材库（ADR-0089）：左栏、选择器与删除保护。三端共用同一份样式。 */
+
+.asset-library {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  min-height: 100%;
+  padding: var(--spacing-3);
+  color: var(--color-text);
+  font-size: 13px;
+  scrollbar-gutter: stable;
+}
+
+.asset-library-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.asset-library-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.asset-eyebrow {
+  color: var(--color-accent);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.asset-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.asset-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.asset-icon-button {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.asset-icon-button:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.asset-upload {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: 10px 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: rgba(56, 189, 248, 0.04);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.asset-upload:hover {
+  border-color: var(--color-accent);
+  background: rgba(56, 189, 248, 0.09);
+}
+
+.asset-upload-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.16);
+  color: var(--color-accent);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.asset-upload-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.asset-upload-copy strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.asset-upload-copy small {
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+
+.asset-tools {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.asset-search {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(5, 13, 26, 0.6);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+}
+
+.asset-search::placeholder {
+  color: var(--color-text-muted);
+}
+
+.asset-search:focus {
+  outline: 2px solid rgba(56, 189, 248, 0.45);
+  outline-offset: 1px;
+}
+
+.asset-status {
+  min-height: 16px;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.asset-grid,
+.asset-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-2);
+  align-content: start;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.asset-grid {
+  flex: 1;
+  min-height: 120px;
+}
+
+.asset-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: rgba(8, 26, 46, 0.55);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.asset-card:hover {
+  background: rgba(14, 45, 74, 0.75);
+}
+
+.asset-card.is-selected {
+  border-color: var(--color-accent);
+  background: rgba(56, 189, 248, 0.12);
+}
+
+.asset-card:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.6);
+  outline-offset: 1px;
+}
+
+.asset-thumb {
+  display: block;
+  aspect-ratio: 4 / 3;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #06101d;
+}
+
+.asset-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.asset-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.asset-name {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-size {
+  color: var(--color-text-muted);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.asset-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: rgba(5, 13, 26, 0.78);
+  color: var(--color-accent);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.asset-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: var(--spacing-4) var(--spacing-2);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.asset-selection {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--color-border);
+  background: linear-gradient(180deg, rgba(5, 13, 26, 0.4), rgba(5, 13, 26, 0.96) 40%);
+  backdrop-filter: blur(8px);
+}
+
+.asset-selection-name {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.asset-selection-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.asset-selection-actions .button,
+.asset-dialog-actions .button,
+.asset-picker-actions .button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 26, 46, 0.8);
+  color: var(--color-text);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.asset-selection-actions .button:hover:not(:disabled),
+.asset-dialog-actions .button:hover:not(:disabled),
+.asset-picker-actions .button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+.asset-selection-actions .button:disabled,
+.asset-picker-actions .button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.button--primary {
+  border-color: var(--color-accent) !important;
+  background: rgba(56, 189, 248, 0.2) !important;
+  color: #e6f9ff !important;
+}
+
+.button--danger {
+  border-color: rgba(248, 113, 113, 0.5) !important;
+  background: rgba(248, 113, 113, 0.12) !important;
+  color: #fecaca !important;
+}
+
+/* ---- 删除确认 / 引用阻断 ---- */
+
+.asset-dialog {
+  width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+}
+
+.asset-dialog::backdrop {
+  background: rgba(1, 6, 14, 0.66);
+  backdrop-filter: blur(2px);
+}
+
+.asset-dialog-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  padding: var(--spacing-5);
+}
+
+.asset-dialog-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.asset-dialog-message {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.asset-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+}
+
+/* ---- 统一选择桥的选择器 ---- */
+
+.asset-picker {
+  width: min(960px, 92vw);
+  height: min(620px, 86vh);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-solid);
+  color: var(--color-text);
+  overflow: hidden;
+}
+
+.asset-picker::backdrop {
+  background: rgba(1, 6, 14, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+.asset-picker[open] {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.asset-picker-head {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: 14px var(--spacing-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.asset-picker-title {
+  flex: 1;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.asset-picker-upload {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 26, 46, 0.8);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.asset-picker-upload:hover {
+  border-color: var(--color-accent);
+}
+
+.asset-picker-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  min-height: 0;
+}
+
+.asset-picker-grid-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  min-height: 0;
+  padding: var(--spacing-4);
+  border-right: 1px solid var(--color-border);
+}
+
+.asset-picker-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  min-height: 0;
+}
+
+.asset-picker-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  min-height: 0;
+  padding: var(--spacing-4);
+  overflow-y: auto;
+  background: rgba(5, 13, 26, 0.5);
+}
+
+.asset-picker-preview {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: #06101d;
+}
+
+.asset-picker-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.asset-picker-meta strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.asset-mono {
+  color: var(--color-text-muted);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", monospace;
+  font-size: 10px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.asset-picker-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: 12px var(--spacing-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.asset-picker-status {
+  flex: 1;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.asset-picker-actions {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+@media (max-width: 760px) {
+  .asset-picker-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .asset-picker-detail {
+    display: none;
+  }
+
+  .asset-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

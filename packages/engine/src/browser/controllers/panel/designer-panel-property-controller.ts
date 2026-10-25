@@ -37,7 +37,7 @@ export class DesignerPanelPropertyController {
       this.callbacks.getInteraction(),
       this.callbacks.getCatalog(),
       this.callbacks.getDatasetFields,
-      this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
+      this.callbacks.isHostResourceSelectionButtonVisible?.() ?? false,
       this.#canvasPresentation,
       this.callbacks.getInspectorControls?.(),
       this.callbacks.getHostConditionalStyleAuthoring?.(),
@@ -51,7 +51,10 @@ export class DesignerPanelPropertyController {
       '[data-canvas-background-image-action]',
     );
     if (backgroundImageAction !== null) {
-      this.callbacks.requestCanvasBackgroundImage?.();
+      this.callbacks.requestHostResourceSelection?.({
+        kind: 'canvas-background',
+        backgroundImageFit: this.callbacks.getDocument()?.canvas.backgroundImageFit ?? null,
+      });
       return true;
     }
     const scaleButton = target.closest<HTMLButtonElement>('[data-canvas-setting="scaleMode"]');

@@ -6,18 +6,34 @@ import { getScreenComponentBounds } from './component-bounds.js';
 import type { ScreenPoint, ScreenRect } from './types.js';
 import { assertPoint, assertRect } from './validation.js';
 
+export interface ScreenHitTestOptions {
+  /**
+   * 每个轴上的最小命中厚度（画布单位）。某个轴上的 canonical 尺寸小于该值时，命中范围
+   * 以组件中心为对称轴扩到该厚度 —— 让 2px 高的分割线、1px 描边的容器这类"容器与内容
+   * 一样大"的组件仍有可点的命中带。默认 0，即严格按 canonical 尺寸命中。
+   */
+  readonly minimumThickness?: number;
+}
+
 export function hitTestScreenComponents(
   document: ScreenDocument,
   point: ScreenPoint,
+  options: ScreenHitTestOptions = {},
 ): readonly string[] {
   assertCoreValidDocument(document);
   assertPoint(point, 'point');
+  const minimumThickness = options.minimumThickness ?? 0;
+  if (!Number.isFinite(minimumThickness) || minimumThickness < 0) {
+    throw new RangeError('Hit test minimumThickness must be a non-negative finite number.');
+  }
   const index = buildComponentIndex(document);
   const byId = index.byId;
   return [...getPainterOrder(document)].reverse().filter((id) => {
     const component = byId.get(id)?.component;
     return (
-      component !== undefined && !isEffectiveHidden(index, id) && pointInComponent(point, component)
+      component !== undefined &&
+      !isEffectiveHidden(index, id) &&
+      pointInComponent(point, component, minimumThickness)
     );
   });
 }
@@ -46,15 +62,25 @@ export function queryScreenComponentsInRect(
     .map(({ id }) => id);
 }
 
-function pointInComponent(point: ScreenPoint, component: ScreenComponentNode): boolean {
-  const centerX = component.position.x + component.size.width / 2;
-  const centerY = component.position.y + component.size.height / 2;
+function pointInComponent(
+  point: ScreenPoint,
+  component: ScreenComponentNode,
+  minimumThickness: number,
+): boolean {
+  const width = component.size.width;
+  const height = component.size.height;
+  // 薄轴上的命中带以中心为轴加宽，厚轴不受影响；判断仍在组件局部坐标系里做，
+  // 所以旋转后的命中带与组件本身同向。
+  const padX = Math.max(0, minimumThickness - width) / 2;
+  const padY = Math.max(0, minimumThickness - height) / 2;
+  const centerX = component.position.x + width / 2;
+  const centerY = component.position.y + height / 2;
   const radians = (-component.rotation * Math.PI) / 180;
   const cos = Math.cos(radians);
   const sin = Math.sin(radians);
-  const x = (point.x - centerX) * cos - (point.y - centerY) * sin + component.size.width / 2;
-  const y = (point.x - centerX) * sin + (point.y - centerY) * cos + component.size.height / 2;
-  return x >= 0 && x <= component.size.width && y >= 0 && y <= component.size.height;
+  const x = (point.x - centerX) * cos - (point.y - centerY) * sin + width / 2;
+  const y = (point.x - centerX) * sin + (point.y - centerY) * cos + height / 2;
+  return x >= -padX && x <= width + padX && y >= -padY && y <= height + padY;
 }
 
 function getComponentCorners(component: ScreenComponentNode): readonly ScreenPoint[] {

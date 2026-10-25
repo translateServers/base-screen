@@ -68,11 +68,13 @@ export interface BaseScreenRenderer {
     }): ScreenParseResult<null>;
     // (undocumented)
     resetBlueprintVisibility(): void;
+    setCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null>;
     setInteractive(enabled: boolean): ScreenParseResult<null>;
     // (undocumented)
     setVariables(variables: ScreenJsonObject): ScreenParseResult<null>;
     // (undocumented)
     suspendData(): void;
+    validateCatalog(document: ScreenDocument, catalog: BaseScreenMaterialCatalog): ScreenParseResult<null>;
 }
 
 // @public (undocumented)

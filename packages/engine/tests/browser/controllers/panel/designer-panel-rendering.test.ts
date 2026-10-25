@@ -41,7 +41,7 @@ describe('designer panel rendering', () => {
     expect(canvasProperties).not.toContain('backgroundSolidColor');
     expect(canvasProperties).not.toContain('backgroundType');
     expect(canvasProperties.at(-1)).toBe('backgroundImage');
-    // 宿主选择按钮默认隐藏（ADR-0047）：未配置 canvasBackgroundImageButton 时不渲染。
+    // 宿主选择按钮默认隐藏（ADR-0089）：未配置 hostResourceSelectionButton 时不渲染。
     expect(
       descendants(properties).some(
         (element) => element.dataset.canvasBackgroundImageAction !== undefined,

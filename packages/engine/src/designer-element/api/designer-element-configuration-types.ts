@@ -60,6 +60,6 @@ export interface BaseScreenDesignerConfiguration {
   readonly previewHandler?: (document: ScreenDocument) => boolean;
   /** 宿主返回入口：启用后由 Designer 顶栏渲染按钮，并派发公开的返回请求事件。 */
   readonly backButton?: boolean;
-  /** 画布背景图宿主选择按钮（ADR-0046/0049）：默认隐藏；宿主配置 true 后属性面板渲染该按钮。 */
-  readonly canvasBackgroundImageButton?: boolean;
+  /** 宿主素材选择桥按钮（ADR-0089）：默认隐藏；宿主配置 true 后检查器渲染选择入口。 */
+  readonly hostResourceSelectionButton?: boolean;
 }

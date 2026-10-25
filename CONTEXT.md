@@ -102,6 +102,21 @@
   官方物料共享的加载/空态容器（`@base-screen/material` 的 `createBaseScreenMaterialLoadingContainer`）。
   物料只提供「读数本身的构成」（单位、前后缀、表头列名），不提供描述性文案；状态展示与无障碍由容器统一负责。
 
+- **统一资源选择桥（Host Resource Selection Bridge，已实现）**
+  组件检查器或画布背景请求宿主打开图片选择器的唯一传输通道：事件
+  `base-screen-host-resource-selection-request`，请求 `requestHostResourceSelection`，提交
+  `commitHostResourceSelection`。它只传 request/commit，不持有素材目录、搜索、缓存或网络客户端；
+  组件图片只存 `host-resource` 身份，画布背景 URL 是唯一例外。组件提交只写 legacy `dataSource`，
+  只接受没有 `dataValue` 键的组件。唯一落点是 `engine`（ADR-0089）；示例后端与三端宿主已提供
+  上传、列表、插入/替换/背景、选择器与删除保护。
+
+- **Catalog 热刷新（Catalog Refresh，已实现）**
+  Designer 初始化后更新物料目录的唯一入口 `refreshCatalog()`；差异按 type 与 Manifest/constructor/tagName
+  比较，全有或全无。constructor/tagName/adapter 变化由 renderer 重挂载；Manifest-only 变化保留元素、只重算
+  model 与面板；未变类型保留 applied key。被引用移除拒绝，下架先 `libraryVisible: false` 软退。物料 type
+  跨构建稳定，tagName 是构建产物（ADR-0090）。示例后端持久化 `MaterialPackage`，三端宿主提供
+  「在线物料」面板，发布代码/仅更新清单/上下架后对运行中的设计器热刷新。
+
 ## 设计系统
 
 工作台的设计语言按四层组织：令牌 → 状态 → 原语 → 面板。下面的术语各有唯一落点，面板文件只消费，不复制。
@@ -134,6 +149,13 @@
 - **焦点环（Focus Ring）**  
   键盘焦点统一用 `--designer-focus-ring`，并投影到与指针命中范围一致的整行或整个控件
   （`outline-offset: -2px`），避免内外两个命中范围。控件不得自造 focus 样式。
+
+- **画布命中容差（Canvas Hit Slop）**  
+  canonical 尺寸就是"容器与内容一样大"的薄组件（分割线默认 2px 高、1px 描边的容器）在画布上留一圈
+  可点厚度：`hitTestScreenComponents` 的 `minimumThickness` 只把薄轴的命中带以组件中心为轴撑到给定厚度，
+  判断仍在组件局部坐标系里做，所以旋转后命中带与组件同向。唯一消费点是手势控制器
+  （`THIN_COMPONENT_HIT_MIN_THICKNESS_PX = 10`，按屏幕像素除以 `zoom` 换算回画布单位），且只在
+  原生命中落空时才启用。它只是编辑器的命中语义：文档几何、选中框、吸附与导出都不受影响。
 
 - **控件原语（Control Primitives）**  
   单个控件（按钮/输入/勾选/开关/下拉/文本域/图标按钮）的唯一落点是

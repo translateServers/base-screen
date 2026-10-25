@@ -4,6 +4,11 @@ export {
   createBaseScreenPluginInspectorControlCatalog,
   createBaseScreenPluginPanelCatalog,
 } from './catalog.js';
+export {
+  type BaseScreenMaterialCatalogDiff,
+  diffBaseScreenMaterialCatalogs,
+  sameBaseScreenMaterialDefinition,
+} from './catalog-diff.js';
 export type {
   BaseScreenConditionalStylePort,
   BaseScreenConditionalStyleRequest,

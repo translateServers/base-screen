@@ -2,12 +2,14 @@ import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AlarmsModule } from './alarms/alarms.module';
+import { AssetsModule } from './assets/assets.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { DatasetsModule } from './datasets/datasets.module';
 import { DatasourcesModule } from './datasources/datasources.module';
 import { DemoModule } from './demo/demo.module';
 import { HealthModule } from './health/health.module';
+import { MaterialPackagesModule } from './material-packages/material-packages.module';
 import { MetricsModule } from './metrics/metrics.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ScreensModule } from './screens/screens.module';
@@ -19,6 +21,10 @@ import { SqliteModule } from './sqlite/sqlite.module';
     PrismaModule,
     ScreensModule,
     MetricsModule,
+    // 宿主素材库（ADR-0089）：元数据 + 本地文件；Screen Document 只存 host_image 身份。
+    AssetsModule,
+    // 在线物料包（ADR-0090）：宿主只存储代码与 Manifest，不执行；前端 import 后热刷新 catalog。
+    MaterialPackagesModule,
     // 数据源管理（台账 / 测试 / 预览 / 受管目录）。必须排在 DatasetsModule 之前：
     // 后者依赖它导出的 DatasourceRuntime（test/preview 与设计器查询共用同一份取数实现）。
     DatasourcesModule,

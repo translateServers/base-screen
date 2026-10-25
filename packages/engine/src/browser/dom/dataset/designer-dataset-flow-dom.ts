@@ -147,6 +147,18 @@ function renderStaticSource(options: DesignerDataSourcePanelOptions): HTMLElemen
   return renderDesignerStaticData(staticDataView(options));
 }
 
+function renderHostResourceSelectionAction(
+  options: DesignerDataSourcePanelOptions,
+): HTMLElement | undefined {
+  if (options.hostResourceSelectionAvailable !== true) return undefined;
+  const button = options.panel.ownerDocument.createElement('button');
+  button.type = 'button';
+  button.className = 'designer-control designer-button';
+  button.dataset.datasetAction = 'select-host-resource';
+  button.textContent = DESIGNER_UI_TEXT.dataSource.hostResourceSelect;
+  return button;
+}
+
 function renderVariableSource(options: DesignerDataSourcePanelOptions): HTMLElement {
   const ownerDocument = options.panel.ownerDocument;
   const section = ownerDocument.createElement('section');
@@ -224,6 +236,8 @@ export function renderDataSourceFlow(options: DesignerDataSourcePanelOptions): H
             options.hostResource.resourceId,
           );
     content.append(renderValueSection(options), summary);
+    const selection = renderHostResourceSelectionAction(options);
+    if (selection !== undefined) content.appendChild(selection);
     section.appendChild(content);
     return section;
   }
@@ -451,6 +465,8 @@ function renderContinuousStaticDataFlow(
     preview.tabIndex = -1;
     content.append(mapping, preview);
   }
+  const selection = renderHostResourceSelectionAction(options);
+  if (selection !== undefined) content.appendChild(selection);
   // 固定值态与数据集共用同一条状态条，动作是「应用」；仍只有流程尾这一份。
   content.appendChild(
     renderInlineDataPanelActions(content.ownerDocument, dataPanelStatusView(options)),

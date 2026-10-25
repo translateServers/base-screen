@@ -119,12 +119,12 @@ export function configure(
     };
   }
   if (
-    configuration.canvasBackgroundImageButton !== undefined &&
-    typeof configuration.canvasBackgroundImageButton !== 'boolean'
+    configuration.hostResourceSelectionButton !== undefined &&
+    typeof configuration.hostResourceSelectionButton !== 'boolean'
   ) {
     return {
       ok: false,
-      diagnostics: [lifecycleDiagnostic('Designer canvasBackgroundImageButton 必须是布尔值。')],
+      diagnostics: [lifecycleDiagnostic('Designer hostResourceSelectionButton 必须是布尔值。')],
     };
   }
   if (
@@ -272,7 +272,7 @@ export function configure(
   elementState.groupMaterialType = configuration.groupMaterialType;
   elementState.previewHandler = configuration.previewHandler;
   elementState.backButton = configuration.backButton ?? false;
-  elementState.canvasBackgroundImageButton = configuration.canvasBackgroundImageButton ?? false;
+  elementState.hostResourceSelectionButton = configuration.hostResourceSelectionButton ?? false;
   elementState.blueprintWorkbenchController.setInitialMode(initialWorkbenchMode);
   elementState.runtime.initialize(element);
   return { ok: true, value: null, diagnostics: [] };

@@ -32,7 +32,7 @@ import { appendSection } from './designer-panel-primitives.js';
 export function appendCanvasControls(
   parent: HTMLElement,
   document: ScreenDocument,
-  canvasBackgroundImageButtonVisible: boolean,
+  hostResourceSelectionButtonVisible: boolean,
   canvasPresentation: DesignerCanvasPresentationSettings,
 ): void {
   const canvasSection = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvas);
@@ -62,7 +62,7 @@ export function appendCanvasControls(
 
   const imageSection = appendSection(parent, DESIGNER_UI_TEXT.propertiesPanel.canvasImageSection);
   imageSection.className += ' designer-canvas-image-section';
-  appendCanvasBackgroundImageControls(imageSection, document, canvasBackgroundImageButtonVisible);
+  appendCanvasBackgroundImageControls(imageSection, document, hostResourceSelectionButtonVisible);
 }
 
 /** 几何输入：符号内嵌在输入框右缘（与组件几何网格同形），免去 W / H 这类前置小标题。 */
@@ -265,8 +265,8 @@ function appendCanvasBackgroundImageControls(
   control.appendChild(input);
   appendDesignerFieldMessage(field, input, 'canvas-backgroundImage');
   if (pickerVisible) {
-    // 背景图片：宿主选择按钮（ADR-0046）默认隐藏，仅宿主配置后渲染；
-    // 点击派发请求事件，宿主自开弹出框可视化选择。
+    // 背景图片：宿主选择按钮（ADR-0089）默认隐藏，仅宿主配置后渲染；
+    // 点击派发统一资源选择请求事件，宿主自开素材选择器。
     const pickerButton = createDesignerButton(ownerDocument, {
       className: 'designer-canvas-image-picker',
       text: DESIGNER_UI_TEXT.propertiesPanel.canvasBackgroundImageAction,

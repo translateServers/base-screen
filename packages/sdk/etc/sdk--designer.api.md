@@ -14,6 +14,7 @@ import { BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_ICONS } from '@base-screen/engine
 import { BASE_SCREEN_DESIGNER_LEFT_PANEL_SLOT_PREFIX } from '@base-screen/engine';
 import { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME } from '@base-screen/engine';
+import { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT } from '@base-screen/engine';
 import { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommand } from '@base-screen/engine';
 import { BaseScreenBlueprintCanvasCommandEventDetail } from '@base-screen/engine';
@@ -42,6 +43,12 @@ import { BaseScreenDesignerWorkbenchModeChangeEventDetail } from '@base-screen/e
 import { BaseScreenDesignerWorkbenchModeChangeReason } from '@base-screen/engine';
 import { BaseScreenHostResourceAuthoringIntent } from '@base-screen/engine';
 import { BaseScreenHostResourceDragDataTransfer } from '@base-screen/engine';
+import { BaseScreenHostResourceSelection } from '@base-screen/engine';
+import { BaseScreenHostResourceSelectionCommit } from '@base-screen/engine';
+import { BaseScreenHostResourceSelectionCurrent } from '@base-screen/engine';
+import { BaseScreenHostResourceSelectionRequest } from '@base-screen/engine';
+import { BaseScreenHostResourceSelectionRequestEventDetail } from '@base-screen/engine';
+import { BaseScreenHostResourceSelectionTarget } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryAction } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryActionEventDetail } from '@base-screen/engine';
 import { BaseScreenMaterialLibraryGroup } from '@base-screen/engine';
@@ -84,6 +91,8 @@ export const BASE_SCREEN_DESIGNER_TAG_NAME: 'base-screen-designer';
 export { BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT }
 
 export { BASE_SCREEN_HOST_RESOURCE_DRAG_MIME }
+
+export { BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT }
 
 export { BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT }
 
@@ -140,6 +149,18 @@ export { BaseScreenDesignerWorkbenchModeChangeReason }
 export { BaseScreenHostResourceAuthoringIntent }
 
 export { BaseScreenHostResourceDragDataTransfer }
+
+export { BaseScreenHostResourceSelection }
+
+export { BaseScreenHostResourceSelectionCommit }
+
+export { BaseScreenHostResourceSelectionCurrent }
+
+export { BaseScreenHostResourceSelectionRequest }
+
+export { BaseScreenHostResourceSelectionRequestEventDetail }
+
+export { BaseScreenHostResourceSelectionTarget }
 
 export { BaseScreenMaterialLibraryAction }
 

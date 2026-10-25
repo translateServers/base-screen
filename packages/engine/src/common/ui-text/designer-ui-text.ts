@@ -456,6 +456,7 @@ export const DESIGNER_UI_TEXT = {
         'host-resource': '宿主资源',
       })[mode] ?? mode,
     hostResourceManaged: '请通过宿主资源面板添加或替换资源。',
+    hostResourceSelect: '选择素材',
     hostResourceSummary: (resourceType: string, resourceId: string) =>
       `当前资源：${resourceType} / ${resourceId}。请通过宿主资源面板替换。`,
     staticTitle: '静态数据',

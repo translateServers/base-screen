@@ -14,12 +14,11 @@ import type {
 } from '@base-screen/plugin-core';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
-  BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT,
   BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT,
   BASE_SCREEN_DESIGNER_LEFT_PANEL_GROUP_CHANGE_EVENT,
   BASE_SCREEN_HOST_RESOURCE_DRAG_MIME,
+  BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
   BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT,
-  type BaseScreenCanvasBackgroundImageRequest,
   type BaseScreenCanvasPresentationChangeEventDetail,
   type BaseScreenComponentFragmentInsertionIntent,
   type BaseScreenComponentInsertionIntent,
@@ -30,6 +29,9 @@ import {
   type BaseScreenDesignerWorkbenchMode,
   type BaseScreenFragmentNode,
   type BaseScreenHostResourceAuthoringIntent,
+  type BaseScreenHostResourceSelectionCommit,
+  type BaseScreenHostResourceSelectionRequest,
+  type BaseScreenHostResourceSelectionTarget,
   type BaseScreenMaterialLibraryGrouping,
   type BaseScreenMaterialLibraryItem,
   createBaseScreenCorePluginCommandPort,
@@ -172,33 +174,28 @@ describe('engine public lifecycle API', () => {
     }>();
   });
 
-  it('exports the canvas background image host request contract (ADR-0046)', () => {
-    expect(BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT).toBe(
-      'base-screen-canvas-background-image-request',
+  it('exports the unified host resource selection contract (ADR-0089)', () => {
+    expect(BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT).toBe(
+      'base-screen-host-resource-selection-request',
     );
-    expectTypeOf<BaseScreenCanvasBackgroundImageRequest>().toMatchTypeOf<{
+    expectTypeOf<BaseScreenHostResourceSelectionRequest>().toMatchTypeOf<{
       readonly requestId: string;
       readonly instanceId: string;
       readonly documentRevision: string | null;
-      readonly current: {
-        readonly backgroundImage: string | null;
-        readonly backgroundImageFit: 'cover' | 'contain' | null;
-      };
+      readonly target: BaseScreenHostResourceSelectionTarget;
+      readonly current: unknown;
     }>();
     expectTypeOf<
-      InstanceType<typeof BaseScreenDesignerElement>['requestCanvasBackgroundImage']
+      InstanceType<typeof BaseScreenDesignerElement>['requestHostResourceSelection']
+    >().parameters.toEqualTypeOf<[BaseScreenHostResourceSelectionTarget]>();
+    expectTypeOf<
+      InstanceType<typeof BaseScreenDesignerElement>['requestHostResourceSelection']
     >().returns.toEqualTypeOf<boolean>();
     expectTypeOf<
-      InstanceType<typeof BaseScreenDesignerElement>['commitCanvasBackgroundImage']
-    >().parameters.toEqualTypeOf<
-      [
-        string,
-        string | null,
-        (import('@base-screen/contracts').ScreenCanvasBackgroundImageFit | undefined)?,
-      ]
-    >();
+      InstanceType<typeof BaseScreenDesignerElement>['commitHostResourceSelection']
+    >().parameters.toEqualTypeOf<[BaseScreenHostResourceSelectionCommit]>();
     expectTypeOf<
-      InstanceType<typeof BaseScreenDesignerElement>['commitCanvasBackgroundImage']
+      InstanceType<typeof BaseScreenDesignerElement>['commitHostResourceSelection']
     >().returns.toEqualTypeOf<ScreenParseResult<import('@base-screen/contracts').ScreenDocument>>();
   });
 

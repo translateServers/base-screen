@@ -3,6 +3,7 @@ import { SCREEN_BLUEPRINT_CAPABILITY_IDS } from '@base-screen/contracts';
 import { createPluginBoardRuntime, PLUGIN_BOARD_ID } from '@base-screen/plugin-board-materials';
 import type {
   BaseScreenMaterialCatalog,
+  BaseScreenMaterialCatalogEntry,
   BaseScreenMaterialConstructor,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -11,7 +12,10 @@ import type {
   BaseScreenRuntimeContributionIndex,
   PluginCommandPort,
 } from '@base-screen/plugin-core';
-import { createBaseScreenMaterialCatalog } from '@base-screen/plugin-core';
+import {
+  createBaseScreenMaterialCatalog,
+  parseBaseScreenMaterialManifest,
+} from '@base-screen/plugin-core';
 import { createPluginEchartsRuntime, PLUGIN_ECHARTS_ID } from '@base-screen/plugin-echarts';
 import {
   createBaseScreenPluginContributionCommandPort,
@@ -22,7 +26,14 @@ import {
   createBaseScreenCorePluginCommandPort,
   createBaseScreenCorePluginDesignReadPort,
 } from '@base-screen/sdk/designer';
+import { api } from '../lib/api';
+import type { OnlineMaterialPackageShape } from '../types';
 import { createHostResourceRuntime } from './host-resource-plugin';
+import {
+  loadOnlineMaterialEntry,
+  type OnlineMaterialApplyResult,
+  type OnlineMaterialRuntime,
+} from './online-materials';
 import { registerHostMaterials } from './register';
 
 const INSTANCE_ID = 'vue-host';
@@ -52,8 +63,9 @@ function createHostAuthoringRuntime(): BaseScreenPluginRuntime {
   };
 }
 
-export interface HostRuntime {
-  readonly catalog: BaseScreenMaterialCatalog;
+export interface HostRuntime extends OnlineMaterialRuntime {
+  /** catalog 会在在线物料发布/下架后整体替换；设计器重新 configure 时读取最新值。 */
+  catalog: BaseScreenMaterialCatalog;
   readonly pluginCatalog: BaseScreenPluginCatalog;
   readonly pluginPanels: BaseScreenPluginPanelCatalog;
   readonly inspectorControls: BaseScreenPluginInspectorControlCatalog;
@@ -141,13 +153,115 @@ async function createHostRuntime(): Promise<HostRuntime> {
     if (!byType.has(entry.manifest.type)) byType.set(entry.manifest.type, entry);
   }
 
-  return {
-    catalog: createBaseScreenMaterialCatalog([...byType.values()]),
+  const baseCatalogEntries = [...byType.values()];
+  const baseTypes = new Set(baseCatalogEntries.map((entry) => entry.manifest.type));
+  const onlineEntries = new Map<string, BaseScreenMaterialCatalogEntry>();
+  const onlineMaterialErrors: string[] = [];
+  const packages = await api.listMaterialPackages();
+  if (packages.ok) {
+    for (const pkg of packages.data.packages) {
+      const loaded = await loadOnlineMaterialEntry(pkg);
+      if (!loaded.ok) {
+        onlineMaterialErrors.push(`${pkg.name}: ${loaded.diagnostics[0]?.message ?? '加载失败'}`);
+        continue;
+      }
+      if (baseTypes.has(loaded.value.manifest.type)) {
+        onlineMaterialErrors.push(`${pkg.name}: 物料类型与内置物料冲突`);
+        continue;
+      }
+      onlineEntries.set(pkg.type, loaded.value);
+    }
+  } else {
+    onlineMaterialErrors.push(`在线物料读取失败：${packages.error.message}`);
+  }
+
+  const buildCatalog = (
+    entries: ReadonlyMap<string, BaseScreenMaterialCatalogEntry>,
+  ): BaseScreenMaterialCatalog =>
+    createBaseScreenMaterialCatalog([...baseCatalogEntries, ...entries.values()]);
+  const commitOnlineEntries = (next: ReadonlyMap<string, BaseScreenMaterialCatalogEntry>): void => {
+    onlineEntries.clear();
+    for (const [type, entry] of next) onlineEntries.set(type, entry);
+  };
+
+  const runtime: HostRuntime = {
+    catalog: buildCatalog(onlineEntries),
     pluginCatalog: snapshot.plugins,
     pluginPanels: snapshot.panels,
     inspectorControls: snapshot.inspectorControls,
     runtimeContributions: snapshot.contributions,
     pluginCommandPort: createBaseScreenPluginContributionCommandPort(manager),
+    onlineMaterialErrors,
+    async applyOnlineMaterialPackage(
+      pkg: OnlineMaterialPackageShape,
+      mode: 'code' | 'manifest',
+    ): Promise<ScreenParseResult<OnlineMaterialApplyResult | null>> {
+      let entry: BaseScreenMaterialCatalogEntry;
+      if (mode === 'manifest') {
+        const existing = onlineEntries.get(pkg.type);
+        if (existing === undefined) {
+          return runtimeFailure(
+            'PLUGIN_CORE_LIFECYCLE_INVALID',
+            '在线物料尚未加载，请先发布代码。',
+          );
+        }
+        const manifest = parseBaseScreenMaterialManifest(pkg.manifest);
+        if (!manifest.ok) return manifest;
+        try {
+          Object.defineProperty(existing.constructor, 'manifest', {
+            value: manifest.value,
+            configurable: true,
+          });
+        } catch {
+          return runtimeFailure(
+            'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+            '无法把 Manifest 挂到在线物料构造器。',
+          );
+        }
+        entry = { ...existing, manifest: manifest.value };
+      } else {
+        const loaded = await loadOnlineMaterialEntry(pkg);
+        if (!loaded.ok) return loaded;
+        entry = loaded.value;
+      }
+      if (baseTypes.has(entry.manifest.type)) {
+        return runtimeFailure(
+          'PLUGIN_CORE_IDENTITY_CONFLICT',
+          `物料类型 ${entry.manifest.type} 与内置物料冲突。`,
+        );
+      }
+      const next = new Map(onlineEntries);
+      next.set(pkg.type, entry);
+      const nextCatalog = buildCatalog(next);
+      if (designer !== undefined) {
+        const refreshed = designer.refreshCatalog(nextCatalog);
+        if (!refreshed.ok) return refreshed;
+        commitOnlineEntries(next);
+        runtime.catalog = nextCatalog;
+        return { ok: true, value: refreshed.value, diagnostics: [] };
+      }
+      commitOnlineEntries(next);
+      runtime.catalog = nextCatalog;
+      return { ok: true, value: null, diagnostics: [] };
+    },
+    async removeOnlineMaterialPackage(
+      type: string,
+    ): Promise<ScreenParseResult<OnlineMaterialApplyResult | null>> {
+      if (!onlineEntries.has(type)) return { ok: true, value: null, diagnostics: [] };
+      const next = new Map(onlineEntries);
+      next.delete(type);
+      const nextCatalog = buildCatalog(next);
+      if (designer !== undefined) {
+        const refreshed = designer.refreshCatalog(nextCatalog);
+        if (!refreshed.ok) return refreshed;
+        commitOnlineEntries(next);
+        runtime.catalog = nextCatalog;
+        return { ok: true, value: refreshed.value, diagnostics: [] };
+      }
+      commitOnlineEntries(next);
+      runtime.catalog = nextCatalog;
+      return { ok: true, value: null, diagnostics: [] };
+    },
     bindDesigner(element) {
       designer = element ?? undefined;
     },
@@ -156,6 +270,17 @@ async function createHostRuntime(): Promise<HostRuntime> {
       await manager.dispose();
     },
   };
+  return runtime;
+}
+
+function runtimeFailure<T>(
+  code:
+    | 'PLUGIN_CORE_LIFECYCLE_INVALID'
+    | 'PLUGIN_CORE_IDENTITY_CONFLICT'
+    | 'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+  message: string,
+): ScreenParseResult<T> {
+  return { ok: false, diagnostics: [{ severity: 'error', code, path: [], message }] };
 }
 
 function designerUnavailable(): ScreenParseResult<ScreenDocument> {

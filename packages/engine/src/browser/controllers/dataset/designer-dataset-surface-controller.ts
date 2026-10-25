@@ -393,6 +393,11 @@ function createDatasetPanelOptions(
     })),
     catalogAvailable: context.callbacks.getCatalogPort() !== undefined,
     resourceAvailable: context.callbacks.getCatalogPort() !== undefined,
+    hostResourceSelectionAvailable:
+      context.callbacks.isHostResourceSelectionButtonVisible?.() === true &&
+      component !== undefined &&
+      !('dataValue' in component) &&
+      context.currentEntry()?.manifest.dataCapabilities.includes('host-resource') === true,
     link: hostLinkView(context),
     bindingOpenRoleId: context.state.bindingOpenRoleId,
     feedback: context.state.feedbackText,

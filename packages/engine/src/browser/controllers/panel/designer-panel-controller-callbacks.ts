@@ -61,10 +61,12 @@ export interface DesignerPanelControllerCallbacks {
   readonly emitDiagnostics: (diagnostics: readonly ScreenDiagnostic[]) => void;
   readonly isMaterialAvailable?: (type: string) => boolean;
   readonly requestMaterialLibraryAction?: (action: 'retry' | 'reload' | 'details') => void;
-  /** 画布背景图宿主选择按钮点击（ADR-0046）：由宿主接管（打开图片选择弹出框），返回是否已有文档。 */
-  readonly requestCanvasBackgroundImage?: () => boolean;
+  /** 宿主素材选择请求（ADR-0089）：由宿主接管并打开自己的选择器。 */
+  readonly requestHostResourceSelection?: (
+    target: import('../../../common/operations/host-resource/host-resource-selection.js').BaseScreenHostResourceSelectionTarget,
+  ) => boolean;
   readonly onCanvasPresentationChange?: (settings: DesignerCanvasPresentationSettings) => void;
-  /** 画布背景图宿主选择按钮是否渲染（ADR-0049）：默认隐藏，仅宿主配置后显示。 */
-  readonly isCanvasBackgroundImageButtonVisible?: () => boolean;
+  /** 素材选择入口是否渲染（ADR-0089）：默认隐藏，仅宿主配置后显示。 */
+  readonly isHostResourceSelectionButtonVisible?: () => boolean;
   readonly selectInspectorTab?: (tab: 'appearance' | 'data' | 'interaction') => void;
 }

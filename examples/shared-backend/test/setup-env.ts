@@ -8,3 +8,7 @@ process.env.DATASET_FAIL_INJECTION = '1';
 // `custom.ds-1` 都需要一张确定的空表，否则两条播种行会让计数与序号漂移。
 // 播种本身由 `datasources.service.spec.ts` 直接调 `ensureSeed()` 覆盖。
 process.env.DATASOURCE_SEED = '0';
+// 素材播种同理：列表与删除保护用例需要确定的空库，播种由独立 spec 直接调用。
+process.env.ASSET_SEED = '0';
+// 素材文件与开发库隔离：放在 data/assets/test 下，仍受仓库忽略规则保护。
+process.env.ASSET_DIR = 'data/assets/test';

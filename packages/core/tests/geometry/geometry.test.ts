@@ -79,6 +79,66 @@ describe('hit testing and rectangle queries', () => {
     expect(hitTestScreenComponents(document, { x: 50, y: 50 })).toEqual(['c1']);
   });
 
+  it('expands thin components to a minimum hit thickness on the thin axis only', () => {
+    const document = makeDocument({
+      components: [
+        makeComponent({
+          id: 'rule',
+          position: { x: 100, y: 200 },
+          size: { width: 320, height: 2 },
+        }),
+        makeComponent({
+          id: 'panel',
+          position: { x: 500, y: 0 },
+          size: { width: 100, height: 200 },
+        }),
+      ],
+    });
+
+    // 严格命中：线只有 2px 厚，离中心 4px 就落空。
+    expect(hitTestScreenComponents(document, { x: 200, y: 205 })).toEqual([]);
+    expect(hitTestScreenComponents(document, { x: 200, y: 205 }, { minimumThickness: 10 })).toEqual(
+      ['rule'],
+    );
+    // 长轴不加宽：命中带只把 2px 撑到 10px，不越过线的两端。
+    expect(hitTestScreenComponents(document, { x: 424, y: 201 }, { minimumThickness: 10 })).toEqual(
+      [],
+    );
+    // 厚轴不享受最小厚度：正常组件边界外 5px 仍然不是命中目标。
+    expect(hitTestScreenComponents(document, { x: 605, y: 100 }, { minimumThickness: 10 })).toEqual(
+      [],
+    );
+  });
+
+  it('measures the minimum hit thickness in the component local frame', () => {
+    const document = makeDocument({
+      components: [
+        makeComponent({
+          id: 'vertical-rule',
+          position: { x: 100, y: 100 },
+          size: { width: 200, height: 2 },
+          rotation: 90,
+        }),
+      ],
+    });
+
+    // 旋转 90° 后线的"薄轴"指向 x：横向偏 4px 命中，纵向偏出线的长度就落空。
+    expect(hitTestScreenComponents(document, { x: 204, y: 200 }, { minimumThickness: 10 })).toEqual(
+      ['vertical-rule'],
+    );
+    expect(hitTestScreenComponents(document, { x: 100, y: 304 }, { minimumThickness: 10 })).toEqual(
+      [],
+    );
+  });
+
+  it('rejects a negative minimum hit thickness', () => {
+    const document = makeDocument({ components: [makeComponent()] });
+
+    expect(() =>
+      hitTestScreenComponents(document, { x: 10, y: 10 }, { minimumThickness: -1 }),
+    ).toThrow(RangeError);
+  });
+
   it('uses rotated geometry for intersect and contain queries', () => {
     const document = makeDocument({
       components: [

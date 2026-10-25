@@ -44,6 +44,32 @@
       "checks": ["plugin-core", "plugin-manager"]
     },
     {
+      "id": "material-catalog-refresh",
+      "title": "在线物料包与 catalog 热刷新",
+      "owner": "base-screen + host",
+      "availability": "current; host material packages refresh through refreshCatalog; host example includes create/publish/retire management",
+      "boundary": "宿主在线生成、审核、加载并 define 物料包，Base Screen 不 fetch；基座提供 refreshCatalog 与 renderer setCatalog。constructor/tagName/adapter 变化重挂载，Manifest-only 变化保留元素并重算 model；未变类型保留数据源与选择。物料 type 跨构建稳定，代码更新使用同 type、新 tagName + 新 constructor；文档不存版本字段。示例后端持久化 MaterialPackage，三端宿主提供在线物料面板与引用保护。",
+      "publicApi": [
+        "BaseScreenDesignerElement.refreshCatalog",
+        "BaseScreenMaterialCatalogRefreshResult",
+        "BaseScreenRenderer.setCatalog",
+        "BaseScreenRenderer.validateCatalog",
+        "diffBaseScreenMaterialCatalogs"
+      ],
+      "references": [
+        "docs/decisions/ADR-0090-online-material-packages-and-catalog-hot-refresh.md",
+        "docs/design/host-assets-and-online-materials.md",
+        "packages/plugin-core/src/catalog-diff.ts",
+        "packages/plugin-core/src/catalog.ts",
+        "packages/renderer/src/renderer/renderer.ts",
+        "packages/engine/src/common/operations/catalog/designer-catalog-refresh.ts",
+        "packages/engine/src/designer-element/api/designer-element-catalog.ts",
+        "examples/shared-backend/src/material-packages/material-packages.service.ts",
+        "examples/vanilla-host/src/screen/online-materials.ts"
+      ],
+      "checks": ["plugin-core", "renderer", "engine"]
+    },
+    {
       "id": "data-resources",
       "title": "数据集与宿主资源",
       "owner": "base-screen + host",
@@ -53,9 +79,32 @@
       "references": [
         "packages/contracts/src/types/dataset-port.ts",
         "packages/contracts/src/types/document.ts",
-        "packages/renderer/src/resource/dataset-query-port.ts"
+        "packages/renderer/src/resource/source-query-port.ts"
       ],
       "checks": ["contracts", "core", "renderer", "engine"]
+    },
+    {
+      "id": "host-image-assets",
+      "title": "宿主图片素材与统一选择桥",
+      "owner": "base-screen + host",
+      "availability": "current",
+      "boundary": "上传、存储、素材目录、权限与删除保护归宿主；基座只提供统一资源选择桥与有界校验，不建立资产目录/Store/网络客户端。组件图片只存 host-resource 身份，画布背景 URL 是唯一例外。组件提交只写 legacy dataSource，且只接受没有 dataValue 键的组件。",
+      "publicApi": [
+        "base-screen-host-resource-selection-request",
+        "BaseScreenDesignerElement.requestHostResourceSelection",
+        "BaseScreenDesignerElement.commitHostResourceSelection",
+        "BaseScreenDesignerElement.insertHostResource",
+        "BaseScreenDesignerElement.replaceHostResource"
+      ],
+      "references": [
+        "docs/decisions/ADR-0089-host-owned-image-assets-and-unified-resource-selection.md",
+        "docs/design/host-assets-and-online-materials.md",
+        "packages/engine/src/common/operations/host-resource/host-resource-selection.ts",
+        "packages/engine/src/designer-element/api/designer-element-host-resource-selection.ts",
+        "packages/engine/src/designer-element/api/designer-element-host-resource.ts",
+        "packages/material/src/image.ts"
+      ],
+      "checks": ["engine"]
     },
     {
       "id": "variables",

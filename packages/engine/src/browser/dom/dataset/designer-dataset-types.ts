@@ -172,6 +172,8 @@ export interface DesignerDataSourcePanelOptions {
   readonly variables: readonly Pick<ScreenVariable, 'id' | 'name'>[];
   readonly catalogAvailable: boolean;
   readonly resourceAvailable: boolean;
+  /** 宿主素材选择入口是否可用；由宿主按钮开关与物料 host-resource 能力共同决定。 */
+  readonly hostResourceSelectionAvailable?: boolean;
   readonly link: DesignerHostLinkView;
   readonly bindingOpenRoleId?: string | null;
   readonly feedback: string;

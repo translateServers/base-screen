@@ -39,11 +39,16 @@ import type {
   BaseScreenDesignerSetWorkbenchModeOptions,
   BaseScreenDesignerWorkbenchMode,
 } from '../common/operations/blueprint/designer-blueprint-protocol.js';
+import type { BaseScreenMaterialCatalogRefreshResult } from '../common/operations/catalog/designer-catalog-refresh.js';
 import {
   type BaseScreenAlignment,
   type BaseScreenDistribution,
 } from '../common/operations/element/designer-layout-operations.js';
 import type { BaseScreenHostResourceAuthoringIntent } from '../common/operations/host-resource/host-resource-authoring.js';
+import type {
+  BaseScreenHostResourceSelectionCommit,
+  BaseScreenHostResourceSelectionTarget,
+} from '../common/operations/host-resource/host-resource-selection.js';
 import type { BaseScreenComponentInsertionIntent } from '../common/operations/material-component/material-component.js';
 import type { BaseScreenComponentFragmentInsertionIntent } from '../common/operations/material-component/material-component-fragment.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../common/operations/material-library/material-library-grouping.js';
@@ -74,6 +79,16 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   get catalog(): BaseScreenMaterialCatalog | undefined {
     return this.#designerState.runtime.readCatalog(this);
+  }
+
+  /**
+   * 初始化后热刷新物料目录（ADR-0090）：全有或全无；changed 中的代码身份变化会重挂载，
+   * Manifest-only 变化不重挂载；失败时 catalog、文档、DOM、历史与数据源状态保持原样。
+   */
+  refreshCatalog(
+    catalog: BaseScreenMaterialCatalog,
+  ): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult> {
+    return this.#designerState.runtime.refreshCatalog(this, catalog);
   }
 
   get workbenchMode(): BaseScreenDesignerWorkbenchMode {
@@ -186,8 +201,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.readBackButton(this);
   }
 
-  get canvasBackgroundImageButton(): boolean {
-    return this.#designerState.runtime.readCanvasBackgroundImageButton(this);
+  get hostResourceSelectionButton(): boolean {
+    return this.#designerState.runtime.readHostResourceSelectionButton(this);
   }
 
   set runtimeContributions(value: BaseScreenRuntimeContributionIndex | undefined) {
@@ -380,25 +395,18 @@ export class BaseScreenDesignerElement extends ElementBase {
     return this.#designerState.runtime.setCanvasBackgroundImage(this, backgroundImage, fit);
   }
 
-  requestCanvasBackgroundImage(): boolean {
-    return this.#designerState.runtime.requestCanvasBackgroundImage(this);
+  requestHostResourceSelection(target: BaseScreenHostResourceSelectionTarget): boolean {
+    return this.#designerState.runtime.requestHostResourceSelection(this, target);
   }
 
   /**
-   * 宿主背景图选择提交（ADR-0046）：会话守护（requestId 匹配且未过期）后经 `update-canvas`
-   * 注入；`null` 清除背景并同时清除 fit；成功消费会话，失败关闭零副作用。
+   * 宿主素材选择提交（ADR-0089）：会话守护（requestId 匹配且未过期）后写入画布背景或
+   * legacy 组件 dataSource；成功消费会话，失败关闭零副作用。
    */
-  commitCanvasBackgroundImage(
-    requestId: string,
-    backgroundImage: string | null,
-    fit?: ScreenCanvasBackgroundImageFit,
+  commitHostResourceSelection(
+    commit: BaseScreenHostResourceSelectionCommit,
   ): ScreenParseResult<ScreenDocument> {
-    return this.#designerState.runtime.commitCanvasBackgroundImage(
-      this,
-      requestId,
-      backgroundImage,
-      fit,
-    );
+    return this.#designerState.runtime.commitHostResourceSelection(this, commit);
   }
 
   get instanceId(): string {

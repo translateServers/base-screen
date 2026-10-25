@@ -1,8 +1,10 @@
 import type {
   DatasetCatalog,
   DatasetDefinition,
+  HostAssetShape,
   MetricRanking,
   MetricSeries,
+  OnlineMaterialPackageShape,
   ScreenShape,
   ScreenSummaryShape,
   TabularDataset,
@@ -37,7 +39,7 @@ export type ApiResult<T> =
   | { readonly ok: false; readonly error: ApiError };
 
 interface RequestOptions {
-  readonly method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  readonly method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly body?: unknown;
   /** 幂等 GET 的网络层重试次数（默认 1 次）。 */
   readonly retries?: number;
@@ -74,6 +76,22 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<A
       }
       if (attempt >= attempts) return { ok: false, error: NETWORK_ERROR };
     }
+  }
+}
+
+/** multipart 上传单独走一条路径：不能设置 Content-Type，交给浏览器生成 boundary。 */
+async function requestForm<T>(path: string, body: FormData): Promise<ApiResult<T>> {
+  try {
+    const response = await fetch(`${resolveApiBase()}${path}`, {
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+      body,
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    if (!response.ok) return { ok: false, error: toApiError(payload, response.status) };
+    return { ok: true, data: payload as T };
+  } catch {
+    return { ok: false, error: NETWORK_ERROR };
   }
 }
 
@@ -130,6 +148,17 @@ export interface DatasourceDraftBody {
   readonly values?: Readonly<Record<string, string | number>>;
 }
 
+export interface OnlineMaterialPackageSaveBody {
+  readonly type: string;
+  readonly name: string;
+  readonly manifest: Record<string, unknown>;
+  readonly code: string;
+}
+
+export interface OnlineMaterialPackageUpdateBody extends OnlineMaterialPackageSaveBody {
+  readonly revision: number;
+}
+
 export const api = {
   health: (): Promise<ApiResult<{ status: string }>> => request('/health'),
   listScreens: (): Promise<ApiResult<{ screens: ScreenSummaryShape[] }>> => request('/screens'),
@@ -165,6 +194,42 @@ export const api = {
     request(`/metrics/series?metric=${encodeURIComponent(metric)}&points=${points}`),
   metricRanking: (dimension: string, limit: number): Promise<ApiResult<MetricRanking>> =>
     request(`/metrics/ranking?dimension=${encodeURIComponent(dimension)}&limit=${limit}`),
+
+  // ---- 宿主素材库（ADR-0089） ----
+  listAssets: (signal?: AbortSignal): Promise<ApiResult<{ assets: HostAssetShape[] }>> =>
+    request('/assets', signal === undefined ? {} : { signal }),
+  uploadAsset: (file: File): Promise<ApiResult<{ asset: HostAssetShape }>> => {
+    const form = new FormData();
+    form.append('file', file);
+    return requestForm('/assets', form);
+  },
+  deleteAsset: (id: string): Promise<ApiResult<{ deleted: true; id: string }>> =>
+    request(`/assets/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // ---- 在线物料包（ADR-0090） ----
+  listMaterialPackages: (
+    signal?: AbortSignal,
+  ): Promise<ApiResult<{ packages: OnlineMaterialPackageShape[] }>> =>
+    request('/material-packages', signal === undefined ? {} : { signal }),
+  createMaterialPackage: (
+    body: OnlineMaterialPackageSaveBody,
+  ): Promise<ApiResult<{ package: OnlineMaterialPackageShape }>> =>
+    request('/material-packages', { method: 'POST', body }),
+  updateMaterialPackage: (
+    id: string,
+    body: OnlineMaterialPackageUpdateBody,
+  ): Promise<ApiResult<{ package: OnlineMaterialPackageShape }>> =>
+    request(`/material-packages/${encodeURIComponent(id)}`, { method: 'PUT', body }),
+  setMaterialPackageVisibility: (
+    id: string,
+    visible: boolean,
+  ): Promise<ApiResult<{ package: OnlineMaterialPackageShape }>> =>
+    request(`/material-packages/${encodeURIComponent(id)}/visibility`, {
+      method: 'PATCH',
+      body: { visible },
+    }),
+  deleteMaterialPackage: (id: string): Promise<ApiResult<{ deleted: true; id: string }>> =>
+    request(`/material-packages/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   /** 数据集目录：分组与条目一次返回（宿主不复用这份分组做第二次请求）。 */
   listDatasets: (
     query: DatasetListQuery,

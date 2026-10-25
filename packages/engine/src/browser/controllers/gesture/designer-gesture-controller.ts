@@ -1,3 +1,4 @@
+import type { ScreenDocument } from '@base-screen/contracts';
 import {
   hitTestScreenComponents,
   isScreenComponentEffectivelyHidden,
@@ -20,6 +21,15 @@ interface PanState {
   readonly startClientX: number;
   readonly startClientY: number;
 }
+
+/**
+ * 极薄组件（分割线、1px 描边容器）的最小可点厚度，按屏幕像素计。
+ *
+ * 这些组件的 canonical 尺寸就是线的粗细（分割线默认 2px 高），DOM 命中带与内容一样大，
+ * 缩放到 50% 后屏幕上不足 1px，几乎点不中。这里只在原生命中落空时用几何命中兜底，
+ * 并把屏幕像素换算回画布单位，所以命中带在任何缩放级别都是同样的手感。
+ */
+const THIN_COMPONENT_HIT_MIN_THICKNESS_PX = 10;
 
 /** Routes DOM events into focused drag, transform, marquee, create, and group-editing states. */
 export class DesignerGestureController {
@@ -195,8 +205,9 @@ export class DesignerGestureController {
       return;
     }
     const material = target.closest<HTMLElement>('[data-base-screen-component-id]');
-    const hitId = material?.dataset.baseScreenComponentId;
-    if (hitId === undefined || material === null) {
+    const hitId =
+      material?.dataset.baseScreenComponentId ?? this.thinComponentHitId(document, event);
+    if (hitId === undefined) {
       this.#groupEditing.clear();
       this.#marquee.start(event, true);
       return;
@@ -241,6 +252,25 @@ export class DesignerGestureController {
     }
     event.preventDefault();
     this.#drag.start(event, components);
+  }
+
+  /**
+   * DOM 命中落空时的极薄组件兜底命中：返回指针落在最小厚度命中带内的最上层组件。
+   *
+   * 只在指针连"严格命中"都落空时才补命中带。若严格命中非空，说明指针本来就在某个组件
+   * 矩形里而 DOM 没命中它（覆盖层、pointer-events 关闭等），这时保持既有的空白语义，
+   * 不越过 DOM 去抢这次点击。所以正常尺寸组件的点击行为、框选起点与"点空白取消选中"
+   * 都不变，只有真正落在组件矩形之外的近邻点击才会命中薄组件。
+   */
+  private thinComponentHitId(document: ScreenDocument, event: PointerEvent): string | undefined {
+    const zoom = this.callbacks.getViewport().zoom;
+    if (!(zoom > 0)) return undefined;
+    const point = this.#environment.canvasPoint(event);
+    if (hitTestScreenComponents(document, point).length > 0) return undefined;
+    const [id] = hitTestScreenComponents(document, point, {
+      minimumThickness: THIN_COMPONENT_HIT_MIN_THICKNESS_PX / zoom,
+    });
+    return id;
   }
 
   private onSelectionPointerDown(event: PointerEvent): void {

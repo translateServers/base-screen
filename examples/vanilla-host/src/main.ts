@@ -1,6 +1,8 @@
 import './styles/base.css';
 import './styles/layout.css';
 import './styles/components.css';
+import './styles/asset-library.css';
+import './styles/online-materials.css';
 import { startRouter } from './router';
 import { registerHostMaterials } from './screen/register';
 

@@ -25,6 +25,7 @@ import type {
   BaseScreenMaterialModel,
   BaseScreenRuntimeContributionIndex,
 } from '@base-screen/plugin-core';
+import { diffBaseScreenMaterialCatalogs } from '@base-screen/plugin-core';
 import { applyCanvasBackground } from '../canvas-background.js';
 import { createMountedProjectionState } from '../resource/resource-state.js';
 import {
@@ -140,6 +141,19 @@ export interface BaseScreenRenderer {
    * 未渲染时只记录状态供下一次 render 使用。Viewer 与 Designer 共用该入口。
    */
   setInteractive(enabled: boolean): ScreenParseResult<null>;
+  /**
+   * 用候选 catalog 预检当前文档：只读，不发请求、不改挂载，复用渲染候选的校验路径。
+   */
+  validateCatalog(
+    document: ScreenDocument,
+    catalog: BaseScreenMaterialCatalog,
+  ): ScreenParseResult<null>;
+  /**
+   * 交换 catalog：清除校验缓存，重挂载代码身份变化的类型；未变类型保留挂载与数据源状态。
+   *
+   * 只更新 renderer 的内部目录，不主动渲染；调用方应在需要时再 `render(document)`。
+   */
+  setCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null>;
   applyBlueprintVisibilityEffects(
     effects: readonly ScreenBlueprintVisibilityEffect[],
   ): ScreenParseResult<null>;
@@ -188,7 +202,7 @@ class Renderer implements BaseScreenRenderer {
     this.#readers = collectReaders(parsedDocument.value);
     const prepared = prepareCandidates(
       parsedDocument.value,
-      this.#state.options.catalog,
+      this.#state.catalog,
       this.#state.options.mode,
       this.#state.interactive,
       this.#state.options.contributionIndex,
@@ -331,6 +345,64 @@ class Renderer implements BaseScreenRenderer {
     // 原地重渲染：同 type 同 id 的挂载按 reconcile 路径复用元素；数据源按实例复用
     // 已就绪的结果，因此不会重取数、不闪烁。
     return this.render(this.#state.document);
+  }
+
+  validateCatalog(
+    document: ScreenDocument,
+    catalog: BaseScreenMaterialCatalog,
+  ): ScreenParseResult<null> {
+    if (this.#state.disposed) {
+      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Renderer has been disposed.');
+    }
+    const parsed = parseScreenDocument(document, this.#state.lastValidatedInput);
+    if (!parsed.ok) return parsed;
+    try {
+      const prepared = prepareCandidates(
+        parsed.value,
+        catalog,
+        this.#state.options.mode,
+        this.#state.interactive,
+        this.#state.options.contributionIndex,
+        this.#state.dataSources,
+        { entries: new Map() },
+        'fail',
+      );
+      return prepared.ok
+        ? { ok: true, value: null, diagnostics: [] }
+        : { ok: false, diagnostics: prepared.diagnostics };
+    } catch {
+      return failure('PLUGIN_CORE_RENDER_FAILED', [], 'Catalog validation failed.');
+    }
+  }
+
+  setCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<null> {
+    if (this.#state.disposed) {
+      return failure('PLUGIN_CORE_LIFECYCLE_INVALID', [], 'Renderer has been disposed.');
+    }
+    if (catalog === this.#state.catalog) {
+      return { ok: true, value: null, diagnostics: [] };
+    }
+    const diff = diffBaseScreenMaterialCatalogs(this.#state.catalog, catalog);
+    const remount = new Set(diff.implementationChanged);
+    const removed = new Set(diff.removed);
+    for (const [componentId, mounted] of this.#state.mounted) {
+      if (!remount.has(mounted.type) && !removed.has(mounted.type)) continue;
+      mounted.element.removeEventListener('base-screen-material-event', mounted.onEvent);
+      mounted.element.remove();
+      this.#state.mounted.delete(componentId);
+      this.#state.candidates.delete(componentId);
+    }
+    // 未变类型的 entry 对象会随 catalog 重建而换新；同步 applied 守卫，避免整屏重写 model。
+    // manifest-only 变更保留旧 applied：下一次 render 会重算 model，但不重挂载元素。
+    const unchanged = new Set(diff.unchanged);
+    for (const mounted of this.#state.mounted.values()) {
+      if (mounted.applied === undefined || !unchanged.has(mounted.type)) continue;
+      const entry = catalog.get(mounted.type);
+      if (entry !== undefined) mounted.applied = { ...mounted.applied, entry };
+    }
+    this.#state.validationCache.entries.clear();
+    this.#state.catalog = catalog;
+    return { ok: true, value: null, diagnostics: [] };
   }
 
   applyBlueprintVisibilityEffects(

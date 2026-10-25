@@ -4,7 +4,10 @@ import type {
   ScreenJsonObject,
   ScreenResourceExecutionContext,
 } from '@base-screen/contracts';
-import { validateBaseScreenMaterialProps } from '@base-screen/plugin-core';
+import {
+  type BaseScreenMaterialCatalog,
+  validateBaseScreenMaterialProps,
+} from '@base-screen/plugin-core';
 import { BlueprintVisibilityController } from '../blueprint-visibility.js';
 import {
   DataSourceRuntime,
@@ -26,6 +29,7 @@ import type {
 
 export interface RendererState {
   readonly options: CreateBaseScreenRendererOptions;
+  catalog: BaseScreenMaterialCatalog;
   mounted: Map<string, MountedMaterial>;
   candidates: Map<string, RenderCandidate>;
   document: import('@base-screen/contracts').ScreenDocument | undefined;
@@ -78,6 +82,7 @@ export function createRendererState(options: CreateBaseScreenRendererOptions): R
   });
   state = {
     options,
+    catalog: options.catalog,
     mounted: new Map(),
     candidates: new Map(),
     document: undefined,

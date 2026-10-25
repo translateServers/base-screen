@@ -19,7 +19,7 @@ import type { ScreenBlueprintCondition } from '@base-screen/contracts';
 import type { ScreenBlueprintLayoutNode } from '@base-screen/contracts';
 import type { ScreenBlueprintLayoutViewport } from '@base-screen/contracts';
 import type { ScreenCanvasBackground } from '@base-screen/contracts';
-import type { ScreenCanvasBackgroundImageFit } from '@base-screen/contracts';
+import { ScreenCanvasBackgroundImageFit } from '@base-screen/contracts';
 import { ScreenComponentDataSource } from '@base-screen/contracts';
 import type { ScreenComponentTextCommitRequest } from '@base-screen/contracts';
 import type { ScreenComponentTextTarget } from '@base-screen/contracts';
@@ -31,6 +31,7 @@ import { ScreenDocumentTransaction } from '@base-screen/core';
 import type { ScreenHostCatalogPort } from '@base-screen/contracts';
 import type { ScreenHostDatasetPort } from '@base-screen/contracts';
 import { ScreenHostResourceDataSource } from '@base-screen/contracts';
+import { ScreenHostResourceParameter } from '@base-screen/contracts';
 import type { ScreenHostResourcePort } from '@base-screen/contracts';
 import { ScreenInteractionState } from '@base-screen/core';
 import { ScreenJsonObject } from '@base-screen/contracts';
@@ -57,9 +58,6 @@ export const BASE_SCREEN_BLUEPRINT_CANVAS_STATE_EVENT: 'base-screen-blueprint-ca
 // @public (undocumented)
 export const BASE_SCREEN_BLUEPRINT_NODE_DRAG_MIME: 'application/x-base-screen-blueprint-node';
 
-// @public
-export const BASE_SCREEN_CANVAS_BACKGROUND_IMAGE_REQUEST_EVENT = "base-screen-canvas-background-image-request";
-
 // @public (undocumented)
 export const BASE_SCREEN_CANVAS_PRESENTATION_CHANGE_EVENT: 'base-screen-canvas-presentation-change';
 
@@ -83,6 +81,9 @@ export const BASE_SCREEN_DESIGNER_WORKBENCH_MODE_CHANGE_EVENT: 'base-screen-desi
 
 // @public (undocumented)
 export const BASE_SCREEN_HOST_RESOURCE_DRAG_MIME: 'application/x-base-screen-host-resource';
+
+// @public (undocumented)
+export const BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT = "base-screen-host-resource-selection-request";
 
 // @public (undocumented)
 export const BASE_SCREEN_MATERIAL_LIBRARY_ACTION_EVENT: 'base-screen-material-library-action';
@@ -337,27 +338,6 @@ export interface BaseScreenBlueprintCanvasTrace {
     readonly lines: readonly string[];
 }
 
-// @public (undocumented)
-export interface BaseScreenCanvasBackgroundImageRequest {
-    // (undocumented)
-    readonly current: {
-        readonly backgroundImage: string | null;
-        readonly backgroundImageFit: ScreenCanvasBackgroundImageFit | null;
-    };
-    // (undocumented)
-    readonly documentRevision: string | null;
-    // (undocumented)
-    readonly instanceId: string;
-    // (undocumented)
-    readonly requestId: string;
-}
-
-// @public (undocumented)
-export interface BaseScreenCanvasBackgroundImageRequestEventDetail {
-    // (undocumented)
-    readonly request: BaseScreenCanvasBackgroundImageRequest;
-}
-
 // @public
 export interface BaseScreenCanvasPresentationChangeEventDetail {
     // (undocumented)
@@ -397,7 +377,6 @@ export interface BaseScreenDesignerBackRequestEventDetail {
 // @public (undocumented)
 export interface BaseScreenDesignerConfiguration {
     readonly backButton?: boolean;
-    readonly canvasBackgroundImageButton?: boolean;
     // (undocumented)
     readonly catalog: BaseScreenMaterialCatalog;
     readonly conditionalStylePort?: BaseScreenConditionalStylePort;
@@ -410,6 +389,7 @@ export interface BaseScreenDesignerConfiguration {
     // (undocumented)
     readonly hostCatalogPort?: ScreenHostCatalogPort;
     readonly hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort;
+    readonly hostResourceSelectionButton?: boolean;
     // (undocumented)
     readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
     // (undocumented)
@@ -457,15 +437,13 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     cancelProjectOperation(): void;
     // (undocumented)
-    get canvasBackgroundImageButton(): boolean;
-    // (undocumented)
     get catalog(): BaseScreenMaterialCatalog | undefined;
     set catalog(value: BaseScreenMaterialCatalog | undefined);
     // (undocumented)
     cloneProject(projectId: string, name: string): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
-    commitCanvasBackgroundImage(requestId: string, backgroundImage: string | null, fit?: ScreenCanvasBackgroundImageFit): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     commitComponentTextEdit(request: ScreenComponentTextCommitRequest): ScreenParseResult<ScreenDocument>;
+    commitHostResourceSelection(commit: BaseScreenHostResourceSelectionCommit): ScreenParseResult<ScreenDocument>;
     // (undocumented)
     get conditionalStylePort(): BaseScreenConditionalStylePort | undefined;
     set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined);
@@ -520,6 +498,8 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get hostConditionalStyleAuthoring(): BaseScreenHostConditionalStyleAuthoringPort | undefined;
     set hostConditionalStyleAuthoring(value: BaseScreenHostConditionalStyleAuthoringPort | undefined);
+    // (undocumented)
+    get hostResourceSelectionButton(): boolean;
     // (undocumented)
     importDocument(document: unknown): ScreenParseResult<ScreenDocument>;
     // (undocumented)
@@ -584,6 +564,7 @@ export class BaseScreenDesignerElement extends ElementBase {
     publish(): Promise<ScreenParseResult<ScreenProjectEnvelope>>;
     // (undocumented)
     redo(): ScreenParseResult<ScreenDocument>;
+    refreshCatalog(catalog: BaseScreenMaterialCatalog): ScreenParseResult<BaseScreenMaterialCatalogRefreshResult>;
     refreshConditionalStyles(componentIds?: readonly string[]): void;
     // (undocumented)
     refreshData(componentId?: string): void;
@@ -598,9 +579,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     replaceHostResource(componentId: string, intent: BaseScreenHostResourceAuthoringIntent): ScreenParseResult<ScreenDocument>;
     // (undocumented)
-    requestCanvasBackgroundImage(): boolean;
-    // (undocumented)
     requestComponentTextEdit(target: ScreenComponentTextTarget): string | null;
+    // (undocumented)
+    requestHostResourceSelection(target: BaseScreenHostResourceSelectionTarget): boolean;
     // (undocumented)
     get resourcePort(): ScreenHostResourcePort | undefined;
     set resourcePort(value: ScreenHostResourcePort | undefined);
@@ -731,6 +712,80 @@ export interface BaseScreenHostResourceDragDataTransfer {
     effectAllowed?: string;
     // (undocumented)
     setData(format: string, data: string): void;
+}
+
+// @public (undocumented)
+export type BaseScreenHostResourceSelection = {
+    readonly kind: 'url';
+    readonly url: string;
+} | {
+    readonly kind: 'host-resource';
+    readonly resourceType: string;
+    readonly resourceId: string;
+    readonly params?: Readonly<Record<string, ScreenHostResourceParameter>>;
+};
+
+// @public (undocumented)
+export interface BaseScreenHostResourceSelectionCommit {
+    readonly backgroundImageFit?: ScreenCanvasBackgroundImageFit;
+    // (undocumented)
+    readonly requestId: string;
+    // (undocumented)
+    readonly selection: BaseScreenHostResourceSelection;
+}
+
+// @public (undocumented)
+export type BaseScreenHostResourceSelectionCurrent = {
+    readonly kind: 'none';
+} | {
+    readonly kind: 'url';
+    readonly url: string;
+} | {
+    readonly kind: 'host-resource';
+    readonly resourceType: string;
+    readonly resourceId: string;
+} | {
+    readonly kind: 'other';
+};
+
+// @public (undocumented)
+export interface BaseScreenHostResourceSelectionRequest {
+    // (undocumented)
+    readonly current: BaseScreenHostResourceSelectionCurrent;
+    // (undocumented)
+    readonly documentRevision: string | null;
+    // (undocumented)
+    readonly instanceId: string;
+    // (undocumented)
+    readonly requestId: string;
+    // (undocumented)
+    readonly target: BaseScreenHostResourceSelectionTarget;
+}
+
+// @public (undocumented)
+export interface BaseScreenHostResourceSelectionRequestEventDetail {
+    // (undocumented)
+    readonly request: BaseScreenHostResourceSelectionRequest;
+}
+
+// @public (undocumented)
+export type BaseScreenHostResourceSelectionTarget = {
+    readonly kind: 'canvas-background';
+    readonly backgroundImageFit: ScreenCanvasBackgroundImageFit | null;
+} | {
+    readonly kind: 'component';
+    readonly componentId: string;
+    readonly materialType: string;
+};
+
+// @public
+export interface BaseScreenMaterialCatalogRefreshResult {
+    // (undocumented)
+    readonly added: readonly string[];
+    // (undocumented)
+    readonly changed: readonly string[];
+    // (undocumented)
+    readonly removed: readonly string[];
 }
 
 // @public (undocumented)

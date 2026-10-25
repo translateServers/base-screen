@@ -57,6 +57,7 @@ import {
   type DesignerElementOperationsHost,
   type DesignerOperationContext,
 } from '../../common/operations/element/designer-element-operations.js';
+import type { BaseScreenHostResourceSelectionTarget } from '../../common/operations/host-resource/host-resource-selection.js';
 import { type BaseScreenMaterialLibraryGrouping } from '../../common/operations/material-library/material-library-grouping.js';
 import {
   type BaseScreenMaterialLibraryItem,
@@ -103,7 +104,7 @@ export interface DesignerElementState {
   toolMaterialTypes: DesignerToolMaterialTypes | undefined;
   previewHandler: ((document: ScreenDocument) => boolean) | undefined;
   backButton: boolean;
-  canvasBackgroundImageButton: boolean;
+  hostResourceSelectionButton: boolean;
   renderer: BaseScreenRenderer | undefined;
   canvas: HTMLDivElement | undefined;
   viewportElement: HTMLDivElement | undefined;
@@ -123,6 +124,7 @@ export interface DesignerElementState {
       readonly generation: number;
       readonly documentGeneration?: number;
       readonly documentRevision?: string | null;
+      readonly hostResourceSelection?: BaseScreenHostResourceSelectionTarget;
     }
   >;
   authoringGeneration: number;
@@ -174,7 +176,7 @@ export function createDesignerElementState(
   designerElementStates.set(element, state);
   state.resolvedMaterialLibraryItems = [];
   state.backButton = false;
-  state.canvasBackgroundImageButton = false;
+  state.hostResourceSelectionButton = false;
   state.instanceId = createScreenAuthoringInstanceId();
   state.pendingAuthoringRequests = new Map<
     string,
@@ -184,6 +186,7 @@ export function createDesignerElementState(
       readonly generation: number;
       readonly documentGeneration?: number;
       readonly documentRevision?: string | null;
+      readonly hostResourceSelection?: BaseScreenHostResourceSelectionTarget;
     }
   >();
   state.authoringGeneration = 0;

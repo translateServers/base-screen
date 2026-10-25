@@ -68,6 +68,14 @@ class FakeRenderer implements BaseScreenRenderer {
     return { ok: true, value: null, diagnostics: [] };
   }
 
+  validateCatalog(): ScreenParseResult<null> {
+    return { ok: true, value: null, diagnostics: [] };
+  }
+
+  setCatalog(): ScreenParseResult<null> {
+    return { ok: true, value: null, diagnostics: [] };
+  }
+
   applyBlueprintVisibilityEffects(
     effects: readonly ScreenBlueprintVisibilityEffect[],
   ): ScreenParseResult<null> {

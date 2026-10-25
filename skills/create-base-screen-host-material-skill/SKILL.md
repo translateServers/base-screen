@@ -35,8 +35,9 @@ The child Skill must instruct the model to:
 - Read the host rules, selected framework route, public material contract, existing catalog, data
   resources, datasets, and matching component references before editing.
 - Create or revise a complete material manifest and implementation using the selected native, React,
-  or Vue public bridge. Keep `type` and `tagName` stable on revisions and use a host namespace for new
-  identities.
+  or Vue public bridge. Keep `type` stable on revisions and use a host namespace for new identities.
+  Keep `tagName` stable when the host reloads the catalog; for online hot-refresh packages, publish a
+  new `tagName` + constructor per build (content hash/build token, no `vN`), per ADR-0090.
 - Validate the manifest, props/style defaults, editor descriptor, data-binding roles, event payloads,
   and optional tabular adapter through the public parsers before source edits are registered.
 - Add focused tests and update only the explicitly allowed standalone or plugin registration file.
@@ -46,9 +47,12 @@ The child Skill must instruct the model to:
   changed files and diagnostics. On any preflight, compile, typecheck, or test failure, leave the old
   registration/catalog state intact.
 
+Online material packages are host-built, host-loaded, and materials-only. The child Skill never
+publishes, fetches, or dynamic-imports at runtime; plugin contributions stay separate.
+
 The child Skill never puts credentials, source URLs, SQL, headers, tokens, service objects, DOM
-references, functions, or framework instances in a manifest, editor descriptor, Screen Document, or
-host snapshot. Dataset samples are used only as sanitized design hints.
+references, functions, version fields, or framework instances in a manifest, editor descriptor,
+Screen Document, or host snapshot. Dataset samples are used only as sanitized design hints.
 
 ## Resources
 

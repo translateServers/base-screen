@@ -33,6 +33,38 @@ model ScreenAlarmBinding {
   updatedAt DateTime @updatedAt
 }
 
+/// 宿主素材库（ADR-0089）：文件落在 data/assets/，这张表只存元数据与稳定 id。
+/// Screen Document 只保存 resourceType + resourceId，不保存这里的任何 URL。
+model Asset {
+  id        String   @id @default(uuid())
+  name      String
+  mimeType  String
+  /// 含点的扩展名，由服务端按 MIME 白名单决定，不接受客户端输入
+  extension String
+  byteSize  Int
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// 在线物料包（ADR-0090）：宿主生成并审核的 ESM 代码与 Manifest，只存储、不执行。
+/// 同一 type 至多一条；代码更新使用新 tagName + 新 constructor（见 Manifest）。
+model MaterialPackage {
+  id        String   @id @default(uuid())
+  /// 稳定物料 type：文档身份，创建后不可改
+  type      String   @unique
+  name      String
+  /// 宿主导入的 ESM 模块源码（default export 是 Custom Element 构造器）
+  code      String
+  /// JSON 字符串：完整 Manifest，必须与代码里的 static manifest 一致
+  manifest  String
+  revision  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
 /// 数据源台账（PRD §8.1）。内置 4 个数据集**不入表**：它们由
 /// `src/datasets/dataset-definitions.ts` 的代码常量提供，落表会产生两份会漂移的真理。
 model DataSource {

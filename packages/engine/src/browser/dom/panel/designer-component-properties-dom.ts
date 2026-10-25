@@ -63,7 +63,7 @@ export function renderDesignerProperties(
   interaction: ScreenInteractionState,
   catalog: BaseScreenMaterialCatalog | undefined,
   getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
-  canvasBackgroundImageButtonVisible = false,
+  hostResourceSelectionButtonVisible = false,
   canvasPresentation = createDesignerCanvasPresentationSettings(),
   inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined,
   hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort,
@@ -76,7 +76,7 @@ export function renderDesignerProperties(
       appendCanvasControls(
         properties,
         document,
-        canvasBackgroundImageButtonVisible,
+        hostResourceSelectionButtonVisible,
         canvasPresentation,
       );
     }

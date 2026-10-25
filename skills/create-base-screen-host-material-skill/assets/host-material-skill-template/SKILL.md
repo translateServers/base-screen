@@ -20,16 +20,18 @@ available; read [material-mcp.md](references/material-mcp.md) only when that pat
    the matching resource/dataset references when the material consumes host data. Prefer the online
    MCP authoring context and template when available; otherwise use the optional local template index.
 3. Clarify whether the request creates a new material or revises an existing one. For a revision,
-   preserve its `type`, `tagName`, event names, public props, and document compatibility unless the
-   user explicitly approves a breaking change. For a new material, use a unique host namespace such
-   as `{{HOST_ID}}.<name>` and a lowercase custom-element tag such as `{{HOST_ID}}-<name>`.
+   preserve its `type`, event names, public props, and document compatibility unless the user
+   explicitly approves a breaking change. Keep `tagName` stable when the host reloads the catalog;
+   for online hot-refresh packages, register a new `tagName` + constructor per build (content
+   hash/build token, no `vN`), per ADR-0090. For a new material, use a unique host namespace such as
+   `{{HOST_ID}}.<name>` and a lowercase custom-element tag such as `{{HOST_ID}}-<name>`.
 4. Write a complete manifest and implementation in the configured source root. Keep all manifest,
    descriptor, event, and adapter values JSON-safe. Use only the selected public framework route;
    do not import Base Screen internals or access a private Engine store.
 5. For design-time creation, use the `draft-only` workflow: create source, a focused test, the
    complete manifest, and a `material-candidate.json` with `status: "pending-review"`,
-   `registration: "draft-only"`, stable host-namespaced `type`/`tagName`, and safe relative
-   `sourcePath`/`testPath`. Do not edit the configured registration file or plugin manifest in this
+   `registration: "draft-only"`, stable host-namespaced `type`, a `tagName` that follows the build /
+   reload rule above, and safe relative `sourcePath`/`testPath`. Do not edit the configured registration file or plugin manifest in this
    mode. The host must build, test, review, and accept the candidate before writing a
    `draft-material-catalog.json` for one screen draft.
 6. If `references/material-provenance.json` exists, treat `online` entries
@@ -67,9 +69,12 @@ available; read [material-mcp.md](references/material-mcp.md) only when that pat
 ## Data and security rules
 
 - A Screen Document persists material `type`, never a tag name, constructor, module path, or package
-  URL. A manifest must declare stable `type`/`tagName` identity and complete defaults.
+  URL. A manifest must declare a stable host-namespaced `type`; `tagName` is stable for reloaded
+  catalogs and build-scoped for hot-refresh packages. Manifest and document carry no version fields.
 - Host-resource data uses literal parameter values and declared binding roles. Do not put URLs, SQL,
   headers, cookies, tokens, credentials, service objects, or live rows in source metadata or docs.
+- Online packages are materials-only and host-loaded. Do not publish, fetch, or dynamic-import at
+  runtime; plugin contributions stay separate from the material package.
 - Version resources are immutable assets bound to a material version. A material may reference only
   resource keys that exist in the current version, and only through the documented
   `useMaterialResource(key)` runtime API. Never invent keys, embed file URLs, or reference files

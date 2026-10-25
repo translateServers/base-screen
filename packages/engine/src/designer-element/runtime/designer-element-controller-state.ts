@@ -262,6 +262,9 @@ export function initializeDesignerElementControllers(
       state.runtime.executeDesignerTransaction(element, transaction),
     report: (diagnostics) => state.runtime.emitDiagnostics(element, diagnostics),
     refresh: (componentId) => element.refreshData(componentId),
+    isHostResourceSelectionButtonVisible: () => state.hostResourceSelectionButton,
+    requestHostResourceSelection: (componentId, materialType) =>
+      element.requestHostResourceSelection({ kind: 'component', componentId, materialType }),
     canUndo: () => state.session.canUndo,
     undo: () => {
       state.session.undo();
@@ -340,7 +343,7 @@ export function initializeDesignerElementControllers(
     isMaterialAvailable: (type) => !state.materialLibraryState?.unavailableTypes?.includes(type),
     requestMaterialLibraryAction: (action) =>
       state.runtime.requestMaterialLibraryAction(element, action),
-    requestCanvasBackgroundImage: () => element.requestCanvasBackgroundImage(),
+    requestHostResourceSelection: (target) => element.requestHostResourceSelection(target),
     onCanvasPresentationChange: (settings) => {
       if (state.canvas !== undefined) {
         state.canvas.style.opacity = String(settings.opacity);
@@ -364,7 +367,7 @@ export function initializeDesignerElementControllers(
         ),
       );
     },
-    isCanvasBackgroundImageButtonVisible: () => state.canvasBackgroundImageButton,
+    isHostResourceSelectionButtonVisible: () => state.hostResourceSelectionButton,
     selectInspectorTab: (tab) => state.workbenchController.selectInspectorTab(tab),
   });
   state.viewportController = new DesignerViewportController({

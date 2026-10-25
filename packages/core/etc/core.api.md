@@ -123,7 +123,7 @@ export function getScreenJsonPath(root: ScreenJsonValue | undefined, path: reado
 export function getScreenSelectionBounds(components: readonly ScreenComponentNode[]): ScreenBounds | null;
 
 // @public (undocumented)
-export function hitTestScreenComponents(document: ScreenDocument, point: ScreenPoint): readonly string[];
+export function hitTestScreenComponents(document: ScreenDocument, point: ScreenPoint, options?: ScreenHitTestOptions): readonly string[];
 
 // @public (undocumented)
 export function insertScreenJsonArrayItem(root: ScreenJsonObject, path: readonly (string | number)[], index: number, item: ScreenJsonValue): ScreenJsonObject | undefined;
@@ -498,6 +498,11 @@ export interface ScreenHistoryState {
     readonly past: readonly ScreenHistoryEntry[];
     // (undocumented)
     readonly present: ScreenDocument;
+}
+
+// @public (undocumented)
+export interface ScreenHitTestOptions {
+    readonly minimumThickness?: number;
 }
 
 // @public

@@ -223,7 +223,9 @@ describe('DesignerPanelController canvas background drafts', () => {
     executeTransaction: (
       transaction: ScreenDocumentTransaction,
     ) => ScreenParseResult<ScreenDocument>,
-    requestCanvasBackgroundImage?: () => boolean,
+    requestHostResourceSelection?: (
+      target: import('../../../../src/common/operations/host-resource/host-resource-selection.js').BaseScreenHostResourceSelectionTarget,
+    ) => boolean,
   ): {
     controller: DesignerPanelController;
     diagnostics: unknown[];
@@ -249,7 +251,7 @@ describe('DesignerPanelController canvas background drafts', () => {
       reduceSelection: () => undefined,
       setZoom: () => undefined,
       undo: () => ({ ok: true, value: document(), diagnostics: [] }),
-      ...(requestCanvasBackgroundImage === undefined ? {} : { requestCanvasBackgroundImage }),
+      ...(requestHostResourceSelection === undefined ? {} : { requestHostResourceSelection }),
     });
     return { controller, diagnostics, transactions };
   }
@@ -268,6 +270,7 @@ describe('DesignerPanelController canvas background drafts', () => {
     controller.onClick({ target: button } as unknown as Event);
 
     expect(request).toHaveBeenCalledOnce();
+    expect(request).toHaveBeenCalledWith({ kind: 'canvas-background', backgroundImageFit: null });
   });
 
   it('marks an unsafe canvas background image draft invalid before execution', () => {

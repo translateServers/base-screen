@@ -17,6 +17,8 @@ shared-backend/
 │   ├── app.module.ts        # 组合根：全局 ValidationPipe / 异常过滤器 / 日志拦截器
 │   ├── prisma/              # PrismaModule（global）+ PrismaService 单例
 │   ├── screens/             # 大屏文档 CRUD + revision 乐观锁 + 启动期按名字补种
+│   ├── assets/              # 宿主素材库：上传/列表/内容/引用保护 + 演示图播种
+│   ├── material-packages/   # 在线物料包：只存宿主审核后的 ESM + Manifest，不执行
 │   ├── metrics/             # 确定性 mock 指标时序（mulberry32 + 固定 seed）
 │   ├── health/              # 存活探针
 │   └── common/              # AllExceptionsFilter（统一错误体）、LoggingInterceptor
@@ -54,6 +56,15 @@ shared-backend/
 | `GET /api/screens/:id` | — | `{ screen: Screen }` | `404 NOT_FOUND` |
 | `PUT /api/screens/:id` | `{ document, revision }` | `{ screen: Screen }`（revision+1） | `404 NOT_FOUND` / `409 REVISION_CONFLICT` / `400 DOCUMENT_INVALID` |
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
+| `GET /api/assets` | — | `{ assets: [{ id, name, mimeType, byteSize, contentPath, referenceCount, createdAt }] }` | — |
+| `POST /api/assets` | multipart `file` | `201 { asset: Asset }` | `400 ASSET_TYPE_UNSUPPORTED` / `ASSET_CONTENT_INVALID`；超过 5 MB 为 `413` |
+| `GET /api/assets/:id/content` | — | PNG / JPEG / WebP / GIF 二进制（`Cache-Control: immutable`） | `404 ASSET_NOT_FOUND` |
+| `DELETE /api/assets/:id` | — | `{ deleted: true, id }` | `404` / `409 ASSET_IN_USE` + `refScreens` |
+| `GET /api/material-packages` | — | `{ packages: [{ id, type, name, code, manifest, revision, ... }] }` | — |
+| `POST /api/material-packages` | `{ type, name, manifest, code }` | `201 { package }` | `400`（命名空间/Manifest/代码） / `409 MATERIAL_TYPE_EXISTS` |
+| `PUT /api/material-packages/:id` | `{ type, name, manifest, code, revision }` | `{ package }`（revision+1） | `400` / `409 REVISION_CONFLICT` |
+| `PATCH /api/material-packages/:id/visibility` | `{ visible }` | `{ package }`（只改 `libraryVisible`） | `404` |
+| `DELETE /api/material-packages/:id` | — | `{ deleted: true, id }` | `404` / `409 MATERIAL_IN_USE` + `refScreens` |
 | `GET /api/metrics/series?metric=cpu_usage&points=24` | — | `{ metric, unit, points: [{ t, value }] }` | `400 UNKNOWN_METRIC` / `400 INVALID_POINTS` |
 | `GET /api/metrics/ranking?dimension=region&limit=6` | — | `{ dimension, unit, items: [{ name, value }] }` | `400 UNKNOWN_DIMENSION` / `400 INVALID_LIMIT` |
 | `GET /api/demo/alarms` | — | `{ revision, alarms: Alarm[] }` | — |
@@ -65,7 +76,9 @@ shared-backend/
 | `POST /api/demo/alarms/reset` | — | `201 { revision, alarms }` | — |
 
 `Screen = { id, name, revision, document, createdAt, updatedAt }`（时间为 ISO 字符串）。
-错误体统一 `{ error, message }`。指标目录：`cpu_usage`（%）、`memory_usage`（%）、
+`Asset` 只暴露宿主展示元数据与相对内容路径；文档里只保存 `host_image` 的
+`resourceType` + `resourceId`，不保存 `contentPath` 或任何 URL。错误体统一 `{ error, message }`。
+指标目录：`cpu_usage`（%）、`memory_usage`（%）、
 `request_rate`（req/s），以及成品种子使用的 `sales_total`（万元）、`order_count`（单）、
 `visitor_count`（人）、`conversion_rate`（%）、`target_completion`（%）、
 `service_satisfaction`（%）、`member_repurchase`（%）；生产监控屏另有 `oee`（%）、
@@ -84,6 +97,19 @@ shared-backend/
 `alarm.open` 绑定），「空气质量监测大屏」是三个自建 SQLite 数据源 + 真实快照（Open-Meteo CAMS）
 的城市空气质量案例。新增种子在旧库重启后自动补上；想彻底重置成出厂状态才需要删
 `data/screens.db`，或直接跑冒烟脚本（它使用独立库并自动迁移）。
+
+在线物料包（`MaterialPackage`）只存 `type`（稳定文档身份）、`name`、ESM `code`、Manifest JSON
+与 revision；同一 `type` 至多一条。后端不执行代码、不解析 Component 实现，发布前校验
+`host.online.*` 命名空间、Manifest 的 `type`/`name`/`tagName` 与代码必须有 default export；
+`PUT` 使用 revision 乐观锁，`type` 创建后不可改。下架只改 Manifest 的 `libraryVisible`；
+删除前扫描已保存文档中的 `component.type`，被引用返回 `409 MATERIAL_IN_USE` 与 `refScreens`。
+代码与 Manifest 的体积上限分别是 200 KiB / 64 KiB。
+
+素材库在空表时由 `AssetSeedService` 生成六张确定性 PNG（代码见 `src/assets/asset-images.ts`），
+文件落在 `data/assets/`（gitignore），`ASSET_SEED=0` 可关闭，`ASSET_DIR` 可覆盖目录（测试用）。
+上传只接受 PNG / JPEG / WebP / GIF 且会校验文件头；SVG 需要消毒/栅格化，示例不接收。
+删除前扫描所有已保存文档中的 `host_image` 引用与画布背景的内容 URL，被引用时返回
+`409 ASSET_IN_USE` 与 `refScreens`。
 
 数据源侧同时幂等生成 `data/datasources/city-air.db` 并播种三条只读 SQLite 源
 （`custom.air-live` / `custom.air-trend` / `custom.air-rank`）。它们与用户自建数据源共用
@@ -110,7 +136,7 @@ pnpm --filter @base-screen-example/shared-backend dev # 开发：migrate deploy 
 - 启动时由 `ScreensService.onModuleInit` 按名字幂等补种五条演示大屏（只插缺失的，不覆盖已有行）
   （`默认销售大屏`、`系统监控大屏`、`生产监控大屏`、`实时告警演示大屏`、`空气质量监测大屏`），
   dev / start / e2e 行为一致；数据源播种由 `DatasourceSeedService` 负责（含 `city-air.db`
-  的幂等生成）。
+  的幂等生成），素材播种由 `AssetSeedService` 负责（仅空表时生成）。
 - 数据库文件：`data/screens.db`（gitignore）；连接信息见 `.env`（非机密默认值）。
 
 ## 测试
@@ -123,6 +149,10 @@ pnpm --filter @base-screen-example/shared-backend test
 - `test/metrics.service.spec.ts`：确定性断言（同参数同结果）、未知指标失败关闭。
 - `test/app.e2e-spec.ts`：真实 AppModule + 独立 test.db，覆盖
   create/update/409/404 生命周期与统一错误体。
+- `test/assets.e2e-spec.ts`：上传/内容读取/引用扫描/删除保护与未知 id，文件目录由
+  `ASSET_DIR=data/assets/test` 隔离；`test/asset-images.spec.ts` 校验生成的 PNG 结构与确定性。
+- `test/material-packages.e2e-spec.ts`：命名空间/Manifest/代码校验、重复类型、revision 乐观锁、
+  上下架与引用保护；在线物料不执行代码。
   jest `globalSetup` 自动执行 `prisma migrate deploy`。
 
 两个错误码由 Service 抛出而非 DTO 校验（`UNKNOWN_METRIC`、`INVALID_POINTS`），
