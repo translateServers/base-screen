@@ -1,12 +1,20 @@
-import type { ScreenComponentNode, ScreenDocument } from '@base-screen/contracts';
+import type { ScreenComponentNode, ScreenDocument, ScreenJsonValue } from '@base-screen/contracts';
 import { MAX_STYLE_RULES_PER_COMPONENT } from '@base-screen/contracts';
 import type { ScreenInteractionState } from '@base-screen/core';
 import { isScreenComponentEffectivelyLocked } from '@base-screen/core';
 import type {
+  BaseScreenHostConditionalStyleAuthoringPort,
+  BaseScreenHostConditionalStyleBinding,
+  BaseScreenHostConditionalStyleSource,
   BaseScreenMaterialCatalog,
   BaseScreenMaterialManifest,
   BaseScreenPluginInspectorControlCatalog,
 } from '@base-screen/plugin-core';
+import {
+  designerHostStyleFields,
+  withHostConditionalStyleBinding,
+  withoutHostConditionalStyleBinding,
+} from '../../../common/operations/style/designer-host-conditional-style.js';
 import {
   type DesignerInspectorContext,
   getDesignerInspectorContext,
@@ -16,7 +24,10 @@ import {
   formatDesignerStyleRuleValue,
 } from '../../../common/operations/style/designer-style-rules.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
-import { createDesignerColorPalette } from '../color/designer-color-palette-dom.js';
+import {
+  createDesignerColorPalette,
+  readDesignerColorPaletteValue,
+} from '../color/designer-color-palette-dom.js';
 import type { DesignerDescriptorDatasetFields } from '../descriptor/designer-descriptor-dom.js';
 import { renderDesignerDescriptorZone } from '../descriptor/designer-descriptor-dom.js';
 import {
@@ -55,6 +66,8 @@ export function renderDesignerProperties(
   canvasBackgroundImageButtonVisible = false,
   canvasPresentation = createDesignerCanvasPresentationSettings(),
   inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined,
+  hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort,
+  refreshConditionalStyles?: (componentIds: readonly string[]) => void,
 ): void {
   properties.replaceChildren();
   const context = getDesignerInspectorContext(document, interaction, catalog);
@@ -87,6 +100,8 @@ export function renderDesignerProperties(
     catalog,
     getDatasetFields,
     inspectorControls,
+    hostConditionalStyleAuthoring,
+    refreshConditionalStyles,
   );
   if (locked) disableLockedComponentControls(properties);
 }
@@ -120,6 +135,8 @@ function appendComponentControls(
   catalog: BaseScreenMaterialCatalog | undefined,
   getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[],
   inspectorControls?: BaseScreenPluginInspectorControlCatalog | undefined,
+  hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort,
+  refreshConditionalStyles?: (componentIds: readonly string[]) => void,
 ): void {
   const { component, manifest } = context;
   const geometry = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.geometry);
@@ -250,6 +267,19 @@ function appendComponentControls(
     }
   }
   appendConditionalStyleSection(properties, component, manifest);
+  if (
+    context.kind === 'single-material' &&
+    hostConditionalStyleAuthoring !== undefined &&
+    hostConditionalStyleAuthoring.sources.length > 0
+  ) {
+    appendHostConditionalStyleSection(
+      properties,
+      component,
+      manifest,
+      hostConditionalStyleAuthoring,
+      refreshConditionalStyles,
+    );
+  }
 }
 
 /** 条件样式：规则按组件 dataState.value 判定，命中后覆盖一个颜色字段。 */
@@ -414,6 +444,295 @@ function appendConditionalStyleSection(
     );
     section.appendChild(limit);
   }
+}
+
+/**
+ * 宿主条件样式：条件源与语义归宿主，Engine 只渲染原生表单并驱动保存。
+ *
+ * 保存成功后宿主必须让新绑定对 `conditionalStylePort` 生效；Engine 随后重算该组件，
+ * 保证「改完即见」而不需要刷新整张画布。列表与表单的状态只存在于作者面，不写文档。
+ */
+function appendHostConditionalStyleSection(
+  properties: HTMLElement,
+  component: ScreenComponentNode,
+  manifest: BaseScreenMaterialManifest,
+  authoring: BaseScreenHostConditionalStyleAuthoringPort,
+  refreshConditionalStyles?: (componentIds: readonly string[]) => void,
+): void {
+  const fields = designerHostStyleFields(manifest);
+  if (fields.length === 0) return;
+  const doc = properties.ownerDocument;
+  const section = appendSection(properties, DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyle);
+  section.className += ' designer-host-conditional-style-section';
+  section.dataset.hostStyleComponent = component.id;
+
+  const hint = doc.createElement('p');
+  hint.className = 'designer-style-rule-hint';
+  hint.textContent = DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleHint;
+  section.appendChild(hint);
+
+  const list = doc.createElement('div');
+  list.className = 'designer-style-rules';
+  list.dataset.hostStyleRows = '';
+  section.appendChild(list);
+
+  const form = doc.createElement('div');
+  form.className = 'designer-style-rule-fields designer-host-style-form';
+  section.appendChild(form);
+
+  const status = doc.createElement('p');
+  status.className = 'designer-host-style-status';
+  status.dataset.hostStyleStatus = '';
+  status.setAttribute('aria-live', 'polite');
+  section.appendChild(status);
+
+  let bindings: readonly BaseScreenHostConditionalStyleBinding[] = [];
+  try {
+    bindings = [...authoring.bindings(component.id)];
+  } catch {
+    // 宿主读取绑定失败不能拖垮整块检查器；表单仍可打开，保存时会再次报告失败。
+    bindings = [];
+  }
+  let sourceId = authoring.sources[0]!.id;
+  let conditionId = authoring.sources[0]!.conditions[0]?.id ?? '';
+  let styleKey = fields[0]!.key;
+  let pendingColor = readHostStyleString(component.style[styleKey]) ?? '#ffffff';
+  let readValue = (): string => pendingColor;
+  let saving = false;
+
+  const sourceOf = (id: string): BaseScreenHostConditionalStyleSource | undefined =>
+    authoring.sources.find((source) => source.id === id);
+  const sourceLabel = (id: string): string => sourceOf(id)?.label ?? id;
+  const conditionLabel = (id: string): string =>
+    sourceOf(sourceId)?.conditions.find((condition) => condition.id === id)?.label ?? id;
+  const boundStyleValue = (key: string): ScreenJsonValue | undefined =>
+    bindings.find((binding) => binding.sourceId === sourceId && binding.conditionId === conditionId)
+      ?.style[key];
+  const initialStyleValue = (): ScreenJsonValue | undefined =>
+    boundStyleValue(styleKey) ?? component.style[styleKey];
+
+  const setButtonsDisabled = (disabled: boolean): void => {
+    for (const button of section.querySelectorAll<HTMLButtonElement>('button')) {
+      button.disabled = disabled;
+    }
+  };
+
+  const renderRows = (): void => {
+    list.replaceChildren();
+    const rows = bindings.flatMap((binding) =>
+      Object.entries(binding.style).map(([key, value]) => ({ binding, key, value })),
+    );
+    if (rows.length === 0) {
+      const empty = doc.createElement('p');
+      empty.className = 'designer-style-rule-empty';
+      empty.textContent = DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleEmpty;
+      list.appendChild(empty);
+      return;
+    }
+    for (const row of rows) {
+      const item = doc.createElement('div');
+      item.className = 'designer-style-rule';
+      const header = doc.createElement('div');
+      header.className = 'designer-style-rule-header';
+      const title = doc.createElement('strong');
+      title.textContent = `${sourceLabel(row.binding.sourceId)} · ${conditionLabel(
+        row.binding.conditionId,
+      )}`;
+      const remove = createDesignerButton(doc, {
+        text: '×',
+        ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleRemove,
+        tip: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleRemove,
+        variant: 'danger',
+        className: 'designer-style-rule-action',
+        disabled: saving,
+      });
+      remove.dataset.hostStyleRemove = '';
+      remove.dataset.hostStyleSourceId = row.binding.sourceId;
+      remove.dataset.hostStyleConditionId = row.binding.conditionId;
+      remove.dataset.hostStyleKey = row.key;
+      remove.addEventListener('click', () => {
+        void commit(
+          withoutHostConditionalStyleBinding(
+            bindings,
+            row.binding.sourceId,
+            row.binding.conditionId,
+            row.key,
+          ),
+        );
+      });
+      header.appendChild(title);
+      header.appendChild(remove);
+      const readout = doc.createElement('p');
+      readout.className = 'designer-style-rule-hint';
+      readout.textContent = `${row.key} = ${formatHostStyleValue(row.value)}`;
+      item.appendChild(header);
+      item.appendChild(readout);
+      list.appendChild(item);
+    }
+  };
+
+  const appendSelectRow = (label: string, select: HTMLSelectElement): void => {
+    const row = createDesignerFieldRow(doc, { label });
+    row.control.appendChild(enhanceDesignerSelect(select).element);
+    form.appendChild(row.field);
+  };
+
+  const renderForm = (): void => {
+    form.replaceChildren();
+    const source = sourceOf(sourceId);
+    const sourceSelect = createDesignerSelect(doc, {
+      ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleSource,
+      options: authoring.sources.map((item) => ({
+        value: item.id,
+        label: item.label,
+        selected: item.id === sourceId,
+      })),
+    });
+    sourceSelect.dataset.hostStyleSource = '';
+    sourceSelect.addEventListener('change', () => {
+      sourceId = sourceSelect.value;
+      conditionId = sourceOf(sourceId)?.conditions[0]?.id ?? '';
+      pendingColor = readHostStyleString(initialStyleValue()) ?? '#ffffff';
+      renderForm();
+    });
+    appendSelectRow(DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleSource, sourceSelect);
+
+    const conditionSelect = createDesignerSelect(doc, {
+      ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleCondition,
+      options: (source?.conditions ?? []).map((item) => ({
+        value: item.id,
+        label: item.label,
+        selected: item.id === conditionId,
+      })),
+    });
+    conditionSelect.dataset.hostStyleCondition = '';
+    conditionSelect.addEventListener('change', () => {
+      conditionId = conditionSelect.value;
+      pendingColor = readHostStyleString(initialStyleValue()) ?? '#ffffff';
+      renderForm();
+    });
+    appendSelectRow(
+      DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleCondition,
+      conditionSelect,
+    );
+
+    const fieldSelect = createDesignerSelect(doc, {
+      ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleField,
+      options: fields.map((item) => ({
+        value: item.key,
+        label: item.label,
+        selected: item.key === styleKey,
+      })),
+    });
+    fieldSelect.dataset.hostStyleField = '';
+    fieldSelect.addEventListener('change', () => {
+      styleKey = fieldSelect.value;
+      pendingColor = readHostStyleString(initialStyleValue()) ?? '#ffffff';
+      renderForm();
+    });
+    appendSelectRow(DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleField, fieldSelect);
+
+    const valueRow = createDesignerFieldRow(doc, {
+      label: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleValue,
+      tagName: 'span',
+      stacked: true,
+    });
+    const field = fields.find((item) => item.key === styleKey) ?? fields[0]!;
+    if (field.control === 'color') {
+      const palette = createDesignerColorPalette(
+        doc,
+        readHostStyleString(initialStyleValue()) ?? '#ffffff',
+        `host-style:${component.id}:${styleKey}`,
+        { allowGradient: false },
+      );
+      const onColorChange = (event: Event): void => {
+        const value = readDesignerColorPaletteValue(event.target);
+        if (value !== undefined) pendingColor = value;
+      };
+      palette.element.addEventListener('change', onColorChange);
+      palette.element.addEventListener('input', onColorChange);
+      readValue = () => pendingColor;
+      valueRow.control.appendChild(palette.element);
+    } else if (field.control === 'select' && field.values !== undefined) {
+      const current: ScreenJsonValue | undefined = initialStyleValue();
+      const select = createDesignerSelect(doc, {
+        ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleValue,
+        options: field.values.map((value) => ({
+          value,
+          label: value,
+          selected: typeof current === 'string' && value === current,
+        })),
+      });
+      select.dataset.hostStyleValue = '';
+      readValue = () => select.value;
+      valueRow.control.appendChild(enhanceDesignerSelect(select).element);
+    } else {
+      const current: ScreenJsonValue | undefined = initialStyleValue();
+      const input = createDesignerInput(doc, {
+        ariaLabel: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleValue,
+        value: typeof current === 'string' ? current : '',
+      });
+      input.dataset.hostStyleValue = '';
+      readValue = () => input.value;
+      valueRow.control.appendChild(input);
+    }
+    form.appendChild(valueRow.field);
+
+    const add = createDesignerButton(doc, {
+      text: DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleAdd,
+      className: 'designer-style-rule-add',
+      disabled: saving,
+    });
+    add.dataset.hostStyleAdd = '';
+    add.addEventListener('click', () => {
+      if (saving) return;
+      const value = readValue().trim();
+      if (value === '') {
+        status.textContent = DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleValueRequired;
+        return;
+      }
+      void commit(
+        withHostConditionalStyleBinding(bindings, sourceId, conditionId, styleKey, value),
+      );
+    });
+    form.appendChild(add);
+  };
+
+  const commit = async (next: readonly BaseScreenHostConditionalStyleBinding[]): Promise<void> => {
+    if (saving) return;
+    saving = true;
+    setButtonsDisabled(true);
+    status.textContent = DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleSaving;
+    try {
+      const result = await authoring.save(component.id, next);
+      if (!result.ok) {
+        status.textContent =
+          result.diagnostics[0]?.message ??
+          DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleSaveFailed;
+        return;
+      }
+      bindings = [...authoring.bindings(component.id)];
+      renderRows();
+      refreshConditionalStyles?.([component.id]);
+      status.textContent = DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleSaved;
+    } catch {
+      status.textContent = DESIGNER_UI_TEXT.propertiesPanel.hostConditionalStyleSaveFailed;
+    } finally {
+      saving = false;
+      setButtonsDisabled(false);
+    }
+  };
+
+  renderRows();
+  renderForm();
+}
+
+function readHostStyleString(value: ScreenJsonValue | undefined): string | undefined {
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+function formatHostStyleValue(value: ScreenJsonValue | undefined): string {
+  return typeof value === 'string' ? value : JSON.stringify(value);
 }
 
 function styleRuleActionButton(

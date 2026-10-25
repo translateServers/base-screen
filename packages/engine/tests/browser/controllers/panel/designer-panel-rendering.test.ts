@@ -1,6 +1,9 @@
 import type { ScreenDocument } from '@base-screen/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { renderDesignerProperties } from '../../../../src/browser/dom/panel/designer-panel-dom.js';
+import {
+  createDesignerCanvasPresentationSettings,
+  renderDesignerProperties,
+} from '../../../../src/browser/dom/panel/designer-panel-dom.js';
 import {
   catalog,
   descendants,
@@ -274,6 +277,71 @@ describe('designer panel rendering', () => {
         .map((element) => element.value),
     ).toContain('#ff4d4f');
     expect(descendants(section!).some((element) => element.dataset.styleRuleAction === 'add')).toBe(
+      true,
+    );
+  });
+
+  it('renders the host conditional style section from the host authoring port', () => {
+    const ownerDocument = new FakeDocument();
+    const properties = ownerDocument.createElement('div');
+    const bindings = vi.fn((componentId: string) =>
+      componentId === 'label-1'
+        ? [{ sourceId: 'alarm.open', conditionId: 'warning', style: { color: '#ff0000' } }]
+        : [],
+    );
+
+    renderDesignerProperties(
+      properties as unknown as HTMLElement,
+      document(),
+      { selectedComponentIds: ['label-1'], focusedComponentId: 'label-1' },
+      catalog(),
+      undefined,
+      false,
+      createDesignerCanvasPresentationSettings(),
+      undefined,
+      {
+        sources: [
+          {
+            id: 'alarm.open',
+            label: '未处理告警',
+            conditions: [
+              { id: 'warning', label: '警告' },
+              { id: 'critical', label: '严重' },
+            ],
+          },
+        ],
+        bindings,
+        save: async () => ({ ok: true as const, value: undefined, diagnostics: [] }),
+      },
+    );
+
+    expect(bindings).toHaveBeenCalledWith('label-1');
+    const all = descendants(properties);
+    const section = all.find((element) =>
+      element.className.includes('designer-host-conditional-style-section'),
+    );
+    expect(section).toBeDefined();
+    const optionValues = descendants(section!)
+      .filter((element) => element.tagName === 'option')
+      .map((element) => element.value);
+    expect(optionValues).toContain('alarm.open');
+    expect(optionValues).toContain('warning');
+    expect(optionValues).toContain('critical');
+    expect(optionValues).toContain('color');
+    const remove = descendants(section!).find(
+      (element) => element.dataset.hostStyleRemove !== undefined,
+    );
+    expect(remove?.dataset.hostStyleSourceId).toBe('alarm.open');
+    expect(remove?.dataset.hostStyleConditionId).toBe('warning');
+    expect(remove?.dataset.hostStyleKey).toBe('color');
+    expect(
+      descendants(section!).some((element) => element.dataset.hostStyleAdd !== undefined),
+    ).toBe(true);
+    expect(
+      descendants(section!).find((element) => element.dataset.hostStyleStatus !== undefined)
+        ?.textContent,
+    ).toBe('');
+    expect(descendants(section!).some((element) => element.textContent === 'color = #ff0000')).toBe(
       true,
     );
   });

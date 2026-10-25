@@ -40,6 +40,8 @@ export class DesignerPanelPropertyController {
       this.callbacks.isCanvasBackgroundImageButtonVisible?.() ?? false,
       this.#canvasPresentation,
       this.callbacks.getInspectorControls?.(),
+      this.callbacks.getHostConditionalStyleAuthoring?.(),
+      this.callbacks.refreshConditionalStyles,
     );
   }
 

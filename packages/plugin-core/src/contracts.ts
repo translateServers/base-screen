@@ -53,6 +53,45 @@ export interface BaseScreenConditionalStylePort {
   resolve(request: BaseScreenConditionalStyleRequest): ScreenJsonObject | undefined;
 }
 
+/**
+ * 宿主条件样式的条件源（如告警 key）与条件（如等级）。
+ *
+ * 只用于作者面展示：Engine 渲染通用表单，不解释 sourceId/conditionId 的语义，
+ * 也不持有外部系统的传输、凭证或阈值配置。
+ */
+export interface BaseScreenHostConditionalStyleCondition {
+  readonly id: string;
+  readonly label: string;
+}
+
+export interface BaseScreenHostConditionalStyleSource {
+  readonly id: string;
+  readonly label: string;
+  readonly conditions: readonly BaseScreenHostConditionalStyleCondition[];
+}
+
+/** 某组件在一个条件源 + 条件命中的样式覆盖；同源同条件可携带多个样式键。 */
+export interface BaseScreenHostConditionalStyleBinding {
+  readonly sourceId: string;
+  readonly conditionId: string;
+  readonly style: ScreenJsonObject;
+}
+
+/**
+ * 宿主条件样式作者口：Engine 只负责原生表单与调用时序，条件源、持久化与语义归宿主。
+ *
+ * `bindings` 返回该组件当前完整绑定；`save` 接收替换后的完整列表，宿主必须在 resolve 前
+ * 让新绑定对 `conditionalStylePort` 生效。保存成功后 Engine 会重算该组件样式。
+ */
+export interface BaseScreenHostConditionalStyleAuthoringPort {
+  readonly sources: readonly BaseScreenHostConditionalStyleSource[];
+  bindings(componentId: string): readonly BaseScreenHostConditionalStyleBinding[];
+  save(
+    componentId: string,
+    bindings: readonly BaseScreenHostConditionalStyleBinding[],
+  ): Promise<ScreenParseResult<void>>;
+}
+
 export type BaseScreenMaterialPropSchema =
   | BaseScreenMaterialStringSchema
   | BaseScreenMaterialNumberSchema

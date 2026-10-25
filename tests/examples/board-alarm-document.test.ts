@@ -181,7 +181,7 @@ describe('alarm demo document', () => {
     if (!parsed.ok) throw new Error('document did not parse');
     const byId = new Map(parsed.value.components.map((component) => [component.id, component]));
 
-    // `DEMO_ALARM_BINDINGS['alarm.open']` 只认这两个 id；改名等于让告警推送失去落点。
+    // 宿主后端种子 `ALARM_DEMO_BINDINGS['alarm.open']` 只认这两个 id；改名等于让告警推送失去落点。
     const alarmValue = byId.get('kpi-alarm-value');
     expect(alarmValue?.type).toBe('board.digital-flop');
     expect(alarmValue?.style.color).toBe('#7ff0ff');

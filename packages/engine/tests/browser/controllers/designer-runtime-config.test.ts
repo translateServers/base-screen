@@ -386,6 +386,41 @@ describe('BaseScreenDesignerElement configure (DRH-R8/RB3)', () => {
     expect(invalid.conditionalStylePort).toBeUndefined();
   });
 
+  it('accepts a valid host conditional style authoring port and rejects an invalid one atomically', () => {
+    const port = {
+      sources: [
+        {
+          id: 'alarm.open',
+          label: '未处理告警',
+          conditions: [{ id: 'warning', label: '警告' }],
+        },
+      ],
+      bindings: () => [],
+      save: async () => ({ ok: true as const, value: undefined, diagnostics: [] }),
+    };
+    const designer = new BaseScreenDesignerElement();
+    const valid = designer.configure({
+      catalog: catalog(),
+      hostConditionalStyleAuthoring: port,
+    });
+    expect(valid.ok).toBe(true);
+    expect(designer.hostConditionalStyleAuthoring).toBe(port);
+
+    const invalid = new BaseScreenDesignerElement();
+    const firstCatalog = catalog();
+    invalid.catalog = firstCatalog;
+    const result = invalid.configure({
+      catalog: catalog(),
+      hostConditionalStyleAuthoring: { sources: [] } as unknown as never,
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.diagnostics[0]?.code).toBe('PLUGIN_CORE_LIFECYCLE_INVALID');
+    }
+    expect(invalid.catalog).toBe(firstCatalog);
+    expect(invalid.hostConditionalStyleAuthoring).toBeUndefined();
+  });
+
   it('accepts the canvas background image button flag and exposes it via getter (ADR-0047)', () => {
     const designer = new BaseScreenDesignerElement();
     expect(designer.canvasBackgroundImageButton).toBe(false); // 默认隐藏

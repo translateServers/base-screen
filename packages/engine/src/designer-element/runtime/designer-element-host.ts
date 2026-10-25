@@ -22,6 +22,7 @@ import type {
 import { type ScreenDocumentCommand, type ScreenDocumentTransaction } from '@base-screen/core';
 import type {
   BaseScreenConditionalStylePort,
+  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -64,6 +65,7 @@ export interface DesignerElementHost extends HTMLElement {
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   hostCatalogPort: ScreenHostCatalogPort | undefined;
   conditionalStylePort: BaseScreenConditionalStylePort | undefined;
+  hostConditionalStyleAuthoring: BaseScreenHostConditionalStyleAuthoringPort | undefined;
   datasetPort: ScreenHostDatasetPort | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
   projectPreviewPort: ScreenProjectPreviewPort | undefined;

@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import type { AlarmBindings } from './alarm-binding-guard';
 import { CreateScreenDto } from './dto/create-screen.dto';
+import { UpdateAlarmBindingsDto } from './dto/update-alarm-bindings.dto';
 import { UpdateScreenDto } from './dto/update-screen.dto';
 import type { ScreenShape, ScreenSummaryShape } from './screen.types';
 import { ScreensService } from './screens.service';
@@ -26,6 +28,22 @@ export class ScreensController {
   @ApiOperation({ summary: '读取单个大屏（含 document）' })
   async get(@Param('id') id: string): Promise<{ screen: ScreenShape }> {
     return { screen: await this.screens.get(id) };
+  }
+
+  @Get(':id/alarm-bindings')
+  @ApiOperation({ summary: '读取宿主按屏持久化的告警绑定（未配置返回 {}）' })
+  async getAlarmBindings(@Param('id') id: string): Promise<{ bindings: AlarmBindings }> {
+    return { bindings: await this.screens.getAlarmBindings(id) };
+  }
+
+  @Put(':id/alarm-bindings')
+  @ApiOperation({ summary: '覆盖宿主按屏持久化的告警绑定' })
+  @ApiResponse({ status: 400, description: 'ALARM_BINDINGS_INVALID：结构不合法' })
+  async updateAlarmBindings(
+    @Param('id') id: string,
+    @Body() dto: UpdateAlarmBindingsDto,
+  ): Promise<{ bindings: AlarmBindings }> {
+    return { bindings: await this.screens.updateAlarmBindings(id, dto.bindings) };
   }
 
   @Put(':id')

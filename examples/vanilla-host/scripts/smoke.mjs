@@ -1281,6 +1281,97 @@ async function main() {
       { timeout: 20_000 },
     );
 
+    // M) 宿主资源作者面：host-resource 组件的页面内插入与改绑。
+    //    告警演示屏的读数走 demo_metric——设计器数据面板对宿主资源只读，
+    //    页面配置必须经宿主侧作者面（insertHostResource / replaceHostResource）走通。
+    await openEditor(page, '实时告警演示大屏');
+    await page.locator('[data-resource-toggle]').click();
+    await page.waitForSelector('[data-resource-panel]:not([hidden])');
+    const resourceDefaults = await page.evaluate(() => ({
+      type: document.querySelector('[data-resource-type]')?.value ?? '',
+      material: document.querySelector('[data-resource-material]')?.value ?? '',
+      rebindDisabled: document.querySelector('[data-resource-rebind]')?.disabled ?? null,
+      metricOptions: [...document.querySelectorAll('[data-resource-id] option')].map(
+        (option) => option.value,
+      ),
+    }));
+    if (resourceDefaults.type !== 'demo_metric') {
+      fail(`M: 默认资源类型应 demo_metric，实际 ${resourceDefaults.type}`);
+    }
+    if (resourceDefaults.material !== 'board.digital-flop') {
+      fail(`M: 默认物料应翻牌读数，实际 ${resourceDefaults.material}`);
+    }
+    if (!resourceDefaults.metricOptions.includes('alarm_warning')) {
+      fail('M: 指标目录缺 alarm_warning，告警读数无法页面配置');
+    }
+    if (resourceDefaults.rebindDisabled !== true) {
+      fail('M: 未选中组件时改绑应禁用');
+    }
+    const resourceBaseline = await page.evaluate(
+      () => document.querySelector('base-screen-designer')?.document?.components.length ?? 0,
+    );
+    await page.locator('[data-resource-id]').selectOption('alarm_warning');
+    await page.locator('[data-resource-insert]').click();
+    await page.waitForFunction(
+      (before) =>
+        (document.querySelector('base-screen-designer')?.document?.components.length ?? 0) ===
+        before + 1,
+      resourceBaseline,
+      { timeout: 10_000 },
+    );
+    const insertedResource = await page.evaluate(() => {
+      const designer = document.querySelector('base-screen-designer');
+      const component = [...(designer?.document?.components ?? [])].find(
+        (item) =>
+          item.dataSource?.type === 'host-resource' &&
+          item.dataSource.resourceType === 'demo_metric' &&
+          item.dataSource.resourceId === 'alarm_warning',
+      );
+      if (component === undefined) return null;
+      return {
+        id: component.id,
+        type: component.type,
+        binding: component.dataSource.binding,
+        params: component.dataSource.params,
+        rebindDisabled: document.querySelector('[data-resource-rebind]')?.disabled ?? null,
+      };
+    });
+    if (insertedResource === null) fail('M: 页面内未插入出 demo_metric/alarm_warning 组件');
+    if (insertedResource.type !== 'board.digital-flop') {
+      fail(`M: 插入物料类型不对：${insertedResource.type}`);
+    }
+    if (JSON.stringify(insertedResource.binding?.fields?.value) !== JSON.stringify(['value'])) {
+      fail(`M: 插入绑定不对：${JSON.stringify(insertedResource.binding)}`);
+    }
+    if (insertedResource.params?.points?.value !== 24) {
+      fail(`M: 插入参数不对：${JSON.stringify(insertedResource.params)}`);
+    }
+    if (insertedResource.rebindDisabled !== false) {
+      fail('M: 插入后自动选中同型组件，改绑应可用');
+    }
+    await page.locator('[data-resource-id]').selectOption('alarm_info');
+    await page.locator('[data-resource-rebind]').click();
+    await page.waitForFunction(
+      (componentId) => {
+        const component = document
+          .querySelector('base-screen-designer')
+          ?.document?.components.find((item) => item.id === componentId);
+        return (
+          component?.dataSource?.type === 'host-resource' &&
+          component.dataSource.resourceId === 'alarm_info'
+        );
+      },
+      insertedResource.id,
+      { timeout: 10_000 },
+    );
+    const resourceRestored = await page.evaluate((before) => {
+      const designer = document.querySelector('base-screen-designer');
+      designer?.undo();
+      designer?.undo();
+      return (designer?.document?.components.length ?? -1) === before;
+    }, resourceBaseline);
+    if (!resourceRestored) fail('M: 撤销后组件数未回到基线');
+
     // 清理：删掉本次 smoke 造的屏与数据源（保持可重复；库本身每次重建）
     for (const screenId of dsScreens) {
       await dsFetch(`/screens/${screenId}`, { method: 'DELETE' });
@@ -1298,7 +1389,7 @@ async function main() {
 
     if (pageErrors.length > 0) fail(`页面存在未捕获错误：${JSON.stringify(pageErrors)}`);
     console.log(
-      'Vanilla 前端冒烟通过：列表 / 成品屏编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）/ 实时告警演示屏（流水·KPI·等级色块·SSE 着色）/ 数据源管理（台账·筛选·REST 闭环·SQLite 表与 SQL 模式·引用保护·掩码·字段变化）。',
+      'Vanilla 前端冒烟通过：列表 / 成品屏编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）/ 实时告警演示屏（流水·KPI·等级色块·SSE 着色·宿主资源页面内插入与改绑）/ 数据源管理（台账·筛选·REST 闭环·SQLite 表与 SQL 模式·引用保护·掩码·字段变化）。',
     );
   } finally {
     await browser.close();

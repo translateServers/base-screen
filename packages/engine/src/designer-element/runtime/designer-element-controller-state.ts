@@ -321,6 +321,9 @@ export function initializeDesignerElementControllers(
     getImageNaturalSize: (componentId) => readDesignerImageNaturalSize(state.canvas, componentId),
     getDatasetFields: () => state.datasetController.getFocusedDatasetFields(),
     getInspectorControls: () => state.inspectorControls,
+    getHostConditionalStyleAuthoring: () => state.hostConditionalStyleAuthoring,
+    refreshConditionalStyles: (componentIds) =>
+      state.runtime.refreshConditionalStyles(element, componentIds),
     getGroupMaterialType: () => state.groupMaterialType,
     getInteraction: () => state.session.interaction,
     getResourcePort: () => state.resourcePort,

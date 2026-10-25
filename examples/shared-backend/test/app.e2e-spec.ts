@@ -98,6 +98,78 @@ describe('host api (e2e)', () => {
       });
   });
 
+  it('serves seeded alarm bindings and persists page-authored overrides per screen', async () => {
+    const list = await request(app.getHttpServer()).get('/api/screens').expect(200);
+    const alarm = (list.body.screens as { id: string; name: string }[]).find(
+      (item) => item.name === '实时告警演示大屏',
+    );
+    expect(alarm).toBeDefined();
+    if (alarm === undefined) return;
+
+    const seeded = await request(app.getHttpServer())
+      .get(`/api/screens/${alarm.id}/alarm-bindings`)
+      .expect(200);
+    expect(seeded.body.bindings['alarm.open']['kpi-alarm-value']).toEqual({
+      warning: { color: '#fa8c16' },
+      critical: { color: '#f5222d' },
+    });
+
+    const authored = {
+      'alarm.open': {
+        'kpi-level-warning-value': { warning: { color: '#00aa00' } },
+      },
+    };
+    const saved = await request(app.getHttpServer())
+      .put(`/api/screens/${alarm.id}/alarm-bindings`)
+      .send({ bindings: authored })
+      .expect(200);
+    expect(saved.body.bindings).toEqual(authored);
+
+    const reread = await request(app.getHttpServer())
+      .get(`/api/screens/${alarm.id}/alarm-bindings`)
+      .expect(200);
+    expect(reread.body.bindings).toEqual(authored);
+
+    // 结构不合法必须 400，且不覆盖已保存的配置。
+    await request(app.getHttpServer())
+      .put(`/api/screens/${alarm.id}/alarm-bindings`)
+      .send({ bindings: { 'alarm.open': { card: { warning: { color: 1 } } } } })
+      .expect(400)
+      .expect((response) => {
+        expect(response.body.error).toBe('ALARM_BINDINGS_INVALID');
+      });
+    const intact = await request(app.getHttpServer())
+      .get(`/api/screens/${alarm.id}/alarm-bindings`)
+      .expect(200);
+    expect(intact.body.bindings).toEqual(authored);
+
+    // 恢复种子值，避免这条用例污染同一测试库里的其它断言。
+    await request(app.getHttpServer())
+      .put(`/api/screens/${alarm.id}/alarm-bindings`)
+      .send({ bindings: seeded.body.bindings })
+      .expect(200);
+  });
+
+  it('returns empty alarm bindings for a new screen and rejects unknown screens', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/screens')
+      .send({ name: 'e2e-告警绑定' })
+      .expect(201);
+    const id = created.body.screen.id as string;
+    createdIds.push(id);
+
+    const empty = await request(app.getHttpServer())
+      .get(`/api/screens/${id}/alarm-bindings`)
+      .expect(200);
+    expect(empty.body.bindings).toEqual({});
+
+    await request(app.getHttpServer()).get('/api/screens/missing/alarm-bindings').expect(404);
+    await request(app.getHttpServer())
+      .put('/api/screens/missing/alarm-bindings')
+      .send({ bindings: {} })
+      .expect(404);
+  });
+
   it('serves deterministic metric series and fails closed on unknown metrics', async () => {
     const first = await request(app.getHttpServer())
       .get('/api/metrics/series?metric=cpu_usage&points=3')

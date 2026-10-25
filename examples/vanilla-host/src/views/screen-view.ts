@@ -13,8 +13,8 @@ import { createLogger } from '../lib/logger';
 import { goToList } from '../lib/navigation';
 import { attachRenderDiagnostics, type RenderDiagnosticsHandle } from '../lib/render-diagnostics';
 import type { Route, ViewModule } from '../router';
-import { DEMO_ALARM_BINDINGS } from '../screen/host-alarm-bindings';
 import { createHostAlarmController } from '../screen/host-alarm-controller';
+import { parseHostAlarmBindings } from '../screen/host-alarm-style-authoring';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -450,9 +450,19 @@ export const screenView: ViewModule = {
     });
 
     // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染。
+    // 绑定按 screenId 从宿主读取，与编辑页看到的是同一份页面配置。
+    const storedBindings = await api.getScreenAlarmBindings(screenId);
+    if (!host.isConnected) {
+      cleanup();
+      return () => {};
+    }
+    const alarmBindings = storedBindings.ok
+      ? (parseHostAlarmBindings(storedBindings.data.bindings) ?? {})
+      : {};
+    if (!storedBindings.ok) logger.warn('alarm bindings unavailable', storedBindings.error);
     alarms = createHostAlarmController({
       apiBase: resolveApiBase(),
-      bindings: DEMO_ALARM_BINDINGS,
+      bindings: alarmBindings,
       onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
     });
     await alarms.ready(800);

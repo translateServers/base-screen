@@ -66,6 +66,11 @@ export interface HostAlarmController {
   readonly status: () => HostAlarmStatusSnapshot;
   /** 首个 snapshot 已应用或超时；宿主在 configure 前等待，避免首屏闪烁。 */
   readonly ready: (timeoutMs?: number) => Promise<void>;
+  /**
+   * 页面里改完绑定后热更新：不重建 SSE 连接，只换映射并失效新旧两侧命中的组件。
+   * 当前快照保持不变——绑定是展示映射，不是告警状态。
+   */
+  setBindings(bindings: HostAlarmBindings): void;
   readonly stop: () => void;
 }
 
@@ -87,6 +92,7 @@ export function createHostAlarmController(
 ): HostAlarmController {
   const connect = options.connect ?? defaultConnect;
   const schedule = options.schedule ?? defaultSchedule;
+  let bindings = options.bindings;
   const records = new Map<string, HostAlarmRecord>();
   let revision = -1;
   let status: HostAlarmStatus = 'connecting';
@@ -117,7 +123,7 @@ export function createHostAlarmController(
       | undefined;
     for (const record of records.values()) {
       if (record.acknowledged || record.suppressed) continue;
-      const style = options.bindings[record.key]?.[componentId]?.[record.level];
+      const style = bindings[record.key]?.[componentId]?.[record.level];
       if (style === undefined) continue;
       if (
         best === undefined ||
@@ -131,8 +137,22 @@ export function createHostAlarmController(
   }
 
   function componentsForKey(key: string): readonly string[] {
-    const components = options.bindings[key];
+    return componentsFor(bindings, key);
+  }
+
+  function componentsFor(source: HostAlarmBindings, key: string): readonly string[] {
+    const components = source[key];
     return components === undefined ? [] : Object.keys(components);
+  }
+
+  function setBindings(next: HostAlarmBindings): void {
+    const affected = new Set<string>();
+    for (const record of records.values()) {
+      for (const componentId of componentsFor(bindings, record.key)) affected.add(componentId);
+      for (const componentId of componentsFor(next, record.key)) affected.add(componentId);
+    }
+    bindings = next;
+    markComponents([...affected]);
   }
 
   function scheduleFlush(): void {
@@ -287,6 +307,7 @@ export function createHostAlarmController(
       ).length,
     }),
     ready,
+    setBindings,
     stop,
   };
 }

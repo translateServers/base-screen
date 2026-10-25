@@ -11,11 +11,11 @@ import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
 import { createLogger } from '../lib/logger';
 import { attachRenderDiagnostics, type RenderDiagnosticsHandle } from '../lib/render-diagnostics';
-import { DEMO_ALARM_BINDINGS } from '../screen/host-alarm-bindings';
 import {
   createHostAlarmController,
   type HostAlarmStatusSnapshot,
 } from '../screen/host-alarm-controller';
+import { parseHostAlarmBindings } from '../screen/host-alarm-style-authoring';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
@@ -281,10 +281,16 @@ export function ScreenViewerPage(): React.ReactElement {
       });
 
       // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染，
-      // 快照到达后由失效 API 补齐，不阻塞页面。
+      // 快照到达后由失效 API 补齐，不阻塞页面。绑定按 screenId 从宿主读取。
+      const storedBindings = await api.getScreenAlarmBindings(screenId);
+      if (disposed) return;
+      const alarmBindings = storedBindings.ok
+        ? (parseHostAlarmBindings(storedBindings.data.bindings) ?? {})
+        : {};
+      if (!storedBindings.ok) logger.warn('alarm bindings unavailable', storedBindings.error);
       alarms = createHostAlarmController({
         apiBase: resolveApiBase(),
-        bindings: DEMO_ALARM_BINDINGS,
+        bindings: alarmBindings,
         onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
       });
       await alarms.ready(800);

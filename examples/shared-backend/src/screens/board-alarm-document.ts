@@ -12,12 +12,12 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  * | KPI 读数 | `board.digital-flop` ← `kpi-alarm-value` | `host-resource` `demo_metric` `alarm_open` |
  * | 等级色块 | 3 组「矩形色块 + 翻牌读数」 | `demo_metric` `alarm_critical` / `alarm_warning` / `alarm_info` |
  *
- * **演示 key 的对齐是这张屏的存在理由**：宿主的 `host-alarm-bindings.ts` 把
- * `alarm.open` 映射到两个**组件 id**（`kpi-alarm-value`、`top-notice`），而绑定表是
- * 全局的、不区分大屏。因此这里的两个组件刻意沿用与生产监控屏相同的 id 与基础色，
- * 宿主侧一行都不用改，`POST /api/demo/alarms/raise { key: 'alarm.open' }` 就能让
- * 这张屏的未处理告警读数与告警播报换色。反过来说，**文档里没有告警 key、阈值或
- * 样式规则**——告警判定与视觉映射都归宿主。
+ * **演示 key 的对齐是这张屏的存在理由**：告警绑定按大屏持久化在宿主后端
+ * （`ScreenAlarmBinding`），种子把 `alarm.open` 映射到两个**组件 id**
+ * （`kpi-alarm-value`、`top-notice`）作为开箱模板；组件检查器的「宿主条件样式」段可以
+ * 增删改这份映射。因此这里的两个组件沿用与生产监控屏相同的 id 与基础色，种子屏
+ * 一行命令就能被 `POST /api/demo/alarms/raise { key: 'alarm.open' }` 换色。反过来说，
+ * **文档里没有告警 key、阈值或样式规则**——告警判定与视觉映射都归宿主。
  *
  * 等级色板的单一来源是 `plugin-board-materials` 的 `BOARD_ALARM_LEVEL_COLORS`。后端
  * 不 import 插件包（CJS 宿主不依赖 ESM 插件），所以这里写同值字面量，由根测试
@@ -535,7 +535,7 @@ text(
   'filter-note-3',
   '筛选说明 3',
   [660, 962, 1200, 18],
-  '告警 key 与样式映射都在宿主侧（src/screen/host-alarm-bindings.ts），文档不持有告警规则。',
+  '告警 key 与样式映射由宿主按屏保存，文档不持有告警规则。',
   { color: '#6f8ba3', fontSize: 12 },
 );
 
@@ -661,6 +661,27 @@ export const BOARD_ALARM_DOCUMENT = {
         ],
       },
     ],
+  },
+} as const;
+
+/**
+ * 宿主侧告警绑定的开箱值：`alarm.open` × 两个组件 × warning/critical。
+ *
+ * 落库位置是 `ScreenAlarmBinding`（按 screenId），不再由前端用常量硬编码——页面里
+ * 的「宿主条件样式」段读取和覆盖的就是这份数据。样式键必须落在目标物料的
+ * Manifest styleSchema 内（digital-flop 只有 color；base.text 额外支持 fontWeight），
+ * 根级测试会对着 manifest 与种子文档核验。
+ */
+export const ALARM_DEMO_BINDINGS = {
+  'alarm.open': {
+    'kpi-alarm-value': {
+      warning: { color: '#fa8c16' },
+      critical: { color: '#f5222d' },
+    },
+    'top-notice': {
+      warning: { color: '#fa8c16', fontWeight: '700' },
+      critical: { color: '#f5222d', fontWeight: '700' },
+    },
   },
 } as const;
 

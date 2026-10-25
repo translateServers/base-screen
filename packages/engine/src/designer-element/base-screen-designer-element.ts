@@ -27,6 +27,7 @@ import {
 } from '@base-screen/core';
 import type {
   BaseScreenConditionalStylePort,
+  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -247,6 +248,16 @@ export class BaseScreenDesignerElement extends ElementBase {
 
   set conditionalStylePort(value: BaseScreenConditionalStylePort | undefined) {
     this.#designerState.runtime.writeConditionalStylePort(this, value);
+  }
+
+  get hostConditionalStyleAuthoring(): BaseScreenHostConditionalStyleAuthoringPort | undefined {
+    return this.#designerState.runtime.readHostConditionalStyleAuthoring(this);
+  }
+
+  set hostConditionalStyleAuthoring(value:
+    | BaseScreenHostConditionalStyleAuthoringPort
+    | undefined) {
+    this.#designerState.runtime.writeHostConditionalStyleAuthoring(this, value);
   }
 
   get datasetPort(): ScreenHostDatasetPort | undefined {

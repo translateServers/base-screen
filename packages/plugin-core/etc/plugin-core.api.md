@@ -81,6 +81,44 @@ export interface BaseScreenDataField {
 // @public (undocumented)
 export type BaseScreenDataValueType = 'string' | 'number' | 'boolean' | 'date';
 
+// @public
+export interface BaseScreenHostConditionalStyleAuthoringPort {
+    // (undocumented)
+    bindings(componentId: string): readonly BaseScreenHostConditionalStyleBinding[];
+    // (undocumented)
+    save(componentId: string, bindings: readonly BaseScreenHostConditionalStyleBinding[]): Promise<ScreenParseResult<void>>;
+    // (undocumented)
+    readonly sources: readonly BaseScreenHostConditionalStyleSource[];
+}
+
+// @public
+export interface BaseScreenHostConditionalStyleBinding {
+    // (undocumented)
+    readonly conditionId: string;
+    // (undocumented)
+    readonly sourceId: string;
+    // (undocumented)
+    readonly style: ScreenJsonObject;
+}
+
+// @public
+export interface BaseScreenHostConditionalStyleCondition {
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly label: string;
+}
+
+// @public (undocumented)
+export interface BaseScreenHostConditionalStyleSource {
+    // (undocumented)
+    readonly conditions: readonly BaseScreenHostConditionalStyleCondition[];
+    // (undocumented)
+    readonly id: string;
+    // (undocumented)
+    readonly label: string;
+}
+
 // @public (undocumented)
 export interface BaseScreenMaterialArraySchema {
     // (undocumented)

@@ -5,6 +5,7 @@
 ```ts
 
 import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
+import type { BaseScreenHostConditionalStyleAuthoringPort } from '@base-screen/plugin-core';
 import type { BaseScreenMaterialCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginCatalog } from '@base-screen/plugin-core';
 import type { BaseScreenPluginInspectorControlCatalog } from '@base-screen/plugin-core';
@@ -408,6 +409,7 @@ export interface BaseScreenDesignerConfiguration {
     readonly groupMaterialType?: string;
     // (undocumented)
     readonly hostCatalogPort?: ScreenHostCatalogPort;
+    readonly hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort;
     // (undocumented)
     readonly initialWorkbenchMode?: BaseScreenDesignerWorkbenchMode;
     // (undocumented)
@@ -515,6 +517,9 @@ export class BaseScreenDesignerElement extends ElementBase {
     // (undocumented)
     get hostCatalogPort(): ScreenHostCatalogPort | undefined;
     set hostCatalogPort(value: ScreenHostCatalogPort | undefined);
+    // (undocumented)
+    get hostConditionalStyleAuthoring(): BaseScreenHostConditionalStyleAuthoringPort | undefined;
+    set hostConditionalStyleAuthoring(value: BaseScreenHostConditionalStyleAuthoringPort | undefined);
     // (undocumented)
     importDocument(document: unknown): ScreenParseResult<ScreenDocument>;
     // (undocumented)

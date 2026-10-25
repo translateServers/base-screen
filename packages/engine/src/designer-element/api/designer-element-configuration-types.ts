@@ -11,6 +11,7 @@ import type {
 } from '@base-screen/contracts';
 import type {
   BaseScreenConditionalStylePort,
+  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -46,6 +47,11 @@ export interface BaseScreenDesignerConfiguration {
   readonly hostCatalogPort?: ScreenHostCatalogPort;
   /** ADR-0059 宿主条件样式端口：configure-only（Renderer 创建时捕获，设计态画布同路径预览）。 */
   readonly conditionalStylePort?: BaseScreenConditionalStylePort;
+  /**
+   * 宿主条件样式的作者口：引擎在组件检查器渲染通用表单，宿主提供条件源、当前绑定与持久化。
+   * 与 `conditionalStylePort` 配对使用；未提供时不渲染任何宿主作者面。
+   */
+  readonly hostConditionalStyleAuthoring?: BaseScreenHostConditionalStyleAuthoringPort;
   readonly datasetPort?: ScreenHostDatasetPort;
   readonly projectCatalogPort?: ScreenProjectCatalogPort;
   readonly projectPreviewPort?: ScreenProjectPreviewPort;

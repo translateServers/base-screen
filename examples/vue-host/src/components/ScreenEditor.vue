@@ -11,11 +11,15 @@ import { createLogger } from '../lib/logger';
 import { showToast } from '../lib/toast';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
 import { rememberDatasourceReturn } from '../screen/datasource-return';
-import { DEMO_ALARM_BINDINGS } from '../screen/host-alarm-bindings';
-import { createHostAlarmController } from '../screen/host-alarm-controller';
+import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
+import {
+  createHostAlarmStyleAuthoring,
+  parseHostAlarmBindings,
+} from '../screen/host-alarm-style-authoring';
 import { createHostCatalogPort } from '../screen/host-catalog-port';
 import { createHostResourcePort } from '../screen/host-data-channel';
 import { createHostDatasetPort } from '../screen/host-dataset-port';
+import { createHostResourceAuthoringPanel } from '../screen/host-resource-authoring';
 import { type HostRuntime, loadHostRuntime } from '../screen/host-runtime';
 import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
@@ -46,6 +50,8 @@ let onDirtyChange: ((event: Event) => void) | undefined;
 let unsubscribeSession: (() => void) | undefined;
 let runtime: HostRuntime | undefined;
 let alarms: ReturnType<typeof createHostAlarmController> | undefined;
+// 宿主资源作者面：host-resource 的创建/改绑入口（数据面板对它只读）。
+let resourceAuthoring: ReturnType<typeof createHostResourceAuthoringPanel> | undefined;
 // 运行时的激活是异步的；await 期间路由可能已经切走，configure 必须能被取消。
 let disposed = false;
 
@@ -119,6 +125,20 @@ onMounted(() => {
     if (state.error !== null && state.error !== previous.error) showToast(state.error, 'error');
   });
 
+  const loadAlarmBindings = async (id: string): Promise<HostAlarmBindings> => {
+    const result = await api.getScreenAlarmBindings(id);
+    if (!result.ok) {
+      logger.warn('alarm bindings unavailable', result.error);
+      return {};
+    }
+    const parsed = parseHostAlarmBindings(result.data.bindings);
+    if (parsed === undefined) {
+      logger.warn('alarm bindings malformed', result.data.bindings);
+      return {};
+    }
+    return parsed;
+  };
+
   void (async () => {
     // 插件元素注册与 manager 激活都在这条 Promise 里；失败时清缓存供下次重试。
     const host = await loadHostRuntime();
@@ -136,13 +156,31 @@ onMounted(() => {
     host.bindDesigner(element);
 
     // 告警端口必须在 configure 前注入；首快照最多等 800ms，超时先按基础样式渲染。
+    // 绑定按 screenId 从宿主读取：页面里配过什么，打开就是什么。
+    const alarmBindings = await loadAlarmBindings(screenId);
+    if (disposed) return;
     alarms = createHostAlarmController({
       apiBase: resolveApiBase(),
-      bindings: DEMO_ALARM_BINDINGS,
+      bindings: alarmBindings,
       onInvalidate: (componentIds) => element.refreshConditionalStyles(componentIds),
     });
     await alarms.ready(800);
     if (disposed) return;
+
+    // 宿主条件样式的作者口：引擎在组件检查器渲染通用表单，保存后热更新端口。
+    const alarmStyleAuthoring = createHostAlarmStyleAuthoring({
+      initialBindings: alarmBindings,
+      save: async (bindings) => {
+        const result = await api.updateScreenAlarmBindings(screenId, bindings);
+        if (!result.ok) return { ok: false, message: result.error.message };
+        const parsed = parseHostAlarmBindings(result.data.bindings);
+        if (parsed === undefined) {
+          return { ok: false, message: '宿主返回的告警绑定格式无效。' };
+        }
+        return { ok: true, bindings: parsed };
+      },
+      onSaved: (bindings) => alarms?.setBindings(bindings),
+    });
 
     // 宿主数据通道必须在 configure 内提交：renderer 在 configure 时建立，
     // 之后再赋 `resourcePort` 会被按「初始化后不可更换端口」拒绝。
@@ -165,6 +203,7 @@ onMounted(() => {
         logger,
       }),
       conditionalStylePort: alarms.port,
+      hostConditionalStyleAuthoring: alarmStyleAuthoring,
       // 组合的编辑期形态：多个原子物料成组后整体移动/缩放/旋转。缺了这行，顶栏「编辑 → 成组」
       // 与图层面板的成组按钮都不可用。
       groupMaterialType: 'base.container',
@@ -222,6 +261,9 @@ onMounted(() => {
       return;
     }
     screenSessionStore.getState().loaded(loaded.value.name, loaded.value.revision);
+
+    resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
+    container.parentElement?.appendChild(resourceAuthoring.element);
   })().catch((error: unknown) => {
     if (disposed) return;
     logger.error('editor bootstrap failed', error);
@@ -243,6 +285,8 @@ onBeforeUnmount(() => {
   }
   alarms?.stop();
   alarms = undefined;
+  resourceAuthoring?.dispose();
+  resourceAuthoring = undefined;
   unsubscribeSession?.();
   clearSaveTimer();
   element?.remove();

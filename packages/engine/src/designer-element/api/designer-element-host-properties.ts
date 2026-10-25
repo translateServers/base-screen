@@ -9,7 +9,10 @@ import type {
   ScreenProjectSnapshotPort,
 } from '@base-screen/contracts';
 import { validateScreenDesignerHostAdapter } from '@base-screen/contracts';
-import type { BaseScreenConditionalStylePort } from '@base-screen/plugin-core';
+import type {
+  BaseScreenConditionalStylePort,
+  BaseScreenHostConditionalStyleAuthoringPort,
+} from '@base-screen/plugin-core';
 import { lifecycleDiagnostic } from '../runtime/designer-element-guards.js';
 import {
   type DesignerElementHost,
@@ -117,6 +120,31 @@ export function readConditionalStylePort(
   const elementState = getDesignerElementState(element);
 
   return elementState.conditionalStylePort;
+}
+
+export function readHostConditionalStyleAuthoring(
+  element: DesignerElementHost,
+): BaseScreenHostConditionalStyleAuthoringPort | undefined {
+  const elementState = getDesignerElementState(element);
+
+  return elementState.hostConditionalStyleAuthoring;
+}
+
+export function writeHostConditionalStyleAuthoring(
+  element: DesignerElementHost,
+  value: BaseScreenHostConditionalStyleAuthoringPort | undefined,
+) {
+  const elementState = getDesignerElementState(element);
+
+  if (elementState.renderer !== undefined && value !== elementState.hostConditionalStyleAuthoring) {
+    elementState.runtime.emitDiagnostics(element, [
+      lifecycleDiagnostic(
+        'Host conditional style authoring cannot change after initialization. Call unload first.',
+      ),
+    ]);
+    return;
+  }
+  elementState.hostConditionalStyleAuthoring = value;
 }
 
 export function writeConditionalStylePort(

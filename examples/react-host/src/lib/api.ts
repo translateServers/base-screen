@@ -145,6 +145,22 @@ export const api = {
     request(`/screens/${encodeURIComponent(id)}`, { method: 'PUT', body: { document, revision } }),
   deleteScreen: (id: string): Promise<ApiResult<{ ok: true }>> =>
     request(`/screens/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  getScreenAlarmBindings: (
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<ApiResult<{ bindings: Record<string, unknown> }>> =>
+    request(
+      `/screens/${encodeURIComponent(id)}/alarm-bindings`,
+      signal === undefined ? {} : { signal },
+    ),
+  updateScreenAlarmBindings: (
+    id: string,
+    bindings: unknown,
+  ): Promise<ApiResult<{ bindings: Record<string, unknown> }>> =>
+    request(`/screens/${encodeURIComponent(id)}/alarm-bindings`, {
+      method: 'PUT',
+      body: { bindings },
+    }),
   metricSeries: (metric: string, points: number): Promise<ApiResult<MetricSeries>> =>
     request(`/metrics/series?metric=${encodeURIComponent(metric)}&points=${points}`),
   metricRanking: (dimension: string, limit: number): Promise<ApiResult<MetricRanking>> =>

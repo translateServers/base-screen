@@ -39,6 +39,24 @@ export function isBaseScreenConditionalStylePort(value: unknown): boolean {
   );
 }
 
+export function isBaseScreenHostConditionalStyleAuthoringPort(value: unknown): boolean {
+  if (value === null || typeof value !== 'object') return false;
+  const record = value as Record<string, unknown>;
+  if (!Array.isArray(record.sources)) return false;
+  if (typeof record.bindings !== 'function' || typeof record.save !== 'function') return false;
+  return record.sources.every((source) => {
+    if (source === null || typeof source !== 'object') return false;
+    const entry = source as Record<string, unknown>;
+    if (typeof entry.id !== 'string' || typeof entry.label !== 'string') return false;
+    if (!Array.isArray(entry.conditions)) return false;
+    return entry.conditions.every((condition) => {
+      if (condition === null || typeof condition !== 'object') return false;
+      const item = condition as Record<string, unknown>;
+      return typeof item.id === 'string' && typeof item.label === 'string';
+    });
+  });
+}
+
 export function isBaseScreenRuntimeContributionIndex(value: unknown): boolean {
   return (
     value !== null &&

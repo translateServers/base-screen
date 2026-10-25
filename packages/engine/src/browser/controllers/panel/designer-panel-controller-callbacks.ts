@@ -12,6 +12,7 @@ import type {
   ScreenInteractionState,
 } from '@base-screen/core';
 import type {
+  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginInspectorControlCatalog,
   BaseScreenRuntimeContributionIndex,
@@ -38,6 +39,12 @@ export interface DesignerPanelControllerCallbacks {
   readonly getDatasetFields?: () => readonly DesignerDescriptorDatasetFields[];
   /** 授权目录：custom 控件只能从这里取构造函数。缺省即不渲染任何自定义控件。 */
   readonly getInspectorControls?: () => BaseScreenPluginInspectorControlCatalog | undefined;
+  /** 宿主条件样式作者口：缺省即不渲染宿主条件样式段。 */
+  readonly getHostConditionalStyleAuthoring?: () =>
+    | BaseScreenHostConditionalStyleAuthoringPort
+    | undefined;
+  /** 宿主绑定保存成功后重算指定组件的条件样式。 */
+  readonly refreshConditionalStyles?: (componentIds: readonly string[]) => void;
   readonly getGroupMaterialType: () => string | undefined;
   readonly getInteraction: () => ScreenInteractionState;
   readonly getResourcePort: () => ScreenHostResourcePort | undefined;

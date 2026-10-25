@@ -223,7 +223,27 @@ describe('host alarm controller', () => {
     harness.controller.stop();
   });
 
-  it('CSR-H06 stops the stream and ignores later events', async () => {
+  it('CSR-H06 rebinds the live snapshot without reconnecting the stream', () => {
+    const harness = createHarness();
+    harness.emit(snapshot(1, [record('alarm.open', 'warning')]));
+    harness.flush();
+    harness.invalidations.length = 0;
+
+    harness.controller.setBindings({
+      'alarm.open': { 'top-notice': { warning: { color: '#123456' } } },
+    });
+    harness.flush();
+
+    // 旧目标必须一起失效，否则已着色的组件会停在旧颜色上。
+    expect([...harness.invalidations[0]!].sort()).toEqual(['kpi-alarm-value', 'top-notice']);
+    expect(harness.controller.port.resolve(request('kpi-alarm-value'))).toBeUndefined();
+    expect(harness.controller.port.resolve(request('top-notice'))).toEqual({ color: '#123456' });
+    expect(harness.closed()).toBe(0);
+    expect(harness.urls).toHaveLength(1);
+    harness.controller.stop();
+  });
+
+  it('CSR-H07 stops the stream and ignores later events', async () => {
     const harness = createHarness();
     harness.emit(snapshot(1, [record('alarm.open')]));
     harness.flush();

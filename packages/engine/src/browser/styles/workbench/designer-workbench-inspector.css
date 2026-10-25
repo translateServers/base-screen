@@ -1048,3 +1048,16 @@
 .properties .designer-style-rule-add {
   width: 100%;
 }
+
+/* 宿主条件样式：条件源表单与保存状态。状态行固定最小高度，切换文案不让面板跳动。 */
+.properties .designer-host-style-form {
+  margin-top: 8px;
+}
+
+.properties .designer-host-style-status {
+  min-height: 16px;
+  margin: 6px 0 0;
+  color: var(--designer-text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}

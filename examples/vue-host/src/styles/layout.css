@@ -198,3 +198,66 @@
 .ds-return-link {
   white-space: nowrap;
 }
+
+/* 编辑页浮动的宿主资源作者面（与「数据源」入口同层，向上叠一行）：
+   host-resource 的授权与目录归宿主，数据面板只读，这里是宿主侧的创建/改绑入口。 */
+.editor-resource-authoring {
+  position: fixed;
+  right: var(--spacing-4);
+  bottom: calc(var(--spacing-4) + 42px);
+  z-index: 40;
+}
+
+.editor-resource-authoring .button {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.editor-resource-panel {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + var(--spacing-2));
+  display: grid;
+  gap: var(--spacing-2);
+  width: 292px;
+  padding: var(--spacing-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-solid);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.editor-resource-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.editor-resource-field {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.editor-resource-input {
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.editor-resource-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-2);
+}
+
+.editor-resource-status {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}

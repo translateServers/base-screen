@@ -7,6 +7,10 @@ export {
 export type {
   BaseScreenConditionalStylePort,
   BaseScreenConditionalStyleRequest,
+  BaseScreenHostConditionalStyleAuthoringPort,
+  BaseScreenHostConditionalStyleBinding,
+  BaseScreenHostConditionalStyleCondition,
+  BaseScreenHostConditionalStyleSource,
   BaseScreenMaterialArraySchema,
   BaseScreenMaterialBooleanSchema,
   BaseScreenMaterialCatalog,

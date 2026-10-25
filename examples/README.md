@@ -50,7 +50,7 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 ```text
 lib/api-base.ts  lib/api.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
 lib/render-diagnostics.ts
-screen/host-alarm-controller.ts  screen/host-alarm-bindings.ts
+screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
 screen/blueprint-canvas.ts  screen/datasource-return.ts
 screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
@@ -206,11 +206,20 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 | KPI 读数 | `kpi-alarm-value` 翻牌 ← `alarm_open` | `demo_metric`（`/api/metrics`） |
 | 等级色块 | 3 组「矩形色块 + 色条 + 翻牌」 | `alarm_critical` / `alarm_warning` / `alarm_info` |
 
-这张屏的存在理由是**把演示 key 落到具体组件上**：宿主的 `host-alarm-bindings.ts` 用组件 id
-（`kpi-alarm-value`、`top-notice`）绑定 `alarm.open`，所以这里刻意沿用与生产监控屏相同的
-两个 id 与基础色，宿主侧一行都不用改；文档本身仍然没有告警 key、阈值或样式规则。
+这张屏的存在理由是**把演示 key 落到具体组件上**：告警绑定按大屏持久化在宿主后端
+（`ScreenAlarmBinding`），种子把 `alarm.open` 映射到组件 id（`kpi-alarm-value`、`top-notice`），
+作为开箱模板；组件检查器的「宿主条件样式」段可以改条件源、等级与样式并保存。
+组件沿用与生产监控屏相同的两个 id 与基础色，文档本身仍然没有告警 key、阈值或样式规则。
 等级色块的三条实色条与流水的 `statusPalette` 同源（`#f5222d` / `#fa8c16` / `#1677ff`），
 根测试按 `BOARD_ALARM_LEVEL_COLORS` 逐色比对，避免"同一等级两种红"。
+
+页面内配置路径（不依赖 JSON 导入或改代码）：
+
+1. 新建或打开大屏，从物料库放置文本、翻牌读数、滚动表格等原子物料；
+2. 在数据源面板绑定 `monitor.alarms` 与 `host-resource` 指标，在变量面板配置轮询/筛选变量；
+3. 在蓝图工作台配置行点击 → 变量的联动；
+4. 在画布选中组件，检查器「宿主条件样式」段选条件源、条件与样式字段后添加绑定；保存即重算，
+   查看页加载同一份按屏配置。种子屏只是这套配置的开箱模板。
 冒烟的实时告警断言就从这张屏做（`?poll=0` 打开，断言样式变化期间不重新取数）。
 
 **「空气质量监测大屏」**——真实数据案例，**三个自建 SQLite 数据源**：
@@ -351,9 +360,10 @@ CAMS，CC BY 4.0），AQI 按 HJ 633-2012 分指数计算；来源 URL、抓取�
 
 - **端口必须在 `configure` 前提交**；三端在配置前 `await alarms.ready(800)`，首快照未到时
   先按基础样式渲染，到达后由失效 API 补齐。
-- **绑定在宿主侧**：`src/screen/host-alarm-bindings.ts` 把 `alarm.open` 映射到组件 id
-  `kpi-alarm-value`（board.digital-flop，只用 `color`）与 `top-notice`（base.text，额外用
-  `fontWeight`）。id 是全屏无关的，所以「生产监控大屏」与「实时告警演示大屏」都有落点；
+- **绑定在宿主侧，按屏持久化**：`GET/PUT /api/screens/:id/alarm-bindings` 保存
+  `alarm key → 组件 id → 等级 → 样式`。种子屏的开箱映射（`alarm.open` → `kpi-alarm-value`
+  与 `top-notice`）只在缺少记录时补种；组件检查器的「宿主条件样式」段按当前物料
+  Manifest 过滤样式字段，保存后经 `controller.setBindings()` 热更新并重算样式，不重建 SSE。
   文档里没有告警 key、阈值或样式规则。
 - **合并与优先级**：同一组件命中多条告警时取 `critical > warning > info`，同级按 alarm id
   字典序；`acknowledged` / `suppressed` 不参与样式。

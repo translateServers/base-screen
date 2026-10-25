@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -25,6 +30,10 @@ const DOCUMENT_INPUT = {
 const DOCUMENT_TEXT = JSON.stringify(DOCUMENT_INPUT);
 
 function createPrismaMock() {
+  const findFirst = jest.fn<Promise<{ id: string } | null>, [unknown]>();
+  findFirst.mockResolvedValue(null);
+  const upsert = jest.fn<Promise<unknown>, [unknown]>();
+  upsert.mockResolvedValue({});
   return {
     screen: {
       count: jest.fn<Promise<number>, []>(),
@@ -32,9 +41,14 @@ function createPrismaMock() {
       create: jest.fn<Promise<ScreenRow>, [{ data: unknown }]>(),
       // 播种只读 `name`，列表读整行：mock 用 Partial 覆盖两种调用形状。
       findMany: jest.fn<Promise<Array<Partial<ScreenRow>>>, [unknown]>(),
+      findFirst,
       findUnique: jest.fn<Promise<ScreenRow | null>, [unknown]>(),
       update: jest.fn<Promise<ScreenRow>, [{ data: Record<string, unknown> }]>(),
       delete: jest.fn<Promise<ScreenRow>, [unknown]>(),
+    },
+    screenAlarmBinding: {
+      findUnique: jest.fn<Promise<{ config: string } | null>, [unknown]>(),
+      upsert,
     },
   };
 }
@@ -66,6 +80,8 @@ describe('ScreensService', () => {
     const prisma = createPrismaMock();
     prisma.screen.findMany.mockResolvedValue([]);
     prisma.screen.createMany.mockResolvedValue({ count: 5 });
+    prisma.screen.findFirst.mockResolvedValue({ id: 'screen-alarm' });
+    prisma.screenAlarmBinding.upsert.mockResolvedValue({});
     const service = await createService(prisma);
 
     await service.ensureSeed();
@@ -224,6 +240,113 @@ describe('ScreensService', () => {
     await service.ensureSeed();
 
     expect(prisma.screen.createMany).not.toHaveBeenCalled();
+  });
+
+  it('seeds the alarm demo binding only when the row is missing', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findMany.mockResolvedValue(SEED_SCREENS.map((screen) => ({ name: screen.name })));
+    prisma.screen.findFirst.mockResolvedValue({ id: 'screen-alarm' });
+    const service = await createService(prisma);
+
+    await service.ensureSeed();
+
+    expect(prisma.screenAlarmBinding.upsert).toHaveBeenCalledTimes(1);
+    const argument = prisma.screenAlarmBinding.upsert.mock.calls[0]?.[0] as
+      | { where: { screenId: string }; create: { config: string }; update: unknown }
+      | undefined;
+    expect(argument?.where).toEqual({ screenId: 'screen-alarm' });
+    // `update: {}` 是不覆盖已有行的关键：用户清空后保存的 `{}` 不会在重启时复活。
+    expect(argument?.update).toEqual({});
+    expect(JSON.parse(argument?.create.config ?? '{}')).toMatchObject({
+      'alarm.open': {
+        'kpi-alarm-value': { warning: { color: '#fa8c16' } },
+      },
+    });
+  });
+
+  it('skips binding seeding when the alarm screen does not exist', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findMany.mockResolvedValue(SEED_SCREENS.map((screen) => ({ name: screen.name })));
+    prisma.screen.findFirst.mockResolvedValue(null);
+    const service = await createService(prisma);
+
+    await service.ensureSeed();
+
+    expect(prisma.screenAlarmBinding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('reads an unconfigured screen as empty bindings', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findUnique.mockResolvedValue(row());
+    prisma.screenAlarmBinding.findUnique.mockResolvedValue(null);
+    const service = await createService(prisma);
+
+    await expect(service.getAlarmBindings('screen-1')).resolves.toEqual({});
+  });
+
+  it('reads persisted bindings and fails closed on corrupt rows', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findUnique.mockResolvedValue(row());
+    prisma.screenAlarmBinding.findUnique.mockResolvedValue({
+      config: JSON.stringify({ 'alarm.open': { card: { warning: { color: '#f00' } } } }),
+    });
+    const service = await createService(prisma);
+
+    await expect(service.getAlarmBindings('screen-1')).resolves.toEqual({
+      'alarm.open': { card: { warning: { color: '#f00' } } },
+    });
+
+    prisma.screenAlarmBinding.findUnique.mockResolvedValue({ config: '{"oops":1}' });
+    await expect(service.getAlarmBindings('screen-1')).rejects.toBeInstanceOf(
+      InternalServerErrorException,
+    );
+  });
+
+  it('rejects malformed alarm bindings before any write', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findUnique.mockResolvedValue(row());
+    const service = await createService(prisma);
+
+    for (const bindings of [
+      { 'alarm.open': { card: { fatal: { color: '#f00' } } } },
+      { 'alarm.open': { card: { warning: { color: 1 } } } },
+      { 'alarm.open': { card: { warning: {} } } },
+      { 'alarm.open': { card: {} } },
+      [],
+    ]) {
+      await expect(service.updateAlarmBindings('screen-1', bindings)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+    }
+    expect(prisma.screenAlarmBinding.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upserts valid bindings and returns the stored shape', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findUnique.mockResolvedValue(row());
+    const service = await createService(prisma);
+    const bindings = {
+      'alarm.open': { card: { warning: { color: '#fa8c16', fontWeight: '700' } } },
+    };
+
+    await expect(service.updateAlarmBindings('screen-1', bindings)).resolves.toEqual(bindings);
+    const argument = prisma.screenAlarmBinding.upsert.mock.calls[0]?.[0] as
+      | { where: { screenId: string }; create: { config: string }; update: { config: string } }
+      | undefined;
+    expect(argument?.where).toEqual({ screenId: 'screen-1' });
+    expect(JSON.parse(argument?.create.config ?? '{}')).toEqual(bindings);
+    expect(JSON.parse(argument?.update.config ?? '{}')).toEqual(bindings);
+  });
+
+  it('rejects binding reads and writes for an unknown screen', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.findUnique.mockResolvedValue(null);
+    const service = await createService(prisma);
+
+    await expect(service.getAlarmBindings('missing')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.updateAlarmBindings('missing', {})).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('lists summaries without documents', async () => {

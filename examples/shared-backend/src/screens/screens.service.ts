@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
   type OnModuleInit,
 } from '@nestjs/common';
@@ -9,9 +10,18 @@ import type { Screen } from '../generated/prisma-client';
 // 必须是值导入：Nest 的构造器注入依赖 emitDecoratorMetadata 产出 paramtypes，
 // 用 `import type` 会把该引用擦除，导致 DI 解析不到 PrismaService。
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  type AlarmBindings,
+  parseStoredAlarmBindings,
+  validateAlarmBindingsInput,
+} from './alarm-binding-guard';
+import { ALARM_DEMO_BINDINGS } from './board-alarm-document';
 import type { ScreenShape, ScreenSummaryShape } from './screen.types';
 import { validateScreenDocumentInput } from './screen-document-guard';
 import { SEED_SCREENS, serializeStarterDocument } from './starter-document';
+
+/** 告警演示屏的开箱绑定按这个名字对齐；绑定本身按 screenId 落库。 */
+const ALARM_SCREEN_NAME = '实时告警演示大屏';
 
 @Injectable()
 export class ScreensService implements OnModuleInit {
@@ -39,12 +49,34 @@ export class ScreensService implements OnModuleInit {
     const existing = await this.prisma.screen.findMany({ select: { name: true } });
     const existingNames = new Set(existing.map((row) => row.name));
     const missing = SEED_SCREENS.filter((screen) => !existingNames.has(screen.name));
-    if (missing.length === 0) return;
-    await this.prisma.screen.createMany({
-      data: missing.map((screen) => ({
-        name: screen.name,
-        document: screen.serialize(),
-      })),
+    if (missing.length > 0) {
+      await this.prisma.screen.createMany({
+        data: missing.map((screen) => ({
+          name: screen.name,
+          document: screen.serialize(),
+        })),
+      });
+    }
+    await this.ensureAlarmBindingSeed();
+  }
+
+  /**
+   * 告警演示屏的开箱绑定：只在缺少这一行时补种。
+   *
+   * 用户在页面里把绑定清空后保存的是一行 `{}`（存在但为空），因此不会被下次启动
+   * 重新灌回默认值；只有「从没有过这一行」才补。老开发库升级后也能直接获得演示配置。
+   */
+  private async ensureAlarmBindingSeed(): Promise<void> {
+    const screen = await this.prisma.screen.findFirst({
+      where: { name: ALARM_SCREEN_NAME },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (screen === null) return;
+    await this.prisma.screenAlarmBinding.upsert({
+      where: { screenId: screen.id },
+      create: { screenId: screen.id, config: JSON.stringify(ALARM_DEMO_BINDINGS) },
+      update: {},
     });
   }
 
@@ -74,6 +106,46 @@ export class ScreensService implements OnModuleInit {
       throw new NotFoundException({ error: 'NOT_FOUND', message: `Screen not found: ${id}` });
     }
     return toShape(row);
+  }
+
+  /** 读取某张屏的宿主告警绑定；没有任何行时返回空对象（未配置 ≠ 配置损坏）。 */
+  async getAlarmBindings(id: string): Promise<AlarmBindings> {
+    await this.requireScreen(id);
+    const row = await this.prisma.screenAlarmBinding.findUnique({ where: { screenId: id } });
+    if (row === null) return {};
+    try {
+      return parseStoredAlarmBindings(row.config);
+    } catch (error: unknown) {
+      throw new InternalServerErrorException({
+        error: 'ALARM_BINDINGS_INVALID',
+        message: error instanceof Error ? error.message : 'Stored alarm bindings are invalid.',
+      });
+    }
+  }
+
+  /** 覆盖某张屏的宿主告警绑定：结构不合法直接 400，不做部分写入。 */
+  async updateAlarmBindings(id: string, input: unknown): Promise<AlarmBindings> {
+    await this.requireScreen(id);
+    const validation = validateAlarmBindingsInput(input);
+    if (!validation.ok) {
+      throw new BadRequestException({
+        error: 'ALARM_BINDINGS_INVALID',
+        message: `Alarm bindings rejected: ${validation.reason}`,
+      });
+    }
+    await this.prisma.screenAlarmBinding.upsert({
+      where: { screenId: id },
+      create: { screenId: id, config: validation.serialized },
+      update: { config: validation.serialized },
+    });
+    return JSON.parse(validation.serialized) as AlarmBindings;
+  }
+
+  private async requireScreen(id: string): Promise<void> {
+    const row = await this.prisma.screen.findUnique({ where: { id }, select: { id: true } });
+    if (row === null) {
+      throw new NotFoundException({ error: 'NOT_FOUND', message: `Screen not found: ${id}` });
+    }
   }
 
   /**

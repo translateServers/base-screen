@@ -11,6 +11,7 @@ import type {
 } from '@base-screen/contracts';
 import type {
   BaseScreenConditionalStylePort,
+  BaseScreenHostConditionalStyleAuthoringPort,
   BaseScreenMaterialCatalog,
   BaseScreenPluginCatalog,
   BaseScreenPluginInspectorControlCatalog,
@@ -92,6 +93,7 @@ export interface DesignerElementState {
   resourcePort: ScreenHostResourcePort | undefined;
   hostCatalogPort: ScreenHostCatalogPort | undefined;
   conditionalStylePort: BaseScreenConditionalStylePort | undefined;
+  hostConditionalStyleAuthoring: BaseScreenHostConditionalStyleAuthoringPort | undefined;
   datasetPort: ScreenHostDatasetPort | undefined;
   designerHostAdapter: ScreenDesignerHostAdapter | undefined;
   projectCatalogPort: ScreenProjectCatalogPort | undefined;
