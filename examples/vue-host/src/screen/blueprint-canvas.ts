@@ -435,7 +435,7 @@ export function createBlueprintCanvas(): HTMLElement {
     <span class="bp-toolbar-title">事件编排 <small data-bp-counts></small></span>
     <button type="button" class="bp-button" data-bp-insert="condition">条件</button>
     <button type="button" class="bp-button" data-bp-insert="set-variable">设置变量</button>
-    <button type="button" class="bp-button" data-bp-insert="emit-host-event">触发宿主事件</button>
+    <button type="button" class="bp-button" data-bp-insert="emit-host-event">触发业务事件</button>
     <button type="button" class="bp-button" data-bp-undo disabled>撤销</button>
     <button type="button" class="bp-button" data-bp-redo disabled>重做</button>
     <button type="button" class="bp-button" data-bp-layout>自动布局</button>

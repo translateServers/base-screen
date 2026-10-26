@@ -120,7 +120,7 @@ export function createOnlineMaterialDraft(
   const type = options.type ?? createOnlineMaterialType(input.name);
   const tagName = options.tagName ?? createOnlineMaterialTagName(type, buildToken);
   const name = input.name.trim().length > 0 ? input.name.trim() : '在线物料';
-  const note = input.note.trim().slice(0, MAX_NOTE_LENGTH) || '由宿主在线生成';
+  const note = input.note.trim().slice(0, MAX_NOTE_LENGTH) || '由业务系统在线生成';
   const value = input.value.trim().length > 0 ? input.value : '42';
   const background = normalizeColor(input.background, '#0f2438');
   const accent = normalizeColor(input.accent, '#38bdf8');
@@ -275,7 +275,7 @@ export function createOnlineMaterialPanel(
     el(
       'p',
       'online-materials-subtitle',
-      '宿主生成 ESM 与 Manifest，管理员审核后发布；设计器只接收重建后的 catalog。',
+      '业务系统在线生成代码与清单，管理员审核后发布；设计器自动应用最新版本。',
     ),
   );
   const close = button('关闭', 'asset-icon-button');
@@ -302,7 +302,7 @@ export function createOnlineMaterialPanel(
   const buildInput = textInput('text', '发布时生成');
   buildInput.readOnly = true;
   const valueInput = textInput('text', '42');
-  const noteInput = textInput('text', '由宿主在线生成');
+  const noteInput = textInput('text', '由业务系统在线生成');
   const backgroundInput = textInput('color', '#0f2438');
   const accentInput = textInput('color', '#38bdf8');
   const widthInput = textInput('number', '280');
@@ -476,7 +476,7 @@ export function createOnlineMaterialPanel(
     const input = state.input ?? {
       name: '',
       value: '42',
-      note: '由宿主在线生成',
+      note: '由业务系统在线生成',
       background: '#0f2438',
       accent: '#38bdf8',
       width: 280,

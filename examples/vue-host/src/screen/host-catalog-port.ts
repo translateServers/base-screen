@@ -39,7 +39,7 @@ const ENTRIES: readonly CatalogEntry[] = [
   {
     sourceId: HOST_VARIABLE_CLOCK,
     name: '当前时间',
-    description: '宿主本地时间（HH:mm:ss），每秒刷新。',
+    description: '本地时间（HH:mm:ss），每秒刷新。',
     previewable: true,
   },
   {
@@ -51,7 +51,7 @@ const ENTRIES: readonly CatalogEntry[] = [
   {
     sourceId: HOST_VARIABLE_STATUS,
     name: '数据源状态',
-    description: '数据源在线/离线与累计失败次数，由宿主请求观察者驱动。',
+    description: '数据源在线/离线与累计失败次数，随数据请求实时更新。',
     previewable: true,
   },
 ];
@@ -94,7 +94,7 @@ export function createHostCatalogPort(deps: HostCatalogPortDeps = {}): ScreenHos
     async describe(request): Promise<ScreenParseResult<ScreenHostCatalogDescriptor>> {
       const entry = ENTRIES.find((item) => item.sourceId === request.sourceId);
       if (entry === undefined) {
-        return failure('HOST_VARIABLE_DESCRIPTOR_INVALID', `未知的宿主来源：${request.sourceId}`);
+        return failure('HOST_VARIABLE_DESCRIPTOR_INVALID', `未知的业务来源：${request.sourceId}`);
       }
       return ok({
         ...toSummary(entry),
@@ -116,7 +116,7 @@ export function createHostCatalogPort(deps: HostCatalogPortDeps = {}): ScreenHos
           purpose: request.purpose,
           error,
         });
-        return failure('HOST_RESOURCE_FAILED', `宿主来源求值失败：${request.sourceId}`);
+        return failure('HOST_RESOURCE_FAILED', `业务来源读取失败：${request.sourceId}`);
       }
     },
   };

@@ -69,6 +69,27 @@ for (const file of [...browserFiles, ...monitoredFiles]) {
   }
 }
 
+// 集成架构里的开发者词汇不得进入用户文案。只扫两份文案模块的字符串行：
+// 注释（含 JSDoc）里的架构叙述允许保留这些词。
+const userFacingTextModules = [
+  'packages/engine/src/common/ui-text/designer-ui-text.ts',
+  'packages/engine/src/common/ui-text/designer-blueprint-ui-text.ts',
+];
+const forbiddenUserFacingTerms = ['宿主'];
+for (const relative of userFacingTextModules) {
+  const lines = readFileSync(resolve(root, relative), 'utf8').split(/\r?\n/);
+  const index = lines.findIndex((line) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+      return false;
+    }
+    return forbiddenUserFacingTerms.some((term) => trimmed.includes(term));
+  });
+  if (index !== -1) {
+    throw new Error(`DESIGNER_UI_DEV_TERM_FORBIDDEN: ${relative}:${index + 1}`);
+  }
+}
+
 // 表单行与表单控件各只有一个来源：`designer-field-primitives`（行骨架 / 复合控件）与
 // `designer-ui-primitives`（单个控件）。手工拼行骨架或直接 createElement 表单元素，会让类名、
 // ARIA 与校验消息连接在多处各自演化——`designer-number-input` 就是绕开原语后单独补 CSS 的产物。

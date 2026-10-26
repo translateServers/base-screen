@@ -118,7 +118,7 @@ describe('DesignerProjectWorkspaceController', () => {
     );
     expect(
       descendants(workspace).some(
-        (element) => element.textContent === '宿主未提供项目目录、预览或快照能力。',
+        (element) => element.textContent === '当前环境未提供项目目录、预览或快照能力。',
       ),
     ).toBe(true);
   });

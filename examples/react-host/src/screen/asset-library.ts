@@ -282,8 +282,8 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
       title: '删除素材',
       message:
         asset.referenceCount > 0
-          ? `「${asset.name}」正被 ${asset.referenceCount} 张大屏引用。删除会被宿主拒绝，建议先替换引用。`
-          : `确定删除「${asset.name}」？文件会从宿主素材目录移除。`,
+          ? `「${asset.name}」正被 ${asset.referenceCount} 张大屏引用。删除会被拒绝，建议先替换引用。`
+          : `确定删除「${asset.name}」？文件会从素材目录移除。`,
       confirmLabel: '删除',
       danger: true,
     });

@@ -57,7 +57,7 @@ describe('DesignerVariableCatalogController', () => {
 
     expect(calls).toEqual(['first', 'next']);
     expect(controller.view.items.map((item) => item.sourceId)).toEqual(['shared']);
-    expect(controller.view.feedback).toBe('宿主变量目录加载失败。');
+    expect(controller.view.feedback).toBe('业务变量目录加载失败。');
   });
 
   it('uses authoring-preview purpose, bounds summaries and hides denied values', async () => {

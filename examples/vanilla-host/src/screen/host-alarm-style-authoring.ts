@@ -7,7 +7,7 @@ import type {
 import type { HostAlarmBindings, HostAlarmLevel } from './host-alarm-controller';
 
 /**
- * 宿主告警 → 基座「宿主条件样式」作者口的适配层。
+ * 宿主告警 → 基座「业务条件样式」作者口的适配层。
  *
  * 引擎负责渲染表单与调用时序；这里只做三件事：
  * 1) 把告警 key/等级声明成条件源（展示名由宿主拥有）；

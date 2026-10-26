@@ -35,9 +35,7 @@ export function appendDescriptorCustomControl(
     const unsupported = ownerDocument.createElement('span');
     unsupported.className = 'designer-descriptor-unsupported';
     unsupported.dataset.descriptorUnsupported = field.id;
-    unsupported.textContent = DESIGNER_UI_TEXT.descriptor.unsupportedControl(
-      field.tagName ?? 'unknown',
-    );
+    unsupported.textContent = DESIGNER_UI_TEXT.descriptor.unsupportedControl;
     const fieldControl = ownerDocument.createElement('span');
     fieldControl.className = 'designer-field-control';
     fieldControl.appendChild(unsupported);

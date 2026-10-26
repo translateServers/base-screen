@@ -127,7 +127,7 @@ export function ScreenEditorPage(): React.ReactElement {
           if (!result.ok) return { ok: false, message: result.error.message };
           const parsed = parseHostAlarmBindings(result.data.bindings);
           if (parsed === undefined) {
-            return { ok: false, message: '宿主返回的告警绑定格式无效。' };
+            return { ok: false, message: '业务系统返回的告警绑定格式无效。' };
           }
           return { ok: true, bindings: parsed };
         },

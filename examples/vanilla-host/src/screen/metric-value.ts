@@ -20,7 +20,7 @@ export const METRIC_VALUE_MANIFEST: BaseScreenMaterialManifest = {
   type: METRIC_VALUE_TYPE,
   tagName: METRIC_VALUE_TAG,
   name: '指标读数',
-  category: '宿主业务',
+  category: '业务指标',
   keywords: ['指标', '读数', 'KPI'],
   defaultSize: { width: 200, height: 64 },
   defaultProps: { unit: '%' },

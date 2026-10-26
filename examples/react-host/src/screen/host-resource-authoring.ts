@@ -203,7 +203,7 @@ export interface HostResourceAuthoringOptions {
 }
 
 /**
- * 宿主资源面板：浮动按钮 + 弹出面板，全部宿主 light DOM。
+ * 业务资源面板：浮动按钮 + 弹出面板，全部宿主 light DOM。
  *
  * - 插入：`designer.insertHostResource(intent)`，引擎取画布可见中心落点并自动选中新组件；
  * - 改绑：监听公开 `base-screen-selection-change`，选中同型宿主资源组件时按钮可用，
@@ -224,7 +224,7 @@ export function createHostResourceAuthoringPanel(
   toggle.type = 'button';
   toggle.className = 'button editor-resource-toggle';
   toggle.dataset.resourceToggle = '';
-  toggle.textContent = '宿主资源';
+  toggle.textContent = '业务资源';
 
   const panel = doc.createElement('div');
   panel.className = 'editor-resource-panel';
@@ -233,7 +233,7 @@ export function createHostResourceAuthoringPanel(
 
   const hint = doc.createElement('p');
   hint.className = 'editor-resource-hint';
-  hint.textContent = '宿主资源经宿主目录创建：选资源与目标物料后插入，或改绑选中的同型组件。';
+  hint.textContent = '选择业务资源和目标物料后插入画布，或改绑选中的同型组件。';
   panel.appendChild(hint);
 
   const typeSelect = appendSelectField(panel, '资源类型', 'resource-type');

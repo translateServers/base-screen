@@ -1,7 +1,7 @@
 import { validateScreenDocumentInput } from './screen-document-guard';
 
 /**
- * 实时告警演示大屏种子：1920×1080，专供「外部告警系统 → 宿主条件样式」这条链路。
+ * 实时告警演示大屏种子：1920×1080，专供「外部告警系统 → 业务条件样式」这条链路。
  *
  * 与 `board-monitor-document.ts` 的分工：那张屏证明数据层四通道全覆盖，这张屏只把
  * 「告警」一条线做深——流水、读数、等级色块三块共用同一套等级语义。
@@ -14,7 +14,7 @@ import { validateScreenDocumentInput } from './screen-document-guard';
  *
  * **演示 key 的对齐是这张屏的存在理由**：告警绑定按大屏持久化在宿主后端
  * （`ScreenAlarmBinding`），种子把 `alarm.open` 映射到两个**组件 id**
- * （`kpi-alarm-value`、`top-notice`）作为开箱模板；组件检查器的「宿主条件样式」段可以
+ * （`kpi-alarm-value`、`top-notice`）作为开箱模板；组件检查器的「业务条件样式」段可以
  * 增删改这份映射。因此这里的两个组件沿用与生产监控屏相同的 id 与基础色，种子屏
  * 一行命令就能被 `POST /api/demo/alarms/raise { key: 'alarm.open' }` 换色。反过来说，
  * **文档里没有告警 key、阈值或样式规则**——告警判定与视觉映射都归宿主。
@@ -424,7 +424,7 @@ rectangle('guide-card', '演示链路卡片底', [1280, 312, 608, 232], {
   borderRadius: 6,
 });
 const GUIDE_LINES: readonly string[] = [
-  '① 宿主把 alarm.open 映射到 kpi-alarm-value 与 top-notice',
+  '① 业务系统把 alarm.open 映射到 kpi-alarm-value 与 top-notice',
   '② warning → #fa8c16 ／ critical → #f5222d，只改样式不改文档',
   '③ SSE 到达即重算条件样式，一帧只失效一次',
   '④ clear 后回到文档基础色，canonical 文档字节不变',
@@ -535,7 +535,7 @@ text(
   'filter-note-3',
   '筛选说明 3',
   [660, 962, 1200, 18],
-  '告警 key 与样式映射由宿主按屏保存，文档不持有告警规则。',
+  '告警 key 与样式映射由业务系统按屏保存，文档不持有告警规则。',
   { color: '#6f8ba3', fontSize: 12 },
 );
 
@@ -668,7 +668,7 @@ export const BOARD_ALARM_DOCUMENT = {
  * 宿主侧告警绑定的开箱值：`alarm.open` × 两个组件 × warning/critical。
  *
  * 落库位置是 `ScreenAlarmBinding`（按 screenId），不再由前端用常量硬编码——页面里
- * 的「宿主条件样式」段读取和覆盖的就是这份数据。样式键必须落在目标物料的
+ * 的「业务条件样式」段读取和覆盖的就是这份数据。样式键必须落在目标物料的
  * Manifest styleSchema 内（digital-flop 只有 color；base.text 额外支持 fontWeight），
  * 根级测试会对着 manifest 与种子文档核验。
  */

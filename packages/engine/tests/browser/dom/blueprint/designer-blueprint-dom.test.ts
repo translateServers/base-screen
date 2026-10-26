@@ -262,10 +262,10 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
     expect(text).toContain('动作触发条件');
     expect(text).toContain('事件数据 · amount 大于等于 固定值 10');
     expect(text).toContain('更新全局变量 · selectedAmount');
-    expect(text).toContain('发送宿主事件 · chart-selection');
+    expect(text).toContain('发送业务事件 · chart-selection');
     // ADR-0076：该索引进没有声明 focus-record，作者面必须明确标为未声明，
-    // 而不是沿用过时的 "执行宿主动作" 文案让作者误以为可用。
-    expect(text).toContain('未声明的宿主动作 · focus-record');
+    // 而不是沿用过时的 "执行业务动作" 文案让作者误以为可用。
+    expect(text).toContain('未声明的业务动作 · focus-record');
     expect(panel.querySelector('[data-blueprint-summary-rule="configured-rule"]')).not.toBeNull();
     const interactionGroup = panel.querySelector<FakeElement>(
       '[data-inspector-search-key="blueprint-interaction-events"]',
@@ -331,6 +331,6 @@ describe('EB-R7-C03 events panel summary and capability state', () => {
 
     const text = queryText(panel);
     expect(text).toContain('高亮选中组件 · plugin.pipeline.spotlight');
-    expect(text).toContain('未声明的宿主动作 · never.declared');
+    expect(text).toContain('未声明的业务动作 · never.declared');
   });
 });
