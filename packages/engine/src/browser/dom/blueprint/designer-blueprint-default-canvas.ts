@@ -36,12 +36,14 @@ import {
  */
 
 const NODE_WIDTH = 208;
-const NODE_HEADER = 34;
-const PORT_ROW = 22;
-const BODY_PADDING = 8;
-const SUBTITLE_HEIGHT = 16;
+const NODE_HEADER = 45;
+const PORT_ROW = 28;
+const SUBTITLE_HEIGHT = 21;
 const SUMMARY_LINE_HEIGHT = 16;
-const NODE_BOTTOM_PADDING = 10;
+const SUMMARY_PADDING = 8;
+const NODE_BOTTOM_PADDING = 8;
+const GRAPH_PADDING = 72;
+const COLUMN_STEP = 280;
 const SNAP = 8;
 const FIT_PADDING = 28;
 const SIMULATION_INSET = 150;
@@ -144,6 +146,11 @@ export function createDesignerBlueprintDefaultCanvas(
   const addButton = textButton(ownerDocument, 'plus', text.addNode, 'add-node');
   addButton.setAttribute('aria-haspopup', 'menu');
   addButton.setAttribute('aria-expanded', 'false');
+  const addChevron = ownerDocument.createElement('span');
+  addChevron.className = 'designer-blueprint-canvas-bar-chevron';
+  addChevron.setAttribute('aria-hidden', 'true');
+  addChevron.innerHTML = designerIcon('arrow-down');
+  addButton.append(addChevron);
   const addMenu = ownerDocument.createElement('div');
   addMenu.className = 'designer-blueprint-canvas-menu';
   addMenu.dataset.canvasMenu = 'add-node';
@@ -187,6 +194,12 @@ export function createDesignerBlueprintDefaultCanvas(
 
   const spacer = ownerDocument.createElement('span');
   spacer.className = 'designer-blueprint-canvas-bar-spacer';
+  const zoomSeparator = ownerDocument.createElement('span');
+  zoomSeparator.className = 'designer-blueprint-canvas-bar-separator';
+  zoomSeparator.setAttribute('aria-hidden', 'true');
+  const simulationSeparator = ownerDocument.createElement('span');
+  simulationSeparator.className = 'designer-blueprint-canvas-bar-separator';
+  simulationSeparator.setAttribute('aria-hidden', 'true');
 
   const zoomOut = iconButton(ownerDocument, 'minus', text.zoomOut, 'zoom-out');
   const zoomValue = ownerDocument.createElement('span');
@@ -204,10 +217,12 @@ export function createDesignerBlueprintDefaultCanvas(
     problemsButton,
     traceButton,
     spacer,
+    zoomSeparator,
     zoomOut,
     zoomValue,
     zoomIn,
     fitButton,
+    simulationSeparator,
     simulateButton,
   );
 
@@ -227,7 +242,9 @@ export function createDesignerBlueprintDefaultCanvas(
   layers.className = 'designer-blueprint-canvas-layers';
   const edges = ownerDocument.createElementNS(SVG_NS, 'svg');
   edges.classList.add('designer-blueprint-canvas-edges');
-  layers.append(edges);
+  const labels = ownerDocument.createElement('div');
+  labels.className = 'designer-blueprint-canvas-edge-labels';
+  layers.append(edges, labels);
 
   const overlay = ownerDocument.createElementNS(SVG_NS, 'svg');
   overlay.classList.add('designer-blueprint-canvas-overlay');
@@ -285,15 +302,19 @@ export function createDesignerBlueprintDefaultCanvas(
   const simulationBar = ownerDocument.createElement('div');
   simulationBar.className = 'designer-blueprint-canvas-simulation-bar';
   simulationBar.dataset.canvasSimulationBar = 'true';
+  const simulationBarIcon = ownerDocument.createElement('span');
+  simulationBarIcon.className = 'designer-blueprint-canvas-simulation-bar-icon';
+  simulationBarIcon.setAttribute('aria-hidden', 'true');
+  simulationBarIcon.innerHTML = designerIcon('play');
   const simulationBarLabel = ownerDocument.createElement('span');
   simulationBarLabel.className = 'designer-blueprint-canvas-simulation-bar-label';
   const simulationExpand = textButton(
     ownerDocument,
-    'play',
+    'arrow-up',
     text.expandSimulation,
     'simulation-expand',
   );
-  simulationBar.append(simulationBarLabel, simulationExpand);
+  simulationBar.append(simulationBarIcon, simulationBarLabel, simulationExpand);
 
   const simulation = ownerDocument.createElement('section');
   simulation.className = 'designer-blueprint-canvas-simulation';
@@ -303,7 +324,7 @@ export function createDesignerBlueprintDefaultCanvas(
   const simulationHeader = ownerDocument.createElement('header');
   simulationHeader.className = 'designer-blueprint-canvas-simulation-header';
   const simulationTitle = ownerDocument.createElement('strong');
-  simulationTitle.textContent = blueprintText.simulate;
+  simulationTitle.textContent = text.simulationTitle;
   const simulationClose = panelIconButton(
     ownerDocument,
     'close',
@@ -472,14 +493,8 @@ export function createDesignerBlueprintDefaultCanvas(
 
   function geometryOf(node: BaseScreenBlueprintCanvasNode): NodeGeometry {
     const summary = node.summary?.secondary ?? '';
-    const summaryLines =
-      node.kind === 'condition' || node.kind === 'action' ? 2 : summary === '' ? 0 : 1;
-    const portStart =
-      NODE_HEADER +
-      BODY_PADDING +
-      SUBTITLE_HEIGHT +
-      (summaryLines === 0 ? 0 : summaryLines * SUMMARY_LINE_HEIGHT + 4) +
-      BODY_PADDING;
+    const summaryHeight = summary === '' ? 0 : SUMMARY_LINE_HEIGHT * 2 + SUMMARY_PADDING;
+    const portStart = NODE_HEADER + SUBTITLE_HEIGHT + summaryHeight;
     if (node.kind === 'component' || node.kind === 'variable') {
       const events = node.events ?? [];
       const rows = Math.max(1, events.length);
@@ -515,7 +530,7 @@ export function createDesignerBlueprintDefaultCanvas(
     if (node.kind === 'condition') {
       return {
         width: NODE_WIDTH,
-        height: portStart + PORT_ROW + NODE_BOTTOM_PADDING,
+        height: portStart + PORT_ROW * 2 + NODE_BOTTOM_PADDING,
         portStart,
         inputY: portStart + PORT_ROW / 2,
         inputHandle: 'condition:in',
@@ -523,7 +538,7 @@ export function createDesignerBlueprintDefaultCanvas(
           {
             handle: 'condition:true',
             label: 'true',
-            y: portStart + PORT_ROW / 2,
+            y: portStart + PORT_ROW + PORT_ROW / 2,
             available: true,
           },
         ],
@@ -695,14 +710,32 @@ export function createDesignerBlueprintDefaultCanvas(
   function labelOffset(edgeId: string): number {
     let hash = 0;
     for (let index = 0; index < edgeId.length; index += 1) {
-      hash = (hash * 31 + edgeId.charCodeAt(index)) % 24;
+      hash = (hash * 31 + edgeId.charCodeAt(index)) % 10;
     }
-    return hash - 12;
+    return 14 + hash;
+  }
+
+  function edgeLabelPoint(edge: BaseScreenBlueprintCanvasEdge): Point | null {
+    const source = nodeById(edge.source);
+    const target = nodeById(edge.target);
+    if (source === undefined || target === undefined) return null;
+    const sourceRight = positionOf(source).x + geometryOf(source).width;
+    const targetLeft = positionOf(target).x;
+    if (targetLeft - sourceRight < 64) return null;
+    const pathData = edgePath(edge);
+    if (pathData === null) return null;
+    const mid = edgeMidpoint(pathData);
+    if (mid === null) return null;
+    return {
+      x: (sourceRight + targetLeft) / 2,
+      y: mid.y + labelOffset(edge.id),
+    };
   }
 
   function renderGraph(): void {
     const current = graph();
     edges.replaceChildren();
+    labels.replaceChildren();
     for (const node of layers.querySelectorAll('.designer-blueprint-canvas-node')) node.remove();
     if (current === null) return;
 
@@ -742,10 +775,10 @@ export function createDesignerBlueprintDefaultCanvas(
       edges.append(hit);
 
       if (label !== '') {
-        const point = edgeMidpoint(pathData);
+        const point = edgeLabelPoint(edge);
         if (point !== null) {
-          const labelElement = ownerDocument.createElementNS(SVG_NS, 'text');
-          labelElement.classList.add('designer-blueprint-canvas-edge-label');
+          const labelElement = ownerDocument.createElement('span');
+          labelElement.className = 'designer-blueprint-canvas-edge-label';
           labelElement.dataset.edgeLabel = edge.id;
           if (traceActive && traced.has(edge.id)) {
             labelElement.dataset.traced = 'true';
@@ -753,10 +786,10 @@ export function createDesignerBlueprintDefaultCanvas(
           if (state?.selection?.kind === 'edge' && state.selection.id === edge.id) {
             labelElement.dataset.selected = 'true';
           }
-          labelElement.setAttribute('x', String(point.x));
-          labelElement.setAttribute('y', String(point.y + labelOffset(edge.id)));
+          labelElement.style.left = `${point.x}px`;
+          labelElement.style.top = `${point.y}px`;
           labelElement.textContent = label;
-          edges.append(labelElement);
+          labels.append(labelElement);
         }
       }
     }
@@ -788,12 +821,15 @@ export function createDesignerBlueprintDefaultCanvas(
 
       const header = ownerDocument.createElement('div');
       header.className = 'designer-blueprint-canvas-node-header';
-      const badge = ownerDocument.createElement('span');
-      badge.className = 'designer-blueprint-canvas-node-badge';
-      badge.textContent = kindLabel;
+      const copy = ownerDocument.createElement('div');
+      copy.className = 'designer-blueprint-canvas-node-copy';
+      const kindElement = ownerDocument.createElement('span');
+      kindElement.className = 'designer-blueprint-canvas-node-kind';
+      kindElement.textContent = kindLabel;
       const titleElement = ownerDocument.createElement('span');
       titleElement.className = 'designer-blueprint-canvas-node-title';
       titleElement.textContent = title;
+      copy.append(kindElement, titleElement);
       const flow = ownerDocument.createElement('span');
       flow.className = 'designer-blueprint-canvas-node-flow';
       const outputCount = geometry.outputs.filter((port) => port.dependency !== true).length;
@@ -803,25 +839,31 @@ export function createDesignerBlueprintDefaultCanvas(
           : geometry.inputHandle === undefined
             ? text.nodeFlowOutputs(outputCount)
             : text.nodeFlow(outputCount);
-      header.append(badge, titleElement, flow);
+      header.append(copy, flow);
 
-      const content = ownerDocument.createElement('div');
-      content.className = 'designer-blueprint-canvas-node-content';
       const subtitle = ownerDocument.createElement('div');
       subtitle.className = 'designer-blueprint-canvas-node-subtitle';
       subtitle.textContent = nodeSubtitle(node);
-      content.append(subtitle);
       const summary = node.summary?.secondary ?? '';
+      let summaryElement: HTMLElement | undefined;
       if (summary !== '') {
-        const summaryElement = ownerDocument.createElement('p');
+        summaryElement = ownerDocument.createElement('p');
         summaryElement.className = 'designer-blueprint-canvas-node-summary';
         summaryElement.textContent = summary;
-        content.append(summaryElement);
       }
 
       const ports = ownerDocument.createElement('div');
       ports.className = 'designer-blueprint-canvas-ports';
       ports.style.top = `${geometry.portStart}px`;
+      if (node.kind === 'condition' || node.kind === 'action') {
+        const inputRow = ownerDocument.createElement('div');
+        inputRow.className =
+          'designer-blueprint-canvas-port-row designer-blueprint-canvas-port-row-in';
+        const inputLabel = ownerDocument.createElement('span');
+        inputLabel.textContent = text.inputRowLabel;
+        inputRow.append(inputLabel);
+        ports.append(inputRow);
+      }
       if (node.kind === 'component' || node.kind === 'variable') {
         const eventPorts = geometry.outputs.filter((port) => port.dependency !== true);
         if (eventPorts.length === 0) {
@@ -864,7 +906,9 @@ export function createDesignerBlueprintDefaultCanvas(
         }
       });
 
-      card.append(header, content, ports);
+      card.append(header, subtitle);
+      if (summaryElement !== undefined) card.append(summaryElement);
+      card.append(ports);
       if (geometry.inputHandle !== undefined) {
         input.dataset.inputHandle = geometry.inputHandle;
         card.append(input);
@@ -986,8 +1030,9 @@ export function createDesignerBlueprintDefaultCanvas(
     simulation.hidden = !simulationOpen;
     root.dataset.simulation = simulationOpen ? 'open' : 'closed';
     const traceLines = state?.trace?.lines ?? [];
-    simulationBarLabel.textContent =
+    const barStatus =
       traceLines.length > 0 ? (traceLines.at(-1) ?? text.simulationIdle) : text.simulationIdle;
+    simulationBarLabel.textContent = `${text.simulationTitle} · ${barStatus}`;
   }
 
   function renderEmpty(): void {
@@ -1505,12 +1550,14 @@ export function createDesignerBlueprintDefaultCanvas(
         const rightPosition = positionOf(right);
         return leftPosition.y - rightPosition.y || left.id.localeCompare(right.id);
       });
-      column.forEach((node, index) => {
+      let cursor = GRAPH_PADDING;
+      for (const node of column) {
         next.set(node.id, {
-          x: 72 + depth * 280,
-          y: 72 + index * 140,
+          x: GRAPH_PADDING + depth * COLUMN_STEP,
+          y: cursor,
         });
-      });
+        cursor += geometryOf(node).height + 36;
+      }
     }
     return next;
   }
@@ -1526,15 +1573,17 @@ export function createDesignerBlueprintDefaultCanvas(
 
   function placeNewNode(node: BaseScreenBlueprintCanvasNode | undefined): Point {
     const column = columnOf(node);
+    const x = GRAPH_PADDING + column * COLUMN_STEP;
     let bottom = 0;
     for (const candidate of graph()?.nodes ?? []) {
-      if (candidate.id === node?.id || columnOf(candidate) !== column) continue;
+      if (candidate.id === node?.id) continue;
       const position = positionOf(candidate);
+      if (Math.abs(position.x - x) > COLUMN_STEP / 2) continue;
       bottom = Math.max(bottom, position.y + geometryOf(candidate).height);
     }
     return {
-      x: 72 + column * 280,
-      y: bottom === 0 ? 72 : bottom + 48,
+      x,
+      y: bottom === 0 ? GRAPH_PADDING : bottom + 48,
     };
   }
 
@@ -1556,8 +1605,12 @@ export function createDesignerBlueprintDefaultCanvas(
   }
 
   function onInsert(kind: 'condition' | 'set-variable' | 'emit-host-event'): void {
-    const rect = viewport.getBoundingClientRect();
-    const point = screenToGraph(rect.left + rect.width / 2, rect.top + rect.height / 2);
+    const point = placeNewNode({
+      id: '',
+      kind: kind === 'condition' ? 'condition' : 'action',
+      x: 0,
+      y: 0,
+    });
     sendCommand({
       type: 'insert-node',
       kind,

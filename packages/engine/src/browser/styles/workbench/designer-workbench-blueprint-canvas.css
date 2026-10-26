@@ -32,24 +32,42 @@
   gap: var(--designer-space-2);
   height: var(--designer-column-header-height);
   padding: 0 var(--designer-space-5);
-  border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
 
 .designer-blueprint-canvas-bar .designer-button {
-  height: var(--designer-control-height-compact);
+  height: 24px;
+  min-height: 24px;
   gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-3);
+  padding: 0 var(--designer-space-4);
   color: var(--designer-text-secondary);
   background: transparent;
   box-shadow: none;
-  font-size: var(--designer-font-size-sm);
+  font-size: var(--designer-font-size-xs);
+  line-height: 1;
   white-space: nowrap;
 }
 
+.designer-blueprint-canvas-bar .designer-icon-button {
+  width: 24px;
+  padding: 0;
+}
+
 .designer-blueprint-canvas-bar .designer-button svg {
-  width: var(--designer-icon-size);
-  height: var(--designer-icon-size);
+  width: 14px;
+  height: 14px;
+}
+
+.designer-blueprint-canvas-bar .designer-blueprint-canvas-bar-chevron {
+  display: inline-flex;
+  width: 12px;
+  height: 12px;
+  margin-left: 1px;
+}
+
+.designer-blueprint-canvas-bar .designer-blueprint-canvas-bar-chevron svg {
+  width: 12px;
+  height: 12px;
 }
 
 .designer-blueprint-canvas-bar .designer-button:hover:not(:disabled) {
@@ -66,9 +84,21 @@
   flex: 1 1 auto;
 }
 
+.designer-blueprint-canvas-bar-separator {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--designer-border-subtle);
+}
+
 .designer-blueprint-canvas-bar-label {
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.designer-blueprint-canvas-problems-button {
+  border-radius: var(--designer-radius-pill);
+  padding: 0 var(--designer-space-4);
 }
 
 .designer-blueprint-canvas-menu-anchor {
@@ -205,22 +235,33 @@
   outline: none;
 }
 
+.designer-blueprint-canvas-edge-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
 .designer-blueprint-canvas-edge-label {
-  fill: var(--designer-text-muted);
+  position: absolute;
+  padding: 1px 6px;
+  border-radius: var(--designer-radius-2);
+  background: var(--designer-surface-panel);
+  box-shadow: 0 0 0 1px var(--designer-border-subtle);
+  color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
-  paint-order: stroke;
-  stroke: var(--designer-surface-canvas);
-  stroke-width: 4px;
-  text-anchor: middle;
+  line-height: 14px;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
 }
 
 .designer-blueprint-canvas-edge-label[data-selected="true"] {
-  fill: var(--designer-accent);
+  color: var(--designer-accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-accent) 45%, transparent);
 }
 
 .designer-blueprint-canvas-edge-label[data-traced="true"] {
-  fill: var(--designer-accent);
+  color: var(--designer-accent);
 }
 
 .designer-blueprint-canvas-viewport[data-zoom-far="true"]
@@ -251,7 +292,7 @@
   box-sizing: border-box;
   border-radius: var(--designer-radius-4);
   background: var(--designer-surface-panel);
-  box-shadow: var(--designer-elev-ring), var(--designer-elev-card);
+  box-shadow: var(--designer-elev-card);
   cursor: move;
   transition:
     background-color var(--designer-motion),
@@ -264,44 +305,64 @@
 }
 
 .designer-blueprint-canvas-node[data-selected="true"] {
-  background: color-mix(in srgb, var(--designer-text-primary) 4%, var(--designer-surface-panel));
-  box-shadow:
-    inset 0 0 0 1px var(--designer-border-active),
-    var(--designer-elev-card);
+  background: color-mix(in srgb, var(--designer-text-primary) 6%, var(--designer-surface-panel));
+  outline: 1px solid var(--designer-border-active);
+  outline-offset: 0;
 }
 
 .designer-blueprint-canvas-node[data-failed="true"] {
-  box-shadow:
-    inset 0 0 0 1px var(--designer-danger),
-    var(--designer-elev-card);
+  outline: 1px solid var(--designer-danger);
+  outline-offset: 0;
 }
 
 .designer-blueprint-canvas-node[data-unconnected="true"] {
+  outline: 1px solid var(--designer-border-default);
+  outline-offset: 0;
+}
+
+/* 默认主题为黑夜：比工作台面板更深的浮层影，与原型的事件画布一致。 */
+:host(:not([theme="light"])) .designer-blueprint-canvas-node {
   box-shadow:
-    inset 0 0 0 1px var(--designer-border-default),
-    var(--designer-elev-card);
+    0 0 0 1px var(--designer-border-default),
+    0 2px 4px color-mix(in srgb, var(--designer-surface-scrim) 60%, transparent),
+    0 16px 32px -20px color-mix(in srgb, var(--designer-surface-scrim) 75%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--designer-text-primary) 5%, transparent) inset;
+}
+
+.designer-blueprint-canvas-node[data-selected="true"]:focus-visible,
+.designer-blueprint-canvas-node[data-failed="true"]:focus-visible {
+  outline: 2px solid var(--designer-focus-ring);
+  outline-offset: 2px;
 }
 
 .designer-blueprint-canvas-node-header {
   display: flex;
-  align-items: center;
+  box-sizing: border-box;
+  align-items: flex-start;
   gap: var(--designer-space-3);
-  height: 34px;
-  padding: 0 10px;
+  height: 45px;
+  padding: 8px 10px 6px;
   overflow: hidden;
-  border-bottom: 1px solid var(--designer-border-subtle);
-  white-space: nowrap;
 }
 
-.designer-blueprint-canvas-node-badge {
-  flex: none;
-  padding: 1px 6px;
-  border-radius: var(--designer-radius-1);
-  background: var(--designer-surface-control);
+.designer-blueprint-canvas-node-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+  overflow: hidden;
+}
+
+.designer-blueprint-canvas-node-kind {
+  overflow: hidden;
   color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
-  letter-spacing: 0.06em;
+  font-weight: 500;
+  line-height: 13.2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .designer-blueprint-canvas-node-title {
@@ -309,40 +370,46 @@
   color: var(--designer-text-primary);
   font-size: var(--designer-font-size-base);
   font-weight: 600;
+  line-height: 16.9px;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .designer-blueprint-canvas-node-flow {
   flex: none;
-  margin-left: auto;
+  padding-top: 1px;
   color: var(--designer-text-muted);
   font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
-}
-
-.designer-blueprint-canvas-node-content {
-  position: absolute;
-  top: 34px;
-  right: 0;
-  left: 0;
-  padding: 8px 10px;
+  font-weight: 500;
+  line-height: 11px;
+  white-space: nowrap;
 }
 
 .designer-blueprint-canvas-node-subtitle {
+  box-sizing: border-box;
+  height: 21px;
+  padding: 0 10px 6px;
   overflow: hidden;
   color: var(--designer-text-muted);
+  font-family: var(--designer-font-family-mono);
   font-size: var(--designer-font-size-xs);
+  font-weight: 500;
+  line-height: 15.4px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .designer-blueprint-canvas-node-summary {
   display: -webkit-box;
-  margin: 4px 0 0;
+  box-sizing: border-box;
+  height: 40px;
+  margin: 0;
+  padding: 0 10px 8px;
   overflow: hidden;
   color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-xs);
-  line-height: 1.45;
+  line-height: 15.95px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -358,12 +425,17 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--designer-space-3);
-  height: 22px;
-  padding-right: 14px;
+  height: 28px;
+  padding: 0 10px;
   overflow: hidden;
-  color: var(--designer-text-muted);
+  color: var(--designer-text-secondary);
   font-size: var(--designer-font-size-xs);
   white-space: nowrap;
+}
+
+.designer-blueprint-canvas-port-row-in {
+  justify-content: flex-start;
+  color: var(--designer-text-muted);
 }
 
 .designer-blueprint-canvas-port-row[data-available="false"] {
@@ -624,9 +696,23 @@
   font-size: var(--designer-font-size-xs);
 }
 
+.designer-blueprint-canvas-simulation-bar-icon {
+  display: inline-flex;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--designer-text-muted);
+}
+
+.designer-blueprint-canvas-simulation-bar-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
 .designer-blueprint-canvas-simulation-bar-label {
   flex: 1 1 auto;
   overflow: hidden;
+  color: var(--designer-text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -663,7 +749,8 @@
   padding: 0 var(--designer-space-5);
   border-bottom: 1px solid var(--designer-border-subtle);
   color: var(--designer-text-primary);
-  font-size: var(--designer-font-size-sm);
+  font-size: var(--designer-font-size-base);
+  font-weight: 600;
 }
 
 .designer-blueprint-canvas-simulation-content {
