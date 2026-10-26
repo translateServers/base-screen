@@ -54,12 +54,16 @@ export function appendVariablesToolbar(
     variant: 'ghost',
   });
   add.dataset.variableAction = 'add';
-  appendIconLabel(add, 'plus', DESIGNER_UI_TEXT.variables.addShort);
+  appendIconLabel(add, 'plus', DESIGNER_UI_TEXT.variables.newShort);
   toolbar.appendChild(add);
   panel.appendChild(toolbar);
 }
 
-export function appendVariablesEmptyState(content: HTMLElement, noVariables: boolean): void {
+export function appendVariablesEmptyState(
+  content: HTMLElement,
+  noVariables: boolean,
+  query = '',
+): void {
   const empty = content.ownerDocument.createElement('section');
   empty.className = 'designer-empty-state variable-empty-state';
   const glyph = content.ownerDocument.createElement('span');
@@ -71,6 +75,14 @@ export function appendVariablesEmptyState(content: HTMLElement, noVariables: boo
     ? DESIGNER_UI_TEXT.variables.emptyTitle
     : DESIGNER_UI_TEXT.variables.noResults;
   empty.appendChild(title);
+  if (!noVariables) {
+    const description = content.ownerDocument.createElement('span');
+    description.textContent =
+      query.trim() === ''
+        ? DESIGNER_UI_TEXT.variables.noResults
+        : DESIGNER_UI_TEXT.variables.noResultsFor(query.trim());
+    empty.appendChild(description);
+  }
   if (noVariables) {
     const description = content.ownerDocument.createElement('span');
     description.textContent = DESIGNER_UI_TEXT.variables.emptyDescription;

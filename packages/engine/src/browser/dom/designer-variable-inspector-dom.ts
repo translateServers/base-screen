@@ -1,9 +1,13 @@
-import type { ScreenDocument } from '@base-screen/contracts';
+import type { ScreenDocument, ScreenVariable } from '@base-screen/contracts';
 import { readDesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
-import { createDesignerIconButton } from './designer-ui-primitives.js';
-import { appendVariableDetails, type DesignerVariablesDraft } from './designer-variables-dom.js';
+import { createDesignerButton, createDesignerIconButton } from './designer-ui-primitives.js';
+import {
+  appendVariableDetails,
+  createVariableGlyph,
+  type DesignerVariablesDraft,
+} from './designer-variables-dom.js';
 import {
   appendCreateEditor,
   appendDeleteConfirmation,
@@ -15,8 +19,13 @@ import {
 export interface DesignerVariableInspectorSurface {
   readonly layer: HTMLElement;
   readonly card: HTMLElement;
+  readonly glyph: HTMLElement;
+  readonly eyebrow: HTMLElement;
+  readonly eyebrowText: HTMLElement;
   readonly title: HTMLElement;
+  readonly sub: HTMLElement;
   readonly body: HTMLElement;
+  readonly foot: HTMLElement;
   readonly close: HTMLButtonElement;
   readonly menuLayer: HTMLElement;
   readonly menu: HTMLElement;
@@ -34,8 +43,13 @@ export function ensureDesignerVariableInspector(
     return {
       layer: existing,
       card: existing.querySelector<HTMLElement>('[data-variable-inspector]')!,
+      glyph: existing.querySelector<HTMLElement>('[data-variable-inspector-glyph]')!,
+      eyebrow: existing.querySelector<HTMLElement>('[data-variable-inspector-eyebrow]')!,
+      eyebrowText: existing.querySelector<HTMLElement>('[data-variable-inspector-eyebrow-text]')!,
       title: existing.querySelector<HTMLElement>('[data-variable-inspector-title]')!,
+      sub: existing.querySelector<HTMLElement>('[data-variable-inspector-sub]')!,
       body: existing.querySelector<HTMLElement>('[data-variable-inspector-scroll]')!,
+      foot: existing.querySelector<HTMLElement>('[data-variable-inspector-foot]')!,
       close: existing.querySelector<HTMLButtonElement>('[data-variable-inspector-close]')!,
       menuLayer: scope.querySelector<HTMLElement>('[data-variable-row-menu-layer]')!,
       menu: scope.querySelector<HTMLElement>('[data-variable-row-menu]')!,
@@ -57,10 +71,32 @@ export function ensureDesignerVariableInspector(
 
   const head = ownerDocument.createElement('header');
   head.className = 'variable-inspector-head';
+  const glyph = ownerDocument.createElement('span');
+  glyph.className = 'variable-inspector-glyph';
+  glyph.dataset.variableInspectorGlyph = '';
+  glyph.setAttribute('aria-hidden', 'true');
+  const headCopy = ownerDocument.createElement('span');
+  headCopy.className = 'variable-inspector-head-copy';
+  const eyebrow = ownerDocument.createElement('span');
+  eyebrow.className = 'variable-inspector-eyebrow';
+  eyebrow.dataset.variableInspectorEyebrow = '';
+  const dot = ownerDocument.createElement('span');
+  dot.className = 'variable-inspector-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  const eyebrowText = ownerDocument.createElement('span');
+  eyebrowText.dataset.variableInspectorEyebrowText = '';
+  eyebrow.appendChild(dot);
+  eyebrow.appendChild(eyebrowText);
   const title = ownerDocument.createElement('span');
   title.className = 'variable-inspector-title';
   title.id = 'designer-variable-inspector-title';
   title.dataset.variableInspectorTitle = '';
+  const sub = ownerDocument.createElement('span');
+  sub.className = 'variable-inspector-sub';
+  sub.dataset.variableInspectorSub = '';
+  headCopy.appendChild(eyebrow);
+  headCopy.appendChild(title);
+  headCopy.appendChild(sub);
   const close = createDesignerIconButton(ownerDocument, {
     className: 'variable-inspector-close',
     icon: 'close',
@@ -70,14 +106,20 @@ export function ensureDesignerVariableInspector(
   close.dataset.variableAction = 'close-inspector';
   close.dataset.variableIndex = '-1';
   close.dataset.variableInspectorClose = '';
-  head.appendChild(title);
+  head.appendChild(glyph);
+  head.appendChild(headCopy);
   head.appendChild(close);
 
   const body = ownerDocument.createElement('div');
   body.className = 'variable-inspector-scroll';
   body.dataset.variableInspectorScroll = '';
+  const foot = ownerDocument.createElement('footer');
+  foot.className = 'variable-inspector-foot';
+  foot.dataset.variableInspectorFoot = '';
+  foot.hidden = true;
   card.appendChild(head);
   card.appendChild(body);
+  card.appendChild(foot);
   layer.appendChild(card);
   scope.appendChild(layer);
 
@@ -93,7 +135,20 @@ export function ensureDesignerVariableInspector(
   menuLayer.appendChild(menu);
   scope.appendChild(menuLayer);
 
-  return { layer, card, title, body, close, menuLayer, menu };
+  return {
+    layer,
+    card,
+    glyph,
+    eyebrow,
+    eyebrowText,
+    title,
+    sub,
+    body,
+    foot,
+    close,
+    menuLayer,
+    menu,
+  };
 }
 
 /** 行“更多”菜单：与检查器共用 overlay host，避免被面板滚动区裁切。 */
@@ -234,39 +289,94 @@ export function renderDesignerVariableInspector(
     return;
   }
 
+  const previousSummary = surface.card.querySelector<HTMLElement>('.variable-error-summary');
+  previousSummary?.remove();
   surface.body.replaceChildren();
+  surface.foot.replaceChildren();
+  surface.foot.hidden = true;
+
   let title: string = DESIGNER_UI_TEXT.variables.createTitle;
+  let eyebrow: string = DESIGNER_UI_TEXT.variables.eyebrowCreate;
+  let sub: string = DESIGNER_UI_TEXT.variables.createIntro;
+  let glyphType: ScreenVariable['type'] = draft.create.type;
+  let detailMode = false;
+
   if (draft.creating) {
     appendCreateEditor(surface.body, draft.create, draft.configuringIndex);
-    title =
-      draft.configuringIndex === undefined
-        ? DESIGNER_UI_TEXT.variables.createTitle
-        : DESIGNER_UI_TEXT.variables.editConfigurationTitle;
+    const editing = draft.configuringIndex !== undefined;
+    title = editing
+      ? DESIGNER_UI_TEXT.variables.editVariableTitle
+      : DESIGNER_UI_TEXT.variables.createFormTitle(variableTypeLabel(draft.create.type));
+    eyebrow = `${variableTypeShort(draft.create.type)} · ${
+      editing ? DESIGNER_UI_TEXT.variables.eyebrowEdit : DESIGNER_UI_TEXT.variables.eyebrowCreate
+    }`;
+    sub = editing
+      ? draft.create.name || DESIGNER_UI_TEXT.variables.unselectedSource
+      : DESIGNER_UI_TEXT.variables.createFormSub;
+    glyphType = draft.create.type;
   } else if (draft.renamingIndex !== undefined && variable !== undefined) {
     appendRenameEditor(surface.body, variable, draft.renamingIndex);
     title = DESIGNER_UI_TEXT.variables.renameTitle;
+    eyebrow = `${variableTypeShort(variable.type)} · ${DESIGNER_UI_TEXT.variables.eyebrowEdit}`;
+    sub = variable.name;
+    glyphType = variable.type;
   } else if (draft.editingDescriptionIndex !== undefined && variable !== undefined) {
     appendDescriptionEditor(surface.body, variable, draft.editingDescriptionIndex);
     title = DESIGNER_UI_TEXT.variables.editDescriptionTitle;
+    eyebrow = `${variableTypeShort(variable.type)} · ${DESIGNER_UI_TEXT.variables.eyebrowEdit}`;
+    sub = variable.name;
+    glyphType = variable.type;
   } else if (draft.editingValueIndex !== undefined && variable !== undefined) {
     appendValueEditor(surface.body, variable, draft.editingValueIndex);
     title = DESIGNER_UI_TEXT.variables.editValueTitle;
+    eyebrow = `${variableTypeShort(variable.type)} · ${DESIGNER_UI_TEXT.variables.eyebrowEdit}`;
+    sub = variable.name;
+    glyphType = variable.type;
   } else if (draft.deletingIndex !== undefined && variable !== undefined) {
     appendDeleteConfirmation(surface.body, variable.name, draft.deletingIndex);
     title = DESIGNER_UI_TEXT.variables.confirmDelete;
+    eyebrow = `${variableTypeShort(variable.type)} · ${DESIGNER_UI_TEXT.variables.eyebrowDelete}`;
+    sub = variable.name;
+    glyphType = variable.type;
   } else if (detailVariable !== undefined) {
     appendVariableDetails(surface.body, detailVariable, detailIndex, draft);
     title = detailVariable.name;
+    eyebrow = `${variableTypeShort(detailVariable.type)} · ${variableTypeLabel(detailVariable.type)}`;
+    sub =
+      detailVariable.type === 'static'
+        ? DESIGNER_UI_TEXT.variables.manualCurrentDocument
+        : detailVariable.sourceId || DESIGNER_UI_TEXT.variables.unselectedSource;
+    glyphType = detailVariable.type;
+    detailMode = true;
   } else {
     surface.layer.hidden = true;
     surface.body.replaceChildren();
     return;
   }
 
-  const detailMode = !hasEditor && detailVariable !== undefined;
+  const summary = surface.body.querySelector<HTMLElement>('.variable-error-summary');
+  if (summary !== null) surface.card.insertBefore(summary, surface.body);
+
   const activeIndex = detailMode ? detailIndex : index;
   surface.title.textContent = title;
+  surface.eyebrowText.textContent = eyebrow;
+  surface.sub.textContent = sub;
+  surface.glyph.replaceChildren();
+  if (detailVariable !== undefined && detailMode) {
+    surface.glyph.appendChild(createVariableGlyph(surface.glyph.ownerDocument, detailVariable));
+  } else {
+    surface.glyph.appendChild(createTypeBrick(surface.glyph.ownerDocument, glyphType));
+  }
   surface.close.dataset.variableIndex = String(activeIndex);
+
+  const editorActions = surface.body.querySelector<HTMLElement>('.variable-editor-actions');
+  if (editorActions !== null) {
+    surface.foot.appendChild(editorActions);
+    surface.foot.hidden = false;
+  } else if (detailMode && detailVariable !== undefined) {
+    appendDetailFoot(surface, detailVariable, detailIndex, draft);
+  }
+
   surface.layer.dataset.variableInspectorMode = detailMode
     ? 'detail'
     : draft.creating
@@ -280,6 +390,63 @@ export function renderDesignerVariableInspector(
   surface.body.dataset.variableIndex = String(activeIndex);
   surface.layer.hidden = false;
   positionInspector(surface, panel, activeIndex);
+}
+
+function variableTypeLabel(type: ScreenVariable['type']): string {
+  return type === 'static'
+    ? DESIGNER_UI_TEXT.variables.typeStatic
+    : type === 'data-source'
+      ? DESIGNER_UI_TEXT.variables.typeDataSource
+      : DESIGNER_UI_TEXT.variables.typeUrlQuery;
+}
+
+function variableTypeShort(type: ScreenVariable['type']): string {
+  return type === 'static'
+    ? DESIGNER_UI_TEXT.variables.typeShortStatic
+    : type === 'data-source'
+      ? DESIGNER_UI_TEXT.variables.typeShortDataSource
+      : DESIGNER_UI_TEXT.variables.typeShortUrlQuery;
+}
+
+function createTypeBrick(ownerDocument: Document, type: ScreenVariable['type']): HTMLElement {
+  const brick = ownerDocument.createElement('span');
+  brick.className = 'variable-inspector-type';
+  brick.innerHTML = designerIcon(
+    type === 'data-source' ? 'database' : type === 'url-query' ? 'link' : 'variable',
+  );
+  return brick;
+}
+
+function appendDetailFoot(
+  surface: DesignerVariableInspectorSurface,
+  variable: ReturnType<typeof readDesignerVariableView>,
+  index: number,
+  draft: DesignerVariablesDraft,
+): void {
+  const ownerDocument = surface.foot.ownerDocument;
+  const add = (action: string, label: string, variant: 'ghost' | 'danger' | 'primary'): void => {
+    const button = createDesignerButton(ownerDocument, {
+      className: 'variable-inspector-foot-button',
+      text: label,
+      tip: label,
+      variant,
+    });
+    button.dataset.variableAction = action;
+    button.dataset.variableIndex = String(index);
+    surface.foot.appendChild(button);
+  };
+  add('duplicate', DESIGNER_UI_TEXT.variables.copy, 'ghost');
+  if ((draft.referenceCounts.get(variable.id) ?? 0) > 0) {
+    add('references', DESIGNER_UI_TEXT.variables.viewReferences, 'ghost');
+  }
+  const spacer = ownerDocument.createElement('span');
+  spacer.className = 'variable-inspector-foot-spacer';
+  surface.foot.appendChild(spacer);
+  if ((draft.referenceCounts.get(variable.id) ?? 0) === 0) {
+    add('delete', DESIGNER_UI_TEXT.variables.delete, 'danger');
+  }
+  add('edit-config', DESIGNER_UI_TEXT.variables.editMenu, 'primary');
+  surface.foot.hidden = false;
 }
 
 function positionInspector(

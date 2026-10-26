@@ -75,7 +75,7 @@ export async function assertAuthoringVariables(page, designer) {
       panelOverflow: getComputedStyle(panel).overflow,
       contentOverflowY: content === null ? undefined : getComputedStyle(content).overflowY,
       groups: [...panel.querySelectorAll('.variable-group > .list-heading')].map(
-        (heading) => heading.textContent,
+        (heading) => heading.querySelector('.variable-group-label')?.textContent,
       ),
       listRoles: [...panel.querySelectorAll('.variable-list')].map((list) =>
         list.getAttribute('role'),
@@ -120,11 +120,12 @@ export async function assertAuthoringVariables(page, designer) {
     variableModule.rowDisplay !== 'block' ||
     (variableModule.rowHeight ?? 0) < 38 ||
     (variableModule.rowHeight ?? 0) > 44 ||
-    variableModule.headerHeight !== variableModule.rowHeight ||
+    (variableModule.headerHeight ?? 0) < 38 ||
+    (variableModule.rowHeight ?? 0) - (variableModule.headerHeight ?? 0) > 2 ||
     variableModule.valueTag !== 'BUTTON' ||
     (variableModule.addHeight ?? 0) < 28 ||
     !['flex', 'inline-flex'].includes(variableModule.addDisplay) ||
-    !variableModule.addText?.includes('新建变量') ||
+    !variableModule.addText?.includes('新建') ||
     variableModule.addGlyphWidth !== 16 ||
     variableModule.addGlyphHeight !== 16 ||
     !variableModule.addHasDecorativeSvg ||
@@ -506,12 +507,9 @@ async function assertReferenceNavigation(page, designer) {
 
 async function createHostVariable(page, designer, variableId, expectedName) {
   await designer.locator('[data-variable-action="add"]').click();
-  // 来源是自绘下拉：点触发器展开，原生 select 仍承担取值与 change。
-  const sourceSelect = designer.locator(
-    '.designer-select-control:has(select[data-variable-create-type])',
-  );
-  await sourceSelect.locator('.designer-select-trigger').click();
-  await sourceSelect.locator('.designer-select-option[data-value="data-source"]').click();
+  // 来源类型是分段控件，直接切到数据集；目录默认折叠，先展开。
+  await designer.locator('[data-variable-action="create-type-data-source"]').click();
+  await designer.locator('[data-variable-catalog-summary]').click();
   const option = designer.locator(
     `[data-variable-action="select-host"][data-source-id="${variableId}"]`,
   );

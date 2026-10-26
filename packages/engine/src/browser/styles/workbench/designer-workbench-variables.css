@@ -1,6 +1,7 @@
 /* 变量面板（对齐工作台原型）：按来源分组的紧凑列表。
    行 = 来源图形/色板 · 变量名 · 当前值；展开/操作只在悬停或聚焦时露出，静止态保持一条读数。 */
 .rail-view[data-variables] {
+  container: variables / inline-size;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   padding: 0;
@@ -12,14 +13,15 @@
   display: none;
 }
 
-/* 工具条只剩一个紧凑的“新建变量”入口，悬浮在内容右上角，不占列头高度。 */
+/* 工具条：搜索占满剩余宽度，右侧保持单一主入口。 */
 .variable-panel-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-2);
-  padding: var(--designer-space-3) var(--designer-space-3) 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--designer-border-subtle);
   background: var(--designer-surface-panel);
 }
 
@@ -102,26 +104,29 @@
   width: auto;
   min-height: 30px;
   align-items: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-2) 0 var(--designer-space-1);
-  border-color: transparent;
+  gap: 5px;
+  padding: 0 10px;
+  border: 0;
   border-radius: var(--designer-radius-2);
-  background: transparent;
-  color: var(--designer-text-secondary);
-  box-shadow: none;
+  background: var(--designer-surface-raised);
+  color: var(--designer-text-primary);
+  box-shadow: var(--designer-elev-ring);
   font: var(--designer-font-small);
+  font-size: var(--designer-font-size-sm);
+  font-weight: 500;
 }
 
 .designer-button.variable-add-button:not(:disabled):hover {
   border-color: transparent;
   background: var(--designer-surface-control-hover);
   color: var(--designer-text-primary);
-  box-shadow: none;
+  box-shadow: 0 0 0 1px var(--designer-border-strong);
 }
 
 .designer-button.variable-add-button:disabled {
   color: var(--designer-text-disabled);
-  background: transparent;
+  background: var(--designer-surface-raised);
+  box-shadow: none;
 }
 
 .variable-button-glyph {
@@ -143,35 +148,104 @@
 .variable-panel-content {
   min-height: 0;
   overflow: hidden auto;
-  padding: 0 0 var(--designer-space-6);
+  padding: 8px 8px 28px;
   scrollbar-gutter: stable;
 }
 
 .variable-group {
   min-width: 0;
+  margin-bottom: 4px;
 }
 
 .variable-group > .list-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
   margin: 0;
-  padding: var(--designer-space-4) var(--designer-space-4) var(--designer-space-1);
+  padding: 6px 6px 3px 8px;
   color: var(--designer-text-muted);
-  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
-  letter-spacing: normal;
-  text-transform: uppercase;
+  font: 500 10px / 1.4 var(--designer-font-numeric);
+  letter-spacing: 0.05em;
+  text-transform: none;
+}
+
+.variable-group-glyph {
+  display: inline-grid;
+  width: 12px;
+  height: 12px;
+  flex: none;
+  place-items: center;
+  color: var(--designer-text-muted);
+}
+
+.variable-group-glyph svg {
+  width: 12px;
+  height: 12px;
+}
+
+.variable-group-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-group-count {
+  margin-left: auto;
+  color: var(--designer-text-muted);
+  font: 500 10px / 1 var(--designer-font-numeric);
+}
+
+.variable-group-add {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--designer-text-muted);
+  box-shadow: none;
+  opacity: 0.5;
+}
+
+.variable-group-add:hover:not(:disabled),
+.variable-group-add:focus-visible {
+  border: 0;
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  box-shadow: none;
+  opacity: 1;
+}
+
+.variable-group-add svg {
+  width: 12px;
+  height: 12px;
 }
 
 .variable-list {
   display: grid;
   min-width: 0;
-  gap: 2px;
+  gap: 1px;
   margin: 0;
-  padding: 0 var(--designer-space-2);
+  padding: 0;
 }
 
-/* 单行：20px 图形槽 + 名称 + 右侧只读值。 */
+/* 单行：16px 图形槽 + 名称 + 右侧只读值。 */
 .variable-row {
   min-width: 0;
+  border: 1px solid transparent;
   border-radius: var(--designer-radius-2);
+  transition:
+    background-color var(--designer-motion),
+    border-color var(--designer-motion);
+}
+
+.variable-row[data-expanded="true"] {
+  border-color: var(--designer-border-default);
+  background: var(--designer-surface-control);
 }
 
 .variable-row-header {
@@ -179,10 +253,10 @@
   display: grid;
   min-width: 0;
   min-height: 38px;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
+  grid-template-columns: 16px minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--designer-space-2);
-  padding: 0 var(--designer-space-2);
+  gap: 8px;
+  padding: 0 8px;
   border-radius: var(--designer-radius-2);
   color: var(--designer-text-secondary);
   transition: background-color var(--designer-motion);
@@ -197,7 +271,7 @@
 .variable-row-toggle {
   position: relative;
   display: grid;
-  width: 20px;
+  width: 16px;
   height: 28px;
   min-width: 0;
   min-height: 28px;
@@ -218,8 +292,8 @@
 
 .variable-row-glyph {
   display: inline-grid;
-  width: 20px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   place-items: center;
   color: var(--designer-text-muted);
   transition: opacity var(--designer-motion);
@@ -230,12 +304,30 @@
   height: 14px;
 }
 
+.variable-type-brick {
+  display: grid;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 4px;
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+}
+
+.variable-type-brick svg {
+  width: 10px;
+  height: 10px;
+}
+
 .variable-swatch {
   display: inline-block;
   width: 14px;
   height: 14px;
   border-radius: 3px;
-  box-shadow: 0 0 0 1px var(--designer-border-default);
+  box-shadow:
+    0 0 0 1px var(--designer-border-default),
+    inset 0 0 0 1px color-mix(in srgb, var(--designer-surface-panel) 30%, transparent);
 }
 
 .variable-row-chevron {
@@ -273,9 +365,8 @@
 .variable-name {
   min-width: 0;
   overflow: hidden;
-  color: inherit;
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-sm);
+  color: var(--designer-text-primary);
+  font: 500 12px / 1.4 var(--designer-font-numeric);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -294,11 +385,10 @@
 }
 
 .variable-row-context-value {
-  max-width: 140px;
+  max-width: 104px;
   overflow: hidden;
   color: var(--designer-text-muted);
-  font: var(--designer-font-numeric);
-  font-size: var(--designer-font-size-xs);
+  font: 500 10px / 1.4 var(--designer-font-numeric);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -306,18 +396,18 @@
 /* 操作簇与值共位：悬停/聚焦时盖住值，静止态保持单行读数。 */
 .variable-row-actions {
   position: absolute;
-  top: 50%;
-  right: var(--designer-space-1);
+  top: 5px;
+  right: 4px;
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 0;
-  padding-left: var(--designer-space-3);
+  gap: 1px;
+  padding: 2px;
   border-radius: var(--designer-radius-2);
-  background: linear-gradient(90deg, transparent, var(--designer-surface-control-hover) 12px);
+  background: var(--designer-surface-control-hover);
+  box-shadow: -10px 0 12px -5px var(--designer-surface-control-hover);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-50%);
   transition: opacity var(--designer-motion);
 }
 
@@ -335,29 +425,27 @@
 }
 
 .variable-row-actions .designer-button {
-  width: 24px;
+  width: auto;
   height: 24px;
-  min-width: 24px;
+  min-width: 0;
   min-height: 24px;
-  padding: 0;
-  border-color: transparent;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 4px;
   background: transparent;
   box-shadow: none;
-  color: var(--designer-text-muted);
+  color: var(--designer-text-secondary);
+  gap: 3px;
 }
 
-.variable-row-actions .variable-row-edit {
-  width: auto;
-  min-width: 0;
-  padding: 0 var(--designer-space-2);
-  gap: var(--designer-space-1);
-}
-
-.variable-row-edit .variable-button-label {
+.variable-row-actions .variable-button-label,
+.variable-row-actions .variable-row-edit .variable-button-label {
   display: inline;
-  font-size: var(--designer-font-size-xs);
+  color: inherit;
+  font-size: 11px;
   font-weight: 500;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .variable-row-actions .designer-button:hover:not(:disabled) {
@@ -524,15 +612,17 @@ button.variable-reference-count:focus-visible {
 }
 
 .variable-empty-state > strong {
-  color: var(--designer-text-secondary);
+  color: var(--designer-text-primary);
   font: var(--designer-font-small);
+  font-size: 13px;
   font-weight: 600;
 }
 
 .variable-empty-state > span:not(.variable-empty-glyph) {
   color: var(--designer-text-muted);
   font: var(--designer-font-small);
-  line-height: 17px;
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .variable-empty-glyph {
@@ -541,8 +631,8 @@ button.variable-reference-count:focus-visible {
   height: 32px;
   place-items: center;
   border-radius: var(--designer-radius-control);
-  background: var(--designer-accent-surface);
-  color: var(--designer-accent);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
 }
 
 .variable-empty-glyph svg {
@@ -569,6 +659,22 @@ button.variable-reference-count:focus-visible {
 .rail-view[data-variables] .designer-control,
 .rail-view[data-variables] .variable-row {
   transition: none;
+}
+
+@container variables (max-width: 180px) {
+  .variable-row-actions .variable-button-label {
+    display: none;
+  }
+
+  .variable-row-actions .designer-button {
+    width: 24px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .variable-row-context-value {
+    max-width: 64px;
+  }
 }
 
 .toolbar-btn {

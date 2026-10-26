@@ -287,7 +287,7 @@ describe('designer variables controller', () => {
     expect(commands).toHaveLength(0);
     expect(reports).toHaveLength(1);
     expect(valueInput?.getAttribute('aria-invalid')).toBe('true');
-    const inlineError = panel.querySelector<FakeElement>('[data-variable-error]');
+    const inlineError = panel.querySelector<FakeElement>('[data-variable-field-error="value"]');
     expect(inlineError?.hidden).toBe(false);
     expect(inlineError?.textContent).toBe(
       '初始值格式无效；对象、数组或带引号文本须使用有效 JSON。',

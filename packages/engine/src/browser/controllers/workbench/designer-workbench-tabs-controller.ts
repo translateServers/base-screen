@@ -177,7 +177,9 @@ export class DesignerWorkbenchTabsController {
           ? DESIGNER_UI_TEXT.panelScope.host
           : dynamicGroupId !== undefined
             ? DESIGNER_UI_TEXT.panelScope.plugin
-            : DESIGNER_UI_TEXT.panelScope.builtin;
+            : this.#leftTab === 'variables'
+              ? DESIGNER_UI_TEXT.panelScope.currentDocument
+              : DESIGNER_UI_TEXT.panelScope.builtin;
     }
     if (leftCount !== null && dynamicGroupId !== undefined) {
       leftCount.hidden = true;

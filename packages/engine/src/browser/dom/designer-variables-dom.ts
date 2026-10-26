@@ -81,7 +81,7 @@ export function renderDesignerVariables(
     .map((variable, index) => ({ index, variable }))
     .filter(({ variable }) => matchesVariableSearch(variable, draft.search));
   if (entries.length === 0) {
-    appendVariablesEmptyState(content, false);
+    appendVariablesEmptyState(content, false, draft.search);
     panel.appendChild(content);
     return;
   }
@@ -93,8 +93,40 @@ export function renderDesignerVariables(
     section.className = 'variable-group';
     section.dataset.variableGroup = group.types[0];
     const heading = panel.ownerDocument.createElement('p');
-    heading.className = 'list-heading';
-    heading.textContent = group.label;
+    heading.className = 'list-heading variable-group-heading';
+    const glyph = panel.ownerDocument.createElement('span');
+    glyph.className = 'variable-group-glyph';
+    glyph.innerHTML = designerIcon(
+      group.types[0] === 'data-source'
+        ? 'database'
+        : group.types[0] === 'url-query'
+          ? 'link'
+          : 'variable',
+    );
+    glyph.setAttribute('aria-hidden', 'true');
+    const label = panel.ownerDocument.createElement('span');
+    label.className = 'variable-group-label';
+    label.textContent = group.label;
+    const count = panel.ownerDocument.createElement('span');
+    count.className = 'variable-group-count';
+    count.textContent = String(group.entries.length);
+    const add = createDesignerButton(panel.ownerDocument, {
+      ariaLabel: DESIGNER_UI_TEXT.variables.groupAdd(group.label),
+      className: 'variable-group-add',
+      tip: DESIGNER_UI_TEXT.variables.groupAdd(group.label),
+      variant: 'ghost',
+    });
+    add.dataset.variableAction =
+      group.types[0] === 'data-source'
+        ? 'create-data-source'
+        : group.types[0] === 'url-query'
+          ? 'create-url-query'
+          : 'add';
+    add.innerHTML = designerIcon('plus');
+    heading.appendChild(glyph);
+    heading.appendChild(label);
+    heading.appendChild(count);
+    heading.appendChild(add);
     section.appendChild(heading);
     const list = panel.ownerDocument.createElement('div');
     list.className = 'variable-list';
@@ -214,42 +246,69 @@ export function appendVariableDetails(
   draft: DesignerVariablesDraft,
 ): void {
   const details = container.ownerDocument.createElement('section');
-  details.className = 'variable-details';
+  details.className = 'variable-details variable-detail-stack';
   details.dataset.variableDetails = variable.id;
   details.setAttribute('aria-label', variable.name);
-  const usage = createVariableReferenceCount(
+  const referenceCount = draft.referenceCounts.get(variable.id) ?? 0;
+
+  const meta = container.ownerDocument.createElement('div');
+  meta.className = 'variable-detail-meta';
+  for (const text of [
+    sourceLabel(variable.type),
+    referenceCount > 0
+      ? DESIGNER_UI_TEXT.variables.referenceCount(referenceCount)
+      : DESIGNER_UI_TEXT.variables.noReferences,
+    variable.type === 'static'
+      ? DESIGNER_UI_TEXT.variables.staticChip
+      : variable.controlled
+        ? DESIGNER_UI_TEXT.variables.enabled
+        : DESIGNER_UI_TEXT.variables.disabled,
+  ]) {
+    const chip = container.ownerDocument.createElement('span');
+    chip.className = 'variable-detail-chip';
+    chip.textContent = text;
+    meta.appendChild(chip);
+  }
+  details.appendChild(meta);
+
+  details.appendChild(createValueDetail(container.ownerDocument, variable, index));
+  if (variable.type !== 'static') {
+    appendPreview(details, variable.id, draft.catalog);
+  }
+
+  const sourceSection = createDetailSection(
     container.ownerDocument,
-    variable,
-    index,
-    draft.referenceCounts.get(variable.id) ?? 0,
-    draft.expandedReferenceName === variable.id,
+    DESIGNER_UI_TEXT.variables.source,
   );
-  usage.className = `${usage.className} variable-row-usage`.trim();
-  details.appendChild(createUsageLine(container.ownerDocument, usage));
-  details.appendChild(
+  sourceSection.appendChild(
     createDetailLine(
       container.ownerDocument,
-      DESIGNER_UI_TEXT.variables.descriptionLabel,
-      variable.description ?? DESIGNER_UI_TEXT.variables.addDescription,
-    ),
-  );
-  details.appendChild(
-    createDetailLine(
-      container.ownerDocument,
-      DESIGNER_UI_TEXT.variables.source,
+      DESIGNER_UI_TEXT.variables.sourceTypeLabel,
       variableSourceLabel(variable),
     ),
   );
-  details.appendChild(createValueDetail(container.ownerDocument, variable, index));
   if (variable.type !== 'static') {
-    details.appendChild(
+    sourceSection.appendChild(
       createCodeDetail(
         container.ownerDocument,
         DESIGNER_UI_TEXT.variables.sourceId,
         variable.sourceId,
       ),
     );
-    details.appendChild(
+  }
+  details.appendChild(sourceSection);
+
+  const runSection = createDetailSection(
+    container.ownerDocument,
+    DESIGNER_UI_TEXT.variables.sectionRun,
+  );
+  if (variable.type === 'static') {
+    const line = container.ownerDocument.createElement('p');
+    line.className = 'variable-detail-description';
+    line.textContent = DESIGNER_UI_TEXT.variables.staticRunHint;
+    runSection.appendChild(line);
+  } else {
+    runSection.appendChild(
       createDetailLine(
         container.ownerDocument,
         DESIGNER_UI_TEXT.variables.controlled,
@@ -258,17 +317,8 @@ export function appendVariableDetails(
           : DESIGNER_UI_TEXT.variables.disabled,
       ),
     );
-    if (variable.processorId !== undefined) {
-      details.appendChild(
-        createCodeDetail(
-          container.ownerDocument,
-          DESIGNER_UI_TEXT.variables.processor,
-          variable.processorId,
-        ),
-      );
-    }
     if (variable.type === 'data-source') {
-      details.appendChild(
+      runSection.appendChild(
         createDetailLine(
           container.ownerDocument,
           DESIGNER_UI_TEXT.variables.autoUpdate,
@@ -278,16 +328,50 @@ export function appendVariableDetails(
         ),
       );
     }
-    appendPreview(details, variable.id, draft.catalog);
+    if (variable.processorId !== undefined) {
+      runSection.appendChild(
+        createCodeDetail(
+          container.ownerDocument,
+          DESIGNER_UI_TEXT.variables.processor,
+          variable.processorId,
+        ),
+      );
+    }
   }
+  details.appendChild(runSection);
+
+  const descriptionSection = createDetailSection(
+    container.ownerDocument,
+    DESIGNER_UI_TEXT.variables.descriptionSection,
+  );
+  const description = container.ownerDocument.createElement('p');
+  description.className = 'variable-detail-description';
+  description.textContent = variable.description ?? DESIGNER_UI_TEXT.variables.addDescription;
+  descriptionSection.appendChild(description);
+  details.appendChild(descriptionSection);
+
+  const usage = createVariableReferenceCount(
+    container.ownerDocument,
+    variable,
+    index,
+    referenceCount,
+    draft.expandedReferenceName === variable.id,
+  );
+  usage.className = `${usage.className} variable-row-usage`.trim();
+  const usageSection = createDetailSection(
+    container.ownerDocument,
+    DESIGNER_UI_TEXT.variables.usage,
+  );
+  usageSection.appendChild(usage);
   if (draft.expandedReferenceName === variable.id) {
     appendVariableReferenceList(
-      details,
+      usageSection,
       variable,
       index,
       draft.references.filter((reference) => reference.variableId === variable.id),
     );
   }
+  details.appendChild(usageSection);
   container.appendChild(details);
 }
 
@@ -295,7 +379,10 @@ export function appendVariableDetails(
  * 行首 14px 图形：静态颜色值显示为色板（与原型设计变量同形），其余按来源取图标。
  * 展开箭头复用同一 20px 槽位、叠在图形上，避免 hover 时行几何变化。
  */
-function createVariableGlyph(ownerDocument: Document, variable: DesignerVariableView): HTMLElement {
+export function createVariableGlyph(
+  ownerDocument: Document,
+  variable: DesignerVariableView,
+): HTMLElement {
   const glyph = ownerDocument.createElement('span');
   glyph.className = 'variable-row-glyph';
   const color = variable.type === 'static' ? colorValue(variable.initialValue) : undefined;
@@ -307,13 +394,16 @@ function createVariableGlyph(ownerDocument: Document, variable: DesignerVariable
     glyph.appendChild(swatch);
     return glyph;
   }
-  glyph.innerHTML = designerIcon(
+  const brick = ownerDocument.createElement('span');
+  brick.className = 'variable-type-brick';
+  brick.innerHTML = designerIcon(
     variable.type === 'data-source'
       ? 'database'
       : variable.type === 'url-query'
         ? 'link'
         : 'variable',
   );
+  glyph.appendChild(brick);
   return glyph;
 }
 
@@ -324,17 +414,6 @@ function colorValue(value: ScreenJsonValue): string | undefined {
   if (/^var\(--[\w-]+\)$/u.test(trimmed)) return trimmed;
   if (/^(?:rgb|rgba|hsl|hsla|oklch)\(/iu.test(trimmed)) return trimmed;
   return undefined;
-}
-
-function createUsageLine(ownerDocument: Document, usage: HTMLElement): HTMLElement {
-  const line = ownerDocument.createElement('div');
-  line.className = 'variable-detail-line variable-usage-line';
-  const label = ownerDocument.createElement('span');
-  label.className = 'variable-detail-label';
-  label.textContent = DESIGNER_UI_TEXT.variables.usage;
-  line.appendChild(label);
-  line.appendChild(usage);
-  return line;
 }
 
 function createRowContext(ownerDocument: Document, variable: DesignerVariableView): HTMLElement {
@@ -391,7 +470,7 @@ function appendCompactActions(
   more.dataset.variableIndex = String(index);
   more.setAttribute('aria-haspopup', 'menu');
   more.setAttribute('aria-expanded', String(draft.menuIndex === index));
-  appendIconLabel(more, 'more', '');
+  appendIconLabel(more, 'more', DESIGNER_UI_TEXT.variables.moreShort);
   actions.appendChild(more);
   header.appendChild(actions);
 }
@@ -413,6 +492,10 @@ function createValueDetail(
   const label = ownerDocument.createElement('span');
   label.className = 'variable-detail-label';
   label.textContent = DESIGNER_UI_TEXT.variables.initialValue;
+  const type = ownerDocument.createElement('span');
+  type.className = 'variable-detail-value-type';
+  type.textContent = valueTypeName(variable.initialValue);
+  label.appendChild(type);
   button.appendChild(label);
   const value = ownerDocument.createElement('code');
   value.className = 'variable-value';
@@ -423,6 +506,31 @@ function createValueDetail(
   edit.innerHTML = designerIcon('pencil');
   button.appendChild(edit);
   return button;
+}
+
+function valueTypeName(value: ScreenJsonValue): string {
+  if (value === null) return DESIGNER_UI_TEXT.variables.valueTypeNull;
+  if (Array.isArray(value)) return DESIGNER_UI_TEXT.variables.valueTypeArray;
+  switch (typeof value) {
+    case 'number':
+      return DESIGNER_UI_TEXT.variables.valueTypeNumber;
+    case 'boolean':
+      return DESIGNER_UI_TEXT.variables.valueTypeBoolean;
+    case 'object':
+      return DESIGNER_UI_TEXT.variables.valueTypeObject;
+    default:
+      return DESIGNER_UI_TEXT.variables.valueTypeText;
+  }
+}
+
+function createDetailSection(ownerDocument: Document, title: string): HTMLElement {
+  const section = ownerDocument.createElement('section');
+  section.className = 'variable-detail-section';
+  const heading = ownerDocument.createElement('span');
+  heading.className = 'variable-detail-section-title';
+  heading.textContent = title;
+  section.appendChild(heading);
+  return section;
 }
 
 function createDetailLine(ownerDocument: Document, label: string, value: string): HTMLElement {

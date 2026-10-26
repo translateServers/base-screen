@@ -2,12 +2,11 @@ import type { ScreenHostCatalogSummary, ScreenVariable } from '@base-screen/cont
 import type { DesignerVariableView } from '../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../common/ui-text/designer-ui-text.js';
 import { type DesignerIconName, designerIcon } from '../ui/designer-icons.js';
-import { enhanceDesignerSelect } from './designer-select-dom.js';
 import {
   createDesignerButton,
   createDesignerCheckbox,
   createDesignerInput,
-  createDesignerSelect,
+  createDesignerTextarea,
 } from './designer-ui-primitives.js';
 
 export interface DesignerVariableCreateDraft {
@@ -67,6 +66,7 @@ export function appendCreateEditor(
   const name = appendEditorField(editor, {
     label: DESIGNER_UI_TEXT.variables.name,
     hint: DESIGNER_UI_TEXT.variables.nameHint,
+    required: true,
     dataKey: 'variableCreateName',
     describedBy: errorId,
   });
@@ -74,6 +74,7 @@ export function appendCreateEditor(
   const description = appendEditorField(editor, {
     label: DESIGNER_UI_TEXT.variables.descriptionLabel,
     hint: DESIGNER_UI_TEXT.variables.descriptionHint,
+    multiline: true,
     dataKey: 'variableCreateDescription',
     describedBy: errorId,
   });
@@ -94,6 +95,7 @@ export function appendCreateEditor(
   const value = appendEditorField(editor, {
     label: DESIGNER_UI_TEXT.variables.initialValue,
     hint: DESIGNER_UI_TEXT.variables.valueHint,
+    multiline: true,
     dataKey: 'variableCreateValue',
     describedBy: errorId,
     json: true,
@@ -102,9 +104,43 @@ export function appendCreateEditor(
   syncInitialFieldDecorations(editor, name, description, value);
   if (draft.type !== 'static') {
     appendResponseField(editor, draft, configuringIndex);
-    appendEditorSection(editor, 'D', DESIGNER_UI_TEXT.variables.sectionRun);
+    const run = editor.ownerDocument.createElement('details');
+    run.className = 'variable-run-section';
+    run.open = draft.controlled || draft.autoUpdate;
+    const summary = editor.ownerDocument.createElement('summary');
+    const key = editor.ownerDocument.createElement('span');
+    key.className = 'variable-editor-section-key';
+    key.textContent = 'D';
+    const runTitle = editor.ownerDocument.createElement('span');
+    runTitle.className = 'variable-run-title';
+    runTitle.textContent = DESIGNER_UI_TEXT.variables.sectionRun;
+    const runSummary = editor.ownerDocument.createElement('span');
+    runSummary.className = 'variable-run-summary';
+    const runState = [
+      `${
+        DESIGNER_UI_TEXT.variables.controlled
+      } ${draft.controlled ? DESIGNER_UI_TEXT.variables.enabled : DESIGNER_UI_TEXT.variables.disabled}`,
+    ];
+    if (draft.type === 'data-source') {
+      runState.push(
+        `${DESIGNER_UI_TEXT.variables.autoUpdate} ${
+          draft.autoUpdate
+            ? DESIGNER_UI_TEXT.variables.enabled
+            : DESIGNER_UI_TEXT.variables.disabled
+        }`,
+      );
+    }
+    runSummary.textContent = runState.join(' · ');
+    const caret = editor.ownerDocument.createElement('span');
+    caret.className = 'variable-run-caret';
+    caret.innerHTML = designerIcon('chevron-right');
+    summary.appendChild(key);
+    summary.appendChild(runTitle);
+    summary.appendChild(runSummary);
+    summary.appendChild(caret);
+    run.appendChild(summary);
     appendCheckboxField(
-      editor,
+      run,
       DESIGNER_UI_TEXT.variables.controlled,
       DESIGNER_UI_TEXT.variables.controlledHint,
       'variableCreateControlled',
@@ -112,18 +148,18 @@ export function appendCreateEditor(
     );
     if (draft.type === 'data-source') {
       appendCheckboxField(
-        editor,
+        run,
         DESIGNER_UI_TEXT.variables.autoUpdate,
         DESIGNER_UI_TEXT.variables.autoUpdateHint,
         'variableCreateAutoUpdate',
         draft.autoUpdate,
       );
-      const interval = appendEditorField(editor, {
+      const interval = appendEditorField(run, {
         label: DESIGNER_UI_TEXT.variables.autoUpdateFrequency,
         hint: DESIGNER_UI_TEXT.variables.autoUpdateFrequencyHint,
         dataKey: 'variableCreateAutoUpdateInterval',
         describedBy: errorId,
-      });
+      }) as HTMLInputElement;
       interval.type = 'number';
       interval.min = '1';
       interval.max = '86400';
@@ -131,6 +167,7 @@ export function appendCreateEditor(
       interval.value = draft.autoUpdateInterval;
       interval.disabled = !draft.autoUpdate;
     }
+    editor.appendChild(run);
   }
   appendEditorError(editor, errorId);
   appendEditorActions(
@@ -239,43 +276,75 @@ export function appendIconLabel(target: HTMLElement, icon: DesignerIconName, lab
 }
 
 function appendCreateTypeChooser(editor: HTMLElement, selected: ScreenVariable['type']): void {
-  const field = editor.ownerDocument.createElement('label');
+  const field = editor.ownerDocument.createElement('div');
   field.className = 'variable-field variable-source-field';
   const label = editor.ownerDocument.createElement('span');
   label.className = 'variable-field-label';
-  label.textContent = DESIGNER_UI_TEXT.variables.source;
+  label.textContent = DESIGNER_UI_TEXT.variables.sourceTypeLabel;
   field.appendChild(label);
-  const select = createDesignerSelect(editor.ownerDocument, {
-    ariaLabel: DESIGNER_UI_TEXT.variables.source,
-    className: 'variable-edit-input',
-    options: (['static', 'data-source', 'url-query'] as const).map((type) => ({
-      label: sourceTypeLabel(type),
-      selected: type === selected,
-      value: type,
-    })),
-    value: selected,
-  });
-  select.dataset.variableCreateType = 'true';
-  const control = enhanceDesignerSelect(select);
-  control.element.classList.add('variable-source-select');
-  field.appendChild(control.element);
+  const group = editor.ownerDocument.createElement('div');
+  group.className = 'variable-source-segmented';
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.source);
+  for (const type of ['static', 'data-source', 'url-query'] as const) {
+    const button = editor.ownerDocument.createElement('button');
+    button.type = 'button';
+    button.className = 'variable-source-segmented-option';
+    button.dataset.variableAction =
+      type === 'static'
+        ? 'create-type-static'
+        : type === 'data-source'
+          ? 'create-type-data-source'
+          : 'create-type-url-query';
+    button.setAttribute('aria-pressed', String(type === selected));
+    button.textContent = sourceTypeLabel(type);
+    group.appendChild(button);
+  }
+  field.appendChild(group);
   editor.appendChild(field);
 }
 
 function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDraft): void {
-  const section = editor.ownerDocument.createElement('section');
+  const section = editor.ownerDocument.createElement('details');
   section.className = 'variable-host-catalog';
-  const label = editor.ownerDocument.createElement('span');
-  label.className = 'variable-field-label';
-  label.textContent = sourceTypeLabel(draft.type);
-  section.appendChild(label);
+  section.open = false;
+  const label = sourceTypeLabel(draft.type);
+  const summary = editor.ownerDocument.createElement('summary');
+  summary.className = 'variable-catalog-summary';
+  summary.dataset.variableCatalogSummary = 'true';
+  const glyph = editor.ownerDocument.createElement('span');
+  glyph.className = 'variable-catalog-glyph';
+  glyph.innerHTML = designerIcon(draft.type === 'data-source' ? 'database' : 'link');
+  glyph.setAttribute('aria-hidden', 'true');
+  const copy = editor.ownerDocument.createElement('span');
+  copy.className = 'variable-catalog-copy';
+  const title = editor.ownerDocument.createElement('span');
+  title.className = 'variable-catalog-title';
+  title.textContent = draft.sourceId ?? DESIGNER_UI_TEXT.variables.selectSource(label);
+  if (draft.sourceId !== undefined) title.dataset.variableSelectedHostId = draft.sourceId;
+  const sub = editor.ownerDocument.createElement('span');
+  sub.className = 'variable-catalog-sub';
+  sub.textContent =
+    draft.catalogFeedback || DESIGNER_UI_TEXT.variables.sourceItemCount(draft.catalogItems.length);
+  copy.appendChild(title);
+  copy.appendChild(sub);
+  const caret = editor.ownerDocument.createElement('span');
+  caret.className = 'variable-catalog-caret';
+  caret.innerHTML = designerIcon('chevron-right');
+  summary.appendChild(glyph);
+  summary.appendChild(copy);
+  summary.appendChild(caret);
+  section.appendChild(summary);
+
+  const body = editor.ownerDocument.createElement('div');
+  body.className = 'variable-catalog-content';
   const search = createDesignerInput(editor.ownerDocument, {
     ariaLabel: DESIGNER_UI_TEXT.variables.catalogSearch,
     placeholder: DESIGNER_UI_TEXT.variables.catalogSearch,
     value: draft.catalogQuery,
   });
   search.dataset.variableCatalogSearch = 'true';
-  section.appendChild(search);
+  body.appendChild(search);
   const list = editor.ownerDocument.createElement('div');
   list.className = 'variable-host-catalog-list';
   for (const item of draft.catalogItems) {
@@ -295,26 +364,26 @@ function appendHostCatalog(editor: HTMLElement, draft: DesignerVariableCreateDra
     button.appendChild(description);
     list.appendChild(button);
   }
-  section.appendChild(list);
+  body.appendChild(list);
   if (draft.catalogCursor !== undefined) {
     const more = createDesignerButton(editor.ownerDocument, {
       text: DESIGNER_UI_TEXT.variables.loadMore,
       variant: 'ghost',
     });
     more.dataset.variableAction = 'catalog-more';
-    section.appendChild(more);
+    body.appendChild(more);
   }
   const feedback = editor.ownerDocument.createElement('p');
   feedback.className = 'variable-catalog-feedback';
   feedback.textContent = draft.catalogFeedback;
-  section.appendChild(feedback);
+  body.appendChild(feedback);
   if (draft.sourceId !== undefined) {
     const selected = editor.ownerDocument.createElement('code');
     selected.className = 'variable-selected-host-id';
     selected.textContent = draft.sourceId;
-    selected.dataset.variableSelectedHostId = draft.sourceId;
-    section.appendChild(selected);
+    body.appendChild(selected);
   }
+  section.appendChild(body);
   editor.appendChild(section);
 }
 
@@ -395,21 +464,27 @@ function sourceTypeLabel(type: ScreenVariable['type']): string {
 
 function appendEditorSection(editor: HTMLElement, key: string, title: string): void {
   const section = editor.ownerDocument.createElement('p');
-  section.className = 'variable-editor-section';
+  section.className = `variable-editor-section${key === 'A' ? ' is-first' : ''}`;
   const glyph = editor.ownerDocument.createElement('span');
   glyph.className = 'variable-editor-section-key';
   glyph.textContent = key;
   const label = editor.ownerDocument.createElement('span');
   label.className = 'variable-editor-section-title';
   label.textContent = title;
+  const hint = editor.ownerDocument.createElement('span');
+  hint.className = 'variable-editor-section-hint';
+  hint.textContent = key === 'A' ? 'NAME' : key === 'B' ? 'SOURCE' : key === 'C' ? 'VALUE' : 'RUN';
   section.appendChild(glyph);
   section.appendChild(label);
+  section.appendChild(hint);
   editor.appendChild(section);
 }
 
 interface EditorFieldOptions {
   readonly label: string;
   readonly hint: string;
+  readonly required?: boolean;
+  readonly multiline?: boolean;
   readonly dataKey:
     | 'variableCreateName'
     | 'variableCreateDescription'
@@ -424,16 +499,32 @@ interface EditorFieldOptions {
   readonly json?: boolean;
 }
 
-function appendEditorField(editor: HTMLElement, options: EditorFieldOptions): HTMLInputElement {
-  const field = editor.ownerDocument.createElement('label');
+function appendEditorField(
+  editor: HTMLElement,
+  options: EditorFieldOptions,
+): HTMLInputElement | HTMLTextAreaElement {
+  const field = editor.ownerDocument.createElement('div');
   field.className = 'variable-field';
-  const label = editor.ownerDocument.createElement('span');
+  const label = editor.ownerDocument.createElement('label');
   label.className = 'variable-field-label';
   label.textContent = options.label;
-  field.appendChild(label);
-  const input = createDesignerInput(editor.ownerDocument, { className: 'variable-edit-input' });
+  const controlId = `designer-${options.dataKey}`;
+  label.htmlFor = controlId;
+  if (options.required) {
+    const required = editor.ownerDocument.createElement('span');
+    required.className = 'variable-required';
+    required.textContent = '*';
+    required.setAttribute('aria-hidden', 'true');
+    label.appendChild(required);
+  }
+  const input = options.multiline
+    ? createDesignerTextarea(editor.ownerDocument, { className: 'variable-edit-input' })
+    : createDesignerInput(editor.ownerDocument, { className: 'variable-edit-input' });
+  input.id = controlId;
   input.dataset[options.dataKey] = options.dataValue ?? 'true';
-  input.autocomplete = 'off';
+  if (!options.multiline) {
+    (input as HTMLInputElement).autocomplete = 'off';
+  }
   input.spellcheck = !options.json;
   const hintId = `${options.describedBy}-${options.dataKey}-hint`;
   const fieldKey = editorFieldKey(options.dataKey);
@@ -442,12 +533,19 @@ function appendEditorField(editor: HTMLElement, options: EditorFieldOptions): HT
     'aria-describedby',
     `${hintId}${fieldKey === undefined ? '' : ` ${fieldErrorId}`} ${options.describedBy}`,
   );
-  field.appendChild(input);
-  const hint = editor.ownerDocument.createElement('small');
-  hint.id = hintId;
-  hint.className = 'variable-field-hint';
-  hint.textContent = options.hint;
-  field.appendChild(hint);
+  const wrap = editor.ownerDocument.createElement('span');
+  wrap.className = 'variable-input-wrap';
+  wrap.appendChild(input);
+  if (fieldKey === 'name') {
+    const check = editor.ownerDocument.createElement('span');
+    check.className = 'variable-input-check';
+    check.dataset.variableNameCheck = '';
+    check.innerHTML = designerIcon('check');
+    check.hidden = true;
+    wrap.appendChild(check);
+  }
+  field.appendChild(label);
+  field.appendChild(wrap);
   if (fieldKey !== undefined) {
     const error = editor.ownerDocument.createElement('p');
     error.id = fieldErrorId;
@@ -456,43 +554,45 @@ function appendEditorField(editor: HTMLElement, options: EditorFieldOptions): HT
     error.setAttribute('role', 'alert');
     error.hidden = true;
     field.appendChild(error);
-    const checks = editor.ownerDocument.createElement('span');
-    checks.className = 'variable-field-checks';
-    if (fieldKey === 'name') {
-      const count = editor.ownerDocument.createElement('span');
-      count.className = 'variable-field-count';
-      count.dataset.variableNameCount = '';
-      count.textContent = '0/128';
-      checks.appendChild(count);
-      const check = editor.ownerDocument.createElement('span');
-      check.className = 'variable-field-check';
-      check.dataset.variableNameCheck = '';
-      check.innerHTML = designerIcon('check');
-      check.hidden = true;
-      checks.appendChild(check);
-    } else if (fieldKey === 'description') {
-      const count = editor.ownerDocument.createElement('span');
-      count.className = 'variable-field-count';
-      count.dataset.variableDescriptionCount = '';
-      count.textContent = '0/4096';
-      checks.appendChild(count);
-    } else if (fieldKey === 'value') {
-      const type = editor.ownerDocument.createElement('span');
-      type.className = 'variable-field-type';
-      type.dataset.variableValueType = '';
-      checks.appendChild(type);
-    }
-    if (checks.childElementCount > 0) field.appendChild(checks);
   }
+  const foot = editor.ownerDocument.createElement('div');
+  foot.className = 'variable-field-foot';
+  const hint = editor.ownerDocument.createElement('small');
+  hint.id = hintId;
+  hint.className = 'variable-field-hint';
+  hint.textContent = options.hint;
+  foot.appendChild(hint);
+  const checks = editor.ownerDocument.createElement('span');
+  checks.className = 'variable-field-checks';
+  if (fieldKey === 'name') {
+    const count = editor.ownerDocument.createElement('span');
+    count.className = 'variable-field-count';
+    count.dataset.variableNameCount = '';
+    count.textContent = '0/128';
+    checks.appendChild(count);
+  } else if (fieldKey === 'description') {
+    const count = editor.ownerDocument.createElement('span');
+    count.className = 'variable-field-count';
+    count.dataset.variableDescriptionCount = '';
+    count.textContent = '0/4096';
+    checks.appendChild(count);
+  } else if (fieldKey === 'value') {
+    const type = editor.ownerDocument.createElement('span');
+    type.className = 'variable-field-type';
+    type.dataset.variableValueType = '';
+    checks.appendChild(type);
+  }
+  if (checks.childElementCount > 0) foot.appendChild(checks);
+  field.appendChild(foot);
   editor.appendChild(field);
   return input;
 }
 
 function syncInitialFieldDecorations(
   editor: HTMLElement,
-  name: HTMLInputElement,
-  description: HTMLInputElement,
-  value: HTMLInputElement,
+  name: HTMLInputElement | HTMLTextAreaElement,
+  description: HTMLInputElement | HTMLTextAreaElement,
+  value: HTMLInputElement | HTMLTextAreaElement,
 ): void {
   const nameCount = editor.querySelector<HTMLElement>('[data-variable-name-count]');
   if (nameCount !== null) nameCount.textContent = `${name.value.length}/128`;

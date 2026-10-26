@@ -122,7 +122,7 @@ export class DesignerVariableEditorController {
     this.#createType = type;
     if (type !== 'static') this.callbacks.getCatalog().ensureList();
     this.callbacks.renderAndFocus(
-      type === 'static' ? '[data-variable-create-name]' : '[data-variable-catalog-search]',
+      type === 'static' ? '[data-variable-create-name]' : '[data-variable-catalog-summary]',
     );
   }
 
@@ -303,8 +303,11 @@ export class DesignerVariableEditorController {
     }
     const bottom = panel.querySelector<HTMLElement>('[data-variable-error]');
     if (bottom !== null) {
-      bottom.textContent = errors[0]?.message ?? '';
-      bottom.hidden = errors.length === 0;
+      const formLevel = errors.find(
+        (error) => error.field === 'source' || error.field === 'filter',
+      );
+      bottom.textContent = formLevel?.message ?? '';
+      bottom.hidden = formLevel === undefined;
     }
     for (const error of errors) {
       if (error.field === 'source' || error.field === 'filter') continue;
@@ -319,6 +322,9 @@ export class DesignerVariableEditorController {
       }
     }
     if (errors.length > 0) {
+      if (errors[0]!.field === 'interval') {
+        panel.querySelector<HTMLElement>('.variable-run-section')?.setAttribute('open', '');
+      }
       this.callbacks.report(designerVariableEditorFailure(errors[0]!.message));
       panel.querySelector<HTMLInputElement>(errors[0]!.selector)?.focus();
       return false;
@@ -367,7 +373,7 @@ export class DesignerVariableEditorController {
     if (this.#createType !== 'static' && this.#selectedSourceId === undefined) {
       errors.push({
         field: 'source',
-        selector: '[data-variable-catalog-search]',
+        selector: '[data-variable-catalog-summary]',
         message: DESIGNER_UI_TEXT.variables.hostRequired,
       });
     }

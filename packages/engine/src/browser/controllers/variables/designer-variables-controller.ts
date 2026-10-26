@@ -333,7 +333,9 @@ export class DesignerVariablesController {
   }
 
   onInput(target: EventTarget | null): boolean {
-    if (!(target instanceof HTMLInputElement)) return false;
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
+      return false;
+    }
     if (target.dataset.variableSearch !== undefined) {
       this.#search = target.value;
       this.#menuIndex = undefined;
@@ -369,7 +371,9 @@ export class DesignerVariablesController {
 
   onFocusOut(event: FocusEvent): boolean {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) return false;
+    if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
+      return false;
+    }
     const field = liveFieldForInput(target);
     if (field === undefined) return false;
     const next = event.relatedTarget;
@@ -550,7 +554,7 @@ export class DesignerVariablesController {
 }
 
 function liveFieldForInput(
-  target: HTMLInputElement,
+  target: HTMLInputElement | HTMLTextAreaElement,
 ): 'name' | 'description' | 'value' | 'interval' | undefined {
   if (target.dataset.variableCreateName !== undefined) return 'name';
   if (target.dataset.variableCreateDescription !== undefined) return 'description';
