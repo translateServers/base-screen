@@ -80,6 +80,16 @@ describe('designer workbench structure and layout', () => {
     expect(workbenchCss).toMatch(/\.blueprint-library-main\[hidden\]\s*\{[^}]*display: none;/s);
   });
 
+  it('separates plugin rail tabs from the tabs before them with one divider', () => {
+    // 插件面板追加在宿主分组之后；只给首项画分界，同一插件的其余面板不进新段。
+    expect(workbenchCss).toMatch(
+      /\.rail-tabs\s*>\s*\.designer-tab:not\(\[data-plugin-panel-tab\]\)\s*\+\s*\.designer-tab\[data-plugin-panel-tab\]\s*\{[^}]*margin-top: var\(--designer-space-6\);/s,
+    );
+    expect(workbenchCss).toMatch(
+      /\.rail-tabs\s*>\s*\.designer-tab:not\(\[data-plugin-panel-tab\]\)\s*\+\s*\.designer-tab\[data-plugin-panel-tab\]::before\s*\{[^}]*height: 1px;[^}]*background: var\(--designer-border-default\);/s,
+    );
+  });
+
   it('projects the host Blueprint canvas into the stable workbench shell', () => {
     expect(workbenchCss).toContain('.designer-blueprint-surface {');
     expect(workbenchCss).toContain('slot::slotted([slot="base-screen-designer-blueprint-canvas"])');

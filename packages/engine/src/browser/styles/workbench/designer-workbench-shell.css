@@ -437,12 +437,17 @@
   color: var(--designer-accent);
 }
 
-/* 宿主分组从第 4 个面板起排在保留项之后：上缘留白 + 分隔线标出「内建 / 宿主」的分界。 */
-.rail-tabs .designer-tab[data-host-left-panel-group] {
+/* 左栏分区：内建 → 宿主分组 → 插件面板。各段首项上缘留白 + 一条发丝线标出分界；
+   插件面板只标首项，同一插件的后续面板跟随在前一项下面，不重复画线。 */
+.rail-tabs .designer-tab[data-host-left-panel-group],
+.rail-tabs > .designer-tab:not([data-plugin-panel-tab]) + .designer-tab[data-plugin-panel-tab] {
   margin-top: var(--designer-space-6);
 }
 
-.rail-tabs .designer-tab[data-host-left-panel-group]::before {
+.rail-tabs .designer-tab[data-host-left-panel-group]::before,
+.rail-tabs
+  > .designer-tab:not([data-plugin-panel-tab])
+  + .designer-tab[data-plugin-panel-tab]::before {
   position: absolute;
   top: -10px;
   right: 10px;
