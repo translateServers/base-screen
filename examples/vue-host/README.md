@@ -56,9 +56,9 @@ pnpm dev:vue-host                                   # 终端 2：本前端 :5175
 ```
 
 - 列表页 `/`：新建 / 编辑 / 查看 / 删除
-- 编辑页 `/screens/:id/edit`：`<base-screen-designer>` 嵌入，自动保存走宿主 project adapter
-  （revision 乐观锁，冲突时 toast 提示）；防抖 / 重试 / 返回前落地的逐条规格见
-  [../README.md](../README.md) 的「编辑页自动保存规格」
+- 编辑页 `/screens/:id/edit`：`<base-screen-designer>` 嵌入，保存走宿主 project adapter
+  （顶栏「保存」显式触发；revision 乐观锁，冲突时 toast 提示）；逐条规格见
+  [../README.md](../README.md) 的「编辑页保存规格」
 - 查看页 `/screens/:id/view`：`<base-screen-viewer>` 只读播放
 
 ## 冒烟
@@ -77,5 +77,5 @@ host-resource 数据通道渲染后端数值、查看器播放、指标确定性
 - 响应式：≥1200px 完整外壳；768–1199px 紧凑内边距；<768px 单列。
 - 错误处理：`api.ts` Result 风格 + ErrorBanner + 重试；GET 网络失败重试 1 次。
 - 日志：`lib/logger.ts`（scope + 时间戳，debug 仅开发模式）。
-- 性能：视图静态导入（单包一次拉取，不做路由级代码分割）、列表单次拉取、保存防抖 + 单飞复用 + 失败退避重试。
+- 性能：视图静态导入（单包一次拉取，不做路由级代码分割）、列表单次拉取、保存由顶栏显式触发（宿主不轮询文档变化）。
 - 样式稳定：骨架屏尺寸固定；hover 只改边框/背景色，不改几何。

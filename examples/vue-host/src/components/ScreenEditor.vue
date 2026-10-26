@@ -35,10 +35,6 @@ import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
 
-const AUTOSAVE_DEBOUNCE_MS = 3000;
-const AUTOSAVE_RETRY_MS = 5000;
-const AUTOSAVE_RETRY_MAX_MS = 60000;
-
 const route = useRoute();
 const router = useRouter();
 const stage = ref<HTMLDivElement | null>(null);
@@ -46,20 +42,8 @@ const stage = ref<HTMLDivElement | null>(null);
 const designer = shallowRef<BaseScreenDesignerElement | null>(null);
 const logger = createLogger('screen-editor');
 
-let saveTimer: number | undefined;
-// 飞行中的那一次保存：定时器与「返回前 flush」共用同一份，避免并发 PUT。
-let saveFlight: Promise<boolean> | undefined;
-let retryDelayMs = AUTOSAVE_RETRY_MS;
-// 引擎只在脏态翻转时发事件，之后连续编辑不再通知，因此宿主自己记脏位。
-let dirty = false;
-// 退避重试已排期：新编辑不该把失败后的重试提前成一次空闲防抖。
-let retryPending = false;
-let conflicted = false;
-let leaving = false;
 let onBack: (() => void) | undefined;
 let onConflict: (() => void) | undefined;
-let onDirtyChange: ((event: Event) => void) | undefined;
-let onDocumentChange: (() => void) | undefined;
 let unsubscribeSession: (() => void) | undefined;
 let runtime: HostRuntime | undefined;
 let alarms: ReturnType<typeof createHostAlarmController> | undefined;
@@ -72,74 +56,18 @@ let onlineMaterials: OnlineMaterialPanelHandle | undefined;
 // 运行时的激活是异步的；await 期间路由可能已经切走，configure 必须能被取消。
 let disposed = false;
 
-function clearSaveTimer(): void {
-  window.clearTimeout(saveTimer);
-}
-
-function scheduleSave(delay: number): void {
-  if (leaving || conflicted) return;
-  clearSaveTimer();
-  saveTimer = window.setTimeout(() => {
-    if (dirty) void runSave();
-  }, delay);
-}
-
-function runSave(): Promise<boolean> {
-  if (saveFlight !== undefined) return saveFlight;
-  const flight = persist().finally(() => {
-    if (saveFlight === flight) saveFlight = undefined;
-  });
-  saveFlight = flight;
-  return flight;
-}
-
+// 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；宿主不订阅文档变化，
+// 也不在离开前隐式落盘——未保存的改动随页面卸载丢弃。三端逐条对等。
 function goDatasources(): void {
-  leaving = true;
-  clearSaveTimer();
-  void (async () => {
-    await runSave();
-    if (dirty && !conflicted) await runSave();
-    const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
-    rememberDatasourceReturn(`#/screens/${screenId}/edit`);
-    void router.push('/datasources');
-  })();
+  const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
+  rememberDatasourceReturn(`#/screens/${screenId}/edit`);
+  void router.push('/datasources');
 }
 
 function goAssets(): void {
-  leaving = true;
-  clearSaveTimer();
-  void (async () => {
-    await runSave();
-    if (dirty && !conflicted) await runSave();
-    const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
-    rememberAssetReturn(`#/screens/${screenId}/edit`);
-    void router.push('/assets');
-  })();
-}
-
-/** 把当前文档 PUT 到宿主；返回是否已无未保存改动。 */
-async function persist(): Promise<boolean> {
-  const instance = designer.value;
-  if (instance === null || conflicted || !dirty) return true;
-  // 脏位只由引擎事件清除：飞行期间的再次编辑不会发事件（引擎侧脏态没翻转），
-  // 保存成功时引擎发现文档与快照不一致就保持 dirty，正好由下面的补排接住。
-  screenSessionStore.getState().saving();
-  const result = await instance.save();
-  if (result.ok) {
-    screenSessionStore.getState().saved(result.value.revision);
-    retryDelayMs = AUTOSAVE_RETRY_MS;
-    retryPending = false;
-    if (dirty) scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-    return !dirty;
-  }
-  if (conflicted) return false;
-  logger.warn('autosave failed', result.diagnostics);
-  screenSessionStore.getState().failed(`${Math.round(retryDelayMs / 1000)} 秒后自动重试`);
-  retryPending = true;
-  scheduleSave(retryDelayMs);
-  // 退避在排期之后推进：文案与实际延时必须是同一个数。
-  retryDelayMs = Math.min(retryDelayMs * 2, AUTOSAVE_RETRY_MAX_MS);
-  return false;
+  const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
+  rememberAssetReturn(`#/screens/${screenId}/edit`);
+  void router.push('/assets');
 }
 
 onMounted(() => {
@@ -255,46 +183,15 @@ onMounted(() => {
     }
 
     onBack = (): void => {
-      leaving = true;
-      clearSaveTimer();
-      void (async () => {
-        // 移除元素会取消在飞行的项目请求，因此必须先落地再路由。
-        await runSave();
-        if (dirty && !conflicted) await runSave();
-        router.push('/');
-      })();
+      void router.push('/');
     };
     element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
 
-    // 冲突意味着 revision 已过期，自动重试只会再冲突一次；停掉自动保存，由用户重载。
+    // 冲突面板由引擎渲染；宿主只把冲突转成 toast，不参与重试或落盘。
     onConflict = (): void => {
-      conflicted = true;
-      clearSaveTimer();
       screenSessionStore.getState().conflicted();
     };
     element.addEventListener('base-screen-project-conflict', onConflict);
-
-    onDirtyChange = (event: Event): void => {
-      const detail = (event as CustomEvent<{ dirty: boolean }>).detail;
-      dirty = detail.dirty;
-      if (!detail.dirty) {
-        // 撤销回基线也会走到这里：未触发的退避延时要归零，否则下次失败从上一次的高度起跳。
-        retryDelayMs = AUTOSAVE_RETRY_MS;
-        retryPending = false;
-        return;
-      }
-      screenSessionStore.getState().dirty();
-      scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-    };
-    element.addEventListener('base-screen-dirty-change', onDirtyChange);
-
-    // 脏态只在翻转时通知，空闲防抖必须挂在每次文档提交上：否则定时器从第一次修改起算，
-    // 用户还在连续编辑时就被落盘（表现为「改一下就马上保存」）。
-    onDocumentChange = (): void => {
-      if (!dirty || retryPending) return;
-      scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-    };
-    element.addEventListener('base-screen-change', onDocumentChange);
 
     const loaded = await element.load(screenId);
     if (!loaded.ok) {
@@ -327,12 +224,6 @@ onBeforeUnmount(() => {
   if (element !== null && onConflict !== undefined) {
     element.removeEventListener('base-screen-project-conflict', onConflict);
   }
-  if (element !== null && onDirtyChange !== undefined) {
-    element.removeEventListener('base-screen-dirty-change', onDirtyChange);
-  }
-  if (element !== null && onDocumentChange !== undefined) {
-    element.removeEventListener('base-screen-change', onDocumentChange);
-  }
   alarms?.stop();
   alarms = undefined;
   resourceAuthoring?.dispose();
@@ -342,7 +233,6 @@ onBeforeUnmount(() => {
   onlineMaterials?.dispose();
   onlineMaterials = undefined;
   unsubscribeSession?.();
-  clearSaveTimer();
   element?.remove();
   designer.value = null;
   runtime?.bindDesigner(null);

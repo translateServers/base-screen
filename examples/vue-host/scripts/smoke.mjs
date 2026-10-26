@@ -1462,6 +1462,8 @@ async function main() {
     if (!tempCardText.includes('临时')) fail(`N: 临时素材卡缺少标记：${tempCardText}`);
     await tempCard.click();
     await page.locator('[data-asset-insert]').click();
+    // 自动保存已移除：显式点顶栏「保存」，宿主 project adapter 才会 PUT。
+    await page.locator('base-screen-designer').locator('[data-action="project-save"]').click();
     const tempSavedDeadline = Date.now() + 20_000;
     let tempSaved = false;
     while (Date.now() < tempSavedDeadline) {

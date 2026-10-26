@@ -4,24 +4,13 @@ import { create } from 'zustand';
  * 当前大屏会话的状态机（编辑页与查看页共用）。
  *
  * 迁移图：
- *   idle ──begin──▶ loading ──loaded──▶ ready ──dirty──▶ dirty ──saving──▶ saving
- *                                        ▲                                    │
- *                                        └────────── saved ◀──────────────────┘
- *   saving ──failed──▶ failed（可重试）   saving ──conflicted──▶ conflict（须重载）
+ *   idle ──begin──▶ loading ──loaded──▶ ready ──conflicted──▶ conflict（须重载）
  *   loading ──failedToLoad──▶ error（终态，需返回列表）
  *
  * 状态文案由 store 统一生成，三个前端因此显示同一套文案。
+ * 保存由引擎顶栏的「保存」操作经宿主 project adapter 完成，store 不承载保存进度。
  */
-export type SessionStatus =
-  | 'idle'
-  | 'loading'
-  | 'ready'
-  | 'dirty'
-  | 'saving'
-  | 'saved'
-  | 'failed'
-  | 'conflict'
-  | 'error';
+export type SessionStatus = 'idle' | 'loading' | 'ready' | 'conflict' | 'error';
 
 export interface ScreenSessionState {
   readonly screenId: string | null;
@@ -31,10 +20,6 @@ export interface ScreenSessionState {
   readonly error: string | null;
   begin(screenId: string): void;
   loaded(name: string, revision: string): void;
-  dirty(): void;
-  saving(): void;
-  saved(revision: string): void;
-  failed(reason: string): void;
   conflicted(): void;
   failedToLoad(reason: string): void;
   reset(): void;
@@ -52,18 +37,6 @@ export const useScreenSessionStore = create<ScreenSessionState>()((set) => ({
   },
   loaded(name: string, revision: string): void {
     set({ status: 'ready', message: `已加载：${name}（版本 ${revision}）`, revision, error: null });
-  },
-  dirty(): void {
-    set({ status: 'dirty', message: '有未保存的更改' });
-  },
-  saving(): void {
-    set({ status: 'saving', message: '正在保存…' });
-  },
-  saved(revision: string): void {
-    set({ status: 'saved', message: `已保存（版本 ${revision}）`, revision, error: null });
-  },
-  failed(reason: string): void {
-    set({ status: 'failed', message: `保存失败：${reason}`, error: reason });
   },
   conflicted(): void {
     set({

@@ -36,25 +36,28 @@ import { showToast } from './toast';
 
 const logger = createLogger('screen-editor');
 
-const AUTOSAVE_DEBOUNCE_MS = 3000;
-const AUTOSAVE_RETRY_MS = 5000;
-const AUTOSAVE_RETRY_MAX_MS = 60000;
-
 /**
  * 设计器嵌入页：设计器是 DOM 节点而非 React 组件——用 ref 拿容器后 appendChild，
  * 并在 effect 内完成 configure / load。顺序不可颠倒：画布与渲染器在元素 connected
  * 时才建立。这一页不叠宿主布局：占满视口，返回入口与保存状态都由基座顶栏提供。
  *
- * 保存策略与另外两个前端逐条对等：每次文档提交重置 3s 空闲定时器，只在最后一次修改后
- * 空闲 3s 才保存；保存在飞行期间再次变脏则落定后补一次；失败按 5s 起指数退避自动重试
- * （退避期间的新编辑不会把重试提前）；冲突即停止自动保存；返回按钮先落地再路由。
+ * 保存是显式的：引擎顶栏「保存」（Ctrl+S）经宿主 project adapter 落盘；宿主不订阅
+ * 文档变化、也不在离开前隐式保存——未保存的改动随页面卸载丢弃。三端逐条对等。
  */
 export function ScreenEditorPage(): React.ReactElement {
   const { screenId } = useParams<{ screenId: string }>();
   const navigate = useNavigate();
   const stageRef = useRef<HTMLDivElement>(null);
-  const datasourcesRef = useRef<() => void>(() => {});
-  const assetsRef = useRef<() => void>(() => {});
+  const openDatasources = (): void => {
+    if (screenId === undefined) return;
+    rememberDatasourceReturn(`#/screens/${screenId}/edit`);
+    navigate('/datasources');
+  };
+  const openAssets = (): void => {
+    if (screenId === undefined) return;
+    rememberAssetReturn(`#/screens/${screenId}/edit`);
+    navigate('/assets');
+  };
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -76,7 +79,6 @@ export function ScreenEditorPage(): React.ReactElement {
     let onlineMaterials: OnlineMaterialPanelHandle | undefined;
     let detach: (() => void) | undefined;
     let disposed = false;
-    let saveTimer: number | undefined;
 
     const loadAlarmBindings = async (): Promise<HostAlarmBindings> => {
       const result = await api.getScreenAlarmBindings(screenId);
@@ -90,10 +92,6 @@ export function ScreenEditorPage(): React.ReactElement {
         return {};
       }
       return parsed;
-    };
-
-    const clearSaveTimer = (): void => {
-      window.clearTimeout(saveTimer);
     };
 
     void (async () => {
@@ -177,125 +175,21 @@ export function ScreenEditorPage(): React.ReactElement {
         return;
       }
 
-      // 飞行中的那一次保存：定时器与「返回前 flush」共用同一份，避免并发 PUT。
-      let saveFlight: Promise<boolean> | undefined;
-      let retryDelayMs = AUTOSAVE_RETRY_MS;
-      // 引擎只在脏态翻转时发事件，之后连续编辑不再通知，因此宿主自己记脏位。
-      let dirty = false;
-      // 退避重试已排期：新编辑不该把失败后的重试提前成一次空闲防抖。
-      let retryPending = false;
-      let conflicted = false;
-      let leaving = false;
-
-      const scheduleSave = (delay: number): void => {
-        if (leaving || conflicted) return;
-        clearSaveTimer();
-        saveTimer = window.setTimeout(() => {
-          if (dirty) void runSave();
-        }, delay);
-      };
-
-      const runSave = (): Promise<boolean> => {
-        if (saveFlight !== undefined) return saveFlight;
-        const flight = persist().finally(() => {
-          if (saveFlight === flight) saveFlight = undefined;
-        });
-        saveFlight = flight;
-        return flight;
-      };
-
-      datasourcesRef.current = (): void => {
-        leaving = true;
-        clearSaveTimer();
-        void (async () => {
-          await runSave();
-          if (dirty && !conflicted) await runSave();
-          rememberDatasourceReturn(`#/screens/${screenId}/edit`);
-          navigate('/datasources');
-        })();
-      };
-      assetsRef.current = (): void => {
-        leaving = true;
-        clearSaveTimer();
-        void (async () => {
-          await runSave();
-          if (dirty && !conflicted) await runSave();
-          rememberAssetReturn(`#/screens/${screenId}/edit`);
-          navigate('/assets');
-        })();
-      };
-
-      /** 把当前文档 PUT 到宿主；返回是否已无未保存改动。 */
-      const persist = async (): Promise<boolean> => {
-        if (conflicted || !dirty) return true;
-        // 脏位只由引擎事件清除：飞行期间的再次编辑不会发事件（引擎侧脏态没翻转），
-        // 保存成功时引擎发现文档与快照不一致就保持 dirty，正好由下面的补排接住。
-        useScreenSessionStore.getState().saving();
-        const result = await element.save();
-        if (result.ok) {
-          useScreenSessionStore.getState().saved(result.value.revision);
-          retryDelayMs = AUTOSAVE_RETRY_MS;
-          retryPending = false;
-          if (dirty) scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-          return !dirty;
-        }
-        if (conflicted) return false;
-        logger.warn('autosave failed', result.diagnostics);
-        useScreenSessionStore.getState().failed(`${Math.round(retryDelayMs / 1000)} 秒后自动重试`);
-        retryPending = true;
-        scheduleSave(retryDelayMs);
-        // 退避在排期之后推进：文案与实际延时必须是同一个数。
-        retryDelayMs = Math.min(retryDelayMs * 2, AUTOSAVE_RETRY_MAX_MS);
-        return false;
-      };
-
       const onBack = (): void => {
-        leaving = true;
-        clearSaveTimer();
-        void (async () => {
-          // 移除元素会取消在飞行的项目请求，因此必须先落地再路由。
-          await runSave();
-          if (dirty && !conflicted) await runSave();
-          navigate('/');
-        })();
+        navigate('/');
       };
       element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
 
-      // 冲突意味着 revision 已过期，自动重试只会再冲突一次；停掉自动保存，由用户重载。
+      // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；冲突面板由引擎
+      // 渲染，宿主只把冲突转成 toast。宿主不订阅文档变化，也不在离开前隐式落盘。
       const onConflict = (): void => {
-        conflicted = true;
-        clearSaveTimer();
         useScreenSessionStore.getState().conflicted();
       };
       element.addEventListener('base-screen-project-conflict', onConflict);
 
-      const onDirtyChange = (event: Event): void => {
-        const detail = (event as CustomEvent<{ dirty: boolean }>).detail;
-        dirty = detail.dirty;
-        if (!detail.dirty) {
-          // 撤销回基线也会走到这里：未触发的退避延时要归零，否则下次失败从上一次的高度起跳。
-          retryDelayMs = AUTOSAVE_RETRY_MS;
-          retryPending = false;
-          return;
-        }
-        useScreenSessionStore.getState().dirty();
-        scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-      };
-      element.addEventListener('base-screen-dirty-change', onDirtyChange);
-
-      // 脏态只在翻转时通知，空闲防抖必须挂在每次文档提交上：否则定时器从第一次修改起算，
-      // 用户还在连续编辑时就被落盘（表现为「改一下就马上保存」）。
-      const onDocumentChange = (): void => {
-        if (!dirty || retryPending) return;
-        scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-      };
-      element.addEventListener('base-screen-change', onDocumentChange);
-
       detach = (): void => {
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
-        element.removeEventListener('base-screen-dirty-change', onDirtyChange);
-        element.removeEventListener('base-screen-change', onDocumentChange);
         runtime.bindDesigner(null);
       };
 
@@ -322,11 +216,8 @@ export function ScreenEditorPage(): React.ReactElement {
 
     return () => {
       disposed = true;
-      datasourcesRef.current = () => {};
-      assetsRef.current = () => {};
       detach?.();
       unsubscribeSession();
-      clearSaveTimer();
       resourceAuthoring?.dispose();
       resourceAuthoring = undefined;
       assetLibrary?.dispose();
@@ -349,7 +240,7 @@ export function ScreenEditorPage(): React.ReactElement {
         type="button"
         className="button editor-datasource-link"
         data-editor-datasources=""
-        onClick={() => datasourcesRef.current()}
+        onClick={openDatasources}
       >
         数据源
       </button>
@@ -357,7 +248,7 @@ export function ScreenEditorPage(): React.ReactElement {
         type="button"
         className="button editor-datasource-link editor-assets-link"
         data-editor-assets=""
-        onClick={() => assetsRef.current()}
+        onClick={openAssets}
       >
         素材
       </button>

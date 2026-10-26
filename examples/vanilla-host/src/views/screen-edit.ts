@@ -37,16 +37,12 @@ import { screenSessionStore } from '../store/screen-session-store';
 
 const logger = createLogger('screen-edit');
 
-const AUTOSAVE_DEBOUNCE_MS = 3000;
-const AUTOSAVE_RETRY_MS = 5000;
-const AUTOSAVE_RETRY_MAX_MS = 60000;
-
 /**
  * 编辑页。清理函数在插件运行时激活前就交给路由：激活是异步的，若等它完成再返回
- * cleanup，加载期间换路由会把设计器和监听留在页面上。保存策略与另外两个前端逐条对等：
- * 每次文档提交重置 3s 空闲定时器，只在最后一次修改后空闲 3s 才保存；飞行期间再次
- * 变脏则落定后补一次；失败按 5s 起指数退避（退避期间的新编辑不会把重试提前）；
- * 冲突即停止自动保存；返回按钮先落地再路由。
+ * cleanup，加载期间换路由会把设计器和监听留在页面上。
+ *
+ * 保存是显式的：引擎顶栏「保存」（Ctrl+S）经宿主 project adapter 落盘；宿主不订阅
+ * 文档变化、也不在离开前隐式保存——未保存的改动随页面卸载丢弃。三端逐条对等。
  */
 export const screenEditView: ViewModule = {
   mount(container, route: Route): () => void {
@@ -84,7 +80,6 @@ export const screenEditView: ViewModule = {
     let onlineMaterials: OnlineMaterialPanelHandle | undefined;
     let detach: (() => void) | undefined;
     let disposed = false;
-    let saveTimer: number | undefined;
 
     const loadAlarmBindings = async (): Promise<HostAlarmBindings> => {
       const result = await api.getScreenAlarmBindings(screenId);
@@ -98,10 +93,6 @@ export const screenEditView: ViewModule = {
         return {};
       }
       return parsed;
-    };
-
-    const clearSaveTimer = (): void => {
-      window.clearTimeout(saveTimer);
     };
 
     void (async () => {
@@ -180,120 +171,34 @@ export const screenEditView: ViewModule = {
         return;
       }
 
-      let saveFlight: Promise<boolean> | undefined;
-      let retryDelayMs = AUTOSAVE_RETRY_MS;
-      let dirty = false;
-      // 退避重试已排期：新编辑不该把失败后的重试提前成一次空闲防抖。
-      let retryPending = false;
-      let conflicted = false;
-      let leaving = false;
-
-      const scheduleSave = (delay: number): void => {
-        if (leaving || conflicted) return;
-        clearSaveTimer();
-        saveTimer = window.setTimeout(() => {
-          if (dirty) void runSave();
-        }, delay);
-      };
-
-      const runSave = (): Promise<boolean> => {
-        if (saveFlight !== undefined) return saveFlight;
-        const flight = persist().finally(() => {
-          if (saveFlight === flight) saveFlight = undefined;
-        });
-        saveFlight = flight;
-        return flight;
-      };
-
-      const persist = async (): Promise<boolean> => {
-        if (conflicted || !dirty) return true;
-        screenSessionStore.getState().saving();
-        const result = await element.save();
-        if (result.ok) {
-          screenSessionStore.getState().saved(result.value.revision);
-          retryDelayMs = AUTOSAVE_RETRY_MS;
-          retryPending = false;
-          if (dirty) scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-          return !dirty;
-        }
-        if (conflicted) return false;
-        logger.warn('autosave failed', result.diagnostics);
-        screenSessionStore.getState().failed(`${Math.round(retryDelayMs / 1000)} 秒后自动重试`);
-        retryPending = true;
-        scheduleSave(retryDelayMs);
-        retryDelayMs = Math.min(retryDelayMs * 2, AUTOSAVE_RETRY_MAX_MS);
-        return false;
-      };
-
       const onBack = (): void => {
-        leaving = true;
-        clearSaveTimer();
-        void (async () => {
-          await runSave();
-          if (dirty && !conflicted) await runSave();
-          goToList();
-        })();
+        goToList();
       };
       element.addEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
 
       const onDatasources = (): void => {
-        leaving = true;
-        clearSaveTimer();
-        void (async () => {
-          await runSave();
-          if (dirty && !conflicted) await runSave();
-          rememberDatasourceReturn(`#/screens/${screenId}/edit`);
-          window.location.hash = '#/datasources';
-        })();
+        rememberDatasourceReturn(`#/screens/${screenId}/edit`);
+        window.location.hash = '#/datasources';
       };
       const onAssets = (): void => {
-        leaving = true;
-        clearSaveTimer();
-        void (async () => {
-          await runSave();
-          if (dirty && !conflicted) await runSave();
-          rememberAssetReturn(`#/screens/${screenId}/edit`);
-          window.location.hash = '#/assets';
-        })();
+        rememberAssetReturn(`#/screens/${screenId}/edit`);
+        window.location.hash = '#/assets';
       };
       datasourcesButton.addEventListener('click', onDatasources);
       assetsButton.addEventListener('click', onAssets);
 
+      // 保存由用户显式触发（顶栏「保存」/ Ctrl+S，经宿主 project adapter）；冲突面板由引擎
+      // 渲染，宿主只把冲突转成 toast。宿主不订阅文档变化，也不在离开前隐式落盘。
       const onConflict = (): void => {
-        conflicted = true;
-        clearSaveTimer();
         screenSessionStore.getState().conflicted();
       };
       element.addEventListener('base-screen-project-conflict', onConflict);
-
-      const onDirtyChange = (event: Event): void => {
-        const detail = (event as CustomEvent<{ dirty: boolean }>).detail;
-        dirty = detail.dirty;
-        if (!detail.dirty) {
-          retryDelayMs = AUTOSAVE_RETRY_MS;
-          retryPending = false;
-          return;
-        }
-        screenSessionStore.getState().dirty();
-        scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-      };
-      element.addEventListener('base-screen-dirty-change', onDirtyChange);
-
-      // 脏态只在翻转时通知，空闲防抖必须挂在每次文档提交上：否则定时器从第一次修改起算，
-      // 用户还在连续编辑时就被落盘（表现为「改一下就马上保存」）。
-      const onDocumentChange = (): void => {
-        if (!dirty || retryPending) return;
-        scheduleSave(AUTOSAVE_DEBOUNCE_MS);
-      };
-      element.addEventListener('base-screen-change', onDocumentChange);
 
       detach = (): void => {
         datasourcesButton.removeEventListener('click', onDatasources);
         assetsButton.removeEventListener('click', onAssets);
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
-        element.removeEventListener('base-screen-dirty-change', onDirtyChange);
-        element.removeEventListener('base-screen-change', onDocumentChange);
         runtime.bindDesigner(null);
       };
 
@@ -318,12 +223,11 @@ export const screenEditView: ViewModule = {
       screenSessionStore.getState().failedToLoad('设计器初始化失败，请返回列表重试。');
     });
 
-    // 3) 清理：先阻断异步 bootstrap 的后续步骤，再拆监听与定时器。
+    // 3) 清理：先阻断异步 bootstrap 的后续步骤，再拆监听。
     return () => {
       disposed = true;
       detach?.();
       unsubscribe();
-      clearSaveTimer();
       resourceAuthoring?.dispose();
       resourceAuthoring = undefined;
       assetLibrary?.dispose();
