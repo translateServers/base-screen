@@ -57,6 +57,13 @@ export function appendCreateEditor(
   intro.textContent = DESIGNER_UI_TEXT.variables.createIntro;
   editor.appendChild(intro);
   const errorId = 'designer-variable-create-error';
+  const summary = editor.ownerDocument.createElement('div');
+  summary.className = 'variable-error-summary';
+  summary.dataset.variableErrorSummary = '';
+  summary.setAttribute('role', 'alert');
+  summary.hidden = true;
+  editor.appendChild(summary);
+  appendEditorSection(editor, 'A', DESIGNER_UI_TEXT.variables.sectionBasic);
   const name = appendEditorField(editor, {
     label: DESIGNER_UI_TEXT.variables.name,
     hint: DESIGNER_UI_TEXT.variables.nameHint,
@@ -71,15 +78,8 @@ export function appendCreateEditor(
     describedBy: errorId,
   });
   description.value = draft.description;
+  appendEditorSection(editor, 'B', DESIGNER_UI_TEXT.variables.sectionSource);
   appendCreateTypeChooser(editor, draft.type);
-  const value = appendEditorField(editor, {
-    label: DESIGNER_UI_TEXT.variables.initialValue,
-    hint: DESIGNER_UI_TEXT.variables.valueHint,
-    dataKey: 'variableCreateValue',
-    describedBy: errorId,
-    json: true,
-  });
-  value.value = draft.valueSource;
   if (draft.type !== 'static') {
     appendHostCatalog(editor, draft);
     const processor = appendEditorField(editor, {
@@ -89,6 +89,20 @@ export function appendCreateEditor(
       describedBy: errorId,
     });
     processor.value = draft.processorId;
+  }
+  appendEditorSection(editor, 'C', DESIGNER_UI_TEXT.variables.sectionValue);
+  const value = appendEditorField(editor, {
+    label: DESIGNER_UI_TEXT.variables.initialValue,
+    hint: DESIGNER_UI_TEXT.variables.valueHint,
+    dataKey: 'variableCreateValue',
+    describedBy: errorId,
+    json: true,
+  });
+  value.value = draft.valueSource;
+  syncInitialFieldDecorations(editor, name, description, value);
+  if (draft.type !== 'static') {
+    appendResponseField(editor, draft, configuringIndex);
+    appendEditorSection(editor, 'D', DESIGNER_UI_TEXT.variables.sectionRun);
     appendCheckboxField(
       editor,
       DESIGNER_UI_TEXT.variables.controlled,
@@ -117,7 +131,6 @@ export function appendCreateEditor(
       interval.value = draft.autoUpdateInterval;
       interval.disabled = !draft.autoUpdate;
     }
-    appendResponseField(editor, draft, configuringIndex);
   }
   appendEditorError(editor, errorId);
   appendEditorActions(
@@ -380,6 +393,20 @@ function sourceTypeLabel(type: ScreenVariable['type']): string {
       : DESIGNER_UI_TEXT.variables.typeUrlQuery;
 }
 
+function appendEditorSection(editor: HTMLElement, key: string, title: string): void {
+  const section = editor.ownerDocument.createElement('p');
+  section.className = 'variable-editor-section';
+  const glyph = editor.ownerDocument.createElement('span');
+  glyph.className = 'variable-editor-section-key';
+  glyph.textContent = key;
+  const label = editor.ownerDocument.createElement('span');
+  label.className = 'variable-editor-section-title';
+  label.textContent = title;
+  section.appendChild(glyph);
+  section.appendChild(label);
+  editor.appendChild(section);
+}
+
 interface EditorFieldOptions {
   readonly label: string;
   readonly hint: string;
@@ -409,15 +436,98 @@ function appendEditorField(editor: HTMLElement, options: EditorFieldOptions): HT
   input.autocomplete = 'off';
   input.spellcheck = !options.json;
   const hintId = `${options.describedBy}-${options.dataKey}-hint`;
-  input.setAttribute('aria-describedby', `${hintId} ${options.describedBy}`);
+  const fieldKey = editorFieldKey(options.dataKey);
+  const fieldErrorId = `${hintId}-error`;
+  input.setAttribute(
+    'aria-describedby',
+    `${hintId}${fieldKey === undefined ? '' : ` ${fieldErrorId}`} ${options.describedBy}`,
+  );
   field.appendChild(input);
   const hint = editor.ownerDocument.createElement('small');
   hint.id = hintId;
   hint.className = 'variable-field-hint';
   hint.textContent = options.hint;
   field.appendChild(hint);
+  if (fieldKey !== undefined) {
+    const error = editor.ownerDocument.createElement('p');
+    error.id = fieldErrorId;
+    error.className = 'variable-field-error';
+    error.dataset.variableFieldError = fieldKey;
+    error.setAttribute('role', 'alert');
+    error.hidden = true;
+    field.appendChild(error);
+    const checks = editor.ownerDocument.createElement('span');
+    checks.className = 'variable-field-checks';
+    if (fieldKey === 'name') {
+      const count = editor.ownerDocument.createElement('span');
+      count.className = 'variable-field-count';
+      count.dataset.variableNameCount = '';
+      count.textContent = '0/128';
+      checks.appendChild(count);
+      const check = editor.ownerDocument.createElement('span');
+      check.className = 'variable-field-check';
+      check.dataset.variableNameCheck = '';
+      check.innerHTML = designerIcon('check');
+      check.hidden = true;
+      checks.appendChild(check);
+    } else if (fieldKey === 'description') {
+      const count = editor.ownerDocument.createElement('span');
+      count.className = 'variable-field-count';
+      count.dataset.variableDescriptionCount = '';
+      count.textContent = '0/4096';
+      checks.appendChild(count);
+    } else if (fieldKey === 'value') {
+      const type = editor.ownerDocument.createElement('span');
+      type.className = 'variable-field-type';
+      type.dataset.variableValueType = '';
+      checks.appendChild(type);
+    }
+    if (checks.childElementCount > 0) field.appendChild(checks);
+  }
   editor.appendChild(field);
   return input;
+}
+
+function syncInitialFieldDecorations(
+  editor: HTMLElement,
+  name: HTMLInputElement,
+  description: HTMLInputElement,
+  value: HTMLInputElement,
+): void {
+  const nameCount = editor.querySelector<HTMLElement>('[data-variable-name-count]');
+  if (nameCount !== null) nameCount.textContent = `${name.value.length}/128`;
+  const descriptionCount = editor.querySelector<HTMLElement>('[data-variable-description-count]');
+  if (descriptionCount !== null) {
+    descriptionCount.textContent = `${[...description.value].length}/4096`;
+  }
+  const valueType = editor.querySelector<HTMLElement>('[data-variable-value-type]');
+  if (valueType !== null) {
+    const text = value.value.trim();
+    valueType.textContent =
+      text === ''
+        ? DESIGNER_UI_TEXT.variables.valueTypeText
+        : text === 'true' || text === 'false'
+          ? DESIGNER_UI_TEXT.variables.valueTypeBoolean
+          : text === 'null'
+            ? DESIGNER_UI_TEXT.variables.valueTypeNull
+            : /^-?\d+(?:\.\d+)?$/u.test(text)
+              ? DESIGNER_UI_TEXT.variables.valueTypeNumber
+              : text.startsWith('[')
+                ? DESIGNER_UI_TEXT.variables.valueTypeArray
+                : text.startsWith('{')
+                  ? DESIGNER_UI_TEXT.variables.valueTypeObject
+                  : DESIGNER_UI_TEXT.variables.valueTypeText;
+  }
+}
+
+function editorFieldKey(
+  dataKey: EditorFieldOptions['dataKey'],
+): 'name' | 'description' | 'value' | 'interval' | undefined {
+  if (dataKey === 'variableCreateName') return 'name';
+  if (dataKey === 'variableCreateDescription') return 'description';
+  if (dataKey === 'variableCreateValue') return 'value';
+  if (dataKey === 'variableCreateAutoUpdateInterval') return 'interval';
+  return undefined;
 }
 
 function appendEditorHeading(

@@ -159,6 +159,38 @@
   font-size: var(--designer-font-size-xs);
 }
 
+.variable-editor-section {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  min-width: 0;
+  margin: var(--designer-space-2) 0 0;
+  color: var(--designer-text-muted);
+  font: var(--designer-font-small);
+  font-size: var(--designer-font-size-xs);
+  font-weight: 600;
+}
+
+.variable-editor-section-key {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--designer-radius-1);
+  background: var(--designer-surface-control);
+  color: var(--designer-text-muted);
+  font: 500 var(--designer-font-size-xs) / 1 var(--designer-font-numeric);
+  box-shadow: inset 0 0 0 1px var(--designer-border-subtle);
+}
+
+.variable-editor-section-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .variable-field {
   display: grid;
   min-width: 0;
@@ -194,6 +226,57 @@
   font-size: var(--designer-font-size-xs);
   line-height: 15px;
   overflow-wrap: anywhere;
+}
+
+.variable-field-error {
+  margin: 0;
+  color: var(--designer-danger-text);
+  font: var(--designer-font-small);
+  font-size: var(--designer-font-size-xs);
+  line-height: 15px;
+  overflow-wrap: anywhere;
+}
+
+.variable-error-summary {
+  padding: var(--designer-space-2) var(--designer-space-3);
+  border-radius: var(--designer-radius-2);
+  background: color-mix(in srgb, var(--designer-danger-surface) 36%, transparent);
+  color: var(--designer-danger-text);
+  font: var(--designer-font-small);
+  font-size: var(--designer-font-size-xs);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--designer-danger) 28%, transparent);
+}
+
+.variable-field-checks {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--designer-space-2);
+  min-height: 14px;
+}
+
+.variable-field-count,
+.variable-field-type {
+  color: var(--designer-text-muted);
+  font: var(--designer-font-numeric);
+  font-size: var(--designer-font-size-xs);
+}
+
+.variable-field-check {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  color: var(--designer-success);
+}
+
+.variable-field-check svg {
+  width: 12px;
+  height: 12px;
+}
+
+.variable-field-check[hidden] {
+  display: none;
 }
 
 .variable-checkbox-field {

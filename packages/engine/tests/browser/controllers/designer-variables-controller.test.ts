@@ -192,17 +192,16 @@ describe('designer variables controller', () => {
     controller.onClick(action('toggle-variable', 0));
     const expandedStatic = descendants(panel).find((child) => child.dataset.variableRow === '0')!;
     expect(expandedStatic.dataset.expanded).toBe('true');
-    expect(expandedStatic.querySelector('[data-variable-action="edit-value"]')).not.toBeNull();
-    expect(
-      expandedStatic.querySelector('[data-variable-action="edit-description"]'),
-    ).not.toBeNull();
+    expect(panel.querySelector('[data-variable-action="edit-value"]')).not.toBeNull();
+    expect(panel.querySelector('[data-variable-details]')).not.toBeNull();
 
     controller.onClick(action('toggle-variable', 1));
     const hostRow = descendants(panel).find((child) => child.dataset.variableRow === '1')!;
-    expect(descendants(hostRow).some((child) => child.textContent === '数据源请求')).toBe(true);
-    expect(descendants(hostRow).some((child) => child.textContent === 'region-1')).toBe(true);
+    expect(descendants(panel).some((child) => child.textContent === '数据集')).toBe(true);
+    expect(descendants(panel).some((child) => child.textContent === 'region-1')).toBe(true);
     expect(hostRow.dataset.variableId).toBe('region');
-    expect(hostRow.querySelector('[data-variable-action="preview"]')).not.toBeNull();
+    controller.onClick(action('more', 1));
+    expect(panel.querySelector('[data-variable-action="preview"]')).not.toBeNull();
   });
 
   it('creates a static variable through the replace-variables command', () => {
@@ -470,7 +469,7 @@ describe('designer variables controller', () => {
         .querySelector<FakeElement>('[data-variable-action="references"]')
         ?.getAttribute('aria-expanded'),
     ).toBe('true');
-    expect(ownerDocument.activeElement?.dataset.variableAction).toBe('rename');
+    expect(ownerDocument.activeElement?.dataset.variableAction).toBe('edit-config');
   });
 
   it('renames an unreferenced variable', () => {
@@ -628,6 +627,8 @@ describe('designer variables rendering', () => {
       editingDescriptionIndex: undefined,
       editingValueIndex: undefined,
       deletingIndex: undefined,
+      menuIndex: undefined,
+      canAddToBlueprint: false,
       search: '',
       typeFilter: 'all',
       referenceCounts: new Map(),
@@ -651,53 +652,10 @@ describe('designer variables rendering', () => {
   });
 
   it('renders the add button and labeled create editor on demand', () => {
-    const ownerDocument = new FakeDocument();
-    const panel = ownerDocument.createElement('div');
-    renderDesignerVariables(
-      panel as unknown as HTMLElement,
-      document([{ type: 'static', id: 'count', name: 'count', initialValue: 0 }]),
-      {
-        creating: true,
-        configuringIndex: undefined,
-        create: {
-          type: 'static',
-          name: '',
-          description: '',
-          valueSource: 'null',
-          sourceId: undefined,
-          processorId: '',
-          controlled: false,
-          autoUpdate: false,
-          autoUpdateInterval: '30',
-          catalogQuery: '',
-          catalogItems: [],
-          catalogCursor: undefined,
-          catalogFeedback: '',
-          previewStatus: 'idle',
-          previewSummary: undefined,
-        },
-        renamingIndex: undefined,
-        editingDescriptionIndex: undefined,
-        editingValueIndex: undefined,
-        deletingIndex: undefined,
-        search: '',
-        typeFilter: 'all',
-        referenceCounts: new Map(),
-        references: [],
-        expandedVariableName: undefined,
-        expandedReferenceName: undefined,
-        catalog: {
-          query: '',
-          items: [],
-          nextCursor: undefined,
-          feedback: '',
-          selected: undefined,
-          previewVariableId: undefined,
-          previewStatus: 'idle',
-          previewSummary: undefined,
-        },
-      },
-    );
+    const { controller, panel } = harness([
+      { type: 'static', id: 'count', name: 'count', initialValue: 0 },
+    ]);
+    controller.onClick(action('add'));
     expect(panel.querySelector('[data-variable-create-name]')).not.toBeNull();
     expect(panel.querySelector('[data-variable-create-value]')).not.toBeNull();
     expect(

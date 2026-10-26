@@ -6,11 +6,16 @@ import {
 } from '@base-screen/contracts';
 import type { ScreenDocumentCommand } from '@base-screen/core';
 import {
+  isDesignerVariableName,
   nextDesignerVariableCopyName,
   nextDesignerVariableName,
   normalizeDesignerVariableDescription,
+  parseDesignerStaticVariableValue,
 } from '../../../common/operations/designer-variable-editing.js';
-import { buildReplaceVariablesCommand } from '../../../common/operations/designer-variable-operations.js';
+import {
+  buildReplaceVariablesCommand,
+  isVariableNameTaken,
+} from '../../../common/operations/designer-variable-operations.js';
 import { readDesignerVariableView } from '../../../common/operations/designer-variable-view.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import type { DesignerVariableCatalogController } from './designer-variable-catalog-controller.js';
@@ -23,7 +28,6 @@ import {
   type DesignerVariableEditorMutationContext,
   deleteDesignerVariable,
   designerVariableEditorFailure,
-  validateDesignerVariableEditorName,
 } from './designer-variable-editor-mutations.js';
 
 export interface DesignerVariableEditorView {
@@ -201,38 +205,21 @@ export class DesignerVariableEditorController {
     const document = this.callbacks.getDocument();
     if (document === undefined || this.callbacks.getPanel() === undefined) return;
     this.captureCreateInputs();
-    if (
-      !validateDesignerVariableEditorName(
-        document.variables,
-        this.#createName,
-        this.#configuringIndex ?? -1,
-        '[data-variable-create-name]',
-        (selector, message) => this.reportFieldFailure(selector, message),
-      )
-    ) {
-      return;
-    }
+    if (!this.applyAllCreateErrors()) return;
     const description = normalizeDesignerVariableDescription(this.#createDescription);
-    if (description === false) {
-      this.reportFieldFailure(
-        '[data-variable-create-description]',
-        DESIGNER_UI_TEXT.variables.descriptionInvalid,
-      );
-      return;
-    }
+    if (description === false) return;
     const variable = this.createVariable(description);
     if (variable === undefined) return;
     const variables = [...document.variables];
     const configuringIndex = this.#configuringIndex;
+    const focusIndex = configuringIndex ?? document.variables.length;
     if (configuringIndex === undefined) variables.push(variable);
     else variables[configuringIndex] = variable;
     if (!this.commit(variables)) return;
     this.reset();
     this.callbacks.getCatalog().clear();
     this.callbacks.renderAndFocus(
-      configuringIndex === undefined
-        ? '[data-variable-action="add"]'
-        : `[data-variable-action="edit-config"][data-variable-index="${configuringIndex}"]`,
+      `[data-variable-action="edit-config"][data-variable-index="${focusIndex}"]`,
     );
   }
 
@@ -242,7 +229,7 @@ export class DesignerVariableEditorController {
     this.callbacks.onVariableRenamed(renamed.variableId, renamed.nextName);
     this.reset();
     this.callbacks.renderAndFocus(
-      `[data-variable-action="rename"][data-variable-index="${index}"]`,
+      `[data-variable-action="edit-config"][data-variable-index="${index}"]`,
     );
   }
 
@@ -250,7 +237,7 @@ export class DesignerVariableEditorController {
     if (!confirmDesignerVariableDescription(index, this.#mutations)) return;
     this.reset();
     this.callbacks.renderAndFocus(
-      `[data-variable-action="edit-description"][data-variable-index="${index}"]`,
+      `[data-variable-action="edit-config"][data-variable-index="${index}"]`,
     );
   }
 
@@ -270,14 +257,226 @@ export class DesignerVariableEditorController {
     this.#editingValueIndex = undefined;
     this.#deletingIndex = index;
     this.callbacks.renderAndFocus(
-      `[data-variable-action="confirm-delete"][data-variable-index="${index}"]`,
+      `[data-variable-action="cancel"][data-variable-index="${index}"]`,
     );
   }
 
   deleteVariable(index: number): void {
+    const document = this.callbacks.getDocument();
+    const hasNext = document !== undefined && document.variables[index + 1] !== undefined;
+    const hasPrevious = document !== undefined && index > 0;
     if (!deleteDesignerVariable(index, this.#mutations)) return;
     this.reset();
-    this.callbacks.renderAndFocus('[data-variable-action="add"]');
+    if (hasNext) {
+      this.callbacks.renderAndFocus(
+        `[data-variable-action="toggle-variable"][data-variable-index="${index}"]`,
+      );
+    } else if (hasPrevious) {
+      this.callbacks.renderAndFocus(
+        `[data-variable-action="toggle-variable"][data-variable-index="${index - 1}"]`,
+      );
+    } else {
+      this.callbacks.renderAndFocus('[data-variable-action="add"]');
+    }
+  }
+
+  private applyAllCreateErrors(): boolean {
+    const document = this.callbacks.getDocument();
+    const panel = this.callbacks.getPanel();
+    if (document === undefined || panel === undefined) return false;
+    const errors = this.collectCreateErrors(document);
+    const fieldKeys = ['name', 'description', 'value', 'interval'] as const;
+    for (const field of fieldKeys) {
+      const input = panel.querySelector<HTMLInputElement>(createFieldSelector(field));
+      input?.setAttribute('aria-invalid', 'false');
+      const fieldError = panel.querySelector<HTMLElement>(`[data-variable-field-error="${field}"]`);
+      if (fieldError !== null) {
+        fieldError.textContent = '';
+        fieldError.hidden = true;
+      }
+    }
+    const summary = panel.querySelector<HTMLElement>('[data-variable-error-summary]');
+    if (summary !== null) {
+      summary.hidden = errors.length < 2;
+      summary.textContent =
+        errors.length < 2 ? '' : DESIGNER_UI_TEXT.variables.errorSummary(errors.length);
+    }
+    const bottom = panel.querySelector<HTMLElement>('[data-variable-error]');
+    if (bottom !== null) {
+      bottom.textContent = errors[0]?.message ?? '';
+      bottom.hidden = errors.length === 0;
+    }
+    for (const error of errors) {
+      if (error.field === 'source' || error.field === 'filter') continue;
+      const input = panel.querySelector<HTMLInputElement>(createFieldSelector(error.field));
+      input?.setAttribute('aria-invalid', 'true');
+      const fieldError = panel.querySelector<HTMLElement>(
+        `[data-variable-field-error="${error.field}"]`,
+      );
+      if (fieldError !== null) {
+        fieldError.textContent = error.message;
+        fieldError.hidden = false;
+      }
+    }
+    if (errors.length > 0) {
+      this.callbacks.report(designerVariableEditorFailure(errors[0]!.message));
+      panel.querySelector<HTMLInputElement>(errors[0]!.selector)?.focus();
+      return false;
+    }
+    return true;
+  }
+
+  private collectCreateErrors(document: ScreenDocument): Array<{
+    readonly field: 'name' | 'description' | 'value' | 'interval' | 'source' | 'filter';
+    readonly selector: string;
+    readonly message: string;
+  }> {
+    const errors: Array<{
+      field: 'name' | 'description' | 'value' | 'interval' | 'source' | 'filter';
+      selector: string;
+      message: string;
+    }> = [];
+    const name = this.#createName.trim();
+    if (!isDesignerVariableName(name)) {
+      errors.push({
+        field: 'name',
+        selector: '[data-variable-create-name]',
+        message: DESIGNER_UI_TEXT.variables.nameInvalid,
+      });
+    } else if (isVariableNameTaken(document.variables, name, this.#configuringIndex ?? -1)) {
+      errors.push({
+        field: 'name',
+        selector: '[data-variable-create-name]',
+        message: DESIGNER_UI_TEXT.variables.nameTaken,
+      });
+    }
+    if (normalizeDesignerVariableDescription(this.#createDescription) === false) {
+      errors.push({
+        field: 'description',
+        selector: '[data-variable-create-description]',
+        message: DESIGNER_UI_TEXT.variables.descriptionInvalid,
+      });
+    }
+    if (parseDesignerStaticVariableValue(this.#createValueSource) === undefined) {
+      errors.push({
+        field: 'value',
+        selector: '[data-variable-create-value]',
+        message: DESIGNER_UI_TEXT.variables.valueInvalid,
+      });
+    }
+    if (this.#createType !== 'static' && this.#selectedSourceId === undefined) {
+      errors.push({
+        field: 'source',
+        selector: '[data-variable-catalog-search]',
+        message: DESIGNER_UI_TEXT.variables.hostRequired,
+      });
+    }
+    if (this.#createProcessorId.length > 256) {
+      errors.push({
+        field: 'filter',
+        selector: '[data-variable-create-processor]',
+        message: DESIGNER_UI_TEXT.variables.processorInvalid,
+      });
+    }
+    if (this.#createType === 'data-source' && this.#createAutoUpdate) {
+      const seconds = Number(this.#createAutoUpdateInterval);
+      if (!Number.isInteger(seconds) || seconds < 1 || seconds > 86_400) {
+        errors.push({
+          field: 'interval',
+          selector: '[data-variable-create-auto-update-interval]',
+          message: DESIGNER_UI_TEXT.variables.autoUpdateInvalid,
+        });
+      }
+    }
+    return errors;
+  }
+
+  validateLive(field: 'name' | 'description' | 'value' | 'interval'): void {
+    if (!this.#creating) return;
+    this.captureCreateInputs();
+    const panel = this.callbacks.getPanel();
+    const document = this.callbacks.getDocument();
+    if (panel === undefined || document === undefined) return;
+    let message = '';
+    if (field === 'name') {
+      const name = this.#createName.trim();
+      if (!isDesignerVariableName(name)) {
+        message = DESIGNER_UI_TEXT.variables.nameInvalid;
+      } else if (isVariableNameTaken(document.variables, name, this.#configuringIndex ?? -1)) {
+        message = DESIGNER_UI_TEXT.variables.nameTaken;
+      }
+    } else if (field === 'description') {
+      if (normalizeDesignerVariableDescription(this.#createDescription) === false) {
+        message = DESIGNER_UI_TEXT.variables.descriptionInvalid;
+      }
+    } else if (field === 'value') {
+      if (parseDesignerStaticVariableValue(this.#createValueSource) === undefined) {
+        message = DESIGNER_UI_TEXT.variables.valueInvalid;
+      }
+    } else if (
+      field === 'interval' &&
+      this.#createType === 'data-source' &&
+      this.#createAutoUpdate
+    ) {
+      const seconds = Number(this.#createAutoUpdateInterval);
+      if (!Number.isInteger(seconds) || seconds < 1 || seconds > 86_400) {
+        message = DESIGNER_UI_TEXT.variables.autoUpdateInvalid;
+      }
+    }
+    this.applyLiveFieldState(panel, field, message);
+    this.refreshLiveSummary(panel);
+  }
+
+  private refreshLiveSummary(panel: HTMLElement): void {
+    if (typeof panel.querySelectorAll !== 'function') return;
+    const count = [...panel.querySelectorAll<HTMLElement>('[data-variable-field-error]')].filter(
+      (element) => !element.hidden,
+    ).length;
+    const summary = panel.querySelector<HTMLElement>('[data-variable-error-summary]');
+    if (summary === null) return;
+    summary.hidden = count < 2;
+    summary.textContent = count < 2 ? '' : DESIGNER_UI_TEXT.variables.errorSummary(count);
+  }
+
+  private applyLiveFieldState(
+    panel: HTMLElement,
+    field: 'name' | 'description' | 'value' | 'interval',
+    message: string,
+  ): void {
+    const selector =
+      field === 'name'
+        ? '[data-variable-create-name]'
+        : field === 'description'
+          ? '[data-variable-create-description]'
+          : field === 'value'
+            ? '[data-variable-create-value]'
+            : '[data-variable-create-auto-update-interval]';
+    const input = panel.querySelector<HTMLInputElement>(selector);
+    input?.setAttribute('aria-invalid', message === '' ? 'false' : 'true');
+    const fieldError = panel.querySelector<HTMLElement>(`[data-variable-field-error="${field}"]`);
+    if (fieldError !== null) {
+      fieldError.textContent = message;
+      fieldError.hidden = message === '';
+    }
+    if (field === 'name') {
+      const count = panel.querySelector<HTMLElement>('[data-variable-name-count]');
+      if (count !== null) count.textContent = `${this.#createName.length}/128`;
+      const check = panel.querySelector<HTMLElement>('[data-variable-name-check]');
+      if (check !== null) check.hidden = message !== '';
+    } else if (field === 'description') {
+      const count = panel.querySelector<HTMLElement>('[data-variable-description-count]');
+      if (count !== null) {
+        count.textContent = `${[...this.#createDescription].length}/4096`;
+      }
+    } else if (field === 'value') {
+      const type = panel.querySelector<HTMLElement>('[data-variable-value-type]');
+      if (type !== null) {
+        type.textContent =
+          parseDesignerStaticVariableValue(this.#createValueSource) === undefined
+            ? DESIGNER_UI_TEXT.variables.valueTypeInvalid
+            : valueTypeLabel(this.#createValueSource);
+      }
+    }
   }
 
   captureCreateInputs(): void {
@@ -320,10 +519,11 @@ export class DesignerVariableEditorController {
             ? 'edit-value'
             : 'delete';
     this.reset();
+    const focusAction = action === 'delete' ? 'more' : action;
     this.callbacks.renderAndFocus(
-      action === 'add'
+      focusAction === 'add'
         ? '[data-variable-action="add"]'
-        : `[data-variable-action="${action}"][data-variable-index="${configuringIndex ?? index}"]`,
+        : `[data-variable-action="${focusAction}"][data-variable-index="${configuringIndex ?? index}"]`,
     );
   }
 
@@ -374,6 +574,23 @@ export class DesignerVariableEditorController {
     const panel = this.callbacks.getPanel();
     const input = panel?.querySelector<HTMLInputElement>(selector);
     input?.setAttribute('aria-invalid', 'true');
+    const field = selector.includes('create-name')
+      ? 'name'
+      : selector.includes('create-description')
+        ? 'description'
+        : selector.includes('create-value')
+          ? 'value'
+          : selector.includes('create-auto-update-interval')
+            ? 'interval'
+            : undefined;
+    const fieldError =
+      field === undefined
+        ? null
+        : panel?.querySelector<HTMLElement>(`[data-variable-field-error="${field}"]`);
+    if (fieldError !== null && fieldError !== undefined) {
+      fieldError.textContent = message;
+      fieldError.hidden = false;
+    }
     const error = panel?.querySelector<HTMLElement>('[data-variable-error]');
     if (error !== null && error !== undefined) {
       error.textContent = message;
@@ -392,4 +609,25 @@ export class DesignerVariableEditorController {
     this.callbacks.report(execution);
     return execution.ok;
   }
+}
+
+function createFieldSelector(field: 'name' | 'description' | 'value' | 'interval'): string {
+  return field === 'name'
+    ? '[data-variable-create-name]'
+    : field === 'description'
+      ? '[data-variable-create-description]'
+      : field === 'value'
+        ? '[data-variable-create-value]'
+        : '[data-variable-create-auto-update-interval]';
+}
+
+function valueTypeLabel(raw: string): string {
+  const text = raw.trim();
+  if (text === '') return DESIGNER_UI_TEXT.variables.valueTypeText;
+  if (text === 'true' || text === 'false') return DESIGNER_UI_TEXT.variables.valueTypeBoolean;
+  if (text === 'null') return DESIGNER_UI_TEXT.variables.valueTypeNull;
+  if (/^-?\d+(?:\.\d+)?$/u.test(text)) return DESIGNER_UI_TEXT.variables.valueTypeNumber;
+  if (text.startsWith('[')) return DESIGNER_UI_TEXT.variables.valueTypeArray;
+  if (text.startsWith('{')) return DESIGNER_UI_TEXT.variables.valueTypeObject;
+  return DESIGNER_UI_TEXT.variables.valueTypeText;
 }

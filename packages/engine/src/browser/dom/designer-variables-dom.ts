@@ -18,12 +18,7 @@ import {
   createVariableReferenceCount,
 } from './designer-variable-references-dom.js';
 import {
-  appendCreateEditor,
-  appendDeleteConfirmation,
-  appendDescriptionEditor,
   appendIconLabel,
-  appendRenameEditor,
-  appendValueEditor,
   type DesignerVariableCreateDraft,
 } from './designer-variables-editor-dom.js';
 import {
@@ -39,6 +34,8 @@ export interface DesignerVariablesDraft {
   readonly editingDescriptionIndex: number | undefined;
   readonly editingValueIndex: number | undefined;
   readonly deletingIndex: number | undefined;
+  readonly menuIndex: number | undefined;
+  readonly canAddToBlueprint: boolean;
   readonly search: string;
   readonly typeFilter: 'all' | ScreenVariable['type'];
   readonly referenceCounts: ReadonlyMap<string, number>;
@@ -75,17 +72,22 @@ export function renderDesignerVariables(
 
   const content = panel.ownerDocument.createElement('div');
   content.className = 'variable-panel-content';
-  if (draft.creating && draft.configuringIndex === undefined) {
-    appendCreateEditor(content, draft.create);
-  }
-  if (!draft.creating && variables.length === 0) {
+  if (variables.length === 0) {
     appendVariablesEmptyState(content, true);
+    panel.appendChild(content);
+    return;
+  }
+  const entries = variables
+    .map((variable, index) => ({ index, variable }))
+    .filter(({ variable }) => matchesVariableSearch(variable, draft.search));
+  if (entries.length === 0) {
+    appendVariablesEmptyState(content, false);
     panel.appendChild(content);
     return;
   }
   // 原型按来源分组（设计变量 / 数据集 / 查询参数），组内保持文档顺序；
   // 行的编辑索引仍取文档下标，分组只影响呈现，不改变任何命令寻址。
-  for (const group of variableGroups(variables)) {
+  for (const group of variableGroups(entries)) {
     if (group.entries.length === 0) continue;
     const section = panel.ownerDocument.createElement('section');
     section.className = 'variable-group';
@@ -99,8 +101,7 @@ export function renderDesignerVariables(
     list.setAttribute('role', 'list');
     list.setAttribute('aria-label', group.label);
     for (const { index, variable } of group.entries) {
-      if (draft.configuringIndex === index) appendCreateEditor(list, draft.create, index);
-      else appendVariableRow(list, variable, index, draft);
+      appendVariableRow(list, variable, index, draft);
     }
     section.appendChild(list);
     content.appendChild(section);
@@ -114,8 +115,18 @@ interface VariableGroup {
   readonly entries: readonly { readonly index: number; readonly variable: DesignerVariableView }[];
 }
 
-function variableGroups(variables: readonly DesignerVariableView[]): readonly VariableGroup[] {
-  const entries = variables.map((variable, index) => ({ index, variable }));
+function matchesVariableSearch(variable: DesignerVariableView, search: string): boolean {
+  const query = search.trim().toLowerCase();
+  if (query === '') return true;
+  return [variable.name, variable.description ?? '', variable.sourceId, sourceLabel(variable.type)]
+    .join(' ')
+    .toLowerCase()
+    .includes(query);
+}
+
+function variableGroups(
+  entries: readonly { readonly index: number; readonly variable: DesignerVariableView }[],
+): readonly VariableGroup[] {
   return [
     {
       label: DESIGNER_UI_TEXT.variables.groupStatic,
@@ -147,21 +158,7 @@ function appendVariableRow(
   row.dataset.variableType = variable.type;
   row.dataset.variableId = variable.id;
   row.setAttribute('role', 'listitem');
-  if (draft.renamingIndex === index) {
-    row.dataset.variableEditor = 'rename';
-    appendRenameEditor(row, variable, index);
-  } else if (draft.editingDescriptionIndex === index) {
-    row.dataset.variableEditor = 'description';
-    appendDescriptionEditor(row, variable, index);
-  } else if (draft.editingValueIndex === index) {
-    row.dataset.variableEditor = 'value';
-    appendValueEditor(row, variable, index);
-  } else if (draft.deletingIndex === index) {
-    row.dataset.variableEditor = 'delete';
-    appendDeleteConfirmation(row, variable.name, index);
-  } else {
-    appendVariableSummary(row, variable, index, draft);
-  }
+  appendVariableSummary(row, variable, index, draft);
   list.appendChild(row);
 }
 
@@ -205,38 +202,56 @@ function appendVariableSummary(
   header.appendChild(identity);
 
   header.appendChild(createRowContext(row.ownerDocument, variable));
-  appendCompactActions(header, variable, index);
+  appendCompactActions(header, variable, index, draft);
   row.appendChild(header);
-  if (!expanded) return;
+}
 
-  const details = row.ownerDocument.createElement('section');
+/** 详情在检查器浮层中渲染；行本身只保留摘要、选中与展开状态。 */
+export function appendVariableDetails(
+  container: HTMLElement,
+  variable: DesignerVariableView,
+  index: number,
+  draft: DesignerVariablesDraft,
+): void {
+  const details = container.ownerDocument.createElement('section');
   details.className = 'variable-details';
+  details.dataset.variableDetails = variable.id;
   details.setAttribute('aria-label', variable.name);
   const usage = createVariableReferenceCount(
-    row.ownerDocument,
+    container.ownerDocument,
     variable,
     index,
     draft.referenceCounts.get(variable.id) ?? 0,
     draft.expandedReferenceName === variable.id,
   );
   usage.className = `${usage.className} variable-row-usage`.trim();
-  details.appendChild(createUsageLine(row.ownerDocument, usage));
-  details.appendChild(createDescriptionAction(row.ownerDocument, variable, index));
+  details.appendChild(createUsageLine(container.ownerDocument, usage));
   details.appendChild(
     createDetailLine(
-      row.ownerDocument,
+      container.ownerDocument,
+      DESIGNER_UI_TEXT.variables.descriptionLabel,
+      variable.description ?? DESIGNER_UI_TEXT.variables.addDescription,
+    ),
+  );
+  details.appendChild(
+    createDetailLine(
+      container.ownerDocument,
       DESIGNER_UI_TEXT.variables.source,
       variableSourceLabel(variable),
     ),
   );
-  details.appendChild(createValueDetail(row.ownerDocument, variable, index));
+  details.appendChild(createValueDetail(container.ownerDocument, variable, index));
   if (variable.type !== 'static') {
     details.appendChild(
-      createCodeDetail(row.ownerDocument, DESIGNER_UI_TEXT.variables.sourceId, variable.sourceId),
+      createCodeDetail(
+        container.ownerDocument,
+        DESIGNER_UI_TEXT.variables.sourceId,
+        variable.sourceId,
+      ),
     );
     details.appendChild(
       createDetailLine(
-        row.ownerDocument,
+        container.ownerDocument,
         DESIGNER_UI_TEXT.variables.controlled,
         variable.controlled
           ? DESIGNER_UI_TEXT.variables.enabled
@@ -246,7 +261,7 @@ function appendVariableSummary(
     if (variable.processorId !== undefined) {
       details.appendChild(
         createCodeDetail(
-          row.ownerDocument,
+          container.ownerDocument,
           DESIGNER_UI_TEXT.variables.processor,
           variable.processorId,
         ),
@@ -255,7 +270,7 @@ function appendVariableSummary(
     if (variable.type === 'data-source') {
       details.appendChild(
         createDetailLine(
-          row.ownerDocument,
+          container.ownerDocument,
           DESIGNER_UI_TEXT.variables.autoUpdate,
           variable.autoUpdate === undefined
             ? DESIGNER_UI_TEXT.variables.disabled
@@ -273,7 +288,7 @@ function appendVariableSummary(
       draft.references.filter((reference) => reference.variableId === variable.id),
     );
   }
-  row.appendChild(details);
+  container.appendChild(details);
 }
 
 /**
@@ -350,111 +365,35 @@ function appendCompactActions(
   header: HTMLElement,
   variable: DesignerVariableView,
   index: number,
+  draft: DesignerVariablesDraft,
 ): void {
   const actions = header.ownerDocument.createElement('div');
   actions.className = 'variable-row-actions';
   actions.setAttribute('role', 'group');
   actions.setAttribute('aria-label', DESIGNER_UI_TEXT.variables.actions(variable.name));
-  if (variable.type !== 'static') {
-    actions.appendChild(
-      createIconAction(
-        header.ownerDocument,
-        'preview',
-        index,
-        'eye',
-        DESIGNER_UI_TEXT.variables.preview(variable.name),
-      ),
-    );
-  }
-  actions.appendChild(
-    createIconAction(
-      header.ownerDocument,
-      'edit-config',
-      index,
-      'sliders',
-      DESIGNER_UI_TEXT.variables.editConfiguration(variable.name),
-    ),
-  );
-  actions.appendChild(
-    createIconAction(
-      header.ownerDocument,
-      'add-to-blueprint',
-      index,
-      'plus',
-      DESIGNER_UI_TEXT.variables.addToBlueprint(variable.name),
-    ),
-  );
-  actions.appendChild(
-    createIconAction(
-      header.ownerDocument,
-      'rename',
-      index,
-      'pencil',
-      DESIGNER_UI_TEXT.variables.renameVariable(variable.name),
-    ),
-  );
-  actions.appendChild(
-    createIconAction(
-      header.ownerDocument,
-      'duplicate',
-      index,
-      'copy',
-      DESIGNER_UI_TEXT.variables.duplicate(variable.name),
-    ),
-  );
-  const remove = createIconAction(
-    header.ownerDocument,
-    'delete',
-    index,
-    'trash',
-    DESIGNER_UI_TEXT.variables.deleteVariable(variable.name),
-  );
-  remove.dataset.variant = 'danger';
-  actions.appendChild(remove);
+  const edit = createDesignerButton(header.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.editConfiguration(variable.name),
+    className: 'variable-row-edit',
+    tip: DESIGNER_UI_TEXT.variables.editConfiguration(variable.name),
+    variant: 'ghost',
+  });
+  edit.dataset.variableAction = 'edit-config';
+  edit.dataset.variableIndex = String(index);
+  appendIconLabel(edit, 'sliders', DESIGNER_UI_TEXT.variables.editMenu);
+  actions.appendChild(edit);
+  const more = createDesignerButton(header.ownerDocument, {
+    ariaLabel: DESIGNER_UI_TEXT.variables.moreMenu,
+    className: 'variable-row-more',
+    tip: DESIGNER_UI_TEXT.variables.moreMenu,
+    variant: 'ghost',
+  });
+  more.dataset.variableAction = 'more';
+  more.dataset.variableIndex = String(index);
+  more.setAttribute('aria-haspopup', 'menu');
+  more.setAttribute('aria-expanded', String(draft.menuIndex === index));
+  appendIconLabel(more, 'more', '');
+  actions.appendChild(more);
   header.appendChild(actions);
-}
-
-function createIconAction(
-  ownerDocument: Document,
-  action: 'preview' | 'edit-config' | 'add-to-blueprint' | 'rename' | 'duplicate' | 'delete',
-  index: number,
-  icon: 'eye' | 'sliders' | 'plus' | 'pencil' | 'copy' | 'trash',
-  label: string,
-): HTMLButtonElement {
-  const button = createDesignerButton(ownerDocument, {
-    ariaLabel: label,
-    className: 'variable-icon-action',
-    tip: label,
-    variant: 'ghost',
-  });
-  button.dataset.variableAction = action;
-  button.dataset.variableIndex = String(index);
-  appendIconLabel(button, icon, '');
-  return button;
-}
-
-function createDescriptionAction(
-  ownerDocument: Document,
-  variable: DesignerVariableView,
-  index: number,
-): HTMLElement {
-  const button = createDesignerButton(ownerDocument, {
-    ariaLabel: DESIGNER_UI_TEXT.variables.editDescription(variable.name),
-    className: 'variable-description-action',
-    tip: variable.description ?? DESIGNER_UI_TEXT.variables.addDescription,
-    variant: 'ghost',
-  });
-  button.dataset.variableAction = 'edit-description';
-  button.dataset.variableIndex = String(index);
-  const label = ownerDocument.createElement('span');
-  label.className = 'variable-detail-label';
-  label.textContent = DESIGNER_UI_TEXT.variables.descriptionLabel;
-  button.appendChild(label);
-  const copy = ownerDocument.createElement('span');
-  copy.className = 'variable-description-copy';
-  copy.textContent = variable.description ?? DESIGNER_UI_TEXT.variables.addDescription;
-  button.appendChild(copy);
-  return button;
 }
 
 function createValueDetail(

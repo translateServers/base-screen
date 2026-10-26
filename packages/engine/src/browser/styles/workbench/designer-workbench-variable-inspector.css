@@ -1,0 +1,197 @@
+/* 变量检查器浮层：锚定左栏、非模态；表单/删除确认在浮层内滚动，不撑高变量列表。 */
+.variable-inspector-layer,
+.designer-overlay-host > .variable-inspector-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--designer-z-popover);
+  pointer-events: none;
+}
+
+.variable-inspector-layer[hidden] {
+  display: none;
+}
+
+.variable-inspector-card {
+  position: absolute;
+  display: flex;
+  width: min(376px, calc(100% - 16px));
+  max-height: calc(100% - 16px);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-4);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-card), var(--designer-shadow-overlay);
+  pointer-events: auto;
+}
+
+.variable-inspector-head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--designer-space-3);
+  min-width: 0;
+  padding: var(--designer-space-4) var(--designer-space-5);
+  border-bottom: 1px solid var(--designer-border-subtle);
+  background: var(--designer-surface-raised);
+}
+
+.variable-inspector-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--designer-text-primary);
+  font: var(--designer-font-small);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.variable-inspector-close {
+  flex: none;
+  width: var(--designer-control-height-compact);
+  height: var(--designer-control-height-compact);
+  min-height: var(--designer-control-height-compact);
+}
+
+.variable-inspector-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden auto;
+  padding: var(--designer-space-5);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.variable-inspector-scroll .variable-details {
+  margin: 0;
+  padding: 0;
+  border-top: 0;
+  gap: var(--designer-space-3);
+}
+
+.variable-row-menu-layer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--designer-z-popover);
+  pointer-events: none;
+}
+
+.variable-row-menu-layer[hidden] {
+  display: none;
+}
+
+.variable-row-menu {
+  position: absolute;
+  display: grid;
+  width: 176px;
+  min-width: 0;
+  padding: var(--designer-space-1);
+  border: 1px solid var(--designer-border-default);
+  border-radius: var(--designer-radius-3);
+  background: var(--designer-surface-overlay);
+  box-shadow: var(--designer-elev-card), var(--designer-shadow-overlay);
+  pointer-events: auto;
+}
+
+.variable-row-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--designer-space-2);
+  width: 100%;
+  min-height: 28px;
+  padding: 0 var(--designer-space-2);
+  border: 0;
+  border-radius: var(--designer-radius-1);
+  background: transparent;
+  color: var(--designer-text-secondary);
+  font: var(--designer-font-small);
+  text-align: left;
+}
+
+.variable-row-menu-item:hover,
+.variable-row-menu-item:focus-visible {
+  background: var(--designer-surface-control-hover);
+  color: var(--designer-text-primary);
+  outline: none;
+}
+
+.variable-row-menu-item[data-variant="danger"] {
+  color: var(--designer-danger);
+}
+
+.variable-row-menu-glyph {
+  display: inline-grid;
+  width: 14px;
+  height: 14px;
+  flex: none;
+  place-items: center;
+  color: var(--designer-text-muted);
+}
+
+.variable-row-menu-glyph svg {
+  width: 13px;
+  height: 13px;
+}
+
+.variable-row-menu-item[data-variant="danger"] .variable-row-menu-glyph {
+  color: var(--designer-danger);
+}
+
+/* 与变量面板一致：主题切换原子生效，不对 token 驱动的颜色做过渡。 */
+.variable-inspector-card .designer-control,
+.variable-inspector-card .designer-button,
+.variable-inspector-card .variable-editor {
+  transition: none;
+}
+
+/* 浮层里的 editor 不再重复卡片描边，只保留表单本身的分组与间距。 */
+.variable-inspector-card .variable-editor {
+  gap: var(--designer-space-4);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  content-visibility: visible;
+}
+
+.variable-inspector-card .variable-create-row {
+  margin-bottom: 0;
+}
+
+.variable-inspector-card .variable-editor-heading {
+  display: none;
+}
+
+.variable-inspector-card .variable-editor-intro {
+  margin: 0;
+}
+
+.variable-inspector-card .variable-editor-actions {
+  position: sticky;
+  bottom: calc(-1 * var(--designer-space-5));
+  padding: var(--designer-space-4) 0 var(--designer-space-1);
+  background: var(--designer-surface-overlay);
+}
+
+.variable-inspector-scroll[data-variable-inspector-mode="delete"] {
+  background: color-mix(
+    in srgb,
+    var(--designer-danger-surface) 24%,
+    var(--designer-surface-overlay)
+  );
+}
+
+.variable-inspector-scroll[data-variable-inspector-mode="delete"] .variable-delete-copy strong {
+  color: var(--designer-text-primary);
+}
+
+@media (max-width: 720px) {
+  .variable-inspector-layer {
+    inset-inline: 0;
+  }
+
+  .variable-inspector-card {
+    width: calc(100% - 16px);
+  }
+}

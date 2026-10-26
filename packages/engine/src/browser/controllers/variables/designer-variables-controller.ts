@@ -8,6 +8,12 @@ import type { ScreenDocumentCommand } from '@base-screen/core';
 import { collectVariableReferences } from '../../../common/operations/designer-variable-operations.js';
 import { readDesignerVariableView } from '../../../common/operations/designer-variable-view.js';
 import {
+  type DesignerVariableInspectorSurface,
+  ensureDesignerVariableInspector,
+  renderDesignerVariableInspector,
+  renderDesignerVariableRowMenu,
+} from '../../dom/designer-variable-inspector-dom.js';
+import {
   type DesignerVariablesDraft,
   renderDesignerVariables,
 } from '../../dom/designer-variables-dom.js';
@@ -17,6 +23,7 @@ import { DesignerVariableEditorController } from './designer-variable-editor-con
 export interface DesignerVariablesCallbacks {
   readonly getDocument: () => ScreenDocument | undefined;
   readonly getHostCatalogPort?: () => ScreenHostCatalogPort | undefined;
+  readonly getOverlayHost?: () => HTMLElement | undefined;
   readonly executeCommand: (command: ScreenDocumentCommand) => ScreenParseResult<ScreenDocument>;
   readonly addToBlueprint?: (variableId: string) => void;
   readonly report: (result: ScreenParseResult<ScreenDocument>) => void;
@@ -25,11 +32,18 @@ export interface DesignerVariablesCallbacks {
 /** Variable-panel orchestration; editing, catalog and preview requests have bounded controllers. */
 export class DesignerVariablesController {
   #panel: HTMLElement | undefined;
+  #scope: HTMLElement | undefined;
+  #inspector: DesignerVariableInspectorSurface | undefined;
   #search = '';
   #typeFilter: 'all' | ScreenVariable['type'] = 'all';
   #expandedVariableId: string | undefined;
   #expandedReferenceId: string | undefined;
+  #menuIndex: number | undefined;
   #lastDocument: ScreenDocument | undefined;
+  readonly #touchedFields = new Set<'name' | 'description' | 'value' | 'interval'>();
+  readonly #validationTimers: Partial<
+    Record<'name' | 'description' | 'value' | 'interval', ReturnType<typeof setTimeout>>
+  > = {};
   readonly #catalog: DesignerVariableCatalogController;
   readonly #editor: DesignerVariableEditorController;
 
@@ -41,7 +55,7 @@ export class DesignerVariablesController {
     });
     this.#editor = new DesignerVariableEditorController({
       getDocument: () => this.#lastDocument ?? callbacks.getDocument(),
-      getPanel: () => this.#panel,
+      getPanel: () => this.#scope ?? this.#panel,
       getCatalog: () => this.#catalog,
       executeCommand: callbacks.executeCommand,
       onVariableRenamed: () => {},
@@ -51,15 +65,26 @@ export class DesignerVariablesController {
   }
 
   connect(panel: HTMLElement): void {
+    this.#inspector?.layer.remove?.();
     this.#panel = panel;
+    this.#scope =
+      this.callbacks.getOverlayHost?.() ??
+      (typeof panel.closest === 'function' ? panel.closest<HTMLElement>('.designer') : null) ??
+      panel;
+    this.#inspector = undefined;
     this.render();
   }
 
   release(): void {
+    this.#inspector?.layer.remove?.();
+    this.#inspector = undefined;
     this.#panel = undefined;
+    this.#scope = undefined;
     this.#lastDocument = undefined;
     this.#expandedVariableId = undefined;
     this.#expandedReferenceId = undefined;
+    this.#menuIndex = undefined;
+    this.clearLiveValidation();
     this.#catalog.clear();
     this.#editor.reset();
   }
@@ -67,9 +92,16 @@ export class DesignerVariablesController {
   render(): void {
     const panel = this.#panel;
     if (panel === undefined) return;
+    if (!this.hasActiveEditor()) this.clearLiveValidation();
     const document = this.callbacks.getDocument();
     this.#lastDocument = document;
-    renderDesignerVariables(panel, document, this.currentDraft());
+    const draft = this.currentDraft();
+    renderDesignerVariables(panel, document, draft);
+    const scope = this.#scope ?? panel;
+    const inspector = ensureDesignerVariableInspector(scope);
+    this.#inspector = inspector;
+    renderDesignerVariableInspector(inspector, panel, document, draft);
+    renderDesignerVariableRowMenu(inspector, panel, document, draft);
   }
 
   currentDraft(): DesignerVariablesDraft {
@@ -118,6 +150,8 @@ export class DesignerVariablesController {
       editingDescriptionIndex: editor.editingDescriptionIndex,
       editingValueIndex: editor.editingValueIndex,
       deletingIndex: editor.deletingIndex,
+      menuIndex: this.#menuIndex,
+      canAddToBlueprint: this.callbacks.addToBlueprint !== undefined,
       search: this.#search,
       typeFilter: this.#typeFilter,
       referenceCounts,
@@ -131,13 +165,33 @@ export class DesignerVariablesController {
   onClick(target: Element): boolean {
     const actionTarget = target.closest<HTMLElement>('[data-variable-action]');
     const action = actionTarget?.dataset.variableAction;
-    if (action === undefined) return false;
+    if (action === undefined) {
+      if (this.#menuIndex !== undefined) {
+        this.#menuIndex = undefined;
+        this.render();
+      }
+      return false;
+    }
+    if (this.#menuIndex !== undefined && action !== 'more') this.#menuIndex = undefined;
     const index = Number(
       target.closest<HTMLElement>('[data-variable-index]')?.dataset.variableIndex ?? -1,
     );
     switch (action) {
+      case 'clear-search':
+        this.#search = '';
+        this.renderAndFocus('[data-variable-search]');
+        return true;
       case 'add':
+        this.clearLiveValidation();
         this.#editor.beginCreate('static');
+        return true;
+      case 'create-data-source':
+        this.clearLiveValidation();
+        this.#editor.beginCreate('data-source');
+        return true;
+      case 'create-url-query':
+        this.clearLiveValidation();
+        this.#editor.beginCreate('url-query');
         return true;
       case 'create-type-static':
       case 'create-type-data-source':
@@ -161,6 +215,35 @@ export class DesignerVariablesController {
       case 'cancel':
         this.#editor.cancel(index);
         return true;
+      case 'close-inspector':
+        this.#menuIndex = undefined;
+        if (this.hasActiveEditor()) {
+          this.#editor.cancel(index);
+        } else if (this.#expandedVariableId !== undefined) {
+          this.#expandedVariableId = undefined;
+          this.#expandedReferenceId = undefined;
+          this.renderAndFocus(
+            `[data-variable-action="toggle-variable"][data-variable-index="${index}"]`,
+          );
+        }
+        return true;
+      case 'more': {
+        const opening = this.#menuIndex !== index;
+        this.#menuIndex = opening ? index : undefined;
+        this.render();
+        if (opening) {
+          this.#scope
+            ?.querySelector<HTMLElement>('[data-variable-row-menu] [role="menuitem"]')
+            ?.focus();
+        } else {
+          this.#panel
+            ?.querySelector<HTMLElement>(
+              `[data-variable-action="more"][data-variable-index="${index}"]`,
+            )
+            ?.focus();
+        }
+        return true;
+      }
       case 'rename':
         this.#editor.beginRowEdit(index, 'rename');
         return true;
@@ -182,6 +265,7 @@ export class DesignerVariablesController {
         if (variable === undefined) return true;
         const expanded = this.#expandedVariableId === variable.id;
         this.#expandedVariableId = expanded ? undefined : variable.id;
+        this.#menuIndex = undefined;
         if (expanded && this.#expandedReferenceId === variable.id) {
           this.#expandedReferenceId = undefined;
         }
@@ -194,8 +278,11 @@ export class DesignerVariablesController {
         const variable =
           this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
         if (variable === undefined) return true;
-        this.#expandedReferenceId =
-          this.#expandedReferenceId === variable.id ? undefined : variable.id;
+        const open =
+          this.#expandedVariableId === variable.id && this.#expandedReferenceId === variable.id;
+        this.#expandedVariableId = variable.id;
+        this.#expandedReferenceId = open ? undefined : variable.id;
+        this.#menuIndex = undefined;
         this.renderAndFocus(`[data-variable-action="references"][data-variable-index="${index}"]`);
         return true;
       }
@@ -206,14 +293,20 @@ export class DesignerVariablesController {
         const document = this.#lastDocument ?? this.callbacks.getDocument();
         const entry = document?.variables[index];
         if (document !== undefined && entry !== undefined) {
+          this.#expandedVariableId = entry.id;
+          this.#expandedReferenceId = undefined;
+          this.#menuIndex = undefined;
           void this.#catalog.preview(readDesignerVariableView(document, entry));
+          this.render();
         }
         return true;
       }
       case 'add-to-blueprint': {
         const variable =
           this.#lastDocument?.variables[index] ?? this.callbacks.getDocument()?.variables[index];
+        this.#menuIndex = undefined;
         if (variable !== undefined) this.callbacks.addToBlueprint?.(variable.id);
+        this.render();
         return true;
       }
       case 'confirm-create':
@@ -243,6 +336,7 @@ export class DesignerVariablesController {
     if (!(target instanceof HTMLInputElement)) return false;
     if (target.dataset.variableSearch !== undefined) {
       this.#search = target.value;
+      this.#menuIndex = undefined;
       this.renderAndRestoreInput('[data-variable-search]', target.value.length);
       return true;
     }
@@ -251,7 +345,45 @@ export class DesignerVariablesController {
       this.#catalog.updateQuery(target.value);
       return true;
     }
+    const field = liveFieldForInput(target);
+    if (field !== undefined) {
+      this.#editor.captureCreateInputs();
+      if (this.#validationTimers[field] !== undefined) {
+        clearTimeout(this.#validationTimers[field]);
+      }
+      if (field === 'description') {
+        this.#editor.validateLive(field);
+      } else if (field === 'value') {
+        this.#validationTimers[field] = setTimeout(() => {
+          this.#editor.validateLive('value');
+        }, 400);
+      } else if (field === 'name' && this.#touchedFields.has('name')) {
+        this.#validationTimers[field] = setTimeout(() => {
+          this.#editor.validateLive('name');
+        }, 300);
+      }
+      return true;
+    }
     return false;
+  }
+
+  onFocusOut(event: FocusEvent): boolean {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return false;
+    const field = liveFieldForInput(target);
+    if (field === undefined) return false;
+    const next = event.relatedTarget;
+    if (next instanceof HTMLElement && next.closest('[data-variable-action]') !== null) {
+      return true;
+    }
+    this.#editor.captureCreateInputs();
+    this.#touchedFields.add(field);
+    if (this.#validationTimers[field] !== undefined) {
+      clearTimeout(this.#validationTimers[field]);
+      delete this.#validationTimers[field];
+    }
+    this.#editor.validateLive(field);
+    return true;
   }
 
   onChange(target: EventTarget | null): boolean {
@@ -307,11 +439,39 @@ export class DesignerVariablesController {
       if (!event.repeat) this.onClick(target);
       return true;
     }
+    if (target instanceof HTMLElement && this.#menuIndex !== undefined && !event.isComposing) {
+      const index = this.#menuIndex;
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.#menuIndex = undefined;
+        this.renderAndFocus(`[data-variable-action="more"][data-variable-index="${index}"]`);
+        return true;
+      }
+      if (
+        (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+        (target.closest('[data-variable-row-menu]') !== null ||
+          target.closest('[data-variable-action="more"]') !== null)
+      ) {
+        event.preventDefault();
+        const items = [
+          ...(this.#scope?.querySelectorAll<HTMLElement>(
+            '[data-variable-row-menu] [role="menuitem"]',
+          ) ?? []),
+        ];
+        if (items.length > 0) {
+          const current = items.indexOf(document.activeElement as HTMLElement);
+          const delta = event.key === 'ArrowDown' ? 1 : -1;
+          items[(current + delta + items.length) % items.length]?.focus();
+        }
+        return true;
+      }
+    }
     if (
       target instanceof HTMLElement &&
       event.key === 'Escape' &&
       !event.isComposing &&
-      target.closest('[data-variable-editor]') !== null
+      (target.closest('[data-variable-editor]') !== null ||
+        target.closest('[data-variable-inspector]') !== null)
     ) {
       event.preventDefault();
       this.#editor.cancel(
@@ -347,17 +507,54 @@ export class DesignerVariablesController {
     return true;
   }
 
+  private clearLiveValidation(): void {
+    for (const field of ['name', 'description', 'value', 'interval'] as const) {
+      if (this.#validationTimers[field] !== undefined) {
+        clearTimeout(this.#validationTimers[field]);
+        delete this.#validationTimers[field];
+      }
+    }
+    this.#touchedFields.clear();
+  }
+
+  private hasActiveEditor(): boolean {
+    const view = this.#editor.view;
+    return (
+      view.creating ||
+      view.renamingIndex !== undefined ||
+      view.editingDescriptionIndex !== undefined ||
+      view.editingValueIndex !== undefined ||
+      view.deletingIndex !== undefined
+    );
+  }
+
   private renderAndFocus(selector: string): void {
     this.render();
-    const panel = this.#panel;
-    const target = panel?.querySelector<HTMLElement>(selector);
-    (target ?? panel?.querySelector<HTMLElement>('[data-variable-action="add"]'))?.focus();
+    const target =
+      this.#scope?.querySelector<HTMLElement>(selector) ??
+      this.#panel?.querySelector<HTMLElement>(selector);
+    const fallback =
+      this.#scope?.querySelector<HTMLElement>('[data-variable-action="add"]') ??
+      this.#panel?.querySelector<HTMLElement>('[data-variable-action="add"]');
+    (target ?? fallback)?.focus();
   }
 
   private renderAndRestoreInput(selector: string, position: number): void {
     this.render();
-    const input = this.#panel?.querySelector<HTMLInputElement>(selector);
+    const input =
+      this.#scope?.querySelector<HTMLInputElement>(selector) ??
+      this.#panel?.querySelector<HTMLInputElement>(selector);
     input?.focus();
     input?.setSelectionRange(position, position);
   }
+}
+
+function liveFieldForInput(
+  target: HTMLInputElement,
+): 'name' | 'description' | 'value' | 'interval' | undefined {
+  if (target.dataset.variableCreateName !== undefined) return 'name';
+  if (target.dataset.variableCreateDescription !== undefined) return 'description';
+  if (target.dataset.variableCreateValue !== undefined) return 'value';
+  if (target.dataset.variableCreateAutoUpdateInterval !== undefined) return 'interval';
+  return undefined;
 }

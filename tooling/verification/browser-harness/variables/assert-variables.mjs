@@ -50,7 +50,8 @@ export async function assertAuthoringVariables(page, designer) {
       ?.querySelector('[data-variable-action="toggle-variable"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
     const row = panel.querySelector('[data-variable-row]');
-    const value = row?.querySelector('[data-variable-action="edit-value"]');
+    const scope = panel.getRootNode();
+    const value = scope.querySelector('[data-variable-action="edit-value"]');
     const add = panel.querySelector('[data-variable-action="add"]');
     const addGlyph = add?.querySelector('.variable-button-glyph');
     const addLabel = add?.querySelector('.variable-button-label');
@@ -128,7 +129,9 @@ export async function assertAuthoringVariables(page, designer) {
     variableModule.addGlyphHeight !== 16 ||
     !variableModule.addHasDecorativeSvg ||
     variableModule.actionSizes.some((size) => size < 24) ||
-    variableModule.actionLabels.some((label) => !label?.includes('count')) ||
+    variableModule.actionLabels.some(
+      (label) => !label?.includes('count') && label !== '更多操作',
+    ) ||
     variableModule.contextValue !== '0' ||
     !variableModule.keyboardActionVisible ||
     (variableModule.nameWidth ?? 0) < 24 ||
@@ -153,21 +156,19 @@ export async function assertAuthoringVariables(page, designer) {
   });
   await page.waitForFunction(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
-    return root.querySelector('[data-variables] [data-variable-create-name]') !== null;
+    return root.querySelector('[data-variable-create-name]') !== null;
   });
   const variableActionNames = await page.evaluate(() => {
-    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    const root = window.baseScreenHarness.designer.shadowRoot;
     return {
-      confirm: panel
+      confirm: root
         .querySelector('[data-variable-action="confirm-create"]')
         ?.getAttribute('aria-label'),
-      cancel: panel.querySelector('[data-variable-action="cancel"]')?.getAttribute('aria-label'),
-      focused:
-        window.baseScreenHarness.designer.shadowRoot.activeElement ===
-        panel.querySelector('[data-variable-create-name]'),
-      labels: panel.querySelectorAll('.variable-field-label').length,
+      cancel: root.querySelector('[data-variable-action="cancel"]')?.getAttribute('aria-label'),
+      focused: root.activeElement === root.querySelector('[data-variable-create-name]'),
+      labels: root.querySelectorAll('.variable-field-label').length,
       usesVectorIcon:
-        panel
+        root
           .querySelector('[data-variable-action="confirm-create"] svg')
           ?.getAttribute('aria-hidden') === 'true',
     };
@@ -203,7 +204,7 @@ export async function assertAuthoringVariables(page, designer) {
       return (values[0] + 0.05) / (values[1] + 0.05);
     };
     const sample = () => {
-      const primary = panel.querySelector('[data-variable-action="confirm-create"]');
+      const primary = root.querySelector('[data-variable-action="confirm-create"]');
       const neutral = root.querySelector('[data-canvas-setting="scaleMode"][aria-pressed="false"]');
       const ghost = root.querySelector('[data-panel-collapse="left"]');
       const pressed = root.querySelector('[data-material-filter="all"]');
@@ -266,9 +267,7 @@ export async function assertAuthoringVariables(page, designer) {
       `BROWSER_HARNESS_BUTTON_SYSTEM_THEME_ATOMIC_FAILED:${JSON.stringify(buttonSystemQuality)}`,
     );
   }
-  const primaryAction = designer.locator(
-    '[data-variables] [data-variable-action="confirm-create"]',
-  );
+  const primaryAction = designer.locator('[data-variable-action="confirm-create"]');
   const primaryIdle = await primaryAction.evaluate((button) => {
     const style = getComputedStyle(button);
     return {
@@ -310,10 +309,9 @@ export async function assertAuthoringVariables(page, designer) {
   }
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
-    const panel = root.querySelector('[data-variables]');
-    panel.querySelector('[data-variable-create-name]').value = 'temporary';
-    panel.querySelector('[data-variable-create-value]').value = 'true';
-    panel
+    root.querySelector('[data-variable-create-name]').value = 'temporary';
+    root.querySelector('[data-variable-create-value]').value = 'true';
+    root
       .querySelector('[data-variable-action="confirm-create"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
@@ -321,7 +319,7 @@ export async function assertAuthoringVariables(page, designer) {
     const names = window.baseScreenHarness.designer.document.variables.map((item) => item.name);
     return names.includes('temporary');
   });
-  // 删除被引用的 region → 拒绝
+  // 删除被引用的 region → 更多菜单只提供“查看引用”，不提供删除。
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-variables]');
@@ -335,17 +333,32 @@ export async function assertAuthoringVariables(page, designer) {
       entry.innerText.includes('region'),
     );
     row
-      .querySelector('[data-variable-action="delete"]')
+      .querySelector('[data-variable-action="more"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
   await page.waitForTimeout(200);
+  const regionMenu = await page.evaluate(() => {
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return {
+      hasDelete: root.querySelector('[data-variable-action="delete"]') !== null,
+      hasReferences: [...root.querySelectorAll('[data-variable-row-menu] [role="menuitem"]')].some(
+        (item) => item.textContent?.trim() === '查看引用',
+      ),
+    };
+  });
+  if (regionMenu.hasDelete || !regionMenu.hasReferences) {
+    throw new Error(
+      `BROWSER_HARNESS_VARIABLES_REFERENCE_GUARD_FAILED:${JSON.stringify(regionMenu)}`,
+    );
+  }
+  await page.keyboard.press('Escape');
   const regionStillPresent = await page.evaluate(() =>
     window.baseScreenHarness.designer.document.variables.some((item) => item.name === 'region'),
   );
   if (!regionStillPresent) {
     throw new Error('BROWSER_HARNESS_VARIABLES_REFERENCE_GUARD_FAILED');
   }
-  // 删除未引用的 count → 先进入行内确认态，确认后生效且一条撤销恢复。
+  // 删除未引用的 count → 更多菜单进入浮动确认态，确认后生效且一条撤销恢复。
   await page.evaluate(() => {
     const root = window.baseScreenHarness.designer.shadowRoot;
     const panel = root.querySelector('[data-variables]');
@@ -359,12 +372,15 @@ export async function assertAuthoringVariables(page, designer) {
       entry.innerText.includes('count'),
     );
     row
+      .querySelector('[data-variable-action="more"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    root
       .querySelector('[data-variable-action="delete"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
   await page.waitForFunction(() => {
-    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
-    return panel.querySelector('[data-variable-action="confirm-delete"]') !== null;
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return root.querySelector('[data-variable-action="confirm-delete"]') !== null;
   });
   const pendingDelete = await page.evaluate(() => ({
     countStillPresent: window.baseScreenHarness.designer.document.variables.some(
@@ -373,15 +389,15 @@ export async function assertAuthoringVariables(page, designer) {
     focusedAction:
       window.baseScreenHarness.designer.shadowRoot.activeElement?.dataset.variableAction,
   }));
-  if (!pendingDelete.countStillPresent || pendingDelete.focusedAction !== 'confirm-delete') {
+  if (!pendingDelete.countStillPresent || pendingDelete.focusedAction !== 'cancel') {
     throw new Error(
       `BROWSER_HARNESS_VARIABLES_DELETE_CONFIRMATION_FAILED:${JSON.stringify(pendingDelete)}`,
     );
   }
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => {
-    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
-    return panel.querySelector('[data-variable-action="confirm-delete"]') === null;
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return root.querySelector('[data-variable-action="confirm-delete"]') === null;
   });
   const cancelledDelete = await page.evaluate(() => ({
     countStillPresent: window.baseScreenHarness.designer.document.variables.some(
@@ -390,27 +406,31 @@ export async function assertAuthoringVariables(page, designer) {
     focusedAction:
       window.baseScreenHarness.designer.shadowRoot.activeElement?.dataset.variableAction,
   }));
-  if (!cancelledDelete.countStillPresent || cancelledDelete.focusedAction !== 'delete') {
+  if (!cancelledDelete.countStillPresent || cancelledDelete.focusedAction !== 'more') {
     throw new Error(
       `BROWSER_HARNESS_VARIABLES_DELETE_CANCEL_FAILED:${JSON.stringify(cancelledDelete)}`,
     );
   }
   await page.evaluate(() => {
-    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
     const row = [...panel.querySelectorAll('[data-variable-row]')].find((entry) =>
       entry.innerText.includes('count'),
     );
     row
+      .querySelector('[data-variable-action="more"]')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    root
       .querySelector('[data-variable-action="delete"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
   await page.waitForFunction(() => {
-    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
-    return panel.querySelector('[data-variable-action="confirm-delete"]') !== null;
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    return root.querySelector('[data-variable-action="confirm-delete"]') !== null;
   });
   await page.evaluate(() => {
-    const panel = window.baseScreenHarness.designer.shadowRoot.querySelector('[data-variables]');
-    panel
+    const root = window.baseScreenHarness.designer.shadowRoot;
+    root
       .querySelector('[data-variable-action="confirm-delete"]')
       .dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
@@ -448,10 +468,9 @@ export async function assertHostVariableAuthoring(page, designer) {
 }
 
 async function assertReferenceNavigation(page, designer) {
-  let region = await expandedVariableRow(designer, 'region');
-  await region.locator('[data-variable-action="references"]').click();
-  region = variableRow(designer, 'region');
-  const actual = await region
+  const region = await expandedVariableRow(designer, 'region');
+  await designer.locator('[data-variable-action="references"]').click();
+  const actual = await designer
     .locator('[data-variable-reference-target="component-parameter"]')
     .evaluateAll((links) => links.map((link) => link.dataset.layerSelect));
   const expected = await page.evaluate(() =>
@@ -470,20 +489,19 @@ async function assertReferenceNavigation(page, designer) {
       `BROWSER_HARNESS_VARIABLE_REFERENCE_TARGETS_FAILED:${JSON.stringify({ actual, expected })}`,
     );
   }
-  await region.locator('[data-variable-reference-target="component-parameter"]').first().click();
+  await designer.locator('[data-variable-reference-target="component-parameter"]').first().click();
   await page.waitForFunction(
     (componentId) =>
       window.__browserHarnessSelectionEvents.at(-1)?.selectedComponentIds?.[0] === componentId,
     actual[0],
   );
-  region = variableRow(designer, 'region');
-  const expanded = await region
+  const expanded = await designer
     .locator('[data-variable-action="references"]')
     .getAttribute('aria-expanded');
   if (expanded !== 'true') {
     throw new Error(`BROWSER_HARNESS_VARIABLE_REFERENCE_EXPANSION_FAILED:${expanded}`);
   }
-  await region.locator('[data-variable-action="references"]').click();
+  await designer.locator('[data-variable-action="references"]').click();
 }
 
 async function createHostVariable(page, designer, variableId, expectedName) {
@@ -512,9 +530,9 @@ async function createHostVariable(page, designer, variableId, expectedName) {
 
 async function assertDescriptionDuplicateAndPreview(page, designer) {
   let tenant = await expandedVariableRow(designer, 'tenantRegion');
-  await tenant.locator('[data-variable-action="edit-description"]').click();
-  await tenant.locator('[data-variable-description]').fill('Updated host description');
-  await tenant.locator('[data-variable-action="confirm-description"]').click();
+  await tenant.locator('[data-variable-action="edit-config"]').click();
+  await designer.locator('[data-variable-create-description]').fill('Updated host description');
+  await designer.locator('[data-variable-action="confirm-config"]').click();
   await page.waitForFunction(() =>
     window.baseScreenHarness.designer.document.variables.some(
       (variable) =>
@@ -523,7 +541,9 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
   );
 
   tenant = variableRow(designer, 'tenantRegion');
-  await tenant.locator('[data-variable-action="duplicate"]').click();
+  await tenant.hover();
+  await tenant.locator('[data-variable-action="more"]').click();
+  await designer.locator('[data-variable-action="duplicate"]').click();
   const duplicate = await designer.locator('[data-variable-editor]').evaluate((editor) => ({
     name: editor.querySelector('[data-variable-create-name]')?.value,
     variableId: editor.querySelector('[data-variable-selected-host-id]')?.textContent,
@@ -534,16 +554,20 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
   await designer.locator('[data-variable-action="cancel"]').click();
 
   tenant = variableRow(designer, 'tenantRegion');
-  await tenant.locator('[data-variable-action="preview"]').click();
-  await tenant.locator('[data-variable-preview-status="ready"]').waitFor();
-  const tenantPreview = await tenant.locator('.variable-preview').textContent();
+  await tenant.hover();
+  await tenant.locator('[data-variable-action="more"]').click();
+  await designer.locator('[data-variable-action="preview"]').click();
+  await designer.locator('[data-variable-preview-status="ready"]').waitFor();
+  const tenantPreview = await designer.locator('.variable-preview').textContent();
   if (!tenantPreview?.includes('north')) {
     throw new Error(`BROWSER_HARNESS_VARIABLE_PREVIEW_FAILED:${tenantPreview}`);
   }
 
   const privateVariable = await expandedVariableRow(designer, 'privateToken');
-  await privateVariable.locator('[data-variable-action="preview"]').click();
-  await privateVariable.locator('[data-variable-preview-status="error"]').waitFor();
+  await privateVariable.hover();
+  await privateVariable.locator('[data-variable-action="more"]').click();
+  await designer.locator('[data-variable-action="preview"]').click();
+  await designer.locator('[data-variable-preview-status="error"]').waitFor();
   const leak = await designer.evaluate((element) =>
     element.shadowRoot.textContent.includes('secret-value-should-never-render'),
   );
@@ -560,9 +584,9 @@ async function assertDescriptionDuplicateAndPreview(page, designer) {
 
 async function assertAtomicRenames(page, designer) {
   let region = await expandedVariableRow(designer, 'region');
-  await region.locator('[data-variable-action="rename"]').click();
-  await region.locator('[data-variable-rename]').fill('selectedRegion');
-  await region.locator('[data-variable-action="confirm-rename"]').click();
+  await region.locator('[data-variable-action="edit-config"]').click();
+  await designer.locator('[data-variable-create-name]').fill('selectedRegion');
+  await designer.locator('[data-variable-action="confirm-config"]').click();
   await page.waitForFunction(() => {
     const document = window.baseScreenHarness.designer.document;
     return (
@@ -586,7 +610,7 @@ async function assertAtomicRenames(page, designer) {
       focusedAction: root.activeElement?.dataset.variableAction,
     };
   });
-  if (renamedDisclosure.expanded !== 'true' || renamedDisclosure.focusedAction !== 'rename') {
+  if (renamedDisclosure.expanded !== 'true' || renamedDisclosure.focusedAction !== 'edit-config') {
     throw new Error(
       `BROWSER_HARNESS_VARIABLE_RENAME_DISCLOSURE_FAILED:${JSON.stringify(renamedDisclosure)}`,
     );
@@ -610,9 +634,9 @@ async function assertAtomicRenames(page, designer) {
   }
 
   const tenant = await expandedVariableRow(designer, 'tenantRegion');
-  await tenant.locator('[data-variable-action="rename"]').click();
-  await tenant.locator('[data-variable-rename]').fill('runtimeRegion');
-  await tenant.locator('[data-variable-action="confirm-rename"]').click();
+  await tenant.locator('[data-variable-action="edit-config"]').click();
+  await designer.locator('[data-variable-create-name]').fill('runtimeRegion');
+  await designer.locator('[data-variable-action="confirm-config"]').click();
   const hostRenamed = await page.evaluate(() =>
     window.baseScreenHarness.designer.document.variables.some(
       (variable) =>
@@ -744,18 +768,21 @@ async function expandedVariableRow(designer, name) {
 export async function assertVariableListThemeQuality(page) {
   const quality = await page.evaluate(async () => {
     const designer = window.baseScreenHarness.designer;
-    const panel = designer.shadowRoot.querySelector('[data-variables]');
+    const root = designer.shadowRoot;
+    const panel = root.querySelector('[data-variables]');
     const add = panel.querySelector('[data-variable-action="add"]');
     const sample = () => {
       const addStyle = getComputedStyle(add);
-      const valueStyle = getComputedStyle(panel.querySelector('.variable-value-button'));
+      const valueStyle = getComputedStyle(root.querySelector('.variable-value-button'));
       const row = panel.querySelector('[data-variable-id="region"]');
       const rowStyle = getComputedStyle(row);
       const name = row.querySelector('.variable-name');
       const nameStyle = getComputedStyle(name);
       const context = row.querySelector('.variable-row-context-value');
       const contextStyle = getComputedStyle(context);
-      const action = panel.querySelector('[data-variable-id="count"] .variable-icon-action');
+      const action = panel.querySelector(
+        '[data-variable-id="count"] .variable-row-actions .designer-button',
+      );
       const actionStyle = getComputedStyle(action);
       // 紧凑行/幽灵按钮自身透明：对比度按实际承托面（向上找到第一个不透明祖先）计算，
       // 而不是把 transparent 当黑色。

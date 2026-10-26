@@ -201,6 +201,7 @@ export function initializeDesignerElementSurfaceBindings(
     focusOut: (_target, event) => {
       state.coordinateEntryController.onFocusOut(event as FocusEvent);
       state.sizeEntryController.onFocusOut(event as FocusEvent);
+      state.variablesController.onFocusOut(event as FocusEvent);
       return state.layersController.onFocusOut(event as FocusEvent);
     },
     keyDownCapture: (_target, event) => {
