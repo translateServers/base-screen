@@ -344,7 +344,7 @@ export async function assertBlueprintWorkbench(designer, page) {
     );
   }
 
-  // 活动 slot 移除时原子回退 Canvas；重新插入后 generation 更新且页签恢复可用。
+  // 活动 slot 移除时由引擎默认画布接管；重新插入后宿主画布重新接管并更新 generation。
   const slotLifecycle = await page.evaluate(async () => {
     const harness = window.baseScreenHarness;
     const beforeGeneration = harness.blueprintCanvasState().generation;
@@ -358,12 +358,17 @@ export async function assertBlueprintWorkbench(designer, page) {
     const tabDisabled = harness.designer.shadowRoot.querySelector(
       '[data-workbench-mode-tab="blueprint"]',
     )?.disabled;
+    const engineCanvas = harness.designer.shadowRoot.querySelector(
+      '[data-designer-blueprint-canvas]',
+    );
+    const engineCanvasVisible = engineCanvas !== null && engineCanvas.hidden !== true;
     harness.designer.append(harness.blueprintCanvas);
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
     return {
       beforeGeneration,
       modeAfterRemoval,
       tabDisabled,
+      engineCanvasVisible,
       generationAfterRestore: harness.blueprintCanvasState()?.generation,
       tabRestored: !harness.designer.shadowRoot.querySelector(
         '[data-workbench-mode-tab="blueprint"]',
@@ -372,18 +377,19 @@ export async function assertBlueprintWorkbench(designer, page) {
     };
   });
   if (
-    slotLifecycle.modeAfterRemoval !== 'canvas' ||
-    !slotLifecycle.tabDisabled ||
+    slotLifecycle.modeAfterRemoval !== 'blueprint' ||
+    slotLifecycle.tabDisabled ||
+    !slotLifecycle.engineCanvasVisible ||
     !(slotLifecycle.generationAfterRestore > slotLifecycle.beforeGeneration) ||
     !slotLifecycle.tabRestored ||
-    !slotLifecycle.fallback
+    slotLifecycle.fallback
   ) {
     throw new Error(
       `BROWSER_HARNESS_BLUEPRINT_SLOT_LIFECYCLE_FAILED:${JSON.stringify(slotLifecycle)}`,
     );
   }
 
-  // 陈旧命令和 slot 回退都会产生可见诊断；验证后关闭，避免污染后续画布交互。
+  // 陈旧命令和 slot 切换都会产生可见诊断；验证后关闭，避免污染后续画布交互。
   const blueprintNotifications = designer.locator('[data-notification-tone="error"]');
   const blueprintNotificationCount = await blueprintNotifications.count();
   for (let index = 0; index < blueprintNotificationCount; index++) {

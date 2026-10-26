@@ -35,6 +35,7 @@ const workbenchCssFiles = [
   '../../../src/browser/styles/workbench/designer-workbench-shell.css',
   '../../../src/browser/styles/workbench/designer-workbench-panels.css',
   '../../../src/browser/styles/workbench/designer-workbench-blueprint-surface.css',
+  '../../../src/browser/styles/workbench/designer-workbench-blueprint-canvas.css',
   '../../../src/browser/styles/workbench/designer-workbench-blueprint-panels.css',
   '../../../src/browser/styles/workbench/designer-workbench-blueprint-details.css',
   '../../../src/browser/styles/workbench/designer-workbench-materials.css',

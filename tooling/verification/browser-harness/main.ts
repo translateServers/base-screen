@@ -936,6 +936,8 @@ const blueprintCanvas = designer.querySelector<HTMLElement>('[data-harness-bluep
 const blueprintGraph = blueprintCanvas.querySelector<HTMLElement>(
   '[data-harness-blueprint-graph]',
 )!;
+// 默认走引擎内置蓝图画布；Playwright 宿主画布断言显式带 ?hostCanvas 保留 harness 画布。
+if (!new URL(location.href).searchParams.has('hostCanvas')) blueprintCanvas.remove();
 let blueprintCanvasState: BaseScreenBlueprintCanvasState | undefined;
 let blueprintCommandSequence = 0;
 let readyBlueprintGeneration = -1;

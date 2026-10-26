@@ -158,7 +158,7 @@ export async function runBrowserHarness(serverPort) {
         }
         await assertRuntimeData(page, viewer);
         await assertCanvasBasics(designer, page);
-        await page.goto(`${baseUrl}/?designer`, { waitUntil: 'networkidle' });
+        await page.goto(`${baseUrl}/?designer&hostCanvas`, { waitUntil: 'networkidle' });
         const authoringDesigner = page.locator('base-screen-designer');
         await assertAuthoringProject(authoringDesigner, page);
         await assertAuthoringMaterials(authoringDesigner, page);

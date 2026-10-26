@@ -60,6 +60,15 @@
   height: 100%;
 }
 
+.designer-blueprint-default-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.designer-blueprint-default-canvas[hidden] {
+  display: none;
+}
+
 .designer-blueprint-surface slot::slotted([slot="base-screen-designer-blueprint-canvas"]) {
   display: block;
   width: 100%;

@@ -199,6 +199,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
       </div>
       <section class="designer-blueprint-surface" data-blueprint-surface hidden aria-label="${DESIGNER_UI_TEXT.blueprint.canvas}">
         <slot name="${BASE_SCREEN_DESIGNER_BLUEPRINT_CANVAS_SLOT}" data-blueprint-canvas-slot></slot>
+        <div class="designer-blueprint-default-canvas" data-blueprint-default-canvas></div>
         <div class="designer-blueprint-fallback" data-blueprint-fallback>${DESIGNER_UI_TEXT.blueprint.noHostCanvas}</div>
       </section>
       <section class="designer-data-workbench" data-data-workbench hidden aria-label="${DESIGNER_UI_TEXT.dataSource.workbench}">

@@ -17,6 +17,10 @@ import {
 } from '../../../common/operations/blueprint/designer-blueprint-protocol.js';
 import { parseDesignerWorkbenchModeRequest } from '../../../common/operations/workbench/designer-workbench-mode.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
+import {
+  createDesignerBlueprintDefaultCanvas,
+  type DesignerBlueprintDefaultCanvasHandle,
+} from '../../dom/blueprint/designer-blueprint-default-canvas.js';
 import { renderDesignerBlueprintWorkbenchChrome } from '../../dom/blueprint/designer-blueprint-workbench-dom.js';
 import { DesignerBlueprintCanvasBridge } from './designer-blueprint-canvas-bridge.js';
 import { DesignerBlueprintPanelsController } from './designer-blueprint-panels-controller.js';
@@ -25,6 +29,8 @@ import type { DesignerBlueprintWorkbenchCallbacks } from './designer-blueprint-w
 export class DesignerBlueprintWorkbenchController {
   #root: ShadowRoot | undefined;
   #slot: HTMLSlotElement | undefined;
+  #defaultCanvasHost: HTMLElement | undefined;
+  #defaultCanvas: DesignerBlueprintDefaultCanvasHandle | undefined;
   #mode: BaseScreenDesignerWorkbenchMode = 'canvas';
   #selection: BaseScreenBlueprintCanvasSelection = null;
   #viewRequest: BaseScreenBlueprintCanvasState['viewRequest'];
@@ -99,6 +105,9 @@ export class DesignerBlueprintWorkbenchController {
     this.disconnect();
     this.#root = root;
     this.#slot = root.querySelector<HTMLSlotElement>('[data-blueprint-canvas-slot]') ?? undefined;
+    this.#defaultCanvasHost =
+      root.querySelector<HTMLElement>('[data-blueprint-default-canvas]') ?? undefined;
+    this.mountDefaultCanvas();
     this.#panels.connect(root);
     this.#bridge.connect(this.callbacks.getHost());
     this.#slot?.addEventListener('slotchange', this.#onSlotChange);
@@ -110,6 +119,10 @@ export class DesignerBlueprintWorkbenchController {
     this.#slot?.removeEventListener('slotchange', this.#onSlotChange);
     this.#bridge.disconnect();
     this.#panels.release();
+    this.#defaultCanvas?.destroy();
+    this.#defaultCanvas?.element.remove();
+    this.#defaultCanvas = undefined;
+    this.#defaultCanvasHost = undefined;
     this.#root = undefined;
     this.#slot = undefined;
   }
@@ -257,8 +270,18 @@ export class DesignerBlueprintWorkbenchController {
         );
   }
 
+  private mountDefaultCanvas(): void {
+    if (this.#defaultCanvas !== undefined || this.#defaultCanvasHost === undefined) return;
+    const handle = createDesignerBlueprintDefaultCanvas(this.#defaultCanvasHost.ownerDocument);
+    this.#defaultCanvasHost.append(handle.element);
+    this.#defaultCanvas = handle;
+  }
+
   private resolveCanvas(): void {
-    const next = this.#slot?.assignedElements({ flatten: true })[0];
+    const assigned = this.#slot?.assignedElements({ flatten: true })[0];
+    const fallback = this.#defaultCanvas?.element;
+    if (fallback !== undefined) fallback.hidden = assigned !== undefined;
+    const next = assigned ?? fallback;
     const previous = this.#bridge.canvas;
     const changed = this.#bridge.setCanvas(next);
     if (!changed) {
