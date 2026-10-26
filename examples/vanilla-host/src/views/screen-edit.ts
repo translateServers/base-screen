@@ -37,14 +37,15 @@ import { screenSessionStore } from '../store/screen-session-store';
 
 const logger = createLogger('screen-edit');
 
-const AUTOSAVE_DEBOUNCE_MS = 1200;
+const AUTOSAVE_DEBOUNCE_MS = 3000;
 const AUTOSAVE_RETRY_MS = 5000;
 const AUTOSAVE_RETRY_MAX_MS = 60000;
 
 /**
  * 编辑页。清理函数在插件运行时激活前就交给路由：激活是异步的，若等它完成再返回
  * cleanup，加载期间换路由会把设计器和监听留在页面上。保存策略与另外两个前端逐条对等：
- * 脏后 1.2s 防抖保存；飞行期间再次变脏则落定后补一次；失败按 5s 起指数退避；
+ * 每次文档提交重置 3s 空闲定时器，只在最后一次修改后空闲 3s 才保存；飞行期间再次
+ * 变脏则落定后补一次；失败按 5s 起指数退避（退避期间的新编辑不会把重试提前）；
  * 冲突即停止自动保存；返回按钮先落地再路由。
  */
 export const screenEditView: ViewModule = {
@@ -182,6 +183,8 @@ export const screenEditView: ViewModule = {
       let saveFlight: Promise<boolean> | undefined;
       let retryDelayMs = AUTOSAVE_RETRY_MS;
       let dirty = false;
+      // 退避重试已排期：新编辑不该把失败后的重试提前成一次空闲防抖。
+      let retryPending = false;
       let conflicted = false;
       let leaving = false;
 
@@ -209,12 +212,14 @@ export const screenEditView: ViewModule = {
         if (result.ok) {
           screenSessionStore.getState().saved(result.value.revision);
           retryDelayMs = AUTOSAVE_RETRY_MS;
+          retryPending = false;
           if (dirty) scheduleSave(AUTOSAVE_DEBOUNCE_MS);
           return !dirty;
         }
         if (conflicted) return false;
         logger.warn('autosave failed', result.diagnostics);
         screenSessionStore.getState().failed(`${Math.round(retryDelayMs / 1000)} 秒后自动重试`);
+        retryPending = true;
         scheduleSave(retryDelayMs);
         retryDelayMs = Math.min(retryDelayMs * 2, AUTOSAVE_RETRY_MAX_MS);
         return false;
@@ -266,6 +271,7 @@ export const screenEditView: ViewModule = {
         dirty = detail.dirty;
         if (!detail.dirty) {
           retryDelayMs = AUTOSAVE_RETRY_MS;
+          retryPending = false;
           return;
         }
         screenSessionStore.getState().dirty();
@@ -273,12 +279,21 @@ export const screenEditView: ViewModule = {
       };
       element.addEventListener('base-screen-dirty-change', onDirtyChange);
 
+      // 脏态只在翻转时通知，空闲防抖必须挂在每次文档提交上：否则定时器从第一次修改起算，
+      // 用户还在连续编辑时就被落盘（表现为「改一下就马上保存」）。
+      const onDocumentChange = (): void => {
+        if (!dirty || retryPending) return;
+        scheduleSave(AUTOSAVE_DEBOUNCE_MS);
+      };
+      element.addEventListener('base-screen-change', onDocumentChange);
+
       detach = (): void => {
         datasourcesButton.removeEventListener('click', onDatasources);
         assetsButton.removeEventListener('click', onAssets);
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
         element.removeEventListener('base-screen-dirty-change', onDirtyChange);
+        element.removeEventListener('base-screen-change', onDocumentChange);
         runtime.bindDesigner(null);
       };
 

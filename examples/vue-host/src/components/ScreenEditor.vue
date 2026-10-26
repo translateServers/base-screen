@@ -35,7 +35,7 @@ import { createRestProjectAdapter } from '../screen/project-adapter';
 import { TOOL_MATERIAL_TYPES } from '../screen/register';
 import { screenSessionStore } from '../store/screen-session-store';
 
-const AUTOSAVE_DEBOUNCE_MS = 1200;
+const AUTOSAVE_DEBOUNCE_MS = 3000;
 const AUTOSAVE_RETRY_MS = 5000;
 const AUTOSAVE_RETRY_MAX_MS = 60000;
 
@@ -52,11 +52,14 @@ let saveFlight: Promise<boolean> | undefined;
 let retryDelayMs = AUTOSAVE_RETRY_MS;
 // 引擎只在脏态翻转时发事件，之后连续编辑不再通知，因此宿主自己记脏位。
 let dirty = false;
+// 退避重试已排期：新编辑不该把失败后的重试提前成一次空闲防抖。
+let retryPending = false;
 let conflicted = false;
 let leaving = false;
 let onBack: (() => void) | undefined;
 let onConflict: (() => void) | undefined;
 let onDirtyChange: ((event: Event) => void) | undefined;
+let onDocumentChange: (() => void) | undefined;
 let unsubscribeSession: (() => void) | undefined;
 let runtime: HostRuntime | undefined;
 let alarms: ReturnType<typeof createHostAlarmController> | undefined;
@@ -125,12 +128,14 @@ async function persist(): Promise<boolean> {
   if (result.ok) {
     screenSessionStore.getState().saved(result.value.revision);
     retryDelayMs = AUTOSAVE_RETRY_MS;
+    retryPending = false;
     if (dirty) scheduleSave(AUTOSAVE_DEBOUNCE_MS);
     return !dirty;
   }
   if (conflicted) return false;
   logger.warn('autosave failed', result.diagnostics);
   screenSessionStore.getState().failed(`${Math.round(retryDelayMs / 1000)} 秒后自动重试`);
+  retryPending = true;
   scheduleSave(retryDelayMs);
   // 退避在排期之后推进：文案与实际延时必须是同一个数。
   retryDelayMs = Math.min(retryDelayMs * 2, AUTOSAVE_RETRY_MAX_MS);
@@ -275,12 +280,21 @@ onMounted(() => {
       if (!detail.dirty) {
         // 撤销回基线也会走到这里：未触发的退避延时要归零，否则下次失败从上一次的高度起跳。
         retryDelayMs = AUTOSAVE_RETRY_MS;
+        retryPending = false;
         return;
       }
       screenSessionStore.getState().dirty();
       scheduleSave(AUTOSAVE_DEBOUNCE_MS);
     };
     element.addEventListener('base-screen-dirty-change', onDirtyChange);
+
+    // 脏态只在翻转时通知，空闲防抖必须挂在每次文档提交上：否则定时器从第一次修改起算，
+    // 用户还在连续编辑时就被落盘（表现为「改一下就马上保存」）。
+    onDocumentChange = (): void => {
+      if (!dirty || retryPending) return;
+      scheduleSave(AUTOSAVE_DEBOUNCE_MS);
+    };
+    element.addEventListener('base-screen-change', onDocumentChange);
 
     const loaded = await element.load(screenId);
     if (!loaded.ok) {
@@ -315,6 +329,9 @@ onBeforeUnmount(() => {
   }
   if (element !== null && onDirtyChange !== undefined) {
     element.removeEventListener('base-screen-dirty-change', onDirtyChange);
+  }
+  if (element !== null && onDocumentChange !== undefined) {
+    element.removeEventListener('base-screen-change', onDocumentChange);
   }
   alarms?.stop();
   alarms = undefined;
