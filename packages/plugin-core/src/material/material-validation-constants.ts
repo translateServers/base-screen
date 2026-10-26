@@ -32,6 +32,7 @@ export const MANIFEST_FIELDS = new Set([
   'stylePanel',
   'events',
   'dataCapabilities',
+  'hostResourceSelection',
   'dataBinding',
   'designCapabilities',
   'libraryVisible',

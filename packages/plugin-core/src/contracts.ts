@@ -209,6 +209,12 @@ export interface BaseScreenMaterialManifest {
   readonly stylePanel: readonly BaseScreenMaterialStylePanelField[];
   readonly events: readonly string[];
   readonly dataCapabilities: readonly ('static' | 'dataset' | 'host-resource' | 'variable')[];
+  /**
+   * 可选：物料取值是否允许经宿主资源选择桥写入（当前用于图片素材）。
+   * 只有同时声明 `host-resource` 数据能力、且宿主启用选择按钮时才显示入口；
+   * 仅声明 `host-resource` 表示物料能消费宿主资源，不代表它的取值是可选素材。
+   */
+  readonly hostResourceSelection?: boolean;
   readonly dataBinding?: { readonly roles: readonly BaseScreenMaterialDataBindingRole[] };
   readonly designCapabilities: BaseScreenMaterialDesignCapabilities;
   readonly libraryVisible?: boolean;

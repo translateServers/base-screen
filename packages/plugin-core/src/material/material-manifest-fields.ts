@@ -71,6 +71,26 @@ export function validateMaterialFields(
       'Only unique static, host-resource, and variable data capability declarations are supported.',
     );
   }
+  if (
+    manifest.hostResourceSelection !== undefined &&
+    typeof manifest.hostResourceSelection !== 'boolean'
+  ) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['hostResourceSelection'],
+      'Host resource selection must be a boolean.',
+    );
+  } else if (
+    manifest.hostResourceSelection === true &&
+    Array.isArray(manifest.dataCapabilities) &&
+    !manifest.dataCapabilities.includes('host-resource')
+  ) {
+    collector.add(
+      'PLUGIN_CORE_MANIFEST_FIELD_INVALID',
+      ['hostResourceSelection'],
+      'Host resource selection requires the host-resource data capability.',
+    );
+  }
   validateDesignCapabilities(manifest.designCapabilities, collector);
   validateDataBinding(manifest.dataBinding, collector);
   validateCover(manifest.cover, collector);

@@ -31,6 +31,7 @@ export function parseBaseScreenMaterialManifest(
   for (const field of MANIFEST_FIELDS) {
     if (
       field !== 'dataBinding' &&
+      field !== 'hostResourceSelection' &&
       field !== 'libraryVisible' &&
       field !== 'defaultData' &&
       field !== 'staticData' &&

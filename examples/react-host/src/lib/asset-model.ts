@@ -11,9 +11,9 @@ export const MAX_ASSET_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ASSET_ACCEPTED_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
 export const ASSET_TEXT = {
-  libraryTitle: '素材库',
   temporaryUpload: '临时上传',
   temporaryUploadHint: '仅当前大屏可见；长期使用请到后台素材库上传',
+  temporaryVisibility: '仅本屏可见',
   publicUpload: '上传素材',
   publicUploadHint: '公共素材对所有大屏可用',
   searchPlaceholder: '搜索素材',

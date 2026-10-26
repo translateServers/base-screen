@@ -368,6 +368,7 @@ export interface BaseScreenMaterialManifest {
     readonly editorDescriptor?: BaseScreenMaterialEditorDescriptor;
     // (undocumented)
     readonly events: readonly string[];
+    readonly hostResourceSelection?: boolean;
     // (undocumented)
     readonly keywords: readonly string[];
     // (undocumented)

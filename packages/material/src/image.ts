@@ -36,6 +36,7 @@ export const BASE_SCREEN_IMAGE_MATERIAL_MANIFEST: BaseScreenMaterialManifest = {
   propertyPanel: [],
   events: [],
   dataCapabilities: ['static', 'host-resource', 'variable'],
+  hostResourceSelection: true,
   designCapabilities: { resize: true, rotate: true, children: false },
 };
 

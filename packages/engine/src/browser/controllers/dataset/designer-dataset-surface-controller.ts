@@ -1,5 +1,6 @@
 import type { ScreenComponentNode } from '@base-screen/contracts';
 import { derivedDataSourceId } from '@base-screen/contracts';
+import { materialSupportsHostResourceSelection } from '../../../common/operations/host-resource/host-resource-selection.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { syncDataPanelNotice } from '../../dom/dataset/designer-data-panel-notice.js';
 import {
@@ -397,7 +398,7 @@ function createDatasetPanelOptions(
       context.callbacks.isHostResourceSelectionButtonVisible?.() === true &&
       component !== undefined &&
       !('dataValue' in component) &&
-      context.currentEntry()?.manifest.dataCapabilities.includes('host-resource') === true,
+      materialSupportsHostResourceSelection(context.currentEntry()?.manifest),
     link: hostLinkView(context),
     bindingOpenRoleId: context.state.bindingOpenRoleId,
     feedback: context.state.feedbackText,

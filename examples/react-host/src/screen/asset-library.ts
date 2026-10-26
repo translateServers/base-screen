@@ -90,14 +90,17 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
   rail.slot = baseScreenDesignerLeftPanelSlotName(HOST_ASSET_LIBRARY_GROUP_ID);
   rail.dataset.hostAssetLibrary = '';
 
-  const header = el('header', 'asset-library-head');
-  const heading = el('div', 'asset-library-heading');
-  heading.append(el('span', 'asset-eyebrow', 'HOST ASSETS'), el('h2', 'asset-title', '素材库'));
-  const count = el('span', 'asset-count', '0');
-  const refresh = button('刷新', 'asset-icon-button');
-  header.append(heading, count, refresh);
+  const toolbar = el('div', 'asset-toolbar');
+  const search = doc.createElement('input');
+  search.type = 'search';
+  search.placeholder = ASSET_TEXT.searchPlaceholder;
+  search.className = 'asset-search';
+  search.dataset.assetSearch = '';
+  const refresh = button(ASSET_TEXT.refresh, 'asset-ghost-button');
+  toolbar.append(search, refresh);
 
   const uploadLabel = el('label', 'asset-upload');
+  uploadLabel.title = ASSET_TEXT.temporaryUploadHint;
   const uploadInput = doc.createElement('input');
   uploadInput.type = 'file';
   uploadInput.accept = ASSET_ACCEPTED_TYPES;
@@ -107,17 +110,9 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
   const uploadCopy = el('span', 'asset-upload-copy');
   uploadCopy.append(
     el('strong', '', ASSET_TEXT.temporaryUpload),
-    el('small', '', ASSET_TEXT.temporaryUploadHint),
+    el('small', '', ASSET_TEXT.temporaryVisibility),
   );
   uploadLabel.append(el('span', 'asset-upload-mark', '+'), uploadCopy, uploadInput);
-
-  const tools = el('div', 'asset-tools');
-  const search = doc.createElement('input');
-  search.type = 'search';
-  search.placeholder = ASSET_TEXT.searchPlaceholder;
-  search.className = 'asset-search';
-  search.dataset.assetSearch = '';
-  tools.append(search);
 
   const status = el('p', 'asset-status');
   status.dataset.assetStatus = '';
@@ -142,14 +137,7 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
   actions.append(insertButton, replaceButton, backgroundButton);
   selectionBar.append(selectionName, actions);
 
-  rail.append(
-    header,
-    ...(canUploadTemporary ? [uploadLabel] : []),
-    tools,
-    status,
-    grid,
-    selectionBar,
-  );
+  rail.append(toolbar, ...(canUploadTemporary ? [uploadLabel] : []), status, grid, selectionBar);
 
   const picker = createPickerDialog(doc, canUploadTemporary);
   doc.body.append(picker.dialog);
@@ -187,7 +175,6 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
 
   const renderRail = (): void => {
     const items = visibleAssets(search.value);
-    count.textContent = String(assets.length);
     grid.replaceChildren(
       ...items.map((asset) =>
         renderAssetCard(
@@ -242,7 +229,7 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
     if (selectedId !== undefined && !assets.some((asset) => asset.id === selectedId)) {
       selectedId = undefined;
     }
-    setStatus(`已加载 ${assets.length} 张素材。`);
+    setStatus(`共 ${assets.length} 张素材。`);
     renderRail();
     if (picker.dialog.open) renderPicker();
   };
@@ -578,7 +565,8 @@ function createPickerDialog(
   const head = el('header', 'asset-picker-head');
   const title = el('h2', 'asset-picker-title');
   title.id = 'asset-picker-title';
-  const uploadLabel = el('label', 'button asset-picker-upload');
+  const uploadLabel = el('label', 'asset-picker-upload');
+  uploadLabel.title = ASSET_TEXT.temporaryUploadHint;
   uploadLabel.append(el('span', '', ASSET_TEXT.temporaryUpload));
   const upload = doc.createElement('input');
   upload.type = 'file';
@@ -586,7 +574,7 @@ function createPickerDialog(
   upload.multiple = true;
   upload.hidden = true;
   uploadLabel.append(upload);
-  const close = button('关闭', 'asset-icon-button');
+  const close = button('关闭', 'asset-ghost-button');
   head.append(title);
   if (showUpload) head.append(uploadLabel);
   head.append(close);

@@ -58,6 +58,9 @@
 ### 2. 素材库浏览与插入
 
 1. 宿主通过 `leftPanelGroups` 在自己的左栏 slot 渲染素材库（默认仅 Canvas 模式）。
+   面板容器已提供 12px 内边距与「分组名 / HOST」列头，宿主内容只填充容器内部，不再叠加
+   外层留白或重复标题；配色、圆角与间距使用与设计器一致的令牌副本，避免宿主品牌色与
+   设计器控件混排。
 2. 点击插入：宿主调用 `insertHostResource`，传入 `materialType: 'base.image'` 与
    `dataSource: { type: 'host-resource', resourceType, resourceId, params: {}, binding: null }`。
 3. 拖拽插入：宿主用固定 MIME `application/x-base-screen-host-resource` 写入严格 JSON；Engine 在 drop
@@ -76,7 +79,8 @@
 ### 4. 检查器选图
 
 1. 设计器在数据面板现有五段之一渲染“选择素材”按钮（宿主通过 `hostResourceSelectionButton` 启用；
-   首个实现只对 `base.image` 显示）。
+   物料还须同时声明 `host-resource` 能力与 `hostResourceSelection: true`，当前只有 `base.image`
+   满足）。仅声明 `host-resource` 的读数、图表等物料不显示该入口。
 2. 点击后派发 `base-screen-host-resource-selection-request`，携带 `target`（组件或画布背景）与
    `current`（none / url / host-resource / other）。
 3. 宿主打开自己的选择器；用户确认后调用 `commitHostResourceSelection`，携带 `requestId` 与选择结果。

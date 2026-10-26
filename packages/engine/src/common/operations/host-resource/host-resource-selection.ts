@@ -11,6 +11,7 @@ import {
   type ScreenJsonValue,
   type ScreenParseResult,
 } from '@base-screen/contracts';
+import type { BaseScreenMaterialManifest } from '@base-screen/plugin-core';
 import { containsForbiddenHostResourceTransportData } from './host-resource-authoring.js';
 
 export const BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT =
@@ -67,6 +68,22 @@ export interface BaseScreenHostResourceSelectionRequestEventDetail {
 
 const COMMIT_FIELDS = new Set(['requestId', 'selection', 'backgroundImageFit']);
 const MAX_SELECTION_BYTES = 8 * 1024;
+
+/**
+ * 选择桥只对显式声明 `hostResourceSelection` 的 host-resource 物料开放。
+ * 仅声明数据能力表示物料能消费宿主资源（读数、图表等），不代表它的取值是可选素材。
+ */
+export function materialSupportsHostResourceSelection(
+  manifest:
+    | Pick<BaseScreenMaterialManifest, 'dataCapabilities' | 'hostResourceSelection'>
+    | undefined,
+): boolean {
+  return (
+    manifest !== undefined &&
+    manifest.hostResourceSelection === true &&
+    manifest.dataCapabilities.includes('host-resource')
+  );
+}
 
 export function buildHostResourceSelectionRequest(input: {
   readonly target: BaseScreenHostResourceSelectionTarget;

@@ -19,6 +19,7 @@ import { BaseScreenDesignerElement } from '../../../src/index.js';
 function manifest(
   type: string,
   dataCapabilities: readonly string[],
+  hostResourceSelection = false,
 ): BaseScreenMaterialCatalogEntry {
   return {
     manifest: {
@@ -36,6 +37,7 @@ function manifest(
       stylePanel: [],
       events: [],
       dataCapabilities: dataCapabilities as never,
+      ...(hostResourceSelection ? { hostResourceSelection: true } : {}),
       designCapabilities: { resize: true, rotate: true, children: false },
     },
     constructor: class {} as never,
@@ -44,6 +46,7 @@ function manifest(
 
 const IMAGE = 'base.image';
 const STATIC_IMAGE = 'base.static-image';
+const HOST_METRIC = 'base.host-metric';
 
 function component(overrides: Partial<ScreenComponentNode> = {}): ScreenComponentNode {
   return {
@@ -108,8 +111,9 @@ function configuredDesigner(nodes?: readonly ScreenComponentNode[]): {
   });
   const configured = designer.configure({
     catalog: createBaseScreenMaterialCatalog([
-      manifest(IMAGE, ['static', 'host-resource']),
+      manifest(IMAGE, ['static', 'host-resource'], true),
       manifest(STATIC_IMAGE, ['static']),
+      manifest(HOST_METRIC, ['static', 'host-resource']),
     ]),
     hostResourceSelectionButton: true,
     resourcePort,
@@ -178,6 +182,21 @@ describe('BaseScreenDesignerElement.requestHostResourceSelection', () => {
     ] as const) {
       expect(designer.requestHostResourceSelection(target)).toBe(false);
     }
+    expect(events).toEqual([]);
+  });
+
+  it('refuses a host-resource material that does not opt into the selection bridge', () => {
+    const { designer, events } = configuredDesigner([
+      component({ id: 'metric-1', type: HOST_METRIC }),
+    ]);
+
+    expect(
+      designer.requestHostResourceSelection({
+        kind: 'component',
+        componentId: 'metric-1',
+        materialType: HOST_METRIC,
+      }),
+    ).toBe(false);
     expect(events).toEqual([]);
   });
 });

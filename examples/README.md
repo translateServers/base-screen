@@ -493,6 +493,11 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 留在后台页。图片 Tab 的「临时上传」把文件写到当前大屏名下，卡片带「临时」标记；临时素材
 不进入公共目录，其他大屏的设计器看不到。选择器的临时上传与左栏一致。
 
+左栏宿主内容只填充引擎提供的面板容器：`.host-left-panel-view` 已给到 12px 内边距和
+「分组名 / HOST」列头，宿主不要再渲染重复标题或额外外层留白。`asset-library.css` 顶部维护
+一份与设计器深色主题一致的本地令牌副本（表面、文本、边框、强调、圆角、间距），左栏与选择器
+共用；选择器开在 light DOM 顶层，因此不引用 Engine 私有 Shadow DOM 样式。
+
 组件图片只写入 `host-resource` 身份（`resourceType: 'host_image'` + 素材 id），文档不保存 URL；
 `host-data-channel.ts` 按当前 API Base 把它解析成稳定内容 URL，查看页复用同一条解析。临时素材
 设为背景时仍走画布背景的 URL 例外；引用扫描同时覆盖组件身份与背景 URL。
@@ -501,6 +506,8 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 `base-screen-host-resource-selection-request`，宿主打开同一个素材选择器后调用
 `commitHostResourceSelection`；画布背景提交 `url` 变体并把 fit 落到 `cover`，组件提交
 `host-resource` 身份。组件目标要求没有 `dataValue` 键（契约禁止两种取值写法并存）。
+组件入口只对同时声明 `host-resource` 能力与 `hostResourceSelection: true` 的物料显示
+（当前只有 `base.image`）；读数、图表等只消费宿主资源的物料不显示「选择素材」。
 
 **临时素材生命周期**：默认 7 天有效；大屏保存时对仍被文档引用的临时素材续期；删除大屏时
 删除该屏绑定且不再被任何屏引用的临时素材；`AssetCleanupService` 每小时回收过期且无引用的

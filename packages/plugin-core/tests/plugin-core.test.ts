@@ -155,6 +155,51 @@ describe('material identity and manifests', () => {
     }
   });
 
+  it('treats hostResourceSelection as an optional boolean opt-in', () => {
+    const missing = parseBaseScreenMaterialManifest(materialManifest());
+    expect(missing.ok).toBe(true);
+    if (missing.ok) expect(missing.value.hostResourceSelection).toBeUndefined();
+
+    const enabled = parseBaseScreenMaterialManifest(
+      materialManifest({
+        dataCapabilities: ['static', 'host-resource'],
+        hostResourceSelection: true,
+      }),
+    );
+    expect(enabled.ok).toBe(true);
+    if (enabled.ok) expect(enabled.value.hostResourceSelection).toBe(true);
+
+    const invalid = parseBaseScreenMaterialManifest(
+      materialManifest({ hostResourceSelection: 'yes' }),
+    );
+    expect(invalid.ok).toBe(false);
+    if (!invalid.ok) {
+      expect(
+        invalid.diagnostics.some(
+          (item) =>
+            item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' &&
+            item.path[0] === 'hostResourceSelection',
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it('requires the host-resource capability when hostResourceSelection is enabled', () => {
+    const result = parseBaseScreenMaterialManifest(
+      materialManifest({ dataCapabilities: ['static'], hostResourceSelection: true }),
+    );
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(
+        result.diagnostics.some(
+          (item) =>
+            item.code === 'PLUGIN_CORE_MANIFEST_FIELD_INVALID' &&
+            item.path[0] === 'hostResourceSelection',
+        ),
+      ).toBe(true);
+    }
+  });
+
   it('R7 accepts an optional detached defaultData sample', () => {
     const result = parseBaseScreenMaterialManifest(
       materialManifest({ defaultData: { columns: [], rows: [{ sample: true }] } }),

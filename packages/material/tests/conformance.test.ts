@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_SCREEN_CHART_MATERIAL_MANIFEST,
   BASE_SCREEN_CHART_TABULAR_DATA_ADAPTER,
+  BASE_SCREEN_IMAGE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_MATERIAL_MANIFEST,
   BASE_SCREEN_TABLE_TABULAR_DATA_ADAPTER,
   BaseScreenChartMaterialElement,
@@ -132,6 +133,12 @@ describe('official material conformance (DRH-R7)', () => {
     expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.dataCapabilities).toContain('dataset');
     expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.dataCapabilities).not.toContain('host-resource');
     expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.dataCapabilities).not.toContain('host-resource');
+  });
+
+  it('only the image material opts into host resource selection', () => {
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.hostResourceSelection).toBe(true);
+    expect(BASE_SCREEN_TABLE_MATERIAL_MANIFEST.hostResourceSelection).not.toBe(true);
+    expect(BASE_SCREEN_CHART_MATERIAL_MANIFEST.hostResourceSelection).not.toBe(true);
   });
 
   it('renders declared gradient background fields while keeping unsupported colors solid-only', () => {

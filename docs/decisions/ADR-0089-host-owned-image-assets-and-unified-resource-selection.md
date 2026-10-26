@@ -51,7 +51,8 @@ Base Screen 不新增资产目录端口、资产 Store、素材搜索 API 或通
 2. `static` URL 继续保留给历史文档、没有身份库的宿主和外部图片；文档中不得保存签名/临时 URL。
 3. 画布背景仍是 `canvas.backgroundImage` 的有界 URL，这是 ADR-0077 的**唯一例外**。宿主素材库
    「设为背景」时必须解析成稳定 URL；是否给画布增加身份字段留给未来 ADR，本轮明确不做。
-4. `base.image` Manifest 不改：不增加 `src` prop，图片地址继续是数据值；fit 仍是样式。
+4. `base.image` Manifest 不增加 `src` prop，图片地址继续是数据值；fit 仍是样式。新增可选
+   `hostResourceSelection: true` 声明，表示该物料的取值可由选择桥写入（见 §3）。
 5. `ScreenDocument` 规范契约零变化，不新增字段、不新增诊断码。
 
 ### 3. 统一资源选择桥
@@ -123,10 +124,11 @@ commitHostResourceSelection(
 
 - 画布属性面板：沿用现有背景图按钮位置。
 - 组件检查器数据面板：在现有五个段（`value` / `source` / `host-link` / `preview` / `authoring`）内，
-  当物料声明 `host-resource` 能力且宿主启用桥时显示「选择素材」；不新增段。若 OpenDesign 定稿建议
-  调整位置，仍必须落在现有五段内。
-- 首个实现只给 `base.image` 提供按钮；桥的形状是通用的，其他 `host-resource` 物料后续可复用，
-  不新增第二种形状。
+  当物料同时声明 `host-resource` 能力与 `hostResourceSelection: true`、且宿主启用桥时显示
+  「选择素材」；不新增段。若 OpenDesign 定稿建议调整位置，仍必须落在现有五段内。
+- 仅声明 `host-resource` 只表示物料能消费宿主资源（读数、图表等），不代表它的取值是可选素材；
+  这类物料不显示选择入口。`base.image` 声明 `hostResourceSelection: true`；桥的形状是通用的，
+  其他图片语义物料可复用，不新增第二种形状。
 
 请求与提交的守卫（复用既有诊断码，不新增）：
 
@@ -145,7 +147,8 @@ commitHostResourceSelection(
 - 组件目标要求组件**没有 `dataValue` 键**：`update-components` 只能合并 patch、不能删除键，
   而 canonical 契约禁止 `dataValue` 与 `dataSource` 同时出现（即使 `dataValue` 为 `null`）。
   新形态取值引用必须先经数据面板转换为 legacy `dataSource`；转为 URL 变体时物料还须声明
-  `static` 能力。`host-resource` 物料不再提供转换入口时，该组件不显示「选择素材」。
+  `static` 能力。`host-resource` 物料不再提供转换入口时，或未声明
+  `hostResourceSelection: true` 时，该组件不显示「选择素材」。
 
 提交必须是一个 Core transaction：
 

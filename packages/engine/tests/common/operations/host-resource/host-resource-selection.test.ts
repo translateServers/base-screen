@@ -4,6 +4,7 @@ import {
   BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT,
   type BaseScreenHostResourceSelectionTarget,
   buildHostResourceSelectionRequest,
+  materialSupportsHostResourceSelection,
   parseHostResourceSelectionCommit,
   readHostResourceSelectionCurrent,
   validateHostResourceSelectionCommitGuards,
@@ -51,6 +52,27 @@ describe('host resource selection protocol (ADR-0089)', () => {
     expect(BASE_SCREEN_HOST_RESOURCE_SELECTION_REQUEST_EVENT).toBe(
       'base-screen-host-resource-selection-request',
     );
+  });
+
+  it('requires both the manifest opt-in and the host-resource capability', () => {
+    expect(materialSupportsHostResourceSelection(undefined)).toBe(false);
+    expect(
+      materialSupportsHostResourceSelection({
+        dataCapabilities: ['host-resource'],
+      }),
+    ).toBe(false);
+    expect(
+      materialSupportsHostResourceSelection({
+        dataCapabilities: ['static'],
+        hostResourceSelection: true,
+      }),
+    ).toBe(false);
+    expect(
+      materialSupportsHostResourceSelection({
+        dataCapabilities: ['static', 'host-resource'],
+        hostResourceSelection: true,
+      }),
+    ).toBe(true);
   });
 
   it('accepts a current session and fails closed for expired or missing ones', () => {

@@ -12,6 +12,7 @@ import {
   type BaseScreenHostResourceSelectionRequestEventDetail,
   type BaseScreenHostResourceSelectionTarget,
   buildHostResourceSelectionRequest,
+  materialSupportsHostResourceSelection,
   parseHostResourceSelectionCommit,
   readHostResourceSelectionCurrent,
   validateHostResourceSelectionCommitGuards,
@@ -146,6 +147,13 @@ export function commitHostResourceSelection(
       'Host resource selection target material is unavailable.',
     );
   }
+  if (!materialSupportsHostResourceSelection(manifest)) {
+    return failure(
+      'AUTHORING_SOURCE_INVALID',
+      ['componentId'],
+      'Host resource selection target material does not expose the selection bridge.',
+    );
+  }
 
   let dataSource: unknown;
   if (selection.kind === 'url') {
@@ -229,9 +237,7 @@ function isSelectionTargetAvailable(
   ) {
     return false;
   }
-  return (
-    state.catalog?.get(component.type)?.manifest.dataCapabilities.includes('host-resource') === true
-  );
+  return materialSupportsHostResourceSelection(state.catalog?.get(component.type)?.manifest);
 }
 
 function hasResourceType(state: DesignerElementState, resourceType: string): boolean {

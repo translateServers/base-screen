@@ -107,7 +107,8 @@
   `base-screen-host-resource-selection-request`，请求 `requestHostResourceSelection`，提交
   `commitHostResourceSelection`。它只传 request/commit，不持有素材目录、搜索、缓存或网络客户端；
   组件图片只存 `host-resource` 身份，画布背景 URL 是唯一例外。组件提交只写 legacy `dataSource`，
-  只接受没有 `dataValue` 键的组件。唯一落点是 `engine`（ADR-0089）；示例后端与三端宿主已提供
+  只接受没有 `dataValue` 键的组件。入口只有同时声明 `hostResourceSelection: true` 与
+  `host-resource` 能力的物料才显示。唯一落点是 `engine`（ADR-0089）；示例后端与三端宿主已提供
   上传、列表、插入/替换/背景、选择器与删除保护。
 
 - **Catalog 热刷新（Catalog Refresh，已实现）**

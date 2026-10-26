@@ -37,6 +37,7 @@ describe('host asset library contract (ADR-0089)', () => {
     expect(HOST_IMAGE_RESOURCE).toBe(HOST_ASSET_RESOURCE_TYPE);
     expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.type).toBe('base.image');
     expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.dataCapabilities).toContain('host-resource');
+    expect(BASE_SCREEN_IMAGE_MATERIAL_MANIFEST.hostResourceSelection).toBe(true);
   });
 
   it('builds an insert intent with identity only (no URL or credentials)', () => {
