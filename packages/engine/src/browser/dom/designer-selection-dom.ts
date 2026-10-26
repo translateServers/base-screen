@@ -47,7 +47,8 @@ export function renderDesignerSelection(
   appendTransformControls(selection, ownerDocument, document, selected, catalog);
 }
 
-// 选区名称标签贴在包围盒上沿外侧，随画布一起缩放（与变换手柄同一坐标系）；
+// 选区名称标签贴在包围盒下沿外侧，随画布一起缩放（与变换手柄同一坐标系）；
+// 上沿让给居中的旋转手柄与北侧手柄：标签过长或组件过窄时会压住它们。
 // 选中信息已由状态栏承载，这里纯装饰，不进可访问性树。
 function appendSelectionTag(
   selection: HTMLDivElement,

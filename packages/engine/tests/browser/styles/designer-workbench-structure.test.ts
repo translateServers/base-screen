@@ -61,6 +61,14 @@ describe('designer workbench structure and layout', () => {
     expect(canvasRule?.[1]).not.toContain('overflow:');
   });
 
+  it('keeps the selection tag clear of the top transform controls', () => {
+    const tagRule = workbenchCss.match(/\.selection-tag\s*\{([^}]*)\}/s);
+    expect(tagRule).not.toBeNull();
+    // 上沿是旋转手柄与其引脚的排布区：标签改到下沿外侧，并与南侧手柄留出净空。
+    expect(tagRule?.[1]).toContain('top: calc(100% + 8px);');
+    expect(tagRule?.[1]).not.toContain('bottom: 100%');
+  });
+
   it('keeps host left panel groups bounded, stable, and hidden with the collapsed rail', () => {
     expect(workbenchCss).toMatch(
       /\.rail-tab-label\s*\{[^}]*overflow: hidden;[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/s,

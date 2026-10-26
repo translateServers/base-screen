@@ -170,10 +170,12 @@
   pointer-events: auto;
 }
 
-/* 选区名称标签：压在选中框上沿外侧，不拦截命中测试。 */
+/* 选区名称标签：贴在选中框下沿外侧，与南侧手柄留出净空，不拦截命中测试。
+   放上沿会压住居中的旋转手柄（含 18px 引脚）与北侧手柄的上半截——标签越长、
+   组件越窄越明显，而这些顶部控件正是选中后的高频操作。 */
 .selection-tag {
   position: absolute;
-  bottom: 100%;
+  top: calc(100% + 6px);
   left: 0;
   max-width: 320px;
   overflow: hidden;
