@@ -10,5 +10,7 @@ process.env.DATASET_FAIL_INJECTION = '1';
 process.env.DATASOURCE_SEED = '0';
 // 素材播种同理：列表与删除保护用例需要确定的空库，播种由独立 spec 直接调用。
 process.env.ASSET_SEED = '0';
+// 过期清理定时器在测试里关闭，用例直接调 sweep 断言，避免时间抖动。
+process.env.ASSET_CLEANUP_INTERVAL_MS = '0';
 // 素材文件与开发库隔离：放在 data/assets/test 下，仍受仓库忽略规则保护。
 process.env.ASSET_DIR = 'data/assets/test';

@@ -11,6 +11,10 @@
   scrollbar-gutter: stable;
 }
 
+.asset-library [hidden] {
+  display: none !important;
+}
+
 .asset-library-head {
   display: flex;
   align-items: center;
@@ -250,6 +254,11 @@
   color: var(--color-accent);
   font-size: 9px;
   line-height: 1.4;
+}
+
+.asset-badge--temporary {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fbbf24;
 }
 
 .asset-empty {

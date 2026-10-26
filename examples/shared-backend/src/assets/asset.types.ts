@@ -8,6 +8,12 @@ export const HOST_ASSET_RESOURCE_TYPE = 'host_image' as const;
 
 export const ASSET_MAX_BYTES = 5 * 1024 * 1024;
 
+/** 临时素材的默认有效期：保存大屏时续期，过期且无引用的由清理任务回收。 */
+export const ASSET_TEMPORARY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** 素材来源：公共目录或绑定大屏的临时上传。 */
+export type AssetScope = 'public' | 'temporary';
+
 /** 仅接受浏览器能直接解码的位图；SVG 需要消毒/栅格化，示例不接收。 */
 export const ASSET_MIME_EXTENSIONS: ReadonlyMap<string, string> = new Map([
   ['image/png', '.png'],
@@ -25,6 +31,14 @@ export interface AssetShape {
   readonly contentPath: string;
   /** 宿主引用扫描结果，供列表标记与删除按钮使用；删除保护仍由后端强制。 */
   readonly referenceCount: number;
+  /** 设计器临时上传；公共素材为 false。 */
+  readonly temporary: boolean;
+  /** 临时素材绑定的大屏；公共素材为 null。 */
+  readonly screenId: string | null;
+  /** 宿主展示用的大屏名称；仅临时素材有值。 */
+  readonly screenName: string | null;
+  /** 临时素材的回收资格；公共素材为 null。 */
+  readonly expiresAt: string | null;
   readonly createdAt: string;
 }
 

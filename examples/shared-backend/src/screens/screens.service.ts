@@ -3,9 +3,11 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   type OnModuleInit,
 } from '@nestjs/common';
+import { AssetsService } from '../assets/assets.service';
 import type { Screen } from '../generated/prisma-client';
 // 必须是值导入：Nest 的构造器注入依赖 emitDecoratorMetadata 产出 paramtypes，
 // 用 `import type` 会把该引用擦除，导致 DI 解析不到 PrismaService。
@@ -25,7 +27,12 @@ const ALARM_SCREEN_NAME = '实时告警演示大屏';
 
 @Injectable()
 export class ScreensService implements OnModuleInit {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger('ScreensService');
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly assets: AssetsService,
+  ) {}
 
   /** 启动期补种：dev / start / 测试三种入口行为一致。 */
   async onModuleInit(): Promise<void> {
@@ -175,6 +182,15 @@ export class ScreensService implements OnModuleInit {
       where: { id },
       data: { document: validation.serialized, revision: { increment: 1 } },
     });
+    // 保存已成功；续期失败不能让前端误以为保存失败，过期回收还会兜底保护被引用素材。
+    try {
+      await this.assets.renewTemporaryAssets(document);
+    } catch (error) {
+      this.logger.warn(
+        `临时素材续期失败：${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
     return toShape(updated);
   }
 
@@ -186,6 +202,15 @@ export class ScreensService implements OnModuleInit {
         throw new NotFoundException({ error: 'NOT_FOUND', message: `Screen not found: ${id}` });
       }
       throw error;
+    }
+    // 屏已删除；素材回收失败交给定时清理，不能反向报错。
+    try {
+      await this.assets.deleteTemporaryAssetsForScreen(id);
+    } catch (error) {
+      this.logger.warn(
+        `删除大屏后清理临时素材失败：${id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
     }
   }
 }

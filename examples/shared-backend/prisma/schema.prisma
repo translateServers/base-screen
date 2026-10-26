@@ -42,9 +42,17 @@ model Asset {
   /// 含点的扩展名，由服务端按 MIME 白名单决定，不接受客户端输入
   extension String
   byteSize  Int
+  /// 设计器临时上传的图片绑定当前大屏；公共素材为 false/null。
+  temporary Boolean  @default(false)
+  /// 逻辑引用 Screen.id，不建外键：删屏后仍需按旧归属清理文件。
+  screenId  String?
+  /// 临时素材的回收资格；被已保存大屏引用时会续期。
+  expiresAt DateTime?
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@index([screenId])
+  @@index([expiresAt])
 }
 
 /// 在线物料包（ADR-0090）：宿主生成并审核的 ESM 代码与 Manifest，只存储、不执行。

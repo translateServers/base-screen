@@ -116,6 +116,19 @@ function toSearch(params: Readonly<Record<string, string | number | undefined>>)
   return text === '' ? '' : `?${text}`;
 }
 
+export interface AssetListQuery {
+  /** 后台：public（默认）或 temporary；省略时由后端返回公共素材。 */
+  readonly scope?: 'public' | 'temporary';
+  /** 设计器：返回公共 + 当前大屏临时素材。 */
+  readonly screenId?: string;
+}
+
+export interface AssetUploadQuery {
+  /** 设计器临时上传必须同时提供 scope=temporary 与 screenId。 */
+  readonly scope?: 'temporary';
+  readonly screenId?: string;
+}
+
 export interface DatasetListQuery {
   readonly query?: string;
   readonly groupId?: string;
@@ -196,12 +209,24 @@ export const api = {
     request(`/metrics/ranking?dimension=${encodeURIComponent(dimension)}&limit=${limit}`),
 
   // ---- 宿主素材库（ADR-0089） ----
-  listAssets: (signal?: AbortSignal): Promise<ApiResult<{ assets: HostAssetShape[] }>> =>
-    request('/assets', signal === undefined ? {} : { signal }),
-  uploadAsset: (file: File): Promise<ApiResult<{ asset: HostAssetShape }>> => {
+  listAssets: (
+    query: AssetListQuery = {},
+    signal?: AbortSignal,
+  ): Promise<ApiResult<{ assets: HostAssetShape[] }>> =>
+    request(
+      `/assets${toSearch({ scope: query.scope, screenId: query.screenId })}`,
+      signal === undefined ? {} : { signal },
+    ),
+  uploadAsset: (
+    file: File,
+    query: AssetUploadQuery = {},
+  ): Promise<ApiResult<{ asset: HostAssetShape }>> => {
     const form = new FormData();
     form.append('file', file);
-    return requestForm('/assets', form);
+    return requestForm(
+      `/assets${toSearch({ scope: query.scope, screenId: query.screenId })}`,
+      form,
+    );
   },
   deleteAsset: (id: string): Promise<ApiResult<{ deleted: true; id: string }>> =>
     request(`/assets/${encodeURIComponent(id)}`, { method: 'DELETE' }),

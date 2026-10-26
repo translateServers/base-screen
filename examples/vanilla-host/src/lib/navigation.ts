@@ -8,6 +8,11 @@ export function goToDatasources(): void {
   window.location.hash = '#/datasources';
 }
 
+/** 素材管理页（顶栏「素材」tab 与编辑页入口共用）。 */
+export function goToAssets(): void {
+  window.location.hash = '#/assets';
+}
+
 export function goToEdit(id: string): void {
   window.location.hash = `#/screens/${encodeURIComponent(id)}/edit`;
 }

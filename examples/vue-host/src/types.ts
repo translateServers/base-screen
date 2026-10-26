@@ -101,6 +101,14 @@ export interface HostAssetShape {
   readonly byteSize: number;
   readonly contentPath: string;
   readonly referenceCount: number;
+  /** 设计器临时上传；公共素材为 false。 */
+  readonly temporary: boolean;
+  /** 临时素材绑定的大屏；公共素材为 null。 */
+  readonly screenId: string | null;
+  /** 后台展示用的绑定大屏名；仅临时素材有值。 */
+  readonly screenName: string | null;
+  /** 临时素材的回收资格；公共素材为 null。 */
+  readonly expiresAt: string | null;
   readonly createdAt: string;
 }
 

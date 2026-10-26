@@ -11,21 +11,29 @@ import {
 } from '@base-screen/sdk/designer';
 import { api } from '../lib/api';
 import { resolveApiBase } from '../lib/api-base';
+import {
+  ASSET_ACCEPTED_TYPES,
+  ASSET_TEXT,
+  assetContentPath,
+  formatAssetBytes,
+  HOST_ASSET_RESOURCE_TYPE,
+  validateAssetFile,
+} from '../lib/asset-model';
 import type { HostAssetShape } from '../types';
 
 /**
  * 宿主素材库（ADR-0089）——三端逐字共享。
  *
  * 左栏只消费公开 slot；插入/替换/背景走公开方法；组件检查器与画布背景的选图请求
- * 走统一选择桥。素材目录、上传、删除保护全部属于宿主，文档只保存 host_image 身份。
+ * 走统一选择桥。公共素材的目录与删除在宿主后台页；设计器只允许临时上传。
+ * 文档只保存 host_image 身份，不保存任何 URL。
  *
  * 与 `host-resource-authoring.ts` 同一对等约定：vanilla 是基准拷贝，react / vue
  * 保持逐字一致；根测试只对纯函数与后端契约做防漂移断言。
  */
+export { assetContentPath, HOST_ASSET_RESOURCE_TYPE } from '../lib/asset-model';
+
 export const HOST_ASSET_LIBRARY_GROUP_ID = 'assets';
-export const HOST_ASSET_RESOURCE_TYPE = 'host_image';
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
-const ACCEPTED_TYPES = 'image/png,image/jpeg,image/webp,image/gif';
 
 export interface HostAssetReplaceComponent {
   readonly id: string;
@@ -35,6 +43,8 @@ export interface HostAssetReplaceComponent {
 
 export interface HostAssetLibraryOptions {
   readonly designer: BaseScreenDesignerElement;
+  /** 当前编辑的大屏 id；有值时上传写入临时素材，列表按屏返回公共 + 本屏临时。 */
+  readonly screenId?: string;
 }
 
 export interface HostAssetLibraryHandle {
@@ -42,10 +52,6 @@ export interface HostAssetLibraryHandle {
   readonly element: HTMLElement;
   load(): Promise<void>;
   dispose(): void;
-}
-
-export function assetContentPath(asset: Pick<HostAssetShape, 'id'>): string {
-  return `/assets/${encodeURIComponent(asset.id)}/content`;
 }
 
 export function buildAssetInsertIntent(
@@ -75,7 +81,8 @@ export function resolveAssetReplaceTarget(
 }
 
 export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAssetLibraryHandle {
-  const { designer } = options;
+  const { designer, screenId } = options;
+  const canUploadTemporary = screenId !== undefined;
   const doc = document;
 
   const rail = doc.createElement('div');
@@ -93,21 +100,21 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
   const uploadLabel = el('label', 'asset-upload');
   const uploadInput = doc.createElement('input');
   uploadInput.type = 'file';
-  uploadInput.accept = ACCEPTED_TYPES;
+  uploadInput.accept = ASSET_ACCEPTED_TYPES;
   uploadInput.multiple = true;
   uploadInput.hidden = true;
   uploadInput.dataset.assetUpload = '';
   const uploadCopy = el('span', 'asset-upload-copy');
   uploadCopy.append(
-    el('strong', '', '上传图片'),
-    el('small', '', 'PNG / JPEG / WebP / GIF · 单张 ≤ 5 MB'),
+    el('strong', '', ASSET_TEXT.temporaryUpload),
+    el('small', '', ASSET_TEXT.temporaryUploadHint),
   );
   uploadLabel.append(el('span', 'asset-upload-mark', '+'), uploadCopy, uploadInput);
 
   const tools = el('div', 'asset-tools');
   const search = doc.createElement('input');
   search.type = 'search';
-  search.placeholder = '搜索素材';
+  search.placeholder = ASSET_TEXT.searchPlaceholder;
   search.className = 'asset-search';
   search.dataset.assetSearch = '';
   tools.append(search);
@@ -132,17 +139,20 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
   replaceButton.dataset.assetReplace = '';
   const backgroundButton = button('设为背景', 'button');
   backgroundButton.dataset.assetBackground = '';
-  const deleteButton = button('删除', 'button button--danger');
-  deleteButton.dataset.assetDelete = '';
-  actions.append(insertButton, replaceButton, backgroundButton, deleteButton);
+  actions.append(insertButton, replaceButton, backgroundButton);
   selectionBar.append(selectionName, actions);
 
-  rail.append(header, uploadLabel, tools, status, grid, selectionBar);
+  rail.append(
+    header,
+    ...(canUploadTemporary ? [uploadLabel] : []),
+    tools,
+    status,
+    grid,
+    selectionBar,
+  );
 
-  const confirmDialog = createConfirmDialog(doc);
-  const noticeDialog = createNoticeDialog(doc);
-  const picker = createPickerDialog(doc);
-  doc.body.append(confirmDialog.dialog, noticeDialog.dialog, picker.dialog);
+  const picker = createPickerDialog(doc, canUploadTemporary);
+  doc.body.append(picker.dialog);
 
   let assets: readonly HostAssetShape[] = [];
   let selectedId: string | undefined;
@@ -201,8 +211,8 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
           'p',
           'asset-empty',
           assets.length === 0
-            ? '还没有素材。上传第一张图片，或检查后端素材播种是否开启。'
-            : '没有匹配的素材。',
+            ? '还没有可用素材。可在后台素材库上传公共图片，或在此临时上传。'
+            : ASSET_TEXT.emptyFiltered,
         ),
       );
     }
@@ -211,7 +221,6 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
     if (asset !== undefined) {
       selectionName.textContent = asset.name;
       replaceButton.disabled = replaceTarget() === undefined;
-      deleteButton.disabled = false;
     }
     if (statusMessage.length > 0) status.textContent = statusMessage;
   };
@@ -220,7 +229,7 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
     loadState = 'loading';
     setStatus('正在读取素材…');
     renderRail();
-    const result = await api.listAssets();
+    const result = await api.listAssets(screenId === undefined ? {} : { screenId });
     if (disposed) return;
     if (!result.ok) {
       loadState = 'error';
@@ -275,70 +284,35 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
     renderRail();
   };
 
-  const removeSelected = async (): Promise<void> => {
-    const asset = selectedAsset();
-    if (asset === undefined) return;
-    const confirmed = await confirmDialog.open({
-      title: '删除素材',
-      message:
-        asset.referenceCount > 0
-          ? `「${asset.name}」正被 ${asset.referenceCount} 张大屏引用。删除会被拒绝，建议先替换引用。`
-          : `确定删除「${asset.name}」？文件会从素材目录移除。`,
-      confirmLabel: '删除',
-      danger: true,
-    });
-    if (!confirmed) return;
-    const result = await api.deleteAsset(asset.id);
-    if (disposed) return;
-    if (!result.ok) {
-      if (result.error.code === 'ASSET_IN_USE') {
-        const screens = readReferencedScreens(result.error.payload);
-        await noticeDialog.open({
-          title: '删除被拒绝',
-          message:
-            screens.length > 0
-              ? `该素材仍被这些大屏引用：${screens.join('、')}。先替换引用后再删除。`
-              : result.error.message,
-        });
-      } else {
-        setStatus(`删除失败：${result.error.message}`);
-      }
-      return;
-    }
-    selectedId = undefined;
-    await load();
-    setStatus(`已删除「${asset.name}」。`);
-    renderRail();
-  };
-
   const uploadFiles = async (files: readonly File[]): Promise<void> => {
-    if (files.length === 0) return;
+    if (files.length === 0 || screenId === undefined) return;
     const accepted: File[] = [];
     for (const file of files) {
-      if (!ACCEPTED_TYPES.split(',').includes(file.type)) {
-        setStatus(`「${file.name}」不是支持的图片类型。`);
-        continue;
-      }
-      if (file.size > MAX_UPLOAD_BYTES) {
-        setStatus(`「${file.name}」超过 5 MB。`);
+      const reason = validateAssetFile(file);
+      if (reason !== null) {
+        setStatus(`「${file.name}」${reason}。`);
         continue;
       }
       accepted.push(file);
     }
     if (accepted.length === 0) return;
 
+    let uploaded = 0;
     for (const [index, file] of accepted.entries()) {
-      setStatus(`正在上传 ${index + 1}/${accepted.length}：${file.name}`);
-      const result = await api.uploadAsset(file);
+      setStatus(`正在临时上传 ${index + 1}/${accepted.length}：${file.name}`);
+      const result = await api.uploadAsset(file, { scope: 'temporary', screenId });
       if (disposed) return;
-      if (!result.ok) {
-        setStatus(`「${file.name}」上传失败：${result.error.message}`);
-      }
+      if (result.ok) uploaded += 1;
+      else setStatus(`「${file.name}」上传失败：${result.error.message}`);
     }
     await load();
     if (disposed) return;
     if (picker.dialog.open) renderPicker();
-    setStatus(`已上传 ${accepted.length} 张素材。`);
+    setStatus(
+      uploaded === accepted.length
+        ? `已临时上传 ${uploaded} 张素材。`
+        : `已上传临时素材 ${uploaded}/${accepted.length} 张。`,
+    );
     renderRail();
   };
 
@@ -369,13 +343,24 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
     const meta = el('div', 'asset-picker-meta');
     meta.append(
       el('strong', '', asset.name),
-      el('span', 'asset-mono', `${asset.mimeType} · ${formatBytes(asset.byteSize)}`),
+      el('span', 'asset-mono', `${asset.mimeType} · ${formatAssetBytes(asset.byteSize)}`),
       el('span', 'asset-mono', `resourceId: ${asset.id}`),
       el(
         'span',
         'asset-mono',
         asset.referenceCount > 0 ? `已被 ${asset.referenceCount} 张大屏引用` : '尚未被引用',
       ),
+      ...(asset.temporary
+        ? [
+            el(
+              'span',
+              'asset-mono',
+              asset.screenName === null
+                ? '临时素材 · 仅当前大屏可见'
+                : `临时素材 · ${asset.screenName}`,
+            ),
+          ]
+        : []),
     );
     picker.detail.replaceChildren(preview, meta);
     picker.status.textContent =
@@ -467,7 +452,6 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
   insertButton.addEventListener('click', insertSelected);
   replaceButton.addEventListener('click', replaceSelected);
   backgroundButton.addEventListener('click', applyBackground);
-  deleteButton.addEventListener('click', () => void removeSelected());
   picker.confirm.addEventListener('click', commitPicker);
   picker.cancel.addEventListener('click', () => {
     pendingRequest = undefined;
@@ -498,11 +482,7 @@ export function createHostAssetLibrary(options: HostAssetLibraryOptions): HostAs
       picker.search.removeEventListener('input', onPickerSearch);
       picker.confirm.removeEventListener('click', commitPicker);
       picker.dialog.close();
-      confirmDialog.dialog.close();
-      noticeDialog.dialog.close();
       picker.dialog.remove();
-      confirmDialog.dialog.remove();
-      noticeDialog.dialog.remove();
       rail.remove();
     },
   };
@@ -549,17 +529,26 @@ function renderAssetCard(
   const meta = el('span', 'asset-meta');
   const name = el('strong', 'asset-name', asset.name);
   name.title = asset.name;
-  const size = el('small', 'asset-size', formatBytes(asset.byteSize));
+  const size = el('small', 'asset-size', formatAssetBytes(asset.byteSize));
   meta.append(name, size);
   image.addEventListener('load', () => {
     if (!image.isConnected) return;
     if (image.naturalWidth > 0 && image.naturalHeight > 0) {
-      size.textContent = `${image.naturalWidth}×${image.naturalHeight} · ${formatBytes(asset.byteSize)}`;
+      size.textContent = `${image.naturalWidth}×${image.naturalHeight} · ${formatAssetBytes(asset.byteSize)}`;
     }
   });
   card.append(thumb, meta);
-  if (asset.referenceCount > 0) {
-    card.append(el('span', 'asset-badge', `引用 ${asset.referenceCount}`));
+  const badge = asset.temporary
+    ? asset.referenceCount > 0
+      ? `${ASSET_TEXT.temporary} · ${ASSET_TEXT.inUse} ${asset.referenceCount}`
+      : ASSET_TEXT.temporary
+    : asset.referenceCount > 0
+      ? `${ASSET_TEXT.inUse} ${asset.referenceCount}`
+      : null;
+  if (badge !== null) {
+    card.append(
+      el('span', `asset-badge${asset.temporary ? ' asset-badge--temporary' : ''}`, badge),
+    );
   }
   card.addEventListener('click', onSelect);
   if (onInsert !== undefined) {
@@ -568,97 +557,10 @@ function renderAssetCard(
   return card;
 }
 
-function createConfirmDialog(doc: Document): {
-  readonly dialog: HTMLDialogElement;
-  open(input: {
-    readonly title: string;
-    readonly message: string;
-    readonly confirmLabel: string;
-    readonly danger?: boolean;
-  }): Promise<boolean>;
-} {
-  const dialog = doc.createElement('dialog');
-  dialog.className = 'asset-dialog';
-  const form = el('div', 'asset-dialog-card');
-  const title = el('h2', 'asset-dialog-title');
-  const message = el('p', 'asset-dialog-message');
-  const footer = el('div', 'asset-dialog-actions');
-  const cancel = button('取消', 'button');
-  const confirm = button('确定', 'button button--primary');
-  footer.append(cancel, confirm);
-  form.append(title, message, footer);
-  dialog.append(form);
-
-  return {
-    dialog,
-    open(input): Promise<boolean> {
-      title.textContent = input.title;
-      message.textContent = input.message;
-      confirm.textContent = input.confirmLabel;
-      confirm.classList.toggle('button--danger', input.danger === true);
-      dialog.showModal();
-      return new Promise((resolve) => {
-        const finish = (value: boolean): void => {
-          cancel.removeEventListener('click', onCancel);
-          confirm.removeEventListener('click', onConfirm);
-          dialog.removeEventListener('cancel', onDismiss);
-          dialog.close();
-          resolve(value);
-        };
-        const onCancel = (): void => finish(false);
-        const onConfirm = (): void => finish(true);
-        const onDismiss = (event: Event): void => {
-          event.preventDefault();
-          finish(false);
-        };
-        cancel.addEventListener('click', onCancel);
-        confirm.addEventListener('click', onConfirm);
-        dialog.addEventListener('cancel', onDismiss);
-      });
-    },
-  };
-}
-
-function createNoticeDialog(doc: Document): {
-  readonly dialog: HTMLDialogElement;
-  open(input: { readonly title: string; readonly message: string }): Promise<void>;
-} {
-  const dialog = doc.createElement('dialog');
-  dialog.className = 'asset-dialog';
-  const form = el('div', 'asset-dialog-card');
-  const title = el('h2', 'asset-dialog-title');
-  const message = el('p', 'asset-dialog-message');
-  const footer = el('div', 'asset-dialog-actions');
-  const close = button('知道了', 'button button--primary');
-  footer.append(close);
-  form.append(title, message, footer);
-  dialog.append(form);
-
-  return {
-    dialog,
-    open(input): Promise<void> {
-      title.textContent = input.title;
-      message.textContent = input.message;
-      dialog.showModal();
-      return new Promise((resolve) => {
-        const finish = (): void => {
-          close.removeEventListener('click', finish);
-          dialog.removeEventListener('cancel', onDismiss);
-          dialog.close();
-          resolve();
-        };
-        const onDismiss = (event: Event): void => {
-          event.preventDefault();
-          finish();
-        };
-        close.addEventListener('click', finish);
-        dialog.addEventListener('cancel', onDismiss);
-      });
-    },
-  };
-}
-
-function createPickerDialog(doc: Document): {
+function createPickerDialog(
+  doc: Document,
+  showUpload: boolean,
+): {
   readonly dialog: HTMLDialogElement;
   readonly title: HTMLHeadingElement;
   readonly search: HTMLInputElement;
@@ -677,21 +579,23 @@ function createPickerDialog(doc: Document): {
   const title = el('h2', 'asset-picker-title');
   title.id = 'asset-picker-title';
   const uploadLabel = el('label', 'button asset-picker-upload');
-  uploadLabel.append(el('span', '', '上传新素材'));
+  uploadLabel.append(el('span', '', ASSET_TEXT.temporaryUpload));
   const upload = doc.createElement('input');
   upload.type = 'file';
-  upload.accept = ACCEPTED_TYPES;
+  upload.accept = ASSET_ACCEPTED_TYPES;
   upload.multiple = true;
   upload.hidden = true;
   uploadLabel.append(upload);
   const close = button('关闭', 'asset-icon-button');
-  head.append(title, uploadLabel, close);
+  head.append(title);
+  if (showUpload) head.append(uploadLabel);
+  head.append(close);
 
   const body = el('div', 'asset-picker-body');
   const gridSide = el('div', 'asset-picker-grid-side');
   const search = doc.createElement('input');
   search.type = 'search';
-  search.placeholder = '搜索素材';
+  search.placeholder = ASSET_TEXT.searchPlaceholder;
   search.className = 'asset-search';
   const grid = el('div', 'asset-picker-grid');
   grid.setAttribute('role', 'listbox');
@@ -713,22 +617,6 @@ function createPickerDialog(doc: Document): {
   close.addEventListener('click', () => dialog.close());
 
   return { dialog, title, search, upload, grid, detail, status, confirm, cancel };
-}
-
-function readReferencedScreens(payload: Readonly<Record<string, unknown>> | undefined): string[] {
-  const refScreens = payload?.refScreens;
-  if (!Array.isArray(refScreens)) return [];
-  return refScreens.flatMap((item) => {
-    if (item === null || typeof item !== 'object') return [];
-    const name = (item as { readonly name?: unknown }).name;
-    return typeof name === 'string' ? [name] : [];
-  });
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 function el<K extends keyof HTMLElementTagNameMap>(

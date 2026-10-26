@@ -195,6 +195,11 @@
   border-color: var(--color-accent);
 }
 
+/* 素材管理入口：与数据源入口同层，叠在宿主资源作者面之上。 */
+.editor-assets-link {
+  bottom: calc(var(--spacing-4) + 84px);
+}
+
 .ds-return-link {
   white-space: nowrap;
 }

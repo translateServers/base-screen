@@ -14,6 +14,7 @@ import {
   HOST_ASSET_LIBRARY_GROUP_ID,
   type HostAssetLibraryHandle,
 } from '../screen/asset-library';
+import { rememberAssetReturn } from '../screen/asset-return';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
 import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
@@ -98,6 +99,18 @@ function goDatasources(): void {
     const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
     rememberDatasourceReturn(`#/screens/${screenId}/edit`);
     void router.push('/datasources');
+  })();
+}
+
+function goAssets(): void {
+  leaving = true;
+  clearSaveTimer();
+  void (async () => {
+    await runSave();
+    if (dirty && !conflicted) await runSave();
+    const screenId = typeof route.params.screenId === 'string' ? route.params.screenId : '';
+    rememberAssetReturn(`#/screens/${screenId}/edit`);
+    void router.push('/assets');
   })();
 }
 
@@ -280,7 +293,7 @@ onMounted(() => {
     resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
     // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。
     document.body.append(resourceAuthoring.element);
-    assetLibrary = createHostAssetLibrary({ designer: element });
+    assetLibrary = createHostAssetLibrary({ designer: element, screenId });
     element.append(assetLibrary.element);
     onlineMaterials = createOnlineMaterialPanel({ designer: element, runtime: host });
     document.body.append(onlineMaterials.element);
@@ -330,5 +343,13 @@ onBeforeUnmount(() => {
     @click="goDatasources"
   >
     数据源
+  </button>
+  <button
+    type="button"
+    class="button editor-datasource-link editor-assets-link"
+    data-editor-assets=""
+    @click="goAssets"
+  >
+    素材
   </button>
 </template>

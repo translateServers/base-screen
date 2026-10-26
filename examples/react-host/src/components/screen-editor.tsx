@@ -12,6 +12,7 @@ import {
   HOST_ASSET_LIBRARY_GROUP_ID,
   type HostAssetLibraryHandle,
 } from '../screen/asset-library';
+import { rememberAssetReturn } from '../screen/asset-return';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
 import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
@@ -52,6 +53,7 @@ export function ScreenEditorPage(): React.ReactElement {
   const navigate = useNavigate();
   const stageRef = useRef<HTMLDivElement>(null);
   const datasourcesRef = useRef<() => void>(() => {});
+  const assetsRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     const stage = stageRef.current;
@@ -209,6 +211,16 @@ export function ScreenEditorPage(): React.ReactElement {
           navigate('/datasources');
         })();
       };
+      assetsRef.current = (): void => {
+        leaving = true;
+        clearSaveTimer();
+        void (async () => {
+          await runSave();
+          if (dirty && !conflicted) await runSave();
+          rememberAssetReturn(`#/screens/${screenId}/edit`);
+          navigate('/assets');
+        })();
+      };
 
       /** 把当前文档 PUT 到宿主；返回是否已无未保存改动。 */
       const persist = async (): Promise<boolean> => {
@@ -283,7 +295,7 @@ export function ScreenEditorPage(): React.ReactElement {
       resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
       // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。
       document.body.append(resourceAuthoring.element);
-      assetLibrary = createHostAssetLibrary({ designer: element });
+      assetLibrary = createHostAssetLibrary({ designer: element, screenId });
       element.append(assetLibrary.element);
       onlineMaterials = createOnlineMaterialPanel({ designer: element, runtime });
       document.body.append(onlineMaterials.element);
@@ -296,6 +308,7 @@ export function ScreenEditorPage(): React.ReactElement {
     return () => {
       disposed = true;
       datasourcesRef.current = () => {};
+      assetsRef.current = () => {};
       detach?.();
       unsubscribeSession();
       clearSaveTimer();
@@ -324,6 +337,14 @@ export function ScreenEditorPage(): React.ReactElement {
         onClick={() => datasourcesRef.current()}
       >
         数据源
+      </button>
+      <button
+        type="button"
+        className="button editor-datasource-link editor-assets-link"
+        data-editor-assets=""
+        onClick={() => assetsRef.current()}
+      >
+        素材
       </button>
     </>
   );

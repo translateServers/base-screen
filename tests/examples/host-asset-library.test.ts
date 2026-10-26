@@ -5,6 +5,11 @@ import {
   HOST_ASSET_RESOURCE_TYPE as BACKEND_RESOURCE_TYPE,
 } from '../../examples/shared-backend/src/assets/asset.types';
 import {
+  assetScopeLabel,
+  readAssetRefScreens,
+  validateAssetFile,
+} from '../../examples/vanilla-host/src/lib/asset-model';
+import {
   assetContentPath,
   buildAssetInsertIntent,
   HOST_ASSET_RESOURCE_TYPE,
@@ -15,11 +20,13 @@ import { BASE_SCREEN_IMAGE_MATERIAL_MANIFEST } from '../../packages/material/src
 
 const HOSTS = ['vanilla-host', 'react-host', 'vue-host'] as const;
 const SHARED_FILES = [
+  'src/lib/asset-model.ts',
+  'src/lib/api.ts',
   'src/screen/asset-library.ts',
+  'src/screen/asset-return.ts',
   'src/screen/host-resource-plugin.ts',
   'src/screen/host-data-channel.ts',
   'src/types.ts',
-  'src/lib/api.ts',
   'src/styles/asset-library.css',
 ] as const;
 
@@ -77,6 +84,28 @@ describe('host asset library contract (ADR-0089)', () => {
       'image/webp',
     ]);
     expect(ASSET_MIME_EXTENSIONS.has('image/svg+xml')).toBe(false);
+  });
+
+  it('applies the same bitmap and size whitelist in the host upload UI', () => {
+    expect(validateAssetFile({ type: 'image/png', size: 1024 })).toBeNull();
+    expect(validateAssetFile({ type: 'image/webp', size: 1024 })).toBeNull();
+    expect(validateAssetFile({ type: 'image/svg+xml', size: 1024 })).toBe('不是支持的图片类型');
+    expect(validateAssetFile({ type: 'image/png', size: 5 * 1024 * 1024 + 1 })).toBe('超过 5 MB');
+  });
+
+  it('labels public and temporary assets for the admin list', () => {
+    expect(assetScopeLabel({ temporary: false, screenName: null })).toBe('公共');
+    expect(assetScopeLabel({ temporary: true, screenName: null })).toBe('临时');
+    expect(assetScopeLabel({ temporary: true, screenName: '告警大屏' })).toBe('临时 · 告警大屏');
+  });
+
+  it('reads referenced screen names from a deletion 409 payload', () => {
+    expect(
+      readAssetRefScreens({
+        refScreens: [{ id: 'a', name: '大屏 A' }, { id: 'b', name: '大屏 B' }, null, {}],
+      }),
+    ).toEqual(['大屏 A', '大屏 B']);
+    expect(readAssetRefScreens(undefined)).toEqual([]);
   });
 
   it('keeps the asset library, API types, and resource types byte-identical across hosts', () => {

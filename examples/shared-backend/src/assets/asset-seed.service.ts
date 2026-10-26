@@ -68,7 +68,8 @@ export class AssetSeedService implements OnApplicationBootstrap {
 
   async onApplicationBootstrap(): Promise<void> {
     if (process.env.ASSET_SEED === '0') return;
-    if ((await this.prisma.asset.count()) > 0) return;
+    // 只以公共素材判断是否已播种：临时素材不应阻止演示素材补种。
+    if ((await this.prisma.asset.count({ where: { temporary: false } })) > 0) return;
     await mkdir(hostAssetDir(), { recursive: true });
     for (const spec of DEMO_ASSETS) {
       const id = randomUUID();

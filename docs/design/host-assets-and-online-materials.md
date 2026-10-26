@@ -52,6 +52,8 @@
    不写入 Screen Document。
 3. 宿主维护引用扫描与删除保护；被屏幕引用的素材默认不可硬删除，或软删除后 `resolve` 返回
    `HOST_RESOURCE_UNAVAILABLE`。
+4. 示例宿主另提供设计器内**临时上传**：素材仍由宿主存储，绑定当前大屏，仅该屏设计器可见；
+   公共素材上传/删除在后台 `#/assets`。临时素材默认 7 天，保存续期、删屏/过期清理；文档仍只存身份。
 
 ### 2. 素材库浏览与插入
 
@@ -61,6 +63,7 @@
 3. 拖拽插入：宿主用固定 MIME `application/x-base-screen-host-resource` 写入严格 JSON；Engine 在 drop
    时重新解析并校验。
 4. 插入提交为单次 Core transaction；新组件自动选中。
+5. 设计器左栏只消费「公共素材 + 当前屏临时素材」；公共上传与删除在后台素材页，左栏只保留临时上传。
 
 ### 3. 替换已选图片
 
@@ -198,7 +201,7 @@ refreshCatalog(catalog: BaseScreenMaterialCatalog):
 6. `events` 变更是否纳入热更校验？推荐纳入；实现成本过高时改为要求新 type。
 7. Viewer 热刷新：本轮只设计 Designer；Viewer 的公开 `setCatalog` 作为后续切片。
 8. 统一桥是否扩展到其他 `host-resource` 物料？形状已通用，首个实现只做图片入口。
-9. OpenDesign 是否覆盖在线物料管理页？推荐先做素材库/选择器/背景流程；管理页只在宿主需要新建时扩展。
+9. OpenDesign 是否覆盖在线物料管理页？推荐先做素材库/选择器/背景流程；示例已扩展素材后台页 `#/assets`，在线物料管理页仍可作为后续切片。
 
 ## 实现切片
 
@@ -206,6 +209,9 @@ refreshCatalog(catalog: BaseScreenMaterialCatalog):
    内容服务；三端 `examples/*-host/src/screen/asset-library.ts` 与资源类型贡献；左栏分组、
    插入/替换/设为背景、统一选择器与删除保护；后端 e2e、根级示例测试与手工浏览器验收。
    browser harness 的独立案例仍可作为后续补充。
+   **2026-10-26 扩展**：三端新增 `#/assets` 后台素材页；左栏改为只消费 + 临时上传（绑定当前大屏）；
+   后端增加 `temporary/screenId/expiresAt`、保存续期、删屏与过期清理、临时内容 `no-store`；
+   示例无鉴权，`screenId` 过滤只是应用层可见性。
 2. **统一选择桥（已完成）**：engine selection pending/session、request event、commit 方法；替换画布背景
    专用协议；数据面板按钮；更新 `engine.api.md`、changeset、测试与 harness（canvas + image）。
 3. **Catalog 热刷新（已完成）**：plugin-core diff 纯函数；engine `refreshCatalog`；renderer
@@ -225,6 +231,7 @@ refreshCatalog(catalog: BaseScreenMaterialCatalog):
 - 页面视觉与交互稿交给 OpenDesign；本目录的
   [OpenDesign Brief](./host-asset-library-opendesign-brief.md) 是交接输入。
 - 范围：宿主素材库左栏、图片选择器、画布背景流程；在线物料管理页可选。
+- 后台素材页 `#/assets` 以现有数据源后台页的表格/筛选/空态为基线；brief 的 P1/T4 覆盖的是设计器左栏历史形态。
 - 设计以 Base Screen 现有令牌与系统清单为基线，不新增设计系统；选择器是宿主页面，不依赖 Engine
   私有 Shadow DOM。
 - OpenDesign 原型是中间产物；方向确认后实现必须落到仓库代码并验证，不以原型交付收尾。

@@ -48,11 +48,12 @@ Toast 不进 store：它是带定时器的瞬时 DOM 副作用，不是应用状
 三端逐字复制、**改动必须同批落地**的宿主侧逻辑（否则同一用例在不同端结果不同）：
 
 ```text
-lib/api-base.ts  lib/api.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
+lib/api-base.ts  lib/api.ts  lib/asset-model.ts  lib/datasource-model.ts  lib/format.ts  lib/logger.ts
 lib/render-diagnostics.ts
 screen/host-alarm-controller.ts  screen/host-alarm-style-authoring.ts
 screen/host-catalog-port.ts  screen/host-data-channel.ts  screen/host-dataset-port.ts
-screen/asset-library.ts  screen/blueprint-canvas.ts  screen/datasource-return.ts
+screen/asset-library.ts  screen/asset-return.ts  screen/blueprint-canvas.ts
+screen/datasource-return.ts
 screen/host-refresh-controller.ts  screen/host-resource-plugin.ts  screen/host-runtime.ts
 screen/metric-value.ts  screen/online-materials.ts  screen/project-adapter.ts
 store/screen-session-store.ts  store/screens-store.ts  types.ts
@@ -78,6 +79,7 @@ DOM 契约发生漂移，都会在冒烟里当场失败。
 | `#/` | 大屏列表 | 卡片列表、新建（POST 后跳编辑）、删除（二次确认）、空态 / 错误态 / 骨架屏 |
 | `#/screens/:id/edit` | 设计器编辑 | 嵌入 `<base-screen-designer>`；宿主 project adapter 载入与保存；自动保存规格见下 |
 | `#/screens/:id/view` | 只读查看 | 嵌入 `<base-screen-viewer>` 播放 canonical 文档 |
+| `#/assets` | 素材后台管理 | 公共素材列表/搜索/上传/删除；临时素材筛选、绑定大屏与删除保护 |
 
 编辑页的两条铁律（三端代码里都有注释）：
 
@@ -107,9 +109,9 @@ DOM 契约发生漂移，都会在冒烟里当场失败。
 | `GET /api/screens/:id` | — | `{ screen: Screen }` | `404 NOT_FOUND` |
 | `PUT /api/screens/:id` | `{ document, revision }` | `{ screen: Screen }`（revision+1） | `404` / `409 REVISION_CONFLICT` / `400 DOCUMENT_INVALID` |
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
-| `GET /api/assets` | — | `{ assets: [{ id, name, mimeType, byteSize, contentPath, referenceCount, createdAt }] }` | — |
-| `POST /api/assets` | multipart `file` | `201 { asset }` | `400 ASSET_TYPE_UNSUPPORTED` / `ASSET_CONTENT_INVALID`；超过 5 MB 为 `413` |
-| `GET /api/assets/:id/content` | — | 图片二进制 | `404 ASSET_NOT_FOUND` |
+| `GET /api/assets` | 可选 `?scope=temporary` 或 `?screenId=` | `{ assets: [Asset] }`（无参数仅公共素材；`screenId` 返回公共 + 该屏临时；`scope=temporary` 返回全部临时） | `400 ASSET_SCOPE_INVALID` / `404 SCREEN_NOT_FOUND` |
+| `POST /api/assets` | multipart `file`；可选 `?scope=temporary&screenId=` | `201 { asset }`（带临时参数时写入当前大屏的临时素材） | `400 ASSET_TYPE_UNSUPPORTED` / `ASSET_CONTENT_INVALID` / `ASSET_SCOPE_INVALID`；超过 5 MB 为 `413` |
+| `GET /api/assets/:id/content` | — | 图片二进制（公共长缓存；临时素材 `no-store`） | `404 ASSET_NOT_FOUND` |
 | `DELETE /api/assets/:id` | — | `{ deleted: true, id }` | `404` / `409 ASSET_IN_USE` + `refScreens` |
 | `GET /api/material-packages` | — | `{ packages: [{ id, type, name, code, manifest, revision, ... }] }` | — |
 | `POST /api/material-packages` | `{ type, name, manifest, code }` | `201 { package }` | `400` / `409 MATERIAL_TYPE_EXISTS` |
@@ -129,6 +131,12 @@ DOM 契约发生漂移，都会在冒烟里当场失败。
 `Screen = { id, name, revision, document, createdAt, updatedAt }`；错误体统一
 `{ error, message }`。`document` 是 canonical Screen Document JSON——后端只存取，
 其 schema 归 `@base-screen/contracts` 所有。
+
+`Asset = { id, name, mimeType, byteSize, contentPath, referenceCount, temporary, screenId,
+screenName, expiresAt, createdAt }`。`temporary=true` 是设计器临时上传：绑定 `screenId`，
+默认 7 天有效；大屏保存时对仍被文档引用的临时素材续期，删除大屏与过期清理会移除不再被引用的
+素材。公共素材的 `screenId/screenName/expiresAt` 为 `null`。示例没有登录/权限系统；
+`screenId` 过滤只是应用层可见性，生产宿主必须自行鉴权。
 
 导出字段（`resourceId: 'cpu_usage'` 的演示指标）由 `GET /api/metrics/series` 提供，
 三端通过宿主数据通道（resourcePort）消费，见下方"数据绑定"。
@@ -174,6 +182,10 @@ G–L 段是本轮新增的**数据源后台管理**闭环（三端逐字同构�
 失败态与预览截断、删除被引用时的 409 保护、header 掩码与字段变化二次确认。
 冒烟**不点设计器内的深层数据源面板**：那几层用 API 克隆「生产监控大屏」的文档并改绑数据源，
 再在查看页断言真的出数（选中模板屏是因为手工拼的最小文档会被 canonical 解析器拒掉）。
+
+N 段是**素材后台与临时上传**闭环：`#/assets` 导航高亮与公共种子列表、公共素材上传/删除、
+临时素材空态与筛选、设计器左栏临时上传并插入后进入保存文档、后台临时行显示绑定大屏、
+被引用时删除被 409 拦截、删除大屏后临时素材被清理。
 
 ## 成品屏种子
 
@@ -466,19 +478,36 @@ Vue SFC / 原生自定义元素），但 `type`、`tagName` 与 schema 完全一
 
 ### 宿主素材库与图片选择（ADR-0089）
 
-编辑页左栏多一个宿主分组「素材库」（`leftPanelGroups` + 公开命名 slot），内容由三端逐字共享的
-`src/screen/asset-library.ts` 渲染：上传、搜索、素材网格、插入/替换/设为背景、删除保护。
+**后台素材页**：顶栏「素材」或 `#/assets`（三端一致）。公共素材在这里上传、搜索、删除；
+「临时素材」筛选展示设计器临时上传的图片、绑定大屏与过期时间。上传按钮只产生公共素材；
+临时素材只能从设计器产生。删除仍由后端引用扫描强制，被引用时返回 409 与 `refScreens`。
+编辑页右下角的「素材」入口会先落地自动保存，再带返回线索进入；素材页的「返回大屏」回到
+原编辑页。
+
+**设计器左栏**由三端逐字共享的 `src/screen/asset-library.ts` 渲染：列表只返回公共素材 +
+当前大屏临时素材，支持搜索、素材网格、插入/替换/设为背景；管理动作（上传公共素材、删除）
+留在后台页。图片 Tab 的「临时上传」把文件写到当前大屏名下，卡片带「临时」标记；临时素材
+不进入公共目录，其他大屏的设计器看不到。选择器的临时上传与左栏一致。
+
 组件图片只写入 `host-resource` 身份（`resourceType: 'host_image'` + 素材 id），文档不保存 URL；
-`host-data-channel.ts` 按当前 API Base 把它解析成稳定内容 URL，查看页复用同一条解析。
+`host-data-channel.ts` 按当前 API Base 把它解析成稳定内容 URL，查看页复用同一条解析。临时素材
+设为背景时仍走画布背景的 URL 例外；引用扫描同时覆盖组件身份与背景 URL。
 
 检查器的「选择素材」与画布背景的「选择图片」共用统一选择桥：Engine 派发
 `base-screen-host-resource-selection-request`，宿主打开同一个素材选择器后调用
 `commitHostResourceSelection`；画布背景提交 `url` 变体并把 fit 落到 `cover`，组件提交
 `host-resource` 身份。组件目标要求没有 `dataValue` 键（契约禁止两种取值写法并存）。
 
-素材后端在 `examples/shared-backend/src/assets/`：空表时生成六张演示 PNG，上传只接受
-PNG / JPEG / WebP / GIF 并校验文件头；删除前扫描已保存文档中的 `host_image` 引用与画布背景的
-内容 URL，被引用时返回 `409 ASSET_IN_USE` 与 `refScreens`。
+**临时素材生命周期**：默认 7 天有效；大屏保存时对仍被文档引用的临时素材续期；删除大屏时
+删除该屏绑定且不再被任何屏引用的临时素材；`AssetCleanupService` 每小时回收过期且无引用的
+临时素材（仍被引用的会续期）。执行间隔可用 `ASSET_CLEANUP_INTERVAL_MS` 覆盖，`0` 关闭
+（测试用）。示例不做鉴权，`screenId` 过滤只是应用层可见性；生产宿主必须把屏幕访问权限与
+素材权限一起校验。
+
+素材后端在 `examples/shared-backend/src/assets/`：空表时生成六张演示 PNG；上传只接受
+PNG / JPEG / WebP / GIF 并校验文件头；`GET /api/assets` 默认只返回公共素材，`?screenId=`
+返回公共 + 该屏临时，`?scope=temporary` 供后台筛选。删除前扫描已保存文档中的 `host_image`
+引用与画布背景的内容 URL，被引用时返回 `409 ASSET_IN_USE` 与 `refScreens`。
 
 ### 在线物料与自定义组件（ADR-0090）
 
@@ -657,6 +686,16 @@ cp my-data.db examples/shared-backend/data/datasources/
 | A37 | 根测试 `tests/examples/datasource-contract.test.ts` | 内置条目取自 `DATASET_DEFINITIONS`、自建参数取自 `parametersToDefinitions` → 过 Entries/Definition/Tabular 三个解析器；`description:null` 合法、空串非法、tabular 多一个键非法 |
 | A38 | 根测试 `tests/examples/vanilla-datasource-route.test.ts` | `#/datasources` 与 `?type=sqlite` 命中；`#/datasources/x` not-found；`#/screens/:id/edit`、`?line=` 行为不变 |
 | A39 | 根测试 `tests/examples/datasource-binding.test.ts` | `custom.*` 文档通过 `parseScreenDocument`；绑定字段都在 `fields` 内 → 通过，缺字段/角色不足 → `HOST_DATASET_BINDING_INVALID`（角色取自 `PLUGIN_BOARD_STATUS_GRID_MANIFEST`，不手抄） |
+
+### 素材后台与临时上传（A40–A44）
+
+| 项 | 覆盖位置 | 断言要点 |
+| --- | --- | --- |
+| A40 | 三端 smoke（N 段） | `#/assets` 导航高亮、6 条公共种子、公共素材上传/删除、临时素材空态 |
+| A41 | 三端 smoke（N 段） | 设计器临时上传后卡片带「临时」标记；插入并保存后文档只含 `host_image` 身份；后台临时筛选显示绑定大屏 |
+| A42 | 三端 smoke（N 段）+ `assets.e2e-spec` | 被引用的临时素材删除返回 409 + `refScreens`；保存大屏后续期 |
+| A43 | 三端 smoke（N 段）+ `assets.e2e-spec` | 删除大屏后该屏未再引用的临时素材被清理；过期 sweep 不删除仍被引用的素材；公共素材不受影响 |
+| A44 | 根测试 `host-asset-library.test` | 三端共享文件逐字一致；上传校验、来源标签、409 引用屏解析 |
 
 > 未列出的子项（配色对比度、字号、动画节奏等纯视觉项）由人眼验收，不进自动化。
 

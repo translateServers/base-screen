@@ -56,9 +56,9 @@ shared-backend/
 | `GET /api/screens/:id` | — | `{ screen: Screen }` | `404 NOT_FOUND` |
 | `PUT /api/screens/:id` | `{ document, revision }` | `{ screen: Screen }`（revision+1） | `404 NOT_FOUND` / `409 REVISION_CONFLICT` / `400 DOCUMENT_INVALID` |
 | `DELETE /api/screens/:id` | — | `{ ok: true }` | `404 NOT_FOUND` |
-| `GET /api/assets` | — | `{ assets: [{ id, name, mimeType, byteSize, contentPath, referenceCount, createdAt }] }` | — |
-| `POST /api/assets` | multipart `file` | `201 { asset: Asset }` | `400 ASSET_TYPE_UNSUPPORTED` / `ASSET_CONTENT_INVALID`；超过 5 MB 为 `413` |
-| `GET /api/assets/:id/content` | — | PNG / JPEG / WebP / GIF 二进制（`Cache-Control: immutable`） | `404 ASSET_NOT_FOUND` |
+| `GET /api/assets` | 可选 `?scope=temporary`、`?screenId=` | `{ assets: [Asset] }`（无参数仅公共；`screenId` 返回公共 + 该屏临时；`scope=temporary` 返回全部临时） | `400 ASSET_SCOPE_INVALID` / `404 SCREEN_NOT_FOUND` |
+| `POST /api/assets` | multipart `file`；可选 `?scope=temporary&screenId=` | `201 { asset: Asset }`（带临时参数时写入当前大屏） | `400 ASSET_TYPE_UNSUPPORTED` / `ASSET_CONTENT_INVALID` / `ASSET_SCOPE_INVALID`；超过 5 MB 为 `413` |
+| `GET /api/assets/:id/content` | — | PNG / JPEG / WebP / GIF 二进制（公共 `Cache-Control: immutable`；临时 `no-store`） | `404 ASSET_NOT_FOUND` |
 | `DELETE /api/assets/:id` | — | `{ deleted: true, id }` | `404` / `409 ASSET_IN_USE` + `refScreens` |
 | `GET /api/material-packages` | — | `{ packages: [{ id, type, name, code, manifest, revision, ... }] }` | — |
 | `POST /api/material-packages` | `{ type, name, manifest, code }` | `201 { package }` | `400`（命名空间/Manifest/代码） / `409 MATERIAL_TYPE_EXISTS` |
@@ -76,8 +76,11 @@ shared-backend/
 | `POST /api/demo/alarms/reset` | — | `201 { revision, alarms }` | — |
 
 `Screen = { id, name, revision, document, createdAt, updatedAt }`（时间为 ISO 字符串）。
-`Asset` 只暴露宿主展示元数据与相对内容路径；文档里只保存 `host_image` 的
-`resourceType` + `resourceId`，不保存 `contentPath` 或任何 URL。错误体统一 `{ error, message }`。
+`Asset = { id, name, mimeType, byteSize, contentPath, referenceCount, temporary, screenId,
+screenName, expiresAt, createdAt }`。`temporary=true` 是设计器临时上传，绑定当前大屏并默认
+7 天有效；公共素材的 `screenId/screenName/expiresAt` 为 `null`。文档里只保存 `host_image`
+的 `resourceType` + `resourceId`，不保存 `contentPath` 或任何 URL。示例不做鉴权，
+`screenId` 过滤只是应用层可见性。错误体统一 `{ error, message }`。
 指标目录：`cpu_usage`（%）、`memory_usage`（%）、
 `request_rate`（req/s），以及成品种子使用的 `sales_total`（万元）、`order_count`（单）、
 `visitor_count`（人）、`conversion_rate`（%）、`target_completion`（%）、
@@ -105,11 +108,17 @@ shared-backend/
 删除前扫描已保存文档中的 `component.type`，被引用返回 `409 MATERIAL_IN_USE` 与 `refScreens`。
 代码与 Manifest 的体积上限分别是 200 KiB / 64 KiB。
 
-素材库在空表时由 `AssetSeedService` 生成六张确定性 PNG（代码见 `src/assets/asset-images.ts`），
-文件落在 `data/assets/`（gitignore），`ASSET_SEED=0` 可关闭，`ASSET_DIR` 可覆盖目录（测试用）。
-上传只接受 PNG / JPEG / WebP / GIF 且会校验文件头；SVG 需要消毒/栅格化，示例不接收。
-删除前扫描所有已保存文档中的 `host_image` 引用与画布背景的内容 URL，被引用时返回
-`409 ASSET_IN_USE` 与 `refScreens`。
+素材库在空表（按公共素材计数）时由 `AssetSeedService` 生成六张确定性 PNG（代码见
+`src/assets/asset-images.ts`），文件落在 `data/assets/`（gitignore），`ASSET_SEED=0` 可关闭，
+`ASSET_DIR` 可覆盖目录（测试用）。上传只接受 PNG / JPEG / WebP / GIF 且会校验文件头；
+SVG 需要消毒/栅格化，示例不接收。删除前扫描所有已保存文档中的 `host_image` 引用与画布背景的
+内容 URL，被引用时返回 `409 ASSET_IN_USE` 与 `refScreens`。
+
+**临时素材**：设计器 `POST /api/assets?scope=temporary&screenId=<id>` 写入，`temporary=true`、
+`expiresAt=now+7d`。`ScreensService.update` 成功后对文档引用的临时素材续期；
+`ScreensService.remove` 删除该屏未再被引用的临时素材；`AssetCleanupService` 每小时扫描
+过期且无引用的临时素材并删除行与文件（仍被引用的续期），`ASSET_CLEANUP_INTERVAL_MS=0`
+可关闭定时器（测试）。
 
 数据源侧同时幂等生成 `data/datasources/city-air.db` 并播种三条只读 SQLite 源
 （`custom.air-live` / `custom.air-trend` / `custom.air-rank`）。它们与用户自建数据源共用
@@ -149,8 +158,11 @@ pnpm --filter @base-screen-example/shared-backend test
 - `test/metrics.service.spec.ts`：确定性断言（同参数同结果）、未知指标失败关闭。
 - `test/app.e2e-spec.ts`：真实 AppModule + 独立 test.db，覆盖
   create/update/409/404 生命周期与统一错误体。
-- `test/assets.e2e-spec.ts`：上传/内容读取/引用扫描/删除保护与未知 id，文件目录由
-  `ASSET_DIR=data/assets/test` 隔离；`test/asset-images.spec.ts` 校验生成的 PNG 结构与确定性。
+- `test/assets.e2e-spec.ts`：上传/内容读取/引用扫描/删除保护与未知 id；临时上传按屏过滤、
+  临时内容 `no-store`、保存续期、删屏清理、过期 sweep，文件目录由 `ASSET_DIR=data/assets/test`
+  隔离；`test/asset-images.spec.ts` 校验生成的 PNG 结构与确定性。
+- `test/screens.service.spec.ts`：除 revision/播种/删除外，还断言保存后续期与删屏后清理的
+  Service 调用，以及续期/清理失败不反向报错。
 - `test/material-packages.e2e-spec.ts`：命名空间/Manifest/代码校验、重复类型、revision 乐观锁、
   上下架与引用保护；在线物料不执行代码。
   jest `globalSetup` 自动执行 `prisma migrate deploy`。

@@ -26,6 +26,12 @@ describe('A38 · parseRoute', () => {
     expect(parseRoute('#/datasourcesfoo')).toEqual({ name: 'not-found' });
   });
 
+  it('maps #/assets to the asset admin page', () => {
+    expect(parseRoute('#/assets')).toEqual({ name: 'assets' });
+    expect(parseRoute('#/assets?scope=temporary')).toEqual({ name: 'assets' });
+    expect(parseRoute('#/assets/x')).toEqual({ name: 'not-found' });
+  });
+
   it('keeps the existing screen routes unchanged', () => {
     expect(parseRoute('#/')).toEqual({ name: 'list' });
     expect(parseRoute('')).toEqual({ name: 'list' });

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { AssetsService } from '../src/assets/assets.service';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ScreensModule } from '../src/screens/screens.module';
@@ -65,14 +66,26 @@ function row(overrides: Partial<ScreenRow> = {}): ScreenRow {
   };
 }
 
-async function createService(prisma: ReturnType<typeof createPrismaMock>): Promise<ScreensService> {
+function createAssetsMock() {
+  return {
+    renewTemporaryAssets: jest.fn<Promise<void>, [unknown]>(),
+    deleteTemporaryAssetsForScreen: jest.fn<Promise<number>, [string]>(),
+  };
+}
+
+async function createService(
+  prisma: ReturnType<typeof createPrismaMock>,
+  assets = createAssetsMock(),
+): Promise<{ service: ScreensService; assets: ReturnType<typeof createAssetsMock> }> {
   const moduleRef = await Test.createTestingModule({
     imports: [PrismaModule, ScreensModule],
   })
     .overrideProvider(PrismaService)
     .useValue(prisma as unknown as PrismaService)
+    .overrideProvider(AssetsService)
+    .useValue(assets)
     .compile();
-  return moduleRef.get(ScreensService);
+  return { service: moduleRef.get(ScreensService), assets };
 }
 
 describe('ScreensService', () => {
@@ -82,7 +95,7 @@ describe('ScreensService', () => {
     prisma.screen.createMany.mockResolvedValue({ count: 5 });
     prisma.screen.findFirst.mockResolvedValue({ id: 'screen-alarm' });
     prisma.screenAlarmBinding.upsert.mockResolvedValue({});
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await service.ensureSeed();
 
@@ -218,7 +231,7 @@ describe('ScreensService', () => {
     const prisma = createPrismaMock();
     prisma.screen.findMany.mockResolvedValue([{ name: '默认销售大屏' }, { name: '系统监控大屏' }]);
     prisma.screen.createMany.mockResolvedValue({ count: 3 });
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await service.ensureSeed();
 
@@ -235,7 +248,7 @@ describe('ScreensService', () => {
   it('does not seed when every seed name already exists', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findMany.mockResolvedValue(SEED_SCREENS.map((screen) => ({ name: screen.name })));
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await service.ensureSeed();
 
@@ -246,7 +259,7 @@ describe('ScreensService', () => {
     const prisma = createPrismaMock();
     prisma.screen.findMany.mockResolvedValue(SEED_SCREENS.map((screen) => ({ name: screen.name })));
     prisma.screen.findFirst.mockResolvedValue({ id: 'screen-alarm' });
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await service.ensureSeed();
 
@@ -268,7 +281,7 @@ describe('ScreensService', () => {
     const prisma = createPrismaMock();
     prisma.screen.findMany.mockResolvedValue(SEED_SCREENS.map((screen) => ({ name: screen.name })));
     prisma.screen.findFirst.mockResolvedValue(null);
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await service.ensureSeed();
 
@@ -279,7 +292,7 @@ describe('ScreensService', () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(row());
     prisma.screenAlarmBinding.findUnique.mockResolvedValue(null);
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await expect(service.getAlarmBindings('screen-1')).resolves.toEqual({});
   });
@@ -290,7 +303,7 @@ describe('ScreensService', () => {
     prisma.screenAlarmBinding.findUnique.mockResolvedValue({
       config: JSON.stringify({ 'alarm.open': { card: { warning: { color: '#f00' } } } }),
     });
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await expect(service.getAlarmBindings('screen-1')).resolves.toEqual({
       'alarm.open': { card: { warning: { color: '#f00' } } },
@@ -305,7 +318,7 @@ describe('ScreensService', () => {
   it('rejects malformed alarm bindings before any write', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(row());
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     for (const bindings of [
       { 'alarm.open': { card: { fatal: { color: '#f00' } } } },
@@ -324,7 +337,7 @@ describe('ScreensService', () => {
   it('upserts valid bindings and returns the stored shape', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(row());
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
     const bindings = {
       'alarm.open': { card: { warning: { color: '#fa8c16', fontWeight: '700' } } },
     };
@@ -341,7 +354,7 @@ describe('ScreensService', () => {
   it('rejects binding reads and writes for an unknown screen', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(null);
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await expect(service.getAlarmBindings('missing')).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.updateAlarmBindings('missing', {})).rejects.toBeInstanceOf(
@@ -352,7 +365,7 @@ describe('ScreensService', () => {
   it('lists summaries without documents', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findMany.mockResolvedValue([row()]);
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await expect(service.list()).resolves.toEqual([
       {
@@ -367,7 +380,7 @@ describe('ScreensService', () => {
   it('rejects a stale revision with a conflict', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(row({ revision: 4 }));
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await expect(service.update('screen-1', DOCUMENT_INPUT, 3)).rejects.toBeInstanceOf(
       ConflictException,
@@ -377,35 +390,70 @@ describe('ScreensService', () => {
   it('rejects an invalid canonical document', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(row());
-    const service = await createService(prisma);
+    const { service } = await createService(prisma);
 
     await expect(service.update('screen-1', { canvas: 'nope' }, 3)).rejects.toBeInstanceOf(
       BadRequestException,
     );
   });
 
-  it('stores the canonical serialization and increments the revision', async () => {
+  it('stores the canonical serialization, increments the revision, and renews temporary assets', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(row());
     prisma.screen.update.mockImplementation((argument) =>
       Promise.resolve(row({ revision: 4, document: String(argument.data.document) })),
     );
-    const service = await createService(prisma);
+    const { service, assets } = await createService(prisma);
 
     await service.update('screen-1', DOCUMENT_INPUT, 3);
 
     const argument = prisma.screen.update.mock.calls[0]?.[0];
     expect(argument?.data.revision).toEqual({ increment: 1 });
     expect(JSON.parse(String(argument?.data.document))).toMatchObject({ canvas: { width: 1920 } });
+    expect(assets.renewTemporaryAssets).toHaveBeenCalledWith(DOCUMENT_INPUT);
+  });
+
+  it('does not fail a successful save when temporary asset renewal fails', async () => {
+    const prisma = createPrismaMock();
+    const assets = createAssetsMock();
+    assets.renewTemporaryAssets.mockRejectedValue(new Error('db down'));
+    prisma.screen.findUnique.mockResolvedValue(row());
+    prisma.screen.update.mockResolvedValue(row({ revision: 4 }));
+    const { service } = await createService(prisma, assets);
+
+    await expect(service.update('screen-1', DOCUMENT_INPUT, 3)).resolves.toMatchObject({
+      revision: 4,
+    });
+  });
+
+  it('cleans temporary assets after deleting a screen', async () => {
+    const prisma = createPrismaMock();
+    prisma.screen.delete.mockResolvedValue(row());
+    const { service, assets } = await createService(prisma);
+
+    await service.remove('screen-1');
+
+    expect(assets.deleteTemporaryAssetsForScreen).toHaveBeenCalledWith('screen-1');
+  });
+
+  it('does not fail a successful delete when temporary asset cleanup fails', async () => {
+    const prisma = createPrismaMock();
+    const assets = createAssetsMock();
+    assets.deleteTemporaryAssetsForScreen.mockRejectedValue(new Error('db down'));
+    prisma.screen.delete.mockResolvedValue(row());
+    const { service } = await createService(prisma, assets);
+
+    await expect(service.remove('screen-1')).resolves.toBeUndefined();
   });
 
   it('maps an unknown id to not found on read and delete', async () => {
     const prisma = createPrismaMock();
     prisma.screen.findUnique.mockResolvedValue(null);
     prisma.screen.delete.mockRejectedValue({ code: 'P2025' });
-    const service = await createService(prisma);
+    const { service, assets } = await createService(prisma);
 
     await expect(service.get('missing')).rejects.toBeInstanceOf(NotFoundException);
     await expect(service.remove('missing')).rejects.toBeInstanceOf(NotFoundException);
+    expect(assets.deleteTemporaryAssetsForScreen).not.toHaveBeenCalled();
   });
 });

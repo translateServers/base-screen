@@ -1,4 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
+import AssetList from './components/AssetList.vue';
 import DatasourceList from './components/DatasourceList.vue';
 import ScreenEditor from './components/ScreenEditor.vue';
 import ScreenList from './components/ScreenList.vue';
@@ -16,6 +17,12 @@ export const router = createRouter({
       path: '/datasources',
       name: 'datasources',
       component: DatasourceList,
+      meta: { hostShell: true },
+    },
+    {
+      path: '/assets',
+      name: 'assets',
+      component: AssetList,
       meta: { hostShell: true },
     },
     { path: '/screens/:screenId/edit', name: 'edit', component: ScreenEditor },

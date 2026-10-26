@@ -27,6 +27,11 @@ const SMOKE_DATABASE_URL = 'file:../data/smoke-vue.db';
 const BACKEND_PORT = 3210;
 const PREVIEW_PORT = 3221;
 const API_BASE = `http://127.0.0.1:${BACKEND_PORT}/api`;
+// N 段临时素材上传用的最小 PNG（后端只校验魔数；前端卡片不依赖解码尺寸）。
+const SMOKE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6n1kAAAAASUVORK5CYII=',
+  'base64',
+);
 
 function fail(message) {
   throw new Error(`HOST_APP_VUE_SMOKE_FAILED: ${message}`);
@@ -297,14 +302,14 @@ async function main() {
       target.evaluate(() => {
         const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
         const legend = root?.querySelector('[data-board-status-legend] [data-state="fault"]');
-        const board = root?.querySelector('[data-board--viewport]');
+        const board = root?.querySelector('[data-board-viewport]');
         return {
           tiles: root?.querySelectorAll('[data-board-status-tile]').length ?? 0,
           faultLegend: legend?.getAttribute('data-count') ?? null,
           nodes: root?.querySelectorAll('[data-board-pipeline-node]').length ?? 0,
           connectors: root?.querySelectorAll('[data-board-pipeline-connector]').length ?? 0,
-          boardRows: root?.querySelectorAll('[data-board--row]').length ?? 0,
-          visibleRows: board?.getAttribute('data-board--visible-rows') ?? null,
+          boardRows: root?.querySelectorAll('[data-board-row]').length ?? 0,
+          visibleRows: board?.getAttribute('data-board-visible-rows') ?? null,
           emptyNodes: root?.querySelectorAll('[data-board-status-empty]').length ?? 0,
           badges: root?.querySelectorAll('[data-board-degraded-badge]').length ?? 0,
           chip: document.querySelector('[data-viewer-status]')?.textContent ?? '',
@@ -355,9 +360,9 @@ async function main() {
     await alarmDemo.waitForFunction(
       (ids) => {
         const root = document.querySelector('base-screen-viewer')?.shadowRoot ?? null;
-        // 视口不足时 scroll-board 会补空行，`[data-board--row]` 数不等于数据条数；
+        // 视口不足时 scroll-board 会补空行，`[data-board-row]` 数不等于数据条数；
         // 只有真实数据行带 `data-board-row-status`（等级色列启用时）。
-        const dataRows = [...(root?.querySelectorAll('[data-board--row]') ?? [])].filter(
+        const dataRows = [...(root?.querySelectorAll('[data-board-row]') ?? [])].filter(
           (row) => row.dataset.boardRowStatus !== undefined,
         ).length;
         const readingsReady = ids.every((id) => {
@@ -376,7 +381,7 @@ async function main() {
         root?.querySelector(`[data-base-screen-component-id="${id}"]`)?.model ?? null;
       const textOf = (id) =>
         root?.querySelector(`[data-base-screen-component-id="${id}"]`)?.textContent ?? '';
-      const rows = [...(root?.querySelectorAll('[data-board--row]') ?? [])];
+      const rows = [...(root?.querySelectorAll('[data-board-row]') ?? [])];
       const dataRows = rows.filter((row) => row.dataset.boardRowStatus !== undefined);
       const countLevel = (level) =>
         dataRows.filter((row) => row.dataset.boardRowStatus === level).length;
@@ -387,7 +392,7 @@ async function main() {
         rows: rows.length,
         dataRows: dataRows.length,
         visibleRows:
-          root?.querySelector('[data-board--viewport]')?.getAttribute('data-board--visible-rows') ??
+          root?.querySelector('[data-board-viewport]')?.getAttribute('data-board-visible-rows') ??
           null,
         critical: countLevel('critical'),
         warning: countLevel('warning'),
@@ -537,7 +542,7 @@ async function main() {
     await waitTiles(clickPage, 48);
     await clickPage
       .locator('base-screen-board-scroll-board', { hasText: 'B 线·焊装' })
-      .locator('[data-board--row]', { hasText: 'B 线·焊装' })
+      .locator('[data-board-row]', { hasText: 'B 线·焊装' })
       .click();
     await waitTiles(clickPage, 36);
     await clickPage.waitForTimeout(1200);
@@ -1372,6 +1377,130 @@ async function main() {
     }, resourceBaseline);
     if (!resourceRestored) fail('M: 撤销后组件数未回到基线');
 
+    // N) 素材后台：公共上传/删除、临时筛选与删除保护、设计器临时上传、删屏清理。
+    await page.evaluate(() => {
+      window.location.hash = '#/assets';
+    });
+    await page.waitForSelector('[data-asset-admin-row]', { timeout: 25_000 });
+    const assetNav = await page.locator('.shell__tab[aria-current="page"]').innerText();
+    if (assetNav.trim() !== '素材') fail(`N: 素材页导航高亮错误：${assetNav}`);
+    const seededAssetRows = await page
+      .locator('[data-asset-admin-row][data-asset-scope="public"]')
+      .count();
+    if (seededAssetRows !== 6) fail(`N: 公共素材应有 6 条种子，实际 ${seededAssetRows}`);
+
+    await page.locator('[data-asset-admin-scope="temporary"]').click();
+    await page.waitForSelector('[data-asset-admin-empty]', { timeout: 10_000 });
+    const emptyTempText = await page.locator('[data-asset-admin-empty]').innerText();
+    if (!emptyTempText.includes('没有临时素材')) fail(`N: 临时素材空态不对：${emptyTempText}`);
+
+    await page.locator('[data-asset-admin-scope="public"]').click();
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-asset-admin-row]').length === 6,
+      undefined,
+      { timeout: 10_000 },
+    );
+    await page.setInputFiles('[data-asset-admin-upload]', {
+      name: 'smoke-public.png',
+      mimeType: 'image/png',
+      buffer: SMOKE_PNG,
+    });
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-asset-admin-row]').length === 7,
+      undefined,
+      { timeout: 20_000 },
+    );
+    const publicAssetRow = page.locator('[data-asset-admin-row]', { hasText: 'smoke-public' });
+    if ((await publicAssetRow.count()) !== 1) fail('N: 公共素材上传后未出现在列表');
+    await publicAssetRow.locator('[data-asset-admin-delete]').click();
+    await publicAssetRow.locator('[data-asset-admin-confirm]').click();
+    await page.waitForFunction(
+      () => document.querySelectorAll('[data-asset-admin-row]').length === 6,
+      undefined,
+      { timeout: 20_000 },
+    );
+
+    const tempScreenName = '冒烟临时素材大屏';
+    const tempScreenCreated = await dsFetch('/screens', {
+      method: 'POST',
+      body: JSON.stringify({ name: tempScreenName }),
+    });
+    if (tempScreenCreated.status !== 201) {
+      fail(`N: 造临时素材大屏失败 HTTP ${tempScreenCreated.status}`);
+    }
+    const tempScreenId = tempScreenCreated.body.screen.id;
+    dsScreens.push(tempScreenId);
+    await page.evaluate((screenId) => {
+      window.location.hash = `#/screens/${screenId}/edit`;
+    }, tempScreenId);
+    await page.waitForSelector('[data-asset-upload]', { state: 'attached', timeout: 25_000 });
+    await page.setInputFiles('[data-asset-upload]', {
+      name: 'smoke-temp.png',
+      mimeType: 'image/png',
+      buffer: SMOKE_PNG,
+    });
+    await page.waitForFunction(
+      () =>
+        [...document.querySelectorAll('.asset-card')].some((card) =>
+          card.textContent?.includes('smoke-temp'),
+        ),
+      undefined,
+      { timeout: 20_000 },
+    );
+    await page.evaluate(() => {
+      const designer = document.querySelector('base-screen-designer');
+      const tab = designer?.shadowRoot?.querySelector('[data-host-left-panel-group="assets"]');
+      if (tab instanceof HTMLElement && tab.getAttribute('aria-selected') !== 'true') {
+        tab.click();
+      }
+    });
+    await page.waitForTimeout(300);
+    const tempCard = page.locator('.asset-card', { hasText: 'smoke-temp' }).first();
+    const tempAssetId = await tempCard.getAttribute('data-asset-id');
+    if (tempAssetId === null) fail('N: 临时素材卡缺少 data-asset-id');
+    const tempCardText = await tempCard.innerText();
+    if (!tempCardText.includes('临时')) fail(`N: 临时素材卡缺少标记：${tempCardText}`);
+    await tempCard.click();
+    await page.locator('[data-asset-insert]').click();
+    const tempSavedDeadline = Date.now() + 20_000;
+    let tempSaved = false;
+    while (Date.now() < tempSavedDeadline) {
+      const current = await dsFetch(`/screens/${tempScreenId}`);
+      if (
+        current.status === 200 &&
+        JSON.stringify(current.body.screen.document).includes(tempAssetId)
+      ) {
+        tempSaved = true;
+        break;
+      }
+      await page.waitForTimeout(250);
+    }
+    if (!tempSaved) fail('N: 临时素材插入后未进入保存文档');
+
+    await page.evaluate(() => {
+      window.location.hash = '#/assets';
+    });
+    await page.waitForSelector('[data-asset-admin-scope="temporary"]', { timeout: 20_000 });
+    await page.locator('[data-asset-admin-scope="temporary"]').click();
+    const tempAssetRow = page.locator('[data-asset-admin-row]', { hasText: 'smoke-temp' });
+    await tempAssetRow.waitFor({ state: 'visible', timeout: 20_000 });
+    if ((await tempAssetRow.count()) !== 1) fail('N: 后台临时素材筛选中未看到临时素材');
+    const tempAssetRowText = await tempAssetRow.innerText();
+    if (!tempAssetRowText.includes(tempScreenName)) {
+      fail(`N: 临时素材行未显示绑定大屏：${tempAssetRowText}`);
+    }
+    await tempAssetRow.locator('[data-asset-admin-delete]').click();
+    await tempAssetRow.locator('[data-asset-admin-confirm]').click();
+    await page.waitForFunction(
+      () =>
+        (document.querySelector('[data-asset-admin-result]')?.textContent ?? '').includes(
+          '仍被这些大屏引用',
+        ),
+      undefined,
+      { timeout: 20_000 },
+    );
+    if ((await tempAssetRow.count()) !== 1) fail('N: 被引用的临时素材不应被删除');
+
     // 清理：删掉本次 smoke 造的屏与数据源（保持可重复；库本身每次重建）
     for (const screenId of dsScreens) {
       await dsFetch(`/screens/${screenId}`, { method: 'DELETE' });
@@ -1386,10 +1515,14 @@ async function main() {
     ]) {
       await dsFetch(`/datasources/${encodeURIComponent(datasetId)}`, { method: 'DELETE' });
     }
+    const tempAssetsAfterCleanup = await dsFetch('/assets?scope=temporary');
+    if ((tempAssetsAfterCleanup.body?.assets ?? []).length !== 0) {
+      fail('N: 删除大屏后临时素材未清理');
+    }
 
     if (pageErrors.length > 0) fail(`页面存在未捕获错误：${JSON.stringify(pageErrors)}`);
     console.log(
-      'Vue 前端冒烟通过：列表 / 成品屏编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）/ 实时告警演示屏（流水·KPI·等级色块·SSE 着色·宿主资源页面内插入与改绑）/ 数据源管理（台账·筛选·REST 闭环·SQLite 表与 SQL 模式·引用保护·掩码·字段变化）。',
+      'Vue 前端冒烟通过：列表 / 成品屏编辑 / 插件物料 / 数据绑定 / 缩放查看器 / 指标与排行确定性 / 生产监控数据层（灯阵·工序链·告警流水·变量联动·降级·暂停）/ 实时告警演示屏（流水·KPI·等级色块·SSE 着色·宿主资源页面内插入与改绑）/ 数据源管理（台账·筛选·REST 闭环·SQLite 表与 SQL 模式·引用保护·掩码·字段变化）/ 素材后台（公共上传·临时筛选·删除保护·删屏清理）。',
     );
   } finally {
     await browser.close();

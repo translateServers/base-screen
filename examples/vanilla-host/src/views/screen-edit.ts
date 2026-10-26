@@ -14,6 +14,7 @@ import {
   HOST_ASSET_LIBRARY_GROUP_ID,
   type HostAssetLibraryHandle,
 } from '../screen/asset-library';
+import { rememberAssetReturn } from '../screen/asset-return';
 import { createBlueprintCanvas } from '../screen/blueprint-canvas';
 import { rememberDatasourceReturn } from '../screen/datasource-return';
 import { createHostAlarmController, type HostAlarmBindings } from '../screen/host-alarm-controller';
@@ -65,7 +66,12 @@ export const screenEditView: ViewModule = {
       text: '数据源',
       attrs: { type: 'button', 'data-editor-datasources': '' },
     });
-    container.append(stage, datasourcesButton);
+    const assetsButton = el('button', {
+      class: 'button editor-datasource-link editor-assets-link',
+      text: '素材',
+      attrs: { type: 'button', 'data-editor-assets': '' },
+    });
+    container.append(stage, datasourcesButton, assetsButton);
 
     let designer: BaseScreenDesignerElement | undefined;
     let alarms: ReturnType<typeof createHostAlarmController> | undefined;
@@ -235,7 +241,18 @@ export const screenEditView: ViewModule = {
           window.location.hash = '#/datasources';
         })();
       };
+      const onAssets = (): void => {
+        leaving = true;
+        clearSaveTimer();
+        void (async () => {
+          await runSave();
+          if (dirty && !conflicted) await runSave();
+          rememberAssetReturn(`#/screens/${screenId}/edit`);
+          window.location.hash = '#/assets';
+        })();
+      };
       datasourcesButton.addEventListener('click', onDatasources);
+      assetsButton.addEventListener('click', onAssets);
 
       const onConflict = (): void => {
         conflicted = true;
@@ -258,6 +275,7 @@ export const screenEditView: ViewModule = {
 
       detach = (): void => {
         datasourcesButton.removeEventListener('click', onDatasources);
+        assetsButton.removeEventListener('click', onAssets);
         element.removeEventListener(BASE_SCREEN_DESIGNER_BACK_REQUEST_EVENT, onBack);
         element.removeEventListener('base-screen-project-conflict', onConflict);
         element.removeEventListener('base-screen-dirty-change', onDirtyChange);
@@ -275,7 +293,7 @@ export const screenEditView: ViewModule = {
       resourceAuthoring = createHostResourceAuthoringPanel({ designer: element });
       // 浮动面板挂 body：不能塞进框架根节点（Vue 的 fragment anchor 会被打乱）。
       document.body.append(resourceAuthoring.element);
-      assetLibrary = createHostAssetLibrary({ designer: element });
+      assetLibrary = createHostAssetLibrary({ designer: element, screenId });
       element.append(assetLibrary.element);
       onlineMaterials = createOnlineMaterialPanel({ designer: element, runtime });
       document.body.append(onlineMaterials.element);
@@ -302,6 +320,7 @@ export const screenEditView: ViewModule = {
       designer?.remove();
       designer = undefined;
       datasourcesButton.remove();
+      assetsButton.remove();
       stage.remove();
       screenSessionStore.getState().reset();
       logger.debug('edit view released');

@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   Res,
   UploadedFile,
   UseInterceptors,
@@ -15,6 +16,7 @@ import type { Response } from 'express';
 import type { AssetShape, UploadedAssetFile } from './asset.types';
 import { ASSET_MAX_BYTES } from './asset.types';
 import { AssetsService, hostAssetDir } from './assets.service';
+import { ListAssetsQueryDto, UploadAssetQueryDto } from './dto/asset-query.dto';
 
 const UPLOAD_TEMP_DIR = resolve(hostAssetDir(), '.uploads');
 
@@ -24,9 +26,11 @@ export class AssetsController {
   constructor(private readonly assets: AssetsService) {}
 
   @Get()
-  @ApiOperation({ summary: '素材列表（只返回身份与宿主展示元数据，不返回签名 URL）' })
-  async list(): Promise<{ assets: readonly AssetShape[] }> {
-    return { assets: await this.assets.list() };
+  @ApiOperation({
+    summary: '素材列表（默认公共；scope=temporary 查看临时；screenId 取公共 + 本屏临时）',
+  })
+  async list(@Query() query: ListAssetsQueryDto): Promise<{ assets: readonly AssetShape[] }> {
+    return { assets: await this.assets.list(query) };
   }
 
   @Post()
@@ -36,21 +40,28 @@ export class AssetsController {
       limits: { fileSize: ASSET_MAX_BYTES, files: 1 },
     }),
   )
-  @ApiOperation({ summary: '上传图片（PNG / JPEG / WebP / GIF，5 MB 上限）' })
+  @ApiOperation({
+    summary: '上传图片（默认公共；scope=temporary + screenId 时写入当前大屏的临时素材）',
+  })
   @ApiResponse({ status: 400, description: 'ASSET_TYPE_UNSUPPORTED / ASSET_CONTENT_INVALID' })
   async upload(
     @UploadedFile() file: UploadedAssetFile | undefined,
+    @Query() query: UploadAssetQueryDto,
   ): Promise<{ asset: AssetShape }> {
-    return { asset: await this.assets.upload(file) };
+    // 参数组合校验放在 Service 内：multer 临时文件必须在失败路径也被清理。
+    return { asset: await this.assets.upload(file, query) };
   }
 
   @Get(':id/content')
-  @ApiOperation({ summary: '读取素材内容（稳定 URL；宿主可在此换成签名 CDN）' })
+  @ApiOperation({ summary: '读取素材内容（公共长缓存；临时素材不缓存）' })
   async content(@Param('id') id: string, @Res() response: Response): Promise<void> {
     const { buffer, asset } = await this.assets.content(id);
     response.setHeader('Content-Type', asset.mimeType);
     response.setHeader('Content-Length', buffer.length);
-    response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    response.setHeader(
+      'Cache-Control',
+      asset.temporary ? 'no-store' : 'public, max-age=31536000, immutable',
+    );
     response.end(buffer);
   }
 

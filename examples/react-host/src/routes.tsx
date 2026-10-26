@@ -1,6 +1,7 @@
 import type React from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppShell } from './components/app-shell';
+import { AssetListPage } from './components/asset-list';
 import { DatasourceListPage } from './components/datasource-list';
 import { ScreenEditorPage } from './components/screen-editor';
 import { ScreenListPage } from './components/screen-list';
@@ -27,6 +28,14 @@ export function AppRoutes(): React.ReactElement {
         element={
           <AppShell>
             <DatasourceListPage />
+          </AppShell>
+        }
+      />
+      <Route
+        path="/assets"
+        element={
+          <AppShell>
+            <AssetListPage />
           </AppShell>
         }
       />
