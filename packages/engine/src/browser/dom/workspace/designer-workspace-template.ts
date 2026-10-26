@@ -1,7 +1,7 @@
 import { DESIGNER_OPERATION_TEXT } from '../../../common/operations/designer-operation-registry.js';
 import { DESIGNER_UI_TEXT } from '../../../common/ui-text/designer-ui-text.js';
 import { designerIcon } from '../../ui/designer-icons.js';
-import { contextMenuIcon, contextSubmenuIcon } from '../menu/designer-context-menu-icons.js';
+import { menuActionIcon, menuSubmenuIcon } from '../menu/designer-menu-icons.js';
 import { TOGGLE_MENU_ACTIONS } from '../menu/designer-menu-model.js';
 
 export const DESIGNER_ZOOM_PRESETS = [25, 50, 75, 100, 125, 150, 200] as const;
@@ -90,10 +90,25 @@ export function labeledActionButton(
   return `<button type="button" class="topbar-text-button ${extraClass}" data-action="${action}" data-tip="${operation.tooltip}${shortcut}" aria-label="${operation.label}"><span class="topbar-text-button-glyph">${glyph}${spinnerGlyph()}</span><span>${operation.label}</span></button>`;
 }
 
+/**
+ * 菜单动作行：图标列 + 标签 + 快捷键；勾选动作的图标列同时承载 check。
+ * 顶栏下拉与画布右键共用这一个行模板，外观才不会长成两套。
+ */
 export function menuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {
   const operation = DESIGNER_OPERATION_TEXT[action];
+  const icon = menuActionIcon(action);
+  const checkable = TOGGLE_MENU_ACTIONS.has(action);
   const shortcut = 'shortcut' in operation ? `<kbd>${operation.shortcut}</kbd>` : '';
-  return `<button type="button" class="designer-control designer-button designer-menu-item" data-menu-action="${action}" role="menuitem"><span>${operation.label}</span>${shortcut}</button>`;
+  const tone = action === 'delete' ? ' data-menu-tone="danger"' : '';
+  const glyph =
+    icon === undefined ? '' : `<span class="menu-item-glyph">${designerIcon(icon)}</span>`;
+  const check = checkable ? `<span class="menu-item-check">${designerIcon('check')}</span>` : '';
+  return (
+    `<button type="button" class="designer-control designer-button designer-menu-item"` +
+    ` data-menu-action="${action}" role="menuitem"${tone}>` +
+    `<span class="menu-item-icon" aria-hidden="true">${glyph}${check}</span>` +
+    `<span class="menu-item-label">${operation.label}</span>${shortcut}</button>`
+  );
 }
 
 export type DesignerMenuEntry =
@@ -103,9 +118,10 @@ export type DesignerMenuEntry =
 
 export type DesignerContextMenuAction = DesignerMenuEntry;
 
+/** 子菜单触发行与动作行同网格，箭头用图标而不是文本，行高与图标列都保持一致。 */
 export function submenuButton(label: string, entries: readonly DesignerMenuEntry[]): string {
   return `<div class="designer-menu-submenu-wrap">
-    <button type="button" class="designer-control designer-button designer-menu-item designer-menu-submenu-trigger" data-submenu-toggle aria-haspopup="menu" aria-expanded="false" role="menuitem"><span>${label}</span><span class="designer-menu-submenu-arrow" aria-hidden="true">&gt;</span></button>
+    <button type="button" class="designer-control designer-button designer-menu-item designer-menu-submenu-trigger" data-submenu-toggle aria-haspopup="menu" aria-expanded="false" role="menuitem"><span class="menu-item-icon" aria-hidden="true">${designerIcon(menuSubmenuIcon(entries))}</span><span class="menu-item-label">${label}</span><span class="designer-menu-submenu-arrow" aria-hidden="true">${designerIcon('chevron-right')}</span></button>
     <div class="designer-menu designer-submenu" data-submenu hidden role="menu">${menuEntriesHtml(entries)}</div>
   </div>`;
 }
@@ -136,17 +152,9 @@ function menuEntriesHtml(entries: readonly DesignerMenuEntry[]): string {
     .join('');
 }
 
-// 画布右键菜单按右键目标动态组合：'separator' 渲染分组分隔线。
+// 画布右键菜单按右键目标动态组合；行模板与顶栏下拉同源，只有内联的分组来源不同。
 export function contextMenuHtml(actions: readonly DesignerContextMenuAction[]): string {
-  return actions
-    .map((entry) =>
-      entry === 'separator'
-        ? '<div class="designer-menu-separator" data-menu-separator role="separator"></div>'
-        : typeof entry === 'string'
-          ? contextMenuButton(entry)
-          : contextSubmenuButton(entry.label, entry.entries),
-    )
-    .join('');
+  return menuEntriesHtml(actions);
 }
 
 /**
@@ -173,31 +181,6 @@ function contextMenuIconAction(action: 'undo' | 'redo'): string {
       action,
     )}</span></span></button>`
   );
-}
-
-/** 右键菜单动作行：图标列 + 标签 + 快捷键；勾选动作的图标列同时承载 check。 */
-export function contextMenuButton(action: keyof typeof DESIGNER_OPERATION_TEXT): string {
-  const operation = DESIGNER_OPERATION_TEXT[action];
-  const icon = contextMenuIcon(action);
-  const checkable = TOGGLE_MENU_ACTIONS.has(action);
-  const shortcut = 'shortcut' in operation ? `<kbd>${operation.shortcut}</kbd>` : '';
-  const tone = action === 'delete' ? ' data-menu-tone="danger"' : '';
-  const glyph =
-    icon === undefined ? '' : `<span class="menu-item-glyph">${designerIcon(icon)}</span>`;
-  const check = checkable ? `<span class="menu-item-check">${designerIcon('check')}</span>` : '';
-  return (
-    `<button type="button" class="designer-control designer-button designer-menu-item"` +
-    ` data-menu-action="${action}" role="menuitem"${tone}>` +
-    `<span class="menu-item-icon" aria-hidden="true">${glyph}${check}</span>` +
-    `<span class="menu-item-label">${operation.label}</span>${shortcut}</button>`
-  );
-}
-
-function contextSubmenuButton(label: string, entries: readonly DesignerMenuEntry[]): string {
-  return `<div class="designer-menu-submenu-wrap">
-    <button type="button" class="designer-control designer-button designer-menu-item designer-menu-submenu-trigger" data-submenu-toggle aria-haspopup="menu" aria-expanded="false" role="menuitem"><span class="menu-item-icon" aria-hidden="true">${designerIcon(contextSubmenuIcon(entries))}</span><span class="menu-item-label">${label}</span><span class="designer-menu-submenu-arrow" aria-hidden="true">${designerIcon('chevron-right')}</span></button>
-    <div class="designer-menu designer-submenu" data-submenu hidden role="menu">${contextMenuHtml(entries)}</div>
-  </div>`;
 }
 
 export function downloadDesignerDocument(

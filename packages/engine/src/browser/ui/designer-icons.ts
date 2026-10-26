@@ -12,6 +12,7 @@ const ICONS = {
   save: '<path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 4v5h7V4M8 21v-6h8v6"/>',
   play: '<path d="M7 5l12 7-12 7z"/>',
   upload: '<path d="M12 16V4"/><path d="m7 9 5-5 5 5"/><path d="M5 20h14"/>',
+  download: '<path d="M12 4v12"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/>',
   type: '<path d="M5 6h14M12 6v13M9 19h6"/>',
   'chart-line': '<path d="M4 19V5M4 19h16"/><path d="M7 15l4-4 3 2.5 5-6.5"/>',
   'chart-bar': '<path d="M4 20V6M20 20V4M10 20V10M16 20V13"/>',
@@ -46,6 +47,8 @@ const ICONS = {
   trash:
     '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/>',
   copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
+  duplicate:
+    '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/><path d="M14.5 11.5v6M11.5 14.5h6"/>',
   grid: '<path d="M4 9.5h16M4 14.5h16M9.5 4v16M14.5 4v16"/>',
   lock: '<rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
   sliders:
@@ -75,6 +78,7 @@ const ICONS = {
     '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>',
   'check-circle': '<circle cx="12" cy="12" r="9"/><path d="m8.4 12.2 2.6 2.6 4.8-5"/>',
   'x-circle': '<circle cx="12" cy="12" r="9"/><path d="m9.2 9.2 5.6 5.6M14.8 9.2l-5.6 5.6"/>',
+  help: '<circle cx="12" cy="12" r="9"/><path d="M9.7 9.4a2.4 2.4 0 1 1 3.4 2.2c-.8.4-1.1 1-1.1 1.8"/><path d="M12 17.2h.01"/>',
   pencil: '<path d="m4 20 4.5-1 10-10a2.1 2.1 0 0 0-3-3l-10 10z"/><path d="m13.5 7.5 3 3"/>',
   star: '<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>',
   'bring-to-front': '<path d="M4 5h16M12 20V8M7.5 12.5 12 8l4.5 4.5"/>',

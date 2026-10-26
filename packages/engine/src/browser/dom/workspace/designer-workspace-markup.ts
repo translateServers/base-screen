@@ -231,7 +231,7 @@ export function designerWorkspaceMarkup(visibleMaterialCount: number): string {
           <span class="status-divider" aria-hidden="true"></span>
           <button type="button" class="designer-control designer-button status-zoom-trigger" data-menu-toggle="status-zoom" data-status-zoom aria-haspopup="menu" aria-expanded="false" aria-label="${DESIGNER_UI_TEXT.zoomRatio}">100%</button>
           <div class="designer-menu status-zoom-menu" data-menu="status-zoom" hidden role="menu" aria-label="${DESIGNER_UI_TEXT.zoomRatio}">
-            ${DESIGNER_ZOOM_PRESETS.map((percent) => `<button type="button" class="designer-control designer-button designer-menu-item" data-status-zoom-preset="${percent}" role="menuitem"><span>${percent}%</span></button>`).join('')}
+            ${DESIGNER_ZOOM_PRESETS.map((percent) => `<button type="button" class="designer-control designer-button designer-menu-item" data-status-zoom-preset="${percent}" role="menuitem"><span class="menu-item-label">${percent}%</span></button>`).join('')}
           </div>
         </div>
       </footer>

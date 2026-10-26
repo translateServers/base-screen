@@ -347,7 +347,7 @@ export class DesignerMenuController {
     const heading = kind === 'multi' ? contextMenuSummaryHtml(selectedIds.length) : '';
     menu.innerHTML = `${heading}${contextMenuHtml(DESIGNER_CONTEXT_MENU[kind])}${pluginCommandMenuSection(
       pluginItems,
-      { label: DESIGNER_UI_TEXT.contextMenuPlugin, context: true },
+      { label: DESIGNER_UI_TEXT.contextMenuPlugin },
     )}`;
     this.renderContextMenuState();
     menu.hidden = false;

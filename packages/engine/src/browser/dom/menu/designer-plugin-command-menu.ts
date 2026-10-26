@@ -29,7 +29,7 @@ export function renderPluginToolsMenu(
 
 export function pluginCommandMenuSection(
   items: readonly DesignerPluginCommandItem[],
-  options: { readonly label?: string; readonly context?: boolean } = {},
+  options: { readonly label?: string } = {},
 ): string {
   if (items.length === 0) return '';
   const label =
@@ -37,29 +37,22 @@ export function pluginCommandMenuSection(
       ? ''
       : `<div class="designer-menu-section-label" role="presentation">${escapeHtml(options.label)}</div>`;
   return `<div class="designer-menu-separator" data-menu-separator role="separator"></div>${label}${items
-    .map((item) => pluginCommandMenuButton(item, options))
+    .map((item) => pluginCommandMenuButton(item))
     .join('')}`;
 }
 
-export function pluginCommandMenuButton(
-  item: DesignerPluginCommandItem,
-  options: { readonly context?: boolean } = {},
-): string {
+/** 插件命令与内建动作同网格：图标槽用 sparkle，标签与快捷键列位置一致。 */
+export function pluginCommandMenuButton(item: DesignerPluginCommandItem): string {
   const shortcut = item.shortcut === undefined ? '' : `<kbd>${escapeHtml(item.shortcut)}</kbd>`;
   const disabled = item.disabled ? ' disabled' : '';
   const id = escapeHtml(item.id);
   const name = escapeHtml(item.name);
-  const icon =
-    options.context === true
-      ? `<span class="menu-item-icon" aria-hidden="true"><span class="menu-item-glyph">${designerIcon('sparkle')}</span></span>`
-      : '';
-  const label =
-    options.context === true
-      ? `<span class="menu-item-label">${name}</span>`
-      : `<span>${name}</span>`;
   return (
     `<button type="button" class="designer-control designer-button designer-menu-item"` +
     ` data-plugin-command="${id}" role="menuitem"${disabled}>` +
-    `${icon}${label}${shortcut}</button>`
+    `<span class="menu-item-icon" aria-hidden="true"><span class="menu-item-glyph">${designerIcon(
+      'sparkle',
+    )}</span></span>` +
+    `<span class="menu-item-label">${name}</span>${shortcut}</button>`
   );
 }

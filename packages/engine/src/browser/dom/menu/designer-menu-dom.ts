@@ -1,4 +1,3 @@
-import { designerIcon } from '../../ui/designer-icons.js';
 import type { DesignerMenuControllerCallbacks } from './designer-menu-model.js';
 import { TOGGLE_MENU_ACTIONS } from './designer-menu-model.js';
 
@@ -35,37 +34,12 @@ export function renderMenuState(
     const id = control.dataset.menuAction;
     if (id === undefined) continue;
     const state = callbacks.getOperationState(id);
-    if (state !== undefined) {
-      control.hidden = !state.available;
-      control.disabled = !state.enabled;
-      // Set aria-checked for toggle actions
-      if (TOGGLE_MENU_ACTIONS.has(id)) {
-        control.setAttribute('aria-checked', String(state.checked));
-        // Ensure checkmark element exists
-        if (!control.querySelector('.menu-item-check')) {
-          const check = document.createElement('span');
-          check.className = 'menu-item-check';
-          check.setAttribute('aria-hidden', 'true');
-          check.innerHTML = designerIcon('check');
-          control.prepend(check);
-          // Wrap label text
-          const label = document.createElement('span');
-          label.className = 'menu-item-label';
-          // Move text nodes to label (but keep kbd at end)
-          const nodes = Array.from(control.childNodes);
-          for (const node of nodes) {
-            if (
-              node.nodeType === Node.TEXT_NODE ||
-              (node instanceof HTMLElement &&
-                !node.classList.contains('menu-item-check') &&
-                node.tagName !== 'KBD')
-            ) {
-              label.appendChild(node);
-            }
-          }
-          control.insertBefore(label, control.querySelector('kbd'));
-        }
-      }
+    if (state === undefined) continue;
+    control.hidden = !state.available;
+    control.disabled = !state.enabled;
+    // 勾选槽由行模板固定输出，这里只投影状态，不再就地改造 DOM。
+    if (TOGGLE_MENU_ACTIONS.has(id)) {
+      control.setAttribute('aria-checked', String(state.checked));
     }
   }
   renderSubmenuVisibility(menu);

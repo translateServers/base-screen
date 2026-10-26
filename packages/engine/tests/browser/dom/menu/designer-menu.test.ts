@@ -4,6 +4,10 @@ import {
   type DesignerMenuControllerCallbacks,
 } from '../../../../src/browser/dom/menu/designer-menu.js';
 import { contextMenuHtml } from '../../../../src/browser/dom/workspace/designer-workspace.js';
+import {
+  type DesignerMenuEntry,
+  menuPanel,
+} from '../../../../src/browser/dom/workspace/designer-workspace-template.js';
 
 class FakeElement {
   readonly dataset: { baseScreenComponentId?: string };
@@ -497,5 +501,26 @@ describe('DesignerMenuController context menu resolution', () => {
 
     expect(menu.style.left).toBe('580px');
     expect(menu.style.top).toBe('360px');
+  });
+});
+
+describe('designer menu markup', () => {
+  it('renders top menu rows with the same template as the context menu', () => {
+    const entries: DesignerMenuEntry[] = [
+      'undo',
+      'separator',
+      {
+        label: '排列',
+        entries: ['align-left', 'separator', 'distribute-horizontal'],
+      },
+    ];
+    const panel = menuPanel('edit', '编辑', entries);
+
+    // 顶栏下拉与右键菜单共用行模板：图标列、标签、快捷键与子菜单箭头都来自同一渲染器。
+    expect(panel).toContain(contextMenuHtml(entries));
+    expect(panel).toContain('class="menu-item-icon"');
+    expect(panel).toContain('class="menu-item-label"');
+    expect(panel).toContain('designer-menu-submenu-arrow');
+    expect(panel).not.toContain('<span>排列</span>');
   });
 });

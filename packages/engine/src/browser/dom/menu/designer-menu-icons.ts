@@ -1,15 +1,16 @@
 import type { DesignerIconName } from '../../ui/designer-icons.js';
 
 /**
- * 右键菜单的动作图标。只覆盖画布/组件/多选菜单实际出现的动作；
- * 未登记的动作不占图标列（由渲染器判断），不会出现空槽导致的文字错位。
+ * 菜单动作图标。顶栏下拉与画布右键共用同一份登记：未登记的动作不画字形，
+ * 图标槽仍然占位，标签列因此不会因菜单不同而错位。
  */
-const CONTEXT_MENU_ICONS: Readonly<Record<string, DesignerIconName>> = {
+const MENU_ACTION_ICONS: Readonly<Record<string, DesignerIconName>> = {
   undo: 'undo',
   redo: 'redo',
   'select-all': 'select-all',
   paste: 'paste',
   copy: 'copy',
+  duplicate: 'duplicate',
   delete: 'trash',
   group: 'group',
   ungroup: 'ungroup',
@@ -35,14 +36,28 @@ const CONTEXT_MENU_ICONS: Readonly<Record<string, DesignerIconName>> = {
   'align-bottom': 'align-bottom',
   'distribute-horizontal': 'distribute-h',
   'distribute-vertical': 'distribute-v',
+  // 顶栏下拉独有的动作，与顶栏按钮同族：导入/导出取文件进出方向，发布沿用顶栏的上传图标。
+  'project-workspace': 'map',
+  import: 'download',
+  export: 'upload',
+  'project-save': 'save',
+  'project-publish': 'upload',
+  'project-retry': 'reset',
+  'project-cancel': 'close',
+  'edit-position': 'locate',
+  'edit-size': 'fit',
+  'select-layer-up': 'arrow-up',
+  'select-layer-down': 'arrow-down',
+  'toggle-workbench': 'layers',
+  'show-help': 'help',
 };
 
-export function contextMenuIcon(action: string): DesignerIconName | undefined {
-  return CONTEXT_MENU_ICONS[action];
+export function menuActionIcon(action: string): DesignerIconName | undefined {
+  return MENU_ACTION_ICONS[action];
 }
 
 /** 子菜单图标由内容判定，不按本地化文案匹配：文案会改，动作 id 不会。 */
-export function contextSubmenuIcon(
+export function menuSubmenuIcon(
   entries: readonly (string | { readonly entries: readonly unknown[] })[],
 ): DesignerIconName {
   const ids = new Set(entries.filter((entry): entry is string => typeof entry === 'string'));
