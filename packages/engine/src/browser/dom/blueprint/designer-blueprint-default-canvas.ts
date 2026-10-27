@@ -735,11 +735,10 @@ export function createDesignerBlueprintDefaultCanvas(
     };
   }
 
-  function renderGraph(): void {
+  function renderEdgesAndLabels(): void {
     const current = graph();
     edges.replaceChildren();
     labels.replaceChildren();
-    for (const node of layers.querySelectorAll('.designer-blueprint-canvas-node')) node.remove();
     if (current === null) return;
 
     const traced = new Set(traceVisible ? (state?.trace?.executedEdgeIds ?? []) : []);
@@ -796,6 +795,13 @@ export function createDesignerBlueprintDefaultCanvas(
         }
       }
     }
+  }
+
+  function renderGraph(): void {
+    const current = graph();
+    for (const node of layers.querySelectorAll('.designer-blueprint-canvas-node')) node.remove();
+    renderEdgesAndLabels();
+    if (current === null) return;
 
     const failedRules = new Set(state?.trace?.failedRuleIds ?? []);
     for (const node of current.nodes) {
@@ -1226,18 +1232,7 @@ export function createDesignerBlueprintDefaultCanvas(
   }
 
   function renderEdgesOnly(): void {
-    const current = graph();
-    if (current === null) return;
-    edges.replaceChildren();
-    for (const edge of current.edges) {
-      const pathData = edgePath(edge);
-      if (pathData === null) continue;
-      const path = ownerDocument.createElementNS(SVG_NS, 'path');
-      path.classList.add('designer-blueprint-canvas-edge');
-      path.setAttribute('d', pathData);
-      path.dataset.kind = edge.kind;
-      edges.append(path);
-    }
+    renderEdgesAndLabels();
   }
 
   function onPortPointerDown(
