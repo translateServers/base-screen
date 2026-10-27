@@ -506,7 +506,8 @@
   z-index: var(--designer-z-dialog);
   top: calc(100% + 4px);
   left: 0;
-  min-width: 100%;
+  box-sizing: border-box;
+  width: 100%;
   padding: var(--designer-space-2);
   border-radius: var(--designer-radius-4);
   background: var(--designer-surface-overlay);
@@ -524,12 +525,14 @@
 
 .designer-select-option {
   display: flex;
+  box-sizing: border-box;
   width: 100%;
   min-height: 28px;
   align-items: center;
   justify-content: space-between;
   gap: var(--designer-space-6);
   padding: 0 var(--designer-space-4);
+  overflow: hidden;
   border: 0;
   border-radius: var(--designer-radius-2);
   background: transparent;
@@ -538,6 +541,13 @@
   font-size: var(--designer-font-size-sm);
   font-weight: 500;
   text-align: left;
+  white-space: nowrap;
+}
+
+.designer-select-option > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
